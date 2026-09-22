@@ -253,7 +253,7 @@ Red {Γ = Γ} Q (obs u) b =
 -- NOT ABOUT THIS MODULE.  Every route tried reaches the same wall from a
 -- different side: the obligation names the candidate at the accumulator
 -- type of a fold on a QUANTIFIED path, so it stands in no relation to
--- the type this recursion runs on.  The five are recorded below because
+-- the type this recursion runs on.  The six are recorded below because
 -- each looks like the obvious repair for the one before it, and the last
 -- is the one the other four were waiting on.
 --
@@ -265,6 +265,18 @@ Red {Γ = Γ} Q (obs u) b =
 -- statement this module is trying to prove is a statement about a
 -- subscribe cycle that re-enters, and the routes below are the price of
 -- that rather than a sign that the carrier is wrong.
+--
+-- AND A REPAIR HAS TO REMOVE THE PREDICATE, NOT ONE OF ITS SIDES.  The
+-- obvious weakening is to stop re-establishing it in the conclusion, so
+-- that the candidate is contravariant and a fold transports into its own
+-- strengthening; the sink is what defeats it.  A sink is a HYPOTHESIS
+-- and it names the predicate, so the predicate's negative occurrence
+-- there is a positive one here and the mix survives -- the arm would
+-- have to hand a stored value's subscription a sink at the weaker
+-- predicate while holding one at the stronger.  So the shape with a sign
+-- is the one naming no state at all, and what that shape owes is the
+-- fold's cell AT THE MOMENT OF THE READ, which under a push is a moment
+-- the arm that wrote it has not yet left.
 --
 -- DEAD ROUTE: quantifying the predicate inside the arm.  It is
 --   IMPREDICATIVE and no level assignment repairs it: the predicate that
@@ -297,6 +309,16 @@ Red {Γ = Γ} Q (obs u) b =
 --   subscribing an arriving observable is exactly what a structural
 --   reading cannot supply, and recovering it is the fundamental theorem
 --   at an expression drawn from a store rather than from a subterm.
+--
+-- DEAD ROUTE: indexing the candidate by the root program instead of by
+--   a predicate, on the reading that every observable value a run builds
+--   is a `strmᵗ` body drawn from a finite set fixed before the run.  The
+--   reading is false and `Refuted.Domain-Predicate` says why in one
+--   line: a fold's output is built by SUBSTITUTION into a template, so
+--   the arriving observable is an instance of a subterm and not a
+--   subterm, related to nothing in hand structurally or numerically.  It
+--   is the same wall a numeric rank hit, which is the point -- how the
+--   descent is denominated was never what was missing.
 --
 -- DEAD ROUTE: a carrier that does not re-enter a fold's own frame, so
 --   that none of the four is needed.  Refuted by measurement rather than

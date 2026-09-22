@@ -254,22 +254,21 @@ reads once — so re-entrancy is the semantics rather than an artefact of how
 the push was written, and a queue that defers the subscribe reorders while a
 stack that keeps the order interleaves the writes identically. What is left of
 the monster is the store obligation a re-entering subscription creates, with
-five routes dead in `Reducible.agda`; the carrier is no longer in the region.
+six routes dead in `Reducible.agda`; the carrier is no longer in the region.
 
 also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
 
 ### Big picture tier roadmap
 
-- **THE STORE OBLIGATION CARRIED BY THE PROGRAM, NOT BY THE STATE.** The
-  carrier is settled and the obligation is what it leaves: a re-entering
-  subscription writes a fold's cell from inside itself, and five routes for
-  carrying that are dead in `Reducible.agda`. The sixth is not a predicate over
-  states at all. Every observable value a run can build is a `strmᵗ` body under
-  an environment, and that body is a subterm of the ROOT program — a finite set
-  fixed before the run — so a candidate indexed by it says what a stored
-  observable is without naming a state. The invariant comes first: it is a fact
-  about `evalWith`, provable where the tower is not. First; the rest stand over
-  it.
+- **THE STATE PREDICATE OUT OF THE CANDIDATE ALTOGETHER.** Six routes are dead
+  in `Reducible.agda` and they share a wall: the predicate stands at both signs,
+  so a fold's arm transports the environment it holds to neither a stronger nor
+  a weaker one. Dropping the conclusion side is not the repair — the SINK is a
+  hypothesis naming the predicate, which turns its sign over and leaves the mix.
+  What is left is a candidate naming no state, with a fold's cell supplied as an
+  equation by the arm that wrote it, since under a push the writer and the
+  reader are the same call. Probe it before typing it: the arrival side reads a
+  cell no arm is inside. First; the rest stand over it.
 
 - **THE FRESHNESS FACE GAINS THE PREMISE ANY PUSH OWES IT.** A pushing
   subscription writes the nodes its continuation's frames name, however the
