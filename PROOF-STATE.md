@@ -252,16 +252,16 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### Big picture tier roadmap
 
-- **INDEX `Red` BY THE ROOM CEILING, WHICH IS WHAT THE CONNECT'S FOLD NOW
-  COSTS.** Folding the def's values down the registered chains puts the fold
-  family inside the candidate's own recursion, and the descent that covers it
-  is carried where no call can see it: the ceiling rides inside `Red (obs u)`,
-  so it reaches `allRed`, `red-val` and `reducible` by APPLICATION and those
-  three call each other with it absent. Moving the ceiling and its witness out
-  of the arm and into their signatures makes the connect's peel an argument
-  every edge of the cycle carries. No new invariant and no new content — a
-  re-index, in one file, and `make recursion-cover` decides it in seconds
-  before any tower runs.
+- **CARRY THE SATISFACTION THE CONNECT ALREADY COMPUTES, INSTEAD OF
+  RE-DERIVING IT INSIDE THE FOLD.** Folding the def's values down the
+  registered chains put the fold family inside the candidate's own recursion,
+  and the fold re-establishes the candidate at a value by RUNNING it — two
+  edges, `stepFrameAny!` through `allRed` and `inner!` through `red-val`, and
+  no others. The connect binds the def's `StreamSat` and drops it unused,
+  which is what both arms go looking for; threading it through the ten `!`
+  signatures cuts them without touching `Red`. The two reads out of the STORE
+  it cannot reach become leaves of `red-scan-installed`'s shape.
+  `make recursion-cover` decides it in seconds, before any tower runs.
 
 - **RUN THE ORACLE AGAINST THE FIXED CONNECT — THIS LEG IS THE MONSTER.** The
   clause now registers the caller's chain and folds the def's values down the

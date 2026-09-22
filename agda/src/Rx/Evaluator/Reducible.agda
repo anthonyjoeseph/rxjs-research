@@ -128,6 +128,17 @@ Room m sched st = unconn (Sched.slots sched) (EvalSt.connectedShares st) ≤ m
 -- the whole argument turns on -- a subscription derivation in every
 -- state, and the guarantee that everything that derivation emits is
 -- itself reducible at the element type.
+--
+-- DEAD ROUTE: re-indexing this by the room ceiling, so that the
+--   ceiling and its witness leave the observable arm and become
+--   arguments of the four faces that today reach them by APPLICATION.
+--   It does make the connect's peel something every edge of the cycle
+--   carries, and the arm then cannot state its own conclusion.  This
+--   predicate GROWS with the ceiling -- a larger one admits more
+--   states, so it quantifies over more -- while the connect descends
+--   to a SMALLER one.  The def's values therefore come back proven at
+--   the inner ceiling and the arm owes them at the outer; weakening
+--   runs the other way, and no instance of it closes the gap.
 Red : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → Set
 Red unitᵗ     _        = ⊤
 Red boolᵗ     _        = ⊤
