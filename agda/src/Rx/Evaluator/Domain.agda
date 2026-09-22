@@ -967,17 +967,35 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- makes it true rather than what weakens it: without it a scripted
 -- slot connects and moves nothing.
 
--- AND THE HALF THAT READS LIKE A MONOTONICITY THEOREM IS SYNTACTIC.
--- The count is taken over the slot TABLE and the connected set, and
--- neither can move against it: the table has ONE writer in the whole
--- evaluator, the run's own initialisation, and the set is only ever
--- consed, since every state below that initialisation is reached by
--- record update.  So no relation in the cycle can raise the count, and
--- what each builder owes is not a `Freshness.Mono` over the fold
--- relations but two conjuncts in its own Σ result -- the table it
--- hands back is the one it was given, and the set it hands back
--- extends -- discharged where the body is written, the way `RedPush`
--- already carries `RedNode`.
+-- AND THE HALF THAT READS LIKE A MONOTONICITY THEOREM IS TRUE FOR A
+-- SYNTACTIC REASON, WHICH IS NOT THE SAME AS BEING FREE.  The count is
+-- taken over the slot TABLE and the connected set, and neither can
+-- move against it: the table has ONE writer in the whole evaluator,
+-- the run's own initialisation, and the set is only ever consed, since
+-- every state below that initialisation is reached by record update.
+-- The checker cannot read either off a state it was handed, so the
+-- pair is still proven once, as a relation between two states' fields.
+
+-- AND IT IS PROVEN ABOUT THE DERIVATION, WHICH COSTS NO RESULT TYPE
+-- ANYTHING.  Every builder's Σ already carries its own derivation as a
+-- conjunct, and so does the candidate's observable arm, so the fact is
+-- read off what is there rather than added to it: slots definitionally
+-- equal, membership preserved.  Indexing that pair by the two FIELDS
+-- rather than by the two states is not a stylistic choice -- a step
+-- rebuilds the schedule by record update, which is not definitionally
+-- the schedule it came from, so a state-indexed form is refused at the
+-- recursive call.
+
+-- AND MEMBERSHIP-PRESERVATION IS THE FORM THE COUNT WANTS, rather than
+-- a cons.  A step does not connect once; it hands back a set reached
+-- by some number of connects, and what its induction can carry is that
+-- whatever was a member still is.  The antitone form takes exactly
+-- that, and the cons form is its special case at the connect itself.
+
+-- THE RING IS `Freshness.Mono`'S SHAPE, over the same thirteen
+-- subscribe relations clause for clause -- and it has to reach five
+-- more, the fold's, which is also what the two Freshness inductions
+-- themselves come to owe the moment this relation calls a fold.
 
 -- AND THAT IS WHAT PAYS FOR THE RE-SEEDING RATHER THAN ROUTING ROUND
 -- IT.  The count is the OUTERMOST component, so the two accessibilities

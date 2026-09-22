@@ -262,8 +262,9 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
   is RECOVERED rather than owed: the unconnected-share count, arithmetic
   already proven, sits OUTSIDE both, and its monotonicity half is syntactic —
   the slot table has one writer in the evaluator and the connected set is only
-  ever consed. So the leg is the nineteen-member block, two Σ conjuncts per
-  builder carrying table and set forward, and the connect's own call.
+  ever consed. So the leg is the fused candidate-and-fold block, a
+  `Freshness.Mono`-shaped ring reading table and set off derivations every Σ
+  already carries, and the connect's call.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream
