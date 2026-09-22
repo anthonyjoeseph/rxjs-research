@@ -244,46 +244,26 @@ observer is all there is; re-entry is required because only a subscriber the
 burst creates is absent when it is handed back.
 
 also: `dispatchShare⇓` — the fan-out the connect does not enter, which is the
-bug stated as a cone: the two are disjoint today and the first leg's wiring is
-exactly what joins them.
+bug stated as a cone: the two are disjoint today and the wiring that joins them
+is the monster's own leg.
 also: `dispatchShare!` — its inhabitation, same reason.
-also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what the first leg widens, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
+also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg widens, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
 also: `evaluate!` — same, its inhabitation.
 also: `run-wellFormed⇓` — same, the one proof that reads the runner's stream.
 also: `subscribe-shaped` — same; its conclusion gains the new component, which is the widening stated where that proof consumes it.
 
 ### Big picture tier roadmap
 
-- **WIDEN THE CARRIER FIRST, WITH THE SECOND COMPONENT EMPTY EVERYWHERE.** A
-  subscribe answers with a burst at `u` AND a stream already at `t`; landing
-  that shape while every constructor hands back `[]` for the second changes no
-  answer, so the bulk of the leg — every family that answers with a burst, all
-  of their constructors, and their builder and candidate mirrors — is
-  mechanical and is MEASURED by the corpus staying exactly where it is. The
-  root-typed families are already the shape and are untouched. Do it before
-  either change below,
-  because both of them are small diffs on top of it and neither can be read
-  while the carrier is still moving under them.
-
-- **A FLATTENER'S WALK PUSHES EACH INNER WHERE IT IS PRODUCED.** The connect's
-  burst belongs in the fan-out — measured, on three shapes including a nested
-  share — and the only reading of WHERE its emits attach that survives the
-  corpus is that nothing collects them: a walk folds each inner rootward as it
-  consumes it, so a subscribe never holds a burst at `u` and a stream at `t` at
-  once. That is the change, and it is in `consume⇓`/`walk⇓` rather than in the
-  share. A second result component read by a fixed rule is refuted at
-  `sharedConnect⇓` by the corpus's exchanged pair.
-
-- **PUSH BY SEGMENTING THE FLATTENER'S WALK.** The walk hands back ORDERED
-  SEGMENTS — each a group at the element type or a stream already at the root —
-  and `foldPath!`'s own frame clause resolves them, so every call still points
-  down. On the relation side this costs nothing: `thruConsume⇓` and `foldPath⇓`
-  are already one interleaved block. Folding from inside the consume instead is
-  the expensive reading, and a closure does not buy it off — the termination
-  checker has to SEE the fold applied to a structurally smaller path, which an
-  applied argument hides, so that reading puts `reducible` inside the fan-out's
-  block. Segments stand unrefuted: the nested row constrains the SHARE's walk,
-  which already complies.
+- **SEGMENT THE CARRIER: A SUBSCRIBE ANSWERS WITH AN ORDERED LIST OF THEM.**
+  One segment per inner a walk consumes — a burst at `u` paired with the stream
+  that inner already sent to `t` — concatenated in order by `pushBurst⇓` and
+  resolved wherever something folds: `foldPath!`'s frame clause, and `eval-run`
+  at the top, where both are already at `t` and resolving is concatenating. The
+  pair the leg before landed is the ONE-SEGMENT case, so this leg is measured
+  the same way — the corpus cannot move while every root component is `[]`, and
+  the exchanged pair splits only once the leg below fills them. That it reaches
+  the SUBSCRIBE rather than stopping at the walk is a fact about `sub-all`, and
+  is recorded there with the route that would need no carrier at all.
 
 - **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** Nothing
   has to be built: `shareWalk⇓` already re-reads `shareAdmit` against the state

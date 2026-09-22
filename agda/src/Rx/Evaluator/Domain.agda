@@ -843,6 +843,29 @@ data pushBurst⇓ {n} {Γ} {t} {e} where
                   ∷ rest
                 , roots₁ ++ roots₂ , sched₂ , st₂ )
 
+-- THIS IS WHERE A FLATTENER'S TWO INNERS ARE WALKED, AND SO WHERE THE
+-- ORDER BETWEEN THEM IS EITHER KEPT OR LOST.  The outer is subscribed
+-- with the `thru-outer` frame already pushed, and what comes back is
+-- pushed through that frame here -- so an inner that answers with a
+-- burst at `u` and one that answers with a stream already at `t` are
+-- consumed by the same walk, and the result is handed UP as this
+-- subscribe's own answer.  Nothing between here and the root folds.
+-- So a carrier holding one group at `u` beside one stream at `t` has
+-- to pick an order, and the corpus's exchanged pair -- two programs
+-- carrying the same values out of the flattener and out of the share,
+-- answered `[7,1,2]` and `[1,2,7]` -- refutes every fixed pick.  The
+-- order has to be part of the ANSWER, one segment per inner, all the
+-- way up to whoever folds.
+--
+-- DEAD ROUTE: fold each inner rootward inside the consume, so that no
+--   subscribe ever holds both at once and no carrier is needed.  It is
+--   not the module direction that blocks it, which a closure would
+--   escape: the termination checker has to SEE the fold applied to a
+--   structurally smaller path, and an applied function argument hides
+--   exactly that.  Threading the fold in therefore fails on its own
+--   terms, and calling it directly puts `reducible` inside this cycle
+--   -- `stepFrameAny!` reaches `red-val` for values a registry path
+--   carries no candidate for, which `sharedConnect⇓` already records.
 data subscribeAll⇓ {n} {Γ} {t} {e} where
 
   sub-all : ∀ {u lo op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
