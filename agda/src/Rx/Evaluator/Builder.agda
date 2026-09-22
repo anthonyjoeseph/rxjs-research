@@ -47,6 +47,33 @@
 -- implementation in the TypeScript, where the mirror is owed anyway and
 -- a partial function is free; settle the design against rxjs there, and
 -- let this tower be the transcription of something already measured.
+
+-- THE MEASURE A FAN-OUT NEEDS IS NOT THE ONE THE FOLD RUNS ON, AND THE
+-- DIFFERENCE IS WHICH END THE PATH IS ROOTED AT.  A share's sink pushes
+-- into rows read out of the registry, and a row's path is rooted where
+-- the CASCADE began rather than above the frame being stepped -- so the
+-- floor climbs across a fan-out where the fold's own measure needs it to
+-- fall.  Nothing is wrong with that measure; it is answering the other
+-- question.
+
+-- WHAT DOES FALL IS THE COUNT OF SHARED SLOTS NOT YET CONNECTED, AND
+-- THE SHARE'S ONE ODD RULING IS WHAT MAKES IT SO.  A slot connects at
+-- the first subscription and never disconnects, so its mark is written
+-- before its def is subscribed and is never taken back; and the only
+-- door from a subscription into a fan-out is that connect.  A cycle
+-- that closes therefore passes a connect it has not passed before, and
+-- the unconnected slots are a finite set that only shrinks -- so the
+-- measure is that count, lexicographically above the floor the fold
+-- already carries, which is non-increasing everywhere else for the same
+-- reason.
+--
+-- AND THE PREMISE IS MEASURED RATHER THAN ASSUMED, BECAUSE A BOUND
+-- NOTHING REACHES IS NO EVIDENCE.  Run over the differential corpus and
+-- the random draw with a reconnect and a depth bound armed in the
+-- pushing reference: the cycle DOES nest, reaching depth two, and no
+-- run reconnected a slot or outran the count.  What that does not cover
+-- is width -- the draw's programs carry at most three slots, so the
+-- bound was only ever tested against three.
 module Rx.Evaluator.Builder where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)

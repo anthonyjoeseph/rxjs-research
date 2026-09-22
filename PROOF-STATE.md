@@ -251,14 +251,14 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
 
 ### Big picture tier roadmap
 
-- **THE MEASURE FOR THE CYCLE THE FAN-OUT CLOSES.** Now the only question:
-  the arm is statable as it stands, since the registry obligation is born at
-  a registration and spent at a dispatch inside one call, so the proof
-  carries it and the type does not. What is left is that a dispatch can
-  subscribe, and a subscribe can dispatch. The path measure the fold already
-  runs on does not descend through a registry row, whose path is rooted
-  where the cascade began rather than above the frame being stepped. Find
-  the measure, or find the program that shows there is none.
+- **THE RE-THREAD, CARRYING THE MEASURE THE FAN-OUT NEEDS.** The measure is
+  found and written down in `Builder.agda`'s header: the count of shared
+  slots not yet connected, lexicographically above the floor the fold
+  already runs on, sound because a slot connects once and a connect is the
+  only door from a subscription into a fan-out. It cannot land alone —
+  nothing consumes it until the block it measures exists — so it lands with
+  the carrier. That makes this the tier's one big commit, and the leg is
+  sized by it rather than by a row.
 
 - **THE OTHER TWO STORE OBLIGATIONS ARE LEAVES, AND SAYING WHY IS THE LEG.**
   A fold's cell and a bracket's buffer are read back inside a subscribe for
