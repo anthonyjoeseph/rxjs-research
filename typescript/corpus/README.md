@@ -47,7 +47,9 @@ is about and the draw barely reaches it. A fold whose accumulator type contains
 an observable is what makes a scan cell's contents something a reducibility
 argument has to carry; ten of the draw's four hundred emitting programs have
 one, so a green sweep is thin evidence there and a redraw is not to be relied
-on. Nine of the ten agree under both carriers and are here to stay agreeing.
+on. Eight of the ten agree today; the two that do not fail with the region's
+own signature, a strict prefix of what rxjs emits, so they are that bug seen
+from here rather than anything this file is about.
 
 Its last five rows are HAND-BUILT, because the draw reaches the region without
 reaching its hard half: in every drawn row the fold REPLACES its accumulator,

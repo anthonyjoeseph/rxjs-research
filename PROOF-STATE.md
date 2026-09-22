@@ -225,10 +225,11 @@ through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
-random draw and the replay of the pinned corpus are separate steps and both
-are red: 490 of 500 on the draw, 3 of 15 rows on the replay. Neither may be
-narrowed to pass. Every failing case has ONE signature — the evaluator emits
-NOTHING where rxjs emits.
+seed sweep and the replay of the pinned corpus are separate steps and both are
+red: 488 of 500 on the sweep, and on the replay 0 of 11 `burst-carrier`, 3 of 6
+`depth-first`, 13 of 15 `obs-accumulator`. Neither may be narrowed to pass.
+Every failing case has ONE signature — the evaluator emits a strict PREFIX of
+what rxjs emits, usually nothing at all.
 
 ### The monster
 
