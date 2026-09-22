@@ -19,7 +19,8 @@ const flag = (name: string, fallback: number): number => {
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === `--${name}`) return Number(argv[i + 1]);
-    if (argv[i].startsWith(`--${name}=`)) return Number(argv[i].slice(name.length + 3));
+    if (argv[i].startsWith(`--${name}=`))
+      return Number(argv[i].slice(name.length + 3));
   }
   return fallback;
 };
@@ -64,7 +65,10 @@ const main = async (): Promise<void> => {
         `divergent ${bad}  ${Math.round(seen / secs)}/s`,
     );
   }
-  if (batch.length > 0) (await check(batch), (seen += batch.length));
+  if (batch.length > 0) {
+    await check(batch);
+    seen += batch.length;
+  }
   console.log(
     `deep sweep: ${seen} cases (${emitting} emitting), ${bad} divergent, ` +
       `${Math.round((Date.now() - started) / 1000)}s`,
