@@ -1,4 +1,4 @@
-.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-run unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-run unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -1536,6 +1536,23 @@ cli-build: stripped
 # that stopped emitting is red rather than quietly vacuous.
 oracle: cli-build
 	cd typescript && npm run oracle -- $(ARGS)
+
+# THE PINNED ROWS, WHICH THE SWEEP DOES NOT GUARD.  A case is an OFFSET
+# into a deterministic draw, so a generator edit moves every one of them
+# -- a program that caught something keeps being run only until the next
+# draw shifts, and then silently is not.  A row here is replayed by its
+# CONTENT, so it survives that.
+#
+# A ROW IS PINNED BECAUSE SOMETHING WAS LEARNED FROM IT, and what was
+# learned is the commit message's business; the file is NDJSON and can
+# carry no comment, so the FILENAME says what the rows are for and one
+# file holds one finding.  `refuseDuplicates` refuses a row pinned twice,
+# which is what keeps a count read off this directory honest.
+oracle-pinned: cli-build
+	@for f in typescript/cases/*.ndjson; do \
+	  echo "== $$f"; \
+	  (cd typescript && npm run --silent oracle -- --cases "../$$f") || exit 1; \
+	done
 
 qc-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/QuickCheck.agda)
