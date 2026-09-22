@@ -257,14 +257,15 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 - **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** The
   evaluator side is built — `shareWalk⇓` and `shareGo⇓` both — and the
   segmented carrier retired the result type that stopped `sharedConnect⇓`
-  calling either, then ruled out the cheap version, since four of five
-  subscribe arms dropped the root column it would emit into. What is
-  left is ONE measure component, and it is the only one. Routing closes a
-  one-edge cycle through `red-val`, fusing nineteen definitions into one block —
-  and `reducible` re-seeds both of `redExpAcc`'s accessibilities, so nothing
-  already threaded survives the loop. What does is an unconnected-slot count, a
-  function of the STATE, which costs a `Freshness.Mono` over the fold relations
-  before it costs an order.
+  calling either, then ruled out the cheap version, four of five subscribe
+  arms having dropped the root column. What is
+  left is TWO HORNS, and the leg picks one. Calling the builder's fold owes no
+  candidate but closes a cycle through `red-val` that re-seeds both of
+  `redExpAcc`'s accessibilities, so only a state-dependent unconnected-slot
+  count funds it — a `Freshness.Mono` over the fold relations first.
+  A reducibility-side fold closes no cycle and owes `RedNode` at `scan-f`, the
+  one frame of six that is not `⊤`. That is the region left: a share whose
+  registered subscriber carries a `scan`.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream

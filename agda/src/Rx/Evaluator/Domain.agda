@@ -965,6 +965,28 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- runs in.  The step itself is the cheap end: `connectedShares` is
 -- consed by the two connect arms and by nothing else.
 
+-- ALL OF WHICH IS ONE HORN.  The measure is owed only because the fold
+-- being called is the BUILDER'S, and the builder's is the one that
+-- asks nothing of a frame.  A fold written on the REDUCIBILITY side
+-- closes no cycle at all -- it is a member of the candidate's own
+-- recursion and descends with it -- and the price moves instead to
+-- what it must carry: stepping a path read out of the registry wants
+-- `RedFrame` and `RedNode` at every frame on it, and a registry row is
+-- a path and an identifier.
+--
+-- AND THAT IS NARROWER THAN IT SOUNDS, BECAUSE ONE FRAME IS THE WHOLE
+-- OF IT.  `RedFrame` costs nothing at any frame: it is `⊤` at four and
+-- `RedFn` at the two holding a closure, and a closure's `RedFn` is
+-- `redFnAcc` with its accessibilities seeded at their own subjects,
+-- exactly as `reducible` seeds `redExpAcc`.  `RedNode` is `⊤` at five
+-- of six.  What is left is `scan-f`, whose cell holds a VALUE that
+-- leaves the frame, so the obligation is the candidate at the STORED
+-- value and no hypothesis on a registry row says anything about it --
+-- the contrast `redTakeVals`'s header draws against a cell holding a
+-- count.  `RedNode`'s own header refutes all four ways of supplying
+-- it.  So the monster is pinned between two horns, and the region it
+-- is down to is a share whose registered subscriber carries a `scan`.
+
 -- AND THE FAN-OUT IS THE RIGHT ANSWER, WHICH IS MEASURED RATHER THAN
 -- ARGUED.  Delivering the definition's burst value-major, re-reading
 -- the registry between values, reproduces rxjs by hand on all three
