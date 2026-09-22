@@ -294,13 +294,23 @@ RedFn : ∀ {n} {Γ : Ctx n} → StPred Γ → ∀ {s u} → FnClo Γ s u → Se
 RedFn {Γ = Γ} Q {s = s} {u = u} fn =
   ∀ {v : Val Γ s} → Red Q s v → Red Q u (applyClo fn v)
 
--- WHAT A FRAME'S OWN NODE MUST HOLD, AND IT IS ONLY EVER THE FOLD
--- THAT ASKS.  The node census says every other frame reads a store
--- that carries no payload -- a count, a flag, an identifier, a queue
--- nothing in a subscribe reads back -- so its obligation is the
--- trivial one and costs a `tt` at every site.  The fold's cell holds a
--- VALUE, and the value it holds is what leaves the frame, so this is
--- where the candidate has to already be true of the store.  Stating it
+-- WHAT A FRAME'S OWN NODE MUST HOLD, AND TWO FRAMES ASK.  The node
+-- census says the rest read a store carrying no payload -- a count, a
+-- flag, an identifier -- so their obligation is the trivial one and
+-- costs a `tt` at every site.  The fold's cell holds a VALUE and the
+-- value it holds is what leaves the frame; a merge's QUEUE holds the
+-- arrivals it refused, and under a push those are read back inside the
+-- very subscribe that parked them, because the drain hangs off a
+-- completion that now arrives before the subscribe has returned.  A
+-- carrier handing a finished list back read the queue only afterwards,
+-- which is why this arm used to be trivial too.
+--
+-- AND THE TWO ARE NOT THE SAME COST, WHICH THE STATEMENT SHOWS.  The
+-- queue holds values at the type the sink extending this frame is
+-- already carrying a candidate for, so its conjunct is discharged from
+-- what the arm has in hand.  The cell holds a value at the frame's
+-- OUTPUT type, which stands in no relation to anything the sink
+-- names -- so it is the one that has to be threaded.  Stating it
 -- as a predicate on the state rather than as a hypothesis on the
 -- fold's own statement is what keeps it PRESERVED rather than merely
 -- assumed: the step face re-establishes it at the state it hands back,
@@ -329,11 +339,14 @@ RedNode : ∀ {n} {Γ : Ctx n} → StPred Γ → ∀ {t} {e : Closed Γ t} {s u}
 RedNode {Γ = Γ} Q (scan-f fn nid) st =
   ∀ {w} {a : Val Γ w}
   → lookupNode nid (EvalSt.nodes st) ≡ just (cell-st a) → Red Q w a
+RedNode {Γ = Γ} Q (thru-outer op nid) st =
+  ∀ {v : Ty} {lim act od} {q : List (Val Γ (obs v))}
+  → lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od)
+  → All (Red Q (obs v)) q
 RedNode Q (map-f fn)                  st = ⊤
 RedNode Q (take-f nid)                st = ⊤
 RedNode Q (batchSync-f nid)           st = ⊤
 RedNode Q (from-inner op allNid inst) st = ⊤
-RedNode Q (thru-outer op nid)         st = ⊤
 
 -- A VALUE ENVIRONMENT IS REDUCIBLE WHEN EVERY ENTRY IS.  Terms are
 -- open in a Θ telescope and a frame's closure pairs a term with one
@@ -443,18 +456,25 @@ RedWalk {Γ = Γ} Q {e = e} {u = u} op nid κ now vals w =
 
 -- THE HOP IS PAID FOR BY THE ARRIVING VALUE'S OWN CANDIDATE, which is
 -- what makes this a body rather than a leaf.  A subscribe arm hands
--- the observable down at a `from-inner` frame and splits what comes
--- back; the candidate quantifies over every schedule and every state,
--- so the freshly-counted schedule this arm builds is one of them by
--- construction and no invariant is threaded.  Every OTHER arm emits
--- nothing at all -- a refused arrival is queued, an unusable store
--- collapses -- so its column is satisfied for want of anything to hold
--- of.
-red-consume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-              (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
-              (now : Tick) {o : Val Γ (obs u)} → Red (obs u) o
-            → (sched : Sched Γ) (st : EvalSt e)
-            → RedConsume {e = e} op nid κ now o sched st
+-- the observable down at a `from-inner` frame and subscribes it there;
+-- the candidate quantifies over every carrier, so the freshly-counted
+-- schedule this arm builds is one of them by construction and no
+-- invariant is threaded.  Every OTHER arm subscribes nothing at all --
+-- a refused arrival is queued, an unusable store collapses -- so the
+-- state it hands back is the one it was given and the predicate rides
+-- through.
+--
+-- AND THE INNER NEEDS A SINK OF ITS OWN, which is what the extra
+-- argument is: an inner emits down its own path and that path is this
+-- one with the operator's frame in front, so the hop can only be taken
+-- by something already holding the sink for the path below.
+red-consume : ∀ {n} {Γ : Ctx n} (Q : StPred Γ) {t} {e : Closed Γ t} {u lo}
+              (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t) (φ : ℕ)
+            → Stable {e = e} φ Q
+            → Sink {e = e} (Red Q u) Q κ
+            → (now : Tick) {o : Val Γ (obs u)} → Red Q (obs u) o
+            → (w : W e) → φ ≤ nodeCt (schW w) → Q (stW w)
+            → RedConsume Q {e = e} op nid κ now o w
 red-consume {u = u} mergeAllᵒ nid κ now ro sched st
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing =
@@ -556,13 +576,15 @@ red-walk op nid κ now (r ∷ rs) sched st =
 -- payload to confuse that -- so this frame's node obligation is the
 -- trivial one and the whole content is the value column.
 --
--- AND THE QUEUE IT PUSHES INTO IS WRITE-ONLY FROM HERE, WHICH IS WHY
--- NO STORE INVARIANT IS OWED AT ALL.  A refused arrival is enqueued
--- and never read back within a subscribe: the read is the DRAIN, which
--- hangs off an inner's completion, and `srcFrame` says in a type that
--- a push cycle is entered only from a source former.  So the entry a
--- subscribe stores is one this face can put in and never has to take
--- out.
+-- AND THE QUEUE IT PUSHES INTO IS READ BACK BEFORE THIS CALL RETURNS,
+-- WHICH IS THE CARRIER AND NOT THE OPERATOR.  A refused arrival is
+-- enqueued and the read is the DRAIN, which hangs off an inner's
+-- completion -- and a completion now arrives while the subscribe that
+-- provoked it is still on the stack.  So the entry this face stores is
+-- one it has to be able to take out again, and the obligation is on the
+-- node rather than on the caller.  What makes it cheap is the TYPE: the
+-- queue holds observables at the element type this frame is already
+-- carrying a candidate for.
 red-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
            (now : Tick) (op : AllOp) (nid : NodeId)
            (κ : Path Γ lo u t)
