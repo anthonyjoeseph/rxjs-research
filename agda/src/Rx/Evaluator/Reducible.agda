@@ -1134,6 +1134,17 @@ foldVSegs! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo ℓ}
 -- the caller's, so the accessibility is built here rather than
 -- threaded: the two runs are over disjoint stretches of the path and
 -- neither is below the other.
+--
+-- AND THE RE-SEED IS ONE OF EXACTLY TWO EDGES HOLDING THE EVALUATOR'S
+-- CYCLE OPEN, which is worth saying here because the descent it drops
+-- is one the code already performs.  `red-consume` applies this fold at
+-- `κ`, and the `foldPath!` clause that reached it was at `fr ↠[ h ] κ`
+-- -- one frame larger.  So the missing fact is not a measure but a
+-- SIGHTLINE: `FoldFn` carries the slot accessibility and not the
+-- floor's, so this seeds where it could take the caller's, and the
+-- application is through a closure where Agda would want a call.  The
+-- repair is the boundary, not the mathematics -- which is the one
+-- respect this edge differs from the candidate's, priced at `allRed`.
 foldAnyPath! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → FoldFn e
 
 dispatchShare! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fin n}

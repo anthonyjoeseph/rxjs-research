@@ -148,12 +148,19 @@ open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeI
 -- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF A PUSH CYCLE.  A
 -- push cycle steps the frame it was handed, and what hands it one is a
 -- source former -- the map, the take, the bracket, the scan, the outer
--- of an operator.  The inner's own frame is never pushed: a subscribe
--- returns the inner's synchronous burst UP to its caller as values, and
--- the frame is walked later, by the instant loop, down a path the
--- registry holds.  So the completion side -- react, finish, drain, and
--- the queued subscribe they end in -- is not reachable from a subscribe
--- at all, and the cycle that a measure was owed for does not exist.
+-- of an operator.  The inner's own frame is never pushed: the frame is
+-- walked later, by the instant loop, down a path the registry holds.
+--
+-- WHAT THE TYPE NO LONGER BUYS IS THE SEPARATION OF THE TWO HALVES, and
+-- reading it as if it still did is the trap this says out loud.  The
+-- arrangement that retired the measure had a subscribe hand its inner's
+-- synchronous burst UP to its caller, which is what kept the completion
+-- side out of a subscribe's reach.  A subscribe now folds its answer
+-- down the path where it produces it, because a frame with a cell counts
+-- what crosses it and the deferred route is one value late -- so react,
+-- finish and drain ARE reachable from a subscribe, in three hops, and
+-- the drain reaches back through the candidate at a stored observable.
+-- The `⊥` still holds: what it refuses is a frame, not a cycle.
 
 -- AND THAT IS PRECISELY WHAT A SHARE'S FAN-OUT AT THE CONNECT WOULD
 -- SPEND, WHICH IS WHY IT IS WORTH PRICING HERE RATHER THAN DISCOVERING
