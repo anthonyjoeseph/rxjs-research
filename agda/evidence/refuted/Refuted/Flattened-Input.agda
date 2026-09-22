@@ -23,7 +23,7 @@
 module Refuted.Flattened-Input where
 
 open import Data.Fin using (zero)
-open import Data.List using (List; []; _∷_; concat; map; length)
+open import Data.List using (List; []; _∷_; _++_; concat; map; length)
 open import Data.Maybe using (Maybe; nothing)
 open import Data.Nat using (ℕ; zero)
 open import Data.Product using (_,_; proj₁; proj₂)
@@ -67,15 +67,21 @@ prog = elaborate κ₁ src
 rootRun = reducible prog []ᵉ tt (root {lo = 1}) 0
             (sched-init prog ins₁) (st-init prog)
 
-burst₀ = proj₁ (proj₁ rootRun)
-st₀    = proj₂ (proj₂ (proj₁ rootRun))
+-- THE WHOLE SUBSCRIBE ANSWER, not its first component.  A subscribe
+-- answers with a burst at its own element type AND a stream already at
+-- the root, and which of the two a value comes back in is a property of
+-- the carrier rather than of this program.  Reading only the burst
+-- would leave this refutation to weaken silently the day the root
+-- component starts carrying anything.
+rootEmits = proj₁ (proj₁ rootRun) ++ proj₁ (proj₂ (proj₁ rootRun))
+st₀       = proj₂ (proj₂ (proj₂ (proj₁ rootRun)))
 
 regLive : List ℕ
 regLive = map (λ r → regSource (proj₁ (proj₂ r))) (EvalSt.registry st₀)
 
 S₀ : Maybe ProtocolSt
 S₀ = runProtocol protocol-init
-       (decodeStream {Γ = plainᵏ Γ₁ κ₁} {a = natᵗ} (concat burst₀))
+       (decodeStream {Γ = plainᵏ Γ₁ κ₁} {a = natᵗ} (concat rootEmits))
 
 Sfull : Maybe ProtocolSt
 Sfull = runProtocol protocol-init
@@ -86,7 +92,7 @@ Sfull = runProtocol protocol-init
 saw-count : length regLive ≡ 1
 saw-count = refl
 
--- the ROOT BURST ALONE is already rejected -- no drain involved
+-- the SUBSCRIBE'S OWN EMITS ALONE are already rejected -- no drain involved
 saw-root : S₀ ≡ nothing
 saw-root = refl
 
