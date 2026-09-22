@@ -252,9 +252,11 @@ also: `dispatchShare!` — its inhabitation, same reason.
 - **WIDEN THE CARRIER FIRST, WITH THE SECOND COMPONENT EMPTY EVERYWHERE.** A
   subscribe answers with a burst at `u` AND a stream already at `t`; landing
   that shape while every constructor hands back `[]` for the second changes no
-  answer, so the bulk of the leg — eleven families, forty-seven constructors,
-  and their builder and candidate mirrors — is mechanical and is MEASURED by
-  the corpus staying exactly where it is. Do it before either change below,
+  answer, so the bulk of the leg — every family that answers with a burst, all
+  of their constructors, and their builder and candidate mirrors — is
+  mechanical and is MEASURED by the corpus staying exactly where it is. The
+  root-typed families are already the shape and are untouched. Do it before
+  either change below,
   because both of them are small diffs on top of it and neither can be read
   while the carrier is still moving under them.
 
