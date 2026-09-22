@@ -289,12 +289,14 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
   since nothing consumes a measure until the block it measures exists.
 
 - **THE REFERENCE RETIRES WITH THE CARRIER.** `ref-eval.ts` is the burst
-  machine, and the moment the Agda pushes it is a superseded predecessor —
-  deleted, not parked, and `ref-push.ts` takes the `--machine ref` name so the
-  transcription check keeps meaning what it says. It is its own leg because
-  the check that entitles every measurement here is the one being rewired, and
-  a leg that both moves the carrier and re-points its judge has nothing left
-  to check itself against.
+  machine and `ref-push.ts` now meets the tier's own closing condition against
+  rxjs — 500/500 on the draw and 15/15 on the pinned rows, where the burst one
+  loses ten and three — so it is a superseded predecessor the moment the Agda
+  pushes: deleted, not parked, with `ref-push.ts` taking the `--machine ref`
+  name so the transcription check keeps meaning what it says. It is its own leg
+  because the check that entitles every measurement here is the one being
+  rewired, and a leg that both moves the carrier and re-points its judge has
+  nothing left to check itself against.
 
 - **ENABLE THE ORACLE IN CI.** Flip the job off `if: false`. It is the leg
   that makes the tier STAY done: until it lands the sweep is a thing somebody
