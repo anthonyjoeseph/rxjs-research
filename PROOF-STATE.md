@@ -251,14 +251,14 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
 
 ### Big picture tier roadmap
 
-- **DOES A SUBSCRIBE EVER DISPATCH TO A ROW IT DID NOT ITSELF REGISTER?** The
-  share's fan-out is the only thing putting registry paths in the candidate's
-  reach, and the registry is read at a CONNECT — an already-connected slot
-  registers and returns without dispatching, and a later emission reaches the
-  fan-out from the arrival loop, outside the arm. So the rows a subscribe can
-  push to may all be ones that subscribe registered, which would move the
-  obligation from the registry to the cascade and put it at types the arm
-  names. Settle that first: it decides whether the arm is statable at all.
+- **THE MEASURE FOR THE CYCLE THE FAN-OUT CLOSES.** Now the only question:
+  the arm is statable as it stands, since the registry obligation is born at
+  a registration and spent at a dispatch inside one call, so the proof
+  carries it and the type does not. What is left is that a dispatch can
+  subscribe, and a subscribe can dispatch. The path measure the fold already
+  runs on does not descend through a registry row, whose path is rooted
+  where the cascade began rather than above the frame being stepped. Find
+  the measure, or find the program that shows there is none.
 
 - **THE OTHER TWO STORE OBLIGATIONS ARE LEAVES, AND SAYING WHY IS THE LEG.**
   A fold's cell and a bracket's buffer are read back inside a subscribe for

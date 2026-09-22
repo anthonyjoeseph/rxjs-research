@@ -177,6 +177,21 @@ Red {Γ = Γ} (obs u) b =
 --   does not save it either: the invariant would stand in a hypothesis,
 --   so the occurrence is negative.
 
+-- AND THE REGISTRY OBLIGATION IS BORN AND SPENT INSIDE ONE CALL, WHICH
+-- IS WHY IT NEED NOT BE IN THIS STATEMENT AT ALL.  A sink exists only as
+-- the root-ward path of a slot's DEF, a def is subscribed only where the
+-- slot is connected, and a slot connects once -- so a fan-out reached
+-- from inside a subscribe fires only while that slot's own connect is on
+-- the stack, and the rows it admits are the ones that same cascade
+-- registered.  Nothing older can be there to push to.  The obligation is
+-- therefore generated at each registration, where the registering
+-- subscribe still holds the candidate for the path it is registering,
+-- and consumed at the dispatch a few frames later; it is an invariant of
+-- the CONSTRUCTION rather than of the store, so it is carried by the
+-- proof and not by the type.  What that leaves open is a MEASURE for the
+-- cycle the dispatch closes, which is a different question from whether
+-- the arm can be written down.
+
 -- THE FLATTENER'S HALF COSTS NOTHING AND THE SHARE'S IS THE WHOLE
 -- QUESTION, WHICH IS NOT HOW IT LOOKED FROM THE STATEMENT.  A merge's
 -- queue holds values at the type this arm is already recursing through,
