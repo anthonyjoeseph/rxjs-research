@@ -253,19 +253,18 @@ Red {Γ = Γ} Q (obs u) b =
 -- NOT ABOUT THIS MODULE.  Every route tried reaches the same wall from a
 -- different side: the obligation names the candidate at the accumulator
 -- type of a fold on a QUANTIFIED path, so it stands in no relation to
--- the type this recursion runs on.  The four are recorded below because
--- each looks like the obvious repair for the one before it, and the
--- fourth is the one that reads as settled.
+-- the type this recursion runs on.  The five are recorded below because
+-- each looks like the obvious repair for the one before it, and the last
+-- is the one the other four were waiting on.
 --
--- SO THE PUSH IS REFUTED BY THE TOWER RATHER THAN BY MEASUREMENT, and
--- the two judges disagree: the differential says the values are right
--- and the descent says the shape is unprovable.  What the carrier owes
--- is a subscribe cycle that does NOT re-enter a fold's own frame, since
--- that is the single property the batching carrier had and the whole of
--- what this statement was spending it on.  That is a question about a
--- CARRIER, answerable where a carrier is cheap -- a reference in the
--- TypeScript, measured against the same draw and the same rows -- and
--- not one to answer by weakening the candidate.
+-- THE CARRIER IS NOT NEGOTIABLE, AND THAT IS A MEASUREMENT RATHER THAN
+-- AN ARGUMENT.  The push is what the semantics IS: a share's subscriber
+-- set has to be re-read BETWEEN two values of one synchronous emission,
+-- because a flattener subscribed by the first must receive the second.
+-- A batching carrier reads it once per emission and cannot.  So the
+-- statement this module is trying to prove is a statement about a
+-- subscribe cycle that re-enters, and the routes below are the price of
+-- that rather than a sign that the carrier is wrong.
 --
 -- DEAD ROUTE: quantifying the predicate inside the arm.  It is
 --   IMPREDICATIVE and no level assignment repairs it: the predicate that
@@ -298,6 +297,17 @@ Red {Γ = Γ} Q (obs u) b =
 --   subscribing an arriving observable is exactly what a structural
 --   reading cannot supply, and recovering it is the fundamental theorem
 --   at an expression drawn from a store rather than from a subterm.
+--
+-- DEAD ROUTE: a carrier that does not re-enter a fold's own frame, so
+--   that none of the four is needed.  Refuted by measurement rather than
+--   by descent: across a 500-case draw a batching carrier is wrong on
+--   exactly the rows that read one shared slot as BOTH a flattener's
+--   outer and its inner, never with a wrong value or a wrong order and
+--   always with no output at all, while the pushing one is right on
+--   every row.  Deferring the subscribe into a queue does remove the
+--   re-entrancy, and it reorders the output: an inner's synchronous
+--   values precede the outer's next value, so a stack that keeps that
+--   order interleaves the writes exactly as the inline push does.
 
 -- THE SAME CARRIER REFUTES THE FRESHNESS FACE'S UNCONDITIONAL FORM, and
 -- the two findings are one fact read from two ends.  A subscription now

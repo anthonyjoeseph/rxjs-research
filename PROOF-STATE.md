@@ -247,29 +247,29 @@ NARROWED AGAIN, on the STATEMENT side. The relation now says the push, so the
 carrier is no longer a question about shape. What is left is whether a tower
 stands over it, and the store is where that bites.
 
-NARROWED FROM THE OTHER END, AND THE TWO JUDGES NOW DISAGREE. The batching
-carrier is refuted by the draw; the INLINE push is refuted by the descent — a
-subscription that steps the frames of its own continuation writes a fold's
-accumulator from inside itself, and four routes for carrying that obligation
-are recorded dead in `Reducible.agda`. So what is left of the monster is not
-whether values are pushed but whether a pushing carrier can avoid re-entering
-a fold's own frame, which is a strictly smaller region than either judge has
-ruled on.
+NARROWED FROM THE OTHER END, AND THE CARRIER QUESTION IS CLOSED. The batching
+carrier's refutation has ONE mechanism: a share's subscriber set has to be
+re-read between two values of a single synchronous emission, which a batch
+reads once — so re-entrancy is the semantics rather than an artefact of how
+the push was written, and a queue that defers the subscribe reorders while a
+stack that keeps the order interleaves the writes identically. What is left of
+the monster is the store obligation a re-entering subscription creates, with
+five routes dead in `Reducible.agda`; the carrier is no longer in the region.
 
 also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
 
 ### Big picture tier roadmap
 
-- **A CARRIER THAT DOES NOT RE-ENTER A FOLD'S OWN FRAME, MEASURED BEFORE IT IS
-  PROVEN.** The inline push is refuted by the descent, not by the draw: four
-  routes for carrying a fold's accumulator obligation are dead in
-  `Reducible.agda`'s header. What the batching carrier had, and the whole of
-  what the candidate spent it on, is that a subscription never stepped a frame
-  of its own continuation. A TRAMPOLINED push — emissions queued at the
-  outermost subscribe, drained in creation order — keeps the values the draw
-  says the batch loses and may keep that property too. A carrier is cheap in
-  the TypeScript, so settle it there: a reference beside `ref-push.ts`, same
-  500-draw, same 15 rows. First — every leg below is stated over it.
+- **THE STORE OBLIGATION CARRIED BY THE PROGRAM, NOT BY THE STATE.** The
+  carrier is settled and the obligation is what it leaves: a re-entering
+  subscription writes a fold's cell from inside itself, and five routes for
+  carrying that are dead in `Reducible.agda`. The sixth is not a predicate over
+  states at all. Every observable value a run can build is a `strmᵗ` body under
+  an environment, and that body is a subterm of the ROOT program — a finite set
+  fixed before the run — so a candidate indexed by it says what a stored
+  observable is without naming a state. The invariant comes first: it is a fact
+  about `evalWith`, provable where the tower is not. First; the rest stand over
+  it.
 
 - **THE FRESHNESS FACE GAINS THE PREMISE ANY PUSH OWES IT.** A pushing
   subscription writes the nodes its continuation's frames name, however the
@@ -277,10 +277,10 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
   the very fold the store question is about. The repair is the premise its
   frame-level members already carry, added across the family; `pushBurst⇓` has
   no subject left and its member goes. It is a leg rather than a fix-up
-  because it is the one piece the carrier verdict cannot move, so it is the
-  work that is safe to land while that verdict is being measured.
+  because it is the one piece the store question cannot move: whatever carries
+  a fold's cell, the premise is owed all the same.
 
-- **THE TOWER RE-THREADED ONTO WHATEVER CARRIER SURVIVES.** Not a re-shaping
+- **THE TOWER RE-THREADED ONTO THE PUSH.** Not a re-shaping
   of results: under any push the subscribe cycle and the fold cycle are ONE
   cycle, spanning the candidate's module and the builder's, so the cut between
   them has to move before a clause can be typed. The measure the fan-out needs
