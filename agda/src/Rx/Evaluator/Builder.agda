@@ -65,6 +65,7 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 chainStep! {n = n} a (lo , path) sched st =
   let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) (arrTick a) path
                   (arrVal a ∷ []) (Arrival.isLast a) sched st
+                  (<-wellFounded _) ≤-refl
   in _ , chain-step f
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
