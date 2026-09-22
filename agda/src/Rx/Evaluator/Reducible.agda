@@ -253,7 +253,7 @@ Red {Γ = Γ} Q (obs u) b =
 -- NOT ABOUT THIS MODULE.  Every route tried reaches the same wall from a
 -- different side: the obligation names the candidate at the accumulator
 -- type of a fold on a QUANTIFIED path, so it stands in no relation to
--- the type this recursion runs on.  The six are recorded below because
+-- the type this recursion runs on.  The seven are recorded below because
 -- each looks like the obvious repair for the one before it, and the last
 -- is the one the other four were waiting on.
 --
@@ -319,6 +319,16 @@ Red {Γ = Γ} Q (obs u) b =
 --   subterm, related to nothing in hand structurally or numerically.  It
 --   is the same wall a numeric rank hit, which is the point -- how the
 --   descent is denominated was never what was missing.
+--
+-- DEAD ROUTE: taking the PATH as that index and recursing on its
+--   length, which is the one quantity the statement already holds.  The
+--   two obligations travel it in opposite directions: a fold's cell sits
+--   on the path and is subscribed at the SUFFIX below its own frame,
+--   which is shorter, while a value the subscription EMITS is subscribed
+--   at an EXTENSION, which is longer.  No single measure descends for
+--   both, and the same objection answers the frame count and the
+--   accumulator types' depth.  An index that serves is one decoupled
+--   from the path and from the type alike.
 --
 -- DEAD ROUTE: a carrier that does not re-enter a fold's own frame, so
 --   that none of the four is needed.  Refuted by measurement rather than

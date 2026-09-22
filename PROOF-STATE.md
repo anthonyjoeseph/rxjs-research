@@ -260,15 +260,16 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
 
 ### Big picture tier roadmap
 
-- **AN INDEX UNDER THE STORE OBLIGATION, WHICH IS WHAT THE SIX ROUTES WANTED.**
-  The candidate has to ASSUME a store fact and RE-ESTABLISH it while that fact
-  names the candidate, so no predicate parameter has one sign and six routes in
-  `Reducible.agda` die of it. The shape that survives is an INDEX: what comes
-  out sits one below what went in. The first act is to find whether the run
-  already carries one — `redExpAcc` descends on a slot floor and on a guarded
-  size — since a fresh index has to be reconciled with `evaluate↓` computing
-  through a `proj₁`, and an approximation that stops at a depth is not a
-  derivation. First; the rest stand over it.
+- **AN INDEX UNDER THE STORE OBLIGATION, DECOUPLED FROM PATH AND TYPE.** The
+  candidate has to ASSUME a store fact and RE-ESTABLISH it while that fact names
+  the candidate, so no predicate parameter has one sign and seven routes in
+  `Reducible.agda` die of it. An index is the shape that survives, and the
+  structural candidates are already among the seven: the path's length descends
+  for a fold's cell, which is subscribed at a suffix, and climbs for an emitted
+  observable, which is subscribed at an extension. So it is a fresh index, and
+  the question to settle before typing one is what a run bounds it BY — an
+  approximation that stops at a depth is not a derivation, and `evaluate↓`
+  computes through a projection.
 
 - **THE FRESHNESS FACE GAINS THE PREMISE ANY PUSH OWES IT.** A pushing
   subscription writes the nodes its continuation's frames name, however the
