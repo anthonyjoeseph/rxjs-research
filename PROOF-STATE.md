@@ -238,19 +238,13 @@ LIST which its caller pushes, rather than values reaching the root as they are
 produced. Everything else in the evaluator is stated in terms of it, and it is
 the one thing here a differential run has actually contradicted.
 
-### Big picture tier roadmap
+NARROWED by a push carrier green on all four pinned rows and 500/500 of the
+draw: the burst is not load-bearing anywhere else. Exactly two clauses do not
+survive it, both named rather than suspected — `batchSync`, which has no burst to read its group off and keeps
+its own buffer, and ARRIVAL DELIVERY, where a value and an end sharing one
+call let a joiner's queue drain ahead of the value handed with it.
 
-- **THE PUSH CARRIER IN THE REFERENCE, DECIDED BY THE POSITION PAIR.** A
-  subscription returns no burst: it pushes each value through its path as the
-  value is produced, so a reaction runs before the source is read again. The
-  position rows are what decide the shape — two inners of one `mergeAll`
-  require opposite output orders, which no fixed channel position and no tail
-  handed to a joiner can give, and a causal thread gives free. `batchSync`'s
-  group moves with it, out of `batchVals` reading a burst and into the node's
-  own state, which is the one place the rewrite can change an answer rather
-  than re-thread one. The reference is where this is cheap; the check that it
-  is still the Agda is `--machine agda --baseline ref`, spent before the
-  rewrite and not after.
+### Big picture tier roadmap
 
 - **A DRAW THAT REACHES THE REGION, BEFORE THE TRANSCRIPTION IS PAID FOR.**
   The reference measured 500/500 against the Agda on the ordinary draw while
@@ -262,6 +256,15 @@ the one thing here a differential run has actually contradicted.
   synchronous multi-value share, a subscription caused by one of those,
   nested shares, a bracket between. That is what makes the next leg's cost
   worth paying rather than a bet on four rows.
+
+- **SPLIT THE ARRIVAL, WHICH IS THE PIECE THE REFERENCE ALREADY DECIDED.** An
+  `Arrival` carries a value and `isLast`, and `chain-step` folds both through
+  one `foldPath⇓`. Under a push carrier that is wrong and the reference proved
+  it: `fromInner` REACTS to an end, so a queued inner subscribed in that
+  reaction emits before the value delivered alongside. So `chainStep⇓` becomes
+  a value step and then an end step, and the share fan-out with it. It sits
+  BELOW `subscribeE⇓` and its shape is settled, which is why it goes ahead of
+  the clause work rather than inside it.
 
 - **THE CARRIER'S SHAPE INTO `Rx.Evaluator.Domain`, AS A TRANSCRIPTION.** Only
   once the reference is green. The relation is where the design is stated and

@@ -4,6 +4,7 @@ import { genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
 import { evaluateRef } from "./ref-eval.js";
+import { evaluatePush } from "./ref-push.js";
 import { readFileSync } from "node:fs";
 
 // THE ORACLE, AND WHAT IT IS AN ORACLE FOR (Anthony: "the sole purpose
@@ -112,6 +113,12 @@ const readCasesFromCli = (): string | undefined => readFlag("cases");
 // whether the reference still IS the Agda, which is the only thing that
 // entitles a measurement taken on the reference to be believed about the
 // tower.  Run it before trusting a reference verdict, never after.
+//
+// `push` IS THE CANDIDATE CARRIER AND IS DELIBERATELY NOT THE AGDA, so
+// `--machine agda --baseline push` is not a transcription check and a
+// divergence there is not a bug -- it is the difference being measured.
+// What decides it is `--machine push --baseline rx`: rxjs is the only
+// authority either carrier answers to.
 const readMachineFromCli = (): string | undefined => readFlag("machine");
 const readBaselineFromCli = (): string | undefined => readFlag("baseline");
 
@@ -255,7 +262,7 @@ async function main() {
   const casesFile = readCasesFromCli();
   const machine = readMachineFromCli() ?? "agda";
   const baseline = readBaselineFromCli() ?? "rx";
-  const known = ["agda", "ref", "rx"];
+  const known = ["agda", "ref", "push", "rx"];
   for (const [flag, v] of [
     ["machine", machine],
     ["baseline", baseline],
@@ -276,11 +283,15 @@ async function main() {
       ? testCases.map((testCase): EvalResult => ({
           values: evaluateRef(testCase),
         }))
-      : which === "rx"
+      : which === "push"
         ? testCases.map((testCase): EvalResult => ({
-            values: evaluatePlain(testCase),
+            values: evaluatePush(testCase),
           }))
-        : await execAgda(testCases.map(serialize));
+        : which === "rx"
+          ? testCases.map((testCase): EvalResult => ({
+              values: evaluatePlain(testCase),
+            }))
+          : await execAgda(testCases.map(serialize));
   if (machine !== "agda" || baseline !== "rx")
     console.log(`comparing ${machine} against ${baseline}`);
   const agdaResults = await run(machine);
