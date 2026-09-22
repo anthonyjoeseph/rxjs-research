@@ -113,7 +113,7 @@
 --   knows.
 module Rx.Evaluator.Domain where
 
-open import Data.Bool using (Bool; true; false; not; _∧_; if_then_else_)
+open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; null)
 open import Data.Bool.ListAction using (any)
