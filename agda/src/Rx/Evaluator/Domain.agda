@@ -985,6 +985,15 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 --   the per-value push was refuted with the root type attached and the
 --   two came apart here: it is the TYPE that kills it, and no carrier
 --   that keeps the root type can be rescued by emitting differently.
+
+-- DEAD ROUTE: schedule the connect's emission as arrivals and let the
+--   DRAIN fan it out, which is attractive because it reuses the one
+--   path already measured to agree with rxjs and leaves the fold on
+--   the side that builds it today.  The exchanged pair refutes it: a
+--   drained emission lands in `eval-run`'s `rest`, after everything
+--   the subscribe produced, so both rows would answer with the share's
+--   values last and one of them answers with them first.  Deferring is
+--   a fixed position under another name, and the pair refutes those.
 data sharedConnect⇓ {n} {Γ} {t} {e} where
 
   connect-live : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
