@@ -238,22 +238,14 @@ LIST which its caller pushes, rather than values reaching the root as they are
 produced. Everything else in the evaluator is stated in terms of it, and it is
 the one thing here a differential run has actually contradicted.
 
-NARROWED BY MEASUREMENT. A draw biased at the region reaches it 8 times in
-500 where the old one reached it 0; the burst carrier fails ALL EIGHT and the
-push carrier none. Predicate and carrier agree exactly, which is what says
-the burst is the mechanism and not one symptom of it. Each carrier also fails
-three rows OUTSIDE the region, overlapping in one — those are other bugs.
+NARROWED BY MEASUREMENT, and one side is now clean. A draw biased at the
+region reaches it 8 times in 500 where the old one reached 0; the burst
+carrier fails all eight and 11 rows in all, the push carrier 0, with the
+pinned corpus green beside it. Predicate and carrier agree exactly, which
+says the burst is the mechanism rather than one symptom. What is left is
+that all of this is measured in TypeScript.
 
 ### Big picture tier roadmap
-
-- **THE THREE ROWS THE BIASED DRAW LEFT RED, AND NONE OF THEM IS THE CARRIER.**
-  All three sit OUTSIDE the region, so whatever they are, the burst is not it.
-  One fails under BOTH carriers — the Agda's own bug, which the old draw never
-  reached. Two fail only under PUSH, and those are what stop the rewrite being
-  a fix rather than a trade: a carrier cannot be transcribed on the strength
-  of eight region rows while it costs two that had nothing to do with the
-  region. Take those two first. The predicate is what makes them cheap to
-  read, because it says where NOT to look.
 
 - **SPLIT THE ARRIVAL, WHICH IS THE PIECE THE REFERENCE ALREADY DECIDED.** An
   `Arrival` carries a value and `isLast`, and `chain-step` folds both through
@@ -263,6 +255,17 @@ three rows OUTSIDE the region, overlapping in one — those are other bugs.
   a value step and then an end step, and the share fan-out with it. It sits
   BELOW `subscribeE⇓` and its shape is settled, which is why it goes ahead of
   the clause work rather than inside it.
+
+- **THE FLOOR BELONGS ON THE JOINING FRAME, AND ONE INDEX ON THE PATH CANNOT
+  SAY IT.** A flattener subscribes its inners at the floor where IT was
+  written, never at the floor of whatever delivered the value — and the two
+  differ exactly when a SHARE is between, since a share's rows are stored at
+  the share's own floor and see fewer slots. An inner subscribed at the
+  delivered floor ENDS instead of reading its input, which reads as a silent
+  program rather than as a scope error. A burst carrier never exposed it,
+  because there the caller supplied the floor. In Agda the floor is one index
+  on `Path Γ lo u t`, so where a joiner's own floor comes from has to be
+  answered before any clause is written.
 
 - **THE CARRIER'S SHAPE INTO `Rx.Evaluator.Domain`, AS A TRANSCRIPTION.** Only
   once the reference is green. The relation is where the design is stated and

@@ -212,7 +212,7 @@ const machine = (ctx: Ty[]) => {
           f.allNode,
           f.inst,
           kappa,
-          lo,
+          f.lo,
           now,
           f.elemTy,
           w,
@@ -222,7 +222,16 @@ const machine = (ctx: Ty[]) => {
       case "thruOuter": {
         // the inners' own values reach the root through their own
         // `fromInner` paths, so nothing passes through here
-        const walked = thruWalk(f.op, f.nid, kappa, lo, now, vals, f.elemTy, w);
+        const walked = thruWalk(
+          f.op,
+          f.nid,
+          kappa,
+          f.lo,
+          now,
+          vals,
+          f.elemTy,
+          w,
+        );
         const r = thruWrap(f.op, f.nid, fin, [], walked.sched, walked.st);
         return {
           vals: [],
@@ -509,7 +518,13 @@ const machine = (ctx: Ty[]) => {
               elemTy,
               {
                 k: "step",
-                frame: { k: "thruOuter", op: "mergeAll", nid, elemTy: exp.ty },
+                frame: {
+                  k: "thruOuter",
+                  op: "mergeAll",
+                  nid,
+                  elemTy: exp.ty,
+                  lo,
+                },
                 rest: kappa,
               },
               installNode(
@@ -570,7 +585,7 @@ const machine = (ctx: Ty[]) => {
     w: W,
   ): Subbed => {
     const nid = freshId("node", w.sched.mint);
-    const frame: Frame = { k: "thruOuter", op, nid, elemTy };
+    const frame: Frame = { k: "thruOuter", op, nid, elemTy, lo };
     const inner = subscribeE(
       src,
       env,
@@ -604,7 +619,7 @@ const machine = (ctx: Ty[]) => {
       obs.env,
       {
         k: "step",
-        frame: { k: "fromInner", op, allNode: allNid, inst, elemTy },
+        frame: { k: "fromInner", op, allNode: allNid, inst, elemTy, lo },
         rest: kappa,
       },
       lo,
@@ -686,53 +701,52 @@ const machine = (ctx: Ty[]) => {
   ): W =>
     os.reduce((acc, o) => thruConsume(op, nid, kappa, lo, now, o, u, acc), w);
 
-  // `mergeAllDrain⇓`.  The shortened queue is written BEFORE the
-  // subscribe, not after the whole drain: rxjs takes the item out of the
-  // buffer before it subscribes it.
+  // `mergeAllDrain⇓`.  THE QUEUE IS RE-READ FROM THE NODE AT EVERY STEP,
+  // and under a push carrier that is not caution.  An inner that
+  // completes INSIDE its own subscribe call re-enters this node and
+  // drains it further, so a carried `queued` goes on to subscribe rows
+  // the re-entrant drain already took -- one queued inner emitting eight
+  // times over.  The burst carrier could carry them safely, because a
+  // synchronous completion reached this node only once the subscribe had
+  // returned; nothing about the drain changed, the moment did.
+  //
+  // The shortened queue is still written BEFORE the subscribe, not after
+  // the drain: rxjs takes the item out of the buffer before subscribing
+  // it, and that is also what the re-entrant call has to see.
   const mergeAllDrain = (
     allNid: NodeId,
     kappa: Path,
     lo: number,
     now: Tick,
-    ty: Ty,
-    limit: number | null,
-    active: number,
-    outerDone: boolean,
-    queued: Val[],
     w: W,
-  ): { active: number; queued: Val[]; w: W } => {
-    if (queued.length === 0) return { active, queued: [], w };
-    if (!hasRoom(limit, active)) return { active, queued, w };
-    const rest = queued.slice(1);
+  ): W => {
+    const node = lookupNode(allNid, w.st.nodes);
+    if (node === undefined || node.k !== "mergeAll") return w;
+    if (node.queued.length === 0 || !hasRoom(node.limit, node.active)) return w;
     const sub = subscribeInner(
       "mergeAll",
       allNid,
-      ty,
+      node.ty,
       kappa,
       lo,
       now,
-      queued[0],
+      node.queued[0],
       {
         ...w,
         st: installNode(
           allNid,
-          { k: "mergeAll", ty, limit, active, queued: rest, outerDone },
+          { ...node, queued: node.queued.slice(1) },
           w.st,
         ),
       },
     );
-    return mergeAllDrain(
-      allNid,
-      kappa,
-      lo,
-      now,
-      ty,
-      limit,
-      sub.done ? active : active + 1,
-      outerDone,
-      rest,
-      sub.w,
-    );
+    return mergeAllDrain(allNid, kappa, lo, now, {
+      ...sub.w,
+      st: {
+        ...sub.w.st,
+        nodes: mergeAllBump(allNid, sub.done, sub.w.st.nodes),
+      },
+    });
   };
 
   // `innerFinish⇓`
@@ -750,29 +764,26 @@ const machine = (ctx: Ty[]) => {
     if (node === undefined || !finishUsable(op, s, inst, node))
       return { fin: false, w };
     if (node.k === "mergeAll") {
-      const drained = mergeAllDrain(
-        allNid,
-        kappa,
-        lo,
-        now,
-        node.ty,
-        node.limit,
-        Math.max(node.active - 1, 0),
-        node.outerDone,
-        node.queued,
-        w,
-      );
+      // the leaving inner comes off the count BEFORE the drain, and the
+      // verdict is read off the node AFTERWARDS -- never off `node`,
+      // which a re-entrant drain may have replaced under us
+      const drained = mergeAllDrain(allNid, kappa, lo, now, {
+        ...w,
+        st: installNode(
+          allNid,
+          { ...node, active: Math.max(node.active - 1, 0) },
+          w.st,
+        ),
+      });
+      const after = lookupNode(allNid, drained.st.nodes);
       return {
         fin:
-          node.outerDone && drained.active === 0 && drained.queued.length === 0,
-        w: {
-          ...drained.w,
-          st: installNode(
-            allNid,
-            { ...node, active: drained.active, queued: drained.queued },
-            drained.w.st,
-          ),
-        },
+          after !== undefined &&
+          after.k === "mergeAll" &&
+          after.outerDone &&
+          after.active === 0 &&
+          after.queued.length === 0,
+        w: drained,
       };
     }
     if (node.k === "switch")

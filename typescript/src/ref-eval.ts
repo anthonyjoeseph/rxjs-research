@@ -344,7 +344,13 @@ const machine = (ctx: Ty[]) => {
             elemTy,
             {
               k: "step",
-              frame: { k: "thruOuter", op: "mergeAll", nid, elemTy: exp.ty },
+              frame: {
+                k: "thruOuter",
+                op: "mergeAll",
+                nid,
+                elemTy: exp.ty,
+                lo,
+              },
               rest: kappa,
             },
             installNode(
@@ -404,7 +410,7 @@ const machine = (ctx: Ty[]) => {
       obs.env,
       {
         k: "step",
-        frame: { k: "fromInner", op, allNode: allNid, inst, elemTy },
+        frame: { k: "fromInner", op, allNode: allNid, inst, elemTy, lo },
         rest: kappa,
       },
       lo,
@@ -793,7 +799,7 @@ const machine = (ctx: Ty[]) => {
     st: EvalSt,
   ): Out => {
     const nid = freshId("node", sched.mint);
-    const frame: Frame = { k: "thruOuter", op, nid, elemTy };
+    const frame: Frame = { k: "thruOuter", op, nid, elemTy, lo };
     const inner = subscribeE(
       src,
       env,

@@ -100,10 +100,28 @@ export type Frame =
   | { k: "scan"; fn: Fn; env: Val[]; nid: NodeId; ty: Ty }
   | { k: "take"; nid: NodeId }
   | { k: "batchSync"; nid: NodeId }
-  | { k: "fromInner"; op: AllOp; allNode: NodeId; inst: NodeId; elemTy: Ty }
-  | { k: "thruOuter"; op: AllOp; nid: NodeId; elemTy: Ty };
+  | {
+      k: "fromInner";
+      op: AllOp;
+      allNode: NodeId;
+      inst: NodeId;
+      elemTy: Ty;
+      lo: number;
+    }
+  | { k: "thruOuter"; op: AllOp; nid: NodeId; elemTy: Ty; lo: number };
 
-// THE FLOOR IS NOT CARRIED ON THE PATH HERE, and that is the one place
+// AND A JOINING FRAME CARRIES ITS FLOOR FOR THE SAME REASON IT CARRIES
+// ITS TYPE.  A flattener subscribes inners in reaction to values, and the
+// floor those inners are subscribed at is the flattener's OWN -- where it
+// was written -- never the floor of whatever delivered the value.  The
+// two coincide until a SHARE is in between: a share's rows are stored at
+// the share's floor, so a value arriving through one carries a floor that
+// can see fewer slots than the program that reacts to it, and an inner
+// subscribed at that floor silently ends instead of reading its input.
+// A carrier that hands the burst back to the caller never exposed this,
+// because there the caller supplied the floor.
+
+// THE FLOOR IS NOT CARRIED ON THE PATH ITSELF, and that is the one place
 // the shape differs from the Agda without the meaning differing.  There
 // the floor is a TYPE index, so `lowerFloor` exists to retype a path a
 // registry row is about to store; here it is an ordinary argument to
