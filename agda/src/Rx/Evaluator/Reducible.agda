@@ -679,9 +679,9 @@ fold (batchRP nid h κ rp) s now vals cs fin sched st rm =
 -- consume built, at any ceiling.
 --
 -- PROBED: `Probed.Stuck-Branches` -- `of(5)` subscribed down a
--- `from-inner` exit frame to the root, at the initial state with the
--- flattener's node installed by hand, through the react, the finish's
--- fold and an empty drain.  Not covered: any state a run reached.
+--   `from-inner` exit frame to the root, at the initial state with the
+--   flattener's node installed by hand, through the react, the finish's
+--   fold and an empty drain.  Not covered: any state a run reached.
 postulate
   stuck-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {S : Set}
               (o : Val Γ (obs u)) (κ′ : Path Γ lo u t) (now : Tick)
@@ -707,8 +707,8 @@ postulate
 -- lowered, at any ceiling.
 --
 -- PROBED: `Probed.Stuck-Branches` -- the empty queue only, which is
--- degenerate.  Not covered: a nonempty queue, the one shape that
--- subscribes anything.
+--   degenerate.  Not covered: a nonempty queue, the one shape that
+--   subscribes anything.
 postulate
   stuck-finish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s lo} {S : Set}
                  (allNid : NodeId) (κ : Path Γ lo s t) (now : Tick)
