@@ -62,8 +62,9 @@ export type Slot =
 export type Slots = Slot[]; // one per Γ slot, index-aligned
 
 // one program's output: the values the exp tree emitted, in order. Both
-// sides (TS-here and Agda-via-CLI) return this per case.
-export type EvalResult = { values: Val[] };
+// sides (TS-here and Agda-via-CLI) return this per case. A `crash` names
+// what the run died at, and its values are then no output at all.
+export type EvalResult = { values: Val[]; crash?: string };
 
 // The serializable unit of differential testing: a whole program.
 // ctx is Γ — the types of the slots, index-aligned with slots.
@@ -204,42 +205,115 @@ const render = (values: Val[]): string => (
 // always the Agda: a reference run puts a transcription there, and a
 // report calling it `agda` would be a lying label on the one output a
 // reader takes a verdict from.
-const interpretResults = (
+//
+// AND A CRASH IS ITS OWN VERDICT, COUNTED BY WHAT IT DIED AT. A run that
+// reached a postulate has no output to compare, so it is neither a match
+// nor a divergence; it fails the sweep all the same. At volume the same
+// postulate is reached by thousands of programs, so what is printed is
+// the count per reason and the SMALLEST few programs for each -- the
+// ones worth pinning -- and the divergences past the first few are
+// counted rather than listed. Only the printing is capped, never the
+// verdict.
+const SHOWN_DIVERGENCES = 20;
+const SHOWN_CRASHES = 3;
+
+type Tally = {
+  n: number;
+  live: number;
+  region: number;
+  valuesOk: number;
+  lengthMismatch?: string;
+  divergences: string[];
+  diverged: number;
+  crashes: Map<string, { count: number; smallest: string[] }>;
+};
+
+const emptyTally = (): Tally => ({
+  n: 0,
+  live: 0,
+  region: 0,
+  valuesOk: 0,
+  divergences: [],
+  diverged: 0,
+  crashes: new Map(),
+});
+
+// the shortest programs first, ties broken by text so the pick is stable
+const keepSmallest = (xs: string[], x: string): string[] =>
+  [...xs, x]
+    .sort((p, q) => p.length - q.length || (p < q ? -1 : p > q ? 1 : 0))
+    .slice(0, SHOWN_CRASHES);
+
+const tallyChunk = (
+  t: Tally,
   agdaResults: EvalResult[],
   rxResults: EvalResult[],
   testCases: TestCase[],
-  lhs: string = "agda",
-  rhs: string = "rx",
-): { report: string; ok: boolean; live: number } => {
+  lhs: string,
+  rhs: string,
+): void => {
   const n = Math.min(agdaResults.length, rxResults.length);
-  const lines: string[] = [];
-  let valuesOk = 0;
-  let live = 0;
+  if (agdaResults.length !== rxResults.length && t.lengthMismatch === undefined)
+    t.lengthMismatch = `${lhs} ${agdaResults.length}, ${rhs} ${rxResults.length}`;
   for (let i = 0; i < n; i++) {
-    const a = render(agdaResults[i].values);
-    const r = render(rxResults[i].values);
+    const at = t.n + i;
     if (agdaResults[i].values.length > 0 || rxResults[i].values.length > 0)
-      live++;
-    if (a === r) {
-      valuesOk++;
+      t.live++;
+    const crash = agdaResults[i].crash ?? rxResults[i].crash;
+    if (crash !== undefined) {
+      const seen = t.crashes.get(crash) ?? { count: 0, smallest: [] };
+      t.crashes.set(crash, {
+        count: seen.count + 1,
+        smallest: keepSmallest(seen.smallest, serialize(testCases[i])),
+      });
       continue;
     }
-    lines.push(`case ${i}: values ✗`);
-    lines.push(`  program     = ${serialize(testCases[i])}`);
-    lines.push(`  ${lhs}.values = ${a}`);
-    lines.push(`  ${rhs}.values = ${r}`);
+    const a = render(agdaResults[i].values);
+    const r = render(rxResults[i].values);
+    if (a === r) {
+      t.valuesOk++;
+      continue;
+    }
+    t.diverged++;
+    if (t.divergences.length < SHOWN_DIVERGENCES * 4)
+      t.divergences.push(
+        `case ${at}: values ✗`,
+        `  program     = ${serialize(testCases[i])}`,
+        `  ${lhs}.values = ${a}`,
+        `  ${rhs}.values = ${r}`,
+      );
   }
-  const region = testCases.slice(0, n).filter(reachesRegion).length;
+  t.region += testCases.slice(0, n).filter(reachesRegion).length;
+  t.n += n;
+};
+
+const crashedCount = (t: Tally): number =>
+  [...t.crashes.values()].reduce((k, c) => k + c.count, 0);
+
+const reportTally = (t: Tally): { report: string; ok: boolean } => {
+  const crashed = crashedCount(t);
   const header =
-    `${n} cases (${live} emitting, ${region} in region):` +
-    ` values ${valuesOk}/${n} match` +
-    (agdaResults.length !== rxResults.length
-      ? ` (LENGTH MISMATCH: ${lhs} ${agdaResults.length}, ${rhs} ${rxResults.length})`
+    `${t.n} cases (${t.live} emitting, ${t.region} in region):` +
+    ` values ${t.valuesOk}/${t.n} match` +
+    (crashed > 0
+      ? `, ${crashed} crashed (${[...t.crashes]
+          .map(([why, c]) => `${why} ${c.count}`)
+          .join(", ")})`
+      : "") +
+    (t.lengthMismatch !== undefined
+      ? ` (LENGTH MISMATCH: ${t.lengthMismatch})`
       : "");
+  const crashLines = [...t.crashes].flatMap(([why, c]) => [
+    `crash ${why}: ${c.count} case(s), smallest ${c.smallest.length}:`,
+    ...c.smallest.map((p) => `  program     = ${p}`),
+  ]);
+  const hidden =
+    t.diverged > SHOWN_DIVERGENCES
+      ? [`(${t.diverged - SHOWN_DIVERGENCES} more divergences not shown)`]
+      : [];
   return {
-    report: [header, ...lines].join("\n"),
-    ok: valuesOk === n && n > 0 && agdaResults.length === rxResults.length,
-    live,
+    report: [...t.divergences, ...hidden, ...crashLines, header].join("\n"),
+    ok: t.valuesOk === t.n && t.n > 0 && t.lengthMismatch === undefined,
   };
 };
 
@@ -265,34 +339,65 @@ const interpretResults = (
 // side emitting and the other not. Filtering on rx-empty would have
 // filtered that finding away. So the silent rows are thinned, never
 // excluded.
+//
+// `--corpus <n>` SETS THE SIZE, and the proportions hold at any size: a
+// fifth silent, the rest emitting, and a seed bound scaled with it. The
+// draw is handed over in CHUNKS, each run and tallied before the next is
+// drawn, so a sweep of millions holds one chunk in memory rather than
+// the corpus -- and a chunk is one CLI batch, whose crashes restart it
+// rather than end it.
 const CORPUS = 500;
-const SILENT_QUOTA = 100;
-const LIVE_TARGET = CORPUS - SILENT_QUOTA;
-const MAX_SEEDS = 400; // a bound, so an `--operator` that can only draw
-// silent programs reports a short corpus instead of looping
+const CHUNK = 2000;
+const quotas = (corpus: number) => {
+  const silentQuota = Math.floor(corpus / 5);
+  return {
+    silentQuota,
+    liveTarget: corpus - silentQuota,
+    // a bound, so an `--operator` that can only draw silent programs
+    // reports a short corpus instead of looping
+    maxSeeds: Math.ceil((corpus * 4) / 5),
+  };
+};
 
-const drawCorpus = (operator?: string): TestCase[] => {
-  const live: TestCase[] = [];
-  const silent: TestCase[] = [];
+function* drawChunks(corpus: number, operator?: string): Generator<TestCase[]> {
+  const { silentQuota, liveTarget, maxSeeds } = quotas(corpus);
+  let live = 0;
+  let silent = 0;
+  let chunk: TestCase[] = [];
   for (
     let i = 0;
-    i < MAX_SEEDS &&
-    (live.length < LIVE_TARGET || silent.length < SILENT_QUOTA);
+    i < maxSeeds && (live < liveTarget || silent < silentQuota);
     i++
   ) {
     for (const testCase of genTestCases(`s${i}`, operator)) {
-      const bucket = evaluatePlain(testCase).length > 0 ? live : silent;
-      const cap = bucket === live ? LIVE_TARGET : SILENT_QUOTA;
-      if (bucket.length < cap) bucket.push(testCase);
+      const emits = evaluatePlain(testCase).length > 0;
+      if (emits ? live >= liveTarget : silent >= silentQuota) continue;
+      if (emits) live++;
+      else silent++;
+      chunk.push(testCase);
+      if (chunk.length === CHUNK) {
+        yield chunk;
+        chunk = [];
+      }
     }
   }
-  return [...live, ...silent];
+  if (chunk.length > 0) yield chunk;
+}
+
+const readCorpusFromCli = (): number | undefined => {
+  const v = readFlag("corpus");
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n <= 0)
+    throw new Error(`--corpus takes a positive integer, not '${v}'`);
+  return n;
 };
 
 async function main() {
   const operator = readOperatorFromCli();
   const cliSeed = readSeedFromCli();
   const casesFile = readCasesFromCli();
+  const corpus = readCorpusFromCli() ?? CORPUS;
   const machine = readMachineFromCli() ?? "agda";
   const baseline = readBaselineFromCli() ?? "rx";
   const known = ["agda", "rx"];
@@ -302,13 +407,17 @@ async function main() {
   ])
     if (!known.includes(v))
       throw new Error(`--${flag} takes ${known.join(" | ")}, not '${v}'`);
-  const testCases =
+  const swept = casesFile === undefined && cliSeed === undefined;
+  const chunks: Iterable<TestCase[]> =
     casesFile !== undefined
-      ? replayCases(casesFile)
+      ? [replayCases(casesFile)]
       : cliSeed !== undefined
-        ? genTestCases(cliSeed, operator)
-        : drawCorpus(operator);
-  const run = async (which: string): Promise<EvalResult[]> =>
+        ? [genTestCases(cliSeed, operator)]
+        : drawChunks(corpus, operator);
+  const run = async (
+    which: string,
+    testCases: TestCase[],
+  ): Promise<EvalResult[]> =>
     which === "rx"
       ? testCases.map((testCase): EvalResult => ({
           values: evaluatePlain(testCase),
@@ -316,15 +425,24 @@ async function main() {
       : await execAgda(testCases.map(serialize));
   if (machine !== "agda" || baseline !== "rx")
     console.log(`comparing ${machine} against ${baseline}`);
-  const agdaResults = await run(machine);
-  const rxResults = await run(baseline);
-  const { report, ok, live } = interpretResults(
-    agdaResults,
-    rxResults,
-    testCases,
-    machine,
-    baseline,
-  );
+  const tally = emptyTally();
+  for (const testCases of chunks) {
+    tallyChunk(
+      tally,
+      await run(machine, testCases),
+      await run(baseline, testCases),
+      testCases,
+      machine,
+      baseline,
+    );
+    // progress on stderr, so the report on stdout stays the report
+    if (swept && corpus > CHUNK)
+      console.error(
+        `${tally.n}/${corpus}: ${tally.valuesOk} match, ` +
+          `${tally.diverged} diverged, ${crashedCount(tally)} crashed`,
+      );
+  }
+  const { report, ok } = reportTally(tally);
   console.log(report);
   // a zero-case run is a failure too: it means the generator produced
   // nothing, which reads as a clean sweep of an empty corpus
@@ -333,10 +451,11 @@ async function main() {
   // because the yield is the thing the draw exists to hold. Only the
   // full sweep is held to it -- a pinned `--seed` or a `--cases` replay
   // is whatever the user asked for.
-  if (casesFile === undefined && cliSeed === undefined && live < LIVE_TARGET) {
+  const { liveTarget, maxSeeds } = quotas(corpus);
+  if (swept && tally.live < liveTarget) {
     console.log(
-      `YIELD SHORT: ${live} emitting rows, target ${LIVE_TARGET} -- the ` +
-        `draw could not find enough programs that emit within ${MAX_SEEDS} seeds`,
+      `YIELD SHORT: ${tally.live} emitting rows, target ${liveTarget} -- the ` +
+        `draw could not find enough programs that emit within ${maxSeeds} seeds`,
     );
     process.exitCode = 1;
   }

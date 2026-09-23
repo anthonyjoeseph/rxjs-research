@@ -51,14 +51,16 @@ private
   nonEmpty ([]      ∷ ls)  = nonEmpty ls
   nonEmpty ((c ∷ l) ∷ ls)  = (c ∷ l) ∷ nonEmpty ls
 
-  concatStr : List String → String
-  concatStr []       = ""
-  concatStr (s ∷ ss) = s ++ concatStr ss
+  -- ONE WRITE PER CASE, AND EACH IS FLUSHED BEFORE THE NEXT CASE IS
+  -- EVALUATED.  A case that reaches a postulate kills the process, and
+  -- the bridge reads the lines already written as that many results and
+  -- restarts past the case that died.  A single write of the whole batch
+  -- would force every case first and lose all of them to one crash.
+  putLines : List (List Char) → IO Unit
+  putLines []       = putStr ""
+  putLines (l ∷ ls) = putStr (process l ++ fromChar nl) >>= λ _ → putLines ls
 
 main : IO Unit
 main =
   getContents >>= λ input →
-  putStr
-    (concatStr
-      (map (λ line → process line ++ fromChar nl)
-           (nonEmpty (splitLines (toList input)))))
+  putLines (nonEmpty (splitLines (toList input)))

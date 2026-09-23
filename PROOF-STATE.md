@@ -250,6 +250,8 @@ also: `chainStep!` — same; the arrival side folds a registry path under the ra
 also: `run-wellFormed⇓` — same, the one proof that reads the runner's stream.
 also: `subscribe-shaped` — same; its conclusion follows the result type, which is the narrowing stated where that proof consumes it.
 also: `reducible` — its inhabitation, and every member of its block: the connect arm is the one strict edge on the room, and every other member is funded by the peel it makes or by a budget under it.
+also: `putLines` — the CLI's per-case writer, which is what lets the sweep count a case reaching a guard rather than end on it; the sweep is how this tier's monster is measured, and no proof reads it.
+also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### Big picture tier roadmap
 
