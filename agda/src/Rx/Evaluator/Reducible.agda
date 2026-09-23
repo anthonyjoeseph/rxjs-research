@@ -27,8 +27,8 @@
 -- ITS OWN SUCCESSOR.  A stateful frame writes a value into the store
 -- that the store cannot vouch for, since a candidate is one universe
 -- above the state; the frame's SUCCESSOR continuation closes over the
--- candidate it just computed, so the next fold through it certifies
--- the cell against a column for what the store holds now.  The arm
+-- candidate it just computed and stands on the store still holding
+-- what it closed over (`Pre`, below).  The arm
 -- that pushed the frame needs that successor -- `batchSync` folds its
 -- flush through it after its source's subscribe has returned -- and
 -- the subscribe it called can only answer at the SOURCE's type, one
@@ -70,8 +70,9 @@
 --   parent where it used to peel.
 -- RECOVERY: git show 3abdafa1:agda/src/Rx/Evaluator/Keeps.agda holds
 --   the store-preservation lemmas every arm spends on its room proof.
--- RECOVERY: git show 3abdafa1:agda/src/Rx/Exp/ValEq.agda holds the
---   decidable value equality the certification compares cells with.
+-- RECOVERY: git show 3abdafa1:agda/src/Rx/Exp/ValEq.agda holds a
+--   decidable value equality, which certifying a cell against a held
+--   column needed and standing on the store's agreement does not.
 
 -- WHY THE STATE IS QUANTIFIED RATHER THAN CONSTRAINED.  `subscribeE⇓`
 -- takes the scheduler and the evaluator state as plain indices with no
@@ -104,7 +105,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing; _<∣>_) renaming (map to mapᵐ)
 open import Data.Nat using (ℕ; suc; _≤_; _<_; _∸_; s≤s; _+_; _<ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit.Polymorphic using (⊤; tt)
@@ -113,7 +114,7 @@ open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Nullary using (yes; no)
 
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
 
 open import Rx.Prim using (Tick; ObservableInput)
 open import Rx.Slots using (scripted; shared)
@@ -125,8 +126,10 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (sourceᵏ; freshId; setAt)
+open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; pres-write)
 open import Decide using (∧ˡ; ∧ʳ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
+  batchSync-f; from-inner; thru-outer; NodeState; lookupNode)
 open import Rx.Evaluator.Unconn-Arith using (unconn)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ; foldPath⇓;
   fold-root)
@@ -162,33 +165,191 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subs-of; subs-empty; subs-
 Room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → ℕ → Sched Γ → EvalSt e → Set
 Room m sched st = unconn (Sched.slots sched) (EvalSt.connectedShares st) ≤ m
 
+-- THE ROOM HAS FALLEN: a connect happened since this ceiling was set.
+-- It is the one fact a frame may spend where the store and its own
+-- closure disagree, because it is the one thing that peels the
+-- accessibility a candidate at the store's contents is funded by.
+Fell : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → ℕ → Sched Γ → EvalSt e → Set
+Fell m sched st = unconn (Sched.slots sched) (EvalSt.connectedShares st) < m
+
+-- WHAT A FRAME HOLDS, AS VALUES AND NOTHING ELSE.  A frame's
+-- continuation closes over candidates for what its node holds, and a
+-- candidate is one universe above the state -- so the store cannot
+-- carry the candidates and the candidate cannot be indexed by them
+-- (that is the positivity failure above).  What the candidate CAN be
+-- indexed by is the values: the node state the closure was built over,
+-- at `Set`.  `Maybe`, because a node can be absent, and a column that
+-- can say so is one every state agrees with.
+HeldF : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
+HeldF           (map-f _)            = ⊤
+HeldF {Γ = Γ}   (scan-f _ _)         = Maybe (NodeState Γ)
+HeldF {Γ = Γ}   (take-f _)           = Maybe (NodeState Γ)
+HeldF {Γ = Γ}   (batchSync-f _)      = Maybe (NodeState Γ)
+HeldF {Γ = Γ}   (from-inner _ _ _)   = Maybe (NodeState Γ)
+HeldF {Γ = Γ}   (thru-outer _ _)     = Maybe (NodeState Γ)
+
+-- WHAT A FRAME'S CONTINUATION STANDS ON.  `live`: the store agrees
+-- with the column it closed candidates over, so there is no value it
+-- cannot vouch for.  `raw`: it was built over the store itself by a
+-- caller holding the accessibility -- the arrival spine, the connect's
+-- fan-out -- and re-vouches on every call.  `fallen`: the room has
+-- fallen since its ceiling was set, so the accessibility peels and it
+-- re-vouches at the lower ceiling.  The branch the old guards could
+-- not close is the one no constructor names: a disagreeing store with
+-- the room still at the ceiling.
+--
+-- IT IS AN INDEX OF THE CONTINUATION, NOT A HYPOTHESIS ON ONE FOLD,
+-- because it is what the SUCCESSOR was built over too: a fold hands
+-- back the successor together with the ground it stands on in the
+-- state it left, and the next caller supplies that ground back.  The
+-- fall is path-wide when it happens -- a live frame's parent expects a
+-- full column, which a peeled candidate cannot supply -- and it is
+-- permanent, because the room never rises.
+data PreF {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) : Set where
+  live   : HeldF f → PreF f
+  raw    : PreF f
+  fallen : PreF f
+
+Pre : ∀ {n} {Γ : Ctx n} {lo u t} → Path Γ lo u t → Set
+Pre root             = ⊤
+Pre (share-sink _ _) = ⊤
+Pre (f ↠[ _ ] κ)     = PreF f × Pre κ
+
+-- THE STORE AGREES WITH THE COLUMN: the frame's node reads back as
+-- what the column says.
+ConsistentF : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+              (f : Frame Γ s u) → HeldF f → EvalSt e → Set
+ConsistentF (map-f _)               _ st = ⊤
+ConsistentF (scan-f _ nid)          h st = lookupNode nid (EvalSt.nodes st) ≡ h
+ConsistentF (take-f nid)            h st = lookupNode nid (EvalSt.nodes st) ≡ h
+ConsistentF (batchSync-f nid)       h st = lookupNode nid (EvalSt.nodes st) ≡ h
+ConsistentF (from-inner _ nid _)    h st = lookupNode nid (EvalSt.nodes st) ≡ h
+ConsistentF (thru-outer _ nid)      h st = lookupNode nid (EvalSt.nodes st) ≡ h
+
+-- AND THE FRAME'S NODE IS BELOW THE COUNTER, which is what makes a
+-- write at the counter leave it alone.  Agreement alone is not
+-- preserved by anything: an arm installing its own node has to know
+-- the node it installs is not one of the path's, and that is a fact
+-- about allocation, carried here beside the agreement it protects.
+FreshF : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Set
+FreshF f (map-f _)            = ⊤
+FreshF f (scan-f _ nid)       = nid < f
+FreshF f (take-f nid)         = nid < f
+FreshF f (batchSync-f nid)    = nid < f
+FreshF f (from-inner _ nid _) = nid < f
+FreshF f (thru-outer _ nid)   = nid < f
+
+PreHoldsF : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+            (m : ℕ) (f : Frame Γ s u) → PreF f → Sched Γ → EvalSt e → Set
+PreHoldsF m f (live h) sched st = ConsistentF f h st × FreshF (nodeCt sched) f
+PreHoldsF m f raw      sched st = ⊤
+PreHoldsF m f fallen   sched st = Fell m sched st
+
+PreHolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
+           (m : ℕ) (κ : Path Γ lo u t) → Pre κ → Sched Γ → EvalSt e → Set
+PreHolds m root             _         sched st = ⊤
+PreHolds m (share-sink _ _) _         sched st = ⊤
+PreHolds m (f ↠[ _ ] κ)     (pf , pre) sched st = PreHoldsF m f pf sched st × PreHolds m κ pre sched st
+
+-- THE CANDIDATE COLUMN IS TOTAL WHERE THE FRAME IS LIVE, and absent
+-- otherwise: a live frame holds candidates for everything its node
+-- holds and receives one beside every value that arrives; a raw or
+-- fallen frame re-vouches everything from the store and needs none;
+-- the root and a share's sink vouch for nothing.
+Column : ∀ {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t)
+         (P : Val Γ u → Set₁) → Pre κ → List (Val Γ u) → Set₁
+Column root             P _             vals = ⊤
+Column (share-sink _ _) P _             vals = ⊤
+Column (f ↠[ _ ] κ)     P (live _ , _)  vals = All P vals
+Column (f ↠[ _ ] κ)     P (raw , _)     vals = ⊤
+Column (f ↠[ _ ] κ)     P (fallen , _)  vals = ⊤
+
+-- a full column is a column on any ground
+ofColumn : ∀ {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t)
+           {P : Val Γ u → Set₁} (pre : Pre κ) {vals : List (Val Γ u)}
+         → All P vals → Column κ P pre vals
+ofColumn root             _            ps = tt
+ofColumn (share-sink _ _) _            ps = tt
+ofColumn (f ↠[ _ ] κ)     (live _ , _) ps = ps
+ofColumn (f ↠[ _ ] κ)     (raw , _)    ps = tt
+ofColumn (f ↠[ _ ] κ)     (fallen , _) ps = tt
+
+-- the store's own reading is live ground for every frame, which is
+-- what the arrival spine stands a raw fold on
+readPre : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
+          (κ : Path Γ lo u t) → EvalSt e → Pre κ
+readPre root                          st = tt
+readPre (share-sink _ _)              st = tt
+readPre (map-f fn ↠[ _ ] κ)           st = raw , readPre κ st
+readPre (scan-f fn nid ↠[ _ ] κ)      st = raw , readPre κ st
+readPre (take-f nid ↠[ _ ] κ)         st = raw , readPre κ st
+readPre (batchSync-f nid ↠[ _ ] κ)    st = raw , readPre κ st
+readPre (from-inner _ nid _ ↠[ _ ] κ) st = raw , readPre κ st
+readPre (thru-outer _ nid ↠[ _ ] κ)   st = raw , readPre κ st
+
+read-holds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} {m}
+             (κ : Path Γ lo u t) (sched : Sched Γ) (st : EvalSt e)
+           → PreHolds m κ (readPre κ st) sched st
+read-holds root                          sched st = tt
+read-holds (share-sink _ _)              sched st = tt
+read-holds (map-f fn ↠[ _ ] κ)           sched st = tt , read-holds κ sched st
+read-holds (scan-f fn nid ↠[ _ ] κ)      sched st = tt , read-holds κ sched st
+read-holds (take-f nid ↠[ _ ] κ)         sched st = tt , read-holds κ sched st
+read-holds (batchSync-f nid ↠[ _ ] κ)    sched st = tt , read-holds κ sched st
+read-holds (from-inner _ nid _ ↠[ _ ] κ) sched st = tt , read-holds κ sched st
+read-holds (thru-outer _ nid ↠[ _ ] κ)   sched st = tt , read-holds κ sched st
+
+-- THE GROUND SURVIVES A STEP THAT WRITES ONLY AT OR ABOVE THE COUNTER,
+-- ADVANCES IT, AND DOES NOT RAISE THE ROOM.  The three hypotheses are
+-- the three things a live frame, a fresh frame and a fallen frame each
+-- stand on; every arm that writes its own node spends exactly this.
+holdsF-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {m}
+              (f : Frame Γ s u) (pf : PreF f) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
+            → PreservedBelow (nodeCt sched) st st′ → nodeCt sched ≤ nodeCt sched′
+            → (Fell m sched st → Fell m sched′ st′)
+            → PreHoldsF m f pf sched st → PreHoldsF m f pf sched′ st′
+holdsF-step (map-f _)            (live h) pr ct fl (c , fr) = tt , tt
+holdsF-step (scan-f _ nid)       (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step (take-f nid)         (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step (batchSync-f nid)    (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step (from-inner _ nid _) (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step (thru-outer _ nid)   (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step f raw    pr ct fl h = tt
+holdsF-step f fallen pr ct fl h = fl h
+
+holds-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} {m}
+             (κ : Path Γ lo u t) (pre : Pre κ) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
+           → PreservedBelow (nodeCt sched) st st′ → nodeCt sched ≤ nodeCt sched′
+           → (Fell m sched st → Fell m sched′ st′)
+           → PreHolds m κ pre sched st → PreHolds m κ pre sched′ st′
+holds-step root             _          pr ct fl h       = tt
+holds-step (share-sink _ _) _          pr ct fl h       = tt
+holds-step (f ↠[ _ ] κ)     (pf , pre) pr ct fl (h , hs) = holdsF-step f pf pr ct fl h , holds-step κ pre pr ct fl hs
+
 -- ONE CALL MADE TO A CONTINUATION, AS THE CALLER MADE IT.  The trace
 -- a subscribe answers with is a list of these, oldest first, and a
 -- fold applied to the fields in order is the call itself -- which is
 -- what makes the replay compute the successor rather than approximate
 -- it.  The room proof travels with the call because the fold demands
 -- it and the replayer holds no other.
-record Call {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u}
-            (P : Val Γ u → Set₁) (S : Set) : Set₁ where
+record Call {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
+            (P : Val Γ u → Set₁) (S : Set) (κ : Path Γ lo u t) : Set₁ where
   constructor call
   field
     st₀   : S
+    pre   : Pre κ
     now   : Tick
     vals  : List (Val Γ u)
-    cands : All (λ v → Maybe (P v)) vals
+    col   : Column κ P pre vals
     fin   : Bool
     sched : Sched Γ
     st    : EvalSt e
     room  : Room m sched st
+    holds : PreHolds m κ pre sched st
 
-Trace : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u}
-        (P : Val Γ u → Set₁) (S : Set) → Set₁
-Trace {e = e} m P S = List (Call {e = e} m P S)
-
--- a column of certainties is a column of candidates
-allJust : ∀ {A : Set} {P : A → Set₁} {xs : List A} → All P xs → All (λ x → Maybe (P x)) xs
-allJust []       = []
-allJust (p ∷ ps) = just p ∷ allJust ps
+Trace : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
+        (P : Val Γ u → Set₁) (S : Set) (κ : Path Γ lo u t) → Set₁
+Trace {e = e} m P S κ = List (Call {e = e} m P S κ)
 
 -- THE CONTINUATION: THE REST OF THE PATH, AS A FOLD THAT TAKES
 -- CANDIDATES AND ANSWERS AT THE ROOT.  A subscribe never sees the
@@ -206,21 +367,26 @@ allJust (p ∷ ps) = just p ∷ allJust ps
 -- it cannot carry a candidate; it is threaded unchanged and every
 -- caller instantiates it at the unit.
 --
--- THE CANDIDATE COLUMN IS `Maybe`, AND `nothing` IS A VALUE THE
--- CONTINUATION CANNOT VOUCH FOR.  Every value arriving through a live
--- subscribe has a candidate; a value read back from a store cell whose
--- writer's successor never reached this closure has none, and a
--- `nothing` arriving where a candidate is NEEDED -- a flattener about
--- to subscribe it -- is what the replay exists to make unreachable.
+-- THE FOLD STANDS ON ITS GROUND AND HANDS BACK ITS SUCCESSOR'S.  The
+-- premise is `PreHolds` at the state folded in; the answer carries the
+-- successor's own `Pre` and its `PreHolds` at the state folded out, so
+-- a caller that threads states through folds alone never has to prove
+-- consistency of anything -- it is handed it.  A caller that writes
+-- the store itself between two folds owes the re-establishment, and
+-- that is exactly the arm writing its OWN node, which touches no other
+-- frame's node by freshness.
 record RP {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
-          (P : Val Γ u → Set₁) (S : Set) (κ : Path Γ lo u t) : Set₁ where
+          (P : Val Γ u → Set₁) (S : Set) (κ : Path Γ lo u t) (pre : Pre κ) : Set₁ where
   coinductive
   field
-    fold : S → (now : Tick) (vals : List (Val Γ u)) → All (λ v → Maybe (P v)) vals
+    fold : S → (now : Tick) (vals : List (Val Γ u)) → Column κ P pre vals
          → (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Room m sched st
+         → PreHolds m κ pre sched st
          → Σ (Stream Γ t × Sched Γ × EvalSt e)
-             (λ r → foldPath⇓ {e = e} now κ vals fin sched st r)
-           × S × RP {e = e} m P S κ
+             (λ r → foldPath⇓ {e = e} now κ vals fin sched st r
+                  × Σ (Pre κ) (λ pre′ → PreHolds m κ pre′ (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                                      × RP {e = e} m P S κ pre′))
+           × S
 open RP public
 
 -- THE CANDIDATE.  At a data type it is trivial, because nothing about
@@ -247,9 +413,12 @@ open RP public
 -- the lower ceiling's candidates to come back UP: they go down the raw
 -- continuation at the ceiling the connect peeled to, and a
 -- continuation built at the higher ceiling that has to cross to the
--- lower one is DROPPED to it (`dropRP`), its candidates forgotten.
--- Weakening only ever runs from the higher ceiling to the lower, which
--- is the direction it is sound in.
+-- lower one is dropped to it, its candidates forgotten.  What comes
+-- back up is not a candidate but a `fallen` successor, which is what
+-- the caller's own ceiling can hold: it stands on the room having
+-- fallen, and re-vouches from the store at the peeled accessibility
+-- on every later call.  Weakening only ever runs from the higher
+-- ceiling to the lower, which is the direction it is sound in.
 --
 -- DEAD ROUTE: re-indexing the candidate by the room WHILE THE ANSWER
 --   STILL CARRIES A SATISFACTION COLUMN.  The connect's def comes back
@@ -267,12 +436,15 @@ Red m (s +ᵗ t)  (inj₁ a) = Red m s a
 Red m (s +ᵗ t)  (inj₂ b) = Red m t b
 Red m (listᵗ t) vs       = All (Red m t) vs
 Red {Γ = Γ} m (obs u) b =
-  ∀ {S : Set} {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t)
-  → RP {e = e} m (Red m u) S κ → S
+  ∀ {S : Set} {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) (pre : Pre κ)
+  → RP {e = e} m (Red m u) S κ pre → S
   → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Room m sched st
+  → PreHolds m κ pre sched st
   → Σ (Stream Γ t × Sched Γ × EvalSt e)
-      (λ r → subscribeE⇓ {e = e} b κ now sched st r)
-    × S × RP {e = e} m (Red m u) S κ × Trace {e = e} m (Red m u) S
+      (λ r → subscribeE⇓ {e = e} b κ now sched st r
+           × Σ (Pre κ) (λ pre′ → PreHolds m κ pre′ (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                               × RP {e = e} m (Red m u) S κ pre′))
+    × S × Trace {e = e} m (Red m u) S κ
 
 -- A VALUE ENVIRONMENT IS REDUCIBLE WHEN EVERY ENTRY IS.  Terms are
 -- open in a Θ telescope and a frame's closure pairs a term with one
@@ -312,9 +484,9 @@ redFoldVals f ρ step (p ∷ ps) rac = redFoldVals f ρ step ps (step p rac)
 ------------------------------------------------------------------
 
 -- THE ROOT MINTS THE BURST FROM NOTHING, and its state is the unit.
-rootRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo} {P : Val Γ t → Set₁}
-       → RP {e = e} m {lo = lo} P ⊤ root
-fold rootRP tt now vals _ fin sched st rm = (_ , fold-root) , tt , rootRP
+rootRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo} {P : Val Γ t → Set₁} {pre : Pre {Γ = Γ} (root {lo = lo} {t = t})}
+       → RP {e = e} m {lo = lo} P ⊤ root pre
+fold (rootRP {pre = pre}) tt now vals _ fin sched st rm h = (_ , fold-root , pre , h , rootRP) , tt
 
 ------------------------------------------------------------------
 -- THE ARMS, STATED.
@@ -435,15 +607,17 @@ postulate
 postulate
   red-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
       (i : Fin n) (ρ : Env Γ Θ) (k : ℕ) → T (toℕ i <ᵇ k) → Acc _<_ k
-    → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
-    → ∀ {m} → RP {e = e} m (Red m (lookup Γ i)) S κ → S
+    → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo) (pre : Pre κ)
+    → ∀ {m} → RP {e = e} m (Red m (lookup Γ i)) S κ pre → S
     → (now : Tick) (sched : Sched Γ)
     → (sc : ObservableInput (Val Γ (lookup Γ i))) {oks : T (isData (lookup Γ i))}
     → Sched.slots sched i ≡ scripted {ok = oks} sc
-    → ∀ (st : EvalSt e) → Acc _<_ m → Room m sched st
+    → ∀ (st : EvalSt e) → Acc _<_ m → Room m sched st → PreHolds m κ pre sched st
     → Σ (Stream Γ t × Sched Γ × EvalSt e)
-        (λ r → subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r)
-      × S × RP {e = e} m (Red m (lookup Γ i)) S κ × Trace {e = e} m (Red m (lookup Γ i)) S
+        (λ r → subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r
+             × Σ (Pre κ) (λ pre′ → PreHolds m κ pre′ (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                                 × RP {e = e} m (Red m (lookup Γ i)) S κ pre′))
+      × S × Trace {e = e} m (Red m (lookup Γ i)) S κ
 
 -- THE SHARED SLOT, AND THE ONE EDGE OF THE CYCLE THAT SPENDS THE ROOM.
 -- A share's definition is an arbitrary expression standing in no
@@ -461,14 +635,16 @@ postulate
       {okd : T (inputsBelowᵉ (toℕ i) d)}
     → Acc _<_ (toℕ i)
     → (ρ : Env Γ Θ)
-      (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
-    → ∀ {m} → RP {e = e} m (Red m (lookup Γ i)) S κ → S
+      (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo) (pre : Pre κ)
+    → ∀ {m} → RP {e = e} m (Red m (lookup Γ i)) S κ pre → S
     → (now : Tick) (sched : Sched Γ)
     → Sched.slots sched i ≡ shared d {ok = okd}
-    → ∀ (st : EvalSt e) → Acc _<_ m → Room m sched st
+    → ∀ (st : EvalSt e) → Acc _<_ m → Room m sched st → PreHolds m κ pre sched st
     → Σ (Stream Γ t × Sched Γ × EvalSt e)
-        (λ r → subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r)
-      × S × RP {e = e} m (Red m (lookup Γ i)) S κ × Trace {e = e} m (Red m (lookup Γ i)) S
+        (λ r → subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r
+             × Σ (Pre κ) (λ pre′ → PreHolds m κ pre′ (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                                 × RP {e = e} m (Red m (lookup Γ i)) S κ pre′))
+      × S × Trace {e = e} m (Red m (lookup Γ i)) S κ
 
 -- THE RAW CONTINUATION FOR A PATH THE STORE HOLDS.  An arrival and a
 -- share's fan-out fold down registry paths no subscribe built, so the
@@ -478,23 +654,23 @@ postulate
 postulate
   rawRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
           (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
-        → (κ : Path Γ ℓ u t) → RP {e = e} m (Red m u) ⊤ κ
+        → (κ : Path Γ ℓ u t) (pre : Pre κ) → RP {e = e} m (Red m u) ⊤ κ pre
 
 ------------------------------------------------------------------
 -- THE BODIES.
 ------------------------------------------------------------------
 
 redExpAcc (input i) ρ rρ k ok aK a aM = red-input i ρ k ok aK aM
-redExpAcc (ofᵉ ts) ρ rρ k ok aK (acc rs) aM κ rp s now sched st rm
+redExpAcc (ofᵉ ts) ρ rρ k ok aK (acc rs) aM κ pre rp s now sched st rm h
   with fold rp s now (map (λ tm → evalWith tm ρ) ts)
-         (allJust (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM)) true sched st rm
-... | ((r , f) , s′ , rp′) =
-      (r , subs-of f) , s′ , rp′
-    , call s now (map (λ tm → evalWith tm ρ) ts)
-        (allJust (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM)) true sched st rm ∷ []
-redExpAcc emptyᵉ ρ rρ k ok aK a aM κ rp s now sched st rm
-  with fold rp s now [] [] true sched st rm
-... | ((r , f) , s′ , rp′) = (r , subs-empty f) , s′ , rp′ , call s now [] [] true sched st rm ∷ []
+         (ofColumn κ pre (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM)) true sched st rm h
+... | ((r , f , nx) , s′) =
+      (r , subs-of f , nx) , s′
+    , call s pre now (map (λ tm → evalWith tm ρ) ts)
+        (ofColumn κ pre (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM)) true sched st rm h ∷ []
+redExpAcc emptyᵉ ρ rρ k ok aK a aM κ pre rp s now sched st rm h
+  with fold rp s now [] (ofColumn κ pre []) true sched st rm h
+... | ((r , f , nx) , s′) = (r , subs-empty f , nx) , s′ , call s pre now [] (ofColumn κ pre []) true sched st rm h ∷ []
 redExpAcc (mapᵉ f b)        ρ rρ k ok aK a aM = red-map f b ρ rρ k ok aK a aM
 redExpAcc (takeᵉ c b)       ρ rρ k ok aK a aM = red-take c b ρ rρ k ok aK a aM
 redExpAcc (batchSyncᵉ b)    ρ rρ k ok aK a aM = red-batchSync b ρ rρ k ok aK a aM
@@ -502,34 +678,35 @@ redExpAcc (scanᵉ f z b)     ρ rρ k ok aK a aM = red-scan f z b ρ rρ k ok a
 redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK a aM = red-mergeAll lim b ρ rρ k ok aK a aM
 redExpAcc (switchAllᵉ b)    ρ rρ k ok aK a aM = red-switchAll b ρ rρ k ok aK a aM
 redExpAcc (exhaustAllᵉ b)   ρ rρ k ok aK a aM = red-exhaustAll b ρ rρ k ok aK a aM
-redExpAcc (μᵉ body) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+redExpAcc (μᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h
   with redExpAcc (unfoldμ body) ρ rρ k (ib-unfoldμ k body ok) aK
          (rs (subst (_< suc (gsizeᵉ body))
                     (sym (gsize-unfoldμ body)) ≤-refl)) aM
-         κ rp s₀ now sched st rm
-... | ((r , d) , s₁ , rp₁ , tr) = (r , subs-μ d) , s₁ , rp₁ , tr
+         κ pre rp s₀ now sched st rm h
+... | ((r , d , nx) , s₁ , tr) = (r , subs-μ d , nx) , s₁ , tr
 redExpAcc (varᵉ ()) ρ rρ k ok aK a aM
-redExpAcc (deferᵉ body) ρ rρ k ok aK a aM κ rp s₀ now sched st rm =
-  (_ , subs-defer refl refl refl refl) , s₀ , rp , []
-redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+redExpAcc (deferᵉ body) ρ rρ k ok aK a aM κ pre rp s₀ now sched st rm h =
+  (_ , subs-defer refl refl refl refl , pre
+     , holds-step κ pre (pres-write st _ _ refl ≤-refl) (n≤1+n _) (λ x → x) h , rp) , s₀ , []
+redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h
   with (let src = freshId sourceᵏ (Sched.mint sched)
-        in redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ rp s₀ now
+        in redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ pre rp s₀ now
              (record sched
                 { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
-             st rm)
-... | ((r , d) , s₁ , rp₁ , tr) = (r , subs-mint refl d) , s₁ , rp₁ , tr
+             st rm (holds-step κ pre (pres (λ _ _ → refl)) ≤-refl (λ x → x) h))
+... | ((r , d , nx) , s₁ , tr) = (r , subs-mint refl d , nx) , s₁ , tr
 
-red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ rp s now sched st rm
+red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ pre rp s now sched st rm h
     with toℕ i <? lo
-... | no  ¬below with fold rp s now [] [] true sched st rm
-... | ((r , f) , s′ , rp′) =
-      (r , subs-floor (≮⇒≥ ¬below) f) , s′ , rp′ , call s now [] [] true sched st rm ∷ []
-red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ rp s now sched st rm
+... | no  ¬below with fold rp s now [] (ofColumn κ pre []) true sched st rm h
+... | ((r , f , nx) , s′) =
+      (r , subs-floor (≮⇒≥ ¬below) f , nx) , s′ , call s pre now [] (ofColumn κ pre []) true sched st rm h ∷ []
+red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ pre rp s now sched st rm h
     | yes below with Sched.slots sched i in slEq
-...   | scripted {ok = oks} sc = red-scripted i ρ k ok (acc rsK) κ below rp s now sched sc {oks = oks} slEq st aM rm
+...   | scripted {ok = oks} sc = red-scripted i ρ k ok (acc rsK) κ below pre rp s now sched sc {oks = oks} slEq st aM rm h
 ...   | shared d {ok = okd} =
         red-input-shared i d (rsK (<ᵇ⇒< (toℕ i) k ok)) ρ
-          κ below rp s now sched slEq st aM rm
+          κ below pre rp s now sched slEq st aM rm h
 
 ------------------------------------------------------------------
 -- THE TERM FACE.

@@ -51,7 +51,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; root; Arrival; arrTick; a
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible using (reducible; rawRP; rootRP; allJust; red-val; fold)
+open import Rx.Evaluator.Reducible using (reducible; rawRP; rootRP; red-val; fold; ofColumn; readPre; read-holds)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.
@@ -67,10 +67,10 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- funds the candidate for every value it carries: a scheduled body is
 -- a closure, and `red-val` rebuilds its candidate by recursion on it.
 chainStep! {n = n} a vs fin (lo , path) sched st =
-  let ((_ , f) , _) =
-        fold (rawRP (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path) tt
-          (arrTick a) vs (allJust (red-val (<-wellFounded _) (listᵗ (arrTy a)) vs))
-          fin sched st ≤-refl
+  let ((_ , f , _) , _) =
+        fold (rawRP (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path (readPre path st)) tt
+          (arrTick a) vs (ofColumn path (readPre path st) (red-val (<-wellFounded _) (listᵗ (arrTy a)) vs))
+          fin sched st ≤-refl (read-holds path sched st)
   in _ , chain-step f
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -128,9 +128,9 @@ drain! (suc k) sched st with sched-next sched in eqn
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
           → Σ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
 evaluate! {n = n} fuel e ins =
-  let (((out , sched₀ , st₀) , s) , _) =
-        reducible (<-wellFounded _) e []ᵉ tt (root {lo = n}) rootRP tt 0
-          (sched-init e ins) (st-init e) ≤-refl
+  let (((out , sched₀ , st₀) , s , _) , _) =
+        reducible (<-wellFounded _) e []ᵉ tt (root {lo = n}) tt rootRP tt 0
+          (sched-init e ins) (st-init e) ≤-refl tt
       (rest , d) = drain! fuel sched₀ st₀
   in _ , eval-run s d
 
