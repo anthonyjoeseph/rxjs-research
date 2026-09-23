@@ -257,16 +257,16 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### Big picture tier roadmap
 
-- **WRITE THE RAW FOLD'S BODY, BUDGETED DRAIN FIRST.** The live flatteners
-  no longer drain anything: on standing ground the column guards keep a
-  merge's queue empty at every walk-order finish, so the same-ceiling
-  re-entry is gone from the live path and what remains of it is the raw
-  fold's. Its header routes the drain on a budget the raw finish seeds from
-  the queue's own length, and argues from the path and row types that an
-  overrun needs a connect inside the drained inner. The body owes that as a
-  lemma: a fold that connects nothing grows no queue. The body decides
-  whether a share's fan-out, the monster's own region, terminates without
-  an outside counter.
+- **GIVE THE RAW FOLD'S INNERS A GROUND, FLOOR INVARIANT FIRST.** The raw
+  fold runs with the room exactly at its ceiling, so an inner it subscribes
+  can stand on neither ground `Pre` has. Its header names the third: frames
+  stacked live over a raw base, which is the inner's exit frame folding the
+  rest of the path. It stands only if the base's fold never writes a stacked
+  frame's node. The floor argues it, but nothing in the state
+  records a node's floor, so that is the invariant to state first. The
+  budgeted drain and its lemma, a fold that connects nothing grows no
+  queue, both sit on this ground, and the body decides whether a share's
+  fan-out, the monster's own region, terminates without an outside counter.
 
 - **INSTANTIATE THE ARMS AT THE PROGRAM THAT GROWS A QUEUE.** No Tier 1 row
   has ever been instantiated. `mergeAll(1)` over a shared `of(1,2,3)` mapped
@@ -311,9 +311,9 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### The ledger
 
-- **`rawFold`** (Reducible) — FALSITY, `RECOVERY`: the fold down a path the
-  store holds, and the only place a merge's queue is nonempty at an inner's
-  finish; its body owes the budgeted drain its header routes.
+- **`rawFold`** (Reducible) — FALSITY, `DEAD ROUTE×2, RECOVERY`: the fold down
+  a path the store holds, and the only place a merge's queue is nonempty at an
+  inner's finish; its body owes its inners a third ground, then the drain.
 - **`red-batchSync`** (Reducible) — FALSITY, `NO EVIDENCE`: the arm the trace
   exists for; its closing fold replays the continuation over its source's
   trace.

@@ -1495,7 +1495,7 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 -- successor would be itself -- and because the arrival spine and the
 -- fallen continuation are its only callers, each of which applies it
 -- once.
---
+
 -- It is also the only place a merge's queue is nonempty at an inner's
 -- finish: on standing ground the column guards keep it empty, but a
 -- share's fan-out reaches the outer while the lane is busy, and a raw
@@ -1506,7 +1506,7 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 -- before it is handed over, and a budgeted finish meeting a queue past
 -- its budget peels the room.  Each frame kind is its own builder, so
 -- none is handed to a candidate at its own ceiling and budget.
---
+
 -- The budget is overrun only if a queue grows while one of its own
 -- drained inners runs, and that takes a connect inside the inner, which
 -- spends the room the peel needs.  Only a share's fan-out delivers to an
@@ -1519,7 +1519,37 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 -- evaluator over 1.5M programs: 44,160 raw finishes met a nonempty queue,
 -- and every one of the 324,536 budgeted finishes met a queue exactly at
 -- its budget; none overran it, and no walk-order finish met a queue.
---
+
+-- THE BODY NEEDS A GROUND NEITHER CONSTRUCTOR OF `Pre` GIVES.  Both
+-- callers hand it the room exactly at the ceiling -- the fallen fold
+-- because its peel lands there, the arrival spine because it seeds there
+-- -- so an inner it subscribes can stand neither on `fallen`, which is
+-- the room below the ceiling, nor on `standing`, whose path ends at the
+-- root where this one may end at a sink.  What the inner's arms need is
+-- a ground whose pushed frames step LIVE over a raw base: the base is the
+-- inner's exit frame, folding the rest of the path raw and descending on
+-- the path, while the frames stacked above it hold their candidates, so
+-- no arm's extension re-enters the raw fold.
+
+-- THAT GROUND OWES WHAT STANDING GROUND GETS FREE FROM THE ROOT: the
+-- base's fold writes no node of a frame stacked above it.  The argument
+-- is the floor.  Everything the base folds sits at or above the inner's
+-- floor, a sink is reached only from at or below its own index, and a
+-- subscribe at that floor reads only inputs strictly below it, so no row
+-- the base reaches passes through a stacked frame.  Nothing in the state
+-- records a node's floor, so the invariant carrying it is still owed.
+
+-- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
+--   room is not below it; raising the ceiling a step needs an
+--   accessibility the peel does not hand out, and a fresh one is not
+--   smaller than the fold's.  Handing the fold the UNPEELED
+--   accessibility with the fall instead makes the fallen fold its own
+--   successor at the same accessibility, through every arm that pushes
+--   a frame.
+-- DEAD ROUTE: each pushed frame rebuilt raw from the store at the same
+--   ceiling.  Every arm pushing a frame re-enters the raw fold at the
+--   same accessibility over a longer path, and nothing on that cycle is
+--   smaller -- the candidate re-seeds the term and the type.
 -- RECOVERY: git show 43c34675:agda/src/Rx/Evaluator/Reducible.agda
 --   restores `drain` and `drainSub`, the live drain the route rebuilds.
 postulate
