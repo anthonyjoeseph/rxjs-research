@@ -130,7 +130,8 @@ open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; p
 open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
   batchSync-f; from-inner; thru-outer; NodeState; lookupNode)
-open import Rx.Evaluator.Unconn-Arith using (unconn)
+open import Rx.Evaluator.Unconn-Arith using (unconn; fell-keeps)
+open import Rx.Evaluator.Keeps using (foldPath-keeps)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ; foldPath⇓;
   fold-root)
 
@@ -192,28 +193,33 @@ HeldF {Γ = Γ}   (thru-outer _ _)     = Maybe (NodeState Γ)
 -- with the column it closed candidates over, so there is no value it
 -- cannot vouch for.  `raw`: it was built over the store itself by a
 -- caller holding the accessibility -- the arrival spine, the connect's
--- fan-out -- and re-vouches on every call.  `fallen`: the room has
--- fallen since its ceiling was set, so the accessibility peels and it
--- re-vouches at the lower ceiling.  The branch the old guards could
--- not close is the one no constructor names: a disagreeing store with
--- the room still at the ceiling.
+-- fan-out -- and re-vouches on every call.
+data PreF {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) : Set where
+  live : HeldF f → PreF f
+  raw  : PreF f
+
+PreFs : ∀ {n} {Γ : Ctx n} {lo u t} → Path Γ lo u t → Set
+PreFs root             = ⊤
+PreFs (share-sink _ _) = ⊤
+PreFs (f ↠[ _ ] κ)     = PreF f × PreFs κ
+
+-- AND WHAT THE PATH STANDS ON: EITHER EVERY FRAME'S OWN GROUND, OR THE
+-- ROOM HAVING FALLEN SINCE THE CEILING WAS SET.  A fallen path holds
+-- no candidates at all -- the accessibility peels and the whole path
+-- is rebuilt raw from the store at the lower ceiling on every call --
+-- and the fall is PATH-WIDE BY TYPE, because a live frame's parent
+-- expects a full column and a peeled candidate cannot supply one.  It
+-- is permanent because the room never rises.  The branch the old
+-- guards could not close is the one no constructor names: a
+-- disagreeing store with the room still at the ceiling.
 --
 -- IT IS AN INDEX OF THE CONTINUATION, NOT A HYPOTHESIS ON ONE FOLD,
 -- because it is what the SUCCESSOR was built over too: a fold hands
 -- back the successor together with the ground it stands on in the
--- state it left, and the next caller supplies that ground back.  The
--- fall is path-wide when it happens -- a live frame's parent expects a
--- full column, which a peeled candidate cannot supply -- and it is
--- permanent, because the room never rises.
-data PreF {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) : Set where
-  live   : HeldF f → PreF f
-  raw    : PreF f
-  fallen : PreF f
-
-Pre : ∀ {n} {Γ : Ctx n} {lo u t} → Path Γ lo u t → Set
-Pre root             = ⊤
-Pre (share-sink _ _) = ⊤
-Pre (f ↠[ _ ] κ)     = PreF f × Pre κ
+-- state it left, and the next caller supplies that ground back.
+data Pre {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t) : Set where
+  standing : PreFs κ → Pre κ
+  fallen   : Pre κ
 
 -- THE STORE AGREES WITH THE COLUMN: the frame's node reads back as
 -- what the column says.
@@ -239,92 +245,87 @@ FreshF f (batchSync-f nid)    = nid < f
 FreshF f (from-inner _ nid _) = nid < f
 FreshF f (thru-outer _ nid)   = nid < f
 
-PreHoldsF : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-            (m : ℕ) (f : Frame Γ s u) → PreF f → Sched Γ → EvalSt e → Set
-PreHoldsF m f (live h) sched st = ConsistentF f h st × FreshF (nodeCt sched) f
-PreHoldsF m f raw      sched st = ⊤
-PreHoldsF m f fallen   sched st = Fell m sched st
+HoldsF : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+         (f : Frame Γ s u) → PreF f → Sched Γ → EvalSt e → Set
+HoldsF f (live h) sched st = ConsistentF f h st × FreshF (nodeCt sched) f
+HoldsF f raw      sched st = ⊤
+
+HoldsFs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
+          (κ : Path Γ lo u t) → PreFs κ → Sched Γ → EvalSt e → Set
+HoldsFs root             _          sched st = ⊤
+HoldsFs (share-sink _ _) _          sched st = ⊤
+HoldsFs (f ↠[ _ ] κ)     (pf , pfs) sched st = HoldsF f pf sched st × HoldsFs κ pfs sched st
 
 PreHolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
            (m : ℕ) (κ : Path Γ lo u t) → Pre κ → Sched Γ → EvalSt e → Set
-PreHolds m root             _         sched st = ⊤
-PreHolds m (share-sink _ _) _         sched st = ⊤
-PreHolds m (f ↠[ _ ] κ)     (pf , pre) sched st = PreHoldsF m f pf sched st × PreHolds m κ pre sched st
+PreHolds m κ (standing pfs) sched st = HoldsFs κ pfs sched st
+PreHolds m κ fallen         sched st = Fell m sched st
 
 -- THE CANDIDATE COLUMN IS TOTAL WHERE THE FRAME IS LIVE, and absent
 -- otherwise: a live frame holds candidates for everything its node
--- holds and receives one beside every value that arrives; a raw or
--- fallen frame re-vouches everything from the store and needs none;
+-- holds and receives one beside every value that arrives; a raw frame
+-- and a fallen path re-vouch everything from the store and need none;
 -- the root and a share's sink vouch for nothing.
 Column : ∀ {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t)
          (P : Val Γ u → Set₁) → Pre κ → List (Val Γ u) → Set₁
-Column root             P _             vals = ⊤
-Column (share-sink _ _) P _             vals = ⊤
-Column (f ↠[ _ ] κ)     P (live _ , _)  vals = All P vals
-Column (f ↠[ _ ] κ)     P (raw , _)     vals = ⊤
-Column (f ↠[ _ ] κ)     P (fallen , _)  vals = ⊤
+Column (f ↠[ _ ] κ) P (standing (live _ , _)) vals = All P vals
+Column _            P _                       vals = ⊤
 
 -- a full column is a column on any ground
 ofColumn : ∀ {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t)
            {P : Val Γ u → Set₁} (pre : Pre κ) {vals : List (Val Γ u)}
          → All P vals → Column κ P pre vals
-ofColumn root             _            ps = tt
-ofColumn (share-sink _ _) _            ps = tt
-ofColumn (f ↠[ _ ] κ)     (live _ , _) ps = ps
-ofColumn (f ↠[ _ ] κ)     (raw , _)    ps = tt
-ofColumn (f ↠[ _ ] κ)     (fallen , _) ps = tt
+ofColumn root             _                       ps = tt
+ofColumn (share-sink _ _) _                       ps = tt
+ofColumn (f ↠[ _ ] κ)     (standing (live _ , _)) ps = ps
+ofColumn (f ↠[ _ ] κ)     (standing (raw , _))    ps = tt
+ofColumn (f ↠[ _ ] κ)     fallen                  ps = tt
 
--- the store's own reading is live ground for every frame, which is
--- what the arrival spine stands a raw fold on
-readPre : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
-          (κ : Path Γ lo u t) → EvalSt e → Pre κ
-readPre root                          st = tt
-readPre (share-sink _ _)              st = tt
-readPre (map-f fn ↠[ _ ] κ)           st = raw , readPre κ st
-readPre (scan-f fn nid ↠[ _ ] κ)      st = raw , readPre κ st
-readPre (take-f nid ↠[ _ ] κ)         st = raw , readPre κ st
-readPre (batchSync-f nid ↠[ _ ] κ)    st = raw , readPre κ st
-readPre (from-inner _ nid _ ↠[ _ ] κ) st = raw , readPre κ st
-readPre (thru-outer _ nid ↠[ _ ] κ)   st = raw , readPre κ st
+-- every frame raw, which is what a fold built over the store itself
+-- stands on, and it stands on nothing
+rawAll : ∀ {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t) → PreFs κ
+rawAll root             = tt
+rawAll (share-sink _ _) = tt
+rawAll (f ↠[ _ ] κ)     = raw , rawAll κ
 
-read-holds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} {m}
-             (κ : Path Γ lo u t) (sched : Sched Γ) (st : EvalSt e)
-           → PreHolds m κ (readPre κ st) sched st
-read-holds root                          sched st = tt
-read-holds (share-sink _ _)              sched st = tt
-read-holds (map-f fn ↠[ _ ] κ)           sched st = tt , read-holds κ sched st
-read-holds (scan-f fn nid ↠[ _ ] κ)      sched st = tt , read-holds κ sched st
-read-holds (take-f nid ↠[ _ ] κ)         sched st = tt , read-holds κ sched st
-read-holds (batchSync-f nid ↠[ _ ] κ)    sched st = tt , read-holds κ sched st
-read-holds (from-inner _ nid _ ↠[ _ ] κ) sched st = tt , read-holds κ sched st
-read-holds (thru-outer _ nid ↠[ _ ] κ)   sched st = tt , read-holds κ sched st
+rawAll-holds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
+               (κ : Path Γ lo u t) (sched : Sched Γ) (st : EvalSt e)
+             → HoldsFs κ (rawAll κ) sched st
+rawAll-holds root             sched st = tt
+rawAll-holds (share-sink _ _) sched st = tt
+rawAll-holds (f ↠[ _ ] κ)     sched st = tt , rawAll-holds κ sched st
 
 -- THE GROUND SURVIVES A STEP THAT WRITES ONLY AT OR ABOVE THE COUNTER,
 -- ADVANCES IT, AND DOES NOT RAISE THE ROOM.  The three hypotheses are
--- the three things a live frame, a fresh frame and a fallen frame each
--- stand on; every arm that writes its own node spends exactly this.
-holdsF-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {m}
+-- what a live frame, a fresh frame and a fallen path each stand on;
+-- every arm that writes its own node spends exactly this.
+holdsF-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
               (f : Frame Γ s u) (pf : PreF f) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
             → PreservedBelow (nodeCt sched) st st′ → nodeCt sched ≤ nodeCt sched′
-            → (Fell m sched st → Fell m sched′ st′)
-            → PreHoldsF m f pf sched st → PreHoldsF m f pf sched′ st′
-holdsF-step (map-f _)            (live h) pr ct fl (c , fr) = tt , tt
-holdsF-step (scan-f _ nid)       (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
-holdsF-step (take-f nid)         (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
-holdsF-step (batchSync-f nid)    (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
-holdsF-step (from-inner _ nid _) (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
-holdsF-step (thru-outer _ nid)   (live h) pr ct fl (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
-holdsF-step f raw    pr ct fl h = tt
-holdsF-step f fallen pr ct fl h = fl h
+            → HoldsF f pf sched st → HoldsF f pf sched′ st′
+holdsF-step (map-f _)            (live h) pr ct (c , fr) = tt , tt
+holdsF-step (scan-f _ nid)       (live h) pr ct (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step (take-f nid)         (live h) pr ct (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step (batchSync-f nid)    (live h) pr ct (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step (from-inner _ nid _) (live h) pr ct (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step (thru-outer _ nid)   (live h) pr ct (c , fr) = trans (below pr nid fr) c , <-≤-trans fr ct
+holdsF-step f raw pr ct h = tt
+
+holdsFs-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
+               (κ : Path Γ lo u t) (pfs : PreFs κ) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
+             → PreservedBelow (nodeCt sched) st st′ → nodeCt sched ≤ nodeCt sched′
+             → HoldsFs κ pfs sched st → HoldsFs κ pfs sched′ st′
+holdsFs-step root             _          pr ct h        = tt
+holdsFs-step (share-sink _ _) _          pr ct h        = tt
+holdsFs-step (f ↠[ _ ] κ)     (pf , pfs) pr ct (h , hs) = holdsF-step f pf pr ct h , holdsFs-step κ pfs pr ct hs
 
 holds-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} {m}
              (κ : Path Γ lo u t) (pre : Pre κ) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
            → PreservedBelow (nodeCt sched) st st′ → nodeCt sched ≤ nodeCt sched′
            → (Fell m sched st → Fell m sched′ st′)
            → PreHolds m κ pre sched st → PreHolds m κ pre sched′ st′
-holds-step root             _          pr ct fl h       = tt
-holds-step (share-sink _ _) _          pr ct fl h       = tt
-holds-step (f ↠[ _ ] κ)     (pf , pre) pr ct fl (h , hs) = holdsF-step f pf pr ct fl h , holds-step κ pre pr ct fl hs
+holds-step κ (standing pfs) pr ct fl h = holdsFs-step κ pfs pr ct h
+holds-step κ fallen         pr ct fl h = fl h
 
 -- ONE CALL MADE TO A CONTINUATION, AS THE CALLER MADE IT.  The trace
 -- a subscribe answers with is a list of these, oldest first, and a
@@ -655,6 +656,27 @@ postulate
   rawRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
           (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
         → (κ : Path Γ ℓ u t) (pre : Pre κ) → RP {e = e} m (Red m u) ⊤ κ pre
+
+-- THE FALLEN CONTINUATION, WHICH IS THE RAW ONE REBUILT AT THE PEELED
+-- CEILING ON EVERY CALL.  It holds no candidates, so nothing it holds
+-- can be stale; the store is the only source of truth after a connect,
+-- and this is the fold that reads it as such.  The accessibility it
+-- peels is the one the arm that built it was funded by, and the peel
+-- is exactly the fallen witness the caller supplies -- the same
+-- descent the connect's fan-out and the old hop's guard made, at the
+-- same place, with the dead branch gone because a caller without the
+-- witness cannot call it.  Its successor is itself, and the witness
+-- survives the fold because a fold keeps the two fields the room
+-- reads.
+fallenRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
+           (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
+         → (κ : Path Γ ℓ u t) → RP {e = e} m (Red m u) ⊤ κ fallen
+fold (fallenRP ac le (acc rsM) κ) tt now vals _ fin sched st rm fell
+  with fold (rawRP ac le (rsM fell) κ (standing (rawAll κ))) tt now vals
+         (ofColumn κ (standing (rawAll κ)) (red-val (rsM fell) _ vals))
+         fin sched st ≤-refl (rawAll-holds κ sched st)
+... | ((r , f , _) , tt) =
+      (r , f , fallen , fell-keeps (foldPath-keeps f) fell , fallenRP ac le (acc rsM) κ) , tt
 
 ------------------------------------------------------------------
 -- THE BODIES.
