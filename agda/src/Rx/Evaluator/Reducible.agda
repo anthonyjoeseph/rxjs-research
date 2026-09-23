@@ -322,11 +322,6 @@ node-in₁ {x} {k} ns p with x ≡ᵇ k
 ... | true  = tt₀
 ... | false = ⊥-elim p
 
-node-in₂ : ∀ {x y k : ℕ} (ns : List ℕ) → T (y ≡ᵇ k) → T (any (_≡ᵇ k) (x ∷ y ∷ ns))
-node-in₂ {x} {y} {k} ns p with x ≡ᵇ k
-... | true  = tt₀
-... | false = node-in₁ {y} {k} ns p
-
 -- a node found among a list of nodes below a bound is below it
 nodes-below : ∀ (ns : List ℕ) {ct} → All (_< ct) ns
             → ∀ k → T (any (_≡ᵇ k) ns) → k < ct
