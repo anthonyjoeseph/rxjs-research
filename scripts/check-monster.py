@@ -119,17 +119,25 @@ def parse_monsters(path):
 
 
 def enclosing_index(defs, def_lines):
-    """anon/module-app node -> the named declaration it continues."""
-    starts = {}
-    for name, sites in def_lines.items():
-        for relpath, ln in sites:
-            cur = starts.get(name)
-            if cur is None or ln < cur[1]:
-                starts[name] = (relpath, ln)
+    """anon/module-app node -> the named declaration it continues.
+
+    The nearest named DEFINING line above the continuation wins, not the
+    nearest declaration START: a mutual block states every signature
+    before any clause, so by start alone each continuation in the first
+    member's clauses is handed to the LAST signature, and whatever it
+    applies goes missing from the cone."""
     named, anon = {}, {}
-    for name, (relpath, ln) in starts.items():
-        (anon if defs[name].kind in ("anon", "module-app") else named) \
-            .setdefault(relpath, []).append((ln, name))
+    for name, sites in def_lines.items():
+        is_anon = defs[name].kind in ("anon", "module-app")
+        for relpath, ln in sites:
+            if is_anon:
+                cur = anon.get(relpath, {}).get(name)
+                if cur is None or ln < cur:
+                    anon.setdefault(relpath, {})[name] = ln
+            else:
+                named.setdefault(relpath, []).append((ln, name))
+    anon = {rp: [(ln, n) for n, ln in rows.items()]
+            for rp, rows in anon.items()}
     for rows in named.values():
         rows.sort()
     out = {}
@@ -274,6 +282,15 @@ the thing we are trying to kill, written without backticks.
     edges.setdefault("asm", set()).update(edges["...#A:9"])
     check("leaf" in reach({"asm"}, edges),
           "and with it the leaf is inside")
+    # a mutual block: both signatures first, then f's clauses, so the
+    # continuation belongs to f even though g's signature STARTS later.
+    defs2 = {"f": D("def", "M.agda"), "g": D("def", "M.agda"),
+             "...#M:6": D("anon", "M.agda")}
+    dl2 = {"f": {("M.agda", 1), ("M.agda", 5)}, "g": {("M.agda", 2),
+           ("M.agda", 8)}, "...#M:6": {("M.agda", 6)}}
+    check(enclosing_index(defs2, dl2).get("...#M:6") == "f",
+          "a continuation in a mutual block goes to the clause above it, "
+          "not to the last signature")
 
     # WHAT IS CHARGED IS CODE ARRIVING.  A header sits ABOVE its declaration
     # and so inside the range of the one before it, so charging comments would

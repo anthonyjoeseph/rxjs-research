@@ -91,6 +91,37 @@ DELIBERATE = {
     frozenset(("ShareChainsFit", "ShareChainsHop")):
         "the same pair one level down, walked over the admitted list "
         "rather than over the share.",
+    # NOT TWO PROOFS OF ONE FACT — the reducibility face's exit-frame
+    # builders and drain peels.  Each pair returns an evaluation (a
+    # derivation plus a state), and the RELATION gate reads them as
+    # propositional only through the `Room` hypothesis's `≤`.  They are
+    # split BY TERMINATION ROUTE, not by content: the raw copy seeds a
+    # fresh drain budget (sound because every route to `rawRP` passes the
+    # shared-input peel), the walk copy has no budget and descends the
+    # room, and each peel takes ONE accessibility per clause because a
+    # rebuilt `acc` across a `with` loses the descent.  Merging any pair
+    # reintroduces the cycle the full termination check rejected.
+    frozenset(("innerReactRaw!", "innerReactWalk!")):
+        "raw and walk exit frames: same answer, different termination "
+        "route (fresh budget vs. room descent).",
+    frozenset(("innerFinishRaw!", "innerFinishWalk!")):
+        "raw and walk exit frames: same answer, different termination "
+        "route (fresh budget vs. room descent).",
+    frozenset(("fromInnerRawRP", "fromInnerWalkRP")):
+        "raw and walk exit frames: same answer, different termination "
+        "route (fresh budget vs. room descent).",
+    frozenset(("finishDrain!", "finishPeelQ!")):
+        "drain dispatcher and its budget peel: one accessibility per "
+        "clause so the descent survives the `with`.",
+    frozenset(("finishPeelM!", "finishWalk!")):
+        "room peel and the budgetless walk that calls it on a nonempty "
+        "queue.",
+    # A FALSE POSITIVE of the normaliser: `(a b : Exp …)` and
+    # `(a b : Tm …)` lose their annotations as binders, so decidable
+    # equality on two different syntactic sorts reads as one statement.
+    frozenset(("eqExp", "eqTm")):
+        "decidable equality on two different sorts, `Exp` and `Tm`; the "
+        "sort lives in an annotated binder the normaliser erases.",
 }
 
 KEYWORDS = {"module", "open", "import", "postulate", "mutual", "opaque",

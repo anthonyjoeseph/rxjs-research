@@ -225,10 +225,10 @@ through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** Both
-halves are green on the values: the sweep matches 500 of 500, the pinned replay
-1 of 1, and neither may be narrowed to pass. The GATE half is not — the
-evaluator does not terminate, so the CLI links only with the checker off, and a
-sweep run by hand is the green memory this tier was disabled behind.
+are red. The evaluator now terminates under the full check, but the sweep
+aborts: 120 of 500 cases reach `stuck-hop`, so the values half fails there
+before any value is compared. Every case that runs matches, and neither half
+may be narrowed to pass.
 
 ### The monster
 
@@ -253,29 +253,15 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 
 ### Big picture tier roadmap
 
-- **BRING THE CONTINUATION-CARRIED CANDIDATE GREEN, AS LANDED.** The
-  evaluator now answers root-only everywhere and hands its candidates DOWN, in
-  the continuation `RP` the fold runs through; the room is the outermost
-  component, a connect is the one edge that peels it, and a drain's budget is
-  the component under it. The draft is in `Rx.Evaluator.Reducible`, `Domain`
-  and `Builder` and has not been typechecked. What this leg does is make it
-  typecheck without weakening it: `Keeps` re-signed over the re-typed
-  relations, the segment vocabulary deleted from `Rx.Evaluator`, the two
-  `where`-bound peels in `finishDrain!` made clauses, `_≟ᵛ_` ground, and the
-  block dev-green then through the tower. What it decides about the monster:
-  whether the connect's peel is the ONLY strict edge the subscribe cycle
-  needs — the two guards are the residue, and anything the checker refuses
-  beyond them names an edge the design missed.
-
-- **ORACLE THE TWO DEAD BRANCHES.** `stuck-hop` and `stuck-finish` are
-  postulated where the design says the room has already fallen: a stored
-  value reaching a flattener unvouched with the room at its ceiling, and a
-  queue outgrowing the budget its subscriber set. Compile with each branch
-  logging and run the sweep. A branch that fires is a refutation of the
-  invariant under it and the finding names the program; a branch that never
-  fires across the sweep is the whole of the remaining proof obligation, and
-  the row for it is born FALSITY until a probe reaches it. This is the leg
-  that turns the monster's region into two named statements.
+- **KEEP A FLATTENED OBSERVABLE'S CANDIDATE ALIVE, SO `stuck-hop` IS DEAD.**
+  The sweep refutes the no-candidate hop being unreachable: `defer(of(5))`
+  reaches it with no share, where the room is 0 and cannot peel. So some
+  producer of an observable-typed value hands the flattener `nothing` —
+  `deferᵉ` returns no candidate, `vouch` gives none at `obs`, and scan
+  accumulators and batch buffers of observable type sit outside `S : Set`.
+  Trace the smallest crasher to the dropping site and carry the candidate
+  there. What it decides about the monster: whether the room is needed at
+  all once every value is vouched, or only a share's connect ever peels it.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
@@ -312,8 +298,12 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 
 ### The ledger
 
-(no rows — what this tier owes is a termination measure, and
-`make recursion-cover` is its ledger, not the postulate count.)
+- **`stuck-hop`** (Reducible) — FALSITY, `NO EVIDENCE`: the sweep reaches it on
+  120 of 500 cases, smallest `defer(of(5))`, so a flattened observable arrives
+  with no candidate at a room that cannot peel.
+- **`stuck-finish`** (Reducible) — FALSITY, `NO EVIDENCE`: a queue outgrowing
+  the budget its subscriber set; the sweep never reached it, and it aborts
+  before most programs could.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`

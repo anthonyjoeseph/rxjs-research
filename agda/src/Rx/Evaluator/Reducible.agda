@@ -42,8 +42,8 @@
 -- flattener's hop subscribe its inner in whatever state the outer
 -- delivery reached, with no invariant threaded.
 
--- AND THE CEILING IS AN INDEX OF THE CANDIDATE, WHICH THE RECORDED
--- DEAD ROUTE SAID COULD NOT BE DONE.  It could not be done while the
+-- AND THE CEILING IS AN INDEX OF THE CANDIDATE, WHICH AN ANSWER
+-- CARRYING CANDIDATES COULD NOT AFFORD.  It could not be done while the
 -- answer carried candidates: a def subscribed at the connect's lower
 -- ceiling came back proven at that ceiling and the arm owed them at
 -- the outer, and the predicate grows with the ceiling, so no weakening
@@ -212,9 +212,8 @@ open RP public
 --
 -- THE CEILING IS AN INDEX AND THE PREDICATE GROWS WITH IT -- a larger
 -- ceiling admits more states, so it quantifies over more -- while a
--- connect descends to a SMALLER one.  That is the shape the dead
--- route below died of, and it is met here by never asking the lower
--- ceiling's candidates to come back UP: they go down the raw
+-- connect descends to a SMALLER one.  It is met here by never asking
+-- the lower ceiling's candidates to come back UP: they go down the raw
 -- continuation at the ceiling the connect peeled to, and a
 -- continuation built at the higher ceiling that has to cross to the
 -- lower one is DROPPED to it (`dropRP`), its candidates forgotten.
@@ -277,6 +276,7 @@ T-if false c ()
 
 -- The pair descends on the element TYPE, which is an argument of both
 -- and shrinks at the one clause that crosses between them.
+-- STRUCTURAL SCC: red-data redDatas
 red-data : ∀ {n} {Γ : Ctx n} (m : ℕ) (u : Ty) → T (isData u) → (v : Val Γ u)
          → Red {Γ = Γ} m u v
 redDatas : ∀ {n} {Γ : Ctx n} (m : ℕ) (u : Ty) → T (isData u) → (vs : List (Val Γ u))
@@ -439,16 +439,16 @@ redScanVals fn rf ra (p ∷ ps) =
 -- every value a bracket buffered, leave unvouched unless their type is
 -- data.
 --
--- AND THE DEAD ROUTE THIS REPLACES IS RE-DERIVING THE CELL'S CANDIDATE
--- BY RUNNING IT.  `red-val` at an observable subscribes the stored
--- closure, so calling it on the cell from inside a fold puts the
--- candidate inside its own recursion at an expression the STORE
--- chose, with the ceiling unchanged -- reading a cell connects
--- nothing.  Holding the candidate and certifying it by value equality
--- calls nothing: a stale cell costs an unvouched column, and an
+-- HOLDING THE CANDIDATE AND CERTIFYING IT BY VALUE EQUALITY CALLS
+-- NOTHING: a stale cell costs an unvouched column, and an
 -- unvouched column costs a guard downstream that the fan-out which
 -- staled the cell has already paid for, by dropping the room.
 --
+-- DEAD ROUTE: re-deriving the cell's candidate by RUNNING it.
+--   `red-val` at an observable subscribes the stored closure, so calling
+--   it on the cell from inside a fold puts the candidate inside its own
+--   recursion at an expression the STORE chose, with the ceiling
+--   unchanged -- reading a cell connects nothing.
 -- DEAD ROUTE: threading the held candidate through the continuation's
 --   STATE, beside the parent's.  The state type is what the candidate's
 --   observable arm quantifies over, so a state holding a candidate sits
@@ -817,6 +817,14 @@ redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Tm Γ [] [] (s ∷ Θ) u)
 -- THE TOP LINE: every closure whose environment is reducible is
 -- itself reducible, which is the face above with both accessibilities
 -- seeded at their own subjects and the room's taken as given.
+--
+-- THE SUBSCRIBE CYCLE DESCENDS LEXICOGRAPHICALLY ON ACCESSIBILITIES IT
+-- CARRIES.  The room's is outermost and only a share's connect peels
+-- it; under it the input bound and the term size fall at every former,
+-- and an environment is walked entry by entry.  Every member takes the
+-- room's accessibility as an argument, so the checker reads the whole
+-- order off the call sites.
+-- STRUCTURAL SCC: dispatchShare! rawRP red-env red-input red-input-shared red-val redExpAcc redFnAcc redTmAcc redTmsAcc reducible shareGo! shareWalk!
 reducible : ∀ {n} {Γ : Ctx n} {Θ t} {m} → Acc _<_ m
           → (b : Exp Γ [] [] Θ t) (ρ : Env Γ Θ)
           → RedEnv m ρ → Red {Γ = Γ} m (obs t) (Θ , b , ρ)
@@ -836,8 +844,8 @@ reducible : ∀ {n} {Γ : Ctx n} {Θ t} {m} → Acc _<_ m
 -- every state -- is spent under the NEXT component: a drained inner is
 -- subscribed with the queue's remaining length as its budget, at the
 -- same room, and a finish reconciles the queue against that budget
--- before it drains.  The refutation below is a program of exactly that
--- shape, and it is funded here without a peel.  The room is asked for
+-- before it drains.  A bounded merge whose lane queues with no share
+-- in the program is funded here without a peel.  The room is asked for
 -- a strict step only where a value the store chose reaches a subscribe
 -- with no candidate and no budget covers it -- which is where the two
 -- guards stand.
