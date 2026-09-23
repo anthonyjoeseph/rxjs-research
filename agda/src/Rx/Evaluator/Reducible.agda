@@ -1507,6 +1507,19 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 -- its budget peels the room.  Each frame kind is its own builder, so
 -- none is handed to a candidate at its own ceiling and budget.
 --
+-- The budget is overrun only if a queue grows while one of its own
+-- drained inners runs, and that takes a connect inside the inner, which
+-- spends the room the peel needs.  Only a share's fan-out delivers to an
+-- outer mid-fold; a row that feeds a share sits on a lower one, while the
+-- inner's own path sinks only above its outer's floor, so nothing the
+-- inner emits reaches the share its outer is registered on, and the only
+-- other way to make that share emit is a connect below it.  So the
+-- over-budget finish is always funded, by room then budget.  Read off the
+-- path and row types, not machine-checked.  Measured on the sweep-era
+-- evaluator over 1.5M programs: 44,160 raw finishes met a nonempty queue,
+-- and every one of the 324,536 budgeted finishes met a queue exactly at
+-- its budget; none overran it, and no walk-order finish met a queue.
+--
 -- RECOVERY: git show 43c34675:agda/src/Rx/Evaluator/Reducible.agda
 --   restores `drain` and `drainSub`, the live drain the route rebuilds.
 postulate

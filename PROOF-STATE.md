@@ -262,8 +262,11 @@ also: `main` — same, the CLI's entry point, which now writes through it.
   merge's queue empty at every walk-order finish, so the same-ceiling
   re-entry is gone from the live path and what remains of it is the raw
   fold's. Its header routes the drain on a budget the raw finish seeds from
-  the queue's own length. The body decides whether a share's fan-out, the
-  monster's own region, terminates without an outside counter.
+  the queue's own length, and argues from the path and row types that an
+  overrun needs a connect inside the drained inner. The body owes that as a
+  lemma: a fold that connects nothing grows no queue. The body decides
+  whether a share's fan-out, the monster's own region, terminates without
+  an outside counter.
 
 - **INSTANTIATE THE ARMS AT THE PROGRAM THAT GROWS A QUEUE.** No Tier 1 row
   has ever been instantiated. `mergeAll(1)` over a shared `of(1,2,3)` mapped
