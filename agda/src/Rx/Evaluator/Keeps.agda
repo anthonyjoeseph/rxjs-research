@@ -114,7 +114,8 @@ takeDispatch-keeps nid vals fin sched st (just (mergeAll-st _ _ _ _)) = keeps-re
 takeDispatch-keeps nid vals fin sched st (just (switch-st _ _))       = keeps-refl _ _
 takeDispatch-keeps nid vals fin sched st (just (exhaust-st _ _))      = keeps-refl _ _
 
--- the bracket writes its buffer while the bit is up and nothing after
+-- the bracket writes its buffer while the bit is up and empties it
+-- once after; only the node table moves either way
 batchDispatch-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                         (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
                         (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
@@ -127,7 +128,10 @@ batchDispatch-keeps {s = s} nid vals fin sched st (just (batchSync-st {w} true b
   with w ≟ᵗ s
 ... | no  _    = keeps-refl _ _
 ... | yes refl = keeps-refl _ _
-batchDispatch-keeps nid vals fin sched st (just (batchSync-st false _ _)) = keeps-refl _ _
+batchDispatch-keeps {s = s} nid vals fin sched st (just (batchSync-st {w} false bur done))
+  with w ≟ᵗ s
+... | no  _    = keeps-refl _ _
+... | yes refl = keeps-refl _ _
 batchDispatch-keeps nid vals fin sched st nothing                        = keeps-refl _ _
 batchDispatch-keeps nid vals fin sched st (just (cell-st _))             = keeps-refl _ _
 batchDispatch-keeps nid vals fin sched st (just (take-st _))             = keeps-refl _ _

@@ -154,7 +154,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root
   atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
-  batchDispatch; batchBuf; thruWrap; consumeUsable; finishUsable; drainSt)
+  batchDispatch; batchDown; thruWrap; consumeUsable; finishUsable; drainSt)
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE CYCLE.  Eleven families, exactly the members of the
@@ -468,8 +468,10 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
   -- own fold or through a registered path a share's fan-out walks
   -- during the very same call; both write the buffer, so reading it
   -- once at the boundary groups them together.  The flush is one
-  -- `foldPath⇓` of the buffer's group, with the buffer's end, in the
-  -- state where the bit is already down.
+  -- `foldPath⇓` THROUGH THE FRAME with nothing arriving, in the state
+  -- where the bit is already down: the frame's own step is what reads
+  -- the buffer out and groups it, so the boundary and a later arrival
+  -- go through one clause.
   subs-batchSync : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ u}
                      {κ : Path Γ lo (u ×ᵗ listᵗ u) t}
                      {now sched st nid out₁ sched₁ st₁ out₂ sched₂ st₂}
@@ -478,10 +480,8 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                      (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                      (installNode nid (batchSync-st {s = u} true [] false) st)
                      (out₁ , sched₁ , st₁)
-                 → foldPath⇓ now κ
-                     (proj₁ (batchBuf u (lookupNode nid (EvalSt.nodes st₁))))
-                     (proj₂ (batchBuf u (lookupNode nid (EvalSt.nodes st₁))))
-                     sched₁ (installNode nid (batchSync-st {s = u} false [] false) st₁)
+                 → foldPath⇓ now (batchSync-f nid ↠[ ≤-refl ] κ) [] false
+                     sched₁ (installNode nid (batchDown u (lookupNode nid (EvalSt.nodes st₁))) st₁)
                      (out₂ , sched₂ , st₂)
                  → subscribeE⇓ (Θ , batchSyncᵉ b , ρ) κ now sched st
                      (out₁ ++ out₂ , sched₂ , st₂)

@@ -608,6 +608,14 @@ batchVals false (v ∷ vs) = (v , []) ∷ batchVals false vs
 -- so a source that ends inside the subscribe call cannot end the
 -- stream ahead of its own group.  A bracket that finds no buffer of
 -- its own element type emits nothing and writes nothing.
+--
+-- WITH THE BIT DOWN THE FRAME FLUSHES WHAT THE BUFFER HOLDS AS ONE
+-- GROUP, WITH THE COMPLETION IT WITHHELD, AND THEN PASSES THE ARRIVING
+-- VALUES SINGLY.  That is the TypeScript's second `defer`: the
+-- boundary lowers the bit and folds the frame once with nothing
+-- arriving, and this clause is what that fold does.  The buffer is
+-- emptied by the flush, so every later fold through the lowered frame
+-- flushes nothing and is the plain per-value regrouping.
 batchDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
               → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
               → Maybe (NodeState Γ)
@@ -619,27 +627,23 @@ batchDispatch {s = s} nid vals fin sched st (just (batchSync-st {w} true bur don
       [] , false , sched ,
       record st { nodes = setNode nid (batchSync-st true (bur ++ vals) (done ∨ fin))
                                   (EvalSt.nodes st) }
-batchDispatch nid vals fin sched st (just (batchSync-st false _ _)) =
-  batchVals false vals , fin , sched , st
+batchDispatch {s = s} nid vals fin sched st (just (batchSync-st {w} false bur done))
+  with w ≟ᵗ s
+... | no  _    = batchVals false vals , fin , sched , st
+... | yes refl =
+      batchVals true bur ++ batchVals false vals , done ∨ fin , sched ,
+      record st { nodes = setNode nid (batchSync-st {s = s} false [] false)
+                                  (EvalSt.nodes st) }
 batchDispatch nid vals fin sched st _ = [] , fin , sched , st
 
--- THE BOUNDARY, WHERE THE BIT GOES DOWN AND THE GROUP LEAVES.  This is
--- the TypeScript's second `defer`: it runs once the source's subscribe
--- call has returned, hands back the one group the call accumulated and
--- the completion it withheld, and is what the whole buffer exists for.
--- `stepSegs` is what assembles it, so the flush is bracketed exactly
--- as any other frame step's answer is.
--- WHAT THE BUFFER HOLDS, GROUPED, AND THE COMPLETION BESIDE IT.  It is
--- split from the assembly below so that the `_≟ᵗ_` every read of the
--- buffer pays sits under a `with` of its OWN: a `with` in the assembly
--- blocks the reduction the reducibility face has to see through, and
--- that face then owes an inversion of `Val` rather than a value list.
-batchBuf : ∀ {n} {Γ : Ctx n} (s : Ty) → Maybe (NodeState Γ)
-         → List (Val Γ (s ×ᵗ listᵗ s)) × Bool
-batchBuf s (just (batchSync-st {w} _ bur done)) with w ≟ᵗ s
-... | no  _    = [] , done
-... | yes refl = batchVals true bur , done
-batchBuf s _ = [] , false
+-- THE BOUNDARY LOWERS THE BIT AND NOTHING ELSE: the buffer and the
+-- completion stay for the flush to read.  A node of another element
+-- type, or none, becomes an empty lowered bracket.
+batchDown : ∀ {n} {Γ : Ctx n} (s : Ty) → Maybe (NodeState Γ) → NodeState Γ
+batchDown s (just (batchSync-st {w} _ bur done)) with w ≟ᵗ s
+... | no  _    = batchSync-st {s = s} false [] done
+... | yes refl = batchSync-st {s = s} false bur done
+batchDown s _ = batchSync-st {s = s} false [] false
 
 -- WHAT A MERGE'S DRAIN RE-READS BETWEEN SPENDS.  rxjs's buffer is one
 -- mutable array and the loop `shift`s it, so a drain that re-enters

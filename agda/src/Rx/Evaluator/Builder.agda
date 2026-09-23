@@ -44,14 +44,14 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit.Polymorphic using (tt)
 
 open import Rx.Prim using (Fuel)
-open import Rx.Exp using (Ctx; Closed; []ᵉ; Val)
+open import Rx.Exp using (Ctx; Closed; []ᵉ; Val; listᵗ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; root; Arrival; arrTick; arrTy; arrVal; AtFloor; RegId; chainsOf;
   cascadeOpen; cascadeClose; sched-next; sched-init; st-init)
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible using (reducible; rawRP; rootRP; vouchAll; fold)
+open import Rx.Evaluator.Reducible using (reducible; rawRP; rootRP; allJust; red-val; fold)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.
@@ -63,10 +63,14 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (sched : Sched Γ) (st : EvalSt e)
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                chainStep⇓ {e = e} a vs fin c sched st r
+-- AN ARRIVAL IS FOLDED OUTSIDE THE BLOCK, so any fresh accessibility
+-- funds the candidate for every value it carries: a scheduled body is
+-- a closure, and `red-val` rebuilds its candidate by recursion on it.
 chainStep! {n = n} a vs fin (lo , path) sched st =
   let ((_ , f) , _) =
         fold (rawRP (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path) tt
-          (arrTick a) vs (vouchAll (arrTy a) vs) fin sched st ≤-refl
+          (arrTick a) vs (allJust (red-val (<-wellFounded _) (listᵗ (arrTy a)) vs))
+          fin sched st ≤-refl
   in _ , chain-step f
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

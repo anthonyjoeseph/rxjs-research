@@ -253,14 +253,22 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 
 ### Big picture tier roadmap
 
-- **LET A FOLD HAND ITS SUCCESSOR THE CANDIDATE IT COMPUTED, SO `stuck-hop`
-  IS DEAD ON THE LIVE PATH.** Four sites drop a candidate, pinned under
-  `typescript/cases/` and named in the postulate's header. Three have a payer
-  and are wiring; the live-path scan cell and batch buffer have none, since
-  nothing on the stack bounds a stored accumulator's body. So `Red`'s
-  continuation is restated first, and the three wirings follow it. What it
-  decides about the monster: whether the room pays for anything but a
+- **TYPECHECK THE SUCCESSOR CONTINUATION AND RUN THE SWEEP OVER IT.** The
+  four sites in the postulate's header are answered in the tree but nothing
+  has checked it: every fold hands back its successor, the sink keeps its
+  column, a raw fold or bracket certifies a stored value by `red-val` under
+  the connect's peel, an arrival's column is the candidate at values, and the
+  bracket's flush is a fold through the frame. Get the block dev-green, then
+  the oracle, and read which of the four pinned cases still reach the guard.
+  What it decides about the monster: whether the room pays for anything but a
   connect's own def, or is exactly the connect arm's one strict edge.
+
+- **THE SUCCESSOR CROSSES ONLY THE EXIT FRAME, AND THAT REGION IS OPEN.** An
+  arm answers with a continuation at its own type and cannot hand back its
+  parent's successor across a frame that changes the element type, so a
+  stateful frame under a map or a second fold is stale to its next fold. Pin
+  it with a case, then decide whether the store carries the candidate, the
+  frame stack indexes the continuation, or the region stays a guard.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE

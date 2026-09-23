@@ -21,6 +21,9 @@
 -- DEGENERATE: `finish-empty`.  `stuck-finish` at an empty queue is the
 -- drain's spent clause.  The sweep never reached the statement, so no
 -- shape of it is the one a run hands over.
+-- DEGENERATE: the continuation each row hands back.  A guard answers
+-- with a continuation at its own path, and the raw builder over the
+-- root is one at every path here; no row folds it.
 --
 -- NOT COVERED: a state the RUN reached.  Every state here is the
 -- initial one or the initial one with the flattener's node installed by
@@ -36,6 +39,7 @@ open import Data.Bool using (false)
 open import Data.List using ([]; _∷_)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (z≤n)
+open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_)
 open import Data.Unit using (⊤; tt)
@@ -49,7 +53,7 @@ open import Rx.Evaluator using (Sched; EvalSt; sched-init; st-init; installNode;
   mergeAll-st; root; from-inner; mergeAllᵒ; _↠[_]_)
 open import Rx.Evaluator.Domain using (subs-of; subs-defer; fold-root; fold-step;
   step-from-inner; react-dead; finish-all-drain; drain-spent)
-open import Rx.Evaluator.Reducible using (stuck-hop; stuck-finish)
+open import Rx.Evaluator.Reducible using (stuck-hop; stuck-finish; rootRP; fromInnerRawRP)
 
 Γ₀ : Ctx 0
 Γ₀ = []ᵛ
@@ -83,17 +87,18 @@ hop-inner =
   (_ , subs-of (fold-step
          (step-from-inner (react-dead refl (finish-all-drain fold-root drain-spent)))
          fold-root))
-  , tt
+  , tt , fromInnerRawRP mergeAllᵒ 0 1 (<-wellFounded 0) ≤-refl root rootRP
 
 hop-root : Confirms (stuck-hop {e = prog} {m = 0} {lo = 0} {S = ⊤} five root 0 tt
              sched₀ st₀ z≤n (λ ()))
-hop-root = (_ , subs-of fold-root) , tt
+hop-root = (_ , subs-of fold-root) , tt , rootRP
 
 hop-defer : Confirms (stuck-hop {e = prog} {m = 0} {lo = 0} {S = ⊤} later
               (from-inner mergeAllᵒ 0 1 ↠[ ≤-refl ] root) 1 tt sched₀ st₁
               z≤n (λ ()))
 hop-defer = (_ , subs-defer refl refl refl refl) , tt
+          , fromInnerRawRP mergeAllᵒ 0 1 (<-wellFounded 0) ≤-refl root rootRP
 
 finish-empty : Confirms (stuck-finish {e = prog} {m = 0} {lo = 0} {S = ⊤} 0 root 1 tt
                  sched₀ st₁ nothing 1 [] false z≤n (λ ()))
-finish-empty = (_ , drain-spent) , tt
+finish-empty = (_ , drain-spent) , tt , rootRP
