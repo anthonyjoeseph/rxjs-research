@@ -695,9 +695,14 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
                         ws.update(re.findall(r"[^\s()\[\]{};,]+", ln.split("--")[0]))
         return ws
 
+    # AND STUBS SHARING ONE INSERTION POINT GO IN SOURCE ORDER.  A stub's
+    # signature may name a sibling stub (a translation indexed by the
+    # continuation it translates), and Agda accepted the file only because
+    # that sibling's signature came first.  `stubs_of` is a set, and set
+    # order once put the consumer's postulate above the sibling it names.
     stub_at: dict[int, list[tuple[int, str]]] = {}
     for bi in heavy:
-        for m in stubs_of[bi]:
+        for m in sorted(stubs_of[bi], key=lambda m: sig_at.get(m, cls_at.get(m, 0))):
             B = back_up(sig_at.get(m, cls_at.get(m, 0)))
             stub_at.setdefault(B, []).append((bi, m))
         if stubs_of[bi]:
@@ -1190,6 +1195,36 @@ def weight(p: Parsed, name: str) -> int:
                if it.kind == "clauses" and it.name == name) or 1
 
 
+def sig_coupled(p: Parsed, foci: list[str]) -> list[str]:
+    """Close a focus set under SIGNATURE coupling.
+
+    A stub is a postulate AT ITS SIGNATURE, and a signature may name a
+    sibling: a trace translation is indexed by the very continuation it
+    translates.  The context's postulate of that sibling is then stated over
+    the CONTEXT's copy of the named member, and a batch that redefines the
+    member for real gets `liveRP != Ctx.liveRP` at every use of the stub.  So a
+    member whose signature names a focus is a focus too, transitively -- one
+    coupled group is one batch, whatever `--batch` says.
+    """
+    for b in p.blocks:
+        if len(b.members) > 1 and any(f in b.members for f in foci):
+            in_sig: dict[str, set[str]] = {}
+            for m in b.members:
+                txt = " ".join(l.split("--")[0] for l in (sig_text(p, m) or []))
+                in_sig[m] = {o for o in b.members if o != m and re.search(
+                    r"(?<![\w\-])" + re.escape(o) + r"(?![\w\-])", txt)}
+            out = set(foci)
+            grew = True
+            while grew:
+                grew = False
+                for m in b.members:
+                    if m not in out and in_sig[m] & out:
+                        out.add(m)
+                        grew = True
+            return [m for m in b.members if m in out]
+    return list(foci)
+
+
 def plan(p: Parsed, foci: list[str], size: int) -> list[list[str]]:
     """Balance the batches by body size, largest first (LPT).
 
@@ -1199,13 +1234,25 @@ def plan(p: Parsed, foci: list[str], size: int) -> list[list[str]]:
     Spreading them also breaks up mutually-recursive clusters, which is the
     other thing that makes a batch expensive.
     """
+    # Signature-coupled members travel as ONE unit (see sig_coupled): a unit
+    # bigger than the batch size gets a batch of its own.
+    pool = set(foci)
+    units: list[list[str]] = []
+    while pool:
+        f = min(pool, key=lambda m: foci.index(m))
+        grp = [m for m in sig_coupled(p, [f]) if m in pool]
+        grp = [m for m in sig_coupled(p, grp) if m in pool]
+        units.append(grp)
+        pool -= set(grp)
+    uw = {tuple(u): sum(weight(p, m) for m in u) for u in units}
     n = max(1, -(-len(foci) // size))
     bins: list[list[str]] = [[] for _ in range(n)]
     load = [0] * n
-    for f in sorted(foci, key=lambda f: -weight(p, f)):
-        k = min((i for i in range(n) if len(bins[i]) < size), key=lambda i: load[i])
-        bins[k].append(f)
-        load[k] += weight(p, f)
+    for u in sorted(units, key=lambda u: -uw[tuple(u)]):
+        room = [i for i in range(n) if len(bins[i]) + len(u) <= size or not bins[i]]
+        k = min(room, key=lambda i: load[i])
+        bins[k].extend(u)
+        load[k] += uw[tuple(u)]
     return [b for b in bins if b]
 
 

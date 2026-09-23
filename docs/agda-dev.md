@@ -32,6 +32,11 @@ Where a block IS stubbed, two things are given up:
 - **Postulates do not reduce**, so a clause needing a sibling to unfold can pass dev
   and fail for real.
 
+Members whose SIGNATURES name a sibling (a trace indexed by the continuation it
+replays) travel as one batch, whatever `--batch` says: the context's postulate of
+such a member is stated over the context's copy of the sibling, and a batch that
+redefined only the sibling would see two different terms.
+
 Self-recursion and recursion within one batch ARE checked. So the residual risk of
 a dev-only workflow is concentrated in the handful of modules with a heavy block,
 which is exactly where `make gate-heavy` earns its keep.

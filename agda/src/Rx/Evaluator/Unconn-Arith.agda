@@ -40,8 +40,8 @@
 --   is the state relation that feeds the antitone one.
 -- RECOVERY: git show 3abdafa1:agda/src/Rx/Evaluator/Unconn-Arith.agda
 --   holds the strict fall at a connect (`unconn-insert`, over
---   `sum-tab-strict` and `unconnAt-cons-≤`) and the non-strict
---   `room-keeps`, which the connect arm and the frame arms spend.
+--   `sum-tab-strict` and `unconnAt-cons-≤`), which the connect arm
+--   spends.
 module Rx.Evaluator.Unconn-Arith where
 
 open import Data.Bool using (true; false; if_then_else_)
@@ -51,7 +51,7 @@ open import Data.List using (List; _∷_; tabulate)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n)
 open import Data.Nat.ListAction using (sum)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-<-trans; +-mono-≤)
+  (≤-refl; ≤-trans; ≤-<-trans; +-mono-≤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx)
@@ -131,8 +131,13 @@ keeps-cons sl cs s = keepsC refl mem-cons
   mem-cons : ∀ r → memberSource r cs ≡ true → memberSource r (s ∷ cs) ≡ true
   mem-cons r h rewrite h = ∨-zeroʳ (sameSource r s)
 
--- and the strict form: a fallen room stays fallen through any step
--- that keeps the two fields
+-- a room under the ceiling stays under it through any step that keeps
+-- the two fields, and the strict form says the same of a fallen one
+room-keeps : ∀ {n} {Γ : Ctx n} {sl sl′ : Slots Γ} {cs cs′ : List Source} {m}
+           → KeepsC sl cs sl′ cs′ → unconn sl cs ≤ m → unconn sl′ cs′ ≤ m
+room-keeps {sl = sl} {cs = cs} {cs′ = cs′} (keepsC refl mono) le =
+  ≤-trans (unconn-antitone sl cs cs′ mono) le
+
 fell-keeps : ∀ {n} {Γ : Ctx n} {sl sl′ : Slots Γ} {cs cs′ : List Source} {m}
            → KeepsC sl cs sl′ cs′ → unconn sl cs < m → unconn sl′ cs′ < m
 fell-keeps {sl = sl} {cs = cs} {cs′ = cs′} (keepsC refl mono) lt =
