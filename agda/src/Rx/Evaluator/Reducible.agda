@@ -107,7 +107,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing; _<∣>_) renaming (map to mapᵐ)
 open import Data.Nat using (ℕ; suc; _≤_; _<_; _∸_; s≤s; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans; <⇒≤)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Unit.Polymorphic using (⊤; tt)
@@ -132,10 +132,11 @@ open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; p
 open import Decide using (∧ˡ; ∧ʳ; ≡ᵇ→≡; ≡ᵇ-refl)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
   batchSync-f; from-inner; thru-outer; NodeState; lookupNode; frameNodes; pathHasNode;
-  register; installNode; atDyn; mergeAll-st; mergeAllᵒ)
-open import Rx.Evaluator.Unconn-Arith using (unconn; fell-keeps; room-keeps)
+  register; installNode; atDyn; atSlot; lowerFloor; memberSource; mergeAll-st; mergeAllᵒ)
+open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert; fell-keeps; room-keeps)
 open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ; subs-map;
+  subs-shared; slot-spent; slot-join; slot-connect; connect;
   foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; injectRoot)
 
 ------------------------------------------------------------------
@@ -922,14 +923,18 @@ postulate
 -- A share's definition is an arbitrary expression standing in no
 -- relation to `input i`, so it cannot be reached by any descent on the
 -- TERM; the telescope's side condition charges it against the input
--- ceiling `toℕ i` instead.  It is subscribed at the sink, with the RAW
--- continuation above it: the def's values fan out over the registry,
--- through paths no subscribe built, at the ceiling the connect just
--- lowered to.  The trigger's own continuation is not used at all; the
--- trigger receives its values through the chain it registered, so the
--- continuation's state comes back untouched and its trace is empty.
-postulate
-  red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
+-- ceiling `toℕ i` instead, and that is the descent the connect makes.
+-- The def is subscribed at the sink AT THE CALLER'S OWN CEILING, on
+-- FALLEN ground: the connect is what drops the count under the
+-- ceiling, so the witness is in hand before the def is subscribed, and
+-- every fold of the sink's continuation peels the room's
+-- accessibility on it and reads the store raw at the lower ceiling.
+-- The def's values fan out over the registry, through paths no
+-- subscribe built.  The trigger's own continuation is not called at
+-- all -- the trigger receives its values through the row it
+-- registered -- so its trace records only the fall, and the fall at
+-- the state the def's subscribe left is the def's own answer.
+red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
       (i : Fin n) (d : Closed Γ (lookup Γ i))
       {okd : T (inputsBelowᵉ (toℕ i) d)}
     → Acc _<_ (toℕ i)
@@ -1171,6 +1176,43 @@ red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ pre rp s now sched st rm
 ...   | shared d {ok = okd} =
         red-input-shared i d (rsK (<ᵇ⇒< (toℕ i) k ok)) ρ
           κ below pre rp s now sched slEq st aM rm h
+
+-- THE SHARED SLOT'S BODY.  Spent: the end folds once through the
+-- continuation.  Joined: one row is registered and nothing is folded,
+-- so the ground stands where it stood.  Neither: the connect, which
+-- registers the trigger's row, inserts the index, and subscribes the
+-- def under the fallen sink; what comes back is the fall at the state
+-- the def left, which is all a fallen answer owes.
+red-input-shared {n = n} i d {okd} aI ρ κ below pre rp s now sched slEq st aM rm h
+    with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
+... | true =
+      let c  = call now [] (ofColumn κ pre []) true sched st rm h
+          an = apply rp s c
+      in _ , subs-shared {κ = κ} {below = below} slEq (slot-spent {κ = κ} {below = below} doneEq (der an))
+         , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+red-input-shared {n = n} i d {okd} aI ρ κ below pre rp s now sched slEq st aM rm h
+    | false with memberSource (toℕ i) (EvalSt.connectedShares st) in connEq
+...   | true =
+        _ , subs-shared {κ = κ} {below = below} slEq (slot-join {κ = κ} {below = below} doneEq connEq refl)
+        , []ᵗ , holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x) h
+        , kept-step κ pre (pres (λ _ _ → refl)) ≤-refl
+...   | false
+      with (let rid    = freshId regᵏ (Sched.mint sched)
+                sched′ = record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
+                st′    = register rid (atSlot i) (lowerFloor below κ)
+                           (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
+                fell′  = ≤-trans (unconn-insert (Sched.slots sched) (EvalSt.connectedShares st) i slEq connEq) rm
+            in redExpAcc d []ᵉ tt (toℕ i) okd aI (<-wellFounded (gsizeᵉ d)) aM
+                 (share-sink i ≤-refl) fallen
+                 (dropS (fallenRP (<-wellFounded (n ∸ toℕ i)) ≤-refl aM (share-sink i ≤-refl)))
+                 tt now sched′ st′ (<⇒≤ fell′) fell′)
+...     | (r , dv , tr , hl , _) =
+          r , subs-shared {κ = κ} {below = below} slEq
+                (slot-connect {κ = κ} {below = below} doneEq connEq (connect {κ = κ} {below = below} refl dv))
+          , fellᵗ
+          , subst (λ p → PreHolds _ (share-sink i ≤-refl) p _ _)
+              (fallen-stays (<-wellFounded (n ∸ toℕ i)) ≤-refl aM (share-sink i ≤-refl) tr) hl
+          , tt
 
 ------------------------------------------------------------------
 -- THE TERM FACE.

@@ -38,23 +38,21 @@
 --   is where every statement below but the last was proven before, and
 --   `git show 2f40824d:agda/src/Verify-Budget-Sufficient/Keeps-Ring.agda`
 --   is the state relation that feeds the antitone one.
--- RECOVERY: git show 3abdafa1:agda/src/Rx/Evaluator/Unconn-Arith.agda
---   holds the strict fall at a connect (`unconn-insert`, over
---   `sum-tab-strict` and `unconnAt-cons-≤`), which the connect arm
---   spends.
 module Rx.Evaluator.Unconn-Arith where
 
-open import Data.Bool using (true; false; if_then_else_)
+open import Data.Bool using (T; true; false; if_then_else_; _∨_)
 open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Fin using (Fin; toℕ) renaming (zero to fzero; suc to fsuc)
 open import Data.List using (List; _∷_; tabulate)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.ListAction using (sum)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-<-trans; +-mono-≤)
+  (≤-refl; ≤-trans; ≤-<-trans; +-mono-≤; +-mono-<-≤; +-mono-≤-<)
+open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx)
+open import Decide using (≡ᵇ-refl)
+open import Rx.Exp using (Ctx; Closed; inputsBelowᵉ)
 open import Rx.Prim using (Source)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator using (memberSource; sameSource)
@@ -77,6 +75,26 @@ sum-tab-mono {zero}  f g h = z≤n
 sum-tab-mono {suc m} f g h =
   +-mono-≤ (h fzero) (sum-tab-mono _ _ (λ i → h (fsuc i)))
 
+-- and the same with one index moving strictly, which is the only way
+-- a sum of naturals falls at all
+sum-tab-strict : ∀ {m} (f g : Fin m → ℕ) → (∀ j → f j ≤ g j) →
+  (i : Fin m) → f i < g i → sum (tabulate f) < sum (tabulate g)
+sum-tab-strict {suc m} f g h fzero    fi<gi =
+  +-mono-<-≤ fi<gi (sum-tab-mono _ _ (λ j → h (fsuc j)))
+sum-tab-strict {suc m} f g h (fsuc i) fi<gi =
+  +-mono-≤-< (h fzero) (sum-tab-strict _ _ (λ j → h (fsuc j)) i fi<gi)
+
+-- adding a member never raises any slot's contribution
+unconnAt-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (s : Source) (i : Fin n) → unconnAt sl (s ∷ cs) i ≤ unconnAt sl cs i
+unconnAt-cons-≤ sl cs s i with sl i
+... | scripted _ = z≤n
+... | shared _ with memberSource (toℕ i) cs
+...   | true  rewrite ∨-zeroʳ (sameSource (toℕ i) s) = z≤n
+...   | false with sameSource (toℕ i) s ∨ false
+...     | true  = z≤n
+...     | false = ≤-refl
+
 -- KEEPING A MEMBER NEVER RAISES A SLOT'S CONTRIBUTION EITHER, and this
 -- is the form a sub-run's induction can hand over.
 unconnAt-antitone : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs cs′ : List Source)
@@ -97,6 +115,24 @@ unconn-antitone : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs cs′ : List Source) 
 unconn-antitone sl cs cs′ mono =
   sum-tab-mono (unconnAt sl cs′) (unconnAt sl cs)
     (λ i → unconnAt-antitone sl cs cs′ i (mono (toℕ i)))
+
+-- THE CONNECT EDGE'S OWN FACT, STATED IN THE CURRENCY THE ARM HOLDS.
+-- The connect clause reaches its body down two branches -- the slot
+-- matched `shared`, and membership read `false` -- and that pair is
+-- exactly what makes its index fall from one to nought while no other
+-- index rises.  Keeping the two separate at the edge and joining them
+-- here is what stops the shape being lost again: the refuted statement
+-- is the one that carries only the second.
+unconn-insert : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+  (i : Fin n) {d : Closed Γ (lookup Γ i)}
+  {ok : T (inputsBelowᵉ (toℕ i) d)} → sl i ≡ shared d {ok = ok} →
+  memberSource (toℕ i) cs ≡ false →
+  unconn sl (toℕ i ∷ cs) < unconn sl cs
+unconn-insert sl cs i eqi fresh =
+  sum-tab-strict _ _ (unconnAt-cons-≤ sl cs (toℕ i)) i strict
+  where
+  strict : unconnAt sl (toℕ i ∷ cs) i < unconnAt sl cs i
+  strict rewrite eqi | fresh | ≡ᵇ-refl (toℕ i) = s≤s z≤n
 
 -- WHAT A STEP OF THE EVALUATOR IS ALLOWED TO DO TO THE TWO FIELDS THE
 -- COUNT READS, STATED OVER THE FIELDS AND NOT OVER THE STATES.  A
