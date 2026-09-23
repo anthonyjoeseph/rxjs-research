@@ -225,10 +225,10 @@ through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** Both
-are red. The evaluator now terminates under the full check, but the sweep
-aborts: 120 of 500 cases reach `stuck-hop`, so the values half fails there
-before any value is compared. Every case that runs matches, and neither half
-may be narrowed to pass.
+are red. The evaluator terminates under the full check, and the sweep matches
+rxjs on 499 of 500 cases; the one remaining case reaches `stuck-hop`, which
+aborts the batch, so the values half is red until the branch is empty. Neither
+half may be narrowed to pass.
 
 ### The monster
 
@@ -253,22 +253,26 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 
 ### Big picture tier roadmap
 
-- **RUN THE SWEEP OVER THE SUCCESSOR CONTINUATION.** The four sites in the
-  postulate's header are answered and the tower accepts them, termination
-  included: every fold hands back its successor, the sink keeps its column, a
-  raw fold or bracket certifies a stored value by `red-val` under the
-  connect's peel, an arrival's column is the candidate at values, and the
-  bracket's flush is a fold through the frame. Run the oracle and read which
-  of the four pinned cases still reach the guard. What it decides about the
-  monster: whether the room pays for anything but a connect's own def, or is
-  exactly the connect arm's one strict edge.
+- **PEEL EVERY FRAME, NOT ONLY THE EXIT FRAME.** The one case the sweep still
+  loses is a buffer whose source subscribe pushed any frame at all: the arm
+  gets the frame's successor back and answers with the stale one it was
+  handed, because `up` is the unit at every frame but `from-inner`. The cheap
+  experiment first: name the parent's predicate through the path index --
+  `UpOf` at a map frame IS the record at the frame's output type, which the
+  path carries -- in one mutual block with the candidate. If the checker takes
+  it, every transformer arm returns its parent's successor and the sweep
+  should be 500 of 500. What it decides: whether the successor design reaches
+  the whole live path or the boundary is structural.
 
-- **THE SUCCESSOR CROSSES ONLY THE EXIT FRAME, AND THAT REGION IS OPEN.** An
-  arm answers with a continuation at its own type and cannot hand back its
-  parent's successor across a frame that changes the element type, so a
-  stateful frame under a map or a second fold is stale to its next fold. Pin
-  it with a case, then decide whether the store carries the candidate, the
-  frame stack indexes the continuation, or the region stays a guard.
+- **THE CERTIFICATION IS A CHECK, AND THE DISCHARGE IS TURNING IT INTO A
+  PROOF.** A green sweep empties the branch without deleting it: a fold
+  certifies the store's cell against its held column by `eqVal`, and the
+  mismatch case vouches nothing at `obs`, which is the branch. Discharging
+  `stuck-hop` means the continuation or the state carries WHICH cell it
+  certifies as an index, transported through every store rewrite -- the
+  invariant-record cost, spread over the `Keeps` lemmas. Decide the carrier
+  after the peel experiment, since a successor that reaches every frame is
+  the natural index and a cert store beside the state is the alternative.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
@@ -306,9 +310,9 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 ### The ledger
 
 - **`stuck-hop`** (Reducible) — FALSITY, `DEAD ROUTE, PROBED`: the sweep
-  reaches it on 120 of 500 cases, smallest `defer(of(5))`, and hand cases reach
-  it with no share, defer or tick — a scan cell, a batch buffer, a share's
-  fan-out each drop the candidate the flattener needs.
+  reaches it on 1 of 500 cases, a buffer whose source subscribe pushed a frame
+  (`candidate-dropped-under-a-frame`); the arm answers with the stale
+  continuation because only the exit frame peels.
 - **`stuck-finish`** (Reducible) — FALSITY, `PROBED`: a queue outgrowing the
   budget its subscriber set; the sweep never reached it, and it aborts before
   most programs could.

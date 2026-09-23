@@ -757,7 +757,7 @@ up (batchRP nid hb fb h κ rp) = tt
 -- and the successor is what the next fold through that frame runs
 -- (`candidate-dropped-at-scan-cell`,
 -- `candidate-dropped-at-batch-buffer`).
---
+
 -- THE SUCCESSOR CROSSES ONLY THE EXIT FRAME, WHICH IS THE BOUNDARY
 -- THAT REMAINS.  The arm that pushed a frame gets that frame's
 -- successor back from the subscribe below it and must answer with a
@@ -770,8 +770,24 @@ up (batchRP nid hb fb h κ rp) = tt
 -- handed, and a cell written below such a frame is stale to the
 -- frame's next fold unless the subscribe under it pushed no frame.
 -- The live-path kill therefore covers a stateful frame whose source
--- is source-shaped; the same frame under a map or a second fold takes
--- this branch still.
+-- is source-shaped; the same frame over ANY frame takes this branch
+-- still, an identity map or a `take` included, since what is lost is
+-- the successor and not the type
+-- (`candidate-dropped-under-a-frame`, whose third row is the
+-- source-shaped control that runs).  The sweep reaches this branch
+-- from that shape alone: one case in five hundred, and every other
+-- case matches.
+--
+-- AND THE CERTIFICATION IS A RUNTIME CHECK EVEN WHERE THE SUCCESSOR
+-- ARRIVES, so closing the boundary empties the branch without
+-- deleting it.  A fold certifies the store's cell against the column
+-- its successor holds by comparing values, and the mismatch case
+-- vouches -- `nothing` at `obs` -- which is what this branch is
+-- reached through.  Turning the check into a proof means the
+-- continuation, or the state, carries which cell it certifies as an
+-- INDEX, transported through every step that rewrites the store; that
+-- is the invariant-record cost, and it is what discharging this
+-- statement is.
 --
 -- IT ANSWERS THE SUBSCRIBE, NOT THE CONSUME, so the arm that reaches it
 -- wraps it exactly as it wraps a paid hop and the relation cannot
