@@ -1972,7 +1972,7 @@ fiHolds→thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ u}
              → PreHolds m (from-inner {s = u} op nid inst ↠[ ≤-refl ] κ) (headPre h p) sched st
              → PreHolds m (thru-outer op nid ↠[ le ] κ) (headPre h p) sched st
 fiHolds→thru op nid inst le κ h (standing pfs) ((c , lt ∷ᵃ _) , ap , hs) =
-  (c , lt ∷ᵃ []ᵃ) , (λ k on → ap k (∨-Tˡ ([ (λ a → a) , (λ ()) ] (∨-T on)))) , hs
+  (c , lt ∷ᵃ []ᵃ) , (λ k on → ap k (∨-Tˡ {nid ≡ᵇ k} {any (_≡ᵇ k) (inst ∷ [])} ([ (λ a → a) , (λ ()) ] (∨-T {nid ≡ᵇ k} {false} on)))) , hs
 fiHolds→thru op nid inst le κ h fallen fell = fell
 
 -- THE TWO COLUMN GUARDS, WHICH ARE WHY NOTHING IS DRAINED ON STANDING
@@ -2065,7 +2065,7 @@ subStanding : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid
                                   (bumpNode sched) (record st { nodes = setNode nid ns′ (EvalSt.nodes st) }) (o′ , sc , s′))
                   (standing pfs) rp s₀ sched st)
                 (λ r → RoomEmpty (Stage.hd r))
-subStanding {u = u} op nid aM le κ pfs rp s₀ ns′ gq o ro now {sched} {st} rm hsκ lt ap =
+subStanding {m = m} {u = u} op nid aM le κ pfs rp s₀ ns′ gq o ro now {sched} {st} rm hsκ lt ap =
   let inst = nodeCt sched
       κ′   = from-inner {s = u} op nid inst ↠[ ≤-refl ] κ
       ss   = fiStep op nid inst
@@ -2080,12 +2080,15 @@ subStanding {u = u} op nid aM le κ pfs rp s₀ ns′ gq o ro now {sched} {st} r
                                   now (bumpNode sched) st″ rm hs′
       (h″ , g″ , eq) = translate-sub-end ≤-refl aM ss (just ns′) gq κ pfs rp tr
       tr′ = translate-sub ≤-refl aM ss (just ns′) gq κ pfs rp tr
-  in stage (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d tr′ refl h″
-       (fiHolds→thru op nid inst le κ h″ (endPre tr′) (subst (λ p → PreHolds _ κ′ p _ _) eq hl))
-       (kept-shift (from-inner op nid inst) (thru-outer op nid) ≤-refl le κ h″ h″ (endPre tr′) (n≤1+n _)
+      sc  = proj₁ (proj₂ r)
+      st′ = proj₂ (proj₂ r)
+  in stage (proj₁ r) sc st′ d tr′ refl h″
+       (fiHolds→thru op nid inst le κ h″ (endPre tr′) (subst (λ p → PreHolds m κ′ p sc st′) eq hl))
+       (kept-shift (from-inner op nid inst) (thru-outer op nid) ≤-refl le κ h″ h″ (endPre tr′)
+          {sched} {bumpNode sched} {sc} {st} {st″} {st′} (n≤1+n (nodeCt sched))
           (λ k k< ne on → [ (λ a → ne (node-in₁ {nid} {k} [] a)) , (λ c → subst T (<→≢ᵇ k<) c) ] (node-two {nid} {inst} {k} on))
           (λ k _ ne → set-above nid k ns′ (EvalSt.nodes st) (head-off nid [] k ne))
-          (subst (λ p → Kept κ′ p _ _ _ _) eq kp))
+          (subst (λ p → Kept κ′ p (bumpNode sched) st″ sc st′) eq kp))
      , qempty-room h″ g″
 
 -- one inner subscribed on fallen ground: the store is read raw
@@ -2144,11 +2147,12 @@ consumeStanding {u = u} op nid aM le κ now pfs rp s₀ h g o ro {sched} {st} rm
             ks  = switchKill-keeps cur sched st refl
             ctE = switchKill-ct cur sched st
             ndE = switchKill-nodes cur sched st
+            hsκ′ : HoldsFs κ pfs (proj₁ sk) (proj₂ sk)
             hsκ′ = holdsFs-step κ pfs (λ k _ _ → cong (lookupNode k) ndE) (subst (nodeCt sched ≤_) (sym ctE) ≤-refl) hsκ
             (sb , gsb) = subStanding switchᵒ nid aM le κ pfs rp s₀ (switch-st (just (nodeCt (proj₁ sk))) od) tt o ro now
                            (room-keeps ks rm) hsκ′ (subst (nid <_) (sym ctE) lt) ap
         in stage-map (λ d → consume-switch-sub c refl refl (inner refl d))
-             (stage-rebase _ le κ (subst (nodeCt sched ≤_) (sym ctE) ≤-refl) (λ k _ _ → cong (lookupNode k) ndE) sb)
+             (stage-rebase (thru-outer op nid) le κ (subst (nodeCt sched ≤_) (sym ctE) ≤-refl) (λ k _ _ → cong (lookupNode k) ndE) sb)
            , gsb
 ...   | u-exhaust od =
         let (sb , gsb) = subStanding exhaustᵒ nid aM le κ pfs rp s₀ (exhaust-st true od) tt o ro now rm hsκ lt ap
@@ -2157,7 +2161,7 @@ consumeStanding {u = u} op nid aM le κ now pfs rp s₀ h g o ro {sched} {st} rm
 ...     | false = stage-map (λ { (refl , refl , refl) → consume-all-enqueue c eqr })
                     (writeStage _ le κ (standing pfs) rp s₀ nid (mergeAll-st lim act (q ++ o ∷ []) od)
                        (λ k ne → head-off nid [] k ne) (just (mergeAll-st lim act (q ++ o ∷ []) od))
-                       (lookup-set nid _ _) h hs)
+                       (lookup-set nid (mergeAll-st lim act (q ++ o ∷ []) od) (EvalSt.nodes st)) h hs)
                 , (λ tr → ⊥-elim (subst T eqr tr))
 ...     | true  =
         let (sb , gsb) = subStanding mergeAllᵒ nid aM le κ pfs rp s₀ (mergeAll-st lim (suc act) q od)
