@@ -109,7 +109,7 @@ open import Data.Nat using (ℕ; suc; _≤_; _<_; _∸_; s≤s; _+_; _<ᵇ_; _�
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Unit.Polymorphic using (⊤; tt)
 open import Data.Unit using () renaming (tt to tt₀)
 open import Data.Vec using (lookup)
@@ -128,11 +128,10 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
-open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; pres-write; Exempt; exempt-sub; onPath-exempt;
-  RegSub; regsub-refl; regsub-snoc)
+open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; pres-write)
 open import Decide using (∧ˡ; ∧ʳ; ≡ᵇ→≡; ≡ᵇ-refl)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
-  batchSync-f; from-inner; thru-outer; NodeState; lookupNode; frameNodes; pathHasNode; RegRow;
+  batchSync-f; from-inner; thru-outer; NodeState; lookupNode; frameNodes; pathHasNode;
   register; installNode; atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Evaluator.Unconn-Arith using (unconn; fell-keeps; room-keeps)
 open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps)
@@ -193,19 +192,19 @@ HeldF {Γ = Γ}   (batchSync-f _)      = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (from-inner _ _ _)   = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (thru-outer _ _)     = Maybe (NodeState Γ)
 
--- WHAT A FRAME'S CONTINUATION STANDS ON.  `live`: the store agrees
--- with the column it closed candidates over, so there is no value it
--- cannot vouch for.  `raw`: it was built over the store itself by a
--- caller holding the accessibility -- the arrival spine, the connect's
--- fan-out -- and re-vouches on every call.
-data PreF {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) : Set where
-  live : HeldF f → PreF f
-  raw  : PreF f
-
+-- WHAT A STANDING PATH'S FRAMES STAND ON: each frame's own column,
+-- which the store agrees with, so there is no value the frame cannot
+-- vouch for.  AND A STANDING PATH ENDS AT THE ROOT.  A share's sink
+-- is reached two ways only -- by the connect, which subscribes the
+-- definition under it with the room fallen, and by the fan-out, which
+-- folds the registered rows raw from the store -- so no continuation
+-- built over candidates ever ends there, and saying so by type is
+-- what lets a standing fold's writes be accounted for by the path
+-- alone: past a sink the path would not know what it wrote.
 PreFs : ∀ {n} {Γ : Ctx n} {lo u t} → Path Γ lo u t → Set
 PreFs root             = ⊤
-PreFs (share-sink _ _) = ⊤
-PreFs (f ↠[ _ ] κ)     = PreF f × PreFs κ
+PreFs (share-sink _ _) = ⊥
+PreFs (f ↠[ _ ] κ)     = HeldF f × PreFs κ
 
 -- AND WHAT THE PATH STANDS ON: EITHER EVERY FRAME'S OWN GROUND, OR THE
 -- ROOM HAVING FALLEN SINCE THE CEILING WAS SET.  A fallen path holds
@@ -245,73 +244,58 @@ FreshF : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Set
 FreshF ct f = All (_< ct) (frameNodes f)
 
 HoldsF : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-         (f : Frame Γ s u) → PreF f → Sched Γ → EvalSt e → Set
-HoldsF f (live h) sched st = ConsistentF f h st × FreshF (nodeCt sched) f
-HoldsF f raw      sched st = ⊤
+         (f : Frame Γ s u) → HeldF f → Sched Γ → EvalSt e → Set
+HoldsF f h sched st = ConsistentF f h st × FreshF (nodeCt sched) f
 
--- AND A LIVE FRAME'S NODES ARE OUTSIDE WHAT A FOLD OF THE PATH ABOVE
--- IT MAY WRITE.  Its own write then touches no frame above it, and the
--- fold above touches no node of its own -- the two directions
--- consistency has to survive.  A fact about the path and the registry
--- together, because past a sink it is not a fact about the path.
-Apart : ∀ {n} {Γ : Ctx n} {lo u t s} (κ : Path Γ lo u t) (f : Frame Γ s u)
-      → List (RegRow Γ t) → Set
-Apart κ f reg = ∀ k → T (any (_≡ᵇ k) (frameNodes f)) → Exempt κ k reg → ⊥
+-- AND A FRAME'S NODES ARE NONE OF THE PATH'S ABOVE IT.  Its own write
+-- then touches no frame above it, and the fold above touches no node
+-- of its own -- the two directions consistency has to survive.  A
+-- fact about the path alone, since a standing path ends at the root.
+Apart : ∀ {n} {Γ : Ctx n} {lo u t s} (κ : Path Γ lo u t) (f : Frame Γ s u) → Set
+Apart κ f = ∀ k → T (any (_≡ᵇ k) (frameNodes f)) → T (pathHasNode k κ) → ⊥
 
 HoldsFs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
           (κ : Path Γ lo u t) → PreFs κ → Sched Γ → EvalSt e → Set
-HoldsFs root             _              sched st = ⊤
-HoldsFs (share-sink _ _) _              sched st = ⊤
-HoldsFs (f ↠[ _ ] κ)     (live h , pfs) sched st =
-  HoldsF f (live h) sched st × Apart κ f (EvalSt.registry st) × HoldsFs κ pfs sched st
-HoldsFs (f ↠[ _ ] κ)     (raw , pfs)    sched st = HoldsFs κ pfs sched st
+HoldsFs root             _         sched st = ⊤
+HoldsFs (share-sink _ _) ()        sched st
+HoldsFs (f ↠[ _ ] κ)     (h , pfs) sched st =
+  HoldsF f h sched st × Apart κ f × HoldsFs κ pfs sched st
 
 PreHolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
            (m : ℕ) (κ : Path Γ lo u t) → Pre κ → Sched Γ → EvalSt e → Set
 PreHolds m κ (standing pfs) sched st = HoldsFs κ pfs sched st
 PreHolds m κ fallen         sched st = Fell m sched st
 
--- THE CANDIDATE COLUMN IS TOTAL WHERE THE FRAME IS LIVE, and absent
--- otherwise: a live frame holds candidates for everything its node
--- holds and receives one beside every value that arrives; a raw frame
--- and a fallen path re-vouch everything from the store and need none;
+-- THE CANDIDATE COLUMN IS TOTAL WHERE THE PATH STANDS ON A FRAME, and
+-- absent otherwise: a standing frame holds candidates for everything
+-- its node holds and receives one beside every value that arrives; a
+-- fallen path re-vouches everything from the store and needs none;
 -- the root and a share's sink vouch for nothing.
 Column : ∀ {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t)
          (P : Val Γ u → Set₁) → Pre κ → List (Val Γ u) → Set₁
-Column (f ↠[ _ ] κ) P (standing (live _ , _)) vals = All P vals
-Column _            P _                       vals = ⊤
+Column (f ↠[ _ ] κ) P (standing _) vals = All P vals
+Column _            P _            vals = ⊤
 
 -- a full column is a column on any ground
 ofColumn : ∀ {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t)
            {P : Val Γ u → Set₁} (pre : Pre κ) {vals : List (Val Γ u)}
          → All P vals → Column κ P pre vals
-ofColumn root             _                       ps = tt
-ofColumn (share-sink _ _) _                       ps = tt
-ofColumn (f ↠[ _ ] κ)     (standing (live _ , _)) ps = ps
-ofColumn (f ↠[ _ ] κ)     (standing (raw , _))    ps = tt
-ofColumn (f ↠[ _ ] κ)     fallen                  ps = tt
+ofColumn root             _            ps = tt
+ofColumn (share-sink _ _) _            ps = tt
+ofColumn (f ↠[ _ ] κ)     (standing _) ps = ps
+ofColumn (f ↠[ _ ] κ)     fallen       ps = tt
 
--- every frame raw, which is what a fold built over the store itself
--- stands on, and it stands on nothing
-rawAll : ∀ {n} {Γ : Ctx n} {lo u t} (κ : Path Γ lo u t) → PreFs κ
-rawAll root             = tt
-rawAll (share-sink _ _) = tt
-rawAll (f ↠[ _ ] κ)     = raw , rawAll κ
-
-rawAll-holds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
-               (κ : Path Γ lo u t) (sched : Sched Γ) (st : EvalSt e)
-             → HoldsFs κ (rawAll κ) sched st
-rawAll-holds root             sched st = tt
-rawAll-holds (share-sink _ _) sched st = tt
-rawAll-holds (f ↠[ _ ] κ)     sched st = rawAll-holds κ sched st
-
--- the two halves of a disjunction under `T`
+-- the two halves of a disjunction under `T`, in and out
 ∨-Tˡ : ∀ {a b : Bool} → T a → T (a ∨ b)
 ∨-Tˡ {true} _ = tt₀
 
 ∨-Tʳ : ∀ {a b : Bool} → T b → T (a ∨ b)
 ∨-Tʳ {true}  _ = tt₀
 ∨-Tʳ {false} p = p
+
+∨-T : ∀ {a b : Bool} → T (a ∨ b) → T a ⊎ T b
+∨-T {true}  _ = inj₁ tt₀
+∨-T {false} p = inj₂ p
 
 -- a node found among a list of nodes below a bound is below it
 nodes-below : ∀ (ns : List ℕ) {ct} → All (_< ct) ns
@@ -339,74 +323,73 @@ consistentF-move (from-inner _ nid j)   h mv c = trans (mv nid (self-node nid (j
 consistentF-move (thru-outer _ nid)     h mv c = trans (mv nid (self-node nid [])) c
 
 -- THE GROUND SURVIVES A STEP THAT READS THE PATH'S OWN NODES BACK THE
--- SAME, DOES NOT LOWER THE COUNTER, AND LOSES REGISTRY ROWS AT MOST.
--- The three hypotheses are what a live frame's agreement, its
--- freshness and its apartness each stand on; every arm that writes its
--- own node spends exactly this, and so does every frame's step.
+-- SAME AND DOES NOT LOWER THE COUNTER.  The two hypotheses are what a
+-- frame's agreement and its freshness each stand on; every arm that
+-- writes its own node spends exactly this, and so does every frame's
+-- step.
 holdsF-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-              (f : Frame Γ s u) (pf : PreF f) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
+              (f : Frame Γ s u) (h : HeldF f) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
             → (∀ k → T (any (_≡ᵇ k) (frameNodes f)) → k < nodeCt sched
                    → lookupNode k (EvalSt.nodes st′) ≡ lookupNode k (EvalSt.nodes st))
             → nodeCt sched ≤ nodeCt sched′
-            → HoldsF f pf sched st → HoldsF f pf sched′ st′
-holdsF-step f (live h) mv ct (c , fr) =
+            → HoldsF f h sched st → HoldsF f h sched′ st′
+holdsF-step f h mv ct (c , fr) =
   consistentF-move f h (λ k on → mv k on (nodes-below _ fr k on)) c , mapᵃ (λ lt → <-≤-trans lt ct) fr
-holdsF-step f raw mv ct h = tt
 
 holdsFs-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
                (κ : Path Γ lo u t) (pfs : PreFs κ) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
              → (∀ k → T (pathHasNode k κ) → k < nodeCt sched
                     → lookupNode k (EvalSt.nodes st′) ≡ lookupNode k (EvalSt.nodes st))
              → nodeCt sched ≤ nodeCt sched′
-             → RegSub (EvalSt.registry st′) (EvalSt.registry st)
              → HoldsFs κ pfs sched st → HoldsFs κ pfs sched′ st′
-holdsFs-step root             _              mv ct rsub h              = tt
-holdsFs-step (share-sink _ _) _              mv ct rsub h              = tt
-holdsFs-step (f ↠[ _ ] κ)     (live h , pfs) {sched} {sched′} {st} {st′} mv ct rsub (hf , ap , hs) =
-    holdsF-step f (live h) {sched} {sched′} {st} {st′} (λ k on → mv k (∨-Tˡ on)) ct hf
-  , (λ k on ex → ap k on (exempt-sub κ k rsub ex))
-  , holdsFs-step κ pfs (λ k on → mv k (∨-Tʳ on)) ct rsub hs
-holdsFs-step (f ↠[ _ ] κ)     (raw , pfs)    mv ct rsub hs             =
-  holdsFs-step κ pfs (λ k on → mv k (∨-Tʳ on)) ct rsub hs
+holdsFs-step root             _         mv ct h = tt
+holdsFs-step (share-sink _ _) ()        mv ct h
+holdsFs-step (f ↠[ _ ] κ)     (h , pfs) {sched} {sched′} {st} {st′} mv ct (hf , ap , hs) =
+    holdsF-step f h {sched} {sched′} {st} {st′} (λ k on → mv k (∨-Tˡ on)) ct hf
+  , ap
+  , holdsFs-step κ pfs (λ k on → mv k (∨-Tʳ on)) ct hs
 
 holds-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} {m}
              (κ : Path Γ lo u t) (pre : Pre κ) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
            → (∀ k → T (pathHasNode k κ) → k < nodeCt sched
                   → lookupNode k (EvalSt.nodes st′) ≡ lookupNode k (EvalSt.nodes st))
            → nodeCt sched ≤ nodeCt sched′
-           → RegSub (EvalSt.registry st′) (EvalSt.registry st)
            → (Fell m sched st → Fell m sched′ st′)
            → PreHolds m κ pre sched st → PreHolds m κ pre sched′ st′
-holds-step κ (standing pfs) mv ct rsub fl h = holdsFs-step κ pfs mv ct rsub h
-holds-step κ fallen         mv ct rsub fl h = fl h
+holds-step κ (standing pfs) mv ct fl h = holdsFs-step κ pfs mv ct h
+holds-step κ fallen         mv ct fl h = fl h
 
 -- WHAT A FOLD KEEPS FOR THE FRAME BENEATH IT.  A frame that hands a
 -- burst up the path and gets the path's successor back has its own
 -- node between the two, and the path above has no business with it: a
 -- standing answer says the counter did not fall, and that every node
--- below it the path could not write -- not a frame's own, not reached
--- through a sink -- reads back as it did AND is still not reachable,
--- so the frame beneath stands on both in the state handed back.  A
+-- below it that is none of the path's own reads back as it did, so
+-- the frame beneath stands on its own in the state handed back.  A
 -- fallen answer keeps nothing, because nothing beneath a fallen path
 -- holds candidates to keep.
+--
+-- IT IS A FACT ABOUT THE PATH ALONE BECAUSE A CONNECT FALLS.  The one
+-- fold that writes below the counter at nodes not its own is a share's
+-- fan-out, and a fan-out happens only inside a connect, whose answer
+-- is fallen the whole way up; a fold that answers standing has
+-- connected nothing, so what it wrote is its frames' nodes and nodes
+-- it minted.
 Kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
        (κ : Path Γ lo u t) → Pre κ → Sched Γ → EvalSt e → Sched Γ → EvalSt e → Set
 Kept κ (standing _) sched st sched′ st′ =
   nodeCt sched ≤ nodeCt sched′
-  × (∀ k → k < nodeCt sched → (Exempt κ k (EvalSt.registry st) → ⊥)
-       → lookupNode k (EvalSt.nodes st′) ≡ lookupNode k (EvalSt.nodes st)
-       × (Exempt κ k (EvalSt.registry st′) → ⊥))
+  × (∀ k → k < nodeCt sched → (T (pathHasNode k κ) → ⊥)
+       → lookupNode k (EvalSt.nodes st′) ≡ lookupNode k (EvalSt.nodes st))
 Kept κ fallen sched st sched′ st′ = ⊤
 
--- a step that writes only at or above the counter, advances it and
--- reaches no more through the registry keeps everything
+-- a step that writes only at or above the counter and advances it
+-- keeps everything
 kept-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
             (κ : Path Γ lo u t) (pre : Pre κ) {sched sched′ : Sched Γ} {st st′ : EvalSt e}
           → PreservedBelow (nodeCt sched) st st′ → nodeCt sched ≤ nodeCt sched′
-          → (∀ k → Exempt κ k (EvalSt.registry st′) → Exempt κ k (EvalSt.registry st))
           → Kept κ pre sched st sched′ st′
-kept-step κ (standing _) pr ct ex = ct , λ k k< ne → below pr k k< , λ x → ne (ex k x)
-kept-step κ fallen       pr ct ex = tt
+kept-step κ (standing _) pr ct = ct , λ k k< _ → below pr k k<
+kept-step κ fallen       pr ct = tt
 
 -- and what was kept from a counter is kept from an equal one
 kept-in : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
@@ -510,19 +493,29 @@ apply rp s c = fold rp s (Call.now c) (Call.vals c) (Call.col c) (Call.fin c)
 -- translates its source's trace through the frame it pushed, call by
 -- call, and the translation's end is the successor of the continuation
 -- it was handed -- which is what the exit frame's peel used to do.
+--
+-- AND THE TRACE STOPS WHERE THE PATH FELL.  A connect never calls the
+-- continuation it was handed -- the trigger receives the definition's
+-- values through the row it registered, folded raw -- and every fold
+-- above a fall reads the store and calls nothing it closed over, so
+-- there is no successor to compute past that point and `fellᵗ` records
+-- only that it happened.  The arm above still owes the fall itself,
+-- as the ground its answer ends on.
 data Trace {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
            (P : Val Γ u → Set₁) (S : Set) (κ : Path Γ lo u t)
          : (pre : Pre κ) → RP {e = e} m P S κ pre → S → Set₁ where
-  []ᵗ  : ∀ {pre rp s} → Trace m P S κ pre rp s
-  _∷ᵗ_ : ∀ {pre rp s} (c : Call {e = e} m P κ pre)
-       → Trace m P S κ (Ans.pre′ (apply rp s c)) (next (apply rp s c)) (Ans.s′ (apply rp s c))
-       → Trace m P S κ pre rp s
+  []ᵗ   : ∀ {pre rp s} → Trace m P S κ pre rp s
+  fellᵗ : ∀ {pre rp s} → Trace m P S κ pre rp s
+  _∷ᵗ_  : ∀ {pre rp s} (c : Call {e = e} m P κ pre)
+        → Trace m P S κ (Ans.pre′ (apply rp s c)) (next (apply rp s c)) (Ans.s′ (apply rp s c))
+        → Trace m P S κ pre rp s
 
 -- where a trace ends: the ground it left the path on
 endPre : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Set₁} {S : Set}
          {κ : Path Γ lo u t} {pre : Pre κ} {rp : RP {e = e} m P S κ pre} {s : S}
        → Trace {e = e} m P S κ pre rp s → Pre κ
 endPre {pre = pre} []ᵗ = pre
+endPre fellᵗ           = fallen
 endPre (c ∷ᵗ tr)       = endPre tr
 
 -- THE CANDIDATE.  At a data type it is trivial, because nothing about
@@ -637,9 +630,9 @@ open Stepped public
 -- the evaluator's own dispatch read at the held state, and the
 -- derivation says so under agreement; the candidates go through it
 -- beside the values; it stays in agreement with what it now holds; it
--- writes only its own nodes, moves the counter not at all and the
--- registry only down.  The flatteners are not of this shape -- they
--- subscribe -- and have folds of their own.
+-- writes only its own nodes and moves the counter not at all.  The
+-- flatteners are not of this shape -- they subscribe -- and have folds
+-- of their own.
 record FrameStep {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (f : Frame Γ s u)
                  (P : Val Γ s → Set₁) (P′ : Val Γ u → Set₁)
                  (Held : HeldF f → Set₁) : Set₁ where
@@ -660,15 +653,13 @@ record FrameStep {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (f : Frame Γ s u)
               → lookupNode k (EvalSt.nodes (st″ (step h vals fin sched st)))
               ≡ lookupNode k (EvalSt.nodes st)
     step-ct   : ∀ h vals fin sched st → nodeCt (sched″ (step h vals fin sched st)) ≡ nodeCt sched
-    step-reg  : ∀ h vals fin sched st
-              → RegSub (EvalSt.registry (st″ (step h vals fin sched st))) (EvalSt.registry st)
 open FrameStep public
 
 -- THE FRAME'S GROUND OVER THE PATH'S: live at what it now holds where
 -- the path stands, fallen where the path fell.
 headPre : ∀ {n} {Γ : Ctx n} {lo ℓ s u t} {f : Frame Γ s u} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t}
         → HeldF f → Pre κ → Pre (f ↠[ le ] κ)
-headPre h (standing pfs) = standing (live h , pfs)
+headPre h (standing pfs) = standing (h , pfs)
 headPre h fallen         = fallen
 
 -- and it holds where the frame's own ground held before the fold and
@@ -676,13 +667,13 @@ headPre h fallen         = fallen
 headHolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u}
             (f : Frame Γ s u) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t) (h : HeldF f)
             {sched₁ sched₂ : Sched Γ} {st₁ st₂ : EvalSt e}
-          → HoldsF f (live h) sched₁ st₁ → Apart κ f (EvalSt.registry st₁)
+          → HoldsF f h sched₁ st₁ → Apart κ f
           → (p : Pre κ) → PreHolds m κ p sched₂ st₂ → Kept κ p sched₁ st₁ sched₂ st₂
           → PreHolds m (f ↠[ le ] κ) (headPre h p) sched₂ st₂
 headHolds f le κ h (c , fr) ap (standing pfs) hs (ct , kp) =
-    ( consistentF-move f h (λ k on → proj₁ (kp k (nodes-below _ fr k on) (ap k on))) c
+    ( consistentF-move f h (λ k on → kp k (nodes-below _ fr k on) (ap k on)) c
     , mapᵃ (λ lt → <-≤-trans lt ct) fr )
-  , (λ k on ex → proj₂ (kp k (nodes-below _ fr k on) (ap k on)) ex)
+  , ap
   , hs
 headHolds f le κ h hf ap fallen fell kp = fell
 
@@ -694,17 +685,13 @@ headKept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u}
          → (∀ k → (T (any (_≡ᵇ k) (frameNodes f)) → ⊥)
                 → lookupNode k (EvalSt.nodes st₁) ≡ lookupNode k (EvalSt.nodes st))
          → nodeCt sched₁ ≡ nodeCt sched
-         → RegSub (EvalSt.registry st₁) (EvalSt.registry st)
          → (p : Pre κ) → Kept κ p sched₁ st₁ sched₂ st₂ → (h : HeldF f)
          → Kept (f ↠[ le ] κ) (headPre h p) sched st sched₂ st₂
-headKept f le κ off ct rsub (standing pfs) (ct₂ , kp) h =
+headKept f le κ off ct (standing pfs) (ct₂ , kp) h =
     subst (_≤ _) ct ct₂
-  , λ k k< ne →
-      let nf = λ on → ne (inj₁ on)
-          r  = kp k (subst (k <_) (sym ct) k<) (λ ex → ne (inj₂ (exempt-sub κ k rsub ex)))
-      in trans (proj₁ r) (off k nf)
-       , λ { (inj₁ on) → nf on ; (inj₂ ex) → proj₂ r ex }
-headKept f le κ off ct rsub fallen kp h = tt
+  , λ k k< ne → trans (kp k (subst (k <_) (sym ct) k<) (λ on → ne (∨-Tʳ on)))
+                      (off k (λ on → ne (∨-Tˡ on)))
+headKept f le κ off ct fallen kp h = tt
 
 -- THE ARM READS THE PATH'S GROUND BACK OUT OF THE FRAME'S, which is
 -- where a frame arm's answer comes from once its source has answered
@@ -717,23 +704,20 @@ unheadHolds f le κ h (standing pfs) (_ , _ , hs) = hs
 unheadHolds f le κ h fallen         fell         = fell
 
 -- and what the frame kept for the arm's caller, given that the arm's
--- own install sat at or above the counter it began at, wrote nothing
--- below it, and reached no more
+-- own install sat at or above the counter it began at and wrote
+-- nothing below it
 unheadKept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u}
              (f : Frame Γ s u) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t) (h : HeldF f) (p : Pre κ)
              {sched sched₁ sched₂ : Sched Γ} {st st₁ st₂ : EvalSt e}
            → (∀ k → k < nodeCt sched → T (any (_≡ᵇ k) (frameNodes f)) → ⊥)
            → nodeCt sched ≤ nodeCt sched₁
            → (∀ k → k < nodeCt sched → lookupNode k (EvalSt.nodes st₁) ≡ lookupNode k (EvalSt.nodes st))
-           → (∀ k → Exempt κ k (EvalSt.registry st₁) → Exempt κ k (EvalSt.registry st))
            → Kept (f ↠[ le ] κ) (headPre h p) sched₁ st₁ sched₂ st₂
            → Kept κ p sched st sched₂ st₂
-unheadKept f le κ h (standing pfs) above ct pr ex (ct₂ , kp) =
+unheadKept f le κ h (standing pfs) above ct pr (ct₂ , kp) =
     ≤-trans ct ct₂
-  , λ k k< ne →
-      let r = kp k (<-≤-trans k< ct) (λ { (inj₁ on) → above k k< on ; (inj₂ e) → ne (ex k e) })
-      in trans (proj₁ r) (pr k k<) , λ e → proj₂ r (inj₂ e)
-unheadKept f le κ h fallen above ct pr ex kp = tt
+  , λ k k< ne → trans (kp k (<-≤-trans k< ct) (λ on → [ above k k< , ne ] (∨-T on))) (pr k k<)
+unheadKept f le κ h fallen above ct pr kp = tt
 
 -- THE CALL A LIVE FRAME MAKES ABOVE IT, FOR THE CALL MADE TO IT: the
 -- step's group with the candidates through the step, at the step's
@@ -744,16 +728,15 @@ headCall : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {f : Frame 
            {P : Val Γ s → Set₁} {P′ : Val Γ u → Set₁} {Held : HeldF f → Set₁} {le : lo ≤ ℓ}
            (fs : FrameStep {e = e} f P P′ Held) (h : HeldF f) → Held h
          → (κ : Path Γ ℓ u t) (pfs : PreFs κ)
-         → Call {e = e} m P (f ↠[ le ] κ) (standing (live h , pfs))
+         → Call {e = e} m P (f ↠[ le ] κ) (standing (h , pfs))
          → Call {e = e} m P′ κ (standing pfs)
 headCall fs h rh κ pfs (call now vals col fin sched st rm ((c , fr) , ap , hs)) =
   let r = step fs h vals fin sched st
   in call now (outs r) (ofColumn κ (standing pfs) (proj₁ (step-red fs col rh))) (fin″ r) (sched″ r) (st″ r)
        (room-keeps (stepFrame-keeps (step-⇓ fs {κ = κ} {now = now} h vals fin sched st c)) rm)
        (holdsFs-step κ pfs
-         (λ k on k< → step-off fs h vals fin sched st k (λ onF → ap k onF (onPath-exempt κ k _ on)))
-         (subst (nodeCt sched ≤_) (sym (step-ct fs h vals fin sched st)) ≤-refl)
-         (step-reg fs h vals fin sched st) hs)
+         (λ k on k< → step-off fs h vals fin sched st k (λ onF → ap k onF on))
+         (subst (nodeCt sched ≤_) (sym (step-ct fs h vals fin sched st)) ≤-refl) hs)
 
 -- candidates through a function, pointwise
 mapAll : ∀ {n} {Γ : Ctx n} {s u} {P : Val Γ s → Set₁} {P′ : Val Γ u → Set₁} {g : Val Γ s → Val Γ u}
@@ -773,8 +756,7 @@ mapStep fn g = record
   ; step-red  = λ ps _ → mapAll g ps , tt
   ; step-cons = λ _ _ _ _ _ _ → tt
   ; step-off  = λ _ _ _ _ _ _ _ → refl
-  ; step-ct   = λ _ _ _ _ _ → refl
-  ; step-reg  = λ _ _ _ _ _ → regsub-refl }
+  ; step-ct   = λ _ _ _ _ _ → refl }
 
 ------------------------------------------------------------------
 -- THE FRAME CONTINUATION THAT REACHES NO CYCLE.
@@ -784,7 +766,7 @@ mapStep fn g = record
 rootRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo} {P : Val Γ t → Set₁} {pre : Pre {Γ = Γ} (root {lo = lo} {t = t})}
        → RP {e = e} m {lo = lo} P ⊤ root pre
 fold (rootRP {pre = pre}) tt now vals _ fin sched st rm h =
-  ans _ sched st fold-root pre h (kept-step root pre (pres (λ _ _ → refl)) ≤-refl (λ _ x → x)) rootRP tt
+  ans _ sched st fold-root pre h (kept-step root pre (pres (λ _ _ → refl)) ≤-refl) rootRP tt
 
 -- A CONTINUATION THAT THREADS NO STATE THREADS ANY: the fallen fold is
 -- built at the unit and a live frame over it carries its caller's.
@@ -963,15 +945,22 @@ postulate
                  (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                        × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
 
--- THE RAW CONTINUATION FOR A PATH THE STORE HOLDS.  An arrival and a
--- share's fan-out fold down registry paths no subscribe built, so the
--- frames' held candidates are rebuilt by `red-val` on what the store
--- holds, funded by the room the connect peeled and by the floor: a
--- chain registered on a share sinks STRICTLY above that share.
+-- THE RAW FOLD OF A PATH THE STORE HOLDS.  An arrival and a share's
+-- fan-out fold down registry paths no subscribe built, so the frames'
+-- held candidates are rebuilt by `red-val` on what the store holds,
+-- funded by the room the connect peeled and by the floor: a chain
+-- registered on a share sinks STRICTLY above that share, so past a
+-- sink the rows fan out at a higher floor.  It is a fold and not a
+-- continuation because it holds nothing between calls -- its
+-- successor would be itself -- and because the arrival spine and the
+-- fallen continuation are its only callers, each of which applies it
+-- once.
 postulate
-  rawRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
-          (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
-        → (κ : Path Γ ℓ u t) (pre : Pre κ) → RP {e = e} m (Red m u) ⊤ κ pre
+  rawFold : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
+            (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
+          → (κ : Path Γ ℓ u t) (now : Tick) (vals : List (Val Γ u)) (fin : Bool)
+            (sched : Sched Γ) (st : EvalSt e) → Room m sched st
+          → Σ (Stream Γ t × Sched Γ × EvalSt e) (foldPath⇓ {e = e} now κ vals fin sched st)
 
 -- THE FALLEN CONTINUATION, WHICH IS THE RAW ONE REBUILT AT THE PEELED
 -- CEILING ON EVERY CALL.  It holds no candidates, so nothing it holds
@@ -988,11 +977,9 @@ fallenRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
            (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
          → (κ : Path Γ ℓ u t) → RP {e = e} m (Red m u) ⊤ κ fallen
 fold (fallenRP ac le (acc rsM) κ) tt now vals _ fin sched st rm fell =
-  let an = fold (rawRP ac le (rsM fell) κ (standing (rawAll κ))) tt now vals
-             (ofColumn κ (standing (rawAll κ)) (red-val (rsM fell) _ vals))
-             fin sched st ≤-refl (rawAll-holds κ sched st)
-  in ans (out an) (Ans.sched′ an) (Ans.st′ an) (der an) fallen
-         (fell-keeps (foldPath-keeps (der an)) fell) tt (fallenRP ac le (acc rsM) κ) tt
+  let (r , d) = rawFold ac le (rsM fell) κ now vals fin sched st ≤-refl
+  in ans (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d fallen
+         (fell-keeps (foldPath-keeps d) fell) tt (fallenRP ac le (acc rsM) κ) tt
 
 -- THE LIVE FOLD OVER A PURE FRAME.  It steps at what it holds, folds
 -- the path above at the step's state with the candidates through the
@@ -1005,7 +992,7 @@ liveRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
          (le : lo ≤ ℓ) → Acc _<_ m → FrameStep {e = e} f (Red m s) (Red m u) Held
        → (h : HeldF f) → Held h → (κ : Path Γ ℓ u t) (pfs : PreFs κ)
        → RP {e = e} m (Red m u) S κ (standing pfs)
-       → RP {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (live h , pfs))
+       → RP {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (h , pfs))
 
 -- the frame's successor over the path's, by the path's ground
 headNext : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
@@ -1050,14 +1037,14 @@ redExpAcc (deferᵉ body) ρ {m} rρ k ok aK a aM {lo = lo} κ pre rp s₀ now s
                      (installNode nid (mergeAll-st nothing 0 [] false) st)
   in _ , subs-defer refl refl refl refl , []ᵗ
      , holds-step {m = m} κ pre (λ k′ _ k< → below (pres-write st st′ _ refl ≤-refl) k′ k<) (n≤1+n _)
-         (regsub-snoc refl) (λ (x : Fell m sched st) → x) h
-     , kept-step κ pre (pres-write st st′ _ refl ≤-refl) (n≤1+n _) (λ k → exempt-sub κ k (regsub-snoc refl))
+         (λ (x : Fell m sched st) → x) h
+     , kept-step κ pre (pres-write st st′ _ refl ≤-refl) (n≤1+n _)
 redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h
   with (let src = freshId sourceᵏ (Sched.mint sched)
         in redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ pre rp s₀ now
              (record sched
                 { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
-             st rm (holds-step κ pre (λ _ _ _ → refl) ≤-refl regsub-refl (λ x → x) h))
+             st rm (holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x) h))
 ... | (r , d , tr , hl , kp) = r , subs-mint refl d , tr , hl , kept-in κ (endPre tr) refl kp
 
 -- the live fold: step, fold above, stand on what came back
@@ -1070,10 +1057,9 @@ fold (liveRP le aM fs h rh κ pfs rp) s now vals col fin sched st rm hs =
          (headHolds _ le κ (held r)
            ( step-cons fs h vals fin sched st (proj₁ (proj₁ hs))
            , subst (λ ct → All (_< ct) _) (sym (step-ct fs h vals fin sched st)) (proj₂ (proj₁ hs)) )
-           (λ k on ex → proj₁ (proj₂ hs) k on (exempt-sub κ k (step-reg fs h vals fin sched st) ex))
-           (Ans.pre′ an) (Ans.holds′ an) (kept an))
+           (proj₁ (proj₂ hs)) (Ans.pre′ an) (Ans.holds′ an) (kept an))
          (headKept _ le κ (step-off fs h vals fin sched st) (step-ct fs h vals fin sched st)
-           (step-reg fs h vals fin sched st) (Ans.pre′ an) (kept an) (held r))
+           (Ans.pre′ an) (kept an) (held r))
          (headNext le aM fs (held r) (proj₂ (step-red fs col rh)) κ (Ans.pre′ an) (next an))
          (Ans.s′ an)
 
@@ -1090,7 +1076,7 @@ translate : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
             (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
             (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
             (rp : RP {e = e} m (Red m u) S κ (standing pfs)) {s₀ : S}
-          → Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (live h , pfs)) (liveRP le aM fs h rh κ pfs rp) s₀
+          → Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (h , pfs)) (liveRP le aM fs h rh κ pfs rp) s₀
           → Trace {e = e} m (Red m u) S κ (standing pfs) rp s₀
 translate-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
                {f : Frame Γ s u} {Held : HeldF f → Set₁}
@@ -1099,7 +1085,8 @@ translate-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Se
                (rp : RP {e = e} m (Red m u) S κ p) {s₀ : S}
              → Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (headPre h p) (headNext le aM fs h rh κ p rp) s₀
              → Trace {e = e} m (Red m u) S κ p rp s₀
-translate le aM fs h rh κ pfs rp []ᵗ = []ᵗ
+translate le aM fs h rh κ pfs rp []ᵗ   = []ᵗ
+translate le aM fs h rh κ pfs rp fellᵗ = fellᵗ
 translate le aM fs h rh κ pfs rp {s₀} (c ∷ᵗ tr) =
   headCall fs h rh κ pfs c
     ∷ᵗ translate-go le aM fs (held (step fs h (Call.vals c) (Call.fin c) (Call.sched c) (Call.st c)))
@@ -1114,6 +1101,7 @@ fallen-stays : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ} {S : Set}
              → (tr : Trace {e = e} m (Red m u) S κ fallen (dropS (fallenRP ac le aM κ)) s₀)
              → endPre tr ≡ fallen
 fallen-stays ac le (acc rsM) κ []ᵗ       = refl
+fallen-stays ac le (acc rsM) κ fellᵗ     = refl
 fallen-stays ac le (acc rsM) κ (c ∷ᵗ tr) = fallen-stays ac le (acc rsM) κ tr
 
 -- and the translation ends where the source's trace did, one frame down
@@ -1122,7 +1110,7 @@ translate-end : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : S
                 (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
                 (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
                 (rp : RP {e = e} m (Red m u) S κ (standing pfs)) {s₀ : S}
-              → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (live h , pfs)) (liveRP le aM fs h rh κ pfs rp) s₀)
+              → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (h , pfs)) (liveRP le aM fs h rh κ pfs rp) s₀)
               → Σ (HeldF f) (λ h″ → endPre tr ≡ headPre h″ (endPre (translate le aM fs h rh κ pfs rp tr)))
 translate-end-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
                    {f : Frame Γ s u} {Held : HeldF f → Set₁}
@@ -1131,7 +1119,8 @@ translate-end-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S 
                    (rp : RP {e = e} m (Red m u) S κ p) {s₀ : S}
                  → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (headPre h p) (headNext le aM fs h rh κ p rp) s₀)
                  → Σ (HeldF f) (λ h″ → endPre tr ≡ headPre h″ (endPre (translate-go le aM fs h rh κ p rp tr)))
-translate-end le aM fs h rh κ pfs rp []ᵗ = h , refl
+translate-end le aM fs h rh κ pfs rp []ᵗ   = h , refl
+translate-end le aM fs h rh κ pfs rp fellᵗ = h , refl
 translate-end le aM fs h rh κ pfs rp {s₀} (c ∷ᵗ tr) =
   translate-end-go le aM fs (held (step fs h (Call.vals c) (Call.fin c) (Call.sched c) (Call.st c)))
     (proj₂ (step-red fs (Call.col c) rh)) κ (Ans.pre′ an) (next an) tr
@@ -1150,7 +1139,7 @@ red-mapFn f b ρ rρ k ok aK aF aM {v} p =
 red-map {s = s} f b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h
   with redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK
          (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM
-         (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) (standing (live tt , pfs))
+         (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) (standing (tt , pfs))
          (liveRP ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp)
          s₀ now sched st rm ((tt , []ᵃ) , (λ _ ()) , h)
 ... | (r , d , tr , hl , kp)
@@ -1160,7 +1149,7 @@ red-map {s = s} f b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sch
       in r , subs-map d , tr′
        , unheadHolds (map-f (_ , f , ρ)) ≤-refl κ h″ (endPre tr′) (subst (λ p → PreHolds _ _ p _ _) eq hl)
        , unheadKept (map-f (_ , f , ρ)) ≤-refl κ h″ (endPre tr′) {sched} {sched} {st = st} {st₁ = st}
-           (λ _ _ ()) ≤-refl (λ _ _ → refl) (λ _ x → x) (subst (λ p → Kept _ p _ _ _ _) eq kp)
+           (λ _ _ ()) ≤-refl (λ _ _ → refl) (subst (λ p → Kept _ p _ _ _ _) eq kp)
 red-map {n = n} {s = s} f b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell
   with redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK
          (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM

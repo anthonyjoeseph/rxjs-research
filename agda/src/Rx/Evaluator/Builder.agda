@@ -44,14 +44,14 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit.Polymorphic using (tt)
 
 open import Rx.Prim using (Fuel)
-open import Rx.Exp using (Ctx; Closed; []ᵉ; Val; listᵗ)
+open import Rx.Exp using (Ctx; Closed; []ᵉ; Val)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; root; Arrival; arrTick; arrTy; arrVal; AtFloor; RegId; chainsOf;
   cascadeOpen; cascadeClose; sched-next; sched-init; st-init)
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible using (reducible; rawRP; rootRP; red-val; fold; ofColumn; standing; rawAll; rawAll-holds; der)
+open import Rx.Evaluator.Reducible using (reducible; rawFold; rootRP; red-env; standing)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.
@@ -64,13 +64,11 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                chainStep⇓ {e = e} a vs fin c sched st r
 -- AN ARRIVAL IS FOLDED OUTSIDE THE BLOCK, so any fresh accessibility
--- funds the candidate for every value it carries: a scheduled body is
--- a closure, and `red-val` rebuilds its candidate by recursion on it.
+-- funds the raw fold, which rebuilds the candidate for every value it
+-- carries from the store.
 chainStep! {n = n} a vs fin (lo , path) sched st =
-  let an = fold (rawRP (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path (standing (rawAll path))) tt
-             (arrTick a) vs (ofColumn path (standing (rawAll path)) (red-val (<-wellFounded _) (listᵗ (arrTy a)) vs))
-             fin sched st ≤-refl (rawAll-holds path sched st)
-  in _ , chain-step (der an)
+  let (_ , d) = rawFold (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path (arrTick a) vs fin sched st ≤-refl
+  in _ , chain-step d
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (a : Arrival Γ) (vs : List (Val Γ (arrTy a))) (fin : Bool)
@@ -126,9 +124,10 @@ drain! (suc k) sched st with sched-next sched in eqn
 -- builders are its leaves.
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
           → Σ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
-evaluate! {n = n} fuel e ins =
-  let ((out , sched₀ , st₀) , s , _ , _ , _) =
-        reducible (<-wellFounded _) e []ᵉ tt (root {lo = n}) (standing tt) rootRP tt 0
+evaluate! {n = n} {Γ = Γ} fuel e ins =
+  let aM = <-wellFounded _
+      ((out , sched₀ , st₀) , s , _ , _ , _) =
+        reducible aM e []ᵉ (red-env {Γ = Γ} aM []ᵉ) (root {lo = n}) (standing tt) rootRP tt 0
           (sched-init e ins) (st-init e) ≤-refl tt
       (rest , d) = drain! fuel sched₀ st₀
   in _ , eval-run s d
