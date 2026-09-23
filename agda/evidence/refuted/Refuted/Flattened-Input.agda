@@ -29,7 +29,7 @@ open import Data.Nat using (ℕ; zero)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Unit.Polymorphic using (tt)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
