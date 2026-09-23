@@ -15,14 +15,14 @@
 -- nobody — so `using ()` is the correct and expected clause here.  It is not
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 --
--- WHY THE TREE HOLDS ONE PROBE.  A probe expires with its target, and
--- every statement this tree was written against before the room's two
--- guards was a reading of a MEASURE — a budget's grant, a frame's
--- carried figure, a depth read off the program text.  None of them is
--- stateable now, so E2 expires every row written against one.  The
--- guards' dead branches are the first statements of the descent that
--- replaced the measure, and `Probed.Stuck-Branches` is what reaches
--- them.
+-- WHY THE TREE HOLDS NO PROBE.  A probe expires with its target, and
+-- every statement this tree was written against before the candidate
+-- answered with a trace was a reading of a MEASURE — a budget's grant,
+-- a frame's carried figure, a depth read off the program text — or the
+-- dead branch of a runtime guard the trace design deleted.  None of
+-- them is stateable now, so E2 expires every row written against one.
+-- The arms of the trace-returning candidate are its first probeable
+-- statements, and no row has reached one yet.
 --
 -- AND TWO FURTHER GENERATIONS EXPIRED THE SAME WAY, WHICH IS WHAT SAYS
 -- THE MECHANISM IS THE RIGHT ONE RATHER THAN AN OVERHEAD.  Six files
@@ -40,6 +40,9 @@
 -- several of them — since a green on a bound this development no longer
 -- states says nothing about the descent that replaced it.
 --
+-- RECOVERY: git show 3abdafa1:agda/evidence/probed/Probed/Stuck-Branches.agda
+--   holds the harness that built a flattener's hop by hand from the
+--   relation's constructors, which a probe of a flattener arm wants back.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 -- RECOVERY: git show 3a3bd405:agda/evidence/probed/Probed/Connect-Count.agda
 -- RECOVERY: git show 15e6c229:agda/evidence/probed/Probed/Pipeline-Claims.agda
@@ -56,4 +59,3 @@ module Probed.Main where
 -- row and E6 refuses a `-- FORK:` that does not inhabit `Separates`, so
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
-open import Probed.Stuck-Branches using (hop-inner; hop-root; hop-defer; finish-empty)

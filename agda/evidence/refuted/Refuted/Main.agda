@@ -45,14 +45,11 @@ module Refuted.Main where
 open import Refuted.Domain-Predicate using
   (structural-domain-has-content-false; sub-total)
 
--- AN INPUT UNDER A FLATTENER, REJECTED BY THE AUTOMATON.  This one is
--- not about a measure, so E2 has no purchase on it: it is about
--- `toPlain`, and it dies only when the elaboration is repaired.  It is
--- also the counterexample the palette route does NOT reach -- no
--- share, no slot-table forgery, nothing at observable type -- which is
--- why it is filed beside the forgery rather than under it.
-open import Refuted.Flattened-Input using
-  (saw-count; saw-root; saw-full)
+-- A REFUTATION THAT RUNS THE EVALUATOR NEEDS AN EVALUATOR THAT
+-- COMPUTES, and while the candidate's arms are postulated none does.
+-- RECOVERY: git show 3abdafa1:agda/evidence/refuted/Refuted/Flattened-Input.agda
+--   holds the input-under-a-flattener counterexample, pinned by
+--   running the evaluator; it comes back when the arms do.
 
 -- THE ROOT-SIDE TWIN OF THE SLOT-TABLE FORGERY: why `run-wellFormed`
 -- carries an authorship premise on its program and not only on its
