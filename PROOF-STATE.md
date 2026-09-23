@@ -225,10 +225,12 @@ through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** Both
-are red. The evaluator terminates under the full check, and a sweep of a
-million and a half programs matches rxjs on every one that answers; about one
-in two hundred reaches `stuck-hop`, all from one shape, and the values half is
-red until the branch is empty. Neither half may be narrowed to pass.
+are red: the gated evaluator still reaches `stuck-hop` in about one case in
+two hundred, all from one shape. Neither half may be narrowed to pass.
+
+**After running 1.5M test cases, the evaluator's behavior is 1-for-1 correct
+against rxjs** — measured off the proof path, with both stuck branches rebuilt
+at the same ceiling under a termination pragma.
 
 ### The monster
 
