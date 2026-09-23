@@ -353,9 +353,9 @@ vouchAll u (v ∷ vs) = vouch u v ∷ vouchAll u vs
 dropRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m m′ u lo}
            {S} {κ : Path Γ lo u t}
        → m′ ≤ m → RP {e = e} m (Red m u) S κ → RP {e = e} m′ (Red m′ u) S κ
-fold (dropRP {u = u} le rp) s now vals _ fin sched st rm =
-  let (r , s′ , rp′) = fold rp s now vals (vouchAll u vals) fin sched st (≤-trans rm le)
-  in r , s′ , dropRP le rp′
+fold (dropRP {u = u} le rp) s now vals _ fin sched st rm
+  with fold rp s now vals (vouchAll u vals) fin sched st (≤-trans rm le)
+... | (r , s′ , rp′) = r , s′ , dropRP le rp′
 up (dropRP {κ = root} le rp)                               = tt
 up (dropRP {κ = share-sink i below} le rp)                 = tt
 up (dropRP {κ = map-f fn ↠[ h ] κ} le rp)                  = tt
@@ -654,22 +654,20 @@ up   rootRP = tt
 mapRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s u lo ℓ S}
         (fn : FnClo Γ s u) → RedFn m fn → (h : lo ≤ ℓ) (κ : Path Γ ℓ u t)
       → RP {e = e} m (Red m u) S κ → RP {e = e} m (Red m s) S (map-f fn ↠[ h ] κ)
-fold (mapRP fn rf h κ rp) s now vals cs fin sched st rm =
-  let ((r , f) , s′ , rp′) =
-        fold rp s now (map (applyClo fn) vals) (redMapVals fn rf cs) fin sched st rm
-  in (r , fold-step step-map f) , s′ , mapRP fn rf h κ rp′
+fold (mapRP fn rf h κ rp) s now vals cs fin sched st rm
+  with fold rp s now (map (applyClo fn) vals) (redMapVals fn rf cs) fin sched st rm
+... | ((r , f) , s′ , rp′) = (r , fold-step step-map f) , s′ , mapRP fn rf h κ rp′
 up (mapRP fn rf h κ rp) = tt
 
 takeRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s lo ℓ S}
          (nid : NodeId) (h : lo ≤ ℓ) (κ : Path Γ ℓ s t)
        → RP {e = e} m (Red m s) S κ → RP {e = e} m (Red m s) S (take-f nid ↠[ h ] κ)
-fold (takeRP nid h κ rp) s now vals cs fin sched st rm =
-  let ns = lookupNode nid (EvalSt.nodes st)
-      (outs , fin′ , sched₁ , st₁) = takeDispatch nid vals fin sched st ns
-      ((r , f) , s′ , rp′) =
-        fold rp s now outs (redTakeDispatch nid fin sched st ns cs) fin′ sched₁ st₁
-          (room-keeps (takeDispatch-keeps nid vals fin sched st ns) rm)
-  in (r , fold-step step-take f) , s′ , takeRP nid h κ rp′
+fold (takeRP nid h κ rp) s now vals cs fin sched st rm
+  with (let ns = lookupNode nid (EvalSt.nodes st)
+            (outs , fin′ , sched₁ , st₁) = takeDispatch nid vals fin sched st ns
+        in fold rp s now outs (redTakeDispatch nid fin sched st ns cs) fin′ sched₁ st₁
+             (room-keeps (takeDispatch-keeps nid vals fin sched st ns) rm))
+... | ((r , f) , s′ , rp′) = (r , fold-step step-take f) , s′ , takeRP nid h κ rp′
 up (takeRP nid h κ rp) = tt
 
 -- THE FOLD CLOSES OVER ITS HELD ACCUMULATOR AND ITS SUCCESSOR OVER
@@ -683,14 +681,15 @@ scanRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s u lo ℓ S}
        → (h : lo ≤ ℓ) (κ : Path Γ ℓ u t)
        → RP {e = e} m (Red m u) S κ
        → RP {e = e} m (Red m s) S (scan-f fn nid ↠[ h ] κ)
-fold (scanRP fn nid rf held fb h κ rp) s now vals cs fin sched st rm =
-  let ns = lookupNode nid (EvalSt.nodes st)
-      (outs , fin′ , sched₁ , st₁) = scanDispatch fn nid vals fin sched st ns
-      (col , held′) = redScanDispatch fn nid fin sched st ns fb held rf cs
-      ((r , f) , s′ , rp′) =
-        fold rp s now outs col fin′ sched₁ st₁
-          (room-keeps (scanDispatch-keeps fn nid vals fin sched st ns) rm)
-  in (r , fold-step step-scan f) , s′ , scanRP fn nid rf held′ fb h κ rp′
+fold (scanRP fn nid rf held fb h κ rp) s now vals cs fin sched st rm
+  with (let ns = lookupNode nid (EvalSt.nodes st)
+            (outs , fin′ , sched₁ , st₁) = scanDispatch fn nid vals fin sched st ns
+            (col , _) = redScanDispatch fn nid fin sched st ns fb held rf cs
+        in fold rp s now outs col fin′ sched₁ st₁
+             (room-keeps (scanDispatch-keeps fn nid vals fin sched st ns) rm))
+... | ((r , f) , s′ , rp′) =
+      let (_ , held′) = redScanDispatch fn nid fin sched st (lookupNode nid (EvalSt.nodes st)) fb held rf cs
+      in (r , fold-step step-scan f) , s′ , scanRP fn nid rf held′ fb h κ rp′
 up (scanRP fn nid rf held fb h κ rp) = tt
 
 -- THE BRACKET'S FLUSH IS ITS OWN FOLD WITH THE BIT DOWN, and the
@@ -701,14 +700,15 @@ batchRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s lo ℓ S}
         → (h : lo ≤ ℓ) (κ : Path Γ ℓ (s ×ᵗ listᵗ s) t)
         → RP {e = e} m (Red m (s ×ᵗ listᵗ s)) S κ
         → RP {e = e} m (Red m s) S (batchSync-f nid ↠[ h ] κ)
-fold (batchRP nid hb fb h κ rp) s now vals cs fin sched st rm =
-  let ns = lookupNode nid (EvalSt.nodes st)
-      (outs , fin′ , sched₁ , st₁) = batchDispatch nid vals fin sched st ns
-      (col , hb′) = redBatchDispatch nid fin sched st ns fb hb cs
-      ((r , f) , s′ , rp′) =
-        fold rp s now outs col fin′ sched₁ st₁
-          (room-keeps (batchDispatch-keeps nid vals fin sched st ns) rm)
-  in (r , fold-step step-batchSync f) , s′ , batchRP nid hb′ fb h κ rp′
+fold (batchRP nid hb fb h κ rp) s now vals cs fin sched st rm
+  with (let ns = lookupNode nid (EvalSt.nodes st)
+            (outs , fin′ , sched₁ , st₁) = batchDispatch nid vals fin sched st ns
+            (col , _) = redBatchDispatch nid fin sched st ns fb hb cs
+        in fold rp s now outs col fin′ sched₁ st₁
+             (room-keeps (batchDispatch-keeps nid vals fin sched st ns) rm))
+... | ((r , f) , s′ , rp′) =
+      let (_ , hb′) = redBatchDispatch nid fin sched st (lookupNode nid (EvalSt.nodes st)) fb hb cs
+      in (r , fold-step step-batchSync f) , s′ , batchRP nid hb′ fb h κ rp′
 up (batchRP nid hb fb h κ rp) = tt
 
 ------------------------------------------------------------------
@@ -775,8 +775,9 @@ up (batchRP nid hb fb h κ rp) = tt
 -- the successor and not the type
 -- (`candidate-dropped-under-a-frame`, whose third row is the
 -- source-shaped control that runs).  The sweep reaches this branch
--- from that shape alone: one case in five hundred, and every other
--- case matches.
+-- from that shape alone -- a `batchSync` under a flattener, in about
+-- one program in two hundred -- and every program that answers
+-- matches.
 --
 -- AND THE CERTIFICATION IS A RUNTIME CHECK EVEN WHERE THE SUCCESSOR
 -- ARRIVES, so closing the boundary empties the branch without
@@ -958,6 +959,23 @@ redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Tm Γ [] [] (s ∷ Θ) u)
 -- THE TOP LINE: every closure whose environment is reducible is
 -- itself reducible, which is the face above with both accessibilities
 -- seeded at their own subjects and the room's taken as given.
+--
+-- A PROJECTED RESULT IS NAMED BY `with`, NEVER BY A PATTERN `let`,
+-- ANYWHERE THE DRAIN RECURSION PASSES.  A pattern `let` is
+-- substitution: each projected field is a fresh copy of the whole
+-- call, and the compiler's common-subexpression pass shares siblings
+-- within one clause but not across a recursion -- so a finish that
+-- drains a queued inner, whose finish drains the next, would run the
+-- drain once per field per level, exponential in the nesting, and a
+-- limited flattener a few lanes deep takes minutes on an arrival its
+-- neighbours clear in milliseconds.  A `with` makes the result one
+-- argument of an auxiliary function shared by every projection, and
+-- inherits the clause's patterns, so a descent on an accessibility
+-- still passes the checker.  A cheap `let` whose projection appears in
+-- the DERIVATION'S TYPE -- a wrap, a node read -- stays inside the
+-- scrutinee, since abstracting it would lose the definitional equation
+-- the derivation is stated against.  Pinned by
+-- `evaluator-stalls-under-a-limited-flattener`.
 --
 -- THE SUBSCRIBE CYCLE DESCENDS LEXICOGRAPHICALLY ON ACCESSIBILITIES IT
 -- CARRIES.  The room's is outermost and only a share's connect peels
@@ -1369,39 +1387,35 @@ shareGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {i : Fin n}
 -- now inside the frame's continuation, one value group at a time, in
 -- the order the values were produced.
 redExpAcc (input i) ρ rρ k ok aK a aM = red-input i ρ k ok aK aM
-redExpAcc (ofᵉ ts) ρ rρ k ok aK (acc rs) aM κ rp s now sched st rm =
-  let ((r , f) , s′ , rp′) =
-        fold rp s now (map (λ tm → evalWith tm ρ) ts)
-          (allJust (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM)) true sched st rm
-  in (r , subs-of f) , s′ , rp′
-redExpAcc emptyᵉ ρ rρ k ok aK a aM κ rp s now sched st rm =
-  let ((r , f) , s′ , rp′) = fold rp s now [] [] true sched st rm
-  in (r , subs-empty f) , s′ , rp′
-redExpAcc (mapᵉ {s = s} f b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
-  let okf = ∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
-      okb = ∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
-      rf  = redFnAcc f ρ rρ k okf aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM
-      ((r , d) , s₁ , _) =
-        redExpAcc b ρ rρ k okb aK
-          (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM
-          (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) (mapRP (_ , f , ρ) rf ≤-refl κ rp) s₀
-          now sched st rm
-  in (r , subs-map d) , s₁ , rp
+redExpAcc (ofᵉ ts) ρ rρ k ok aK (acc rs) aM κ rp s now sched st rm
+  with fold rp s now (map (λ tm → evalWith tm ρ) ts)
+         (allJust (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM)) true sched st rm
+... | ((r , f) , s′ , rp′) = (r , subs-of f) , s′ , rp′
+redExpAcc emptyᵉ ρ rρ k ok aK a aM κ rp s now sched st rm
+  with fold rp s now [] [] true sched st rm
+... | ((r , f) , s′ , rp′) = (r , subs-empty f) , s′ , rp′
+redExpAcc (mapᵉ {s = s} f b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+  with (let okf = ∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
+            okb = ∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
+            rf  = redFnAcc f ρ rρ k okf aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM
+        in redExpAcc b ρ rρ k okb aK
+             (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM
+             (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) (mapRP (_ , f , ρ) rf ≤-refl κ rp) s₀
+             now sched st rm)
+... | ((r , d) , s₁ , _) = (r , subs-map d) , s₁ , rp
 redExpAcc (takeᵉ c b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
   with evalWith c ρ in ceq
-... | zero  =
-  let ((r , f) , s′ , rp′) = fold rp s₀ now [] [] true sched st rm
-  in (r , subs-take-zero ceq f) , s′ , rp′
-... | suc j =
-  let okb = ∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok
-      nid = freshId nodeᵏ (Sched.mint sched)
-      ((r , d) , s₁ , _) =
-        redExpAcc b ρ rρ k okb aK
-          (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
-          (take-f nid ↠[ ≤-refl ] κ) (takeRP nid ≤-refl κ rp) s₀ now
-          (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-          (installNode nid (take-st (suc j)) st) rm
-  in (r , subs-take-suc ceq refl d) , s₁ , rp
+... | zero with fold rp s₀ now [] [] true sched st rm
+... | ((r , f) , s′ , rp′) = (r , subs-take-zero ceq f) , s′ , rp′
+redExpAcc (takeᵉ c b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm | suc j
+  with (let okb = ∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok
+            nid = freshId nodeᵏ (Sched.mint sched)
+        in redExpAcc b ρ rρ k okb aK
+             (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
+             (take-f nid ↠[ ≤-refl ] κ) (takeRP nid ≤-refl κ rp) s₀ now
+             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+             (installNode nid (take-st (suc j)) st) rm)
+... | ((r , d) , s₁ , _) = (r , subs-take-suc ceq refl d) , s₁ , rp
 
 -- THE BRACKET IS OPENED BY THE INSTALL AND CLOSED WHEN THE SUBSCRIBE
 -- CALL RETURNS, WHICH IS WHERE THE BIT GOES DOWN AND THE GROUP LEAVES.
@@ -1409,86 +1423,81 @@ redExpAcc (takeᵉ c b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
 -- with nothing arriving; that fold reads the buffer out of the store,
 -- certifies it against the column the successor holds, and folds the
 -- group up the parent -- the one fold this arm makes itself.
-redExpAcc (batchSyncᵉ {t = u} b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
-  let nid = freshId nodeᵏ (Sched.mint sched)
-      ((( out₁ , sched₁ , st₁) , d) , s₁ , rpB) =
-        redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
-          (batchSync-f nid ↠[ ≤-refl ] κ) (batchRP nid ([] , []) (vouch u) ≤-refl κ rp) s₀ now
-          (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-          (installNode nid (batchSync-st {s = u} true [] false) st) rm
-      ns = lookupNode nid (EvalSt.nodes st₁)
-      ((( out₂ , sched₂ , st₂) , f) , s₂ , _) =
-        fold rpB s₁ now [] [] false
-          sched₁ (installNode nid (batchDown u ns) st₁)
-          (room-keeps (subscribeE-keeps d) rm)
-  in ((out₁ ++ out₂ , sched₂ , st₂) , subs-batchSync refl d f) , s₂ , rp
+redExpAcc (batchSyncᵉ {t = u} b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+  with (let nid = freshId nodeᵏ (Sched.mint sched)
+        in redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
+             (batchSync-f nid ↠[ ≤-refl ] κ) (batchRP nid ([] , []) (vouch u) ≤-refl κ rp) s₀ now
+             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+             (installNode nid (batchSync-st {s = u} true [] false) st) rm)
+... | ((( out₁ , sched₁ , st₁) , d) , s₁ , rpB)
+  with (let nid = freshId nodeᵏ (Sched.mint sched)
+            ns  = lookupNode nid (EvalSt.nodes st₁)
+        in fold rpB s₁ now [] [] false
+             sched₁ (installNode nid (batchDown u ns) st₁)
+             (room-keeps (subscribeE-keeps d) rm))
+... | ((( out₂ , sched₂ , st₂) , f) , s₂ , _) =
+      ((out₁ ++ out₂ , sched₂ , st₂) , subs-batchSync refl d f) , s₂ , rp
 
 -- THE FOLD BUILDS ITS CONTINUATION OVER THE INITIAL ACCUMULATOR AND
 -- THE TERM FACE'S CANDIDATE FOR IT; what the store does to the cell
 -- afterwards is the continuation's business, entry by entry.
-redExpAcc (scanᵉ {s = s} {t = u} f z b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
-  let zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b
-      okf = ∧ˡ (inputsBelowᵗ k f) zbe ok
-      rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
-      okz = ∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
-      okb = ∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
-      nid = freshId nodeᵏ (Sched.mint sched)
-      rf  = redFnAcc f ρ rρ k okf aK
-              (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵗ z + gsizeᵉ b)))) aM
-      rz  = redTmAcc z ρ rρ k okz aK
-              (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b))
-                                (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f))))) aM
-      ((r , d) , s₁ , _) =
-        redExpAcc b ρ rρ k okb aK
-          (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
-                            (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f))))) aM
-          (scan-f (_ , f , ρ) nid ↠[ ≤-refl ] κ)
-          (scanRP (_ , f , ρ) nid rf (just (evalWith z ρ , rz)) (vouch u) ≤-refl κ rp) s₀ now
-          (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-          (installNode nid (cell-st (evalWith z ρ)) st) rm
-  in (r , subs-scan refl d) , s₁ , rp
-redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
-  let nid = freshId nodeᵏ (Sched.mint sched)
-      ((r , d) , s₁ , _) =
-        redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
-          (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ) (thruRP mergeAllᵒ nid aM ≤-refl κ rp) s₀ now
-          (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-          (installNode nid (mergeAll-st lim 0 [] false) st) rm
-  in (r , subs-merge-all (sub-all refl d)) , s₁ , rp
-redExpAcc (switchAllᵉ b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
-  let nid = freshId nodeᵏ (Sched.mint sched)
-      ((r , d) , s₁ , _) =
-        redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
-          (thru-outer switchᵒ nid ↠[ ≤-refl ] κ) (thruRP switchᵒ nid aM ≤-refl κ rp) s₀ now
-          (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-          (installNode nid (switch-st nothing false) st) rm
-  in (r , subs-switch-all (sub-all refl d)) , s₁ , rp
-redExpAcc (exhaustAllᵉ b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
-  let nid = freshId nodeᵏ (Sched.mint sched)
-      ((r , d) , s₁ , _) =
-        redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
-          (thru-outer exhaustᵒ nid ↠[ ≤-refl ] κ) (thruRP exhaustᵒ nid aM ≤-refl κ rp) s₀ now
-          (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-          (installNode nid (exhaust-st false false) st) rm
-  in (r , subs-exhaust-all (sub-all refl d)) , s₁ , rp
-redExpAcc (μᵉ body) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
-  let ((r , d) , s₁ , rp₁) =
-        redExpAcc (unfoldμ body) ρ rρ k (ib-unfoldμ k body ok) aK
-          (rs (subst (_< suc (gsizeᵉ body))
-                     (sym (gsize-unfoldμ body)) ≤-refl)) aM
-          κ rp s₀ now sched st rm
-  in (r , subs-μ d) , s₁ , rp₁
+redExpAcc (scanᵉ {s = s} {t = u} f z b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+  with (let zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b
+            okf = ∧ˡ (inputsBelowᵗ k f) zbe ok
+            rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
+            okz = ∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
+            okb = ∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
+            nid = freshId nodeᵏ (Sched.mint sched)
+            rf  = redFnAcc f ρ rρ k okf aK
+                    (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵗ z + gsizeᵉ b)))) aM
+            rz  = redTmAcc z ρ rρ k okz aK
+                    (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b))
+                                      (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f))))) aM
+        in redExpAcc b ρ rρ k okb aK
+             (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
+                               (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f))))) aM
+             (scan-f (_ , f , ρ) nid ↠[ ≤-refl ] κ)
+             (scanRP (_ , f , ρ) nid rf (just (evalWith z ρ , rz)) (vouch u) ≤-refl κ rp) s₀ now
+             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+             (installNode nid (cell-st (evalWith z ρ)) st) rm)
+... | ((r , d) , s₁ , _) = (r , subs-scan refl d) , s₁ , rp
+redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+  with (let nid = freshId nodeᵏ (Sched.mint sched)
+        in redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
+             (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ) (thruRP mergeAllᵒ nid aM ≤-refl κ rp) s₀ now
+             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+             (installNode nid (mergeAll-st lim 0 [] false) st) rm)
+... | ((r , d) , s₁ , _) = (r , subs-merge-all (sub-all refl d)) , s₁ , rp
+redExpAcc (switchAllᵉ b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+  with (let nid = freshId nodeᵏ (Sched.mint sched)
+        in redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
+             (thru-outer switchᵒ nid ↠[ ≤-refl ] κ) (thruRP switchᵒ nid aM ≤-refl κ rp) s₀ now
+             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+             (installNode nid (switch-st nothing false) st) rm)
+... | ((r , d) , s₁ , _) = (r , subs-switch-all (sub-all refl d)) , s₁ , rp
+redExpAcc (exhaustAllᵉ b) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+  with (let nid = freshId nodeᵏ (Sched.mint sched)
+        in redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
+             (thru-outer exhaustᵒ nid ↠[ ≤-refl ] κ) (thruRP exhaustᵒ nid aM ≤-refl κ rp) s₀ now
+             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+             (installNode nid (exhaust-st false false) st) rm)
+... | ((r , d) , s₁ , _) = (r , subs-exhaust-all (sub-all refl d)) , s₁ , rp
+redExpAcc (μᵉ body) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+  with redExpAcc (unfoldμ body) ρ rρ k (ib-unfoldμ k body ok) aK
+         (rs (subst (_< suc (gsizeᵉ body))
+                    (sym (gsize-unfoldμ body)) ≤-refl)) aM
+         κ rp s₀ now sched st rm
+... | ((r , d) , s₁ , rp₁) = (r , subs-μ d) , s₁ , rp₁
 redExpAcc (varᵉ ()) ρ rρ k ok aK a aM
 redExpAcc (deferᵉ body) ρ rρ k ok aK a aM κ rp s₀ now sched st rm =
   (_ , subs-defer refl refl refl refl) , s₀ , rp
-redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
-  let src = freshId sourceᵏ (Sched.mint sched)
-      ((r , d) , s₁ , rp₁) =
-        redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ rp s₀ now
-          (record sched
-             { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
-          st rm
-  in (r , subs-mint refl d) , s₁ , rp₁
+redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm
+  with (let src = freshId sourceᵏ (Sched.mint sched)
+        in redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ rp s₀ now
+             (record sched
+                { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
+             st rm)
+... | ((r , d) , s₁ , rp₁) = (r , subs-mint refl d) , s₁ , rp₁
 
 -- THE SLOT ARMS.  Each scripted arm folds what the slot script says
 -- through the continuation, with `red-data` beside every value; the
@@ -1497,38 +1506,36 @@ redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ rp s₀ now sched st rm =
 -- this very chain and a cut severs registrations.
 red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ rp s now sched st rm
     with toℕ i <? lo
-... | no  ¬below =
-      let ((r , f) , s′ , rp′) = fold rp s now [] [] true sched st rm
-      in (r , subs-floor (≮⇒≥ ¬below) f) , s′ , rp′
-... | yes below  with Sched.slots sched i in slEq
+... | no  ¬below with fold rp s now [] [] true sched st rm
+... | ((r , f) , s′ , rp′) = (r , subs-floor (≮⇒≥ ¬below) f) , s′ , rp′
+red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ rp s now sched st rm
+    | yes below  with Sched.slots sched i in slEq
 ...   | scripted {ok = okD} (hot async)
         with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
-...     | true  =
-          let ((r , f) , s′ , rp′) = fold rp s now [] [] true sched st rm
-          in (r , subs-hot-done below slEq doneEq f) , s′ , rp′
 ...     | false = (_ , subs-hot-live below slEq doneEq refl) , s , rp
+...     | true  with fold rp s now [] [] true sched st rm
+...     | ((r , f) , s′ , rp′) = (r , subs-hot-done below slEq doneEq f) , s′ , rp′
 red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ rp s now sched st rm
-    | yes below | scripted {ok = okD} (cold sync []) =
-      let ((r , f) , s′ , rp′) = fold rp s now sync (allJust (redDatas _ _ okD sync)) true sched st rm
-      in (r , subs-cold-sync below slEq f) , s′ , rp′
+    | yes below | scripted {ok = okD} (cold sync [])
+      with fold rp s now sync (allJust (redDatas _ _ okD sync)) true sched st rm
+...   | ((r , f) , s′ , rp′) = (r , subs-cold-sync below slEq f) , s′ , rp′
 red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ rp s now sched st rm
-    | yes below | scripted {ok = okD} (cold sync (d ∷ ds)) =
-      let rid = freshId regᵏ (Sched.mint sched)
-          ((r , f) , s′ , rp′) =
-            fold rp s now sync (allJust (redDatas _ _ okD sync)) false
-              (record sched
-                 { mint = setAt regᵏ (suc rid)
-                            (setAt sourceᵏ (suc (freshId sourceᵏ (Sched.mint sched)))
-                              (setAt ordinalᵏ (suc (freshId ordinalᵏ (Sched.mint sched)))
-                                (Sched.mint sched)))
-                 ; live = record { source = freshId sourceᵏ (Sched.mint sched)
-                                 ; ordinal = freshId ordinalᵏ (Sched.mint sched)
-                                 ; elemTy = lookup Γ i
-                                 ; pending = resolve now (d ∷ ds) }
-                          ∷ Sched.live sched })
-              (register rid (atDyn (freshId sourceᵏ (Sched.mint sched)) lo) κ st)
-              (room-keeps (keeps-refl (Sched.slots sched) (EvalSt.connectedShares st)) rm)
-      in (r , subs-cold-async below slEq refl refl refl f) , s′ , rp′
+    | yes below | scripted {ok = okD} (cold sync (d ∷ ds))
+      with (let rid = freshId regᵏ (Sched.mint sched)
+            in fold rp s now sync (allJust (redDatas _ _ okD sync)) false
+                 (record sched
+                    { mint = setAt regᵏ (suc rid)
+                               (setAt sourceᵏ (suc (freshId sourceᵏ (Sched.mint sched)))
+                                 (setAt ordinalᵏ (suc (freshId ordinalᵏ (Sched.mint sched)))
+                                   (Sched.mint sched)))
+                    ; live = record { source = freshId sourceᵏ (Sched.mint sched)
+                                    ; ordinal = freshId ordinalᵏ (Sched.mint sched)
+                                    ; elemTy = lookup Γ i
+                                    ; pending = resolve now (d ∷ ds) }
+                             ∷ Sched.live sched })
+                 (register rid (atDyn (freshId sourceᵏ (Sched.mint sched)) lo) κ st)
+                 (room-keeps (keeps-refl (Sched.slots sched) (EvalSt.connectedShares st)) rm))
+...   | ((r , f) , s′ , rp′) = (r , subs-cold-async below slEq refl refl refl f) , s′ , rp′
 red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ rp s now sched st rm
     | yes below | shared d {ok = okd} =
       red-input-shared i d (rsK (<ᵇ⇒< (toℕ i) k ok)) ρ
@@ -1543,32 +1550,33 @@ red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ rp s now sched st rm
 -- Everything the def's values reach is reached raw, at that ceiling.
 red-input-shared {n = n} {Γ = Γ} {t = t} {lo = lo} i d {okd} aI ρ κ below rp s now sched slEq st (acc rsM) rm
     with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
-... | true =
-      let ((r , f) , s′ , rp′) = fold rp s now [] [] true sched st rm
-      in (r , subs-shared {κ = κ} {below = below} slEq
-                (slot-spent {κ = κ} {below = below} doneEq f)) , s′ , rp′
-... | false
+... | true with fold rp s now [] [] true sched st rm
+... | ((r , f) , s′ , rp′) =
+      (r , subs-shared {κ = κ} {below = below} slEq
+             (slot-spent {κ = κ} {below = below} doneEq f)) , s′ , rp′
+red-input-shared {n = n} {Γ = Γ} {t = t} {lo = lo} i d {okd} aI ρ κ below rp s now sched slEq st (acc rsM) rm
+    | false
       with memberSource (toℕ i) (EvalSt.connectedShares st) in connEq
 ...   | true =
         (_ , subs-shared {κ = κ} {below = below} slEq
                (slot-join {κ = κ} {below = below} doneEq connEq refl)) , s , rp
-...   | false =
-        let fall = ≤-trans (unconn-insert (Sched.slots sched)
-                              (EvalSt.connectedShares st) i slEq connEq) rm
-            aM′  = rsM fall
-            rid  = freshId regᵏ (Sched.mint sched)
-            ((r , dv) , _ , _) =
-              redExpAcc d []ᵉ tt (toℕ i) okd aI (<-wellFounded (gsizeᵉ d)) aM′
-                (share-sink i ≤-refl)
-                (rawRP (<-wellFounded (n ∸ toℕ i)) ≤-refl aM′ (share-sink i ≤-refl)) tt now
-                (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
-                (register rid (atSlot i) (lowerFloor below κ)
-                  (record st
-                    { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
-                ≤-refl
-        in (r , subs-shared {κ = κ} {below = below} slEq
-                  (slot-connect {κ = κ} {below = below} doneEq connEq
-                    (connect {κ = κ} {below = below} refl dv))) , s , rp
+...   | false
+      with (let fall = ≤-trans (unconn-insert (Sched.slots sched)
+                                  (EvalSt.connectedShares st) i slEq connEq) rm
+                aM′  = rsM fall
+                rid  = freshId regᵏ (Sched.mint sched)
+            in redExpAcc d []ᵉ tt (toℕ i) okd aI (<-wellFounded (gsizeᵉ d)) aM′
+                 (share-sink i ≤-refl)
+                 (rawRP (<-wellFounded (n ∸ toℕ i)) ≤-refl aM′ (share-sink i ≤-refl)) tt now
+                 (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
+                 (register rid (atSlot i) (lowerFloor below κ)
+                   (record st
+                     { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+                 ≤-refl)
+...   | ((r , dv) , _ , _) =
+        (r , subs-shared {κ = κ} {below = below} slEq
+               (slot-connect {κ = κ} {below = below} doneEq connEq
+                 (connect {κ = κ} {below = below} refl dv))) , s , rp
 
 ------------------------------------------------------------------
 -- THE TERM FACE.
@@ -1715,15 +1723,15 @@ red-consume {u = u} mergeAllᵒ nid κ now o co rp s sched st aM rm
                (trans (cong (consumeUsable mergeAllᵒ u) eq) (cong ⌊_⌋ eqw))) , s , rp
 ...   | yes refl with hasRoom lim act in eqr
 ...     | false = (_ , consume-all-enqueue eq eqr) , s , rp
-...     | true =
-          let inst   = freshId nodeᵏ (Sched.mint sched)
-              sched′ = record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }
-              st′    = record st
-                         { nodes = setNode nid (mergeAll-st lim (suc act) q od)
-                             (EvalSt.nodes st) }
-              ((( out , sched₁ , st₁) , d) , s′ , rp′) =
-                red-hop mergeAllᵒ nid inst κ now o co rp s sched′ st′ aM rm
-          in ((out , sched₁ , st₁) , consume-all-sub eq eqr (inner refl d)) , s′ , rp′
+...     | true
+          with (let inst   = freshId nodeᵏ (Sched.mint sched)
+                    sched′ = record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }
+                    st′    = record st
+                               { nodes = setNode nid (mergeAll-st lim (suc act) q od)
+                                   (EvalSt.nodes st) }
+                in red-hop mergeAllᵒ nid inst κ now o co rp s sched′ st′ aM rm)
+...     | ((( out , sched₁ , st₁) , d) , s′ , rp′) =
+          ((out , sched₁ , st₁) , consume-all-sub eq eqr (inner refl d)) , s′ , rp′
 
 red-consume {u = u} switchᵒ nid κ now o co rp s sched st aM rm
   with lookupNode nid (EvalSt.nodes st) in eq
@@ -1740,16 +1748,16 @@ red-consume {u = u} switchᵒ nid κ now o co rp s sched st aM rm
 ... | just (exhaust-st _ _) =
       (_ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq)) , s , rp
 ... | just (switch-st cur od) with switchKill cur sched st in eqk
-...   | (sched₁ , st₁) =
-        let inst   = freshId nodeᵏ (Sched.mint sched₁)
-            sched′ = record sched₁ { mint = setAt nodeᵏ (suc inst) (Sched.mint sched₁) }
-            st′    = record st₁
-                       { nodes = setNode nid (switch-st (just inst) od)
-                           (EvalSt.nodes st₁) }
-            rm′    = room-keeps (switchKill-keeps cur sched st eqk) rm
-            ((( out , sched₂ , st₂) , d) , s′ , rp′) =
-              red-hop switchᵒ nid inst κ now o co rp s sched′ st′ aM rm′
-        in ((out , sched₂ , st₂) , consume-switch-sub eq eqk refl (inner refl d)) , s′ , rp′
+...   | (sched₁ , st₁)
+        with (let inst   = freshId nodeᵏ (Sched.mint sched₁)
+                  sched′ = record sched₁ { mint = setAt nodeᵏ (suc inst) (Sched.mint sched₁) }
+                  st′    = record st₁
+                             { nodes = setNode nid (switch-st (just inst) od)
+                                 (EvalSt.nodes st₁) }
+                  rm′    = room-keeps (switchKill-keeps cur sched st eqk) rm
+              in red-hop switchᵒ nid inst κ now o co rp s sched′ st′ aM rm′)
+...     | ((( out , sched₂ , st₂) , d) , s′ , rp′) =
+          ((out , sched₂ , st₂) , consume-switch-sub eq eqk refl (inner refl d)) , s′ , rp′
 
 red-consume {u = u} exhaustᵒ nid κ now o co rp s sched st aM rm
   with lookupNode nid (EvalSt.nodes st) in eq
@@ -1767,94 +1775,89 @@ red-consume {u = u} exhaustᵒ nid κ now o co rp s sched st aM rm
       (_ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq)) , s , rp
 ... | just (exhaust-st true _) =
       (_ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq)) , s , rp
-... | just (exhaust-st false od) =
-      let inst   = freshId nodeᵏ (Sched.mint sched)
-          sched′ = record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }
-          st′    = record st
-                     { nodes = setNode nid (exhaust-st true od) (EvalSt.nodes st) }
-          ((( out , sched₁ , st₁) , d) , s′ , rp′) =
-            red-hop exhaustᵒ nid inst κ now o co rp s sched′ st′ aM rm
-      in ((out , sched₁ , st₁) , consume-exhaust-sub eq (inner refl d)) , s′ , rp′
+... | just (exhaust-st false od)
+      with (let inst   = freshId nodeᵏ (Sched.mint sched)
+                sched′ = record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }
+                st′    = record st
+                           { nodes = setNode nid (exhaust-st true od) (EvalSt.nodes st) }
+            in red-hop exhaustᵒ nid inst κ now o co rp s sched′ st′ aM rm)
+...   | ((( out , sched₁ , st₁) , d) , s′ , rp′) =
+        ((out , sched₁ , st₁) , consume-exhaust-sub eq (inner refl d)) , s′ , rp′
 
-red-hop op nid inst κ now o (just ro) rp s sched st aM rm =
-  let (r , s′ , rp′) =
-        ro (from-inner op nid inst ↠[ ≤-refl ] κ)
+red-hop op nid inst κ now o (just ro) rp s sched st aM rm
+  with ro (from-inner op nid inst ↠[ ≤-refl ] κ)
           (fromInnerWalkRP op nid inst aM ≤-refl κ rp) s now sched st rm
-  in r , s′ , up rp′
+... | (r , s′ , rp′) = r , s′ , up rp′
 red-hop {m = m} op nid inst κ now o nothing rp s sched st (acc rsM) rm
   with unconn (Sched.slots sched) (EvalSt.connectedShares st) <? m
-... | yes lt =
-      let (r , s′ , _) =
-            red-val (rsM lt) (obs _) o (from-inner op nid inst ↠[ ≤-refl ] κ)
-              (fromInnerWalkRP op nid inst (rsM lt) ≤-refl κ (dropRP (<⇒≤ lt) rp))
-              s now sched st ≤-refl
-      in r , s′ , rp
 ... | no nlt =
       let (r , s′ , rp′) = stuck-hop o (from-inner op nid inst ↠[ ≤-refl ] κ) now s sched st rm nlt
       in r , s′ , up rp′
+... | yes lt
+  with red-val (rsM lt) (obs _) o (from-inner op nid inst ↠[ ≤-refl ] κ)
+         (fromInnerWalkRP op nid inst (rsM lt) ≤-refl κ (dropRP (<⇒≤ lt) rp))
+         s now sched st ≤-refl
+... | (r , s′ , _) = r , s′ , rp
 
 red-walk op nid κ now []       []        rp s sched st aM rm = (_ , walk-nil) , s , rp
-red-walk op nid κ now (o ∷ os) (co ∷ cs) rp s sched st aM rm =
-  let ((( out₁ , sched₁ , st₁) , c) , s₁ , rp₁) =
-        red-consume op nid κ now o co rp s sched st aM rm
-      ((( out₂ , sched₂ , st₂) , w) , s₂ , rp₂) =
-        red-walk op nid κ now os cs rp₁ s₁ sched₁ st₁ aM
-          (room-keeps (thruConsume-keeps c) rm)
-  in ((out₁ ++ out₂ , sched₂ , st₂) , walk-cons c w) , s₂ , rp₂
+red-walk op nid κ now (o ∷ os) (co ∷ cs) rp s sched st aM rm
+  with red-consume op nid κ now o co rp s sched st aM rm
+... | ((( out₁ , sched₁ , st₁) , c) , s₁ , rp₁)
+  with red-walk op nid κ now os cs rp₁ s₁ sched₁ st₁ aM
+         (room-keeps (thruConsume-keeps c) rm)
+... | ((( out₂ , sched₂ , st₂) , w) , s₂ , rp₂) =
+      ((out₁ ++ out₂ , sched₂ , st₂) , walk-cons c w) , s₂ , rp₂
 
-fold (thruRP op nid aM h κ rp) s now vals cs fin sched st rm =
-  let ((( out₁ , sched₁ , st₁) , w) , s₁ , rp₁) =
-        red-walk op nid κ now vals cs rp s sched st aM rm
-      (fin′ , sched₂ , st₂) = thruWrap op nid fin (sched₁ , st₁)
-      ((( out₂ , sched₃ , st₃) , f) , s₂ , rp₂) =
-        fold rp₁ s₁ now [] [] fin′ sched₂ st₂
-          (room-keeps (thruWrap-keeps op nid fin sched₁ st₁)
-            (room-keeps (thruWalk-keeps w) rm))
-  in ((out₁ ++ out₂ , sched₃ , st₃) , fold-step (step-thru-outer w) f) , s₂
-   , thruRP op nid aM h κ rp₂
+fold (thruRP op nid aM h κ rp) s now vals cs fin sched st rm
+  with red-walk op nid κ now vals cs rp s sched st aM rm
+... | ((( out₁ , sched₁ , st₁) , w) , s₁ , rp₁)
+  with (let (fin′ , sched₂ , st₂) = thruWrap op nid fin (sched₁ , st₁)
+        in fold rp₁ s₁ now [] [] fin′ sched₂ st₂
+             (room-keeps (thruWrap-keeps op nid fin sched₁ st₁)
+               (room-keeps (thruWalk-keeps w) rm)))
+... | ((( out₂ , sched₃ , st₃) , f) , s₂ , rp₂) =
+      ((out₁ ++ out₂ , sched₃ , st₃) , fold-step (step-thru-outer w) f) , s₂
+    , thruRP op nid aM h κ rp₂
 up (thruRP op nid aM h κ rp) = tt
 
-fold (fromInnerRP op allNid inst aM k aQ h κ rp) s now vals cs fin sched st rm =
-  let ((( out₁ , vals′ , fin′ , sched₁ , st₁) , r , cs′) , s₁ , rp₁) =
-        innerReact! op allNid inst κ now vals cs rp s sched st fin aM k aQ rm
-      ((( out₂ , sched₂ , st₂) , f) , s₂ , rp₂) =
-        fold rp₁ s₁ now vals′ cs′ fin′ sched₁ st₁
-          (room-keeps (innerReact-keeps r) rm)
-  in ((out₁ ++ out₂ , sched₂ , st₂) , fold-step (step-from-inner r) f) , s₂
-   , fromInnerRP op allNid inst aM k aQ h κ rp₂
+fold (fromInnerRP op allNid inst aM k aQ h κ rp) s now vals cs fin sched st rm
+  with innerReact! op allNid inst κ now vals cs rp s sched st fin aM k aQ rm
+... | ((( out₁ , vals′ , fin′ , sched₁ , st₁) , r , cs′) , s₁ , rp₁)
+  with fold rp₁ s₁ now vals′ cs′ fin′ sched₁ st₁ (room-keeps (innerReact-keeps r) rm)
+... | ((( out₂ , sched₂ , st₂) , f) , s₂ , rp₂) =
+      ((out₁ ++ out₂ , sched₂ , st₂) , fold-step (step-from-inner r) f) , s₂
+    , fromInnerRP op allNid inst aM k aQ h κ rp₂
 up (fromInnerRP op allNid inst aM k aQ h κ rp) = rp
 
-fold (fromInnerRawRP op allNid inst aM h κ rp) s now vals cs fin sched st rm =
-  let ((( out₁ , vals′ , fin′ , sched₁ , st₁) , r , cs′) , s₁ , rp₁) =
-        innerReactRaw! op allNid inst κ now vals cs rp s sched st fin aM rm
-      ((( out₂ , sched₂ , st₂) , f) , s₂ , rp₂) =
-        fold rp₁ s₁ now vals′ cs′ fin′ sched₁ st₁
-          (room-keeps (innerReact-keeps r) rm)
-  in ((out₁ ++ out₂ , sched₂ , st₂) , fold-step (step-from-inner r) f) , s₂
-   , fromInnerRawRP op allNid inst aM h κ rp₂
+fold (fromInnerRawRP op allNid inst aM h κ rp) s now vals cs fin sched st rm
+  with innerReactRaw! op allNid inst κ now vals cs rp s sched st fin aM rm
+... | ((( out₁ , vals′ , fin′ , sched₁ , st₁) , r , cs′) , s₁ , rp₁)
+  with fold rp₁ s₁ now vals′ cs′ fin′ sched₁ st₁ (room-keeps (innerReact-keeps r) rm)
+... | ((( out₂ , sched₂ , st₂) , f) , s₂ , rp₂) =
+      ((out₁ ++ out₂ , sched₂ , st₂) , fold-step (step-from-inner r) f) , s₂
+    , fromInnerRawRP op allNid inst aM h κ rp₂
 up (fromInnerRawRP op allNid inst aM h κ rp) = rp
 
-fold (fromInnerWalkRP op allNid inst aM h κ rp) s now vals cs fin sched st rm =
-  let ((( out₁ , vals′ , fin′ , sched₁ , st₁) , r , cs′) , s₁ , rp₁) =
-        innerReactWalk! op allNid inst κ now vals cs rp s sched st fin aM rm
-      ((( out₂ , sched₂ , st₂) , f) , s₂ , rp₂) =
-        fold rp₁ s₁ now vals′ cs′ fin′ sched₁ st₁
-          (room-keeps (innerReact-keeps r) rm)
-  in ((out₁ ++ out₂ , sched₂ , st₂) , fold-step (step-from-inner r) f) , s₂
-   , fromInnerWalkRP op allNid inst aM h κ rp₂
+fold (fromInnerWalkRP op allNid inst aM h κ rp) s now vals cs fin sched st rm
+  with innerReactWalk! op allNid inst κ now vals cs rp s sched st fin aM rm
+... | ((( out₁ , vals′ , fin′ , sched₁ , st₁) , r , cs′) , s₁ , rp₁)
+  with fold rp₁ s₁ now vals′ cs′ fin′ sched₁ st₁ (room-keeps (innerReact-keeps r) rm)
+... | ((( out₂ , sched₂ , st₂) , f) , s₂ , rp₂) =
+      ((out₁ ++ out₂ , sched₂ , st₂) , fold-step (step-from-inner r) f) , s₂
+    , fromInnerWalkRP op allNid inst aM h κ rp₂
 up (fromInnerWalkRP op allNid inst aM h κ rp) = rp
 
 ------------------------------------------------------------------
 -- THE COMPLETION SIDE.
 ------------------------------------------------------------------
 
-inner! op allNid κ now o rp s sched st aM k aQ rm =
-  let inst = freshId nodeᵏ (Sched.mint sched)
-      ((( out , sched′ , st′) , d) , s′ , rp′) =
-        red-val aM (obs _) o (from-inner op allNid inst ↠[ ≤-refl ] κ)
-          (fromInnerRP op allNid inst aM k aQ ≤-refl κ rp) s now
-          (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st rm
-  in ((inst , out , sched′ , st′) , inner refl d) , s′ , up rp′
+inner! op allNid κ now o rp s sched st aM k aQ rm
+  with (let inst = freshId nodeᵏ (Sched.mint sched)
+        in red-val aM (obs _) o (from-inner op allNid inst ↠[ ≤-refl ] κ)
+             (fromInnerRP op allNid inst aM k aQ ≤-refl κ rp) s now
+             (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st rm)
+... | ((( out , sched′ , st′) , d) , s′ , rp′) =
+      ((freshId nodeᵏ (Sched.mint sched) , out , sched′ , st′) , inner refl d) , s′ , up rp′
 
 -- THE DRAIN'S DESCENT IS ITS FUEL, AND THE BUDGET IT HANDS EACH SPENT
 -- INNER IS THE FUEL'S TAIL.  An inner that ends synchronously inside
@@ -1869,19 +1872,19 @@ mergeAllDrain! allNid κ now (f ∷ fs) lim act od []      rp s sched st aM aQ r
 mergeAllDrain! {s = u} allNid κ now (f ∷ fs) lim act od (o ∷ q) rp s sched st aM (acc rsQ) rm
   with hasRoom lim act in eqr
 ... | false = (_ , drain-no-room eqr) , s , rp
-... | true  =
-      let ((( inst , out , sched₁ , st₁) , sb) , s₁ , rp₁) =
-            inner! mergeAllᵒ allNid κ now o rp s sched
-              (record st
-                 { nodes = setNode allNid (mergeAll-st lim (suc act) q od)
-                     (EvalSt.nodes st) })
-              aM (length fs) (rsQ ≤-refl) rm
-          (lim₂ , act₂ , q₂ , od₂) =
-            drainSt u (lookupNode allNid (EvalSt.nodes st₁))
-          ((( out′ , act′ , q′ , sched₂ , st₂) , d) , s₂ , rp₂) =
-            mergeAllDrain! allNid κ now fs lim₂ act₂ od₂ q₂ rp₁ s₁ sched₁ st₁ aM (rsQ ≤-refl)
-              (room-keeps (subscribeInner-keeps sb) rm)
-      in ((out ++ out′ , act′ , q′ , sched₂ , st₂) , drain-room eqr sb refl d) , s₂ , rp₂
+... | true
+  with inner! mergeAllᵒ allNid κ now o rp s sched
+         (record st
+            { nodes = setNode allNid (mergeAll-st lim (suc act) q od)
+                (EvalSt.nodes st) })
+         aM (length fs) (rsQ ≤-refl) rm
+... | ((( inst , out , sched₁ , st₁) , sb) , s₁ , rp₁)
+  with drainSt u (lookupNode allNid (EvalSt.nodes st₁)) in eqd
+... | (lim₂ , act₂ , q₂ , od₂)
+  with mergeAllDrain! allNid κ now fs lim₂ act₂ od₂ q₂ rp₁ s₁ sched₁ st₁ aM (rsQ ≤-refl)
+         (room-keeps (subscribeInner-keeps sb) rm)
+... | ((( out′ , act′ , q′ , sched₂ , st₂) , d) , s₂ , rp₂) =
+      ((out ++ out′ , act′ , q′ , sched₂ , st₂) , drain-room eqr sb eqd d) , s₂ , rp₂
 
 -- THE MERGE'S FINISH: FOLD THE LAST VALUES, THEN DRAIN, THEN HAND THE
 -- COMPLETION UP.  The queue is reconciled against the budget in the
@@ -1889,17 +1892,16 @@ mergeAllDrain! {s = u} allNid κ now (f ∷ fs) lim act od (o ∷ q) rp s sched 
 innerFinish! {s = u} mergeAllᵒ allNid inst κ now vals cs rp s sched st
              (just (mergeAll-st {w} lim act q od)) aM k aQ rm with w ≟ᵗ u in eqw
 ... | no  _    = (_ , finish-nil (cong ⌊_⌋ eqw) , cs) , s , rp
-... | yes refl =
-      let ((( outV , sched₁ , st₁) , fp) , s₁ , rp₁) =
-            fold rp s now vals cs false sched st rm
-          rm₁ = room-keeps (foldPath-keeps fp) rm
-          ((( out , act′ , q′ , sched₂ , st₂) , d) , s₂ , rp₂) =
-            finishDrain! allNid κ now lim act od q rp₁ s₁ sched₁ st₁ aM k aQ rm₁
-      in (( outV ++ out , [] , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched₂
-          , record st₂
-              { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
-                  (EvalSt.nodes st₂) })
-         , finish-all-drain fp d , []) , s₂ , rp₂
+... | yes refl with fold rp s now vals cs false sched st rm
+... | ((( outV , sched₁ , st₁) , fp) , s₁ , rp₁)
+  with finishDrain! allNid κ now lim act od q rp₁ s₁ sched₁ st₁ aM k aQ
+         (room-keeps (foldPath-keeps fp) rm)
+... | ((( out , act′ , q′ , sched₂ , st₂) , d) , s₂ , rp₂) =
+      (( outV ++ out , [] , null q ∧ od ∧ (act′ ≡ᵇ 0) , sched₂
+       , record st₂
+           { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
+               (EvalSt.nodes st₂) })
+      , finish-all-drain fp d , []) , s₂ , rp₂
 innerFinish! switchᵒ allNid inst κ now vals cs rp s sched st
              (just (switch-st (just c) od)) aM k aQ rm with (c ≡ᵇ inst) in eqc
 ... | true  = (_ , finish-switch-clear eqc , cs) , s , rp
@@ -1931,17 +1933,16 @@ innerFinish! exhaustᵒ allNid inst κ now vals cs rp s sched st (just (switch-s
 innerFinishWalk! {s = u} mergeAllᵒ allNid inst κ now vals cs rp s sched st
              (just (mergeAll-st {w} lim act q od)) aM rm with w ≟ᵗ u in eqw
 ... | no  _    = (_ , finish-nil (cong ⌊_⌋ eqw) , cs) , s , rp
-... | yes refl =
-      let ((( outV , sched₁ , st₁) , fp) , s₁ , rp₁) =
-            fold rp s now vals cs false sched st rm
-          rm₁ = room-keeps (foldPath-keeps fp) rm
-          ((( out , act′ , q′ , sched₂ , st₂) , d) , s₂ , rp₂) =
-            finishWalk! allNid κ now lim act od q rp₁ s₁ sched₁ st₁ aM rm₁
-      in (( outV ++ out , [] , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched₂
-          , record st₂
-              { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
-                  (EvalSt.nodes st₂) })
-         , finish-all-drain fp d , []) , s₂ , rp₂
+... | yes refl with fold rp s now vals cs false sched st rm
+... | ((( outV , sched₁ , st₁) , fp) , s₁ , rp₁)
+  with finishWalk! allNid κ now lim act od q rp₁ s₁ sched₁ st₁ aM
+         (room-keeps (foldPath-keeps fp) rm)
+... | ((( out , act′ , q′ , sched₂ , st₂) , d) , s₂ , rp₂) =
+      (( outV ++ out , [] , null q ∧ od ∧ (act′ ≡ᵇ 0) , sched₂
+       , record st₂
+           { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
+               (EvalSt.nodes st₂) })
+      , finish-all-drain fp d , []) , s₂ , rp₂
 innerFinishWalk! switchᵒ allNid inst κ now vals cs rp s sched st
              (just (switch-st (just c) od)) aM rm with (c ≡ᵇ inst) in eqc
 ... | true  = (_ , finish-switch-clear eqc , cs) , s , rp
@@ -1975,18 +1976,16 @@ innerFinishWalk! exhaustᵒ allNid inst κ now vals cs rp s sched st (just (swit
 innerFinishRaw! {s = u} mergeAllᵒ allNid inst κ now vals cs rp s sched st
              (just (mergeAll-st {w} lim act q od)) aM rm with w ≟ᵗ u in eqw
 ... | no  _    = (_ , finish-nil (cong ⌊_⌋ eqw) , cs) , s , rp
-... | yes refl =
-      let ((( outV , sched₁ , st₁) , fp) , s₁ , rp₁) =
-            fold rp s now vals cs false sched st rm
-          rm₁ = room-keeps (foldPath-keeps fp) rm
-          ((( out , act′ , q′ , sched₂ , st₂) , d) , s₂ , rp₂) =
-            mergeAllDrain! allNid κ now q lim (pred act) od q rp₁ s₁ sched₁ st₁ aM
-              (<-wellFounded (length q)) rm₁
-      in (( outV ++ out , [] , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched₂
-          , record st₂
-              { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
-                  (EvalSt.nodes st₂) })
-         , finish-all-drain fp d , []) , s₂ , rp₂
+... | yes refl with fold rp s now vals cs false sched st rm
+... | ((( outV , sched₁ , st₁) , fp) , s₁ , rp₁)
+  with mergeAllDrain! allNid κ now q lim (pred act) od q rp₁ s₁ sched₁ st₁ aM
+         (<-wellFounded (length q)) (room-keeps (foldPath-keeps fp) rm)
+... | ((( out , act′ , q′ , sched₂ , st₂) , d) , s₂ , rp₂) =
+      (( outV ++ out , [] , null q ∧ od ∧ (act′ ≡ᵇ 0) , sched₂
+       , record st₂
+           { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
+               (EvalSt.nodes st₂) })
+      , finish-all-drain fp d , []) , s₂ , rp₂
 innerFinishRaw! op allNid inst κ now vals cs rp s sched st ns aM rm =
   innerFinish! op allNid inst κ now vals cs rp s sched st ns aM 0 (<-wellFounded 0) rm
 
@@ -2004,12 +2003,11 @@ finishPeelQ! allNid κ now lim act od q rp s sched st aM k (acc rsQ) rm
 
 finishPeelM! {m = m} allNid κ now lim act od q rp s sched st (acc rsM) rm
   with unconn (Sched.slots sched) (EvalSt.connectedShares st) <? m
-... | yes lt =
-      let (r , s′ , _) =
-            mergeAllDrain! allNid κ now q lim (pred act) od q (dropRP (<⇒≤ lt) rp) s sched st
-              (rsM lt) (<-wellFounded (length q)) ≤-refl
-      in r , s′ , rp
 ... | no nlt = stuck-finish allNid κ now s sched st lim act q od rm nlt
+... | yes lt
+  with mergeAllDrain! allNid κ now q lim (pred act) od q (dropRP (<⇒≤ lt) rp) s sched st
+         (rsM lt) (<-wellFounded (length q)) ≤-refl
+... | (r , s′ , _) = r , s′ , rp
 
 finishWalk! allNid κ now lim act od []      rp s sched st aM rm = (_ , drain-spent) , s , rp
 finishWalk! allNid κ now lim act od (o ∷ q) rp s sched st aM rm =
@@ -2020,33 +2018,30 @@ innerReact! op allNid inst κ now vals cs rp s sched st false aM k aQ rm =
 innerReact! op allNid inst κ now vals cs rp s sched st true aM k aQ rm
   with any (aliveThroughᶠ inst st) (EvalSt.registry st) in eqa
 ... | true  = (_ , react-alive eqa , cs) , s , rp
-... | false =
-      let ((r , f , cs′) , s′ , rp′) =
-            innerFinish! op allNid inst κ now vals cs rp s sched st
-              (lookupNode allNid (EvalSt.nodes st)) aM k aQ rm
-      in (r , react-dead eqa f , cs′) , s′ , rp′
+... | false
+  with innerFinish! op allNid inst κ now vals cs rp s sched st
+         (lookupNode allNid (EvalSt.nodes st)) aM k aQ rm
+... | ((r , f , cs′) , s′ , rp′) = (r , react-dead eqa f , cs′) , s′ , rp′
 
 innerReactRaw! op allNid inst κ now vals cs rp s sched st false aM rm =
   (_ , react-false , cs) , s , rp
 innerReactRaw! op allNid inst κ now vals cs rp s sched st true aM rm
   with any (aliveThroughᶠ inst st) (EvalSt.registry st) in eqa
 ... | true  = (_ , react-alive eqa , cs) , s , rp
-... | false =
-      let ((r , f , cs′) , s′ , rp′) =
-            innerFinishRaw! op allNid inst κ now vals cs rp s sched st
-              (lookupNode allNid (EvalSt.nodes st)) aM rm
-      in (r , react-dead eqa f , cs′) , s′ , rp′
+... | false
+  with innerFinishRaw! op allNid inst κ now vals cs rp s sched st
+         (lookupNode allNid (EvalSt.nodes st)) aM rm
+... | ((r , f , cs′) , s′ , rp′) = (r , react-dead eqa f , cs′) , s′ , rp′
 
 innerReactWalk! op allNid inst κ now vals cs rp s sched st false aM rm =
   (_ , react-false , cs) , s , rp
 innerReactWalk! op allNid inst κ now vals cs rp s sched st true aM rm
   with any (aliveThroughᶠ inst st) (EvalSt.registry st) in eqa
 ... | true  = (_ , react-alive eqa , cs) , s , rp
-... | false =
-      let ((r , f , cs′) , s′ , rp′) =
-            innerFinishWalk! op allNid inst κ now vals cs rp s sched st
-              (lookupNode allNid (EvalSt.nodes st)) aM rm
-      in (r , react-dead eqa f , cs′) , s′ , rp′
+... | false
+  with innerFinishWalk! op allNid inst κ now vals cs rp s sched st
+         (lookupNode allNid (EvalSt.nodes st)) aM rm
+... | ((r , f , cs′) , s′ , rp′) = (r , react-dead eqa f , cs′) , s′ , rp′
 
 ------------------------------------------------------------------
 -- THE RAW CONTINUATION AND THE SHARE FAN-OUT.
@@ -2080,9 +2075,9 @@ rawRP ac le aM (from-inner op allNid inst ↠[ h ] κ) =
 rawRP ac le aM (thru-outer op nid ↠[ h ] κ) =
   thruRP op nid aM h κ (rawRP ac (≤-trans le h) aM κ)
 
-fold (sinkRP ac below aM) tt now vals cs fin sched st rm =
-  let (r , d) = dispatchShare! ac below now vals cs fin sched st aM rm
-  in (r , fold-sink d) , tt , sinkRP ac below aM
+fold (sinkRP ac below aM) tt now vals cs fin sched st rm
+  with dispatchShare! ac below now vals cs fin sched st aM rm
+... | (r , d) = (r , fold-sink d) , tt , sinkRP ac below aM
 up (sinkRP ac below aM) = tt
 
 -- THE FAN-OUT CARRIES THE COLUMN THE DEF'S SUBSCRIBE HANDED THE SINK,
@@ -2099,13 +2094,12 @@ shareWalk! {i = i} ac now [] [] true sched st aM rm =
                   (shareAdmit i (EvalSt.registry st)) sched (shareSpend i st) aM
                   (room-keeps (shareSpend-keeps i sched st) rm)
   in _ , walk-end g
-shareWalk! {i = i} ac now (v ∷ vs) (c ∷ cs) fin sched₀ st₀ aM rm =
-  let ((emits , sched₁ , st₁) , g) =
-        shareGo! ac now (v ∷ []) (c ∷ []) false
-          (shareAdmit i (EvalSt.registry st₀)) sched₀ st₀ aM rm
-      (_ , r) = shareWalk! ac now vs cs fin sched₁ st₁ aM
-                  (room-keeps (shareGo-keeps g) rm)
-  in _ , walk-more g r
+shareWalk! {i = i} ac now (v ∷ vs) (c ∷ cs) fin sched₀ st₀ aM rm
+  with shareGo! ac now (v ∷ []) (c ∷ []) false
+         (shareAdmit i (EvalSt.registry st₀)) sched₀ st₀ aM rm
+... | ((emits , sched₁ , st₁) , g)
+  with shareWalk! ac now vs cs fin sched₁ st₁ aM (room-keeps (shareGo-keeps g) rm)
+... | (_ , r) = _ , walk-more g r
 
 -- EVERY ADMITTED CHAIN IS WALKED RAW, at this ceiling, from the floor
 -- the registry row names, with the column beside the values.
@@ -2114,10 +2108,9 @@ shareGo! {i = i} ac now vals cs fin ((rid , p) ∷ ps) sched st aM rm
   with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
 ... | true  = let (_ , g) = shareGo! ac now vals cs fin ps sched st aM rm
               in _ , go-cut eqc g
-... | false =
-      let ((( emits , sched₁ , st₁) , f) , _) =
-            fold (rawRP ac ≤-refl aM p) tt now vals cs fin sched
-              (record st { delivered = rid ∷ EvalSt.delivered st }) rm
-          (_ , g) = shareGo! ac now vals cs fin ps sched₁ st₁ aM
-                      (room-keeps (foldPath-keeps f) rm)
-      in _ , go-live eqc f g
+... | false
+  with fold (rawRP ac ≤-refl aM p) tt now vals cs fin sched
+         (record st { delivered = rid ∷ EvalSt.delivered st }) rm
+... | ((( emits , sched₁ , st₁) , f) , _)
+  with shareGo! ac now vals cs fin ps sched₁ st₁ aM (room-keeps (foldPath-keeps f) rm)
+... | (_ , g) = _ , go-live eqc f g

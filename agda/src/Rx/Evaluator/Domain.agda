@@ -809,6 +809,21 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
   -- So the fold is INSIDE the rule and its result is the root stream
   -- this finish sent; the group left behind is empty and carries the
   -- walk's completion alone.
+  --
+  -- AND THE COMPLETION IS OWNED BY THE FINISH THAT FOUND THE QUEUE
+  -- EMPTY.  A queued inner this drain subscribes can end synchronously
+  -- inside it, and its own finish is a finish of the same node: it
+  -- drains after it and reports the end when nothing is left.  Were
+  -- this finish then to report the same end from the same drained
+  -- state, the frame above would fold the completion twice, and a
+  -- limited flattener over it would drain its own queue twice -- an
+  -- inner subscribed, and its values sent, that rxjs never sees,
+  -- because its subscriber's `complete` is idempotent where this
+  -- stream is not.  So a finish that had a queue reports no end: the
+  -- end it would report has already gone up through the inner it
+  -- drained, exactly as the outer loop of rxjs's `mergeInternals`
+  -- finds nothing to do once a nested one has run.  Pinned by
+  -- `completion-crosses-the-exit-frame-twice`.
   finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {now}
                        {vals : List (Val Γ s)} {sched st} {lim act q od}
                        {outV sched₁ st₁} {out act′ q′ sched₂ st₂}
@@ -818,7 +833,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
                    → innerFinish⇓ mergeAllᵒ allNid inst κ now vals sched st
                        (just (mergeAll-st {t = s} lim act q od))
                        ( outV ++ out , []
-                       , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched₂
+                       , null q ∧ od ∧ (act′ ≡ᵇ 0) , sched₂
                        , record st₂
                            { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
                                (EvalSt.nodes st₂) } )

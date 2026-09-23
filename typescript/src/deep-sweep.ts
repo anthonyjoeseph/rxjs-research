@@ -12,6 +12,7 @@ import { genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
 import { evaluatePlain } from "./plain-eval.js";
+import { showValues } from "./exp.js";
 import type { TestCase } from "./prop-test.js";
 import { appendFileSync } from "node:fs";
 
@@ -42,8 +43,8 @@ const check = async (batch: TestCase[]): Promise<void> => {
   batch.forEach((testCase, i) => {
     const rx = evaluatePlain(testCase);
     emitting += rx.length > 0 ? 1 : 0;
-    const a = JSON.stringify(agda[i].values);
-    const r = JSON.stringify(rx);
+    const a = showValues(agda[i].values);
+    const r = showValues(rx);
     if (a === r) return;
     bad++;
     appendFileSync(out, serialize(testCase) + "\n");

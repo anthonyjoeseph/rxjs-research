@@ -1,19 +1,20 @@
 import { Observable } from "rxjs";
 import { InstEmit, SourceId } from "./inst-emit.js";
-import { Val } from "./exp.js";
+import { ScriptVal, Val, toVal } from "./exp.js";
 import { Arrival, Driver } from "./driver.js";
 import { LiveSink, cold, hot } from "./constructors.js";
 import type { ObservableInput, Timed } from "./prop-test.js";
 
 // delta-encoded waits → absolute ticks (gap = wait + 1, so a source's
-// ticks are strictly increasing by construction) — Agda's resolve
+// ticks are strictly increasing by construction) — Agda's resolve; the
+// script's values cross into the run here
 const resolveTicks = (
   anchor: number,
-  timed: Timed<Val>[],
+  timed: Timed<ScriptVal>[],
 ): { tick: number; val: Val }[] =>
   timed.reduce<{ tick: number; val: Val }[]>((acc, { wait, val }) => {
     const prev = acc.length > 0 ? acc[acc.length - 1].tick : anchor;
-    return [...acc, { tick: prev + wait + 1, val }];
+    return [...acc, { tick: prev + wait + 1, val: toVal(val) }];
   }, []);
 
 // one scripted source's driver deliveries: each is one InstEmit under
@@ -53,7 +54,7 @@ const scriptedDeliveries = (
 // belongs to the constructors and is not restated here.
 export const makeInputSource = (
   driver: Driver,
-  input: ObservableInput<Val>,
+  input: ObservableInput<ScriptVal>,
   index: number,
 ): Observable<InstEmit<Val>> =>
   input.type === "hot"
@@ -64,7 +65,9 @@ export const makeInputSource = (
         );
       })
     : cold<Val>(driver, (source) => ({
-        sync: input.sync.map((value) => ({ type: "value", value }) as const),
+        sync: input.sync.map(
+          (value) => ({ type: "value", value: toVal(value) }) as const,
+        ),
         async:
           input.async.length === 0
             ? undefined

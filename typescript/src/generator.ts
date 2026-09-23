@@ -1,4 +1,4 @@
-import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val, tyEq } from "./exp.js";
+import { Closed, Exp, Fn, PrimOp, ScriptVal, Tm, Ty, tyEq } from "./exp.js";
 import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 
 // The differential-testing generator: deterministic, seeded canonical
@@ -642,7 +642,9 @@ const genExp = (
 };
 
 // ---- scripted inputs ----
-const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
+// a scripted value as the corpus spells it: nats are JSON numbers here
+// and become exact only when a run reads them
+const genVal = (rng: Rng, ty: Ty, depth: number): ScriptVal => {
   switch (ty.type) {
     case "unit":
       return null;
@@ -670,8 +672,8 @@ const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
   }
 };
 
-const genScripted = (rng: Rng, ty: Ty): ObservableInput<Val> => {
-  const timed = (n: number): Timed<Val>[] =>
+const genScripted = (rng: Rng, ty: Ty): ObservableInput<ScriptVal> => {
+  const timed = (n: number): Timed<ScriptVal>[] =>
     Array.from({ length: n }, () => ({
       wait: int(rng, 0, 2),
       val: genVal(rng, ty, 2),

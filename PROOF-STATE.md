@@ -225,10 +225,10 @@ through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** Both
-are red. The evaluator terminates under the full check, and the sweep matches
-rxjs on 499 of 500 cases; the one remaining case reaches `stuck-hop`, which
-aborts the batch, so the values half is red until the branch is empty. Neither
-half may be narrowed to pass.
+are red. The evaluator terminates under the full check, and a sweep of a
+million and a half programs matches rxjs on every one that answers; about one
+in two hundred reaches `stuck-hop`, all from one shape, and the values half is
+red until the branch is empty. Neither half may be narrowed to pass.
 
 ### The monster
 
@@ -255,7 +255,7 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### Big picture tier roadmap
 
-- **PEEL EVERY FRAME, NOT ONLY THE EXIT FRAME.** The one case the sweep still
+- **PEEL EVERY FRAME, NOT ONLY THE EXIT FRAME.** The one shape the sweep still
   loses is a buffer whose source subscribe pushed any frame at all: the arm
   gets the frame's successor back and answers with the stale one it was
   handed, because `up` is the unit at every frame but `from-inner`. The cheap
@@ -263,7 +263,7 @@ also: `main` — same, the CLI's entry point, which now writes through it.
   `UpOf` at a map frame IS the record at the frame's output type, which the
   path carries -- in one mutual block with the candidate. If the checker takes
   it, every transformer arm returns its parent's successor and the sweep
-  should be 500 of 500. What it decides: whether the successor design reaches
+  should answer on every case. What it decides: whether the successor design reaches
   the whole live path or the boundary is structural.
 
 - **THE CERTIFICATION IS A CHECK, AND THE DISCHARGE IS TURNING IT INTO A
@@ -312,12 +312,13 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 ### The ledger
 
 - **`stuck-hop`** (Reducible) — FALSITY, `DEAD ROUTE, PROBED`: the sweep
-  reaches it on 1 of 500 cases, a buffer whose source subscribe pushed a frame
+  reaches it in about one case of two hundred, every one a `batchSync` under a
+  flattener whose source subscribe pushed a frame
   (`candidate-dropped-under-a-frame`); the arm answers with the stale
   continuation because only the exit frame peels.
 - **`stuck-finish`** (Reducible) — FALSITY, `PROBED`: a queue outgrowing the
-  budget its subscriber set; the sweep never reached it, and it aborts before
-  most programs could.
+  budget its subscriber set; a million and a half programs never reached it,
+  nonempty queues included.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`

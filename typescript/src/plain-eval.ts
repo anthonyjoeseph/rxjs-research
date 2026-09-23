@@ -14,7 +14,15 @@ import {
   switchAll,
   take as rxTake,
 } from "rxjs";
-import { Closed, ObsVal, Val, evalWith, unfoldMu } from "./exp.js";
+import {
+  Closed,
+  ObsVal,
+  ScriptVal,
+  Val,
+  evalWith,
+  toVal,
+  unfoldMu,
+} from "./exp.js";
 import { PlainDriver, createPlainDriver, plainHop } from "./plain-driver.js";
 import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 
@@ -31,14 +39,15 @@ import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 // the comparison.
 
 // delta-encoded waits → absolute ticks (gap = wait + 1, so a source's
-// ticks are strictly increasing by construction)
+// ticks are strictly increasing by construction); the script's values
+// cross into the run here
 const resolveTicks = (
   anchor: number,
-  timed: Timed<Val>[],
+  timed: Timed<ScriptVal>[],
 ): { tick: number; val: Val }[] =>
   timed.reduce<{ tick: number; val: Val }[]>((acc, { wait, val }) => {
     const prev = acc.length > 0 ? acc[acc.length - 1].tick : anchor;
-    return [...acc, { tick: prev + wait + 1, val }];
+    return [...acc, { tick: prev + wait + 1, val: toVal(val) }];
   }, []);
 
 // a scripted tail as an observable: the driver fires each entry, the
@@ -70,7 +79,7 @@ const tail = (
 // rather than anything the tree can reach.
 const plainInput = (
   driver: PlainDriver,
-  input: ObservableInput<Val>,
+  input: ObservableInput<ScriptVal>,
   index: number,
 ): Observable<Val> => {
   if (input.type === "hot") {
@@ -120,7 +129,7 @@ const plainInput = (
       input.async.length === 0
         ? EMPTY
         : tail(driver, resolveTicks(driver.currentTick(), input.async)),
-      rxOf(...input.sync),
+      rxOf(...input.sync.map(toVal)),
     ),
   );
 };
@@ -168,10 +177,10 @@ export const compilePlain = (
       );
     case "take": {
       const count = evalWith(exp.count, env);
-      if (typeof count !== "number")
+      if (typeof count !== "bigint")
         throw new Error("take count did not evaluate to a nat");
       // take 0 never subscribes its source, as in rxjs
-      return count === 0 ? EMPTY : recur(exp.src).pipe(rxTake(count));
+      return count === 0n ? EMPTY : recur(exp.src).pipe(rxTake(Number(count)));
     }
     case "mergeAll":
       return inner(exp.src).pipe(mergeAll(exp.limit ?? Infinity));

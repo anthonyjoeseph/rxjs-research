@@ -88,9 +88,27 @@ const runOnce = (bin: string, serialized: string[]): Promise<Run> =>
 
 // each line is either `null` (declined case) or {"values":[...]} —
 // normalize null to an empty value list
+//
+// AND A NAT IS READ EXACTLY, FROM ITS SOURCE TEXT. The CLI prints ℕ as
+// digits, and `JSON.parse` alone would round anything past 2^53 to a
+// double -- which is the one place the exact side would silently take on
+// the inexact side's error. The reviver's third argument carries the
+// token's source text, and every number in a value list is a nat.
+const exactNats = (
+  _key: string,
+  value: unknown,
+  context?: { source?: string },
+): unknown =>
+  typeof value === "number" ? BigInt(context?.source ?? value) : value;
+
 const parseLine = (line: string): EvalResult => {
   try {
-    return (JSON.parse(line) as EvalResult | null) ?? { values: [] };
+    return (
+      (JSON.parse(
+        line,
+        exactNats as (this: unknown, key: string, value: unknown) => unknown,
+      ) as EvalResult | null) ?? { values: [] }
+    );
   } catch (e) {
     throw new Error(`Agda CLI produced non-JSON output: ${String(e)}`);
   }

@@ -60,12 +60,60 @@ export type ObsVal = { exp: Exp; env: Val[] };
 export type Val =
   | null
   | boolean
-  | number
+  | bigint // a nat, exact: the spec's ℕ, never a double
   | symbol // a uniq token, always from a `mint` binder
   | [Val, Val]
   | Val[]
   | { type: "inl" | "inr"; val: Val }
   | ObsVal;
+
+// A NAT IS EXACT BECAUSE THE SPEC'S IS, AND A DOUBLE DRIFTED. The Agda
+// evaluator computes in ℕ; a `scan` squaring its accumulator reached
+// 5^64 there and the rxjs side, rounding at every `mul`, landed one ulp
+// away from the exact value rounded once -- a divergence the oracle
+// reported that was neither machine's semantics. So the value language
+// here carries bigints, and the only place a nat is a JSON number is the
+// corpus, which is JSON and cannot spell an integer past 2^53. A case
+// carries `ScriptVal`, a run carries `Val`, and `toVal` is the one
+// crossing.
+export type ScriptVal =
+  | null
+  | boolean
+  | number
+  | [ScriptVal, ScriptVal]
+  | ScriptVal[]
+  | { type: "inl" | "inr"; val: ScriptVal }
+  | ObsVal;
+
+export const toVal = (v: ScriptVal): Val =>
+  typeof v === "number"
+    ? BigInt(v)
+    : Array.isArray(v)
+      ? (v.map(toVal) as Val)
+      : v !== null && typeof v === "object" && "type" in v
+        ? { type: v.type, val: toVal(v.val) }
+        : v;
+
+// THE RENDERING BOTH SIDES ARE COMPARED THROUGH. A nat prints as its
+// digits, so two lists compare equal exactly when their values do, and
+// a value the comparison has no spelling for -- a token -- is refused
+// rather than dropped.
+export const showVal = (v: Val): string => {
+  if (typeof v === "bigint") return v.toString();
+  if (v === null || typeof v === "boolean") return String(v);
+  if (typeof v === "symbol")
+    throw new Error("a uniq token reached the output and has no rendering");
+  if (Array.isArray(v)) return `[${v.map(showVal).join(",")}]`;
+  if ("type" in v) return `{"type":"${v.type}","val":${showVal(v.val)}}`;
+  // an obs value is a closure; its environment's nats are rendered as
+  // the doubles the corpus would spell them as
+  return JSON.stringify(v, (_k, x: unknown) =>
+    typeof x === "bigint" ? Number(x) : x,
+  );
+};
+
+export const showValues = (vs: Val[]): string =>
+  `[${vs.map(showVal).join(",")}]`;
 
 // Agda: Rx.Exp.Tm — first-order terms, the only function language.
 // All variables are de Bruijn indices. Θ-binders (map/scan fns, case
@@ -171,15 +219,15 @@ const applyPrim = (op: PrimOp, arg: Val): Val => {
   const [a, b] = arg as [Val, Val]; // add/sub/mul/eq/lt take a pair
   switch (op) {
     case "add":
-      return (a as number) + (b as number);
+      return (a as bigint) + (b as bigint);
     case "sub":
-      return Math.max(0, (a as number) - (b as number));
+      return (a as bigint) > (b as bigint) ? (a as bigint) - (b as bigint) : 0n;
     case "mul":
-      return (a as number) * (b as number);
+      return (a as bigint) * (b as bigint);
     case "eq":
       return valEq(a, b);
     case "lt":
-      return (a as number) < (b as number);
+      return (a as bigint) < (b as bigint);
     case "eqU":
       return a === b; // tokens are compared by identity and nothing else
   }
@@ -235,7 +283,7 @@ export const evalWith = (tm: Tm, env: Val[]): Val => {
     case "boolT":
       return tm.val;
     case "natT":
-      return tm.val;
+      return BigInt(tm.val);
     case "pairT":
       return [evalWith(tm.fst, env), evalWith(tm.snd, env)];
     case "fstT":

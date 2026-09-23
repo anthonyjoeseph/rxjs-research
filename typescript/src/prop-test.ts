@@ -1,10 +1,10 @@
-import { Closed, Ty, Val } from "./exp.js";
+import { Closed, ScriptVal, Ty, Val, showValues } from "./exp.js";
 import { evaluatePlain } from "./plain-eval.js";
 import { genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
 import { reachesRegion } from "./region.js";
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
 // THE ORACLE, AND WHAT IT IS AN ORACLE FOR (Anthony: "the sole purpose
 // of the fastcheck run is to ensure that the 'plain' agda Exp tree and
@@ -56,7 +56,7 @@ export type ObservableInput<A> = ObservableInputCold<A> | ObservableInputHot<A>;
 // const telescope) — generator invariant, re-checked by the Agda
 // decoder alongside well-typedness and μ-guardedness.
 export type Slot =
-  | { type: "scripted"; input: ObservableInput<Val> }
+  | { type: "scripted"; input: ObservableInput<ScriptVal> }
   | { type: "shared"; def: Closed };
 
 export type Slots = Slot[]; // one per Γ slot, index-aligned
@@ -98,6 +98,13 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // prints.  Without it a divergence is reproducible only by re-running
 // the sweep that found it, and a generator edit moves every offset.
 const readCasesFromCli = (): string | undefined => readFlag("cases");
+// `--crashes <file>` KEEPS EVERY CRASHING PROGRAM, one `{why, case}` per
+// line, where the report keeps only the smallest few per reason. The
+// smallest are the ones worth pinning; the whole set is what says
+// whether a reason has ONE shape or several, which a sample of three
+// cannot. The file is truncated at the start of the run and appended a
+// chunk at a time, so a killed sweep still leaves what it found.
+const readCrashesFromCli = (): string | undefined => readFlag("crashes");
 
 // KEY ORDER IS NOT CONTENT, so two spellings of one row compare equal.
 // A hand-written row and the compact line a failing case prints carry
@@ -155,7 +162,7 @@ const readMachineFromCli = (): string | undefined => readFlag("machine");
 const readBaselineFromCli = (): string | undefined => readFlag("baseline");
 
 // A TOKEN IN A VALUE POSITION IS REFUSED, WHICH IS THE ONE PLACE A
-// SYMBOL WOULD LIE.  `JSON.stringify` drops a symbol silently, so a
+// SYMBOL WOULD LIE.  A JSON rendering drops a symbol silently, so a
 // minted token reaching the output would compare equal to a side that
 // emitted nothing there — a false green, and the only kind this
 // comparison can produce. The two sides carry a token differently (TS a
@@ -167,7 +174,7 @@ const noToken = (v: unknown): void => {
   if (typeof v === "symbol")
     throw new Error(
       "a uniq token reached the output — the comparison has no renaming " +
-        "for one, and JSON.stringify would drop it silently",
+        "for one, and a JSON rendering would drop it silently",
     );
   if (Array.isArray(v)) v.forEach(noToken);
   else if (v !== null && typeof v === "object")
@@ -176,7 +183,7 @@ const noToken = (v: unknown): void => {
 
 const render = (values: Val[]): string => (
   values.forEach(noToken),
-  JSON.stringify(values)
+  showValues(values)
 );
 
 // Compare the Agda (oracle) and rxjs value lists case by case, and
@@ -286,6 +293,20 @@ const tallyChunk = (
   t.region += testCases.slice(0, n).filter(reachesRegion).length;
   t.n += n;
 };
+
+// the `--crashes` rows of one chunk: a case is a row iff either side
+// died on it, and the row says what it died at
+const crashRows = (
+  agdaResults: EvalResult[],
+  rxResults: EvalResult[],
+  testCases: TestCase[],
+): string[] =>
+  testCases.flatMap((testCase, i) => {
+    const why = agdaResults[i]?.crash ?? rxResults[i]?.crash;
+    return why === undefined
+      ? []
+      : [`{"why":${JSON.stringify(why)},"case":${serialize(testCase)}}`];
+  });
 
 const crashedCount = (t: Tally): number =>
   [...t.crashes.values()].reduce((k, c) => k + c.count, 0);
@@ -425,16 +446,24 @@ async function main() {
       : await execAgda(testCases.map(serialize));
   if (machine !== "agda" || baseline !== "rx")
     console.log(`comparing ${machine} against ${baseline}`);
+  const crashesFile = readCrashesFromCli();
+  if (crashesFile !== undefined) writeFileSync(crashesFile, "");
   const tally = emptyTally();
   for (const testCases of chunks) {
+    const machineResults = await run(machine, testCases);
+    const baselineResults = await run(baseline, testCases);
     tallyChunk(
       tally,
-      await run(machine, testCases),
-      await run(baseline, testCases),
+      machineResults,
+      baselineResults,
       testCases,
       machine,
       baseline,
     );
+    if (crashesFile !== undefined) {
+      const rows = crashRows(machineResults, baselineResults, testCases);
+      if (rows.length > 0) appendFileSync(crashesFile, rows.join("\n") + "\n");
+    }
     // progress on stderr, so the report on stdout stays the report
     if (swept && corpus > CHUNK)
       console.error(
