@@ -1,8 +1,8 @@
 # Handoff — tier 1, the `stuck-hop` crashes
 
 Temporary. It records what one session found so the next can pick up without
-re-deriving it. Delete it once its contents have moved to PROOF-STATE.md, the
-source headers, or git history. CLAUDE.md is still the law; read it first, then
+re-deriving it. Delete it, and `temp-handoff-crash-seeds.txt` with it, once its
+contents have moved to PROOF-STATE.md, the source headers, or git history. CLAUDE.md is still the law; read it first, then
 PROOF-STATE.md's Tier 1 section.
 
 ## Where things stand
@@ -69,6 +69,44 @@ cd typescript
 npm run --silent oracle -- --corpus 1500000 --crashes /path/to/crashes.ndjson > sweep.log 2>&1
 tail -1 sweep.log
 ```
+
+### Faster: rebuild all 7,833 crashers from their seeds
+
+`temp-handoff-crash-seeds.txt`, beside this file, lists every distinct crasher
+as `s<seed>:<position>`, one per line. The sweep draws seed `s<i>` through
+`genTestCases`, which yields twenty cases per seed from a seeded generator, so a
+seed and a position name one program exactly. The list is valid only while
+`typescript/src/generator.ts` is unchanged from this branch's head: any edit to
+the generator moves every position.
+
+Rebuilding and replaying the whole set was checked: 7,833 cases rebuilt, all
+7,833 crash at `stuck-hop`, in about three minutes. This compiles the harness to
+a throwaway directory and rebuilds the cases:
+
+```
+cd typescript
+./node_modules/.bin/tsc --outDir .seedmap-tmp --rootDir src --noEmit false
+cat > .seedmap-tmp/regen.mjs <<'EOF'
+import { readFileSync, writeFileSync } from "node:fs";
+import { genTestCases } from "./generator.js";
+import { serialize } from "./serialize.js";
+const [seedFile, outFile] = process.argv.slice(2);
+const rows = readFileSync(seedFile, "utf8").split("\n")
+  .filter((l) => /^s\d+:\d+$/.test(l))
+  .map((l) => { const [seed, j] = l.split(":"); return serialize(genTestCases(seed)[Number(j)]); });
+writeFileSync(outFile, rows.join("\n") + "\n");
+console.log(`${rows.length} cases written to ${outFile}`);
+EOF
+node .seedmap-tmp/regen.mjs ../temp-handoff-crash-seeds.txt crash-cases.ndjson
+rm -rf .seedmap-tmp
+npm run --silent oracle -- --cases crash-cases.ndjson
+```
+
+A single seed also replays directly, with every case it yields rather than just
+the crasher: `npm run oracle -- --seed s44` runs the seed holding the first
+listed crasher.
+
+### From scratch: the sweep's own crash file
 
 Rows written by the crashes flag are wrapped as an object with a `why` field
 and a `case` field. The replay flag wants bare cases, and it refuses a file
@@ -178,7 +216,7 @@ seconds. The first is the smallest known: no inputs, fuel 1, a `switchAll` over
 
 - `pkill -f <pattern>` inside a Bash call matches the calling shell's own
   command line and kills it. Find the process id with `ps` first.
-- The earlier sweep's crash set lived in a session scratchpad and is gone with
-  that container. Regenerate it with the sweep above.
+- The sweep's 22 MB crash file lived in a session scratchpad and is gone with
+  that container. The seed list replaces it.
 - The CLI binary is `agda/_cli/Main`. Set `AGDA_CLI_BIN` to compare against a
   saved copy of an older build.
