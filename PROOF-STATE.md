@@ -224,9 +224,9 @@ operators in `plain-eval.ts`, runs the same program
 through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
-**DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** Both
-are red: the gated evaluator still reaches `stuck-hop` in about one case in
-two hundred, all from one shape. Neither half may be narrowed to pass.
+**DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
+proof half is red: the candidate still stands on the postulated arms below,
+and the oracle job is still off in CI. Neither half may be narrowed to pass.
 
 **After running 1.5M test cases, the evaluator's behavior is 1-for-1 correct
 against rxjs** — measured off the proof path, with both stuck branches rebuilt
@@ -257,26 +257,21 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### Big picture tier roadmap
 
-- **PEEL EVERY FRAME, NOT ONLY THE EXIT FRAME.** The one shape the sweep still
-  loses is a buffer whose source subscribe pushed any frame at all: the arm
-  gets the frame's successor back and answers with the stale one it was
-  handed, because `up` is the unit at every frame but `from-inner`. The cheap
-  experiment first: name the parent's predicate through the path index --
-  `UpOf` at a map frame IS the record at the frame's output type, which the
-  path carries -- in one mutual block with the candidate. If the checker takes
-  it, every transformer arm returns its parent's successor and the sweep
-  should answer on every case. What it decides: whether the successor design reaches
-  the whole live path or the boundary is structural.
+- **WRITE THE RAW FOLD'S BODY, BUDGETED DRAIN FIRST.** The live flatteners
+  no longer drain anything: on standing ground the column guards keep a
+  merge's queue empty at every walk-order finish, so the same-ceiling
+  re-entry is gone from the live path and what remains of it is the raw
+  fold's. Its header routes the drain on a budget the raw finish seeds from
+  the queue's own length. The body decides whether a share's fan-out, the
+  monster's own region, terminates without an outside counter.
 
-- **THE CERTIFICATION IS A CHECK, AND THE DISCHARGE IS TURNING IT INTO A
-  PROOF.** A green sweep empties the branch without deleting it: a fold
-  certifies the store's cell against its held column by `eqVal`, and the
-  mismatch case vouches nothing at `obs`, which is the branch. Discharging
-  `stuck-hop` means the continuation or the state carries WHICH cell it
-  certifies as an index, transported through every store rewrite -- the
-  invariant-record cost, spread over the `Keeps` lemmas. Decide the carrier
-  after the peel experiment, since a successor that reaches every frame is
-  the natural index and a cert store beside the state is the alternative.
+- **INSTANTIATE THE ARMS AT THE PROGRAM THAT GROWS A QUEUE.** No Tier 1 row
+  has ever been instantiated. `mergeAll(1)` over a shared `of(1,2,3)` mapped
+  to the shared stream grows the queue while the lane is busy and reaches
+  the raw finish; inhabiting `rawFold`'s and `red-batchSync`'s conclusions
+  there from the relation's constructors is the first receipt the tier can
+  carry, and the one that could refute the monster's fan-out before the
+  body above is ground.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
@@ -313,14 +308,16 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### The ledger
 
-- **`stuck-hop`** (Reducible) — FALSITY, `DEAD ROUTE, PROBED`: the sweep
-  reaches it in about one case of two hundred, every one a `batchSync` under a
-  flattener whose source subscribe pushed a frame
-  (`candidate-dropped-under-a-frame`); the arm answers with the stale
-  continuation because only the exit frame peels.
-- **`stuck-finish`** (Reducible) — FALSITY, `PROBED`: a queue outgrowing the
-  budget its subscriber set; a million and a half programs never reached it,
-  nonempty queues included.
+- **`rawFold`** (Reducible) — FALSITY, `RECOVERY`: the fold down a path the
+  store holds, and the only place a merge's queue is nonempty at an inner's
+  finish; its body owes the budgeted drain its header routes.
+- **`red-batchSync`** (Reducible) — FALSITY, `NO EVIDENCE`: the arm the trace
+  exists for; its closing fold replays the continuation over its source's
+  trace.
+- **`red-take`**, **`red-scan`** (Reducible) — FALSITY, `NO EVIDENCE`: the
+  frame arms that hold state read off the store.
+- **`red-scripted`** (Reducible) — FALSITY, `NO EVIDENCE`: the scripted slot,
+  which registers before folding a cold prefix.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`
