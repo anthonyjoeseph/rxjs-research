@@ -138,7 +138,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _
 open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert; fell-keeps; room-keeps)
 open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps; Keeps; switchKill-keeps; thruWrap-keeps; thruWalk-keeps;
   thruConsume-keeps; innerFinish-keeps)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ; subs-map;
+open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ; subs-map;
   subs-shared; slot-spent; slot-join; slot-connect; connect; foldPath⇓; fold-root; fold-step;
   stepFrame⇓; step-map; injectRoot; inner; thruConsume⇓; consume-all-sub; consume-all-enqueue;
   consume-all-nil; consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
@@ -2294,6 +2294,11 @@ fiDead {Γ = Γ} {e = e} {u = u} op allNid inst le κ pfs rp s₀ h g now vals c
 ...     | refl =
         let fi = from-inner {s = u} op allNid inst
             s₁ = callStage fi le κ h (standing pfs) rp s₀ now vals (ofColumn κ (standing pfs) col) false rm hs
+            s₂ : Stage _ fi le κ
+                   (λ o sc s′ → Σ ℕ (λ act′ → Σ (List (Val Γ (obs u))) (λ q′ →
+                      mergeAllDrain⇓ {e = e} allNid κ now [] lim (pred act) od [] (Stage.sc s₁) (Stage.st′ s₁)
+                        (o , act′ , q′ , sc , s′))))
+                   (endPre (Stage.tr s₁)) (endRP (Stage.tr s₁)) (endS (Stage.tr s₁)) (Stage.sc s₁) (Stage.st′ s₁)
             s₂ = stage-nil fi le κ (endPre (Stage.tr s₁)) (endRP (Stage.tr s₁)) (endS (Stage.tr s₁)) []
                    (pred act , [] , drain-spent) (Stage.hd s₁) (Stage.hl s₁)
             s₁₂ : Stage _ fi le κ
