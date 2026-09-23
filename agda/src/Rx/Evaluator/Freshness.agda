@@ -24,8 +24,9 @@ open import Data.Bool using (true; false)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-trans)
 open import Data.List using (List; []; _∷_)
+open import Data.Maybe using (just)
 open import Data.Product using (_×_; _,_)
-open import Decide using (≡ᵇ→≡)
+open import Decide using (≡ᵇ→≡; ≡ᵇ-refl)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 
 open import Rx.Exp using (Ctx; Closed)
@@ -47,6 +48,15 @@ record PreservedBelow {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → lookupNode k (EvalSt.nodes st′) ≡ lookupNode k (EvalSt.nodes st)
 
 open PreservedBelow public using (below)
+
+-- the written node reads back as written
+lookup-set : ∀ {n} {Γ : Ctx n} (nid : NodeId) (ns : NodeState Γ)
+             (ts : List (NodeId × NodeState Γ))
+           → lookupNode nid (setNode nid ns ts) ≡ just ns
+lookup-set nid ns []             rewrite ≡ᵇ-refl nid = refl
+lookup-set nid ns ((k , s) ∷ r) with k ≡ᵇ nid in eq
+... | true  rewrite ≡ᵇ-refl nid = refl
+... | false rewrite eq = lookup-set nid ns r
 
 -- every node other than the written one reads back as it did.  The
 -- table is an association list, so the two clauses are the two ways a
