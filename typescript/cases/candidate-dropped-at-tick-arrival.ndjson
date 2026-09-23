@@ -1,0 +1,1 @@
+{"ctx": [], "exp": {"type": "defer", "ty": {"type": "nat"}, "body": {"type": "of", "ty": {"type": "nat"}, "items": [{"type": "natT", "ty": {"type": "nat"}, "val": 5}]}}, "slots": [], "fuel": 6}

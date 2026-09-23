@@ -253,15 +253,14 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 
 ### Big picture tier roadmap
 
-- **KEEP A FLATTENED OBSERVABLE'S CANDIDATE ALIVE, SO `stuck-hop` IS DEAD.**
-  The sweep refutes the no-candidate hop being unreachable: `defer(of(5))`
-  reaches it with no share, where the room is 0 and cannot peel. So some
-  producer of an observable-typed value hands the flattener `nothing` —
-  `deferᵉ` returns no candidate, `vouch` gives none at `obs`, and scan
-  accumulators and batch buffers of observable type sit outside `S : Set`.
-  Trace the smallest crasher to the dropping site and carry the candidate
-  there. What it decides about the monster: whether the room is needed at
-  all once every value is vouched, or only a share's connect ever peels it.
+- **LET A FOLD HAND ITS SUCCESSOR THE CANDIDATE IT COMPUTED, SO `stuck-hop`
+  IS DEAD ON THE LIVE PATH.** Four sites drop a candidate, pinned under
+  `typescript/cases/` and named in the postulate's header. Three have a payer
+  and are wiring; the live-path scan cell and batch buffer have none, since
+  nothing on the stack bounds a stored accumulator's body. So `Red`'s
+  continuation is restated first, and the three wirings follow it. What it
+  decides about the monster: whether the room pays for anything but a
+  connect's own def, or is exactly the connect arm's one strict edge.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
@@ -299,8 +298,9 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 ### The ledger
 
 - **`stuck-hop`** (Reducible) — FALSITY, `PROBED`: the sweep reaches it on 120
-  of 500 cases, smallest `defer(of(5))`, so a flattened observable arrives with
-  no candidate at a room that cannot peel.
+  of 500 cases, smallest `defer(of(5))`, and hand cases reach it with no share,
+  defer or tick — a scan cell, a batch buffer, a share's fan-out each drop the
+  candidate the flattener needs.
 - **`stuck-finish`** (Reducible) — FALSITY, `PROBED`: a queue outgrowing the
   budget its subscriber set; the sweep never reached it, and it aborts before
   most programs could.

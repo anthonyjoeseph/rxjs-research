@@ -636,18 +636,17 @@ fold (batchRP nid h κ rp) s now vals cs fin sched st rm =
   in (r , fold-step step-batchSync f) , s′
 
 ------------------------------------------------------------------
--- THE TWO DEAD BRANCHES, WHICH ARE THE WHOLE OF WHAT IS LEFT TO PROVE.
+-- THE TWO GUARDS' STUCK BRANCHES, WHICH ARE THE ONLY LEAVES LEFT.
 ------------------------------------------------------------------
 
 -- BOTH GUARDS ASK THE SAME QUESTION: HAS A CONNECT HAPPENED SINCE THIS
--- CEILING WAS SET?  A connect is the only thing that lowers the room,
--- and it is also the only thing that walks a registry path during a
--- subscribe -- so it is the only thing that can put an unvouched value
--- in front of a flattener, and the only thing that can grow a
--- flattener's queue behind a drain's back.  Where the guard finds the
--- room strictly under the ceiling, it peels the accessibility and
--- re-enters at the lower ceiling; where it does not, the state it is
--- standing in should be unreachable, and the branch is a leaf.
+-- CEILING WAS SET?  A connect is the only thing that lowers the room.
+-- Where the guard finds the room strictly under the ceiling, it peels
+-- the accessibility and re-enters at the lower ceiling; where it does
+-- not, there is nothing to peel and the branch is a leaf.  The leaf is
+-- dead exactly when nothing but a connect can stand the guard in that
+-- state -- which is the queue's case and, the oracle says, not the
+-- hop's.
 --
 -- THE LEAVES ARE ON THE EXTRACTED PATH, WHICH IS THE POINT.  A
 -- postulate here is not deferred debt: it is an evaluator that dies at
@@ -658,19 +657,45 @@ fold (batchRP nid h κ rp) s now vals cs fin sched st rm =
 -- of the invariant, with the program that refutes it.
 
 -- AN UNVOUCHED OBSERVABLE REACHED A FLATTENER WITH THE ROOM STILL AT
--- ITS CEILING.  The value came out of a store -- a fold's cell, a
--- bracket's buffer -- that a fold this subscribe never saw had
--- written; that fold was a fan-out; a fan-out is a connect; a connect
--- lowered the room.  So the room is under the ceiling and this branch
--- is dead.
+-- ITS CEILING.  Every observable a flattener is handed was built by
+-- the fundamental theorem with its candidate beside it, and the
+-- candidate is lost where the value crosses into something of type
+-- `Set` -- a node in the state, or a column a sink drops -- since the
+-- next read of it is a `vouch` at `obs`, which is `nothing`.  The room
+-- was to pay for that read on the ground that only a connect's fan-out
+-- writes such a store and a connect lowers the room.  The oracle
+-- refutes the ground: this branch is taken from four sites, three of
+-- them in programs with no share.
 --
--- THE SWEEP REACHES IT FROM THE SCHEDULE, WHICH THAT ARGUMENT MISSES.
--- `subs-defer` does not subscribe its body: it schedules the body as
--- an observable arriving at a `mergeAll` frame, and the arrival folds
--- the raw path with `vouchAll`, which vouches nothing at an
--- observable.  So `defer(of(5))` hands the flattener an unvouched
--- value with no share in the program, the room is zero, and this
--- branch is taken -- on 120 of the sweep's 500 cases.
+-- THE FOUR SITES, EACH PINNED BY A ROW UNDER `typescript/cases/`.  A
+-- scan's fold closes over the `Held` candidate of its INITIAL
+-- accumulator and re-reads the cell from the state, so `certify`
+-- recovers a candidate only while the cell still equals that initial
+-- value: an observable-typed accumulator matches rxjs through one
+-- group and takes this branch on the second
+-- (`candidate-dropped-at-scan-cell`).  A `batchSync` buffer of
+-- observables is a node in the state, so its flush is `redBatchBuf`'s
+-- `vouchAll` (`candidate-dropped-at-batch-buffer`).  A share's sink
+-- discards the candidate column the def's subscribe hands it, and the
+-- raw walk it fans out over rebuilds every cell with no candidate
+-- (`candidate-dropped-at-share-fan-out`).  An arrival from the
+-- schedule -- `defer`'s body, a tick -- is folded by `chainStep!`
+-- under `vouchAll` at a ceiling equal to the count, so there is
+-- nothing to peel (`candidate-dropped-at-tick-arrival`, the sweep's
+-- smallest crasher).
+--
+-- WHAT KILLS THE BRANCH IS THE CANDIDATE ARRIVING, NOT THE ROOM
+-- PEELING.  A stored observable is a `Val` -- a closure over a subterm
+-- and an environment of `Val`s -- so `red-val` rebuilds its candidate
+-- by structural recursion on the value, and what differs by site is
+-- which column of the measure pays for the rebuild.  Outside the block
+-- (`chainStep!`) any fresh accessibility does.  Under a connect, on a
+-- reading of the block's call graph, the peel already taken does: every
+-- cycle back to the fan-out passes `red-input-shared`.  On the live
+-- path nothing does, because the accumulator's body is a subterm of
+-- nothing on the stack -- so a fold there has to hand its successor
+-- the candidate it just computed, and a continuation closed over one
+-- `Held` cannot.  That is a restatement of `Red`'s continuation.
 --
 -- IT ANSWERS THE SUBSCRIBE, NOT THE CONSUME, so the arm that reaches it
 -- wraps it exactly as it wraps a paid hop and the relation cannot
