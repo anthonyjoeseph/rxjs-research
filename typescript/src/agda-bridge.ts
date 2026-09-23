@@ -114,6 +114,13 @@ const parseLine = (line: string): EvalResult => {
   }
 };
 
+// AND ONE PROCESS IS HANDED A WINDOW, NOT THE REST OF THE BATCH. A
+// restart re-sends everything after the crash, so a file made of
+// crashers -- a sweep's crash set, replayed -- costs the square of its
+// length in serialisation alone, and reads as a hang. A window bounds a
+// restart's cost; every row is still run, in order, one result each.
+const WINDOW = 500;
+
 export const execAgda = async (serialized: string[]): Promise<EvalResult[]> => {
   const bin = binPath();
   if (serialized.length > 0 && !existsSync(bin))
@@ -122,17 +129,18 @@ export const execAgda = async (serialized: string[]): Promise<EvalResult[]> => {
     );
   const go = async (rest: string[]): Promise<EvalResult[]> => {
     if (rest.length === 0) return [];
-    const { lines, crash } = await runOnce(bin, rest);
+    const window = rest.slice(0, WINDOW);
+    const { lines, crash } = await runOnce(bin, window);
     const done = lines.map(parseLine);
     if (crash === undefined) {
-      if (lines.length !== rest.length)
+      if (lines.length !== window.length)
         throw new Error(
-          `Agda CLI returned ${lines.length} results for ${rest.length} cases`,
+          `Agda CLI returned ${lines.length} results for ${window.length} cases`,
         );
-      return done;
+      return [...done, ...(await go(rest.slice(window.length)))];
     }
     // a death after the last row belongs to no case, so it is the run's
-    if (lines.length >= rest.length)
+    if (lines.length >= window.length)
       throw new Error(`Agda CLI died after its last result: ${crash}`);
     return [
       ...done,
