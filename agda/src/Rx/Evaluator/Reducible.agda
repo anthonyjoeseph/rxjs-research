@@ -2208,7 +2208,7 @@ drainSub {n = n} {u = u} allNid inst aM steps {ℓ = ℓ} le κ now lim act od q
                       (bumpNode sched) (record st { nodes = setNode allNid (mergeAll-st lim (suc act) q₀ od) (EvalSt.nodes st) })
                       rm fell
   in fallenStage _ le κ rp s₀ (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d (subscribeE-keeps d) fell h
-drainSub {u = u} allNid inst aM steps le κ now lim act od q₀ o (standing pfs) rp s₀ h {sched} {st} rm
+drainSub {m = m} {u = u} allNid inst aM steps le κ now lim act od q₀ o (standing pfs) rp s₀ h {sched} {st} rm
          ((c , lt₁ ∷ᵃ lt₂ ∷ᵃ []ᵃ) , ap , hsκ) =
   let inst′ = nodeCt sched
       ns′   = mergeAll-st {t = u} lim (suc act) q₀ od
