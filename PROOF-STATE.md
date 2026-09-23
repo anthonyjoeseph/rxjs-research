@@ -244,43 +244,56 @@ it is handed back. The clause registers the caller's chain and folds the def's
 values down the fan-out. The sweep now matches on every case it draws, which
 narrows where it could be false without killing it.
 
-also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg widens, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
+also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg moves, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
 also: `evaluate!` — same, its inhabitation.
+also: `chainStep!` — same; the arrival side folds a registry path under the raw continuation, which is the connect's own apparatus reached from the schedule.
 also: `run-wellFormed⇓` — same, the one proof that reads the runner's stream.
-also: `subscribe-shaped` — same; its conclusion gains the new component, which is the widening stated where that proof consumes it.
+also: `subscribe-shaped` — same; its conclusion follows the result type, which is the narrowing stated where that proof consumes it.
+also: `reducible` — its inhabitation, and every member of its block: the connect arm is the one strict edge on the room, and every other member is funded by the peel it makes or by a budget under it.
 
 ### Big picture tier roadmap
 
-- **THE STORE RE-ENTRY HAS NOW SHUT BOTH ARMS OF THE FORK, AND THE MECHANISM
-  IS THE QUESTION (Anthony's call).** The cycle is the evaluator's own:
-  `red-val` re-establishes a stored closure's candidate by restarting the
-  cascade at an expression the store chose. The fork was a measure or carrying
-  the claim so no read needs one. Carrying is refuted in four forms, in
-  `red-val`'s and `RedNode`'s headers. The measure arm has now taken two more:
-  a stratification of the candidate is a spent counter, and indexing by the
-  ROOM is refuted outright in `red-val`'s header. Three successive routes, one
-  region. The next move is not a fourth subdivision. `make recursion-cover`
-  names the cycle in seconds.
+- **BRING THE CONTINUATION-CARRIED CANDIDATE GREEN, AS LANDED.** The
+  evaluator now answers root-only everywhere and hands its candidates DOWN, in
+  the continuation `RP` the fold runs through; the room is the outermost
+  component, a connect is the one edge that peels it, and a drain's budget is
+  the component under it. The draft is in `Rx.Evaluator.Reducible`, `Domain`
+  and `Builder` and has not been typechecked. What this leg does is make it
+  typecheck without weakening it: `Keeps` re-signed over the re-typed
+  relations, the segment vocabulary deleted from `Rx.Evaluator`, the two
+  `where`-bound peels in `finishDrain!` made clauses, `_≟ᵛ_` ground, and the
+  block dev-green then through the tower. What it decides about the monster:
+  whether the connect's peel is the ONLY strict edge the subscribe cycle
+  needs — the two guards are the residue, and anything the checker refuses
+  beyond them names an edge the design missed.
 
-- **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
-  COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream
-  BEFORE its values, and nothing has tested that: every root component is `[]`
-  until the leg above runs, so the two readings are indistinguishable today and
-  were unified on an argument rather than a measurement. The argument is that a
-  connect fans out to subscribers already registered, so their delivery ran
-  before the subscribe holding this segment existed. A probe instantiating the
-  resolved stream at the exchanged pair decides it — and decides it alone,
-  rather than through three simultaneous changes to the corpus.
+- **ORACLE THE TWO DEAD BRANCHES.** `stuck-hop` and `stuck-finish` are
+  postulated where the design says the room has already fallen: a stored
+  value reaching a flattener unvouched with the room at its ceiling, and a
+  queue outgrowing the budget its subscriber set. Compile with each branch
+  logging and run the sweep. A branch that fires is a refutation of the
+  invariant under it and the finding names the program; a branch that never
+  fires across the sweep is the whole of the remaining proof obligation, and
+  the row for it is born FALSITY until a probe reaches it. This is the leg
+  that turns the monster's region into two named statements.
 
-- **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
+- **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
+  STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
+  what the group it hands on reaches, and the argument for it is that a
+  frame which subscribed sent those values while it ran, before the group it
+  passes on existed. A probe instantiating the fold at the exchanged pair
+  decides it — and decides it alone, rather than through three simultaneous
+  changes to the corpus.
+
+- **WHAT THE SINGLETON FOLD COSTS `batchSync`, NOW THAT THE FAN-OUT RUNS.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one
   former that can see a burst reads the whole of it: the sync bit turns a
   subscribe frame's values into a single group, so a per-value walk turns them
   into one group each. Either the bit is the wrong state for it to hold — rxjs
   batches by TICK, and a burst is only this evaluator's stand-in for one — or
   the walk hands a subscriber its whole entitled suffix and loses the
-  interleave. Unmeasurable until the leg above lands, because no row of the
-  corpus reaches the walk today.
+  interleave. Measurable as soon as the sweep runs on the landed evaluator,
+  because a connect now folds to the sink and the walk is reached.
 
 - **THE ORACLE HAS TWO SIDES AND BOTH ARE AUTHORITIES (Anthony).** The compiled
   Agda and plain rxjs, and nothing else may stand on either: a hand-written

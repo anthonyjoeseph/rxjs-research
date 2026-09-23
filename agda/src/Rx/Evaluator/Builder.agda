@@ -11,21 +11,21 @@
 -- a negative case: there is no negative case to answer.
 --
 -- AND THE SUBSCRIBE CYCLE IS NOT HERE, BECAUSE IT IS ALREADY PROVEN
--- NEXT DOOR.  `Rx.Evaluator.Reducible` builds every subscribe, push,
--- frame step and flattening walk a SUBSCRIPTION reaches, carrying the
--- candidate through each; re-deriving them here would be a second copy
--- of the same induction with the satisfaction column thrown away.
--- What is left for this module is what a subscription never enters:
--- the completion side, the share fan-out, and the arrival spine.
+-- NEXT DOOR.  `Rx.Evaluator.Reducible` builds every subscribe, frame
+-- step, flattening walk, completion and share fan-out a SUBSCRIPTION
+-- reaches, carrying the candidate down each in the continuation the
+-- fold runs through; re-deriving them here would be a second copy of
+-- the same induction with the candidates thrown away.  What is left
+-- for this module is the arrival spine alone.
 --
--- AND THE ONE THING THAT USED TO BE A LEAF IS NOW A CALL.  A merge's
--- parked lane hands back a value the store kept, and a store keeps
--- values rather than premises -- so the drain used to be short of the
--- candidate that value arrived with.  With a value at observable type
--- being a body paired with an environment, and the claim at an
--- environment's entries being the whole of the claim at the pair, the
--- fundamental theorem at VALUES is total and the drain simply calls
--- it.
+-- AND A CHAIN DELIVERED FROM THE SCHEDULE IS FOLDED RAW.  Nothing on
+-- the arrival side holds a candidate for what it delivers -- a
+-- registry path was read out of the store -- so the fold runs under
+-- the RAW continuation, which draws every candidate it wants from the
+-- fundamental theorem at values, at the ceiling the room stands at
+-- when the arrival is folded.  The ceiling is the current count
+-- itself, witnessed by reflexivity; a tick sits at the top of the
+-- measure and is free.
 --
 -- SO THE EVALUATOR IS A PROJECTION.  `evaluate↓` is `proj₁` of
 -- `evaluate!`, and a projection computes only as far as the thing
@@ -41,7 +41,7 @@ open import Data.Nat.Properties using (≤-refl)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit.Polymorphic using (tt)
 
 open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed; []ᵉ; Val)
@@ -51,7 +51,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; root; Arrival; arrTick; a
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible using (reducible; foldPath!)
+open import Rx.Evaluator.Reducible using (reducible; rawRP; rootRP; allNothing; fold)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.
@@ -64,9 +64,9 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                chainStep⇓ {e = e} a vs fin c sched st r
 chainStep! {n = n} a vs fin (lo , path) sched st =
-  let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) ≤-refl (arrTick a) path
-                  vs fin sched st
-                  (<-wellFounded _) ≤-refl
+  let ((_ , f) , _) =
+        fold (rawRP (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path) tt
+          (arrTick a) vs (allNothing vs) fin sched st ≤-refl
   in _ , chain-step f
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -124,9 +124,9 @@ drain! (suc k) sched st with sched-next sched in eqn
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
           → Σ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
 evaluate! {n = n} fuel e ins =
-  let ((segs , sched₀ , st₀) , s , _) =
-        reducible e []ᵉ tt (root {lo = n}) 0 (sched-init e ins) (st-init e)
-          (<-wellFounded _) ≤-refl
+  let (((out , sched₀ , st₀) , s) , _) =
+        reducible (<-wellFounded _) e []ᵉ tt (root {lo = n}) rootRP tt 0
+          (sched-init e ins) (st-init e) ≤-refl
       (rest , d) = drain! fuel sched₀ st₀
   in _ , eval-run s d
 
