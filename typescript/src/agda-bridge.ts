@@ -36,27 +36,50 @@ const crashReason = (code: number | null, err: string): string =>
   err.trim().split("\n")[0] ??
   `exit ${code}`;
 
+// AND A CASE THAT NEVER ANSWERS IS A RESULT TOO. The evaluator is total,
+// but total is not fast: one program took minutes on a single arrival
+// that its neighbours clear in milliseconds, and a batch waiting on it
+// waits forever. So a CLI that writes nothing for this long is killed,
+// and the case it was on is a crash whose reason says it timed out.
+const CASE_TIMEOUT_MS = Number(process.env.ORACLE_CASE_TIMEOUT_MS ?? 10000);
+
 const runOnce = (bin: string, serialized: string[]): Promise<Run> =>
   new Promise((resolvePromise, reject) => {
     const child = spawn(bin, [], { stdio: ["pipe", "pipe", "pipe"] });
     let out = "";
     let err = "";
+    let timedOut = false;
+    const watch = () =>
+      setTimeout(() => {
+        timedOut = true;
+        child.kill("SIGKILL");
+      }, CASE_TIMEOUT_MS);
+    let timer = watch();
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => (out += chunk));
+    child.stdout.on("data", (chunk: string) => {
+      out += chunk;
+      clearTimeout(timer);
+      timer = watch();
+    });
     child.stderr.on("data", (chunk: string) => (err += chunk));
     child.on("error", reject); // e.g. spawn failure
     // a child that died early closes its stdin under us; the death is
     // what `close` reports, so the write error carries nothing more
     child.stdin.on("error", () => undefined);
     child.on("close", (code) => {
+      clearTimeout(timer);
       // the fragment after the last newline is a line the crash cut off
       const lines = out
         .split("\n")
         .slice(0, -1)
         .filter((l) => l.trim().length > 0);
       resolvePromise(
-        code === 0 ? { lines } : { lines, crash: crashReason(code, err) },
+        timedOut
+          ? { lines, crash: `timeout (${CASE_TIMEOUT_MS} ms)` }
+          : code === 0
+            ? { lines }
+            : { lines, crash: crashReason(code, err) },
       );
     });
     child.stdin.write(serialized.join("\n") + "\n");
