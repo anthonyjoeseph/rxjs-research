@@ -1,3 +1,4 @@
 name: rxjs-evidence
 include: refuted probed ../src
 depend: standard-library-2.3
+flags: --guardedness

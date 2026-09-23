@@ -381,6 +381,13 @@ PASSTHRU = re.compile(r"^(open|import|module|infix\w*|syntax|pattern|variable)\b
 SIG = re.compile(r"^([^\s(){};]+)\s+:(\s|$)")
 # `name args = ...`, `name args with ...`, or a with-continuation `... | p = e`.
 CLAUSE = re.compile(r"^([^\s(){};]+)(\s|$)")
+# A COPATTERN CLAUSE `field (name args) ... = e`, or `field name ... = e` for a
+# builder with no arguments, DEFINES `name`: the head token is a record field,
+# which has no top-level signature, and the definition is the one it projects
+# from.  Read by its first token it names the field, so every builder's clauses
+# pool into one phantom member and the builder never leaves the pending list --
+# which swallows the rest of the file into one block.
+COPAT = re.compile(r"^([^\s(){};]+)\s+\(?([^\s(){};]+)")
 
 
 @dataclass
@@ -435,6 +442,7 @@ def parse(path: str) -> Parsed:
 
     i = 0
     n = len(lines)
+    signed: set[str] = set()
     while i < n:
         line = lines[i]
         # Blank lines and comments attach to whatever declaration follows, so a
@@ -488,8 +496,11 @@ def parse(path: str) -> Parsed:
                 items.append(Item("comment", None, i, end))
         elif m := SIG.match(line):
             items.append(Item("sig", m.group(1), i, end))
+            signed.add(m.group(1))
         elif m := CLAUSE.match(line):
             name = m.group(1)
+            if name not in signed and (c := COPAT.match(line)) and c.group(2) in signed:
+                name = c.group(2)
             # Clauses of one function are contiguous up to comments and blanks,
             # so a same-name group after a comment is the SAME definition -- not
             # a second one.  Getting this wrong split subscribeE-caps's body

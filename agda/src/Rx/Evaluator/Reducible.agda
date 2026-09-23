@@ -59,7 +59,6 @@
 -- value IS a body paired with the environment it closed over, so the
 -- expression face concludes about that pair directly and no lemma
 -- relating a peel to a substitution is owed anywhere.
-{-# OPTIONS --guardedness #-}
 module Rx.Evaluator.Reducible where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; T; _∧_)
@@ -208,7 +207,7 @@ record RP {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
          → (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Room m sched st
          → Σ (Stream Γ t × Sched Γ × EvalSt e)
              (λ r → foldPath⇓ {e = e} now κ vals fin sched st r)
-           × S × RP m P S κ
+           × S × RP {e = e} m P S κ
     up   : UpOf {e = e} m P S κ
 open RP public
 
@@ -774,18 +773,18 @@ up (batchRP nid hb fb h κ rp) = tt
 -- is source-shaped; the same frame under a map or a second fold takes
 -- this branch still.
 --
+-- IT ANSWERS THE SUBSCRIBE, NOT THE CONSUME, so the arm that reaches it
+-- wraps it exactly as it wraps a paid hop and the relation cannot
+-- tell the two apart.  Stated at full strength: a subscription of the
+-- arriving observable down the exit frame's path, from the state the
+-- consume built, at any ceiling.
+--
 -- DEAD ROUTE: a continuation carrying its parent's predicate as a
 --   field, or a datatype of continuations indexed by the frame stack,
 --   so that an arm could return its PARENT'S successor.  Both put the
 --   candidate at the frame's output type inside a record over the
 --   candidate at its input type, which `Red` -- a function on `Ty` --
 --   cannot host without a universe.
---
--- IT ANSWERS THE SUBSCRIBE, NOT THE CONSUME, so the arm that reaches it
--- wraps it exactly as it wraps a paid hop and the relation cannot
--- tell the two apart.  Stated at full strength: a subscription of the
--- arriving observable down the exit frame's path, from the state the
--- consume built, at any ceiling.
 --
 -- PROBED: `Probed.Stuck-Branches` -- `of(5)` subscribed down a
 --   `from-inner` exit frame to the root, at the initial state with the
@@ -949,8 +948,10 @@ redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Tm Γ [] [] (s ∷ Θ) u)
 -- it; under it the input bound and the term size fall at every former,
 -- and an environment is walked entry by entry.  Every member takes the
 -- room's accessibility as an argument, so the checker reads the whole
--- order off the call sites.
--- STRUCTURAL SCC: dispatchShare! rawRP red-env red-input red-input-shared red-val redExpAcc redFnAcc redTmAcc redTmsAcc reducible shareGo! shareWalk! sinkRP
+-- order off the call sites.  The flattener's builders close the same
+-- cycle through their walks and drains, which descend on the drain
+-- budget and the queue under an unchanged room.
+-- STRUCTURAL SCC: dispatchShare! finishDrain! finishPeelM! finishPeelQ! finishWalk! fromInnerRP fromInnerRawRP fromInnerWalkRP inner! innerFinish! innerFinishRaw! innerFinishWalk! innerReact! innerReactRaw! innerReactWalk! mergeAllDrain! rawRP red-consume red-env red-hop red-input red-input-shared red-val red-walk redExpAcc redFnAcc redTmAcc redTmsAcc reducible shareGo! shareWalk! sinkRP thruRP
 reducible : ∀ {n} {Γ : Ctx n} {Θ t} {m} → Acc _<_ m
           → (b : Exp Γ [] [] Θ t) (ρ : Env Γ Θ)
           → RedEnv m ρ → Red {Γ = Γ} m (obs t) (Θ , b , ρ)
@@ -1772,7 +1773,9 @@ red-hop {m = m} op nid inst κ now o nothing rp s sched st (acc rsM) rm
               (fromInnerWalkRP op nid inst (rsM lt) ≤-refl κ (dropRP (<⇒≤ lt) rp))
               s now sched st ≤-refl
       in r , s′ , rp
-... | no nlt = stuck-hop o (from-inner op nid inst ↠[ ≤-refl ] κ) now s sched st rm nlt
+... | no nlt =
+      let (r , s′ , rp′) = stuck-hop o (from-inner op nid inst ↠[ ≤-refl ] κ) now s sched st rm nlt
+      in r , s′ , up rp′
 
 red-walk op nid κ now []       []        rp s sched st aM rm = (_ , walk-nil) , s , rp
 red-walk op nid κ now (o ∷ os) (co ∷ cs) rp s sched st aM rm =

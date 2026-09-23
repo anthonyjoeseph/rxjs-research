@@ -54,6 +54,10 @@ EVALUATOR_DIR = "agda/src/Rx/Evaluator"
 WORD = r"[A-Za-z][A-Za-z0-9'´ᵃ-ᵪ₀-₟′!↓⇓-]*"
 SIG = re.compile(r"^(" + WORD + r")\s*:\s")
 HEAD = re.compile(r"^(" + WORD + r")\s")
+# A copattern clause `field (name args) = e` -- or `field name = e` -- is a
+# clause OF `name`: the field has no top-level signature, so read by its head
+# token the body belonged to nothing and every edge out of a builder was lost.
+COPAT = re.compile(r"^(" + WORD + r")\s+\(?(" + WORD + r")")
 TOK = re.compile(WORD)
 PEEL = re.compile(r"--\s*PEEL:\s*(" + WORD + r")\s*->\s*(" + WORD + r")\s*$")
 SCC = re.compile(r"--\s*STRUCTURAL SCC:\s*(.+?)\s*$")
@@ -98,8 +102,11 @@ def parse(path):
     cur = None
     for ln in lines:
         m = HEAD.match(ln)
+        c = COPAT.match(ln)
         if m and m.group(1) in names:
             cur = None if re.match(r"^\s*:\s", ln[m.end(1):]) else m.group(1)
+        elif m and c and c.group(2) in names:
+            cur = c.group(2)
         elif ln and not ln[0].isspace() and not ln.startswith("--") \
                 and not ln.startswith("...") and not ln.startswith("|"):
             cur = None

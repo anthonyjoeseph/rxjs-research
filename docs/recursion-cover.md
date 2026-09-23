@@ -81,3 +81,14 @@ pattern the check read the module as having no recursion at all and reported a
 tidy zero. Any future naming convention reaching outside `WORD` fails the same
 way, silently — which is why the selftest fixtures pin the *firing*, not the
 passing.
+
+**A copattern clause is a clause of the definition it projects from.** A
+continuation builder is written `fold (mapRP …) … = …`: its head token is a
+record field with no top-level signature, so read by that token the body
+belonged to nothing and every edge out of a builder was invisible — which hid a
+whole flattener cycle behind the share cycle that happened to be declared. A
+line whose head is not a declared name and whose next token (bare or after one
+`(`) is one is attributed to that name. `uncovered-copattern.agda` pins it.
+`agda-dev.py`'s parser makes the same attribution, since the same misreading
+there pooled every builder's clauses into one phantom member and swallowed the
+rest of the module into one block.

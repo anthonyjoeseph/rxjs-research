@@ -32,8 +32,8 @@
 -- is the only shape of it that subscribes anything.
 module Probed.Stuck-Branches where
 
--- TARGET: stuck-hop @f588e7
--- TARGET: stuck-finish @d82f9d
+-- TARGET: stuck-hop @118e60
+-- TARGET: stuck-finish @c3829a
 
 open import Data.Bool using (false)
 open import Data.List using ([]; _∷_)
@@ -42,7 +42,7 @@ open import Data.Nat using (z≤n)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit.Polymorphic using (⊤; tt)
 open import Data.Vec using () renaming ([] to []ᵛ)
 open import Relation.Binary.PropositionalEquality using (refl)
 

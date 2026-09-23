@@ -253,15 +253,15 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 
 ### Big picture tier roadmap
 
-- **TYPECHECK THE SUCCESSOR CONTINUATION AND RUN THE SWEEP OVER IT.** The
-  four sites in the postulate's header are answered in the tree but nothing
-  has checked it: every fold hands back its successor, the sink keeps its
-  column, a raw fold or bracket certifies a stored value by `red-val` under
-  the connect's peel, an arrival's column is the candidate at values, and the
-  bracket's flush is a fold through the frame. Get the block dev-green, then
-  the oracle, and read which of the four pinned cases still reach the guard.
-  What it decides about the monster: whether the room pays for anything but a
-  connect's own def, or is exactly the connect arm's one strict edge.
+- **RUN THE SWEEP OVER THE SUCCESSOR CONTINUATION.** The four sites in the
+  postulate's header are answered and the tower accepts them, termination
+  included: every fold hands back its successor, the sink keeps its column, a
+  raw fold or bracket certifies a stored value by `red-val` under the
+  connect's peel, an arrival's column is the candidate at values, and the
+  bracket's flush is a fold through the frame. Run the oracle and read which
+  of the four pinned cases still reach the guard. What it decides about the
+  monster: whether the room pays for anything but a connect's own def, or is
+  exactly the connect arm's one strict edge.
 
 - **THE SUCCESSOR CROSSES ONLY THE EXIT FRAME, AND THAT REGION IS OPEN.** An
   arm answers with a continuation at its own type and cannot hand back its
@@ -305,10 +305,10 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 
 ### The ledger
 
-- **`stuck-hop`** (Reducible) — FALSITY, `PROBED`: the sweep reaches it on 120
-  of 500 cases, smallest `defer(of(5))`, and hand cases reach it with no share,
-  defer or tick — a scan cell, a batch buffer, a share's fan-out each drop the
-  candidate the flattener needs.
+- **`stuck-hop`** (Reducible) — FALSITY, `DEAD ROUTE, PROBED`: the sweep
+  reaches it on 120 of 500 cases, smallest `defer(of(5))`, and hand cases reach
+  it with no share, defer or tick — a scan cell, a batch buffer, a share's
+  fan-out each drop the candidate the flattener needs.
 - **`stuck-finish`** (Reducible) — FALSITY, `PROBED`: a queue outgrowing the
   budget its subscriber set; the sweep never reached it, and it aborts before
   most programs could.

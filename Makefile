@@ -261,8 +261,10 @@ bug-cache-run: stripped
 	 fi
 
 # SOUNDNESS GUARD.  The build is NOT `--safe` — `make gate-heavy` runs a plain
-# `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the
-# .agda-lib — so nothing mechanically stops an unsafe pragma landing on the
+# `agda src/Main.agda`, there is no OPTIONS pragma in src/, and the .agda-lib's
+# one flag is `--guardedness`, which `--safe` accepts: the continuation record
+# is coinductive and the flag is infective, so it is set library-wide rather
+# than in every importer — so nothing mechanically stops an unsafe pragma on the
 # proof path.  `--safe` cannot be switched on while postulates exist (it rejects
 # `postulate` as well as the pragmas), so until the endgame this grep IS the
 # guard.  EXEMPT: src/QuickCheck.agda, a test harness Main does not import.
@@ -713,7 +715,7 @@ recursion-cover:
 # covered recursion would be routed around within a day.
 recursion-cover-selftest:
 	@fail=0; S=scripts/recursion-cover-selftest; \
-	  for bad in uncovered stale-peel stale-scc; do \
+	  for bad in uncovered uncovered-copattern stale-peel stale-scc; do \
 	    if scripts/check-recursion-cover.py --file $$S/$$bad.agda > /dev/null 2>&1; then \
 	      echo "SELFTEST FAIL: $$bad PASSED — the check is dead"; fail=1; \
 	    fi; \
