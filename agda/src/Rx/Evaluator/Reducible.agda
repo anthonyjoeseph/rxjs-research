@@ -1535,6 +1535,20 @@ reducible b ρ rρ =
 --   down by one at each use.  That is a counter the run spends, which
 --   is the measure this development is trying not to need.
 --
+-- DEAD ROUTE: INDEXING the candidate by the room, so that the whole
+--   cycle descends on `unconn` and every read the store serves is
+--   funded by an invariant saying the queue holding it witnesses a
+--   strict fall.  The resumption tree this wants is writable and its
+--   connect peel is real; what is not is the funding.  The room counts
+--   SHARED slots, so a program whose table is all scripted has room
+--   zero at every state — and a bounded merge over two inners still
+--   fills its lane's queue there, through the ordinary refusal path,
+--   with no connect anywhere near it.  Every ceiling in such a run is
+--   zero, so the peel reads `0 < 0`.  The obstruction is the currency
+--   rather than the phrasing: the backlog exists precisely where the
+--   room has nothing to give.
+-- REFUTED: `Refuted.Room-Backlog`
+--
 -- DEAD ROUTE: a LEDGER for the flattener's backlog, as the cell ledger
 --   does for a scan.  A queue entry is an observable at the element
 --   type, so its claim wants a path at that type -- and the frame an

@@ -58,3 +58,12 @@ open import Refuted.Flattened-Input using
 -- carries an authorship premise on its program and not only on its
 -- table.
 open import Refuted.Forged-Root using (saw-forged-root)
+
+-- THE ROOM IS THE WRONG CURRENCY FOR THE STORE RE-ENTRY.  A candidate
+-- indexed by the unconnected count closes every edge of the subscribe
+-- cycle but one, and the repair for that one is an invariant funding
+-- the flattener's backlog pop out of a fall in the room.  A program
+-- with no share in it has room zero at every state and still takes
+-- that pop, so the funding conclusion is refuted outright rather than
+-- merely unproven.
+open import Refuted.Room-Backlog using (room-zero; saw-room-cannot-fund)

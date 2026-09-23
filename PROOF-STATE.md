@@ -251,14 +251,16 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### Big picture tier roadmap
 
-- **FIND A MEASURE FOR THE STORE RE-ENTRY — THE CARRYING ARM OF THE FORK IS
-  SHUT.** The cycle is the evaluator's own: `red-val` re-establishes a stored
-  closure's candidate by restarting the cascade at an expression the store
-  chose. The fork was a third measure or carrying the claim so no read needs
-  one, and the carrying arm is refuted in every form — `red-val`'s and
-  `RedNode`'s headers carry the four. So the measure is the arm left, and it
-  covers three doors at once: an arriving burst, a lane's backlog, a folded
-  cell. `make recursion-cover` names the cycle in seconds.
+- **THE STORE RE-ENTRY HAS NOW SHUT BOTH ARMS OF THE FORK, AND THE MECHANISM
+  IS THE QUESTION (Anthony's call).** The cycle is the evaluator's own:
+  `red-val` re-establishes a stored closure's candidate by restarting the
+  cascade at an expression the store chose. The fork was a measure or carrying
+  the claim so no read needs one. Carrying is refuted in four forms, in
+  `red-val`'s and `RedNode`'s headers. The measure arm has now taken two more:
+  a stratification of the candidate is a spent counter, and indexing by the
+  ROOM is refuted outright in `red-val`'s header. Three successive routes, one
+  region. The next move is not a fourth subdivision. `make recursion-cover`
+  names the cycle in seconds.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream
