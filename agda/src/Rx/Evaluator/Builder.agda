@@ -51,7 +51,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; root; Arrival; arrTick; a
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible using (reducible; rawRP; rootRP; allNothing; fold)
+open import Rx.Evaluator.Reducible using (reducible; rawRP; rootRP; vouchAll; fold)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.
@@ -66,7 +66,7 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 chainStep! {n = n} a vs fin (lo , path) sched st =
   let ((_ , f) , _) =
         fold (rawRP (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path) tt
-          (arrTick a) vs (allNothing vs) fin sched st ≤-refl
+          (arrTick a) vs (vouchAll (arrTy a) vs) fin sched st ≤-refl
   in _ , chain-step f
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
