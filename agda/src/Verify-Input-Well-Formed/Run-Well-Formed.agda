@@ -66,8 +66,8 @@ open import Rx.Elaborated using (Elabᵉ; Elabˢ)
 open import Rx.Slots using (Slots)
 open import Rx.Envelope using (machineEmitᵗ)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Stream; Segs;
-  resolveSegs; chainsOf; arrSource; sched-init; st-init; root; sched-next;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; Stream;
+  chainsOf; arrSource; sched-init; st-init; root; sched-next;
   schedGo)
 open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓;
                                        evaluate⇓; eval-run;
@@ -174,10 +174,10 @@ Owes {Γ = Γ} st S =
 postulate
   subscribe-shaped :
     ∀ {n} {Γ : Ctx n} {a} {e : Closed Γ (machineEmitᵗ a)} {ins : Slots Γ}
-      {sched₀ st₀} {segs : Segs Γ (machineEmitᵗ a) (machineEmitᵗ a)} →
+      {sched₀ st₀} {out : Stream Γ (machineEmitᵗ a)} →
     Elabᵉ e →
     subscribeE⇓ {e = e} {lo = n} ([] , e , []ᵉ) root 0
-      (sched-init e ins) (st-init e) (segs , sched₀ , st₀) →
+      (sched-init e ins) (st-init e) (out , sched₀ , st₀) →
     -- AFTER the derivation, not before: the schedule is an implicit
     -- solved from the walk, and a premise mentioning `Sched.slots`
     -- ahead of it eta-expands the selector and leaves the schedule
@@ -186,7 +186,7 @@ postulate
     Elabˢ ins →
     Σ ProtocolSt λ S₀ →
         WellShaped protocol-init
-          (decodeStream (concat (resolveSegs {t = machineEmitᵗ a} segs))) S₀
+          (decodeStream (concat out)) S₀
       × Owes st₀ S₀
       -- AND THE TABLE SURVIVES THE WALK.  The premise arrives on `ins`
       -- and the drain reads it off `Sched.slots sched₀`, so somebody
@@ -317,7 +317,7 @@ drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} eqn c d) es
 -- is answered by the telescope now and not by a predicate on syntax.
 --
 -- The index is GENERALISED before the derivation is matched on:
--- `evaluate⇓`'s stream argument is `resolveSegs segs ++ rest`, and
+-- `evaluate⇓`'s stream argument is `out ++ rest`, and
 -- matching it against `proj₁ (evaluate! ...)` in place loses the
 -- connection between the two halves and the term.
 run-wellFormed⇓ :
@@ -327,23 +327,19 @@ run-wellFormed⇓ :
   evaluate⇓ fuel e ins s →
   Accepted (runProtocol protocol-init (decodeStream (concat s)))
 run-wellFormed⇓ {Γ = Γ} {a = a} _ el es
-    (eval-run {segs = segs} {rest = rest} sub dr)
+    (eval-run {out = out} {rest = rest} sub dr)
   with subscribe-shaped el sub es
-... | S₀ , wsSegs , ow₁ , es₀
+... | S₀ , wsOut , ow₁ , es₀
     with drain-shaped el ow₁ dr es₀
 ...   | S₂ , wsRest =
       wellShaped-accepted (subst (λ z → WellShaped protocol-init z S₂)
                                  (sym dEq)
-                                 (ws-++ wsSegs wsRest))
+                                 (ws-++ wsOut wsRest))
       where
-      dEq : decodeStream (concat (resolveSegs {t = machineEmitᵗ a} segs ++ rest))
-              ≡ decodeStream (concat (resolveSegs {t = machineEmitᵗ a} segs))
-                  ++ decodeStream (concat rest)
-      dEq = trans (cong decodeStream
-                        (concat-++ (resolveSegs {t = machineEmitᵗ a} segs) rest))
-                  (decodeStream-++
-                     (concat (resolveSegs {t = machineEmitᵗ a} segs))
-                     (concat rest))
+      dEq : decodeStream (concat (out ++ rest))
+              ≡ decodeStream (concat out) ++ decodeStream (concat rest)
+      dEq = trans (cong decodeStream (concat-++ out rest))
+                  (decodeStream-++ (concat out) (concat rest))
 
 run-wellFormed :
   ∀ {n} {Γ : Ctx n} {a} (fuel : Fuel) (e : Closed Γ (machineEmitᵗ a))

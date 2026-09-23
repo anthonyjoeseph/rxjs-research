@@ -6,7 +6,7 @@ open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
-open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
+open import Data.List    using (List; []; _∷_; _++_; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
 open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -16,8 +16,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (Tick; Ordinal; Source; Timed; after_,_; hot; cold;
-  PlainEvent; valueᵖ; completeᵖ)
+open import Rx.Prim using (Tick; Ordinal; Source; Timed; after_,_; hot; cold; PlainEvent)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
 
 variable
@@ -53,25 +52,6 @@ Burst Γ t = List (PlainEvent (Val Γ t))
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- bursts, in canonical order
 Stream Γ t = List (Burst Γ t)
-
--- AN ORDERED ANSWER, AND THE ORDER IS THE WHOLE POINT.  Subscribing
--- can hand values back at the element type AND send bursts straight to
--- the root, and which of the two came first is a property of the
--- PROGRAM rather than of the carrier: the oracle's exchanged pair
--- carries the same values out of a flattener and out of a share, and
--- rxjs answers `[7,1,2]` one way round and `[1,2,7]` the other.  So no
--- fixed rule for reading a group beside a stream can be right, and the
--- order goes into the answer -- one segment per subscribe that
--- contributed, in the order they ran.
-VSegs : ∀ {n} → Ctx n → Ty → Ty → Set
-VSegs Γ u t = List (List (Val Γ u) × Stream Γ t)
-
--- THE ONE-SEGMENT ANSWER, which is what every former that cannot reach
--- the root produces and is the shape this carrier widened from.  A
--- reading of the tree that only ever meets these is reading the case
--- the exchanged pair does not separate.
-oneVSeg : ∀ {n} {Γ : Ctx n} {u t} → List (Val Γ u) → VSegs Γ u t
-oneVSeg vs = (vs , []) ∷ []
 
 ------------------------------------------------------------------
 -- The global scheduler
@@ -509,21 +489,6 @@ st-init e = record { registry = [] ; nodes = []
                    ; delivered = [] ; cancelled = [] ; dying = [] }
   -- all populated by the root subscribeE and by lazy share connects
 
--- A SOURCE THAT LIVES AND DIES INSIDE ITS OWN SUBSCRIPTION BURST
--- (`ofᵉ`, `emptyᵉ`, `take 0`, a cold with no async tail): its values
--- and the end, as ONE burst, with nothing registered and nothing
--- scheduled.  It is pure, and that is the protocol leaving: the old
--- shape minted a source so an `init`/`close` pair had something to
--- name, and a plain carrier has neither event to carry.
-oneShotBurst : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ u) → Stream Γ u
-oneShotBurst vals = (map valueᵖ vals ++ completeᵖ ∷ []) ∷ []
-
--- A source already spent before this subscription reached it — a
--- completed Subject, a share whose def has closed, or a slot the
--- registration's own floor test refuses.  The end, immediately.
-spentBurst : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u
-spentBurst = (completeᵖ ∷ []) ∷ []
-
 -- the arrival's source's live chains, in subscription order, at
 -- exactly the arrival's element type: a chain is admitted only past a
 -- Ty equality check, so no payload is ever read at the wrong type (a
@@ -547,91 +512,6 @@ chainsGo a ((rid , s , (u , p)) ∷ r)
 chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          → (a : Arrival Γ) → EvalSt e → List (RegId × AtFloor Γ (arrTy a) t)
 chainsOf a st = chainsGo a (EvalSt.registry st)
-
--- SPLITTING A BURST INTO WHAT A FRAME STEPS AND WHAT IT REACTS TO.
--- A plain burst carries values and, at most, the end; the values are
--- what the frame transforms and the end is the `fin` bit threaded
--- alongside.  With the protocol out of the carrier there is no third
--- column: nothing has to be retagged across a payload type, because
--- nothing but a value carries one.
-splitEvents : ∀ {n} {Γ : Ctx n} {u} → Burst Γ u → List (Val Γ u) × Bool
-splitEvents []              = [] , false
-splitEvents (valueᵖ v ∷ es) = let (vs , c) = splitEvents es in v ∷ vs , c
-splitEvents (completeᵖ ∷ es) = let (vs , _) = splitEvents es in vs , true
-
-splitBurst : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → List (Val Γ u) × Bool
-splitBurst []         = [] , false
-splitBurst (b ∷ bs) =
-  let (vs  , c ) = splitEvents b
-      (vs′ , c′) = splitBurst bs
-  in vs ++ vs′ , c ∨ c′
-
--- THE SAME ORDERED ANSWER ONE LEVEL UP, WHERE A CONTRIBUTION IS A
--- STREAM RATHER THAN A VALUE LIST.  A subscribe hands its output back
--- as BURSTS, because the bracketing is what a `batchSync` downstream
--- reads off it, so a subscribe-side segment pairs a stream at `u` with
--- the stream that same contribution sent to the root.
-Segs : ∀ {n} → Ctx n → Ty → Ty → Set
-Segs Γ u t = List (Stream Γ u × Stream Γ t)
-
--- THE ONE-SEGMENT ANSWER, which is every subscribe that cannot reach
--- the root -- today that is all of them, since nothing on this side
--- mints a root emit until the connect is routed through the fan-out.
-oneSeg : ∀ {n} {Γ : Ctx n} {u t} → Stream Γ u → Segs Γ u t
-oneSeg bs = (bs , []) ∷ []
-
--- ONE OUTPUT BURST PER SEGMENT, WHICH IS WHERE A FLATTENER'S ORDER
--- SURVIVES THE PUSH -- AND WHERE THE BRACKETING CHANGES.  A push used
--- to answer one burst per INPUT burst, concatenating every segment's
--- values into it, which collapses two inners delivered in the same
--- burst.  That is exactly the exchanged pair's shape, so keeping them
--- apart costs them a burst each.
---
--- THE COMPLETION RIDES THE LAST SEGMENT, which is the reading closest
--- to the one burst this used to answer: at one segment the answer is
--- the old one term for term, so the only shapes that move are the ones
--- the split is for.  A drain is what still answers at several.
-stepSegs : ∀ {n} {Γ : Ctx n} {u t} → VSegs Γ u t → Bool → Segs Γ u t
-stepSegs [] fin =
-  ((if fin then completeᵖ ∷ [] else []) ∷ [] , []) ∷ []
-stepSegs ((vs , rs) ∷ []) fin =
-  ((map valueᵖ vs ++ (if fin then completeᵖ ∷ [] else [])) ∷ [] , rs) ∷ []
-stepSegs ((vs , rs) ∷ s ∷ ss) fin =
-  (map valueᵖ vs ∷ [] , rs) ∷ stepSegs (s ∷ ss) fin
-
--- RESOLVING AT THE TOP, WHERE BOTH COLUMNS ARE ALREADY AT `t` AND
--- RESOLVING IS CONCATENATING.  Root stream before value stream within
--- one segment, which is the rule `foldVSegs⇓` resolves by.  A
--- flattener's step is what fills the root component, and it is the
--- frame the two readings disagree on.
-resolveSegs : ∀ {n} {Γ : Ctx n} {t} → Segs Γ t t → Stream Γ t
-resolveSegs []               = []
-resolveSegs ((bs , rs) ∷ ss) = rs ++ bs ++ resolveSegs ss
-
-hasComplete : ∀ {n} {Γ : Ctx n} {u} → Burst Γ u → Bool
-hasComplete = any isFinᵖ
-  where isFinᵖ : ∀ {A : Set} → PlainEvent A → Bool
-        isFinᵖ (valueᵖ _) = false
-        isFinᵖ completeᵖ  = true
-
-burstCompleted : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Bool
-burstCompleted = any hasComplete
-
--- WHETHER A SEGMENTED ANSWER ENDED, WHICH IS THE ONE QUESTION THAT
--- MAY BE ASKED ACROSS SEGMENTS.  A completion is somewhere or nowhere
--- and reading it back tells you nothing about order, so this is not
--- the seam `vsegVals` is -- and it is stated as a predicate rather
--- than a flattening so that no ordered answer is handed out.
-segsCompleted : ∀ {n} {Γ : Ctx n} {u t} → Segs Γ u t → Bool
-segsCompleted = any (λ sg → burstCompleted (proj₁ sg))
-
--- DROPPING ONE LEVEL OF BRACKETING AND NOTHING ELSE.  A flattener's
--- inner is subscribed and its answer walked by a frame that wants
--- VALUES, not bursts; the segments and their root columns survive
--- one for one, so this is a change of what a segment CARRIES and
--- never of how many there are or what order they are in.
-segVSegs : ∀ {n} {Γ : Ctx n} {u t} → Segs Γ u t → VSegs Γ u t
-segVSegs = map (λ sg → proj₁ (splitBurst (proj₁ sg)) , proj₂ sg)
 
 -- THE PER-FRAME SEMANTICS, AND EVERY ONE OF THEM TAKES A BURST.  A
 -- subscription hands its whole output back at once, so what arrives
@@ -760,13 +640,6 @@ batchBuf s (just (batchSync-st {w} _ bur done)) with w ≟ᵗ s
 ... | no  _    = [] , done
 ... | yes refl = batchVals true bur , done
 batchBuf s _ = [] , false
-
-batchClose : ∀ {n} {Γ : Ctx n} {t} (s : Ty) → Maybe (NodeState Γ)
-           → Segs Γ (s ×ᵗ listᵗ s) t
-batchClose {t = t} s m =
-  stepSegs {u = s ×ᵗ listᵗ s} {t = t}
-    (oneVSeg {u = s ×ᵗ listᵗ s} {t = t} (proj₁ (batchBuf s m)))
-    (proj₂ (batchBuf s m))
 
 -- WHAT A MERGE'S DRAIN RE-READS BETWEEN SPENDS.  rxjs's buffer is one
 -- mutable array and the loop `shift`s it, so a drain that re-enters

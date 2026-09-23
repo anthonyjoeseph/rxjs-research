@@ -26,6 +26,8 @@ open import Data.Fin using (zero)
 open import Data.List using (List; []; _∷_; concat; map; length)
 open import Data.Maybe using (Maybe; nothing)
 open import Data.Nat using (ℕ; zero)
+open import Data.Nat.Induction using (<-wellFounded)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
@@ -38,8 +40,8 @@ open import Rx.Slots using (Slots; scripted)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Evaluator using
-  (EvalSt; sched-init; st-init; root; regSource; resolveSegs)
-open import Rx.Evaluator.Reducible using (reducible)
+  (EvalSt; sched-init; st-init; root; regSource)
+open import Rx.Evaluator.Reducible using (reducible; rootRP)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol)
 
@@ -64,19 +66,15 @@ src = mergeAllˢ nothing inner
 prog : Closed (plainᵏ Γ₁ κ₁) (emitᵗ natᵗ)
 prog = elaborate κ₁ src
 
-rootRun = reducible prog []ᵉ tt (root {lo = 1}) 0
-            (sched-init prog ins₁) (st-init prog)
+-- THE ROOT SUBSCRIBE EXACTLY AS THE BUILDER RUNS IT: the root path, the
+-- root continuation, at the ceiling the whole run is seeded with.  Its
+-- answer is the stream the root received, so nothing here reads a
+-- column the evaluator did not hand to the root.
+rootRun = reducible (<-wellFounded _) prog []ᵉ tt (root {lo = 1}) rootRP tt 0
+            (sched-init prog ins₁) (st-init prog) ≤-refl
 
--- THE WHOLE SUBSCRIBE ANSWER, resolved, not any one column of it.  A
--- subscribe answers with an ordered list of segments, each pairing a
--- burst at its own element type with a stream the same contribution
--- already sent to the root, and which column a value comes back in is
--- a property of the carrier rather than of this program.  `resolveSegs`
--- is the evaluator's own reading of the pair, so this refutation cannot
--- weaken silently the day a root column starts carrying anything.
-rootEmits = resolveSegs {Γ = plainᵏ Γ₁ κ₁} {t = emitᵗ natᵗ}
-              (proj₁ (proj₁ rootRun))
-st₀       = proj₂ (proj₂ (proj₁ rootRun))
+rootEmits = proj₁ (proj₁ (proj₁ rootRun))
+st₀       = proj₂ (proj₂ (proj₁ (proj₁ rootRun)))
 
 regLive : List ℕ
 regLive = map (λ r → regSource (proj₁ (proj₂ r))) (EvalSt.registry st₀)

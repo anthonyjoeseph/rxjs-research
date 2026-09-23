@@ -136,8 +136,7 @@ open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
-open import Data.Empty using (⊥)
+open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
@@ -156,40 +155,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
   batchDispatch; batchBuf; thruWrap; consumeUsable; finishUsable; drainSt)
-
--- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
--- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF A PUSH CYCLE.  A
--- push cycle steps the frame it was handed, and what hands it one is a
--- source former -- the map, the take, the bracket, the scan, the outer
--- of an operator.  The inner's own frame is never pushed: the frame is
--- walked later, by the instant loop, down a path the registry holds.
---
--- WHAT THE TYPE NO LONGER BUYS IS THE SEPARATION OF THE TWO HALVES, and
--- reading it as if it still did is the trap this says out loud.  The
--- arrangement that retired the measure had a subscribe hand its inner's
--- synchronous burst UP to its caller, which is what kept the completion
--- side out of a subscribe's reach.  A subscribe now folds its answer
--- down the path where it produces it, because a frame with a cell counts
--- what crosses it and the deferred route is one value late -- so react,
--- finish and drain ARE reachable from a subscribe, in three hops, and
--- the drain reaches back through the candidate at a stored observable.
--- The `⊥` still holds: what it refuses is a frame, not a cycle.
-
--- AND THAT IS PRECISELY WHAT A SHARE'S FAN-OUT AT THE CONNECT WOULD
--- SPEND, WHICH IS WHY IT IS WORTH PRICING HERE RATHER THAN DISCOVERING
--- LATER.  Handing a burst UP is what keeps the two halves apart; a
--- subscribe that pushes where it produces puts the fold back inside
--- the subscribe's own cycle and re-owes the measure this arrangement
--- retired.  The order that would fund it is three deep -- the
--- UNCONNECTED-SLOT count outermost, which only a connect moves and
--- which nothing anywhere raises, the share floor's remaining room
--- next, and the element type's observable nesting under that -- and
--- each component is the one the edge above it cannot order.  So the
--- price is not a lemma but a measure, and `connectedShares` stops
--- being bookkeeping and becomes load-bearing.
-srcFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
-srcFrame (from-inner _ _ _) = ⊥
-srcFrame _                  = ⊤
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE CYCLE.  Eleven families, exactly the members of the

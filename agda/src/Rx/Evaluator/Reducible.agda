@@ -82,11 +82,10 @@ open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Nullary using (yes; no; ¬_)
 open import Relation.Nullary.Decidable using (⌊_⌋)
-open import Relation.Binary.Definitions using (DecidableEquality)
 
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim using (Tick; PlainEvent; valueᵖ; completeᵖ; hot; cold)
+open import Rx.Prim using (Tick; hot; cold)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; _≟ᵗ_;
   Ctx; Closed; Val; Exp; Tm; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals;
@@ -99,37 +98,29 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ; ib-topᵗ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; ordinalᵏ; freshId; setAt)
-open import Decide using (∧ˡ; ∧ʳ; ≡ᵇ-refl)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame;
-  _↠[_]_; map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink; root; mergeAllᵒ;
-  switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState; cell-st; take-st; batchSync-st; mergeAll-st;
-  switch-st; exhaust-st; takeVals; takeDispatch; scanVals; scanDispatch; batchVals;
-  batchDispatch; batchBuf; lookupNode; setNode; installNode; memberSource;
-  consumeUsable; hasRoom; drainSt; switchKill; register; atSlot; atDyn; resolve; lowerFloor;
-  aliveThroughᶠ; shareAdmit; shareDying; shareSpend; shareFinish; thruWrap; RegId)
+open import Decide using (∧ˡ; ∧ʳ)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; _↠[_]_; map-f; take-f; scan-f; batchSync-f; from-inner;
+  thru-outer; share-sink; root; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState;
+  cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
+  scanVals; scanDispatch; batchVals; batchDispatch; batchBuf; lookupNode; setNode; installNode;
+  memberSource; consumeUsable; hasRoom; drainSt; switchKill; register; atSlot; atDyn; resolve;
+  lowerFloor; aliveThroughᶠ; shareAdmit; shareDying; shareSpend; thruWrap; RegId)
 open import Rx.Exp.ValEq using (eqVal)
 open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert; room-keeps; keeps-refl)
-open import Rx.Evaluator.Keeps using (switchKill-keeps; subscribeE-keeps; subscribeInner-keeps;
-  scanDispatch-keeps; takeDispatch-keeps; batchDispatch-keeps; thruWrap-keeps;
-  thruConsume-keeps; thruWalk-keeps; innerReact-keeps; foldPath-keeps; mergeAllDrain-keeps;
-  shareDying-keeps; shareSpend-keeps; shareGo-keeps)
-open import Rx.Evaluator.Domain using (subscribeE⇓; stepFrame⇓;
-  step-map; step-scan; step-take; step-batchSync; step-from-inner;
-  subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
-  subs-batchSync; subs-mint; subs-defer; subs-floor; subs-hot-done; subs-hot-live;
-  subs-cold-sync; subs-cold-async; subs-μ; sub-all; subs-merge-all;
-  subs-switch-all; subs-exhaust-all; thruConsume⇓; thruWalk⇓;
+open import Rx.Evaluator.Keeps using (switchKill-keeps; subscribeE-keeps; subscribeInner-keeps; scanDispatch-keeps;
+  takeDispatch-keeps; batchDispatch-keeps; thruWrap-keeps; thruConsume-keeps; thruWalk-keeps;
+  innerReact-keeps; foldPath-keeps; shareDying-keeps; shareSpend-keeps; shareGo-keeps)
+open import Rx.Evaluator.Domain using (subscribeE⇓; step-map; step-scan; step-take; step-batchSync; step-from-inner; subs-of;
+  subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-batchSync; subs-mint;
+  subs-defer; subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
+  subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all; thruConsume⇓; thruWalk⇓;
   step-thru-outer; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
-  consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
-  walk-nil; walk-cons; walk-end; walk-more; subs-shared; slot-spent; slot-join; slot-connect;
-  connect;
-  subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; foldPath⇓;
-  dispatchShare⇓; shareWalk⇓; shareGo⇓;
-  drain-spent; drain-nil; drain-no-room; drain-room;
-  finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
-  react-false; react-alive; react-dead;
-  fold-root; fold-sink; fold-step;
-  disp; go-nil; go-cut; go-live)
+  consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil;
+  walk-cons; walk-end; walk-more; subs-shared; slot-spent; slot-join; slot-connect; connect;
+  subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; foldPath⇓; dispatchShare⇓;
+  shareWalk⇓; shareGo⇓; drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain;
+  finish-switch-clear; finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead;
+  fold-root; fold-sink; fold-step; disp; go-nil; go-cut; go-live)
 
 ------------------------------------------------------------------
 -- THE CEILING, THE CONTINUATION, THE CANDIDATE.
