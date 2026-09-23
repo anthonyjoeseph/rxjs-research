@@ -664,6 +664,14 @@ fold (batchRP nid h κ rp) s now vals cs fin sched st rm =
 -- lowered the room.  So the room is under the ceiling and this branch
 -- is dead.
 --
+-- THE SWEEP REACHES IT FROM THE SCHEDULE, WHICH THAT ARGUMENT MISSES.
+-- `subs-defer` does not subscribe its body: it schedules the body as
+-- an observable arriving at a `mergeAll` frame, and the arrival folds
+-- the raw path with `vouchAll`, which vouches nothing at an
+-- observable.  So `defer(of(5))` hands the flattener an unvouched
+-- value with no share in the program, the room is zero, and this
+-- branch is taken -- on 120 of the sweep's 500 cases.
+--
 -- IT ANSWERS THE SUBSCRIBE, NOT THE CONSUME, so the arm that reaches it
 -- wraps it exactly as it wraps a paid hop and the relation cannot
 -- tell the two apart.  Stated at full strength: a subscription of the

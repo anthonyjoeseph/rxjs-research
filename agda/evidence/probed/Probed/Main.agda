@@ -15,14 +15,14 @@
 -- nobody — so `using ()` is the correct and expected clause here.  It is not
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 --
--- WHY THE TREE IS EMPTY.  A probe expires with its target, and every
--- statement this tree was written against was a reading of a MEASURE —
--- a budget's grant, a frame's carried figure, a depth read off the
--- program text.  None of them is stateable now, so the rows would be
--- evidence about a machine that is gone and E2 expires every one of
--- them.  What replaced the measure has not been instantiated at
--- anything yet, which is the single largest unmanaged risk in the
--- repo and the next thing this tree is for.
+-- WHY THE TREE HOLDS ONE PROBE.  A probe expires with its target, and
+-- every statement this tree was written against before the room's two
+-- guards was a reading of a MEASURE — a budget's grant, a frame's
+-- carried figure, a depth read off the program text.  None of them is
+-- stateable now, so E2 expires every row written against one.  The
+-- guards' dead branches are the first statements of the descent that
+-- replaced the measure, and `Probed.Stuck-Branches` is what reaches
+-- them.
 --
 -- AND TWO FURTHER GENERATIONS EXPIRED THE SAME WAY, WHICH IS WHAT SAYS
 -- THE MECHANISM IS THE RIGHT ONE RATHER THAN AN OVERHEAD.  Six files
@@ -56,3 +56,4 @@ module Probed.Main where
 -- row and E6 refuses a `-- FORK:` that does not inhabit `Separates`, so
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
+open import Probed.Stuck-Branches using (hop-inner; hop-root; hop-defer; finish-empty)
