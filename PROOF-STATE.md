@@ -298,12 +298,12 @@ also: `reducible` — its inhabitation, and every member of its block: the conne
 
 ### The ledger
 
-- **`stuck-hop`** (Reducible) — FALSITY, `NO EVIDENCE`: the sweep reaches it on
-  120 of 500 cases, smallest `defer(of(5))`, so a flattened observable arrives
-  with no candidate at a room that cannot peel.
-- **`stuck-finish`** (Reducible) — FALSITY, `NO EVIDENCE`: a queue outgrowing
-  the budget its subscriber set; the sweep never reached it, and it aborts
-  before most programs could.
+- **`stuck-hop`** (Reducible) — FALSITY, `PROBED`: the sweep reaches it on 120
+  of 500 cases, smallest `defer(of(5))`, so a flattened observable arrives with
+  no candidate at a room that cannot peel.
+- **`stuck-finish`** (Reducible) — FALSITY, `PROBED`: a queue outgrowing the
+  budget its subscriber set; the sweep never reached it, and it aborts before
+  most programs could.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`

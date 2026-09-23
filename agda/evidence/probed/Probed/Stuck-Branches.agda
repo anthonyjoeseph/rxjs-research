@@ -32,12 +32,14 @@ module Probed.Stuck-Branches where
 -- TARGET: stuck-hop @f588e7
 -- TARGET: stuck-finish @d82f9d
 
+open import Data.Bool using (false)
 open import Data.List using ([]; _∷_)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (z≤n)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_)
 open import Data.Unit using (⊤; tt)
+open import Data.Vec using () renaming ([] to []ᵛ)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Probed.Apparatus using (Confirms)
@@ -50,7 +52,7 @@ open import Rx.Evaluator.Domain using (subs-of; subs-defer; fold-root; fold-step
 open import Rx.Evaluator.Reducible using (stuck-hop; stuck-finish)
 
 Γ₀ : Ctx 0
-Γ₀ = []
+Γ₀ = []ᵛ
 
 prog : Closed Γ₀ natᵗ
 prog = deferᵉ (ofᵉ (nat̂ 5 ∷ []))
@@ -74,7 +76,7 @@ five = [] , ofᵉ (nat̂ 5 ∷ []) , []ᵉ
 later : Val Γ₀ (obs natᵗ)
 later = [] , prog , []ᵉ
 
-hop-inner : Confirms (stuck-hop {e = prog} {m = 0} {S = ⊤} five
+hop-inner : Confirms (stuck-hop {e = prog} {m = 0} {lo = 0} {S = ⊤} five
               (from-inner mergeAllᵒ 0 1 ↠[ ≤-refl ] root) 1 tt sched₀ st₁
               z≤n (λ ()))
 hop-inner =
@@ -83,15 +85,15 @@ hop-inner =
          fold-root))
   , tt
 
-hop-root : Confirms (stuck-hop {e = prog} {m = 0} {S = ⊤} five root 0 tt
+hop-root : Confirms (stuck-hop {e = prog} {m = 0} {lo = 0} {S = ⊤} five root 0 tt
              sched₀ st₀ z≤n (λ ()))
 hop-root = (_ , subs-of fold-root) , tt
 
-hop-defer : Confirms (stuck-hop {e = prog} {m = 0} {S = ⊤} later
+hop-defer : Confirms (stuck-hop {e = prog} {m = 0} {lo = 0} {S = ⊤} later
               (from-inner mergeAllᵒ 0 1 ↠[ ≤-refl ] root) 1 tt sched₀ st₁
               z≤n (λ ()))
 hop-defer = (_ , subs-defer refl refl refl refl) , tt
 
-finish-empty : Confirms (stuck-finish {e = prog} {m = 0} {S = ⊤} 0 root 1 tt
+finish-empty : Confirms (stuck-finish {e = prog} {m = 0} {lo = 0} {S = ⊤} 0 root 1 tt
                  sched₀ st₁ nothing 1 [] false z≤n (λ ()))
 finish-empty = (_ , drain-spent) , tt
