@@ -201,7 +201,18 @@ jobs:
 
       - name: make gate
         # The profile is read off this log: per-definition times, after the tower.
-        run: make gate AGDA_PROFILE=--profile=definitions
+        #
+        # AND MEMORY IS READ OFF IT TOO, because a runner that runs out is
+        # killed from outside: the log just stops at "the runner has
+        # received a shutdown signal", and no later step runs to say why.
+        # A line every 30 s on this step's own output survives the kill,
+        # the way the rest of the log does. It never touches what the gate
+        # checks.
+        run: |
+          ( while sleep 30; do
+              echo "mem: $(free -m | awk 'NR==2{print $3"/"$2" MB used"} NR==3{print "swap "$3"/"$2" MB"}' | paste -sd' ') top: $(ps -eo rss=,comm= --sort=-rss | head -1 | awk '{print $2" "int($1/1024)" MB"}')"
+            done ) &
+          make gate AGDA_PROFILE=--profile=definitions
 
   # THE SWEEP THE BUG CACHE EXISTS FOR. `make gate` runs the cache's EXISTING
   # rows and is green exactly when no KNOWN counterexample remains; nothing in
