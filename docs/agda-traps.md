@@ -28,6 +28,18 @@ error message actively misdirects. Read the entry before reasoning from the erro
   in it is in scope, suspect the BINDERS, not the pattern**; a one-letter rename decides
   it in one dev run.
 
+- **A `with` ON A TERM THAT RUNS THE EVALUATOR MAKES THE TYPECHECKER RUN IT, AND THE
+  FAILURE IS AN OUT-OF-MEMORY WITH NO ERROR AT ALL.** Abstracting a `with` head normalises
+  it, and a head like `agrees c` — a whole `evaluate↓` over a variable case — unfolds the
+  evaluator symbolically once nothing on the path is a postulate. Nothing names the
+  clause: the module's `Checking` line is the last output, the heap climbs, and the
+  process is killed from outside. Worked instance: the bug cache's runner, where a `with`
+  on `wellFormed c` alone checked at once and one on `agrees c` alone filled a 6 GB heap;
+  the same verdicts matched in a helper function checked in seconds. **Match the result
+  in a helper, or use the non-dependent eliminator**, as `CLI.Main` already does with
+  `maybe′` for the same reason. To find the clause, check under a heap cap
+  (`agda +RTS -M4G -RTS`) so it fails fast instead of swapping, and bisect by definition.
+
 - **A `with` INSIDE A CYCLE LOSES A MATCHED ACCESSIBILITY'S ORDER, AND THE ERROR NAMES
   EVERY MEMBER OF THE LOOP.** A clause matching `(acc rs)` hands its with-functions the
   FIELD `rs`, so a call in the with body re-applying `acc rs` reads as unrelated to the

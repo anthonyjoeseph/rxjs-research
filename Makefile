@@ -1,8 +1,15 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-run unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
 export LANG := C.UTF-8
+
+# Every source a compiled runner can depend on: its file target is stale
+# exactly when one of these is newer than the binary.  Defined up here because
+# a PREREQUISITE list expands as the rule is read, so a definition below its
+# first use leaves that rule depending on nothing.
+AGDA_SRC := $(shell find agda/src -name '*.agda')
+ORACLE_BIN := agda/_oracle/_cli
 
 # ─────────────────────────────────────────────────────────────────────────
 # THE AGDA INVOCATION — ONE DEFINITION, USED BY EVERY TARGET, AND BY
@@ -108,7 +115,7 @@ help:
 	@echo "                  changed set is light-checkable, the full one when it"
 	@echo "                  is not, and prints which and why"
 	@echo "  gate-heavy     the tower, forced: gate-light's cheap half plus every"
-	@echo "                  module, the refutations and the bug cache.  Many"
+	@echo "                  module, the refutations and the two runners.  Many"
 	@echo "                  minutes; stamps the commit the drift check counts from"
 	@echo "  postulates    every postulate in agda/src by name — the work ledger"
 	@echo "  find          SEARCH FIRST, made cheap: search the declared TYPE of"
@@ -165,6 +172,7 @@ help:
 	@echo "                  make bg-wait T=gate   /   make bg-wait T=gate-heavy I=90"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
+	@echo "  oracle-key    print the oracle build's cache key (its runners' cone)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
 	@echo "                  make oracle                   (full seed sweep)"
 	@echo "                  make oracle ARGS='--seed 1'   (ONE seed only)"
@@ -226,6 +234,12 @@ agda-dev-selftest:
 # so nothing else in the build would ever notice it rotting.  This target is
 # what makes its invariant enforceable rather than remembered.
 #
+# IT RUNS IN THE ORACLE JOB, FROM THE ORACLE'S OWN BUILD.  It checks the
+# evaluator, not the proof, so it runs beside the sweep and on the same
+# binary tree -- the one built with termination checking off (see
+# `oracle-tree`).  The gate still LINKS its own copy (`bug-cache-build`), which
+# is what keeps the runner compiling under the full check.
+#
 # THE CORPUS IS RUN, NOT TYPECHECKED, and the verdict comes back as text
 # because `CLI.IO` has no exit status to hand back -- stdin and stdout are its
 # whole FFI surface.  So this demands the summary line BEFORE refusing any FAIL
@@ -258,9 +272,15 @@ bug-cache: stripped
 	 fi; \
 	 $(MAKE) --no-print-directory bug-cache-run
 
-bug-cache-run: stripped
+agda/_cli/Bug-Cache: $(AGDA_SRC)
+	@$(MAKE) --no-print-directory stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/Implementation/Unit-Test/Bug-Cache.agda)
-	@out=$$(agda/_cli/Bug-Cache); printf '%s\n' "$$out"; \
+	@touch $@
+
+bug-cache-build: agda/_cli/Bug-Cache
+
+bug-cache-run: $(ORACLE_BIN)/Bug-Cache
+	@out=$$($(ORACLE_BIN)/Bug-Cache); printf '%s\n' "$$out"; \
 	 printf '%s\n' "$$out" | grep -q '^bug-cache: ran ' \
 	   || { echo "bug-cache: the runner printed no summary line" >&2; exit 1; }; \
 	 if printf '%s\n' "$$out" | grep -q '^bug-cache: FAIL '; then \
@@ -1246,7 +1266,7 @@ gate-heavy: stripped
 	 [ "$$st" -eq 0 ] || { scripts/notify.py "RED (the tower)"; exit 1; }
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory probed
-	@$(MAKE) --no-print-directory bug-cache
+	@$(MAKE) --no-print-directory cli-build bug-cache-build
 	@scripts/dev-changed.py --stamp
 	@echo "gate-heavy: ALL GREEN"
 	@scripts/notify.py "GREEN (heavy)"
@@ -1526,8 +1546,40 @@ formers-selftest:
 	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda sweep's REACH is held to the map in both directions with a token boundary that a substring scan would cross, and that reach composes rather than unions -- the harness root counts, an undrawn elaboration arm does not, a postulated one does not, and a helper the arms reach does, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
 	  exit $$fail
 
-cli-build: stripped
+# A FILE TARGET, SO ONE BUILD SERVES EVERY RUN AFTER IT -- one local build
+# serves every corpus file, and the oracle's targets below are built the same way.
+# A phony build re-entered Agda each time to load the whole tower's
+# interfaces and find nothing to do.  Any source edit is newer than the
+# binary and rebuilds it; the `touch` is owed because a compile that found
+# nothing stale leaves the binary's old mtime behind.
+agda/_cli/Main: $(AGDA_SRC)
+	@$(MAKE) --no-print-directory stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)
+	@touch $@
+
+cli-build: agda/_cli/Main
+
+# THE ORACLE'S OWN BUILD: the runners' import cone, copied out of the mirror
+# with termination checking off, in a tree with its own `_build` so neither
+# build ever invalidates the other's interfaces.  Why each of those, and why
+# the cone is also the cache key: scripts/oracle-mirror.py.  CI caches the two
+# BINARIES under that key, so an edit outside the cone -- the whole proof --
+# never rebuilds them.
+oracle-tree: stripped
+	@scripts/oracle-mirror.py --sync
+
+oracle-key: stripped
+	@scripts/oracle-mirror.py --key
+
+$(ORACLE_BIN)/Main: $(AGDA_SRC) scripts/oracle-mirror.py
+	@$(MAKE) --no-print-directory oracle-tree
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/Main.agda
+	@touch $@
+
+$(ORACLE_BIN)/Bug-Cache: $(AGDA_SRC) scripts/oracle-mirror.py
+	@$(MAKE) --no-print-directory oracle-tree
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/Implementation/Unit-Test/Bug-Cache.agda
+	@touch $@
 
 # ITS OWN CI JOB RATHER THAN A STEP OF THE GATE, so a divergence reports as
 # itself rather than as a red tower; and it is absent from GATE_CHEAP for
@@ -1547,8 +1599,8 @@ cli-build: stripped
 # never by shrinking the corpus, relaxing the comparison, or excluding a
 # shape.  The draw holds its own YIELD for exactly that reason, so a corpus
 # that stopped emitting is red rather than quietly vacuous.
-oracle: cli-build
-	cd typescript && npm run oracle -- $(ARGS)
+oracle: $(ORACLE_BIN)/Main
+	cd typescript && AGDA_CLI_BIN=$(CURDIR)/$(ORACLE_BIN)/Main npm run oracle -- $(ARGS)
 
 # THE PINNED ROWS, WHICH THE SWEEP DOES NOT GUARD.  A case is an OFFSET
 # into a deterministic draw, so a generator edit moves every one of them
@@ -1561,10 +1613,10 @@ oracle: cli-build
 # carry no comment, so the FILENAME says what the rows are for and one
 # file holds one finding.  `refuseDuplicates` refuses a row pinned twice,
 # which is what keeps a count read off this directory honest.
-oracle-pinned: cli-build
+oracle-pinned: $(ORACLE_BIN)/Main
 	@for f in typescript/cases/*.ndjson; do \
 	  echo "== $$f"; \
-	  (cd typescript && npm run --silent oracle -- --cases "../$$f") || exit 1; \
+	  (cd typescript && AGDA_CLI_BIN=$(CURDIR)/$(ORACLE_BIN)/Main npm run --silent oracle -- --cases "../$$f") || exit 1; \
 	done
 
 qc-build: stripped

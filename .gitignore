@@ -60,3 +60,4 @@ agda/_stripped-comments/
 # the ntfy topic is an ADDRESS, not config: anyone holding it can read the
 # gate notifications, so it stays out of the tree
 .ntfy-topic
+agda/_oracle/

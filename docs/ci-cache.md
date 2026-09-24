@@ -30,7 +30,7 @@ CATEGORIES; it is gitignored, so CI never has one and `make gate` always takes
 the full heavy path. The interface cache is a different thing entirely: every
 check still runs, every file is still considered, and Agda re-verifies each
 module's validity key itself. So **"CI takes the heavy path" explains why
-`refuted`, `probed` and the bug cache also run — it does NOT explain a slow
+`refuted`, `probed` and the two runners' builds also run — it does NOT explain a slow
 tower.** A warm heavy gate skips unchanged modules. If the tower is slow, the
 cache is stale, and the routing is a red herring.
 
@@ -77,7 +77,7 @@ actually collects, to avoid a cost that a scheduled job removes for free.
 
 ## The second cache: MAlonzo objects, and why its key is the TOOLCHAIN
 
-`make gate` runs the bug cache, which is a real GHC compile — the Agda backend
+`make gate` compiles the CLI and the bug-cache runner, each a real GHC compile — the Agda backend
 emits MAlonzo Haskell for the whole transitive cone, stdlib included, and then
 links a binary. That directory was cached by nothing, so every run paid for all
 of it; the figure is in `typecheck-performance-numbers.md` under *The other
@@ -108,3 +108,21 @@ Safety is the same argument as the interface cache one section up: GHC
 re-verifies every module's recompilation condition against the `.hs` Agda has
 just written, so a stale or absent entry costs a rebuild and can never turn a
 check that should fail into one that passes.
+
+## The third cache: the oracle's binaries, and why its key is the CONE
+
+The oracle job shares nothing with the gate. It builds its own two runners from
+its own tree (`make oracle-tree`: the runners' import cone, copied out of the
+stripped mirror with termination checking off), and caches the **linked
+binaries** rather than anything they were built from. That is the opposite of
+the MAlonzo rule above, for the opposite reason: there the binaries relink on
+every run anyway, while here a hit skips Agda altogether — the job does not
+even install it.
+
+**The key is `make oracle-key`: a hash of the cone's STRIPPED sources**, plus
+`scripts/oracle-mirror.py` and `scripts/install-agda.sh`. So an edit outside
+the cone (the whole proof) or a comment edit leaves the binaries standing, and
+any edit that could change what the evaluator computes rebuilds them. There
+are **no restore-keys**: a near match is a binary of some other evaluator, and
+running it would report that evaluator's verdicts as this commit's. A miss is a
+cold build of the cone, stdlib included.

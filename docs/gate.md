@@ -13,7 +13,7 @@ So there are three targets, and **`gate` is the one you type** — it routes:
 | --- | --- | --- |
 | `gate` | asks for the verdict, then takes the light path or the heavy one, and says which and why | either of the below |
 | `gate-light` | every cheap check, plus a real dev check of each module this tree has touched. Red when the heavy path is owed | seconds, plus one dev pass per changed module |
-| `gate-heavy` | the cheap checks, the full tower, the refutations, the bug cache — and stamps the commit | many minutes |
+| `gate-heavy` | the cheap checks, the full tower, the refutations, the CLI and bug-cache runners compiled — and stamps the commit | many minutes |
 
 **`gate` routing is the whole point.** If the expensive target kept the
 plainest name, every session would reach for the tower by default, whatever a
@@ -206,9 +206,12 @@ not checked. `DEPS=1` dev-checks the cone too, where its members have no
 multi-member block. (Cross-checked on one module: the tool reported 10 consumer
 modules and the subsequent full gate spent its time on 11.)
 
-The second thing it does not check: `bug-cache` depends on `agda/src`, so
-running it would rebuild the cone the light gate is avoiding. It belongs to the
-merge gate.
+The second thing it does not check: the two runners depend on `agda/src`, so
+building them would rebuild the cone the light gate is avoiding. The heavy gate
+compiles them, which proves they still link under the full check; it runs
+neither. CI's oracle job builds its OWN pair, with termination checking off, and
+runs the bug cache beside the sweep, since what it checks is the evaluator
+rather than the proof.
 
 `refuted` and `probed` depend on `agda/src` the same way, and are handled the
 other way round — the light gate runs whichever one the changed set touched.

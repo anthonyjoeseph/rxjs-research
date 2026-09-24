@@ -13,7 +13,7 @@ name: Gate
 # there is never a `.gate-heavy-stamp` (it's gitignored — local dev-loop
 # state only), so `make gate` always finds itself in the "cold-cache case"
 # and takes the full `gate-heavy` path: every cheap check, the whole Agda
-# tower, refuted, probed, and the bug cache. That is the point — CI always
+# tower, refuted, probed, and the two compiled runners. That is the point — CI always
 # gets the strong guarantee, never the light-gate bet on unchanged consumers.
 
 on:
@@ -167,7 +167,7 @@ jobs:
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
 
-      # `make gate` runs the bug cache, which is a GHC compile of the whole
+      # `make gate` compiles the CLI and the bug cache, each a GHC build of the whole
       # MAlonzo cone, stdlib included -- a large fraction of a WARM gate, paid
       # in full every run because this directory was cached by nothing.
       # Restoring it pays because Agda's backend is incremental: it rewrites
@@ -356,10 +356,12 @@ jobs:
   # the plain tree and its evaluator claim rests on this job.
   #
   # IT IS ITS OWN JOB RATHER THAN A STEP OF `gate`, so a divergence reports
-  # as itself rather than as a red tower. It WAITS on the gate all the same:
-  # linking the CLI compiles the evaluator, which is the tower, and the gate
-  # is what saves this commit's interfaces. Run beside it, this job rebuilds
-  # the tower cold from an older commit's cache inside its own budget.
+  # as itself rather than as a red tower -- and it shares NOTHING with the
+  # gate, so it runs beside it rather than after it. It builds its own two
+  # runners, with termination checking off, from its own tree (`make
+  # oracle-tree`), and caches the BINARIES under a key that hashes only the
+  # runners' import cone: an edit to the proof leaves them standing, and so
+  # does any comment.
   #
   # A CASE GETS TWO MINUTES, not the harness's ten-second default. A crash is
   # red, and the deep flattener nests the sweep draws take tens of seconds on
@@ -372,7 +374,6 @@ jobs:
   # a corpus row, and not by running the draw without the replay, which would
   # put a green light on exactly the shape a random draw is thin on.
   oracle:
-    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -391,26 +392,46 @@ jobs:
       - name: Install TypeScript deps
         run: cd typescript && npm ci
 
-      - name: Set up Agda
-        uses: ./.github/actions/agda-toolchain
+      # THE KEY IS THE CONE, READ OFF THE STRIPPED MIRROR: the runners'
+      # transitive imports, the script that computes them, and the toolchain.
+      # No restore-keys -- a near match is a binary of some other evaluator.
+      - name: Compute the runners' cache key
+        id: key
+        run: echo "key=$(make --no-print-directory oracle-key)" >> "$GITHUB_OUTPUT"
 
-      # RESTORE-ONLY, as in the sweep: the gate job owns these keys, and a
-      # miss costs a cold build of the cone under `CLI/Main.agda`.
-      - name: Restore Agda interfaces
+      - name: Restore the compiled runners
+        id: runners
         uses: actions/cache/restore@v4
         with:
           path: |
-            agda/_stripped-comments/_build
-            agda/_stripped-comments/evidence/_build
-          key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            agda-interfaces-${{ runner.os }}-
+            agda/_oracle/_cli/Main
+            agda/_oracle/_cli/Bug-Cache
+          key: agda-oracle-runners-${{ runner.os }}-${{ steps.key.outputs.key }}
 
-      - name: Restore compiled MAlonzo objects
-        uses: actions/cache/restore@v4
+      # A restored binary is OLDER than the fresh checkout, so without this
+      # `make` would rebuild what the key has just said is current.
+      - name: Mark the restored runners current
+        if: steps.runners.outputs.cache-hit == 'true'
+        run: touch agda/_oracle/_cli/Main agda/_oracle/_cli/Bug-Cache
+
+      - name: Set up Agda
+        if: steps.runners.outputs.cache-hit != 'true'
+        uses: ./.github/actions/agda-toolchain
+
+      - name: Build the runners
+        if: steps.runners.outputs.cache-hit != 'true'
+        run: make agda/_oracle/_cli/Main agda/_oracle/_cli/Bug-Cache
+
+      # SAVED AS SOON AS THEY ARE BUILT, not at the job's end, so a red sweep
+      # still leaves the next run a cache hit.
+      - name: Save the compiled runners
+        if: steps.runners.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
         with:
-          path: agda/_cli/MAlonzo
-          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+          path: |
+            agda/_oracle/_cli/Main
+            agda/_oracle/_cli/Bug-Cache
+          key: agda-oracle-runners-${{ runner.os }}-${{ steps.key.outputs.key }}
 
       # The corpus is drawn by rejection and the draw holds its own YIELD, so
       # this is red on a divergence, on a corpus that came up short of
@@ -433,3 +454,11 @@ jobs:
             echo "== ${f#typescript/}"
             make oracle ARGS="--cases ${f#typescript/}"
           done
+
+      # THE KNOWN COUNTEREXAMPLES, which check the evaluator rather than the
+      # proof, so they run here beside the sweep. Green exactly when no known
+      # counterexample remains. LAST, and on `always()`, so it runs whatever
+      # the sweep found and a red here never hides the sweep.
+      - name: make bug-cache
+        if: always() && !cancelled()
+        run: make bug-cache

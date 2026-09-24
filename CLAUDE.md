@@ -36,7 +36,6 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `recursion-cover` | a cycle in the evaluator's call graph that no declared descent covers — so it names a termination failure in SECONDS, before any tower runs | [docs/recursion-cover.md](docs/recursion-cover.md) |
 | the tower (inline in `gate-heavy`) | **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` / `probed` | the evidence trees not typechecking | EVIDENCE.md |
-| `bug-cache` | a known impl counterexample regressing. `Unit-Test.agda` is off Main, so nothing else would notice | [docs/bug-cache.md](docs/bug-cache.md) |
 
 Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`, `make strip-selftest`, `make agda-dev-selftest`.
 
@@ -385,6 +384,6 @@ Not for proof work, tooling or documentation.
 
 Capture an implementation bug immediately as a **row of the corpus** in `agda/src/Implementation/Unit-Test.agda` — a program, not a claim about one. Dead simple: a wall of little entries, no fancy names, no abstraction. **Append-only**, and the invariant is **`make bug-cache` green ⟺ no known counterexample remains**.
 
-The run happens in a BINARY, not the typechecker — a row used to be a `refl` over a whole `evaluate` run, so an append-only corpus charged the gate forever. Corollary: a green row is checked by the GHC backend and the FFI, so **no proof may ever depend on the cache**. Delete the module once `The-Proof.agda` is discharged. → [docs/bug-cache.md](docs/bug-cache.md)
+The run happens in a BINARY, not the typechecker — a row used to be a `refl` over a whole `evaluate` run, so an append-only corpus charged the gate forever. **It runs in CI's oracle job, not in `make gate`**: it checks the evaluator rather than the proof, so it runs beside the sweep, from the oracle's own build (termination checking off, cached as binaries keyed on the runners' import cone). Corollary: a green row is checked by the GHC backend and the FFI, so **no proof may ever depend on the cache**. Delete the module once `The-Proof.agda` is discharged. → [docs/bug-cache.md](docs/bug-cache.md)
 
 A new "naive rx" operator to fix an Agda-impl bug is allowed and encouraged when it is the best solution — but follow the port order: TypeScript first, as a proper rxjs-delegating, purely-functional operator.
