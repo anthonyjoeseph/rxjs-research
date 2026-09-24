@@ -1826,6 +1826,12 @@ Spends sched st sched′ st′ =
 --   reader, and through a one-lane merge handed a fresh inner, both in
 --   the share's def and at the root, from stores the builder reached.
 --   Not a switch cutting a sibling, nor the unsupported formers.
+--   BLOCKED here: a switch cuts only a sibling still registered when the
+--   next inner arrives.  A fold that connects nothing meets no such
+--   sibling without a scripted slot: a cold inner completes inside its
+--   own subscribe, a finished share completes a joiner at once, and a
+--   share still mid-emission is one whose connect is running, which
+--   spends.  The scripted arm is postulated, so no probe reaches it.
 postulate
   raw-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {κ : Path Γ lo u t}
                {now vals fin sched st out sched′ st′}
