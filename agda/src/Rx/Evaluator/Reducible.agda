@@ -311,15 +311,15 @@ rawConsume {u = u} ac le aM op nid κ now o sched st rm so nd
                           _ (lookup-set nid _ (EvalSt.nodes st)) (<-wellFounded _) ≤-refl
           in _ , consume-exhaust-sub c (inner refl d)
                , inner-after exhaustᵒ nid κ sched d (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
-...     | u-merge lim act q od with hasRoom lim act in eqr
-...       | false = _ , consume-all-enqueue c eqr , sub-ot (λ r∈ → r∈) ≤-refl so , sub-on (λ r∈ → r∈) ≤-refl nd
-...       | true  =
+...     | u-merge lim act q od = by-bool (hasRoom lim act)
+          (λ eqr → _ , consume-all-enqueue c eqr , sub-ot (λ r∈ → r∈) ≤-refl so , sub-on (λ r∈ → r∈) ≤-refl nd)
+          (λ eqr →
           let (r , d) = rawInner ac le aM mergeAllᵒ nid κ now o sched
                           (record st { nodes = setNode nid (mergeAll-st lim (suc act) q od) (EvalSt.nodes st) }) rm
                           (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
                           _ (lookup-set nid _ (EvalSt.nodes st)) (<-wellFounded _) ≤-refl
           in _ , consume-all-sub c eqr (inner refl d)
-               , inner-after mergeAllᵒ nid κ sched d (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+               , inner-after mergeAllᵒ nid κ sched d (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd))
 
 -- the outer's values consumed raw, in walk order
 rawThru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
@@ -1167,40 +1167,39 @@ red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ pre rp s now sched st rm
 -- registers the trigger's row, inserts the index, and subscribes the
 -- def under the fallen sink; what comes back is the fall at the state
 -- the def left, which is all a fallen answer owes.
-red-input-shared {n = n} i d {okd} aI ρ κ below pre rp s now sched slEq st aM rm h
-    with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
-... | true =
-      let c  = call now [] (ofColumn κ pre []) true sched st rm h
-          an = apply rp s c
-      in _ , subs-shared {κ = κ} {below = below} slEq (slot-spent {κ = κ} {below = below} doneEq (der an))
-         , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
-red-input-shared {n = n} {lo = lo} i d {okd} aI ρ κ below pre rp s now sched slEq st aM rm h
-    | false with memberSource (toℕ i) (EvalSt.connectedShares st) in connEq
-...   | true =
+red-input-shared {n = n} {lo = lo} i d {okd} aI ρ κ below pre rp s now sched slEq st aM rm h =
+  by-bool (memberSource (toℕ i) (EvalSt.completedSources st))
+    (λ doneEq → by-bool (memberSource (toℕ i) (EvalSt.connectedShares st))
+      (λ connEq →
+        let rid    = freshId regᵏ (Sched.mint sched)
+            sched′ = record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
+            st′    = register rid (atSlot i) (lowerFloor below κ)
+                       (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
+            fell′  = ≤-trans (unconn-insert (Sched.slots sched) (EvalSt.connectedShares st) i slEq connEq) rm
+            (r , dv , tr , hl , _) =
+              redExpAcc d []ᵉ tt (toℕ i) okd aI (<-wellFounded (gsizeᵉ d)) aM
+                (share-sink i ≤-refl) fallen
+                (dropS (fallenRP (<-wellFounded (n ∸ toℕ i)) ≤-refl aM (share-sink i ≤-refl)))
+                tt now sched′ st′ (<⇒≤ fell′) (grounded fell′ (sink-sound i ≤-refl (ruled (row-sound i below κ sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (sub-ot (λ r∈ → r∈) ≤-refl (sounds h))))))
+        in r , subs-shared {κ = κ} {below = below} slEq
+                (slot-connect {κ = κ} {below = below} doneEq connEq (connect {κ = κ} {below = below} refl dv))
+          , fellᵗ (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM κ)) s
+          , grounded
+              (ground (subst (λ p → PreHolds _ (share-sink i ≤-refl) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+                        (fallen-stays (<-wellFounded (n ∸ toℕ i)) ≤-refl aM (share-sink i ≤-refl) tr) hl))
+              (subscribe-kept dv (sink-sound i ≤-refl (ruled (row-sound i below κ sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (sub-ot (λ r∈ → r∈) ≤-refl (sounds h))))) κ (row-sound i below κ sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (sub-ot (λ r∈ → r∈) ≤-refl (sounds h))) (λ k ()))
+          , tt)
+      (λ connEq →
         _ , subs-shared {κ = κ} {below = below} slEq (slot-join {κ = κ} {below = below} doneEq connEq refl)
         , []ᵗ , holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x) (row-sound i below κ sched st) h
         , kept-step κ pre (pres (λ _ _ → refl)) ≤-refl
             (ends-register {κ = κ} {sched = sched} {st = st} (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ)
-               (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on)))
-...   | false
-      with (let rid    = freshId regᵏ (Sched.mint sched)
-                sched′ = record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
-                st′    = register rid (atSlot i) (lowerFloor below κ)
-                           (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
-                fell′  = ≤-trans (unconn-insert (Sched.slots sched) (EvalSt.connectedShares st) i slEq connEq) rm
-            in redExpAcc d []ᵉ tt (toℕ i) okd aI (<-wellFounded (gsizeᵉ d)) aM
-                 (share-sink i ≤-refl) fallen
-                 (dropS (fallenRP (<-wellFounded (n ∸ toℕ i)) ≤-refl aM (share-sink i ≤-refl)))
-                 tt now sched′ st′ (<⇒≤ fell′) (grounded fell′ (sink-sound i ≤-refl (ruled (row-sound i below κ sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (sub-ot (λ r∈ → r∈) ≤-refl (sounds h)))))))
-...     | (r , dv , tr , hl , _) =
-          r , subs-shared {κ = κ} {below = below} slEq
-                (slot-connect {κ = κ} {below = below} doneEq connEq (connect {κ = κ} {below = below} refl dv))
-          , fellᵗ (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM κ)) s
-          , grounded
-              (ground (subst (λ p → PreHolds _ (share-sink i ≤-refl) p _ _)
-                        (fallen-stays (<-wellFounded (n ∸ toℕ i)) ≤-refl aM (share-sink i ≤-refl) tr) hl))
-              (subscribe-kept dv (sink-sound i ≤-refl (ruled (row-sound i below κ sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (sub-ot (λ r∈ → r∈) ≤-refl (sounds h))))) κ (row-sound i below κ sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (sub-ot (λ r∈ → r∈) ≤-refl (sounds h))) (λ k ()))
-          , tt
+               (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on)))))
+    (λ doneEq →
+      let c  = call now [] (ofColumn κ pre []) true sched st rm h
+          an = apply rp s c
+      in _ , subs-shared {κ = κ} {below = below} slEq (slot-spent {κ = κ} {below = below} doneEq (der an))
+         , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an)
 
 ------------------------------------------------------------------
 -- THE TERM FACE.
@@ -1244,31 +1243,26 @@ redTmAcc (sndᵗ q) ρ rρ k ok aK (acc rs) aM =
 redTmAcc (inlᵗ x) ρ rρ k ok aK (acc rs) aM = redTmAcc x ρ rρ k ok aK (rs ≤-refl) aM
 redTmAcc (inrᵗ x) ρ rρ k ok aK (acc rs) aM = redTmAcc x ρ rρ k ok aK (rs ≤-refl) aM
 redTmAcc (caseᵗ sc l r) ρ rρ k ok aK (acc rs) aM
-  with ∧ˡ (inputsBelowᵗ k sc) (inputsBelowᵗ k l ∧ inputsBelowᵗ k r) ok
-     | ∧ʳ (inputsBelowᵗ k sc) (inputsBelowᵗ k l ∧ inputsBelowᵗ k r) ok
-... | oksc | rest
   with evalWith sc ρ
-     | redTmAcc sc ρ rρ k oksc aK
+     | redTmAcc sc ρ rρ k (∧ˡ (inputsBelowᵗ k sc) (inputsBelowᵗ k l ∧ inputsBelowᵗ k r) ok) aK
          (rs (s≤s (m≤m+n (gsizeᵗ sc) (gsizeᵗ l + gsizeᵗ r)))) aM
 ... | inj₁ x | q =
   redTmAcc l (x ∷ᵉ ρ) (q , rρ) k
-    (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest) aK
+    (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) (∧ʳ (inputsBelowᵗ k sc) (inputsBelowᵗ k l ∧ inputsBelowᵗ k r) ok)) aK
     (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ l) (gsizeᵗ r))
                       (m≤n+m (gsizeᵗ l + gsizeᵗ r) (gsizeᵗ sc))))) aM
 ... | inj₂ y | q =
   redTmAcc r (y ∷ᵉ ρ) (q , rρ) k
-    (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest) aK
+    (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) (∧ʳ (inputsBelowᵗ k sc) (inputsBelowᵗ k l ∧ inputsBelowᵗ k r) ok)) aK
     (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ r) (gsizeᵗ l))
                       (m≤n+m (gsizeᵗ l + gsizeᵗ r) (gsizeᵗ sc))))) aM
-redTmAcc (ifᵗ c x y) ρ rρ k ok aK (acc rs) aM
-  with ∧ʳ (inputsBelowᵗ k c) (inputsBelowᵗ k x ∧ inputsBelowᵗ k y) ok
-... | rest with evalWith c ρ
+redTmAcc (ifᵗ c x y) ρ rρ k ok aK (acc rs) aM with evalWith c ρ
 ... | true  =
-  redTmAcc x ρ rρ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗ k y) rest) aK
+  redTmAcc x ρ rρ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗ k y) (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵗ k x ∧ inputsBelowᵗ k y) ok)) aK
     (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ x) (gsizeᵗ y))
                       (m≤n+m (gsizeᵗ x + gsizeᵗ y) (gsizeᵗ c))))) aM
 ... | false =
-  redTmAcc y ρ rρ k (∧ʳ (inputsBelowᵗ k x) (inputsBelowᵗ k y) rest) aK
+  redTmAcc y ρ rρ k (∧ʳ (inputsBelowᵗ k x) (inputsBelowᵗ k y) (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵗ k x ∧ inputsBelowᵗ k y) ok)) aK
     (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ y) (gsizeᵗ x))
                       (m≤n+m (gsizeᵗ x + gsizeᵗ y) (gsizeᵗ c))))) aM
 redTmAcc (primᵗ add x)  ρ rρ k ok aK a aM = tt
