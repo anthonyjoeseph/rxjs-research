@@ -72,9 +72,8 @@ open import Rx.Evaluator using (Sched; EvalSt; RegRow; Path; Frame; root; share-
   thru-outer; mergeAllᵒ; sched-init; st-init)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; stepFrame⇓; fold-step; subs-merge-all; sub-all; subs-of)
-open import Rx.Evaluator.Reducible using (reducible; rootRP; red-env; standing; rule; Sound; sound; grounded; rowEnd; endOf; ∨-T;
-  Distinct; rowDistinct;
-  step-kept; subscribe-kept; fold-kept)
+open import Rx.Evaluator.Reducible using (reducible; red-env)
+open import Rx.Evaluator.Reducible.Support using (rootRP; standing; rule; Sound; sound; grounded; rowEnd; endOf; ∨-T; Distinct; rowDistinct; step-kept; subscribe-kept; fold-kept)
 
 ------------------------------------------------------------------
 -- THE RULE, DECIDED AT A CONCRETE STORE.

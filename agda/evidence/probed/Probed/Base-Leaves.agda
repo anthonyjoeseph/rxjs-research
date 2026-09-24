@@ -72,9 +72,8 @@ open import Rx.Evaluator using (Sched; EvalSt; RegRow; NodeState; mergeAll-st; P
   thru-outer; mergeAllᵒ; pathHasNode; lookupNode; sched-init; st-init)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Unconn-Arith using (unconn)
-open import Rx.Evaluator.Reducible using (reducible; rootRP; red-env; standing; Sound; sound; rule; grounded;
-  rowThrough; rowEnd; endOf; EndsAt; Kept; NodeOn; node-on; colsOf; waiting; ∨-T; rawFold; rawInner;
-  raw-kept; refill-spends)
+open import Rx.Evaluator.Reducible using (reducible; red-env; rawFold; rawInner)
+open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Sound; sound; rule; grounded; rowThrough; rowEnd; endOf; EndsAt; Kept; NodeOn; node-on; colsOf; waiting; ∨-T; raw-kept; refill-spends)
 
 ------------------------------------------------------------------
 -- `EndsAt`, DECIDED.

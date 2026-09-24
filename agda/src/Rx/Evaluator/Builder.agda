@@ -64,9 +64,8 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; Arrival; arrT
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible using (reducible; rawFold; rootRP; red-env; standing; Rule; rule; termini;
-  fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf;
-  sub-rule; sub-ot; fold-kept)
+open import Rx.Evaluator.Reducible using (reducible; rawFold; red-env)
+open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Rule; rule; termini; fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf; sub-rule; sub-ot; fold-kept)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.

@@ -248,9 +248,9 @@ agda-dev-selftest:
 # target says so on every run rather than printing a quiet pass.
 bug-cache: stripped
 	@leaves=$$(scripts/check-wiring.py --postulates 2>/dev/null \
-	   | grep -c '  Rx/Evaluator/Reducible.agda:' || true); \
+	   | grep -cE '  Rx/Evaluator/Reducible(\.agda|/)' || true); \
 	 if [ "$$leaves" -gt 0 ]; then \
-	   echo "bug-cache: SUSPENDED — Rx/Evaluator/Reducible.agda holds $$leaves live postulate leaves,"; \
+	   echo "bug-cache: SUSPENDED — Rx/Evaluator/Reducible{,/*}.agda hold $$leaves live postulate leaves,"; \
 	   echo "bug-cache: and the compiled runner extracts its stream from that candidate, so a reached"; \
 	   echo "bug-cache: leaf crashes MAlonzo.  'green ⟺ no known counterexample remains' is NOT"; \
 	   echo "bug-cache: enforced while this holds.  It resumes by itself when that count reaches zero."; \
