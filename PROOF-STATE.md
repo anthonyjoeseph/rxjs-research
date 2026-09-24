@@ -257,16 +257,16 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### Big picture tier roadmap
 
-- **GIVE THE RAW FOLD'S INNERS A GROUND, FLOOR INVARIANT FIRST.** The raw
-  fold runs with the room exactly at its ceiling, so an inner it subscribes
-  can stand on neither ground `Pre` has. Its header names the third: frames
-  stacked live over a raw base, which is the inner's exit frame folding the
-  rest of the path. It stands only if the base's fold never writes a stacked
-  frame's node. The floor argues it, but nothing in the state
-  records a node's floor, so that is the invariant to state first. The
-  budgeted drain and its lemma, a fold that connects nothing grows no
-  queue, both sit on this ground, and the body decides whether a share's
-  fan-out, the monster's own region, terminates without an outside counter.
+- **GIVE THE RAW FOLD'S INNERS A GROUND, TERMINUS FIELD FIRST.** An inner
+  the raw fold subscribes stands on neither ground `Pre` has; its header
+  names the third, frames stacked live over a raw base. That stands only if
+  the base's fold writes no stacked frame's node, which follows from ONE
+  TERMINUS PER NODE, stated there and clean on a swept corpus. The state
+  records no terminus: add the field to the invariant record, show every
+  step keeps it, then build the ground. The budgeted drain and its lemma,
+  a fold that connects nothing grows no queue, both sit on this ground,
+  and the body decides whether a share's fan-out, the monster's own
+  region, terminates without an outside counter.
 
 - **INSTANTIATE THE ARMS AT THE PROGRAM THAT GROWS A QUEUE.** No Tier 1 row
   has ever been instantiated. `mergeAll(1)` over a shared `of(1,2,3)` mapped

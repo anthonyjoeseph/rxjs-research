@@ -1546,6 +1546,16 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 -- state records no terminus, so the record field is owed with the
 -- ground.
 
+-- The invariant held on a swept corpus of 1.5M programs, run on the
+-- side branch's evaluator over this relation: at every frame step whose
+-- continuation fanned out or connected (4.4M fan-out, 107k connect), the
+-- frame's nodes came through the rest of the fold unchanged in shape and
+-- value, and every registry row through them ended at the frame's own
+-- terminus.  The same check fed the pre-step state at take's frame
+-- flagged 1.4k writes on 20k programs, so it can fire.  Steps with
+-- neither a fan-out nor a connect were not checked, and 63 deep
+-- recursive programs timed out uncovered.
+
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
 --   accessibility the peel does not hand out, and a fresh one is not
