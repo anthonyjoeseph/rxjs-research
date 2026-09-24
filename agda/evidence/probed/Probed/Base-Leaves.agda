@@ -12,12 +12,16 @@
 -- nodes it guards, listed before and after.  Which nodes it guards is
 -- decided by `endsᵇ`, which is sound and complete for `EndsAt`.
 --
--- Three programs.  `progR` merges, one lane at a time, two deferred
--- inners at the root.  `progS` reads a share whose def is that same
--- merge, from a merge of its own at the root, so the def runs raw and
--- its merge sits on a path ending at the share's sink.  `progW` is a
--- root switch over a take of a hot slot.
---
+-- `progR` merges, one lane at a time, two deferred inners at the root.
+-- `progS` reads a share whose def is that same merge, from a merge of
+-- its own at the root, so the def runs raw and its merge sits on a path
+-- ending at the share's sink.  The rest read a hot slot that registers
+-- and never speaks, which is what leaves a store holding live siblings:
+-- `progW` a root switch over a take of it, `progE` the same exhaust,
+-- `progB` a root merge of its batchSync, `progH` a root merge of two
+-- takes of it.  `progQ` reads, from a root switch re-subscribing on each
+-- value, a share whose def is a one-lane merge whose lane a take holds.
+
 -- LOAD-BEARING: `raw-kept` down the share's sink, which fans out to the
 -- reader.  It fails if the fan-out writes a node whose rows end at the
 -- sink -- the def's merge and its inners -- which is the one write the
@@ -28,38 +32,63 @@
 -- row pins that the fold cut something.  It fails if the cut or the
 -- subscribe after it writes the take node, which ends at the root where
 -- the path does and is off it.
+-- LOAD-BEARING: `raw-kept` through a root merge whose inner batches the
+-- hot slot, handed a fresh batched inner.  It fails if the fresh inner's
+-- batch node is minted over, or written into, the live one's.
+-- NEAR-DEGENERATE: `raw-kept` through a busy root exhaust.  The inner is
+-- refused, so it re-decides that a refusal writes nothing it guards.
 -- LOAD-BEARING: `raw-kept` through the def's merge, handed a fresh
 -- inner, and the same through the root merge in `progR`.  Each fails if
 -- subscribing the inner rewrites a sibling inner's node, which ends
 -- where the path does and is off it.
+
 -- LOAD-BEARING: `refill-spends` for a fresh inner of the def's merge,
 -- whose values fold to the sink and fan out.  It fails if that fan-out
 -- reaches the merge's own outer and queues onto it.
+-- LOAD-BEARING: `refill-spends` at `progQ`'s full lane, for a fresh
+-- inner whose value fans out to the switch, which subscribes the share
+-- again mid-emission; the row pins that it did.  It fails if the join
+-- re-runs the def's outer, which would queue the take onto the full lane.
 -- NEAR-DEGENERATE: `refill-spends` at `progR`'s root merge.  Nothing
 -- re-enters the outer there, so it re-decides that an inner's own run
 -- leaves its merge's queue alone.
---
+
 -- LOAD-BEARING: `fold-refill-spends` at the def's merge, an inner's
 -- exit frame finishing it: the finish drains the merge's queue and the
 -- value folds to the sink and fans out.  It fails if the fan-out queues
 -- onto the merge's own outer.
+-- LOAD-BEARING: the same at `progQ`'s full lane, the value fanning out
+-- to the re-subscribing switch.
 -- NEAR-DEGENERATE: the same at `progR`'s root merge, where nothing
 -- re-enters the outer.
 
+-- LOAD-BEARING: `fold-kept`, `step-kept` and `subscribe-kept` for
+-- `progH`'s merge handed a fresh take, asked at the first live take's
+-- own path, which shares the merge's node.  Each fails if the run writes
+-- a row through that node ending off the root, or a node at or past the
+-- counter onto the sibling's path.
+-- LOAD-BEARING: `fold-kept` for `progW`'s switch, asked at the path of
+-- the take it cuts.  It fails if the cut leaves a row through the take's
+-- node that the rule no longer admits.
+
 -- NOT COVERED: a queue refilled while an inner runs, which is the
 -- statement's whole risky region -- no program here re-enters a merge's
--- outer during one of its inners.  Nor an exhaust, a scan, a batchSync,
--- or a scripted slot's arrival -- `progW`'s slot only registers.
+-- outer during one of its inners; `progQ` re-enters the share above it,
+-- which is the nearest one gets.  Nor a scan, or a scripted slot's
+-- arrival -- every hot slot here only registers.
 module Probed.Base-Leaves where
 
 -- TARGET: raw-kept @2a5289
 -- TARGET: refill-spends @731051
 -- TARGET: fold-refill-spends @15a00a
+-- TARGET: step-kept @152c13
+-- TARGET: subscribe-kept @93c511
+-- TARGET: fold-kept @8401d5
 
 open import Data.Bool using (Bool; true; false; T; not; _∧_; _∨_; if_then_else_)
 open import Data.Bool.ListAction using (all)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Fin using (Fin; zero)
+open import Data.Fin using (Fin; zero; suc)
 open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
 open import Data.List using (List; []; _∷_; map; length)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -80,16 +109,19 @@ open import Relation.Nullary.Decidable using (⌊_⌋; toWitness; from-yes; from
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Probed.Apparatus using (Confirms)
-open import Probed.Rule-Kept using (sound?; toSound)
-open import Rx.Exp using (Ctx; Closed; Val; obs; natᵗ; ofᵉ; deferᵉ; mergeAllᵉ; switchAllᵉ; takeᵉ; input; strmᵗ; nat̂; []ᵉ; evalWith)
+open import Probed.Rule-Kept using (sound?; toSound; step-of; rowNodes)
+open import Rx.Exp using (Ctx; Closed; Val; obs; natᵗ; _×ᵗ_; listᵗ; ofᵉ; deferᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; takeᵉ;
+  batchSyncᵉ; mapᵉ; input; strmᵗ; nat̂; []ᵉ; evalWith)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Prim using (hot)
 open import Rx.Evaluator using (Sched; EvalSt; RegRow; NodeState; mergeAll-st; Path; root; share-sink; _↠[_]_;
-  thru-outer; from-inner; mergeAllᵒ; switchᵒ; switch-st; pathHasNode; lookupNode; sched-init; st-init)
+  thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; switch-st; exhaust-st; atSlot; pathHasNode; lookupNode;
+  sched-init; st-init)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Unconn-Arith using (unconn)
 open import Rx.Evaluator.Reducible using (reducible; red-env; rawFold; rawInner)
-open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Sound; sound; rule; grounded; rowThrough; rowEnd; endOf; EndsAt; Kept; NodeOn; node-on; colsOf; waiting; ∨-T; raw-kept; refill-spends; fold-refill-spends)
+open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Sound; sound; rule; grounded; rowThrough; rowEnd; endOf; EndsAt; Kept; NodeOn; node-on; colsOf; waiting; ∨-T; bumpNode;
+  raw-kept; refill-spends; fold-refill-spends; fold-kept; subscribe-kept; step-kept)
 
 ------------------------------------------------------------------
 -- `EndsAt`, DECIDED.
@@ -319,7 +351,7 @@ _ : Confirms (raw-kept (proj₂ foldS) (toSound (from-yes (sound? κS (nodeCt sc
                (from-no (unconn (Sched.slots schedS′) (EvalSt.connectedShares stS′)
                          <? unconn (Sched.slots schedS) (EvalSt.connectedShares stS)))
                {pfs = colsOf κS stS})
-_ = keptOf κS schedS stS stS′ {sched′ = schedS′} (from-yes (nodeCt schedS ≤? nodeCt schedS′)) refl tt₀
+_ = keptOf κS schedS stS stS′ {pfs = colsOf κS stS} {sched′ = schedS′} (from-yes (nodeCt schedS ≤? nodeCt schedS′)) refl tt₀
 
 -- the root merge, handed a fresh inner
 foldR = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κR 0 (innerR ∷ []) false schedR stR ≤-refl
@@ -333,7 +365,7 @@ _ : Confirms (raw-kept (proj₂ foldR) (toSound (from-yes (sound? κR (nodeCt sc
                (from-no (unconn (Sched.slots schedR′) (EvalSt.connectedShares stR′)
                          <? unconn (Sched.slots schedR) (EvalSt.connectedShares stR)))
                {pfs = colsOf κR stR})
-_ = keptOf κR schedR stR stR′ {sched′ = schedR′} (from-yes (nodeCt schedR ≤? nodeCt schedR′)) refl tt₀
+_ = keptOf κR schedR stR stR′ {pfs = colsOf κR stR} {sched′ = schedR′} (from-yes (nodeCt schedR ≤? nodeCt schedR′)) refl tt₀
 
 -- a root switch whose inner reads a hot slot that never speaks, so the
 -- store the run leaves still holds that inner, and its take node, live
@@ -385,7 +417,176 @@ _ : Confirms (raw-kept (proj₂ foldW) (toSound (from-yes (sound? κW (nodeCt sc
                (from-no (unconn (Sched.slots schedW′) (EvalSt.connectedShares stW′)
                          <? unconn (Sched.slots schedW) (EvalSt.connectedShares stW)))
                {pfs = colsOf κW stW})
-_ = keptOf κW schedW stW stW′ {sched′ = schedW′} (from-yes (nodeCt schedW ≤? nodeCt schedW′)) refl tt₀
+_ = keptOf κW schedW stW stW′ {pfs = colsOf κW stW} {sched′ = schedW′} (from-yes (nodeCt schedW ≤? nodeCt schedW′)) refl tt₀
+
+-- a root exhaust whose inner reads the hot slot, so it is busy when a
+-- fresh inner arrives and refuses it
+progE : Closed Γ₂ natᵗ
+progE = exhaustAllᵉ (ofᵉ (strmᵗ (takeᵉ (nat̂ 5) (input zero)) ∷ []))
+
+runE = let aM = <-wellFounded _ in
+       reducible aM progE []ᵉ (red-env {Γ = Γ₂} aM []ᵉ) (root {lo = 1}) (standing tt) rootRP tt 0
+         (sched-init progE slots₂) (st-init progE) ≤-refl
+         (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt))
+
+schedE : Sched Γ₂
+schedE = proj₁ (proj₂ (proj₁ runE))
+
+stE : EvalSt progE
+stE = proj₂ (proj₂ (proj₁ runE))
+
+busy : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Bool
+busy (just (exhaust-st true _)) = true
+busy _                          = false
+
+nidE : ℕ
+nidE = pick (λ k → busy (lookupNode k (EvalSt.nodes stE))) (below (nodeCt schedE))
+
+κE : Path Γ₂ 0 (obs natᵗ) natᵗ
+κE = thru-outer exhaustᵒ nidE ↠[ ≤-refl ] root
+
+foldE = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κE 0 (innerW ∷ []) false schedE stE ≤-refl
+          (toSound (from-yes (sound? κE (nodeCt schedE) (EvalSt.registry stE))))
+
+schedE′ = proj₁ (proj₂ (proj₁ foldE))
+stE′    = proj₂ (proj₂ (proj₁ foldE))
+
+-- NEAR-DEGENERATE
+_ : Confirms (raw-kept (proj₂ foldE) (toSound (from-yes (sound? κE (nodeCt schedE) (EvalSt.registry stE))))
+               (from-no (unconn (Sched.slots schedE′) (EvalSt.connectedShares stE′)
+                         <? unconn (Sched.slots schedE) (EvalSt.connectedShares stE)))
+               {pfs = colsOf κE stE})
+_ = keptOf κE schedE stE stE′ {pfs = colsOf κE stE} {sched′ = schedE′} (from-yes (nodeCt schedE ≤? nodeCt schedE′)) refl tt₀
+
+-- a root merge whose one inner batches the hot slot, left live
+progB : Closed Γ₂ (natᵗ ×ᵗ listᵗ natᵗ)
+progB = mergeAllᵉ nothing (ofᵉ (strmᵗ (batchSyncᵉ (input zero)) ∷ []))
+
+runB = let aM = <-wellFounded _ in
+       reducible aM progB []ᵉ (red-env {Γ = Γ₂} aM []ᵉ) (root {lo = 1}) (standing tt) rootRP tt 0
+         (sched-init progB slots₂) (st-init progB) ≤-refl
+         (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt))
+
+schedB : Sched Γ₂
+schedB = proj₁ (proj₂ (proj₁ runB))
+
+stB : EvalSt progB
+stB = proj₂ (proj₂ (proj₁ runB))
+
+κB : Path Γ₂ 0 (obs (natᵗ ×ᵗ listᵗ natᵗ)) (natᵗ ×ᵗ listᵗ natᵗ)
+κB = thru-outer mergeAllᵒ (nodeCt (sched-init progB slots₂)) ↠[ ≤-refl ] root
+
+innerB : Val Γ₂ (obs (natᵗ ×ᵗ listᵗ natᵗ))
+innerB = evalWith {Γ = Γ₂} (strmᵗ (batchSyncᵉ (deferᵉ (ofᵉ (nat̂ 9 ∷ []))))) []ᵉ
+
+foldB = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κB 0 (innerB ∷ []) false schedB stB ≤-refl
+          (toSound (from-yes (sound? κB (nodeCt schedB) (EvalSt.registry stB))))
+
+schedB′ = proj₁ (proj₂ (proj₁ foldB))
+stB′    = proj₂ (proj₂ (proj₁ foldB))
+
+-- LOAD-BEARING
+_ : Confirms (raw-kept (proj₂ foldB) (toSound (from-yes (sound? κB (nodeCt schedB) (EvalSt.registry stB))))
+               (from-no (unconn (Sched.slots schedB′) (EvalSt.connectedShares stB′)
+                         <? unconn (Sched.slots schedB) (EvalSt.connectedShares stB)))
+               {pfs = colsOf κB stB})
+_ = keptOf κB schedB stB stB′ {pfs = colsOf κB stB} {sched′ = schedB′} (from-yes (nodeCt schedB ≤? nodeCt schedB′)) refl tt₀
+
+------------------------------------------------------------------
+-- THE RULE AT A SECOND CONTINUATION CARRYING A NODE OF ITS OWN: a
+-- live sibling's own path, read off the registry the run left.
+------------------------------------------------------------------
+
+firstRow : ∀ {n} {Γ : Ctx n} {t} → RegRow Γ t → List (RegRow Γ t) → RegRow Γ t
+firstRow d []      = d
+firstRow d (r ∷ _) = r
+
+-- a root merge of two takes of the hot slot, both left live
+progH : Closed Γ₂ natᵗ
+progH = mergeAllᵉ nothing (ofᵉ (strmᵗ (takeᵉ (nat̂ 5) (input zero)) ∷ strmᵗ (takeᵉ (nat̂ 6) (input zero)) ∷ []))
+
+runH = let aM = <-wellFounded _ in
+       reducible aM progH []ᵉ (red-env {Γ = Γ₂} aM []ᵉ) (root {lo = 1}) (standing tt) rootRP tt 0
+         (sched-init progH slots₂) (st-init progH) ≤-refl
+         (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt))
+
+schedH : Sched Γ₂
+schedH = proj₁ (proj₂ (proj₁ runH))
+
+stH : EvalSt progH
+stH = proj₂ (proj₂ (proj₁ runH))
+
+-- both inners live, each row through the merge's node and its own take's
+_ : map (λ r → rowNodes r , rowEnd r) (EvalSt.registry stH)
+      ≡ ((2 ∷ 0 ∷ 1 ∷ []) , nothing) ∷ ((4 ∷ 0 ∷ 3 ∷ []) , nothing) ∷ []
+_ = refl
+
+nidH : ℕ
+nidH = nodeCt (sched-init progH slots₂)
+
+κH : Path Γ₂ 0 (obs natᵗ) natᵗ
+κH = thru-outer mergeAllᵒ nidH ↠[ ≤-refl ] root
+
+κ₂H = proj₂ (proj₂ (proj₂ (firstRow (0 , atSlot zero , (natᵗ , root)) (EvalSt.registry stH))))
+
+innerH : Val Γ₂ (obs natᵗ)
+innerH = evalWith {Γ = Γ₂} (strmᵗ (takeᵉ (nat̂ 7) (input zero))) []ᵉ
+
+soH : Sound κH schedH stH
+soH = toSound (from-yes (sound? κH (nodeCt schedH) (EvalSt.registry stH)))
+
+so₂H = toSound {κ = κ₂H} {sched = schedH} {st = stH} (from-yes (sound? κ₂H (nodeCt schedH) (EvalSt.registry stH)))
+
+-- the merge handed a fresh take of the same slot
+foldH = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κH 0 (innerH ∷ []) false schedH stH ≤-refl soH
+
+schedH′ = proj₁ (proj₂ (proj₁ foldH))
+stH′    = proj₂ (proj₂ (proj₁ foldH))
+
+-- LOAD-BEARING
+_ : Confirms (fold-kept (proj₂ foldH) soH κ₂H so₂H (λ _ _ _ → refl))
+_ = toSound {κ = κ₂H} {sched = schedH′} {st = stH′} (from-yes (sound? κ₂H (nodeCt schedH′) (EvalSt.registry stH′)))
+
+-- its head step, at a store holding live rows
+stpH = step-of (proj₂ foldH)
+
+-- LOAD-BEARING
+_ : Confirms (step-kept ≤-refl (proj₂ stpH) soH)
+_ = toSound (from-yes (sound? κH (nodeCt (proj₁ (proj₂ (proj₂ (proj₂ (proj₁ stpH))))))
+                                     (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ stpH))))))))
+
+-- the same fresh take subscribed as the merge's inner
+soRH : Sound (root {lo = 0}) schedH stH
+soRH = toSound (from-yes (sound? (root {lo = 0}) (nodeCt schedH) (EvalSt.registry stH)))
+
+ndH : NodeOn nidH (root {lo = 0}) schedH stH
+ndH = nodeOn nidH root tt₀ (from-yes (nidH <? nodeCt schedH)) (λ ())
+
+innH = rawInner (<-wellFounded _) ≤-refl (<-wellFounded _) mergeAllᵒ nidH (root {lo = 0}) 0 innerH schedH stH ≤-refl soRH ndH
+         _ refl (<-wellFounded _) ≤-refl
+
+κIH : Path Γ₂ 0 natᵗ natᵗ
+κIH = from-inner mergeAllᵒ nidH (nodeCt schedH) ↠[ ≤-refl ] root
+
+soIH : Sound κIH (bumpNode schedH) stH
+soIH = toSound (from-yes (sound? κIH (nodeCt (bumpNode schedH)) (EvalSt.registry stH)))
+
+so₂IH = toSound {κ = κ₂H} {sched = bumpNode schedH} {st = stH} (from-yes (sound? κ₂H (nodeCt (bumpNode schedH)) (EvalSt.registry stH)))
+
+-- LOAD-BEARING
+_ : Confirms (subscribe-kept (proj₂ innH) soIH κ₂H so₂IH (λ _ _ _ → refl))
+_ = toSound {κ = κ₂H} {sched = proj₁ (proj₂ (proj₁ innH))} {st = proj₂ (proj₂ (proj₁ innH))}
+      (from-yes (sound? κ₂H (nodeCt (proj₁ (proj₂ (proj₁ innH)))) (EvalSt.registry (proj₂ (proj₂ (proj₁ innH))))))
+
+-- the switch cutting its sibling, asked at the sibling's own path
+κ₂W = proj₂ (proj₂ (proj₂ (firstRow (0 , atSlot zero , (natᵗ , root)) (EvalSt.registry stW))))
+
+so₂W = toSound {κ = κ₂W} {sched = schedW} {st = stW} (from-yes (sound? κ₂W (nodeCt schedW) (EvalSt.registry stW)))
+
+-- LOAD-BEARING
+_ : Confirms (fold-kept (proj₂ foldW) (toSound (from-yes (sound? κW (nodeCt schedW) (EvalSt.registry stW))))
+               κ₂W so₂W (λ _ _ _ → refl))
+_ = toSound {κ = κ₂W} {sched = schedW′} {st = stW′} (from-yes (sound? κ₂W (nodeCt schedW′) (EvalSt.registry stW′)))
 
 ------------------------------------------------------------------
 -- `refill-spends`.
@@ -434,10 +635,10 @@ _ = from-yes (waiting (lookupNode nidR (EvalSt.nodes (proj₂ (proj₂ rR)))) �
 κFS : Path Γ₁ 0 natᵗ natᵗ
 κFS = from-inner mergeAllᵒ nidS (nodeCt schedS) ↠[ ≤-refl ] sink₀
 
-soFS : Sound κFS schedS stS
-soFS = toSound (from-yes (sound? κFS (nodeCt schedS) (EvalSt.registry stS)))
+soFS : Sound κFS (bumpNode schedS) stS
+soFS = toSound (from-yes (sound? κFS (nodeCt (bumpNode schedS)) (EvalSt.registry stS)))
 
-foldFS = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κFS 0 (9 ∷ []) true schedS stS ≤-refl soFS
+foldFS = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κFS 0 (9 ∷ []) true (bumpNode schedS) stS ≤-refl soFS
 
 rFS = proj₁ foldFS
 
@@ -450,10 +651,10 @@ _ = from-yes (waiting (lookupNode nidS (EvalSt.nodes (proj₂ (proj₂ rFS)))) �
 κFR : Path Γ₀ 0 natᵗ natᵗ
 κFR = from-inner mergeAllᵒ nidR (nodeCt schedR) ↠[ ≤-refl ] root
 
-soFR : Sound κFR schedR stR
-soFR = toSound (from-yes (sound? κFR (nodeCt schedR) (EvalSt.registry stR)))
+soFR : Sound κFR (bumpNode schedR) stR
+soFR = toSound (from-yes (sound? κFR (nodeCt (bumpNode schedR)) (EvalSt.registry stR)))
 
-foldFR = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κFR 0 (9 ∷ []) true schedR stR ≤-refl soFR
+foldFR = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κFR 0 (9 ∷ []) true (bumpNode schedR) stR ≤-refl soFR
 
 rFR = proj₁ foldFR
 
@@ -462,3 +663,86 @@ _ : Confirms (fold-refill-spends mergeAllᵒ nidR (nodeCt schedR) root (proj₂ 
                (from-no (unconn (Sched.slots (proj₁ (proj₂ rFR))) (EvalSt.connectedShares (proj₂ (proj₂ rFR)))
                          <? unconn (Sched.slots schedR) (EvalSt.connectedShares stR))))
 _ = from-yes (waiting (lookupNode nidR (EvalSt.nodes (proj₂ (proj₂ rFR)))) ≤? waiting (lookupNode nidR (EvalSt.nodes stR)))
+
+------------------------------------------------------------------
+-- THE REFILL'S EDGE: a one-lane merge held full inside a share, whose
+-- fan-out reaches a root switch that re-subscribes to the same share.
+------------------------------------------------------------------
+
+Γ₃ : Ctx 2
+Γ₃ = natᵗ ∷ᵛ natᵗ ∷ᵛ []ᵛ
+
+defQ : Closed Γ₃ natᵗ
+defQ = mergeAllᵉ (just 1) (ofᵉ (strmᵗ (takeᵉ (nat̂ 5) (input zero)) ∷ []))
+
+slots₃ : Slots Γ₃
+slots₃ zero       = scripted {ok = tt₀} (hot [])
+slots₃ (suc zero) = shared defQ
+
+progQ : Closed Γ₃ natᵗ
+progQ = switchAllᵉ (mapᵉ (strmᵗ (input (suc zero))) (input (suc zero)))
+
+runQ = let aM = <-wellFounded _ in
+       reducible aM progQ []ᵉ (red-env {Γ = Γ₃} aM []ᵉ) (root {lo = 2}) (standing tt) rootRP tt 0
+         (sched-init progQ slots₃) (st-init progQ) ≤-refl
+         (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt))
+
+schedQ : Sched Γ₃
+schedQ = proj₁ (proj₂ (proj₁ runQ))
+
+stQ : EvalSt progQ
+stQ = proj₂ (proj₂ (proj₁ runQ))
+
+nidQ : ℕ
+nidQ = pick (λ k → oneLane (lookupNode k (EvalSt.nodes stQ))) (below (nodeCt schedQ))
+
+full : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Bool
+full (just (mergeAll-st (just (suc zero)) (suc zero) [] _)) = true
+full _                                                      = false
+
+-- the lane is held by the take and nothing waits
+_ : T (full (lookupNode nidQ (EvalSt.nodes stQ)))
+_ = tt₀
+
+sinkQ : Path Γ₃ 0 natᵗ natᵗ
+sinkQ = share-sink (suc zero) z≤n
+
+innerQ : Val Γ₃ (obs natᵗ)
+innerQ = evalWith {Γ = Γ₃} (strmᵗ (deferᵉ (ofᵉ (nat̂ 9 ∷ [])))) []ᵉ
+
+soSkQ : Sound sinkQ schedQ stQ
+soSkQ = toSound (from-yes (sound? sinkQ (nodeCt schedQ) (EvalSt.registry stQ)))
+
+ndQ : NodeOn nidQ sinkQ schedQ stQ
+ndQ = nodeOn nidQ sinkQ tt₀ (from-yes (nidQ <? nodeCt schedQ)) (λ ())
+
+innQ = rawInner (<-wellFounded _) ≤-refl (<-wellFounded _) mergeAllᵒ nidQ sinkQ 0 innerQ schedQ stQ ≤-refl soSkQ ndQ
+         _ refl (<-wellFounded _) ≤-refl
+
+rQ = proj₁ innQ
+
+-- the premise that makes the row load-bearing: the fan-out reached the
+-- switch, which subscribed the share again
+_ = from-yes (length (EvalSt.registry stQ) <? length (EvalSt.registry (proj₂ (proj₂ rQ))))
+
+-- LOAD-BEARING
+_ : Confirms (refill-spends mergeAllᵒ nidQ sinkQ (proj₂ innQ) soSkQ ndQ refl
+               (from-no (unconn (Sched.slots (proj₁ (proj₂ rQ))) (EvalSt.connectedShares (proj₂ (proj₂ rQ)))
+                         <? unconn (Sched.slots schedQ) (EvalSt.connectedShares stQ))))
+_ = from-yes (waiting (lookupNode nidQ (EvalSt.nodes (proj₂ (proj₂ rQ)))) ≤? waiting (lookupNode nidQ (EvalSt.nodes stQ)))
+
+κFQ : Path Γ₃ 0 natᵗ natᵗ
+κFQ = from-inner mergeAllᵒ nidQ (nodeCt schedQ) ↠[ ≤-refl ] sinkQ
+
+soFQ : Sound κFQ (bumpNode schedQ) stQ
+soFQ = toSound (from-yes (sound? κFQ (nodeCt (bumpNode schedQ)) (EvalSt.registry stQ)))
+
+foldFQ = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κFQ 0 (9 ∷ []) true (bumpNode schedQ) stQ ≤-refl soFQ
+
+rFQ = proj₁ foldFQ
+
+-- LOAD-BEARING
+_ : Confirms (fold-refill-spends mergeAllᵒ nidQ (nodeCt schedQ) sinkQ (proj₂ foldFQ) soFQ
+               (from-no (unconn (Sched.slots (proj₁ (proj₂ rFQ))) (EvalSt.connectedShares (proj₂ (proj₂ rFQ)))
+                         <? unconn (Sched.slots schedQ) (EvalSt.connectedShares stQ))))
+_ = from-yes (waiting (lookupNode nidQ (EvalSt.nodes (proj₂ (proj₂ rFQ)))) ≤? waiting (lookupNode nidQ (EvalSt.nodes stQ)))

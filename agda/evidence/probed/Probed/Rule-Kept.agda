@@ -31,11 +31,11 @@
 --
 -- NOT COVERED: a second continuation that carries a node, which the
 -- statements' `Agree` is the whole content of -- every κ₂ here is the
--- run's own path or node-free.  Nor a share whose def FLATTENS: its def
--- runs on fallen ground, the inner it subscribes is `rawInner`'s, and a
--- postulate does not compute, so no run through one reaches a store.
--- Nor a cut, a switch, an exhaust, a take, a scan, a batchSync or a
--- scripted slot -- the last four are postulated arms.
+-- run's own path or node-free; `Probed.Base-Leaves` reaches one.  Nor a
+-- share whose def FLATTENS: its def runs on fallen ground, the inner it
+-- subscribes is `rawInner`'s, and a postulate does not compute, so no
+-- run through one reaches a store.  Nor a cut, a switch, an exhaust, a
+-- take, a scan, a batchSync or a scripted slot.
 module Probed.Rule-Kept where
 
 -- TARGET: step-kept @152c13

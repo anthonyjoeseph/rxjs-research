@@ -385,6 +385,8 @@ postulate
   -- PROBED: `Probed.Rule-Kept` -- the merge's head step over a literal of
   --   deferred inners, at a store of rows sharing the merge's node and at
   --   one also holding a row through a node ending at a share's sink.
+  --   `Probed.Base-Leaves` -- the head step of a merge handed a fresh take
+  --   of a hot slot, at a store holding two live takes through its node.
   step-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo ℓ} {f : Frame Γ s u}
                 (le : lo ≤ ℓ) {κ : Path Γ ℓ u t} {now vals fin sched st r}
             → stepFrame⇓ {e = e} now f κ vals fin sched st r
@@ -392,16 +394,20 @@ postulate
             → Sound (f ↠[ le ] κ) (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
   -- PROBED: `Probed.Rule-Kept` -- the root subscribe of a merge of
   --   deferred inners, and of one reading a share whose def is deferred,
-  --   asked at the root and, in the second, at the sink.  Not a κ₂
-  --   carrying a node, nor a share whose def flattens.
+  --   asked at the root and, in the second, at the sink.
+  --   `Probed.Base-Leaves` -- a fresh take of a hot slot subscribed as a
+  --   root merge's inner, asked at a live sibling take's path, a κ₂
+  --   sharing the merge's node.  Not a share whose def flattens.
   subscribe-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {o : Val Γ (obs u)}
                      {κ : Path Γ lo u t} {now sched st r}
                  → subscribeE⇓ {e = e} o κ now sched st r → Sound κ sched st
                  → ∀ {lo′ s′} (κ₂ : Path Γ lo′ s′ t) → Sound κ₂ sched st → Agree κ κ₂
                  → Sound κ₂ (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
   -- PROBED: `Probed.Rule-Kept` -- the merge's outer fold in both
-  --   programs, asked at its own path, the root and the sink.  Not a κ₂
-  --   carrying a node other than the fold's own path.
+  --   programs, asked at its own path, the root and the sink.
+  --   `Probed.Base-Leaves` -- a root merge handed a fresh take, asked at a
+  --   live sibling take's path, and a root switch cutting its live take,
+  --   asked at the cut take's path.  Not a scan, nor a slot's arrival.
   fold-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {κ : Path Γ lo u t}
                 {now vals fin sched st r}
             → foldPath⇓ {e = e} now κ vals fin sched st r → Sound κ sched st
@@ -1826,8 +1832,9 @@ Spends sched st sched′ st′ =
 --   reader, and through a one-lane merge handed a fresh inner, both in
 --   the share's def and at the root, from stores the builder reached;
 --   and through a root switch cutting a sibling kept live by a hot slot,
---   the only way a fold that connects nothing meets a registered one.
---   Not an exhaust, scan or batchSync sibling, nor the unsupported formers.
+--   the only way a fold that connects nothing meets a registered one;
+--   through a busy exhaust refusing an inner, and a merge beside a live
+--   batchSync.  Not a scan sibling, nor the unsupported formers.
 postulate
   raw-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {κ : Path Γ lo u t}
                {now vals fin sched st out sched′ st′}
@@ -1858,9 +1865,10 @@ postulate
 -- quantifies over every state its hypotheses admit.
 --
 -- PROBED: `Probed.Base-Leaves` -- a fresh inner of a one-lane merge in a
---   share's def, whose values fan out past the sink, and one at the root.
---   Neither re-enters the merge's outer, so the refill itself is not
---   covered.
+--   share's def, whose values fan out past the sink, and one at the root;
+--   and one at a lane a take holds full, whose fan-out reaches a switch
+--   that subscribes the share again mid-emission.  None re-enters the
+--   merge's outer, so the refill itself is not covered.
 postulate
   refill-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u ℓ} (op : AllOp) (nid : NodeId)
                     (κ : Path Γ ℓ u t) {o : Val Γ (obs u)} {now} {sched : Sched Γ} {st : EvalSt e} {r}
@@ -1884,8 +1892,9 @@ postulate
 --
 -- PROBED: `Probed.Base-Leaves` -- an inner of a one-lane merge in a
 --   share's def finishing, its value folded past the sink and fanned
---   out, and one at the root.  Neither queues onto the merge's outer, so
---   the refill itself is not covered.
+--   out, and one at the root; and one at a lane a take holds full, whose
+--   fan-out re-subscribes the share.  None queues onto the merge's outer,
+--   so the refill itself is not covered.
 postulate
   fold-refill-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u ℓ} (op : AllOp) (nid inst : NodeId)
                          (κ : Path Γ ℓ u t) {now vals fin} {sched : Sched Γ} {st : EvalSt e} {r}
