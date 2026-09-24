@@ -380,7 +380,30 @@ const quotas = (corpus: number) => {
   };
 };
 
-function* drawChunks(corpus: number, operator?: string): Generator<TestCase[]> {
+// `--shard k/n` RUNS ONE NTH OF THE SAME DRAW, so n processes cover one
+// corpus between them. Every shard makes the whole draw and keeps the
+// accepted cases whose position is k mod n: the union of the shards is
+// the unsharded corpus exactly, and the quotas and the yield are the
+// draw's, not a shard's. What a shard repeats is generation and the rx
+// filter; what it splits is the Agda side, which is the cost.
+type Shard = { k: number; n: number };
+const readShardFromCli = (): Shard | undefined => {
+  const v = readFlag("shard");
+  if (v === undefined) return undefined;
+  const m = /^(\d+)\/(\d+)$/.exec(v);
+  const k = Number(m?.[1]);
+  const n = Number(m?.[2]);
+  if (m === null || n <= 0 || k >= n)
+    throw new Error(`--shard takes k/n with 0 <= k < n, not '${v}'`);
+  return { k, n };
+};
+
+function* drawChunks(
+  corpus: number,
+  shard: Shard,
+  drawn: { live: number },
+  operator?: string,
+): Generator<TestCase[]> {
   const { silentQuota, liveTarget, maxSeeds } = quotas(corpus);
   let live = 0;
   let silent = 0;
@@ -393,8 +416,11 @@ function* drawChunks(corpus: number, operator?: string): Generator<TestCase[]> {
     for (const testCase of genTestCases(`s${i}`, operator)) {
       const emits = evaluatePlain(testCase).length > 0;
       if (emits ? live >= liveTarget : silent >= silentQuota) continue;
+      const position = live + silent;
       if (emits) live++;
       else silent++;
+      drawn.live = live;
+      if (position % shard.n !== shard.k) continue;
       chunk.push(testCase);
       if (chunk.length === CHUNK) {
         yield chunk;
@@ -419,6 +445,8 @@ async function main() {
   const cliSeed = readSeedFromCli();
   const casesFile = readCasesFromCli();
   const corpus = readCorpusFromCli() ?? CORPUS;
+  const shard = readShardFromCli() ?? { k: 0, n: 1 };
+  const drawn = { live: 0 };
   const machine = readMachineFromCli() ?? "agda";
   const baseline = readBaselineFromCli() ?? "rx";
   const known = ["agda", "rx"];
@@ -434,7 +462,7 @@ async function main() {
       ? [replayCases(casesFile)]
       : cliSeed !== undefined
         ? [genTestCases(cliSeed, operator)]
-        : drawChunks(corpus, operator);
+        : drawChunks(corpus, shard, drawn, operator);
   const run = async (
     which: string,
     testCases: TestCase[],
@@ -467,7 +495,8 @@ async function main() {
     // progress on stderr, so the report on stdout stays the report
     if (swept && corpus > CHUNK)
       console.error(
-        `${tally.n}/${corpus}: ${tally.valuesOk} match, ` +
+        `${shard.n > 1 ? `shard ${shard.k}/${shard.n} ` : ""}` +
+          `${tally.n}/${Math.ceil(corpus / shard.n)}: ${tally.valuesOk} match, ` +
           `${tally.diverged} diverged, ${crashedCount(tally)} crashed`,
       );
   }
@@ -481,9 +510,9 @@ async function main() {
   // full sweep is held to it -- a pinned `--seed` or a `--cases` replay
   // is whatever the user asked for.
   const { liveTarget, maxSeeds } = quotas(corpus);
-  if (swept && tally.live < liveTarget) {
+  if (swept && drawn.live < liveTarget) {
     console.log(
-      `YIELD SHORT: ${tally.live} emitting rows, target ${liveTarget} -- the ` +
+      `YIELD SHORT: ${drawn.live} emitting rows, target ${liveTarget} -- the ` +
         `draw could not find enough programs that emit within ${maxSeeds} seeds`,
     );
     process.exitCode = 1;
