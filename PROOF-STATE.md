@@ -225,8 +225,8 @@ through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
-proof half holds no postulate; the oracle job is still off in CI. Neither
-half may be narrowed to pass.
+proof half holds no postulate, and the oracle runs in CI after the gate.
+Neither half may be narrowed to pass.
 
 **After running 1.5M test cases, the evaluator's behavior is 1-for-1 correct
 against rxjs** — measured off the proof path, with both stuck branches rebuilt
@@ -292,12 +292,6 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
   construction, and a former that cannot be written as one is the finding it
   exists to make. So a carrier is measured by transcribing it into the Agda and
   running the oracle, never by a second machine in the TypeScript.
-
-- **ENABLE THE ORACLE IN CI.** Flip the job off `if: false`. It is the leg
-  that makes the tier STAY done: until it lands the sweep is a thing somebody
-  remembers running, and a green memory is what this tier was disabled behind
-  in the first place. `oracle` stays out of `GATE_CHEAP`, whose invariant is
-  that nothing on it compiles, and this target links the CLI.
 
 ### The ledger
 

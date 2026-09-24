@@ -344,41 +344,28 @@ jobs:
   # a green measured once is a receipt, and a receipt is not a check. What
   # the plain tree and its evaluator claim rests on this job.
   #
-  # IT IS ITS OWN JOB RATHER THAN A STEP OF `gate`, for the reason `ts` is:
-  # the gate is the merge gate and stays whole, while a divergence between
-  # two machines that take seconds to run has no business waiting on the
-  # tower. It needs the Agda toolchain only to link the CLI -- the cone under
-  # `CLI/Main.agda`, not the tower -- so it restores the same read-only
-  # caches the sweep does.
+  # IT IS ITS OWN JOB RATHER THAN A STEP OF `gate`, so a divergence reports
+  # as itself rather than as a red tower. It WAITS on the gate all the same:
+  # linking the CLI compiles the evaluator, which is the tower, and the gate
+  # is what saves this commit's interfaces. Run beside it, this job rebuilds
+  # the tower cold from an older commit's cache inside its own budget.
   #
-  # STILL OFF, AND WHAT REMAINS RED IS COUNTED RATHER THAN DESCRIBED. The job
-  # is two steps, the random draw and the replay of the pinned corpus, and it
-  # goes on whole or not at all. The draw stands at 490 of 500 against rxjs,
-  # 10 cases; the replay is red on 12 of its 15 rows. A draw that once matched
-  # on every case did so because it never reached the shape -- biasing the
-  # generator at it is what turned an inference into those numbers.
+  # A CASE GETS TWO MINUTES, not the harness's ten-second default. A crash is
+  # red, and the deep flattener nests the sweep draws take tens of seconds on
+  # a shared runner while agreeing with rxjs, so the default reports load as
+  # a finding. A case still running at two minutes is a finding.
   #
-  # WHAT IS RED IS THE BURST CARRIER, AND IT IS ONE MECHANISM, NOT ELEVEN. A
-  # subscription hands back a burst which its caller then pushes, so a
-  # reaction to a burst's first value runs after the whole burst is harvested
-  # -- and where that reaction SUBSCRIBES the share the burst came from, rxjs
-  # has already moved the observer list on and the evaluator has not. Every
-  # failing case emits NOTHING where rxjs emits. The measurement and the three
-  # neighbours that separate it are in the evaluator's own header, where the
-  # repair is owed; a carrier that pushes clears all 15 rows and all 500.
-  # Two of the ten sit outside the region the predicate names, and the pushing
-  # carrier wins those too -- the predicate under-reads, it is not a second
-  # mechanism.
-  #
-  # AND THE RULE THAT DECIDES THE SHAPE OF THAT REPAIR: nothing here may be
-  # narrowed to make it pass. A divergence is a finding about one of the two
-  # machines, and it is fixed in whichever of them drifted -- not by dropping
+  # NOTHING HERE MAY BE NARROWED TO MAKE IT PASS. A divergence is a finding
+  # about one of the two machines, and it is fixed in whichever of them
+  # drifted -- not by dropping
   # a corpus row, and not by running the draw without the replay, which would
   # put a green light on exactly the shape a random draw is thin on.
   oracle:
-    if: false
+    needs: gate
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
+    env:
+      ORACLE_CASE_TIMEOUT_MS: "120000"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -431,7 +418,7 @@ jobs:
       - name: replay the pinned corpus
         if: always() && !cancelled()
         run: |
-          for f in typescript/corpus/*.ndjson; do
+          for f in typescript/corpus/*.ndjson typescript/cases/*.ndjson; do
             echo "== ${f#typescript/}"
             make oracle ARGS="--cases ${f#typescript/}"
           done
