@@ -12,15 +12,22 @@
 -- nodes it guards, listed before and after.  Which nodes it guards is
 -- decided by `endsᵇ`, which is sound and complete for `EndsAt`.
 --
--- Two programs.  `progR` merges, one lane at a time, two deferred
+-- Three programs.  `progR` merges, one lane at a time, two deferred
 -- inners at the root.  `progS` reads a share whose def is that same
 -- merge, from a merge of its own at the root, so the def runs raw and
--- its merge sits on a path ending at the share's sink.
+-- its merge sits on a path ending at the share's sink.  `progW` is a
+-- root switch over a take of a hot slot.
 --
 -- LOAD-BEARING: `raw-kept` down the share's sink, which fans out to the
 -- reader.  It fails if the fan-out writes a node whose rows end at the
 -- sink -- the def's merge and its inners -- which is the one write the
 -- statement forbids and the fan-out is the only thing that could make.
+-- LOAD-BEARING: `raw-kept` through a root switch whose first inner reads
+-- a hot slot that never speaks, so the store still holds it, and its
+-- take node, live.  Handed a fresh inner, the switch must cut it; the
+-- row pins that the fold cut something.  It fails if the cut or the
+-- subscribe after it writes the take node, which ends at the root where
+-- the path does and is off it.
 -- LOAD-BEARING: `raw-kept` through the def's merge, handed a fresh
 -- inner, and the same through the root merge in `progR`.  Each fails if
 -- subscribing the inner rewrites a sibling inner's node, which ends
@@ -41,8 +48,8 @@
 
 -- NOT COVERED: a queue refilled while an inner runs, which is the
 -- statement's whole risky region -- no program here re-enters a merge's
--- outer during one of its inners.  Nor a switch cutting a sibling, an
--- exhaust, a take, a scan, a batchSync or a scripted slot.
+-- outer during one of its inners.  Nor an exhaust, a scan, a batchSync,
+-- or a scripted slot's arrival -- `progW`'s slot only registers.
 module Probed.Base-Leaves where
 
 -- TARGET: raw-kept @2a5289
@@ -54,7 +61,7 @@ open import Data.Bool.ListAction using (all)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Fin using (Fin; zero)
 open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_; map; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Properties using (∷-injective)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -74,10 +81,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 
 open import Probed.Apparatus using (Confirms)
 open import Probed.Rule-Kept using (sound?; toSound)
-open import Rx.Exp using (Ctx; Closed; Val; obs; natᵗ; ofᵉ; deferᵉ; mergeAllᵉ; input; strmᵗ; nat̂; []ᵉ; evalWith)
-open import Rx.Slots using (Slots; shared)
+open import Rx.Exp using (Ctx; Closed; Val; obs; natᵗ; ofᵉ; deferᵉ; mergeAllᵉ; switchAllᵉ; takeᵉ; input; strmᵗ; nat̂; []ᵉ; evalWith)
+open import Rx.Slots using (Slots; shared; scripted)
+open import Rx.Prim using (hot)
 open import Rx.Evaluator using (Sched; EvalSt; RegRow; NodeState; mergeAll-st; Path; root; share-sink; _↠[_]_;
-  thru-outer; from-inner; mergeAllᵒ; pathHasNode; lookupNode; sched-init; st-init)
+  thru-outer; from-inner; mergeAllᵒ; switchᵒ; switch-st; pathHasNode; lookupNode; sched-init; st-init)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Unconn-Arith using (unconn)
 open import Rx.Evaluator.Reducible using (reducible; red-env; rawFold; rawInner)
@@ -326,6 +334,58 @@ _ : Confirms (raw-kept (proj₂ foldR) (toSound (from-yes (sound? κR (nodeCt sc
                          <? unconn (Sched.slots schedR) (EvalSt.connectedShares stR)))
                {pfs = colsOf κR stR})
 _ = keptOf κR schedR stR stR′ {sched′ = schedR′} (from-yes (nodeCt schedR ≤? nodeCt schedR′)) refl tt₀
+
+-- a root switch whose inner reads a hot slot that never speaks, so the
+-- store the run leaves still holds that inner, and its take node, live
+Γ₂ : Ctx 1
+Γ₂ = natᵗ ∷ᵛ []ᵛ
+
+progW : Closed Γ₂ natᵗ
+progW = switchAllᵉ (ofᵉ (strmᵗ (takeᵉ (nat̂ 5) (input zero)) ∷ []))
+
+slots₂ : Slots Γ₂
+slots₂ zero = scripted {ok = tt₀} (hot [])
+
+runW = let aM = <-wellFounded _ in
+       reducible aM progW []ᵉ (red-env {Γ = Γ₂} aM []ᵉ) (root {lo = 1}) (standing tt) rootRP tt 0
+         (sched-init progW slots₂) (st-init progW) ≤-refl
+         (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt))
+
+schedW : Sched Γ₂
+schedW = proj₁ (proj₂ (proj₁ runW))
+
+stW : EvalSt progW
+stW = proj₂ (proj₂ (proj₁ runW))
+
+running : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Bool
+running (just (switch-st (just _) _)) = true
+running _                             = false
+
+nidW : ℕ
+nidW = pick (λ k → running (lookupNode k (EvalSt.nodes stW))) (below (nodeCt schedW))
+
+κW : Path Γ₂ 0 (obs natᵗ) natᵗ
+κW = thru-outer switchᵒ nidW ↠[ ≤-refl ] root
+
+innerW : Val Γ₂ (obs natᵗ)
+innerW = evalWith {Γ = Γ₂} (strmᵗ (deferᵉ (ofᵉ (nat̂ 9 ∷ [])))) []ᵉ
+
+-- the switch, handed a fresh inner while its first is still registered
+foldW = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κW 0 (innerW ∷ []) false schedW stW ≤-refl
+          (toSound (from-yes (sound? κW (nodeCt schedW) (EvalSt.registry stW))))
+
+schedW′ = proj₁ (proj₂ (proj₁ foldW))
+stW′    = proj₂ (proj₂ (proj₁ foldW))
+
+-- the premise that makes the row load-bearing: the fold cut something
+_ = from-yes (length (EvalSt.cancelled stW) <? length (EvalSt.cancelled stW′))
+
+-- LOAD-BEARING
+_ : Confirms (raw-kept (proj₂ foldW) (toSound (from-yes (sound? κW (nodeCt schedW) (EvalSt.registry stW))))
+               (from-no (unconn (Sched.slots schedW′) (EvalSt.connectedShares stW′)
+                         <? unconn (Sched.slots schedW) (EvalSt.connectedShares stW)))
+               {pfs = colsOf κW stW})
+_ = keptOf κW schedW stW stW′ {sched′ = schedW′} (from-yes (nodeCt schedW ≤? nodeCt schedW′)) refl tt₀
 
 ------------------------------------------------------------------
 -- `refill-spends`.

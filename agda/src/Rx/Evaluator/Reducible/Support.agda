@@ -378,7 +378,7 @@ sub-on sb ct (node-on ea lt op) = node-on (λ a → ea (sb a)) (<-≤-trans lt c
 -- under an inner ends where the inner's continuation does; a fan-out
 -- folds each admitted row down its own path, whose nodes the rule
 -- already ties to its end; a cut only removes rows.  Stated at any state
--- the rule holds in, which nothing has instantiated.  The route is one
+-- the rule holds in.  The route is one
 -- structural induction over the evaluator's relations, in the shape of
 -- the one that proves the room is kept.
 postulate
@@ -1824,14 +1824,10 @@ Spends sched st sched′ st′ =
 --
 -- PROBED: `Probed.Base-Leaves` -- down a share's sink fanning out to a
 --   reader, and through a one-lane merge handed a fresh inner, both in
---   the share's def and at the root, from stores the builder reached.
---   Not a switch cutting a sibling, nor the unsupported formers.
---   BLOCKED here: a switch cuts only a sibling still registered when the
---   next inner arrives.  A fold that connects nothing meets no such
---   sibling without a scripted slot: a cold inner completes inside its
---   own subscribe, a finished share completes a joiner at once, and a
---   share still mid-emission is one whose connect is running, which
---   spends.  The scripted arm is postulated, so no probe reaches it.
+--   the share's def and at the root, from stores the builder reached;
+--   and through a root switch cutting a sibling kept live by a hot slot,
+--   the only way a fold that connects nothing meets a registered one.
+--   Not an exhaust, scan or batchSync sibling, nor the unsupported formers.
 postulate
   raw-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {κ : Path Γ lo u t}
                {now vals fin sched st out sched′ st′}
