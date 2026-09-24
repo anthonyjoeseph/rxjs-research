@@ -72,6 +72,7 @@ Standing approval for any change that **does not alter the spec** — impl edits
 ## Long Agda builds
 
 - **`make gate` is the merge gate and it ROUTES — type it and let it decide.** It prints which path and why. Timings: `typecheck-performance-numbers.md`.
+- **Never run `gate-heavy` locally — push and let CI run the tower (Anthony).** Locally: `make gate-cheap` + `make agda-dev`.
 - `gate-heavy` is the only thing that sees TERMINATION, since the dev loop stubs mutual blocks.
 - **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. The flag must be identical in the Makefile and `agda_flags()`, changed in the same commit. → [docs/agda-build.md](docs/agda-build.md)
 - **Agda never checks `agda/src` — it checks the comment-stripped mirror, which is why a comment edit is free.** A direct `agda` run on `agda/src` is a second interface cache, alternating with the mirror's.
