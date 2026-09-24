@@ -238,15 +238,14 @@ at the same ceiling under a termination pragma.
 set of subscribers, so every reader that emission was supposed to reach is
 served by nobody.
 
-Worth killing because the region's three conditions are this one clause and
-not three facts: a hot-fed share agrees because a cascade folds one arrival at
-a time, one synchronous value agrees because one observer is all there is, and
-re-entry is required because only a subscriber the burst creates is absent when
-it is handed back. The sweep matches on every case it draws, which narrows
-where it could be false without killing it. Ruled out: a fan-out re-entering
-its own merge without connecting (`Rx.Evaluator.Reducible.Floor`), and a
-connect registering the caller's chain breaking the rule for any path agreeing
-with it (`Rx.Evaluator.Reducible.Rule-Kept`).
+Worth killing because the region's three conditions are one clause, not three
+facts: a hot-fed share agrees since a cascade folds one arrival at a time, one
+synchronous value since one observer is all there is, and re-entry is needed
+since only a subscriber the burst creates is absent when handed back. Every
+swept case matches. Ruled out: a
+fan-out re-entering its merge unconnected (`Rx.Evaluator.Reducible.Floor`); a
+connect registering the caller's chain, for paths agreeing with it
+(`Rx.Evaluator.Reducible.Rule-Kept`).
 
 also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg moves, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
 also: `evaluate!` — same, its inhabitation.
