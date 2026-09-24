@@ -198,7 +198,8 @@ jobs:
           key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
 
       - name: make gate
-        run: make gate
+        # The profile is read off this log: per-definition times, after the tower.
+        run: make gate AGDA_PROFILE=--profile=definitions
 
   # THE SWEEP THE BUG CACHE EXISTS FOR. `make gate` runs the cache's EXISTING
   # rows and is green exactly when no KNOWN counterexample remains; nothing in

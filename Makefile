@@ -35,6 +35,13 @@ AGDA_BIN ?= agda
 export AGDA_BIN
 AGDA := $(AGDA_BIN) -W error
 
+# PROFILING THE TOWER, opt in: `make gate AGDA_PROFILE=--profile=definitions`
+# prints per-definition check times after the tower.  Agda blanks the
+# profiling options when it decides whether a cached interface is stale, so
+# setting it rechecks nothing -- which is also why it is kept OFF `AGDA`, where
+# it would reach `agda-dev` and every evidence check for no reason.
+AGDA_PROFILE ?=
+
 all: help
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -1228,7 +1235,7 @@ gate:
 gate-heavy: stripped
 	@$(MAKE) --no-print-directory gate-cheap || { scripts/notify.py "RED (cheap checks)"; exit 1; }
 	@t0=$$(date +%s); log=$$(mktemp); rc=$$(mktemp); \
-	 { (cd agda/_stripped-comments && $(AGDA) src/Main.agda); echo $$? > $$rc; } 2>&1 \
+	 { (cd agda/_stripped-comments && $(AGDA) $(AGDA_PROFILE) src/Main.agda); echo $$? > $$rc; } 2>&1 \
 	   | scripts/unmap-positions.py | tee $$log; \
 	 st=$$(cat $$rc); el=$$(( $$(date +%s) - t0 )); \
 	 n=$$(grep -c '^[[:space:]]*Checking ' $$log || true); \
