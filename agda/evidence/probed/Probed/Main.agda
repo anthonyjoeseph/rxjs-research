@@ -59,3 +59,4 @@ module Probed.Main where
 -- row and E6 refuses a `-- FORK:` that does not inhabit `Separates`, so
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
+open import Probed.Rule-Kept using ()

@@ -254,23 +254,26 @@ also: `subscribe-shaped` — same; its conclusion follows the result type, which
 also: `reducible` — its inhabitation, and every member of its block: the connect arm is the one strict edge on the room, and every other member is funded by the peel it makes or by a budget under it.
 also: `putLines` — the CLI's per-case writer, which is what lets the sweep count a case reaching a guard rather than end on it; the sweep is how this tier's monster is measured, and no proof reads it.
 also: `main` — same, the CLI's entry point, which now writes through it.
+also: `formal-verification-batchSimultaneous` — Tier 3's top line, whose operator body is Anthony's upper-tier work on this branch; another tier's, admitted at his discretion.
+also: `batch-online` — same, the online property Main asserts beside the main theorem, proven by Anthony.
+also: `run-wellFormed` — same, the input-well-formed top line, which the subscribe carrier's port reached.
 
 ### Big picture tier roadmap
 
-- **CARRY ONE TERMINUS PER NODE ON THE GROUNDS, THEN GIVE THE INNERS ONE.**
-  The raw fold now assumes the rule, which it diverges without, and both
-  its callers take it from a SHAPE leaf. Carry it on the fallen ground and
-  thread it through the drain's states, showing every step keeps it; then
-  build the third ground its header names, frames stacked live over a raw
-  base. The budgeted drain and its lemma,
-  a fold that connects nothing grows no queue, both sit on this ground,
-  and the body decides whether a share's fan-out, the monster's own
-  region, terminates without an outside counter.
+- **INSTANTIATE THE KEEPING OF THE RULE, THEN GIVE THE INNERS A GROUND.**
+  The rule now rides on both grounds and down the arrival spine, and every
+  step that could break it is one of three FALSITY leaves that nothing has
+  instantiated: a frame step, a subscribe, a fold, each keeping the rule for
+  every path that agrees with its own. Probe them at a program whose inner
+  registers a row through an outer's node, which is the one region they
+  could fail; then build the third ground `rawInner`'s header names, frames
+  stacked live over a raw base, which decides whether a share's fan-out,
+  the monster's own region, terminates without an outside counter.
 
 - **INSTANTIATE THE ARMS AT THE PROGRAM THAT GROWS A QUEUE.** No Tier 1 row
   has ever been instantiated. `mergeAll(1)` over a shared `of(1,2,3)` mapped
   to the shared stream grows the queue while the lane is busy and reaches
-  the raw finish; inhabiting `rawFold`'s and `red-batchSync`'s conclusions
+  the raw finish; inhabiting `rawInner`'s and `red-batchSync`'s conclusions
   there from the relation's constructors is the first receipt the tier can
   carry, and the one that could refute the monster's fan-out before the
   body above is ground.
@@ -310,10 +313,12 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### The ledger
 
-- **`rawFold`** (Reducible) — FALSITY, `DEAD ROUTE×2, RECOVERY`: the fold down
-  a path the store holds, and the only place a merge's queue is nonempty at an
-  inner's finish; its body owes its inners a third ground, then the drain.
-  It assumes one terminus per node, without which it diverges.
+- **`rawInner`** (Reducible) — FALSITY, `DEAD ROUTE×2, RECOVERY`: an inner
+  subscribed from the raw fold, the only place a merge's queue is nonempty at
+  an inner's finish; it owes a third ground, then the drain.
+- **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,
+  `PROBED`: every run keeps the rule for each path agreeing with its own, which
+  is all the raw fold stands on.
 - **`red-batchSync`** (Reducible) — FALSITY, `NO EVIDENCE`: the arm the trace
   exists for; its closing fold replays the continuation over its source's
   trace.
@@ -321,10 +326,6 @@ also: `main` — same, the CLI's entry point, which now writes through it.
   frame arms that hold state read off the store.
 - **`red-scripted`** (Reducible) — FALSITY, `NO EVIDENCE`: the scripted slot,
   which registers before folding a cold prefix.
-- **`fallen-terminus`** (Reducible) — SHAPE, `NO EVIDENCE`: the fallen ground
-  does not carry the rule; the route is to carry it there.
-- **`arrival-terminus`** (Builder) — SHAPE, `NO EVIDENCE`: the arrival spine
-  does not carry the rule; the route is to thread it through the drain.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`

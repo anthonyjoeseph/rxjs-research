@@ -760,6 +760,10 @@ roadmap-order-selftest:
 	      --ledger $$S/order-ledger-t1.txt --src-names $$S/order-src-t1.txt \
 	      --headers $$S/order-headers-none.txt > /dev/null \
 	    || { echo "SELFTEST FAIL: ANOTHER tier's open FALSITY blocked a discharge — the law is per-tier"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-renumbered.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/order-ledger-retired.txt --src-names $$S/order-src-names.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a RETIRED tier's discharge was charged to the tier that took its number — a tier is its rows"; fail=1; }; \
 	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
 	      --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
 	      --headers $$S/order-headers-prereq.txt > /dev/null \
@@ -775,7 +779,7 @@ roadmap-order-selftest:
 	       --definitions $$S/order-defs-none.txt > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: a body standing on NOTHING open was excused as a conversion — the exemption is blanket"; fail=1; \
 	  fi; \
-	  if [ $$fail -eq 0 ]; then echo "roadmap-order-selftest: PASS (banking fires, and so does a body standing on nothing open; deleting, reclassifying, another tier's risk, a named prerequisite and a conversion do not)"; else exit 1; fi
+	  if [ $$fail -eq 0 ]; then echo "roadmap-order-selftest: PASS (banking fires, and so does a body standing on nothing open; deleting, reclassifying, another tier's risk, a retired tier's number, a named prerequisite and a conversion do not)"; else exit 1; fi
 
 # PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
 # Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
