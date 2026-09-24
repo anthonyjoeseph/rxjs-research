@@ -66,7 +66,8 @@ open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; d
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (reducible; rawFold; red-env)
 open import Rx.Evaluator.Reducible.Floor using (drop-sub)
-open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Rule; rule; termini; fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf; sub-rule; sub-ot; fold-kept)
+open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Rule; rule; termini; fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf; sub-rule; sub-ot)
+open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.

@@ -154,20 +154,22 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of;
 open import Rx.Evaluator.Reducible.Support using (Agree; Ans; Apart; Arm; BatchHeld; Call; Column;
   ConsistentF; Fell; FrameStep; by-bool; FreshF; HeldF; HoldsFs; Kept; NodeOn; Pre; PreFs; PreHolds; QEmpty; RP; Red;
   RedEnv; Room; RoomEmpty; Rule; ScanHeld; Sound; Stage; SubStep; Trace; Wrapped; []ᵗ; _∷ᵗ_; _++ᵗ_; admit-agree; admit-ot;
-  ans; apart-fi; apply; batchStep; batch₀; bumpNode; call; callStage; cell-inj; colsOf; consumeNil; der;
+  ans; apart-fi; apply; batchStep; batch₀; bumpNode; call; cell-inj; colsOf; consumeNil; der;
   distinct; downHeld; drain-waiting; drop-ot; dropS; dying-rule; end-++; endPre; endRP; endS; ends-register;
-  ends-sub; f-exhaust; f-merge; f-switch; fallen; fallenStage; fellᵗ; fiHolds→thru; fiStep; finishing; fold;
-  fold-kept; fold-sound; fresh-apart; fresh-inner; fresh-path; fresh-sound; ground; grounded; head-off;
-  head-on; headCall; headHolds; headKept; headPre; held; holds-step; holdsFs-step; holdsOf; inner-after;
+  ends-sub; f-exhaust; f-merge; f-switch; fallen; fallenStage; fellᵗ; fiHolds→thru; finishing; fold;
+  fresh-apart; fresh-inner; fresh-path; fresh-sound; ground; grounded; head-off;
+  head-on; headHolds; headKept; headPre; held; holds-step; holdsFs-step; holdsOf;
   inner-back; joinPre; kept; kept-in; kept-shift; kept-step; kill-sub; lower-nodes; mapStep; next; node-eq;
   node-in₁; node-one; node-two; ofColumn; out; push-sound; push-thru; qempty-room; red-scripted;
   redFoldVals; redLookup; register-sound; room-wrap; row-sound; ruled; scanCons; scanCt;
   scanOff; scanRed; scanReg; scanStepped; self-node; sink-sound; sounds; spend-or; ceil-or; stage; stage-map;
-  stage-nil; stage-rebase; stage-seq; standing; step; step-cons; step-ct; step-kept; step-off; step-red;
-  step-reg; step-⇓; st″; sub-on; sub-ot; sub-rule; subscribe-kept; switchKill-ct; switchKill-nodes; takeStep;
+  stage-nil; stage-rebase; stage-seq; standing; step; step-cons; step-ct; step-off; step-red;
+  step-reg; step-⇓; st″; sub-on; sub-ot; sub-rule; switchKill-ct; switchKill-nodes; takeStep;
   termini; u-exhaust; u-merge; u-switch; unheadHolds; unheadKept; usable; waiting; wrap-facts; wrap-ot;
   wrap-reg; wrapNode; writeStage; ∨-T)
 open import Rx.Evaluator.Reducible.Floor using (fold-refill-spends; raw-kept; refill-spends)
+open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept; fold-sound; step-kept; subscribe-kept)
+open import Rx.Evaluator.Reducible.Calls using (callStage; fiStep; headCall; inner-after)
 
 baseRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
          (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m

@@ -225,8 +225,8 @@ through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
-proof half is red: the candidate still stands on the postulated arms below,
-and the oracle job is still off in CI. Neither half may be narrowed to pass.
+proof half holds no postulate; the oracle job is still off in CI. Neither
+half may be narrowed to pass.
 
 **After running 1.5M test cases, the evaluator's behavior is 1-for-1 correct
 against rxjs** — measured off the proof path, with both stuck branches rebuilt
@@ -244,7 +244,9 @@ a time, one synchronous value agrees because one observer is all there is, and
 re-entry is required because only a subscriber the burst creates is absent when
 it is handed back. The sweep matches on every case it draws, which narrows
 where it could be false without killing it. Ruled out: a fan-out re-entering
-its own merge without connecting (`Rx.Evaluator.Reducible.Floor`).
+its own merge without connecting (`Rx.Evaluator.Reducible.Floor`), and a
+connect registering the caller's chain breaking the rule for any path agreeing
+with it (`Rx.Evaluator.Reducible.Rule-Kept`).
 
 also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg moves, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
 also: `evaluate!` — same, its inhabitation.
@@ -259,14 +261,6 @@ also: `batch-online` — same, the online property Main asserts beside the main 
 also: `run-wellFormed` — same, the input-well-formed top line, which the subscribe carrier's port reached.
 
 ### Big picture tier roadmap
-
-- **THE RULE-KEEP TRIO, OVER THE FLOOR'S WALK.** `fold-kept`,
-  `subscribe-kept` and `step-kept` are all the raw fold still stands on, and
-  the floor induction already walks the fourteen relations they speak of
-  with an invariant threaded through a connect. Restate the trio as that
-  walk's second invariant, or find the arm where the rule is not carried —
-  a connect registering the caller's chain is the one arm the floor passes
-  over by peeling room, and it is the monster's clause.
 
 - **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
   frame what `Sound`'s `distinct` now carries for the whole path; drop
@@ -307,9 +301,8 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### The ledger
 
-- **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,
-  `PROBED`: every run keeps the rule for each path agreeing with its own, which
-  is all the raw fold stands on.
+(empty — every statement this tier's proof half stands on is proven; what
+remains is the oracle's half.)
 
 ## Tier 2 — finish `batchSimultaneousᵖ`
 
