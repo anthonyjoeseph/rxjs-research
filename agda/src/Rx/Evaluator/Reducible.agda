@@ -100,7 +100,7 @@ open import Data.Bool.ListAction using (any)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
-open import Data.List using (List; []; _∷_; map; _++_; null)
+open import Data.List using (List; []; _∷_; map; _++_; null; length)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᵃ)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
@@ -108,9 +108,9 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.Maybe using (Maybe; just; nothing; _<∣>_) renaming (map to mapᵐ)
-open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; _+_; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; z≤n; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans; <⇒≤; ∸-monoʳ-<; <-irrefl)
+open import Data.Nat.Properties using (_<?_; _≤?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans; <⇒≤; ∸-monoʳ-<; <-irrefl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Unit.Polymorphic using (⊤; tt)
@@ -1864,44 +1864,61 @@ holdsOf (f ↠[ _ ] κ) {st = st} fp (ap , ds) =
   , ap
   , holdsOf κ (λ k on → fp k (∨-Tʳ on)) ds
 
--- THE INNER'S BASE: ITS EXIT FRAME OVER THE REST OF THE PATH, FOLDED
--- RAW.  It is the one continuation an inner subscribed from the raw
--- fold is handed, so the frames the inner stacks step live above it and
--- no arm's extension re-enters the raw fold.  It holds no candidates,
--- so its column is what the store holds, and its successor stands there
--- again -- or on `fallen`, where the fold connected.
+-- how many inners a merge's node holds back, and none at any other node
+waiting : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → ℕ
+waiting (just (mergeAll-st _ _ q _)) = length q
+waiting _                            = 0
 
--- ITS KEEP IS THE TERMINUS.  Past the path's sink the fold fans out,
--- and the fan-out writes the nodes of the rows it folds; a row on slot
--- `j` sits at floor `suc j` and ends above it or at the root, and so
--- does every row that fan-out reaches in turn, so a node whose rows all
--- end at `j`'s sink is on none of them.
+-- the drain reads back no more than the node holds
+drain-waiting : ∀ {n} {Γ : Ctx n} (s : Ty) (h : Maybe (NodeState Γ))
+              → length (proj₁ (proj₂ (proj₂ (drainSt s h)))) ≤ waiting h
+drain-waiting s (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s
+... | no  _    = z≤n
+... | yes refl = ≤-refl
+drain-waiting s nothing                     = z≤n
+drain-waiting s (just (cell-st _))          = z≤n
+drain-waiting s (just (take-st _))          = z≤n
+drain-waiting s (just (switch-st _ _))      = z≤n
+drain-waiting s (just (exhaust-st _ _))     = z≤n
+drain-waiting s (just (batchSync-st _ _ _)) = z≤n
 
--- It is also the only place a merge's queue is nonempty at an inner's
--- finish: on standing ground the column guards keep it empty, but a
--- share's fan-out reaches the outer while the lane is busy, and a raw
--- finish meets what it queued.  The unwritten route drains that queue
--- on a budget no caller supplies: the raw finish seeds it at the
--- queue's own length, each drained inner is subscribed under a frame
--- budgeted at the strictly smaller remaining length, built first-order
--- before it is handed over, and a budgeted finish meeting a queue past
--- its budget peels the room.  Each frame kind is its own builder, so
--- none is handed to a candidate at its own ceiling and budget.
+-- A RUN SPENT ROOM: something it subscribed connected.
+Spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → Sched Γ → EvalSt e → Set
+Spends sched st sched′ st′ =
+  unconn (Sched.slots sched′) (EvalSt.connectedShares st′) < unconn (Sched.slots sched) (EvalSt.connectedShares st)
 
--- The budget is overrun only if a queue grows while one of its own
--- drained inners runs, and every admitted way of growing it spends room.
--- A fold reaches the flattener's outer frame along a path through its
--- node, and there are three such paths.  The inner's own is excluded by
--- `off-path`.  A row folded by the fan-out of the sink the inner's path
--- ends at, `just j`, is excluded as well: `at-end` puts every row through
--- the node at `just j`, while a row on slot `j` sits at floor `suc j` and
--- ends above it or at the root, and so does every row that fan-out
--- reaches in turn.
--- That leaves a row folded inside a connect's definition, which is the
--- one arm that adds to the connected set; nothing removes from it, so
--- the room is strictly lower for the rest of the run.  The measure is
--- the room, then the queue's length.  Read off the relation's arms and
--- the path and row types, not machine-checked.
+-- A RAW FOLD THAT CONNECTS NOTHING KEEPS THE TERMINUS.  Past the path's
+-- sink the fold fans out, and the fan-out writes the nodes of the rows
+-- it folds; a row on slot `j` sits at floor `suc j` and ends above it or
+-- at the root, and so does every row that fan-out reaches in turn, so a
+-- node whose rows all end at `j`'s sink is on none of them.  Every other
+-- write is to a frame's own node on the path or to one the counter hands
+-- out.  Read off the relation's arms and the row types, not
+-- machine-checked.
+
+-- Measured on the side branch's evaluator over 142k programs of the 1.5M
+-- corpus: at 157k frame steps whose continuation fanned out and 5.9k
+-- that connected, the fold below left the frame's own nodes unchanged in
+-- shape and value.  That reads the nodes of frames stacked on a path,
+-- not every node the terminus guards, and reachable states only.
+postulate
+  raw-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {κ : Path Γ lo u t}
+               {now vals fin sched st out sched′ st′}
+           → foldPath⇓ {e = e} now κ vals fin sched st (out , sched′ , st′) → Sound κ sched st
+           → (Spends sched st sched′ st′ → ⊥)
+           → ∀ {pfs} → Kept κ (standing pfs) sched st sched′ st′
+
+-- A MERGE'S QUEUE REFILLS WHILE ONE OF ITS INNERS RUNS ONLY BY SPENDING
+-- ROOM.  A fold reaches the flattener's outer frame along a path through
+-- its node, and there are three such paths.  The inner's own is excluded
+-- by `off-path`.  A row folded by the fan-out of the sink the inner's
+-- path ends at, `just j`, is excluded as well: `at-end` puts every row
+-- through the node at `just j`, while a row on slot `j` sits at floor
+-- `suc j` and ends above it or at the root, and so does every row that
+-- fan-out reaches in turn.  That leaves a row folded inside a connect's
+-- definition.  A share that already finished completes its new
+-- subscriber and runs nothing (`slot-spent`).  Read off the relation's
+-- arms and the path and row types, not machine-checked.
 
 -- Measured on the sweep-era evaluator over 1.5M programs: 44,160 raw
 -- finishes met a nonempty queue, and every one of the 324,536 budgeted
@@ -1912,14 +1929,53 @@ holdsOf (f ↠[ _ ] κ) {st = st} fp (ap , ds) =
 -- finishes met one exactly at budget, and the overrun, unfunded and
 -- walk-order tags never fired.  Reachable states only; the statement
 -- quantifies over every state its hypotheses admit.
--- RECOVERY: git show 43c34675:agda/src/Rx/Evaluator/Reducible.agda
---   restores `drain` and `drainSub`, the live drain the route rebuilds.
 postulate
-  baseRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
-           (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
-         → (op : AllOp) (nid inst : NodeId) (κ : Path Γ ℓ u t)
-           (pfs : PreFs (from-inner {s = u} op nid inst ↠[ ≤-refl ] κ))
-         → RP {e = e} m (Red m u) ⊤ (from-inner op nid inst ↠[ ≤-refl ] κ) (standing pfs)
+  refill-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u ℓ} (op : AllOp) (nid : NodeId)
+                    (κ : Path Γ ℓ u t) {o : Val Γ (obs u)} {now} {sched : Sched Γ} {st : EvalSt e} {r}
+                → subscribeE⇓ {e = e} o (from-inner op nid (nodeCt sched) ↠[ ≤-refl ] κ) now (bumpNode sched) st r
+                → Sound κ sched st → NodeOn nid κ sched st
+                → ∀ {h} → lookupNode nid (EvalSt.nodes st) ≡ h
+                → (Spends sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) → ⊥)
+                → waiting (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))) ≤ waiting h
+
+-- THE INNER'S BASE: ITS EXIT FRAME OVER THE REST OF THE PATH, FOLDED
+-- RAW.  It is the one continuation an inner subscribed from the raw
+-- fold is handed, so the frames the inner stacks step live above it and
+-- no arm's extension re-enters the raw fold.  It holds no candidates,
+-- so its column is what the store holds, and its successor stands there
+-- again -- or on `fallen`, where the fold connected.
+
+-- IT IS BUDGETED BY THE QUEUE ITS OWN COLUMN PINS.  It is the only place
+-- a merge's queue is nonempty at an inner's finish: on standing ground
+-- the column guards keep it empty, but a share's fan-out reaches the
+-- outer while the lane is busy, and a raw finish meets what it queued.
+-- Standing ground makes the store read back the column at every fold, so
+-- the finish drains exactly the queue the base was built over; each
+-- drained inner's base is built over the queue with that inner popped,
+-- and a drain reading its queue back longer than it left it has spent
+-- room and peels it.  The accessibility is the column's, so no fold
+-- transports it.
+
+-- DEAD ROUTE: the base folded raw at the same room, unbudgeted.  The
+--   base reaches the drain's inner as an argument to its candidate, and
+--   a call there is not guarded by the `fold` copattern: nothing on the
+--   cycle through `rawInner` is smaller.
+baseRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
+         (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
+       → (op : AllOp) (nid inst : NodeId) (κ : Path Γ ℓ u t)
+         (pfs : PreFs (from-inner {s = u} op nid inst ↠[ ≤-refl ] κ)) → Acc _<_ (waiting (proj₁ pfs))
+       → RP {e = e} m (Red m u) ⊤ (from-inner op nid inst ↠[ ≤-refl ] κ) (standing pfs)
+
+-- what one fold of the base answers: fallen where it connected, and the
+-- base again, over the store's columns, where it did not
+baseAns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
+          (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
+        → (op : AllOp) (nid inst : NodeId) (κ : Path Γ ℓ u t) {now : Tick} {vals : List (Val Γ u)} {fin : Bool}
+          (sched : Sched Γ) (st : EvalSt e) → Room m sched st
+        → Sound (from-inner {s = u} op nid inst ↠[ ≤-refl ] κ) sched st
+        → (r : Stream Γ t × Sched Γ × EvalSt e)
+        → foldPath⇓ {e = e} now (from-inner op nid inst ↠[ ≤-refl ] κ) vals fin sched st r
+        → Ans {e = e} m (Red m u) ⊤ (from-inner op nid inst ↠[ ≤-refl ] κ) now vals fin sched st
 
 -- ONE INNER SUBSCRIBED RAW, under its exit frame pushed on a path the
 -- store holds: its own candidate, at the room it was handed, over the
@@ -1929,14 +1985,17 @@ postulate
 -- which the rule vouches for.
 
 -- IT RE-ENTERS THE CANDIDATE, AND THE CANDIDATE REACHES THE RAW FOLD
--- AGAIN ONLY THROUGH THE FALLEN CONTINUATION, whose fold peels the
--- room's accessibility: that is the one strict edge on the cycle this
--- closes, and every other edge on it hands the same accessibility on.
--- Under the room every member keeps the order it had: the input bound
--- and the term size at the arms, the value at `red-val`, the path and
--- its floor at the raw fold, and every continuation builder guarded by
--- the `fold` copattern it answers.
--- STRUCTURAL SCC: batchFinish consume consumeFallen consumeStanding fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-exhaustAll red-input red-input-shared red-map red-mapFn red-mergeAll red-scan red-switchAll red-take red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-end translate-sub-end-go translate-sub-go walk
+-- AGAIN THROUGH THE FALLEN CONTINUATION AND THROUGH THE BASE.  The
+-- fallen fold peels the room's accessibility.  The base's fold reaches
+-- `rawInner` again at its own path only through its drain, whose inner
+-- is budgeted at the queue's accessibility, strictly below the one the
+-- base was built over, or at the room the refill peeled; everywhere
+-- else the base folds the path below it, which is shorter.  Under the
+-- room every member keeps the order it had: the input bound and the
+-- term size at the arms, the value at `red-val`, the path and its floor
+-- at the raw fold, and every continuation builder guarded by the `fold`
+-- copattern it answers.
+-- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-exhaustAll red-input red-input-shared red-map red-mapFn red-mergeAll red-scan red-switchAll red-take red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-end translate-sub-end-go translate-sub-go walk
 
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
@@ -1954,35 +2013,59 @@ rawInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
          → (op : AllOp) (nid : NodeId) (κ : Path Γ ℓ u t) (now : Tick) (o : Val Γ (obs u))
            (sched : Sched Γ) (st : EvalSt e) → Room m sched st
          → Sound κ sched st → NodeOn nid κ sched st
+         → (h : Maybe (NodeState Γ)) → lookupNode nid (EvalSt.nodes st) ≡ h → Acc _<_ (waiting h)
          → Σ (Stream Γ t × Sched Γ × EvalSt e)
              (subscribeE⇓ {e = e} o (from-inner op nid (nodeCt sched) ↠[ ≤-refl ] κ) now (bumpNode sched) st)
 
 -- a merge's queue drained raw, one inner a lane, on the fuel the finish
--- found it at
+-- found it at: each inner is budgeted at the queue it leaves, and a
+-- queue read back longer than that has spent room, so the drain goes on
+-- at the ceiling the connect peeled.  The bound is decided, not assumed:
+-- the evaluator runs this body, and a budget built from a postulate
+-- would be forced by the next pop, so only a queue that overran with
+-- nothing spent reaches `refill-spends`, and that is its refutation
 rawDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s lo ℓ}
            (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
          → (nid : NodeId) (κ : Path Γ ℓ s t) (now : Tick) (fuel : List (Val Γ (obs s)))
            (lim : Maybe ℕ) (act : ℕ) (od : Bool) (q : List (Val Γ (obs s)))
            (sched : Sched Γ) (st : EvalSt e) → Room m sched st
-         → Sound κ sched st → NodeOn nid κ sched st
+         → Sound κ sched st → NodeOn nid κ sched st → Acc _<_ (length q)
          → Σ (Stream Γ t × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e)
              (λ r → mergeAllDrain⇓ {e = e} nid κ now fuel lim act od q sched st r
                   × Sound κ (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
                   × NodeOn nid κ (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r)))))
-rawDrain ac le aM nid κ now [] lim act od q sched st rm so nd = _ , drain-spent , so , nd
-rawDrain ac le aM nid κ now (_ ∷ fs) lim act od [] sched st rm so nd = _ , drain-nil , so , nd
-rawDrain {s = s} ac le aM nid κ now (_ ∷ fs) lim act od (o ∷ q) sched st rm so nd
+rawDrain ac le aM nid κ now [] lim act od q sched st rm so nd aq = _ , drain-spent , so , nd
+rawDrain ac le aM nid κ now (_ ∷ fs) lim act od [] sched st rm so nd aq = _ , drain-nil , so , nd
+rawDrain {s = s} ac le (acc rsM) nid κ now (_ ∷ fs) lim act od (o ∷ q) sched st rm so nd (acc rs)
   with hasRoom lim act in eqr
 ... | false = _ , drain-no-room eqr , so , nd
-... | true  =
-  let (r₁ , d₁) = rawInner ac le aM mergeAllᵒ nid κ now o sched
-                    (record st { nodes = setNode nid (mergeAll-st {t = s} lim (suc act) q od) (EvalSt.nodes st) })
-                    rm (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
-      (so₁ , nd₁) = inner-after mergeAllᵒ nid κ sched d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+... | true
+  with rawInner ac le (acc rsM) mergeAllᵒ nid κ now o sched
+         (record st { nodes = setNode nid (mergeAll-st {t = s} lim (suc act) q od) (EvalSt.nodes st) })
+         rm (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+         (just (mergeAll-st {t = s} lim (suc act) q od)) (lookup-set nid _ (EvalSt.nodes st)) (rs ≤-refl)
+...   | (r₁ , d₁)
+  with unconn (Sched.slots (proj₁ (proj₂ r₁))) (EvalSt.connectedShares (proj₂ (proj₂ r₁)))
+         <? unconn (Sched.slots sched) (EvalSt.connectedShares st)
+...     | yes sp =
+  let (so₁ , nd₁) = inner-after mergeAllᵒ nid κ sched d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
       ds = drainSt s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))
-      (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le aM nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
+      (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le (rsM (<-≤-trans sp rm)) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
+                                (proj₂ (proj₂ (proj₂ ds))) (proj₁ (proj₂ (proj₂ ds)))
+                                (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) ≤-refl so₁ nd₁ (<-wellFounded _)
+  in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂
+...     | no nsp
+  with waiting (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁)))) ≤? length q
+...       | no nw = ⊥-elim (nw (refill-spends mergeAllᵒ nid κ d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+                                (lookup-set nid _ (EvalSt.nodes st)) nsp))
+...       | yes w =
+  let (so₁ , nd₁) = inner-after mergeAllᵒ nid κ sched d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+      ds = drainSt s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))
+      bd = ≤-trans (drain-waiting s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))) w
+      (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le (acc rsM) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
                                 (proj₂ (proj₂ (proj₂ ds))) (proj₁ (proj₂ (proj₂ ds)))
                                 (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) (room-keeps (subscribeE-keeps d₁) rm) so₁ nd₁
+                                (rs (s≤s bd))
   in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂
 
 -- one observable consumed raw: the store says which lane it takes
@@ -2007,11 +2090,13 @@ rawConsume {u = u} ac le aM op nid κ now o sched st rm so nd
               nd′ = sub-on {nid = nid} {κ = κ} {sched = sched} {sched′ = proj₁ sk} {st = st} {st′ = st₁} (kill-sub cur sched st) ct nd
               (r , d) = rawInner ac le aM switchᵒ nid κ now o (proj₁ sk) st₁
                           (room-keeps (switchKill-keeps cur sched st refl) rm) so′ nd′
+                          _ (lookup-set nid _ (EvalSt.nodes (proj₂ sk))) (<-wellFounded _)
           in _ , consume-switch-sub c refl refl (inner refl d) , inner-after switchᵒ nid κ (proj₁ sk) d so′ nd′
 ...     | u-exhaust od =
           let (r , d) = rawInner ac le aM exhaustᵒ nid κ now o sched
                           (record st { nodes = setNode nid (exhaust-st true od) (EvalSt.nodes st) }) rm
                           (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+                          _ (lookup-set nid _ (EvalSt.nodes st)) (<-wellFounded _)
           in _ , consume-exhaust-sub c (inner refl d)
                , inner-after exhaustᵒ nid κ sched d (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
 ...     | u-merge lim act q od with hasRoom lim act in eqr
@@ -2020,6 +2105,7 @@ rawConsume {u = u} ac le aM op nid κ now o sched st rm so nd
           let (r , d) = rawInner ac le aM mergeAllᵒ nid κ now o sched
                           (record st { nodes = setNode nid (mergeAll-st lim (suc act) q od) (EvalSt.nodes st) }) rm
                           (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+                          _ (lookup-set nid _ (EvalSt.nodes st)) (<-wellFounded _)
           in _ , consume-all-sub c eqr (inner refl d)
                , inner-after mergeAllᵒ nid κ sched d (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
 
@@ -2110,18 +2196,21 @@ rawReact : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s lo ℓ ℓ′}
          → (op : AllOp) (nid inst : NodeId) (le′ : ℓ ≤ ℓ′) (κ : Path Γ ℓ′ s t) (now : Tick)
            (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Room m sched st
          → Sound (from-inner op nid inst ↠[ le′ ] κ) sched st
+         → (h : Maybe (NodeState Γ)) → lookupNode nid (EvalSt.nodes st) ≡ h → Acc _<_ (waiting h)
          → Σ (Stream Γ t × List (Val Γ s) × Bool × Sched Γ × EvalSt e)
              (λ r → stepFrame⇓ {e = e} now (from-inner op nid inst) κ vals fin sched st r
                   × Sound κ (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r)))))
 
--- and finishing it once nd chain under the instance is registered
+-- and finishing it once nd chain under the instance is registered, at
+-- the node the store reads back
 rawFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s lo ℓ ℓ′}
             (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ′) → Acc _<_ m
           → (op : AllOp) (nid inst : NodeId) (le′ : ℓ ≤ ℓ′) (κ : Path Γ ℓ′ s t) (now : Tick)
             (vals : List (Val Γ s)) (sched : Sched Γ) (st : EvalSt e) → Room m sched st
           → Sound (from-inner op nid inst ↠[ le′ ] κ) sched st
+          → (h : Maybe (NodeState Γ)) → Acc _<_ (waiting h)
           → Σ (Stream Γ t × List (Val Γ s) × Bool × Sched Γ × EvalSt e)
-              (λ r → innerFinish⇓ {e = e} op nid inst κ now vals sched st (lookupNode nid (EvalSt.nodes st)) r
+              (λ r → innerFinish⇓ {e = e} op nid inst κ now vals sched st h r
                    × Sound κ (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r)))))
 
 -- a share's fan-out, one value to every admitted row before the next
@@ -2165,6 +2254,7 @@ rawFold ac le aM (batchSync-f k ↠[ le′ ] κ) now vals fin sched st rm so =
        (drop-ot (batchSync-f k) le′ κ (step-kept le′ sd so))
 rawFold ac le aM (from-inner op nid inst ↠[ le′ ] κ) now vals fin sched st rm so =
   let (r , sd , so′) = rawReact ac (≤-trans le le′) aM op nid inst le′ κ now vals fin sched st rm so
+                         _ refl (<-wellFounded _)
   in rawAfter ac le aM (from-inner op nid inst) le′ κ r sd (room-keeps (stepFrame-keeps sd) rm) so′
 rawFold ac le aM (thru-outer op nid ↠[ le′ ] κ) now vals fin sched st rm so =
   let (r , w , so₁ , _) = rawThru ac (≤-trans le le′) aM op nid κ now vals sched st rm
@@ -2178,18 +2268,17 @@ rawAfter ac le aM f le′ κ {now} (_ , vals′ , fin′ , sched₁ , st₁) sd 
   let (r , d) = rawFold ac (≤-trans le le′) aM κ now vals′ fin′ sched₁ st₁ rm so
   in _ , fold-step sd d
 
-rawReact ac le aM op nid inst le′ κ now vals false sched st rm so =
+rawReact ac le aM op nid inst le′ κ now vals false sched st rm so h eq aq =
   _ , step-from-inner react-false , drop-ot (from-inner op nid inst) le′ κ so
-rawReact ac le aM op nid inst le′ κ now vals true sched st rm so
+rawReact ac le aM op nid inst le′ κ now vals true sched st rm so h eq aq
   with any (aliveThroughᶠ inst st) (EvalSt.registry st) in eqa
 ... | true  = _ , step-from-inner (react-alive eqa) , drop-ot (from-inner op nid inst) le′ κ so
 ... | false =
-  let (r , fd , so′) = rawFinish ac le aM op nid inst le′ κ now vals sched st rm so
-  in r , step-from-inner (react-dead eqa fd) , so′
+  let (r , fd , so′) = rawFinish ac le aM op nid inst le′ κ now vals sched st rm so h aq
+  in r , step-from-inner (react-dead eqa (subst (λ x → innerFinish⇓ op nid inst κ now vals sched st x r) (sym eq) fd)) , so′
 
-rawFinish {s = s} ac le aM op nid inst le′ κ now vals sched st rm so
-  with lookupNode nid (EvalSt.nodes st)
-... | h with finishUsable op s inst h in equ
+rawFinish {s = s} ac le aM op nid inst le′ κ now vals sched st rm so h aq
+  with finishUsable op s inst h in equ
 ...   | false = _ , finish-nil equ , drop-ot (from-inner op nid inst) le′ κ so
 ...   | true with finishing op s inst h equ
 ...     | f-switch c od eqc = _ , finish-switch-clear eqc , sub-ot (λ r∈ → r∈) ≤-refl (drop-ot (from-inner op nid inst) le′ κ so)
@@ -2201,7 +2290,7 @@ rawFinish {s = s} ac le aM op nid inst le′ κ now vals sched st rm so
               so₁ = fold-kept d₁ so₀ (fi ↠[ le′ ] κ) so (λ _ _ _ → refl)
               (r₂ , d₂ , so₂ , _) = rawDrain ac le aM nid κ now q lim (pred act) od q
                                       (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) (room-keeps (foldPath-keeps d₁) rm)
-                                      (drop-ot fi le′ κ so₁) (head-on fi le′ κ nid (self-node nid (inst ∷ [])) so₁)
+                                      (drop-ot fi le′ κ so₁) (head-on fi le′ κ nid (self-node nid (inst ∷ [])) so₁) aq
           in _ , finish-all-drain {act = act} d₁ d₂ , sub-ot (λ r∈ → r∈) ≤-refl so₂
 
 rawWalk i ac aM now [] false sched st rm ru = _ , walk-nil , ru
@@ -3525,13 +3614,34 @@ red-val aM (obs u)   (Θ , b , ρ) = reducible aM b ρ (red-env aM ρ)
 red-env aM []ᵉ                 = tt
 red-env aM (_∷ᵉ_ {s = s} v vs) = red-val aM s v , red-env aM vs
 
-rawInner {u = u} ac le aM op nid κ now o sched st rm so nd =
+rawInner {u = u} ac le aM op nid κ now o sched st rm so nd h eq aq =
   let κ′  = from-inner {s = u} op nid (nodeCt sched) ↠[ ≤-refl ] κ
       so′ = fresh-inner op nid κ sched so nd
-      (r , d , _) = red-val aM (obs u) o κ′ (standing (colsOf κ′ st))
-                      (baseRP ac le aM op nid (nodeCt sched) κ (colsOf κ′ st)) tt now (bumpNode sched) st rm
-                      (grounded (holdsOf κ′ (fresh-path so′) (distinct so′)) so′)
+      (r , d , _) = red-val aM (obs u) o κ′ (standing (h , colsOf κ st))
+                      (baseRP ac le aM op nid (nodeCt sched) κ (h , colsOf κ st) aq) tt now (bumpNode sched) st rm
+                      (grounded (subst (λ x → HoldsFs κ′ (x , colsOf κ st) (bumpNode sched) st) eq
+                                   (holdsOf κ′ (fresh-path so′) (distinct so′))) so′)
   in r , d
+
+-- the base: its exit frame reacts at the budget its column pins, and the
+-- path below folds raw
+fold (baseRP ac le aM op nid inst κ (h , pfs) aq) tt now vals _ fin sched st rm (grounded hs so) =
+  let (r₀ , sd , so₀) = rawReact ac le aM op nid inst ≤-refl κ now vals fin sched st rm so h (proj₁ (proj₁ hs)) aq
+      (r , d) = rawAfter ac le aM (from-inner op nid inst) ≤-refl κ r₀ sd (room-keeps (stepFrame-keeps sd) rm) so₀
+  in baseAns ac le aM op nid inst κ sched st rm so r d
+
+baseAns ac le aM op nid inst κ sched st rm so (out , sched′ , st′) d
+  with unconn (Sched.slots sched′) (EvalSt.connectedShares st′) <? unconn (Sched.slots sched) (EvalSt.connectedShares st)
+... | yes sp =
+  ans out sched′ st′ d fallen (grounded (<-≤-trans sp rm) (fold-sound d so)) tt
+      (fallenRP ac le aM (from-inner op nid inst ↠[ ≤-refl ] κ)) tt
+... | no nsp =
+  let κ′  = from-inner op nid inst ↠[ ≤-refl ] κ
+      so′ = fold-sound d so
+  in ans out sched′ st′ d (standing (colsOf κ′ st′))
+         (grounded (holdsOf κ′ {sched = sched′} {st = st′} (fresh-path so′) (distinct so′)) so′)
+         (raw-kept d so nsp {pfs = colsOf κ′ st′})
+         (baseRP ac le aM op nid inst κ (colsOf κ′ st′) (<-wellFounded _)) tt
 
 ------------------------------------------------------------------
 -- THE FOLD OVER A SUBSCRIBING FRAME, AND THE FLATTENER ARMS.

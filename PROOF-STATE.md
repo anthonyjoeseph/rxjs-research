@@ -260,16 +260,15 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### Big picture tier roadmap
 
-- **GIVE THE BASE A BODY: THE BUDGETED DRAIN.** An inner subscribed from
-  the raw fold now stands on the store's own columns, over a path that may
-  end at a share's sink, and what it owes is `baseRP`: its exit frame
-  reacting, then the rest of the path folded raw. Its fold is the one place
-  a merge's queue is nonempty at a finish, so the body is the drain its
-  header names, on a budget at the queue's length, with an overrun peeling
-  the room; that decides whether a share's fan-out, the monster's own
-  region, terminates without an outside counter. Ruled out by the ground
-  landing: that the inner needs a ground no caller can supply, since the
-  candidate's cycle through it closes on the room alone.
+- **INSTANTIATE THE BASE'S TWO LEAVES AT A SHARE'S FAN-OUT.** The base
+  now folds raw and re-enters itself on the queue its own column pins, so
+  its cycle descends on the room or on that queue, and what it stands on is
+  `raw-kept` and `refill-spends`. Both speak of a run that connects nothing,
+  which is exactly a share's fan-out re-entering its own merge: a probe
+  reaching that run by evaluation, not by a hand-built state, decides both
+  in the monster's region. Ruled out by the body landing: that the base
+  needs an outside counter, since the queue its column pins budgets it, and
+  an unbudgeted base cannot pass the guard at all.
 
 - **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
   frame what `Sound`'s `distinct` now carries for the whole path; drop
@@ -310,10 +309,10 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### The ledger
 
-- **`baseRP`** (Reducible) — FALSITY, `RECOVERY`: an inner's exit frame over a
-  path the store holds, folded raw, as a continuation standing on the store's
-  columns; the only place a merge's queue is nonempty at a finish; owes the
-  budgeted drain.
+- **`refill-spends`** (Reducible) — FALSITY, `NO EVIDENCE`: an inner refills
+  its merge's queue only by spending room; the base's queue budget.
+- **`raw-kept`** (Reducible) — FALSITY, `NO EVIDENCE`: a raw fold that connects
+  nothing keeps the terminus; the base's standing re-entry.
 - **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,
   `PROBED`: every run keeps the rule for each path agreeing with its own, which
   is all the raw fold stands on.
