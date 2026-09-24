@@ -260,23 +260,20 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE KEEPING OF THE RULE, THEN GIVE THE INNERS A GROUND.**
-  The rule now rides on both grounds and down the arrival spine, and every
-  step that could break it is one of three FALSITY leaves that nothing has
-  instantiated: a frame step, a subscribe, a fold, each keeping the rule for
-  every path that agrees with its own. Probe them at a program whose inner
-  registers a row through an outer's node, which is the one region they
-  could fail; then build the third ground `rawInner`'s header names, frames
-  stacked live over a raw base, which decides whether a share's fan-out,
-  the monster's own region, terminates without an outside counter.
+- **GIVE THE INNERS A GROUND.** The keeping of the rule is instantiated at
+  an inner registering a row through an outer's node, and the oracle sweep
+  found no break of it; what the fan-out still stands on is `rawInner`.
+  Build the third ground its header names, frames stacked live over a raw
+  base, which decides whether a share's fan-out, the monster's own region,
+  terminates without an outside counter.
 
-- **INSTANTIATE THE ARMS AT THE PROGRAM THAT GROWS A QUEUE.** No Tier 1 row
-  has ever been instantiated. `mergeAll(1)` over a shared `of(1,2,3)` mapped
-  to the shared stream grows the queue while the lane is busy and reaches
-  the raw finish; inhabiting `rawInner`'s and `red-batchSync`'s conclusions
-  there from the relation's constructors is the first receipt the tier can
-  carry, and the one that could refute the monster's fan-out before the
-  body above is ground.
+- **INSTANTIATE `rawInner` AT THE PROGRAM THAT GROWS A QUEUE.** Every
+  frame arm now has a body; `rawInner` is the one statement nothing has
+  instantiated. `mergeAll(1)` over a shared `of(1,2,3)` mapped to the shared
+  stream grows the queue while the lane is busy and reaches the raw finish;
+  inhabiting its conclusion there from the relation's constructors is the
+  receipt that could refute the monster's fan-out before the ground above
+  is built.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
@@ -319,13 +316,6 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 - **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,
   `PROBED`: every run keeps the rule for each path agreeing with its own, which
   is all the raw fold stands on.
-- **`red-batchSync`** (Reducible) — FALSITY, `NO EVIDENCE`: the arm the trace
-  exists for; its closing fold replays the continuation over its source's
-  trace.
-- **`red-take`**, **`red-scan`** (Reducible) — FALSITY, `NO EVIDENCE`: the
-  frame arms that hold state read off the store.
-- **`red-scripted`** (Reducible) — FALSITY, `NO EVIDENCE`: the scripted slot,
-  which registers before folding a cold prefix.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`

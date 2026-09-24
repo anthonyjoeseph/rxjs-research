@@ -103,11 +103,12 @@ open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.List using (List; []; _∷_; map; _++_; null)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᵃ)
+open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.Maybe using (Maybe; just; nothing; _<∣>_) renaming (map to mapᵐ)
-open import Data.Nat using (ℕ; suc; pred; _≤_; _<_; _∸_; s≤s; _+_; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans; <⇒≤; ∸-monoʳ-<; <-irrefl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -120,7 +121,7 @@ open import Relation.Nullary using (yes; no)
 
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
 
-open import Rx.Prim using (Tick; ObservableInput)
+open import Rx.Prim using (Tick; ObservableInput; hot; cold)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Closed; Val; Exp; Tm; Env; []ᵉ;
   _∷ᵉ_; evalWith; foldVals; lookupEnv; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
@@ -129,7 +130,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
   add; sub; mul; eqᵖ; eqᵘ; ltᵖ; notᵖ; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ; FnClo; applyClo; _≟ᵗ_)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
-open import Rx.Mint using (sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
+open import Rx.Mint using (sourceᵏ; nodeᵏ; regᵏ; ordinalᵏ; freshId; setAt)
 open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; pres-write; lookup-set; set-above; <→≢ᵇ)
 open import Decide using (∧ˡ; ∧ʳ; ≡ᵇ→≡; ≡ᵇ-refl)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
@@ -137,11 +138,11 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _
   register; installNode; atDyn; atSlot; lowerFloor; memberSource; mergeAll-st; mergeAllᵒ;
   AllOp; switchᵒ; exhaustᵒ; NodeId; RegRow; cell-st; take-st; switch-st; exhaust-st; batchSync-st;
   setNode; hasRoom; consumeUsable; finishUsable; thruWrap; switchKill; aliveThroughᶠ;
-  RegId; RegSrc; regFloor; cutThrough; shareAdmit; shareDying; shareSpend; drainSt)
+  RegId; RegSrc; regFloor; cutThrough; takeVals; takeDispatch; scanVals; scanDispatch; batchVals; batchDispatch; batchDown; resolve; shareAdmit; shareDying; shareSpend; drainSt)
 open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert; fell-keeps; room-keeps)
 open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps; Keeps; switchKill-keeps; thruWrap-keeps; thruWalk-keeps;
   thruConsume-keeps; innerFinish-keeps; subscribeE-keeps; shareGo-keeps; shareDying-keeps)
-open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ; subs-map;
+open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-batchSync; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-shared; slot-spent; slot-join; slot-connect; connect; foldPath⇓; fold-root; fold-step;
   stepFrame⇓; step-map; injectRoot; inner; thruConsume⇓; consume-all-sub; consume-all-enqueue;
   consume-all-nil; consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
@@ -2047,7 +2048,7 @@ rawGo i ac aM now vals fin ((rid , p) ∷ ps) sched st rm ru ok ag
 -- bound and the term size fall at every former.  Every member of the
 -- candidate's cycle carries all three, so the checker reads the whole
 -- order off the call sites.
--- STRUCTURAL SCC: red-all red-exhaustAll red-input red-input-shared red-map red-mapFn red-mergeAll red-switchAll redExpAcc redTmAcc redTmsAcc
+-- STRUCTURAL SCC: red-all red-batchSync red-exhaustAll red-input red-input-shared red-map red-mapFn red-mergeAll red-scan red-switchAll red-take redExpAcc redTmAcc redTmsAcc
 Arm : ∀ {n} {Γ : Ctx n} {Θ t} → Exp Γ [] [] Θ t → Set₁
 Arm {Γ = Γ} {Θ = Θ} {t = t} b =
   ∀ (ρ : Env Γ Θ) {m} → RedEnv m ρ
@@ -2133,23 +2134,20 @@ red-mapFn : ∀ {n} {Γ : Ctx n} {Θ s t} (f : Tm Γ [] [] (s ∷ Θ) t)
 
 -- THE TAKE ARM.  Its frame holds a count read off the store; the
 -- translation truncates the column as the frame's dispatch does.
-postulate
-  red-take : ∀ {n} {Γ : Ctx n} {Θ t} (c : Tm Γ [] [] Θ natᵗ)
-               (b : Exp Γ [] [] Θ t) → Arm (takeᵉ c b)
+red-take : ∀ {n} {Γ : Ctx n} {Θ t} (c : Tm Γ [] [] Θ natᵗ)
+             (b : Exp Γ [] [] Θ t) → Arm (takeᵉ c b)
 
 -- THE BATCHSYNC ARM, WHICH IS THE ONE THE TRACE EXISTS FOR.  The
 -- bracket is opened by the install and closed when the subscribe call
 -- returns; the arm lowers the bit and folds its frame's successor once
 -- more with nothing arriving, and that successor is the replay of the
 -- continuation it built over the trace its source answered with.
-postulate
-  red-batchSync : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t) → Arm (batchSyncᵉ b)
+red-batchSync : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t) → Arm (batchSyncᵉ b)
 
 -- THE SCAN ARM.  Its frame holds the accumulator and its candidate;
 -- the translation folds the step's candidate along the column.
-postulate
-  red-scan : ∀ {n} {Γ : Ctx n} {Θ s t} (f : Tm Γ [] [] ((t ×ᵗ s) ∷ Θ) t)
-               (z : Tm Γ [] [] Θ t) (b : Exp Γ [] [] Θ s) → Arm (scanᵉ f z b)
+red-scan : ∀ {n} {Γ : Ctx n} {Θ s t} (f : Tm Γ [] [] ((t ×ᵗ s) ∷ Θ) t)
+             (z : Tm Γ [] [] Θ t) (b : Exp Γ [] [] Θ s) → Arm (scanᵉ f z b)
 
 -- THE FLATTENERS.  Each subscribes its source under the outer frame
 -- holding the fresh node, and the outer frame's step is a fold over
@@ -2163,25 +2161,90 @@ red-mergeAll : ∀ {n} {Γ : Ctx n} {Θ t} (lim : Maybe ℕ)
 red-switchAll : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ (obs t)) → Arm (switchAllᵉ b)
 red-exhaustAll : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ (obs t)) → Arm (exhaustAllᵉ b)
 
+-- A VALUE OF A DATA TYPE IS A CANDIDATE AT EVERY CEILING, AND ASKS
+-- NOTHING OF IT: no observable sits anywhere inside it, so nothing is
+-- subscribed and no accessibility is spent.
+red-data : ∀ {n} {Γ : Ctx n} {m} (t : Ty) → T (isData t) → (v : Val Γ t) → Red m t v
+red-data unitᵗ     _  _        = tt
+red-data boolᵗ     _  _        = tt
+red-data natᵗ      _  _        = tt
+red-data uniqᵗ     _  _        = tt
+red-data (s ×ᵗ u)  ok (a , b)  with isData s in es
+... | true  = red-data s (subst T (sym es) tt₀) a , red-data u ok b
+... | false = ⊥-elim ok
+red-data (s +ᵗ u)  ok (inj₁ a) with isData s in es
+... | true  = red-data s (subst T (sym es) tt₀) a
+... | false = ⊥-elim ok
+red-data (s +ᵗ u)  ok (inj₂ b) with isData s in es
+... | true  = red-data u ok b
+... | false = ⊥-elim ok
+red-data (listᵗ u) ok []       = []ᵃ
+red-data (listᵗ u) ok (x ∷ xs) = red-data u ok x ∷ᵃ red-data (listᵗ u) ok xs
+red-data (obs _)   ()
+
+-- what a run kept after a step that wrote nothing below the counter,
+-- it kept from before the step
+kept-before : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
+              (κ : Path Γ lo u t) {sched sched₁ sched₂ : Sched Γ} {st st₁ st₂ : EvalSt e}
+            → PreservedBelow (nodeCt sched) st st₁ → nodeCt sched ≤ nodeCt sched₁
+            → (p : Pre κ) → Kept κ p sched₁ st₁ sched₂ st₂ → Kept κ p sched st sched₂ st₂
+kept-before κ {sched} {sched₁} {sched₂} {st} {st₁} {st₂} pr ct (standing q) kp =
+  kept-trans κ q (standing q) {sched} {sched₁} {sched₂} {st} {st₁} {st₂}
+    (kept-step κ (standing q) {sched} {sched₁} {st} {st₁} pr ct) kp
+kept-before κ pr ct fallen       kp = tt
+
 -- THE SCRIPTED SLOT.  Folds what the slot script says through the
--- continuation with `red-val` beside every value; the live hot slot
--- registers and folds nothing; the cold slot with a tail registers
+-- continuation with a data candidate beside every value; the live hot
+-- slot registers and folds nothing; the cold slot with a tail registers
 -- FIRST and then folds its prefix, since a synchronous value can cut
 -- this very chain and a cut severs registrations.
-postulate
-  red-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
-      (i : Fin n) (ρ : Env Γ Θ) (k : ℕ) → T (toℕ i <ᵇ k) → Acc _<_ k
-    → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo) (pre : Pre κ)
-    → ∀ {m} (rp : RP {e = e} m (Red m (lookup Γ i)) S κ pre) (s : S)
-    → (now : Tick) (sched : Sched Γ)
-    → (sc : ObservableInput (Val Γ (lookup Γ i))) {oks : T (isData (lookup Γ i))}
-    → Sched.slots sched i ≡ scripted {ok = oks} sc
-    → ∀ (st : EvalSt e) → Acc _<_ m → Room m sched st → PreHolds m κ pre sched st
-    → Σ (Stream Γ t × Sched Γ × EvalSt e)
-        (λ r → subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r
-             × Σ (Trace {e = e} m (Red m (lookup Γ i)) S κ pre rp s)
-                 (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-                       × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
+red-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
+    (i : Fin n) (ρ : Env Γ Θ) (k : ℕ) → T (toℕ i <ᵇ k) → Acc _<_ k
+  → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo) (pre : Pre κ)
+  → ∀ {m} (rp : RP {e = e} m (Red m (lookup Γ i)) S κ pre) (s : S)
+  → (now : Tick) (sched : Sched Γ)
+  → (sc : ObservableInput (Val Γ (lookup Γ i))) {oks : T (isData (lookup Γ i))}
+  → Sched.slots sched i ≡ scripted {ok = oks} sc
+  → ∀ (st : EvalSt e) → Acc _<_ m → Room m sched st → PreHolds m κ pre sched st
+  → Σ (Stream Γ t × Sched Γ × EvalSt e)
+      (λ r → subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r
+           × Σ (Trace {e = e} m (Red m (lookup Γ i)) S κ pre rp s)
+               (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                     × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
+red-scripted i ρ k ok aK κ below pre rp s now sched (hot async) slEq st aM rm h
+  with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
+... | true =
+      let c  = call now [] (ofColumn κ pre []ᵃ) true sched st rm h
+          an = apply rp s c
+      in _ , subs-hot-done below slEq doneEq (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+... | false =
+      _ , subs-hot-live below slEq doneEq refl , []ᵗ
+    , holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x)
+        (register-sound {sched = sched} {st = st} (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ)
+           ≤-refl (lower-end below κ) (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on)))
+        h
+    , kept-step κ pre (pres (λ _ _ → refl)) ≤-refl
+red-scripted i ρ k ok aK κ below pre rp s now sched (cold sync []) {oks} slEq st aM rm h =
+  let c  = call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) true sched st rm h
+      an = apply rp s c
+  in _ , subs-cold-sync below slEq (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+red-scripted {Γ = Γ} {lo = lo} i ρ k ok aK κ below pre rp s now sched (cold sync (d ∷ ds)) {oks} slEq st aM rm h =
+  let src    = freshId sourceᵏ (Sched.mint sched)
+      ord    = freshId ordinalᵏ (Sched.mint sched)
+      rid    = freshId regᵏ (Sched.mint sched)
+      sched₁ = record sched
+                 { mint = setAt regᵏ (suc rid) (setAt sourceᵏ (suc src) (setAt ordinalᵏ (suc ord) (Sched.mint sched)))
+                 ; live = record { source = src ; ordinal = ord ; elemTy = lookup Γ i
+                                 ; pending = resolve now (d ∷ ds) }
+                          ∷ Sched.live sched }
+      st₁    = register rid (atDyn src lo) κ st
+      h₁     = holds-step κ pre {sched′ = sched₁} {st′ = st₁} (λ _ _ _ → refl) ≤-refl (λ x → x)
+                 (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl refl (λ k′ on → inj₁ on))
+                 h
+      c      = call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm h₁
+      an     = apply rp s c
+  in _ , subs-cold-async below slEq refl refl refl (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an
+   , kept-before κ (pres (λ _ _ → refl)) ≤-refl (Ans.pre′ an) (kept an)
 
 -- THE SHARED SLOT, AND THE ONE EDGE OF THE CYCLE THAT SPENDS THE ROOM.
 -- A share's definition is an arbitrary expression standing in no
@@ -2434,6 +2497,605 @@ red-map {n = n} {s = s} f b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s�
     , unheadHolds (map-f (_ , f , ρ)) ≤-refl κ tt fallen
         (subst (λ p → PreHolds _ (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) p _ _) (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
     , tt
+
+-- A TRUNCATION CANNOT INVENT A VALUE, WHICH IS WHY THE TAKE FRAME NEEDS
+-- NOTHING FROM THE STORE.  The node a take installs holds a COUNT, and
+-- the dispatch's value column is a prefix of the burst it was handed --
+-- on the cut path and the non-cut path alike, and at a stuck lookup the
+-- column is empty.  So the arriving candidates are the departing ones
+-- and the store decides only HOW MANY survive.
+redTakeVals : ∀ {n} {Γ : Ctx n} {s} {P : Val Γ s → Set₁} (k : ℕ)
+              {vals : List (Val Γ s)} → All P vals
+            → All P (proj₁ (takeVals k vals))
+redTakeVals zero          rv          = []ᵃ
+redTakeVals (suc k)       []ᵃ         = []ᵃ
+redTakeVals (suc zero)    (p ∷ᵃ ps)   = p ∷ᵃ []ᵃ
+redTakeVals (suc (suc k)) (p ∷ᵃ ps)   = p ∷ᵃ redTakeVals (suc k) ps
+
+redTakeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {P : Val Γ s → Set₁}
+                  (nid : NodeId) {vals : List (Val Γ s)} (fin : Bool)
+                  (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ))
+                → All P vals
+                → All P (proj₁ (takeDispatch {e = e} nid vals fin sched st ns))
+redTakeDispatch nid {vals} fin sched st (just (take-st k)) rv
+  with proj₂ (proj₂ (takeVals k vals))
+... | true  = redTakeVals k rv
+... | false = redTakeVals k rv
+redTakeDispatch nid fin sched st (just (cell-st _))           rv = []ᵃ
+redTakeDispatch nid fin sched st (just (batchSync-st _ _ _))  rv = []ᵃ
+redTakeDispatch nid fin sched st (just (mergeAll-st _ _ _ _)) rv = []ᵃ
+redTakeDispatch nid fin sched st (just (switch-st _ _))       rv = []ᵃ
+redTakeDispatch nid fin sched st (just (exhaust-st _ _))      rv = []ᵃ
+redTakeDispatch nid fin sched st nothing                      rv = []ᵃ
+
+-- the dispatch writes its own node and no other, and the cut sweeps
+-- rows and the live set but mints nothing
+takeOff : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+            (nid : NodeId) (ns : Maybe (NodeState Γ)) (vals : List (Val Γ s)) (fin : Bool)
+            (sched : Sched Γ) (st : EvalSt e) (k : NodeId) → (nid ≡ᵇ k) ≡ false
+        → lookupNode k (EvalSt.nodes (proj₂ (proj₂ (proj₂ (takeDispatch {e = e} nid vals fin sched st ns)))))
+        ≡ lookupNode k (EvalSt.nodes st)
+takeOff nid (just (take-st j)) vals fin sched st k ne with proj₂ (proj₂ (takeVals j vals))
+... | true  = set-above nid k (take-st zero) (EvalSt.nodes st) ne
+... | false = set-above nid k (take-st (proj₁ (proj₂ (takeVals j vals)))) (EvalSt.nodes st) ne
+takeOff nid (just (cell-st _))           vals fin sched st k ne = refl
+takeOff nid (just (batchSync-st _ _ _))  vals fin sched st k ne = refl
+takeOff nid (just (mergeAll-st _ _ _ _)) vals fin sched st k ne = refl
+takeOff nid (just (switch-st _ _))       vals fin sched st k ne = refl
+takeOff nid (just (exhaust-st _ _))      vals fin sched st k ne = refl
+takeOff nid nothing                      vals fin sched st k ne = refl
+
+takeCt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+           (nid : NodeId) (ns : Maybe (NodeState Γ)) (vals : List (Val Γ s)) (fin : Bool)
+           (sched : Sched Γ) (st : EvalSt e)
+       → nodeCt (proj₁ (proj₂ (proj₂ (takeDispatch {e = e} nid vals fin sched st ns)))) ≡ nodeCt sched
+takeCt nid (just (take-st j)) vals fin sched st with proj₂ (proj₂ (takeVals j vals))
+... | true  = refl
+... | false = refl
+takeCt nid (just (cell-st _))           vals fin sched st = refl
+takeCt nid (just (batchSync-st _ _ _))  vals fin sched st = refl
+takeCt nid (just (mergeAll-st _ _ _ _)) vals fin sched st = refl
+takeCt nid (just (switch-st _ _))       vals fin sched st = refl
+takeCt nid (just (exhaust-st _ _))      vals fin sched st = refl
+takeCt nid nothing                      vals fin sched st = refl
+
+-- THE TAKE FRAME'S STEP: the dispatch at what the frame holds, holding
+-- what the dispatch wrote.  Agreement is what lets the derivation read
+-- the store and the step read the held state, and they are one read.
+takeStepped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} (nid : NodeId)
+            → Maybe (NodeState Γ) → List (Val Γ s) → Bool → Sched Γ → EvalSt e
+            → Stepped {e = e} (take-f {s = s} nid)
+takeStepped nid h vals fin sched st =
+  let r = takeDispatch nid vals fin sched st h
+  in stepped (proj₁ r) (proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r)))
+             (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂ r)))))
+
+takeStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} (nid : NodeId) {P : Val Γ s → Set₁}
+         → FrameStep {e = e} (take-f nid) P P (λ _ → ⊤)
+takeStep nid = record
+  { step      = takeStepped nid
+  ; step-⇓    = λ {_} {κ} {now} h vals fin sched st c →
+                  subst (λ x → stepFrame⇓ now (take-f nid) κ vals fin sched st
+                                 (injectRoot (takeDispatch nid vals fin sched st x)))
+                        c step-take
+  ; step-red  = λ {h} {vals} {fin} {sched} {st} ps _ → redTakeDispatch nid fin sched st h ps , tt
+  ; step-cons = λ _ _ _ _ _ _ → refl
+  ; step-off  = λ h vals fin sched st k ne → takeOff nid h vals fin sched st k (head-off nid [] k ne)
+  ; step-ct   = takeCt nid }
+
+-- THE NODE THE COUNTER HANDS OUT IS ON EVERY PATH THE RULE HOLDS FOR,
+-- once installed: no row runs through it, so every row through it ends
+-- wherever the path does.
+fresh-on : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} (κ : Path Γ lo u t)
+             (ns : NodeState Γ) {sched : Sched Γ} {st : EvalSt e}
+         → Sound κ sched st
+         → NodeOn (nodeCt sched) κ (bumpNode sched) (installNode (nodeCt sched) ns st)
+fresh-on κ ns so = node-on (λ r∈ th → ⊥-elim (<-irrefl refl (fresh-rows (ruled so) r∈ _ th))) ≤-refl
+
+-- A FRAME WHOSE NODES ARE THE ONE THE COUNTER HANDS OUT, installed
+-- there, stands on the rule
+fresh-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s u} (f : Frame Γ s u) (κ : Path Γ lo u t)
+                (ns : NodeState Γ) {sched : Sched Γ} {st : EvalSt e}
+            → (∀ k → T (any (_≡ᵇ k) (frameNodes f)) → nodeCt sched ≡ k)
+            → Sound κ sched st
+            → Sound (f ↠[ ≤-refl ] κ) (bumpNode sched) (installNode (nodeCt sched) ns st)
+fresh-sound f κ ns {sched} {st} one so =
+  push-sound f ≤-refl κ (sub-ot (λ r∈ → r∈) (n≤1+n _) so)
+    (λ k a → subst (λ j → NodeOn j κ (bumpNode sched) (installNode (nodeCt sched) ns st)) (one k a) (fresh-on κ ns so))
+
+-- and its ground, over a standing path
+fresh-holds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo s u} (f : Frame Γ s u) (κ : Path Γ lo u t)
+                (pfs : PreFs κ) (h : HeldF f) (ns : NodeState Γ) {sched : Sched Γ} {st : EvalSt e}
+            → (∀ k → T (any (_≡ᵇ k) (frameNodes f)) → nodeCt sched ≡ k)
+            → ConsistentF f h (installNode (nodeCt sched) ns st) → FreshF (suc (nodeCt sched)) f
+            → PreHolds m κ (standing pfs) sched st
+            → PreHolds m (f ↠[ ≤-refl ] κ) (standing (h , pfs)) (bumpNode sched) (installNode (nodeCt sched) ns st)
+fresh-holds f κ pfs h ns {sched} {st} one c fr hs =
+  grounded
+    ( (c , fr)
+    , (λ k′ on onκ → fresh-apart κ pfs (ground hs) k′
+                       (subst (λ j → T (nodeCt sched ≡ᵇ j)) (one k′ on) (subst T (sym (≡ᵇ-refl (nodeCt sched))) tt₀)) onκ)
+    , holdsFs-step κ pfs (λ k′ on k< → set-above (nodeCt sched) k′ ns (EvalSt.nodes st) (<→≢ᵇ k<)) (n≤1+n _) (ground hs) )
+    (fresh-sound f κ ns one (sounds hs))
+
+-- THE TAKE ARM'S BODY.  A zero count completes on subscription and
+-- never touches the source; otherwise the node goes in at the counter
+-- and the arm is the map arm's over the take frame.
+red-take c b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h with evalWith c ρ in eq
+red-take c b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h | zero =
+  let cl = call now [] (ofColumn κ pre []ᵃ) true sched st rm h
+      an = apply rp s₀ cl
+  in _ , subs-take-zero eq (der an) , cl ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+red-take c b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h | suc j
+  with redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
+         (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
+         (take-f (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (take-st (suc j)) , pfs))
+         (liveRP ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp)
+         s₀ now (bumpNode sched) (installNode (nodeCt sched) (take-st (suc j)) st) rm
+         (fresh-holds (take-f (nodeCt sched)) κ pfs (just (take-st (suc j))) (take-st (suc j)) (λ _ → node-eq)
+            (lookup-set (nodeCt sched) (take-st (suc j)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h)
+... | (r , d , tr , hl , kp)
+  with translate-end ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp tr
+...   | (h″ , _ , eq′) =
+      let tr′ = translate ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp tr
+      in r , subs-take-suc eq refl d , tr′
+       , unheadHolds (take-f (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
+           (subst (λ p → PreHolds _ (take-f (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ hl)
+       , unheadKept (take-f (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
+           {sched} {bumpNode sched} {st = st} {st₁ = installNode (nodeCt sched) (take-st (suc j)) st}
+           (λ k′ k< on → subst T (<→≢ᵇ k<) (node-one {nodeCt sched} {k′} on)) (n≤1+n _)
+           (λ k′ k< → set-above (nodeCt sched) k′ (take-st (suc j)) (EvalSt.nodes st) (<→≢ᵇ k<))
+           (subst (λ p → Kept (take-f (nodeCt sched) ↠[ ≤-refl ] κ) p (bumpNode sched)
+                                (installNode (nodeCt sched) (take-st (suc j)) st) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ kp)
+red-take {n = n} c b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell | suc j
+  with redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
+         (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
+         (take-f (nodeCt sched) ↠[ ≤-refl ] κ) fallen
+         (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (take-f (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
+         (bumpNode sched) (installNode (nodeCt sched) (take-st (suc j)) st) rm
+         (grounded (ground fell) (fresh-sound (take-f (nodeCt sched)) κ (take-st (suc j)) (λ _ → node-eq) (sounds fell)))
+... | (r , d , tr , hl , kp) =
+      r , subs-take-suc eq refl d , []ᵗ
+    , unheadHolds (take-f (nodeCt sched)) ≤-refl κ nothing fallen
+        (subst (λ p → PreHolds _ (take-f (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+           (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
+    , tt
+
+-- A FOLD IS ITS ACCUMULATOR THREADED ALONG THE BATCH, and so is the
+-- claim about it: each output IS the next accumulator, so one walk
+-- delivers both the candidate at every emitted value and the candidate
+-- at what gets written back.
+redScanVals : ∀ {n} {Γ : Ctx n} {m s u} (fn : FnClo Γ (u ×ᵗ s) u)
+            → (∀ {v} → Red m (u ×ᵗ s) v → Red m u (applyClo fn v))
+            → {a : Val Γ u} → Red m u a
+            → {vals : List (Val Γ s)} → All (Red m s) vals
+            → All (Red m u) (proj₁ (scanVals fn a vals)) × Red m u (proj₂ (scanVals fn a vals))
+redScanVals fn rf ra []ᵃ       = []ᵃ , ra
+redScanVals fn rf ra (p ∷ᵃ ps) =
+  let q = rf (ra , p)
+  in q ∷ᵃ proj₁ (redScanVals fn rf q ps) , proj₂ (redScanVals fn rf q ps)
+
+-- WHAT THE SCAN FRAME HOLDS A CANDIDATE FOR: the accumulator its cell
+-- holds, whenever it holds one of the frame's own type
+ScanHeld : ∀ {n} {Γ : Ctx n} (m : ℕ) (u : Ty) → Maybe (NodeState Γ) → Set₁
+ScanHeld {Γ = Γ} m u h = ∀ {a : Val Γ u} → h ≡ just (cell-st a) → Red m u a
+
+cell-inj : ∀ {n} {Γ : Ctx n} {u} {a b : Val Γ u} → just (cell-st {Γ = Γ} a) ≡ just (cell-st b) → a ≡ b
+cell-inj refl = refl
+
+-- what the frame holds after the dispatch: the cell it wrote, or what it
+-- held where the dispatch wrote nothing
+scanHeld : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ (u ×ᵗ s) u → List (Val Γ s)
+         → Maybe (NodeState Γ) → Maybe (NodeState Γ)
+scanHeld {u = u} fn vals (just (cell-st {w} a)) with w ≟ᵗ u
+... | no  _    = just (cell-st a)
+... | yes refl = just (cell-st (proj₂ (scanVals fn a vals)))
+scanHeld fn vals h = h
+
+scanRed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s u} (fn : FnClo Γ (u ×ᵗ s) u)
+            (rf : ∀ {v} → Red m (u ×ᵗ s) v → Red m u (applyClo fn v))
+            (nid : NodeId) {vals : List (Val Γ s)} (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+            (h : Maybe (NodeState Γ))
+        → All (Red m s) vals → ScanHeld m u h
+        → All (Red m u) (proj₁ (scanDispatch {e = e} fn nid vals fin sched st h)) × ScanHeld m u (scanHeld fn vals h)
+scanRed {u = u} fn rf nid fin sched st (just (cell-st {w} a)) ps rh with w ≟ᵗ u
+... | no  _    = []ᵃ , rh
+... | yes refl =
+      proj₁ (redScanVals fn rf (rh refl) ps)
+    , λ eq → subst (Red _ u) (cell-inj eq) (proj₂ (redScanVals fn rf (rh refl) ps))
+scanRed fn rf nid fin sched st (just (take-st _))           ps rh = []ᵃ , rh
+scanRed fn rf nid fin sched st (just (batchSync-st _ _ _))  ps rh = []ᵃ , rh
+scanRed fn rf nid fin sched st (just (mergeAll-st _ _ _ _)) ps rh = []ᵃ , rh
+scanRed fn rf nid fin sched st (just (switch-st _ _))       ps rh = []ᵃ , rh
+scanRed fn rf nid fin sched st (just (exhaust-st _ _))      ps rh = []ᵃ , rh
+scanRed fn rf nid fin sched st nothing                      ps rh = []ᵃ , rh
+
+scanCons : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (fn : FnClo Γ (u ×ᵗ s) u)
+             (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+             (h : Maybe (NodeState Γ)) → lookupNode nid (EvalSt.nodes st) ≡ h
+         → lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂ (scanDispatch {e = e} fn nid vals fin sched st h)))))
+         ≡ scanHeld fn vals h
+scanCons {u = u} fn nid vals fin sched st (just (cell-st {w} a)) c with w ≟ᵗ u
+... | no  _    = c
+... | yes refl = lookup-set nid (cell-st (proj₂ (scanVals fn a vals))) (EvalSt.nodes st)
+scanCons fn nid vals fin sched st (just (take-st _))           c = c
+scanCons fn nid vals fin sched st (just (batchSync-st _ _ _))  c = c
+scanCons fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) c = c
+scanCons fn nid vals fin sched st (just (switch-st _ _))       c = c
+scanCons fn nid vals fin sched st (just (exhaust-st _ _))      c = c
+scanCons fn nid vals fin sched st nothing                      c = c
+
+scanOff : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (fn : FnClo Γ (u ×ᵗ s) u)
+            (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+            (h : Maybe (NodeState Γ)) (k : NodeId) → (nid ≡ᵇ k) ≡ false
+        → lookupNode k (EvalSt.nodes (proj₂ (proj₂ (proj₂ (scanDispatch {e = e} fn nid vals fin sched st h)))))
+        ≡ lookupNode k (EvalSt.nodes st)
+scanOff {u = u} fn nid vals fin sched st (just (cell-st {w} a)) k ne with w ≟ᵗ u
+... | no  _    = refl
+... | yes refl = set-above nid k (cell-st (proj₂ (scanVals fn a vals))) (EvalSt.nodes st) ne
+scanOff fn nid vals fin sched st (just (take-st _))           k ne = refl
+scanOff fn nid vals fin sched st (just (batchSync-st _ _ _))  k ne = refl
+scanOff fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) k ne = refl
+scanOff fn nid vals fin sched st (just (switch-st _ _))       k ne = refl
+scanOff fn nid vals fin sched st (just (exhaust-st _ _))      k ne = refl
+scanOff fn nid vals fin sched st nothing                      k ne = refl
+
+scanCt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (fn : FnClo Γ (u ×ᵗ s) u)
+           (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+           (h : Maybe (NodeState Γ))
+       → nodeCt (proj₁ (proj₂ (proj₂ (scanDispatch {e = e} fn nid vals fin sched st h)))) ≡ nodeCt sched
+scanCt {u = u} fn nid vals fin sched st (just (cell-st {w} a)) with w ≟ᵗ u
+... | no  _    = refl
+... | yes refl = refl
+scanCt fn nid vals fin sched st (just (take-st _))           = refl
+scanCt fn nid vals fin sched st (just (batchSync-st _ _ _))  = refl
+scanCt fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) = refl
+scanCt fn nid vals fin sched st (just (switch-st _ _))       = refl
+scanCt fn nid vals fin sched st (just (exhaust-st _ _))      = refl
+scanCt fn nid vals fin sched st nothing                      = refl
+
+-- THE SCAN FRAME'S STEP: the dispatch at what the frame holds, holding
+-- the accumulator it wrote back, with the closure's candidate carried
+-- along the batch from the one the frame held.
+scanStepped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
+            → Maybe (NodeState Γ) → List (Val Γ s) → Bool → Sched Γ → EvalSt e
+            → Stepped {e = e} (scan-f fn nid)
+scanStepped fn nid h vals fin sched st =
+  let r = scanDispatch fn nid vals fin sched st h
+  in stepped (proj₁ r) (proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r)))
+             (scanHeld fn vals h)
+
+scanStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s u} (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
+         → (∀ {v} → Red m (u ×ᵗ s) v → Red m u (applyClo fn v))
+         → FrameStep {e = e} (scan-f fn nid) (Red m s) (Red m u) (ScanHeld m u)
+scanStep fn nid rf = record
+  { step      = scanStepped fn nid
+  ; step-⇓    = λ {_} {κ} {now} h vals fin sched st c →
+                  subst (λ x → stepFrame⇓ now (scan-f fn nid) κ vals fin sched st
+                                 (injectRoot (scanDispatch fn nid vals fin sched st x)))
+                        c step-scan
+  ; step-red  = λ {h} {vals} {fin} {sched} {st} ps rh → scanRed fn rf nid fin sched st h ps rh
+  ; step-cons = λ h vals fin sched st c → scanCons fn nid vals fin sched st h c
+  ; step-off  = λ h vals fin sched st k ne → scanOff fn nid vals fin sched st h k (head-off nid [] k ne)
+  ; step-ct   = λ h vals fin sched st → scanCt fn nid vals fin sched st h }
+
+-- THE SCAN ARM'S BODY: the take arm's, with the cell seeded from the
+-- seed's own candidate and the closure's funded by the term's size.
+red-scan f z b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h
+  with redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
+         (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z)) (m≤n+m _ (gsizeᵗ f))))) aM
+         (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (cell-st (evalWith z ρ)) , pfs))
+         (liveRP ≤-refl aM
+           (scanStep (_ , f , ρ) (nodeCt sched)
+             (λ {v} p → redTmAcc f (v ∷ᵉ ρ) (p , rρ) k (∧ˡ (inputsBelowᵗ k f) _ ok) aK
+                          (rs (s≤s (m≤m+n (gsizeᵗ f) _))) aM))
+           (just (cell-st (evalWith z ρ)))
+           (λ eq → subst (Red _ _) (cell-inj eq)
+                     (redTmAcc z ρ rρ k (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
+                        (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b)) (m≤n+m _ (gsizeᵗ f))))) aM))
+           κ pfs rp)
+         s₀ now (bumpNode sched) (installNode (nodeCt sched) (cell-st (evalWith z ρ)) st) rm
+         (fresh-holds (scan-f (_ , f , ρ) (nodeCt sched)) κ pfs (just (cell-st (evalWith z ρ))) (cell-st (evalWith z ρ))
+            (λ _ → node-eq) (lookup-set (nodeCt sched) (cell-st (evalWith z ρ)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h)
+... | (r , d , tr , hl , kp)
+  with translate-end ≤-refl aM
+         (scanStep (_ , f , ρ) (nodeCt sched)
+           (λ {v} p → redTmAcc f (v ∷ᵉ ρ) (p , rρ) k (∧ˡ (inputsBelowᵗ k f) _ ok) aK
+                        (rs (s≤s (m≤m+n (gsizeᵗ f) _))) aM))
+         (just (cell-st (evalWith z ρ)))
+         (λ eq → subst (Red _ _) (cell-inj eq)
+                   (redTmAcc z ρ rρ k (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
+                      (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b)) (m≤n+m _ (gsizeᵗ f))))) aM))
+         κ pfs rp tr
+...   | (h″ , _ , eq′) =
+      let tr′ = translate ≤-refl aM
+                  (scanStep (_ , f , ρ) (nodeCt sched)
+                    (λ {v} p → redTmAcc f (v ∷ᵉ ρ) (p , rρ) k (∧ˡ (inputsBelowᵗ k f) _ ok) aK
+                                 (rs (s≤s (m≤m+n (gsizeᵗ f) _))) aM))
+                  (just (cell-st (evalWith z ρ)))
+                  (λ eq → subst (Red _ _) (cell-inj eq)
+                            (redTmAcc z ρ rρ k (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
+                               (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b)) (m≤n+m _ (gsizeᵗ f))))) aM))
+                  κ pfs rp tr
+      in r , subs-scan refl d , tr′
+       , unheadHolds (scan-f (_ , f , ρ) (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
+           (subst (λ p → PreHolds _ (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ hl)
+       , unheadKept (scan-f (_ , f , ρ) (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
+           {sched} {bumpNode sched} {st = st} {st₁ = installNode (nodeCt sched) (cell-st (evalWith z ρ)) st}
+           (λ k′ k< on → subst T (<→≢ᵇ k<) (node-one {nodeCt sched} {k′} on)) (n≤1+n _)
+           (λ k′ k< → set-above (nodeCt sched) k′ (cell-st (evalWith z ρ)) (EvalSt.nodes st) (<→≢ᵇ k<))
+           (subst (λ p → Kept (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) p (bumpNode sched)
+                                (installNode (nodeCt sched) (cell-st (evalWith z ρ)) st) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ kp)
+red-scan {n = n} f z b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell
+  with redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
+         (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z)) (m≤n+m _ (gsizeᵗ f))))) aM
+         (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) fallen
+         (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
+         (bumpNode sched) (installNode (nodeCt sched) (cell-st (evalWith z ρ)) st) rm
+         (grounded (ground fell) (fresh-sound (scan-f (_ , f , ρ) (nodeCt sched)) κ (cell-st (evalWith z ρ)) (λ _ → node-eq) (sounds fell)))
+... | (r , d , tr , hl , kp) =
+      r , subs-scan refl d , []ᵗ
+    , unheadHolds (scan-f (_ , f , ρ) (nodeCt sched)) ≤-refl κ nothing fallen
+        (subst (λ p → PreHolds _ (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+           (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
+    , tt
+
+-- WHAT THE BATCH FRAME HOLDS A CANDIDATE FOR: the buffer its bracket
+-- holds, whenever it holds one of the frame's own element type.  The
+-- buffer is only ever a concatenation of arrivals, so the candidates
+-- are the arrivals' own.
+BatchHeld : ∀ {n} {Γ : Ctx n} (m : ℕ) (u : Ty) → Maybe (NodeState Γ) → Set₁
+BatchHeld {Γ = Γ} m u h =
+  ∀ {sync} {bur : List (Val Γ u)} {done} → h ≡ just (batchSync-st {s = u} sync bur done) → All (Red m u) bur
+
+-- the bracket the install opens holds nothing
+batch₀ : ∀ {n} {Γ : Ctx n} {m u} → BatchHeld {Γ = Γ} m u (just (batchSync-st {s = u} true [] false))
+batch₀ refl = []ᵃ
+
+-- a regrouping of candidates is candidates for the groups
+redBatch : ∀ {n} {Γ : Ctx n} {m s} (sync : Bool) {vals : List (Val Γ s)}
+         → All (Red m s) vals → All (Red m (s ×ᵗ listᵗ s)) (batchVals sync vals)
+redBatch _     []ᵃ       = []ᵃ
+redBatch true  (p ∷ᵃ ps) = (p , ps) ∷ᵃ []ᵃ
+redBatch false (p ∷ᵃ ps) = (p , []ᵃ) ∷ᵃ redBatch false ps
+
+-- what the frame holds after the dispatch: the bracket it wrote, or
+-- what it held where the dispatch wrote nothing
+batchHeld : ∀ {n} {Γ : Ctx n} {s} → List (Val Γ s) → Bool → Maybe (NodeState Γ) → Maybe (NodeState Γ)
+batchHeld {s = s} vals fin (just (batchSync-st {w} true bur done)) with w ≟ᵗ s
+... | no  _    = just (batchSync-st true bur done)
+... | yes refl = just (batchSync-st true (bur ++ vals) (done ∨ fin))
+batchHeld {s = s} vals fin (just (batchSync-st {w} false bur done)) with w ≟ᵗ s
+... | no  _    = just (batchSync-st false bur done)
+... | yes refl = just (batchSync-st {s = s} false [] false)
+batchHeld vals fin h = h
+
+batchRed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s} (nid : NodeId) {vals : List (Val Γ s)} (fin : Bool)
+             (sched : Sched Γ) (st : EvalSt e) (h : Maybe (NodeState Γ))
+         → All (Red m s) vals → BatchHeld m s h
+         → All (Red m (s ×ᵗ listᵗ s)) (proj₁ (batchDispatch {e = e} nid vals fin sched st h))
+         × BatchHeld m s (batchHeld vals fin h)
+batchRed {s = s} nid fin sched st (just (batchSync-st {w} true bur done)) ps rh with w ≟ᵗ s
+... | no  _    = []ᵃ , rh
+... | yes refl = []ᵃ , λ { refl → ++⁺ (rh refl) ps }
+batchRed {s = s} nid fin sched st (just (batchSync-st {w} false bur done)) ps rh with w ≟ᵗ s
+... | no  _    = redBatch false ps , rh
+... | yes refl = ++⁺ (redBatch true (rh refl)) (redBatch false ps) , λ { refl → []ᵃ }
+batchRed nid fin sched st (just (cell-st _))           ps rh = []ᵃ , rh
+batchRed nid fin sched st (just (take-st _))           ps rh = []ᵃ , rh
+batchRed nid fin sched st (just (mergeAll-st _ _ _ _)) ps rh = []ᵃ , rh
+batchRed nid fin sched st (just (switch-st _ _))       ps rh = []ᵃ , rh
+batchRed nid fin sched st (just (exhaust-st _ _))      ps rh = []ᵃ , rh
+batchRed nid fin sched st nothing                      ps rh = []ᵃ , rh
+
+batchCons : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+              (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+              (h : Maybe (NodeState Γ)) → lookupNode nid (EvalSt.nodes st) ≡ h
+          → lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂ (batchDispatch {e = e} nid vals fin sched st h)))))
+          ≡ batchHeld vals fin h
+batchCons {s = s} nid vals fin sched st (just (batchSync-st {w} true bur done)) c with w ≟ᵗ s
+... | no  _    = c
+... | yes refl = lookup-set nid (batchSync-st true (bur ++ vals) (done ∨ fin)) (EvalSt.nodes st)
+batchCons {s = s} nid vals fin sched st (just (batchSync-st {w} false bur done)) c with w ≟ᵗ s
+... | no  _    = c
+... | yes refl = lookup-set nid (batchSync-st {s = s} false [] false) (EvalSt.nodes st)
+batchCons nid vals fin sched st (just (cell-st _))           c = c
+batchCons nid vals fin sched st (just (take-st _))           c = c
+batchCons nid vals fin sched st (just (mergeAll-st _ _ _ _)) c = c
+batchCons nid vals fin sched st (just (switch-st _ _))       c = c
+batchCons nid vals fin sched st (just (exhaust-st _ _))      c = c
+batchCons nid vals fin sched st nothing                      c = c
+
+batchOff : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+             (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+             (h : Maybe (NodeState Γ)) (k : NodeId) → (nid ≡ᵇ k) ≡ false
+         → lookupNode k (EvalSt.nodes (proj₂ (proj₂ (proj₂ (batchDispatch {e = e} nid vals fin sched st h)))))
+         ≡ lookupNode k (EvalSt.nodes st)
+batchOff {s = s} nid vals fin sched st (just (batchSync-st {w} true bur done)) k ne with w ≟ᵗ s
+... | no  _    = refl
+... | yes refl = set-above nid k (batchSync-st true (bur ++ vals) (done ∨ fin)) (EvalSt.nodes st) ne
+batchOff {s = s} nid vals fin sched st (just (batchSync-st {w} false bur done)) k ne with w ≟ᵗ s
+... | no  _    = refl
+... | yes refl = set-above nid k (batchSync-st {s = s} false [] false) (EvalSt.nodes st) ne
+batchOff nid vals fin sched st (just (cell-st _))           k ne = refl
+batchOff nid vals fin sched st (just (take-st _))           k ne = refl
+batchOff nid vals fin sched st (just (mergeAll-st _ _ _ _)) k ne = refl
+batchOff nid vals fin sched st (just (switch-st _ _))       k ne = refl
+batchOff nid vals fin sched st (just (exhaust-st _ _))      k ne = refl
+batchOff nid vals fin sched st nothing                      k ne = refl
+
+batchCt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+            (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+            (h : Maybe (NodeState Γ))
+        → nodeCt (proj₁ (proj₂ (proj₂ (batchDispatch {e = e} nid vals fin sched st h)))) ≡ nodeCt sched
+batchCt {s = s} nid vals fin sched st (just (batchSync-st {w} true bur done)) with w ≟ᵗ s
+... | no  _    = refl
+... | yes refl = refl
+batchCt {s = s} nid vals fin sched st (just (batchSync-st {w} false bur done)) with w ≟ᵗ s
+... | no  _    = refl
+... | yes refl = refl
+batchCt nid vals fin sched st (just (cell-st _))           = refl
+batchCt nid vals fin sched st (just (take-st _))           = refl
+batchCt nid vals fin sched st (just (mergeAll-st _ _ _ _)) = refl
+batchCt nid vals fin sched st (just (switch-st _ _))       = refl
+batchCt nid vals fin sched st (just (exhaust-st _ _))      = refl
+batchCt nid vals fin sched st nothing                      = refl
+
+-- THE BATCH FRAME'S STEP: the dispatch at what the frame holds, holding
+-- the bracket it wrote.  With the bit up the arrivals go into the
+-- buffer beside their candidates; with it down the buffer's candidates
+-- leave as the flushed group's.
+batchStepped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} (nid : NodeId)
+             → Maybe (NodeState Γ) → List (Val Γ s) → Bool → Sched Γ → EvalSt e
+             → Stepped {e = e} (batchSync-f {s = s} nid)
+batchStepped nid h vals fin sched st =
+  let r = batchDispatch nid vals fin sched st h
+  in stepped (proj₁ r) (proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r)))
+             (batchHeld vals fin h)
+
+batchStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s} (nid : NodeId)
+          → FrameStep {e = e} (batchSync-f {s = s} nid) (Red m s) (Red m (s ×ᵗ listᵗ s)) (BatchHeld m s)
+batchStep {s = s} nid = record
+  { step      = batchStepped nid
+  ; step-⇓    = λ {_} {κ} {now} h vals fin sched st c →
+                  subst (λ x → stepFrame⇓ now (batchSync-f nid) κ vals fin sched st
+                                 (injectRoot {u = s ×ᵗ listᵗ s} (batchDispatch nid vals fin sched st x)))
+                        c step-batchSync
+  ; step-red  = λ {h} {vals} {fin} {sched} {st} ps rh → batchRed nid fin sched st h ps rh
+  ; step-cons = λ h vals fin sched st c → batchCons nid vals fin sched st h c
+  ; step-off  = λ h vals fin sched st k ne → batchOff nid vals fin sched st h k (head-off nid [] k ne)
+  ; step-ct   = λ h vals fin sched st → batchCt nid vals fin sched st h }
+
+-- lowering the bit keeps the buffer, so it keeps the buffer's
+-- candidates; a bracket of another type is emptied
+downHeld : ∀ {n} {Γ : Ctx n} {m} (u : Ty) (x : Maybe (NodeState Γ))
+         → BatchHeld m u x → BatchHeld m u (just (batchDown u x))
+downHeld u (just (batchSync-st {w} sync bur done)) rh with w ≟ᵗ u
+... | no  _    = λ { refl → []ᵃ }
+... | yes refl = λ { refl → rh refl }
+downHeld u (just (cell-st _))           rh = λ { refl → []ᵃ }
+downHeld u (just (take-st _))           rh = λ { refl → []ᵃ }
+downHeld u (just (mergeAll-st _ _ _ _)) rh = λ { refl → []ᵃ }
+downHeld u (just (switch-st _ _))       rh = λ { refl → []ᵃ }
+downHeld u (just (exhaust-st _ _))      rh = λ { refl → []ᵃ }
+downHeld u nothing                      rh = λ { refl → []ᵃ }
+
+-- ONE FOLD THROUGH A PURE FRAME, AS A STAGE: on standing ground the
+-- live fold, whose one call above is the head call; on fallen ground
+-- the fallen fold, which calls nothing.  The frame's candidate is owed
+-- only where the ground stands.
+stepStage : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s u}
+              {f : Frame Γ s u} {Held : HeldF f → Set₁}
+              (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
+              (κ : Path Γ ℓ u t) (h : HeldF f)
+              (q : Pre κ) (rp : RP {e = e} m (Red m u) S κ q) (s₀ : S)
+              (now : Tick) (vals : List (Val Γ s)) → Column (f ↠[ le ] κ) (Red m s) (headPre h q) vals
+          → (fin : Bool) {sched : Sched Γ} {st : EvalSt e} → Room m sched st
+          → PreHolds m (f ↠[ le ] κ) (headPre h q) sched st
+          → (∀ {pfs} → q ≡ standing pfs → Held h)
+          → Stage m f le κ (λ o sc s′ → foldPath⇓ {e = e} now (f ↠[ le ] κ) vals fin sched st (o , sc , s′)) q rp s₀ sched st
+stepStage {f = f} le aM fs κ h (standing pfs) rp s₀ now vals col fin {sched} {st} rm hs rh =
+  let r  = step fs h vals fin sched st
+      c  = headCall {le = le} fs h (rh refl) κ pfs (call now vals col fin sched st rm hs)
+      an = apply rp s₀ c
+      d  = step-⇓ fs {κ = κ} {now = now} h vals fin sched st (proj₁ (proj₁ (ground hs)))
+      so = step-kept le d (sounds hs)
+  in stage (out an) (Ans.sched′ an) (Ans.st′ an) (fold-step d (der an)) (c ∷ᵗ []ᵗ) refl (held r)
+       (headHolds f le κ (held r)
+         ( step-cons fs h vals fin sched st (proj₁ (proj₁ (ground hs)))
+         , subst (λ ct → All (_< ct) _) (sym (step-ct fs h vals fin sched st)) (proj₂ (proj₁ (ground hs))) )
+         (proj₁ (proj₂ (ground hs))) (Ans.pre′ an) (Ans.holds′ an) (kept an)
+         (fold-kept (der an) (drop-ot f le κ so) (f ↠[ le ] κ) so (λ _ _ _ → refl)))
+       (headKept f le κ (step-off fs h vals fin sched st) (step-ct fs h vals fin sched st) (Ans.pre′ an) (kept an) (held r))
+stepStage {n = n} {lo = lo} {f = f} le aM fs κ h fallen rp s₀ now vals col fin {sched} {st} rm (grounded fell so) rh =
+  let an = fold (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (f ↠[ le ] κ)) tt now vals tt fin sched st rm
+                (grounded fell so)
+  in stage (out an) (Ans.sched′ an) (Ans.st′ an) (der an) []ᵗ refl h
+       (grounded (fell-keeps (foldPath-keeps (der an)) fell) (fold-sound (der an) so)) tt
+
+-- THE BRACKET CLOSED.  Whatever the source's subscription left, the
+-- arm lowers the bit at the frame's node and folds the frame once more
+-- with nothing arriving, over the ground the source's trace ended on;
+-- the flush's candidates are the buffer's, which the frame held.
+batchFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {Θ u lo m} {S : Set}
+                (b : Exp Γ [] [] Θ u) (ρ : Env Γ Θ) (aM : Acc _<_ m)
+                (κ : Path Γ lo (u ×ᵗ listᵗ u) t) (pre : Pre κ)
+                (rp : RP {e = e} m (Red m (u ×ᵗ listᵗ u)) S κ pre) (s₀ : S)
+                (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Room m sched st
+            → (A : Stage m (batchSync-f {s = u} (nodeCt sched)) ≤-refl κ
+                     (λ o sc s′ → subscribeE⇓ {e = e} (Θ , b , ρ) (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) now
+                                    (bumpNode sched) (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st)
+                                    (o , sc , s′))
+                     pre rp s₀ (bumpNode sched) (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st))
+            → BatchHeld m u (Stage.hd A)
+            → Σ (Stream Γ t × Sched Γ × EvalSt e)
+                (λ r → subscribeE⇓ {e = e} (Θ , batchSyncᵉ b , ρ) κ now sched st r
+                     × Σ (Trace {e = e} m (Red m (u ×ᵗ listᵗ u)) S κ pre rp s₀)
+                         (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                               × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
+batchFinish {e = e} {Θ = Θ} {u = u} {m = m} b ρ aM κ pre rp s₀ now sched st rm A rhA =
+  let nid = nodeCt sched
+      x   = lookupNode nid (EvalSt.nodes (Stage.st′ A))
+      W   = writeStage (batchSync-f {s = u} nid) ≤-refl κ (endPre (Stage.tr A)) (endRP (Stage.tr A)) (endS (Stage.tr A))
+              nid (batchDown u x) (λ k ne → head-off nid [] k ne) (just (batchDown u x))
+              (lookup-set nid (batchDown u x) (EvalSt.nodes (Stage.st′ A))) (Stage.hd A) (Stage.hl A)
+      F   = stepStage ≤-refl aM (batchStep nid) κ (just (batchDown u x))
+              (endPre (Stage.tr A)) (endRP (Stage.tr A)) (endS (Stage.tr A)) now []
+              (ofColumn (batchSync-f nid ↠[ ≤-refl ] κ) (headPre (just (batchDown u x)) (endPre (Stage.tr A))) []ᵃ)
+              false (room-keeps (subscribeE-keeps (Stage.dv A)) rm) (Stage.hl W)
+              (λ {pfs} eq → downHeld u x
+                 (subst (BatchHeld m u)
+                    (sym (proj₁ (proj₁ (ground (subst (λ p → PreHolds m (batchSync-f nid ↠[ ≤-refl ] κ) (headPre (Stage.hd A) p)
+                                                                  (Stage.sc A) (Stage.st′ A))
+                                                      eq (Stage.hl A))))))
+                    rhA))
+      S′  = stage-seq {D₃ = λ o sc s′ → subscribeE⇓ {e = e} (Θ , batchSyncᵉ b , ρ) κ now sched st (o , sc , s′)} A
+              (stage-rebase (batchSync-f nid) ≤-refl κ ≤-refl
+                 (λ k _ ne → set-above nid k (batchDown u x) (EvalSt.nodes (Stage.st′ A)) (head-off nid [] k ne)) F)
+              (λ d₂ → subs-batchSync refl (Stage.dv A) d₂)
+  in (Stage.out S′ , Stage.sc S′ , Stage.st′ S′) , Stage.dv S′ , Stage.tr S′
+   , unheadHolds (batchSync-f nid) ≤-refl κ (Stage.hd S′) (endPre (Stage.tr S′)) (Stage.hl S′)
+   , unheadKept (batchSync-f nid) ≤-refl κ (Stage.hd S′) (endPre (Stage.tr S′))
+       {sched} {bumpNode sched} {st = st} {st₁ = installNode nid (batchSync-st {s = u} true [] false) st}
+       (λ k′ k< on → subst T (<→≢ᵇ k<) (node-one {nid} {k′} on)) (n≤1+n _)
+       (λ k′ k< → set-above nid k′ (batchSync-st {s = u} true [] false) (EvalSt.nodes st) (<→≢ᵇ k<))
+       (Stage.kp S′)
+
+-- THE BATCHSYNC ARM'S BODY: the take arm's source subscription with
+-- the bracket opened at the counter, then the bracket closed.
+red-batchSync {t = u} b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h
+  with redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
+         (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (batchSync-st {s = u} true [] false) , pfs))
+         (liveRP ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp)
+         s₀ now (bumpNode sched) (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st) rm
+         (fresh-holds (batchSync-f (nodeCt sched)) κ pfs (just (batchSync-st {s = u} true [] false))
+            (batchSync-st {s = u} true [] false) (λ _ → node-eq)
+            (lookup-set (nodeCt sched) (batchSync-st {s = u} true [] false) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h)
+... | ((o₁ , sc₁ , st₁) , d , tr , hl , kp)
+  with translate-end ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp tr
+...   | (h″ , rh″ , eq′) =
+      batchFinish b ρ aM κ (standing pfs) rp s₀ now sched st rm
+        (stage o₁ sc₁ st₁ d
+           (translate ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp tr)
+           refl h″
+           (subst (λ p → PreHolds _ (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) p sc₁ st₁) eq′ hl)
+           (subst (λ p → Kept (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) p (bumpNode sched)
+                                (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st) sc₁ st₁) eq′ kp))
+        rh″
+red-batchSync {n = n} {t = u} b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell
+  with redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
+         (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) fallen
+         (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
+         (bumpNode sched) (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st) rm
+         (grounded (ground fell)
+            (fresh-sound (batchSync-f (nodeCt sched)) κ (batchSync-st {s = u} true [] false) (λ _ → node-eq) (sounds fell)))
+... | ((o₁ , sc₁ , st₁) , d , tr , hl , kp) =
+      batchFinish b ρ aM κ fallen rp s₀ now sched st rm
+        (stage o₁ sc₁ st₁ d []ᵗ refl nothing
+           (subst (λ p → PreHolds _ (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) p sc₁ st₁)
+              (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
+           tt)
+        (λ ())
 
 red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ pre rp s now sched st rm h
     with toℕ i <? lo
@@ -3090,29 +3752,6 @@ fiStep op allNid inst le κ pfs rp s₀ h g now vals col true sched st rm hs
 -- THE FLATTENER ARMS' SHARED BODY: install the node at the counter,
 -- subscribe the outer under the outer frame live over whatever ground
 -- the caller stands on, and read the path's ground back out.
--- the outer frame, installed at the counter, stands on the rule: no row
--- runs through the node the counter hands out
-all-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} (op : AllOp) (κ : Path Γ lo u t)
-              (ns : NodeState Γ) {sched : Sched Γ} {st : EvalSt e}
-          → Sound κ sched st
-          → Sound (thru-outer {u = u} op (nodeCt sched) ↠[ ≤-refl ] κ) (bumpNode sched) (installNode (nodeCt sched) ns st)
-all-sound op κ ns {sched} so =
-  push-thru op (nodeCt sched) ≤-refl κ (sub-ot (λ r∈ → r∈) (n≤1+n _) so)
-    (node-on (λ r∈ th → ⊥-elim (<-irrefl refl (fresh-rows (ruled so) r∈ _ th))) ≤-refl)
-
--- and its ground, over a standing path
-all-holds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo u} (op : AllOp) (κ : Path Γ lo u t) (pfs : PreFs κ)
-              (ns : NodeState Γ) {sched : Sched Γ} {st : EvalSt e}
-          → PreHolds m κ (standing pfs) sched st
-          → PreHolds m (thru-outer {u = u} op (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just ns , pfs))
-              (bumpNode sched) (installNode (nodeCt sched) ns st)
-all-holds op κ pfs ns {sched} {st} hs =
-  grounded
-    ( (lookup-set (nodeCt sched) ns (EvalSt.nodes st) , ≤-refl ∷ᵃ []ᵃ)
-    , (λ k′ on onκ → fresh-apart κ pfs (ground hs) k′ (node-one {nodeCt sched} {k′} on) onκ)
-    , holdsFs-step κ pfs (λ k′ on k< → set-above (nodeCt sched) k′ ns (EvalSt.nodes st) (<→≢ᵇ k<)) (n≤1+n _) (ground hs) )
-    (all-sound op κ ns (sounds hs))
-
 red-all : ∀ {n} {Γ : Ctx n} {Θ u} (op : AllOp) (ns : NodeState Γ) → RoomEmpty (just ns) → ∀ (b : Exp Γ [] [] Θ (obs u))
           (ρ : Env Γ Θ) {m} → RedEnv m ρ → (k : ℕ) → T (inputsBelowᵉ k b) → Acc _<_ k
         → Acc _<_ (gsizeᵉ b) → (aM : Acc _<_ m)
@@ -3127,7 +3766,9 @@ red-all : ∀ {n} {Γ : Ctx n} {Θ u} (op : AllOp) (ns : NodeState Γ) → RoomE
 red-all op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched st rm hs
   with redExpAcc b ρ rρ k ok aK aB aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just ns , pfs))
          (subRP ≤-refl aM (thruStep op (nodeCt sched) aM) (just ns) gns κ pfs rp) s₀ now
-         (bumpNode sched) (installNode (nodeCt sched) ns st) rm (all-holds op κ pfs ns hs)
+         (bumpNode sched) (installNode (nodeCt sched) ns st) rm
+         (fresh-holds (thru-outer op (nodeCt sched)) κ pfs (just ns) ns (λ _ → node-eq)
+            (lookup-set (nodeCt sched) ns (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) hs)
 ... | (r , d , tr , hl , kp)
   with translate-sub-end ≤-refl aM (thruStep op (nodeCt sched) aM) (just ns) gns κ pfs rp tr
 ...   | (h″ , _ , eq) =
@@ -3144,7 +3785,7 @@ red-all op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched st 
 red-all {n = n} op ns gns b ρ rρ k ok aK aB aM {lo = lo} κ fallen rp s₀ now sched st rm fell
   with redExpAcc b ρ rρ k ok aK aB aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) fallen
          (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
-         (bumpNode sched) (installNode (nodeCt sched) ns st) rm (grounded (ground fell) (all-sound op κ ns (sounds fell)))
+         (bumpNode sched) (installNode (nodeCt sched) ns st) rm (grounded (ground fell) (fresh-sound (thru-outer op (nodeCt sched)) κ ns (λ _ → node-eq) (sounds fell)))
 ... | (r , d , tr , hl , kp) =
       r , sub-all refl d , []ᵗ
     , unheadHolds (thru-outer op (nodeCt sched)) ≤-refl κ nothing fallen
