@@ -770,13 +770,14 @@ redExpAcc {t = u} (deferᵉ body) ρ {m} rρ k ok aK a aM {lo = lo} κ pre rp s�
             (freshId regᵏ (Sched.mint sched)) (atDyn (freshId sourceᵏ (Sched.mint sched)) lo)
             (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ)
             (λ k′ on → [ (λ a → inj₂ (subst (nodeCt sched ≤_) (node-eq a) ≤-refl)) , inj₁ ] (∨-T on)))
-redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h
-  with (let src = freshId sourceᵏ (Sched.mint sched)
-        in redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ pre rp s₀ now
-             (record sched
-                { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
-             st rm (holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x) (sub-ot (λ r∈ → r∈) ≤-refl) h))
-... | (r , d , tr , hl , kp) = r , subs-mint refl d , tr , hl , kept-in κ (endPre tr) refl kp
+redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
+  let src = freshId sourceᵏ (Sched.mint sched)
+      (r , d , tr , hl , kp) =
+        redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ pre rp s₀ now
+          (record sched
+             { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
+          st rm (holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x) (sub-ot (λ r∈ → r∈) ≤-refl) h)
+  in r , subs-mint refl d , tr , hl , kept-in κ (endPre tr) refl kp
 
 -- the live fold: step, fold above, stand on what came back
 fold (liveRP {f = f} le aM fs h rh κ pfs rp) s now vals col fin sched st rm hs =
@@ -1513,16 +1514,16 @@ consumeFallen {n = n} {u = u} op nid aM {ℓ} κ now o ro {sched} {st} rm fell s
                                          (grounded fell (fresh-inner exhaustᵒ nid κ sched {st₁}
                                             (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)))
             in _ , consume-exhaust-sub c (inner refl d) , inner-back exhaustᵒ nid (nodeCt sched) κ (sounds hl)
-...     | u-merge lim act q od with hasRoom lim act in eqr
-...       | false = _ , consume-all-enqueue c eqr , sub-ot (λ r∈ → r∈) ≤-refl so , sub-on (λ r∈ → r∈) ≤-refl nd
-...       | true  =
+...     | u-merge lim act q od = by-bool (hasRoom lim act)
+            (λ eqr → _ , consume-all-enqueue c eqr , sub-ot (λ r∈ → r∈) ≤-refl so , sub-on (λ r∈ → r∈) ≤-refl nd)
+            (λ eqr →
             let st₁ = record st { nodes = setNode nid (mergeAll-st lim (suc act) q od) (EvalSt.nodes st) }
                 κ′  = from-inner {s = u} mergeAllᵒ nid (nodeCt sched) ↠[ ≤-refl ] κ
                 (r , d , _ , hl , _) = ro κ′ fallen (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ′)) tt now
                                          (bumpNode sched) st₁ rm
                                          (grounded fell (fresh-inner mergeAllᵒ nid κ sched {st₁}
                                             (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)))
-            in _ , consume-all-sub c eqr (inner refl d) , inner-back mergeAllᵒ nid (nodeCt sched) κ (sounds hl)
+            in _ , consume-all-sub c eqr (inner refl d) , inner-back mergeAllᵒ nid (nodeCt sched) κ (sounds hl))
 
 -- one observable consumed by the walk, on standing ground
 consumeStanding : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid : NodeId)
@@ -1557,16 +1558,16 @@ consumeStanding {u = u} op nid aM le κ now pfs rp s₀ h g o ro {sched} {st} rm
 ...   | u-exhaust od =
         let (sb , gsb) = subStanding exhaustᵒ nid aM le κ pfs rp s₀ (exhaust-st true od) tt o ro now rm hsκ lt ap so
         in stage-map (λ d → consume-exhaust-sub c (inner refl d)) sb , gsb
-...   | u-merge lim act q od with hasRoom lim act in eqr
-...     | false = stage-map (λ { (refl , refl , refl) → consume-all-enqueue c eqr })
+...   | u-merge lim act q od = by-bool (hasRoom lim act)
+        (λ eqr → stage-map (λ { (refl , refl , refl) → consume-all-enqueue c eqr })
                     (writeStage _ le κ (standing pfs) rp s₀ nid (mergeAll-st lim act (q ++ o ∷ []) od)
                        (λ k ne → head-off nid [] k ne) (just (mergeAll-st lim act (q ++ o ∷ []) od))
                        (lookup-set nid (mergeAll-st lim act (q ++ o ∷ []) od) (EvalSt.nodes st)) h hs)
-                , (λ tr → ⊥-elim (subst T eqr tr))
-...     | true  =
+                , (λ tr → ⊥-elim (subst T eqr tr)))
+        (λ eqr →
         let (sb , gsb) = subStanding mergeAllᵒ nid aM le κ pfs rp s₀ (mergeAll-st lim (suc act) q od)
-                           (g tt₀) o ro now rm hsκ lt ap so
-        in stage-map (λ d → consume-all-sub c eqr (inner refl d)) sb , gsb
+                           (g (subst T (sym eqr) tt₀)) o ro now rm hsκ lt ap so
+        in stage-map (λ d → consume-all-sub c eqr (inner refl d)) sb , gsb)
 
 consume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid : NodeId)
           (aM : Acc _<_ m) {S : Set} {lo ℓ}
