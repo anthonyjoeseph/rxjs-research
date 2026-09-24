@@ -7,34 +7,42 @@
 -- registry, and `toSound` turns the decision into the record, so a row
 -- whose store broke the rule would leave `from-yes` at `⊤` and fail.
 --
--- Two programs.  `prog` merges two deferred inners, so the store holds
+-- Three programs.  `prog` merges two deferred inners, so the store holds
 -- two rows through the merge's node, each through its own inner's.
 -- `prog₁` merges a read of a shared slot, whose def is a deferred inner,
 -- beside a deferred inner of its own: the store then holds rows ending
 -- at the root and a row through a node ending at the share's sink, which
 -- is the only shape in which one terminus per node can fail.  Both
 -- stores are pinned by the rows that read their nodes and termini.
+-- `prog₂` merges two reads of a shared slot whose def is itself a merge
+-- of a deferred inner: the first read connects the share and the def
+-- subscribes its own inner, the second joins the running share.
 --
 -- LOAD-BEARING: each row at the run's own path -- the root subscribe,
--- the merge's outer fold and its head step, in both programs.  Each
+-- the merge's outer fold and its head step, in all three programs.  Each
 -- decides one terminus per node and node freshness over a store of two
 -- or three rows sharing a node, and the continuation's own ends and
 -- freshness; it fails if a run registers a row through a node another
 -- row ends elsewhere from, a node at or past the counter, or a row
 -- through the folded path's node ending off it.
--- LOAD-BEARING: the rows asking the share program's subscribe and fold
+-- LOAD-BEARING: the rows asking the share programs' subscribe and fold
 -- for a second continuation ending at the sink.  Their own clauses are
 -- vacuous, since the sink carries no node, so what they decide is the
 -- rule itself at a store with two termini.
+-- LOAD-BEARING: the join's subscribe, from the state the connect left,
+-- asked at the share's own row, which ends at the sink through three
+-- nodes.  Pinned that the share is connected there and that the row
+-- carries its nodes; it fails if the join registers a row through a node
+-- the share's rows end elsewhere from, or leaves the share's row through
+-- a node at or past the counter.
 -- DEGENERATE: the first program's fold asked for the root.  The root
 -- carries no node, so it re-decides the fold's rule and nothing else.
 --
 -- NOT COVERED: a second continuation that carries a node, which the
 -- statements' `Agree` is the whole content of -- every κ₂ here is the
--- run's own path or node-free; `Probed.Base-Leaves` reaches one.  Nor a
--- share whose def FLATTENS: its def runs on fallen ground, the inner it
--- subscribes is `rawInner`'s, and a postulate does not compute, so no
--- run through one reaches a store.  Nor a cut, a switch, an exhaust, a
+-- run's own path or node-free, except the join's; `Probed.Base-Leaves`
+-- reaches more.  Nor a share whose def flattens more than one inner, or
+-- whose inner emits before the join.  Nor a cut, a switch, an exhaust, a
 -- take, a scan, a batchSync or a scripted slot.
 module Probed.Rule-Kept where
 
@@ -46,12 +54,13 @@ open import Data.Bool using (true; T)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
 open import Data.List using (List; []; _∷_; _++_; map)
+import Data.List
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.Nat using () renaming (_≟_ to _≟ⁿ_)
 open import Data.List.Relation.Unary.All using (All; all?; lookup)
 open import Data.List.Relation.Unary.Any using (here; there; any?)
-open import Data.Maybe using (nothing; just)
+open import Data.Maybe using (Maybe; nothing; just; from-just)
 open import Data.Maybe.Properties using (≡-dec)
 open import Data.Nat using (ℕ; _<_; _≤_; _<?_; _≡ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≡ᵇ⇒≡)
@@ -66,14 +75,15 @@ open import Relation.Nullary.Decidable using (Dec; yes; from-yes; _×-dec_; _→
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Probed.Apparatus using (Confirms)
-open import Rx.Exp using (Ctx; Closed; Env; Tm; natᵗ; obs; ofᵉ; deferᵉ; mergeAllᵉ; input; strmᵗ; nat̂; []ᵉ; evalWith)
+open import Rx.Exp using (Ctx; Closed; Env; Tm; Val; natᵗ; obs; ofᵉ; deferᵉ; mergeAllᵉ; input; strmᵗ; nat̂; []ᵉ; evalWith)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; RegRow; Path; Frame; root; share-sink; _↠[_]_; frameNodes; pathHasNode;
-  thru-outer; mergeAllᵒ; sched-init; st-init)
+  thru-outer; from-inner; mergeAllᵒ; sched-init; st-init; atSlot; memberSource)
 open import Rx.Evaluator.Freshness using (nodeCt)
-open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; stepFrame⇓; fold-step; subs-merge-all; sub-all; subs-of)
+open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; stepFrame⇓; thruWalk⇓; thruConsume⇓; fold-step; subs-merge-all;
+  sub-all; subs-of; step-thru-outer; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil; inner)
 open import Rx.Evaluator.Reducible using (reducible; red-env)
-open import Rx.Evaluator.Reducible.Support using (rootRP; standing; rule; Sound; sound; grounded; rowEnd; endOf; ∨-T; Distinct; rowDistinct; step-kept; subscribe-kept; fold-kept)
+open import Rx.Evaluator.Reducible.Support using (rootRP; standing; rule; Sound; sound; grounded; rowEnd; endOf; ∨-T; Distinct; rowDistinct; Agree; step-kept; subscribe-kept; fold-kept)
 
 ------------------------------------------------------------------
 -- THE RULE, DECIDED AT A CONCRETE STORE.
@@ -336,3 +346,159 @@ _ = toSound (from-yes (sound? κo (nodeCt (proj₁ (proj₂ (proj₂ (proj₂ (p
 _ : Confirms (step-kept ≤-refl (proj₂ stpS) soκS)
 _ = toSound (from-yes (sound? κS (nodeCt (proj₁ (proj₂ (proj₂ (proj₂ (proj₁ stpS))))))
                                          (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ stpS))))))))
+
+------------------------------------------------------------------
+-- THE FLATTENING SHARE: slot 0 is a shared merge of a deferred inner,
+-- and the root merges two reads of it.  The first read connects the
+-- share, whose def subscribes its own inner; the second joins the
+-- running share.
+------------------------------------------------------------------
+
+def₂ : Closed Γ₁ natᵗ
+def₂ = mergeAllᵉ nothing (ofᵉ (strmᵗ (deferᵉ (ofᵉ (nat̂ 7 ∷ []))) ∷ []))
+
+slots₂ : Slots Γ₁
+slots₂ zero = shared def₂
+
+prog₂ : Closed Γ₁ natᵗ
+prog₂ = mergeAllᵉ nothing (ofᵉ (strmᵗ (input zero) ∷ strmᵗ (input zero) ∷ []))
+
+schedF : Sched Γ₁
+schedF = sched-init prog₂ slots₂
+
+stF : EvalSt prog₂
+stF = st-init prog₂
+
+soF : Sound {e = prog₂} (root {lo = 1}) schedF stF
+soF = sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt
+
+runF = let aM = <-wellFounded _ in
+       reducible aM prog₂ []ᵉ (red-env {Γ = Γ₁} aM []ᵉ) (root {lo = 1}) (standing tt) rootRP tt 0
+         schedF stF ≤-refl (grounded tt soF)
+
+schedF₁ : Sched Γ₁
+schedF₁ = proj₁ (proj₂ (proj₁ runF))
+
+stF₁ : EvalSt prog₂
+stF₁ = proj₂ (proj₂ (proj₁ runF))
+
+dF = proj₁ (proj₂ runF)
+
+_ : map rowEnd (EvalSt.registry stF₁) ≡ nothing ∷ just zero ∷ nothing ∷ []
+_ = refl
+
+soSkF : Sound {e = prog₂} sink₀ schedF stF
+soSkF = sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt
+
+-- LOAD-BEARING
+_ : Confirms (subscribe-kept dF soF (root {lo = 1}) soF (λ _ _ _ → refl))
+_ = toSound {sched = schedF₁} {st = stF₁} (from-yes (sound? (root {lo = 1}) (nodeCt schedF₁) (EvalSt.registry stF₁)))
+
+-- LOAD-BEARING
+_ : Confirms (subscribe-kept dF soF sink₀ soSkF (λ k ()))
+_ = toSound {sched = schedF₁} {st = stF₁} (from-yes (sound? sink₀ (nodeCt schedF₁) (EvalSt.registry stF₁)))
+
+ofF = outer-fold dF
+
+κF : Path Γ₁ 1 (obs natᵗ) natᵗ
+κF = thru-outer mergeAllᵒ (nodeCt schedF) ↠[ ≤-refl ] root
+
+fdF = proj₂ (proj₂ ofF)
+
+soκF : Sound κF (proj₁ ofF) (proj₁ (proj₂ ofF))
+soκF = toSound (from-yes (sound? κF (nodeCt (proj₁ ofF)) (EvalSt.registry (proj₁ (proj₂ ofF)))))
+
+soSkF′ : Sound sink₀ (proj₁ ofF) (proj₁ (proj₂ ofF))
+soSkF′ = toSound (from-yes (sound? sink₀ (nodeCt (proj₁ ofF)) (EvalSt.registry (proj₁ (proj₂ ofF)))))
+
+-- LOAD-BEARING
+_ : Confirms (fold-kept fdF soκF κF soκF (λ _ _ _ → refl))
+_ = toSound {sched = schedF₁} {st = stF₁} (from-yes (sound? κF (nodeCt schedF₁) (EvalSt.registry stF₁)))
+
+-- LOAD-BEARING
+_ : Confirms (fold-kept fdF soκF sink₀ soSkF′ (λ k _ ()))
+_ = toSound {sched = schedF₁} {st = stF₁} (from-yes (sound? sink₀ (nodeCt schedF₁) (EvalSt.registry stF₁)))
+
+stpF = step-of fdF
+
+-- LOAD-BEARING
+_ : Confirms (step-kept ≤-refl (proj₂ stpF) soκF)
+_ = toSound (from-yes (sound? κF (nodeCt (proj₁ (proj₂ (proj₂ (proj₂ (proj₁ stpF))))))
+                                         (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ stpF))))))))
+
+------------------------------------------------------------------
+-- THE JOIN: the second read's subscribe, run from the state the
+-- connect left, asked at the share's own row -- a second continuation
+-- carrying the def's merge node and ending at the sink.
+------------------------------------------------------------------
+
+module _ {n} {Γ : Ctx n} {t} where
+
+  AgreeD : ∀ {lo lo′ s s′} → Path Γ lo s t → Path Γ lo′ s′ t → Set
+  AgreeD κ κ₂ = All (λ k → k ∈ pathNodes κ₂ → endOf κ ≡ endOf κ₂) (pathNodes κ)
+
+  agree? : ∀ {lo lo′ s s′} (κ : Path Γ lo s t) (κ₂ : Path Γ lo′ s′ t) → Dec (AgreeD κ κ₂)
+  agree? κ κ₂ = all? (λ k → (k ∈? pathNodes κ₂) →-dec ≡-dec _≟ᶠ_ (endOf κ) (endOf κ₂)) (pathNodes κ)
+
+  toAgree : ∀ {lo lo′ s s′} (κ : Path Γ lo s t) (κ₂ : Path Γ lo′ s′ t) → AgreeD κ κ₂ → Agree κ κ₂
+  toAgree κ κ₂ d k h h₂ = lookup d (has→∈ k κ h) (has→∈ k κ₂ h₂)
+
+walk-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo op nid} {κ : Path Γ lo u t} {now vals fin sched st r}
+        → stepFrame⇓ {e = e} now (thru-outer op nid) κ vals fin sched st r
+        → Σ _ (thruWalk⇓ {e = e} op nid κ now vals sched st)
+walk-of (step-thru-outer w) = _ , w
+
+second : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo op nid} {κ : Path Γ lo u t} {now o₁ o₂ os sched st r}
+       → thruWalk⇓ {e = e} op nid κ now (o₁ ∷ o₂ ∷ os) sched st r
+       → Σ (Sched Γ) λ s₁ → Σ (EvalSt e) λ st₁ → Σ _ (thruConsume⇓ {e = e} op nid κ now o₂ s₁ st₁)
+second (walk-cons _ (walk-cons c _)) = _ , _ , _ , c
+
+JoinSub : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) {u lo} → ℕ → Path Γ lo u t → ℕ → Val Γ (obs u) → Set
+JoinSub {Γ = Γ} e nid κ now o =
+  Σ (Sched Γ) λ s′ → Σ (EvalSt e) λ st′ → Σ ℕ λ inst →
+    Σ _ (subscribeE⇓ {e = e} o (from-inner mergeAllᵒ nid inst ↠[ ≤-refl ] κ) now s′ st′)
+
+join-sub : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo nid} {κ : Path Γ lo u t} {now o sched st r}
+         → thruConsume⇓ {e = e} mergeAllᵒ nid κ now o sched st r → Maybe (JoinSub e nid κ now o)
+join-sub (consume-all-sub _ _ (inner {inst = i} _ sub)) = just (_ , _ , i , _ , sub)
+join-sub (consume-all-enqueue _ _)                       = nothing
+join-sub (consume-all-nil _)                             = nothing
+
+jF = from-just (join-sub (proj₂ (proj₂ (proj₂ (second (proj₂ (walk-of (proj₂ stpF))))))))
+
+schedJ : Sched Γ₁
+schedJ = proj₁ jF
+
+stJ : EvalSt prog₂
+stJ = proj₁ (proj₂ jF)
+
+κJ : Path Γ₁ 1 natᵗ natᵗ
+κJ = from-inner mergeAllᵒ (nodeCt schedF) (proj₁ (proj₂ (proj₂ jF))) ↠[ ≤-refl ] root
+
+-- the share's own row at the join: the first row ending at the sink
+sinkRow : ∀ {n} {Γ : Ctx n} {t} → RegRow Γ t → List (RegRow Γ t) → RegRow Γ t
+sinkRow d []      = d
+sinkRow d (r ∷ rs) with rowEnd r
+... | just _  = r
+... | nothing = sinkRow d rs
+
+κ₂J = proj₂ (proj₂ (proj₂ (sinkRow (0 , atSlot zero , (natᵗ , root)) (EvalSt.registry stJ))))
+
+-- the premises that make the row load-bearing: the share is already
+-- connected, so the second read joins it; and κ₂ ends at the sink
+-- carrying three nodes
+_ : memberSource 0 (EvalSt.connectedShares stJ) ≡ true
+_ = refl
+
+_ : endOf κ₂J ≡ just zero
+_ = refl
+
+_ : Data.List.length (pathNodes κ₂J) ≡ 3
+_ = refl
+
+-- LOAD-BEARING
+_ : Confirms (subscribe-kept (proj₂ (proj₂ (proj₂ (proj₂ jF))))
+               (toSound (from-yes (sound? κJ (nodeCt schedJ) (EvalSt.registry stJ))))
+               κ₂J (toSound (from-yes (sound? κ₂J (nodeCt schedJ) (EvalSt.registry stJ))))
+               (toAgree κJ κ₂J (from-yes (agree? κJ κ₂J))))
+_ = toSound (from-yes (sound? κ₂J (nodeCt schedF₁) (EvalSt.registry stF₁)))

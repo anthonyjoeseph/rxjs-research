@@ -384,7 +384,9 @@ sub-on sb ct (node-on ea lt op) = node-on (λ a → ea (sb a)) (<-≤-trans lt c
 postulate
   -- PROBED: `Probed.Rule-Kept` -- the merge's head step over a literal of
   --   deferred inners, at a store of rows sharing the merge's node and at
-  --   one also holding a row through a node ending at a share's sink.
+  --   one also holding a row through a node ending at a share's sink,
+  --   and over two reads of a share whose def is a merge, the step that
+  --   connects it and then joins it.
   --   `Probed.Base-Leaves` -- the head step of a merge handed a fresh take
   --   of a hot slot, at a store holding two live takes through its node.
   step-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo ℓ} {f : Frame Γ s u}
@@ -394,17 +396,23 @@ postulate
             → Sound (f ↠[ le ] κ) (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
   -- PROBED: `Probed.Rule-Kept` -- the root subscribe of a merge of
   --   deferred inners, and of one reading a share whose def is deferred,
-  --   asked at the root and, in the second, at the sink.
+  --   asked at the root and, in the second, at the sink; the root
+  --   subscribe of two reads of a share whose def is a merge, asked at the
+  --   root and the sink; and the second read's subscribe, which joins the
+  --   connected share, asked at the share's own row -- a κ₂ ending at the
+  --   sink through the def merge's node.
   --   `Probed.Base-Leaves` -- a fresh take of a hot slot subscribed as a
   --   root merge's inner, asked at a live sibling take's path, a κ₂
-  --   sharing the merge's node.  Not a share whose def flattens.
+  --   sharing the merge's node.
   subscribe-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {o : Val Γ (obs u)}
                      {κ : Path Γ lo u t} {now sched st r}
                  → subscribeE⇓ {e = e} o κ now sched st r → Sound κ sched st
                  → ∀ {lo′ s′} (κ₂ : Path Γ lo′ s′ t) → Sound κ₂ sched st → Agree κ κ₂
                  → Sound κ₂ (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-  -- PROBED: `Probed.Rule-Kept` -- the merge's outer fold in both
-  --   programs, asked at its own path, the root and the sink.
+  -- PROBED: `Probed.Rule-Kept` -- the merge's outer fold in all three
+  --   programs, asked at its own path, the root and the sink; the third
+  --   reads a share whose def is a merge twice, connecting it then
+  --   joining it.
   --   `Probed.Base-Leaves` -- a root merge handed a fresh take, asked at a
   --   live sibling take's path, and a root switch cutting its live take,
   --   asked at the cut take's path.  Not a scan, nor a slot's arrival.
