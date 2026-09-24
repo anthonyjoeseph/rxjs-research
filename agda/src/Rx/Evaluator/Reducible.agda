@@ -276,6 +276,16 @@ HoldsFs (share-sink _ _) ()        sched st
 HoldsFs (f ↠[ _ ] κ)     (h , pfs) sched st =
   HoldsF f h sched st × Apart κ f × HoldsFs κ pfs sched st
 
+-- AND NO FRAME'S NODES RECUR ON THE PATH BELOW IT, on either ground.
+-- Every path a run builds is nested one frame at a time at nodes the
+-- counter hands out, so it is distinct by construction; carried here
+-- because the store's rows and the raw fold's paths are read back from
+-- the registry, where nothing else says so.
+Distinct : ∀ {n} {Γ : Ctx n} {lo u t} → Path Γ lo u t → Set
+Distinct root             = ⊤
+Distinct (share-sink _ _) = ⊤
+Distinct (f ↠[ _ ] κ)     = Apart κ f × Distinct κ
+
 -- WHERE A PATH ENDS: at the root, or at one share's sink.
 endOf : ∀ {n} {Γ : Ctx n} {lo s t} → Path Γ lo s t → Maybe (Fin n)
 endOf root             = nothing
@@ -287,6 +297,9 @@ rowThrough k (_ , _ , (_ , p)) = pathHasNode k p
 
 rowEnd : ∀ {n} {Γ : Ctx n} {t} → RegRow Γ t → Maybe (Fin n)
 rowEnd (_ , _ , (_ , p)) = endOf p
+
+rowDistinct : ∀ {n} {Γ : Ctx n} {t} → RegRow Γ t → Set
+rowDistinct (_ , _ , (_ , p)) = Distinct p
 
 -- ONE TERMINUS PER NODE: two rows through one node end at the same
 -- place.
@@ -309,8 +322,9 @@ FreshPath κ sched = ∀ k → T (pathHasNode k κ) → k < nodeCt sched
 record Rule {n} {Γ : Ctx n} {t} {e : Closed Γ t} (sched : Sched Γ) (st : EvalSt e) : Set where
   constructor rule
   field
-    termini    : Termini st
-    fresh-rows : FreshRows sched st
+    termini       : Termini st
+    fresh-rows    : FreshRows sched st
+    distinct-rows : ∀ {r} → r ∈ EvalSt.registry st → rowDistinct r
 open Rule public
 
 -- AND THE RULE FOR A CONTINUATION, which the store does not hold: every
@@ -325,16 +339,22 @@ record Sound {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s}
     ruled      : Rule sched st
     ends       : ∀ k → T (pathHasNode k κ) → EndsAt k (endOf κ) st
     fresh-path : FreshPath κ sched
+    distinct   : Distinct κ
 open Sound public
 
 -- A FLATTENER'S OWN NODE, below the path it sits on: its rows end where
--- that path does, and it is below the counter.
+-- that path does, it is below the counter, and it is not on that path.
+-- Without the last, a path passing the flattener's own outer frame is
+-- admitted, and there an inner subscribed raw queues onto the merge
+-- whose finish drains it, one level down each time, so `rawInner` has
+-- no finite derivation: `git show 966e2e99:agda/evidence/refuted/Refuted/Raw-Inner-Feedback.agda`.
 record NodeOn {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s}
               (nid : NodeId) (κ : Path Γ lo s t) (sched : Sched Γ) (st : EvalSt e) : Set where
   constructor node-on
   field
     at-end     : EndsAt nid (endOf κ) st
     node-below : nid < nodeCt sched
+    off-path   : T (pathHasNode nid κ) → ⊥
 open NodeOn public
 
 Ground : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
@@ -418,32 +438,32 @@ Agree κ κ₂ = ∀ k → T (pathHasNode k κ) → T (pathHasNode k κ₂) → 
 drop-ot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u} (f : Frame Γ s u) (le : lo ≤ ℓ)
             (κ : Path Γ ℓ u t) {sched : Sched Γ} {st : EvalSt e}
         → Sound (f ↠[ le ] κ) sched st → Sound κ sched st
-drop-ot f le κ (sound ru ea fp) = sound ru (λ k h → ea k (∨-Tʳ h)) (λ k h → fp k (∨-Tʳ h))
+drop-ot f le κ (sound ru ea fp (_ , ds)) = sound ru (λ k h → ea k (∨-Tʳ h)) (λ k h → fp k (∨-Tʳ h)) ds
 
 -- and a head frame's own node sits on the path below it
 head-on : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u} (f : Frame Γ s u) (le : lo ≤ ℓ)
             (κ : Path Γ ℓ u t) {sched : Sched Γ} {st : EvalSt e} (k : NodeId)
         → T (any (_≡ᵇ k) (frameNodes f)) → Sound (f ↠[ le ] κ) sched st → NodeOn k κ sched st
-head-on f le κ k h (sound _ ea fp) = node-on (ea k (∨-Tˡ h)) (fp k (∨-Tˡ h))
+head-on f le κ k h (sound _ ea fp (ap , _)) = node-on (ea k (∨-Tˡ h)) (fp k (∨-Tˡ h)) (ap k h)
 
 -- a registry that only lost rows, under a counter that did not fall,
 -- keeps every rule it had
 sub-rule : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {sched sched′ : Sched Γ} {st st′ : EvalSt e}
          → (∀ {r} → r ∈ EvalSt.registry st′ → r ∈ EvalSt.registry st) → nodeCt sched ≤ nodeCt sched′
          → Rule sched st → Rule sched′ st′
-sub-rule sb ct (rule tm fr) = rule (λ k a b → tm k (sb a) (sb b)) (λ a k h → <-≤-trans (fr (sb a) k h) ct)
+sub-rule sb ct (rule tm fr dr) = rule (λ k a b → tm k (sb a) (sb b)) (λ a k h → <-≤-trans (fr (sb a) k h) ct) (λ a → dr (sb a))
 
 sub-ot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t}
            {sched sched′ : Sched Γ} {st st′ : EvalSt e}
        → (∀ {r} → r ∈ EvalSt.registry st′ → r ∈ EvalSt.registry st) → nodeCt sched ≤ nodeCt sched′
        → Sound κ sched st → Sound κ sched′ st′
-sub-ot sb ct (sound ru ea fp) = sound (sub-rule sb ct ru) (λ k h a → ea k h (sb a)) (λ k h → <-≤-trans (fp k h) ct)
+sub-ot sb ct (sound ru ea fp ds) = sound (sub-rule sb ct ru) (λ k h a → ea k h (sb a)) (λ k h → <-≤-trans (fp k h) ct) ds
 
 sub-on : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {nid : NodeId} {κ : Path Γ lo s t}
            {sched sched′ : Sched Γ} {st st′ : EvalSt e}
        → (∀ {r} → r ∈ EvalSt.registry st′ → r ∈ EvalSt.registry st) → nodeCt sched ≤ nodeCt sched′
        → NodeOn nid κ sched st → NodeOn nid κ sched′ st′
-sub-on sb ct (node-on ea lt) = node-on (λ a → ea (sb a)) (<-≤-trans lt ct)
+sub-on sb ct (node-on ea lt op) = node-on (λ a → ea (sb a)) (<-≤-trans lt ct) op
 
 -- EVERY RUN KEEPS THE RULE.  A run's new rows are its continuation with
 -- frames pushed at nodes the counter hands out, and a row registered
@@ -499,9 +519,10 @@ push-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u} (f : Frame 
                (κ : Path Γ ℓ u t) {sched : Sched Γ} {st : EvalSt e}
            → Sound κ sched st → (∀ k → T (any (_≡ᵇ k) (frameNodes f)) → NodeOn k κ sched st)
            → Sound (f ↠[ le ] κ) sched st
-push-sound f le κ (sound ru ea fp) nd =
+push-sound f le κ (sound ru ea fp ds) nd =
   sound ru (λ k h {r} → [ (λ a → at-end (nd k a) {r}) , (λ on → ea k on {r}) ] (∨-T h))
            (λ k h → [ (λ a → node-below (nd k a)) , fp k ] (∨-T h))
+           ((λ k a → off-path (nd k a)) , ds)
 
 -- and the outer frame, at a node on the path
 push-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ u} (op : AllOp) (nid : NodeId) (le : lo ≤ ℓ)
@@ -514,7 +535,7 @@ push-thru op nid le κ {sched} {st} so nd =
 sink-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} (i : Fin n) (le : lo ≤ toℕ i)
                {sched : Sched Γ} {st : EvalSt e}
            → Rule sched st → Sound {e = e} (share-sink {Γ = Γ} {t = t} i le) sched st
-sink-sound i le ru = sound ru (λ k ()) (λ k ())
+sink-sound i le ru = sound ru (λ k ()) (λ k ()) tt
 
 -- a lowered floor moves neither the nodes nor the end
 lower-nodes : ∀ {n} {Γ : Ctx n} {s t lo lo′} (le : lo′ ≤ lo) (κ : Path Γ lo s t) (k : NodeId)
@@ -529,17 +550,25 @@ lower-end le root             = refl
 lower-end le (share-sink i p) = refl
 lower-end le (f ↠[ h ] p)     = refl
 
+lower-distinct : ∀ {n} {Γ : Ctx n} {s t lo lo′} (le : lo′ ≤ lo) (κ : Path Γ lo s t)
+               → Distinct κ → Distinct (lowerFloor le κ)
+lower-distinct le root             d = d
+lower-distinct le (share-sink i p) d = d
+lower-distinct le (f ↠[ h ] p)     d = d
+
 -- A ROW REGISTERED FOR A PATH THE RULE HOLDS FOR KEEPS IT, when the row
--- ends where the path does and every node it runs through is either
--- one of the path's or one the counter has just handed out.
+-- ends where the path does, every node it runs through is either one of
+-- the path's or one the counter has just handed out, and the rule for
+-- the path makes the row's own path distinct.
 register-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s u} {κ : Path Γ lo s t}
                    {sched sched′ : Sched Γ} {st : EvalSt e}
                    (rid : RegId) (rs : RegSrc Γ) (p : Path Γ (regFloor rs) u t)
                → nodeCt sched ≤ nodeCt sched′ → endOf p ≡ endOf κ
                → (∀ k → T (pathHasNode k p) → T (pathHasNode k κ) ⊎ (nodeCt sched ≤ k × k < nodeCt sched′))
+               → (Sound κ sched st → Distinct p)
                → Sound κ sched st → Sound κ sched′ (register rid rs p st)
-register-sound {κ = κ} {sched} {sched′} {st} rid rs p ct ee cls (sound (rule tm fr) ea fp) =
-  sound (rule tm′ fr′) ea′ (λ k h → <-≤-trans (fp k h) ct)
+register-sound {κ = κ} {sched} {sched′} {st} rid rs p ct ee cls dp so@(sound (rule tm fr dr) ea fp ds) =
+  sound (rule tm′ fr′ dr′) ea′ (λ k h → <-≤-trans (fp k h) ct) ds
   where
   old-new : ∀ k {r} → r ∈ EvalSt.registry st → T (rowThrough k r) → T (pathHasNode k p)
           → rowEnd r ≡ endOf p
@@ -562,6 +591,10 @@ register-sound {κ = κ} {sched} {sched′} {st} rid rs p ct ee cls (sound (rule
   ea′ k onκ a th with ∈-++⁻ (EvalSt.registry st) a
   ... | inj₁ a′          = ea k onκ a′ th
   ... | inj₂ (here refl) = ee
+  dr′ : ∀ {r} → r ∈ EvalSt.registry (register rid rs p st) → rowDistinct r
+  dr′ a with ∈-++⁻ (EvalSt.registry st) a
+  ... | inj₁ a′          = dr a′
+  ... | inj₂ (here refl) = dp so
 
 -- so a slot's row, the trigger's path with its floor lowered to the
 -- share's, keeps it
@@ -573,7 +606,7 @@ row-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} (i : Fin n) (below :
 row-sound i below κ sched st so =
   register-sound {sched = sched} {st = st}
     (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ) ≤-refl (lower-end below κ)
-    (λ k on → inj₁ (subst T (lower-nodes below κ k) on)) so
+    (λ k on → inj₁ (subst T (lower-nodes below κ k) on)) (λ so′ → lower-distinct below κ (distinct so′)) so
 
 -- CONSISTENCY MOVES ACROSS A STATE THAT READS THE FRAME'S NODES BACK
 -- THE SAME.
@@ -1639,12 +1672,26 @@ admit-row {Γ = Γ} i ((rid , atSlot j , (u , p)) ∷ reg) x∈ with i ≟ᶠ j 
 ...   | here refl = _ , here refl , (λ k → refl) , refl
 ...   | there x∈′ = let (r₀ , m , ek , ee) = admit-row i reg x∈′ in r₀ , there m , ek , ee
 
+-- and its path is distinct if every row's is
+admit-distinct : ∀ {n} {Γ : Ctx n} {t} (i : Fin n) (reg : List (RegRow Γ t))
+                   {x : RegId × Path Γ (suc (toℕ i)) (lookup Γ i) t}
+               → (∀ {r} → r ∈ reg → rowDistinct r) → x ∈ shareAdmit i reg → Distinct (proj₂ x)
+admit-distinct i [] dr ()
+admit-distinct i ((rid , atDyn _ _ , _) ∷ reg) dr x∈ = admit-distinct i reg (λ m → dr (there m)) x∈
+admit-distinct {Γ = Γ} i ((rid , atSlot j , (u , p)) ∷ reg) dr x∈ with i ≟ᶠ j | u ≟ᵗ lookup Γ i
+... | no _     | _        = admit-distinct i reg (λ m → dr (there m)) x∈
+... | yes _    | no _     = admit-distinct i reg (λ m → dr (there m)) x∈
+... | yes refl | yes refl with x∈
+...   | here refl = dr (here refl)
+...   | there x∈′ = admit-distinct i reg (λ m → dr (there m)) x∈′
+
 admit-ot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (i : Fin n) (sched : Sched Γ) (st : EvalSt e) → Rule sched st
          → ∀ {a} → a ∈ shareAdmit i (EvalSt.registry st) → Sound (proj₂ a) sched st
 admit-ot i sched st ru a∈ =
   let (r₀ , m , ek , ee) = admit-row i (EvalSt.registry st) a∈
   in sound ru (λ k h r∈ th → trans (termini ru k r∈ m th (subst T (sym (ek k)) h)) ee)
               (λ k h → fresh-rows ru m k (subst T (sym (ek k)) h))
+              (admit-distinct i (EvalSt.registry st) (distinct-rows ru) a∈)
 
 admit-agree : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (i : Fin n) (st : EvalSt e) → Termini st
             → ∀ {a b} → a ∈ shareAdmit i (EvalSt.registry st) → b ∈ shareAdmit i (EvalSt.registry st)
@@ -1703,19 +1750,13 @@ node-cases {x} {y} {k} p l r with x ≡ᵇ k in eq
 -- walk-order tags never fired.  Reachable states only; the statement
 -- quantifies over every state its hypotheses admit.
 
--- AND THE HYPOTHESES ADMIT A STATE NO RUN REACHES, where it is false.
--- `Sound` and `NodeOn` constrain the registry's rows and where the
--- path's nodes end, never the path itself, so the path below the exit
--- frame may pass the flattener's own outer node.  An inner that
--- re-enters that outer queues onto the merge whose finish drains it, and
--- each drained inner meets the same state one level down, so no
--- derivation is finite.  The budget argument above holds of paths built
--- by nesting, which are node-distinct, and not of this one.  The repair
--- is that invariant carried by the record: in `Sound` for the path, and
--- in `Rule` for each row's chain, which is what keeps the flattener's
--- node off the path its own inner runs on.
+-- The budget argument is one about paths built by nesting, and it
+-- reaches the admitted states through `Distinct` and `off-path`: the
+-- path the inner runs on never passes its flattener's node again, so
+-- nothing the inner folds down its own path lands on the queue its
+-- finish drains.
+-- Stated over those, which nothing has instantiated.
 
--- REFUTED: `Refuted.Raw-Inner-Feedback`
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
 --   accessibility the peel does not hand out, and a fresh one is not
@@ -1745,7 +1786,7 @@ fresh-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} (op : AllOp) (ni
                 (κ : Path Γ lo u t) (sched : Sched Γ) {st : EvalSt e}
             → Sound κ sched st → NodeOn nid κ sched st
             → Sound (from-inner op nid (nodeCt sched) ↠[ ≤-refl ] κ) (bumpNode sched) st
-fresh-inner op nid κ sched {st} (sound ru ea fp) (node-on at lt) =
+fresh-inner op nid κ sched {st} (sound ru ea fp ds) (node-on at lt op′) =
   sound (sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sched)) ru)
     (λ k h → [ (λ fn → node-cases {x = nid} {y = nodeCt sched} fn
                          (λ eq → subst (λ j → EndsAt j (endOf κ) st) eq at)
@@ -1755,6 +1796,10 @@ fresh-inner op nid κ sched {st} (sound ru ea fp) (node-on at lt) =
     (λ k h → [ (λ fn → nodes-below (nid ∷ nodeCt sched ∷ [])
                           (<-≤-trans lt (n≤1+n _) ∷ᵃ ≤-refl ∷ᵃ []ᵃ) k fn)
              , (λ on → <-≤-trans (fp k on) (n≤1+n _)) ] (∨-T h))
+    ( (λ k fn onκ → node-cases {x = nid} {y = nodeCt sched} fn
+                      (λ eq → op′ (subst (λ j → T (pathHasNode j κ)) (sym eq) onκ))
+                      (λ eq → <-irrefl (sym eq) (fp k onκ)))
+    , ds )
 
 -- an inner's exit frame's rule is the rule on the path below it and on
 -- its flattener's node
@@ -2239,7 +2284,8 @@ red-scripted i ρ k ok aK κ below pre rp s now sched (hot async) slEq st aM rm 
       _ , subs-hot-live below slEq doneEq refl , []ᵗ
     , holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x)
         (register-sound {sched = sched} {st = st} (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ)
-           ≤-refl (lower-end below κ) (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on)))
+           ≤-refl (lower-end below κ) (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on))
+           (λ so′ → lower-distinct below κ (distinct so′)))
         h
     , kept-step κ pre (pres (λ _ _ → refl)) ≤-refl
 red-scripted i ρ k ok aK κ below pre rp s now sched (cold sync []) {oks} slEq st aM rm h =
@@ -2257,7 +2303,7 @@ red-scripted {Γ = Γ} {lo = lo} i ρ k ok aK κ below pre rp s now sched (cold 
                           ∷ Sched.live sched }
       st₁    = register rid (atDyn src lo) κ st
       h₁     = holds-step κ pre {sched′ = sched₁} {st′ = st₁} (λ _ _ _ → refl) ≤-refl (λ x → x)
-                 (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl refl (λ k′ on → inj₁ on))
+                 (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl refl (λ k′ on → inj₁ on) (λ so′ → distinct so′))
                  h
       c      = call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm h₁
       an     = apply rp s c
@@ -2381,6 +2427,7 @@ redExpAcc (deferᵉ body) ρ {m} rρ k ok aK a aM {lo = lo} κ pre rp s₀ now s
                    (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ) (n≤1+n _) refl
                    (λ k′ on → [ (λ a → inj₂ (subst (λ j → nodeCt sched ≤ j × j < suc (nodeCt sched)) (node-eq a) (≤-refl , ≤-refl)))
                               , inj₁ ] (∨-T on))
+                   (λ so′ → (λ k′ a onκ → <-irrefl (sym (node-eq a)) (fresh-path so′ k′ onκ)) , distinct so′)
                    (sub-ot {st′ = installNode nid (mergeAll-st nothing 0 [] false) st} (λ r∈ → r∈) ≤-refl so))
          h
      , kept-step κ pre (pres-write st st′ _ refl ≤-refl) (n≤1+n _)
@@ -2609,6 +2656,7 @@ fresh-on : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} (κ : Path Γ lo u 
          → Sound κ sched st
          → NodeOn (nodeCt sched) κ (bumpNode sched) (installNode (nodeCt sched) ns st)
 fresh-on κ ns so = node-on (λ r∈ th → ⊥-elim (<-irrefl refl (fresh-rows (ruled so) r∈ _ th))) ≤-refl
+                             (λ on → <-irrefl refl (fresh-path so _ on))
 
 -- A FRAME WHOSE NODES ARE THE ONE THE COUNTER HANDS OUT, installed
 -- there, stands on the rule

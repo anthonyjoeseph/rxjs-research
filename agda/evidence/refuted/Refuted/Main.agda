@@ -64,10 +64,3 @@ open import Refuted.Forged-Root using (saw-forged-root)
 -- that pop, so the funding conclusion is refuted outright rather than
 -- merely unproven.
 open import Refuted.Room-Backlog using (room-zero; saw-room-cannot-fund)
-
--- THE RAW INNER'S HYPOTHESES DO NOT CONSTRAIN ITS PATH.  `Sound` and
--- `NodeOn` speak of the registry's rows, so a path passing the
--- flattener's own outer node below the exit frame is admitted, and there
--- the inner queues onto the merge whose finish drains it, one level
--- down each time: no derivation of its subscribe is finite.
-open import Refuted.Raw-Inner-Feedback using (raw-inner-false)

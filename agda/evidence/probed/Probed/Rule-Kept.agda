@@ -58,10 +58,11 @@ open import Data.Nat.Properties using (≤-refl; ≡ᵇ⇒≡)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit.Polymorphic using (tt)
+open import Data.Unit.Polymorphic using (⊤; tt)
 open import Data.Vec using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Fin using (zero)
-open import Relation.Nullary.Decidable using (Dec; from-yes; _×-dec_; _→-dec_)
+open import Relation.Nullary using (¬_)
+open import Relation.Nullary.Decidable using (Dec; yes; from-yes; _×-dec_; _→-dec_; ¬?)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Probed.Apparatus using (Confirms)
@@ -72,6 +73,7 @@ open import Rx.Evaluator using (Sched; EvalSt; RegRow; Path; Frame; root; share-
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; stepFrame⇓; fold-step; subs-merge-all; sub-all; subs-of)
 open import Rx.Evaluator.Reducible using (reducible; rootRP; red-env; standing; rule; Sound; sound; grounded; rowEnd; endOf; ∨-T;
+  Distinct; rowDistinct;
   step-kept; subscribe-kept; fold-kept)
 
 ------------------------------------------------------------------
@@ -108,25 +110,53 @@ module _ {n} {Γ : Ctx n} {t} where
   Ends : ∀ {lo s} → Path Γ lo s t → List (RegRow Γ t) → Set
   Ends κ reg = All (λ k → All (λ r → k ∈ rowNodes r → rowEnd r ≡ endOf κ) reg) (pathNodes κ)
 
+  DistinctD : ∀ {lo s} → Path Γ lo s t → Set
+  DistinctD root             = ⊤
+  DistinctD (share-sink _ _) = ⊤
+  DistinctD (f ↠[ _ ] κ)     = All (λ k → ¬ (k ∈ pathNodes κ)) (frameNodes f) × DistinctD κ
+
+  distinct? : ∀ {lo s} (κ : Path Γ lo s t) → Dec (DistinctD κ)
+  distinct? root             = yes tt
+  distinct? (share-sink _ _) = yes tt
+  distinct? (f ↠[ _ ] κ)     = all? (λ k → ¬? (k ∈? pathNodes κ)) (frameNodes f) ×-dec distinct? κ
+
+  toDistinct : ∀ {lo s} (κ : Path Γ lo s t) → DistinctD κ → Distinct κ
+  toDistinct root             _        = tt
+  toDistinct (share-sink _ _) _        = tt
+  toDistinct (f ↠[ _ ] κ)     (ap , d) = (λ k a h → lookup ap (anyᵇ→∈ (frameNodes f) a) (has→∈ k κ h)) , toDistinct κ d
+
+  RowD : RegRow Γ t → Set
+  RowD (_ , _ , (_ , p)) = DistinctD p
+
+  rowD? : ∀ r → Dec (RowD r)
+  rowD? (_ , _ , (_ , p)) = distinct? p
+
+  toRowD : ∀ r → RowD r → rowDistinct r
+  toRowD (_ , _ , (_ , p)) = toDistinct p
+
   SoundD : ∀ {lo s} → Path Γ lo s t → ℕ → List (RegRow Γ t) → Set
-  SoundD κ ct reg = (Fresh ct reg × Tied ct reg) × Ends κ reg × All (_< ct) (pathNodes κ)
+  SoundD κ ct reg = (Fresh ct reg × Tied ct reg × All RowD reg) × Ends κ reg × All (_< ct) (pathNodes κ) × DistinctD κ
 
   sound? : ∀ {lo s} (κ : Path Γ lo s t) ct reg → Dec (SoundD κ ct reg)
   sound? κ ct reg =
     (all? (λ r → all? (_<? ct) (rowNodes r)) reg
      ×-dec all? (λ r → all? (λ r′ → all? (λ k → (k ∈? rowNodes r′) →-dec ≡-dec _≟ᶠ_ (rowEnd r) (rowEnd r′))
-                                           (rowNodes r)) reg) reg)
+                                           (rowNodes r)) reg) reg
+     ×-dec all? rowD? reg)
     ×-dec all? (λ k → all? (λ r → (k ∈? rowNodes r) →-dec ≡-dec _≟ᶠ_ (rowEnd r) (endOf κ)) reg) (pathNodes κ)
     ×-dec all? (_<? ct) (pathNodes κ)
+    ×-dec distinct? κ
 
   toSound : ∀ {e : Closed Γ t} {lo s} {κ : Path Γ lo s t} {sched : Sched Γ} {st : EvalSt e}
           → SoundD κ (nodeCt sched) (EvalSt.registry st) → Sound κ sched st
-  toSound {κ = κ} ((fr , ti) , en , fp) =
+  toSound {κ = κ} ((fr , ti , rd) , en , fp , dκ) =
     sound (rule (λ k {r} {r′} r∈ r′∈ th th′ →
                    lookup (lookup (lookup ti r∈) r′∈) (has→∈ k (proj₂ (proj₂ (proj₂ r))) th) (has→∈ k (proj₂ (proj₂ (proj₂ r′))) th′))
-                (λ {r} r∈ k th → lookup (lookup fr r∈) (has→∈ k (proj₂ (proj₂ (proj₂ r))) th)))
+                (λ {r} r∈ k th → lookup (lookup fr r∈) (has→∈ k (proj₂ (proj₂ (proj₂ r))) th))
+                (λ {r} r∈ → toRowD r (lookup rd r∈)))
           (λ k th {r} r∈ th′ → lookup (lookup en (has→∈ k κ th)) r∈ (has→∈ k (proj₂ (proj₂ (proj₂ r))) th′))
           (λ k th → lookup fp (has→∈ k κ th))
+          (toDistinct κ dκ)
 
 ------------------------------------------------------------------
 -- THE OUTER FOLD A MERGE OF A LITERAL RUNS, read off its subscribe.
@@ -161,7 +191,7 @@ st₀ : EvalSt prog
 st₀ = st-init prog
 
 so₀ : Sound {e = prog} (root {lo = 0}) sched₀ st₀
-so₀ = sound (rule (λ k ()) (λ ())) (λ k ()) (λ k ())
+so₀ = sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt
 
 run = let aM = <-wellFounded _ in
       reducible aM prog []ᵉ (red-env {Γ = Γ₀} aM []ᵉ) (root {lo = 0}) (standing tt) rootRP tt 0
@@ -231,7 +261,7 @@ stS : EvalSt prog₁
 stS = st-init prog₁
 
 soS : Sound {e = prog₁} (root {lo = 1}) schedS stS
-soS = sound (rule (λ k ()) (λ ())) (λ k ()) (λ k ())
+soS = sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt
 
 runS = let aM = <-wellFounded _ in
        reducible aM prog₁ []ᵉ (red-env {Γ = Γ₁} aM []ᵉ) (root {lo = 1}) (standing tt) rootRP tt 0
@@ -254,7 +284,7 @@ sink₀ : Path Γ₁ 0 natᵗ natᵗ
 sink₀ = share-sink zero z≤n
 
 soSk : Sound {e = prog₁} sink₀ schedS stS
-soSk = sound (rule (λ k ()) (λ ())) (λ k ()) (λ k ())
+soSk = sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt
 
 -- LOAD-BEARING
 _ : Confirms (subscribe-kept dS soS (root {lo = 1}) soS (λ _ _ _ → refl))

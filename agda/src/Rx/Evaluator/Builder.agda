@@ -65,7 +65,8 @@ open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; d
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (reducible; rawFold; rootRP; red-env; standing; Rule; rule; termini;
-  fresh-rows; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf; sub-rule; sub-ot; fold-kept)
+  fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf;
+  sub-rule; sub-ot; fold-kept)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.
@@ -85,6 +86,18 @@ chain-row a ((rid , s , (u , p)) ∷ reg) x∈ with sameSource (arrSource a) (re
 ...   | here refl = _ , here refl , (λ k → refl) , refl
 ...   | there x∈′ = let (r₀ , m , ek , ee) = chain-row a reg x∈′ in r₀ , there m , ek , ee
 
+-- and a chain is distinct if every row's path is
+chain-distinct : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ) (reg : List (RegRow Γ t))
+                   {x : RegId × AtFloor Γ (arrTy a) t}
+               → (∀ {r} → r ∈ reg → rowDistinct r) → x ∈ chainsGo a reg → Distinct (proj₂ (proj₂ x))
+chain-distinct a [] dr ()
+chain-distinct a ((rid , s , (u , p)) ∷ reg) dr x∈ with sameSource (arrSource a) (regSource s) | u ≟ᵗ arrTy a
+... | false | _        = chain-distinct a reg (λ m → dr (there m)) x∈
+... | true  | no _     = chain-distinct a reg (λ m → dr (there m)) x∈
+... | true  | yes refl with x∈
+...   | here refl = dr (here refl)
+...   | there x∈′ = chain-distinct a reg (λ m → dr (there m)) x∈′
+
 -- so the store's rule is the rule for each chain
 chain-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) {sched : Sched Γ} {st : EvalSt e}
             → Rule sched st → ∀ {x} → x ∈ chainsOf a st → Sound (proj₂ (proj₂ x)) sched st
@@ -92,6 +105,7 @@ chain-sound a {st = st} ru x∈ =
   let (r₀ , m , ek , ee) = chain-row a (EvalSt.registry st) x∈
   in sound ru (λ k h r∈ th → trans (termini ru k r∈ m th (subst T (sym (ek k)) h)) ee)
               (λ k h → fresh-rows ru m k (subst T (sym (ek k)) h))
+              (chain-distinct a (EvalSt.registry st) (distinct-rows ru) x∈)
 
 -- and a snapshot's chains agree with each other
 chain-agree : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) {sched : Sched Γ} {st : EvalSt e}
@@ -211,7 +225,7 @@ evaluate! {n = n} {Γ = Γ} fuel e ins =
       ((out , sched₀ , st₀) , s , _ , hs , _) =
         reducible aM e []ᵉ (red-env {Γ = Γ} aM []ᵉ) (root {lo = n}) (standing tt) rootRP tt 0
           (sched-init e ins) (st-init e) ≤-refl
-          (grounded tt (sound (rule (λ k ()) (λ ())) (λ k ()) (λ k ())))
+          (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt))
       (rest , d) = drain! fuel sched₀ st₀ (ruled (sounds hs))
   in _ , eval-run s d
 
