@@ -260,20 +260,22 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### Big picture tier roadmap
 
+- **PUT NODE-DISTINCT PATHS IN THE RECORD.** `rawInner` is refuted at a
+  path that passes its flattener's own outer node below the exit frame:
+  the inner queues onto the merge whose finish drains it, forever. Every
+  path a run builds is node-distinct, so the repair is a field, not a
+  hypothesis: `Sound` carries it for the path and `Rule` for each row's
+  chain, cascaded through every producer of either. This decides whether
+  the budget argument in `rawInner`'s header survives the hypotheses it
+  is stated under, which is the fan-out the monster's region runs on.
+  Ruled out: an admitted overrun that needs no revisited node.
+
 - **GIVE THE INNERS A GROUND.** The keeping of the rule is instantiated at
   an inner registering a row through an outer's node, and the oracle sweep
-  found no break of it; what the fan-out still stands on is `rawInner`.
-  Build the third ground its header names, frames stacked live over a raw
-  base, which decides whether a share's fan-out, the monster's own region,
-  terminates without an outside counter.
-
-- **HUNT THE OVERRUN AT A STATE THE HYPOTHESES ADMIT.** A concrete run
-  cannot refute `rawInner` -- its conclusion is an existence claim -- and
-  the oracle's reachable states never overran the drain's budget. What
-  could refute it is a state that satisfies `Room`, `Sound` and `NodeOn`
-  but that no run reaches, where a share's fan-out delivers to an outer
-  while one of its own drained inners runs. Build that state or show the
-  hypotheses exclude it; the second is the measure the third ground needs.
+  found no break of it; what the fan-out still stands on is `rawInner`,
+  restated. Build the third ground its header names, frames stacked live
+  over a raw base, which decides whether a share's fan-out, the monster's
+  own region, terminates without an outside counter.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
@@ -310,12 +312,13 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### The ledger
 
-- **`rawInner`** (Reducible) — FALSITY, `DEAD ROUTE×2, RECOVERY`: an inner
-  subscribed from the raw fold, the only place a merge's queue is nonempty at
-  an inner's finish; it owes a third ground, then the drain.
 - **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,
   `PROBED`: every run keeps the rule for each path agreeing with its own, which
   is all the raw fold stands on.
+- **`rawInner`** (Reducible) — SHAPE, `REFUTED, DEAD ROUTE×2, RECOVERY`: an
+  inner subscribed from the raw fold, refuted at a path revisiting its
+  flattener's node; restate over node-distinct paths, then a third ground and
+  the drain.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`

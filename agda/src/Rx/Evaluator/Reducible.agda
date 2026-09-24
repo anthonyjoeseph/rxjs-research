@@ -1703,14 +1703,19 @@ node-cases {x} {y} {k} p l r with x ≡ᵇ k in eq
 -- walk-order tags never fired.  Reachable states only; the statement
 -- quantifies over every state its hypotheses admit.
 
--- AND A CONCRETE INSTANCE CANNOT REFUTE IT.  The conclusion is an
--- existence claim, so a row hand-builds one derivation at one point, and
--- that succeeds wherever the run terminates -- which the oracle already
--- shows at every point it reaches.  What is in doubt is uniform: whether
--- the drain's budget holds at every admitted state, which is the measure
--- argument above.  A refutation has to be a state the hypotheses admit
--- where a queue grows while its own drained inner runs.
+-- AND THE HYPOTHESES ADMIT A STATE NO RUN REACHES, where it is false.
+-- `Sound` and `NodeOn` constrain the registry's rows and where the
+-- path's nodes end, never the path itself, so the path below the exit
+-- frame may pass the flattener's own outer node.  An inner that
+-- re-enters that outer queues onto the merge whose finish drains it, and
+-- each drained inner meets the same state one level down, so no
+-- derivation is finite.  The budget argument above holds of paths built
+-- by nesting, which are node-distinct, and not of this one.  The repair
+-- is that invariant carried by the record: in `Sound` for the path, and
+-- in `Rule` for each row's chain, which is what keeps the flattener's
+-- node off the path its own inner runs on.
 
+-- REFUTED: `Refuted.Raw-Inner-Feedback`
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
 --   accessibility the peel does not hand out, and a fresh one is not
