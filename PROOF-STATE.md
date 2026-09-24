@@ -309,9 +309,9 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### The ledger
 
-- **`refill-spends`** (Reducible) — FALSITY, `NO EVIDENCE`: an inner refills
-  its merge's queue only by spending room; the base's queue budget.
-- **`raw-kept`** (Reducible) — FALSITY, `NO EVIDENCE`: a raw fold that connects
+- **`refill-spends`** (Reducible) — FALSITY, `PROBED`: an inner refills its
+  merge's queue only by spending room; the base's queue budget.
+- **`raw-kept`** (Reducible) — FALSITY, `PROBED`: a raw fold that connects
   nothing keeps the terminus; the base's standing re-entry.
 - **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,
   `PROBED`: every run keeps the rule for each path agreeing with its own, which

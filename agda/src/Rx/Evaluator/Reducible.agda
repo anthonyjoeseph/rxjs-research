@@ -1901,6 +1901,11 @@ Spends sched st sched′ st′ =
 -- that connected, the fold below left the frame's own nodes unchanged in
 -- shape and value.  That reads the nodes of frames stacked on a path,
 -- not every node the terminus guards, and reachable states only.
+--
+-- PROBED: `Probed.Base-Leaves` -- down a share's sink fanning out to a
+--   reader, and through a one-lane merge handed a fresh inner, both in
+--   the share's def and at the root, from stores the builder reached.
+--   Not a switch cutting a sibling, nor the unsupported formers.
 postulate
   raw-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {κ : Path Γ lo u t}
                {now vals fin sched st out sched′ st′}
@@ -1929,6 +1934,11 @@ postulate
 -- finishes met one exactly at budget, and the overrun, unfunded and
 -- walk-order tags never fired.  Reachable states only; the statement
 -- quantifies over every state its hypotheses admit.
+--
+-- PROBED: `Probed.Base-Leaves` -- a fresh inner of a one-lane merge in a
+--   share's def, whose values fan out past the sink, and one at the root.
+--   Neither re-enters the merge's outer, so the refill itself is not
+--   covered.
 postulate
   refill-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u ℓ} (op : AllOp) (nid : NodeId)
                     (κ : Path Γ ℓ u t) {o : Val Γ (obs u)} {now} {sched : Sched Γ} {st : EvalSt e} {r}
