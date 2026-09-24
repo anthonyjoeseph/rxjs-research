@@ -133,7 +133,7 @@ open import Decide using (∧ˡ; ∧ʳ; ≡ᵇ→≡; ≡ᵇ-refl)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
   batchSync-f; from-inner; thru-outer; NodeState; lookupNode; frameNodes; pathHasNode;
   register; installNode; atDyn; atSlot; lowerFloor; memberSource; mergeAll-st; mergeAllᵒ;
-  AllOp; switchᵒ; exhaustᵒ; NodeId; cell-st; take-st; switch-st; exhaust-st; batchSync-st;
+  AllOp; switchᵒ; exhaustᵒ; NodeId; RegRow; cell-st; take-st; switch-st; exhaust-st; batchSync-st;
   setNode; hasRoom; consumeUsable; finishUsable; thruWrap; switchKill; aliveThroughᶠ)
 open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert; fell-keeps; room-keeps)
 open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps; Keeps; switchKill-keeps; thruWrap-keeps; thruWalk-keeps;
@@ -1485,6 +1485,30 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
                  (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                        × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
 
+-- WHERE A PATH ENDS: at the root, or at one share's sink.
+endOf : ∀ {n} {Γ : Ctx n} {lo s t} → Path Γ lo s t → Maybe (Fin n)
+endOf root             = nothing
+endOf (share-sink i _) = just i
+endOf (_ ↠[ _ ] p)     = endOf p
+
+rowThrough : ∀ {n} {Γ : Ctx n} {t} → NodeId → RegRow Γ t → Bool
+rowThrough k (_ , _ , (_ , p)) = pathHasNode k p
+
+rowEnd : ∀ {n} {Γ : Ctx n} {t} → RegRow Γ t → Maybe (Fin n)
+rowEnd (_ , _ , (_ , p)) = endOf p
+
+-- ONE TERMINUS PER NODE: two rows through one node end at the same
+-- place, and a path folded down ends where every row through any of
+-- its nodes does.  The second half is what ties a continuation, which
+-- the store does not hold, to the rows the store does.
+OneTerminus : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s}
+              → Path Γ lo s t → EvalSt e → Set
+OneTerminus κ st =
+    (∀ k {r r′} → r ∈ EvalSt.registry st → r′ ∈ EvalSt.registry st
+       → T (rowThrough k r) → T (rowThrough k r′) → rowEnd r ≡ rowEnd r′)
+  × (∀ k {r} → r ∈ EvalSt.registry st → T (pathHasNode k κ)
+       → T (rowThrough k r) → rowEnd r ≡ endOf κ)
+
 -- THE RAW FOLD OF A PATH THE STORE HOLDS.  An arrival and a share's
 -- fan-out fold down registry paths no subscribe built, so the frames'
 -- held candidates are rebuilt by `red-val` on what the store holds,
@@ -1543,8 +1567,20 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 -- ending at `j`'s sink reaches only rows on shares from `j` up, and a
 -- row on a share sits above that share's index, so it never ends at
 -- `j`'s sink, which is the one place a stacked frame's rows end.  The
--- state records no terminus, so the record field is owed with the
--- ground.
+-- state records no terminus, so every ground reaching this fold owes
+-- the rule.
+
+-- WITHOUT THE RULE THE FOLD DIVERGES, from a state no run reaches.  A
+-- merge limited to one lane, busy, with an inner queued, is finished
+-- under an inner frame whose path ends at a share's sink, and the
+-- share's registry holds a row mapping every value to that same inner
+-- through the merge's own outer frame to the root.  The finish drains
+-- the queued inner; its value fans out through the row and is queued
+-- again behind the lane it holds; its end finishes and drains it once
+-- more, and nothing on that cycle is smaller.  The merge's node then
+-- has a row ending at the root and an inner frame ending at the sink,
+-- which is what the rule forbids.  Read off the relation, not
+-- machine-checked.
 
 -- The invariant held on a swept corpus of 1.5M programs, run on the
 -- side branch's evaluator over this relation: at every frame step whose
@@ -1573,8 +1609,19 @@ postulate
   rawFold : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
             (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
           → (κ : Path Γ ℓ u t) (now : Tick) (vals : List (Val Γ u)) (fin : Bool)
-            (sched : Sched Γ) (st : EvalSt e) → Room m sched st
+            (sched : Sched Γ) (st : EvalSt e) → Room m sched st → OneTerminus κ st
           → Σ (Stream Γ t × Sched Γ × EvalSt e) (foldPath⇓ {e = e} now κ vals fin sched st)
+
+-- THE FALLEN GROUND DOES NOT CARRY THE RULE, so this conclusion needs
+-- information in none of its hypotheses: a fallen continuation is folded
+-- at any state under the ceiling, and the state that makes the raw fold
+-- diverge is one of them.  The route is to carry the rule on the ground
+-- itself, which makes every producer of fallen ground owe it, and those
+-- producers reach standing ground through the connect.
+postulate
+  fallen-terminus : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo u}
+                    (κ : Path Γ lo u t) {sched : Sched Γ} {st : EvalSt e}
+                  → Fell m sched st → OneTerminus κ st
 
 -- THE FALLEN CONTINUATION, WHICH IS THE RAW ONE REBUILT AT THE PEELED
 -- CEILING ON EVERY CALL.  It holds no candidates, so nothing it holds
@@ -1591,7 +1638,7 @@ fallenRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
            (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
          → (κ : Path Γ ℓ u t) → RP {e = e} m (Red m u) ⊤ κ fallen
 fold (fallenRP ac le (acc rsM) κ) tt now vals _ fin sched st rm fell =
-  let (r , d) = rawFold ac le (rsM fell) κ now vals fin sched st ≤-refl
+  let (r , d) = rawFold ac le (rsM fell) κ now vals fin sched st ≤-refl (fallen-terminus κ {sched} {st} fell)
   in ans (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d fallen
          (fell-keeps (foldPath-keeps d) fell) tt (fallenRP ac le (acc rsM) κ) tt
 

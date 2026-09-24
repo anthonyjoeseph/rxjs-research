@@ -257,13 +257,12 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 
 ### Big picture tier roadmap
 
-- **GIVE THE RAW FOLD'S INNERS A GROUND, TERMINUS FIELD FIRST.** An inner
-  the raw fold subscribes stands on neither ground `Pre` has; its header
-  names the third, frames stacked live over a raw base. That stands only if
-  the base's fold writes no stacked frame's node, which follows from ONE
-  TERMINUS PER NODE, stated there and clean on a swept corpus. The state
-  records no terminus: add the field to the invariant record, show every
-  step keeps it, then build the ground. The budgeted drain and its lemma,
+- **CARRY ONE TERMINUS PER NODE ON THE GROUNDS, THEN GIVE THE INNERS ONE.**
+  The raw fold now assumes the rule, which it diverges without, and both
+  its callers take it from a SHAPE leaf. Carry it on the fallen ground and
+  thread it through the drain's states, showing every step keeps it; then
+  build the third ground its header names, frames stacked live over a raw
+  base. The budgeted drain and its lemma,
   a fold that connects nothing grows no queue, both sit on this ground,
   and the body decides whether a share's fan-out, the monster's own
   region, terminates without an outside counter.
@@ -314,6 +313,7 @@ also: `main` — same, the CLI's entry point, which now writes through it.
 - **`rawFold`** (Reducible) — FALSITY, `DEAD ROUTE×2, RECOVERY`: the fold down
   a path the store holds, and the only place a merge's queue is nonempty at an
   inner's finish; its body owes its inners a third ground, then the drain.
+  It assumes one terminus per node, without which it diverges.
 - **`red-batchSync`** (Reducible) — FALSITY, `NO EVIDENCE`: the arm the trace
   exists for; its closing fold replays the continuation over its source's
   trace.
@@ -321,6 +321,10 @@ also: `main` — same, the CLI's entry point, which now writes through it.
   frame arms that hold state read off the store.
 - **`red-scripted`** (Reducible) — FALSITY, `NO EVIDENCE`: the scripted slot,
   which registers before folding a cold prefix.
+- **`fallen-terminus`** (Reducible) — SHAPE, `NO EVIDENCE`: the fallen ground
+  does not carry the rule; the route is to carry it there.
+- **`arrival-terminus`** (Builder) — SHAPE, `NO EVIDENCE`: the arrival spine
+  does not carry the rule; the route is to thread it through the drain.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`

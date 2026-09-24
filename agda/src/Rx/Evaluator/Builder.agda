@@ -39,7 +39,7 @@ open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷
 open import Data.Nat using (zero; suc; _∸_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit.Polymorphic using (tt)
 
@@ -51,11 +51,21 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; root; Arrival; arrTick; a
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible using (reducible; rawFold; rootRP; red-env; standing)
+open import Rx.Evaluator.Reducible using (reducible; rawFold; rootRP; red-env; standing; OneTerminus)
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.
 ------------------------------------------------------------------
+
+-- THE ARRIVAL SPINE DOES NOT CARRY THE RULE, so this conclusion needs
+-- information in none of its hypotheses: the chain is read out of any
+-- state the drain is handed, and a state the raw fold diverges from is
+-- one of them.  The route is to thread the rule through the drain's
+-- states, from the empty registry a run starts with.
+postulate
+  arrival-terminus : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ)
+                     (c : AtFloor Γ (arrTy a) t) (st : EvalSt e)
+                   → OneTerminus (proj₂ c) st
 
 chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (a : Arrival Γ) (vs : List (Val Γ (arrTy a))) (fin : Bool)
@@ -68,6 +78,7 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- carries from the store.
 chainStep! {n = n} a vs fin (lo , path) sched st =
   let (_ , d) = rawFold (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path (arrTick a) vs fin sched st ≤-refl
+                  (arrival-terminus a (lo , path) st)
   in _ , chain-step d
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
