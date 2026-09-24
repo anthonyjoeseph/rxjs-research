@@ -112,7 +112,7 @@ open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; z≤
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (_<?_; _≤?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans; <⇒≤; ∸-monoʳ-<; <-irrefl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]; [_,_]′)
 open import Data.Unit.Polymorphic using (⊤; tt)
 open import Data.Unit using () renaming (tt to tt₀)
 open import Data.Vec using (lookup)
@@ -1882,6 +1882,16 @@ drain-waiting s (just (switch-st _ _))      = z≤n
 drain-waiting s (just (exhaust-st _ _))     = z≤n
 drain-waiting s (just (batchSync-st _ _ _)) = z≤n
 
+-- a drain step decided outside the drain's cycle: room was spent, or the
+-- queue read back within its budget.  `f` is forced only when the bound
+-- is refuted, so the evaluator never runs a postulate handed in as `f`
+spend-or : ∀ {x y w l : ℕ} → ((x < y → ⊥) → w ≤ l) → x < y ⊎ w ≤ l
+spend-or {x} {y} {w} {l} f with x <? y
+... | yes sp = inj₁ sp
+... | no nsp with w ≤? l
+...   | yes bd = inj₂ bd
+...   | no nbd = ⊥-elim (nbd (f nsp))
+
 -- A RUN SPENT ROOM: something it subscribed connected.
 Spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → Sched Γ → EvalSt e → Set
 Spends sched st sched′ st′ =
@@ -2054,29 +2064,23 @@ rawDrain {s = s} ac le (acc rsM) nid κ now (_ ∷ fs) lim act od (o ∷ q) sche
          (record st { nodes = setNode nid (mergeAll-st {t = s} lim (suc act) q od) (EvalSt.nodes st) })
          rm (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
          (just (mergeAll-st {t = s} lim (suc act) q od)) (lookup-set nid _ (EvalSt.nodes st)) (rs ≤-refl)
-...   | (r₁ , d₁)
-  with unconn (Sched.slots (proj₁ (proj₂ r₁))) (EvalSt.connectedShares (proj₂ (proj₂ r₁)))
-         <? unconn (Sched.slots sched) (EvalSt.connectedShares st)
-...     | yes sp =
+...   | (r₁ , d₁) =
   let (so₁ , nd₁) = inner-after mergeAllᵒ nid κ sched d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
       ds = drainSt s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))
-      (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le (rsM (<-≤-trans sp rm)) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
-                                (proj₂ (proj₂ (proj₂ ds))) (proj₁ (proj₂ (proj₂ ds)))
-                                (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) ≤-refl so₁ nd₁ (<-wellFounded _)
-  in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂
-...     | no nsp
-  with waiting (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁)))) ≤? length q
-...       | no nw = ⊥-elim (nw (refill-spends mergeAllᵒ nid κ d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
-                                (lookup-set nid _ (EvalSt.nodes st)) nsp))
-...       | yes w =
-  let (so₁ , nd₁) = inner-after mergeAllᵒ nid κ sched d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
-      ds = drainSt s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))
-      bd = ≤-trans (drain-waiting s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))) w
-      (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le (acc rsM) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
-                                (proj₂ (proj₂ (proj₂ ds))) (proj₁ (proj₂ (proj₂ ds)))
-                                (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) (room-keeps (subscribeE-keeps d₁) rm) so₁ nd₁
-                                (rs (s≤s bd))
-  in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂
+  in [ (λ sp →
+         let (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le (rsM (<-≤-trans sp rm)) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
+                                       (proj₂ (proj₂ (proj₂ ds))) (proj₁ (proj₂ (proj₂ ds)))
+                                       (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) ≤-refl so₁ nd₁ (<-wellFounded _)
+         in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂)
+     , (λ w →
+         let bd = ≤-trans (drain-waiting s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))) w
+             (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le (acc rsM) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
+                                       (proj₂ (proj₂ (proj₂ ds))) (proj₁ (proj₂ (proj₂ ds)))
+                                       (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) (room-keeps (subscribeE-keeps d₁) rm) so₁ nd₁
+                                       (rs (s≤s bd))
+         in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂)
+     ]′ (spend-or (refill-spends mergeAllᵒ nid κ d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+                                 (lookup-set nid _ (EvalSt.nodes st))))
 
 -- one observable consumed raw: the store says which lane it takes
 rawConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
