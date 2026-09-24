@@ -260,15 +260,16 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE BASE'S TWO LEAVES AT A SHARE'S FAN-OUT.** The base
-  now folds raw and re-enters itself on the queue its own column pins, so
-  its cycle descends on the room or on that queue, and what it stands on is
-  `raw-kept` and `refill-spends`. Both speak of a run that connects nothing,
+- **INSTANTIATE THE BASE'S THREE LEAVES AT A SHARE'S FAN-OUT.** The base
+  folds raw and succeeds itself at the accessibility it was built over, the
+  queue travelling as a ceiling with its witness beside it, so its cycle is
+  structural and what it stands on is `raw-kept`, `refill-spends` and
+  `fold-refill-spends`. All three speak of a run that connects nothing,
   which is exactly a share's fan-out re-entering its own merge: a probe
-  reaching that run by evaluation, not by a hand-built state, decides both
-  in the monster's region. Ruled out by the body landing: that the base
-  needs an outside counter, since the queue its column pins budgets it, and
-  an unbudgeted base cannot pass the guard at all.
+  reaching that run by evaluation, not by a hand-built state, decides them
+  in the monster's region. Ruled out: that the base needs an outside
+  counter, and that its successor can be re-armed at a fresh accessibility,
+  which the termination checker refuses once the drain's order is visible.
 
 - **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
   frame what `Sound`'s `distinct` now carries for the whole path; drop
@@ -311,6 +312,9 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 - **`refill-spends`** (Reducible) — FALSITY, `PROBED`: an inner refills its
   merge's queue only by spending room; the base's queue budget.
+- **`fold-refill-spends`** (Reducible) — FALSITY, `PROBED`: a raw fold from an
+  inner's exit frame refills its merge's queue only by spending room; the
+  base's successor at its own accessibility.
 - **`raw-kept`** (Reducible) — FALSITY, `PROBED`: a raw fold that connects
   nothing keeps the terminus; the base's standing re-entry.
 - **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,

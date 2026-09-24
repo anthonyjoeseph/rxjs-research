@@ -28,6 +28,29 @@ error message actively misdirects. Read the entry before reasoning from the erro
   in it is in scope, suspect the BINDERS, not the pattern**; a one-letter rename decides
   it in one dev run.
 
+- **A `with` INSIDE A CYCLE LOSES A MATCHED ACCESSIBILITY'S ORDER, AND THE ERROR NAMES
+  EVERY MEMBER OF THE LOOP.** A clause matching `(acc rs)` hands its with-functions the
+  FIELD `rs`, so a call in the with body re-applying `acc rs` reads as unrelated to the
+  clause's argument rather than equal to it. The accessibility then drops out of every
+  loop that passes through that call, and an unrelated decrease elsewhere on the loop is
+  what the error ends up blamed on. Decide the Boolean or the Σ OUTSIDE the cycle — a
+  `let` for a Σ, an eliminator taking the equation for a Boolean — so the clause has no
+  with-function at all.
+
+- **AND THE OPPOSITE HOLDS FOR A COPATTERN'S SUCCESSOR: a `with` branch keeps the guard,
+  and a lambda does not.** A coinductive successor at the head of a clause or of a `with`
+  branch, under a constructor, is guarded by the `fold` copattern it answers. The same
+  successor under a lambda handed to an eliminator (`[_,_]′`) is an ARGUMENT of that
+  eliminator, and the guard is gone. So the two traps pull opposite ways: eliminate a
+  decision without `with` where an accessibility is matched, and keep the `with` where a
+  guarded successor is built.
+
+- **Bisect a termination failure on a SUBSET of the block, not on the whole.** Stubbing
+  every member except a chosen few as postulates leaves the termination checker only the
+  loops among those few, which takes seconds where the whole block takes the tower. A
+  loop that survives on five members is the real culprit; cutting one call edge at a
+  time, by routing it to a postulated copy of its callee, names the edge.
+
 - **The termination checker rejects `where`-bound abbreviations of the recursion
   pattern.** Inline it — write `suc (suc j)`, not a bound alias.
 

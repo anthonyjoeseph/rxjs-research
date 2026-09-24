@@ -1787,12 +1787,20 @@ drain-waiting s (just (batchSync-st _ _ _)) = z≤n
 -- a drain step decided outside the drain's cycle: room was spent, or the
 -- queue read back within its budget.  `f` is forced only when the bound
 -- is refuted, so the evaluator never runs a postulate handed in as `f`
-spend-or : ∀ {x y w l : ℕ} → ((x < y → ⊥) → w ≤ l) → x < y ⊎ w ≤ l
+spend-or : ∀ {x y w l : ℕ} → ((x < y → ⊥) → w ≤ l) → x < y ⊎ (x < y → ⊥) × w ≤ l
 spend-or {x} {y} {w} {l} f with x <? y
 ... | yes sp = inj₁ sp
 ... | no nsp with w ≤? l
-...   | yes bd = inj₂ bd
+...   | yes bd = inj₂ (nsp , bd)
 ...   | no nbd = ⊥-elim (nbd (f nsp))
+
+-- a Boolean decided outside a cycle, its equation handed to each branch.
+-- A `with` inside a cycle binds a clause's matched accessibility by its
+-- field, so a call re-applying `acc` reads to the termination checker as
+-- unrelated to the clause's own argument, and the order is lost
+by-bool : ∀ {a} {A : Set a} (b : Bool) → (b ≡ false → A) → (b ≡ true → A) → A
+by-bool false f t = f refl
+by-bool true  f t = t refl
 
 -- A RUN SPENT ROOM: something it subscribed connected.
 Spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → Sched Γ → EvalSt e → Set
@@ -1859,6 +1867,30 @@ postulate
                 → ∀ {h} → lookupNode nid (EvalSt.nodes st) ≡ h
                 → (Spends sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) → ⊥)
                 → waiting (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))) ≤ waiting h
+
+-- AND A RAW FOLD FROM AN INNER'S EXIT FRAME DOES NOT REFILL ITS MERGE'S
+-- QUEUE WITHOUT SPENDING ROOM.  The fold is the one the inner's base
+-- runs: the exit frame reacts, and a finish drains the queue it reads,
+-- and then the path below the frame folds.  A value reaches the merge's
+-- outer frame again only along a path through its node, and the three
+-- such paths are excluded as at `refill-spends`: the frame's own path by
+-- `off-path`, the fan-out of its sink by `at-end`, and a connect's
+-- definition only by connecting, which spends.  It is what lets the
+-- base succeed itself at the accessibility it was built over, so the
+-- base's cycle is structural.  Read off the relation's arms, not
+-- machine-checked.
+--
+-- PROBED: `Probed.Base-Leaves` -- an inner of a one-lane merge in a
+--   share's def finishing, its value folded past the sink and fanned
+--   out, and one at the root.  Neither queues onto the merge's outer, so
+--   the refill itself is not covered.
+postulate
+  fold-refill-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u ℓ} (op : AllOp) (nid inst : NodeId)
+                         (κ : Path Γ ℓ u t) {now vals fin} {sched : Sched Γ} {st : EvalSt e} {r}
+                     → foldPath⇓ {e = e} now (from-inner {s = u} op nid inst ↠[ ≤-refl ] κ) vals fin sched st r
+                     → Sound (from-inner op nid inst ↠[ ≤-refl ] κ) sched st
+                     → (Spends sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) → ⊥)
+                     → waiting (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))) ≤ waiting (lookupNode nid (EvalSt.nodes st))
 
 -- THE INNER'S BASE: ITS EXIT FRAME OVER THE REST OF THE PATH, FOLDED
 -- RAW.  It is the one continuation an inner subscribed from the raw

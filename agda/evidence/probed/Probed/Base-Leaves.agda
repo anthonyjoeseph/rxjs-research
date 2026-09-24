@@ -32,6 +32,13 @@
 -- re-enters the outer there, so it re-decides that an inner's own run
 -- leaves its merge's queue alone.
 --
+-- LOAD-BEARING: `fold-refill-spends` at the def's merge, an inner's
+-- exit frame finishing it: the finish drains the merge's queue and the
+-- value folds to the sink and fans out.  It fails if the fan-out queues
+-- onto the merge's own outer.
+-- NEAR-DEGENERATE: the same at `progR`'s root merge, where nothing
+-- re-enters the outer.
+
 -- NOT COVERED: a queue refilled while an inner runs, which is the
 -- statement's whole risky region -- no program here re-enters a merge's
 -- outer during one of its inners.  Nor a switch cutting a sibling, an
@@ -40,6 +47,7 @@ module Probed.Base-Leaves where
 
 -- TARGET: raw-kept @2a5289
 -- TARGET: refill-spends @731051
+-- TARGET: fold-refill-spends @15a00a
 
 open import Data.Bool using (Bool; true; false; T; not; _∧_; _∨_; if_then_else_)
 open import Data.Bool.ListAction using (all)
@@ -69,11 +77,11 @@ open import Probed.Rule-Kept using (sound?; toSound)
 open import Rx.Exp using (Ctx; Closed; Val; obs; natᵗ; ofᵉ; deferᵉ; mergeAllᵉ; input; strmᵗ; nat̂; []ᵉ; evalWith)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; RegRow; NodeState; mergeAll-st; Path; root; share-sink; _↠[_]_;
-  thru-outer; mergeAllᵒ; pathHasNode; lookupNode; sched-init; st-init)
+  thru-outer; from-inner; mergeAllᵒ; pathHasNode; lookupNode; sched-init; st-init)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Unconn-Arith using (unconn)
 open import Rx.Evaluator.Reducible using (reducible; red-env; rawFold; rawInner)
-open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Sound; sound; rule; grounded; rowThrough; rowEnd; endOf; EndsAt; Kept; NodeOn; node-on; colsOf; waiting; ∨-T; raw-kept; refill-spends)
+open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Sound; sound; rule; grounded; rowThrough; rowEnd; endOf; EndsAt; Kept; NodeOn; node-on; colsOf; waiting; ∨-T; raw-kept; refill-spends; fold-refill-spends)
 
 ------------------------------------------------------------------
 -- `EndsAt`, DECIDED.
@@ -330,7 +338,7 @@ ndS : NodeOn nidS sink₀ schedS stS
 ndS = nodeOn nidS sink₀ tt₀ (from-yes (nidS <? nodeCt schedS)) (λ ())
 
 innS = rawInner (<-wellFounded _) ≤-refl (<-wellFounded _) mergeAllᵒ nidS sink₀ 0 innerS schedS stS ≤-refl soSk ndS
-         _ refl (<-wellFounded _)
+         _ refl (<-wellFounded _) ≤-refl
 
 rS = proj₁ innS
 
@@ -347,7 +355,7 @@ ndR : NodeOn nidR (root {lo = 0}) schedR stR
 ndR = nodeOn nidR root tt₀ (from-yes (nidR <? nodeCt schedR)) (λ ())
 
 innR = rawInner (<-wellFounded _) ≤-refl (<-wellFounded _) mergeAllᵒ nidR (root {lo = 0}) 0 innerR schedR stR ≤-refl soR ndR
-         _ refl (<-wellFounded _)
+         _ refl (<-wellFounded _) ≤-refl
 
 rR = proj₁ innR
 
@@ -356,3 +364,41 @@ _ : Confirms (refill-spends mergeAllᵒ nidR root (proj₂ innR) soR ndR refl
                (from-no (unconn (Sched.slots (proj₁ (proj₂ rR))) (EvalSt.connectedShares (proj₂ (proj₂ rR)))
                          <? unconn (Sched.slots schedR) (EvalSt.connectedShares stR))))
 _ = from-yes (waiting (lookupNode nidR (EvalSt.nodes (proj₂ (proj₂ rR)))) ≤? waiting (lookupNode nidR (EvalSt.nodes stR)))
+
+------------------------------------------------------------------
+-- `fold-refill-spends`.
+------------------------------------------------------------------
+
+-- an inner of the def's merge finishing: its exit frame at a fresh
+-- instance, over the share's sink
+κFS : Path Γ₁ 0 natᵗ natᵗ
+κFS = from-inner mergeAllᵒ nidS (nodeCt schedS) ↠[ ≤-refl ] sink₀
+
+soFS : Sound κFS schedS stS
+soFS = toSound (from-yes (sound? κFS (nodeCt schedS) (EvalSt.registry stS)))
+
+foldFS = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κFS 0 (9 ∷ []) true schedS stS ≤-refl soFS
+
+rFS = proj₁ foldFS
+
+-- LOAD-BEARING
+_ : Confirms (fold-refill-spends mergeAllᵒ nidS (nodeCt schedS) sink₀ (proj₂ foldFS) soFS
+               (from-no (unconn (Sched.slots (proj₁ (proj₂ rFS))) (EvalSt.connectedShares (proj₂ (proj₂ rFS)))
+                         <? unconn (Sched.slots schedS) (EvalSt.connectedShares stS))))
+_ = from-yes (waiting (lookupNode nidS (EvalSt.nodes (proj₂ (proj₂ rFS)))) ≤? waiting (lookupNode nidS (EvalSt.nodes stS)))
+
+κFR : Path Γ₀ 0 natᵗ natᵗ
+κFR = from-inner mergeAllᵒ nidR (nodeCt schedR) ↠[ ≤-refl ] root
+
+soFR : Sound κFR schedR stR
+soFR = toSound (from-yes (sound? κFR (nodeCt schedR) (EvalSt.registry stR)))
+
+foldFR = rawFold (<-wellFounded _) ≤-refl (<-wellFounded _) κFR 0 (9 ∷ []) true schedR stR ≤-refl soFR
+
+rFR = proj₁ foldFR
+
+-- NEAR-DEGENERATE
+_ : Confirms (fold-refill-spends mergeAllᵒ nidR (nodeCt schedR) root (proj₂ foldFR) soFR
+               (from-no (unconn (Sched.slots (proj₁ (proj₂ rFR))) (EvalSt.connectedShares (proj₂ (proj₂ rFR)))
+                         <? unconn (Sched.slots schedR) (EvalSt.connectedShares stR))))
+_ = from-yes (waiting (lookupNode nidR (EvalSt.nodes (proj₂ (proj₂ rFR)))) ≤? waiting (lookupNode nidR (EvalSt.nodes stR)))
