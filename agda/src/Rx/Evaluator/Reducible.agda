@@ -1532,12 +1532,19 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 -- no arm's extension re-enters the raw fold.
 
 -- THAT GROUND OWES WHAT STANDING GROUND GETS FREE FROM THE ROOT: the
--- base's fold writes no node of a frame stacked above it.  The argument
--- is the floor.  Everything the base folds sits at or above the inner's
--- floor, a sink is reached only from at or below its own index, and a
--- subscribe at that floor reads only inputs strictly below it, so no row
--- the base reaches passes through a stacked frame.  Nothing in the state
--- records a node's floor, so the invariant carrying it is still owed.
+-- base's fold, connecting nothing, writes no node of a frame stacked
+-- above it.  The invariant carrying it is ONE TERMINUS PER NODE: every
+-- registry row through a frame's node ends where that frame's own path
+-- ends, at the root or at one sink.  A flattener's frames sit only on
+-- its outer's path and its inners', which share its continuation, and a
+-- row registered under an inner is that inner's continuation with its
+-- floor lowered, so no row leaves the terminus it was made under.  A
+-- base ending at the root reaches no sink without a connect.  A base
+-- ending at `j`'s sink reaches only rows on shares from `j` up, and a
+-- row on a share sits above that share's index, so it never ends at
+-- `j`'s sink, which is the one place a stacked frame's rows end.  The
+-- state records no terminus, so the record field is owed with the
+-- ground.
 
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
