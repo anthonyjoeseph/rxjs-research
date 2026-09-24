@@ -260,15 +260,16 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### Big picture tier roadmap
 
-- **GIVE THE INNERS A GROUND.** The keeping of the rule is instantiated at
-  an inner registering a row through an outer's node, and the oracle sweep
-  found no break of it; what the fan-out still stands on is `rawInner`,
-  restated. Build the third ground its header names, frames stacked live
-  over a raw base, descending on the room and then the queue's length,
-  which decides whether a share's fan-out, the monster's own region,
-  terminates without an outside counter. Ruled out by reading the arms: a
-  refill of a drained merge's queue at the room it started at, since only
-  a connect's definition folds a row through the node.
+- **GIVE THE BASE A BODY: THE BUDGETED DRAIN.** An inner subscribed from
+  the raw fold now stands on the store's own columns, over a path that may
+  end at a share's sink, and what it owes is `baseRP`: its exit frame
+  reacting, then the rest of the path folded raw. Its fold is the one place
+  a merge's queue is nonempty at a finish, so the body is the drain its
+  header names, on a budget at the queue's length, with an overrun peeling
+  the room; that decides whether a share's fan-out, the monster's own
+  region, terminates without an outside counter. Ruled out by the ground
+  landing: that the inner needs a ground no caller can supply, since the
+  candidate's cycle through it closes on the room alone.
 
 - **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
   frame what `Sound`'s `distinct` now carries for the whole path; drop
@@ -309,14 +310,13 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### The ledger
 
+- **`baseRP`** (Reducible) — FALSITY, `RECOVERY`: an inner's exit frame over a
+  path the store holds, folded raw, as a continuation standing on the store's
+  columns; the only place a merge's queue is nonempty at a finish; owes the
+  budgeted drain.
 - **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,
   `PROBED`: every run keeps the rule for each path agreeing with its own, which
   is all the raw fold stands on.
-- **`rawInner`** (Reducible) — FALSITY, `DEAD ROUTE×2, RECOVERY`: an inner
-  subscribed from the raw fold over a distinct path its flattener is off;
-  the only place a merge's queue is nonempty at a finish; owes a third
-  ground, then the drain.
-
 
 ## Tier 2 — finish `batchSimultaneousᵖ`
 
