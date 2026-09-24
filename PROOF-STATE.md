@@ -260,24 +260,19 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### Big picture tier roadmap
 
-- **HUNT THE OVERRUN ON DISTINCT PATHS.** `rawInner` now stands on
-  `Distinct` paths and a flattener `off-path`, which excludes the one
-  admitted overrun found, a path revisiting the flattener's node. What is
-  left is a share's fan-out delivering to the outer while one of its own
-  drained inners runs, on a distinct path; build such a state or read
-  off why `Termini` excludes it. Ruled out: an overrun on the inner's own
-  path.
-
-- **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
-  frame what `Sound`'s `distinct` now carries for the whole path; drop
-  the copy, so the standing ground says nothing the rule does not.
-
 - **GIVE THE INNERS A GROUND.** The keeping of the rule is instantiated at
   an inner registering a row through an outer's node, and the oracle sweep
   found no break of it; what the fan-out still stands on is `rawInner`,
   restated. Build the third ground its header names, frames stacked live
-  over a raw base, which decides whether a share's fan-out, the monster's
-  own region, terminates without an outside counter.
+  over a raw base, descending on the room and then the queue's length,
+  which decides whether a share's fan-out, the monster's own region,
+  terminates without an outside counter. Ruled out by reading the arms: a
+  refill of a drained merge's queue at the room it started at, since only
+  a connect's definition folds a row through the node.
+
+- **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
+  frame what `Sound`'s `distinct` now carries for the whole path; drop
+  the copy, so the standing ground says nothing the rule does not.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE

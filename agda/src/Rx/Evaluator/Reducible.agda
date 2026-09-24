@@ -1733,14 +1733,21 @@ node-cases {x} {y} {k} p l r with x ≡ᵇ k in eq
 -- none is handed to a candidate at its own ceiling and budget.
 
 -- The budget is overrun only if a queue grows while one of its own
--- drained inners runs, and that takes a connect inside the inner, which
--- spends the room the peel needs.  Only a share's fan-out delivers to an
--- outer mid-fold; a row that feeds a share sits on a lower one, while the
--- inner's own path sinks only above its outer's floor, so nothing the
--- inner emits reaches the share its outer is registered on, and the only
--- other way to make that share emit is a connect below it.  So the
--- over-budget finish is always funded, by room then budget.  Read off the
--- path and row types, not machine-checked.  Measured on the sweep-era
+-- drained inners runs, and every admitted way of growing it spends room.
+-- A fold reaches the flattener's outer frame along a path through its
+-- node, and there are three such paths.  The inner's own is excluded by
+-- `off-path`.  A row folded by the fan-out of the sink the inner's path
+-- ends at, `just j`, is excluded as well: `at-end` puts every row through
+-- the node at `just j`, while a row on slot `j` sits at floor `suc j` and
+-- ends above it or at the root, and so does every row that fan-out
+-- reaches in turn.
+-- That leaves a row folded inside a connect's definition, which is the
+-- one arm that adds to the connected set; nothing removes from it, so
+-- the room is strictly lower for the rest of the run.  The measure is
+-- the room, then the queue's length.  Read off the relation's arms and
+-- the path and row types, not machine-checked.
+
+-- Measured on the sweep-era
 -- evaluator over 1.5M programs: 44,160 raw finishes met a nonempty queue,
 -- and every one of the 324,536 budgeted finishes met a queue exactly at
 -- its budget; none overran it, and no walk-order finish met a queue.
@@ -1749,13 +1756,6 @@ node-cases {x} {y} {k} p l r with x ≡ᵇ k in eq
 -- finishes met one exactly at budget, and the overrun, unfunded and
 -- walk-order tags never fired.  Reachable states only; the statement
 -- quantifies over every state its hypotheses admit.
-
--- The budget argument is one about paths built by nesting, and it
--- reaches the admitted states through `Distinct` and `off-path`: the
--- path the inner runs on never passes its flattener's node again, so
--- nothing the inner folds down its own path lands on the queue its
--- finish drains.
--- Stated over those, which nothing has instantiated.
 
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
