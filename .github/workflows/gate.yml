@@ -32,13 +32,15 @@ on:
         required: false
         default: ""
 
-# Keyed on the PR, and ONE pending run is held per group: a push to a branch
-# whose gate is already queued DISPLACES the waiter rather than cancelling the
-# runner, so only the newest push is ever waiting. What that costs scales with
-# the run, so it bites on a cold cache and barely at all on a warm one.
+# Keyed on the PR: a push to a branch CANCELS the run already going on it
+# (Anthony), since a gate on a superseded commit answers a question nobody is
+# asking and holds a runner for the better part of an hour to do it. A
+# cancelled run saves no interface cache, so the new one starts from the
+# cache the last completed run left. Pushes to main are never cancelled --
+# each merge's gate runs to the end, so main's cache always advances.
 concurrency:
   group: gate-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # THE FAST SIGNAL. `make gate` runs `ts-gate` too, inside its cheap path,
