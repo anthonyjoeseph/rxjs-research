@@ -483,12 +483,12 @@ rawAfter ac le aM f le′ κ {now} (_ , vals′ , fin′ , sched₁ , st₁) sd 
 
 rawReact ac le aM op nid inst le′ κ now vals false sched st rm so h eq aq wq =
   _ , step-from-inner react-false , drop-ot (from-inner op nid inst) le′ κ so
-rawReact ac le aM op nid inst le′ κ now vals true sched st rm so h eq aq wq
-  with any (aliveThroughᶠ inst st) (EvalSt.registry st) in eqa
-... | true  = _ , step-from-inner (react-alive eqa) , drop-ot (from-inner op nid inst) le′ κ so
-... | false =
-  let (r , fd , so′) = rawFinish ac le aM op nid inst le′ κ now vals sched st rm so h aq wq
-  in r , step-from-inner (react-dead eqa (subst (λ x → innerFinish⇓ op nid inst κ now vals sched st x r) (sym eq) fd)) , so′
+rawReact ac le aM op nid inst le′ κ now vals true sched st rm so h eq aq wq =
+  by-bool (any (aliveThroughᶠ inst st) (EvalSt.registry st))
+    (λ eqa →
+      let (r , fd , so′) = rawFinish ac le aM op nid inst le′ κ now vals sched st rm so h aq wq
+      in r , step-from-inner (react-dead eqa (subst (λ x → innerFinish⇓ op nid inst κ now vals sched st x r) (sym eq) fd)) , so′)
+    (λ eqa → _ , step-from-inner (react-alive eqa) , drop-ot (from-inner op nid inst) le′ κ so)
 
 rawFinish {s = s} ac le aM op nid inst le′ κ now vals sched st rm so h aq wq
   with finishUsable op s inst h in equ
@@ -520,13 +520,8 @@ rawWalk i ac aM now (v ∷ vs) fin sched st rm ru =
   in _ , walk-more g w , ru₂
 
 rawGo i ac aM now vals fin [] sched st rm ru ok ag = _ , go-nil , ru
-rawGo i ac aM now vals fin ((rid , p) ∷ ps) sched st rm ru ok ag
-  with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
-... | true  =
-  let (r , g , ru′) = rawGo i ac aM now vals fin ps sched st rm ru (λ a∈ → ok (there a∈))
-                        (λ a∈ b∈ → ag (there a∈) (there b∈))
-  in r , go-cut eqc g , ru′
-... | false =
+rawGo i ac aM now vals fin ((rid , p) ∷ ps) sched st rm ru ok ag =
+  by-bool (any (_≡ᵇ rid) (EvalSt.cancelled st)) (λ eqc →
   let so = sub-ot (λ r∈ → r∈) ≤-refl (ok (here refl))
       (r₁ , d) = rawFold ac ≤-refl aM p now vals fin sched
                    (record st { delivered = rid ∷ EvalSt.delivered st }) rm so
@@ -536,7 +531,11 @@ rawGo i ac aM now vals fin ((rid , p) ∷ ps) sched st rm ru ok ag
                          (λ {a} a∈ → fold-kept d so (proj₂ a) (sub-ot (λ r∈ → r∈) ≤-refl (ok (there a∈)))
                                        (ag (here refl) (there a∈)))
                          (λ a∈ b∈ → ag (there a∈) (there b∈))
-  in _ , go-live eqc d g , ru₂
+  in _ , go-live eqc d g , ru₂)
+  (λ eqc →
+  let (r , g , ru′) = rawGo i ac aM now vals fin ps sched st rm ru (λ a∈ → ok (there a∈))
+                        (λ a∈ b∈ → ag (there a∈) (there b∈))
+  in r , go-cut eqc g , ru′)
 
 ------------------------------------------------------------------
 -- THE ARMS, STATED.
