@@ -157,16 +157,17 @@ open import Rx.Evaluator.Reducible.Support using (Agree; Ans; Apart; Arm; BatchH
   ans; apart-fi; apply; batchStep; batch₀; bumpNode; call; callStage; cell-inj; colsOf; consumeNil; der;
   distinct; downHeld; drain-waiting; drop-ot; dropS; dying-rule; end-++; endPre; endRP; endS; ends-register;
   ends-sub; f-exhaust; f-merge; f-switch; fallen; fallenStage; fellᵗ; fiHolds→thru; fiStep; finishing; fold;
-  fold-kept; fold-refill-spends; fold-sound; fresh-apart; fresh-inner; fresh-path; fresh-sound; ground; grounded; head-off;
+  fold-kept; fold-sound; fresh-apart; fresh-inner; fresh-path; fresh-sound; ground; grounded; head-off;
   head-on; headCall; headHolds; headKept; headPre; held; holds-step; holdsFs-step; holdsOf; inner-after;
   inner-back; joinPre; kept; kept-in; kept-shift; kept-step; kill-sub; lower-nodes; mapStep; next; node-eq;
-  node-in₁; node-one; node-two; ofColumn; out; push-sound; push-thru; qempty-room; raw-kept; red-scripted;
-  redFoldVals; redLookup; refill-spends; register-sound; room-wrap; row-sound; ruled; scanCons; scanCt;
-  scanOff; scanRed; scanReg; scanStepped; self-node; sink-sound; sounds; spend-or; stage; stage-map;
+  node-in₁; node-one; node-two; ofColumn; out; push-sound; push-thru; qempty-room; red-scripted;
+  redFoldVals; redLookup; register-sound; room-wrap; row-sound; ruled; scanCons; scanCt;
+  scanOff; scanRed; scanReg; scanStepped; self-node; sink-sound; sounds; spend-or; ceil-or; stage; stage-map;
   stage-nil; stage-rebase; stage-seq; standing; step; step-cons; step-ct; step-kept; step-off; step-red;
   step-reg; step-⇓; st″; sub-on; sub-ot; sub-rule; subscribe-kept; switchKill-ct; switchKill-nodes; takeStep;
   termini; u-exhaust; u-merge; u-switch; unheadHolds; unheadKept; usable; waiting; wrap-facts; wrap-ot;
   wrap-reg; wrapNode; writeStage; ∨-T)
+open import Rx.Evaluator.Reducible.Floor using (fold-refill-spends; raw-kept; refill-spends)
 
 baseRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
          (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
@@ -274,7 +275,7 @@ rawDrain {s = s} ac le (acc rsM) nid κ now (_ ∷ fs) lim act od (o ∷ q) sche
                                        (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) (room-keeps (subscribeE-keeps d₁) rm) so₁ nd₁
                                        (rs wq) bd
          in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂)
-     ]′ (spend-or (refill-spends mergeAllᵒ nid κ d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
+     ]′ (spend-or (refill-spends mergeAllᵒ nid κ d₁ (sub-on (λ r∈ → r∈) ≤-refl nd)
                                  (lookup-set nid _ (EvalSt.nodes st))))
 
 -- one observable consumed raw: the store says which lane it takes
@@ -1335,9 +1336,10 @@ rawInner {u = u} ac le aM op nid κ now o sched st rm so nd h eq aq wq =
 -- the base: its exit frame reacts at the budget its column pins, and the
 -- path below folds raw
 fold (baseRP ac le aM op nid inst κ (h , pfs) aq wq) tt now vals _ fin sched st rm (grounded hs so) =
-  let (r₀ , sd , so₀) = rawReact ac le aM op nid inst ≤-refl κ now vals fin sched st rm so h (proj₁ (proj₁ hs)) aq wq
+  let wq′ = ceil-or (subst (λ x → waiting x ≤ _) (sym (proj₁ (proj₁ hs))) wq)
+      (r₀ , sd , so₀) = rawReact ac le aM op nid inst ≤-refl κ now vals fin sched st rm so _ refl aq wq′
       (r , d) = rawAfter ac le aM (from-inner op nid inst) ≤-refl κ r₀ sd (room-keeps (stepFrame-keeps sd) rm) so₀
-  in baseAns ac le aM op nid inst κ sched st rm so aq (subst (λ x → waiting x ≤ _) (sym (proj₁ (proj₁ hs))) wq) r d
+  in baseAns ac le aM op nid inst κ sched st rm so aq wq′ r d
 
 -- the successor sits at the head of a `with` branch, where the `fold`
 -- copattern guards it; under a lambda handed to an eliminator it is an
@@ -1352,7 +1354,7 @@ baseAns ac le aM op nid inst κ sched st rm so aq wq (out , sched′ , st′) d
       so′ = fold-sound d so
   in ans out sched′ st′ d (standing (colsOf κ′ st′))
          (grounded (holdsOf κ′ {sched = sched′} {st = st′} (fresh-path so′) (distinct so′)) so′)
-         (raw-kept d so nsp {pfs = colsOf κ′ st′})
+         (raw-kept d nsp {pfs = colsOf κ′ st′})
          (baseRP ac le aM op nid inst κ (colsOf κ′ st′) aq (≤-trans bd wq)) tt
 
 ------------------------------------------------------------------

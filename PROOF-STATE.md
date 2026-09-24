@@ -242,9 +242,9 @@ Worth killing because the region's three conditions are this one clause and
 not three facts: a hot-fed share agrees because a cascade folds one arrival at
 a time, one synchronous value agrees because one observer is all there is, and
 re-entry is required because only a subscriber the burst creates is absent when
-it is handed back. The clause registers the caller's chain and folds the def's
-values down the fan-out. The sweep now matches on every case it draws, which
-narrows where it could be false without killing it.
+it is handed back. The sweep matches on every case it draws, which narrows
+where it could be false without killing it. Ruled out: a fan-out re-entering
+its own merge without connecting (`Rx.Evaluator.Reducible.Floor`).
 
 also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg moves, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
 also: `evaluate!` — same, its inhabitation.
@@ -260,16 +260,13 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE BASE'S THREE LEAVES AT A SHARE'S FAN-OUT.** The base
-  folds raw and succeeds itself at the accessibility it was built over, the
-  queue travelling as a ceiling with its witness beside it, so its cycle is
-  structural and what it stands on is `raw-kept`, `refill-spends` and
-  `fold-refill-spends`. All three speak of a run that connects nothing,
-  which is exactly a share's fan-out re-entering its own merge: a probe
-  reaching that run by evaluation, not by a hand-built state, decides them
-  in the monster's region. Ruled out: that the base needs an outside
-  counter, and that its successor can be re-armed at a fresh accessibility,
-  which the termination checker refuses once the drain's order is visible.
+- **THE RULE-KEEP TRIO, OVER THE FLOOR'S WALK.** `fold-kept`,
+  `subscribe-kept` and `step-kept` are all the raw fold still stands on, and
+  the floor induction already walks the fourteen relations they speak of
+  with an invariant threaded through a connect. Restate the trio as that
+  walk's second invariant, or find the arm where the rule is not carried —
+  a connect registering the caller's chain is the one arm the floor passes
+  over by peeling room, and it is the monster's clause.
 
 - **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
   frame what `Sound`'s `distinct` now carries for the whole path; drop
@@ -310,13 +307,6 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
 
 ### The ledger
 
-- **`refill-spends`** (Reducible) — FALSITY, `PROBED`: an inner refills its
-  merge's queue only by spending room; the base's queue budget.
-- **`fold-refill-spends`** (Reducible) — FALSITY, `PROBED`: a raw fold from an
-  inner's exit frame refills its merge's queue only by spending room; the
-  base's successor at its own accessibility.
-- **`raw-kept`** (Reducible) — FALSITY, `PROBED`: a raw fold that connects
-  nothing keeps the terminus; the base's standing re-entry.
 - **`fold-kept`**, **`subscribe-kept`**, **`step-kept`** (Reducible) — FALSITY,
   `PROBED`: every run keeps the rule for each path agreeing with its own, which
   is all the raw fold stands on.

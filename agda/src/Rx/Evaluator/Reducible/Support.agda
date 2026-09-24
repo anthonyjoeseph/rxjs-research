@@ -1800,6 +1800,14 @@ spend-or {x} {y} {w} {l} f with x <? y
 ...   | yes bd = inj₂ (nsp , bd)
 ...   | no nbd = ⊥-elim (nbd (f nsp))
 
+-- a bound decided at run time, `f` forced only when it is refuted: a
+-- proof carried across a fold stands on the fold's own postulates, and a
+-- ceiling built from one would be forced by the next accessibility step
+ceil-or : ∀ {w l : ℕ} → w ≤ l → w ≤ l
+ceil-or {w} {l} f with w ≤? l
+... | yes bd = bd
+... | no nbd = ⊥-elim (nbd f)
+
 -- a Boolean decided outside a cycle, its equation handed to each branch.
 -- A `with` inside a cycle binds a clause's matched accessibility by its
 -- field, so a call re-applying `acc` reads to the termination checker as
@@ -1812,96 +1820,6 @@ by-bool true  f t = t refl
 Spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → Sched Γ → EvalSt e → Set
 Spends sched st sched′ st′ =
   unconn (Sched.slots sched′) (EvalSt.connectedShares st′) < unconn (Sched.slots sched) (EvalSt.connectedShares st)
-
--- A RAW FOLD THAT CONNECTS NOTHING KEEPS THE TERMINUS.  Past the path's
--- sink the fold fans out, and the fan-out writes the nodes of the rows
--- it folds; a row on slot `j` sits at floor `suc j` and ends above it or
--- at the root, and so does every row that fan-out reaches in turn, so a
--- node whose rows all end at `j`'s sink is on none of them.  Every other
--- write is to a frame's own node on the path or to one the counter hands
--- out.  Read off the relation's arms and the row types, not
--- machine-checked.
-
--- Measured on the side branch's evaluator over 142k programs of the 1.5M
--- corpus: at 157k frame steps whose continuation fanned out and 5.9k
--- that connected, the fold below left the frame's own nodes unchanged in
--- shape and value.  That reads the nodes of frames stacked on a path,
--- not every node the terminus guards, and reachable states only.
---
--- PROBED: `Probed.Base-Leaves` -- down a share's sink fanning out to a
---   reader, and through a one-lane merge handed a fresh inner, both in
---   the share's def and at the root, from stores the builder reached;
---   and through a root switch cutting a sibling kept live by a hot slot,
---   the only way a fold that connects nothing meets a registered one;
---   through a busy exhaust refusing an inner, and a merge beside a live
---   batchSync.  Not a scan sibling, nor the unsupported formers.
-postulate
-  raw-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {κ : Path Γ lo u t}
-               {now vals fin sched st out sched′ st′}
-           → foldPath⇓ {e = e} now κ vals fin sched st (out , sched′ , st′) → Sound κ sched st
-           → (Spends sched st sched′ st′ → ⊥)
-           → ∀ {pfs} → Kept κ (standing pfs) sched st sched′ st′
-
--- A MERGE'S QUEUE REFILLS WHILE ONE OF ITS INNERS RUNS ONLY BY SPENDING
--- ROOM.  A fold reaches the flattener's outer frame along a path through
--- its node, and there are three such paths.  The inner's own is excluded
--- by `off-path`.  A row folded by the fan-out of the sink the inner's
--- path ends at, `just j`, is excluded as well: `at-end` puts every row
--- through the node at `just j`, while a row on slot `j` sits at floor
--- `suc j` and ends above it or at the root, and so does every row that
--- fan-out reaches in turn.  That leaves a row folded inside a connect's
--- definition.  A share that already finished completes its new
--- subscriber and runs nothing (`slot-spent`).  Read off the relation's
--- arms and the path and row types, not machine-checked.
-
--- Measured on the sweep-era evaluator over 1.5M programs: 44,160 raw
--- finishes met a nonempty queue, and every one of the 324,536 budgeted
--- finishes met a queue exactly at its budget; none overran it, and no
--- walk-order finish met a queue.
--- The budgeted-drain prototype on the oracle's side branch agrees over
--- 48k programs: 42k raw finishes met a nonempty queue, 129k budgeted
--- finishes met one exactly at budget, and the overrun, unfunded and
--- walk-order tags never fired.  Reachable states only; the statement
--- quantifies over every state its hypotheses admit.
---
--- PROBED: `Probed.Base-Leaves` -- a fresh inner of a one-lane merge in a
---   share's def, whose values fan out past the sink, and one at the root;
---   and one at a lane a take holds full, whose fan-out reaches a switch
---   that subscribes the share again mid-emission.  None re-enters the
---   merge's outer, so the refill itself is not covered.
-postulate
-  refill-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u ℓ} (op : AllOp) (nid : NodeId)
-                    (κ : Path Γ ℓ u t) {o : Val Γ (obs u)} {now} {sched : Sched Γ} {st : EvalSt e} {r}
-                → subscribeE⇓ {e = e} o (from-inner op nid (nodeCt sched) ↠[ ≤-refl ] κ) now (bumpNode sched) st r
-                → Sound κ sched st → NodeOn nid κ sched st
-                → ∀ {h} → lookupNode nid (EvalSt.nodes st) ≡ h
-                → (Spends sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) → ⊥)
-                → waiting (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))) ≤ waiting h
-
--- AND A RAW FOLD FROM AN INNER'S EXIT FRAME DOES NOT REFILL ITS MERGE'S
--- QUEUE WITHOUT SPENDING ROOM.  The fold is the one the inner's base
--- runs: the exit frame reacts, and a finish drains the queue it reads,
--- and then the path below the frame folds.  A value reaches the merge's
--- outer frame again only along a path through its node, and the three
--- such paths are excluded as at `refill-spends`: the frame's own path by
--- `off-path`, the fan-out of its sink by `at-end`, and a connect's
--- definition only by connecting, which spends.  It is what lets the
--- base succeed itself at the accessibility it was built over, so the
--- base's cycle is structural.  Read off the relation's arms, not
--- machine-checked.
---
--- PROBED: `Probed.Base-Leaves` -- an inner of a one-lane merge in a
---   share's def finishing, its value folded past the sink and fanned
---   out, and one at the root; and one at a lane a take holds full, whose
---   fan-out re-subscribes the share.  None queues onto the merge's outer,
---   so the refill itself is not covered.
-postulate
-  fold-refill-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u ℓ} (op : AllOp) (nid inst : NodeId)
-                         (κ : Path Γ ℓ u t) {now vals fin} {sched : Sched Γ} {st : EvalSt e} {r}
-                     → foldPath⇓ {e = e} now (from-inner {s = u} op nid inst ↠[ ≤-refl ] κ) vals fin sched st r
-                     → Sound (from-inner op nid inst ↠[ ≤-refl ] κ) sched st
-                     → (Spends sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) → ⊥)
-                     → waiting (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))) ≤ waiting (lookupNode nid (EvalSt.nodes st))
 
 -- THE INNER'S BASE: ITS EXIT FRAME OVER THE REST OF THE PATH, FOLDED
 -- RAW.  It is the one continuation an inner subscribed from the raw

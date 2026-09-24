@@ -83,6 +83,36 @@ def strip_block_comments(lines):
     return out
 
 
+# A PARAMETERISED MODULE'S BODY IS INDENTED, and every pattern below reads a
+# declaration at column 0: a block stated inside `module M (x : A) where` was
+# invisible, so its cycle went uncovered and its declaration read as stale.
+# The body is read at the column its first line sets, until a line outdents.
+def dedent_modules(lines):
+    out, header, pending, indent = [], False, False, None
+    for ln in lines:
+        if indent is not None:
+            if not ln.strip():
+                out.append(ln)
+                continue
+            if ln.startswith(indent):
+                out.append(ln[len(indent):])
+                continue
+            indent = None
+        if pending and ln.strip() and not ln.lstrip().startswith("--"):
+            lead = ln[:len(ln) - len(ln.lstrip())]
+            pending = False
+            if lead:
+                indent = lead
+                out.append(ln[len(lead):])
+                continue
+        if ln.startswith("module "):
+            header = True
+        if header and re.search(r"\bwhere\s*$", ln.split("--")[0]):
+            header, pending = False, True
+        out.append(ln)
+    return out
+
+
 def parse(path):
     raw = open(path, encoding="utf-8").read().split("\n")
     peels, sccs = set(), []
@@ -95,7 +125,7 @@ def parse(path):
         if m:
             sccs.append(frozenset(m.group(1).split()))
 
-    lines = strip_block_comments(raw)
+    lines = dedent_modules(strip_block_comments(raw))
     names = {m.group(1) for ln in lines if (m := SIG.match(ln))}
 
     edges = {}

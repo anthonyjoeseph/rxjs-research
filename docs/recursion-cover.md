@@ -92,3 +92,10 @@ line whose head is not a declared name and whose next token (bare or after one
 `agda-dev.py`'s parser makes the same attribution, since the same misreading
 there pooled every builder's clauses into one phantom member and swallowed the
 rest of the module into one block.
+
+**A parameterised module's body is read at its own column.** Every pattern
+reads a declaration at column 0, so a block stated inside `module M (x : A)
+where` was invisible: its cycle went uncovered, and a `STRUCTURAL SCC:` naming
+it read as stale. The body after a `module … where` header is dedented by the
+indentation its first line sets, until a line outdents.
+`uncovered-module.agda` pins it.

@@ -55,16 +55,17 @@ open import Data.Unit.Polymorphic using (tt)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
 
-open import Rx.Prim using (Fuel; Source)
+open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed; []ᵉ; Val; _≟ᵗ_)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; Arrival; arrTick; arrTy; arrVal; arrSource; AtFloor;
-  RegId; RegRow; regSource; sameSource; pathHasNode; chainsGo; chainsOf; schedGo; dropSource;
+  RegId; RegRow; regSource; sameSource; pathHasNode; chainsGo; chainsOf; schedGo;
   cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init)
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (reducible; rawFold; red-env)
+open import Rx.Evaluator.Reducible.Floor using (drop-sub)
 open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Rule; rule; termini; fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf; sub-rule; sub-ot; fold-kept)
 
 ------------------------------------------------------------------
@@ -114,16 +115,6 @@ chain-agree a {st = st} ru x∈ y∈ k hx hy =
   let (r₀ , m₀ , kx , ex) = chain-row a (EvalSt.registry st) x∈
       (r₁ , m₁ , ky , ey) = chain-row a (EvalSt.registry st) y∈
   in trans (sym ex) (trans (termini ru k m₀ m₁ (subst T (sym (kx k)) hx) (subst T (sym (ky k)) hy)) ey)
-
--- the end of a cascade drops rows and moves nothing else the rule reads
-drop-sub : ∀ {n} {Γ : Ctx n} {t} (src : Source) (reg : List (RegRow Γ t)) {r}
-         → r ∈ dropSource src reg → r ∈ reg
-drop-sub src [] ()
-drop-sub src ((rid , s , c) ∷ reg) r∈ with sameSource src (regSource s)
-... | true  = there (drop-sub src reg r∈)
-... | false with r∈
-...   | here refl = here refl
-...   | there r∈′ = there (drop-sub src reg r∈′)
 
 finish-rule : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e)
             → Rule sched st → Rule (proj₁ (cascadeFinish a sched st)) (proj₂ (cascadeFinish a sched st))

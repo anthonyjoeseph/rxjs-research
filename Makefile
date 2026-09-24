@@ -722,7 +722,7 @@ recursion-cover:
 # covered recursion would be routed around within a day.
 recursion-cover-selftest:
 	@fail=0; S=scripts/recursion-cover-selftest; \
-	  for bad in uncovered uncovered-copattern stale-peel stale-scc; do \
+	  for bad in uncovered uncovered-copattern uncovered-module stale-peel stale-scc; do \
 	    if scripts/check-recursion-cover.py --file $$S/$$bad.agda > /dev/null 2>&1; then \
 	      echo "SELFTEST FAIL: $$bad PASSED — the check is dead"; fail=1; \
 	    fi; \
