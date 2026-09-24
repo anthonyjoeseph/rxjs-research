@@ -267,13 +267,13 @@ also: `run-wellFormed` — same, the input-well-formed top line, which the subsc
   base, which decides whether a share's fan-out, the monster's own region,
   terminates without an outside counter.
 
-- **INSTANTIATE `rawInner` AT THE PROGRAM THAT GROWS A QUEUE.** Every
-  frame arm now has a body; `rawInner` is the one statement nothing has
-  instantiated. `mergeAll(1)` over a shared `of(1,2,3)` mapped to the shared
-  stream grows the queue while the lane is busy and reaches the raw finish;
-  inhabiting its conclusion there from the relation's constructors is the
-  receipt that could refute the monster's fan-out before the ground above
-  is built.
+- **HUNT THE OVERRUN AT A STATE THE HYPOTHESES ADMIT.** A concrete run
+  cannot refute `rawInner` -- its conclusion is an existence claim -- and
+  the oracle's reachable states never overran the drain's budget. What
+  could refute it is a state that satisfies `Room`, `Sound` and `NodeOn`
+  but that no run reaches, where a share's fan-out delivers to an outer
+  while one of its own drained inners runs. Build that state or show the
+  hypotheses exclude it; the second is the measure the third ground needs.
 
 - **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
   STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE

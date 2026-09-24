@@ -1697,6 +1697,19 @@ node-cases {x} {y} {k} p l r with x ≡ᵇ k in eq
 -- evaluator over 1.5M programs: 44,160 raw finishes met a nonempty queue,
 -- and every one of the 324,536 budgeted finishes met a queue exactly at
 -- its budget; none overran it, and no walk-order finish met a queue.
+-- The budgeted-drain prototype on the oracle's side branch agrees over
+-- 48k programs: 42k raw finishes met a nonempty queue, 129k budgeted
+-- finishes met one exactly at budget, and the overrun, unfunded and
+-- walk-order tags never fired.  Reachable states only; the statement
+-- quantifies over every state its hypotheses admit.
+
+-- AND A CONCRETE INSTANCE CANNOT REFUTE IT.  The conclusion is an
+-- existence claim, so a row hand-builds one derivation at one point, and
+-- that succeeds wherever the run terminates -- which the oracle already
+-- shows at every point it reaches.  What is in doubt is uniform: whether
+-- the drain's budget holds at every admitted state, which is the measure
+-- argument above.  A refutation has to be a state the hypotheses admit
+-- where a queue grows while its own drained inner runs.
 
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
