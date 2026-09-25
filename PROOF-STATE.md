@@ -225,12 +225,10 @@ through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
-proof half holds no postulate, and the oracle runs in CI after the gate.
-Neither half may be narrowed to pass.
-
-**After running 1.5M test cases, the evaluator's behavior is 1-for-1 correct
-against rxjs** — measured off the proof path, with both stuck branches rebuilt
-at the same ceiling under a termination pragma.
+proof half holds no postulate, and the oracle runs in CI beside the gate.
+Neither half may be narrowed to pass. **Nor does the tier close, or its branch
+merge, until a 3M-case local sweep has come back and every crash in it has been
+investigated (Anthony).**
 
 ### The monster
 
