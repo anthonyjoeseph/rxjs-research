@@ -239,3 +239,15 @@ error message actively misdirects. Read the entry before reasoning from the erro
   number, neither of which you wrote. **Write the telescope explicitly whenever a
   statement mentions more than one generalised name**; the block is a convenience for
   single-binder signatures and stops paying past that.
+
+- **A PATTERN `let` RUNS ITS RIGHT-HAND SIDE ONCE PER COMPONENT, AND NOTHING REPORTS IT
+  EXCEPT THE CLOCK.** Agda substitutes a `let`: `let (r , d) = E in b` elaborates to `b`
+  with `proj₁ E` and `proj₁ (proj₂ E)` in place of `r` and `d`, and the compiled code
+  evaluates E once per use. Where E is the evaluator's own recursive call the factor
+  compounds at every level of nesting, which read as the oracle's cases stalling. **In
+  the runtime modules bind a pattern with `E |>′ λ (r , d) → b`** (`Function.Base`): E is
+  an argument, so it is evaluated once, and `|>′` unfolds, so the two forms are
+  definitionally equal and a proof sees no difference. One cost: the body is now checked
+  before the result type is known, so an implicit lambda the expected type used to
+  insert must be written out (`λ {lo′} {s′} κ₂ → …`). A plain `let x = E` is substituted
+  too, and costs the same whenever `x` is used more than once.

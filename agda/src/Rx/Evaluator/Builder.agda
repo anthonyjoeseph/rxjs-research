@@ -50,6 +50,7 @@ open import Data.Nat using (zero; suc; _∸_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Function.Base using (_|>′_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit.Polymorphic using (tt)
 open import Relation.Nullary using (yes; no)
@@ -81,11 +82,11 @@ chain-row : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ) (reg : List (RegRow Γ t))
                                   × rowEnd r₀ ≡ endOf (proj₂ (proj₂ x)))
 chain-row a [] ()
 chain-row a ((rid , s , (u , p)) ∷ reg) x∈ with sameSource (arrSource a) (regSource s) | u ≟ᵗ arrTy a
-... | false | _        = let (r₀ , m , ek , ee) = chain-row a reg x∈ in r₀ , there m , ek , ee
-... | true  | no _     = let (r₀ , m , ek , ee) = chain-row a reg x∈ in r₀ , there m , ek , ee
+... | false | _        = chain-row a reg x∈ |>′ λ (r₀ , m , ek , ee) → r₀ , there m , ek , ee
+... | true  | no _     = chain-row a reg x∈ |>′ λ (r₀ , m , ek , ee) → r₀ , there m , ek , ee
 ... | true  | yes refl with x∈
 ...   | here refl = _ , here refl , (λ k → refl) , refl
-...   | there x∈′ = let (r₀ , m , ek , ee) = chain-row a reg x∈′ in r₀ , there m , ek , ee
+...   | there x∈′ = chain-row a reg x∈′ |>′ λ (r₀ , m , ek , ee) → r₀ , there m , ek , ee
 
 -- and a chain is distinct if every row's path is
 chain-distinct : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ) (reg : List (RegRow Γ t))
@@ -103,8 +104,8 @@ chain-distinct a ((rid , s , (u , p)) ∷ reg) dr x∈ with sameSource (arrSourc
 chain-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) {sched : Sched Γ} {st : EvalSt e}
             → Rule sched st → ∀ {x} → x ∈ chainsOf a st → Sound (proj₂ (proj₂ x)) sched st
 chain-sound a {st = st} ru x∈ =
-  let (r₀ , m , ek , ee) = chain-row a (EvalSt.registry st) x∈
-  in sound ru (λ k h r∈ th → trans (termini ru k r∈ m th (subst T (sym (ek k)) h)) ee)
+  chain-row a (EvalSt.registry st) x∈ |>′ λ (r₀ , m , ek , ee) →
+  sound ru (λ k h r∈ th → trans (termini ru k r∈ m th (subst T (sym (ek k)) h)) ee)
               (λ k h → fresh-rows ru m k (subst T (sym (ek k)) h))
               (chain-distinct a (EvalSt.registry st) (distinct-rows ru) x∈)
 
@@ -113,9 +114,9 @@ chain-agree : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) {sched
             → Rule sched st → ∀ {x y} → x ∈ chainsOf a st → y ∈ chainsOf a st
             → Agree (proj₂ (proj₂ x)) (proj₂ (proj₂ y))
 chain-agree a {st = st} ru x∈ y∈ k hx hy =
-  let (r₀ , m₀ , kx , ex) = chain-row a (EvalSt.registry st) x∈
-      (r₁ , m₁ , ky , ey) = chain-row a (EvalSt.registry st) y∈
-  in trans (sym ex) (trans (termini ru k m₀ m₁ (subst T (sym (kx k)) hx) (subst T (sym (ky k)) hy)) ey)
+  chain-row a (EvalSt.registry st) x∈ |>′ λ (r₀ , m₀ , kx , ex) →
+  chain-row a (EvalSt.registry st) y∈ |>′ λ (r₁ , m₁ , ky , ey) →
+  trans (sym ex) (trans (termini ru k m₀ m₁ (subst T (sym (kx k)) hx) (subst T (sym (ky k)) hy)) ey)
 
 finish-rule : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e)
             → Rule sched st → Rule (proj₁ (cascadeFinish a sched st)) (proj₂ (cascadeFinish a sched st))
@@ -142,8 +143,8 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- funds the raw fold, which rebuilds the candidate for every value it
 -- carries from the store.
 chainStep! {n = n} a vs fin (lo , path) sched st so =
-  let (_ , d) = rawFold (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path (arrTick a) vs fin sched st ≤-refl so
-  in _ , chain-step d , (λ κ₂ → fold-kept d so κ₂)
+  rawFold (<-wellFounded (n ∸ lo)) ≤-refl (<-wellFounded _) path (arrTick a) vs fin sched st ≤-refl so |>′ λ (_ , d) →
+  _ , chain-step d , (λ {lo′} {s′} κ₂ → fold-kept d so κ₂)
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (a : Arrival Γ) (vs : List (Val Γ (arrTy a))) (fin : Bool)
@@ -156,18 +157,17 @@ cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 cascadeGo! a vs fin []               sched st ru sds ag = _ , casc-nil , ru
 cascadeGo! a vs fin ((rid , c) ∷ cs) sched st ru sds ag
   with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
-... | true  = let (_ , g , ru′) = cascadeGo! a vs fin cs sched st ru (λ x∈ → sds (there x∈))
-                                    (λ x∈ y∈ → ag (there x∈) (there y∈))
-              in _ , casc-cut eqc g , ru′
+... | true  = cascadeGo! a vs fin cs sched st ru (λ x∈ → sds (there x∈))
+                                    (λ x∈ y∈ → ag (there x∈) (there y∈)) |>′ λ (_ , g , ru′) →
+              _ , casc-cut eqc g , ru′
 ... | false =
-      let so = sub-ot (λ r∈ → r∈) ≤-refl (sds (here refl))
-          ((emits , sched₁ , st₁) , s , kept) =
-            chainStep! a vs fin c sched
-              (record st { delivered = rid ∷ EvalSt.delivered st }) so
-          (_ , g , ru′) = cascadeGo! a vs fin cs sched₁ st₁ (ruled (kept (proj₂ c) so (λ _ _ _ → refl)))
+      let so = sub-ot (λ r∈ → r∈) ≤-refl (sds (here refl)) in
+      chainStep! a vs fin c sched
+              (record st { delivered = rid ∷ EvalSt.delivered st }) so |>′ λ ((emits , sched₁ , st₁) , s , kept) →
+      cascadeGo! a vs fin cs sched₁ st₁ (ruled (kept (proj₂ c) so (λ _ _ _ → refl)))
                             (λ x∈ → kept _ (sub-ot (λ r∈ → r∈) ≤-refl (sds (there x∈))) (ag (here refl) (there x∈)))
-                            (λ x∈ y∈ → ag (there x∈) (there y∈))
-      in _ , casc-live eqc s g , ru′
+                            (λ x∈ y∈ → ag (there x∈) (there y∈)) |>′ λ (_ , g , ru′) →
+      _ , casc-live eqc s g , ru′
 
 cascade! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) → Rule sched st
@@ -175,21 +175,18 @@ cascade! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              cascade⇓ {e = e} a sched st r × Rule (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 cascade! a sched st ru with Arrival.isLast a in eql
 ... | false =
-      let ((_ , sched′ , st′) , g , ru′) =
-            cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched (cascadeOpen st)
+      cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched (cascadeOpen st)
               (sub-rule (λ r∈ → r∈) ≤-refl ru)
-              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru x∈)) (chain-agree a ru)
-      in _ , casc-run eql g , finish-rule a sched′ st′ ru′
+              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru x∈)) (chain-agree a ru) |>′ λ ((_ , sched′ , st′) , g , ru′) →
+      _ , casc-run eql g , finish-rule a sched′ st′ ru′
 ... | true  =
-      let ((_ , sched₁ , st₁) , g , ru₁) =
-            cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched (cascadeOpen st)
+      cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched (cascadeOpen st)
               (sub-rule (λ r∈ → r∈) ≤-refl ru)
-              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru x∈)) (chain-agree a ru)
-          ((_ , sched₂ , st₂) , g′ , ru₂) =
-            cascadeGo! a [] true (chainsOf a st₁) sched₁ (cascadeClose a st₁)
+              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru x∈)) (chain-agree a ru) |>′ λ ((_ , sched₁ , st₁) , g , ru₁) →
+      cascadeGo! a [] true (chainsOf a st₁) sched₁ (cascadeClose a st₁)
               (sub-rule (λ r∈ → r∈) ≤-refl ru₁)
-              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru₁ x∈)) (chain-agree a ru₁)
-      in _ , casc-run-last eql g g′ , finish-rule a sched₂ st₂ ru₂
+              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru₁ x∈)) (chain-agree a ru₁) |>′ λ ((_ , sched₂ , st₂) , g′ , ru₂) →
+      _ , casc-run-last eql g g′ , finish-rule a sched₂ st₂ ru₂
 
 drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) → Rule sched st
@@ -198,9 +195,9 @@ drain! zero    sched st ru = _ , drain-done
 drain! (suc k) sched st ru with sched-next sched in eqn
 ... | inj₁ _            = _ , drain-empty eqn
 ... | inj₂ (a , sched′) =
-      let ((out , sched″ , st′) , c , ru′) = cascade! a sched′ st (pop-rule eqn ru)
-          (_ , d)                          = drain! k sched″ st′ ru′
-      in _ , drain-step eqn c d
+      cascade! a sched′ st (pop-rule eqn ru) |>′ λ ((out , sched″ , st′) , c , ru′) →
+      drain! k sched″ st′ ru′ |>′ λ (_ , d) →
+      _ , drain-step eqn c d
 
 ------------------------------------------------------------------
 -- THE TOP LINE.
@@ -212,13 +209,12 @@ drain! (suc k) sched st ru with sched-next sched in eqn
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
           → Σ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
 evaluate! {n = n} {Γ = Γ} fuel e ins =
-  let aM = <-wellFounded _
-      ((out , sched₀ , st₀) , s , _ , hs , _) =
-        reducible aM e []ᵉ (red-env {Γ = Γ} aM []ᵉ) (root {lo = n}) (standing tt) rootRP tt 0
+  let aM = <-wellFounded _ in
+  reducible aM e []ᵉ (red-env {Γ = Γ} aM []ᵉ) (root {lo = n}) (standing tt) rootRP tt 0
           (sched-init e ins) (st-init e) ≤-refl
-          (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt))
-      (rest , d) = drain! fuel sched₀ st₀ (ruled (sounds hs))
-  in _ , eval-run s d
+          (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt)) |>′ λ ((out , sched₀ , st₀) , s , _ , hs , _) →
+  drain! fuel sched₀ st₀ (ruled (sounds hs)) |>′ λ (rest , d) →
+  _ , eval-run s d
 
 -- AND THE EVALUATOR IS THE PROJECTION.  Not a new machine -- the same
 -- machine reached through the builder rather than through a witness it

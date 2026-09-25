@@ -1565,7 +1565,6 @@ agda/_cli/Main: $(AGDA_SRC)
 # BINARIES under that key, so an edit outside the cone -- the whole proof --
 # never rebuilds them.
 oracle-tree: stripped
-	@scripts/oracle-mirror.py --selftest
 	@scripts/oracle-mirror.py --sync
 
 oracle-key: stripped

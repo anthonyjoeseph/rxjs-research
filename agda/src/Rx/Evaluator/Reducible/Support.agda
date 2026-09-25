@@ -23,6 +23,7 @@ open import Data.Maybe using (Maybe; just; nothing; _<∣>_) renaming (map to ma
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (_<?_; _≤?_; ≤-refl; ≤-trans; n≤1+n; <-≤-trans; <-irrefl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Function.Base using (_|>′_)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]; [_,_]′)
 open import Data.Unit.Polymorphic using (⊤; tt)
 open import Data.Unit using () renaming (tt to tt₀)
@@ -1538,13 +1539,13 @@ admit-row : ∀ {n} {Γ : Ctx n} {t} (i : Fin n) (reg : List (RegRow Γ t))
                                   × rowEnd r₀ ≡ endOf (proj₂ x))
 admit-row i [] ()
 admit-row i ((rid , atDyn _ _ , _) ∷ reg) x∈ =
-  let (r₀ , m , ek , ee) = admit-row i reg x∈ in r₀ , there m , ek , ee
+  admit-row i reg x∈ |>′ λ (r₀ , m , ek , ee) → r₀ , there m , ek , ee
 admit-row {Γ = Γ} i ((rid , atSlot j , (u , p)) ∷ reg) x∈ with i ≟ᶠ j | u ≟ᵗ lookup Γ i
-... | no _     | _        = let (r₀ , m , ek , ee) = admit-row i reg x∈ in r₀ , there m , ek , ee
-... | yes _    | no _     = let (r₀ , m , ek , ee) = admit-row i reg x∈ in r₀ , there m , ek , ee
+... | no _     | _        = admit-row i reg x∈ |>′ λ (r₀ , m , ek , ee) → r₀ , there m , ek , ee
+... | yes _    | no _     = admit-row i reg x∈ |>′ λ (r₀ , m , ek , ee) → r₀ , there m , ek , ee
 ... | yes refl | yes refl with x∈
 ...   | here refl = _ , here refl , (λ k → refl) , refl
-...   | there x∈′ = let (r₀ , m , ek , ee) = admit-row i reg x∈′ in r₀ , there m , ek , ee
+...   | there x∈′ = admit-row i reg x∈′ |>′ λ (r₀ , m , ek , ee) → r₀ , there m , ek , ee
 
 -- and its path is distinct if every row's is
 admit-distinct : ∀ {n} {Γ : Ctx n} {t} (i : Fin n) (reg : List (RegRow Γ t))
@@ -1562,8 +1563,8 @@ admit-distinct {Γ = Γ} i ((rid , atSlot j , (u , p)) ∷ reg) dr x∈ with i �
 admit-ot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (i : Fin n) (sched : Sched Γ) (st : EvalSt e) → Rule sched st
          → ∀ {a} → a ∈ shareAdmit i (EvalSt.registry st) → Sound (proj₂ a) sched st
 admit-ot i sched st ru a∈ =
-  let (r₀ , m , ek , ee) = admit-row i (EvalSt.registry st) a∈
-  in sound ru (λ k h r∈ th → trans (termini ru k r∈ m th (subst T (sym (ek k)) h)) ee)
+  admit-row i (EvalSt.registry st) a∈ |>′ λ (r₀ , m , ek , ee) →
+  sound ru (λ k h r∈ th → trans (termini ru k r∈ m th (subst T (sym (ek k)) h)) ee)
               (λ k h → fresh-rows ru m k (subst T (sym (ek k)) h))
               (admit-distinct i (EvalSt.registry st) (distinct-rows ru) a∈)
 
@@ -1571,9 +1572,9 @@ admit-agree : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (i : Fin n) (st : EvalS
             → ∀ {a b} → a ∈ shareAdmit i (EvalSt.registry st) → b ∈ shareAdmit i (EvalSt.registry st)
             → Agree (proj₂ a) (proj₂ b)
 admit-agree i st tm a∈ b∈ k ha hb =
-  let (r₀ , m₀ , ka , ea) = admit-row i (EvalSt.registry st) a∈
-      (r₁ , m₁ , kb , eb) = admit-row i (EvalSt.registry st) b∈
-  in trans (sym ea) (trans (tm k m₀ m₁ (subst T (sym (ka k)) ha) (subst T (sym (kb k)) hb)) eb)
+  admit-row i (EvalSt.registry st) a∈ |>′ λ (r₀ , m₀ , ka , ea) →
+  admit-row i (EvalSt.registry st) b∈ |>′ λ (r₁ , m₁ , kb , eb) →
+  trans (sym ea) (trans (tm k m₀ m₁ (subst T (sym (ka k)) ha) (subst T (sym (kb k)) hb)) eb)
 
 -- a node found in a two-node frame is one of the two
 node-cases : ∀ {x y k : ℕ} {A : Set} → T (any (_≡ᵇ k) (x ∷ y ∷ [])) → (x ≡ k → A) → (y ≡ k → A) → A
@@ -2242,9 +2243,9 @@ fiHolds→thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ u}
 fiHolds→thru op nid inst le κ h (standing pfs) (grounded ((c , lt ∷ᵃ _) , ap , hs) so) =
   grounded
     ((c , lt ∷ᵃ []ᵃ) , (λ k on → ap k (∨-Tˡ {nid ≡ᵇ k} {any (_≡ᵇ k) (inst ∷ [])} ([ (λ a → a) , (λ ()) ] (∨-T {nid ≡ᵇ k} {false} on)))) , hs)
-    (let (so′ , nd) = inner-back op nid inst κ so in push-thru op nid le κ so′ nd)
+    (inner-back op nid inst κ so |>′ λ (so′ , nd) → push-thru op nid le κ so′ nd)
 fiHolds→thru op nid inst le κ h fallen (grounded fell so) =
-  grounded fell (let (so′ , nd) = inner-back op nid inst κ so in push-thru op nid le κ so′ nd)
+  grounded fell (inner-back op nid inst κ so |>′ λ (so′ , nd) → push-thru op nid le κ so′ nd)
 
 -- THE TWO COLUMN GUARDS, WHICH ARE WHY NOTHING IS DRAINED ON STANDING
 -- GROUND.  The outer's column never holds a queue beside a free lane:

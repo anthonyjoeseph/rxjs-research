@@ -25,6 +25,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; _≤_; _<_; z≤n; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; n≤1+n; <-≤-trans; <-irrefl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Function.Base using (_|>′_)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
@@ -326,9 +327,9 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   admit-PI : ∀ (i : Fin n) {R : List (RegRow Γ t)} → Clr x i → EA R
            → ∀ {a} → a ∈ shareAdmit i R → PI (proj₂ a)
   admit-PI i {R} c eak {a} a∈ =
-    let (r₀ , m , ek , ee) = admit-row i R a∈
-        off = λ h → floor-miss x i (proj₂ a) c (trans (sym ee) (eak m (subst T (sym (ek nid)) h)))
-    in pᵢ (off-ok (proj₂ a) off) (λ h → ⊥-elim (off h)) (floor-clear x i (proj₂ a) c)
+    admit-row i R a∈ |>′ λ (r₀ , m , ek , ee) →
+    let off = λ h → floor-miss x i (proj₂ a) c (trans (sym ee) (eak m (subst T (sym (ek nid)) h))) in
+    pᵢ (off-ok (proj₂ a) off) (λ h → ⊥-elim (off h)) (floor-clear x i (proj₂ a) c)
 
   -- THE FOURTEEN-MEMBER INDUCTION.  Every clause matches a constructor
   -- and recurses on its sub-derivations, so the block descends

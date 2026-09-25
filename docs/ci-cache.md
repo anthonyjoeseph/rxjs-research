@@ -114,11 +114,8 @@ check that should fail into one that passes.
 The oracle job shares nothing with the gate. It builds its own two runners from
 its own tree (`make cli-build`, whose first half is `make oracle-tree`: the
 runners' import cone, copied out of the stripped mirror with termination
-checking off, every `{-@0-}` marker made a real `@0` under `--erasure`, and
-the runtime modules' pattern `let`s rewritten so each right-hand side runs
-once — why: `scripts/oracle-mirror.py`), and
-caches the **linked
-binaries** rather than anything they were built from. That is the opposite of
+checking off and every `{-@0-}` marker made a real `@0` under `--erasure` —
+why: `scripts/oracle-mirror.py`), and caches the **linked binaries** rather than anything they were built from. That is the opposite of
 the MAlonzo rule above, for the opposite reason: there the binaries relink on
 every run anyway, while here a hit skips Agda altogether — the job does not
 even install it.

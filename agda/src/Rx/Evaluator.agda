@@ -10,6 +10,7 @@ open import Data.List    using (List; []; _∷_; _++_; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
 open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Function.Base using (_|>′_)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (yes; no)
@@ -535,7 +536,7 @@ takeVals zero          _        = [] , zero , false
 takeVals (suc k)       []       = [] , suc k , false
 takeVals (suc zero)    (v ∷ _)  = v ∷ [] , zero , true
 takeVals (suc (suc k)) (v ∷ vs) =
-  let (out , rem , didCut) = takeVals (suc k) vs in v ∷ out , rem , didCut
+  takeVals (suc k) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
 
 -- take's whole step.  Non-cut passes the budgeted prefix through and
 -- threads the remaining count; the cut exhausts the budget, forces the
@@ -546,8 +547,8 @@ takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
              → List (Val Γ s) × Bool × Sched Γ × EvalSt e
 takeDispatch nid vals fin sched st (just (take-st k)) =
   if proj₂ (proj₂ (takeVals k vals))
-  then (let (kept , cutRids) = cutThrough nid (EvalSt.registry st)
-        in proj₁ (takeVals k vals) , true ,
+  then (cutThrough nid (EvalSt.registry st) |>′ λ (kept , cutRids) →
+        proj₁ (takeVals k vals) , true ,
            record sched { live = sweepLive kept (Sched.live sched) } ,
            record st { registry = kept
                      ; cancelled = cutRids ++ EvalSt.cancelled st
@@ -564,9 +565,9 @@ scanVals : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ (u ×ᵗ s) u
          → Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
 scanVals fn ac []       = [] , ac
 scanVals fn ac (v ∷ vs) =
-  let ac′           = applyClo fn (ac , v)
-      (outs , last) = scanVals fn ac′ vs
-  in ac′ ∷ outs , last
+  let ac′           = applyClo fn (ac , v) in
+  scanVals fn ac′ vs |>′ λ (outs , last) →
+  ac′ ∷ outs , last
 
 -- THE SCAN'S WHOLE STEP, AS ONE FUNCTION OF WHAT THE NODE HOLDS.  A
 -- fold that finds no accumulator of its own element type emits nothing
@@ -682,8 +683,8 @@ switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → Sched Γ × EvalSt e
 switchKill nothing  sched₀ st₀ = sched₀ , st₀
 switchKill (just v) sched₀ st₀ =
-  let (kept , cutRids) = cutThrough v (EvalSt.registry st₀)
-  in record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
+  cutThrough v (EvalSt.registry st₀) |>′ λ (kept , cutRids) →
+  record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
      record st₀ { registry = kept
                 ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
 

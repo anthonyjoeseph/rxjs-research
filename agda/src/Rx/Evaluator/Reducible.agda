@@ -110,6 +110,7 @@ open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; _+_;
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; n≤1+n; <-≤-trans; <⇒≤; ∸-monoʳ-<; <-irrefl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Function.Base using (_|>′_)
 open import Data.Sum using (inj₁; inj₂; [_,_]; [_,_]′)
 open import Data.Unit.Polymorphic using (⊤; tt)
 open import Data.Unit using () renaming (tt to tt₀)
@@ -258,25 +259,25 @@ rawDrain ac le aM nid κ now [] lim act od q sched st rm so nd aq wq = _ , drain
 rawDrain ac le aM nid κ now (_ ∷ fs) lim act od [] sched st rm so nd aq wq = _ , drain-nil , so , nd
 rawDrain {s = s} ac le (acc rsM) nid κ now (_ ∷ fs) lim act od (o ∷ q) sched st rm so nd (acc rs) wq =
   by-bool (hasRoom lim act) (λ eqr → _ , drain-no-room eqr , so , nd) λ eqr →
-  let (r₁ , d₁) = rawInner ac le (acc rsM) mergeAllᵒ nid κ now o sched
+  rawInner ac le (acc rsM) mergeAllᵒ nid κ now o sched
                     (record st { nodes = setNode nid (mergeAll-st {t = s} lim (suc act) q od) (EvalSt.nodes st) })
                     rm (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
-                    (just (mergeAll-st {t = s} lim (suc act) q od)) (lookup-set nid _ (EvalSt.nodes st)) (rs wq) ≤-refl
-      (so₁ , nd₁) = inner-after mergeAllᵒ nid κ sched d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
-      ds = drainSt s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))
-  in [ (λ sp →
-         let (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le (rsM (<-≤-trans sp rm)) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
+                    (just (mergeAll-st {t = s} lim (suc act) q od)) (lookup-set nid _ (EvalSt.nodes st)) (rs wq) ≤-refl |>′ λ (r₁ , d₁) →
+  inner-after mergeAllᵒ nid κ sched d₁ (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd) |>′ λ (so₁ , nd₁) →
+  let ds = drainSt s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁)))) in
+  [ (λ sp →
+         rawDrain ac le (rsM (<-≤-trans sp rm)) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
                                        (proj₂ (proj₂ (proj₂ ds))) (proj₁ (proj₂ (proj₂ ds)))
-                                       (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) ≤-refl so₁ nd₁ (<-wellFounded _) ≤-refl
-         in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂)
+                                       (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) ≤-refl so₁ nd₁ (<-wellFounded _) ≤-refl |>′ λ (r₂ , d₂ , so₂ , nd₂) →
+         _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂)
      , (λ nw →
          let w  = proj₂ nw
-             bd = ≤-trans (drain-waiting s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))) w
-             (r₂ , d₂ , so₂ , nd₂) = rawDrain ac le (acc rsM) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
+             bd = ≤-trans (drain-waiting s (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₁))))) w in
+         rawDrain ac le (acc rsM) nid κ now fs (proj₁ ds) (proj₁ (proj₂ ds))
                                        (proj₂ (proj₂ (proj₂ ds))) (proj₁ (proj₂ (proj₂ ds)))
                                        (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) (room-keeps (subscribeE-keeps d₁) rm) so₁ nd₁
-                                       (rs wq) bd
-         in _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂)
+                                       (rs wq) bd |>′ λ (r₂ , d₂ , so₂ , nd₂) →
+         _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂)
      ]′ (spend-or (refill-spends mergeAllᵒ nid κ d₁ (sub-on (λ r∈ → r∈) ≤-refl nd)
                                  (lookup-set nid _ (EvalSt.nodes st))))
 
@@ -299,26 +300,26 @@ rawConsume {u = u} ac le aM op nid κ now o sched st rm so nd
               st₁ = record (proj₂ sk) { nodes = setNode nid (switch-st (just (nodeCt (proj₁ sk))) od) (EvalSt.nodes (proj₂ sk)) }
               ct  = subst (nodeCt sched ≤_) (sym (switchKill-ct cur sched st)) ≤-refl
               so′ = sub-ot {κ = κ} {sched = sched} {sched′ = proj₁ sk} {st = st} {st′ = st₁} (kill-sub cur sched st) ct so
-              nd′ = sub-on {nid = nid} {κ = κ} {sched = sched} {sched′ = proj₁ sk} {st = st} {st′ = st₁} (kill-sub cur sched st) ct nd
-              (r , d) = rawInner ac le aM switchᵒ nid κ now o (proj₁ sk) st₁
+              nd′ = sub-on {nid = nid} {κ = κ} {sched = sched} {sched′ = proj₁ sk} {st = st} {st′ = st₁} (kill-sub cur sched st) ct nd in
+          rawInner ac le aM switchᵒ nid κ now o (proj₁ sk) st₁
                           (room-keeps (switchKill-keeps cur sched st refl) rm) so′ nd′
-                          _ (lookup-set nid _ (EvalSt.nodes (proj₂ sk))) (<-wellFounded _) ≤-refl
-          in _ , consume-switch-sub c refl refl (inner refl d) , inner-after switchᵒ nid κ (proj₁ sk) d so′ nd′
+                          _ (lookup-set nid _ (EvalSt.nodes (proj₂ sk))) (<-wellFounded _) ≤-refl |>′ λ (r , d) →
+          _ , consume-switch-sub c refl refl (inner refl d) , inner-after switchᵒ nid κ (proj₁ sk) d so′ nd′
 ...     | u-exhaust od =
-          let (r , d) = rawInner ac le aM exhaustᵒ nid κ now o sched
+          rawInner ac le aM exhaustᵒ nid κ now o sched
                           (record st { nodes = setNode nid (exhaust-st true od) (EvalSt.nodes st) }) rm
                           (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
-                          _ (lookup-set nid _ (EvalSt.nodes st)) (<-wellFounded _) ≤-refl
-          in _ , consume-exhaust-sub c (inner refl d)
+                          _ (lookup-set nid _ (EvalSt.nodes st)) (<-wellFounded _) ≤-refl |>′ λ (r , d) →
+          _ , consume-exhaust-sub c (inner refl d)
                , inner-after exhaustᵒ nid κ sched d (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
 ...     | u-merge lim act q od = by-bool (hasRoom lim act)
           (λ eqr → _ , consume-all-enqueue c eqr , sub-ot (λ r∈ → r∈) ≤-refl so , sub-on (λ r∈ → r∈) ≤-refl nd)
           (λ eqr →
-          let (r , d) = rawInner ac le aM mergeAllᵒ nid κ now o sched
+          rawInner ac le aM mergeAllᵒ nid κ now o sched
                           (record st { nodes = setNode nid (mergeAll-st lim (suc act) q od) (EvalSt.nodes st) }) rm
                           (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)
-                          _ (lookup-set nid _ (EvalSt.nodes st)) (<-wellFounded _) ≤-refl
-          in _ , consume-all-sub c eqr (inner refl d)
+                          _ (lookup-set nid _ (EvalSt.nodes st)) (<-wellFounded _) ≤-refl |>′ λ (r , d) →
+          _ , consume-all-sub c eqr (inner refl d)
                , inner-after mergeAllᵒ nid κ sched d (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd))
 
 -- the outer's values consumed raw, in walk order
@@ -332,10 +333,10 @@ rawThru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
                  × Sound κ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) × NodeOn nid κ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
 rawThru ac le aM op nid κ now [] sched st rm so nd = _ , walk-nil , so , nd
 rawThru ac le aM op nid κ now (o ∷ os) sched st rm so nd =
-  let (r₁ , d₁ , so₁ , nd₁) = rawConsume ac le aM op nid κ now o sched st rm so nd
-      (r₂ , d₂ , so₂ , nd₂) = rawThru ac le aM op nid κ now os (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
-                                (room-keeps (thruConsume-keeps d₁) rm) so₁ nd₁
-  in _ , walk-cons d₁ d₂ , so₂ , nd₂
+  rawConsume ac le aM op nid κ now o sched st rm so nd |>′ λ (r₁ , d₁ , so₁ , nd₁) →
+  rawThru ac le aM op nid κ now os (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
+                                (room-keeps (thruConsume-keeps d₁) rm) so₁ nd₁ |>′ λ (r₂ , d₂ , so₂ , nd₂) →
+  _ , walk-cons d₁ d₂ , so₂ , nd₂
 
 -- THE RAW FOLD OF A PATH THE STORE HOLDS.  An arrival and a share's
 -- fan-out fold down registry paths nd subscribe built, so the frames'
@@ -447,10 +448,10 @@ rawGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} (i : Fin n)
 
 rawFold ac le aM root now vals fin sched st rm so = _ , fold-root
 rawFold {n = n} (acc rs) le aM (share-sink i below) now vals fin sched st rm so =
-  let (r , w , _) = rawWalk i (rs (∸-monoʳ-< (s≤s (≤-trans le below)) (toℕ<n i))) aM now vals fin
+  rawWalk i (rs (∸-monoʳ-< (s≤s (≤-trans le below)) (toℕ<n i))) aM now vals fin
                       sched (shareDying i fin st) (room-keeps (shareDying-keeps i fin sched st) rm)
-                      (dying-rule i fin sched st (ruled so))
-  in _ , fold-sink (disp w)
+                      (dying-rule i fin sched st (ruled so)) |>′ λ (r , w , _) →
+  _ , fold-sink (disp w)
 rawFold ac le aM (map-f fn ↠[ le′ ] κ) now vals fin sched st rm so =
   rawAfter ac le aM (map-f fn) le′ κ _ step-map rm (drop-ot (map-f fn) le′ κ so)
 rawFold ac le aM (scan-f fn k ↠[ le′ ] κ) now vals fin sched st rm so =
@@ -466,28 +467,28 @@ rawFold ac le aM (batchSync-f k ↠[ le′ ] κ) now vals fin sched st rm so =
   in rawAfter ac le aM (batchSync-f k) le′ κ _ sd (room-keeps (stepFrame-keeps sd) rm)
        (drop-ot (batchSync-f k) le′ κ (step-kept le′ sd so))
 rawFold ac le aM (from-inner op nid inst ↠[ le′ ] κ) now vals fin sched st rm so =
-  let (r , sd , so′) = rawReact ac (≤-trans le le′) aM op nid inst le′ κ now vals fin sched st rm so
-                         _ refl (<-wellFounded _) ≤-refl
-  in rawAfter ac le aM (from-inner op nid inst) le′ κ r sd (room-keeps (stepFrame-keeps sd) rm) so′
+  rawReact ac (≤-trans le le′) aM op nid inst le′ κ now vals fin sched st rm so
+                         _ refl (<-wellFounded _) ≤-refl |>′ λ (r , sd , so′) →
+  rawAfter ac le aM (from-inner op nid inst) le′ κ r sd (room-keeps (stepFrame-keeps sd) rm) so′
 rawFold ac le aM (thru-outer op nid ↠[ le′ ] κ) now vals fin sched st rm so =
-  let (r , w , so₁ , _) = rawThru ac (≤-trans le le′) aM op nid κ now vals sched st rm
+  rawThru ac (≤-trans le le′) aM op nid κ now vals sched st rm
                             (drop-ot (thru-outer op nid) le′ κ so)
-                            (head-on (thru-outer op nid) le′ κ nid (self-node nid []) so)
-  in rawAfter ac le aM (thru-outer op nid) le′ κ _ (step-thru-outer w)
+                            (head-on (thru-outer op nid) le′ κ nid (self-node nid []) so) |>′ λ (r , w , so₁ , _) →
+  rawAfter ac le aM (thru-outer op nid) le′ κ _ (step-thru-outer w)
        (room-keeps (thruWrap-keeps op nid fin (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) (room-keeps (thruWalk-keeps w) rm))
        (wrap-ot op nid fin (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) so₁)
 
 rawAfter ac le aM f le′ κ {now} (_ , vals′ , fin′ , sched₁ , st₁) sd rm so =
-  let (r , d) = rawFold ac (≤-trans le le′) aM κ now vals′ fin′ sched₁ st₁ rm so
-  in _ , fold-step sd d
+  rawFold ac (≤-trans le le′) aM κ now vals′ fin′ sched₁ st₁ rm so |>′ λ (r , d) →
+  _ , fold-step sd d
 
 rawReact ac le aM op nid inst le′ κ now vals false sched st rm so h eq aq wq =
   _ , step-from-inner react-false , drop-ot (from-inner op nid inst) le′ κ so
 rawReact ac le aM op nid inst le′ κ now vals true sched st rm so h eq aq wq =
   by-bool (any (aliveThroughᶠ inst st) (EvalSt.registry st))
     (λ eqa →
-      let (r , fd , so′) = rawFinish ac le aM op nid inst le′ κ now vals sched st rm so h aq wq
-      in r , step-from-inner (react-dead eqa (subst (λ x → innerFinish⇓ op nid inst κ now vals sched st x r) (sym eq) fd)) , so′)
+      rawFinish ac le aM op nid inst le′ κ now vals sched st rm so h aq wq |>′ λ (r , fd , so′) →
+      r , step-from-inner (react-dead eqa (subst (λ x → innerFinish⇓ op nid inst κ now vals sched st x r) (sym eq) fd)) , so′)
     (λ eqa → _ , step-from-inner (react-alive eqa) , drop-ot (from-inner op nid inst) le′ κ so)
 
 rawFinish {s = s} ac le aM op nid inst le′ κ now vals sched st rm so h aq wq
@@ -498,44 +499,44 @@ rawFinish {s = s} ac le aM op nid inst le′ κ now vals sched st rm so h aq wq
 ...     | f-exhaust act od  = _ , finish-exhaust-clear , sub-ot (λ r∈ → r∈) ≤-refl (drop-ot (from-inner op nid inst) le′ κ so)
 ...     | f-merge lim act q od =
           let fi  = from-inner {s = s} op nid inst
-              so₀ = drop-ot fi le′ κ so
-              (r₁ , d₁) = rawFold ac le aM κ now vals false sched st rm so₀
-              so₁ = fold-kept d₁ so₀ (fi ↠[ le′ ] κ) so (λ _ _ _ → refl)
-              (r₂ , d₂ , so₂ , _) = rawDrain ac le aM nid κ now q lim (pred act) od q
+              so₀ = drop-ot fi le′ κ so in
+          rawFold ac le aM κ now vals false sched st rm so₀ |>′ λ (r₁ , d₁) →
+          let so₁ = fold-kept d₁ so₀ (fi ↠[ le′ ] κ) so (λ _ _ _ → refl) in
+          rawDrain ac le aM nid κ now q lim (pred act) od q
                                       (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) (room-keeps (foldPath-keeps d₁) rm)
-                                      (drop-ot fi le′ κ so₁) (head-on fi le′ κ nid (self-node nid (inst ∷ [])) so₁) aq wq
-          in _ , finish-all-drain {act = act} d₁ d₂ , sub-ot (λ r∈ → r∈) ≤-refl so₂
+                                      (drop-ot fi le′ κ so₁) (head-on fi le′ κ nid (self-node nid (inst ∷ [])) so₁) aq wq |>′ λ (r₂ , d₂ , so₂ , _) →
+          _ , finish-all-drain {act = act} d₁ d₂ , sub-ot (λ r∈ → r∈) ≤-refl so₂
 
 rawWalk i ac aM now [] false sched st rm ru = _ , walk-nil , ru
 rawWalk i ac aM now [] true sched st rm ru =
-  let (r , g , ru′) = rawGo i ac aM now [] true (shareAdmit i (EvalSt.registry st)) sched (shareSpend i st) rm
+  rawGo i ac aM now [] true (shareAdmit i (EvalSt.registry st)) sched (shareSpend i st) rm
                         (sub-rule (λ r∈ → r∈) ≤-refl ru)
-                        (λ a∈ → sub-ot (λ r∈ → r∈) ≤-refl (admit-ot i sched st ru a∈)) (admit-agree i st (termini ru))
-  in r , walk-end g , ru′
+                        (λ a∈ → sub-ot (λ r∈ → r∈) ≤-refl (admit-ot i sched st ru a∈)) (admit-agree i st (termini ru)) |>′ λ (r , g , ru′) →
+  r , walk-end g , ru′
 rawWalk i ac aM now (v ∷ vs) fin sched st rm ru =
-  let (r₁ , g , ru₁) = rawGo i ac aM now (v ∷ []) false (shareAdmit i (EvalSt.registry st)) sched st rm ru
-                         (admit-ot i sched st ru) (admit-agree i st (termini ru))
-      (r₂ , w , ru₂) = rawWalk i ac aM now vs fin (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
-                         (room-keeps (shareGo-keeps g) rm) ru₁
-  in _ , walk-more g w , ru₂
+  rawGo i ac aM now (v ∷ []) false (shareAdmit i (EvalSt.registry st)) sched st rm ru
+                         (admit-ot i sched st ru) (admit-agree i st (termini ru)) |>′ λ (r₁ , g , ru₁) →
+  rawWalk i ac aM now vs fin (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
+                         (room-keeps (shareGo-keeps g) rm) ru₁ |>′ λ (r₂ , w , ru₂) →
+  _ , walk-more g w , ru₂
 
 rawGo i ac aM now vals fin [] sched st rm ru ok ag = _ , go-nil , ru
 rawGo i ac aM now vals fin ((rid , p) ∷ ps) sched st rm ru ok ag =
   by-bool (any (_≡ᵇ rid) (EvalSt.cancelled st)) (λ eqc →
-  let so = sub-ot (λ r∈ → r∈) ≤-refl (ok (here refl))
-      (r₁ , d) = rawFold ac ≤-refl aM p now vals fin sched
-                   (record st { delivered = rid ∷ EvalSt.delivered st }) rm so
-      (r₂ , g , ru₂) = rawGo i ac aM now vals fin ps (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
+  let so = sub-ot (λ r∈ → r∈) ≤-refl (ok (here refl)) in
+  rawFold ac ≤-refl aM p now vals fin sched
+                   (record st { delivered = rid ∷ EvalSt.delivered st }) rm so |>′ λ (r₁ , d) →
+  rawGo i ac aM now vals fin ps (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
                          (room-keeps (foldPath-keeps d) rm)
                          (ruled (fold-kept d so p so (λ _ _ _ → refl)))
                          (λ {a} a∈ → fold-kept d so (proj₂ a) (sub-ot (λ r∈ → r∈) ≤-refl (ok (there a∈)))
                                        (ag (here refl) (there a∈)))
-                         (λ a∈ b∈ → ag (there a∈) (there b∈))
-  in _ , go-live eqc d g , ru₂)
+                         (λ a∈ b∈ → ag (there a∈) (there b∈)) |>′ λ (r₂ , g , ru₂) →
+  _ , go-live eqc d g , ru₂)
   (λ eqc →
-  let (r , g , ru′) = rawGo i ac aM now vals fin ps sched st rm ru (λ a∈ → ok (there a∈))
-                        (λ a∈ b∈ → ag (there a∈) (there b∈))
-  in r , go-cut eqc g , ru′)
+  rawGo i ac aM now vals fin ps sched st rm ru (λ a∈ → ok (there a∈))
+                        (λ a∈ b∈ → ag (there a∈) (there b∈)) |>′ λ (r , g , ru′) →
+  r , go-cut eqc g , ru′)
 
 ------------------------------------------------------------------
 -- THE ARMS, STATED.
@@ -692,8 +693,8 @@ fallenRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
            (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
          → (κ : Path Γ ℓ u t) → RP {e = e} m (Red m u) ⊤ κ fallen
 fold (fallenRP ac le (acc rsM) κ) tt now vals _ fin sched st rm (grounded fell so) =
-  let (r , d) = rawFold ac le (rsM fell) κ now vals fin sched st ≤-refl so
-  in ans (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d fallen
+  rawFold ac le (rsM fell) κ now vals fin sched st ≤-refl so |>′ λ (r , d) →
+  ans (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d fallen
          (grounded (fell-keeps (foldPath-keeps d) fell) (fold-sound d so)) tt (fallenRP ac le (acc rsM) κ) tt
 
 -- THE LIVE FOLD OVER A PURE FRAME.  It steps at what it holds, folds
@@ -743,11 +744,11 @@ redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK a aM = red-mergeAll lim b ρ rρ k 
 redExpAcc (switchAllᵉ b)    ρ rρ k ok aK a aM = red-switchAll b ρ rρ k ok aK a aM
 redExpAcc (exhaustAllᵉ b)   ρ rρ k ok aK a aM = red-exhaustAll b ρ rρ k ok aK a aM
 redExpAcc (μᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
-  let (r , d , rest) = redExpAcc (unfoldμ body) ρ rρ k (ib-unfoldμ k body ok) aK
+  redExpAcc (unfoldμ body) ρ rρ k (ib-unfoldμ k body ok) aK
                          (rs (subst (_< suc (gsizeᵉ body))
                                     (sym (gsize-unfoldμ body)) ≤-refl)) aM
-                         κ pre rp s₀ now sched st rm h
-  in r , subs-μ d , rest
+                         κ pre rp s₀ now sched st rm h |>′ λ (r , d , rest) →
+  r , subs-μ d , rest
 redExpAcc (varᵉ ()) ρ rρ k ok aK a aM
 redExpAcc {t = u} (deferᵉ body) ρ {m} rρ k ok aK a aM {lo = lo} κ pre rp s₀ now sched st rm h =
   let nid = freshId nodeᵏ (Sched.mint sched)
@@ -771,13 +772,12 @@ redExpAcc {t = u} (deferᵉ body) ρ {m} rρ k ok aK a aM {lo = lo} κ pre rp s�
             (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ)
             (λ k′ on → [ (λ a → inj₂ (subst (nodeCt sched ≤_) (node-eq a) ≤-refl)) , inj₁ ] (∨-T on)))
 redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
-  let src = freshId sourceᵏ (Sched.mint sched)
-      (r , d , tr , hl , kp) =
-        redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ pre rp s₀ now
+  let src = freshId sourceᵏ (Sched.mint sched) in
+  redExpAcc body (src ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM κ pre rp s₀ now
           (record sched
              { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
-          st rm (holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x) (sub-ot (λ r∈ → r∈) ≤-refl) h)
-  in r , subs-mint refl d , tr , hl , kept-in κ (endPre tr) refl kp
+          st rm (holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x) (sub-ot (λ r∈ → r∈) ≤-refl) h) |>′ λ (r , d , tr , hl , kp) →
+  r , subs-mint refl d , tr , hl , kept-in κ (endPre tr) refl kp
 
 -- the live fold: step, fold above, stand on what came back
 fold (liveRP {f = f} le aM fs h rh κ pfs rp) s now vals col fin sched st rm hs =
@@ -878,26 +878,26 @@ red-mapFn f b ρ rρ k ok aK aF aM {v} p =
   redTmAcc f (v ∷ᵉ ρ) (p , rρ) k (∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK aF aM
 
 red-map {s = s} f b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h =
-  let (r , d , tr , hl , kp) = redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK
+  redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK
                                   (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM
                                   (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) (standing (tt , pfs))
                                   (liveRP ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp)
-                                  s₀ now sched st rm (grounded ((tt , []ᵃ) , (λ _ ()) , ground h) (push-sound (map-f (_ , f , ρ)) ≤-refl κ (sounds h) (λ k ())))
-      (h″ , _ , eq) = translate-end ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp tr
-      tr′ = translate ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp tr
-  in r , subs-map d , tr′
+                                  s₀ now sched st rm (grounded ((tt , []ᵃ) , (λ _ ()) , ground h) (push-sound (map-f (_ , f , ρ)) ≤-refl κ (sounds h) (λ k ()))) |>′ λ (r , d , tr , hl , kp) →
+  translate-end ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp tr |>′ λ (h″ , _ , eq) →
+  let tr′ = translate ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp tr in
+  r , subs-map d , tr′
    , unheadHolds (map-f (_ , f , ρ)) ≤-refl κ h″ (endPre tr′)
        (subst (λ p → PreHolds _ (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq hl)
    , unheadKept (map-f (_ , f , ρ)) ≤-refl κ h″ (endPre tr′) {sched} {sched} {st = st} {st₁ = st}
        (λ _ _ ()) ≤-refl (λ _ _ → refl) (λ _ _ _ ea → ea)
        (subst (λ p → Kept (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) p sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq kp)
 red-map {n = n} {s = s} f b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell =
-  let (r , d , tr , hl , kp) = redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK
+  redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK
                                   (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM
                                   (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) fallen
                                   (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (map-f (_ , f , ρ) ↠[ ≤-refl ] κ))) s₀ now sched st rm
-                                  (grounded (ground fell) (push-sound (map-f (_ , f , ρ)) ≤-refl κ (sounds fell) (λ k ())))
-  in r , subs-map d , []ᵗ
+                                  (grounded (ground fell) (push-sound (map-f (_ , f , ρ)) ≤-refl κ (sounds fell) (λ k ()))) |>′ λ (r , d , tr , hl , kp) →
+  r , subs-map d , []ᵗ
     , unheadHolds (map-f (_ , f , ρ)) ≤-refl κ tt fallen
         (subst (λ p → PreHolds _ (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
     , tt
@@ -926,16 +926,16 @@ red-take c b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h | zero 
       an = apply rp s₀ cl
   in _ , subs-take-zero eq (der an) , cl ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 red-take c b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h | suc j =
-  let (r , d , tr , hl , kp) = redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
+  redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
                                   (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
                                   (take-f (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (take-st (suc j)) , pfs))
                                   (liveRP ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp)
                                   s₀ now (bumpNode sched) (installNode (nodeCt sched) (take-st (suc j)) st) rm
                                   (fresh-holds (take-f (nodeCt sched)) κ pfs (just (take-st (suc j))) (take-st (suc j)) (λ _ → node-eq)
-                                     (lookup-set (nodeCt sched) (take-st (suc j)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h)
-      (h″ , _ , eq′) = translate-end ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp tr
-      tr′ = translate ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp tr
-  in r , subs-take-suc eq refl d , tr′
+                                     (lookup-set (nodeCt sched) (take-st (suc j)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h) |>′ λ (r , d , tr , hl , kp) →
+  translate-end ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp tr |>′ λ (h″ , _ , eq′) →
+  let tr′ = translate ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp tr in
+  r , subs-take-suc eq refl d , tr′
    , unheadHolds (take-f (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
        (subst (λ p → PreHolds _ (take-f (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ hl)
    , unheadKept (take-f (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
@@ -946,13 +946,13 @@ red-take c b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st r
        (subst (λ p → Kept (take-f (nodeCt sched) ↠[ ≤-refl ] κ) p (bumpNode sched)
                            (installNode (nodeCt sched) (take-st (suc j)) st) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ kp)
 red-take {n = n} c b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell | suc j =
-  let (r , d , tr , hl , kp) = redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
+  redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
                                   (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
                                   (take-f (nodeCt sched) ↠[ ≤-refl ] κ) fallen
                                   (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (take-f (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
                                   (bumpNode sched) (installNode (nodeCt sched) (take-st (suc j)) st) rm
-                                  (grounded (ground fell) (fresh-sound (take-f (nodeCt sched)) κ (take-st (suc j)) (λ _ → node-eq) (sounds fell)))
-  in r , subs-take-suc eq refl d , []ᵗ
+                                  (grounded (ground fell) (fresh-sound (take-f (nodeCt sched)) κ (take-st (suc j)) (λ _ → node-eq) (sounds fell))) |>′ λ (r , d , tr , hl , kp) →
+  r , subs-take-suc eq refl d , []ᵗ
     , unheadHolds (take-f (nodeCt sched)) ≤-refl κ nothing fallen
         (subst (λ p → PreHolds _ (take-f (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
            (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
@@ -976,7 +976,7 @@ scanStep fn nid rf = record
 -- THE SCAN ARM'S BODY: the take arm's, with the cell seeded from the
 -- seed's own candidate and the closure's funded by the term's size.
 red-scan f z b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h =
-  let (r , d , tr , hl , kp) = redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
+  redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
                                   (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z)) (m≤n+m _ (gsizeᵗ f))))) aM
                                   (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (cell-st (evalWith z ρ)) , pfs))
                                   (liveRP ≤-refl aM
@@ -990,8 +990,8 @@ red-scan f z b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st
                                     κ pfs rp)
                                   s₀ now (bumpNode sched) (installNode (nodeCt sched) (cell-st (evalWith z ρ)) st) rm
                                   (fresh-holds (scan-f (_ , f , ρ) (nodeCt sched)) κ pfs (just (cell-st (evalWith z ρ))) (cell-st (evalWith z ρ))
-                                     (λ _ → node-eq) (lookup-set (nodeCt sched) (cell-st (evalWith z ρ)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h)
-      (h″ , _ , eq′) = translate-end ≤-refl aM
+                                     (λ _ → node-eq) (lookup-set (nodeCt sched) (cell-st (evalWith z ρ)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h) |>′ λ (r , d , tr , hl , kp) →
+  translate-end ≤-refl aM
                           (scanStep (_ , f , ρ) (nodeCt sched)
                             (λ {v} p → redTmAcc f (v ∷ᵉ ρ) (p , rρ) k (∧ˡ (inputsBelowᵗ k f) _ ok) aK
                                          (rs (s≤s (m≤m+n (gsizeᵗ f) _))) aM))
@@ -999,8 +999,8 @@ red-scan f z b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st
                           (λ eq → subst (Red _ _) (cell-inj eq)
                                     (redTmAcc z ρ rρ k (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
                                        (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b)) (m≤n+m _ (gsizeᵗ f))))) aM))
-                          κ pfs rp tr
-      tr′ = translate ≤-refl aM
+                          κ pfs rp tr |>′ λ (h″ , _ , eq′) →
+  let tr′ = translate ≤-refl aM
               (scanStep (_ , f , ρ) (nodeCt sched)
                 (λ {v} p → redTmAcc f (v ∷ᵉ ρ) (p , rρ) k (∧ˡ (inputsBelowᵗ k f) _ ok) aK
                              (rs (s≤s (m≤m+n (gsizeᵗ f) _))) aM))
@@ -1008,8 +1008,8 @@ red-scan f z b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st
               (λ eq → subst (Red _ _) (cell-inj eq)
                         (redTmAcc z ρ rρ k (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
                            (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b)) (m≤n+m _ (gsizeᵗ f))))) aM))
-              κ pfs rp tr
-  in r , subs-scan refl d , tr′
+              κ pfs rp tr in
+  r , subs-scan refl d , tr′
    , unheadHolds (scan-f (_ , f , ρ) (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
        (subst (λ p → PreHolds _ (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ hl)
    , unheadKept (scan-f (_ , f , ρ) (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
@@ -1020,13 +1020,13 @@ red-scan f z b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st
        (subst (λ p → Kept (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) p (bumpNode sched)
                            (installNode (nodeCt sched) (cell-st (evalWith z ρ)) st) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ kp)
 red-scan {n = n} f z b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell =
-  let (r , d , tr , hl , kp) = redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
+  redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
                                   (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z)) (m≤n+m _ (gsizeᵗ f))))) aM
                                   (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) fallen
                                   (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
                                   (bumpNode sched) (installNode (nodeCt sched) (cell-st (evalWith z ρ)) st) rm
-                                  (grounded (ground fell) (fresh-sound (scan-f (_ , f , ρ) (nodeCt sched)) κ (cell-st (evalWith z ρ)) (λ _ → node-eq) (sounds fell)))
-  in r , subs-scan refl d , []ᵗ
+                                  (grounded (ground fell) (fresh-sound (scan-f (_ , f , ρ) (nodeCt sched)) κ (cell-st (evalWith z ρ)) (λ _ → node-eq) (sounds fell))) |>′ λ (r , d , tr , hl , kp) →
+  r , subs-scan refl d , []ᵗ
     , unheadHolds (scan-f (_ , f , ρ) (nodeCt sched)) ≤-refl κ nothing fallen
         (subst (λ p → PreHolds _ (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
            (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
@@ -1119,15 +1119,15 @@ batchFinish {e = e} {Θ = Θ} {u = u} {m = m} b ρ aM κ pre rp s₀ now sched s
 -- THE BATCHSYNC ARM'S BODY: the take arm's source subscription with
 -- the bracket opened at the counter, then the bracket closed.
 red-batchSync {t = u} b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h =
-  let ((o₁ , sc₁ , st₁) , d , tr , hl , kp) = redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
+  redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
                                                   (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (batchSync-st {s = u} true [] false) , pfs))
                                                   (liveRP ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp)
                                                   s₀ now (bumpNode sched) (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st) rm
                                                   (fresh-holds (batchSync-f (nodeCt sched)) κ pfs (just (batchSync-st {s = u} true [] false))
                                                      (batchSync-st {s = u} true [] false) (λ _ → node-eq)
-                                                     (lookup-set (nodeCt sched) (batchSync-st {s = u} true [] false) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h)
-      (h″ , rh″ , eq′) = translate-end ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp tr
-  in batchFinish b ρ aM κ (standing pfs) rp s₀ now sched st rm
+                                                     (lookup-set (nodeCt sched) (batchSync-st {s = u} true [] false) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h) |>′ λ ((o₁ , sc₁ , st₁) , d , tr , hl , kp) →
+  translate-end ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp tr |>′ λ (h″ , rh″ , eq′) →
+  batchFinish b ρ aM κ (standing pfs) rp s₀ now sched st rm
        (stage o₁ sc₁ st₁ d
           (translate ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp tr)
           refl h″
@@ -1136,13 +1136,13 @@ red-batchSync {t = u} b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now
                               (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st) sc₁ st₁) eq′ kp))
        rh″
 red-batchSync {n = n} {t = u} b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell =
-  let ((o₁ , sc₁ , st₁) , d , tr , hl , kp) = redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
+  redExpAcc b ρ rρ k ok aK (rs ≤-refl) aM
                                                   (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) fallen
                                                   (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
                                                   (bumpNode sched) (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st) rm
                                                   (grounded (ground fell)
-                                                     (fresh-sound (batchSync-f (nodeCt sched)) κ (batchSync-st {s = u} true [] false) (λ _ → node-eq) (sounds fell)))
-  in batchFinish b ρ aM κ fallen rp s₀ now sched st rm
+                                                     (fresh-sound (batchSync-f (nodeCt sched)) κ (batchSync-st {s = u} true [] false) (λ _ → node-eq) (sounds fell))) |>′ λ ((o₁ , sc₁ , st₁) , d , tr , hl , kp) →
+  batchFinish b ρ aM κ fallen rp s₀ now sched st rm
        (stage o₁ sc₁ st₁ d []ᵗ refl nothing
           (subst (λ p → PreHolds _ (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) p sc₁ st₁)
              (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
@@ -1176,13 +1176,12 @@ red-input-shared {n = n} {lo = lo} i d {okd} aI ρ κ below pre rp s now sched s
             sched′ = record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
             st′    = register rid (atSlot i) (lowerFloor below κ)
                        (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
-            fell′  = ≤-trans (unconn-insert (Sched.slots sched) (EvalSt.connectedShares st) i slEq connEq) rm
-            (r , dv , tr , hl , _) =
-              redExpAcc d []ᵉ tt (toℕ i) okd aI (<-wellFounded (gsizeᵉ d)) aM
+            fell′  = ≤-trans (unconn-insert (Sched.slots sched) (EvalSt.connectedShares st) i slEq connEq) rm in
+        redExpAcc d []ᵉ tt (toℕ i) okd aI (<-wellFounded (gsizeᵉ d)) aM
                 (share-sink i ≤-refl) fallen
                 (dropS (fallenRP (<-wellFounded (n ∸ toℕ i)) ≤-refl aM (share-sink i ≤-refl)))
-                tt now sched′ st′ (<⇒≤ fell′) (grounded fell′ (sink-sound i ≤-refl (ruled (row-sound i below κ sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (sub-ot (λ r∈ → r∈) ≤-refl (sounds h))))))
-        in r , subs-shared {κ = κ} {below = below} slEq
+                tt now sched′ st′ (<⇒≤ fell′) (grounded fell′ (sink-sound i ≤-refl (ruled (row-sound i below κ sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (sub-ot (λ r∈ → r∈) ≤-refl (sounds h)))))) |>′ λ (r , dv , tr , hl , _) →
+        r , subs-shared {κ = κ} {below = below} slEq
                 (slot-connect {κ = κ} {below = below} doneEq connEq (connect {κ = κ} {below = below} refl dv))
           , fellᵗ (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM κ)) s
           , grounded
@@ -1312,20 +1311,20 @@ red-env aM (_∷ᵉ_ {s = s} v vs) = red-val aM s v , red-env aM vs
 
 rawInner {u = u} ac le aM op nid κ now o sched st rm so nd h eq aq wq =
   let κ′  = from-inner {s = u} op nid (nodeCt sched) ↠[ ≤-refl ] κ
-      so′ = fresh-inner op nid κ sched so nd
-      (r , d , _) = red-val aM (obs u) o κ′ (standing (h , colsOf κ st))
+      so′ = fresh-inner op nid κ sched so nd in
+  red-val aM (obs u) o κ′ (standing (h , colsOf κ st))
                       (baseRP ac le aM op nid (nodeCt sched) κ (h , colsOf κ st) aq wq) tt now (bumpNode sched) st rm
                       (grounded (subst (λ x → HoldsFs κ′ (x , colsOf κ st) (bumpNode sched) st) eq
-                                   (holdsOf κ′ (fresh-path so′) (distinct so′))) so′)
-  in r , d
+                                   (holdsOf κ′ (fresh-path so′) (distinct so′))) so′) |>′ λ (r , d , _) →
+  r , d
 
 -- the base: its exit frame reacts at the budget its column pins, and the
 -- path below folds raw
 fold (baseRP ac le aM op nid inst κ (h , pfs) aq wq) tt now vals _ fin sched st rm (grounded hs so) =
-  let wq′ = ceil-or (subst (λ x → waiting x ≤ _) (sym (proj₁ (proj₁ hs))) wq)
-      (r₀ , sd , so₀) = rawReact ac le aM op nid inst ≤-refl κ now vals fin sched st rm so _ refl aq wq′
-      (r , d) = rawAfter ac le aM (from-inner op nid inst) ≤-refl κ r₀ sd (room-keeps (stepFrame-keeps sd) rm) so₀
-  in baseAns ac le aM op nid inst κ sched st rm so aq wq′ r d
+  let wq′ = ceil-or (subst (λ x → waiting x ≤ _) (sym (proj₁ (proj₁ hs))) wq) in
+  rawReact ac le aM op nid inst ≤-refl κ now vals fin sched st rm so _ refl aq wq′ |>′ λ (r₀ , sd , so₀) →
+  rawAfter ac le aM (from-inner op nid inst) ≤-refl κ r₀ sd (room-keeps (stepFrame-keeps sd) rm) so₀ |>′ λ (r , d) →
+  baseAns ac le aM op nid inst κ sched st rm so aq wq′ r d
 
 -- the successor sits at the head of a `with` branch, where the `fold`
 -- copattern guards it; under a lambda handed to an eliminator it is an
@@ -1421,10 +1420,10 @@ translate-sub-end le aM ss h g κ pfs rp {s₀} (c ∷ᵗ tr) =
   let rg = ss le κ pfs rp s₀ h g (Call.now c) (Call.vals c) (Call.col c) (Call.fin c)
               (Call.sched c) (Call.st c) (Call.room c) (Call.holds c)
       r  = proj₁ rg
-      go = translate-sub-go le aM ss (Stage.hd r) (proj₂ rg) κ (endPre (Stage.tr r)) (endRP (Stage.tr r)) tr
-      ((h″ , g″ , eq) , jn) = translate-sub-end-go le aM ss (Stage.hd r) (proj₂ rg) κ (endPre (Stage.tr r)) (endRP (Stage.tr r)) tr
-      e₂ = trans (end-++ (Stage.tr r) go) jn
-  in h″ , g″ , trans eq (cong (headPre h″) (sym e₂))
+      go = translate-sub-go le aM ss (Stage.hd r) (proj₂ rg) κ (endPre (Stage.tr r)) (endRP (Stage.tr r)) tr in
+  translate-sub-end-go le aM ss (Stage.hd r) (proj₂ rg) κ (endPre (Stage.tr r)) (endRP (Stage.tr r)) tr |>′ λ ((h″ , g″ , eq) , jn) →
+  let e₂ = trans (end-++ (Stage.tr r) go) jn in
+  h″ , g″ , trans eq (cong (headPre h″) (sym e₂))
 translate-sub-end-go le aM ss h g κ (standing pfs) rp tr = translate-sub-end le aM ss h g κ pfs rp tr , refl
 translate-sub-end-go {n = n} {lo = lo} le aM ss h g κ fallen rp tr =
   (h , g , fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM (_ ↠[ le ] κ) tr) , refl
@@ -1460,17 +1459,17 @@ subStanding {m = m} {u = u} op nid aM le κ pfs rp s₀ ns′ gq o ro now {sched
             , apart-fi op nid κ pfs hsκ (λ k a → ap k (node-in₁ {nid} {k} [] a))
             , holdsFs-step κ pfs
                 (λ k on _ → set-above nid k ns′ (EvalSt.nodes st) (head-off nid [] k (λ onN → ap k onN on)))
-                (n≤1+n _) hsκ )
-      (r , d , tr , hl , kp) = ro κ′ (standing (just ns′ , pfs)) (subRP ≤-refl aM ss (just ns′) gq κ pfs rp) s₀
+                (n≤1+n _) hsκ ) in
+  ro κ′ (standing (just ns′ , pfs)) (subRP ≤-refl aM ss (just ns′) gq κ pfs rp) s₀
                                   now (bumpNode sched) st″ rm
                                   (grounded hs′ (fresh-inner op nid κ sched {st″}
                                      (sub-ot (λ r∈ → r∈) ≤-refl (drop-ot (thru-outer op nid) le κ so))
-                                     (sub-on (λ r∈ → r∈) ≤-refl (head-on (thru-outer op nid) le κ nid (self-node nid []) so))))
-      (h″ , g″ , eq) = translate-sub-end ≤-refl aM ss (just ns′) gq κ pfs rp tr
-      tr′ = translate-sub ≤-refl aM ss (just ns′) gq κ pfs rp tr
+                                     (sub-on (λ r∈ → r∈) ≤-refl (head-on (thru-outer op nid) le κ nid (self-node nid []) so)))) |>′ λ (r , d , tr , hl , kp) →
+  translate-sub-end ≤-refl aM ss (just ns′) gq κ pfs rp tr |>′ λ (h″ , g″ , eq) →
+  let tr′ = translate-sub ≤-refl aM ss (just ns′) gq κ pfs rp tr
       sc  = proj₁ (proj₂ r)
-      st′ = proj₂ (proj₂ r)
-  in stage (proj₁ r) sc st′ d tr′ refl h″
+      st′ = proj₂ (proj₂ r) in
+  stage (proj₁ r) sc st′ d tr′ refl h″
        (fiHolds→thru op nid inst le κ h″ (endPre tr′) (subst (λ p → PreHolds m κ′ p sc st′) eq hl))
        (kept-shift (from-inner op nid inst) (thru-outer op nid) ≤-refl le κ h″ h″ (endPre tr′)
           {sched} {bumpNode sched} {sc} {st} {st″} {st′} (n≤1+n (nodeCt sched))
@@ -1501,29 +1500,29 @@ consumeFallen {n = n} {u = u} op nid aM {ℓ} κ now o ro {sched} {st} rm fell s
                 ct  = subst (nodeCt sched ≤_) (sym (switchKill-ct cur sched st)) ≤-refl
                 so′ = sub-ot {κ = κ} {sched = sched} {sched′ = proj₁ sk} {st = st} {st′ = st₁} (kill-sub cur sched st) ct so
                 nd′ = sub-on {nid = nid} {κ = κ} {sched = sched} {sched′ = proj₁ sk} {st = st} {st′ = st₁} (kill-sub cur sched st) ct nd
-                κ′  = from-inner {s = u} switchᵒ nid (nodeCt (proj₁ sk)) ↠[ ≤-refl ] κ
-                (r , d , _ , hl , _) = ro κ′ fallen (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ′)) tt now
+                κ′  = from-inner {s = u} switchᵒ nid (nodeCt (proj₁ sk)) ↠[ ≤-refl ] κ in
+            ro κ′ fallen (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ′)) tt now
                                          (bumpNode (proj₁ sk)) st₁ (room-keeps ks rm)
-                                         (grounded (fell-keeps ks fell) (fresh-inner switchᵒ nid κ (proj₁ sk) {st₁} so′ nd′))
-            in _ , consume-switch-sub c refl refl (inner refl d) , inner-back switchᵒ nid (nodeCt (proj₁ sk)) κ (sounds hl)
+                                         (grounded (fell-keeps ks fell) (fresh-inner switchᵒ nid κ (proj₁ sk) {st₁} so′ nd′)) |>′ λ (r , d , _ , hl , _) →
+            _ , consume-switch-sub c refl refl (inner refl d) , inner-back switchᵒ nid (nodeCt (proj₁ sk)) κ (sounds hl)
 ...     | u-exhaust od =
             let st₁ = record st { nodes = setNode nid (exhaust-st true od) (EvalSt.nodes st) }
-                κ′  = from-inner {s = u} exhaustᵒ nid (nodeCt sched) ↠[ ≤-refl ] κ
-                (r , d , _ , hl , _) = ro κ′ fallen (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ′)) tt now
+                κ′  = from-inner {s = u} exhaustᵒ nid (nodeCt sched) ↠[ ≤-refl ] κ in
+            ro κ′ fallen (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ′)) tt now
                                          (bumpNode sched) st₁ rm
                                          (grounded fell (fresh-inner exhaustᵒ nid κ sched {st₁}
-                                            (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)))
-            in _ , consume-exhaust-sub c (inner refl d) , inner-back exhaustᵒ nid (nodeCt sched) κ (sounds hl)
+                                            (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd))) |>′ λ (r , d , _ , hl , _) →
+            _ , consume-exhaust-sub c (inner refl d) , inner-back exhaustᵒ nid (nodeCt sched) κ (sounds hl)
 ...     | u-merge lim act q od = by-bool (hasRoom lim act)
             (λ eqr → _ , consume-all-enqueue c eqr , sub-ot (λ r∈ → r∈) ≤-refl so , sub-on (λ r∈ → r∈) ≤-refl nd)
             (λ eqr →
             let st₁ = record st { nodes = setNode nid (mergeAll-st lim (suc act) q od) (EvalSt.nodes st) }
-                κ′  = from-inner {s = u} mergeAllᵒ nid (nodeCt sched) ↠[ ≤-refl ] κ
-                (r , d , _ , hl , _) = ro κ′ fallen (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ′)) tt now
+                κ′  = from-inner {s = u} mergeAllᵒ nid (nodeCt sched) ↠[ ≤-refl ] κ in
+            ro κ′ fallen (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ′)) tt now
                                          (bumpNode sched) st₁ rm
                                          (grounded fell (fresh-inner mergeAllᵒ nid κ sched {st₁}
-                                            (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd)))
-            in _ , consume-all-sub c eqr (inner refl d) , inner-back mergeAllᵒ nid (nodeCt sched) κ (sounds hl))
+                                            (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd))) |>′ λ (r , d , _ , hl , _) →
+            _ , consume-all-sub c eqr (inner refl d) , inner-back mergeAllᵒ nid (nodeCt sched) κ (sounds hl))
 
 -- one observable consumed by the walk, on standing ground
 consumeStanding : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid : NodeId)
@@ -1547,17 +1546,17 @@ consumeStanding {u = u} op nid aM le κ now pfs rp s₀ h g o ro {sched} {st} rm
             ctE = switchKill-ct cur sched st
             ndE = switchKill-nodes cur sched st
             hsκ′ : HoldsFs κ pfs (proj₁ sk) (proj₂ sk)
-            hsκ′ = holdsFs-step κ pfs (λ k _ _ → cong (lookupNode k) ndE) (subst (nodeCt sched ≤_) (sym ctE) ≤-refl) hsκ
-            (sb , gsb) = subStanding switchᵒ nid aM le κ pfs rp s₀ (switch-st (just (nodeCt (proj₁ sk))) od) tt o ro now
+            hsκ′ = holdsFs-step κ pfs (λ k _ _ → cong (lookupNode k) ndE) (subst (nodeCt sched ≤_) (sym ctE) ≤-refl) hsκ in
+        subStanding switchᵒ nid aM le κ pfs rp s₀ (switch-st (just (nodeCt (proj₁ sk))) od) tt o ro now
                            (room-keeps ks rm) hsκ′ (subst (nid <_) (sym ctE) lt) ap
-                           (sub-ot (kill-sub cur sched st) (subst (nodeCt sched ≤_) (sym ctE) ≤-refl) so)
-        in stage-map (λ d → consume-switch-sub c refl refl (inner refl d))
+                           (sub-ot (kill-sub cur sched st) (subst (nodeCt sched ≤_) (sym ctE) ≤-refl) so) |>′ λ (sb , gsb) →
+        stage-map (λ d → consume-switch-sub c refl refl (inner refl d))
              (stage-rebase (thru-outer op nid) le κ (subst (nodeCt sched ≤_) (sym ctE) ≤-refl) (λ k _ _ → cong (lookupNode k) ndE)
                 (ends-sub (thru-outer op nid ↠[ le ] κ) {sched = sched} {st = st} {st′ = proj₂ sk} (kill-sub cur sched st)) sb)
            , gsb
 ...   | u-exhaust od =
-        let (sb , gsb) = subStanding exhaustᵒ nid aM le κ pfs rp s₀ (exhaust-st true od) tt o ro now rm hsκ lt ap so
-        in stage-map (λ d → consume-exhaust-sub c (inner refl d)) sb , gsb
+        subStanding exhaustᵒ nid aM le κ pfs rp s₀ (exhaust-st true od) tt o ro now rm hsκ lt ap so |>′ λ (sb , gsb) →
+        stage-map (λ d → consume-exhaust-sub c (inner refl d)) sb , gsb
 ...   | u-merge lim act q od = by-bool (hasRoom lim act)
         (λ eqr → stage-map (λ { (refl , refl , refl) → consume-all-enqueue c eqr })
                     (writeStage _ le κ (standing pfs) rp s₀ nid (mergeAll-st lim act (q ++ o ∷ []) od)
@@ -1565,9 +1564,9 @@ consumeStanding {u = u} op nid aM le κ now pfs rp s₀ h g o ro {sched} {st} rm
                        (lookup-set nid (mergeAll-st lim act (q ++ o ∷ []) od) (EvalSt.nodes st)) h hs)
                 , (λ tr → ⊥-elim (subst T eqr tr)))
         (λ eqr →
-        let (sb , gsb) = subStanding mergeAllᵒ nid aM le κ pfs rp s₀ (mergeAll-st lim (suc act) q od)
-                           (g (subst T (sym eqr) tt₀)) o ro now rm hsκ lt ap so
-        in stage-map (λ d → consume-all-sub c eqr (inner refl d)) sb , gsb)
+        subStanding mergeAllᵒ nid aM le κ pfs rp s₀ (mergeAll-st lim (suc act) q od)
+                           (g (subst T (sym eqr) tt₀)) o ro now rm hsκ lt ap so |>′ λ (sb , gsb) →
+        stage-map (λ d → consume-all-sub c eqr (inner refl d)) sb , gsb)
 
 consume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid : NodeId)
           (aM : Acc _<_ m) {S : Set} {lo ℓ}
@@ -1582,9 +1581,9 @@ consume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid : N
 consume op nid aM le κ now (standing pfs) rp s₀ h g o ro rm hs =
   consumeStanding op nid aM le κ now pfs rp s₀ h g o ro rm hs
 consume op nid aM le κ now fallen rp s₀ h g o ro rm (grounded fell so) =
-  let (r , d , so′ , nd′) = consumeFallen op nid aM κ now o ro rm fell
-                              (drop-ot (thru-outer op nid) le κ so) (head-on (thru-outer op nid) le κ nid (self-node nid []) so)
-  in fallenStage _ le κ rp s₀ (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d (thruConsume-keeps d) fell
+  consumeFallen op nid aM κ now o ro rm fell
+                              (drop-ot (thru-outer op nid) le κ so) (head-on (thru-outer op nid) le κ nid (self-node nid []) so) |>′ λ (r , d , so′ , nd′) →
+  fallenStage _ le κ rp s₀ (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d (thruConsume-keeps d) fell
        (push-thru op nid le κ so′ nd′) h , g
 
 walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid : NodeId)
@@ -1599,10 +1598,10 @@ walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid : Node
          (λ r → RoomEmpty (Stage.hd r))
 walk op nid aM le κ now q rp s₀ h g [] []ᵃ rm hs = stage-nil _ le κ q rp s₀ [] walk-nil h hs , g
 walk op nid aM le κ now q rp s₀ h g (o ∷ os) (ro ∷ᵃ ros) rm hs =
-  let (c , gc) = consume op nid aM le κ now q rp s₀ h g o ro rm hs
-      (w , gw) = walk op nid aM le κ now (endPre (Stage.tr c)) (endRP (Stage.tr c)) (endS (Stage.tr c)) (Stage.hd c) gc os ros
-                   (room-keeps (thruConsume-keeps (Stage.dv c)) rm) (Stage.hl c)
-  in stage-seq c w (λ d₂ → walk-cons (Stage.dv c) d₂) , gw
+  consume op nid aM le κ now q rp s₀ h g o ro rm hs |>′ λ (c , gc) →
+  walk op nid aM le κ now (endPre (Stage.tr c)) (endRP (Stage.tr c)) (endS (Stage.tr c)) (Stage.hd c) gc os ros
+                   (room-keeps (thruConsume-keeps (Stage.dv c)) rm) (Stage.hl c) |>′ λ (w , gw) →
+  stage-seq c w (λ d₂ → walk-cons (Stage.dv c) d₂) , gw
 
 -- the wrap at the end of the walk, and the one call above it
 thruTail : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u} (op : AllOp) (nid : NodeId) {S : Set} {lo ℓ}
@@ -1647,10 +1646,10 @@ thruTail op nid le κ now fin fallen rp s₀ h g {sched} {st} rm (grounded fell 
      , room-wrap op fin h g
 
 thruStep op nid aM le κ pfs rp s₀ h g now vals col fin sched st rm hs =
-  let (w , gw) = walk op nid aM le κ now (standing pfs) rp s₀ h g vals col rm hs
-      (t , gt) = thruTail op nid le κ now fin (endPre (Stage.tr w)) (endRP (Stage.tr w)) (endS (Stage.tr w)) (Stage.hd w) gw
-                   (room-keeps (thruWalk-keeps (Stage.dv w)) rm) (Stage.hl w)
-  in stage-seq w t (λ dt → fold-step (step-thru-outer (Stage.dv w)) dt) , gt
+  walk op nid aM le κ now (standing pfs) rp s₀ h g vals col rm hs |>′ λ (w , gw) →
+  thruTail op nid le κ now fin (endPre (Stage.tr w)) (endRP (Stage.tr w)) (endS (Stage.tr w)) (Stage.hd w) gw
+                   (room-keeps (thruWalk-keeps (Stage.dv w)) rm) (Stage.hl w) |>′ λ (t , gt) →
+  stage-seq w t (λ dt → fold-step (step-thru-outer (Stage.dv w)) dt) , gt
 
 -- THE FLATTENER ARMS' SHARED BODY: install the node at the counter,
 -- subscribe the outer under the outer frame live over whatever ground
@@ -1667,14 +1666,14 @@ red-all : ∀ {n} {Γ : Ctx n} {Θ u} (op : AllOp) (ns : NodeState Γ) → RoomE
                      (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                            × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
 red-all op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched st rm hs =
-  let (r , d , tr , hl , kp) = redExpAcc b ρ rρ k ok aK aB aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just ns , pfs))
+  redExpAcc b ρ rρ k ok aK aB aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just ns , pfs))
                                   (subRP ≤-refl aM (thruStep op (nodeCt sched) aM) (just ns) gns κ pfs rp) s₀ now
                                   (bumpNode sched) (installNode (nodeCt sched) ns st) rm
                                   (fresh-holds (thru-outer op (nodeCt sched)) κ pfs (just ns) ns (λ _ → node-eq)
-                                     (lookup-set (nodeCt sched) ns (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) hs)
-      (h″ , _ , eq) = translate-sub-end ≤-refl aM (thruStep op (nodeCt sched) aM) (just ns) gns κ pfs rp tr
-      tr′ = translate-sub ≤-refl aM (thruStep op (nodeCt sched) aM) (just ns) gns κ pfs rp tr
-  in r , sub-all refl d , tr′
+                                     (lookup-set (nodeCt sched) ns (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) hs) |>′ λ (r , d , tr , hl , kp) →
+  translate-sub-end ≤-refl aM (thruStep op (nodeCt sched) aM) (just ns) gns κ pfs rp tr |>′ λ (h″ , _ , eq) →
+  let tr′ = translate-sub ≤-refl aM (thruStep op (nodeCt sched) aM) (just ns) gns κ pfs rp tr in
+  r , sub-all refl d , tr′
    , unheadHolds (thru-outer op (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
        (subst (λ p → PreHolds _ (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq hl)
    , unheadKept (thru-outer op (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
@@ -1685,21 +1684,21 @@ red-all op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched st 
        (subst (λ p → Kept (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) p (bumpNode sched) (installNode (nodeCt sched) ns st)
                            (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq kp)
 red-all {n = n} op ns gns b ρ rρ k ok aK aB aM {lo = lo} κ fallen rp s₀ now sched st rm fell =
-  let (r , d , tr , hl , kp) = redExpAcc b ρ rρ k ok aK aB aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) fallen
+  redExpAcc b ρ rρ k ok aK aB aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) fallen
                                   (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
-                                  (bumpNode sched) (installNode (nodeCt sched) ns st) rm (grounded (ground fell) (fresh-sound (thru-outer op (nodeCt sched)) κ ns (λ _ → node-eq) (sounds fell)))
-  in r , sub-all refl d , []ᵗ
+                                  (bumpNode sched) (installNode (nodeCt sched) ns st) rm (grounded (ground fell) (fresh-sound (thru-outer op (nodeCt sched)) κ ns (λ _ → node-eq) (sounds fell))) |>′ λ (r , d , tr , hl , kp) →
+  r , sub-all refl d , []ᵗ
     , unheadHolds (thru-outer op (nodeCt sched)) ≤-refl κ nothing fallen
         (subst (λ p → PreHolds _ (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
            (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
     , tt
 
 red-mergeAll lim b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
-  let (r , d , rest) = red-all mergeAllᵒ (mergeAll-st lim 0 [] false) (λ _ → refl) b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h
-  in r , subs-merge-all d , rest
+  red-all mergeAllᵒ (mergeAll-st lim 0 [] false) (λ _ → refl) b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h |>′ λ (r , d , rest) →
+  r , subs-merge-all d , rest
 red-switchAll b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
-  let (r , d , rest) = red-all switchᵒ (switch-st nothing false) tt b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h
-  in r , subs-switch-all d , rest
+  red-all switchᵒ (switch-st nothing false) tt b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h |>′ λ (r , d , rest) →
+  r , subs-switch-all d , rest
 red-exhaustAll b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
-  let (r , d , rest) = red-all exhaustᵒ (exhaust-st false false) tt b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h
-  in r , subs-exhaust-all d , rest
+  red-all exhaustᵒ (exhaust-st false false) tt b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h |>′ λ (r , d , rest) →
+  r , subs-exhaust-all d , rest

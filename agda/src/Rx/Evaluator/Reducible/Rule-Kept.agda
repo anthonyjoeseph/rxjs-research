@@ -26,6 +26,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; suc; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; n≤1+n; <-≤-trans; <-irrefl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Function.Base using (_|>′_)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
@@ -142,8 +143,8 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   admit-agree₂ : ∀ (i : Fin n) {lo′ s′} {κ₂ : Path Γ lo′ s′ t} {sched : Sched Γ} {st : EvalSt e}
                → Sound κ₂ sched st → ∀ {a} → a ∈ shareAdmit i (EvalSt.registry st) → Agree (proj₂ a) κ₂
   admit-agree₂ i {st = st} so₂ a∈ k ha h₂ =
-    let (r₀ , m , ek , ee) = admit-row i (EvalSt.registry st) a∈
-    in trans (sym ee) (ends so₂ k h₂ m (subst T (sym (ek k)) ha))
+    admit-row i (EvalSt.registry st) a∈ |>′ λ (r₀ , m , ek , ee) →
+    trans (sym ee) (ends so₂ k h₂ m (subst T (sym (ek k)) ha))
 
   -- the switch's cut, the share's marks and its retirement only drop rows
   kill-ot : ∀ {lo s} {κ : Path Γ lo s t} (cur : Maybe NodeId) {sched sched₁ : Sched Γ} {st st₁ : EvalSt e}
