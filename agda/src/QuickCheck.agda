@@ -53,7 +53,7 @@ module QuickCheck where
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Char using (toℕ)
 open import Data.Fin using (Fin; zero; suc)
-open import Data.List using (List; []; _∷_; map; length; concat)
+open import Data.List using (List; []; _∷_; map; length; concat; take)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
@@ -74,7 +74,7 @@ open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatches; eqBursts)
 open import Spec using (spec-batchSimultaneous)
 open import Spec.Unwrap using (unwrapSpec)
-open import Implementation.Unit-Test.Prelude using (Γ₂; mkSlots; cached; runOf; implBurstsOf; specBurstsOf; metaBurstsOf; agrees)
+open import Implementation.Unit-Test.Prelude using (Γ₂; mkSlots; cached; runOf; implBurstsOf; specBurstsOf; metaBurstsOf)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
@@ -776,30 +776,38 @@ bumpEach fs (g ∷ gs) (c ∷ cs) =
 bump : Marks → Tally → Tally
 bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 
-oneCase : ℕ → Gen (Marks × List String)
+-- EACH RUN IS AN ARGUMENT, SO IT IS COMPUTED ONCE.  A `let` is
+-- substituted at compile time, so a name used in three checks is three
+-- evaluations; a function argument is one shared thunk.
+verdict : SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
+        → List (List (List ℕ)) → List (List (List ℕ)) → List (List (List ℕ))
+        → List (InstEmit ℕ) → List (ℕ × String)
+verdict e d₀ d₁ impl spec meta s =
+  agreeFails ++ᴸ metaFails ++ᴸ spanFails ++ᴸ wfFails
+  where
+  whole      = unwrapSpec (spec-batchSimultaneous s)
+  agreeFails = if eqBursts impl spec then []
+               else (0 , report "FAIL" e d₀ d₁ impl spec s) ∷ []
+  metaFails  = if eqBursts meta spec then []
+               else (1 , report "META-FAIL" e d₀ d₁ meta spec s) ∷ []
+  spanFails  = if eqBatches (concat spec) whole then []
+               else (2 , reportSpan e d₀ d₁ whole spec s) ∷ []
+  wfFails    = if wellFormed? s then [] else (3 , reportWF e d₀ d₁ s) ∷ []
+
+oneCase : ℕ → Gen (Marks × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED AND WHAT IS PRINTED, AND THE CAP IS
 -- NEITHER.  It is applied above the elaboration, so it is not a former
 -- of the author's tree at all and cannot inflate a census; and a cached
 -- row names the author's program, since the cap is the harness's and
 -- `runOf` re-applies it wherever the row is run.
 oneCase d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  let d₀   = proj₁ ds
-      d₁   = proj₂ ds
-      c    = cached "?" FUEL e (mkSlots d₀ d₁)
-      s    = runOf c
-      agreeFails = if agrees c then []
-                   else report "FAIL" e d₀ d₁ (implBurstsOf c) (specBurstsOf c) s ∷ []
-      metaFails  = if eqBursts (metaBurstsOf c) (specBurstsOf c) then []
-                   else report "META-FAIL" e d₀ d₁ (metaBurstsOf c) (specBurstsOf c) s ∷ []
-      whole      = unwrapSpec (spec-batchSimultaneous s)
-      spanFails  = if eqBatches (concat (specBurstsOf c)) whole then []
-                   else reportSpan e d₀ d₁ whole (specBurstsOf c) s ∷ []
-      wfFails    = if wellFormed? s then [] else reportWF e d₀ d₁ s ∷ []
-  in pureG (marksˢ e , agreeFails ++ᴸ metaFails ++ᴸ spanFails ++ᴸ wfFails)
+  let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
+  in pureG (marksˢ e , verdict e (proj₁ ds) (proj₂ ds)
+                               (implBurstsOf c) (specBurstsOf c) (metaBurstsOf c) (runOf c))
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
-runN : ℕ → ℕ → Gen (Tally × List String)
+runN : ℕ → ℕ → Gen (Tally × List (ℕ × String))
 runN zero    d = pureG (zeroTally , [])
 runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
   pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
@@ -849,9 +857,26 @@ censusPairs : List Former → List ℕ → List String
 censusPairs (f ∷ gs) (c ∷ cs) = formerTag f ∷ " " ∷ show c ∷ " " ∷ censusPairs gs cs
 censusPairs _        _        = []
 
-dumpFails : List String → String
-dumpFails []       = "  (all agree)\n"
-dumpFails (f ∷ fs) = concatStr (f ∷ fs)
+-- THE FIRST FEW, THEN A COUNT: a dev loop reads the top of the list,
+-- and printing every report costs as much as finding them
+ofKind : ℕ → List (ℕ × String) → List String
+ofKind k []             = []
+ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
+
+kinds : List String
+kinds = "FAIL" ∷ "META" ∷ "SPAN" ∷ "WF" ∷ []
+
+counts : ℕ → List String → List (ℕ × String) → List String
+counts k []       fs = []
+counts k (t ∷ ts) fs = t ∷ " " ∷ show (length (ofKind k fs)) ∷ " " ∷ counts (suc k) ts fs
+
+samples : ℕ → List (ℕ × String) → String
+samples k fs = concatStr (take 2 (ofKind k fs))
+
+dumpFails : List (ℕ × String) → String
+dumpFails [] = "  (all agree)\n"
+dumpFails fs = concatStr (counts 0 kinds fs) ++ "\n"
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such

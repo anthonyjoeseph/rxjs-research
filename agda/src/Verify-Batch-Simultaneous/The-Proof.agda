@@ -20,6 +20,7 @@ open import Rx.Exp                using (Ctx)
 open import Rx.SExp               using (SExp; Kinds)
 open import Rx.Elaborate          using (elaborateSpec)
 open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Arrivals using (arrivals↓)
 open import Rx.Envelope.Decode using (decodeSpec)
 open import Rx.Simul-Slots using (SimulSlots; embedSlotsSpec)
 open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
@@ -1170,15 +1171,6 @@ elaborated-accepted κ fuel e ins =
 -- waiting for effort -- it is an equation waiting for its left side,
 -- and attempting it before tier 2 finishes the operator is wasted work.
 --
--- AND THE LOCALITY ARGUMENT NEEDS RE-ESTABLISHING.  The operator is
--- `mergeAllᵉ ∘ mapᵉ ∘ scanᵉ`, because a batcher must be able to DECLINE
--- to emit and a scan cannot; `mergeAllᵉ` carries a `mergeAll-st` with a
--- queue and an active count, so locality is a lemma rather than an
--- observation.  It should still hold: `hasRoom nothing active = true`,
--- so at unlimited concurrency nothing is ever queued and each
--- synchronous inner drains inside the cascade that opened it -- which
--- is also what keeps the two runs' bursts in step.
---
 -- WHAT IT IS NOT is a claim about batching.  It says the machine runs
 -- `step-batch`, nothing more; that `step-batch` agrees with the spec is
 -- `burst-agreement`, with no evaluator in scope.
@@ -1187,10 +1179,10 @@ postulate
     ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
       (ins : SimulSlots Γ κ) →
     map unwrapImpl
-        (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins))
+        (arrivals↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins))
       ≡ map unwrapSpec
           (foldBursts batch-init
-             (map decodeSpec (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))
+             (map decodeSpec (arrivals↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))
 
 -- THE ONLINE FOLD AGREES WITH THE SPEC, ONE BURST AT A TIME.  Over the
 -- whole stream this is `batch-agreement`, proven; what is new is the
@@ -1213,9 +1205,9 @@ postulate
       (ins : SimulSlots Γ κ) →
     map unwrapSpec
         (foldBursts batch-init
-           (map decodeSpec (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))
+           (map decodeSpec (arrivals↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))
       ≡ map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec)
-            (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))
+            (arrivals↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))
 
 -- THE verified object, end to end: for every SRXJS program, what a
 -- subscriber to the batched run sees, burst by burst, is what the spec
@@ -1236,9 +1228,11 @@ postulate
 -- order, grouped into the batches that carry them.
 --
 -- AND THEY MEET PER BURST, WHICH IS WHERE TIMING LIVES.  A burst is
--- everything one arrival causes, so comparing burst by burst pins WHEN
--- each batch leaves as well as what is in it; a `concat` before the
--- comparison would pass a batcher that held everything to the end.
+-- everything one arrival causes -- `Rx.Arrivals`, not the evaluator's
+-- per-delivery `Burst`, whose count depends on the program's shape --
+-- so comparing burst by burst pins WHEN each batch leaves as well as
+-- what is in it; a `concat` before the comparison would pass a batcher
+-- that held everything to the end.
 --
 -- WHAT IS NOT COMPARED is completion: `decodeSpec` drops `completeᵖ`,
 -- and `unwrapImpl` follows it, so a batched run that never completes
@@ -1254,8 +1248,8 @@ formal-verification-batchSimultaneous :
   ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
     (ins : SimulSlots Γ κ) →
   map unwrapImpl
-      (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins))
+      (arrivals↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins))
     ≡ map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec)
-          (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))
+          (arrivals↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))
 formal-verification-batchSimultaneous κ fuel e ins =
   trans (batch-transcription κ fuel e ins) (burst-agreement κ fuel e ins)

@@ -1,4 +1,4 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -179,6 +179,7 @@ help:
 	@echo "                  make oracle ARGS='--seed 1'   (ONE seed only)"
 	@echo "                  make oracle ARGS='--operator mergeAll'"
 	@echo "  qc-build      compile the all-Agda QuickCheck binary ($(ORACLE_BIN)/QuickCheck)"
+	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs)"
 	@echo "  quickcheck    all-Agda QuickCheck: impl- vs spec-batchSimultaneous"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
@@ -1635,6 +1636,21 @@ qc-build: $(ORACLE_BIN)/QuickCheck
 
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
+
+# THE DEV LOOP: one sweep under a HARD time budget.  Over budget is a
+# failure, not a wait -- the budget is what keeps the loop a loop, and it
+# is raised only once the operator passes at the current one.
+# QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
+QC ?= 1 20 1
+QC_BUDGET ?= 15
+QC_LOG := agda/_oracle/qc.log
+qc-fast: qc-build
+	@printf '%s\n' "$(QC)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG); \
+	ec=$$?; head -c 6000 $(QC_LOG); \
+	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
+	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
+	grep -q '(all agree)' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
+	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s"
 
 
 # THE ONE TO POLL.  Exits 3 while running, 1 when red -- but never loop on it

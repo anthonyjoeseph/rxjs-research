@@ -51,6 +51,7 @@ open import Rx.SExp using (SExp; plainᵏ; Kinds; sharedᵏ; emptyˢ)
 open import Rx.Elaborate using (elaborateSpec)
 open import Rx.Envelope.Decode using (decodeSpec)
 open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Arrivals using (arrivals↓)
 open import Rx.Simul-Slots using (SimulSlots; SimulSlot; sharedˢ; embedSlotsSpec)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBursts)
@@ -166,14 +167,14 @@ wellFormed c = wellFormed? (runOf c)
 implBurstsOf : Case → List (List (List ℕ))
 implBurstsOf c =
   map (unwrapImpl {Γ = Γ₂ᵉ} {a = natᵗ})
-      (evaluate↓ (fuel c)
+      (arrivals↓ (fuel c)
                  (batchSimultaneousᵖ (capProg (elaborateImpl κ₂ (prog c))))
                  (embedSlotsImpl (slots c)))
 
 specBurstsOf : Case → List (List (List ℕ))
 specBurstsOf c =
   map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec {Γ = Γ₂ᵉ} {a = natᵗ})
-      (evaluate↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c)))
+      (arrivals↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c)))
                  (embedSlotsSpec (slots c)))
 
 agrees : Case → Bool
@@ -186,5 +187,5 @@ metaBurstsOf c =
   map unwrapSpec
       (foldBursts batch-init
          (map (decodeSpec {Γ = Γ₂ᵉ} {a = natᵗ})
-              (evaluate↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c)))
+              (arrivals↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c)))
                          (embedSlotsSpec (slots c)))))

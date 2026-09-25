@@ -220,16 +220,14 @@ research lives; where they disagree, the header wins.
 
 **THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `Rx.SExp` and the evaluator
 are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
-close without changing one of them, STOP and report that proof. Suspicion is
-not proof.
+close without changing one of them, STOP and report that proof. The envelope's
+shape is free; TypeScript is out of scope this tier (Anthony).
 
-The top line runs two pipelines over one author program: the frozen spec side
-(`elaborateSpec`, `embedSlotsSpec`, `decodeSpec`, `Spec.Unwrap`) and
-`Implementation.Pipeline`, which is free, together with `Rx.Batch`. They meet
-per burst, in raw values. **DONE IS THE AGDA QUICKCHECK PASSING FULLY** on
-that comparison. `make agda-dev` is the check here, not the gate (Anthony). A
-dead envelope shape is a `DEAD ROUTE` in `Implementation.Pipeline`'s header,
-citing the bug-cache row that killed it.
+The top line runs the frozen spec pipeline and `Implementation.Pipeline` with
+`Rx.Batch`, meeting per arrival (`Rx.Arrivals`) in raw values; it may be
+restated to absorb a fuel difference between the runs (Anthony). **DONE IS
+THE AGDA QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go
+in `Rx.Envelope`'s header; counterexamples go in the bug cache.
 
 ### The monster
 
@@ -239,27 +237,33 @@ bound.
 
 ### Big picture tier roadmap
 
-- **PROBE THE PER-BURST STATEMENT'S TWO PRECONDITIONS, BEFORE ANY OPERATOR
-  WORK.** Applying the spec per burst is right only if no spec instant spans
-  two bursts, and the two runs can only match if they have equally many
-  bursts. Sweep both with the compiled QuickCheck. If the first fails, no
-  operator can pass, and that is a finding for Anthony, not a bug to fix.
+- **SCRIPTED SLOTS IN THE HARNESS, SO A SWEEP REACHES AN ARRIVAL AT ALL.**
+  Both harness slots are `sharedᵏ`, and a share schedules nothing, so every
+  run today is its subscribe burst alone and later arrivals are unsampled.
+  The operator batches burst 0 through `batchSyncᵉ` and each later emit
+  alone; the first scripted sweep is what says whether that is wrong.
 
-- **THE OWED/LIVE ARITHMETIC INTO `BatchStᵗ`.** `Rx.Protocol`'s automaton run
-  in producing mode: `live` as a `listᵗ uniqᵗ`, `owed` as a
-  `listᵗ (uniqᵗ ×ᵗ natᵗ)`, both data. `Implementation.step-batch` is the twin
-  to agree with. This is what moves a batch into the burst that paid it off,
-  instead of the burst whose next instant flushes it.
+- **BATCH A LATER ARRIVAL'S EMITS, WHICH `batchSyncᵉ` HANDS OVER SINGLY.**
+  The operator must know when an arrival's instant is over. Candidates, as
+  interior nodes of the dead-route tree: the protocol's owed count
+  (`Implementation.step-batch` is the twin), or an impl envelope carrying an
+  explicit end-of-instant mark. Decided by the scripted sweep, not by
+  argument.
 
-- **DRIVE THE QUICKCHECK TO GREEN, RESHAPING THE IMPL ENVELOPE WHERE THE
-  OPERATOR CANNOT SEE ENOUGH.** Every failure is a bug-cache row; every
-  envelope shape abandoned is a `DEAD ROUTE` naming one. A new envelope lands
-  as new bodies in `Implementation.Pipeline`, never as an edit to the spec
-  side.
+- **CLIMB THE BUDGET LADDER (Anthony).** `qc-fast` green at 15 s, then the
+  bound raised to 30 s and green there, and upward until a 10-minute sweep
+  passes. Over budget is a failure, never a wait; every counterexample
+  becomes a bug-cache row first.
+
+- **RESTATE THE PROOF'S MIDDLE TERM TO THE OPERATOR THAT PASSES.**
+  `burst-agreement` as stated is FALSE — `foldBursts` never flushes a
+  subscribe-kind instant, whose owed list stays empty, so `ofˢ` of one value
+  gives `[[]]` against `[[[1]]]`. Once the operator settles, its meta-level
+  mirror replaces `foldBursts` as the term both leaves meet in.
 
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
-  from the oracle's tree, as `qc-build` now does. This leg closes the tier:
-  the check that decides tier 2 then guards it. Nothing in the job may be
+  from the oracle's tree, as `qc-build` does. This leg closes the tier: the
+  check that decides tier 2 then guards it. Nothing in the job may be
   narrowed to make it pass.
 
 ### The ledger
