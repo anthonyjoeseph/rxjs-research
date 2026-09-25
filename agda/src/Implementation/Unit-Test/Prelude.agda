@@ -45,21 +45,20 @@ open import Data.Fin using (zero; suc)
 open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
-open import Rx.Prim using (InstEmit)
+open import Rx.Prim using (InstEmit; ObservableInput)
 open import Rx.Exp using (Ctx; Closed; Val; natᵗ; takeᵉ; nat̂; inputsBelowᵉ)
-open import Rx.SExp using (SExp; plainᵏ; Kinds; sharedᵏ; emptyˢ)
+open import Rx.SExp using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ)
 open import Rx.Elaborate using (elaborateSpec)
 open import Rx.Envelope.Decode using (decodeSpec)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Arrivals using (arrivals↓)
-open import Rx.Simul-Slots using (SimulSlots; SimulSlot; sharedˢ; embedSlotsSpec)
+open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; embedSlotsSpec)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBursts)
 open import Function using (_∘_)
 open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
 open import Spec.Unwrap using (unwrapSpec)
 open import Rx.Batch using (batchSimultaneousᵖ)
-open import Implementation using (foldBursts; batch-init)
 open import Spec using (spec-batchSimultaneous)
 
 -- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
@@ -68,20 +67,23 @@ open import Spec using (spec-batchSimultaneous)
 Γ₂ : Ctx 2
 Γ₂ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
 
--- BOTH SLOTS ARE `sharedᵏ`: each one holds another srxjs program, so
--- it stands at the ENVELOPE and `input` reads it straight.  The kind
--- vector is not a free choice beside the table -- `SimulSlot` is
--- indexed by it, so this line and `mkSlots` below are one statement.
+-- SLOT ZERO IS SCRIPTED AND SLOT ONE IS SHARED.  A script is the only
+-- slot that schedules arrivals -- a share runs inside whatever
+-- subscribed it -- so without one every run is its subscribe burst
+-- alone.  Slot one holds another srxjs program, stands at the ENVELOPE,
+-- and may read slot zero.  The kind vector is not a free choice beside
+-- the table -- `SimulSlot` is indexed by it, so this line and `mkSlots`
+-- below are one statement.
 κ₂ : Kinds 2
-κ₂ = sharedᵏ ∷ⱽ sharedᵏ ∷ⱽ []ⱽ
+κ₂ = scriptedᵏ ∷ⱽ sharedᵏ ∷ⱽ []ⱽ
 
 Γ₂ᵉ : Ctx 2
 Γ₂ᵉ = plainᵏ Γ₂ κ₂
 
--- THE TABLE IS BUILT FROM TWO AUTHOR-WRITTEN DEFINITIONS, and that is
--- what a row has to name, because the sweep DRAWS it.  What makes a
--- drawn table possible at all is that the stratification side
--- condition COMPUTES: a definition is an `SExp` and every elaboration
+-- THE TABLE IS BUILT FROM A SCRIPT AND AN AUTHOR-WRITTEN DEFINITION,
+-- and that is what a row has to name, because the sweep DRAWS it.  What
+-- makes a drawn definition possible at all is that the stratification
+-- side condition COMPUTES: a definition is an `SExp` and every elaboration
 -- leaf is a real body, so `inputsBelowᵉ` of it reduces to a boolean
 -- rather than getting stuck on a postulate.
 --
@@ -92,16 +94,15 @@ tOf : (b : Bool) → Maybe (T b)
 tOf true  = just tt
 tOf false = nothing
 
+slot₀ : ObservableInput ℕ → SimulSlot Γ₂ κ₂ 0 natᵗ scriptedᵏ
+slot₀ s = scriptedˢ {ok = tt} s
+
 -- A DEFINITION THAT BREAKS STRATIFICATION FALLS BACK TO SILENCE rather
 -- than being rejected, because this is a total function and the
 -- generator has no way to prove its draw stratified.  In practice the
 -- fallback is unreached -- `genSlotRef k` draws only from slots below
 -- `k` by construction -- but it is what makes the row a program rather
 -- than a proof obligation.
-slot₀ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 0 natᵗ sharedᵏ
-slot₀ d with tOf (inputsBelowᵉ 0 (elaborateSpec κ₂ d))
-... | just ok = sharedˢ d {ok = ok}
-... | nothing = sharedˢ emptyˢ
 
 slot₁ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 1 natᵗ sharedᵏ
 slot₁ d with tOf (inputsBelowᵉ 1 (elaborateSpec κ₂ d))
@@ -112,7 +113,7 @@ slot₁ d with tOf (inputsBelowᵉ 1 (elaborateSpec κ₂ d))
 -- use is `lookup κ₂ i`, which does not reduce for an abstract `i`.
 -- That is the kind indexing doing its job -- a table cannot name an
 -- arm without saying which slot it is naming it for.
-mkSlots : SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ → SimulSlots Γ₂ κ₂
+mkSlots : ObservableInput ℕ → SExp Γ₂ [] [] [] natᵗ → SimulSlots Γ₂ κ₂
 mkSlots d₀ d₁ zero          = slot₀ d₀
 mkSlots d₀ d₁ (suc zero)    = slot₁ d₁
 mkSlots d₀ d₁ (suc (suc ()))
@@ -179,13 +180,3 @@ specBurstsOf c =
 
 agrees : Case → Bool
 agrees c = eqBursts (implBurstsOf c) (specBurstsOf c)
-
--- `The-Proof.burst-agreement`'s left side on one row: the protocol fold,
--- burst by burst, over the spec pipeline's decoded run
-metaBurstsOf : Case → List (List (List ℕ))
-metaBurstsOf c =
-  map unwrapSpec
-      (foldBursts batch-init
-         (map (decodeSpec {Γ = Γ₂ᵉ} {a = natᵗ})
-              (arrivals↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c)))
-                         (embedSlotsSpec (slots c)))))

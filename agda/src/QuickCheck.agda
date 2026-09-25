@@ -64,7 +64,7 @@ open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
-open import Rx.Prim using (after_,_; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
+open import Rx.Prim using (after_,_; Timed; ObservableInput; hot; cold; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ;
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
@@ -74,7 +74,7 @@ open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatches; eqBursts)
 open import Spec using (spec-batchSimultaneous)
 open import Spec.Unwrap using (unwrapSpec)
-open import Implementation.Unit-Test.Prelude using (Γ₂; mkSlots; cached; runOf; implBurstsOf; specBurstsOf; metaBurstsOf)
+open import Implementation.Unit-Test.Prelude using (Γ₂; mkSlots; cached; runOf; implBurstsOf; specBurstsOf)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
@@ -170,10 +170,40 @@ genSlotDef k = genB 4 >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
   else if c ≡ᵇ 2 then pureG (ofˢ (natˢ x ∷ []))
   else                pureG (ofˢ (natˢ x ∷ natˢ y ∷ []))
 
+-- SLOT ZERO IS A SCRIPT, AND IT IS THE ONLY THING THAT SCHEDULES.  A
+-- share runs its definition inside whatever subscribed it, so a table of
+-- shares alone is a run that is its subscribe burst and nothing after;
+-- a scripted source is what puts ARRIVALS in a run.  Hot and cold, with
+-- and without synchronous values, one or two arrivals.
+Script : Set
+Script = ObservableInput ℕ
+
+-- printed as Agda, so a pasted row typechecks where the corpus lives
+showNats : List ℕ → String
+showNats []       = "[]"
+showNats (x ∷ xs) = "(" ++ show x ++ " ∷ " ++ showNats xs ++ ")"
+
+showTimed : List (Timed ℕ) → String
+showTimed []                  = "[]"
+showTimed ((after w , v) ∷ r) =
+  "((after " ++ show w ++ " , " ++ show v ++ ") ∷ " ++ showTimed r ++ ")"
+
+showScript : Script → String
+showScript (hot ts)     = "hot " ++ showTimed ts
+showScript (cold ss ts) = "cold " ++ showNats ss ++ " " ++ showTimed ts
+
+genScript : Gen Script
+genScript = genB 4 >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
+  genB 2 >>=G λ w →
+       if c ≡ᵇ 0 then pureG (hot ((after w , x) ∷ []))
+  else if c ≡ᵇ 1 then pureG (hot ((after 0 , x) ∷ (after w , y) ∷ []))
+  else if c ≡ᵇ 2 then pureG (cold (x ∷ []) ((after w , y) ∷ []))
+  else                pureG (cold [] ((after w , x) ∷ (after 0 , y) ∷ []))
+
 -- THE TELESCOPE IS DRAWN IN ORDER, each slot seeing only the ones
 -- below it, which is exactly the argument `genSlotRef` takes.
-genSlots : Gen (SExp Γ₂ [] [] [] natᵗ × SExp Γ₂ [] [] [] natᵗ)
-genSlots = genSlotDef 0 >>=G λ d₀ → genSlotDef 1 >>=G λ d₁ →
+genSlots : Gen (Script × SExp Γ₂ [] [] [] natᵗ)
+genSlots = genScript >>=G λ d₀ → genSlotDef 1 >>=G λ d₁ →
   pureG (d₀ , d₁)
 
 -- value functions (natᵗ → natᵗ): identity, +k, *k, and a CONSTANT.
@@ -708,14 +738,14 @@ FUEL = 30
 -- same `showSExp` the program goes through, and `mkSlots` is in the
 -- prelude so the corpus can see the name.
 pasteRow : SExp Γ₂ [] [] [] natᵗ
-         → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ → String
+         → Script → SExp Γ₂ [] [] [] natᵗ → String
 pasteRow e d₀ d₁ =
   "\n-- <<<PASTE\n  cached \"?\" " ++ show FUEL ++ "\n          "
-       ++ showSExp e ++ "\n          (mkSlots (" ++ showSExp d₀ ++ ")\n"
+       ++ showSExp e ++ "\n          (mkSlots (" ++ showScript d₀ ++ ")\n"
        ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- PASTE>>>\n"
 
 report : String → SExp Γ₂ [] [] [] natᵗ
-       → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
+       → Script → SExp Γ₂ [] [] [] natᵗ
        → List (List (List ℕ)) → List (List (List ℕ)) → List (InstEmit ℕ) → String
 report tag e d₀ d₁ impl spec raw =
   "  " ++ tag ++ "\n    impl = " ++ showBursts impl
@@ -724,7 +754,7 @@ report tag e d₀ d₁ impl spec raw =
 
 -- a WellFormed violation of the evaluator's raw output
 reportWF : SExp Γ₂ [] [] [] natᵗ
-         → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
+         → Script → SExp Γ₂ [] [] [] natᵗ
          → List (InstEmit ℕ) → String
 reportWF e d₀ d₁ s =
   "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e d₀ d₁
@@ -737,7 +767,7 @@ reportWF e d₀ d₁ s =
 -- itself does not give.  So it is reported apart from FAIL: it is a
 -- finding about the statement, not a bug in the operator.
 reportSpan : SExp Γ₂ [] [] [] natᵗ
-           → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
+           → Script → SExp Γ₂ [] [] [] natᵗ
            → List (List ℕ) → List (List (List ℕ)) → List (InstEmit ℕ) → String
 reportSpan e d₀ d₁ whole bursts raw =
   "  SPAN-FAIL\n    whole  = " ++ showBatches whole
@@ -779,17 +809,15 @@ bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 -- EACH RUN IS AN ARGUMENT, SO IT IS COMPUTED ONCE.  A `let` is
 -- substituted at compile time, so a name used in three checks is three
 -- evaluations; a function argument is one shared thunk.
-verdict : SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
-        → List (List (List ℕ)) → List (List (List ℕ)) → List (List (List ℕ))
+verdict : SExp Γ₂ [] [] [] natᵗ → Script → SExp Γ₂ [] [] [] natᵗ
+        → List (List (List ℕ)) → List (List (List ℕ))
         → List (InstEmit ℕ) → List (ℕ × String)
-verdict e d₀ d₁ impl spec meta s =
-  agreeFails ++ᴸ metaFails ++ᴸ spanFails ++ᴸ wfFails
+verdict e d₀ d₁ impl spec s =
+  agreeFails ++ᴸ spanFails ++ᴸ wfFails
   where
   whole      = unwrapSpec (spec-batchSimultaneous s)
   agreeFails = if eqBursts impl spec then []
                else (0 , report "FAIL" e d₀ d₁ impl spec s) ∷ []
-  metaFails  = if eqBursts meta spec then []
-               else (1 , report "META-FAIL" e d₀ d₁ meta spec s) ∷ []
   spanFails  = if eqBatches (concat spec) whole then []
                else (2 , reportSpan e d₀ d₁ whole spec s) ∷ []
   wfFails    = if wellFormed? s then [] else (3 , reportWF e d₀ d₁ s) ∷ []
@@ -803,7 +831,7 @@ oneCase : ℕ → Gen (Marks × List (ℕ × String))
 oneCase d = genExp d >>=G λ e → genSlots >>=G λ ds →
   let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
   in pureG (marksˢ e , verdict e (proj₁ ds) (proj₂ ds)
-                               (implBurstsOf c) (specBurstsOf c) (metaBurstsOf c) (runOf c))
+                               (implBurstsOf c) (specBurstsOf c) (runOf c))
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
@@ -813,7 +841,7 @@ runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
   pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
 
 ------------------------------------------------------------------------
--- stdin parsing: "SEED [RUNS] [DEPTH]"
+-- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE]"
 
 toCodes : String → List ℕ
 toCodes s = map toℕ (toList s)
@@ -864,7 +892,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = "FAIL" ∷ "META" ∷ "SPAN" ∷ "WF" ∷ []
+kinds = "FAIL" ∷ "-" ∷ "SPAN" ∷ "WF" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -903,6 +931,20 @@ showAt n d = skipN (n ∸ 1) d >>=G λ _ →
   genExp d >>=G λ e → genSlots >>=G λ ds →
   pureG (pasteRow e (proj₁ ds) (proj₂ ds))
 
+-- RUN ONE CASE, named the same way, so a case that hangs a sweep can be
+-- timed and re-run alone rather than by bisecting the count
+runAt : ℕ → ℕ → Gen (Marks × List (ℕ × String))
+runAt n d = skipN (n ∸ 1) d >>=G λ _ → oneCase d
+
+-- AND ONE SIDE OF IT, so a hang is attributed to the pipeline that owns
+-- it: 1 the impl run, 2 the spec run, anything else the raw run
+sideAt : ℕ → ℕ → ℕ → Gen String
+sideAt k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >>=G λ ds →
+  let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
+  in pureG (if k ≡ᵇ 1 then showBursts (implBurstsOf c)
+            else if k ≡ᵇ 2 then showBursts (specBurstsOf c)
+            else showStream (runOf c))
+
 main : IO Unit
 main = getContents >>= λ s →
   let cs    = toCodes s
@@ -910,10 +952,16 @@ main = getContents >>= λ s →
       runs  = numAt 1 200 cs
       d     = numAt 2 4 cs
       at    = numAt 3 0 cs
+      only  = numAt 4 0 cs
+      side  = numAt 5 0 cs
       res   = proj₁ (runN runs d (randList seed 2000000))
       tally = proj₁ res
       fails = proj₂ res
-  in if not (at ≡ᵇ 0)
+  in if not (side ≡ᵇ 0)
+     then putStr (proj₁ (sideAt side only d (randList seed 2000000)) ++ "\n")
+     else if not (only ≡ᵇ 0)
+     then putStr (dumpFails (proj₂ (proj₁ (runAt only d (randList seed 2000000)))))
+     else if not (at ≡ᵇ 0)
      then putStr (proj₁ (showAt at d (randList seed 2000000)))
      else putStr (concatStr
        (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs

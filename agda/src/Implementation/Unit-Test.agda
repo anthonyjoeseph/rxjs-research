@@ -24,18 +24,16 @@
 -- which run to make; the label is the seed that found it and means
 -- nothing more.
 --
--- THE CORPUS IS EMPTY, AND THAT IS A GENERATION CHANGE RATHER THAN A
--- CLEARED LEDGER.  Every row it held was a plain `Exp` program driven
--- by scripted slots, and a plain run carries no envelope, so none of
--- them is a case the batching question can even be asked of now that a
--- row is an author's `SExp` under `elaborateSpec`; every one of them was
--- also driven by a SCRIPTED slot, which an elaborated telescope does
--- not admit -- a script at the envelope would be writing tokens by
--- hand -- so the tables could not be ported mechanically either.  What
--- they established
--- was agreement on the PLAIN tree, which is the oracle's question and
--- not this cache's.  Until the sweep refills it the invariant below
--- holds vacuously, which is worth knowing before reading a green.
+-- A PROBE AND A ROW ARE ONE OBJECT AT TWO TIMES, SO THIS IS THE ONE
+-- CORPUS (Anthony).  Every row passes once its bug is fixed and then
+-- guards against regression.  A refutation of an envelope SHAPE is not a
+-- row: the program that kills shape A passes under shape B, so it
+-- cannot stay here failing without breaking the invariant.  It is a
+-- dead-route entry in `Rx.Envelope`'s header citing the killing row by
+-- index, which is stable because the corpus is append-only.
+--
+-- WHILE THE CORPUS IS EMPTY the invariant below holds vacuously, which
+-- is worth knowing before reading a green.
 --
 -- THE IMPORT BLOCK IS MACHINE-OWNED, between the markers below.  A row
 -- can mention any constructor the generator can emit, and nothing knows

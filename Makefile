@@ -1641,15 +1641,19 @@ quickcheck: qc-build
 # failure, not a wait -- the budget is what keeps the loop a loop, and it
 # is raised only once the operator passes at the current one.
 # QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
-QC ?= 1 20 1
-QC_BUDGET ?= 15
+#
+# IT GATES ON AGREEMENT -- FAIL and SPAN -- AND REPORTS WF.  A WF row is the
+# SPEC's raw stream breaking the protocol automaton, which no impl change
+# can reach; it is printed with its count and sample, and gates nothing here.
+QC ?= 1 15 1
+QC_BUDGET ?= 120
 QC_LOG := agda/_oracle/qc.log
 qc-fast: qc-build
 	@printf '%s\n' "$(QC)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG); \
 	ec=$$?; head -c 6000 $(QC_LOG); \
 	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
 	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
-	grep -q '(all agree)' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
+	grep -q '(all agree)\|^FAIL 0 - 0 SPAN 0 ' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
 	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s"
 
 

@@ -1,3 +1,14 @@
+-- THE ANCHOR FOR THE IMPL ENVELOPE'S DEAD ROUTES, AND THEY FORM A TREE
+-- CARRIED IN THE KEYS, NOT IN INDENTATION (Anthony).  One line per
+-- entry, each with a path key -- `-- DEAD ROUTE envelope/<question>/
+-- <route>: what structurally blocked it; row N @ <sha>.` -- so that
+-- `make find-prose Q='envelope/owed'` returns a whole subtree, where a
+-- nested comment would lose its parent under grep.  The interior nodes
+-- are the design questions: where the owed count lives, what triggers
+-- the flush, how completion is signalled.  The row is the bug-cache
+-- row that killed the shape, by index, with the SHA of the shape it
+-- killed: that row passes under the next shape, so it cannot stay a
+-- failing row, and the entry is what remembers it.
 module Rx.Envelope where
 
 open import Data.Bool using (true; false)

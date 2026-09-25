@@ -29,12 +29,12 @@ open import Rx.SExp      using (SExp; Kinds; plainᵏ; emitᵗ)
 open import Rx.Slots     using (Slots)
 open import Rx.Envelope  using (instEventᵗ; machineEmitᵗ)
 open import Rx.Evaluator using (Burst)
-open import Rx.Elaborate using (elaborateSpec)
+open import Implementation.Elaborate using (elaborateᴵ)
 open import Rx.Simul-Slots using (SimulSlots; embedSlotsSpec)
 
 elaborateImpl : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t : Ty}
               → SExp Γ [] [] [] t → Exp (plainᵏ Γ κ) [] [] [] (emitᵗ t)
-elaborateImpl κ e = elaborateSpec κ e
+elaborateImpl κ e = elaborateᴵ κ e
 
 embedSlotsImpl : ∀ {n} {Γ : Ctx n} {κ : Kinds n}
                → SimulSlots Γ κ → Slots (plainᵏ Γ κ)
