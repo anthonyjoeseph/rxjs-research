@@ -363,11 +363,11 @@ jobs:
   # runners' import cone: an edit to the proof leaves them standing, and so
   # does any comment.
   #
-  # A CASE GETS TWENTY MINUTES, not the harness's ten-second default. A crash
-  # is red, and a timeout is one, but a slow case is SLOW, not wrong (Anthony):
-  # the evaluator is total and the pinned flattener nests outrun two minutes
-  # while agreeing with rxjs. So the limit sits above the slowest case known,
-  # and the per-case times the log prints are the performance record.
+  # A CASE GETS TWO MINUTES, not the harness's ten-second default. A crash is
+  # red, and the deep flattener nests the sweep draws take tens of seconds on
+  # a shared runner while agreeing with rxjs, so the default reports load as
+  # a finding. A case still running at two minutes is SLOW, not wrong
+  # (Anthony) -- and the repair is a faster evaluator, not a longer limit.
   #
   # NOTHING HERE MAY BE NARROWED TO MAKE IT PASS. A divergence is a finding
   # about one of the two machines, and it is fixed in whichever of them
@@ -378,7 +378,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      ORACLE_CASE_TIMEOUT_MS: "1200000"
+      ORACLE_CASE_TIMEOUT_MS: "120000"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
