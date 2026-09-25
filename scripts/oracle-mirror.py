@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The oracle's own Agda tree: the import CONE of its two runners, copied out
-of the comment-stripped mirror with termination checking switched off.
+of the comment-stripped mirror with termination checking switched off and the
+erasure markers made real.
 
 WHY A SEPARATE TREE.  The oracle checks the evaluator's VALUES against rxjs,
 not the proof, so it has no use for the termination check -- the tower pays
@@ -13,6 +14,14 @@ WHY A PRAGMA PER FILE AND NOT A COMMAND-LINE FLAG.  A flag reaches every module
 the run loads, the standard library included, and the stdlib's interfaces are
 shared with every other build on the machine.  A pragma is scoped to the file
 it heads, so only this tree's modules are affected.
+
+WHY THE MARKERS ARE COMMENTS IN `src`.  `{-@0-}` sits exactly where an `@0`
+would go -- `({-@0-}le : lo ≤ ℓ)`, `→ {-@0-}Acc _<_ m →` -- and the proof never
+sees it: to the gate it is a comment, so `src` stays under the options it has
+and the tower checks what it always checked.  Here it becomes `@0 `, under
+`--erasure`, so the compiled runners stop building and carrying the proof
+terms a marked binder holds.  A marker the oracle's check rejects is one
+placed on a binder the evaluator's VALUES read: the build says so by name.
 
 WHY ONLY THE CONE.  What the key hashes and what the tree holds are the same
 set, so a module outside the runners' cone can never invalidate the oracle's
@@ -34,7 +43,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MIRROR = os.path.join(REPO, "agda", "_stripped-comments", "src")
 DEST = os.path.join(REPO, "agda", "_oracle")
 ROOTS = ["CLI.Main", "Implementation.Unit-Test.Bug-Cache"]
-PRAGMA = "{-# OPTIONS --no-termination-check #-}\n"
+PRAGMA = "{-# OPTIONS --erasure --no-termination-check #-}\n"
+MARK, ERASED = "{-@0-}", "@0 "
 LIB = ("name: rxjs-research-oracle\n"
        "include: src\n"
        "depend: standard-library-2.3\n"
@@ -70,7 +80,8 @@ def cone() -> dict[str, str]:
 
 def sync(files: dict[str, str]) -> None:
     src = os.path.join(DEST, "src")
-    want = {os.path.join(src, rel): PRAGMA + text for rel, text in files.items()}
+    want = {os.path.join(src, rel): PRAGMA + text.replace(MARK, ERASED)
+            for rel, text in files.items()}
     for path, text in want.items():
         if os.path.isfile(path) and open(path, encoding="utf-8").read() == text:
             continue
@@ -106,7 +117,9 @@ def main() -> int:
     files = cone()
     if a.sync:
         sync(files)
-        print(f"oracle-mirror: {len(files)} modules in the runners' cone")
+        marks = sum(t.count(MARK) for t in files.values())
+        print(f"oracle-mirror: {len(files)} modules in the runners' cone, "
+              f"{marks} erasure markers")
     else:
         print(key(files))
     return 0

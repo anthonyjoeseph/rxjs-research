@@ -112,8 +112,10 @@ check that should fail into one that passes.
 ## The third cache: the oracle's binaries, and why its key is the CONE
 
 The oracle job shares nothing with the gate. It builds its own two runners from
-its own tree (`make oracle-tree`: the runners' import cone, copied out of the
-stripped mirror with termination checking off), and caches the **linked
+its own tree (`make cli-build`, whose first half is `make oracle-tree`: the
+runners' import cone, copied out of the stripped mirror with termination
+checking off and every `{-@0-}` marker made a real `@0` under `--erasure`), and
+caches the **linked
 binaries** rather than anything they were built from. That is the opposite of
 the MAlonzo rule above, for the opposite reason: there the binaries relink on
 every run anyway, while here a hit skips Agda altogether — the job does not
@@ -121,7 +123,8 @@ even install it.
 
 **The key is `make oracle-key`: a hash of the cone's STRIPPED sources**, plus
 `scripts/oracle-mirror.py` and `scripts/install-agda.sh`. So an edit outside
-the cone (the whole proof) or a comment edit leaves the binaries standing, and
+the cone (the whole proof) or a comment edit leaves the binaries standing — a
+marker is the one comment the stripper keeps, since it changes the build — and
 any edit that could change what the evaluator computes rebuilds them. There
 are **no restore-keys**: a near match is a binary of some other evaluator, and
 running it would report that evaluator's verdicts as this commit's. A miss is a

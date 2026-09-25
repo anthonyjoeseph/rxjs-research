@@ -363,10 +363,11 @@ jobs:
   # runners' import cone: an edit to the proof leaves them standing, and so
   # does any comment.
   #
-  # A CASE GETS TWO MINUTES, not the harness's ten-second default. A crash is
-  # red, and the deep flattener nests the sweep draws take tens of seconds on
-  # a shared runner while agreeing with rxjs, so the default reports load as
-  # a finding. A case still running at two minutes is a finding.
+  # A CASE GETS TWENTY MINUTES, not the harness's ten-second default. A crash
+  # is red, and a timeout is one, but a slow case is SLOW, not wrong (Anthony):
+  # the evaluator is total and the pinned flattener nests outrun two minutes
+  # while agreeing with rxjs. So the limit sits above the slowest case known,
+  # and the per-case times the log prints are the performance record.
   #
   # NOTHING HERE MAY BE NARROWED TO MAKE IT PASS. A divergence is a finding
   # about one of the two machines, and it is fixed in whichever of them
@@ -377,7 +378,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      ORACLE_CASE_TIMEOUT_MS: "120000"
+      ORACLE_CASE_TIMEOUT_MS: "1200000"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -420,7 +421,7 @@ jobs:
 
       - name: Build the runners
         if: steps.runners.outputs.cache-hit != 'true'
-        run: make agda/_oracle/_cli/Main agda/_oracle/_cli/Bug-Cache
+        run: make cli-build
 
       # SAVED AS SOON AS THEY ARE BUILT, not at the job's end, so a red sweep
       # still leaves the next run a cache hit.

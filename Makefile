@@ -171,7 +171,8 @@ help:
 	@echo "                  to poll: it cannot return while still running"
 	@echo "                  make bg-wait T=gate   /   make bg-wait T=gate-heavy I=90"
 	@echo "  ts-check      typecheck the TypeScript source"
-	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
+	@echo "  cli-build     the oracle's tree (erasure markers made real), then its two"
+	@echo "                  runners: $(ORACLE_BIN)/Main and $(ORACLE_BIN)/Bug-Cache"
 	@echo "  oracle-key    print the oracle build's cache key (its runners' cone)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
 	@echo "                  make oracle                   (full seed sweep)"
@@ -1266,7 +1267,7 @@ gate-heavy: stripped
 	 [ "$$st" -eq 0 ] || { scripts/notify.py "RED (the tower)"; exit 1; }
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory probed
-	@$(MAKE) --no-print-directory cli-build bug-cache-build
+	@$(MAKE) --no-print-directory agda/_cli/Main bug-cache-build
 	@scripts/dev-changed.py --stamp
 	@echo "gate-heavy: ALL GREEN"
 	@scripts/notify.py "GREEN (heavy)"
@@ -1557,8 +1558,6 @@ agda/_cli/Main: $(AGDA_SRC)
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)
 	@touch $@
 
-cli-build: agda/_cli/Main
-
 # THE ORACLE'S OWN BUILD: the runners' import cone, copied out of the mirror
 # with termination checking off, in a tree with its own `_build` so neither
 # build ever invalidates the other's interfaces.  Why each of those, and why
@@ -1580,6 +1579,12 @@ $(ORACLE_BIN)/Bug-Cache: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
 	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/Implementation/Unit-Test/Bug-Cache.agda
 	@touch $@
+
+# BOTH HALVES, IN ORDER: `oracle-tree` copies the cone and turns every
+# `{-@0-}` marker into a real `@0` under `--erasure`, then the two runners are
+# compiled from it.  Where the markers go, and why they are comments in `src`:
+# scripts/oracle-mirror.py.
+cli-build: $(ORACLE_BIN)/Main $(ORACLE_BIN)/Bug-Cache
 
 # ITS OWN CI JOB RATHER THAN A STEP OF THE GATE, so a divergence reports as
 # itself rather than as a red tower; and it is absent from GATE_CHEAP for
