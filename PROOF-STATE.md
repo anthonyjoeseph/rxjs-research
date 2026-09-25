@@ -341,9 +341,9 @@ definition rather than a postulate, so its cone is real.
 - **`batch-transcription`** (The-Proof) — FALSITY, `NO EVIDENCE`: false against
   the landed operator until tier 2 finishes it; its locality argument also
   needs re-establishing over `mergeAllᵉ`.
-- **`burst-agreement`** (The-Proof) — FALSITY, `NO EVIDENCE`: false if a spec
-  instant spans two bursts; its body is owed over `elaborated-accepted` and a
-  settledness leaf.
+- **`burst-agreement-accepted`** (The-Proof) — FALSITY, `NO EVIDENCE`: false if
+  a spec instant spans two bursts, which the QuickCheck's SPAN rows show the
+  spec elaboration doing; the rest is a settledness leaf.
 - **`cascade-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: the per-former
   split, and the `EvalSt` node-provenance invariant it is probably still
   missing.

@@ -1194,20 +1194,35 @@ postulate
 -- lists is false, and the claim is scoped to the elaboration's image
 -- instead, as `elaborated-accepted` is.
 --
--- THE BODY OWED HERE is `batch-agreement`'s relation generalised past
+-- THE LEAF STILL TAKES ACCEPTANCE AS A PREMISE, which is the `-core`
+-- shape (Anthony: wired this way on purpose, to keep
+-- `elaborated-accepted` on the tree until the real body is written).
+-- That body is `batch-agreement`'s relation generalised past
 -- `protocol-init` -- `fold-agree` already takes any related triple --
--- over `elaborated-accepted` and a settledness leaf saying each burst
--- of an elaborated run ends paid off.  Until it is written,
--- `elaborated-accepted` has no consumer.
+-- over acceptance and a settledness leaf saying each burst of an
+-- elaborated run ends paid off.
 postulate
-  burst-agreement :
+  burst-agreement-accepted :
     ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
       (ins : SimulSlots Γ κ) →
+    Accepted (runProtocol protocol-init
+               (decodeSpec (concat (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))) →
     map unwrapSpec
         (foldBursts batch-init
            (map decodeSpec (arrivals↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))
       ≡ map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec)
             (arrivals↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))
+
+burst-agreement :
+  ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
+    (ins : SimulSlots Γ κ) →
+  map unwrapSpec
+      (foldBursts batch-init
+         (map decodeSpec (arrivals↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))
+    ≡ map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec)
+          (arrivals↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))
+burst-agreement κ fuel e ins =
+  burst-agreement-accepted κ fuel e ins (elaborated-accepted κ fuel e ins)
 
 -- THE verified object, end to end: for every SRXJS program, what a
 -- subscriber to the batched run sees, burst by burst, is what the spec

@@ -15,12 +15,14 @@
 --   appearance behind the values it caused, and the spec orders a burst's
 --   batches by first appearance, value-less emits included, so the batches
 --   come out permuted; row 9 @ 0de565ef.
--- DEAD ROUTE envelope/flush/end-mark: a mark emitted after an arrival, for
---   the root to read as its end, is an OUTER emit wherever its path
---   crosses a flattener -- `switchAllᵉ` cuts the live lane on it,
---   `exhaustAllᵉ` drops it while busy, a bounded `mergeAllᵉ` queues it.
---   Filtering it out before the outer loses it, and no in-body multicast
---   exists to route it around.  Row 4 is the program it had to fix.
+-- DEAD ROUTE envelope/flush/end-mark-on-outer: a mark a delivery carries
+--   behind its value, for the root to read as the end of its instant, is
+--   an OUTER emit wherever the delivery's path enters a flattener as its
+--   outer -- `switchAllᵉ` cuts the live lane on it, `exhaustAllᵉ` drops
+--   it while busy, a bounded `mergeAllᵉ` queues it.  Filtered out before
+--   the outer it loses its position, and one regenerated inside the lane
+--   lands before a share's later subscribers have had the value.  Through
+--   an inner, and through an unbounded `mergeAllᵉ`'s outer, it passes.
 -- DEAD ROUTE envelope/flush/root-merge: bracketing the subscribe burst as
 --   `mergeAllᵉ` of the run and a one-emit `ofᵉ` puts a flattener above the
 --   whole run, and the evaluator's cost is multiplicative in flattener
