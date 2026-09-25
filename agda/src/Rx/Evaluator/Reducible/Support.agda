@@ -1001,9 +1001,10 @@ fold (rootRP {pre = pre}) tt now vals _ fin sched st rm h =
 dropS : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Set₁} {S : Set}
         {κ : Path Γ lo u t} {pre : Pre κ}
       → RP {e = e} m P ⊤ κ pre → RP {e = e} m P S κ pre
-fold (dropS rp) s now vals col fin sched st rm h =
-  let an = fold rp tt now vals col fin sched st rm h
-  in ans (out an) (Ans.sched′ an) (Ans.st′ an) (der an) (Ans.pre′ an) (Ans.holds′ an) (kept an)
+fold (dropS rp) s now vals col fin sched st rm h
+  with fold rp tt now vals col fin sched st rm h
+... | an =
+  ans (out an) (Ans.sched′ an) (Ans.st′ an) (der an) (Ans.pre′ an) (Ans.holds′ an) (kept an)
          (dropS (next an)) s
 
 ------------------------------------------------------------------

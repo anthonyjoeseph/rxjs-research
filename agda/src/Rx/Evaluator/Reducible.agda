@@ -794,9 +794,10 @@ redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st 
   r , subs-mint refl d , tr , hl , kept-in κ (endPre tr) refl kp
 
 -- the live fold: step, fold above, stand on what came back
-fold (liveRP {f = f} le aM fs h rh κ pfs rp) s now vals col fin sched st rm hs =
+fold (liveRP {f = f} le aM fs h rh κ pfs rp) s now vals col fin sched st rm hs
+  with apply rp s (headCall {le = le} fs h rh κ pfs (call now vals col fin sched st rm hs))
+... | an =
   let r  = step fs h vals fin sched st
-      an = apply rp s (headCall {le = le} fs h rh κ pfs (call now vals col fin sched st rm hs))
       so = step-kept le (step-⇓ fs {κ = κ} {now = now} h vals fin sched st (proj₁ (proj₁ (ground hs)))) (sounds hs)
   in ans (out an) (Ans.sched′ an) (Ans.st′ an)
          (fold-step (step-⇓ fs h vals fin sched st (proj₁ (proj₁ (ground hs)))) (der an))
@@ -1374,10 +1375,10 @@ subNext : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set} {f
         → (h : HeldF f) → G h → (κ : Path Γ ℓ u t) (p : Pre κ)
         → RP {e = e} m (Red m u) S κ p
         → RP {e = e} m (Red m s) S (f ↠[ le ] κ) (headPre h p)
-fold (subRP le aM ss h g κ pfs rp) s₀ now vals col fin sched st rm hs =
-  let r = proj₁ (ss le κ pfs rp s₀ h g now vals col fin sched st rm hs)
-      g′ = proj₂ (ss le κ pfs rp s₀ h g now vals col fin sched st rm hs)
-  in ans (Stage.out r) (Stage.sc r) (Stage.st′ r) (Stage.dv r)
+fold (subRP le aM ss h g κ pfs rp) s₀ now vals col fin sched st rm hs
+  with ss le κ pfs rp s₀ h g now vals col fin sched st rm hs
+... | (r , g′) =
+  ans (Stage.out r) (Stage.sc r) (Stage.st′ r) (Stage.dv r)
          (headPre (Stage.hd r) (endPre (Stage.tr r))) (Stage.hl r) (Stage.kp r)
          (subNext le aM ss (Stage.hd r) g′ κ (endPre (Stage.tr r)) (endRP (Stage.tr r)))
          (endS (Stage.tr r))
