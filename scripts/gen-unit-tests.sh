@@ -98,7 +98,8 @@ open import Rx.SExp using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeA
   varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; inlˢ; inrˢ; caseˢ; ifˢ;
   primˢ; nilˢ; consˢ; foldˢ; strmˢ)
 
-open import Implementation.Unit-Test.Prelude using (Case; cached; slots₂)
+open import Rx.Prim using (hot; cold; after_,_)
+open import Implementation.Unit-Test.Prelude using (Case; cached; mkSlots)
 AGDA
 
 widen () {

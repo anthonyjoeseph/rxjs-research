@@ -32,9 +32,6 @@
 -- dead-route entry in `Rx.Envelope`'s header citing the killing row by
 -- index, which is stable because the corpus is append-only.
 --
--- WHILE THE CORPUS IS EMPTY the invariant below holds vacuously, which
--- is worth knowing before reading a green.
---
 -- THE IMPORT BLOCK IS MACHINE-OWNED, between the markers below.  A row
 -- can mention any constructor the generator can emit, and nothing knows
 -- which until the row exists, so the block is written WIDE before an
@@ -45,12 +42,64 @@
 ------------------------------------------------------------------
 module Implementation.Unit-Test where
 
-open import Data.List using (List; [])
+open import Data.List using (List; []; _∷_)
 
 -- <<<IMPORTS
-open import Implementation.Unit-Test.Prelude using (Case)
+open import Data.Fin using (zero; suc)
+open import Data.Maybe using (nothing; just)
+open import Data.List.Relation.Unary.Any using (here)
+open import Relation.Binary.PropositionalEquality using (refl)
+
+open import Rx.SExp using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; mergeAllˢ;
+  switchAllˢ; exhaustAllˢ; varˢᵗ; natˢ; primˢ; pairˢ; strmˢ)
+open import Rx.Exp using (add)
+
+open import Rx.Prim using (hot; cold; after_,_)
+open import Implementation.Unit-Test.Prelude using (Case; cached; mkSlots)
 -- IMPORTS>>>
 
 cases : List Case
 cases =
+  cached "two ofs in one delivery" 30
+          (mergeAllˢ nothing (mapˢ (strmˢ (mergeAllˢ nothing (ofˢ (
+              (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
+              (strmˢ (ofˢ ((primˢ add (pairˢ (varˢᵗ (here refl)) (natˢ 1))) ∷ []))) ∷ []))))
+            (inputˢ zero)))
+          (mkSlots (hot ((after 1 , 5) ∷ []))
+                   emptyˢ) ∷
+  cached "one of, two values, per delivery" 30
+          (mergeAllˢ nothing (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ (varˢᵗ (here refl)) ∷ [])))
+            (inputˢ zero)))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "the script merged with itself" 30
+          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))
+          (mkSlots (hot ((after 1 , 5) ∷ []))
+                   emptyˢ) ∷
+  cached "a share of the script merged with itself" 30
+          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
+          (mkSlots (hot ((after 1 , 5) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a delivery subscribing the script again" 30
+          (mergeAllˢ nothing (mapˢ (strmˢ (inputˢ zero)) (inputˢ zero)))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a delivery switching to two ofs" 30
+          (switchAllˢ (mapˢ (strmˢ (mergeAllˢ nothing (ofˢ (
+              (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
+              (strmˢ (ofˢ ((natˢ 7) ∷ []))) ∷ []))))
+            (inputˢ zero)))
+          (mkSlots (cold (3 ∷ []) ((after 1 , 5) ∷ []))
+                   emptyˢ) ∷
+  cached "a delivery exhausting into two ofs" 30
+          (exhaustAllˢ (mapˢ (strmˢ (mergeAllˢ (just 1) (ofˢ (
+              (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
+              (strmˢ (ofˢ ((natˢ 7) ∷ []))) ∷ []))))
+            (inputˢ zero)))
+          (mkSlots (hot ((after 1 , 5) ∷ []))
+                   emptyˢ) ∷
+  cached "take one of the script" 30
+          (takeˢ (natˢ 1) (inputˢ zero))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
   []

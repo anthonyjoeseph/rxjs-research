@@ -74,7 +74,9 @@ open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatches; eqBursts)
 open import Spec using (spec-batchSimultaneous)
 open import Spec.Unwrap using (unwrapSpec)
-open import Implementation.Unit-Test.Prelude using (Γ₂; mkSlots; cached; runOf; implBurstsOf; specBurstsOf)
+open import Implementation.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; implBurstsOf; specBurstsOf;
+  agrees; wellFormed)
+open import Implementation.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
@@ -945,6 +947,34 @@ sideAt k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >
             else if k ≡ᵇ 2 then showBursts (specBurstsOf c)
             else showStream (runOf c))
 
+-- THE CORPUS, EVERY ROW WITH BOTH SIDES PRINTED WHETHER OR NOT THEY
+-- AGREE.  A row is a probe before it is a guard, and a probe is read for
+-- its shape as much as for its verdict -- which the bug-cache runner,
+-- printing only failures, cannot show.  Zero generated cases asks for it.
+showRow : Case → String
+showRow c = Case.name c ++ (if agrees c then ": agree" else ": FAIL")
+  ++ (if wellFormed c then "" else " WF")
+  ++ "\n    impl = " ++ showBursts (implBurstsOf c)
+  ++ "\n    spec = " ++ showBursts (specBurstsOf c)
+  ++ "\n    raw  = " ++ showStream (runOf c) ++ "\n"
+
+-- one row at a time, so a row that hangs is named by what printed before
+-- it; `k` picks one row, 1-based, and 0 runs them all
+-- and `side` names one pipeline of it, as it does for a generated case
+sideRow : ℕ → Case → String
+sideRow k c = Case.name c ++ ": " ++
+  (if k ≡ᵇ 1 then showBursts (implBurstsOf c)
+   else if k ≡ᵇ 2 then showBursts (specBurstsOf c)
+   else showStream (runOf c)) ++ "\n"
+
+printRows : ℕ → ℕ → ℕ → List Case → IO Unit
+printRows sd k i []       = putStr ""
+printRows sd k i (c ∷ cs) =
+  (if (k ≡ᵇ 0) ∨ (k ≡ᵇ i)
+   then putStr (if sd ≡ᵇ 0 then showRow c else sideRow sd c)
+   else putStr "") >>= λ _ →
+  printRows sd k (suc i) cs
+
 main : IO Unit
 main = getContents >>= λ s →
   let cs    = toCodes s
@@ -957,7 +987,9 @@ main = getContents >>= λ s →
       res   = proj₁ (runN runs d (randList seed 2000000))
       tally = proj₁ res
       fails = proj₂ res
-  in if not (side ≡ᵇ 0)
+  in if runs ≡ᵇ 0
+     then printRows side only 1 cases
+     else if not (side ≡ᵇ 0)
      then putStr (proj₁ (sideAt side only d (randList seed 2000000)) ++ "\n")
      else if not (only ≡ᵇ 0)
      then putStr (dumpFails (proj₂ (proj₁ (runAt only d (randList seed 2000000)))))
