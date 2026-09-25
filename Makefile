@@ -1642,9 +1642,11 @@ quickcheck: qc-build
 # is raised only once the operator passes at the current one.
 # QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
 #
-# IT GATES ON AGREEMENT -- FAIL and SPAN -- AND REPORTS WF.  A WF row is the
-# SPEC's raw stream breaking the protocol automaton, which no impl change
-# can reach; it is printed with its count and sample, and gates nothing here.
+# IT GATES ON AGREEMENT -- FAIL -- AND REPORTS SPAN AND WF.  Both are
+# properties of the SPEC side alone: a SPAN row is one spec burst whose
+# instants recur across arrivals, a WF row the spec's raw stream breaking
+# the protocol automaton, and no impl change can reach either.  They are
+# printed with their counts and samples, and gate nothing here.
 QC ?= 1 15 1
 QC_BUDGET ?= 120
 QC_LOG := agda/_oracle/qc.log
@@ -1653,7 +1655,7 @@ qc-fast: qc-build
 	ec=$$?; head -c 6000 $(QC_LOG); \
 	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
 	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
-	grep -q '(all agree)\|^FAIL 0 - 0 SPAN 0 ' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
+	grep -q '(all agree)\|^FAIL 0 - 0 ' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
 	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s"
 
 

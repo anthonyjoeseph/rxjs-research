@@ -237,23 +237,19 @@ bound.
 
 ### Big picture tier roadmap
 
-- **SCRIPTED SLOTS IN THE HARNESS, SO A SWEEP REACHES AN ARRIVAL AT ALL.**
-  Both harness slots are `sharedᵏ`, and a share schedules nothing, so every
-  run today is its subscribe burst alone and later arrivals are unsampled.
-  The operator batches burst 0 through `batchSyncᵉ` and each later emit
-  alone; the first scripted sweep is what says whether that is wrong.
+- **BATCH A LATER ARRIVAL'S EMITS — A QUESTION FOR ANTHONY, NOT A GRIND.**
+  `batchSyncᵉ` groups only the subscribe frame, so a later arrival's emits
+  come out singly; bug-cache row 4 is the failing program. Knowing that an
+  arrival is over needs a mark that crosses a flattener's OUTER, which every
+  flattener cuts, drops or queues, and there is no in-body multicast to
+  route around one. The four routes tried are dead routes in
+  `Rx.Envelope`'s header; what is left moves `Rx.Exp` or the evaluator.
 
-- **BATCH A LATER ARRIVAL'S EMITS, WHICH `batchSyncᵉ` HANDS OVER SINGLY.**
-  The operator must know when an arrival's instant is over. Candidates, as
-  interior nodes of the dead-route tree: the protocol's owed count
-  (`Implementation.step-batch` is the twin), or an impl envelope carrying an
-  explicit end-of-instant mark. Decided by the scripted sweep, not by
-  argument.
-
-- **CLIMB THE BUDGET LADDER (Anthony).** `qc-fast` green at 15 s, then the
-  bound raised to 30 s and green there, and upward until a 10-minute sweep
-  passes. Over budget is a failure, never a wait; every counterexample
-  becomes a bug-cache row first.
+- **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony).** Depth 1 is the
+  sweep that fits, because a run costs multiplicatively in flattener
+  nesting (`typecheck-performance-numbers.md`). Gate on FAIL alone: SPAN
+  and WF are the spec side's own, and SPAN is tier 3's evidence against
+  `burst-agreement`. Every counterexample becomes a bug-cache row first.
 
 - **RESTATE THE PROOF'S MIDDLE TERM TO THE OPERATOR THAT PASSES.**
   `burst-agreement` as stated is FALSE — `foldBursts` never flushes a

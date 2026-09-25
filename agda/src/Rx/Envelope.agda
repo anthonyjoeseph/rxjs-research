@@ -1,7 +1,7 @@
--- THE ANCHOR FOR THE IMPL ENVELOPE'S DEAD ROUTES, AND THEY FORM A TREE
--- CARRIED IN THE KEYS, NOT IN INDENTATION (Anthony).  One line per
--- entry, each with a path key -- `-- DEAD ROUTE envelope/<question>/
--- <route>: what structurally blocked it; row N @ <sha>.` -- so that
+-- THE ANCHOR FOR THE IMPL ENVELOPE'S ABANDONED SHAPES, AND THEY FORM A
+-- TREE CARRIED IN THE KEYS, NOT IN INDENTATION (Anthony).  One entry
+-- each, keyed by a path -- `envelope/<question>/<route>: what
+-- structurally blocked it; row N @ <sha>.` -- so that
 -- `make find-prose Q='envelope/owed'` returns a whole subtree, where a
 -- nested comment would lose its parent under grep.  The interior nodes
 -- are the design questions: where the owed count lives, what triggers
@@ -9,6 +9,28 @@
 -- row that killed the shape, by index, with the SHA of the shape it
 -- killed: that row passes under the next shape, so it cannot stay a
 -- failing row, and the entry is what remembers it.
+--
+-- DEAD ROUTE envelope/lane/book-last: running the re-stamped outer
+--   envelope AFTER the lane's inner streams moves its instant's first
+--   appearance behind the values it caused, and the spec orders a burst's
+--   batches by first appearance, value-less emits included, so the batches
+--   come out permuted; row 9 @ 0de565ef.
+-- DEAD ROUTE envelope/flush/end-mark: a mark emitted after an arrival, for
+--   the root to read as its end, is an OUTER emit wherever its path
+--   crosses a flattener -- `switchAllᵉ` cuts the live lane on it,
+--   `exhaustAllᵉ` drops it while busy, a bounded `mergeAllᵉ` queues it.
+--   Filtering it out before the outer loses it, and no in-body multicast
+--   exists to route it around.  Row 4 is the program it had to fix.
+-- DEAD ROUTE envelope/flush/root-merge: bracketing the subscribe burst as
+--   `mergeAllᵉ` of the run and a one-emit `ofᵉ` puts a flattener above the
+--   whole run, and the evaluator's cost is multiplicative in flattener
+--   nesting (`typecheck-performance-numbers.md`), so it costs more than
+--   the `batchSyncᵉ` it replaces.
+-- DEAD ROUTE envelope/flush/sentinel-registration: a registration read as
+--   the last of its arrival stays last only until something registers
+--   after it -- the registry is appended and dispatched oldest-first, a
+--   `deferᵉ` re-registration lands a tick late, and a cold slot has one
+--   timeline per registration, so no one registration closes them all.
 module Rx.Envelope where
 
 open import Data.Bool using (true; false)

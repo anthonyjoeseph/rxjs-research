@@ -102,4 +102,9 @@ cases =
           (takeˢ (natˢ 1) (inputˢ zero))
           (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
+  cached "seed 1 depth 1 case 108" 30
+          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ emptyˢ) ∷
+            (strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 3) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 3) ∷ (after 0 , 7) ∷ []))
+                   (ofˢ ((natˢ 5) ∷ (natˢ 7) ∷ []))) ∷
   []

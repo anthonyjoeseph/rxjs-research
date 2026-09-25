@@ -967,13 +967,16 @@ sideRow k c = Case.name c ++ ": " ++
    else if k ≡ᵇ 2 then showBursts (specBurstsOf c)
    else showStream (runOf c)) ++ "\n"
 
-printRows : ℕ → ℕ → ℕ → List Case → IO Unit
-printRows sd k i []       = putStr ""
-printRows sd k i (c ∷ cs) =
+-- and a nonzero `f` runs every row at that fuel instead of its own
+printRows : ℕ → ℕ → ℕ → ℕ → List Case → IO Unit
+printRows f sd k i []       = putStr ""
+printRows f sd k i (c ∷ cs) =
   (if (k ≡ᵇ 0) ∨ (k ≡ᵇ i)
-   then putStr (if sd ≡ᵇ 0 then showRow c else sideRow sd c)
+   then putStr (if sd ≡ᵇ 0 then showRow c′ else sideRow sd c′)
    else putStr "") >>= λ _ →
-  printRows sd k (suc i) cs
+  printRows f sd k (suc i) cs
+  where
+  c′ = if f ≡ᵇ 0 then c else record c { fuel = f }
 
 main : IO Unit
 main = getContents >>= λ s →
@@ -984,11 +987,12 @@ main = getContents >>= λ s →
       at    = numAt 3 0 cs
       only  = numAt 4 0 cs
       side  = numAt 5 0 cs
+      fuelʳ = numAt 6 0 cs
       res   = proj₁ (runN runs d (randList seed 2000000))
       tally = proj₁ res
       fails = proj₂ res
   in if runs ≡ᵇ 0
-     then printRows side only 1 cases
+     then printRows fuelʳ side only 1 cases
      else if not (side ≡ᵇ 0)
      then putStr (proj₁ (sideAt side only d (randList seed 2000000)) ++ "\n")
      else if not (only ≡ᵇ 0)

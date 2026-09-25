@@ -827,3 +827,54 @@ way: the blowup is COMPUTATIONAL, so compiling does not help. Consequence for th
 proof: series Q cannot settle the FALSITY it was built to test, and the walk
 face's chain-frame rows are classed structurally instead (they peel no gas —
 Evaluator:1436-1458).
+
+## QuickCheck run cost: multiplicative in flattener NESTING (compiled harness)
+
+Single cases of the tier-2 sweep, `agda/_oracle/_cli/QuickCheck`, fuel 30,
+wall clock on the cloud container. The evaluator is compiled, so none of this is
+typechecking; it lives here because every measured timing does.
+
+Nesting one more `mergeAllˢ nothing (ofˢ [strmˢ …])` around a program, hot slot
+with one arrival:
+
+| program | spec side | impl side |
+|---|---|---|
+| `of[1]` | 17 ms | 16 ms |
+| one merge around it | 46 ms | 248 ms |
+| two | > 10 s | > 10 s |
+| `switchAll` twice | 9.8 s | > 10 s |
+| `map-merge` of `of` over the input | 337 ms | 1.6 s |
+| … with one merge inside the lane | > 10 s | 3.8 s |
+
+So a user-level flattener costs a factor of roughly 200 per level. The elaborated
+lane is itself a `mergeObsᵛ` fold of `mergeAllᵉ`s, so one author flattener is
+several evaluator flatteners. Depth-two random programs time out on BOTH sides,
+and the spec side is frozen — the sweep's reach is depth one.
+
+What the impl pipeline adds, on two slow depth-one cases (a flattener over three
+inners):
+
+| pipeline | case A | case B |
+|---|---|---|
+| spec run, batched in Agda | 1.3 s | 0.7 s |
+| + in-machine `mapᵉ groupEmitᵇ` per emit | 2.3 s | 1.2 s |
+| + `batchSyncᵉ` at the root | 8.0 s | 6.3 s |
+| `mergeAllᵉ` of the run with `emptyᵉ` at the root, then `mapᵉ` | 15 s | 11 s |
+
+One flattener ABOVE the whole run multiplies it by about seven. `batchSyncᵉ` is
+about four. The Tm-level batching itself is about one second.
+
+What that leaves the sweep, seed 1 depth 1, each case run alone:
+
+| sweep | wall clock |
+|---|---|
+| `QC='1 15 1'` whole, through `make qc-fast` | 16 s |
+| cases 1–30 but 16, each | 16 ms – 10 s |
+| case 16, spec side alone | > 120 s |
+| case 16, impl side alone | > 120 s |
+| `QC='1 30 1'` whole | > 300 s |
+
+Case 16 is `switchAllˢ` over a `scanˢ` whose accumulator is itself a
+`switchAllˢ` — two flatteners nested at depth one, since `scanˢ` carries a
+stream. The frozen spec side alone exceeds the two-minute cap on it, so the
+cap fixes the sweep at the first fifteen cases of seed 1.
