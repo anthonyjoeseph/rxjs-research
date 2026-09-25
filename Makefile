@@ -178,7 +178,7 @@ help:
 	@echo "                  make oracle                   (full seed sweep)"
 	@echo "                  make oracle ARGS='--seed 1'   (ONE seed only)"
 	@echo "                  make oracle ARGS='--operator mergeAll'"
-	@echo "  qc-build      compile the all-Agda QuickCheck binary (agda/_cli/QuickCheck)"
+	@echo "  qc-build      compile the all-Agda QuickCheck binary ($(ORACLE_BIN)/QuickCheck)"
 	@echo "  quickcheck    all-Agda QuickCheck: impl- vs spec-batchSimultaneous"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
@@ -1624,8 +1624,14 @@ oracle-pinned: $(ORACLE_BIN)/Main
 	  (cd typescript && AGDA_CLI_BIN=$(CURDIR)/$(ORACLE_BIN)/Main npm run --silent oracle -- --cases "../$$f") || exit 1; \
 	done
 
-qc-build: stripped
-	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/QuickCheck.agda)
+# ON THE ORACLE'S TREE, termination checking off: the binary samples the
+# evaluator's values, and the tower is what checks it terminates.
+$(ORACLE_BIN)/QuickCheck: $(AGDA_SRC) scripts/oracle-mirror.py
+	@$(MAKE) --no-print-directory oracle-tree
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/QuickCheck.agda
+	@touch $@
+
+qc-build: $(ORACLE_BIN)/QuickCheck
 
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)

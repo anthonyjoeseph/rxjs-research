@@ -13,8 +13,8 @@
 -- agreement, which is the property the whole campaign is about.
 --
 -- WHY THE PREDICATES ARE BOOLEANS RATHER THAN EQUATIONS.  Agreement is
--- stated on the BATCHED streams, whose payloads are lists of naturals,
--- and it is settled by `Rx.Emit-Eq` -- the same family the QuickCheck
+-- stated on the two sides of the top line, per burst and unwrapped to
+-- raw values, and it is settled by `Rx.Emit-Eq` -- the same family the QuickCheck
 -- binary already decides agreement with, so a cached case and the seed
 -- that found it are answering one question.  Well-formedness is already
 -- a boolean at the protocol automaton, so there was never an equation
@@ -39,22 +39,26 @@ module Implementation.Unit-Test.Prelude where
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.List using (List; []; concat)
+open import Data.List using (List; []; concat; map)
 open import Data.Nat using (ℕ)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Prim using (InstEmit)
-open import Rx.Exp using (Ctx; Closed; Val; natᵗ; listᵗ; takeᵉ; nat̂; inputsBelowᵉ)
-open import Rx.SExp using (SExp; emitᵗ; plainᵏ; Kinds; sharedᵏ; emptyˢ)
-open import Rx.Elaborate using (elaborate)
-open import Rx.Envelope.Decode using (decodeStream)
+open import Rx.Exp using (Ctx; Closed; Val; natᵗ; takeᵉ; nat̂; inputsBelowᵉ)
+open import Rx.SExp using (SExp; plainᵏ; Kinds; sharedᵏ; emptyˢ)
+open import Rx.Elaborate using (elaborateSpec)
+open import Rx.Envelope.Decode using (decodeSpec)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Simul-Slots using (SimulSlots; SimulSlot; sharedˢ; embedSlots)
+open import Rx.Simul-Slots using (SimulSlots; SimulSlot; sharedˢ; embedSlotsSpec)
 open import Rx.Protocol using (wellFormed?)
-open import Rx.Emit-Eq using (eqBatched)
+open import Rx.Emit-Eq using (eqBursts)
+open import Function using (_∘_)
+open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
+open import Spec.Unwrap using (unwrapSpec)
 open import Rx.Batch using (batchSimultaneousᵖ)
+open import Implementation using (foldBursts; batch-init)
 open import Spec using (spec-batchSimultaneous)
 
 -- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
@@ -94,12 +98,12 @@ tOf false = nothing
 -- `k` by construction -- but it is what makes the row a program rather
 -- than a proof obligation.
 slot₀ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 0 natᵗ sharedᵏ
-slot₀ d with tOf (inputsBelowᵉ 0 (elaborate κ₂ d))
+slot₀ d with tOf (inputsBelowᵉ 0 (elaborateSpec κ₂ d))
 ... | just ok = sharedˢ d {ok = ok}
 ... | nothing = sharedˢ emptyˢ
 
 slot₁ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 1 natᵗ sharedᵏ
-slot₁ d with tOf (inputsBelowᵉ 1 (elaborate κ₂ d))
+slot₁ d with tOf (inputsBelowᵉ 1 (elaborateSpec κ₂ d))
 ... | just ok = sharedˢ d {ok = ok}
 ... | nothing = sharedˢ emptyˢ
 
@@ -139,36 +143,48 @@ open Case using (name; fuel; prog; slots)
 -- delivery -- which is the quantity the harness's cost is linear in.
 -- The cap is a harness budget and not part of any program a row names,
 -- so it belongs above the elaboration on those grounds too.
-capProg : Closed Γ₂ᵉ (emitᵗ natᵗ) → Closed Γ₂ᵉ (emitᵗ natᵗ)
+capProg : ∀ {t} → Closed Γ₂ᵉ t → Closed Γ₂ᵉ t
 capProg e = takeᵉ (nat̂ 24) e
 
 -- the run a row names: the author's program elaborated, capped, driven
 -- by the slot table, and decoded back to the envelope stream both
 -- batchings read
 runOf : Case → List (InstEmit (Val Γ₂ᵉ natᵗ))
-runOf c = decodeStream {Γ = Γ₂ᵉ} {a = natᵗ}
-            (concat (evaluate↓ (fuel c) (capProg (elaborate κ₂ (prog c))) (embedSlots (slots c))))
+runOf c = decodeSpec {Γ = Γ₂ᵉ} {a = natᵗ}
+            (concat (evaluate↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c))) (embedSlotsSpec (slots c))))
 
 -- the decoded stream must satisfy the protocol automaton
 -- (evaluate-well-formed, cached case by case)
 wellFormed : Case → Bool
 wellFormed c = wellFormed? (runOf c)
 
--- THE SAME ROW, RUN WITH THE OPERATOR INSIDE THE MACHINE.  This is the
--- left side of `formal-verification-batchSimultaneous`, and it is a
--- second RUN rather than a function applied to the first: the tree is
--- the author's program, elaborated, capped, and wrapped in the plain
--- batching former.  `Val Γ (listᵗ t) = List (Val Γ t)` definitionally,
--- which is why the two sides below meet without a transport.
-batchedOf : Case → List (InstEmit (List (Val Γ₂ᵉ natᵗ)))
-batchedOf c = decodeStream {Γ = Γ₂ᵉ} {a = listᵗ natᵗ}
-                (concat (evaluate↓ (fuel c)
-                          (batchSimultaneousᵖ (capProg (elaborate κ₂ (prog c))))
-                          (embedSlots (slots c))))
+-- THE TWO SIDES OF `formal-verification-batchSimultaneous`, ON ONE ROW.
+-- Each is a RUN, capped the same way: the left runs the impl pipeline
+-- with the batching operator inside the machine; the right runs the
+-- frozen spec pipeline and batches each burst in Agda.  Both answer per
+-- burst, in raw values, so neither side's envelope reaches the verdict.
+implBurstsOf : Case → List (List (List ℕ))
+implBurstsOf c =
+  map (unwrapImpl {Γ = Γ₂ᵉ} {a = natᵗ})
+      (evaluate↓ (fuel c)
+                 (batchSimultaneousᵖ (capProg (elaborateImpl κ₂ (prog c))))
+                 (embedSlotsImpl (slots c)))
 
--- THE MACHINE'S BATCHING AND THE SPEC'S MUST AGREE.  The old shape fed
--- ONE stream to two Agda functions and so tested no evaluator at all;
--- this compares a run of the batching program against the spec applied
--- to the run without it.
+specBurstsOf : Case → List (List (List ℕ))
+specBurstsOf c =
+  map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec {Γ = Γ₂ᵉ} {a = natᵗ})
+      (evaluate↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c)))
+                 (embedSlotsSpec (slots c)))
+
 agrees : Case → Bool
-agrees c = eqBatched (batchedOf c) (spec-batchSimultaneous (runOf c))
+agrees c = eqBursts (implBurstsOf c) (specBurstsOf c)
+
+-- `The-Proof.burst-agreement`'s left side on one row: the protocol fold,
+-- burst by burst, over the spec pipeline's decoded run
+metaBurstsOf : Case → List (List (List ℕ))
+metaBurstsOf c =
+  map unwrapSpec
+      (foldBursts batch-init
+         (map (decodeSpec {Γ = Γ₂ᵉ} {a = natᵗ})
+              (evaluate↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c)))
+                         (embedSlotsSpec (slots c)))))

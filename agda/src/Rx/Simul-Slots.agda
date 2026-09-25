@@ -50,7 +50,7 @@ open import Rx.Prim using (ObservableInput)
 open import Rx.Exp  using (Ty; Ctx; Val; isData; inputsBelowᵉ)
 open import Rx.SExp using (SExp; Kind; Kinds; scriptedᵏ; sharedᵏ;
                            slotTy; plainᵏ; plainᵗ)
-open import Rx.Elaborate using (elaborate)
+open import Rx.Elaborate using (elaborateSpec)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 
 -- slot i of Γ, as the AUTHOR states it.  The kind index is the last
@@ -72,7 +72,7 @@ data SimulSlot {n} (Γ : Ctx n) (κ : Kinds n) (k : ℕ) (t : Ty)
   -- stratification side condition is charged on the ELABORATION,
   -- since that is the tree the evaluator's measure walks.
   sharedˢ   : (d : SExp Γ [] [] [] t)
-            → {ok : T (inputsBelowᵉ k (elaborate κ d))}
+            → {ok : T (inputsBelowᵉ k (elaborateSpec κ d))}
             → SimulSlot Γ κ k t sharedᵏ
 
 SimulSlots : ∀ {n} (Γ : Ctx n) (κ : Kinds n) → Set
@@ -83,9 +83,9 @@ SimulSlots Γ κ = ∀ i → SimulSlot Γ κ (toℕ i) (lookup Γ i) (lookup κ 
 -- a field of a record every evaluator module had to be parameterised
 -- by.  Nothing downstream of `Rx.Slots` changes; a statement simply
 -- quantifies over `SimulSlots` and runs this.
-embedSlots : ∀ {n} {Γ : Ctx n} {κ : Kinds n}
-           → SimulSlots Γ κ → Slots (plainᵏ Γ κ)
-embedSlots {Γ = Γ} {κ = κ} ins i =
+embedSlotsSpec : ∀ {n} {Γ : Ctx n} {κ : Kinds n}
+               → SimulSlots Γ κ → Slots (plainᵏ Γ κ)
+embedSlotsSpec {Γ = Γ} {κ = κ} ins i =
   subst (Slot (plainᵏ Γ κ) (toℕ i))
         (sym (lookup-zipWith slotTy i Γ κ))
         (go (lookup κ i) (ins i))
@@ -93,4 +93,4 @@ embedSlots {Γ = Γ} {κ = κ} ins i =
     go : ∀ kd → SimulSlot Γ κ (toℕ i) (lookup Γ i) kd
        → Slot (plainᵏ Γ κ) (toℕ i) (slotTy (lookup Γ i) kd)
     go scriptedᵏ (scriptedˢ {ok = ok} inp) = scripted {ok = ok} inp
-    go sharedᵏ   (sharedˢ d {ok = ok})     = shared (elaborate κ d) {ok = ok}
+    go sharedᵏ   (sharedˢ d {ok = ok})     = shared (elaborateSpec κ d) {ok = ok}

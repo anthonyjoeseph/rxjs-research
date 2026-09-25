@@ -9,7 +9,7 @@
   "scripts": {
     "oracle": "bash scripts/run-oracle.sh",
     "agda:cli": "cd ../agda && agda --compile --compile-dir=_cli src/CLI/Main.agda",
-    "agda:qc": "cd ../agda && agda --compile --compile-dir=_cli src/QuickCheck.agda",
+    "agda:qc": "cd .. && make qc-build",
     "typecheck": "tsc",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",

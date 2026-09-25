@@ -65,7 +65,7 @@ open import Rx.Exp      using (Ctx; Closed; Val; []ᵉ)
 open import Rx.Elaborated using (Elabᵉ; Elabˢ)
 open import Rx.Slots using (Slots)
 open import Rx.Envelope using (machineEmitᵗ)
-open import Rx.Envelope.Decode using (decodeStream)
+open import Rx.Envelope.Decode using (decodeSpec)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Stream;
   chainsOf; arrSource; sched-init; st-init; root; sched-next;
   schedGo)
@@ -96,7 +96,7 @@ concat-++ (xs ∷ xss) yss =
 
 decodeStream-++ : ∀ {n} {Γ : Ctx n} {a}
   (xs ys : List (PlainEvent (Val Γ (machineEmitᵗ a)))) →
-  decodeStream (xs ++ ys) ≡ decodeStream xs ++ decodeStream ys
+  decodeSpec (xs ++ ys) ≡ decodeSpec xs ++ decodeSpec ys
 decodeStream-++ []              ys = refl
 decodeStream-++ (valueᵖ e ∷ xs) ys = cong (_ ∷_) (decodeStream-++ xs ys)
 decodeStream-++ (completeᵖ ∷ xs) ys = decodeStream-++ xs ys
@@ -186,7 +186,7 @@ postulate
     Elabˢ ins →
     Σ ProtocolSt λ S₀ →
         WellShaped protocol-init
-          (decodeStream (concat out)) S₀
+          (decodeSpec (concat out)) S₀
       × Owes st₀ S₀
       -- AND THE TABLE SURVIVES THE WALK.  The premise arrives on `ins`
       -- and the drain reads it off `Sched.slots sched₀`, so somebody
@@ -230,7 +230,7 @@ postulate
     cascade⇓ {e = e} ar sched′ st (out , sched″ , st′) →
     Elabˢ (Sched.slots sched′) →
     Σ ProtocolSt λ S′ →
-        WellShaped S (decodeStream (concat out)) S′
+        WellShaped S (decodeSpec (concat out)) S′
       × Owes st′ S′
       -- the cascade may install nodes and enlist sources; it does not
       -- rewrite the telescope, so the premise is handed on
@@ -270,7 +270,7 @@ drain-shaped :
   Owes {e = e} st S →
   drain⇓ {e = e} fuel sched st rest →
   Elabˢ (Sched.slots sched) →
-  Σ ProtocolSt λ S′ → WellShaped S (decodeStream (concat rest)) S′
+  Σ ProtocolSt λ S′ → WellShaped S (decodeSpec (concat rest)) S′
 drain-shaped {S = S} el ow drain-done      es = S , ws-nil
 drain-shaped {S = S} el ow (drain-empty _) es = S , ws-nil
 drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} eqn c d) es
@@ -280,9 +280,9 @@ drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} eqn c d) es
 ...   | S″ , wsRest =
       S″ , subst (λ z → WellShaped S z S″) (sym dEq) (ws-++ wsOut wsRest)
       where
-      dEq : decodeStream (concat (out ++ rest))
-              ≡ decodeStream (concat out) ++ decodeStream (concat rest)
-      dEq = trans (cong decodeStream (concat-++ out rest))
+      dEq : decodeSpec (concat (out ++ rest))
+              ≡ decodeSpec (concat out) ++ decodeSpec (concat rest)
+      dEq = trans (cong decodeSpec (concat-++ out rest))
                   (decodeStream-++ (concat out) (concat rest))
 
 ------------------------------------------------------------------
@@ -325,7 +325,7 @@ run-wellFormed⇓ :
     {ins : Slots Γ} (s : Stream Γ (machineEmitᵗ a)) →
   Elabᵉ e → Elabˢ ins →
   evaluate⇓ fuel e ins s →
-  Accepted (runProtocol protocol-init (decodeStream (concat s)))
+  Accepted (runProtocol protocol-init (decodeSpec (concat s)))
 run-wellFormed⇓ {Γ = Γ} {a = a} _ el es
     (eval-run {out = out} {rest = rest} sub dr)
   with subscribe-shaped el sub es
@@ -336,9 +336,9 @@ run-wellFormed⇓ {Γ = Γ} {a = a} _ el es
                                  (sym dEq)
                                  (ws-++ wsOut wsRest))
       where
-      dEq : decodeStream (concat (out ++ rest))
-              ≡ decodeStream (concat out) ++ decodeStream (concat rest)
-      dEq = trans (cong decodeStream (concat-++ out rest))
+      dEq : decodeSpec (concat (out ++ rest))
+              ≡ decodeSpec (concat out) ++ decodeSpec (concat rest)
+      dEq = trans (cong decodeSpec (concat-++ out rest))
                   (decodeStream-++ (concat out) (concat rest))
 
 run-wellFormed :
@@ -346,6 +346,6 @@ run-wellFormed :
     (ins : Slots Γ) →
   Elabᵉ e → Elabˢ ins →
   Accepted (runProtocol protocol-init
-             (decodeStream (concat (evaluate↓ fuel e ins))))
+             (decodeSpec (concat (evaluate↓ fuel e ins))))
 run-wellFormed fuel e ins el es =
   run-wellFormed⇓ _ el es (proj₂ (evaluate! fuel e ins))

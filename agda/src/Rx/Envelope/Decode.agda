@@ -87,9 +87,9 @@ decodeEmit {Γ = Γ} (evs , inst , src , k) =
 -- the rxjs-level signal beside it.  Were the two independent, this
 -- clause would have to SYNTHESISE an emit and there would be no
 -- instant to give it.
-decodeStream : ∀ {n} {Γ : Ctx n} {a}
-             → List (PlainEvent (Val Γ (instEmitᵗ uniqᵗ a)))
-             → List (InstEmit (Val Γ a))
-decodeStream []               = []
-decodeStream (valueᵖ e ∷ es)  = decodeEmit e ∷ decodeStream es
-decodeStream (completeᵖ ∷ es) = decodeStream es
+decodeSpec : ∀ {n} {Γ : Ctx n} {a}
+           → List (PlainEvent (Val Γ (instEmitᵗ uniqᵗ a)))
+           → List (InstEmit (Val Γ a))
+decodeSpec []               = []
+decodeSpec (valueᵖ e ∷ es)  = decodeEmit e ∷ decodeSpec es
+decodeSpec (completeᵖ ∷ es) = decodeSpec es

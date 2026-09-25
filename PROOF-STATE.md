@@ -181,14 +181,16 @@ the row is DIFFICULTY.
 
 ```
 formal-verification-batchSimultaneous    The-Proof.agda — a REAL body over
- │                                        three leaves
- ├─ batchSimultaneousᵖ                    Rx/Batch.agda — a REAL body:
- │                                        scan for the state, mergeMap→EMPTY
- │                                        for the silence — tier 2 finishes it
+ │                                        two leaves; impl pipeline against
+ │                                        spec pipeline, per burst, raw values
+ ├─ batchSimultaneousᵖ, Implementation.Pipeline
+ │                                        the impl side — tier 2 finishes it
  ├─ batch-transcription                   that operator's run computes
- │                                        step-batch — tier 3
- └─ elaborated-accepted                   PROVEN, over run-wellFormed, whose
-     └─ subscribe-shaped, cascade-shaped   two leaves are tier 3
+ │                                        foldBursts — tier 3
+ └─ burst-agreement                       foldBursts agrees with the spec per
+     │                                    burst — tier 3; its body is owed
+     └─ elaborated-accepted               PROVEN, over run-wellFormed, whose
+         └─ subscribe-shaped, cascade-shaped   two leaves are tier 3
 
   batch-agreement, batch-online           PROVEN; claimed by Main in their own
                                           right — nothing above consumes them
@@ -214,144 +216,55 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — the plain evaluator mirrors rxjs
+## Tier 2 — an impl envelope the spec batches agree with
 
-**THIS TIER HAS NOTHING TO DO WITH SRXJS.** No `SExp`, no elaboration, no
-envelope, no simul variant of anything. The question is whether `Rx.Exp` and
-its evaluator mirror plain rxjs, and the judge is the TypeScript differential
-harness: `prop-test.ts` draws a program, runs it through ordinary rxjs
-operators in `plain-eval.ts`, runs the same program
-through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
-VALUES exactly.
+**THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `Rx.SExp` and the evaluator
+are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
+close without changing one of them, STOP and report that proof. Suspicion is
+not proof.
 
-**DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
-proof half holds no postulate, and the oracle runs in CI beside the gate.
-Neither half may be narrowed to pass. **Nor does the tier close, or its branch
-merge, until a 3M-case local sweep has come back and every crash in it has been
-investigated (Anthony).**
-
-### The monster
-
-`sharedConnect⇓` — a share emitting during its own connect serves the wrong
-set of subscribers, so every reader that emission was supposed to reach is
-served by nobody.
-
-Worth killing because the region's three conditions are one clause, not three
-facts: a hot-fed share agrees since a cascade folds one arrival at a time, one
-synchronous value since one observer is all there is, and re-entry is needed
-since only a subscriber the burst creates is absent when handed back. Every
-swept case matches. Ruled out: a
-fan-out re-entering its merge unconnected (`Rx.Evaluator.Reducible.Floor`); a
-connect registering the caller's chain, for paths agreeing with it
-(`Rx.Evaluator.Reducible.Rule-Kept`).
-
-also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg moves, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
-also: `evaluate!` — same, its inhabitation.
-also: `chainStep!` — same; the arrival side folds a registry path under the raw continuation, which is the connect's own apparatus reached from the schedule.
-also: `run-wellFormed⇓` — same, the one proof that reads the runner's stream.
-also: `subscribe-shaped` — same; its conclusion follows the result type, which is the narrowing stated where that proof consumes it.
-also: `reducible` — its inhabitation, and every member of its block: the connect arm is the one strict edge on the room, and every other member is funded by the peel it makes or by a budget under it.
-also: `putLines` — the CLI's per-case writer, which is what lets the sweep count a case reaching a guard rather than end on it; the sweep is how this tier's monster is measured, and no proof reads it.
-also: `main` — same, the CLI's entry point, which now writes through it.
-also: `formal-verification-batchSimultaneous` — Tier 3's top line, whose operator body is Anthony's upper-tier work on this branch; another tier's, admitted at his discretion.
-also: `batch-online` — same, the online property Main asserts beside the main theorem, proven by Anthony.
-also: `run-wellFormed` — same, the input-well-formed top line, which the subscribe carrier's port reached.
-
-### Big picture tier roadmap
-
-- **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
-  frame what `Sound`'s `distinct` now carries for the whole path; drop
-  the copy, so the standing ground says nothing the rule does not.
-
-- **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
-  STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
-  what the group it hands on reaches, and the argument for it is that a
-  frame which subscribed sent those values while it ran, before the group it
-  passes on existed. A probe instantiating the fold at the exchanged pair
-  decides it — and decides it alone, rather than through three simultaneous
-  changes to the corpus.
-
-- **WHAT THE SINGLETON FOLD COSTS `batchSync`, NOW THAT THE FAN-OUT RUNS.**
-  The value walk hands a subscriber one value per `foldPath⇓`, and the one
-  former that can see a burst reads the whole of it: the sync bit turns a
-  subscribe frame's values into a single group, so a per-value walk turns them
-  into one group each. Either the bit is the wrong state for it to hold — rxjs
-  batches by TICK, and a burst is only this evaluator's stand-in for one — or
-  the walk hands a subscriber its whole entitled suffix and loses the
-  interleave. Measurable as soon as the sweep runs on the landed evaluator,
-  because a connect now folds to the sink and the walk is reached.
-
-- **THE ORACLE HAS TWO SIDES AND BOTH ARE AUTHORITIES (Anthony).** The compiled
-  Agda and plain rxjs, and nothing else may stand on either: a hand-written
-  transcription of the evaluator on the machine side makes the comparison one
-  between two things this repo authored, which is green for reasons that say
-  nothing about rxjs. `plain-eval.ts` is one rxjs operator per former by
-  construction, and a former that cannot be written as one is the finding it
-  exists to make. So a carrier is measured by transcribing it into the Agda and
-  running the oracle, never by a second machine in the TypeScript.
-
-### The ledger
-
-(empty — every statement this tier's proof half stands on is proven; what
-remains is the oracle's half.)
-
-## Tier 2 — finish `batchSimultaneousᵖ`
-
-**THE OPERATOR HAS A BODY AND THE BODY IS HONEST ABOUT WHAT IT SKIPS.**
-`Rx.Batch` is a `scanᵉ` carrying `BatchStᵗ` behind a `mergeAllᵉ` to `emptyᵉ` —
-scan for the state, mergeMap→EMPTY for the silence, since a batcher is one
-value in and ZERO OR ONE out. Two things are deliberately missing, both named
-in that file: the owed/live arithmetic that decides WHEN an instant flushes,
-and the final flush, `scanᵉ` having no end hook.
-
-**DONE IS THE AGDA QUICKCHECK PASSING FULLY.** `QuickCheck.agda` draws an
-`SExp`, runs the batching operator inside the machine, and compares against
-`spec-batchSimultaneous` applied to the run without it — so it is exactly the
-match this tier is for, and it decides the tier rather than merely informing
-it.
-
-**STOP AND REPORT if this work turns out to need a new former in `Rx.Exp`.**
-Not a suspicion — only if there is provably no way around it. The vocabulary
-is small on purpose and every addition is a forgery surface.
+The top line runs two pipelines over one author program: the frozen spec side
+(`elaborateSpec`, `embedSlotsSpec`, `decodeSpec`, `Spec.Unwrap`) and
+`Implementation.Pipeline`, which is free, together with `Rx.Batch`. They meet
+per burst, in raw values. **DONE IS THE AGDA QUICKCHECK PASSING FULLY** on
+that comparison. `make agda-dev` is the check here, not the gate (Anthony). A
+dead envelope shape is a `DEAD ROUTE` in `Implementation.Pipeline`'s header,
+citing the bug-cache row that killed it.
 
 ### The monster
 
-(no monster) — the tier is one operator's body against one executable check.
-There is no declaration here whose falsity a cone could bound.
+(no monster) — the tier is one operator and its envelope against one
+executable check. There is no declaration here whose falsity a cone could
+bound.
 
 ### Big picture tier roadmap
+
+- **PROBE THE PER-BURST STATEMENT'S TWO PRECONDITIONS, BEFORE ANY OPERATOR
+  WORK.** Applying the spec per burst is right only if no spec instant spans
+  two bursts, and the two runs can only match if they have equally many
+  bursts. Sweep both with the compiled QuickCheck. If the first fails, no
+  operator can pass, and that is a finding for Anthony, not a bug to fix.
 
 - **THE OWED/LIVE ARITHMETIC INTO `BatchStᵗ`.** `Rx.Protocol`'s automaton run
   in producing mode: `live` as a `listᵗ uniqᵗ`, `owed` as a
-  `listᵗ (uniqᵗ ×ᵗ natᵗ)`, both data, so both are `Ty`s and the carrier just
-  grows fields. The pending slot is already where a flush announces itself, so
-  this is filling in rather than reshaping. `settleBatch` / `applyBatch` /
-  `paidOff` in `typescript/src/batch-simultaneous.ts` are the reference, and
-  `Implementation.step-batch` is the Agda twin to agree with.
+  `listᵗ (uniqᵗ ×ᵗ natᵗ)`, both data. `Implementation.step-batch` is the twin
+  to agree with. This is what moves a batch into the burst that paid it off,
+  instead of the burst whose next instant flushes it.
 
-- **`complete` AS A FLUSH TRIGGER.** The missing end hook. `splitEventsᵛ`
-  already returns the completion flag this code ignores, so the source's own
-  completion can close the open batch — which is what `foldBatch`'s terminal
-  `flushBatch` does over a list. Worth doing second: it is only observable
-  once the owed arithmetic has stopped flushing late.
+- **DRIVE THE QUICKCHECK TO GREEN, RESHAPING THE IMPL ENVELOPE WHERE THE
+  OPERATOR CANNOT SEE ENOUGH.** Every failure is a bug-cache row; every
+  envelope shape abandoned is a `DEAD ROUTE` naming one. A new envelope lands
+  as new bodies in `Implementation.Pipeline`, never as an edit to the spec
+  side.
 
-- **DRIVE THE QUICKCHECK TO GREEN.** The sweep can RUN now — the GHC backend
-  had nothing to compile while the operator was a postulate, so this leg is
-  the first time the match has ever been executed. Expect the first failures
-  to be in the generator's reach rather than in the operator, and cache
-  counterexamples as rows in `Implementation.Unit-Test` as they are found.
-
-- **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false`. Its own note
-  gives two reasons for the disable and BOTH are now spent — the machine it
-  swept has been replaced and the replacement runs, and the elaborator arm it
-  named as permanently red is no longer a postulate. What keeps it off is the
-  operator, so this is the leg that closes the tier: the check that decides
-  tier 2 is the check that then guards it. Nothing in the job may be narrowed
-  to make it pass.
+- **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
+  from the oracle's tree, as `qc-build` now does. This leg closes the tier:
+  the check that decides tier 2 then guards it. Nothing in the job may be
+  narrowed to make it pass.
 
 ### The ledger
 
-(empty — `batchSimultaneousᵖ` is a definition, not a postulate.)
+(empty — the tier's work is definitions, not postulates.)
 
 
 ## Tier 3 — the two run leaves, and the transcription
@@ -411,10 +324,11 @@ definition rather than a postulate, so its cone is real.
   expected if there is one — cut it into commits by FORMER, and report rather
   than push if two consecutive formers each undo the previous one's fix.
 
-- **`batch-transcription` OVER THE FINISHED OPERATOR.** Blocked until tier 2
-  lands: the equation's right side is `foldBatch`, whose flush points the
-  current body does not have, so the statement is FALSE rather than merely
-  unproven. Its header says so.
+- **`batch-transcription` OVER THE FINISHED OPERATOR, AND `burst-agreement`'S
+  BODY.** The first is blocked until tier 2 lands: its right side is
+  `foldBursts`, whose flush points the current body does not have. The second
+  is `fold-agree` cut at burst boundaries, over `elaborated-accepted` and a
+  leaf saying each burst of an elaborated run ends paid off.
 
 - **`subscribe-shaped` LAST.** Deliberately. `st-init`'s registry and
   `protocol-init`'s live set are both empty, so the seed is trivial and the
@@ -427,6 +341,9 @@ definition rather than a postulate, so its cone is real.
 - **`batch-transcription`** (The-Proof) — FALSITY, `NO EVIDENCE`: false against
   the landed operator until tier 2 finishes it; its locality argument also
   needs re-establishing over `mergeAllᵉ`.
+- **`burst-agreement`** (The-Proof) — FALSITY, `NO EVIDENCE`: false if a spec
+  instant spans two bursts; its body is owed over `elaborated-accepted` and a
+  settledness leaf.
 - **`cascade-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: the per-former
   split, and the `EvalSt` node-provenance invariant it is probably still
   missing.

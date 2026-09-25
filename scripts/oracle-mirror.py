@@ -29,7 +29,7 @@ cache -- an edit to the proof leaves the binaries standing.  The files hashed
 are the STRIPPED ones, so a comment edit invalidates nothing either.
 
   oracle-mirror.py --sync   write the tree (only files whose content changed)
-  oracle-mirror.py --key    print the cache key: a hash of the cone as synced
+  oracle-mirror.py --key    print the cache key: a hash of the runners' cone
 """
 from __future__ import annotations
 
@@ -43,6 +43,11 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MIRROR = os.path.join(REPO, "agda", "_stripped-comments", "src")
 DEST = os.path.join(REPO, "agda", "_oracle")
 ROOTS = ["CLI.Main", "Implementation.Unit-Test.Bug-Cache"]
+# IN THE TREE, NOT IN THE KEY.  The QuickCheck binary is a dev loop, not a
+# runner CI caches, so its cone is synced beside the runners -- one `_build`,
+# shared interfaces, the same termination-off options -- while an edit to it
+# leaves the cached runners standing.
+SYNC_ONLY = ["QuickCheck"]
 PRAGMA = "{-# OPTIONS --erasure --no-termination-check #-}\n"
 MARK, ERASED = "{-@0-}", "@0 "
 LIB = ("name: rxjs-research-oracle\n"
@@ -59,10 +64,10 @@ def _check_imports():
     return mod
 
 
-def cone() -> dict[str, str]:
+def cone(roots: list[str]) -> dict[str, str]:
     """Module-relative path -> stripped content, for every module the roots reach."""
     ci = _check_imports()
-    out, stack = {}, list(ROOTS)
+    out, stack = {}, list(roots)
     while stack:
         mod = stack.pop()
         rel = mod.replace(".", os.sep) + ".agda"
@@ -72,7 +77,7 @@ def cone() -> dict[str, str]:
         text = open(path, encoding="utf-8").read()
         out[rel] = text
         stack += [d.mod for d in ci.parse(ci.strip_comments_checked(text))]
-    missing = [r for r in ROOTS if r.replace(".", os.sep) + ".agda" not in out]
+    missing = [r for r in roots if r.replace(".", os.sep) + ".agda" not in out]
     if missing:
         sys.exit(f"oracle-mirror: no mirror file for {missing} -- run `make stripped` first")
     return out
@@ -119,11 +124,12 @@ def main() -> int:
     g.add_argument("--sync", action="store_true")
     g.add_argument("--key", action="store_true")
     a = ap.parse_args()
-    files = cone()
+    files = cone(ROOTS)
     if a.sync:
+        files = cone(ROOTS + SYNC_ONLY)
         sync(files)
         marks = sum(t.count(MARK) for t in files.values())
-        print(f"oracle-mirror: {len(files)} modules in the runners' cone, "
+        print(f"oracle-mirror: {len(files)} modules in the tree, "
               f"{marks} erasure markers")
     else:
         print(key(files))

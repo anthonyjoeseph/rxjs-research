@@ -875,7 +875,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 -- happen is between two stamps of the SAME run, which the two agree on
 -- exactly.  So the difference is reachable by no program, and the
 -- binder is the tighter of the two rather than a divergence.
-elaborate : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {Δᵍ Δ : List Ty} {t : Ty}
-          → SExp Γ Δᵍ Δ [] t
-          → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) [] (emitᵗ t)
-elaborate κ e = mintᵉ (toPlain κ e)
+elaborateSpec : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {Δᵍ Δ : List Ty} {t : Ty}
+              → SExp Γ Δᵍ Δ [] t
+              → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) [] (emitᵗ t)
+elaborateSpec κ e = mintᵉ (toPlain κ e)

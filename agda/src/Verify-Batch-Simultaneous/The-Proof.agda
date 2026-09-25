@@ -5,12 +5,12 @@ open import Data.Unit    using (tt)
 open import Data.Nat     using (suc; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; n≤1+n; ≤-refl; 1+n≰n)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.List    using (List; []; _∷_; _++_; concat)
+open import Data.List    using (List; []; _∷_; _++_; concat; map)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
-open import Function     using (_∋_)
+open import Function     using (_∋_; _∘_)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
@@ -18,10 +18,12 @@ open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as
   EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted)
 open import Rx.Exp                using (Ctx)
 open import Rx.SExp               using (SExp; Kinds)
-open import Rx.Elaborate          using (elaborate)
+open import Rx.Elaborate          using (elaborateSpec)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Simul-Slots using (SimulSlots; embedSlots)
+open import Rx.Envelope.Decode using (decodeSpec)
+open import Rx.Simul-Slots using (SimulSlots; embedSlotsSpec)
+open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
+open import Spec.Unwrap using (unwrapSpec)
 open import Rx.Elaborated using (elab-mint; elab-toPlain; elab-slots)
 open import Verify-Input-Well-Formed.Run-Well-Formed using (run-wellFormed)
 open import Rx.Batch using (batchSimultaneousᵖ)
@@ -33,7 +35,7 @@ open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runPro
 -- a using-list short is the trade `make dup-check` exists to refuse.
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
-open import Implementation        using (foldBatch;
+open import Implementation        using (foldBatch; foldBursts;
                                          step-batch; flushBatch; closeBatch;
                                          settleBatch; applyBatch;
                                          batch-init; BatchSt; OpenBatch)
@@ -1119,7 +1121,7 @@ batch-agreement xs acc =
 -- `settle` seeds owed from `countIn s []`, which is zero, and
 -- `payOwed` underflows.  So the statement is FALSE at `Closed` and
 -- cannot be repaired by proving it; it is true only in the image of
--- `elaborate`, and saying so by SCOPE costs no hypothesis and leaves
+-- `elaborateSpec`, and saying so by SCOPE costs no hypothesis and leaves
 -- nothing downstream carrying a side condition.
 --
 -- AND THE TABLE IS SAID BY SCOPE TOO, WHICH IS WHAT LET THIS BECOME A
@@ -1127,7 +1129,7 @@ batch-agreement xs acc =
 -- definition reaches the wire unwrapped and the same hand-built emit
 -- inhabits the table as well as the root.  `SimulSlots` is not: its
 -- shared definitions are `SExp`s and reach the evaluator only through
--- `embedSlots`, which is `elaborate`.  So BOTH sides of the run are in
+-- `embedSlotsSpec`, which is `elaborateSpec`.  So BOTH sides of the run are in
 -- the elaboration's image, and neither costs a hypothesis here.
 --
 -- THE BODY IS THE JOIN, AND IT IS THREE LINES BECAUSE THE WORK IS IN
@@ -1149,78 +1151,98 @@ elaborated-accepted :
   ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
     (ins : SimulSlots Γ κ) →
   Accepted (runProtocol protocol-init
-             (decodeStream (concat (evaluate↓ fuel (elaborate κ e) (embedSlots ins)))))
+             (decodeSpec (concat (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins)))))
 elaborated-accepted κ fuel e ins =
-  run-wellFormed fuel (elaborate κ e) (embedSlots ins)
+  run-wellFormed fuel (elaborateSpec κ e) (embedSlotsSpec ins)
                  (elab-mint (elab-toPlain κ e))
                  (elab-slots refl ins refl)
 
--- THE TRANSCRIPTION LEAF: THE NODE COMPUTES THE FOLD.  This is the
--- only place the evaluator and the batcher meet.  Given acceptance,
--- fan-out exactness settles an instant's owed count inside the cascade
--- that minted it, so the accumulator is EMPTY at every `drain-step`
--- boundary and the induction is per cascade rather than over the whole
--- run.
+-- THE TRANSCRIPTION LEAF: THE NODE COMPUTES THE FOLD, BURST BY BURST.
+-- This is the only place the evaluator and the batcher meet.  The right
+-- side is `foldBursts`, the online fold carrying its state across burst
+-- boundaries and never flushing at the end -- which is all a machine
+-- answering each burst before the next arrives can do.
 --
 -- IT IS FALSE AS IT STANDS, AND SAYING SO IS THE POINT OF THIS NOTE.
--- The right side is `foldBatch`, which flushes mid-stream on `paidOff`
--- and flushes the open tail at the end; `Rx.Batch`'s body flushes only
--- when a LATER instant arrives and has no end hook at all.  Both gaps
--- are named in that file.  This is not a hard proof waiting for
--- effort -- it is an equation waiting for its left side, and attempting
--- it before the operator is finished is wasted work.
+-- `Rx.Batch`'s body flushes only when a LATER instant arrives, so an
+-- instant's batch lands in the NEXT burst, or never; `foldBursts`
+-- flushes on `paidOff`, inside the burst.  This is not a hard proof
+-- waiting for effort -- it is an equation waiting for its left side,
+-- and attempting it before tier 2 finishes the operator is wasted work.
 --
--- AND THE LOCALITY ARGUMENT NEEDS RE-ESTABLISHING.  This header used to
--- read "it is local because `batchSimultaneousᵖ` is a scan -- one emit
--- in, one emit out, no schedule of its own".  The operator is now
+-- AND THE LOCALITY ARGUMENT NEEDS RE-ESTABLISHING.  The operator is
 -- `mergeAllᵉ ∘ mapᵉ ∘ scanᵉ`, because a batcher must be able to DECLINE
 -- to emit and a scan cannot; `mergeAllᵉ` carries a `mergeAll-st` with a
--- queue and an active count, so locality is a lemma now rather than an
+-- queue and an active count, so locality is a lemma rather than an
 -- observation.  It should still hold: `hasRoom nothing active = true`,
 -- so at unlimited concurrency nothing is ever queued and each
--- synchronous inner drains inside the cascade that opened it.  That is
--- the first thing to prove here, and `cascade-shaped` wants it too.
+-- synchronous inner drains inside the cascade that opened it -- which
+-- is also what keeps the two runs' bursts in step.
 --
 -- WHAT IT IS NOT is a claim about batching.  It says the machine runs
--- `step-batch`, nothing more; that `step-batch` is correct is
--- `batch-agreement`, over a bare list, with no evaluator in scope.
--- Keeping those two apart is what stops the online-versus-clairvoyant
--- argument from being re-derived inside the cascade structure.
+-- `step-batch`, nothing more; that `step-batch` agrees with the spec is
+-- `burst-agreement`, with no evaluator in scope.
 postulate
   batch-transcription :
     ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
       (ins : SimulSlots Γ κ) →
-    decodeStream (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborate κ e)) (embedSlots ins)))
-      ≡ foldBatch batch-init
-          (decodeStream (concat (evaluate↓ fuel (elaborate κ e) (embedSlots ins))))
+    map unwrapImpl
+        (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins))
+      ≡ map unwrapSpec
+          (foldBursts batch-init
+             (map decodeSpec (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))
 
--- THE verified object, end to end: for every SRXJS program, running
--- the batching operator INSIDE the machine agrees with batching its
--- rendered stream mathematically.  A real definition again -- the
--- proof IS the composition of the three leaves above with
--- `batch-agreement`, which is a proven lemma and stays one.
+-- THE ONLINE FOLD AGREES WITH THE SPEC, ONE BURST AT A TIME.  Over the
+-- whole stream this is `batch-agreement`, proven; what is new is the
+-- cut at burst boundaries, and it needs a fact about the RUN that
+-- acceptance does not carry: no instant is still owed when its burst
+-- ends.  Acceptance alone admits an instant opened in one burst and
+-- paid off in a later one, where the spec, applied per burst, splits
+-- what the fold keeps whole -- so a statement over arbitrary accepted
+-- lists is false, and the claim is scoped to the elaboration's image
+-- instead, as `elaborated-accepted` is.
 --
--- THE PROGRAM IS A SIMUL PROGRAM AND THAT IS THE CLAIM'S SHAPE, NOT A
--- CONVENIENCE.  Quantifying over `SExp` says what is actually being
--- claimed -- every program an author can compose out of the shipped
--- palette batches correctly -- and the elaboration is the only bridge,
--- so the runs below are ordinary runs of the ordinary machine.
+-- THE BODY OWED HERE is `batch-agreement`'s relation generalised past
+-- `protocol-init` -- `fold-agree` already takes any related triple --
+-- over `elaborated-accepted` and a settledness leaf saying each burst
+-- of an elaborated run ends paid off.  Until it is written,
+-- `elaborated-accepted` has no consumer.
+postulate
+  burst-agreement :
+    ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
+      (ins : SimulSlots Γ κ) →
+    map unwrapSpec
+        (foldBursts batch-init
+           (map decodeSpec (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))))
+      ≡ map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec)
+            (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))
+
+-- THE verified object, end to end: for every SRXJS program, what a
+-- subscriber to the batched run sees, burst by burst, is what the spec
+-- batches out of the same burst of the unbatched run.
 --
--- THE SIDES ARE NOT SYMMETRIC AND THAT IS THE RESTATEMENT.  The left
--- is a RUN of a tree with the operator in it; the right is an Agda
--- function applied to the run of the same tree WITHOUT it.  The old
--- statement compared two functions on one list and so said nothing
--- about the evaluator at all.  `Val Γ (listᵗ t) = List (Val Γ t)`
--- definitionally (Rx.Exp), which is why the two sides meet without a
--- transport.
+-- TWO PIPELINES, AND ONLY ONE OF THEM IS THE SPEC.  The right side runs
+-- the FROZEN elaboration (`elaborateSpec`, `embedSlotsSpec`,
+-- `decodeSpec`, `Spec.Unwrap`), which is where the spec's instants come
+-- from; the left side runs `Implementation.Pipeline`, which is free.
+-- They share the author's program, the evaluator and the fuel, and
+-- nothing else.
 --
--- THE `decodeStream` IS WHERE THE PROTOCOL ENTERS, AND IT ENTERS
--- TWICE NOW, ONCE PER RUN.  The evaluator's carrier is a plain stream
--- of ordinary rxjs events, so nothing it produces is an `InstEmit` and
--- no stage of it knows the protocol exists.  What makes the statement
--- sayable is that `elaborate` lands in the envelope type, so a run's
--- VALUES are the protocol's alphabet and reading them off is total and
--- structural.
+-- THEY MEET IN RAW VALUES, SO NO ENVELOPE IS COMPARED.  A comparison of
+-- envelopes lets the impl's bookkeeping decide the verdict -- an
+-- elaborator minting one instant per emit makes the spec batch nothing
+-- -- and makes two envelope shapes incomparable.  What is left after
+-- unwrapping is what an rxjs subscriber could observe: the values, in
+-- order, grouped into the batches that carry them.
+--
+-- AND THEY MEET PER BURST, WHICH IS WHERE TIMING LIVES.  A burst is
+-- everything one arrival causes, so comparing burst by burst pins WHEN
+-- each batch leaves as well as what is in it; a `concat` before the
+-- comparison would pass a batcher that held everything to the end.
+--
+-- WHAT IS NOT COMPARED is completion: `decodeSpec` drops `completeᵖ`,
+-- and `unwrapImpl` follows it, so a batched run that never completes
+-- agrees with one that does.
 --
 -- RECOVERY: git show 8c1b5750^:agda/src/Verify-Well-Formed.agda
 --   restores `evaluate-accepted`, the two dead routes recorded against
@@ -1231,11 +1253,9 @@ postulate
 formal-verification-batchSimultaneous :
   ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
     (ins : SimulSlots Γ κ) →
-  decodeStream (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborate κ e)) (embedSlots ins)))
-    ≡ spec-batchSimultaneous
-        (decodeStream (concat (evaluate↓ fuel (elaborate κ e) (embedSlots ins))))
+  map unwrapImpl
+      (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins))
+    ≡ map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec)
+          (evaluate↓ fuel (elaborateSpec κ e) (embedSlotsSpec ins))
 formal-verification-batchSimultaneous κ fuel e ins =
-  trans (batch-transcription κ fuel e ins)
-        (sym (batch-agreement
-                (decodeStream (concat (evaluate↓ fuel (elaborate κ e) (embedSlots ins))))
-                (elaborated-accepted κ fuel e ins)))
+  trans (batch-transcription κ fuel e ins) (burst-agreement κ fuel e ins)

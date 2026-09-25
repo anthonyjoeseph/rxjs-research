@@ -30,12 +30,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; subst)
 
 open import Rx.Exp using (Ctx; Exp; uniqᵗ; mintᵉ; Ren∈; renExp)
 open import Rx.SExp using (SExp; Kinds; plainᵏ)
-open import Rx.Simul-Slots using (SimulSlots; embedSlots)
+open import Rx.Simul-Slots using (SimulSlots; embedSlotsSpec)
 open import Rx.Slots using (Slots)
 open import Rx.Elaborate using (toPlain)
 
 -- A TREE THE ELABORATION BUILT, up to the two operations that move a
--- tree without touching what it emits.  `mintᵉ` because `elaborate` is
+-- tree without touching what it emits.  `mintᵉ` because `elaborateSpec` is
 -- `mintᵉ ∘ toPlain` and a closed root arrives already minted; renaming
 -- because a subtree written under a `mapᵉ` binder stands in a wider
 -- term telescope than the elaboration it carries, which is what an
@@ -77,4 +77,4 @@ record Elabˢ {n} {Γ : Ctx n} (ins : Slots Γ) : Set where
     {kinds} : Kinds n        -- and how the elaboration reads each slot
     ctx-eq  : Γ ≡ plainᵏ ctx kinds
     source  : SimulSlots ctx kinds
-    embeds  : subst Slots ctx-eq ins ≡ embedSlots source
+    embeds  : subst Slots ctx-eq ins ≡ embedSlotsSpec source

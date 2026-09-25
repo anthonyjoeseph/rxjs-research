@@ -63,7 +63,7 @@ else
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-QC="$ROOT/agda/_cli/QuickCheck"
+QC="$ROOT/agda/_oracle/_cli/QuickCheck"
 CORPUS="$ROOT/agda/src/Implementation/Unit-Test.agda"
 
 [ -x "$QC" ]     || { echo "gen-unit-tests: no $QC — run 'make qc-build' first" >&2; exit 1; }

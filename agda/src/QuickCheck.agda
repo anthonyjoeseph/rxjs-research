@@ -1,7 +1,9 @@
 -- An all-Agda QuickCheck: generate random well-typed programs (exp tree +
 -- scripted inputs) over a fixed 2-slot nat context, run them through the
--- evaluator, and check the BATCHING RUN ≡ spec-batchSimultaneous on
--- the resulting stream. A fast in-Agda dev loop for the implementation.
+-- evaluator, and check the two sides of the top line agree: the impl
+-- pipeline's BATCHING RUN against spec-batchSimultaneous applied to the
+-- spec pipeline's run, burst by burst, in raw values. A fast in-Agda dev
+-- loop for the implementation.
 --
 --   agda --compile --compile-dir=_cli src/QuickCheck.agda
 --   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
@@ -51,7 +53,7 @@ module QuickCheck where
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Char using (toℕ)
 open import Data.Fin using (Fin; zero; suc)
-open import Data.List using (List; []; _∷_; map; length)
+open import Data.List using (List; []; _∷_; map; length; concat)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
@@ -69,9 +71,10 @@ open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Protocol using (wellFormed?)
-open import Rx.Emit-Eq using (eqBatched)
+open import Rx.Emit-Eq using (eqBatches; eqBursts)
 open import Spec using (spec-batchSimultaneous)
-open import Implementation.Unit-Test.Prelude using (Γ₂; mkSlots; cached; runOf; batchedOf)
+open import Spec.Unwrap using (unwrapSpec)
+open import Implementation.Unit-Test.Prelude using (Γ₂; mkSlots; cached; runOf; implBurstsOf; specBurstsOf; metaBurstsOf; agrees)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
@@ -547,7 +550,7 @@ marksˢᵗˢ []       = noMarks
 marksˢᵗˢ (y ∷ ys) = marksˢᵗ y ⊕ marksˢᵗˢ ys
 
 ------------------------------------------------------------------------
--- a compact dump of a batched stream (for failure reports)
+-- a compact dump of both sides' bursts (for failure reports)
 
 private
   commaJoin : List String → String
@@ -561,23 +564,14 @@ private
           mapShow []       = []
           mapShow (v ∷ vs) = show v ∷ mapShow vs
 
-  showEvent : InstEvent (List ℕ) → String
-  showEvent (init s)    = "i" ++ show s
-  showEvent (value v)   = "v" ++ showVals v
-  showEvent (close s _) = "c" ++ show s
-  showEvent (handoff s) = "h" ++ show s
-  showEvent complete    = "F"
+-- one burst's batches, bracketed, then the next burst
+showBatches : List (List ℕ) → String
+showBatches []       = ""
+showBatches (b ∷ bs) = showVals b ++ " " ++ showBatches bs
 
-  showEvents : List (InstEvent (List ℕ)) → String
-  showEvents []       = ""
-  showEvents (e ∷ es) = showEvent e ++ " " ++ showEvents es
-
-  showEmit : InstEmit (List ℕ) → String
-  showEmit (es at i from s as _) = "@" ++ show i ++ "{" ++ showEvents es ++ "}"
-
-showBatched : List (InstEmit (List ℕ)) → String
-showBatched []       = "·"
-showBatched (e ∷ es) = showEmit e ++ " " ++ showBatched es
+showBursts : List (List (List ℕ)) → String
+showBursts []         = "·"
+showBursts (bs ∷ bss) = "[" ++ showBatches bs ++ "] " ++ showBursts bss
 
 -- same, for the RAW canonical stream (values are bare ℕ)
 private
@@ -720,12 +714,13 @@ pasteRow e d₀ d₁ =
        ++ showSExp e ++ "\n          (mkSlots (" ++ showSExp d₀ ++ ")\n"
        ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- PASTE>>>\n"
 
-report : SExp Γ₂ [] [] [] natᵗ
+report : String → SExp Γ₂ [] [] [] natᵗ
        → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
-       → List (InstEmit (List ℕ)) → List (InstEmit (List ℕ)) → String
-report e d₀ d₁ impl spec =
-  "  FAIL\n    impl = " ++ showBatched impl
-       ++ "\n    spec = " ++ showBatched spec ++ pasteRow e d₀ d₁
+       → List (List (List ℕ)) → List (List (List ℕ)) → List (InstEmit ℕ) → String
+report tag e d₀ d₁ impl spec raw =
+  "  " ++ tag ++ "\n    impl = " ++ showBursts impl
+       ++ "\n    spec = " ++ showBursts spec
+       ++ "\n    raw  = " ++ showStream raw ++ pasteRow e d₀ d₁
 
 -- a WellFormed violation of the evaluator's raw output
 reportWF : SExp Γ₂ [] [] [] natᵗ
@@ -734,9 +729,24 @@ reportWF : SExp Γ₂ [] [] [] natᵗ
 reportWF e d₀ d₁ s =
   "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e d₀ d₁
 
--- two checks on one generated program: impl ≡ spec on the batched stream,
--- and the raw stream satisfies the protocol automaton
--- (evaluate-well-formed, sampled).
+-- A SPEC INSTANT SPANNING TWO BURSTS, which no operator can repair.  The
+-- top line applies the spec per burst, and that agrees with applying it
+-- to the whole run exactly when no instant's emits fall in two bursts;
+-- where they do, the per-burst spec splits a batch the whole-run spec
+-- keeps, and the statement asks the operator for a batching the spec
+-- itself does not give.  So it is reported apart from FAIL: it is a
+-- finding about the statement, not a bug in the operator.
+reportSpan : SExp Γ₂ [] [] [] natᵗ
+           → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
+           → List (List ℕ) → List (List (List ℕ)) → List (InstEmit ℕ) → String
+reportSpan e d₀ d₁ whole bursts raw =
+  "  SPAN-FAIL\n    whole  = " ++ showBatches whole
+       ++ "\n    bursts = " ++ showBursts bursts
+       ++ "\n    raw    = " ++ showStream raw ++ pasteRow e d₀ d₁
+
+-- three checks on one generated program: impl ≡ spec per burst, no spec
+-- instant spanning two bursts, and the raw stream satisfying the protocol
+-- automaton (evaluate-well-formed, sampled).
 --
 -- THE THIRD CHECK WENT WITH THE THING IT SAMPLED, AND ITS COVERAGE IS
 -- NOT LOST.  It reported a run that gave up at a descent guard, which
@@ -777,12 +787,15 @@ oneCase d = genExp d >>=G λ e → genSlots >>=G λ ds →
       d₁   = proj₂ ds
       c    = cached "?" FUEL e (mkSlots d₀ d₁)
       s    = runOf c
-      impl = batchedOf c
-      spec = spec-batchSimultaneous s
-      agreeFails = if eqBatched impl spec then []
-                   else report e d₀ d₁ impl spec ∷ []
+      agreeFails = if agrees c then []
+                   else report "FAIL" e d₀ d₁ (implBurstsOf c) (specBurstsOf c) s ∷ []
+      metaFails  = if eqBursts (metaBurstsOf c) (specBurstsOf c) then []
+                   else report "META-FAIL" e d₀ d₁ (metaBurstsOf c) (specBurstsOf c) s ∷ []
+      whole      = unwrapSpec (spec-batchSimultaneous s)
+      spanFails  = if eqBatches (concat (specBurstsOf c)) whole then []
+                   else reportSpan e d₀ d₁ whole (specBurstsOf c) s ∷ []
       wfFails    = if wellFormed? s then [] else reportWF e d₀ d₁ s ∷ []
-  in pureG (marksˢ e , agreeFails ++ᴸ wfFails)
+  in pureG (marksˢ e , agreeFails ++ᴸ metaFails ++ᴸ spanFails ++ᴸ wfFails)
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached

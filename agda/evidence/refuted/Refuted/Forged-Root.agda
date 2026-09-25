@@ -3,7 +3,7 @@
 --
 -- `Rx.Simul-Slots` closed the forgery channel in the SLOT TABLE, by
 -- making a shared definition an `SExp` that reaches the evaluator only
--- through `elaborate`.  That left the ROOT PROGRAM untouched, and no
+-- through `elaborateSpec`.  That left the ROOT PROGRAM untouched, and no
 -- condition on slots could ever have reached it.  `run-wellFormed` quantified over an arbitrary
 -- `e : Closed Γ (machineEmitᵗ a)` -- its own header said "every run of
 -- every ELABORATED program" while its statement said every run of every
@@ -22,7 +22,7 @@
 -- predicate over the whole of `Exp` -- threaded through
 -- `subscribe-shaped`, `cascade-shaped`, `drain-shaped` and
 -- `run-wellFormed⇓`.  `elaborated-accepted` discharges it at the only
--- call site, since its program is `elaborate κ e` and
+-- call site, since its program is `elaborateSpec κ e` and
 -- `elab-mint (elab-toPlain κ e)` is exactly that.
 --
 -- WHY IT WAS NOT FOUND EARLIER.  The old comment on `run-wellFormed`
@@ -45,7 +45,7 @@ open import Rx.SExp using (Kinds; scriptedᵏ; plainᵏ; emitᵗ)
 open import Rx.Envelope using (instEmitᵛ)
 open import Rx.Elaborate using (deliveryᵛ)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Envelope.Decode using (decodeStream)
+open import Rx.Envelope.Decode using (decodeSpec)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol)
 
@@ -68,7 +68,7 @@ forged = mintᵉ (ofᵉ (instEmitᵛ nilᵗ (varᵗ (here refl)) (varᵗ (here r
 
 S : Maybe ProtocolSt
 S = runProtocol protocol-init
-      (decodeStream {Γ = plainᵏ Γ₁ κ₁} {a = natᵗ}
+      (decodeSpec {Γ = plainᵏ Γ₁ κ₁} {a = natᵗ}
         (concat (evaluate↓ 60 forged ins₁)))
 
 saw-forged-root : S ≡ nothing
