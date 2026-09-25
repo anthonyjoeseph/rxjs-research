@@ -38,12 +38,26 @@ conservative in the direction that matters and cannot pass a recursion it has
 not seen.
 """
 import argparse
+import glob
 import re
 import sys
+
+# THE SUBJECT IS THE EVALUATOR, NOT ONE MODULE OF IT.  A cycle is a property of
+# the call graph and moves with the code: the check was pointed at the one file
+# that held the burst walk, so relocating a fold would have carried the
+# recursion out from under it in silence.  A glob is covered by construction --
+# a module added to the evaluator is checked the day it appears, which is the
+# whole difference between a check and a habit.
+EVALUATOR = "agda/src/Rx/Evaluator.agda"
+EVALUATOR_DIR = "agda/src/Rx/Evaluator"
 
 WORD = r"[A-Za-z][A-Za-z0-9'´ᵃ-ᵪ₀-₟′!↓⇓-]*"
 SIG = re.compile(r"^(" + WORD + r")\s*:\s")
 HEAD = re.compile(r"^(" + WORD + r")\s")
+# A copattern clause `field (name args) = e` -- or `field name = e` -- is a
+# clause OF `name`: the field has no top-level signature, so read by its head
+# token the body belonged to nothing and every edge out of a builder was lost.
+COPAT = re.compile(r"^(" + WORD + r")\s+\(?(" + WORD + r")")
 TOK = re.compile(WORD)
 PEEL = re.compile(r"--\s*PEEL:\s*(" + WORD + r")\s*->\s*(" + WORD + r")\s*$")
 SCC = re.compile(r"--\s*STRUCTURAL SCC:\s*(.+?)\s*$")
@@ -69,6 +83,36 @@ def strip_block_comments(lines):
     return out
 
 
+# A PARAMETERISED MODULE'S BODY IS INDENTED, and every pattern below reads a
+# declaration at column 0: a block stated inside `module M (x : A) where` was
+# invisible, so its cycle went uncovered and its declaration read as stale.
+# The body is read at the column its first line sets, until a line outdents.
+def dedent_modules(lines):
+    out, header, pending, indent = [], False, False, None
+    for ln in lines:
+        if indent is not None:
+            if not ln.strip():
+                out.append(ln)
+                continue
+            if ln.startswith(indent):
+                out.append(ln[len(indent):])
+                continue
+            indent = None
+        if pending and ln.strip() and not ln.lstrip().startswith("--"):
+            lead = ln[:len(ln) - len(ln.lstrip())]
+            pending = False
+            if lead:
+                indent = lead
+                out.append(ln[len(lead):])
+                continue
+        if ln.startswith("module "):
+            header = True
+        if header and re.search(r"\bwhere\s*$", ln.split("--")[0]):
+            header, pending = False, True
+        out.append(ln)
+    return out
+
+
 def parse(path):
     raw = open(path, encoding="utf-8").read().split("\n")
     peels, sccs = set(), []
@@ -81,15 +125,18 @@ def parse(path):
         if m:
             sccs.append(frozenset(m.group(1).split()))
 
-    lines = strip_block_comments(raw)
+    lines = dedent_modules(strip_block_comments(raw))
     names = {m.group(1) for ln in lines if (m := SIG.match(ln))}
 
     edges = {}
     cur = None
     for ln in lines:
         m = HEAD.match(ln)
+        c = COPAT.match(ln)
         if m and m.group(1) in names:
             cur = None if re.match(r"^\s*:\s", ln[m.end(1):]) else m.group(1)
+        elif m and c and c.group(2) in names:
+            cur = c.group(2)
         elif ln and not ln[0].isspace() and not ln.startswith("--") \
                 and not ln.startswith("...") and not ln.startswith("|"):
             cur = None
@@ -146,18 +193,15 @@ def multi_sccs(edges, nodes):
     return out
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--file", default="agda/src/Rx/Evaluator/Builder.agda")
-    args = ap.parse_args()
-
-    names, edges, peels, declared = parse(args.file)
+def audit(path):
+    """-> (findings, declaration count, peel count, named-cycle count)."""
+    names, edges, peels, declared = parse(path)
     findings = []
 
     for caller, callee in sorted(peels):
         if callee not in edges.get(caller, ()):
             findings.append(
-                f"declared PEEL {caller} -> {callee} is not a call in {args.file}")
+                f"declared PEEL {caller} -> {callee} is not a call in {path}")
 
     cut = {a: {b for b in bs if (a, b) not in peels} for a, bs in edges.items()}
     surviving = multi_sccs(cut, names)
@@ -165,13 +209,34 @@ def main():
     for comp in surviving:
         if comp not in declared:
             findings.append(
-                "cycle covered by no declared descent: "
+                f"{path}: cycle covered by no declared descent: "
                 + " ".join(sorted(comp)))
     for comp in declared:
         if comp not in surviving:
             findings.append(
-                "declared STRUCTURAL SCC is no longer a cycle: "
+                f"{path}: declared STRUCTURAL SCC is no longer a cycle: "
                 + " ".join(sorted(comp)))
+
+    return findings, len(names), len(peels), len(declared)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--file", action="append",
+                    help="one module; repeatable.  Default: every module of "
+                         "the evaluator, found by glob.")
+    args = ap.parse_args()
+
+    files = args.file or sorted(
+        [EVALUATOR] + glob.glob(EVALUATOR_DIR + "/**/*.agda", recursive=True))
+
+    findings, names, peels, declared = [], 0, 0, 0
+    for path in files:
+        f, n, p, d = audit(path)
+        findings += f
+        names += n
+        peels += p
+        declared += d
 
     if findings:
         print("recursion-cover: " + str(len(findings)) + " finding(s):")
@@ -185,9 +250,9 @@ def main():
         print("code, which is what makes it worse than no declaration.")
         return 1
 
-    print(f"recursion-cover: {args.file} — {len(names)} declaration(s), "
-          f"{len(peels)} declared peel(s) cut, "
-          f"{len(declared)} structural cycle(s) left standing and named, "
+    print(f"recursion-cover: {len(files)} module(s) — {names} declaration(s), "
+          f"{peels} declared peel(s) cut, "
+          f"{declared} structural cycle(s) left standing and named, "
           f"no cycle uncovered")
     return 0
 

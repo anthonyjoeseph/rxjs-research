@@ -119,17 +119,25 @@ def parse_monsters(path):
 
 
 def enclosing_index(defs, def_lines):
-    """anon/module-app node -> the named declaration it continues."""
-    starts = {}
-    for name, sites in def_lines.items():
-        for relpath, ln in sites:
-            cur = starts.get(name)
-            if cur is None or ln < cur[1]:
-                starts[name] = (relpath, ln)
+    """anon/module-app node -> the named declaration it continues.
+
+    The nearest named DEFINING line above the continuation wins, not the
+    nearest declaration START: a mutual block states every signature
+    before any clause, so by start alone each continuation in the first
+    member's clauses is handed to the LAST signature, and whatever it
+    applies goes missing from the cone."""
     named, anon = {}, {}
-    for name, (relpath, ln) in starts.items():
-        (anon if defs[name].kind in ("anon", "module-app") else named) \
-            .setdefault(relpath, []).append((ln, name))
+    for name, sites in def_lines.items():
+        is_anon = defs[name].kind in ("anon", "module-app")
+        for relpath, ln in sites:
+            if is_anon:
+                cur = anon.get(relpath, {}).get(name)
+                if cur is None or ln < cur:
+                    anon.setdefault(relpath, {})[name] = ln
+            else:
+                named.setdefault(relpath, []).append((ln, name))
+    anon = {rp: [(ln, n) for n, ln in rows.items()]
+            for rp, rows in anon.items()}
     for rows in named.values():
         rows.sort()
     out = {}
@@ -274,6 +282,30 @@ the thing we are trying to kill, written without backticks.
     edges.setdefault("asm", set()).update(edges["...#A:9"])
     check("leaf" in reach({"asm"}, edges),
           "and with it the leaf is inside")
+    # a mutual block: both signatures first, then f's clauses, so the
+    # continuation belongs to f even though g's signature STARTS later.
+    defs2 = {"f": D("def", "M.agda"), "g": D("def", "M.agda"),
+             "...#M:6": D("anon", "M.agda")}
+    dl2 = {"f": {("M.agda", 1), ("M.agda", 5)}, "g": {("M.agda", 2),
+           ("M.agda", 8)}, "...#M:6": {("M.agda", 6)}}
+    check(enclosing_index(defs2, dl2).get("...#M:6") == "f",
+          "a continuation in a mutual block goes to the clause above it, "
+          "not to the last signature")
+
+    # WHAT IS CHARGED IS CODE ARRIVING.  A header sits ABOVE its declaration
+    # and so inside the range of the one before it, so charging comments would
+    # report a finding written exactly where the convention says to write it.
+    check(is_comment("-- a finding"), "a line comment is not charged")
+    check(is_comment("      -- an indented one"), "nor an indented one")
+    check(is_comment("--"), "nor a bare `--`")
+    check(is_comment(""), "nor a blank line")
+    check(is_comment("   "), "nor a whitespace-only line")
+    check(not is_comment("foo = bar"), "while a body IS charged")
+    check(not is_comment("_-->_ : A → B"),
+          "and so is an operator clause headed by `-->`, which `--` does not "
+          "open a comment on")
+    check(not is_comment("  x --y"),
+          "and a trailing comment does not excuse the code before it")
 
     os.unlink(tmp)
     if fails:
@@ -290,7 +322,9 @@ the thing we are trying to kill, written without backticks.
           "spliced into the declaration it continues -- without which an "
           "assembly applying its leaves in a `with` arm reaches none of them, "
           "which is the shape that made the first run of this check report "
-          "nine offenders that were all its own body)")
+          "nine offenders that were all its own body; and a comment or a blank "
+          "line is not work ARRIVING, while a clause headed by an operator "
+          "`--` does not open a comment on still is)")
 
 
 def reach(seed, edges):
@@ -313,8 +347,24 @@ def merge_base():
     return None
 
 
+# A COMMENT IS NOT WORK ARRIVING, AND A LINE IS OWNED BY THE DECLARATION IT
+# SITS INSIDE -- so charging comments would charge a header to whatever
+# declaration happens to precede it, which is the one directly ABOVE the
+# thing the header is about.  A finding written where the convention says to
+# write it would then be off-monster by construction, and the repair on offer
+# would be to move it somewhere it does not belong.  Agda's `--` opens a
+# comment only when what follows is not a symbol character, so `-->` at the
+# head of an operator clause is code and is still charged.
+COMMENT_RE = re.compile(r"^\s*--(?:[^!-/:-@\[-^`{-~]|$)")
+
+
+def is_comment(text):
+    return text.strip() == "" or COMMENT_RE.match(text) is not None
+
+
 def added_lines(base, src_rel):
-    """(relpath-within-src, new lineno) for every ADDED line under agda/src."""
+    """(relpath-within-src, new lineno) for every ADDED line of CODE under
+    agda/src; blank lines and `--` comments are not charged."""
     p = subprocess.run(
         ["git", "diff", "-U0", base, "--", src_rel],
         capture_output=True, text=True)
@@ -331,7 +381,7 @@ def added_lines(base, src_rel):
             n = int(m.group(1))
             continue
         if line.startswith("+") and not line.startswith("+++"):
-            if cur:
+            if cur and not is_comment(line[1:]):
                 hits.append((cur, n))
             n += 1
         elif line.startswith(" "):

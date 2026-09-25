@@ -33,15 +33,17 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `roadmap-order` | discharging a GRINDABLE or DIFFICULTY row while its tier holds an open FALSITY or SHAPE. Only DISCHARGE is held — delete, rename, split, restate, reclassify stay free; a PREREQUISITE the risky statement names is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-moved` | a branch landing proof work with PROOF-STATE byte-identical to **main**. Baseline is the merge-base, so fix-ups inside a branch cost nothing | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-check` | a date, a historical marker or a LINE NUMBER in `agda/src`/`agda/evidence`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
+| `recursion-cover` | a cycle in the evaluator's call graph that no declared descent covers — so it names a termination failure in SECONDS, before any tower runs | [docs/recursion-cover.md](docs/recursion-cover.md) |
 | the tower (inline in `gate-heavy`) | **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` / `probed` | the evidence trees not typechecking | EVIDENCE.md |
-| `bug-cache` | a known impl counterexample regressing. `Unit-Test.agda` is off Main, so nothing else would notice | [docs/bug-cache.md](docs/bug-cache.md) |
 
 Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`, `make strip-selftest`, `make agda-dev-selftest`.
 
 ## Autonomy
 
 Standing approval for any change that **does not alter the spec** — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
+
+**The `Exp` tree is FIXED, and the evaluator is not (Anthony).** Its formers are not the spec, so the standing approval above reads as licensing a new one — it does not. Evaluator internals are free: change the relation, the scheduling, the carrier, whatever makes it work and provable. A change that needs a new `Exp` former, or re-types an existing one, is a question instead.
 
 **The stop conditions are exhaustive — nothing else is one (Anthony: "never stop working until you hit a stop condition").** All three are questions only Anthony can answer:
 
@@ -63,14 +65,16 @@ Standing approval for any change that **does not alter the spec** — impl edits
 - Parallel workers authorized; parallel Agda up to two heavyweight checks at once, cheap modules freely → [docs/typecheck-cost.md](docs/typecheck-cost.md).
 - **Directives carry the law** — every worker prompt restates the rules it needs.
 - Workers don't commit. Land green work via a PR, never a direct push to main — ask first.
+- **Stage explicitly while a worker holds a file — never `git add -A` (Anthony).**
 - **Run continuously** (Anthony: "continue and continue, don't stop for context window or usage credits"). Review, merge, launch the next.
 
 ## Long Agda builds
 
-- **`make gate` is the merge gate and it ROUTES — type it and let it decide.** It prints which path and why. **Don't run it to merge — open a PR and let the `Gate` workflow run it.** Timings: `typecheck-performance-numbers.md`.
-- **Carve-out for forcing `gate-heavy`: TERMINATION** — the one property the dev loop can't see, since it stubs mutual blocks.
+- **`make gate` is the merge gate and it ROUTES — type it and let it decide.** It prints which path and why. Timings: `typecheck-performance-numbers.md`.
+- **Never run `gate-heavy` locally — push and let CI run the tower (Anthony).** Locally: `make gate-cheap` + `make agda-dev`.
+- `gate-heavy` is the only thing that sees TERMINATION, since the dev loop stubs mutual blocks.
 - **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. The flag must be identical in the Makefile and `agda_flags()`, changed in the same commit. → [docs/agda-build.md](docs/agda-build.md)
-- **Agda never checks `agda/src` — it checks the comment-stripped mirror, which is why a comment edit is free.** Never run `agda` against `agda/src` directly: a second interface cache, and every alternation invalidates the other's cone.
+- **Agda never checks `agda/src` — it checks the comment-stripped mirror, which is why a comment edit is free.** A direct `agda` run on `agda/src` is a second interface cache, alternating with the mirror's.
 - **Two commands: `make bg T=<target>` as a BACKGROUND tool call, then `make bg-check T=<target>`.** `bg` blocks, logs, appends `EXIT=<code>`. `bg-check` reports GREEN / RED-with-tail / STILL-RUNNING. `bg-wait` is for a human. A `sleep N; tail` or `until` loop is the apparatus re-implemented worse. `make bg` always exits non-zero by design, so **a completion notification is never a result — `bg-check` is.**
 - **"Detached" means the Bash tool's background flag, never shell syntax (Anthony).** Type the command bare. No `&` (backgrounds a wrapper the harness already manages), no `>/dev/null 2>&1` (throws away WHERE the log is), **and never a pipe — a pipeline exits with the LAST command's status, so `make gate | tail` reports the tail's success over a RED build.** A foreground call is capped at 600 s and a build that outruns it is KILLED. **One build at a time.** → [docs/bg.md](docs/bg.md)
 - **The Bash tool's cwd persists between calls — pin it.** Absolute paths; never rely on a previous `cd`.
@@ -380,6 +384,6 @@ Not for proof work, tooling or documentation.
 
 Capture an implementation bug immediately as a **row of the corpus** in `agda/src/Implementation/Unit-Test.agda` — a program, not a claim about one. Dead simple: a wall of little entries, no fancy names, no abstraction. **Append-only**, and the invariant is **`make bug-cache` green ⟺ no known counterexample remains**.
 
-The run happens in a BINARY, not the typechecker — a row used to be a `refl` over a whole `evaluate` run, so an append-only corpus charged the gate forever. Corollary: a green row is checked by the GHC backend and the FFI, so **no proof may ever depend on the cache**. Delete the module once `The-Proof.agda` is discharged. → [docs/bug-cache.md](docs/bug-cache.md)
+The run happens in a BINARY, not the typechecker — a row used to be a `refl` over a whole `evaluate` run, so an append-only corpus charged the gate forever. **It runs in CI's oracle job, not in `make gate`**: it checks the evaluator rather than the proof, so it runs beside the sweep, from the oracle's own build (termination checking off, cached as binaries keyed on the runners' import cone). Corollary: a green row is checked by the GHC backend and the FFI, so **no proof may ever depend on the cache**. Delete the module once `The-Proof.agda` is discharged. → [docs/bug-cache.md](docs/bug-cache.md)
 
 A new "naive rx" operator to fix an Agda-impl bug is allowed and encouraged when it is the best solution — but follow the port order: TypeScript first, as a proper rxjs-delegating, purely-functional operator.

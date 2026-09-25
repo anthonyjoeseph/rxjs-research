@@ -1,4 +1,4 @@
-import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val } from "./exp.js";
+import { Closed, Exp, Fn, PrimOp, ScriptVal, Tm, Ty, tyEq } from "./exp.js";
 import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 
 // The differential-testing generator: deterministic, seeded canonical
@@ -56,22 +56,6 @@ const natT: Ty = { type: "nat" };
 const uniqT: Ty = { type: "uniq" };
 const prodNN: Ty = { type: "prod", fst: natT, snd: natT };
 const prodUU: Ty = { type: "prod", fst: uniqT, snd: uniqT };
-
-const tyEq = (a: Ty, b: Ty): boolean => {
-  if (a.type === "prod" && b.type === "prod")
-    return tyEq(a.fst, b.fst) && tyEq(a.snd, b.snd);
-  if (a.type === "sum" && b.type === "sum")
-    return tyEq(a.left, b.left) && tyEq(a.right, b.right);
-  if (a.type === "obs" && b.type === "obs") return tyEq(a.elem, b.elem);
-  if (a.type === "list" && b.type === "list") return tyEq(a.elem, b.elem);
-  return (
-    a.type === b.type &&
-    a.type !== "prod" &&
-    a.type !== "sum" &&
-    a.type !== "obs" &&
-    a.type !== "list"
-  );
-};
 
 // value types only (no obs): scripted-slot element types and the types a
 // term inhabits. obs types arise only as the SOURCE of an *All join
@@ -552,6 +536,96 @@ const genExp = (
     };
   };
 
+  // THE REGION LANE, AND IT IS THE ONLY LANE HERE AIMED AT A CARRIER
+  // RATHER THAN AT AN OPERATOR.  Three conditions have to hold AT ONCE
+  // for a subscription's result being a LIST to be observable: a share,
+  // a synchronous burst of at least two values through it, and a
+  // subscription to THAT share caused by one of those values.  Each is
+  // ordinary and the draw reached all three together zero times in five
+  // hundred, because the third needs the SAME slot named in the outer
+  // and inside a spawned `strmT` -- a coincidence nothing was steering
+  // toward.  `genSlots` supplies the burst; this lane writes the
+  // coincidence.  The `of`-written inners are deliberately NOT this
+  // shape: there the `of` causes the subscriptions, and those rows are
+  // what say the region is the boundary rather than sharing itself.
+  const sharedAt = ctx.gamma
+    .map((gt, i) => ({ gt, i }))
+    .filter((x) => ctx.sharedSlots[x.i] && tyEq(x.gt, ty))
+    .map((x) => x.i);
+  if (sharedAt.length > 0)
+    operators.region = () => {
+      const i = pick(rng, sharedAt);
+      const inner: Ty = { type: "obs", elem: ty };
+      const share: Exp = { type: "input", ty, index: i };
+      // the bracket variant: a group between the share and the joiner,
+      // which is a place the carrier could have mattered and does not
+      const bracket = (src: Exp): Exp => {
+        const pairTy: Ty = {
+          type: "prod",
+          fst: ty,
+          snd: { type: "list", elem: ty },
+        };
+        return {
+          type: "map",
+          ty,
+          fn: {
+            type: "fstT",
+            ty,
+            pair: { type: "varT", ty: pairTy, index: 0 },
+          },
+          src: { type: "batchSync", ty: pairTy, src },
+        };
+      };
+      // what SUBSCRIBES the share -- the values that cause the inners
+      const outer: Exp = pick(rng, [
+        () => share,
+        () => share,
+        () => bracket(share),
+        (): Exp => ({
+          type: "take",
+          ty,
+          count: { type: "natT", ty: natT, val: int(rng, 2, 4) },
+          src: share,
+        }),
+        // the joiner two levels down from the share
+        (): Exp => ({
+          type: "map",
+          ty,
+          fn: { type: "varT", ty, index: 0 },
+          src: share,
+        }),
+      ])();
+      // what each of those values SPAWNS -- another subscription to the
+      // same share, which is the whole of condition three
+      const spawn: Exp = pick(rng, [
+        () => share,
+        () => share,
+        (): Exp => ({
+          type: "take",
+          ty,
+          count: { type: "natT", ty: natT, val: int(rng, 1, 3) },
+          src: share,
+        }),
+      ])();
+      const src: Exp = {
+        type: "map",
+        ty: inner,
+        fn: { type: "strmT", ty: inner, exp: spawn },
+        src: outer,
+      };
+      const op = pick(rng, ["mergeAll", "mergeAll", "switchAll", "exhaustAll"]);
+      return op === "mergeAll"
+        ? {
+            type: "mergeAll",
+            ty,
+            limit: pick(rng, [undefined, 1, 2] as (number | undefined)[]),
+            src,
+          }
+        : op === "switchAll"
+          ? { type: "switchAll", ty, src }
+          : { type: "exhaustAll", ty, src };
+    };
+
   // of/empty are leaves; force them there, real operators from `operators`
   const forced =
     force === "of"
@@ -568,7 +642,9 @@ const genExp = (
 };
 
 // ---- scripted inputs ----
-const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
+// a scripted value as the corpus spells it: nats are JSON numbers here
+// and become exact only when a run reads them
+const genVal = (rng: Rng, ty: Ty, depth: number): ScriptVal => {
   switch (ty.type) {
     case "unit":
       return null;
@@ -596,8 +672,8 @@ const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
   }
 };
 
-const genScripted = (rng: Rng, ty: Ty): ObservableInput<Val> => {
-  const timed = (n: number): Timed<Val>[] =>
+const genScripted = (rng: Rng, ty: Ty): ObservableInput<ScriptVal> => {
+  const timed = (n: number): Timed<ScriptVal>[] =>
     Array.from({ length: n }, () => ({
       wait: int(rng, 0, 2),
       val: genVal(rng, ty, 2),
@@ -634,18 +710,44 @@ const genSlots = (rng: Rng, depth: number): { types: Ty[]; slots: Slot[] } => {
         ? { type: "scripted", input: genScripted(rng, ty) }
         : {
             type: "shared",
-            def: genExp(
-              rng,
-              ty,
-              {
-                gamma: prefix,
-                sharedSlots: slots.map((sl) => sl.type === "shared"),
-                guarded: [],
-                usable: [],
-                theta: [],
-              },
-              Math.min(depth, 3),
-            ) as Closed,
+            // A SHARE'S DEFINITION IS DRAWN TO BURST HALF THE TIME, and
+            // that is a coverage decision, not a taste one: a share is
+            // only where a burst carrier can be caught when at least
+            // TWO of its values are synchronous, and a freely drawn def
+            // lands there by accident. An `of` of two or three is the
+            // smallest thing that does it; the other half stays free so
+            // the shape of a share is not pinned to one former.
+            def: (chance(rng, 0.5)
+              ? {
+                  type: "of",
+                  ty,
+                  items: Array.from({ length: int(rng, 2, 3) }, () =>
+                    genTm(
+                      rng,
+                      ty,
+                      {
+                        gamma: prefix,
+                        sharedSlots: slots.map((sl) => sl.type === "shared"),
+                        guarded: [],
+                        usable: [],
+                        theta: [],
+                      },
+                      2,
+                    ),
+                  ),
+                }
+              : genExp(
+                  rng,
+                  ty,
+                  {
+                    gamma: prefix,
+                    sharedSlots: slots.map((sl) => sl.type === "shared"),
+                    guarded: [],
+                    usable: [],
+                    theta: [],
+                  },
+                  Math.min(depth, 3),
+                )) as Closed,
           },
     );
   }

@@ -67,7 +67,8 @@ open import Rx.Slots using (Slots)
 open import Rx.Envelope using (machineEmitᵗ)
 open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Stream;
-  chainsOf; arrSource; sched-init; st-init; root; sched-next; schedGo)
+  chainsOf; arrSource; sched-init; st-init; root; sched-next;
+  schedGo)
 open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓;
                                        evaluate⇓; eval-run;
                                        drain-done; drain-empty; drain-step)
@@ -144,10 +145,10 @@ Owes {Γ = Γ} st S =
 -- been expensive before.
 --
 --   * A CASE NEEDING MORE OF `Sched.mint` THAN FRESHNESS.
---     `Rx/Evaluator/Freshness*` already carries freshness and
---     monotonicity at an arbitrary key.  Needing a stronger fact --
---     distinctness, an equality, a strict bound -- means the id
---     discipline is wrong rather than under-proven.
+--     `Rx.Mint` is the whole of the id discipline: a key's counter
+--     rises and nothing reads one twice.  Needing a stronger fact --
+--     distinctness, an equality, a strict bound -- means the discipline
+--     is wrong rather than under-proven.
 --
 --   * ANY CASE THAT CANNOT CLOSE WITHOUT RE-OPENING `Rx.Elaborate`.
 --     The elaboration is the thing under judgement here; changing it
@@ -173,10 +174,10 @@ Owes {Γ = Γ} st S =
 postulate
   subscribe-shaped :
     ∀ {n} {Γ : Ctx n} {a} {e : Closed Γ (machineEmitᵗ a)} {ins : Slots Γ}
-      {burst sched₀ st₀} →
+      {sched₀ st₀} {out : Stream Γ (machineEmitᵗ a)} →
     Elabᵉ e →
     subscribeE⇓ {e = e} {lo = n} ([] , e , []ᵉ) root 0
-      (sched-init e ins) (st-init e) (burst , sched₀ , st₀) →
+      (sched-init e ins) (st-init e) (out , sched₀ , st₀) →
     -- AFTER the derivation, not before: the schedule is an implicit
     -- solved from the walk, and a premise mentioning `Sched.slots`
     -- ahead of it eta-expands the selector and leaves the schedule
@@ -184,7 +185,8 @@ postulate
     -- written down.
     Elabˢ ins →
     Σ ProtocolSt λ S₀ →
-        WellShaped protocol-init (decodeStream (concat burst)) S₀
+        WellShaped protocol-init
+          (decodeStream (concat out)) S₀
       × Owes st₀ S₀
       -- AND THE TABLE SURVIVES THE WALK.  The premise arrives on `ins`
       -- and the drain reads it off `Sched.slots sched₀`, so somebody
@@ -315,26 +317,29 @@ drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} eqn c d) es
 -- is answered by the telescope now and not by a predicate on syntax.
 --
 -- The index is GENERALISED before the derivation is matched on:
--- `evaluate⇓`'s stream argument is `burst ++ rest`, and matching it
--- against `proj₁ (evaluate! ...)` in place loses the connection
--- between the two halves and the term.
+-- `evaluate⇓`'s stream argument is `out ++ rest`, and
+-- matching it against `proj₁ (evaluate! ...)` in place loses the
+-- connection between the two halves and the term.
 run-wellFormed⇓ :
   ∀ {n} {Γ : Ctx n} {a} {fuel : Fuel} {e : Closed Γ (machineEmitᵗ a)}
     {ins : Slots Γ} (s : Stream Γ (machineEmitᵗ a)) →
   Elabᵉ e → Elabˢ ins →
   evaluate⇓ fuel e ins s →
   Accepted (runProtocol protocol-init (decodeStream (concat s)))
-run-wellFormed⇓ _ el es (eval-run {burst = burst} {rest = rest} sub dr)
+run-wellFormed⇓ {Γ = Γ} {a = a} _ el es
+    (eval-run {out = out} {rest = rest} sub dr)
   with subscribe-shaped el sub es
-... | S₀ , wsBurst , ow₀ , es₀ with drain-shaped el ow₀ dr es₀
-...   | S₁ , wsRest =
-      wellShaped-accepted (subst (λ z → WellShaped protocol-init z S₁)
-                                 (sym dEq) (ws-++ wsBurst wsRest))
+... | S₀ , wsOut , ow₁ , es₀
+    with drain-shaped el ow₁ dr es₀
+...   | S₂ , wsRest =
+      wellShaped-accepted (subst (λ z → WellShaped protocol-init z S₂)
+                                 (sym dEq)
+                                 (ws-++ wsOut wsRest))
       where
-      dEq : decodeStream (concat (burst ++ rest))
-              ≡ decodeStream (concat burst) ++ decodeStream (concat rest)
-      dEq = trans (cong decodeStream (concat-++ burst rest))
-                  (decodeStream-++ (concat burst) (concat rest))
+      dEq : decodeStream (concat (out ++ rest))
+              ≡ decodeStream (concat out) ++ decodeStream (concat rest)
+      dEq = trans (cong decodeStream (concat-++ out rest))
+                  (decodeStream-++ (concat out) (concat rest))
 
 run-wellFormed :
   ∀ {n} {Γ : Ctx n} {a} (fuel : Fuel) (e : Closed Γ (machineEmitᵗ a))

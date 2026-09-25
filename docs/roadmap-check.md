@@ -412,6 +412,15 @@ this tree happens to declare and an accidental match must not buy the exemption;
 in the statement half a bare token is the real thing, since Agda has no backticks
 and a name in a type is a dependency the typechecker enforces.
 
+**A tier is its rows, not its number.** Tiers are renumbered as the lowest is
+retired, so the number a row sat under on the baseline can name an unrelated tier
+today — and reading it by number charged a discharge in a retired tier to the
+open rows of the tier that took its number. The baseline tier's successors are
+the current tiers sharing a claimed row with it. A risky row still live is still
+listed, since `roadmap-check` holds every live postulate to a row, so a baseline
+tier whose risky rows are open always has a successor holding them; a baseline
+tier with no successor has had every row leave the ledger, and holds nothing.
+
 **Endpoints.** The check compares the same two roadmap versions `roadmap-moved`
 does, through the same `resolve_endpoints` — the merge-base with main against
 disk on a branch, HEAD against HEAD~1 where there is no divergence. That is a
@@ -422,10 +431,11 @@ right. It also means the banking rule is scoped to the BRANCH exactly as the
 movement rule is: what may not be banked under an open FALSITY row is what the
 whole PR banks, not what its latest commit happens to.
 
-**`make roadmap-order-selftest`** pins six directions. One is that the check
-FIRES on a banked row. The other five are that it stays QUIET: on a roadmap that
+**`make roadmap-order-selftest`** pins its directions. One is that the check
+FIRES on a banked row. The others are that it stays QUIET: on a roadmap that
 banked nothing, on a row DELETED from `agda/src`, on a RECLASSIFIED row, on a
 discharge in a tier whose own risky rows are closed while another tier's are
-open, and on a prerequisite the risky header names. The five matter more than the
+open, on a discharge in a RETIRED tier whose number another tier now carries,
+and on a prerequisite the risky header names. The five matter more than the
 one — an over-firing check here would hold the proof's shape hostage, and the
 quiet directions are the only thing standing between this rule and that.

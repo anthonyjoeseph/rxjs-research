@@ -38,8 +38,9 @@ container's figures as an honest placeholder (same non-macOS shape, comparable c
 count) rather than the laptop's, and no `ci`-tagged per-module rows exist yet — CI always
 takes `gate-heavy`, so nothing there has ever run the per-module dev loop that writes
 them, and the light path this file once expected to start the accumulation cannot occur
-in CI at all. What IS measured is the whole-gate figure, cold and warm, under *The gate in
-CI* below.
+in CI at all. **No CI figure is recorded in this file at all** — `make ci-gate-time`
+fetches the whole-gate number from the runs themselves, for the reason under *The gate
+in CI* below.
 
 ## Recorded by the build
 
@@ -139,47 +140,56 @@ when nothing moved, so a build does not dirty the tree.
 | `make gate-heavy (full gate, 326 modules)` | **3374.0 s** | 3374.0 s | 1 |
 | `make gate-heavy (full gate, 24 modules)` | **2643.0 s** | 2643.0 s | 1 |
 | `make gate-heavy (full gate, 37 modules)` | **2476.0 s** | 2476.0 s | 1 |
+| `make gate-heavy (full gate, 5 modules)` | **990.0 s** | 2090.0 s | 2 |
 | `make gate-heavy (full gate, 13 modules)` | **64.0 s** | 64.0 s | 1 |
+| `agda-dev ../evidence/refuted/Refuted/Room-Backlog.agda` | **60.4 s** | 60.4 s | 1 |
 | `make gate-heavy (full gate, 8 modules)` | **29.0 s** | 29.0 s | 1 |
-| `agda-dev Rx/Evaluator/Freshness/Preserve.agda` | **16.6 s** | 16.6 s | 1 |
-| `agda-dev Rx/Evaluator/Freshness/Mono.agda` | **16.0 s** | 16.0 s | 1 |
+| `make gate-heavy (full gate, 16 modules)` | **20.0 s** | 20.0 s | 1 |
+| `agda-dev Rx/Evaluator/Reducible/Support.agda` | **18.1 s** | 18.1 s | 2 |
+| `agda-dev Rx/Evaluator/Keeps.agda` | **17.2 s** | 17.2 s | 1 |
+| `agda-dev Rx/Evaluator/Reducible/Calls.agda` | **16.1 s** | 16.1 s | 1 |
+| `agda-dev Rx/Evaluator/Reducible/Floor.agda` | **15.9 s** | 15.9 s | 1 |
+| `make gate-heavy (full gate, 3 modules)` | **15.0 s** | 18.0 s | 2 |
+| `agda-dev Rx/Evaluator/Reducible/Rule-Kept.agda` | **13.4 s** | 13.4 s | 1 |
 | `agda-dev QuickCheck.agda` | **10.6 s** | 18.2 s | 8 |
 | `agda-dev Implementation/Unit-Test/Bug-Cache.agda` | **8.0 s** | >1 s | 4 |
-| `agda-dev Rx/Evaluator/Domain.agda` | **7.5 s** | 9.0 s | 6 |
+| `agda-dev Rx/Evaluator/Domain.agda` | **7.5 s** | 54.3 s | 10 |
+| `agda-dev Verify-Input-Well-Formed/Run-Well-Formed.agda` | **7.3 s** | 8.9 s | 2 |
 | `agda-dev ../evidence/probed/Probed/Main.agda` | **7.2 s** | 7.2 s | 10 |
 | `agda-dev Rx/Inputs-Below.agda` | **7.1 s** | 7.5 s | 5 |
 | `agda-dev CLI/Decode.agda` | **7.0 s** | 8.4 s | 6 |
-| `agda-dev Rx/Exp.agda` | **7.0 s** | 12.9 s | 8 |
-| `agda-dev CLI/Main.agda` | **6.8 s** | >2 s | 4 |
-| `agda-dev Main.agda` | **6.8 s** | 6.8 s | 7 |
+| `agda-dev Rx/Exp.agda` | **7.0 s** | 18.1 s | 9 |
+| `agda-dev CLI/Main.agda` | **6.8 s** | >2 s | 6 |
+| `agda-dev Main.agda` | **6.8 s** | 12.7 s | 10 |
 | `agda-dev Rx/Slots.agda` | **6.7 s** | 8.0 s | 2 |
 | `agda-dev Implementation/Unit-Test.agda` | **6.6 s** | >1 s | 7 |
 | `agda-dev Implementation/Unit-Test/Prelude.agda` | **6.6 s** | >1 s | 5 |
+| `agda-dev Rx/Evaluator/Freshness.agda` | **6.5 s** | 6.5 s | 1 |
 | `agda-dev CLI/IO.agda` | **6.4 s** | 6.4 s | 1 |
-| `agda-dev Rx/Evaluator.agda` | **6.1 s** | 14.5 s | 15 |
+| `agda-dev Rx/Evaluator/Unconn-Arith.agda` | **6.3 s** | 7.5 s | 2 |
+| `agda-dev Rx/Evaluator.agda` | **6.1 s** | 23.4 s | 20 |
 | `agda-dev ../evidence/refuted/Refuted/Main.agda` | **5.9 s** | 5.9 s | 7 |
 | `agda-dev CLI/Encode.agda` | **5.9 s** | 7.0 s | 5 |
-| `agda-dev Rx/Envelope.agda` | **5.9 s** | 7.8 s | 2 |
+| `agda-dev Rx/Envelope.agda` | **5.9 s** | 6.4 s | 3 |
 | `agda-dev Rx/SExp.agda` | **5.8 s** | 5.8 s | 2 |
-| `agda-dev Rx/Evaluator/Builder.agda` | **5.6 s** | 7.4 s | 20 |
-| `agda-dev Rx/Evaluator/Reducible.agda` | **5.6 s** | 17.4 s | 65 |
+| `agda-dev Rx/Evaluator/Builder.agda` | **5.6 s** | 9.8 s | 21 |
+| `agda-dev Rx/Evaluator/Reducible.agda` | **5.6 s** | 69.8 s | 78 |
 | `agda-dev Rx/Exp/Guarded.agda` | **5.6 s** | 6.3 s | 3 |
 | `agda-dev Rx/Elaborate.agda` | **5.4 s** | 12.0 s | 6 |
 | `agda-dev Rx/Envelope/Decode.agda` | **5.3 s** | 5.3 s | 2 |
-| `agda-dev Rx/Evaluator/Freshness.agda` | **5.1 s** | 5.1 s | 2 |
 | `agda-dev Verify-Batch-Simultaneous/Batch-Theorems.agda` | **4.4 s** | 4.4 s | 2 |
 | `agda-dev ../evidence/probed/Probed/Apparatus.agda` | **3.5 s** | 3.5 s | 1 |
 | `agda-dev CLI/JSON.agda` | **3.5 s** | 3.5 s | 1 |
 | `agda-dev Spec.agda` | **3.5 s** | >1 s | 2 |
 | `agda-dev Decide.agda` | **3.4 s** | 3.4 s | 1 |
 | `agda-dev Implementation.agda` | **3.2 s** | 3.2 s | 2 |
-| `agda-dev Rx/Emit-Eq.agda` | **3.0 s** | 3.0 s | 1 |
+| `agda-dev Rx/Emit-Eq.agda` | **3.0 s** | 3.5 s | 2 |
 | `agda-dev Rx/Prim.agda` | **3.0 s** | 3.0 s | 3 |
 | `agda-dev Rx/Protocol.agda` | **3.0 s** | 3.0 s | 4 |
 | `agda-dev Rx/Mint.agda` | **2.6 s** | >2 s | 8 |
 | `agda-dev Verify-Batch-Simultaneous/The-Proof.agda` | **1.0 s** | >1 s | 94 |
 
-<!-- AUTO:DATA {"cloud|agda-dev ../evidence/probed/Probed/Apparatus.agda": {"best": 3.5, "last": 3.5, "runs": 1}, "cloud|agda-dev ../evidence/probed/Probed/Main.agda": {"best": 7.2, "last": 7.2, "runs": 10}, "cloud|agda-dev ../evidence/refuted/Refuted/Main.agda": {"best": 5.9, "last": 5.9, "runs": 7}, "cloud|agda-dev CLI/Decode.agda": {"best": 7.0, "last": 8.4, "runs": 6}, "cloud|agda-dev CLI/Encode.agda": {"best": 5.9, "last": 7.0, "runs": 5}, "cloud|agda-dev CLI/IO.agda": {"best": 6.4, "last": 6.4, "runs": 1}, "cloud|agda-dev CLI/JSON.agda": {"best": 3.5, "last": 3.5, "runs": 1}, "cloud|agda-dev CLI/Main.agda": {"best": 6.8, "floor": true, "last": 2.0, "runs": 4}, "cloud|agda-dev Decide.agda": {"best": 3.4, "last": 3.4, "runs": 1}, "cloud|agda-dev Implementation.agda": {"best": 3.2, "last": 3.2, "runs": 2}, "cloud|agda-dev Implementation/Unit-Test.agda": {"best": 6.6, "floor": true, "last": 1.0, "runs": 7}, "cloud|agda-dev Implementation/Unit-Test/Bug-Cache.agda": {"best": 8.0, "floor": true, "last": 1.0, "runs": 4}, "cloud|agda-dev Implementation/Unit-Test/Prelude.agda": {"best": 6.6, "floor": true, "last": 1.0, "runs": 5}, "cloud|agda-dev Main.agda": {"best": 6.8, "last": 6.8, "runs": 7}, "cloud|agda-dev QuickCheck.agda": {"best": 10.6, "last": 18.2, "runs": 8}, "cloud|agda-dev Rx/Elaborate.agda": {"best": 5.4, "last": 12.0, "runs": 6}, "cloud|agda-dev Rx/Emit-Eq.agda": {"best": 3.0, "last": 3.0, "runs": 1}, "cloud|agda-dev Rx/Envelope.agda": {"best": 5.9, "last": 7.8, "runs": 2}, "cloud|agda-dev Rx/Envelope/Decode.agda": {"best": 5.3, "last": 5.3, "runs": 2}, "cloud|agda-dev Rx/Evaluator.agda": {"best": 6.1, "last": 14.5, "runs": 15}, "cloud|agda-dev Rx/Evaluator/Builder.agda": {"best": 5.6, "last": 7.4, "runs": 20}, "cloud|agda-dev Rx/Evaluator/Domain.agda": {"best": 7.5, "last": 9.0, "runs": 6}, "cloud|agda-dev Rx/Evaluator/Freshness.agda": {"best": 5.1, "last": 5.1, "runs": 2}, "cloud|agda-dev Rx/Evaluator/Freshness/Mono.agda": {"best": 16.0, "last": 16.0, "runs": 1}, "cloud|agda-dev Rx/Evaluator/Freshness/Preserve.agda": {"best": 16.6, "last": 16.6, "runs": 1}, "cloud|agda-dev Rx/Evaluator/Reducible.agda": {"best": 5.6, "last": 17.4, "runs": 65}, "cloud|agda-dev Rx/Exp.agda": {"best": 7.0, "last": 12.9, "runs": 8}, "cloud|agda-dev Rx/Exp/Guarded.agda": {"best": 5.6, "last": 6.3, "runs": 3}, "cloud|agda-dev Rx/Inputs-Below.agda": {"best": 7.1, "last": 7.5, "runs": 5}, "cloud|agda-dev Rx/Mint.agda": {"best": 2.6, "floor": true, "last": 2.0, "runs": 8}, "cloud|agda-dev Rx/Prim.agda": {"best": 3.0, "last": 3.0, "runs": 3}, "cloud|agda-dev Rx/Protocol.agda": {"best": 3.0, "last": 3.0, "runs": 4}, "cloud|agda-dev Rx/SExp.agda": {"best": 5.8, "last": 5.8, "runs": 2}, "cloud|agda-dev Rx/Slots.agda": {"best": 6.7, "last": 8.0, "runs": 2}, "cloud|agda-dev Spec.agda": {"best": 3.5, "floor": true, "last": 1.0, "runs": 2}, "cloud|agda-dev Verify-Batch-Simultaneous/Batch-Theorems.agda": {"best": 4.4, "last": 4.4, "runs": 2}, "cloud|agda-dev Verify-Batch-Simultaneous/The-Proof.agda": {"best": 1.0, "floor": true, "last": 1.0, "runs": 94}, "cloud|make gate-heavy (full gate, 13 modules)": {"best": 64.0, "last": 64.0, "runs": 1}, "cloud|make gate-heavy (full gate, 24 modules)": {"best": 2643.0, "last": 2643.0, "runs": 1}, "cloud|make gate-heavy (full gate, 326 modules)": {"best": 3374.0, "last": 3374.0, "runs": 1}, "cloud|make gate-heavy (full gate, 37 modules)": {"best": 2476.0, "last": 2476.0, "runs": 1}, "cloud|make gate-heavy (full gate, 51 modules)": {"best": 3917.0, "last": 3917.0, "runs": 1}, "cloud|make gate-heavy (full gate, 8 modules)": {"best": 29.0, "last": 29.0, "runs": 1}, "local|agda-dev CLI/Decode.agda": {"best": 5.1, "last": 5.1, "runs": 1}, "local|agda-dev Decide.agda": {"best": 1.6, "last": 1.6, "runs": 1}, "local|agda-dev Implementation/Unit-Test.agda": {"best": 1.0, "floor": true, "last": 1.0, "runs": 1, "unmeasured": true}, "local|agda-dev Implementation/Unit-Test/Bug-Cache.agda": {"best": 1.0, "floor": true, "last": 1.0, "runs": 1, "unmeasured": true}, "local|agda-dev Implementation/Unit-Test/Prelude.agda": {"best": 3.3, "floor": true, "last": 1.0, "runs": 2}, "local|agda-dev Main.agda": {"best": 45.0, "floor": true, "last": 45.0, "runs": 1}, "local|agda-dev QuickCheck.agda": {"best": 5.3, "last": 5.3, "runs": 2}, "local|agda-dev Rx/Elaborate.agda": {"best": 3.4, "last": 3.4, "runs": 1}, "local|agda-dev Rx/Evaluator.agda": {"best": 7.7, "last": 7.7, "runs": 2}, "local|agda-dev Rx/Exp.agda": {"best": 3.2, "last": 3.2, "runs": 3}, "local|agda-dev Rx/Mint.agda": {"best": 1.4, "last": 1.4, "runs": 1}, "local|agda-dev Rx/SExp.agda": {"best": 2.7, "last": 2.7, "runs": 1}, "local|agda-dev Rx/Slots.agda": {"best": 2.5, "last": 2.5, "runs": 3}, "local|agda-dev Spec.agda": {"best": 1.0, "floor": true, "last": 1.0, "runs": 1, "unmeasured": true}, "local|agda-dev Verify-Batch-Simultaneous/The-Proof.agda": {"best": 5.6, "floor": true, "last": 1.0, "runs": 1025}, "local|agda-dev Verify-Input-Well-Formed/Run-Well-Formed.agda": {"best": 45.0, "floor": true, "last": 45.0, "runs": 1, "unmeasured": true}, "local|agda-dev Verify-Input-Well-Formed/Well-Shaped.agda": {"best": 1.6, "last": 1.6, "runs": 1}, "local|make gate-heavy (full gate, 1 modules)": {"best": 5.0, "last": 7.0, "runs": 3}, "local|make gate-heavy (full gate, 10 modules)": {"best": 65.0, "last": 65.0, "runs": 5}, "local|make gate-heavy (full gate, 11 modules)": {"best": 18.0, "last": 1052.0, "runs": 9}, "local|make gate-heavy (full gate, 12 modules)": {"best": 375.0, "last": 1107.0, "runs": 5}, "local|make gate-heavy (full gate, 13 modules)": {"best": 88.0, "last": 1106.0, "runs": 5}, "local|make gate-heavy (full gate, 14 modules)": {"best": 19.0, "last": 1889.0, "runs": 2}, "local|make gate-heavy (full gate, 15 modules)": {"best": 19.0, "last": 80.0, "runs": 5}, "local|make gate-heavy (full gate, 16 modules)": {"best": 15.0, "last": 1101.0, "runs": 6}, "local|make gate-heavy (full gate, 17 modules)": {"best": 12.0, "last": 1495.0, "runs": 7}, "local|make gate-heavy (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "local|make gate-heavy (full gate, 18 modules)": {"best": 28.0, "last": 278.0, "runs": 8}, "local|make gate-heavy (full gate, 19 modules)": {"best": 31.0, "last": 1203.0, "runs": 11}, "local|make gate-heavy (full gate, 2 modules)": {"best": 7.0, "last": 7.0, "runs": 1}, "local|make gate-heavy (full gate, 20 modules)": {"best": 32.0, "last": 32.0, "runs": 1}, "local|make gate-heavy (full gate, 21 modules)": {"best": 35.0, "last": 1697.0, "runs": 5}, "local|make gate-heavy (full gate, 22 modules)": {"best": 352.0, "last": 1312.0, "runs": 2}, "local|make gate-heavy (full gate, 23 modules)": {"best": 399.0, "last": 399.0, "runs": 1}, "local|make gate-heavy (full gate, 24 modules)": {"best": 1368.0, "last": 1368.0, "runs": 2}, "local|make gate-heavy (full gate, 25 modules)": {"best": 1211.0, "last": 1486.0, "runs": 3}, "local|make gate-heavy (full gate, 26 modules)": {"best": 1297.0, "last": 1297.0, "runs": 1}, "local|make gate-heavy (full gate, 28 modules)": {"best": 1448.0, "last": 1448.0, "runs": 1}, "local|make gate-heavy (full gate, 29 modules)": {"best": 1298.0, "last": 1298.0, "runs": 1}, "local|make gate-heavy (full gate, 3 modules)": {"best": 9.0, "last": 9.0, "runs": 1}, "local|make gate-heavy (full gate, 30 modules)": {"best": 1342.0, "last": 1342.0, "runs": 2}, "local|make gate-heavy (full gate, 306 modules)": {"best": 1709.0, "last": 1709.0, "runs": 2}, "local|make gate-heavy (full gate, 32 modules)": {"best": 1642.0, "last": 1642.0, "runs": 1}, "local|make gate-heavy (full gate, 34 modules)": {"best": 669.0, "last": 669.0, "runs": 1}, "local|make gate-heavy (full gate, 35 modules)": {"best": 1633.0, "last": 1633.0, "runs": 1}, "local|make gate-heavy (full gate, 36 modules)": {"best": 1338.0, "last": 1338.0, "runs": 1}, "local|make gate-heavy (full gate, 37 modules)": {"best": 1831.0, "last": 1831.0, "runs": 1}, "local|make gate-heavy (full gate, 38 modules)": {"best": 1477.0, "last": 1477.0, "runs": 1}, "local|make gate-heavy (full gate, 4 modules)": {"best": 9.0, "last": 11.0, "runs": 4}, "local|make gate-heavy (full gate, 43 modules)": {"best": 1791.0, "last": 1791.0, "runs": 1}, "local|make gate-heavy (full gate, 45 modules)": {"best": 662.0, "last": 662.0, "runs": 1}, "local|make gate-heavy (full gate, 46 modules)": {"best": 1407.0, "last": 1407.0, "runs": 1}, "local|make gate-heavy (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "local|make gate-heavy (full gate, 5 modules)": {"best": 9.0, "last": 13.0, "runs": 6}, "local|make gate-heavy (full gate, 50 modules)": {"best": 660.0, "last": 1760.0, "runs": 4}, "local|make gate-heavy (full gate, 51 modules)": {"best": 1980.0, "last": 1980.0, "runs": 1}, "local|make gate-heavy (full gate, 52 modules)": {"best": 1893.0, "last": 1893.0, "runs": 1}, "local|make gate-heavy (full gate, 54 modules)": {"best": 1788.0, "last": 1788.0, "runs": 1}, "local|make gate-heavy (full gate, 55 modules)": {"best": 3004.0, "last": 3004.0, "runs": 1}, "local|make gate-heavy (full gate, 58 modules)": {"best": 2095.0, "last": 2095.0, "runs": 1}, "local|make gate-heavy (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}, "local|make gate-heavy (full gate, 6 modules)": {"best": 10.0, "last": 34.0, "runs": 8}, "local|make gate-heavy (full gate, 61 modules)": {"best": 1592.0, "last": 1592.0, "runs": 1}, "local|make gate-heavy (full gate, 69 modules)": {"best": 1578.0, "last": 1578.0, "runs": 1}, "local|make gate-heavy (full gate, 7 modules)": {"best": 13.0, "last": 37.0, "runs": 11}, "local|make gate-heavy (full gate, 70 modules)": {"best": 1583.0, "last": 1583.0, "runs": 1}, "local|make gate-heavy (full gate, 77 modules)": {"best": 1658.0, "last": 1658.0, "runs": 1}, "local|make gate-heavy (full gate, 8 modules)": {"best": 38.0, "last": 38.0, "runs": 6}, "local|make gate-heavy (full gate, 85 modules)": {"best": 114.0, "last": 114.0, "runs": 1}, "local|make gate-heavy (full gate, 9 modules)": {"best": 14.0, "last": 38.0, "runs": 7}} -->
+<!-- AUTO:DATA {"cloud|agda-dev ../evidence/probed/Probed/Apparatus.agda": {"best": 3.5, "last": 3.5, "runs": 1}, "cloud|agda-dev ../evidence/probed/Probed/Main.agda": {"best": 7.2, "last": 7.2, "runs": 10}, "cloud|agda-dev ../evidence/refuted/Refuted/Main.agda": {"best": 5.9, "last": 5.9, "runs": 7}, "cloud|agda-dev ../evidence/refuted/Refuted/Room-Backlog.agda": {"best": 60.4, "last": 60.4, "runs": 1}, "cloud|agda-dev CLI/Decode.agda": {"best": 7.0, "last": 8.4, "runs": 6}, "cloud|agda-dev CLI/Encode.agda": {"best": 5.9, "last": 7.0, "runs": 5}, "cloud|agda-dev CLI/IO.agda": {"best": 6.4, "last": 6.4, "runs": 1}, "cloud|agda-dev CLI/JSON.agda": {"best": 3.5, "last": 3.5, "runs": 1}, "cloud|agda-dev CLI/Main.agda": {"best": 6.8, "floor": true, "last": 2.0, "runs": 6}, "cloud|agda-dev Decide.agda": {"best": 3.4, "last": 3.4, "runs": 1}, "cloud|agda-dev Implementation.agda": {"best": 3.2, "last": 3.2, "runs": 2}, "cloud|agda-dev Implementation/Unit-Test.agda": {"best": 6.6, "floor": true, "last": 1.0, "runs": 7}, "cloud|agda-dev Implementation/Unit-Test/Bug-Cache.agda": {"best": 8.0, "floor": true, "last": 1.0, "runs": 4}, "cloud|agda-dev Implementation/Unit-Test/Prelude.agda": {"best": 6.6, "floor": true, "last": 1.0, "runs": 5}, "cloud|agda-dev Main.agda": {"best": 6.8, "last": 12.7, "runs": 10}, "cloud|agda-dev QuickCheck.agda": {"best": 10.6, "last": 18.2, "runs": 8}, "cloud|agda-dev Rx/Elaborate.agda": {"best": 5.4, "last": 12.0, "runs": 6}, "cloud|agda-dev Rx/Emit-Eq.agda": {"best": 3.0, "last": 3.5, "runs": 2}, "cloud|agda-dev Rx/Envelope.agda": {"best": 5.9, "last": 6.4, "runs": 3}, "cloud|agda-dev Rx/Envelope/Decode.agda": {"best": 5.3, "last": 5.3, "runs": 2}, "cloud|agda-dev Rx/Evaluator.agda": {"best": 6.1, "last": 23.4, "runs": 20}, "cloud|agda-dev Rx/Evaluator/Builder.agda": {"best": 5.6, "last": 9.8, "runs": 21}, "cloud|agda-dev Rx/Evaluator/Domain.agda": {"best": 7.5, "last": 54.3, "runs": 10}, "cloud|agda-dev Rx/Evaluator/Freshness.agda": {"best": 6.5, "last": 6.5, "runs": 1}, "cloud|agda-dev Rx/Evaluator/Keeps.agda": {"best": 17.2, "last": 17.2, "runs": 1}, "cloud|agda-dev Rx/Evaluator/Reducible.agda": {"best": 5.6, "last": 69.8, "runs": 78}, "cloud|agda-dev Rx/Evaluator/Reducible/Calls.agda": {"best": 16.1, "last": 16.1, "runs": 1}, "cloud|agda-dev Rx/Evaluator/Reducible/Floor.agda": {"best": 15.9, "last": 15.9, "runs": 1}, "cloud|agda-dev Rx/Evaluator/Reducible/Rule-Kept.agda": {"best": 13.4, "last": 13.4, "runs": 1}, "cloud|agda-dev Rx/Evaluator/Reducible/Support.agda": {"best": 18.1, "last": 18.1, "runs": 2}, "cloud|agda-dev Rx/Evaluator/Unconn-Arith.agda": {"best": 6.3, "last": 7.5, "runs": 2}, "cloud|agda-dev Rx/Exp.agda": {"best": 7.0, "last": 18.1, "runs": 9}, "cloud|agda-dev Rx/Exp/Guarded.agda": {"best": 5.6, "last": 6.3, "runs": 3}, "cloud|agda-dev Rx/Inputs-Below.agda": {"best": 7.1, "last": 7.5, "runs": 5}, "cloud|agda-dev Rx/Mint.agda": {"best": 2.6, "floor": true, "last": 2.0, "runs": 8}, "cloud|agda-dev Rx/Prim.agda": {"best": 3.0, "last": 3.0, "runs": 3}, "cloud|agda-dev Rx/Protocol.agda": {"best": 3.0, "last": 3.0, "runs": 4}, "cloud|agda-dev Rx/SExp.agda": {"best": 5.8, "last": 5.8, "runs": 2}, "cloud|agda-dev Rx/Slots.agda": {"best": 6.7, "last": 8.0, "runs": 2}, "cloud|agda-dev Spec.agda": {"best": 3.5, "floor": true, "last": 1.0, "runs": 2}, "cloud|agda-dev Verify-Batch-Simultaneous/Batch-Theorems.agda": {"best": 4.4, "last": 4.4, "runs": 2}, "cloud|agda-dev Verify-Batch-Simultaneous/The-Proof.agda": {"best": 1.0, "floor": true, "last": 1.0, "runs": 94}, "cloud|agda-dev Verify-Input-Well-Formed/Run-Well-Formed.agda": {"best": 7.3, "last": 8.9, "runs": 2}, "cloud|make gate-heavy (full gate, 13 modules)": {"best": 64.0, "last": 64.0, "runs": 1}, "cloud|make gate-heavy (full gate, 16 modules)": {"best": 20.0, "last": 20.0, "runs": 1}, "cloud|make gate-heavy (full gate, 24 modules)": {"best": 2643.0, "last": 2643.0, "runs": 1}, "cloud|make gate-heavy (full gate, 3 modules)": {"best": 15.0, "last": 18.0, "runs": 2}, "cloud|make gate-heavy (full gate, 326 modules)": {"best": 3374.0, "last": 3374.0, "runs": 1}, "cloud|make gate-heavy (full gate, 37 modules)": {"best": 2476.0, "last": 2476.0, "runs": 1}, "cloud|make gate-heavy (full gate, 5 modules)": {"best": 990.0, "last": 2090.0, "runs": 2}, "cloud|make gate-heavy (full gate, 51 modules)": {"best": 3917.0, "last": 3917.0, "runs": 1}, "cloud|make gate-heavy (full gate, 8 modules)": {"best": 29.0, "last": 29.0, "runs": 1}, "local|agda-dev CLI/Decode.agda": {"best": 5.1, "last": 5.1, "runs": 1}, "local|agda-dev Decide.agda": {"best": 1.6, "last": 1.6, "runs": 1}, "local|agda-dev Implementation/Unit-Test.agda": {"best": 1.0, "floor": true, "last": 1.0, "runs": 1, "unmeasured": true}, "local|agda-dev Implementation/Unit-Test/Bug-Cache.agda": {"best": 1.0, "floor": true, "last": 1.0, "runs": 1, "unmeasured": true}, "local|agda-dev Implementation/Unit-Test/Prelude.agda": {"best": 3.3, "floor": true, "last": 1.0, "runs": 2}, "local|agda-dev Main.agda": {"best": 45.0, "floor": true, "last": 45.0, "runs": 1}, "local|agda-dev QuickCheck.agda": {"best": 5.3, "last": 5.3, "runs": 2}, "local|agda-dev Rx/Elaborate.agda": {"best": 3.4, "last": 3.4, "runs": 1}, "local|agda-dev Rx/Evaluator.agda": {"best": 7.7, "last": 7.7, "runs": 2}, "local|agda-dev Rx/Exp.agda": {"best": 3.2, "last": 3.2, "runs": 3}, "local|agda-dev Rx/Mint.agda": {"best": 1.4, "last": 1.4, "runs": 1}, "local|agda-dev Rx/SExp.agda": {"best": 2.7, "last": 2.7, "runs": 1}, "local|agda-dev Rx/Slots.agda": {"best": 2.5, "last": 2.5, "runs": 3}, "local|agda-dev Spec.agda": {"best": 1.0, "floor": true, "last": 1.0, "runs": 1, "unmeasured": true}, "local|agda-dev Verify-Batch-Simultaneous/The-Proof.agda": {"best": 5.6, "floor": true, "last": 1.0, "runs": 1025}, "local|agda-dev Verify-Input-Well-Formed/Run-Well-Formed.agda": {"best": 45.0, "floor": true, "last": 45.0, "runs": 1, "unmeasured": true}, "local|agda-dev Verify-Input-Well-Formed/Well-Shaped.agda": {"best": 1.6, "last": 1.6, "runs": 1}, "local|make gate-heavy (full gate, 1 modules)": {"best": 5.0, "last": 7.0, "runs": 3}, "local|make gate-heavy (full gate, 10 modules)": {"best": 65.0, "last": 65.0, "runs": 5}, "local|make gate-heavy (full gate, 11 modules)": {"best": 18.0, "last": 1052.0, "runs": 9}, "local|make gate-heavy (full gate, 12 modules)": {"best": 375.0, "last": 1107.0, "runs": 5}, "local|make gate-heavy (full gate, 13 modules)": {"best": 88.0, "last": 1106.0, "runs": 5}, "local|make gate-heavy (full gate, 14 modules)": {"best": 19.0, "last": 1889.0, "runs": 2}, "local|make gate-heavy (full gate, 15 modules)": {"best": 19.0, "last": 80.0, "runs": 5}, "local|make gate-heavy (full gate, 16 modules)": {"best": 15.0, "last": 1101.0, "runs": 6}, "local|make gate-heavy (full gate, 17 modules)": {"best": 12.0, "last": 1495.0, "runs": 7}, "local|make gate-heavy (full gate, 174 modules)": {"best": 802.0, "last": 802.0, "runs": 1}, "local|make gate-heavy (full gate, 18 modules)": {"best": 28.0, "last": 278.0, "runs": 8}, "local|make gate-heavy (full gate, 19 modules)": {"best": 31.0, "last": 1203.0, "runs": 11}, "local|make gate-heavy (full gate, 2 modules)": {"best": 7.0, "last": 7.0, "runs": 1}, "local|make gate-heavy (full gate, 20 modules)": {"best": 32.0, "last": 32.0, "runs": 1}, "local|make gate-heavy (full gate, 21 modules)": {"best": 35.0, "last": 1697.0, "runs": 5}, "local|make gate-heavy (full gate, 22 modules)": {"best": 352.0, "last": 1312.0, "runs": 2}, "local|make gate-heavy (full gate, 23 modules)": {"best": 399.0, "last": 399.0, "runs": 1}, "local|make gate-heavy (full gate, 24 modules)": {"best": 1368.0, "last": 1368.0, "runs": 2}, "local|make gate-heavy (full gate, 25 modules)": {"best": 1211.0, "last": 1486.0, "runs": 3}, "local|make gate-heavy (full gate, 26 modules)": {"best": 1297.0, "last": 1297.0, "runs": 1}, "local|make gate-heavy (full gate, 28 modules)": {"best": 1448.0, "last": 1448.0, "runs": 1}, "local|make gate-heavy (full gate, 29 modules)": {"best": 1298.0, "last": 1298.0, "runs": 1}, "local|make gate-heavy (full gate, 3 modules)": {"best": 9.0, "last": 9.0, "runs": 1}, "local|make gate-heavy (full gate, 30 modules)": {"best": 1342.0, "last": 1342.0, "runs": 2}, "local|make gate-heavy (full gate, 306 modules)": {"best": 1709.0, "last": 1709.0, "runs": 2}, "local|make gate-heavy (full gate, 32 modules)": {"best": 1642.0, "last": 1642.0, "runs": 1}, "local|make gate-heavy (full gate, 34 modules)": {"best": 669.0, "last": 669.0, "runs": 1}, "local|make gate-heavy (full gate, 35 modules)": {"best": 1633.0, "last": 1633.0, "runs": 1}, "local|make gate-heavy (full gate, 36 modules)": {"best": 1338.0, "last": 1338.0, "runs": 1}, "local|make gate-heavy (full gate, 37 modules)": {"best": 1831.0, "last": 1831.0, "runs": 1}, "local|make gate-heavy (full gate, 38 modules)": {"best": 1477.0, "last": 1477.0, "runs": 1}, "local|make gate-heavy (full gate, 4 modules)": {"best": 9.0, "last": 11.0, "runs": 4}, "local|make gate-heavy (full gate, 43 modules)": {"best": 1791.0, "last": 1791.0, "runs": 1}, "local|make gate-heavy (full gate, 45 modules)": {"best": 662.0, "last": 662.0, "runs": 1}, "local|make gate-heavy (full gate, 46 modules)": {"best": 1407.0, "last": 1407.0, "runs": 1}, "local|make gate-heavy (full gate, 49 modules)": {"best": 743.0, "last": 743.0, "runs": 1}, "local|make gate-heavy (full gate, 5 modules)": {"best": 9.0, "last": 13.0, "runs": 6}, "local|make gate-heavy (full gate, 50 modules)": {"best": 660.0, "last": 1760.0, "runs": 4}, "local|make gate-heavy (full gate, 51 modules)": {"best": 1980.0, "last": 1980.0, "runs": 1}, "local|make gate-heavy (full gate, 52 modules)": {"best": 1893.0, "last": 1893.0, "runs": 1}, "local|make gate-heavy (full gate, 54 modules)": {"best": 1788.0, "last": 1788.0, "runs": 1}, "local|make gate-heavy (full gate, 55 modules)": {"best": 3004.0, "last": 3004.0, "runs": 1}, "local|make gate-heavy (full gate, 58 modules)": {"best": 2095.0, "last": 2095.0, "runs": 1}, "local|make gate-heavy (full gate, 59 modules)": {"best": 704.0, "last": 704.0, "runs": 1}, "local|make gate-heavy (full gate, 6 modules)": {"best": 10.0, "last": 34.0, "runs": 8}, "local|make gate-heavy (full gate, 61 modules)": {"best": 1592.0, "last": 1592.0, "runs": 1}, "local|make gate-heavy (full gate, 69 modules)": {"best": 1578.0, "last": 1578.0, "runs": 1}, "local|make gate-heavy (full gate, 7 modules)": {"best": 13.0, "last": 37.0, "runs": 11}, "local|make gate-heavy (full gate, 70 modules)": {"best": 1583.0, "last": 1583.0, "runs": 1}, "local|make gate-heavy (full gate, 77 modules)": {"best": 1658.0, "last": 1658.0, "runs": 1}, "local|make gate-heavy (full gate, 8 modules)": {"best": 38.0, "last": 38.0, "runs": 6}, "local|make gate-heavy (full gate, 85 modules)": {"best": 114.0, "last": 114.0, "runs": 1}, "local|make gate-heavy (full gate, 9 modules)": {"best": 14.0, "last": 38.0, "runs": 7}} -->
 
 <!-- AUTO:END -->
 
@@ -283,45 +293,43 @@ one section up, arriving as a memory figure rather than as a duration.
 Agda 2.7.0.1 → 2.8.0 was the one lever that ever moved the gate: **927 s → 384 s** total
 on Subscribe-Face, **779 s → 300 s** of that being Positivity (2.6×).
 
-## The gate in CI — the interface cache is worth ~38x on the gate step
+## The gate in CI — FETCHED, never recorded here
 
-CI always takes `gate-heavy` (`.gate-heavy-stamp` is gitignored, so a fresh checkout
-never has one), so these two rows are the SAME command over the same tree. The only
-variable is whether `actions/cache` restored a snapshot Agda still considers valid.
+```
+make ci-gate-time          # the 5 most recent GREEN Gate runs
+make ci-gate-time N=20
+```
 
-| | `make gate` | job total |
-|---|---|---|
-| cold — restored snapshot 10 Agda commits stale | **3789 s** (63 m 09 s) | 3887 s (64 m 47 s) |
-| warm — no Agda file changed since the snapshot | **78–101 s** | 163–192 s |
+It prints, per run, how long the `make gate` step took and whether the Agda interface
+cache was restored. **That is the only number in this file that is not written down,
+and the reason is that it is the only one nobody here can re-measure.** Every other row
+is a command away — re-run it and see. A CI figure is a receipt about a machine nobody
+owns, on a cache state nobody controls, and the runner image, the toolchain step and
+the cache key all move underneath it. Written down it becomes unfalsifiable; fetched it
+is whatever the runs say today.
 
-Five warm runs, gate step: 78, 80, 86, 100, 101 s. The spread is runner noise, not
-tree state.
+**Read the spread, not a figure.** CI always takes `gate-heavy` (`.gate-heavy-stamp` is
+gitignored, so a fresh checkout never has one), so every row is the SAME command over
+its own tree and the only real variable is the cache. A warm run restored a snapshot
+Agda still accepts. A cold one did not, and what it measures is that snapshot's
+STALENESS — a cone, not the tower from nothing — so there is no single "cold cost" and
+a snapshot stale by one cheap commit lands somewhere the table could never say. Why a
+PR that changes no Agda file can land cold anyway: [docs/ci-cache.md](docs/ci-cache.md).
 
-**The restore itself is free and the toolchain is not.** Restoring the interface cache
-measures 0–2 s for ~85 MB, and `Checkout` at `fetch-depth: 0` is 2–4 s. What actually
-floors a warm run is `Set up GHC + cabal` at 71–79 s — comparable to the entire warm
-gate. So the warm number is roughly half toolchain and half Agda, and shaving the gate
-further buys less than the table suggests.
-
-**Do not read the cold row as the cost of a cold cache.** It is the cost of a snapshot
-that is stale by a specific amount — ten commits touching `agda/src`, spanning the walk,
-caps and nest faces — so it measures that cone, not the tower from nothing. A snapshot
-stale by one cheap commit sits somewhere between the two rows, and nothing here says
-where. Why a PR that changes no Agda file can land on the cold row anyway:
-[docs/ci-cache.md](docs/ci-cache.md).
+**What floors a warm run is the toolchain, not Agda.** Restoring the interface cache is
+0–2 s for ~85 MB and `Checkout` at `fetch-depth: 0` is 2–4 s, while `Set up GHC + cabal`
+is comparable to the whole warm gate. So shaving the gate buys less than the fetched
+numbers suggest — that shape is stable even as the figures move, which is why it is
+here and they are not.
 
 ### The other uncached third: MAlonzo objects
 
 `make gate` runs the bug cache, which is a GHC compile the interface cache above
-does not touch. Measured on one warm-cache CI run, gate step 177 s:
+does not touch — `agda/_cli/MAlonzo` absent costs ~61 s over 157 modules. With that
+tree warm (laptop) only **12 of 157** recompile: the 12 are this repo's own, whose
+`.hs` Agda rewrites on every run, and the 145 GHC skips are the stdlib's.
 
-| | |
-|---|---|
-| `ghc -O -o ../_cli/Bug-Cache`, `agda/_cli/MAlonzo` absent | **~61 s**, 157 modules |
-| the same compile with that tree warm (laptop) | **12 of 157** modules recompiled |
-
-The 12 are this repo's own, whose `.hs` Agda rewrites on every run; the 145 GHC
-skips are the stdlib's. Sizes, which decide the cache key: the object tree is
+Sizes, which decide the cache key: the object tree is
 44 MB and the three linked binaries are 84 MB — so the binaries are excluded and
 the key names the toolchain rather than the commit, per
 [docs/ci-cache.md](docs/ci-cache.md).

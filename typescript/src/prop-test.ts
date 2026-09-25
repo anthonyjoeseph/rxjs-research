@@ -1,9 +1,10 @@
-import { Closed, Ty, Val } from "./exp.js";
+import { Closed, ScriptVal, Ty, Val, showValues } from "./exp.js";
 import { evaluatePlain } from "./plain-eval.js";
 import { genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
-import { readFileSync } from "node:fs";
+import { reachesRegion } from "./region.js";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
 // THE ORACLE, AND WHAT IT IS AN ORACLE FOR (Anthony: "the sole purpose
 // of the fastcheck run is to ensure that the 'plain' agda Exp tree and
@@ -55,14 +56,15 @@ export type ObservableInput<A> = ObservableInputCold<A> | ObservableInputHot<A>;
 // const telescope) — generator invariant, re-checked by the Agda
 // decoder alongside well-typedness and μ-guardedness.
 export type Slot =
-  | { type: "scripted"; input: ObservableInput<Val> }
+  | { type: "scripted"; input: ObservableInput<ScriptVal> }
   | { type: "shared"; def: Closed };
 
 export type Slots = Slot[]; // one per Γ slot, index-aligned
 
 // one program's output: the values the exp tree emitted, in order. Both
-// sides (TS-here and Agda-via-CLI) return this per case.
-export type EvalResult = { values: Val[] };
+// sides (TS-here and Agda-via-CLI) return this per case. A `crash` names
+// what the run died at, and its values are then no output at all.
+export type EvalResult = { values: Val[]; crash?: string };
 
 // The serializable unit of differential testing: a whole program.
 // ctx is Γ — the types of the slots, index-aligned with slots.
@@ -96,9 +98,71 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // prints.  Without it a divergence is reproducible only by re-running
 // the sweep that found it, and a generator edit moves every offset.
 const readCasesFromCli = (): string | undefined => readFlag("cases");
+// `--crashes <file>` KEEPS EVERY CRASHING PROGRAM, one `{why, case}` per
+// line, where the report keeps only the smallest few per reason. The
+// smallest are the ones worth pinning; the whole set is what says
+// whether a reason has ONE shape or several, which a sample of three
+// cannot. The file is truncated at the start of the run and appended a
+// chunk at a time, so a killed sweep still leaves what it found.
+const readCrashesFromCli = (): string | undefined => readFlag("crashes");
+
+// KEY ORDER IS NOT CONTENT, so two spellings of one row compare equal.
+// A hand-written row and the compact line a failing case prints carry
+// the same program in different orders, which is exactly the pair a
+// textual comparison would miss.
+const canonical = (v: unknown): string =>
+  JSON.stringify(v, (_k, x: unknown) =>
+    x !== null && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(
+          Object.entries(x as Record<string, unknown>).sort(([a], [b]) =>
+            a < b ? -1 : 1,
+          ),
+        )
+      : x,
+  );
+
+// A PINNED FILE'S ROW COUNT IS A COVERAGE CLAIM, AND A REPEATED ROW
+// MAKES IT A FALSE ONE.  Two rows naming one program cannot fail
+// independently, so the count reads as reach the file does not have --
+// the same shape of lie as a green sweep that never entered the region,
+// and just as invisible while the number is only ever read.
+//
+// It is not a hypothetical: a row is pinned by COPYING the line a
+// failing case prints, so a program already pinned by hand gets pinned
+// again in the other spelling, and the file then reports a bigger
+// denominator every summary of the run quotes.
+const refuseDuplicates = (file: string, cases: TestCase[]): void => {
+  const keys = cases.map(canonical);
+  const dup = keys
+    .map((k, i) => ({ i, first: keys.indexOf(k) }))
+    .find(({ i, first }) => first !== i);
+  if (dup !== undefined)
+    throw new Error(
+      `${file}: row ${dup.i} names the same program as row ${dup.first} — ` +
+        `a row that cannot fail independently of another inflates the count ` +
+        `this file is read for`,
+    );
+};
+
+const replayCases = (file: string): TestCase[] => {
+  const cases = readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as TestCase);
+  return (refuseDuplicates(file, cases), cases);
+};
+// THE TWO SIDES ARE THE COMPILED AGDA AND PLAIN RXJS, AND NOTHING ELSE
+// MAY STAND ON EITHER.  A third machine here would be a semantics this
+// repo wrote to check its own semantics against, and a green between
+// two things we authored says nothing about rxjs -- which is the only
+// authority the evaluator answers to.  `--machine` picks what is under
+// test, `--baseline` what it is compared against; the defaults are the
+// only pairing that measures anything.
+const readMachineFromCli = (): string | undefined => readFlag("machine");
+const readBaselineFromCli = (): string | undefined => readFlag("baseline");
 
 // A TOKEN IN A VALUE POSITION IS REFUSED, WHICH IS THE ONE PLACE A
-// SYMBOL WOULD LIE.  `JSON.stringify` drops a symbol silently, so a
+// SYMBOL WOULD LIE.  A JSON rendering drops a symbol silently, so a
 // minted token reaching the output would compare equal to a side that
 // emitted nothing there — a false green, and the only kind this
 // comparison can produce. The two sides carry a token differently (TS a
@@ -110,7 +174,7 @@ const noToken = (v: unknown): void => {
   if (typeof v === "symbol")
     throw new Error(
       "a uniq token reached the output — the comparison has no renaming " +
-        "for one, and JSON.stringify would drop it silently",
+        "for one, and a JSON rendering would drop it silently",
     );
   if (Array.isArray(v)) v.forEach(noToken);
   else if (v !== null && typeof v === "object")
@@ -119,7 +183,7 @@ const noToken = (v: unknown): void => {
 
 const render = (values: Val[]): string => (
   values.forEach(noToken),
-  JSON.stringify(values)
+  showValues(values)
 );
 
 // Compare the Agda (oracle) and rxjs value lists case by case, and
@@ -143,38 +207,134 @@ const render = (values: Val[]): string => (
 // toward a coverage claim is the vacuous-row failure this file's own
 // EMPTY-output incident already records, one notch weaker: there the
 // check could not fail, here most of it does not.
-const interpretResults = (
+//
+// AND THE SIDES ARE NAMED BY THE CALLER, because the oracle side is not
+// always the Agda: a reference run puts a transcription there, and a
+// report calling it `agda` would be a lying label on the one output a
+// reader takes a verdict from.
+//
+// AND A CRASH IS ITS OWN VERDICT, COUNTED BY WHAT IT DIED AT. A run that
+// reached a postulate has no output to compare, so it is neither a match
+// nor a divergence; it fails the sweep all the same. At volume the same
+// postulate is reached by thousands of programs, so what is printed is
+// the count per reason and the SMALLEST few programs for each -- the
+// ones worth pinning -- and the divergences past the first few are
+// counted rather than listed. Only the printing is capped, never the
+// verdict.
+const SHOWN_DIVERGENCES = 20;
+const SHOWN_CRASHES = 3;
+
+type Tally = {
+  n: number;
+  live: number;
+  region: number;
+  valuesOk: number;
+  lengthMismatch?: string;
+  divergences: string[];
+  diverged: number;
+  crashes: Map<string, { count: number; smallest: string[] }>;
+};
+
+const emptyTally = (): Tally => ({
+  n: 0,
+  live: 0,
+  region: 0,
+  valuesOk: 0,
+  divergences: [],
+  diverged: 0,
+  crashes: new Map(),
+});
+
+// the shortest programs first, ties broken by text so the pick is stable
+const keepSmallest = (xs: string[], x: string): string[] =>
+  [...xs, x]
+    .sort((p, q) => p.length - q.length || (p < q ? -1 : p > q ? 1 : 0))
+    .slice(0, SHOWN_CRASHES);
+
+const tallyChunk = (
+  t: Tally,
   agdaResults: EvalResult[],
   rxResults: EvalResult[],
   testCases: TestCase[],
-): { report: string; ok: boolean; live: number } => {
+  lhs: string,
+  rhs: string,
+): void => {
   const n = Math.min(agdaResults.length, rxResults.length);
-  const lines: string[] = [];
-  let valuesOk = 0;
-  let live = 0;
+  if (agdaResults.length !== rxResults.length && t.lengthMismatch === undefined)
+    t.lengthMismatch = `${lhs} ${agdaResults.length}, ${rhs} ${rxResults.length}`;
   for (let i = 0; i < n; i++) {
-    const a = render(agdaResults[i].values);
-    const r = render(rxResults[i].values);
+    const at = t.n + i;
     if (agdaResults[i].values.length > 0 || rxResults[i].values.length > 0)
-      live++;
-    if (a === r) {
-      valuesOk++;
+      t.live++;
+    const crash = agdaResults[i].crash ?? rxResults[i].crash;
+    if (crash !== undefined) {
+      const seen = t.crashes.get(crash) ?? { count: 0, smallest: [] };
+      t.crashes.set(crash, {
+        count: seen.count + 1,
+        smallest: keepSmallest(seen.smallest, serialize(testCases[i])),
+      });
       continue;
     }
-    lines.push(`case ${i}: values ✗`);
-    lines.push(`  program     = ${serialize(testCases[i])}`);
-    lines.push(`  agda.values = ${a}`);
-    lines.push(`  rx.values   = ${r}`);
+    const a = render(agdaResults[i].values);
+    const r = render(rxResults[i].values);
+    if (a === r) {
+      t.valuesOk++;
+      continue;
+    }
+    t.diverged++;
+    if (t.divergences.length < SHOWN_DIVERGENCES * 4)
+      t.divergences.push(
+        `case ${at}: values ✗`,
+        `  program     = ${serialize(testCases[i])}`,
+        `  ${lhs}.values = ${a}`,
+        `  ${rhs}.values = ${r}`,
+      );
   }
+  t.region += testCases.slice(0, n).filter(reachesRegion).length;
+  t.n += n;
+};
+
+// the `--crashes` rows of one chunk: a case is a row iff either side
+// died on it, and the row says what it died at
+const crashRows = (
+  agdaResults: EvalResult[],
+  rxResults: EvalResult[],
+  testCases: TestCase[],
+): string[] =>
+  testCases.flatMap((testCase, i) => {
+    const why = agdaResults[i]?.crash ?? rxResults[i]?.crash;
+    return why === undefined
+      ? []
+      : [`{"why":${JSON.stringify(why)},"case":${serialize(testCase)}}`];
+  });
+
+const crashedCount = (t: Tally): number =>
+  [...t.crashes.values()].reduce((k, c) => k + c.count, 0);
+
+const reportTally = (t: Tally): { report: string; ok: boolean } => {
+  const crashed = crashedCount(t);
   const header =
-    `${n} cases (${live} emitting): values ${valuesOk}/${n} match` +
-    (agdaResults.length !== rxResults.length
-      ? ` (LENGTH MISMATCH: agda ${agdaResults.length}, rx ${rxResults.length})`
+    `${t.n} cases (${t.live} emitting, ${t.region} in region):` +
+    ` values ${t.valuesOk}/${t.n} match` +
+    (crashed > 0
+      ? `, ${crashed} crashed (${[...t.crashes]
+          .map(([why, c]) => `${why} ${c.count}`)
+          .join(", ")})`
+      : "") +
+    (t.lengthMismatch !== undefined
+      ? ` (LENGTH MISMATCH: ${t.lengthMismatch})`
       : "");
+  const crashLines = [...t.crashes].flatMap(([why, c]) => [
+    `crash ${why}: ${c.count} case(s), smallest ${c.smallest.length}:`,
+    ...c.smallest.map((p) => `  program     = ${p}`),
+  ]);
+  const hidden =
+    t.diverged > SHOWN_DIVERGENCES
+      ? [`(${t.diverged - SHOWN_DIVERGENCES} more divergences not shown)`]
+      : [];
   return {
-    report: [header, ...lines].join("\n"),
-    ok: valuesOk === n && n > 0 && agdaResults.length === rxResults.length,
-    live,
+    report: [...t.divergences, ...hidden, ...crashLines, header].join("\n"),
+    ok: t.valuesOk === t.n && t.n > 0 && t.lengthMismatch === undefined,
   };
 };
 
@@ -200,52 +360,147 @@ const interpretResults = (
 // side emitting and the other not. Filtering on rx-empty would have
 // filtered that finding away. So the silent rows are thinned, never
 // excluded.
+//
+// `--corpus <n>` SETS THE SIZE, and the proportions hold at any size: a
+// fifth silent, the rest emitting, and a seed bound scaled with it. The
+// draw is handed over in CHUNKS, each run and tallied before the next is
+// drawn, so a sweep of millions holds one chunk in memory rather than
+// the corpus -- and a chunk is one CLI batch, whose crashes restart it
+// rather than end it.
 const CORPUS = 500;
-const SILENT_QUOTA = 100;
-const LIVE_TARGET = CORPUS - SILENT_QUOTA;
-const MAX_SEEDS = 400; // a bound, so an `--operator` that can only draw
-// silent programs reports a short corpus instead of looping
+const CHUNK = 2000;
+const quotas = (corpus: number) => {
+  const silentQuota = Math.floor(corpus / 5);
+  return {
+    silentQuota,
+    liveTarget: corpus - silentQuota,
+    // a bound, so an `--operator` that can only draw silent programs
+    // reports a short corpus instead of looping
+    maxSeeds: Math.ceil((corpus * 4) / 5),
+  };
+};
 
-const drawCorpus = (operator?: string): TestCase[] => {
-  const live: TestCase[] = [];
-  const silent: TestCase[] = [];
+// `--shard k/n` RUNS ONE NTH OF THE SAME DRAW, so n processes cover one
+// corpus between them. Every shard makes the whole draw and keeps the
+// accepted cases whose position is k mod n: the union of the shards is
+// the unsharded corpus exactly, and the quotas and the yield are the
+// draw's, not a shard's. What a shard repeats is generation and the rx
+// filter; what it splits is the Agda side, which is the cost.
+type Shard = { k: number; n: number };
+const readShardFromCli = (): Shard | undefined => {
+  const v = readFlag("shard");
+  if (v === undefined) return undefined;
+  const m = /^(\d+)\/(\d+)$/.exec(v);
+  const k = Number(m?.[1]);
+  const n = Number(m?.[2]);
+  if (m === null || n <= 0 || k >= n)
+    throw new Error(`--shard takes k/n with 0 <= k < n, not '${v}'`);
+  return { k, n };
+};
+
+function* drawChunks(
+  corpus: number,
+  shard: Shard,
+  drawn: { live: number },
+  operator?: string,
+): Generator<TestCase[]> {
+  const { silentQuota, liveTarget, maxSeeds } = quotas(corpus);
+  let live = 0;
+  let silent = 0;
+  let chunk: TestCase[] = [];
   for (
     let i = 0;
-    i < MAX_SEEDS &&
-    (live.length < LIVE_TARGET || silent.length < SILENT_QUOTA);
+    i < maxSeeds && (live < liveTarget || silent < silentQuota);
     i++
   ) {
     for (const testCase of genTestCases(`s${i}`, operator)) {
-      const bucket = evaluatePlain(testCase).length > 0 ? live : silent;
-      const cap = bucket === live ? LIVE_TARGET : SILENT_QUOTA;
-      if (bucket.length < cap) bucket.push(testCase);
+      const emits = evaluatePlain(testCase).length > 0;
+      if (emits ? live >= liveTarget : silent >= silentQuota) continue;
+      const position = live + silent;
+      if (emits) live++;
+      else silent++;
+      drawn.live = live;
+      if (position % shard.n !== shard.k) continue;
+      chunk.push(testCase);
+      if (chunk.length === CHUNK) {
+        yield chunk;
+        chunk = [];
+      }
     }
   }
-  return [...live, ...silent];
+  if (chunk.length > 0) yield chunk;
+}
+
+const readCorpusFromCli = (): number | undefined => {
+  const v = readFlag("corpus");
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n <= 0)
+    throw new Error(`--corpus takes a positive integer, not '${v}'`);
+  return n;
 };
 
 async function main() {
   const operator = readOperatorFromCli();
   const cliSeed = readSeedFromCli();
   const casesFile = readCasesFromCli();
-  const testCases =
+  const corpus = readCorpusFromCli() ?? CORPUS;
+  const shard = readShardFromCli() ?? { k: 0, n: 1 };
+  const drawn = { live: 0 };
+  const machine = readMachineFromCli() ?? "agda";
+  const baseline = readBaselineFromCli() ?? "rx";
+  const known = ["agda", "rx"];
+  for (const [flag, v] of [
+    ["machine", machine],
+    ["baseline", baseline],
+  ])
+    if (!known.includes(v))
+      throw new Error(`--${flag} takes ${known.join(" | ")}, not '${v}'`);
+  const swept = casesFile === undefined && cliSeed === undefined;
+  const chunks: Iterable<TestCase[]> =
     casesFile !== undefined
-      ? readFileSync(casesFile, "utf8")
-          .split("\n")
-          .filter((line) => line.trim().length > 0)
-          .map((line) => JSON.parse(line) as TestCase)
+      ? [replayCases(casesFile)]
       : cliSeed !== undefined
-        ? genTestCases(cliSeed, operator)
-        : drawCorpus(operator);
-  const agdaResults = await execAgda(testCases.map(serialize));
-  const rxResults = testCases.map((testCase): EvalResult => ({
-    values: evaluatePlain(testCase),
-  }));
-  const { report, ok, live } = interpretResults(
-    agdaResults,
-    rxResults,
-    testCases,
-  );
+        ? [genTestCases(cliSeed, operator)]
+        : drawChunks(corpus, shard, drawn, operator);
+  const run = async (
+    which: string,
+    testCases: TestCase[],
+  ): Promise<EvalResult[]> =>
+    which === "rx"
+      ? testCases.map((testCase): EvalResult => ({
+          values: evaluatePlain(testCase),
+        }))
+      : await execAgda(testCases.map(serialize));
+  if (machine !== "agda" || baseline !== "rx")
+    console.log(`comparing ${machine} against ${baseline}`);
+  const crashesFile = readCrashesFromCli();
+  if (crashesFile !== undefined) writeFileSync(crashesFile, "");
+  const tally = emptyTally();
+  for (const testCases of chunks) {
+    const machineResults = await run(machine, testCases);
+    const baselineResults = await run(baseline, testCases);
+    tallyChunk(
+      tally,
+      machineResults,
+      baselineResults,
+      testCases,
+      machine,
+      baseline,
+    );
+    if (crashesFile !== undefined) {
+      const rows = crashRows(machineResults, baselineResults, testCases);
+      if (rows.length > 0) appendFileSync(crashesFile, rows.join("\n") + "\n");
+    }
+    // progress on stderr, so the report on stdout stays the report
+    if (swept && corpus > CHUNK)
+      console.error(
+        `${shard.n > 1 ? `shard ${shard.k}/${shard.n} ` : ""}` +
+          `${tally.n}/${Math.ceil(corpus / shard.n)}: ${tally.valuesOk} match, ` +
+          `${tally.diverged} diverged, ${crashedCount(tally)} crashed`,
+      );
+  }
+  const { report, ok } = reportTally(tally);
   console.log(report);
   // a zero-case run is a failure too: it means the generator produced
   // nothing, which reads as a clean sweep of an empty corpus
@@ -254,10 +509,11 @@ async function main() {
   // because the yield is the thing the draw exists to hold. Only the
   // full sweep is held to it -- a pinned `--seed` or a `--cases` replay
   // is whatever the user asked for.
-  if (casesFile === undefined && cliSeed === undefined && live < LIVE_TARGET) {
+  const { liveTarget, maxSeeds } = quotas(corpus);
+  if (swept && drawn.live < liveTarget) {
     console.log(
-      `YIELD SHORT: ${live} emitting rows, target ${LIVE_TARGET} -- the ` +
-        `draw could not find enough programs that emit within ${MAX_SEEDS} seeds`,
+      `YIELD SHORT: ${drawn.live} emitting rows, target ${liveTarget} -- the ` +
+        `draw could not find enough programs that emit within ${maxSeeds} seeds`,
     );
     process.exitCode = 1;
   }

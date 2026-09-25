@@ -5,6 +5,13 @@
 **/node_modules
 typescript/node_modules
 typescript/.oracle-tmp
+# the deep sweep's own emit dir and the failures it appends -- a divergence
+# is pinned by COPYING the printed program into `corpus/`, never by
+# committing the raw log, which would be a corpus nobody shrank
+typescript/.deep-tmp
+typescript/corpus/.deep-failures.ndjson
+# and the census's, which is the same arrangement: a tsc output dir, never a source
+typescript/.census-tmp
 
 # agda
 **/MAlonzo
@@ -53,3 +60,4 @@ agda/_stripped-comments/
 # the ntfy topic is an ADDRESS, not config: anyone holding it can read the
 # gate notifications, so it stays out of the tree
 .ntfy-topic
+agda/_oracle/

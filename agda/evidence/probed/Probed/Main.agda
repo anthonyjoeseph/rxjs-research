@@ -15,14 +15,14 @@
 -- nobody — so `using ()` is the correct and expected clause here.  It is not
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 --
--- WHY THE TREE IS EMPTY.  A probe expires with its target, and every
--- statement this tree was written against was a reading of a MEASURE —
--- a budget's grant, a frame's carried figure, a depth read off the
--- program text.  None of them is stateable now, so the rows would be
--- evidence about a machine that is gone and E2 expires every one of
--- them.  What replaced the measure has not been instantiated at
--- anything yet, which is the single largest unmanaged risk in the
--- repo and the next thing this tree is for.
+-- WHY THE TREE HOLDS NO PROBE.  A probe expires with its target, and
+-- every statement this tree was written against before the candidate
+-- answered with a trace was a reading of a MEASURE — a budget's grant,
+-- a frame's carried figure, a depth read off the program text — or the
+-- dead branch of a runtime guard the trace design deleted.  None of
+-- them is stateable now, so E2 expires every row written against one.
+-- The arms of the trace-returning candidate are its first probeable
+-- statements, and no row has reached one yet.
 --
 -- AND TWO FURTHER GENERATIONS EXPIRED THE SAME WAY, WHICH IS WHAT SAYS
 -- THE MECHANISM IS THE RIGHT ONE RATHER THAN AN OVERHEAD.  Six files
@@ -40,6 +40,9 @@
 -- several of them — since a green on a bound this development no longer
 -- states says nothing about the descent that replaced it.
 --
+-- RECOVERY: git show 3abdafa1:agda/evidence/probed/Probed/Stuck-Branches.agda
+--   holds the harness that built a flattener's hop by hand from the
+--   relation's constructors, which a probe of a flattener arm wants back.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 -- RECOVERY: git show 3a3bd405:agda/evidence/probed/Probed/Connect-Count.agda
 -- RECOVERY: git show 15e6c229:agda/evidence/probed/Probed/Pipeline-Claims.agda

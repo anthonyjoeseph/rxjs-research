@@ -10,6 +10,7 @@ open import Data.Vec     using (Vec; lookup)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Maybe   using (Maybe)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Function.Base using (_|>′_)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (Dec; yes; no)
@@ -651,12 +652,12 @@ evalWith (caseᵗ sc l r) env with evalWith sc env
 ... | inj₁ x = evalWith l (x ∷ᵉ env)
 ... | inj₂ y = evalWith r (y ∷ᵉ env)
 evalWith (ifᵗ c t e)   env = if evalWith c env then evalWith t env else evalWith e env
-evalWith (primᵗ add arg)  env = let (a , b) = evalWith arg env in a + b
-evalWith (primᵗ sub arg)  env = let (a , b) = evalWith arg env in a ∸ b
-evalWith (primᵗ mul arg)  env = let (a , b) = evalWith arg env in a * b
-evalWith (primᵗ eqᵖ arg)  env = let (a , b) = evalWith arg env in a ≡ᵇ b
-evalWith (primᵗ eqᵘ arg)  env = let (a , b) = evalWith arg env in a ≡ᵇ b
-evalWith (primᵗ ltᵖ arg)  env = let (a , b) = evalWith arg env in a <ᵇ b
+evalWith (primᵗ add arg)  env = evalWith arg env |>′ λ (a , b) → a + b
+evalWith (primᵗ sub arg)  env = evalWith arg env |>′ λ (a , b) → a ∸ b
+evalWith (primᵗ mul arg)  env = evalWith arg env |>′ λ (a , b) → a * b
+evalWith (primᵗ eqᵖ arg)  env = evalWith arg env |>′ λ (a , b) → a ≡ᵇ b
+evalWith (primᵗ eqᵘ arg)  env = evalWith arg env |>′ λ (a , b) → a ≡ᵇ b
+evalWith (primᵗ ltᵖ arg)  env = evalWith arg env |>′ λ (a , b) → a <ᵇ b
 evalWith (primᵗ notᵖ arg) env = not (evalWith arg env)
 -- THE CLAUSE THE WHOLE FAMILY EXISTS FOR: the body is PAIRED with the
 -- environment rather than substituted into, so nothing is reified and

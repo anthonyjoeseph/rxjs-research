@@ -60,8 +60,11 @@ SYMBOLS = set("-!#$%&*+./<=>?@\\^|~:;,'\"`")
 
 LINE_COMMENT = re.compile(r"^[ \t]*(-{2,})(.?)")
 
-# a `{-` that does NOT open a pragma
-BLOCK_OPEN = re.compile(r"\{-(?!#)")
+# a `{-` that does NOT open a pragma, nor the oracle's erasure marker.
+# `{-@0-}` closes on the character it opens with and holds no `--`, so no
+# line can start inside one: it leaves the line-local rule exactly as sound
+# as a file without it.  scripts/oracle-mirror.py spends it.
+BLOCK_OPEN = re.compile(r"\{-(?!#|@0-\})")
 
 
 def strippable(line):
@@ -268,6 +271,16 @@ def selftest():
     elif kept != [1, 3, 4]:
         bad.append(f"  line map wrong for the pragma case: {kept}")
 
+    # nor does the erasure marker -- but a marker glued to a real block
+    # comment's opener must not smuggle that comment past the exclusion
+    marked = "f : ({-@0-}p : A) → B\n-- gone\ncode = 1\n"
+    out, _kept, reason = strip_text(marked)
+    if reason is not None or out != "f : ({-@0-}p : A) → B\ncode = 1\n":
+        bad.append("  `{-@0-}` is the oracle's marker, not a block comment")
+    for glued in ("{-@0 a block -}\n", "{-@0-}{- a block -}\n"):
+        if strip_text(glued + "-- kept\n")[2] is None:
+            bad.append(f"  {glued.strip()!r} hides a block comment and was stripped")
+
     # THE POINT OF THE WHOLE TOOL: inserting a comment line must not change
     # the stripped output at all.
     a = "a = 1\n-- x\nb = 2\n"
@@ -327,7 +340,8 @@ def selftest():
         print("\n".join(bad))
         return 1
     print(f"strip-comments selftest: PASS ({len(CASES)} lexical cases, "
-          "block-comment exclusion, pragma, line map, insert-invariance; and "
+          "block-comment exclusion, pragma, erasure marker, line map, "
+          "insert-invariance; and "
           "the interface orphan sweep reaches _build rather than the .agda's "
           "sibling, spares a live module and spares _dev)")
     return 0

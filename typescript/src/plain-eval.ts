@@ -2,7 +2,6 @@ import {
   EMPTY,
   Observable,
   Subject,
-  concat,
   defer as rxDefer,
   exhaustAll,
   map as rxMap,
@@ -15,7 +14,15 @@ import {
   switchAll,
   take as rxTake,
 } from "rxjs";
-import { Closed, ObsVal, Val, evalWith, unfoldMu } from "./exp.js";
+import {
+  Closed,
+  ObsVal,
+  ScriptVal,
+  Val,
+  evalWith,
+  toVal,
+  unfoldMu,
+} from "./exp.js";
 import { PlainDriver, createPlainDriver, plainHop } from "./plain-driver.js";
 import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 
@@ -32,14 +39,15 @@ import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 // the comparison.
 
 // delta-encoded waits → absolute ticks (gap = wait + 1, so a source's
-// ticks are strictly increasing by construction)
+// ticks are strictly increasing by construction); the script's values
+// cross into the run here
 const resolveTicks = (
   anchor: number,
-  timed: Timed<Val>[],
+  timed: Timed<ScriptVal>[],
 ): { tick: number; val: Val }[] =>
   timed.reduce<{ tick: number; val: Val }[]>((acc, { wait, val }) => {
     const prev = acc.length > 0 ? acc[acc.length - 1].tick : anchor;
-    return [...acc, { tick: prev + wait + 1, val }];
+    return [...acc, { tick: prev + wait + 1, val: toVal(val) }];
   }, []);
 
 // a scripted tail as an observable: the driver fires each entry, the
@@ -71,7 +79,7 @@ const tail = (
 // rather than anything the tree can reach.
 const plainInput = (
   driver: PlainDriver,
-  input: ObservableInput<Val>,
+  input: ObservableInput<ScriptVal>,
   index: number,
 ): Observable<Val> => {
   if (input.type === "hot") {
@@ -89,12 +97,39 @@ const plainInput = (
     );
     return subject;
   }
+  // A COLD REGISTERS ITS TAIL BEFORE REPLAYING ITS PREFIX, AND THE
+  // ORDER IS OBSERVABLE RATHER THAN COSMETIC. Both orderings are
+  // ordinary rxjs -- a source may schedule and then emit, or emit and
+  // then schedule -- and with real timers the choice decides which of
+  // two same-instant deliveries is armed first. Here it decides the
+  // ORDINAL, since the driver mints those in registration order, so a
+  // cold whose prefix cascade subscribes another source either outranks
+  // that source or is outranked by it.
+  //
+  // `merge` AND NOT `concat`, WHICH IS THE WHOLE EDIT. `concat`
+  // subscribes the tail only once the prefix has completed, so every
+  // source the prefix's own cascade subscribes registers first; the
+  // Agda evaluator registers at the point of subscription, before
+  // handing the prefix back as a burst for its caller to cascade, and
+  // that is forced there rather than chosen -- a subscribe returns its
+  // burst upward, so it cannot run the cascade and then register. The
+  // two must agree for the same reason the hot slot above takes its
+  // ordinal from the slot index instead of minting one, and a flattener
+  // is where a disagreement surfaces: `exhaustAll` refuses an arrival
+  // while an inner is live, so whether the inner's completion or the
+  // outer's next value is delivered first decides whether a whole inner
+  // run is admitted or dropped.
+  //
+  // The cut is handled either way and is not what decides this:
+  // `concat` never subscribes a tail the prefix cut, while a tail
+  // registered first is severed by rx teardown through
+  // `registerSource`'s cancel.
   return rxDefer(() =>
-    concat(
-      rxOf(...input.sync),
+    merge(
       input.async.length === 0
         ? EMPTY
         : tail(driver, resolveTicks(driver.currentTick(), input.async)),
+      rxOf(...input.sync.map(toVal)),
     ),
   );
 };
@@ -142,10 +177,10 @@ export const compilePlain = (
       );
     case "take": {
       const count = evalWith(exp.count, env);
-      if (typeof count !== "number")
+      if (typeof count !== "bigint")
         throw new Error("take count did not evaluate to a nat");
       // take 0 never subscribes its source, as in rxjs
-      return count === 0 ? EMPTY : recur(exp.src).pipe(rxTake(count));
+      return count === 0n ? EMPTY : recur(exp.src).pipe(rxTake(Number(count)));
     }
     case "mergeAll":
       return inner(exp.src).pipe(mergeAll(exp.limit ?? Infinity));

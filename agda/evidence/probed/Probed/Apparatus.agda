@@ -55,13 +55,14 @@
 --   knowing is that the shape was wanted once.
 module Probed.Apparatus where
 
+open import Level using (Level)
 open import Relation.Nullary.Negation using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 -- contexts are Vecs; ∷/[] overload per type
 
 
-Confirms : {A : Set} → .(claim : A) → Set
-Confirms {A} _ = A
+Confirms : ∀ {ℓ : Level} {A : Set ℓ} → .(claim : A) → Set ℓ
+Confirms {A = A} _ = A
 
 -- THE FORK'S PRODUCT, AND IT IS A TYPE RATHER THAN A MARKER.  A
 -- `-- FORK:` probe stands between two candidate MECHANISMS, and what it

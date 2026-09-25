@@ -217,57 +217,83 @@ research lives; where they disagree, the header wins.
 ## Tier 1 — the plain evaluator mirrors rxjs
 
 **THIS TIER HAS NOTHING TO DO WITH SRXJS.** No `SExp`, no elaboration, no
-envelope, no simul variant of anything. The single question is whether
-`Rx.Exp` and its evaluator are a faithful mirror of plain rxjs, and the judge
-is the TypeScript differential harness: `prop-test.ts` draws a program, runs
-it through ordinary rxjs operators in `plain-eval.ts`, runs the same program
+envelope, no simul variant of anything. The question is whether `Rx.Exp` and
+its evaluator mirror plain rxjs, and the judge is the TypeScript differential
+harness: `prop-test.ts` draws a program, runs it through ordinary rxjs
+operators in `plain-eval.ts`, runs the same program
 through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
-VALUES exactly. Neither side carries an envelope, which is what makes it a
-comparison of two plain machines rather than of one against a projection.
+VALUES exactly.
 
-**IT IS DISABLED ON PURPOSE AND THIS TIER IS THE "LATER".** `oracle` is absent
-from `GATE_CHEAP` and its CI job is `if: false` (Anthony: "we want to
-officially disable that check from our gate and from ci, so that we can tackle
-it later"). Done is: the sweep is green and the target is back in the gate.
+**DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
+proof half holds no postulate, and the oracle runs in CI beside the gate.
+Neither half may be narrowed to pass. **Nor does the tier close, or its branch
+merge, until a 3M-case local sweep has come back and every crash in it has been
+investigated (Anthony).**
 
 ### The monster
 
-(no monster) — nothing here is a claim in Agda. The judge is a differential
-run, so a disagreement is a measurement rather than a false declaration, and a
-cone would have nothing to hold.
+`sharedConnect⇓` — a share emitting during its own connect serves the wrong
+set of subscribers, so every reader that emission was supposed to reach is
+served by nobody.
+
+Worth killing because the region's three conditions are one clause, not three
+facts: a hot-fed share agrees since a cascade folds one arrival at a time, one
+synchronous value since one observer is all there is, and re-entry is needed
+since only a subscriber the burst creates is absent when handed back. Every
+swept case matches. Ruled out: a
+fan-out re-entering its merge unconnected (`Rx.Evaluator.Reducible.Floor`); a
+connect registering the caller's chain, for paths agreeing with it
+(`Rx.Evaluator.Reducible.Rule-Kept`).
+
+also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg moves, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
+also: `evaluate!` — same, its inhabitation.
+also: `chainStep!` — same; the arrival side folds a registry path under the raw continuation, which is the connect's own apparatus reached from the schedule.
+also: `run-wellFormed⇓` — same, the one proof that reads the runner's stream.
+also: `subscribe-shaped` — same; its conclusion follows the result type, which is the narrowing stated where that proof consumes it.
+also: `reducible` — its inhabitation, and every member of its block: the connect arm is the one strict edge on the room, and every other member is funded by the peel it makes or by a budget under it.
+also: `putLines` — the CLI's per-case writer, which is what lets the sweep count a case reaching a guard rather than end on it; the sweep is how this tier's monster is measured, and no proof reads it.
+also: `main` — same, the CLI's entry point, which now writes through it.
+also: `formal-verification-batchSimultaneous` — Tier 3's top line, whose operator body is Anthony's upper-tier work on this branch; another tier's, admitted at his discretion.
+also: `batch-online` — same, the online property Main asserts beside the main theorem, proven by Anthony.
+also: `run-wellFormed` — same, the input-well-formed top line, which the subscribe carrier's port reached.
 
 ### Big picture tier roadmap
 
-- **RE-MEASURE BEFORE FIXING ANYTHING.** The recorded figure — 500 drawn, 400
-  emitting, 498 matching — predates the evaluator rewrite, the `Slots`
-  changes and the kinded contexts. Establish what the sweep says TODAY before
-  spending a commit on a shape that may no longer fail, or on two that have
-  become five. The receipt for this leg is the new numbers, written into
-  `oracle`'s header in the Makefile where the old ones live.
+- **DERIVE THE GROUND'S `Apart` FROM `Distinct`.** `HoldsFs` carries per
+  frame what `Sound`'s `distinct` now carries for the whole path; drop
+  the copy, so the standing ground says nothing the rule does not.
 
-- **THE `exhaustAll` OVER A `mergeAll` OF A DOUBLED INNER.** One of the two
-  recorded disagreements. The doubling is what makes it interesting: the inner
-  is subscribed while an outer lane is already active, so it tests exactly the
-  arbitration `exhaustᵒ` exists to perform. Expect the finding to be in the
-  Agda evaluator rather than in the generator — but check the generator first,
-  since a mis-drawn program is cheaper to be wrong about.
+- **PIN THE STEP'S ROOT-BEFORE-GROUP ORDER, AT THE FIRST PROGRAM THAT FILLS A
+  STEP'S ROOT STREAM.** `fold-step` lays a step's own root stream down BEFORE
+  what the group it hands on reaches, and the argument for it is that a
+  frame which subscribed sent those values while it ran, before the group it
+  passes on existed. A probe instantiating the fold at the exchanged pair
+  decides it — and decides it alone, rather than through three simultaneous
+  changes to the corpus.
 
-- **THE `switchAll` READING A SHARED SLOT.** The other one. A shared slot is
-  subscribed down the consumer's path, and `switchᵒ` kills its previous inner
-  on each outer emit; the interaction between a kill and a share's connect is
-  the thing under test, and it has no analogue in the other two flatteners.
+- **WHAT THE SINGLETON FOLD COSTS `batchSync`, NOW THAT THE FAN-OUT RUNS.**
+  The value walk hands a subscriber one value per `foldPath⇓`, and the one
+  former that can see a burst reads the whole of it: the sync bit turns a
+  subscribe frame's values into a single group, so a per-value walk turns them
+  into one group each. Either the bit is the wrong state for it to hold — rxjs
+  batches by TICK, and a burst is only this evaluator's stand-in for one — or
+  the walk hands a subscriber its whole entitled suffix and loses the
+  interleave. Measurable as soon as the sweep runs on the landed evaluator,
+  because a connect now folds to the sink and the walk is reached.
 
-- **ENABLE THE ORACLE IN CI.** Put `oracle` back into `GATE_CHEAP` and flip
-  its CI job off `if: false`. The two move together, as the Makefile's note
-  says. It is the leg that makes the tier STAY done: until it lands the sweep
-  is a thing somebody remembers running, and a green memory is what this tier
-  was disabled behind in the first place. Nothing in the job may be narrowed
-  to make it pass.
+- **THE ORACLE HAS TWO SIDES AND BOTH ARE AUTHORITIES (Anthony).** The compiled
+  Agda and plain rxjs, and nothing else may stand on either: a hand-written
+  transcription of the evaluator on the machine side makes the comparison one
+  between two things this repo authored, which is green for reasons that say
+  nothing about rxjs. `plain-eval.ts` is one rxjs operator per former by
+  construction, and a former that cannot be written as one is the finding it
+  exists to make. So a carrier is measured by transcribing it into the Agda and
+  running the oracle, never by a second machine in the TypeScript.
 
 ### The ledger
 
-(empty — this tier states nothing in Agda, so it postulates nothing.)
-
+(empty — every statement this tier's proof half stands on is proven; what
+remains is the oracle's half.)
 
 ## Tier 2 — finish `batchSimultaneousᵖ`
 
@@ -404,8 +430,9 @@ definition rather than a postulate, so its cone is real.
 - **`cascade-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: the per-former
   split, and the `EvalSt` node-provenance invariant it is probably still
   missing.
-- **`subscribe-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: trivial seed,
-  content is what the walk installs — but its `Owes` conclusion carries the
-  monster's own recorded gap, so the class is the gap's and not the grind's.
+- **`subscribe-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: trivial
+  seed, content is what the walk installs — but its `Owes` conclusion carries
+  the monster's own recorded gap, so the class is the gap's and not the
+  grind's.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

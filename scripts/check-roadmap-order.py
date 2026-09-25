@@ -74,6 +74,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 RISKY = ("FALSITY", "SHAPE")
 MECHANICAL = ("GRINDABLE", "DIFFICULTY")
+CLASSED = ("FALSITY", "SHAPE", "VACUITY", "DIFFICULTY", "GRINDABLE")
 
 
 def _load(name):
@@ -114,6 +115,23 @@ def claimed_names(tiers, classes):
             for group in rm.head_groups(label):
                 out.setdefault(tier, []).append(group)
     return out
+
+
+def successors(base_tier, was_all, now_all):
+    """The CURRENT tiers that are the base tier's successors: those sharing a
+    claimed row with it.
+
+    A TIER IS ITS ROWS, NOT ITS NUMBER.  Tiers are renumbered as the lowest one
+    is retired, so the number a row sat under on the baseline can name an
+    unrelated tier today, and reading it by number charges a row to open work
+    it never shared a tier with.  A risky row still live is still listed --
+    `roadmap-check` holds every live postulate to a row -- so a base tier
+    whose risky rows are still open always has a successor holding them, and
+    a base tier with no successor is one whose every row has left the ledger,
+    which is a retired tier and holds nothing open."""
+    mine = {n for g in was_all.get(base_tier, []) for n in g}
+    return [t for t, groups in now_all.items()
+            if any(n in mine for g in groups for n in g)]
 
 
 def discharged(groups, live, srcnames):
@@ -266,8 +284,12 @@ def main():
     else:
         srcnames = _CR.src_decl_names(root)
 
-    was = claimed_names(_CR.parse(Text(base_text)), MECHANICAL)
-    now = claimed_names(_CR.parse(Text(cur_text)), RISKY)
+    base_tiers = _CR.parse(Text(base_text))
+    cur_tiers = _CR.parse(Text(cur_text))
+    was = claimed_names(base_tiers, MECHANICAL)
+    now = claimed_names(cur_tiers, RISKY)
+    was_all = claimed_names(base_tiers, CLASSED)
+    now_all = claimed_names(cur_tiers, CLASSED)
     headers = load_headers(args.headers) if args.headers else None
     defs = load_headers(args.definitions) if args.definitions else None
 
@@ -277,7 +299,8 @@ def main():
         banked = discharged(groups, live, srcnames)
         if not banked:
             continue
-        blockers = still_open(now.get(tier, []), live)
+        blockers = still_open([g for t in successors(tier, was_all, now_all)
+                               for g in now.get(t, [])], live)
         if not blockers:
             continue
         for name in banked:

@@ -28,6 +28,41 @@ error message actively misdirects. Read the entry before reasoning from the erro
   in it is in scope, suspect the BINDERS, not the pattern**; a one-letter rename decides
   it in one dev run.
 
+- **A `with` ON A TERM THAT RUNS THE EVALUATOR MAKES THE TYPECHECKER RUN IT, AND THE
+  FAILURE IS AN OUT-OF-MEMORY WITH NO ERROR AT ALL.** Abstracting a `with` head normalises
+  it, and a head like `agrees c` — a whole `evaluate↓` over a variable case — unfolds the
+  evaluator symbolically once nothing on the path is a postulate. Nothing names the
+  clause: the module's `Checking` line is the last output, the heap climbs, and the
+  process is killed from outside. Worked instance: the bug cache's runner, where a `with`
+  on `wellFormed c` alone checked at once and one on `agrees c` alone filled a 6 GB heap;
+  the same verdicts matched in a helper function checked in seconds. **Match the result
+  in a helper, or use the non-dependent eliminator**, as `CLI.Main` already does with
+  `maybe′` for the same reason. To find the clause, check under a heap cap
+  (`agda +RTS -M4G -RTS`) so it fails fast instead of swapping, and bisect by definition.
+
+- **A `with` INSIDE A CYCLE LOSES A MATCHED ACCESSIBILITY'S ORDER, AND THE ERROR NAMES
+  EVERY MEMBER OF THE LOOP.** A clause matching `(acc rs)` hands its with-functions the
+  FIELD `rs`, so a call in the with body re-applying `acc rs` reads as unrelated to the
+  clause's argument rather than equal to it. The accessibility then drops out of every
+  loop that passes through that call, and an unrelated decrease elsewhere on the loop is
+  what the error ends up blamed on. Decide the Boolean or the Σ OUTSIDE the cycle — a
+  `let` for a Σ, an eliminator taking the equation for a Boolean — so the clause has no
+  with-function at all.
+
+- **AND THE OPPOSITE HOLDS FOR A COPATTERN'S SUCCESSOR: a `with` branch keeps the guard,
+  and a lambda does not.** A coinductive successor at the head of a clause or of a `with`
+  branch, under a constructor, is guarded by the `fold` copattern it answers. The same
+  successor under a lambda handed to an eliminator (`[_,_]′`) is an ARGUMENT of that
+  eliminator, and the guard is gone. So the two traps pull opposite ways: eliminate a
+  decision without `with` where an accessibility is matched, and keep the `with` where a
+  guarded successor is built.
+
+- **Bisect a termination failure on a SUBSET of the block, not on the whole.** Stubbing
+  every member except a chosen few as postulates leaves the termination checker only the
+  loops among those few, which takes seconds where the whole block takes the tower. A
+  loop that survives on five members is the real culprit; cutting one call edge at a
+  time, by routing it to a postulated copy of its callee, names the edge.
+
 - **The termination checker rejects `where`-bound abbreviations of the recursion
   pattern.** Inline it — write `suc (suc j)`, not a bound alias.
 
@@ -204,3 +239,23 @@ error message actively misdirects. Read the entry before reasoning from the erro
   number, neither of which you wrote. **Write the telescope explicitly whenever a
   statement mentions more than one generalised name**; the block is a convenience for
   single-binder signatures and stops paying past that.
+
+- **A PATTERN `let` RUNS ITS RIGHT-HAND SIDE ONCE PER COMPONENT, AND NOTHING REPORTS IT
+  EXCEPT THE CLOCK.** Agda substitutes a `let`: `let (r , d) = E in b` elaborates to `b`
+  with `proj₁ E` and `proj₁ (proj₂ E)` in place of `r` and `d`, and the compiled code
+  evaluates E once per use. Where E is the evaluator's own recursive call the factor
+  compounds at every level of nesting, which read as the oracle's cases stalling. **In
+  the runtime modules bind a pattern with `E |>′ λ (r , d) → b`** (`Function.Base`): E is
+  an argument, so it is evaluated once, and `|>′` unfolds, so the two forms are
+  definitionally equal and a proof sees no difference. One cost: the body is now checked
+  before the result type is known, so an implicit lambda the expected type used to
+  insert must be written out (`λ {lo′} {s′} κ₂ → …`). **Except in a `fold` copattern
+  clause whose body builds the coinductive successor**: there the lambda strips the guard
+  (the entry above), so bind with `with E … | (r , d) = b` instead — the with-function
+  takes E as one argument, and a record pattern still unfolds. **Unless that clause also
+  matches `(acc rs)` and re-applies `acc rs` in the successor**: the with-function is
+  handed the field `rs`, not the `acc` it came from, so the call reads as unrelated to
+  the clause's pattern and termination fails. There, call a helper in the same mutual
+  block from the clause head — passing E and the whole `(acc rs)` — and build the
+  successor in the helper under the `ans` constructor. A plain `let x = E` is
+  substituted too, and costs the same whenever `x` is used more than once.

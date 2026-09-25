@@ -82,11 +82,23 @@ markers.
 
 The prune runs even when a sweep finds nothing, since the widening did too.
 
-## Why the target exists
+## Why the target exists, and why it runs in the oracle job
 
 The corpus is **not** reachable from `Main.agda`, so `make gate-heavy`'s tower
 does not check it. `make bug-cache` enforces the invariant above — it exists
 precisely because nothing else in the build would notice the cache rotting.
+
+**It runs in CI's oracle job, not the gate.** What it checks is the evaluator
+rather than the proof, so it belongs beside the sweep, on the same build: the
+oracle's own tree (`make oracle-tree`, `scripts/oracle-mirror.py`), compiled with
+termination checking off and cached as binaries keyed on the runners' import
+cone. `make gate-heavy` still LINKS its own copy (`bug-cache-build`), so a runner
+that stops compiling under the full check goes red there. In the oracle job it
+runs last and on `always()`, so a red corpus and a red sweep are both reported.
+
+**The runner matches its verdicts in a helper, never with a `with`.** A `with` on
+`agrees c` makes the typechecker normalise a whole evaluator run and exhausts any
+heap; see [agda-traps.md](agda-traps.md).
 
 ## What is deliberately not cached
 
