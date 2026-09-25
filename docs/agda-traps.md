@@ -249,5 +249,8 @@ error message actively misdirects. Read the entry before reasoning from the erro
   an argument, so it is evaluated once, and `|>′` unfolds, so the two forms are
   definitionally equal and a proof sees no difference. One cost: the body is now checked
   before the result type is known, so an implicit lambda the expected type used to
-  insert must be written out (`λ {lo′} {s′} κ₂ → …`). A plain `let x = E` is substituted
-  too, and costs the same whenever `x` is used more than once.
+  insert must be written out (`λ {lo′} {s′} κ₂ → …`). **Except in a `fold` copattern
+  clause whose body builds the coinductive successor**: there the lambda strips the guard
+  (the entry above), so bind with `with E … | (r , d) = b` instead — the with-function
+  takes E as one argument, and a record pattern still unfolds. A plain `let x = E` is
+  substituted too, and costs the same whenever `x` is used more than once.

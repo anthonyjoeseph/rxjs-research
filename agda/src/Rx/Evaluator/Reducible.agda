@@ -692,8 +692,9 @@ red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 fallenRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
            (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
          → (κ : Path Γ ℓ u t) → RP {e = e} m (Red m u) ⊤ κ fallen
-fold (fallenRP ac le (acc rsM) κ) tt now vals _ fin sched st rm (grounded fell so) =
-  rawFold ac le (rsM fell) κ now vals fin sched st ≤-refl so |>′ λ (r , d) →
+fold (fallenRP ac le (acc rsM) κ) tt now vals _ fin sched st rm (grounded fell so)
+  with rawFold ac le (rsM fell) κ now vals fin sched st ≤-refl so
+... | (r , d) =
   ans (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) d fallen
          (grounded (fell-keeps (foldPath-keeps d) fell) (fold-sound d so)) tt (fallenRP ac le (acc rsM) κ) tt
 
@@ -1320,11 +1321,11 @@ rawInner {u = u} ac le aM op nid κ now o sched st rm so nd h eq aq wq =
 
 -- the base: its exit frame reacts at the budget its column pins, and the
 -- path below folds raw
-fold (baseRP ac le aM op nid inst κ (h , pfs) aq wq) tt now vals _ fin sched st rm (grounded hs so) =
-  let wq′ = ceil-or (subst (λ x → waiting x ≤ _) (sym (proj₁ (proj₁ hs))) wq) in
-  rawReact ac le aM op nid inst ≤-refl κ now vals fin sched st rm so _ refl aq wq′ |>′ λ (r₀ , sd , so₀) →
-  rawAfter ac le aM (from-inner op nid inst) ≤-refl κ r₀ sd (room-keeps (stepFrame-keeps sd) rm) so₀ |>′ λ (r , d) →
-  baseAns ac le aM op nid inst κ sched st rm so aq wq′ r d
+fold (baseRP ac le aM op nid inst κ (h , pfs) aq wq) tt now vals _ fin sched st rm (grounded hs so)
+  with ceil-or (subst (λ x → waiting x ≤ _) (sym (proj₁ (proj₁ hs))) wq)
+... | wq′ with rawReact ac le aM op nid inst ≤-refl κ now vals fin sched st rm so _ refl aq wq′
+...   | (r₀ , sd , so₀) with rawAfter ac le aM (from-inner op nid inst) ≤-refl κ r₀ sd (room-keeps (stepFrame-keeps sd) rm) so₀
+...     | (r , d) = baseAns ac le aM op nid inst κ sched st rm so aq wq′ r d
 
 -- the successor sits at the head of a `with` branch, where the `fold`
 -- copattern guards it; under a lambda handed to an eliminator it is an
