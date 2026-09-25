@@ -252,5 +252,10 @@ error message actively misdirects. Read the entry before reasoning from the erro
   insert must be written out (`λ {lo′} {s′} κ₂ → …`). **Except in a `fold` copattern
   clause whose body builds the coinductive successor**: there the lambda strips the guard
   (the entry above), so bind with `with E … | (r , d) = b` instead — the with-function
-  takes E as one argument, and a record pattern still unfolds. A plain `let x = E` is
+  takes E as one argument, and a record pattern still unfolds. **Unless that clause also
+  matches `(acc rs)` and re-applies `acc rs` in the successor**: the with-function is
+  handed the field `rs`, not the `acc` it came from, so the call reads as unrelated to
+  the clause's pattern and termination fails. There, call a helper in the same mutual
+  block from the clause head — passing E and the whole `(acc rs)` — and build the
+  successor in the helper under the `ans` constructor. A plain `let x = E` is
   substituted too, and costs the same whenever `x` is used more than once.
