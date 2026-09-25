@@ -73,6 +73,7 @@ LIB = ("name: rxjs-research-oracle\n"
 
 LET = re.compile(r"(?:(?<=[\s(])|^)let(?=\s)")
 IN = re.compile(r"(?:(?<=\s)|^)in(?=\s|$)")
+SIG = re.compile(r"[^\s()]+[ ]+:(?=\s|$)")
 VAR = "shareᵒ"
 OP = "▷ₛ"
 
@@ -138,6 +139,15 @@ def _block(code, i, kw):
         last -= 1
     spans = [(s, starts[t + 1] - 1 if t + 1 < len(starts) else last)
              for t, s in enumerate(starts)]
+    # A type signature and the definition after it are ONE binding: splitting
+    # them into two `let … in`s leaves the signature with no definition.
+    t = 0
+    while t < len(spans):
+        if SIG.match(code[spans[t][0]], c):
+            if t + 1 == len(spans):
+                return None
+            spans[t:t + 2] = [(spans[t][0], spans[t + 1][1])]
+        t += 1
     for s, e in spans:
         for r in range(s, e + 1):
             seg = code[r]
@@ -325,6 +335,17 @@ SHARE_CASES = [
     # the one-line form
     ("f x = let (a , b) = g x in a + b",
      "f x =              (g x ) ▷ₛ λ shareᵒ → let (a , b) = shareᵒ in a + b"),
+    # a signature stays with its definition: one binding, one `in`
+    ("f x =\n"
+     "  let y : N\n"
+     "      y = k x\n"
+     "      (a , b) = g y\n"
+     "  in a",
+     "f x =\n"
+     "  let y : N\n"
+     "      y = k x in\n"
+     "               (g y ) ▷ₛ λ shareᵒ → let (a , b) = shareᵒ in\n"
+     "     a"),
     # nothing to share: left exactly alone
     ("f x = let y = k x in y", "f x = let y = k x in y"),
     # a `let` inside a binding: the parser declines rather than guesses
