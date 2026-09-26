@@ -930,12 +930,14 @@ runAt : ℕ → ℕ → Gen (Marks × List (ℕ × String))
 runAt n d = skipN (n ∸ 1) d >>=G λ _ → oneCase d
 
 -- AND ONE SIDE OF IT, so a hang is attributed to the pipeline that owns
--- it: 1 the impl run, 2 the spec run, anything else the raw run
+-- it: 1 the impl run, 2 the spec run, 4 the program read as plain rxjs,
+-- anything else the raw run
 sideAt : ℕ → ℕ → ℕ → Gen String
 sideAt k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >>=G λ ds →
   let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
   in pureG (if k ≡ᵇ 1 then showBursts (implBurstsOf c)
             else if k ≡ᵇ 2 then showBursts (specBurstsOf c)
+            else if k ≡ᵇ 4 then showBatches (plainOf c)
             else showStream (runOf c))
 
 -- THE CORPUS, EVERY ROW WITH BOTH SIDES PRINTED WHETHER OR NOT THEY
@@ -956,6 +958,7 @@ sideRow : ℕ → Case → String
 sideRow k c = Case.name c ++ ": " ++
   (if k ≡ᵇ 1 then showBursts (implBurstsOf c)
    else if k ≡ᵇ 2 then showBursts (specBurstsOf c)
+   else if k ≡ᵇ 4 then showBatches (plainOf c)
    else showStream (runOf c)) ++ "\n"
 
 -- and a nonzero `f` runs every row at that fuel instead of its own

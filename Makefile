@@ -244,9 +244,20 @@ agda-dev-selftest:
 #
 # THE CORPUS IS RUN, NOT TYPECHECKED, and the verdict comes back as text
 # because `CLI.IO` has no exit status to hand back -- stdin and stdout are its
-# whole FFI surface.  So this demands the summary line BEFORE refusing any FAIL
-# line: a binary that walked nothing prints nothing, and a grep for failures
-# alone would read that as green, which is the one way this target could lie.
+# whole FFI surface.  So this demands every row's `done` line BEFORE refusing
+# any FAIL line: a binary that ran nothing prints nothing, and a grep for
+# failures alone would read that as green, which is the one way this target
+# could lie.  The row count comes from the binary too, so a corpus that
+# compiled empty says `ran 0 cases` rather than passing silently.
+#
+# ONE PROCESS PER ROW, UNDER BUG_CACHE_ROW_BUDGET SECONDS.  The oracle tree
+# is built with termination checking off, so a row's run can fail to end --
+# which is a counterexample, and one inside a single walk of the corpus would
+# take every later verdict with it and hold the job to its timeout.  A row
+# over budget is a FAIL named by the row, whose name the runner flushes
+# before the run starts.
+BUG_CACHE_ROW_BUDGET ?= 60
+
 #
 # SUSPENDED WHILE THE CANDIDATE HAS LIVE LEAVES (Anthony: "suspend,
 # self-expiring").  The Girard-Tait cutover made the evaluator extract a run's
@@ -282,10 +293,23 @@ agda/_cli/Bug-Cache: $(AGDA_SRC)
 bug-cache-build: agda/_cli/Bug-Cache
 
 bug-cache-run: $(ORACLE_BIN)/Bug-Cache
-	@out=$$($(ORACLE_BIN)/Bug-Cache); printf '%s\n' "$$out"; \
-	 printf '%s\n' "$$out" | grep -q '^bug-cache: ran ' \
-	   || { echo "bug-cache: the runner printed no summary line" >&2; exit 1; }; \
-	 if printf '%s\n' "$$out" | grep -q '^bug-cache: FAIL '; then \
+	@n=$$(echo 0 | $(ORACLE_BIN)/Bug-Cache | sed -n 's/^bug-cache: rows \([0-9][0-9]*\)$$/\1/p'); \
+	 [ -n "$$n" ] || { echo "bug-cache: the runner printed no row count" >&2; exit 1; }; \
+	 bad=0; k=0; \
+	 while [ $$k -lt $$n ]; do \
+	   k=$$((k + 1)); \
+	   out=$$(echo $$k | timeout $(BUG_CACHE_ROW_BUDGET) $(ORACLE_BIN)/Bug-Cache); ec=$$?; \
+	   row=$$(printf '%s\n' "$$out" | sed -n 's/^bug-cache: row //p'); \
+	   if [ $$ec = 124 ]; then \
+	     echo "bug-cache: FAIL $$row (row $$k) no verdict within $(BUG_CACHE_ROW_BUDGET)s"; bad=$$((bad + 1)); \
+	   elif [ $$ec != 0 ] || ! printf '%s\n' "$$out" | grep -q '^bug-cache: done$$'; then \
+	     echo "bug-cache: FAIL $$row (row $$k) the runner exited $$ec without a verdict"; bad=$$((bad + 1)); \
+	   elif printf '%s\n' "$$out" | grep -q '^bug-cache: FAIL '; then \
+	     printf '%s\n' "$$out" | grep '^bug-cache: FAIL '; bad=$$((bad + 1)); \
+	   fi; \
+	 done; \
+	 echo "bug-cache: ran $$n cases, $$bad failing"; \
+	 if [ $$bad != 0 ]; then \
 	   echo "bug-cache: RED — a known counterexample is live again" >&2; exit 1; \
 	 fi
 
@@ -1336,10 +1360,10 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a CHANGED claim root was not held back — a root's dev check IS the tower, so it times out at the per-module budget and reports RED for a module with nothing wrong with it, and one edited comment is enough to put it in the changed set"; fail=1; }; \
 	  echo "$$out" | grep -q 'plan .* agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: a CHANGED claim root is in the sweep plan — the cone half of this exclusion was written first and is not the whole rule"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Spec.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Rx/Plain.agda 2>&1); \
 	  echo "$$out" | grep -q 'skip  agda/src/Verify-Batch-Simultaneous/The-Proof.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
-	  echo "$$out" | grep -q 'FAIL  agda/src/Spec.agda' \
+	  echo "$$out" | grep -q 'FAIL  agda/src/Rx/Plain.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'unchecked: ' \

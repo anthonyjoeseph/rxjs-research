@@ -255,7 +255,9 @@ bound.
   Depth 1 is the sweep that fits, and some programs cost exponentially in
   fuel, so a sweep bounds each CASE in wall clock
   (`typecheck-performance-numbers.md`). Every counterexample becomes a
-  bug-cache row first.
+  bug-cache row first. Three rows — an `of` pair merged inside a
+  delivery's inner — give no verdict in 60 s even at fuel 1, while the
+  same programs read plain run at once: the cost is the ELABORATION's.
 
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
   from the oracle's tree, as `qc-build` does. This leg closes the tier: the
