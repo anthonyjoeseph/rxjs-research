@@ -4,7 +4,7 @@ open import Data.Bool    using (if_then_else_)
 open import Data.Nat     using (_≡ᵇ_)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.Maybe   using (Maybe; just; nothing; fromMaybe)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; complete; cutPending; EmitKind;
   subscribe; delivery; plumbing; InstEmit; _at_from_as_)
@@ -117,26 +117,6 @@ foldBatch : ∀ {A : Set} → BatchSt A → List (InstEmit A) → List (InstEmit
 foldBatch st []       = flushBatch st
 foldBatch st (x ∷ xs) = let (out , st′) = step-batch x st
                         in out ++ foldBatch st′ xs
-
--- THE FOLD AS THE MACHINE RUNS IT: ONE BURST AT A TIME, STATE CARRIED
--- ACROSS, AND NO TERMINAL FLUSH.  A burst is everything one arrival
--- causes, so the operator answers each burst before it knows whether
--- another is coming; `foldBatch`'s end flush is the one step no burst
--- boundary can take.  What makes the two agree is every instant being
--- paid off inside the burst that minted it, which is
--- `The-Proof.burst-agreement`'s business, not this fold's.
-stepsBatch : ∀ {A : Set} → BatchSt A → List (InstEmit A)
-           → List (InstEmit (List A)) × BatchSt A
-stepsBatch st []       = [] , st
-stepsBatch st (x ∷ xs) = let (out , st′)  = step-batch x st
-                             (out′ , st″) = stepsBatch st′ xs
-                         in out ++ out′ , st″
-
-foldBursts : ∀ {A : Set} → BatchSt A → List (List (InstEmit A))
-           → List (List (InstEmit (List A)))
-foldBursts st []         = []
-foldBursts st (xs ∷ xss) = proj₁ (stepsBatch st xs)
-                         ∷ foldBursts (proj₂ (stepsBatch st xs)) xss
 
 -- `impl-batchSimultaneous = foldBatch batch-init` STOOD HERE and is
 -- gone.  It was the batcher as an AGDA FUNCTION, and the harness tested

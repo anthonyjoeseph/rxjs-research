@@ -13,8 +13,9 @@
 -- body at the slot's type, so a claim quantified over it is a claim
 -- about the plain evaluator with some trees bolted on -- not about the
 -- srxjs operators in isolation, which is the claim being made.  Here a
--- shared definition is an `SExp` and reaches the evaluator only by
--- being elaborated, so every operator in it went through `toPlain`.
+-- shared definition is an `SExp`, and reaches the evaluator only as a
+-- reading of one: `Rx.Plain.plainExp` on the plain side, the impl's
+-- elaboration on the other.
 --
 -- TWO: A KIND AND ITS SLOT HAVE TO AGREE.  `Rx.SExp`'s `Kinds` vector
 -- tells the elaboration how to read each slot -- `scriptedᵏ` stands at
@@ -43,14 +44,11 @@ open import Data.List using ([])
 open import Data.Nat  using (ℕ)
 open import Data.Vec  using (lookup)
 open import Data.Fin  using (toℕ)
-open import Data.Vec.Properties using (lookup-zipWith)
-open import Relation.Binary.PropositionalEquality using (subst; sym)
 
 open import Rx.Prim using (ObservableInput)
 open import Rx.Exp  using (Ty; Ctx; Val; isData; inputsBelowᵉ)
-open import Rx.SExp using (SExp; Kind; Kinds; scriptedᵏ; sharedᵏ;
-                           slotTy; plainᵏ; plainᵗ)
-open import Rx.Elaborate using (elaborateSpec)
+open import Rx.SExp using (SExp; Kind; Kinds; scriptedᵏ; sharedᵏ; plainᵏ; plainᵗ)
+open import Rx.Plain using (plainExp; unplainᵈ; isData-unplain; mapInput)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 
 -- slot i of Γ, as the AUTHOR states it.  The kind index is the last
@@ -67,30 +65,26 @@ data SimulSlot {n} (Γ : Ctx n) (κ : Kinds n) (k : ℕ) (t : Ty)
   scriptedˢ : {ok : T (isData (plainᵗ t))}
             → ObservableInput (Val (plainᵏ Γ κ) (plainᵗ t))
             → SimulSlot Γ κ k t scriptedᵏ
-  -- ANOTHER SRXJS PROGRAM, stated in the author's syntax.  It stands
-  -- at the envelope because it is already elaborated, and the
-  -- stratification side condition is charged on the ELABORATION,
-  -- since that is the tree the evaluator's measure walks.
+  -- ANOTHER SRXJS PROGRAM, stated in the author's syntax.  The
+  -- stratification side condition is charged on its PLAIN reading,
+  -- which is fixed; the impl's elaboration is free, so it cannot be
+  -- what the table is asked about.
   sharedˢ   : (d : SExp Γ [] [] [] t)
-            → {ok : T (inputsBelowᵉ k (elaborateSpec κ d))}
+            → {ok : T (inputsBelowᵉ k (plainExp d))}
             → SimulSlot Γ κ k t sharedᵏ
 
 SimulSlots : ∀ {n} (Γ : Ctx n) (κ : Kinds n) → Set
 SimulSlots Γ κ = ∀ i → SimulSlot Γ κ (toℕ i) (lookup Γ i) (lookup κ i)
 
--- THE READING BACK INTO THE EVALUATOR'S TELESCOPE -- the old palette's
--- `embed`, now a function between two concrete telescopes rather than
--- a field of a record every evaluator module had to be parameterised
--- by.  Nothing downstream of `Rx.Slots` changes; a statement simply
--- quantifies over `SimulSlots` and runs this.
-embedSlotsSpec : ∀ {n} {Γ : Ctx n} {κ : Kinds n}
-               → SimulSlots Γ κ → Slots (plainᵏ Γ κ)
-embedSlotsSpec {Γ = Γ} {κ = κ} ins i =
-  subst (Slot (plainᵏ Γ κ) (toℕ i))
-        (sym (lookup-zipWith slotTy i Γ κ))
-        (go (lookup κ i) (ins i))
+-- THE TABLE READ PLAIN: a script stays a script, a share is its
+-- definition read plain.  A script's payloads stand at `plainᵗ` in the
+-- elaboration's context, and are data, so `unplainᵈ` reads them back
+-- at the author's type without inspecting anything.
+plainSlots : ∀ {n} {Γ : Ctx n} {κ : Kinds n} → SimulSlots Γ κ → Slots Γ
+plainSlots {Γ = Γ} {κ = κ} ins i = go (lookup κ i) (ins i)
   where
-    go : ∀ kd → SimulSlot Γ κ (toℕ i) (lookup Γ i) kd
-       → Slot (plainᵏ Γ κ) (toℕ i) (slotTy (lookup Γ i) kd)
-    go scriptedᵏ (scriptedˢ {ok = ok} inp) = scripted {ok = ok} inp
-    go sharedᵏ   (sharedˢ d {ok = ok})     = shared (elaborateSpec κ d) {ok = ok}
+    go : ∀ kd → SimulSlot Γ κ (toℕ i) (lookup Γ i) kd → Slot Γ (toℕ i) (lookup Γ i)
+    go scriptedᵏ (scriptedˢ {ok = ok} inp) =
+      scripted {ok = isData-unplain (lookup Γ i) ok}
+               (mapInput (unplainᵈ (lookup Γ i) (isData-unplain (lookup Γ i) ok)) inp)
+    go sharedᵏ   (sharedˢ d {ok = ok})     = shared (plainExp d) {ok = ok}

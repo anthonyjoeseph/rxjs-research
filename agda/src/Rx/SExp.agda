@@ -142,7 +142,7 @@ emitᶜ ts = map emitᵗ ts
 -- `inputˢ i` without caring whether slot i is fed by a script or
 -- defined by another srxjs program; the ELABORATION cares, because the
 -- two arrive in different shapes, so the kinds are an argument to
--- `toPlain` and nothing above it changes.
+-- `toEnvelope` and nothing above it changes.
 data Kind : Set where
   scriptedᵏ : Kind   -- an external source: bare payloads, `inputᵖ` wraps them
   sharedᵏ   : Kind   -- another srxjs program: already elaborated

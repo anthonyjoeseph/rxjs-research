@@ -19,8 +19,8 @@
 -- it happens in a compiled binary at a speed no typechecker reaches, so
 -- appending a case costs a list entry and nothing else.
 --
--- A ROW IS A PROGRAM, NOT A CLAIM ABOUT ONE.  Both properties the
--- cache carries are checked of every row, so what a row has to say is
+-- A ROW IS A PROGRAM, NOT A CLAIM ABOUT ONE.  Every property the
+-- cache carries is checked of every row, so what a row has to say is
 -- which run to make; the label is the seed that found it and means
 -- nothing more.
 --
@@ -107,4 +107,20 @@ cases =
             (strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 3) ∷ []))) ∷ [])))
           (mkSlots (cold [] ((after 1 , 3) ∷ (after 0 , 7) ∷ []))
                    (ofˢ ((natˢ 5) ∷ (natˢ 7) ∷ []))) ∷
+  cached "seed 6 depth 1 case 4" 30
+          (switchAllˢ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ emptyˢ) ∷ [])))
+          (mkSlots (hot ((after 0 , 1) ∷ ((after 1 , 1) ∷ [])))
+                   (emptyˢ)) ∷
+  cached "seed 7 depth 1 case 12" 30
+          (exhaustAllˢ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (ofˢ ((natˢ 4) ∷ (natˢ 6) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 0 , 8) ∷ ((after 0 , 8) ∷ [])))
+                   ((inputˢ zero))) ∷
+  cached "seed 2 depth 1 case 15" 30
+          (mergeAllˢ nothing (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) (inputˢ zero)))
+          (mkSlots (hot ((after 0 , 2) ∷ ((after 1 , 5) ∷ [])))
+                   ((ofˢ ((natˢ 9) ∷ [])))) ∷
+  cached "seed 9 depth 1 case 2" 30
+          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 9) ∷ (natˢ 9) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 1) ∷ ((after 0 , 0) ∷ [])))
+                   ((ofˢ ((natˢ 5) ∷ [])))) ∷
   []

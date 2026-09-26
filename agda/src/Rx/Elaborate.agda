@@ -711,7 +711,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
  mutual
 
-   toPlain : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+   toEnvelope : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
            → SExp Γ Δᵍ Δ Θ t
            → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (emitᵗ t)
    -- AN INPUT IS THE ONE SOURCE THIS BODY WRITES, AND IT IS A TRANSPORT
@@ -796,7 +796,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    -- gives `machineEmitᵗ (plainᵗ _)`, which IS that type; a SHARED one
    -- stands at `emitᵗ` already, so the reference is `input i` and
    -- nothing is wrapped a second time.
-   toPlain {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (inputˢ i)
+   toEnvelope {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (inputˢ i)
      with lookup κ i | lookup-zipWith slotTy i Γ κ
    ... | scriptedᵏ | eq =
          subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ)
@@ -805,77 +805,49 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    ... | sharedᵏ   | eq =
          subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) u)
                eq (input i)
-   toPlain {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toPlainTms ts)
-   toPlain {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
-   toPlain (takeˢ k e)         = takeᵖ (toPlainTm k) (toPlain e)
-   toPlain (mapˢ f e)          = mapᵖ (toPlainTm f) (toPlain e)
-   toPlain (scanˢ f z e)       = scanᵖ (toPlainTm f) (toPlainTm z) (toPlain e)
-   toPlain (mergeAllˢ k e)     = mergeAllᵖ k (toPlain e)
-   toPlain (switchAllˢ e)      = switchAllᵖ (toPlain e)
-   toPlain (exhaustAllˢ e)     = exhaustAllᵖ (toPlain e)
-   toPlain (μˢ e)              = μᵉ (toPlain e)
-   toPlain (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
-   toPlain {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
+   toEnvelope {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toEnvelopeTms ts)
+   toEnvelope {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
+   toEnvelope (takeˢ k e)         = takeᵖ (toEnvelopeTm k) (toEnvelope e)
+   toEnvelope (mapˢ f e)          = mapᵖ (toEnvelopeTm f) (toEnvelope e)
+   toEnvelope (scanˢ f z e)       = scanᵖ (toEnvelopeTm f) (toEnvelopeTm z) (toEnvelope e)
+   toEnvelope (mergeAllˢ k e)     = mergeAllᵖ k (toEnvelope e)
+   toEnvelope (switchAllˢ e)      = switchAllᵖ (toEnvelope e)
+   toEnvelope (exhaustAllˢ e)     = exhaustAllᵖ (toEnvelope e)
+   toEnvelope (μˢ e)              = μᵉ (toEnvelope e)
+   toEnvelope (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
+   toEnvelope {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
      deferᵉ (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
-                   (map-++ emitᵗ Δᵍ Δ) (toPlain e))
+                   (map-++ emitᵗ Δᵍ Δ) (toEnvelope e))
 
-   toPlainTm : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+   toEnvelopeTm : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
              → STm Γ Δᵍ Δ Θ t
              → Tm (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t)
-   toPlainTm (varˢᵗ x)      = varᵗ (∈-++⁺ˡ (∈-map⁺ plainᵗ x))
-   toPlainTm unitˢ          = unit̂
-   toPlainTm (boolˢ b)      = bool̂ b
-   toPlainTm (natˢ k)       = nat̂ k
-   toPlainTm (pairˢ a b)    = pairᵗ (toPlainTm a) (toPlainTm b)
-   toPlainTm (fstˢ p)       = fstᵗ (toPlainTm p)
-   toPlainTm (sndˢ p)       = sndᵗ (toPlainTm p)
-   toPlainTm nilˢ           = nilᵗ
-   toPlainTm (consˢ h t)    = consᵗ (toPlainTm h) (toPlainTm t)
-   toPlainTm (inlˢ a)       = inlᵗ (toPlainTm a)
-   toPlainTm (inrˢ b)       = inrᵗ (toPlainTm b)
-   toPlainTm (caseˢ s l r)  = caseᵗ (toPlainTm s) (toPlainTm l) (toPlainTm r)
-   toPlainTm (foldˢ l z f)  = foldᵗ (toPlainTm l) (toPlainTm z) (toPlainTm f)
-   toPlainTm (ifˢ c a b)    = ifᵗ (toPlainTm c) (toPlainTm a) (toPlainTm b)
-   toPlainTm (primˢ add a)  = primᵗ add  (toPlainTm a)
-   toPlainTm (primˢ sub a)  = primᵗ sub  (toPlainTm a)
-   toPlainTm (primˢ mul a)  = primᵗ mul  (toPlainTm a)
-   toPlainTm (primˢ eqᵖ a)  = primᵗ eqᵖ  (toPlainTm a)
-   toPlainTm (primˢ ltᵖ a)  = primᵗ ltᵖ  (toPlainTm a)
-   toPlainTm (primˢ eqᵘ a)  = primᵗ eqᵘ  (toPlainTm a)
-   toPlainTm (primˢ notᵖ a) = primᵗ notᵖ (toPlainTm a)
-   toPlainTm (strmˢ e)      = strmᵗ (toPlain e)
+   toEnvelopeTm (varˢᵗ x)      = varᵗ (∈-++⁺ˡ (∈-map⁺ plainᵗ x))
+   toEnvelopeTm unitˢ          = unit̂
+   toEnvelopeTm (boolˢ b)      = bool̂ b
+   toEnvelopeTm (natˢ k)       = nat̂ k
+   toEnvelopeTm (pairˢ a b)    = pairᵗ (toEnvelopeTm a) (toEnvelopeTm b)
+   toEnvelopeTm (fstˢ p)       = fstᵗ (toEnvelopeTm p)
+   toEnvelopeTm (sndˢ p)       = sndᵗ (toEnvelopeTm p)
+   toEnvelopeTm nilˢ           = nilᵗ
+   toEnvelopeTm (consˢ h t)    = consᵗ (toEnvelopeTm h) (toEnvelopeTm t)
+   toEnvelopeTm (inlˢ a)       = inlᵗ (toEnvelopeTm a)
+   toEnvelopeTm (inrˢ b)       = inrᵗ (toEnvelopeTm b)
+   toEnvelopeTm (caseˢ s l r)  = caseᵗ (toEnvelopeTm s) (toEnvelopeTm l) (toEnvelopeTm r)
+   toEnvelopeTm (foldˢ l z f)  = foldᵗ (toEnvelopeTm l) (toEnvelopeTm z) (toEnvelopeTm f)
+   toEnvelopeTm (ifˢ c a b)    = ifᵗ (toEnvelopeTm c) (toEnvelopeTm a) (toEnvelopeTm b)
+   toEnvelopeTm (primˢ add a)  = primᵗ add  (toEnvelopeTm a)
+   toEnvelopeTm (primˢ sub a)  = primᵗ sub  (toEnvelopeTm a)
+   toEnvelopeTm (primˢ mul a)  = primᵗ mul  (toEnvelopeTm a)
+   toEnvelopeTm (primˢ eqᵖ a)  = primᵗ eqᵖ  (toEnvelopeTm a)
+   toEnvelopeTm (primˢ ltᵖ a)  = primᵗ ltᵖ  (toEnvelopeTm a)
+   toEnvelopeTm (primˢ eqᵘ a)  = primᵗ eqᵘ  (toEnvelopeTm a)
+   toEnvelopeTm (primˢ notᵖ a) = primᵗ notᵖ (toEnvelopeTm a)
+   toEnvelopeTm (strmˢ e)      = strmᵗ (toEnvelope e)
 
    -- spelled out rather than `map`ped, so the recursion is structural
-   toPlainTms : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+   toEnvelopeTms : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
               → List (STm Γ Δᵍ Δ Θ t)
               → List (Tm (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t))
-   toPlainTms []       = []
-   toPlainTms (m ∷ ms) = toPlainTm m ∷ toPlainTms ms
-
--- THE ELABORATION PROPER, AND THE ONE THING IT ADDS TO THE WALK IS THE
--- FRAME.  A closed simul program elaborates to a closed plain one, so
--- the token the walk stands under is bound and discharged here and
--- nowhere else; every consumer sees an ordinary `Exp` at an empty value
--- telescope and carries no side condition about a token being in scope.
---
--- ONE MINT FOR THE WHOLE PROGRAM IS THE CLAIM, and it is the mirror's.
--- `mintᵉ` draws once per subscription of the node it stands at, and it
--- stands at the root, so every source beneath reads the same token for
--- one subscription of the program and a fresh one for the next — which
--- is what a subscribe frame is.  A resubscribe through `deferᵉ` re-runs
--- the body and not this binder, so an inner's frame is its outer's,
--- which is the sharing the grouping compares and the reason the token
--- could not have been bound per source.
---
--- THE MIRROR'S CONSTANT IS COARSER THAN THIS AND THE TWO STILL AGREE,
--- because the token's identity is READ BY NOBODY.  `SUBSCRIBE_FRAME`
--- is one module-level symbol shared by every run the process performs,
--- where this draws one per subscription; nothing on either side ever
--- compares a stamp against a literal, and every comparison that does
--- happen is between two stamps of the SAME run, which the two agree on
--- exactly.  So the difference is reachable by no program, and the
--- binder is the tighter of the two rather than a divergence.
-elaborateSpec : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {Δᵍ Δ : List Ty} {t : Ty}
-              → SExp Γ Δᵍ Δ [] t
-              → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) [] (emitᵗ t)
-elaborateSpec κ e = mintᵉ (toPlain κ e)
+   toEnvelopeTms []       = []
+   toEnvelopeTms (m ∷ ms) = toEnvelopeTm m ∷ toEnvelopeTms ms

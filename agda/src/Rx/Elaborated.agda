@@ -30,20 +30,21 @@ open import Relation.Binary.PropositionalEquality using (_≡_; subst)
 
 open import Rx.Exp using (Ctx; Exp; uniqᵗ; mintᵉ; Ren∈; renExp)
 open import Rx.SExp using (SExp; Kinds; plainᵏ)
-open import Rx.Simul-Slots using (SimulSlots; embedSlotsSpec)
+open import Rx.Simul-Slots using (SimulSlots)
+open import Implementation.Pipeline using (embedSlotsImpl)
 open import Rx.Slots using (Slots)
-open import Rx.Elaborate using (toPlain)
+open import Rx.Elaborate using (toEnvelope)
 
 -- A TREE THE ELABORATION BUILT, up to the two operations that move a
--- tree without touching what it emits.  `mintᵉ` because `elaborateSpec` is
--- `mintᵉ ∘ toPlain` and a closed root arrives already minted; renaming
+-- tree without touching what it emits.  `mintᵉ` because `elaborateImpl` is
+-- `mintᵉ ∘ toEnvelope` and a closed root arrives already minted; renaming
 -- because a subtree written under a `mapᵉ` binder stands in a wider
 -- term telescope than the elaboration it carries, which is what an
 -- author's `source$.pipe(map(x => inner$))` produces.
 data Elabᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → Set where
-  elab-toPlain : ∀ {n} {Γ₀ : Ctx n} (κ : Kinds n) {Δᵍ₀ Δ₀ Θ₀ u}
+  elab-toEnvelope : ∀ {n} {Γ₀ : Ctx n} (κ : Kinds n) {Δᵍ₀ Δ₀ Θ₀ u}
                  (s : SExp Γ₀ Δᵍ₀ Δ₀ Θ₀ u)
-               → Elabᵉ (toPlain κ s)
+               → Elabᵉ (toEnvelope κ s)
   elab-mint    : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Exp Γ Δᵍ Δ (uniqᵗ ∷ Θ) t}
                → Elabᵉ e → Elabᵉ (mintᵉ e)
   elab-ren     : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} {e : Exp Γ Δᵍ Δ Θ t}
@@ -77,4 +78,4 @@ record Elabˢ {n} {Γ : Ctx n} (ins : Slots Γ) : Set where
     {kinds} : Kinds n        -- and how the elaboration reads each slot
     ctx-eq  : Γ ≡ plainᵏ ctx kinds
     source  : SimulSlots ctx kinds
-    embeds  : subst Slots ctx-eq ins ≡ embedSlotsSpec source
+    embeds  : subst Slots ctx-eq ins ≡ embedSlotsImpl source

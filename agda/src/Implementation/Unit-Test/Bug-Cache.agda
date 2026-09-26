@@ -2,7 +2,7 @@
 -- THE BUG CACHE'S RUNNER: a compiled entry point that walks the corpus
 -- and prints which rows failed, and on which property.
 --
--- WHY THERE IS A BINARY AT ALL.  A row is a pair of booleans over a
+-- WHY THERE IS A BINARY AT ALL.  A row is a set of booleans over a
 -- whole `evaluate` run, and Agda's evaluator is the wrong machine to
 -- ask: the typechecker normalises the run, pays the termination check
 -- on the way and caches nothing usable, while the GHC backend runs the
@@ -22,30 +22,33 @@ open import Agda.Builtin.IO using (IO)
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; length)
                       renaming (_++_ to _++ᴸ_)
+open import Data.Product using (_×_; _,_)
 open import Data.Nat.Show using (show)
 open import Data.String using (String; _++_)
 
 open import CLI.IO using (putStr; Unit)
 open import Implementation.Unit-Test using (cases)
-open import Implementation.Unit-Test.Prelude using (Case; wellFormed; agrees)
+open import Implementation.Unit-Test.Prelude using (Case; checksOf)
 
 open Case using (name)
 
 -- one row's verdicts, as the report lines it is owed: a row can fail
--- both properties, and saying which is the whole value of the line
+-- several properties, and saying which is the whole value of the line
 --
 -- MATCHED IN A HELPER, NEVER BY A `with` ON THE VERDICTS.  A `with
 -- agrees c` makes the TYPECHECKER normalise the run it abstracts, and
 -- the run is a whole `evaluate↓` over a variable case: measured, it
 -- exhausts any heap before the module finishes checking.
-verdicts : Case → Bool → Bool → List String
-verdicts c true  true  = []
-verdicts c true  false = (name c ++ " impl≡spec") ∷ []
-verdicts c false true  = (name c ++ " well-formed") ∷ []
-verdicts c false false = (name c ++ " well-formed") ∷ (name c ++ " impl≡spec") ∷ []
+verdict : Case → String → Bool → List String
+verdict c l true  = []
+verdict c l false = (name c ++ " " ++ l) ∷ []
+
+verdicts : Case → List (String × Bool) → List String
+verdicts c []             = []
+verdicts c ((l , b) ∷ bs) = verdict c l b ++ᴸ verdicts c bs
 
 faults : Case → List String
-faults c = verdicts c (wellFormed c) (agrees c)
+faults c = verdicts c (checksOf c)
 
 allFaults : List Case → List String
 allFaults []       = []

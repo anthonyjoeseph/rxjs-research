@@ -2,23 +2,18 @@
 -- THE BUG CACHE'S SHARED VOCABULARY: what a cached case IS, now that a
 -- case is a value rather than a type.
 --
--- A CASE IS A PROGRAM, AND BOTH PROPERTIES ARE CHECKED OF IT.  Each
--- entry used to be a `refl` pinning one predicate of one run, which put
--- the run inside the TYPECHECKER: a case cost minutes, so the two
--- predicates were two separate types and a program found to violate one
--- was never asked about the other.  Compiled, the run is a function
--- call and asking twice is free -- so a row names a program, and every
--- row is held to both.  That is strictly more than the cache used to
--- carry: a program cached for a protocol violation now also guards
--- agreement, which is the property the whole campaign is about.
+-- A CASE IS A PROGRAM, AND EVERY TOP-LINE STATEMENT IS CHECKED OF IT.
+-- Compiled, a run is a function call and asking several questions of it
+-- is free -- so a row names a program, and every row is held to all of
+-- `The-Proof`'s statements that compute on it: the run `WellFormed`
+-- field by field, its values the plain program's arrival by arrival,
+-- and the batcher's batches the spec's.
 --
--- WHY THE PREDICATES ARE BOOLEANS RATHER THAN EQUATIONS.  Agreement is
--- stated on the two sides of the top line, per burst and unwrapped to
--- raw values, and it is settled by `Rx.Emit-Eq` -- the same family the QuickCheck
--- binary already decides agreement with, so a cached case and the seed
--- that found it are answering one question.  Well-formedness is already
--- a boolean at the protocol automaton, so there was never an equation
--- there to lose.
+-- WHY THE PREDICATES ARE BOOLEANS RATHER THAN EQUATIONS.  Each is the
+-- decision of one statement's conclusion on one row, settled by
+-- `Rx.Emit-Eq` where it is an agreement -- the family the QuickCheck
+-- binary decides with, so a cached case and the seed that found it are
+-- answering one question.
 --
 -- A ROW IS AN AUTHOR'S PROGRAM, AND THE HARNESS ROOT IS WHAT MAKES IT
 -- ONE RUN.  Batching reads the protocol off an ENVELOPE, and only an
@@ -36,30 +31,31 @@
 ------------------------------------------------------------------
 module Implementation.Unit-Test.Prelude where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (Bool; true; false; T; _∧_; _∨_; not)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.List using (List; []; concat; map)
-open import Data.Nat using (ℕ)
+open import Data.List using (List; []; _∷_; concat; map; length)
+open import Data.Nat using (ℕ; _≡ᵇ_; _<ᵇ_; _≟_)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
+open import Data.Product using (_×_; _,_)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Prim using (InstEmit; ObservableInput)
 open import Rx.Exp using (Ctx; Closed; Val; natᵗ; takeᵉ; nat̂; inputsBelowᵉ)
 open import Rx.SExp using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ)
-open import Rx.Elaborate using (elaborateSpec)
-open import Rx.Envelope.Decode using (decodeSpec)
-open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Envelope.Decode using (decodeEmits)
 open import Rx.Arrivals using (arrivals↓)
-open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; embedSlotsSpec)
-open import Rx.Protocol using (wellFormed?)
-open import Rx.Emit-Eq using (eqBursts)
+open import Rx.Plain using (plainExp; plainValues)
+open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; plainSlots)
+open import Rx.Protocol using (wellFormed?; protocol-init; runProtocol; accepts?)
+open import Rx.Emit-Eq using (eqBatches; eqBursts)
 open import Function using (_∘_)
 open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
-open import Spec.Unwrap using (unwrapSpec)
 open import Rx.Batch using (batchSimultaneousᵖ)
-open import Spec using (spec-batchSimultaneous)
+open import Verify-Batch-Simultaneous.Well-Formed using (valuesOf; toSpec; ends?)
+import Spec
+open Spec ℕ _≟_ using (spec-batchSimultaneous)
 
 -- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
 -- the one an elaborated program stands in, where each slot holds the
@@ -105,7 +101,7 @@ slot₀ s = scriptedˢ {ok = tt} s
 -- than a proof obligation.
 
 slot₁ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 1 natᵗ sharedᵏ
-slot₁ d with tOf (inputsBelowᵉ 1 (elaborateSpec κ₂ d))
+slot₁ d with tOf (inputsBelowᵉ 1 (plainExp d))
 ... | just ok = sharedˢ d {ok = ok}
 ... | nothing = sharedˢ emptyˢ
 
@@ -149,22 +145,83 @@ capProg : ∀ {t} → Closed Γ₂ᵉ t → Closed Γ₂ᵉ t
 capProg e = takeᵉ (nat̂ 24) e
 
 -- the run a row names: the author's program elaborated, capped, driven
--- by the slot table, and decoded back to the envelope stream both
--- batchings read
-runOf : Case → List (InstEmit (Val Γ₂ᵉ natᵗ))
-runOf c = decodeSpec {Γ = Γ₂ᵉ} {a = natᵗ}
-            (concat (evaluate↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c))) (embedSlotsSpec (slots c))))
+-- by the slot table, and decoded arrival by arrival -- `runᴵ` under the
+-- harness cap
+runsOf : Case → List (List (InstEmit (Val Γ₂ᵉ natᵗ)))
+runsOf c = map (decodeEmits {Γ = Γ₂ᵉ} {a = natᵗ})
+               (arrivals↓ (fuel c) (capProg (elaborateImpl κ₂ (prog c))) (embedSlotsImpl (slots c)))
 
--- the decoded stream must satisfy the protocol automaton
--- (evaluate-well-formed, cached case by case)
+runOf : Case → List (InstEmit (Val Γ₂ᵉ natᵗ))
+runOf = concat ∘ runsOf
+
+------------------------------------------------------------------
+-- `input-well-formed`, one field at a time, so a failing row says which.
+------------------------------------------------------------------
+
+instants : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List ℕ
+instants = map InstEmit.instant
+
+allAre : ℕ → List ℕ → Bool
+allAre i []       = true
+allAre i (j ∷ js) = (i ≡ᵇ j) ∧ allAre i js
+
+memᵇ : ℕ → List ℕ → Bool
+memᵇ i []       = false
+memᵇ i (j ∷ js) = (i ≡ᵇ j) ∨ memᵇ i js
+
+disjoint : List ℕ → List ℕ → Bool
+disjoint []       ys = true
+disjoint (x ∷ xs) ys = not (memᵇ x ys) ∧ disjoint xs ys
+
+sameᵇ : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → Bool
+sameᵇ []                = true
+sameᵇ ([] ∷ arrs)       = sameᵇ arrs
+sameᵇ ((x ∷ xs) ∷ arrs) = allAre (InstEmit.instant x) (instants xs) ∧ sameᵇ arrs
+
+distinctᵇ : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → Bool
+distinctᵇ []           = true
+distinctᵇ (arr ∷ arrs) = disjoint (instants arr) (instants (concat arrs)) ∧ distinctᵇ arrs
+
+-- the `same` field is `sameᵇ`, one instant per arrival; the `distinct`
+-- field is `distinctᵇ`, no instant in two arrivals; and the `accepted`
+-- field is `acceptedᵇ`, the protocol automaton accepting the flat run
+acceptedᵇ : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → Bool
+acceptedᵇ runs = accepts? (runProtocol protocol-init (concat runs))
+
+-- the bug cache's own, and STRONGER than the field: the flat run is
+-- accepted AND ends paid up
 wellFormed : Case → Bool
 wellFormed c = wellFormed? (runOf c)
 
--- THE TWO SIDES OF `formal-verification-batchSimultaneous`, ON ONE ROW.
--- Each is a RUN, capped the same way: the left runs the impl pipeline
--- with the batching operator inside the machine; the right runs the
--- frozen spec pipeline and batches each burst in Agda.  Both answer per
--- burst, in raw values, so neither side's envelope reaches the verdict.
+------------------------------------------------------------------
+-- `plain-agrees`.
+------------------------------------------------------------------
+
+-- THE PLAIN PROGRAM IS CAPPED IN VALUES AND THE ELABORATED ONE IN
+-- ENVELOPES, so the two cuts are not one cut and a capped row is not
+-- compared.  A row neither cap reached is the uncapped run on both
+-- sides; `capped` says which rows those are, and a sweep counts them.
+capPlain : ∀ {t} → Closed Γ₂ t → Closed Γ₂ t
+capPlain e = takeᵉ (nat̂ 24) e
+
+plainOf : Case → List (List ℕ)
+plainOf c = map plainValues (arrivals↓ (fuel c) (capPlain (plainExp (prog c))) (plainSlots (slots c)))
+
+-- over the two runs, so a harness that has them computes neither twice
+plainAgreesᵇ : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → List (List ℕ) → Bool
+plainAgreesᵇ runs plain =
+  not (length (concat runs) <ᵇ 24) ∨ not (length (concat plain) <ᵇ 24)
+    ∨ eqBatches (map valuesOf runs) plain
+
+------------------------------------------------------------------
+-- `batch-agrees`, on the run the row's program gives.
+------------------------------------------------------------------
+
+-- THE BATCHER IS RUN INSIDE THE MACHINE, OVER THE ROW'S OWN PROGRAM,
+-- rather than over a replay: that is the operator the TypeScript port
+-- mirrors.  Where the run is `WellFormed` it answers the statement's
+-- question; where it is not, a disagreement may be the run's fault
+-- rather than the batcher's, which is why the fields are checked apart.
 implBurstsOf : Case → List (List (List ℕ))
 implBurstsOf c =
   map (unwrapImpl {Γ = Γ₂ᵉ} {a = natᵗ})
@@ -172,11 +229,26 @@ implBurstsOf c =
                  (batchSimultaneousᵖ (capProg (elaborateImpl κ₂ (prog c))))
                  (embedSlotsImpl (slots c)))
 
+specOf : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → List (List (List ℕ))
+specOf = map (spec-batchSimultaneous ∘ toSpec)
+
 specBurstsOf : Case → List (List (List ℕ))
-specBurstsOf c =
-  map (unwrapSpec ∘ spec-batchSimultaneous ∘ decodeSpec {Γ = Γ₂ᵉ} {a = natᵗ})
-      (arrivals↓ (fuel c) (capProg (elaborateSpec κ₂ (prog c)))
-                 (embedSlotsSpec (slots c)))
+specBurstsOf c = specOf (runsOf c)
 
 agrees : Case → Bool
 agrees c = eqBursts (implBurstsOf c) (specBurstsOf c)
+
+------------------------------------------------------------------
+-- EVERY CHECK AT ONCE, OVER RUNS COMPUTED ONCE.  Each argument is one
+-- shared thunk, where each of six `Case`-level checks would re-run the
+-- program: a row costs its runs, not its runs times its checks.
+------------------------------------------------------------------
+checks : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → List (List (List ℕ)) → List (List ℕ)
+       → List (String × Bool)
+checks runs impl plain =
+  ("well-formed" , wellFormed? (concat runs)) ∷ ("impl≡spec" , eqBursts impl (specOf runs))
+  ∷ ("plain" , plainAgreesᵇ runs plain) ∷ ("same" , sameᵇ runs)
+  ∷ ("distinct" , distinctᵇ runs) ∷ ("ends" , ends? protocol-init runs) ∷ []
+
+checksOf : Case → List (String × Bool)
+checksOf c = checks (runsOf c) (implBurstsOf c) (plainOf c)

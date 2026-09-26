@@ -321,8 +321,7 @@ here is one `make refuted` run, and it is paid outside the gate.
 
 A `… → ⊥` with a **real consumer** is not a refutation record — it is an
 ordinary lemma that happens to be negative, and it belongs in `src` like any
-other. Today: `n≢jᵂ` (`.Decide`), applied as a proof term under `⊥-elim`
-wherever the batcher's step equation rules out a branch.
+other.
 
 Likewise a `refl` pin with a real consumer is not a probe; and a `refl` pin
 with no consumer that captures a known implementation BUG is not a probe

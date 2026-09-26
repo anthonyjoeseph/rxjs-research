@@ -3,10 +3,10 @@
 -- decodes to a stream the protocol automaton accepts.
 ------------------------------------------------------------------
 
--- WHAT THIS MODULE IS FOR.  `batch-agreement` proves the batcher
--- matches the spec on any ACCEPTED stream, and it is postulate-free.
--- What the top line still owes is the step from a RUN to an accepted
--- stream, and that is what is stated here.
+-- WHAT THIS MODULE IS FOR.  `Verify-Batch-Simultaneous.Well-Formed`
+-- asks a run to be ACCEPTED by the protocol automaton, among other
+-- things; this is that field, for every run of an elaborated program,
+-- read at the evaluator's arrival cut.
 --
 -- THE INDUCTION IS ON THE RUN AND NOT ON THE TREE, AND THE TREE ROUTE
 -- IS RULED OUT RATHER THAN MERELY DISLIKED.  The obvious shape is to
@@ -53,7 +53,7 @@
 -- whose content the census pins down exactly.
 module Verify-Input-Well-Formed.Run-Well-Formed where
 
-open import Data.List    using (List; []; _∷_; _++_; concat; length)
+open import Data.List    using (List; []; _∷_; _++_; concat; length; map)
 open import Data.List.Properties using (++-assoc)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
@@ -65,14 +65,15 @@ open import Rx.Exp      using (Ctx; Closed; Val; []ᵉ)
 open import Rx.Elaborated using (Elabᵉ; Elabˢ)
 open import Rx.Slots using (Slots)
 open import Rx.Envelope using (machineEmitᵗ)
-open import Rx.Envelope.Decode using (decodeSpec)
+open import Rx.Envelope.Decode using (decodeEmits)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Stream;
   chainsOf; arrSource; sched-init; st-init; root; sched-next;
   schedGo)
 open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓;
                                        evaluate⇓; eval-run;
                                        drain-done; drain-empty; drain-step)
-open import Rx.Evaluator.Builder using (evaluate!; evaluate↓)
+open import Rx.Evaluator.Builder using (evaluate!)
+open import Rx.Arrivals using (drained; arrivalsOf; arrivals↓)
 open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol; countIn; Accepted)
 open import Verify-Input-Well-Formed.Well-Shaped using
   (WellShaped; ws-nil; ws-++; wellShaped-accepted)
@@ -96,7 +97,7 @@ concat-++ (xs ∷ xss) yss =
 
 decodeStream-++ : ∀ {n} {Γ : Ctx n} {a}
   (xs ys : List (PlainEvent (Val Γ (machineEmitᵗ a)))) →
-  decodeSpec (xs ++ ys) ≡ decodeSpec xs ++ decodeSpec ys
+  decodeEmits (xs ++ ys) ≡ decodeEmits xs ++ decodeEmits ys
 decodeStream-++ []              ys = refl
 decodeStream-++ (valueᵖ e ∷ xs) ys = cong (_ ∷_) (decodeStream-++ xs ys)
 decodeStream-++ (completeᵖ ∷ xs) ys = decodeStream-++ xs ys
@@ -117,7 +118,7 @@ decodeStream-++ (completeᵖ ∷ xs) ys = decodeStream-++ xs ys
 --
 -- IT IS DEFINED, NOT POSTULATED, because a named predicate with an
 -- unknown body is what four refuted guesses looked like.  With a body
--- it is checkable against the elaboration as `toPlain` is written --
+-- it is checkable against the elaboration as `toEnvelope` is written --
 -- which is the point of having the proof before the implementation.
 -- Expect it to be wrong in detail and corrected by contact.
 --
@@ -171,6 +172,11 @@ Owes {Γ = Γ} st S =
 -- two ledgers agreeing.  `st-init`'s registry is empty and
 -- `protocol-init`'s live set is empty, so the seed is trivial; the
 -- content is what the subscribe walk installs on the way down.
+--
+-- THE QUICKCHECK FINDS ITS CONCLUSION FALSE ON TODAY'S IMPL: a
+-- subscribe frame whose share connects mid-frame leaves the automaton
+-- rejecting, an instant recurring after another's (the WF rows of
+-- `QuickCheck`, bug-cache `seed 9 depth 1 case 2`).
 postulate
   subscribe-shaped :
     ∀ {n} {Γ : Ctx n} {a} {e : Closed Γ (machineEmitᵗ a)} {ins : Slots Γ}
@@ -186,7 +192,7 @@ postulate
     Elabˢ ins →
     Σ ProtocolSt λ S₀ →
         WellShaped protocol-init
-          (decodeSpec (concat out)) S₀
+          (decodeEmits (concat out)) S₀
       × Owes st₀ S₀
       -- AND THE TABLE SURVIVES THE WALK.  The premise arrives on `ins`
       -- and the drain reads it off `Sched.slots sched₀`, so somebody
@@ -199,6 +205,10 @@ postulate
 
 -- LEAF 2: one cascade emits a well-shaped burst and preserves the
 -- agreement.
+--
+-- THE QUICKCHECK FINDS ITS CONCLUSION FALSE ON TODAY'S IMPL: an inner
+-- spawned by a delivery is stamped with the subscribe instant, which
+-- recurs after the delivery's own (bug-cache `seed 2 depth 1 case 15`).
 --
 -- ITS ELABORATION PREMISE IS ON `e` AND THAT IS PROBABLY NOT YET
 -- ENOUGH, which is worth saying before the grind rather than after.
@@ -230,7 +240,7 @@ postulate
     cascade⇓ {e = e} ar sched′ st (out , sched″ , st′) →
     Elabˢ (Sched.slots sched′) →
     Σ ProtocolSt λ S′ →
-        WellShaped S (decodeSpec (concat out)) S′
+        WellShaped S (decodeEmits (concat out)) S′
       × Owes st′ S′
       -- the cascade may install nodes and enlist sources; it does not
       -- rewrite the telescope, so the premise is handed on
@@ -270,7 +280,7 @@ drain-shaped :
   Owes {e = e} st S →
   drain⇓ {e = e} fuel sched st rest →
   Elabˢ (Sched.slots sched) →
-  Σ ProtocolSt λ S′ → WellShaped S (decodeSpec (concat rest)) S′
+  Σ ProtocolSt λ S′ → WellShaped S (decodeEmits (concat rest)) S′
 drain-shaped {S = S} el ow drain-done      es = S , ws-nil
 drain-shaped {S = S} el ow (drain-empty _) es = S , ws-nil
 drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} eqn c d) es
@@ -280,9 +290,9 @@ drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} eqn c d) es
 ...   | S″ , wsRest =
       S″ , subst (λ z → WellShaped S z S″) (sym dEq) (ws-++ wsOut wsRest)
       where
-      dEq : decodeSpec (concat (out ++ rest))
-              ≡ decodeSpec (concat out) ++ decodeSpec (concat rest)
-      dEq = trans (cong decodeSpec (concat-++ out rest))
+      dEq : decodeEmits (concat (out ++ rest))
+              ≡ decodeEmits (concat out) ++ decodeEmits (concat rest)
+      dEq = trans (cong decodeEmits (concat-++ out rest))
                   (decodeStream-++ (concat out) (concat rest))
 
 ------------------------------------------------------------------
@@ -325,7 +335,7 @@ run-wellFormed⇓ :
     {ins : Slots Γ} (s : Stream Γ (machineEmitᵗ a)) →
   Elabᵉ e → Elabˢ ins →
   evaluate⇓ fuel e ins s →
-  Accepted (runProtocol protocol-init (decodeSpec (concat s)))
+  Accepted (runProtocol protocol-init (decodeEmits (concat s)))
 run-wellFormed⇓ {Γ = Γ} {a = a} _ el es
     (eval-run {out = out} {rest = rest} sub dr)
   with subscribe-shaped el sub es
@@ -336,16 +346,44 @@ run-wellFormed⇓ {Γ = Γ} {a = a} _ el es
                                  (sym dEq)
                                  (ws-++ wsOut wsRest))
       where
-      dEq : decodeSpec (concat (out ++ rest))
-              ≡ decodeSpec (concat out) ++ decodeSpec (concat rest)
-      dEq = trans (cong decodeSpec (concat-++ out rest))
+      dEq : decodeEmits (concat (out ++ rest))
+              ≡ decodeEmits (concat out) ++ decodeEmits (concat rest)
+      dEq = trans (cong decodeEmits (concat-++ out rest))
                   (decodeStream-++ (concat out) (concat rest))
+
+-- THE ARRIVAL CUT LOSES NOTHING: joined back up, the arrivals are the
+-- run, so acceptance read either way is one fact.
+drained-concat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {fuel sched st s}
+  (d : drain⇓ {e = e} fuel sched st s) → concat (drained d) ≡ concat s
+drained-concat drain-done      = refl
+drained-concat (drain-empty _) = refl
+drained-concat (drain-step {out = out} {rest = rest} _ _ d) =
+  trans (cong (concat out ++_) (drained-concat d)) (sym (concat-++ out rest))
+
+arrivals-concat : ∀ {n} {Γ : Ctx n} {t} {fuel} {e : Closed Γ t} {ins s}
+  (d : evaluate⇓ fuel e ins s) → concat (arrivalsOf d) ≡ concat s
+arrivals-concat (eval-run {out = out} {rest = rest} _ d) =
+  trans (cong (concat out ++_) (drained-concat d)) (sym (concat-++ out rest))
+
+decode-concat : ∀ {n} {Γ : Ctx n} {a}
+  (xss : List (List (PlainEvent (Val Γ (machineEmitᵗ a))))) →
+  concat (map decodeEmits xss) ≡ decodeEmits (concat xss)
+decode-concat []         = refl
+decode-concat (xs ∷ xss) =
+  trans (cong (decodeEmits xs ++_) (decode-concat xss))
+        (sym (decodeStream-++ xs (concat xss)))
 
 run-wellFormed :
   ∀ {n} {Γ : Ctx n} {a} (fuel : Fuel) (e : Closed Γ (machineEmitᵗ a))
     (ins : Slots Γ) →
   Elabᵉ e → Elabˢ ins →
   Accepted (runProtocol protocol-init
-             (decodeSpec (concat (evaluate↓ fuel e ins))))
-run-wellFormed fuel e ins el es =
-  run-wellFormed⇓ _ el es (proj₂ (evaluate! fuel e ins))
+             (concat (map decodeEmits (arrivals↓ fuel e ins))))
+run-wellFormed fuel e ins el es = go (proj₂ (evaluate! fuel e ins))
+  where
+  go : ∀ {s} (d : evaluate⇓ fuel e ins s) →
+       Accepted (runProtocol protocol-init (concat (map decodeEmits (arrivalsOf d))))
+  go {s} d =
+    subst (λ z → Accepted (runProtocol protocol-init z))
+          (sym (trans (decode-concat (arrivalsOf d)) (cong decodeEmits (arrivals-concat d))))
+          (run-wellFormed⇓ s el es d)

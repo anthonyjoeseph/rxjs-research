@@ -1510,7 +1510,7 @@ formers-selftest:
 	      "sed -i.bak 's/^  deferᵖ : SExp Γ t → Exp Γ t/deferᵖ : SExp Γ t → Exp Γ t\ndeferᵖ e = deferᵉ e/' agda/src/Rx/Elaborate.agda" \
 	      'the Agda generator DOES write `deferᵉ`'; \
 	  run "an agen=yes row whose elaboration helper stops being reached" \
-	      "sed -i.bak 's/toPlain (liftˢ f)  = liftᵖ (toPlainTm f)/toPlain (liftˢ f)  = toPlain f/' agda/src/Rx/Elaborate.agda" \
+	      "sed -i.bak 's/toEnvelope (liftˢ f)  = liftᵖ (toEnvelopeTm f)/toEnvelope (liftˢ f)  = toEnvelope f/' agda/src/Rx/Elaborate.agda" \
 	      'no arm of the Agda generator writes `liftᵉ`'; \
 	  run "a row unreachable by BOTH generators" \
 	      "sed -i.bak 's/\tno\tyes\tsource/\tno\tno\tsource/' scripts/formers.tsv" \
@@ -1642,11 +1642,10 @@ quickcheck: qc-build
 # is raised only once the operator passes at the current one.
 # QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
 #
-# IT GATES ON AGREEMENT -- FAIL -- AND REPORTS SPAN AND WF.  Both are
-# properties of the SPEC side alone: a SPAN row is one spec burst whose
-# instants recur across arrivals, a WF row the spec's raw stream breaking
-# the protocol automaton, and no impl change can reach either.  They are
-# printed with their counts and samples, and gate nothing here.
+# IT GATES ON EVERY CHECK.  Each is one top-line statement, or one field
+# of `WellFormed`, decided on one program's run, and every one of them is
+# a claim about the implementation -- so any of them failing is a known
+# counterexample, printed with its count and samples.
 QC ?= 1 15 1
 QC_BUDGET ?= 120
 QC_LOG := agda/_oracle/qc.log
@@ -1655,7 +1654,7 @@ qc-fast: qc-build
 	ec=$$?; head -c 6000 $(QC_LOG); \
 	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
 	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
-	grep -q '(all agree)\|^FAIL 0 - 0 ' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
+	grep -q '(all agree)' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
 	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s"
 
 

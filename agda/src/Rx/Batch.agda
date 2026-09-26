@@ -8,9 +8,8 @@
 --
 -- ONE ENVELOPE OUT PER GROUP IN, AND THE GROUP IS WHAT `batchSyncᵉ`
 -- HANDS OVER.  The subscribe frame's emits arrive as ONE group, so the
--- whole of burst 0 is in hand at once and is batched exactly as
--- `Spec.specGo` batches a list: one batch per instant, in order of the
--- instant's first emit, holding every value that instant carried, and
+-- whole of burst 0 is in hand at once and is batched as a list: one
+-- batch per instant, in order of the instant's first emit, holding every value that instant carried, and
 -- no batch for an instant with no values.  The batches ride ONE output
 -- envelope as its value events, so an envelope may carry several
 -- batches or none -- the subscriber sees the batches, and the envelope
@@ -56,7 +55,7 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} where
   nullᵇ : ∀ {Θ s} → Tm Γ Δᵍ Δ Θ (listᵗ s) → Tm Γ Δᵍ Δ Θ boolᵗ
   nullᵇ xs = foldᵗ xs (bool̂ true) (bool̂ false)
 
-  -- `Spec.valuesAt`: every value the list's emits carry under instant u
+  -- every value the list's emits carry under instant u
   valuesAtᵇ : ∀ {Θ a} → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ (listᵗ (machineEmitᵗ a))
             → Tm Γ Δᵍ Δ Θ (listᵗ a)
   valuesAtᵇ u es = foldᵗ es nilᵗ
@@ -64,7 +63,7 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} where
          (appendᵗ (varᵗ (there (here refl))) (payloadsᵇ (varᵗ (here refl))))
          (varᵗ (there (here refl))))
 
-  -- `Spec.specGo` over a list, values only: the instants seen so far
+  -- a list's batches, values only: the instants seen so far
   -- and the batches so far, reversed while the fold runs
   batchesᵇ : ∀ {Θ a} → Tm Γ Δᵍ Δ Θ (listᵗ (machineEmitᵗ a)) → Tm Γ Δᵍ Δ Θ (listᵗ (listᵗ a))
   batchesᵇ {Θ} {a} es = revᵗ (sndᵗ (foldᵗ es (pairᵗ nilᵗ nilᵗ) body))

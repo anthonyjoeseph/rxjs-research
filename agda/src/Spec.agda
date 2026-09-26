@@ -1,50 +1,34 @@
-module Spec where
-
-open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_)
-open import Data.Nat  using (_≡ᵇ_)
-
-open import Rx.Prim using (Id; Source; InstEvent; value; EmitKind;
-                           InstEmit; _at_from_as_)
-
 ------------------------------------------------------------------
--- Clairvoyant batching: whole stream in view — group emits by
--- instant id, concat their values in stream order, drop valueless
--- instants; each batch keeps its instant id (a batched stream
--- re-batches).  Batches appear in first-occurrence order of their
--- instant; a batch's source is its first emit's source (in a
--- WellFormed stream every emit of an instant carries the arrival's
--- source, so the choice is forced there).
+-- THE SPEC: `batchSimultaneous` cuts a stream into maximal runs of one
+-- instant, and never reorders.
+--
+-- The input is what a subscriber sees, each value tagged with the
+-- instant that caused it; the output is the batches.  Values leave in
+-- exactly the order they arrived, and later in the array means later
+-- in time -- `[1,5] [3] [7,0]` is a batching of `1 5 3 7 0`, and
+-- `[1,5,3,0,7]` is not one of anything (`Readme-Semantics`).
+--
+-- AN INSTANT IS OPAQUE, AND THAT IS WHY THE MODULE IS PARAMETERISED.
+-- The spec asks one question of an instant -- is it the same one as the
+-- last? -- so it is given equality and nothing else.  No order, no
+-- successor, no arithmetic: whatever an implementation uses to name
+-- its instants, the spec cannot tell and does not care.
 ------------------------------------------------------------------
+open import Relation.Binary.Definitions using (DecidableEquality)
 
-valuesOf : ∀ {A : Set} → List (InstEvent A) → List A
-valuesOf []             = []
-valuesOf (value v ∷ es) = v ∷ valuesOf es
-valuesOf (_       ∷ es) = valuesOf es
+module Spec (Instant : Set) (_≟_ : DecidableEquality Instant) where
 
--- every value the stream assigns to instant i, in stream order
-valuesAt : ∀ {A : Set} → Id → List (InstEmit A) → List A
-valuesAt i [] = []
-valuesAt i ((es at j from _ as _) ∷ xs) =
-  (if i ≡ᵇ j then valuesOf es else []) ++ valuesAt i xs
+open import Data.List    using (List; []; _∷_; _∷ʳ_)
+open import Data.Product using (_×_; _,_)
+open import Relation.Nullary using (yes; no)
 
-seenBefore : Id → List Id → Bool
-seenBefore i []       = false
-seenBefore i (j ∷ js) = if i ≡ᵇ j then true else seenBefore i js
+-- the batch open at instant `i`, holding `vs` so far
+batchFrom : ∀ {A : Set} → Instant → List A → List (Instant × A) → List (List A)
+batchFrom i vs []             = vs ∷ []
+batchFrom i vs ((j , v) ∷ xs) with i ≟ j
+... | yes _ = batchFrom i (vs ∷ʳ v) xs
+... | no  _ = vs ∷ batchFrom j (v ∷ []) xs
 
--- one instant's batch: a single value event carrying the instant's
--- list of values, under the instant's own id (envelope — source and
--- kind — from the instant's first emit) — dropped when valueless
-batchOf : ∀ {A : Set} → Id → Source → EmitKind → List A → List (InstEmit (List A))
-batchOf i s k []       = []
-batchOf i s k (v ∷ vs) = ((value (v ∷ vs) ∷ []) at i from s as k) ∷ []
-
-specGo : ∀ {A : Set} → List Id → List (InstEmit A) → List (InstEmit (List A))
-specGo seen [] = []
-specGo seen ((es at i from s as k) ∷ xs) =
-  if seenBefore i seen
-  then specGo seen xs
-  else batchOf i s k (valuesOf es ++ valuesAt i xs) ++ specGo (i ∷ seen) xs
-
-spec-batchSimultaneous : ∀ {A : Set} → List (InstEmit A) → List (InstEmit (List A))
-spec-batchSimultaneous = specGo []
+spec-batchSimultaneous : ∀ {A : Set} → List (Instant × A) → List (List A)
+spec-batchSimultaneous []             = []
+spec-batchSimultaneous ((i , v) ∷ xs) = batchFrom i (v ∷ []) xs

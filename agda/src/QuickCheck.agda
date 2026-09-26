@@ -1,9 +1,9 @@
 -- An all-Agda QuickCheck: generate random well-typed programs (exp tree +
 -- scripted inputs) over a fixed 2-slot nat context, run them through the
--- evaluator, and check the two sides of the top line agree: the impl
--- pipeline's BATCHING RUN against spec-batchSimultaneous applied to the
--- spec pipeline's run, burst by burst, in raw values. A fast in-Agda dev
--- loop for the implementation.
+-- evaluator, and decide every top-line statement that computes on the
+-- run: the batcher's batches against the spec's, arrival by arrival, in
+-- raw values; the run's values against the plain program's; and each
+-- `WellFormed` field. A fast in-Agda dev loop for the implementation.
 --
 --   agda --compile --compile-dir=_cli src/QuickCheck.agda
 --   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
@@ -70,12 +70,11 @@ open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Rx.Protocol using (wellFormed?)
-open import Rx.Emit-Eq using (eqBatches; eqBursts)
-open import Spec using (spec-batchSimultaneous)
-open import Spec.Unwrap using (unwrapSpec)
-open import Implementation.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; implBurstsOf; specBurstsOf;
-  agrees; wellFormed)
+open import Rx.Protocol using (protocol-init)
+open import Rx.Emit-Eq using (eqBursts)
+open import Verify-Batch-Simultaneous.Well-Formed using (ends?)
+open import Implementation.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; runsOf; implBurstsOf;
+  specBurstsOf; specOf; plainOf; plainAgreesᵇ; sameᵇ; distinctᵇ; acceptedᵇ; agrees; wellFormed)
 open import Implementation.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
@@ -754,40 +753,22 @@ report tag e d₀ d₁ impl spec raw =
        ++ "\n    spec = " ++ showBursts spec
        ++ "\n    raw  = " ++ showStream raw ++ pasteRow e d₀ d₁
 
--- a WellFormed violation of the evaluator's raw output
-reportWF : SExp Γ₂ [] [] [] natᵗ
+-- a violation of one `WellFormed` field, tagged with the field
+reportWF : String → SExp Γ₂ [] [] [] natᵗ
          → Script → SExp Γ₂ [] [] [] natᵗ
-         → List (InstEmit ℕ) → String
-reportWF e d₀ d₁ s =
-  "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e d₀ d₁
+         → List (List (InstEmit ℕ)) → String
+reportWF tag e d₀ d₁ runs =
+  "  " ++ tag ++ "\n    arrivals = " ++ showBursts (map (map (λ x → InstEmit.instant x ∷ [])) runs)
+       ++ "\n    raw      = " ++ showStream (concat runs) ++ pasteRow e d₀ d₁
 
--- A SPEC INSTANT SPANNING TWO BURSTS, which no operator can repair.  The
--- top line applies the spec per burst, and that agrees with applying it
--- to the whole run exactly when no instant's emits fall in two bursts;
--- where they do, the per-burst spec splits a batch the whole-run spec
--- keeps, and the statement asks the operator for a batching the spec
--- itself does not give.  So it is reported apart from FAIL: it is a
--- finding about the statement, not a bug in the operator.
-reportSpan : SExp Γ₂ [] [] [] natᵗ
-           → Script → SExp Γ₂ [] [] [] natᵗ
-           → List (List ℕ) → List (List (List ℕ)) → List (InstEmit ℕ) → String
-reportSpan e d₀ d₁ whole bursts raw =
-  "  SPAN-FAIL\n    whole  = " ++ showBatches whole
-       ++ "\n    bursts = " ++ showBursts bursts
-       ++ "\n    raw    = " ++ showStream raw ++ pasteRow e d₀ d₁
+-- the run's values against the plain program's, arrival by arrival
+reportPlain : SExp Γ₂ [] [] [] natᵗ
+            → Script → SExp Γ₂ [] [] [] natᵗ
+            → List (List (InstEmit ℕ)) → List (List ℕ) → String
+reportPlain e d₀ d₁ runs plain =
+  "  PLAIN\n    plain = " ++ showBatches plain
+       ++ "\n    raw   = " ++ showStream (concat runs) ++ pasteRow e d₀ d₁
 
--- three checks on one generated program: impl ≡ spec per burst, no spec
--- instant spanning two bursts, and the raw stream satisfying the protocol
--- automaton (evaluate-well-formed, sampled).
---
--- THE THIRD CHECK WENT WITH THE THING IT SAMPLED, AND ITS COVERAGE IS
--- NOT LOST.  It reported a run that gave up at a descent guard, which
--- was the cheapest instantiation of the claim that no run does — and
--- the sweep's verdict over 4500 programs is recorded where that claim
--- was, since the guards it sampled are gone and the statement it
--- sampled is not stateable.  What it would have to sample now is a
--- proof obligation rather than an output, and nothing a generator
--- produces can fail one.
 -- one count per former, in `allFormers` order, plus the obs-fold count
 Tally : Set
 Tally = List ℕ × ℕ
@@ -811,18 +792,27 @@ bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 -- EACH RUN IS AN ARGUMENT, SO IT IS COMPUTED ONCE.  A `let` is
 -- substituted at compile time, so a name used in three checks is three
 -- evaluations; a function argument is one shared thunk.
+--
+-- ONE CHECK PER STATEMENT, AND PER FIELD OF `WellFormed`, so a report
+-- says which claim a program breaks rather than that it breaks one.
+-- The batcher's check is only as good as the run under it: where a
+-- field fails, a FAIL on the same row may be the run's fault.
+check : ℕ → Bool → String → List (ℕ × String)
+check k true  r = []
+check k false r = (k , r) ∷ []
+
 verdict : SExp Γ₂ [] [] [] natᵗ → Script → SExp Γ₂ [] [] [] natᵗ
-        → List (List (List ℕ)) → List (List (List ℕ))
-        → List (InstEmit ℕ) → List (ℕ × String)
-verdict e d₀ d₁ impl spec s =
-  agreeFails ++ᴸ spanFails ++ᴸ wfFails
+        → List (List (List ℕ)) → List (List (InstEmit ℕ)) → List (List ℕ)
+        → List (ℕ × String)
+verdict e d₀ d₁ impl runs plain =
+  check 0 (eqBursts impl spec) (report "FAIL" e d₀ d₁ impl spec (concat runs))
+  ++ᴸ check 1 (plainAgreesᵇ runs plain) (reportPlain e d₀ d₁ runs plain)
+  ++ᴸ check 2 (sameᵇ runs) (reportWF "SAME" e d₀ d₁ runs)
+  ++ᴸ check 3 (distinctᵇ runs) (reportWF "DISTINCT" e d₀ d₁ runs)
+  ++ᴸ check 4 (acceptedᵇ runs) (reportWF "WF" e d₀ d₁ runs)
+  ++ᴸ check 5 (ends? protocol-init runs) (reportWF "ENDS" e d₀ d₁ runs)
   where
-  whole      = unwrapSpec (spec-batchSimultaneous s)
-  agreeFails = if eqBursts impl spec then []
-               else (0 , report "FAIL" e d₀ d₁ impl spec s) ∷ []
-  spanFails  = if eqBatches (concat spec) whole then []
-               else (2 , reportSpan e d₀ d₁ whole spec s) ∷ []
-  wfFails    = if wellFormed? s then [] else (3 , reportWF e d₀ d₁ s) ∷ []
+  spec = specOf runs
 
 oneCase : ℕ → Gen (Marks × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED AND WHAT IS PRINTED, AND THE CAP IS
@@ -833,7 +823,7 @@ oneCase : ℕ → Gen (Marks × List (ℕ × String))
 oneCase d = genExp d >>=G λ e → genSlots >>=G λ ds →
   let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
   in pureG (marksˢ e , verdict e (proj₁ ds) (proj₂ ds)
-                               (implBurstsOf c) (specBurstsOf c) (runOf c))
+                               (implBurstsOf c) (runsOf c) (plainOf c))
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
@@ -894,7 +884,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = "FAIL" ∷ "-" ∷ "SPAN" ∷ "WF" ∷ []
+kinds = "FAIL" ∷ "PLAIN" ∷ "SAME" ∷ "DISTINCT" ∷ "WF" ∷ "ENDS" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -907,6 +897,7 @@ dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = concatStr (counts 0 kinds fs) ++ "\n"
   ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs
+  ++ samples 4 fs ++ samples 5 fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such

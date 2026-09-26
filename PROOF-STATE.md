@@ -180,26 +180,23 @@ the row is DIFFICULTY.
 ## The theorem chain (top → leaves)
 
 ```
-formal-verification-batchSimultaneous    The-Proof.agda — a REAL body over
- │                                        two leaves; impl pipeline against
- │                                        spec pipeline, per burst, raw values
- ├─ batchSimultaneousᵖ, Implementation.Pipeline
- │                                        the impl side — tier 2 finishes it
- ├─ batch-transcription                   that operator's run computes
- │                                        foldBursts — tier 3
- └─ burst-agreement                       foldBursts agrees with the spec per
-     │                                    burst — tier 3; its body is owed
-     └─ elaborated-accepted               PROVEN, over run-wellFormed, whose
-         └─ subscribe-shaped, cascade-shaped   two leaves are tier 3
+formal-verification-batchSimultaneous    The-Proof.agda — three statements
+ │                                        side by side, meeting in raw values
+ ├─ input-well-formed                     REAL body: the impl run is WellFormed
+ │   ├─ arrival-same, arrival-distinct, arrival-ends       tier 3
+ │   └─ run-wellFormed                    PROVEN over its two leaves
+ │       └─ subscribe-shaped, cascade-shaped               tier 3
+ ├─ plain-agrees                          the run's values are the plain
+ │                                        program's, per arrival — tier 3
+ └─ batch-agrees                          over any WellFormed run, the batcher
+                                          gives the spec's batches — tier 3
 
-  batch-agreement, batch-online           PROVEN; claimed by Main in their own
-                                          right — nothing above consumes them
+  wf-batches, wf-arrival-batch,           PROVEN; the README's semantics over
+  spec-preserves-order                    the spec, claimed by Main
+  batch-online                            PROVEN; claimed by Main
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
-
-  toPlain                                 Rx/Elaborate.agda — a REAL body,
-                                          0 postulates
 
   every tier above is stated over Rx.Exp's syntax
 ```
@@ -223,11 +220,10 @@ are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
 close without changing one of them, STOP and report that proof. The envelope's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
-The top line runs the frozen spec pipeline and `Implementation.Pipeline` with
-`Rx.Batch`, meeting per arrival (`Rx.Arrivals`) in raw values; it may be
-restated to absorb a fuel difference between the runs (Anthony). **DONE IS
-THE AGDA QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go
-in `Rx.Envelope`'s header; counterexamples go in the bug cache.
+The top line is three statements over the impl run, and `QuickCheck` decides
+each on random programs, `WellFormed` field by field. **DONE IS THE AGDA
+QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
+`Rx.Envelope`'s header; counterexamples go in the bug cache.
 
 ### The monster
 
@@ -237,25 +233,29 @@ bound.
 
 ### Big picture tier roadmap
 
-- **BATCH A LATER ARRIVAL'S EMITS — A QUESTION FOR ANTHONY, NOT A GRIND.**
-  `batchSyncᵉ` groups only the subscribe frame, so a later arrival's emits
-  come out singly; bug-cache row 4 is the failing program. Knowing that an
-  arrival is over needs a mark that crosses a flattener's OUTER, which every
-  flattener cuts, drops or queues, and there is no in-body multicast to
-  route around one. The four routes tried are dead routes in
-  `Rx.Envelope`'s header; what is left moves `Rx.Exp` or the evaluator.
+- **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
+  The QuickCheck's SAME rows are a share's connect minting its own instant
+  inside the subscribe frame, and a spawned inner stamped with the subscribe
+  instant rather than its trigger's; DISTINCT, WF and every FAIL so far fall
+  on the same rows (bug-cache `seed 9 depth 1 case 2`, `seed 2 depth 1
+  case 15`). Fix the elaboration's stamping.
 
-- **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony).** Depth 1 is the
-  sweep that fits, because a run costs multiplicatively in flattener
-  nesting (`typecheck-performance-numbers.md`). Gate on FAIL alone: SPAN
-  and WF are the spec side's own, and SPAN is tier 3's evidence against
-  `burst-agreement`. Every counterexample becomes a bug-cache row first.
+- **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
+  The PLAIN rows: a switched-away inner stays subscribed (`seed 6 depth 1
+  case 4`), and an inner arriving while one is live is not dropped (`seed 7
+  depth 1 case 12`). Mirror the plain formers' bookkeeping in the envelope.
 
-- **RESTATE THE PROOF'S MIDDLE TERM TO THE OPERATOR THAT PASSES.**
-  `burst-agreement` as stated is FALSE — `foldBursts` never flushes a
-  subscribe-kind instant, whose owed list stays empty, so `ofˢ` of one value
-  gives `[[]]` against `[[[1]]]`. Once the operator settles, its meta-level
-  mirror replaces `foldBursts` as the term both leaves meet in.
+- **MARK WHERE EACH INSTANT ENDS — POSSIBLY A QUESTION FOR ANTHONY.** ENDS
+  fails on nearly every run: a subscribe-kind instant owes nothing, and
+  `paidOff []` is false. The same mark is what batching a later arrival
+  needs (bug-cache row 4); the four routes tried are dead routes in
+  `Rx.Envelope`'s header, and what is left may move `Rx.Exp` or the evaluator.
+
+- **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
+  Depth 1 is the sweep that fits, and some programs cost exponentially in
+  fuel, so a sweep bounds each CASE in wall clock
+  (`typecheck-performance-numbers.md`). Every counterexample becomes a
+  bug-cache row first.
 
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
   from the oracle's tree, as `qc-build` does. This leg closes the tier: the
@@ -302,54 +302,50 @@ definition rather than a postulate, so its cone is real.
   ids `mintᵉ` bound — and measured, those differ. So the equation holds only if
   an arrival carries the WIRE's naming, which is a requirement on the
   elaboration that nothing yet discharges. Settle it at a cut or a share's
-  connect, where a node is read back out of the registry; do not settle it on
-  `map-f`, which cannot tell the two readings apart.
+  connect, where a node is read back out of the registry.
 
-- **THE mergeAll-LOCALITY LEMMA, WHICH TWO ROWS WANT.** `batchSimultaneousᵖ`
-  is now `mergeAllᵉ ∘ mapᵉ ∘ scanᵉ`, so neither `batch-transcription` nor
-  `cascade-shaped` can treat a flattener as schedule-free any more. The fact
-  to prove: `hasRoom nothing active = true`, so at unlimited concurrency
-  nothing is ever queued and each synchronous inner drains inside the cascade
-  that opened it. Cheap, and it unblocks both.
+- **THE mergeAll-LOCALITY LEMMA.** `batchSimultaneousᵖ` is
+  `mergeAllᵉ ∘ mapᵉ ∘ scanᵉ`, so `cascade-shaped` cannot treat a flattener as
+  schedule-free. The fact to prove: `hasRoom nothing active = true`, so at
+  unlimited concurrency nothing is ever queued and each synchronous inner
+  drains inside the cascade that opened it. Cheap, and it unblocks the arms.
 
 - **`cascade-shaped`'S CHEAP ARMS, TO FIX THE SHAPE.** `map-f` and `scan-f`
-  leave `sched` and `st` untouched. Landing them first is not grinding for its
-  own sake: it forces the per-former statement into its final form against
-  arms whose content is nil, so the traffic-bearing arms are written against a
-  shape that has already survived contact.
+  leave `sched` and `st` untouched. Landing them first forces the per-former
+  statement into its final form against arms whose content is nil, so the
+  traffic-bearing arms are written against a shape that survived contact.
 
 - **THE TRAFFIC-BEARING FRAMES, AND THE ELABORATION CHANGES THEY FORCE.** The
-  cut, the three flatteners, a share's connect. This is the leg where the
-  virtuous cycle is expected to run, so it is also where the spiral is
-  expected if there is one — cut it into commits by FORMER, and report rather
-  than push if two consecutive formers each undo the previous one's fix.
+  cut, the three flatteners, a share's connect — the frames tier 2's SAME and
+  PLAIN rows fall on. Cut it into commits by FORMER, and report rather than
+  push if two consecutive formers each undo the previous one's fix.
 
-- **`batch-transcription` OVER THE FINISHED OPERATOR, AND `burst-agreement`'S
-  BODY.** The first is blocked until tier 2 lands: its right side is
-  `foldBursts`, whose flush points the current body does not have. The second
-  is `fold-agree` cut at burst boundaries, over `elaborated-accepted` and a
-  leaf saying each burst of an elaborated run ends paid off.
+- **`batch-agrees` OVER THE REPLAY.** Its run is a hot script, one delivery
+  per emit, so the batcher's run is one flattener over one scan — the shape
+  the recovered `fold-agree` proved against a grouping spec. Probe the replay
+  on the tier's bug-cache runs before any grind.
 
 - **`subscribe-shaped` LAST.** Deliberately. `st-init`'s registry and
   `protocol-init`'s live set are both empty, so the seed is trivial and the
-  content is what the subscribe walk installs on the way down — which is a
-  strictly smaller question once `cascade-shaped` has settled what a
-  well-shaped burst and a preserved `Owes` actually are.
+  content is what the subscribe walk installs on the way down — a strictly
+  smaller question once `cascade-shaped` has settled what a well-shaped burst
+  and a preserved `Owes` actually are.
 
 ### The ledger
 
-- **`batch-transcription`** (The-Proof) — FALSITY, `NO EVIDENCE`: false against
-  the landed operator until tier 2 finishes it; its locality argument also
-  needs re-establishing over `mergeAllᵉ`.
-- **`burst-agreement-accepted`** (The-Proof) — FALSITY, `NO EVIDENCE`: false if
-  a spec instant spans two bursts, which the QuickCheck's SPAN rows show the
-  spec elaboration doing; the rest is a settledness leaf.
-- **`cascade-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: the per-former
-  split, and the `EvalSt` node-provenance invariant it is probably still
-  missing.
-- **`subscribe-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: trivial
-  seed, content is what the walk installs — but its `Owes` conclusion carries
-  the monster's own recorded gap, so the class is the gap's and not the
-  grind's.
+- **`arrival-same`** (The-Proof) — FALSITY, `NO EVIDENCE`: QuickCheck finds two
+  instants in one arrival on today's impl; tier 2's first leg.
+- **`arrival-distinct`** (The-Proof) — FALSITY, `NO EVIDENCE`: falls on the
+  same rows as `arrival-same`.
+- **`arrival-ends`** (The-Proof) — FALSITY, `NO EVIDENCE`: false at every
+  subscribe frame today; tier 2's end-mark leg.
+- **`plain-agrees`** (The-Proof) — FALSITY, `NO EVIDENCE`: the elaborated
+  `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's second leg.
+- **`subscribe-shaped`** (Run-Well-Formed) — FALSITY, `NO EVIDENCE`: the
+  QuickCheck's WF rows break acceptance inside the subscribe frame.
+- **`cascade-shaped`** (Run-Well-Formed) — FALSITY, `NO EVIDENCE`: WF rows
+  break acceptance in later arrivals too.
+- **`batch-agrees`** (The-Proof) — FALSITY, `NO EVIDENCE`: nothing has
+  instantiated the replay.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

@@ -15,8 +15,8 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; c
 -- init/close counts, the spec reads only instant ids.  ACCEPTANCE of
 -- the run is the bridge premise that the two vocabularies tell the
 -- same story on a stream: what the evaluator promises
--- (`evaluate-accepted`) and what the batcher assumes
--- (`batch-agreement`).  Every fact here is WRITER-ASSERTED (the kind
+-- (`run-wellFormed`) and what the batcher assumes
+-- (`batch-agrees`, through `WellFormed`).  Every fact here is WRITER-ASSERTED (the kind
 -- tag, the handoff announcement, the close reason) and the
 -- automaton only checks; it never reconstructs.  stepProtocol
 -- rejects (nothing) any emit breaking a clause:
@@ -46,7 +46,7 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; c
 --                         protocol law — without it, a post-payoff
 --                         subscribe emit could smuggle values into
 --                         an instant the batcher already closed,
---                         and batch-agreement would be false.
+--                         and batch-agrees would be false.
 --                         (Obligation-free instants — subscribe
 --                         frames, whose owed table never seeds —
 --                         are exempt: paidOff [] is false.)

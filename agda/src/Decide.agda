@@ -31,7 +31,7 @@
 --
 -- THE NAMES ARE NOT NORMALISED, AND THAT IS A RULING, NOT AN OVERSIGHT.
 -- The class arrived with several conventions at once (`≡ᵇ-refl`,
--- `≡ᵇ→≡`, `just-injᵂ`), and renaming to one of them rewrites call sites
+-- `≡ᵇ→≡`), and renaming to one of them rewrites call sites
 -- for no proof content.  The duplicate-generating mechanism is LOCALITY,
 -- not spelling: with every such fact in one file, the check before
 -- adding one is reading this file.  Match a neighbour's convention when
@@ -46,8 +46,6 @@ module Decide where
 open import Data.Bool using (Bool; true; false; T; _∧_)
 open import Data.Unit using (tt)
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; cong)
 
@@ -59,25 +57,9 @@ open import Relation.Binary.PropositionalEquality
 ≡ᵇ-refl zero    = refl
 ≡ᵇ-refl (suc m) = ≡ᵇ-refl m
 
-≡ᵇ-sym : ∀ (a b : ℕ) → (a ≡ᵇ b) ≡ (b ≡ᵇ a)
-≡ᵇ-sym zero    zero    = refl
-≡ᵇ-sym zero    (suc b) = refl
-≡ᵇ-sym (suc a) zero    = refl
-≡ᵇ-sym (suc a) (suc b) = ≡ᵇ-sym a b
-
 ≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
 ≡ᵇ→≡ zero    zero    _ = refl
 ≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
-
-------------------------------------------------------------------
--- Maybe
-------------------------------------------------------------------
-
-just-injᵂ : ∀ {A : Set} {x y : A} → _≡_ {A = Maybe A} (just x) (just y) → x ≡ y
-just-injᵂ refl = refl
-
-n≢jᵂ : ∀ {A : Set} {x : A} → _≡_ {A = Maybe A} nothing (just x) → ⊥
-n≢jᵂ ()
 
 ------------------------------------------------------------------
 -- CONJUNCTION IN `T` FORM, AND THE BOOLS ARE EXPLICIT ON PURPOSE.

@@ -123,7 +123,7 @@ record InstEmit (A : Set) : Set where
 -- SO THE PROTOCOL RIDES ON THE VALUES RATHER THAN ON THE CARRIER,
 -- which is where the TypeScript keeps it: its operators are plain
 -- rxjs and the envelope is the type flowing THROUGH them.  `emitᵗ` in
--- `Rx.Envelope` is that envelope at the object level and `toPlain`
+-- `Rx.Envelope` is that envelope at the object level and `toEnvelope`
 -- puts it there, so a machine carrying one too would be holding the
 -- same record twice, once at each level, with only the object-level
 -- copy having a counterpart in the mirror.
