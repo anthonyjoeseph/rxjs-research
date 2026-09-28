@@ -180,19 +180,26 @@ the row is DIFFICULTY.
 ## The theorem chain (top → leaves)
 
 ```
-formal-verification-batchSimultaneous    The-Proof.agda — three statements
- │                                        side by side, meeting in raw values
- ├─ input-well-formed                     REAL body: the impl run is WellFormed
- │   ├─ arrival-same, arrival-distinct, arrival-ends       tier 3
+formal-verification-batchSimultaneous    The-Proof.agda — statements side by
+ │                                        side, meeting in raw values
+ ├─ left-to-right                         the batches, joined, are the plain
+ │                                        program's values — tier 3
+ ├─ timing-correct                        stamps group emits as the timed
+ │                                        translation's packets do — tier 3
+ ├─ countable-output                      REAL body: the impl run is Countable
+ │   ├─ output-ends                       tier 3
  │   └─ run-wellFormed                    PROVEN over its two leaves
  │       └─ subscribe-shaped, cascade-shaped               tier 3
- ├─ plain-agrees                          the run's values are the plain
- │                                        program's, per arrival — tier 3
- └─ batch-agrees                          over any WellFormed run, the batcher
-                                          gives the spec's batches — tier 3
+ ├─ countable-batches                     over any Countable stream, the batcher
+ │                                        gives the spec's batches on time — tier 3
+ └─ timed-faithful                        the timed run carries the plain run's
+                                          values — tier 3
 
-  wf-batches, wf-arrival-batch,           PROVEN; the README's semantics over
-  spec-preserves-order                    the spec, claimed by Main
+  timed, timed-below                      Rx/Timed.agda — the translation the
+                                          packets come from; unwritten — tier 3
+
+  spec-preserves-order                    PROVEN; the README's semantics over
+                                          the spec, claimed by Main
   batch-online                            PROVEN; claimed by Main
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
@@ -220,8 +227,9 @@ are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
 close without changing one of them, STOP and report that proof. The envelope's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
-The top line is three statements over the impl run, and `QuickCheck` decides
-each on random programs, `WellFormed` field by field. **DONE IS THE AGDA
+The top line is stated over the impl run and the timed translation's packets;
+`QuickCheck` still decides the arrival-cut reading it replaced, and is owed a
+port to the new statements. **DONE IS THE AGDA
 QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
 `Rx.Envelope`'s header; counterexamples go in the bug cache.
 
@@ -232,6 +240,13 @@ executable check. There is no declaration here whose falsity a cone could
 bound.
 
 ### Big picture tier roadmap
+
+- **GIVE `timed` A BODY — AND ASK ANTHONY ABOUT `connect` FIRST.** Until it
+  has one, `timing-correct` compares stamps against packets nothing defines,
+  and `timed-faithful` is the only thing standing between it and `empty`. Port
+  `typescript/src/timed.ts`, whose packets match rxjs call stacks on every
+  generated program; a concurrency-limited `mergeAll` needs its outer
+  multicast, which no `Exp` former gives.
 
 - **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
   The QuickCheck's SAME rows are a share's connect minting its own instant
@@ -322,7 +337,7 @@ definition rather than a postulate, so its cone is real.
   PLAIN rows fall on. Cut it into commits by FORMER, and report rather than
   push if two consecutive formers each undo the previous one's fix.
 
-- **`batch-agrees` OVER THE REPLAY.** Its run is a hot script, one delivery
+- **`countable-batches` OVER THE CLOCKED REPLAY.** Its run is a hot script, one delivery
   per emit, so the batcher's run is one flattener over one scan — the shape
   the recovered `fold-agree` proved against a grouping spec. Probe the replay
   on the tier's bug-cache runs before any grind.
@@ -335,19 +350,23 @@ definition rather than a postulate, so its cone is real.
 
 ### The ledger
 
-- **`arrival-same`** (The-Proof) — FALSITY, `NO EVIDENCE`: QuickCheck finds two
-  instants in one arrival on today's impl; tier 2's first leg.
-- **`arrival-distinct`** (The-Proof) — FALSITY, `NO EVIDENCE`: falls on the
-  same rows as `arrival-same`.
-- **`arrival-ends`** (The-Proof) — FALSITY, `NO EVIDENCE`: false at every
+- **`left-to-right`** (The-Proof) — FALSITY, `NO EVIDENCE`: the elaborated
+  `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third leg.
+- **`timing-correct`** (The-Proof) — FALSITY, `NO EVIDENCE`: stated over an
+  unwritten `timed`; QuickCheck's SAME rows are the impl's half of it.
+- **`output-ends`** (The-Proof) — FALSITY, `NO EVIDENCE`: false at every
   subscribe frame today; tier 2's end-mark leg.
-- **`plain-agrees`** (The-Proof) — FALSITY, `NO EVIDENCE`: the elaborated
-  `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's second leg.
+- **`timed-faithful`** (The-Proof) — FALSITY, `NO EVIDENCE`: stated over an
+  unwritten `timed`.
+- **`timed-below`** (Rx.Timed) — FALSITY, `NO EVIDENCE`: stated over an
+  unwritten `timed`.
 - **`subscribe-shaped`** (Run-Well-Formed) — FALSITY, `NO EVIDENCE`: the
   QuickCheck's WF rows break acceptance inside the subscribe frame.
 - **`cascade-shaped`** (Run-Well-Formed) — FALSITY, `NO EVIDENCE`: WF rows
   break acceptance in later arrivals too.
-- **`batch-agrees`** (The-Proof) — FALSITY, `NO EVIDENCE`: nothing has
-  instantiated the replay.
+- **`countable-batches`** (The-Proof) — FALSITY, `NO EVIDENCE`: nothing has
+  instantiated the clocked replay.
+- **`timed`** (Rx.Timed) — VACUITY, `NO EVIDENCE`: a postulated function
+  asserts nothing; `λ _ → emptyˢ` inhabits it.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

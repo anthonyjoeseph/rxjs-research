@@ -53,11 +53,7 @@ s.next(6); // logs [6, 60]
 > [agda/src/Spec.agda](agda/src/Spec.agda): it cuts the stream a subscriber
 > sees into maximal runs of one instant, and never reorders. What this README
 > says about it is proven in
-> [agda/src/Readme-Semantics.agda](agda/src/Readme-Semantics.agda) and
-> [agda/src/Verify-Batch-Simultaneous/Well-Formed.agda](agda/src/Verify-Batch-Simultaneous/Well-Formed.agda),
-> whose `wf-batches` is the hub: over a well-formed run, the spec's batches
-> are one per root cause that carried a value, holding exactly that cause's
-> values.
+> [agda/src/Readme-Semantics.agda](agda/src/Readme-Semantics.agda).
 
 Independent events stay in separate batches, and a branch that filters an
 instant out still releases the batch (a filtered diamond logs `[1]` for the

@@ -1,8 +1,10 @@
 -- THE IMPL SIDE OF THE TOP LINE, AND EVERYTHING HERE IS FREE.  The
--- top line holds this pipeline to two fixed things and nothing else:
--- the author's program read plain (`Rx.Plain`), whose values it must
--- emit arrival by arrival, and `Verify-Batch-Simultaneous.Well-Formed`,
--- the shape its instants must take.  The envelope this side runs on --
+-- top line holds this pipeline to fixed things and nothing else: the
+-- author's program read plain (`Rx.Plain`), whose values its batches
+-- must carry in order; the timed translation (`Rx.Timed`), whose
+-- packets its instant stamps must agree with; and
+-- `Verify-Batch-Simultaneous.Countable`, what its envelope must tell a
+-- batcher.  The envelope this side runs on --
 -- its fields, its ids, its kinds -- is an implementation detail the
 -- theorem never sees past those two.
 --
@@ -17,7 +19,7 @@ module Implementation.Pipeline where
 
 open import Data.Bool    using (true; false; T)
 open import Data.Fin     using (toℕ)
-open import Data.List    using (List; []; _∷_; _++_; map)
+open import Data.List    using (List; []; _∷_; _++_; concat)
 open import Data.Product using (_,_)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (tt)
@@ -32,9 +34,10 @@ open import Rx.Slots     using (Slot; Slots; scripted; shared)
 open import Rx.Envelope  using (instEventᵗ; machineEmitᵗ)
 open import Rx.Envelope.Decode using (decodeEmits)
 open import Rx.Evaluator using (Burst)
-open import Rx.Arrivals  using (arrivals↓)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Elaborate using (toEnvelope)
 open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
+open import Rx.Batch     using (batchSimultaneousᵖ)
 
 -- ONE MINT FOR THE WHOLE PROGRAM.  `mintᵉ` draws once per subscription
 -- of the node it stands at, and it stands at the root, so every source
@@ -70,11 +73,10 @@ embedSlotsImpl {Γ = Γ} {κ = κ} ins i =
     go sharedᵏ   (sharedˢ d)               = sharedᴵ κ (toℕ i) d
 
 -- THE IMPL'S RUN, AS THE TOP LINE READS IT: the elaborated program's
--- output cut at the evaluator's arrivals (`Rx.Arrivals`), each emit
--- decoded back to the envelope record.
+-- output, flat, each emit decoded back to the envelope record.
 runᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t
-     → SimulSlots Γ κ → List (List (InstEmit (Val (plainᵏ Γ κ) (plainᵗ t))))
-runᴵ κ fuel e ins = map decodeEmits (arrivals↓ fuel (elaborateImpl κ e) (embedSlotsImpl ins))
+     → SimulSlots Γ κ → List (InstEmit (Val (plainᵏ Γ κ) (plainᵗ t)))
+runᴵ κ fuel e ins = decodeEmits (concat (evaluate↓ fuel (elaborateImpl κ e) (embedSlotsImpl ins)))
 
 -- an envelope's value payloads, read off the wire directly: the impl
 -- side has no use for the spec's decoded `InstEmit`
@@ -92,3 +94,10 @@ unwrapImpl []                     = []
 unwrapImpl {a = a} (valueᵖ (evs , _) ∷ es) =
   payloadsᴵ {u = uniqᵗ} {b = listᵗ a} evs ++ unwrapImpl es
 unwrapImpl (completeᵖ ∷ es)       = unwrapImpl es
+
+-- THE BATCHED RUN, AS A SUBSCRIBER SEES IT: the elaborated program
+-- through `batchSimultaneousᵖ`, one entry per batch, in stream order
+batchesᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t
+         → SimulSlots Γ κ → List (List (Val (plainᵏ Γ κ) (plainᵗ t)))
+batchesᴵ κ fuel e ins =
+  unwrapImpl (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins)))

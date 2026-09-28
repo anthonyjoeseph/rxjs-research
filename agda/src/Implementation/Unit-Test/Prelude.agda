@@ -53,7 +53,7 @@ open import Rx.Emit-Eq using (eqBatches; eqBursts)
 open import Function using (_∘_)
 open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
 open import Rx.Batch using (batchSimultaneousᵖ)
-open import Verify-Batch-Simultaneous.Well-Formed using (valuesOf; toSpec; ends?)
+open import Verify-Batch-Simultaneous.Countable using (valuesOf; toSpec; ends?)
 import Spec
 open Spec ℕ _≟_ using (spec-batchSimultaneous)
 

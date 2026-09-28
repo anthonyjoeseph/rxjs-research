@@ -1,113 +1,67 @@
 ------------------------------------------------------------------
--- THE TOP LINE: three statements, side by side, and together they are
--- the claim that `batchSimultaneous` batches what plain rxjs would
--- deliver, by instant, without reordering and without waiting.
+-- THE TOP LINE: four statements, and together they are the claim that
+-- `batchSimultaneous` batches what plain rxjs would deliver, by
+-- instant, without reordering and without waiting.
 --
---   input-well-formed  every program's run is `WellFormed`: one
---                      instant per arrival, the envelope marking where
---                      each ends
---   plain-agrees       the run carries the values the program read as
---                      plain rxjs carries, arrival by arrival
---   batch-agrees       handed any well-formed run, the batcher gives
---                      the spec's batches, each in the arrival that
---                      ends its instant
+--   left-to-right      the batches, joined back up, are the values the
+--                      program read as plain rxjs delivers, in order
+--   timing-correct     the impl's instant stamps group emits exactly
+--                      as the timed translation's packets do
+--   countable-output   the impl's stream tells a batcher where each
+--                      instant ends
+--   countable-batches  handed any such stream, the batcher gives the
+--                      spec's batches, each with the emit that ends
+--                      its instant
 --
--- EACH CLOSES A CHEAT THE OTHER TWO LEAVE OPEN.  Stamping every emit
--- with one instant, or each with its own, fails `input-well-formed`,
--- since the arrival cut is the fixed evaluator's.  Elaborating every
--- program to `empty` -- well formed, and trivially batched -- fails
--- `plain-agrees`; so does holding a value back one arrival, which is
--- why that comparison is per arrival rather than flat.  And
--- `batch-agrees` sees only a replay of a run, so its proof can use
--- nothing about the program but the `WellFormed` facts: the tree and
--- the batcher are decoupled exactly there.
+-- EACH CLOSES A CHEAT THE OTHERS LEAVE OPEN.  Elaborating every program
+-- to `empty` is countable and trivially batched, and fails
+-- left-to-right.  Stamping every emit with one instant, or each with
+-- its own, fails timing-correct, since the packets are the translation's
+-- and not the impl's to arrange.  A batcher that holds each batch until
+-- the next instant starts fails countable-batches, which pins every
+-- batch to one delivery.
 --
--- THE THREE MEET IN RAW VALUES, as a subscriber sees them.  No
+-- `timed-faithful` IS THE TRANSLATION'S OWN OBLIGATION, not the impl's:
+-- a translation to `empty` would make timing-correct say nothing.
+--
+-- THE STATEMENTS MEET IN RAW VALUES, as a subscriber sees them.  No
 -- envelope is compared anywhere; valueless emits contribute nothing.
 ------------------------------------------------------------------
 module Verify-Batch-Simultaneous.The-Proof where
 
 open import Data.Bool    using (T)
 open import Data.Fin     using (zero; suc)
-open import Data.List    using (List; []; _∷_; concat; map; length; take; drop)
-open import Data.List.Relation.Unary.All using (All)
+open import Data.List    using (List; []; _∷_; concat; map; length)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
-open import Data.Nat     using (ℕ; _≟_)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Maybe   using (nothing)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Unit    using (⊤)
 open import Data.Vec     using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
-open import Function     using (_∘_)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+open import Function     using (_∘_; _⇔_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim      using (Id; Fuel; InstEmit; hot; after_,_)
-open import Rx.Exp       using (Ctx; Ty; Val; isData; input)
+open import Rx.Prim      using (Fuel; InstEmit; valueᵖ; hot; after_,_)
+open import Rx.Exp       using (Ctx; Ty; Val; Closed; isData; unitᵗ; _+ᵗ_; listᵗ;
+                                input; ofᵉ; mapᵉ; mergeAllᵉ; strmᵗ; inlᵗ; inrᵗ; varᵗ; unit̂)
 open import Rx.SExp      using (SExp; Kinds)
 open import Rx.Slots     using (Slots; scripted)
 open import Rx.Envelope  using (machineEmitᵗ)
 open import Rx.Envelope.Decode using (encodeEmit)
-open import Rx.Arrivals  using (arrivals↓)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Plain     using (plainExp; unplainᵈ; plainValues)
 open import Rx.Simul-Slots using (SimulSlots; plainSlots)
 open import Rx.Batch     using (batchSimultaneousᵖ)
 open import Rx.Protocol  using (protocol-init)
 open import Rx.Elaborated using (elab-mint; elab-toEnvelope; elab-slots)
-open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; runᴵ; unwrapImpl)
+open import Rx.Timed     using (timed; timedSlots; packetOf; valuesᵀ; untimedᵈ)
+open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; runᴵ; batchesᴵ; unwrapImpl)
 open import Verify-Input-Well-Formed.Run-Well-Formed using (run-wellFormed)
-open import Verify-Batch-Simultaneous.Well-Formed using (WellFormed; valuesOf; toSpec; ends?)
-import Spec
-open Spec Id _≟_ using (spec-batchSimultaneous)
+open import Verify-Batch-Simultaneous.Countable using (Countable; toSpec; stampRuns; ends?; due)
 
 ------------------------------------------------------------------
--- INPUT-WELL-FORMED.
-------------------------------------------------------------------
-
-Input-Well-Formed : Set
-Input-Well-Formed =
-  ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
-    (ins : SimulSlots Γ κ) →
-  WellFormed (runᴵ κ fuel e ins)
-
--- THE THREE INSTANT FIELDS ARE THE ELABORATION'S OWN CLAIMS, AND THE
--- QUICKCHECK REFUTES TWO OF THEM ON TODAY'S IMPL.  `arrival-same` falls
--- where a share's connect mints its own instant inside the subscribe
--- frame (bug-cache `seed 9 depth 1 case 2`), and where an inner spawned
--- by a delivery is stamped with the subscribe instant rather than its
--- trigger's (`seed 2 depth 1 case 15`); `arrival-distinct` falls on the
--- second, since that stamp recurs in every later arrival.
-postulate
-  arrival-same :
-    ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
-      (ins : SimulSlots Γ κ) →
-    All (λ arr → Σ Id (λ i → All (λ x → InstEmit.instant x ≡ i) arr)) (runᴵ κ fuel e ins)
-
-  arrival-distinct :
-    ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
-      (ins : SimulSlots Γ κ) →
-    AllPairs (λ arr arr′ → All (λ x → All (λ y →
-               InstEmit.instant x ≢ InstEmit.instant y) arr′) arr)
-             (runᴵ κ fuel e ins)
-
-  -- FALSE TODAY AT EVERY SUBSCRIBE FRAME THE QUICKCHECK REACHES, which
-  -- is the tier's open operator problem seen from the run's side: a
-  -- `subscribe`-kind emit settles nothing, so its instant's owed list
-  -- stays empty and `paidOff` never reads it as closed.
-  arrival-ends :
-    ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
-      (ins : SimulSlots Γ κ) →
-    T (ends? protocol-init (runᴵ κ fuel e ins))
-
--- ACCEPTANCE IS NOT A LEAF HERE: it is `run-wellFormed`, whose own
--- leaves are tier 3's.
-input-well-formed : Input-Well-Formed
-input-well-formed κ fuel e ins = record
-  { same     = arrival-same κ fuel e ins
-  ; distinct = arrival-distinct κ fuel e ins
-  ; accepted = run-wellFormed fuel (elaborateImpl κ e) (embedSlotsImpl ins)
-                              (elab-mint (elab-toEnvelope κ e)) (elab-slots refl ins refl)
-  ; ends     = arrival-ends κ fuel e ins
-  }
-
-------------------------------------------------------------------
--- PLAIN-AGREES.
+-- LEFT-TO-RIGHT.
 ------------------------------------------------------------------
 
 -- AT DATA TYPES ONLY, AND THAT IS A LIMIT OF WHAT `≡` CAN SAY RATHER
@@ -117,34 +71,77 @@ input-well-formed κ fuel e ins = record
 -- equality at all.  A data value is the same value in every context,
 -- which `unplainᵈ` says.
 --
--- THE QUICKCHECK REFUTES IT ON TODAY'S IMPL, at the two flatteners
--- that drop: a switched-away inner stays subscribed (bug-cache `seed 6
--- depth 1 case 4`), and an inner arriving while one is live is not
--- dropped (`seed 7 depth 1 case 12`).
+-- OVER EVERY PROGRAM, SO OVER EVERY TIMED ONE: at `timed κ e` the
+-- values compared are (packet, value) pairs, and the batches are then
+-- read against the packets.
 --
 -- THE IMPL'S SHARED-SLOT FALLBACK IS OWED HERE.  `embedSlotsImpl`
 -- checks stratification of the elaborated definition and falls back to
 -- `empty` if it fails; the table only certifies the plain one, so this
 -- statement is where "the check never fails" is paid.
-Plain-Agrees : Set
-Plain-Agrees =
+Left-To-Right : Set
+Left-To-Right =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
     (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
-  map (map (unplainᵈ t ok) ∘ valuesOf) (runᴵ κ fuel e ins)
-    ≡ map plainValues (arrivals↓ fuel (plainExp e) (plainSlots ins))
+  map (unplainᵈ t ok) (concat (batchesᴵ κ fuel e ins))
+    ≡ plainValues (concat (evaluate↓ fuel (plainExp e) (plainSlots ins)))
 
 postulate
-  plain-agrees : Plain-Agrees
+  left-to-right : Left-To-Right
 
 ------------------------------------------------------------------
--- BATCH-AGREES.
+-- TIMING-CORRECT.
 ------------------------------------------------------------------
 
--- THE REPLAY: a run handed to the batcher as a hot script of envelope
--- values, one scheduled delivery per emit.  Every emit is its own
--- arrival there, so a batcher that waits for the NEXT arrival to learn
--- an instant is over gives its batch late; one that reads the
--- envelope's `ends` mark gives it with the emit that ends the instant.
+-- EVERY PAIR OF VALUES THE IMPL EMITS FOR A TIMED PROGRAM: same stamp
+-- exactly when same packet.  END items carry packets too, so a
+-- completion's instant is pinned as well as a value's.
+Timing-Correct : Set
+Timing-Correct =
+  ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
+    (ins : SimulSlots Γ κ) →
+  AllPairs (λ p q → (proj₁ p ≡ proj₁ q) ⇔ (packetOf t (proj₂ p) ≡ packetOf t (proj₂ q)))
+           (toSpec (runᴵ κ fuel (timed κ e) (timedSlots ins)))
+
+postulate
+  timing-correct : Timing-Correct
+
+------------------------------------------------------------------
+-- COUNTABLE-OUTPUT.
+------------------------------------------------------------------
+
+Countable-Output : Set
+Countable-Output =
+  ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
+    (ins : SimulSlots Γ κ) →
+  Countable (runᴵ κ fuel e ins)
+
+-- FALSE ON TODAY'S IMPL AT EVERY SUBSCRIBE FRAME THE QUICKCHECK
+-- REACHES: a `subscribe`-kind emit settles nothing, so its instant's
+-- owed list stays empty and `paidOff` never reads it as closed.
+postulate
+  output-ends :
+    ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
+      (ins : SimulSlots Γ κ) →
+    T (ends? protocol-init (stampRuns (runᴵ κ fuel e ins)))
+
+-- ACCEPTANCE IS NOT A LEAF HERE: it is `run-wellFormed`, whose own
+-- leaves are tier 3's.
+countable-output : Countable-Output
+countable-output κ fuel e ins = record
+  { accepted = run-wellFormed fuel (elaborateImpl κ e) (embedSlotsImpl ins)
+                              (elab-mint (elab-toEnvelope κ e)) (elab-slots refl ins refl)
+  ; ends     = output-ends κ fuel e ins
+  }
+
+------------------------------------------------------------------
+-- COUNTABLE-BATCHES.
+------------------------------------------------------------------
+
+-- THE REPLAY: a stream handed to the batcher as a hot script of
+-- envelope values, one scheduled delivery per emit.  The batcher sees
+-- nothing of the program that made it, so its proof can use nothing
+-- but `Countable`.
 Γᴿ : Ty → Ctx 1
 Γᴿ a = machineEmitᵗ a ∷ⱽ []ⱽ
 
@@ -152,15 +149,31 @@ replay : ∀ {a} → T (isData (machineEmitᵗ a)) → List (InstEmit (Val (Γ�
 replay ok xs zero    = scripted {ok = ok} (hot (map (λ x → after 0 , encodeEmit x) xs))
 replay ok xs (suc ())
 
--- the replay's arrivals gathered back into the run's, `k` at a time
-regroup : ∀ {B : Set} → List ℕ → List (List B) → List (List B)
-regroup []       xs = []
-regroup (k ∷ ks) xs = concat (take k xs) ∷ regroup ks (drop k xs)
+-- A SUBSCRIBER WATCHING THE REPLAY AND THE BATCHES AT ONCE.  It
+-- subscribes to the replay first, so each delivery reaches it as a
+-- tick before the batcher sees it, and whatever the batcher emits in
+-- that delivery's cascade lands after the tick and before the next.
+-- This is how "when" is read without the evaluator's cut: from plain
+-- rxjs's own ordering of two subscribers to one hot source.
+clockᵖ : ∀ {a} → Closed (Γᴿ a) (unitᵗ +ᵗ machineEmitᵗ (listᵗ a))
+clockᵖ = mergeAllᵉ nothing
+  (ofᵉ (strmᵗ (mapᵉ (inlᵗ unit̂) (input zero))
+      ∷ strmᵗ (mapᵉ (inrᵗ (varᵗ (here refl))) (batchSimultaneousᵖ (input zero)))
+      ∷ []))
 
--- THE REPLAY'S SUBSCRIBE FRAME COMES FIRST AND IS EMPTY, then each of
--- the run's arrivals: what the batcher gave while that arrival's emits
--- were delivered is the spec's batching of that arrival.  Over the
--- whole run this is the spec's batching of the run, by `wf-batches`.
+private
+  cut : ∀ {B : Set} → List (⊤ ⊎ B) → List B × List (List B)
+  cut []            = [] , []
+  cut (inj₁ _ ∷ xs) = [] , (proj₁ (cut xs) ∷ proj₂ (cut xs))
+  cut (inj₂ b ∷ xs) = (b ∷ proj₁ (cut xs)) , proj₂ (cut xs)
+
+-- what the subscriber saw before the first tick, then after each
+windows : ∀ {B : Set} → List (⊤ ⊎ B) → List (List B)
+windows xs = proj₁ (cut xs) ∷ proj₂ (cut xs)
+
+-- NOTHING AT SUBSCRIBE, THEN AFTER EACH DELIVERY EXACTLY WHAT IT OWES
+-- (`Countable.due`): a batch with the emit that ends its stamp run,
+-- and nothing with any other.
 --
 -- RECOVERY: git show f5ba6a6c:agda/src/Verify-Batch-Simultaneous/The-Proof.agda
 --   restores `batch-agreement` and `fold-agree`: an online fold over an
@@ -168,22 +181,39 @@ regroup (k ∷ ks) xs = concat (take k xs) ∷ regroup ks (drop k xs)
 --   between the fold's state, the protocol's and the spec's pending
 --   instants -- the shape a proof of this statement through a
 --   meta-level mirror of the operator would take.
-Batch-Agrees : Set
-Batch-Agrees =
-  ∀ {a} (ok : T (isData (machineEmitᵗ a))) (run : List (List (InstEmit (Val (Γᴿ a) a)))) →
-  WellFormed run →
-  regroup (1 ∷ map length run)
-    (map unwrapImpl (arrivals↓ (length (concat run))
-                               (batchSimultaneousᵖ (input zero))
-                               (replay ok (concat run))))
-    ≡ [] ∷ map (spec-batchSimultaneous ∘ toSpec) run
+Countable-Batches : Set
+Countable-Batches =
+  ∀ {a} (ok : T (isData (machineEmitᵗ a))) (xs : List (InstEmit (Val (Γᴿ a) a))) →
+  Countable xs →
+  map (unwrapImpl ∘ map valueᵖ)
+      (windows (plainValues (concat (evaluate↓ (length xs) clockᵖ (replay ok xs)))))
+    ≡ [] ∷ due xs
 
 postulate
-  batch-agrees : Batch-Agrees
+  countable-batches : Countable-Batches
+
+------------------------------------------------------------------
+-- TIMED-FAITHFUL.
+------------------------------------------------------------------
+
+-- the timed run, packets and END items dropped, is the plain run
+Timed-Faithful : Set
+Timed-Faithful =
+  ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
+    (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
+  map (untimedᵈ t ok)
+      (valuesᵀ {t = t} (plainValues (concat (evaluate↓ fuel (plainExp (timed κ e))
+                                                         (plainSlots (timedSlots ins))))))
+    ≡ plainValues (concat (evaluate↓ fuel (plainExp e) (plainSlots ins)))
+
+postulate
+  timed-faithful : Timed-Faithful
 
 ------------------------------------------------------------------
 -- THE VERIFIED OBJECT.
 ------------------------------------------------------------------
 
-formal-verification-batchSimultaneous : Input-Well-Formed × Plain-Agrees × Batch-Agrees
-formal-verification-batchSimultaneous = input-well-formed , plain-agrees , batch-agrees
+formal-verification-batchSimultaneous :
+  Left-To-Right × Timing-Correct × Countable-Output × Countable-Batches × Timed-Faithful
+formal-verification-batchSimultaneous =
+  left-to-right , timing-correct , countable-output , countable-batches , timed-faithful

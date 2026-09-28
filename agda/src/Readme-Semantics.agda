@@ -4,12 +4,8 @@
 -- says in prose, this module says in Agda, and nothing here reads an
 -- implementation.
 --
--- TWO FACTS CARRY EVERY CLAIM IT MAKES.  Batching never reorders --
--- the batches, joined back up, are the values in arrival order.  And
--- over a well-formed run there is one batch per arrival that carried a
--- value, holding exactly that arrival's values
--- (`Verify-Batch-Simultaneous.Well-Formed.wf-batches` and
--- `wf-arrival-batch`, which live beside the record they read).
+-- Batching never reorders: the batches, joined back up, are the
+-- values in order.
 ------------------------------------------------------------------
 module Readme-Semantics where
 

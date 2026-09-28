@@ -72,7 +72,7 @@ open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Protocol using (protocol-init)
 open import Rx.Emit-Eq using (eqBursts)
-open import Verify-Batch-Simultaneous.Well-Formed using (ends?)
+open import Verify-Batch-Simultaneous.Countable using (ends?)
 open import Implementation.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; runsOf; implBurstsOf;
   specBurstsOf; specOf; plainOf; plainAgreesᵇ; sameᵇ; distinctᵇ; acceptedᵇ; agrees; wellFormed)
 open import Implementation.Unit-Test using (cases)

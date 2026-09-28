@@ -3,10 +3,9 @@
 -- decodes to a stream the protocol automaton accepts.
 ------------------------------------------------------------------
 
--- WHAT THIS MODULE IS FOR.  `Verify-Batch-Simultaneous.Well-Formed`
--- asks a run to be ACCEPTED by the protocol automaton, among other
--- things; this is that field, for every run of an elaborated program,
--- read at the evaluator's arrival cut.
+-- WHAT THIS MODULE IS FOR.  `Verify-Batch-Simultaneous.Countable`
+-- asks a stream to be ACCEPTED by the protocol automaton, among other
+-- things; this is that field, for every run of an elaborated program.
 --
 -- THE INDUCTION IS ON THE RUN AND NOT ON THE TREE, AND THE TREE ROUTE
 -- IS RULED OUT RATHER THAN MERELY DISLIKED.  The obvious shape is to
@@ -53,7 +52,7 @@
 -- whose content the census pins down exactly.
 module Verify-Input-Well-Formed.Run-Well-Formed where
 
-open import Data.List    using (List; []; _∷_; _++_; concat; length; map)
+open import Data.List    using (List; []; _∷_; _++_; concat; length)
 open import Data.List.Properties using (++-assoc)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
@@ -72,8 +71,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; Stream;
 open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓;
                                        evaluate⇓; eval-run;
                                        drain-done; drain-empty; drain-step)
-open import Rx.Evaluator.Builder using (evaluate!)
-open import Rx.Arrivals using (drained; arrivalsOf; arrivals↓)
+open import Rx.Evaluator.Builder using (evaluate!; evaluate↓)
 open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol; countIn; Accepted)
 open import Verify-Input-Well-Formed.Well-Shaped using
   (WellShaped; ws-nil; ws-++; wellShaped-accepted)
@@ -351,39 +349,10 @@ run-wellFormed⇓ {Γ = Γ} {a = a} _ el es
       dEq = trans (cong decodeEmits (concat-++ out rest))
                   (decodeStream-++ (concat out) (concat rest))
 
--- THE ARRIVAL CUT LOSES NOTHING: joined back up, the arrivals are the
--- run, so acceptance read either way is one fact.
-drained-concat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {fuel sched st s}
-  (d : drain⇓ {e = e} fuel sched st s) → concat (drained d) ≡ concat s
-drained-concat drain-done      = refl
-drained-concat (drain-empty _) = refl
-drained-concat (drain-step {out = out} {rest = rest} _ _ d) =
-  trans (cong (concat out ++_) (drained-concat d)) (sym (concat-++ out rest))
-
-arrivals-concat : ∀ {n} {Γ : Ctx n} {t} {fuel} {e : Closed Γ t} {ins s}
-  (d : evaluate⇓ fuel e ins s) → concat (arrivalsOf d) ≡ concat s
-arrivals-concat (eval-run {out = out} {rest = rest} _ d) =
-  trans (cong (concat out ++_) (drained-concat d)) (sym (concat-++ out rest))
-
-decode-concat : ∀ {n} {Γ : Ctx n} {a}
-  (xss : List (List (PlainEvent (Val Γ (machineEmitᵗ a))))) →
-  concat (map decodeEmits xss) ≡ decodeEmits (concat xss)
-decode-concat []         = refl
-decode-concat (xs ∷ xss) =
-  trans (cong (decodeEmits xs ++_) (decode-concat xss))
-        (sym (decodeStream-++ xs (concat xss)))
-
 run-wellFormed :
   ∀ {n} {Γ : Ctx n} {a} (fuel : Fuel) (e : Closed Γ (machineEmitᵗ a))
     (ins : Slots Γ) →
   Elabᵉ e → Elabˢ ins →
-  Accepted (runProtocol protocol-init
-             (concat (map decodeEmits (arrivals↓ fuel e ins))))
-run-wellFormed fuel e ins el es = go (proj₂ (evaluate! fuel e ins))
-  where
-  go : ∀ {s} (d : evaluate⇓ fuel e ins s) →
-       Accepted (runProtocol protocol-init (concat (map decodeEmits (arrivalsOf d))))
-  go {s} d =
-    subst (λ z → Accepted (runProtocol protocol-init z))
-          (sym (trans (decode-concat (arrivalsOf d)) (cong decodeEmits (arrivals-concat d))))
-          (run-wellFormed⇓ s el es d)
+  Accepted (runProtocol protocol-init (decodeEmits (concat (evaluate↓ fuel e ins))))
+run-wellFormed fuel e ins el es =
+  run-wellFormed⇓ (evaluate↓ fuel e ins) el es (proj₂ (evaluate! fuel e ins))

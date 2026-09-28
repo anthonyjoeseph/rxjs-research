@@ -19,23 +19,21 @@
 module Main where
 
 ------------------------------------------------------------------
--- THE THEOREM.  The verified object, end to end: every program's run is
--- well formed, carries the plain program's values, and the batcher
--- gives the spec's batches of it.
+-- THE THEOREM.  The verified object, end to end: every program's
+-- batches carry the plain program's values in order, its instants are
+-- the timed translation's, its stream tells a batcher where each one
+-- ends, and the batcher gives the spec's batches of any such stream,
+-- each on time.
 ------------------------------------------------------------------
 open import Verify-Batch-Simultaneous.The-Proof
   using (formal-verification-batchSimultaneous)
 
 ------------------------------------------------------------------
 -- THE README'S SEMANTICS.  What the root README says `batchSimultaneous`
--- does, as facts about the spec: it never reorders, and over a
--- well-formed run it gives one batch per arrival that carried a value.
+-- does, as facts about the spec: it never reorders.
 ------------------------------------------------------------------
 open import Readme-Semantics
   using (spec-preserves-order)
-
-open import Verify-Batch-Simultaneous.Well-Formed
-  using (wf-batches; wf-arrival-batch)
 
 open import Verify-Batch-Simultaneous.Batch-Theorems
   using (batch-online)
