@@ -52,7 +52,7 @@ elaborateImpl κ e = mintᵉ (toEnvelope κ e)
 -- A SHARE'S STRATIFICATION IS CHECKED HERE, NOT ASSUMED.  The table
 -- certifies it of the definition read plain; the elaboration adds no
 -- input, so the check below always passes, but saying so is a fact
--- about `toEnvelope` that nothing proves yet -- and `plain-agrees` is
+-- about `toEnvelope` that nothing proves yet -- and `left-to-right` is
 -- where it is owed, since the fallback would change the values.
 sharedᴵ : ∀ {n} {Γ : Ctx n} (κ : Kinds n) (k : _) {t : Ty}
         → SExp Γ [] [] [] t → Slot (plainᵏ Γ κ) k (emitᵗ t)

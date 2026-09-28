@@ -1,8 +1,8 @@
 ------------------------------------------------------------------
 -- DECIDING TWO BATCHINGS EQUAL AS A BOOLEAN, for the two compiled
 -- binaries that have to compare them without a typechecker underneath.
--- What is compared is the top line's currency: per burst, the batches'
--- raw values, with no envelope left on either side.
+-- What is compared is the top line's currency: the batches' raw
+-- values, with no envelope left on either side.
 --
 -- WHY A BOOLEAN AND NOT A DECISION PROCEDURE.  Nothing here is used in
 -- a proof: both consumers are `main`s that print a verdict, so what is
@@ -35,13 +35,9 @@ eqListℕ []       []       = true
 eqListℕ (x ∷ xs) (y ∷ ys) = (x ≡ᵇ y) ∧ eqListℕ xs ys
 eqListℕ _        _        = false
 
--- one burst: its batches, in order
+-- batches, in order
 eqBatches : List (List ℕ) → List (List ℕ) → Bool
 eqBatches []       []       = true
 eqBatches (x ∷ xs) (y ∷ ys) = eqListℕ x y ∧ eqBatches xs ys
 eqBatches _        _        = false
 
-eqBursts : List (List (List ℕ)) → List (List (List ℕ)) → Bool
-eqBursts []       []       = true
-eqBursts (x ∷ xs) (y ∷ ys) = eqBatches x y ∧ eqBursts xs ys
-eqBursts _        _        = false

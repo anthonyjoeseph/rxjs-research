@@ -16,7 +16,7 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; c
 -- the run is the bridge premise that the two vocabularies tell the
 -- same story on a stream: what the evaluator promises
 -- (`run-wellFormed`) and what the batcher assumes
--- (`batch-agrees`, through `WellFormed`).  Every fact here is WRITER-ASSERTED (the kind
+-- (`countable-batches`, through `Countable`).  Every fact here is WRITER-ASSERTED (the kind
 -- tag, the handoff announcement, the close reason) and the
 -- automaton only checks; it never reconstructs.  stepProtocol
 -- rejects (nothing) any emit breaking a clause:
@@ -46,7 +46,7 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; c
 --                         protocol law — without it, a post-payoff
 --                         subscribe emit could smuggle values into
 --                         an instant the batcher already closed,
---                         and batch-agrees would be false.
+--                         and countable-batches would be false.
 --                         (Obligation-free instants — subscribe
 --                         frames, whose owed table never seeds —
 --                         are exempt: paidOff [] is false.)

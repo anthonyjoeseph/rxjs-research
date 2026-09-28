@@ -25,8 +25,7 @@ the two predicates — is gone, and what is left is a list.
 
 - `Unit-Test/Prelude.agda` — what a `Case` is (a label, a fuel, a program, its
   slots) and `checksOf`, the labelled properties every row is held to: the run
-  well-formed, impl≡spec, plain-agrees, and the `WellFormed` fields `same`,
-  `distinct` and `ends`.
+  accepted, impl≡spec, left-to-right, and the `Countable` field `ends`.
 - `Unit-Test.agda` — the corpus: `cases : List Case`, one row per cached
   counterexample.
 - `Unit-Test/Bug-Cache.agda` — the runner. A `MODULE_ROOTS` entry, compiled to

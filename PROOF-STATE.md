@@ -227,9 +227,9 @@ are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
 close without changing one of them, STOP and report that proof. The envelope's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
-The top line is stated over the impl run and the timed translation's packets;
-`QuickCheck` still decides the arrival-cut reading it replaced, and is owed a
-port to the new statements. **DONE IS THE AGDA
+`QuickCheck` decides the top line's computable half on random programs, on
+the flat run: acceptance, impl≡spec, left-to-right, and `Countable`'s end
+mark. **DONE IS THE AGDA
 QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
 `Rx.Envelope`'s header; counterexamples go in the bug cache.
 
@@ -249,11 +249,10 @@ bound.
   multicast, which no `Exp` former gives.
 
 - **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
-  The QuickCheck's SAME rows are a share's connect minting its own instant
-  inside the subscribe frame, and a spawned inner stamped with the subscribe
-  instant rather than its trigger's; DISTINCT, WF and every FAIL so far fall
-  on the same rows (bug-cache `seed 9 depth 1 case 2`, `seed 2 depth 1
-  case 15`). Fix the elaboration's stamping.
+  A share's connect mints its own instant inside the subscribe frame, and a
+  spawned inner is stamped with the subscribe instant rather than its
+  trigger's; the WF rows and every FAIL so far fall there (bug-cache `seed 9
+  depth 1 case 2`, `seed 2 depth 1 case 15`). Fix the elaboration's stamping.
 
 - **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
   The PLAIN rows: a switched-away inner stays subscribed (`seed 6 depth 1
@@ -333,7 +332,7 @@ definition rather than a postulate, so its cone is real.
   traffic-bearing arms are written against a shape that survived contact.
 
 - **THE TRAFFIC-BEARING FRAMES, AND THE ELABORATION CHANGES THEY FORCE.** The
-  cut, the three flatteners, a share's connect — the frames tier 2's SAME and
+  cut, the three flatteners, a share's connect — the frames tier 2's WF and
   PLAIN rows fall on. Cut it into commits by FORMER, and report rather than
   push if two consecutive formers each undo the previous one's fix.
 
@@ -353,7 +352,7 @@ definition rather than a postulate, so its cone is real.
 - **`left-to-right`** (The-Proof) — FALSITY, `NO EVIDENCE`: the elaborated
   `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third leg.
 - **`timing-correct`** (The-Proof) — FALSITY, `NO EVIDENCE`: stated over an
-  unwritten `timed`; QuickCheck's SAME rows are the impl's half of it.
+  unwritten `timed`; tier 2's stamping leg is the impl's half of it.
 - **`output-ends`** (The-Proof) — FALSITY, `NO EVIDENCE`: false at every
   subscribe frame today; tier 2's end-mark leg.
 - **`timed-faithful`** (The-Proof) — FALSITY, `NO EVIDENCE`: stated over an

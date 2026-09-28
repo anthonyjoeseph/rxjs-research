@@ -96,7 +96,7 @@ decodeEmits (valueᵖ e ∷ es)  = decodeEmit e ∷ decodeEmits es
 decodeEmits (completeᵖ ∷ es) = decodeEmits es
 
 -- AND BACK AGAIN: each arm the inverse of the decoding arm above it.  A
--- REPLAY needs it -- `batch-agrees` hands the batcher a run as a script
+-- REPLAY needs it -- `countable-batches` hands the batcher a stream as a script
 -- of envelope values, and a script holds values, not records.
 encodeReason : ∀ {n} {Γ : Ctx n} → CloseReason → Val Γ closeReasonᵗ
 encodeReason cut        = inj₁ tt

@@ -21,7 +21,7 @@
 -- since the definition side is answered by the telescope and not by a
 -- predicate over the whole of `Exp` -- threaded through
 -- `subscribe-shaped`, `cascade-shaped`, `drain-shaped` and
--- `run-wellFormed⇓`.  `input-well-formed` discharges it at the only
+-- `run-wellFormed⇓`.  `countable-output` discharges it at the only
 -- call site, since its program is `elaborateImpl κ e` and
 -- `elab-mint (elab-toEnvelope κ e)` is exactly that.
 --

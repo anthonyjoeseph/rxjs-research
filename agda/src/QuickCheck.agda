@@ -1,9 +1,9 @@
 -- An all-Agda QuickCheck: generate random well-typed programs (exp tree +
 -- scripted inputs) over a fixed 2-slot nat context, run them through the
 -- evaluator, and decide every top-line statement that computes on the
--- run: the batcher's batches against the spec's, arrival by arrival, in
--- raw values; the run's values against the plain program's; and each
--- `WellFormed` field. A fast in-Agda dev loop for the implementation.
+-- run: the batcher's batches against the spec's, in raw values; the
+-- batches joined back up against the plain program's values; and each
+-- `Countable` field. A fast in-Agda dev loop for the implementation.
 --
 --   agda --compile --compile-dir=_cli src/QuickCheck.agda
 --   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
@@ -70,11 +70,9 @@ open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Rx.Protocol using (protocol-init)
-open import Rx.Emit-Eq using (eqBursts)
-open import Verify-Batch-Simultaneous.Countable using (ends?)
-open import Implementation.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; runsOf; implBurstsOf;
-  specBurstsOf; specOf; plainOf; plainAgreesᵇ; sameᵇ; distinctᵇ; acceptedᵇ; agrees; wellFormed)
+open import Rx.Emit-Eq using (eqBatches)
+open import Implementation.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; implBatchesOf;
+  specBatchesOf; specOf; plainOf; plainAgreesᵇ; acceptedᵇ; endsᵇ; agrees)
 open import Implementation.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
@@ -581,7 +579,7 @@ marksˢᵗˢ []       = noMarks
 marksˢᵗˢ (y ∷ ys) = marksˢᵗ y ⊕ marksˢᵗˢ ys
 
 ------------------------------------------------------------------------
--- a compact dump of both sides' bursts (for failure reports)
+-- a compact dump of both sides' batches (for failure reports)
 
 private
   commaJoin : List String → String
@@ -595,14 +593,10 @@ private
           mapShow []       = []
           mapShow (v ∷ vs) = show v ∷ mapShow vs
 
--- one burst's batches, bracketed, then the next burst
+-- the batches, bracketed, in order
 showBatches : List (List ℕ) → String
 showBatches []       = ""
 showBatches (b ∷ bs) = showVals b ++ " " ++ showBatches bs
-
-showBursts : List (List (List ℕ)) → String
-showBursts []         = "·"
-showBursts (bs ∷ bss) = "[" ++ showBatches bs ++ "] " ++ showBursts bss
 
 -- same, for the RAW canonical stream (values are bare ℕ)
 private
@@ -747,27 +741,27 @@ pasteRow e d₀ d₁ =
 
 report : String → SExp Γ₂ [] [] [] natᵗ
        → Script → SExp Γ₂ [] [] [] natᵗ
-       → List (List (List ℕ)) → List (List (List ℕ)) → List (InstEmit ℕ) → String
+       → List (List ℕ) → List (List ℕ) → List (InstEmit ℕ) → String
 report tag e d₀ d₁ impl spec raw =
-  "  " ++ tag ++ "\n    impl = " ++ showBursts impl
-       ++ "\n    spec = " ++ showBursts spec
+  "  " ++ tag ++ "\n    impl = " ++ showBatches impl
+       ++ "\n    spec = " ++ showBatches spec
        ++ "\n    raw  = " ++ showStream raw ++ pasteRow e d₀ d₁
 
--- a violation of one `WellFormed` field, tagged with the field
-reportWF : String → SExp Γ₂ [] [] [] natᵗ
-         → Script → SExp Γ₂ [] [] [] natᵗ
-         → List (List (InstEmit ℕ)) → String
-reportWF tag e d₀ d₁ runs =
-  "  " ++ tag ++ "\n    arrivals = " ++ showBursts (map (map (λ x → InstEmit.instant x ∷ [])) runs)
-       ++ "\n    raw      = " ++ showStream (concat runs) ++ pasteRow e d₀ d₁
+-- a violation of one `Countable` field, tagged with the field
+reportC : String → SExp Γ₂ [] [] [] natᵗ
+        → Script → SExp Γ₂ [] [] [] natᵗ
+        → List (InstEmit ℕ) → String
+reportC tag e d₀ d₁ run =
+  "  " ++ tag ++ "\n    raw = " ++ showStream run ++ pasteRow e d₀ d₁
 
--- the run's values against the plain program's, arrival by arrival
+-- the batches joined back up against the plain program's values
 reportPlain : SExp Γ₂ [] [] [] natᵗ
             → Script → SExp Γ₂ [] [] [] natᵗ
-            → List (List (InstEmit ℕ)) → List (List ℕ) → String
-reportPlain e d₀ d₁ runs plain =
-  "  PLAIN\n    plain = " ++ showBatches plain
-       ++ "\n    raw   = " ++ showStream (concat runs) ++ pasteRow e d₀ d₁
+            → List (List ℕ) → List ℕ → List (InstEmit ℕ) → String
+reportPlain e d₀ d₁ impl plain run =
+  "  PLAIN\n    impl  = " ++ showBatches impl
+       ++ "\n    plain = " ++ showVals plain
+       ++ "\n    raw   = " ++ showStream run ++ pasteRow e d₀ d₁
 
 -- one count per former, in `allFormers` order, plus the obs-fold count
 Tally : Set
@@ -793,7 +787,7 @@ bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 -- substituted at compile time, so a name used in three checks is three
 -- evaluations; a function argument is one shared thunk.
 --
--- ONE CHECK PER STATEMENT, AND PER FIELD OF `WellFormed`, so a report
+-- ONE CHECK PER STATEMENT, AND PER FIELD OF `Countable`, so a report
 -- says which claim a program breaks rather than that it breaks one.
 -- The batcher's check is only as good as the run under it: where a
 -- field fails, a FAIL on the same row may be the run's fault.
@@ -802,17 +796,15 @@ check k true  r = []
 check k false r = (k , r) ∷ []
 
 verdict : SExp Γ₂ [] [] [] natᵗ → Script → SExp Γ₂ [] [] [] natᵗ
-        → List (List (List ℕ)) → List (List (InstEmit ℕ)) → List (List ℕ)
+        → List (List ℕ) → List (InstEmit ℕ) → List ℕ
         → List (ℕ × String)
-verdict e d₀ d₁ impl runs plain =
-  check 0 (eqBursts impl spec) (report "FAIL" e d₀ d₁ impl spec (concat runs))
-  ++ᴸ check 1 (plainAgreesᵇ runs plain) (reportPlain e d₀ d₁ runs plain)
-  ++ᴸ check 2 (sameᵇ runs) (reportWF "SAME" e d₀ d₁ runs)
-  ++ᴸ check 3 (distinctᵇ runs) (reportWF "DISTINCT" e d₀ d₁ runs)
-  ++ᴸ check 4 (acceptedᵇ runs) (reportWF "WF" e d₀ d₁ runs)
-  ++ᴸ check 5 (ends? protocol-init runs) (reportWF "ENDS" e d₀ d₁ runs)
+verdict e d₀ d₁ impl run plain =
+  check 0 (eqBatches impl spec) (report "FAIL" e d₀ d₁ impl spec run)
+  ++ᴸ check 1 (plainAgreesᵇ run impl plain) (reportPlain e d₀ d₁ impl plain run)
+  ++ᴸ check 2 (acceptedᵇ run) (reportC "WF" e d₀ d₁ run)
+  ++ᴸ check 3 (endsᵇ run) (reportC "ENDS" e d₀ d₁ run)
   where
-  spec = specOf runs
+  spec = specOf run
 
 oneCase : ℕ → Gen (Marks × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED AND WHAT IS PRINTED, AND THE CAP IS
@@ -823,7 +815,7 @@ oneCase : ℕ → Gen (Marks × List (ℕ × String))
 oneCase d = genExp d >>=G λ e → genSlots >>=G λ ds →
   let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
   in pureG (marksˢ e , verdict e (proj₁ ds) (proj₂ ds)
-                               (implBurstsOf c) (runsOf c) (plainOf c))
+                               (implBatchesOf c) (runOf c) (plainOf c))
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
@@ -884,7 +876,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = "FAIL" ∷ "PLAIN" ∷ "SAME" ∷ "DISTINCT" ∷ "WF" ∷ "ENDS" ∷ []
+kinds = "FAIL" ∷ "PLAIN" ∷ "WF" ∷ "ENDS" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -897,7 +889,6 @@ dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = concatStr (counts 0 kinds fs) ++ "\n"
   ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs
-  ++ samples 4 fs ++ samples 5 fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -935,9 +926,9 @@ runAt n d = skipN (n ∸ 1) d >>=G λ _ → oneCase d
 sideAt : ℕ → ℕ → ℕ → Gen String
 sideAt k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >>=G λ ds →
   let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
-  in pureG (if k ≡ᵇ 1 then showBursts (implBurstsOf c)
-            else if k ≡ᵇ 2 then showBursts (specBurstsOf c)
-            else if k ≡ᵇ 4 then showBatches (plainOf c)
+  in pureG (if k ≡ᵇ 1 then showBatches (implBatchesOf c)
+            else if k ≡ᵇ 2 then showBatches (specBatchesOf c)
+            else if k ≡ᵇ 4 then showVals (plainOf c)
             else showStream (runOf c))
 
 -- THE CORPUS, EVERY ROW WITH BOTH SIDES PRINTED WHETHER OR NOT THEY
@@ -946,9 +937,9 @@ sideAt k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >
 -- printing only failures, cannot show.  Zero generated cases asks for it.
 showRow : Case → String
 showRow c = Case.name c ++ (if agrees c then ": agree" else ": FAIL")
-  ++ (if wellFormed c then "" else " WF")
-  ++ "\n    impl = " ++ showBursts (implBurstsOf c)
-  ++ "\n    spec = " ++ showBursts (specBurstsOf c)
+  ++ (if acceptedᵇ (runOf c) then "" else " WF")
+  ++ "\n    impl = " ++ showBatches (implBatchesOf c)
+  ++ "\n    spec = " ++ showBatches (specBatchesOf c)
   ++ "\n    raw  = " ++ showStream (runOf c) ++ "\n"
 
 -- one row at a time, so a row that hangs is named by what printed before
@@ -956,9 +947,9 @@ showRow c = Case.name c ++ (if agrees c then ": agree" else ": FAIL")
 -- and `side` names one pipeline of it, as it does for a generated case
 sideRow : ℕ → Case → String
 sideRow k c = Case.name c ++ ": " ++
-  (if k ≡ᵇ 1 then showBursts (implBurstsOf c)
-   else if k ≡ᵇ 2 then showBursts (specBurstsOf c)
-   else if k ≡ᵇ 4 then showBatches (plainOf c)
+  (if k ≡ᵇ 1 then showBatches (implBatchesOf c)
+   else if k ≡ᵇ 2 then showBatches (specBatchesOf c)
+   else if k ≡ᵇ 4 then showVals (plainOf c)
    else showStream (runOf c)) ++ "\n"
 
 -- and a nonzero `f` runs every row at that fuel instead of its own

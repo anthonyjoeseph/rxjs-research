@@ -2,8 +2,8 @@
 -- THE AUTHOR'S PROGRAM AS PLAIN RXJS: every simul former read as the
 -- same-named `Exp` former, over the same contexts and at the same
 -- type.  No envelope, no instant, no mint -- this is what the program
--- means before anything is batched, and `plain-agrees` holds the
--- impl's elaboration to it value for value, arrival by arrival.
+-- means before anything is batched, and `left-to-right` holds the
+-- impl's batches to it value for value, in order.
 --
 -- IT IS AN IDENTITY MAP BECAUSE THE TWO GRAMMARS ARE ONE GRAMMAR.
 -- `Rx.SExp` is `Rx.Exp` minus the two formers only an elaboration

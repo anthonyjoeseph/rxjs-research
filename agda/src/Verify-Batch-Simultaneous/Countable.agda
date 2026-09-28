@@ -42,13 +42,9 @@ valuesᴱ []             = []
 valuesᴱ (value v ∷ es) = v ∷ valuesᴱ es
 valuesᴱ (_       ∷ es) = valuesᴱ es
 
--- every value the emits carry, in order; a valueless emit contributes
--- nothing, which is what a subscriber would see of it
-valuesOf : ∀ {A : Set} → List (InstEmit A) → List A
-valuesOf []       = []
-valuesOf (x ∷ xs) = valuesᴱ (InstEmit.events x) ++ valuesOf xs
-
--- the spec's input: every value tagged with its emit's instant
+-- the spec's input: every value tagged with its emit's instant; a
+-- valueless emit contributes nothing, which is what a subscriber would
+-- see of it
 toSpec : ∀ {A : Set} → List (InstEmit A) → List (Id × A)
 toSpec []       = []
 toSpec (x ∷ xs) = map (InstEmit.instant x ,_) (valuesᴱ (InstEmit.events x)) ++ toSpec xs

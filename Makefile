@@ -1667,7 +1667,7 @@ quickcheck: qc-build
 # QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
 #
 # IT GATES ON EVERY CHECK.  Each is one top-line statement, or one field
-# of `WellFormed`, decided on one program's run, and every one of them is
+# of `Countable`, decided on one program's run, and every one of them is
 # a claim about the implementation -- so any of them failing is a known
 # counterexample, printed with its count and samples.
 QC ?= 1 15 1

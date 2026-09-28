@@ -5,9 +5,9 @@
 -- A CASE IS A PROGRAM, AND EVERY TOP-LINE STATEMENT IS CHECKED OF IT.
 -- Compiled, a run is a function call and asking several questions of it
 -- is free -- so a row names a program, and every row is held to all of
--- `The-Proof`'s statements that compute on it: the run `WellFormed`
--- field by field, its values the plain program's arrival by arrival,
--- and the batcher's batches the spec's.
+-- `The-Proof`'s statements that compute on it: the run `Countable`
+-- field by field, the batches joined back up against the plain
+-- program's values, and the batcher's batches against the spec's.
 --
 -- WHY THE PREDICATES ARE BOOLEANS RATHER THAN EQUATIONS.  Each is the
 -- decision of one statement's conclusion on one row, settled by
@@ -31,11 +31,11 @@
 ------------------------------------------------------------------
 module Implementation.Unit-Test.Prelude where
 
-open import Data.Bool using (Bool; true; false; T; _∧_; _∨_; not)
+open import Data.Bool using (Bool; true; false; T; _∨_; not)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.List using (List; []; _∷_; concat; map; length)
-open import Data.Nat using (ℕ; _≡ᵇ_; _<ᵇ_; _≟_)
+open import Data.List using (List; []; _∷_; concat; length)
+open import Data.Nat using (ℕ; _<ᵇ_; _≟_)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
 open import Data.Product using (_×_; _,_)
@@ -45,15 +45,15 @@ open import Rx.Prim using (InstEmit; ObservableInput)
 open import Rx.Exp using (Ctx; Closed; Val; natᵗ; takeᵉ; nat̂; inputsBelowᵉ)
 open import Rx.SExp using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ)
 open import Rx.Envelope.Decode using (decodeEmits)
-open import Rx.Arrivals using (arrivals↓)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Plain using (plainExp; plainValues)
 open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; plainSlots)
-open import Rx.Protocol using (wellFormed?; protocol-init; runProtocol; accepts?)
-open import Rx.Emit-Eq using (eqBatches; eqBursts)
+open import Rx.Protocol using (wellFormed?; protocol-init)
+open import Rx.Emit-Eq using (eqListℕ; eqBatches)
 open import Function using (_∘_)
 open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
 open import Rx.Batch using (batchSimultaneousᵖ)
-open import Verify-Batch-Simultaneous.Countable using (valuesOf; toSpec; ends?)
+open import Verify-Batch-Simultaneous.Countable using (toSpec; stampRuns; ends?)
 import Spec
 open Spec ℕ _≟_ using (spec-batchSimultaneous)
 
@@ -145,56 +145,26 @@ capProg : ∀ {t} → Closed Γ₂ᵉ t → Closed Γ₂ᵉ t
 capProg e = takeᵉ (nat̂ 24) e
 
 -- the run a row names: the author's program elaborated, capped, driven
--- by the slot table, and decoded arrival by arrival -- `runᴵ` under the
--- harness cap
-runsOf : Case → List (List (InstEmit (Val Γ₂ᵉ natᵗ)))
-runsOf c = map (decodeEmits {Γ = Γ₂ᵉ} {a = natᵗ})
-               (arrivals↓ (fuel c) (capProg (elaborateImpl κ₂ (prog c))) (embedSlotsImpl (slots c)))
-
+-- by the slot table, and decoded -- `runᴵ` under the harness cap
 runOf : Case → List (InstEmit (Val Γ₂ᵉ natᵗ))
-runOf = concat ∘ runsOf
+runOf c = decodeEmits {Γ = Γ₂ᵉ} {a = natᵗ}
+            (concat (evaluate↓ (fuel c) (capProg (elaborateImpl κ₂ (prog c))) (embedSlotsImpl (slots c))))
 
 ------------------------------------------------------------------
--- `input-well-formed`, one field at a time, so a failing row says which.
+-- `Countable`, one field at a time, so a failing row says which.
 ------------------------------------------------------------------
 
-instants : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List ℕ
-instants = map InstEmit.instant
+-- the `accepted` field, and STRONGER: the run is accepted AND ends
+-- paid up
+acceptedᵇ : List (InstEmit (Val Γ₂ᵉ natᵗ)) → Bool
+acceptedᵇ = wellFormed?
 
-allAre : ℕ → List ℕ → Bool
-allAre i []       = true
-allAre i (j ∷ js) = (i ≡ᵇ j) ∧ allAre i js
-
-memᵇ : ℕ → List ℕ → Bool
-memᵇ i []       = false
-memᵇ i (j ∷ js) = (i ≡ᵇ j) ∨ memᵇ i js
-
-disjoint : List ℕ → List ℕ → Bool
-disjoint []       ys = true
-disjoint (x ∷ xs) ys = not (memᵇ x ys) ∧ disjoint xs ys
-
-sameᵇ : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → Bool
-sameᵇ []                = true
-sameᵇ ([] ∷ arrs)       = sameᵇ arrs
-sameᵇ ((x ∷ xs) ∷ arrs) = allAre (InstEmit.instant x) (instants xs) ∧ sameᵇ arrs
-
-distinctᵇ : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → Bool
-distinctᵇ []           = true
-distinctᵇ (arr ∷ arrs) = disjoint (instants arr) (instants (concat arrs)) ∧ distinctᵇ arrs
-
--- the `same` field is `sameᵇ`, one instant per arrival; the `distinct`
--- field is `distinctᵇ`, no instant in two arrivals; and the `accepted`
--- field is `acceptedᵇ`, the protocol automaton accepting the flat run
-acceptedᵇ : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → Bool
-acceptedᵇ runs = accepts? (runProtocol protocol-init (concat runs))
-
--- the bug cache's own, and STRONGER than the field: the flat run is
--- accepted AND ends paid up
-wellFormed : Case → Bool
-wellFormed c = wellFormed? (runOf c)
+-- the `ends` field
+endsᵇ : List (InstEmit (Val Γ₂ᵉ natᵗ)) → Bool
+endsᵇ run = ends? protocol-init (stampRuns run)
 
 ------------------------------------------------------------------
--- `plain-agrees`.
+-- `left-to-right`.
 ------------------------------------------------------------------
 
 -- THE PLAIN PROGRAM IS CAPPED IN VALUES AND THE ELABORATED ONE IN
@@ -204,51 +174,50 @@ wellFormed c = wellFormed? (runOf c)
 capPlain : ∀ {t} → Closed Γ₂ t → Closed Γ₂ t
 capPlain e = takeᵉ (nat̂ 24) e
 
-plainOf : Case → List (List ℕ)
-plainOf c = map plainValues (arrivals↓ (fuel c) (capPlain (plainExp (prog c))) (plainSlots (slots c)))
+plainOf : Case → List ℕ
+plainOf c = plainValues (concat (evaluate↓ (fuel c) (capPlain (plainExp (prog c))) (plainSlots (slots c))))
 
--- over the two runs, so a harness that has them computes neither twice
-plainAgreesᵇ : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → List (List ℕ) → Bool
-plainAgreesᵇ runs plain =
-  not (length (concat runs) <ᵇ 24) ∨ not (length (concat plain) <ᵇ 24)
-    ∨ eqBatches (map valuesOf runs) plain
+-- the batches joined back up against the plain run; over the two runs,
+-- so a harness that has them computes neither twice
+plainAgreesᵇ : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ) → List ℕ → Bool
+plainAgreesᵇ run impl plain =
+  not (length run <ᵇ 24) ∨ not (length plain <ᵇ 24)
+    ∨ eqListℕ (concat impl) plain
 
 ------------------------------------------------------------------
--- `batch-agrees`, on the run the row's program gives.
+-- The batcher on the run the row's program gives.
 ------------------------------------------------------------------
 
 -- THE BATCHER IS RUN INSIDE THE MACHINE, OVER THE ROW'S OWN PROGRAM,
 -- rather than over a replay: that is the operator the TypeScript port
--- mirrors.  Where the run is `WellFormed` it answers the statement's
--- question; where it is not, a disagreement may be the run's fault
--- rather than the batcher's, which is why the fields are checked apart.
-implBurstsOf : Case → List (List (List ℕ))
-implBurstsOf c =
-  map (unwrapImpl {Γ = Γ₂ᵉ} {a = natᵗ})
-      (arrivals↓ (fuel c)
-                 (batchSimultaneousᵖ (capProg (elaborateImpl κ₂ (prog c))))
-                 (embedSlotsImpl (slots c)))
+-- mirrors.  Where the run is not `Countable` a disagreement may be the
+-- run's fault rather than the batcher's, which is why the fields are
+-- checked apart.
+implBatchesOf : Case → List (List ℕ)
+implBatchesOf c =
+  unwrapImpl {Γ = Γ₂ᵉ} {a = natᵗ}
+    (concat (evaluate↓ (fuel c)
+                       (batchSimultaneousᵖ (capProg (elaborateImpl κ₂ (prog c))))
+                       (embedSlotsImpl (slots c))))
 
-specOf : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → List (List (List ℕ))
-specOf = map (spec-batchSimultaneous ∘ toSpec)
+specOf : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ)
+specOf = spec-batchSimultaneous ∘ toSpec
 
-specBurstsOf : Case → List (List (List ℕ))
-specBurstsOf c = specOf (runsOf c)
+specBatchesOf : Case → List (List ℕ)
+specBatchesOf c = specOf (runOf c)
 
 agrees : Case → Bool
-agrees c = eqBursts (implBurstsOf c) (specBurstsOf c)
+agrees c = eqBatches (implBatchesOf c) (specBatchesOf c)
 
 ------------------------------------------------------------------
 -- EVERY CHECK AT ONCE, OVER RUNS COMPUTED ONCE.  Each argument is one
--- shared thunk, where each of six `Case`-level checks would re-run the
--- program: a row costs its runs, not its runs times its checks.
+-- shared thunk, where each `Case`-level check would re-run the program:
+-- a row costs its runs, not its runs times its checks.
 ------------------------------------------------------------------
-checks : List (List (InstEmit (Val Γ₂ᵉ natᵗ))) → List (List (List ℕ)) → List (List ℕ)
-       → List (String × Bool)
-checks runs impl plain =
-  ("well-formed" , wellFormed? (concat runs)) ∷ ("impl≡spec" , eqBursts impl (specOf runs))
-  ∷ ("plain" , plainAgreesᵇ runs plain) ∷ ("same" , sameᵇ runs)
-  ∷ ("distinct" , distinctᵇ runs) ∷ ("ends" , ends? protocol-init runs) ∷ []
+checks : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ) → List ℕ → List (String × Bool)
+checks run impl plain =
+  ("accepted" , acceptedᵇ run) ∷ ("impl≡spec" , eqBatches impl (specOf run))
+  ∷ ("left-to-right" , plainAgreesᵇ run impl plain) ∷ ("ends" , endsᵇ run) ∷ []
 
 checksOf : Case → List (String × Bool)
-checksOf c = checks (runsOf c) (implBurstsOf c) (plainOf c)
+checksOf c = checks (runOf c) (implBatchesOf c) (plainOf c)
