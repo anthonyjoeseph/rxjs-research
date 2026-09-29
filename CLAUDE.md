@@ -53,7 +53,7 @@ Standing approval for any change that **does not alter the spec** — impl edits
 
 ## The goal
 
-The five top-line statement modules (`Left-To-Right`, `Timed`, `Countable`) fully discharged, no postulates, everything typechecks, on every canonical program. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
+The four top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) fully discharged, no postulates, everything typechecks, on every canonical program. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
 
 ## Delegation — the design session directs, Sonnet workers grind
 

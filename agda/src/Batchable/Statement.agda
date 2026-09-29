@@ -24,7 +24,7 @@ open import Data.Bool    using (T; true; false)
 open import Data.Fin     using (zero)
 open import Data.List    using (List; []; _∷_; map; length; concat)
 open import Data.Nat     using (_≟_)
-open import Data.Product using (map₂)
+open import Data.Product using (map₂; proj₂)
 open import Data.Unit    using (tt)
 import Data.Vec as Vec
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -39,7 +39,8 @@ open import Rx.Evaluator using (Burst)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Plain     using (unplainᵈ)
 open import Rx.Batch     using (batchSimultaneousᵖ)
-open import Implementation.Pipeline using (emitsᴵ; runᴵ; unwrapImpl)
+open import Implementation.Pipeline using (emitsᴵ; runᴵ)
+open import Rx.Envelope.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 import Spec
 open Spec Id _≟_ using (spec-batchSimultaneous)
@@ -62,7 +63,8 @@ emitsᴮ t ok (completeᵖ ∷ es) = emitsᴮ t ok es
 -- the second evaluator: `batchSimultaneousᵖ` over the emits, one per
 -- tick, run to completion
 batchedᴮ : ∀ t → T (isData t) → List (Val (Γᴮ t) (machineEmitᵗ t)) → List (List (Val (Γᴮ t) t))
-batchedᴮ t ok xs = unwrapImpl (concat (evaluate↓ (length xs) (batchSimultaneousᵖ (input zero)) slots))
+batchedᴮ t ok xs =
+  map proj₂ (instExtract (decodeEmits (concat (evaluate↓ (length xs) (batchSimultaneousᵖ (input zero)) slots))))
   where
   slots : Slots (Γᴮ t)
   slots zero = scripted {ok = emitData t ok} (hot (map (λ x → after 0 , x) xs))

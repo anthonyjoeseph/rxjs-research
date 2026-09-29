@@ -1,6 +1,7 @@
 ------------------------------------------------------------------
--- LEFT-TO-RIGHT: the batches, joined back up, are the values the
--- program read as plain rxjs delivers, in order.
+-- LEFT-TO-RIGHT: run the program with `batchSimultaneousᵖ` on the end,
+-- read each emit's values, and join the batches back up -- that is the
+-- values the program read as plain rxjs delivers, in order.
 --
 -- CLOSES A CHEAT THE OTHER TOP-LINE STATEMENTS LEAVE OPEN.
 -- Elaborating every program to `empty` is trivially batched, and fails
@@ -26,6 +27,7 @@ module Left-To-Right.Statement where
 
 open import Data.Bool    using (T)
 open import Data.List    using ([]; concat; map)
+open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel)
@@ -34,13 +36,17 @@ open import Rx.SExp      using (SExp; Kinds)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Plain     using (plainExp; unplainᵈ; plainValues)
 open import Rx.Simul-Slots using (SimulSlots; plainSlots)
-open import Implementation.Pipeline using (batchesᴵ)
+open import Rx.Envelope.Decode using (decodeEmits)
+open import Rx.Batch     using (batchSimultaneousᵖ)
+open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl)
+open import Batchable.Inst-Extract using (instExtract)
 
 Left-To-Right : Set
 Left-To-Right =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
     (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
-  map (unplainᵈ t ok) (concat (batchesᴵ κ fuel e ins))
+  map (unplainᵈ t ok) (concat (map proj₂ (instExtract (decodeEmits
+      (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins)))))))
     ≡ plainValues (concat (evaluate↓ fuel (plainExp e) (plainSlots ins)))
 
 postulate

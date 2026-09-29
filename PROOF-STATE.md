@@ -304,8 +304,8 @@ still being rewritten there.
   setting any batcher can pass.
 
 - **CARRY `batchable`'S SECOND EVALUATOR INTO THE HARNESS.** The FAIL check in
-  `QuickCheck` and the bug cache still batch inside the program's own run
-  (`batchesᴵ`), so a green row there is not a green row of `batchable`. Port
+  `QuickCheck` and the bug cache still batch inside the program's own run,
+  as `left-to-right` does, so a green row there is not a green row of `batchable`. Port
   `batchedᴮ` so the check decides the statement as written.
 
 - **`timed-below` AND `timed-faithful` ONCE `timed` HAS A BODY.** Both are

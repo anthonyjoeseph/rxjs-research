@@ -18,25 +18,21 @@ module Implementation.Pipeline where
 
 open import Data.Bool    using (true; false; T)
 open import Data.Fin     using (toℕ)
-open import Data.List    using (List; []; _∷_; _++_; concat)
-open import Data.Product using (_,_)
-open import Data.Sum     using (inj₁; inj₂)
+open import Data.List    using (List; []; concat)
 open import Data.Unit    using (tt)
 open import Data.Vec     using (lookup)
 open import Data.Vec.Properties using (lookup-zipWith)
 open import Relation.Binary.PropositionalEquality using (subst; sym)
 
-open import Rx.Prim      using (Fuel; InstEmit; valueᵖ; completeᵖ)
-open import Rx.Exp       using (Ctx; Ty; Exp; Val; listᵗ; uniqᵗ; mintᵉ; inputsBelowᵉ)
+open import Rx.Prim      using (Fuel; InstEmit)
+open import Rx.Exp       using (Ctx; Ty; Exp; Val; mintᵉ; inputsBelowᵉ)
 open import Rx.SExp      using (SExp; Kinds; scriptedᵏ; sharedᵏ; slotTy; plainᵏ; plainᵗ; emitᵗ; emptyˢ)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
-open import Rx.Envelope  using (instEventᵗ; machineEmitᵗ)
 open import Rx.Envelope.Decode using (decodeEmits)
 open import Rx.Evaluator using (Burst)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Elaborate using (toEnvelope)
 open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
-open import Rx.Batch     using (batchSimultaneousᵖ)
 
 -- ONE MINT FOR THE WHOLE PROGRAM.  `mintᵉ` draws once per subscription
 -- of the node it stands at, and it stands at the root, so every source
@@ -81,27 +77,3 @@ emitsᴵ κ fuel e ins = concat (evaluate↓ fuel (elaborateImpl κ e) (embedSlo
 runᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t
      → SimulSlots Γ κ → List (InstEmit (Val (plainᵏ Γ κ) (plainᵗ t)))
 runᴵ κ fuel e ins = decodeEmits (emitsᴵ κ fuel e ins)
-
--- an envelope's value payloads, read off the wire directly: the impl
--- side has no use for the spec's decoded `InstEmit`
-payloadsᴵ : ∀ {n} {Γ : Ctx n} {u b : Ty}
-          → List (Val Γ (instEventᵗ u b)) → List (Val Γ b)
-payloadsᴵ []                  = []
-payloadsᴵ (inj₂ (inj₁ v) ∷ xs) = v ∷ payloadsᴵ xs
-payloadsᴵ (_ ∷ xs)            = payloadsᴵ xs
-
--- one burst of the batched run, as a subscriber sees it: one entry per
--- batch, in stream order
-unwrapImpl : ∀ {n} {Γ : Ctx n} {a : Ty}
-           → Burst Γ (machineEmitᵗ (listᵗ a)) → List (List (Val Γ a))
-unwrapImpl []                     = []
-unwrapImpl {a = a} (valueᵖ (evs , _) ∷ es) =
-  payloadsᴵ {u = uniqᵗ} {b = listᵗ a} evs ++ unwrapImpl es
-unwrapImpl (completeᵖ ∷ es)       = unwrapImpl es
-
--- THE BATCHED RUN, AS A SUBSCRIBER SEES IT: the elaborated program
--- through `batchSimultaneousᵖ`, one entry per batch, in stream order
-batchesᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t
-         → SimulSlots Γ κ → List (List (Val (plainᵏ Γ κ) (plainᵗ t)))
-batchesᴵ κ fuel e ins =
-  unwrapImpl (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins)))

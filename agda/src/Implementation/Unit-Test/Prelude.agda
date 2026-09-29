@@ -34,15 +34,15 @@ module Implementation.Unit-Test.Prelude where
 open import Data.Bool using (Bool; true; false; T; _∨_; not)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.List using (List; []; _∷_; concat; length)
+open import Data.List using (List; []; _∷_; concat; length; map)
 open import Data.Nat using (ℕ; _<ᵇ_; _≟_)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₂)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Prim using (InstEmit; ObservableInput)
-open import Rx.Exp using (Ctx; Closed; Val; natᵗ; takeᵉ; nat̂; inputsBelowᵉ)
+open import Rx.Exp using (Ctx; Closed; Val; natᵗ; listᵗ; takeᵉ; nat̂; inputsBelowᵉ)
 open import Rx.SExp using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ)
 open import Rx.Envelope.Decode using (decodeEmits)
 open import Rx.Evaluator.Builder using (evaluate↓)
@@ -50,7 +50,7 @@ open import Rx.Plain using (plainExp; plainValues)
 open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; plainSlots)
 open import Rx.Emit-Eq using (eqListℕ; eqBatches)
 open import Function using (_∘_)
-open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
+open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import Rx.Batch using (batchSimultaneousᵖ)
 open import Batchable.Inst-Extract using (instExtract)
 import Spec
@@ -175,14 +175,14 @@ plainAgreesᵇ run impl plain =
 ------------------------------------------------------------------
 
 -- THE BATCHER IS RUN INSIDE THE MACHINE, OVER THE ROW'S OWN PROGRAM,
--- as `batchable` states it: that is the operator the TypeScript port
--- mirrors.
+-- as `left-to-right` states it: that is the operator the TypeScript
+-- port mirrors.
 implBatchesOf : Case → List (List ℕ)
 implBatchesOf c =
-  unwrapImpl {Γ = Γ₂ᵉ} {a = natᵗ}
+  map proj₂ (instExtract (decodeEmits {Γ = Γ₂ᵉ} {a = listᵗ natᵗ}
     (concat (evaluate↓ (fuel c)
                        (batchSimultaneousᵖ (capProg (elaborateImpl κ₂ (prog c))))
-                       (embedSlotsImpl (slots c))))
+                       (embedSlotsImpl (slots c))))))
 
 specOf : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ)
 specOf = spec-batchSimultaneous ∘ instExtract
