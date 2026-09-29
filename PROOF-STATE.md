@@ -1,7 +1,7 @@
 # PROOF-STATE — the roadmap
 
 **What this file is.** The ordered worklist for the one goal: discharging the
-five top-line statement modules (`Left-To-Right`, `Timed`, `Countable`) — no
+top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) — no
 postulates, everything typechecks. This file holds the SCHEDULE — each tier's
 next legs — over a LEDGER of one-line hooks; everything else lives in the
 code.
@@ -181,7 +181,7 @@ the row is DIFFICULTY.
 ## The theorem chain (top → leaves)
 
 ```
-Main                                     five top-line statements, claimed
+Main                                     four top-line statements, claimed
  │                                        side by side, meeting in raw values
  ├─ left-to-right                         Left-To-Right/Statement.agda — the
  │                                        batches, joined, are the plain
@@ -189,23 +189,16 @@ Main                                     five top-line statements, claimed
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
  │                                        group emits as the timed
  │                                        translation's packets do — tier 3
- ├─ countable-output                      Countable/Output.agda — REAL body:
- │   │                                    the impl run is Countable
- │   ├─ output-ends                       tier 3
- │   └─ run-wellFormed                    PROVEN over its two leaves
- │       └─ subscribe-shaped, cascade-shaped               tier 3
- ├─ countable-batches                     Countable/Batches.agda — over any
- │                                        Countable stream, the batcher gives
- │                                        the spec's batches on time — tier 3
+ ├─ batchable                             Batchable/Statement.agda — a second
+ │                                        evaluator running the batcher over
+ │                                        the run's emits gives the spec's
+ │                                        grouping of them — tier 3
  └─ timed-faithful                        Timed/Faithful.agda — the timed run
                                           carries the plain run's values — tier 3
 
   timed, timed-below                      Rx/Timed.agda — the translation the
                                           packets come from; unwritten — tier 3
 
-  spec-preserves-order                    PROVEN; the README's semantics over
-                                          the spec, claimed by Main
-  batch-online                            PROVEN; Batch-Online.agda, claimed by Main
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -233,8 +226,7 @@ close without changing one of them, STOP and report that proof. The envelope's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
 `QuickCheck` decides the top line's computable half on random programs, on
-the flat run: acceptance, impl≡spec, left-to-right, and `Countable`'s end
-mark. **DONE IS THE AGDA
+the flat run: impl≡spec and left-to-right. **DONE IS THE AGDA
 QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
 `Rx.Envelope`'s header; counterexamples go in the bug cache.
 
@@ -256,7 +248,7 @@ bound.
 - **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
   A share's connect mints its own instant inside the subscribe frame, and a
   spawned inner is stamped with the subscribe instant rather than its
-  trigger's; the WF rows and every FAIL so far fall there (bug-cache `seed 9
+  trigger's; every FAIL so far falls there (bug-cache `seed 9
   depth 1 case 2`, `seed 2 depth 1 case 15`). Fix the elaboration's stamping.
 
 - **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
@@ -264,10 +256,10 @@ bound.
   case 4`), and an inner arriving while one is live is not dropped (`seed 7
   depth 1 case 12`). Mirror the plain formers' bookkeeping in the envelope.
 
-- **MARK WHERE EACH INSTANT ENDS — POSSIBLY A QUESTION FOR ANTHONY.** ENDS
-  fails on nearly every run: a subscribe-kind instant owes nothing, and
-  `paidOff []` is false. The same mark is what batching a later arrival
-  needs (bug-cache row 4); the four routes tried are dead routes in
+- **BATCH A LATER ARRIVAL'S EMITS — POSSIBLY A QUESTION FOR ANTHONY.** Past
+  the subscribe frame `batchSimultaneousᵖ` batches each emit alone (bug-cache
+  row 4), and `batchable` hands it one emit per tick, so the envelope must
+  carry where each instant ends; the four routes tried are dead routes in
   `Rx.Envelope`'s header, and what is left may move `Rx.Exp` or the evaluator.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
@@ -288,88 +280,51 @@ bound.
 (empty — the tier's work is definitions, not postulates.)
 
 
-## Tier 3 — the two run leaves, and the transcription
+## Tier 3 — the top-line statements, and the translation
 
-**THIS IS WHERE THE SRXJS OPERATORS ARE ACTUALLY JUDGED.** `cascade-shaped` is
-one cascade emitting a well-shaped burst and preserving `Owes`, and its
-per-former split is the whole content: `map-f` and `scan-f` are cheap, and the
-traffic-bearing frames — the cut, the three flatteners, a share's connect —
-are the operators this proof exists to judge.
-
-**EXPECT THE ELABORATION TO MOVE, AND PLAN FOR IT.** Writing the proof will
-find things the implementation has wrong, and fixing the implementation will
-find things the proof has wrong. That cycle is the work, not an interruption
-to it — but it is also the failure mode, so report if it starts spiralling out
-rather than in.
+**WHERE THE IMPLEMENTATION IS ACTUALLY JUDGED.** Every row is a top-line
+statement or the translation one of them is stated over. Expect the
+elaboration and the batcher to move under contact, and report rather than push
+if that starts spiralling out rather than in.
 
 **STOP AND REPORT if this needs a new former in `Rx.Exp`** — same bar as tier
-2: only on certainty, never on suspicion. `Run-Well-Formed`'s BOUNDARIES
-header carries the other stop conditions.
+2: only on certainty, never on suspicion.
 
 ### The monster
 
-`Owes` — `Run-Well-Formed.agda`. It is the single place the evaluator's state
-reaches the wire, its own header says "expect it to be wrong in detail and
-corrected by contact", and it replaced four guessed invariants that
-measurement refuted. Every row in this tier routes through it, and it is a
-definition rather than a postulate, so its cone is real.
+(no monster) — chosen when tier 2 closes, since the batcher the rows judge is
+still being rewritten there.
 
 ### Big picture tier roadmap
 
-- **`Owes` UNDER CONTACT, AT THE FIRST TRAFFIC-BEARING FRAME.** The monster,
-  and the one thing worth attacking before anything is ground. Its two sides
-  count in different namespaces — `chainsOf` over registry rows carrying the
-  evaluator's dynamic source ids, `ProtocolSt.live` over announces carrying the
-  ids `mintᵉ` bound — and measured, those differ. So the equation holds only if
-  an arrival carries the WIRE's naming, which is a requirement on the
-  elaboration that nothing yet discharges. Settle it at a cut or a share's
-  connect, where a node is read back out of the registry.
+- **PROBE `batchable` BEFORE ANY GRIND.** Both sides compute: instantiate it in
+  `agda/evidence/probed/` at the bug-cache programs, one row per fuel up to
+  each run's end, so every cut is a row. What it decides is whether the
+  statement's second evaluator — one emit per tick, run to completion — is a
+  setting any batcher can pass.
 
-- **THE mergeAll-LOCALITY LEMMA.** `batchSimultaneousᵖ` is
-  `mergeAllᵉ ∘ mapᵉ ∘ scanᵉ`, so `cascade-shaped` cannot treat a flattener as
-  schedule-free. The fact to prove: `hasRoom nothing active = true`, so at
-  unlimited concurrency nothing is ever queued and each synchronous inner
-  drains inside the cascade that opened it. Cheap, and it unblocks the arms.
+- **CARRY `batchable`'S SECOND EVALUATOR INTO THE HARNESS.** The FAIL check in
+  `QuickCheck` and the bug cache still batch inside the program's own run
+  (`batchesᴵ`), so a green row there is not a green row of `batchable`. Port
+  `batchedᴮ` so the check decides the statement as written.
 
-- **`cascade-shaped`'S CHEAP ARMS, TO FIX THE SHAPE.** `map-f` and `scan-f`
-  leave `sched` and `st` untouched. Landing them first forces the per-former
-  statement into its final form against arms whose content is nil, so the
-  traffic-bearing arms are written against a shape that survived contact.
-
-- **THE TRAFFIC-BEARING FRAMES, AND THE ELABORATION CHANGES THEY FORCE.** The
-  cut, the three flatteners, a share's connect — the frames tier 2's WF and
-  PLAIN rows fall on. Cut it into commits by FORMER, and report rather than
-  push if two consecutive formers each undo the previous one's fix.
-
-- **`countable-batches` OVER THE CLOCKED REPLAY.** Its run is a hot script, one delivery
-  per emit, so the batcher's run is one flattener over one scan — the shape
-  the recovered `fold-agree` proved against a grouping spec. Probe the replay
-  on the tier's bug-cache runs before any grind.
-
-- **`subscribe-shaped` LAST.** Deliberately. `st-init`'s registry and
-  `protocol-init`'s live set are both empty, so the seed is trivial and the
-  content is what the subscribe walk installs on the way down — a strictly
-  smaller question once `cascade-shaped` has settled what a well-shaped burst
-  and a preserved `Owes` actually are.
+- **`timed-below` AND `timed-faithful` ONCE `timed` HAS A BODY.** Both are
+  stated over tier 2's unwritten translation; probe each against the ported
+  body before grinding either.
 
 ### The ledger
 
-- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: the elaborated
-  `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third leg.
-- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: stated over an
-  unwritten `timed`; tier 2's stamping leg is the impl's half of it.
-- **`output-ends`** (Countable.Output) — FALSITY, `NO EVIDENCE`: false at every
-  subscribe frame today; tier 2's end-mark leg.
-- **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: stated over an
-  unwritten `timed`.
+- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: the
+  elaborated `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third
+  leg.
+- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: stated
+  over an unwritten `timed`; tier 2's stamping leg is the impl's half of it.
+- **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: stated over
+  an unwritten `timed`.
 - **`timed-below`** (Rx.Timed) — FALSITY, `NO EVIDENCE`: stated over an
   unwritten `timed`.
-- **`subscribe-shaped`** (Run-Well-Formed) — FALSITY, `NO EVIDENCE`: the
-  QuickCheck's WF rows break acceptance inside the subscribe frame.
-- **`cascade-shaped`** (Run-Well-Formed) — FALSITY, `NO EVIDENCE`: WF rows
-  break acceptance in later arrivals too.
-- **`countable-batches`** (Countable.Batches) — FALSITY, `NO EVIDENCE`: nothing has
-  instantiated the clocked replay.
+- **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: nothing has
+  instantiated the second evaluator; the first leg.
 - **`timed`** (Rx.Timed) — VACUITY, `NO EVIDENCE`: a postulated function
   asserts nothing; `λ _ → emptyˢ` inhabits it.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),

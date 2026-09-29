@@ -235,7 +235,7 @@ figures out even where the `⊥` does not need them.
 
 **Do not reflexively delete a refutation because the surrounding goal has since
 been proven some other way.** Nothing in this campaign is settled until the
-five top-line statement modules (`Left-To-Right`, `Timed`, `Countable`) are
+top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) are
 discharged, and until then there is always some chance of having to reopen a
 region. A refutation that says "not that way" keeps its
 value across a reopening; the proof that superseded it does not carry that

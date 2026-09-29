@@ -14,9 +14,8 @@
 -- State it in one shape and report it; do not invent one.
 module Rx.Envelope.Decode where
 
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_)
 open import Data.Product using (_,_)
-open import Data.Unit using (tt)
 open import Data.Sum using (inj₁; inj₂)
 
 open import Rx.Prim using (PlainEvent; valueᵖ; completeᵖ;
@@ -95,28 +94,3 @@ decodeEmits []               = []
 decodeEmits (valueᵖ e ∷ es)  = decodeEmit e ∷ decodeEmits es
 decodeEmits (completeᵖ ∷ es) = decodeEmits es
 
--- AND BACK AGAIN: each arm the inverse of the decoding arm above it.  A
--- REPLAY needs it -- `countable-batches` hands the batcher a stream as a script
--- of envelope values, and a script holds values, not records.
-encodeReason : ∀ {n} {Γ : Ctx n} → CloseReason → Val Γ closeReasonᵗ
-encodeReason cut        = inj₁ tt
-encodeReason cutPending = inj₂ (inj₁ tt)
-encodeReason exhausted  = inj₂ (inj₂ tt)
-
-encodeKind : ∀ {n} {Γ : Ctx n} → EmitKind → Val Γ emitKindᵗ
-encodeKind subscribe = inj₁ tt
-encodeKind delivery  = inj₂ (inj₁ tt)
-encodeKind plumbing  = inj₂ (inj₂ tt)
-
-encodeEvent : ∀ {n} {Γ : Ctx n} {a}
-            → InstEvent (Val Γ a) → Val Γ (instEventᵗ uniqᵗ a)
-encodeEvent (init tok)                = inj₁ tok
-encodeEvent (value v)                 = inj₂ (inj₁ v)
-encodeEvent {Γ = Γ} (close tok r)     = inj₂ (inj₂ (inj₁ (tok , encodeReason {Γ = Γ} r)))
-encodeEvent (handoff tok)             = inj₂ (inj₂ (inj₂ (inj₁ tok)))
-encodeEvent complete                  = inj₂ (inj₂ (inj₂ (inj₂ tt)))
-
-encodeEmit : ∀ {n} {Γ : Ctx n} {a}
-           → InstEmit (Val Γ a) → Val Γ (instEmitᵗ uniqᵗ a)
-encodeEmit {Γ = Γ} (evs at inst from src as k) =
-  map (encodeEvent {Γ = Γ}) evs , inst , src , encodeKind {Γ = Γ} k

@@ -8,8 +8,8 @@ These are a **performance cache** of discovered work: faster to recheck than
 QuickCheck, and pinned to a specific canonical program (spec-derived), so a
 regression is caught by one `make bug-cache` instead of surfacing only in a
 random seed. They exist only to accelerate finding the implementation; they are
-**not** meant to survive past the proof. Delete the corpus once the five
-top-line statement modules (`Left-To-Right`, `Timed`, `Countable`) are
+**not** meant to survive past the proof. Delete the corpus once the
+top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) are
 discharged.
 
 ## It runs, it does not typecheck — and that is the whole design
@@ -25,8 +25,8 @@ one module per case, a ledger of import-and-pin blocks, two separate *types* for
 the two predicates — is gone, and what is left is a list.
 
 - `Unit-Test/Prelude.agda` — what a `Case` is (a label, a fuel, a program, its
-  slots) and `checksOf`, the labelled properties every row is held to: the run
-  accepted, impl≡spec, left-to-right, and the `Countable` field `ends`.
+  slots) and `checksOf`, the labelled properties every row is held to:
+  `batchable` (impl≡spec) and `left-to-right`.
 - `Unit-Test.agda` — the corpus: `cases : List Case`, one row per cached
   counterexample.
 - `Unit-Test/Bug-Cache.agda` — the runner. A `MODULE_ROOTS` entry, compiled to

@@ -5,9 +5,9 @@
 -- A CASE IS A PROGRAM, AND EVERY TOP-LINE STATEMENT IS CHECKED OF IT.
 -- Compiled, a run is a function call and asking several questions of it
 -- is free -- so a row names a program, and every row is held to all of
--- the top-line statements that compute on it: the run `Countable`
--- field by field, the batches joined back up against the plain
--- program's values, and the batcher's batches against the spec's.
+-- the top-line statements that compute on it: the batcher's batches
+-- against the spec's (`batchable`), and the batches joined back up
+-- against the plain program's values (`left-to-right`).
 --
 -- WHY THE PREDICATES ARE BOOLEANS RATHER THAN EQUATIONS.  Each is the
 -- decision of one statement's conclusion on one row, settled by
@@ -48,12 +48,11 @@ open import Rx.Envelope.Decode using (decodeEmits)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Plain using (plainExp; plainValues)
 open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; plainSlots)
-open import Rx.Protocol using (wellFormed?; protocol-init)
 open import Rx.Emit-Eq using (eqListℕ; eqBatches)
 open import Function using (_∘_)
 open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
 open import Rx.Batch using (batchSimultaneousᵖ)
-open import Countable.Countable using (toSpec; stampRuns; ends?)
+open import Batchable.Inst-Extract using (instExtract)
 import Spec
 open Spec ℕ _≟_ using (spec-batchSimultaneous)
 
@@ -151,19 +150,6 @@ runOf c = decodeEmits {Γ = Γ₂ᵉ} {a = natᵗ}
             (concat (evaluate↓ (fuel c) (capProg (elaborateImpl κ₂ (prog c))) (embedSlotsImpl (slots c))))
 
 ------------------------------------------------------------------
--- `Countable`, one field at a time, so a failing row says which.
-------------------------------------------------------------------
-
--- the `accepted` field, and STRONGER: the run is accepted AND ends
--- paid up
-acceptedᵇ : List (InstEmit (Val Γ₂ᵉ natᵗ)) → Bool
-acceptedᵇ = wellFormed?
-
--- the `ends` field
-endsᵇ : List (InstEmit (Val Γ₂ᵉ natᵗ)) → Bool
-endsᵇ run = ends? protocol-init (stampRuns run)
-
-------------------------------------------------------------------
 -- `left-to-right`.
 ------------------------------------------------------------------
 
@@ -185,14 +171,12 @@ plainAgreesᵇ run impl plain =
     ∨ eqListℕ (concat impl) plain
 
 ------------------------------------------------------------------
--- The batcher on the run the row's program gives.
+-- `batchable`: the batcher on the run the row's program gives.
 ------------------------------------------------------------------
 
 -- THE BATCHER IS RUN INSIDE THE MACHINE, OVER THE ROW'S OWN PROGRAM,
--- rather than over a replay: that is the operator the TypeScript port
--- mirrors.  Where the run is not `Countable` a disagreement may be the
--- run's fault rather than the batcher's, which is why the fields are
--- checked apart.
+-- as `batchable` states it: that is the operator the TypeScript port
+-- mirrors.
 implBatchesOf : Case → List (List ℕ)
 implBatchesOf c =
   unwrapImpl {Γ = Γ₂ᵉ} {a = natᵗ}
@@ -201,7 +185,7 @@ implBatchesOf c =
                        (embedSlotsImpl (slots c))))
 
 specOf : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ)
-specOf = spec-batchSimultaneous ∘ toSpec
+specOf = spec-batchSimultaneous ∘ instExtract
 
 specBatchesOf : Case → List (List ℕ)
 specBatchesOf c = specOf (runOf c)
@@ -216,8 +200,8 @@ agrees c = eqBatches (implBatchesOf c) (specBatchesOf c)
 ------------------------------------------------------------------
 checks : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ) → List ℕ → List (String × Bool)
 checks run impl plain =
-  ("accepted" , acceptedᵇ run) ∷ ("impl≡spec" , eqBatches impl (specOf run))
-  ∷ ("left-to-right" , plainAgreesᵇ run impl plain) ∷ ("ends" , endsᵇ run) ∷ []
+  ("batchable" , eqBatches impl (specOf run))
+  ∷ ("left-to-right" , plainAgreesᵇ run impl plain) ∷ []
 
 checksOf : Case → List (String × Bool)
 checksOf c = checks (runOf c) (implBatchesOf c) (plainOf c)

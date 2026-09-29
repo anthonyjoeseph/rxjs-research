@@ -322,8 +322,8 @@ bug-cache-run: $(ORACLE_BIN)/Bug-Cache
 # `postulate` as well as the pragmas), so until the endgame this grep IS the
 # guard.  EXEMPT: src/QuickCheck.agda, a test harness Main does not import.
 #
-# At the finish line this target retires: once the five top-line statement
-# modules (Left-To-Right, Timed, Countable) carry no postulates,
+# At the finish line this target retires: once the top-line statement
+# modules (Left-To-Right, Timed, Batchable) carry no postulates,
 # `agda --safe src/Main.agda` checks both halves at once.
 unsafe-check:
 	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ evidence/ \
@@ -1362,7 +1362,7 @@ dev-changed-selftest:
 	  echo "$$out" | grep -q 'plan .* agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: a CHANGED claim root is in the sweep plan — the cone half of this exclusion was written first and is not the whole rule"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Rx/Plain.agda 2>&1); \
-	  echo "$$out" | grep -q 'skip  agda/src/Countable/Batches.agda' \
+	  echo "$$out" | grep -q 'skip  agda/src/Batchable/Statement.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
 	  echo "$$out" | grep -q 'FAIL  agda/src/Rx/Plain.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
@@ -1667,8 +1667,8 @@ quickcheck: qc-build
 # is raised only once the operator passes at the current one.
 # QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
 #
-# IT GATES ON EVERY CHECK.  Each is one top-line statement, or one field
-# of `Countable`, decided on one program's run, and every one of them is
+# IT GATES ON EVERY CHECK.  Each is one top-line statement, decided on
+# one program's run, and every one of them is
 # a claim about the implementation -- so any of them failing is a known
 # counterexample, printed with its count and samples.
 QC ?= 1 15 1

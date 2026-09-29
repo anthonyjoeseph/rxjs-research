@@ -25,14 +25,14 @@ open import Rx.SExp      using (SExp; Kinds)
 open import Rx.Simul-Slots using (SimulSlots)
 open import Rx.Timed     using (timed; timedSlots; packetOf)
 open import Implementation.Pipeline using (runᴵ)
-open import Countable.Countable using (toSpec)
+open import Batchable.Inst-Extract using (instExtract)
 
 Timing-Correct : Set
 Timing-Correct =
   ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
     (ins : SimulSlots Γ κ) →
   AllPairs (λ p q → (proj₁ p ≡ proj₁ q) ⇔ (packetOf t (proj₂ p) ≡ packetOf t (proj₂ q)))
-           (toSpec (runᴵ κ fuel (timed κ e) (timedSlots ins)))
+           (instExtract (runᴵ κ fuel (timed κ e) (timedSlots ins)))
 
 postulate
   timing-correct : Timing-Correct

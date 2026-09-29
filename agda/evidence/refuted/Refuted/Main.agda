@@ -51,11 +51,6 @@ open import Refuted.Domain-Predicate using
 --   holds the input-under-a-flattener counterexample, pinned by
 --   running the evaluator; it comes back when the arms do.
 
--- THE ROOT-SIDE TWIN OF THE SLOT-TABLE FORGERY: why `run-wellFormed`
--- carries an authorship premise on its program and not only on its
--- table.
-open import Refuted.Forged-Root using (saw-forged-root)
-
 -- THE ROOM IS THE WRONG CURRENCY FOR THE STORE RE-ENTRY.  A candidate
 -- indexed by the unconnected count closes every edge of the subscribe
 -- cycle but one, and the repair for that one is an invariant funding

@@ -3,8 +3,8 @@
 -- program read as plain rxjs delivers, in order.
 --
 -- CLOSES A CHEAT THE OTHER TOP-LINE STATEMENTS LEAVE OPEN.
--- Elaborating every program to `empty` is countable and trivially
--- batched, and fails left-to-right.
+-- Elaborating every program to `empty` is trivially batched, and fails
+-- left-to-right.
 --
 -- AT DATA TYPES ONLY, AND THAT IS A LIMIT OF WHAT `≡` CAN SAY RATHER
 -- THAN OF THE CLAIM.  The two runs stand in different contexts -- the

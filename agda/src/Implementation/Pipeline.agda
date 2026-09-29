@@ -3,10 +3,9 @@
 -- author's program read plain (`Rx.Plain`), whose values its batches
 -- must carry in order; the timed translation (`Rx.Timed`), whose
 -- packets its instant stamps must agree with; and
--- `Countable.Countable`, what its envelope must tell a
--- batcher.  The envelope this side runs on --
--- its fields, its ids, its kinds -- is an implementation detail the
--- theorem never sees past those two.
+-- `spec-batchSimultaneous`, the grouping its batcher must reproduce.
+-- The envelope this side runs on -- its fields, its ids, its kinds --
+-- is an implementation detail the theorem never sees past those.
 --
 -- What is NOT free is below this module: `Rx.Exp`, `Rx.SExp` and the
 -- evaluator.  A change that needs one of those is a question for
@@ -72,11 +71,16 @@ embedSlotsImpl {Γ = Γ} {κ = κ} ins i =
     go scriptedᵏ (scriptedˢ {ok = ok} inp) = scripted {ok = ok} inp
     go sharedᵏ   (sharedˢ d)               = sharedᴵ κ (toℕ i) d
 
--- THE IMPL'S RUN, AS THE TOP LINE READS IT: the elaborated program's
--- output, flat, each emit decoded back to the envelope record.
+-- the elaborated program's output, flat, as the wire carries it
+emitsᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t
+       → SimulSlots Γ κ → Burst (plainᵏ Γ κ) (emitᵗ t)
+emitsᴵ κ fuel e ins = concat (evaluate↓ fuel (elaborateImpl κ e) (embedSlotsImpl ins))
+
+-- THE IMPL'S RUN, AS THE TOP LINE READS IT: each emit decoded back to
+-- the envelope record.
 runᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t
      → SimulSlots Γ κ → List (InstEmit (Val (plainᵏ Γ κ) (plainᵗ t)))
-runᴵ κ fuel e ins = decodeEmits (concat (evaluate↓ fuel (elaborateImpl κ e) (embedSlotsImpl ins)))
+runᴵ κ fuel e ins = decodeEmits (emitsᴵ κ fuel e ins)
 
 -- an envelope's value payloads, read off the wire directly: the impl
 -- side has no use for the spec's decoded `InstEmit`

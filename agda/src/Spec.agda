@@ -6,7 +6,7 @@
 -- instant that caused it; the output is the batches.  Values leave in
 -- exactly the order they arrived, and later in the array means later
 -- in time -- `[1,5] [3] [7,0]` is a batching of `1 5 3 7 0`, and
--- `[1,5,3,0,7]` is not one of anything (`Readme-Semantics`).
+-- `[1,5,3,0,7]` is not one of anything (`left-to-right`).
 --
 -- AN INSTANT IS OPAQUE, AND THAT IS WHY THE MODULE IS PARAMETERISED.
 -- The spec asks one question of an instant -- is it the same one as the

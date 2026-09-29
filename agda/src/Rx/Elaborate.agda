@@ -76,13 +76,7 @@ exhaustedᵛ = inrᵗ (inrᵗ unit̂)
 subscribeᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
 subscribeᵛ = inlᵗ unit̂
 
--- THE ARRIVAL KIND, AND IT IS THE ONE THAT PAYS.  `settle` is a no-op
--- at `subscribe` and at `plumbing`; a `delivery` seeds this instant's
--- owed from the source's live registration count and pays one against
--- it.  So the tag an input's per-arrival emit carries is what makes the
--- batcher's flush point reachable at all -- stamped `subscribe` the
--- owed table would never seed, `paidOff` would stay false, and every
--- instant would flush lazily at the next one.
+-- the arrival kind: the tag an input's per-arrival emit carries
 deliveryᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
 deliveryᵛ = inrᵗ (inlᵗ unit̂)
 
@@ -150,12 +144,9 @@ valuesᵛ (v ∷ vs) rest = consᵗ (valueᵛ v) (valuesᵛ vs rest)
 
 -- WHAT IS DELIBERATELY ABSENT: the `close` at `exhausted`.  The
 -- TypeScript mirror mints one off its script's `isLast`, and
--- `batchSyncᵉ` hands over no such bit.  It costs nothing HERE because
--- bracketing rejects a close with no init and never an init with no
--- close, and settledness is not part of the legality anything claims
--- (Rx.Protocol) -- so an unclosed registration at the end of a stream
--- is accepted.  An input that must be seen to complete is owed a
--- separate reading of the script, not a repair of this term.
+-- `batchSyncᵉ` hands over no such bit.  An input that must be seen to
+-- complete is owed a separate reading of the script, not a repair of
+-- this term.
 inputᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (i : Fin n)
        → Tm Γ Δᵍ Δ Θ uniqᵗ
        → Exp Γ Δᵍ Δ Θ (machineEmitᵗ (lookup Γ i))
@@ -180,9 +171,7 @@ inputᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i frame =
   src = varᵗ (here refl)
 
   -- the registration announcement: one `init`, in the subscribe frame,
-  -- tagged `subscribe` so it owes and pays nothing.  Without it the
-  -- source is absent from `live`, every delivery seeds owed at zero and
-  -- underflows, and the automaton rejects the whole stream.
+  -- tagged `subscribe` so it owes and pays nothing.
   announce : Exp Γ Δᵍ Δ Θ¹ (machineEmitᵗ a)
   announce =
     ofᵉ (instEmitᵛ (consᵗ (initᵛ src) nilᵗ) (↑ frame) src subscribeᵛ ∷ [])

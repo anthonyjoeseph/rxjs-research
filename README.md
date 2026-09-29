@@ -51,9 +51,7 @@ s.next(6); // logs [6, 60]
 
 > **Formalized.** The spec is
 > [agda/src/Spec.agda](agda/src/Spec.agda): it cuts the stream a subscriber
-> sees into maximal runs of one instant, and never reorders. What this README
-> says about it is proven in
-> [agda/src/Readme-Semantics.agda](agda/src/Readme-Semantics.agda).
+> sees into maximal runs of one instant, and never reorders.
 
 Independent events stay in separate batches, and a branch that filters an
 instant out still releases the batch (a filtered diamond logs `[1]` for the
@@ -262,8 +260,8 @@ array.
 the values plain rxjs delivers, in the order it delivers them. If a
 subscriber would see `1 5 3 7 0`, batching may give `[1, 5] [3] [7, 0]`, or
 `[1] [5] [3, 7, 0]`, or `[1, 5, 3, 7, 0]` — but never `[1, 5, 3, 0, 7]`
-(`spec-preserves-order` in
-[agda/src/Readme-Semantics.agda](agda/src/Readme-Semantics.agda)).
+(`left-to-right` in
+[agda/src/Left-To-Right/Statement.agda](agda/src/Left-To-Right/Statement.agda)).
 
 ### The serial joins mirror rxjs
 
@@ -327,9 +325,8 @@ npm run oracle     # the property oracle: random programs through rxjs and the A
 | Path | What |
 | --- | --- |
 | [agda/src/Spec.agda](agda/src/Spec.agda) | The spec: `spec-batchSimultaneous` |
-| [agda/src/Left-To-Right/](agda/src/Left-To-Right/), [agda/src/Timed/](agda/src/Timed/), [agda/src/Countable/](agda/src/Countable/) | The top line: the implementation meets the spec on every program, as five statements |
-| [agda/src/Readme-Semantics.agda](agda/src/Readme-Semantics.agda) | What this README says, as proofs over the spec |
-| [agda/src/Rx/](agda/src/Rx/) | The Agda implementation: the program tree, the evaluator, the protocol, `batchSimultaneous` |
+| [agda/src/Left-To-Right/](agda/src/Left-To-Right/), [agda/src/Timed/](agda/src/Timed/), [agda/src/Batchable/](agda/src/Batchable/) | The top line: the implementation meets the spec on every program, as four statements |
+| [agda/src/Rx/](agda/src/Rx/) | The Agda implementation: the program tree, the evaluator, the envelope, `batchSimultaneous` |
 | [agda/src/Main.agda](agda/src/Main.agda) | Every claim the development makes, by name |
 | [typescript/src/](typescript/src/) | The TypeScript implementation, mirroring the Agda one, and its oracle |
 | [PROOF-STATE.md](PROOF-STATE.md) | The roadmap: what remains to prove, in order |

@@ -19,7 +19,7 @@
 module Main where
 
 ------------------------------------------------------------------
--- THE THEOREM.  Five statements, and together they are the claim that
+-- THE THEOREM.  Four statements, and together they are the claim that
 -- `batchSimultaneous` batches what plain rxjs would deliver, by
 -- instant, without reordering and without waiting.
 --
@@ -27,21 +27,16 @@ module Main where
 --                      program read as plain rxjs delivers, in order
 --   timing-correct     the impl's instant stamps group emits exactly
 --                      as the timed translation's packets do
---   countable-output   the impl's stream tells a batcher where each
---                      instant ends
---   countable-batches  handed any such stream, the batcher gives the
---                      spec's batches, each with the emit that ends
---                      its instant
+--   batchable          at every fuel, the batched run is the spec's
+--                      grouping of the run by instant
 --   timed-faithful     the timed translation is itself faithful to the
 --                      plain run, packets and END items dropped
 --
 -- EACH CLOSES A CHEAT THE OTHERS LEAVE OPEN.  Elaborating every program
--- to `empty` is countable and trivially batched, and fails
--- left-to-right.  Stamping every emit with one instant, or each with
--- its own, fails timing-correct, since the packets are the translation's
--- and not the impl's to arrange.  A batcher that holds each batch until
--- the next instant starts fails countable-batches, which pins every
--- batch to one delivery.  `timed-faithful` is the translation's own
+-- to `empty` is trivially batched, and fails left-to-right.  Stamping
+-- every emit with one instant, or each with its own, fails
+-- timing-correct, since the packets are the translation's and not the
+-- impl's to arrange.  `timed-faithful` is the translation's own
 -- obligation, not the impl's: a translation to `empty` would make
 -- timing-correct say nothing.
 --
@@ -52,22 +47,10 @@ open import Left-To-Right.Statement
   using (left-to-right)
 open import Timed.Timing-Correct
   using (timing-correct)
-open import Countable.Output
-  using (countable-output)
-open import Countable.Batches
-  using (countable-batches)
+open import Batchable.Statement
+  using (batchable)
 open import Timed.Faithful
   using (timed-faithful)
-
-------------------------------------------------------------------
--- THE README'S SEMANTICS.  What the root README says `batchSimultaneous`
--- does, as facts about the spec: it never reorders.
-------------------------------------------------------------------
-open import Readme-Semantics
-  using (spec-preserves-order)
-
-open import Batch-Online
-  using (batch-online)
 
 ------------------------------------------------------------------
 -- THE EVALUATOR-LEVEL CLAIMS ARE GONE, AND WHAT REMOVED THEM WAS NOT

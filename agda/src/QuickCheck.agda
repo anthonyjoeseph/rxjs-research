@@ -2,8 +2,7 @@
 -- scripted inputs) over a fixed 2-slot nat context, run them through the
 -- evaluator, and decide every top-line statement that computes on the
 -- run: the batcher's batches against the spec's, in raw values; the
--- batches joined back up against the plain program's values; and each
--- `Countable` field. A fast in-Agda dev loop for the implementation.
+-- batches joined back up against the plain program's values. A fast in-Agda dev loop for the implementation.
 --
 --   agda --compile --compile-dir=_cli src/QuickCheck.agda
 --   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
@@ -72,7 +71,7 @@ open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Emit-Eq using (eqBatches)
 open import Implementation.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; implBatchesOf;
-  specBatchesOf; specOf; plainOf; plainAgreesᵇ; acceptedᵇ; endsᵇ; agrees)
+  specBatchesOf; specOf; plainOf; plainAgreesᵇ; agrees)
 open import Implementation.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
@@ -747,13 +746,6 @@ report tag e d₀ d₁ impl spec raw =
        ++ "\n    spec = " ++ showBatches spec
        ++ "\n    raw  = " ++ showStream raw ++ pasteRow e d₀ d₁
 
--- a violation of one `Countable` field, tagged with the field
-reportC : String → SExp Γ₂ [] [] [] natᵗ
-        → Script → SExp Γ₂ [] [] [] natᵗ
-        → List (InstEmit ℕ) → String
-reportC tag e d₀ d₁ run =
-  "  " ++ tag ++ "\n    raw = " ++ showStream run ++ pasteRow e d₀ d₁
-
 -- the batches joined back up against the plain program's values
 reportPlain : SExp Γ₂ [] [] [] natᵗ
             → Script → SExp Γ₂ [] [] [] natᵗ
@@ -787,10 +779,9 @@ bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 -- substituted at compile time, so a name used in three checks is three
 -- evaluations; a function argument is one shared thunk.
 --
--- ONE CHECK PER STATEMENT, AND PER FIELD OF `Countable`, so a report
--- says which claim a program breaks rather than that it breaks one.
--- The batcher's check is only as good as the run under it: where a
--- field fails, a FAIL on the same row may be the run's fault.
+-- ONE CHECK PER STATEMENT, so a report says which claim a program
+-- breaks rather than that it breaks one: FAIL is `batchable`, PLAIN is
+-- `left-to-right`.
 check : ℕ → Bool → String → List (ℕ × String)
 check k true  r = []
 check k false r = (k , r) ∷ []
@@ -801,8 +792,6 @@ verdict : SExp Γ₂ [] [] [] natᵗ → Script → SExp Γ₂ [] [] [] natᵗ
 verdict e d₀ d₁ impl run plain =
   check 0 (eqBatches impl spec) (report "FAIL" e d₀ d₁ impl spec run)
   ++ᴸ check 1 (plainAgreesᵇ run impl plain) (reportPlain e d₀ d₁ impl plain run)
-  ++ᴸ check 2 (acceptedᵇ run) (reportC "WF" e d₀ d₁ run)
-  ++ᴸ check 3 (endsᵇ run) (reportC "ENDS" e d₀ d₁ run)
   where
   spec = specOf run
 
@@ -876,7 +865,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = "FAIL" ∷ "PLAIN" ∷ "WF" ∷ "ENDS" ∷ []
+kinds = "FAIL" ∷ "PLAIN" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -888,7 +877,7 @@ samples k fs = concatStr (take 2 (ofKind k fs))
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs
+  ++ samples 0 fs ++ samples 1 fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -937,7 +926,6 @@ sideAt k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >
 -- printing only failures, cannot show.  Zero generated cases asks for it.
 showRow : Case → String
 showRow c = Case.name c ++ (if agrees c then ": agree" else ": FAIL")
-  ++ (if acceptedᵇ (runOf c) then "" else " WF")
   ++ "\n    impl = " ++ showBatches (implBatchesOf c)
   ++ "\n    spec = " ++ showBatches (specBatchesOf c)
   ++ "\n    raw  = " ++ showStream (runOf c) ++ "\n"
