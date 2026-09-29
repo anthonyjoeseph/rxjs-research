@@ -3,7 +3,7 @@
 -- author's program read plain (`Rx.Plain`), whose values its batches
 -- must carry in order; the timed translation (`Rx.Timed`), whose
 -- packets its instant stamps must agree with; and
--- `Verify-Batch-Simultaneous.Countable`, what its envelope must tell a
+-- `Countable.Countable`, what its envelope must tell a
 -- batcher.  The envelope this side runs on --
 -- its fields, its ids, its kinds -- is an implementation detail the
 -- theorem never sees past those two.

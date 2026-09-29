@@ -1,9 +1,10 @@
 # PROOF-STATE — the roadmap
 
-**What this file is.** The ordered worklist for the one goal: discharging
-`agda/src/Verify-Batch-Simultaneous/The-Proof.agda` — no postulates, everything
-typechecks. This file holds the SCHEDULE — each tier's next legs — over a
-LEDGER of one-line hooks; everything else lives in the code.
+**What this file is.** The ordered worklist for the one goal: discharging the
+five top-line statement modules (`Left-To-Right`, `Timed`, `Countable`) — no
+postulates, everything typechecks. This file holds the SCHEDULE — each tier's
+next legs — over a LEDGER of one-line hooks; everything else lives in the
+code.
 
 **Hygiene — the rules this file lives by:**
 
@@ -180,27 +181,31 @@ the row is DIFFICULTY.
 ## The theorem chain (top → leaves)
 
 ```
-formal-verification-batchSimultaneous    The-Proof.agda — statements side by
- │                                        side, meeting in raw values
- ├─ left-to-right                         the batches, joined, are the plain
+Main                                     five top-line statements, claimed
+ │                                        side by side, meeting in raw values
+ ├─ left-to-right                         Left-To-Right/Statement.agda — the
+ │                                        batches, joined, are the plain
  │                                        program's values — tier 3
- ├─ timing-correct                        stamps group emits as the timed
+ ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
+ │                                        group emits as the timed
  │                                        translation's packets do — tier 3
- ├─ countable-output                      REAL body: the impl run is Countable
+ ├─ countable-output                      Countable/Output.agda — REAL body:
+ │   │                                    the impl run is Countable
  │   ├─ output-ends                       tier 3
  │   └─ run-wellFormed                    PROVEN over its two leaves
  │       └─ subscribe-shaped, cascade-shaped               tier 3
- ├─ countable-batches                     over any Countable stream, the batcher
- │                                        gives the spec's batches on time — tier 3
- └─ timed-faithful                        the timed run carries the plain run's
-                                          values — tier 3
+ ├─ countable-batches                     Countable/Batches.agda — over any
+ │                                        Countable stream, the batcher gives
+ │                                        the spec's batches on time — tier 3
+ └─ timed-faithful                        Timed/Faithful.agda — the timed run
+                                          carries the plain run's values — tier 3
 
   timed, timed-below                      Rx/Timed.agda — the translation the
                                           packets come from; unwritten — tier 3
 
   spec-preserves-order                    PROVEN; the README's semantics over
                                           the spec, claimed by Main
-  batch-online                            PROVEN; claimed by Main
+  batch-online                            PROVEN; Batch-Online.agda, claimed by Main
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -349,13 +354,13 @@ definition rather than a postulate, so its cone is real.
 
 ### The ledger
 
-- **`left-to-right`** (The-Proof) — FALSITY, `NO EVIDENCE`: the elaborated
+- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: the elaborated
   `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third leg.
-- **`timing-correct`** (The-Proof) — FALSITY, `NO EVIDENCE`: stated over an
+- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: stated over an
   unwritten `timed`; tier 2's stamping leg is the impl's half of it.
-- **`output-ends`** (The-Proof) — FALSITY, `NO EVIDENCE`: false at every
+- **`output-ends`** (Countable.Output) — FALSITY, `NO EVIDENCE`: false at every
   subscribe frame today; tier 2's end-mark leg.
-- **`timed-faithful`** (The-Proof) — FALSITY, `NO EVIDENCE`: stated over an
+- **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: stated over an
   unwritten `timed`.
 - **`timed-below`** (Rx.Timed) — FALSITY, `NO EVIDENCE`: stated over an
   unwritten `timed`.
@@ -363,7 +368,7 @@ definition rather than a postulate, so its cone is real.
   QuickCheck's WF rows break acceptance inside the subscribe frame.
 - **`cascade-shaped`** (Run-Well-Formed) — FALSITY, `NO EVIDENCE`: WF rows
   break acceptance in later arrivals too.
-- **`countable-batches`** (The-Proof) — FALSITY, `NO EVIDENCE`: nothing has
+- **`countable-batches`** (Countable.Batches) — FALSITY, `NO EVIDENCE`: nothing has
   instantiated the clocked replay.
 - **`timed`** (Rx.Timed) — VACUITY, `NO EVIDENCE`: a postulated function
   asserts nothing; `λ _ → emptyˢ` inhabits it.

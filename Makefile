@@ -322,8 +322,9 @@ bug-cache-run: $(ORACLE_BIN)/Bug-Cache
 # `postulate` as well as the pragmas), so until the endgame this grep IS the
 # guard.  EXEMPT: src/QuickCheck.agda, a test harness Main does not import.
 #
-# At the finish line this target retires: once The-Proof.agda carries no
-# postulates, `agda --safe src/Main.agda` checks both halves at once.
+# At the finish line this target retires: once the five top-line statement
+# modules (Left-To-Right, Timed, Countable) carry no postulates,
+# `agda --safe src/Main.agda` checks both halves at once.
 unsafe-check:
 	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ evidence/ \
 	    --include='*.agda' | grep -v '^src/QuickCheck.agda:' || true); \
@@ -1361,7 +1362,7 @@ dev-changed-selftest:
 	  echo "$$out" | grep -q 'plan .* agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: a CHANGED claim root is in the sweep plan — the cone half of this exclusion was written first and is not the whole rule"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Rx/Plain.agda 2>&1); \
-	  echo "$$out" | grep -q 'skip  agda/src/Verify-Batch-Simultaneous/The-Proof.agda' \
+	  echo "$$out" | grep -q 'skip  agda/src/Countable/Batches.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
 	  echo "$$out" | grep -q 'FAIL  agda/src/Rx/Plain.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \

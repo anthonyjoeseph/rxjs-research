@@ -327,7 +327,7 @@ npm run oracle     # the property oracle: random programs through rxjs and the A
 | Path | What |
 | --- | --- |
 | [agda/src/Spec.agda](agda/src/Spec.agda) | The spec: `spec-batchSimultaneous` |
-| [agda/src/Verify-Batch-Simultaneous/The-Proof.agda](agda/src/Verify-Batch-Simultaneous/The-Proof.agda) | The top line: the implementation meets the spec on every program |
+| [agda/src/Left-To-Right/](agda/src/Left-To-Right/), [agda/src/Timed/](agda/src/Timed/), [agda/src/Countable/](agda/src/Countable/) | The top line: the implementation meets the spec on every program, as five statements |
 | [agda/src/Readme-Semantics.agda](agda/src/Readme-Semantics.agda) | What this README says, as proofs over the spec |
 | [agda/src/Rx/](agda/src/Rx/) | The Agda implementation: the program tree, the evaluator, the protocol, `batchSimultaneous` |
 | [agda/src/Main.agda](agda/src/Main.agda) | Every claim the development makes, by name |

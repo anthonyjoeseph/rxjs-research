@@ -8,8 +8,9 @@ These are a **performance cache** of discovered work: faster to recheck than
 QuickCheck, and pinned to a specific canonical program (spec-derived), so a
 regression is caught by one `make bug-cache` instead of surfacing only in a
 random seed. They exist only to accelerate finding the implementation; they are
-**not** meant to survive past the proof. Delete the corpus once
-`The-Proof.agda` is discharged.
+**not** meant to survive past the proof. Delete the corpus once the five
+top-line statement modules (`Left-To-Right`, `Timed`, `Countable`) are
+discharged.
 
 ## It runs, it does not typecheck — and that is the whole design
 

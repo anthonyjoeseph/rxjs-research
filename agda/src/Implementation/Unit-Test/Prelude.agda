@@ -5,7 +5,7 @@
 -- A CASE IS A PROGRAM, AND EVERY TOP-LINE STATEMENT IS CHECKED OF IT.
 -- Compiled, a run is a function call and asking several questions of it
 -- is free -- so a row names a program, and every row is held to all of
--- `The-Proof`'s statements that compute on it: the run `Countable`
+-- the top-line statements that compute on it: the run `Countable`
 -- field by field, the batches joined back up against the plain
 -- program's values, and the batcher's batches against the spec's.
 --
@@ -53,7 +53,7 @@ open import Rx.Emit-Eq using (eqListℕ; eqBatches)
 open import Function using (_∘_)
 open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl; unwrapImpl)
 open import Rx.Batch using (batchSimultaneousᵖ)
-open import Verify-Batch-Simultaneous.Countable using (toSpec; stampRuns; ends?)
+open import Countable.Countable using (toSpec; stampRuns; ends?)
 import Spec
 open Spec ℕ _≟_ using (spec-batchSimultaneous)
 

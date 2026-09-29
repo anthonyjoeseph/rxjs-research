@@ -234,9 +234,10 @@ figures out even where the `⊥` does not need them.
 ### Keeping a refutation after its route is settled (Anthony)
 
 **Do not reflexively delete a refutation because the surrounding goal has since
-been proven some other way.** Nothing in this campaign is settled until
-`The-Proof.agda` is discharged, and until then there is always some chance of
-having to reopen a region. A refutation that says "not that way" keeps its
+been proven some other way.** Nothing in this campaign is settled until the
+five top-line statement modules (`Left-To-Right`, `Timed`, `Countable`) are
+discharged, and until then there is always some chance of having to reopen a
+region. A refutation that says "not that way" keeps its
 value across a reopening; the proof that superseded it does not carry that
 information.
 

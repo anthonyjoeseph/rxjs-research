@@ -19,14 +19,45 @@
 module Main where
 
 ------------------------------------------------------------------
--- THE THEOREM.  The verified object, end to end: every program's
--- batches carry the plain program's values in order, its instants are
--- the timed translation's, its stream tells a batcher where each one
--- ends, and the batcher gives the spec's batches of any such stream,
--- each on time.
+-- THE THEOREM.  Five statements, and together they are the claim that
+-- `batchSimultaneous` batches what plain rxjs would deliver, by
+-- instant, without reordering and without waiting.
+--
+--   left-to-right      the batches, joined back up, are the values the
+--                      program read as plain rxjs delivers, in order
+--   timing-correct     the impl's instant stamps group emits exactly
+--                      as the timed translation's packets do
+--   countable-output   the impl's stream tells a batcher where each
+--                      instant ends
+--   countable-batches  handed any such stream, the batcher gives the
+--                      spec's batches, each with the emit that ends
+--                      its instant
+--   timed-faithful     the timed translation is itself faithful to the
+--                      plain run, packets and END items dropped
+--
+-- EACH CLOSES A CHEAT THE OTHERS LEAVE OPEN.  Elaborating every program
+-- to `empty` is countable and trivially batched, and fails
+-- left-to-right.  Stamping every emit with one instant, or each with
+-- its own, fails timing-correct, since the packets are the translation's
+-- and not the impl's to arrange.  A batcher that holds each batch until
+-- the next instant starts fails countable-batches, which pins every
+-- batch to one delivery.  `timed-faithful` is the translation's own
+-- obligation, not the impl's: a translation to `empty` would make
+-- timing-correct say nothing.
+--
+-- THE STATEMENTS MEET IN RAW VALUES, as a subscriber sees them.  No
+-- envelope is compared anywhere; valueless emits contribute nothing.
 ------------------------------------------------------------------
-open import Verify-Batch-Simultaneous.The-Proof
-  using (formal-verification-batchSimultaneous)
+open import Left-To-Right.Statement
+  using (left-to-right)
+open import Timed.Timing-Correct
+  using (timing-correct)
+open import Countable.Output
+  using (countable-output)
+open import Countable.Batches
+  using (countable-batches)
+open import Timed.Faithful
+  using (timed-faithful)
 
 ------------------------------------------------------------------
 -- THE README'S SEMANTICS.  What the root README says `batchSimultaneous`
@@ -35,7 +66,7 @@ open import Verify-Batch-Simultaneous.The-Proof
 open import Readme-Semantics
   using (spec-preserves-order)
 
-open import Verify-Batch-Simultaneous.Batch-Theorems
+open import Batch-Online
   using (batch-online)
 
 ------------------------------------------------------------------

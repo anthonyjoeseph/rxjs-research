@@ -18,7 +18,7 @@
 -- instants is `Timing-Correct`'s question, about one program; this is
 -- the batcher's, about any stream at all.
 ------------------------------------------------------------------
-module Verify-Batch-Simultaneous.Countable where
+module Countable.Countable where
 
 open import Data.Bool    using (Bool; true; false; T; if_then_else_)
 open import Data.List    using (List; []; _∷_; _++_; _∷ʳ_; concat; map)

@@ -3,7 +3,7 @@
 -- decodes to a stream the protocol automaton accepts.
 ------------------------------------------------------------------
 
--- WHAT THIS MODULE IS FOR.  `Verify-Batch-Simultaneous.Countable`
+-- WHAT THIS MODULE IS FOR.  `Countable.Countable`
 -- asks a stream to be ACCEPTED by the protocol automaton, among other
 -- things; this is that field, for every run of an elaborated program.
 --

@@ -7,8 +7,9 @@
 -- guard that stays.  Nothing is ever deleted or rewritten, so the
 -- corpus only grows and the invariant it carries is that EVERY row
 -- holds -- `make bug-cache` is green exactly when no known
--- counterexample remains.  The whole file goes when
--- `Verify-Batch-Simultaneous.The-Proof` is discharged.
+-- counterexample remains.  The whole file goes when the five
+-- top-line statement modules under `Left-To-Right`, `Timed` and `Countable` are
+-- discharged.
 --
 -- IT IS ONE FILE AGAIN, WHICH THE TYPE-LEVEL CACHE COULD NOT AFFORD.
 -- A row used to be a `refl` over a whole `evaluate` run, so the

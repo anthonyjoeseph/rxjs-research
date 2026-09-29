@@ -17,6 +17,7 @@ So the policing is textual. `make unsafe-check` covers:
 CLAUDE.md authorises it.**
 
 `--safe` cannot be enabled today (it rejects `postulate`, and we have dozens by
-design), but it IS the finish-line certificate: the day `The-Proof.agda` is
-discharged, `agda --safe src/Main.agda` verifies "no postulates AND no unsafe pragma"
+design), but it IS the finish-line certificate: the day the five top-line
+statement modules (`Left-To-Right`, `Timed`, `Countable`) are discharged,
+`agda --safe src/Main.agda` verifies "no postulates AND no unsafe pragma"
 in one command. Changing a flag invalidates interfaces — it is not a free query.

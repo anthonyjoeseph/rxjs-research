@@ -25,14 +25,14 @@
 --
 -- AUTHORITY.  Anthony delegated the SHAPE to this session,
 -- conditional on the main proof not depending on this claim.  That condition was
--- then verified, not assumed: `Batch-Theorems` is imported ONLY by Main,
--- `The-Proof.agda` does not import it at all, and `batch-online` has no in-repo
--- consumer.  So `formal-verification-batchSimultaneous` cannot be affected by
--- anything written here — this is a leaf claim Main asserts BESIDE the theorem,
--- which makes its shape a reporting question rather than a soundness one.  If a
+-- then verified, not assumed: `Batch-Online` is imported ONLY by Main, none of
+-- the five top-line statement modules import it, and `batch-online` has no
+-- in-repo consumer.  So the top-line theorem cannot be affected by anything
+-- written here — this is a leaf claim Main asserts BESIDE the theorem, which
+-- makes its shape a reporting question rather than a soundness one.  If a
 -- future change ever routes the main proof through this module, that delegation
 -- has lapsed and the shape needs asking about again.
-module Verify-Batch-Simultaneous.Batch-Theorems where
+module Batch-Online where
 
 open import Data.List    using (List; []; _∷_; _++_)
 -- the constructors are renamed because `[]` and `_∷_` would otherwise
