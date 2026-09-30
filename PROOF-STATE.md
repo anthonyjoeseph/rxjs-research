@@ -218,53 +218,6 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — one flattener, echoing its outer
-
-**THE THREE FLATTENERS ARE ONE FORMER, AND THE TIER IS THAT SWAP.**
-`flattenᵉ` hands on each outer element's echo as the element arrives, before
-its lane is handled — what the timed translation needs and no other `Exp`
-former gives (`typescript/src/timed.ts`, rule `echo`). Its type is settled
-(Anthony): `flattenᵉ : FlatOp → Exp ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) →
-Exp t`, with `typescript/src/flatten.ts` the rxjs it means. rxjs's own
-mergeAll/switchAll/exhaustAll are `flatAllᵉ` (`SExp.Plain`) and `flatAll`
-(`typescript/src/exp.ts`): a flatten over an element map that echoes
-nothing. The `Exp` change is licensed here and nowhere else. Done is the old
-formers deleted, the evaluator's lanes collapsed onto the echo, the oracle —
-its sweep and every pinned corpus — agreeing with rxjs, and the gate green.
-QuickCheck and the bug cache judge the SExp tree, so they are tier 2's and
-stay off in CI until then (Anthony).
-
-### The monster
-
-(no monster) — a former swap judged by the oracle alone; no
-statement here could be false, and the swap touches every module that cases
-on `Exp` by design.
-
-### Big picture tier roadmap
-
-- **FORCE THE SUCCESSOR.** The bug-cache row switching to two ofs is
-  GC-bound: a successor is a thunk over the whole answer below it (`next
-  an`, `held r`). Forcing the successor and its arguments, hand-patched into
-  the compiled Haskell, halves that row's peak residency. The rest is
-  derivation constructors and proof thunks, reachable through each
-  `Stage`'s trace of `Answered`s; no `seq` reaches them and
-  `--ghc-strict-data` is worse, since it builds every derivation. The row
-  runs three evaluations, two of them over SExp-elaborated programs. Tier 2
-  may not touch the evaluator, so this lands here.
-
-- **CARRY THE FORCE LEMMA.** Every proof that unfolds `liveRP`/`subRP`
-  (`translate`, `translate-sub`, `fallen-stays` and their `-at` lemmas) sees
-  the forced successor; rewrite each by the force lemma at the point it
-  reads `next`, and keep the evaluator's answers shared while doing it.
-
-- **CLOSE THE TIER.** The oracle's sweep and every pinned corpus agreeing
-  with rxjs on the forced evaluator, and the gate's tower green on CI.
-
-### The ledger
-
-(empty — the tier's work is definitions, not postulates.)
-
-
 ## Tier 2 — an impl InstEmit the spec batches agree with
 
 **THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
@@ -289,7 +242,7 @@ bound.
   `timing-correct` compares stamps against packets nothing defines, and
   `timed-faithful` is the only thing standing between it and `empty`. Port
   the `echo` rule of `typescript/src/timed.ts`, whose packets match rxjs call
-  stacks on every generated program and which needs nothing tier 1's former
+  stacks on every generated program and which needs nothing `flattenᵉ`
   does not give.
 
 - **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**

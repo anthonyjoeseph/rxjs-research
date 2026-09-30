@@ -639,6 +639,15 @@ record RP {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
 -- derivation, the successor with the ground it stands on in that
 -- state, what it kept for the frame beneath, and the state it was
 -- threaded.
+
+-- EVERY FIELD IS A THUNK OVER THE ANSWER IT CAME FROM, so a compiled run
+-- keeps what its answers can still reach.  Measured on the bug-cache row
+-- switching to two ofs: forcing `next` and the arguments `liveRP` and
+-- `subRP` close over halves the peak residency; the rest is derivation
+-- constructors and proof thunks, reached through each `Stage`'s trace of
+-- `Answered`s, which only erasing the proof-carrying fields would drop.
+-- `--ghc-strict-data` is worse -- it builds every derivation a lazy run
+-- never demands.
 record Ans {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
            (P : Val Γ u → Set₁) (S : Set) (κ : Path Γ lo u t)
            (now : Tick) (vals : List (Val Γ u)) (fin : Bool)
