@@ -242,15 +242,15 @@ on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **FORCE THE SUCCESSOR.** Recompute is ruled out: answers are bound once
-  and traces carry them. What remains is residency — the bug-cache row
-  switching to two ofs spends nearly all its run in GC with a third of its
-  allocation live, retained by `liveRP`/`subRP` closures (a retainer
-  profile): a successor is a thunk over the whole answer below it (`next
-  an`, `held r`), so each continuation holds the run's history. Force it
-  where the fold builds it, and measure that row's residency against the
-  profile before anything else moves. Tier 2 may not touch the evaluator,
-  so this lands here.
+- **FORCE THE SUCCESSOR.** The bug-cache row switching to two ofs is
+  GC-bound: a successor is a thunk over the whole answer below it (`next
+  an`, `held r`). Forcing the successor and its arguments, hand-patched into
+  the compiled Haskell, halves that row's peak residency. The rest is
+  derivation constructors and proof thunks, reachable through each
+  `Stage`'s trace of `Answered`s; no `seq` reaches them and
+  `--ghc-strict-data` is worse, since it builds every derivation. The row
+  runs three evaluations, two of them over SExp-elaborated programs. Tier 2
+  may not touch the evaluator, so this lands here.
 
 - **CARRY THE FORCE LEMMA.** Every proof that unfolds `liveRP`/`subRP`
   (`translate`, `translate-sub`, `fallen-stays` and their `-at` lemmas) sees
