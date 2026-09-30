@@ -218,6 +218,58 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
+## Tier 1 — one flattener, echoing its outer
+
+**THE THREE FLATTENERS BECOME ONE FORMER, AND THE TIER IS THAT SWAP.**
+`flattenᵉ` hands on each outer element's echo as the element arrives, before
+its lane is handled — what the timed translation needs and no `Exp` former
+gives (`typescript/src/timed.ts`, rule `echo`). It is ADDED first, beside
+`mergeAllᵉ`/`switchAllᵉ`/`exhaustAllᵉ`, so the three are its differential
+oracle, and they are deleted once every producer is rewritten over it
+(Anthony). The `Exp` change is licensed here and nowhere else. Done is the
+three gone, `flattenᵉ` through the oracle and the Agda QuickCheck, and the
+gate green.
+
+### The monster
+
+(no monster) — a former swap judged by the oracle and the QuickCheck; no
+statement here could be false, and the swap touches every module that cases
+on `Exp` by design.
+
+### Big picture tier roadmap
+
+- **STATE THE FORMER — ITS TYPE IS ANTHONY'S CALL.** Proposed:
+  `flattenᵉ : FlatOp → Exp ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) → Exp t`, the
+  op a limited merge, switch or exhaust. An element's echo, if any, leaves on
+  arrival; its lane, if any, is flattened. An echo-only element is a filter,
+  so plain `mergeAll` is the echo-less case and nothing needs stripping.
+
+- **ADD IT ON THE TYPESCRIPT SIDE AND DIFF IT AGAINST THE THREE.** `exp.ts`,
+  `generator.ts`, `plain-eval.ts` over `echoFlatten`, `scripts/formers.tsv`;
+  the oracle runs each old former beside its encoding over `flattenᵉ` on
+  generated programs. Settles the semantics before any Agda moves.
+
+- **ADD IT TO THE AGDA EVALUATOR.** One `subs-` arm into `subscribeAll⇓` with
+  the op as its `AllOp` tag; the outer's walk (`thruWalk⇓`) emits the echo
+  before consuming the element, so the machinery under it is unchanged. Then
+  its arms in `Reducible` and `Reducible.Support`, `CLI.Decode`, and the
+  QuickCheck differential against the three.
+
+- **REWRITE EVERY PRODUCER OVER `flattenᵉ`, THEN DELETE THE THREE.**
+  `SExp.Elaborate`, both generators, the traversals in `Rx.Exp`, every proof
+  arm the three own, and the bug-cache rows RE-ENCODED rather than dropped.
+  `AllOp` stays as the policy tag only if it still earns its place.
+
+- **PORT `timed.ts` ONTO IT.** The translation's flatteners become
+  `echoFlatten` read by `last-seen`; the `max-` rules, keys, trails and
+  copies are deleted, and `timed-fuzz.ts --selftest` pins what is left. The
+  TypeScript half of tier 2's `timed` leg.
+
+### The ledger
+
+(empty — the tier's work is definitions, not postulates.)
+
+
 ## Tier 2 — an impl InstEmit the spec batches agree with
 
 **THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
@@ -238,12 +290,12 @@ bound.
 
 ### Big picture tier roadmap
 
-- **GIVE `timed` A BODY — AND ASK ANTHONY ABOUT `connect` FIRST.** Until it
-  has one, `timing-correct` compares stamps against packets nothing defines,
-  and `timed-faithful` is the only thing standing between it and `empty`. Port
-  `typescript/src/timed.ts`, whose packets match rxjs call stacks on every
-  generated program; a concurrency-limited `mergeAll` needs its outer
-  multicast, which no `Exp` former gives.
+- **GIVE `timed` A BODY OVER `flattenᵉ`.** Until it has one,
+  `timing-correct` compares stamps against packets nothing defines, and
+  `timed-faithful` is the only thing standing between it and `empty`. Port
+  the `echo` rule of `typescript/src/timed.ts`, whose packets match rxjs call
+  stacks on every generated program and which needs nothing tier 1's former
+  does not give.
 
 - **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
   A share's connect mints its own instant inside the subscribe frame, and a
@@ -321,11 +373,11 @@ still being rewritten there.
   over an unwritten `timed`; tier 2's stamping leg is the impl's half of it.
 - **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: stated over
   an unwritten `timed`.
-- **`timed-below`** (Timed.Translation) — FALSITY, `NO EVIDENCE`: stated over an
-  unwritten `timed`.
+- **`timed-below`** (Timed.Translation) — FALSITY, `NO EVIDENCE`: stated over
+  an unwritten `timed`.
 - **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: nothing has
   instantiated the second evaluator; the first leg.
-- **`timed`** (Timed.Translation) — VACUITY, `NO EVIDENCE`: a postulated function
-  asserts nothing; `λ _ → emptyˢ` inhabits it.
+- **`timed`** (Timed.Translation) — VACUITY, `DEAD ROUTE`: a postulated
+  function asserts nothing; `λ _ → emptyˢ` inhabits it.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

@@ -95,31 +95,26 @@ timedᶜ Γ κ = zipWith timedTy Γ κ
 -- (`typescript/src/timed.ts`) is the route: its packets partition
 -- emits exactly as rxjs call stacks do on every generated program.
 --
--- A QUEUED INNER NEEDS AN ORDER ON PACKETS, NOT A MULTICAST.  Under a
--- concurrency-limited `mergeAll` an inner is subscribed at the LATER
--- of its own outer emission and the last lane instant before it, so
--- with packets that compare in the driver's (tick, ordinal) order the
--- translation needs no former it lacks: the `max-key` rule, `max`
--- resolved at the root.  Two places it still falls short, both pinned
--- by `timed-fuzz.ts --selftest`: `switchAll`'s own END, which needs the
--- outer's END and cannot take it as a lane without cancelling one; and
--- a SHARED slot, whose frame is anchored on each subscriber though it
--- connected on one, so a late subscriber's keys are wrong.  Two dynamic
--- sources registered in one arrival and firing at one tick are ordered
--- as the driver does by the `max-sub` rule: their registrations'
--- depth-first positions in that arrival's call stack, ranked at a hot
--- or shared fan-out by each subscriber's own subscription, not by
--- position in the program.  The default rule multicasts the outer with
--- rxjs `connect` and has neither gap.
+-- THE ROUTE IS A FLATTENER THAT ECHOES ITS OUTER.  An inner's subscribe
+-- instant, and a flattener's own END, are the last instant seen in the
+-- flattener's output, once each outer element's packet is echoed there
+-- as the element arrives: the `echo` rule of `typescript/src/timed.ts`,
+-- clean against rxjs call stacks on every generated program, the shared
+-- and `switchAll` cases pinned by `timed-fuzz.ts --selftest` included.
+-- No former echoes yet; tier 1 adds `flattenᵉ`.
 --
--- `switchAll`'s END IS READ OFF A SECOND COPY OF THE OUTER, subscribed
--- beside it and read only for its END: the `max-dup` rule.  After the
--- real outer when a subscription to it schedules nothing, BEFORE it when
--- it does, so each source the copy registers fires just ahead of its
--- real twin and names the same instant.  A copy placed first would
--- connect any share the outer reaches, so an outer that both schedules
--- and reaches one keeps the gap.  Copies nest, doubling per stacked
--- `switchAll` over a scheduling outer.
+-- WITHOUT AN ECHO, PACKETS MUST BE ORDERED rather than only named: a
+-- queued inner is subscribed at the LATER of its outer emission and the
+-- last lane instant, which the `max-` rules there resolve by computed
+-- keys, reading `switchAll`'s END off a second copy of the outer.  They
+-- fall short where a shared slot's keys are anchored on a late
+-- subscriber, and where a scheduling outer reaches a share.
+--
+-- DEAD ROUTE: a flattener reporting only a Start and a Done per lane and
+--   an OuterDone.  A lane whose outer value arrives after the previous
+--   lane's Done reads exactly as a queued one, and the OuterDone carries
+--   no instant; `timed-fuzz.ts --selftest` pins both under its `markers`
+--   rule.
 postulate
   timed : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t}
         → SExp Γ [] [] [] t → SExp (timedᶜ Γ κ) [] [] [] (itemᵗ t)
