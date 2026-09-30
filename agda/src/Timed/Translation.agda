@@ -103,9 +103,13 @@ timedᶜ Γ κ = zipWith timedTy Γ κ
 -- resolved at the root.  Two places it still falls short, both pinned
 -- by `timed-fuzz.ts --selftest`: `switchAll`'s own END, which needs the
 -- outer's END and cannot take it as a lane without cancelling one; and
--- two dynamic sources registered in one arrival firing at one tick,
--- which the driver orders by a registration counter the program does
--- not determine locally.  The default rule multicasts the outer with
+-- a SHARED slot, whose frame is anchored on each subscriber though it
+-- connected on one, so a late subscriber's keys are wrong.  Two dynamic
+-- sources registered in one arrival and firing at one tick are ordered
+-- as the driver does by the `max-sub` rule: their registrations'
+-- depth-first positions in that arrival's call stack, ranked at a hot
+-- or shared fan-out by each subscriber's own subscription, not by
+-- position in the program.  The default rule multicasts the outer with
 -- rxjs `connect` and has neither gap.
 postulate
   timed : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t}

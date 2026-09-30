@@ -259,6 +259,132 @@ const sameArrival: TestCase = {
   },
 };
 
+// LEFT-MOST IN THE PROGRAM DOES NOT WIN. Hot 0 fires once, at tick 2,
+// into two flat-maps onto colds 1 and 2, which fire 2 ticks after they
+// are subscribed. The left one X sits behind a defer, so it subscribes to
+// hot 0 at tick 1; the right one Y at the root, first. A hot delivers in
+// SUBSCRIPTION order, so Y registers cold 2 before X registers cold 1,
+// and both fire at tick 5: the 6 (arrival 3) comes before the 5 (arrival
+// 4). `max-sub` ranks the two deliveries by the subscriptions; `max-left`
+// ranks them by program site and orders the 5 first.
+const flatMapHot = (s: number): Closed => ({
+  type: "mergeAll",
+  ty: nat,
+  src: { type: "map", ty: obsNat, fn: strm(input(s)), src: input(0) },
+});
+// a cold with no sync prefix and one async value
+const tail = (wait: number, val: number) => ({
+  type: "scripted" as const,
+  input: { type: "cold" as const, sync: [], async: [{ wait, val }] },
+});
+const both = (a: Closed, b: Closed): Closed => ({
+  type: "mergeAll",
+  ty: nat,
+  src: { type: "of", ty: obsNat, items: [strm(a), strm(b)] },
+});
+const fanOut: TestCase = {
+  ctx: [nat, nat, nat],
+  slots: [hotAt(1), tail(2, 5), tail(2, 6)],
+  fuel: 6,
+  exp: both({ type: "defer", ty: nat, body: flatMapHot(1) }, flatMapHot(2)),
+};
+
+// THE SAME WITHOUT A DEFER. Hot 1 fires twice into a `switchAll` whose
+// every lane flat-maps hot 0 onto cold 2, so the lane that hears hot 0
+// subscribed to it in hot 1's second arrival; the right-hand flat-map
+// onto cold 3 subscribed at the root. Hot 0 reaches the right one first:
+// the 6 (arrival 4) before the 5 (arrival 5), both at tick 6.
+const switchFan: TestCase = {
+  ctx: [nat, nat, nat, nat],
+  slots: [
+    hotAt(3),
+    {
+      type: "scripted",
+      input: {
+        type: "hot",
+        async: [
+          { wait: 0, val: 1 },
+          { wait: 0, val: 1 },
+        ],
+      },
+    },
+    tail(1, 5),
+    tail(1, 6),
+  ],
+  fuel: 8,
+  exp: both(
+    {
+      type: "switchAll",
+      ty: nat,
+      src: { type: "map", ty: obsNat, fn: strm(flatMapHot(2)), src: input(1) },
+    },
+    flatMapHot(3),
+  ),
+};
+
+// A COMPLETION IS AFTER WHAT IT FOLLOWS. `mergeAll(1)` over three lanes:
+// A ends at tick 1, which subscribes B, a `batchSync` over `of(cold 1)`.
+// B's group leaves first, and the root flat-map subscribes cold 1; only
+// then does B's held END complete it, subscribing C, which gives cold 2.
+// Both colds fire at tick 4, cold 1 first. Ranked by the END's own place
+// in B's burst, C's subscription would sort before the group's.
+const burstEnd: TestCase = {
+  ctx: [nat, nat, nat],
+  slots: [tail(0, 1), tail(2, 5), tail(2, 6)],
+  fuel: 8,
+  exp: {
+    type: "mergeAll",
+    ty: nat,
+    src: {
+      type: "mergeAll",
+      ty: obsNat,
+      limit: 1,
+      src: {
+        type: "of",
+        ty: obsObsNat,
+        items: [
+          strmOO({
+            type: "map",
+            ty: obsNat,
+            fn: strm({ type: "empty", ty: nat }),
+            src: input(0),
+          }),
+          strmOO({
+            type: "map",
+            ty: obsNat,
+            fn: {
+              type: "fstT",
+              ty: obsNat,
+              pair: { type: "varT", ty: nat, index: 0 },
+            },
+            src: {
+              type: "batchSync",
+              ty: nat,
+              src: { type: "of", ty: obsNat, items: [strm(input(1))] },
+            },
+          }),
+          strmOO({ type: "of", ty: obsNat, items: [strm(input(2))] }),
+        ],
+      },
+    },
+  },
+};
+
+// THE SHARE GAP. A share's frame is subscribed ONCE, by whichever
+// subscriber connected it, but its packets are anchored on a hole that
+// every subscriber fills with its own subscription. Two root subscribers
+// of a share over cold 0 hear its one value in one arrival, and the late
+// one's copy names its own subscription as the registering event. The
+// connecting subscription is on no path a late subscriber's packet
+// travels, so no substitution can give it. `max-key` keeps a key per
+// arrival and passes here only by not looking at the trail.
+const shareLate: TestCase = {
+  ctx: [nat, nat],
+  slots: [tail(1, 3), { type: "shared", def: input(0) }],
+  fuel: 3,
+  exp: both(input(1), input(1)),
+};
+
 // THE SWITCH GAP. `switchAll` over an outer whose one value (an empty
 // inner) comes at tick 1 and which ends at tick 4 with no value, then a
 // concat onto `of(7)`. The 7 is emitted in the outer's END, arrival 2,
@@ -327,6 +453,22 @@ const holds = (name: string, testCase: TestCase, rule: SubscribeRule) => {
   return ok;
 };
 
+// a directed case under one rule: whether its partition holds AND its
+// computed keys follow the arrivals
+const keyed = (name: string, testCase: TestCase, rule: SubscribeRule) => {
+  const emits = runTimed(testCase, rule);
+  const ok = partitionOk(emits) && keysOk(emits);
+  console.log(
+    `${name} / ${rule} keys: ${ok ? "ok" : "MISORDERED"} ` +
+      emits
+        .map(
+          (x) => `${x.value}@${x.arrival}=${x.key.tick}/${x.key.ord.join(".")}`,
+        )
+        .join("  "),
+  );
+  return ok;
+};
+
 const main = () => {
   const argv = process.argv.slice(2);
   if (argv[0] === "--selftest") {
@@ -355,6 +497,23 @@ const main = () => {
       holds("sameArrival", sameArrival, "max-clock") &&
       !holds("sameArrival", sameArrival, "max-key") &&
       runTimed(sameArrival, "max-key").some((x) => x.tie);
+    // `max-sub` closes it and orders both fan-outs and the held END;
+    // `max-left` closes it and is refuted by both fan-outs
+    const subOk =
+      holds("laneLater", laneLater, "max-sub") &&
+      holds("outerLater", outerLater, "max-sub") &&
+      keyed("sameArrival", sameArrival, "max-sub") &&
+      keyed("fanOut", fanOut, "max-sub") &&
+      keyed("switchFan", switchFan, "max-sub") &&
+      keyed("burstEnd", burstEnd, "max-sub") &&
+      keyed("sameArrival", sameArrival, "max-left") &&
+      !keyed("fanOut", fanOut, "max-left") &&
+      !keyed("switchFan", switchFan, "max-left") &&
+      !keyed("fanOut", fanOut, "max-key") &&
+      !keyed("burstEnd", burstEnd, "max-key");
+    const shareGapOk =
+      !keyed("shareLate", shareLate, "max-sub") &&
+      keyed("shareLate", shareLate, "max-key");
     const refuted = (["outer-packet", "lanes-only"] as const).map((rule) => {
       const t = sweep(200, rule, false);
       console.log(`${rule}: ${JSON.stringify(t)}`);
@@ -365,6 +524,8 @@ const main = () => {
       !tiesOk ||
       !switchOk ||
       !keyGapOk ||
+      !subOk ||
+      !shareGapOk ||
       refuted.includes(false)
     ) {
       console.log("SELFTEST FAILED");
@@ -372,7 +533,8 @@ const main = () => {
     }
     console.log(
       "selftest ok: the END case holds, max-key orders both ties, the " +
-        "switch and key gaps stand, and every refuted rule is refuted",
+        "switch and key gaps stand, max-sub closes the key gap, the share " +
+        "gap stands, and every refuted rule is refuted",
     );
     return;
   }

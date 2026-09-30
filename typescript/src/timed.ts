@@ -45,7 +45,9 @@ import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 // rules do without it by ORDERING packets instead of only naming them,
 // and `timed-fuzz.ts --selftest` pins the two places `max-key` still
 // falls short: `switchAll`'s own END, and two dynamic sources
-// registered in one arrival firing at one tick.
+// registered in one arrival firing at one tick. `max-sub` closes the
+// second and meets the SHARE gap instead: a share's frame is anchored on
+// every subscriber rather than on the one that connected it.
 
 // ---------------------------------------------------------------
 // Packets.
@@ -63,12 +65,42 @@ import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 // every operand's key (below) is closed. A translation cannot compare
 // inside a frame, since a key relative to a frame whose own instant is
 // still a hole has no tick yet.
+//
+// `at` is an EVENT inside an instant: the one `trail` below the event
+// `base`, in the depth-first order of that instant's rxjs call stack. It
+// never changes a name or a key; only the `max-sub` and `max-left` rules
+// read it, to order the dynamic sources one arrival registers.
 export type Pkt =
   | { t: "hole" }
   | { t: "abs"; name: string; key?: Key; dyn?: Dyn }
   | { t: "rel"; kind: string; path: string[]; off: number; base: Pkt }
-  | { t: "max"; a: Pkt; b: Pkt; tickOnly?: boolean };
+  | { t: "max"; a: Pkt; b: Pkt; tickOnly?: boolean }
+  | { t: "at"; base: Pkt; trail: Atom[] };
 const HOLE: Pkt = { t: "hole" };
+
+// A TRAIL IS A PATH OF SIBLING RANKS down one call stack, compared
+// lexicographically, a prefix first: the stack is walked depth-first, so
+// an event precedes everything it causes, and all of that precedes its
+// next sibling. A number ranks by program or emission order: the k-th
+// synchronous emission, a hot's value before its END. A `Rank` is the
+// rank at a FAN-OUT, a hot or shared slot delivering to each subscriber
+// in the order they subscribed: `sub` is that subscriber's own
+// subscription event (`max-sub`), `site` its place in the program, the
+// frame segments down to it (`max-left`, the refuted "left-most wins").
+type Rank = { sub: Pkt; site: string[] };
+type Atom = number | Rank;
+// after every event the one it follows causes: a completion, which runs
+// once its last value's cascade has returned. `BURST` sits just below it,
+// for `batchSync`'s group, which leaves after its source's sync phase.
+const TOP = 1e9;
+const BURST = TOP - 1;
+
+const at = (base: Pkt, trail: Atom[]): Pkt =>
+  base.t === "at"
+    ? { t: "at", base: base.base, trail: [...base.trail, ...trail] }
+    : { t: "at", base, trail };
+// a fan-out's delivery to the subscriber whose frame this is
+const RANK: Rank = { sub: HOLE, site: [] };
 
 // AN INSTANT'S POSITION IN THE DRIVER'S ORDER, computed from the program
 // and the scripts alone: (tick, ordinal), compared lexicographically, as
@@ -76,8 +108,9 @@ const HOLE: Pkt = { t: "hole" };
 // dynamic source (a cold's async tail, a defer's hop) is minted above
 // every hot one in REGISTRATION order, which across arrivals is the
 // order of the arrivals that registered it -- so its ordinal is its
-// base's key. Two dynamic sources registered in ONE arrival get equal
-// keys here; the driver orders them by a counter no translation sees.
+// base's key. Within ONE arrival the driver's counter follows the call
+// stack, so `max-sub` extends the ordinal by the registering event's
+// trail; `max-key` does not, and gives two such sources equal keys.
 export type Key = { tick: number; ord: number[] };
 // minted `off` ticks after the instant `base` subscribed it
 type Dyn = { off: number; base: Pkt };
@@ -103,6 +136,15 @@ const subst = (seg: string, sp: Pkt, p: Pkt): Pkt => {
         : p;
     case "max":
       return { ...p, a: subst(seg, sp, p.a), b: subst(seg, sp, p.b) };
+    case "at":
+      return at(
+        subst(seg, sp, p.base),
+        p.trail.map((a) =>
+          typeof a === "number"
+            ? a
+            : { sub: subst(seg, sp, a.sub), site: [seg, ...a.site] },
+        ),
+      );
   }
 };
 
@@ -112,6 +154,8 @@ const subst = (seg: string, sp: Pkt, p: Pkt): Pkt => {
 // KEY does not close: it stays anchored on the connecting subscriber's
 // instant, which is a hole here and is filled by EVERY subscriber, so a
 // late subscriber's key is wrong -- `timed-fuzz.ts` counts those cases.
+// So is a late subscriber's trail, the same arrival or not, which
+// `max-sub` reads: its `shareLate` case.
 const closeShare = (j: number, p: Pkt): Pkt =>
   p.t === "rel"
     ? {
@@ -121,7 +165,14 @@ const closeShare = (j: number, p: Pkt): Pkt =>
       }
     : p.t === "max"
       ? { ...p, a: closeShare(j, p.a), b: closeShare(j, p.b) }
-      : p;
+      : p.t === "at"
+        ? at(
+            closeShare(j, p.base),
+            p.trail.map((a) =>
+              typeof a === "number" ? a : { ...a, sub: closeShare(j, a.sub) },
+            ),
+          )
+        : p;
 
 const cmpKey = (x: Key, y: Key): number => {
   if (x.tick !== y.tick) return x.tick - y.tick;
@@ -131,48 +182,117 @@ const cmpKey = (x: Key, y: Key): number => {
   return x.ord.length - y.ord.length;
 };
 
-// THE ROOT'S READING of a packet: its name, its key, and whether some
-// `max` met two DIFFERENT names under equal keys and had to guess.
-export type Resolved = { name: string; key: Key; tie: boolean };
+const cmpSeq = (x: number[], y: number[]): number =>
+  cmpKey({ tick: 0, ord: x }, { tick: 0, ord: y });
+
+// THE ROOT'S READING of a packet: its name, its key, its trail, and
+// whether some `max` met two DIFFERENT names under equal keys and had
+// to guess. The trail is read only in modes `sub` and `left`, and is
+// then flat: a rank is ENCODED (`encEv`, `encSite`), so each atom is a
+// number or a self-delimiting number sequence.
+type RAtom = number | number[];
+export type Resolved = {
+  name: string;
+  key: Key;
+  trail: RAtom[];
+  tie: boolean;
+};
+type Mode = "key" | "sub" | "left";
 
 // the root subscription is arrival 0, at tick 0, before every source
 const ROOT_KEY: Key = { tick: 0, ord: [] };
 
-const dynKey = (d: Dyn): { key: Key; tie: boolean } => {
-  const b = resolve(d.base);
+// AN EVENT AS ONE NUMBER SEQUENCE whose lexicographic order is the
+// event order, and which no other event's encoding extends: the tick,
+// then the ordinal (self-delimiting given the tick: [] only at tick 0, a
+// hot's [0, i], a dynamic source's [1, ...its registration's encoding]),
+// then the trail, each atom behind a 1 and closed by a 0, so a shorter
+// trail sorts first.
+const encTrail = (trail: RAtom[]): number[] => [
+  ...trail.flatMap((a) => [1, ...(typeof a === "number" ? [a] : a)]),
+  0,
+];
+const encEv = (r: Resolved): number[] => [
+  r.key.tick,
+  ...r.key.ord,
+  ...encTrail(r.trail),
+];
+// `max-left`'s rank: the lane indices down to the subscriber, a defer's
+// body counting as the one lane it has
+const encSite = (site: string[]): number[] => [
+  ...site.flatMap((s) => {
+    const n = s.slice(s.lastIndexOf("#") + 1);
+    return [1, n === "d" ? 0 : Number(n)];
+  }),
+  0,
+];
+
+// A DYNAMIC SOURCE'S ORDINAL. Mode `key` gives it its registering
+// arrival's key, so one arrival's registrations tie; `sub` and `left`
+// give it its registering EVENT, trail included, which is what the
+// driver's counter counts in.
+const dynKey = (d: Dyn, mode: Mode): { key: Key; tie: boolean } => {
+  const b = resolve(d.base, mode);
   return {
-    key: { tick: b.key.tick + d.off, ord: [1, b.key.tick, ...b.key.ord] },
+    key: {
+      tick: b.key.tick + d.off,
+      ord: mode === "key" ? [1, b.key.tick, ...b.key.ord] : [1, ...encEv(b)],
+    },
     tie: b.tie,
   };
 };
 
-export const resolve = (p: Pkt): Resolved => {
+export const resolve = (p: Pkt, mode: Mode = "key"): Resolved => {
   switch (p.t) {
     case "hole":
-      return { name: "S", key: ROOT_KEY, tie: false };
+      return { name: "S", key: ROOT_KEY, trail: [], tie: false };
     case "abs": {
-      const k = p.dyn ? dynKey(p.dyn) : { key: p.key ?? ROOT_KEY, tie: false };
-      return { name: p.name, ...k };
+      const k = p.dyn
+        ? dynKey(p.dyn, mode)
+        : { key: p.key ?? ROOT_KEY, tie: false };
+      return { name: p.name, trail: [], ...k };
     }
     case "rel":
       return {
         name: `S/${p.path.join("/")}/${p.kind}`,
-        ...dynKey({ off: p.off, base: p.base }),
+        trail: [],
+        ...dynKey({ off: p.off, base: p.base }, mode),
       };
     case "max": {
-      const a = resolve(p.a);
-      const b = resolve(p.b);
+      const a = resolve(p.a, mode);
+      const b = resolve(p.b, mode);
       // `tickOnly` is the refuted `max-tick`: a tick alone, and a tie
       // goes to the lane
       const c = p.tickOnly
         ? a.key.tick > b.key.tick
           ? 1
           : -1
-        : cmpKey(a.key, b.key);
+        : mode === "key"
+          ? cmpKey(a.key, b.key)
+          : cmpSeq(encEv(a), encEv(b));
       const win = c >= 0 ? a : b;
       return {
         ...win,
         tie: a.tie || b.tie || (c === 0 && a.name !== b.name),
+      };
+    }
+    case "at": {
+      const b = resolve(p.base, mode);
+      if (mode === "key") return b;
+      const ranks = p.trail.map((a) =>
+        typeof a === "number"
+          ? { atom: a, tie: false }
+          : mode === "left"
+            ? { atom: encSite(a.site), tie: false }
+            : (() => {
+                const s = resolve(a.sub, mode);
+                return { atom: encEv(s), tie: s.tie };
+              })(),
+      );
+      return {
+        ...b,
+        trail: [...b.trail, ...ranks.map((r) => r.atom)],
+        tie: b.tie || ranks.some((r) => r.tie),
       };
     }
   }
@@ -238,7 +358,10 @@ const timedInput = (
       })),
       index,
     );
-    return subject;
+    // a fan-out: every subscriber gets the value, then every one the END
+    return subject.pipe(
+      rxMap((x): Item => ({ ...x, p: at(x.p, [x.end ? 1 : 0, RANK]) })),
+    );
   }
   const s = input.sync.length;
   // the k-th async tick's distance from the subscription, which the
@@ -273,7 +396,7 @@ const timedInput = (
                 ),
               ),
             ),
-        rxOf(...input.sync.map((x) => val(HOLE, toVal(x)))),
+        rxOf(...input.sync.map((x, k) => val(at(HOLE, [k]), toVal(x)))),
       ),
     ),
   );
@@ -318,13 +441,23 @@ const timedInput = (
 // is what gives the flattener's own END -- except under `switchAll`,
 // where a lane cancels the live one, so there the END is the last lane
 // instant alone, which is wrong whenever the outer ends later.
+//
+// `max-sub` is `max-key` with the dynamic sources one arrival registers
+// ordered too, by their registering EVENT (its trail), and with the lane
+// operand taken just AFTER the last lane item, since a slot is freed by
+// a completion, which runs once that item's cascade has returned.
+// `max-left` is the same with a fan-out ranked by program site instead
+// of by subscription, and the self-test refutes it.
 export type SubscribeRule =
   | "last-seen"
   | "outer-packet"
   | "lanes-only"
   | "max-clock"
   | "max-key"
-  | "max-tick";
+  | "max-tick"
+  | "max-sub"
+  | "max-left";
+type FreeRule = "max-clock" | "max-key" | "max-tick" | "max-sub" | "max-left";
 
 type N =
   | { k: "start"; n: number; outer: Pkt; at: number; endLane: boolean }
@@ -332,13 +465,16 @@ type N =
   | { k: "fin" };
 type FreeSt = {
   last: Pkt;
+  // whether `last` is a lane's, rather than the flattener's own
+  // subscription, which is no completion and precedes every lane
+  seen: boolean;
   lastAt: number;
   sps: Record<number, Pkt>;
   out: Item | null;
 };
 
 const flattenFree = (
-  rule: "max-clock" | "max-key" | "max-tick",
+  rule: FreeRule,
   how: "merge" | "switch" | "exhaust",
   limit: number | undefined,
   pos: string,
@@ -393,12 +529,15 @@ const flattenFree = (
                 : {
                     t: "max",
                     a: m.outer,
-                    b: st.last,
+                    b:
+                      st.seen && (rule === "max-sub" || rule === "max-left")
+                        ? at(st.last, [TOP])
+                        : st.last,
                     tickOnly: rule === "max-tick",
                   };
             const sps = { ...st.sps, [m.n]: sp };
             return m.endLane
-              ? { last: sp, lastAt: clock(), sps, out: null }
+              ? { last: sp, seen: true, lastAt: clock(), sps, out: null }
               : { ...st, sps, out: null };
           }
           case "item": {
@@ -406,6 +545,7 @@ const flattenFree = (
             return {
               ...st,
               last: p,
+              seen: true,
               lastAt: clock(),
               out: m.x.end ? null : { ...m.x, p },
             };
@@ -414,7 +554,7 @@ const flattenFree = (
             return { ...st, out: end(st.last) };
         }
       },
-      { last: HOLE, lastAt: -1, sps: {}, out: null },
+      { last: HOLE, seen: false, lastAt: -1, sps: {}, out: null },
     ),
     filter((st) => st.out !== null),
     rxMap((st) => st.out as Item),
@@ -437,9 +577,9 @@ const flatten = (
   outer: Observable<Item>,
   compileInner: (o: ObsVal) => Observable<Item>,
 ): Observable<Item> =>
-  rule === "max-clock" || rule === "max-key" || rule === "max-tick"
-    ? flattenFree(rule, how, limit, pos, outer, compileInner, clock)
-    : flattenConnect(rule, how, limit, pos, outer, compileInner);
+  rule === "last-seen" || rule === "outer-packet" || rule === "lanes-only"
+    ? flattenConnect(rule, how, limit, pos, outer, compileInner)
+    : flattenFree(rule, how, limit, pos, outer, compileInner, clock);
 
 const flattenConnect = (
   rule: "last-seen" | "outer-packet" | "lanes-only",
@@ -534,8 +674,8 @@ const compile = (
       return slots[exp.index];
     case "of":
       return rxOf(
-        ...exp.items.map((it) => val(HOLE, evalWith(it, env))),
-        end(HOLE),
+        ...exp.items.map((it, k) => val(at(HOLE, [k]), evalWith(it, env))),
+        end(at(HOLE, [exp.items.length])),
       );
     case "empty":
       return rxOf(end(HOLE));
@@ -636,7 +776,9 @@ const compile = (
       );
     case "batchSync":
       // the plain leg's, with the group in the subscribe instant and an
-      // END seen inside the burst held until the group has left
+      // END seen inside the burst held until the group has left. The
+      // held END is the completion, AFTER the group's cascade, so it
+      // takes the subscribe instant too, not its own place in the burst.
       return rxDefer(() => {
         let sync = true;
         const burst: Val[] = [];
@@ -645,7 +787,7 @@ const compile = (
           recur(exp.src, "s").pipe(
             mergeMap((x): Observable<Item> => {
               if (sync) {
-                if (x.end) endP = x.p;
+                if (x.end) endP = at(HOLE, [TOP]);
                 else burst.push(x.v);
                 return EMPTY;
               }
@@ -657,7 +799,7 @@ const compile = (
             return rxOf(
               ...(burst.length === 0
                 ? []
-                : [val(HOLE, [burst[0], burst.slice(1)] as Val)]),
+                : [val(at(HOLE, [BURST]), [burst[0], burst.slice(1)] as Val)]),
               ...(endP ? [end(endP)] : []),
             );
           }),
@@ -706,6 +848,8 @@ export const runTimed = (
               resetOnComplete: false,
               resetOnError: false,
             }),
+            // a fan-out, one item at a time
+            rxMap(onPkt((p) => at(p, [RANK]))),
           ),
     ],
     [],
@@ -721,7 +865,10 @@ export const runTimed = (
     "",
   ).subscribe((x) => {
     if (!x.end) {
-      const r = resolve(x.p);
+      const r = resolve(
+        x.p,
+        rule === "max-sub" ? "sub" : rule === "max-left" ? "left" : "key",
+      );
       out.push({
         value: showVal(x.v),
         instant: r.name,
