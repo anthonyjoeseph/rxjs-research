@@ -39,10 +39,13 @@ import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 // action, which is one rxjs call stack.
 //
 // Everything here is the plain leg's own rxjs, operator for operator,
-// with the packet riding beside the value -- EXCEPT the flatteners,
-// which multicast their outer with rxjs `connect`. That is the one
-// capability `Exp` has no former for, and `timed-fuzz.ts --selftest`
-// refutes the two translations that do without it.
+// with the packet riding beside the value -- EXCEPT the flatteners
+// under the default rule, which multicast their outer with rxjs
+// `connect`, the one capability `Exp` has no former for. The `max-`
+// rules do without it by ORDERING packets instead of only naming them,
+// and `timed-fuzz.ts --selftest` pins the two places `max-key` still
+// falls short: `switchAll`'s own END, and two dynamic sources
+// registered in one arrival firing at one tick.
 
 // ---------------------------------------------------------------
 // Packets.
@@ -54,11 +57,30 @@ import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 // INSIDE this frame (a cold's async tick, a defer's hop), named by the
 // path of (flattener position, inner index) segments down to it, since
 // each subscription of a cold is its own schedule.
+//
+// `max` is the subscribe instant of a queued inner under the `max-key`
+// rule: whichever operand is LATER, decided only at the root, where
+// every operand's key (below) is closed. A translation cannot compare
+// inside a frame, since a key relative to a frame whose own instant is
+// still a hole has no tick yet.
 export type Pkt =
   | { t: "hole" }
-  | { t: "abs"; name: string }
-  | { t: "rel"; kind: string; path: string[] };
+  | { t: "abs"; name: string; key?: Key; dyn?: Dyn }
+  | { t: "rel"; kind: string; path: string[]; off: number; base: Pkt }
+  | { t: "max"; a: Pkt; b: Pkt; tickOnly?: boolean };
 const HOLE: Pkt = { t: "hole" };
+
+// AN INSTANT'S POSITION IN THE DRIVER'S ORDER, computed from the program
+// and the scripts alone: (tick, ordinal), compared lexicographically, as
+// `plain-driver.ts` arbitrates. A hot slot's ordinal is its index; a
+// dynamic source (a cold's async tail, a defer's hop) is minted above
+// every hot one in REGISTRATION order, which across arrivals is the
+// order of the arrivals that registered it -- so its ordinal is its
+// base's key. Two dynamic sources registered in ONE arrival get equal
+// keys here; the driver orders them by a counter no translation sees.
+export type Key = { tick: number; ord: number[] };
+// minted `off` ticks after the instant `base` subscribed it
+type Dyn = { off: number; base: Pkt };
 
 // a value, or the END marker a stream emits just before it completes,
 // carrying the instant it completes in. A `take` cut emits none: its
@@ -67,24 +89,94 @@ export type Item = { p: Pkt; v: Val; end?: false } | { p: Pkt; end: true };
 const val = (p: Pkt, v: Val): Item => ({ p, v });
 const end = (p: Pkt): Item => ({ p, end: true });
 
-// entering sub-frame `seg`, subscribed at instant `sp`
-const subst = (seg: string, sp: Pkt, p: Pkt): Pkt =>
-  p.t === "hole" ? sp : p.t === "rel" ? { ...p, path: [seg, ...p.path] } : p;
+// entering sub-frame `seg`, subscribed at instant `sp`. A name's base
+// is where its key is anchored, so it is filled like any other hole.
+const subst = (seg: string, sp: Pkt, p: Pkt): Pkt => {
+  switch (p.t) {
+    case "hole":
+      return sp;
+    case "rel":
+      return { ...p, path: [seg, ...p.path], base: subst(seg, sp, p.base) };
+    case "abs":
+      return p.dyn
+        ? { ...p, dyn: { ...p.dyn, base: subst(seg, sp, p.dyn.base) } }
+        : p;
+    case "max":
+      return { ...p, a: subst(seg, sp, p.a), b: subst(seg, sp, p.b) };
+  }
+};
 
 // a share connects once, so its own frame is unique: every relative
 // name inside it closes there. A hole leaves it as a hole -- a connect
-// burst goes to the subscriber whose subscription connected it.
+// burst goes to the subscriber whose subscription connected it. The
+// KEY does not close: it stays anchored on the connecting subscriber's
+// instant, which is a hole here and is filled by EVERY subscriber, so a
+// late subscriber's key is wrong -- `timed-fuzz.ts` counts those cases.
 const closeShare = (j: number, p: Pkt): Pkt =>
   p.t === "rel"
-    ? { t: "abs", name: `Sh${j}/${p.path.join("/")}/${p.kind}` }
-    : p;
+    ? {
+        t: "abs",
+        name: `Sh${j}/${p.path.join("/")}/${p.kind}`,
+        dyn: { off: p.off, base: closeShare(j, p.base) },
+      }
+    : p.t === "max"
+      ? { ...p, a: closeShare(j, p.a), b: closeShare(j, p.b) }
+      : p;
 
-export const rootName = (p: Pkt): string =>
-  p.t === "hole"
-    ? "S"
-    : p.t === "abs"
-      ? p.name
-      : `S/${p.path.join("/")}/${p.kind}`;
+const cmpKey = (x: Key, y: Key): number => {
+  if (x.tick !== y.tick) return x.tick - y.tick;
+  const n = Math.min(x.ord.length, y.ord.length);
+  for (let i = 0; i < n; i++)
+    if (x.ord[i] !== y.ord[i]) return x.ord[i] - y.ord[i];
+  return x.ord.length - y.ord.length;
+};
+
+// THE ROOT'S READING of a packet: its name, its key, and whether some
+// `max` met two DIFFERENT names under equal keys and had to guess.
+export type Resolved = { name: string; key: Key; tie: boolean };
+
+// the root subscription is arrival 0, at tick 0, before every source
+const ROOT_KEY: Key = { tick: 0, ord: [] };
+
+const dynKey = (d: Dyn): { key: Key; tie: boolean } => {
+  const b = resolve(d.base);
+  return {
+    key: { tick: b.key.tick + d.off, ord: [1, b.key.tick, ...b.key.ord] },
+    tie: b.tie,
+  };
+};
+
+export const resolve = (p: Pkt): Resolved => {
+  switch (p.t) {
+    case "hole":
+      return { name: "S", key: ROOT_KEY, tie: false };
+    case "abs": {
+      const k = p.dyn ? dynKey(p.dyn) : { key: p.key ?? ROOT_KEY, tie: false };
+      return { name: p.name, ...k };
+    }
+    case "rel":
+      return {
+        name: `S/${p.path.join("/")}/${p.kind}`,
+        ...dynKey({ off: p.off, base: p.base }),
+      };
+    case "max": {
+      const a = resolve(p.a);
+      const b = resolve(p.b);
+      // `tickOnly` is the refuted `max-tick`: a tick alone, and a tie
+      // goes to the lane
+      const c = p.tickOnly
+        ? a.key.tick > b.key.tick
+          ? 1
+          : -1
+        : cmpKey(a.key, b.key);
+      const win = c >= 0 ? a : b;
+      return {
+        ...win,
+        tie: a.tie || b.tie || (c === 0 && a.name !== b.name),
+      };
+    }
+  }
+};
 
 const onPkt =
   (f: (p: Pkt) => Pkt) =>
@@ -132,7 +224,11 @@ const timedInput = (
       resolveTicks(0, input.async).map(({ tick, val: v, k }) => ({
         tick,
         fire: (isLast: boolean) => {
-          const p: Pkt = { t: "abs", name: `H${index}.${k}` };
+          const p: Pkt = {
+            t: "abs",
+            name: `H${index}.${k}`,
+            key: { tick, ord: [0, index] },
+          };
           subject.next(val(p, v));
           if (isLast) {
             subject.next(end(p));
@@ -145,6 +241,9 @@ const timedInput = (
     return subject;
   }
   const s = input.sync.length;
+  // the k-th async tick's distance from the subscription, which the
+  // script alone fixes
+  const offs = resolveTicks(0, input.async).map((r) => r.tick);
   return endAfter(
     rxDefer(() =>
       merge(
@@ -158,7 +257,13 @@ const timedInput = (
                     fire: (isLast: boolean) => {
                       sink.next(
                         val(
-                          { t: "rel", kind: `C${index}.${s + k}`, path: [] },
+                          {
+                            t: "rel",
+                            kind: `C${index}.${s + k}`,
+                            path: [],
+                            off: offs[k],
+                            base: HOLE,
+                          },
                           v,
                         ),
                       );
@@ -195,17 +300,149 @@ const timedInput = (
 // The rule is a parameter so the self-test can swap in the two refuted
 // ones: `outer-packet` (the outer value's own packet) and `lanes-only`
 // (the last instant seen, with no beats).
-export type SubscribeRule = "last-seen" | "outer-packet" | "lanes-only";
+//
+// THE TWO `max-` RULES DO WITHOUT `connect`. A queued inner is
+// subscribed either on its own outer emission, when nothing later has
+// happened in the lanes, or inside the completion of the lane that
+// freed a slot, whose END is then the last lane item and later than
+// the emission. Either way its instant is the LATER of its outer
+// value's packet -- which rides into the lane through the `map` that
+// builds it, so no beat is needed -- and the last lane instant seen.
+// `max-clock` reads "later" off the driver's arrival count, which only
+// the harness has, so it tests the rule; `max-key` builds a `max`
+// packet the root resolves by computed keys, which is what a
+// translation could do. `max-tick` compares ticks alone and gives a
+// tie to the lane; two instants share a tick in either order, so the
+// self-test refutes it. The outer's END becomes one more lane, last
+// in any queue and completing at once, so it moves no plain value and
+// is what gives the flattener's own END -- except under `switchAll`,
+// where a lane cancels the live one, so there the END is the last lane
+// instant alone, which is wrong whenever the outer ends later.
+export type SubscribeRule =
+  | "last-seen"
+  | "outer-packet"
+  | "lanes-only"
+  | "max-clock"
+  | "max-key"
+  | "max-tick";
+
+type N =
+  | { k: "start"; n: number; outer: Pkt; at: number; endLane: boolean }
+  | { k: "item"; n: number; x: Item }
+  | { k: "fin" };
+type FreeSt = {
+  last: Pkt;
+  lastAt: number;
+  sps: Record<number, Pkt>;
+  out: Item | null;
+};
+
+const flattenFree = (
+  rule: "max-clock" | "max-key" | "max-tick",
+  how: "merge" | "switch" | "exhaust",
+  limit: number | undefined,
+  pos: string,
+  outer: Observable<Item>,
+  compileInner: (o: ObsVal) => Observable<Item>,
+  clock: () => number,
+): Observable<Item> => {
+  // only a limited merge ever queues; everything else subscribes on the
+  // outer emission, whose packet is then exact
+  const queues = how === "merge" && limit !== undefined;
+  const lanes = outer.pipe(
+    filter((x) => how !== "switch" || !x.end),
+    rxScan((acc: { n: number; x: Item }, x: Item) => ({ n: acc.n + 1, x }), {
+      n: -1,
+      x: end(HOLE),
+    }),
+    rxMap(({ n, x }) => {
+      const head = rxOf<N>({
+        k: "start",
+        n,
+        outer: x.p,
+        at: clock(),
+        endLane: x.end === true,
+      });
+      return x.end
+        ? head
+        : concat(
+            head,
+            compileInner(x.v as ObsVal).pipe(
+              rxMap((y): N => ({ k: "item", n, x: y })),
+            ),
+          );
+    }),
+  );
+  const flat =
+    how === "merge"
+      ? lanes.pipe(mergeAll(limit ?? Infinity))
+      : how === "switch"
+        ? lanes.pipe(switchAll())
+        : lanes.pipe(exhaustAll());
+  return concat(flat, rxOf<N>({ k: "fin" })).pipe(
+    rxScan(
+      (st: FreeSt, m: N): FreeSt => {
+        switch (m.k) {
+          case "start": {
+            const sp: Pkt = !queues
+              ? m.outer
+              : rule === "max-clock"
+                ? m.at >= st.lastAt
+                  ? m.outer
+                  : st.last
+                : {
+                    t: "max",
+                    a: m.outer,
+                    b: st.last,
+                    tickOnly: rule === "max-tick",
+                  };
+            const sps = { ...st.sps, [m.n]: sp };
+            return m.endLane
+              ? { last: sp, lastAt: clock(), sps, out: null }
+              : { ...st, sps, out: null };
+          }
+          case "item": {
+            const p = subst(`${pos}#${m.n}`, st.sps[m.n], m.x.p);
+            return {
+              ...st,
+              last: p,
+              lastAt: clock(),
+              out: m.x.end ? null : { ...m.x, p },
+            };
+          }
+          case "fin":
+            return { ...st, out: end(st.last) };
+        }
+      },
+      { last: HOLE, lastAt: -1, sps: {}, out: null },
+    ),
+    filter((st) => st.out !== null),
+    rxMap((st) => st.out as Item),
+  );
+};
 
 type M =
   | { k: "beat"; p: Pkt }
   | { k: "start"; n: number; outer: Pkt }
   | { k: "item"; n: number; x: Item }
   | { k: "fin" };
-type FlatSt = { last: Pkt; sps: Pkt[]; out: Item | null };
+type FlatSt = { last: Pkt; sps: Record<number, Pkt>; out: Item | null };
 
 const flatten = (
   rule: SubscribeRule,
+  clock: () => number,
+  how: "merge" | "switch" | "exhaust",
+  limit: number | undefined,
+  pos: string,
+  outer: Observable<Item>,
+  compileInner: (o: ObsVal) => Observable<Item>,
+): Observable<Item> =>
+  rule === "max-clock" || rule === "max-key" || rule === "max-tick"
+    ? flattenFree(rule, how, limit, pos, outer, compileInner, clock)
+    : flattenConnect(rule, how, limit, pos, outer, compileInner);
+
+const flattenConnect = (
+  rule: "last-seen" | "outer-packet" | "lanes-only",
   how: "merge" | "switch" | "exhaust",
   limit: number | undefined,
   pos: string,
@@ -251,7 +488,10 @@ const flatten = (
               case "start":
                 return {
                   ...st,
-                  sps: [...st.sps, rule === "outer-packet" ? m.outer : st.last],
+                  sps: {
+                    ...st.sps,
+                    [m.n]: rule === "outer-packet" ? m.outer : st.last,
+                  },
                   out: null,
                 };
               case "item": {
@@ -262,7 +502,7 @@ const flatten = (
                 return { ...st, out: end(st.last) };
             }
           },
-          { last: HOLE, sps: [], out: null },
+          { last: HOLE, sps: {}, out: null },
         ),
         filter((st) => st.out !== null),
         rxMap((st) => st.out as Item),
@@ -278,6 +518,7 @@ const flatten = (
 // and a defer's hop are named by it, so two in one frame never collide.
 const compile = (
   rule: SubscribeRule,
+  clock: () => number,
   exp: Closed,
   env: Val[],
   driver: PlainDriver,
@@ -285,8 +526,9 @@ const compile = (
   pos: string,
 ): Observable<Item> => {
   const recur = (e: Closed, sub: string) =>
-    compile(rule, e, env, driver, slots, `${pos}.${sub}`);
-  const inner = (o: ObsVal) => compile(rule, o.exp, o.env, driver, slots, "");
+    compile(rule, clock, e, env, driver, slots, `${pos}.${sub}`);
+  const inner = (o: ObsVal) =>
+    compile(rule, clock, o.exp, o.env, driver, slots, "");
   switch (exp.type) {
     case "input":
       return slots[exp.index];
@@ -329,10 +571,19 @@ const compile = (
         : recur(exp.src, "s").pipe(rxTake(Number(count)));
     }
     case "mergeAll":
-      return flatten(rule, "merge", exp.limit, pos, recur(exp.src, "s"), inner);
+      return flatten(
+        rule,
+        clock,
+        "merge",
+        exp.limit,
+        pos,
+        recur(exp.src, "s"),
+        inner,
+      );
     case "switchAll":
       return flatten(
         rule,
+        clock,
         "switch",
         undefined,
         pos,
@@ -342,6 +593,7 @@ const compile = (
     case "exhaustAll":
       return flatten(
         rule,
+        clock,
         "exhaust",
         undefined,
         pos,
@@ -353,7 +605,13 @@ const compile = (
     case "defer": {
       // the hop is an instant minted in this frame; the body is a
       // sub-frame subscribed in it
-      const hop: Pkt = { t: "rel", kind: `D${pos}`, path: [] };
+      const hop: Pkt = {
+        t: "rel",
+        kind: `D${pos}`,
+        path: [],
+        off: 1,
+        base: HOLE,
+      };
       return rxDefer(() =>
         plainHop(driver, driver.currentTick() + 1).pipe(
           mergeMap(() =>
@@ -368,6 +626,7 @@ const compile = (
       return rxDefer(() =>
         compile(
           rule,
+          clock,
           exp.body,
           [Symbol("uniq"), ...env],
           driver,
@@ -417,20 +676,30 @@ const compile = (
 
 // `arrival` is the ground truth: the driver's scheduled action the
 // value was emitted in, 0 for the root subscribe frame. `instant` is
-// the packet's name, closed at the root.
-export type TimedEmit = { value: string; instant: string; arrival: number };
+// the packet's name, closed at the root. `key` is its computed
+// position in the driver's order, and `tie` says a `max` had to guess.
+export type TimedEmit = {
+  value: string;
+  instant: string;
+  arrival: number;
+  key: Key;
+  tie: boolean;
+};
 
 export const runTimed = (
   testCase: TestCase,
   rule: SubscribeRule = "last-seen",
 ): TimedEmit[] => {
   const driver = createPlainDriver(testCase.slots.length);
+  // the harness's own count, read only by `max-clock`
+  let arrival = 0;
+  const clock = () => arrival;
   const slots = testCase.slots.reduce<Observable<Item>[]>(
     (prefix, slot, j) => [
       ...prefix,
       slot.type === "scripted"
         ? timedInput(driver, slot.input, j)
-        : compile(rule, slot.def, [], driver, prefix, "").pipe(
+        : compile(rule, clock, slot.def, [], driver, prefix, "").pipe(
             rxMap(onPkt((p) => closeShare(j, p))),
             rxShare({
               resetOnRefCountZero: false,
@@ -442,13 +711,26 @@ export const runTimed = (
     [],
   );
   const out: TimedEmit[] = [];
-  let arrival = 0;
-  const sub = compile(rule, testCase.exp, [], driver, slots, "").subscribe(
-    (x) => {
-      if (!x.end)
-        out.push({ value: showVal(x.v), instant: rootName(x.p), arrival });
-    },
-  );
+  const sub = compile(
+    rule,
+    clock,
+    testCase.exp,
+    [],
+    driver,
+    slots,
+    "",
+  ).subscribe((x) => {
+    if (!x.end) {
+      const r = resolve(x.p);
+      out.push({
+        value: showVal(x.v),
+        instant: r.name,
+        arrival,
+        key: r.key,
+        tie: r.tie,
+      });
+    }
+  });
   for (let spent = 0; spent < testCase.fuel; spent++) {
     arrival++;
     if (!driver.deliverNextArrival()) break;

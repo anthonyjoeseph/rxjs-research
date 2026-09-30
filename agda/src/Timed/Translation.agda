@@ -93,11 +93,20 @@ timedᶜ Γ κ = zipWith timedTy Γ κ
 -- `Timing-Correct` is what makes the packets mean instants; neither
 -- is content until this has a body.  The TypeScript prototype
 -- (`typescript/src/timed.ts`) is the route: its packets partition
--- emits exactly as rxjs call stacks do on every generated program,
--- except under a concurrency-limited `mergeAll`, where a queued inner
--- is subscribed at a later outer's completion and reading which one
--- needs the outer multicast -- rxjs `connect` -- which no former here
--- provides.
+-- emits exactly as rxjs call stacks do on every generated program.
+--
+-- A QUEUED INNER NEEDS AN ORDER ON PACKETS, NOT A MULTICAST.  Under a
+-- concurrency-limited `mergeAll` an inner is subscribed at the LATER
+-- of its own outer emission and the last lane instant before it, so
+-- with packets that compare in the driver's (tick, ordinal) order the
+-- translation needs no former it lacks: the `max-key` rule, `max`
+-- resolved at the root.  Two places it still falls short, both pinned
+-- by `timed-fuzz.ts --selftest`: `switchAll`'s own END, which needs the
+-- outer's END and cannot take it as a lane without cancelling one; and
+-- two dynamic sources registered in one arrival firing at one tick,
+-- which the driver orders by a registration counter the program does
+-- not determine locally.  The default rule multicasts the outer with
+-- rxjs `connect` and has neither gap.
 postulate
   timed : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t}
         → SExp Γ [] [] [] t → SExp (timedᶜ Γ κ) [] [] [] (itemᵗ t)
