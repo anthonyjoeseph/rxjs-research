@@ -19,8 +19,8 @@ import {
   ObsVal,
   ScriptVal,
   Val,
-  FlatOp,
   evalWith,
+  flatAllSrc,
   optVal,
   toVal,
   unfoldMu,
@@ -137,9 +137,10 @@ const plainInput = (
   );
 };
 
-// HOW THE THREE OLD FLATTENERS ARE RUN: as rxjs's own operators, or as
-// `flatten` over echo-less elements -- the encoding `flattenᵉ` replaces
-// them by, which `flatten-diff.ts` holds to the native run.
+// HOW A `flatAll` IS RUN: as rxjs's own `mergeAll`/`switchAll`/
+// `exhaustAll`, or as the `flatten` it is written as, which
+// `flatten-diff.ts` holds to the native run.  Any other `flatten` has no
+// native reading and runs as itself either way.
 export type Via = "native" | "echo";
 
 export const compilePlain = (
@@ -191,19 +192,14 @@ export const compilePlain = (
       // take 0 never subscribes its source, as in rxjs
       return count === 0n ? EMPTY : recur(exp.src).pipe(rxTake(Number(count)));
     }
-    case "mergeAll":
-      return via === "native"
-        ? inner(exp.src).pipe(mergeAll(exp.limit ?? Infinity))
-        : lanesOnly(inner(exp.src), { how: "merge", limit: exp.limit });
-    case "switchAll":
-      return via === "native"
-        ? inner(exp.src).pipe(switchAll())
-        : lanesOnly(inner(exp.src), { how: "switch" });
-    case "exhaustAll":
-      return via === "native"
-        ? inner(exp.src).pipe(exhaustAll())
-        : lanesOnly(inner(exp.src), { how: "exhaust" });
-    case "flatten":
+    case "flatten": {
+      const lanes = flatAllSrc(exp);
+      if (via === "native" && lanes !== undefined)
+        return exp.op.how === "merge"
+          ? inner(lanes).pipe(mergeAll(exp.op.limit ?? Infinity))
+          : exp.op.how === "switch"
+            ? inner(lanes).pipe(switchAll())
+            : inner(lanes).pipe(exhaustAll());
       // each element an optional echo beside an optional lane, and the
       // lane a closure compiled as it passes, as `inner`'s are
       return recur(exp.src).pipe(
@@ -228,6 +224,7 @@ export const compilePlain = (
         }),
         flatten<Val>(exp.op),
       );
+    }
     case "mu":
       // one unfolding now; the recursive occurrences inside sit behind
       // defer hops, so each further unfolding costs a tick
@@ -299,13 +296,6 @@ export const compilePlain = (
       );
   }
 };
-
-// an old flattener's element, with no echo
-const lanesOnly = (lanes: Observable<Observable<Val>>, op: FlatOp) =>
-  lanes.pipe(
-    rxMap((lane): Elem<Val> => ({ echo: [], lane: [lane] })),
-    flatten<Val>(op),
-  );
 
 export const evaluatePlain = (testCase: TestCase): Val[] =>
   evaluatePlainArrivals(testCase).map((x) => x.value);

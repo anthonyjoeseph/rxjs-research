@@ -27,6 +27,7 @@ import {
   ScriptVal,
   Val,
   evalWith,
+  flatAllSrc,
   optVal,
   showVal,
   toVal,
@@ -842,7 +843,7 @@ export const slotKinds = (testCase: TestCase): SlotKinds => ({
 // element type, so a stream the term carries -- written in it, or closed
 // over in its environment -- counts only once the term holds such a
 // flattener, and then what its body reaches counts too, to a fixpoint.
-// The lanes a `switchAll` subscribes are not its outer's business.
+// The lanes a switching flattener subscribes are not its outer's business.
 type Copy = "after" | "first" | "none";
 const copyOf = (exp: Closed, env: Val[], kinds: SlotKinds): Copy => {
   const found = { schedules: false, shares: false };
@@ -859,13 +860,7 @@ const copyOf = (exp: Closed, env: Val[], kinds: SlotKinds): Copy => {
       carried.push({ elem: JSON.stringify(e.ty), body: e });
       return;
     }
-    if (
-      o.type === "mergeAll" ||
-      o.type === "switchAll" ||
-      o.type === "exhaustAll" ||
-      o.type === "flatten"
-    )
-      flattened.add(JSON.stringify(o.ty));
+    if (o.type === "flatten") flattened.add(JSON.stringify(o.ty));
     if (o.type === "defer") found.schedules = true;
     if (o.type === "input" && typeof o.index === "number") {
       if (kinds.scheduling.has(o.index)) found.schedules = true;
@@ -898,7 +893,7 @@ const copyOf = (exp: Closed, env: Val[], kinds: SlotKinds): Copy => {
   return !found.schedules ? "after" : !found.shares ? "first" : "none";
 };
 
-// the `switchAll` nodes the program text holds, by where their outer's
+// the switching flattens the program text holds, by where their outer's
 // second copy goes
 export const switchOuters = (testCase: TestCase): Record<Copy, number> => {
   const kinds = slotKinds(testCase);
@@ -907,9 +902,9 @@ export const switchOuters = (testCase: TestCase): Record<Copy, number> => {
   const go = (y: unknown): void => {
     if (typeof y !== "object" || y === null || seen.has(y)) return;
     seen.add(y);
-    const o = y as { type?: unknown; src?: unknown };
-    if (o.type === "switchAll")
-      found[copyOf((o as { src: Closed }).src, [], kinds)]++;
+    const o = y as Closed;
+    if (o.type === "flatten" && o.op.how === "switch")
+      found[copyOf(flatAllSrc(o) ?? o.src, [], kinds)]++;
     Object.values(y).forEach(go);
   };
   go(testCase.exp);
@@ -1054,41 +1049,26 @@ const compile = (
         ? rxOf(end(HOLE))
         : endAfter(recur(exp.src, "s").pipe(rxTake(Number(count))));
     }
-    case "mergeAll":
-      return flatten(
-        rule,
-        clock,
-        "merge",
-        exp.limit,
-        pos,
-        recur(exp.src, "s"),
-        inner,
-      );
-    case "switchAll":
-      return flatten(
-        rule,
-        clock,
-        "switch",
-        undefined,
-        pos,
-        recur(exp.src, "s"),
-        inner,
-        ((copy: Copy) =>
-          rule === "max-dup" && copy !== "none"
-            ? { copy: recur(exp.src, "s"), first: copy === "first" }
-            : undefined)(copyOf(exp.src, env, kinds)),
-      );
-    case "exhaustAll":
-      return flatten(
-        rule,
-        clock,
-        "exhaust",
-        undefined,
-        pos,
-        recur(exp.src, "s"),
-        inner,
-      );
     case "flatten": {
+      // A `flatAll` IS TRANSLATED AS THE FLATTENER IT IS, with no connect:
+      // an echo-less element is exactly the lane it carries.
+      const lanesSrc = flatAllSrc(exp);
+      if (lanesSrc !== undefined)
+        return flatten(
+          rule,
+          clock,
+          exp.op.how,
+          exp.op.how === "merge" ? exp.op.limit : undefined,
+          pos,
+          recur(lanesSrc, "s"),
+          inner,
+          exp.op.how === "switch"
+            ? ((copy: Copy) =>
+                rule === "max-dup" && copy !== "none"
+                  ? { copy: recur(lanesSrc, "s"), first: copy === "first" }
+                  : undefined)(copyOf(lanesSrc, env, kinds))
+            : undefined,
+        );
       // `flatten` IS A CONNECT OVER AN ECHO BRANCH AND A LANES-ONLY
       // FLATTENER, AND SO IS ITS TRANSLATION: an echo leaves in its
       // element's own instant, at its packet, and the lanes go through the

@@ -18,13 +18,15 @@
 -- DEAD ROUTE InstEmit/flush/end-mark-on-outer: a mark a delivery carries
 --   behind its value, for the root to read as the end of its instant, is
 --   an OUTER emit wherever the delivery's path enters a flattener as its
---   outer -- `switchAllᵉ` cuts the live lane on it, `exhaustAllᵉ` drops
---   it while busy, a bounded `mergeAllᵉ` queues it.  Filtered out before
+--   outer -- a switching `flattenᵉ` cuts the live lane on it, an
+--   exhausting one drops it while busy, a bounded merging one queues
+--   it.  Filtered out before
 --   the outer it loses its position, and one regenerated inside the lane
 --   lands before a share's later subscribers have had the value.  Through
---   an inner, and through an unbounded `mergeAllᵉ`'s outer, it passes.
+--   an inner, and through an unbounded merging flattener's outer, it
+--   passes.
 -- DEAD ROUTE InstEmit/flush/root-merge: bracketing the subscribe burst as
---   `mergeAllᵉ` of the run and a one-emit `ofᵉ` puts a flattener above the
+--   a merging `flattenᵉ` of the run and a one-emit `ofᵉ` puts a flattener above the
 --   whole run, and the evaluator's cost is multiplicative in flattener
 --   nesting (`typecheck-performance-numbers.md`), so it costs more than
 --   the `batchSyncᵉ` it replaces.

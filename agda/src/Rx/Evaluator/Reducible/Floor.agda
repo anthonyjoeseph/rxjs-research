@@ -50,8 +50,8 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   innerFinish⇓; innerReact⇓; stepFrame⇓; subscribeAll⇓; subscribeSharedSlot⇓; foldPath⇓; dispatchShare⇓;
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
-  subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan; subs-merge-all; subs-switch-all;
-  subs-exhaust-all; subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
+  subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan;
+  subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
   finish-nil; react-false; react-alive; react-dead; step-map; step-scan; step-take; step-batchSync;
@@ -426,9 +426,6 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   subscribeE-floor (subs-map sub)          ph (inj₂ s) = subscribeE-floor sub (push (λ ()) (λ ()) ph) (inj₂ s)
   subscribeE-floor (subs-scan refl sub)    ph (inj₂ s) =
     subscribeE-floor sub (push (fresh-off (lt s)) (fresh-off (lt s)) ph) (inj₂ (fresh-SI _ s))
-  subscribeE-floor (subs-merge-all sa)     ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
-  subscribeE-floor (subs-switch-all sa)    ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
-  subscribeE-floor (subs-exhaust-all sa)   ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
   subscribeE-floor (subs-flatten sa)       ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
   subscribeE-floor (subs-μ sub)            ph (inj₂ s) = subscribeE-floor sub ph (inj₂ s)
   subscribeE-floor {sched = sched} (subs-defer refl refl refl refl) ph (inj₂ s) =
@@ -627,9 +624,6 @@ subscribeE-ct (subs-take-suc _ refl sub)         = ≤-trans (n≤1+n _) (subscr
 subscribeE-ct (subs-batchSync refl sub f)        = ≤-trans (n≤1+n _) (≤-trans (subscribeE-ct sub) (foldPath-ct f))
 subscribeE-ct (subs-map sub)                     = subscribeE-ct sub
 subscribeE-ct (subs-scan refl sub)               = ≤-trans (n≤1+n _) (subscribeE-ct sub)
-subscribeE-ct (subs-merge-all sa)                = subscribeAll-ct sa
-subscribeE-ct (subs-switch-all sa)               = subscribeAll-ct sa
-subscribeE-ct (subs-exhaust-all sa)              = subscribeAll-ct sa
 subscribeE-ct (subs-flatten sa)                  = subscribeAll-ct sa
 subscribeE-ct (subs-μ sub)                       = subscribeE-ct sub
 subscribeE-ct (subs-defer refl refl refl refl)   = n≤1+n _

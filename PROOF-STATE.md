@@ -220,17 +220,17 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — one flattener, echoing its outer
 
-**THE THREE FLATTENERS BECOME ONE FORMER, AND THE TIER IS THAT SWAP.**
+**THE THREE FLATTENERS ARE ONE FORMER, AND THE TIER IS THAT SWAP.**
 `flattenᵉ` hands on each outer element's echo as the element arrives, before
-its lane is handled — what the timed translation needs and no `Exp` former
-gives (`typescript/src/timed.ts`, rule `echo`). It is ADDED first, beside
-`mergeAllᵉ`/`switchAllᵉ`/`exhaustAllᵉ`, so the three are its differential
-oracle, and they are deleted once every producer is rewritten over it
-(Anthony). Its type is settled (Anthony):
-`flattenᵉ : FlatOp → Exp ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) → Exp t`, with
-`typescript/src/flatten.ts` the rxjs it means. The `Exp` change is licensed
-here and nowhere else. Done is the three gone, `flattenᵉ` through the oracle
-and the Agda QuickCheck, and the gate green.
+its lane is handled — what the timed translation needs and no other `Exp`
+former gives (`typescript/src/timed.ts`, rule `echo`). Its type is settled
+(Anthony): `flattenᵉ : FlatOp → Exp ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) →
+Exp t`, with `typescript/src/flatten.ts` the rxjs it means. rxjs's own
+mergeAll/switchAll/exhaustAll are `flatAllᵉ` (`SExp.Plain`) and `flatAll`
+(`typescript/src/exp.ts`): a flatten over an element map that echoes
+nothing. The `Exp` change is licensed here and nowhere else. Done is the
+evaluator's lane bookkeeping collapsed onto the echo, `timed.ts` translating
+through it, and the gate green.
 
 ### The monster
 
@@ -240,22 +240,22 @@ on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **REWRITE EVERY PRODUCER OVER `flattenᵉ`.** `SExp.Elaborate`'s and
-  `SExp.Plain`'s three arms, and the TypeScript generator's three lanes,
-  write `flattenᵉ` over an element map that echoes nothing, so the Agda
-  sweep reaches it and its `agen=no` row in `scripts/formers.tsv` flips. The
-  author's palette keeps `mergeAllˢ`/`switchAllˢ`/`exhaustAllˢ`, so the
-  bug-cache rows, which are author programs, stand as written.
-
-- **DELETE THE THREE.** The formers and every proof arm they own
-  (`red-mergeAll`, `subs-merge-all` and their siblings), `bare` lanes and
-  `Lanes` with it; `AllOp` stays as the policy tag only if it still earns
-  its place.
+- **ONE LANE SHAPE IN THE EVALUATOR.** `deferᵉ`'s pending element is the
+  last `bare` lane: `subs-defer` registers `thru-outer bare mergeAllᵒ`. Retype
+  it as the echoing pair `(inj₁ tt , inj₂ body)` and `bare` and `Lanes` go,
+  with every `Support` lemma quantified over `Lanes`; `AllOp` folds into
+  `FlatOp` only if the policy tag and the syntax op coincide.
 
 - **PORT `timed.ts` ONTO IT.** The translation's flatteners become
-  `flatten` read by `last-seen`; the `max-` rules, keys, trails and
-  copies are deleted, and `timed-fuzz.ts --selftest` pins what is left. The
-  TypeScript half of tier 2's `timed` leg.
+  `flatten` read by `last-seen`, and the `flatAllSrc` fast path that routes a
+  lane-only flatten to the old rules goes, so every flatten takes the `echo`
+  rule. `timed-fuzz.ts --selftest` and a 500-seed sweep hold `mismatched` at
+  zero. The TypeScript half of tier 2's `timed` leg.
+
+- **DELETE THE `max-` RULES.** With no flatten reaching them, the `max-`
+  rules, keys, trails and switch copies in `timed.ts` are dead; delete them
+  and the `timed-fuzz` fixtures that pin only them, keeping the ones that pin
+  the echo.
 
 ### The ledger
 

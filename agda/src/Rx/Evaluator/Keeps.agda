@@ -42,7 +42,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   foldPath⇓; dispatchShare⇓; shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc;
-  subs-batchSync; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-flatten;
+  subs-batchSync; subs-scan; subs-flatten;
   subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
@@ -326,9 +326,6 @@ subscribeE-keeps (subs-take-suc _ refl sub)    = subscribeE-keeps sub
 subscribeE-keeps (subs-batchSync refl sub f)   =
   keeps-trans (subscribeE-keeps sub) (foldPath-keeps f)
 subscribeE-keeps (subs-scan refl sub)          = subscribeE-keeps sub
-subscribeE-keeps (subs-merge-all sa)           = subscribeAll-keeps sa
-subscribeE-keeps (subs-switch-all sa)          = subscribeAll-keeps sa
-subscribeE-keeps (subs-exhaust-all sa)         = subscribeAll-keeps sa
 subscribeE-keeps (subs-flatten sa)             = subscribeAll-keeps sa
 subscribeE-keeps (subs-μ sub)                  = subscribeE-keeps sub
 subscribeE-keeps (subs-defer refl _ _ _)       = keeps-refl _ _

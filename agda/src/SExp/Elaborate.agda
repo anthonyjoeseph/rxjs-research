@@ -13,7 +13,7 @@ open import Data.Vec.Properties using (lookup-zipWith)
 open import Relation.Binary.PropositionalEquality using (subst; refl)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
-  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; batchSyncᵉ;
+  mapᵉ; scanᵉ; mergeᶠ; switchᶠ; exhaustᶠ; batchSyncᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
   foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul;
   eqᵖ; ltᵖ; eqᵘ; notᵖ)
@@ -21,6 +21,7 @@ open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; even
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
                                machineEmitᵗ)
+open import SExp.Plain using (flatAllᵉ)
 open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; scriptedᵏ; sharedᵏ; slotTy;
@@ -128,7 +129,7 @@ valuesᵛ (v ∷ vs) rest = consᵗ (valueᵛ v) (valuesᵛ vs rest)
 -- THE ARITY THAT LOOKED MISSING.  `mintᵉ` draws once per subscription
 -- of the node it stands at.  The OUTER mint stands at this node, so it
 -- draws one SOURCE token per subscription of the input -- a source's
--- own arity.  The INNER mint stands at the head of a `mergeAllᵉ`'s
+-- own arity.  The INNER mint stands at the head of a merging flattener's
 -- inner, which is subscribed once per outer value, so it draws one
 -- INSTANT token per arrival.  Two arities, one former, and the
 -- difference is where the binder sits.
@@ -151,7 +152,7 @@ inputᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (i : Fin n)
        → Tm Γ Δᵍ Δ Θ uniqᵗ
        → Exp Γ Δᵍ Δ Θ (machineEmitᵗ (lookup Γ i))
 inputᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i frame =
-  mintᵉ (mergeAllᵉ nothing (ofᵉ (strmᵗ announce ∷ strmᵗ deliveries ∷ [])))
+  mintᵉ (flatAllᵉ (mergeᶠ nothing) (ofᵉ (strmᵗ announce ∷ strmᵗ deliveries ∷ [])))
   where
   a : Ty
   a = lookup Γ i
@@ -200,7 +201,7 @@ inputᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i frame =
   stamp = strmᵗ (mintᵉ (ofᵉ (instEmitᵛ evs inst srcᵍ deliveryᵛ ∷ [])))
 
   deliveries : Exp Γ Δᵍ Δ Θ¹ (machineEmitᵗ a)
-  deliveries = mergeAllᵉ nothing (mapᵉ stamp (batchSyncᵉ (input i)))
+  deliveries = flatAllᵉ (mergeᶠ nothing) (mapᵉ stamp (batchSyncᵉ (input i)))
 
 ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
     → Tm Γ Δᵍ Δ Θ uniqᵗ
@@ -577,7 +578,7 @@ takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ counted)
   counted = scanᵉ step seed e'
 
 -- a runtime list of observables as ONE observable: the merge of its
--- elements, in order.  `mergeAllᵉ` over a two-element `ofᵉ` is rxjs's
+-- elements, in order.  A merging flattener over a two-element `ofᵉ` is rxjs's
 -- `merge` exactly, and folding it over the list is how a term language
 -- with no application reaches an n-ary one.
 mergeObsᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
@@ -585,7 +586,7 @@ mergeObsᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
 mergeObsᵛ {Θ = Θ} {a = a} xs = foldᵗ (revᵗ xs) (strmᵗ emptyᵉ) body
   where
   body : Tm _ _ _ (obs a ∷ obs a ∷ Θ) (obs a)
-  body = strmᵗ (mergeAllᵉ nothing
+  body = strmᵗ (flatAllᵉ (mergeᶠ nothing)
                  (ofᵉ (varᵗ (here refl) ∷ varᵗ (there (here refl)) ∷ [])))
 
 -- ONE OUTER EMIT'S LANE, WHICH IS WHAT ALL THREE FLATTENERS ARE WRITTEN
@@ -634,15 +635,15 @@ laneᵛ {Θ = Θ} {t = t} =
 
 mergeAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
           → Maybe ℕ → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-mergeAllᵖ k e = mergeAllᵉ k (mapᵉ laneᵛ e)
+mergeAllᵖ k e = flatAllᵉ (mergeᶠ k) (mapᵉ laneᵛ e)
 
 switchAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
            → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-switchAllᵖ e = switchAllᵉ (mapᵉ laneᵛ e)
+switchAllᵖ e = flatAllᵉ switchᶠ (mapᵉ laneᵛ e)
 
 exhaustAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
             → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-exhaustAllᵖ e = exhaustAllᵉ (mapᵉ laneᵛ e)
+exhaustAllᵖ e = flatAllᵉ exhaustᶠ (mapᵉ laneᵛ e)
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.

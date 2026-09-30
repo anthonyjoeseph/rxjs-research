@@ -316,6 +316,47 @@ def top_level(text: str) -> dict[str, set[str]]:
     return out
 
 
+def named_defs(text: str, names: set[str]) -> dict[str, set[str]]:
+    """Each of `names` defined at column zero in `text`, with every name it mentions.
+
+    A definition is its signature and its clauses, every one of which starts
+    with its own name, so it ends at the first line at column zero that does
+    not -- a `mutual` block below it included, which a slice from one
+    signature to the next would fold into it.
+    """
+    lines = bodies(text).splitlines()
+    out: dict[str, set[str]] = {}
+    for nm in names:
+        own = re.compile(r"^" + re.escape(nm) + r"(\s|$)")
+        i = next((k for k, l in enumerate(lines) if own.match(l)), None)
+        if i is None:
+            continue
+        j = next((k for k in range(i + 1, len(lines))
+                  if lines[k][:1] not in ("", " ") and not lines[k].startswith("--")
+                  and not own.match(lines[k])), len(lines))
+        out[nm] = mentions("\n".join(lines[i:j]))
+    return out
+
+
+def imported_helpers(root: Path, elab: str) -> dict[str, set[str]]:
+    """The helpers the elaboration imports BY NAME from its sibling modules.
+
+    An arm reaching `flatAllᵉ` reaches whatever its body writes, wherever it
+    is defined, and the reading of a flattener belongs with the plain reading
+    rather than in the elaboration.  Only the names an `open import SExp.…
+    using (…)` lists are taken, so a sibling module's other definitions --
+    `plainExp`, which names every former -- are not credited.
+    """
+    out: dict[str, set[str]] = {}
+    for m in re.finditer(r"^open import (SExp\.[^\s]+)\s+using\s*\(([^)]*)\)", elab, re.M):
+        path = root / "agda/src" / (m.group(1).replace(".", "/") + ".agda")
+        if not path.exists():
+            sys.exit(f"check-formers: the elaboration imports {m.group(1)}, and {path} does not exist")
+        names = {n.strip() for n in m.group(2).split(";") if n.strip()}
+        out.update(named_defs(path.read_text(encoding="utf-8"), names))
+    return out
+
+
 def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
     """The elaboration, arm by arm: what each clause CONSUMES and what it WRITES.
 
@@ -376,7 +417,8 @@ def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
     return arms, rest
 
 
-def agda_gen_reach(census: str, elab: str, harness: str) -> set[str]:
+def agda_gen_reach(census: str, elab: str, harness: str,
+                   imported: dict[str, set[str]]) -> set[str]:
     """THE SIXTH SURFACE: which plain formers the Agda sweep can actually write.
 
     The sweep no longer builds plain programs.  It draws from the AUTHOR's
@@ -419,7 +461,7 @@ def agda_gen_reach(census: str, elab: str, harness: str) -> set[str]:
     # `mapᵖ` reaches whatever `mapᵖ`'s body writes, and an arm nothing reaches
     # takes its helper down with it
     reach |= mentions(bodies(harness))
-    helpers = top_level(rest)
+    helpers = {**imported, **top_level(rest)}
     while True:
         grown = reach | {t for nm, body in helpers.items() if nm in reach for t in body}
         if grown == reach:
@@ -507,7 +549,8 @@ def main() -> int:
                 f"unreachable -- the hole closed and the row was not"
             )
 
-    agen = agda_gen_reach(src["census"], src["elab"], src["harness"])
+    agen = agda_gen_reach(src["census"], src["elab"], src["harness"],
+                          imported_helpers(root, src["elab"]))
     for r in rows:
         if r.agen and r.agda not in agen:
             findings.append(

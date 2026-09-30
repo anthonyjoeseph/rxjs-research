@@ -1537,6 +1537,9 @@ formers-selftest:
 	  run "an agen=yes row whose elaboration helper stops being reached" \
 	      "sed -i.bak 's/toInstEmit (liftˢ f)  = liftᵖ (toInstEmitTm f)/toInstEmit (liftˢ f)  = toInstEmit f/' agda/src/SExp/Elaborate.agda" \
 	      'no arm of the Agda generator writes `liftᵉ`'; \
+	  run "an elaboration helper dropped from the sibling module's using list" \
+	      "sed -i.bak 's/using (liftᵖ)/using ()/' agda/src/SExp/Elaborate.agda" \
+	      'no arm of the Agda generator writes `liftᵉ`'; \
 	  run "a row unreachable by BOTH generators" \
 	      "sed -i.bak 's/\tno\tyes\tsource/\tno\tno\tsource/' scripts/formers.tsv" \
 	      'reachable by NEITHER generator'; \
@@ -1570,7 +1573,7 @@ formers-selftest:
 	  run "a declared former the roll never walks" \
 	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/CLI/QuickCheck.agda" \
 	      'so the tally never walks it'; \
-	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda sweep's REACH is held to the map in both directions with a token boundary that a substring scan would cross, and that reach composes rather than unions -- the harness root counts, an undrawn elaboration arm does not, a postulated one does not, and a helper the arms reach does, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda sweep's REACH is held to the map in both directions with a token boundary that a substring scan would cross, and that reach composes rather than unions -- the harness root counts, an undrawn elaboration arm does not, a postulated one does not, and a helper the arms reach does, imported by name from a sibling module included while that module's other definitions are not, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
 	  exit $$fail
 
 # A FILE TARGET, SO ONE BUILD SERVES EVERY RUN AFTER IT -- one local build

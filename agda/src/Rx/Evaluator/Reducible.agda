@@ -123,8 +123,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Rx.Prim using (Tick)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Closed; Val; Exp; Tm; Env; []ᵉ;
-  _∷ᵉ_; evalWith; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; flattenᵉ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; μᵉ; varᵉ; deferᵉ; mintᵉ; unfoldμ; varᵗ; unit̂; bool̂; nat̂; nilᵗ; consᵗ; foldᵗ;
+  _∷ᵉ_; evalWith; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
+  flattenᵉ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; μᵉ; varᵉ; deferᵉ; mintᵉ; unfoldμ; varᵗ; unit̂; bool̂; nat̂; nilᵗ; consᵗ; foldᵗ;
   pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; eqᵘ; ltᵖ; notᵖ;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ; FnClo; applyClo)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
@@ -148,7 +148,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of;
   consume-exhaust-sub; thruWalk⇓; walk-nil; walk-echo; walk-cons; drain-spent; innerFinish⇓;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil; react-false;
   react-alive; react-dead; step-from-inner; step-thru-outer; subscribeAll⇓; sub-all;
-  subs-merge-all; subs-switch-all; subs-exhaust-all; subs-flatten; shareWalk⇓; shareGo⇓; fold-sink; disp;
+  subs-flatten; shareWalk⇓; shareGo⇓; fold-sink; disp;
   walk-end; walk-more; go-nil; go-cut; go-live; drain-nil; drain-no-room; drain-room;
   step-scan; step-take; step-batchSync)
 
@@ -215,7 +215,7 @@ baseAns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
 -- term size at the arms, the value at `red-val`, the path and its floor
 -- at the raw fold, and every continuation builder guarded by the `fold`
 -- copattern it answers.
--- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenAns fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-exhaustAll red-flatten red-input red-input-shared red-map red-mapFn red-mergeAll red-scan red-switchAll red-take red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-end translate-sub-end-go translate-sub-go walk
+-- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenAns fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-flatten red-input red-input-shared red-map red-mapFn red-scan red-take red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-end translate-sub-end-go translate-sub-go walk
 
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
@@ -642,17 +642,13 @@ red-batchSync : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t) → Arm (bat
 red-scan : ∀ {n} {Γ : Ctx n} {Θ s t} (f : Tm Γ [] [] ((t ×ᵗ s) ∷ Θ) t)
              (z : Tm Γ [] [] Θ t) (b : Exp Γ [] [] Θ s) → Arm (scanᵉ f z b)
 
--- THE FLATTENERS.  Each subscribes its source under the outer frame
+-- THE FLATTENER.  It subscribes its source under the outer frame
 -- holding the fresh node, and the outer frame's step is a fold over
 -- the from-inner frame's step: an inner subscribed in walk order is
 -- vouched by the value's own candidate, and the candidate never
 -- re-enters itself, because on standing ground a walk-order inner
 -- finishes with nothing queued.  Bodies at the foot of the file, past
 -- the fold over a subscribing frame.
-red-mergeAll : ∀ {n} {Γ : Ctx n} {Θ t} (lim : Maybe ℕ)
-                 (b : Exp Γ [] [] Θ (obs t)) → Arm (mergeAllᵉ lim b)
-red-switchAll : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ (obs t)) → Arm (switchAllᵉ b)
-red-exhaustAll : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ (obs t)) → Arm (exhaustAllᵉ b)
 red-flatten : ∀ {n} {Γ : Ctx n} {Θ t} (op : FlatOp)
                 (b : Exp Γ [] [] Θ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))) → Arm (flattenᵉ op b)
 
@@ -763,9 +759,6 @@ redExpAcc (mapᵉ f b)        ρ rρ k ok aK a aM = red-map f b ρ rρ k ok aK a
 redExpAcc (takeᵉ c b)       ρ rρ k ok aK a aM = red-take c b ρ rρ k ok aK a aM
 redExpAcc (batchSyncᵉ b)    ρ rρ k ok aK a aM = red-batchSync b ρ rρ k ok aK a aM
 redExpAcc (scanᵉ f z b)     ρ rρ k ok aK a aM = red-scan f z b ρ rρ k ok aK a aM
-redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK a aM = red-mergeAll lim b ρ rρ k ok aK a aM
-redExpAcc (switchAllᵉ b)    ρ rρ k ok aK a aM = red-switchAll b ρ rρ k ok aK a aM
-redExpAcc (exhaustAllᵉ b)   ρ rρ k ok aK a aM = red-exhaustAll b ρ rρ k ok aK a aM
 redExpAcc (flattenᵉ op b)   ρ rρ k ok aK a aM = red-flatten op b ρ rρ k ok aK a aM
 redExpAcc (μᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
   redExpAcc (unfoldμ body) ρ rρ k (ib-unfoldμ k body ok) aK
@@ -1735,15 +1728,6 @@ red-all {n = n} ln op ns gns b ρ rρ k ok aK aB aM {lo = lo} κ fallen rp s₀ 
            (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
     , tt
 
-red-mergeAll lim b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
-  red-all bare mergeAllᵒ (mergeAll-st lim 0 [] false) (λ _ → refl) b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h |>′ λ (r , d , rest) →
-  r , subs-merge-all d , rest
-red-switchAll b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
-  red-all bare switchᵒ (switch-st nothing false) tt b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h |>′ λ (r , d , rest) →
-  r , subs-switch-all d , rest
-red-exhaustAll b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
-  red-all bare exhaustᵒ (exhaust-st false false) tt b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h |>′ λ (r , d , rest) →
-  r , subs-exhaust-all d , rest
 red-flatten (mergeᶠ lim) b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
   red-all echoing mergeAllᵒ (mergeAll-st lim 0 [] false) (λ _ → refl) b ρ rρ k ok aK (rs ≤-refl) aM κ pre rp s₀ now sched st rm h |>′ λ (r , d , rest) →
   r , subs-flatten d , rest

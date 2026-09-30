@@ -233,7 +233,7 @@ genScanFn = pureG (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl)))
 -- AND NOT A STEP AT ALL.  `mapᵉ` and `scanᵉ` are both per-VALUE, so the
 -- list they hand back is always as long as the one they were given, and
 -- a sweep built only out of them never changes a count.  Zero-or-more
--- out is `mergeAllᵉ` over a step returning LITERAL SYNTAX — rxjs's own
+-- out is `mergeAllˢ` over a step returning LITERAL SYNTAX — rxjs's own
 -- `mergeMap(x => …)` — so this generates the step and the lane spends
 -- it under a flattener.  The arms are a lattice over what happens to
 -- the count: emptied, doubled, one longer, filtered, and unchanged.
@@ -478,8 +478,8 @@ genExp d = genExpAt 0 0 2 d
 -- here, and `scripts/formers.tsv` holds these tags to the ones the
 -- decoder and the TypeScript union spell.
 data Former : Set where
-  fInput fOf fEmpty fTake fMap fScan fMergeAll fSwitchAll fExhaustAll
-    fFlatten fMu fVar fDefer fMint fBatchSync : Former
+  fInput fOf fEmpty fTake fMap fScan fFlatten fMu fVar fDefer fMint
+    fBatchSync : Former
 
 formerTag : Former → String
 formerTag fInput      = "input"
@@ -488,9 +488,6 @@ formerTag fEmpty      = "empty"
 formerTag fTake       = "take"
 formerTag fMap        = "map"
 formerTag fScan       = "scan"
-formerTag fMergeAll   = "mergeAll"
-formerTag fSwitchAll  = "switchAll"
-formerTag fExhaustAll = "exhaustAll"
 formerTag fFlatten    = "flatten"
 formerTag fMu         = "mu"
 formerTag fVar        = "varE"
@@ -499,9 +496,8 @@ formerTag fMint       = "mint"
 formerTag fBatchSync  = "batchSync"
 
 allFormers : List Former
-allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fMap ∷ fScan ∷ fMergeAll
-           ∷ fSwitchAll ∷ fExhaustAll ∷ fFlatten ∷ fMu ∷ fVar ∷ fDefer
-           ∷ fMint ∷ fBatchSync ∷ []
+allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fMap ∷ fScan ∷ fFlatten
+           ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ fBatchSync ∷ []
 
 formerIx : Former → ℕ
 formerIx fInput      = 0
@@ -510,15 +506,12 @@ formerIx fEmpty      = 2
 formerIx fTake       = 3
 formerIx fMap        = 4
 formerIx fScan       = 5
-formerIx fMergeAll   = 6
-formerIx fSwitchAll  = 7
-formerIx fExhaustAll = 8
-formerIx fFlatten    = 9
-formerIx fMu         = 10
-formerIx fVar        = 11
-formerIx fDefer      = 12
-formerIx fMint       = 13
-formerIx fBatchSync  = 14
+formerIx fFlatten    = 6
+formerIx fMu         = 7
+formerIx fVar        = 8
+formerIx fDefer      = 9
+formerIx fMint       = 10
+formerIx fBatchSync  = 11
 
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
@@ -552,9 +545,10 @@ marksˢ (takeˢ c e)      = one fTake ⊕ marksˢᵗ c ⊕ marksˢ e
 marksˢ (mapˢ f e)       = one fMap ⊕ marksˢᵗ f ⊕ marksˢ e
 marksˢ (scanˢ {t = t} f z e) =
   one fScan ⊕ ([] , not (isData t)) ⊕ marksˢᵗ f ⊕ marksˢᵗ z ⊕ marksˢ e
-marksˢ (mergeAllˢ _ e)  = one fMergeAll ⊕ marksˢ e
-marksˢ (switchAllˢ e)   = one fSwitchAll ⊕ marksˢ e
-marksˢ (exhaustAllˢ e)  = one fExhaustAll ⊕ marksˢ e
+-- the author's three flatteners are each one `flattenᵉ` over a `mapᵉ`
+marksˢ (mergeAllˢ _ e)  = one fFlatten ⊕ one fMap ⊕ marksˢ e
+marksˢ (switchAllˢ e)   = one fFlatten ⊕ one fMap ⊕ marksˢ e
+marksˢ (exhaustAllˢ e)  = one fFlatten ⊕ one fMap ⊕ marksˢ e
 marksˢ (μˢ e)           = one fMu ⊕ marksˢ e
 marksˢ (varˢ x)         = one fVar
 marksˢ (deferˢ e)       = one fDefer ⊕ marksˢ e
@@ -698,7 +692,7 @@ showSExp (deferˢ e)      = "(deferˢ " ++ showSExp e ++ ")"
 
 -- THE FUEL IS AN EXPONENT FOR SOME PROGRAMS, WHICH IS WHY THE SWEEP HAS
 -- TO BE BOUNDED FROM OUTSIDE.  A guarded fixpoint under an unbounded
--- `mergeAllᵉ` with no `takeᵉ` above it emits once per unit of fuel; one
+-- merging flattener with no `takeᵉ` above it emits once per unit of fuel; one
 -- whose step hands back MORE elements than it was given doubles instead,
 -- and the corpus contains such programs because nothing in the generator
 -- declines to draw one.  The cost is inside `evaluate↓` rather than in

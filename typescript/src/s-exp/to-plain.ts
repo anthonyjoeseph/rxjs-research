@@ -17,6 +17,7 @@
 // the leaves are visibly unfilled.
 
 import type { Observable } from "rxjs";
+import { flatAll, mergeOp } from "../exp.js";
 import type { Exp, Fn, Tm, Ty, Val } from "../exp.js";
 import type { SExp, STm } from "./s-exp.js";
 
@@ -150,13 +151,13 @@ const revT = (elem: Ty, l: Tm): Tm =>
 // arrival stamped with an instant, a source and a kind. Neither is
 // anything the author can say, so this clause says both.
 //
-//   mint (mergeAll (of [ strm announce, strm deliveries ]))
+//   mint (flatAll merge (of [ strm announce, strm deliveries ]))
 //
 // THE TWO MINTS ARE TWO DIFFERENT ARITIES AND THE DIFFERENCE IS WHERE
 // THE BINDER SITS. `mint` draws once per subscription of the node it
 // stands at. The OUTER mint stands at this node, so it draws one SOURCE
 // token per subscription of the input -- a source's own arity. The
-// INNER mint stands at the head of a `mergeAll`'s inner, which is
+// INNER mint stands at the head of a merging flattener's inner, which is
 // subscribed once per outer value, so it draws one INSTANT token per
 // arrival.
 //
@@ -232,33 +233,25 @@ export const inputP = (i: number, a: Ty, frame: Tm): Exp => {
     },
   });
 
-  const deliveries: Exp = {
-    type: "mergeAll",
-    ty: env,
+  const deliveries: Exp = flatAll(mergeOp(undefined), env, {
+    type: "map",
+    ty: obs(env),
+    fn: stamp,
     src: {
-      type: "map",
-      ty: obs(env),
-      fn: stamp,
-      src: {
-        type: "batchSync",
-        ty: group,
-        src: { type: "input", ty: a, index: i },
-      },
+      type: "batchSync",
+      ty: group,
+      src: { type: "input", ty: a, index: i },
     },
-  };
+  });
 
   return {
     type: "mint",
     ty: env,
-    body: {
-      type: "mergeAll",
-      ty: env,
-      src: {
-        type: "of",
-        ty: obs(env),
-        items: [strm(obs(env), announce), strm(obs(env), deliveries)],
-      },
-    },
+    body: flatAll(mergeOp(undefined), env, {
+      type: "of",
+      ty: obs(env),
+      items: [strm(obs(env), announce), strm(obs(env), deliveries)],
+    }),
   };
 };
 
@@ -270,7 +263,7 @@ export const inputP = (i: number, a: Ty, frame: Tm): Exp => {
 // does InstEmit work of its own -- `ofP` brackets a one-shot burst
 // against the ambient frame, `mapP` rebuilds each emit under the
 // incoming InstEmit's own instant/source/kind, `mergeAllP` is
-// `mergeAll . map laneV`, and so on. They are left as leaves here
+// `flatAll merge . map laneV`, and so on. They are left as leaves here
 // because the point of this file is the shape of the recursion and the
 // one clause above, not a second transcription of the elaboration.
 export declare const ofP: (frame: Tm, items: Tm[], t: Ty) => Exp;
@@ -294,8 +287,8 @@ export declare const scanP: (fn: Fn, init: Tm, src: Exp, t: Ty) => Exp;
 //   Agda: SExp.Elaborate.laneV
 //     Fn G Dg D Th (emitT (obs t)) (obs (emitT t))
 //
-// And `mergeAllP k e = mergeAll k (map laneV e)` -- which is why a
-// forged inner reaches the wire untouched: `mergeAll` SUBSCRIBES the
+// And `mergeAllP k e = flatAll (merge k) (map laneV e)` -- which is why a
+// forged inner reaches the wire untouched: the flattener SUBSCRIBES the
 // lane, and a lane's inners are whatever the payload held.
 export declare const laneV: (outer: Val) => Observable<Val>;
 

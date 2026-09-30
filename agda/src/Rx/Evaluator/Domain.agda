@@ -144,7 +144,7 @@ open import Rx.Prim using (Tick; Fuel; valueᵖ; completeᵖ; hot; cold)
 open import Rx.Exp using (Ty; obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
   _×ᵗ_; _+ᵗ_; listᵗ; uniqᵗ;
   Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
-  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; flattenᵉ; μᵉ; deferᵉ; mintᵉ;
+  mapᵉ; scanᵉ; flattenᵉ; μᵉ; deferᵉ; mintᵉ;
   unitᵗ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
@@ -518,24 +518,6 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                 (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                 (installNode nid (cell-st (evalWith i ρ)) st) r
             → subscribeE⇓ (Θ , scanᵉ f i b , ρ) κ now sched st r
-
-  subs-merge-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {lim} {b : Exp Γ [] [] Θ (obs u)}
-                     {κ : Path Γ lo u t} {now sched st r}
-                 → subscribeAll⇓ bare mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false)
-                     (Θ , b , ρ) κ now sched st r
-                 → subscribeE⇓ (Θ , mergeAllᵉ lim b , ρ) κ now sched st r
-
-  subs-switch-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ (obs u)}
-                      {κ : Path Γ lo u t} {now sched st r}
-                  → subscribeAll⇓ bare switchᵒ (switch-st nothing false)
-                      (Θ , b , ρ) κ now sched st r
-                  → subscribeE⇓ (Θ , switchAllᵉ b , ρ) κ now sched st r
-
-  subs-exhaust-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ (obs u)}
-                       {κ : Path Γ lo u t} {now sched st r}
-                   → subscribeAll⇓ bare exhaustᵒ (exhaust-st false false)
-                       (Θ , b , ρ) κ now sched st r
-                   → subscribeE⇓ (Θ , exhaustAllᵉ b , ρ) κ now sched st r
 
   -- the one flattener: the same node under `echoing` lanes, so each
   -- element's echo is handed rootward before its lane is handled

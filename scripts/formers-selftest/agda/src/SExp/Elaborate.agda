@@ -4,11 +4,14 @@
 --
 -- Three of the four properties that composition has are pinned right here,
 -- by the base fixture being QUIET: `liftˢ` is drawn and its arm reaches a
--- HELPER, so what the helper writes counts; `notˢ` is NOT drawn, so what
+-- HELPER, imported by name from `SExp.Plain`, so what the helper writes
+-- counts; `notˢ` is NOT drawn, so what
 -- its arm writes does not, which a union over the file would get wrong;
 -- and `deferˢ` IS drawn but its arm is a POSTULATE, which has no body and
 -- so reaches nothing.
 module SExp.Elaborate where
+
+open import SExp.Plain using (liftᵖ)
 
 postulate
   -- a drawn arm with no body: the shape that makes an author former's
@@ -23,6 +26,3 @@ mutual
 
   toInstEmitTm : STm Γ t → Tm Γ t
   toInstEmitTm (natˢ k) = nat̂ k
-
-liftᵖ : Tm Γ t → Exp Γ t
-liftᵖ f = liftᵉ (primᵗ add f)

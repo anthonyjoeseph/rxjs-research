@@ -1,9 +1,19 @@
 import type { Closed, Tm, Ty } from "./exp.js";
-import { showVal } from "./exp.js";
+import { flatAll, mergeOp, showVal } from "./exp.js";
 import { genTestCases } from "./generator.js";
 import { evaluatePlainArrivals } from "./plain-eval.js";
 import type { TestCase } from "./prop-test.js";
 import { SubscribeRule, TimedEmit, runTimed, switchOuters } from "./timed.js";
+
+// the fixtures' flatteners, each a `flatAll`
+type Flat = { ty: Ty; src: Closed };
+const mergeAllF = (...a: [number, Flat] | [Flat]): Closed =>
+  a.length === 1
+    ? flatAll(mergeOp(undefined), a[0].ty, a[0].src)
+    : flatAll(mergeOp(a[0]), a[1].ty, a[1].src);
+const switchAllF = (f: Flat): Closed => flatAll({ how: "switch" }, f.ty, f.src);
+const exhaustAllF = (f: Flat): Closed =>
+  flatAll({ how: "exhaust" }, f.ty, f.src);
 
 // THE TIMED TRANSLATION AGAINST GROUND TRUTH, on generated programs.
 // Two checks per program:
@@ -108,10 +118,8 @@ type Tally = {
 // emitted in P's completion, and its packet is P's END.
 const withTail = (testCase: TestCase): TestCase => ({
   ...testCase,
-  exp: {
-    type: "mergeAll",
+  exp: mergeAllF(1, {
     ty: nat,
-    limit: 1,
     src: {
       type: "of",
       ty: obsNat,
@@ -129,7 +137,7 @@ const withTail = (testCase: TestCase): TestCase => ({
         }),
       ],
     },
-  },
+  }),
 });
 
 const sweep = (
@@ -149,11 +157,11 @@ const sweep = (
         const ok = faithful && partitionOk(timed);
         const mismatch = faithful && !ok;
         const sw =
-          JSON.stringify(testCase.exp).includes('"switchAll"') ||
+          JSON.stringify(testCase.exp).includes('"how":"switch"') ||
           testCase.slots.some(
             (sl) =>
               sl.type !== "scripted" &&
-              JSON.stringify(sl).includes('"switchAll"'),
+              JSON.stringify(sl).includes('"how":"switch"'),
           );
         const sh = testCase.slots.some((sl) => sl.type !== "scripted");
         const tie = timed.some((x) => x.tie);
@@ -225,24 +233,23 @@ const endDirected: TestCase = {
     { type: "scripted", input: { type: "hot", async: [{ wait: 0, val: 1 }] } },
   ],
   fuel: 3,
-  exp: {
-    type: "mergeAll",
+  exp: mergeAllF(1, {
     ty: nat,
-    limit: 1,
     src: {
       type: "of",
       ty: obsNat,
       items: [
-        strm({
-          type: "mergeAll",
-          ty: nat,
-          src: {
-            type: "map",
-            ty: obsNat,
-            fn: strm({ type: "empty", ty: nat }),
-            src: { type: "input", ty: nat, index: 0 },
-          },
-        }),
+        strm(
+          mergeAllF({
+            ty: nat,
+            src: {
+              type: "map",
+              ty: obsNat,
+              fn: strm({ type: "empty", ty: nat }),
+              src: { type: "input", ty: nat, index: 0 },
+            },
+          }),
+        ),
         strm({
           type: "of",
           ty: nat,
@@ -250,7 +257,7 @@ const endDirected: TestCase = {
         }),
       ],
     },
-  },
+  }),
 };
 
 // TWO INSTANTS AT ONE TICK, IN BOTH ORDERS. `mergeAll(1)` over an outer
@@ -272,23 +279,26 @@ const nine: Closed = {
   ty: nat,
   items: [{ type: "natT", ty: nat, val: 9 }],
 };
-const twoLanes = (a: Closed, bSlot: number): Closed => ({
-  type: "mergeAll",
-  ty: nat,
-  limit: 1,
-  src: {
-    type: "mergeAll",
-    ty: obsNat,
-    src: {
-      type: "of",
-      ty: obsObsNat,
-      items: [
-        strmOO({ type: "map", ty: obsNat, fn: strm(a), src: input(0) }),
-        strmOO({ type: "map", ty: obsNat, fn: strm(nine), src: input(bSlot) }),
-      ],
-    },
-  },
-});
+const twoLanes = (a: Closed, bSlot: number): Closed =>
+  mergeAllF(1, {
+    ty: nat,
+    src: mergeAllF({
+      ty: obsNat,
+      src: {
+        type: "of",
+        ty: obsObsNat,
+        items: [
+          strmOO({ type: "map", ty: obsNat, fn: strm(a), src: input(0) }),
+          strmOO({
+            type: "map",
+            ty: obsNat,
+            fn: strm(nine),
+            src: input(bSlot),
+          }),
+        ],
+      },
+    }),
+  });
 const hotAt = (wait: number) => ({
   type: "scripted" as const,
   input: { type: "hot" as const, async: [{ wait, val: 1 }] },
@@ -320,12 +330,9 @@ const sameArrival: TestCase = {
   ctx: [nat, nat, nat],
   slots: [hotAt(0), coldAt([1], 3), coldAt([], 3)],
   fuel: 3,
-  exp: {
-    type: "mergeAll",
+  exp: mergeAllF(1, {
     ty: nat,
-    limit: 1,
-    src: {
-      type: "mergeAll",
+    src: mergeAllF({
       ty: obsNat,
       src: {
         type: "of",
@@ -335,8 +342,8 @@ const sameArrival: TestCase = {
           strmOO({ type: "of", ty: obsNat, items: [strm(input(1))] }),
         ],
       },
-    },
-  },
+    }),
+  }),
 };
 
 // LEFT-MOST IN THE PROGRAM DOES NOT WIN. Hot 0 fires once, at tick 2,
@@ -347,21 +354,21 @@ const sameArrival: TestCase = {
 // and both fire at tick 5: the 6 (arrival 3) comes before the 5 (arrival
 // 4). `max-sub` ranks the two deliveries by the subscriptions; `max-left`
 // ranks them by program site and orders the 5 first.
-const flatMapHot = (s: number): Closed => ({
-  type: "mergeAll",
-  ty: nat,
-  src: { type: "map", ty: obsNat, fn: strm(input(s)), src: input(0) },
-});
+const flatMapHot = (s: number): Closed =>
+  mergeAllF({
+    ty: nat,
+    src: { type: "map", ty: obsNat, fn: strm(input(s)), src: input(0) },
+  });
 // a cold with no sync prefix and one async value
 const tail = (wait: number, val: number) => ({
   type: "scripted" as const,
   input: { type: "cold" as const, sync: [], async: [{ wait, val }] },
 });
-const both = (a: Closed, b: Closed): Closed => ({
-  type: "mergeAll",
-  ty: nat,
-  src: { type: "of", ty: obsNat, items: [strm(a), strm(b)] },
-});
+const both = (a: Closed, b: Closed): Closed =>
+  mergeAllF({
+    ty: nat,
+    src: { type: "of", ty: obsNat, items: [strm(a), strm(b)] },
+  });
 const fanOut: TestCase = {
   ctx: [nat, nat, nat],
   slots: [hotAt(1), tail(2, 5), tail(2, 6)],
@@ -393,11 +400,10 @@ const switchFan: TestCase = {
   ],
   fuel: 8,
   exp: both(
-    {
-      type: "switchAll",
+    switchAllF({
       ty: nat,
       src: { type: "map", ty: obsNat, fn: strm(flatMapHot(2)), src: input(1) },
-    },
+    }),
     flatMapHot(3),
   ),
 };
@@ -412,13 +418,10 @@ const burstEnd: TestCase = {
   ctx: [nat, nat, nat],
   slots: [tail(0, 1), tail(2, 5), tail(2, 6)],
   fuel: 8,
-  exp: {
-    type: "mergeAll",
+  exp: mergeAllF({
     ty: nat,
-    src: {
-      type: "mergeAll",
+    src: mergeAllF(1, {
       ty: obsNat,
-      limit: 1,
       src: {
         type: "of",
         ty: obsObsNat,
@@ -446,8 +449,8 @@ const burstEnd: TestCase = {
           strmOO({ type: "of", ty: obsNat, items: [strm(input(2))] }),
         ],
       },
-    },
-  },
+    }),
+  }),
 };
 
 // THE SHARE GAP. A share's frame is subscribed ONCE, by whichever
@@ -471,55 +474,54 @@ const shareLate: TestCase = {
 // and only the outer's END says so; `max-key` cannot hand it to
 // `switchAll` without cancelling a lane, so it names tick 1 instead.
 // the outer, whose tick-4 source is slot `late`, behind `wrap`
-const switchEndOn = (
-  late: number,
-  wrap = (e: Closed): Closed => e,
-): Closed => ({
-  type: "mergeAll",
-  ty: nat,
-  limit: 1,
-  src: {
-    type: "of",
-    ty: obsNat,
-    items: [
-      strm({
-        type: "switchAll",
-        ty: nat,
-        src: wrap({
-          type: "mergeAll",
-          ty: obsNat,
-          src: {
-            type: "of",
-            ty: obsObsNat,
-            items: [
-              strmOO({
-                type: "map",
-                ty: obsNat,
-                fn: strm({ type: "empty", ty: nat }),
-                src: input(0),
-              }),
-              strmOO({
-                type: "mergeAll",
+const switchEndOn = (late: number, wrap = (e: Closed): Closed => e): Closed =>
+  mergeAllF(1, {
+    ty: nat,
+    src: {
+      type: "of",
+      ty: obsNat,
+      items: [
+        strm(
+          switchAllF({
+            ty: nat,
+            src: wrap(
+              mergeAllF({
                 ty: obsNat,
                 src: {
-                  type: "map",
+                  type: "of",
                   ty: obsObsNat,
-                  fn: strmOO({ type: "empty", ty: obsNat }),
-                  src: input(late),
+                  items: [
+                    strmOO({
+                      type: "map",
+                      ty: obsNat,
+                      fn: strm({ type: "empty", ty: nat }),
+                      src: input(0),
+                    }),
+                    strmOO(
+                      mergeAllF({
+                        ty: obsNat,
+                        src: {
+                          type: "map",
+                          ty: obsObsNat,
+                          fn: strmOO({ type: "empty", ty: obsNat }),
+                          src: input(late),
+                        },
+                      }),
+                    ),
+                  ],
                 },
               }),
-            ],
-          },
+            ),
+          }),
+        ),
+        strm({
+          type: "of",
+          ty: nat,
+          items: [{ type: "natT", ty: nat, val: 7 }],
         }),
-      }),
-      strm({
-        type: "of",
-        ty: nat,
-        items: [{ type: "natT", ty: nat, val: 7 }],
-      }),
-    ],
-  },
-});
+      ],
+    },
+  });
 const switchEnd: TestCase = {
   ctx: [nat, nat],
   slots: [hotAt(0), hotAt(3)],
