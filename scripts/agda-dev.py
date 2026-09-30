@@ -1196,6 +1196,33 @@ def keep_real_for(p: Parsed, foci: list[str]) -> list[str]:
     return []
 
 
+def forward_refs(p: Parsed, heavy: list[int]) -> list[tuple[str, str]]:
+    """(member, sibling) pairs where a body names a sibling ABOVE its signature.
+
+    Agda scopes a file top to bottom, so a clause can call a block sibling
+    only once that sibling's signature has been read -- otherwise the real
+    file is `NotInScope`.  The loop cannot see it: every focus module it
+    writes puts all the signatures first.  So it is checked here, on the
+    text, where it costs nothing and fails in seconds rather than under the
+    tower.
+    """
+    out: list[tuple[str, str]] = []
+    for bi in heavy:
+        ms = p.blocks[bi].members
+        sigpos = {it.name: it.start for it in p.items
+                  if it.kind == "sig" and it.name in ms}
+        for it in p.items:
+            if it.kind != "clauses" or it.name not in ms:
+                continue
+            body = "\n".join(l.split("--")[0] for l in p.lines[it.start : it.end])
+            for o in ms:
+                if (o != it.name and sigpos.get(o, -1) > it.start
+                        and (it.name, o) not in out
+                        and re.search(r"(?<![\w\-])" + re.escape(o) + r"(?![\w\-])", body)):
+                    out.append((it.name, o))
+    return out
+
+
 def weight(p: Parsed, name: str) -> int:
     """Lines of real body -- the only cheap proxy for what a member costs."""
     return sum(it.end - it.start for it in p.items
@@ -1485,6 +1512,14 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
     p = parse(path)
     heavy = heavy_blocks(p)
     mod = mangle(rel)
+
+    fwd = forward_refs(p, heavy)
+    for m, o in fwd:
+        print(f"  FAIL  {m} names {o} above {o}'s signature "
+              "(NotInScope in the real file; the loop hoists signatures)")
+    if fwd:
+        print(f"agda-dev: src/{rel} RED (forward reference)")
+        return False
 
     foci: list[str | None] = []
     for bi in heavy:

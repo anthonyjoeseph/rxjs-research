@@ -322,29 +322,6 @@ rawConsume {u = u} ac le aM op nid κ now o sched st rm so nd
           _ , consume-all-sub c eqr (inner refl d)
                , inner-after mergeAllᵒ nid κ sched d (sub-ot (λ r∈ → r∈) ≤-refl so) (sub-on (λ r∈ → r∈) ≤-refl nd))
 
--- the outer's values consumed raw, in walk order
-rawThru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
-          (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
-        → (op : AllOp) (nid : NodeId) (κ : Path Γ ℓ u t) (now : Tick) (vals : List (Val Γ (u +ᵗ obs u)))
-          (sched : Sched Γ) (st : EvalSt e) → Room m sched st
-        → Sound κ sched st → NodeOn nid κ sched st
-        → Σ (Stream Γ t × Sched Γ × EvalSt e)
-            (λ r → thruWalk⇓ {e = e} op nid κ now vals sched st r
-                 × Sound κ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) × NodeOn nid κ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-rawThru ac le aM op nid κ now [] sched st rm so nd = _ , walk-nil , so , nd
-rawThru ac le aM op nid κ now (inj₁ v ∷ os) sched st rm so nd =
-  rawFold ac le aM κ now (v ∷ []) false sched st rm so |>′ λ (r₁ , d₁) →
-  let soT = fold-kept d₁ so (thru-outer bare op nid ↠[ ≤-refl ] κ) (push-thru bare op nid ≤-refl κ so nd) (λ _ _ _ → refl) in
-  rawThru ac le aM op nid κ now os (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
-                                (room-keeps (foldPath-keeps d₁) rm) (drop-ot (thru-outer bare op nid) ≤-refl κ soT)
-                                (head-on (thru-outer bare op nid) ≤-refl κ nid (self-node nid []) soT) |>′ λ (r₂ , d₂ , so₂ , nd₂) →
-  _ , walk-echo d₁ d₂ , so₂ , nd₂
-rawThru ac le aM op nid κ now (inj₂ o ∷ os) sched st rm so nd =
-  rawConsume ac le aM op nid κ now o sched st rm so nd |>′ λ (r₁ , d₁ , so₁ , nd₁) →
-  rawThru ac le aM op nid κ now os (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
-                                (room-keeps (thruConsume-keeps d₁) rm) so₁ nd₁ |>′ λ (r₂ , d₂ , so₂ , nd₂) →
-  _ , walk-cons d₁ d₂ , so₂ , nd₂
-
 -- THE RAW FOLD OF A PATH THE STORE HOLDS.  An arrival and a share's
 -- fan-out fold down registry paths nd subscribe built, so the frames'
 -- held candidates are rebuilt by `red-val` on what the store holds,
@@ -398,6 +375,29 @@ rawFold : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
         → (κ : Path Γ ℓ u t) (now : Tick) (vals : List (Val Γ u)) (fin : Bool)
           (sched : Sched Γ) (st : EvalSt e) → Room m sched st → Sound κ sched st
         → Σ (Stream Γ t × Sched Γ × EvalSt e) (foldPath⇓ {e = e} now κ vals fin sched st)
+
+-- the outer's values consumed raw, in walk order
+rawThru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
+          (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → Acc _<_ m
+        → (op : AllOp) (nid : NodeId) (κ : Path Γ ℓ u t) (now : Tick) (vals : List (Val Γ (u +ᵗ obs u)))
+          (sched : Sched Γ) (st : EvalSt e) → Room m sched st
+        → Sound κ sched st → NodeOn nid κ sched st
+        → Σ (Stream Γ t × Sched Γ × EvalSt e)
+            (λ r → thruWalk⇓ {e = e} op nid κ now vals sched st r
+                 × Sound κ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) × NodeOn nid κ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+rawThru ac le aM op nid κ now [] sched st rm so nd = _ , walk-nil , so , nd
+rawThru ac le aM op nid κ now (inj₁ v ∷ os) sched st rm so nd =
+  rawFold ac le aM κ now (v ∷ []) false sched st rm so |>′ λ (r₁ , d₁) →
+  let soT = fold-kept d₁ so (thru-outer bare op nid ↠[ ≤-refl ] κ) (push-thru bare op nid ≤-refl κ so nd) (λ _ _ _ → refl) in
+  rawThru ac le aM op nid κ now os (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
+                                (room-keeps (foldPath-keeps d₁) rm) (drop-ot (thru-outer bare op nid) ≤-refl κ soT)
+                                (head-on (thru-outer bare op nid) ≤-refl κ nid (self-node nid []) soT) |>′ λ (r₂ , d₂ , so₂ , nd₂) →
+  _ , walk-echo d₁ d₂ , so₂ , nd₂
+rawThru ac le aM op nid κ now (inj₂ o ∷ os) sched st rm so nd =
+  rawConsume ac le aM op nid κ now o sched st rm so nd |>′ λ (r₁ , d₁ , so₁ , nd₁) →
+  rawThru ac le aM op nid κ now os (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
+                                (room-keeps (thruConsume-keeps d₁) rm) so₁ nd₁ |>′ λ (r₂ , d₂ , so₂ , nd₂) →
+  _ , walk-cons d₁ d₂ , so₂ , nd₂
 
 -- a frame's step, then the fold of the path below it
 rawAfter : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s u lo ℓ ℓ′}
