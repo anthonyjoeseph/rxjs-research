@@ -5,8 +5,10 @@ import {
   concat,
   connect,
   defer as rxDefer,
+  endWith,
   exhaustAll,
   filter,
+  ignoreElements,
   map as rxMap,
   merge,
   mergeAll,
@@ -50,6 +52,14 @@ import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 // every subscriber rather than on the one that connected it. `max-dup`
 // closes the first by subscribing the outer twice, except where the
 // outer both schedules and reaches a share.
+//
+// `echo` needs none of that, and no key: a flattener that ECHOES each
+// outer element as it arrives, before handling it, gives `last-seen` its
+// beats from ordinary rxjs, and both gaps close, since the outer's END is
+// echoed like any element and nothing is compared. `markers` -- a Start
+// and Done per lane and an OuterDone -- is not enough: a queued lane and
+// one whose outer value came later both follow a Done, and the OuterDone
+// carries no instant.
 
 // ---------------------------------------------------------------
 // Packets.
@@ -484,7 +494,9 @@ export type SubscribeRule =
   | "max-tick"
   | "max-sub"
   | "max-left"
-  | "max-dup";
+  | "max-dup"
+  | "echo"
+  | "markers";
 type FreeRule =
   "max-clock" | "max-key" | "max-tick" | "max-sub" | "max-left" | "max-dup";
 
@@ -626,7 +638,190 @@ const flatten = (
 ): Observable<Item> =>
   rule === "last-seen" || rule === "outer-packet" || rule === "lanes-only"
     ? flattenConnect(rule, how, limit, pos, outer, compileInner)
-    : flattenFree(rule, how, limit, pos, outer, compileInner, clock, outerEnd);
+    : rule === "echo"
+      ? flattenEcho(how, limit, pos, outer, compileInner)
+      : rule === "markers"
+        ? flattenMarked(how, limit, pos, outer, compileInner)
+        : flattenFree(
+            rule,
+            how,
+            limit,
+            pos,
+            outer,
+            compileInner,
+            clock,
+            outerEnd,
+          );
+
+// ---------------------------------------------------------------
+// Reporting flatteners: what a flattener former would have to emit for
+// the translation to need no `connect` of its own.
+// ---------------------------------------------------------------
+
+const flattener =
+  <T>(how: "merge" | "switch" | "exhaust", limit: number | undefined) =>
+  (o: Observable<Observable<T>>): Observable<T> =>
+    how === "merge"
+      ? o.pipe(mergeAll(limit ?? Infinity))
+      : how === "switch"
+        ? o.pipe(switchAll())
+        : o.pipe(exhaustAll());
+
+// AN ECHOING FLATTENER: every outer element's `s` leaves AS IT ARRIVES,
+// before its lane (if it has one) is handled. An element with no lane is
+// only echoed, which is how the outer's END reaches the output without
+// being subscribed. Generic, and ordinary rxjs.
+type Echoed<S, T> = { k: "echo"; s: S } | { k: "value"; t: T };
+const echoFlatten =
+  <S, T>(how: "merge" | "switch" | "exhaust", limit: number | undefined) =>
+  (outer: Observable<{ s: S; lane: Observable<T> | null }>) =>
+    outer.pipe(
+      connect((sh) =>
+        merge(
+          sh.pipe(rxMap((x): Echoed<S, T> => ({ k: "echo", s: x.s }))),
+          sh.pipe(
+            filter((x): x is { s: S; lane: Observable<T> } => x.lane !== null),
+            rxMap((x) => x.lane),
+            flattener<T>(how, limit),
+            rxMap((t): Echoed<S, T> => ({ k: "value", t })),
+          ),
+        ),
+      ),
+    );
+
+// A MARKING FLATTENER: a Start as each lane is actually subscribed, a
+// Done as it completes, an OuterDone as the outer does.
+type Marked<T> =
+  { m: "start" } | { m: "value"; t: T } | { m: "done" } | { m: "outerDone" };
+const markFlatten =
+  <T>(how: "merge" | "switch" | "exhaust", limit: number | undefined) =>
+  (outer: Observable<Observable<T>>): Observable<Marked<T>> =>
+    outer.pipe(
+      connect((sh) =>
+        merge(
+          sh.pipe(
+            rxMap((lane) =>
+              concat(
+                rxDefer(() => rxOf<Marked<T>>({ m: "start" })),
+                lane.pipe(rxMap((t): Marked<T> => ({ m: "value", t }))),
+                rxOf<Marked<T>>({ m: "done" }),
+              ),
+            ),
+            flattener<Marked<T>>(how, limit),
+          ),
+          sh.pipe(ignoreElements(), endWith<Marked<T>>({ m: "outerDone" })),
+        ),
+      ),
+    );
+
+// the outer's values as numbered lanes, each opening with its outer
+// packet
+const numbered = (
+  outer: Observable<Item>,
+  compileInner: (o: ObsVal) => Observable<Item>,
+) =>
+  outer.pipe(
+    rxScan(
+      (acc: { n: number; x: Item }, x: Item) => ({
+        n: x.end ? acc.n : acc.n + 1,
+        x,
+      }),
+      { n: -1, x: end(HOLE) },
+    ),
+    rxMap(({ n, x }) => ({
+      p: x.p,
+      lane: x.end
+        ? null
+        : concat(
+            rxOf<M>({ k: "start", n, outer: x.p }),
+            compileInner(x.v as ObsVal).pipe(
+              rxMap((y): M => ({ k: "item", n, x: y })),
+            ),
+          ),
+    })),
+  );
+
+// `echo`: the outer's packets echoed as beats, read by `last-seen`
+const flattenEcho = (
+  how: "merge" | "switch" | "exhaust",
+  limit: number | undefined,
+  pos: string,
+  outer: Observable<Item>,
+  compileInner: (o: ObsVal) => Observable<Item>,
+): Observable<Item> =>
+  readLastSeen(
+    pos,
+    false,
+    numbered(outer, compileInner).pipe(
+      rxMap(({ p, lane }) => ({ s: p, lane })),
+      echoFlatten<Pkt, M>(how, limit),
+      rxMap((e): M => (e.k === "echo" ? { k: "beat", p: e.s } : e.t)),
+    ),
+  );
+
+// `markers`: a queued lane is read as subscribed in the END of the lane
+// whose Done it follows, any other lane in its outer packet; the
+// OuterDone names nothing, so the flattener's END is the last lane
+// instant
+type MarkSt = {
+  last: Pkt;
+  afterDone: boolean;
+  sps: Record<number, Pkt>;
+  out: Item | null;
+};
+const flattenMarked = (
+  how: "merge" | "switch" | "exhaust",
+  limit: number | undefined,
+  pos: string,
+  outer: Observable<Item>,
+  compileInner: (o: ObsVal) => Observable<Item>,
+): Observable<Item> =>
+  concat(
+    numbered(outer, compileInner).pipe(
+      filter((x): x is { p: Pkt; lane: Observable<M> } => x.lane !== null),
+      rxMap((x) => x.lane),
+      markFlatten<M>(how, limit),
+    ),
+    rxOf<Marked<M> | { m: "fin" }>({ m: "fin" }),
+  ).pipe(
+    rxScan(
+      (st: MarkSt, e: Marked<M> | { m: "fin" }): MarkSt => {
+        switch (e.m) {
+          case "start":
+          case "outerDone":
+            return { ...st, out: null };
+          case "done":
+            return { ...st, afterDone: true, out: null };
+          case "fin":
+            return { ...st, out: end(st.last) };
+          case "value": {
+            const m = e.t;
+            if (m.k === "start") {
+              const queued = how === "merge" && limit !== undefined;
+              const sp = queued && st.afterDone ? st.last : m.outer;
+              return {
+                ...st,
+                afterDone: false,
+                sps: { ...st.sps, [m.n]: sp },
+                out: null,
+              };
+            }
+            if (m.k !== "item") return { ...st, out: null };
+            const p = subst(`${pos}#${m.n}`, st.sps[m.n], m.x.p);
+            return {
+              ...st,
+              last: p,
+              afterDone: false,
+              out: m.x.end ? null : { ...m.x, p },
+            };
+          }
+        }
+      },
+      { last: HOLE, afterDone: false, sps: {}, out: null },
+    ),
+    filter((st) => st.out !== null),
+    rxMap((st) => st.out as Item),
+  );
 
 // the slots a second copy has to reckon with: a cold with an async tail
 // registers a source every time it is subscribed, and a share connects
@@ -765,41 +960,45 @@ const flattenConnect = (
           ),
         ),
       );
-      const flat =
-        how === "merge"
-          ? lanes.pipe(mergeAll(limit ?? Infinity))
-          : how === "switch"
-            ? lanes.pipe(switchAll())
-            : lanes.pipe(exhaustAll());
-      return concat(merge(beats, flat), rxOf<M>({ k: "fin" })).pipe(
-        rxScan(
-          (st: FlatSt, m: M): FlatSt => {
-            switch (m.k) {
-              case "beat":
-                return { ...st, last: m.p, out: null };
-              case "start":
-                return {
-                  ...st,
-                  sps: {
-                    ...st.sps,
-                    [m.n]: rule === "outer-packet" ? m.outer : st.last,
-                  },
-                  out: null,
-                };
-              case "item": {
-                const p = subst(`${pos}#${m.n}`, st.sps[m.n], m.x.p);
-                return { ...st, last: p, out: m.x.end ? null : { ...m.x, p } };
-              }
-              case "fin":
-                return { ...st, out: end(st.last) };
-            }
-          },
-          { last: HOLE, sps: {}, out: null },
-        ),
-        filter((st) => st.out !== null),
-        rxMap((st) => st.out as Item),
+      return readLastSeen(
+        pos,
+        rule === "outer-packet",
+        merge(beats, lanes.pipe(flattener<M>(how, limit))),
       );
     }),
+  );
+
+// a lane is subscribed in the last instant seen before its START: a
+// beat's, or a lane item's
+const readLastSeen = (
+  pos: string,
+  outerPacket: boolean,
+  ms: Observable<M>,
+): Observable<Item> =>
+  concat(ms, rxOf<M>({ k: "fin" })).pipe(
+    rxScan(
+      (st: FlatSt, m: M): FlatSt => {
+        switch (m.k) {
+          case "beat":
+            return { ...st, last: m.p, out: null };
+          case "start":
+            return {
+              ...st,
+              sps: { ...st.sps, [m.n]: outerPacket ? m.outer : st.last },
+              out: null,
+            };
+          case "item": {
+            const p = subst(`${pos}#${m.n}`, st.sps[m.n], m.x.p);
+            return { ...st, last: p, out: m.x.end ? null : { ...m.x, p } };
+          }
+          case "fin":
+            return { ...st, out: end(st.last) };
+        }
+      },
+      { last: HOLE, sps: {}, out: null },
+    ),
+    filter((st) => st.out !== null),
+    rxMap((st) => st.out as Item),
   );
 
 // ---------------------------------------------------------------

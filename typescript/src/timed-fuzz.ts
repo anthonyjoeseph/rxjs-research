@@ -640,6 +640,26 @@ const main = () => {
     const shareGapOk =
       !keyed("shareLate", shareLate, "max-sub") &&
       keyed("shareLate", shareLate, "max-key");
+    // A FLATTENER THAT ECHOES ITS OUTER needs no rule of its own: every
+    // directed case holds, the switch and share gaps included. One that
+    // only MARKS its lanes' start and end cannot tell a queued lane from
+    // one whose outer value came later, and has no instant for the
+    // outer's own END
+    const reportOk = [
+      holds("laneLater", laneLater, "echo"),
+      holds("outerLater", outerLater, "echo"),
+      holds("sameArrival", sameArrival, "echo"),
+      holds("fanOut", fanOut, "echo"),
+      holds("switchFan", switchFan, "echo"),
+      holds("burstEnd", burstEnd, "echo"),
+      holds("shareLate", shareLate, "echo"),
+      sw("echo"),
+      sw("echo", " (cold)", switchEndCold),
+      sw("echo", " (shared)", switchEndShared),
+      holds("laneLater", laneLater, "markers"),
+      !holds("outerLater", outerLater, "markers"),
+      !sw("markers"),
+    ].every((b) => b);
     const refuted = (["outer-packet", "lanes-only"] as const).map((rule) => {
       const t = sweep(200, rule, false);
       console.log(`${rule}: ${JSON.stringify(t)}`);
@@ -652,6 +672,7 @@ const main = () => {
       !keyGapOk ||
       !subOk ||
       !shareGapOk ||
+      !reportOk ||
       refuted.includes(false)
     ) {
       console.log("SELFTEST FAILED");
