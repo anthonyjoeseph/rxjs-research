@@ -6,7 +6,7 @@
 // gap between them:
 //
 //   * `Exp` (exp.ts) is PROTOCOL-BLIND. It is what the evaluator runs,
-//     it has no idea what an envelope is, and `mint` / `batchSync` are
+//     it has no idea what an InstEmit is, and `mint` / `batchSync` are
 //     the two formers that let a program manufacture one.
 //
 //   * `SExp` (here) is the AUTHOR'S palette. It is what a person writes
@@ -15,7 +15,7 @@
 //     identity token or reading the subscribe frame.
 //
 // The elaboration `toPlain` (to-plain.ts) is the translation, and every
-// envelope in a running system is put there by IT rather than by
+// InstEmit in a running system is put there by IT rather than by
 // anything the author wrote. That is the invariant the Agda proof is
 // trying to state: an elaborated program cannot break the protocol
 // BECAUSE the author could not reach the formers that would break it.

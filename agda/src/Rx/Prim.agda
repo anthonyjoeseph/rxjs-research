@@ -19,12 +19,12 @@ Id = ℕ                              -- concrete so the spec can compare; harne
 -- order preserves the ids themselves.
 --
 -- NOTHING CONSULTS THE ORDER.  `Spec` groups by comparing instants for
--- equality, so when the envelope is re-expressed as a TYPE of the
+-- equality, so when the InstEmit is re-expressed as a TYPE of the
 -- object language its instant field stands at the unique primitive,
 -- whose sole eliminator is a primitive equality, and nothing is lost.
 
 -- A TOKEN, AND THAT IS THE WHOLE OF WHAT ANYTHING ASKS OF IT.  `Spec`
--- binds this and copies it onto the batch envelope without ever
+-- binds this and copies it onto the batch InstEmit without ever
 -- comparing it.  So ℕ is over-strong here in a way it is not for `Id` above, and the
 -- over-strength is not free: every statement quantifying over streams
 -- inherits obligations about ones carrying sources no mint could
@@ -90,13 +90,13 @@ record InstEmit (A : Set) : Set where
 -- vocabulary: the spec reads one, batches by its `instant`, and hands
 -- back another.  A machine running an ordinary rxjs pipeline pushes
 -- something far smaller — a value, or the end of the stream — one at
--- a time and depth-first, with no envelope around it and no grouping
+-- a time and depth-first, with no InstEmit around it and no grouping
 -- across a cascade.
 --
 -- SO THE PROTOCOL RIDES ON THE VALUES RATHER THAN ON THE CARRIER,
 -- which is where the TypeScript keeps it: its operators are plain
--- rxjs and the envelope is the type flowing THROUGH them.  `emitᵗ` in
--- `Rx.Envelope` is that envelope at the object level and `toEnvelope`
+-- rxjs and the InstEmit is the type flowing THROUGH them.  `emitᵗ` in
+-- `SExp.InstEmit` is that InstEmit at the object level and `toInstEmit`
 -- puts it there, so a machine carrying one too would be holding the
 -- same record twice, once at each level, with only the object-level
 -- copy having a counterpart in the mirror.

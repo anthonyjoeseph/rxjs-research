@@ -388,7 +388,7 @@ Not for proof work, tooling or documentation.
 
 ## Bug cache
 
-Capture an implementation bug immediately as a **row of the corpus** in `agda/src/Implementation/Unit-Test.agda` — a program, not a claim about one. Dead simple: a wall of little entries, no fancy names, no abstraction. **Append-only**, and the invariant is **`make bug-cache` green ⟺ no known counterexample remains**.
+Capture an implementation bug immediately as a **row of the corpus** in `agda/src/CLI/Unit-Test.agda` — a program, not a claim about one. Dead simple: a wall of little entries, no fancy names, no abstraction. **Append-only**, and the invariant is **`make bug-cache` green ⟺ no known counterexample remains**.
 
 The run happens in a BINARY, not the typechecker — a row used to be a `refl` over a whole `evaluate` run, so an append-only corpus charged the gate forever. **It runs in CI's oracle job, not in `make gate`**: it checks the evaluator rather than the proof, so it runs beside the sweep, from the oracle's own build (termination checking off, cached as binaries keyed on the runners' import cone). Corollary: a green row is checked by the GHC backend and the FFI, so **no proof may ever depend on the cache**. Delete the module once `The-Proof.agda` is discharged. → [docs/bug-cache.md](docs/bug-cache.md)
 

@@ -27,10 +27,10 @@
 --
 -- A PROBE AND A ROW ARE ONE OBJECT AT TWO TIMES, SO THIS IS THE ONE
 -- CORPUS (Anthony).  Every row passes once its bug is fixed and then
--- guards against regression.  A refutation of an envelope SHAPE is not a
+-- guards against regression.  A refutation of an InstEmit SHAPE is not a
 -- row: the program that kills shape A passes under shape B, so it
 -- cannot stay here failing without breaking the invariant.  It is a
--- dead-route entry in `Rx.Envelope`'s header citing the killing row by
+-- dead-route entry in `SExp.InstEmit`'s header citing the killing row by
 -- index, which is stable because the corpus is append-only.
 --
 -- THE IMPORT BLOCK IS MACHINE-OWNED, between the markers below.  A row
@@ -41,7 +41,7 @@
 -- appended row unscopeable.  Edit the wide form in the generator, not
 -- here; anything written between the markers by hand is overwritten.
 ------------------------------------------------------------------
-module Implementation.Unit-Test where
+module CLI.Unit-Test where
 
 open import Data.List using (List; []; _∷_)
 
@@ -56,7 +56,7 @@ open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; mergeAllˢ
 open import Rx.Exp using (add)
 
 open import Rx.Prim using (hot; cold; after_,_)
-open import Implementation.Unit-Test.Prelude using (Case; cached; mkSlots)
+open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots)
 -- IMPORTS>>>
 
 cases : List Case

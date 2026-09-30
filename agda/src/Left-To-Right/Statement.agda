@@ -9,7 +9,7 @@
 --
 -- AT DATA TYPES ONLY, AND THAT IS A LIMIT OF WHAT `≡` CAN SAY RATHER
 -- THAN OF THE CLAIM.  The two runs stand in different contexts -- the
--- elaboration's reads a share at the envelope -- and a value at `obs`
+-- elaboration's reads a share at the InstEmit -- and a value at `obs`
 -- is a closure over its context, so two of them are not comparable by
 -- equality at all.  A data value is the same value in every context,
 -- which `unplainᵈ` says.
@@ -36,9 +36,9 @@ open import SExp.Syntax      using (SExp; Kinds)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import SExp.Plain     using (plainExp; unplainᵈ; plainValues)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
-open import Rx.Envelope.Decode using (decodeEmits)
-open import Rx.Batch     using (batchSimultaneousᵖ)
-open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl)
+open import SExp.InstEmit.Decode using (decodeEmits)
+open import SExp.Batch     using (batchSimultaneousᵖ)
+open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import Batchable.Inst-Extract using (instExtract)
 
 Left-To-Right : Set

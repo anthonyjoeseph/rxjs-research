@@ -40,7 +40,7 @@ an exemption and a claim cannot self-certify.
 **BUT ONE OF THE ROOTS THAT REMAIN IS TYPECHECKED BY NO GATE TARGET, AND THAT IS A
 LIVE GAP.** Being a seed here buys the reachability law over a cone, not a build:
 `gate-heavy` compiles Main's cone, then `refuted` and `probed`, then links the CLI and
-the bug-cache runner — which covers `CLI.Main` and `Implementation.Unit-Test`.
+the bug-cache runner — which covers `CLI.Main` and `CLI.Unit-Test`.
 `QuickCheck` is built only by `qc-build`, which the gate does not run, so an impl or
 spec change can break the all-Agda QuickCheck loop with nothing going red until
 someone reaches for it — which is exactly the moment it is needed and the worst

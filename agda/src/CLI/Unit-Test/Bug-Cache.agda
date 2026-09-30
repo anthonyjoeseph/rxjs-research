@@ -25,7 +25,7 @@
 -- every row, which is what stops a row that ran nothing from reading as
 -- green, and then refuses any `FAIL` line.
 ------------------------------------------------------------------
-module Implementation.Unit-Test.Bug-Cache where
+module CLI.Unit-Test.Bug-Cache where
 
 open import Agda.Builtin.IO using (IO)
 open import Data.Bool using (Bool; true; false)
@@ -38,8 +38,8 @@ open import Data.Nat.Show using (show; readMaybe)
 open import Data.String using (String; _++_; words)
 
 open import CLI.IO using (putStr; getContents; _>>=_; Unit)
-open import Implementation.Unit-Test using (cases)
-open import Implementation.Unit-Test.Prelude using (Case; checksOf)
+open import CLI.Unit-Test using (cases)
+open import CLI.Unit-Test.Prelude using (Case; checksOf)
 
 open Case using (name)
 

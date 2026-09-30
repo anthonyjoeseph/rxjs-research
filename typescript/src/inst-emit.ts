@@ -4,7 +4,7 @@ export type SourceId = number | symbol; // a SOURCE observable; the impl counts 
 // The instant every subscribe burst belongs to, and there is only ONE
 // of it because no operator ever compares two. A burst minted inside an
 // arrival's cascade is a GRAFT: the join that caused it reassembles it
-// under the carrier's envelope, so the burst's own stamp is computed
+// under the carrier's InstEmit, so the burst's own stamp is computed
 // and then discarded. A burst minted outside one belongs to the root's
 // subscribe frame, which is a single frame. Neither case can tell two
 // subscribe instants apart, so an operator that READ an ambient
@@ -77,7 +77,7 @@ export const splitEmit = <A>(
 });
 
 export const reassemble = <B>(
-  envelope: { instant: Provenance; source: SourceId; kind: EmitKind },
+  instEmit: { instant: Provenance; source: SourceId; kind: EmitKind },
   bookkeeping: InstEvent<never>[],
   frameEvents: InstEvent<never>[],
   values: B[],
@@ -89,9 +89,9 @@ export const reassemble = <B>(
     ...values.map((value) => ({ type: "value", value }) as const),
     ...(fin ? [{ type: "complete" } as const] : []),
   ],
-  instant: envelope.instant,
-  source: envelope.source,
-  kind: envelope.kind,
+  instant: instEmit.instant,
+  source: instEmit.source,
+  kind: instEmit.kind,
 });
 
 // mergeAll a subscription's sync burst into grafts for the emit that

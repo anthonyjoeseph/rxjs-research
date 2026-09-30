@@ -42,12 +42,12 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MIRROR = os.path.join(REPO, "agda", "_stripped-comments", "src")
 DEST = os.path.join(REPO, "agda", "_oracle")
-ROOTS = ["CLI.Main", "Implementation.Unit-Test.Bug-Cache"]
+ROOTS = ["CLI.Main", "CLI.Unit-Test.Bug-Cache"]
 # IN THE TREE, NOT IN THE KEY.  The QuickCheck binary is a dev loop, not a
 # runner CI caches, so its cone is synced beside the runners -- one `_build`,
 # shared interfaces, the same termination-off options -- while an edit to it
 # leaves the cached runners standing.
-SYNC_ONLY = ["QuickCheck"]
+SYNC_ONLY = ["CLI.QuickCheck"]
 PRAGMA = "{-# OPTIONS --erasure --no-termination-check #-}\n"
 MARK, ERASED = "{-@0-}", "@0 "
 LIB = ("name: rxjs-research-oracle\n"

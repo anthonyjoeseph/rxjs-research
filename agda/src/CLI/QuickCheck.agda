@@ -4,7 +4,7 @@
 -- run: the batcher's batches against the spec's, in raw values; the
 -- batches joined back up against the plain program's values. A fast in-Agda dev loop for the implementation.
 --
---   agda --compile --compile-dir=_cli src/QuickCheck.agda
+--   agda --compile --compile-dir=_cli src/CLI/QuickCheck.agda
 --   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
 --
 -- A nonzero `at` prints the paste row of that one case (1-based) and runs
@@ -47,7 +47,7 @@
 -- last thought about.  The per-run line is raw material: a sweep sums
 -- it across seeds, and a former totalling zero is a hole in what the
 -- sweep covered rather than a fact about any one seed.
-module QuickCheck where
+module CLI.QuickCheck where
 
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Char using (toℕ)
@@ -69,10 +69,10 @@ open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; m
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Rx.Emit-Eq using (eqBatches)
-open import Implementation.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; implBatchesOf;
+open import CLI.Emit-Eq using (eqBatches)
+open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; implBatchesOf;
   specBatchesOf; specOf; plainOf; plainAgreesᵇ; agrees)
-open import Implementation.Unit-Test using (cases)
+open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
@@ -117,7 +117,7 @@ genB bound (r ∷ rs) = natMod r bound , rs
 ------------------------------------------------------------------------
 -- THE TREE THE SWEEP DRAWS IS THE AUTHOR'S, WHICH IS WHAT PUTS THE
 -- BATCHING QUESTION IN RANGE AT ALL.  Both batchings read the protocol
--- off an ENVELOPE, and only an elaborated program carries one, so a
+-- off an INSTEMIT, and only an elaborated program carries one, so a
 -- drawn `Exp` could be run and could not be ASKED.  The generator is
 -- therefore indexed by `SExp`, and `SExp.Elaborate` is what stands
 -- between it and the evaluator; the two formers the plain tree has and
@@ -127,7 +127,7 @@ genB bound (r ∷ rs) = natMod r bound , rs
 -- THE CONTEXT COMES FROM THE PRELUDE BECAUSE A CACHED ROW AND THE SEED
 -- THAT FOUND IT HAVE TO BE ONE RUN.  `Γ₂` is what the author sees and
 -- `Γ₂ᵉ` is where an elaborated program stands, each slot holding the
--- envelope over the author's type.
+-- InstEmit over the author's type.
 
 genFin2 : Gen (Fin 2)
 genFin2 = genB 2 >>=G λ c → pureG (if c ≡ᵇ 0 then zero else suc zero)
@@ -715,7 +715,7 @@ FUEL : ℕ
 FUEL = 30
 
 -- A PASTE-READY BUG-CACHE ROW: the block IS a row of
--- `Implementation.Unit-Test.cases`, trailing `∷` included, so the script
+-- `CLI.Unit-Test.cases`, trailing `∷` included, so the script
 -- that appends it neither builds nor parses Agda.  The name is written
 -- `"?"` rather than left blank, because a block pasted by hand has to
 -- typecheck as it stands; the script substitutes the seed.  Line 2 --

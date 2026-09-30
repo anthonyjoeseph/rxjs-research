@@ -231,7 +231,7 @@ warm:
 agda-dev-selftest:
 	scripts/agda-dev.py --falsify $(ARGS)
 
-# Implementation/Unit-Test.agda is deliberately not imported by Main (it is a
+# CLI/Unit-Test.agda is deliberately not imported by Main (it is a
 # throwaway performance cache, deleted once Formal-Verification is discharged),
 # so nothing else in the build would ever notice it rotting.  This target is
 # what makes its invariant enforceable rather than remembered.
@@ -287,7 +287,7 @@ bug-cache: stripped
 
 agda/_cli/Bug-Cache: $(AGDA_SRC)
 	@$(MAKE) --no-print-directory stripped
-	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/Implementation/Unit-Test/Bug-Cache.agda)
+	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Unit-Test/Bug-Cache.agda)
 	@touch $@
 
 bug-cache-build: agda/_cli/Bug-Cache
@@ -320,21 +320,21 @@ bug-cache-run: $(ORACLE_BIN)/Bug-Cache
 # than in every importer — so nothing mechanically stops an unsafe pragma on the
 # proof path.  `--safe` cannot be switched on while postulates exist (it rejects
 # `postulate` as well as the pragmas), so until the endgame this grep IS the
-# guard.  EXEMPT: src/QuickCheck.agda, a test harness Main does not import.
+# guard.  EXEMPT: src/CLI/QuickCheck.agda, a test harness Main does not import.
 #
 # At the finish line this target retires: once the top-line statement
 # modules (Left-To-Right, Timed, Batchable) carry no postulates,
 # `agda --safe src/Main.agda` checks both halves at once.
 unsafe-check:
 	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ evidence/ \
-	    --include='*.agda' | grep -v '^src/QuickCheck.agda:' || true); \
+	    --include='*.agda' | grep -v '^src/CLI/QuickCheck.agda:' || true); \
 	  opts=$$(grep -rn -E '\{-# *OPTIONS.*(--type-in-type|--no-termination-check|--no-positivity-check|--rewriting)' src/ evidence/ \
 	    --include='*.agda' || true); \
 	  if [ -n "$$hits$$opts" ]; then \
 	    echo "UNSAFE PRAGMA ON THE PROOF PATH OR IN THE EVIDENCE — a soundness hole, not a shortcut:"; \
 	    echo "$$hits"; echo "$$opts"; exit 1; \
 	  else \
-	    echo "unsafe-check: clean in src and evidence (0 unsafe pragmas outside the documented QuickCheck.agda exemption)"; \
+	    echo "unsafe-check: clean in src and evidence (0 unsafe pragmas outside the documented CLI/QuickCheck.agda exemption)"; \
 	  fi
 
 # THE COMMENT-STRIPPED MIRROR -- what Agda actually checks, and why a
@@ -1523,19 +1523,19 @@ formers-selftest:
 	      "sed -i.bak 's/\tno\tyes\tsource\tthe fixture.*/\tno\tyes\tsource/' scripts/formers.tsv" \
 	      "needs a reason"; \
 	  run "an agen=yes row the harness root stops writing" \
-	      "sed -i.bak 's/capProg e = sharedSigᵉ e/capProg e = e/' agda/src/Implementation/Unit-Test/Prelude.agda" \
+	      "sed -i.bak 's/capProg e = sharedSigᵉ e/capProg e = e/' agda/src/CLI/Unit-Test/Prelude.agda" \
 	      'no arm of the Agda generator writes `sharedSigᵉ`'; \
 	  run "an agen=no row the Agda generator DOES write" \
-	      "sed -i.bak 's/notᵖCount/notᵖ/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/notᵖCount/notᵖ/' agda/src/CLI/QuickCheck.agda" \
 	      'the Agda generator DOES write `notᵖ`'; \
 	  run "an agen=no row whose elaboration arm the generator starts drawing" \
-	      "sed -i.bak 's/else liftˢ (natˢ d))/else notˢ d)/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/else liftˢ (natˢ d))/else notˢ d)/' agda/src/CLI/QuickCheck.agda" \
 	      'the Agda generator DOES write `notᵖ`'; \
 	  run "an agen=no row whose postulated elaboration arm gains a body" \
 	      "sed -i.bak 's/^  deferᵖ : SExp Γ t → Exp Γ t/deferᵖ : SExp Γ t → Exp Γ t\ndeferᵖ e = deferᵉ e/' agda/src/SExp/Elaborate.agda" \
 	      'the Agda generator DOES write `deferᵉ`'; \
 	  run "an agen=yes row whose elaboration helper stops being reached" \
-	      "sed -i.bak 's/toEnvelope (liftˢ f)  = liftᵖ (toEnvelopeTm f)/toEnvelope (liftˢ f)  = toEnvelope f/' agda/src/SExp/Elaborate.agda" \
+	      "sed -i.bak 's/toInstEmit (liftˢ f)  = liftᵖ (toInstEmitTm f)/toInstEmit (liftˢ f)  = toInstEmit f/' agda/src/SExp/Elaborate.agda" \
 	      'no arm of the Agda generator writes `liftᵉ`'; \
 	  run "a row unreachable by BOTH generators" \
 	      "sed -i.bak 's/\tno\tyes\tsource/\tno\tno\tsource/' scripts/formers.tsv" \
@@ -1562,13 +1562,13 @@ formers-selftest:
 	      "sed -i.bak 's/op: \"not\"/op: \"gone\"/' typescript/src/generator.ts" \
 	      'nothing generates the tag "not"'; \
 	  run "a census tag in no exp row" \
-	      "sed -i.bak 's/formerTag fLift      = \"lift\"/formerTag fLift      = \"hoisted\"/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/formerTag fLift      = \"lift\"/formerTag fLift      = \"hoisted\"/' agda/src/CLI/QuickCheck.agda" \
 	      'reports under the tag "hoisted"'; \
 	  run "an exp row the census counts nothing under" \
-	      "sed -i.bak 's/formerTag fDefer     = \"defer\"/formerTag fDefer     = \"hoisted\"/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/formerTag fDefer     = \"defer\"/formerTag fDefer     = \"hoisted\"/' agda/src/CLI/QuickCheck.agda" \
 	      'counts nothing under the tag "defer"'; \
 	  run "a declared former the roll never walks" \
-	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/CLI/QuickCheck.agda" \
 	      'so the tally never walks it'; \
 	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda sweep's REACH is held to the map in both directions with a token boundary that a substring scan would cross, and that reach composes rather than unions -- the harness root counts, an undrawn elaboration arm does not, a postulated one does not, and a helper the arms reach does, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
 	  exit $$fail
@@ -1603,7 +1603,7 @@ $(ORACLE_BIN)/Main: $(AGDA_SRC) scripts/oracle-mirror.py
 
 $(ORACLE_BIN)/Bug-Cache: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/Implementation/Unit-Test/Bug-Cache.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/Unit-Test/Bug-Cache.agda
 	@touch $@
 
 # BOTH HALVES, IN ORDER: `oracle-tree` copies the cone and turns every
@@ -1654,7 +1654,7 @@ oracle-pinned: $(ORACLE_BIN)/Main
 # evaluator's values, and the tower is what checks it terminates.
 $(ORACLE_BIN)/QuickCheck: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/QuickCheck.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/QuickCheck.agda
 	@touch $@
 
 qc-build: $(ORACLE_BIN)/QuickCheck

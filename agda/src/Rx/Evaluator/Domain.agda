@@ -373,7 +373,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
 
   -- A LIVE HOT HANDS BACK NOTHING AT ALL, which is what a plain
   -- carrier makes of a registration: the old shape emitted one
-  -- `init`-only envelope so the ledger downstream had something to
+  -- `init`-only InstEmit so the ledger downstream had something to
   -- count, and counting has left the carrier.  What remains of the
   -- subscription is the registry row.
   subs-hot-live : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}

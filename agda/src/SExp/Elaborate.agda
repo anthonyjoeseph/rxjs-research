@@ -17,7 +17,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; 
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
   foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul;
   eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import Rx.Envelope using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ;
+open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ;
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
                                machineEmitᵗ)
@@ -58,7 +58,7 @@ open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ;
 
 -- NEITHER IS READING THE RUNNING INSTANT, AND WHICH INSTANT IS WANTED
 -- IS WHY.  Downstream of a source the instant is not missing at all:
--- the incoming emit IS an envelope, a term can project its instant
+-- the incoming emit IS an InstEmit, a term can project its instant
 -- field, and a step that stamps its output with the instant it was
 -- handed is an ordinary `Tm`.  A former with NO input has nothing to
 -- read it off — but the two sources want the SUBSCRIBE FRAME's instant
@@ -67,7 +67,7 @@ open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ;
 
 -- THE TWO ARMS OF A NESTED SUM THAT THIS ELABORATION NAMES, AND THEY
 -- ARE HERE RATHER THAN BESIDE THE ENCODING BECAUSE ONE ELABORATION IS
--- THEIR ONLY CONSUMER.  `Rx.Envelope` owes the constructors, which
+-- THEIR ONLY CONSUMER.  `SExp.InstEmit` owes the constructors, which
 -- every operator needs; which REASON a source closes for and which
 -- KIND of emit a subscribe burst is are this walk's vocabulary.
 exhaustedᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ closeReasonᵗ
@@ -88,7 +88,7 @@ valuesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
 valuesᵛ []       rest = rest
 valuesᵛ (v ∷ vs) rest = consᵗ (valueᵛ v) (valuesᵛ vs rest)
 
--- A COLD SOURCE IS ONE ENVELOPE, WHICH IS WHY THE FRAME TOKEN IS THE
+-- A COLD SOURCE IS ONE INSTEMIT, WHICH IS WHY THE FRAME TOKEN IS THE
 -- WHOLE OF WHAT IT WAS SHORT OF.  Everything this former emits leaves
 -- in the subscribe burst — the `init` naming the source, every value
 -- the author wrote, the exhausted `close` and the `complete` — so the
@@ -107,9 +107,9 @@ valuesᵛ (v ∷ vs) rest = consᵗ (valueᵛ v) (valuesᵛ vs rest)
 -- spec's grouping compares.
 -- THE INPUT SOURCE, WRAPPED HERE RATHER THAN ASSUMED ON THE TABLE.
 -- The slot stands at the author's bare payload, so this is the term
--- that builds every envelope an input contributes: one `init` naming
+-- that builds every InstEmit an input contributes: one `init` naming
 -- the source, then one emit per ARRIVAL carrying that arrival's
--- values.  Nothing else in the elaboration writes an input's envelope,
+-- values.  Nothing else in the elaboration writes an input's InstEmit,
 -- which is what makes a well-formedness claim about inputs a lemma
 -- about this definition instead of a hypothesis about the table.
 --
@@ -222,7 +222,7 @@ ofᵖ {Θ = Θ} {t = t} frame ts = mintᵉ (ofᵉ (instEmitᵛ evs frame↑ src 
                        (consᵗ (closeᵛ src exhaustedᵛ) (consᵗ completeᵛ nilᵗ)))
 
 -- THE EMPTY SRXJS SOURCE IS NOT THE EMPTY PLAIN ONE, and the gap is
--- one envelope rather than one event: it still brackets a subscribe
+-- one InstEmit rather than one event: it still brackets a subscribe
 -- frame, so it emits an `init` and a `complete` where `emptyᵉ` emits
 -- nothing at all.  It is `ofᵖ` at no values, which is what the mirror
 -- writes too.
@@ -233,8 +233,8 @@ emptyᵖ frame = ofᵖ frame []
 -- THE TWO FORMERS OF THIS LEG THAT WERE NEVER BLOCKED, AND WRITING
 -- THEM IS WHAT SAYS SO.  Neither adds an event, mints anything or can
 -- end the stream, so everything either needs is in the emit it was
--- handed: the payloads come out of the envelope, the author's step runs
--- over them, and what goes back in is the same envelope with new
+-- handed: the payloads come out of the InstEmit, the author's step runs
+-- over them, and what goes back in is the same InstEmit with new
 -- payloads.  The instant is not missing here — it is READ off the
 -- incoming emit, which is the finding the source rows above turn on.
 --
@@ -479,7 +479,7 @@ cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
 -- NOT A STEP'S WORK.  rxjs ends on `takeWhile(p, true)`, whose
 -- predicate reads the scan's own state; the plain palette can only end
 -- at an emit INDEX fixed at subscription, and a cut over the author's
--- VALUES is not one, since how many envelopes it takes to fill a quota
+-- VALUES is not one, since how many InstEmits it takes to fill a quota
 -- over their payloads is a property of the run.  So the emit that fills
 -- the quota carries the closes and the completion, and every emit after
 -- it passes through carrying its bookkeeping and no values — where the
@@ -596,10 +596,10 @@ mergeObsᵛ {Θ = Θ} {a = a} xs = foldᵗ (revᵗ xs) (strmᵗ emptyᵉ) body
 -- re-stamped and payload-free, and the inner streams the emit carried
 -- run behind it.
 --
--- THE ENVELOPE APPEARS TWICE IN THE ARGUMENT, WHICH IS EASY TO READ
+-- THE INSTEMIT APPEARS TWICE IN THE ARGUMENT, WHICH IS EASY TO READ
 -- PAST.  `emitᵗ (obs t)` unfolds through `plainᵗ`'s observable clause,
--- so the outer's payload is an observable of ENVELOPES: the argument is
--- an enveloped stream of enveloped streams.  Both layers are already
+-- so the outer's payload is an observable of INSTEMITS: the argument is
+-- an InstEmit stream of InstEmit streams.  Both layers are already
 -- stamped when they arrive, which is why nothing here mints — the
 -- inner's bookkeeping rides the inner's own emits, and only the OUTER's
 -- has to be placed.
@@ -648,13 +648,13 @@ exhaustAllᵖ e = exhaustAllᵉ (mapᵉ laneᵛ e)
 -- The elaboration: one simul program down into one plain program.
 ------------------------------------------------------------------
 
--- THE ONE PLACE THE ENVELOPE IS WRITTEN, WHICH IS WHAT MAKES THE
+-- THE ONE PLACE THE INSTEMIT IS WRITTEN, WHICH IS WHAT MAKES THE
 -- PALETTE ARGUMENT A PROOF RATHER THAN A CONVENTION.  A simul program
 -- names no token, so every instant and every source appearing in an
 -- elaborated program is put there here; and since the evaluator runs
 -- only the plain tree, the elaboration is also the sole route by which
 -- a shipped operator's protocol behaviour reaches a run.  Anything an
--- author could do to an envelope, they did by choosing a former.
+-- author could do to an InstEmit, they did by choosing a former.
 
 -- THE AUTHOR'S TERM LANGUAGE NEEDS NOTHING, AND THAT IS A RESULT AND
 -- NOT A CONVENIENCE.  Every `STm` former translates to its plain
@@ -700,14 +700,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
  mutual
 
-   toEnvelope : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+   toInstEmit : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
            → SExp Γ Δᵍ Δ Θ t
            → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (emitᵗ t)
    -- AN INPUT IS THE ONE SOURCE THIS BODY WRITES, AND IT IS A TRANSPORT
-   -- BECAUSE THE SLOT ALREADY CARRIES ENVELOPES.  The shape on the table
+   -- BECAUSE THE SLOT ALREADY CARRIES INSTEMITS.  The shape on the table
    -- is a slot carrying PLAIN values that the elaboration wraps instead
    -- -- a sync bracket for a cold, a bare stamp for a hot -- which moves
-   -- the envelope's construction OUT of the machine and into the term
+   -- the InstEmit's construction OUT of the machine and into the term
    -- language, where every other elaborated behaviour already lives.
 
    -- THE BRANCH IS AVAILABLE FOR THE ASKING, and the cost is one
@@ -760,14 +760,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
    -- WHAT A SLOT'S DEF DOES AT THIS ARM, INSTANTIATED RATHER THAN READ
    -- OFF THE CODE.  The arm passes the slot STRAIGHT THROUGH: the input
-   -- already stands at the envelope, so nothing is wrapped here and the
+   -- already stands at the InstEmit, so nothing is wrapped here and the
    -- program's own elaboration mints over whatever the slot hands it.  A
-   -- `shared` def is then a program at the envelope that was itself
+   -- `shared` def is then a program at the InstEmit that was itself
    -- elaborated, so it arrives already minted and the mint above it is a
    -- second layer.  Run at a def that is an elaborated source, the
    -- second layer costs nothing a consumer can see: the program
    -- evaluates, the input delivers, and the decoded emit is a single
-   -- coherent envelope.  What the def DOES move is the ambient token,
+   -- coherent InstEmit.  What the def DOES move is the ambient token,
    -- since instants are minted from one counter -- a source-free program
    -- reads its own frame at token 1 in an empty context, at 2 under a
    -- table of width one whatever the slot holds, and at 3 when the
@@ -785,7 +785,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    -- gives `machineEmitᵗ (plainᵗ _)`, which IS that type; a SHARED one
    -- stands at `emitᵗ` already, so the reference is `input i` and
    -- nothing is wrapped a second time.
-   toEnvelope {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (inputˢ i)
+   toInstEmit {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (inputˢ i)
      with lookup κ i | lookup-zipWith slotTy i Γ κ
    ... | scriptedᵏ | eq =
          subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ)
@@ -794,49 +794,49 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    ... | sharedᵏ   | eq =
          subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) u)
                eq (input i)
-   toEnvelope {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toEnvelopeTms ts)
-   toEnvelope {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
-   toEnvelope (takeˢ k e)         = takeᵖ (toEnvelopeTm k) (toEnvelope e)
-   toEnvelope (mapˢ f e)          = mapᵖ (toEnvelopeTm f) (toEnvelope e)
-   toEnvelope (scanˢ f z e)       = scanᵖ (toEnvelopeTm f) (toEnvelopeTm z) (toEnvelope e)
-   toEnvelope (mergeAllˢ k e)     = mergeAllᵖ k (toEnvelope e)
-   toEnvelope (switchAllˢ e)      = switchAllᵖ (toEnvelope e)
-   toEnvelope (exhaustAllˢ e)     = exhaustAllᵖ (toEnvelope e)
-   toEnvelope (μˢ e)              = μᵉ (toEnvelope e)
-   toEnvelope (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
-   toEnvelope {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
+   toInstEmit {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toInstEmitTms ts)
+   toInstEmit {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
+   toInstEmit (takeˢ k e)         = takeᵖ (toInstEmitTm k) (toInstEmit e)
+   toInstEmit (mapˢ f e)          = mapᵖ (toInstEmitTm f) (toInstEmit e)
+   toInstEmit (scanˢ f z e)       = scanᵖ (toInstEmitTm f) (toInstEmitTm z) (toInstEmit e)
+   toInstEmit (mergeAllˢ k e)     = mergeAllᵖ k (toInstEmit e)
+   toInstEmit (switchAllˢ e)      = switchAllᵖ (toInstEmit e)
+   toInstEmit (exhaustAllˢ e)     = exhaustAllᵖ (toInstEmit e)
+   toInstEmit (μˢ e)              = μᵉ (toInstEmit e)
+   toInstEmit (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
+   toInstEmit {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
      deferᵉ (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
-                   (map-++ emitᵗ Δᵍ Δ) (toEnvelope e))
+                   (map-++ emitᵗ Δᵍ Δ) (toInstEmit e))
 
-   toEnvelopeTm : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+   toInstEmitTm : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
              → STm Γ Δᵍ Δ Θ t
              → Tm (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t)
-   toEnvelopeTm (varˢᵗ x)      = varᵗ (∈-++⁺ˡ (∈-map⁺ plainᵗ x))
-   toEnvelopeTm unitˢ          = unit̂
-   toEnvelopeTm (boolˢ b)      = bool̂ b
-   toEnvelopeTm (natˢ k)       = nat̂ k
-   toEnvelopeTm (pairˢ a b)    = pairᵗ (toEnvelopeTm a) (toEnvelopeTm b)
-   toEnvelopeTm (fstˢ p)       = fstᵗ (toEnvelopeTm p)
-   toEnvelopeTm (sndˢ p)       = sndᵗ (toEnvelopeTm p)
-   toEnvelopeTm nilˢ           = nilᵗ
-   toEnvelopeTm (consˢ h t)    = consᵗ (toEnvelopeTm h) (toEnvelopeTm t)
-   toEnvelopeTm (inlˢ a)       = inlᵗ (toEnvelopeTm a)
-   toEnvelopeTm (inrˢ b)       = inrᵗ (toEnvelopeTm b)
-   toEnvelopeTm (caseˢ s l r)  = caseᵗ (toEnvelopeTm s) (toEnvelopeTm l) (toEnvelopeTm r)
-   toEnvelopeTm (foldˢ l z f)  = foldᵗ (toEnvelopeTm l) (toEnvelopeTm z) (toEnvelopeTm f)
-   toEnvelopeTm (ifˢ c a b)    = ifᵗ (toEnvelopeTm c) (toEnvelopeTm a) (toEnvelopeTm b)
-   toEnvelopeTm (primˢ add a)  = primᵗ add  (toEnvelopeTm a)
-   toEnvelopeTm (primˢ sub a)  = primᵗ sub  (toEnvelopeTm a)
-   toEnvelopeTm (primˢ mul a)  = primᵗ mul  (toEnvelopeTm a)
-   toEnvelopeTm (primˢ eqᵖ a)  = primᵗ eqᵖ  (toEnvelopeTm a)
-   toEnvelopeTm (primˢ ltᵖ a)  = primᵗ ltᵖ  (toEnvelopeTm a)
-   toEnvelopeTm (primˢ eqᵘ a)  = primᵗ eqᵘ  (toEnvelopeTm a)
-   toEnvelopeTm (primˢ notᵖ a) = primᵗ notᵖ (toEnvelopeTm a)
-   toEnvelopeTm (strmˢ e)      = strmᵗ (toEnvelope e)
+   toInstEmitTm (varˢᵗ x)      = varᵗ (∈-++⁺ˡ (∈-map⁺ plainᵗ x))
+   toInstEmitTm unitˢ          = unit̂
+   toInstEmitTm (boolˢ b)      = bool̂ b
+   toInstEmitTm (natˢ k)       = nat̂ k
+   toInstEmitTm (pairˢ a b)    = pairᵗ (toInstEmitTm a) (toInstEmitTm b)
+   toInstEmitTm (fstˢ p)       = fstᵗ (toInstEmitTm p)
+   toInstEmitTm (sndˢ p)       = sndᵗ (toInstEmitTm p)
+   toInstEmitTm nilˢ           = nilᵗ
+   toInstEmitTm (consˢ h t)    = consᵗ (toInstEmitTm h) (toInstEmitTm t)
+   toInstEmitTm (inlˢ a)       = inlᵗ (toInstEmitTm a)
+   toInstEmitTm (inrˢ b)       = inrᵗ (toInstEmitTm b)
+   toInstEmitTm (caseˢ s l r)  = caseᵗ (toInstEmitTm s) (toInstEmitTm l) (toInstEmitTm r)
+   toInstEmitTm (foldˢ l z f)  = foldᵗ (toInstEmitTm l) (toInstEmitTm z) (toInstEmitTm f)
+   toInstEmitTm (ifˢ c a b)    = ifᵗ (toInstEmitTm c) (toInstEmitTm a) (toInstEmitTm b)
+   toInstEmitTm (primˢ add a)  = primᵗ add  (toInstEmitTm a)
+   toInstEmitTm (primˢ sub a)  = primᵗ sub  (toInstEmitTm a)
+   toInstEmitTm (primˢ mul a)  = primᵗ mul  (toInstEmitTm a)
+   toInstEmitTm (primˢ eqᵖ a)  = primᵗ eqᵖ  (toInstEmitTm a)
+   toInstEmitTm (primˢ ltᵖ a)  = primᵗ ltᵖ  (toInstEmitTm a)
+   toInstEmitTm (primˢ eqᵘ a)  = primᵗ eqᵘ  (toInstEmitTm a)
+   toInstEmitTm (primˢ notᵖ a) = primᵗ notᵖ (toInstEmitTm a)
+   toInstEmitTm (strmˢ e)      = strmᵗ (toInstEmit e)
 
    -- spelled out rather than `map`ped, so the recursion is structural
-   toEnvelopeTms : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+   toInstEmitTms : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
               → List (STm Γ Δᵍ Δ Θ t)
               → List (Tm (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t))
-   toEnvelopeTms []       = []
-   toEnvelopeTms (m ∷ ms) = toEnvelopeTm m ∷ toEnvelopeTms ms
+   toInstEmitTms []       = []
+   toInstEmitTms (m ∷ ms) = toInstEmitTm m ∷ toInstEmitTms ms

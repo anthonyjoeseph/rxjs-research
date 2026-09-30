@@ -15,7 +15,7 @@ are decidable:
   B  the Agda decoder     agda/src/CLI/Decode.agda  `tag is "..."` / `op is "..."`
   C  the TypeScript types typescript/src/exp.ts     `export type Exp` / `Tm` / `PrimOp`
   D  the TS generator     typescript/src/generator.ts   `type: "..."`, the op lanes
-  E  the sweep's census   agda/src/QuickCheck.agda  `formerTag` / `allFormers`
+  E  the sweep's census   agda/src/CLI/QuickCheck.agda  `formerTag` / `allFormers`
   F  the Agda sweep's reach  the `gen*` definitions, composed with
                              `SExp/Elaborate.agda` and the harness root
 
@@ -71,9 +71,9 @@ PATHS = {
     "decode": "agda/src/CLI/Decode.agda",
     "ts": "typescript/src/exp.ts",
     "gen": "typescript/src/generator.ts",
-    "census": "agda/src/QuickCheck.agda",
+    "census": "agda/src/CLI/QuickCheck.agda",
     "elab": "agda/src/SExp/Elaborate.agda",
-    "harness": "agda/src/Implementation/Unit-Test/Prelude.agda",
+    "harness": "agda/src/CLI/Unit-Test/Prelude.agda",
 }
 
 
@@ -319,7 +319,7 @@ def top_level(text: str) -> dict[str, set[str]]:
 def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
     """The elaboration, arm by arm: what each clause CONSUMES and what it WRITES.
 
-    `toEnvelope` is defined one clause per author former, so the pairing is
+    `toInstEmit` is defined one clause per author former, so the pairing is
     already in the source and needs only to be read off: the left of the
     first top-level `=` names the author's constructor, the right names the
     plain formers that constructor turns into.  Keeping them paired is what
@@ -342,11 +342,11 @@ def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
     # elaboration read as the elaboration having been DELETED, which is the
     # one failure a coverage check must not have -- it fires loudly while
     # saying nothing about coverage.
-    anchor = re.compile(r"^(\s+)toEnvelope(Tm|Tms)?\b")
+    anchor = re.compile(r"^(\s+)toInstEmit(Tm|Tms)?\b")
     indent = next((m.group(1) for m in map(anchor.match, lines) if m), None)
     if indent is None:
-        sys.exit("check-formers: no `toEnvelope` clauses found -- the elaboration moved or was renamed")
-    head = re.compile(r"^" + re.escape(indent) + r"toEnvelope(Tm|Tms)?\b")
+        sys.exit("check-formers: no `toInstEmit` clauses found -- the elaboration moved or was renamed")
+    head = re.compile(r"^" + re.escape(indent) + r"toInstEmit(Tm|Tms)?\b")
     starts = [i for i, l in enumerate(lines) if head.match(l)]
     covered: set[int] = set()
     arms: list[tuple[set[str], set[str]]] = []
@@ -371,7 +371,7 @@ def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
             continue
         arms.append((mentions(text[:cut]), mentions(text[cut + 1 :])))
     if not arms:
-        sys.exit("check-formers: no `toEnvelope` clauses found -- the elaboration moved or was renamed")
+        sys.exit("check-formers: no `toInstEmit` clauses found -- the elaboration moved or was renamed")
     rest = "\n".join(l for k, l in enumerate(lines) if k not in covered)
     return arms, rest
 

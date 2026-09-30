@@ -134,7 +134,7 @@ never reaches `Probed.Main`.
   silent AND reports a total, and a total of zero reads as tidy.
 - **A probe that pins the EVALUATOR is not a probe.** If its rows survive
   their target because what they really test is that some composite reduces,
-  it is a unit test: move it to `Implementation/Unit-Test.agda`, which is
+  it is a unit test: move it to `CLI/Unit-Test.agda`, which is
   append-only and has its own end-of-life.
 - **The comment-stripped mirror covers the evidence tree too**, so a
   comment-only edit out here is free in the same way — but **`make refuted` and

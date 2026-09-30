@@ -39,7 +39,7 @@ open import Rx.Mint using (Mint; mint-init)
 -- run pushes is what an rxjs subscriber sees: values in order, then an
 -- end.  A simultaneity-aware program reaches this machine only through
 -- the elaboration, which compiles the protocol into the VALUE type, so
--- the machine itself never handles an envelope and the mirror keeps
+-- the machine itself never handles an InstEmit and the mirror keeps
 -- its footing — the TypeScript's operators are plain rxjs too.
 
 -- A BURST IS EVERYTHING ONE INCOMING EMIT CAUSES, AND IT IS THE UNIT A

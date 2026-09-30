@@ -4,7 +4,7 @@
 -- is the spec's grouping of those same emits by instant.
 --
 -- IMPARTIAL ABOUT HOW THE BATCHER DECIDES.  Nothing here names the
--- envelope protocol or any mark the stream carries: the batcher is
+-- InstEmit protocol or any mark the stream carries: the batcher is
 -- held to `spec-batchSimultaneous` over `instExtract` of the emits, and
 -- whatever it reads to get there is its own business.  Nor can it lean
 -- on the program's own synchrony: the second evaluator sees one emit
@@ -34,13 +34,13 @@ open import Rx.Exp       using (Ctx; Ty; Val; isData; input)
 open import SExp.Syntax      using (SExp; Kinds; emitᵗ)
 open import Rx.Slots     using (Slots; scripted)
 open import SExp.Simul-Slots using (SimulSlots)
-open import Rx.Envelope  using (machineEmitᵗ)
+open import SExp.InstEmit  using (machineEmitᵗ)
 open import Rx.Evaluator using (Burst)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import SExp.Plain     using (unplainᵈ)
-open import Rx.Batch     using (batchSimultaneousᵖ)
-open import Implementation.Pipeline using (emitsᴵ; runᴵ)
-open import Rx.Envelope.Decode using (decodeEmits)
+open import SExp.Batch     using (batchSimultaneousᵖ)
+open import SExp.Pipeline using (emitsᴵ; runᴵ)
+open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 import Spec
 open Spec Id _≟_ using (spec-batchSimultaneous)

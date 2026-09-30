@@ -1,21 +1,21 @@
 -- THE BATCHING OPERATOR, AS A PROGRAM.
 --
 -- `batchSimultaneousᵖ` is a former over the PLAIN tree: it takes a
--- stream of machine envelopes and hands back a stream of envelopes
+-- stream of machine InstEmits and hands back a stream of InstEmits
 -- carrying batched payloads.  It lives here rather than in a
 -- verification module because it is an operator and not a claim -- the
 -- harness runs it, and the proof quantifies over it.
 --
--- ONE ENVELOPE OUT PER GROUP IN, AND THE GROUP IS WHAT `batchSyncᵉ`
+-- ONE INSTEMIT OUT PER GROUP IN, AND THE GROUP IS WHAT `batchSyncᵉ`
 -- HANDS OVER.  The subscribe frame's emits arrive as ONE group, so the
 -- whole of burst 0 is in hand at once and is batched as a list: one
 -- batch per instant, in order of the instant's first emit, holding every value that instant carried, and
 -- no batch for an instant with no values.  The batches ride ONE output
--- envelope as its value events, so an envelope may carry several
--- batches or none -- the subscriber sees the batches, and the envelope
+-- InstEmit as its value events, so an InstEmit may carry several
+-- batches or none -- the subscriber sees the batches, and the InstEmit
 -- around them is bookkeeping the top line never compares.
 --
--- THE ENVELOPE'S TOKENS ARE FORWARDED FROM THE GROUP'S FIRST EMIT,
+-- THE INSTEMIT'S TOKENS ARE FORWARDED FROM THE GROUP'S FIRST EMIT,
 -- because `uniqᵗ` has no term former: only `mintᵉ` introduces one, so
 -- that no program can forge a token in use.  A group is nonempty by
 -- construction, which is what makes the forwarding total.
@@ -23,7 +23,7 @@
 -- WHAT THIS DOES NOT YET DO is batch a LATER arrival's emits: after the
 -- subscribe frame `batchSyncᵉ` hands over singletons, and each is
 -- batched alone.
-module Rx.Batch where
+module SExp.Batch where
 
 open import Data.List using (List; _∷_)
 open import Data.Bool using (true; false)
@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Exp      using (Ctx; Ty; Exp; Tm; listᵗ; uniqᵗ; boolᵗ; _×ᵗ_; varᵗ; bool̂; fstᵗ; sndᵗ;
   pairᵗ; nilᵗ; consᵗ; foldᵗ; ifᵗ; primᵗ; eqᵘ; appendᵗ; revᵗ; renTm; mapᵉ; batchSyncᵉ)
-open import Rx.Envelope using (machineEmitᵗ; eventsᵛ; instantᵛ; sourceᵛ; kindᵛ; instEmitᵛ;
+open import SExp.InstEmit using (machineEmitᵗ; eventsᵛ; instantᵛ; sourceᵛ; kindᵛ; instEmitᵛ;
   valueᵛ; splitEventsᵛ)
 
 module _ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} where
@@ -80,7 +80,7 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} where
       i   = instantᵛ (varᵗ (here refl))
       vs  = valuesAtᵇ i (⇑ es)
 
-  -- one group in, one envelope out: a value event per batch, under the
+  -- one group in, one InstEmit out: a value event per batch, under the
   -- group's first emit's tokens
   groupEmitᵇ : ∀ {Θ a} → Tm Γ Δᵍ Δ Θ (machineEmitᵗ a ×ᵗ listᵗ (machineEmitᵗ a))
              → Tm Γ Δᵍ Δ Θ (machineEmitᵗ (listᵗ a))

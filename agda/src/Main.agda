@@ -41,7 +41,7 @@ module Main where
 -- timing-correct say nothing.
 --
 -- THE STATEMENTS MEET IN RAW VALUES, as a subscriber sees them.  No
--- envelope is compared anywhere; valueless emits contribute nothing.
+-- InstEmit is compared anywhere; valueless emits contribute nothing.
 ------------------------------------------------------------------
 open import Left-To-Right.Statement
   using (left-to-right)

@@ -19,18 +19,18 @@
 --
 -- TWO: A KIND AND ITS SLOT HAVE TO AGREE.  `SExp.Syntax`'s `Kinds` vector
 -- tells the elaboration how to read each slot -- `scriptedᵏ` stands at
--- the PAYLOAD and `inputᵖ` wraps it, `sharedᵏ` stands at the ENVELOPE
+-- the PAYLOAD and `inputᵖ` wraps it, `sharedᵏ` stands at the INSTEMIT
 -- and `input` reads it straight.  Held apart from the table, those two
 -- can disagree, and one direction of disagreement is the forgery hole
 -- itself: a table that scripts slot i while `κ` calls it `sharedᵏ`
 -- types fine -- the slot stands at `emitᵗ a`, so the script is asked
--- for envelope VALUES -- and hands the machine deliveries no `init`
+-- for InstEmit VALUES -- and hands the machine deliveries no `init`
 -- ever enlisted.  `SimulSlot` is INDEXED BY THE KIND, so the arm is
 -- forced by the vector and the two cannot come apart.
 --
 -- AND THAT IS WHY `Rx.Slots.shared` NEEDS NO `isData`.  The bar there
 -- was closing the forgery channel at `plainᵗ (obs u) = obs (emitᵗ u)`,
--- where a slot's values are observables of envelopes that the
+-- where a slot's values are observables of InstEmits that the
 -- consumer's `mergeAllˢ` subscribes directly, past `stamp`.  A
 -- definition here cannot stand at that type dishonestly whatever its
 -- type is, because it was BUILT by the elaboration -- so the
@@ -60,7 +60,7 @@ data SimulSlot {n} (Γ : Ctx n) (κ : Kinds n) (k : ℕ) (t : Ty)
   -- AN EXTERNAL SOURCE, stated at the author's payload type.  The
   -- elaboration wraps it: `inputᵖ` mints per subscription and stamps
   -- each arrival, so a scripted arrival cannot reach the wire except
-  -- inside an envelope the machine wrote.  Data only, exactly as in
+  -- inside an InstEmit the machine wrote.  Data only, exactly as in
   -- `Rx.Slots` and for the same descent reason.
   scriptedˢ : {ok : T (isData (plainᵗ t))}
             → ObservableInput (Val (plainᵏ Γ κ) (plainᵗ t))

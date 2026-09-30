@@ -17,8 +17,8 @@
 // staring at. `evaluatePlain` builds each slot source itself: a
 // scripted slot becomes a bare rxjs stream, and a shared slot compiles
 // its PLAIN definition under a never-resetting `share`. Nothing in the
-// table is elaborated, and nothing in it carries an envelope. Every
-// envelope in the run is put there by `inputP` at the REFERENCE site.
+// table is elaborated, and nothing in it carries an InstEmit. Every
+// InstEmit in the run is put there by `inputP` at the REFERENCE site.
 //
 // AND THAT IS WHERE THE AGDA DIFFICULTY LIVES. Because the table holds
 // plain trees, a shared slot at an observable type can hold a stream of

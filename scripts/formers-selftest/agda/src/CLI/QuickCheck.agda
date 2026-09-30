@@ -5,7 +5,7 @@
 -- The generator writes the AUTHOR's palette and nothing plain, which is
 -- the whole reason the sixth surface is a composition: read alone this
 -- region reaches no former in the map at all.
-module QuickCheck where
+module CLI.QuickCheck where
 
 genB : ℕ → Gen ℕ
 genB bound rs = bound , rs

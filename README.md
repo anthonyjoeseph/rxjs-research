@@ -326,7 +326,9 @@ npm run oracle     # the property oracle: random programs through rxjs and the A
 | --- | --- |
 | [agda/src/Spec.agda](agda/src/Spec.agda) | The spec: `spec-batchSimultaneous` |
 | [agda/src/Left-To-Right/](agda/src/Left-To-Right/), [agda/src/Timed/](agda/src/Timed/), [agda/src/Batchable/](agda/src/Batchable/) | The top line: the implementation meets the spec on every program, as four statements |
-| [agda/src/Rx/](agda/src/Rx/) | The Agda implementation: the program tree, the evaluator, the envelope, `batchSimultaneous` |
+| [agda/src/Rx/](agda/src/Rx/) | Plain rxjs in Agda: the `Exp` program tree and its evaluator |
+| [agda/src/SExp/](agda/src/SExp/) | The author's program tree, its elaboration onto `Exp` with InstEmits, and `batchSimultaneous` |
+| [agda/src/CLI/](agda/src/CLI/) | The compiled test binaries: the oracle's runner, QuickCheck, and the bug cache |
 | [agda/src/Main.agda](agda/src/Main.agda) | Every claim the development makes, by name |
 | [typescript/src/](typescript/src/) | The TypeScript implementation, mirroring the Agda one, and its oracle |
 | [PROOF-STATE.md](PROOF-STATE.md) | The roadmap: what remains to prove, in order |

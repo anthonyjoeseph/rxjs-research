@@ -4,7 +4,7 @@
 -- must carry in order; the timed translation (`Timed.Translation`), whose
 -- packets its instant stamps must agree with; and
 -- `spec-batchSimultaneous`, the grouping its batcher must reproduce.
--- The envelope this side runs on -- its fields, its ids, its kinds --
+-- The InstEmit this side runs on -- its fields, its ids, its kinds --
 -- is an implementation detail the theorem never sees past those.
 --
 -- What is NOT free is below this module: `Rx.Exp`, `SExp.Syntax` and the
@@ -12,9 +12,9 @@
 -- Anthony, never a patch.
 --
 -- RECOVERY: git show 0de565ef:agda/src/Implementation/Elaborate.agda
---   restores the impl side's own walk, a copy of `toEnvelope` whose flattener
---   arms call their own lane -- the place a per-former envelope change lands.
-module Implementation.Pipeline where
+--   restores the impl side's own walk, a copy of `toInstEmit` whose flattener
+--   arms call their own lane -- the place a per-former InstEmit change lands.
+module SExp.Pipeline where
 
 open import Data.Bool    using (true; false; T)
 open import Data.Fin     using (toℕ)
@@ -28,10 +28,10 @@ open import Rx.Prim      using (Fuel; InstEmit)
 open import Rx.Exp       using (Ctx; Ty; Exp; Val; mintᵉ; inputsBelowᵉ)
 open import SExp.Syntax      using (SExp; Kinds; scriptedᵏ; sharedᵏ; slotTy; plainᵏ; plainᵗ; emitᵗ; emptyˢ)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
-open import Rx.Envelope.Decode using (decodeEmits)
+open import SExp.InstEmit.Decode using (decodeEmits)
 open import Rx.Evaluator using (Burst)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import SExp.Elaborate using (toEnvelope)
+open import SExp.Elaborate using (toInstEmit)
 open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
 
 -- ONE MINT FOR THE WHOLE PROGRAM.  `mintᵉ` draws once per subscription
@@ -42,12 +42,12 @@ open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
 -- an inner's frame is its outer's.
 elaborateImpl : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t : Ty}
               → SExp Γ [] [] [] t → Exp (plainᵏ Γ κ) [] [] [] (emitᵗ t)
-elaborateImpl κ e = mintᵉ (toEnvelope κ e)
+elaborateImpl κ e = mintᵉ (toInstEmit κ e)
 
 -- A SHARE'S STRATIFICATION IS CHECKED HERE, NOT ASSUMED.  The table
 -- certifies it of the definition read plain; the elaboration adds no
 -- input, so the check below always passes, but saying so is a fact
--- about `toEnvelope` that nothing proves yet -- and `left-to-right` is
+-- about `toInstEmit` that nothing proves yet -- and `left-to-right` is
 -- where it is owed, since the fallback would change the values.
 sharedᴵ : ∀ {n} {Γ : Ctx n} (κ : Kinds n) (k : _) {t : Ty}
         → SExp Γ [] [] [] t → Slot (plainᵏ Γ κ) k (emitᵗ t)
@@ -73,7 +73,7 @@ emitsᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] 
 emitsᴵ κ fuel e ins = concat (evaluate↓ fuel (elaborateImpl κ e) (embedSlotsImpl ins))
 
 -- THE IMPL'S RUN, AS THE TOP LINE READS IT: each emit decoded back to
--- the envelope record.
+-- the InstEmit record.
 runᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t
      → SimulSlots Γ κ → List (InstEmit (Val (plainᵏ Γ κ) (plainᵗ t)))
 runᴵ κ fuel e ins = decodeEmits (emitsᴵ κ fuel e ins)

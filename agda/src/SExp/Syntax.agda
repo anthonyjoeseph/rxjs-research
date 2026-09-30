@@ -10,7 +10,7 @@ open import Data.Maybe   using (Maybe)
 
 open import Rx.Exp      using (Ty; Ctx; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_;
                                listᵗ; obs; PrimOp)
-open import Rx.Envelope using (machineEmitᵗ)
+open import SExp.InstEmit using (machineEmitᵗ)
 
 ------------------------------------------------------------------
 -- The SIMUL tree: what an srxjs author writes.
@@ -19,20 +19,20 @@ open import Rx.Envelope using (machineEmitᵗ)
 -- A SECOND SYNTAX WHOSE FORMERS ARE THE SHIPPED OPERATORS, AND WHOSE
 -- INDEX IS THE AUTHOR'S PAYLOAD.  `Rx.Exp` is the whole of what the
 -- evaluator runs and is deliberately larger than anything anyone should
--- compose: it can build an emit by hand, and once the envelope is an
+-- compose: it can build an emit by hand, and once the InstEmit is an
 -- ordinary type of the object language it can build one of those too.
 -- The theorem is not about that language.  It is about programs made of
 -- the operators this development ships, so those operators are a
 -- SYNTAX, and being outside it is a scope error rather than a side
 -- condition anything has to carry.
 --
--- WHAT KEEPS THE ENVELOPE HONEST IS THE PALETTE AND NOT A PREDICATE.
+-- WHAT KEEPS THE INSTEMIT HONEST IS THE PALETTE AND NOT A PREDICATE.
 -- No former below reaches the term that makes a token, so no simul
 -- program can name an instant or a source, let alone forge one that
 -- collides; the elaboration is the only thing that writes those fields
 -- and the evaluator is the only thing that mints their values.  That is
--- why the author's payload index here is a plain `Ty` with no envelope
--- anywhere in it, while the elaboration's result stands at the envelope
+-- why the author's payload index here is a plain `Ty` with no InstEmit
+-- anywhere in it, while the elaboration's result stands at the InstEmit
 -- — the wrapper appears exactly once, at the boundary between the two
 -- trees, instead of being threaded through a program's own types.
 --
@@ -99,7 +99,7 @@ mutual
 
 -- AN AUTHOR'S TYPE AND THE TYPE ITS ELABORATION STANDS AT DIFFER IN
 -- EXACTLY ONE PLACE, and it is not the outermost one.  A simul program
--- at `t` elaborates to a plain program at the machine envelope over
+-- at `t` elaborates to a plain program at the machine InstEmit over
 -- `t`, so the wrapper at the top is applied by the elaboration's own
 -- signature; what this walk is for is the wrappers UNDERNEATH, since a
 -- nested observable is a value the author wrote at `obs t` and the
@@ -122,8 +122,8 @@ plainᶜ ts = map plainᵗ ts
 -- WHAT A STREAM NAME STANDS AT IS WHAT ITS SUBTREE ELABORATES TO, AND
 -- THAT IS NOT WHAT A VALUE NAME STANDS AT.  A μ-bound name in a simul
 -- program is a STREAM at the author's payload, so the program it
--- elaborates to binds one at the envelope over the translated payload;
--- a `Θ` name is an ordinary value and carries no envelope anywhere.
+-- elaborates to binds one at the InstEmit over the translated payload;
+-- a `Θ` name is an ordinary value and carries no InstEmit anywhere.
 -- One translation cannot serve both, so the elaboration's four contexts
 -- split two and two: the two stream telescopes walk with `emitᶜ` and
 -- the value telescope with `plainᶜ`.
@@ -142,7 +142,7 @@ emitᶜ ts = map emitᵗ ts
 -- `inputˢ i` without caring whether slot i is fed by a script or
 -- defined by another srxjs program; the ELABORATION cares, because the
 -- two arrive in different shapes, so the kinds are an argument to
--- `toEnvelope` and nothing above it changes.
+-- `toInstEmit` and nothing above it changes.
 data Kind : Set where
   scriptedᵏ : Kind   -- an external source: bare payloads, `inputᵖ` wraps them
   sharedᵏ   : Kind   -- another srxjs program: already elaborated
@@ -153,7 +153,7 @@ Kinds n = Vec Kind n
 -- WHAT A SLOT STANDS AT, NOW PER SLOT RATHER THAN UNIFORMLY.
 --
 -- A SCRIPTED SLOT STANDS AT THE PAYLOAD, and it has to: a script is
--- arbitrary, so standing it at the envelope would let a table name an
+-- arbitrary, so standing it at the InstEmit would let a table name an
 -- instant past the counter and reach the output through `input`
 -- untouched -- exactly how `evaluate-accepted` was refuted.  `inputᵖ`
 -- wrapping it is what makes a claim about inputs a lemma about the
@@ -164,7 +164,7 @@ Kinds n = Vec Kind n
 -- `ObservableInput<Val>` -- bare payloads and waits -- and returns an
 -- `Observable<InstEmit<Val>>`.  It is the only door into a pipeline, so
 -- srxjs cannot BE handed a malformed input stream; a slot at the
--- envelope models a system that can, which is the model being wrong
+-- InstEmit models a system that can, which is the model being wrong
 -- about the artifact rather than the artifact being unproven.
 --
 -- WHAT UNBLOCKED THE WRAPPING WAS THE GROUPING AND NOT A NEW FORMER.
@@ -179,10 +179,10 @@ Kinds n = Vec Kind n
 -- has something to key on.  See `inputᵖ` for the placement that gives
 -- one token per arrival.
 --
--- A SHARED SLOT STANDS AT THE ENVELOPE, and the same objection does
+-- A SHARED SLOT STANDS AT THE INSTEMIT, and the same objection does
 -- not reach it, because its content is not a script.  A shared
 -- definition is an srxjs program, so it has ALREADY been elaborated
--- and already carries the envelopes `inputᵖ` would otherwise build --
+-- and already carries the InstEmits `inputᵖ` would otherwise build --
 -- which is why the reference to it is a transport and not a second
 -- wrapping.  Wrapping it twice is what refuted `mapᵉ laneᵛ ∘
 -- elaborate` as a reading, over an empty inner and so structurally.

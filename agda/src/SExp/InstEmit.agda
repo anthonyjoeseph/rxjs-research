@@ -1,8 +1,8 @@
--- THE ANCHOR FOR THE IMPL ENVELOPE'S ABANDONED SHAPES, AND THEY FORM A
+-- THE ANCHOR FOR THE IMPL INSTEMIT'S ABANDONED SHAPES, AND THEY FORM A
 -- TREE CARRIED IN THE KEYS, NOT IN INDENTATION (Anthony).  One entry
--- each, keyed by a path -- `envelope/<question>/<route>: what
+-- each, keyed by a path -- `InstEmit/<question>/<route>: what
 -- structurally blocked it; row N @ <sha>.` -- so that
--- `make find-prose Q='envelope/owed'` returns a whole subtree, where a
+-- `make find-prose Q='InstEmit/owed'` returns a whole subtree, where a
 -- nested comment would lose its parent under grep.  The interior nodes
 -- are the design questions: where the owed count lives, what triggers
 -- the flush, how completion is signalled.  The row is the bug-cache
@@ -10,12 +10,12 @@
 -- killed: that row passes under the next shape, so it cannot stay a
 -- failing row, and the entry is what remembers it.
 --
--- DEAD ROUTE envelope/lane/book-last: running the re-stamped outer
---   envelope AFTER the lane's inner streams moves its instant's first
+-- DEAD ROUTE InstEmit/lane/book-last: running the re-stamped outer
+--   InstEmit AFTER the lane's inner streams moves its instant's first
 --   appearance behind the values it caused, and the spec orders a burst's
 --   batches by first appearance, value-less emits included, so the batches
 --   come out permuted; row 9 @ 0de565ef.
--- DEAD ROUTE envelope/flush/end-mark-on-outer: a mark a delivery carries
+-- DEAD ROUTE InstEmit/flush/end-mark-on-outer: a mark a delivery carries
 --   behind its value, for the root to read as the end of its instant, is
 --   an OUTER emit wherever the delivery's path enters a flattener as its
 --   outer -- `switchAllᵉ` cuts the live lane on it, `exhaustAllᵉ` drops
@@ -23,17 +23,17 @@
 --   the outer it loses its position, and one regenerated inside the lane
 --   lands before a share's later subscribers have had the value.  Through
 --   an inner, and through an unbounded `mergeAllᵉ`'s outer, it passes.
--- DEAD ROUTE envelope/flush/root-merge: bracketing the subscribe burst as
+-- DEAD ROUTE InstEmit/flush/root-merge: bracketing the subscribe burst as
 --   `mergeAllᵉ` of the run and a one-emit `ofᵉ` puts a flattener above the
 --   whole run, and the evaluator's cost is multiplicative in flattener
 --   nesting (`typecheck-performance-numbers.md`), so it costs more than
 --   the `batchSyncᵉ` it replaces.
--- DEAD ROUTE envelope/flush/sentinel-registration: a registration read as
+-- DEAD ROUTE InstEmit/flush/sentinel-registration: a registration read as
 --   the last of its arrival stays last only until something registers
 --   after it -- the registry is appended and dispatched oldest-first, a
 --   `deferᵉ` re-registration lands a tick late, and a cold slot has one
 --   timeline per registration, so no one registration closes them all.
-module Rx.Envelope where
+module SExp.InstEmit where
 
 open import Data.Bool using (true; false)
 open import Data.List using (_∷_)
@@ -46,15 +46,15 @@ open import Rx.Exp using (Ty; Ctx; Tm; unitᵗ; boolᵗ; uniqᵗ; _×ᵗ_; _+ᵗ
                           renTm; ext∈)
 
 ------------------------------------------------------------------
--- The protocol envelope, as a TYPE of the object language.
+-- The protocol InstEmit, as a TYPE of the object language.
 ------------------------------------------------------------------
 
--- THE ENVELOPE STOPS BEING THE MACHINE'S AND BECOMES THE PROGRAM'S.
+-- THE INSTEMIT STOPS BEING THE MACHINE'S AND BECOMES THE PROGRAM'S.
 -- `Rx.Prim` declares the same four shapes in Agda, where they are the
 -- return type of the evaluator and so are minted by the machine on
 -- every emit whether the program asked for one or not.  Here they are
 -- ordinary types the author-facing tree ELABORATES into, so an emit
--- carrying an envelope is an emit whose payload happens to be a tuple
+-- carrying an InstEmit is an emit whose payload happens to be a tuple
 -- and the evaluator owes nothing.  Nothing is duplicated between the
 -- two: the meta-level record stays for the acceptance oracle and the
 -- spec, which read a finished stream, while these are what a running
@@ -67,7 +67,7 @@ open import Rx.Exp using (Ty; Ctx; Tm; unitᵗ; boolᵗ; uniqᵗ; _×ᵗ_; _+ᵗ
 -- at `unitᵗ` the very same shapes are what an AUTHOR may write, because
 -- the sole inhabitant is `tt` and a slot standing there can carry no
 -- claim about provenance at all.  One vocabulary, two instantiations,
--- and the difference between the machine's envelope and the author's is
+-- and the difference between the machine's InstEmit and the author's is
 -- a type argument rather than a second family.
 --
 -- THE PAYLOAD-FREE CASES ARE SPELLED AS NESTED SUMS OF `unitᵗ` because
@@ -104,7 +104,7 @@ machineEmitᵗ a = instEmitᵗ uniqᵗ a
 
 
 ------------------------------------------------------------------
--- The envelope, as TERMS: the constructors and the one eliminator.
+-- The InstEmit, as TERMS: the constructors and the one eliminator.
 ------------------------------------------------------------------
 
 -- WITHOUT THESE THE TYPES ABOVE ARE UNUSABLE, AND THE REASON IS THAT
@@ -188,7 +188,7 @@ instEmitᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u a}
 instEmitᵛ evs inst src k = pairᵗ evs (pairᵗ inst (pairᵗ src k))
 
 ------------------------------------------------------------------
--- The two halves of every elaborated operator's envelope handling.
+-- The two halves of every elaborated operator's InstEmit handling.
 ------------------------------------------------------------------
 
 -- SPLITTING IS A REBUILD AND NOT A FILTER, WHICH IS THE ONE THING THIS
@@ -238,7 +238,7 @@ splitEventsᵛ {Θ = Θ} {u = u} {a = a} {b = b} evs =
 
 -- and the other half: the events in the protocol's normalized order —
 -- bookkeeping, then the payloads, then the completion if this emit is
--- the one carrying it — under the incoming envelope's own instant,
+-- the one carrying it — under the incoming InstEmit's own instant,
 -- source and kind, none of which an operator of this shape may change.
 reassembleᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u a b}
             → Tm Γ Δᵍ Δ Θ (instEmitᵗ u a)

@@ -2,7 +2,7 @@
 -- DECIDING TWO BATCHINGS EQUAL AS A BOOLEAN, for the two compiled
 -- binaries that have to compare them without a typechecker underneath.
 -- What is compared is the top line's currency: the batches' raw
--- values, with no envelope left on either side.
+-- values, with no InstEmit left on either side.
 --
 -- WHY A BOOLEAN AND NOT A DECISION PROCEDURE.  Nothing here is used in
 -- a proof: both consumers are `main`s that print a verdict, so what is
@@ -24,7 +24,7 @@
 -- vocabulary so that the cone either caller pays for is that
 -- vocabulary and nothing else.
 ------------------------------------------------------------------
-module Rx.Emit-Eq where
+module CLI.Emit-Eq where
 
 open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.List using (List; []; _∷_)

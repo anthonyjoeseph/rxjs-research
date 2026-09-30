@@ -16,13 +16,13 @@ postulate
   deferᵖ : SExp Γ t → Exp Γ t
 
 mutual
-  toEnvelope : SExp Γ t → Exp Γ t
-  toEnvelope (liftˢ f)  = liftᵖ (toEnvelopeTm f)
-  toEnvelope (deferˢ e) = deferᵖ (toEnvelope e)
-  toEnvelope (notˢ b)   = liftᵉ (primᵗ notᵖ (toEnvelopeTm b))
+  toInstEmit : SExp Γ t → Exp Γ t
+  toInstEmit (liftˢ f)  = liftᵖ (toInstEmitTm f)
+  toInstEmit (deferˢ e) = deferᵖ (toInstEmit e)
+  toInstEmit (notˢ b)   = liftᵉ (primᵗ notᵖ (toInstEmitTm b))
 
-  toEnvelopeTm : STm Γ t → Tm Γ t
-  toEnvelopeTm (natˢ k) = nat̂ k
+  toInstEmitTm : STm Γ t → Tm Γ t
+  toInstEmitTm (natˢ k) = nat̂ k
 
 liftᵖ : Tm Γ t → Exp Γ t
 liftᵖ f = liftᵉ (primᵗ add f)

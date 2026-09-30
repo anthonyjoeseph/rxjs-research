@@ -24,7 +24,7 @@ open import Rx.Exp        using (Ctx)
 open import SExp.Syntax      using (SExp; Kinds)
 open import SExp.Simul-Slots using (SimulSlots)
 open import Timed.Translation     using (timed; timedSlots; packetOf)
-open import Implementation.Pipeline using (runᴵ)
+open import SExp.Pipeline using (runᴵ)
 open import Batchable.Inst-Extract using (instExtract)
 
 Timing-Correct : Set

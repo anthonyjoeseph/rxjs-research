@@ -72,7 +72,7 @@ E2.
 
   If what a probe actually pins is the **evaluator** rather than a statement,
   it is not a probe — it is a unit test, and its home is the bug cache
-  (`Implementation/Unit-Test.agda`, `make bug-cache`).
+  (`CLI/Unit-Test.agda`, `make bug-cache`).
 
 - **E6 — A PROBE IS A RECEIPT OR A FORK, NEVER NEITHER AND NEVER BOTH.** The
   two products are different. A `-- TARGET:` probe instantiates ONE statement

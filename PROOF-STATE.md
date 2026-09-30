@@ -218,21 +218,21 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 2 — an impl envelope the spec batches agree with
+## Tier 2 — an impl InstEmit the spec batches agree with
 
 **THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
 are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
-close without changing one of them, STOP and report that proof. The envelope's
+close without changing one of them, STOP and report that proof. The InstEmit's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
 `QuickCheck` decides the top line's computable half on random programs, on
 the flat run: impl≡spec and left-to-right. **DONE IS THE AGDA
 QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
-`Rx.Envelope`'s header; counterexamples go in the bug cache.
+`SExp.InstEmit`'s header; counterexamples go in the bug cache.
 
 ### The monster
 
-(no monster) — the tier is one operator and its envelope against one
+(no monster) — the tier is one operator and its InstEmit against one
 executable check. There is no declaration here whose falsity a cone could
 bound.
 
@@ -254,13 +254,13 @@ bound.
 - **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
   The PLAIN rows: a switched-away inner stays subscribed (`seed 6 depth 1
   case 4`), and an inner arriving while one is live is not dropped (`seed 7
-  depth 1 case 12`). Mirror the plain formers' bookkeeping in the envelope.
+  depth 1 case 12`). Mirror the plain formers' bookkeeping in the InstEmit.
 
 - **BATCH A LATER ARRIVAL'S EMITS — POSSIBLY A QUESTION FOR ANTHONY.** Past
   the subscribe frame `batchSimultaneousᵖ` batches each emit alone (bug-cache
-  row 4), and `batchable` hands it one emit per tick, so the envelope must
+  row 4), and `batchable` hands it one emit per tick, so the InstEmit must
   carry where each instant ends; the four routes tried are dead routes in
-  `Rx.Envelope`'s header, and what is left may move `Rx.Exp` or the evaluator.
+  `SExp.InstEmit`'s header, and what is left may move `Rx.Exp` or the evaluator.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   Depth 1 is the sweep that fits, and some programs cost exponentially in

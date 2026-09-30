@@ -11,12 +11,12 @@
 --
 -- WHY THE PREDICATES ARE BOOLEANS RATHER THAN EQUATIONS.  Each is the
 -- decision of one statement's conclusion on one row, settled by
--- `Rx.Emit-Eq` where it is an agreement -- the family the QuickCheck
+-- `CLI.Emit-Eq` where it is an agreement -- the family the QuickCheck
 -- binary decides with, so a cached case and the seed that found it are
 -- answering one question.
 --
 -- A ROW IS AN AUTHOR'S PROGRAM, AND THE HARNESS ROOT IS WHAT MAKES IT
--- ONE RUN.  Batching reads the protocol off an ENVELOPE, and only an
+-- ONE RUN.  Batching reads the protocol off an INSTEMIT, and only an
 -- elaborated program carries one, so a row holds an `SExp` and the
 -- three steps between it and a verdict -- elaborate, cap, decode -- sit
 -- here rather than in either harness.  Sharing them is not tidiness: a
@@ -29,7 +29,7 @@
 -- refusing, which the QuickCheck binary reports unpasteably, and it
 -- stays out of a corpus whose verdict gates the build.
 ------------------------------------------------------------------
-module Implementation.Unit-Test.Prelude where
+module CLI.Unit-Test.Prelude where
 
 open import Data.Bool using (Bool; true; false; T; _∨_; not)
 open import Data.Unit using (tt)
@@ -44,28 +44,28 @@ open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Rx.Prim using (InstEmit; ObservableInput)
 open import Rx.Exp using (Ctx; Closed; Val; natᵗ; listᵗ; takeᵉ; nat̂; inputsBelowᵉ)
 open import SExp.Syntax using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ)
-open import Rx.Envelope.Decode using (decodeEmits)
+open import SExp.InstEmit.Decode using (decodeEmits)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import SExp.Plain using (plainExp; plainValues)
 open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; plainSlots)
-open import Rx.Emit-Eq using (eqListℕ; eqBatches)
+open import CLI.Emit-Eq using (eqListℕ; eqBatches)
 open import Function using (_∘_)
-open import Implementation.Pipeline using (elaborateImpl; embedSlotsImpl)
-open import Rx.Batch using (batchSimultaneousᵖ)
+open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
+open import SExp.Batch using (batchSimultaneousᵖ)
 open import Batchable.Inst-Extract using (instExtract)
 import Spec
 open Spec ℕ _≟_ using (spec-batchSimultaneous)
 
 -- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
 -- the one an elaborated program stands in, where each slot holds the
--- envelope over the author's type
+-- InstEmit over the author's type
 Γ₂ : Ctx 2
 Γ₂ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
 
 -- SLOT ZERO IS SCRIPTED AND SLOT ONE IS SHARED.  A script is the only
 -- slot that schedules arrivals -- a share runs inside whatever
 -- subscribed it -- so without one every run is its subscribe burst
--- alone.  Slot one holds another srxjs program, stands at the ENVELOPE,
+-- alone.  Slot one holds another srxjs program, stands at the INSTEMIT,
 -- and may read slot zero.  The kind vector is not a free choice beside
 -- the table -- `SimulSlot` is indexed by it, so this line and `mkSlots`
 -- below are one statement.
@@ -135,8 +135,8 @@ open Case using (name; fuel; prog; slots)
 -- AND IT IS A PLAIN FORMER OVER THE ELABORATED PROGRAM RATHER THAN THE
 -- AUTHOR'S `takeˢ`, WHICH CUTS AT THE WRONG LEVEL FOR THIS JOB.  A
 -- `takeˢ` counts the author's VALUES, so a program whose every value
--- arrives in one envelope is not bounded by one at all; above the
--- elaboration the count is in ENVELOPES, and an envelope is one
+-- arrives in one InstEmit is not bounded by one at all; above the
+-- elaboration the count is in INSTEMITS, and an InstEmit is one
 -- delivery -- which is the quantity the harness's cost is linear in.
 -- The cap is a harness budget and not part of any program a row names,
 -- so it belongs above the elaboration on those grounds too.
@@ -154,7 +154,7 @@ runOf c = decodeEmits {Γ = Γ₂ᵉ} {a = natᵗ}
 ------------------------------------------------------------------
 
 -- THE PLAIN PROGRAM IS CAPPED IN VALUES AND THE ELABORATED ONE IN
--- ENVELOPES, so the two cuts are not one cut and a capped row is not
+-- INSTEMITS, so the two cuts are not one cut and a capped row is not
 -- compared.  A row neither cap reached is the uncapped run on both
 -- sides; `capped` says which rows those are, and a sweep counts them.
 capPlain : ∀ {t} → Closed Γ₂ t → Closed Γ₂ t

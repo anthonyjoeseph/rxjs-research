@@ -1,7 +1,7 @@
 # `make bug-cache` — the cached-counterexample corpus
 
 When you discover an implementation bug, capture it immediately as a row of
-`agda/src/Implementation/Unit-Test.agda` — a named program, run by a compiled
+`agda/src/CLI/Unit-Test.agda` — a named program, run by a compiled
 binary rather than normalised by the typechecker.
 
 These are a **performance cache** of discovered work: faster to recheck than

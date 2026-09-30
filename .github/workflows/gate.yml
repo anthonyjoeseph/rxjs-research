@@ -156,7 +156,7 @@ jobs:
       # same entries read-only. Two savers on one key is not an error but
       # it is a coin flip about which snapshot survives, and the gate's is
       # the one worth keeping: it covers the whole tower, while the sweep
-      # touches only the cone under `QuickCheck.agda`.
+      # touches only the cone under `CLI/QuickCheck.agda`.
       - name: Cache Agda interfaces
         uses: actions/cache@v4
         with:
@@ -242,7 +242,7 @@ jobs:
       # RESTORE-ONLY, both of them: the gate job owns these keys (see its own
       # comments for what they hold and why restoring one cannot make a check
       # pass that should fail). A miss costs this job a cold build of the cone
-      # under `QuickCheck.agda` and nothing else.
+      # under `CLI/QuickCheck.agda` and nothing else.
       - name: Restore Agda interfaces
         uses: actions/cache/restore@v4
         with:
@@ -301,7 +301,7 @@ jobs:
           fi
           echo "quickcheck: THE SWEEP FOUND SOMETHING — new bug-cache row(s):"
           echo
-          git --no-pager diff -- agda/src/Implementation/Unit-Test.agda
+          git --no-pager diff -- agda/src/CLI/Unit-Test.agda
           echo
           echo "Land these rows, then fix the implementation: 'make bug-cache'"
           echo "is green exactly when no known counterexample remains, so it"
@@ -345,7 +345,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: quickcheck-counterexamples
-          path: agda/src/Implementation/Unit-Test.agda
+          path: agda/src/CLI/Unit-Test.agda
           if-no-files-found: ignore
 
   # THE OTHER DIFFERENTIAL LEG, AND THE ONE NOTHING WAS RUNNING. `quickcheck`

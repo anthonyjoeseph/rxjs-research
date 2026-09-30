@@ -120,7 +120,7 @@ export const markSync = <A>(src: Observable<A>): Observable<Marked<A>> =>
 // because what the protocol is about is a source's LIFECYCLE — its
 // init, the registrations it opens, its close — and a bare value
 // carries none of that. So both constructors MINT the source id and
-// lay down the subscribe envelope themselves; a caller supplies only
+// lay down the subscribe InstEmit themselves; a caller supplies only
 // what the source has to say.
 //
 // They differ in exactly one place and everything else follows from

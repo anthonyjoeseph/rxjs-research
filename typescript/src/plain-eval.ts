@@ -27,7 +27,7 @@ import { PlainDriver, createPlainDriver, plainHop } from "./plain-driver.js";
 import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 
 // THE PLAIN LEG OF THE ORACLE: an Exp tree run as ORDINARY rxjs, with
-// no envelope anywhere in it (Anthony: "nothing involving InstEmit at
+// no InstEmit anywhere in it (Anthony: "nothing involving InstEmit at
 // all"). Every case below is one rxjs operator, which is the property
 // being tested — if a former cannot be written as one, the Agda
 // implementation has claimed a capability plain rxjs does not have, and

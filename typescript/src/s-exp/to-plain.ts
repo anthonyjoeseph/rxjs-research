@@ -1,11 +1,11 @@
 // THE ELABORATION: `SExp` -> `Exp`, mirroring Agda's `SExp.Elaborate`.
 //
 // This is the seam the whole Agda development turns on. `elaborate` is
-// `mint . toPlain`, and every envelope a running program ever sees is
+// `mint . toPlain`, and every InstEmit a running program ever sees is
 // put there by a clause of THIS function rather than by anything the
 // author wrote. The author's palette (s-exp.ts) has no `mint` and no
 // `batchSync`, so it is not that an author is discouraged from forging
-// an envelope -- there is no term for it.
+// an InstEmit -- there is no term for it.
 //
 // WHAT IS WRITTEN HERE AND WHAT IS POSTULATED. Only `inputP` is
 // transcribed, because it is the clause that matters: it is where a
@@ -67,7 +67,7 @@ export const machineEmitT = (a: Ty): Ty => instEmitT(uniqT, a);
 export const emitT = (t: Ty): Ty => machineEmitT(plainT(t));
 
 // ---------------------------------------------------------------
-// Envelope constructors (Agda: Rx.Envelope / SExp.Elaborate).
+// InstEmit constructors (Agda: SExp.InstEmit / SExp.Elaborate).
 // ---------------------------------------------------------------
 
 const varT = (ty: Ty, index: number): Tm => ({ type: "varT", ty, index });
@@ -115,8 +115,8 @@ const subscribeV: Tm = inl(emitKindT, unitV);
 const deliveryV: Tm = inr(emitKindT, inl(sum(unitT, unitT), unitV));
 
 // `instEmitV evs inst src k = pairT evs (pairT inst (pairT src k))` --
-// an envelope IS a nested pair at runtime, which is worth noticing:
-// there is no envelope RECORD in the plain tree, only a product the
+// an InstEmit IS a nested pair at runtime, which is worth noticing:
+// there is no InstEmit RECORD in the plain tree, only a product the
 // decoder reads back.
 const instEmitV = (a: Ty, evs: Tm, inst: Tm, src: Tm, kind: Tm): Tm =>
   pair(
@@ -267,9 +267,9 @@ export const inputP = (i: number, a: Ty, frame: Tm): Exp => {
 // ---------------------------------------------------------------
 
 // Each of these is a real definition in Agda's SExp.Elaborate and each
-// does envelope work of its own -- `ofP` brackets a one-shot burst
+// does InstEmit work of its own -- `ofP` brackets a one-shot burst
 // against the ambient frame, `mapP` rebuilds each emit under the
-// incoming envelope's own instant/source/kind, `mergeAllP` is
+// incoming InstEmit's own instant/source/kind, `mergeAllP` is
 // `mergeAll . map laneV`, and so on. They are left as leaves here
 // because the point of this file is the shape of the recursion and the
 // one clause above, not a second transcription of the elaboration.
@@ -280,12 +280,12 @@ export declare const mapP: (fn: Fn, src: Exp, t: Ty) => Exp;
 export declare const scanP: (fn: Fn, init: Tm, src: Exp, t: Ty) => Exp;
 // ONE OUTER EMIT'S LANE, and the type is the one you would reach for
 // by hand. `emitT (obs t)` unfolds through `plainT`'s observable clause,
-// so the outer emit's PAYLOAD is an observable of envelopes -- the
-// argument is an enveloped stream of enveloped streams, i.e. exactly
+// so the outer emit's PAYLOAD is an observable of InstEmits -- the
+// argument is an InstEmit stream of InstEmit streams, i.e. exactly
 //
 //   Observable<InstEmit<Observable<InstEmit<A>>>>
 //
-// `laneV` takes ONE of those outer envelopes and returns the lane it
+// `laneV` takes ONE of those outer InstEmits and returns the lane it
 // opens: the outer emit's own bookkeeping, re-stamped and payload-free,
 // followed by the inner streams that emit carried. Nothing mints here,
 // because BOTH layers arrive already stamped -- the inner's bookkeeping

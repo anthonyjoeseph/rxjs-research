@@ -1,7 +1,7 @@
 -- Encode an evaluated run's values as JSON, in stream order, by
 -- recursion on the root type t.
 --
--- THERE IS NO ENVELOPE TO PROJECT AWAY, AND THAT IS THE POINT
+-- THERE IS NO INSTEMIT TO PROJECT AWAY, AND THAT IS THE POINT
 -- (Anthony: the oracle wants "nothing involving InstEmit at all").
 -- What the comparison is about is whether this tree run as ORDINARY
 -- rxjs emits what the Agda evaluator emits, so ids, kinds,
