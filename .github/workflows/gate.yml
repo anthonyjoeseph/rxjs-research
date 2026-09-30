@@ -447,19 +447,28 @@ jobs:
       # draw is random and most of what it draws is silent, so a regression
       # on one of them is exactly what a sweep can miss. Replaying them costs
       # a second, and it runs even when the sweep went red, since the two
-      # findings are independent.
+      # findings are independent. EVERY file runs and the step fails at the
+      # end: the step's shell is `bash -e`, so a bare loop stops at the first
+      # red file and every file after it reads as never having been asked.
       - name: replay the pinned corpus
         if: always() && !cancelled()
         run: |
+          red=""
           for f in typescript/corpus/*.ndjson typescript/cases/*.ndjson; do
             echo "== ${f#typescript/}"
-            make oracle ARGS="--cases ${f#typescript/}"
+            make oracle ARGS="--cases ${f#typescript/}" || red="$red ${f#typescript/}"
           done
+          if [ -n "$red" ]; then echo "red:$red"; exit 1; fi
 
       # THE KNOWN COUNTEREXAMPLES, which check the evaluator rather than the
       # proof, so they run here beside the sweep. Green exactly when no known
       # counterexample remains. LAST, and on `always()`, so it runs whatever
       # the sweep found and a red here never hides the sweep.
+      #
+      # DISABLED WITH THE QUICKCHECK JOB ABOVE (Anthony): its rows are author
+      # programs checked through the elaboration, so it judges the SExp tree,
+      # which is tier 2's work; tier 1 is judged by the oracle alone. It
+      # comes back ON, unchanged, with the quickcheck job.
       - name: make bug-cache
-        if: always() && !cancelled()
+        if: false
         run: make bug-cache

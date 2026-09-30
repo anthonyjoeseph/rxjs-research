@@ -86,8 +86,14 @@ const runOnce = (bin: string, serialized: string[]): Promise<Run> =>
     child.stdin.end();
   });
 
-// each line is either `null` (declined case) or {"values":[...]} —
-// normalize null to an empty value list
+// each line is either `null` (declined case) or {"values":[...]}.
+//
+// A DECLINED CASE IS A CRASH, NOT AN EMPTY RUN. The CLI prints `null` when
+// the case does not DECODE -- a node whose `ty` disagrees with where it
+// sits, a slot telescope that is not stratified -- and read as `[]` that
+// passes for a verdict on any program rxjs answers with nothing, and for
+// a value mismatch on any other, pointing at the evaluator for what is a
+// malformed row.
 //
 // AND A NAT IS READ EXACTLY, FROM ITS SOURCE TEXT. The CLI prints ℕ as
 // digits, and `JSON.parse` alone would round anything past 2^53 to a
@@ -107,7 +113,7 @@ const parseLine = (line: string): EvalResult => {
       (JSON.parse(
         line,
         exactNats as (this: unknown, key: string, value: unknown) => unknown,
-      ) as EvalResult | null) ?? { values: [] }
+      ) as EvalResult | null) ?? { values: [], crash: "declined" }
     );
   } catch (e) {
     throw new Error(`Agda CLI produced non-JSON output: ${String(e)}`);

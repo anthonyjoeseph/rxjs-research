@@ -228,34 +228,41 @@ former gives (`typescript/src/timed.ts`, rule `echo`). Its type is settled
 Exp t`, with `typescript/src/flatten.ts` the rxjs it means. rxjs's own
 mergeAll/switchAll/exhaustAll are `flatAllᵉ` (`SExp.Plain`) and `flatAll`
 (`typescript/src/exp.ts`): a flatten over an element map that echoes
-nothing. The `Exp` change is licensed here and nowhere else. Done is the
-evaluator's lane bookkeeping collapsed onto the echo, `timed.ts` translating
-through it, and the gate green.
+nothing. The `Exp` change is licensed here and nowhere else. Done is the old
+formers deleted, the evaluator's lanes collapsed onto the echo, the oracle —
+its sweep and every pinned corpus — agreeing with rxjs, and the gate green.
+QuickCheck and the bug cache judge the SExp tree, so they are tier 2's and
+stay off in CI until then (Anthony).
 
 ### The monster
 
-(no monster) — a former swap judged by the oracle and the QuickCheck; no
+(no monster) — a former swap judged by the oracle alone; no
 statement here could be false, and the swap touches every module that cases
 on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **ONE LANE SHAPE IN THE EVALUATOR.** `deferᵉ`'s pending element is the
-  last `bare` lane: `subs-defer` registers `thru-outer bare mergeAllᵒ`. Retype
-  it as the echoing pair `(inj₁ tt , inj₂ body)` and `bare` and `Lanes` go,
-  with every `Support` lemma quantified over `Lanes`; `AllOp` folds into
-  `FlatOp` only if the policy tag and the syntax op coincide.
+- **BOUND THE EVALUATOR'S REWORK UNDER NESTED FLATTENERS.** A cold input
+  subscribed as a non-first lane, and a flatten whose outer is itself a
+  flatten, re-run their subscribe stages at a cost exponential in the
+  nesting: memory flat, CPU pinned, the run finishing late. One sweep case
+  already sits near the oracle's per-case cap, and the same shape is what
+  times the bug-cache rows out, so tier 2 inherits it; the evaluator is
+  this tier's, so the fix is too. Find the recomputed stage and share it.
 
-- **PORT `timed.ts` ONTO IT.** The translation's flatteners become
-  `flatten` read by `last-seen`, and the `flatAllSrc` fast path that routes a
-  lane-only flatten to the old rules goes, so every flatten takes the `echo`
-  rule. `timed-fuzz.ts --selftest` and a 500-seed sweep hold `mismatched` at
-  zero. The TypeScript half of tier 2's `timed` leg.
+- **RETYPE `deferᵉ`'S PENDING ELEMENT AS AN ECHOING PAIR.** It is the last
+  `bare` lane: `subs-defer` registers `thru-outer bare mergeAllᵒ`, and
+  `Domain`, `Floor` and `Rule-Kept` state it so. Register the pair
+  `(inj₁ tt , inj₂ body)` under `echoing` instead; the oracle's sweep and
+  every pinned file stay green.
 
-- **DELETE THE `max-` RULES.** With no flatten reaching them, the `max-`
-  rules, keys, trails and switch copies in `timed.ts` are dead; delete them
-  and the `timed-fuzz` fixtures that pin only them, keeping the ones that pin
-  the echo.
+- **DELETE `bare` AND `Lanes`.** With no `bare` producer the lane index has
+  one value; drop it from `thru-outer`, `thruEvents`, `redEvents` and every
+  `Support` lemma quantified over it.
+
+- **FOLD `AllOp` INTO `FlatOp`.** With one lane shape the evaluator's policy
+  tag and the syntax op name the same three policies; fold them if they
+  coincide, and record in `Rx.Evaluator`'s header why not if they do not.
 
 ### The ledger
 
@@ -315,7 +322,8 @@ bound.
   same programs read plain run at once: the cost is the ELABORATION's.
 
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
-  from the oracle's tree, as `qc-build` does. This leg closes the tier: the
+  from the oracle's tree, as `qc-build` does, and the oracle job's `make
+  bug-cache` step with it. This leg closes the tier: the
   check that decides tier 2 then guards it. Nothing in the job may be
   narrowed to make it pass.
 
@@ -351,6 +359,17 @@ still being rewritten there.
   `QuickCheck` and the bug cache still batch inside the program's own run,
   as `left-to-right` does, so a green row there is not a green row of `batchable`. Port
   `batchedᴮ` so the check decides the statement as written.
+
+- **PORT `timed.ts` ONTO `flatten`.** The translation's flatteners become
+  `flatten` read by `last-seen`, and the `flatAllSrc` fast path that routes a
+  lane-only flatten to the old rules goes, so every flatten takes the `echo`
+  rule. `timed-fuzz.ts --selftest` and a 500-seed sweep hold `mismatched` at
+  zero. The TypeScript half of tier 2's `timed` leg.
+
+- **DELETE THE `max-` RULES.** With no flatten reaching them, the `max-`
+  rules, keys, trails and switch copies in `timed.ts` are dead; delete them
+  and the `timed-fuzz` fixtures that pin only them, keeping the ones that pin
+  the echo.
 
 - **`timed-below` AND `timed-faithful` ONCE `timed` HAS A BODY.** Both are
   stated over tier 2's unwritten translation; probe each against the ported
