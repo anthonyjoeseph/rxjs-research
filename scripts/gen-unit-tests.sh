@@ -158,8 +158,8 @@ for seed in $(seq "$FIRST" "$LAST"); do
     ' "$tmp" > "$row"
 
     # line 2 is the program, and it is the whole key: every row is held to
-    # BOTH properties, so a program that fails agreement and well-formedness
-    # at once dedups to one row rather than being cached twice
+    # all four statements, so a program that fails several at once dedups
+    # to one row rather than being cached twice
     key="$(sed -n '2p' "$row")"
     if grep -Fqx -- "$key" "$CORPUS"; then
       continue
@@ -168,7 +168,7 @@ for seed in $(seq "$FIRST" "$LAST"); do
     # one seed can yield several blocks, and two seeds can find the same
     # shape, so the label is disambiguated rather than assumed unique
     label="$seed"; n=1
-    while grep -Fq -- "\"$label\" 30" "$CORPUS"; do
+    while grep -Fq -- "\"$label\" " "$CORPUS"; do
       n=$((n + 1)); label="$seed-$n"
     done
     sed -i "1s/\"?\"/\"$label\"/" "$row"

@@ -1,4 +1,4 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -55,7 +55,7 @@ all: help
 # The two differential-test workflows:
 #
 #   make oracle       rxjs (TS) vs the Agda oracle, per generated program
-#   make quickcheck   impl- vs spec-batchSimultaneous, all in Agda
+#   make quickcheck   the four statements of Main, each at its own sides, all in Agda
 #
 # Both accept arguments after ARGS=. See each target below for the exact syntax
 # and seed examples. `make help` shows the descriptions.
@@ -179,8 +179,11 @@ help:
 	@echo "                  make oracle ARGS='--seed 1'   (ONE seed only)"
 	@echo "                  make oracle ARGS='--operator mergeAll'"
 	@echo "  qc-build      compile the all-Agda QuickCheck binary ($(ORACLE_BIN)/QuickCheck)"
-	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs)"
-	@echo "  quickcheck    all-Agda QuickCheck: impl- vs spec-batchSimultaneous"
+	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs,"
+	@echo "                  QC_FUEL=n, QC_STMT=1..4 for one statement in Main's order, 0 for all four)"
+	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful"
+	@echo "                qc-fast on that one statement of Main"
+	@echo "  quickcheck    all-Agda QuickCheck: the four statements of Main, caching counterexamples"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
 	@echo "                  make quickcheck ARGS='1 500 300 5' (seeds 1..500, 300 runs, depth 5)"
@@ -1668,17 +1671,25 @@ quickcheck: qc-build
 # THE DEV LOOP: one sweep under a HARD time budget.  Over budget is a
 # failure, not a wait -- the budget is what keeps the loop a loop, and it
 # is raised only once the operator passes at the current one.
-# QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
+# QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds; QC_FUEL 0 is the binary's
+# default fuel.
 #
-# IT GATES ON EVERY CHECK.  Each is one top-line statement, decided on
-# one program's run, and every one of them is
-# a claim about the implementation -- so any of them failing is a known
-# counterexample, printed with its count and samples.
+# FOUR QUICKCHECKS, ONE PER STATEMENT `Main` IMPORTS.  Each decides that
+# statement's own two sides on one program's run, so any of them failing
+# is a known counterexample to it, printed with its count and samples.
+# QC_STMT names one, in `Main`'s order; 0 gates on all four.
 QC ?= 1 15 1
 QC_BUDGET ?= 120
+QC_FUEL ?= 0
+QC_STMT ?= 0
 QC_LOG := agda/_oracle/qc.log
+QC_IN = $(word 1,$(QC)) $(or $(word 2,$(QC)),200) $(or $(word 3,$(QC)),4) 0 0 0 $(QC_FUEL) $(QC_STMT)
+qc-left-to-right:  ; @$(MAKE) --no-print-directory qc-fast QC_STMT=1
+qc-timing-correct: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=2
+qc-batchable:      ; @$(MAKE) --no-print-directory qc-fast QC_STMT=3
+qc-timed-faithful: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=4
 qc-fast: qc-build
-	@printf '%s\n' "$(QC)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG); \
+	@printf '%s\n' "$(QC_IN)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG); \
 	ec=$$?; head -c 6000 $(QC_LOG); \
 	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
 	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \

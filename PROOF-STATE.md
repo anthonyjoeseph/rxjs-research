@@ -225,8 +225,9 @@ are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
 close without changing one of them, STOP and report that proof. The InstEmit's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
-`QuickCheck` decides the top line's computable half on random programs, on
-the flat run: impl≡spec and left-to-right. **DONE IS THE AGDA
+`QuickCheck` is four quickchecks, one per statement `Main` imports, each
+deciding that statement's own sides, uncapped, on the real evaluator
+(`make qc-left-to-right` and its three siblings). **DONE IS THE AGDA
 QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
 `SExp.InstEmit`'s header; counterexamples go in the bug cache.
 
@@ -239,8 +240,9 @@ bound.
 ### Big picture tier roadmap
 
 - **GIVE `timed` A BODY OVER `flattenᵉ`.** Until it has one,
-  `timing-correct` compares stamps against packets nothing defines, and
-  `timed-faithful` is the only thing standing between it and `empty`. Port
+  `timing-correct` compares stamps against packets nothing defines,
+  `timed-faithful` is the only thing standing between it and `empty`, and
+  their two quickchecks halt on the postulate. Port
   the `echo` rule of `typescript/src/timed.ts`, whose packets match rxjs call
   stacks on every generated program and which needs nothing `flattenᵉ`
   does not give.

@@ -39,7 +39,7 @@ open import Data.String using (String; _++_; words)
 
 open import CLI.IO using (putStr; getContents; _>>=_; Unit)
 open import CLI.Unit-Test using (cases)
-open import CLI.Unit-Test.Prelude using (Case; checksOf)
+open import CLI.Unit-Test.Prelude using (Case; checksOf; statements)
 
 open Case using (name)
 
@@ -47,7 +47,7 @@ open Case using (name)
 -- several properties, and saying which is the whole value of the line
 --
 -- MATCHED IN A HELPER, NEVER BY A `with` ON THE VERDICTS.  A `with
--- agrees c` makes the TYPECHECKER normalise the run it abstracts, and
+-- holds s c` makes the TYPECHECKER normalise the run it abstracts, and
 -- the run is a whole `evaluate↓` over a variable case: measured, it
 -- exhausts any heap before the module finishes checking.
 verdict : Case → String → Bool → List String
@@ -59,7 +59,7 @@ verdicts c []             = []
 verdicts c ((l , b) ∷ bs) = verdict c l b ++ᴸ verdicts c bs
 
 faults : Case → List String
-faults c = verdicts c (checksOf c)
+faults c = verdicts c (checksOf statements c)
 
 lines : List String → String
 lines []       = ""

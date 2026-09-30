@@ -1,8 +1,9 @@
 -- An all-Agda QuickCheck: generate random well-typed programs (exp tree +
 -- scripted inputs) over a fixed 2-slot nat context, run them through the
--- evaluator, and decide every top-line statement that computes on the
--- run: the batcher's batches against the spec's, in raw values; the
--- batches joined back up against the plain program's values. A fast in-Agda dev loop for the implementation.
+-- real evaluator, and decide the four statements `Main` imports, each at
+-- its own two sides (`CLI.Unit-Test.Prelude`): four quickchecks, one per
+-- statement, selectable one at a time.  A fast in-Agda dev loop for the
+-- implementation.
 --
 --   agda --compile --compile-dir=_cli src/CLI/QuickCheck.agda
 --   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
@@ -69,9 +70,11 @@ open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; m
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import CLI.Emit-Eq using (eqBatches)
-open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; implBatchesOf;
-  specBatchesOf; specOf; plainOf; plainAgreesᵇ; agrees)
+open import CLI.Emit-Eq using (eqListℕ; eqBatches)
+open import SExp.Pipeline using (runᴵ)
+open import CLI.Unit-Test.Prelude using (Γ₂; κ₂; Case; mkSlots; cached; Statement;
+  left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; statements; statementName;
+  ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
@@ -702,11 +705,11 @@ showSExp (deferˢ e)      = "(deferˢ " ++ showSExp e ++ ")"
 -- reached only by paying for it.  `scripts/gen-unit-tests.sh` therefore
 -- bounds a SEED in wall clock and reports the ones it could not run.
 --
--- What retires it is the ROOT CAP, not a budget read from here: the
--- prelude's `capProg` puts a `takeᵉ` above every elaborated tree, which
--- unsubscribes the fixpoint instead of letting it be performed and then
--- discarded.  The wall-clock bound stays on as a backstop for whatever
--- the cap does not cut.
+-- AND NOTHING CUTS THE RUN FROM INSIDE, because every check is a
+-- statement's own sides at the drawn program, and a `takeᵉ` above it is
+-- a different program.  The fuel is the one budget the statements
+-- quantify over, so a sweep that cannot afford a case lowers the fuel
+-- (stdin's seventh number) or raises the wall clock, never the program.
 FUEL : ℕ
 FUEL = 30
 
@@ -717,9 +720,9 @@ FUEL = 30
 -- typecheck as it stands; the script substitutes the seed.  Line 2 --
 -- the program -- is the dedup key.
 --
--- ONE SHAPE FOR BOTH CHECKS, and that is what makes the key work: the
--- cache holds every row to BOTH properties, so a program that fails
--- either one wants the same row, and a program that fails both dedups
+-- ONE SHAPE FOR EVERY CHECK, and that is what makes the key work: the
+-- cache holds every row to all four statements, so a program that fails
+-- any one wants the same row, and a program that fails several dedups
 -- to it instead of being cached twice.
 --
 -- THE SLOT TABLE IS RENDERED RATHER THAN NAMED, because the sweep
@@ -727,29 +730,49 @@ FUEL = 30
 -- from the one that failed.  Both definitions are printed through the
 -- same `showSExp` the program goes through, and `mkSlots` is in the
 -- prelude so the corpus can see the name.
-pasteRow : SExp Γ₂ [] [] [] natᵗ
+pasteRow : ℕ → SExp Γ₂ [] [] [] natᵗ
          → Script → SExp Γ₂ [] [] [] natᵗ → String
-pasteRow e d₀ d₁ =
-  "\n-- <<<PASTE\n  cached \"?\" " ++ show FUEL ++ "\n          "
+pasteRow f e d₀ d₁ =
+  "\n-- <<<PASTE\n  cached \"?\" " ++ show f ++ "\n          "
        ++ showSExp e ++ "\n          (mkSlots (" ++ showScript d₀ ++ ")\n"
        ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- PASTE>>>\n"
 
-report : String → SExp Γ₂ [] [] [] natᵗ
-       → Script → SExp Γ₂ [] [] [] natᵗ
-       → List (List ℕ) → List (List ℕ) → List (InstEmit ℕ) → String
-report tag e d₀ d₁ impl spec raw =
-  "  " ++ tag ++ "\n    impl = " ++ showBatches impl
-       ++ "\n    spec = " ++ showBatches spec
-       ++ "\n    raw  = " ++ showStream raw ++ pasteRow e d₀ d₁
+-- what a case was drawn from: the program and its slot table
+Drawn : Set
+Drawn = SExp Γ₂ [] [] [] natᵗ × Script × SExp Γ₂ [] [] [] natᵗ
 
--- the batches joined back up against the plain program's values
-reportPlain : SExp Γ₂ [] [] [] natᵗ
-            → Script → SExp Γ₂ [] [] [] natᵗ
-            → List (List ℕ) → List ℕ → List (InstEmit ℕ) → String
-reportPlain e d₀ d₁ impl plain run =
-  "  PLAIN\n    impl  = " ++ showBatches impl
-       ++ "\n    plain = " ++ showVals plain
-       ++ "\n    raw   = " ++ showStream run ++ pasteRow e d₀ d₁
+showPair : {A : Set} → (A → String) → A × A → String
+showPair f (l , r) = "lhs = " ++ f l ++ "\n    rhs = " ++ f r
+
+showStamps : List (ℕ × List ℕ) → String
+showStamps []            = ""
+showStamps ((i , p) ∷ ps) = "@" ++ show i ++ showVals p ++ " " ++ showStamps ps
+
+-- ONE STATEMENT ON ONE CASE: whether it holds, and its sides rendered.
+-- EACH TAKES ITS SIDES AS ONE ARGUMENT.  A `let` is substituted at
+-- compile time, so a name used in the verdict and again in the report
+-- is two evaluations; a function argument is one shared thunk.
+pairᴸ : List ℕ × List ℕ → Bool × String
+pairᴸ (l , r) = eqListℕ l r , showPair showVals (l , r)
+
+pairᴮ : List (List ℕ) × List (List ℕ) → Bool × String
+pairᴮ (l , r) = eqBatches l r , showPair showBatches (l , r)
+
+pairsᵀ : List (ℕ × List ℕ) → Bool × String
+pairsᵀ ps = allPairsᵇ ps , "stamped = " ++ showStamps ps
+
+decide : Case → Statement → Bool × String
+decide c left-to-rightˢ  = pairᴸ (ltrSides c)
+decide c timing-correctˢ = pairsᵀ (stampsOf c)
+decide c batchableˢ      = pairᴮ (batchableSides c)
+decide c timed-faithfulˢ = pairᴸ (faithfulSides c)
+
+-- a report counts statements in `Main`'s order
+indexOf : Statement → ℕ
+indexOf left-to-rightˢ  = 0
+indexOf timing-correctˢ = 1
+indexOf batchableˢ      = 2
+indexOf timed-faithfulˢ = 3
 
 -- one count per former, in `allFormers` order, plus the obs-fold count
 Tally : Set
@@ -771,46 +794,36 @@ bumpEach fs (g ∷ gs) (c ∷ cs) =
 bump : Marks → Tally → Tally
 bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 
--- EACH RUN IS AN ARGUMENT, SO IT IS COMPUTED ONCE.  A `let` is
--- substituted at compile time, so a name used in three checks is three
--- evaluations; a function argument is one shared thunk.
---
 -- ONE CHECK PER STATEMENT, so a report says which claim a program
--- breaks rather than that it breaks one: FAIL is `batchable`, PLAIN is
--- `left-to-right`.
+-- breaks rather than that it breaks one.
 check : ℕ → Bool → String → List (ℕ × String)
 check k true  r = []
 check k false r = (k , r) ∷ []
 
-verdict : SExp Γ₂ [] [] [] natᵗ → Script → SExp Γ₂ [] [] [] natᵗ
-        → List (List ℕ) → List (InstEmit ℕ) → List ℕ
-        → List (ℕ × String)
-verdict e d₀ d₁ impl run plain =
-  check 0 (eqBatches impl spec) (report "FAIL" e d₀ d₁ impl spec run)
-  ++ᴸ check 1 (plainAgreesᵇ run impl plain) (reportPlain e d₀ d₁ impl plain run)
-  where
-  spec = specOf run
+judgeOf : ℕ → Drawn → Statement → Bool × String → List (ℕ × String)
+judgeOf f (e , d₀ , d₁) s (b , body) =
+  check (indexOf s) b ("  " ++ statementName s ++ "\n    " ++ body ++ pasteRow f e d₀ d₁)
 
-oneCase : ℕ → Gen (Marks × List (ℕ × String))
--- THE DRAWN TREE IS WHAT IS COUNTED AND WHAT IS PRINTED, AND THE CAP IS
--- NEITHER.  It is applied above the elaboration, so it is not a former
--- of the author's tree at all and cannot inflate a census; and a cached
--- row names the author's program, since the cap is the harness's and
--- `runOf` re-applies it wherever the row is run.
-oneCase d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
-  in pureG (marksˢ e , verdict e (proj₁ ds) (proj₂ ds)
-                               (implBatchesOf c) (runOf c) (plainOf c))
+verdicts : ℕ → Drawn → Case → List Statement → List (ℕ × String)
+verdicts f x c []       = []
+verdicts f x c (s ∷ ss) = judgeOf f x s (decide c s) ++ᴸ verdicts f x c ss
+
+oneCase : List Statement → ℕ → ℕ → Gen (Marks × List (ℕ × String))
+-- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
+-- the statement's sides at exactly the program a cached row names.
+oneCase ss f d = genExp d >>=G λ e → genSlots >>=G λ ds →
+  pureG (marksˢ e , verdicts f (e , proj₁ ds , proj₂ ds)
+                             (cached "?" f e (mkSlots (proj₁ ds) (proj₂ ds))) ss)
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
-runN : ℕ → ℕ → Gen (Tally × List (ℕ × String))
-runN zero    d = pureG (zeroTally , [])
-runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
+runN : List Statement → ℕ → ℕ → ℕ → Gen (Tally × List (ℕ × String))
+runN ss f zero    d = pureG (zeroTally , [])
+runN ss f (suc k) d = oneCase ss f d >>=G λ r → runN ss f k d >>=G λ acc →
   pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
 
 ------------------------------------------------------------------------
--- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE]"
+-- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT]"
 
 toCodes : String → List ℕ
 toCodes s = map toℕ (toList s)
@@ -861,7 +874,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = "FAIL" ∷ "PLAIN" ∷ []
+kinds = map statementName statements
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -873,7 +886,7 @@ samples k fs = concatStr (take 2 (ofKind k fs))
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -895,55 +908,66 @@ skipN zero    d = pureG 0
 skipN (suc k) d = genExp d >>=G λ _ → genSlots >>=G λ _ → skipN k d
 
 -- the paste row of ONE case, named by its 1-based index
-showAt : ℕ → ℕ → Gen String
-showAt n d = skipN (n ∸ 1) d >>=G λ _ →
+showAt : ℕ → ℕ → ℕ → Gen String
+showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
   genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (pasteRow e (proj₁ ds) (proj₂ ds))
+  pureG (pasteRow f e (proj₁ ds) (proj₂ ds))
 
 -- RUN ONE CASE, named the same way, so a case that hangs a sweep can be
 -- timed and re-run alone rather than by bisecting the count
-runAt : ℕ → ℕ → Gen (Marks × List (ℕ × String))
-runAt n d = skipN (n ∸ 1) d >>=G λ _ → oneCase d
+runAt : List Statement → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
+runAt ss f n d = skipN (n ∸ 1) d >>=G λ _ → oneCase ss f d
 
--- AND ONE SIDE OF IT, so a hang is attributed to the pipeline that owns
--- it: 1 the impl run, 2 the spec run, 4 the program read as plain rxjs,
--- anything else the raw run
-sideAt : ℕ → ℕ → ℕ → Gen String
-sideAt k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >>=G λ ds →
-  let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
-  in pureG (if k ≡ᵇ 1 then showBatches (implBatchesOf c)
-            else if k ≡ᵇ 2 then showBatches (specBatchesOf c)
-            else if k ≡ᵇ 4 then showVals (plainOf c)
-            else showStream (runOf c))
+-- THE STATEMENT A NUMBER NAMES, in `Main`'s order; zero is all four
+selected : ℕ → List Statement
+selected (suc zero)                   = left-to-rightˢ ∷ []
+selected (suc (suc zero))             = timing-correctˢ ∷ []
+selected (suc (suc (suc zero)))       = batchableˢ ∷ []
+selected (suc (suc (suc (suc zero)))) = timed-faithfulˢ ∷ []
+selected _                            = statements
 
--- THE CORPUS, EVERY ROW WITH BOTH SIDES PRINTED WHETHER OR NOT THEY
+-- the impl's raw run, decoded, for reading a batchable failure by
+rawOf : Case → String
+rawOf c = showStream (runᴵ κ₂ (Case.fuel c) (Case.prog c) (Case.slots c))
+
+-- AND ONE SIDE OF IT, so a hang is attributed to the statement that owns
+-- it: 1 to 4 that statement's sides, in `Main`'s order, anything else
+-- the impl's raw run
+sidesOf : ℕ → Case → String
+sidesOf k c with selected k
+... | s ∷ [] = proj₂ (decide c s)
+... | _      = rawOf c
+
+sideAt : ℕ → ℕ → ℕ → ℕ → Gen String
+sideAt f k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >>=G λ ds →
+  pureG (sidesOf k (cached "?" f e (mkSlots (proj₁ ds) (proj₂ ds))))
+
+-- THE CORPUS, EVERY ROW WITH EVERY SIDE PRINTED WHETHER OR NOT THEY
 -- AGREE.  A row is a probe before it is a guard, and a probe is read for
 -- its shape as much as for its verdict -- which the bug-cache runner,
 -- printing only failures, cannot show.  Zero generated cases asks for it.
-showRow : Case → String
-showRow c = Case.name c ++ (if agrees c then ": agree" else ": FAIL")
-  ++ "\n    impl = " ++ showBatches (implBatchesOf c)
-  ++ "\n    spec = " ++ showBatches (specBatchesOf c)
-  ++ "\n    raw  = " ++ showStream (runOf c) ++ "\n"
+lineOf : Statement → Bool × String → String
+lineOf s (b , body) =
+  "  " ++ statementName s ++ (if b then ": agree" else ": FAIL") ++ "\n    " ++ body ++ "\n"
+
+showRow : List Statement → Case → String
+showRow []       c = ""
+showRow (s ∷ ss) c = lineOf s (decide c s) ++ showRow ss c
 
 -- one row at a time, so a row that hangs is named by what printed before
 -- it; `k` picks one row, 1-based, and 0 runs them all
--- and `side` names one pipeline of it, as it does for a generated case
+-- and `side` names one statement of it, as it does for a generated case
 sideRow : ℕ → Case → String
-sideRow k c = Case.name c ++ ": " ++
-  (if k ≡ᵇ 1 then showBatches (implBatchesOf c)
-   else if k ≡ᵇ 2 then showBatches (specBatchesOf c)
-   else if k ≡ᵇ 4 then showVals (plainOf c)
-   else showStream (runOf c)) ++ "\n"
+sideRow k c = Case.name c ++ ": " ++ sidesOf k c ++ "\n"
 
 -- and a nonzero `f` runs every row at that fuel instead of its own
-printRows : ℕ → ℕ → ℕ → ℕ → List Case → IO Unit
-printRows f sd k i []       = putStr ""
-printRows f sd k i (c ∷ cs) =
+printRows : List Statement → ℕ → ℕ → ℕ → ℕ → List Case → IO Unit
+printRows ss f sd k i []       = putStr ""
+printRows ss f sd k i (c ∷ cs) =
   (if (k ≡ᵇ 0) ∨ (k ≡ᵇ i)
-   then putStr (if sd ≡ᵇ 0 then showRow c′ else sideRow sd c′)
+   then putStr (if sd ≡ᵇ 0 then Case.name c′ ++ "\n" ++ showRow ss c′ else sideRow sd c′)
    else putStr "") >>= λ _ →
-  printRows f sd k (suc i) cs
+  printRows ss f sd k (suc i) cs
   where
   c′ = if f ≡ᵇ 0 then c else record c { fuel = f }
 
@@ -957,19 +981,21 @@ main = getContents >>= λ s →
       only  = numAt 4 0 cs
       side  = numAt 5 0 cs
       fuelʳ = numAt 6 0 cs
-      res   = proj₁ (runN runs d (randList seed 2000000))
+      ss    = selected (numAt 7 0 cs)
+      f     = if fuelʳ ≡ᵇ 0 then FUEL else fuelʳ
+      res   = proj₁ (runN ss f runs d (randList seed 2000000))
       tally = proj₁ res
       fails = proj₂ res
   in if runs ≡ᵇ 0
-     then printRows fuelʳ side only 1 cases
+     then printRows ss fuelʳ side only 1 cases
      else if not (side ≡ᵇ 0)
-     then putStr (proj₁ (sideAt side only d (randList seed 2000000)) ++ "\n")
+     then putStr (proj₁ (sideAt f side only d (randList seed 2000000)) ++ "\n")
      else if not (only ≡ᵇ 0)
-     then putStr (dumpFails (proj₂ (proj₁ (runAt only d (randList seed 2000000)))))
+     then putStr (dumpFails (proj₂ (proj₁ (runAt ss f only d (randList seed 2000000)))))
      else if not (at ≡ᵇ 0)
-     then putStr (proj₁ (showAt at d (randList seed 2000000)))
+     then putStr (proj₁ (showAt f at d (randList seed 2000000)))
      else putStr (concatStr
-       (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs
+       (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " fuel " ∷ show f ∷ " — ran " ∷ show runs
         ∷ " cases, " ∷ show (length fails) ∷ " failures"
         ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
         ++ᴸ censusPairs allFormers (proj₁ tally)

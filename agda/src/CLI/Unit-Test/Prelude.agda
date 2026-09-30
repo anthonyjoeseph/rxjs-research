@@ -4,24 +4,14 @@
 --
 -- A CASE IS A PROGRAM, AND EVERY TOP-LINE STATEMENT IS CHECKED OF IT.
 -- Compiled, a run is a function call and asking several questions of it
--- is free -- so a row names a program, and every row is held to all of
--- the top-line statements that compute on it: the batcher's batches
--- against the spec's (`batchable`), and the batches joined back up
--- against the plain program's values (`left-to-right`).
+-- is free -- so a row names a program, and every row is held to the four
+-- statements `Main` imports, each at its own two sides.
 --
 -- WHY THE PREDICATES ARE BOOLEANS RATHER THAN EQUATIONS.  Each is the
 -- decision of one statement's conclusion on one row, settled by
 -- `CLI.Emit-Eq` where it is an agreement -- the family the QuickCheck
 -- binary decides with, so a cached case and the seed that found it are
 -- answering one question.
---
--- A ROW IS AN AUTHOR'S PROGRAM, AND THE HARNESS ROOT IS WHAT MAKES IT
--- ONE RUN.  Batching reads the protocol off an INSTEMIT, and only an
--- elaborated program carries one, so a row holds an `SExp` and the
--- three steps between it and a verdict -- elaborate, cap, decode -- sit
--- here rather than in either harness.  Sharing them is not tidiness: a
--- cached row and the seed that found it have to be the same run, and a
--- cap applied in one place and not the other is two.
 --
 -- WHAT IS NOT HERE, DELIBERATELY: a predicate for a run that went DRY.
 -- No builder constructs the marker, so a dry run is not a disagreement
@@ -31,30 +21,29 @@
 ------------------------------------------------------------------
 module CLI.Unit-Test.Prelude where
 
-open import Data.Bool using (Bool; true; false; T; _∨_; not)
+open import Data.Bool using (Bool; true; false; T; _∧_; not; _xor_)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.List using (List; []; _∷_; concat; length; map)
-open import Data.Nat using (ℕ; _<ᵇ_; _≟_)
+open import Data.List using (List; []; _∷_; map; all)
+open import Data.Nat using (ℕ; _≡ᵇ_)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
-open import Data.Product using (_×_; _,_; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
-open import Rx.Prim using (InstEmit; ObservableInput)
-open import Rx.Exp using (Ctx; Closed; Val; natᵗ; listᵗ; takeᵉ; nat̂; inputsBelowᵉ)
-open import SExp.Syntax using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ)
-open import SExp.InstEmit.Decode using (decodeEmits)
-open import Rx.Evaluator.Builder using (evaluate↓)
-open import SExp.Plain using (plainExp; plainValues)
-open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; plainSlots)
+open import Rx.Prim using (ObservableInput)
+open import Rx.Exp using (Ctx; natᵗ; inputsBelowᵉ)
+open import SExp.Syntax using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ; emitᵗ)
+open import Rx.Evaluator using (Burst)
+open import SExp.Plain using (plainExp)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
 open import CLI.Emit-Eq using (eqListℕ; eqBatches)
-open import Function using (_∘_)
-open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
-open import SExp.Batch using (batchSimultaneousᵖ)
-open import Batchable.Inst-Extract using (instExtract)
-import Spec
-open Spec ℕ _≟_ using (spec-batchSimultaneous)
+open import SExp.Pipeline using (emitsᴵ; runᴾ)
+open import Timed.Translation using (packetOf)
+open import Left-To-Right.Statement using (joinedᴵ)
+open import Timed.Timing-Correct using (stampedᵀ)
+open import Batchable.Statement using (batchedᴱ; groupedᴱ)
+open import Timed.Faithful using (untimedᵀ)
 
 -- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
 -- the one an elaborated program stands in, where each slot holds the
@@ -124,84 +113,73 @@ record Case : Set where
 
 open Case using (name; fuel; prog; slots)
 
--- THE ROOT CAP, AND IT IS WHAT MAKES A SWEEP FINITE AT ALL.  A guarded
--- fixpoint whose step hands back more than it was given costs the fuel
--- as an EXPONENT, and nothing in a generator declines to draw one.  A
--- budget on the emitted stream cannot retire that, because the cost is
--- inside one cascade rather than in the stream's spine, so the budget
--- is only reached by paying for it; a `takeᵉ` cuts instead, since it
--- unsubscribes the fixpoint.
+------------------------------------------------------------------
+-- THE FOUR STATEMENTS `Main` IMPORTS, EACH DECIDED AT ITS OWN SIDES.
+-- A side is the statement module's own definition applied at this row,
+-- never a restatement of it, so the check and the claim cannot drift
+-- apart: at `Γ₂`, `κ₂`, `natᵗ` and `tt`, what is compared here is what
+-- the statement says is equal.
 --
--- AND IT IS A PLAIN FORMER OVER THE ELABORATED PROGRAM RATHER THAN THE
--- AUTHOR'S `takeˢ`, WHICH CUTS AT THE WRONG LEVEL FOR THIS JOB.  A
--- `takeˢ` counts the author's VALUES, so a program whose every value
--- arrives in one InstEmit is not bounded by one at all; above the
--- elaboration the count is in INSTEMITS, and an InstEmit is one
--- delivery -- which is the quantity the harness's cost is linear in.
--- The cap is a harness budget and not part of any program a row names,
--- so it belongs above the elaboration on those grounds too.
-capProg : ∀ {t} → Closed Γ₂ᵉ t → Closed Γ₂ᵉ t
-capProg e = takeᵉ (nat̂ 24) e
-
--- the run a row names: the author's program elaborated, capped, driven
--- by the slot table, and decoded -- `runᴵ` under the harness cap
-runOf : Case → List (InstEmit (Val Γ₂ᵉ natᵗ))
-runOf c = decodeEmits {Γ = Γ₂ᵉ} {a = natᵗ}
-            (concat (evaluate↓ (fuel c) (capProg (elaborateImpl κ₂ (prog c))) (embedSlotsImpl (slots c))))
-
-------------------------------------------------------------------
--- `left-to-right`.
+-- NO CAP.  A `takeᵉ` above the program -- counted in InstEmits or in
+-- values -- runs a different program from the one the row names, and a
+-- capped run is an instance of no statement.  The fuel is the one budget
+-- the statements quantify over, so it is the one a row may set.
 ------------------------------------------------------------------
 
--- THE PLAIN PROGRAM IS CAPPED IN VALUES AND THE ELABORATED ONE IN
--- INSTEMITS, so the two cuts are not one cut and a capped row is not
--- compared.  A row neither cap reached is the uncapped run on both
--- sides; `capped` says which rows those are, and a sweep counts them.
-capPlain : ∀ {t} → Closed Γ₂ t → Closed Γ₂ t
-capPlain e = takeᵉ (nat̂ 24) e
+data Statement : Set where
+  left-to-rightˢ timing-correctˢ batchableˢ timed-faithfulˢ : Statement
 
-plainOf : Case → List ℕ
-plainOf c = plainValues (concat (evaluate↓ (fuel c) (capPlain (plainExp (prog c))) (plainSlots (slots c))))
+-- in `Main`'s order, which is the order a report counts them in
+statements : List Statement
+statements = left-to-rightˢ ∷ timing-correctˢ ∷ batchableˢ ∷ timed-faithfulˢ ∷ []
 
--- the batches joined back up against the plain run; over the two runs,
--- so a harness that has them computes neither twice
-plainAgreesᵇ : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ) → List ℕ → Bool
-plainAgreesᵇ run impl plain =
-  not (length run <ᵇ 24) ∨ not (length plain <ᵇ 24)
-    ∨ eqListℕ (concat impl) plain
+statementName : Statement → String
+statementName left-to-rightˢ  = "left-to-right"
+statementName timing-correctˢ = "timing-correct"
+statementName batchableˢ      = "batchable"
+statementName timed-faithfulˢ = "timed-faithful"
 
-------------------------------------------------------------------
--- `batchable`: the batcher on the run the row's program gives.
-------------------------------------------------------------------
+-- `left-to-right`: the batches joined back up, and the plain run
+ltrSides : Case → List ℕ × List ℕ
+ltrSides c = joinedᴵ tt κ₂ (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
 
--- THE BATCHER IS RUN INSIDE THE MACHINE, OVER THE ROW'S OWN PROGRAM,
--- as `left-to-right` states it: that is the operator the TypeScript
--- port mirrors.
-implBatchesOf : Case → List (List ℕ)
-implBatchesOf c =
-  map proj₂ (instExtract (decodeEmits {Γ = Γ₂ᵉ} {a = listᵗ natᵗ}
-    (concat (evaluate↓ (fuel c)
-                       (batchSimultaneousᵖ (capProg (elaborateImpl κ₂ (prog c))))
-                       (embedSlotsImpl (slots c))))))
+-- `timing-correct`: each value's stamp, beside its packet
+stampsOf : Case → List (ℕ × List ℕ)
+stampsOf c = map (λ p → proj₁ p , packetOf natᵗ (proj₂ p)) (stampedᵀ κ₂ (fuel c) (prog c) (slots c))
 
-specOf : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ)
-specOf = spec-batchSimultaneous ∘ instExtract
+-- `batchable`: both sides read one run's emits, so the run is an
+-- argument and computed once
+batchSides : Burst Γ₂ᵉ (emitᵗ natᵗ) → List (List ℕ) × List (List ℕ)
+batchSides es = batchedᴱ natᵗ tt es , groupedᴱ natᵗ tt es
 
-specBatchesOf : Case → List (List ℕ)
-specBatchesOf c = specOf (runOf c)
+batchableSides : Case → List (List ℕ) × List (List ℕ)
+batchableSides c = batchSides (emitsᴵ κ₂ (fuel c) (prog c) (slots c))
 
-agrees : Case → Bool
-agrees c = eqBatches (implBatchesOf c) (specBatchesOf c)
+-- `timed-faithful`: the timed program's run untimed, and the plain run
+faithfulSides : Case → List ℕ × List ℕ
+faithfulSides c = untimedᵀ tt κ₂ (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
 
-------------------------------------------------------------------
--- EVERY CHECK AT ONCE, OVER RUNS COMPUTED ONCE.  Each argument is one
--- shared thunk, where each `Case`-level check would re-run the program:
--- a row costs its runs, not its runs times its checks.
-------------------------------------------------------------------
-checks : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ) → List ℕ → List (String × Bool)
-checks run impl plain =
-  ("batchable" , eqBatches impl (specOf run))
-  ∷ ("left-to-right" , plainAgreesᵇ run impl plain) ∷ []
+-- `Coherent`, decided: same stamp exactly when same packet
+coherentᵇ : ℕ × List ℕ → ℕ × List ℕ → Bool
+coherentᵇ (i , p) (j , q) = not ((i ≡ᵇ j) xor eqListℕ p q)
 
-checksOf : Case → List (String × Bool)
-checksOf c = checks (runOf c) (implBatchesOf c) (plainOf c)
+-- `AllPairs`, decided
+allPairsᵇ : List (ℕ × List ℕ) → Bool
+allPairsᵇ []       = true
+allPairsᵇ (x ∷ xs) = all (coherentᵇ x) xs ∧ allPairsᵇ xs
+
+-- each takes its sides as ONE argument, so a pair is computed once
+agreeᴸ : List ℕ × List ℕ → Bool
+agreeᴸ (l , r) = eqListℕ l r
+
+agreeᴮ : List (List ℕ) × List (List ℕ) → Bool
+agreeᴮ (l , r) = eqBatches l r
+
+holds : Statement → Case → Bool
+holds left-to-rightˢ  c = agreeᴸ (ltrSides c)
+holds timing-correctˢ c = allPairsᵇ (stampsOf c)
+holds batchableˢ      c = agreeᴮ (batchableSides c)
+holds timed-faithfulˢ c = agreeᴸ (faithfulSides c)
+
+checksOf : List Statement → Case → List (String × Bool)
+checksOf ss c = map (λ s → statementName s , holds s c) ss

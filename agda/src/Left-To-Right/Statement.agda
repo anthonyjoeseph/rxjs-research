@@ -26,28 +26,33 @@
 module Left-To-Right.Statement where
 
 open import Data.Bool    using (T)
-open import Data.List    using ([]; concat; map)
+open import Data.List    using (List; []; concat; map)
 open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel)
-open import Rx.Exp        using (Ctx; isData)
+open import Rx.Exp        using (Ctx; Val; isData)
 open import SExp.Syntax      using (SExp; Kinds)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import SExp.Plain     using (plainExp; unplainᵈ; plainValues)
-open import SExp.Simul-Slots using (SimulSlots; plainSlots)
+open import SExp.Plain     using (unplainᵈ)
+open import SExp.Simul-Slots using (SimulSlots)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import SExp.Batch     using (batchSimultaneousᵖ)
-open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
+open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl; runᴾ)
 open import Batchable.Inst-Extract using (instExtract)
+
+-- the batches, joined back up
+joinedᴵ : ∀ {n} {Γ : Ctx n} {t} → T (isData t) → (κ : Kinds n) → Fuel
+        → SExp Γ [] [] [] t → SimulSlots Γ κ → List (Val Γ t)
+joinedᴵ {t = t} ok κ fuel e ins =
+  map (unplainᵈ t ok) (concat (map proj₂ (instExtract (decodeEmits
+      (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins)))))))
 
 Left-To-Right : Set
 Left-To-Right =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
     (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
-  map (unplainᵈ t ok) (concat (map proj₂ (instExtract (decodeEmits
-      (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins)))))))
-    ≡ plainValues (concat (evaluate↓ fuel (plainExp e) (plainSlots ins)))
+  joinedᴵ ok κ fuel e ins ≡ runᴾ fuel e ins
 
 postulate
   left-to-right : Left-To-Right

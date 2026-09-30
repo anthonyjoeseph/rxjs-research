@@ -32,7 +32,8 @@ open import SExp.InstEmit.Decode using (decodeEmits)
 open import Rx.Evaluator using (Burst)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import SExp.Elaborate using (toInstEmit)
-open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; plainSlots)
+open import SExp.Plain using (plainExp; plainValues)
 
 -- ONE MINT FOR THE WHOLE PROGRAM.  `mintᵉ` draws once per subscription
 -- of the node it stands at, and it stands at the root, so every source
@@ -77,3 +78,10 @@ emitsᴵ κ fuel e ins = concat (evaluate↓ fuel (elaborateImpl κ e) (embedSlo
 runᴵ : ∀ {n} {Γ : Ctx n} {t : Ty} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t
      → SimulSlots Γ κ → List (InstEmit (Val (plainᵏ Γ κ) (plainᵗ t)))
 runᴵ κ fuel e ins = decodeEmits (emitsᴵ κ fuel e ins)
+
+-- AND WHAT IT IS HELD TO: the author's program read as plain rxjs, its
+-- values as a subscriber receives them.  One name for the one run that
+-- `left-to-right` and `timed-faithful` both compare against.
+runᴾ : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t : Ty} → Fuel → SExp Γ [] [] [] t
+     → SimulSlots Γ κ → List (Val Γ t)
+runᴾ fuel e ins = plainValues (concat (evaluate↓ fuel (plainExp e) (plainSlots ins)))

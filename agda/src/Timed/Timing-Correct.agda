@@ -13,26 +13,34 @@
 ------------------------------------------------------------------
 module Timed.Timing-Correct where
 
-open import Data.List    using ([])
+open import Data.List    using (List; [])
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (_×_; proj₁; proj₂)
 open import Function     using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim      using (Fuel)
-open import Rx.Exp        using (Ctx)
-open import SExp.Syntax      using (SExp; Kinds)
+open import Rx.Prim      using (Fuel; Id)
+open import Rx.Exp        using (Ctx; Val)
+open import SExp.Syntax      using (SExp; Kinds; plainᵏ; plainᵗ)
 open import SExp.Simul-Slots using (SimulSlots)
-open import Timed.Translation     using (timed; timedSlots; packetOf)
+open import Timed.Translation     using (timed; timedSlots; packetOf; timedᶜ; itemᵗ)
 open import SExp.Pipeline using (runᴵ)
 open import Batchable.Inst-Extract using (instExtract)
+
+-- the impl's run of the timed program: each value with its stamp
+stampedᵀ : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ
+         → List (Id × Val (plainᵏ (timedᶜ Γ κ) κ) (plainᵗ (itemᵗ t)))
+stampedᵀ κ fuel e ins = instExtract (runᴵ κ fuel (timed κ e) (timedSlots ins))
+
+-- same stamp exactly when same packet
+Coherent : ∀ {m} {Γ′ : Ctx m} t → (p q : Id × Val Γ′ (plainᵗ (itemᵗ t))) → Set
+Coherent t p q = (proj₁ p ≡ proj₁ q) ⇔ (packetOf t (proj₂ p) ≡ packetOf t (proj₂ q))
 
 Timing-Correct : Set
 Timing-Correct =
   ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
     (ins : SimulSlots Γ κ) →
-  AllPairs (λ p q → (proj₁ p ≡ proj₁ q) ⇔ (packetOf t (proj₂ p) ≡ packetOf t (proj₂ q)))
-           (instExtract (runᴵ κ fuel (timed κ e) (timedSlots ins)))
+  AllPairs (Coherent t) (stampedᵀ κ fuel e ins)
 
 postulate
   timing-correct : Timing-Correct
