@@ -31,7 +31,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _+ᵗ_; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; Lanes; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
+open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; echoᵗ; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
   switchKill; scanDispatch; takeDispatch; batchDispatch; thruWrap; shareDying; shareFinish;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
 open import Rx.Evaluator.Unconn-Arith using (KeepsC; keeps-refl; keeps-trans;
@@ -212,11 +212,11 @@ stepFrame-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                     (out , vals′ , fin′ , sched₁ , st₁)
                 → Keeps {e = e} sched st sched₁ st₁
 
-subscribeAll-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {ln : Lanes s u}
-                       {op} {ns : NodeState Γ} {b : Val Γ (obs s)}
+subscribeAll-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+                       {op} {ns : NodeState Γ} {b : Val Γ (obs (echoᵗ u))}
                        {κ : Path Γ lo u t} {now}
                        {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {out}
-                   → subscribeAll⇓ {e = e} ln op ns b κ now sched st
+                   → subscribeAll⇓ {e = e} op ns b κ now sched st
                        (out , sched₂ , st₁)
                    → Keeps {e = e} sched st sched₂ st₁
 

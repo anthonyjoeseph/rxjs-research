@@ -242,24 +242,23 @@ on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **DELETE `Lanes`.** `deferᵉ` now registers its pending element as an
-  echo-less pair under `echoing`, and `bare` is gone, so the lane index has
-  one value; drop it from `thru-outer`, `thruEvents`, `redEvents` and every
-  `Support` lemma quantified over it.
+- **FORCE THE SUCCESSOR.** Recompute is ruled out: answers are bound once
+  and traces carry them. What remains is residency — the bug-cache row
+  switching to two ofs spends nearly all its run in GC with a third of its
+  allocation live, retained by `liveRP`/`subRP` closures (a retainer
+  profile): a successor is a thunk over the whole answer below it (`next
+  an`, `held r`), so each continuation holds the run's history. Force it
+  where the fold builds it, and measure that row's residency against the
+  profile before anything else moves. Tier 2 may not touch the evaluator,
+  so this lands here.
 
-- **FOLD `AllOp` INTO `FlatOp`.** With one lane shape the evaluator's policy
-  tag and the syntax op name the same three policies; fold them if they
-  coincide, and record in `Rx.Evaluator`'s header why not if they do not.
+- **CARRY THE FORCE LEMMA.** Every proof that unfolds `liveRP`/`subRP`
+  (`translate`, `translate-sub`, `fallen-stays` and their `-at` lemmas) sees
+  the forced successor; rewrite each by the force lemma at the point it
+  reads `next`, and keep the evaluator's answers shared while doing it.
 
-- **BOUND THE EVALUATOR'S RETENTION.** Recompute is ruled out: answers are
-  bound once and traces carry them. What remains is residency — the
-  bug-cache row switching to two ofs spends nearly all its run in GC with a
-  third of its allocation live, retained by `liveRP`/`subRP` closures (a
-  retainer profile): a successor is a thunk over the
-  whole answer below it (`next an`, `held r`), so each continuation holds
-  the run's history. Force the successor where the fold builds it and carry
-  the force lemma through every proof unfolding that fold. Tier 2 may not
-  touch the evaluator, so this lands here.
+- **CLOSE THE TIER.** The oracle's sweep and every pinned corpus agreeing
+  with rxjs on the forced evaluator, and the gate's tower green on CI.
 
 ### The ledger
 

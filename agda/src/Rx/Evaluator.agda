@@ -265,7 +265,9 @@ setNode nid s ((k , s′) ∷ r) =
 
 -- the mergeAll operator tag carries NO limit: the limit lives in the node
 -- state, which every consumer already reads, and a second copy in the
--- frame is a copy that can drift from it
+-- frame is a copy that can drift from it.  That is also why this is not
+-- `FlatOp`: the syntax's op is this tag WITH merge's limit, and
+-- `Rx.Evaluator.Domain`'s `flatOp` erases it where `flatSt` stores it
 data AllOp : Set where
   mergeAllᵒ switchᵒ exhaustᵒ : AllOp
 
@@ -273,16 +275,16 @@ data AllOp : Set where
 -- optional lane.  The walk reads it as EVENTS, echo first -- the echo
 -- leaves as the element arrives, before its lane is handled, which is
 -- `flatten` in `typescript/src/flatten.ts`.
-data Lanes : Ty → Ty → Set where
-  echoing : ∀ {u} → Lanes ((unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)) u
+echoᵗ : Ty → Ty
+echoᵗ u = (unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)
 
 -- an echo event is `inj₁`, a lane event `inj₂`
-thruEvents : ∀ {n} {Γ : Ctx n} {s u} → Lanes s u → List (Val Γ s) → List (Val Γ (u +ᵗ obs u))
-thruEvents echoing []                         = []
-thruEvents echoing ((inj₁ _ , inj₁ _) ∷ xs) = thruEvents echoing xs
-thruEvents echoing ((inj₁ _ , inj₂ o) ∷ xs) = inj₂ o ∷ thruEvents echoing xs
-thruEvents echoing ((inj₂ v , inj₁ _) ∷ xs) = inj₁ v ∷ thruEvents echoing xs
-thruEvents echoing ((inj₂ v , inj₂ o) ∷ xs) = inj₁ v ∷ inj₂ o ∷ thruEvents echoing xs
+thruEvents : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ (echoᵗ u)) → List (Val Γ (u +ᵗ obs u))
+thruEvents []                         = []
+thruEvents ((inj₁ _ , inj₁ _) ∷ xs) = thruEvents xs
+thruEvents ((inj₁ _ , inj₂ o) ∷ xs) = inj₂ o ∷ thruEvents xs
+thruEvents ((inj₂ v , inj₁ _) ∷ xs) = inj₁ v ∷ thruEvents xs
+thruEvents ((inj₂ v , inj₂ o) ∷ xs) = inj₁ v ∷ inj₂ o ∷ thruEvents xs
 
 -- one operator the emission passes through, rootward.  deferᵉ
 -- contributes NO frame (it merely relays its body), and share is not
@@ -322,7 +324,7 @@ data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
   from-inner : ∀ {s} → AllOp → (allNode innerInstance : NodeId) → Frame Γ s s
                -- exiting a subscribed inner: the *All's own node, and
                -- this inner subscription's instance (switch kills by it)
-  thru-outer : ∀ {s u} → Lanes s u → AllOp → NodeId → Frame Γ s u
+  thru-outer : ∀ {u} → AllOp → NodeId → Frame Γ (echoᵗ u) u
                -- the value carries an inner obs: consumed, subscribed, burst grafted
 
 -- THE FLOOR IS AN INDEX, WHICH IS WHAT MAKES THE SHARE NEST DESCEND.
@@ -409,7 +411,7 @@ frameNodes (scan-f _ k)       = k ∷ []
 frameNodes (take-f k)         = k ∷ []
 frameNodes (batchSync-f k)    = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
-frameNodes (thru-outer _ _ k) = k ∷ []
+frameNodes (thru-outer _ k) = k ∷ []
 
 pathHasNode : ∀ {n} {Γ : Ctx n} {s t} → NodeId → Path Γ lo s t → Bool
 pathHasNode nid root           = false

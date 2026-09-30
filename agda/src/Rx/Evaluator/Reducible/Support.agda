@@ -42,7 +42,7 @@ open import Rx.Mint using (sourceᵏ; nodeᵏ; regᵏ; ordinalᵏ; freshId; setA
 open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; lookup-set; set-above; <→≢ᵇ)
 open import Decide using (≡ᵇ→≡; ≡ᵇ-refl)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
-  batchSync-f; from-inner; thru-outer; Lanes; NodeState; lookupNode; frameNodes; pathHasNode;
+  batchSync-f; from-inner; thru-outer; NodeState; lookupNode; frameNodes; pathHasNode;
   register; installNode; atDyn; atSlot; lowerFloor; memberSource; mergeAll-st; mergeAllᵒ;
   AllOp; switchᵒ; exhaustᵒ; NodeId; RegRow; cell-st; take-st; switch-st; exhaust-st;
   batchSync-st; setNode; hasRoom; consumeUsable; finishUsable; thruWrap; switchKill;
@@ -107,7 +107,7 @@ HeldF {Γ = Γ}   (scan-f _ _)         = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (take-f _)           = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (batchSync-f _)      = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (from-inner _ _ _)   = Maybe (NodeState Γ)
-HeldF {Γ = Γ}   (thru-outer _ _ _)   = Maybe (NodeState Γ)
+HeldF {Γ = Γ}   (thru-outer _ _)   = Maybe (NodeState Γ)
 
 -- WHAT A STANDING PATH'S FRAMES STAND ON: each frame's own column,
 -- which the store agrees with, so there is no value the frame cannot
@@ -148,7 +148,7 @@ ConsistentF (scan-f _ nid)          h st = lookupNode nid (EvalSt.nodes st) ≡ 
 ConsistentF (take-f nid)            h st = lookupNode nid (EvalSt.nodes st) ≡ h
 ConsistentF (batchSync-f nid)       h st = lookupNode nid (EvalSt.nodes st) ≡ h
 ConsistentF (from-inner _ nid _)    h st = lookupNode nid (EvalSt.nodes st) ≡ h
-ConsistentF (thru-outer _ _ nid)    h st = lookupNode nid (EvalSt.nodes st) ≡ h
+ConsistentF (thru-outer _ nid)    h st = lookupNode nid (EvalSt.nodes st) ≡ h
 
 -- AND THE FRAME'S NODE IS BELOW THE COUNTER, which is what makes a
 -- write at the counter leave it alone.  Agreement alone is not
@@ -391,11 +391,11 @@ push-sound f le κ (sound ru ea fp ds) nd =
            ((λ k a → off-path (nd k a)) , ds)
 
 -- and the outer frame, at a node on the path
-push-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u} (ln : Lanes s u) (op : AllOp) (nid : NodeId) (le : lo ≤ ℓ)
+push-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ u} (op : AllOp) (nid : NodeId) (le : lo ≤ ℓ)
               (κ : Path Γ ℓ u t) {sched : Sched Γ} {st : EvalSt e}
-          → Sound κ sched st → NodeOn nid κ sched st → Sound (thru-outer ln op nid ↠[ le ] κ) sched st
-push-thru ln op nid le κ {sched} {st} so nd =
-  push-sound (thru-outer ln op nid) le κ so (λ k a → subst (λ j → NodeOn j κ sched st) (node-eq a) nd)
+          → Sound κ sched st → NodeOn nid κ sched st → Sound (thru-outer op nid ↠[ le ] κ) sched st
+push-thru op nid le κ {sched} {st} so nd =
+  push-sound (thru-outer op nid) le κ so (λ k a → subst (λ j → NodeOn j κ sched st) (node-eq a) nd)
 
 -- a sink names no node, so the rule for it is the rule for the store
 sink-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} (i : Fin n) (le : lo ≤ toℕ i)
@@ -499,7 +499,7 @@ consistentF-move (scan-f _ nid)         h mv c = trans (mv nid (self-node nid []
 consistentF-move (take-f nid)           h mv c = trans (mv nid (self-node nid [])) c
 consistentF-move (batchSync-f nid)      h mv c = trans (mv nid (self-node nid [])) c
 consistentF-move (from-inner _ nid j)   h mv c = trans (mv nid (self-node nid (j ∷ []))) c
-consistentF-move (thru-outer _ _ nid)   h mv c = trans (mv nid (self-node nid [])) c
+consistentF-move (thru-outer _ nid)   h mv c = trans (mv nid (self-node nid [])) c
 
 -- THE GROUND SURVIVES A STEP THAT READS THE PATH'S OWN NODES BACK THE
 -- SAME AND DOES NOT LOWER THE COUNTER.  The two hypotheses are what a
@@ -1651,7 +1651,7 @@ colOf (scan-f _ nid)       st = lookupNode nid (EvalSt.nodes st)
 colOf (take-f nid)         st = lookupNode nid (EvalSt.nodes st)
 colOf (batchSync-f nid)    st = lookupNode nid (EvalSt.nodes st)
 colOf (from-inner _ nid _) st = lookupNode nid (EvalSt.nodes st)
-colOf (thru-outer _ _ nid) st = lookupNode nid (EvalSt.nodes st)
+colOf (thru-outer _ nid) st = lookupNode nid (EvalSt.nodes st)
 
 colsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} (κ : Path Γ lo u t) → EvalSt e → PreFs κ
 colsOf root             st = tt
@@ -1665,7 +1665,7 @@ consistentOf (scan-f _ _)         st = refl
 consistentOf (take-f _)           st = refl
 consistentOf (batchSync-f _)      st = refl
 consistentOf (from-inner _ _ _)   st = refl
-consistentOf (thru-outer _ _ _)   st = refl
+consistentOf (thru-outer _ _)   st = refl
 
 -- every node found among some is below a bound, so all of them are
 all-below : ∀ (ns : List ℕ) {ct} → (∀ k → T (any (_≡ᵇ k) ns) → k < ct) → All (_< ct) ns
@@ -2261,17 +2261,17 @@ downHeld u nothing                      rh = λ { refl → []ᵃ }
 -- INSTANCE'S.  Both frames hold the flattener's node the same way;
 -- the outer names only that node, and an earlier instance is below
 -- the counter and apart from the path by the frame it came from.
-fiHolds→thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u}
-               (ln : Lanes s u) (op : AllOp) (nid inst : NodeId) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t)
+fiHolds→thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ u}
+               (op : AllOp) (nid inst : NodeId) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t)
                (h : Maybe (NodeState Γ)) (p : Pre κ) {sched : Sched Γ} {st : EvalSt e}
              → PreHolds m (from-inner {s = u} op nid inst ↠[ ≤-refl ] κ) (headPre h p) sched st
-             → PreHolds m (thru-outer ln op nid ↠[ le ] κ) (headPre h p) sched st
-fiHolds→thru ln op nid inst le κ h (standing pfs) (grounded ((c , lt ∷ᵃ _) , ap , hs) so) =
+             → PreHolds m (thru-outer op nid ↠[ le ] κ) (headPre h p) sched st
+fiHolds→thru op nid inst le κ h (standing pfs) (grounded ((c , lt ∷ᵃ _) , ap , hs) so) =
   grounded
     ((c , lt ∷ᵃ []ᵃ) , (λ k on → ap k (∨-Tˡ {nid ≡ᵇ k} {any (_≡ᵇ k) (inst ∷ [])} ([ (λ a → a) , (λ ()) ] (∨-T {nid ≡ᵇ k} {false} on)))) , hs)
-    (inner-back op nid inst κ so |>′ λ (so′ , nd) → push-thru ln op nid le κ so′ nd)
-fiHolds→thru ln op nid inst le κ h fallen (grounded fell so) =
-  grounded fell (inner-back op nid inst κ so |>′ λ (so′ , nd) → push-thru ln op nid le κ so′ nd)
+    (inner-back op nid inst κ so |>′ λ (so′ , nd) → push-thru op nid le κ so′ nd)
+fiHolds→thru op nid inst le κ h fallen (grounded fell so) =
+  grounded fell (inner-back op nid inst κ so |>′ λ (so′ , nd) → push-thru op nid le κ so′ nd)
 
 -- THE TWO COLUMN GUARDS, WHICH ARE WHY NOTHING IS DRAINED ON STANDING
 -- GROUND.  The outer's column never holds a queue beside a free lane:

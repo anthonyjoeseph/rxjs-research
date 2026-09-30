@@ -36,7 +36,7 @@ open import Rx.Prim using (Source)
 open import Rx.Exp using (Ctx; Closed; Val; obs; _+ᵗ_)
 open import Rx.Slots using (shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f;
-  from-inner; thru-outer; Lanes; echoing; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
+  from-inner; thru-outer; echoᵗ; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
   setNode; frameNodes; pathHasNode; installNode; lowerFloor; AllOp; mergeAllᵒ; switch-st;
   exhaust-st; mergeAll-st; shareAdmit; shareDying; shareFinish; switchKill; thruWrap; drainSt;
   regSource; sameSource; dropSource)
@@ -145,7 +145,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   FrameOK f@(take-f k)         = NotIn f
   FrameOK f@(batchSync-f k)    = NotIn f
   FrameOK f@(from-inner _ _ _) = fed ≡ false → NotIn f
-  FrameOK f@(thru-outer _ _ k) = NotIn f
+  FrameOK f@(thru-outer _ k) = NotIn f
 
   PathOK : ∀ {lo u} → Path Γ lo u t → Set
   PathOK root             = ⊤
@@ -205,7 +205,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   frame-ok (take-f _)         ni = ni
   frame-ok (batchSync-f _)    ni = ni
   frame-ok (from-inner _ _ _) ni = λ _ → ni
-  frame-ok (thru-outer _ _ _) ni = ni
+  frame-ok (thru-outer _ _) ni = ni
 
   -- a path off the watched node stands on allowed frames
   off-ok : ∀ {lo u} (κ : Path Γ lo u t) → (T (pathHasNode nid κ) → ⊥) → PathOK κ
@@ -346,9 +346,9 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                             → subscribeSharedSlot⇓ {e = e} i d κ below now sched st (out , sched′ , st′)
                             → PI κ → Q sched st → Q sched′ st′
 
-  subscribeAll-floor : ∀ {s u lo} {ln : Lanes s u} {op} {ns : NodeState Γ} {b : Val Γ (obs s)} {κ : Path Γ lo u t} {now}
+  subscribeAll-floor : ∀ {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (echoᵗ u))} {κ : Path Γ lo u t} {now}
                          {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
-                     → subscribeAll⇓ {e = e} ln op ns b κ now sched st (out , sched′ , st′)
+                     → subscribeAll⇓ {e = e} op ns b κ now sched st (out , sched′ , st′)
                      → PI κ → Q sched st → Q sched′ st′
 
   subscribeInner-floor : ∀ {u lo} {op a} {κ : Path Γ lo u t} {now} {o : Val Γ (obs u)}
@@ -429,7 +429,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   subscribeE-floor (subs-flatten sa)       ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
   subscribeE-floor (subs-μ sub)            ph (inj₂ s) = subscribeE-floor sub ph (inj₂ s)
   subscribeE-floor {sched = sched} (subs-defer refl refl refl refl) ph (inj₂ s) =
-    let ph′ = push {f = thru-outer echoing mergeAllᵒ (nodeCt sched)} {le = ≤-refl} (fresh-off (lt s)) (fresh-off (lt s)) ph
+    let ph′ = push {f = thru-outer mergeAllᵒ (nodeCt sched)} {le = ≤-refl} (fresh-off (lt s)) (fresh-off (lt s)) ph
     in inj₂ (si (NI-fresh (lt s) (ni s)) (ea-reg (ea s) (PI.pon ph′))
                 (<-≤-trans (lt s) (n≤1+n _)) (rm s))
   subscribeE-floor (subs-mint refl sub)    ph (inj₂ s) = subscribeE-floor sub ph (inj₂ (si (ni s) (ea s) (lt s) (rm s)))
@@ -558,9 +558,9 @@ subscribeSharedSlot-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fi
                        → subscribeSharedSlot⇓ {e = e} i d κ below now sched st (out , sched′ , st′)
                        → nodeCt sched ≤ nodeCt sched′
 
-subscribeAll-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {ln : Lanes s u} {op} {ns : NodeState Γ} {b : Val Γ (obs s)}
+subscribeAll-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (echoᵗ u))}
                     {κ : Path Γ lo u t} {now} {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
-                → subscribeAll⇓ {e = e} ln op ns b κ now sched st (out , sched′ , st′) → nodeCt sched ≤ nodeCt sched′
+                → subscribeAll⇓ {e = e} op ns b κ now sched st (out , sched′ , st′) → nodeCt sched ≤ nodeCt sched′
 
 subscribeInner-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {op a} {κ : Path Γ lo u t} {now}
                       {o : Val Γ (obs u)} {sched sched′ : Sched Γ} {st st′ : EvalSt e} {inst out}

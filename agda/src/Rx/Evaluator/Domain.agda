@@ -152,7 +152,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root
   shareDying; shareSpend; shareFinish; from-inner; arrTick; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
   RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve;
-  atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; Lanes; echoing; thruEvents; cell-st; take-st;
+  atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; echoᵗ; thruEvents; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
   batchDispatch; batchDown; thruWrap; consumeUsable; finishUsable; drainSt)
@@ -234,8 +234,8 @@ data stepFrame⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
    → Stream Γ t × List (Val Γ u) × Bool × Sched Γ × EvalSt e → Set
 
 data subscribeAll⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {s u lo} →
-     Lanes s u → AllOp → NodeState Γ → Val Γ (obs s) → Path Γ lo u t
+     ∀ {u lo} →
+     AllOp → NodeState Γ → Val Γ (obs (echoᵗ u)) → Path Γ lo u t
    → Tick → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
@@ -519,12 +519,12 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                 (installNode nid (cell-st (evalWith i ρ)) st) r
             → subscribeE⇓ (Θ , scanᵉ f i b , ρ) κ now sched st r
 
-  -- the one flattener: the same node under `echoing` lanes, so each
-  -- element's echo is handed rootward before its lane is handled
+  -- the one flattener: each element's echo is handed rootward before
+  -- its lane is handled
   subs-flatten : ∀ {lo u Θ} {ρ : Env Γ Θ} {op}
                    {b : Exp Γ [] [] Θ ((unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u))}
                    {κ : Path Γ lo u t} {now sched st r}
-               → subscribeAll⇓ echoing (flatOp op) (flatSt u op)
+               → subscribeAll⇓ (flatOp op) (flatSt u op)
                    (Θ , b , ρ) κ now sched st r
                → subscribeE⇓ (Θ , flattenᵉ op b , ρ) κ now sched st r
 
@@ -558,7 +558,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                                      ; pending = (suc now , (inj₁ tt , inj₂ (Θ , body , ρ))) ∷ [] }
                               ∷ Sched.live sched }
                  , register rid (atDyn src lo)
-                            (thru-outer echoing mergeAllᵒ nid ↠[ ≤-refl ] κ)
+                            (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ)
                             (installNode nid
                               (mergeAll-st {t = u} nothing 0 [] false) st) )
 
@@ -951,12 +951,12 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
   -- THE OUTER'S WALK SENDS EVERYTHING ROOTWARD ITSELF, and what it
   -- hands on is the empty group with the wrapped end: the flattener's
   -- own completion, if the outer's end and the node's state make one.
-  step-thru-outer : ∀ {s u lo} {ln : Lanes s u} {op nid} {κ : Path Γ lo u t}
-                      {now} {vals : List (Val Γ s)} {fin sched st}
+  step-thru-outer : ∀ {u lo} {op nid} {κ : Path Γ lo u t}
+                      {now} {vals : List (Val Γ (echoᵗ u))} {fin sched st}
                       {out sched′ st′}
-                  → thruWalk⇓ op nid κ now (thruEvents ln vals) sched st
+                  → thruWalk⇓ op nid κ now (thruEvents vals) sched st
                       (out , sched′ , st′)
-                  → stepFrame⇓ now (thru-outer ln op nid) κ vals fin sched st
+                  → stepFrame⇓ now (thru-outer op nid) κ vals fin sched st
                       (out , [] , thruWrap op nid fin (sched′ , st′))
 
 -- THIS IS WHERE A FLATTENER'S OUTER IS SUBSCRIBED, WITH THE
@@ -971,13 +971,13 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 -- that separates the two.
 data subscribeAll⇓ {n} {Γ} {t} {e} where
 
-  sub-all : ∀ {s u lo} {ln : Lanes s u} {op} {ns : NodeState Γ} {b : Val Γ (obs s)}
+  sub-all : ∀ {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (echoᵗ u))}
               {κ : Path Γ lo u t} {now sched st nid r}
           → freshId nodeᵏ (Sched.mint sched) ≡ nid
-          → subscribeE⇓ b (thru-outer ln op nid ↠[ ≤-refl ] κ) now
+          → subscribeE⇓ b (thru-outer op nid ↠[ ≤-refl ] κ) now
               (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
               (installNode nid ns st) r
-          → subscribeAll⇓ ln op ns b κ now sched st r
+          → subscribeAll⇓ op ns b κ now sched st r
 
 -- THE CONNECT'S OWN GUARD IS NOT INDEXED HERE EITHER, AND THE SAME
 -- RULING AS THE UNFOLD'S APPLIES: a run's answer to a question this
