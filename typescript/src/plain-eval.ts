@@ -20,14 +20,17 @@ import {
   ScriptVal,
   Val,
   evalWith,
+  flatAllSrc,
+  optVal,
   toVal,
   unfoldMu,
 } from "./exp.js";
+import { Elem, flatten } from "./flatten.js";
 import { PlainDriver, createPlainDriver, plainHop } from "./plain-driver.js";
 import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 
 // THE PLAIN LEG OF THE ORACLE: an Exp tree run as ORDINARY rxjs, with
-// no envelope anywhere in it (Anthony: "nothing involving InstEmit at
+// no InstEmit anywhere in it (Anthony: "nothing involving InstEmit at
 // all"). Every case below is one rxjs operator, which is the property
 // being tested — if a former cannot be written as one, the Agda
 // implementation has claimed a capability plain rxjs does not have, and
@@ -134,20 +137,27 @@ const plainInput = (
   );
 };
 
+// HOW A `flatAll` IS RUN: as rxjs's own `mergeAll`/`switchAll`/
+// `exhaustAll`, or as the `flatten` it is written as, which
+// `flatten-diff.ts` holds to the native run.  Any other `flatten` has no
+// native reading and runs as itself either way.
+export type Via = "native" | "echo";
+
 export const compilePlain = (
   exp: Closed,
   env: Val[],
   driver: PlainDriver,
   slotSources: Observable<Val>[],
+  via: Via = "native",
 ): Observable<Val> => {
-  const recur = (e: Closed) => compilePlain(e, env, driver, slotSources);
+  const recur = (e: Closed) => compilePlain(e, env, driver, slotSources, via);
   // an inner observable is a CLOSURE carried as a value, so it compiles
   // against the environment it was written under as its emission passes
   const inner = (src: Closed): Observable<Observable<Val>> =>
     recur(src).pipe(
       rxMap((v) => {
         const o = v as ObsVal;
-        return compilePlain(o.exp, o.env, driver, slotSources);
+        return compilePlain(o.exp, o.env, driver, slotSources, via);
       }),
     );
   switch (exp.type) {
@@ -182,12 +192,39 @@ export const compilePlain = (
       // take 0 never subscribes its source, as in rxjs
       return count === 0n ? EMPTY : recur(exp.src).pipe(rxTake(Number(count)));
     }
-    case "mergeAll":
-      return inner(exp.src).pipe(mergeAll(exp.limit ?? Infinity));
-    case "switchAll":
-      return inner(exp.src).pipe(switchAll());
-    case "exhaustAll":
-      return inner(exp.src).pipe(exhaustAll());
+    case "flatten": {
+      const lanes = flatAllSrc(exp);
+      if (via === "native" && lanes !== undefined)
+        return exp.op.how === "merge"
+          ? inner(lanes).pipe(mergeAll(exp.op.limit ?? Infinity))
+          : exp.op.how === "switch"
+            ? inner(lanes).pipe(switchAll())
+            : inner(lanes).pipe(exhaustAll());
+      // each element an optional echo beside an optional lane, and the
+      // lane a closure compiled as it passes, as `inner`'s are
+      return recur(exp.src).pipe(
+        rxMap((v): Elem<Val> => {
+          const [echo, lane] = v as [Val, Val];
+          const o = optVal(lane);
+          return {
+            echo: optVal(echo),
+            lane:
+              o.length === 0
+                ? []
+                : [
+                    compilePlain(
+                      (o[0] as ObsVal).exp,
+                      (o[0] as ObsVal).env,
+                      driver,
+                      slotSources,
+                      via,
+                    ),
+                  ],
+          };
+        }),
+        flatten<Val>(exp.op),
+      );
+    }
     case "mu":
       // one unfolding now; the recursive occurrences inside sit behind
       // defer hops, so each further unfolding costs a tick
@@ -205,7 +242,13 @@ export const compilePlain = (
       // admits exactly the one operation `eqU` is, and nothing else
       // produces one, so the token cannot be forged or ordered.
       return rxDefer(() =>
-        compilePlain(exp.body, [Symbol("uniq"), ...env], driver, slotSources),
+        compilePlain(
+          exp.body,
+          [Symbol("uniq"), ...env],
+          driver,
+          slotSources,
+          via,
+        ),
       );
     case "batchSync":
       // THE SYNC BIT IS rxjs's OWN SUBSCRIBE ORDERING AND NOTHING ELSE.
@@ -254,7 +297,16 @@ export const compilePlain = (
   }
 };
 
-export const evaluatePlain = (testCase: TestCase): Val[] => {
+export const evaluatePlain = (testCase: TestCase): Val[] =>
+  evaluatePlainArrivals(testCase).map((x) => x.value);
+
+// the same run, each value beside the driver arrival that emitted it
+// (0 is the root sync burst): the ground truth a timed run's packets are
+// held to
+export const evaluatePlainArrivals = (
+  testCase: TestCase,
+  via: Via = "native",
+): { value: Val; arrival: number }[] => {
   const driver = createPlainDriver(testCase.slots.length);
   // the const telescope, literally: each shared slot compiles against
   // the prefix of already-built slots, under a share that never resets
@@ -263,7 +315,7 @@ export const evaluatePlain = (testCase: TestCase): Val[] => {
       ...prefix,
       slot.type === "scripted"
         ? plainInput(driver, slot.input, index)
-        : compilePlain(slot.def, [], driver, prefix).pipe(
+        : compilePlain(slot.def, [], driver, prefix, via).pipe(
             rxShare({
               resetOnRefCountZero: false,
               resetOnComplete: false,
@@ -273,14 +325,21 @@ export const evaluatePlain = (testCase: TestCase): Val[] => {
     ],
     [],
   );
-  const out: Val[] = [];
-  const sub = compilePlain(testCase.exp, [], driver, slotSources).subscribe(
-    (value) => out.push(value),
-  );
+  const out: { value: Val; arrival: number }[] = [];
+  let arrival = 0;
+  const sub = compilePlain(
+    testCase.exp,
+    [],
+    driver,
+    slotSources,
+    via,
+  ).subscribe((value) => out.push({ value, arrival }));
   // subscribing already ran the root sync burst — fuel pays only for
   // arrivals
-  for (let spent = 0; spent < testCase.fuel; spent++)
+  for (let spent = 0; spent < testCase.fuel; spent++) {
+    arrival++;
     if (!driver.deliverNextArrival()) break;
+  }
   sub.unsubscribe();
   return out;
 };

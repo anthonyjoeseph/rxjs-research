@@ -20,13 +20,14 @@ open import Data.Vec using (lookup; fromList)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; PlainEvent; valueᵖ; completeᵖ)
+open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm; []ᵉ;
-  input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; batchSyncᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; batchSyncᵉ; flattenᵉ; μᵉ;
   varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
+open import SExp.Plain using (plainValues)
 open import CLI.JSON using (jarr; jbool; jnum; jobj; JSON; jstr)
 open import CLI.Encode using (encodeValues)
 
@@ -146,6 +147,15 @@ decodeTy (suc fuel) j = getField "type" j >>=? asStr >>=? λ tag →
 childTy : ℕ → String → JSON → Maybe Ty
 childTy fuel name j = getField name j >>=? λ c → getField "ty" c >>=? decodeTy fuel
 
+-- a flattener's policy: `how` names it, and merge's absent `limit` is
+-- rxjs's Infinity exactly as on `mergeAll`
+decodeFlatOp : JSON → Maybe FlatOp
+decodeFlatOp j = getField "how" j >>=? asStr >>=? λ how →
+  if how is "merge" then just (mergeᶠ (getField "limit" j >>=? asNum))
+  else if how is "switch" then just switchᶠ
+  else if how is "exhaust" then just exhaustᶠ
+  else nothing
+
 ------------------------------------------------------------------------
 -- expressions and terms (checking mode: expected type in, typed term out)
 
@@ -179,16 +189,11 @@ mutual
       (getField "count" j >>=? decodeTm fuel Γ Δᵍ Δ Θ natᵗ >>=? λ c →
        getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ t >>=? λ src →
        just (takeᵉ c src))
-    else if tag is "mergeAll" then
-      -- an ABSENT "limit" is rxjs's Infinity, so the Maybe the accessor
-      -- already returns IS the concurrency argument and the JSON grammar
-      -- needs no null
-      (getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ (obs t) >>=? λ src →
-       just (mergeAllᵉ (getField "limit" j >>=? asNum) src))
-    else if tag is "switchAll" then
-      (getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ (obs t) >>=? λ src → just (switchAllᵉ src))
-    else if tag is "exhaustAll" then
-      (getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ (obs t) >>=? λ src → just (exhaustAllᵉ src))
+    else if tag is "flatten" then
+      (getField "op" j >>=? decodeFlatOp >>=? λ op →
+       getField "src" j
+         >>=? decodeExp fuel Γ Δᵍ Δ Θ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) >>=? λ src →
+       just (flattenᵉ op src))
     else if tag is "mu" then
       (getField "body" j >>=? decodeExp fuel Γ (t ∷ Δᵍ) Δ Θ t >>=? λ b → just (μᵉ b))
     else if tag is "varE" then
@@ -350,13 +355,6 @@ decodeSlots fuel Γ slotsJ = seqFin (decodeSlotAt fuel Γ slotsJ)
 BIG : ℕ
 BIG = 100000
 
--- The CLI reports VALUES; the stream's end marker is the machine's
--- business and the encoder has no arm for it.
-valuesOf : {A : Set} → List (PlainEvent A) → List A
-valuesOf []               = []
-valuesOf (valueᵖ v ∷ evs) = v ∷ valuesOf evs
-valuesOf (completeᵖ ∷ evs) = valuesOf evs
-
 decodeCase : JSON → Maybe String
 decodeCase j =
   getField "ctx" j >>=? asArr >>=? mapMaybe (decodeTy BIG) >>=? λ tys →
@@ -365,5 +363,5 @@ decodeCase j =
   decodeExp BIG (fromList tys) [] [] [] t expJ >>=? λ e →
   getField "slots" j >>=? asArr >>=? decodeSlots BIG (fromList tys) >>=? λ ins →
   getField "fuel" j >>=? asNum >>=? λ f →
-  let values = valuesOf (concat (evaluate↓ f e ins)) in
+  let values = plainValues (concat (evaluate↓ f e ins)) in
   just ("{" ++ˢ "\"values\":" ++ˢ encodeValues t values ++ˢ "}")

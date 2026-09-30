@@ -14,45 +14,18 @@ Id : Set                            -- an INSTANT (one arrival's cascade); spec 
 Id = ℕ                              -- concrete so the spec can compare; harness compares up to renaming
 -- Ids mint from ARRIVAL POSITION: 0 is the subscribe frame, then
 -- 1, 2, … per cascade (the drain counter).  Distinctness is
--- structural, instants strictly increase along the stream (the
--- Protocol's horizon check reads exactly this), and timing-invariance
+-- structural, instants strictly increase along the stream, and timing-invariance
 -- holds up to ≡, not just ≈ — a retiming that preserves arbitration
 -- order preserves the ids themselves.
 --
--- AND THE ORDER IS LOAD-BEARING, SO THIS IS NOT A TOKEN.  `Spec`
--- compares instants and does nothing else with one, which makes this
--- read as a type needing only decidable equality — and it is not one.
--- `Rx.Protocol` carries a freshness watermark and admits an emit only
--- when the watermark has not passed its instant, so the ORDER on this
--- type is what rejects a stream revisiting a departed instant.  A
--- carrier offering equality alone cannot state that check: the repair
--- would be a seen-set, retaining every past instant for the length of
--- the run where a watermark retains one position.  So the two ids of
--- this module are not a pair to treat alike — this one is an ordered
--- ARRIVAL POSITION and `Source` below is the token.
-
--- AND WHAT NEEDS THE ORDER IS THE CHECKER, NOT THE PIPELINE — WHICH IS
--- WHAT DECIDES THE OBJECT-LANGUAGE ENCODING.  The paragraph above is a
--- fact about `Rx.Protocol`, and `Rx.Protocol` is an ACCEPTANCE ORACLE:
--- it reads a finished stream and rules on whether the protocol was
--- obeyed.  Nothing in the batching pipeline the theorem is about ever
--- consults the order.  `Spec` groups by comparing instants for
--- equality; the implementation holds one open batch and asks only
--- whether the incoming instant equals the open one, flushing when it
--- does not.  So when the envelope is re-expressed as a TYPE of the
--- object language, its instant field stands at the unique primitive,
--- whose sole eliminator is a primitive equality, and nothing is lost —
--- the watermark stays where it already is, in a meta-level automaton
--- over meta-level emits, which is the only thing that could have
--- wanted a successor or a `≤` in the first place.  Read the two
--- paragraphs together: equality alone cannot state the CHECK, and
--- equality alone is all the RUN was ever asking for.
+-- NOTHING CONSULTS THE ORDER.  `Spec` groups by comparing instants for
+-- equality, so when the InstEmit is re-expressed as a TYPE of the
+-- object language its instant field stands at the unique primitive,
+-- whose sole eliminator is a primitive equality, and nothing is lost.
 
 -- A TOKEN, AND THAT IS THE WHOLE OF WHAT ANYTHING ASKS OF IT.  `Spec`
--- binds this and copies it onto the batch envelope without ever
--- comparing it; `Rx.Protocol` compares it and never orders or computes
--- with it, a registration ledger being keyed by it and nothing more.
--- So ℕ is over-strong here in a way it is not for `Id` above, and the
+-- binds this and copies it onto the batch InstEmit without ever
+-- comparing it.  So ℕ is over-strong here in a way it is not for `Id` above, and the
 -- over-strength is not free: every statement quantifying over streams
 -- inherits obligations about ones carrying sources no mint could
 -- produce.  The TypeScript counterpart is already typed as a number OR
@@ -117,13 +90,13 @@ record InstEmit (A : Set) : Set where
 -- vocabulary: the spec reads one, batches by its `instant`, and hands
 -- back another.  A machine running an ordinary rxjs pipeline pushes
 -- something far smaller — a value, or the end of the stream — one at
--- a time and depth-first, with no envelope around it and no grouping
+-- a time and depth-first, with no InstEmit around it and no grouping
 -- across a cascade.
 --
 -- SO THE PROTOCOL RIDES ON THE VALUES RATHER THAN ON THE CARRIER,
 -- which is where the TypeScript keeps it: its operators are plain
--- rxjs and the envelope is the type flowing THROUGH them.  `emitᵗ` in
--- `Rx.Envelope` is that envelope at the object level and `toPlain`
+-- rxjs and the InstEmit is the type flowing THROUGH them.  `emitᵗ` in
+-- `SExp.InstEmit` is that InstEmit at the object level and `toInstEmit`
 -- puts it there, so a machine carrying one too would be holding the
 -- same record twice, once at each level, with only the object-level
 -- copy having a counterpart in the mirror.

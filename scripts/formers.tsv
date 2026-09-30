@@ -50,9 +50,7 @@ exp	emptyᵉ	empty	yes	yes	source
 exp	takeᵉ	take	yes	yes	protocol
 exp	mapᵉ	map	yes	yes	pure
 exp	scanᵉ	scan	yes	yes	pure
-exp	mergeAllᵉ	mergeAll	yes	yes	flatten
-exp	switchAllᵉ	switchAll	yes	yes	flatten
-exp	exhaustAllᵉ	exhaustAll	yes	yes	flatten
+exp	flattenᵉ	flatten	yes	yes	flatten
 exp	μᵉ	mu	yes	yes	binder
 exp	varᵉ	varE	yes	yes	binder
 exp	deferᵉ	defer	yes	yes	protocol
@@ -69,7 +67,7 @@ tm	nilᵗ	nilT	yes	yes	-
 tm	consᵗ	consT	yes	yes	-
 tm	inlᵗ	inlT	yes	yes	-
 tm	inrᵗ	inrT	yes	yes	-
-tm	caseᵗ	caseT	yes	no	-	sums are not in the Agda generator's type palette, whose every node is natᵗ
+tm	caseᵗ	caseT	yes	yes	-
 tm	foldᵗ	foldT	yes	yes	-
 tm	ifᵗ	ifT	yes	yes	-
 tm	primᵗ	primT	yes	yes	-

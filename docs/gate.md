@@ -119,9 +119,11 @@ that is wrong in a way the phrase "cheaper than the tower" hides: **every
 module in `agda/src` has a route to Main by the wiring law, so EVERY cone
 contains the claim roots**, and a dev check on `Main.agda` is `make gate-heavy` with
 a comment-stripping round trip in front of it. Measured on the run that found
-this: the roots and `The-Proof.agda` each hit the 45 s budget and were reported
-`FAIL`, then at 560 s `Main.agda` took minutes and `The-Proof.agda` had still
-not finished — while **every non-root consumer in the same run came in under
+this: the roots and `The-Proof.agda` (since split into the top-line
+statement modules under `Left-To-Right`, `Timed` and `Batchable`) each hit the
+45 s budget and were reported `FAIL`, then at 560 s `Main.agda` took minutes
+and `The-Proof.agda` had still not finished — while **every non-root consumer
+in the same run came in under
 12 s.** The cheap part was real; the roots were the whole cost.
 
 So the sweep subtracts the claim roots and says which ones it held back. What

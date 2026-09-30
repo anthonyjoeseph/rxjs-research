@@ -31,9 +31,9 @@ open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
 
-open import Rx.Exp using (Ctx; Closed; Val; obs)
+open import Rx.Exp using (Ctx; Closed; Val; obs; _+ᵗ_; _×ᵗ_; unitᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; Path; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f; from-inner;
-  thru-outer; NodeId; RegId; RegSrc; regFloor; register; lookupNode; frameNodes; pathHasNode;
+  thru-outer; echoᵗ; NodeId; RegId; RegSrc; regFloor; register; lookupNode; frameNodes; pathHasNode;
   atSlot; atDyn; lowerFloor; mergeAllᵒ; mergeAll-st; AllOp; shareAdmit; shareDying;
   shareFinish; switchKill)
 open import Rx.Mint using (freshId; setAt; regᵏ; sourceᵏ)
@@ -42,9 +42,9 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   innerFinish⇓; innerReact⇓; stepFrame⇓; subscribeAll⇓; subscribeSharedSlot⇓; foldPath⇓; dispatchShare⇓;
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
-  subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan; subs-merge-all; subs-switch-all;
-  subs-exhaust-all; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
-  consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-cons;
+  subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan;
+  subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
+  consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
   finish-nil; react-false; react-alive; react-dead; step-map; step-scan; step-take; step-batchSync;
   step-from-inner; step-thru-outer; sub-all; connect; slot-spent; slot-join; slot-connect; disp; walk-end;
@@ -67,7 +67,7 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   -- A FLATTENER'S NODE STANDING ON THE PATH BELOW IT, as one path: its
   -- nodes are the flattener's and the path's, and it ends where the path
   -- does.  Every member walking a flattener's inners carries this.
-  Thru : ∀ {lo u} → NodeId → Path Γ lo u t → Path Γ lo (obs u) t
+  Thru : ∀ {lo u} → NodeId → Path Γ lo u t → Path Γ lo ((unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)) t
   Thru {u = u} a κ = thru-outer {u = u} mergeAllᵒ a ↠[ ≤-refl ] κ
 
   -- a flattener's node is among its inner's exit frame's
@@ -90,7 +90,7 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
 
   -- and the outer frame's rule is the flattener's, whichever flattener
   outer-thru : ∀ {lo ℓ u} {op : AllOp} {a : NodeId} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t} {sched : Sched Γ} {st : EvalSt e}
-             → Sound (thru-outer {u = u} op a ↠[ le ] κ) sched st → Sound (Thru a κ) sched st
+             → Sound (thru-outer op a ↠[ le ] κ) sched st → Sound (Thru a κ) sched st
   outer-thru (sound ru ea fp ds) = sound ru ea fp ds
 
   -- A FRAME AT THE COUNTER MEETS NO PATH BELOW IT, so a path agreeing
@@ -178,7 +178,7 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
                            → subscribeSharedSlot⇓ {e = e} i d κ below now sched st (out , sched′ , st′)
                            → Sound κ sched st → RuleKept κ sched st sched′ st′
 
-  subscribeAll-rule : ∀ {u lo} {op} {ns} {b : Val Γ (obs (obs u))} {κ : Path Γ lo u t} {now}
+  subscribeAll-rule : ∀ {u lo} {op} {ns} {b : Val Γ (obs (echoᵗ u))} {κ : Path Γ lo u t} {now}
                         {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
                     → subscribeAll⇓ {e = e} op ns b κ now sched st (out , sched′ , st′)
                     → Sound κ sched st → RuleKept κ sched st sched′ st′
@@ -193,7 +193,7 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
                  → stepFrame⇓ {e = e} now f κ vals fin sched st (out , vals′ , fin′ , sched′ , st′)
                  → Sound (f ↠[ le ] κ) sched st → RuleKept (f ↠[ le ] κ) sched st sched′ st′
 
-  thruWalk-rule : ∀ {u lo} {op a} {κ : Path Γ lo u t} {now} {vals : List (Val Γ (obs u))}
+  thruWalk-rule : ∀ {u lo} {op a} {κ : Path Γ lo u t} {now} {vals : List (Val Γ (u +ᵗ obs u))}
                     {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
                 → thruWalk⇓ {e = e} op a κ now vals sched st (out , sched′ , st′)
                 → Sound (Thru a κ) sched st → RuleKept (Thru a κ) sched st sched′ st′
@@ -273,9 +273,7 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     subscribeE-rule sub (fresh-sound (scan-f (Θ , fn , ρ) (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
       (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
       (fresh-agree (scan-f (Θ , fn , ρ) (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
-  subscribeE-rule (subs-merge-all sa)     so = subscribeAll-rule sa so
-  subscribeE-rule (subs-switch-all sa)    so = subscribeAll-rule sa so
-  subscribeE-rule (subs-exhaust-all sa)   so = subscribeAll-rule sa so
+  subscribeE-rule (subs-flatten sa)       so = subscribeAll-rule sa so
   subscribeE-rule (subs-μ sub)            so = subscribeE-rule sub so
   subscribeE-rule {u = u} {lo = lo} {κ = κ} {sched = sched} (subs-defer refl refl refl refl) so κ₂ so₂ ag =
     register-kept {π = π} (freshId regᵏ (Sched.mint sched)) (atDyn (freshId sourceᵏ (Sched.mint sched)) lo) π
@@ -300,10 +298,10 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     so₁ : Sound κ sched st₁
     so₁ = sub-ot {st′ = st₁} (λ r∈ → r∈) ≤-refl so
 
-  subscribeAll-rule {u = u} {op = op} {κ = κ} {sched = sched} (sub-all refl sub) so κ₂ so₂ ag =
-    subscribeE-rule sub (fresh-sound (thru-outer {u = u} op (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
+  subscribeAll-rule {op = op} {κ = κ} {sched = sched} (sub-all refl sub) so κ₂ so₂ ag =
+    subscribeE-rule sub (fresh-sound (thru-outer op (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
       (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
-      (fresh-agree (thru-outer {u = u} op (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
+      (fresh-agree (thru-outer op (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
 
   subscribeInner-rule {op = op} {a = a} {κ = κ} {sched = sched} (inner refl sub) so κ₂ so₂ ag =
     subscribeE-rule sub
@@ -329,6 +327,10 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     wrap-ot op c fin sched′ st′ (thruWalk-rule w (outer-thru so) κ₂ so₂ ag)
 
   thruWalk-rule walk-nil        so κ₂ so₂ ag = so₂
+  thruWalk-rule {a = a} {κ = κ} (walk-echo fp w) so κ₂ so₂ ag =
+    thruWalk-rule w (foldPath-rule fp (drop-ot (thru-outer mergeAllᵒ a) ≤-refl κ so) (Thru a κ) so (λ _ _ _ → refl)) κ₂
+      (foldPath-rule fp (drop-ot (thru-outer mergeAllᵒ a) ≤-refl κ so) κ₂ so₂
+        (λ k h h₂ → ag k (∨-Tʳ {a = any (_≡ᵇ k) (a ∷ [])} h) h₂)) ag
   thruWalk-rule (walk-cons c w) so κ₂ so₂ ag =
     thruWalk-rule w (thruConsume-rule c so _ so (λ _ _ _ → refl)) κ₂ (thruConsume-rule c so κ₂ so₂ ag) ag
 

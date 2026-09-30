@@ -32,10 +32,17 @@ Where a block IS stubbed, two things are given up:
 - **Postulates do not reduce**, so a clause needing a sibling to unfold can pass dev
   and fail for real.
 
+A third would be SCOPE: every focus module puts the signatures first, so a body
+calling a sibling above that sibling's signature — `NotInScope` in the real file —
+checks green here. That one is taken back textually, before any focus runs, as
+a forward-reference failure.
+
 Members whose SIGNATURES name a sibling (a trace indexed by the continuation it
 replays) travel as one batch, whatever `--batch` says: the context's postulate of
 such a member is stated over the context's copy of the sibling, and a batch that
-redefined only the sibling would see two different terms.
+redefined only the sibling would see two different terms. The named sibling's
+PRIVATE HELPERS (members whose only in-block caller it is) travel too, since
+it is named to be unfolded and would otherwise unfold to a stub.
 
 Self-recursion and recursion within one batch ARE checked. So the residual risk of
 a dev-only workflow is concentrated in the handful of modules with a heavy block,

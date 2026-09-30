@@ -30,8 +30,8 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
+open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _+ᵗ_; _≟ᵗ_)
+open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; echoᵗ; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
   switchKill; scanDispatch; takeDispatch; batchDispatch; thruWrap; shareDying; shareFinish;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
 open import Rx.Evaluator.Unconn-Arith using (KeepsC; keeps-refl; keeps-trans;
@@ -42,11 +42,11 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   foldPath⇓; dispatchShare⇓; shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc;
-  subs-batchSync; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all;
+  subs-batchSync; subs-scan; subs-flatten;
   subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
-  walk-nil; walk-cons; drain-spent; drain-nil; drain-no-room; drain-room;
+  walk-nil; walk-echo; walk-cons; drain-spent; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
   step-map; step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
@@ -213,7 +213,7 @@ stepFrame-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                 → Keeps {e = e} sched st sched₁ st₁
 
 subscribeAll-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                       {op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
+                       {op} {ns : NodeState Γ} {b : Val Γ (obs (echoᵗ u))}
                        {κ : Path Γ lo u t} {now}
                        {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {out}
                    → subscribeAll⇓ {e = e} op ns b κ now sched st
@@ -230,7 +230,7 @@ subscribeInner-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 
 thruWalk-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                    {op} {nid} {κ : Path Γ lo u t} {now}
-                   {vals : List (Val Γ (obs u))} {sched sched′ : Sched Γ}
+                   {vals : List (Val Γ (u +ᵗ obs u))} {sched sched′ : Sched Γ}
                    {st st′ : EvalSt e} {out}
                → thruWalk⇓ {e = e} op nid κ now vals sched st (out , sched′ , st′)
                → Keeps {e = e} sched st sched′ st′
@@ -326,9 +326,7 @@ subscribeE-keeps (subs-take-suc _ refl sub)    = subscribeE-keeps sub
 subscribeE-keeps (subs-batchSync refl sub f)   =
   keeps-trans (subscribeE-keeps sub) (foldPath-keeps f)
 subscribeE-keeps (subs-scan refl sub)          = subscribeE-keeps sub
-subscribeE-keeps (subs-merge-all sa)           = subscribeAll-keeps sa
-subscribeE-keeps (subs-switch-all sa)          = subscribeAll-keeps sa
-subscribeE-keeps (subs-exhaust-all sa)         = subscribeAll-keeps sa
+subscribeE-keeps (subs-flatten sa)             = subscribeAll-keeps sa
 subscribeE-keeps (subs-μ sub)                  = subscribeE-keeps sub
 subscribeE-keeps (subs-defer refl _ _ _)       = keeps-refl _ _
 subscribeE-keeps (subs-mint _ sub)             = subscribeE-keeps sub
@@ -349,6 +347,8 @@ subscribeAll-keeps (sub-all refl sub) = subscribeE-keeps sub
 subscribeInner-keeps (inner refl sub) = subscribeE-keeps sub
 
 thruWalk-keeps walk-nil        = keeps-refl _ _
+thruWalk-keeps (walk-echo f w) =
+  keeps-trans (foldPath-keeps f) (thruWalk-keeps w)
 thruWalk-keeps (walk-cons c w) =
   keeps-trans (thruConsume-keeps c) (thruWalk-keeps w)
 

@@ -10,13 +10,13 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 // of the fastcheck run is to ensure that the 'plain' agda Exp tree and
 // evaluator's behavior matches the behavior of 'plain' rxjs. Nothing
 // involving InstEmit at all"). Both sides produce a LIST OF VALUES and
-// the lists are compared exactly. The envelope — instants, source ids,
+// the lists are compared exactly. The InstEmit — instants, source ids,
 // chain emits, the fin bit — is a construct of the simultaneity layer
 // and is not under test here on either side: the TS leg is built from
 // ordinary rxjs operators in `plain-eval.ts`, and the Agda leg is the
 // evaluator reached through `CLI.Decode` — `evaluate↓`, whose result is
 // a list of BURSTS of plain events, flattened and projected to values
-// at the decode seam. Neither side carries an envelope, which is what
+// at the decode seam. Neither side carries an InstEmit, which is what
 // makes this a comparison of two plain machines rather than of one
 // plain one against a projection.
 //

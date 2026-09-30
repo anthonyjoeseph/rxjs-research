@@ -140,6 +140,27 @@ export type Tm =
   // there is no application here.
   | { type: "foldT"; ty: Ty; list: Tm; init: Tm; step: Tm };
 
+// Agda: Rx.Exp.FlatOp -- what a flattener does with a lane that arrives
+// while it is busy: queue it (up to `limit` live), cancel the live one, or
+// drop the arrival.  `limit` is rxjs's `concurrent`: absent is Infinity
+// (mergeAll), 1 is concatAll, k >= 2 the bounded mergeMap(f, k).  It is a
+// literal and NOT a Tm, unlike take's count, because rxjs fixes
+// `concurrent` when the pipeline is BUILT; and it is ABSENT rather than
+// null so that JSON.stringify drops it and the Agda decoder reads it as a
+// Maybe with no null in the JSON grammar.
+export type FlatOp =
+  { how: "merge"; limit?: number } | { how: "switch" } | { how: "exhaust" };
+
+// an option, a zero- or one-element array since `null` is a value (the unit)
+export type Opt<A> = readonly [] | readonly [A];
+
+// an option at `unit + t`, as `flatten`'s elements carry both halves:
+// `inr` holds the value and `inl` none
+export const optVal = (v: Val): Opt<Val> => {
+  const s = v as { type: "inl" | "inr"; val: Val };
+  return s.type === "inr" ? [s.val] : [];
+};
+
 // Agda: Fn Γ Δᵍ Δ Θ s t = Tm with the argument bound as Θ-var 0.
 export type Fn = Tm;
 
@@ -164,17 +185,10 @@ export type Exp =
   // an expression. Shared observables live in the slot telescope
   // (prop-test's Slot) and are referenced with `input`, exactly like
   // scripted inputs.
-  // ONE higher-order primitive carrying rxjs's `concurrent` argument:
-  // ABSENT is Infinity (mergeAll), 1 is concatAll, k >= 2 is the bounded
-  // mergeMap(f, k) that has no name of its own in rxjs. The limit is a
-  // literal and NOT a Tm, unlike take's count: rxjs fixes `concurrent`
-  // when the pipeline is BUILT, not when it is subscribed. Unbounded is
-  // an ABSENT field rather than null so that JSON.stringify drops it and
-  // the Agda decoder reads the limit as `getField "limit" >>=? asNum` —
-  // a Maybe with no null constructor needed in the JSON grammar.
-  | { type: "mergeAll"; ty: Ty; limit?: number; src: Exp }
-  | { type: "switchAll"; ty: Ty; src: Exp }
-  | { type: "exhaustAll"; ty: Ty; src: Exp }
+  // THE ONE FLATTENER, whose rxjs meaning is `flatten` in `flatten.ts`:
+  // `src` emits `(unit + ty) × (unit + obs ty)`, an optional ECHO beside an
+  // optional LANE, each option `inr` when present and `inl null` when not.
+  | { type: "flatten"; ty: Ty; op: FlatOp; src: Exp }
   | { type: "mu"; ty: Ty; body: Exp } // binds a μ-var, GUARDED (Agda's Δᵍ)
   | { type: "varE"; ty: Ty; index: number } // into the μ-binder stack, usable vars only (Agda's Δ)
   | { type: "defer"; ty: Ty; body: Exp }
@@ -200,6 +214,55 @@ export type Exp =
 
 // Agda: Closed Γ t — no free Θ-vars or μ-vars; input nodes are allowed.
 export type Closed = Exp;
+
+// A FLATTENER OVER A SOURCE OF OBSERVABLES, which is what rxjs's
+// `mergeAll`, `switchAll` and `exhaustAll` are: `flatten` over a map
+// that makes every element a lane and none an echo.
+export const flatAll = (op: FlatOp, ty: Ty, src: Exp): Exp => {
+  const obsTy: Ty = { type: "obs", elem: ty };
+  const unitT: Ty = { type: "unit" };
+  const opt = (t: Ty): Ty => ({ type: "sum", left: unitT, right: t });
+  const elemTy: Ty = { type: "prod", fst: opt(ty), snd: opt(obsTy) };
+  return {
+    type: "flatten",
+    ty,
+    op,
+    src: {
+      type: "map",
+      ty: elemTy,
+      fn: {
+        type: "pairT",
+        ty: elemTy,
+        fst: { type: "inlT", ty: opt(ty), val: { type: "unitT", ty: unitT } },
+        snd: {
+          type: "inrT",
+          ty: opt(obsTy),
+          val: { type: "varT", ty: obsTy, index: 0 },
+        },
+      },
+      src,
+    },
+  };
+};
+
+// the source of a `flatten` that is exactly a `flatAll`, which is how a
+// run can still read it as rxjs's own flattener
+export const flatAllSrc = (exp: Exp & { type: "flatten" }): Exp | undefined => {
+  const m = exp.src;
+  if (m.type !== "map") return undefined;
+  const f = m.fn;
+  return f.type === "pairT" &&
+    f.fst.type === "inlT" &&
+    f.fst.val.type === "unitT" &&
+    f.snd.type === "inrT" &&
+    f.snd.val.type === "varT" &&
+    f.snd.val.index === 0
+    ? m.src
+    : undefined;
+};
+
+export const mergeOp = (limit: number | undefined): FlatOp =>
+  limit === undefined ? { how: "merge" } : { how: "merge", limit };
 
 // Substitution plumbing — twins of Agda's evalTm/applyFn/unfoldμ,
 // used by the rx compiler: evalTm/applyFn turn Tm functions into host
@@ -440,9 +503,7 @@ const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
         count: substMuTm(exp.count, st, knot),
         src: substMuExp(exp.src, st, knot),
       };
-    case "mergeAll":
-    case "switchAll":
-    case "exhaustAll":
+    case "flatten":
     case "batchSync":
       return { ...exp, src: substMuExp(exp.src, st, knot) };
     case "mu":
@@ -540,9 +601,7 @@ const shiftExp = (exp: Exp, cutoff: number, by: number): Exp => {
         count: shiftTm(exp.count, cutoff, by),
         src: shiftExp(exp.src, cutoff, by),
       };
-    case "mergeAll":
-    case "switchAll":
-    case "exhaustAll":
+    case "flatten":
     case "batchSync":
       return { ...exp, src: shiftExp(exp.src, cutoff, by) };
     case "mu":

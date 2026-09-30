@@ -1,9 +1,9 @@
 import { Observable } from "rxjs";
 
 // VIRTUAL TIME FOR THE PLAIN LEG, AND NOTHING ELSE. This is the
-// envelope-free twin of `driver.ts`: the same (tick, ordinal)
+// InstEmit-free twin of `driver.ts`: the same (tick, ordinal)
 // arbitration, none of the protocol. A source id, a cascade instant and
-// a chain-emit channel are all things the ENVELOPE needs; a plain rxjs
+// a chain-emit channel are all things the INSTEMIT needs; a plain rxjs
 // pipeline has no notion of any of them, so the oracle's plain leg must
 // be able to run without one, and this is what "run without one" means
 // concretely.

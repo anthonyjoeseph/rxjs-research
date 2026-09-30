@@ -9,14 +9,6 @@
 --      by whatever a module happens to re-export.
 --   3. MAIN IS NEVER TOUCHED WITHOUT ANTHONY'S EXPLICIT APPROVAL.
 --
--- Note what is NOT here and no longer exists: the protocol face.  Its
--- one statement said no emit of a canonical run is rejected by the
--- automaton, and it was the single leaf the top line stood on; it was
--- also false against a slot table scripted at the envelope type.  What
--- replaces it is owed over the values once the plain machine computes,
--- so the top line below is a bare postulate meanwhile — the leaf-only
--- law, which forbids minting a leaf whose fit nothing can check.
---
 -- COVERAGE, and read this before trusting a green `make gate-heavy`: Agda
 -- compiles exactly what is transitively imported, so this file defines
 -- the build's coverage as well as its claim set.  Every module under
@@ -27,14 +19,38 @@
 module Main where
 
 ------------------------------------------------------------------
--- THE THEOREM.  The verified object, end to end: for every program,
--- batching its rendered stream is spec-correct.
+-- THE THEOREM.  Four statements, and together they are the claim that
+-- `batchSimultaneous` batches what plain rxjs would deliver, by
+-- instant, without reordering and without waiting.
+--
+--   left-to-right      the batches, joined back up, are the values the
+--                      program read as plain rxjs delivers, in order
+--   timing-correct     the impl's instant stamps group emits exactly
+--                      as the timed translation's packets do
+--   batchable          at every fuel, the batched run is the spec's
+--                      grouping of the run by instant
+--   timed-faithful     the timed translation is itself faithful to the
+--                      plain run, packets and END items dropped
+--
+-- EACH CLOSES A CHEAT THE OTHERS LEAVE OPEN.  Elaborating every program
+-- to `empty` is trivially batched, and fails left-to-right.  Stamping
+-- every emit with one instant, or each with its own, fails
+-- timing-correct, since the packets are the translation's and not the
+-- impl's to arrange.  `timed-faithful` is the translation's own
+-- obligation, not the impl's: a translation to `empty` would make
+-- timing-correct say nothing.
+--
+-- THE STATEMENTS MEET IN RAW VALUES, as a subscriber sees them.  No
+-- InstEmit is compared anywhere; valueless emits contribute nothing.
 ------------------------------------------------------------------
-open import Verify-Batch-Simultaneous.The-Proof
-  using (formal-verification-batchSimultaneous; batch-agreement)
-
-open import Verify-Batch-Simultaneous.Batch-Theorems
-  using (batch-online)
+open import Left-To-Right.Statement
+  using (left-to-right)
+open import Timed.Timing-Correct
+  using (timing-correct)
+open import Batchable.Statement
+  using (batchable)
+open import Timed.Faithful
+  using (timed-faithful)
 
 ------------------------------------------------------------------
 -- THE EVALUATOR-LEVEL CLAIMS ARE GONE, AND WHAT REMOVED THEM WAS NOT

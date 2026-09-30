@@ -45,8 +45,6 @@
 --   relation's constructors, which a probe of a flattener arm wants back.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 -- RECOVERY: git show 3a3bd405:agda/evidence/probed/Probed/Connect-Count.agda
--- RECOVERY: git show 15e6c229:agda/evidence/probed/Probed/Pipeline-Claims.agda
---   holds the online rows, expired by `batch-online` being proven.
 -- RECOVERY: git show 15e6c229:agda/evidence/probed/Probed/MergeMap-Empty.agda
 --   and `.../Share-Channel.agda` hold real-evaluator harnesses -- a
 --   slot-free root at `Ctx 0`, and a five-way share reading -- but each

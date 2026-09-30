@@ -22,6 +22,7 @@ open import Data.Unit.Polymorphic using (tt)
 open import Data.Unit using () renaming (tt to tt₀)
 
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
+open import Function.Base using (_|>′_)
 
 open import Rx.Prim using (Tick)
 open import Rx.Exp using (obs; Ctx; Closed; Val)
@@ -33,12 +34,12 @@ open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps; innerFini
 open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; foldPath⇓; fold-step; drain-spent; innerFinish⇓;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil; innerReact⇓;
   react-false; react-alive; react-dead; step-from-inner)
-open import Rx.Evaluator.Reducible.Support using (_∷ᵗ_; Ans; Call; Column; FrameStep; HeldF; NodeOn; Pre; PreFs; PreHolds; QEmpty; RP; Red;
-  Room; Sound; Stage; SubStep; []ᵗ; apply; bumpNode; call; deadBy; der; drop-ot; endPre; endRP;
-  endS; f-exhaust; f-merge; f-switch; fallen; finishing; fin″; fold; fresh-inner; grounded;
-  head-off; headHolds; headKept; headPre; holdsFs-step; inner-back; kept; ofColumn; out; outs;
-  sched″; stage; stage-map; stage-nil; stage-seq; standing; step; step-ct; step-off; step-red;
-  step-⇓; st″; writeStage)
+open import Rx.Evaluator.Reducible.Support using (_∷ᵗ_; Ans; Answered; answer; bind≡; Call; Column; FrameStep; HeldF; NodeOn; Pre; PreFs;
+  PreHolds; QEmpty; RP; Red; Room; Sound; Stage; SubStep; []ᵗ; bumpNode; call; deadBy; der;
+  drop-ot; endPre; endRP; endS; f-exhaust; f-merge; f-switch; fallen; finishing; fin″; fold;
+  fresh-inner; grounded; head-off; headHolds; headKept; headPre; holdsFs-step; inner-back;
+  kept; ofColumn; out; outs; sched″; stage; stage-map; stage-nil; stage-seq; standing; step;
+  step-ct; step-off; step-red; step-⇓; st″; writeStage)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; subscribe-kept; fold-kept)
 
 -- THE CALL A LIVE FRAME MAKES ABOVE IT, FOR THE CALL MADE TO IT: the
@@ -73,15 +74,15 @@ callStage : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s u
           → PreHolds m (f ↠[ le ] κ) (headPre h q) sched st
           → Stage m f le κ (λ o sc s′ → foldPath⇓ {e = e} now κ vals fin sched st (o , sc , s′)) q rp s₀ sched st
 callStage f le κ h (standing pfs) rp s₀ now vals col fin {sched} {st} rm (grounded (hf , ap , hs) so) =
-  let c  = call now vals col fin sched st rm (grounded hs (drop-ot f le κ so))
-      an = apply rp s₀ c
-  in stage (out an) (Ans.sched′ an) (Ans.st′ an) (der an) (c ∷ᵗ []ᵗ) refl h
+  answer rp s₀ (call now vals col fin sched st rm (grounded hs (drop-ot f le κ so))) λ a →
+  let an = Answered.an a
+  in stage (out an) (Ans.sched′ an) (Ans.st′ an) (der an) (a ∷ᵗ []ᵗ) refl h
        (headHolds f le κ h hf ap so (Ans.pre′ an) (Ans.holds′ an) (kept an)
           (fold-kept (der an) (drop-ot f le κ so) (f ↠[ le ] κ) so (λ _ _ _ → refl)))
        (headKept f le κ (λ _ _ → refl) refl (λ _ _ _ ea → ea) (Ans.pre′ an) (kept an) h)
 callStage f le κ h fallen rp s₀ now vals col fin {sched} {st} rm (grounded fell so) =
-  let an = fold rp s₀ now vals col fin sched st rm (grounded fell (drop-ot f le κ so))
-  in stage (out an) (Ans.sched′ an) (Ans.st′ an) (der an) []ᵗ refl h
+  fold rp s₀ now vals col fin sched st rm (grounded fell (drop-ot f le κ so)) |>′ λ an →
+  stage (out an) (Ans.sched′ an) (Ans.st′ an) (der an) []ᵗ refl h
        (grounded (fell-keeps (foldPath-keeps (der an)) fell)
           (fold-kept (der an) (drop-ot f le κ so) (f ↠[ le ] κ) so (λ _ _ _ → refl)))
        tt
@@ -163,9 +164,9 @@ fiDead {Γ = Γ} {e = e} {u = u} op allNid inst le κ pfs rp s₀ h g now vals c
            , tt
 ...   | f-merge lim act q od with g
 ...     | refl =
-        let fi = from-inner {s = u} op allNid inst
-            s₁ = callStage fi le κ h (standing pfs) rp s₀ now vals (ofColumn κ (standing pfs) col) false rm hs
-            s₂ : Stage _ fi le κ
+        let fi = from-inner {s = u} op allNid inst in
+        callStage fi le κ h (standing pfs) rp s₀ now vals (ofColumn κ (standing pfs) col) false rm hs |>′ λ s₁ →
+        let s₂ : Stage _ fi le κ
                    (λ o sc s′ → Σ ℕ (λ act′ → Σ (List (Val Γ (obs u))) (λ q′ →
                       mergeAllDrain⇓ {e = e} allNid κ now [] lim (pred act) od [] (Stage.sc s₁) (Stage.st′ s₁)
                         (o , act′ , q′ , sc , s′))))
@@ -186,18 +187,18 @@ fiDead {Γ = Γ} {e = e} {u = u} op allNid inst le κ pfs rp s₀ h g now vals c
             w  = writeStage fi le κ (endPre (Stage.tr s₁₂)) (endRP (Stage.tr s₁₂)) (endS (Stage.tr s₁₂)) allNid
                    (mergeAll-st lim act′ q′ od) (λ k ne → head-off allNid (inst ∷ []) k ne)
                    (just (mergeAll-st lim act′ q′ od)) (lookup-set allNid (mergeAll-st lim act′ q′ od) (EvalSt.nodes (Stage.st′ s₁₂))) (Stage.hd s₁₂) (Stage.hl s₁₂)
-            cs = callStage fi le κ (just (mergeAll-st lim act′ q′ od)) (endPre (Stage.tr s₁₂)) (endRP (Stage.tr s₁₂)) (endS (Stage.tr s₁₂))
-                   now [] (ofColumn κ _ []ᵃ) fin′ (room-keeps (innerFinish-keeps dfin) rm) (Stage.hl w)
             cs-hd = callStage-hd fi le κ (just (mergeAll-st lim act′ q′ od)) (endPre (Stage.tr s₁₂)) (endRP (Stage.tr s₁₂))
                       (endS (Stage.tr s₁₂)) now [] (ofColumn κ _ []ᵃ) fin′ (room-keeps (innerFinish-keeps dfin) rm) (Stage.hl w)
-            s₃ : Stage _ fi le κ
+        in bind≡ (callStage fi le κ (just (mergeAll-st lim act′ q′ od)) (endPre (Stage.tr s₁₂)) (endRP (Stage.tr s₁₂)) (endS (Stage.tr s₁₂))
+                    now [] (ofColumn κ _ []ᵃ) fin′ (room-keeps (innerFinish-keeps dfin) rm) (Stage.hl w)) λ cs eq →
+        let s₃ : Stage _ fi le κ
                    (λ o sc s′ → foldPath⇓ {e = e} now κ [] fin′ (Stage.sc s₁₂)
                                   (record (Stage.st′ s₁₂) { nodes = setNode allNid (mergeAll-st lim act′ q′ od) (EvalSt.nodes (Stage.st′ s₁₂)) })
                                   (o , sc , s′))
                    (endPre (Stage.tr s₁₂)) (endRP (Stage.tr s₁₂)) (endS (Stage.tr s₁₂)) (Stage.sc s₁₂) (Stage.st′ s₁₂)
             s₃ = stage-seq w cs (λ d → d)
         in stage-seq s₁₂ s₃ (λ d₃ → fold-step (step-from-inner (deadBy eqa c dfin)) d₃)
-           , subst QEmpty (sym cs-hd) refl
+           , subst QEmpty (sym (trans (cong Stage.hd eq) cs-hd)) refl
 
 fiStep op allNid inst le κ pfs rp s₀ h g now vals col false sched st rm hs =
   pass op allNid inst le κ pfs rp s₀ h now vals col false rm hs react-false , g

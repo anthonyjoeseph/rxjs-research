@@ -1,15 +1,16 @@
 # `make bug-cache` — the cached-counterexample corpus
 
 When you discover an implementation bug, capture it immediately as a row of
-`agda/src/Implementation/Unit-Test.agda` — a named program, run by a compiled
+`agda/src/CLI/Unit-Test.agda` — a named program, run by a compiled
 binary rather than normalised by the typechecker.
 
 These are a **performance cache** of discovered work: faster to recheck than
 QuickCheck, and pinned to a specific canonical program (spec-derived), so a
 regression is caught by one `make bug-cache` instead of surfacing only in a
 random seed. They exist only to accelerate finding the implementation; they are
-**not** meant to survive past the proof. Delete the corpus once
-`The-Proof.agda` is discharged.
+**not** meant to survive past the proof. Delete the corpus once the
+top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) are
+discharged.
 
 ## It runs, it does not typecheck — and that is the whole design
 
@@ -24,34 +25,47 @@ one module per case, a ledger of import-and-pin blocks, two separate *types* for
 the two predicates — is gone, and what is left is a list.
 
 - `Unit-Test/Prelude.agda` — what a `Case` is (a label, a fuel, a program, its
-  slots) and the two predicates every row is held to: `wellFormed` and `agrees`.
+  slots) and `checksOf`, the labelled properties every row is held to:
+  `batchable` (impl≡spec) and `left-to-right`.
 - `Unit-Test.agda` — the corpus: `cases : List Case`, one row per cached
   counterexample.
 - `Unit-Test/Bug-Cache.agda` — the runner. A `MODULE_ROOTS` entry, compiled to
   `agda/_cli/Bug-Cache`.
 
-## Both predicates, every row
+## Every property, every row
 
-Asking twice is free once the run is compiled, so a row says only *which run to
-make* and the runner checks both properties of it. That is strictly more than
-the type-level cache carried: a program cached for a protocol violation now also
-guards agreement, the property the whole campaign is about. It is also what
-makes the dedup key work — a program that fails both checks wants one row, not
-two.
+Asking again is free once the run is compiled — `checksOf` makes each run once
+and hands it to every check — so a row says only *which run to make* and the
+runner checks every property of it. A program cached for a protocol violation
+also guards agreement, the property the whole campaign is about. It is also what
+makes the dedup key work — a program that fails several checks wants one row,
+not several.
 
-## The verdict is text, and the target demands the summary
+## One row per process, under a budget
+
+The runner reads a row number on stdin and runs that row alone; `0` asks for
+the row count. The oracle tree is built with termination checking off, so a
+row's run can fail to END — a counterexample like any other, but one that inside
+a single walk of the corpus would take every later verdict with it and hold the
+CI job to its timeout. So `make bug-cache` starts one process per row under
+`BUG_CACHE_ROW_BUDGET` seconds (default 60), and a row over budget is a `FAIL`
+named by the row: the runner prints and flushes the name before the run starts.
+
+## The verdict is text, and the target demands it
 
 `CLI.IO`'s whole FFI surface is stdin and stdout — there is no exit status to
-hand back — so the runner prints
+hand back — so for one row the runner prints
 
 ```
+bug-cache: row <name>
 bug-cache: FAIL <name> <property>     (one per failing property)
-bug-cache: ran <N> cases, <M> failures
+bug-cache: done
 ```
 
-and `make bug-cache` **requires the summary line before it refuses any `FAIL`
-line**. That order matters: a binary that walked nothing prints nothing, and a
-grep for failures alone would read that as green.
+and `make bug-cache` **requires every row's `done` line before it refuses any
+`FAIL` line**, then prints `bug-cache: ran <N> cases, <M> failing`. That order
+matters: a binary that ran nothing prints nothing, and a grep for failures alone
+would read that as green.
 
 ## Append-only
 

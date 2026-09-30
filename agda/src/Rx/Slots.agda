@@ -39,17 +39,17 @@ open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ)
 --
 -- THIS TELESCOPE IS THE EVALUATOR AT FULL SCOPE AND A SHARED DEF HERE
 -- IS AN ARBITRARY PLAIN TREE, which at an observable type can hand the
--- machine an envelope no elaboration produced -- `subs-shared`
+-- machine an InstEmit no elaboration produced -- `subs-shared`
 -- subscribes a definition straight down the consumer's path, so its
 -- emissions reach the wire exactly as written.  That is DELIBERATE and
 -- it is what the differential harness runs at: the TypeScript
 -- fast-check drives this evaluator over plain trees and knows nothing
 -- of srxjs, so narrowing here would narrow the thing under test.
 --
--- WHAT A CLAIM ABOUT SRXJS QUANTIFIES OVER INSTEAD IS `Rx.Simul-Slots`,
+-- WHAT A CLAIM ABOUT SRXJS QUANTIFIES OVER INSTEAD IS `SExp.Simul-Slots`,
 -- where a shared slot's definition is an `SExp` and the table is read
 -- back into this one by elaborating it.  A definition there cannot
--- forge at any type, because every envelope in it was built by the
+-- forge at any type, because every InstEmit in it was built by the
 -- elaboration -- so the observable-typed shared slot survives, and it
 -- survives without a side condition here.
 ---- THE TELESCOPE IS STRATIFIED (`inputsBelowᵉ k`): slot k's def may

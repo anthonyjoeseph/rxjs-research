@@ -107,7 +107,7 @@ HeldF {Γ = Γ}   (scan-f _ _)         = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (take-f _)           = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (batchSync-f _)      = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (from-inner _ _ _)   = Maybe (NodeState Γ)
-HeldF {Γ = Γ}   (thru-outer _ _)     = Maybe (NodeState Γ)
+HeldF {Γ = Γ}   (thru-outer _ _)   = Maybe (NodeState Γ)
 
 -- WHAT A STANDING PATH'S FRAMES STAND ON: each frame's own column,
 -- which the store agrees with, so there is no value the frame cannot
@@ -148,7 +148,7 @@ ConsistentF (scan-f _ nid)          h st = lookupNode nid (EvalSt.nodes st) ≡ 
 ConsistentF (take-f nid)            h st = lookupNode nid (EvalSt.nodes st) ≡ h
 ConsistentF (batchSync-f nid)       h st = lookupNode nid (EvalSt.nodes st) ≡ h
 ConsistentF (from-inner _ nid _)    h st = lookupNode nid (EvalSt.nodes st) ≡ h
-ConsistentF (thru-outer _ nid)      h st = lookupNode nid (EvalSt.nodes st) ≡ h
+ConsistentF (thru-outer _ nid)    h st = lookupNode nid (EvalSt.nodes st) ≡ h
 
 -- AND THE FRAME'S NODE IS BELOW THE COUNTER, which is what makes a
 -- write at the counter leave it alone.  Agreement alone is not
@@ -393,7 +393,7 @@ push-sound f le κ (sound ru ea fp ds) nd =
 -- and the outer frame, at a node on the path
 push-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ u} (op : AllOp) (nid : NodeId) (le : lo ≤ ℓ)
               (κ : Path Γ ℓ u t) {sched : Sched Γ} {st : EvalSt e}
-          → Sound κ sched st → NodeOn nid κ sched st → Sound (thru-outer {u = u} op nid ↠[ le ] κ) sched st
+          → Sound κ sched st → NodeOn nid κ sched st → Sound (thru-outer op nid ↠[ le ] κ) sched st
 push-thru op nid le κ {sched} {st} so nd =
   push-sound (thru-outer op nid) le κ so (λ k a → subst (λ j → NodeOn j κ sched st) (node-eq a) nd)
 
@@ -499,7 +499,7 @@ consistentF-move (scan-f _ nid)         h mv c = trans (mv nid (self-node nid []
 consistentF-move (take-f nid)           h mv c = trans (mv nid (self-node nid [])) c
 consistentF-move (batchSync-f nid)      h mv c = trans (mv nid (self-node nid [])) c
 consistentF-move (from-inner _ nid j)   h mv c = trans (mv nid (self-node nid (j ∷ []))) c
-consistentF-move (thru-outer _ nid)     h mv c = trans (mv nid (self-node nid [])) c
+consistentF-move (thru-outer _ nid)   h mv c = trans (mv nid (self-node nid [])) c
 
 -- THE GROUND SURVIVES A STEP THAT READS THE PATH'S OWN NODES BACK THE
 -- SAME AND DOES NOT LOWER THE COUNTER.  The two hypotheses are what a
@@ -639,6 +639,15 @@ record RP {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
 -- derivation, the successor with the ground it stands on in that
 -- state, what it kept for the frame beneath, and the state it was
 -- threaded.
+
+-- EVERY FIELD IS A THUNK OVER THE ANSWER IT CAME FROM, so a compiled run
+-- keeps what its answers can still reach.  Measured on the bug-cache row
+-- switching to two ofs: forcing `next` and the arguments `liveRP` and
+-- `subRP` close over halves the peak residency; the rest is derivation
+-- constructors and proof thunks, reached through each `Stage`'s trace of
+-- `Answered`s, which only erasing the proof-carrying fields would drop.
+-- `--ghc-strict-data` is worse -- it builds every derivation a lazy run
+-- never demands.
 record Ans {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
            (P : Val Γ u → Set₁) (S : Set) (κ : Path Γ lo u t)
            (now : Tick) (vals : List (Val Γ u)) (fin : Bool)
@@ -674,12 +683,37 @@ apply : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Se
 apply rp s c = fold rp s (Call.now c) (Call.vals c) (Call.col c) (Call.fin c)
                     (Call.sched c) (Call.st c) (Call.room c) (Call.holds c)
 
+-- BOUND ONCE, AND REMEMBERED AS WHAT WAS BOUND.  A `let` is
+-- substituted before compilation, so every projection of a let-bound
+-- fold re-runs the whole continuation above it, and nested frames
+-- multiply the re-runs; a lambda's argument is evaluated once.  The
+-- equation is what lets the body still be typed against the term.
+bind≡ : ∀ {a b} {A : Set a} {B : Set b} (x : A) → ((y : A) → y ≡ x → B) → B
+bind≡ x k = k x refl
+
+-- WHAT THE FOLD ANSWERED A CALL, held rather than recomputed: the
+-- answer IS the fold applied, by the equation.
+record Answered {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Set₁} {S : Set}
+                {κ : Path Γ lo u t} {pre : Pre κ}
+                (rp : RP {e = e} m P S κ pre) (s : S) (c : Call {e = e} m P κ pre) : Set₁ where
+  constructor answered
+  field
+    an : Ans {e = e} m P S κ (Call.now c) (Call.vals c) (Call.fin c) (Call.sched c) (Call.st c)
+    is : an ≡ apply rp s c
+
+-- the call applied once, for the body to read
+answer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Set₁} {S : Set}
+         {κ : Path Γ lo u t} {pre : Pre κ} {b} {B : Set b}
+       → (rp : RP {e = e} m P S κ pre) (s : S) (c : Call {e = e} m P κ pre)
+       → (Answered rp s c → B) → B
+answer rp s c k = k (answered (apply rp s c) refl)
+
 -- THE TRACE: THE CALLS A SUBSCRIBE MADE TO ITS CONTINUATION, IN ORDER,
 -- EACH TYPED AGAINST THE SUCCESSOR THE ONE BEFORE IT ANSWERED WITH.
--- Replaying it is applying the fold to each call in turn, and that is
--- not a second computation of the successor to be proven equal to the
--- first: it IS the successor, by the type, so a subscribe answers with
--- the trace and nothing else about its continuation.  A frame arm
+-- Each call carries its answer, which IS the fold applied to it, by the
+-- equation it carries, so a subscribe answers with the trace and
+-- nothing else about its continuation, and reading where it ended
+-- re-runs nothing.  A frame arm
 -- translates its source's trace through the frame it pushed, call by
 -- call, and the translation's end is the successor of the continuation
 -- it was handed -- which is what the exit frame's peel used to do.
@@ -698,8 +732,8 @@ data Trace {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
          : (pre : Pre κ) → RP {e = e} m P S κ pre → S → Set₁ where
   []ᵗ   : ∀ {pre rp s} → Trace m P S κ pre rp s
   fellᵗ : ∀ {pre rp s} → RP {e = e} m P S κ fallen → S → Trace m P S κ pre rp s
-  _∷ᵗ_  : ∀ {pre rp s} (c : Call {e = e} m P κ pre)
-        → Trace m P S κ (Ans.pre′ (apply rp s c)) (next (apply rp s c)) (Ans.s′ (apply rp s c))
+  _∷ᵗ_  : ∀ {pre rp s} {c : Call {e = e} m P κ pre} (a : Answered rp s c)
+        → Trace m P S κ (Ans.pre′ (Answered.an a)) (next (Answered.an a)) (Ans.s′ (Answered.an a))
         → Trace m P S κ pre rp s
 
 -- where a trace ends: the ground it left the path on
@@ -1626,7 +1660,7 @@ colOf (scan-f _ nid)       st = lookupNode nid (EvalSt.nodes st)
 colOf (take-f nid)         st = lookupNode nid (EvalSt.nodes st)
 colOf (batchSync-f nid)    st = lookupNode nid (EvalSt.nodes st)
 colOf (from-inner _ nid _) st = lookupNode nid (EvalSt.nodes st)
-colOf (thru-outer _ nid)   st = lookupNode nid (EvalSt.nodes st)
+colOf (thru-outer _ nid) st = lookupNode nid (EvalSt.nodes st)
 
 colsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} (κ : Path Γ lo u t) → EvalSt e → PreFs κ
 colsOf root             st = tt
@@ -1640,7 +1674,7 @@ consistentOf (scan-f _ _)         st = refl
 consistentOf (take-f _)           st = refl
 consistentOf (batchSync-f _)      st = refl
 consistentOf (from-inner _ _ _)   st = refl
-consistentOf (thru-outer _ _)     st = refl
+consistentOf (thru-outer _ _)   st = refl
 
 -- every node found among some is below a bound, so all of them are
 all-below : ∀ (ns : List ℕ) {ct} → (∀ k → T (any (_≡ᵇ k) ns) → k < ct) → All (_< ct) ns
@@ -1796,9 +1830,9 @@ red-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 red-scripted i ρ k ok aK κ below pre rp s now sched (hot async) slEq st aM rm h
   with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
 ... | true =
-      let c  = call now [] (ofColumn κ pre []ᵃ) true sched st rm h
-          an = apply rp s c
-      in _ , subs-hot-done below slEq doneEq (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+      answer rp s (call now [] (ofColumn κ pre []ᵃ) true sched st rm h) λ a →
+      let an = Answered.an a
+      in _ , subs-hot-done below slEq doneEq (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 ... | false =
       _ , subs-hot-live below slEq doneEq refl , []ᵗ
     , holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x)
@@ -1810,9 +1844,9 @@ red-scripted i ρ k ok aK κ below pre rp s now sched (hot async) slEq st aM rm 
         (ends-register {κ = κ} {sched = sched} {st = st} (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ)
            (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on)))
 red-scripted i ρ k ok aK κ below pre rp s now sched (cold sync []) {oks} slEq st aM rm h =
-  let c  = call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) true sched st rm h
-      an = apply rp s c
-  in _ , subs-cold-sync below slEq (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+  answer rp s (call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) true sched st rm h) λ a →
+  let an = Answered.an a
+  in _ , subs-cold-sync below slEq (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 red-scripted {Γ = Γ} {lo = lo} i ρ k ok aK κ below pre rp s now sched (cold sync (d ∷ ds)) {oks} slEq st aM rm h =
   let src    = freshId sourceᵏ (Sched.mint sched)
       ord    = freshId ordinalᵏ (Sched.mint sched)
@@ -1826,9 +1860,9 @@ red-scripted {Γ = Γ} {lo = lo} i ρ k ok aK κ below pre rp s now sched (cold 
       h₁     = holds-step κ pre {sched′ = sched₁} {st′ = st₁} (λ _ _ _ → refl) ≤-refl (λ x → x)
                  (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl refl (λ k′ on → inj₁ on) (λ so′ → distinct so′))
                  h
-      c      = call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm h₁
-      an     = apply rp s c
-  in _ , subs-cold-async below slEq refl refl refl (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an
+  in answer rp s (call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm h₁) λ a →
+  let an = Answered.an a
+  in _ , subs-cold-async below slEq refl refl refl (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an
    , kept-before κ (pres (λ _ _ → refl)) ≤-refl
        (ends-register {κ = κ} {sched = sched} {st = st} rid (atDyn src lo) κ (λ k′ on → inj₁ on)) (Ans.pre′ an) (kept an)
 

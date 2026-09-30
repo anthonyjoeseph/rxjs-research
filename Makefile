@@ -1,4 +1,4 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -178,7 +178,8 @@ help:
 	@echo "                  make oracle                   (full seed sweep)"
 	@echo "                  make oracle ARGS='--seed 1'   (ONE seed only)"
 	@echo "                  make oracle ARGS='--operator mergeAll'"
-	@echo "  qc-build      compile the all-Agda QuickCheck binary (agda/_cli/QuickCheck)"
+	@echo "  qc-build      compile the all-Agda QuickCheck binary ($(ORACLE_BIN)/QuickCheck)"
+	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs)"
 	@echo "  quickcheck    all-Agda QuickCheck: impl- vs spec-batchSimultaneous"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
@@ -230,7 +231,7 @@ warm:
 agda-dev-selftest:
 	scripts/agda-dev.py --falsify $(ARGS)
 
-# Implementation/Unit-Test.agda is deliberately not imported by Main (it is a
+# CLI/Unit-Test.agda is deliberately not imported by Main (it is a
 # throwaway performance cache, deleted once Formal-Verification is discharged),
 # so nothing else in the build would ever notice it rotting.  This target is
 # what makes its invariant enforceable rather than remembered.
@@ -243,9 +244,20 @@ agda-dev-selftest:
 #
 # THE CORPUS IS RUN, NOT TYPECHECKED, and the verdict comes back as text
 # because `CLI.IO` has no exit status to hand back -- stdin and stdout are its
-# whole FFI surface.  So this demands the summary line BEFORE refusing any FAIL
-# line: a binary that walked nothing prints nothing, and a grep for failures
-# alone would read that as green, which is the one way this target could lie.
+# whole FFI surface.  So this demands every row's `done` line BEFORE refusing
+# any FAIL line: a binary that ran nothing prints nothing, and a grep for
+# failures alone would read that as green, which is the one way this target
+# could lie.  The row count comes from the binary too, so a corpus that
+# compiled empty says `ran 0 cases` rather than passing silently.
+#
+# ONE PROCESS PER ROW, UNDER BUG_CACHE_ROW_BUDGET SECONDS.  The oracle tree
+# is built with termination checking off, so a row's run can fail to end --
+# which is a counterexample, and one inside a single walk of the corpus would
+# take every later verdict with it and hold the job to its timeout.  A row
+# over budget is a FAIL named by the row, whose name the runner flushes
+# before the run starts.
+BUG_CACHE_ROW_BUDGET ?= 60
+
 #
 # SUSPENDED WHILE THE CANDIDATE HAS LIVE LEAVES (Anthony: "suspend,
 # self-expiring").  The Girard-Tait cutover made the evaluator extract a run's
@@ -275,16 +287,29 @@ bug-cache: stripped
 
 agda/_cli/Bug-Cache: $(AGDA_SRC)
 	@$(MAKE) --no-print-directory stripped
-	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/Implementation/Unit-Test/Bug-Cache.agda)
+	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Unit-Test/Bug-Cache.agda)
 	@touch $@
 
 bug-cache-build: agda/_cli/Bug-Cache
 
 bug-cache-run: $(ORACLE_BIN)/Bug-Cache
-	@out=$$($(ORACLE_BIN)/Bug-Cache); printf '%s\n' "$$out"; \
-	 printf '%s\n' "$$out" | grep -q '^bug-cache: ran ' \
-	   || { echo "bug-cache: the runner printed no summary line" >&2; exit 1; }; \
-	 if printf '%s\n' "$$out" | grep -q '^bug-cache: FAIL '; then \
+	@n=$$(echo 0 | $(ORACLE_BIN)/Bug-Cache | sed -n 's/^bug-cache: rows \([0-9][0-9]*\)$$/\1/p'); \
+	 [ -n "$$n" ] || { echo "bug-cache: the runner printed no row count" >&2; exit 1; }; \
+	 bad=0; k=0; \
+	 while [ $$k -lt $$n ]; do \
+	   k=$$((k + 1)); \
+	   out=$$(echo $$k | timeout $(BUG_CACHE_ROW_BUDGET) $(ORACLE_BIN)/Bug-Cache); ec=$$?; \
+	   row=$$(printf '%s\n' "$$out" | sed -n 's/^bug-cache: row //p'); \
+	   if [ $$ec = 124 ]; then \
+	     echo "bug-cache: FAIL $$row (row $$k) no verdict within $(BUG_CACHE_ROW_BUDGET)s"; bad=$$((bad + 1)); \
+	   elif [ $$ec != 0 ] || ! printf '%s\n' "$$out" | grep -q '^bug-cache: done$$'; then \
+	     echo "bug-cache: FAIL $$row (row $$k) the runner exited $$ec without a verdict"; bad=$$((bad + 1)); \
+	   elif printf '%s\n' "$$out" | grep -q '^bug-cache: FAIL '; then \
+	     printf '%s\n' "$$out" | grep '^bug-cache: FAIL '; bad=$$((bad + 1)); \
+	   fi; \
+	 done; \
+	 echo "bug-cache: ran $$n cases, $$bad failing"; \
+	 if [ $$bad != 0 ]; then \
 	   echo "bug-cache: RED — a known counterexample is live again" >&2; exit 1; \
 	 fi
 
@@ -295,20 +320,21 @@ bug-cache-run: $(ORACLE_BIN)/Bug-Cache
 # than in every importer — so nothing mechanically stops an unsafe pragma on the
 # proof path.  `--safe` cannot be switched on while postulates exist (it rejects
 # `postulate` as well as the pragmas), so until the endgame this grep IS the
-# guard.  EXEMPT: src/QuickCheck.agda, a test harness Main does not import.
+# guard.  EXEMPT: src/CLI/QuickCheck.agda, a test harness Main does not import.
 #
-# At the finish line this target retires: once The-Proof.agda carries no
-# postulates, `agda --safe src/Main.agda` checks both halves at once.
+# At the finish line this target retires: once the top-line statement
+# modules (Left-To-Right, Timed, Batchable) carry no postulates,
+# `agda --safe src/Main.agda` checks both halves at once.
 unsafe-check:
 	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ evidence/ \
-	    --include='*.agda' | grep -v '^src/QuickCheck.agda:' || true); \
+	    --include='*.agda' | grep -v '^src/CLI/QuickCheck.agda:' || true); \
 	  opts=$$(grep -rn -E '\{-# *OPTIONS.*(--type-in-type|--no-termination-check|--no-positivity-check|--rewriting)' src/ evidence/ \
 	    --include='*.agda' || true); \
 	  if [ -n "$$hits$$opts" ]; then \
 	    echo "UNSAFE PRAGMA ON THE PROOF PATH OR IN THE EVIDENCE — a soundness hole, not a shortcut:"; \
 	    echo "$$hits"; echo "$$opts"; exit 1; \
 	  else \
-	    echo "unsafe-check: clean in src and evidence (0 unsafe pragmas outside the documented QuickCheck.agda exemption)"; \
+	    echo "unsafe-check: clean in src and evidence (0 unsafe pragmas outside the documented CLI/QuickCheck.agda exemption)"; \
 	  fi
 
 # THE COMMENT-STRIPPED MIRROR -- what Agda actually checks, and why a
@@ -1335,10 +1361,10 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a CHANGED claim root was not held back — a root's dev check IS the tower, so it times out at the per-module budget and reports RED for a module with nothing wrong with it, and one edited comment is enough to put it in the changed set"; fail=1; }; \
 	  echo "$$out" | grep -q 'plan .* agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: a CHANGED claim root is in the sweep plan — the cone half of this exclusion was written first and is not the whole rule"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Spec.agda 2>&1); \
-	  echo "$$out" | grep -q 'skip  agda/src/Verify-Batch-Simultaneous/The-Proof.agda' \
+	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/SExp/Plain.agda 2>&1); \
+	  echo "$$out" | grep -q 'skip  agda/src/Batchable/Statement.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
-	  echo "$$out" | grep -q 'FAIL  agda/src/Spec.agda' \
+	  echo "$$out" | grep -q 'FAIL  agda/src/SExp/Plain.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'unchecked: ' \
@@ -1497,19 +1523,22 @@ formers-selftest:
 	      "sed -i.bak 's/\tno\tyes\tsource\tthe fixture.*/\tno\tyes\tsource/' scripts/formers.tsv" \
 	      "needs a reason"; \
 	  run "an agen=yes row the harness root stops writing" \
-	      "sed -i.bak 's/capProg e = sharedSigᵉ e/capProg e = e/' agda/src/Implementation/Unit-Test/Prelude.agda" \
+	      "sed -i.bak 's/capProg e = sharedSigᵉ e/capProg e = e/' agda/src/CLI/Unit-Test/Prelude.agda" \
 	      'no arm of the Agda generator writes `sharedSigᵉ`'; \
 	  run "an agen=no row the Agda generator DOES write" \
-	      "sed -i.bak 's/notᵖCount/notᵖ/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/notᵖCount/notᵖ/' agda/src/CLI/QuickCheck.agda" \
 	      'the Agda generator DOES write `notᵖ`'; \
 	  run "an agen=no row whose elaboration arm the generator starts drawing" \
-	      "sed -i.bak 's/else liftˢ (natˢ d))/else notˢ d)/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/else liftˢ (natˢ d))/else notˢ d)/' agda/src/CLI/QuickCheck.agda" \
 	      'the Agda generator DOES write `notᵖ`'; \
 	  run "an agen=no row whose postulated elaboration arm gains a body" \
-	      "sed -i.bak 's/^  deferᵖ : SExp Γ t → Exp Γ t/deferᵖ : SExp Γ t → Exp Γ t\ndeferᵖ e = deferᵉ e/' agda/src/Rx/Elaborate.agda" \
+	      "sed -i.bak 's/^  deferᵖ : SExp Γ t → Exp Γ t/deferᵖ : SExp Γ t → Exp Γ t\ndeferᵖ e = deferᵉ e/' agda/src/SExp/Elaborate.agda" \
 	      'the Agda generator DOES write `deferᵉ`'; \
 	  run "an agen=yes row whose elaboration helper stops being reached" \
-	      "sed -i.bak 's/toPlain (liftˢ f)  = liftᵖ (toPlainTm f)/toPlain (liftˢ f)  = toPlain f/' agda/src/Rx/Elaborate.agda" \
+	      "sed -i.bak 's/toInstEmit (liftˢ f)  = liftᵖ (toInstEmitTm f)/toInstEmit (liftˢ f)  = toInstEmit f/' agda/src/SExp/Elaborate.agda" \
+	      'no arm of the Agda generator writes `liftᵉ`'; \
+	  run "an elaboration helper dropped from the sibling module's using list" \
+	      "sed -i.bak 's/using (liftᵖ)/using ()/' agda/src/SExp/Elaborate.agda" \
 	      'no arm of the Agda generator writes `liftᵉ`'; \
 	  run "a row unreachable by BOTH generators" \
 	      "sed -i.bak 's/\tno\tyes\tsource/\tno\tno\tsource/' scripts/formers.tsv" \
@@ -1536,15 +1565,15 @@ formers-selftest:
 	      "sed -i.bak 's/op: \"not\"/op: \"gone\"/' typescript/src/generator.ts" \
 	      'nothing generates the tag "not"'; \
 	  run "a census tag in no exp row" \
-	      "sed -i.bak 's/formerTag fLift      = \"lift\"/formerTag fLift      = \"hoisted\"/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/formerTag fLift      = \"lift\"/formerTag fLift      = \"hoisted\"/' agda/src/CLI/QuickCheck.agda" \
 	      'reports under the tag "hoisted"'; \
 	  run "an exp row the census counts nothing under" \
-	      "sed -i.bak 's/formerTag fDefer     = \"defer\"/formerTag fDefer     = \"hoisted\"/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/formerTag fDefer     = \"defer\"/formerTag fDefer     = \"hoisted\"/' agda/src/CLI/QuickCheck.agda" \
 	      'counts nothing under the tag "defer"'; \
 	  run "a declared former the roll never walks" \
-	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/QuickCheck.agda" \
+	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/CLI/QuickCheck.agda" \
 	      'so the tally never walks it'; \
-	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda sweep's REACH is held to the map in both directions with a token boundary that a substring scan would cross, and that reach composes rather than unions -- the harness root counts, an undrawn elaboration arm does not, a postulated one does not, and a helper the arms reach does, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda sweep's REACH is held to the map in both directions with a token boundary that a substring scan would cross, and that reach composes rather than unions -- the harness root counts, an undrawn elaboration arm does not, a postulated one does not, and a helper the arms reach does, imported by name from a sibling module included while that module's other definitions are not, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
 	  exit $$fail
 
 # A FILE TARGET, SO ONE BUILD SERVES EVERY RUN AFTER IT -- one local build
@@ -1577,7 +1606,7 @@ $(ORACLE_BIN)/Main: $(AGDA_SRC) scripts/oracle-mirror.py
 
 $(ORACLE_BIN)/Bug-Cache: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/Implementation/Unit-Test/Bug-Cache.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/Unit-Test/Bug-Cache.agda
 	@touch $@
 
 # BOTH HALVES, IN ORDER: `oracle-tree` copies the cone and turns every
@@ -1624,11 +1653,37 @@ oracle-pinned: $(ORACLE_BIN)/Main
 	  (cd typescript && AGDA_CLI_BIN=$(CURDIR)/$(ORACLE_BIN)/Main npm run --silent oracle -- --cases "../$$f") || exit 1; \
 	done
 
-qc-build: stripped
-	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/QuickCheck.agda)
+# ON THE ORACLE'S TREE, termination checking off: the binary samples the
+# evaluator's values, and the tower is what checks it terminates.
+$(ORACLE_BIN)/QuickCheck: $(AGDA_SRC) scripts/oracle-mirror.py
+	@$(MAKE) --no-print-directory oracle-tree
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/QuickCheck.agda
+	@touch $@
+
+qc-build: $(ORACLE_BIN)/QuickCheck
 
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
+
+# THE DEV LOOP: one sweep under a HARD time budget.  Over budget is a
+# failure, not a wait -- the budget is what keeps the loop a loop, and it
+# is raised only once the operator passes at the current one.
+# QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
+#
+# IT GATES ON EVERY CHECK.  Each is one top-line statement, decided on
+# one program's run, and every one of them is
+# a claim about the implementation -- so any of them failing is a known
+# counterexample, printed with its count and samples.
+QC ?= 1 15 1
+QC_BUDGET ?= 120
+QC_LOG := agda/_oracle/qc.log
+qc-fast: qc-build
+	@printf '%s\n' "$(QC)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG); \
+	ec=$$?; head -c 6000 $(QC_LOG); \
+	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
+	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
+	grep -q '(all agree)' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
+	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s"
 
 
 # THE ONE TO POLL.  Exits 3 while running, 1 when red -- but never loop on it

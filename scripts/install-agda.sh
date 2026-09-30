@@ -20,7 +20,7 @@
 #                                            # locale crash at runtime
 #   cd agda && agda src/Main.agda                       # typecheck everything
 #   agda --compile --compile-dir=_cli src/CLI/Main.agda # build the batch CLI
-#   agda --compile --compile-dir=_cli src/QuickCheck.agda
+#   agda --compile --compile-dir=_cli src/CLI/QuickCheck.agda
 #
 # NEW AGENT, START HERE: run this script, then read CLAUDE.md for the
 # working methodology. The TS side lives in typescript/ (npm install; the

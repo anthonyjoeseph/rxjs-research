@@ -15,9 +15,9 @@ are decidable:
   B  the Agda decoder     agda/src/CLI/Decode.agda  `tag is "..."` / `op is "..."`
   C  the TypeScript types typescript/src/exp.ts     `export type Exp` / `Tm` / `PrimOp`
   D  the TS generator     typescript/src/generator.ts   `type: "..."`, the op lanes
-  E  the sweep's census   agda/src/QuickCheck.agda  `formerTag` / `allFormers`
+  E  the sweep's census   agda/src/CLI/QuickCheck.agda  `formerTag` / `allFormers`
   F  the Agda sweep's reach  the `gen*` definitions, composed with
-                             `Rx/Elaborate.agda` and the harness root
+                             `SExp/Elaborate.agda` and the harness root
 
 A, C and E are checked BOTH ways -- they are closed declarations, so a former
 present there and absent from the map is a finding, which is what catches a
@@ -71,9 +71,9 @@ PATHS = {
     "decode": "agda/src/CLI/Decode.agda",
     "ts": "typescript/src/exp.ts",
     "gen": "typescript/src/generator.ts",
-    "census": "agda/src/QuickCheck.agda",
-    "elab": "agda/src/Rx/Elaborate.agda",
-    "harness": "agda/src/Implementation/Unit-Test/Prelude.agda",
+    "census": "agda/src/CLI/QuickCheck.agda",
+    "elab": "agda/src/SExp/Elaborate.agda",
+    "harness": "agda/src/CLI/Unit-Test/Prelude.agda",
 }
 
 
@@ -316,10 +316,51 @@ def top_level(text: str) -> dict[str, set[str]]:
     return out
 
 
+def named_defs(text: str, names: set[str]) -> dict[str, set[str]]:
+    """Each of `names` defined at column zero in `text`, with every name it mentions.
+
+    A definition is its signature and its clauses, every one of which starts
+    with its own name, so it ends at the first line at column zero that does
+    not -- a `mutual` block below it included, which a slice from one
+    signature to the next would fold into it.
+    """
+    lines = bodies(text).splitlines()
+    out: dict[str, set[str]] = {}
+    for nm in names:
+        own = re.compile(r"^" + re.escape(nm) + r"(\s|$)")
+        i = next((k for k, l in enumerate(lines) if own.match(l)), None)
+        if i is None:
+            continue
+        j = next((k for k in range(i + 1, len(lines))
+                  if lines[k][:1] not in ("", " ") and not lines[k].startswith("--")
+                  and not own.match(lines[k])), len(lines))
+        out[nm] = mentions("\n".join(lines[i:j]))
+    return out
+
+
+def imported_helpers(root: Path, elab: str) -> dict[str, set[str]]:
+    """The helpers the elaboration imports BY NAME from its sibling modules.
+
+    An arm reaching `flatAllᵉ` reaches whatever its body writes, wherever it
+    is defined, and the reading of a flattener belongs with the plain reading
+    rather than in the elaboration.  Only the names an `open import SExp.…
+    using (…)` lists are taken, so a sibling module's other definitions --
+    `plainExp`, which names every former -- are not credited.
+    """
+    out: dict[str, set[str]] = {}
+    for m in re.finditer(r"^open import (SExp\.[^\s]+)\s+using\s*\(([^)]*)\)", elab, re.M):
+        path = root / "agda/src" / (m.group(1).replace(".", "/") + ".agda")
+        if not path.exists():
+            sys.exit(f"check-formers: the elaboration imports {m.group(1)}, and {path} does not exist")
+        names = {n.strip() for n in m.group(2).split(";") if n.strip()}
+        out.update(named_defs(path.read_text(encoding="utf-8"), names))
+    return out
+
+
 def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
     """The elaboration, arm by arm: what each clause CONSUMES and what it WRITES.
 
-    `toPlain` is defined one clause per author former, so the pairing is
+    `toInstEmit` is defined one clause per author former, so the pairing is
     already in the source and needs only to be read off: the left of the
     first top-level `=` names the author's constructor, the right names the
     plain formers that constructor turns into.  Keeping them paired is what
@@ -342,11 +383,11 @@ def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
     # elaboration read as the elaboration having been DELETED, which is the
     # one failure a coverage check must not have -- it fires loudly while
     # saying nothing about coverage.
-    anchor = re.compile(r"^(\s+)toPlain(Tm|Tms)?\b")
+    anchor = re.compile(r"^(\s+)toInstEmit(Tm|Tms)?\b")
     indent = next((m.group(1) for m in map(anchor.match, lines) if m), None)
     if indent is None:
-        sys.exit("check-formers: no `toPlain` clauses found -- the elaboration moved or was renamed")
-    head = re.compile(r"^" + re.escape(indent) + r"toPlain(Tm|Tms)?\b")
+        sys.exit("check-formers: no `toInstEmit` clauses found -- the elaboration moved or was renamed")
+    head = re.compile(r"^" + re.escape(indent) + r"toInstEmit(Tm|Tms)?\b")
     starts = [i for i, l in enumerate(lines) if head.match(l)]
     covered: set[int] = set()
     arms: list[tuple[set[str], set[str]]] = []
@@ -371,12 +412,13 @@ def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
             continue
         arms.append((mentions(text[:cut]), mentions(text[cut + 1 :])))
     if not arms:
-        sys.exit("check-formers: no `toPlain` clauses found -- the elaboration moved or was renamed")
+        sys.exit("check-formers: no `toInstEmit` clauses found -- the elaboration moved or was renamed")
     rest = "\n".join(l for k, l in enumerate(lines) if k not in covered)
     return arms, rest
 
 
-def agda_gen_reach(census: str, elab: str, harness: str) -> set[str]:
+def agda_gen_reach(census: str, elab: str, harness: str,
+                   imported: dict[str, set[str]]) -> set[str]:
     """THE SIXTH SURFACE: which plain formers the Agda sweep can actually write.
 
     The sweep no longer builds plain programs.  It draws from the AUTHOR's
@@ -419,7 +461,7 @@ def agda_gen_reach(census: str, elab: str, harness: str) -> set[str]:
     # `mapᵖ` reaches whatever `mapᵖ`'s body writes, and an arm nothing reaches
     # takes its helper down with it
     reach |= mentions(bodies(harness))
-    helpers = top_level(rest)
+    helpers = {**imported, **top_level(rest)}
     while True:
         grown = reach | {t for nm, body in helpers.items() if nm in reach for t in body}
         if grown == reach:
@@ -507,7 +549,8 @@ def main() -> int:
                 f"unreachable -- the hole closed and the row was not"
             )
 
-    agen = agda_gen_reach(src["census"], src["elab"], src["harness"])
+    agen = agda_gen_reach(src["census"], src["elab"], src["harness"],
+                          imported_helpers(root, src["elab"]))
     for r in rows:
         if r.agen and r.agda not in agen:
             findings.append(

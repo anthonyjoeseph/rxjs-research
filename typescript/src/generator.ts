@@ -1,4 +1,16 @@
-import { Closed, Exp, Fn, PrimOp, ScriptVal, Tm, Ty, tyEq } from "./exp.js";
+import {
+  Closed,
+  Exp,
+  FlatOp,
+  flatAll,
+  Fn,
+  PrimOp,
+  ScriptVal,
+  Tm,
+  Ty,
+  mergeOp,
+  tyEq,
+} from "./exp.js";
 import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 
 // The differential-testing generator: deterministic, seeded canonical
@@ -383,7 +395,7 @@ const genExp = (
     // generator blind to them is the blind spot this file's history
     // already records. rxjs reaches them with `mergeMap(x => ...)`, so
     // this lane writes exactly that: a step returning literal syntax,
-    // spent by `mergeAll`.
+    // spent by a merging flatten.
     fan: () => {
       const inner: Ty = { type: "obs", elem: ty };
       // the step's OWN context: its argument is Θ-var 0, so everything
@@ -408,17 +420,12 @@ const genExp = (
           else: strm({ type: "of", ty, items: [x] }),
         }),
       ])();
-      return {
-        type: "mergeAll",
-        ty,
-        limit: undefined,
-        src: {
-          type: "map",
-          ty: inner,
-          fn: step,
-          src: genExp(rng, ty, ctx, depth - 1),
-        },
-      };
+      return flatAll(mergeOp(undefined), ty, {
+        type: "map",
+        ty: inner,
+        fn: step,
+        src: genExp(rng, ty, ctx, depth - 1),
+      });
     },
     take: () => ({
       type: "take",
@@ -441,22 +448,64 @@ const genExp = (
     // middle that nothing in this development could previously reach.
     // Two lanes with three parked inners is the smallest shape whose
     // drain refills more than one lane in a single instant
-    mergeAll: () => ({
-      type: "mergeAll",
-      ty,
-      limit: pick(rng, [undefined, 1, 1, 2, 3] as (number | undefined)[]),
-      src: genExp(rng, obsOf, ctx, depth - 1),
-    }),
-    switchAll: () => ({
-      type: "switchAll",
-      ty,
-      src: genExp(rng, obsOf, ctx, depth - 1),
-    }),
-    exhaustAll: () => ({
-      type: "exhaustAll",
-      ty,
-      src: genExp(rng, obsOf, ctx, depth - 1),
-    }),
+    mergeAll: () => {
+      const limit = pick(rng, [undefined, 1, 1, 2, 3] as (
+        number | undefined
+      )[]);
+      return flatAll(mergeOp(limit), ty, genExp(rng, obsOf, ctx, depth - 1));
+    },
+    switchAll: () =>
+      flatAll({ how: "switch" }, ty, genExp(rng, obsOf, ctx, depth - 1)),
+    exhaustAll: () =>
+      flatAll({ how: "exhaust" }, ty, genExp(rng, obsOf, ctx, depth - 1)),
+    // THE ONE FLATTENER, and its source is written rather than drawn: a
+    // pair of options at an arbitrary type is a shape the term draw
+    // almost never lands on, so the step writes each half as absent or
+    // present -- and, per element, which of two such pairs, since an
+    // echo-only element beside a lane-carrying one is what tells the
+    // echo from the flattener's policies.
+    flatten: () => {
+      const s = genValTy(rng, 2);
+      const opt = (t: Ty): Ty => ({ type: "sum", left: unitT, right: t });
+      const elemTy: Ty = { type: "prod", fst: opt(ty), snd: opt(obsOf) };
+      const under: GenCtx = { ...ctx, theta: [s, ...ctx.theta] };
+      const half = (t: Ty): Tm =>
+        chance(rng, 0.5)
+          ? { type: "inlT", ty: opt(t), val: { type: "unitT", ty: unitT } }
+          : { type: "inrT", ty: opt(t), val: genTm(rng, t, under, depth - 1) };
+      const pair = (): Tm => ({
+        type: "pairT",
+        ty: elemTy,
+        fst: half(ty),
+        snd: half(obsOf),
+      });
+      const op: FlatOp = pick(rng, [
+        { how: "merge" },
+        { how: "merge", limit: 1 },
+        { how: "merge", limit: 2 },
+        { how: "switch" },
+        { how: "exhaust" },
+      ] as FlatOp[]);
+      return {
+        type: "flatten",
+        ty,
+        op,
+        src: {
+          type: "map",
+          ty: elemTy,
+          fn: chance(rng, 0.5)
+            ? pair()
+            : {
+                type: "ifT",
+                ty: elemTy,
+                cond: genTm(rng, boolT, under, Math.min(depth, 2)),
+                then: pair(),
+                else: pair(),
+              },
+          src: genExp(rng, s, ctx, depth - 1),
+        },
+      };
+    },
     // μ binds a guarded var; defer moves the guarded vars into scope
     mu: () => ({
       type: "mu",
@@ -614,16 +663,15 @@ const genExp = (
         src: outer,
       };
       const op = pick(rng, ["mergeAll", "mergeAll", "switchAll", "exhaustAll"]);
-      return op === "mergeAll"
-        ? {
-            type: "mergeAll",
-            ty,
-            limit: pick(rng, [undefined, 1, 2] as (number | undefined)[]),
-            src,
-          }
-        : op === "switchAll"
-          ? { type: "switchAll", ty, src }
-          : { type: "exhaustAll", ty, src };
+      return flatAll(
+        op === "mergeAll"
+          ? mergeOp(pick(rng, [undefined, 1, 2] as (number | undefined)[]))
+          : op === "switchAll"
+            ? { how: "switch" }
+            : { how: "exhaust" },
+        ty,
+        src,
+      );
     };
 
   // of/empty are leaves; force them there, real operators from `operators`

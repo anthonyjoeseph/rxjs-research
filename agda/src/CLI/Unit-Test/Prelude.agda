@@ -1,0 +1,207 @@
+------------------------------------------------------------------
+-- THE BUG CACHE'S SHARED VOCABULARY: what a cached case IS, now that a
+-- case is a value rather than a type.
+--
+-- A CASE IS A PROGRAM, AND EVERY TOP-LINE STATEMENT IS CHECKED OF IT.
+-- Compiled, a run is a function call and asking several questions of it
+-- is free -- so a row names a program, and every row is held to all of
+-- the top-line statements that compute on it: the batcher's batches
+-- against the spec's (`batchable`), and the batches joined back up
+-- against the plain program's values (`left-to-right`).
+--
+-- WHY THE PREDICATES ARE BOOLEANS RATHER THAN EQUATIONS.  Each is the
+-- decision of one statement's conclusion on one row, settled by
+-- `CLI.Emit-Eq` where it is an agreement -- the family the QuickCheck
+-- binary decides with, so a cached case and the seed that found it are
+-- answering one question.
+--
+-- A ROW IS AN AUTHOR'S PROGRAM, AND THE HARNESS ROOT IS WHAT MAKES IT
+-- ONE RUN.  Batching reads the protocol off an INSTEMIT, and only an
+-- elaborated program carries one, so a row holds an `SExp` and the
+-- three steps between it and a verdict -- elaborate, cap, decode -- sit
+-- here rather than in either harness.  Sharing them is not tidiness: a
+-- cached row and the seed that found it have to be the same run, and a
+-- cap applied in one place and not the other is two.
+--
+-- WHAT IS NOT HERE, DELIBERATELY: a predicate for a run that went DRY.
+-- No builder constructs the marker, so a dry run is not a disagreement
+-- between two implementations of one batching — it is the descent
+-- refusing, which the QuickCheck binary reports unpasteably, and it
+-- stays out of a corpus whose verdict gates the build.
+------------------------------------------------------------------
+module CLI.Unit-Test.Prelude where
+
+open import Data.Bool using (Bool; true; false; T; _∨_; not)
+open import Data.Unit using (tt)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.List using (List; []; _∷_; concat; length; map)
+open import Data.Nat using (ℕ; _<ᵇ_; _≟_)
+open import Data.Fin using (zero; suc)
+open import Data.String using (String)
+open import Data.Product using (_×_; _,_; proj₂)
+open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
+
+open import Rx.Prim using (InstEmit; ObservableInput)
+open import Rx.Exp using (Ctx; Closed; Val; natᵗ; listᵗ; takeᵉ; nat̂; inputsBelowᵉ)
+open import SExp.Syntax using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ)
+open import SExp.InstEmit.Decode using (decodeEmits)
+open import Rx.Evaluator.Builder using (evaluate↓)
+open import SExp.Plain using (plainExp; plainValues)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ; plainSlots)
+open import CLI.Emit-Eq using (eqListℕ; eqBatches)
+open import Function using (_∘_)
+open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
+open import SExp.Batch using (batchSimultaneousᵖ)
+open import Batchable.Inst-Extract using (instExtract)
+import Spec
+open Spec ℕ _≟_ using (spec-batchSimultaneous)
+
+-- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
+-- the one an elaborated program stands in, where each slot holds the
+-- InstEmit over the author's type
+Γ₂ : Ctx 2
+Γ₂ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
+
+-- SLOT ZERO IS SCRIPTED AND SLOT ONE IS SHARED.  A script is the only
+-- slot that schedules arrivals -- a share runs inside whatever
+-- subscribed it -- so without one every run is its subscribe burst
+-- alone.  Slot one holds another srxjs program, stands at the INSTEMIT,
+-- and may read slot zero.  The kind vector is not a free choice beside
+-- the table -- `SimulSlot` is indexed by it, so this line and `mkSlots`
+-- below are one statement.
+κ₂ : Kinds 2
+κ₂ = scriptedᵏ ∷ⱽ sharedᵏ ∷ⱽ []ⱽ
+
+Γ₂ᵉ : Ctx 2
+Γ₂ᵉ = plainᵏ Γ₂ κ₂
+
+-- THE TABLE IS BUILT FROM A SCRIPT AND AN AUTHOR-WRITTEN DEFINITION,
+-- and that is what a row has to name, because the sweep DRAWS it.  What
+-- makes a drawn definition possible at all is that the stratification
+-- side condition COMPUTES: a definition is an `SExp` and every elaboration
+-- leaf is a real body, so `inputsBelowᵉ` of it reduces to a boolean
+-- rather than getting stuck on a postulate.
+--
+-- IT LIVES HERE RATHER THAN IN THE GENERATOR because a pasted row has
+-- to typecheck where the corpus lives, so the name a row prints has to
+-- be one the corpus can see.
+tOf : (b : Bool) → Maybe (T b)
+tOf true  = just tt
+tOf false = nothing
+
+slot₀ : ObservableInput ℕ → SimulSlot Γ₂ κ₂ 0 natᵗ scriptedᵏ
+slot₀ s = scriptedˢ {ok = tt} s
+
+-- A DEFINITION THAT BREAKS STRATIFICATION FALLS BACK TO SILENCE rather
+-- than being rejected, because this is a total function and the
+-- generator has no way to prove its draw stratified.  In practice the
+-- fallback is unreached -- `genSlotRef k` draws only from slots below
+-- `k` by construction -- but it is what makes the row a program rather
+-- than a proof obligation.
+
+slot₁ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 1 natᵗ sharedᵏ
+slot₁ d with tOf (inputsBelowᵉ 1 (plainExp d))
+... | just ok = sharedˢ d {ok = ok}
+... | nothing = sharedˢ emptyˢ
+
+-- WRITTEN SLOT BY SLOT rather than with a wildcard: the arm a slot may
+-- use is `lookup κ₂ i`, which does not reduce for an abstract `i`.
+-- That is the kind indexing doing its job -- a table cannot name an
+-- arm without saying which slot it is naming it for.
+mkSlots : ObservableInput ℕ → SExp Γ₂ [] [] [] natᵗ → SimulSlots Γ₂ κ₂
+mkSlots d₀ d₁ zero          = slot₀ d₀
+mkSlots d₀ d₁ (suc zero)    = slot₁ d₁
+mkSlots d₀ d₁ (suc (suc ()))
+
+-- one cached counterexample: a label, and the run that produced it
+record Case : Set where
+  constructor cached
+  field
+    name  : String
+    fuel  : ℕ
+    prog  : SExp Γ₂ [] [] [] natᵗ
+    slots : SimulSlots Γ₂ κ₂
+
+open Case using (name; fuel; prog; slots)
+
+-- THE ROOT CAP, AND IT IS WHAT MAKES A SWEEP FINITE AT ALL.  A guarded
+-- fixpoint whose step hands back more than it was given costs the fuel
+-- as an EXPONENT, and nothing in a generator declines to draw one.  A
+-- budget on the emitted stream cannot retire that, because the cost is
+-- inside one cascade rather than in the stream's spine, so the budget
+-- is only reached by paying for it; a `takeᵉ` cuts instead, since it
+-- unsubscribes the fixpoint.
+--
+-- AND IT IS A PLAIN FORMER OVER THE ELABORATED PROGRAM RATHER THAN THE
+-- AUTHOR'S `takeˢ`, WHICH CUTS AT THE WRONG LEVEL FOR THIS JOB.  A
+-- `takeˢ` counts the author's VALUES, so a program whose every value
+-- arrives in one InstEmit is not bounded by one at all; above the
+-- elaboration the count is in INSTEMITS, and an InstEmit is one
+-- delivery -- which is the quantity the harness's cost is linear in.
+-- The cap is a harness budget and not part of any program a row names,
+-- so it belongs above the elaboration on those grounds too.
+capProg : ∀ {t} → Closed Γ₂ᵉ t → Closed Γ₂ᵉ t
+capProg e = takeᵉ (nat̂ 24) e
+
+-- the run a row names: the author's program elaborated, capped, driven
+-- by the slot table, and decoded -- `runᴵ` under the harness cap
+runOf : Case → List (InstEmit (Val Γ₂ᵉ natᵗ))
+runOf c = decodeEmits {Γ = Γ₂ᵉ} {a = natᵗ}
+            (concat (evaluate↓ (fuel c) (capProg (elaborateImpl κ₂ (prog c))) (embedSlotsImpl (slots c))))
+
+------------------------------------------------------------------
+-- `left-to-right`.
+------------------------------------------------------------------
+
+-- THE PLAIN PROGRAM IS CAPPED IN VALUES AND THE ELABORATED ONE IN
+-- INSTEMITS, so the two cuts are not one cut and a capped row is not
+-- compared.  A row neither cap reached is the uncapped run on both
+-- sides; `capped` says which rows those are, and a sweep counts them.
+capPlain : ∀ {t} → Closed Γ₂ t → Closed Γ₂ t
+capPlain e = takeᵉ (nat̂ 24) e
+
+plainOf : Case → List ℕ
+plainOf c = plainValues (concat (evaluate↓ (fuel c) (capPlain (plainExp (prog c))) (plainSlots (slots c))))
+
+-- the batches joined back up against the plain run; over the two runs,
+-- so a harness that has them computes neither twice
+plainAgreesᵇ : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ) → List ℕ → Bool
+plainAgreesᵇ run impl plain =
+  not (length run <ᵇ 24) ∨ not (length plain <ᵇ 24)
+    ∨ eqListℕ (concat impl) plain
+
+------------------------------------------------------------------
+-- `batchable`: the batcher on the run the row's program gives.
+------------------------------------------------------------------
+
+-- THE BATCHER IS RUN INSIDE THE MACHINE, OVER THE ROW'S OWN PROGRAM,
+-- as `left-to-right` states it: that is the operator the TypeScript
+-- port mirrors.
+implBatchesOf : Case → List (List ℕ)
+implBatchesOf c =
+  map proj₂ (instExtract (decodeEmits {Γ = Γ₂ᵉ} {a = listᵗ natᵗ}
+    (concat (evaluate↓ (fuel c)
+                       (batchSimultaneousᵖ (capProg (elaborateImpl κ₂ (prog c))))
+                       (embedSlotsImpl (slots c))))))
+
+specOf : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ)
+specOf = spec-batchSimultaneous ∘ instExtract
+
+specBatchesOf : Case → List (List ℕ)
+specBatchesOf c = specOf (runOf c)
+
+agrees : Case → Bool
+agrees c = eqBatches (implBatchesOf c) (specBatchesOf c)
+
+------------------------------------------------------------------
+-- EVERY CHECK AT ONCE, OVER RUNS COMPUTED ONCE.  Each argument is one
+-- shared thunk, where each `Case`-level check would re-run the program:
+-- a row costs its runs, not its runs times its checks.
+------------------------------------------------------------------
+checks : List (InstEmit (Val Γ₂ᵉ natᵗ)) → List (List ℕ) → List ℕ → List (String × Bool)
+checks run impl plain =
+  ("batchable" , eqBatches impl (specOf run))
+  ∷ ("left-to-right" , plainAgreesᵇ run impl plain) ∷ []
+
+checksOf : Case → List (String × Bool)
+checksOf c = checks (runOf c) (implBatchesOf c) (plainOf c)

@@ -33,10 +33,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Rx.Prim using (Source)
-open import Rx.Exp using (Ctx; Closed; Val; obs)
+open import Rx.Exp using (Ctx; Closed; Val; obs; _+ᵗ_)
 open import Rx.Slots using (shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f;
-  from-inner; thru-outer; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
+  from-inner; thru-outer; echoᵗ; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
   setNode; frameNodes; pathHasNode; installNode; lowerFloor; AllOp; mergeAllᵒ; switch-st;
   exhaust-st; mergeAll-st; shareAdmit; shareDying; shareFinish; switchKill; thruWrap; drainSt;
   regSource; sameSource; dropSource)
@@ -50,9 +50,9 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   innerFinish⇓; innerReact⇓; stepFrame⇓; subscribeAll⇓; subscribeSharedSlot⇓; foldPath⇓; dispatchShare⇓;
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
-  subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan; subs-merge-all; subs-switch-all;
-  subs-exhaust-all; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
-  consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-cons;
+  subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan;
+  subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
+  consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
   finish-nil; react-false; react-alive; react-dead; step-map; step-scan; step-take; step-batchSync;
   step-from-inner; step-thru-outer; sub-all; connect; slot-spent; slot-join; slot-connect; disp; walk-end;
@@ -145,7 +145,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   FrameOK f@(take-f k)         = NotIn f
   FrameOK f@(batchSync-f k)    = NotIn f
   FrameOK f@(from-inner _ _ _) = fed ≡ false → NotIn f
-  FrameOK f@(thru-outer op k)  = NotIn f
+  FrameOK f@(thru-outer _ k) = NotIn f
 
   PathOK : ∀ {lo u} → Path Γ lo u t → Set
   PathOK root             = ⊤
@@ -205,7 +205,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   frame-ok (take-f _)         ni = ni
   frame-ok (batchSync-f _)    ni = ni
   frame-ok (from-inner _ _ _) ni = λ _ → ni
-  frame-ok (thru-outer _ _)   ni = ni
+  frame-ok (thru-outer _ _) ni = ni
 
   -- a path off the watched node stands on allowed frames
   off-ok : ∀ {lo u} (κ : Path Γ lo u t) → (T (pathHasNode nid κ) → ⊥) → PathOK κ
@@ -346,7 +346,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                             → subscribeSharedSlot⇓ {e = e} i d κ below now sched st (out , sched′ , st′)
                             → PI κ → Q sched st → Q sched′ st′
 
-  subscribeAll-floor : ∀ {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))} {κ : Path Γ lo u t} {now}
+  subscribeAll-floor : ∀ {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (echoᵗ u))} {κ : Path Γ lo u t} {now}
                          {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
                      → subscribeAll⇓ {e = e} op ns b κ now sched st (out , sched′ , st′)
                      → PI κ → Q sched st → Q sched′ st′
@@ -361,7 +361,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                   → stepFrame⇓ {e = e} now f κ vals fin sched st (out , vals′ , fin′ , sched′ , st′)
                   → PF f κ → Q sched st → Q sched′ st′
 
-  thruWalk-floor : ∀ {u lo} {op a} {κ : Path Γ lo u t} {now} {vals : List (Val Γ (obs u))}
+  thruWalk-floor : ∀ {u lo} {op a} {κ : Path Γ lo u t} {now} {vals : List (Val Γ (u +ᵗ obs u))}
                      {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
                  → thruWalk⇓ {e = e} op a κ now vals sched st (out , sched′ , st′)
                  → (a ≡ᵇ nid) ≡ false → PI κ → Q sched st → Q sched′ st′
@@ -426,9 +426,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   subscribeE-floor (subs-map sub)          ph (inj₂ s) = subscribeE-floor sub (push (λ ()) (λ ()) ph) (inj₂ s)
   subscribeE-floor (subs-scan refl sub)    ph (inj₂ s) =
     subscribeE-floor sub (push (fresh-off (lt s)) (fresh-off (lt s)) ph) (inj₂ (fresh-SI _ s))
-  subscribeE-floor (subs-merge-all sa)     ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
-  subscribeE-floor (subs-switch-all sa)    ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
-  subscribeE-floor (subs-exhaust-all sa)   ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
+  subscribeE-floor (subs-flatten sa)       ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
   subscribeE-floor (subs-μ sub)            ph (inj₂ s) = subscribeE-floor sub ph (inj₂ s)
   subscribeE-floor {sched = sched} (subs-defer refl refl refl refl) ph (inj₂ s) =
     let ph′ = push {f = thru-outer mergeAllᵒ (nodeCt sched)} {le = ≤-refl} (fresh-off (lt s)) (fresh-off (lt s)) ph
@@ -475,6 +473,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
   thruWalk-floor d ne ph (inj₁ l) = inj₁ (fell-keeps (thruWalk-keeps d) l)
   thruWalk-floor walk-nil        ne ph (inj₂ s) = inj₂ s
+  thruWalk-floor (walk-echo f w) ne ph (inj₂ s) = thruWalk-floor w ne ph (foldPath-floor f ph (inj₂ s))
   thruWalk-floor (walk-cons c w) ne ph (inj₂ s) = thruWalk-floor w ne ph (thruConsume-floor c ne ph (inj₂ s))
 
   thruConsume-floor d ne ph (inj₁ l) = inj₁ (fell-keeps (thruConsume-keeps d) l)
@@ -559,7 +558,7 @@ subscribeSharedSlot-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fi
                        → subscribeSharedSlot⇓ {e = e} i d κ below now sched st (out , sched′ , st′)
                        → nodeCt sched ≤ nodeCt sched′
 
-subscribeAll-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
+subscribeAll-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (echoᵗ u))}
                     {κ : Path Γ lo u t} {now} {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
                 → subscribeAll⇓ {e = e} op ns b κ now sched st (out , sched′ , st′) → nodeCt sched ≤ nodeCt sched′
 
@@ -574,7 +573,7 @@ stepFrame-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {f : Frame Γ
              → nodeCt sched ≤ nodeCt sched′
 
 thruWalk-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {op a} {κ : Path Γ lo u t} {now}
-                {vals : List (Val Γ (obs u))} {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
+                {vals : List (Val Γ (u +ᵗ obs u))} {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
             → thruWalk⇓ {e = e} op a κ now vals sched st (out , sched′ , st′) → nodeCt sched ≤ nodeCt sched′
 
 thruConsume-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {op a} {κ : Path Γ lo u t} {now}
@@ -625,9 +624,7 @@ subscribeE-ct (subs-take-suc _ refl sub)         = ≤-trans (n≤1+n _) (subscr
 subscribeE-ct (subs-batchSync refl sub f)        = ≤-trans (n≤1+n _) (≤-trans (subscribeE-ct sub) (foldPath-ct f))
 subscribeE-ct (subs-map sub)                     = subscribeE-ct sub
 subscribeE-ct (subs-scan refl sub)               = ≤-trans (n≤1+n _) (subscribeE-ct sub)
-subscribeE-ct (subs-merge-all sa)                = subscribeAll-ct sa
-subscribeE-ct (subs-switch-all sa)               = subscribeAll-ct sa
-subscribeE-ct (subs-exhaust-all sa)              = subscribeAll-ct sa
+subscribeE-ct (subs-flatten sa)                  = subscribeAll-ct sa
 subscribeE-ct (subs-μ sub)                       = subscribeE-ct sub
 subscribeE-ct (subs-defer refl refl refl refl)   = n≤1+n _
 subscribeE-ct (subs-mint refl sub)               = subscribeE-ct sub
@@ -652,6 +649,7 @@ stepFrame-ct (step-thru-outer {op = op} {nid = c} {fin = fin} {sched′ = sched�
   in ≤-trans (thruWalk-ct w) (≤-reflexive (cong nodeCt (sym sc)))
 
 thruWalk-ct walk-nil        = ≤-refl
+thruWalk-ct (walk-echo f w) = ≤-trans (foldPath-ct f) (thruWalk-ct w)
 thruWalk-ct (walk-cons c w) = ≤-trans (thruConsume-ct c) (thruWalk-ct w)
 
 thruConsume-ct (consume-all-sub _ _ c)   = subscribeInner-ct c

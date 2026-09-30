@@ -156,7 +156,7 @@ jobs:
       # same entries read-only. Two savers on one key is not an error but
       # it is a coin flip about which snapshot survives, and the gate's is
       # the one worth keeping: it covers the whole tower, while the sweep
-      # touches only the cone under `QuickCheck.agda`.
+      # touches only the cone under `CLI/QuickCheck.agda`.
       - name: Cache Agda interfaces
         uses: actions/cache@v4
         with:
@@ -242,7 +242,7 @@ jobs:
       # RESTORE-ONLY, both of them: the gate job owns these keys (see its own
       # comments for what they hold and why restoring one cannot make a check
       # pass that should fail). A miss costs this job a cold build of the cone
-      # under `QuickCheck.agda` and nothing else.
+      # under `CLI/QuickCheck.agda` and nothing else.
       - name: Restore Agda interfaces
         uses: actions/cache/restore@v4
         with:
@@ -301,7 +301,7 @@ jobs:
           fi
           echo "quickcheck: THE SWEEP FOUND SOMETHING — new bug-cache row(s):"
           echo
-          git --no-pager diff -- agda/src/Implementation/Unit-Test.agda
+          git --no-pager diff -- agda/src/CLI/Unit-Test.agda
           echo
           echo "Land these rows, then fix the implementation: 'make bug-cache'"
           echo "is green exactly when no known counterexample remains, so it"
@@ -345,7 +345,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: quickcheck-counterexamples
-          path: agda/src/Implementation/Unit-Test.agda
+          path: agda/src/CLI/Unit-Test.agda
           if-no-files-found: ignore
 
   # THE OTHER DIFFERENTIAL LEG, AND THE ONE NOTHING WAS RUNNING. `quickcheck`
@@ -447,19 +447,28 @@ jobs:
       # draw is random and most of what it draws is silent, so a regression
       # on one of them is exactly what a sweep can miss. Replaying them costs
       # a second, and it runs even when the sweep went red, since the two
-      # findings are independent.
+      # findings are independent. EVERY file runs and the step fails at the
+      # end: the step's shell is `bash -e`, so a bare loop stops at the first
+      # red file and every file after it reads as never having been asked.
       - name: replay the pinned corpus
         if: always() && !cancelled()
         run: |
+          red=""
           for f in typescript/corpus/*.ndjson typescript/cases/*.ndjson; do
             echo "== ${f#typescript/}"
-            make oracle ARGS="--cases ${f#typescript/}"
+            make oracle ARGS="--cases ${f#typescript/}" || red="$red ${f#typescript/}"
           done
+          if [ -n "$red" ]; then echo "red:$red"; exit 1; fi
 
       # THE KNOWN COUNTEREXAMPLES, which check the evaluator rather than the
       # proof, so they run here beside the sweep. Green exactly when no known
       # counterexample remains. LAST, and on `always()`, so it runs whatever
       # the sweep found and a red here never hides the sweep.
+      #
+      # DISABLED WITH THE QUICKCHECK JOB ABOVE (Anthony): its rows are author
+      # programs checked through the elaboration, so it judges the SExp tree,
+      # which is tier 2's work; tier 1 is judged by the oracle alone. It
+      # comes back ON, unchanged, with the quickcheck job.
       - name: make bug-cache
-        if: always() && !cancelled()
+        if: false
         run: make bug-cache

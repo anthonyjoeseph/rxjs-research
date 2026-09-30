@@ -94,7 +94,7 @@ red, which is the property the tag-string convention never had.
 Constructors are read by **indentation** from `data <name> … where` to the
 first line indented no further — which is what keeps a `mutual` block's
 siblings (`Fn`, `Val`) out of the set. Several constructors may **share one
-signature** (`switchAllᵉ exhaustAllᵉ : …`), and a reader taking the first name
+signature** (`eqᵖ ltᵖ : …`), and a reader taking the first name
 only reports the rest as deleted; that is a real shape in this tree, and the
 fixture reproduces it.
 

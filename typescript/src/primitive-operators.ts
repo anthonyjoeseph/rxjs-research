@@ -446,7 +446,7 @@ export const defer = <A>(
           // stream rather than accumulated by a subscriber: everything
           // before SYNC_END is the burst, the marker itself is where
           // the one delivery emit comes out, everything after is the
-          // body's async tail passing through under its own envelope.
+          // body's async tail passing through under its own InstEmit.
           // rx completion needs no special case — if the body finished
           // inside its burst the merged stream completes on its own;
           // `takeWhile` covers the other exit, a body that signalled

@@ -18,7 +18,7 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Ordinal; Source; Timed; after_,_; hot; cold; PlainEvent)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _+ᵗ_; unitᵗ; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
 
 variable
   lo : ℕ
@@ -39,7 +39,7 @@ open import Rx.Mint using (Mint; mint-init)
 -- run pushes is what an rxjs subscriber sees: values in order, then an
 -- end.  A simultaneity-aware program reaches this machine only through
 -- the elaboration, which compiles the protocol into the VALUE type, so
--- the machine itself never handles an envelope and the mirror keeps
+-- the machine itself never handles an InstEmit and the mirror keeps
 -- its footing — the TypeScript's operators are plain rxjs too.
 
 -- A BURST IS EVERYTHING ONE INCOMING EMIT CAUSES, AND IT IS THE UNIT A
@@ -265,9 +265,26 @@ setNode nid s ((k , s′) ∷ r) =
 
 -- the mergeAll operator tag carries NO limit: the limit lives in the node
 -- state, which every consumer already reads, and a second copy in the
--- frame is a copy that can drift from it
+-- frame is a copy that can drift from it.  That is also why this is not
+-- `FlatOp`: the syntax's op is this tag WITH merge's limit, and
+-- `Rx.Evaluator.Domain`'s `flatOp` erases it where `flatSt` stores it
 data AllOp : Set where
   mergeAllᵒ switchᵒ exhaustᵒ : AllOp
+
+-- WHAT A FLATTENER'S OUTER ELEMENT CARRIES: an optional echo beside an
+-- optional lane.  The walk reads it as EVENTS, echo first -- the echo
+-- leaves as the element arrives, before its lane is handled, which is
+-- `flatten` in `typescript/src/flatten.ts`.
+echoᵗ : Ty → Ty
+echoᵗ u = (unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)
+
+-- an echo event is `inj₁`, a lane event `inj₂`
+thruEvents : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ (echoᵗ u)) → List (Val Γ (u +ᵗ obs u))
+thruEvents []                         = []
+thruEvents ((inj₁ _ , inj₁ _) ∷ xs) = thruEvents xs
+thruEvents ((inj₁ _ , inj₂ o) ∷ xs) = inj₂ o ∷ thruEvents xs
+thruEvents ((inj₂ v , inj₁ _) ∷ xs) = inj₁ v ∷ thruEvents xs
+thruEvents ((inj₂ v , inj₂ o) ∷ xs) = inj₁ v ∷ inj₂ o ∷ thruEvents xs
 
 -- one operator the emission passes through, rootward.  deferᵉ
 -- contributes NO frame (it merely relays its body), and share is not
@@ -307,8 +324,8 @@ data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
   from-inner : ∀ {s} → AllOp → (allNode innerInstance : NodeId) → Frame Γ s s
                -- exiting a subscribed inner: the *All's own node, and
                -- this inner subscription's instance (switch kills by it)
-  thru-outer : ∀ {u} → AllOp → NodeId → Frame Γ (obs u) u
-               -- the value IS an inner obs: consumed, subscribed, burst grafted
+  thru-outer : ∀ {u} → AllOp → NodeId → Frame Γ (echoᵗ u) u
+               -- the value carries an inner obs: consumed, subscribed, burst grafted
 
 -- THE FLOOR IS AN INDEX, WHICH IS WHAT MAKES THE SHARE NEST DESCEND.
 -- A chain registered on share i can only sink into a share ABOVE i —
@@ -394,7 +411,7 @@ frameNodes (scan-f _ k)       = k ∷ []
 frameNodes (take-f k)         = k ∷ []
 frameNodes (batchSync-f k)    = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
-frameNodes (thru-outer _ k)   = k ∷ []
+frameNodes (thru-outer _ k) = k ∷ []
 
 pathHasNode : ∀ {n} {Γ : Ctx n} {s t} → NodeId → Path Γ lo s t → Bool
 pathHasNode nid root           = false

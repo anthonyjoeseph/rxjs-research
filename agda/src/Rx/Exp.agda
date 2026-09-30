@@ -57,6 +57,26 @@ data PrimOp : Ty → Ty → Set where
   notᵖ        : PrimOp boolᵗ boolᵗ
 
 
+-- what a flattener does with a lane arriving while it is busy: queue it,
+-- cancel the live one, or drop the arrival -- `FlatOp` in
+-- `typescript/src/exp.ts`.
+--
+-- THE QUEUE'S LIMIT IS RXJS'S OWN `concurrent` ARGUMENT.  `nothing` is
+-- Infinity, which is plain `mergeAll`; `just 1` is `concatAll`; `just k`
+-- for k ≥ 2 is the bounded `mergeMap(f , k)` that has no name of its own
+-- in rxjs.  It is a `Maybe ℕ` and NOT a `Tm`, unlike `takeᵉ`'s count:
+-- rxjs fixes `concurrent` when the pipeline is BUILT, not when it is
+-- subscribed, so a limit that varied per subscription would be a
+-- capability the real operator does not have.  `just 0` is degenerate but
+-- well defined -- the queue grows and nothing is ever subscribed -- and is
+-- left representable rather than ruled out by a side condition, which
+-- would have to be threaded through every well-formedness face to buy the
+-- exclusion of one program already indistinguishable from `emptyᵉ` on its
+-- outputs.
+data FlatOp : Set where
+  mergeᶠ   : Maybe ℕ → FlatOp
+  switchᶠ exhaustᶠ : FlatOp
+
 ------------------------------------------------------------------
 -- Syntax.  Contexts: Γ inputs, Δᵍ guarded μ-vars, Δ usable μ-vars,
 -- Θ value vars.  μᵉ binds into Δᵍ; deferᵉ is the sole gate moving
@@ -131,10 +151,10 @@ mutual
                  -- GAP.  A step that could emit a LIST would be a
                  -- flatten fused into a map, and rxjs has no such
                  -- operator for a reason — flattening is ambiguous, which
-                 -- is why `mergeAll`, `switchAll` and `exhaustAll` are
-                 -- three operators and not one.  So filter is
-                 -- `mergeAllᵉ` over a step returning `strmᵗ (ofᵉ [ x ])`
-                 -- or `strmᵗ emptyᵉ`, and duplicate is the same with a
+                 -- is why rxjs has three flatteners and `FlatOp` three
+                 -- policies.  So filter is a merging `flattenᵉ` over a
+                 -- step whose lane is `strmᵗ (ofᵉ [ x ])` or
+                 -- `strmᵗ emptyᵉ`, and duplicate is the same with a
                  -- two-element `ofᵉ`: `mergeMap(x => p(x) ? of(x) :
                  -- EMPTY)`, which is how a plain rxjs program writes it.
                  --
@@ -171,25 +191,13 @@ mutual
                -- binding, not an expression.  Shared observables live in the
                -- slot telescope (Rx.Evaluator.Slot) and are referenced with
                -- `input`, exactly like scripted inputs
-    mergeAllᵉ   : ∀ {t} → Maybe ℕ → Exp Γ Δᵍ Δ Θ (obs t) → Exp Γ Δᵍ Δ Θ t
-                 -- ONE higher-order primitive, carrying rxjs's own
-                 -- `concurrent` argument.  `nothing` is Infinity, which is
-                 -- plain `mergeAll`; `just 1` is `concatAll`; `just k` for k ≥ 2
-                 -- is the bounded `mergeMap(f , k)` that has no name of its
-                 -- own in rxjs and that nothing in this development could
-                 -- previously express.  The limit is a `Maybe ℕ` and NOT a
-                 -- `Tm`, unlike `takeᵉ`'s count: rxjs fixes `concurrent` when
-                 -- the pipeline is BUILT, not when it is subscribed, so a
-                 -- limit that varied per subscription would be a capability
-                 -- the real operator does not have.  `just 0` is degenerate
-                 -- but well defined — the queue grows and nothing is ever
-                 -- subscribed — and is left representable rather than ruled
-                 -- out by a side condition, which would have to be threaded
-                 -- through every well-formedness face to buy the exclusion
-                 -- of one program already indistinguishable from `emptyᵉ` on
-                 -- its outputs.
-    switchAllᵉ exhaustAllᵉ :
-                 ∀ {t} → Exp Γ Δᵍ Δ Θ (obs t) → Exp Γ Δᵍ Δ Θ t
+    flattenᵉ   : ∀ {t} → FlatOp
+               → Exp Γ Δᵍ Δ Θ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) → Exp Γ Δᵍ Δ Θ t
+                 -- THE ONE FLATTENER: each element an optional ECHO beside
+                 -- an optional LANE, `inj₂` present and `inj₁ tt` absent.
+                 -- The echo leaves as the element arrives, before its lane
+                 -- is handled, and no policy sees it -- `flatten` in
+                 -- `typescript/src/flatten.ts` is the rxjs it means.
     μᵉ         : ∀ {t} → Exp Γ (t ∷ Δᵍ) Δ Θ t → Exp Γ Δᵍ Δ Θ t
     varᵉ       : ∀ {t} → t ∈ Δ → Exp Γ Δᵍ Δ Θ t
     deferᵉ     : ∀ {t} → Exp Γ [] (Δᵍ ++ Δ) Θ t → Exp Γ Δᵍ Δ Θ t
@@ -402,9 +410,7 @@ mutual
   renExp ρg ρd ρt (batchSyncᵉ e) = batchSyncᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (mapᵉ f e)     = mapᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (scanᵉ f i e)  = scanᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
-  renExp ρg ρd ρt (mergeAllᵉ lim e) = mergeAllᵉ lim (renExp ρg ρd ρt e)
-  renExp ρg ρd ρt (switchAllᵉ e) = switchAllᵉ (renExp ρg ρd ρt e)
-  renExp ρg ρd ρt (exhaustAllᵉ e) = exhaustAllᵉ (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (flattenᵉ op e) = flattenᵉ op (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (μᵉ e)         = μᵉ (renExp (ext∈ ρg) ρd ρt e)
   renExp ρg ρd ρt (varᵉ x)       = varᵉ (ρd x)
   renExp ρg ρd ρt (deferᵉ e)     = deferᵉ (renExp (λ ()) (++Ren ρg ρd) ρt e)
@@ -523,9 +529,7 @@ mutual
     mapᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGExp Θl x cl e)
   elimGExp Θl x cl (scanᵉ f i e)  =
     scanᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
-  elimGExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimGExp Θl x cl e)
-  elimGExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimGExp Θl x cl e)
-  elimGExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimGExp Θl x cl e)
+  elimGExp Θl x cl (flattenᵉ op e) = flattenᵉ op (elimGExp Θl x cl e)
   elimGExp Θl x cl (μᵉ e)         = μᵉ (elimGExp Θl (there x) cl e)
   elimGExp Θl x cl (varᵉ y)       = varᵉ y
   elimGExp Θl x cl (deferᵉ e)     =
@@ -574,9 +578,7 @@ mutual
     mapᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDExp Θl x cl e)
   elimDExp Θl x cl (scanᵉ f i e)  =
     scanᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
-  elimDExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimDExp Θl x cl e)
-  elimDExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimDExp Θl x cl e)
-  elimDExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimDExp Θl x cl e)
+  elimDExp Θl x cl (flattenᵉ op e) = flattenᵉ op (elimDExp Θl x cl e)
   elimDExp Θl x cl (μᵉ e)         = μᵉ (elimDExp Θl x cl e)
   elimDExp Θl x cl (varᵉ y)       with compare∈ x y
   ... | inj₁ refl = renExp (λ ()) (λ ()) (∈-++⁺ʳ Θl) cl
@@ -706,9 +708,7 @@ mutual
   inputsBelowᵉ k (mapᵉ f e)      = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (scanᵉ f z e)   =
     inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
-  inputsBelowᵉ k (mergeAllᵉ lim e) = inputsBelowᵉ k e
-  inputsBelowᵉ k (switchAllᵉ e)  = inputsBelowᵉ k e
-  inputsBelowᵉ k (exhaustAllᵉ e) = inputsBelowᵉ k e
+  inputsBelowᵉ k (flattenᵉ _ e) = inputsBelowᵉ k e
   inputsBelowᵉ k (μᵉ e)          = inputsBelowᵉ k e
   inputsBelowᵉ k (varᵉ x)        = true
   inputsBelowᵉ k (deferᵉ e)      = inputsBelowᵉ k e

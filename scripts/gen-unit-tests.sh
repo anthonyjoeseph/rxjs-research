@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Append newly-discovered QuickCheck counterexamples to the bug cache's
-# corpus, agda/src/Implementation/Unit-Test.agda.
+# corpus, agda/src/CLI/Unit-Test.agda.
 #
 #   scripts/gen-unit-tests.sh [FIRST] [LAST] [RUNS] [DEPTH] [SECS]
 #
@@ -63,8 +63,8 @@ else
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-QC="$ROOT/agda/_cli/QuickCheck"
-CORPUS="$ROOT/agda/src/Implementation/Unit-Test.agda"
+QC="$ROOT/agda/_oracle/_cli/QuickCheck"
+CORPUS="$ROOT/agda/src/CLI/Unit-Test.agda"
 
 [ -x "$QC" ]     || { echo "gen-unit-tests: no $QC — run 'make qc-build' first" >&2; exit 1; }
 [ -f "$CORPUS" ] || { echo "gen-unit-tests: no $CORPUS" >&2; exit 1; }
@@ -93,12 +93,13 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Exp using (add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import Rx.SExp using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ;
+open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ;
   switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
   varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; inlˢ; inrˢ; caseˢ; ifˢ;
   primˢ; nilˢ; consˢ; foldˢ; strmˢ)
 
-open import Implementation.Unit-Test.Prelude using (Case; cached; slots₂)
+open import Rx.Prim using (hot; cold; after_,_)
+open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots)
 AGDA
 
 widen () {
@@ -127,7 +128,7 @@ widen
 added=0
 timedout=""
 for seed in $(seq "$FIRST" "$LAST"); do
-  # stdin is: SEED RUNS DEPTH  (QuickCheck.agda's main: parseNat, numAt 1,
+  # stdin is: SEED RUNS DEPTH  (CLI/QuickCheck.agda's main: parseNat, numAt 1,
   # numAt 2 — runs before depth)
   if printf '%s %s %s\n' "$seed" "$RUNS" "$DEPTH" | $TIMEOUT "$QC" > "$tmp"
   then :; else

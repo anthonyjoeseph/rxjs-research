@@ -93,7 +93,7 @@ from collections import defaultdict
 # A name earns its place by being CLAIMED, never by being listed here.  The
 # top-line theorems and the semantic claims are Main's own `using (...)`
 # names, so they are reachability SEEDS; `main` in CLI/Main.agda and
-# QuickCheck.agda is a definition of a MODULE_ROOTS file, seeded the same
+# CLI/QuickCheck.agda is a definition of a MODULE_ROOTS file, seeded the same
 # way; an anonymous `_ : T` pin is a seed because the typechecker checks it.
 #
 # The `*-absurd` REFUTATION WITNESSES used to be exempted here by SUFFIX,
@@ -506,7 +506,7 @@ def extract_definitions(src_dir, files):
             # `_≟ᵗ_`) — check tokens[1:] for a known mixfix core first.
             # Exception 2: bare `_` is Agda's anonymous top-level check
             # (`_ : impl prog ≡ expected` in the append-only bug cache,
-            # Implementation/Unit-Test.agda) — it can never have a
+            # CLI/Unit-Test.agda) — it can never have a
             # consumer BY DESIGN, so it is not a definition worth tracking
             # at all, let alone flagging as an orphan.
             if tok0 == "...":
@@ -866,9 +866,9 @@ VACUOUS_ALLOWLIST = {
 MODULE_ROOTS = {
     "CLI.Main": ("the oracle CLI — compiled by `make cli-build`, run by `make oracle`",
                  ("main",)),
-    "QuickCheck": ("the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
+    "CLI.QuickCheck": ("the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
                    ("main",)),
-    "Implementation.Unit-Test.Bug-Cache": ("the bug cache's runner — `make bug-cache`",
+    "CLI.Unit-Test.Bug-Cache": ("the bug cache's runner — `make bug-cache`",
                                            ("main",)),
 }
 
@@ -1423,7 +1423,7 @@ def main():
         "    docstring).  That is deliberate and self-limiting: it can only\n"
         "    fail a name whose ONLY route home was the suppressed edge.\n"
         "  * Two DIFFERENT definitions sharing a name (`main` in both\n"
-        "    CLI/Main.agda and QuickCheck.agda) merge into one node.\n"
+        "    CLI/Main.agda and CLI/QuickCheck.agda) merge into one node.\n"
         "  * Reachability answers 'no consumer TODAY', never 'no consumer\n"
         "    EVER'.  A definition needed by work not yet written reads as\n"
         "    unreachable; prefer WIRING to deleting whenever a plausible\n"

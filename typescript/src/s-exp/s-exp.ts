@@ -1,4 +1,4 @@
-// THE AUTHOR'S TREE: an untyped runtime mirror of Agda's `Rx.SExp`.
+// THE AUTHOR'S TREE: an untyped runtime mirror of Agda's `SExp.Syntax`.
 //
 // WHAT MAKES IT A DIFFERENT TREE FROM `Exp` AND NOT A SUBSET OF IT.
 // There are two syntax trees in this system and it is worth being blunt
@@ -6,7 +6,7 @@
 // gap between them:
 //
 //   * `Exp` (exp.ts) is PROTOCOL-BLIND. It is what the evaluator runs,
-//     it has no idea what an envelope is, and `mint` / `batchSync` are
+//     it has no idea what an InstEmit is, and `mint` / `batchSync` are
 //     the two formers that let a program manufacture one.
 //
 //   * `SExp` (here) is the AUTHOR'S palette. It is what a person writes
@@ -15,7 +15,7 @@
 //     identity token or reading the subscribe frame.
 //
 // The elaboration `toPlain` (to-plain.ts) is the translation, and every
-// envelope in a running system is put there by IT rather than by
+// InstEmit in a running system is put there by IT rather than by
 // anything the author wrote. That is the invariant the Agda proof is
 // trying to state: an elaborated program cannot break the protocol
 // BECAUSE the author could not reach the formers that would break it.
@@ -27,7 +27,7 @@
 
 import type { Exp, Fn, PrimOp, Tm, Ty, Val } from "../exp.js";
 
-// Agda: Rx.SExp.STm. The author's TERM language is the plain one with
+// Agda: SExp.Syntax.STm. The author's TERM language is the plain one with
 // its observable former re-pointed at the simul tree.
 //
 // EVERYTHING ELSE IS COPIED RATHER THAN SHARED, and the reason is one
@@ -57,7 +57,7 @@ export type STm =
 // Agda: SFn Γ Δᵍ Δ Θ s t = STm with the argument bound as Θ-var 0.
 export type SFn = STm;
 
-// Agda: Rx.SExp.SExp.
+// Agda: SExp.Syntax.SExp.
 //
 // NOTE WHAT IS ABSENT, since the absences are the point: no `mint`, no
 // `batchSync`, and no `share` node — share identity is a BINDING and

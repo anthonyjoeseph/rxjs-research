@@ -72,7 +72,7 @@ E2.
 
   If what a probe actually pins is the **evaluator** rather than a statement,
   it is not a probe — it is a unit test, and its home is the bug cache
-  (`Implementation/Unit-Test.agda`, `make bug-cache`).
+  (`CLI/Unit-Test.agda`, `make bug-cache`).
 
 - **E6 — A PROBE IS A RECEIPT OR A FORK, NEVER NEITHER AND NEVER BOTH.** The
   two products are different. A `-- TARGET:` probe instantiates ONE statement
@@ -234,9 +234,10 @@ figures out even where the `⊥` does not need them.
 ### Keeping a refutation after its route is settled (Anthony)
 
 **Do not reflexively delete a refutation because the surrounding goal has since
-been proven some other way.** Nothing in this campaign is settled until
-`The-Proof.agda` is discharged, and until then there is always some chance of
-having to reopen a region. A refutation that says "not that way" keeps its
+been proven some other way.** Nothing in this campaign is settled until the
+top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) are
+discharged, and until then there is always some chance of having to reopen a
+region. A refutation that says "not that way" keeps its
 value across a reopening; the proof that superseded it does not carry that
 information.
 
@@ -321,8 +322,7 @@ here is one `make refuted` run, and it is paid outside the gate.
 
 A `… → ⊥` with a **real consumer** is not a refutation record — it is an
 ordinary lemma that happens to be negative, and it belongs in `src` like any
-other. Today: `n≢jᵂ` (`.Decide`), applied as a proof term under `⊥-elim`
-wherever the batcher's step equation rules out a branch.
+other.
 
 Likewise a `refl` pin with a real consumer is not a probe; and a `refl` pin
 with no consumer that captures a known implementation BUG is not a probe

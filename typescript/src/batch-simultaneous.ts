@@ -66,7 +66,7 @@ type BatchSt<A> = { live: SourceId[]; current: OpenBatch<A> | null };
 
 const batchInit = <A>(): BatchSt<A> => ({ live: [], current: null });
 
-// a finished batch: one value event under the instant's own envelope,
+// a finished batch: one value event under the instant's own InstEmit,
 // dropped when valueless (the spec's batchOf, online)
 const closeBatch = <A>(b: OpenBatch<A>): InstEmit<A[]>[] =>
   b.values.length === 0

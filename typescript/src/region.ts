@@ -43,9 +43,7 @@ const subscribed = (e: Exp, acc: Set<number>): void => {
     case "map":
     case "scan":
     case "take":
-    case "mergeAll":
-    case "switchAll":
-    case "exhaustAll":
+    case "flatten":
     case "batchSync":
       subscribed(e.src, acc);
       return;
@@ -84,9 +82,7 @@ const anywhere = (e: Exp, acc: Set<number>): void => {
       anywhereTm(e.count, acc);
       anywhere(e.src, acc);
       return;
-    case "mergeAll":
-    case "switchAll":
-    case "exhaustAll":
+    case "flatten":
     case "batchSync":
       anywhere(e.src, acc);
       return;
@@ -171,9 +167,7 @@ const spawned = (e: Exp, acc: Set<number>): void => {
       anywhereTm(e.count, acc);
       spawned(e.src, acc);
       return;
-    case "mergeAll":
-    case "switchAll":
-    case "exhaustAll":
+    case "flatten":
     case "batchSync":
       spawned(e.src, acc);
       return;
@@ -226,9 +220,7 @@ const flattenerSrcs = (e: Exp, acc: Exp[]): Exp[] => {
       return acc;
     case "of":
       return acc;
-    case "mergeAll":
-    case "switchAll":
-    case "exhaustAll":
+    case "flatten":
       acc.push(e.src);
       return flattenerSrcs(e.src, acc);
     case "map":

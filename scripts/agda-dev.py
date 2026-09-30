@@ -1196,6 +1196,33 @@ def keep_real_for(p: Parsed, foci: list[str]) -> list[str]:
     return []
 
 
+def forward_refs(p: Parsed, heavy: list[int]) -> list[tuple[str, str]]:
+    """(member, sibling) pairs where a body names a sibling ABOVE its signature.
+
+    Agda scopes a file top to bottom, so a clause can call a block sibling
+    only once that sibling's signature has been read -- otherwise the real
+    file is `NotInScope`.  The loop cannot see it: every focus module it
+    writes puts all the signatures first.  So it is checked here, on the
+    text, where it costs nothing and fails in seconds rather than under the
+    tower.
+    """
+    out: list[tuple[str, str]] = []
+    for bi in heavy:
+        ms = p.blocks[bi].members
+        sigpos = {it.name: it.start for it in p.items
+                  if it.kind == "sig" and it.name in ms}
+        for it in p.items:
+            if it.kind != "clauses" or it.name not in ms:
+                continue
+            body = "\n".join(l.split("--")[0] for l in p.lines[it.start : it.end])
+            for o in ms:
+                if (o != it.name and sigpos.get(o, -1) > it.start
+                        and (it.name, o) not in out
+                        and re.search(r"(?<![\w\-])" + re.escape(o) + r"(?![\w\-])", body)):
+                    out.append((it.name, o))
+    return out
+
+
 def weight(p: Parsed, name: str) -> int:
     """Lines of real body -- the only cheap proxy for what a member costs."""
     return sum(it.end - it.start for it in p.items
@@ -1212,6 +1239,14 @@ def sig_coupled(p: Parsed, foci: list[str]) -> list[str]:
     member for real gets `liveRP != Ctx.liveRP` at every use of the stub.  So a
     member whose signature names a focus is a focus too, transitively -- one
     coupled group is one batch, whatever `--batch` says.
+
+    A NAMED member is named to be UNFOLDED, so its PRIVATE HELPERS travel
+    too: a sibling whose only in-block caller is a named member.  Otherwise
+    the named copattern unfolds to a stubbed helper and stops there --
+    `fallen-stays` names `fallenRP`, whose `fold` is `fallenAns …`, and
+    without `fallenAns` real its `pre′` never reaches `fallen`.  Which batch
+    the helper landed in was LPT's luck, so the check went red when an
+    unrelated member was added.
     """
     for b in p.blocks:
         if len(b.members) > 1 and any(f in b.members for f in foci):
@@ -1220,12 +1255,16 @@ def sig_coupled(p: Parsed, foci: list[str]) -> list[str]:
                 txt = " ".join(l.split("--")[0] for l in (sig_text(p, m) or []))
                 in_sig[m] = {o for o in b.members if o != m and re.search(
                     r"(?<![\w\-])" + re.escape(o) + r"(?![\w\-])", txt)}
+            only_caller = {h: cs[0] for h in b.members
+                           for cs in [callers_of(p, h, b.members)] if len(cs) == 1}
             out = set(foci)
             grew = True
             while grew:
                 grew = False
+                named = {o for m in out for o in in_sig[m]}
                 for m in b.members:
-                    if m not in out and in_sig[m] & out:
+                    if m not in out and (in_sig[m] & out
+                                         or only_caller.get(m) in named & out):
                         out.add(m)
                         grew = True
             return [m for m in b.members if m in out]
@@ -1256,7 +1295,12 @@ def plan(p: Parsed, foci: list[str], size: int) -> list[list[str]]:
     bins: list[list[str]] = [[] for _ in range(n)]
     load = [0] * n
     for u in sorted(units, key=lambda u: -uw[tuple(u)]):
-        room = [i for i in range(n) if len(bins[i]) + len(u) <= size or not bins[i]]
+        room = [i for i in range(len(bins)) if len(bins[i]) + len(u) <= size or not bins[i]]
+        if not room:
+            # coupled units can outgrow the count the member total predicted
+            bins.append([])
+            load.append(0)
+            room = [len(bins) - 1]
         k = min(room, key=lambda i: load[i])
         bins[k].extend(u)
         load[k] += uw[tuple(u)]
@@ -1473,6 +1517,14 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
     p = parse(path)
     heavy = heavy_blocks(p)
     mod = mangle(rel)
+
+    fwd = forward_refs(p, heavy)
+    for m, o in fwd:
+        print(f"  FAIL  {m} names {o} above {o}'s signature "
+              "(NotInScope in the real file; the loop hoists signatures)")
+    if fwd:
+        print(f"agda-dev: src/{rel} RED (forward reference)")
+        return False
 
     foci: list[str | None] = []
     for bi in heavy:
