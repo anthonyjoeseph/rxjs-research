@@ -242,14 +242,6 @@ on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **BOUND THE EVALUATOR'S REWORK UNDER NESTED FLATTENERS.** A cold input
-  subscribed as a non-first lane, and a flatten whose outer is itself a
-  flatten, re-run their subscribe stages at a cost exponential in the
-  nesting: memory flat, CPU pinned, the run finishing late. One sweep case
-  already sits near the oracle's per-case cap, and the same shape is what
-  times the bug-cache rows out, so tier 2 inherits it; the evaluator is
-  this tier's, so the fix is too. Find the recomputed stage and share it.
-
 - **RETYPE `deferᵉ`'S PENDING ELEMENT AS AN ECHOING PAIR.** It is the last
   `bare` lane: `subs-defer` registers `thru-outer bare mergeAllᵒ`, and
   `Domain`, `Floor` and `Rule-Kept` state it so. Register the pair
@@ -263,6 +255,16 @@ on `Exp` by design.
 - **FOLD `AllOp` INTO `FlatOp`.** With one lane shape the evaluator's policy
   tag and the syntax op name the same three policies; fold them if they
   coincide, and record in `Rx.Evaluator`'s header why not if they do not.
+
+- **BOUND THE EVALUATOR'S RETENTION.** Recompute is ruled out: answers are
+  bound once and traces carry them. What remains is residency — the
+  bug-cache row switching to two ofs spends nearly all its run in GC with a
+  third of its allocation live, retained by `liveRP`/`subRP` closures (a
+  retainer profile): a successor is a thunk over the
+  whole answer below it (`next an`, `held r`), so each continuation holds
+  the run's history. Force the successor where the fold builds it and carry
+  the force lemma through every proof unfolding that fold. Tier 2 may not
+  touch the evaluator, so this lands here.
 
 ### The ledger
 
