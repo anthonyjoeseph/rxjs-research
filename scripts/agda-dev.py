@@ -1295,7 +1295,12 @@ def plan(p: Parsed, foci: list[str], size: int) -> list[list[str]]:
     bins: list[list[str]] = [[] for _ in range(n)]
     load = [0] * n
     for u in sorted(units, key=lambda u: -uw[tuple(u)]):
-        room = [i for i in range(n) if len(bins[i]) + len(u) <= size or not bins[i]]
+        room = [i for i in range(len(bins)) if len(bins[i]) + len(u) <= size or not bins[i]]
+        if not room:
+            # coupled units can outgrow the count the member total predicted
+            bins.append([])
+            load.append(0)
+            room = [len(bins) - 1]
         k = min(room, key=lambda i: load[i])
         bins[k].extend(u)
         load[k] += uw[tuple(u)]

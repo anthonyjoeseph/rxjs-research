@@ -152,7 +152,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of;
   walk-end; walk-more; go-nil; go-cut; go-live; drain-nil; drain-no-room; drain-room;
   step-scan; step-take; step-batchSync)
 
-open import Rx.Evaluator.Reducible.Support using (Agree; Ans; Apart; Arm; BatchHeld; Call; Column;
+open import Rx.Evaluator.Reducible.Support using (Agree; Ans; Answered; answer; answered; bind≡; Apart; Arm; BatchHeld; Call; Column;
   ConsistentF; Fell; FrameStep; by-bool; FreshF; HeldF; HoldsFs; Kept; NodeOn; Pre; PreFs; PreHolds; QEmpty; RP; Red;
   RedEnv; Room; RoomEmpty; Rule; ScanHeld; Sound; Stage; SubStep; Trace; Wrapped; []ᵗ; _∷ᵗ_; _++ᵗ_; admit-agree; admit-ot;
   ans; apart-fi; apply; batchStep; batch₀; bumpNode; call; cell-inj; colsOf; consumeNil; der;
@@ -215,7 +215,7 @@ baseAns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
 -- term size at the arms, the value at `red-val`, the path and its floor
 -- at the raw fold, and every continuation builder guarded by the `fold`
 -- copattern it answers.
--- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenAns fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-flatten red-input red-input-shared red-map red-mapFn red-scan red-take red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-end translate-sub-end-go translate-sub-go walk
+-- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenAns fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-flatten red-input red-input-shared red-map red-mapFn red-scan red-take red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-go walk
 
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
@@ -747,14 +747,14 @@ headNext : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
 
 redExpAcc (input i) ρ rρ k ok aK a aM = red-input i ρ k ok aK aM
 redExpAcc (ofᵉ ts) ρ rρ k ok aK (acc rs) aM κ pre rp s now sched st rm h =
-  let c  = call now (map (λ tm → evalWith tm ρ) ts)
-             (ofColumn κ pre (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM)) true sched st rm h
-      an = apply rp s c
-  in _ , subs-of (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+  answer rp s (call now (map (λ tm → evalWith tm ρ) ts)
+                (ofColumn κ pre (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM)) true sched st rm h) λ a →
+  let an = Answered.an a
+  in _ , subs-of (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 redExpAcc emptyᵉ ρ rρ k ok aK a aM κ pre rp s now sched st rm h =
-  let c  = call now [] (ofColumn κ pre []) true sched st rm h
-      an = apply rp s c
-  in _ , subs-empty (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+  answer rp s (call now [] (ofColumn κ pre []) true sched st rm h) λ a →
+  let an = Answered.an a
+  in _ , subs-empty (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 redExpAcc (mapᵉ f b)        ρ rρ k ok aK a aM = red-map f b ρ rρ k ok aK a aM
 redExpAcc (takeᵉ c b)       ρ rρ k ok aK a aM = red-take c b ρ rρ k ok aK a aM
 redExpAcc (batchSyncᵉ b)    ρ rρ k ok aK a aM = red-batchSync b ρ rρ k ok aK a aM
@@ -820,36 +820,15 @@ headNext le aM fs h rh κ (standing pfs) rp = liveRP le aM fs h rh κ pfs rp
 headNext {n = n} {lo = lo} le aM fs h rh κ fallen rp =
   dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (_ ↠[ le ] κ))
 
--- THE TRANSLATION OF A SOURCE'S TRACE THROUGH THE LIVE FRAME IT WAS
--- SUBSCRIBED UNDER: each call becomes the call the frame made above
--- it, and the walk stops where the path fell, since past the fall the
--- frame's fold reads the store and calls nothing it was handed.  It
--- descends on the trace: a call-bearing clause peels one call, and the
--- dispatch by ground re-enters at what that peel left.
-translate : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
-            {f : Frame Γ s u} {Held : HeldF f → Set₁}
-            (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
-            (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
-            (rp : RP {e = e} m (Red m u) S κ (standing pfs)) {s₀ : S}
-          → Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (h , pfs)) (liveRP le aM fs h rh κ pfs rp) s₀
-          → Trace {e = e} m (Red m u) S κ (standing pfs) rp s₀
-translate-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
-               {f : Frame Γ s u} {Held : HeldF f → Set₁}
-               (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
-               (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (p : Pre κ)
-               (rp : RP {e = e} m (Red m u) S κ p) {s₀ : S}
-             → Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (headPre h p) (headNext le aM fs h rh κ p rp) s₀
-             → Trace {e = e} m (Red m u) S κ p rp s₀
-translate le aM fs h rh κ pfs rp []ᵗ = []ᵗ
-translate {n = n} {ℓ = ℓ} le aM fs h rh κ pfs rp (fellᵗ _ s′) =
-  fellᵗ (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ)) s′
-translate le aM fs h rh κ pfs rp {s₀} (c ∷ᵗ tr) =
-  headCall fs h rh κ pfs c
-    ∷ᵗ translate-go le aM fs (held (step fs h (Call.vals c) (Call.fin c) (Call.sched c) (Call.st c)))
-         (proj₂ (step-red fs (Call.col c) rh)) κ (Ans.pre′ an) (next an) tr
-  where an = apply rp s₀ (headCall fs h rh κ pfs c)
-translate-go le aM fs h rh κ (standing pfs) rp tr = translate le aM fs h rh κ pfs rp tr
-translate-go le aM fs h rh κ fallen         rp tr = []ᵗ
+-- WHERE A TRACE STANDS: the ground, the continuation on it, and the
+-- state threaded to it.
+At : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo} (P : Val Γ u → Set₁) (S : Set) (κ : Path Γ lo u t) → Set₁
+At {e = e} m P S κ = Σ (Pre κ) (λ q → RP {e = e} m P S κ q × S)
+
+-- a call made where the equation places it
+callAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Set₁} {S : Set} {κ : Path Γ lo u t}
+           {x y : At {e = e} m P S κ} → x ≡ y → Call {e = e} m P κ (proj₁ x) → Call {e = e} m P κ (proj₁ y)
+callAt {e = e} {m = m} {P = P} {κ = κ} eq c = subst (λ a → Call {e = e} m P κ (proj₁ a)) eq c
 
 -- a trace on the fallen fold ends fallen
 fallen-stays : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ} {S : Set}
@@ -858,35 +837,81 @@ fallen-stays : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ} {S : Set}
              → endPre tr ≡ fallen
 fallen-stays ac le (acc rsM) κ []ᵗ         = refl
 fallen-stays ac le (acc rsM) κ (fellᵗ _ _) = refl
-fallen-stays ac le (acc rsM) κ (c ∷ᵗ tr) = fallen-stays ac le (acc rsM) κ tr
+fallen-stays ac le (acc rsM) κ (answered _ refl ∷ᵗ tr) = fallen-stays ac le (acc rsM) κ tr
 
--- and the translation ends where the source's trace did, one frame
--- down, with the frame holding candidates for what it holds there.  It
--- descends on the trace as the translation does.
--- STRUCTURAL SCC: translate-end translate-end-go
-translate-end : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
-                {f : Frame Γ s u} {Held : HeldF f → Set₁}
-                (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
-                (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
-                (rp : RP {e = e} m (Red m u) S κ (standing pfs)) {s₀ : S}
-              → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (h , pfs)) (liveRP le aM fs h rh κ pfs rp) s₀)
-              → Σ (HeldF f) (λ h″ → Held h″ × endPre tr ≡ headPre h″ (endPre (translate le aM fs h rh κ pfs rp tr)))
-translate-end-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
-                   {f : Frame Γ s u} {Held : HeldF f → Set₁}
-                   (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
-                   (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (p : Pre κ)
-                   (rp : RP {e = e} m (Red m u) S κ p) {s₀ : S}
-                 → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (headPre h p) (headNext le aM fs h rh κ p rp) s₀)
-                 → Σ (HeldF f) (λ h″ → Held h″ × endPre tr ≡ headPre h″ (endPre (translate-go le aM fs h rh κ p rp tr)))
-translate-end le aM fs h rh κ pfs rp []ᵗ         = h , rh , refl
-translate-end le aM fs h rh κ pfs rp (fellᵗ _ _) = h , rh , refl
-translate-end le aM fs h rh κ pfs rp {s₀} (c ∷ᵗ tr) =
-  translate-end-go le aM fs (held (step fs h (Call.vals c) (Call.fin c) (Call.sched c) (Call.st c)))
-    (proj₂ (step-red fs (Call.col c) rh)) κ (Ans.pre′ an) (next an) tr
-  where an = apply rp s₀ (headCall fs h rh κ pfs c)
-translate-end-go le aM fs h rh κ (standing pfs) rp tr = translate-end le aM fs h rh κ pfs rp tr
-translate-end-go {n = n} {lo = lo} le aM fs h rh κ fallen rp tr =
-  h , rh , fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM (_ ↠[ le ] κ) tr
+-- and wherever the equation places it there
+fallen-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ} {S : Set}
+            (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) (aM : Acc _<_ m) (κ : Path Γ ℓ u t) {s₁ : S} {q₀ rp₀ s₀}
+          → (tr : Trace {e = e} m (Red m u) S κ q₀ rp₀ s₀)
+          → _≡_ {A = At {e = e} m (Red m u) S κ} (q₀ , rp₀ , s₀) (fallen , dropS (fallenRP ac le aM κ) , s₁)
+          → endPre tr ≡ fallen
+fallen-at ac le aM κ tr refl = fallen-stays ac le aM κ tr
+
+-- THE TRANSLATION OF A SOURCE'S TRACE THROUGH THE LIVE FRAME IT WAS
+-- SUBSCRIBED UNDER: each call becomes the call the frame made above
+-- it, and the walk stops where the path fell, since past the fall the
+-- frame's fold reads the store and calls nothing it was handed.  It
+-- ends where the source's trace did, one frame down, with the frame
+-- holding candidates for what it holds there.
+--
+-- IT RECURSES AT THE SUCCESSOR THE CALL ABOVE ANSWERED WITH, held,
+-- and takes the source's trace wherever an equation places it, so that
+-- the step to the tail is a transport of the equation and not of the
+-- trace: the tail stays a subterm, and nothing the answer holds is
+-- applied a second time.  It descends on the trace.
+translate : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
+            {f : Frame Γ s u} {Held : HeldF f → Set₁}
+            (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
+            (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
+            (rp : RP {e = e} m (Red m u) S κ (standing pfs)) (s₁ : S) {q₀ rp₀ s₀}
+          → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) q₀ rp₀ s₀)
+          → _≡_ {A = At {e = e} m (Red m s) S (f ↠[ le ] κ)} (q₀ , rp₀ , s₀)
+                (standing (h , pfs) , liveRP le aM fs h rh κ pfs rp , s₁)
+          → Σ (Trace {e = e} m (Red m u) S κ (standing pfs) rp s₁)
+              (λ tr′ → Σ (HeldF f) (λ h″ → Held h″ × endPre tr ≡ headPre h″ (endPre tr′)))
+translate-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
+               {f : Frame Γ s u} {Held : HeldF f → Set₁}
+               (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
+               (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (p : Pre κ)
+               (rp : RP {e = e} m (Red m u) S κ p) (s₁ : S) {q₀ rp₀ s₀}
+             → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) q₀ rp₀ s₀)
+             → _≡_ {A = At {e = e} m (Red m s) S (f ↠[ le ] κ)} (q₀ , rp₀ , s₀)
+                   (headPre h p , headNext le aM fs h rh κ p rp , s₁)
+             → Σ (Trace {e = e} m (Red m u) S κ p rp s₁)
+                 (λ tr′ → Σ (HeldF f) (λ h″ → Held h″ × endPre tr ≡ headPre h″ (endPre tr′)))
+
+-- the live fold's answer, by the equation, is its step over the answer above
+live-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
+          {f : Frame Γ s u} {Held : HeldF f → Set₁}
+          (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
+          (h : HeldF f) (rh : Held h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
+          (rp : RP {e = e} m (Red m u) S κ (standing pfs)) {s₁ : S} {q₀ rp₀ s₀}
+          (eq : _≡_ {A = At {e = e} m (Red m s) S (f ↠[ le ] κ)} (q₀ , rp₀ , s₀)
+                    (standing (h , pfs) , liveRP le aM fs h rh κ pfs rp , s₁))
+          {c : Call {e = e} m (Red m s) (f ↠[ le ] κ) q₀}
+        → (a : Answered rp₀ s₀ c) (b : Answered rp s₁ (headCall fs h rh κ pfs (callAt eq c)))
+        → _≡_ {A = At {e = e} m (Red m s) S (f ↠[ le ] κ)}
+              (Ans.pre′ (Answered.an a) , next (Answered.an a) , Ans.s′ (Answered.an a))
+              ( headPre (held (step fs h (Call.vals (callAt eq c)) (Call.fin (callAt eq c)) (Call.sched (callAt eq c)) (Call.st (callAt eq c))))
+                        (Ans.pre′ (Answered.an b))
+              , headNext le aM fs (held (step fs h (Call.vals (callAt eq c)) (Call.fin (callAt eq c)) (Call.sched (callAt eq c)) (Call.st (callAt eq c))))
+                  (proj₂ (step-red fs (Call.col (callAt eq c)) rh)) κ (Ans.pre′ (Answered.an b)) (next (Answered.an b))
+              , Ans.s′ (Answered.an b))
+live-at le aM fs h rh κ pfs rp refl (answered _ refl) (answered _ refl) = refl
+
+translate le aM fs h rh κ pfs rp s₁ []ᵗ eq = []ᵗ , h , rh , cong proj₁ eq
+translate {n = n} {ℓ = ℓ} le aM fs h rh κ pfs rp s₁ (fellᵗ _ s′) eq =
+  fellᵗ (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ)) s′ , h , rh , refl
+translate le aM fs h rh κ pfs rp s₁ (_∷ᵗ_ {c = c} a tr) eq =
+  answer rp s₁ (headCall fs h rh κ pfs (callAt eq c)) λ b →
+  translate-go le aM fs
+    (held (step fs h (Call.vals (callAt eq c)) (Call.fin (callAt eq c)) (Call.sched (callAt eq c)) (Call.st (callAt eq c))))
+    (proj₂ (step-red fs (Call.col (callAt eq c)) rh)) κ (Ans.pre′ (Answered.an b)) (next (Answered.an b)) (Ans.s′ (Answered.an b))
+    tr (live-at le aM fs h rh κ pfs rp eq a b) |>′ λ (tr′ , h″ , rh″ , e″) →
+  b ∷ᵗ tr′ , h″ , rh″ , e″
+translate-go le aM fs h rh κ (standing pfs) rp s₁ tr eq = translate le aM fs h rh κ pfs rp s₁ tr eq
+translate-go {n = n} {lo = lo} le aM fs h rh κ fallen rp s₁ tr eq =
+  []ᵗ , h , rh , fallen-at (<-wellFounded (n ∸ lo)) ≤-refl aM (_ ↠[ le ] κ) tr eq
 
 -- THE MAP ARM'S BODY.  Over a standing path the frame goes on live and
 -- the answer is the translation; over a fallen one the frame goes on
@@ -901,8 +926,7 @@ red-map {s = s} f b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sch
                                   (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) (standing (tt , pfs))
                                   (liveRP ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp)
                                   s₀ now sched st rm (grounded ((tt , []ᵃ) , (λ _ ()) , ground h) (push-sound (map-f (_ , f , ρ)) ≤-refl κ (sounds h) (λ k ()))) |>′ λ (r , d , tr , hl , kp) →
-  translate-end ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp tr |>′ λ (h″ , _ , eq) →
-  let tr′ = translate ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp tr in
+  translate ≤-refl aM (mapStep (_ , f , ρ) (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)) tt tt κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , _ , eq) →
   r , subs-map d , tr′
    , unheadHolds (map-f (_ , f , ρ)) ≤-refl κ h″ (endPre tr′)
        (subst (λ p → PreHolds _ (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq hl)
@@ -940,9 +964,9 @@ fresh-holds f κ pfs h ns {sched} {st} one c fr hs =
 -- and the arm is the map arm's over the take frame.
 red-take c b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h with evalWith c ρ in eq
 red-take c b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h | zero =
-  let cl = call now [] (ofColumn κ pre []ᵃ) true sched st rm h
-      an = apply rp s₀ cl
-  in _ , subs-take-zero eq (der an) , cl ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+  answer rp s₀ (call now [] (ofColumn κ pre []ᵃ) true sched st rm h) λ a →
+  let an = Answered.an a
+  in _ , subs-take-zero eq (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 red-take c b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h | suc j =
   redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
                                   (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
@@ -951,8 +975,7 @@ red-take c b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st r
                                   s₀ now (bumpNode sched) (installNode (nodeCt sched) (take-st (suc j)) st) rm
                                   (fresh-holds (take-f (nodeCt sched)) κ pfs (just (take-st (suc j))) (take-st (suc j)) (λ _ → node-eq)
                                      (lookup-set (nodeCt sched) (take-st (suc j)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h) |>′ λ (r , d , tr , hl , kp) →
-  translate-end ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp tr |>′ λ (h″ , _ , eq′) →
-  let tr′ = translate ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp tr in
+  translate ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , _ , eq′) →
   r , subs-take-suc eq refl d , tr′
    , unheadHolds (take-f (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
        (subst (λ p → PreHolds _ (take-f (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ hl)
@@ -1009,7 +1032,7 @@ red-scan f z b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st
                                   s₀ now (bumpNode sched) (installNode (nodeCt sched) (cell-st (evalWith z ρ)) st) rm
                                   (fresh-holds (scan-f (_ , f , ρ) (nodeCt sched)) κ pfs (just (cell-st (evalWith z ρ))) (cell-st (evalWith z ρ))
                                      (λ _ → node-eq) (lookup-set (nodeCt sched) (cell-st (evalWith z ρ)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h) |>′ λ (r , d , tr , hl , kp) →
-  translate-end ≤-refl aM
+  translate ≤-refl aM
                           (scanStep (_ , f , ρ) (nodeCt sched)
                             (λ {v} p → redTmAcc f (v ∷ᵉ ρ) (p , rρ) k (∧ˡ (inputsBelowᵗ k f) _ ok) aK
                                          (rs (s≤s (m≤m+n (gsizeᵗ f) _))) aM))
@@ -1017,16 +1040,7 @@ red-scan f z b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st
                           (λ eq → subst (Red _ _) (cell-inj eq)
                                     (redTmAcc z ρ rρ k (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
                                        (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b)) (m≤n+m _ (gsizeᵗ f))))) aM))
-                          κ pfs rp tr |>′ λ (h″ , _ , eq′) →
-  let tr′ = translate ≤-refl aM
-              (scanStep (_ , f , ρ) (nodeCt sched)
-                (λ {v} p → redTmAcc f (v ∷ᵉ ρ) (p , rρ) k (∧ˡ (inputsBelowᵗ k f) _ ok) aK
-                             (rs (s≤s (m≤m+n (gsizeᵗ f) _))) aM))
-              (just (cell-st (evalWith z ρ)))
-              (λ eq → subst (Red _ _) (cell-inj eq)
-                        (redTmAcc z ρ rρ k (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) (∧ʳ (inputsBelowᵗ k f) _ ok)) aK
-                           (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b)) (m≤n+m _ (gsizeᵗ f))))) aM))
-              κ pfs rp tr in
+                          κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , _ , eq′) →
   r , subs-scan refl d , tr′
    , unheadHolds (scan-f (_ , f , ρ) (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
        (subst (λ p → PreHolds _ (scan-f (_ , f , ρ) (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq′ hl)
@@ -1065,12 +1079,12 @@ stepStage : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s u
           → (∀ {pfs} → q ≡ standing pfs → Held h)
           → Stage m f le κ (λ o sc s′ → foldPath⇓ {e = e} now (f ↠[ le ] κ) vals fin sched st (o , sc , s′)) q rp s₀ sched st
 stepStage {f = f} le aM fs κ h (standing pfs) rp s₀ now vals col fin {sched} {st} rm hs rh =
+  answer rp s₀ (headCall {le = le} fs h (rh refl) κ pfs (call now vals col fin sched st rm hs)) λ a →
   let r  = step fs h vals fin sched st
-      c  = headCall {le = le} fs h (rh refl) κ pfs (call now vals col fin sched st rm hs)
-      an = apply rp s₀ c
+      an = Answered.an a
       d  = step-⇓ fs {κ = κ} {now = now} h vals fin sched st (proj₁ (proj₁ (ground hs)))
       so = step-kept le d (sounds hs)
-  in stage (out an) (Ans.sched′ an) (Ans.st′ an) (fold-step d (der an)) (c ∷ᵗ []ᵗ) refl (held r)
+  in stage (out an) (Ans.sched′ an) (Ans.st′ an) (fold-step d (der an)) (a ∷ᵗ []ᵗ) refl (held r)
        (headHolds f le κ (held r)
          ( step-cons fs h vals fin sched st (proj₁ (proj₁ (ground hs)))
          , subst (λ ct → All (_< ct) _) (sym (step-ct fs h vals fin sched st)) (proj₂ (proj₁ (ground hs))) )
@@ -1080,9 +1094,9 @@ stepStage {f = f} le aM fs κ h (standing pfs) rp s₀ now vals col fin {sched} 
          (ends-sub (f ↠[ le ] κ) {sched = sched} {st = st} {st′ = st″ r} (step-reg fs h vals fin sched st))
          (Ans.pre′ an) (kept an) (held r))
 stepStage {n = n} {lo = lo} {f = f} le aM fs κ h fallen rp s₀ now vals col fin {sched} {st} rm (grounded fell so) rh =
-  let an = fold (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (f ↠[ le ] κ)) tt now vals tt fin sched st rm
-                (grounded fell so)
-  in stage (out an) (Ans.sched′ an) (Ans.st′ an) (der an) []ᵗ refl h
+  fold (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (f ↠[ le ] κ)) tt now vals tt fin sched st rm
+       (grounded fell so) |>′ λ an →
+  stage (out an) (Ans.sched′ an) (Ans.st′ an) (der an) []ᵗ refl h
        (grounded (fell-keeps (foldPath-keeps (der an)) fell) (fold-sound (der an) so)) tt
 
 -- THE BRACKET CLOSED.  Whatever the source's subscription left, the
@@ -1126,7 +1140,8 @@ batchFinish {e = e} {Θ = Θ} {u = u} {m = m} b ρ aM κ pre rp s₀ now sched s
                  (λ k _ ne → set-above nid k (batchDown u x) (EvalSt.nodes (Stage.st′ A)) (head-off nid [] k ne))
                  (λ _ _ _ ea → ea) F)
               (λ d₂ → subs-batchSync refl (Stage.dv A) d₂)
-  in (Stage.out S′ , Stage.sc S′ , Stage.st′ S′) , Stage.dv S′ , Stage.tr S′
+  in S′ |>′ λ S′ →
+     (Stage.out S′ , Stage.sc S′ , Stage.st′ S′) , Stage.dv S′ , Stage.tr S′
    , unheadHolds (batchSync-f nid) ≤-refl κ (Stage.hd S′) (endPre (Stage.tr S′)) (Stage.hl S′)
    , unheadKept (batchSync-f nid) ≤-refl κ (Stage.hd S′) (endPre (Stage.tr S′))
        {sched} {bumpNode sched} {st = st} {st₁ = installNode nid (batchSync-st {s = u} true [] false) st}
@@ -1144,11 +1159,9 @@ red-batchSync {t = u} b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now
                                                   (fresh-holds (batchSync-f (nodeCt sched)) κ pfs (just (batchSync-st {s = u} true [] false))
                                                      (batchSync-st {s = u} true [] false) (λ _ → node-eq)
                                                      (lookup-set (nodeCt sched) (batchSync-st {s = u} true [] false) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h) |>′ λ ((o₁ , sc₁ , st₁) , d , tr , hl , kp) →
-  translate-end ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp tr |>′ λ (h″ , rh″ , eq′) →
+  translate ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , rh″ , eq′) →
   batchFinish b ρ aM κ (standing pfs) rp s₀ now sched st rm
-       (stage o₁ sc₁ st₁ d
-          (translate ≤-refl aM (batchStep (nodeCt sched)) (just (batchSync-st {s = u} true [] false)) batch₀ κ pfs rp tr)
-          refl h″
+       (stage o₁ sc₁ st₁ d tr′ refl h″
           (subst (λ p → PreHolds _ (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) p sc₁ st₁) eq′ hl)
           (subst (λ p → Kept (batchSync-f (nodeCt sched) ↠[ ≤-refl ] κ) p (bumpNode sched)
                               (installNode (nodeCt sched) (batchSync-st {s = u} true [] false) st) sc₁ st₁) eq′ kp))
@@ -1170,9 +1183,9 @@ red-batchSync {n = n} {t = u} b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen r
 red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ pre rp s now sched st rm h
     with toℕ i <? lo
 ... | no  ¬below =
-      let c  = call now [] (ofColumn κ pre []) true sched st rm h
-          an = apply rp s c
-      in _ , subs-floor (≮⇒≥ ¬below) (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+      answer rp s (call now [] (ofColumn κ pre []) true sched st rm h) λ a →
+      let an = Answered.an a
+      in _ , subs-floor (≮⇒≥ ¬below) (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 red-input {Γ = Γ} i ρ k ok (acc rsK) aM {lo = lo} κ pre rp s now sched st rm h
     | yes below with Sched.slots sched i in slEq
 ...   | scripted {ok = oks} sc = red-scripted i ρ k ok (acc rsK) κ below pre rp s now sched sc {oks = oks} slEq st aM rm h
@@ -1214,10 +1227,10 @@ red-input-shared {n = n} {lo = lo} i d {okd} aI ρ κ below pre rp s now sched s
             (ends-register {κ = κ} {sched = sched} {st = st} (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ)
                (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on)))))
     (λ doneEq →
-      let c  = call now [] (ofColumn κ pre []) true sched st rm h
-          an = apply rp s c
+      answer rp s (call now [] (ofColumn κ pre []) true sched st rm h) λ a →
+      let an = Answered.an a
       in _ , subs-shared {κ = κ} {below = below} slEq (slot-spent {κ = κ} {below = below} doneEq (der an))
-         , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an)
+         , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an)
 
 ------------------------------------------------------------------
 -- THE TERM FACE.
@@ -1391,60 +1404,69 @@ subNext {n = n} {lo = lo} le aM ss h g κ fallen rp =
 
 -- THE TRANSLATION OF A SOURCE'S TRACE THROUGH A SUBSCRIBING FRAME:
 -- each call becomes the calls the step made above it, appended, and
--- the walk stops where the path fell.  It descends on the trace, one
--- call per call-bearing clause.
+-- the walk stops where the path fell.  It ends where the source's trace
+-- did, one frame down, on a ground that never stands where the ground
+-- it started from fell, at a column the guard still holds of.
+--
+-- It runs each step once, at the successor the step answered with,
+-- and takes the source's trace wherever an equation places it, as the
+-- live frame's translation does.  It descends on the trace.
 translate-sub : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set} {f : Frame Γ s u} {G : HeldF f → Set}
                 (le : lo ≤ ℓ) (aM : Acc _<_ m) (ss : SubStep {e = e} f G m)
                 (h : HeldF f) (g : G h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
-                (rp : RP {e = e} m (Red m u) S κ (standing pfs)) {s₀ : S}
-              → Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (h , pfs)) (subRP le aM ss h g κ pfs rp) s₀
-              → Trace {e = e} m (Red m u) S κ (standing pfs) rp s₀
+                (rp : RP {e = e} m (Red m u) S κ (standing pfs)) (s₁ : S) {q₀ rp₀ s₀}
+              → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) q₀ rp₀ s₀)
+              → _≡_ {A = At {e = e} m (Red m s) S (f ↠[ le ] κ)} (q₀ , rp₀ , s₀)
+                    (standing (h , pfs) , subRP le aM ss h g κ pfs rp , s₁)
+              → Σ (Trace {e = e} m (Red m u) S κ (standing pfs) rp s₁)
+                  (λ tr′ → Σ (HeldF f) (λ h″ → G h″ × endPre tr ≡ headPre h″ (endPre tr′)))
 translate-sub-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set} {f : Frame Γ s u} {G : HeldF f → Set}
                    (le : lo ≤ ℓ) (aM : Acc _<_ m) (ss : SubStep {e = e} f G m)
                    (h : HeldF f) (g : G h) (κ : Path Γ ℓ u t) (p : Pre κ)
-                   (rp : RP {e = e} m (Red m u) S κ p) {s₀ : S}
-                 → Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (headPre h p) (subNext le aM ss h g κ p rp) s₀
-                 → Trace {e = e} m (Red m u) S κ p rp s₀
-translate-sub le aM ss h g κ pfs rp []ᵗ = []ᵗ
-translate-sub {n = n} {ℓ = ℓ} le aM ss h g κ pfs rp (fellᵗ _ s′) =
-  fellᵗ (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ)) s′
-translate-sub le aM ss h g κ pfs rp {s₀} (c ∷ᵗ tr) =
-  let rg = ss le κ pfs rp s₀ h g (Call.now c) (Call.vals c) (Call.col c) (Call.fin c)
-              (Call.sched c) (Call.st c) (Call.room c) (Call.holds c)
-      r  = proj₁ rg
-  in Stage.tr r ++ᵗ translate-sub-go le aM ss (Stage.hd r) (proj₂ rg) κ (endPre (Stage.tr r)) (endRP (Stage.tr r)) tr
-translate-sub-go le aM ss h g κ (standing pfs) rp tr = translate-sub le aM ss h g κ pfs rp tr
-translate-sub-go le aM ss h g κ fallen         rp tr = []ᵗ
+                   (rp : RP {e = e} m (Red m u) S κ p) (s₁ : S) {q₀ rp₀ s₀}
+                 → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) q₀ rp₀ s₀)
+                 → _≡_ {A = At {e = e} m (Red m s) S (f ↠[ le ] κ)} (q₀ , rp₀ , s₀)
+                       (headPre h p , subNext le aM ss h g κ p rp , s₁)
+                 → Σ (Trace {e = e} m (Red m u) S κ p rp s₁)
+                     (λ tr′ → Σ (HeldF f) (λ h″ → G h″ × endPre tr ≡ headPre h″ (endPre tr′))
+                            × joinPre p (endPre tr′) ≡ endPre tr′)
 
--- and it ends where the source's trace did, one frame down, on a
--- ground that never stands where the ground it started from fell, at
--- a column the guard still holds of.  It descends on the trace.
-translate-sub-end : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set} {f : Frame Γ s u} {G : HeldF f → Set}
-                    (le : lo ≤ ℓ) (aM : Acc _<_ m) (ss : SubStep {e = e} f G m)
-                    (h : HeldF f) (g : G h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
-                    (rp : RP {e = e} m (Red m u) S κ (standing pfs)) {s₀ : S}
-                  → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (standing (h , pfs)) (subRP le aM ss h g κ pfs rp) s₀)
-                  → Σ (HeldF f) (λ h″ → G h″ × endPre tr ≡ headPre h″ (endPre (translate-sub le aM ss h g κ pfs rp tr)))
-translate-sub-end-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set} {f : Frame Γ s u} {G : HeldF f → Set}
-                       (le : lo ≤ ℓ) (aM : Acc _<_ m) (ss : SubStep {e = e} f G m)
-                       (h : HeldF f) (g : G h) (κ : Path Γ ℓ u t) (p : Pre κ)
-                       (rp : RP {e = e} m (Red m u) S κ p) {s₀ : S}
-                     → (tr : Trace {e = e} m (Red m s) S (f ↠[ le ] κ) (headPre h p) (subNext le aM ss h g κ p rp) s₀)
-                     → Σ (HeldF f) (λ h″ → G h″ × endPre tr ≡ headPre h″ (endPre (translate-sub-go le aM ss h g κ p rp tr)))
-                       × joinPre p (endPre (translate-sub-go le aM ss h g κ p rp tr)) ≡ endPre (translate-sub-go le aM ss h g κ p rp tr)
-translate-sub-end le aM ss h g κ pfs rp []ᵗ         = h , g , refl
-translate-sub-end le aM ss h g κ pfs rp (fellᵗ _ _) = h , g , refl
-translate-sub-end le aM ss h g κ pfs rp {s₀} (c ∷ᵗ tr) =
-  let rg = ss le κ pfs rp s₀ h g (Call.now c) (Call.vals c) (Call.col c) (Call.fin c)
-              (Call.sched c) (Call.st c) (Call.room c) (Call.holds c)
-      r  = proj₁ rg
-      go = translate-sub-go le aM ss (Stage.hd r) (proj₂ rg) κ (endPre (Stage.tr r)) (endRP (Stage.tr r)) tr in
-  translate-sub-end-go le aM ss (Stage.hd r) (proj₂ rg) κ (endPre (Stage.tr r)) (endRP (Stage.tr r)) tr |>′ λ ((h″ , g″ , eq) , jn) →
-  let e₂ = trans (end-++ (Stage.tr r) go) jn in
-  h″ , g″ , trans eq (cong (headPre h″) (sym e₂))
-translate-sub-end-go le aM ss h g κ (standing pfs) rp tr = translate-sub-end le aM ss h g κ pfs rp tr , refl
-translate-sub-end-go {n = n} {lo = lo} le aM ss h g κ fallen rp tr =
-  (h , g , fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM (_ ↠[ le ] κ) tr) , refl
+-- the subscribing fold's answer, by the equation, is the step's end
+sub-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set} {f : Frame Γ s u} {G : HeldF f → Set}
+         (le : lo ≤ ℓ) (aM : Acc _<_ m) (ss : SubStep {e = e} f G m)
+         (h : HeldF f) (g : G h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
+         (rp : RP {e = e} m (Red m u) S κ (standing pfs)) {s₁ : S} {q₀ rp₀ s₀}
+         (eq : _≡_ {A = At {e = e} m (Red m s) S (f ↠[ le ] κ)} (q₀ , rp₀ , s₀)
+                   (standing (h , pfs) , subRP le aM ss h g κ pfs rp , s₁))
+         {c : Call {e = e} m (Red m s) (f ↠[ le ] κ) q₀} (a : Answered rp₀ s₀ c)
+         (rg : Σ (Stage m f le κ (λ o sc s′ → foldPath⇓ {e = e} (Call.now (callAt eq c)) (f ↠[ le ] κ) (Call.vals (callAt eq c))
+                                                  (Call.fin (callAt eq c)) (Call.sched (callAt eq c)) (Call.st (callAt eq c)) (o , sc , s′))
+                        (standing pfs) rp s₁ (Call.sched (callAt eq c)) (Call.st (callAt eq c)))
+                 (λ r → G (Stage.hd r)))
+       → rg ≡ ss le κ pfs rp s₁ h g (Call.now (callAt eq c)) (Call.vals (callAt eq c)) (Call.col (callAt eq c)) (Call.fin (callAt eq c))
+                 (Call.sched (callAt eq c)) (Call.st (callAt eq c)) (Call.room (callAt eq c)) (Call.holds (callAt eq c))
+       → _≡_ {A = At {e = e} m (Red m s) S (f ↠[ le ] κ)}
+             (Ans.pre′ (Answered.an a) , next (Answered.an a) , Ans.s′ (Answered.an a))
+             ( headPre (Stage.hd (proj₁ rg)) (endPre (Stage.tr (proj₁ rg)))
+             , subNext le aM ss (Stage.hd (proj₁ rg)) (proj₂ rg) κ (endPre (Stage.tr (proj₁ rg))) (endRP (Stage.tr (proj₁ rg)))
+             , endS (Stage.tr (proj₁ rg)))
+sub-at le aM ss h g κ pfs rp refl (answered _ refl) _ refl = refl
+
+translate-sub le aM ss h g κ pfs rp s₁ []ᵗ eq = []ᵗ , h , g , cong proj₁ eq
+translate-sub {n = n} {ℓ = ℓ} le aM ss h g κ pfs rp s₁ (fellᵗ _ s′) eq =
+  fellᵗ (dropS (fallenRP (<-wellFounded (n ∸ ℓ)) ≤-refl aM κ)) s′ , h , g , refl
+translate-sub le aM ss h g κ pfs rp s₁ (_∷ᵗ_ {c = c} a tr) eq =
+  bind≡ (ss le κ pfs rp s₁ h g (Call.now (callAt eq c)) (Call.vals (callAt eq c)) (Call.col (callAt eq c)) (Call.fin (callAt eq c))
+            (Call.sched (callAt eq c)) (Call.st (callAt eq c)) (Call.room (callAt eq c)) (Call.holds (callAt eq c))) λ rg eqr →
+  translate-sub-go le aM ss (Stage.hd (proj₁ rg)) (proj₂ rg) κ
+    (endPre (Stage.tr (proj₁ rg))) (endRP (Stage.tr (proj₁ rg))) (endS (Stage.tr (proj₁ rg)))
+    tr (sub-at le aM ss h g κ pfs rp eq a rg eqr) |>′ λ (tr′ , (h″ , g″ , e″) , jn) →
+  Stage.tr (proj₁ rg) ++ᵗ tr′ , h″ , g″
+    , trans e″ (cong (headPre h″) (sym (trans (end-++ (Stage.tr (proj₁ rg)) tr′) jn)))
+translate-sub-go le aM ss h g κ (standing pfs) rp s₁ tr eq =
+  translate-sub le aM ss h g κ pfs rp s₁ tr eq |>′ λ (tr′ , x) → tr′ , x , refl
+translate-sub-go {n = n} {lo = lo} le aM ss h g κ fallen rp s₁ tr eq =
+  []ᵗ , (h , g , fallen-at (<-wellFounded (n ∸ lo)) ≤-refl aM (_ ↠[ le ] κ) tr eq) , refl
 
 -- what the walk reads is reducible where the outer's elements are
 redEvents : ∀ {n} {Γ : Ctx n} {m s u} (ln : Lanes s u) (vals : List (Val Γ s))
@@ -1494,9 +1516,8 @@ subStanding {m = m} {u = u} ln op nid aM le κ pfs rp s₀ ns′ gq o ro now {sc
                                   (grounded hs′ (fresh-inner op nid κ sched {st″}
                                      (sub-ot (λ r∈ → r∈) ≤-refl (drop-ot (thru-outer ln op nid) le κ so))
                                      (sub-on (λ r∈ → r∈) ≤-refl (head-on (thru-outer ln op nid) le κ nid (self-node nid []) so)))) |>′ λ (r , d , tr , hl , kp) →
-  translate-sub-end ≤-refl aM ss (just ns′) gq κ pfs rp tr |>′ λ (h″ , g″ , eq) →
-  let tr′ = translate-sub ≤-refl aM ss (just ns′) gq κ pfs rp tr
-      sc  = proj₁ (proj₂ r)
+  translate-sub ≤-refl aM ss (just ns′) gq κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , g″ , eq) →
+  let sc  = proj₁ (proj₂ r)
       st′ = proj₂ (proj₂ r) in
   stage (proj₁ r) sc st′ d tr′ refl h″
        (fiHolds→thru ln op nid inst le κ h″ (endPre tr′) (subst (λ p → PreHolds m κ′ p sc st′) eq hl))
@@ -1627,8 +1648,9 @@ walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s u} (ln : Lanes s u) (op :
          (λ r → RoomEmpty (Stage.hd r))
 walk ln op nid aM le κ now q rp s₀ h g [] []ᵃ rm hs = stage-nil _ le κ q rp s₀ [] walk-nil h hs , g
 walk ln op nid aM le κ now q rp s₀ h g (inj₁ v ∷ os) (rv ∷ᵃ ros) rm hs =
-  let c  = callStage (thru-outer ln op nid) le κ h q rp s₀ now (v ∷ []) (ofColumn κ q (rv ∷ᵃ []ᵃ)) false rm hs
-      gc = subst RoomEmpty (sym (callStage-hd (thru-outer ln op nid) le κ h q rp s₀ now (v ∷ []) (ofColumn κ q (rv ∷ᵃ []ᵃ)) false rm hs)) g in
+  bind≡ (callStage (thru-outer ln op nid) le κ h q rp s₀ now (v ∷ []) (ofColumn κ q (rv ∷ᵃ []ᵃ)) false rm hs) λ c eq →
+  let gc = subst RoomEmpty (sym (trans (cong Stage.hd eq)
+             (callStage-hd (thru-outer ln op nid) le κ h q rp s₀ now (v ∷ []) (ofColumn κ q (rv ∷ᵃ []ᵃ)) false rm hs))) g in
   walk ln op nid aM le κ now (endPre (Stage.tr c)) (endRP (Stage.tr c)) (endS (Stage.tr c)) (Stage.hd c) gc os ros
                    (room-keeps (foldPath-keeps (Stage.dv c)) rm) (Stage.hl c) |>′ λ (w , gw) →
   stage-seq c w (λ d₂ → walk-echo (Stage.dv c) d₂) , gw
@@ -1706,8 +1728,7 @@ red-all ln op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched 
                                   (bumpNode sched) (installNode (nodeCt sched) ns st) rm
                                   (fresh-holds (thru-outer ln op (nodeCt sched)) κ pfs (just ns) ns (λ _ → node-eq)
                                      (lookup-set (nodeCt sched) ns (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) hs) |>′ λ (r , d , tr , hl , kp) →
-  translate-sub-end ≤-refl aM (thruStep ln op (nodeCt sched) aM) (just ns) gns κ pfs rp tr |>′ λ (h″ , _ , eq) →
-  let tr′ = translate-sub ≤-refl aM (thruStep ln op (nodeCt sched) aM) (just ns) gns κ pfs rp tr in
+  translate-sub ≤-refl aM (thruStep ln op (nodeCt sched) aM) (just ns) gns κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , _ , eq) →
   r , sub-all refl d , tr′
    , unheadHolds (thru-outer ln op (nodeCt sched)) ≤-refl κ h″ (endPre tr′)
        (subst (λ p → PreHolds _ (thru-outer ln op (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) eq hl)

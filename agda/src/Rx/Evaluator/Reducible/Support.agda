@@ -674,12 +674,37 @@ apply : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Se
 apply rp s c = fold rp s (Call.now c) (Call.vals c) (Call.col c) (Call.fin c)
                     (Call.sched c) (Call.st c) (Call.room c) (Call.holds c)
 
+-- BOUND ONCE, AND REMEMBERED AS WHAT WAS BOUND.  A `let` is
+-- substituted before compilation, so every projection of a let-bound
+-- fold re-runs the whole continuation above it, and nested frames
+-- multiply the re-runs; a lambda's argument is evaluated once.  The
+-- equation is what lets the body still be typed against the term.
+bind≡ : ∀ {a b} {A : Set a} {B : Set b} (x : A) → ((y : A) → y ≡ x → B) → B
+bind≡ x k = k x refl
+
+-- WHAT THE FOLD ANSWERED A CALL, held rather than recomputed: the
+-- answer IS the fold applied, by the equation.
+record Answered {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Set₁} {S : Set}
+                {κ : Path Γ lo u t} {pre : Pre κ}
+                (rp : RP {e = e} m P S κ pre) (s : S) (c : Call {e = e} m P κ pre) : Set₁ where
+  constructor answered
+  field
+    an : Ans {e = e} m P S κ (Call.now c) (Call.vals c) (Call.fin c) (Call.sched c) (Call.st c)
+    is : an ≡ apply rp s c
+
+-- the call applied once, for the body to read
+answer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo} {P : Val Γ u → Set₁} {S : Set}
+         {κ : Path Γ lo u t} {pre : Pre κ} {b} {B : Set b}
+       → (rp : RP {e = e} m P S κ pre) (s : S) (c : Call {e = e} m P κ pre)
+       → (Answered rp s c → B) → B
+answer rp s c k = k (answered (apply rp s c) refl)
+
 -- THE TRACE: THE CALLS A SUBSCRIBE MADE TO ITS CONTINUATION, IN ORDER,
 -- EACH TYPED AGAINST THE SUCCESSOR THE ONE BEFORE IT ANSWERED WITH.
--- Replaying it is applying the fold to each call in turn, and that is
--- not a second computation of the successor to be proven equal to the
--- first: it IS the successor, by the type, so a subscribe answers with
--- the trace and nothing else about its continuation.  A frame arm
+-- Each call carries its answer, which IS the fold applied to it, by the
+-- equation it carries, so a subscribe answers with the trace and
+-- nothing else about its continuation, and reading where it ended
+-- re-runs nothing.  A frame arm
 -- translates its source's trace through the frame it pushed, call by
 -- call, and the translation's end is the successor of the continuation
 -- it was handed -- which is what the exit frame's peel used to do.
@@ -698,8 +723,8 @@ data Trace {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
          : (pre : Pre κ) → RP {e = e} m P S κ pre → S → Set₁ where
   []ᵗ   : ∀ {pre rp s} → Trace m P S κ pre rp s
   fellᵗ : ∀ {pre rp s} → RP {e = e} m P S κ fallen → S → Trace m P S κ pre rp s
-  _∷ᵗ_  : ∀ {pre rp s} (c : Call {e = e} m P κ pre)
-        → Trace m P S κ (Ans.pre′ (apply rp s c)) (next (apply rp s c)) (Ans.s′ (apply rp s c))
+  _∷ᵗ_  : ∀ {pre rp s} {c : Call {e = e} m P κ pre} (a : Answered rp s c)
+        → Trace m P S κ (Ans.pre′ (Answered.an a)) (next (Answered.an a)) (Ans.s′ (Answered.an a))
         → Trace m P S κ pre rp s
 
 -- where a trace ends: the ground it left the path on
@@ -1796,9 +1821,9 @@ red-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
 red-scripted i ρ k ok aK κ below pre rp s now sched (hot async) slEq st aM rm h
   with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
 ... | true =
-      let c  = call now [] (ofColumn κ pre []ᵃ) true sched st rm h
-          an = apply rp s c
-      in _ , subs-hot-done below slEq doneEq (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+      answer rp s (call now [] (ofColumn κ pre []ᵃ) true sched st rm h) λ a →
+      let an = Answered.an a
+      in _ , subs-hot-done below slEq doneEq (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 ... | false =
       _ , subs-hot-live below slEq doneEq refl , []ᵗ
     , holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x)
@@ -1810,9 +1835,9 @@ red-scripted i ρ k ok aK κ below pre rp s now sched (hot async) slEq st aM rm 
         (ends-register {κ = κ} {sched = sched} {st = st} (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ)
            (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on)))
 red-scripted i ρ k ok aK κ below pre rp s now sched (cold sync []) {oks} slEq st aM rm h =
-  let c  = call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) true sched st rm h
-      an = apply rp s c
-  in _ , subs-cold-sync below slEq (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an , kept an
+  answer rp s (call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) true sched st rm h) λ a →
+  let an = Answered.an a
+  in _ , subs-cold-sync below slEq (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 red-scripted {Γ = Γ} {lo = lo} i ρ k ok aK κ below pre rp s now sched (cold sync (d ∷ ds)) {oks} slEq st aM rm h =
   let src    = freshId sourceᵏ (Sched.mint sched)
       ord    = freshId ordinalᵏ (Sched.mint sched)
@@ -1826,9 +1851,9 @@ red-scripted {Γ = Γ} {lo = lo} i ρ k ok aK κ below pre rp s now sched (cold 
       h₁     = holds-step κ pre {sched′ = sched₁} {st′ = st₁} (λ _ _ _ → refl) ≤-refl (λ x → x)
                  (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl refl (λ k′ on → inj₁ on) (λ so′ → distinct so′))
                  h
-      c      = call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm h₁
-      an     = apply rp s c
-  in _ , subs-cold-async below slEq refl refl refl (der an) , c ∷ᵗ []ᵗ , Ans.holds′ an
+  in answer rp s (call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm h₁) λ a →
+  let an = Answered.an a
+  in _ , subs-cold-async below slEq refl refl refl (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an
    , kept-before κ (pres (λ _ _ → refl)) ≤-refl
        (ends-register {κ = κ} {sched = sched} {st = st} rid (atDyn src lo) κ (λ k′ on → inj₁ on)) (Ans.pre′ an) (kept an)
 
