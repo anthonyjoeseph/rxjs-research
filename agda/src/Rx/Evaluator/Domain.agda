@@ -152,7 +152,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root
   shareDying; shareSpend; shareFinish; from-inner; arrTick; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
   RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve;
-  atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; Lanes; bare; echoing; thruEvents; cell-st; take-st;
+  atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; Lanes; echoing; thruEvents; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
   batchDispatch; batchDown; thruWrap; consumeUsable; finishUsable; drainSt)
@@ -554,11 +554,11 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                                   (setAt sourceᵏ (suc src)
                                     (setAt ordinalᵏ (suc ord) (Sched.mint sched))))
                      ; live = record { source = src ; ordinal = ord
-                                     ; elemTy = obs u
-                                     ; pending = (suc now , (Θ , body , ρ)) ∷ [] }
+                                     ; elemTy = (unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)
+                                     ; pending = (suc now , (inj₁ tt , inj₂ (Θ , body , ρ))) ∷ [] }
                               ∷ Sched.live sched }
                  , register rid (atDyn src lo)
-                            (thru-outer bare mergeAllᵒ nid ↠[ ≤-refl ] κ)
+                            (thru-outer echoing mergeAllᵒ nid ↠[ ≤-refl ] κ)
                             (installNode nid
                               (mergeAll-st {t = u} nothing 0 [] false) st) )
 

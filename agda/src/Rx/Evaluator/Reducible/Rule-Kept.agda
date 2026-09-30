@@ -31,9 +31,9 @@ open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
 
-open import Rx.Exp using (Ctx; Closed; Val; obs; _+ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; _+ᵗ_; _×ᵗ_; unitᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; Path; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f; from-inner;
-  thru-outer; Lanes; bare; NodeId; RegId; RegSrc; regFloor; register; lookupNode; frameNodes; pathHasNode;
+  thru-outer; Lanes; echoing; NodeId; RegId; RegSrc; regFloor; register; lookupNode; frameNodes; pathHasNode;
   atSlot; atDyn; lowerFloor; mergeAllᵒ; mergeAll-st; AllOp; shareAdmit; shareDying;
   shareFinish; switchKill)
 open import Rx.Mint using (freshId; setAt; regᵏ; sourceᵏ)
@@ -67,8 +67,8 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   -- A FLATTENER'S NODE STANDING ON THE PATH BELOW IT, as one path: its
   -- nodes are the flattener's and the path's, and it ends where the path
   -- does.  Every member walking a flattener's inners carries this.
-  Thru : ∀ {lo u} → NodeId → Path Γ lo u t → Path Γ lo (obs u) t
-  Thru {u = u} a κ = thru-outer {u = u} bare mergeAllᵒ a ↠[ ≤-refl ] κ
+  Thru : ∀ {lo u} → NodeId → Path Γ lo u t → Path Γ lo ((unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)) t
+  Thru {u = u} a κ = thru-outer {u = u} echoing mergeAllᵒ a ↠[ ≤-refl ] κ
 
   -- a flattener's node is among its inner's exit frame's
   widen : ∀ {lo u} {a j k : ℕ} (κ : Path Γ lo u t)
@@ -278,10 +278,10 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   subscribeE-rule {u = u} {lo = lo} {κ = κ} {sched = sched} (subs-defer refl refl refl refl) so κ₂ so₂ ag =
     register-kept {π = π} (freshId regᵏ (Sched.mint sched)) (atDyn (freshId sourceᵏ (Sched.mint sched)) lo) π
       ≤-refl refl (λ k h → h) (distinct soπ) soπ κ₂ (sub-ot (λ r∈ → r∈) (n≤1+n _) so₂)
-      (fresh-agree (thru-outer {u = u} bare mergeAllᵒ (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
+      (fresh-agree (thru-outer {u = u} echoing mergeAllᵒ (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
     where
-    π   = thru-outer bare mergeAllᵒ (nodeCt sched) ↠[ ≤-refl ] κ
-    soπ = fresh-sound (thru-outer bare mergeAllᵒ (nodeCt sched)) κ (mergeAll-st {t = u} nothing 0 [] false) (λ k a → node-eq a) so
+    π   = thru-outer echoing mergeAllᵒ (nodeCt sched) ↠[ ≤-refl ] κ
+    soπ = fresh-sound (thru-outer echoing mergeAllᵒ (nodeCt sched)) κ (mergeAll-st {t = u} nothing 0 [] false) (λ k a → node-eq a) so
   subscribeE-rule (subs-mint refl sub)    so κ₂ so₂ ag =
     subscribeE-rule sub (sub-ot (λ r∈ → r∈) ≤-refl so) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl so₂) ag
 
@@ -305,8 +305,8 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
 
   subscribeInner-rule {op = op} {a = a} {κ = κ} {sched = sched} (inner refl sub) so κ₂ so₂ ag =
     subscribeE-rule sub
-      (fresh-inner op a κ sched (drop-ot (thru-outer bare mergeAllᵒ a) ≤-refl κ so)
-        (head-on (thru-outer bare mergeAllᵒ a) ≤-refl κ a (self-node a []) so))
+      (fresh-inner op a κ sched (drop-ot (thru-outer echoing mergeAllᵒ a) ≤-refl κ so)
+        (head-on (thru-outer echoing mergeAllᵒ a) ≤-refl κ a (self-node a []) so))
       κ₂ (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
       (inner-agree {op = op} {a = a} {c = nodeCt sched} {le = ≤-refl} {κ = κ} {κ₂ = κ₂} (fresh-path so₂) ag)
 
@@ -328,8 +328,8 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
 
   thruWalk-rule walk-nil        so κ₂ so₂ ag = so₂
   thruWalk-rule {a = a} {κ = κ} (walk-echo fp w) so κ₂ so₂ ag =
-    thruWalk-rule w (foldPath-rule fp (drop-ot (thru-outer bare mergeAllᵒ a) ≤-refl κ so) (Thru a κ) so (λ _ _ _ → refl)) κ₂
-      (foldPath-rule fp (drop-ot (thru-outer bare mergeAllᵒ a) ≤-refl κ so) κ₂ so₂
+    thruWalk-rule w (foldPath-rule fp (drop-ot (thru-outer echoing mergeAllᵒ a) ≤-refl κ so) (Thru a κ) so (λ _ _ _ → refl)) κ₂
+      (foldPath-rule fp (drop-ot (thru-outer echoing mergeAllᵒ a) ≤-refl κ so) κ₂ so₂
         (λ k h h₂ → ag k (∨-Tʳ {a = any (_≡ᵇ k) (a ∷ [])} h) h₂)) ag
   thruWalk-rule (walk-cons c w) so κ₂ so₂ ag =
     thruWalk-rule w (thruConsume-rule c so _ so (λ _ _ _ → refl)) κ₂ (thruConsume-rule c so κ₂ so₂ ag) ag
@@ -352,8 +352,8 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
 
   innerFinish-rule {a = a} {κ = κ} (finish-all-drain fp dr) so κ₂ so₂ ag =
     sub-ot {κ = κ₂} (λ r∈ → r∈) ≤-refl
-      (mergeAllDrain-rule dr (foldPath-rule fp (drop-ot (thru-outer bare mergeAllᵒ a) ≤-refl κ so) (Thru a κ) so (λ _ _ _ → refl)) κ₂
-        (foldPath-rule fp (drop-ot (thru-outer bare mergeAllᵒ a) ≤-refl κ so) κ₂ so₂
+      (mergeAllDrain-rule dr (foldPath-rule fp (drop-ot (thru-outer echoing mergeAllᵒ a) ≤-refl κ so) (Thru a κ) so (λ _ _ _ → refl)) κ₂
+        (foldPath-rule fp (drop-ot (thru-outer echoing mergeAllᵒ a) ≤-refl κ so) κ₂ so₂
           (λ k h h₂ → ag k (∨-Tʳ {a = any (_≡ᵇ k) (a ∷ [])} h) h₂)) ag)
   innerFinish-rule (finish-switch-clear _) so κ₂ so₂ ag = sub-ot (λ r∈ → r∈) ≤-refl so₂
   innerFinish-rule finish-exhaust-clear    so κ₂ so₂ ag = sub-ot (λ r∈ → r∈) ≤-refl so₂

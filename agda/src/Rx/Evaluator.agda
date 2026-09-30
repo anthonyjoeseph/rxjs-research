@@ -6,7 +6,7 @@ open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
-open import Data.List    using (List; []; _∷_; _++_; concat; tabulate; null; map)
+open import Data.List    using (List; []; _∷_; _++_; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
 open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -269,19 +269,15 @@ setNode nid s ((k , s′) ∷ r) =
 data AllOp : Set where
   mergeAllᵒ switchᵒ exhaustᵒ : AllOp
 
--- WHAT A FLATTENER'S OUTER ELEMENT CARRIES: a bare lane, or an optional
--- echo beside an optional lane.  Either way the walk reads it as EVENTS,
--- echo first -- the echo leaves as the element arrives, before its lane
--- is handled, which is `flatten` in `typescript/src/flatten.ts` -- so a
--- bare element is the echo-less element exactly, as `lanesOnly` in
--- `typescript/src/plain-eval.ts` builds it.
+-- WHAT A FLATTENER'S OUTER ELEMENT CARRIES: an optional echo beside an
+-- optional lane.  The walk reads it as EVENTS, echo first -- the echo
+-- leaves as the element arrives, before its lane is handled, which is
+-- `flatten` in `typescript/src/flatten.ts`.
 data Lanes : Ty → Ty → Set where
-  bare    : ∀ {u} → Lanes (obs u) u
   echoing : ∀ {u} → Lanes ((unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)) u
 
 -- an echo event is `inj₁`, a lane event `inj₂`
 thruEvents : ∀ {n} {Γ : Ctx n} {s u} → Lanes s u → List (Val Γ s) → List (Val Γ (u +ᵗ obs u))
-thruEvents bare    vals                       = map inj₂ vals
 thruEvents echoing []                         = []
 thruEvents echoing ((inj₁ _ , inj₁ _) ∷ xs) = thruEvents echoing xs
 thruEvents echoing ((inj₁ _ , inj₂ o) ∷ xs) = inj₂ o ∷ thruEvents echoing xs

@@ -36,7 +36,7 @@ open import Rx.Prim using (Source)
 open import Rx.Exp using (Ctx; Closed; Val; obs; _+ᵗ_)
 open import Rx.Slots using (shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f;
-  from-inner; thru-outer; Lanes; bare; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
+  from-inner; thru-outer; Lanes; echoing; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
   setNode; frameNodes; pathHasNode; installNode; lowerFloor; AllOp; mergeAllᵒ; switch-st;
   exhaust-st; mergeAll-st; shareAdmit; shareDying; shareFinish; switchKill; thruWrap; drainSt;
   regSource; sameSource; dropSource)
@@ -429,7 +429,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   subscribeE-floor (subs-flatten sa)       ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
   subscribeE-floor (subs-μ sub)            ph (inj₂ s) = subscribeE-floor sub ph (inj₂ s)
   subscribeE-floor {sched = sched} (subs-defer refl refl refl refl) ph (inj₂ s) =
-    let ph′ = push {f = thru-outer bare mergeAllᵒ (nodeCt sched)} {le = ≤-refl} (fresh-off (lt s)) (fresh-off (lt s)) ph
+    let ph′ = push {f = thru-outer echoing mergeAllᵒ (nodeCt sched)} {le = ≤-refl} (fresh-off (lt s)) (fresh-off (lt s)) ph
     in inj₂ (si (NI-fresh (lt s) (ni s)) (ea-reg (ea s) (PI.pon ph′))
                 (<-≤-trans (lt s) (n≤1+n _)) (rm s))
   subscribeE-floor (subs-mint refl sub)    ph (inj₂ s) = subscribeE-floor sub ph (inj₂ (si (ni s) (ea s) (lt s) (rm s)))

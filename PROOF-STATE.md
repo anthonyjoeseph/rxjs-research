@@ -242,13 +242,8 @@ on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **RETYPE `deferᵉ`'S PENDING ELEMENT AS AN ECHOING PAIR.** It is the last
-  `bare` lane: `subs-defer` registers `thru-outer bare mergeAllᵒ`, and
-  `Domain`, `Floor` and `Rule-Kept` state it so. Register the pair
-  `(inj₁ tt , inj₂ body)` under `echoing` instead; the oracle's sweep and
-  every pinned file stay green.
-
-- **DELETE `bare` AND `Lanes`.** With no `bare` producer the lane index has
+- **DELETE `Lanes`.** `deferᵉ` now registers its pending element as an
+  echo-less pair under `echoing`, and `bare` is gone, so the lane index has
   one value; drop it from `thru-outer`, `thruEvents`, `redEvents` and every
   `Support` lemma quantified over it.
 

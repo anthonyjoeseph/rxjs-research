@@ -133,7 +133,7 @@ open import Rx.Mint using (sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Evaluator.Freshness using (nodeCt; pres; below; pres-write; lookup-set; set-above; <→≢ᵇ)
 open import Decide using (∧ˡ; ∧ʳ; ≡ᵇ-refl)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
-  batchSync-f; from-inner; thru-outer; Lanes; bare; echoing; thruEvents; NodeState; lookupNode; frameNodes; register;
+  batchSync-f; from-inner; thru-outer; Lanes; echoing; thruEvents; NodeState; lookupNode; frameNodes; register;
   installNode; atDyn; atSlot; lowerFloor; memberSource; mergeAll-st; mergeAllᵒ; AllOp; switchᵒ;
   exhaustᵒ; NodeId; cell-st; take-st; switch-st; exhaust-st; batchSync-st; setNode; hasRoom;
   consumeUsable; finishUsable; thruWrap; switchKill; aliveThroughᶠ; RegId; scanDispatch;
@@ -388,10 +388,10 @@ rawThru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
 rawThru ac le aM op nid κ now [] sched st rm so nd = _ , walk-nil , so , nd
 rawThru ac le aM op nid κ now (inj₁ v ∷ os) sched st rm so nd =
   rawFold ac le aM κ now (v ∷ []) false sched st rm so |>′ λ (r₁ , d₁) →
-  let soT = fold-kept d₁ so (thru-outer bare op nid ↠[ ≤-refl ] κ) (push-thru bare op nid ≤-refl κ so nd) (λ _ _ _ → refl) in
+  let soT = fold-kept d₁ so (thru-outer echoing op nid ↠[ ≤-refl ] κ) (push-thru echoing op nid ≤-refl κ so nd) (λ _ _ _ → refl) in
   rawThru ac le aM op nid κ now os (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁))
-                                (room-keeps (foldPath-keeps d₁) rm) (drop-ot (thru-outer bare op nid) ≤-refl κ soT)
-                                (head-on (thru-outer bare op nid) ≤-refl κ nid (self-node nid []) soT) |>′ λ (r₂ , d₂ , so₂ , nd₂) →
+                                (room-keeps (foldPath-keeps d₁) rm) (drop-ot (thru-outer echoing op nid) ≤-refl κ soT)
+                                (head-on (thru-outer echoing op nid) ≤-refl κ nid (self-node nid []) soT) |>′ λ (r₂ , d₂ , so₂ , nd₂) →
   _ , walk-echo d₁ d₂ , so₂ , nd₂
 rawThru ac le aM op nid κ now (inj₂ o ∷ os) sched st rm so nd =
   rawConsume ac le aM op nid κ now o sched st rm so nd |>′ λ (r₁ , d₁ , so₁ , nd₁) →
@@ -770,14 +770,14 @@ redExpAcc (varᵉ ()) ρ rρ k ok aK a aM
 redExpAcc {t = u} (deferᵉ body) ρ {m} rρ k ok aK a aM {lo = lo} κ pre rp s₀ now sched st rm h =
   let nid = freshId nodeᵏ (Sched.mint sched)
       st′ = register (freshId regᵏ (Sched.mint sched)) (atDyn (freshId sourceᵏ (Sched.mint sched)) lo)
-                     (thru-outer bare mergeAllᵒ nid ↠[ ≤-refl ] κ)
+                     (thru-outer echoing mergeAllᵒ nid ↠[ ≤-refl ] κ)
                      (installNode nid (mergeAll-st nothing 0 [] false) st)
   in _ , subs-defer refl refl refl refl , []ᵗ
      , holds-step {m = m} κ pre (λ k′ _ k< → below (pres-write st st′ _ refl ≤-refl) k′ k<) (n≤1+n _)
          (λ (x : Fell m sched st) → x)
          (λ so → register-sound {sched = sched} {st = installNode nid (mergeAll-st nothing 0 [] false) st}
                    (freshId regᵏ (Sched.mint sched)) (atDyn (freshId sourceᵏ (Sched.mint sched)) lo)
-                   (thru-outer bare mergeAllᵒ nid ↠[ ≤-refl ] κ) (n≤1+n _) refl
+                   (thru-outer echoing mergeAllᵒ nid ↠[ ≤-refl ] κ) (n≤1+n _) refl
                    (λ k′ on → [ (λ a → inj₂ (subst (λ j → nodeCt sched ≤ j × j < suc (nodeCt sched)) (node-eq a) (≤-refl , ≤-refl)))
                               , inj₁ ] (∨-T on))
                    (λ so′ → (λ k′ a onκ → <-irrefl (sym (node-eq a)) (fresh-path so′ k′ onκ)) , distinct so′)
@@ -786,7 +786,7 @@ redExpAcc {t = u} (deferᵉ body) ρ {m} rρ k ok aK a aM {lo = lo} κ pre rp s�
      , kept-step κ pre (pres-write st st′ _ refl ≤-refl) (n≤1+n _)
          (ends-register {κ = κ} {sched = sched} {st = installNode nid (mergeAll-st {t = u} nothing 0 [] false) st}
             (freshId regᵏ (Sched.mint sched)) (atDyn (freshId sourceᵏ (Sched.mint sched)) lo)
-            (thru-outer bare mergeAllᵒ nid ↠[ ≤-refl ] κ)
+            (thru-outer echoing mergeAllᵒ nid ↠[ ≤-refl ] κ)
             (λ k′ on → [ (λ a → inj₂ (subst (nodeCt sched ≤_) (node-eq a) ≤-refl)) , inj₁ ] (∨-T on)))
 redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h =
   let src = freshId sourceᵏ (Sched.mint sched) in
@@ -1471,8 +1471,6 @@ translate-sub-go {n = n} {lo = lo} le aM ss h g κ fallen rp s₁ tr eq =
 -- what the walk reads is reducible where the outer's elements are
 redEvents : ∀ {n} {Γ : Ctx n} {m s u} (ln : Lanes s u) (vals : List (Val Γ s))
           → All (Red m s) vals → All (Red m (u +ᵗ obs u)) (thruEvents ln vals)
-redEvents bare    []                        []ᵃ                = []ᵃ
-redEvents bare    (_ ∷ vs)                  (r ∷ᵃ rs)          = r ∷ᵃ redEvents bare vs rs
 redEvents echoing []                        []ᵃ                = []ᵃ
 redEvents echoing ((inj₁ _ , inj₁ _) ∷ vs) (_ ∷ᵃ rs)          = redEvents echoing vs rs
 redEvents echoing ((inj₁ _ , inj₂ _) ∷ vs) ((_ , ro) ∷ᵃ rs)   = ro ∷ᵃ redEvents echoing vs rs
