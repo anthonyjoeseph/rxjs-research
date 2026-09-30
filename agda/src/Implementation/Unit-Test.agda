@@ -51,7 +51,7 @@ open import Data.Maybe using (nothing; just)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.SExp using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; mergeAllˢ;
+open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; mergeAllˢ;
   switchAllˢ; exhaustAllˢ; varˢᵗ; natˢ; primˢ; pairˢ; strmˢ)
 open import Rx.Exp using (add)
 

@@ -13,11 +13,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel)
 open import Rx.Exp        using (Ctx; isData)
-open import Rx.SExp      using (SExp; Kinds)
-open import Rx.Simul-Slots using (SimulSlots; plainSlots)
+open import SExp.Syntax      using (SExp; Kinds)
+open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Plain     using (plainExp; plainValues)
-open import Rx.Timed     using (timed; timedSlots; valuesᵀ; untimedᵈ)
+open import SExp.Plain     using (plainExp; plainValues)
+open import Timed.Translation     using (timed; timedSlots; valuesᵀ; untimedᵈ)
 
 Timed-Faithful : Set
 Timed-Faithful =

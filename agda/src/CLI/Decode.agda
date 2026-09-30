@@ -27,7 +27,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
-open import Rx.Plain using (plainValues)
+open import SExp.Plain using (plainValues)
 open import CLI.JSON using (jarr; jbool; jnum; jobj; JSON; jstr)
 open import CLI.Encode using (encodeValues)
 

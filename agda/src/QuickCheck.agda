@@ -65,7 +65,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Rx.Prim using (after_,_; Timed; ObservableInput; hot; cold; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ;
+open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ;
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -119,7 +119,7 @@ genB bound (r ∷ rs) = natMod r bound , rs
 -- BATCHING QUESTION IN RANGE AT ALL.  Both batchings read the protocol
 -- off an ENVELOPE, and only an elaborated program carries one, so a
 -- drawn `Exp` could be run and could not be ASKED.  The generator is
--- therefore indexed by `SExp`, and `Rx.Elaborate` is what stands
+-- therefore indexed by `SExp`, and `SExp.Elaborate` is what stands
 -- between it and the evaluator; the two formers the plain tree has and
 -- the author's does not -- mint and batchSync -- leave with it, and
 -- what reaches them now is the elaboration rather than a seed.

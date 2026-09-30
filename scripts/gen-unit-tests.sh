@@ -93,7 +93,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Exp using (add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import Rx.SExp using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ;
+open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ;
   switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
   varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; inlˢ; inrˢ; caseˢ; ifˢ;
   primˢ; nilˢ; consˢ; foldˢ; strmˢ)

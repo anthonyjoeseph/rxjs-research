@@ -1,4 +1,4 @@
-// THE ELABORATION: `SExp` -> `Exp`, mirroring Agda's `Rx.Elaborate`.
+// THE ELABORATION: `SExp` -> `Exp`, mirroring Agda's `SExp.Elaborate`.
 //
 // This is the seam the whole Agda development turns on. `elaborate` is
 // `mint . toPlain`, and every envelope a running program ever sees is
@@ -21,7 +21,7 @@ import type { Exp, Fn, Tm, Ty, Val } from "../exp.js";
 import type { SExp, STm } from "./s-exp.js";
 
 // ---------------------------------------------------------------
-// The type translation (Agda: Rx.SExp.plainT / emitT).
+// The type translation (Agda: SExp.Syntax.plainT / emitT).
 // ---------------------------------------------------------------
 
 const unitT: Ty = { type: "unit" };
@@ -67,7 +67,7 @@ export const machineEmitT = (a: Ty): Ty => instEmitT(uniqT, a);
 export const emitT = (t: Ty): Ty => machineEmitT(plainT(t));
 
 // ---------------------------------------------------------------
-// Envelope constructors (Agda: Rx.Envelope / Rx.Elaborate).
+// Envelope constructors (Agda: Rx.Envelope / SExp.Elaborate).
 // ---------------------------------------------------------------
 
 const varT = (ty: Ty, index: number): Tm => ({ type: "varT", ty, index });
@@ -266,7 +266,7 @@ export const inputP = (i: number, a: Ty, frame: Tm): Exp => {
 // POSTULATED: the remaining wrappers.
 // ---------------------------------------------------------------
 
-// Each of these is a real definition in Agda's Rx.Elaborate and each
+// Each of these is a real definition in Agda's SExp.Elaborate and each
 // does envelope work of its own -- `ofP` brackets a one-shot burst
 // against the ambient frame, `mapP` rebuilds each emit under the
 // incoming envelope's own instant/source/kind, `mergeAllP` is
@@ -291,7 +291,7 @@ export declare const scanP: (fn: Fn, init: Tm, src: Exp, t: Ty) => Exp;
 // because BOTH layers arrive already stamped -- the inner's bookkeeping
 // rides the inner's own emits, and only the outer's has to be placed.
 //
-//   Agda: Rx.Elaborate.laneV
+//   Agda: SExp.Elaborate.laneV
 //     Fn G Dg D Th (emitT (obs t)) (obs (emitT t))
 //
 // And `mergeAllP k e = mergeAll k (map laneV e)` -- which is why a

@@ -1,4 +1,4 @@
-// THE AUTHOR'S TREE: an untyped runtime mirror of Agda's `Rx.SExp`.
+// THE AUTHOR'S TREE: an untyped runtime mirror of Agda's `SExp.Syntax`.
 //
 // WHAT MAKES IT A DIFFERENT TREE FROM `Exp` AND NOT A SUBSET OF IT.
 // There are two syntax trees in this system and it is worth being blunt
@@ -27,7 +27,7 @@
 
 import type { Exp, Fn, PrimOp, Tm, Ty, Val } from "../exp.js";
 
-// Agda: Rx.SExp.STm. The author's TERM language is the plain one with
+// Agda: SExp.Syntax.STm. The author's TERM language is the plain one with
 // its observable former re-pointed at the simul tree.
 //
 // EVERYTHING ELSE IS COPIED RATHER THAN SHARED, and the reason is one
@@ -57,7 +57,7 @@ export type STm =
 // Agda: SFn Γ Δᵍ Δ Θ s t = STm with the argument bound as Θ-var 0.
 export type SFn = STm;
 
-// Agda: Rx.SExp.SExp.
+// Agda: SExp.Syntax.SExp.
 //
 // NOTE WHAT IS ABSENT, since the absences are the point: no `mint`, no
 // `batchSync`, and no `share` node — share identity is a BINDING and

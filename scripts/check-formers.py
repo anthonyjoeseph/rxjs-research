@@ -17,7 +17,7 @@ are decidable:
   D  the TS generator     typescript/src/generator.ts   `type: "..."`, the op lanes
   E  the sweep's census   agda/src/QuickCheck.agda  `formerTag` / `allFormers`
   F  the Agda sweep's reach  the `gen*` definitions, composed with
-                             `Rx/Elaborate.agda` and the harness root
+                             `SExp/Elaborate.agda` and the harness root
 
 A, C and E are checked BOTH ways -- they are closed declarations, so a former
 present there and absent from the map is a finding, which is what catches a
@@ -72,7 +72,7 @@ PATHS = {
     "ts": "typescript/src/exp.ts",
     "gen": "typescript/src/generator.ts",
     "census": "agda/src/QuickCheck.agda",
-    "elab": "agda/src/Rx/Elaborate.agda",
+    "elab": "agda/src/SExp/Elaborate.agda",
     "harness": "agda/src/Implementation/Unit-Test/Prelude.agda",
 }
 

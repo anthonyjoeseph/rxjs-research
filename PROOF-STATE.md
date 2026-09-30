@@ -196,7 +196,7 @@ Main                                     four top-line statements, claimed
  └─ timed-faithful                        Timed/Faithful.agda — the timed run
                                           carries the plain run's values — tier 3
 
-  timed, timed-below                      Rx/Timed.agda — the translation the
+  timed, timed-below                      Timed/Translation.agda — the translation the
                                           packets come from; unwritten — tier 3
 
 
@@ -220,7 +220,7 @@ research lives; where they disagree, the header wins.
 
 ## Tier 2 — an impl envelope the spec batches agree with
 
-**THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `Rx.SExp` and the evaluator
+**THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
 are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
 close without changing one of them, STOP and report that proof. The envelope's
 shape is free; TypeScript is out of scope this tier (Anthony).
@@ -321,11 +321,11 @@ still being rewritten there.
   over an unwritten `timed`; tier 2's stamping leg is the impl's half of it.
 - **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: stated over
   an unwritten `timed`.
-- **`timed-below`** (Rx.Timed) — FALSITY, `NO EVIDENCE`: stated over an
+- **`timed-below`** (Timed.Translation) — FALSITY, `NO EVIDENCE`: stated over an
   unwritten `timed`.
 - **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: nothing has
   instantiated the second evaluator; the first leg.
-- **`timed`** (Rx.Timed) — VACUITY, `NO EVIDENCE`: a postulated function
+- **`timed`** (Timed.Translation) — VACUITY, `NO EVIDENCE`: a postulated function
   asserts nothing; `λ _ → emptyˢ` inhabits it.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

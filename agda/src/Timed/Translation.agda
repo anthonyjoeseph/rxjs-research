@@ -23,7 +23,7 @@
 -- inner emitted need carry it.  END is last, so `take` over a timed
 -- stream counts values exactly as it does over the plain one.
 ------------------------------------------------------------------
-module Rx.Timed where
+module Timed.Translation where
 
 open import Data.Bool    using (T)
 open import Data.Fin     using (toℕ)
@@ -39,9 +39,9 @@ open import Relation.Binary.PropositionalEquality using (subst; sym)
 open import Rx.Prim  using (ObservableInput; hot; cold; Timed; after_,_)
 open import Rx.Exp   using (Ty; Ctx; Val; isData; inputsBelowᵉ;
   unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
-open import Rx.SExp  using (SExp; Kind; Kinds; scriptedᵏ; sharedᵏ; plainᵗ)
-open import Rx.Plain using (plainExp; mapInput; ∧ˡ; ∧ʳ)
-open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
+open import SExp.Syntax  using (SExp; Kind; Kinds; scriptedᵏ; sharedᵏ; plainᵗ)
+open import SExp.Plain using (plainExp; mapInput; ∧ˡ; ∧ʳ)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
 
 ------------------------------------------------------------------
 -- Types.

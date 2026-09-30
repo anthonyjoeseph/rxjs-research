@@ -21,9 +21,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel)
 open import Rx.Exp        using (Ctx)
-open import Rx.SExp      using (SExp; Kinds)
-open import Rx.Simul-Slots using (SimulSlots)
-open import Rx.Timed     using (timed; timedSlots; packetOf)
+open import SExp.Syntax      using (SExp; Kinds)
+open import SExp.Simul-Slots using (SimulSlots)
+open import Timed.Translation     using (timed; timedSlots; packetOf)
 open import Implementation.Pipeline using (runᴵ)
 open import Batchable.Inst-Extract using (instExtract)
 

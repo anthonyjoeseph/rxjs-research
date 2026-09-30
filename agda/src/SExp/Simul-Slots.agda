@@ -14,10 +14,10 @@
 -- about the plain evaluator with some trees bolted on -- not about the
 -- srxjs operators in isolation, which is the claim being made.  Here a
 -- shared definition is an `SExp`, and reaches the evaluator only as a
--- reading of one: `Rx.Plain.plainExp` on the plain side, the impl's
+-- reading of one: `SExp.Plain.plainExp` on the plain side, the impl's
 -- elaboration on the other.
 --
--- TWO: A KIND AND ITS SLOT HAVE TO AGREE.  `Rx.SExp`'s `Kinds` vector
+-- TWO: A KIND AND ITS SLOT HAVE TO AGREE.  `SExp.Syntax`'s `Kinds` vector
 -- tells the elaboration how to read each slot -- `scriptedᵏ` stands at
 -- the PAYLOAD and `inputᵖ` wraps it, `sharedᵏ` stands at the ENVELOPE
 -- and `input` reads it straight.  Held apart from the table, those two
@@ -37,7 +37,7 @@
 -- observable-typed shared slot, which a real author wants, survives.
 -- The restriction that closes the hole is the one on scripts, and it
 -- is already carried below by `scriptedˢ`.
-module Rx.Simul-Slots where
+module SExp.Simul-Slots where
 
 open import Data.Bool using (T)
 open import Data.List using ([])
@@ -47,8 +47,8 @@ open import Data.Fin  using (toℕ)
 
 open import Rx.Prim using (ObservableInput)
 open import Rx.Exp  using (Ty; Ctx; Val; isData; inputsBelowᵉ)
-open import Rx.SExp using (SExp; Kind; Kinds; scriptedᵏ; sharedᵏ; plainᵏ; plainᵗ)
-open import Rx.Plain using (plainExp; unplainᵈ; isData-unplain; mapInput)
+open import SExp.Syntax using (SExp; Kind; Kinds; scriptedᵏ; sharedᵏ; plainᵏ; plainᵗ)
+open import SExp.Plain using (plainExp; unplainᵈ; isData-unplain; mapInput)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 
 -- slot i of Γ, as the AUTHOR states it.  The kind index is the last

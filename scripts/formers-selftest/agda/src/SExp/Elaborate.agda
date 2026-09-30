@@ -8,7 +8,7 @@
 -- its arm writes does not, which a union over the file would get wrong;
 -- and `deferˢ` IS drawn but its arm is a POSTULATE, which has no body and
 -- so reaches nothing.
-module Rx.Elaborate where
+module SExp.Elaborate where
 
 postulate
   -- a drawn arm with no body: the shape that makes an author former's

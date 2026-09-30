@@ -1,4 +1,4 @@
-module Rx.SExp where
+module SExp.Syntax where
 
 open import Data.Nat     using (ℕ)
 open import Data.Bool    using (Bool)

@@ -1,13 +1,13 @@
 -- THE IMPL SIDE OF THE TOP LINE, AND EVERYTHING HERE IS FREE.  The
 -- top line holds this pipeline to fixed things and nothing else: the
--- author's program read plain (`Rx.Plain`), whose values its batches
--- must carry in order; the timed translation (`Rx.Timed`), whose
+-- author's program read plain (`SExp.Plain`), whose values its batches
+-- must carry in order; the timed translation (`Timed.Translation`), whose
 -- packets its instant stamps must agree with; and
 -- `spec-batchSimultaneous`, the grouping its batcher must reproduce.
 -- The envelope this side runs on -- its fields, its ids, its kinds --
 -- is an implementation detail the theorem never sees past those.
 --
--- What is NOT free is below this module: `Rx.Exp`, `Rx.SExp` and the
+-- What is NOT free is below this module: `Rx.Exp`, `SExp.Syntax` and the
 -- evaluator.  A change that needs one of those is a question for
 -- Anthony, never a patch.
 --
@@ -26,13 +26,13 @@ open import Relation.Binary.PropositionalEquality using (subst; sym)
 
 open import Rx.Prim      using (Fuel; InstEmit)
 open import Rx.Exp       using (Ctx; Ty; Exp; Val; mintᵉ; inputsBelowᵉ)
-open import Rx.SExp      using (SExp; Kinds; scriptedᵏ; sharedᵏ; slotTy; plainᵏ; plainᵗ; emitᵗ; emptyˢ)
+open import SExp.Syntax      using (SExp; Kinds; scriptedᵏ; sharedᵏ; slotTy; plainᵏ; plainᵗ; emitᵗ; emptyˢ)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
 open import Rx.Envelope.Decode using (decodeEmits)
 open import Rx.Evaluator using (Burst)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Elaborate using (toEnvelope)
-open import Rx.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
+open import SExp.Elaborate using (toEnvelope)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
 
 -- ONE MINT FOR THE WHOLE PROGRAM.  `mintᵉ` draws once per subscription
 -- of the node it stands at, and it stands at the root, so every source

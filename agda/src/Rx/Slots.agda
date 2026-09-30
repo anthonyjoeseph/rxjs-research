@@ -46,7 +46,7 @@ open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ)
 -- fast-check drives this evaluator over plain trees and knows nothing
 -- of srxjs, so narrowing here would narrow the thing under test.
 --
--- WHAT A CLAIM ABOUT SRXJS QUANTIFIES OVER INSTEAD IS `Rx.Simul-Slots`,
+-- WHAT A CLAIM ABOUT SRXJS QUANTIFIES OVER INSTEAD IS `SExp.Simul-Slots`,
 -- where a shared slot's definition is an `SExp` and the table is read
 -- back into this one by elaborating it.  A definition there cannot
 -- forge at any type, because every envelope in it was built by the

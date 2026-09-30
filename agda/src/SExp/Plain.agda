@@ -6,7 +6,7 @@
 -- impl's batches to it value for value, in order.
 --
 -- IT IS AN IDENTITY MAP BECAUSE THE TWO GRAMMARS ARE ONE GRAMMAR.
--- `Rx.SExp` is `Rx.Exp` minus the two formers only an elaboration
+-- `SExp.Syntax` is `Rx.Exp` minus the two formers only an elaboration
 -- writes (`batchSyncᵉ`, `mintᵉ`), so no clause below has a choice to
 -- make, and a clause that did would be a second semantics.
 --
@@ -17,7 +17,7 @@
 -- a script is data, and a data value is the same value in every
 -- context, which `unplainᵈ` says without inspecting anything.
 ------------------------------------------------------------------
-module Rx.Plain where
+module SExp.Plain where
 
 open import Data.Bool    using (T; true; false; if_then_else_)
 open import Data.List    using (List; []; _∷_; map)
@@ -30,7 +30,7 @@ open import Rx.Exp   using (unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; 
   emptyᵉ; takeᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ;
   unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ;
   strmᵗ)
-open import Rx.SExp  using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
+open import SExp.Syntax  using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ)
 

@@ -1361,10 +1361,10 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a CHANGED claim root was not held back — a root's dev check IS the tower, so it times out at the per-module budget and reports RED for a module with nothing wrong with it, and one edited comment is enough to put it in the changed set"; fail=1; }; \
 	  echo "$$out" | grep -q 'plan .* agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: a CHANGED claim root is in the sweep plan — the cone half of this exclusion was written first and is not the whole rule"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Rx/Plain.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/SExp/Plain.agda 2>&1); \
 	  echo "$$out" | grep -q 'skip  agda/src/Batchable/Statement.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
-	  echo "$$out" | grep -q 'FAIL  agda/src/Rx/Plain.agda' \
+	  echo "$$out" | grep -q 'FAIL  agda/src/SExp/Plain.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'unchecked: ' \
@@ -1532,10 +1532,10 @@ formers-selftest:
 	      "sed -i.bak 's/else liftˢ (natˢ d))/else notˢ d)/' agda/src/QuickCheck.agda" \
 	      'the Agda generator DOES write `notᵖ`'; \
 	  run "an agen=no row whose postulated elaboration arm gains a body" \
-	      "sed -i.bak 's/^  deferᵖ : SExp Γ t → Exp Γ t/deferᵖ : SExp Γ t → Exp Γ t\ndeferᵖ e = deferᵉ e/' agda/src/Rx/Elaborate.agda" \
+	      "sed -i.bak 's/^  deferᵖ : SExp Γ t → Exp Γ t/deferᵖ : SExp Γ t → Exp Γ t\ndeferᵖ e = deferᵉ e/' agda/src/SExp/Elaborate.agda" \
 	      'the Agda generator DOES write `deferᵉ`'; \
 	  run "an agen=yes row whose elaboration helper stops being reached" \
-	      "sed -i.bak 's/toEnvelope (liftˢ f)  = liftᵖ (toEnvelopeTm f)/toEnvelope (liftˢ f)  = toEnvelope f/' agda/src/Rx/Elaborate.agda" \
+	      "sed -i.bak 's/toEnvelope (liftˢ f)  = liftᵖ (toEnvelopeTm f)/toEnvelope (liftˢ f)  = toEnvelope f/' agda/src/SExp/Elaborate.agda" \
 	      'no arm of the Agda generator writes `liftᵉ`'; \
 	  run "a row unreachable by BOTH generators" \
 	      "sed -i.bak 's/\tno\tyes\tsource/\tno\tno\tsource/' scripts/formers.tsv" \

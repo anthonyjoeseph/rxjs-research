@@ -1,4 +1,4 @@
-module Rx.Elaborate where
+module SExp.Elaborate where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; map)
@@ -21,7 +21,7 @@ open import Rx.Envelope using (instEventᵗ; closeReasonᵗ; emitKindᵗ; events
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
                                machineEmitᵗ)
-open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
+open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; scriptedᵏ; sharedᵏ; slotTy;
   plainᵏ)
@@ -693,7 +693,7 @@ frameᵛ Θ = varᵗ (∈-++⁺ʳ (plainᶜ Θ) (here refl))
 -- THE WALK IS PARAMETERISED BY THE SLOT KINDS, AND BY NOTHING ELSE NEW.
 -- `κ` says how each slot is SUPPLIED, which is the one thing the input
 -- arm has to split on and the one thing an author's tree does not
--- record (Rx.SExp).  It rides as a module parameter rather than an
+-- record (SExp.Syntax).  It rides as a module parameter rather than an
 -- argument so that the ~40 recursive calls below read exactly as they
 -- did; `Γ` joins it there because the walk never changes slots.
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
