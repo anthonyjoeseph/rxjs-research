@@ -23,6 +23,7 @@ import {
   toVal,
   unfoldMu,
 } from "./exp.js";
+import { Elem, FlatOp, flatten } from "./flatten.js";
 import { PlainDriver, createPlainDriver, plainHop } from "./plain-driver.js";
 import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 
@@ -134,20 +135,26 @@ const plainInput = (
   );
 };
 
+// HOW THE THREE OLD FLATTENERS ARE RUN: as rxjs's own operators, or as
+// `flatten` over echo-less elements -- the encoding `flattenᵉ` replaces
+// them by, which `flatten-diff.ts` holds to the native run.
+export type Via = "native" | "echo";
+
 export const compilePlain = (
   exp: Closed,
   env: Val[],
   driver: PlainDriver,
   slotSources: Observable<Val>[],
+  via: Via = "native",
 ): Observable<Val> => {
-  const recur = (e: Closed) => compilePlain(e, env, driver, slotSources);
+  const recur = (e: Closed) => compilePlain(e, env, driver, slotSources, via);
   // an inner observable is a CLOSURE carried as a value, so it compiles
   // against the environment it was written under as its emission passes
   const inner = (src: Closed): Observable<Observable<Val>> =>
     recur(src).pipe(
       rxMap((v) => {
         const o = v as ObsVal;
-        return compilePlain(o.exp, o.env, driver, slotSources);
+        return compilePlain(o.exp, o.env, driver, slotSources, via);
       }),
     );
   switch (exp.type) {
@@ -183,11 +190,17 @@ export const compilePlain = (
       return count === 0n ? EMPTY : recur(exp.src).pipe(rxTake(Number(count)));
     }
     case "mergeAll":
-      return inner(exp.src).pipe(mergeAll(exp.limit ?? Infinity));
+      return via === "native"
+        ? inner(exp.src).pipe(mergeAll(exp.limit ?? Infinity))
+        : lanesOnly(inner(exp.src), { how: "merge", limit: exp.limit });
     case "switchAll":
-      return inner(exp.src).pipe(switchAll());
+      return via === "native"
+        ? inner(exp.src).pipe(switchAll())
+        : lanesOnly(inner(exp.src), { how: "switch" });
     case "exhaustAll":
-      return inner(exp.src).pipe(exhaustAll());
+      return via === "native"
+        ? inner(exp.src).pipe(exhaustAll())
+        : lanesOnly(inner(exp.src), { how: "exhaust" });
     case "mu":
       // one unfolding now; the recursive occurrences inside sit behind
       // defer hops, so each further unfolding costs a tick
@@ -205,7 +218,13 @@ export const compilePlain = (
       // admits exactly the one operation `eqU` is, and nothing else
       // produces one, so the token cannot be forged or ordered.
       return rxDefer(() =>
-        compilePlain(exp.body, [Symbol("uniq"), ...env], driver, slotSources),
+        compilePlain(
+          exp.body,
+          [Symbol("uniq"), ...env],
+          driver,
+          slotSources,
+          via,
+        ),
       );
     case "batchSync":
       // THE SYNC BIT IS rxjs's OWN SUBSCRIBE ORDERING AND NOTHING ELSE.
@@ -254,6 +273,13 @@ export const compilePlain = (
   }
 };
 
+// an old flattener's element, with no echo
+const lanesOnly = (lanes: Observable<Observable<Val>>, op: FlatOp) =>
+  lanes.pipe(
+    rxMap((lane): Elem<Val> => ({ echo: [], lane: [lane] })),
+    flatten<Val>(op),
+  );
+
 export const evaluatePlain = (testCase: TestCase): Val[] =>
   evaluatePlainArrivals(testCase).map((x) => x.value);
 
@@ -262,6 +288,7 @@ export const evaluatePlain = (testCase: TestCase): Val[] =>
 // held to
 export const evaluatePlainArrivals = (
   testCase: TestCase,
+  via: Via = "native",
 ): { value: Val; arrival: number }[] => {
   const driver = createPlainDriver(testCase.slots.length);
   // the const telescope, literally: each shared slot compiles against
@@ -271,7 +298,7 @@ export const evaluatePlainArrivals = (
       ...prefix,
       slot.type === "scripted"
         ? plainInput(driver, slot.input, index)
-        : compilePlain(slot.def, [], driver, prefix).pipe(
+        : compilePlain(slot.def, [], driver, prefix, via).pipe(
             rxShare({
               resetOnRefCountZero: false,
               resetOnComplete: false,
@@ -283,9 +310,13 @@ export const evaluatePlainArrivals = (
   );
   const out: { value: Val; arrival: number }[] = [];
   let arrival = 0;
-  const sub = compilePlain(testCase.exp, [], driver, slotSources).subscribe(
-    (value) => out.push({ value, arrival }),
-  );
+  const sub = compilePlain(
+    testCase.exp,
+    [],
+    driver,
+    slotSources,
+    via,
+  ).subscribe((value) => out.push({ value, arrival }));
   // subscribing already ran the root sync burst — fuel pays only for
   // arrivals
   for (let spent = 0; spent < testCase.fuel; spent++) {

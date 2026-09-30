@@ -226,9 +226,11 @@ its lane is handled — what the timed translation needs and no `Exp` former
 gives (`typescript/src/timed.ts`, rule `echo`). It is ADDED first, beside
 `mergeAllᵉ`/`switchAllᵉ`/`exhaustAllᵉ`, so the three are its differential
 oracle, and they are deleted once every producer is rewritten over it
-(Anthony). The `Exp` change is licensed here and nowhere else. Done is the
-three gone, `flattenᵉ` through the oracle and the Agda QuickCheck, and the
-gate green.
+(Anthony). Its type is settled (Anthony):
+`flattenᵉ : FlatOp → Exp ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) → Exp t`, with
+`typescript/src/flatten.ts` the rxjs it means. The `Exp` change is licensed
+here and nowhere else. Done is the three gone, `flattenᵉ` through the oracle
+and the Agda QuickCheck, and the gate green.
 
 ### The monster
 
@@ -238,22 +240,18 @@ on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **STATE THE FORMER — ITS TYPE IS ANTHONY'S CALL.** Proposed:
-  `flattenᵉ : FlatOp → Exp ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) → Exp t`, the
-  op a limited merge, switch or exhaust. An element's echo, if any, leaves on
-  arrival; its lane, if any, is flattened. An echo-only element is a filter,
-  so plain `mergeAll` is the echo-less case and nothing needs stripping.
+- **ECHO IN THE EVALUATOR'S FLATTENER, UNDER THE THREE.** The outer's frame
+  (`thru-outer`) takes `(unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)` and its walk
+  (`thruWalk⇓`) emits the echo before consuming the lane; the three formers
+  enter it through an echo-less map, as `lanesOnly` in `plain-eval.ts` does.
+  Evaluator internals only, so the QuickCheck and the bug cache must not
+  move; the `Reducible` and `Reducible.Support` arms follow.
 
-- **ADD IT ON THE TYPESCRIPT SIDE AND DIFF IT AGAINST THE THREE.** `exp.ts`,
-  `generator.ts`, `plain-eval.ts` over `echoFlatten`, `scripts/formers.tsv`;
-  the oracle runs each old former beside its encoding over `flattenᵉ` on
-  generated programs. Settles the semantics before any Agda moves.
-
-- **ADD IT TO THE AGDA EVALUATOR.** One `subs-` arm into `subscribeAll⇓` with
-  the op as its `AllOp` tag; the outer's walk (`thruWalk⇓`) emits the echo
-  before consuming the element, so the machinery under it is unchanged. Then
-  its arms in `Reducible` and `Reducible.Support`, `CLI.Decode`, and the
-  QuickCheck differential against the three.
+- **ADD `flattenᵉ` TO BOTH TREES AT ONCE.** `scripts/formers.tsv` holds the
+  two trees' formers to one map, so neither gains it alone: `Rx.Exp` and its
+  traversals, `CLI.Decode`, the QuickCheck census, `exp.ts`, both generators,
+  and `plain-eval.ts` over `flatten`. With the echo already underneath, its
+  evaluator arm is one `subs-` arm into `subscribeAll⇓`.
 
 - **REWRITE EVERY PRODUCER OVER `flattenᵉ`, THEN DELETE THE THREE.**
   `SExp.Elaborate`, both generators, the traversals in `Rx.Exp`, every proof
@@ -261,7 +259,7 @@ on `Exp` by design.
   `AllOp` stays as the policy tag only if it still earns its place.
 
 - **PORT `timed.ts` ONTO IT.** The translation's flatteners become
-  `echoFlatten` read by `last-seen`; the `max-` rules, keys, trails and
+  `flatten` read by `last-seen`; the `max-` rules, keys, trails and
   copies are deleted, and `timed-fuzz.ts --selftest` pins what is left. The
   TypeScript half of tier 2's `timed` leg.
 

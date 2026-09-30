@@ -29,6 +29,12 @@ import {
   toVal,
   unfoldMu,
 } from "./exp.js";
+import {
+  Elem,
+  FlatOp,
+  flatten as echoFlatten,
+  flattener as lanesFlattener,
+} from "./flatten.js";
 import { PlainDriver, createPlainDriver, plainHop } from "./plain-driver.js";
 import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 
@@ -658,36 +664,15 @@ const flatten = (
 // the translation to need no `connect` of its own.
 // ---------------------------------------------------------------
 
-const flattener =
-  <T>(how: "merge" | "switch" | "exhaust", limit: number | undefined) =>
-  (o: Observable<Observable<T>>): Observable<T> =>
-    how === "merge"
-      ? o.pipe(mergeAll(limit ?? Infinity))
-      : how === "switch"
-        ? o.pipe(switchAll())
-        : o.pipe(exhaustAll());
+const flattener = <T>(
+  how: "merge" | "switch" | "exhaust",
+  limit: number | undefined,
+) => lanesFlattener<T>(opOf(how, limit));
 
-// AN ECHOING FLATTENER: every outer element's `s` leaves AS IT ARRIVES,
-// before its lane (if it has one) is handled. An element with no lane is
-// only echoed, which is how the outer's END reaches the output without
-// being subscribed. Generic, and ordinary rxjs.
-type Echoed<S, T> = { k: "echo"; s: S } | { k: "value"; t: T };
-const echoFlatten =
-  <S, T>(how: "merge" | "switch" | "exhaust", limit: number | undefined) =>
-  (outer: Observable<{ s: S; lane: Observable<T> | null }>) =>
-    outer.pipe(
-      connect((sh) =>
-        merge(
-          sh.pipe(rxMap((x): Echoed<S, T> => ({ k: "echo", s: x.s }))),
-          sh.pipe(
-            filter((x): x is { s: S; lane: Observable<T> } => x.lane !== null),
-            rxMap((x) => x.lane),
-            flattener<T>(how, limit),
-            rxMap((t): Echoed<S, T> => ({ k: "value", t })),
-          ),
-        ),
-      ),
-    );
+const opOf = (
+  how: "merge" | "switch" | "exhaust",
+  limit: number | undefined,
+): FlatOp => (how === "merge" ? { how, limit } : { how });
 
 // A MARKING FLATTENER: a Start as each lane is actually subscribed, a
 // Done as it completes, an OuterDone as the outer does.
@@ -741,7 +726,8 @@ const numbered = (
     })),
   );
 
-// `echo`: the outer's packets echoed as beats, read by `last-seen`
+// `echo`: the outer's packets echoed as beats by `flatten`, read by
+// `last-seen`; the outer's END is echoed and has no lane
 const flattenEcho = (
   how: "merge" | "switch" | "exhaust",
   limit: number | undefined,
@@ -753,9 +739,11 @@ const flattenEcho = (
     pos,
     false,
     numbered(outer, compileInner).pipe(
-      rxMap(({ p, lane }) => ({ s: p, lane })),
-      echoFlatten<Pkt, M>(how, limit),
-      rxMap((e): M => (e.k === "echo" ? { k: "beat", p: e.s } : e.t)),
+      rxMap(({ p, lane }): Elem<M> => ({
+        echo: [{ k: "beat", p }],
+        lane: lane === null ? [] : [lane],
+      })),
+      echoFlatten<M>(opOf(how, limit)),
     ),
   );
 
