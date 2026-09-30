@@ -30,7 +30,7 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _+ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
   switchKill; scanDispatch; takeDispatch; batchDispatch; thruWrap; shareDying; shareFinish;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
@@ -46,7 +46,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
-  walk-nil; walk-cons; drain-spent; drain-nil; drain-no-room; drain-room;
+  walk-nil; walk-echo; walk-cons; drain-spent; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
   step-map; step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
@@ -230,7 +230,7 @@ subscribeInner-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 
 thruWalk-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                    {op} {nid} {κ : Path Γ lo u t} {now}
-                   {vals : List (Val Γ (obs u))} {sched sched′ : Sched Γ}
+                   {vals : List (Val Γ (u +ᵗ obs u))} {sched sched′ : Sched Γ}
                    {st st′ : EvalSt e} {out}
                → thruWalk⇓ {e = e} op nid κ now vals sched st (out , sched′ , st′)
                → Keeps {e = e} sched st sched′ st′
@@ -349,6 +349,8 @@ subscribeAll-keeps (sub-all refl sub) = subscribeE-keeps sub
 subscribeInner-keeps (inner refl sub) = subscribeE-keeps sub
 
 thruWalk-keeps walk-nil        = keeps-refl _ _
+thruWalk-keeps (walk-echo f w) =
+  keeps-trans (foldPath-keeps f) (thruWalk-keeps w)
 thruWalk-keeps (walk-cons c w) =
   keeps-trans (thruConsume-keeps c) (thruWalk-keeps w)
 

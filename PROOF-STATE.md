@@ -240,23 +240,18 @@ on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **ECHO IN THE EVALUATOR'S FLATTENER, UNDER THE THREE.** The outer's frame
-  (`thru-outer`) takes `(unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)` and its walk
-  (`thruWalk⇓`) emits the echo before consuming the lane; the three formers
-  enter it through an echo-less map, as `lanesOnly` in `plain-eval.ts` does.
-  Evaluator internals only, so the QuickCheck and the bug cache must not
-  move; the `Reducible` and `Reducible.Support` arms follow.
-
 - **ADD `flattenᵉ` TO BOTH TREES AT ONCE.** `scripts/formers.tsv` holds the
   two trees' formers to one map, so neither gains it alone: `Rx.Exp` and its
   traversals, `CLI.Decode`, the QuickCheck census, `exp.ts`, both generators,
-  and `plain-eval.ts` over `flatten`. With the echo already underneath, its
-  evaluator arm is one `subs-` arm into `subscribeAll⇓`.
+  and `plain-eval.ts` over `flatten`. The echo is already underneath
+  (`thru-outer`'s `echoing` lanes, `walk-echo`), so the evaluator arm is one
+  `subs-` arm into `subscribeAll⇓` once that takes the `Lanes` it installs.
 
 - **REWRITE EVERY PRODUCER OVER `flattenᵉ`, THEN DELETE THE THREE.**
   `SExp.Elaborate`, both generators, the traversals in `Rx.Exp`, every proof
   arm the three own, and the bug-cache rows RE-ENCODED rather than dropped.
-  `AllOp` stays as the policy tag only if it still earns its place.
+  `bare` lanes go with them, and `Lanes` with it; `AllOp` stays as the
+  policy tag only if it still earns its place.
 
 - **PORT `timed.ts` ONTO IT.** The translation's flatteners become
   `flatten` read by `last-seen`; the `max-` rules, keys, trails and

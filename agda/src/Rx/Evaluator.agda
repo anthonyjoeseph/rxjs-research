@@ -6,7 +6,7 @@ open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
-open import Data.List    using (List; []; _∷_; _++_; concat; tabulate; null)
+open import Data.List    using (List; []; _∷_; _++_; concat; tabulate; null; map)
 open import Data.Bool.ListAction using (any)
 open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -18,7 +18,7 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Ordinal; Source; Timed; after_,_; hot; cold; PlainEvent)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _+ᵗ_; unitᵗ; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
 
 variable
   lo : ℕ
@@ -269,6 +269,25 @@ setNode nid s ((k , s′) ∷ r) =
 data AllOp : Set where
   mergeAllᵒ switchᵒ exhaustᵒ : AllOp
 
+-- WHAT A FLATTENER'S OUTER ELEMENT CARRIES: a bare lane, or an optional
+-- echo beside an optional lane.  Either way the walk reads it as EVENTS,
+-- echo first -- the echo leaves as the element arrives, before its lane
+-- is handled, which is `flatten` in `typescript/src/flatten.ts` -- so a
+-- bare element is the echo-less element exactly, as `lanesOnly` in
+-- `typescript/src/plain-eval.ts` builds it.
+data Lanes : Ty → Ty → Set where
+  bare    : ∀ {u} → Lanes (obs u) u
+  echoing : ∀ {u} → Lanes ((unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u)) u
+
+-- an echo event is `inj₁`, a lane event `inj₂`
+thruEvents : ∀ {n} {Γ : Ctx n} {s u} → Lanes s u → List (Val Γ s) → List (Val Γ (u +ᵗ obs u))
+thruEvents bare    vals                       = map inj₂ vals
+thruEvents echoing []                         = []
+thruEvents echoing ((inj₁ _ , inj₁ _) ∷ xs) = thruEvents echoing xs
+thruEvents echoing ((inj₁ _ , inj₂ o) ∷ xs) = inj₂ o ∷ thruEvents echoing xs
+thruEvents echoing ((inj₂ v , inj₁ _) ∷ xs) = inj₁ v ∷ thruEvents echoing xs
+thruEvents echoing ((inj₂ v , inj₂ o) ∷ xs) = inj₁ v ∷ inj₂ o ∷ thruEvents echoing xs
+
 -- one operator the emission passes through, rootward.  deferᵉ
 -- contributes NO frame (it merely relays its body), and share is not
 -- an operator at all: a shared slot fans out by registry multiplicity,
@@ -307,8 +326,8 @@ data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
   from-inner : ∀ {s} → AllOp → (allNode innerInstance : NodeId) → Frame Γ s s
                -- exiting a subscribed inner: the *All's own node, and
                -- this inner subscription's instance (switch kills by it)
-  thru-outer : ∀ {u} → AllOp → NodeId → Frame Γ (obs u) u
-               -- the value IS an inner obs: consumed, subscribed, burst grafted
+  thru-outer : ∀ {s u} → Lanes s u → AllOp → NodeId → Frame Γ s u
+               -- the value carries an inner obs: consumed, subscribed, burst grafted
 
 -- THE FLOOR IS AN INDEX, WHICH IS WHAT MAKES THE SHARE NEST DESCEND.
 -- A chain registered on share i can only sink into a share ABOVE i —
@@ -394,7 +413,7 @@ frameNodes (scan-f _ k)       = k ∷ []
 frameNodes (take-f k)         = k ∷ []
 frameNodes (batchSync-f k)    = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
-frameNodes (thru-outer _ k)   = k ∷ []
+frameNodes (thru-outer _ _ k) = k ∷ []
 
 pathHasNode : ∀ {n} {Γ : Ctx n} {s t} → NodeId → Path Γ lo s t → Bool
 pathHasNode nid root           = false

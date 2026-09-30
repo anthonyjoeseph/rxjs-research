@@ -142,7 +142,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Tick; Fuel; valueᵖ; completeᵖ; hot; cold)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
-  _×ᵗ_; listᵗ; uniqᵗ;
+  _×ᵗ_; _+ᵗ_; listᵗ; uniqᵗ;
   Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
   mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
@@ -151,7 +151,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root
   shareDying; shareSpend; shareFinish; from-inner; arrTick; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
   RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve;
-  atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; cell-st; take-st;
+  atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; Lanes; bare; thruEvents; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
   batchDispatch; batchDown; thruWrap; consumeUsable; finishUsable; drainSt)
@@ -191,7 +191,7 @@ data thruConsume⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 data thruWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Tick
-   → List (Val Γ (obs u)) → Sched Γ → EvalSt e
+   → List (Val Γ (u +ᵗ obs u)) → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data mergeAllDrain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
@@ -552,7 +552,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                                      ; pending = (suc now , (Θ , body , ρ)) ∷ [] }
                               ∷ Sched.live sched }
                  , register rid (atDyn src lo)
-                            (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ)
+                            (thru-outer bare mergeAllᵒ nid ↠[ ≤-refl ] κ)
                             (installNode nid
                               (mergeAll-st {t = u} nothing 0 [] false) st) )
 
@@ -704,12 +704,24 @@ data thruWalk⇓ {n} {Γ} {t} {e} where
   walk-nil : ∀ {u lo op nid} {κ : Path Γ lo u t} {now} {sched₀ st₀}
            → thruWalk⇓ op nid κ now [] sched₀ st₀ ([] , sched₀ , st₀)
 
+  -- AN ECHO IS FOLDED ROOTWARD WHERE THE WALK REACHES IT, like an
+  -- inner's synchronous value: a frame below that COUNTS sees it before
+  -- anything the next lane subscribes, which is the order `thruConsume⇓`
+  -- is stated at.
+  walk-echo : ∀ {u lo op nid} {κ : Path Γ lo u t} {now}
+                {v : Val Γ u} {os sched₀ st₀}
+                {out₁ sched₁ st₁} {out₂ sched₂ st₂}
+            → foldPath⇓ now κ (v ∷ []) false sched₀ st₀ (out₁ , sched₁ , st₁)
+            → thruWalk⇓ op nid κ now os sched₁ st₁ (out₂ , sched₂ , st₂)
+            → thruWalk⇓ op nid κ now (inj₁ v ∷ os) sched₀ st₀
+                (out₁ ++ out₂ , sched₂ , st₂)
+
   walk-cons : ∀ {u lo op nid} {κ : Path Γ lo u t} {now}
                 {o : Val Γ (obs u)} {os sched₀ st₀}
                 {out₁ sched₁ st₁} {out₂ sched₂ st₂}
             → thruConsume⇓ op nid κ now o sched₀ st₀ (out₁ , sched₁ , st₁)
             → thruWalk⇓ op nid κ now os sched₁ st₁ (out₂ , sched₂ , st₂)
-            → thruWalk⇓ op nid κ now (o ∷ os) sched₀ st₀
+            → thruWalk⇓ op nid κ now (inj₂ o ∷ os) sched₀ st₀
                 (out₁ ++ out₂ , sched₂ , st₂)
 
 data mergeAllDrain⇓ {n} {Γ} {t} {e} where
@@ -933,12 +945,12 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
   -- THE OUTER'S WALK SENDS EVERYTHING ROOTWARD ITSELF, and what it
   -- hands on is the empty group with the wrapped end: the flattener's
   -- own completion, if the outer's end and the node's state make one.
-  step-thru-outer : ∀ {u lo op nid} {κ : Path Γ lo u t}
-                      {now} {vals : List (Val Γ (obs u))} {fin sched st}
+  step-thru-outer : ∀ {s u lo} {ln : Lanes s u} {op nid} {κ : Path Γ lo u t}
+                      {now} {vals : List (Val Γ s)} {fin sched st}
                       {out sched′ st′}
-                  → thruWalk⇓ op nid κ now vals sched st
+                  → thruWalk⇓ op nid κ now (thruEvents ln vals) sched st
                       (out , sched′ , st′)
-                  → stepFrame⇓ now (thru-outer op nid) κ vals fin sched st
+                  → stepFrame⇓ now (thru-outer ln op nid) κ vals fin sched st
                       (out , [] , thruWrap op nid fin (sched′ , st′))
 
 -- THIS IS WHERE A FLATTENER'S OUTER IS SUBSCRIBED, WITH THE
@@ -956,7 +968,7 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
   sub-all : ∀ {u lo op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
               {κ : Path Γ lo u t} {now sched st nid r}
           → freshId nodeᵏ (Sched.mint sched) ≡ nid
-          → subscribeE⇓ b (thru-outer op nid ↠[ ≤-refl ] κ) now
+          → subscribeE⇓ b (thru-outer bare op nid ↠[ ≤-refl ] κ) now
               (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
               (installNode nid ns st) r
           → subscribeAll⇓ op ns b κ now sched st r

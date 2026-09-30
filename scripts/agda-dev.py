@@ -1212,6 +1212,14 @@ def sig_coupled(p: Parsed, foci: list[str]) -> list[str]:
     member for real gets `liveRP != Ctx.liveRP` at every use of the stub.  So a
     member whose signature names a focus is a focus too, transitively -- one
     coupled group is one batch, whatever `--batch` says.
+
+    A NAMED member is named to be UNFOLDED, so its PRIVATE HELPERS travel
+    too: a sibling whose only in-block caller is a named member.  Otherwise
+    the named copattern unfolds to a stubbed helper and stops there --
+    `fallen-stays` names `fallenRP`, whose `fold` is `fallenAns …`, and
+    without `fallenAns` real its `pre′` never reaches `fallen`.  Which batch
+    the helper landed in was LPT's luck, so the check went red when an
+    unrelated member was added.
     """
     for b in p.blocks:
         if len(b.members) > 1 and any(f in b.members for f in foci):
@@ -1220,12 +1228,16 @@ def sig_coupled(p: Parsed, foci: list[str]) -> list[str]:
                 txt = " ".join(l.split("--")[0] for l in (sig_text(p, m) or []))
                 in_sig[m] = {o for o in b.members if o != m and re.search(
                     r"(?<![\w\-])" + re.escape(o) + r"(?![\w\-])", txt)}
+            only_caller = {h: cs[0] for h in b.members
+                           for cs in [callers_of(p, h, b.members)] if len(cs) == 1}
             out = set(foci)
             grew = True
             while grew:
                 grew = False
+                named = {o for m in out for o in in_sig[m]}
                 for m in b.members:
-                    if m not in out and in_sig[m] & out:
+                    if m not in out and (in_sig[m] & out
+                                         or only_caller.get(m) in named & out):
                         out.add(m)
                         grew = True
             return [m for m in b.members if m in out]
