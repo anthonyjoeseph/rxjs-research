@@ -19,11 +19,13 @@ import {
   ObsVal,
   ScriptVal,
   Val,
+  FlatOp,
   evalWith,
+  optVal,
   toVal,
   unfoldMu,
 } from "./exp.js";
-import { Elem, FlatOp, flatten } from "./flatten.js";
+import { Elem, flatten } from "./flatten.js";
 import { PlainDriver, createPlainDriver, plainHop } from "./plain-driver.js";
 import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 
@@ -201,6 +203,31 @@ export const compilePlain = (
       return via === "native"
         ? inner(exp.src).pipe(exhaustAll())
         : lanesOnly(inner(exp.src), { how: "exhaust" });
+    case "flatten":
+      // each element an optional echo beside an optional lane, and the
+      // lane a closure compiled as it passes, as `inner`'s are
+      return recur(exp.src).pipe(
+        rxMap((v): Elem<Val> => {
+          const [echo, lane] = v as [Val, Val];
+          const o = optVal(lane);
+          return {
+            echo: optVal(echo),
+            lane:
+              o.length === 0
+                ? []
+                : [
+                    compilePlain(
+                      (o[0] as ObsVal).exp,
+                      (o[0] as ObsVal).env,
+                      driver,
+                      slotSources,
+                      via,
+                    ),
+                  ],
+          };
+        }),
+        flatten<Val>(exp.op),
+      );
     case "mu":
       // one unfolding now; the recursive occurrences inside sit behind
       // defer hops, so each further unfolding costs a tick

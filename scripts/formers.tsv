@@ -53,6 +53,7 @@ exp	scanᵉ	scan	yes	yes	pure
 exp	mergeAllᵉ	mergeAll	yes	yes	flatten
 exp	switchAllᵉ	switchAll	yes	yes	flatten
 exp	exhaustAllᵉ	exhaustAll	yes	yes	flatten
+exp	flattenᵉ	flatten	yes	no	flatten	the author's palette spells a flattener as mergeAllˢ, switchAllˢ or exhaustAllˢ, and SExp.Elaborate still writes the three
 exp	μᵉ	mu	yes	yes	binder
 exp	varᵉ	varE	yes	yes	binder
 exp	deferᵉ	defer	yes	yes	protocol

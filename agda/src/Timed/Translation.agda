@@ -101,7 +101,7 @@ timedᶜ Γ κ = zipWith timedTy Γ κ
 -- as the element arrives: the `echo` rule of `typescript/src/timed.ts`,
 -- clean against rxjs call stacks on every generated program, the shared
 -- and `switchAll` cases pinned by `timed-fuzz.ts --selftest` included.
--- No former echoes yet; tier 1 adds `flattenᵉ`.
+-- `flattenᵉ` is that former.
 --
 -- WITHOUT AN ECHO, PACKETS MUST BE ORDERED rather than only named: a
 -- queued inner is subscribed at the LATER of its outer emission and the

@@ -31,7 +31,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _+ᵗ_; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
+open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; Lanes; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
   switchKill; scanDispatch; takeDispatch; batchDispatch; thruWrap; shareDying; shareFinish;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
 open import Rx.Evaluator.Unconn-Arith using (KeepsC; keeps-refl; keeps-trans;
@@ -42,7 +42,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   foldPath⇓; dispatchShare⇓; shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc;
-  subs-batchSync; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all;
+  subs-batchSync; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-flatten;
   subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
@@ -212,11 +212,11 @@ stepFrame-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                     (out , vals′ , fin′ , sched₁ , st₁)
                 → Keeps {e = e} sched st sched₁ st₁
 
-subscribeAll-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                       {op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
+subscribeAll-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {ln : Lanes s u}
+                       {op} {ns : NodeState Γ} {b : Val Γ (obs s)}
                        {κ : Path Γ lo u t} {now}
                        {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {out}
-                   → subscribeAll⇓ {e = e} op ns b κ now sched st
+                   → subscribeAll⇓ {e = e} ln op ns b κ now sched st
                        (out , sched₂ , st₁)
                    → Keeps {e = e} sched st sched₂ st₁
 
@@ -329,6 +329,7 @@ subscribeE-keeps (subs-scan refl sub)          = subscribeE-keeps sub
 subscribeE-keeps (subs-merge-all sa)           = subscribeAll-keeps sa
 subscribeE-keeps (subs-switch-all sa)          = subscribeAll-keeps sa
 subscribeE-keeps (subs-exhaust-all sa)         = subscribeAll-keeps sa
+subscribeE-keeps (subs-flatten sa)             = subscribeAll-keeps sa
 subscribeE-keeps (subs-μ sub)                  = subscribeE-keeps sub
 subscribeE-keeps (subs-defer refl _ _ _)       = keeps-refl _ _
 subscribeE-keeps (subs-mint _ sub)             = subscribeE-keeps sub

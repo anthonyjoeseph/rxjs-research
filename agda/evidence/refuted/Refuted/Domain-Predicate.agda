@@ -43,8 +43,8 @@ open import Data.Product using (Σ; _,_)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Nullary using (¬_)
 
-open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
-  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
+open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
+  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; flattenᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 
 -- the structural domain predicate: one constructor per former, each
 -- taking the predicate at the Exp children a subscribe actually walks.
@@ -72,6 +72,8 @@ data Sub {n} {Γ : Ctx n} : ∀ {t} → Closed Γ t → Set where
   s-switch : ∀ {t} {b : Closed Γ (obs t)} → Sub b → Sub (switchAllᵉ b)
   s-batchSync : ∀ {t} {b : Closed Γ t} → Sub b → Sub (batchSyncᵉ b)
   s-exhaust : ∀ {t} {b : Closed Γ (obs t)} → Sub b → Sub (exhaustAllᵉ b)
+  s-flatten : ∀ {t op} {b : Closed Γ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))}
+            → Sub b → Sub (flattenᵉ op b)
 
 sub-total : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → Sub e
 sub-total (input i)         = s-input
@@ -87,6 +89,7 @@ sub-total (mergeAllᵉ l b)   = s-merge (sub-total b)
 sub-total (switchAllᵉ b)    = s-switch (sub-total b)
 sub-total (batchSyncᵉ b)    = s-batchSync (sub-total b)
 sub-total (exhaustAllᵉ b)   = s-exhaust (sub-total b)
+sub-total (flattenᵉ op b)   = s-flatten (sub-total b)
 sub-total (varᵉ ())
 
 -- the claim that the structural domain predicate is worth carrying:

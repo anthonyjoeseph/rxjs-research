@@ -43,7 +43,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
   subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan; subs-merge-all; subs-switch-all;
-  subs-exhaust-all; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
+  subs-exhaust-all; subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
   finish-nil; react-false; react-alive; react-dead; step-map; step-scan; step-take; step-batchSync;
@@ -178,9 +178,9 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
                            → subscribeSharedSlot⇓ {e = e} i d κ below now sched st (out , sched′ , st′)
                            → Sound κ sched st → RuleKept κ sched st sched′ st′
 
-  subscribeAll-rule : ∀ {u lo} {op} {ns} {b : Val Γ (obs (obs u))} {κ : Path Γ lo u t} {now}
+  subscribeAll-rule : ∀ {s u lo} {ln : Lanes s u} {op} {ns} {b : Val Γ (obs s)} {κ : Path Γ lo u t} {now}
                         {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
-                    → subscribeAll⇓ {e = e} op ns b κ now sched st (out , sched′ , st′)
+                    → subscribeAll⇓ {e = e} ln op ns b κ now sched st (out , sched′ , st′)
                     → Sound κ sched st → RuleKept κ sched st sched′ st′
 
   subscribeInner-rule : ∀ {u lo} {op a} {κ : Path Γ lo u t} {now} {o : Val Γ (obs u)}
@@ -276,6 +276,7 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   subscribeE-rule (subs-merge-all sa)     so = subscribeAll-rule sa so
   subscribeE-rule (subs-switch-all sa)    so = subscribeAll-rule sa so
   subscribeE-rule (subs-exhaust-all sa)   so = subscribeAll-rule sa so
+  subscribeE-rule (subs-flatten sa)       so = subscribeAll-rule sa so
   subscribeE-rule (subs-μ sub)            so = subscribeE-rule sub so
   subscribeE-rule {u = u} {lo = lo} {κ = κ} {sched = sched} (subs-defer refl refl refl refl) so κ₂ so₂ ag =
     register-kept {π = π} (freshId regᵏ (Sched.mint sched)) (atDyn (freshId sourceᵏ (Sched.mint sched)) lo) π
@@ -300,10 +301,10 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     so₁ : Sound κ sched st₁
     so₁ = sub-ot {st′ = st₁} (λ r∈ → r∈) ≤-refl so
 
-  subscribeAll-rule {u = u} {op = op} {κ = κ} {sched = sched} (sub-all refl sub) so κ₂ so₂ ag =
-    subscribeE-rule sub (fresh-sound (thru-outer {u = u} bare op (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
+  subscribeAll-rule {ln = ln} {op = op} {κ = κ} {sched = sched} (sub-all refl sub) so κ₂ so₂ ag =
+    subscribeE-rule sub (fresh-sound (thru-outer ln op (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
       (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
-      (fresh-agree (thru-outer {u = u} bare op (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
+      (fresh-agree (thru-outer ln op (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
 
   subscribeInner-rule {op = op} {a = a} {κ = κ} {sched = sched} (inner refl sub) so κ₂ so₂ ag =
     subscribeE-rule sub

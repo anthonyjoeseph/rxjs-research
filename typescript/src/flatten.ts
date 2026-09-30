@@ -8,6 +8,7 @@ import {
   mergeAll,
   switchAll,
 } from "rxjs";
+import { FlatOp, Opt } from "./exp.js";
 
 // THE ONE FLATTENER, as ordinary rxjs: `flattenᵉ`'s semantics, and the
 // reference both trees are held to. Each outer element carries an
@@ -22,10 +23,6 @@ import {
 // multicasts the outer to both branches, and a multicast delivers to its
 // subscribers in the order they subscribed, so every element reaches the
 // echo branch before the flattening one.
-export type FlatOp =
-  { how: "merge"; limit?: number } | { how: "switch" } | { how: "exhaust" };
-
-export type Opt<A> = readonly [] | readonly [A];
 export type Elem<T> = { echo: Opt<T>; lane: Opt<Observable<T>> };
 
 // the three policies over lanes alone: what happens when a lane arrives

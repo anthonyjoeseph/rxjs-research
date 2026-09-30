@@ -1,4 +1,14 @@
-import { Closed, Exp, Fn, PrimOp, ScriptVal, Tm, Ty, tyEq } from "./exp.js";
+import {
+  Closed,
+  Exp,
+  FlatOp,
+  Fn,
+  PrimOp,
+  ScriptVal,
+  Tm,
+  Ty,
+  tyEq,
+} from "./exp.js";
 import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 
 // The differential-testing generator: deterministic, seeded canonical
@@ -457,6 +467,54 @@ const genExp = (
       ty,
       src: genExp(rng, obsOf, ctx, depth - 1),
     }),
+    // THE ONE FLATTENER, and its source is written rather than drawn: a
+    // pair of options at an arbitrary type is a shape the term draw
+    // almost never lands on, so the step writes each half as absent or
+    // present -- and, per element, which of two such pairs, since an
+    // echo-only element beside a lane-carrying one is what tells the
+    // echo from the flattener's policies.
+    flatten: () => {
+      const s = genValTy(rng, 2);
+      const opt = (t: Ty): Ty => ({ type: "sum", left: unitT, right: t });
+      const elemTy: Ty = { type: "prod", fst: opt(ty), snd: opt(obsOf) };
+      const under: GenCtx = { ...ctx, theta: [s, ...ctx.theta] };
+      const half = (t: Ty): Tm =>
+        chance(rng, 0.5)
+          ? { type: "inlT", ty: opt(t), val: { type: "unitT", ty: unitT } }
+          : { type: "inrT", ty: opt(t), val: genTm(rng, t, under, depth - 1) };
+      const pair = (): Tm => ({
+        type: "pairT",
+        ty: elemTy,
+        fst: half(ty),
+        snd: half(obsOf),
+      });
+      const op: FlatOp = pick(rng, [
+        { how: "merge" },
+        { how: "merge", limit: 1 },
+        { how: "merge", limit: 2 },
+        { how: "switch" },
+        { how: "exhaust" },
+      ] as FlatOp[]);
+      return {
+        type: "flatten",
+        ty,
+        op,
+        src: {
+          type: "map",
+          ty: elemTy,
+          fn: chance(rng, 0.5)
+            ? pair()
+            : {
+                type: "ifT",
+                ty: elemTy,
+                cond: genTm(rng, boolT, under, Math.min(depth, 2)),
+                then: pair(),
+                else: pair(),
+              },
+          src: genExp(rng, s, ctx, depth - 1),
+        },
+      };
+    },
     // μ binds a guarded var; defer moves the guarded vars into scope
     mu: () => ({
       type: "mu",

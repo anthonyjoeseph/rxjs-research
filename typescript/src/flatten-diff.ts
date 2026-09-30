@@ -1,8 +1,8 @@
 import { Observable, Subject, of, toArray } from "rxjs";
-import { Elem, FlatOp, Opt, flatten } from "./flatten.js";
+import { Elem, flatten } from "./flatten.js";
 import { genTestCases } from "./generator.js";
 import { evaluatePlainArrivals } from "./plain-eval.js";
-import { showVal } from "./exp.js";
+import { FlatOp, Opt, showVal } from "./exp.js";
 
 // THE OLD FLATTENERS AGAINST THEIR ENCODING OVER `flatten`. Every
 // generated program is run plain twice -- `mergeAll`/`switchAll`/

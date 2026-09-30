@@ -21,17 +21,19 @@ import {
 } from "rxjs";
 import {
   Closed,
+  FlatOp,
   ObsVal,
+  Opt,
   ScriptVal,
   Val,
   evalWith,
+  optVal,
   showVal,
   toVal,
   unfoldMu,
 } from "./exp.js";
 import {
   Elem,
-  FlatOp,
   flatten as echoFlatten,
   flattener as lanesFlattener,
 } from "./flatten.js";
@@ -860,7 +862,8 @@ const copyOf = (exp: Closed, env: Val[], kinds: SlotKinds): Copy => {
     if (
       o.type === "mergeAll" ||
       o.type === "switchAll" ||
-      o.type === "exhaustAll"
+      o.type === "exhaustAll" ||
+      o.type === "flatten"
     )
       flattened.add(JSON.stringify(o.ty));
     if (o.type === "defer") found.schedules = true;
@@ -1085,6 +1088,51 @@ const compile = (
         recur(exp.src, "s"),
         inner,
       );
+    case "flatten": {
+      // `flatten` IS A CONNECT OVER AN ECHO BRANCH AND A LANES-ONLY
+      // FLATTENER, AND SO IS ITS TRANSLATION: an echo leaves in its
+      // element's own instant, at its packet, and the lanes go through the
+      // flattener every rule already translates.  That one sees the outer's
+      // END and no echo-only element, which moves nothing it reads: a lane
+      // subscribes on its own element or on a lane's END, never on an echo.
+      const { how } = exp.op;
+      const limit = exp.op.how === "merge" ? exp.op.limit : undefined;
+      const half = (x: Item, k: 0 | 1): Opt<Val> =>
+        x.end ? [] : optVal((x.v as [Val, Val])[k]);
+      const lanes = (src: Observable<Item>) =>
+        src.pipe(
+          filter((x) => x.end === true || half(x, 1).length === 1),
+          rxMap((x) => (x.end ? x : val(x.p, half(x, 1)[0] as Val))),
+        );
+      return recur(exp.src, "s").pipe(
+        connect((sh) =>
+          merge(
+            sh.pipe(
+              filter((x) => half(x, 0).length === 1),
+              rxMap((x) => val(x.p, half(x, 0)[0] as Val)),
+            ),
+            flatten(
+              rule,
+              clock,
+              how,
+              limit,
+              pos,
+              lanes(sh),
+              inner,
+              how === "switch"
+                ? ((copy: Copy) =>
+                    rule === "max-dup" && copy !== "none"
+                      ? {
+                          copy: lanes(recur(exp.src, "s")),
+                          first: copy === "first",
+                        }
+                      : undefined)(copyOf(exp.src, env, kinds))
+                : undefined,
+            ),
+          ),
+        ),
+      );
+    }
     case "mu":
       return recur(unfoldMu(exp.body), "u");
     case "defer": {

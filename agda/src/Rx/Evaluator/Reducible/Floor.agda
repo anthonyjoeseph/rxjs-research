@@ -36,7 +36,7 @@ open import Rx.Prim using (Source)
 open import Rx.Exp using (Ctx; Closed; Val; obs; _+ᵗ_)
 open import Rx.Slots using (shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f;
-  from-inner; thru-outer; bare; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
+  from-inner; thru-outer; Lanes; bare; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
   setNode; frameNodes; pathHasNode; installNode; lowerFloor; AllOp; mergeAllᵒ; switch-st;
   exhaust-st; mergeAll-st; shareAdmit; shareDying; shareFinish; switchKill; thruWrap; drainSt;
   regSource; sameSource; dropSource)
@@ -51,7 +51,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
   subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan; subs-merge-all; subs-switch-all;
-  subs-exhaust-all; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
+  subs-exhaust-all; subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
   finish-nil; react-false; react-alive; react-dead; step-map; step-scan; step-take; step-batchSync;
@@ -346,9 +346,9 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                             → subscribeSharedSlot⇓ {e = e} i d κ below now sched st (out , sched′ , st′)
                             → PI κ → Q sched st → Q sched′ st′
 
-  subscribeAll-floor : ∀ {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))} {κ : Path Γ lo u t} {now}
+  subscribeAll-floor : ∀ {s u lo} {ln : Lanes s u} {op} {ns : NodeState Γ} {b : Val Γ (obs s)} {κ : Path Γ lo u t} {now}
                          {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
-                     → subscribeAll⇓ {e = e} op ns b κ now sched st (out , sched′ , st′)
+                     → subscribeAll⇓ {e = e} ln op ns b κ now sched st (out , sched′ , st′)
                      → PI κ → Q sched st → Q sched′ st′
 
   subscribeInner-floor : ∀ {u lo} {op a} {κ : Path Γ lo u t} {now} {o : Val Γ (obs u)}
@@ -429,6 +429,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   subscribeE-floor (subs-merge-all sa)     ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
   subscribeE-floor (subs-switch-all sa)    ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
   subscribeE-floor (subs-exhaust-all sa)   ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
+  subscribeE-floor (subs-flatten sa)       ph (inj₂ s) = subscribeAll-floor sa ph (inj₂ s)
   subscribeE-floor (subs-μ sub)            ph (inj₂ s) = subscribeE-floor sub ph (inj₂ s)
   subscribeE-floor {sched = sched} (subs-defer refl refl refl refl) ph (inj₂ s) =
     let ph′ = push {f = thru-outer bare mergeAllᵒ (nodeCt sched)} {le = ≤-refl} (fresh-off (lt s)) (fresh-off (lt s)) ph
@@ -560,9 +561,9 @@ subscribeSharedSlot-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fi
                        → subscribeSharedSlot⇓ {e = e} i d κ below now sched st (out , sched′ , st′)
                        → nodeCt sched ≤ nodeCt sched′
 
-subscribeAll-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
+subscribeAll-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {ln : Lanes s u} {op} {ns : NodeState Γ} {b : Val Γ (obs s)}
                     {κ : Path Γ lo u t} {now} {sched sched′ : Sched Γ} {st st′ : EvalSt e} {out}
-                → subscribeAll⇓ {e = e} op ns b κ now sched st (out , sched′ , st′) → nodeCt sched ≤ nodeCt sched′
+                → subscribeAll⇓ {e = e} ln op ns b κ now sched st (out , sched′ , st′) → nodeCt sched ≤ nodeCt sched′
 
 subscribeInner-ct : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {op a} {κ : Path Γ lo u t} {now}
                       {o : Val Γ (obs u)} {sched sched′ : Sched Γ} {st st′ : EvalSt e} {inst out}
@@ -629,6 +630,7 @@ subscribeE-ct (subs-scan refl sub)               = ≤-trans (n≤1+n _) (subscr
 subscribeE-ct (subs-merge-all sa)                = subscribeAll-ct sa
 subscribeE-ct (subs-switch-all sa)               = subscribeAll-ct sa
 subscribeE-ct (subs-exhaust-all sa)              = subscribeAll-ct sa
+subscribeE-ct (subs-flatten sa)                  = subscribeAll-ct sa
 subscribeE-ct (subs-μ sub)                       = subscribeE-ct sub
 subscribeE-ct (subs-defer refl refl refl refl)   = n≤1+n _
 subscribeE-ct (subs-mint refl sub)               = subscribeE-ct sub

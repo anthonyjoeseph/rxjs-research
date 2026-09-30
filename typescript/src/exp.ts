@@ -140,6 +140,22 @@ export type Tm =
   // there is no application here.
   | { type: "foldT"; ty: Ty; list: Tm; init: Tm; step: Tm };
 
+// Agda: Rx.Exp.FlatOp -- what a flattener does with a lane that arrives
+// while it is busy: queue it (up to `limit` live), cancel the live one, or
+// drop the arrival.  An absent `limit` is rxjs's Infinity.
+export type FlatOp =
+  { how: "merge"; limit?: number } | { how: "switch" } | { how: "exhaust" };
+
+// an option, a zero- or one-element array since `null` is a value (the unit)
+export type Opt<A> = readonly [] | readonly [A];
+
+// an option at `unit + t`, as `flatten`'s elements carry both halves:
+// `inr` holds the value and `inl` none
+export const optVal = (v: Val): Opt<Val> => {
+  const s = v as { type: "inl" | "inr"; val: Val };
+  return s.type === "inr" ? [s.val] : [];
+};
+
 // Agda: Fn Γ Δᵍ Δ Θ s t = Tm with the argument bound as Θ-var 0.
 export type Fn = Tm;
 
@@ -175,6 +191,10 @@ export type Exp =
   | { type: "mergeAll"; ty: Ty; limit?: number; src: Exp }
   | { type: "switchAll"; ty: Ty; src: Exp }
   | { type: "exhaustAll"; ty: Ty; src: Exp }
+  // THE ONE FLATTENER, whose rxjs meaning is `flatten` in `flatten.ts`:
+  // `src` emits `(unit + ty) × (unit + obs ty)`, an optional ECHO beside an
+  // optional LANE, each option `inr` when present and `inl null` when not.
+  | { type: "flatten"; ty: Ty; op: FlatOp; src: Exp }
   | { type: "mu"; ty: Ty; body: Exp } // binds a μ-var, GUARDED (Agda's Δᵍ)
   | { type: "varE"; ty: Ty; index: number } // into the μ-binder stack, usable vars only (Agda's Δ)
   | { type: "defer"; ty: Ty; body: Exp }
@@ -443,6 +463,7 @@ const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
     case "mergeAll":
     case "switchAll":
     case "exhaustAll":
+    case "flatten":
     case "batchSync":
       return { ...exp, src: substMuExp(exp.src, st, knot) };
     case "mu":
@@ -543,6 +564,7 @@ const shiftExp = (exp: Exp, cutoff: number, by: number): Exp => {
     case "mergeAll":
     case "switchAll":
     case "exhaustAll":
+    case "flatten":
     case "batchSync":
       return { ...exp, src: shiftExp(exp.src, cutoff, by) };
     case "mu":

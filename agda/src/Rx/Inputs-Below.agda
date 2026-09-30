@@ -51,7 +51,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Ren∈; ext∈;
                           elimDExp; elimDTm; elimDTms;
                           unfoldμ; compare∈; ⊟-++ˡ; ⊟-++ʳ;
                           input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
-                          mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
+                          mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; flattenᵉ;
                           μᵉ; varᵉ; deferᵉ; mintᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
@@ -81,6 +81,7 @@ mutual
   ib-renᵉ k ρg ρd ρt (switchAllᵉ e)  = ib-renᵉ k ρg ρd ρt e
   ib-renᵉ k ρg ρd ρt (batchSyncᵉ e)  = ib-renᵉ k ρg ρd ρt e
   ib-renᵉ k ρg ρd ρt (exhaustAllᵉ e) = ib-renᵉ k ρg ρd ρt e
+  ib-renᵉ k ρg ρd ρt (flattenᵉ _ e) = ib-renᵉ k ρg ρd ρt e
   ib-renᵉ k ρg ρd ρt (μᵉ e)          = ib-renᵉ k (ext∈ ρg) ρd ρt e
   ib-renᵉ k ρg ρd ρt (varᵉ x)        = refl
   ib-renᵉ k ρg ρd ρt (deferᵉ e)      = ib-renᵉ k (λ ()) _ ρt e
@@ -176,6 +177,7 @@ mutual
   ib-elimGᵉ k Θl x cl hcl (switchAllᵉ e)  ok = ib-elimGᵉ k Θl x cl hcl e ok
   ib-elimGᵉ k Θl x cl hcl (batchSyncᵉ e)  ok = ib-elimGᵉ k Θl x cl hcl e ok
   ib-elimGᵉ k Θl x cl hcl (exhaustAllᵉ e) ok = ib-elimGᵉ k Θl x cl hcl e ok
+  ib-elimGᵉ k Θl x cl hcl (flattenᵉ _ e) ok = ib-elimGᵉ k Θl x cl hcl e ok
   ib-elimGᵉ k Θl x cl hcl (μᵉ e)          ok =
     ib-elimGᵉ k Θl (there x) cl hcl e ok
   ib-elimGᵉ k Θl x cl hcl (varᵉ y)        ok = tt
@@ -309,6 +311,7 @@ mutual
   ib-elimDᵉ k Θl x cl hcl (switchAllᵉ e)  ok = ib-elimDᵉ k Θl x cl hcl e ok
   ib-elimDᵉ k Θl x cl hcl (batchSyncᵉ e)  ok = ib-elimDᵉ k Θl x cl hcl e ok
   ib-elimDᵉ k Θl x cl hcl (exhaustAllᵉ e) ok = ib-elimDᵉ k Θl x cl hcl e ok
+  ib-elimDᵉ k Θl x cl hcl (flattenᵉ _ e) ok = ib-elimDᵉ k Θl x cl hcl e ok
   ib-elimDᵉ k Θl x cl hcl (μᵉ e)          ok = ib-elimDᵉ k Θl x cl hcl e ok
   ib-elimDᵉ k Θl x cl hcl (varᵉ y)        ok with compare∈ x y
   ... | inj₁ refl =
@@ -429,6 +432,7 @@ mutual
   ib-topᵉ (switchAllᵉ e)  = ib-topᵉ e
   ib-topᵉ (batchSyncᵉ e)  = ib-topᵉ e
   ib-topᵉ (exhaustAllᵉ e) = ib-topᵉ e
+  ib-topᵉ (flattenᵉ _ e) = ib-topᵉ e
   ib-topᵉ (μᵉ e)          = ib-topᵉ e
   ib-topᵉ (varᵉ x)        = tt
   ib-topᵉ (deferᵉ e)      = ib-topᵉ e

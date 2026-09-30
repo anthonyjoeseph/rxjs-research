@@ -57,6 +57,13 @@ data PrimOp : Ty → Ty → Set where
   notᵖ        : PrimOp boolᵗ boolᵗ
 
 
+-- what a flattener does with a lane arriving while it is busy: queue it
+-- (the limit is rxjs's `concurrent`, `nothing` its Infinity), cancel the
+-- live one, or drop the arrival -- `FlatOp` in `typescript/src/exp.ts`
+data FlatOp : Set where
+  mergeᶠ   : Maybe ℕ → FlatOp
+  switchᶠ exhaustᶠ : FlatOp
+
 ------------------------------------------------------------------
 -- Syntax.  Contexts: Γ inputs, Δᵍ guarded μ-vars, Δ usable μ-vars,
 -- Θ value vars.  μᵉ binds into Δᵍ; deferᵉ is the sole gate moving
@@ -190,6 +197,13 @@ mutual
                  -- its outputs.
     switchAllᵉ exhaustAllᵉ :
                  ∀ {t} → Exp Γ Δᵍ Δ Θ (obs t) → Exp Γ Δᵍ Δ Θ t
+    flattenᵉ   : ∀ {t} → FlatOp
+               → Exp Γ Δᵍ Δ Θ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) → Exp Γ Δᵍ Δ Θ t
+                 -- THE ONE FLATTENER: each element an optional ECHO beside
+                 -- an optional LANE, `inj₂` present and `inj₁ tt` absent.
+                 -- The echo leaves as the element arrives, before its lane
+                 -- is handled, and no policy sees it -- `flatten` in
+                 -- `typescript/src/flatten.ts` is the rxjs it means.
     μᵉ         : ∀ {t} → Exp Γ (t ∷ Δᵍ) Δ Θ t → Exp Γ Δᵍ Δ Θ t
     varᵉ       : ∀ {t} → t ∈ Δ → Exp Γ Δᵍ Δ Θ t
     deferᵉ     : ∀ {t} → Exp Γ [] (Δᵍ ++ Δ) Θ t → Exp Γ Δᵍ Δ Θ t
@@ -405,6 +419,7 @@ mutual
   renExp ρg ρd ρt (mergeAllᵉ lim e) = mergeAllᵉ lim (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (switchAllᵉ e) = switchAllᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (exhaustAllᵉ e) = exhaustAllᵉ (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (flattenᵉ op e) = flattenᵉ op (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (μᵉ e)         = μᵉ (renExp (ext∈ ρg) ρd ρt e)
   renExp ρg ρd ρt (varᵉ x)       = varᵉ (ρd x)
   renExp ρg ρd ρt (deferᵉ e)     = deferᵉ (renExp (λ ()) (++Ren ρg ρd) ρt e)
@@ -526,6 +541,7 @@ mutual
   elimGExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimGExp Θl x cl e)
   elimGExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimGExp Θl x cl e)
   elimGExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimGExp Θl x cl e)
+  elimGExp Θl x cl (flattenᵉ op e) = flattenᵉ op (elimGExp Θl x cl e)
   elimGExp Θl x cl (μᵉ e)         = μᵉ (elimGExp Θl (there x) cl e)
   elimGExp Θl x cl (varᵉ y)       = varᵉ y
   elimGExp Θl x cl (deferᵉ e)     =
@@ -577,6 +593,7 @@ mutual
   elimDExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimDExp Θl x cl e)
   elimDExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimDExp Θl x cl e)
   elimDExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimDExp Θl x cl e)
+  elimDExp Θl x cl (flattenᵉ op e) = flattenᵉ op (elimDExp Θl x cl e)
   elimDExp Θl x cl (μᵉ e)         = μᵉ (elimDExp Θl x cl e)
   elimDExp Θl x cl (varᵉ y)       with compare∈ x y
   ... | inj₁ refl = renExp (λ ()) (λ ()) (∈-++⁺ʳ Θl) cl
@@ -709,6 +726,7 @@ mutual
   inputsBelowᵉ k (mergeAllᵉ lim e) = inputsBelowᵉ k e
   inputsBelowᵉ k (switchAllᵉ e)  = inputsBelowᵉ k e
   inputsBelowᵉ k (exhaustAllᵉ e) = inputsBelowᵉ k e
+  inputsBelowᵉ k (flattenᵉ _ e) = inputsBelowᵉ k e
   inputsBelowᵉ k (μᵉ e)          = inputsBelowᵉ k e
   inputsBelowᵉ k (varᵉ x)        = true
   inputsBelowᵉ k (deferᵉ e)      = inputsBelowᵉ k e

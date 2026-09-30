@@ -141,20 +141,35 @@ open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Tick; Fuel; valueᵖ; completeᵖ; hot; cold)
-open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
+open import Rx.Exp using (Ty; obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
   _×ᵗ_; _+ᵗ_; listᵗ; uniqᵗ;
   Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
-  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
+  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; flattenᵉ; μᵉ; deferᵉ; mintᵉ;
+  unitᵗ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit;
   shareDying; shareSpend; shareFinish; from-inner; arrTick; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
   RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve;
-  atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; Lanes; bare; thruEvents; cell-st; take-st;
+  atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; Lanes; bare; echoing; thruEvents; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
   batchDispatch; batchDown; thruWrap; consumeUsable; finishUsable; drainSt)
+
+------------------------------------------------------------------
+-- A FLATTENER'S POLICY AND THE STATE ITS NODE STARTS IN
+------------------------------------------------------------------
+
+flatOp : FlatOp → AllOp
+flatOp (mergeᶠ _) = mergeAllᵒ
+flatOp switchᶠ    = switchᵒ
+flatOp exhaustᶠ   = exhaustᵒ
+
+flatSt : ∀ {n} {Γ : Ctx n} (u : Ty) → FlatOp → NodeState Γ
+flatSt u (mergeᶠ lim) = mergeAll-st {t = u} lim 0 [] false
+flatSt u switchᶠ      = switch-st nothing false
+flatSt u exhaustᶠ     = exhaust-st false false
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE CYCLE.  Eleven families, exactly the members of the
@@ -219,8 +234,8 @@ data stepFrame⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
    → Stream Γ t × List (Val Γ u) × Bool × Sched Γ × EvalSt e → Set
 
 data subscribeAll⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {u lo} →
-     AllOp → NodeState Γ → Val Γ (obs (obs u)) → Path Γ lo u t
+     ∀ {s u lo} →
+     Lanes s u → AllOp → NodeState Γ → Val Γ (obs s) → Path Γ lo u t
    → Tick → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
@@ -506,21 +521,30 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
 
   subs-merge-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {lim} {b : Exp Γ [] [] Θ (obs u)}
                      {κ : Path Γ lo u t} {now sched st r}
-                 → subscribeAll⇓ mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false)
+                 → subscribeAll⇓ bare mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false)
                      (Θ , b , ρ) κ now sched st r
                  → subscribeE⇓ (Θ , mergeAllᵉ lim b , ρ) κ now sched st r
 
   subs-switch-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ (obs u)}
                       {κ : Path Γ lo u t} {now sched st r}
-                  → subscribeAll⇓ switchᵒ (switch-st nothing false)
+                  → subscribeAll⇓ bare switchᵒ (switch-st nothing false)
                       (Θ , b , ρ) κ now sched st r
                   → subscribeE⇓ (Θ , switchAllᵉ b , ρ) κ now sched st r
 
   subs-exhaust-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ (obs u)}
                        {κ : Path Γ lo u t} {now sched st r}
-                   → subscribeAll⇓ exhaustᵒ (exhaust-st false false)
+                   → subscribeAll⇓ bare exhaustᵒ (exhaust-st false false)
                        (Θ , b , ρ) κ now sched st r
                    → subscribeE⇓ (Θ , exhaustAllᵉ b , ρ) κ now sched st r
+
+  -- the one flattener: the same node under `echoing` lanes, so each
+  -- element's echo is handed rootward before its lane is handled
+  subs-flatten : ∀ {lo u Θ} {ρ : Env Γ Θ} {op}
+                   {b : Exp Γ [] [] Θ ((unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u))}
+                   {κ : Path Γ lo u t} {now sched st r}
+               → subscribeAll⇓ echoing (flatOp op) (flatSt u op)
+                   (Θ , b , ρ) κ now sched st r
+               → subscribeE⇓ (Θ , flattenᵉ op b , ρ) κ now sched st r
 
   -- THE UNFOLDING IS UNCONDITIONAL, AND THAT CONCEDES NOTHING.  A
   -- machine comparing the unfolding's synchronous size against a
@@ -965,13 +989,13 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 -- that separates the two.
 data subscribeAll⇓ {n} {Γ} {t} {e} where
 
-  sub-all : ∀ {u lo op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
+  sub-all : ∀ {s u lo} {ln : Lanes s u} {op} {ns : NodeState Γ} {b : Val Γ (obs s)}
               {κ : Path Γ lo u t} {now sched st nid r}
           → freshId nodeᵏ (Sched.mint sched) ≡ nid
-          → subscribeE⇓ b (thru-outer bare op nid ↠[ ≤-refl ] κ) now
+          → subscribeE⇓ b (thru-outer ln op nid ↠[ ≤-refl ] κ) now
               (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
               (installNode nid ns st) r
-          → subscribeAll⇓ op ns b κ now sched st r
+          → subscribeAll⇓ ln op ns b κ now sched st r
 
 -- THE CONNECT'S OWN GUARD IS NOT INDEXED HERE EITHER, AND THE SAME
 -- RULING AS THE UNFOLD'S APPLIES: a run's answer to a question this

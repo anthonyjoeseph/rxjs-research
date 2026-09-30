@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm; []ᵉ;
-  input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; batchSyncᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; batchSyncᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; flattenᵉ; μᵉ;
   varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
@@ -147,6 +147,15 @@ decodeTy (suc fuel) j = getField "type" j >>=? asStr >>=? λ tag →
 childTy : ℕ → String → JSON → Maybe Ty
 childTy fuel name j = getField name j >>=? λ c → getField "ty" c >>=? decodeTy fuel
 
+-- a flattener's policy: `how` names it, and merge's absent `limit` is
+-- rxjs's Infinity exactly as on `mergeAll`
+decodeFlatOp : JSON → Maybe FlatOp
+decodeFlatOp j = getField "how" j >>=? asStr >>=? λ how →
+  if how is "merge" then just (mergeᶠ (getField "limit" j >>=? asNum))
+  else if how is "switch" then just switchᶠ
+  else if how is "exhaust" then just exhaustᶠ
+  else nothing
+
 ------------------------------------------------------------------------
 -- expressions and terms (checking mode: expected type in, typed term out)
 
@@ -190,6 +199,11 @@ mutual
       (getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ (obs t) >>=? λ src → just (switchAllᵉ src))
     else if tag is "exhaustAll" then
       (getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ (obs t) >>=? λ src → just (exhaustAllᵉ src))
+    else if tag is "flatten" then
+      (getField "op" j >>=? decodeFlatOp >>=? λ op →
+       getField "src" j
+         >>=? decodeExp fuel Γ Δᵍ Δ Θ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) >>=? λ src →
+       just (flattenᵉ op src))
     else if tag is "mu" then
       (getField "body" j >>=? decodeExp fuel Γ (t ∷ Δᵍ) Δ Θ t >>=? λ b → just (μᵉ b))
     else if tag is "varE" then

@@ -240,18 +240,17 @@ on `Exp` by design.
 
 ### Big picture tier roadmap
 
-- **ADD `flattenᵉ` TO BOTH TREES AT ONCE.** `scripts/formers.tsv` holds the
-  two trees' formers to one map, so neither gains it alone: `Rx.Exp` and its
-  traversals, `CLI.Decode`, the QuickCheck census, `exp.ts`, both generators,
-  and `plain-eval.ts` over `flatten`. The echo is already underneath
-  (`thru-outer`'s `echoing` lanes, `walk-echo`), so the evaluator arm is one
-  `subs-` arm into `subscribeAll⇓` once that takes the `Lanes` it installs.
+- **REWRITE EVERY PRODUCER OVER `flattenᵉ`.** `SExp.Elaborate`'s and
+  `SExp.Plain`'s three arms, and the TypeScript generator's three lanes,
+  write `flattenᵉ` over an element map that echoes nothing, so the Agda
+  sweep reaches it and its `agen=no` row in `scripts/formers.tsv` flips. The
+  author's palette keeps `mergeAllˢ`/`switchAllˢ`/`exhaustAllˢ`, so the
+  bug-cache rows, which are author programs, stand as written.
 
-- **REWRITE EVERY PRODUCER OVER `flattenᵉ`, THEN DELETE THE THREE.**
-  `SExp.Elaborate`, both generators, the traversals in `Rx.Exp`, every proof
-  arm the three own, and the bug-cache rows RE-ENCODED rather than dropped.
-  `bare` lanes go with them, and `Lanes` with it; `AllOp` stays as the
-  policy tag only if it still earns its place.
+- **DELETE THE THREE.** The formers and every proof arm they own
+  (`red-mergeAll`, `subs-merge-all` and their siblings), `bare` lanes and
+  `Lanes` with it; `AllOp` stays as the policy tag only if it still earns
+  its place.
 
 - **PORT `timed.ts` ONTO IT.** The translation's flatteners become
   `flatten` read by `last-seen`; the `max-` rules, keys, trails and

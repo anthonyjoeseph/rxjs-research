@@ -51,7 +51,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong
 
 open import Rx.Exp using (Ctx; Ty; Exp; Tm; elimGExp; elimGTm; elimGTms; unfoldμ;
   input; ofᵉ; emptyᵉ; takeᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
+  exhaustAllᵉ; flattenᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ)
 
@@ -70,6 +70,7 @@ mutual
   gsizeᵉ (switchAllᵉ e)    = suc (gsizeᵉ e)
   gsizeᵉ (batchSyncᵉ e)    = suc (gsizeᵉ e)
   gsizeᵉ (exhaustAllᵉ e)   = suc (gsizeᵉ e)
+  gsizeᵉ (flattenᵉ _ e)    = suc (gsizeᵉ e)
   gsizeᵉ (μᵉ e)            = suc (gsizeᵉ e)
   gsizeᵉ (varᵉ x)          = zero
   gsizeᵉ (deferᵉ e)        = zero
@@ -121,6 +122,7 @@ mutual
   gsize-elimG Θl x cl (switchAllᵉ e)    = cong suc (gsize-elimG Θl x cl e)
   gsize-elimG Θl x cl (batchSyncᵉ e)    = cong suc (gsize-elimG Θl x cl e)
   gsize-elimG Θl x cl (exhaustAllᵉ e)   = cong suc (gsize-elimG Θl x cl e)
+  gsize-elimG Θl x cl (flattenᵉ _ e)    = cong suc (gsize-elimG Θl x cl e)
   gsize-elimG Θl x cl (μᵉ e)            = cong suc (gsize-elimG Θl (there x) cl e)
   gsize-elimG Θl x cl (varᵉ y)          = refl
   gsize-elimG Θl x cl (deferᵉ e)        = refl

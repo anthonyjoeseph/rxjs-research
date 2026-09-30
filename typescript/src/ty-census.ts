@@ -22,7 +22,10 @@ const walk = (
     if (under) hit.scanObsUnderFlat++;
   }
   const flat =
-    n.type === "mergeAll" || n.type === "switchAll" || n.type === "exhaustAll";
+    n.type === "mergeAll" ||
+    n.type === "switchAll" ||
+    n.type === "exhaustAll" ||
+    n.type === "flatten";
   for (const k of Object.keys(n))
     if (k !== "ty") walk(n[k], under || flat, hit);
 };

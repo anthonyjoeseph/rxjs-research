@@ -479,7 +479,7 @@ genExp d = genExpAt 0 0 2 d
 -- decoder and the TypeScript union spell.
 data Former : Set where
   fInput fOf fEmpty fTake fMap fScan fMergeAll fSwitchAll fExhaustAll
-    fMu fVar fDefer fMint fBatchSync : Former
+    fFlatten fMu fVar fDefer fMint fBatchSync : Former
 
 formerTag : Former → String
 formerTag fInput      = "input"
@@ -491,6 +491,7 @@ formerTag fScan       = "scan"
 formerTag fMergeAll   = "mergeAll"
 formerTag fSwitchAll  = "switchAll"
 formerTag fExhaustAll = "exhaustAll"
+formerTag fFlatten    = "flatten"
 formerTag fMu         = "mu"
 formerTag fVar        = "varE"
 formerTag fDefer      = "defer"
@@ -499,8 +500,8 @@ formerTag fBatchSync  = "batchSync"
 
 allFormers : List Former
 allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fMap ∷ fScan ∷ fMergeAll
-           ∷ fSwitchAll ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ fMint
-           ∷ fBatchSync ∷ []
+           ∷ fSwitchAll ∷ fExhaustAll ∷ fFlatten ∷ fMu ∷ fVar ∷ fDefer
+           ∷ fMint ∷ fBatchSync ∷ []
 
 formerIx : Former → ℕ
 formerIx fInput      = 0
@@ -512,11 +513,12 @@ formerIx fScan       = 5
 formerIx fMergeAll   = 6
 formerIx fSwitchAll  = 7
 formerIx fExhaustAll = 8
-formerIx fMu         = 9
-formerIx fVar        = 10
-formerIx fDefer      = 11
-formerIx fMint       = 12
-formerIx fBatchSync  = 13
+formerIx fFlatten    = 9
+formerIx fMu         = 10
+formerIx fVar        = 11
+formerIx fDefer      = 12
+formerIx fMint       = 13
+formerIx fBatchSync  = 14
 
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
