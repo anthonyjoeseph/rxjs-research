@@ -222,7 +222,10 @@ research lives; where they disagree, the header wins.
 
 **THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
 are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
-close without changing one of them, STOP and report that proof. The InstEmit's
+close without changing one of them, STOP and report that proof. One ruling
+moves `SExp.Syntax` with `Rx.Exp`: it mirrors `Exp` former for former, less the
+elaboration-only `batchSyncᵉ` and `mintᵉ` (Anthony), so its flattener is
+`flattenˢ` and rxjs's named three are that former with no echo. The InstEmit's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
 `QuickCheck` is four quickchecks, one per statement `Main` imports, each
@@ -240,13 +243,12 @@ bound.
 
 ### Big picture tier roadmap
 
-- **`timed`'S BODY WAITS ON A QUESTION FOR ANTHONY.** The `echo` rule of
-  `typescript/src/timed.ts` needs `flattenᵉ`, an `Exp` former, and `timed`
-  lands in `SExp` because `timing-correct` runs the impl on it; the palette
-  cannot spell an echo (`timed`'s header). Either `SExp.Syntax` gains an
-  echoing flattener, or `timed` lands in `Exp` and `timing-correct` pairs
-  the impl's stamps on the author's own program with the timed run's
-  packets. Until then the two timed quickchecks halt on the postulate.
+- **GIVE `timed` ITS ECHO BODY OVER `flattenˢ`.** `SExp` now has the echoing
+  flattener, so the `echo` rule of `typescript/src/timed.ts` transcribes:
+  packets encoded in `packetᵗ`, a hole filled and paths prefixed per lane
+  frame, each lane's subscribe instant the last packet seen before its START
+  (a `scanˢ`), a shared slot's names closed at the share. Until it lands the
+  two timed quickchecks halt on the postulate and decide nothing.
 
 - **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
   A share's connect mints its own instant inside the subscribe frame, and a

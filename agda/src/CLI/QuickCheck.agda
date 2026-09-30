@@ -65,14 +65,15 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim using (after_,_; Timed; ObservableInput; hot; cold; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ;
+open import Rx.Exp using (Ty; natᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ;
+  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ;
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import CLI.Emit-Eq using (eqListℕ; eqBatches)
 open import SExp.Pipeline using (runᴵ)
-open import CLI.Unit-Test.Prelude using (Γ₂; κ₂; Case; mkSlots; cached; Statement;
+open import CLI.Unit-Test.Prelude using (Γ₂; κ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; statements; statementName;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ)
 open import CLI.Unit-Test using (cases)
@@ -251,29 +252,50 @@ genScanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ nat�
 genScanFn = pureG (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl)))
                                     (sndˢ (varˢᵗ (here refl)))))
 
--- THE STEP THAT CHANGES AN EMIT'S VALUE COUNT, WHICH IS NOW A FLATTEN
--- AND NOT A STEP AT ALL.  `mapᵉ` and `scanᵉ` are both per-VALUE, so the
+-- THE STEP THAT CHANGES AN EMIT'S VALUE COUNT, WHICH IS A FLATTEN AND
+-- NOT A STEP AT ALL.  `mapᵉ` and `scanᵉ` are both per-VALUE, so the
 -- list they hand back is always as long as the one they were given, and
 -- a sweep built only out of them never changes a count.  Zero-or-more
--- out is `mergeAllˢ` over a step returning LITERAL SYNTAX — rxjs's own
--- `mergeMap(x => …)` — so this generates the step and the lane spends
--- it under a flattener.  The arms are a lattice over what happens to
--- the count: emptied, doubled, one longer, filtered, and unchanged.
+-- out is `flattenˢ` over a step returning an ELEMENT — an optional echo
+-- beside an optional lane of LITERAL SYNTAX, rxjs's own
+-- `mergeMap(x => …)` when the echo is absent — so this generates the
+-- step and the fan arm spends it under a drawn policy.  The lane arms
+-- are a lattice over what happens to the count: emptied, doubled, one
+-- longer, filtered, and unchanged; the echo arms are the same lattice
+-- spent WITHOUT a lane, which no policy sees, and one arm carrying both.
 --
--- THE IDENTITY ARM IS DELIBERATE, on the reasoning `genFn` records: a
+-- THE IDENTITY ARMS ARE DELIBERATE, on the reasoning `genFn` records: a
 -- generator whose every arm exercises the interesting shape cannot
 -- produce the program that distinguishes a step which ignores its input
 -- from one that does not.
-genFanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ (obs natᵗ))
-genFanFn = genB 5 >>=G λ c → genNat >>=G λ k →
+genFanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ)))
+genFanFn = genB 9 >>=G λ c → genNat >>=G λ k →
   let x = varˢᵗ (here refl)
+      lane : ∀ {Δᵍ Δ Θ} → STm Γ₂ Δᵍ Δ Θ (obs natᵗ) → STm Γ₂ Δᵍ Δ Θ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ))
+      lane o = pairˢ (inlˢ unitˢ) (inrˢ o)
+      none = pairˢ (inlˢ unitˢ) (inlˢ unitˢ)
+      echo = pairˢ (inrˢ x) (inlˢ unitˢ)
   in pureG
-    (      if c ≡ᵇ 0 then strmˢ emptyˢ
-      else if c ≡ᵇ 1 then strmˢ (ofˢ (x ∷ x ∷ []))
-      else if c ≡ᵇ 2 then strmˢ (ofˢ (x ∷ natˢ k ∷ []))
+    (      if c ≡ᵇ 0 then lane (strmˢ emptyˢ)
+      else if c ≡ᵇ 1 then lane (strmˢ (ofˢ (x ∷ x ∷ [])))
+      else if c ≡ᵇ 2 then lane (strmˢ (ofˢ (x ∷ natˢ k ∷ [])))
       else if c ≡ᵇ 3 then
-        ifˢ (primˢ ltᵖ (pairˢ x (natˢ k))) (strmˢ emptyˢ) (strmˢ (ofˢ (x ∷ [])))
-      else strmˢ (ofˢ (x ∷ [])))
+        ifˢ (primˢ ltᵖ (pairˢ x (natˢ k))) (lane (strmˢ emptyˢ)) (lane (strmˢ (ofˢ (x ∷ []))))
+      else if c ≡ᵇ 4 then lane (strmˢ (ofˢ (x ∷ [])))
+      else if c ≡ᵇ 5 then none
+      else if c ≡ᵇ 6 then ifˢ (primˢ ltᵖ (pairˢ x (natˢ k))) none echo
+      else if c ≡ᵇ 7 then pairˢ (inrˢ x) (inrˢ (strmˢ (ofˢ (natˢ k ∷ []))))
+      else echo)
+
+-- A FLATTENER'S POLICY, each of rxjs's named ones and the bounded merge
+-- between them
+genOp : Gen FlatOp
+genOp = genB 5 >>=G λ c → genB 3 >>=G λ k →
+  pureG (      if c ≡ᵇ 0 then mergeᶠ nothing
+          else if c ≡ᵇ 1 then mergeᶠ (just (suc k))
+          else if c ≡ᵇ 2 then switchᶠ
+          else if c ≡ᵇ 3 then exhaustᶠ
+          else mergeᶠ nothing)
 
 -- THE ACCUMULATOR AT OBSERVABLE TYPE, WHICH IS THE ONE BINDER THAT
 -- BREAKS A DATA ENVIRONMENT.  Substituting a value of observable type
@@ -293,12 +315,12 @@ genObsScanFn = genB 6 >>=G λ c → genNat >>=G λ k →
   let acc = fstˢ (varˢᵗ (here refl))
       cur = sndˢ (varˢᵗ (here refl))
   in pureG
-    (      if c ≡ᵇ 0 then strmˢ (mergeAllˢ nothing (ofˢ (acc ∷ [])))
+    (      if c ≡ᵇ 0 then strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ (acc ∷ [])))
       else if c ≡ᵇ 1 then acc
       else if c ≡ᵇ 2 then strmˢ (ofˢ (cur ∷ []))
       else if c ≡ᵇ 3 then strmˢ emptyˢ
-      else if c ≡ᵇ 4 then strmˢ (switchAllˢ (ofˢ (acc ∷ [])))
-      else strmˢ (mergeAllˢ nothing
+      else if c ≡ᵇ 4 then strmˢ (flatAllˢ switchᶠ (ofˢ (acc ∷ [])))
+      else strmˢ (flatAllˢ (mergeᶠ nothing)
              (ofˢ (acc ∷ strmˢ (ofˢ (natˢ k ∷ [])) ∷ []))))
 
 -- the fold's own seed, at observable type.  `emptyᵉ` is the shallowest
@@ -365,23 +387,23 @@ genExpAt g u sl (suc d) = genB 12 >>=G λ c →
   else if c ≡ᵇ 3 then
     (genScanFn >>=G λ f → genNat >>=G λ z → genExpAt g u sl d >>=G λ e →
      pureG (scanˢ f (natˢ z) e))
-  else if c ≡ᵇ 4 then (genObsAt g u sl d >>=G λ t → pureG (mergeAllˢ nothing t))
+  else if c ≡ᵇ 4 then (genObsAt g u sl d >>=G λ t → pureG (flatAllˢ (mergeᶠ nothing) t))
   else if c ≡ᵇ 5 then
     -- the limit axis, which is where bounded concurrency gets sampled:
     -- 1 is the old concat, 2 and 3 are the middle nothing here could
     -- previously reach.  Two lanes with three parked inners is the
     -- smallest shape whose drain refills more than one lane in a
     -- single instant, so `genB 3` is the floor and not a taste
-    (genB 3 >>=G λ k → genObsAt g u sl d >>=G λ t → pureG (mergeAllˢ (just (suc k)) t))
-  else if c ≡ᵇ 6 then (genObsAt g u sl d >>=G λ t → pureG (switchAllˢ t))
-  else if c ≡ᵇ 7 then (genObsAt g u sl d >>=G λ t → pureG (exhaustAllˢ t))
+    (genB 3 >>=G λ k → genObsAt g u sl d >>=G λ t → pureG (flatAllˢ (mergeᶠ (just (suc k))) t))
+  else if c ≡ᵇ 6 then (genObsAt g u sl d >>=G λ t → pureG (flatAllˢ switchᶠ t))
+  else if c ≡ᵇ 7 then (genObsAt g u sl d >>=G λ t → pureG (flatAllˢ exhaustᶠ t))
   else if c ≡ᵇ 8 then (genSpineG g u sl d >>=G λ b → pureG (μˢ b))
   else if c ≡ᵇ 9 then (genExpAt 0 (g + u) sl d >>=G λ b → pureG (gate g u b))
   else if c ≡ᵇ 10 then
     (genNat >>=G λ k → genExpAt g u sl d >>=G λ e → pureG (takeˢ (natˢ k) e))
   else
-    (genFanFn >>=G λ f → genExpAt g u sl d >>=G λ e →
-     pureG (mergeAllˢ nothing (mapˢ f e)))
+    (genOp >>=G λ op → genFanFn >>=G λ f → genExpAt g u sl d >>=G λ e →
+     pureG (flattenˢ op (mapˢ f e)))
 
 genInners g u sl d zero    = pureG []
 genInners g u sl d (suc n) =
@@ -431,25 +453,25 @@ genSpineD w sl (suc d) = genB 9 >>=G λ c →
   else if c ≡ᵇ 3 then
     (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
-     pureG (mergeAllˢ nothing (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ (mergeᶠ nothing) (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 4 then
     (genB 3 >>=G λ k → genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
-     pureG (mergeAllˢ (just (suc k)) (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ (mergeᶠ (just (suc k))) (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 5 then
     (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
-     pureG (switchAllˢ (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ switchᶠ (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 6 then
-    (genFanFn >>=G λ f → genSpineD w sl d >>=G λ e →
-     pureG (mergeAllˢ nothing (mapˢ f e)))
+    (genOp >>=G λ op → genFanFn >>=G λ f → genSpineD w sl d >>=G λ e →
+     pureG (flattenˢ op (mapˢ f e)))
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineD w sl d >>=G λ e →
      pureG (takeˢ (natˢ (suc k)) e))
   else
     (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
-     pureG (exhaustAllˢ (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ exhaustᶠ (ofˢ (strmˢ e ∷ rest))))
 
 -- before the gate: the binder is guarded, so every route ends in a `deferᵉ`
 genSpineG g u sl zero    = pureG (gate (suc g) u (varˢ (here refl)))
@@ -463,21 +485,21 @@ genSpineG g u sl (suc d) = genB 9 >>=G λ c →
   else if c ≡ᵇ 4 then
     (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u sl d (suc extra) >>=G λ rest →
-     pureG (mergeAllˢ nothing (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ (mergeᶠ nothing) (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 5 then
     (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u sl d (suc extra) >>=G λ rest →
-     pureG (switchAllˢ (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ switchᶠ (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 6 then
-    (genFanFn >>=G λ f → genSpineG g u sl d >>=G λ e →
-     pureG (mergeAllˢ nothing (mapˢ f e)))
+    (genOp >>=G λ op → genFanFn >>=G λ f → genSpineG g u sl d >>=G λ e →
+     pureG (flattenˢ op (mapˢ f e)))
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineG g u sl d >>=G λ e →
      pureG (takeˢ (natˢ (suc k)) e))
   else
     (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u sl d (suc extra) >>=G λ rest →
-     pureG (exhaustAllˢ (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ exhaustᶠ (ofˢ (strmˢ e ∷ rest))))
 
 -- the PROGRAM's slot bound is the whole table: a program, unlike a def,
 -- sits above every slot and may read any of them
@@ -568,9 +590,7 @@ marksˢ (mapˢ f e)       = one fMap ⊕ marksˢᵗ f ⊕ marksˢ e
 marksˢ (scanˢ {t = t} f z e) =
   one fScan ⊕ ([] , not (isData t)) ⊕ marksˢᵗ f ⊕ marksˢᵗ z ⊕ marksˢ e
 -- the author's three flatteners are each one `flattenᵉ` over a `mapᵉ`
-marksˢ (mergeAllˢ _ e)  = one fFlatten ⊕ one fMap ⊕ marksˢ e
-marksˢ (switchAllˢ e)   = one fFlatten ⊕ one fMap ⊕ marksˢ e
-marksˢ (exhaustAllˢ e)  = one fFlatten ⊕ one fMap ⊕ marksˢ e
+marksˢ (flattenˢ _ e)   = one fFlatten ⊕ marksˢ e
 marksˢ (μˢ e)           = one fMu ⊕ marksˢ e
 marksˢ (varˢ x)         = one fVar
 marksˢ (deferˢ e)       = one fDefer ⊕ marksˢ e
@@ -656,8 +676,17 @@ showPrim ltᵖ  = "ltᵖ"
 showPrim eqᵘ  = "eqᵘ"
 showPrim notᵖ = "notᵖ"
 
+-- the limit prints as the `Maybe ℕ` it IS, not as the ∞ a reader would
+-- prefer: a witness is printed to be PASTED, and the corpus is Agda
+showFlatOp : FlatOp → String
+showFlatOp (mergeᶠ nothing)  = "(mergeᶠ nothing)"
+showFlatOp (mergeᶠ (just k)) = "(mergeᶠ (just " ++ show k ++ "))"
+showFlatOp switchᶠ           = "switchᶠ"
+showFlatOp exhaustᶠ          = "exhaustᶠ"
+
 showSExp : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → String
 showSTm  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → String
+showFlat : ∀ {Δᵍ Δ Θ u} → FlatOp → SExp Γ₂ Δᵍ Δ Θ u → String
 
 showSTmList : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → String
 showSTmList []       = "[]"
@@ -698,16 +727,18 @@ showSExp (takeˢ n e)     = "(takeˢ " ++ showSTm n ++ " " ++ showSExp e ++ ")"
 showSExp (mapˢ f e)      = "(mapˢ " ++ showSTm f ++ " " ++ showSExp e ++ ")"
 showSExp (scanˢ f z e)   =
   "(scanˢ " ++ showSTm f ++ " " ++ showSTm z ++ " " ++ showSExp e ++ ")"
--- the limit prints as the `Maybe ℕ` it IS, not as the ∞ a reader would
--- prefer: a witness is printed to be PASTED, and the corpus is Agda
-showSExp (mergeAllˢ nothing s)  = "(mergeAllˢ nothing " ++ showSExp s ++ ")"
-showSExp (mergeAllˢ (just k) s) =
-  "(mergeAllˢ (just " ++ show k ++ ") " ++ showSExp s ++ ")"
-showSExp (switchAllˢ s)  = "(switchAllˢ " ++ showSExp s ++ ")"
-showSExp (exhaustAllˢ s) = "(exhaustAllˢ " ++ showSExp s ++ ")"
+showSExp (flattenˢ op s) = showFlat op s
 showSExp (μˢ e)          = "(μˢ " ++ showSExp e ++ ")"
 showSExp (varˢ x)        = "(varˢ " ++ showIx x ++ ")"
 showSExp (deferˢ e)      = "(deferˢ " ++ showSExp e ++ ")"
+
+-- rxjs's named flatteners print as the corpus's `flatAllˢ`, which is
+-- what they expand to, and every other flatten prints as itself.  It
+-- takes its argument at ANY type because printing reads none: at the
+-- element type an `inputˢ`'s lookup cannot be unified against a pair.
+showFlat op (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (varˢᵗ (here refl)))) s) =
+  "(flatAllˢ " ++ showFlatOp op ++ " " ++ showSExp s ++ ")"
+showFlat op s = "(flattenˢ " ++ showFlatOp op ++ " " ++ showSExp s ++ ")"
 
 ------------------------------------------------------------------------
 -- one case, a run, and reporting

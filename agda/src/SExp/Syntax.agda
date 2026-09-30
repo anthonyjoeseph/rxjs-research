@@ -6,10 +6,9 @@ open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Vec     using (Vec; lookup; zipWith) renaming (map to mapⱽ)
 open import Data.Fin     using (Fin)
-open import Data.Maybe   using (Maybe)
 
 open import Rx.Exp      using (Ty; Ctx; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_;
-                               listᵗ; obs; PrimOp)
+                               listᵗ; obs; PrimOp; FlatOp)
 open import SExp.InstEmit using (machineEmitᵗ)
 
 ------------------------------------------------------------------
@@ -36,9 +35,16 @@ open import SExp.InstEmit using (machineEmitᵗ)
 -- — the wrapper appears exactly once, at the boundary between the two
 -- trees, instead of being threaded through a program's own types.
 --
--- THE PALETTE IS THE TYPESCRIPT ONE, NAME FOR NAME, which is what makes
--- the two implementations comparable at all rather than merely
--- analogous.  `share` is absent from both for the same reason: a shared
+-- THE FORMERS ARE `Exp`'S, FORMER FOR FORMER, less the two that only an
+-- elaboration may write (`batchSyncᵉ`, `mintᵉ`) (Anthony).  That is what
+-- lets a translation out of this tree build the SAME KIND of tree it
+-- read: `timed` rewrites a program into another program, and a palette
+-- narrower than `Exp`'s would leave it holding shapes the plain run
+-- builds and it cannot.  So the flattener is the one `flattenᵉ`, echo
+-- lane and all, and rxjs's three named flatteners are that former with
+-- the echo absent.  The TypeScript twin is the same palette, which is
+-- what makes the two implementations comparable at all rather than
+-- merely analogous.  `share` is absent from both for the same reason: a shared
 -- observable is a BINDING and not an expression, so it lives in the
 -- slot telescope and is referenced with `inputˢ`.  The two pure-function
 -- formers are `mapˢ` and `scanˢ` for the reason their plain
@@ -56,9 +62,8 @@ mutual
     mapˢ        : ∀ {s t} → SFn Γ Δᵍ Δ Θ s t → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
     scanˢ       : ∀ {s t} → SFn Γ Δᵍ Δ Θ (t ×ᵗ s) t
                 → STm Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
-    mergeAllˢ   : ∀ {t} → Maybe ℕ → SExp Γ Δᵍ Δ Θ (obs t) → SExp Γ Δᵍ Δ Θ t
-    switchAllˢ exhaustAllˢ :
-                  ∀ {t} → SExp Γ Δᵍ Δ Θ (obs t) → SExp Γ Δᵍ Δ Θ t
+    flattenˢ    : ∀ {t} → FlatOp
+                → SExp Γ Δᵍ Δ Θ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) → SExp Γ Δᵍ Δ Θ t
     μˢ          : ∀ {t} → SExp Γ (t ∷ Δᵍ) Δ Θ t → SExp Γ Δᵍ Δ Θ t
     varˢ        : ∀ {t} → t ∈ Δ → SExp Γ Δᵍ Δ Θ t
     deferˢ      : ∀ {t} → SExp Γ [] (Δᵍ ++ Δ) Θ t → SExp Γ Δᵍ Δ Θ t

@@ -5,15 +5,14 @@ open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (Maybe; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Maybe using (nothing)
 open import Data.Fin using (Fin)
 open import Data.Vec using (lookup)
 open import Data.Vec.Properties using (lookup-zipWith)
 open import Relation.Binary.PropositionalEquality using (subst; refl)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
-  mapᵉ; scanᵉ; mergeᶠ; switchᶠ; exhaustᶠ; batchSyncᵉ;
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
+  mapᵉ; scanᵉ; FlatOp; mergeᶠ; flattenᵉ; batchSyncᵉ; unitᵗ; _+ᵗ_;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
   foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul;
   eqᵖ; ltᵖ; eqᵘ; notᵖ)
@@ -21,8 +20,7 @@ open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; even
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
                                machineEmitᵗ)
-open import SExp.Plain using (flatAllᵉ)
-open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
+open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; scriptedᵏ; sharedᵏ; slotTy;
   plainᵏ)
@@ -76,6 +74,12 @@ exhaustedᵛ = inrᵗ (inrᵗ unit̂)
 
 subscribeᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
 subscribeᵛ = inlᵗ unit̂
+
+-- A FLATTENER OVER A SOURCE OF OBSERVABLES, which is what rxjs's
+-- `mergeAll`, `switchAll` and `exhaustAll` are: `flattenᵉ` over a map
+-- making every element a lane and none an echo.
+flatAllᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → FlatOp → Exp Γ Δᵍ Δ Θ (obs t) → Exp Γ Δᵍ Δ Θ t
+flatAllᵉ op e = flattenᵉ op (mapᵉ (pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl)))) e)
 
 -- the arrival kind: the tag an input's per-arrival emit carries
 deliveryᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
@@ -577,73 +581,79 @@ takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ counted)
   counted : Exp _ _ _ (uniqᵗ ∷ Θ) S
   counted = scanᵉ step seed e'
 
--- a runtime list of observables as ONE observable: the merge of its
--- elements, in order.  A merging flattener over a two-element `ofᵉ` is rxjs's
--- `merge` exactly, and folding it over the list is how a term language
--- with no application reaches an n-ary one.
-mergeObsᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
-          → Tm Γ Δᵍ Δ Θ (listᵗ (obs a)) → Tm Γ Δᵍ Δ Θ (obs a)
-mergeObsᵛ {Θ = Θ} {a = a} xs = foldᵗ (revᵗ xs) (strmᵗ emptyᵉ) body
-  where
-  body : Tm _ _ _ (obs a ∷ obs a ∷ Θ) (obs a)
-  body = strmᵗ (flatAllᵉ (mergeᶠ nothing)
-                 (ofᵉ (varᵗ (here refl) ∷ varᵗ (there (here refl)) ∷ [])))
-
--- ONE OUTER EMIT'S LANE, WHICH IS WHAT ALL THREE FLATTENERS ARE WRITTEN
--- OVER — the mirror's `join.ts` is one engine parameterised by how a
--- lane is disposed of, and this is the same factoring: the three bodies
--- below differ in their plain flattener and in nothing else.  The
--- lane's own subscribe burst carries the outer emit's bookkeeping,
--- re-stamped and payload-free, and the inner streams the emit carried
--- run behind it.
+-- ONE OUTER EMIT AS ONE FLATTENER ELEMENT: an echo carrying the emit's
+-- bookkeeping and its echoed values, beside a lane merging the inners it
+-- carried.  The flattener is `flattenᵉ` itself, at the author's policy,
+-- because the author wrote `flattenˢ`; nothing here chooses one.
 --
 -- THE INSTEMIT APPEARS TWICE IN THE ARGUMENT, WHICH IS EASY TO READ
--- PAST.  `emitᵗ (obs t)` unfolds through `plainᵗ`'s observable clause,
--- so the outer's payload is an observable of INSTEMITS: the argument is
--- an InstEmit stream of InstEmit streams.  Both layers are already
--- stamped when they arrive, which is why nothing here mints — the
--- inner's bookkeeping rides the inner's own emits, and only the OUTER's
--- has to be placed.
+-- PAST.  `emitᵗ` unfolds through `plainᵗ`'s observable clause, so an
+-- inner lane is an observable of INSTEMITS: the argument is an InstEmit
+-- stream whose payloads may hold InstEmit streams.  Both layers are
+-- already stamped when they arrive, which is why nothing here mints —
+-- the inner's bookkeeping rides the inner's own emits, and only the
+-- OUTER's has to be placed.
 --
--- AND PLACING IT ON A LANE IS THE READING THIS LOSES, WHICH IS WHERE
--- THE MIRROR STILL DIFFERS.  A lane is what a concurrency limit COUNTS,
--- what a switch CUTS and what an exhaust DROPS, so at a saturated limit
--- the bookkeeping queues behind a running inner, and a lane the outer
--- disposes of takes its own bookkeeping with it.  The twin does not
--- pay that: it puts every event through one channel and holds the lane
--- table in a `scan` beside it, and a channel is this language's one
--- multicast — reachable today only as a slot BINDING, never from inside
--- an operator's body.
-laneᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-      → Fn Γ Δᵍ Δ Θ (emitᵗ (obs t)) (obs (emitᵗ t))
-laneᵛ {Θ = Θ} {t = t} =
+-- AND IT IS PLACED ON THE ECHO, WHICH NO POLICY SEES.  A lane is what a
+-- concurrency limit COUNTS, what a switch CUTS and what an exhaust
+-- DROPS, so bookkeeping riding a lane would queue behind a running inner
+-- at a saturated limit and vanish with a dropped one; the echo leaves as
+-- the element arrives, before its lane is handled, which is the twin's
+-- one ordered channel.  For the same reason an emit carrying no inner
+-- has NO lane rather than an empty one: under a switch an empty lane
+-- still cancels the live one.
+--
+-- THE LANE IS PER EMIT AND NOT PER INNER: an emit carrying two inners
+-- hands the flattener one lane, their merge.
+elemᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+      → Fn Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)))
+                    ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t)))
+elemᵛ {Θ = Θ} {t = t} =
   letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (varᵗ (here refl))))
-       (strmᵗ emptyᵉ) body
+       (pairᵗ (inlᵗ unit̂) (inlᵗ unit̂)) body
   where
+  L : Ty
+  L = unitᵗ +ᵗ obs (emitᵗ t)
+
+  P : Ty
+  P = (unitᵗ +ᵗ plainᵗ t) ×ᵗ L
+
   SP : Ty
-  SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ (obs t)) ×ᵗ boolᵗ)
+  SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ P ×ᵗ boolᵗ)
+
+  -- one payload's echo consed onto the accumulated ones, reversed:
+  -- the payload, then the accumulator
+  echoStep : Tm _ _ _ (P ∷ listᵗ (plainᵗ t) ∷ SP ∷ emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) ∷ Θ)
+                (listᵗ (plainᵗ t))
+  echoStep = caseᵗ (fstᵗ (varᵗ (here refl)))
+                   (varᵗ (there (there (here refl))))
+                   (consᵗ (varᵗ (here refl)) (varᵗ (there (there (here refl)))))
+
+  -- one payload's lane merged in FRONT of the accumulated one, over the
+  -- payloads reversed, so the first inner leads: the payload, then the
+  -- accumulator
+  laneStep : Tm _ _ _ (P ∷ L ∷ SP ∷ emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) ∷ Θ) L
+  laneStep = caseᵗ (sndᵗ (varᵗ (here refl)))
+                   (varᵗ (there (there (here refl))))
+                   (caseᵗ (varᵗ (there (there (here refl))))
+                          (inrᵗ (varᵗ (there (here refl))))
+                          (inrᵗ (strmᵗ (flatAllᵉ (mergeᶠ nothing)
+                                  (ofᵉ (varᵗ (there (here refl)) ∷ varᵗ (here refl) ∷ []))))))
 
   -- inside the `letᵗ`: the split, the former's argument, then Θ
-  body : Tm _ _ _ (SP ∷ emitᵗ (obs t) ∷ Θ) (obs (emitᵗ t))
-  body = mergeObsᵛ (consᵗ bookLane (fstᵗ (sndᵗ split)))
+  body : Tm _ _ _ (SP ∷ emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) ∷ Θ)
+            ((unitᵗ +ᵗ emitᵗ t) ×ᵗ L)
+  body = pairᵗ (inrᵗ (reassembleᵛ env (fstᵗ split) echoes (sndᵗ (sndᵗ split))))
+               (foldᵗ (revᵗ vals) (inlᵗ unit̂) laneStep)
     where
-    split = varᵗ (here refl)
-    env   = varᵗ (there (here refl))
+    split  = varᵗ (here refl)
+    env    = varᵗ (there (here refl))
+    vals   = fstᵗ (sndᵗ split)
+    echoes = revᵗ (foldᵗ vals nilᵗ echoStep)
 
-    bookLane = strmᵗ (ofᵉ (reassembleᵛ env (fstᵗ split) nilᵗ
-                                       (sndᵗ (sndᵗ split)) ∷ []))
-
-mergeAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-          → Maybe ℕ → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-mergeAllᵖ k e = flatAllᵉ (mergeᶠ k) (mapᵉ laneᵛ e)
-
-switchAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-           → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-switchAllᵖ e = flatAllᵉ switchᶠ (mapᵉ laneᵛ e)
-
-exhaustAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-            → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-exhaustAllᵖ e = flatAllᵉ exhaustᶠ (mapᵉ laneᵛ e)
+flattenᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → FlatOp
+         → Exp Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+flattenᵖ op e = flattenᵉ op (mapᵉ elemᵛ e)
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.
@@ -800,9 +810,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    toInstEmit (takeˢ k e)         = takeᵖ (toInstEmitTm k) (toInstEmit e)
    toInstEmit (mapˢ f e)          = mapᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (scanˢ f z e)       = scanᵖ (toInstEmitTm f) (toInstEmitTm z) (toInstEmit e)
-   toInstEmit (mergeAllˢ k e)     = mergeAllᵖ k (toInstEmit e)
-   toInstEmit (switchAllˢ e)      = switchAllᵖ (toInstEmit e)
-   toInstEmit (exhaustAllˢ e)     = exhaustAllᵖ (toInstEmit e)
+   toInstEmit (flattenˢ op e)     = flattenᵖ op (toInstEmit e)
    toInstEmit (μˢ e)              = μᵉ (toInstEmit e)
    toInstEmit (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
    toInstEmit {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =

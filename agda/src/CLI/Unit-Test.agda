@@ -51,49 +51,49 @@ open import Data.Maybe using (nothing; just)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; mergeAllˢ;
-  switchAllˢ; exhaustAllˢ; varˢᵗ; natˢ; primˢ; pairˢ; strmˢ)
-open import Rx.Exp using (add)
+open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; varˢᵗ; natˢ;
+  primˢ; pairˢ; strmˢ)
+open import Rx.Exp using (add; mergeᶠ; switchᶠ; exhaustᶠ)
 
 open import Rx.Prim using (hot; cold; after_,_)
-open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots)
+open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots; flatAllˢ)
 -- IMPORTS>>>
 
 cases : List Case
 cases =
   cached "two ofs in one delivery" 30
-          (mergeAllˢ nothing (mapˢ (strmˢ (mergeAllˢ nothing (ofˢ (
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ (
               (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
               (strmˢ (ofˢ ((primˢ add (pairˢ (varˢᵗ (here refl)) (natˢ 1))) ∷ []))) ∷ []))))
             (inputˢ zero)))
           (mkSlots (hot ((after 1 , 5) ∷ []))
                    emptyˢ) ∷
   cached "one of, two values, per delivery" 30
-          (mergeAllˢ nothing (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ (varˢᵗ (here refl)) ∷ [])))
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ (varˢᵗ (here refl)) ∷ [])))
             (inputˢ zero)))
           (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
   cached "the script merged with itself" 30
-          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))
           (mkSlots (hot ((after 1 , 5) ∷ []))
                    emptyˢ) ∷
   cached "a share of the script merged with itself" 30
-          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
           (mkSlots (hot ((after 1 , 5) ∷ []))
                    (inputˢ zero)) ∷
   cached "a delivery subscribing the script again" 30
-          (mergeAllˢ nothing (mapˢ (strmˢ (inputˢ zero)) (inputˢ zero)))
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (inputˢ zero)) (inputˢ zero)))
           (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
   cached "a delivery switching to two ofs" 30
-          (switchAllˢ (mapˢ (strmˢ (mergeAllˢ nothing (ofˢ (
+          (flatAllˢ switchᶠ (mapˢ (strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ (
               (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
               (strmˢ (ofˢ ((natˢ 7) ∷ []))) ∷ []))))
             (inputˢ zero)))
           (mkSlots (cold (3 ∷ []) ((after 1 , 5) ∷ []))
                    emptyˢ) ∷
   cached "a delivery exhausting into two ofs" 30
-          (exhaustAllˢ (mapˢ (strmˢ (mergeAllˢ (just 1) (ofˢ (
+          (flatAllˢ exhaustᶠ (mapˢ (strmˢ (flatAllˢ (mergeᶠ (just 1)) (ofˢ (
               (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
               (strmˢ (ofˢ ((natˢ 7) ∷ []))) ∷ []))))
             (inputˢ zero)))
@@ -104,24 +104,24 @@ cases =
           (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
   cached "seed 1 depth 1 case 108" 30
-          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ emptyˢ) ∷
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ emptyˢ) ∷
             (strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 3) ∷ []))) ∷ [])))
           (mkSlots (cold [] ((after 1 , 3) ∷ (after 0 , 7) ∷ []))
                    (ofˢ ((natˢ 5) ∷ (natˢ 7) ∷ []))) ∷
   cached "seed 6 depth 1 case 4" 30
-          (switchAllˢ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ emptyˢ) ∷ [])))
+          (flatAllˢ switchᶠ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ emptyˢ) ∷ [])))
           (mkSlots (hot ((after 0 , 1) ∷ ((after 1 , 1) ∷ [])))
                    (emptyˢ)) ∷
   cached "seed 7 depth 1 case 12" 30
-          (exhaustAllˢ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (ofˢ ((natˢ 4) ∷ (natˢ 6) ∷ []))) ∷ [])))
+          (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (ofˢ ((natˢ 4) ∷ (natˢ 6) ∷ []))) ∷ [])))
           (mkSlots (cold [] ((after 0 , 8) ∷ ((after 0 , 8) ∷ [])))
                    ((inputˢ zero))) ∷
   cached "seed 2 depth 1 case 15" 30
-          (mergeAllˢ nothing (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) (inputˢ zero)))
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) (inputˢ zero)))
           (mkSlots (hot ((after 0 , 2) ∷ ((after 1 , 5) ∷ [])))
                    ((ofˢ ((natˢ 9) ∷ [])))) ∷
   cached "seed 9 depth 1 case 2" 30
-          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 9) ∷ (natˢ 9) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 9) ∷ (natˢ 9) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
           (mkSlots (cold [] ((after 1 , 1) ∷ ((after 0 , 0) ∷ [])))
                    ((ofˢ ((natˢ 5) ∷ [])))) ∷
   []

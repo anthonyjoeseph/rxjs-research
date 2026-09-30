@@ -46,7 +46,7 @@
 # kind	agda	tag	gen	agen	role	why
 exp	input	input	yes	yes	source
 exp	ofᵉ	of	yes	yes	source
-exp	emptyᵉ	empty	yes	yes	source
+exp	emptyᵉ	empty	yes	no	source	the elaboration writes `emptyᵖ`, an `ofᵖ` with no payloads, not `emptyᵉ`; the Agda sweep runs `emptyᵉ` only in the plain reading (`runᴾ`), which this surface does not read
 exp	takeᵉ	take	yes	no	protocol	the elaboration writes `takeᵖ`, not `takeᵉ`, and nothing caps the elaborated run any more; the Agda sweep runs `takeᵉ` only in the plain reading (`runᴾ`), which this surface does not read
 exp	mapᵉ	map	yes	yes	pure
 exp	scanᵉ	scan	yes	yes	pure

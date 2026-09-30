@@ -30,10 +30,13 @@ open import Data.Fin using (zero; suc)
 open import Data.String using (String)
 open import Data.Product using (_×_; _,_)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
+open import Data.List.Relation.Unary.Any using (here)
+open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (ObservableInput)
-open import Rx.Exp using (Ctx; Val; natᵗ; inputsBelowᵉ)
-open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ; emitᵗ)
+open import Rx.Exp using (Ctx; Val; natᵗ; obs; inputsBelowᵉ; FlatOp)
+open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ; emitᵗ;
+  flattenˢ; mapˢ; pairˢ; inlˢ; inrˢ; unitˢ; varˢᵗ)
 open import Rx.Evaluator using (Burst)
 open import SExp.Plain using (plainExp)
 open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
@@ -101,6 +104,15 @@ mkSlots : ObservableInput ℕ → SExp Γ₂ [] [] [] natᵗ → SimulSlots Γ�
 mkSlots d₀ d₁ zero          = slot₀ d₀
 mkSlots d₀ d₁ (suc zero)    = slot₁ d₁
 mkSlots d₀ d₁ (suc (suc ()))
+
+-- RXJS'S THREE NAMED FLATTENERS, which the author's tree does not have
+-- as formers: `flattenˢ` over a map making every element a lane and none
+-- an echo.  `mergeAll` is `flatAllˢ (mergeᶠ nothing)`, `concatAll` is
+-- `flatAllˢ (mergeᶠ (just 1))`, `switchAll` and `exhaustAll` are
+-- `flatAllˢ switchᶠ` and `flatAllˢ exhaustᶠ`.  It lives HERE because a
+-- row is pasted where the corpus lives and the sweep prints the name.
+flatAllˢ : ∀ {Δᵍ Δ Θ t} → FlatOp → SExp Γ₂ Δᵍ Δ Θ (obs t) → SExp Γ₂ Δᵍ Δ Θ t
+flatAllˢ op e = flattenˢ op (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (varˢᵗ (here refl)))) e)
 
 -- one cached counterexample: a label, and the run that produced it
 record Case : Set where

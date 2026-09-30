@@ -31,7 +31,7 @@
 -- AND THAT IS WHY `Rx.Slots.shared` NEEDS NO `isData`.  The bar there
 -- was closing the forgery channel at `plainᵗ (obs u) = obs (emitᵗ u)`,
 -- where a slot's values are observables of InstEmits that the
--- consumer's `mergeAllˢ` subscribes directly, past `stamp`.  A
+-- consumer's `flattenˢ` subscribes directly, past `stamp`.  A
 -- definition here cannot stand at that type dishonestly whatever its
 -- type is, because it was BUILT by the elaboration -- so the
 -- observable-typed shared slot, which a real author wants, survives.
