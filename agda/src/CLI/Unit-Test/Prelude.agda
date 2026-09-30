@@ -24,22 +24,22 @@ module CLI.Unit-Test.Prelude where
 open import Data.Bool using (Bool; true; false; T; _∧_; not; _xor_)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.List using (List; []; _∷_; map; all)
+open import Data.List using (List; []; _∷_; map)
 open import Data.Nat using (ℕ; _≡ᵇ_)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Prim using (ObservableInput)
-open import Rx.Exp using (Ctx; natᵗ; inputsBelowᵉ)
-open import SExp.Syntax using (SExp; plainᵏ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ; emitᵗ)
+open import Rx.Exp using (Ctx; Val; natᵗ; inputsBelowᵉ)
+open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ; emitᵗ)
 open import Rx.Evaluator using (Burst)
 open import SExp.Plain using (plainExp)
 open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
 open import CLI.Emit-Eq using (eqListℕ; eqBatches)
 open import SExp.Pipeline using (emitsᴵ; runᴾ)
-open import Timed.Translation using (packetOf)
+open import Timed.Translation using (packetOf; timedᶜ; itemᵗ)
 open import Left-To-Right.Statement using (joinedᴵ)
 open import Timed.Timing-Correct using (stampedᵀ)
 open import Batchable.Statement using (batchedᴱ; groupedᴱ)
@@ -143,14 +143,23 @@ statementName timed-faithfulˢ = "timed-faithful"
 ltrSides : Case → List ℕ × List ℕ
 ltrSides c = joinedᴵ tt κ₂ (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
 
--- `timing-correct`: each value's stamp, beside its packet
+-- `timing-correct`: each value's stamp, beside its packet.  The
+-- contexts are passed by hand because `Val` at a concrete type forgets
+-- its context, so no argument's type can say which one it was.
+Γ₂ᵗ : Ctx 2
+Γ₂ᵗ = plainᵏ (timedᶜ Γ₂ κ₂) κ₂
+
+packets : List (ℕ × Val Γ₂ᵗ (plainᵗ (itemᵗ natᵗ))) → List (ℕ × List ℕ)
+packets []             = []
+packets ((i , v) ∷ ps) = (i , packetOf {Γ = Γ₂ᵗ} natᵗ v) ∷ packets ps
+
 stampsOf : Case → List (ℕ × List ℕ)
-stampsOf c = map (λ p → proj₁ p , packetOf natᵗ (proj₂ p)) (stampedᵀ κ₂ (fuel c) (prog c) (slots c))
+stampsOf c = packets (stampedᵀ κ₂ (fuel c) (prog c) (slots c))
 
 -- `batchable`: both sides read one run's emits, so the run is an
 -- argument and computed once
 batchSides : Burst Γ₂ᵉ (emitᵗ natᵗ) → List (List ℕ) × List (List ℕ)
-batchSides es = batchedᴱ natᵗ tt es , groupedᴱ natᵗ tt es
+batchSides es = batchedᴱ {Γ′ = Γ₂ᵉ} natᵗ tt es , groupedᴱ {Γ′ = Γ₂ᵉ} natᵗ tt es
 
 batchableSides : Case → List (List ℕ) × List (List ℕ)
 batchableSides c = batchSides (emitsᴵ κ₂ (fuel c) (prog c) (slots c))
@@ -164,9 +173,13 @@ coherentᵇ : ℕ × List ℕ → ℕ × List ℕ → Bool
 coherentᵇ (i , p) (j , q) = not ((i ≡ᵇ j) xor eqListℕ p q)
 
 -- `AllPairs`, decided
+coheresWith : ℕ × List ℕ → List (ℕ × List ℕ) → Bool
+coheresWith x []       = true
+coheresWith x (y ∷ ys) = coherentᵇ x y ∧ coheresWith x ys
+
 allPairsᵇ : List (ℕ × List ℕ) → Bool
 allPairsᵇ []       = true
-allPairsᵇ (x ∷ xs) = all (coherentᵇ x) xs ∧ allPairsᵇ xs
+allPairsᵇ (x ∷ xs) = coheresWith x xs ∧ allPairsᵇ xs
 
 -- each takes its sides as ONE argument, so a pair is computed once
 agreeᴸ : List ℕ × List ℕ → Bool
