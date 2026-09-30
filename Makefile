@@ -180,7 +180,8 @@ help:
 	@echo "                  make oracle ARGS='--operator mergeAll'"
 	@echo "  qc-build      compile the all-Agda QuickCheck binary ($(ORACLE_BIN)/QuickCheck)"
 	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs,"
-	@echo "                  QC_FUEL=n, QC_STMT=1..4 for one statement in Main's order, 0 for all four)"
+	@echo "                  QC_FUEL=n, QC_STMT=1..4 for one statement in Main's order, 0 for all four,"
+	@echo "                  QC_CASE=secs per case, 0 for none)"
 	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful"
 	@echo "                qc-fast on that one statement of Main"
 	@echo "  quickcheck    all-Agda QuickCheck: the four statements of Main, caching counterexamples"
@@ -1672,7 +1673,9 @@ quickcheck: qc-build
 # failure, not a wait -- the budget is what keeps the loop a loop, and it
 # is raised only once the operator passes at the current one.
 # QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds; QC_FUEL 0 is the binary's
-# default fuel.
+# default fuel.  QC_CASE is the wall clock per CASE in seconds, unset for
+# the binary's default and 0 for none: a case past it is a `timeout`
+# failure with its paste row, and the sweep goes on.
 #
 # FOUR QUICKCHECKS, ONE PER STATEMENT `Main` IMPORTS.  Each decides that
 # statement's own two sides on one program's run, so any of them failing
@@ -1682,8 +1685,9 @@ QC ?= 1 15 1
 QC_BUDGET ?= 120
 QC_FUEL ?= 0
 QC_STMT ?= 0
+QC_CASE ?=
 QC_LOG := agda/_oracle/qc.log
-QC_IN = $(word 1,$(QC)) $(or $(word 2,$(QC)),200) $(or $(word 3,$(QC)),4) 0 0 0 $(QC_FUEL) $(QC_STMT)
+QC_IN = $(word 1,$(QC)) $(or $(word 2,$(QC)),200) $(or $(word 3,$(QC)),4) 0 0 0 $(QC_FUEL) $(QC_STMT) $(QC_CASE)
 qc-left-to-right:  ; @$(MAKE) --no-print-directory qc-fast QC_STMT=1
 qc-timing-correct: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=2
 qc-batchable:      ; @$(MAKE) --no-print-directory qc-fast QC_STMT=3

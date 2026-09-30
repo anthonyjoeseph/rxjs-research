@@ -110,11 +110,28 @@ timedᶜ Γ κ = zipWith timedTy Γ κ
 -- fall short where a shared slot's keys are anchored on a late
 -- subscriber, and where a scheduling outer reaches a share.
 --
+-- BUT `flattenᵉ` IS AN `Exp` FORMER AND THIS SIGNATURE LANDS IN `SExp`,
+-- whose flatteners are the three lane-only ones -- and it must land there
+-- as stated, since `Timing-Correct` runs the IMPL on the timed program and
+-- the impl elaborates only `SExp`.  So the echo body needs an echoing
+-- former in `SExp.Syntax`, or this codomain moved to `Exp` with
+-- `Timing-Correct` restated to pair the impl's stamps on the author's own
+-- program with the timed plain run's packets.  Both are Anthony's call.
+--
 -- DEAD ROUTE: a flattener reporting only a Start and a Done per lane and
 --   an OuterDone.  A lane whose outer value arrives after the previous
 --   lane's Done reads exactly as a queued one, and the OuterDone carries
 --   no instant; `timed-fuzz.ts --selftest` pins both under its `markers`
 --   rule.
+-- DEAD ROUTE: the echo spelled in `SExp`'s own palette.  Every outer
+--   element, its END item included, must reach both the beat and the
+--   policy, and within one subscription a stream reaches ONE operator;
+--   the palette's only fan-out is a shared slot, which the table fixes,
+--   and subscribing the outer twice mints a second schedule.  Folding the
+--   beat into its lane as a leading `ofˢ` holds under an unbounded
+--   `mergeAllˢ` and nowhere else: `exhaustAllˢ` drops the beat with its
+--   lane, a bounded `mergeAllˢ` queues it, and under `switchAllˢ` the END
+--   item's beat, as an inner, cancels the live lane.
 postulate
   timed : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t}
         → SExp Γ [] [] [] t → SExp (timedᶜ Γ κ) [] [] [] (itemᵗ t)

@@ -59,7 +59,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Maybe using (nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.String using (String; _++_; toList)
+open import Data.String using (String; _++_; toList) renaming (length to lengthˢ)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
@@ -95,6 +95,25 @@ postulate randFold : {A : Set} → ℕ → ℕ → (ℕ → A → A) → A → A
 
 postulate natMod : ℕ → ℕ → ℕ
 {-# COMPILE GHC natMod = \a b -> if b == 0 then 0 else a `mod` b #-}
+
+-- A WALL CLOCK AROUND ONE PURE VALUE: `within s n x d` is `x` when `n`,
+-- a number whose evaluation forces `x`, finishes within `s` seconds, and
+-- `d` otherwise.  It is the
+-- harness's one cap, because it is the one that does not change what is
+-- run; zero seconds is no bound at all.
+{-# FOREIGN GHC import qualified System.Timeout #-}
+{-# FOREIGN GHC import qualified Control.Exception #-}
+{-# FOREIGN GHC import qualified System.IO.Unsafe #-}
+{-# FOREIGN GHC
+withinH :: Integer -> Integer -> a -> a -> a
+withinH s n x d
+  | s == 0    = x
+  | otherwise = System.IO.Unsafe.unsafePerformIO
+      (maybe d id <$> System.Timeout.timeout (fromInteger (s * 1000000))
+                        (Control.Exception.evaluate n >> return x))
+#-}
+postulate within : {A : Set} → ℕ → ℕ → A → A → A
+{-# COMPILE GHC within = \_ -> withinH #-}
 
 randList : ℕ → ℕ → List ℕ
 randList seed count = randFold seed count _∷_ []
@@ -707,11 +726,17 @@ showSExp (deferˢ e)      = "(deferˢ " ++ showSExp e ++ ")"
 --
 -- AND NOTHING CUTS THE RUN FROM INSIDE, because every check is a
 -- statement's own sides at the drawn program, and a `takeᵉ` above it is
--- a different program.  The fuel is the one budget the statements
--- quantify over, so a sweep that cannot afford a case lowers the fuel
--- (stdin's seventh number) or raises the wall clock, never the program.
+-- a different program.  An author's `takeˢ` above it IS an instance, and
+-- was measured: it buys nothing, since the cases that outrun a sweep
+-- spend it inside the subscribe frame, at fuel 1, before any value.  So
+-- the cap is a WALL CLOCK PER CASE (`CASE`, stdin's ninth number): a case
+-- that outruns it is reported as a `timeout`, with its paste row, and the
+-- sweep goes on to the next.
 FUEL : ℕ
 FUEL = 30
+
+CASE : ℕ
+CASE = 10
 
 -- A PASTE-READY BUG-CACHE ROW: the block IS a row of
 -- `CLI.Unit-Test.cases`, trailing `∷` included, so the script
@@ -808,22 +833,46 @@ verdicts : ℕ → Drawn → Case → List Statement → List (ℕ × String)
 verdicts f x c []       = []
 verdicts f x c (s ∷ ss) = judgeOf f x s (decide c s) ++ᴸ verdicts f x c ss
 
-oneCase : List Statement → ℕ → ℕ → Gen (Marks × List (ℕ × String))
+-- forcing a case's reports forces every verdict, since `check` matches
+-- on each before it knows whether there is a report
+forced : List (ℕ × String) → ℕ
+forced []             = 0
+forced ((k , r) ∷ rs) = k + lengthˢ r + forced rs
+
+-- a case past its wall clock: one report of its own kind, after the
+-- four statements', carrying the row that reproduces it
+TIMEOUT : ℕ
+TIMEOUT = 4
+
+timedOut : ℕ → ℕ → Drawn → List (ℕ × String)
+timedOut s f (e , d₀ , d₁) =
+  (TIMEOUT , "  timeout\n    no verdict within " ++ show s ++ "s" ++ pasteRow f e d₀ d₁) ∷ []
+
+-- the reports are an ARGUMENT, so forcing them and returning them share
+-- one evaluation
+boundedBy : ℕ → List (ℕ × String) → List (ℕ × String) → List (ℕ × String)
+boundedBy s rs d = within s (forced rs) rs d
+
+bounded : ℕ → ℕ → Drawn → List Statement → List (ℕ × String)
+bounded s f (e , d₀ , d₁) ss =
+  boundedBy s (verdicts f (e , d₀ , d₁) (cached "?" f e (mkSlots d₀ d₁)) ss)
+              (timedOut s f (e , d₀ , d₁))
+
+oneCase : List Statement → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
 -- the statement's sides at exactly the program a cached row names.
-oneCase ss f d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (marksˢ e , verdicts f (e , proj₁ ds , proj₂ ds)
-                             (cached "?" f e (mkSlots (proj₁ ds) (proj₂ ds))) ss)
+oneCase ss f s d = genExp d >>=G λ e → genSlots >>=G λ ds →
+  pureG (marksˢ e , bounded s f (e , proj₁ ds , proj₂ ds) ss)
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
-runN : List Statement → ℕ → ℕ → ℕ → Gen (Tally × List (ℕ × String))
-runN ss f zero    d = pureG (zeroTally , [])
-runN ss f (suc k) d = oneCase ss f d >>=G λ r → runN ss f k d >>=G λ acc →
+runN : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Tally × List (ℕ × String))
+runN ss f s zero    d = pureG (zeroTally , [])
+runN ss f s (suc k) d = oneCase ss f s d >>=G λ r → runN ss f s k d >>=G λ acc →
   pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
 
 ------------------------------------------------------------------------
--- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT]"
+-- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT] [CASE]"
 
 toCodes : String → List ℕ
 toCodes s = map toℕ (toList s)
@@ -874,7 +923,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = map statementName statements
+kinds = map statementName statements ++ᴸ "timeout" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -886,7 +935,7 @@ samples k fs = concatStr (take 2 (ofKind k fs))
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples TIMEOUT fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -915,8 +964,8 @@ showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
 
 -- RUN ONE CASE, named the same way, so a case that hangs a sweep can be
 -- timed and re-run alone rather than by bisecting the count
-runAt : List Statement → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
-runAt ss f n d = skipN (n ∸ 1) d >>=G λ _ → oneCase ss f d
+runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
+runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase ss f s d
 
 -- THE STATEMENT A NUMBER NAMES, in `Main`'s order; zero is all four
 selected : ℕ → List Statement
@@ -983,7 +1032,8 @@ main = getContents >>= λ s →
       fuelʳ = numAt 6 0 cs
       ss    = selected (numAt 7 0 cs)
       f     = if fuelʳ ≡ᵇ 0 then FUEL else fuelʳ
-      res   = proj₁ (runN ss f runs d (randList seed 2000000))
+      secs  = numAt 8 CASE cs
+      res   = proj₁ (runN ss f secs runs d (randList seed 2000000))
       tally = proj₁ res
       fails = proj₂ res
   in if runs ≡ᵇ 0
@@ -991,7 +1041,7 @@ main = getContents >>= λ s →
      else if not (side ≡ᵇ 0)
      then putStr (proj₁ (sideAt f side only d (randList seed 2000000)) ++ "\n")
      else if not (only ≡ᵇ 0)
-     then putStr (dumpFails (proj₂ (proj₁ (runAt ss f only d (randList seed 2000000)))))
+     then putStr (dumpFails (proj₂ (proj₁ (runAt ss f secs only d (randList seed 2000000)))))
      else if not (at ≡ᵇ 0)
      then putStr (proj₁ (showAt f at d (randList seed 2000000)))
      else putStr (concatStr

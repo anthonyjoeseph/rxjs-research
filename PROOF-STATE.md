@@ -226,8 +226,9 @@ close without changing one of them, STOP and report that proof. The InstEmit's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
 `QuickCheck` is four quickchecks, one per statement `Main` imports, each
-deciding that statement's own sides, uncapped, on the real evaluator
-(`make qc-left-to-right` and its three siblings). **DONE IS THE AGDA
+deciding that statement's own sides, uncapped, on the real evaluator,
+each case under its own wall clock (`make qc-left-to-right` and its three
+siblings). **DONE IS THE AGDA
 QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
 `SExp.InstEmit`'s header; counterexamples go in the bug cache.
 
@@ -239,13 +240,13 @@ bound.
 
 ### Big picture tier roadmap
 
-- **GIVE `timed` A BODY OVER `flattenᵉ`.** Until it has one,
-  `timing-correct` compares stamps against packets nothing defines,
-  `timed-faithful` is the only thing standing between it and `empty`, and
-  their two quickchecks halt on the postulate. Port
-  the `echo` rule of `typescript/src/timed.ts`, whose packets match rxjs call
-  stacks on every generated program and which needs nothing `flattenᵉ`
-  does not give.
+- **`timed`'S BODY WAITS ON A QUESTION FOR ANTHONY.** The `echo` rule of
+  `typescript/src/timed.ts` needs `flattenᵉ`, an `Exp` former, and `timed`
+  lands in `SExp` because `timing-correct` runs the impl on it; the palette
+  cannot spell an echo (`timed`'s header). Either `SExp.Syntax` gains an
+  echoing flattener, or `timed` lands in `Exp` and `timing-correct` pairs
+  the impl's stamps on the author's own program with the timed run's
+  packets. Until then the two timed quickchecks halt on the postulate.
 
 - **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
   A share's connect mints its own instant inside the subscribe frame, and a
@@ -266,7 +267,7 @@ bound.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   Depth 1 is the sweep that fits, and some programs cost exponentially in
-  fuel, so a sweep bounds each CASE in wall clock
+  fuel; a case past its wall clock (`QC_CASE`) is a `timeout` failure
   (`typecheck-performance-numbers.md`). Every counterexample becomes a
   bug-cache row first. Three rows — an `of` pair merged inside a
   delivery's inner — give no verdict in 60 s even at fuel 1, while the
@@ -339,7 +340,7 @@ still being rewritten there.
   an unwritten `timed`.
 - **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: nothing has
   instantiated the second evaluator; the first leg.
-- **`timed`** (Timed.Translation) — VACUITY, `DEAD ROUTE`: a postulated
+- **`timed`** (Timed.Translation) — VACUITY, `DEAD ROUTE×2`: a postulated
   function asserts nothing; `λ _ → emptyˢ` inhabits it.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
-  `randFold`/`natMod` (QuickCheck). Carried, not counted.
+  `randFold`/`natMod`/`within` (QuickCheck). Carried, not counted.
