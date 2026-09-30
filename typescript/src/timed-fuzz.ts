@@ -1,9 +1,9 @@
 import type { Closed, Tm, Ty } from "./exp.js";
 import { showVal } from "./exp.js";
 import { genTestCases } from "./generator.js";
-import { evaluatePlain } from "./plain-eval.js";
+import { evaluatePlainArrivals } from "./plain-eval.js";
 import type { TestCase } from "./prop-test.js";
-import { SubscribeRule, TimedEmit, runTimed } from "./timed.js";
+import { SubscribeRule, TimedEmit, runTimed, switchOuters } from "./timed.js";
 
 // THE TIMED TRANSLATION AGAINST GROUND TRUTH, on generated programs.
 // Two checks per program:
@@ -14,6 +14,8 @@ import { SubscribeRule, TimedEmit, runTimed } from "./timed.js";
 //              a driver arrival, i.e. an rxjs call stack
 //
 //   node timed-fuzz.js [seeds] [rule]   the sweep (default 500, last-seen)
+//   node timed-fuzz.js seeds rule --tail   every program's END made visible
+//   ... --operator <op>                  that operator at every root
 //   node timed-fuzz.js --selftest       the refuted rules must be refuted
 //
 // A partition check is only load-bearing on a program whose emits span
@@ -25,6 +27,33 @@ import { SubscribeRule, TimedEmit, runTimed } from "./timed.js";
 // programs where a `max` met two instants under one key. A mismatch is
 // split by what the program holds, since `max-key` is known to be
 // approximate under `switchAll` (its END) and shared slots (their keys).
+
+// A TIMED RUN HELD TO THE PLAIN ONE. The timed program may register
+// sources of its own (a second copy of an outer, under `max-dup`), which
+// spend fuel and add arrivals no plain emit is in; so it runs on spare
+// fuel, stops at the plain run's length, and each emit is relabelled
+// with the PLAIN run's arrival. Faithful is then value equality on that
+// prefix, and every arrival below is ground truth. The spare is generous
+// because copies NEST: an outer holding a `switchAll` copies that one's
+// copy too, so `switchAll` stacked k deep over a `defer` runs 2^k hops.
+const grounded = (
+  testCase: TestCase,
+  rule: SubscribeRule,
+): { faithful: boolean; emits: TimedEmit[] } => {
+  const plain = evaluatePlainArrivals(testCase);
+  const timed = runTimed(
+    testCase,
+    rule,
+    64 * (testCase.fuel + 1),
+    plain.length,
+  ).slice(0, plain.length);
+  return {
+    faithful:
+      JSON.stringify(timed.map((x) => x.value)) ===
+      JSON.stringify(plain.map((x) => showVal(x.value))),
+    emits: timed.map((x, i) => ({ ...x, arrival: plain[i]?.arrival ?? -1 })),
+  };
+};
 
 // emits are in time order, so adjacent pairs decide it: the same arrival
 // must have the same key, a later one a strictly larger key
@@ -65,16 +94,58 @@ type Tally = {
   withSwitch: number;
   withShared: number;
   withTie: number;
+  // switchAll nodes in the program text, by where `max-dup` puts the
+  // outer's second copy, and programs holding one it can place nowhere
+  switchAfter: number;
+  switchFirst: number;
+  switchNone: number;
+  programsNone: number;
 };
 
-const sweep = (seeds: number, rule: SubscribeRule, verbose: boolean): Tally =>
-  Array.from({ length: seeds }, (_, i) => genTestCases(`s${i}`)).reduce<Tally>(
+// THE COMPLETION MADE VISIBLE. A generated program's own END is almost
+// never read, so no sweep says whether its packet is right. With `tail`
+// every program P runs as `concat(P.map(() => 0), of(7))`: the 7 is
+// emitted in P's completion, and its packet is P's END.
+const withTail = (testCase: TestCase): TestCase => ({
+  ...testCase,
+  exp: {
+    type: "mergeAll",
+    ty: nat,
+    limit: 1,
+    src: {
+      type: "of",
+      ty: obsNat,
+      items: [
+        strm({
+          type: "map",
+          ty: nat,
+          fn: { type: "natT", ty: nat, val: 0 },
+          src: testCase.exp,
+        }),
+        strm({
+          type: "of",
+          ty: nat,
+          items: [{ type: "natT", ty: nat, val: 7 }],
+        }),
+      ],
+    },
+  },
+});
+
+const sweep = (
+  seeds: number,
+  rule: SubscribeRule,
+  verbose: boolean,
+  tail = false,
+  operator?: string,
+): Tally =>
+  Array.from({ length: seeds }, (_, i) =>
+    genTestCases(`s${i}`, operator),
+  ).reduce<Tally>(
     (tally, cases, i) =>
-      cases.reduce<Tally>((t, testCase, c) => {
-        const plain = evaluatePlain(testCase).map(showVal);
-        const timed = runTimed(testCase, rule);
-        const faithful =
-          JSON.stringify(timed.map((x) => x.value)) === JSON.stringify(plain);
+      cases.reduce<Tally>((t, generated, c) => {
+        const testCase = tail ? withTail(generated) : generated;
+        const { faithful, emits: timed } = grounded(testCase, rule);
         const ok = faithful && partitionOk(timed);
         const mismatch = faithful && !ok;
         const sw =
@@ -86,6 +157,7 @@ const sweep = (seeds: number, rule: SubscribeRule, verbose: boolean): Tally =>
           );
         const sh = testCase.slots.some((sl) => sl.type !== "scripted");
         const tie = timed.some((x) => x.tie);
+        const outers = switchOuters(testCase);
         const keyed = keysOk(timed);
         if (!keyed && verbose)
           console.log(
@@ -117,6 +189,10 @@ const sweep = (seeds: number, rule: SubscribeRule, verbose: boolean): Tally =>
           withSwitch: t.withSwitch + (mismatch && sw ? 1 : 0),
           withShared: t.withShared + (mismatch && sh ? 1 : 0),
           withTie: t.withTie + (mismatch && tie ? 1 : 0),
+          switchAfter: t.switchAfter + outers.after,
+          switchFirst: t.switchFirst + outers.first,
+          switchNone: t.switchNone + outers.none,
+          programsNone: t.programsNone + (outers.none > 0 ? 1 : 0),
         };
       }, tally),
     {
@@ -129,6 +205,10 @@ const sweep = (seeds: number, rule: SubscribeRule, verbose: boolean): Tally =>
       withSwitch: 0,
       withShared: 0,
       withTie: 0,
+      switchAfter: 0,
+      switchFirst: 0,
+      switchNone: 0,
+      programsNone: 0,
     },
   );
 
@@ -390,62 +470,89 @@ const shareLate: TestCase = {
 // concat onto `of(7)`. The 7 is emitted in the outer's END, arrival 2,
 // and only the outer's END says so; `max-key` cannot hand it to
 // `switchAll` without cancelling a lane, so it names tick 1 instead.
+// the outer, whose tick-4 source is slot `late`, behind `wrap`
+const switchEndOn = (
+  late: number,
+  wrap = (e: Closed): Closed => e,
+): Closed => ({
+  type: "mergeAll",
+  ty: nat,
+  limit: 1,
+  src: {
+    type: "of",
+    ty: obsNat,
+    items: [
+      strm({
+        type: "switchAll",
+        ty: nat,
+        src: wrap({
+          type: "mergeAll",
+          ty: obsNat,
+          src: {
+            type: "of",
+            ty: obsObsNat,
+            items: [
+              strmOO({
+                type: "map",
+                ty: obsNat,
+                fn: strm({ type: "empty", ty: nat }),
+                src: input(0),
+              }),
+              strmOO({
+                type: "mergeAll",
+                ty: obsNat,
+                src: {
+                  type: "map",
+                  ty: obsObsNat,
+                  fn: strmOO({ type: "empty", ty: obsNat }),
+                  src: input(late),
+                },
+              }),
+            ],
+          },
+        }),
+      }),
+      strm({
+        type: "of",
+        ty: nat,
+        items: [{ type: "natT", ty: nat, val: 7 }],
+      }),
+    ],
+  },
+});
 const switchEnd: TestCase = {
   ctx: [nat, nat],
   slots: [hotAt(0), hotAt(3)],
   fuel: 3,
-  exp: {
-    type: "mergeAll",
-    ty: nat,
-    limit: 1,
-    src: {
-      type: "of",
-      ty: obsNat,
-      items: [
-        strm({
-          type: "switchAll",
-          ty: nat,
-          src: {
-            type: "mergeAll",
-            ty: obsNat,
-            src: {
-              type: "of",
-              ty: obsObsNat,
-              items: [
-                strmOO({
-                  type: "map",
-                  ty: obsNat,
-                  fn: strm({ type: "empty", ty: nat }),
-                  src: input(0),
-                }),
-                strmOO({
-                  type: "mergeAll",
-                  ty: obsNat,
-                  src: {
-                    type: "map",
-                    ty: obsObsNat,
-                    fn: strmOO({ type: "empty", ty: obsNat }),
-                    src: input(1),
-                  },
-                }),
-              ],
-            },
-          },
-        }),
-        strm({
-          type: "of",
-          ty: nat,
-          items: [{ type: "natT", ty: nat, val: 7 }],
-        }),
-      ],
-    },
-  },
+  exp: switchEndOn(1),
+};
+
+// THE SAME OVER A COLD. The outer's tick-4 source is now a cold whose
+// one value comes 3 ticks after it is subscribed, so a second copy of
+// the outer is a second run registering a second source. Subscribed
+// AFTER the real one its END would come an arrival late; `max-dup`
+// subscribes it FIRST, so its source fires just before the real one's
+// and its END names the instant the real END is in.
+const switchEndCold: TestCase = {
+  ...switchEnd,
+  slots: [hotAt(0), tail(3, 1)],
+};
+
+// THE GAP LEFT. The outer sits behind a `defer`, so it schedules and a
+// copy must go first, and its tick-4 source is a share over hot 1, so a
+// copy subscribed first would connect it. `max-dup` makes no copy, and
+// the 7 is named off the lanes, as under `max-sub`.
+const switchEndShared: TestCase = {
+  ctx: [nat, nat, nat],
+  slots: [hotAt(0), hotAt(3), { type: "shared", def: input(1) }],
+  fuel: 3,
+  exp: switchEndOn(2, (e) => ({ type: "defer", ty: nat, body: e })),
 };
 
 // a directed case under one rule: whether its partition holds
 const holds = (name: string, testCase: TestCase, rule: SubscribeRule) => {
-  const emits = runTimed(testCase, rule);
-  const ok = partitionOk(emits);
+  const { faithful, emits } = grounded(testCase, rule);
+  const ok = faithful && partitionOk(emits);
   console.log(
     `${name} / ${rule}: ${ok ? "ok" : "MISMATCH"} ` +
       emits.map((x) => `${x.value}@${x.arrival}:${x.instant}`).join("  "),
@@ -456,8 +563,8 @@ const holds = (name: string, testCase: TestCase, rule: SubscribeRule) => {
 // a directed case under one rule: whether its partition holds AND its
 // computed keys follow the arrivals
 const keyed = (name: string, testCase: TestCase, rule: SubscribeRule) => {
-  const emits = runTimed(testCase, rule);
-  const ok = partitionOk(emits) && keysOk(emits);
+  const { faithful, emits } = grounded(testCase, rule);
+  const ok = faithful && partitionOk(emits) && keysOk(emits);
   console.log(
     `${name} / ${rule} keys: ${ok ? "ok" : "MISORDERED"} ` +
       emits
@@ -478,10 +585,20 @@ const main = () => {
       directed[0].arrival === 1 &&
       directed[0].instant === "H0.0";
     console.log(`END directed: ${JSON.stringify(directed)}`);
-    const sw = (rule: SubscribeRule) => {
-      const e = runTimed(switchEnd, rule);
-      console.log(`switch END / ${rule}: ${JSON.stringify(e)}`);
-      return e.length === 1 && e[0].arrival === 2 && e[0].instant === "H1.0";
+    // the 7 alone, in the arrival and under the instant `last-seen`
+    // gives it, which the plain run's arrival is checked against
+    const sw = (rule: SubscribeRule, name = "", c = switchEnd) => {
+      const { faithful, emits: e } = grounded(c, rule);
+      const ref = grounded(c, "last-seen").emits;
+      console.log(`switch END${name} / ${rule}: ${JSON.stringify(e)}`);
+      return (
+        faithful &&
+        e.length === 1 &&
+        ref.length === 1 &&
+        partitionOk(ref) &&
+        e[0].arrival === ref[0].arrival &&
+        e[0].instant === ref[0].instant
+      );
     };
     const tiesOk =
       holds("laneLater", laneLater, "max-key") &&
@@ -492,7 +609,16 @@ const main = () => {
       holds("outerLater", outerLater, "last-seen") &&
       holds("laneLater", laneLater, "last-seen");
     // the gaps are ASSERTED, so their comments go red when they close
-    const switchOk = sw("last-seen") && !sw("max-key");
+    // `max-dup` closes it over a hot and over a cold, and not where the
+    // outer both schedules and reaches a share
+    const switchOk =
+      runTimed(switchEnd, "last-seen")[0]?.instant === "H1.0" &&
+      !sw("max-key") &&
+      !sw("max-sub") &&
+      sw("max-dup") &&
+      !sw("max-sub", " (cold)", switchEndCold) &&
+      sw("max-dup", " (cold)", switchEndCold) &&
+      !sw("max-dup", " (shared)", switchEndShared);
     const keyGapOk =
       holds("sameArrival", sameArrival, "max-clock") &&
       !holds("sameArrival", sameArrival, "max-key") &&
@@ -533,8 +659,9 @@ const main = () => {
     }
     console.log(
       "selftest ok: the END case holds, max-key orders both ties, the " +
-        "switch and key gaps stand, max-sub closes the key gap, the share " +
-        "gap stands, and every refuted rule is refuted",
+        "switch and key gaps stand, max-sub closes the key gap, max-dup " +
+        "closes the switch gap but for a scheduling outer over a share, the " +
+        "share gap stands, and every refuted rule is refuted",
     );
     return;
   }
@@ -542,6 +669,10 @@ const main = () => {
     Number(argv[0] ?? 500),
     (argv[1] ?? "last-seen") as SubscribeRule,
     true,
+    argv.includes("--tail"),
+    argv.includes("--operator")
+      ? argv[argv.indexOf("--operator") + 1]
+      : undefined,
   );
   console.log(JSON.stringify(t));
   if (t.unfaithful > 0 || t.mismatched > 0) process.exit(1);

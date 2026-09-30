@@ -47,7 +47,9 @@ import type { ObservableInput, TestCase, Timed } from "./prop-test.js";
 // falls short: `switchAll`'s own END, and two dynamic sources
 // registered in one arrival firing at one tick. `max-sub` closes the
 // second and meets the SHARE gap instead: a share's frame is anchored on
-// every subscriber rather than on the one that connected it.
+// every subscriber rather than on the one that connected it. `max-dup`
+// closes the first by subscribing the outer twice, except where the
+// outer both schedules and reaches a share.
 
 // ---------------------------------------------------------------
 // Packets.
@@ -302,15 +304,17 @@ const onPkt =
   (f: (p: Pkt) => Pkt) =>
   (x: Item): Item => ({ ...x, p: f(x.p) });
 
-// append the END marker, carrying the last instant seen
+// append the END marker, carrying the last instant seen, unless the
+// stream already ended with one. A stream that completes with no item at
+// all ends in its subscription's own instant: the hole.
 const endAfter = (src: Observable<Item>): Observable<Item> =>
   concat(src.pipe(rxMap((x): Item | null => x)), rxOf<Item | null>(null)).pipe(
     rxScan(
-      (st: { last: Pkt; out: Item | null }, x: Item | null) =>
+      (st: { last: Pkt; ended: boolean; out: Item | null }, x: Item | null) =>
         x === null
-          ? { last: st.last, out: end(st.last) }
-          : { last: x.p, out: x },
-      { last: HOLE, out: null },
+          ? { ...st, out: st.ended ? null : end(st.last) }
+          : { last: x.p, ended: x.end === true, out: x },
+      { last: HOLE, ended: false, out: null },
     ),
     filter((st) => st.out !== null),
     rxMap((st) => st.out as Item),
@@ -358,9 +362,13 @@ const timedInput = (
       })),
       index,
     );
-    // a fan-out: every subscriber gets the value, then every one the END
-    return subject.pipe(
-      rxMap((x): Item => ({ ...x, p: at(x.p, [x.end ? 1 : 0, RANK]) })),
+    // a fan-out: every subscriber gets the value, then every one the END;
+    // one subscribed after the last tick finds the subject completed, and
+    // ends in its own subscription
+    return endAfter(
+      subject.pipe(
+        rxMap((x): Item => ({ ...x, p: at(x.p, [x.end ? 1 : 0, RANK]) })),
+      ),
     );
   }
   const s = input.sync.length;
@@ -448,6 +456,25 @@ const timedInput = (
 // a completion, which runs once that item's cascade has returned.
 // `max-left` is the same with a fan-out ranked by program site instead
 // of by subscription, and the self-test refutes it.
+//
+// `max-dup` is `max-sub` with `switchAll`'s own END repaired by READING
+// THE OUTER TWICE: a second copy, compiled at the same position so its
+// packets carry the same names, read only for its END. Where a
+// subscription to the outer schedules nothing of its own -- no `defer`
+// hop, no cold slot with an async tail, anywhere the outer reaches --
+// both copies hear the same deliveries in the same call stacks, and the
+// copy, subscribed AFTER the real one, ends in the outer's own END.
+// Where it does schedule, the copy is subscribed FIRST: each source it
+// registers takes the ordinal just below its real twin's, so fires just
+// before it at the same tick, and its END comes one arrival early under
+// the name the real END will have. A shared slot forbids FIRST -- the
+// copy would connect it and take its burst -- so an outer that both
+// schedules and reaches a share is left to the lanes, as under `max-sub`.
+//
+// A FIRST copy is not free: the arrivals its sources fire in carry no
+// plain emit, so the timed run has more arrivals than the plain one, and
+// copies NEST -- an outer holding a `switchAll` copies that one's copy
+// too, so k stacked `switchAll`s over a scheduling outer run 2^k copies.
 export type SubscribeRule =
   | "last-seen"
   | "outer-packet"
@@ -456,12 +483,15 @@ export type SubscribeRule =
   | "max-key"
   | "max-tick"
   | "max-sub"
-  | "max-left";
-type FreeRule = "max-clock" | "max-key" | "max-tick" | "max-sub" | "max-left";
+  | "max-left"
+  | "max-dup";
+type FreeRule =
+  "max-clock" | "max-key" | "max-tick" | "max-sub" | "max-left" | "max-dup";
 
 type N =
   | { k: "start"; n: number; outer: Pkt; at: number; endLane: boolean }
   | { k: "item"; n: number; x: Item }
+  | { k: "outerEnd"; p: Pkt }
   | { k: "fin" };
 type FreeSt = {
   last: Pkt;
@@ -481,6 +511,8 @@ const flattenFree = (
   outer: Observable<Item>,
   compileInner: (o: ObsVal) => Observable<Item>,
   clock: () => number,
+  // the outer's END, read off a second copy, and where it subscribes
+  outerEnd: { copy: Observable<Item>; first: boolean } | undefined,
 ): Observable<Item> => {
   // only a limited merge ever queues; everything else subscribes on the
   // outer emission, whose packet is then exact
@@ -513,7 +545,15 @@ const flattenFree = (
     how === "merge"
       ? lanes.pipe(mergeAll(limit ?? Infinity))
       : how === "switch"
-        ? lanes.pipe(switchAll())
+        ? ((ends: Observable<N>) =>
+            outerEnd?.first
+              ? merge(ends, lanes.pipe(switchAll()))
+              : merge(lanes.pipe(switchAll()), ends))(
+            (outerEnd?.copy ?? EMPTY).pipe(
+              filter((x) => x.end === true),
+              rxMap((x): N => ({ k: "outerEnd", p: x.p })),
+            ),
+          )
         : lanes.pipe(exhaustAll());
   return concat(flat, rxOf<N>({ k: "fin" })).pipe(
     rxScan(
@@ -530,7 +570,10 @@ const flattenFree = (
                     t: "max",
                     a: m.outer,
                     b:
-                      st.seen && (rule === "max-sub" || rule === "max-left")
+                      st.seen &&
+                      (rule === "max-sub" ||
+                        rule === "max-left" ||
+                        rule === "max-dup")
                         ? at(st.last, [TOP])
                         : st.last,
                     tickOnly: rule === "max-tick",
@@ -550,6 +593,9 @@ const flattenFree = (
               out: m.x.end ? null : { ...m.x, p },
             };
           }
+          case "outerEnd":
+            // no lane subscribes on it, so it only moves the last instant
+            return { ...st, last: m.p, seen: true, lastAt: clock(), out: null };
           case "fin":
             return { ...st, out: end(st.last) };
         }
@@ -576,10 +622,116 @@ const flatten = (
   pos: string,
   outer: Observable<Item>,
   compileInner: (o: ObsVal) => Observable<Item>,
+  outerEnd?: { copy: Observable<Item>; first: boolean },
 ): Observable<Item> =>
   rule === "last-seen" || rule === "outer-packet" || rule === "lanes-only"
     ? flattenConnect(rule, how, limit, pos, outer, compileInner)
-    : flattenFree(rule, how, limit, pos, outer, compileInner, clock);
+    : flattenFree(rule, how, limit, pos, outer, compileInner, clock, outerEnd);
+
+// the slots a second copy has to reckon with: a cold with an async tail
+// registers a source every time it is subscribed, and a share connects
+// on its first subscriber
+type SlotKinds = {
+  scheduling: ReadonlySet<number>;
+  shared: ReadonlySet<number>;
+};
+export const slotKinds = (testCase: TestCase): SlotKinds => ({
+  scheduling: new Set(
+    testCase.slots.flatMap((sl, j) =>
+      sl.type === "scripted" &&
+      sl.input.type === "cold" &&
+      sl.input.async.length > 0
+        ? [j]
+        : [],
+    ),
+  ),
+  shared: new Set(
+    testCase.slots.flatMap((sl, j) => (sl.type === "scripted" ? [] : [j])),
+  ),
+});
+
+// WHERE A SECOND COPY OF A TERM GOES, read off what subscribing it
+// reaches. A subscription schedules on a `defer` hop or a scheduling
+// slot; a shared slot never does, since it connects once. A stream
+// VALUE is subscribed only by a flattener whose output is that stream's
+// element type, so a stream the term carries -- written in it, or closed
+// over in its environment -- counts only once the term holds such a
+// flattener, and then what its body reaches counts too, to a fixpoint.
+// The lanes a `switchAll` subscribes are not its outer's business.
+type Copy = "after" | "first" | "none";
+const copyOf = (exp: Closed, env: Val[], kinds: SlotKinds): Copy => {
+  const found = { schedules: false, shares: false };
+  const flattened = new Set<string>();
+  const carried: { elem: string; body: unknown }[] = [];
+  const seen = new Set<object>();
+  // what subscribing `x` reaches, streams it carries set aside
+  const subscribe = (x: unknown): void => {
+    if (typeof x !== "object" || x === null || seen.has(x)) return;
+    seen.add(x);
+    const o = x as { type?: unknown; index?: unknown; ty?: unknown };
+    if (o.type === "strmT") {
+      const e = (x as { exp: Closed }).exp;
+      carried.push({ elem: JSON.stringify(e.ty), body: e });
+      return;
+    }
+    if (
+      o.type === "mergeAll" ||
+      o.type === "switchAll" ||
+      o.type === "exhaustAll"
+    )
+      flattened.add(JSON.stringify(o.ty));
+    if (o.type === "defer") found.schedules = true;
+    if (o.type === "input" && typeof o.index === "number") {
+      if (kinds.scheduling.has(o.index)) found.schedules = true;
+      if (kinds.shared.has(o.index)) found.shares = true;
+    }
+    Object.values(x).forEach(subscribe);
+  };
+  // the streams a value closes over, set aside the same way
+  const carry = (v: unknown): void => {
+    if (typeof v !== "object" || v === null || seen.has(v)) return;
+    seen.add(v);
+    if ("exp" in v && "env" in v) {
+      const o = v as ObsVal;
+      carried.push({ elem: JSON.stringify(o.exp.ty), body: o.exp });
+      carry(o.env);
+      return;
+    }
+    Object.values(v).forEach(carry);
+  };
+  subscribe(exp);
+  carry(env);
+  const drain = (): void => {
+    const next = carried.findIndex((c) => flattened.has(c.elem));
+    if (next < 0) return;
+    const [c] = carried.splice(next, 1);
+    subscribe(c.body);
+    drain();
+  };
+  drain();
+  return !found.schedules ? "after" : !found.shares ? "first" : "none";
+};
+
+// the `switchAll` nodes the program text holds, by where their outer's
+// second copy goes
+export const switchOuters = (testCase: TestCase): Record<Copy, number> => {
+  const kinds = slotKinds(testCase);
+  const found: Record<Copy, number> = { after: 0, first: 0, none: 0 };
+  const seen = new Set<object>();
+  const go = (y: unknown): void => {
+    if (typeof y !== "object" || y === null || seen.has(y)) return;
+    seen.add(y);
+    const o = y as { type?: unknown; src?: unknown };
+    if (o.type === "switchAll")
+      found[copyOf((o as { src: Closed }).src, [], kinds)]++;
+    Object.values(y).forEach(go);
+  };
+  go(testCase.exp);
+  testCase.slots.forEach((sl) => {
+    if (sl.type !== "scripted") go(sl.def);
+  });
+  return found;
+};
 
 const flattenConnect = (
   rule: "last-seen" | "outer-packet" | "lanes-only",
@@ -659,6 +811,7 @@ const flattenConnect = (
 const compile = (
   rule: SubscribeRule,
   clock: () => number,
+  kinds: SlotKinds,
   exp: Closed,
   env: Val[],
   driver: PlainDriver,
@@ -666,9 +819,9 @@ const compile = (
   pos: string,
 ): Observable<Item> => {
   const recur = (e: Closed, sub: string) =>
-    compile(rule, clock, e, env, driver, slots, `${pos}.${sub}`);
+    compile(rule, clock, kinds, e, env, driver, slots, `${pos}.${sub}`);
   const inner = (o: ObsVal) =>
-    compile(rule, clock, o.exp, o.env, driver, slots, "");
+    compile(rule, clock, kinds, o.exp, o.env, driver, slots, "");
   switch (exp.type) {
     case "input":
       return slots[exp.index];
@@ -701,14 +854,15 @@ const compile = (
     }
     case "take": {
       // THE END IS LAST, SO `take` COUNTS IT CORRECTLY: a source that
-      // fills the quota is cut at its nth value, before any END; one
-      // that does not passes its END as an item within the quota.
+      // fills the quota is cut at its nth value, before any END, and
+      // completes in that value's instant, so the END is appended there;
+      // one that does not passes its END as an item within the quota.
       const count = evalWith(exp.count, env);
       if (typeof count !== "bigint")
         throw new Error("take count did not evaluate to a nat");
       return count === 0n
         ? rxOf(end(HOLE))
-        : recur(exp.src, "s").pipe(rxTake(Number(count)));
+        : endAfter(recur(exp.src, "s").pipe(rxTake(Number(count))));
     }
     case "mergeAll":
       return flatten(
@@ -729,6 +883,10 @@ const compile = (
         pos,
         recur(exp.src, "s"),
         inner,
+        ((copy: Copy) =>
+          rule === "max-dup" && copy !== "none"
+            ? { copy: recur(exp.src, "s"), first: copy === "first" }
+            : undefined)(copyOf(exp.src, env, kinds)),
       );
     case "exhaustAll":
       return flatten(
@@ -767,6 +925,7 @@ const compile = (
         compile(
           rule,
           clock,
+          kinds,
           exp.body,
           [Symbol("uniq"), ...env],
           driver,
@@ -831,25 +990,35 @@ export type TimedEmit = {
 export const runTimed = (
   testCase: TestCase,
   rule: SubscribeRule = "last-seen",
+  // arrivals to deliver: a translation that registers sources of its
+  // own spends more than the plain run does
+  fuel: number = testCase.fuel,
+  // stop once this many values are out
+  enough: number = Infinity,
 ): TimedEmit[] => {
   const driver = createPlainDriver(testCase.slots.length);
   // the harness's own count, read only by `max-clock`
   let arrival = 0;
   const clock = () => arrival;
+  const kinds = slotKinds(testCase);
   const slots = testCase.slots.reduce<Observable<Item>[]>(
     (prefix, slot, j) => [
       ...prefix,
       slot.type === "scripted"
         ? timedInput(driver, slot.input, j)
-        : compile(rule, clock, slot.def, [], driver, prefix, "").pipe(
-            rxMap(onPkt((p) => closeShare(j, p))),
-            rxShare({
-              resetOnRefCountZero: false,
-              resetOnComplete: false,
-              resetOnError: false,
-            }),
-            // a fan-out, one item at a time
-            rxMap(onPkt((p) => at(p, [RANK]))),
+        : // one subscribed after the share completed ends in its own
+          // subscription
+          endAfter(
+            compile(rule, clock, kinds, slot.def, [], driver, prefix, "").pipe(
+              rxMap(onPkt((p) => closeShare(j, p))),
+              rxShare({
+                resetOnRefCountZero: false,
+                resetOnComplete: false,
+                resetOnError: false,
+              }),
+              // a fan-out, one item at a time
+              rxMap(onPkt((p) => at(p, [RANK]))),
+            ),
           ),
     ],
     [],
@@ -858,6 +1027,7 @@ export const runTimed = (
   const sub = compile(
     rule,
     clock,
+    kinds,
     testCase.exp,
     [],
     driver,
@@ -867,7 +1037,11 @@ export const runTimed = (
     if (!x.end) {
       const r = resolve(
         x.p,
-        rule === "max-sub" ? "sub" : rule === "max-left" ? "left" : "key",
+        rule === "max-sub" || rule === "max-dup"
+          ? "sub"
+          : rule === "max-left"
+            ? "left"
+            : "key",
       );
       out.push({
         value: showVal(x.v),
@@ -878,7 +1052,7 @@ export const runTimed = (
       });
     }
   });
-  for (let spent = 0; spent < testCase.fuel; spent++) {
+  for (let spent = 0; spent < fuel && out.length < enough; spent++) {
     arrival++;
     if (!driver.deliverNextArrival()) break;
   }

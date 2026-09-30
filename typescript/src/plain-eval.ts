@@ -254,7 +254,15 @@ export const compilePlain = (
   }
 };
 
-export const evaluatePlain = (testCase: TestCase): Val[] => {
+export const evaluatePlain = (testCase: TestCase): Val[] =>
+  evaluatePlainArrivals(testCase).map((x) => x.value);
+
+// the same run, each value beside the driver arrival that emitted it
+// (0 is the root sync burst): the ground truth a timed run's packets are
+// held to
+export const evaluatePlainArrivals = (
+  testCase: TestCase,
+): { value: Val; arrival: number }[] => {
   const driver = createPlainDriver(testCase.slots.length);
   // the const telescope, literally: each shared slot compiles against
   // the prefix of already-built slots, under a share that never resets
@@ -273,14 +281,17 @@ export const evaluatePlain = (testCase: TestCase): Val[] => {
     ],
     [],
   );
-  const out: Val[] = [];
+  const out: { value: Val; arrival: number }[] = [];
+  let arrival = 0;
   const sub = compilePlain(testCase.exp, [], driver, slotSources).subscribe(
-    (value) => out.push(value),
+    (value) => out.push({ value, arrival }),
   );
   // subscribing already ran the root sync burst — fuel pays only for
   // arrivals
-  for (let spent = 0; spent < testCase.fuel; spent++)
+  for (let spent = 0; spent < testCase.fuel; spent++) {
+    arrival++;
     if (!driver.deliverNextArrival()) break;
+  }
   sub.unsubscribe();
   return out;
 };

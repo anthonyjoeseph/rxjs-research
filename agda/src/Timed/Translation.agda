@@ -111,6 +111,15 @@ timedᶜ Γ κ = zipWith timedTy Γ κ
 -- or shared fan-out by each subscriber's own subscription, not by
 -- position in the program.  The default rule multicasts the outer with
 -- rxjs `connect` and has neither gap.
+--
+-- `switchAll`'s END IS READ OFF A SECOND COPY OF THE OUTER, subscribed
+-- beside it and read only for its END: the `max-dup` rule.  After the
+-- real outer when a subscription to it schedules nothing, BEFORE it when
+-- it does, so each source the copy registers fires just ahead of its
+-- real twin and names the same instant.  A copy placed first would
+-- connect any share the outer reaches, so an outer that both schedules
+-- and reaches one keeps the gap.  Copies nest, doubling per stacked
+-- `switchAll` over a scheduling outer.
 postulate
   timed : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t}
         → SExp Γ [] [] [] t → SExp (timedᶜ Γ κ) [] [] [] (itemᵗ t)
