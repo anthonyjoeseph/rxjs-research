@@ -241,11 +241,12 @@ bound.
 ### Big picture tier roadmap
 
 - **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** Depth 2 is green
-  on seeds 1 and 3, and at `QC_FUEL=6`, where a cut-off run makes the
+  on seeds 1, 3 and 4, and at `QC_FUEL=6`, where a cut-off run makes the
   sandwich's second half bear weight. Sweep more seeds and fuels under the
   10-minute cap, raising `QC_CASE` until no case is a `timeout`. Seed 3's
-  `μ` over a merge holding its own defer times out at 150 s: a case still
-  timing out under the cap is the one evaluator-cost finding worth having.
+  `μ` over a merge holding its own defer times out at 150 s, seed 5 at
+  fuel 4 twice at 60 s: a case still timing out under the cap is the one
+  evaluator-cost finding worth having.
 
 - **EVERY DISAGREEMENT IS THE ELABORATION'S TO FIX.** A non-timeout failure is
   a counterexample to a top-line statement: bug-cache row first, then the

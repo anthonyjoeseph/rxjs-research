@@ -51,8 +51,8 @@ open import Data.Maybe using (nothing; just)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; varˢᵗ; natˢ;
-  primˢ; pairˢ; strmˢ; μˢ; deferˢ; varˢ)
+open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; varˢᵗ; natˢ;
+  primˢ; pairˢ; fstˢ; sndˢ; strmˢ; μˢ; deferˢ; varˢ)
 open import Rx.Exp using (add; mergeᶠ; switchᶠ; exhaustᶠ)
 
 open import Rx.Prim using (hot; cold; after_,_)
@@ -140,4 +140,12 @@ cases =
           (flatAllˢ (mergeᶠ (just 2)) (ofˢ ((strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ (suc zero)))) ∷ (strmˢ (μˢ (deferˢ (varˢ (here refl))))) ∷ [])))
           (mkSlots (cold (2 ∷ []) ((after 0 , 9) ∷ []))
                    ((inputˢ zero))) ∷
+  cached "seed 5 depth 2 fuel 4 timing-correct" 4
+          (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 5) (ofˢ ((natˢ 3) ∷ (natˢ 9) ∷ [])))) ∷ (strmˢ (takeˢ (natˢ 5) (inputˢ zero))) ∷ [])))
+          (mkSlots (cold (5 ∷ []) ((after 0 , 3) ∷ []))
+                   (emptyˢ)) ∷
+  cached "seed 5 depth 2 fuel 4 timing-correct, at fuel 30" 30
+          (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 5) (ofˢ ((natˢ 3) ∷ (natˢ 9) ∷ [])))) ∷ (strmˢ (takeˢ (natˢ 5) (inputˢ zero))) ∷ [])))
+          (mkSlots (cold (5 ∷ []) ((after 0 , 3) ∷ []))
+                   (emptyˢ)) ∷
   []

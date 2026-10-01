@@ -107,11 +107,12 @@ deliveryᵛ = inrᵗ (inlᵗ unit̂)
 -- is bound once above the whole walk and read here.  Two colds side by
 -- side therefore get two sources and one instant, which is what the
 -- spec's grouping compares.
+
 -- THE INPUT SOURCE, WRAPPED HERE RATHER THAN ASSUMED ON THE TABLE.
 -- The slot stands at the author's bare payload, so this is the term
--- that builds every InstEmit an input contributes: one `init` naming
--- the source, then one emit per ARRIVAL carrying that arrival's
--- values.  Nothing else in the elaboration writes an input's InstEmit,
+-- that builds every InstEmit an input contributes: one carrying the
+-- `init` and the subscribe frame's values, then one emit per later
+-- ARRIVAL carrying that arrival's value.  Nothing else in the elaboration writes an input's InstEmit,
 -- which is what makes a well-formedness claim about inputs a lemma
 -- about this definition instead of a hypothesis about the table.
 --
@@ -121,10 +122,20 @@ deliveryᵛ = inrᵗ (inlᵗ unit̂)
 -- subscribe burst into as many instants as it has values.
 -- `batchSyncᵉ` already draws that boundary -- it emits `(head , rest)`,
 -- the whole synchronous group under one value -- so a group IS an
--- instant and no arm has to ask which kind it is; an isolated
--- asynchronous arrival is the same shape at `rest ≡ []`.  Nothing here
--- senses synchrony, which is the property the machine was always
--- GIVEN and a timing-based repair would have re-derived.
+-- instant.  Nothing here senses synchrony, which is the property the
+-- machine was always GIVEN and a timing-based repair would have
+-- re-derived.
+
+-- THE SUBSCRIBE FRAME'S GROUP IS THE FRAME'S INSTANT, NOT A NEW ONE.
+-- One `subscribe()` call is one batch (README), so a cold's synchronous
+-- values share the instant of whatever subscribed it, and the emit
+-- says so by carrying the frame, tagged `subscribe` so an enclosing
+-- flattener re-instants it.  The group alone cannot say which one it
+-- is -- a one-value frame and a later arrival are both `(v , [])` --
+-- so a marker merged in AHEAD of the input makes the frame's group
+-- always exist and always lead with the marker, and no later group
+-- can.  The `init` rides the same emit, which is why there is no
+-- separate announcement.
 --
 -- AND THE PER-ARRIVAL TOKEN COMES FROM THE MINT'S PLACEMENT, WHICH IS
 -- THE ARITY THAT LOOKED MISSING.  `mintᵉ` draws once per subscription
@@ -132,7 +143,7 @@ deliveryᵛ = inrᵗ (inlᵗ unit̂)
 -- draws one SOURCE token per subscription of the input -- a source's
 -- own arity.  The INNER mint stands at the head of a merging flattener's
 -- inner, which is subscribed once per outer value, so it draws one
--- INSTANT token per arrival.  Two arities, one former, and the
+-- INSTANT token per later arrival.  Two arities, one former, and the
 -- difference is where the binder sits.
 --
 -- DEAD ROUTE: bracket the frame with `batchSyncᵉ` and let the GROUPING
@@ -159,56 +170,61 @@ inputᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (i : Fin n)
        → Tm Γ Δᵍ Δ Θ uniqᵗ
        → Exp Γ Δᵍ Δ Θ (machineEmitᵗ (lookup Γ i))
 inputᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i frame =
-  mintᵉ (flatAllᵉ (mergeᶠ nothing) (ofᵉ (strmᵗ announce ∷ strmᵗ deliveries ∷ [])))
+  mintᵉ (flatAllᵉ (mergeᶠ nothing) (mapᵉ stamp (batchSyncᵉ marked)))
   where
   a : Ty
   a = lookup Γ i
+
+  m : Ty
+  m = unitᵗ +ᵗ a
 
   -- under the SOURCE binder
   Θ¹ : List Ty
   Θ¹ = uniqᵗ ∷ Θ
 
-  -- under the SOURCE binder, the group, and the INSTANT binder
-  Θ² : List Ty
-  Θ² = uniqᵗ ∷ (a ×ᵗ listᵗ a) ∷ Θ¹
+  -- under the SOURCE binder and the group
+  Θᵍ : List Ty
+  Θᵍ = (m ×ᵗ listᵗ m) ∷ Θ¹
 
-  ↑ : ∀ {r} → Tm Γ Δᵍ Δ Θ r → Tm Γ Δᵍ Δ Θ¹ r
+  -- the marker first, so the subscribe frame's group always exists and
+  -- always leads with it; the input's own values behind it
+  marked : Exp Γ Δᵍ Δ Θ¹ m
+  marked = flatAllᵉ (mergeᶠ nothing)
+    (ofᵉ (strmᵗ (ofᵉ (inlᵗ unit̂ ∷ [])) ∷
+          strmᵗ (mapᵉ (inrᵗ (varᵗ (here refl))) (input i)) ∷ []))
+
+  grp : Tm Γ Δᵍ Δ Θᵍ (m ×ᵗ listᵗ m)
+  grp = varᵗ (here refl)
+
+  src : Tm Γ Δᵍ Δ Θᵍ uniqᵗ
+  src = varᵗ (there (here refl))
+
+  frameᵍ : Tm Γ Δᵍ Δ Θᵍ uniqᵗ
+  frameᵍ = renTm (λ x → x) (λ x → x) (λ x → there (there x)) frame
+
+  -- the tail in arrival order (the `revᵗ` is what makes a cons-fold
+  -- rebuild the list rather than reverse it); a marker in it is
+  -- dropped, and only a group's head can be one
+  rest : Tm Γ Δᵍ Δ Θᵍ (listᵗ (instEventᵗ uniqᵗ a))
+  rest = foldᵗ (revᵗ (sndᵗ grp)) nilᵗ
+           (caseᵗ (varᵗ (here refl))
+                  (varᵗ (there (there (here refl))))
+                  (consᵗ (valueᵛ (varᵗ (here refl))) (varᵗ (there (there (here refl))))))
+
+  ↑ : ∀ {s r} → Tm Γ Δᵍ Δ Θᵍ r → Tm Γ Δᵍ Δ (s ∷ Θᵍ) r
   ↑ = renTm (λ x → x) (λ x → x) there
 
-  src : Tm Γ Δᵍ Δ Θ¹ uniqᵗ
-  src = varᵗ (here refl)
+  ↑² : ∀ {s s′ r} → Tm Γ Δᵍ Δ Θᵍ r → Tm Γ Δᵍ Δ (s′ ∷ s ∷ Θᵍ) r
+  ↑² = renTm (λ x → x) (λ x → x) (λ x → there (there x))
 
-  -- the registration announcement: one `init`, in the subscribe frame,
-  -- tagged `subscribe` so it owes and pays nothing.
-  announce : Exp Γ Δᵍ Δ Θ¹ (machineEmitᵗ a)
-  announce =
-    ofᵉ (instEmitᵛ (consᵗ (initᵛ src) nilᵗ) (↑ frame) src subscribeᵛ ∷ [])
-
-  -- inside the INSTANT binder: the token, then the group, then the
-  -- source token, then Θ
-  inst : Tm Γ Δᵍ Δ Θ² uniqᵗ
-  inst = varᵗ (here refl)
-
-  grp : Tm Γ Δᵍ Δ Θ² (a ×ᵗ listᵗ a)
-  grp = varᵗ (there (here refl))
-
-  srcᵍ : Tm Γ Δᵍ Δ Θ² uniqᵗ
-  srcᵍ = varᵗ (there (there (here refl)))
-
-  -- head first, then the tail in arrival order (the `revᵗ` is what
-  -- makes a cons-fold rebuild the list rather than reverse it)
-  evs : Tm Γ Δᵍ Δ Θ² (listᵗ (instEventᵗ uniqᵗ a))
-  evs = consᵗ (valueᵛ (fstᵗ grp))
-              (foldᵗ (revᵗ (sndᵗ grp)) nilᵗ
-                     (consᵗ (valueᵛ (varᵗ (here refl)))
-                            (varᵗ (there (here refl)))))
-
-  -- one arrival: mint its instant, emit its whole group under it
-  stamp : Tm Γ Δᵍ Δ ((a ×ᵗ listᵗ a) ∷ Θ¹) (obs (machineEmitᵗ a))
-  stamp = strmᵗ (mintᵉ (ofᵉ (instEmitᵛ evs inst srcᵍ deliveryᵛ ∷ [])))
-
-  deliveries : Exp Γ Δᵍ Δ Θ¹ (machineEmitᵗ a)
-  deliveries = flatAllᵉ (mergeᶠ nothing) (mapᵉ stamp (batchSyncᵉ (input i)))
+  -- the subscribe frame: the `init` and the frame's values, under the
+  -- frame, tagged `subscribe`.  A later arrival: mint its instant and
+  -- emit its value under it.
+  stamp : Tm Γ Δᵍ Δ Θᵍ (obs (machineEmitᵗ a))
+  stamp = caseᵗ (fstᵗ grp)
+    (strmᵗ (ofᵉ (instEmitᵛ (consᵗ (initᵛ (↑ src)) (↑ rest)) (↑ frameᵍ) (↑ src) subscribeᵛ ∷ [])))
+    (strmᵗ (mintᵉ (ofᵉ (instEmitᵛ (consᵗ (valueᵛ (varᵗ (there (here refl)))) (↑² rest))
+                                 (varᵗ (here refl)) (↑² src) deliveryᵛ ∷ []))))
 
 ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
     → Tm Γ Δᵍ Δ Θ uniqᵗ
