@@ -886,3 +886,26 @@ Case 16 is `switchAllˢ` over a `scanˢ` whose accumulator is itself a
 `switchAllˢ` — two flatteners nested at depth one, since `scanˢ` carries a
 stream. The frozen spec side alone exceeds the two-minute cap on it, so the
 cap fixes the sweep at the first fifteen cases of seed 1.
+
+## Bug-cache run cost: a value at SUBSCRIBE time costs 20–60× a delivered one
+
+`agda/_oracle/_cli/Bug-Cache`, fuel 1, each side run alone. The program is
+`mergeAll(of(x))` nested k deep over slot zero, carrying one value `3` —
+either in a cold script's synchronous half (present at subscription) or
+delivered at tick 1.
+
+| k | elaborated, sync | elaborated, async | elaborated TIMED, sync | elaborated TIMED, async |
+|---|---|---|---|---|
+| 1 | 69 ms | 29 ms | 24.7 s | 0.42 s |
+| 2 | 352 ms | 50 ms | > 120 s | 4.3 s |
+| 3 | 1.0 s | 143 ms | | |
+| 4 | 2.5 s | 102 ms | | |
+| 6 | 7.8 s | 261 ms | | |
+
+The plain run of the same TIMED program is instant at k = 1 (`timed-faithful`'s
+plain side), and so is the same value from a hot script at tick 0, and a bare
+`inputˢ` read of the synchronous script. So the cost is the IMPL's, on a
+subscribe-time value, and the timed translation — several flatteners per author
+flattener — multiplies it past any wall clock. `a delivery switching to two
+ofs` (row 6) is this shape: no side of `timing-correct` or `timed-faithful`
+gives a verdict at fuel 1, while `left-to-right` and `batchable` are instant.

@@ -240,9 +240,12 @@ bound.
 
 ### Big picture tier roadmap
 
-- **GIVE `a delivery switching to two ofs` A VERDICT.** One emit per `of`
-  value gave five of the six timeout rows one; this row still runs past
-  60 s, and its cost is the elaboration's.
+- **GIVE `a delivery switching to two ofs` A VERDICT.** Its cost is a value
+  present at SUBSCRIBE time, run through the elaborated TIMED program: the
+  plain timed run is instant, and the same value delivered at tick 1 costs
+  20–60× less (`typecheck-performance-numbers.md`). Find which elaborated
+  former's subscribe path pays it before touching the timed translation; the
+  evaluator is the tier's boundary.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   Depth 1 is the sweep that fits, and some programs cost exponentially in
