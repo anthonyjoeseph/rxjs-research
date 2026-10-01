@@ -239,21 +239,15 @@ bound.
 
 ### Big picture tier roadmap
 
-- **BATCH A LATER ARRIVAL'S EMITS — POSSIBLY A QUESTION FOR ANTHONY.** Past
-  the subscribe frame `batchSimultaneousᵖ` batches each emit alone, and
-  `batchable` hands it one emit per tick, so the InstEmit must carry where
-  each instant ends; the four routes tried are dead routes in
-  `SExp.InstEmit`'s header, and what is left may move `Rx.Exp` or the
-  evaluator. Every verdict-bearing FAIL left is here, and each merges a
-  SHARED input: bug-cache row 4, `seed 1 depth 1 case 108`, `seed 9 depth 1
-  case 2` fail `batchable` alone. Stamping is ruled out — a subscribe burst
-  now takes its trigger's instant, and no row fails `left-to-right` or
-  `timing-correct`.
-
 - **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
   The PLAIN rows: a switched-away inner stays subscribed (`seed 6 depth 1
   case 4`), and an inner arriving while one is live is not dropped (`seed 7
   depth 1 case 12`). Mirror the plain formers' bookkeeping in the InstEmit.
+
+- **GIVE THE SIX TIMEOUT ROWS A VERDICT.** Every bug-cache row that
+  finishes passes; the six left run past 60 s. Batching is ruled out --
+  `batchSimultaneousᵖ` cuts the spec's runs and closes the last one on the
+  run's completion -- so what is left is the elaboration's cost.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   Depth 1 is the sweep that fits, and some programs cost exponentially in

@@ -41,9 +41,15 @@ open import Data.String using (String; _++_; words)
 
 open import CLI.IO using (putStr; getContents; _>>=_; Unit)
 open import CLI.Unit-Test using (cases)
-open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides)
+open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides; κ₂; Γ₂ᵉ)
+open import Rx.Prim using (InstEmit; InstEvent; EmitKind; subscribe; delivery; plumbing;
+  value; complete; PlainEvent; valueᵖ; completeᵖ)
+open import SExp.Syntax using (plainᵗ)
+open import Rx.Exp using (natᵗ)
+open import SExp.Pipeline using (emitsᴵ)
+open import SExp.InstEmit.Decode using (decodeEmits)
 
-open Case using (name)
+open Case using (name; fuel; prog; slots)
 
 -- one row's verdicts, as the report lines it is owed: a row can fail
 -- several properties, and saying which is the whole value of the line
@@ -88,14 +94,49 @@ showBatches : List (List ℕ) → String
 showBatches []       = "[]"
 showBatches (b ∷ bs) = "[" ++ showNats b ++ "] ∷ " ++ showBatches bs
 
+showKind : EmitKind → String
+showKind subscribe = "subscribe"
+showKind delivery  = "delivery"
+showKind plumbing  = "plumbing"
+
+valuesIn : ∀ {A : Set} → List (InstEvent A) → ℕ
+valuesIn []             = 0
+valuesIn (value _ ∷ es) = suc (valuesIn es)
+valuesIn (_ ∷ es)       = valuesIn es
+
+completes : ∀ {A : Set} → List (InstEvent A) → String
+completes []            = ""
+completes (complete ∷ _) = " complete"
+completes (_ ∷ es)      = completes es
+
+showEmits : ∀ {A : Set} → List (InstEmit A) → String
+showEmits []       = ""
+showEmits (e ∷ es) =
+  "  emit at " ++ show (InstEmit.instant e) ++ " " ++ showKind (InstEmit.kind e) ++
+  " values " ++ show (valuesIn (InstEmit.events e)) ++ completes (InstEmit.events e) ++ "\n" ++
+  showEmits es
+
+plainEnd : ∀ {A : Set} → List (PlainEvent A) → String
+plainEnd []                = "the run does not complete\n"
+plainEnd (completeᵖ ∷ _)   = "the run completes\n"
+plainEnd (valueᵖ _ ∷ es)   = plainEnd es
+
+-- MATCHED IN HELPERS, NEVER BY A `with`, for the reason `verdict` is:
+-- a `with` over a run makes the typechecker normalise it.
+ltrLines : List ℕ × List ℕ → String
+ltrLines (l , r) = "left-to-right  joined  " ++ showNats l ++ "\n" ++
+                   "left-to-right  plain   " ++ showNats r ++ "\n"
+
+batchLines : List (List ℕ) × List (List ℕ) → String
+batchLines (l , r) = "batchable      batched " ++ showBatches l ++ "\n" ++
+                     "batchable      grouped " ++ showBatches r ++ "\n"
+
 showSides : Maybe Case → IO Unit
 showSides nothing  = putStr "bug-cache: no such row\n"
-showSides (just c) with ltrSides c | batchableSides c
-... | l , r | bl , br =
-  putStr ("left-to-right  joined  " ++ showNats l ++ "\n" ++
-          "left-to-right  plain   " ++ showNats r ++ "\n" ++
-          "batchable      batched " ++ showBatches bl ++ "\n" ++
-          "batchable      grouped " ++ showBatches br ++ "\n")
+showSides (just c) =
+  putStr (ltrLines (ltrSides c) ++ batchLines (batchableSides c) ++
+          showEmits (decodeEmits {Γ = Γ₂ᵉ} {a = plainᵗ natᵗ} (emitsᴵ κ₂ (fuel c) (prog c) (slots c))) ++
+          plainEnd (emitsᴵ κ₂ (fuel c) (prog c) (slots c)))
 
 answer : Maybe ℕ → List String → IO Unit
 answer nothing     _               = putStr "bug-cache: expected a row number on stdin\n"

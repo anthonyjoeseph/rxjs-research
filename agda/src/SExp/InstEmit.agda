@@ -35,6 +35,11 @@
 --   after it -- the registry is appended and dispatched oldest-first, a
 --   `deferᵉ` re-registration lands a tick late, and a cold slot has one
 --   timeline per registration, so no one registration closes them all.
+-- DEAD ROUTE InstEmit/flush/complete-event: closing the last batch on a
+--   `complete` event reads the wrong signal both ways -- a merge's lanes
+--   each carry their own `complete` up to the root, and a run whose
+--   completion lands on a delivery carries it on no emit at all, as the
+--   twin's join leaves it to the root; rows 9 and 4 @ ed51d9c6.
 module SExp.InstEmit where
 
 open import Data.Bool using (true; false)
