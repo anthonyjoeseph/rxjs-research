@@ -1,7 +1,9 @@
 ------------------------------------------------------------------
 -- THE BUG CACHE'S RUNNER: a compiled entry point that runs ONE row of
 -- the corpus, named by the number on stdin, and prints which of its
--- properties failed.  Zero asks for the row count instead.
+-- properties failed.  Zero asks for the row count instead, and a
+-- second word `sides` asks for the two sides each comparison read, which
+-- is what a failing row is diagnosed from.
 --
 -- WHY THERE IS A BINARY AT ALL.  A row is a set of booleans over a
 -- whole `evaluate` run, and Agda's evaluator is the wrong machine to
@@ -39,7 +41,7 @@ open import Data.String using (String; _++_; words)
 
 open import CLI.IO using (putStr; getContents; _>>=_; Unit)
 open import CLI.Unit-Test using (cases)
-open import CLI.Unit-Test.Prelude using (Case; checksOf; statements)
+open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides)
 
 open Case using (name)
 
@@ -78,16 +80,38 @@ runRow (just c) =
   putStr ("bug-cache: row " ++ name c ++ "\n") >>= λ _ →
   putStr (lines (faults c) ++ "bug-cache: done\n")
 
-answer : Maybe ℕ → IO Unit
-answer nothing  = putStr "bug-cache: expected a row number on stdin\n"
-answer (just zero) = putStr ("bug-cache: rows " ++ show (length cases) ++ "\n")
-answer (just k) = runRow (row k cases)
+showNats : List ℕ → String
+showNats []       = "[]"
+showNats (x ∷ xs) = show x ++ " ∷ " ++ showNats xs
+
+showBatches : List (List ℕ) → String
+showBatches []       = "[]"
+showBatches (b ∷ bs) = "[" ++ showNats b ++ "] ∷ " ++ showBatches bs
+
+showSides : Maybe Case → IO Unit
+showSides nothing  = putStr "bug-cache: no such row\n"
+showSides (just c) with ltrSides c | batchableSides c
+... | l , r | bl , br =
+  putStr ("left-to-right  joined  " ++ showNats l ++ "\n" ++
+          "left-to-right  plain   " ++ showNats r ++ "\n" ++
+          "batchable      batched " ++ showBatches bl ++ "\n" ++
+          "batchable      grouped " ++ showBatches br ++ "\n")
+
+answer : Maybe ℕ → List String → IO Unit
+answer nothing     _               = putStr "bug-cache: expected a row number on stdin\n"
+answer (just zero) _               = putStr ("bug-cache: rows " ++ show (length cases) ++ "\n")
+answer (just k)    ("sides" ∷ _)   = showSides (row k cases)
+answer (just k)    _               = runRow (row k cases)
 
 firstNat : List String → Maybe ℕ
 firstNat []      = nothing
 firstNat (w ∷ _) = readMaybe 10 w
 
+rest : List String → List String
+rest []       = []
+rest (_ ∷ ws) = ws
+
 main : IO Unit
 main =
   getContents >>= λ s →
-  answer (firstNat (words s))
+  answer (firstNat (words s)) (rest (words s))
