@@ -196,8 +196,9 @@ Main                                     four top-line statements, claimed
  └─ timed-faithful                        Timed/Faithful.agda — the timed run
                                           carries the plain run's values — tier 3
 
-  timed, timed-below                      Timed/Translation.agda — the translation the
-                                          packets come from; unwritten — tier 3
+  timed-below                             Timed/Translation.agda — the translation the
+                                          packets come from reads only its
+                                          source's inputs — tier 3
 
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
@@ -243,13 +244,6 @@ bound.
 
 ### Big picture tier roadmap
 
-- **GIVE `timed` ITS ECHO BODY OVER `flattenˢ`.** `SExp` now has the echoing
-  flattener, so the `echo` rule of `typescript/src/timed.ts` transcribes:
-  packets encoded in `packetᵗ`, a hole filled and paths prefixed per lane
-  frame, each lane's subscribe instant the last packet seen before its START
-  (a `scanˢ`), a shared slot's names closed at the share. Until it lands the
-  two timed quickchecks halt on the postulate and decide nothing.
-
 - **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
   A share's connect mints its own instant inside the subscribe frame, and a
   spawned inner is stamped with the subscribe instant rather than its
@@ -273,7 +267,10 @@ bound.
   (`typecheck-performance-numbers.md`). Every counterexample becomes a
   bug-cache row first. Three rows — an `of` pair merged inside a
   delivery's inner — give no verdict in 60 s even at fuel 1, while the
-  same programs read plain run at once: the cost is the ELABORATION's.
+  same programs read plain run at once: the cost is the ELABORATION's. The
+  timed program multiplies it, every flatten becoming four: an `exhaustᶠ`
+  over three `of` inners gives `timing-correct` no verdict in 20 s while
+  `timed-faithful`, run plain, passes.
 
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
   from the oracle's tree, as `qc-build` does, and the oracle job's `make
@@ -325,24 +322,22 @@ still being rewritten there.
   and the `timed-fuzz` fixtures that pin only them, keeping the ones that pin
   the echo.
 
-- **`timed-below` AND `timed-faithful` ONCE `timed` HAS A BODY.** Both are
-  stated over tier 2's unwritten translation; probe each against the ported
-  body before grinding either.
+- **PROBE `timed-below` AND `timed-faithful` AGAINST `timed`'S BODY.** Both
+  compute now that the translation is real; instantiate each at the
+  bug-cache programs before grinding either.
 
 ### The ledger
 
 - **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: the
   elaborated `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third
   leg.
-- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: stated
-  over an unwritten `timed`; tier 2's stamping leg is the impl's half of it.
-- **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: stated over
-  an unwritten `timed`.
-- **`timed-below`** (Timed.Translation) — FALSITY, `NO EVIDENCE`: stated over
-  an unwritten `timed`.
+- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: its
+  QuickCheck is the instantiation; tier 2's stamping leg is the impl's half.
+- **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: its
+  QuickCheck is the instantiation.
+- **`timed-below`** (Timed.Translation) — FALSITY, `NO EVIDENCE`: nothing has
+  instantiated it against `timed`'s body.
 - **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: nothing has
   instantiated the second evaluator; the first leg.
-- **`timed`** (Timed.Translation) — VACUITY, `DEAD ROUTE×2`: a postulated
-  function asserts nothing; `λ _ → emptyˢ` inhabits it.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod`/`within` (QuickCheck). Carried, not counted.
