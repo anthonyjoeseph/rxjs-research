@@ -124,4 +124,8 @@ cases =
           (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 9) ∷ (natˢ 9) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
           (mkSlots (cold [] ((after 1 , 1) ∷ ((after 0 , 0) ∷ [])))
                    ((ofˢ ((natˢ 5) ∷ [])))) ∷
+  cached "seed 2 depth 1 timing-correct" 30
+          (flatAllˢ switchᶠ (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ emptyˢ) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
+          (mkSlots (hot ((after 0 , 6) ∷ []))
+                   ((ofˢ ((natˢ 9) ∷ (natˢ 7) ∷ [])))) ∷
   []

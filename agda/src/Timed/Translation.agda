@@ -25,7 +25,7 @@
 ------------------------------------------------------------------
 module Timed.Translation where
 
-open import Data.Bool    using (T; true; false)
+open import Data.Bool    using (Bool; T; true; false; _∧_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -39,17 +39,18 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup; zipWith)
 open import Data.Vec.Properties using (lookup-zipWith)
-open import Relation.Binary.PropositionalEquality using (refl; cong; subst; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst; sym)
 
 open import Rx.Prim  using (ObservableInput; hot; cold; Timed; after_,_)
-open import Rx.Exp   using (Ty; Ctx; Val; isData; inputsBelowᵉ; PrimOp;
+open import Rx.Exp   using (Ty; Ctx; Val; isData; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ; PrimOp;
   add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; FlatOp; mergeᶠ;
   unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
 open import SExp.Syntax  using (SExp; STm; Kind; Kinds; scriptedᵏ; sharedᵏ; plainᵗ;
   inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ; μˢ; varˢ; deferˢ;
   varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; ifˢ; primˢ; strmˢ)
-open import SExp.Plain using (plainExp; mapInput; ∧ˡ; ∧ʳ; ∧-intro)
+open import SExp.Plain using (plainExp; plainTm; plainTms; mapInput; ∧ˡ; ∧ʳ; ∧-intro)
+open import Decide using (∧⁺) renaming (∧ˡ to ∧ˡᵇ; ∧ʳ to ∧ʳᵇ)
 open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
 
 ------------------------------------------------------------------
@@ -352,15 +353,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   -- a slot read as items, ended where its source completes: a scripted
   -- slot's tag named, a shared slot's items as its own translation left
   -- them
+  inputᵏ : ∀ {Δᵍ Δ Θ} (i : Fin n) kd → SExp (timedᶜ Γ κ) Δᵍ Δ Θ (timedTy (lookup Γ i) kd)
+         → SExp (timedᶜ Γ κ) Δᵍ Δ Θ (itemᵗ (lookup Γ i))
+  inputᵏ i scriptedᵏ e = endAfterˢ {t = lookup Γ i}
+    (mapˢ (pairˢ (tickᵖ (toℕ i) (fstˢ v₀)) (inlˢ (sndˢ v₀))) e)
+  inputᵏ i sharedᵏ   e = endAfterˢ {t = lookup Γ i} e
+
   inputᵀ : ∀ {Δᵍ Δ Θ} (i : Fin n) → SExp (timedᶜ Γ κ) Δᵍ Δ Θ (itemᵗ (lookup Γ i))
   inputᵀ {Δᵍ} {Δ} {Θ} i =
-    go (lookup κ i) (subst (SExp (timedᶜ Γ κ) Δᵍ Δ Θ) (lookup-zipWith timedTy i Γ κ) (inputˢ i))
-    where
-      go : ∀ kd → SExp (timedᶜ Γ κ) Δᵍ Δ Θ (timedTy (lookup Γ i) kd)
-         → SExp (timedᶜ Γ κ) Δᵍ Δ Θ (itemᵗ (lookup Γ i))
-      go scriptedᵏ e = endAfterˢ {t = lookup Γ i}
-        (mapˢ (pairˢ (tickᵖ (toℕ i) (fstˢ v₀)) (inlˢ (sndˢ v₀))) e)
-      go sharedᵏ   e = endAfterˢ {t = lookup Γ i} e
+    inputᵏ i (lookup κ i) (subst (SExp (timedᶜ Γ κ) Δᵍ Δ Θ) (lookup-zipWith timedTy i Γ κ) (inputˢ i))
 
   mutual
     τ : ∀ {Δᵍ Δ Θ Θ′ t} → ℕ → Ren Θ Θ′ → SExp Γ Δᵍ Δ Θ t
@@ -424,11 +425,119 @@ timed : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t}
       → SExp Γ [] [] [] t → SExp (timedᶜ Γ κ) [] [] [] (itemᵗ t)
 timed κ e = τ κ 0 noneᵀ e
 
-postulate
-  -- the translation reads the inputs its source read, and no others
-  timed-below : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (k : ℕ) (d : SExp Γ [] [] [] t)
-              → T (inputsBelowᵉ k (plainExp d))
-              → T (inputsBelowᵉ k (plainExp (timed κ d)))
+------------------------------------------------------------------
+-- THE TRANSLATION READS THE INPUTS ITS SOURCE READ, AND NO OTHERS:
+-- every term it adds mentions no input, so each guard reduces to its
+-- source's, with a trailing `true` at most.
+------------------------------------------------------------------
+
+conj² : ∀ a b a′ b′ → (T a → T a′) → (T b → T b′) → T (a ∧ b) → T (a′ ∧ b′)
+conj² a b a′ b′ f g p = ∧⁺ a′ b′ (f (∧ˡᵇ a b p)) (g (∧ʳᵇ a b p))
+
+conj³ : ∀ a b c a′ b′ c′ → (T a → T a′) → (T b → T b′) → (T c → T c′)
+      → T (a ∧ b ∧ c) → T (a′ ∧ b′ ∧ c′)
+conj³ a b c a′ b′ c′ f g h = conj² a (b ∧ c) a′ (b′ ∧ c′) f (conj² b c b′ c′ g h)
+
+conj-true : ∀ a → T a → T (a ∧ true)
+conj-true a p = ∧⁺ a true p tt
+
+module _ {n} {Γ : Ctx n} (k : ℕ) where
+  ib : ∀ {Δᵍ Δ Θ t} → SExp Γ Δᵍ Δ Θ t → Bool
+  ib e = inputsBelowᵉ k (plainExp e)
+
+  ibᵗ : ∀ {Δᵍ Δ Θ t} → STm Γ Δᵍ Δ Θ t → Bool
+  ibᵗ m = inputsBelowᵗ k (plainTm m)
+
+  ibᵗˢ : ∀ {Δᵍ Δ Θ t} → List (STm Γ Δᵍ Δ Θ t) → Bool
+  ibᵗˢ ms = inputsBelowᵗˢ k (plainTms ms)
+
+  subst-belowᵗ : ∀ {Δᵍ Δ Θ s t} (eq : s ≡ t) (e : SExp Γ Δᵍ Δ Θ s)
+               → T (ib e) → T (ib (subst (SExp Γ Δᵍ Δ Θ) eq e))
+  subst-belowᵗ refl e p = p
+
+  subst-belowᴰ : ∀ {Δᵍ Δ Δ′ Θ t} (eq : Δ ≡ Δ′) (e : SExp Γ Δᵍ Δ Θ t)
+               → T (ib e) → T (ib (subst (λ ζ → SExp Γ Δᵍ ζ Θ t) eq e))
+  subst-belowᴰ refl e p = p
+
+module _ {n} {Γ : Ctx n} (κ : Kinds n) (k : ℕ) where
+  inputᵏ-below : ∀ {Δᵍ Δ Θ} (i : Fin n) kd (e : SExp (timedᶜ Γ κ) Δᵍ Δ Θ (timedTy (lookup Γ i) kd))
+               → T (ib k e) → T (ib k (inputᵏ κ i kd e))
+  inputᵏ-below i scriptedᵏ e p = conj-true (ib k e) p
+  inputᵏ-below i sharedᵏ   e p = conj-true (ib k e) p
+
+  mutual
+    τ-below : ∀ {Δᵍ Δ Θ Θ′ t} d (ρ : Ren Θ Θ′) (e : SExp Γ Δᵍ Δ Θ t)
+            → T (ib k e) → T (ib k (τ κ d ρ e))
+    τ-below d ρ (inputˢ i) p =
+      inputᵏ-below i (lookup κ i) _
+        (subst-belowᵗ k (lookup-zipWith timedTy i Γ κ) (inputˢ i) p)
+    τ-below d ρ (ofˢ ts) p = τof-below ρ ts p
+    τ-below d ρ emptyˢ p = tt
+    τ-below d ρ (takeˢ c e) p =
+      conj-true (ibᵗ k (τᵗ κ ρ c) ∧ ib k (τ κ (suc d) ρ e))
+        (conj² (ibᵗ k c) (ib k e) (ibᵗ k (τᵗ κ ρ c)) (ib k (τ κ (suc d) ρ e))
+            (τᵗ-below ρ c) (τ-below (suc d) ρ e) p)
+    τ-below d ρ (mapˢ f e) p =
+      conj² (ibᵗ k f) (ib k e) (ibᵗ k f′ ∧ true) (ib k (τ κ (suc d) ρ e))
+         (λ q → conj-true (ibᵗ k f′) (τᵗ-below (extᵀ (wkᵀ ρ)) f q)) (τ-below (suc d) ρ e) p
+      where f′ = τᵗ κ (extᵀ (wkᵀ ρ)) f
+    τ-below d ρ (scanˢ f z e) p =
+      conj³ (ibᵗ k f) (ibᵗ k z) (ib k e)
+         (((ibᵗ k f′ ∧ true) ∧ true) ∧ true) (ibᵗ k (τᵗ κ ρ z) ∧ true) (ib k (τ κ (suc d) ρ e))
+         (λ q → conj-true ((ibᵗ k f′ ∧ true) ∧ true) (conj-true (ibᵗ k f′ ∧ true)
+                  (conj-true (ibᵗ k f′) (τᵗ-below (extᵀ (wkᵀ (wkᵀ ρ))) f q))))
+         (λ q → conj-true (ibᵗ k (τᵗ κ ρ z)) (τᵗ-below ρ z q))
+         (τ-below (suc d) ρ e) p
+      where f′ = τᵗ κ (extᵀ (wkᵀ (wkᵀ ρ))) f
+    τ-below d ρ (flattenˢ op e) p = conj-true (ib k (τ κ (suc d) ρ e)) (τ-below (suc d) ρ e p)
+    τ-below d ρ (μˢ e) p = τ-below (suc d) ρ e p
+    τ-below d ρ (varˢ x) p = tt
+    τ-below {Δᵍ = Δᵍ} {Δ = Δ} d ρ (deferˢ e) p =
+      subst-belowᴰ k (map-++ itemᵗ Δᵍ Δ) (τ κ (suc d) ρ e) (τ-below (suc d) ρ e p)
+
+    τof-below : ∀ {Δᵍ Δ Θ Θ′ t} (ρ : Ren Θ Θ′) (ts : List (STm Γ Δᵍ Δ Θ t))
+              → T (ibᵗˢ k ts) → T (ibᵗˢ k (τof κ ρ ts))
+    τof-below ρ []       p = tt
+    τof-below ρ (x ∷ xs) p =
+      conj² (ibᵗ k x) (ibᵗˢ k xs) (ibᵗ k (τᵗ κ ρ x)) (ibᵗˢ k (τof κ ρ xs))
+         (τᵗ-below ρ x) (τof-below ρ xs) p
+
+    τᵗ-below : ∀ {Δᵍ Δ Θ Θ′ t} (ρ : Ren Θ Θ′) (m : STm Γ Δᵍ Δ Θ t)
+             → T (ibᵗ k m) → T (ibᵗ k (τᵗ κ ρ m))
+    τᵗ-below ρ (varˢᵗ x)     p = tt
+    τᵗ-below ρ unitˢ         p = tt
+    τᵗ-below ρ (boolˢ b)     p = tt
+    τᵗ-below ρ (natˢ j)      p = tt
+    τᵗ-below ρ (pairˢ a b)   p =
+      conj² (ibᵗ k a) (ibᵗ k b) (ibᵗ k (τᵗ κ ρ a)) (ibᵗ k (τᵗ κ ρ b))
+         (τᵗ-below ρ a) (τᵗ-below ρ b) p
+    τᵗ-below ρ (fstˢ a)      p = τᵗ-below ρ a p
+    τᵗ-below ρ (sndˢ a)      p = τᵗ-below ρ a p
+    τᵗ-below ρ nilˢ          p = tt
+    τᵗ-below ρ (consˢ a b)   p =
+      conj² (ibᵗ k a) (ibᵗ k b) (ibᵗ k (τᵗ κ ρ a)) (ibᵗ k (τᵗ κ ρ b))
+         (τᵗ-below ρ a) (τᵗ-below ρ b) p
+    τᵗ-below ρ (inlˢ a)      p = τᵗ-below ρ a p
+    τᵗ-below ρ (inrˢ a)      p = τᵗ-below ρ a p
+    τᵗ-below ρ (caseˢ s l r) p =
+      conj³ (ibᵗ k s) (ibᵗ k l) (ibᵗ k r)
+         (ibᵗ k (τᵗ κ ρ s)) (ibᵗ k (τᵗ κ (extᵀ ρ) l)) (ibᵗ k (τᵗ κ (extᵀ ρ) r))
+         (τᵗ-below ρ s) (τᵗ-below (extᵀ ρ) l) (τᵗ-below (extᵀ ρ) r) p
+    τᵗ-below ρ (foldˢ l z f) p =
+      conj³ (ibᵗ k l) (ibᵗ k z) (ibᵗ k f)
+         (ibᵗ k (τᵗ κ ρ l)) (ibᵗ k (τᵗ κ ρ z)) (ibᵗ k (τᵗ κ (extᵀ (extᵀ ρ)) f))
+         (τᵗ-below ρ l) (τᵗ-below ρ z) (τᵗ-below (extᵀ (extᵀ ρ)) f) p
+    τᵗ-below ρ (ifˢ c a b)   p =
+      conj³ (ibᵗ k c) (ibᵗ k a) (ibᵗ k b)
+         (ibᵗ k (τᵗ κ ρ c)) (ibᵗ k (τᵗ κ ρ a)) (ibᵗ k (τᵗ κ ρ b))
+         (τᵗ-below ρ c) (τᵗ-below ρ a) (τᵗ-below ρ b) p
+    τᵗ-below ρ (primˢ op a)  p = τᵗ-below ρ a p
+    τᵗ-below ρ (strmˢ e)     p = τ-below 0 ρ e p
+
+timed-below : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (k : ℕ) (d : SExp Γ [] [] [] t)
+            → T (inputsBelowᵉ k (plainExp d))
+            → T (inputsBelowᵉ k (plainExp (timed κ d)))
+timed-below κ k d = τ-below κ k 0 noneᵀ d
 
 ------------------------------------------------------------------
 -- The slot table, translated.

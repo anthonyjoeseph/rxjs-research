@@ -167,8 +167,7 @@ code.
   exist. Find it and delete it.
 
 **The tier law and the risk classes are DEFINED IN CLAUDE.md** — the
-lowest-numbered tier below finishes first, strictly, and an emptied tier is
-DELETED rather than renumbered, so the numbers are names and not positions;
+lowest-numbered tier below finishes first, strictly;
 classes worst-first are FALSITY, SHAPE, VACUITY, DIFFICULTY, GRINDABLE. This
 file only ASSIGNS them, and schedules them into legs. Read that section
 before re-classifying anything: what counts as evidence for lowering a class, the
@@ -185,21 +184,16 @@ Main                                     four top-line statements, claimed
  │                                        side by side, meeting in raw values
  ├─ left-to-right                         Left-To-Right/Statement.agda — the
  │                                        batches, joined, are the plain
- │                                        program's values — tier 3
+ │                                        program's values — tier 2
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
  │                                        group emits as the timed
- │                                        translation's packets do — tier 3
+ │                                        translation's packets do — tier 2
  ├─ batchable                             Batchable/Statement.agda — a second
  │                                        evaluator running the batcher over
  │                                        the run's emits gives the spec's
- │                                        grouping of them — tier 3
+ │                                        grouping of them — tier 2
  └─ timed-faithful                        Timed/Faithful.agda — the timed run
-                                          carries the plain run's values — tier 3
-
-  timed-below                             Timed/Translation.agda — the translation the
-                                          packets come from reads only its
-                                          source's inputs — tier 3
-
+                                          carries the plain run's values — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -219,7 +213,10 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 2 — an impl InstEmit the spec batches agree with
+## Tier 1 — a fully stated spec and a passing QuickCheck
+
+**THE SPEC IS FULLY STATED (Anthony):** no postulate inside a top-line
+statement's type.
 
 **THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
 are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
@@ -229,10 +226,8 @@ elaboration-only `batchSyncᵉ` and `mintᵉ` (Anthony), so its flattener is
 `flattenˢ` and rxjs's named three are that former with no echo. The InstEmit's
 shape is free; TypeScript is out of scope this tier (Anthony).
 
-`QuickCheck` is four quickchecks, one per statement `Main` imports, each
-deciding that statement's own sides, uncapped, on the real evaluator,
-each case under its own wall clock (`make qc-left-to-right` and its three
-siblings). **DONE IS THE AGDA
+`QuickCheck` decides each of `Main`'s four statements on the real evaluator,
+each case under its own wall clock (`make qc-left-to-right` and siblings). **DONE IS THE AGDA
 QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
 `SExp.InstEmit`'s header; counterexamples go in the bug cache.
 
@@ -248,7 +243,8 @@ bound.
   A share's connect mints its own instant inside the subscribe frame, and a
   spawned inner is stamped with the subscribe instant rather than its
   trigger's; every FAIL so far falls there (bug-cache `seed 9
-  depth 1 case 2`, `seed 2 depth 1 case 15`). Fix the elaboration's stamping.
+  depth 1 case 2`, `seed 2 depth 1 case 15`, `seed 2 depth 1
+  timing-correct`). Fix the elaboration's stamping.
 
 - **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
   The PLAIN rows: a switched-away inner stays subscribed (`seed 6 depth 1
@@ -275,7 +271,7 @@ bound.
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
   from the oracle's tree, as `qc-build` does, and the oracle job's `make
   bug-cache` step with it. This leg closes the tier: the
-  check that decides tier 2 then guards it. Nothing in the job may be
+  check that decides tier 1 then guards it. Nothing in the job may be
   narrowed to make it pass.
 
 ### The ledger
@@ -283,61 +279,50 @@ bound.
 (empty — the tier's work is definitions, not postulates.)
 
 
-## Tier 3 — the top-line statements, and the translation
+## Tier 2 — proving the spec
 
 **WHERE THE IMPLEMENTATION IS ACTUALLY JUDGED.** Every row is a top-line
-statement or the translation one of them is stated over. Expect the
+statement. Expect the
 elaboration and the batcher to move under contact, and report rather than push
 if that starts spiralling out rather than in.
 
 **STOP AND REPORT if this needs a new former in `Rx.Exp`** — same bar as tier
-2: only on certainty, never on suspicion.
+1: only on certainty, never on suspicion.
 
 ### The monster
 
-(no monster) — chosen when tier 2 closes, since the batcher the rows judge is
+(no monster) — chosen when tier 1 closes, since the batcher the rows judge is
 still being rewritten there.
 
 ### Big picture tier roadmap
-
-- **PROBE `batchable` BEFORE ANY GRIND.** Both sides compute: instantiate it in
-  `agda/evidence/probed/` at the bug-cache programs, one row per fuel up to
-  each run's end, so every cut is a row. What it decides is whether the
-  statement's second evaluator — one emit per tick, run to completion — is a
-  setting any batcher can pass.
-
-- **CARRY `batchable`'S SECOND EVALUATOR INTO THE HARNESS.** The FAIL check in
-  `QuickCheck` and the bug cache still batch inside the program's own run,
-  as `left-to-right` does, so a green row there is not a green row of `batchable`. Port
-  `batchedᴮ` so the check decides the statement as written.
 
 - **PORT `timed.ts` ONTO `flatten`.** The translation's flatteners become
   `flatten` read by `last-seen`, and the `flatAllSrc` fast path that routes a
   lane-only flatten to the old rules goes, so every flatten takes the `echo`
   rule. `timed-fuzz.ts --selftest` and a 500-seed sweep hold `mismatched` at
-  zero. The TypeScript half of tier 2's `timed` leg.
+  zero. The TypeScript half of the Agda translation.
 
 - **DELETE THE `max-` RULES.** With no flatten reaching them, the `max-`
   rules, keys, trails and switch copies in `timed.ts` are dead; delete them
   and the `timed-fuzz` fixtures that pin only them, keeping the ones that pin
   the echo.
 
-- **PROBE `timed-below` AND `timed-faithful` AGAINST `timed`'S BODY.** Both
-  compute now that the translation is real; instantiate each at the
-  bug-cache programs before grinding either.
+- **GIVE `left-to-right` AN ASSEMBLY.** Outside in: its body written over
+  leaf postulates about the elaboration, one per former, so the tier's
+  monster can be chosen among leaves rather than at the top line. The
+  likeliest-false leaf is the flattener's, where tier 1's switch and exhaust
+  rows fall.
 
 ### The ledger
 
 - **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: the
-  elaborated `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third
-  leg.
+  elaborated `switchAll`/`exhaustAll` disagree with plain rxjs; tier 1's
+  switch leg.
 - **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: its
-  QuickCheck is the instantiation; tier 2's stamping leg is the impl's half.
+  QuickCheck is the instantiation; tier 1's stamping leg is the impl's half.
 - **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: its
   QuickCheck is the instantiation.
-- **`timed-below`** (Timed.Translation) — FALSITY, `NO EVIDENCE`: nothing has
-  instantiated it against `timed`'s body.
-- **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: nothing has
-  instantiated the second evaluator; the first leg.
+- **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: its
+  QuickCheck is the instantiation; tier 1's later-arrival leg is its half.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod`/`within` (QuickCheck). Carried, not counted.
