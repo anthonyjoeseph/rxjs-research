@@ -257,6 +257,24 @@ class Def:
         self.kind = kind  # 'def' | 'data/record' | 'postulate'
 
 
+# THE HARNESS'S FFI IS NOT REMAINING WORK (Anthony).  A postulate in `CLI/`
+# bound by a `COMPILE GHC` pragma HAS a body -- the Haskell one the binary
+# runs -- and no proof may depend on the harness, so it leaves the ledger.
+# Outside `CLI/` a binding earns nothing: a proof could cite it.
+COMPILE_RE = re.compile(r"\{-#\s*COMPILE\s+GHC\s+(\S+)\s*=")
+
+
+def ffi_bindings(src_dir, files):
+    """-> {file: set of names bound by `COMPILE GHC`}, for files in CLI/."""
+    out = {}
+    for f in files:
+        if not f.replace(os.sep, "/").startswith("CLI/"):
+            continue
+        with open(os.path.join(src_dir, f), encoding="utf-8") as h:
+            out[f] = set(COMPILE_RE.findall(h.read()))
+    return out
+
+
 def find_agda_files(src_dir):
     files = []
     for root, _dirs, filenames in os.walk(src_dir):
@@ -1296,10 +1314,13 @@ def main():
         extract_definitions(src_dir, files)
 
     if args.postulates:
-        for name in sorted(postulate_names):
+        ffi = ffi_bindings(src_dir, files)
+        ledger = sorted(n for n in postulate_names
+                        if n not in ffi.get(postulate_sites[n][0], ()))
+        for name in ledger:
             f, ln = postulate_sites[name]
             print(f"{name}  {f}:{ln}")
-        print(f"-- {len(postulate_names)} postulate(s)")
+        print(f"-- {len(ledger)} postulate(s)")
         return
 
     corpus = build_corpus(src_dir, files)

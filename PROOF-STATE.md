@@ -325,5 +325,3 @@ still being rewritten there.
   QuickCheck is the instantiation.
 - **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: its
   QuickCheck is the instantiation; tier 1's later-arrival leg is its half.
-- **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
-  `randFold`/`natMod`/`within` (QuickCheck). Carried, not counted.

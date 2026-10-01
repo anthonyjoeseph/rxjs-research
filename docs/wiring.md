@@ -149,3 +149,8 @@ Each otherwise costs a full build.
 ledger. Do NOT substitute `grep '^postulate'`: that finds the block HEADERS, a third
 of the count, and a branch hidden inside a block is exactly how eight well-formedness
 postulates once went uncounted while the index claimed the campaign reduced to two.
+
+**The harness's FFI is not on it (Anthony).** A postulate in `CLI/` bound by a
+`COMPILE GHC` pragma has a body, the Haskell one the binary runs, and no proof may
+depend on the harness. A binding outside `CLI/` earns nothing, since a proof could
+cite it.
