@@ -891,11 +891,20 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    toInstEmit {Θ = Θ} (flattenˢ op e) = flattenᵖ op (frameᵛ Θ) (toInstEmit e)
    toInstEmit (μˢ e)              = μᵉ (toInstEmit e)
    toInstEmit (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
+   -- A DEFERRED HOP IS A NEW INSTANT, AND IT SAYS SO BEFORE ANYTHING
+   -- ELSE.  The hop's first emit is an empty one under its own token, so
+   -- a reader learns that the previous instant is over even when the
+   -- body puts out nothing -- an unproductive `μ` looping through a
+   -- defer is the case where nothing else ever would.  It LEADS the
+   -- body rather than trailing it because a trailer is followed by
+   -- whatever the body's completion subscribes, in this same instant.
    toInstEmit {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
      deferᵉ (mintᵉ (mapᵉ (restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)))
-       (renExp (λ x → x) (λ x → x) there
-         (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
-                (map-++ emitᵗ Δᵍ Δ) (toInstEmit e)))))
+       (flatAllᵉ (mergeᶠ nothing) (ofᵉ (
+         strmᵗ (ofᵉ (instEmitᵛ nilᵗ (varᵗ (here refl)) (varᵗ (here refl)) deliveryᵛ ∷ [])) ∷
+         strmᵗ (renExp (λ x → x) (λ x → x) there
+           (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
+                  (map-++ emitᵗ Δᵍ Δ) (toInstEmit e))) ∷ [])))))
 
    toInstEmitTm : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
              → STm Γ Δᵍ Δ Θ t

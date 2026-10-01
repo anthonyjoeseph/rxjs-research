@@ -7,12 +7,12 @@
 -- harness runs it, and the proof quantifies over it.
 --
 -- IT CUTS WHERE THE SPEC CUTS: a batch is a maximal run of values under
--- one instant, and an emit carrying no value is invisible to it.  So
--- one scan carries the open instant and its values, and a value under
--- any other instant closes the batch.  An instant arriving as several
--- emits, at any distance apart, is one batch for as long as no other
--- instant's value comes between them, which is why nothing here groups
--- by synchrony.  Each batch rides an output InstEmit as one value
+-- one instant.  So one scan carries the open instant and its values,
+-- and an emit under any other instant closes the batch -- valued or
+-- not, since an instant's emits are contiguous in a run, so another
+-- instant's emit, even an empty one, says this one is over.  An instant
+-- arriving as several emits is one batch, which is why nothing here
+-- groups by synchrony.  Each batch rides an output InstEmit as one value
 -- event under its own instant; an InstEmit closing nothing carries no
 -- events, and is bookkeeping the top line never compares.
 --
@@ -21,13 +21,25 @@
 -- emit is obliged to carry the completion in its events.  So the run is
 -- concatenated with a one-emit marker -- a merging `flattenᵉ` at one
 -- lane subscribes it exactly when the run completes -- and the marker
--- closes the open batch.  A run that never completes keeps its last
--- batch.
+-- closes the open batch.  A run that never completes is one a deferred
+-- hop keeps alive, and every hop opens with an emit under its own
+-- instant, which closes the batch before it.
+--
+-- WHAT IS LEFT OPEN IS A BATCH NOTHING FOLLOWS: the run's last instant,
+-- when the fuel cuts it off rather than the run completing.
 --
 -- THE TOKENS COME FROM THE STREAM, because `uniqᵗ` has no term former:
 -- only `mintᵉ` introduces one, so that no program can forge a token in
 -- use.  The one mint here stands for the instant open before anything
 -- arrived, which no emit can carry.
+--
+-- DEAD ROUTE: close an instant on an empty emit TRAILING its source's
+--   own, sent from the arrival stamp, the deferred hop or the root
+--   frame.  It travels depth-first behind everything its predecessor
+--   caused, except what a COMPLETION subscribes: a source that ends
+--   with that arrival completes after its trailer, and a queued lane
+--   or a concat tail it frees subscribes in the same instant after the
+--   batch has closed, splitting it.
 module SExp.Batch where
 
 open import Data.List using (List; []; _∷_)
@@ -100,11 +112,10 @@ batchSimultaneousᵖ {Γ = Γ} {Δᵍ} {Δ} {Θ} {a} e =
 
     onEmit : Tm Γ Δᵍ Δ (machineEmitᵗ a ∷ (S ×ᵗ X) ∷ uniqᵗ ∷ Θ) S
     onEmit =
-      ifᵗ (nullᵇ vs) (pairᵗ open′ nothing′)
-        (ifᵗ (primᵗ eqᵘ (pairᵗ (instantᵛ em) o))
-             (pairᵗ (pairᵗ o (appendᵗ os vs)) nothing′)
-             (pairᵗ (pairᵗ (instantᵛ em) vs)
-                    (instEmitᵛ (batchEventsᵇ os) o (sourceᵛ em) (kindᵛ em))))
+      ifᵗ (primᵗ eqᵘ (pairᵗ (instantᵛ em) o))
+          (pairᵗ (pairᵗ o (appendᵗ os vs)) nothing′)
+          (pairᵗ (pairᵗ (instantᵛ em) vs)
+                 (instEmitᵛ (batchEventsᵇ os) o (sourceᵛ em) (kindᵛ em)))
       where
       em = varᵗ (here refl)
       vs = payloadsᵇ em

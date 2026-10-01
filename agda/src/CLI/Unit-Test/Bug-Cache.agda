@@ -47,7 +47,8 @@ open import CLI.IO using (putStr; getContents; _>>=_; Unit)
 open import CLI.Unit-Test using (cases)
 open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides; stampsOf; Γ₂ᵉ; faithfulSides)
 open import Rx.Prim using (InstEmit; InstEvent; EmitKind; subscribe; delivery; plumbing;
-  value; complete; PlainEvent; valueᵖ; completeᵖ)
+  init; value; close; handoff; complete; CloseReason; cut; cutPending; exhausted;
+  PlainEvent; valueᵖ; completeᵖ)
 open import SExp.Syntax using (plainᵗ)
 open import Rx.Exp using (natᵗ)
 open import SExp.Pipeline using (emitsᴵ)
@@ -103,21 +104,25 @@ showKind subscribe = "subscribe"
 showKind delivery  = "delivery"
 showKind plumbing  = "plumbing"
 
-valuesIn : ∀ {A : Set} → List (InstEvent A) → ℕ
-valuesIn []             = 0
-valuesIn (value _ ∷ es) = suc (valuesIn es)
-valuesIn (_ ∷ es)       = valuesIn es
+showReason : CloseReason → String
+showReason cut        = "cut"
+showReason cutPending = "cutPending"
+showReason exhausted  = "exhausted"
 
-completes : ∀ {A : Set} → List (InstEvent A) → String
-completes []            = ""
-completes (complete ∷ _) = " complete"
-completes (_ ∷ es)      = completes es
+-- every event, with the source it names: what the batcher counts
+showEvents : ∀ {A : Set} → List (InstEvent A) → String
+showEvents []                = ""
+showEvents (init s ∷ es)     = " init " ++ show s ++ showEvents es
+showEvents (value _ ∷ es)    = " value" ++ showEvents es
+showEvents (close s r ∷ es)  = " close " ++ show s ++ " " ++ showReason r ++ showEvents es
+showEvents (handoff s ∷ es)  = " handoff " ++ show s ++ showEvents es
+showEvents (complete ∷ es)   = " complete" ++ showEvents es
 
 showEmits : ∀ {A : Set} → List (InstEmit A) → String
 showEmits []       = ""
 showEmits (e ∷ es) =
-  "  emit at " ++ show (InstEmit.instant e) ++ " " ++ showKind (InstEmit.kind e) ++
-  " values " ++ show (valuesIn (InstEmit.events e)) ++ completes (InstEmit.events e) ++ "\n" ++
+  "  emit at " ++ show (InstEmit.instant e) ++ " from " ++ show (InstEmit.source e) ++ " " ++
+  showKind (InstEmit.kind e) ++ ":" ++ showEvents (InstEmit.events e) ++ "\n" ++
   showEmits es
 
 plainEnd : ∀ {A : Set} → List (PlainEvent A) → String
