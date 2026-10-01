@@ -240,15 +240,6 @@ bound.
 
 ### Big picture tier roadmap
 
-- **ONE HOT ARRIVAL IS ONE INSTANT FOR EVERY SUBSCRIBER -- A QUESTION FOR
-  ANTHONY.** `the script merged with itself` fails `timing-correct`. The
-  README's diamond makes one `.next()` one instant however many subscribe,
-  but `inputᵖ` mints the instant per subscription, and the palette has no
-  term by which two sibling subscriptions agree on a token minted after both
-  subscribed: a shared token must be in scope at subscription, and a late
-  subscriber cannot count the arrivals before it. Needs `Rx.Exp`,
-  `SExp.Syntax` or the evaluator to move.
-
 - **END THE ELABORATED `take` ON ITS CUT.** `take one of the script` fails
   `timing-correct`: with no takeWhile in the palette the elaborated take
   completes on the next upstream emit, so the timed END lands an instant
