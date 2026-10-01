@@ -52,7 +52,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; varˢᵗ; natˢ;
-  primˢ; pairˢ; strmˢ)
+  primˢ; pairˢ; strmˢ; μˢ; deferˢ; varˢ)
 open import Rx.Exp using (add; mergeᶠ; switchᶠ; exhaustᶠ)
 
 open import Rx.Prim using (hot; cold; after_,_)
@@ -128,4 +128,8 @@ cases =
           (flatAllˢ switchᶠ (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ emptyˢ) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
           (mkSlots (hot ((after 0 , 6) ∷ []))
                    ((ofˢ ((natˢ 9) ∷ (natˢ 7) ∷ [])))) ∷
+  cached "seed 1 depth 2 case 1" 30
+          (flatAllˢ (mergeᶠ (just 2)) (ofˢ ((strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ (suc zero)))) ∷ (strmˢ (μˢ (deferˢ (varˢ (here refl))))) ∷ [])))
+          (mkSlots (cold (2 ∷ []) ((after 0 , 9) ∷ []))
+                   ((inputˢ zero))) ∷
   []
