@@ -24,6 +24,7 @@ open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (_<?_; _≤?_; ≤-refl; ≤-trans; n≤1+n; <-≤-trans; <-irrefl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Function.Base using (_|>′_)
+open import Level using () renaming (_⊔_ to _⊔ˡ_)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]; [_,_]′)
 open import Data.Unit.Polymorphic using (⊤; tt)
 open import Data.Unit using () renaming (tt to tt₀)
@@ -605,8 +606,8 @@ record Call {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
     fin   : Bool
     sched : Sched Γ
     st    : EvalSt e
-    room  : Room m sched st
-    holds : PreHolds m κ pre sched st
+  field {-@0-}room  : Room m sched st
+  field {-@0-}holds : PreHolds m κ pre sched st
 
 -- THE CONTINUATION: THE REST OF THE PATH, AS A FOLD THAT TAKES
 -- CANDIDATES AND ANSWERS AT THE ROOT.  A subscribe never sees the
@@ -658,10 +659,11 @@ record Ans {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {u lo}
     out    : Stream Γ t
     sched′ : Sched Γ
     st′    : EvalSt e
-    der    : foldPath⇓ {e = e} now κ vals fin sched st (out , sched′ , st′)
-    pre′   : Pre κ
-    holds′ : PreHolds m κ pre′ sched′ st′
-    kept   : Kept κ pre′ sched st sched′ st′
+  field {-@0-}der    : foldPath⇓ {e = e} now κ vals fin sched st (out , sched′ , st′)
+  field pre′   : Pre κ
+  field {-@0-}holds′ : PreHolds m κ pre′ sched′ st′
+  field {-@0-}kept   : Kept κ pre′ sched st sched′ st′
+  field
     next   : RP {e = e} m P S κ pre′
     s′     : S
 open Ans public using (out; der; kept; next)
@@ -670,8 +672,8 @@ record RP {n} {Γ} {t} {e} m {u} {lo} P S κ pre where
   coinductive
   field
     fold : S → (now : Tick) (vals : List (Val Γ u)) → Column κ P pre vals
-         → (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Room m sched st
-         → PreHolds m κ pre sched st
+         → (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → {-@0-}Room m sched st
+         → {-@0-}PreHolds m κ pre sched st
          → Ans {e = e} m P S κ now vals fin sched st
 open RP public
 
@@ -790,6 +792,41 @@ end-++ (c ∷ᵗ tr)    tr′ = end-++ tr tr′
 end-++ {pre = standing _} []ᵗ tr′ = refl
 end-++ {pre = fallen}     []ᵗ tr′ = refl
 
+-- A PAIR WHOSE PROOF HALF THE ORACLE NEVER BUILDS.  To the proof these
+-- are `_×_` and `Σ`; in the oracle's tree the marked half is erased, so
+-- a compiled run stops carrying a derivation beside every answer.  The
+-- constructor is `_,_`, overloaded with `Σ`'s, so a site reads the same
+-- either way.
+record _⁰×_ {a b} (A : Set a) (B : Set b) : Set (a ⊔ˡ b) where
+  constructor _,_
+  field {-@0-}fst⁰ : A
+  field snd⁰ : B
+infixr 2 _⁰×_
+
+record Σ⁰ {a b} (A : Set a) (B : A → Set b) : Set (a ⊔ˡ b) where
+  constructor _,_
+  field fst⁰ : A
+  field {-@0-}snd⁰ : B fst⁰
+
+-- and a proof handed on to what follows, which the oracle never builds
+_|>⁰_ : ∀ {a b} {A : Set a} {B : Set b} → {-@0-}A → ({-@0-}A → B) → B
+x |>⁰ f = f x
+infixl 0 _|>⁰_
+
+-- and a value moved along an equation that is only ever proven
+subst⁰ : ∀ {a p} {A : Set a} (P : A → Set p) {x y : A} → {-@0-}x ≡ y → P x → P y
+subst⁰ P refl px = px
+
+-- and a write read back from the equations it was handed
+by-eqs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {D : Stream Γ t → Sched Γ → EvalSt e → Set}
+                 {sched : Sched Γ} {st : EvalSt e}
+             → D [] sched st → ∀ {o sc s′} → (o ≡ []) × (sc ≡ sched) × (s′ ≡ st) → D o sc s′
+by-eqs d (refl , refl , refl) = d
+
+-- and an absurdity that is only ever proven
+⊥-elim⁰ : ∀ {a} {A : Set a} → {-@0-}⊥ → A
+⊥-elim⁰ ()
+
 -- THE CANDIDATE.  At a data type it is trivial, because nothing about
 -- a number can fail to be reducible; at an observable it is the
 -- statement the whole argument turns on -- given any continuation
@@ -840,11 +877,11 @@ Red m (listᵗ t) vs       = All (Red m t) vs
 Red {Γ = Γ} m (obs u) b =
   ∀ {S : Set} {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) (pre : Pre κ)
   → (rp : RP {e = e} m (Red m u) S κ pre) (s : S)
-  → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Room m sched st
-  → PreHolds m κ pre sched st
+  → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → {-@0-}Room m sched st
+  → {-@0-}PreHolds m κ pre sched st
   → Σ (Stream Γ t × Sched Γ × EvalSt e)
       (λ r → subscribeE⇓ {e = e} b κ now sched st r
-           × Σ (Trace {e = e} m (Red m u) S κ pre rp s)
+           ⁰× Σ⁰ (Trace {e = e} m (Red m u) S κ pre rp s)
                (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                      × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
 
@@ -1357,12 +1394,12 @@ record Stage {n} {Γ : Ctx n} {t} {e : Closed Γ t} (m : ℕ) {S : Set} {lo ℓ 
     out   : Stream Γ t
     sc    : Sched Γ
     st′   : EvalSt e
-    dv    : D out sc st′
-    tr    : Trace {e = e} m (Red m u) S κ q rp s₀
-    endOk : joinPre q (endPre tr) ≡ endPre tr
-    hd    : HeldF f
-    hl    : PreHolds m (f ↠[ le ] κ) (headPre hd (endPre tr)) sc st′
-    kp    : Kept (f ↠[ le ] κ) (headPre hd (endPre tr)) sched st sc st′
+  field {-@0-}dv    : D out sc st′
+  field tr    : Trace {e = e} m (Red m u) S κ q rp s₀
+  field {-@0-}endOk : joinPre q (endPre tr) ≡ endPre tr
+  field hd    : HeldF f
+  field {-@0-}hl    : PreHolds m (f ↠[ le ] κ) (headPre hd (endPre tr)) sc st′
+  field {-@0-}kp    : Kept (f ↠[ le ] κ) (headPre hd (endPre tr)) sched st sc st′
 
 -- a stage that calls nothing and moves nothing
 stage-nil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s u}
@@ -1370,8 +1407,8 @@ stage-nil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s u
             {D : Stream Γ t → Sched Γ → EvalSt e → Set}
             (q : Pre κ) (rp : RP {e = e} m (Red m u) S κ q) (s₀ : S)
             {sched : Sched Γ} {st : EvalSt e}
-            (out : Stream Γ t) → D out sched st
-          → (h : HeldF f) → PreHolds m (f ↠[ le ] κ) (headPre h q) sched st
+            (out : Stream Γ t) → {-@0-}D out sched st
+          → (h : HeldF f) → {-@0-}PreHolds m (f ↠[ le ] κ) (headPre h q) sched st
           → Stage m f le κ D q rp s₀ sched st
 stage-nil f le κ q rp s₀ out d h hs = stage out _ _ d []ᵗ (join-idem q) h hs (kept-refl _ _)
 
@@ -1382,8 +1419,8 @@ fallenStage : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s
               {D : Stream Γ t → Sched Γ → EvalSt e → Set}
               (rp : RP {e = e} m (Red m u) S κ fallen) (s₀ : S)
               {sched : Sched Γ} {st : EvalSt e}
-              (out : Stream Γ t) (sc : Sched Γ) (st′ : EvalSt e) → D out sc st′
-            → Keeps {e = e} sched st sc st′ → Fell m sched st → Sound (f ↠[ le ] κ) sc st′ → (h : HeldF f)
+              (out : Stream Γ t) (sc : Sched Γ) (st′ : EvalSt e) → {-@0-}D out sc st′
+            → {-@0-}Keeps {e = e} sched st sc st′ → {-@0-}Fell m sched st → {-@0-}Sound (f ↠[ le ] κ) sc st′ → (h : HeldF f)
             → Stage m f le κ D fallen rp s₀ sched st
 fallenStage f le κ rp s₀ out sc st′ d ks fell so h =
   stage out sc st′ d []ᵗ refl h (grounded (fell-keeps ks fell) so) tt
@@ -1394,7 +1431,7 @@ stage-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s u
             {D₁ D₂ : Stream Γ t → Sched Γ → EvalSt e → Set}
             {q : Pre κ} {rp : RP {e = e} m (Red m u) S κ q} {s₀ : S}
             {sched : Sched Γ} {st : EvalSt e}
-          → (∀ {o sc s′} → D₁ o sc s′ → D₂ o sc s′)
+          → {-@0-}(∀ {o sc s′} → D₁ o sc s′ → D₂ o sc s′)
           → Stage m f le κ D₁ q rp s₀ sched st → Stage m f le κ D₂ q rp s₀ sched st
 stage-map g (stage out sc st′ d tr e h hl kp) = stage out sc st′ (g d) tr e h hl kp
 
@@ -1405,10 +1442,10 @@ stage-rebase : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ 
                {D : Stream Γ t → Sched Γ → EvalSt e → Set}
                {q : Pre κ} {rp : RP {e = e} m (Red m u) S κ q} {s₀ : S}
                {sched₀ sched : Sched Γ} {st₀ st : EvalSt e}
-             → nodeCt sched₀ ≤ nodeCt sched
-             → (∀ k → k < nodeCt sched₀ → (T (any (_≡ᵇ k) (frameNodes f)) → ⊥)
+             → {-@0-}nodeCt sched₀ ≤ nodeCt sched
+             → {-@0-}(∀ k → k < nodeCt sched₀ → (T (any (_≡ᵇ k) (frameNodes f)) → ⊥)
                     → lookupNode k (EvalSt.nodes st) ≡ lookupNode k (EvalSt.nodes st₀))
-             → EndsKept (f ↠[ le ] κ) sched₀ st₀ st
+             → {-@0-}EndsKept (f ↠[ le ] κ) sched₀ st₀ st
              → Stage m f le κ D q rp s₀ sched st → Stage m f le κ D q rp s₀ sched₀ st₀
 stage-rebase f le κ ct off eks (stage out sc st′ d tr e h hl kp) =
   stage out sc st′ d tr e h hl (kept-shift f f le le κ h h (endPre tr) ct (λ _ _ ne → ne) off eks kp)
@@ -1424,11 +1461,11 @@ stage-seq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s u
             (a : Stage m f le κ D₁ q rp s₀ sched st)
           → Stage m f le κ D₂ (endPre (Stage.tr a)) (endRP (Stage.tr a)) (endS (Stage.tr a))
                   (Stage.sc a) (Stage.st′ a)
-          → (∀ {o sc s′} → D₂ o sc s′ → D₃ (Stage.out a ++ o) sc s′)
+          → {-@0-}(∀ {o sc s′} → D₂ o sc s′ → D₃ (Stage.out a ++ o) sc s′)
           → Stage m f le κ D₃ q rp s₀ sched st
 stage-seq {f = f} {le} {κ} {q = q} a b glue =
-  let eqE = trans (end-++ (Stage.tr a) (Stage.tr b)) (Stage.endOk b)
-  in stage (Stage.out a ++ Stage.out b) (Stage.sc b) (Stage.st′ b) (glue (Stage.dv b))
+  trans (end-++ (Stage.tr a) (Stage.tr b)) (Stage.endOk b) |>⁰ λ eqE →
+  stage (Stage.out a ++ Stage.out b) (Stage.sc b) (Stage.st′ b) (glue (Stage.dv b))
        (Stage.tr a ++ᵗ Stage.tr b)
        (subst (λ p → joinPre q p ≡ p) (sym eqE) (join-chain q _ _ (Stage.endOk a) (Stage.endOk b)))
        (Stage.hd b)
@@ -1443,10 +1480,10 @@ writeStage : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {S : Set} {lo ℓ s 
              (f : Frame Γ s u) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t)
              (p : Pre κ) (rp : RP {e = e} m (Red m u) S κ p) (s₀ : S)
              (nid : NodeId) (ns : NodeState Γ)
-           → (∀ k → (T (any (_≡ᵇ k) (frameNodes f)) → ⊥) → (nid ≡ᵇ k) ≡ false)
+           → {-@0-}(∀ k → (T (any (_≡ᵇ k) (frameNodes f)) → ⊥) → (nid ≡ᵇ k) ≡ false)
            → (h′ : HeldF f) {sched : Sched Γ} {st : EvalSt e}
-           → ConsistentF f h′ (record st { nodes = setNode nid ns (EvalSt.nodes st) })
-           → (h : HeldF f) → PreHolds m (f ↠[ le ] κ) (headPre h p) sched st
+           → {-@0-}ConsistentF f h′ (record st { nodes = setNode nid ns (EvalSt.nodes st) })
+           → (h : HeldF f) → {-@0-}PreHolds m (f ↠[ le ] κ) (headPre h p) sched st
            → Stage m f le κ (λ o sc s′ → (o ≡ []) × (sc ≡ sched)
                                        × (s′ ≡ record st { nodes = setNode nid ns (EvalSt.nodes st) }))
                    p rp s₀ sched st
@@ -1493,8 +1530,8 @@ SubStep {Γ = Γ} {t} {e} {s} {u} f G m =
   ∀ {S : Set} {lo ℓ} (le : lo ≤ ℓ) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
     (rp : RP {e = e} m (Red m u) S κ (standing pfs)) (s₀ : S) (h : HeldF f) → G h
   → (now : Tick) (vals : List (Val Γ s)) → All (Red m s) vals → (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) → Room m sched st
-  → PreHolds m (f ↠[ le ] κ) (standing (h , pfs)) sched st
+    (sched : Sched Γ) (st : EvalSt e) → {-@0-}Room m sched st
+  → {-@0-}PreHolds m (f ↠[ le ] κ) (standing (h , pfs)) sched st
   → Σ (Stage m f le κ (λ o sc s′ → foldPath⇓ {e = e} now (f ↠[ le ] κ) vals fin sched st (o , sc , s′))
              (standing pfs) rp s₀ sched st)
       (λ r → G (Stage.hd r))
@@ -1729,20 +1766,20 @@ drain-waiting s (just (batchSync-st _ _ _)) = z≤n
 -- a drain step decided outside the drain's cycle: room was spent, or the
 -- queue read back within its budget.  `f` is forced only when the bound
 -- is refuted, so the evaluator never runs a postulate handed in as `f`
-spend-or : ∀ {x y w l : ℕ} → ((x < y → ⊥) → w ≤ l) → x < y ⊎ (x < y → ⊥) × w ≤ l
+spend-or : ∀ {x y w l : ℕ} → {-@0-}((x < y → ⊥) → w ≤ l) → x < y ⊎ (x < y → ⊥) × w ≤ l
 spend-or {x} {y} {w} {l} f with x <? y
 ... | yes sp = inj₁ sp
 ... | no nsp with w ≤? l
 ...   | yes bd = inj₂ (nsp , bd)
-...   | no nbd = ⊥-elim (nbd (f nsp))
+...   | no nbd = ⊥-elim⁰ (nbd (f nsp))
 
 -- a bound decided at run time, `f` forced only when it is refuted: a
 -- proof carried across a fold stands on the fold's own postulates, and a
 -- ceiling built from one would be forced by the next accessibility step
-ceil-or : ∀ {w l : ℕ} → w ≤ l → w ≤ l
+ceil-or : ∀ {w l : ℕ} → {-@0-}w ≤ l → w ≤ l
 ceil-or {w} {l} f with w ≤? l
 ... | yes bd = bd
-... | no nbd = ⊥-elim (nbd f)
+... | no nbd = ⊥-elim⁰ (nbd f)
 
 -- a Boolean decided outside a cycle, its equation handed to each branch.
 -- A `with` inside a cycle binds a clause's matched accessibility by its
@@ -1789,8 +1826,8 @@ Spends sched st sched′ st′ =
 Arm : ∀ {n} {Γ : Ctx n} {Θ t} → Exp Γ [] [] Θ t → Set₁
 Arm {Γ = Γ} {Θ = Θ} {t = t} b =
   ∀ (ρ : Env Γ Θ) {m} → RedEnv m ρ
-  → (k : ℕ) → T (inputsBelowᵉ k b) → Acc _<_ k
-  → Acc _<_ (gsizeᵉ b) → Acc _<_ m → Red {Γ = Γ} m (obs t) (Θ , b , ρ)
+  → (k : ℕ) → T (inputsBelowᵉ k b) → {-@0-}Acc _<_ k
+  → {-@0-}Acc _<_ (gsizeᵉ b) → {-@0-}Acc _<_ m → Red {Γ = Γ} m (obs t) (Θ , b , ρ)
 
 -- A VALUE OF A DATA TYPE IS A CANDIDATE AT EVERY CEILING, AND ASKS
 -- NOTHING OF IT: no observable sits anywhere inside it, so nothing is
@@ -1830,16 +1867,16 @@ kept-before κ pr ct ek fallen       kp = tt
 -- FIRST and then folds its prefix, since a synchronous value can cut
 -- this very chain and a cut severs registrations.
 red-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ S}
-    (i : Fin n) (ρ : Env Γ Θ) (k : ℕ) → T (toℕ i <ᵇ k) → Acc _<_ k
+    (i : Fin n) (ρ : Env Γ Θ) (k : ℕ) → T (toℕ i <ᵇ k) → {-@0-}Acc _<_ k
   → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo) (pre : Pre κ)
   → ∀ {m} (rp : RP {e = e} m (Red m (lookup Γ i)) S κ pre) (s : S)
   → (now : Tick) (sched : Sched Γ)
   → (sc : ObservableInput (Val Γ (lookup Γ i))) {oks : T (isData (lookup Γ i))}
   → Sched.slots sched i ≡ scripted {ok = oks} sc
-  → ∀ (st : EvalSt e) → Acc _<_ m → Room m sched st → PreHolds m κ pre sched st
+  → ∀ (st : EvalSt e) → {-@0-}Acc _<_ m → {-@0-}Room m sched st → {-@0-}PreHolds m κ pre sched st
   → Σ (Stream Γ t × Sched Γ × EvalSt e)
       (λ r → subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r
-           × Σ (Trace {e = e} m (Red m (lookup Γ i)) S κ pre rp s)
+           ⁰× Σ⁰ (Trace {e = e} m (Red m (lookup Γ i)) S κ pre rp s)
                (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                      × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
 red-scripted i ρ k ok aK κ below pre rp s now sched (hot async) slEq st aM rm h
@@ -1872,10 +1909,10 @@ red-scripted {Γ = Γ} {lo = lo} i ρ k ok aK κ below pre rp s now sched (cold 
                                  ; pending = resolve now (d ∷ ds) }
                           ∷ Sched.live sched }
       st₁    = register rid (atDyn src lo) κ st
-      h₁     = holds-step κ pre {sched′ = sched₁} {st′ = st₁} (λ _ _ _ → refl) ≤-refl (λ x → x)
-                 (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl refl (λ k′ on → inj₁ on) (λ so′ → distinct so′))
-                 h
-  in answer rp s (call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm h₁) λ a →
+  in answer rp s (call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm
+                   (holds-step κ pre {sched′ = sched₁} {st′ = st₁} (λ _ _ _ → refl) ≤-refl (λ x → x)
+                      (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl refl (λ k′ on → inj₁ on) (λ so′ → distinct so′))
+                      h)) λ a →
   let an = Answered.an a
   in _ , subs-cold-async below slEq refl refl refl (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an
    , kept-before κ (pres (λ _ _ → refl)) ≤-refl

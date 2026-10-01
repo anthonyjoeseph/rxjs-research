@@ -240,14 +240,14 @@ bound.
 
 ### Big picture tier roadmap
 
-- **THE COMPILED EVALUATOR KEEPS EVERY PROOF IT BUILDS (Anthony: fix its
-  cost).** `a delivery switching to two ofs` spends 36 of its timed plain
-  run's 38 s in GC at 3 GB live, and its elaborated run passes 12 GB: proof
-  thunks and derivations, each closing over the answer before it
-  (`typecheck-performance-numbers.md`). Mark the evaluator's proof-carrying
-  binders and fields `{-@0-}` -- `Acc`, `Room`, `PreHolds`, `Kept`, the
-  derivations, in `Ans`, `Call`, `Stage` and the arms' results -- so the
-  oracle stops building them; its typecheck names any binder a value reads.
+- **THE ELABORATED RUN KEEPS A SECOND LEAK (Anthony: fix its cost).** With
+  the evaluator's proofs `{-@0-}` in the oracle, `a delivery switching to two
+  ofs`'s timed plain run drops from most of its budget to seconds, so that
+  leak was the proofs. Its elaborated run still spends most of its time in GC
+  and passes its budget alone (`typecheck-performance-numbers.md`). Profile it
+  by closure type; the unerased suspect is `Trace`, whose every entry keeps
+  its `Call` and its `Ans` with a `next` over the fold before it. Erase what a
+  run never reads back.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   `QC='1 15 1'` is green on all four statements. Depth 1 is the sweep that

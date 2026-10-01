@@ -67,7 +67,7 @@ open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; d
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (reducible; rawFold; red-env)
 open import Rx.Evaluator.Reducible.Floor using (drop-sub)
-open import Rx.Evaluator.Reducible.Support using (rootRP; standing; Rule; rule; termini; fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf; sub-rule; sub-ot)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; _,_; _|>⁰_; rootRP; standing; Rule; rule; termini; fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf; sub-rule; sub-ot)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 
 ------------------------------------------------------------------
@@ -134,8 +134,8 @@ pop-rule {sched = sched} refl ru | inj₂ (a , ls) = sub-rule (λ r∈ → r∈)
 chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (a : Arrival Γ) (vs : List (Val Γ (arrTy a))) (fin : Bool)
              (c : AtFloor Γ (arrTy a) t)
-             (sched : Sched Γ) (st : EvalSt e) → Sound (proj₂ c) sched st
-           → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+             (sched : Sched Γ) (st : EvalSt e) → {-@0-}Sound (proj₂ c) sched st
+           → Σ⁰ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                chainStep⇓ {e = e} a vs fin c sched st r
              × (∀ {lo′ s′} (κ₂ : Path Γ lo′ s′ t) → Sound κ₂ sched st → Agree (proj₂ c) κ₂
                 → Sound κ₂ (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
@@ -149,10 +149,10 @@ chainStep! {n = n} a vs fin (lo , path) sched st so =
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (a : Arrival Γ) (vs : List (Val Γ (arrTy a))) (fin : Bool)
              (chains : List (RegId × AtFloor Γ (arrTy a) t))
-             (sched : Sched Γ) (st : EvalSt e) → Rule sched st
-           → (∀ {x} → x ∈ chains → Sound (proj₂ (proj₂ x)) sched st)
-           → (∀ {x y} → x ∈ chains → y ∈ chains → Agree (proj₂ (proj₂ x)) (proj₂ (proj₂ y)))
-           → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+             (sched : Sched Γ) (st : EvalSt e) → {-@0-}Rule sched st
+           → {-@0-}(∀ {x} → x ∈ chains → Sound (proj₂ (proj₂ x)) sched st)
+           → {-@0-}(∀ {x y} → x ∈ chains → y ∈ chains → Agree (proj₂ (proj₂ x)) (proj₂ (proj₂ y)))
+           → Σ⁰ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                cascadeGo⇓ {e = e} a vs fin chains sched st r × Rule (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 cascadeGo! a vs fin []               sched st ru sds ag = _ , casc-nil , ru
 cascadeGo! a vs fin ((rid , c) ∷ cs) sched st ru sds ag
@@ -161,7 +161,7 @@ cascadeGo! a vs fin ((rid , c) ∷ cs) sched st ru sds ag
                                     (λ x∈ y∈ → ag (there x∈) (there y∈)) |>′ λ (_ , g , ru′) →
               _ , casc-cut eqc g , ru′
 ... | false =
-      let so = sub-ot (λ r∈ → r∈) ≤-refl (sds (here refl)) in
+      sub-ot (λ r∈ → r∈) ≤-refl (sds (here refl)) |>⁰ λ so →
       chainStep! a vs fin c sched
               (record st { delivered = rid ∷ EvalSt.delivered st }) so |>′ λ ((emits , sched₁ , st₁) , s , kept) →
       cascadeGo! a vs fin cs sched₁ st₁ (ruled (kept (proj₂ c) so (λ _ _ _ → refl)))
@@ -170,8 +170,8 @@ cascadeGo! a vs fin ((rid , c) ∷ cs) sched st ru sds ag
       _ , casc-live eqc s g , ru′
 
 cascade! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-           (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) → Rule sched st
-         → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+           (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) → {-@0-}Rule sched st
+         → Σ⁰ (Stream Γ t × Sched Γ × EvalSt e) λ r →
              cascade⇓ {e = e} a sched st r × Rule (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 cascade! a sched st ru with Arrival.isLast a in eql
 ... | false =
@@ -189,8 +189,8 @@ cascade! a sched st ru with Arrival.isLast a in eql
       _ , casc-run-last eql g g′ , finish-rule a sched₂ st₂ ru₂
 
 drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-         (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) → Rule sched st
-       → Σ (Stream Γ t) λ s → drain⇓ {e = e} fuel sched st s
+         (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) → {-@0-}Rule sched st
+       → Σ⁰ (Stream Γ t) λ s → drain⇓ {e = e} fuel sched st s
 drain! zero    sched st ru = _ , drain-done
 drain! (suc k) sched st ru with sched-next sched in eqn
 ... | inj₁ _            = _ , drain-empty eqn
@@ -207,7 +207,7 @@ drain! (suc k) sched st ru with sched-next sched in eqn
 -- says so in one constructor -- so this is the assembly and the two
 -- builders are its leaves.
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
-          → Σ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
+          → Σ⁰ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
 evaluate! {n = n} {Γ = Γ} fuel e ins =
   let aM = <-wellFounded _ in
   reducible aM e []ᵉ (red-env {Γ = Γ} aM []ᵉ) (root {lo = n}) (standing tt) rootRP tt 0
@@ -221,4 +221,4 @@ evaluate! {n = n} {Γ = Γ} fuel e ins =
 -- seeds itself.
 evaluate↓ : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ
           → Stream Γ t
-evaluate↓ fuel e ins = proj₁ (evaluate! fuel e ins)
+evaluate↓ fuel e ins = Σ⁰.fst⁰ (evaluate! fuel e ins)
