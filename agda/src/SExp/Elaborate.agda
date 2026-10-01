@@ -16,7 +16,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; 
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
   foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul;
   eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ;
+open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ; instantᵛ; sourceᵛ; kindᵛ;
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
                                machineEmitᵗ)
@@ -651,9 +651,45 @@ elemᵛ {Θ = Θ} {t = t} =
     vals   = fstᵗ (sndᵗ split)
     echoes = revᵗ (foldᵗ vals nilᵗ echoStep)
 
+-- A SUBSCRIBE BURST TAKES THE INSTANT OF WHATEVER SUBSCRIBED IT.  An
+-- emit of kind `subscribe` was stamped with the frame it was BUILT in,
+-- which is the root's; when the subscription happened inside a later
+-- cascade, the burst belongs to that cascade, and `at`/`as` name it.
+-- The twin's join grafts such a burst onto its carrier for the same
+-- reason.
+restampᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
+         → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ emitKindᵗ
+         → Tm Γ Δᵍ Δ Θ (machineEmitᵗ a) → Tm Γ Δᵍ Δ Θ (machineEmitᵗ a)
+restampᵛ at as e =
+  ifᵗ (caseᵗ (kindᵛ e) (bool̂ true) (bool̂ false))
+      (instEmitᵛ (eventsᵛ e) at (sourceᵛ e) as)
+      e
+
+-- A LANE IS SUBSCRIBED IN THE LAST INSTANT THE FLATTENER PUT OUT: the
+-- echo of the outer emit that carried it, or the lane emit whose
+-- completion freed its slot.  So a scan over the output carries that
+-- instant and its kind, and every subscribe burst behind it takes them.
+-- Inside the root frame everything is the frame and nothing moves.
 flattenᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → FlatOp
+         → Tm Γ Δᵍ Δ Θ uniqᵗ
          → Exp Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-flattenᵖ op e = flattenᵉ op (mapᵉ elemᵛ e)
+flattenᵖ {Θ = Θ} {t = t} op frame e =
+  mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed (flattenᵉ op (mapᵉ elemᵛ e)))
+  where
+  -- the last instant and kind put out, and the emit put out
+  S : Ty
+  S = (uniqᵗ ×ᵗ emitKindᵗ) ×ᵗ emitᵗ t
+
+  seed : Tm _ _ _ Θ S
+  seed = pairᵗ (pairᵗ frame subscribeᵛ) (instEmitᵛ nilᵗ frame frame subscribeᵛ)
+
+  step : Tm _ _ _ ((S ×ᵗ emitᵗ t) ∷ Θ) S
+  step = letᵗ (restampᵛ (fstᵗ (fstᵗ (fstᵗ arg))) (sndᵗ (fstᵗ (fstᵗ arg))) (sndᵗ arg))
+              (fstᵗ arg)
+              (pairᵗ (pairᵗ (instantᵛ (varᵗ (here refl))) (kindᵛ (varᵗ (here refl))))
+                     (varᵗ (here refl)))
+    where
+    arg = varᵗ (here refl)
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.
@@ -803,19 +839,23 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                           (machineEmitᵗ u))
                eq (inputᵖ i (frameᵛ Θ))
    ... | sharedᵏ   | eq =
-         subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) u)
-               eq (input i)
+         mapᵉ (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ
+                        (varᵗ (here refl)))
+              (subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) u)
+                     eq (input i))
    toInstEmit {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toInstEmitTms ts)
    toInstEmit {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
    toInstEmit (takeˢ k e)         = takeᵖ (toInstEmitTm k) (toInstEmit e)
    toInstEmit (mapˢ f e)          = mapᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (scanˢ f z e)       = scanᵖ (toInstEmitTm f) (toInstEmitTm z) (toInstEmit e)
-   toInstEmit (flattenˢ op e)     = flattenᵖ op (toInstEmit e)
+   toInstEmit {Θ = Θ} (flattenˢ op e) = flattenᵖ op (frameᵛ Θ) (toInstEmit e)
    toInstEmit (μˢ e)              = μᵉ (toInstEmit e)
    toInstEmit (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
    toInstEmit {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
-     deferᵉ (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
-                   (map-++ emitᵗ Δᵍ Δ) (toInstEmit e))
+     deferᵉ (mintᵉ (mapᵉ (restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)))
+       (renExp (λ x → x) (λ x → x) there
+         (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
+                (map-++ emitᵗ Δᵍ Δ) (toInstEmit e)))))
 
    toInstEmitTm : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
              → STm Γ Δᵍ Δ Θ t
