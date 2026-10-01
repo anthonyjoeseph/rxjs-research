@@ -5,14 +5,14 @@ open import Data.List using (List; []; _∷_; _++_; map; foldr)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (nothing; just)
 open import Data.Fin using (Fin; _↑ʳ_)
 open import Data.Vec using (lookup; zipWith)
 open import Data.Vec.Properties using (lookup-zipWith; lookup-++ʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; refl; trans)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
-  mapᵉ; scanᵉ; FlatOp; mergeᶠ; flattenᵉ; batchSyncᵉ; unitᵗ; _+ᵗ_;
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; takeᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
+  mapᵉ; scanᵉ; FlatOp; mergeᶠ; switchᶠ; flattenᵉ; batchSyncᵉ; unitᵗ; _+ᵗ_;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
   foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul;
   eqᵖ; ltᵖ; eqᵘ; notᵖ)
@@ -494,15 +494,18 @@ cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
 -- and the emit together because the palette reads a value and nothing
 -- beside it.
 --
--- WHAT IS NOT MIRRORED IS THE ENDING, AND IT IS THE ONE PIECE THAT IS
--- NOT A STEP'S WORK.  rxjs ends on `takeWhile(p, true)`, whose
--- predicate reads the scan's own state; the plain palette can only end
--- at an emit INDEX fixed at subscription, and a cut over the author's
--- VALUES is not one, since how many InstEmits it takes to fill a quota
--- over their payloads is a property of the run.  So the emit that fills
--- the quota carries the closes and the completion, and every emit after
--- it passes through carrying its bookkeeping and no values — where the
--- twin has unsubscribed and the stream is over.
+-- THE ENDING IS A TAKE-UNTIL, BECAUSE THE PALETTE HAS NO TAKE-WHILE.
+-- rxjs ends on `takeWhile(p, true)`, whose predicate reads the scan's
+-- own state; the plain palette can only end at an emit INDEX fixed at
+-- subscription, or when a flattener's outer and inner have both ended.
+-- So the counted stream is a switch's first lane, and the outer's
+-- second lane -- concatenated, so subscribed after the first -- is the
+-- first emit of a SECOND subscription to the count whose cut has
+-- happened, carrying an empty lane.  Subscribed second, it hears each
+-- arrival after the first lane has put it out, so the switch drops the
+-- count and completes in the instant of the emit that filled the quota.
+-- Every emit the count puts out after it, before the cut is heard,
+-- carries its bookkeeping and no values.
 --
 -- AND THE BEHAVIOUR THE CUT MUST MIRROR IS MEASURED RATHER THAN
 -- INFERRED (Anthony: "just run it in js").  Real rxjs `take` was run
@@ -521,7 +524,9 @@ cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
 --   subscription-time count has to name.
 takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
       → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ counted)
+takeᵖ {Θ = Θ} {t = t} k e =
+  mintᵉ (flatAllᵉ switchᶠ (flatAllᵉ (mergeᶠ (just 1))
+    (ofᵉ (strmᵗ (ofᵉ (strmᵗ (mapᵉ outᵛ counted) ∷ [])) ∷ strmᵗ (takeᵉ (nat̂ 1) cutᵉ) ∷ []))))
   where
   -- the quota left, whether the cut has happened, the open
   -- registrations, and the emit this delivery produced
@@ -594,6 +599,12 @@ takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ counted)
 
   counted : Exp _ _ _ (uniqᵗ ∷ Θ) S
   counted = scanᵉ step seed e'
+
+  -- an empty lane from every emit at or after the cut
+  cutᵉ : Exp _ _ _ (uniqᵗ ∷ Θ) (obs (emitᵗ t))
+  cutᵉ = flattenᵉ (mergeᶠ nothing)
+    (mapᵉ (pairᵗ (ifᵗ (fstᵗ (sndᵗ (varᵗ (here refl)))) (inrᵗ (strmᵗ emptyᵉ)) (inlᵗ unit̂)) (inlᵗ unit̂))
+          counted)
 
 -- ONE OUTER EMIT AS ONE FLATTENER ELEMENT: an echo carrying the emit's
 -- bookkeeping and its echoed values, beside a lane merging the inners it

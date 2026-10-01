@@ -240,13 +240,6 @@ bound.
 
 ### Big picture tier roadmap
 
-- **END THE ELABORATED `take` ON ITS CUT.** `take one of the script` fails
-  `timing-correct`: with no takeWhile in the palette the elaborated take
-  completes on the next upstream emit, so the timed END lands an instant
-  late. Route: a takeUntil -- `switchᶠ` over the counted stream, then
-  `emptyᵉ` once `takeᵉ 1` of its cut fires -- at the price of a second
-  subscription of the source.
-
 - **GIVE `a delivery switching to two ofs` A VERDICT.** One emit per `of`
   value gave five of the six timeout rows one; this row still runs past
   60 s, and its cost is the elaboration's.
