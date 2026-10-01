@@ -39,7 +39,7 @@ open import Rx.Evaluator.Reducible.Support using (_∷ᵗ_; Ans; Answered; answe
   drop-ot; endPre; endRP; endS; f-exhaust; f-merge; f-switch; fallen; finishing; fin″; fold;
   fresh-inner; grounded; head-off; headHolds; headKept; headPre; holdsFs-step; inner-back;
   kept; ofColumn; out; outs; sched″; stage; stage-map; stage-nil; stage-seq; standing; step;
-  step-ct; step-off; step-red; step-⇓; st″; writeStage)
+  step-ct; step-off; step-red; step-⇓; st″; subst⁰; writeStage)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; subscribe-kept; fold-kept)
 
 -- THE CALL A LIVE FRAME MAKES ABOVE IT, FOR THE CALL MADE TO IT: the
@@ -54,14 +54,18 @@ headCall : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {f : Frame 
          → Call {e = e} m P (f ↠[ le ] κ) (standing (h , pfs))
          → Call {e = e} m P′ κ (standing pfs)
 headCall {f = f} {le = le} fs h rh κ pfs (call now vals col fin sched st rm (grounded ((c , fr) , ap , hs) so)) =
-  let r = step fs h vals fin sched st
-  in call now (outs r) (ofColumn κ (standing pfs) (proj₁ (step-red fs col rh))) (fin″ r) (sched″ r) (st″ r)
-       (room-keeps (stepFrame-keeps (step-⇓ fs {κ = κ} {now = now} h vals fin sched st c)) rm)
-       (grounded
-         (holdsFs-step κ pfs
-           (λ k on k< → step-off fs h vals fin sched st k (λ onF → ap k onF on))
-           (subst (nodeCt sched ≤_) (sym (step-ct fs h vals fin sched st)) ≤-refl) hs)
-         (drop-ot f le κ (step-kept le (step-⇓ fs {κ = κ} {now = now} h vals fin sched st c) so)))
+  bind≡ (step fs h vals fin sched st) λ r eqr →
+  call now (outs r) (subst⁰ (λ r′ → Column κ _ (standing pfs) (outs r′)) (sym eqr)
+                      (ofColumn κ (standing pfs) (proj₁ (step-red fs col rh))))
+       (fin″ r) (sched″ r) (st″ r)
+       (subst⁰ (λ r′ → Room _ (sched″ r′) (st″ r′)) (sym eqr)
+         (room-keeps (stepFrame-keeps (step-⇓ fs {κ = κ} {now = now} h vals fin sched st c)) rm))
+       (subst⁰ (λ r′ → PreHolds _ κ (standing pfs) (sched″ r′) (st″ r′)) (sym eqr)
+         (grounded
+           (holdsFs-step κ pfs
+             (λ k on k< → step-off fs h vals fin sched st k (λ onF → ap k onF on))
+             (subst (nodeCt sched ≤_) (sym (step-ct fs h vals fin sched st)) ≤-refl) hs)
+           (drop-ot f le κ (step-kept le (step-⇓ fs {κ = κ} {now = now} h vals fin sched st c) so))))
 
 -- ONE CALL ABOVE THE FRAME, AS A STAGE: on standing ground it is the
 -- fold applied once and the frame's ground carried over it; on fallen

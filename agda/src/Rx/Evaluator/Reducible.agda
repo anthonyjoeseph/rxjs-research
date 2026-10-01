@@ -139,7 +139,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _
   consumeUsable; finishUsable; thruWrap; switchKill; aliveThroughᶠ; RegId; scanDispatch;
   batchDown; shareAdmit; shareDying; shareSpend; drainSt)
 open import Rx.Evaluator.Unconn-Arith using (unconn-insert; fell-keeps; room-keeps)
-open import Rx.Evaluator.Keeps using (Keeps; foldPath-keeps; stepFrame-keeps; switchKill-keeps; thruWrap-keeps; thruWalk-keeps;
+open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps; switchKill-keeps; thruWrap-keeps; thruWalk-keeps;
   thruConsume-keeps; subscribeE-keeps; shareGo-keeps; shareDying-keeps)
 open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ;
   subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-batchSync; subs-shared; slot-spent;
@@ -798,9 +798,11 @@ redExpAcc (mintᵉ body) ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st 
 
 -- the live fold: step, fold above, stand on what came back
 fold (liveRP {f = f} le aM fs h rh κ pfs rp) s now vals col fin sched st rm hs
-  with apply rp s (headCall {le = le} fs h rh κ pfs (call now vals col fin sched st rm hs))
-... | an =
+  with headCall {le = le} fs h rh κ pfs (call now vals col fin sched st rm hs) in eqc
+... | c′ with apply rp s c′
+...   | an₀ =
   let r  = step fs h vals fin sched st
+      an = subst⁰ (λ c → Ans _ _ _ κ (Call.now c) (Call.vals c) (Call.fin c) (Call.sched c) (Call.st c)) (sym eqc) an₀
   in ans (out an) (Ans.sched′ an) (Ans.st′ an)
          (fold-step (step-⇓ fs h vals fin sched st (proj₁ (proj₁ (ground hs)))) (der an))
          (headPre (held r) (Ans.pre′ an))
