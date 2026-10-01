@@ -6,10 +6,10 @@ open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Fin using (Fin)
-open import Data.Vec using (lookup)
-open import Data.Vec.Properties using (lookup-zipWith)
-open import Relation.Binary.PropositionalEquality using (subst; refl)
+open import Data.Fin using (Fin; _↑ʳ_)
+open import Data.Vec using (lookup; zipWith)
+open import Data.Vec.Properties using (lookup-zipWith; lookup-++ʳ)
+open import Relation.Binary.PropositionalEquality using (_≡_; subst; refl; trans)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   mapᵉ; scanᵉ; FlatOp; mergeᶠ; flattenᵉ; batchSyncᵉ; unitᵗ; _+ᵗ_;
@@ -22,8 +22,8 @@ open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; even
                                machineEmitᵗ)
 open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
-  foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; scriptedᵏ; sharedᵏ; slotTy;
-  plainᵏ)
+  foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; hotᵏ; coldᵏ; sharedᵏ; slotTy;
+  rawTy; plainᵏ)
 
 ------------------------------------------------------------------
 -- The per-former plumbing the elaboration is a composition of.
@@ -143,6 +143,12 @@ deliveryᵛ = inrᵗ (inlᵗ unit̂)
 --   the old objection -- two sources grouping separately -- is a
 --   semantics question and not a blocker, since two independent
 --   arrivals in one turn are two arrivals.
+
+-- SO A HOT SCRIPT IS WRAPPED ONCE, IN THE TABLE, and not per
+-- reference: `SExp.Pipeline` puts this term in a share, so every
+-- subscriber of a hot slot reads one instant per arrival.  A cold
+-- script re-runs per subscription, so its reference is wrapped where
+-- it is read.
 
 -- WHAT IS DELIBERATELY ABSENT: the `close` at `exhausted`.  The
 -- TypeScript mirror mints one off its script's `isLast`, and
@@ -745,6 +751,22 @@ frameᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} (Θ : List Ty)
        → Tm Γ Δᵍ Δ (plainᶜ⁺ Θ) uniqᵗ
 frameᵛ Θ = varᵗ (∈-++⁺ʳ (plainᶜ Θ) (here refl))
 
+-- the author's slot i is the STAMPED half's slot `n ↑ʳ i`
+stampedSlot : ∀ {n} (Γ : Ctx n) (κ : Kinds n) (i : Fin n)
+            → lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ slotTy (lookup Γ i) (lookup κ i)
+stampedSlot {n} Γ κ i =
+  trans (lookup-++ʳ (zipWith rawTy Γ κ) (zipWith slotTy Γ κ) i) (lookup-zipWith slotTy i Γ κ)
+
+-- A SLOT ALREADY AT THE INSTEMIT, READ: the share wrapped it once, so
+-- the reference only hands its subscribe-kind emits this program's
+-- frame.
+readStampedᵖ : ∀ {m} {Γ : Ctx m} {Δᵍ Δ Θ : List Ty} {u : Ty} (j : Fin m)
+             → lookup Γ j ≡ machineEmitᵗ u → Tm Γ Δᵍ Δ Θ uniqᵗ
+             → Exp Γ Δᵍ Δ Θ (machineEmitᵗ u)
+readStampedᵖ {Γ = Γ} {Δᵍ} {Δ} {Θ} j eq frame =
+  mapᵉ (restampᵛ (renTm (λ x → x) (λ x → x) there frame) subscribeᵛ (varᵗ (here refl)))
+       (subst (Exp Γ Δᵍ Δ Θ) eq (input j))
+
 -- THE WALK IS PARAMETERISED BY THE SLOT KINDS, AND BY NOTHING ELSE NEW.
 -- `κ` says how each slot is SUPPLIED, which is the one thing the input
 -- arm has to split on and the one thing an author's tree does not
@@ -835,22 +857,21 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    -- the token was tracking.  Not covered: a hot def, a def reading
    -- another slot, and every table wider than one.
    -- THE ONE ARM THAT READS `κ`, and the only place in the walk that
-   -- cares how a slot is supplied.  Both arms land at `emitᵗ (lookup Γ
-   -- i)`: a SCRIPTED slot stands at `plainᵗ`, so `inputᵖ` wrapping it
-   -- gives `machineEmitᵗ (plainᵗ _)`, which IS that type; a SHARED one
-   -- stands at `emitᵗ` already, so the reference is `input i` and
-   -- nothing is wrapped a second time.
+   -- cares how a slot is supplied.  Every arm reads the STAMPED half's
+   -- slot `n ↑ʳ i` and lands at `emitᵗ (lookup Γ i)`: a COLD slot stands
+   -- at `plainᵗ`, so `inputᵖ` wrapping it gives `machineEmitᵗ (plainᵗ
+   -- _)`, which IS that type; a HOT or SHARED one stands at `emitᵗ`
+   -- already, wrapped once by the share every reference reads, so
+   -- nothing is wrapped a second time and its subscribe-kind emits take
+   -- this program's frame.
    toInstEmit {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (inputˢ i)
-     with lookup κ i | lookup-zipWith slotTy i Γ κ
-   ... | scriptedᵏ | eq =
+     with lookup κ i | stampedSlot Γ κ i
+   ... | coldᵏ   | eq =
          subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ)
                           (machineEmitᵗ u))
-               eq (inputᵖ i (frameᵛ Θ))
-   ... | sharedᵏ   | eq =
-         mapᵉ (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ
-                        (varᵗ (here refl)))
-              (subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) u)
-                     eq (input i))
+               eq (inputᵖ (n ↑ʳ i) (frameᵛ Θ))
+   ... | hotᵏ    | eq = readStampedᵖ (n ↑ʳ i) eq (frameᵛ Θ)
+   ... | sharedᵏ | eq = readStampedᵖ (n ↑ʳ i) eq (frameᵛ Θ)
    toInstEmit {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toInstEmitTms ts)
    toInstEmit {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
    toInstEmit (takeˢ k e)         = takeᵖ (toInstEmitTm k) (toInstEmit e)

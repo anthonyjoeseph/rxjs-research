@@ -223,8 +223,9 @@ are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
 close without changing one of them, STOP and report that proof. One ruling
 moves `SExp.Syntax` with `Rx.Exp`: it mirrors `Exp` former for former, less the
 elaboration-only `batchSyncᵉ` and `mintᵉ` (Anthony), so its flattener is
-`flattenˢ` and rxjs's named three are that former with no echo. The InstEmit's
-shape is free; TypeScript is out of scope this tier (Anthony).
+`flattenˢ` and rxjs's named three are that former with no echo. A second
+splits hot from cold, so a hot script is minted once, in the table (Anthony). The InstEmit's shape is free; TypeScript is out of scope
+this tier (Anthony).
 
 `QuickCheck` decides each of `Main`'s four statements on the real evaluator,
 each case under its own wall clock (`make qc-left-to-right` and siblings). **DONE IS THE AGDA

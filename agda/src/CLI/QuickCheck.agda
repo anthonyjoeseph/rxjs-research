@@ -73,7 +73,7 @@ open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; m
 open import Data.List.Membership.Propositional using (_∈_)
 open import CLI.Emit-Eq using (eqListℕ; eqBatches)
 open import SExp.Pipeline using (runᴵ)
-open import CLI.Unit-Test.Prelude using (Γ₂; κ₂; Case; mkSlots; cached; Statement; flatAllˢ;
+open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; statements; statementName;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ)
 open import CLI.Unit-Test using (cases)
@@ -1008,7 +1008,7 @@ selected _                            = statements
 
 -- the impl's raw run, decoded, for reading a batchable failure by
 rawOf : Case → String
-rawOf c = showStream (runᴵ κ₂ (Case.fuel c) (Case.prog c) (Case.slots c))
+rawOf c = showStream (runᴵ (Case.kinds c) (Case.fuel c) (Case.prog c) (Case.slots c))
 
 -- AND ONE SIDE OF IT, so a hang is attributed to the statement that owns
 -- it: 1 to 4 that statement's sides, in `Main`'s order, anything else

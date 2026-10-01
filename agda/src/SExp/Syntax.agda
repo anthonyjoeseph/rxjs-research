@@ -1,10 +1,10 @@
 module SExp.Syntax where
 
-open import Data.Nat     using (ℕ)
+open import Data.Nat     using (ℕ; _+_)
 open import Data.Bool    using (Bool)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Vec     using (Vec; lookup; zipWith) renaming (map to mapⱽ)
+open import Data.Vec     using (Vec; lookup; zipWith) renaming (map to mapⱽ; _++_ to _++ⱽ_)
 open import Data.Fin     using (Fin)
 
 open import Rx.Exp      using (Ty; Ctx; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_;
@@ -148,21 +148,31 @@ emitᶜ ts = map emitᵗ ts
 -- defined by another srxjs program; the ELABORATION cares, because the
 -- two arrive in different shapes, so the kinds are an argument to
 -- `toInstEmit` and nothing above it changes.
+--
+-- A HOT SCRIPT AND A COLD ONE ARE TWO KINDS, BECAUSE THEY WRAP AT TWO
+-- ARITIES.  One hot arrival is one instant however many subscribe (the
+-- README's diamond), so a hot script is wrapped ONCE, in a share every
+-- reference reads; a cold one is a fresh source per subscription, so it
+-- is wrapped per reference.  The elaboration has to know which before
+-- it sees the table.
 data Kind : Set where
-  scriptedᵏ : Kind   -- an external source: bare payloads, `inputᵖ` wraps them
-  sharedᵏ   : Kind   -- another srxjs program: already elaborated
+  hotᵏ    : Kind   -- a script anchored at tick zero: wrapped once, shared
+  coldᵏ   : Kind   -- a script re-run per subscription: `inputᵖ` wraps each
+  sharedᵏ : Kind   -- another srxjs program: already elaborated
 
 Kinds : ℕ → Set
 Kinds n = Vec Kind n
 
 -- WHAT A SLOT STANDS AT, NOW PER SLOT RATHER THAN UNIFORMLY.
 --
--- A SCRIPTED SLOT STANDS AT THE PAYLOAD, and it has to: a script is
--- arbitrary, so standing it at the InstEmit would let a table name an
--- instant past the counter and reach the output through `input`
--- untouched -- exactly how `evaluate-accepted` was refuted.  `inputᵖ`
--- wrapping it is what makes a claim about inputs a lemma about the
--- elaboration rather than a hypothesis about the table.
+-- A SCRIPT STANDS AT THE PAYLOAD WHERE THE TABLE SUPPLIES IT, and it
+-- has to: a script is arbitrary, so standing it at the InstEmit would
+-- let a table name an instant past the counter and reach the output
+-- through `input` untouched -- exactly how `evaluate-accepted` was
+-- refuted.  `inputᵖ` wrapping it is what makes a claim about inputs a
+-- lemma about the elaboration rather than a hypothesis about the table.
+-- A hot slot's InstEmit stream is that wrapping, put in the table by
+-- the IMPL and not by whoever wrote the script.
 --
 -- THE TYPESCRIPT MIRROR IS WHAT SETTLES IT RATHER THAN THE PROOF'S
 -- CONVENIENCE.  `input-source.ts`'s `makeInputSource` takes an
@@ -192,10 +202,21 @@ Kinds n = Vec Kind n
 -- wrapping.  Wrapping it twice is what refuted `mapᵉ laneᵛ ∘
 -- elaborate` as a reading, over an empty inner and so structurally.
 slotTy : Ty → Kind → Ty
-slotTy t scriptedᵏ = plainᵗ t
-slotTy t sharedᵏ   = emitᵗ t
+slotTy t hotᵏ    = emitᵗ t
+slotTy t coldᵏ   = plainᵗ t
+slotTy t sharedᵏ = emitᵗ t
 
--- the context an elaborated program stands in: the author's types,
--- read through the kinds
-plainᵏ : ∀ {n} → Ctx n → Kinds n → Ctx n
-plainᵏ Γ κ = zipWith slotTy Γ κ
+-- what the RAW half holds: a hot script itself, below the share that
+-- wraps it, and nothing a program reads for the other two kinds
+rawTy : Ty → Kind → Ty
+rawTy t hotᵏ    = plainᵗ t
+rawTy t coldᵏ   = unitᵗ
+rawTy t sharedᵏ = unitᵗ
+
+-- THE CONTEXT AN ELABORATED PROGRAM STANDS IN IS TWO HALVES, AND THE
+-- RAW ONE COMES FIRST.  A share may read only the slots below it, so
+-- the share wrapping hot script i stands at `n + i` over the script at
+-- `i`.  The author's slot i is the STAMPED half's slot `n + i`, read
+-- through the kinds; the raw half is the elaboration's own.
+plainᵏ : ∀ {n} → Ctx n → Kinds n → Ctx (n + n)
+plainᵏ Γ κ = zipWith rawTy Γ κ ++ⱽ zipWith slotTy Γ κ

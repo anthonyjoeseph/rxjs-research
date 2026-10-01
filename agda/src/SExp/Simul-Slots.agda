@@ -18,7 +18,7 @@
 -- elaboration on the other.
 --
 -- TWO: A KIND AND ITS SLOT HAVE TO AGREE.  `SExp.Syntax`'s `Kinds` vector
--- tells the elaboration how to read each slot -- `scriptedᵏ` stands at
+-- tells the elaboration how to read each slot -- a script stands at
 -- the PAYLOAD and `inputᵖ` wraps it, `sharedᵏ` stands at the INSTEMIT
 -- and `input` reads it straight.  Held apart from the table, those two
 -- can disagree, and one direction of disagreement is the forgery hole
@@ -36,18 +36,18 @@
 -- type is, because it was BUILT by the elaboration -- so the
 -- observable-typed shared slot, which a real author wants, survives.
 -- The restriction that closes the hole is the one on scripts, and it
--- is already carried below by `scriptedˢ`.
+-- is already carried below by `hotˢ` and `coldˢ`.
 module SExp.Simul-Slots where
 
 open import Data.Bool using (T)
-open import Data.List using ([])
+open import Data.List using (List; [])
 open import Data.Nat  using (ℕ)
 open import Data.Vec  using (lookup)
 open import Data.Fin  using (toℕ)
 
-open import Rx.Prim using (ObservableInput)
+open import Rx.Prim using (Timed; hot; cold)
 open import Rx.Exp  using (Ty; Ctx; Val; isData; inputsBelowᵉ)
-open import SExp.Syntax using (SExp; Kind; Kinds; scriptedᵏ; sharedᵏ; plainᵏ; plainᵗ)
+open import SExp.Syntax using (SExp; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ)
 open import SExp.Plain using (plainExp; unplainᵈ; isData-unplain; mapInput)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 
@@ -57,14 +57,17 @@ open import Rx.Slots using (Slot; Slots; scripted; shared)
 -- fixed.
 data SimulSlot {n} (Γ : Ctx n) (κ : Kinds n) (k : ℕ) (t : Ty)
      : Kind → Set where
-  -- AN EXTERNAL SOURCE, stated at the author's payload type.  The
-  -- elaboration wraps it: `inputᵖ` mints per subscription and stamps
+  -- AN EXTERNAL SOURCE, stated at the author's payload type, hot or
+  -- cold.  The elaboration wraps it in `inputᵖ`, which mints and stamps
   -- each arrival, so a scripted arrival cannot reach the wire except
   -- inside an InstEmit the machine wrote.  Data only, exactly as in
   -- `Rx.Slots` and for the same descent reason.
-  scriptedˢ : {ok : T (isData (plainᵗ t))}
-            → ObservableInput (Val (plainᵏ Γ κ) (plainᵗ t))
-            → SimulSlot Γ κ k t scriptedᵏ
+  hotˢ  : {ok : T (isData (plainᵗ t))}
+        → List (Timed (Val (plainᵏ Γ κ) (plainᵗ t)))
+        → SimulSlot Γ κ k t hotᵏ
+  coldˢ : {ok : T (isData (plainᵗ t))}
+        → List (Val (plainᵏ Γ κ) (plainᵗ t)) → List (Timed (Val (plainᵏ Γ κ) (plainᵗ t)))
+        → SimulSlot Γ κ k t coldᵏ
   -- ANOTHER SRXJS PROGRAM, stated in the author's syntax.  The
   -- stratification side condition is charged on its PLAIN reading,
   -- which is fixed; the impl's elaboration is free, so it cannot be
@@ -84,7 +87,10 @@ plainSlots : ∀ {n} {Γ : Ctx n} {κ : Kinds n} → SimulSlots Γ κ → Slots 
 plainSlots {Γ = Γ} {κ = κ} ins i = go (lookup κ i) (ins i)
   where
     go : ∀ kd → SimulSlot Γ κ (toℕ i) (lookup Γ i) kd → Slot Γ (toℕ i) (lookup Γ i)
-    go scriptedᵏ (scriptedˢ {ok = ok} inp) =
+    go hotᵏ    (hotˢ {ok = ok} as) =
       scripted {ok = isData-unplain (lookup Γ i) ok}
-               (mapInput (unplainᵈ (lookup Γ i) (isData-unplain (lookup Γ i) ok)) inp)
+               (mapInput (unplainᵈ (lookup Γ i) (isData-unplain (lookup Γ i) ok)) (hot as))
+    go coldᵏ   (coldˢ {ok = ok} ss as) =
+      scripted {ok = isData-unplain (lookup Γ i) ok}
+               (mapInput (unplainᵈ (lookup Γ i) (isData-unplain (lookup Γ i) ok)) (cold ss as))
     go sharedᵏ   (sharedˢ d {ok = ok})     = shared (plainExp d) {ok = ok}

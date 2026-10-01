@@ -41,7 +41,7 @@ open import Data.String using (String; _++_; words)
 
 open import CLI.IO using (putStr; getContents; _>>=_; Unit)
 open import CLI.Unit-Test using (cases)
-open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides; stampsOf; κ₂; Γ₂ᵉ)
+open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides; stampsOf; Γ₂ᵉ)
 open import Rx.Prim using (InstEmit; InstEvent; EmitKind; subscribe; delivery; plumbing;
   value; complete; PlainEvent; valueᵖ; completeᵖ)
 open import SExp.Syntax using (plainᵗ)
@@ -49,7 +49,7 @@ open import Rx.Exp using (natᵗ)
 open import SExp.Pipeline using (emitsᴵ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 
-open Case using (name; fuel; prog; slots)
+open Case using (name; fuel; prog; kinds; slots)
 
 -- one row's verdicts, as the report lines it is owed: a row can fail
 -- several properties, and saying which is the whole value of the line
@@ -141,8 +141,8 @@ showSides : Maybe Case → IO Unit
 showSides nothing  = putStr "bug-cache: no such row\n"
 showSides (just c) =
   putStr (ltrLines (ltrSides c) ++ batchLines (batchableSides c) ++ showStamps (stampsOf c) ++
-          showEmits (decodeEmits {Γ = Γ₂ᵉ} {a = plainᵗ natᵗ} (emitsᴵ κ₂ (fuel c) (prog c) (slots c))) ++
-          plainEnd (emitsᴵ κ₂ (fuel c) (prog c) (slots c)))
+          showEmits (decodeEmits {Γ = Γ₂ᵉ (kinds c)} {a = plainᵗ natᵗ} (emitsᴵ (kinds c) (fuel c) (prog c) (slots c))) ++
+          plainEnd (emitsᴵ (kinds c) (fuel c) (prog c) (slots c)))
 
 answer : Maybe ℕ → List String → IO Unit
 answer nothing     _               = putStr "bug-cache: expected a row number on stdin\n"

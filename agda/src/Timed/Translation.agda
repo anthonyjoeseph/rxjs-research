@@ -45,13 +45,13 @@ open import Rx.Prim  using (ObservableInput; hot; cold; Timed; after_,_)
 open import Rx.Exp   using (Ty; Ctx; Val; isData; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ; PrimOp;
   add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; FlatOp; mergeᶠ;
   unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
-open import SExp.Syntax  using (SExp; STm; Kind; Kinds; scriptedᵏ; sharedᵏ; plainᵗ;
+open import SExp.Syntax  using (SExp; STm; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵗ;
   inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ; μˢ; varˢ; deferˢ;
   varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; ifˢ; primˢ; strmˢ)
 open import SExp.Plain using (plainExp; plainTm; plainTms; mapInput; ∧ˡ; ∧ʳ; ∧-intro)
 open import Decide using (∧⁺) renaming (∧ˡ to ∧ˡᵇ; ∧ʳ to ∧ʳᵇ)
-open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; hotˢ; coldˢ; sharedˢ)
 
 ------------------------------------------------------------------
 -- Types.
@@ -96,8 +96,9 @@ mutual
 -- a scripted slot carries its tick beside each payload; a shared slot
 -- is a translated program, so it emits items
 timedTy : Ty → Kind → Ty
-timedTy t scriptedᵏ = tickᵗ ×ᵗ timedᵗ t
-timedTy t sharedᵏ   = itemᵗ t
+timedTy t hotᵏ    = tickᵗ ×ᵗ timedᵗ t
+timedTy t coldᵏ   = tickᵗ ×ᵗ timedᵗ t
+timedTy t sharedᵏ = itemᵗ t
 
 timedᶜ : ∀ {n} → Ctx n → Kinds n → Ctx n
 timedᶜ Γ κ = zipWith timedTy Γ κ
@@ -355,9 +356,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   -- them
   inputᵏ : ∀ {Δᵍ Δ Θ} (i : Fin n) kd → SExp (timedᶜ Γ κ) Δᵍ Δ Θ (timedTy (lookup Γ i) kd)
          → SExp (timedᶜ Γ κ) Δᵍ Δ Θ (itemᵗ (lookup Γ i))
-  inputᵏ i scriptedᵏ e = endAfterˢ {t = lookup Γ i}
+  inputᵏ i hotᵏ    e = endAfterˢ {t = lookup Γ i}
     (mapˢ (pairˢ (tickᵖ (toℕ i) (fstˢ v₀)) (inlˢ (sndˢ v₀))) e)
-  inputᵏ i sharedᵏ   e = endAfterˢ {t = lookup Γ i} e
+  inputᵏ i coldᵏ   e = endAfterˢ {t = lookup Γ i}
+    (mapˢ (pairˢ (tickᵖ (toℕ i) (fstˢ v₀)) (inlˢ (sndˢ v₀))) e)
+  inputᵏ i sharedᵏ e = endAfterˢ {t = lookup Γ i} e
 
   inputᵀ : ∀ {Δᵍ Δ Θ} (i : Fin n) → SExp (timedᶜ Γ κ) Δᵍ Δ Θ (itemᵗ (lookup Γ i))
   inputᵀ {Δᵍ} {Δ} {Θ} i =
@@ -462,8 +465,9 @@ module _ {n} {Γ : Ctx n} (k : ℕ) where
 module _ {n} {Γ : Ctx n} (κ : Kinds n) (k : ℕ) where
   inputᵏ-below : ∀ {Δᵍ Δ Θ} (i : Fin n) kd (e : SExp (timedᶜ Γ κ) Δᵍ Δ Θ (timedTy (lookup Γ i) kd))
                → T (ib k e) → T (ib k (inputᵏ κ i kd e))
-  inputᵏ-below i scriptedᵏ e p = conj-true (ib k e) p
-  inputᵏ-below i sharedᵏ   e p = conj-true (ib k e) p
+  inputᵏ-below i hotᵏ    e p = conj-true (ib k e) p
+  inputᵏ-below i coldᵏ   e p = conj-true (ib k e) p
+  inputᵏ-below i sharedᵏ e p = conj-true (ib k e) p
 
   mutual
     τ-below : ∀ {Δᵍ Δ Θ Θ′ t} d (ρ : Ren Θ Θ′) (e : SExp Γ Δᵍ Δ Θ t)
@@ -583,6 +587,15 @@ tickInput : ∀ {A : Set} → ObservableInput A → ObservableInput ((⊤ ⊎ (�
 tickInput (hot as)     = hot (ticks (λ k → inj₂ (inj₁ k)) zero as)
 tickInput (cold ss as) = cold (map (inj₁ tt ,_) ss) (ticks (λ k → inj₂ (inj₂ k)) zero as)
 
+-- a script's two halves, read back off a tagged one
+syncOf : ∀ {A : Set} → ObservableInput A → List A
+syncOf (hot _)     = []
+syncOf (cold ss _) = ss
+
+asyncOf : ∀ {A : Set} → ObservableInput A → List (Timed A)
+asyncOf (hot as)    = as
+asyncOf (cold _ as) = as
+
 -- shared slot j's program, its relative names closed
 closeShareˢ : ∀ {n} {Γ : Ctx n} {t} → ℕ → SExp Γ [] [] [] (itemᵗ t) → SExp Γ [] [] [] (itemᵗ t)
 closeShareˢ j e = mapˢ (pairˢ (closeᵖ j (fstˢ v₀)) (sndˢ v₀)) e
@@ -595,9 +608,13 @@ timedSlots {Γ = Γ} {κ = κ} ins i =
   where
     go : ∀ kd → SimulSlot Γ κ (toℕ i) (lookup Γ i) kd
        → SimulSlot (timedᶜ Γ κ) κ (toℕ i) (timedTy (lookup Γ i) kd) kd
-    go scriptedᵏ (scriptedˢ {ok = ok} inp) =
-      scriptedˢ {ok = timedᵈ-ok (lookup Γ i) ok}
-                (tickInput (mapInput (timedᵈ (lookup Γ i) ok) inp))
+    go hotᵏ    (hotˢ {ok = ok} as) =
+      hotˢ {ok = timedᵈ-ok (lookup Γ i) ok}
+           (asyncOf (tickInput (mapInput (timedᵈ (lookup Γ i) ok) (hot as))))
+    go coldᵏ   (coldˢ {ok = ok} ss as) =
+      coldˢ {ok = timedᵈ-ok (lookup Γ i) ok}
+            (syncOf (tickInput (mapInput (timedᵈ (lookup Γ i) ok) (cold ss as))))
+            (asyncOf (tickInput (mapInput (timedᵈ (lookup Γ i) ok) (cold ss as))))
     go sharedᵏ   (sharedˢ d {ok = ok})     =
       sharedˢ (closeShareˢ (toℕ i) (timed κ d)) {ok = timed-below κ (toℕ i) d ok}
 

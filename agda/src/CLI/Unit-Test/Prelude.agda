@@ -33,13 +33,13 @@ open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (ObservableInput)
+open import Rx.Prim using (ObservableInput; hot; cold)
 open import Rx.Exp using (Ctx; Val; natᵗ; obs; inputsBelowᵉ; FlatOp)
-open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; scriptedᵏ; sharedᵏ; emptyˢ; emitᵗ;
+open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; hotᵏ; coldᵏ; sharedᵏ; emptyˢ; emitᵗ;
   flattenˢ; mapˢ; pairˢ; inlˢ; inrˢ; unitˢ; varˢᵗ)
 open import Rx.Evaluator using (Burst)
 open import SExp.Plain using (plainExp)
-open import SExp.Simul-Slots using (SimulSlots; SimulSlot; scriptedˢ; sharedˢ)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; hotˢ; coldˢ; sharedˢ)
 open import CLI.Emit-Eq using (eqListℕ; eqBatches)
 open import SExp.Pipeline using (emitsᴵ; runᴾ)
 open import Timed.Translation using (packetOf; timedᶜ; itemᵗ)
@@ -59,13 +59,14 @@ open import Timed.Faithful using (untimedᵀ)
 -- subscribed it -- so without one every run is its subscribe burst
 -- alone.  Slot one holds another srxjs program, stands at the INSTEMIT,
 -- and may read slot zero.  The kind vector is not a free choice beside
--- the table -- `SimulSlot` is indexed by it, so this line and `mkSlots`
--- below are one statement.
-κ₂ : Kinds 2
-κ₂ = scriptedᵏ ∷ⱽ sharedᵏ ∷ⱽ []ⱽ
+-- the table -- `SimulSlot` is indexed by it, so slot zero's kind is
+-- read off its script, and `mkSlots` below is what says so.
+κOf : ObservableInput ℕ → Kinds 2
+κOf (hot _)    = hotᵏ  ∷ⱽ sharedᵏ ∷ⱽ []ⱽ
+κOf (cold _ _) = coldᵏ ∷ⱽ sharedᵏ ∷ⱽ []ⱽ
 
-Γ₂ᵉ : Ctx 2
-Γ₂ᵉ = plainᵏ Γ₂ κ₂
+Γ₂ᵉ : Kinds 2 → Ctx 4
+Γ₂ᵉ κ = plainᵏ Γ₂ κ
 
 -- THE TABLE IS BUILT FROM A SCRIPT AND AN AUTHOR-WRITTEN DEFINITION,
 -- and that is what a row has to name, because the sweep DRAWS it.  What
@@ -81,9 +82,6 @@ tOf : (b : Bool) → Maybe (T b)
 tOf true  = just tt
 tOf false = nothing
 
-slot₀ : ObservableInput ℕ → SimulSlot Γ₂ κ₂ 0 natᵗ scriptedᵏ
-slot₀ s = scriptedˢ {ok = tt} s
-
 -- A DEFINITION THAT BREAKS STRATIFICATION FALLS BACK TO SILENCE rather
 -- than being rejected, because this is a total function and the
 -- generator has no way to prove its draw stratified.  In practice the
@@ -91,19 +89,21 @@ slot₀ s = scriptedˢ {ok = tt} s
 -- `k` by construction -- but it is what makes the row a program rather
 -- than a proof obligation.
 
-slot₁ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 1 natᵗ sharedᵏ
+slot₁ : ∀ {κ} → SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ 1 natᵗ sharedᵏ
 slot₁ d with tOf (inputsBelowᵉ 1 (plainExp d))
 ... | just ok = sharedˢ d {ok = ok}
 ... | nothing = sharedˢ emptyˢ
 
 -- WRITTEN SLOT BY SLOT rather than with a wildcard: the arm a slot may
--- use is `lookup κ₂ i`, which does not reduce for an abstract `i`.
--- That is the kind indexing doing its job -- a table cannot name an
--- arm without saying which slot it is naming it for.
-mkSlots : ObservableInput ℕ → SExp Γ₂ [] [] [] natᵗ → SimulSlots Γ₂ κ₂
-mkSlots d₀ d₁ zero          = slot₀ d₀
-mkSlots d₀ d₁ (suc zero)    = slot₁ d₁
-mkSlots d₀ d₁ (suc (suc ()))
+-- use is `lookup (κOf d₀) i`, which does not reduce for an abstract `i`
+-- or script.  That is the kind indexing doing its job -- a table cannot
+-- name an arm without saying which slot it is naming it for.
+mkSlots : (d₀ : ObservableInput ℕ) → SExp Γ₂ [] [] [] natᵗ → SimulSlots Γ₂ (κOf d₀)
+mkSlots (hot as)     d₁ zero       = hotˢ {ok = tt} as
+mkSlots (cold ss as) d₁ zero       = coldˢ {ok = tt} ss as
+mkSlots (hot _)      d₁ (suc zero) = slot₁ d₁
+mkSlots (cold _ _)   d₁ (suc zero) = slot₁ d₁
+mkSlots _            d₁ (suc (suc ()))
 
 -- RXJS'S THREE NAMED FLATTENERS, which the author's tree does not have
 -- as formers: `flattenˢ` over a map making every element a lane and none
@@ -116,20 +116,24 @@ flatAllˢ op e = flattenˢ op (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (varˢᵗ (he
 
 -- one cached counterexample: a label, and the run that produced it
 record Case : Set where
-  constructor cached
   field
     name  : String
     fuel  : ℕ
     prog  : SExp Γ₂ [] [] [] natᵗ
-    slots : SimulSlots Γ₂ κ₂
+    kinds : Kinds 2
+    slots : SimulSlots Γ₂ kinds
 
-open Case using (name; fuel; prog; slots)
+open Case using (name; fuel; prog; kinds; slots)
+
+-- the kinds are read off the table's own type, so a row names none
+cached : String → ℕ → SExp Γ₂ [] [] [] natᵗ → {κ : Kinds 2} → SimulSlots Γ₂ κ → Case
+cached n f e {κ} ins = record { name = n ; fuel = f ; prog = e ; kinds = κ ; slots = ins }
 
 ------------------------------------------------------------------
 -- THE FOUR STATEMENTS `Main` IMPORTS, EACH DECIDED AT ITS OWN SIDES.
 -- A side is the statement module's own definition applied at this row,
 -- never a restatement of it, so the check and the claim cannot drift
--- apart: at `Γ₂`, `κ₂`, `natᵗ` and `tt`, what is compared here is what
+-- apart: at `Γ₂`, the row's kinds, `natᵗ` and `tt`, what is compared here is what
 -- the statement says is equal.
 --
 -- NO CAP.  A `takeᵉ` above the program -- counted in InstEmits or in
@@ -153,32 +157,32 @@ statementName timed-faithfulˢ = "timed-faithful"
 
 -- `left-to-right`: the batches joined back up, and the plain run
 ltrSides : Case → List ℕ × List ℕ
-ltrSides c = joinedᴵ tt κ₂ (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
+ltrSides c = joinedᴵ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
 
 -- `timing-correct`: each value's stamp, beside its packet.  The
 -- contexts are passed by hand because `Val` at a concrete type forgets
 -- its context, so no argument's type can say which one it was.
-Γ₂ᵗ : Ctx 2
-Γ₂ᵗ = plainᵏ (timedᶜ Γ₂ κ₂) κ₂
+Γ₂ᵗ : Kinds 2 → Ctx 4
+Γ₂ᵗ κ = plainᵏ (timedᶜ Γ₂ κ) κ
 
-packets : List (ℕ × Val Γ₂ᵗ (plainᵗ (itemᵗ natᵗ))) → List (ℕ × List ℕ)
-packets []             = []
-packets ((i , v) ∷ ps) = (i , packetOf {Γ = Γ₂ᵗ} natᵗ v) ∷ packets ps
+packets : ∀ κ → List (ℕ × Val (Γ₂ᵗ κ) (plainᵗ (itemᵗ natᵗ))) → List (ℕ × List ℕ)
+packets κ []             = []
+packets κ ((i , v) ∷ ps) = (i , packetOf {Γ = Γ₂ᵗ κ} natᵗ v) ∷ packets κ ps
 
 stampsOf : Case → List (ℕ × List ℕ)
-stampsOf c = packets (stampedᵀ κ₂ (fuel c) (prog c) (slots c))
+stampsOf c = packets (kinds c) (stampedᵀ (kinds c) (fuel c) (prog c) (slots c))
 
 -- `batchable`: both sides read one run's emits, so the run is an
 -- argument and computed once
-batchSides : Burst Γ₂ᵉ (emitᵗ natᵗ) → List (List ℕ) × List (List ℕ)
-batchSides es = batchedᴱ {Γ′ = Γ₂ᵉ} natᵗ tt es , groupedᴱ {Γ′ = Γ₂ᵉ} natᵗ tt es
+batchSides : ∀ κ → Burst (Γ₂ᵉ κ) (emitᵗ natᵗ) → List (List ℕ) × List (List ℕ)
+batchSides κ es = batchedᴱ {Γ′ = Γ₂ᵉ κ} natᵗ tt es , groupedᴱ {Γ′ = Γ₂ᵉ κ} natᵗ tt es
 
 batchableSides : Case → List (List ℕ) × List (List ℕ)
-batchableSides c = batchSides (emitsᴵ κ₂ (fuel c) (prog c) (slots c))
+batchableSides c = batchSides (kinds c) (emitsᴵ (kinds c) (fuel c) (prog c) (slots c))
 
 -- `timed-faithful`: the timed program's run untimed, and the plain run
 faithfulSides : Case → List ℕ × List ℕ
-faithfulSides c = untimedᵀ tt κ₂ (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
+faithfulSides c = untimedᵀ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
 
 -- `Coherent`, decided: same stamp exactly when same packet
 coherentᵇ : ℕ × List ℕ → ℕ × List ℕ → Bool
