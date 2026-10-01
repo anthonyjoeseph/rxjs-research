@@ -25,7 +25,7 @@ open import Data.Bool using (Bool; true; false; T; _∧_; not; _xor_)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.List using (List; []; _∷_; map)
-open import Data.Nat using (ℕ; _≡ᵇ_)
+open import Data.Nat using (ℕ; _≡ᵇ_; _+_)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
 open import Data.Product using (_×_; _,_)
@@ -40,7 +40,7 @@ open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; hotᵏ; coldᵏ;
 open import Rx.Evaluator using (Burst)
 open import SExp.Plain using (plainExp)
 open import SExp.Simul-Slots using (SimulSlots; SimulSlot; hotˢ; coldˢ; sharedˢ)
-open import CLI.Emit-Eq using (eqListℕ; eqBatches)
+open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import SExp.Pipeline using (emitsᴵ; runᴾ)
 open import Timed.Translation using (packetOf; timedᶜ; itemᵗ)
 open import Left-To-Right.Statement using (joinedᴵ)
@@ -155,9 +155,11 @@ statementName timing-correctˢ = "timing-correct"
 statementName batchableˢ      = "batchable"
 statementName timed-faithfulˢ = "timed-faithful"
 
--- `left-to-right`: the batches joined back up, and the plain run
-ltrSides : Case → List ℕ × List ℕ
-ltrSides c = joinedᴵ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
+-- `left-to-right`: the batches joined back up, the plain run, and the
+-- batches joined back up at one more unit of fuel
+ltrSides : Case → List ℕ × List ℕ × List ℕ
+ltrSides c = joinedᴵ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c) ,
+             joinedᴵ tt (kinds c) (1 + fuel c) (prog c) (slots c)
 
 -- `timing-correct`: each value's stamp, beside its packet.  The
 -- contexts are passed by hand because `Val` at a concrete type forgets
@@ -201,11 +203,15 @@ allPairsᵇ (x ∷ xs) = coheresWith x xs ∧ allPairsᵇ xs
 agreeᴸ : List ℕ × List ℕ → Bool
 agreeᴸ (l , r) = eqListℕ l r
 
+-- the plain run between the two joined ones, each a prefix of the next
+sandwichᴸ : List ℕ × List ℕ × List ℕ → Bool
+sandwichᴸ (l , p , l′) = prefixListℕ l p ∧ prefixListℕ p l′
+
 agreeᴮ : List (List ℕ) × List (List ℕ) → Bool
 agreeᴮ (l , r) = eqBatches l r
 
 holds : Statement → Case → Bool
-holds left-to-rightˢ  c = agreeᴸ (ltrSides c)
+holds left-to-rightˢ  c = sandwichᴸ (ltrSides c)
 holds timing-correctˢ c = allPairsᵇ (stampsOf c)
 holds batchableˢ      c = agreeᴮ (batchableSides c)
 holds timed-faithfulˢ c = agreeᴸ (faithfulSides c)

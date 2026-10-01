@@ -132,4 +132,12 @@ cases =
           (flatAllˢ (mergeᶠ (just 2)) (ofˢ ((strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ (suc zero)))) ∷ (strmˢ (μˢ (deferˢ (varˢ (here refl))))) ∷ [])))
           (mkSlots (cold (2 ∷ []) ((after 0 , 9) ∷ []))
                    ((inputˢ zero))) ∷
+  cached "seed 1 depth 2 case 1 at fuel 1" 1
+          (flatAllˢ (mergeᶠ (just 2)) (ofˢ ((strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ (suc zero)))) ∷ (strmˢ (μˢ (deferˢ (varˢ (here refl))))) ∷ [])))
+          (mkSlots (cold (2 ∷ []) ((after 0 , 9) ∷ []))
+                   ((inputˢ zero))) ∷
+  cached "seed 1 depth 2 case 1 at fuel 2" 2
+          (flatAllˢ (mergeᶠ (just 2)) (ofˢ ((strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ (suc zero)))) ∷ (strmˢ (μˢ (deferˢ (varˢ (here refl))))) ∷ [])))
+          (mkSlots (cold (2 ∷ []) ((after 0 , 9) ∷ []))
+                   ((inputˢ zero))) ∷
   []

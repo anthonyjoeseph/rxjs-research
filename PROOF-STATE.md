@@ -240,11 +240,12 @@ bound.
 
 ### Big picture tier roadmap
 
-- **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** `QC='1 15 1'` is
-  green on all four statements; that is the near-degenerate end. Raise
-  `QC_BUDGET` to the 10-minute cap and `QC_CASE` until no case is a
-  `timeout`, then sweep depth 2 and more seeds. A case still timing out under
-  the cap is the one evaluator-cost finding worth having: report it.
+- **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** Depth 2 is green
+  on seeds 1 and 3, and at `QC_FUEL=6`, where a cut-off run makes the
+  sandwich's second half bear weight. Sweep more seeds and fuels under the
+  10-minute cap, raising `QC_CASE` until no case is a `timeout`. Seed 3's
+  `μ` over a merge holding its own defer times out at 150 s: a case still
+  timing out under the cap is the one evaluator-cost finding worth having.
 
 - **EVERY DISAGREEMENT IS THE ELABORATION'S TO FIX.** A non-timeout failure is
   a counterexample to a top-line statement: bug-cache row first, then the
@@ -299,9 +300,10 @@ still being rewritten there.
 
 ### The ledger
 
-- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: the
-  elaborated `switchAll`/`exhaustAll` disagree with plain rxjs; tier 1's
-  switch leg.
+- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: a
+  prefix sandwich, the plain run between the joined runs at its fuel and one
+  past it, since a cut-off run's last batch waits for an arrival (Anthony);
+  its QuickCheck is the instantiation.
 - **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: its
   QuickCheck is the instantiation; tier 1's stamping leg is the impl's half.
 - **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: its

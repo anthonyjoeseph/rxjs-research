@@ -3,6 +3,15 @@
 -- read each emit's values, and join the batches back up -- that is the
 -- values the program read as plain rxjs delivers, in order.
 --
+-- AT ONE MORE UNIT OF FUEL, BECAUSE A BATCH CANNOT LEAVE BEFORE ITS
+-- INSTANT IS SEEN TO END.  What says so is the next instant's first
+-- emit or the run's completion, so a run the fuel cuts off holds its
+-- last instant's values that the plain run, cut at the same point, has
+-- already delivered.  So the joined run at a fuel is a PREFIX of the
+-- plain run, and the plain run a prefix of the joined one a single
+-- arrival later: never ahead of rxjs, and never more than one arrival
+-- behind (Anthony).
+--
 -- CLOSES A CHEAT THE OTHER TOP-LINE STATEMENTS LEAVE OPEN.
 -- Elaborating every program to `empty` is trivially batched, and fails
 -- left-to-right.
@@ -27,7 +36,9 @@ module Left-To-Right.Statement where
 
 open import Data.Bool    using (T)
 open import Data.List    using (List; []; concat; map)
-open import Data.Product using (proj₂)
+open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
+open import Data.Nat     using (suc)
+open import Data.Product using (_×_; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel)
@@ -52,7 +63,8 @@ Left-To-Right : Set
 Left-To-Right =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
     (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
-  joinedᴵ ok κ fuel e ins ≡ runᴾ fuel e ins
+  Prefix _≡_ (joinedᴵ ok κ fuel e ins) (runᴾ fuel e ins) ×
+  Prefix _≡_ (runᴾ fuel e ins) (joinedᴵ ok κ (suc fuel) e ins)
 
 postulate
   left-to-right : Left-To-Right

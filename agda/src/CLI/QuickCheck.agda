@@ -71,7 +71,7 @@ open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; m
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import CLI.Emit-Eq using (eqListℕ; eqBatches)
+open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import SExp.Pipeline using (runᴵ)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; statements; statementName;
@@ -811,6 +811,12 @@ showStamps ((i , p) ∷ ps) = "@" ++ show i ++ showVals p ++ " " ++ showStamps p
 pairᴸ : List ℕ × List ℕ → Bool × String
 pairᴸ (l , r) = eqListℕ l r , showPair showVals (l , r)
 
+-- the plain run between the joined runs at the fuel and one past it
+sandwichᴸ : List ℕ × List ℕ × List ℕ → Bool × String
+sandwichᴸ (l , p , l′) =
+  prefixListℕ l p ∧ prefixListℕ p l′ ,
+  "joined = " ++ showVals l ++ "\n    plain = " ++ showVals p ++ "\n    joined at one more fuel = " ++ showVals l′
+
 pairᴮ : List (List ℕ) × List (List ℕ) → Bool × String
 pairᴮ (l , r) = eqBatches l r , showPair showBatches (l , r)
 
@@ -818,7 +824,7 @@ pairsᵀ : List (ℕ × List ℕ) → Bool × String
 pairsᵀ ps = allPairsᵇ ps , "stamped = " ++ showStamps ps
 
 decide : Case → Statement → Bool × String
-decide c left-to-rightˢ  = pairᴸ (ltrSides c)
+decide c left-to-rightˢ  = sandwichᴸ (ltrSides c)
 decide c timing-correctˢ = pairsᵀ (stampsOf c)
 decide c batchableˢ      = pairᴮ (batchableSides c)
 decide c timed-faithfulˢ = pairᴸ (faithfulSides c)

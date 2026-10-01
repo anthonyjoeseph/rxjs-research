@@ -132,9 +132,10 @@ plainEnd (valueᵖ _ ∷ es)   = plainEnd es
 
 -- MATCHED IN HELPERS, NEVER BY A `with`, for the reason `verdict` is:
 -- a `with` over a run makes the typechecker normalise it.
-ltrLines : List ℕ × List ℕ → String
-ltrLines (l , r) = "left-to-right  joined  " ++ showNats l ++ "\n" ++
-                   "left-to-right  plain   " ++ showNats r ++ "\n"
+ltrLines : List ℕ × List ℕ × List ℕ → String
+ltrLines (l , r , l′) = "left-to-right  joined  " ++ showNats l ++ "\n" ++
+                        "left-to-right  plain   " ++ showNats r ++ "\n" ++
+                        "left-to-right  joined+1 " ++ showNats l′ ++ "\n"
 
 batchLines : List (List ℕ) × List (List ℕ) → String
 batchLines (l , r) = "batchable      batched " ++ showBatches l ++ "\n" ++
@@ -164,7 +165,7 @@ answer : Maybe ℕ → List String → IO Unit
 answer nothing     _               = putStr "bug-cache: expected a row number on stdin\n"
 answer (just zero) _               = putStr ("bug-cache: rows " ++ show (length cases) ++ "\n")
 answer (just k)    ("sides" ∷ _)   = showSides (row k cases)
-answer (just k)    ("plain" ∷ _)   = oneSide (row k cases) (λ c → sideLine "plain" (proj₂ (ltrSides c)))
+answer (just k)    ("plain" ∷ _)   = oneSide (row k cases) (λ c → sideLine "plain" (proj₁ (proj₂ (ltrSides c))))
 answer (just k)    ("joined" ∷ _)  = oneSide (row k cases) (λ c → sideLine "joined" (proj₁ (ltrSides c)))
 answer (just k)    ("untimed" ∷ _) = oneSide (row k cases) (λ c → sideLine "untimed" (proj₁ (faithfulSides c)))
 answer (just k)    ("stamps" ∷ _)  = oneSide (row k cases) (λ c → showStamps (stampsOf c))
