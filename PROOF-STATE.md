@@ -240,15 +240,14 @@ bound.
 
 ### Big picture tier roadmap
 
-- **THE EVALUATOR RE-RUNS EVERY SUBSCRIBING STEP (Anthony: fix its cost).**
-  `a delivery switching to two ofs` runs its timed program plain in 46 s of
-  the row's 60 s and elaborated in over 200 s. Per flatten, `thruStep` runs
-  three times -- the first run, the echo map's `translate` replay, and
-  `translate-sub`'s -- each re-subscribing the inner subtree, so cost is
-  3^depth in nested lanes (`typecheck-performance-numbers.md`). Fuse the
-  echo map into the flatten arm so one replay serves both frames (base
-  3 → 2). The replay itself recovers a parent's successor the types cannot
-  expose; if 2^depth still misses the row, that is the finding to report.
+- **THE COMPILED EVALUATOR KEEPS EVERY PROOF IT BUILDS (Anthony: fix its
+  cost).** `a delivery switching to two ofs` spends 36 of its timed plain
+  run's 38 s in GC at 3 GB live, and its elaborated run passes 12 GB: proof
+  thunks and derivations, each closing over the answer before it
+  (`typecheck-performance-numbers.md`). Mark the evaluator's proof-carrying
+  binders and fields `{-@0-}` -- `Acc`, `Room`, `PreHolds`, `Kept`, the
+  derivations, in `Ans`, `Call`, `Stage` and the arms' results -- so the
+  oracle stops building them; its typecheck names any binder a value reads.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   `QC='1 15 1'` is green on all four statements. Depth 1 is the sweep that

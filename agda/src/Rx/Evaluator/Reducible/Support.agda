@@ -936,6 +936,21 @@ headPre : ∀ {n} {Γ : Ctx n} {lo ℓ s u t} {f : Frame Γ s u} {le : lo ≤ �
 headPre h (standing pfs) = standing (h , pfs)
 headPre h fallen         = fallen
 
+-- AND THE PATH'S GROUND UNDER THE FRAME'S, read off the frame's alone.
+-- An arm reads it off its source's answer rather than off the frame
+-- pushed back onto the translation's, so the translation's last answer
+-- is never demanded by a proof term
+unheadPre : ∀ {n} {Γ : Ctx n} {lo ℓ s u t} {f : Frame Γ s u} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t}
+          → Pre (f ↠[ le ] κ) → Pre κ
+unheadPre (standing (_ , pfs)) = standing pfs
+unheadPre fallen               = fallen
+
+-- which is the ground the frame went onto
+unheadPre-head : ∀ {n} {Γ : Ctx n} {lo ℓ s u t} {f : Frame Γ s u} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t}
+                 (h : HeldF f) (p : Pre κ) {q : Pre (f ↠[ le ] κ)} → q ≡ headPre h p → unheadPre q ≡ p
+unheadPre-head h (standing _) refl = refl
+unheadPre-head h fallen       refl = refl
+
 -- and it holds where the frame's own ground held before the fold and
 -- the fold kept the frame's nodes
 headHolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u}
@@ -975,29 +990,29 @@ headKept f le κ off ct eks fallen kp h = tt
 -- where a frame arm's answer comes from once its source has answered
 -- about the path with the frame pushed.
 unheadHolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u}
-              (f : Frame Γ s u) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t) (h : HeldF f)
-              (p : Pre κ) {sched : Sched Γ} {st : EvalSt e}
-            → PreHolds m (f ↠[ le ] κ) (headPre h p) sched st → PreHolds m κ p sched st
-unheadHolds f le κ h (standing pfs) (grounded (_ , _ , hs) so) = grounded hs (drop-ot f le κ so)
-unheadHolds f le κ h fallen         (grounded fell so)         = grounded fell (drop-ot f le κ so)
+              (f : Frame Γ s u) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t)
+              (q : Pre (f ↠[ le ] κ)) {sched : Sched Γ} {st : EvalSt e}
+            → PreHolds m (f ↠[ le ] κ) q sched st → PreHolds m κ (unheadPre q) sched st
+unheadHolds f le κ (standing _) (grounded (_ , _ , hs) so) = grounded hs (drop-ot f le κ so)
+unheadHolds f le κ fallen       (grounded fell so)         = grounded fell (drop-ot f le κ so)
 
 -- and what the frame kept for the arm's caller, given that the arm's
 -- own install sat at or above the counter it began at and wrote
 -- nothing below it
 unheadKept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u}
-             (f : Frame Γ s u) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t) (h : HeldF f) (p : Pre κ)
+             (f : Frame Γ s u) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t) (q : Pre (f ↠[ le ] κ))
              {sched sched₁ sched₂ : Sched Γ} {st st₁ st₂ : EvalSt e}
            → (∀ k → k < nodeCt sched → T (any (_≡ᵇ k) (frameNodes f)) → ⊥)
            → nodeCt sched ≤ nodeCt sched₁
            → (∀ k → k < nodeCt sched → lookupNode k (EvalSt.nodes st₁) ≡ lookupNode k (EvalSt.nodes st))
            → EndsKept κ sched st st₁
-           → Kept (f ↠[ le ] κ) (headPre h p) sched₁ st₁ sched₂ st₂
-           → Kept κ p sched st sched₂ st₂
-unheadKept f le κ h (standing pfs) above ct pr eks (ct₂ , kp , ek) =
+           → Kept (f ↠[ le ] κ) q sched₁ st₁ sched₂ st₂
+           → Kept κ (unheadPre q) sched st sched₂ st₂
+unheadKept f le κ (standing _) above ct pr eks (ct₂ , kp , ek) =
     ≤-trans ct ct₂
   , (λ k k< ne ea → trans (kp k (<-≤-trans k< ct) (λ on → [ above k k< , ne ] (∨-T on)) (eks k k< ne ea)) (pr k k<))
   , λ k k< ne ea → ek k (<-≤-trans k< ct) (λ on → [ above k k< , ne ] (∨-T on)) (eks k k< ne ea)
-unheadKept f le κ h fallen above ct pr eks kp = tt
+unheadKept f le κ fallen above ct pr eks kp = tt
 
 -- candidates through a function, pointwise
 mapAll : ∀ {n} {Γ : Ctx n} {s u} {P : Val Γ s → Set₁} {P′ : Val Γ u → Set₁} {g : Val Γ s → Val Γ u}

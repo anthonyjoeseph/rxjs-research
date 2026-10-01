@@ -958,5 +958,25 @@ budget of 60 s for every side in one process:
 | timed program, elaborated (`timing-correct`) | > 200 s |
 
 The plain side alone takes most of the budget, and no elaborated run measured
-here was cheaper than the plain run of the same program. `QC='1 15 1'` through
+here was cheaper than the plain run of the same program.
+
+Those two slow sides are GARBAGE COLLECTION, not evaluation. `+RTS -s` on the
+oracle binary, row 6:
+
+| side | mutator | GC | max residency |
+|---|---|---|---|
+| timed program, plain | 2.6 s | 38.1 s | 3.0 GB |
+| same, `translate` no longer forcing the replayed answer | 2.0 s | 36.0 s | 3.0 GB |
+| same, `Ans`'s `pre′` and `next` made strict (Haskell-level experiment) | 2.1 s | 16.9 s | 2.0 GB |
+| timed program, elaborated, interrupted at 120 s | 7.2 s | 161 s | 12.2 GB |
+
+A biographical heap profile of the plain timed run peaks at 4.4 GB, of which
+3.5 GB is VOID (built, never read) and 52 MB is in use: derivation
+constructors (`fold-step`), pairs, `Path` and `call` cells, and unevaluated
+proof thunks, retained by `liveRP`'s closures. Each answer's successor and
+proof fields are thunks over the answer before it, so every proof term ever
+built stays reachable. `-fno-full-laziness` changes nothing;
+`-A256m -F4` gives 20 s; erasing `der` alone leaves residency at 3.2 GB;
+`holds′` is demanded at runtime by `callStage`'s match on `grounded`, and
+`kept` inside `red-all`'s `answer`. `QC='1 15 1'` through
 `make qc-fast`, all four statements: GREEN within the 120 s cap.
