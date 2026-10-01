@@ -286,8 +286,9 @@ statement. Expect the
 elaboration and the batcher to move under contact, and report rather than push
 if that starts spiralling out rather than in.
 
-**STOP AND REPORT if this needs a new former in `Rx.Exp`** — same bar as tier
-1: only on certainty, never on suspicion.
+**`Rx.Exp` AND `SExp.Syntax` ARE OFF LIMITS (Anthony).** Tier 1 closing fixes
+both; a proof that needs either to move is a question for Anthony, never a
+patch.
 
 ### The monster
 
