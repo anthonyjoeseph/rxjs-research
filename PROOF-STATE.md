@@ -240,23 +240,22 @@ bound.
 
 ### Big picture tier roadmap
 
-- **GIVE `a delivery switching to two ofs` A VERDICT.** Its cost is a value
-  present at SUBSCRIBE time, run through the elaborated TIMED program: the
-  plain timed run is instant, and the same value delivered at tick 1 costs
-  20–60× less (`typecheck-performance-numbers.md`). Find which elaborated
-  former's subscribe path pays it before touching the timed translation; the
-  evaluator is the tier's boundary.
+- **ROW 6 NEEDS A BOUNDARY RULING (Anthony).** `a delivery switching to two
+  ofs` runs its timed program PLAIN -- `timed-faithful`'s left side, no
+  elaboration in it -- in 46 s of the row's 60 s, and elaborated in over
+  200 s: the evaluator is exponential in nested LANES, plain programs too,
+  and the timed translation nests several per author flattener
+  (`typecheck-performance-numbers.md`). No elaboration change reaches that
+  side. Each option crosses a line: the evaluator's cost (the boundary), a
+  shallower translation (moves `Timing-Correct`'s definition and its
+  TypeScript mirror), or the row budget.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
-  Depth 1 is the sweep that fits, and some programs cost exponentially in
-  fuel; a case past its wall clock (`QC_CASE`) is a `timeout` failure
-  (`typecheck-performance-numbers.md`). Every counterexample becomes a
-  bug-cache row first. Three rows — an `of` pair merged inside a
-  delivery's inner — give no verdict in 60 s even at fuel 1, while the
-  same programs read plain run at once: the cost is the ELABORATION's. The
-  timed program multiplies it, every flatten becoming four: an `exhaustᶠ`
-  over three `of` inners gives `timing-correct` no verdict in 20 s while
-  `timed-faithful`, run plain, passes.
+  `QC='1 15 1'` is green on all four statements. Depth 1 is the sweep that
+  fits, and a case past its wall clock (`QC_CASE`) is a `timeout` failure.
+  Every counterexample becomes a bug-cache row first. Widening the sweep
+  meets row 6's exponential: two flatteners nested at depth one time out on
+  both sides (`typecheck-performance-numbers.md`).
 
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
   from the oracle's tree, as `qc-build` does, and the oracle job's `make

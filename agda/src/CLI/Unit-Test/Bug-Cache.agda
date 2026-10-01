@@ -3,7 +3,11 @@
 -- the corpus, named by the number on stdin, and prints which of its
 -- properties failed.  Zero asks for the row count instead, and a
 -- second word `sides` asks for the two sides each comparison read, which
--- is what a failing row is diagnosed from.
+-- is what a failing row is diagnosed from.  A second word `plain`,
+-- `joined`, `untimed` or `stamps` runs ONE side alone -- the plain run,
+-- the elaborated run, the timed program run plain, the timed program
+-- elaborated -- which is what a SLOW row is timed from, since a row's
+-- budget covers every side at once.
 --
 -- WHY THERE IS A BINARY AT ALL.  A row is a set of booleans over a
 -- whole `evaluate` run, and Agda's evaluator is the wrong machine to
@@ -35,13 +39,13 @@ open import Data.List using (List; []; _∷_; length)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Nat.Show using (show; readMaybe)
 open import Data.String using (String; _++_; words)
 
 open import CLI.IO using (putStr; getContents; _>>=_; Unit)
 open import CLI.Unit-Test using (cases)
-open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides; stampsOf; Γ₂ᵉ)
+open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides; stampsOf; Γ₂ᵉ; faithfulSides)
 open import Rx.Prim using (InstEmit; InstEvent; EmitKind; subscribe; delivery; plumbing;
   value; complete; PlainEvent; valueᵖ; completeᵖ)
 open import SExp.Syntax using (plainᵗ)
@@ -144,10 +148,21 @@ showSides (just c) =
           showEmits (decodeEmits {Γ = Γ₂ᵉ (kinds c)} {a = plainᵗ natᵗ} (emitsᴵ (kinds c) (fuel c) (prog c) (slots c))) ++
           plainEnd (emitsᴵ (kinds c) (fuel c) (prog c) (slots c)))
 
+oneSide : Maybe Case → (Case → String) → IO Unit
+oneSide nothing  f = putStr "bug-cache: no such row\n"
+oneSide (just c) f = putStr (f c)
+
+sideLine : String → List ℕ → String
+sideLine name vs = name ++ " " ++ showNats vs ++ "\n"
+
 answer : Maybe ℕ → List String → IO Unit
 answer nothing     _               = putStr "bug-cache: expected a row number on stdin\n"
 answer (just zero) _               = putStr ("bug-cache: rows " ++ show (length cases) ++ "\n")
 answer (just k)    ("sides" ∷ _)   = showSides (row k cases)
+answer (just k)    ("plain" ∷ _)   = oneSide (row k cases) (λ c → sideLine "plain" (proj₂ (ltrSides c)))
+answer (just k)    ("joined" ∷ _)  = oneSide (row k cases) (λ c → sideLine "joined" (proj₁ (ltrSides c)))
+answer (just k)    ("untimed" ∷ _) = oneSide (row k cases) (λ c → sideLine "untimed" (proj₁ (faithfulSides c)))
+answer (just k)    ("stamps" ∷ _)  = oneSide (row k cases) (λ c → showStamps (stampsOf c))
 answer (just k)    _               = runRow (row k cases)
 
 firstNat : List String → Maybe ℕ
