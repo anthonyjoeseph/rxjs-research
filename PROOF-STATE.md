@@ -239,15 +239,25 @@ bound.
 
 ### Big picture tier roadmap
 
-- **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
-  The PLAIN rows: a switched-away inner stays subscribed (`seed 6 depth 1
-  case 4`), and an inner arriving while one is live is not dropped (`seed 7
-  depth 1 case 12`). Mirror the plain formers' bookkeeping in the InstEmit.
+- **ONE HOT ARRIVAL IS ONE INSTANT FOR EVERY SUBSCRIBER -- A QUESTION FOR
+  ANTHONY.** `the script merged with itself` fails `timing-correct`. The
+  README's diamond makes one `.next()` one instant however many subscribe,
+  but `inputᵖ` mints the instant per subscription, and the palette has no
+  term by which two sibling subscriptions agree on a token minted after both
+  subscribed: a shared token must be in scope at subscription, and a late
+  subscriber cannot count the arrivals before it. Needs `Rx.Exp`,
+  `SExp.Syntax` or the evaluator to move.
 
-- **GIVE THE SIX TIMEOUT ROWS A VERDICT.** Every bug-cache row that
-  finishes passes; the six left run past 60 s. Batching is ruled out --
-  `batchSimultaneousᵖ` cuts the spec's runs and closes the last one on the
-  run's completion -- so what is left is the elaboration's cost.
+- **END THE ELABORATED `take` ON ITS CUT.** `take one of the script` fails
+  `timing-correct`: with no takeWhile in the palette the elaborated take
+  completes on the next upstream emit, so the timed END lands an instant
+  late. Route: a takeUntil -- `switchᶠ` over the counted stream, then
+  `emptyᵉ` once `takeᵉ 1` of its cut fires -- at the price of a second
+  subscription of the source.
+
+- **GIVE `a delivery switching to two ofs` A VERDICT.** One emit per `of`
+  value gave five of the six timeout rows one; this row still runs past
+  60 s, and its cost is the elaboration's.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   Depth 1 is the sweep that fits, and some programs cost exponentially in

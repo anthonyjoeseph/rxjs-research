@@ -1,7 +1,7 @@
 module SExp.Elaborate where
 
 open import Data.Bool using (true; false)
-open import Data.List using (List; []; _∷_; _++_; map)
+open import Data.List using (List; []; _∷_; _++_; map; foldr)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -85,23 +85,20 @@ flatAllᵉ op e = flattenᵉ op (mapᵉ (pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ
 deliveryᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
 deliveryᵛ = inrᵗ (inlᵗ unit̂)
 
--- a run of `value` events, in order, ahead of whatever closes the list
-valuesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
-        → List (Tm Γ Δᵍ Δ Θ a)
-        → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ a))
-        → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ a))
-valuesᵛ []       rest = rest
-valuesᵛ (v ∷ vs) rest = consᵗ (valueᵛ v) (valuesᵛ vs rest)
-
--- A COLD SOURCE IS ONE INSTEMIT, WHICH IS WHY THE FRAME TOKEN IS THE
--- WHOLE OF WHAT IT WAS SHORT OF.  Everything this former emits leaves
--- in the subscribe burst — the `init` naming the source, every value
--- the author wrote, the exhausted `close` and the `complete` — so the
--- one instant it has to name is the frame's, and a source that
+-- A COLD SOURCE IS ONE INSTEMIT PER VALUE, ALL UNDER THE FRAME TOKEN.
+-- Everything this former emits leaves in the subscribe burst — the
+-- `init` naming the source on the first emit, the author's values one
+-- per emit, the exhausted `close` and the `complete` on the last — so
+-- the one instant it has to name is the frame's, and a source that
 -- INHERITED a later cascade's would be naming something it can never
--- be handed.  The mirror settles the field order and the kind:
--- `primitive-operators.ts`'s `of` builds exactly this list, stamps it
--- `SUBSCRIBE_FRAME`, and marks the emit `subscribe`.
+-- be handed.
+--
+-- ONE VALUE PER EMIT BECAUSE A FLATTENER ELEMENT HOLDS ONE LANE.  An
+-- emit carrying k inners is one element whose lane is their merge, so
+-- one emit for an `of` of k observables nests a flattener plain rxjs
+-- does not have, and the evaluator's cost is multiplicative in that
+-- nesting (`typecheck-performance-numbers.md`).  The twin's `of` is one
+-- emit; batching cannot tell the two apart, since both are one instant.
 --
 -- THE SOURCE TOKEN IS MINTED AT THIS NODE AND THE INSTANT IS NOT, AND
 -- the difference is the arity.  A source is a fresh identity per
@@ -210,7 +207,7 @@ inputᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i frame =
 ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
     → Tm Γ Δᵍ Δ Θ uniqᵗ
     → List (Tm Γ Δᵍ Δ Θ (plainᵗ t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-ofᵖ {Θ = Θ} {t = t} frame ts = mintᵉ (ofᵉ (instEmitᵛ evs frame↑ src subscribeᵛ ∷ []))
+ofᵖ {Θ = Θ} {t = t} frame ts = mintᵉ (ofᵉ (emits (initᵛ src ∷ []) (map ↑ ts)))
   where
   ↑ : ∀ {r} → Tm _ _ _ Θ r → Tm _ _ _ (uniqᵗ ∷ Θ) r
   ↑ = renTm (λ x → x) (λ x → x) there
@@ -221,10 +218,21 @@ ofᵖ {Θ = Θ} {t = t} frame ts = mintᵉ (ofᵉ (instEmitᵛ evs frame↑ src 
   frame↑ : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
   frame↑ = ↑ frame
 
-  evs : Tm _ _ _ (uniqᵗ ∷ Θ) (listᵗ (instEventᵗ uniqᵗ (plainᵗ t)))
-  evs = consᵗ (initᵛ src)
-              (valuesᵛ (map ↑ ts)
-                       (consᵗ (closeᵛ src exhaustedᵛ) (consᵗ completeᵛ nilᵗ)))
+  E : Ty
+  E = instEventᵗ uniqᵗ (plainᵗ t)
+
+  emit : List (Tm _ _ _ (uniqᵗ ∷ Θ) E) → Tm _ _ _ (uniqᵗ ∷ Θ) (emitᵗ t)
+  emit evs = instEmitᵛ (foldr consᵗ nilᵗ evs) frame↑ src subscribeᵛ
+
+  ending : List (Tm _ _ _ (uniqᵗ ∷ Θ) E)
+  ending = closeᵛ src exhaustedᵛ ∷ completeᵛ ∷ []
+
+  -- the events owed before the next value, then the values left
+  emits : List (Tm _ _ _ (uniqᵗ ∷ Θ) E) → List (Tm _ _ _ (uniqᵗ ∷ Θ) (plainᵗ t))
+        → List (Tm _ _ _ (uniqᵗ ∷ Θ) (emitᵗ t))
+  emits pre []           = emit (pre ++ ending) ∷ []
+  emits pre (v ∷ [])     = emit (pre ++ valueᵛ v ∷ ending) ∷ []
+  emits pre (v ∷ w ∷ vs) = emit (pre ++ valueᵛ v ∷ []) ∷ emits [] (w ∷ vs)
 
 -- THE EMPTY SRXJS SOURCE IS NOT THE EMPTY PLAIN ONE, and the gap is
 -- one InstEmit rather than one event: it still brackets a subscribe

@@ -41,7 +41,7 @@ open import Data.String using (String; _++_; words)
 
 open import CLI.IO using (putStr; getContents; _>>=_; Unit)
 open import CLI.Unit-Test using (cases)
-open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides; κ₂; Γ₂ᵉ)
+open import CLI.Unit-Test.Prelude using (Case; checksOf; statements; ltrSides; batchableSides; stampsOf; κ₂; Γ₂ᵉ)
 open import Rx.Prim using (InstEmit; InstEvent; EmitKind; subscribe; delivery; plumbing;
   value; complete; PlainEvent; valueᵖ; completeᵖ)
 open import SExp.Syntax using (plainᵗ)
@@ -131,10 +131,16 @@ batchLines : List (List ℕ) × List (List ℕ) → String
 batchLines (l , r) = "batchable      batched " ++ showBatches l ++ "\n" ++
                      "batchable      grouped " ++ showBatches r ++ "\n"
 
+-- the timed run's values, each with its instant and its packet
+showStamps : List (ℕ × List ℕ) → String
+showStamps []             = ""
+showStamps ((i , p) ∷ ps) =
+  "  stamp at " ++ show i ++ " packet " ++ showNats p ++ "\n" ++ showStamps ps
+
 showSides : Maybe Case → IO Unit
 showSides nothing  = putStr "bug-cache: no such row\n"
 showSides (just c) =
-  putStr (ltrLines (ltrSides c) ++ batchLines (batchableSides c) ++
+  putStr (ltrLines (ltrSides c) ++ batchLines (batchableSides c) ++ showStamps (stampsOf c) ++
           showEmits (decodeEmits {Γ = Γ₂ᵉ} {a = plainᵗ natᵗ} (emitsᴵ κ₂ (fuel c) (prog c) (slots c))) ++
           plainEnd (emitsᴵ κ₂ (fuel c) (prog c) (slots c)))
 
