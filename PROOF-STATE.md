@@ -220,17 +220,17 @@ statement's type.
 
 **THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
 are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
-close without changing one of them, STOP and report that proof. One ruling
-moves `SExp.Syntax` with `Rx.Exp`: it mirrors `Exp` former for former, less the
-elaboration-only `batchSyncᵉ` and `mintᵉ` (Anthony), so its flattener is
-`flattenˢ` and rxjs's named three are that former with no echo. A second
-splits hot from cold, so a hot script is minted once, in the table (Anthony).
-A third opens the evaluator for COST alone (Anthony). The InstEmit's shape is free; TypeScript is out of scope
-(Anthony).
+close without changing one of them, STOP and report that proof. `SExp.Syntax`
+mirrors `Exp` former for former, less the elaboration-only `batchSyncᵉ` and
+`mintᵉ`, so rxjs's named flatteners are `flattenˢ` with no echo; hot is split
+from cold, a hot script minted once, in the table (Anthony). The evaluator is
+open for COST alone, and cost is a detail: a slow case gets a longer clock
+until all of QuickCheck passes 10 minutes (Anthony). The InstEmit's shape
+is free; TypeScript is out of scope (Anthony).
 
 `QuickCheck` decides each of `Main`'s four statements on the real evaluator,
 each case under its own wall clock. **DONE IS THE AGDA
-QUICKCHECK PASSING FULLY**, driven by `make qc-fast`; counterexamples go in the bug cache.
+QUICKCHECK PASSING FULLY**, by `make qc-fast`; counterexamples go in the bug cache.
 
 ### The monster
 
@@ -240,20 +240,16 @@ bound.
 
 ### Big picture tier roadmap
 
-- **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
-  `QC='1 15 1'` is green on all four statements. Depth 1 is the sweep that
-  fits, and a case past its wall clock (`QC_CASE`) is a `timeout` failure.
-  Every counterexample becomes a bug-cache row first. Widening the sweep
-  meets row 6's exponential: two flatteners nested at depth one time out on
-  both sides (`typecheck-performance-numbers.md`).
+- **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** `QC='1 15 1'` is
+  green on all four statements; that is the near-degenerate end. Raise
+  `QC_BUDGET` to the 10-minute cap and `QC_CASE` until no case is a
+  `timeout`, then sweep depth 2 and more seeds. A case still timing out under
+  the cap is the one evaluator-cost finding worth having: report it.
 
-- **THE MUTATOR IS THE NEXT COST (Anthony: fix its cost).** With the
-  answer records strict and a 1 GB nursery, row 6's elaborated run takes
-  48 s, 41 of them in the mutator (`typecheck-performance-numbers.md`). A
-  live frame's fold and `translate` still apply `step` once per use, and
-  `translate`/`translate-sub` replay a lane's stage once per nesting level.
-  Share the step where it is re-applied, then measure what nesting still
-  costs, before widening the sweep.
+- **EVERY DISAGREEMENT IS THE ELABORATION'S TO FIX.** A non-timeout failure is
+  a counterexample to a top-line statement: bug-cache row first, then the
+  fix in the elaboration or the InstEmit, never in a statement's sides.
+  This is the leg that points tier 2 somewhere provable.
 
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
   from the oracle's tree, as `qc-build` does, and the oracle job's `make

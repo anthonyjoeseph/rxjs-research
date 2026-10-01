@@ -1038,3 +1038,14 @@ halves either side of it (`Support`, `Candidate`), `Trace` lazy between
 them, and `-with-rtsopts=-A1g` linked into the oracle's runners
 (`scripts/oracle-mirror.py`'s `GHC_FLAGS`). `stamps` 47.6 s, output
 byte-identical.
+
+**Where the remaining 41 s goes (profiled, `-fprof-late` on the Rx
+modules).** Not in any one function, but in how many times the folds run:
+21.5M live-frame folds, 259M closure applications under `mapStep`, and 15.7M
+scan dispatches, for a run with a handful of input values. The flat profile
+puts `_≟ᵗ_` at the top, with 2.07B entries at about 52 per call: every scan
+step re-checks the cell's existential type in `scanDispatch`, `scanHeld` and
+`scanRed`. That is the symptom. The multiplier is `translate` re-applying the
+fold above a live frame once per nesting level, where the live fold already
+applied it once. Not pursued: the evaluator's cost is a detail, and a slow
+case gets a longer clock instead (PROOF-STATE, tier 1).
