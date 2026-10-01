@@ -10,6 +10,8 @@ export LANG := C.UTF-8
 # first use leaves that rule depending on nothing.
 AGDA_SRC := $(shell find agda/src -name '*.agda')
 ORACLE_BIN := agda/_oracle/_cli
+# the runners' GHC flags, read from where the oracle's cache key covers them
+ORACLE_GHC = $(shell scripts/oracle-mirror.py --ghc-flags)
 
 # ─────────────────────────────────────────────────────────────────────────
 # THE AGDA INVOCATION — ONE DEFINITION, USED BY EVERY TARGET, AND BY
@@ -679,13 +681,14 @@ wiring-selftest:
 	    echo "$$out" | grep -q "    $$n$$" && { echo "SELFTEST FAIL: $$n reported, but it is legitimately wired"; fail=1; }; \
 	  done; \
 	  echo "$$out" | grep -q "^    \.\.\." && { echo "SELFTEST FAIL: a bare \`...\` node surfaced as a definition — with-arm owners must be per-site and exempt"; fail=1; }; \
+	  echo "$$out" | grep -q "^    #-}$$" && { echo "SELFTEST FAIL: a nested pragma's outer \`#-}\` surfaced as a definition — block comments must nest"; fail=1; }; \
 	  led=$$(scripts/check-wiring.py --postulates --src scripts/wiring-selftest 2>&1); \
 	  echo "$$led" | grep -q "^sealed-gap " || { echo "SELFTEST FAIL: sealed-gap missing from the ledger — a nested block opener is being sliced off the RAW line, so members of a postulate block inside a seal are invisible"; fail=1; }; \
 	  echo "$$led" | grep -qE "^(te|ct|al|te) " && { echo "SELFTEST FAIL: a keyword tail registered as a postulate — the nested opener is sliced off the RAW line"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-bound " && { echo "SELFTEST FAIL: ffi-bound on the ledger — a CLI postulate with a COMPILE GHC body is not remaining work"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-unbound " || { echo "SELFTEST FAIL: ffi-unbound missing from the ledger — the FFI exemption swallowed a CLI postulate with no binding"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-outside " || { echo "SELFTEST FAIL: ffi-outside missing from the ledger — a binding outside CLI/ must earn nothing"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
+	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
 	  else echo "$$out"; exit 1; fi
 
 # THE ACCEPTANCE TEST, cheap checks FIRST.  Ordering is the point: an orphan
@@ -1608,12 +1611,12 @@ oracle-key: stripped
 
 $(ORACLE_BIN)/Main: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/Main.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli $(ORACLE_GHC) src/CLI/Main.agda
 	@touch $@
 
 $(ORACLE_BIN)/Bug-Cache: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/Unit-Test/Bug-Cache.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli $(ORACLE_GHC) src/CLI/Unit-Test/Bug-Cache.agda
 	@touch $@
 
 # BOTH HALVES, IN ORDER: `oracle-tree` copies the cone and turns every
@@ -1664,7 +1667,7 @@ oracle-pinned: $(ORACLE_BIN)/Main
 # evaluator's values, and the tower is what checks it terminates.
 $(ORACLE_BIN)/QuickCheck: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/QuickCheck.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli $(ORACLE_GHC) src/CLI/QuickCheck.agda
 	@touch $@
 
 qc-build: $(ORACLE_BIN)/QuickCheck

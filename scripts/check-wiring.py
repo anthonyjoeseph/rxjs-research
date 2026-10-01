@@ -181,29 +181,28 @@ SKIP_HEAD_TOKENS = {
 def strip_block_comments(raw_lines):
     """Blank out {- ... -} spans (including pragmas {-# ... #-}), across
     line boundaries, preserving line count and non-comment characters'
-    positions so indentation/columns stay meaningful."""
+    positions so indentation/columns stay meaningful.
+
+    They NEST, as Agda's do: a `FOREIGN GHC` pragma carrying a GHC
+    `{-# LANGUAGE … #-}` closes on its OWN `#-}`, and a first `-}` taken as
+    the close leaves the outer one standing as a phantom definition."""
     out = []
-    in_block = False
+    depth = 0
     for line in raw_lines:
         buf = []
         i, n = 0, len(line)
         while i < n:
-            if in_block:
-                if line[i : i + 2] == "-}":
-                    buf.append("  ")
-                    i += 2
-                    in_block = False
-                else:
-                    buf.append(" ")
-                    i += 1
+            if line[i : i + 2] == "{-":
+                buf.append("  ")
+                i += 2
+                depth += 1
+            elif depth and line[i : i + 2] == "-}":
+                buf.append("  ")
+                i += 2
+                depth -= 1
             else:
-                if line[i : i + 2] == "{-":
-                    buf.append("  ")
-                    i += 2
-                    in_block = True
-                else:
-                    buf.append(line[i])
-                    i += 1
+                buf.append(" " if depth else line[i])
+                i += 1
         out.append("".join(buf))
     return out
 

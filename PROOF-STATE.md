@@ -240,21 +240,20 @@ bound.
 
 ### Big picture tier roadmap
 
-- **THE ELABORATED RUN KEEPS A SECOND LEAK (Anthony: fix its cost).** With
-  the evaluator's proofs `{-@0-}` in the oracle, `a delivery switching to two
-  ofs`'s timed plain run drops from most of its budget to seconds, so that
-  leak was the proofs. Its elaborated run still spends most of its time in GC
-  and passes its budget alone (`typecheck-performance-numbers.md`). Profile it
-  by closure type; the unerased suspect is `Trace`, whose every entry keeps
-  its `Call` and its `Ans` with a `next` over the fold before it. Erase what a
-  run never reads back.
-
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   `QC='1 15 1'` is green on all four statements. Depth 1 is the sweep that
   fits, and a case past its wall clock (`QC_CASE`) is a `timeout` failure.
   Every counterexample becomes a bug-cache row first. Widening the sweep
   meets row 6's exponential: two flatteners nested at depth one time out on
   both sides (`typecheck-performance-numbers.md`).
+
+- **THE MUTATOR IS THE NEXT COST (Anthony: fix its cost).** With the
+  answer records strict and a 1 GB nursery, row 6's elaborated run takes
+  48 s, 41 of them in the mutator (`typecheck-performance-numbers.md`). A
+  live frame's fold and `translate` still apply `step` once per use, and
+  `translate`/`translate-sub` replay a lane's stage once per nesting level.
+  Share the step where it is re-applied, then measure what nesting still
+  costs, before widening the sweep.
 
 - **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
   from the oracle's tree, as `qc-build` does, and the oracle job's `make

@@ -152,22 +152,22 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of;
   walk-end; walk-more; go-nil; go-cut; go-live; drain-nil; drain-no-room; drain-room;
   step-scan; step-take; step-batchSync)
 
-open import Rx.Evaluator.Reducible.Support using (Σ⁰; _⁰×_; _,_; _|>⁰_; subst⁰; by-eqs; Agree; Ans; Answered; answer; answered; bind≡; Apart; Arm; BatchHeld; Call; Column;
-  ConsistentF; Fell; FrameStep; by-bool; FreshF; HeldF; HoldsFs; Kept; NodeOn; Pre; PreFs; PreHolds; QEmpty; RP; Red;
-  RedEnv; Room; RoomEmpty; Rule; ScanHeld; Sound; Stage; SubStep; Trace; Wrapped; []ᵗ; _∷ᵗ_; _++ᵗ_; admit-agree; admit-ot;
-  ans; apart-fi; apply; batchStep; batch₀; bumpNode; call; cell-inj; colsOf; consumeNil; der;
-  distinct; downHeld; drain-waiting; drop-ot; dropS; dying-rule; end-++; endPre; endRP; endS; ends-register;
-  ends-sub; f-exhaust; f-merge; f-switch; fallen; fallenStage; fellᵗ; fiHolds→thru; finishing; fold;
-  fresh-apart; fresh-inner; fresh-path; fresh-sound; ground; grounded; head-off;
-  head-on; headHolds; headKept; headPre; held; holds-step; holdsFs-step; holdsOf;
-  inner-back; joinPre; kept; kept-in; kept-shift; kept-step; kill-sub; lower-nodes; mapStep; next; node-eq;
-  node-in₁; node-one; node-two; ofColumn; out; push-sound; push-thru; qempty-room; red-scripted;
-  redFoldVals; redLookup; register-sound; room-wrap; row-sound; ruled; scanCons; scanCt;
-  scanOff; scanRed; scanReg; scanStepped; self-node; sink-sound; sounds; spend-or; ceil-or; stage; stage-map;
-  stage-nil; stage-rebase; stage-seq; standing; step; step-cons; step-ct; step-off; step-red;
-  step-reg; step-⇓; st″; sub-on; sub-ot; sub-rule; switchKill-ct; switchKill-nodes; takeStep;
-  termini; u-exhaust; u-merge; u-switch; unheadHolds; unheadKept; unheadPre-head; usable; waiting; wrap-facts; wrap-ot;
-  wrap-reg; wrapNode; writeStage; ∨-T)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; _⁰×_; _,_; _|>⁰_; subst⁰; by-eqs; Agree; Ans; Answered; answer;
+  answered; bind≡; Apart; Call; Column; ConsistentF; Fell; FrameStep; by-bool; FreshF; HeldF; HoldsFs; Kept; NodeOn;
+  Pre; PreFs; PreHolds; QEmpty; RP; Room; RoomEmpty; Rule; Sound; Wrapped; admit-agree; admit-ot; ans; apart-fi;
+  apply; bumpNode; call; cell-inj; colsOf; consumeNil; der; distinct; drain-waiting; drop-ot; dropS; dying-rule;
+  ends-register; ends-sub; f-exhaust; f-merge; f-switch; fallen; fiHolds→thru; finishing; fold; fresh-apart;
+  fresh-inner; fresh-path; fresh-sound; ground; grounded; head-off; head-on; headHolds; headKept; headPre; held;
+  holds-step; holdsFs-step; holdsOf; inner-back; joinPre; kept; kept-in; kept-shift; kept-step; kill-sub; lower-nodes;
+  mapStep; next; node-eq; node-in₁; node-one; node-two; ofColumn; out; push-sound; push-thru; qempty-room;
+  register-sound; room-wrap; row-sound; ruled; scanCons; scanCt; scanOff; scanReg; scanStepped; self-node; sink-sound;
+  sounds; spend-or; ceil-or; standing; step; step-cons; step-ct; step-off; step-red; step-reg; step-⇓; st″; sub-on;
+  sub-ot; sub-rule; switchKill-ct; switchKill-nodes; takeStep; termini; u-exhaust; u-merge; u-switch; unheadHolds;
+  unheadKept; unheadPre-head; usable; waiting; wrap-facts; wrap-ot; wrap-reg; wrapNode; ∨-T)
+open import Rx.Evaluator.Reducible.Trace using (Trace; []ᵗ; _∷ᵗ_; _++ᵗ_; end-++; endPre; endRP; endS; fellᵗ)
+open import Rx.Evaluator.Reducible.Candidate using (Arm; BatchHeld; Red; RedEnv; ScanHeld; Stage; SubStep; batchStep;
+  batch₀; downHeld; fallenStage; red-scripted; redFoldVals; redLookup; scanRed; stage; stage-map; stage-nil;
+  stage-rebase; stage-seq; writeStage)
 open import Rx.Evaluator.Reducible.Floor using (fold-refill-spends; raw-kept; refill-spends)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept; fold-sound; step-kept; subscribe-kept)
 open import Rx.Evaluator.Reducible.Calls using (callStage; callStage-hd; fiStep; headCall; inner-after)

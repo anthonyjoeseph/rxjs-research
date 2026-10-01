@@ -30,6 +30,7 @@ are the STRIPPED ones, so a comment edit invalidates nothing either.
 
   oracle-mirror.py --sync   write the tree (only files whose content changed)
   oracle-mirror.py --key    print the cache key: a hash of the runners' cone
+  oracle-mirror.py --ghc-flags   the compile's `--ghc-flag`s, which the key covers
 """
 from __future__ import annotations
 
@@ -50,6 +51,12 @@ ROOTS = ["CLI.Main", "CLI.Unit-Test.Bug-Cache"]
 SYNC_ONLY = ["CLI.QuickCheck"]
 PRAGMA = "{-# OPTIONS --erasure --no-termination-check #-}\n"
 MARK, ERASED = "{-@0-}", "@0 "
+# THE RUNNERS' RTS DEFAULTS, LINKED INTO THE BINARY -- and here rather than in
+# the Makefile because the key hashes this file, so a change to them rebuilds
+# the cached runners.  A 1 GB nursery: a run's answers are short-lived and the
+# default 1 MB nursery spent most of the bug-cache row switching to two ofs
+# collecting them (`typecheck-performance-numbers.md`).
+GHC_FLAGS = ["-with-rtsopts=-A1g"]
 LIB = ("name: rxjs-research-oracle\n"
        "include: src\n"
        "depend: standard-library-2.3\n"
@@ -123,7 +130,11 @@ def main() -> int:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--sync", action="store_true")
     g.add_argument("--key", action="store_true")
+    g.add_argument("--ghc-flags", action="store_true")
     a = ap.parse_args()
+    if a.ghc_flags:
+        print(" ".join(f"--ghc-flag={f}" for f in GHC_FLAGS))
+        return 0
     files = cone(ROOTS)
     if a.sync:
         files = cone(ROOTS + SYNC_ONLY)

@@ -34,12 +34,14 @@ open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps; innerFini
 open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; foldPath⇓; fold-step; drain-spent; innerFinish⇓;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil; innerReact⇓;
   react-false; react-alive; react-dead; step-from-inner)
-open import Rx.Evaluator.Reducible.Support using (_∷ᵗ_; Ans; Answered; answer; bind≡; Call; Column; FrameStep; HeldF; NodeOn; Pre; PreFs;
-  PreHolds; QEmpty; RP; Red; Room; Sound; Stage; SubStep; []ᵗ; bumpNode; call; deadBy; der; ground;
-  drop-ot; endPre; endRP; endS; f-exhaust; f-merge; f-switch; fallen; finishing; fin″; fold;
-  fresh-inner; grounded; head-off; headHolds; headKept; headPre; holdsFs-step; inner-back;
-  kept; ofColumn; out; outs; sched″; stage; stage-map; stage-nil; stage-seq; standing; step;
-  step-ct; step-off; step-red; step-⇓; st″; subst⁰; writeStage)
+open import Rx.Evaluator.Reducible.Support using (Ans; Answered; answer; bind≡; Call; Column; FrameStep; HeldF;
+  NodeOn; Pre; PreFs; PreHolds; QEmpty; RP; Room; Sound; bumpNode; call; deadBy; der; ground; drop-ot; f-exhaust;
+  f-merge; f-switch; fallen; finishing; fin″; fold; fresh-inner; grounded; head-off; headHolds; headKept; headPre;
+  holdsFs-step; inner-back; kept; ofColumn; out; outs; sched″; standing; step; step-ct; step-off; step-red; step-⇓;
+  st″; subst⁰)
+open import Rx.Evaluator.Reducible.Trace using (_∷ᵗ_; []ᵗ; endPre; endRP; endS)
+open import Rx.Evaluator.Reducible.Candidate using (Red; Stage; SubStep; stage; stage-map; stage-nil; stage-seq;
+  writeStage)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; subscribe-kept; fold-kept)
 
 -- THE CALL A LIVE FRAME MAKES ABOVE IT, FOR THE CALL MADE TO IT: the
