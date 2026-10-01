@@ -847,6 +847,19 @@ fallen-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ} {S : Set}
           → endPre tr ≡ fallen
 fallen-at ac le aM κ tr refl = fallen-stays ac le aM κ tr
 
+-- where the ground with a frame on top stands, the ground under it does
+headPre-standing : ∀ {n} {Γ : Ctx n} {t} {lo ℓ s u} {f : Frame Γ s u} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t}
+                   (h : HeldF f) (p : Pre κ) {h′ : HeldF f} {pfs : PreFs κ}
+                 → headPre {le = le} h p ≡ standing (h′ , pfs) → p ≡ standing pfs
+headPre-standing h (standing pfs) refl = refl
+headPre-standing h fallen ()
+
+-- and where it fell, the ground under it fell
+headPre-fallen : ∀ {n} {Γ : Ctx n} {t} {lo ℓ s u} {f : Frame Γ s u} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t}
+                 (h : HeldF f) (p : Pre κ) → headPre {le = le} h p ≡ fallen → p ≡ fallen
+headPre-fallen h (standing _) ()
+headPre-fallen h fallen refl = refl
+
 -- THE TRANSLATION OF A SOURCE'S TRACE THROUGH THE LIVE FRAME IT WAS
 -- SUBSCRIBED UNDER: each call becomes the call the frame made above
 -- it, and the walk stops where the path fell, since past the fall the
@@ -859,6 +872,13 @@ fallen-at ac le aM κ tr refl = fallen-stays ac le aM κ tr
 -- the step to the tail is a transport of the equation and not of the
 -- trace: the tail stays a subterm, and nothing the answer holds is
 -- applied a second time.  It descends on the trace.
+--
+-- IT READS THE GROUND OFF THE SOURCE'S ANSWER, NEVER OFF THE ONE ABOVE.
+-- The two agree by `live-at`, but the answer above is a replay of the
+-- fold over the path, and reading its ground forces it: under a
+-- subscribing frame that re-runs the frame's whole step, re-subscribing
+-- every inner it walks.  Read off the source, the answer above is never
+-- forced unless what consumes the translation reads it.
 translate : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set}
             {f : Frame Γ s u} {Held : HeldF f → Set₁}
             (le : lo ≤ ℓ) (aM : Acc _<_ m) (fs : FrameStep {e = e} f (Red m s) (Red m u) Held)
@@ -909,9 +929,12 @@ translate le aM fs h rh κ pfs rp s₁ (_∷ᵗ_ {c = c} a tr) eq =
     (proj₂ (step-red fs (Call.col (callAt eq c)) rh)) κ (Ans.pre′ (Answered.an b)) (next (Answered.an b)) (Ans.s′ (Answered.an b))
     tr (live-at le aM fs h rh κ pfs rp eq a b) |>′ λ (tr′ , h″ , rh″ , e″) →
   b ∷ᵗ tr′ , h″ , rh″ , e″
-translate-go le aM fs h rh κ (standing pfs) rp s₁ tr eq = translate le aM fs h rh κ pfs rp s₁ tr eq
-translate-go {n = n} {lo = lo} le aM fs h rh κ fallen rp s₁ tr eq =
-  []ᵗ , h , rh , fallen-at (<-wellFounded (n ∸ lo)) ≤-refl aM (_ ↠[ le ] κ) tr eq
+translate-go le aM fs h rh κ p rp s₁ {q₀ = standing _} tr eq
+  with headPre-standing h p (sym (cong proj₁ eq))
+... | refl = translate le aM fs h rh κ _ rp s₁ tr eq
+translate-go {n = n} {lo = lo} le aM fs h rh κ p rp s₁ {q₀ = fallen} tr eq
+  with headPre-fallen h p (sym (cong proj₁ eq))
+... | refl = []ᵗ , h , rh , fallen-at (<-wellFounded (n ∸ lo)) ≤-refl aM (_ ↠[ le ] κ) tr eq
 
 -- THE MAP ARM'S BODY.  Over a standing path the frame goes on live and
 -- the answer is the translation; over a fallen one the frame goes on
