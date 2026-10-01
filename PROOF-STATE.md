@@ -215,7 +215,7 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — a fully stated spec and a passing QuickCheck
 
-**THE SPEC IS FULLY STATED (Anthony):** no postulate inside a top-line
+**THE SPEC IS FULLY STATED (Anthony):** no postulate in a top-line
 statement's type.
 
 **THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
@@ -224,13 +224,13 @@ close without changing one of them, STOP and report that proof. One ruling
 moves `SExp.Syntax` with `Rx.Exp`: it mirrors `Exp` former for former, less the
 elaboration-only `batchSyncᵉ` and `mintᵉ` (Anthony), so its flattener is
 `flattenˢ` and rxjs's named three are that former with no echo. A second
-splits hot from cold, so a hot script is minted once, in the table (Anthony). The InstEmit's shape is free; TypeScript is out of scope
-this tier (Anthony).
+splits hot from cold, so a hot script is minted once, in the table (Anthony).
+A third opens the evaluator for COST alone (Anthony). The InstEmit's shape is free; TypeScript is out of scope
+(Anthony).
 
 `QuickCheck` decides each of `Main`'s four statements on the real evaluator,
-each case under its own wall clock (`make qc-left-to-right` and siblings). **DONE IS THE AGDA
-QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
-`SExp.InstEmit`'s header; counterexamples go in the bug cache.
+each case under its own wall clock. **DONE IS THE AGDA
+QUICKCHECK PASSING FULLY**, driven by `make qc-fast`; counterexamples go in the bug cache.
 
 ### The monster
 
@@ -240,15 +240,15 @@ bound.
 
 ### Big picture tier roadmap
 
-- **ROW 6 NEEDS A BOUNDARY RULING (Anthony).** `a delivery switching to two
-  ofs` runs its timed program PLAIN -- `timed-faithful`'s left side, no
-  elaboration in it -- in 46 s of the row's 60 s, and elaborated in over
-  200 s: the evaluator is exponential in nested LANES, plain programs too,
-  and the timed translation nests several per author flattener
-  (`typecheck-performance-numbers.md`). No elaboration change reaches that
-  side. Each option crosses a line: the evaluator's cost (the boundary), a
-  shallower translation (moves `Timing-Correct`'s definition and its
-  TypeScript mirror), or the row budget.
+- **THE EVALUATOR RE-RUNS EVERY SUBSCRIBING STEP (Anthony: fix its cost).**
+  `a delivery switching to two ofs` runs its timed program plain in 46 s of
+  the row's 60 s and elaborated in over 200 s. Per flatten, `thruStep` runs
+  three times -- the first run, the echo map's `translate` replay, and
+  `translate-sub`'s -- each re-subscribing the inner subtree, so cost is
+  3^depth in nested lanes (`typecheck-performance-numbers.md`). Fuse the
+  echo map into the flatten arm so one replay serves both frames (base
+  3 → 2). The replay itself recovers a parent's successor the types cannot
+  expose; if 2^depth still misses the row, that is the finding to report.
 
 - **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
   `QC='1 15 1'` is green on all four statements. Depth 1 is the sweep that

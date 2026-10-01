@@ -942,10 +942,11 @@ So the multiplier is the LANE, not the path length. Removing `flattenᵖ`'s
 restamp scan (an experiment, reverted — the scan is semantics) cut elaborated
 `lane₄` to 3.8 s, `concat₄` to 1.6 s, and the elaborated TIMED
 `mergeAll(of(input))` from 90 s to 14.5 s, still ×4 per lane level. On plain
-`lane₆` against `lane₈`, a `-fprof-auto` profile gives IDENTICAL entry counts
-for `thruStep`, `fiStep`, `subStanding`, `translate-sub` and `subRP` while the
-time grows 11×: the growth is per call, not in calls, and was not attributed
-further.
+`lane₆` against `lane₈`, a `-fprof-auto` profile puts the growth in CALLS:
+`red-flatten` runs 3^(k−1)+1 times (244 → 2,188), and `translate-sub`,
+`thruStep` and `subStanding` grow ×9 over the two levels. `translate-sub`
+re-runs each subscribing frame's step to rebuild its trace, and for a
+flattener that step re-reduces every inner subscription.
 
 `a delivery switching to two ofs` (row 6) at its own fuel 30, against a row
 budget of 60 s for every side in one process:
