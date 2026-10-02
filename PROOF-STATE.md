@@ -249,6 +249,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
+- **END THE ELABORATED `take` ON ONE SUBSCRIPTION.** The sweep's
+  counterexample row fails `simulation`, `arrival-runs` and
+  `timing-correct`: `takeᵖ`'s cut lane re-subscribes a source holding a
+  share, misses the values that filled the quota, and puts the END at a
+  later instant. The TypeScript ends on one subscription's `takeWhile`;
+  `Rx.Exp` has no such former, so the fix waits on Anthony's ruling on
+  one. Then re-elaborate, port, and re-run the sweep that found it.
+
 - **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
   in CI where it fits, reaches nestings no targeted row builds: a late
   `take` under two flatteners, a share connected inside a switch. A

@@ -204,4 +204,8 @@ cases =
           (μˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ (natˢ 1) (deferˢ (varˢ (here refl))))) ∷ [])))))
           (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
+  cached "the seeds 13..36 depth 2 sweep's counterexample" 30
+          (takeˢ (natˢ 3) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))
+          (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
+                   ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
   []

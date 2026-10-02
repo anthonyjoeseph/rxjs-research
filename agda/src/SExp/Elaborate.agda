@@ -523,6 +523,17 @@ cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
 -- Every emit the count puts out after it, before the cut is heard,
 -- carries its bookkeeping and no values.
 --
+-- THE SECOND SUBSCRIPTION IS OBSERVABLE, AND A SHARE IS WHERE.  The
+-- cut lane re-subscribes the author's source, and a share connected by
+-- the first subscription replays nothing to the second, so the cut
+-- lane can miss the very values that filled the quota and cut at a
+-- LATER source event.  The bug cache's row "the seeds 13..36 depth 2
+-- sweep's counterexample" is that: `take 3` over a merge of an `of`, a
+-- share of an `of` and a cold puts out 5, 5, 3 at subscription and its
+-- END only at the cold's first event, where the plain `take` ends at
+-- subscription.  The TypeScript ends on one subscription's
+-- `takeWhile`, so this is the mirror diverging, not the spec.
+--
 -- AND THE BEHAVIOUR THE CUT MUST MIRROR IS MEASURED RATHER THAN
 -- INFERRED (Anthony: "just run it in js").  Real rxjs `take` was run
 -- against a four-item synchronous source, against a `mergeAll` of two
