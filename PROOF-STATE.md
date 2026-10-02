@@ -241,7 +241,9 @@ over one leaf joined by `run-prefix`: `arrival-runs`, the only statement in the
 tier about both machines at once, cutting the impl's arrivals into one run per
 plain arrival. The impl runs at its own fuel (Anthony). RULED OUT: one impl
 arrival per plain arrival, one instant per impl arrival, and a shared impl
-arrival at every late-subscribed `take` the bug cache aims at. What is left of
+arrival at every late-subscribed `take` the bug cache aims at, and any sweep
+counterexample over depth 2 seeds 13..36 and depth 3 seeds 1..8, which draw
+`takeWhileˢ` (undecided cases excepted). What is left of
 the monster is whether every plain arrival's values come out CONTIGUOUSLY: no
 impl arrival carrying two plain arrivals' values, none interleaving them.
 
@@ -249,15 +251,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **CONFIRM THE ONE-SUBSCRIPTION `take` AGAINST BOTH SWEEPS.** `takeᵖ`
-  now ends on `takeWhileᵉ` (Anthony's ruling) over its scan's own state,
-  and a zero count picks `emptyᵖ` at subscribe without subscribing the
-  source, and a chain through a take that has already cut is never
-  registered, so a post-cut subscribe in the same instant cannot hold a
-  flattener above it open. The bug cache is green on both sweeps' rows;
-  re-run seeds 13..36 at depth 2 and 1..8 at depth 3, which now draw the
-  author's `takeWhileˢ` too (Anthony). A new counterexample refutes
-  `simulation` before anything is stated over it.
+- **MAKE THE TIMED IMPL RUN AFFORDABLE.** The impl's run of `timed`'s
+  translation is the side `timing-correct`, `simulation` and
+  `arrival-runs` all read, and it is what leaves a case undecided: about a
+  second for `take 1` of a two-value exhaust against a fifth of that
+  without the take, and past a minute on a synchronous depth-3 case whose
+  untimed runs take a twentieth of a second. Attribute it (the elaborated
+  term's size against the evaluator's work per burst) before changing
+  either: the depth-3 sweep cannot cover what it cannot decide.
 
 - **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
   in CI where it fits, reaches nestings no targeted row builds: a late
