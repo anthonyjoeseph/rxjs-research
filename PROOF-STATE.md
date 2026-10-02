@@ -240,8 +240,8 @@ bound.
 ### Big picture tier roadmap
 
 - **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** Nothing has
-  disagreed since the input fix: depth 2 on seeds 1, 3, 4, 6, 7 and 11, at
-  `QC_FUEL=6`, 3 and 1, and seed 10 at depth 3. Every undecided case is on
+  disagreed since the input fix: depth 2 on seeds 1 to 12 with every former
+  in the census, at fuels 30, 6, 3 and 1, and seed 10 at depth 3. Every undecided case is on
   the timed side, whose run costs about 70× per author flattener
   (`typecheck-performance-numbers.md`). Keep widening seeds and depth; an
   undecided count that crowds out the decided ones is what would reopen

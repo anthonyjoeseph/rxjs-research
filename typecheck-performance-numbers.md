@@ -1071,3 +1071,11 @@ So one more author flattener costs about 70×. The timed translation writes each
 author flattener as about five nested flatteners (`someˢ`, the beat's
 `concatˢ`, the policy's own, the lane's `concatˢ`, `runˢ`), and the evaluator's
 multiplier is per evaluator flattener, which is what puts depth two past the cap.
+
+## The CI QuickCheck sweep: seeds 1..12, 15 cases each, depth 2
+
+`scripts/gen-unit-tests.sh 1 12 15 2 600`, the workflow's default, on the
+compiled `QuickCheck` with its default 10 s per case: 16 m 34 s wall clock
+locally for 180 cases. No statement disagreed; 18 cases were undecided (past
+the per-case clock), between 0 and 4 per seed. A seed costs 1–2 minutes, set
+mostly by how many of its cases run to the clock.
