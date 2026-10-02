@@ -252,10 +252,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **CONFIRM THE ONE-SUBSCRIPTION `take` AGAINST BOTH SWEEPS.** `takeᵖ`
   now ends on `takeWhileᵉ` (Anthony's ruling) over its scan's own state,
   and a zero count picks `emptyᵖ` at subscribe without subscribing the
-  source. Both sweeps' counterexample rows sit in the bug cache; green
-  there, then re-run seeds 13..36 at depth 2 and 1..8 at depth 3, which
-  now draw the author's `takeWhileˢ` too (Anthony). A new counterexample
-  refutes `simulation` before anything is stated over it.
+  source, and a chain through a take that has already cut is never
+  registered, so a post-cut subscribe in the same instant cannot hold a
+  flattener above it open. The bug cache is green on both sweeps' rows;
+  re-run seeds 13..36 at depth 2 and 1..8 at depth 3, which now draw the
+  author's `takeWhileˢ` too (Anthony). A new counterexample refutes
+  `simulation` before anything is stated over it.
 
 - **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
   in CI where it fits, reaches nestings no targeted row builds: a late

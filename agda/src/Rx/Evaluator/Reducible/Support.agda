@@ -50,7 +50,7 @@ open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; l
 open import Decide using (≡ᵇ→≡; ≡ᵇ-refl)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
   batchSync-f; from-inner; thru-outer; NodeState; lookupNode; frameNodes; pathHasNode;
-  register; installNode; atDyn; atSlot; lowerFloor; mergeAll-st; mergeAllᵒ; AllOp; switchᵒ;
+  register; spentOn; installNode; atDyn; atSlot; lowerFloor; mergeAll-st; mergeAllᵒ; AllOp; switchᵒ;
   exhaustᵒ; NodeId; RegRow; cell-st; take-st; switch-st; exhaust-st; batchSync-st; hasRoom;
   consumeUsable; finishUsable; thruWrap; switchKill; aliveThroughᶠ; RegId; RegSrc; regFloor;
   cutThrough; spends; takeVals; takeDispatch; scanVals; scanDispatch; batchDispatch; shareAdmit;
@@ -426,6 +426,18 @@ lower-distinct le root             d = d
 lower-distinct le (share-sink i p) d = d
 lower-distinct le (f ↠[ h ] p)     d = d
 
+-- A ROW OF THE REGISTRY AFTER A REGISTRATION WAS THERE BEFORE IT OR IS
+-- THE ONE IT ENLISTED, whichever way the cut test went.
+∈-register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {st : EvalSt e}
+               (rid : RegId) (rs : RegSrc Γ) (p : Path Γ (regFloor rs) u t) {r : RegRow Γ t}
+           → r ∈ EvalSt.registry (register rid rs p st)
+           → r ∈ EvalSt.registry st ⊎ r ≡ (rid , rs , u , p)
+∈-register {st = st} rid rs p a with spentOn p (EvalSt.nodes st)
+... | true  = inj₁ a
+... | false with ∈-++⁻ (EvalSt.registry st) a
+...   | inj₁ a′        = inj₁ a′
+...   | inj₂ (here eq) = inj₂ eq
+
 -- A ROW REGISTERED FOR A PATH THE RULE HOLDS FOR KEEPS IT, when the row
 -- ends where the path does, every node it runs through is either one of
 -- the path's or one the counter has just handed out, and the rule for
@@ -446,25 +458,25 @@ register-sound {κ = κ} {sched} {sched′} {st} rid rs p ct ee cls dp so@(sound
   ... | inj₁ onκ      = trans (ea k onκ r∈ th) (sym ee)
   ... | inj₂ (le , _) = ⊥-elim (<-irrefl refl (<-≤-trans (fr r∈ k th) le))
   tm′ : Termini (register rid rs p st)
-  tm′ k a b th th′ with ∈-++⁻ (EvalSt.registry st) a | ∈-++⁻ (EvalSt.registry st) b
-  ... | inj₁ a′          | inj₁ b′          = tm k a′ b′ th th′
-  ... | inj₁ a′          | inj₂ (here refl) = old-new k a′ th th′
-  ... | inj₂ (here refl) | inj₁ b′          = sym (old-new k b′ th′ th)
-  ... | inj₂ (here refl) | inj₂ (here refl) = refl
+  tm′ k a b th th′ with ∈-register {st = st} rid rs p a | ∈-register {st = st} rid rs p b
+  ... | inj₁ a′    | inj₁ b′    = tm k a′ b′ th th′
+  ... | inj₁ a′    | inj₂ refl  = old-new k a′ th th′
+  ... | inj₂ refl  | inj₁ b′    = sym (old-new k b′ th′ th)
+  ... | inj₂ refl  | inj₂ refl  = refl
   fr′ : FreshRows sched′ (register rid rs p st)
-  fr′ a k th with ∈-++⁻ (EvalSt.registry st) a
+  fr′ a k th with ∈-register {st = st} rid rs p a
   ... | inj₁ a′ = <-≤-trans (fr a′ k th) ct
-  ... | inj₂ (here refl) with cls k th
+  ... | inj₂ refl with cls k th
   ...   | inj₁ onκ      = <-≤-trans (fp k onκ) ct
   ...   | inj₂ (_ , lt) = lt
   ea′ : ∀ k → T (pathHasNode k κ) → EndsAt k (endOf κ) (register rid rs p st)
-  ea′ k onκ a th with ∈-++⁻ (EvalSt.registry st) a
-  ... | inj₁ a′          = ea k onκ a′ th
-  ... | inj₂ (here refl) = ee
+  ea′ k onκ a th with ∈-register {st = st} rid rs p a
+  ... | inj₁ a′    = ea k onκ a′ th
+  ... | inj₂ refl  = ee
   dr′ : ∀ {r} → r ∈ EvalSt.registry (register rid rs p st) → rowDistinct r
-  dr′ a with ∈-++⁻ (EvalSt.registry st) a
-  ... | inj₁ a′          = dr a′
-  ... | inj₂ (here refl) = dp so
+  dr′ a with ∈-register {st = st} rid rs p a
+  ... | inj₁ a′    = dr a′
+  ... | inj₂ refl  = dp so
 
 -- AND IT KEEPS EVERY TERMINUS OFF THE PATH, when every node the row
 -- runs through is the path's or one at or above the counter.
@@ -473,9 +485,9 @@ ends-register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s u} {κ : Path �
                   (rid : RegId) (rs : RegSrc Γ) (p : Path Γ (regFloor rs) u t)
               → (∀ k → T (pathHasNode k p) → T (pathHasNode k κ) ⊎ nodeCt sched ≤ k)
               → EndsKept κ sched st (register rid rs p st)
-ends-register {st = st} rid rs p cls k k< ne ea a th with ∈-++⁻ (EvalSt.registry st) a
-... | inj₁ a′          = ea a′ th
-... | inj₂ (here refl) with cls k th
+ends-register {st = st} rid rs p cls k k< ne ea a th with ∈-register {st = st} rid rs p a
+... | inj₁ a′    = ea a′ th
+... | inj₂ refl  with cls k th
 ...   | inj₁ on = ⊥-elim (ne on)
 ...   | inj₂ le = ⊥-elim (<-irrefl refl (<-≤-trans k< le))
 

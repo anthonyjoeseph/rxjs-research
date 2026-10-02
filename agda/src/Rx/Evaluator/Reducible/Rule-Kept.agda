@@ -21,7 +21,6 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; suc; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; n≤1+n; <-≤-trans; <-irrefl)
@@ -52,7 +51,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
 open import Rx.Evaluator.Reducible.Support using (Sound; sound; ruled; ends; fresh-path; distinct; termini; Agree; rowThrough; rowEnd;
   push-sound; Distinct; endOf; ∨-T; ∨-Tˡ; ∨-Tʳ; node-one; node-in₁; node-eq; node-cases;
   self-node; drop-ot; head-on; sub-ot; sink-sound; lower-nodes; lower-end; lower-distinct;
-  register-sound; admit-row; admit-ot; admit-agree; kill-sub; switchKill-ct; wrap-ot;
+  register-sound; ∈-register; admit-row; admit-ot; admit-agree; kill-sub; switchKill-ct; wrap-ot;
   fresh-inner; fresh-sound; scanCt; scanReg; takeCt; takeReg; batchCt; batchReg)
 open import Rx.Evaluator.Reducible.Floor using (drop-sub)
 
@@ -127,9 +126,9 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     where
     ea′ : ∀ k → T (pathHasNode k κ₂) → ∀ {r} → r ∈ EvalSt.registry (register rid rs p st)
         → T (rowThrough k r) → rowEnd r ≡ endOf κ₂
-    ea′ k h₂ a th with ∈-++⁻ (EvalSt.registry st) a
-    ... | inj₁ a′          = ends so₂ k h₂ a′ th
-    ... | inj₂ (here refl) = trans ee (ag k (nk k th) h₂)
+    ea′ k h₂ a th with ∈-register {st = st} rid rs p a
+    ... | inj₁ a′    = ends so₂ k h₂ a′ th
+    ... | inj₂ refl  = trans ee (ag k (nk k th) h₂)
 
   -- a slot's row: the walked path with its floor lowered
   slot-kept : ∀ {lo} (i : Fin n) (below : toℕ i < lo) {κ : Path Γ lo (lookup Γ i) t} {sched sched′ : Sched Γ} {st : EvalSt e}

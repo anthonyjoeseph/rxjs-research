@@ -212,4 +212,16 @@ cases =
           (takeˢ (natˢ 0) (takeˢ (natˢ 3) (μˢ (deferˢ (varˢ (here refl))))))
           (mkSlots (cold [] ((after 1 , 8) ∷ ((after 0 , 3) ∷ [])))
                    ((inputˢ zero))) ∷
+  cached "a take cut mid share fan-out, a merged inner still pending" 30
+          (takeˢ (natˢ 4) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))
+          (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
+                   ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
+  cached "the same cut take as a concat's first inner" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ (natˢ 4) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))) ∷ (strmˢ (ofˢ ((natˢ 99) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
+                   ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
+  cached "the same cut take, one value shorter, as a concat's first inner" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ (natˢ 3) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))) ∷ (strmˢ (ofˢ ((natˢ 99) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
+                   ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
   []

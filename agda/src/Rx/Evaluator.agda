@@ -499,10 +499,34 @@ record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
 -- and it rides on the schedule, which this function is not given; the
 -- caller reads `regᵏ` and advances it in the same breath, which is the
 -- shape node instances already have.
+--
+-- AND A CHAIN THROUGH A TAKE THAT HAS ALREADY CUT IS NOT REGISTERED AT
+-- ALL.  rxjs's take unsubscribes everything above it as it completes,
+-- so nothing upstream subscribes again: an `of` checks `closed` before
+-- each next item, and a flattener whose outer has been torn down never
+-- reaches its queued inners.  The evaluator answers a burst at a time,
+-- so a subscription the cut should have prevented can still be made
+-- later in the same instant -- a flattener's next inner behind a share
+-- whose fan-out the cut landed in.  Registered, it threads every
+-- flattener above the take, and each of them reads its completion as
+-- an inner still running.  Only the registry decides it, so every other
+-- field of the store is the caller's, unchanged.
+spentAt : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Bool
+spentAt (just (take-st zero)) = true
+spentAt _                     = false
+
+spentOn : ∀ {n} {Γ : Ctx n} {lo s t} → Path Γ lo s t → List (NodeId × NodeState Γ) → Bool
+spentOn root                  ns = false
+spentOn (share-sink i _)      ns = false
+spentOn (take-f _ k ↠[ _ ] p) ns = spentAt (lookupNode k ns) ∨ spentOn p ns
+spentOn (_ ↠[ _ ] p)          ns = spentOn p ns
+
 register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → RegId → (rs : RegSrc Γ) → Path Γ (regFloor rs) u t → EvalSt e → EvalSt e
 register {u = u} rid rs path st =
-  record st { registry = EvalSt.registry st ++ (rid , rs , u , path) ∷ [] }
+  record st { registry = if spentOn path (EvalSt.nodes st)
+                         then EvalSt.registry st
+                         else EvalSt.registry st ++ (rid , rs , u , path) ∷ [] }
 
 installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → NodeId → NodeState Γ → EvalSt e → EvalSt e

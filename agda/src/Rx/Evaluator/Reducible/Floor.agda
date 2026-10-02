@@ -13,7 +13,7 @@
 
 module Rx.Evaluator.Reducible.Floor where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (Bool; true; false; T; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Fin using (Fin; toℕ)
@@ -39,7 +39,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠[_]_;
   from-inner; thru-outer; echoᵗ; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
   setNode; frameNodes; pathHasNode; installNode; lowerFloor; AllOp; mergeAllᵒ; switch-st;
   exhaust-st; mergeAll-st; shareAdmit; shareDying; shareFinish; switchKill; thruWrap; drainSt;
-  regSource; sameSource; dropSource)
+  regSource; sameSource; dropSource; spentOn)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above; <→≢ᵇ)
 open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert; room-keeps; fell-keeps; keeps-refl)
 open import Rx.Evaluator.Keeps using (Keeps; subscribeE-keeps; subscribeSharedSlot-keeps; subscribeAll-keeps;
@@ -261,11 +261,15 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   ea-sub : ∀ {R R′ : List (RegRow Γ t)} → (∀ {r} → r ∈ R′ → r ∈ R) → EA R → EA R′
   ea-sub sb ea′ r∈ th = ea′ (sb r∈) th
 
-  ea-reg : ∀ {R : List (RegRow Γ t)} {u rid} {rs : RegSrc Γ} {p : Path Γ (regFloor rs) u t}
-         → EA R → (T (pathHasNode nid p) → endOf p ≡ x) → EA (R ++ (rid , rs , u , p) ∷ [])
-  ea-reg {R} ea′ h r∈ th with ∈-++⁻ R r∈
-  ... | inj₁ a           = ea′ a th
-  ... | inj₂ (here refl) = h th
+  ea-reg : ∀ {R : List (RegRow Γ t)} {ns : List (NodeId × NodeState Γ)} {u rid} {rs : RegSrc Γ}
+             {p : Path Γ (regFloor rs) u t}
+         → EA R → (T (pathHasNode nid p) → endOf p ≡ x)
+         → EA (if spentOn p ns then R else R ++ (rid , rs , u , p) ∷ [])
+  ea-reg {R} {ns} {p = p} ea′ h r∈ th with spentOn p ns
+  ... | true  = ea′ r∈ th
+  ... | false with ∈-++⁻ R r∈
+  ...   | inj₁ a           = ea′ a th
+  ...   | inj₂ (here refl) = h th
 
   lower-on : ∀ {lo lo′ u} (le : lo′ ≤ lo) (κ : Path Γ lo u t) → PI κ
            → T (pathHasNode nid (lowerFloor le κ)) → endOf (lowerFloor le κ) ≡ x
