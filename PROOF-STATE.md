@@ -254,9 +254,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   two plain arrivals' values. An impl pop is one scheduled event, and the
   elaborated `take`'s cold copies enqueue right behind their originals,
   so look for a copy popped AFTER another plain arrival's event. A `take`
-  subscribed late by a merge or a switch of a hot, or by a cold's own
-  arrivals, keeps its copy adjacent (rows pinned); a `take` under a
-  `defer` re-entered through `μ` is untried. Pin each as a bug-cache row
+  subscribed late by a merge or a switch of a hot, by a cold's own
+  arrivals, or by a `defer` re-entered through `μ`, keeps its copy
+  adjacent (rows pinned); a `scan` feeding one is untried. Pin each as a row
   read with its sides printed; a shared arrival refutes the leaf, and the
   restatement cuts WITHIN an impl arrival, by instants.
 

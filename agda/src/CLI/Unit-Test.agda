@@ -180,4 +180,12 @@ cases =
           (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (takeˢ (natˢ 1) (inputˢ zero))) (inputˢ (suc zero))))
           (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    (inputˢ zero)) ∷
+  cached "a take of a deferred self merged with a hot" 12
+          (μˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ (natˢ 1) (deferˢ (varˢ (here refl))))) ∷ []))))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of a deferred self merged with a cold" 12
+          (μˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ (natˢ 1) (deferˢ (varˢ (here refl))))) ∷ []))))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
   []
