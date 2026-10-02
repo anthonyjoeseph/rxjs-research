@@ -278,27 +278,30 @@ patch.
 
 ### The monster
 
-(no monster) — chosen when tier 1 closes, since the batcher the rows judge is
-still being rewritten there.
+(no monster) — chosen among the simulation's leaves once the first leg lands,
+since until then every row is a top-line statement.
 
 ### Big picture tier roadmap
 
-- **PORT `timed.ts` ONTO `flatten`.** The translation's flatteners become
-  `flatten` read by `last-seen`, and the `flatAllSrc` fast path that routes a
-  lane-only flatten to the old rules goes, so every flatten takes the `echo`
-  rule. `timed-fuzz.ts --selftest` and a 500-seed sweep hold `mismatched` at
-  zero. The TypeScript half of the Agda translation.
+- **STATE THE SIMULATION AND ASSEMBLE OVER IT.** Outside in: one
+  postulated theorem, that decoding the elaborated run gives the plain
+  run's emits each tagged with its instant, and each of `Main`'s four
+  statements written as a real body over it plus leaves about the batcher
+  on a list. Then one leaf per former under the simulation, so the tier's
+  monster is chosen among leaves rather than at the top line.
 
-- **DELETE THE `max-` RULES.** With no flatten reaching them, the `max-`
-  rules, keys, trails and switch copies in `timed.ts` are dead; delete them
-  and the `timed-fuzz` fixtures that pin only them, keeping the ones that pin
-  the echo.
+- **PROBE THE FLATTENER'S GROUPING LEAF FIRST.** The likeliest-false leaf:
+  that a flattener's stamps group its inner emits as the scheduler's
+  instants do, under merge, switch and exhaust, where tier 1's rows fell.
+  Instantiate it on reached states in `agda/evidence/probed/` before
+  anything under it is ground; a refutation restates the simulation, not
+  the batcher.
 
-- **GIVE `left-to-right` AN ASSEMBLY.** Outside in: its body written over
-  leaf postulates about the elaboration, one per former, so the tier's
-  monster can be chosen among leaves rather than at the top line. The
-  likeliest-false leaf is the flattener's, where tier 1's switch and exhaust
-  rows fall.
+- **ONLY THEN GRIND THE REST.** The simulation by a two-run relation
+  recursing on the type as `Red` does, reusing its descent for the μ peel,
+  the flattener's hop and a share's connect; the batcher's leaves are list
+  lemmas. A case the one-past fuel slack in `left-to-right` does not cover
+  is a fuel finding for Anthony, not a restatement.
 
 ### The ledger
 
