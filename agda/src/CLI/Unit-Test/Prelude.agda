@@ -22,13 +22,14 @@
 module CLI.Unit-Test.Prelude where
 
 open import Data.Bool using (Bool; true; false; T; _∧_; not; _xor_)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_; map; length; zipWith)
 open import Data.Nat using (ℕ; _≡ᵇ_; _+_)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -41,8 +42,10 @@ open import Rx.Evaluator using (Burst)
 open import SExp.Plain using (plainExp)
 open import SExp.Simul-Slots using (SimulSlots; SimulSlot; hotˢ; coldˢ; sharedˢ)
 open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
-open import SExp.Pipeline using (emitsᴵ; runᴾ)
-open import Timed.Translation using (packetOf; timedᶜ; itemᵗ)
+open import SExp.Pipeline using (emitsᴵ; runᴵ; runᴾ)
+open import Timed.Translation using (packetOf; timedᶜ; itemᵗ; timed; timedSlots)
+open import Batchable.Inst-Extract using (instExtract)
+open import Simulation.Statement using (arrivalsOf)
 open import Left-To-Right.Statement using (joinedᴵ)
 open import Timed.Timing-Correct using (stampedᵀ)
 open import Batchable.Statement using (batchedᴱ; groupedᴱ)
@@ -130,7 +133,8 @@ cached : String → ℕ → SExp Γ₂ [] [] [] natᵗ → {κ : Kinds 2} → Si
 cached n f e {κ} ins = record { name = n ; fuel = f ; prog = e ; kinds = κ ; slots = ins }
 
 ------------------------------------------------------------------
--- THE FOUR STATEMENTS `Main` IMPORTS, EACH DECIDED AT ITS OWN SIDES.
+-- THE FOUR STATEMENTS `Main` IMPORTS, AND THE SIMULATION TWO OF THEM
+-- ARE ASSEMBLED OVER, EACH DECIDED AT ITS OWN SIDES.
 -- A side is the statement module's own definition applied at this row,
 -- never a restatement of it, so the check and the claim cannot drift
 -- apart: at `Γ₂`, the row's kinds, `natᵗ` and `tt`, what is compared here is what
@@ -143,17 +147,19 @@ cached n f e {κ} ins = record { name = n ; fuel = f ; prog = e ; kinds = κ ; s
 ------------------------------------------------------------------
 
 data Statement : Set where
-  left-to-rightˢ timing-correctˢ batchableˢ timed-faithfulˢ : Statement
+  left-to-rightˢ timing-correctˢ batchableˢ timed-faithfulˢ simulationˢ : Statement
 
--- in `Main`'s order, which is the order a report counts them in
+-- in `Main`'s order, which is the order a report counts them in, and
+-- the simulation last
 statements : List Statement
-statements = left-to-rightˢ ∷ timing-correctˢ ∷ batchableˢ ∷ timed-faithfulˢ ∷ []
+statements = left-to-rightˢ ∷ timing-correctˢ ∷ batchableˢ ∷ timed-faithfulˢ ∷ simulationˢ ∷ []
 
 statementName : Statement → String
 statementName left-to-rightˢ  = "left-to-right"
 statementName timing-correctˢ = "timing-correct"
 statementName batchableˢ      = "batchable"
 statementName timed-faithfulˢ = "timed-faithful"
+statementName simulationˢ     = "simulation"
 
 -- `left-to-right`: the batches joined back up, the plain run, and the
 -- batches joined back up at one more unit of fuel
@@ -186,6 +192,27 @@ batchableSides c = batchSides (kinds c) (emitsᴵ (kinds c) (fuel c) (prog c) (s
 faithfulSides : Case → List ℕ × List ℕ
 faithfulSides c = untimedᵀ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
 
+-- `simulation` at one program: the stamped run, the plain run, and the
+-- plain run's arrivals
+Sim : Set → Set
+Sim A = List (ℕ × A) × List A × List ℕ
+
+simPlain : Case → Sim ℕ
+simPlain c = instExtract (runᴵ (kinds c) (fuel c) (prog c) (slots c)) , runᴾ (fuel c) (prog c) (slots c) ,
+             arrivalsOf {κ = kinds c} (fuel c) (prog c) (slots c)
+
+-- a timed item at `natᵗ`: its packet, and a value or END
+Item : Set
+Item = List ℕ × (ℕ ⊎ ⊤)
+
+-- and at the program's timed translation, which is where
+-- `timing-correct` applies it
+simTimed : Case → Sim Item
+simTimed c =
+  stampedᵀ (kinds c) (fuel c) (prog c) (slots c) ,
+  runᴾ {κ = kinds c} (fuel c) (timed (kinds c) (prog c)) (timedSlots (slots c)) ,
+  arrivalsOf {κ = kinds c} (fuel c) (timed (kinds c) (prog c)) (timedSlots (slots c))
+
 -- `Coherent`, decided: same stamp exactly when same packet
 coherentᵇ : ℕ × List ℕ → ℕ × List ℕ → Bool
 coherentᵇ (i , p) (j , q) = not ((i ≡ᵇ j) xor eqListℕ p q)
@@ -198,6 +225,29 @@ coheresWith x (y ∷ ys) = coherentᵇ x y ∧ coheresWith x ys
 allPairsᵇ : List (ℕ × List ℕ) → Bool
 allPairsᵇ []       = true
 allPairsᵇ (x ∷ xs) = coheresWith x xs ∧ allPairsᵇ xs
+
+-- `Agrees` at data, decided: equal, element by element
+eqBy : {A : Set} → (A → A → Bool) → List A → List A → Bool
+eqBy eq []       []       = true
+eqBy eq (x ∷ xs) (y ∷ ys) = eq x y ∧ eqBy eq xs ys
+eqBy eq _        _        = false
+
+eqItem : Item → Item → Bool
+eqItem (p , inj₁ a) (q , inj₁ b) = eqListℕ p q ∧ (a ≡ᵇ b)
+eqItem (p , inj₂ _) (q , inj₂ _) = eqListℕ p q
+eqItem _            _            = false
+
+-- an injective naming of the arrivals, decided: as many stamps as
+-- arrivals, equal exactly when the arrivals are.  A finite injection
+-- always extends to one on all of ℕ, so this is the `Σ`, not a weakening.
+renamesᵇ : List ℕ → List ℕ → Bool
+renamesᵇ ss ar = (length ss ≡ᵇ length ar) ∧ allPairsᵇ (zipWith (λ s a → s , a ∷ []) ss ar)
+
+simᵇ : {A : Set} → (A → A → Bool) → Sim A → Bool
+simᵇ eq (st , vs , ar) = eqBy eq (map proj₂ st) vs ∧ renamesᵇ (map proj₁ st) ar
+
+simulationᴮ : Sim ℕ × Sim Item → Bool
+simulationᴮ (p , t) = simᵇ _≡ᵇ_ p ∧ simᵇ eqItem t
 
 -- each takes its sides as ONE argument, so a pair is computed once
 agreeᴸ : List ℕ × List ℕ → Bool
@@ -215,6 +265,7 @@ holds left-to-rightˢ  c = sandwichᴸ (ltrSides c)
 holds timing-correctˢ c = allPairsᵇ (stampsOf c)
 holds batchableˢ      c = agreeᴮ (batchableSides c)
 holds timed-faithfulˢ c = agreeᴸ (faithfulSides c)
+holds simulationˢ     c = simulationᴮ (simPlain c , simTimed c)
 
 checksOf : List Statement → Case → List (String × Bool)
 checksOf ss c = map (λ s → statementName s , holds s c) ss

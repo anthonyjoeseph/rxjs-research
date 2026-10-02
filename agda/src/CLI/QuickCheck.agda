@@ -1,8 +1,9 @@
 -- An all-Agda QuickCheck: generate random well-typed programs (exp tree +
 -- scripted inputs) over a fixed 2-slot nat context, run them through the
--- real evaluator, and decide the four statements `Main` imports, each at
--- its own two sides (`CLI.Unit-Test.Prelude`): four quickchecks, one per
--- statement, selectable one at a time.  A fast in-Agda dev loop for the
+-- real evaluator, and decide the four statements `Main` imports and the
+-- simulation two of them stand on, each at its own sides
+-- (`CLI.Unit-Test.Prelude`): one quickcheck per statement, selectable
+-- one at a time.  A fast in-Agda dev loop for the
 -- implementation.
 --
 --   agda --compile --compile-dir=_cli src/CLI/QuickCheck.agda
@@ -59,6 +60,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Maybe using (nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.String using (String; _++_; toList) renaming (length to lengthˢ)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -76,8 +78,9 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
-  left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; statements; statementName;
-  ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf)
+  left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; statements; statementName;
+  ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
+  Sim; Item; simPlain; simTimed; simulationᴮ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
@@ -821,7 +824,7 @@ CASE = 10
 -- the program -- is the dedup key.
 --
 -- ONE SHAPE FOR EVERY CHECK, and that is what makes the key work: the
--- cache holds every row to all four statements, so a program that fails
+-- cache holds every row to every statement, so a program that fails
 -- any one wants the same row, and a program that fails several dedups
 -- to it instead of being cached twice.
 --
@@ -877,11 +880,27 @@ pairᴮ (l , r) = eqBatches l r , showPair showBatches (l , r)
 pairsᵀ : List (ℕ × List ℕ) → Bool × String
 pairsᵀ ps = allPairsᵇ ps , "stamped = " ++ showStamps ps
 
+showItem : Item → String
+showItem (p , inj₁ a) = showVals p ++ ":" ++ show a
+showItem (p , inj₂ _) = showVals p ++ ":END"
+
+showSim : {A : Set} → (A → String) → Sim A → String
+showSim sh (st , vs , ar) =
+  "stamped = " ++ commaJoin (map (λ p → "@" ++ show (proj₁ p) ++ " " ++ sh (proj₂ p)) st) ++
+  "\n    plain = " ++ commaJoin (map sh vs) ++
+  "\n    arrivals = " ++ showVals ar
+
+-- the simulation at the program and at its timed translation
+simulationᴿ : Sim ℕ × Sim Item → Bool × String
+simulationᴿ (p , t) =
+  simulationᴮ (p , t) , showSim show p ++ "\n    timed: " ++ showSim showItem t
+
 decide : Case → Statement → Bool × String
 decide c left-to-rightˢ  = sandwichᴸ (ltrSides c)
 decide c timing-correctˢ = pairsᵀ (stampsOf c)
 decide c batchableˢ      = pairᴮ (batchableSides c)
 decide c timed-faithfulˢ = pairᴸ (faithfulSides c)
+decide c simulationˢ     = simulationᴿ (simPlain c , simTimed c)
 
 -- a report counts statements in `Main`'s order
 indexOf : Statement → ℕ
@@ -889,6 +908,7 @@ indexOf left-to-rightˢ  = 0
 indexOf timing-correctˢ = 1
 indexOf batchableˢ      = 2
 indexOf timed-faithfulˢ = 3
+indexOf simulationˢ     = 4
 
 -- one count per former, in `allFormers` order, plus the obs-fold count
 Tally : Set
@@ -931,9 +951,9 @@ forced []             = 0
 forced ((k , r) ∷ rs) = k + lengthˢ r + forced rs
 
 -- a case past its wall clock: one report of its own kind, after the
--- four statements', carrying the row that reproduces it
+-- statements', carrying the row that reproduces it
 TIMEOUT : ℕ
-TIMEOUT = 4
+TIMEOUT = 5
 
 timedOut : ℕ → ℕ → Drawn → List (ℕ × String)
 timedOut s f (e , d₀ , d₁) =
@@ -1040,7 +1060,7 @@ agreeing (_ ∷ _) = ""
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = agreeing (decided fs) ++ concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples TIMEOUT fs
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples TIMEOUT fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -1072,12 +1092,14 @@ showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
 runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
 runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase ss f s d
 
--- THE STATEMENT A NUMBER NAMES, in `Main`'s order; zero is all four
+-- THE STATEMENT A NUMBER NAMES, in `Main`'s order and the simulation
+-- fifth; zero is all of them
 selected : ℕ → List Statement
 selected (suc zero)                   = left-to-rightˢ ∷ []
 selected (suc (suc zero))             = timing-correctˢ ∷ []
 selected (suc (suc (suc zero)))       = batchableˢ ∷ []
 selected (suc (suc (suc (suc zero)))) = timed-faithfulˢ ∷ []
+selected (suc (suc (suc (suc (suc zero))))) = simulationˢ ∷ []
 selected _                            = statements
 
 -- the impl's raw run, decoded, for reading a batchable failure by

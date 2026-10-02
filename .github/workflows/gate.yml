@@ -216,8 +216,9 @@ jobs:
   # runs the cache's EXISTING rows and is green exactly when no KNOWN
   # counterexample remains; nothing there ever looks for a new one. This job
   # does, on the same run rather than on whichever later session happens to
-  # type the command. It is tier 1's verdict: all four of `Main`'s
-  # statements, decided on the real evaluator over drawn author programs.
+  # type the command: all four of `Main`'s statements and the simulation
+  # two of them stand on, decided on the real evaluator over drawn author
+  # programs.
   #
   # A CASE PAST THE BINARY'S PER-CASE CLOCK IS UNDECIDED, NEVER A FAILURE
   # (Anthony). Any clock has a case past it, so a clock cannot be what turns

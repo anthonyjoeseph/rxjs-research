@@ -228,8 +228,9 @@ if that starts spiralling out rather than in.
 
 **`Rx.Exp` AND `SExp.Syntax` ARE OFF LIMITS (Anthony).** Both are fixed; a
 proof that needs either to move is a question for Anthony, never a patch.
-`make quickcheck` in CI decides all four statements on drawn programs, and a
-case past its clock is undecided, never a failure (Anthony).
+`make quickcheck` in CI decides all four statements and the simulation on
+drawn programs, and a case past its clock is undecided, never a failure
+(Anthony).
 
 ### The monster
 

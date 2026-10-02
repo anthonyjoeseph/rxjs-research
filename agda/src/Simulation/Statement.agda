@@ -112,7 +112,7 @@ postulate
   -- PROBED: `Probed.Simulation` -- decided at fuel 3 over three
   --   first-order programs and their timed translations: a take of one
   --   of two arrivals, both arrivals kept, and a literal of two at the
-  --   subscription.  Not a flattener, a share, a `μ` nor a cold slot;
-  --   `make quickcheck` reaches those only through the top-line
-  --   statements, which this implies and does not follow from.
+  --   subscription.  Not a flattener, a share, a `μ` nor a cold slot,
+  --   which are `make quickcheck`'s alone: it decides this statement on
+  --   drawn programs and on every bug-cache row.
   simulation : Simulation

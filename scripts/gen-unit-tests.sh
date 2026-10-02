@@ -168,7 +168,7 @@ for seed in $(seq "$FIRST" "$LAST"); do
     ' "$tmp" > "$row"
 
     # line 2 is the program, and it is the whole key: every row is held to
-    # all four statements, so a program that fails several at once dedups
+    # every statement, so a program that fails several at once dedups
     # to one row rather than being cached twice
     key="$(sed -n '2p' "$row")"
     if grep -Fqx -- "$key" "$CORPUS"; then
