@@ -241,7 +241,7 @@ bound.
 ### Big picture tier roadmap
 
 - **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** Depth 2 is green
-  on seeds 1, 3 and 4, and at `QC_FUEL=6`, where a cut-off run makes the
+  on seeds 1, 3, 4, 6 and 7, and at `QC_FUEL=6` and 3, where a cut-off run makes the
   sandwich's second half bear weight. Sweep more seeds and fuels under the
   10-minute cap, raising `QC_CASE` until no case is a `timeout`. Seed 3's
   `μ` over a merge holding its own defer times out at 150 s. Seed 5's case
