@@ -1,4 +1,4 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -183,11 +183,11 @@ help:
 	@echo "                  make oracle ARGS='--operator mergeAll'"
 	@echo "  qc-build      compile the all-Agda QuickCheck binary ($(ORACLE_BIN)/QuickCheck)"
 	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs,"
-	@echo "                  QC_FUEL=n, QC_STMT=1..5 for one statement (Main's four, then the simulation), 0 for all,"
+	@echo "                  QC_FUEL=n, QC_STMT=1..6 for one statement (Main's four, the simulation, its leaf), 0 for all,"
 	@echo "                  QC_CASE=secs per case, 0 for none)"
-	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful / qc-simulation"
+	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful / qc-simulation / qc-arrival-runs"
 	@echo "                qc-fast on that one statement"
-	@echo "  quickcheck    all-Agda QuickCheck: Main's four statements and the simulation, caching counterexamples"
+	@echo "  quickcheck    all-Agda QuickCheck: Main's four statements, the simulation and its leaf, caching counterexamples"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
 	@echo "                  make quickcheck ARGS='1 500 300 5' (seeds 1..500, 300 runs, depth 5)"
@@ -1691,11 +1691,12 @@ quickcheck: qc-build
 # a failure (Anthony) -- counted, printed with its paste row, and the
 # sweep goes on.
 #
-# ONE QUICKCHECK PER STATEMENT `Main` IMPORTS, AND ONE FOR THE SIMULATION
-# two of them stand on.  Each decides that statement's own sides on one
-# program's run, so any of them failing is a known counterexample to it,
-# printed with its count and samples.  QC_STMT names one, in `Main`'s
-# order and the simulation fifth; 0 gates on all of them.
+# ONE QUICKCHECK PER STATEMENT `Main` IMPORTS, ONE FOR THE SIMULATION
+# two of them stand on, and one for `arrival-runs`, the leaf it stands
+# on.  Each decides that statement's own sides on one program's run, so
+# any of them failing is a known counterexample to it, printed with its
+# count and samples.  QC_STMT names one, in `Main`'s order, the
+# simulation fifth and its leaf sixth; 0 gates on all of them.
 QC ?= 1 15 1
 QC_BUDGET ?= 120
 QC_FUEL ?= 0
@@ -1708,6 +1709,7 @@ qc-timing-correct: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=2
 qc-batchable:      ; @$(MAKE) --no-print-directory qc-fast QC_STMT=3
 qc-timed-faithful: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=4
 qc-simulation:     ; @$(MAKE) --no-print-directory qc-fast QC_STMT=5
+qc-arrival-runs:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=6
 qc-fast: qc-build
 	@printf '%s\n' "$(QC_IN)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG); \
 	ec=$$?; head -c 6000 $(QC_LOG); \

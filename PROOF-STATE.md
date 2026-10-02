@@ -188,9 +188,8 @@ Main                                     four top-line statements, claimed
  │   ├─ simulation                        Simulation/Statement.agda — the
  │   │   │                                impl's run is the plain run, each
  │   │   │                                value named by its arrival
- │   │   ├─ arrival-values                each plain arrival's values, one
- │   │   │                                impl arrival's
- │   │   └─ arrival-instants              one instant per arrival, the impl's
+ │   │   └─ arrival-runs                  each plain arrival a run of impl
+ │   │                                    arrivals, one instant to a run
  │   └─ batched-sandwich                  the batcher against its own run
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
  │   │                                    group emits as the timed
@@ -231,43 +230,42 @@ if that starts spiralling out rather than in.
 
 **`Rx.Exp` AND `SExp.Syntax` ARE OFF LIMITS (Anthony).** Both are fixed; a
 proof that needs either to move is a question for Anthony, never a patch.
-`make quickcheck` in CI decides all four statements and the simulation on
-drawn programs, and a case past its clock is undecided, never a failure
-(Anthony).
+`make quickcheck`, locally or in CI, decides all four statements, the
+simulation and its leaf on drawn programs, and a case past its clock is
+undecided, never a failure (Anthony).
 
 ### The monster
 
 `simulation` — the one theorem both assembled top lines stand on, a real body
-over two leaves joined by `run-prefix`: `arrival-values`, the only statement in
-the tier about both machines at once, and `arrival-instants`, about the impl
-alone. The impl now runs at its own fuel, never less than the plain run's
-(Anthony), because an elaborated `take` subscribes a cold twice; the
-equal-fuel forms stay refuted in `Refuted.Take-Twice`. What is left of the
-monster is whether every plain arrival's values come out of ONE impl arrival,
-which is what `arrival-values` now claims through its rising fuel map.
+over one leaf joined by `run-prefix`: `arrival-runs`, the only statement in the
+tier about both machines at once, cutting the impl's arrivals into one run per
+plain arrival. The impl runs at its own fuel (Anthony). RULED OUT: one impl
+arrival per plain arrival, and one instant per impl arrival. What is left of
+the monster is whether every plain arrival's values come out CONTIGUOUSLY: no
+impl arrival carrying two plain arrivals' values, none interleaving them.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **PROBE THE FUEL MAP WHERE A PLAIN ARRIVAL COULD SPLIT.** `arrival-values`
-  sends each plain arrival to one impl arrival. A cold under two takes, or
-  under a take inside a merge, fans one plain arrival out to several live
-  copies of the source, and those may deliver its values across two impl
-  arrivals, which no rising map can pair. Probe those shapes before
-  anything is stated beneath the leaf; a split refutes it, and the
-  restatement then sends an arrival to a run of impl arrivals.
+- **SWEEP FOR AN IMPL ARRIVAL TWO PLAIN ARRIVALS SHARE.** `arrival-runs`
+  cuts the impl's arrivals into contiguous runs. A cold under two takes
+  inside a merge, or a share whose connect lands mid-arrival, may deliver
+  the tail of one plain arrival and the head of the next in ONE impl
+  arrival, which no cut separates. Sweep `make qc-arrival-runs` wide and
+  probe those shapes before anything is stated beneath the leaf; a shared
+  impl arrival refutes it, and the restatement then cuts WITHIN an impl
+  arrival, by its instants.
 
-- **STATE THE CONFIGURATION CORRESPONDENCE.** The values split recurses on
+- **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel
-  map: one obligation per former, the elaborated `take` the one where the
-  map skips.
+  map: one obligation per former, the elaborated `take` the one whose run
+  is longer than one arrival.
 
-- **SPLIT THE INSTANTS PER FORMER.** `arrival-instants` reads the impl
-  alone: every value of one arrival's slice carries one instant, and no
-  two arrivals share one. State it over the impl's cascade, one former at
-  a time, beside the values split so the two leaves recurse on the same
-  configuration and the monster drops to whichever stays riskier.
+- **SPLIT THE INSTANTS PER FORMER.** A run's values carry one instant and
+  no two runs share one: a claim the impl's cascade makes one former at a
+  time. State it beside the values split so both recurse on the same
+  configuration, and the monster drops to whichever stays riskier.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -278,12 +276,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`arrival-values`** (Simulation.Statement) — FALSITY, `REFUTED, PROBED`:
-  each plain arrival's slice agrees with one impl arrival's, a rising map
-  saying which; the impl arrivals it skips send nothing.
-- **`arrival-instants`** (Simulation.Statement) — FALSITY, `PROBED`: every
-  value of one arrival's slice of the impl's run carries one instant, and no
-  two arrivals' instants coincide.
+- **`arrival-runs`** (Simulation.Statement) — FALSITY, `REFUTED, PROBED`: each
+  plain arrival's slice agrees with a contiguous run of impl arrivals, a rising
+  map saying where each ends, and a run's values carry one instant, no two runs
+  sharing one.
 - **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY, `PROBED`: the
   joined run between its own unbatched values at one fuel and one past it,
   since a cut-off run's last batch waits for an arrival (Anthony).

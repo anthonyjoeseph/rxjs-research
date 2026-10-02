@@ -62,7 +62,7 @@ open import Data.Nat using (ℕ)
 open import Relation.Nullary.Negation using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (ObservableInput; hot; cold; after_,_)
+open import Rx.Prim using (ObservableInput; hot; after_,_)
 open import Rx.Exp using (natᵗ)
 open import SExp.Syntax using (SExp; Kinds; inputˢ; ofˢ; emptyˢ; takeˢ; natˢ)
 open import SExp.Simul-Slots using (SimulSlots)
@@ -122,12 +122,4 @@ of-two : Point
 of-two = record
   { d₀   = hot []
   ; prog = ofˢ (natˢ 9 ∷ natˢ 7 ∷ [])
-  ; d₁   = emptyˢ }
-
--- `take 2` over a COLD with two values: `takeᵖ` subscribes the cold
--- twice, so the impl spends an arrival the plain run does not
-take-two-cold : Point
-take-two-cold = record
-  { d₀   = cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ [])
-  ; prog = takeˢ (natˢ 2) (inputˢ zero)
   ; d₁   = emptyˢ }

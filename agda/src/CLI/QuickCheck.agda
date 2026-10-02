@@ -78,9 +78,9 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
-  left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; statements; statementName;
+  left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
-  Sim; Item; simPlain; simTimed; stampedOf; simulationᴮ)
+  Item; Arr; arrPlain; arrTimed; simulationᴮ; arrivalRunsᴮ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
@@ -884,23 +884,30 @@ showItem : Item → String
 showItem (p , inj₁ a) = showVals p ++ ":" ++ show a
 showItem (p , inj₂ _) = showVals p ++ ":END"
 
-showSim : {A : Set} → (A → String) → Sim A → String
-showSim sh (st , vs , ar) =
-  "stamped = " ++ commaJoin (map (λ p → "@" ++ show (proj₁ p) ++ " " ++ sh (proj₂ p)) st) ++
-  "\n    plain = " ++ commaJoin (map sh vs) ++
-  "\n    arrivals = " ++ showVals ar
+-- a program's two runs cut at their arrivals, one slice to a bracket
+showArr : {A : Set} → (A → String) → Arr A → String
+showArr sh (is , dry , ps) =
+  "impl slices = " ++ commaJoin (map (λ i → "[" ++ commaJoin (map (λ p → "@" ++ show (proj₁ p) ++ " " ++ sh (proj₂ p)) i) ++ "]") is) ++
+  (if dry then " (queue dry)" else " (at the fuel cap)") ++
+  "\n    plain slices = " ++ commaJoin (map (λ p → "[" ++ commaJoin (map sh p) ++ "]") ps)
 
--- the simulation at the program and at its timed translation
-simulationᴿ : Sim ℕ × Sim Item → Bool × String
-simulationᴿ (p , t) =
-  simulationᴮ (p , t) , showSim show p ++ "\n    timed: " ++ showSim showItem t
+-- the simulation and its leaf, at the program and at its timed translation
+showArrs : Arr ℕ × Arr Item → String
+showArrs (p , t) = showArr show p ++ "\n    timed: " ++ showArr showItem t
+
+simulationᴿ : Arr ℕ × Arr Item → Bool × String
+simulationᴿ pt = simulationᴮ pt , showArrs pt
+
+arrivalRunsᴿ : Arr ℕ × Arr Item → Bool × String
+arrivalRunsᴿ pt = arrivalRunsᴮ pt , showArrs pt
 
 decide : Case → Statement → Bool × String
 decide c left-to-rightˢ  = sandwichᴸ (ltrSides c)
 decide c timing-correctˢ = pairsᵀ (stampsOf c)
 decide c batchableˢ      = pairᴮ (batchableSides c)
 decide c timed-faithfulˢ = pairᴸ (faithfulSides c)
-decide c simulationˢ     = simulationᴿ (simPlain c , simTimed c (stampedOf c))
+decide c simulationˢ     = simulationᴿ (arrPlain c , arrTimed c)
+decide c arrival-runsˢ = arrivalRunsᴿ (arrPlain c , arrTimed c)
 
 -- a report counts statements in `Main`'s order
 indexOf : Statement → ℕ
@@ -909,6 +916,7 @@ indexOf timing-correctˢ = 1
 indexOf batchableˢ      = 2
 indexOf timed-faithfulˢ = 3
 indexOf simulationˢ     = 4
+indexOf arrival-runsˢ = 5
 
 -- one count per former, in `allFormers` order, plus the obs-fold count
 Tally : Set
@@ -953,7 +961,7 @@ forced ((k , r) ∷ rs) = k + lengthˢ r + forced rs
 -- a case past its wall clock: one report of its own kind, after the
 -- statements', carrying the row that reproduces it
 TIMEOUT : ℕ
-TIMEOUT = 5
+TIMEOUT = 6
 
 timedOut : ℕ → ℕ → Drawn → List (ℕ × String)
 timedOut s f (e , d₀ , d₁) =
@@ -1060,7 +1068,7 @@ agreeing (_ ∷ _) = ""
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = agreeing (decided fs) ++ concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples TIMEOUT fs
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples 5 fs ++ samples TIMEOUT fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -1092,14 +1100,15 @@ showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
 runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
 runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase ss f s d
 
--- THE STATEMENT A NUMBER NAMES, in `Main`'s order and the simulation
--- fifth; zero is all of them
+-- THE STATEMENT A NUMBER NAMES, in `Main`'s order, the simulation
+-- fifth and its leaf sixth; zero is all of them
 selected : ℕ → List Statement
 selected (suc zero)                   = left-to-rightˢ ∷ []
 selected (suc (suc zero))             = timing-correctˢ ∷ []
 selected (suc (suc (suc zero)))       = batchableˢ ∷ []
 selected (suc (suc (suc (suc zero)))) = timed-faithfulˢ ∷ []
 selected (suc (suc (suc (suc (suc zero))))) = simulationˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc zero)))))) = arrival-runsˢ ∷ []
 selected _                            = statements
 
 -- the impl's raw run, decoded, for reading a batchable failure by
@@ -1107,8 +1116,8 @@ rawOf : Case → String
 rawOf c = showStream (runᴵ (Case.kinds c) (Case.fuel c) (Case.prog c) (Case.slots c))
 
 -- AND ONE SIDE OF IT, so a hang is attributed to the statement that owns
--- it: 1 to 4 that statement's sides, in `Main`'s order, anything else
--- the impl's raw run
+-- it: 1 to 6 that statement's sides, in `selected`'s numbering,
+-- anything else the impl's raw run
 sidesOf : ℕ → Case → String
 sidesOf k c with selected k
 ... | s ∷ [] = proj₂ (decide c s)
