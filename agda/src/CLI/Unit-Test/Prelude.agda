@@ -162,7 +162,10 @@ statementName timed-faithfulˢ = "timed-faithful"
 statementName simulationˢ     = "simulation"
 
 -- `left-to-right`: the batches joined back up, the plain run, and the
--- batches joined back up at one more unit of fuel
+-- batches joined back up at one more unit of fuel.  Every side at the
+-- case's one fuel: that names the impl's own fuel as the plain run's,
+-- which is a witness and not the statement, so a green decides it and a
+-- red is a candidate, to be read at a larger impl fuel.
 ltrSides : Case → List ℕ × List ℕ × List ℕ
 ltrSides c = joinedᴵ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c) ,
              joinedᴵ tt (kinds c) (1 + fuel c) (prog c) (slots c)
@@ -206,7 +209,8 @@ faithfulSides : Case → List ℕ × List ℕ
 faithfulSides c = untimedᵀ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
 
 -- `simulation` at one program: the stamped run, the plain run, and the
--- plain run's arrivals
+-- plain run's arrivals, both runs at the case's one fuel -- the same
+-- witness for the impl's fuel as `ltrSides` takes
 Sim : Set → Set
 Sim A = List (ℕ × A) × List A × List ℕ
 

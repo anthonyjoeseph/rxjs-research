@@ -18,6 +18,7 @@ open import Data.List.Properties using (∷-injectiveˡ; ∷-injectiveʳ)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; Pointwise-≡⇒≡)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
+open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
 open import Data.Nat     using (ℕ)
 open import Data.Product using (_×_; Σ; proj₁; proj₂)
 open import Function     using (_⇔_; mk⇔)
@@ -29,7 +30,7 @@ open import SExp.Syntax      using (SExp; Kinds; plainᵏ; plainᵗ)
 open import SExp.Simul-Slots using (SimulSlots)
 open import Timed.Translation     using (timed; timedSlots; packetOf; timedᶜ; itemᵗ)
 open import SExp.Pipeline using (runᴵ; runᴾ)
-open import Simulation.Statement using (Agrees; simulation; arrivalsOf)
+open import Simulation.Statement using (Agrees; simulation; arrivalsOf; stamped-prefix)
 open import Batchable.Inst-Extract using (instExtract)
 
 -- the impl's run of the timed program: each value with its stamp
@@ -102,12 +103,27 @@ packets-agree : ∀ {n m} {Γ′ : Ctx m} {Γ : Ctx n} t {xs : List (Id × Val �
 packets-agree t []       = refl
 packets-agree t (q ∷ qs) = cong₂ _∷_ (Pointwise-≡⇒≡ (proj₁ q)) (packets-agree t qs)
 
+-- a relation every pair of a list satisfies, every pair of its prefix
+-- does
+all-prefix : ∀ {A : Set} {P : A → Set} {xs ys : List A} → Prefix _≡_ xs ys → All P ys → All P xs
+all-prefix []         _        = []
+all-prefix (refl ∷ p) (q ∷ qs) = q ∷ all-prefix p qs
+
+allPairs-prefix : ∀ {A : Set} {R : A → A → Set} {xs ys : List A} → Prefix _≡_ xs ys
+                → AllPairs R ys → AllPairs R xs
+allPairs-prefix []         _        = []
+allPairs-prefix (refl ∷ p) (q ∷ qs) = all-prefix p q ∷ allPairs-prefix p qs
+
+-- THE SIMULATION NAMES THE IMPL RUN AT ITS OWN, LARGER FUEL, so
+-- coherence is proven there and read back down the prefix
 timing-correct : Timing-Correct
 timing-correct {Γ = Γ} {t = t} κ fuel e ins =
-  named-coherent proj₁ (λ p → packetOf {Γ = plainᵏ (timedᶜ Γ κ) κ} t (proj₂ p))
-    (λ {a} {b} → proj₁ (proj₂ (proj₂ sim)) {a} {b}) (λ {a} {b} → proj₁ (proj₂ pkt) {a} {b})
-    (stampedᵀ κ fuel e ins) _ (proj₂ (proj₂ (proj₂ sim)))
-    (trans (packets-agree t (proj₁ sim)) (proj₂ (proj₂ pkt)))
+  allPairs-prefix (stamped-prefix κ (timed κ e) (timedSlots ins) (proj₁ (proj₂ sim)))
+    (named-coherent proj₁ (λ p → packetOf {Γ = plainᵏ (timedᶜ Γ κ) κ} t (proj₂ p))
+      (λ {a} {b} → proj₁ (proj₂ named) {a} {b}) (λ {a} {b} → proj₁ (proj₂ pkt) {a} {b})
+      (stampedᵀ κ (proj₁ sim) e ins) _ (proj₂ (proj₂ named))
+      (trans (packets-agree t (proj₁ (proj₂ (proj₂ sim)))) (proj₂ (proj₂ pkt))))
   where
     sim = simulation κ fuel (timed κ e) (timedSlots ins)
+    named = proj₂ (proj₂ (proj₂ sim))
     pkt = packets-name-arrivals κ fuel e ins

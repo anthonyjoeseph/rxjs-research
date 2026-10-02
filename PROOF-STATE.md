@@ -188,7 +188,8 @@ Main                                     four top-line statements, claimed
  │   ├─ simulation                        Simulation/Statement.agda — the
  │   │   │                                impl's run is the plain run, each
  │   │   │                                value named by its arrival
- │   │   ├─ arrival-values                one arrival's values, run on run
+ │   │   ├─ arrival-values                each plain arrival's values, one
+ │   │   │                                impl arrival's
  │   │   └─ arrival-instants              one instant per arrival, the impl's
  │   └─ batched-sandwich                  the batcher against its own run
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
@@ -239,28 +240,28 @@ drawn programs, and a case past its clock is undecided, never a failure
 `simulation` — the one theorem both assembled top lines stand on, a real body
 over two leaves joined by `run-prefix`: `arrival-values`, the only statement in
 the tier about both machines at once, and `arrival-instants`, about the impl
-alone. It is REFUTED as stated, with `left-to-right` above it
-(`Refuted.Take-Twice`): an elaborated `take` subscribes a cold twice, so the
-impl spends more arrivals than the plain run and no fixed fuel slack covers
-it. It stays the monster until it is restated, which waits on Anthony.
+alone. The impl now runs at its own fuel, never less than the plain run's
+(Anthony), because an elaborated `take` subscribes a cold twice; the
+equal-fuel forms stay refuted in `Refuted.Take-Twice`. What is left of the
+monster is whether every plain arrival's values come out of ONE impl arrival,
+which is what `arrival-values` now claims through its rising fuel map.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **RULE ON THE TAKE'S SECOND SUBSCRIPTION (Anthony).** `takeᵖ` ends on
-  a take-until over a second subscription to its own count, because the
-  palette has no take-while; over a cold that is a second live source, so
-  the two runs stop meeting at equal fuel. Either a take-while former lets
-  the gadget subscribe once, as the TypeScript does, or the fuel each side
-  is read at is restated. Which one decides what `simulation` and
-  `left-to-right` become, so nothing below is restated before it.
+- **PROBE THE FUEL MAP WHERE A PLAIN ARRIVAL COULD SPLIT.** `arrival-values`
+  sends each plain arrival to one impl arrival. A cold under two takes, or
+  under a take inside a merge, fans one plain arrival out to several live
+  copies of the source, and those may deliver its values across two impl
+  arrivals, which no rising map can pair. Probe those shapes before
+  anything is stated beneath the leaf; a split refutes it, and the
+  restatement then sends an arrival to a run of impl arrivals.
 
-- **RESTATE THE SIMULATION AT THE RULED FUEL.** Restate `simulation` and
-  `arrival-values` to the ruling, re-run `Refuted.Take-Twice` against the
-  new statements, and probe the restated leaf at a cold `take` first, since
-  that is where the old one fell. Then state the configuration
-  correspondence the values split recurses on, one obligation per former.
+- **STATE THE CONFIGURATION CORRESPONDENCE.** The values split recurses on
+  a relation between the two machines' configurations, carrying the fuel
+  map: one obligation per former, the elaborated `take` the one where the
+  map skips.
 
 - **SPLIT THE INSTANTS PER FORMER.** `arrival-instants` reads the impl
   alone: every value of one arrival's slice carries one instant, and no
@@ -271,12 +272,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
   the μ peel, the flattener's hop and a share's connect; the batcher's
-  leaves are list lemmas. A case the one-past fuel slack in
+  leaves are list lemmas. A case the impl's one-past fuel slack in
   `left-to-right` does not cover is a fuel finding for Anthony, not a
   restatement.
 
 ### The ledger
 
+- **`arrival-values`** (Simulation.Statement) — FALSITY, `REFUTED, PROBED`:
+  each plain arrival's slice agrees with one impl arrival's, a rising map
+  saying which; the impl arrivals it skips send nothing.
 - **`arrival-instants`** (Simulation.Statement) — FALSITY, `PROBED`: every
   value of one arrival's slice of the impl's run carries one instant, and no
   two arrivals' instants coincide.
@@ -289,6 +293,3 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   only, so flatteners are its QuickCheck's alone.
 - **`batchable`** (Batchable.Statement) — FALSITY, `PROBED`: probed first-order
   only, so flatteners are its QuickCheck's alone.
-- **`arrival-values`** (Simulation.Statement) — SHAPE, `REFUTED, PROBED`: one
-  arrival's slice of the impl's run agrees with the plain run's slice at the
-  same fuel, which a cold `take` breaks; restated once the fuel is ruled on.

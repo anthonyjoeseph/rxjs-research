@@ -6,11 +6,16 @@
 -- AT ONE MORE UNIT OF FUEL, BECAUSE A BATCH CANNOT LEAVE BEFORE ITS
 -- INSTANT IS SEEN TO END.  What says so is the next instant's first
 -- emit or the run's completion, so a run the fuel cuts off holds its
--- last instant's values that the plain run, cut at the same point, has
--- already delivered.  So the joined run at a fuel is a PREFIX of the
--- plain run, and the plain run a prefix of the joined one a single
+-- last instant's values that the plain run, cut at the matching point,
+-- has already delivered.  So the joined run at a fuel is a PREFIX of the
+-- plain run, and the plain run a prefix of the joined one a single impl
 -- arrival later: never ahead of rxjs, and never more than one arrival
 -- behind (Anthony).
+--
+-- THE IMPL RUNS AT ITS OWN FUEL, NEVER LESS THAN THE PLAIN RUN'S
+-- (Anthony).  The elaboration's `takeᵖ` subscribes a cold twice, so the
+-- impl reaches a plain arrival's values some arrivals later; the fuel
+-- that matches is `simulation`'s.
 --
 -- CLOSES A CHEAT THE OTHER TOP-LINE STATEMENTS LEAVE OPEN.
 -- Elaborating every program to `empty` is trivially batched, and fails
@@ -38,8 +43,8 @@ module Left-To-Right.Statement where
 open import Data.Bool    using (T)
 open import Data.List    using (List; []; concat; map)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
-open import Data.Nat     using (suc)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Nat     using (suc; _≤_)
+open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst)
 
 open import Rx.Prim      using (Fuel)
@@ -66,12 +71,15 @@ valsᴵ : ∀ {n} {Γ : Ctx n} {t} → T (isData t) → (κ : Kinds n) → Fuel
       → SExp Γ [] [] [] t → SimulSlots Γ κ → List (Val Γ t)
 valsᴵ {t = t} ok κ fuel e ins = map (unplainᵈ t ok) (map proj₂ (instExtract (runᴵ κ fuel e ins)))
 
+-- REFUTED: `left-to-right-false` -- the equal-fuel form, at `take 2`
+--   over a cold with two async values.
 Left-To-Right : Set
 Left-To-Right =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
     (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
-  Prefix _≡_ (joinedᴵ ok κ fuel e ins) (runᴾ fuel e ins) ×
-  Prefix _≡_ (runᴾ fuel e ins) (joinedᴵ ok κ (suc fuel) e ins)
+  Σ Fuel λ fuelᴵ → fuel ≤ fuelᴵ ×
+  Prefix _≡_ (joinedᴵ ok κ fuelᴵ e ins) (runᴾ fuel e ins) ×
+  Prefix _≡_ (runᴾ fuel e ins) (joinedᴵ ok κ (suc fuelᴵ) e ins)
 
 -- the batcher's own sandwich, against the run it batches
 Batched-Sandwich : Set
@@ -89,9 +97,12 @@ postulate
 
 left-to-right : Left-To-Right
 left-to-right {Γ = Γ} {t = t} ok κ fuel e ins =
-  subst (Prefix _≡_ (joinedᴵ ok κ fuel e ins)) same (proj₁ sandwich) ,
-  subst (λ xs → Prefix _≡_ xs (joinedᴵ ok κ (suc fuel) e ins)) same (proj₂ sandwich)
+  fuelᴵ , proj₁ (proj₂ sim) ,
+  subst (Prefix _≡_ (joinedᴵ ok κ fuelᴵ e ins)) same (proj₁ sandwich) ,
+  subst (λ xs → Prefix _≡_ xs (joinedᴵ ok κ (suc fuelᴵ) e ins)) same (proj₂ sandwich)
   where
-    sandwich = batched-sandwich ok κ fuel e ins
-    same : valsᴵ ok κ fuel e ins ≡ runᴾ fuel e ins
-    same = agrees-values (plainᵏ Γ κ) Γ t ok (proj₁ (simulation κ fuel e ins))
+    sim = simulation κ fuel e ins
+    fuelᴵ = proj₁ sim
+    sandwich = batched-sandwich ok κ fuelᴵ e ins
+    same : valsᴵ ok κ fuelᴵ e ins ≡ runᴾ fuel e ins
+    same = agrees-values (plainᵏ Γ κ) Γ t ok (proj₁ (proj₂ (proj₂ sim)))
