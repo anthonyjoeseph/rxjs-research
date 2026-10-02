@@ -51,7 +51,8 @@ open import Data.Nat.Properties using (≤-refl)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Function.Base using (_|>′_)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Unit using (⊤)
 open import Data.Unit.Polymorphic using (tt)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
@@ -62,7 +63,7 @@ open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; Arrival; arrTick; arrTy; arrVal; arrSource; AtFloor;
   RegId; RegRow; regSource; sameSource; pathHasNode; chainsGo; chainsOf; schedGo;
   cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init)
-open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
+open import Rx.Evaluator.Domain using (subscribeE⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (reducible; rawFold; red-env)
@@ -188,32 +189,52 @@ cascade! a sched st ru with Arrival.isLast a in eql
               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru₁ x∈)) (chain-agree a ru₁) |>′ λ ((_ , sched₂ , st₂) , g′ , ru₂) →
       _ , casc-run-last eql g g′ , finish-rule a sched₂ st₂ ru₂
 
-drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-         (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) → {-@0-}Rule sched st
-       → Σ⁰ (Stream Γ t) λ s → drain⇓ {e = e} fuel sched st s
-drain! zero    sched st ru = _ , drain-done
-drain! (suc k) sched st ru with sched-next sched in eqn
-... | inj₁ _            = _ , drain-empty eqn
-... | inj₂ (a , sched′) =
-      cascade! a sched′ st (pop-rule eqn ru) |>′ λ ((out , sched″ , st′) , c , ru′) →
-      drain! k sched″ st′ ru′ |>′ λ (_ , d) →
-      _ , drain-step eqn c d
+-- THE POP IS AN ARGUMENT RATHER THAN A `with`, so a proof comparing
+-- two fuels can split on it once for both: a `with … in` abstraction
+-- over a goal that already holds this one's equation is ill-typed.
+mutual
+  drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+           (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) → {-@0-}Rule sched st
+         → Σ⁰ (Stream Γ t) λ s → drain⇓ {e = e} fuel sched st s
+  drain! zero    sched st ru = _ , drain-done
+  drain! (suc k) sched st ru = drainOn k sched st ru (sched-next sched) refl
+
+  drainOn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+            (k : Fuel) (sched : Sched Γ) (st : EvalSt e) → {-@0-}Rule sched st
+          → (x : ⊤ ⊎ (Arrival Γ × Sched Γ)) → {-@0-}sched-next sched ≡ x
+          → Σ⁰ (Stream Γ t) λ s → drain⇓ {e = e} (suc k) sched st s
+  drainOn k sched st ru (inj₁ _)            eqn = _ , drain-empty eqn
+  drainOn k sched st ru (inj₂ (a , sched′)) eqn =
+    cascade! a sched′ st (pop-rule eqn ru) |>′ λ ((out , sched″ , st′) , c , ru′) →
+    drain! k sched″ st′ ru′ |>′ λ (_ , d) →
+    _ , drain-step eqn c d
 
 ------------------------------------------------------------------
 -- THE TOP LINE.
 ------------------------------------------------------------------
+
+-- THE ROOT SUBSCRIBE, NAMED BECAUSE IT DOES NOT READ THE FUEL.  Runs
+-- at two fuels share it as one term only if it is one definition, which
+-- is what lets a proof compare them.
+subscribe! : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+           → Σ⁰ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+               subscribeE⇓ {e = e} ([] , e , []ᵉ) (root {lo = n}) 0 (sched-init e ins) (st-init e) r
+             × Rule (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+subscribe! {n = n} {Γ = Γ} e ins =
+  let aM = <-wellFounded _ in
+  reducible aM e []ᵉ (red-env {Γ = Γ} aM []ᵉ) (root {lo = n}) (standing tt) rootRP tt 0
+          (sched-init e ins) (st-init e) ≤-refl
+          (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt)) |>′ λ (r , s , _ , hs , _) →
+  r , s , ruled (sounds hs)
 
 -- A RUN IS ITS ROOT SUBSCRIBE FOLLOWED BY ITS DRAIN, and the relation
 -- says so in one constructor -- so this is the assembly and the two
 -- builders are its leaves.
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
           → Σ⁰ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
-evaluate! {n = n} {Γ = Γ} fuel e ins =
-  let aM = <-wellFounded _ in
-  reducible aM e []ᵉ (red-env {Γ = Γ} aM []ᵉ) (root {lo = n}) (standing tt) rootRP tt 0
-          (sched-init e ins) (st-init e) ≤-refl
-          (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt)) |>′ λ ((out , sched₀ , st₀) , s , _ , hs , _) →
-  drain! fuel sched₀ st₀ (ruled (sounds hs)) |>′ λ (rest , d) →
+evaluate! fuel e ins =
+  subscribe! e ins |>′ λ ((out , sched₀ , st₀) , s , ru) →
+  drain! fuel sched₀ st₀ ru |>′ λ (rest , d) →
   _ , eval-run s d
 
 -- AND THE EVALUATOR IS THE PROJECTION.  Not a new machine -- the same

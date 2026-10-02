@@ -186,8 +186,10 @@ Main                                     four top-line statements, claimed
  │   │                                    batches, joined, are the plain
  │   │                                    program's values — tier 2
  │   ├─ simulation                        Simulation/Statement.agda — the
- │   │                                    impl's run is the plain run, each
- │   │                                    value named by its arrival
+ │   │   │                                impl's run is the plain run, each
+ │   │   │                                value named by its arrival
+ │   │   ├─ arrival-values                one arrival's values, run on run
+ │   │   └─ arrival-instants              one instant per arrival, the impl's
  │   └─ batched-sandwich                  the batcher against its own run
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
  │   │                                    group emits as the timed
@@ -234,39 +236,47 @@ drawn programs, and a case past its clock is undecided, never a failure
 
 ### The monster
 
-(no monster) — chosen among the simulation's leaves once it is split per
-former, since until then it is one statement under both assembled top lines.
+`simulation` — the one theorem both assembled top lines stand on, now a real
+body over two leaves joined by `run-prefix`: `arrival-values`, the only
+statement in the tier about both machines at once, and `arrival-instants`,
+about the impl alone. It descends to `arrival-values` once that leaf is a body
+per former; until then the leaf's cone would shut out the assembly the next
+leg rewrites.
+
+also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **QUICKCHECK THE SIMULATION ON FLATTENERS.** The likeliest-false
-  region: that a flattener's stamps group its inner emits as the plain
-  run's arrivals do, under merge, switch and exhaust, where the bug
-  cache's rows fell. A flattener's run does not reduce in the typechecker
-  inside 8 GB, so the probe tree reaches first-order only; decide both
-  conjuncts in `make quickcheck` on drawn programs before anything under
-  the simulation is ground. A failure restates the simulation, not the
-  batcher.
+- **SPLIT THE ARRIVAL'S VALUES PER FORMER.** `arrival-values` is the
+  riskiest leaf: one arrival's values, impl against plain. State a
+  correspondence between the two machines' configurations first — each
+  plain node beside the gadget elaboration made of it, live sources and
+  ordinals matched in order — then the leaf as that relation preserved
+  by one drain step, one obligation per former. A former whose step
+  breaks it is a FALSITY localised to that former, which a drawn program
+  can then reach.
 
-- **SPLIT THE SIMULATION PER FORMER.** `left-to-right` and
-  `timing-correct` are real bodies over `simulation`; `batchable` and
-  `timed-faithful` do not stand on it, the first being the protocol's
-  well-formedness and the second plain-only. What remains is one leaf
-  per former under the simulation, so the tier's monster is chosen among
-  leaves rather than at the theorem every top line stands on.
+- **SPLIT THE INSTANTS PER FORMER.** `arrival-instants` reads the impl
+  alone: every value of one arrival's slice carries one instant, and no
+  two arrivals share one. State it over the impl's cascade, one former at
+  a time, beside the values split so the two leaves recurse on the same
+  configuration and the monster drops to whichever stays riskier.
 
-- **ONLY THEN GRIND THE REST.** The simulation by a two-run relation
-  recursing on the type as `Red` does, reusing its descent for the μ peel,
-  the flattener's hop and a share's connect; the batcher's leaves are list
-  lemmas. A case the one-past fuel slack in `left-to-right` does not cover
-  is a fuel finding for Anthony, not a restatement.
+- **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
+  relation recursing on the type as `Red` does, reusing its descent for
+  the μ peel, the flattener's hop and a share's connect; the batcher's
+  leaves are list lemmas. A case the one-past fuel slack in
+  `left-to-right` does not cover is a fuel finding for Anthony, not a
+  restatement.
 
 ### The ledger
 
-- **`simulation`** (Simulation.Statement) — FALSITY, `PROBED`: the impl's run,
-  decoded, is the plain run with each value stamped by a name for its arrival,
-  read off the plain run's value counts at successive fuels; carries
-  `left-to-right` and `timing-correct`.
+- **`arrival-values`** (Simulation.Statement) — FALSITY, `PROBED`: one
+  arrival's slice of the impl's run, decoded, agrees value by value with the
+  plain run's slice for it; the shared-slot fallback is paid here.
+- **`arrival-instants`** (Simulation.Statement) — FALSITY, `PROBED`: every
+  value of one arrival's slice of the impl's run carries one instant, and no
+  two arrivals' instants coincide.
 - **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY, `PROBED`: the
   joined run between its own unbatched values at one fuel and one past it,
   since a cut-off run's last batch waits for an arrival (Anthony).
