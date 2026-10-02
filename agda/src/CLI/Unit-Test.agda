@@ -208,4 +208,8 @@ cases =
           (takeˢ (natˢ 3) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))
           (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
                    ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
+  cached "the seeds 1..8 depth 3 sweep's counterexample" 30
+          (takeˢ (natˢ 0) (takeˢ (natˢ 3) (μˢ (deferˢ (varˢ (here refl))))))
+          (mkSlots (cold [] ((after 1 , 8) ∷ ((after 0 , 3) ∷ [])))
+                   ((inputˢ zero))) ∷
   []

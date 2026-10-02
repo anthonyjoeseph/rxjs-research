@@ -13,9 +13,7 @@
 -- behind (Anthony).
 --
 -- THE IMPL RUNS AT ITS OWN FUEL, NEVER LESS THAN THE PLAIN RUN'S
--- (Anthony).  The elaboration's `takeᵖ` subscribes a cold twice, so the
--- impl reaches a plain arrival's values some arrivals later; the fuel
--- that matches is `simulation`'s.
+-- (Anthony).  The fuel that matches is `simulation`'s.
 --
 -- CLOSES A CHEAT THE OTHER TOP-LINE STATEMENTS LEAVE OPEN.
 -- Elaborating every program to `empty` is trivially batched, and fails
@@ -71,8 +69,6 @@ valsᴵ : ∀ {n} {Γ : Ctx n} {t} → T (isData t) → (κ : Kinds n) → Fuel
       → SExp Γ [] [] [] t → SimulSlots Γ κ → List (Val Γ t)
 valsᴵ {t = t} ok κ fuel e ins = map (unplainᵈ t ok) (map proj₂ (instExtract (runᴵ κ fuel e ins)))
 
--- REFUTED: `left-to-right-false` -- the equal-fuel form, at `take 2`
---   over a cold with two async values.
 Left-To-Right : Set
 Left-To-Right =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)

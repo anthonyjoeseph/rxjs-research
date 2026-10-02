@@ -18,7 +18,7 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Ordinal; Source; Timed; after_,_; hot; cold; PlainEvent)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; _+ᵗ_; unitᵗ; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _+ᵗ_; unitᵗ; boolᵗ; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
 
 variable
   lo : ℕ
@@ -208,7 +208,7 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- is named for what it HOLDS rather than for whichever
                -- former happens to be installed over it.  The type is
                -- existential, so each read pays a `_≟ᵗ_`.
-  take-st    : ℕ → NodeState Γ                  -- emissions remaining
+  take-st    : ℕ → NodeState Γ                  -- the budget remaining
   mergeAll-st : ∀ {t} → (limit : Maybe ℕ) (active : ℕ)
                (queued : List (Val Γ (obs t))) (outerDone : Bool) → NodeState Γ
                -- ONE state for every concurrency.  The two states this
@@ -309,7 +309,15 @@ data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
                -- raise fin, and neither can see the frame it is
                -- stepping — which is what keeps both expressible as the
                -- plain-rxjs operators they are named after.
-  take-f     : ∀ {s} → NodeId → Frame Γ s s
+  take-f     : ∀ {s} → Maybe (FnClo Γ s boolᵗ) → NodeId → Frame Γ s s
+               -- ONE FRAME FOR `take` AND `takeWhile`, BECAUSE THEY DIFFER
+               -- ONLY IN WHICH VALUE SPENDS THE BUDGET.  A count spends one
+               -- per value; a test leaves a budget of one unspent until a
+               -- value FAILS it, and that value still leaves -- rxjs's
+               -- inclusive `takeWhile(p , true)`.  Either way the value
+               -- that spends the last of it leaves, the frame cuts
+               -- mid-burst and the stream ends, so the node, the cut and
+               -- every fact about them are shared.
   batchSync-f : ∀ {s} → NodeId → Frame Γ s (s ×ᵗ listᵗ s)
                -- THE ONLY FRAME WHOSE OUTPUT TYPE IS NOT ITS INPUT'S
                -- OR A LAYER OFF IT, AND THE GROUPING IS WHY.  Values
@@ -408,7 +416,7 @@ lowerFloor le (f ↠[ h ] p)     = f ↠[ ≤-trans le h ] p
 frameNodes : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List NodeId
 frameNodes (map-f _)          = []
 frameNodes (scan-f _ k)       = k ∷ []
-frameNodes (take-f k)         = k ∷ []
+frameNodes (take-f _ k)       = k ∷ []
 frameNodes (batchSync-f k)    = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
 frameNodes (thru-outer _ k) = k ∷ []
@@ -548,32 +556,40 @@ chainsOf a st = chainsGo a (EvalSt.registry st)
 -- limit.  Real `take` cuts MID-BURST rather than waiting for the burst
 -- to finish, which is what the third component says and what the
 -- dispatch below acts on.
-takeVals : ∀ {n} {Γ : Ctx n} {s} → ℕ → List (Val Γ s) → List (Val Γ s) × ℕ × Bool
-takeVals zero          _        = [] , zero , false
-takeVals (suc k)       []       = [] , suc k , false
-takeVals (suc zero)    (v ∷ _)  = v ∷ [] , zero , true
-takeVals (suc (suc k)) (v ∷ vs) =
-  takeVals (suc k) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
+spends : ∀ {n} {Γ : Ctx n} {s} → Maybe (FnClo Γ s boolᵗ) → Val Γ s → Bool
+spends nothing  _ = true
+spends (just p) v = not (applyClo p v)
+
+takeVals : ∀ {n} {Γ : Ctx n} {s} → Maybe (FnClo Γ s boolᵗ) → ℕ → List (Val Γ s)
+         → List (Val Γ s) × ℕ × Bool
+takeVals w zero          _        = [] , zero , false
+takeVals w (suc k)       []       = [] , suc k , false
+takeVals w (suc zero)    (v ∷ vs) with spends w v
+... | true  = v ∷ [] , zero , true
+... | false = takeVals w (suc zero) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
+takeVals w (suc (suc k)) (v ∷ vs) with spends w v
+... | true  = takeVals w (suc k) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
+... | false = takeVals w (suc (suc k)) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
 
 -- take's whole step.  Non-cut passes the budgeted prefix through and
 -- threads the remaining count; the cut exhausts the budget, forces the
 -- end, and severs the registrations threaded through this node.
 takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-             → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
+             → Maybe (FnClo Γ s boolᵗ) → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
              → Maybe (NodeState Γ)
              → List (Val Γ s) × Bool × Sched Γ × EvalSt e
-takeDispatch nid vals fin sched st (just (take-st k)) =
-  if proj₂ (proj₂ (takeVals k vals))
+takeDispatch w nid vals fin sched st (just (take-st k)) =
+  if proj₂ (proj₂ (takeVals w k vals))
   then (cutThrough nid (EvalSt.registry st) |>′ λ (kept , cutRids) →
-        proj₁ (takeVals k vals) , true ,
+        proj₁ (takeVals w k vals) , true ,
            record sched { live = sweepLive kept (Sched.live sched) } ,
            record st { registry = kept
                      ; cancelled = cutRids ++ EvalSt.cancelled st
                      ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
-  else (proj₁ (takeVals k vals) , fin , sched ,
-        record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+  else (proj₁ (takeVals w k vals) , fin , sched ,
+        record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals w k vals))))
                                       (EvalSt.nodes st) })
-takeDispatch nid vals fin sched st _ = [] , fin , sched , st
+takeDispatch w nid vals fin sched st _ = [] , fin , sched , st
 
 -- scan's per-value fold: one running output per input, threading the
 -- accumulator.  Its output IS its carried state, which is what rxjs's

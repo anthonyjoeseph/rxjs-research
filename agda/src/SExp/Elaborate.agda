@@ -5,17 +5,16 @@ open import Data.List using (List; []; _∷_; _++_; map; foldr)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (nothing; just)
+open import Data.Maybe using (nothing)
 open import Data.Fin using (Fin; _↑ʳ_)
 open import Data.Vec using (lookup; zipWith)
 open import Data.Vec.Properties using (lookup-zipWith; lookup-++ʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; refl; trans)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; takeᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
-  mapᵉ; scanᵉ; FlatOp; mergeᶠ; switchᶠ; flattenᵉ; batchSyncᵉ; unitᵗ; _+ᵗ_;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
-  foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul;
-  eqᵖ; ltᵖ; eqᵘ; notᵖ)
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ;
+  mintᵉ; mapᵉ; scanᵉ; FlatOp; mergeᶠ; flattenᵉ; batchSyncᵉ; unitᵗ; _+ᵗ_; varᵗ; unit̂; bool̂;
+  nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ;
+  revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; takeWhileᵉ)
 open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ; instantᵛ; sourceᵛ; kindᵛ;
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
@@ -502,37 +501,21 @@ cutClosesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ b}
 cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
   (consᵗ (closeᵛ (varᵗ (here refl)) (inlᵗ unit̂)) (varᵗ (there (here refl)))))
 
--- THE PIPELINE THE MIRROR WRITES, MINUS ITS ENDING.  A scan carrying
--- the quota, the open registrations, whether the cut has happened and
--- the emit this delivery produced; then a projection pulling that emit
--- back out of the state.  Counting the author's values and truncating
--- their list is a pure step's work, and the state carries the answer
--- and the emit together because the palette reads a value and nothing
--- beside it.
+-- THE PIPELINE THE MIRROR WRITES, OPERATOR FOR OPERATOR.  A scan
+-- carrying the quota, whether the cut has happened, the open
+-- registrations and the emit this delivery produced; an inclusive
+-- `takeWhileᵉ` ending on the state whose cut has happened; then a
+-- projection pulling the emit back out of the state.  Counting the
+-- author's values and truncating their list is a pure step's work, and
+-- the state carries the answer and the emit together because the
+-- palette reads a value and nothing beside it.
 --
--- THE ENDING IS A TAKE-UNTIL, BECAUSE THE PALETTE HAS NO TAKE-WHILE.
--- rxjs ends on `takeWhile(p, true)`, whose predicate reads the scan's
--- own state; the plain palette can only end at an emit INDEX fixed at
--- subscription, or when a flattener's outer and inner have both ended.
--- So the counted stream is a switch's first lane, and the outer's
--- second lane -- concatenated, so subscribed after the first -- is the
--- first emit of a SECOND subscription to the count whose cut has
--- happened, carrying an empty lane.  Subscribed second, it hears each
--- arrival after the first lane has put it out, so the switch drops the
--- count and completes in the instant of the emit that filled the quota.
--- Every emit the count puts out after it, before the cut is heard,
--- carries its bookkeeping and no values.
---
--- THE SECOND SUBSCRIPTION IS OBSERVABLE, AND A SHARE IS WHERE.  The
--- cut lane re-subscribes the author's source, and a share connected by
--- the first subscription replays nothing to the second, so the cut
--- lane can miss the very values that filled the quota and cut at a
--- LATER source event.  The bug cache's row "the seeds 13..36 depth 2
--- sweep's counterexample" is that: `take 3` over a merge of an `of`, a
--- share of an `of` and a cold puts out 5, 5, 3 at subscription and its
--- END only at the cold's first event, where the plain `take` ends at
--- subscription.  The TypeScript ends on one subscription's
--- `takeWhile`, so this is the mirror diverging, not the spec.
+-- THE ENDING READS THE SCAN'S OWN STATE ON THE ONE SUBSCRIPTION, AND
+-- THE ONE SUBSCRIPTION IS OBSERVABLE.  An ending that subscribed the
+-- author's source a second time misses whatever a share upstream put
+-- out to the first, so it cuts at a LATER source event than the
+-- plain `take` -- the bug cache's row "the seeds 13..36 depth 2
+-- sweep's counterexample".
 --
 -- AND THE BEHAVIOUR THE CUT MUST MIRROR IS MEASURED RATHER THAN
 -- INFERRED (Anthony: "just run it in js").  Real rxjs `take` was run
@@ -542,6 +525,13 @@ cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
 -- dropped rather than waited for; and at ZERO it never subscribes its
 -- source at all, which is the fact a count-down silently gets wrong.
 --
+-- SO ZERO IS DECIDED AT SUBSCRIBE, BEFORE THE SOURCE EXISTS.  The count
+-- is a term, so the choice is a one-lane flatten whose lane is picked
+-- by `ifᵗ` when it is subscribed: `emptyᵖ` under the frame at zero, the
+-- counted pipeline otherwise.  A pipeline that subscribes and cuts at
+-- the source's first emit is wrong exactly when that emit is late, which
+-- is the bug-cache row "the seeds 1..8 depth 3 sweep's counterexample".
+--
 -- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, exactly as `scanᵖ`'s is: a
 -- scan emits the result of its FIRST application and never the seed, so
 -- the tokens below are read by nothing and claim no freshness.  One
@@ -550,10 +540,13 @@ cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
 --   converts a budget over values into the emit index a
 --   subscription-time count has to name.
 takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-      → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-takeᵖ {Θ = Θ} {t = t} k e =
-  mintᵉ (flatAllᵉ switchᶠ (flatAllᵉ (mergeᶠ (just 1))
-    (ofᵉ (strmᵗ (ofᵉ (strmᵗ (mapᵉ outᵛ counted) ∷ [])) ∷ strmᵗ (takeᵉ (nat̂ 1) cutᵉ) ∷ []))))
+      → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ natᵗ
+      → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+takeᵖ {Θ = Θ} {t = t} frame k e =
+  flatAllᵉ (mergeᶠ nothing)
+    (ofᵉ (ifᵗ (primᵗ eqᵖ (pairᵗ k (nat̂ 0)))
+              (strmᵗ (emptyᵖ frame))
+              (strmᵗ (mintᵉ (mapᵉ outᵛ (takeWhileᵉ open? counted)))) ∷ []))
   where
   -- the quota left, whether the cut has happened, the open
   -- registrations, and the emit this delivery produced
@@ -592,7 +585,7 @@ takeᵖ {Θ = Θ} {t = t} k e =
                                                 (appendᵗ book (cutClosesᵛ open'))
                                                 taken (bool̂ true)))))
               (pairᵗ (primᵗ sub (pairᵗ rem (lengthᵛ taken)))
-                     (pairᵗ done
+                     (pairᵗ (bool̂ false)
                             (pairᵗ open' (reassembleᵛ env book taken fin))))
     where
     taken = varᵗ (here refl)
@@ -602,13 +595,11 @@ takeᵖ {Θ = Θ} {t = t} k e =
     book  = fstᵗ split
     fin   = sndᵗ (sndᵗ split)
     rem   = fstᵗ st
-    done  = fstᵗ (sndᵗ st)
     open' = openAfterᵛ book (fstᵗ (sndᵗ (sndᵗ st)))
 
-    -- the closes are minted ONCE: the quota is spent from the emit that
-    -- fills it onwards, so the equality alone would re-cut on every
-    -- emit after it.
-    cut? = ifᵗ done (bool̂ false) (primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem))
+    -- the emit that fills the quota cuts, and the ending lets nothing
+    -- after it through
+    cut? = primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem)
 
   -- inside the first `letᵗ`: the split, the step's argument, the
   -- mint's token, then Θ
@@ -627,11 +618,9 @@ takeᵖ {Θ = Θ} {t = t} k e =
   counted : Exp _ _ _ (uniqᵗ ∷ Θ) S
   counted = scanᵉ step seed e'
 
-  -- an empty lane from every emit at or after the cut
-  cutᵉ : Exp _ _ _ (uniqᵗ ∷ Θ) (obs (emitᵗ t))
-  cutᵉ = flattenᵉ (mergeᶠ nothing)
-    (mapᵉ (pairᵗ (ifᵗ (fstᵗ (sndᵗ (varᵗ (here refl)))) (inrᵗ (strmᵗ emptyᵉ)) (inlᵗ unit̂)) (inlᵗ unit̂))
-          counted)
+  -- open until the state whose cut has happened, which still leaves
+  open? : Fn _ _ _ (uniqᵗ ∷ Θ) S boolᵗ
+  open? = primᵗ notᵖ (fstᵗ (sndᵗ (varᵗ (here refl))))
 
 -- ONE OUTER EMIT AS ONE FLATTENER ELEMENT: an echo carrying the emit's
 -- bookkeeping and its echoed values, beside a lane merging the inners it
@@ -912,7 +901,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    ... | sharedᵏ | eq = readStampedᵖ (n ↑ʳ i) eq (frameᵛ Θ)
    toInstEmit {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toInstEmitTms ts)
    toInstEmit {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
-   toInstEmit (takeˢ k e)         = takeᵖ (toInstEmitTm k) (toInstEmit e)
+   toInstEmit {Θ = Θ} (takeˢ k e) = takeᵖ (frameᵛ Θ) (toInstEmitTm k) (toInstEmit e)
    toInstEmit (mapˢ f e)          = mapᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (scanˢ f z e)       = scanᵖ (toInstEmitTm f) (toInstEmitTm z) (toInstEmit e)
    toInstEmit {Θ = Θ} (flattenˢ op e) = flattenᵖ op (frameᵛ Θ) (toInstEmit e)

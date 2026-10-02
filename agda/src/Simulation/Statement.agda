@@ -111,11 +111,7 @@ arrivalsOf : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] 
 arrivalsOf {κ = κ} fuel e ins = arrivalsᴾ (λ k → length (runᴾ {κ = κ} k e ins)) fuel
 
 -- THE IMPL RUNS AT ITS OWN FUEL, NEVER LESS THAN THE PLAIN RUN'S
--- (Anthony).  The elaboration's `takeᵖ` subscribes its upstream twice,
--- so over a cold one the impl spends more arrivals delivering what the
--- plain run delivers in fewer.
--- REFUTED: `simulation-false` -- the equal-fuel form, at `take 2` over
---   a cold with two async values.
+-- (Anthony).
 Simulation : Set
 Simulation =
   ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel)
@@ -175,34 +171,22 @@ postulate
   -- arrivals 1 and 2, both at instant 29.  Not stated in Agda: the timed
   -- `take` does not reduce in the typechecker in useful time.
   --
-  -- RUNS LONGER THAN ONE IMPL ARRIVAL HOLD WHERE THE SWEEP REACHES THEM.
-  -- Compiled, every statement decided: the bug cache's rows "a cold
-  -- under two takes in one merge" -- the cut lane's empty arrival folds
-  -- into the next run, and timed, a value and its END land at two impl
-  -- arrivals of one instant -- and "a take of a cold exhausted beside an
-  -- of", timed, the same split; "an of buffered behind a take of a
-  -- cold", untimed, splits VALUES: the cut lane's copy of the cold's first
-  -- event completes the `take`, so the buffered `of` emits one impl
-  -- arrival later, at the same instant.  CI's sweep, seeds 1..12 at
-  -- fifteen cases of depth 2, adds no counterexample.
+  -- RUNS LONGER THAN ONE IMPL ARRIVAL HOLD WHERE THE BUG CACHE REACHES
+  -- THEM.  Compiled, every statement decided: the rows "a cold under two
+  -- takes in one merge" and "a take of a cold exhausted beside an of",
+  -- where timed, a value and its END land at two impl arrivals of one
+  -- instant.
   --
   -- NO TARGETED ROW REACHES AN IMPL ARRIVAL CARRYING TWO PLAIN ARRIVALS'
-  -- VALUES.  An impl pop is one scheduled event, and the elaborated
-  -- `take`'s copies enqueue right behind their originals, so a shared
-  -- arrival needs a copy popped after another plain arrival's event.
-  -- The bug cache aims at each way to subscribe a `take` late, every
+  -- VALUES.  The bug cache aims at each way to subscribe a `take` late, every
   -- statement decided: a merge buffering behind it ("an of buffered
   -- behind a take of a cold"), a merge or a switch of a hot subscribing
   -- it per arrival, a cold subscribing it at its own arrivals, a `defer`
   -- re-entering it through `μ`, and a `scan` fed back through that
-  -- `defer`.  Each keeps a copy adjacent to its original; where an impl
-  -- arrival holds two values ("a scan fed back through a take of a
-  -- deferred self, hot"), the plain arrival holds the same two.
+  -- `defer`.  Where an impl arrival holds two values ("a scan fed back
+  -- through a take of a deferred self, hot"), the plain arrival holds the
+  -- same two.
   --
-  -- REFUTED: `arrival-values-false` -- the equal-fuel form with the map
-  --   the identity, at `take 2` over a cold with two async values;
-  --   `takeᵖ` subscribes the cold twice, so the impl's slice at arrival 2
-  --   is empty where the plain run's holds 6.
   -- PROBED: `Probed.Simulation` -- every slice through fuel 3 over three
   --   first-order programs and the timed translations of two, all over a
   --   hot slot with the map the identity, the empty slices included.  No

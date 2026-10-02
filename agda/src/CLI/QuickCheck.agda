@@ -68,7 +68,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Rx.Prim using (after_,_; Timed; ObservableInput; hot; cold; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; Ctx; natᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ;
-  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Exp; Tm; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
+  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Exp; Tm; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
   flattenᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; foldᵗ; nilᵗ; consᵗ; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ;
@@ -528,7 +528,7 @@ genExp d = genExpAt 0 0 2 d
 -- decoder and the TypeScript union spell.
 data Former : Set where
   fInput fOf fEmpty fTake fMap fScan fFlatten fMu fVar fDefer fMint
-    fBatchSync : Former
+    fBatchSync fTakeWhile : Former
 
 formerTag : Former → String
 formerTag fInput      = "input"
@@ -543,10 +543,11 @@ formerTag fVar        = "varE"
 formerTag fDefer      = "defer"
 formerTag fMint       = "mint"
 formerTag fBatchSync  = "batchSync"
+formerTag fTakeWhile  = "takeWhile"
 
 allFormers : List Former
 allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fMap ∷ fScan ∷ fFlatten
-           ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ fBatchSync ∷ []
+           ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ fBatchSync ∷ fTakeWhile ∷ []
 
 formerIx : Former → ℕ
 formerIx fInput      = 0
@@ -561,6 +562,7 @@ formerIx fVar        = 8
 formerIx fDefer      = 9
 formerIx fMint       = 10
 formerIx fBatchSync  = 11
+formerIx fTakeWhile  = 12
 
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
@@ -620,9 +622,9 @@ marksˢᵗ (strmˢ e)     = marksˢ e
 marksˢᵗˢ []       = noMarks
 marksˢᵗˢ (y ∷ ys) = marksˢᵗ y ⊕ marksˢᵗˢ ys
 
--- THE TWO FORMERS ONLY AN ELABORATION MAY WRITE are counted where they
+-- THE FORMERS ONLY AN ELABORATION MAY WRITE are counted where they
 -- are written: in the tree the case's program elaborates to, since no
--- author program can carry one (`SExp.Syntax`).  Only those two, because
+-- author program can carry one (`SExp.Syntax`).  Only those, because
 -- every other former is the author's and is counted above, where a
 -- second count off the elaborated tree would double it.
 elabMarksᵉ  : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → Marks
@@ -633,6 +635,7 @@ elabMarksᵉ (input i)      = noMarks
 elabMarksᵉ (ofᵉ ts)       = elabMarksᵗˢ ts
 elabMarksᵉ emptyᵉ         = noMarks
 elabMarksᵉ (takeᵉ c e)    = elabMarksᵗ c ⊕ elabMarksᵉ e
+elabMarksᵉ (takeWhileᵉ f e) = one fTakeWhile ⊕ elabMarksᵗ f ⊕ elabMarksᵉ e
 elabMarksᵉ (batchSyncᵉ e) = one fBatchSync ⊕ elabMarksᵉ e
 elabMarksᵉ (mapᵉ f e)     = elabMarksᵗ f ⊕ elabMarksᵉ e
 elabMarksᵉ (scanᵉ f z e)  = elabMarksᵗ f ⊕ elabMarksᵗ z ⊕ elabMarksᵉ e

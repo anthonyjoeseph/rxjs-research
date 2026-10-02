@@ -43,6 +43,7 @@ const subscribed = (e: Exp, acc: Set<number>): void => {
     case "map":
     case "scan":
     case "take":
+    case "takeWhile":
     case "flatten":
     case "batchSync":
       subscribed(e.src, acc);
@@ -80,6 +81,10 @@ const anywhere = (e: Exp, acc: Set<number>): void => {
       return;
     case "take":
       anywhereTm(e.count, acc);
+      anywhere(e.src, acc);
+      return;
+    case "takeWhile":
+      anywhereTm(e.fn, acc);
       anywhere(e.src, acc);
       return;
     case "flatten":
@@ -167,6 +172,10 @@ const spawned = (e: Exp, acc: Set<number>): void => {
       anywhereTm(e.count, acc);
       spawned(e.src, acc);
       return;
+    case "takeWhile":
+      anywhereTm(e.fn, acc);
+      spawned(e.src, acc);
+      return;
     case "flatten":
     case "batchSync":
       spawned(e.src, acc);
@@ -226,6 +235,7 @@ const flattenerSrcs = (e: Exp, acc: Exp[]): Exp[] => {
     case "map":
     case "scan":
     case "take":
+    case "takeWhile":
     case "batchSync":
       return flattenerSrcs(e.src, acc);
     case "mu":

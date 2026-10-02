@@ -249,13 +249,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **END THE ELABORATED `take` ON ONE SUBSCRIPTION.** The sweep's
-  counterexample row fails `simulation`, `arrival-runs` and
-  `timing-correct`: `takeᵖ`'s cut lane re-subscribes a source holding a
-  share, misses the values that filled the quota, and puts the END at a
-  later instant. The TypeScript ends on one subscription's `takeWhile`;
-  `Rx.Exp` has no such former, so the fix waits on Anthony's ruling on
-  one. Then re-elaborate, port, and re-run the sweep that found it.
+- **CONFIRM THE ONE-SUBSCRIPTION `take` AGAINST BOTH SWEEPS.** `takeᵖ`
+  now ends on `takeWhileᵉ` (Anthony's ruling) over its scan's own state,
+  and a zero count picks `emptyᵖ` at subscribe without subscribing the
+  source. Both sweeps' counterexample rows sit in the bug cache; green
+  there, then re-run seeds 13..36 at depth 2 and 1..8 at depth 3. A new
+  counterexample refutes `simulation` before anything is stated over it.
 
 - **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
   in CI where it fits, reaches nestings no targeted row builds: a late
@@ -282,9 +281,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`arrival-runs`** (Simulation.Statement) — FALSITY, `REFUTED, PROBED`: each
-  plain arrival's slice agrees with a contiguous run of impl arrivals, a rising
-  map saying where each ends, and a run's values carry one instant, no two runs
+- **`arrival-runs`** (Simulation.Statement) — FALSITY, `PROBED`: each plain
+  arrival's slice agrees with a contiguous run of impl arrivals, a rising map
+  saying where each ends, and a run's values carry one instant, no two runs
   sharing one.
 - **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY, `PROBED`: the
   joined run between its own unbatched values at one fuel and one past it,

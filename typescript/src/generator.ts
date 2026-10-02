@@ -433,6 +433,12 @@ const genExp = (
       count: genTm(rng, natT, ctx, Math.min(depth, 2)),
       src: genExp(rng, ty, ctx, depth - 1),
     }),
+    takeWhile: () => ({
+      type: "takeWhile",
+      ty,
+      fn: genFn(rng, ty, boolT, ctx, Math.min(depth, 2)),
+      src: genExp(rng, ty, ctx, depth - 1),
+    }),
     scan: () => {
       const s = genValTy(rng, 2);
       return {

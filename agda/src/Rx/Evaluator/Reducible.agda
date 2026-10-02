@@ -123,7 +123,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Rx.Prim using (Tick)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Closed; Val; Exp; Tm; Env; []ᵉ;
-  _∷ᵉ_; evalWith; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
+  _∷ᵉ_; evalWith; input; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
   flattenᵉ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; μᵉ; varᵉ; deferᵉ; mintᵉ; unfoldμ; varᵗ; unit̂; bool̂; nat̂; nilᵗ; consᵗ; foldᵗ;
   pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; eqᵘ; ltᵖ; notᵖ;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ; FnClo; applyClo)
@@ -142,7 +142,7 @@ open import Rx.Evaluator.Unconn-Arith using (unconn-insert; fell-keeps; room-kee
 open import Rx.Evaluator.Keeps using (foldPath-keeps; stepFrame-keeps; switchKill-keeps; thruWrap-keeps; thruWalk-keeps;
   thruConsume-keeps; subscribeE-keeps; shareGo-keeps; shareDying-keeps)
 open import Rx.Evaluator.Domain using (subscribeE⇓; mergeAllDrain⇓; subs-of; subs-empty; subs-mint; subs-defer; subs-floor; subs-μ;
-  subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-batchSync; subs-shared; slot-spent;
+  subs-map; subs-take-zero; subs-take-suc; subs-takeWhile; subs-scan; subs-batchSync; subs-shared; slot-spent;
   slot-join; slot-connect; connect; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map;
   injectRoot; inner; thruConsume⇓; consume-all-sub; consume-all-enqueue; consume-switch-sub;
   consume-exhaust-sub; thruWalk⇓; walk-nil; walk-echo; walk-cons; drain-spent; innerFinish⇓;
@@ -215,7 +215,7 @@ baseAns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
 -- term size at the arms, the value at `red-val`, the path and its floor
 -- at the raw fold, and every continuation builder guarded by the `fold`
 -- copattern it answers.
--- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenAns fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-flatten red-input red-input-shared red-map red-mapFn red-scan red-take red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-go walk
+-- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenAns fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-flatten red-input red-input-shared red-map red-mapFn red-scan red-take red-takeWhile red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-go walk
 
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
@@ -465,10 +465,10 @@ rawFold ac le aM (scan-f fn k ↠[ le′ ] κ) now vals fin sched st rm so =
   let sd = step-scan {fn = fn} {nid = k} {κ = κ} {now = now} {vals = vals} {fin = fin} {sched = sched} {st = st}
   in rawAfter ac le aM (scan-f fn k) le′ κ _ sd (room-keeps (stepFrame-keeps sd) rm)
        (drop-ot (scan-f fn k) le′ κ (step-kept le′ sd so))
-rawFold ac le aM (take-f k ↠[ le′ ] κ) now vals fin sched st rm so =
-  let sd = step-take {nid = k} {κ = κ} {now = now} {vals = vals} {fin = fin} {sched = sched} {st = st}
-  in rawAfter ac le aM (take-f k) le′ κ _ sd (room-keeps (stepFrame-keeps sd) rm)
-       (drop-ot (take-f k) le′ κ (step-kept le′ sd so))
+rawFold ac le aM (take-f w k ↠[ le′ ] κ) now vals fin sched st rm so =
+  let sd = step-take {w = w} {nid = k} {κ = κ} {now = now} {vals = vals} {fin = fin} {sched = sched} {st = st}
+  in rawAfter ac le aM (take-f w k) le′ κ _ sd (room-keeps (stepFrame-keeps sd) rm)
+       (drop-ot (take-f w k) le′ κ (step-kept le′ sd so))
 rawFold ac le aM (batchSync-f k ↠[ le′ ] κ) now vals fin sched st rm so =
   let sd = step-batchSync {nid = k} {κ = κ} {now = now} {vals = vals} {fin = fin} {sched = sched} {st = st}
   in rawAfter ac le aM (batchSync-f k) le′ κ _ sd (room-keeps (stepFrame-keeps sd) rm)
@@ -630,6 +630,12 @@ red-mapFn : ∀ {n} {Γ : Ctx n} {Θ s t} (f : Tm Γ [] [] (s ∷ Θ) t)
 red-take : ∀ {n} {Γ : Ctx n} {Θ t} (c : Tm Γ [] [] Θ natᵗ)
              (b : Exp Γ [] [] Θ t) → Arm (takeᵉ c b)
 
+-- THE TAKE-WHILE ARM, which is the take arm's at a budget of one: the
+-- frame is the take frame carrying its test, so the translation is the
+-- same truncation.
+red-takeWhile : ∀ {n} {Γ : Ctx n} {Θ t} (f : Tm Γ [] [] (t ∷ Θ) boolᵗ)
+                  (b : Exp Γ [] [] Θ t) → Arm (takeWhileᵉ f b)
+
 -- THE BATCHSYNC ARM, WHICH IS THE ONE THE TRACE EXISTS FOR.  The
 -- bracket is opened by the install and closed when the subscribe call
 -- returns; the arm lowers the bit and folds its frame's successor once
@@ -757,6 +763,7 @@ redExpAcc emptyᵉ ρ rρ k ok aK a aM κ pre rp s now sched st rm h =
   in _ , subs-empty (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an , kept an
 redExpAcc (mapᵉ f b)        ρ rρ k ok aK a aM = red-map f b ρ rρ k ok aK a aM
 redExpAcc (takeᵉ c b)       ρ rρ k ok aK a aM = red-take c b ρ rρ k ok aK a aM
+redExpAcc (takeWhileᵉ f b)  ρ rρ k ok aK a aM = red-takeWhile f b ρ rρ k ok aK a aM
 redExpAcc (batchSyncᵉ b)    ρ rρ k ok aK a aM = red-batchSync b ρ rρ k ok aK a aM
 redExpAcc (scanᵉ f z b)     ρ rρ k ok aK a aM = red-scan f z b ρ rρ k ok aK a aM
 redExpAcc (flattenᵉ op b)   ρ rρ k ok aK a aM = red-flatten op b ρ rρ k ok aK a aM
@@ -996,17 +1003,17 @@ red-take c b ρ rρ k ok aK (acc rs) aM κ pre rp s₀ now sched st rm h | zero 
 red-take c b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h | suc j =
   redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
                                   (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
-                                  (take-f (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (take-st (suc j)) , pfs))
-                                  (liveRP ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp)
+                                  (take-f nothing (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (take-st (suc j)) , pfs))
+                                  (liveRP ≤-refl aM (takeStep nothing (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp)
                                   s₀ now (bumpNode sched) (installNode (nodeCt sched) (take-st (suc j)) st) rm
-                                  (fresh-holds (take-f (nodeCt sched)) κ pfs (just (take-st (suc j))) (take-st (suc j)) (λ _ → node-eq)
+                                  (fresh-holds (take-f nothing (nodeCt sched)) κ pfs (just (take-st (suc j))) (take-st (suc j)) (λ _ → node-eq)
                                      (lookup-set (nodeCt sched) (take-st (suc j)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h) |>′ λ (r , d , tr , hl , kp) →
-  translate ≤-refl aM (takeStep (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , _ , eq′) →
+  translate ≤-refl aM (takeStep nothing (nodeCt sched)) (just (take-st (suc j))) tt κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , _ , eq′) →
   r , subs-take-suc eq refl d , tr′
    , subst (λ p → PreHolds _ κ p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) (unheadPre-head h″ (endPre tr′) eq′)
-       (unheadHolds (take-f (nodeCt sched)) ≤-refl κ (endPre tr) hl)
+       (unheadHolds (take-f nothing (nodeCt sched)) ≤-refl κ (endPre tr) hl)
    , subst (λ p → Kept κ p sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) (unheadPre-head h″ (endPre tr′) eq′)
-       (unheadKept (take-f (nodeCt sched)) ≤-refl κ (endPre tr)
+       (unheadKept (take-f nothing (nodeCt sched)) ≤-refl κ (endPre tr)
        {sched} {bumpNode sched} {st = st} {st₁ = installNode (nodeCt sched) (take-st (suc j)) st}
        (λ k′ k< on → subst T (<→≢ᵇ k<) (node-one {nodeCt sched} {k′} on)) (n≤1+n _)
        (λ k′ k< → set-above (nodeCt sched) k′ (take-st (suc j)) (EvalSt.nodes st) (<→≢ᵇ k<))
@@ -1015,13 +1022,47 @@ red-take c b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st r
 red-take {n = n} c b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell | suc j =
   redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok) aK
                                   (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c)))) aM
-                                  (take-f (nodeCt sched) ↠[ ≤-refl ] κ) fallen
-                                  (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (take-f (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
+                                  (take-f nothing (nodeCt sched) ↠[ ≤-refl ] κ) fallen
+                                  (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (take-f nothing (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
                                   (bumpNode sched) (installNode (nodeCt sched) (take-st (suc j)) st) rm
-                                  (grounded (ground fell) (fresh-sound (take-f (nodeCt sched)) κ (take-st (suc j)) (λ _ → node-eq) (sounds fell))) |>′ λ (r , d , tr , hl , kp) →
+                                  (grounded (ground fell) (fresh-sound (take-f nothing (nodeCt sched)) κ (take-st (suc j)) (λ _ → node-eq) (sounds fell))) |>′ λ (r , d , tr , hl , kp) →
   r , subs-take-suc eq refl d , []ᵗ
-    , unheadHolds (take-f (nodeCt sched)) ≤-refl κ fallen
-        (subst (λ p → PreHolds _ (take-f (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+    , unheadHolds (take-f nothing (nodeCt sched)) ≤-refl κ fallen
+        (subst (λ p → PreHolds _ (take-f nothing (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+           (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
+    , tt
+
+-- THE TAKE-WHILE ARM'S BODY: the take arm's at a budget of one, whose
+-- source is always subscribed.
+red-takeWhile f b ρ rρ k ok aK (acc rs) aM κ (standing pfs) rp s₀ now sched st rm h =
+  redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK
+                                  (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM
+                                  (take-f (just (_ , f , ρ)) (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just (take-st (suc zero)) , pfs))
+                                  (liveRP ≤-refl aM (takeStep (just (_ , f , ρ)) (nodeCt sched)) (just (take-st (suc zero))) tt κ pfs rp)
+                                  s₀ now (bumpNode sched) (installNode (nodeCt sched) (take-st (suc zero)) st) rm
+                                  (fresh-holds (take-f (just (_ , f , ρ)) (nodeCt sched)) κ pfs (just (take-st (suc zero))) (take-st (suc zero)) (λ _ → node-eq)
+                                     (lookup-set (nodeCt sched) (take-st (suc zero)) (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) h) |>′ λ (r , d , tr , hl , kp) →
+  translate ≤-refl aM (takeStep (just (_ , f , ρ)) (nodeCt sched)) (just (take-st (suc zero))) tt κ pfs rp s₀ tr refl |>′ λ (tr′ , h″ , _ , eq′) →
+  r , subs-takeWhile refl d , tr′
+   , subst (λ p → PreHolds _ κ p (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) (unheadPre-head h″ (endPre tr′) eq′)
+       (unheadHolds (take-f (just (_ , f , ρ)) (nodeCt sched)) ≤-refl κ (endPre tr) hl)
+   , subst (λ p → Kept κ p sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))) (unheadPre-head h″ (endPre tr′) eq′)
+       (unheadKept (take-f (just (_ , f , ρ)) (nodeCt sched)) ≤-refl κ (endPre tr)
+       {sched} {bumpNode sched} {st = st} {st₁ = installNode (nodeCt sched) (take-st (suc zero)) st}
+       (λ k′ k< on → subst T (<→≢ᵇ k<) (node-one {nodeCt sched} {k′} on)) (n≤1+n _)
+       (λ k′ k< → set-above (nodeCt sched) k′ (take-st (suc zero)) (EvalSt.nodes st) (<→≢ᵇ k<))
+       (λ _ _ _ ea → ea)
+       kp)
+red-takeWhile {n = n} f b ρ rρ k ok aK (acc rs) aM {lo = lo} κ fallen rp s₀ now sched st rm fell =
+  redExpAcc b ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK
+                                  (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM
+                                  (take-f (just (_ , f , ρ)) (nodeCt sched) ↠[ ≤-refl ] κ) fallen
+                                  (dropS (fallenRP (<-wellFounded (n ∸ lo)) ≤-refl aM (take-f (just (_ , f , ρ)) (nodeCt sched) ↠[ ≤-refl ] κ))) s₀ now
+                                  (bumpNode sched) (installNode (nodeCt sched) (take-st (suc zero)) st) rm
+                                  (grounded (ground fell) (fresh-sound (take-f (just (_ , f , ρ)) (nodeCt sched)) κ (take-st (suc zero)) (λ _ → node-eq) (sounds fell))) |>′ λ (r , d , tr , hl , kp) →
+  r , subs-takeWhile refl d , []ᵗ
+    , unheadHolds (take-f (just (_ , f , ρ)) (nodeCt sched)) ≤-refl κ fallen
+        (subst (λ p → PreHolds _ (take-f (just (_ , f , ρ)) (nodeCt sched) ↠[ ≤-refl ] κ) p (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
            (fallen-stays (<-wellFounded (n ∸ lo)) ≤-refl aM _ tr) hl)
     , tt
 

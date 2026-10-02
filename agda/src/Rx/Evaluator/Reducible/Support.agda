@@ -44,7 +44,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
 
 open import Rx.Prim using (Tick)
-open import Rx.Exp using (Ty; _×ᵗ_; obs; Ctx; Closed; Val; FnClo; applyClo; _≟ᵗ_)
+open import Rx.Exp using (Ty; _×ᵗ_; obs; boolᵗ; Ctx; Closed; Val; FnClo; applyClo; _≟ᵗ_)
 open import Rx.Mint using (nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; pres; below; lookup-set; set-above; <→≢ᵇ)
 open import Decide using (≡ᵇ→≡; ≡ᵇ-refl)
@@ -53,7 +53,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _
   register; installNode; atDyn; atSlot; lowerFloor; mergeAll-st; mergeAllᵒ; AllOp; switchᵒ;
   exhaustᵒ; NodeId; RegRow; cell-st; take-st; switch-st; exhaust-st; batchSync-st; hasRoom;
   consumeUsable; finishUsable; thruWrap; switchKill; aliveThroughᶠ; RegId; RegSrc; regFloor;
-  cutThrough; takeVals; takeDispatch; scanVals; scanDispatch; batchDispatch; shareAdmit;
+  cutThrough; spends; takeVals; takeDispatch; scanVals; scanDispatch; batchDispatch; shareAdmit;
   shareDying; drainSt)
 open import Rx.Evaluator.Unconn-Arith using (unconn)
 open import Rx.Evaluator.Domain using (foldPath⇓; fold-root; stepFrame⇓; step-map; injectRoot; thruConsume⇓; consume-all-nil;
@@ -108,7 +108,7 @@ Fell m sched st = unconn (Sched.slots sched) (EvalSt.connectedShares st) < m
 HeldF : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
 HeldF           (map-f _)            = ⊤
 HeldF {Γ = Γ}   (scan-f _ _)         = Maybe (NodeState Γ)
-HeldF {Γ = Γ}   (take-f _)           = Maybe (NodeState Γ)
+HeldF {Γ = Γ}   (take-f _ _)         = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (batchSync-f _)      = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (from-inner _ _ _)   = Maybe (NodeState Γ)
 HeldF {Γ = Γ}   (thru-outer _ _)   = Maybe (NodeState Γ)
@@ -149,7 +149,7 @@ ConsistentF : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
               (f : Frame Γ s u) → HeldF f → EvalSt e → Set
 ConsistentF (map-f _)               _ st = ⊤
 ConsistentF (scan-f _ nid)          h st = lookupNode nid (EvalSt.nodes st) ≡ h
-ConsistentF (take-f nid)            h st = lookupNode nid (EvalSt.nodes st) ≡ h
+ConsistentF (take-f _ nid)          h st = lookupNode nid (EvalSt.nodes st) ≡ h
 ConsistentF (batchSync-f nid)       h st = lookupNode nid (EvalSt.nodes st) ≡ h
 ConsistentF (from-inner _ nid _)    h st = lookupNode nid (EvalSt.nodes st) ≡ h
 ConsistentF (thru-outer _ nid)    h st = lookupNode nid (EvalSt.nodes st) ≡ h
@@ -500,7 +500,7 @@ consistentF-move : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
                  → ConsistentF f h st → ConsistentF f h st′
 consistentF-move (map-f _)              h mv c = tt
 consistentF-move (scan-f _ nid)         h mv c = trans (mv nid (self-node nid [])) c
-consistentF-move (take-f nid)           h mv c = trans (mv nid (self-node nid [])) c
+consistentF-move (take-f _ nid)         h mv c = trans (mv nid (self-node nid [])) c
 consistentF-move (batchSync-f nid)      h mv c = trans (mv nid (self-node nid [])) c
 consistentF-move (from-inner _ nid j)   h mv c = trans (mv nid (self-node nid (j ∷ []))) c
 consistentF-move (thru-outer _ nid)   h mv c = trans (mv nid (self-node nid [])) c
@@ -1387,7 +1387,7 @@ inner-back {u = u} op nid inst κ so =
 colOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (f : Frame Γ s u) → EvalSt e → HeldF f
 colOf (map-f _)            st = tt
 colOf (scan-f _ nid)       st = lookupNode nid (EvalSt.nodes st)
-colOf (take-f nid)         st = lookupNode nid (EvalSt.nodes st)
+colOf (take-f _ nid)       st = lookupNode nid (EvalSt.nodes st)
 colOf (batchSync-f nid)    st = lookupNode nid (EvalSt.nodes st)
 colOf (from-inner _ nid _) st = lookupNode nid (EvalSt.nodes st)
 colOf (thru-outer _ nid) st = lookupNode nid (EvalSt.nodes st)
@@ -1401,7 +1401,7 @@ consistentOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (f : Frame Γ s 
              → ConsistentF f (colOf f st) st
 consistentOf (map-f _)            st = tt
 consistentOf (scan-f _ _)         st = refl
-consistentOf (take-f _)           st = refl
+consistentOf (take-f _ _)         st = refl
 consistentOf (batchSync-f _)      st = refl
 consistentOf (from-inner _ _ _)   st = refl
 consistentOf (thru-outer _ _)   st = refl
@@ -1489,101 +1489,105 @@ kept-before κ pr ct ek fallen       kp = tt
 -- on the cut path and the non-cut path alike, and at a stuck lookup the
 -- column is empty.  So the arriving candidates are the departing ones
 -- and the store decides only HOW MANY survive.
-redTakeVals : ∀ {n} {Γ : Ctx n} {s} {P : Val Γ s → Set₁} (k : ℕ)
+redTakeVals : ∀ {n} {Γ : Ctx n} {s} {P : Val Γ s → Set₁} (w : Maybe (FnClo Γ s boolᵗ)) (k : ℕ)
               {vals : List (Val Γ s)} → All P vals
-            → All P (proj₁ (takeVals k vals))
-redTakeVals zero          rv          = []ᵃ
-redTakeVals (suc k)       []ᵃ         = []ᵃ
-redTakeVals (suc zero)    (p ∷ᵃ ps)   = p ∷ᵃ []ᵃ
-redTakeVals (suc (suc k)) (p ∷ᵃ ps)   = p ∷ᵃ redTakeVals (suc k) ps
+            → All P (proj₁ (takeVals w k vals))
+redTakeVals w zero          rv          = []ᵃ
+redTakeVals w (suc k)       []ᵃ         = []ᵃ
+redTakeVals w (suc zero)    {v ∷ _} (p ∷ᵃ ps) with spends w v
+... | true  = p ∷ᵃ []ᵃ
+... | false = p ∷ᵃ redTakeVals w (suc zero) ps
+redTakeVals w (suc (suc k)) {v ∷ _} (p ∷ᵃ ps) with spends w v
+... | true  = p ∷ᵃ redTakeVals w (suc k) ps
+... | false = p ∷ᵃ redTakeVals w (suc (suc k)) ps
 
 redTakeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {P : Val Γ s → Set₁}
-                  (nid : NodeId) {vals : List (Val Γ s)} (fin : Bool)
+                  (w : Maybe (FnClo Γ s boolᵗ)) (nid : NodeId) {vals : List (Val Γ s)} (fin : Bool)
                   (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ))
                 → All P vals
-                → All P (proj₁ (takeDispatch {e = e} nid vals fin sched st ns))
-redTakeDispatch nid {vals} fin sched st (just (take-st k)) rv
-  with proj₂ (proj₂ (takeVals k vals))
-... | true  = redTakeVals k rv
-... | false = redTakeVals k rv
-redTakeDispatch nid fin sched st (just (cell-st _))           rv = []ᵃ
-redTakeDispatch nid fin sched st (just (batchSync-st _ _ _))  rv = []ᵃ
-redTakeDispatch nid fin sched st (just (mergeAll-st _ _ _ _)) rv = []ᵃ
-redTakeDispatch nid fin sched st (just (switch-st _ _))       rv = []ᵃ
-redTakeDispatch nid fin sched st (just (exhaust-st _ _))      rv = []ᵃ
-redTakeDispatch nid fin sched st nothing                      rv = []ᵃ
+                → All P (proj₁ (takeDispatch {e = e} w nid vals fin sched st ns))
+redTakeDispatch w nid {vals} fin sched st (just (take-st k)) rv
+  with proj₂ (proj₂ (takeVals w k vals))
+... | true  = redTakeVals w k rv
+... | false = redTakeVals w k rv
+redTakeDispatch w nid fin sched st (just (cell-st _))           rv = []ᵃ
+redTakeDispatch w nid fin sched st (just (batchSync-st _ _ _))  rv = []ᵃ
+redTakeDispatch w nid fin sched st (just (mergeAll-st _ _ _ _)) rv = []ᵃ
+redTakeDispatch w nid fin sched st (just (switch-st _ _))       rv = []ᵃ
+redTakeDispatch w nid fin sched st (just (exhaust-st _ _))      rv = []ᵃ
+redTakeDispatch w nid fin sched st nothing                      rv = []ᵃ
 
 -- the dispatch writes its own node and no other, and the cut sweeps
 -- rows and the live set but mints nothing
 takeOff : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-            (nid : NodeId) (ns : Maybe (NodeState Γ)) (vals : List (Val Γ s)) (fin : Bool)
+            (w : Maybe (FnClo Γ s boolᵗ)) (nid : NodeId) (ns : Maybe (NodeState Γ)) (vals : List (Val Γ s)) (fin : Bool)
             (sched : Sched Γ) (st : EvalSt e) (k : NodeId) → (nid ≡ᵇ k) ≡ false
-        → lookupNode k (EvalSt.nodes (proj₂ (proj₂ (proj₂ (takeDispatch {e = e} nid vals fin sched st ns)))))
+        → lookupNode k (EvalSt.nodes (proj₂ (proj₂ (proj₂ (takeDispatch {e = e} w nid vals fin sched st ns)))))
         ≡ lookupNode k (EvalSt.nodes st)
-takeOff nid (just (take-st j)) vals fin sched st k ne with proj₂ (proj₂ (takeVals j vals))
+takeOff w nid (just (take-st j)) vals fin sched st k ne with proj₂ (proj₂ (takeVals w j vals))
 ... | true  = set-above nid k (take-st zero) (EvalSt.nodes st) ne
-... | false = set-above nid k (take-st (proj₁ (proj₂ (takeVals j vals)))) (EvalSt.nodes st) ne
-takeOff nid (just (cell-st _))           vals fin sched st k ne = refl
-takeOff nid (just (batchSync-st _ _ _))  vals fin sched st k ne = refl
-takeOff nid (just (mergeAll-st _ _ _ _)) vals fin sched st k ne = refl
-takeOff nid (just (switch-st _ _))       vals fin sched st k ne = refl
-takeOff nid (just (exhaust-st _ _))      vals fin sched st k ne = refl
-takeOff nid nothing                      vals fin sched st k ne = refl
+... | false = set-above nid k (take-st (proj₁ (proj₂ (takeVals w j vals)))) (EvalSt.nodes st) ne
+takeOff w nid (just (cell-st _))           vals fin sched st k ne = refl
+takeOff w nid (just (batchSync-st _ _ _))  vals fin sched st k ne = refl
+takeOff w nid (just (mergeAll-st _ _ _ _)) vals fin sched st k ne = refl
+takeOff w nid (just (switch-st _ _))       vals fin sched st k ne = refl
+takeOff w nid (just (exhaust-st _ _))      vals fin sched st k ne = refl
+takeOff w nid nothing                      vals fin sched st k ne = refl
 
 takeCt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-           (nid : NodeId) (ns : Maybe (NodeState Γ)) (vals : List (Val Γ s)) (fin : Bool)
+           (w : Maybe (FnClo Γ s boolᵗ)) (nid : NodeId) (ns : Maybe (NodeState Γ)) (vals : List (Val Γ s)) (fin : Bool)
            (sched : Sched Γ) (st : EvalSt e)
-       → nodeCt (proj₁ (proj₂ (proj₂ (takeDispatch {e = e} nid vals fin sched st ns)))) ≡ nodeCt sched
-takeCt nid (just (take-st j)) vals fin sched st with proj₂ (proj₂ (takeVals j vals))
+       → nodeCt (proj₁ (proj₂ (proj₂ (takeDispatch {e = e} w nid vals fin sched st ns)))) ≡ nodeCt sched
+takeCt w nid (just (take-st j)) vals fin sched st with proj₂ (proj₂ (takeVals w j vals))
 ... | true  = refl
 ... | false = refl
-takeCt nid (just (cell-st _))           vals fin sched st = refl
-takeCt nid (just (batchSync-st _ _ _))  vals fin sched st = refl
-takeCt nid (just (mergeAll-st _ _ _ _)) vals fin sched st = refl
-takeCt nid (just (switch-st _ _))       vals fin sched st = refl
-takeCt nid (just (exhaust-st _ _))      vals fin sched st = refl
-takeCt nid nothing                      vals fin sched st = refl
+takeCt w nid (just (cell-st _))           vals fin sched st = refl
+takeCt w nid (just (batchSync-st _ _ _))  vals fin sched st = refl
+takeCt w nid (just (mergeAll-st _ _ _ _)) vals fin sched st = refl
+takeCt w nid (just (switch-st _ _))       vals fin sched st = refl
+takeCt w nid (just (exhaust-st _ _))      vals fin sched st = refl
+takeCt w nid nothing                      vals fin sched st = refl
 
 -- and it only cuts rows
 takeReg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-            (nid : NodeId) (ns : Maybe (NodeState Γ)) (vals : List (Val Γ s)) (fin : Bool)
+            (w : Maybe (FnClo Γ s boolᵗ)) (nid : NodeId) (ns : Maybe (NodeState Γ)) (vals : List (Val Γ s)) (fin : Bool)
             (sched : Sched Γ) (st : EvalSt e) {r}
-        → r ∈ EvalSt.registry (proj₂ (proj₂ (proj₂ (takeDispatch {e = e} nid vals fin sched st ns))))
+        → r ∈ EvalSt.registry (proj₂ (proj₂ (proj₂ (takeDispatch {e = e} w nid vals fin sched st ns))))
         → r ∈ EvalSt.registry st
-takeReg nid (just (take-st j)) vals fin sched st {r} r∈ with proj₂ (proj₂ (takeVals j vals))
+takeReg w nid (just (take-st j)) vals fin sched st {r} r∈ with proj₂ (proj₂ (takeVals w j vals))
 ... | true  = cut-sub nid (EvalSt.registry st) r r∈
 ... | false = r∈
-takeReg nid (just (cell-st _))           vals fin sched st r∈ = r∈
-takeReg nid (just (batchSync-st _ _ _))  vals fin sched st r∈ = r∈
-takeReg nid (just (mergeAll-st _ _ _ _)) vals fin sched st r∈ = r∈
-takeReg nid (just (switch-st _ _))       vals fin sched st r∈ = r∈
-takeReg nid (just (exhaust-st _ _))      vals fin sched st r∈ = r∈
-takeReg nid nothing                      vals fin sched st r∈ = r∈
+takeReg w nid (just (cell-st _))           vals fin sched st r∈ = r∈
+takeReg w nid (just (batchSync-st _ _ _))  vals fin sched st r∈ = r∈
+takeReg w nid (just (mergeAll-st _ _ _ _)) vals fin sched st r∈ = r∈
+takeReg w nid (just (switch-st _ _))       vals fin sched st r∈ = r∈
+takeReg w nid (just (exhaust-st _ _))      vals fin sched st r∈ = r∈
+takeReg w nid nothing                      vals fin sched st r∈ = r∈
 
 -- THE TAKE FRAME'S STEP: the dispatch at what the frame holds, holding
 -- what the dispatch wrote.  Agreement is what lets the derivation read
 -- the store and the step read the held state, and they are one read.
-takeStepped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} (nid : NodeId)
+takeStepped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} (w : Maybe (FnClo Γ s boolᵗ)) (nid : NodeId)
             → Maybe (NodeState Γ) → List (Val Γ s) → Bool → Sched Γ → EvalSt e
-            → Stepped {e = e} (take-f {s = s} nid)
-takeStepped nid h vals fin sched st =
-  let r = takeDispatch nid vals fin sched st h
+            → Stepped {e = e} (take-f {s = s} w nid)
+takeStepped w nid h vals fin sched st =
+  let r = takeDispatch w nid vals fin sched st h
   in stepped (proj₁ r) (proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r)))
              (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂ r)))))
 
-takeStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} (nid : NodeId) {P : Val Γ s → Set₁}
-         → FrameStep {e = e} (take-f nid) P P (λ _ → ⊤)
-takeStep nid = record
-  { step      = takeStepped nid
+takeStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} (w : Maybe (FnClo Γ s boolᵗ)) (nid : NodeId) {P : Val Γ s → Set₁}
+         → FrameStep {e = e} (take-f w nid) P P (λ _ → ⊤)
+takeStep w nid = record
+  { step      = takeStepped w nid
   ; step-⇓    = λ {_} {κ} {now} h vals fin sched st c →
-                  subst (λ x → stepFrame⇓ now (take-f nid) κ vals fin sched st
-                                 (injectRoot (takeDispatch nid vals fin sched st x)))
+                  subst (λ x → stepFrame⇓ now (take-f w nid) κ vals fin sched st
+                                 (injectRoot (takeDispatch w nid vals fin sched st x)))
                         c step-take
-  ; step-red  = λ {h} {vals} {fin} {sched} {st} ps _ → redTakeDispatch nid fin sched st h ps , tt
+  ; step-red  = λ {h} {vals} {fin} {sched} {st} ps _ → redTakeDispatch w nid fin sched st h ps , tt
   ; step-cons = λ _ _ _ _ _ _ → refl
-  ; step-off  = λ h vals fin sched st k ne → takeOff nid h vals fin sched st k (head-off nid [] k ne)
-  ; step-ct   = takeCt nid
-  ; step-reg  = λ h vals fin sched st → takeReg nid h vals fin sched st }
+  ; step-off  = λ h vals fin sched st k ne → takeOff w nid h vals fin sched st k (head-off nid [] k ne)
+  ; step-ct   = takeCt w nid
+  ; step-reg  = λ h vals fin sched st → takeReg w nid h vals fin sched st }
 
 -- THE NODE THE COUNTER HANDS OUT IS ON EVERY PATH THE RULE HOLDS FOR,
 -- once installed: no row runs through it, so every row through it ends
