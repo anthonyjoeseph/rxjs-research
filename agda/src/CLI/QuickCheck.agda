@@ -80,7 +80,7 @@ open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; statements; statementName;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
-  Sim; Item; simPlain; simTimed; simulationᴮ)
+  Sim; Item; simPlain; simTimed; stampedOf; simulationᴮ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
@@ -900,7 +900,7 @@ decide c left-to-rightˢ  = sandwichᴸ (ltrSides c)
 decide c timing-correctˢ = pairsᵀ (stampsOf c)
 decide c batchableˢ      = pairᴮ (batchableSides c)
 decide c timed-faithfulˢ = pairᴸ (faithfulSides c)
-decide c simulationˢ     = simulationᴿ (simPlain c , simTimed c)
+decide c simulationˢ     = simulationᴿ (simPlain c , simTimed c (stampedOf c))
 
 -- a report counts statements in `Main`'s order
 indexOf : Statement → ℕ

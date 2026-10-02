@@ -262,8 +262,11 @@ agda-dev-selftest:
 # which is a counterexample, and one inside a single walk of the corpus would
 # take every later verdict with it and hold the job to its timeout.  A row
 # over budget is a FAIL named by the row, whose name the runner flushes
-# before the run starts.
-BUG_CACHE_ROW_BUDGET ?= 60
+# before the run starts.  The budget is set by the DEAREST row, since a
+# slow case gets a longer clock: every statement runs in the one process,
+# and the simulation reads the timed program's plain run at every fuel up
+# to the row's own.
+BUG_CACHE_ROW_BUDGET ?= 300
 
 #
 # SUSPENDED WHILE THE CANDIDATE HAS LIVE LEAVES (Anthony: "suspend,

@@ -177,8 +177,21 @@ packets : ∀ κ → List (ℕ × Val (Γ₂ᵗ κ) (plainᵗ (itemᵗ natᵗ)))
 packets κ []             = []
 packets κ ((i , v) ∷ ps) = (i , packetOf {Γ = Γ₂ᵗ κ} natᵗ v) ∷ packets κ ps
 
+-- a timed item at `natᵗ`: its packet, and a value or END
+Item : Set
+Item = List ℕ × (ℕ ⊎ ⊤)
+
+-- THE TIMED TRANSLATION'S STAMPED RUN, a row's dearest side, read by
+-- both `timing-correct` and `simulation`: a row computes it once and
+-- passes it to each
+Stamped : Set
+Stamped = List (ℕ × Item)
+
+stampedOf : Case → Stamped
+stampedOf c = stampedᵀ (kinds c) (fuel c) (prog c) (slots c)
+
 stampsOf : Case → List (ℕ × List ℕ)
-stampsOf c = packets (kinds c) (stampedᵀ (kinds c) (fuel c) (prog c) (slots c))
+stampsOf c = packets (kinds c) (stampedOf c)
 
 -- `batchable`: both sides read one run's emits, so the run is an
 -- argument and computed once
@@ -201,15 +214,11 @@ simPlain : Case → Sim ℕ
 simPlain c = instExtract (runᴵ (kinds c) (fuel c) (prog c) (slots c)) , runᴾ (fuel c) (prog c) (slots c) ,
              arrivalsOf {κ = kinds c} (fuel c) (prog c) (slots c)
 
--- a timed item at `natᵗ`: its packet, and a value or END
-Item : Set
-Item = List ℕ × (ℕ ⊎ ⊤)
-
 -- and at the program's timed translation, which is where
 -- `timing-correct` applies it
-simTimed : Case → Sim Item
-simTimed c =
-  stampedᵀ (kinds c) (fuel c) (prog c) (slots c) ,
+simTimed : Case → Stamped → Sim Item
+simTimed c st =
+  st ,
   runᴾ {κ = kinds c} (fuel c) (timed (kinds c) (prog c)) (timedSlots (slots c)) ,
   arrivalsOf {κ = kinds c} (fuel c) (timed (kinds c) (prog c)) (timedSlots (slots c))
 
@@ -260,12 +269,15 @@ sandwichᴸ (l , p , l′) = prefixListℕ l p ∧ prefixListℕ p l′
 agreeᴮ : List (List ℕ) × List (List ℕ) → Bool
 agreeᴮ (l , r) = eqBatches l r
 
-holds : Statement → Case → Bool
-holds left-to-rightˢ  c = sandwichᴸ (ltrSides c)
-holds timing-correctˢ c = allPairsᵇ (stampsOf c)
-holds batchableˢ      c = agreeᴮ (batchableSides c)
-holds timed-faithfulˢ c = agreeᴸ (faithfulSides c)
-holds simulationˢ     c = simulationᴮ (simPlain c , simTimed c)
+holds : Statement → Case → Stamped → Bool
+holds left-to-rightˢ  c st = sandwichᴸ (ltrSides c)
+holds timing-correctˢ c st = allPairsᵇ (packets (kinds c) st)
+holds batchableˢ      c st = agreeᴮ (batchableSides c)
+holds timed-faithfulˢ c st = agreeᴸ (faithfulSides c)
+holds simulationˢ     c st = simulationᴮ (simPlain c , simTimed c st)
+
+checksWith : List Statement → Case → Stamped → List (String × Bool)
+checksWith ss c st = map (λ s → statementName s , holds s c st) ss
 
 checksOf : List Statement → Case → List (String × Bool)
-checksOf ss c = map (λ s → statementName s , holds s c) ss
+checksOf ss c = checksWith ss c (stampedOf c)
