@@ -19,7 +19,7 @@ open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; even
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
                                machineEmitᵗ)
-open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ; μˢ;
+open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; hotᵏ; coldᵏ; sharedᵏ; slotTy;
   rawTy; plainᵏ)
@@ -407,11 +407,11 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
               (fstᵗ arg)
               body
 
--- THE FOUR LIST ROUTINES THE CUT IS WRITTEN OUT OF, AND THEY ARE HERE
+-- THE LIST ROUTINES THE CUT IS WRITTEN OUT OF, AND THEY ARE HERE
 -- BECAUSE THE TERM LANGUAGE HAS NO LIBRARY.  `Tm` has one eliminator
--- over lists and no application, so `take`, `length`, and a multiset
--- delete are each a fold with a pair-shaped accumulator rather than a
--- call.  The mirror spells the same four inline as ordinary JavaScript,
+-- over lists and no application, so `take`, `takeWhile`, `length`, and a
+-- multiset delete are each a fold with a pair-shaped accumulator rather than a
+-- call.  The mirror spells the same routines inline as ordinary JavaScript,
 -- which is why nothing about them is a finding.
 
 takeListᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
@@ -435,6 +435,28 @@ lengthᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
         → Tm Γ Δᵍ Δ Θ (listᵗ a) → Tm Γ Δᵍ Δ Θ natᵗ
 lengthᵛ xs = foldᵗ xs (nat̂ 0)
                    (primᵗ add (pairᵗ (varᵗ (there (here refl))) (nat̂ 1)))
+
+-- the prefix up to and including the first element failing the
+-- predicate, and whether one did
+takeWhileListᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
+               → Tm Γ Δᵍ Δ (a ∷ Θ) boolᵗ → Tm Γ Δᵍ Δ Θ (listᵗ a)
+               → Tm Γ Δᵍ Δ Θ (listᵗ a ×ᵗ boolᵗ)
+takeWhileListᵛ {Θ = Θ} {a = a} p xs =
+  letᵗ (foldᵗ xs (pairᵗ (bool̂ false) nilᵗ) body) (pairᵗ nilᵗ (bool̂ false))
+       (pairᵗ (revᵗ (sndᵗ (varᵗ (here refl)))) (fstᵗ (varᵗ (here refl))))
+  where
+  A : Ty
+  A = boolᵗ ×ᵗ listᵗ a
+
+  acc : Tm _ _ _ (a ∷ A ∷ Θ) A
+  acc = varᵗ (there (here refl))
+
+  p↑ : Tm _ _ _ (a ∷ A ∷ Θ) boolᵗ
+  p↑ = renTm (λ x → x) (λ x → x) (ext∈ there) p
+
+  body : Tm _ _ _ (a ∷ A ∷ Θ) A
+  body = ifᵗ (fstᵗ acc) acc
+             (pairᵗ (primᵗ notᵖ p↑) (consᵗ (varᵗ (here refl)) (sndᵗ acc)))
 
 -- the open registrations are a MULTISET, so a `close` retires ONE
 -- occurrence: two subscriptions of one source are two entries and the
@@ -501,15 +523,108 @@ cutClosesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ b}
 cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
   (consᵗ (closeᵛ (varᵗ (here refl)) (inlᵗ unit̂)) (varᵗ (there (here refl)))))
 
--- THE PIPELINE THE MIRROR WRITES, OPERATOR FOR OPERATOR.  A scan
--- carrying the quota, whether the cut has happened, the open
--- registrations and the emit this delivery produced; an inclusive
--- `takeWhileᵉ` ending on the state whose cut has happened; then a
--- projection pulling the emit back out of the state.  Counting the
--- author's values and truncating their list is a pure step's work, and
--- the state carries the answer and the emit together because the
--- palette reads a value and nothing beside it.
+-- THE PIPELINE THE MIRROR WRITES, OPERATOR FOR OPERATOR, FOR BOTH
+-- CUTTING OPERATORS.  A scan carrying a budget, whether the cut has
+-- happened, the open registrations and the emit this delivery produced;
+-- an inclusive `takeWhileᵉ` ending on the state whose cut has happened;
+-- then a projection pulling the emit back out of the state.  Cutting the
+-- author's values out of one emit's list is a pure step's work, and the
+-- state carries the answer and the emit together because the palette
+-- reads a value and nothing beside it.  What differs between `take` and
+-- `takeWhile` is only that step: the CUTTER, handed the budget and one
+-- emit's payloads, returns the payloads let through, whether they end
+-- the stream, and the budget left.
 --
+-- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, exactly as `scanᵖ`'s is: a
+-- scan emits the result of its FIRST application and never the seed, so
+-- the tokens below are read by nothing and claim no freshness.  One
+-- `mintᵉ` supplies the inhabitant `uniqᵗ` has no literal for.
+CutS : Ty → Ty → Ty
+CutS B t = B ×ᵗ (boolᵗ ×ᵗ (listᵗ uniqᵗ ×ᵗ emitᵗ t))
+
+CutSP : Ty → Ty
+CutSP t = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ t) ×ᵗ boolᵗ)
+
+-- where a cutter runs: one emit's split, the step's argument, the mint's
+-- token, then Θ
+CutCtx : Ty → Ty → List Ty → List Ty
+CutCtx B t Θ = CutSP t ∷ (CutS B t ×ᵗ emitᵗ t) ∷ uniqᵗ ∷ Θ
+
+cutᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t B : Ty}
+     → Tm Γ Δᵍ Δ (uniqᵗ ∷ Θ) B
+     → (Tm Γ Δᵍ Δ (CutCtx B t Θ) B → Tm Γ Δᵍ Δ (CutCtx B t Θ) (listᵗ (plainᵗ t))
+        → Tm Γ Δᵍ Δ (CutCtx B t Θ) (listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ B)))
+     → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+cutᵖ {Θ = Θ} {t = t} {B = B} b₀ cutter e = mintᵉ (mapᵉ outᵛ (takeWhileᵉ open? counted))
+  where
+  S : Ty
+  S = CutS B t
+
+  P : Ty
+  P = S ×ᵗ emitᵗ t
+
+  SP : Ty
+  SP = CutSP t
+
+  R : Ty
+  R = listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ B)
+
+  e' : Exp _ _ _ (uniqᵗ ∷ Θ) (emitᵗ t)
+  e' = renExp (λ x → x) (λ x → x) there e
+
+  tok : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
+  tok = varᵗ (here refl)
+
+  seed : Tm _ _ _ (uniqᵗ ∷ Θ) S
+  seed = pairᵗ b₀ (pairᵗ (bool̂ false)
+                         (pairᵗ nilᵗ (instEmitᵛ nilᵗ tok tok subscribeᵛ)))
+
+  -- inside the two `letᵗ`s: the cutter's answer, the split, the step's
+  -- argument, the mint's token, then Θ
+  inner : Tm _ _ _ (R ∷ SP ∷ P ∷ uniqᵗ ∷ Θ) S
+  inner = ifᵗ cut?
+              (pairᵗ left
+                     (pairᵗ (bool̂ true)
+                            (pairᵗ nilᵗ
+                                   (reassembleᵛ env
+                                                (appendᵗ book (cutClosesᵛ open'))
+                                                taken (bool̂ true)))))
+              (pairᵗ left
+                     (pairᵗ (bool̂ false)
+                            (pairᵗ open' (reassembleᵛ env book taken fin))))
+    where
+    answer = varᵗ (here refl)
+    taken  = fstᵗ answer
+    cut?   = fstᵗ (sndᵗ answer)
+    left   = sndᵗ (sndᵗ answer)
+    split  = varᵗ (there (here refl))
+    st     = fstᵗ (varᵗ (there (there (here refl))))
+    env    = sndᵗ (varᵗ (there (there (here refl))))
+    book   = fstᵗ split
+    fin    = sndᵗ (sndᵗ split)
+    open'  = openAfterᵛ book (fstᵗ (sndᵗ (sndᵗ st)))
+
+  -- inside the first `letᵗ`: the split, the step's argument, the
+  -- mint's token, then Θ
+  body : Tm _ _ _ (SP ∷ P ∷ uniqᵗ ∷ Θ) S
+  body = letᵗ (cutter (fstᵗ st) (fstᵗ (sndᵗ (varᵗ (here refl))))) st inner
+    where
+    st = fstᵗ (varᵗ (there (here refl)))
+
+  step : Tm _ _ _ (P ∷ uniqᵗ ∷ Θ) S
+  step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ (varᵗ (here refl)))))
+              (fstᵗ (varᵗ (here refl))) body
+
+  outᵛ : Fn _ _ _ (uniqᵗ ∷ Θ) S (emitᵗ t)
+  outᵛ = sndᵗ (sndᵗ (sndᵗ (varᵗ (here refl))))
+
+  counted : Exp _ _ _ (uniqᵗ ∷ Θ) S
+  counted = scanᵉ step seed e'
+
+  -- open until the state whose cut has happened, which still leaves
+  open? : Fn _ _ _ (uniqᵗ ∷ Θ) S boolᵗ
+  open? = primᵗ notᵖ (fstᵗ (sndᵗ (varᵗ (here refl))))
+
 -- THE ENDING READS THE SCAN'S OWN STATE ON THE ONE SUBSCRIPTION, AND
 -- THE ONE SUBSCRIPTION IS OBSERVABLE.  An ending that subscribed the
 -- author's source a second time misses whatever a share upstream put
@@ -532,10 +647,6 @@ cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
 -- the source's first emit is wrong exactly when that emit is late, which
 -- is the bug-cache row "the seeds 1..8 depth 3 sweep's counterexample".
 --
--- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, exactly as `scanᵖ`'s is: a
--- scan emits the result of its FIRST application and never the seed, so
--- the tokens below are read by nothing and claim no freshness.  One
--- `mintᵉ` supplies the inhabitant `uniqᵗ` has no literal for.
 -- DEAD ROUTE: cut with `takeᵉ` over a count the scan computes.  Nothing
 --   converts a budget over values into the emit index a
 --   subscription-time count has to name.
@@ -546,81 +657,35 @@ takeᵖ {Θ = Θ} {t = t} frame k e =
   flatAllᵉ (mergeᶠ nothing)
     (ofᵉ (ifᵗ (primᵗ eqᵖ (pairᵗ k (nat̂ 0)))
               (strmᵗ (emptyᵖ frame))
-              (strmᵗ (mintᵉ (mapᵉ outᵛ (takeWhileᵉ open? counted)))) ∷ []))
+              (strmᵗ (cutᵖ (renTm (λ x → x) (λ x → x) there k) counter e)) ∷ []))
   where
-  -- the quota left, whether the cut has happened, the open
-  -- registrations, and the emit this delivery produced
-  S : Ty
-  S = natᵗ ×ᵗ (boolᵗ ×ᵗ (listᵗ uniqᵗ ×ᵗ emitᵗ t))
-
-  -- the step's argument: the carried state and the arriving emit
-  P : Ty
-  P = S ×ᵗ emitᵗ t
-
-  -- the split of one emit: bookkeeping retagged, payloads, completion
-  SP : Ty
-  SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ t) ×ᵗ boolᵗ)
-
-  k' : Tm _ _ _ (uniqᵗ ∷ Θ) natᵗ
-  k' = renTm (λ x → x) (λ x → x) there k
-
-  e' : Exp _ _ _ (uniqᵗ ∷ Θ) (emitᵗ t)
-  e' = renExp (λ x → x) (λ x → x) there e
-
-  tok : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
-  tok = varᵗ (here refl)
-
-  seed : Tm _ _ _ (uniqᵗ ∷ Θ) S
-  seed = pairᵗ k' (pairᵗ (bool̂ false)
-                         (pairᵗ nilᵗ (instEmitᵛ nilᵗ tok tok subscribeᵛ)))
-
-  -- inside the two `letᵗ`s: the taken payloads, the split, the step's
-  -- argument, the mint's token, then Θ
-  inner : Tm _ _ _ (listᵗ (plainᵗ t) ∷ SP ∷ P ∷ uniqᵗ ∷ Θ) S
-  inner = ifᵗ cut?
-              (pairᵗ (nat̂ 0)
-                     (pairᵗ (bool̂ true)
-                            (pairᵗ nilᵗ
-                                   (reassembleᵛ env
-                                                (appendᵗ book (cutClosesᵛ open'))
-                                                taken (bool̂ true)))))
-              (pairᵗ (primᵗ sub (pairᵗ rem (lengthᵛ taken)))
-                     (pairᵗ (bool̂ false)
-                            (pairᵗ open' (reassembleᵛ env book taken fin))))
+  -- the quota's prefix of the payloads; the emit that fills the quota
+  -- cuts
+  counter : Tm _ _ _ (CutCtx natᵗ t Θ) natᵗ → Tm _ _ _ (CutCtx natᵗ t Θ) (listᵗ (plainᵗ t))
+          → Tm _ _ _ (CutCtx natᵗ t Θ) (listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ natᵗ))
+  counter rem vs =
+    letᵗ (takeListᵛ rem vs) (pairᵗ nilᵗ (pairᵗ (bool̂ false) rem))
+         (pairᵗ taken (pairᵗ (primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem↑))
+                             (primᵗ sub (pairᵗ rem↑ (lengthᵛ taken)))))
     where
     taken = varᵗ (here refl)
-    split = varᵗ (there (here refl))
-    st    = fstᵗ (varᵗ (there (there (here refl))))
-    env   = sndᵗ (varᵗ (there (there (here refl))))
-    book  = fstᵗ split
-    fin   = sndᵗ (sndᵗ split)
-    rem   = fstᵗ st
-    open' = openAfterᵛ book (fstᵗ (sndᵗ (sndᵗ st)))
+    rem↑  = renTm (λ x → x) (λ x → x) there rem
 
-    -- the emit that fills the quota cuts, and the ending lets nothing
-    -- after it through
-    cut? = primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem)
+-- rxjs `takeWhile(p, true)`: the payloads up to and including the first
+-- the author's predicate fails, and that failure cuts.  No budget, and
+-- nothing to decide at subscribe: unlike `take 0`, rxjs's `takeWhile`
+-- always subscribes its source.
+takeWhileᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+           → Fn Γ Δᵍ Δ Θ (plainᵗ t) boolᵗ
+           → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+takeWhileᵖ {Θ = Θ} {t = t} f e = cutᵖ unit̂ cutter e
+  where
+  f↑ : Tm _ _ _ (plainᵗ t ∷ CutCtx unitᵗ t Θ) boolᵗ
+  f↑ = renTm (λ x → x) (λ x → x) (ext∈ (λ x → there (there (there x)))) f
 
-  -- inside the first `letᵗ`: the split, the step's argument, the
-  -- mint's token, then Θ
-  body : Tm _ _ _ (SP ∷ P ∷ uniqᵗ ∷ Θ) S
-  body = letᵗ (takeListᵛ (fstᵗ st) (fstᵗ (sndᵗ (varᵗ (here refl))))) st inner
-    where
-    st = fstᵗ (varᵗ (there (here refl)))
-
-  step : Tm _ _ _ (P ∷ uniqᵗ ∷ Θ) S
-  step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ (varᵗ (here refl)))))
-              (fstᵗ (varᵗ (here refl))) body
-
-  outᵛ : Fn _ _ _ (uniqᵗ ∷ Θ) S (emitᵗ t)
-  outᵛ = sndᵗ (sndᵗ (sndᵗ (varᵗ (here refl))))
-
-  counted : Exp _ _ _ (uniqᵗ ∷ Θ) S
-  counted = scanᵉ step seed e'
-
-  -- open until the state whose cut has happened, which still leaves
-  open? : Fn _ _ _ (uniqᵗ ∷ Θ) S boolᵗ
-  open? = primᵗ notᵖ (fstᵗ (sndᵗ (varᵗ (here refl))))
+  cutter : Tm _ _ _ (CutCtx unitᵗ t Θ) unitᵗ → Tm _ _ _ (CutCtx unitᵗ t Θ) (listᵗ (plainᵗ t))
+         → Tm _ _ _ (CutCtx unitᵗ t Θ) (listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ unitᵗ))
+  cutter _ vs = pairᵗ (fstᵗ (takeWhileListᵛ f↑ vs)) (pairᵗ (sndᵗ (takeWhileListᵛ f↑ vs)) unit̂)
 
 -- ONE OUTER EMIT AS ONE FLATTENER ELEMENT: an echo carrying the emit's
 -- bookkeeping and its echoed values, beside a lane merging the inners it
@@ -902,6 +967,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    toInstEmit {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toInstEmitTms ts)
    toInstEmit {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
    toInstEmit {Θ = Θ} (takeˢ k e) = takeᵖ (frameᵛ Θ) (toInstEmitTm k) (toInstEmit e)
+   toInstEmit (takeWhileˢ f e)    = takeWhileᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (mapˢ f e)          = mapᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (scanˢ f z e)       = scanᵖ (toInstEmitTm f) (toInstEmitTm z) (toInstEmit e)
    toInstEmit {Θ = Θ} (flattenˢ op e) = flattenᵖ op (frameᵛ Θ) (toInstEmit e)

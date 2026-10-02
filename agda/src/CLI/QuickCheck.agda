@@ -67,11 +67,11 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim using (after_,_; Timed; ObservableInput; hot; cold; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; Ctx; natᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ;
+open import Rx.Exp using (Ty; Ctx; boolᵗ; natᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ;
   FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Exp; Tm; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
   flattenᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; foldᵗ; nilᵗ; consᵗ; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
-open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ;
+open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ;
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -252,6 +252,12 @@ genFn = genB 4 >>=G λ c → genNat >>=G λ k →
     else if c ≡ᵇ 2 then primˢ mul (pairˢ (varˢᵗ (here refl)) (natˢ k))
     else natˢ k)
 
+-- a `takeWhile` predicate: below a bound, or anything but one value
+genPredFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ boolᵗ)
+genPredFn = genB 2 >>=G λ c → genNat >>=G λ k →
+  pureG (if c ≡ᵇ 0 then primˢ ltᵖ (pairˢ (varˢᵗ (here refl)) (natˢ k))
+    else primˢ notᵖ (primˢ eqᵖ (pairˢ (varˢᵗ (here refl)) (natˢ k))))
+
 -- scan step (acc, cur) → acc + cur
 genScanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) natᵗ)
 genScanFn = pureG (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl)))
@@ -385,7 +391,7 @@ genLeafAt g u sl = genB 3 >>=G λ c →
   else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofˢ (natˢ a ∷ natˢ b ∷ [])))
 
 genExpAt g u sl zero    = genLeafAt g u sl
-genExpAt g u sl (suc d) = genB 12 >>=G λ c →
+genExpAt g u sl (suc d) = genB 13 >>=G λ c →
   if c ≡ᵇ 0 then genLeafAt g u sl
   else if c ≡ᵇ 1 then genLeafAt g u sl
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt g u sl d >>=G λ e → pureG (mapˢ f e))
@@ -406,6 +412,8 @@ genExpAt g u sl (suc d) = genB 12 >>=G λ c →
   else if c ≡ᵇ 9 then (genExpAt 0 (g + u) sl d >>=G λ b → pureG (gate g u b))
   else if c ≡ᵇ 10 then
     (genNat >>=G λ k → genExpAt g u sl d >>=G λ e → pureG (takeˢ (natˢ k) e))
+  else if c ≡ᵇ 11 then
+    (genPredFn >>=G λ f → genExpAt g u sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
     (genOp >>=G λ op → genFanFn >>=G λ f → genExpAt g u sl d >>=G λ e →
      pureG (flattenˢ op (mapˢ f e)))
@@ -449,7 +457,7 @@ genObsAt g u sl d =
 
 -- past the gate: the var is in scope and this subtree plants exactly one
 genSpineD w sl zero    = pureG (varˢ (here refl))
-genSpineD w sl (suc d) = genB 9 >>=G λ c →
+genSpineD w sl (suc d) = genB 10 >>=G λ c →
   if c ≡ᵇ 0 then pureG (varˢ (here refl))
   else if c ≡ᵇ 1 then (genFn >>=G λ f → genSpineD w sl d >>=G λ e → pureG (mapˢ f e))
   else if c ≡ᵇ 2 then
@@ -473,6 +481,8 @@ genSpineD w sl (suc d) = genB 9 >>=G λ c →
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineD w sl d >>=G λ e →
      pureG (takeˢ (natˢ (suc k)) e))
+  else if c ≡ᵇ 8 then
+    (genPredFn >>=G λ f → genSpineD w sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
     (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
@@ -480,7 +490,7 @@ genSpineD w sl (suc d) = genB 9 >>=G λ c →
 
 -- before the gate: the binder is guarded, so every route ends in a `deferᵉ`
 genSpineG g u sl zero    = pureG (gate (suc g) u (varˢ (here refl)))
-genSpineG g u sl (suc d) = genB 9 >>=G λ c →
+genSpineG g u sl (suc d) = genB 10 >>=G λ c →
   if c ≡ᵇ 0 then (genSpineD (g + u) sl d >>=G λ b → pureG (gate (suc g) u b))
   else if c ≡ᵇ 1 then (genSpineD (g + u) sl d >>=G λ b → pureG (gate (suc g) u b))
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genSpineG g u sl d >>=G λ e → pureG (mapˢ f e))
@@ -501,6 +511,8 @@ genSpineG g u sl (suc d) = genB 9 >>=G λ c →
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineG g u sl d >>=G λ e →
      pureG (takeˢ (natˢ (suc k)) e))
+  else if c ≡ᵇ 8 then
+    (genPredFn >>=G λ f → genSpineG g u sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
     (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u sl d (suc extra) >>=G λ rest →
@@ -590,6 +602,7 @@ marksˢ (inputˢ i)       = one fInput
 marksˢ (ofˢ ts)         = one fOf ⊕ marksˢᵗˢ ts
 marksˢ emptyˢ           = one fEmpty
 marksˢ (takeˢ c e)      = one fTake ⊕ marksˢᵗ c ⊕ marksˢ e
+marksˢ (takeWhileˢ f e) = one fTakeWhile ⊕ marksˢᵗ f ⊕ marksˢ e
 -- the second component reads the CARRIED state's type, which is the former's
 -- own accumulator: `isData (obs _)` is false, so it fires exactly when the
 -- former re-binds something the run could subscribe
@@ -635,7 +648,7 @@ elabMarksᵉ (input i)      = noMarks
 elabMarksᵉ (ofᵉ ts)       = elabMarksᵗˢ ts
 elabMarksᵉ emptyᵉ         = noMarks
 elabMarksᵉ (takeᵉ c e)    = elabMarksᵗ c ⊕ elabMarksᵉ e
-elabMarksᵉ (takeWhileᵉ f e) = one fTakeWhile ⊕ elabMarksᵗ f ⊕ elabMarksᵉ e
+elabMarksᵉ (takeWhileᵉ f e) = elabMarksᵗ f ⊕ elabMarksᵉ e
 elabMarksᵉ (batchSyncᵉ e) = one fBatchSync ⊕ elabMarksᵉ e
 elabMarksᵉ (mapᵉ f e)     = elabMarksᵗ f ⊕ elabMarksᵉ e
 elabMarksᵉ (scanᵉ f z e)  = elabMarksᵗ f ⊕ elabMarksᵗ z ⊕ elabMarksᵉ e
@@ -774,6 +787,7 @@ showSExp (inputˢ i)      = "(inputˢ " ++ showFin i ++ ")"
 showSExp (ofˢ items)     = "(ofˢ (" ++ showSTmList items ++ "))"
 showSExp emptyˢ          = "emptyˢ"
 showSExp (takeˢ n e)     = "(takeˢ " ++ showSTm n ++ " " ++ showSExp e ++ ")"
+showSExp (takeWhileˢ f e) = "(takeWhileˢ " ++ showSTm f ++ " " ++ showSExp e ++ ")"
 showSExp (mapˢ f e)      = "(mapˢ " ++ showSTm f ++ " " ++ showSExp e ++ ")"
 showSExp (scanˢ f z e)   =
   "(scanˢ " ++ showSTm f ++ " " ++ showSTm z ++ " " ++ showSExp e ++ ")"
