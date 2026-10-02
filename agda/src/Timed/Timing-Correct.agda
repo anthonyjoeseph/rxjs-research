@@ -43,4 +43,11 @@ Timing-Correct =
   AllPairs (Coherent t) (stampedᵀ κ fuel e ins)
 
 postulate
+  -- PROBED: `Probed.Timing-Correct` -- `AllPairs` decided at fuel 30 over three
+  --   first-order programs: a scripted slot taken to one of two arrivals,
+  --   the script's two arrivals kept (two instants), and a literal of two
+  --   values (one instant).  Not a flattener, a share, a `μ` nor a cold
+  --   slot: a flattener's run does not reduce in the typechecker inside 8 GB
+  --   at fuel 30 or 3, so those shapes are `make quickcheck`'s alone. The
+  --   take stamps one item and is degenerate.
   timing-correct : Timing-Correct

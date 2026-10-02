@@ -213,58 +213,6 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — a fully stated spec and a passing QuickCheck
-
-**THE SPEC IS FULLY STATED (Anthony):** no postulate in a top-line
-statement's type.
-
-**THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
-are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
-close without changing one of them, STOP and report that proof. `SExp.Syntax`
-mirrors `Exp` former for former, less the elaboration-only `batchSyncᵉ` and
-`mintᵉ`, so rxjs's named flatteners are `flattenˢ` with no echo; hot is split
-from cold, a hot script minted once, in the table (Anthony). The evaluator is
-open for COST alone: a case past its clock is UNDECIDED, never a failure,
-and a sweep is sized to 10 minutes (Anthony). The InstEmit's shape is free;
-TypeScript is out of scope (Anthony).
-
-**DONE IS `make qc-fast` WITH NO STATEMENT DISAGREEING**, all four of
-`Main`'s on the real evaluator; counterexamples go in the bug cache.
-
-### The monster
-
-(no monster) — the tier is one operator and its InstEmit against one
-executable check. There is no declaration here whose falsity a cone could
-bound.
-
-### Big picture tier roadmap
-
-- **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** Nothing has
-  disagreed since the input fix: depth 2 on seeds 1 to 12 with every former
-  in the census, at fuels 30, 6, 3 and 1, and seed 10 at depth 3. Every undecided case is on
-  the timed side, whose run costs about 70× per author flattener
-  (`typecheck-performance-numbers.md`). Keep widening seeds and depth; an
-  undecided count that crowds out the decided ones is what would reopen
-  the evaluator's cost.
-
-- **EVERY DISAGREEMENT IS THE ELABORATION'S TO FIX.** A non-timeout failure is
-  a counterexample to a top-line statement: bug-cache row first, then the
-  fix in the elaboration or the InstEmit, never in a statement's sides.
-  This is the leg that points tier 2 somewhere provable.
-
-- **LAND THE QUICKCHECK'S CI JOB GREEN.** It is back on: built from the
-  oracle's tree under its own key (`make qc-key`), sweeping `make
-  quickcheck`'s default, an undecided row printed under `UNDECIDED`
-  markers the script never appends; the oracle job's `make bug-cache` runs
-  again. What remains is a green run with every former in the census,
-  `mint` and `batchSync` counted off the elaborated tree. This leg closes
-  the tier; nothing in the job may be narrowed to make it pass.
-
-### The ledger
-
-(empty — the tier's work is definitions, not postulates.)
-
-
 ## Tier 2 — proving the spec
 
 **WHERE THE IMPLEMENTATION IS ACTUALLY JUDGED.** Every row is a top-line
@@ -272,9 +220,10 @@ statement. Expect the
 elaboration and the batcher to move under contact, and report rather than push
 if that starts spiralling out rather than in.
 
-**`Rx.Exp` AND `SExp.Syntax` ARE OFF LIMITS (Anthony).** Tier 1 closing fixes
-both; a proof that needs either to move is a question for Anthony, never a
-patch.
+**`Rx.Exp` AND `SExp.Syntax` ARE OFF LIMITS (Anthony).** Both are fixed; a
+proof that needs either to move is a question for Anthony, never a patch.
+`make quickcheck` in CI decides all four statements on drawn programs, and a
+case past its clock is undecided, never a failure (Anthony).
 
 ### The monster
 
@@ -292,7 +241,7 @@ since until then every row is a top-line statement.
 
 - **PROBE THE FLATTENER'S GROUPING LEAF FIRST.** The likeliest-false leaf:
   that a flattener's stamps group its inner emits as the scheduler's
-  instants do, under merge, switch and exhaust, where tier 1's rows fell.
+  instants do, under merge, switch and exhaust, where the bug cache's rows fell.
   Instantiate it on reached states in `agda/evidence/probed/` before
   anything under it is ground; a refutation restates the simulation, not
   the batcher.
@@ -305,13 +254,13 @@ since until then every row is a top-line statement.
 
 ### The ledger
 
-- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: a
-  prefix sandwich, the plain run between the joined runs at its fuel and one
-  past it, since a cut-off run's last batch waits for an arrival (Anthony);
-  its QuickCheck is the instantiation.
-- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: its
-  QuickCheck is the instantiation; tier 1's stamping leg is the impl's half.
-- **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: its
-  QuickCheck is the instantiation.
-- **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: its
-  QuickCheck is the instantiation; tier 1's later-arrival leg is its half.
+- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `PROBED`: a prefix
+  sandwich, the plain run between the joined runs at its fuel and one past it,
+  since a cut-off run's last batch waits for an arrival (Anthony); probed
+  first-order only, so flatteners are its QuickCheck's alone.
+- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `PROBED`: probed
+  first-order only, so flatteners are its QuickCheck's alone.
+- **`timed-faithful`** (Timed.Faithful) — FALSITY, `PROBED`: probed first-order
+  only, so flatteners are its QuickCheck's alone.
+- **`batchable`** (Batchable.Statement) — FALSITY, `PROBED`: probed first-order
+  only, so flatteners are its QuickCheck's alone.

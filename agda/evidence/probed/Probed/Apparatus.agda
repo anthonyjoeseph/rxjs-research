@@ -39,9 +39,9 @@
 -- no longer has: the grant, the nest store and the walk maximum it was
 -- written over went with the budget.
 --
--- `hotOnce` and the one-slot table `oneSlot` went with the last row that
--- evaluated a program.  They are five lines to rewrite, and what is worth
--- knowing is that every program-running probe wanted exactly that shape.
+-- A `Point` is a program and its two slots, at the bug cache's own
+-- table shape (`mkSlots`), so a row instantiating a top-line statement
+-- reaches a REACHABLE state by running and never a hand-built one.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/Apparatus.agda
 -- RECOVERY: git show 8c6fc8d:agda/evidence/probed/Probed/Apparatus.agda
 --   holds the seven forks that spent `Separates` before this tree was
@@ -56,8 +56,17 @@
 module Probed.Apparatus where
 
 open import Level using (Level)
+open import Data.Fin using (zero)
+open import Data.List using ([]; _∷_)
+open import Data.Nat using (ℕ)
 open import Relation.Nullary.Negation using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
+
+open import Rx.Prim using (ObservableInput; hot; after_,_)
+open import Rx.Exp using (natᵗ)
+open import SExp.Syntax using (SExp; Kinds; inputˢ; ofˢ; emptyˢ; takeˢ; natˢ)
+open import SExp.Simul-Slots using (SimulSlots)
+open import CLI.Unit-Test.Prelude using (Γ₂; κOf; mkSlots)
 -- contexts are Vecs; ∷/[] overload per type
 
 
@@ -82,3 +91,35 @@ record Separates {A : Set} {B : A → Set} (f g : (x : A) → B x) : Set where
     at    : A
     apart : ¬ (f at ≡ g at)
 
+record Point : Set where
+  field
+    d₀   : ObservableInput ℕ
+    prog : SExp Γ₂ [] [] [] natᵗ
+    d₁   : SExp Γ₂ [] [] [] natᵗ
+
+κᵖ : Point → Kinds 2
+κᵖ p = κOf (Point.d₀ p)
+
+insᵖ : (p : Point) → SimulSlots Γ₂ (κᵖ p)
+insᵖ p = mkSlots (Point.d₀ p) (Point.d₁ p)
+
+-- two arrivals, the second dropped by `take`: one instant survives
+take-one : Point
+take-one = record
+  { d₀   = hot ((after 1 , 5) ∷ (after 0 , 6) ∷ [])
+  ; prog = takeˢ (natˢ 1) (inputˢ zero)
+  ; d₁   = emptyˢ }
+
+-- two arrivals of the script, both kept: two items, two instants
+two-arrivals : Point
+two-arrivals = record
+  { d₀   = hot ((after 1 , 5) ∷ (after 0 , 6) ∷ [])
+  ; prog = inputˢ zero
+  ; d₁   = emptyˢ }
+
+-- a literal of two values: two items, ONE instant, the subscribe burst
+of-two : Point
+of-two = record
+  { d₀   = hot []
+  ; prog = ofˢ (natˢ 9 ∷ natˢ 7 ∷ [])
+  ; d₁   = emptyˢ }
