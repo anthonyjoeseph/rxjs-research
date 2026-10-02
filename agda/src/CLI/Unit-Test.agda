@@ -188,4 +188,20 @@ cases =
           (μˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ (natˢ 1) (deferˢ (varˢ (here refl))))) ∷ []))))
           (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
+  cached "a take of a scan of a cold merged with the cold" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (takeˢ (natˢ 1) (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (inputˢ zero)))) ∷ (strmˢ (inputˢ zero)) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of a scan of an of beside a take of a cold" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (takeˢ (natˢ 2) (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (ofˢ ((natˢ 3) ∷ (natˢ 4) ∷ (natˢ 5) ∷ []))))) ∷ (strmˢ (takeˢ (natˢ 1) (inputˢ zero))) ∷ [])))
+          (mkSlots (cold [] ((after 0 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a scan fed back through a take of a deferred self, hot" 12
+          (μˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ (natˢ 1) (deferˢ (varˢ (here refl))))) ∷ [])))))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a scan fed back through a take of a deferred self, cold" 12
+          (μˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ (natˢ 1) (deferˢ (varˢ (here refl))))) ∷ [])))))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
   []

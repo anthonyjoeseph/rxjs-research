@@ -184,8 +184,20 @@ postulate
   -- cold", untimed, splits VALUES: the cut lane's copy of the cold's first
   -- event completes the `take`, so the buffered `of` emits one impl
   -- arrival later, at the same instant.  CI's sweep, seeds 1..12 at
-  -- fifteen cases of depth 2, adds no counterexample.  No row reached an impl arrival carrying two plain
-  -- arrivals' values, which is where this can still fail.
+  -- fifteen cases of depth 2, adds no counterexample.
+  --
+  -- NO TARGETED ROW REACHES AN IMPL ARRIVAL CARRYING TWO PLAIN ARRIVALS'
+  -- VALUES.  An impl pop is one scheduled event, and the elaborated
+  -- `take`'s copies enqueue right behind their originals, so a shared
+  -- arrival needs a copy popped after another plain arrival's event.
+  -- The bug cache aims at each way to subscribe a `take` late, every
+  -- statement decided: a merge buffering behind it ("an of buffered
+  -- behind a take of a cold"), a merge or a switch of a hot subscribing
+  -- it per arrival, a cold subscribing it at its own arrivals, a `defer`
+  -- re-entering it through `μ`, and a `scan` fed back through that
+  -- `defer`.  Each keeps a copy adjacent to its original; where an impl
+  -- arrival holds two values ("a scan fed back through a take of a
+  -- deferred self, hot"), the plain arrival holds the same two.
   --
   -- REFUTED: `arrival-values-false` -- the equal-fuel form with the map
   --   the identity, at `take 2` over a cold with two async values;

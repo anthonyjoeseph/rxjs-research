@@ -240,7 +240,8 @@ undecided, never a failure (Anthony).
 over one leaf joined by `run-prefix`: `arrival-runs`, the only statement in the
 tier about both machines at once, cutting the impl's arrivals into one run per
 plain arrival. The impl runs at its own fuel (Anthony). RULED OUT: one impl
-arrival per plain arrival, and one instant per impl arrival. What is left of
+arrival per plain arrival, one instant per impl arrival, and a shared impl
+arrival at every late-subscribed `take` the bug cache aims at. What is left of
 the monster is whether every plain arrival's values come out CONTIGUOUSLY: no
 impl arrival carrying two plain arrivals' values, none interleaving them.
 
@@ -248,17 +249,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **BUILD AN IMPL ARRIVAL TWO PLAIN ARRIVALS SHARE.** `arrival-runs`
-  cuts the impl's arrivals into contiguous runs, and the targeted rows
-  reach runs longer than one arrival but never one impl arrival holding
-  two plain arrivals' values. An impl pop is one scheduled event, and the
-  elaborated `take`'s cold copies enqueue right behind their originals,
-  so look for a copy popped AFTER another plain arrival's event. A `take`
-  subscribed late by a merge or a switch of a hot, by a cold's own
-  arrivals, or by a `defer` re-entered through `μ`, keeps its copy
-  adjacent (rows pinned); a `scan` feeding one is untried. Pin each as a row
-  read with its sides printed; a shared arrival refutes the leaf, and the
-  restatement cuts WITHIN an impl arrival, by instants.
+- **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
+  in CI where it fits, reaches nestings no targeted row builds: a late
+  `take` under two flatteners, a share connected inside a switch. A
+  counterexample refutes `arrival-runs` before the correspondence is
+  stated over it; a green range is the evidence that lowers its class.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel
