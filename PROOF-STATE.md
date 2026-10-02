@@ -241,11 +241,10 @@ over one leaf joined by `run-prefix`: `arrival-runs`, the only statement in the
 tier about both machines at once, cutting the impl's arrivals into one run per
 plain arrival. The impl runs at its own fuel (Anthony). RULED OUT: one impl
 arrival per plain arrival, one instant per impl arrival, and a shared impl
-arrival at every late-subscribed `take` the bug cache aims at, and any sweep
-counterexample over depth 2 seeds 13..36 and depth 3 seeds 1..8, which draw
-`takeWhileˢ` (undecided cases excepted). What is left of
-the monster is whether every plain arrival's values come out CONTIGUOUSLY: no
-impl arrival carrying two plain arrivals' values, none interleaving them.
+arrival at every late-subscribed `take` the bug cache aims at, and any
+decided counterexample at depth 2 seeds 13..36 or depth 3 seeds 1..8. Left:
+whether every plain arrival's values come out CONTIGUOUSLY: no impl arrival
+carrying two plain arrivals' values, none interleaving them.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
