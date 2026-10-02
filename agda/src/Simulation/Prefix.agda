@@ -29,13 +29,13 @@ prefix-++ (x ∷ xs) p = refl ∷ prefix-++ xs p
 
 mutual
   drain-prefix : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (k : Fuel) (sched : Sched Γ) (st : EvalSt e)
-                 (ru : Rule sched st)
+                 ({-@0-}ru : Rule sched st)
                → Prefix _≡_ (Σ⁰.fst⁰ (drain! k sched st ru)) (Σ⁰.fst⁰ (drain! (suc k) sched st ru))
   drain-prefix zero    sched st ru = []
   drain-prefix (suc k) sched st ru = on-prefix k sched st ru (sched-next sched) refl
 
   on-prefix : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (k : Fuel) (sched : Sched Γ) (st : EvalSt e)
-              (ru : Rule sched st) (x : ⊤ ⊎ (Arrival Γ × Sched Γ)) (eqn : sched-next sched ≡ x)
+              ({-@0-}ru : Rule sched st) (x : ⊤ ⊎ (Arrival Γ × Sched Γ)) ({-@0-}eqn : sched-next sched ≡ x)
             → Prefix _≡_ (Σ⁰.fst⁰ (drainOn k sched st ru x eqn)) (Σ⁰.fst⁰ (drainOn (suc k) sched st ru x eqn))
   on-prefix k sched st ru (inj₁ _)            eqn = []
   on-prefix k sched st ru (inj₂ (a , sched′)) eqn =
