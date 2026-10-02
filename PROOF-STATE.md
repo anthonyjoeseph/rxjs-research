@@ -244,9 +244,10 @@ bound.
   on seeds 1, 3 and 4, and at `QC_FUEL=6`, where a cut-off run makes the
   sandwich's second half bear weight. Sweep more seeds and fuels under the
   10-minute cap, raising `QC_CASE` until no case is a `timeout`. Seed 3's
-  `μ` over a merge holding its own defer times out at 150 s, seed 5 at
-  fuel 4 twice at 60 s: a case still timing out under the cap is the one
-  evaluator-cost finding worth having.
+  `μ` over a merge holding its own defer times out at 150 s. Seed 5's case
+  37 is past the cap on the TIMED side alone, about 70× per author
+  flattener (`typecheck-performance-numbers.md`): the finding this leg was
+  for, and Anthony's to rule on.
 
 - **EVERY DISAGREEMENT IS THE ELABORATION'S TO FIX.** A non-timeout failure is
   a counterexample to a top-line statement: bug-cache row first, then the

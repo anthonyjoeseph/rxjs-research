@@ -1049,3 +1049,25 @@ step re-checks the cell's existential type in `scanDispatch`, `scanHeld` and
 fold above a live frame once per nesting level, where the live fold already
 applied it once. Not pursued: the evaluator's cost is a detail, and a slow
 case gets a longer clock instead (PROOF-STATE, tier 1).
+
+## The first case past the 10-minute cap: the timed side, one scan step per level
+
+QuickCheck seed 5, depth 2, case 37, each statement alone on the compiled
+`QuickCheck`: left-to-right 1 s, batchable 0 s, timing-correct and
+timed-faithful each past 590 s. It is past 150 s at fuel 1, 2 and 3 alike, so the
+cost is in the subscribe frame, not in fuel. Both slow statements run the
+timed translation; neither elaborated side is slow.
+
+The shape, cut down and run through `Bug-Cache` (all four statements, fuel 1):
+`flatAllˢ merge (scanˢ step (strmˢ (ofˢ [5])) src)`, where `step` wraps the
+accumulated stream in one more `flatAllˢ merge (ofˢ [acc, ofˢ [1]])`.
+
+| `src` | nesting the last value reaches | wall clock |
+|---|---|---|
+| `ofˢ [1]` | one merge around `ofˢ [5]` | 11.4 s |
+| `ofˢ [1, 9]` | two | 806 s |
+
+So one more author flattener costs about 70×. The timed translation writes each
+author flattener as about five nested flatteners (`someˢ`, the beat's
+`concatˢ`, the policy's own, the lane's `concatˢ`, `runˢ`), and the evaluator's
+multiplier is per evaluator flattener, which is what puts depth two past the cap.
