@@ -160,4 +160,24 @@ cases =
           (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (ofˢ ((natˢ 4) ∷ []))) ∷ (strmˢ (takeˢ (natˢ 2) (inputˢ zero))) ∷ [])))
           (mkSlots (cold (5 ∷ []) ((after 0 , 3) ∷ (after 1 , 8) ∷ []))
                    emptyˢ) ∷
+  cached "an of buffered behind a take of a cold" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ (natˢ 1) (inputˢ zero))) ∷ (strmˢ (ofˢ ((natˢ 7) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a cold buffered behind a take of itself" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ (natˢ 1) (inputˢ zero))) ∷ (strmˢ (inputˢ zero)) ∷ [])))
+          (mkSlots (cold (2 ∷ []) ((after 0 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of an of subscribed at each hot arrival, merged" 30
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (takeˢ (natˢ 1) (ofˢ ((natˢ 7) ∷ (varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of an of subscribed at each hot arrival, switched" 30
+          (flatAllˢ switchᶠ (mapˢ (strmˢ (takeˢ (natˢ 1) (ofˢ ((natˢ 7) ∷ (varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of a cold subscribed at each of its own arrivals" 30
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (takeˢ (natˢ 1) (inputˢ zero))) (inputˢ (suc zero))))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   (inputˢ zero)) ∷
   []

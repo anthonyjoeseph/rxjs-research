@@ -180,8 +180,11 @@ postulate
   -- under two takes in one merge" -- the cut lane's empty arrival folds
   -- into the next run, and timed, a value and its END land at two impl
   -- arrivals of one instant -- and "a take of a cold exhausted beside an
-  -- of", timed, the same split; CI's sweep, seeds 1..12 at fifteen
-  -- cases of depth 2, adds no counterexample.  No row reached an impl arrival carrying two plain
+  -- of", timed, the same split; "an of buffered behind a take of a
+  -- cold", untimed, splits VALUES: the cut lane's copy of the cold's first
+  -- event completes the `take`, so the buffered `of` emits one impl
+  -- arrival later, at the same instant.  CI's sweep, seeds 1..12 at
+  -- fifteen cases of depth 2, adds no counterexample.  No row reached an impl arrival carrying two plain
   -- arrivals' values, which is where this can still fail.
   --
   -- REFUTED: `arrival-values-false` -- the equal-fuel form with the map

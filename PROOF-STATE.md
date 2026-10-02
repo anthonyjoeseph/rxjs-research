@@ -251,11 +251,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **BUILD AN IMPL ARRIVAL TWO PLAIN ARRIVALS SHARE.** `arrival-runs`
   cuts the impl's arrivals into contiguous runs, and the targeted rows
   reach runs longer than one arrival but never one impl arrival holding
-  two plain arrivals' values. Look for a mechanism that could put them
-  there -- a `scan` or `μ` feeding a value back within one pop, a share's
-  connect replaying a cold mid-arrival -- and pin each as a bug-cache row
+  two plain arrivals' values. An impl pop is one scheduled event, and the
+  elaborated `take`'s cold copies enqueue right behind their originals,
+  so look for a copy popped AFTER another plain arrival's event. A `take`
+  subscribed late by a merge or a switch of a hot, or by a cold's own
+  arrivals, keeps its copy adjacent (rows pinned); a `take` under a
+  `defer` re-entered through `μ` is untried. Pin each as a bug-cache row
   read with its sides printed; a shared arrival refutes the leaf, and the
-  restatement then cuts WITHIN an impl arrival, by its instants.
+  restatement cuts WITHIN an impl arrival, by instants.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel
