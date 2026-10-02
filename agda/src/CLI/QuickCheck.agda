@@ -969,9 +969,22 @@ counts k (t ∷ ts) fs = t ∷ " " ∷ show (length (ofKind k fs)) ∷ " " ∷ c
 samples : ℕ → List (ℕ × String) → String
 samples k fs = concatStr (take 2 (ofKind k fs))
 
+-- A TIMEOUT IS UNDECIDED, NEVER A FAILURE (Anthony).  Any wall clock
+-- has a case past it, so a clock cannot be what fails a sweep; what
+-- fails one is a statement that answered and disagreed.  The timeouts
+-- are still counted and their rows still printed, since a case nobody
+-- has decided is where an undecided counterexample would be.
+decided : List (ℕ × String) → List (ℕ × String)
+decided []             = []
+decided ((k , r) ∷ fs) = if k ≡ᵇ TIMEOUT then decided fs else (k , r) ∷ decided fs
+
+agreeing : List (ℕ × String) → String
+agreeing []      = "  (all agree)\n"
+agreeing (_ ∷ _) = ""
+
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
-dumpFails fs = concatStr (counts 0 kinds fs) ++ "\n"
+dumpFails fs = agreeing (decided fs) ++ concatStr (counts 0 kinds fs) ++ "\n"
   ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples TIMEOUT fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
@@ -1083,7 +1096,8 @@ main = getContents >>= λ s →
      then putStr (proj₁ (showAt f at d (randList seed 2000000)))
      else putStr (concatStr
        (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " fuel " ∷ show f ∷ " — ran " ∷ show runs
-        ∷ " cases, " ∷ show (length fails) ∷ " failures"
+        ∷ " cases, " ∷ show (length (decided fails)) ∷ " failures, "
+        ∷ show (length fails ∸ length (decided fails)) ∷ " undecided"
         ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
         ++ᴸ censusPairs allFormers (proj₁ tally)
         ++ᴸ ("\n" ∷ dumpFails fails ∷ [])))

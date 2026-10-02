@@ -224,13 +224,12 @@ close without changing one of them, STOP and report that proof. `SExp.Syntax`
 mirrors `Exp` former for former, less the elaboration-only `batchSyncᵉ` and
 `mintᵉ`, so rxjs's named flatteners are `flattenˢ` with no echo; hot is split
 from cold, a hot script minted once, in the table (Anthony). The evaluator is
-open for COST alone, and cost is a detail: a slow case gets a longer clock
-until all of QuickCheck passes 10 minutes (Anthony). The InstEmit's shape
-is free; TypeScript is out of scope (Anthony).
+open for COST alone: a case past its clock is UNDECIDED, never a failure,
+and a sweep is sized to 10 minutes (Anthony). The InstEmit's shape is free;
+TypeScript is out of scope (Anthony).
 
-`QuickCheck` decides each of `Main`'s four statements on the real evaluator,
-each case under its own wall clock. **DONE IS THE AGDA
-QUICKCHECK PASSING FULLY**, by `make qc-fast`; counterexamples go in the bug cache.
+**DONE IS `make qc-fast` WITH NO STATEMENT DISAGREEING**, all four of
+`Main`'s on the real evaluator; counterexamples go in the bug cache.
 
 ### The monster
 
@@ -240,15 +239,13 @@ bound.
 
 ### Big picture tier roadmap
 
-- **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** Depth 2 is green
-  on seeds 1, 3, 4, 6 and 7, and at `QC_FUEL=6`, 3 and 1, where a cut-off run makes the
-  sandwich's second half bear weight. Sweep more seeds and fuels under the
-  10-minute cap, raising `QC_CASE` until no case is a `timeout`. Seed 3's
-  `μ` over a merge holding its own defer times out at 150 s. Seed 5's case
-  37 is past the cap on the TIMED side alone, about 70× per author
-  flattener (`typecheck-performance-numbers.md`): the finding this leg was
-  for, and Anthony's to rule on. Seed 10 at depth 3 agrees everywhere it
-  answers; only timed-side statements time out.
+- **WIDEN THE SWEEP TO WHAT 10 MINUTES BUYS (Anthony).** Nothing has
+  disagreed since the input fix: depth 2 on seeds 1, 3, 4, 6, 7 and 11, at
+  `QC_FUEL=6`, 3 and 1, and seed 10 at depth 3. Every undecided case is on
+  the timed side, whose run costs about 70× per author flattener
+  (`typecheck-performance-numbers.md`). Keep widening seeds and depth; an
+  undecided count that crowds out the decided ones is what would reopen
+  the evaluator's cost.
 
 - **EVERY DISAGREEMENT IS THE ELABORATION'S TO FIX.** A non-timeout failure is
   a counterexample to a top-line statement: bug-cache row first, then the

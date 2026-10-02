@@ -1680,8 +1680,9 @@ quickcheck: qc-build
 # is raised only once the operator passes at the current one.
 # QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds; QC_FUEL 0 is the binary's
 # default fuel.  QC_CASE is the wall clock per CASE in seconds, unset for
-# the binary's default and 0 for none: a case past it is a `timeout`
-# failure with its paste row, and the sweep goes on.
+# the binary's default and 0 for none: a case past it is UNDECIDED, never
+# a failure (Anthony) -- counted, printed with its paste row, and the
+# sweep goes on.
 #
 # FOUR QUICKCHECKS, ONE PER STATEMENT `Main` IMPORTS.  Each decides that
 # statement's own two sides on one program's run, so any of them failing
@@ -1704,7 +1705,7 @@ qc-fast: qc-build
 	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
 	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
 	grep -q '(all agree)' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
-	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s"
+	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s, $$(grep -o '[0-9]* undecided' $(QC_LOG) | head -1)"
 
 
 # THE ONE TO POLL.  Exits 3 while running, 1 when red -- but never loop on it
