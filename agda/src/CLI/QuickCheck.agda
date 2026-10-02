@@ -65,17 +65,19 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim using (after_,_; Timed; ObservableInput; hot; cold; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ;
-  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Rx.Exp using (Ty; Ctx; natᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ;
+  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Exp; Tm; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
+  flattenᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; foldᵗ; nilᵗ; consᵗ; pairᵗ; fstᵗ;
+  sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ;
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
-open import SExp.Pipeline using (runᴵ)
+open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; statements; statementName;
-  ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ)
+  ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
@@ -615,6 +617,48 @@ marksˢᵗ (strmˢ e)     = marksˢ e
 marksˢᵗˢ []       = noMarks
 marksˢᵗˢ (y ∷ ys) = marksˢᵗ y ⊕ marksˢᵗˢ ys
 
+-- THE TWO FORMERS ONLY AN ELABORATION MAY WRITE are counted where they
+-- are written: in the tree the case's program elaborates to, since no
+-- author program can carry one (`SExp.Syntax`).  Only those two, because
+-- every other former is the author's and is counted above, where a
+-- second count off the elaborated tree would double it.
+elabMarksᵉ  : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → Marks
+elabMarksᵗ  : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → Marks
+elabMarksᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → Marks
+
+elabMarksᵉ (input i)      = noMarks
+elabMarksᵉ (ofᵉ ts)       = elabMarksᵗˢ ts
+elabMarksᵉ emptyᵉ         = noMarks
+elabMarksᵉ (takeᵉ c e)    = elabMarksᵗ c ⊕ elabMarksᵉ e
+elabMarksᵉ (batchSyncᵉ e) = one fBatchSync ⊕ elabMarksᵉ e
+elabMarksᵉ (mapᵉ f e)     = elabMarksᵗ f ⊕ elabMarksᵉ e
+elabMarksᵉ (scanᵉ f z e)  = elabMarksᵗ f ⊕ elabMarksᵗ z ⊕ elabMarksᵉ e
+elabMarksᵉ (flattenᵉ _ e) = elabMarksᵉ e
+elabMarksᵉ (μᵉ e)         = elabMarksᵉ e
+elabMarksᵉ (varᵉ x)       = noMarks
+elabMarksᵉ (deferᵉ e)     = elabMarksᵉ e
+elabMarksᵉ (mintᵉ e)      = one fMint ⊕ elabMarksᵉ e
+
+elabMarksᵗ (varᵗ x)      = noMarks
+elabMarksᵗ unit̂          = noMarks
+elabMarksᵗ (bool̂ _)      = noMarks
+elabMarksᵗ (nat̂ _)       = noMarks
+elabMarksᵗ (foldᵗ l z f) = elabMarksᵗ l ⊕ elabMarksᵗ z ⊕ elabMarksᵗ f
+elabMarksᵗ nilᵗ          = noMarks
+elabMarksᵗ (consᵗ a bs)  = elabMarksᵗ a ⊕ elabMarksᵗ bs
+elabMarksᵗ (pairᵗ a b)   = elabMarksᵗ a ⊕ elabMarksᵗ b
+elabMarksᵗ (fstᵗ p)      = elabMarksᵗ p
+elabMarksᵗ (sndᵗ p)      = elabMarksᵗ p
+elabMarksᵗ (inlᵗ a)      = elabMarksᵗ a
+elabMarksᵗ (inrᵗ a)      = elabMarksᵗ a
+elabMarksᵗ (caseᵗ s l r) = elabMarksᵗ s ⊕ elabMarksᵗ l ⊕ elabMarksᵗ r
+elabMarksᵗ (ifᵗ c a b)   = elabMarksᵗ c ⊕ elabMarksᵗ a ⊕ elabMarksᵗ b
+elabMarksᵗ (primᵗ _ a)   = elabMarksᵗ a
+elabMarksᵗ (strmᵗ e)     = elabMarksᵉ e
+
+elabMarksᵗˢ []       = noMarks
+elabMarksᵗˢ (y ∷ ys) = elabMarksᵗ y ⊕ elabMarksᵗˢ ys
+
 ------------------------------------------------------------------------
 -- a compact dump of both sides' batches (for failure reports)
 
@@ -786,12 +830,22 @@ CASE = 10
 -- from the one that failed.  Both definitions are printed through the
 -- same `showSExp` the program goes through, and `mkSlots` is in the
 -- prelude so the corpus can see the name.
+--
+-- AN UNDECIDED CASE PRINTS THE SAME ROW UNDER ITS OWN MARKERS, because
+-- the script appends every `PASTE` block to the corpus and the corpus
+-- holds known counterexamples only: a case past its clock is not one
+-- (Anthony), and a row of it would be red until the evaluator got
+-- faster rather than until anything was fixed.
+rowIn : String → ℕ → SExp Γ₂ [] [] [] natᵗ
+      → Script → SExp Γ₂ [] [] [] natᵗ → String
+rowIn m f e d₀ d₁ =
+  "\n-- <<<" ++ m ++ "\n  cached \"?\" " ++ show f ++ "\n          "
+       ++ showSExp e ++ "\n          (mkSlots (" ++ showScript d₀ ++ ")\n"
+       ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- " ++ m ++ ">>>\n"
+
 pasteRow : ℕ → SExp Γ₂ [] [] [] natᵗ
          → Script → SExp Γ₂ [] [] [] natᵗ → String
-pasteRow f e d₀ d₁ =
-  "\n-- <<<PASTE\n  cached \"?\" " ++ show f ++ "\n          "
-       ++ showSExp e ++ "\n          (mkSlots (" ++ showScript d₀ ++ ")\n"
-       ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- PASTE>>>\n"
+pasteRow = rowIn "PASTE"
 
 -- what a case was drawn from: the program and its slot table
 Drawn : Set
@@ -883,7 +937,7 @@ TIMEOUT = 4
 
 timedOut : ℕ → ℕ → Drawn → List (ℕ × String)
 timedOut s f (e , d₀ , d₁) =
-  (TIMEOUT , "  timeout\n    no verdict within " ++ show s ++ "s" ++ pasteRow f e d₀ d₁) ∷ []
+  (TIMEOUT , "  timeout\n    no verdict within " ++ show s ++ "s" ++ rowIn "UNDECIDED" f e d₀ d₁) ∷ []
 
 -- the reports are an ARGUMENT, so forcing them and returning them share
 -- one evaluation
@@ -899,7 +953,8 @@ oneCase : List Statement → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × 
 -- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
 -- the statement's sides at exactly the program a cached row names.
 oneCase ss f s d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (marksˢ e , bounded s f (e , proj₁ ds , proj₂ ds) ss)
+  pureG (marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e)
+        , bounded s f (e , proj₁ ds , proj₂ ds) ss)
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached

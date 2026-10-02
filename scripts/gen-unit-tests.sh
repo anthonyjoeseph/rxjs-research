@@ -117,6 +117,9 @@ widen () {
 export LC_ALL="${LC_ALL:-C.UTF-8}"
 export LANG="${LANG:-C.UTF-8}"
 
+# the counts below go to the build directory, which a fresh checkout lacks
+mkdir -p "$ROOT/agda/_cli"
+
 tmp="$(mktemp)"
 row="$(mktemp)"
 spl="$(mktemp)"
@@ -126,6 +129,7 @@ trap 'rm -f "$tmp" "$row" "$spl" "$cen"' EXIT
 widen
 
 added=0
+undecided=0
 timedout=""
 for seed in $(seq "$FIRST" "$LAST"); do
   # stdin is: SEED RUNS DEPTH  (CLI/QuickCheck.agda's main: parseNat, numAt 1,
@@ -142,6 +146,12 @@ for seed in $(seq "$FIRST" "$LAST"); do
     exit "$rc"
   fi
   head -1 "$tmp"
+  # a case past the binary's own per-case clock is UNDECIDED, never a
+  # failure (Anthony): its row is printed under `UNDECIDED` markers, which
+  # the splice below never reads, and only its count is kept
+  u="$(head -1 "$tmp" | grep -o '[0-9]* undecided' | grep -o '^[0-9]*' || true)"
+  undecided=$((undecided + ${u:-0}))
+  awk '/^-- <<<UNDECIDED$/,/^-- UNDECIDED>>>$/' "$tmp"
   # one census line per run, banked for the aggregate below rather than
   # printed: per-seed counts are noise at 300 seeds, and the question the
   # census answers is about the SWEEP
@@ -202,6 +212,12 @@ awk '{ for (i = 2; i < NF; i += 2) t[$i] += $(i + 1) }
      END { for (k in t) print k, t[k] }' "$cen" | sort > "$CENSUS"
 echo "gen-unit-tests: census over seeds $FIRST..$LAST -> ${CENSUS#"$ROOT"/}"
 awk '{ printf "  %-12s %s\n", $1, $2 }' "$CENSUS"
+
+if [ "$undecided" -gt 0 ]; then
+  echo "gen-unit-tests: $undecided case(s) UNDECIDED — past the per-case clock,"
+  echo "                so neither agreeing nor a counterexample (Anthony);"
+  echo "                their rows are printed under their seeds above"
+fi
 
 if [ -n "$timedout" ]; then
   echo "gen-unit-tests: TIMED OUT:$timedout"

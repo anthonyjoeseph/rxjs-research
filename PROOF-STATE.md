@@ -252,11 +252,13 @@ bound.
   fix in the elaboration or the InstEmit, never in a statement's sides.
   This is the leg that points tier 2 somewhere provable.
 
-- **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
-  from the oracle's tree, as `qc-build` does, and the oracle job's `make
-  bug-cache` step with it. This leg closes the tier: the
-  check that decides tier 1 then guards it. Nothing in the job may be
-  narrowed to make it pass.
+- **LAND THE QUICKCHECK'S CI JOB GREEN.** It is back on: built from the
+  oracle's tree under its own key (`make qc-key`), sweeping `make
+  quickcheck`'s default, an undecided row printed under `UNDECIDED`
+  markers the script never appends; the oracle job's `make bug-cache` runs
+  again. What remains is a green run with every former in the census,
+  `mint` and `batchSync` counted off the elaborated tree. This leg closes
+  the tier; nothing in the job may be narrowed to make it pass.
 
 ### The ledger
 

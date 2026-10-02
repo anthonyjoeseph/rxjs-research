@@ -30,6 +30,7 @@ are the STRIPPED ones, so a comment edit invalidates nothing either.
 
   oracle-mirror.py --sync   write the tree (only files whose content changed)
   oracle-mirror.py --key    print the cache key: a hash of the runners' cone
+  oracle-mirror.py --qc-key the same over the QuickCheck binary's cone
   oracle-mirror.py --ghc-flags   the compile's `--ghc-flag`s, which the key covers
 """
 from __future__ import annotations
@@ -44,10 +45,10 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MIRROR = os.path.join(REPO, "agda", "_stripped-comments", "src")
 DEST = os.path.join(REPO, "agda", "_oracle")
 ROOTS = ["CLI.Main", "CLI.Unit-Test.Bug-Cache"]
-# IN THE TREE, NOT IN THE KEY.  The QuickCheck binary is a dev loop, not a
-# runner CI caches, so its cone is synced beside the runners -- one `_build`,
-# shared interfaces, the same termination-off options -- while an edit to it
-# leaves the cached runners standing.
+# IN THE TREE, NOT IN THE RUNNERS' KEY.  The QuickCheck binary's cone is
+# synced beside the runners -- one `_build`, shared interfaces, the same
+# termination-off options -- and keyed on its OWN cone (`--qc-key`), so an
+# edit to it leaves the cached runners standing and the reverse.
 SYNC_ONLY = ["CLI.QuickCheck"]
 PRAGMA = "{-# OPTIONS --erasure --no-termination-check #-}\n"
 MARK, ERASED = "{-@0-}", "@0 "
@@ -130,10 +131,14 @@ def main() -> int:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--sync", action="store_true")
     g.add_argument("--key", action="store_true")
+    g.add_argument("--qc-key", action="store_true")
     g.add_argument("--ghc-flags", action="store_true")
     a = ap.parse_args()
     if a.ghc_flags:
         print(" ".join(f"--ghc-flag={f}" for f in GHC_FLAGS))
+        return 0
+    if a.qc_key:
+        print(key(cone(SYNC_ONLY)))
         return 0
     files = cone(ROOTS)
     if a.sync:
