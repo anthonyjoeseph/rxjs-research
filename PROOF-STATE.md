@@ -248,14 +248,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SWEEP FOR AN IMPL ARRIVAL TWO PLAIN ARRIVALS SHARE.** `arrival-runs`
-  cuts the impl's arrivals into contiguous runs. A cold under two takes
-  inside a merge, or a share whose connect lands mid-arrival, may deliver
-  the tail of one plain arrival and the head of the next in ONE impl
-  arrival, which no cut separates. Sweep `make qc-arrival-runs` wide and
-  probe those shapes before anything is stated beneath the leaf; a shared
-  impl arrival refutes it, and the restatement then cuts WITHIN an impl
-  arrival, by its instants.
+- **BUILD AN IMPL ARRIVAL TWO PLAIN ARRIVALS SHARE.** `arrival-runs`
+  cuts the impl's arrivals into contiguous runs, and the targeted rows
+  reach runs longer than one arrival but never one impl arrival holding
+  two plain arrivals' values. Look for a mechanism that could put them
+  there -- a `scan` or `μ` feeding a value back within one pop, a share's
+  connect replaying a cold mid-arrival -- and pin each as a bug-cache row
+  read with its sides printed; a shared arrival refutes the leaf, and the
+  restatement then cuts WITHIN an impl arrival, by its instants.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel

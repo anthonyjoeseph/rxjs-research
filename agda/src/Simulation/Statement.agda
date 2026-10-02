@@ -175,6 +175,15 @@ postulate
   -- arrivals 1 and 2, both at instant 29.  Not stated in Agda: the timed
   -- `take` does not reduce in the typechecker in useful time.
   --
+  -- RUNS LONGER THAN ONE IMPL ARRIVAL HOLD WHERE THE SWEEP REACHES THEM.
+  -- Compiled, every statement decided: the bug cache's rows "a cold
+  -- under two takes in one merge" -- the cut lane's empty arrival folds
+  -- into the next run, and timed, a value and its END land at two impl
+  -- arrivals of one instant -- and "a take of a cold exhausted beside an
+  -- of", timed, the same split; CI's sweep, seeds 1..12 at fifteen
+  -- cases of depth 2, adds no counterexample.  No row reached an impl arrival carrying two plain
+  -- arrivals' values, which is where this can still fail.
+  --
   -- REFUTED: `arrival-values-false` -- the equal-fuel form with the map
   --   the identity, at `take 2` over a cold with two async values;
   --   `takeᵖ` subscribes the cold twice, so the impl's slice at arrival 2

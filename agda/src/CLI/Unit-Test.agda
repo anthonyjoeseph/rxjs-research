@@ -148,4 +148,16 @@ cases =
           (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 5) (ofˢ ((natˢ 3) ∷ (natˢ 9) ∷ [])))) ∷ (strmˢ (takeˢ (natˢ 5) (inputˢ zero))) ∷ [])))
           (mkSlots (cold (5 ∷ []) ((after 0 , 3) ∷ []))
                    (emptyˢ)) ∷
+  cached "a cold under two takes in one merge" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (takeˢ (natˢ 1) (inputˢ zero))) ∷ (strmˢ (takeˢ (natˢ 2) (inputˢ zero))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a share of a cold merged with a take of itself" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (takeˢ (natˢ 1) (inputˢ (suc zero)))) ∷ [])))
+          (mkSlots (cold (3 ∷ []) ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a take of a cold exhausted beside an of" 30
+          (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (ofˢ ((natˢ 4) ∷ []))) ∷ (strmˢ (takeˢ (natˢ 2) (inputˢ zero))) ∷ [])))
+          (mkSlots (cold (5 ∷ []) ((after 0 , 3) ∷ (after 1 , 8) ∷ []))
+                   emptyˢ) ∷
   []
