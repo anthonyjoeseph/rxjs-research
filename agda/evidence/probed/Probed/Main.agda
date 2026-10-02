@@ -15,25 +15,6 @@
 -- nobody — so `using ()` is the correct and expected clause here.  It is not
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 --
--- WHY THE TREE HOLDS NO PROBE.  A probe expires with its target, and
--- every statement this tree was written against before the candidate
--- answered with a trace was a reading of a MEASURE — a budget's grant,
--- a frame's carried figure, a depth read off the program text — or the
--- dead branch of a runtime guard the trace design deleted.  None of
--- them is stateable now, so E2 expires every row written against one.
--- The arms of the trace-returning candidate are its first probeable
--- statements, and no row has reached one yet.
---
--- AND TWO FURTHER GENERATIONS EXPIRED THE SAME WAY, WHICH IS WHAT SAYS
--- THE MECHANISM IS THE RIGHT ONE RATHER THAN AN OVERHEAD.  Six files
--- were written against a drain premise that READ a registry against the
--- program, and that reading is refuted in every form it was tried; nine
--- more instantiated the CARRIED bound a frame was held to, and the whole
--- apparatus of a carried figure went when the descent stopped being
--- ordered by a syntactic seed.  Every one of those rows was green to the
--- last day and said nothing about the statement that replaced it — which
--- is exactly the silent death E2 exists to make loud.
---
 -- What is worth recovering from the fifty-one expired files is the
 -- HARNESS rather than any verdict — the real-evaluator plumbing, the
 -- program families, and the coverage boundaries recorded at the foot of
@@ -59,5 +40,6 @@ module Probed.Main where
 open import Probed.Apparatus using (Confirms; Separates)
 open import Probed.Left-To-Right using ()
 open import Probed.Timing-Correct using ()
+open import Probed.Simulation using ()
 open import Probed.Timed-Faithful using ()
 open import Probed.Batchable using ()

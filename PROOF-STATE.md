@@ -183,11 +183,17 @@ the row is DIFFICULTY.
 Main                                     four top-line statements, claimed
  │                                        side by side, meeting in raw values
  ├─ left-to-right                         Left-To-Right/Statement.agda — the
- │                                        batches, joined, are the plain
- │                                        program's values — tier 2
+ │   │                                    batches, joined, are the plain
+ │   │                                    program's values — tier 2
+ │   ├─ simulation                        Simulation/Statement.agda — the
+ │   │                                    impl's run is the plain run, each
+ │   │                                    value named by its arrival
+ │   └─ batched-sandwich                  the batcher against its own run
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
- │                                        group emits as the timed
- │                                        translation's packets do — tier 2
+ │   │                                    group emits as the timed
+ │   │                                    translation's packets do — tier 2
+ │   ├─ simulation                        at the timed program
+ │   └─ packets-name-arrivals             one packet per plain arrival
  ├─ batchable                             Batchable/Statement.agda — a second
  │                                        evaluator running the batcher over
  │                                        the run's emits gives the spec's
@@ -216,7 +222,7 @@ research lives; where they disagree, the header wins.
 ## Tier 2 — proving the spec
 
 **WHERE THE IMPLEMENTATION IS ACTUALLY JUDGED.** Every row is a top-line
-statement. Expect the
+statement or a leaf one is assembled over. Expect the
 elaboration and the batcher to move under contact, and report rather than push
 if that starts spiralling out rather than in.
 
@@ -227,24 +233,26 @@ case past its clock is undecided, never a failure (Anthony).
 
 ### The monster
 
-(no monster) — chosen among the simulation's leaves once the first leg lands,
-since until then every row is a top-line statement.
+(no monster) — chosen among the simulation's leaves once it is split per
+former, since until then it is one statement under both assembled top lines.
 
 ### Big picture tier roadmap
 
-- **STATE THE SIMULATION AND ASSEMBLE OVER IT.** Outside in: one
-  postulated theorem, that decoding the elaborated run gives the plain
-  run's emits each tagged with its instant, and each of `Main`'s four
-  statements written as a real body over it plus leaves about the batcher
-  on a list. Then one leaf per former under the simulation, so the tier's
-  monster is chosen among leaves rather than at the top line.
+- **QUICKCHECK THE SIMULATION ON FLATTENERS.** The likeliest-false
+  region: that a flattener's stamps group its inner emits as the plain
+  run's arrivals do, under merge, switch and exhaust, where the bug
+  cache's rows fell. A flattener's run does not reduce in the typechecker
+  inside 8 GB, so the probe tree reaches first-order only; decide both
+  conjuncts in `make quickcheck` on drawn programs before anything under
+  the simulation is ground. A failure restates the simulation, not the
+  batcher.
 
-- **PROBE THE FLATTENER'S GROUPING LEAF FIRST.** The likeliest-false leaf:
-  that a flattener's stamps group its inner emits as the scheduler's
-  instants do, under merge, switch and exhaust, where the bug cache's rows fell.
-  Instantiate it on reached states in `agda/evidence/probed/` before
-  anything under it is ground; a refutation restates the simulation, not
-  the batcher.
+- **SPLIT THE SIMULATION PER FORMER.** `left-to-right` and
+  `timing-correct` are real bodies over `simulation`; `batchable` and
+  `timed-faithful` do not stand on it, the first being the protocol's
+  well-formedness and the second plain-only. What remains is one leaf
+  per former under the simulation, so the tier's monster is chosen among
+  leaves rather than at the theorem every top line stands on.
 
 - **ONLY THEN GRIND THE REST.** The simulation by a two-run relation
   recursing on the type as `Red` does, reusing its descent for the μ peel,
@@ -254,12 +262,15 @@ since until then every row is a top-line statement.
 
 ### The ledger
 
-- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `PROBED`: a prefix
-  sandwich, the plain run between the joined runs at its fuel and one past it,
-  since a cut-off run's last batch waits for an arrival (Anthony); probed
-  first-order only, so flatteners are its QuickCheck's alone.
-- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `PROBED`: probed
-  first-order only, so flatteners are its QuickCheck's alone.
+- **`simulation`** (Simulation.Statement) — FALSITY, `PROBED`: the impl's run,
+  decoded, is the plain run with each value stamped by a name for its arrival,
+  read off the plain run's value counts at successive fuels; carries
+  `left-to-right` and `timing-correct`.
+- **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY, `PROBED`: the
+  joined run between its own unbatched values at one fuel and one past it,
+  since a cut-off run's last batch waits for an arrival (Anthony).
+- **`packets-name-arrivals`** (Timed.Timing-Correct) — FALSITY, `PROBED`: the
+  timed program's plain run carries one packet per arrival, injectively.
 - **`timed-faithful`** (Timed.Faithful) — FALSITY, `PROBED`: probed first-order
   only, so flatteners are its QuickCheck's alone.
 - **`batchable`** (Batchable.Statement) — FALSITY, `PROBED`: probed first-order

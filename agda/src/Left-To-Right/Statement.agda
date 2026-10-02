@@ -27,10 +27,11 @@
 -- values compared are (packet, value) pairs, and the batches are then
 -- read against the packets.
 --
--- THE IMPL'S SHARED-SLOT FALLBACK IS OWED HERE.  `embedSlotsImpl`
--- checks stratification of the elaborated definition and falls back to
--- `empty` if it fails; the table only certifies the plain one, so this
--- statement is where "the check never fails" is paid.
+-- TWO CLAIMS, AND THE BODY KEEPS THEM APART.  That the elaborated run's
+-- values ARE the plain run's is `simulation`'s; that the batcher only
+-- delays them, by at most one arrival, is `batched-sandwich`'s, stated
+-- against the elaborated run itself, which is the only run the batcher
+-- sees.
 ------------------------------------------------------------------
 module Left-To-Right.Statement where
 
@@ -38,19 +39,20 @@ open import Data.Bool    using (T)
 open import Data.List    using (List; []; concat; map)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.Nat     using (suc)
-open import Data.Product using (_×_; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; subst)
 
 open import Rx.Prim      using (Fuel)
 open import Rx.Exp        using (Ctx; Val; isData)
-open import SExp.Syntax      using (SExp; Kinds)
+open import SExp.Syntax      using (SExp; Kinds; plainᵏ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import SExp.Plain     using (unplainᵈ)
 open import SExp.Simul-Slots using (SimulSlots)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import SExp.Batch     using (batchSimultaneousᵖ)
-open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl; runᴾ)
+open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl; runᴵ; runᴾ)
 open import Batchable.Inst-Extract using (instExtract)
+open import Simulation.Statement using (simulation; agrees-values)
 
 -- the batches, joined back up
 joinedᴵ : ∀ {n} {Γ : Ctx n} {t} → T (isData t) → (κ : Kinds n) → Fuel
@@ -59,6 +61,11 @@ joinedᴵ {t = t} ok κ fuel e ins =
   map (unplainᵈ t ok) (concat (map proj₂ (instExtract (decodeEmits
       (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins)))))))
 
+-- the elaborated run without the batcher, read at data
+valsᴵ : ∀ {n} {Γ : Ctx n} {t} → T (isData t) → (κ : Kinds n) → Fuel
+      → SExp Γ [] [] [] t → SimulSlots Γ κ → List (Val Γ t)
+valsᴵ {t = t} ok κ fuel e ins = map (unplainᵈ t ok) (map proj₂ (instExtract (runᴵ κ fuel e ins)))
+
 Left-To-Right : Set
 Left-To-Right =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
@@ -66,12 +73,25 @@ Left-To-Right =
   Prefix _≡_ (joinedᴵ ok κ fuel e ins) (runᴾ fuel e ins) ×
   Prefix _≡_ (runᴾ fuel e ins) (joinedᴵ ok κ (suc fuel) e ins)
 
+-- the batcher's own sandwich, against the run it batches
+Batched-Sandwich : Set
+Batched-Sandwich =
+  ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
+    (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
+  Prefix _≡_ (joinedᴵ ok κ fuel e ins) (valsᴵ ok κ fuel e ins) ×
+  Prefix _≡_ (valsᴵ ok κ fuel e ins) (joinedᴵ ok κ (suc fuel) e ins)
+
 postulate
-  -- PROBED: `Probed.Left-To-Right` -- both prefixes decided at fuel 30 over three
-  --   first-order programs: a scripted slot taken to one of two arrivals,
-  --   the script's two arrivals kept (two instants), and a literal of two
-  --   values (one instant).  Not a flattener, a share, a `μ` nor a cold
-  --   slot: a flattener's run does not reduce in the typechecker inside 8 GB
-  --   at fuel 30 or 3, so those shapes are `make quickcheck`'s alone. Every
-  --   run completes inside its fuel, so the one-past slack is not reached.
-  left-to-right : Left-To-Right
+  -- PROBED: `Probed.Left-To-Right` -- both prefixes decided at fuel 30
+  --   over the same three first-order programs.  Every run completes
+  --   inside its fuel, so the one-past slack is not exercised.
+  batched-sandwich : Batched-Sandwich
+
+left-to-right : Left-To-Right
+left-to-right {Γ = Γ} {t = t} ok κ fuel e ins =
+  subst (Prefix _≡_ (joinedᴵ ok κ fuel e ins)) same (proj₁ sandwich) ,
+  subst (λ xs → Prefix _≡_ xs (joinedᴵ ok κ (suc fuel) e ins)) same (proj₂ sandwich)
+  where
+    sandwich = batched-sandwich ok κ fuel e ins
+    same : valsᴵ ok κ fuel e ins ≡ runᴾ fuel e ins
+    same = agrees-values (plainᵏ Γ κ) Γ t ok (proj₁ (simulation κ fuel e ins))
