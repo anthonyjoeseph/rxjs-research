@@ -236,25 +236,31 @@ drawn programs, and a case past its clock is undecided, never a failure
 
 ### The monster
 
-`simulation` — the one theorem both assembled top lines stand on, now a real
-body over two leaves joined by `run-prefix`: `arrival-values`, the only
-statement in the tier about both machines at once, and `arrival-instants`,
-about the impl alone. It descends to `arrival-values` once that leaf is a body
-per former; until then the leaf's cone would shut out the assembly the next
-leg rewrites.
+`simulation` — the one theorem both assembled top lines stand on, a real body
+over two leaves joined by `run-prefix`: `arrival-values`, the only statement in
+the tier about both machines at once, and `arrival-instants`, about the impl
+alone. It is REFUTED as stated, with `left-to-right` above it
+(`Refuted.Take-Twice`): an elaborated `take` subscribes a cold twice, so the
+impl spends more arrivals than the plain run and no fixed fuel slack covers
+it. It stays the monster until it is restated, which waits on Anthony.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **SPLIT THE ARRIVAL'S VALUES PER FORMER.** `arrival-values` is the
-  riskiest leaf: one arrival's values, impl against plain. State a
-  correspondence between the two machines' configurations first — each
-  plain node beside the gadget elaboration made of it, live sources and
-  ordinals matched in order — then the leaf as that relation preserved
-  by one drain step, one obligation per former. A former whose step
-  breaks it is a FALSITY localised to that former, which a drawn program
-  can then reach.
+- **RULE ON THE TAKE'S SECOND SUBSCRIPTION (Anthony).** `takeᵖ` ends on
+  a take-until over a second subscription to its own count, because the
+  palette has no take-while; over a cold that is a second live source, so
+  the two runs stop meeting at equal fuel. Either a take-while former lets
+  the gadget subscribe once, as the TypeScript does, or the fuel each side
+  is read at is restated. Which one decides what `simulation` and
+  `left-to-right` become, so nothing below is restated before it.
+
+- **RESTATE THE SIMULATION AT THE RULED FUEL.** Restate `simulation` and
+  `arrival-values` to the ruling, re-run `Refuted.Take-Twice` against the
+  new statements, and probe the restated leaf at a cold `take` first, since
+  that is where the old one fell. Then state the configuration
+  correspondence the values split recurses on, one obligation per former.
 
 - **SPLIT THE INSTANTS PER FORMER.** `arrival-instants` reads the impl
   alone: every value of one arrival's slice carries one instant, and no
@@ -271,9 +277,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`arrival-values`** (Simulation.Statement) — FALSITY, `PROBED`: one
-  arrival's slice of the impl's run, decoded, agrees value by value with the
-  plain run's slice for it; the shared-slot fallback is paid here.
 - **`arrival-instants`** (Simulation.Statement) — FALSITY, `PROBED`: every
   value of one arrival's slice of the impl's run carries one instant, and no
   two arrivals' instants coincide.
@@ -286,3 +289,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   only, so flatteners are its QuickCheck's alone.
 - **`batchable`** (Batchable.Statement) — FALSITY, `PROBED`: probed first-order
   only, so flatteners are its QuickCheck's alone.
+- **`arrival-values`** (Simulation.Statement) — SHAPE, `REFUTED, PROBED`: one
+  arrival's slice of the impl's run agrees with the plain run's slice at the
+  same fuel, which a cold `take` breaks; restated once the fuel is ruled on.

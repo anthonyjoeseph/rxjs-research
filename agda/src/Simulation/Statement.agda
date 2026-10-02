@@ -147,11 +147,15 @@ Arrival-Instants =
     (∀ k → k ≤ fuel → All (λ p → proj₁ p ≡ σ k) (sliceAt (stampedAt κ e ins) k))
 
 postulate
+  -- A QUICKCHECK THAT DECIDES `simulation` AT A FUEL PAST BOTH RUNS'
+  -- ENDS CANNOT SEE THIS STATEMENT FAIL: what it compares is two whole
+  -- runs, and a run lagging the other by arrivals has caught up by then.
+  -- REFUTED: `arrival-values-false` -- `take 2` over a cold with two
+  --   async values; `takeᵖ` subscribes the cold twice, so the impl's slice
+  --   at arrival 2 is empty where the plain run's holds 6.
   -- PROBED: `Probed.Simulation` -- every slice through fuel 3 over three
   --   first-order programs and the timed translations of two, the empty
-  --   slices included.  Not a timed `take`, a flattener, a share, a `μ`
-  --   nor a cold slot: `make quickcheck` decides those through
-  --   `simulation`, which this carries.
+  --   slices included, all over a hot slot.
   arrival-values   : Arrival-Values
   -- PROBED: `Probed.Simulation` -- at fuel 3 over the same five programs,
   --   with two values in one slice and values in two slices both

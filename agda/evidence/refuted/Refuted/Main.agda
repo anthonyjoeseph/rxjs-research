@@ -59,3 +59,9 @@ open import Refuted.Domain-Predicate using
 -- that pop, so the funding conclusion is refuted outright rather than
 -- merely unproven.
 open import Refuted.Room-Backlog using (room-zero; saw-room-cannot-fund)
+
+-- THE TOP LINE AT EQUAL FUEL, AND ONE PAST IT.  An elaborated `take`
+-- subscribes its source twice, so over a cold the impl's schedule holds
+-- two arrivals for each of the plain run's; the values still all arrive,
+-- in order, but later than any fixed slack of fuel allows for.
+open import Refuted.Take-Twice using (arrival-values-false; simulation-false; left-to-right-false)
