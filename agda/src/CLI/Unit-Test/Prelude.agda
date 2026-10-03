@@ -388,8 +388,12 @@ mutual
     if eqBy eq (map proj₂ acc) p then uniformᵇ acc ∧ runsᵇ eq is dry ps (ns ++ instantOf acc)
     else ((length acc <ᵇ length p) ∧ runᵇ eq acc is dry p ps ns)
 
+-- one run's half of it, untimed or timed
+runsOfᵇ : {A : Set} → (A → A → Bool) → Arr A → Bool
+runsOfᵇ eq (is , dry , ps) = runsᵇ eq is dry ps []
+
 arrivalRunsᴮ : Arr ℕ × Arr Item → Bool
-arrivalRunsᴮ ((is , dry , ps) , (is′ , dry′ , ps′)) = runsᵇ _≡ᵇ_ is dry ps [] ∧ runsᵇ eqItem is′ dry′ ps′ []
+arrivalRunsᴮ (p , t) = runsOfᵇ _≡ᵇ_ p ∧ runsOfᵇ eqItem t
 
 -- each takes its sides as ONE argument, so a pair is computed once
 agreeᴸ : List ℕ × List ℕ → Bool

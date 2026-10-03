@@ -255,10 +255,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `take` under two flatteners, a share connected inside a switch. A
   counterexample refutes `arrival-runs` before the correspondence is
   stated over it; a green range is the evidence that lowers its class.
-  Seeds 2–4: 200 cases, no failure, 12 past a 10–240 s clock. Each case
-  is streamed as it is decided, so a sweep the budget kills banks what it
-  reached. An undecided case is where the sweep is blind, and its cost is
-  the raw fold past a fall and the replay under a mapped outer.
+  Seeds 2–8: 880 cases, no failure. A case's untimed half is now decided
+  apart from its timed one. Blind where the timed impl run outlasts the
+  clock: μ over a merge deferring itself, decided at fuel 8, and a scan
+  whose accumulator is a stream re-flattened each step, ×8 per step at
+  any fuel.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel

@@ -54,7 +54,7 @@ module CLI.QuickCheck where
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Char using (toℕ)
 open import Data.Fin using (Fin; zero; suc)
-open import Data.List using (List; []; _∷_; map; length; concat; take)
+open import Data.List using (List; []; _∷_; map; length; concat; concatMap; take)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
@@ -80,7 +80,7 @@ open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
-  Item; Arr; arrPlain; arrTimed; simulationᴮ; arrivalRunsᴮ)
+  Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; runsOfᵇ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; putErr; Unit)
@@ -908,23 +908,34 @@ showArr sh (is , dry , ps) =
   (if dry then " (queue dry)" else " (at the fuel cap)") ++
   "\n    plain slices = " ++ commaJoin (map (λ p → "[" ++ commaJoin (map sh p) ++ "]") ps)
 
--- the simulation and its leaf, at the program and at its timed translation
-showArrs : Arr ℕ × Arr Item → String
-showArrs (p , t) = showArr show p ++ "\n    timed: " ++ showArr showItem t
+-- A STATEMENT IS DECIDED IN HALVES WHERE ITS RUNS ARE INDEPENDENT: what
+-- reads the program's own run, and what reads its timed translation's.
+-- The timed impl run can outlast any clock where the program's own run
+-- takes a tenth of a second, and under one clock a failing untimed half
+-- was reported as undecided, since its report prints both runs.  So a
+-- sweep decides every cheap half first and every dear one after,
+-- stopping at the first past its clock: a slow case still costs one
+-- clock, and only what reads the slow run goes undecided.
+halves : Case → Statement → List (Bool × String) × List (Bool × String)
+halves c left-to-rightˢ  = sandwichᴸ (ltrSides c) ∷ [] , []
+halves c timing-correctˢ = [] , pairsᵀ (stampsOf c) ∷ []
+halves c batchableˢ      = pairᴮ (batchableSides c) ∷ [] , []
+halves c timed-faithfulˢ = [] , pairᴸ (faithfulSides c) ∷ []
+halves c simulationˢ     =
+  (simᵇ _≡ᵇ_ (arrPlain c) , showArr show (arrPlain c)) ∷ []
+  , (simᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
+halves c arrival-runsˢ   =
+  (runsOfᵇ _≡ᵇ_ (arrPlain c) , showArr show (arrPlain c)) ∷ []
+  , (runsOfᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
 
-simulationᴿ : Arr ℕ × Arr Item → Bool × String
-simulationᴿ pt = simulationᴮ pt , showArrs pt
-
-arrivalRunsᴿ : Arr ℕ × Arr Item → Bool × String
-arrivalRunsᴿ pt = arrivalRunsᴮ pt , showArrs pt
+joinᴴ : List (Bool × String) → Bool × String
+joinᴴ []             = true , ""
+joinᴴ (h ∷ [])       = h
+joinᴴ ((b , r) ∷ hs) with joinᴴ hs
+... | b′ , r′ = b ∧ b′ , r ++ "\n    " ++ r′
 
 decide : Case → Statement → Bool × String
-decide c left-to-rightˢ  = sandwichᴸ (ltrSides c)
-decide c timing-correctˢ = pairsᵀ (stampsOf c)
-decide c batchableˢ      = pairᴮ (batchableSides c)
-decide c timed-faithfulˢ = pairᴸ (faithfulSides c)
-decide c simulationˢ     = simulationᴿ (arrPlain c , arrTimed c)
-decide c arrival-runsˢ = arrivalRunsᴿ (arrPlain c , arrTimed c)
+decide c s = joinᴴ (proj₁ (halves c s) ++ᴸ proj₂ (halves c s))
 
 -- a report counts statements in `Main`'s order
 indexOf : Statement → ℕ
@@ -965,9 +976,6 @@ judgeOf : ℕ → Drawn → Statement → Bool × String → List (ℕ × String
 judgeOf f (e , d₀ , d₁) s (b , body) =
   check (indexOf s) b ("  " ++ statementName s ++ "\n    " ++ body ++ pasteRow f e d₀ d₁)
 
-verdicts : ℕ → Drawn → Case → List Statement → List (ℕ × String)
-verdicts f x c []       = []
-verdicts f x c (s ∷ ss) = judgeOf f x s (decide c s) ++ᴸ verdicts f x c ss
 
 -- forcing a case's reports forces every verdict, since `check` matches
 -- on each before it knows whether there is a report
@@ -989,10 +997,23 @@ timedOut s f (e , d₀ , d₁) =
 boundedBy : ℕ → List (ℕ × String) → List (ℕ × String) → List (ℕ × String)
 boundedBy s rs d = within s (forced rs) rs d
 
+-- every statement's cheap halves, then every statement's dear ones
+ordered : Case → List Statement → List (Statement × (Bool × String))
+ordered c ss = concatMap (λ s → map (s ,_) (proj₁ (halves c s))) ss
+            ++ᴸ concatMap (λ s → map (s ,_) (proj₂ (halves c s))) ss
+
+ranOut : List (ℕ × String) → Bool
+ranOut []             = false
+ranOut ((k , _) ∷ rs) = (k ≡ᵇ TIMEOUT) ∨ ranOut rs
+
+boundedEach : ℕ → ℕ → Drawn → List (Statement × (Bool × String)) → List (ℕ × String)
+boundedEach s f x []              = []
+boundedEach s f x ((st , h) ∷ hs) with boundedBy s (judgeOf f x st h) (timedOut s f x)
+... | r = if ranOut r then r else r ++ᴸ boundedEach s f x hs
+
 bounded : ℕ → ℕ → Drawn → List Statement → List (ℕ × String)
 bounded s f (e , d₀ , d₁) ss =
-  boundedBy s (verdicts f (e , d₀ , d₁) (cached "?" f e (mkSlots d₀ d₁)) ss)
-              (timedOut s f (e , d₀ , d₁))
+  boundedEach s f (e , d₀ , d₁) (ordered (cached "?" f e (mkSlots d₀ d₁)) ss)
 
 oneCase : List Statement → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
