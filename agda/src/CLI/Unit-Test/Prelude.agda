@@ -50,7 +50,8 @@ open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import SExp.Pipeline using (emitsᴵ; runᴾ; elaborateImpl; embedSlotsImpl)
 open import Timed.Translation using (packetOf; timedᶜ; itemᵗ; timed; timedSlots)
 open import Batchable.Inst-Extract using (instExtract)
-open import Left-To-Right.Statement using (joinedᴵ)
+open import Left-To-Right.Statement using (joinedᴵ; valsᴵ)
+open import Simulation.Statement using (arrivalsOf)
 open import Batchable.Statement using (batchedᴱ; groupedᴱ)
 open import Timed.Faithful using (untimedᵀ)
 
@@ -151,11 +152,14 @@ cached n f e {κ} ins = record { name = n ; fuel = f ; prog = e ; kinds = κ ; s
 
 data Statement : Set where
   left-to-rightˢ timing-correctˢ batchableˢ timed-faithfulˢ simulationˢ arrival-runsˢ : Statement
+  batched-sandwichˢ packets-name-arrivalsˢ : Statement
 
 -- in `Main`'s order, which is the order a report counts them in, then
--- the simulation and the leaf it stands on
+-- the simulation and the leaf it stands on, then the leaves the two
+-- assembled top lines stand on beside it
 statements : List Statement
-statements = left-to-rightˢ ∷ timing-correctˢ ∷ batchableˢ ∷ timed-faithfulˢ ∷ simulationˢ ∷ arrival-runsˢ ∷ []
+statements = left-to-rightˢ ∷ timing-correctˢ ∷ batchableˢ ∷ timed-faithfulˢ ∷ simulationˢ ∷ arrival-runsˢ
+           ∷ batched-sandwichˢ ∷ packets-name-arrivalsˢ ∷ []
 
 statementName : Statement → String
 statementName left-to-rightˢ  = "left-to-right"
@@ -164,6 +168,8 @@ statementName batchableˢ      = "batchable"
 statementName timed-faithfulˢ = "timed-faithful"
 statementName simulationˢ     = "simulation"
 statementName arrival-runsˢ = "arrival-runs"
+statementName batched-sandwichˢ = "batched-sandwich"
+statementName packets-name-arrivalsˢ = "packets-name-arrivals"
 
 -- `left-to-right`: the batches joined back up, the plain run, and the
 -- batches joined back up at one more unit of fuel, the joined runs at
@@ -186,11 +192,20 @@ ltrFrom J p (suc k) f j j′ =
   then ltrFrom J p k (suc f) j′ (J (suc (suc f)))
   else (j , p , j′)
 
-ltrSides : Case → List ℕ × List ℕ × List ℕ
-ltrSides c = ltrFrom J (runᴾ (fuel c) (prog c) (slots c)) ltrWindow (fuel c) (J (fuel c)) (J (suc (fuel c)))
+-- the search, against whichever run the joined ones are read against
+sandwichFrom : Case → List ℕ → List ℕ × List ℕ × List ℕ
+sandwichFrom c p = ltrFrom J p ltrWindow (fuel c) (J (fuel c)) (J (suc (fuel c)))
   where
     J : Fuel → List ℕ
     J f = joinedᴵ tt (kinds c) f (prog c) (slots c)
+
+ltrSides : Case → List ℕ × List ℕ × List ℕ
+ltrSides c = sandwichFrom c (runᴾ (fuel c) (prog c) (slots c))
+
+-- `batched-sandwich`: the same search, against the elaborated run's
+-- own values at the fuel, the only run the batcher sees
+bsSides : Case → List ℕ × List ℕ × List ℕ
+bsSides c = sandwichFrom c (valsᴵ tt (kinds c) (fuel c) (prog c) (slots c))
 
 -- `timing-correct`: each value's stamp, beside its packet.  The
 -- contexts are passed by hand because `Val` at a concrete type forgets
@@ -304,6 +319,13 @@ batchableSides c = batchSides (kinds c) (emitsᴵ (kinds c) (fuel c) (prog c) (s
 faithfulSides : Case → List ℕ × List ℕ
 faithfulSides c = untimedᵀ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c)
 
+-- `packets-name-arrivals`: the timed program's plain run, each value's
+-- arrival and its packet
+namingSides : Case → List ℕ × List (List ℕ)
+namingSides c =
+  arrivalsOf {κ = kinds c} (fuel c) (timed (kinds c) (prog c)) (timedSlots (slots c)) ,
+  map proj₁ (runᴾ {κ = kinds c} (fuel c) (timed (kinds c) (prog c)) (timedSlots (slots c)))
+
 -- `Coherent`, decided: same stamp exactly when same packet
 coherentᵇ : ℕ × List ℕ → ℕ × List ℕ → Bool
 coherentᵇ (i , p) (j , q) = not ((i ≡ᵇ j) xor eqListℕ p q)
@@ -316,6 +338,12 @@ coheresWith x (y ∷ ys) = coherentᵇ x y ∧ coheresWith x ys
 allPairsᵇ : List (ℕ × List ℕ) → Bool
 allPairsᵇ []       = true
 allPairsᵇ (x ∷ xs) = coheresWith x xs ∧ allPairsᵇ xs
+
+-- an injective naming of the arrivals by packets, decided: a packet per
+-- arrival read, the same exactly when the arrival is.  A finite
+-- injection extends to one on all of ℕ, so this is the `Σ`.
+namesᵇ : List ℕ × List (List ℕ) → Bool
+namesᵇ (ar , ps) = (length ar ≡ᵇ length ps) ∧ allPairsᵇ (zipWith (λ a q → a , q) ar ps)
 
 -- `Agrees` at data, decided: equal, element by element
 eqBy : {A : Set} → (A → A → Bool) → List A → List A → Bool
@@ -431,6 +459,8 @@ holds batchableˢ      c p t = agreeᴮ (batchableSides c)
 holds timed-faithfulˢ c p t = agreeᴸ (faithfulSides c)
 holds simulationˢ     c p t = simulationᴮ (p , t)
 holds arrival-runsˢ c p t = arrivalRunsᴮ (p , t)
+holds batched-sandwichˢ c p t = sandwichᴸ (bsSides c)
+holds packets-name-arrivalsˢ c p t = namesᵇ (namingSides c)
 
 checksWith : List Statement → Case → Arr ℕ → Arr Item → List (String × Bool)
 checksWith ss c p t = map (λ s → statementName s , holds s c p t) ss

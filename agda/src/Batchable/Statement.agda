@@ -85,6 +85,12 @@ Batchable =
   batchedᴱ t ok (emitsᴵ κ fuel e ins) ≡ groupedᴱ t ok (emitsᴵ κ fuel e ins)
 
 postulate
+  -- THE COMPILED SWEEP REACHES THE FLATTENERS, AND FOUND NOTHING.
+  -- `make qc-batchable` decides this statement itself; at depth 3, fuel
+  -- one, seeds 12..17 gave no red, and seed 17 alone had 338 cases
+  -- grouping values under an author flattener and 89 under a `μ`, every
+  -- one agreeing.  Those counts are read at fuel one only.
+  --
   -- PROBED: `Probed.Batchable` -- by `refl` at fuel 30 over three first-order
   --   programs: a scripted slot taken to one of two arrivals, the script's
   --   two arrivals kept (two instants), and a literal of two values (one

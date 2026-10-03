@@ -55,7 +55,7 @@ open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_
 open import Data.Bool.ListAction using (any)
 open import Data.Char using (toℕ)
 open import Data.Fin using (Fin; zero; suc)
-open import Data.List using (List; []; _∷_; map; length; concat; concatMap; take)
+open import Data.List using (List; []; _∷_; map; length; concat; concatMap; take; zipWith)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
@@ -80,6 +80,7 @@ open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
+  batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
   Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; runsOfᵇ)
 open import CLI.Unit-Test using (cases)
@@ -898,6 +899,11 @@ pairᴮ (l , r) = eqBatches l r , showPair showBatches (l , r)
 pairsᵀ : List (ℕ × List ℕ) → Bool × String
 pairsᵀ ps = allPairsᵇ ps , "stamped = " ++ showStamps ps
 
+namesᵀ : List ℕ × List (List ℕ) → Bool × String
+namesᵀ (ar , ps) = namesᵇ (ar , ps) ,
+  "@arrival packet = " ++ showStamps (zipWith (λ a q → a , q) ar ps)
+  ++ "\n    " ++ show (length ar) ++ " arrivals, " ++ show (length ps) ++ " packets"
+
 showItem : Item → String
 showItem (p , inj₁ a) = showVals p ++ ":" ++ show a
 showItem (p , inj₂ _) = showVals p ++ ":END"
@@ -928,6 +934,8 @@ halves c simulationˢ     =
 halves c arrival-runsˢ   =
   (runsOfᵇ _≡ᵇ_ (arrPlain c) , showArr show (arrPlain c)) ∷ []
   , (runsOfᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
+halves c batched-sandwichˢ = sandwichᴸ (bsSides c) ∷ [] , []
+halves c packets-name-arrivalsˢ = [] , namesᵀ (namingSides c) ∷ []
 
 joinᴴ : List (Bool × String) → Bool × String
 joinᴴ []             = true , ""
@@ -946,6 +954,8 @@ indexOf batchableˢ      = 2
 indexOf timed-faithfulˢ = 3
 indexOf simulationˢ     = 4
 indexOf arrival-runsˢ = 5
+indexOf batched-sandwichˢ = 6
+indexOf packets-name-arrivalsˢ = 7
 
 -- one count per former, in `allFormers` order, plus the obs-fold count,
 -- the count of cases bearing on contiguity and of those holding values
@@ -996,7 +1006,7 @@ forced ((k , r) ∷ rs) = k + lengthˢ r + forced rs
 -- a case past its wall clock: one report of its own kind, after the
 -- statements', carrying the row that reproduces it
 TIMEOUT : ℕ
-TIMEOUT = 6
+TIMEOUT = 8
 
 timedOut : ℕ → ℕ → Drawn → List (ℕ × String)
 timedOut s f (e , d₀ , d₁) =
@@ -1177,7 +1187,7 @@ agreeing (_ ∷ _) = ""
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = agreeing (decided fs) ++ concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples 5 fs ++ samples TIMEOUT fs
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples 5 fs ++ samples 6 fs ++ samples 7 fs ++ samples TIMEOUT fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -1210,7 +1220,8 @@ runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Seen × List (�
 runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase false ss f s d
 
 -- THE STATEMENT A NUMBER NAMES, in `Main`'s order, the simulation
--- fifth and its leaf sixth; zero is all of them
+-- fifth and its leaf sixth, the two assembled top lines' leaves seventh
+-- and eighth; zero is all of them
 selected : ℕ → List Statement
 selected (suc zero)                   = left-to-rightˢ ∷ []
 selected (suc (suc zero))             = timing-correctˢ ∷ []
@@ -1218,6 +1229,8 @@ selected (suc (suc (suc zero)))       = batchableˢ ∷ []
 selected (suc (suc (suc (suc zero)))) = timed-faithfulˢ ∷ []
 selected (suc (suc (suc (suc (suc zero))))) = simulationˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc zero)))))) = arrival-runsˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc (suc zero))))))) = batched-sandwichˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))) = packets-name-arrivalsˢ ∷ []
 selected _                            = statements
 
 -- the impl's raw run, decoded, for reading a batchable failure by
@@ -1225,7 +1238,7 @@ rawOf : Case → String
 rawOf c = showStream (runᴵ (Case.kinds c) (Case.fuel c) (Case.prog c) (Case.slots c))
 
 -- AND ONE SIDE OF IT, so a hang is attributed to the statement that owns
--- it: 1 to 6 that statement's sides, in `selected`'s numbering,
+-- it: 1 to 8 that statement's sides, in `selected`'s numbering,
 -- anything else the impl's raw run
 sidesOf : ℕ → Case → String
 sidesOf k c with selected k

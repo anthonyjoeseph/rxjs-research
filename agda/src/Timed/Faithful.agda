@@ -31,6 +31,12 @@ Timed-Faithful =
   untimedᵀ ok κ fuel e ins ≡ runᴾ fuel e ins
 
 postulate
+  -- THE COMPILED SWEEP REACHES THE FLATTENERS, AND FOUND NOTHING.
+  -- `make qc-timed-faithful` decides this statement itself; at depth 3,
+  -- fuel one, seeds 12..17 gave no red, and seed 17 alone had 107
+  -- cases with values on two plain arrivals under an author flattener,
+  -- every one agreeing.  Those counts are read at fuel one only.
+  --
   -- PROBED: `Probed.Timed-Faithful` -- by `refl` at fuel 30 over three first-order
   --   programs: a scripted slot taken to one of two arrivals, the script's
   --   two arrivals kept (two instants), and a literal of two values (one
