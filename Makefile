@@ -1728,11 +1728,12 @@ qc-fast: qc-build
 	    echo "  $$v $$(grep -c "^case [0-9]*/[0-9]* $$v$$" $(QC_STREAM))"; done; \
 	  echo "  bearing on contiguity $$(grep -c '^  bears on contiguity$$' $(QC_STREAM))"; \
 	  echo "  holding values back at the fuel $$(grep -c '^  holds values back at the fuel$$' $(QC_STREAM))"; \
+	  echo "  grouping values $$(grep -c '^  groups values$$' $(QC_STREAM))"; \
 	  grep -A40 "^case [0-9]*/[0-9]* FAIL$$" $(QC_STREAM) | head -c 6000; \
 	  echo "  (every decided case: $(QC_STREAM))"; exit 1; fi; \
 	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
 	grep -q '(all agree)' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
-	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s, $$(grep -o '[0-9]* undecided' $(QC_LOG) | head -1), $$(grep -c '^  bears on contiguity$$' $(QC_STREAM)) bearing on contiguity, $$(grep -c '^  holds values back at the fuel$$' $(QC_STREAM)) holding values back at the fuel"
+	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s, $$(grep -o '[0-9]* undecided' $(QC_LOG) | head -1), $$(grep -c '^  bears on contiguity$$' $(QC_STREAM)) bearing on contiguity, $$(grep -c '^  holds values back at the fuel$$' $(QC_STREAM)) holding values back at the fuel, $$(grep -c '^  groups values$$' $(QC_STREAM)) grouping values"
 
 
 # THE ONE TO POLL.  Exits 3 while running, 1 when red -- but never loop on it
