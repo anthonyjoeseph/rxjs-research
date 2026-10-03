@@ -243,23 +243,13 @@ plain arrival. The impl runs at its own fuel (Anthony). RULED OUT: one impl
 arrival per plain arrival, one instant per impl arrival, a shared impl
 arrival at every late-subscribed `take` the bug cache aims at, and a
 non-contiguous run at depth 2 seeds 13..36 or depth 3 seeds 1..11, 275
-programs bearing on it. Left: the correspondence carrying contiguity through
-every former, and whether `batched-sandwich`, the one leaf still FALSITY,
-is likelier false.
+programs bearing on it. Every top-line leaf went green under flatteners,
+decided itself, at depth 3, fuel 1. Left: the correspondence carrying
+contiguity through every former.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **READ `batched-sandwich`'S SLACK OFF ITS OWN SIDES, AT DEPTH 3, FUEL 1.**
-  Seeds 12..18 lowered `batchable`, `timed-faithful` and
-  `packets-name-arrivals`, each decided directly in its region under
-  flatteners. Seed 18 decided `batched-sandwich` directly too, with no
-  red, but counted values held back against the plain run; the flag now
-  reads the leaf's own sides, so one more seed says whether its slack is
-  reached. A counterexample is a FALSITY with a smaller cone than the
-  monster's and moves it there. Slow shapes: μ over a self-deferring merge, nested
-  limited merges, a scan re-flattening a stream accumulator.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel
@@ -280,10 +270,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY,
-  `REFUTED, PROBED`: the unbatched values at one fuel between the joined run at
-  a batcher fuel never less and one past it, since a cut-off run's last batch
-  waits for an arrival that is not silent.
+- **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
+  `REFUTED, PROBED`: the unbatched values between the joined run at a
+  batcher fuel never less and one past it; the sweep, deciding it
+  directly, reached held-back values under a flattener with no red.
 - **`timed-faithful`** (Timed.Faithful) — DIFFICULTY, `PROBED`: probed
   first-order; the sweep, deciding it directly, reached values on two
   arrivals under a flattener with no red.
