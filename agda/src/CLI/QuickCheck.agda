@@ -1041,10 +1041,10 @@ bears : ℕ → ℕ → Drawn → Bool
 bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots d₀ d₁))))))
 
 -- A CASE TESTS THE ONE-PAST SLACK WHEN THE BATCHER HOLDS VALUES BACK AT
--- THE FUEL: the joined run shorter than the plain run, so only the
--- joined run at one more fuel can cover it.  That slack is the one
--- `left-to-right` takes from `batched-sandwich`'s second prefix, which
--- says nothing anywhere else.  Read off the untimed side under the
+-- ITS FUEL: the joined run at the searched witness shorter than the
+-- plain run, so only the joined run at one more fuel can cover it.
+-- That slack is the one `left-to-right` takes from `batched-sandwich`'s
+-- second prefix, which says nothing anywhere else.  Read off the untimed side under the
 -- case's clock, and past it counted as holding nothing.
 holdsBack : ℕ → List ℕ × List ℕ × List ℕ → Bool
 holdsBack s (l , p , _) with length p ∸ length l

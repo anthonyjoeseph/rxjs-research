@@ -250,17 +250,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SWEEP THE FOUR TOP-LINE LEAVES AT DEPTH 3.** `batched-sandwich`,
-  `packets-name-arrivals`, `timed-faithful` and `batchable` are probed
-  first-order only, and no sweep has reached depth 3 on them. `make
-  qc-fast QC_STMT=0` decides all six per case; a counterexample is a
-  FALSITY with a smaller cone than the monster's and moves it there, and
-  a green range on cases that could fail lowers them as it lowered
-  `arrival-runs`. First question: what a case must do to bear on a
-  batcher's statement, since two valued arrivals is contiguity's
-  predicate, not theirs. Slow shapes, at fuel 8 or a 600 s clock: μ over
-  a merge deferring itself, merges under a concurrency limit nested two
-  deep, a scan whose accumulator is a stream re-flattened each step.
+- **SWEEP THE FOUR TOP-LINE LEAVES AT DEPTH 3, AT FUEL 1.** `make qc-fast
+  QC_STMT=0` at seeds 12..14 decided 1494 of 1500; the one red refuted
+  `batched-sandwich`'s one-past slack, since an arrival can be silent, and
+  it now names the batcher's own fuel, which the QuickCheck searches.
+  Fuel 1 is where the batcher holds values back. A counterexample is a
+  FALSITY with a smaller cone than the monster's and moves it there.
+  Open: what a case must do to bear on a batcher's statement. Slow
+  shapes: μ over a self-deferring merge, merges under a concurrency limit
+  nested two deep, a scan re-flattening a stream accumulator.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel
@@ -281,9 +279,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY, `PROBED`: the
-  joined run between its own unbatched values at one fuel and one past it,
-  since a cut-off run's last batch waits for an arrival (Anthony).
+- **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY,
+  `REFUTED, PROBED`: the unbatched values at one fuel between the joined run at
+  a batcher fuel never less and one past it, since a cut-off run's last batch
+  waits for an arrival that is not silent.
 - **`packets-name-arrivals`** (Timed.Timing-Correct) — FALSITY, `PROBED`: the
   timed program's plain run carries one packet per arrival, injectively.
 - **`timed-faithful`** (Timed.Faithful) — FALSITY, `PROBED`: probed first-order

@@ -166,13 +166,31 @@ statementName simulationˢ     = "simulation"
 statementName arrival-runsˢ = "arrival-runs"
 
 -- `left-to-right`: the batches joined back up, the plain run, and the
--- batches joined back up at one more unit of fuel.  Every side at the
--- case's one fuel: that names the impl's own fuel as the plain run's,
--- which is a witness and not the statement, so a green decides it and a
--- red is a candidate, to be read at a larger impl fuel.
+-- batches joined back up at one more unit of fuel, the joined runs at
+-- an impl fuel the statement leaves free.  A unit of fuel is an arrival
+-- and an arrival can be silent, so the batcher can need several units
+-- past the plain run's fuel before the instant it holds open closes.
+-- The witness is SEARCHED upward from the plain run's fuel, stopping at
+-- the first that sandwiches it, at the first whose joined run has
+-- overtaken the plain one, or `ltrWindow` units past: a green decides
+-- the statement and a red is a candidate past that window.
+ltrWindow : ℕ
+ltrWindow = 8
+
+-- the joined runs at `f` and one past it, `j` and `j′`, each computed
+-- once and only if read
+ltrFrom : (Fuel → List ℕ) → List ℕ → ℕ → Fuel → List ℕ → List ℕ → List ℕ × List ℕ × List ℕ
+ltrFrom J p zero    f j j′ = j , p , j′
+ltrFrom J p (suc k) f j j′ =
+  if prefixListℕ j p ∧ not (prefixListℕ p j′)
+  then ltrFrom J p k (suc f) j′ (J (suc (suc f)))
+  else (j , p , j′)
+
 ltrSides : Case → List ℕ × List ℕ × List ℕ
-ltrSides c = joinedᴵ tt (kinds c) (fuel c) (prog c) (slots c) , runᴾ (fuel c) (prog c) (slots c) ,
-             joinedᴵ tt (kinds c) (1 + fuel c) (prog c) (slots c)
+ltrSides c = ltrFrom J (runᴾ (fuel c) (prog c) (slots c)) ltrWindow (fuel c) (J (fuel c)) (J (suc (fuel c)))
+  where
+    J : Fuel → List ℕ
+    J f = joinedᴵ tt (kinds c) f (prog c) (slots c)
 
 -- `timing-correct`: each value's stamp, beside its packet.  The
 -- contexts are passed by hand because `Val` at a concrete type forgets

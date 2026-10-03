@@ -13,7 +13,8 @@
 -- behind (Anthony).
 --
 -- THE IMPL RUNS AT ITS OWN FUEL, NEVER LESS THAN THE PLAIN RUN'S
--- (Anthony).  The fuel that matches is `simulation`'s.
+-- (Anthony).  The fuel that matches is the batcher's own, never less
+-- than `simulation`'s.
 --
 -- CLOSES A CHEAT THE OTHER TOP-LINE STATEMENTS LEAVE OPEN.
 -- Elaborating every program to `empty` is trivially batched, and fails
@@ -42,6 +43,7 @@ open import Data.Bool    using (T)
 open import Data.List    using (List; []; concat; map)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.Nat     using (suc; _≤_)
+open import Data.Nat.Properties using (≤-trans)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst)
 
@@ -77,25 +79,40 @@ Left-To-Right =
   Prefix _≡_ (joinedᴵ ok κ fuelᴵ e ins) (runᴾ fuel e ins) ×
   Prefix _≡_ (runᴾ fuel e ins) (joinedᴵ ok κ (suc fuelᴵ) e ins)
 
--- the batcher's own sandwich, against the run it batches
+-- the batcher's own sandwich, against the run it batches, at a fuel of
+-- the batcher's own
 Batched-Sandwich : Set
 Batched-Sandwich =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
     (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
-  Prefix _≡_ (joinedᴵ ok κ fuel e ins) (valsᴵ ok κ fuel e ins) ×
-  Prefix _≡_ (valsᴵ ok κ fuel e ins) (joinedᴵ ok κ (suc fuel) e ins)
+  Σ Fuel λ fuelᴮ → fuel ≤ fuelᴮ ×
+  Prefix _≡_ (joinedᴵ ok κ fuelᴮ e ins) (valsᴵ ok κ fuel e ins) ×
+  Prefix _≡_ (valsᴵ ok κ fuel e ins) (joinedᴵ ok κ (suc fuelᴮ) e ins)
 
 postulate
+  -- THE BATCHER'S FUEL IS ITS OWN, BECAUSE A UNIT OF FUEL IS AN ARRIVAL
+  -- AND AN ARRIVAL CAN BE SILENT.  A batch leaves only when the next
+  -- instant's first emit or the run's completion closes its instant,
+  -- and the arrival one unit past the run's fuel may put nothing on the
+  -- run at all, so the batcher can need several units past it.  The
+  -- witness is the fuel just before the arrival that closes the open
+  -- instant -- not past it, or the joined run overtakes the run it was
+  -- read against.
+  --
+  -- REFUTED: `Refuted.Batched-Sandwich` -- the slack fixed at one unit
+  --   past the run's own fuel, false at fuel one where the second
+  --   arrival is silent.
   -- PROBED: `Probed.Left-To-Right` -- both prefixes decided at fuel 30
-  --   over the same three first-order programs.  Every run completes
-  --   inside its fuel, so the one-past slack is not exercised.
+  --   over the same three first-order programs, every run complete
+  --   inside its fuel, and at the refutation's own program at fuel one
+  --   with the batcher's witness at two, which is the silent arrival.
   batched-sandwich : Batched-Sandwich
 
 left-to-right : Left-To-Right
 left-to-right {Γ = Γ} {t = t} ok κ fuel e ins =
-  fuelᴵ , proj₁ (proj₂ sim) ,
-  subst (Prefix _≡_ (joinedᴵ ok κ fuelᴵ e ins)) same (proj₁ sandwich) ,
-  subst (λ xs → Prefix _≡_ xs (joinedᴵ ok κ (suc fuelᴵ) e ins)) same (proj₂ sandwich)
+  proj₁ sandwich , ≤-trans (proj₁ (proj₂ sim)) (proj₁ (proj₂ sandwich)) ,
+  subst (Prefix _≡_ (joinedᴵ ok κ (proj₁ sandwich) e ins)) same (proj₁ (proj₂ (proj₂ sandwich))) ,
+  subst (λ xs → Prefix _≡_ xs (joinedᴵ ok κ (suc (proj₁ sandwich)) e ins)) same (proj₂ (proj₂ (proj₂ sandwich)))
   where
     sim = simulation κ fuel e ins
     fuelᴵ = proj₁ sim
