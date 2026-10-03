@@ -1037,20 +1037,28 @@ bearsOn s n = within s n (2 ≤ᵇ n) false
 bears : ℕ → ℕ → Drawn → Bool
 bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots d₀ d₁))))))
 
-oneCase : List Statement → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
+-- A SWEEP MAY DECIDE ONLY THE CASES THAT BEAR.  Whether one does is
+-- read before any statement is, so a sweep aimed at contiguity spends
+-- its clocks on cases that could fail it; one that does not bear is
+-- drawn, counted in the census and left undecided-by-choice.
+judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
+judged ob ss f s m x with bears s f x
+... | b = (m , b) , (if ob ∧ not b then [] else bounded s f x ss)
+
+oneCase : Bool → List Statement → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
 -- the statement's sides at exactly the program a cached row names.
-oneCase ss f s d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG ((marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e)
-         , bears s f (e , proj₁ ds , proj₂ ds))
-        , bounded s f (e , proj₁ ds , proj₂ ds) ss)
+oneCase ob ss f s d = genExp d >>=G λ e → genSlots >>=G λ ds →
+  pureG (judged ob ss f s (marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e))
+                (e , proj₁ ds , proj₂ ds))
 
 -- every case drawn, in generation order, its reports still unforced:
 -- drawing is cheap and upstream of every run, so the list is whole
 -- before the first case is run
-casesN : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (List (Seen × List (ℕ × String)))
-casesN ss f s zero    d = pureG []
-casesN ss f s (suc k) d = oneCase ss f s d >>=G λ r → casesN ss f s k d >>=G λ rs → pureG (r ∷ rs)
+casesN : Bool → List Statement → ℕ → ℕ → ℕ → ℕ → Gen (List (Seen × List (ℕ × String)))
+casesN ob ss f s zero    d = pureG []
+casesN ob ss f s (suc k) d =
+  oneCase ob ss f s d >>=G λ r → casesN ob ss f s k d >>=G λ rs → pureG (r ∷ rs)
 
 -- EVERY failing case's reports, in generation order, and which recursion
 -- constructors the corpus actually reached
@@ -1062,7 +1070,7 @@ tallyOf []       = zeroTally , []
 tallyOf (r ∷ rs) = joinT r (tallyOf rs)
 
 ------------------------------------------------------------------------
--- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT] [CASE]"
+-- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT] [CASE] [BEARING]"
 
 toCodes : String → List ℕ
 toCodes s = map toℕ (toList s)
@@ -1168,7 +1176,7 @@ showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
 -- RUN ONE CASE, named the same way, so a case that hangs a sweep can be
 -- timed and re-run alone rather than by bisecting the count
 runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
-runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase ss f s d
+runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase false ss f s d
 
 -- THE STATEMENT A NUMBER NAMES, in `Main`'s order, the simulation
 -- fifth and its leaf sixth; zero is all of them
@@ -1238,13 +1246,14 @@ verdictOf rs@(_ ∷ _) with decided rs
 ... | []    = "undecided"
 ... | _ ∷ _ = "FAIL"
 
-streamCases : ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
-streamCases n i []       = putErr ""
-streamCases n i (r ∷ rs) =
-  putErr ("case " ++ show i ++ "/" ++ show n ++ " " ++ verdictOf (proj₂ r) ++ "\n"
+streamCases : Bool → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
+streamCases ob n i []       = putErr ""
+streamCases ob n i (r ∷ rs) =
+  putErr ("case " ++ show i ++ "/" ++ show n ++ " "
+          ++ (if ob ∧ not (proj₂ (proj₁ r)) then "degenerate" else verdictOf (proj₂ r)) ++ "\n"
           ++ (if proj₂ (proj₁ r) then "  bears on contiguity\n" else "")
           ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
-  streamCases n (suc i) rs
+  streamCases ob n (suc i) rs
 
 -- the summary, over the tally of the cases the stream already forced
 summaryOf : ℕ → ℕ → ℕ → ℕ → Tally × List (ℕ × String) → String
@@ -1258,8 +1267,8 @@ summaryOf seed d f runs (tally , fails) = concatStr
    ++ᴸ ("\n" ∷ dumpFails fails ∷ []))
 
 -- the cases are an ARGUMENT, so the stream and the summary read one list
-sweep : ℕ → ℕ → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
-sweep seed d f runs rs = streamCases runs 1 rs >>= λ _ → putStr (summaryOf seed d f runs (tallyOf rs))
+sweep : Bool → ℕ → ℕ → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
+sweep ob seed d f runs rs = streamCases ob runs 1 rs >>= λ _ → putStr (summaryOf seed d f runs (tallyOf rs))
 
 main : IO Unit
 main = getContents >>= λ s →
@@ -1274,6 +1283,7 @@ main = getContents >>= λ s →
       ss    = selected (numAt 7 0 cs)
       f     = if fuelʳ ≡ᵇ 0 then FUEL else fuelʳ
       secs  = numAt 8 CASE cs
+      ob    = numAt 9 0 cs ≡ᵇ 1
   in if runs ≡ᵇ 0
      then printRows ss fuelʳ side only 1 cases
      else if not (side ≡ᵇ 0)
@@ -1282,4 +1292,4 @@ main = getContents >>= λ s →
      then putStr (dumpFails (proj₂ (proj₁ (runAt ss f secs only d (randList seed 2000000)))))
      else if not (at ≡ᵇ 0)
      then putStr (proj₁ (showAt f at d (randList seed 2000000)))
-     else sweep seed d f runs (proj₁ (casesN ss f secs runs d (randList seed 2000000)))
+     else sweep ob seed d f runs (proj₁ (casesN ob ss f secs runs d (randList seed 2000000)))

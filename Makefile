@@ -184,7 +184,7 @@ help:
 	@echo "  qc-build      compile the all-Agda QuickCheck binary ($(ORACLE_BIN)/QuickCheck)"
 	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs,"
 	@echo "                  QC_FUEL=n, QC_STMT=1..6 for one statement (Main's four, the simulation, its leaf), 0 for all,"
-	@echo "                  QC_CASE=secs per case, 0 for none)"
+	@echo "                  QC_CASE=secs per case, 0 for none, QC_BEAR=1 to decide only cases bearing on contiguity)"
 	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful / qc-simulation / qc-arrival-runs"
 	@echo "                qc-fast on that one statement"
 	@echo "  quickcheck    all-Agda QuickCheck: Main's four statements, the simulation and its leaf, caching counterexamples"
@@ -1689,7 +1689,9 @@ quickcheck: qc-build
 # default fuel.  QC_CASE is the wall clock per CASE in seconds, unset for
 # the binary's default and 0 for none: a case past it is UNDECIDED, never
 # a failure (Anthony) -- counted, printed with its paste row, and the
-# sweep goes on.
+# sweep goes on.  QC_BEAR=1 decides only the cases bearing on contiguity
+# and streams the rest as `degenerate`; it needs QC_CASE, since the
+# binary reads its arguments by position.
 #
 # EVERY CASE IS STREAMED TO $(QC_STREAM) AS IT IS DECIDED, so a sweep the
 # budget kills still says what it decided: how many cases agreed, and
@@ -1707,9 +1709,10 @@ QC_BUDGET ?= 120
 QC_FUEL ?= 0
 QC_STMT ?= 0
 QC_CASE ?=
+QC_BEAR ?=
 QC_LOG := agda/_oracle/qc.log
 QC_STREAM := agda/_oracle/qc.stream
-QC_IN = $(word 1,$(QC)) $(or $(word 2,$(QC)),200) $(or $(word 3,$(QC)),4) 0 0 0 $(QC_FUEL) $(QC_STMT) $(QC_CASE)
+QC_IN = $(word 1,$(QC)) $(or $(word 2,$(QC)),200) $(or $(word 3,$(QC)),4) 0 0 0 $(QC_FUEL) $(QC_STMT) $(if $(QC_BEAR),$(or $(QC_CASE),$(error QC_BEAR needs QC_CASE)) $(QC_BEAR),$(QC_CASE))
 qc-left-to-right:  ; @$(MAKE) --no-print-directory qc-fast QC_STMT=1
 qc-timing-correct: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=2
 qc-batchable:      ; @$(MAKE) --no-print-directory qc-fast QC_STMT=3
@@ -1721,7 +1724,7 @@ qc-fast: qc-build
 	ec=$$?; head -c 6000 $(QC_LOG); \
 	if [ $$ec = 124 ]; then \
 	  echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)' -- decided before the kill:"; \
-	  for v in agree FAIL undecided; do \
+	  for v in agree FAIL undecided degenerate; do \
 	    echo "  $$v $$(grep -c "^case [0-9]*/[0-9]* $$v$$" $(QC_STREAM))"; done; \
 	  echo "  bearing on contiguity $$(grep -c '^  bears on contiguity$$' $(QC_STREAM))"; \
 	  grep -A40 "^case [0-9]*/[0-9]* FAIL$$" $(QC_STREAM) | head -c 6000; \
