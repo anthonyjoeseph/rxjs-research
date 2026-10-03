@@ -205,7 +205,7 @@ postulate
   -- agreeing and one undecided at its clock; seed 19, 60, all agreeing.
   --
   -- PROBED: `Probed.Simulation`, read back by
-  --   `git show SHA:agda/evidence/probed/Probed/Simulation.agda`.
+  --   `git show 3d8872c4:agda/evidence/probed/Probed/Simulation.agda`.
   --   Its rows pin `arrival-runs`'s conclusion -- every slice through fuel
   --   3 over three first-order programs and the timed translations of two,
   --   all over a hot slot with the map the identity, the empty slices

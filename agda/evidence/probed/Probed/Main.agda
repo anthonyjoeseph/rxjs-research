@@ -40,6 +40,5 @@ module Probed.Main where
 open import Probed.Apparatus using (Confirms; Separates)
 open import Probed.Left-To-Right using ()
 open import Probed.Timing-Correct using ()
-open import Probed.Simulation using ()
 open import Probed.Timed-Faithful using ()
 open import Probed.Batchable using ()
