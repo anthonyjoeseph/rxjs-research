@@ -38,7 +38,7 @@ record Conf {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
   constructor conf
   field sched : Sched Γ
         st    : EvalSt e
-        ru    : Rule sched st
+  field {-@0-}ru : Rule sched st
 open Conf
 
 module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
