@@ -24,6 +24,7 @@ module CLI.Unit-Test.Prelude where
 open import Data.Bool using (Bool; true; false; T; _∧_; _∨_; not; _xor_; if_then_else_)
 open import Data.Unit using (⊤; tt)
 open import Data.Maybe using (Maybe; just; nothing)
+import Data.Maybe
 open import Data.List using (List; []; _∷_; _++_; map; length; zipWith; concat; take; drop; replicate)
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_; _+_)
 open import Data.Fin using (zero; suc)
@@ -152,11 +153,13 @@ cached n f e {κ} ins = record { name = n ; fuel = f ; prog = e ; kinds = κ ; s
 
 data Statement : Set where
   left-to-rightˢ timing-correctˢ batchableˢ timed-faithfulˢ simulationˢ arrival-runsˢ : Statement
-  batched-sandwichˢ packets-name-arrivalsˢ : Statement
+  batched-sandwichˢ packets-name-arrivalsˢ clocked-runsˢ : Statement
 
 -- in `Main`'s order, which is the order a report counts them in, then
 -- the simulation and the leaf it stands on, then the leaves the two
--- assembled top lines stand on beside it
+-- assembled top lines stand on beside it.  `clocked-runs` is not among
+-- them: it decides a candidate witness, not a statement, so no row of
+-- the bug cache is held to it
 statements : List Statement
 statements = left-to-rightˢ ∷ timing-correctˢ ∷ batchableˢ ∷ timed-faithfulˢ ∷ simulationˢ ∷ arrival-runsˢ
            ∷ batched-sandwichˢ ∷ packets-name-arrivalsˢ ∷ []
@@ -170,6 +173,7 @@ statementName simulationˢ     = "simulation"
 statementName arrival-runsˢ = "arrival-runs"
 statementName batched-sandwichˢ = "batched-sandwich"
 statementName packets-name-arrivalsˢ = "packets-name-arrivals"
+statementName clocked-runsˢ = "clocked-runs"
 
 -- `left-to-right`: the batches joined back up, the plain run, and the
 -- batches joined back up at one more unit of fuel, the joined runs at
@@ -221,55 +225,79 @@ packets κ ((i , v) ∷ ps) = (i , packetOf {Γ = Γ₂ᵗ κ} natᵗ v) ∷ pac
 Item : Set
 Item = List ℕ × (ℕ ⊎ ⊤)
 
+-- AN ARRIVAL'S KEY: its tick and the source it came from.  Both
+-- machines run the same scripts, so a tick names the same moment on
+-- each and a slot names the same script.  A dynamic source's number is
+-- not comparable -- the elaboration's mints draw on the same ledger --
+-- so each is renamed by the order of its first arrival, past the slots.
+Key : Set
+Key = ℕ × ℕ
+
+posOf : ℕ → List ℕ → Maybe ℕ
+posOf s []       = nothing
+posOf s (x ∷ xs) = if x ≡ᵇ s then just 0 else Data.Maybe.map suc (posOf s xs)
+
+rankFrom : ℕ → List ℕ → List Key → List Key
+rankFrom n seen []             = []
+rankFrom n seen ((t , s) ∷ ks) with s <ᵇ n | posOf s seen
+... | true  | _      = (t , s) ∷ rankFrom n seen ks
+... | false | just i = (t , n + i) ∷ rankFrom n seen ks
+... | false | nothing = (t , n + length seen) ∷ rankFrom n (seen ++ s ∷ []) ks
+
 -- THE RUN CUT AT ITS ARRIVALS: the subscribe's stream, then one per
--- arrival the drain took, and whether the queue ran dry before the fuel
--- did.  It is the drain's own builder split where it appends, and the
--- erased half says the pieces concatenate to the run `evaluate↓` returns
--- -- so a slice read off them is the run's, not a second machine's.
+-- arrival the drain took, each arrival's key, and whether the queue ran
+-- dry before the fuel did.  It is the drain's own builder split where it
+-- appends, and the erased half says the pieces concatenate to the run
+-- `evaluate↓` returns -- so a slice read off them is the run's, not a
+-- second machine's.
 mutual
   chunks! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st)
-          → Σ⁰ (List (Stream Γ t) × Bool) λ r → concat (proj₁ r) ≡ Σ⁰.fst⁰ (drain! fuel sched st ru)
-  chunks! zero    sched st ru = ([] , false) , refl
+          → Σ⁰ (List (Stream Γ t) × List Key × Bool) λ r → concat (proj₁ r) ≡ Σ⁰.fst⁰ (drain! fuel sched st ru)
+  chunks! zero    sched st ru = ([] , [] , false) , refl
   chunks! (suc k) sched st ru = chunksOn k sched st ru (sched-next sched) refl
 
   chunksOn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (k : Fuel) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st)
            → (x : ⊤ ⊎ (Arrival Γ × Sched Γ)) ({-@0-}eqn : sched-next sched ≡ x)
-           → Σ⁰ (List (Stream Γ t) × Bool) λ r → concat (proj₁ r) ≡ Σ⁰.fst⁰ (drainOn k sched st ru x eqn)
-  chunksOn k sched st ru (inj₁ _)            eqn = ([] , true) , refl
-  chunksOn k sched st ru (inj₂ (a , sched′)) eqn = then! k (cascade! a sched′ st (pop-rule eqn ru))
+           → Σ⁰ (List (Stream Γ t) × List Key × Bool) λ r → concat (proj₁ r) ≡ Σ⁰.fst⁰ (drainOn k sched st ru x eqn)
+  chunksOn k sched st ru (inj₁ _)            eqn = ([] , [] , true) , refl
+  chunksOn k sched st ru (inj₂ (a , sched′)) eqn =
+    then! k ((Arrival.tick a , Arrival.source a) ∷ []) (cascade! a sched′ st (pop-rule eqn ru))
 
   -- a step's stream, then the drain from where it left the queue
   then! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {D : Stream Γ t × Sched Γ × EvalSt e → Set} (k : Fuel)
+          (ks : List Key)
           (r : Σ⁰ (Stream Γ t × Sched Γ × EvalSt e) λ r → D r × Rule (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-        → Σ⁰ (List (Stream Γ t) × Bool) λ x →
+        → Σ⁰ (List (Stream Γ t) × List Key × Bool) λ x →
             concat (proj₁ x) ≡ proj₁ (Σ⁰.fst⁰ r) ++
               Σ⁰.fst⁰ (drain! k (proj₁ (proj₂ (Σ⁰.fst⁰ r))) (proj₂ (proj₂ (Σ⁰.fst⁰ r))) (proj₂ (Σ⁰.snd⁰ r)))
-  then! k ((out , sched′ , st′) , _ , ru′) =
-    chunks! k sched′ st′ ru′ |>′ λ ((cs , dry) , eq) → (out ∷ cs , dry) , cong (out ++_) eq
+  then! k ks ((out , sched′ , st′) , _ , ru′) =
+    chunks! k sched′ st′ ru′ |>′ λ ((cs , ks′ , dry) , eq) → (out ∷ cs , ks ++ ks′ , dry) , cong (out ++_) eq
 
 cut : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
-    → Σ⁰ (List (Stream Γ t) × Bool) λ r → concat (proj₁ r) ≡ evaluate↓ fuel e ins
-cut fuel e ins = then! fuel (subscribe! e ins)
+    → Σ⁰ (List (Stream Γ t) × List Key × Bool) λ r → concat (proj₁ r) ≡ evaluate↓ fuel e ins
+cut fuel e ins = then! fuel [] (subscribe! e ins)
 
 -- EACH ARRIVAL'S SLICE, read off the cut with the reading the statement
 -- takes the whole run through.  Every step of each reading is
--- element by element, so it commutes with the cut.
+-- element by element, so it commutes with the cut.  The keys come back
+-- with their dynamic sources ranked.
 implSlices : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ
-           → List (List (Id × Val (plainᵏ Γ κ) (plainᵗ t))) × Bool
-implSlices κ fuel e ins =
+           → List (List (Id × Val (plainᵏ Γ κ) (plainᵗ t))) × List Key × Bool
+implSlices {n} κ fuel e ins =
   readSlices (λ s → instExtract (decodeEmits (concat s))) (Σ⁰.fst⁰ (cut fuel (elaborateImpl κ e) (embedSlotsImpl ins)))
   where
-    readSlices : ∀ {A B : Set} → (A → B) → List A × Bool → List B × Bool
-    readSlices f (cs , dry) = map f cs , dry
+    readSlices : ∀ {A B : Set} → (A → B) → List A × List Key × Bool → List B × List Key × Bool
+    readSlices f (cs , ks , dry) = map f cs , rankFrom n [] ks , dry
 
 -- the plain run's, one per arrival through the fuel, an arrival past
--- the queue's end sending nothing
+-- the queue's end sending nothing, and the keys one arrival further:
+-- the next arrival's key is where the last run ends
 plainSlices : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ
-            → List (List (Val Γ t))
-plainSlices fuel e ins =
-  padTo (suc fuel) (map (λ s → plainValues (concat s)) (proj₁ (Σ⁰.fst⁰ (cut fuel (plainExp e) (plainSlots ins)))))
+            → List (List (Val Γ t)) × List Key
+plainSlices {n} fuel e ins with Σ⁰.fst⁰ (cut (suc fuel) (plainExp e) (plainSlots ins))
+... | cs , ks , _ = padTo (suc fuel) (take (suc fuel) (map (λ s → plainValues (concat s)) cs)) , rankFrom n [] ks
   where
     padTo : ∀ {A : Set} → ℕ → List (List A) → List (List A)
     padTo zero    xs       = xs
@@ -282,12 +310,13 @@ capOf : ℕ → ℕ
 capOf f = suc (f + f)
 
 -- A PROGRAM'S TWO RUNS, CUT: the impl's slices through the cap and
--- whether its queue ran dry first, and the plain run's through the fuel
+-- whether its queue ran dry first, the plain run's through the fuel, and
+-- each run's arrival keys
 Arr : Set → Set
-Arr A = List (List (ℕ × A)) × Bool × List (List A)
+Arr A = List (List (ℕ × A)) × Bool × List (List A) × List Key × List Key
 
-arrWith : {A : Set} → List (List (ℕ × A)) × Bool → List (List A) → Arr A
-arrWith (is , dry) ps = is , dry , ps
+arrWith : {A : Set} → List (List (ℕ × A)) × List Key × Bool → List (List A) × List Key → Arr A
+arrWith (is , ik , dry) (ps , pk) = is , dry , ps , ik , pk
 
 arrPlain : Case → Arr ℕ
 arrPlain c = arrWith (implSlices (kinds c) (capOf (fuel c)) (prog c) (slots c))
@@ -302,7 +331,7 @@ arrTimed c = arrWith (implSlices (kinds c) (capOf (fuel c)) (timed (kinds c) (pr
 
 -- the impl's stamped run at the plain run's fuel: its first slices
 stampedAtFuel : {A : Set} → Arr A → List (ℕ × A)
-stampedAtFuel (is , _ , ps) = concat (take (length ps) is)
+stampedAtFuel (is , _ , ps , _) = concat (take (length ps) is)
 
 stampsOf : Case → List (ℕ × List ℕ)
 stampsOf c = packets (kinds c) (stampedAtFuel (arrTimed c))
@@ -377,7 +406,7 @@ searchᵇ eq vs ar st []       = simAtᵇ eq vs ar st
 searchᵇ eq vs ar st (s ∷ ss) = simAtᵇ eq vs ar st ∨ searchᵇ eq vs ar (st ++ s) ss
 
 simᵇ : {A : Set} → (A → A → Bool) → Arr A → Bool
-simᵇ eq (is , _ , ps) = searchᵇ eq (concat ps) (arrivalsFrom 0 ps) (concat (take (length ps) is)) (drop (length ps) is)
+simᵇ eq (is , _ , ps , _) = searchᵇ eq (concat ps) (arrivalsFrom 0 ps) (concat (take (length ps) is)) (drop (length ps) is)
 
 simulationᴮ : Arr ℕ × Arr Item → Bool
 simulationᴮ (p , t) = simᵇ _≡ᵇ_ p ∧ simᵇ eqItem t
@@ -436,10 +465,54 @@ mutual
 
 -- one run's half of it, untimed or timed
 runsOfᵇ : {A : Set} → (A → A → Bool) → Arr A → Bool
-runsOfᵇ eq (is , dry , ps) = runsᵇ eq is dry ps []
+runsOfᵇ eq (is , dry , ps , _) = runsᵇ eq is dry ps []
 
 arrivalRunsᴮ : Arr ℕ × Arr Item → Bool
 arrivalRunsᴮ (p , t) = runsOfᵇ _≡ᵇ_ p ∧ runsOfᵇ eqItem t
+
+-- `arrival-runs` WITH ψ READ OFF THE SCHEDULES RATHER THAN SEARCHED: a
+-- candidate witness, decided before anything is stated over it.  Each
+-- plain arrival's key is matched, in order, to the first impl arrival
+-- with the same key past the last match, and a run is that impl arrival
+-- and every unmatched one behind it.  It is false where some plain
+-- arrival has no impl arrival bearing its key -- the impl's schedule
+-- does not embed the plain one -- and where the runs it cuts disagree.
+eqKey : Key → Key → Bool
+eqKey (t , s) (u , r) = (t ≡ᵇ u) ∧ (s ≡ᵇ r)
+
+-- the runs the matching cuts, how many impl arrivals matched nothing
+-- while a plain key was still waiting, and whether every plain key
+-- matched.  One past the last plain key is past what the plain run was
+-- read to, so an impl arrival there is not counted as matching nothing.
+clockCut : {A : Set} → List (ℕ × A) → List Key → List (List (ℕ × A)) → List Key
+         → List (List (ℕ × A)) × ℕ × Bool
+clockCut acc pk       []       _        = acc ∷ [] , 0 , emptyᵇ pk
+clockCut acc pk       (_ ∷ _)  []       = acc ∷ [] , 0 , false
+clockCut acc []       (i ∷ is) (k ∷ ks) = clockCut (acc ++ i) [] is ks
+clockCut acc (q ∷ pk) (i ∷ is) (k ∷ ks) with eqKey q k
+... | true  with clockCut i pk is ks
+...   | rs , x , m = acc ∷ rs , x , m
+clockCut acc (q ∷ pk) (i ∷ is) (k ∷ ks) | false with clockCut (acc ++ i) (q ∷ pk) is ks
+...   | rs , x , m = rs , suc x , m
+
+clockRuns : {A : Set} → Arr A → List (List (ℕ × A)) × ℕ × Bool
+clockRuns ([]     , _ , _ , _ , _)   = [] , 0 , false
+clockRuns (i ∷ is , _ , _ , ik , pk) = clockCut i pk is ik
+
+-- each run against its plain slice, the plain slices past the last run
+-- empty
+agreeRunsᵇ : {A : Set} → (A → A → Bool) → List (List (ℕ × A)) → List (List A) → List ℕ → Bool
+agreeRunsᵇ eq []       ps       ns = emptyᵇ (concat ps) ∧ distinctᵇ ns
+agreeRunsᵇ eq (r ∷ rs) []       ns = distinctᵇ ns
+agreeRunsᵇ eq (r ∷ rs) (p ∷ ps) ns =
+  eqBy eq (map proj₂ r) p ∧ uniformᵇ r ∧ agreeRunsᵇ eq rs ps (ns ++ instantOf r)
+
+clockedᵇ : {A : Set} → (A → A → Bool) → Arr A → Bool
+clockedᵇ eq x@(_ , _ , ps , _) with clockRuns x
+... | rs , _ , m = m ∧ agreeRunsᵇ eq rs ps []
+
+clockedᴮ : Arr ℕ × Arr Item → Bool
+clockedᴮ (p , t) = clockedᵇ _≡ᵇ_ p ∧ clockedᵇ eqItem t
 
 -- each takes its sides as ONE argument, so a pair is computed once
 agreeᴸ : List ℕ × List ℕ → Bool
@@ -461,6 +534,7 @@ holds simulationˢ     c p t = simulationᴮ (p , t)
 holds arrival-runsˢ c p t = arrivalRunsᴮ (p , t)
 holds batched-sandwichˢ c p t = sandwichᴸ (bsSides c)
 holds packets-name-arrivalsˢ c p t = namesᵇ (namingSides c)
+holds clocked-runsˢ c p t = clockedᴮ (p , t)
 
 checksWith : List Statement → Case → Arr ℕ → Arr Item → List (String × Bool)
 checksWith ss c p t = map (λ s → statementName s , holds s c p t) ss

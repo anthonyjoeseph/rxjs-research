@@ -81,6 +81,7 @@ open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
+  clocked-runsˢ; clockRuns; clockedᵇ; Key;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
   Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; runsOfᵇ)
 open import CLI.Unit-Test using (cases)
@@ -910,10 +911,22 @@ showItem (p , inj₂ _) = showVals p ++ ":END"
 
 -- a program's two runs cut at their arrivals, one slice to a bracket
 showArr : {A : Set} → (A → String) → Arr A → String
-showArr sh (is , dry , ps) =
+showArr sh (is , dry , ps , ik , pk) =
   "impl slices = " ++ commaJoin (map (λ i → "[" ++ commaJoin (map (λ p → "@" ++ show (proj₁ p) ++ " " ++ sh (proj₂ p)) i) ++ "]") is) ++
   (if dry then " (queue dry)" else " (at the fuel cap)") ++
-  "\n    plain slices = " ++ commaJoin (map (λ p → "[" ++ commaJoin (map sh p) ++ "]") ps)
+  "\n    plain slices = " ++ commaJoin (map (λ p → "[" ++ commaJoin (map sh p) ++ "]") ps) ++
+  "\n    impl keys = " ++ showKeys ik ++ "\n    plain keys = " ++ showKeys pk
+  where
+    showKeys : List Key → String
+    showKeys ks = commaJoin (map (λ k → show (proj₁ k) ++ "/" ++ show (proj₂ k)) ks)
+
+-- the runs the schedules cut, and how many impl arrivals matched nothing
+showClock : {A : Set} → (A → String) → Arr A → String
+showClock sh x with clockRuns x
+... | rs , extra , m =
+  "clock runs = " ++ commaJoin (map (λ r → "[" ++ commaJoin (map (λ p → "@" ++ show (proj₁ p) ++ " " ++ sh (proj₂ p)) r) ++ "]") rs)
+  ++ ", " ++ show extra ++ " unmatched impl arrivals" ++ (if m then "" else ", A PLAIN KEY UNMATCHED")
+  ++ "\n    " ++ showArr sh x
 
 -- A STATEMENT IS DECIDED IN HALVES WHERE ITS RUNS ARE INDEPENDENT: what
 -- reads the program's own run, and what reads its timed translation's.
@@ -936,6 +949,9 @@ halves c arrival-runsˢ   =
   , (runsOfᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
 halves c batched-sandwichˢ = sandwichᴸ (bsSides c) ∷ [] , []
 halves c packets-name-arrivalsˢ = [] , namesᵀ (namingSides c) ∷ []
+halves c clocked-runsˢ   =
+  (clockedᵇ _≡ᵇ_ (arrPlain c) , showClock show (arrPlain c)) ∷ []
+  , (clockedᵇ eqItem (arrTimed c) , "timed: " ++ showClock showItem (arrTimed c)) ∷ []
 
 joinᴴ : List (Bool × String) → Bool × String
 joinᴴ []             = true , ""
@@ -956,6 +972,7 @@ indexOf simulationˢ     = 4
 indexOf arrival-runsˢ = 5
 indexOf batched-sandwichˢ = 6
 indexOf packets-name-arrivalsˢ = 7
+indexOf clocked-runsˢ = 8
 
 -- one count per former, in `allFormers` order, plus the obs-fold count,
 -- the count of cases bearing on contiguity and of those holding values
@@ -977,12 +994,13 @@ bumpEach fs (g ∷ gs) (c ∷ cs) =
   (if carries g fs then suc c else c) ∷ bumpEach fs gs cs
 
 -- a case's marks, whether it bears on contiguity, whether its batcher
--- holds values back at the fuel, and whether its values group
+-- holds values back at the fuel, whether its values group, and whether
+-- an impl arrival matches no plain one
 Seen : Set
-Seen = Marks × Bool × Bool × Bool
+Seen = Marks × Bool × Bool × Bool × Bool
 
 bump : Seen → Tally → Tally
-bump ((fs , o) , b , h , g) (cs , p , q , r , u) =
+bump ((fs , o) , b , h , g , _) (cs , p , q , r , u) =
   bumpEach fs allFormers cs , (if o then suc p else p) , (if b then suc q else q)
   , (if h then suc r else r) , (if g then suc u else u)
 
@@ -1006,7 +1024,7 @@ forced ((k , r) ∷ rs) = k + lengthˢ r + forced rs
 -- a case past its wall clock: one report of its own kind, after the
 -- statements', carrying the row that reproduces it
 TIMEOUT : ℕ
-TIMEOUT = 8
+TIMEOUT = 9
 
 timedOut : ℕ → ℕ → Drawn → List (ℕ × String)
 timedOut s f (e , d₀ , d₁) =
@@ -1049,7 +1067,7 @@ bearsOn : ℕ → ℕ → Bool
 bearsOn s n = within s n (2 ≤ᵇ n) false
 
 bears : ℕ → ℕ → Drawn → Bool
-bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots d₀ d₁))))))
+bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₁ (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots d₀ d₁)))))))
 
 -- A CASE TESTS THE ONE-PAST SLACK WHEN THE BATCHER HOLDS VALUES BACK AT
 -- ITS FUEL: the joined run at the searched witness shorter than the
@@ -1078,13 +1096,28 @@ groups : ℕ → ℕ → Drawn → Bool
 groups s f (e , d₀ , d₁) with proj₂ (batchableSides (cached "?" f e (mkSlots d₀ d₁)))
 ... | bs = within s (length (concat bs)) (groupsOn bs) false
 
+-- A CASE SPLITS A PLAIN ARRIVAL WHEN SOME IMPL ARRIVAL MATCHES NONE of
+-- the plain run's keys, so a run is longer than one arrival.  Read only
+-- where `clocked-runs` is being decided, since its timed half is the
+-- dear run; past the case's clock it counts as splitting nothing.
+isClocked : Statement → Bool
+isClocked clocked-runsˢ = true
+isClocked _             = false
+
+splits : List Statement → ℕ → ℕ → Drawn → Bool
+splits ss s f (e , d₀ , d₁) with any isClocked ss
+... | false = false
+... | true  with cached "?" f e (mkSlots d₀ d₁)
+...   | c with proj₁ (proj₂ (clockRuns (arrPlain c))) + proj₁ (proj₂ (clockRuns (arrTimed c)))
+...     | x = within s x (1 ≤ᵇ x) false
+
 -- A SWEEP MAY DECIDE ONLY THE CASES THAT BEAR.  Whether one does is
 -- read before any statement is, so a sweep aimed at contiguity spends
 -- its clocks on cases that could fail it; one that does not bear is
 -- drawn, counted in the census and left undecided-by-choice.
 judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 judged ob ss f s m x with bears s f x
-... | b = (m , b , slack s f x , groups s f x) , (if ob ∧ not b then [] else bounded s f x ss)
+... | b = (m , b , slack s f x , groups s f x , splits ss s f x) , (if ob ∧ not b then [] else bounded s f x ss)
 
 oneCase : Bool → List Statement → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
@@ -1162,7 +1195,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = map statementName statements ++ᴸ "timeout" ∷ []
+kinds = map statementName (statements ++ᴸ clocked-runsˢ ∷ []) ++ᴸ "timeout" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -1187,7 +1220,7 @@ agreeing (_ ∷ _) = ""
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = agreeing (decided fs) ++ concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples 5 fs ++ samples 6 fs ++ samples 7 fs ++ samples TIMEOUT fs
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples 5 fs ++ samples 6 fs ++ samples 7 fs ++ samples 8 fs ++ samples TIMEOUT fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -1231,6 +1264,7 @@ selected (suc (suc (suc (suc (suc zero))))) = simulationˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc zero)))))) = arrival-runsˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc zero))))))) = batched-sandwichˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))) = packets-name-arrivalsˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc (suc (suc (suc zero))))))))) = clocked-runsˢ ∷ []
 selected _                            = statements
 
 -- the impl's raw run, decoded, for reading a batchable failure by
@@ -1238,7 +1272,7 @@ rawOf : Case → String
 rawOf c = showStream (runᴵ (Case.kinds c) (Case.fuel c) (Case.prog c) (Case.slots c))
 
 -- AND ONE SIDE OF IT, so a hang is attributed to the statement that owns
--- it: 1 to 8 that statement's sides, in `selected`'s numbering,
+-- it: 1 to 9 that statement's sides, in `selected`'s numbering,
 -- anything else the impl's raw run
 sidesOf : ℕ → Case → String
 sidesOf k c with selected k
@@ -1300,7 +1334,8 @@ streamCases ob n i (r ∷ rs) =
           ++ "  formers" ++ concatStr (map (λ g → if carries g (proj₁ (proj₁ (proj₁ r))) then " " ++ formerTag g else "") allFormers) ++ "\n"
           ++ (if proj₁ (proj₂ (proj₁ r)) then "  bears on contiguity\n" else "")
           ++ (if proj₁ (proj₂ (proj₂ (proj₁ r))) then "  holds values back at the fuel\n" else "")
-          ++ (if proj₂ (proj₂ (proj₂ (proj₁ r))) then "  groups values\n" else "")
+          ++ (if proj₁ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  groups values\n" else "")
+          ++ (if proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  splits a plain arrival\n" else "")
           ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
   streamCases ob n (suc i) rs
 
