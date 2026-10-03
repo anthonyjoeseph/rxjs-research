@@ -250,22 +250,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **MAKE THE TIMED IMPL RUN AFFORDABLE.** Attributed: the cost is
-  `translate-sub` running a subscribing step a second time per call,
-  compounding per nested flattener, not the elaborated term's size. An
-  outer that emits a list and ends (`SyncOuter`) now skips the replay,
-  taking a synchronous depth-3 impl case from past two minutes to six
-  seconds. `memoᶠ` holds the slot table, which had re-elaborated every
-  share at each budget check: a wide depth-3 case 85 s → 51 s, seed 2's
-  undecided 14 → 11 of 120. Left: the raw fold past a fall, the replay
-  under a mapped outer. Ruled out: the replay's dispatch moved onto the
-  source's ground ran slower lazy.
-
 - **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
   in CI where it fits, reaches nestings no targeted row builds: a late
   `take` under two flatteners, a share connected inside a switch. A
   counterexample refutes `arrival-runs` before the correspondence is
   stated over it; a green range is the evidence that lowers its class.
+  Seeds 2–4: 200 cases, no failure, 12 past a 10–240 s clock. Each case
+  is streamed as it is decided, so a sweep the budget kills banks what it
+  reached. An undecided case is where the sweep is blind, and its cost is
+  the raw fold past a fall and the replay under a mapped outer.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel

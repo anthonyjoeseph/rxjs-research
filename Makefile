@@ -1691,6 +1691,11 @@ quickcheck: qc-build
 # a failure (Anthony) -- counted, printed with its paste row, and the
 # sweep goes on.
 #
+# EVERY CASE IS STREAMED TO $(QC_STREAM) AS IT IS DECIDED, so a sweep the
+# budget kills still says what it decided: how many cases agreed, and
+# every row that failed or went undecided.  A FAIL in a killed sweep is
+# as red as one in a finished sweep.
+#
 # ONE QUICKCHECK PER STATEMENT `Main` IMPORTS, ONE FOR THE SIMULATION
 # two of them stand on, and one for `arrival-runs`, the leaf it stands
 # on.  Each decides that statement's own sides on one program's run, so
@@ -1703,6 +1708,7 @@ QC_FUEL ?= 0
 QC_STMT ?= 0
 QC_CASE ?=
 QC_LOG := agda/_oracle/qc.log
+QC_STREAM := agda/_oracle/qc.stream
 QC_IN = $(word 1,$(QC)) $(or $(word 2,$(QC)),200) $(or $(word 3,$(QC)),4) 0 0 0 $(QC_FUEL) $(QC_STMT) $(QC_CASE)
 qc-left-to-right:  ; @$(MAKE) --no-print-directory qc-fast QC_STMT=1
 qc-timing-correct: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=2
@@ -1711,9 +1717,14 @@ qc-timed-faithful: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=4
 qc-simulation:     ; @$(MAKE) --no-print-directory qc-fast QC_STMT=5
 qc-arrival-runs:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=6
 qc-fast: qc-build
-	@printf '%s\n' "$(QC_IN)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG); \
+	@printf '%s\n' "$(QC_IN)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG) 2> $(QC_STREAM); \
 	ec=$$?; head -c 6000 $(QC_LOG); \
-	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
+	if [ $$ec = 124 ]; then \
+	  echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)' -- decided before the kill:"; \
+	  for v in agree FAIL undecided; do \
+	    echo "  $$v $$(grep -c "^case [0-9]*/[0-9]* $$v$$" $(QC_STREAM))"; done; \
+	  grep -A40 "^case [0-9]*/[0-9]* FAIL$$" $(QC_STREAM) | head -c 6000; \
+	  echo "  (every decided case: $(QC_STREAM))"; exit 1; fi; \
 	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
 	grep -q '(all agree)' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
 	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s, $$(grep -o '[0-9]* undecided' $(QC_LOG) | head -1)"

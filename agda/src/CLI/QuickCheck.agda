@@ -83,7 +83,7 @@ open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement
   Item; Arr; arrPlain; arrTimed; simulationᴮ; arrivalRunsᴮ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
-open import CLI.IO using (_>>=_; getContents; putStr; Unit)
+open import CLI.IO using (_>>=_; getContents; putStr; putErr; Unit)
 
 ------------------------------------------------------------------------
 -- randomness (FFI: a pure LCG over Integer, no unary-ℕ blowup)
@@ -1001,12 +1001,21 @@ oneCase ss f s d = genExp d >>=G λ e → genSlots >>=G λ ds →
   pureG (marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e)
         , bounded s f (e , proj₁ ds , proj₂ ds) ss)
 
--- accumulate EVERY failing case's reports, in generation order, and tally
--- which recursion constructors the corpus actually reached
-runN : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Tally × List (ℕ × String))
-runN ss f s zero    d = pureG (zeroTally , [])
-runN ss f s (suc k) d = oneCase ss f s d >>=G λ r → runN ss f s k d >>=G λ acc →
-  pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
+-- every case drawn, in generation order, its reports still unforced:
+-- drawing is cheap and upstream of every run, so the list is whole
+-- before the first case is run
+casesN : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (List (Marks × List (ℕ × String)))
+casesN ss f s zero    d = pureG []
+casesN ss f s (suc k) d = oneCase ss f s d >>=G λ r → casesN ss f s k d >>=G λ rs → pureG (r ∷ rs)
+
+-- EVERY failing case's reports, in generation order, and which recursion
+-- constructors the corpus actually reached
+joinT : Marks × List (ℕ × String) → Tally × List (ℕ × String) → Tally × List (ℕ × String)
+joinT r acc = bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc
+
+tallyOf : List (Marks × List (ℕ × String)) → Tally × List (ℕ × String)
+tallyOf []       = zeroTally , []
+tallyOf (r ∷ rs) = joinT r (tallyOf rs)
 
 ------------------------------------------------------------------------
 -- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT] [CASE]"
@@ -1173,6 +1182,39 @@ printRows ss f sd k i (c ∷ cs) =
   where
   c′ = if f ≡ᵇ 0 then c else record c { fuel = f }
 
+-- EACH CASE IS REPORTED THE MOMENT IT IS DECIDED, on stderr, because the
+-- summary can only be printed once the last case is: a sweep killed by
+-- its budget otherwise leaves nothing behind, every case it had decided
+-- included.  A case that does not agree streams its reports verbatim,
+-- paste and undecided blocks and all, so a killed run's stream is read
+-- by the same splitter as a finished run's summary.
+verdictOf : List (ℕ × String) → String
+verdictOf []         = "agree"
+verdictOf rs@(_ ∷ _) with decided rs
+... | []    = "undecided"
+... | _ ∷ _ = "FAIL"
+
+streamCases : ℕ → ℕ → List (Marks × List (ℕ × String)) → IO Unit
+streamCases n i []       = putErr ""
+streamCases n i (r ∷ rs) =
+  putErr ("case " ++ show i ++ "/" ++ show n ++ " " ++ verdictOf (proj₂ r) ++ "\n"
+          ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
+  streamCases n (suc i) rs
+
+-- the summary, over the tally of the cases the stream already forced
+summaryOf : ℕ → ℕ → ℕ → ℕ → Tally × List (ℕ × String) → String
+summaryOf seed d f runs (tally , fails) = concatStr
+  (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " fuel " ∷ show f ∷ " — ran " ∷ show runs
+   ∷ " cases, " ∷ show (length (decided fails)) ∷ " failures, "
+   ∷ show (length fails ∸ length (decided fails)) ∷ " undecided"
+   ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
+   ++ᴸ censusPairs allFormers (proj₁ tally)
+   ++ᴸ ("\n" ∷ dumpFails fails ∷ []))
+
+-- the cases are an ARGUMENT, so the stream and the summary read one list
+sweep : ℕ → ℕ → ℕ → ℕ → List (Marks × List (ℕ × String)) → IO Unit
+sweep seed d f runs rs = streamCases runs 1 rs >>= λ _ → putStr (summaryOf seed d f runs (tallyOf rs))
+
 main : IO Unit
 main = getContents >>= λ s →
   let cs    = toCodes s
@@ -1186,9 +1228,6 @@ main = getContents >>= λ s →
       ss    = selected (numAt 7 0 cs)
       f     = if fuelʳ ≡ᵇ 0 then FUEL else fuelʳ
       secs  = numAt 8 CASE cs
-      res   = proj₁ (runN ss f secs runs d (randList seed 2000000))
-      tally = proj₁ res
-      fails = proj₂ res
   in if runs ≡ᵇ 0
      then printRows ss fuelʳ side only 1 cases
      else if not (side ≡ᵇ 0)
@@ -1197,10 +1236,4 @@ main = getContents >>= λ s →
      then putStr (dumpFails (proj₂ (proj₁ (runAt ss f secs only d (randList seed 2000000)))))
      else if not (at ≡ᵇ 0)
      then putStr (proj₁ (showAt f at d (randList seed 2000000)))
-     else putStr (concatStr
-       (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " fuel " ∷ show f ∷ " — ran " ∷ show runs
-        ∷ " cases, " ∷ show (length (decided fails)) ∷ " failures, "
-        ∷ show (length fails ∸ length (decided fails)) ∷ " undecided"
-        ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
-        ++ᴸ censusPairs allFormers (proj₁ tally)
-        ++ᴸ ("\n" ∷ dumpFails fails ∷ [])))
+     else sweep seed d f runs (proj₁ (casesN ss f secs runs d (randList seed 2000000)))

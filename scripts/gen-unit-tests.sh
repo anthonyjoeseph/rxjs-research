@@ -124,7 +124,8 @@ tmp="$(mktemp)"
 row="$(mktemp)"
 spl="$(mktemp)"
 cen="$(mktemp)"
-trap 'rm -f "$tmp" "$row" "$spl" "$cen"' EXIT
+str="$(mktemp)"
+trap 'rm -f "$tmp" "$row" "$spl" "$cen" "$str"' EXIT
 
 widen
 
@@ -134,22 +135,34 @@ timedout=""
 for seed in $(seq "$FIRST" "$LAST"); do
   # stdin is: SEED RUNS DEPTH  (CLI/QuickCheck.agda's main: parseNat, numAt 1,
   # numAt 2 — runs before depth)
-  if printf '%s %s %s\n' "$seed" "$RUNS" "$DEPTH" | $TIMEOUT "$QC" > "$tmp"
+  # A SEED THE CLOCK KILLS IS READ OFF ITS STREAM.  The binary reports
+  # each case on stderr the moment it is decided, every disagreeing one
+  # with the same paste block the summary would carry, so the splice
+  # below caches what the killed seed found; only its census is lost.
+  killed=""
+  if printf '%s %s %s\n' "$seed" "$RUNS" "$DEPTH" | $TIMEOUT "$QC" > "$tmp" 2> "$str"
   then :; else
     rc=$?
     if [ "$rc" -eq 124 ]; then
-      echo "seed $seed depth $DEPTH — TIMED OUT after ${SECS}s; not checked"
+      n="$(grep -c '^case [0-9]*/[0-9]* ' "$str" || true)"
+      echo "seed $seed depth $DEPTH — TIMED OUT after ${SECS}s; ${n:-0} of $RUNS cases decided before it"
       timedout="$timedout $seed"
-      continue
+      killed=1
+      cp "$str" "$tmp"
+    else
+      echo "gen-unit-tests: seed $seed exited $rc" >&2
+      exit "$rc"
     fi
-    echo "gen-unit-tests: seed $seed exited $rc" >&2
-    exit "$rc"
   fi
-  head -1 "$tmp"
   # a case past the binary's own per-case clock is UNDECIDED, never a
   # failure (Anthony): its row is printed under `UNDECIDED` markers, which
   # the splice below never reads, and only its count is kept
-  u="$(head -1 "$tmp" | grep -o '[0-9]* undecided' | grep -o '^[0-9]*' || true)"
+  if [ -n "$killed" ]; then
+    u="$(grep -c '^case [0-9]*/[0-9]* undecided$' "$str" || true)"
+  else
+    head -1 "$tmp"
+    u="$(head -1 "$tmp" | grep -o '[0-9]* undecided' | grep -o '^[0-9]*' || true)"
+  fi
   undecided=$((undecided + ${u:-0}))
   awk '/^-- <<<UNDECIDED$/,/^-- UNDECIDED>>>$/' "$tmp"
   # one census line per run, banked for the aggregate below rather than
@@ -222,8 +235,9 @@ fi
 if [ -n "$timedout" ]; then
   echo "gen-unit-tests: TIMED OUT:$timedout"
   echo "                each of these seeds drew a program whose run does not"
-  echo "                finish in ${SECS}s, so its whole batch is unchecked —"
-  echo "                the census and the corpus below cover the rest."
+  echo "                finish in ${SECS}s, so its batch is checked only up to"
+  echo "                that case — what it decided is cached above, and the"
+  echo "                census covers the seeds that finished."
 fi
 
 unreached="$(awk '$2 == 0 { printf "%s ", $1 }' "$CENSUS")"
