@@ -244,20 +244,21 @@ arrival per plain arrival, one instant per impl arrival, a shared impl
 arrival at every late-subscribed `take` the bug cache aims at, and a
 non-contiguous run at depth 2 seeds 13..36 or depth 3 seeds 1..11, 275
 programs bearing on it. Left: the correspondence carrying contiguity through
-every former, and whether `batched-sandwich` or `packets-name-arrivals`
+every former, and whether `batched-sandwich`, the one leaf still FALSITY,
 is likelier false.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **DECIDE THE TWO REMAINING LEAVES THEMSELVES, AT DEPTH 3, FUEL 1.**
-  Seeds 12..17 lowered `batchable` and `timed-faithful`, decided directly
-  with grouping and two-arrival cases under flatteners. `batched-sandwich`
-  and `packets-name-arrivals` were only read through their assemblies, so
-  the QuickCheck now decides each itself (`QC_STMT` 7 and 8). A
-  counterexample is a FALSITY with a smaller cone than the monster's and
-  moves it there. Slow shapes: μ over a self-deferring merge, nested
+- **READ `batched-sandwich`'S SLACK OFF ITS OWN SIDES, AT DEPTH 3, FUEL 1.**
+  Seeds 12..18 lowered `batchable`, `timed-faithful` and
+  `packets-name-arrivals`, each decided directly in its region under
+  flatteners. Seed 18 decided `batched-sandwich` directly too, with no
+  red, but counted values held back against the plain run; the flag now
+  reads the leaf's own sides, so one more seed says whether its slack is
+  reached. A counterexample is a FALSITY with a smaller cone than the
+  monster's and moves it there. Slow shapes: μ over a self-deferring merge, nested
   limited merges, a scan re-flattening a stream accumulator.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
@@ -283,14 +284,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `REFUTED, PROBED`: the unbatched values at one fuel between the joined run at
   a batcher fuel never less and one past it, since a cut-off run's last batch
   waits for an arrival that is not silent.
-- **`packets-name-arrivals`** (Timed.Timing-Correct) — FALSITY, `PROBED`: the
-  timed program's plain run carries one packet per arrival, injectively.
 - **`timed-faithful`** (Timed.Faithful) — DIFFICULTY, `PROBED`: probed
   first-order; the sweep, deciding it directly, reached values on two
   arrivals under a flattener with no red.
 - **`batchable`** (Batchable.Statement) — DIFFICULTY, `PROBED`: probed
   first-order; the sweep, deciding it directly, reached values grouping
   under a flattener and a `μ` with no red.
+- **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED`:
+  one packet per arrival, injectively; the sweep, deciding it directly,
+  reached values on two arrivals under a flattener with no red.
 - **`arrival-runs`** (Simulation.Statement) — DIFFICULTY, `PROBED`: each plain
   arrival's slice agrees with a contiguous run of impl arrivals, a rising map
   saying where each ends, and a run's values carry one instant, no two runs

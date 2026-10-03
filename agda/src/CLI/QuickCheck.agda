@@ -1053,16 +1053,16 @@ bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₂ (proj₂ (arrPlain (cac
 
 -- A CASE TESTS THE ONE-PAST SLACK WHEN THE BATCHER HOLDS VALUES BACK AT
 -- ITS FUEL: the joined run at the searched witness shorter than the
--- plain run, so only the joined run at one more fuel can cover it.
--- That slack is the one `left-to-right` takes from `batched-sandwich`'s
--- second prefix, which says nothing anywhere else.  Read off the untimed side under the
--- case's clock, and past it counted as holding nothing.
+-- elaborated run's values, so only the joined run at one more fuel can
+-- cover it.  That is `batched-sandwich`'s second prefix, which says
+-- nothing anywhere else, read off the leaf's own sides rather than
+-- `left-to-right`'s.  Past the case's clock it counts as holding nothing.
 holdsBack : ℕ → List ℕ × List ℕ × List ℕ → Bool
 holdsBack s (l , p , _) with length p ∸ length l
 ... | n = within s n (1 ≤ᵇ n) false
 
 slack : ℕ → ℕ → Drawn → Bool
-slack s f (e , d₀ , d₁) = holdsBack s (ltrSides (cached "?" f e (mkSlots d₀ d₁)))
+slack s f (e , d₀ , d₁) = holdsBack s (bsSides (cached "?" f e (mkSlots d₀ d₁)))
 
 -- A CASE BEARS ON `batchable` WHEN ITS VALUES GROUP: the grouping the
 -- statement compares against holds a batch of two values or two batches
