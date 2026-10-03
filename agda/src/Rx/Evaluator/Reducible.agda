@@ -159,7 +159,7 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; _⁰×_; _,_; _|>⁰_; 
   ends-register; ends-sub; f-exhaust; f-merge; f-switch; fallen; fiHolds→thru; finishing; fold; fresh-apart;
   fresh-inner; fresh-path; fresh-sound; ground; grounded; head-off; head-on; headHolds; headKept; headPre; held;
   holds-step; holdsFs-step; holdsOf; inner-back; joinPre; kept; kept-in; kept-shift; kept-step; kill-sub; lower-nodes;
-  mapStep; next; node-eq; node-in₁; node-one; node-two; ofColumn; out; push-sound; push-thru; qempty-room;
+  mapAll; mapStep; next; node-eq; node-in₁; node-one; node-two; ofColumn; out; push-sound; push-thru; qempty-room;
   register-sound; room-wrap; row-sound; ruled; scanCons; scanCt; scanOff; scanReg; scanStepped; self-node; sink-sound;
   sounds; spend-or; ceil-or; standing; step; step-cons; step-ct; step-off; step-red; step-reg; step-⇓; st″; sub-on;
   sub-ot; sub-rule; switchKill-ct; switchKill-nodes; takeStep; termini; u-exhaust; u-merge; u-switch; unheadHolds;
@@ -215,7 +215,7 @@ baseAns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
 -- term size at the arms, the value at `red-val`, the path and its floor
 -- at the raw fold, and every continuation builder guarded by the `fold`
 -- copattern it answers.
--- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenAns fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-flatten red-input red-input-shared red-map red-mapFn red-scan red-take red-takeWhile red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-go walk
+-- STRUCTURAL SCC: baseAns baseRP batchFinish consume consumeFallen consumeStanding fallenAns fallenRP headNext liveRP rawAfter rawConsume rawDrain rawFinish rawFold rawGo rawInner rawReact rawThru rawWalk red-all red-batchSync red-env red-flatten red-input red-input-shared red-map red-mapFn red-scan red-sync red-take red-takeWhile red-val redExpAcc redTmAcc redTmsAcc reducible stepStage subNext subRP subStanding thruStep translate translate-go translate-sub translate-sub-go walk
 
 -- DEAD ROUTE: the inners on `fallen` ground.  At the peeled ceiling the
 --   room is not below it; raising the ceiling a step needs an
@@ -1479,6 +1479,15 @@ subNext {n = n} {lo = lo} le aM ss h g κ fallen rp =
 -- It runs each step once, at the successor the step answered with,
 -- and takes the source's trace wherever an equation places it, as the
 -- live frame's translation does.  It descends on the trace.
+--
+-- SO A SUBSCRIBING STEP RUNS TWICE PER CALL, once under `subRP` and once
+-- here, and under nested subscribing frames the doubling compounds: it is
+-- the timed impl run's dominant cost, not the elaborated term's size.
+-- The first run's stage cannot be kept for this one: `RP`'s successor at
+-- the parent is opaque, and exposing it puts `Red` at the parent's type
+-- inside `RP`, which is either not strictly positive or breaks `Red`'s
+-- descent on the type.  `SyncOuter` is the outer that calls once, which
+-- `red-all` steps directly instead of subscribing.
 translate-sub : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m lo ℓ s u} {S : Set} {f : Frame Γ s u} {G : HeldF f → Set}
                 (le : lo ≤ ℓ) ({-@0-}aM : Acc _<_ m) (ss : SubStep {e = e} f G m)
                 (h : HeldF f) (g : G h) (κ : Path Γ ℓ u t) (pfs : PreFs κ)
@@ -1773,6 +1782,80 @@ thruStep op nid aM le κ pfs rp s₀ h g now vals col fin sched st rm hs =
                    (room-keeps (thruWalk-keeps (Stage.dv w)) rm) (Stage.hl w) |>′ λ (t , gt) →
   stage-seq w t (λ dt → fold-step (step-thru-outer (Stage.dv w)) dt) , gt
 
+-- AN OUTER THAT EMITS A LIST AND ENDS: an `ofᵉ` under maps and mints,
+-- which subscribe nothing and so call their continuation exactly once,
+-- with the whole list and the end.  `red-all` hands that one call to the
+-- outer frame's step directly, where a subscription under `subRP` would
+-- run the step and `translate-sub` would run it again; under a nest of
+-- flatteners each such doubling compounds.  Read at an index general
+-- enough to split, since `red-all`'s outer sits at `echoᵗ u`, where
+-- `input`'s index cannot be unified away.
+data SyncOuter {n} {Γ : Ctx n} : ∀ {Θ s} → Exp Γ [] [] Θ s → Set where
+  sOf   : ∀ {Θ s} (ts : List (Tm Γ [] [] Θ s)) → SyncOuter (ofᵉ ts)
+  sMap  : ∀ {Θ s u} (f : Tm Γ [] [] (s ∷ Θ) u) (b : Exp Γ [] [] Θ s) → SyncOuter b → SyncOuter (mapᵉ f b)
+  sMint : ∀ {Θ s} (body : Exp Γ [] [] (uniqᵗ ∷ Θ) s) → SyncOuter body → SyncOuter (mintᵉ body)
+
+syncView : ∀ {n} {Γ : Ctx n} {Θ s} (b : Exp Γ [] [] Θ s) → Maybe (SyncOuter b)
+syncView (ofᵉ ts)     = just (sOf ts)
+syncView (mapᵉ f b)   = mapᵐ (sMap f b) (syncView b)
+syncView (mintᵉ body) = mapᵐ (sMint body) (syncView body)
+syncView _            = nothing
+
+-- the schedule after a `mintᵉ` draws its source
+mintSched : ∀ {n} {Γ : Ctx n} → Sched Γ → Sched Γ
+mintSched sched = record sched { mint = setAt sourceᵏ (suc (freshId sourceᵏ (Sched.mint sched))) (Sched.mint sched) }
+
+-- the schedule the list is folded at, and the list
+syncSched : ∀ {n} {Γ : Ctx n} {Θ s} {b : Exp Γ [] [] Θ s} → SyncOuter b → Sched Γ → Sched Γ
+syncSched (sOf _)       sched = sched
+syncSched (sMap _ _ sv) sched = syncSched sv sched
+syncSched (sMint _ sv)  sched = syncSched sv (mintSched sched)
+
+syncVals : ∀ {n} {Γ : Ctx n} {Θ s} {b : Exp Γ [] [] Θ s} → SyncOuter b → Env Γ Θ → Sched Γ → List (Val Γ s)
+syncVals (sOf ts)      ρ sched = map (λ tm → evalWith tm ρ) ts
+syncVals (sMap f _ sv) ρ sched = map (applyClo (_ , f , ρ)) (syncVals sv ρ sched)
+syncVals (sMint _ sv)  ρ sched = syncVals sv (freshId sourceᵏ (Sched.mint sched) ∷ᵉ ρ) (mintSched sched)
+
+syncSubs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {Θ s} {b : Exp Γ [] [] Θ s} (sv : SyncOuter b) {ρ : Env Γ Θ}
+             {lo} {κ : Path Γ lo s t} {now sched st out sc st′}
+         → foldPath⇓ {e = e} now κ (syncVals sv ρ sched) true (syncSched sv sched) st (out , sc , st′)
+         → subscribeE⇓ (Θ , b , ρ) κ now sched st (out , sc , st′)
+syncSubs (sOf _)       d = subs-of d
+syncSubs (sMap _ _ sv) d = subs-map (syncSubs sv (fold-step step-map d))
+syncSubs (sMint _ sv)  d = subs-mint refl (syncSubs sv d)
+
+syncCt : ∀ {n} {Γ : Ctx n} {Θ s} {b : Exp Γ [] [] Θ s} (sv : SyncOuter b) (sched : Sched Γ)
+       → nodeCt (syncSched sv sched) ≡ nodeCt sched
+syncCt (sOf _)       _     = refl
+syncCt (sMap _ _ sv) sched = syncCt sv sched
+syncCt (sMint _ sv)  sched = syncCt sv (mintSched sched)
+
+syncRoom : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {Θ s} {b : Exp Γ [] [] Θ s} (sv : SyncOuter b) {m sched} {st : EvalSt e}
+         → Room m sched st → Room m (syncSched sv sched) st
+syncRoom (sOf _)                                rm = rm
+syncRoom (sMap _ _ sv) {m} {sched} {st} rm = syncRoom sv {m} {sched} {st} rm
+syncRoom (sMint _ sv)  {m} {sched} {st} rm = syncRoom sv {m} {mintSched sched} {st} rm
+
+syncHolds : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {Θ s} {b : Exp Γ [] [] Θ s} (sv : SyncOuter b) {m lo u}
+              (κ : Path Γ lo u t) (pre : Pre κ) {sched} {st : EvalSt e}
+          → PreHolds m κ pre sched st → PreHolds m κ pre (syncSched sv sched) st
+syncHolds (sOf _)       κ pre h = h
+syncHolds (sMap _ _ sv) κ pre h = syncHolds sv κ pre h
+syncHolds (sMint _ sv)  κ pre h =
+  syncHolds sv κ pre (holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x) (sub-ot (λ r∈ → r∈) ≤-refl) h)
+
+-- the list's candidates, as the arms of `redExpAcc` would fund them
+red-sync : ∀ {n} {Γ : Ctx n} {Θ s} {b : Exp Γ [] [] Θ s} (sv : SyncOuter b) (ρ : Env Γ Θ) {m} → RedEnv m ρ
+         → (k : ℕ) → T (inputsBelowᵉ k b) → {-@0-}Acc _<_ k
+         → {-@0-}Acc _<_ (gsizeᵉ b) → {-@0-}Acc _<_ m
+         → (sched : Sched Γ) → All (Red m s) (syncVals sv ρ sched)
+red-sync (sOf ts) ρ rρ k ok aK (acc rs) aM sched = redTmsAcc ts ρ rρ k ok aK (rs ≤-refl) aM
+red-sync (sMap f b sv) ρ rρ k ok aK (acc rs) aM sched =
+  mapAll (red-mapFn f b ρ rρ k ok aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))) aM)
+         (red-sync sv ρ rρ k (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok) aK (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f)))) aM sched)
+red-sync (sMint _ sv) ρ rρ k ok aK (acc rs) aM sched =
+  red-sync sv (freshId sourceᵏ (Sched.mint sched) ∷ᵉ ρ) (tt , rρ) k ok aK (rs ≤-refl) aM (mintSched sched)
+
 -- THE FLATTENER ARMS' SHARED BODY: install the node at the counter,
 -- subscribe the outer under the outer frame live over whatever ground
 -- the caller stands on, and read the path's ground back out.
@@ -1787,7 +1870,24 @@ red-all : ∀ {n} {Γ : Ctx n} {Θ u} (op : AllOp) (ns : NodeState Γ) → RoomE
                  ⁰× Σ⁰ (Trace {e = e} m (Red m u) S κ pre rp s₀)
                      (λ tr → PreHolds m κ (endPre tr) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                            × Kept κ (endPre tr) sched st (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))
-red-all op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched st rm hs =
+red-all op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched st rm hs with syncView b
+red-all op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched st rm hs | just sv =
+  thruStep op (nodeCt sched) aM ≤-refl κ pfs rp s₀ (just ns) gns now (syncVals sv ρ (bumpNode sched))
+           (red-sync sv ρ rρ k ok aK aB aM (bumpNode sched)) true (syncSched sv (bumpNode sched))
+           (installNode (nodeCt sched) ns st) (syncRoom sv {sched = bumpNode sched} {st = installNode (nodeCt sched) ns st} rm)
+           (syncHolds sv _ _ (fresh-holds (thru-outer op (nodeCt sched)) κ pfs (just ns) ns (λ _ → node-eq)
+              (lookup-set (nodeCt sched) ns (EvalSt.nodes st)) (≤-refl ∷ᵃ []ᵃ) hs)) |>′ λ (w , _) →
+  (Stage.out w , Stage.sc w , Stage.st′ w) , sub-all refl (syncSubs sv (Stage.dv w)) , Stage.tr w
+   , subst (λ p → PreHolds _ κ p (Stage.sc w) (Stage.st′ w)) (unheadPre-head (Stage.hd w) (endPre (Stage.tr w)) refl)
+       (unheadHolds (thru-outer op (nodeCt sched)) ≤-refl κ _ (Stage.hl w))
+   , subst (λ p → Kept κ p sched st (Stage.sc w) (Stage.st′ w)) (unheadPre-head (Stage.hd w) (endPre (Stage.tr w)) refl)
+       (unheadKept (thru-outer op (nodeCt sched)) ≤-refl κ _
+       {sched} {bumpNode sched} {st = st} {st₁ = installNode (nodeCt sched) ns st}
+       (λ k′ k< on → subst T (<→≢ᵇ k<) (node-one {nodeCt sched} {k′} on)) (n≤1+n _)
+       (λ k′ k< → set-above (nodeCt sched) k′ ns (EvalSt.nodes st) (<→≢ᵇ k<))
+       (λ _ _ _ ea → ea)
+       (kept-in _ _ (syncCt sv (bumpNode sched)) (Stage.kp w)))
+red-all op ns gns b ρ rρ k ok aK aB aM κ (standing pfs) rp s₀ now sched st rm hs | nothing =
   redExpAcc b ρ rρ k ok aK aB aM (thru-outer op (nodeCt sched) ↠[ ≤-refl ] κ) (standing (just ns , pfs))
                                   (subRP ≤-refl aM (thruStep op (nodeCt sched) aM) (just ns) gns κ pfs rp) s₀ now
                                   (bumpNode sched) (installNode (nodeCt sched) ns st) rm

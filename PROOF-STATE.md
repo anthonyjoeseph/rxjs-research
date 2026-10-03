@@ -250,14 +250,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **MAKE THE TIMED IMPL RUN AFFORDABLE.** The impl's run of `timed`'s
-  translation is the side `timing-correct`, `simulation` and
-  `arrival-runs` all read, and it is what leaves a case undecided: about a
-  second for `take 1` of a two-value exhaust against a fifth of that
-  without the take, and past a minute on a synchronous depth-3 case whose
-  untimed runs take a twentieth of a second. Attribute it (the elaborated
-  term's size against the evaluator's work per burst) before changing
-  either: the depth-3 sweep cannot cover what it cannot decide.
+- **MAKE THE TIMED IMPL RUN AFFORDABLE.** Attributed: the cost is
+  `translate-sub` running a subscribing step a second time per call,
+  compounding per nested flattener, not the elaborated term's size. An
+  outer that emits a list and ends (`SyncOuter`) now skips the replay,
+  taking a synchronous depth-3 impl case from past two minutes to six
+  seconds and its plain run from 35 s to a quarter of one. Left: the
+  replay under a mapped outer (`flatAllˢ`) and an inner's drains, still
+  about eightfold per impl level. Count the depth-3 sweep's undecided
+  cases before cutting further: what it decides is the measure.
 
 - **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
   in CI where it fits, reaches nestings no targeted row builds: a late
