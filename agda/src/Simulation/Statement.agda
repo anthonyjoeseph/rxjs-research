@@ -161,7 +161,14 @@ postulate
   -- WHERE IT CAN STILL FAIL: A RUN THAT IS NOT CONTIGUOUS -- one plain
   -- arrival's values interleaved with the next's in the impl's order,
   -- or an impl arrival carrying the tail of one plain arrival and the
-  -- head of the next.  Read off the definitions, not instantiated.
+  -- head of the next.  Only a program two of whose plain arrivals
+  -- deliver values can do either.
+  --
+  -- CONTIGUITY HOLDS ON EVERY DRAWN PROGRAM THAT COULD BREAK IT.  The
+  -- compiled sweep at depth 3, seeds 9 and 11, drew 275 programs two of
+  -- whose plain arrivals deliver values -- `QC_BEAR=1` decides only
+  -- those -- and decided every one, untimed and timed, every one
+  -- agreeing.  Seeds 2 to 10 agree on the 1280 they drew, bearing or not.
   --
   -- A PLAIN ARRIVAL DOES SPLIT, so no form sending it to ONE impl
   -- arrival holds, nor one instant per impl arrival.  Found by the

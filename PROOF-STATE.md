@@ -240,28 +240,27 @@ undecided, never a failure (Anthony).
 over one leaf joined by `run-prefix`: `arrival-runs`, the only statement in the
 tier about both machines at once, cutting the impl's arrivals into one run per
 plain arrival. The impl runs at its own fuel (Anthony). RULED OUT: one impl
-arrival per plain arrival, one instant per impl arrival, and a shared impl
-arrival at every late-subscribed `take` the bug cache aims at, and any
-decided counterexample at depth 2 seeds 13..36 or depth 3 seeds 1..10. Left:
-whether every plain arrival's values come out CONTIGUOUSLY: no impl arrival
-carrying two plain arrivals' values, none interleaving them.
+arrival per plain arrival, one instant per impl arrival, a shared impl
+arrival at every late-subscribed `take` the bug cache aims at, and a
+non-contiguous run at depth 2 seeds 13..36 or depth 3 seeds 1..11, 275
+programs bearing on it. Left: the correspondence carrying contiguity through
+every former, and whether a top-line leaf is likelier false.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
-  in CI where it fits, reaches nestings no targeted row builds: a late
-  `take` under two flatteners, a share connected inside a switch. A
-  counterexample refutes `arrival-runs` before the correspondence is
-  stated over it; a green range is the evidence that lowers its class.
-  Seeds 2–10: 1280 cases, no failure; of seeds 9–10's 400, all but four
-  decided, each untimed half apart from its timed one. Slow where the
-  timed impl run outlasts the clock: μ over a merge deferring itself,
-  decided at fuel 8; merges under a concurrency limit nested two deep,
-  100–300 s at any fuel, decided at 600 s. Blind: a scan whose
-  accumulator is a stream re-flattened each step, ×8 per step at any
-  fuel.
+- **SWEEP THE FOUR TOP-LINE LEAVES AT DEPTH 3.** `batched-sandwich`,
+  `packets-name-arrivals`, `timed-faithful` and `batchable` are probed
+  first-order only, and no sweep has reached depth 3 on them. `make
+  qc-fast QC_STMT=0` decides all six per case; a counterexample is a
+  FALSITY with a smaller cone than the monster's and moves it there, and
+  a green range on cases that could fail lowers them as it lowered
+  `arrival-runs`. First question: what a case must do to bear on a
+  batcher's statement, since two valued arrivals is contiguity's
+  predicate, not theirs. Slow shapes, at fuel 8 or a 600 s clock: μ over
+  a merge deferring itself, merges under a concurrency limit nested two
+  deep, a scan whose accumulator is a stream re-flattened each step.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel
@@ -282,10 +281,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`arrival-runs`** (Simulation.Statement) — FALSITY, `PROBED`: each plain
-  arrival's slice agrees with a contiguous run of impl arrivals, a rising map
-  saying where each ends, and a run's values carry one instant, no two runs
-  sharing one.
 - **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY, `PROBED`: the
   joined run between its own unbatched values at one fuel and one past it,
   since a cut-off run's last batch waits for an arrival (Anthony).
@@ -295,3 +290,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   only, so flatteners are its QuickCheck's alone.
 - **`batchable`** (Batchable.Statement) — FALSITY, `PROBED`: probed first-order
   only, so flatteners are its QuickCheck's alone.
+- **`arrival-runs`** (Simulation.Statement) — DIFFICULTY, `PROBED`: each plain
+  arrival's slice agrees with a contiguous run of impl arrivals, a rising map
+  saying where each ends, and a run's values carry one instant, no two runs
+  sharing one.
