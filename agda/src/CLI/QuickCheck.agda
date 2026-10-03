@@ -81,9 +81,9 @@ open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
-  clocked-runsˢ; clockRuns; clockedᵇ; Key;
+  same-clockˢ; sameClockᵇ; Key;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
-  Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; runsOfᵇ)
+  Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; lockstepᵇ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; putErr; Unit)
@@ -920,14 +920,6 @@ showArr sh (is , dry , ps , ik , pk) =
     showKeys : List Key → String
     showKeys ks = commaJoin (map (λ k → show (proj₁ k) ++ "/" ++ show (proj₂ k)) ks)
 
--- the runs the schedules cut, and how many impl arrivals matched nothing
-showClock : {A : Set} → (A → String) → Arr A → String
-showClock sh x with clockRuns x
-... | rs , extra , m =
-  "clock runs = " ++ commaJoin (map (λ r → "[" ++ commaJoin (map (λ p → "@" ++ show (proj₁ p) ++ " " ++ sh (proj₂ p)) r) ++ "]") rs)
-  ++ ", " ++ show extra ++ " unmatched impl arrivals" ++ (if m then "" else ", A PLAIN KEY UNMATCHED")
-  ++ "\n    " ++ showArr sh x
-
 -- A STATEMENT IS DECIDED IN HALVES WHERE ITS RUNS ARE INDEPENDENT: what
 -- reads the program's own run, and what reads its timed translation's.
 -- The timed impl run can outlast any clock where the program's own run
@@ -945,13 +937,13 @@ halves c simulationˢ     =
   (simᵇ _≡ᵇ_ (arrPlain c) , showArr show (arrPlain c)) ∷ []
   , (simᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
 halves c arrival-runsˢ   =
-  (runsOfᵇ _≡ᵇ_ (arrPlain c) , showArr show (arrPlain c)) ∷ []
-  , (runsOfᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
+  (lockstepᵇ _≡ᵇ_ (arrPlain c) , showArr show (arrPlain c)) ∷ []
+  , (lockstepᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
 halves c batched-sandwichˢ = sandwichᴸ (bsSides c) ∷ [] , []
 halves c packets-name-arrivalsˢ = [] , namesᵀ (namingSides c) ∷ []
-halves c clocked-runsˢ   =
-  (clockedᵇ _≡ᵇ_ (arrPlain c) , showClock show (arrPlain c)) ∷ []
-  , (clockedᵇ eqItem (arrTimed c) , "timed: " ++ showClock showItem (arrTimed c)) ∷ []
+halves c same-clockˢ     =
+  (sameClockᵇ (arrPlain c) , showArr show (arrPlain c)) ∷ []
+  , (sameClockᵇ (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
 
 joinᴴ : List (Bool × String) → Bool × String
 joinᴴ []             = true , ""
@@ -972,7 +964,7 @@ indexOf simulationˢ     = 4
 indexOf arrival-runsˢ = 5
 indexOf batched-sandwichˢ = 6
 indexOf packets-name-arrivalsˢ = 7
-indexOf clocked-runsˢ = 8
+indexOf same-clockˢ = 8
 
 -- one count per former, in `allFormers` order, plus the obs-fold count,
 -- the count of cases bearing on contiguity and of those holding values
@@ -1096,20 +1088,20 @@ groups : ℕ → ℕ → Drawn → Bool
 groups s f (e , d₀ , d₁) with proj₂ (batchableSides (cached "?" f e (mkSlots d₀ d₁)))
 ... | bs = within s (length (concat bs)) (groupsOn bs) false
 
--- A CASE SPLITS A PLAIN ARRIVAL WHEN SOME IMPL ARRIVAL MATCHES NONE of
--- the plain run's keys, so a run is longer than one arrival.  Read only
--- where `clocked-runs` is being decided, since its timed half is the
--- dear run; past the case's clock it counts as splitting nothing.
+-- A CASE'S CLOCKS PART WHEN SOME IMPL ARRIVAL'S KEY IS NOT THE PLAIN
+-- ARRIVAL'S at the same position.  Read only where `same-clock` is being
+-- decided, since its timed half is the dear run; past the case's clock
+-- it counts as parting nothing.
 isClocked : Statement → Bool
-isClocked clocked-runsˢ = true
-isClocked _             = false
+isClocked same-clockˢ = true
+isClocked _           = false
 
 splits : List Statement → ℕ → ℕ → Drawn → Bool
 splits ss s f (e , d₀ , d₁) with any isClocked ss
 ... | false = false
 ... | true  with cached "?" f e (mkSlots d₀ d₁)
-...   | c with proj₁ (proj₂ (clockRuns (arrPlain c))) + proj₁ (proj₂ (clockRuns (arrTimed c)))
-...     | x = within s x (1 ≤ᵇ x) false
+...   | c with sameClockᵇ (arrPlain c) ∧ sameClockᵇ (arrTimed c)
+...     | x = within s (if x then 0 else 1) (not x) false
 
 -- A SWEEP MAY DECIDE ONLY THE CASES THAT BEAR.  Whether one does is
 -- read before any statement is, so a sweep aimed at contiguity spends
@@ -1195,7 +1187,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = map statementName (statements ++ᴸ clocked-runsˢ ∷ []) ++ᴸ "timeout" ∷ []
+kinds = map statementName (statements ++ᴸ same-clockˢ ∷ []) ++ᴸ "timeout" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -1264,7 +1256,7 @@ selected (suc (suc (suc (suc (suc zero))))) = simulationˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc zero)))))) = arrival-runsˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc zero))))))) = batched-sandwichˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))) = packets-name-arrivalsˢ ∷ []
-selected (suc (suc (suc (suc (suc (suc (suc (suc (suc zero))))))))) = clocked-runsˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc (suc (suc (suc zero))))))))) = same-clockˢ ∷ []
 selected _                            = statements
 
 -- the impl's raw run, decoded, for reading a batchable failure by
@@ -1335,7 +1327,7 @@ streamCases ob n i (r ∷ rs) =
           ++ (if proj₁ (proj₂ (proj₁ r)) then "  bears on contiguity\n" else "")
           ++ (if proj₁ (proj₂ (proj₂ (proj₁ r))) then "  holds values back at the fuel\n" else "")
           ++ (if proj₁ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  groups values\n" else "")
-          ++ (if proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  splits a plain arrival\n" else "")
+          ++ (if proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  parts the two clocks\n" else "")
           ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
   streamCases ob n (suc i) rs
 

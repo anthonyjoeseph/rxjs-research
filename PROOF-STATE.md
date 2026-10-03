@@ -188,8 +188,10 @@ Main                                     four top-line statements, claimed
  │   ├─ simulation                        Simulation/Statement.agda — the
  │   │   │                                impl's run is the plain run, each
  │   │   │                                value named by its arrival
- │   │   └─ arrival-runs                  each plain arrival a run of impl
- │   │                                    arrivals, one instant to a run
+ │   │   └─ arrival-runs                  each plain arrival one impl
+ │   │       │                            arrival, one instant to it
+ │   │       └─ correspondence            a relation each arrival keeps,
+ │   │                                    sending agreeing values
  │   └─ batched-sandwich                  the batcher against its own run
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
  │   │                                    group emits as the timed
@@ -237,28 +239,28 @@ undecided, never a failure (Anthony).
 ### The monster
 
 `simulation` — the one theorem both assembled top lines stand on, a real body
-over one leaf joined by `run-prefix`: `arrival-runs`, the only statement in the
-tier about both machines at once, cutting the impl's arrivals into one run per
-plain arrival. The impl runs at its own fuel (Anthony). RULED OUT: one impl
-arrival per plain arrival, one instant per impl arrival, a shared impl
-arrival at every late-subscribed `take` the bug cache aims at, and a
-non-contiguous run at depth 2 seeds 13..36 or depth 3 seeds 1..11, 275
-programs bearing on it. Every top-line leaf went green under flatteners,
-decided itself, at depth 3, fuel 1. Left: the correspondence carrying
-contiguity through every former.
+by induction on arrivals over one leaf, `correspondence`: a relation between
+the two machines' configurations each arrival keeps, under which the two send
+agreeing values, the impl's under one rising instant. The impl runs at its own
+fuel (Anthony). RULED OUT: an impl arrival the plain schedule
+lacks, or a plain arrival split across two, on every bug-cache row and at depth
+3 seeds 19 and 20; a non-contiguous run at depth 2 seeds 13..36 or depth 3
+seeds 1..11. Every top-line leaf went green under flatteners, decided itself,
+at depth 3, fuel 1. Left: the relation itself, through every former.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
-  a relation between the two machines' configurations, carrying the fuel
-  map: one obligation per former, the elaborated `take` the one whose run
-  is longer than one arrival.
+- **DEFINE THE CORRESPONDENCE.** `correspondence` becomes a body: a
+  concrete relation pairing live sources, registry rows and node states per
+  former, schedules ticking together as `make qc-same-clock` decides, with
+  the subscribe, the pop and the cascade stated over it as leaves, so the
+  monster drops to whichever of them is riskiest.
 
-- **SPLIT THE INSTANTS PER FORMER.** A run's values carry one instant and
-  no two runs share one: a claim the impl's cascade makes one former at a
-  time. State it beside the values split so both recurse on the same
+- **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
+  instant and no two arrivals share one: a claim the impl's cascade makes
+  one former at a time. State it beside the values split so both recurse on the same
   configuration, and the monster drops to whichever stays riskier.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
@@ -283,7 +285,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED`:
   one packet per arrival, injectively; the sweep, deciding it directly,
   reached values on two arrivals under a flattener with no red.
-- **`arrival-runs`** (Simulation.Statement) — DIFFICULTY, `PROBED`: each plain
-  arrival's slice agrees with a contiguous run of impl arrivals, a rising map
-  saying where each ends, and a run's values carry one instant, no two runs
-  sharing one.
+- **`correspondence`** (Simulation.Statement) — DIFFICULTY, `PROBED`: some
+  relation between the machines' configurations each arrival keeps, sending
+  agreeing values, the impl's under one instant its clock passes.

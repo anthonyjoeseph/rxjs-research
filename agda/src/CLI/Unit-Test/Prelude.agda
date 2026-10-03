@@ -153,12 +153,12 @@ cached n f e {κ} ins = record { name = n ; fuel = f ; prog = e ; kinds = κ ; s
 
 data Statement : Set where
   left-to-rightˢ timing-correctˢ batchableˢ timed-faithfulˢ simulationˢ arrival-runsˢ : Statement
-  batched-sandwichˢ packets-name-arrivalsˢ clocked-runsˢ : Statement
+  batched-sandwichˢ packets-name-arrivalsˢ same-clockˢ : Statement
 
 -- in `Main`'s order, which is the order a report counts them in, then
 -- the simulation and the leaf it stands on, then the leaves the two
--- assembled top lines stand on beside it.  `clocked-runs` is not among
--- them: it decides a candidate witness, not a statement, so no row of
+-- assembled top lines stand on beside it.  `same-clock` is not among
+-- them: it decides a candidate invariant, not a statement, so no row of
 -- the bug cache is held to it
 statements : List Statement
 statements = left-to-rightˢ ∷ timing-correctˢ ∷ batchableˢ ∷ timed-faithfulˢ ∷ simulationˢ ∷ arrival-runsˢ
@@ -173,7 +173,7 @@ statementName simulationˢ     = "simulation"
 statementName arrival-runsˢ = "arrival-runs"
 statementName batched-sandwichˢ = "batched-sandwich"
 statementName packets-name-arrivalsˢ = "packets-name-arrivals"
-statementName clocked-runsˢ = "clocked-runs"
+statementName same-clockˢ = "same-clock"
 
 -- `left-to-right`: the batches joined back up, the plain run, and the
 -- batches joined back up at one more unit of fuel, the joined runs at
@@ -411,19 +411,16 @@ simᵇ eq (is , _ , ps , _) = searchᵇ eq (concat ps) (arrivalsFrom 0 ps) (conc
 simulationᴮ : Arr ℕ × Arr Item → Bool
 simulationᴮ (p , t) = simᵇ _≡ᵇ_ p ∧ simᵇ eqItem t
 
--- `arrival-runs`, decided: ψ built greedily.  Each plain slice takes
--- impl slices, at least one, until what they hold agrees with it, and
--- refutes once they hold as many values and do not.  Closing at the
--- first agreement loses nothing: what a later close would add is empty,
--- and the next run is free to take it.  Every run's values carry one
--- instant, and no two runs holding values share one.  Out of impl
--- slices with the queue dry, every slice past it is empty; out of them
--- with fuel left, it is undecided at the cap and reads as a failure.
+-- `arrival-runs`, decided: the impl run's k-th slice against the plain
+-- run's k-th, through the fuel, each slice's values carrying one
+-- instant, each later slice holding values a later one.  Out of impl
+-- slices, every plain slice past them is empty; the cap is past the
+-- fuel, so that is a queue run dry, never the cap.
 emptyᵇ : {A : Set} → List A → Bool
 emptyᵇ []      = true
 emptyᵇ (_ ∷ _) = false
 
--- a run's one instant, if it holds a value
+-- a slice's one instant, if it holds a value
 instantOf : {A : Set} → List (ℕ × A) → List ℕ
 instantOf []          = []
 instantOf ((i , _) ∷ _) = i ∷ []
@@ -436,83 +433,42 @@ uniformᵇ : {A : Set} → List (ℕ × A) → Bool
 uniformᵇ []            = true
 uniformᵇ ((i , _) ∷ r) = stampedᵇ i r
 
--- `n` among `ns`
-amongᵇ : ℕ → List ℕ → Bool
-amongᵇ n []       = false
-amongᵇ n (m ∷ ms) = (m ≡ᵇ n) ∨ amongᵇ n ms
+-- each instant past the one before it, which is what a clock minting
+-- them one arrival at a time gives
+risingᵇ : List ℕ → Bool
+risingᵇ []           = true
+risingᵇ (m ∷ [])     = true
+risingᵇ (m ∷ n ∷ ns) = (m <ᵇ n) ∧ risingᵇ (n ∷ ns)
 
-distinctᵇ : List ℕ → Bool
-distinctᵇ []       = true
-distinctᵇ (n ∷ ns) = not (amongᵇ n ns) ∧ distinctᵇ ns
+agreeSlicesᵇ : {A : Set} → (A → A → Bool) → List (List (ℕ × A)) → List (List A) → List ℕ → Bool
+agreeSlicesᵇ eq []       ps       ns = emptyᵇ (concat ps) ∧ risingᵇ ns
+agreeSlicesᵇ eq (r ∷ rs) []       ns = risingᵇ ns
+agreeSlicesᵇ eq (r ∷ rs) (p ∷ ps) ns =
+  eqBy eq (map proj₂ r) p ∧ uniformᵇ r ∧ agreeSlicesᵇ eq rs ps (ns ++ instantOf r)
 
-mutual
-  runsᵇ : {A : Set} → (A → A → Bool) → List (List (ℕ × A)) → Bool → List (List A) → List ℕ → Bool
-  runsᵇ eq is dry []       ns = distinctᵇ ns
-  runsᵇ eq is dry (p ∷ ps) ns = runᵇ eq [] is dry p ps ns
-
-  runᵇ : {A : Set} → (A → A → Bool) → List (ℕ × A) → List (List (ℕ × A)) → Bool → List A → List (List A)
-       → List ℕ → Bool
-  runᵇ eq acc []       dry p ps ns =
-    dry ∧ eqBy eq (map proj₂ acc) p ∧ uniformᵇ acc ∧ emptyᵇ (concat ps) ∧ distinctᵇ (ns ++ instantOf acc)
-  runᵇ eq acc (i ∷ is) dry p ps ns =
-    closeᵇ eq (acc ++ i) is dry p ps ns
-
-  closeᵇ : {A : Set} → (A → A → Bool) → List (ℕ × A) → List (List (ℕ × A)) → Bool → List A → List (List A)
-         → List ℕ → Bool
-  closeᵇ eq acc is dry p ps ns =
-    if eqBy eq (map proj₂ acc) p then uniformᵇ acc ∧ runsᵇ eq is dry ps (ns ++ instantOf acc)
-    else ((length acc <ᵇ length p) ∧ runᵇ eq acc is dry p ps ns)
-
--- one run's half of it, untimed or timed
-runsOfᵇ : {A : Set} → (A → A → Bool) → Arr A → Bool
-runsOfᵇ eq (is , dry , ps , _) = runsᵇ eq is dry ps []
+lockstepᵇ : {A : Set} → (A → A → Bool) → Arr A → Bool
+lockstepᵇ eq (is , _ , ps , _) = agreeSlicesᵇ eq is ps []
 
 arrivalRunsᴮ : Arr ℕ × Arr Item → Bool
-arrivalRunsᴮ (p , t) = runsOfᵇ _≡ᵇ_ p ∧ runsOfᵇ eqItem t
+arrivalRunsᴮ (p , t) = lockstepᵇ _≡ᵇ_ p ∧ lockstepᵇ eqItem t
 
--- `arrival-runs` WITH ψ READ OFF THE SCHEDULES RATHER THAN SEARCHED: a
--- candidate witness, decided before anything is stated over it.  Each
--- plain arrival's key is matched, in order, to the first impl arrival
--- with the same key past the last match, and a run is that impl arrival
--- and every unmatched one behind it.  It is false where some plain
--- arrival has no impl arrival bearing its key -- the impl's schedule
--- does not embed the plain one -- and where the runs it cuts disagree.
+-- THE TWO SCHEDULES TICK TOGETHER: the impl's arrival keys are the
+-- plain run's, in order, as far as both were read.  A candidate for the
+-- schedule half of the correspondence `arrival-runs` recurses on,
+-- decided before anything is stated over it.
 eqKey : Key → Key → Bool
 eqKey (t , s) (u , r) = (t ≡ᵇ u) ∧ (s ≡ᵇ r)
 
--- the runs the matching cuts, how many impl arrivals matched nothing
--- while a plain key was still waiting, and whether every plain key
--- matched.  One past the last plain key is past what the plain run was
--- read to, so an impl arrival there is not counted as matching nothing.
-clockCut : {A : Set} → List (ℕ × A) → List Key → List (List (ℕ × A)) → List Key
-         → List (List (ℕ × A)) × ℕ × Bool
-clockCut acc pk       []       _        = acc ∷ [] , 0 , emptyᵇ pk
-clockCut acc pk       (_ ∷ _)  []       = acc ∷ [] , 0 , false
-clockCut acc []       (i ∷ is) (k ∷ ks) = clockCut (acc ++ i) [] is ks
-clockCut acc (q ∷ pk) (i ∷ is) (k ∷ ks) with eqKey q k
-... | true  with clockCut i pk is ks
-...   | rs , x , m = acc ∷ rs , x , m
-clockCut acc (q ∷ pk) (i ∷ is) (k ∷ ks) | false with clockCut (acc ++ i) (q ∷ pk) is ks
-...   | rs , x , m = rs , suc x , m
+sameKeysᵇ : List Key → List Key → Bool
+sameKeysᵇ []       _        = true
+sameKeysᵇ _        []       = true
+sameKeysᵇ (k ∷ ks) (q ∷ qs) = eqKey k q ∧ sameKeysᵇ ks qs
 
-clockRuns : {A : Set} → Arr A → List (List (ℕ × A)) × ℕ × Bool
-clockRuns ([]     , _ , _ , _ , _)   = [] , 0 , false
-clockRuns (i ∷ is , _ , _ , ik , pk) = clockCut i pk is ik
+sameClockᵇ : {A : Set} → Arr A → Bool
+sameClockᵇ (_ , _ , _ , ik , pk) = sameKeysᵇ ik pk
 
--- each run against its plain slice, the plain slices past the last run
--- empty
-agreeRunsᵇ : {A : Set} → (A → A → Bool) → List (List (ℕ × A)) → List (List A) → List ℕ → Bool
-agreeRunsᵇ eq []       ps       ns = emptyᵇ (concat ps) ∧ distinctᵇ ns
-agreeRunsᵇ eq (r ∷ rs) []       ns = distinctᵇ ns
-agreeRunsᵇ eq (r ∷ rs) (p ∷ ps) ns =
-  eqBy eq (map proj₂ r) p ∧ uniformᵇ r ∧ agreeRunsᵇ eq rs ps (ns ++ instantOf r)
-
-clockedᵇ : {A : Set} → (A → A → Bool) → Arr A → Bool
-clockedᵇ eq x@(_ , _ , ps , _) with clockRuns x
-... | rs , _ , m = m ∧ agreeRunsᵇ eq rs ps []
-
-clockedᴮ : Arr ℕ × Arr Item → Bool
-clockedᴮ (p , t) = clockedᵇ _≡ᵇ_ p ∧ clockedᵇ eqItem t
+sameClockᴮ : Arr ℕ × Arr Item → Bool
+sameClockᴮ (p , t) = sameClockᵇ p ∧ sameClockᵇ t
 
 -- each takes its sides as ONE argument, so a pair is computed once
 agreeᴸ : List ℕ × List ℕ → Bool
@@ -534,7 +490,7 @@ holds simulationˢ     c p t = simulationᴮ (p , t)
 holds arrival-runsˢ c p t = arrivalRunsᴮ (p , t)
 holds batched-sandwichˢ c p t = sandwichᴸ (bsSides c)
 holds packets-name-arrivalsˢ c p t = namesᵇ (namingSides c)
-holds clocked-runsˢ c p t = clockedᴮ (p , t)
+holds same-clockˢ c p t = sameClockᴮ (p , t)
 
 checksWith : List Statement → Case → Arr ℕ → Arr Item → List (String × Bool)
 checksWith ss c p t = map (λ s → statementName s , holds s c p t) ss

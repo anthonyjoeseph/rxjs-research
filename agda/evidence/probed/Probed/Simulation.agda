@@ -1,8 +1,8 @@
 -- THE SIMULATION'S LEAF AT FOUR FIRST-ORDER PROGRAMS AND THE TIMED
 -- TRANSLATIONS OF TWO, ONE ARRIVAL AT A TIME THROUGH FUEL 3: each plain
--- slice's values agree with the run of impl slices the fuel map cuts for
--- it, decided, and the run's stamps are one instant, an injective
--- function of the arrival, pinned under a shift.  Fuel 3 is past every
+-- slice's values agree with the impl's slice at the same arrival,
+-- decided, and its stamps are one instant, an injective function of the
+-- arrival, pinned under a shift.  Fuel 3 is past every
 -- plain run's completion.
 --
 -- LOAD-BEARING for the values at every slice, the empty ones included:
@@ -17,18 +17,15 @@
 -- NOT `take-one`'s timed translation: its elaborated run does not
 -- reduce in the typechecker in useful time, even at fuel 0 (measured in
 -- typecheck-performance-numbers.md), so a timed `take` is
--- `make quickcheck`'s alone, and so is the run a timed `take` splits
--- across two impl arrivals.  Nor `take 2` over a cold, the one point
--- here where the map is not the identity: its stamps at impl fuel 4 do
--- not reduce within the dev loop's budget, though its values do.
+-- `make quickcheck`'s alone.
 -- TARGET: arrival-runs @7b6d0a
 module Probed.Simulation where
 
 open import Data.Unit using (tt)
 open import Data.List using (List)
 open import Data.List.Relation.Unary.All using (All) renaming (all? to all?ᴬ)
-open import Data.Nat using (ℕ; suc; _≤_; _<_; s≤s; _≟_; _+_)
-open import Data.Nat.Properties using (+-cancelʳ-≡; n<1+n)
+open import Data.Nat using (ℕ; suc; _≤_; s≤s; _≟_; _+_)
+open import Data.Nat.Properties using (+-cancelʳ-≡)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.List.Relation.Binary.Pointwise.Properties using (decidable)
@@ -62,43 +59,36 @@ upTo3 P p₀ p₁ p₂ p₃ 2 _ = p₂
 upTo3 P p₀ p₁ p₂ p₃ 3 _ = p₃
 upTo3 P p₀ p₁ p₂ p₃ (suc (suc (suc (suc _)))) (s≤s (s≤s (s≤s ())))
 
--- a run whose impl arrivals are the plain run's, one for one
-same : ℕ → ℕ
-same k = k
-
-same-up : ∀ k → same k < same (suc k)
-same-up k = n<1+n k
-
 _ : Confirms (arrival-runs (κᵖ take-one) 3 (Point.prog take-one) (insᵖ take-one))
-_ = same , same-up , (_+ 8) , (λ {a} {b} → +-cancelʳ-≡ 8 a b) , upTo3 _
+_ = (_+ 8) , (λ {a} {b} → +-cancelʳ-≡ 8 a b) , upTo3 _
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
 
 _ : Confirms (arrival-runs (κᵖ two-arrivals) 3 (Point.prog two-arrivals) (insᵖ two-arrivals))
-_ = same , same-up , (_+ 7) , (λ {a} {b} → +-cancelʳ-≡ 7 a b) , upTo3 _
+_ = (_+ 7) , (λ {a} {b} → +-cancelʳ-≡ 7 a b) , upTo3 _
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
 
 _ : Confirms (arrival-runs (κᵖ two-arrivals) 3 (timed (κᵖ two-arrivals) (Point.prog two-arrivals)) (timedSlots (insᵖ two-arrivals)))
-_ = same , same-up , (_+ 9) , (λ {a} {b} → +-cancelʳ-≡ 9 a b) , upTo3 _
+_ = (_+ 9) , (λ {a} {b} → +-cancelʳ-≡ 9 a b) , upTo3 _
     (toWitness {a? = decidable (λ p w → item? (proj₂ p) w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → item? (proj₂ p) w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → item? (proj₂ p) w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → item? (proj₂ p) w) _ _} tt , stamps)
 
 _ : Confirms (arrival-runs (κᵖ of-two) 3 (Point.prog of-two) (insᵖ of-two))
-_ = same , same-up , (_+ 5) , (λ {a} {b} → +-cancelʳ-≡ 5 a b) , upTo3 _
+_ = (_+ 5) , (λ {a} {b} → +-cancelʳ-≡ 5 a b) , upTo3 _
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → proj₂ p ≟ w) _ _} tt , stamps)
 
 _ : Confirms (arrival-runs (κᵖ of-two) 3 (timed (κᵖ of-two) (Point.prog of-two)) (timedSlots (insᵖ of-two)))
-_ = same , same-up , (_+ 5) , (λ {a} {b} → +-cancelʳ-≡ 5 a b) , upTo3 _
+_ = (_+ 5) , (λ {a} {b} → +-cancelʳ-≡ 5 a b) , upTo3 _
     (toWitness {a? = decidable (λ p w → item? (proj₂ p) w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → item? (proj₂ p) w) _ _} tt , stamps)
     (toWitness {a? = decidable (λ p w → item? (proj₂ p) w) _ _} tt , stamps)
