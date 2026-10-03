@@ -947,11 +947,12 @@ indexOf simulationˢ     = 4
 indexOf arrival-runsˢ = 5
 
 -- one count per former, in `allFormers` order, plus the obs-fold count
+-- and the count of cases bearing on contiguity
 Tally : Set
-Tally = List ℕ × ℕ
+Tally = List ℕ × ℕ × ℕ
 
 zeroTally : Tally
-zeroTally = map (λ _ → 0) allFormers , 0
+zeroTally = map (λ _ → 0) allFormers , 0 , 0
 
 carries : Former → List Former → Bool
 carries f []       = false
@@ -963,8 +964,13 @@ bumpEach fs (g ∷ gs) []       = []
 bumpEach fs (g ∷ gs) (c ∷ cs) =
   (if carries g fs then suc c else c) ∷ bumpEach fs gs cs
 
-bump : Marks → Tally → Tally
-bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
+-- a case's marks, and whether it bears on contiguity
+Seen : Set
+Seen = Marks × Bool
+
+bump : Seen → Tally → Tally
+bump ((fs , o) , b) (cs , p , q) =
+  bumpEach fs allFormers cs , (if o then suc p else p) , (if b then suc q else q)
 
 -- ONE CHECK PER STATEMENT, so a report says which claim a program
 -- breaks rather than that it breaks one.
@@ -1015,26 +1021,43 @@ bounded : ℕ → ℕ → Drawn → List Statement → List (ℕ × String)
 bounded s f (e , d₀ , d₁) ss =
   boundedEach s f (e , d₀ , d₁) (ordered (cached "?" f e (mkSlots d₀ d₁)) ss)
 
-oneCase : List Statement → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
+-- A CASE BEARS ON CONTIGUITY WHEN TWO PLAIN ARRIVALS DELIVER VALUES:
+-- only then can one impl arrival carry both, or a run interleave them,
+-- so a green case that does not is a row that could not have failed.
+-- Read off the untimed program's plain run under the case's clock, and
+-- past it counted as bearing on nothing.
+valued : {A : Set} → List (List A) → ℕ
+valued []             = 0
+valued ([] ∷ ps)      = valued ps
+valued ((_ ∷ _) ∷ ps) = suc (valued ps)
+
+bearsOn : ℕ → ℕ → Bool
+bearsOn s n = within s n (2 ≤ᵇ n) false
+
+bears : ℕ → ℕ → Drawn → Bool
+bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots d₀ d₁))))))
+
+oneCase : List Statement → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
 -- the statement's sides at exactly the program a cached row names.
 oneCase ss f s d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e)
+  pureG ((marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e)
+         , bears s f (e , proj₁ ds , proj₂ ds))
         , bounded s f (e , proj₁ ds , proj₂ ds) ss)
 
 -- every case drawn, in generation order, its reports still unforced:
 -- drawing is cheap and upstream of every run, so the list is whole
 -- before the first case is run
-casesN : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (List (Marks × List (ℕ × String)))
+casesN : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (List (Seen × List (ℕ × String)))
 casesN ss f s zero    d = pureG []
 casesN ss f s (suc k) d = oneCase ss f s d >>=G λ r → casesN ss f s k d >>=G λ rs → pureG (r ∷ rs)
 
 -- EVERY failing case's reports, in generation order, and which recursion
 -- constructors the corpus actually reached
-joinT : Marks × List (ℕ × String) → Tally × List (ℕ × String) → Tally × List (ℕ × String)
+joinT : Seen × List (ℕ × String) → Tally × List (ℕ × String) → Tally × List (ℕ × String)
 joinT r acc = bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc
 
-tallyOf : List (Marks × List (ℕ × String)) → Tally × List (ℕ × String)
+tallyOf : List (Seen × List (ℕ × String)) → Tally × List (ℕ × String)
 tallyOf []       = zeroTally , []
 tallyOf (r ∷ rs) = joinT r (tallyOf rs)
 
@@ -1144,7 +1167,7 @@ showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
 
 -- RUN ONE CASE, named the same way, so a case that hangs a sweep can be
 -- timed and re-run alone rather than by bisecting the count
-runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Marks × List (ℕ × String))
+runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
 runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase ss f s d
 
 -- THE STATEMENT A NUMBER NAMES, in `Main`'s order, the simulation
@@ -1215,10 +1238,11 @@ verdictOf rs@(_ ∷ _) with decided rs
 ... | []    = "undecided"
 ... | _ ∷ _ = "FAIL"
 
-streamCases : ℕ → ℕ → List (Marks × List (ℕ × String)) → IO Unit
+streamCases : ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
 streamCases n i []       = putErr ""
 streamCases n i (r ∷ rs) =
   putErr ("case " ++ show i ++ "/" ++ show n ++ " " ++ verdictOf (proj₂ r) ++ "\n"
+          ++ (if proj₂ (proj₁ r) then "  bears on contiguity\n" else "")
           ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
   streamCases n (suc i) rs
 
@@ -1228,12 +1252,13 @@ summaryOf seed d f runs (tally , fails) = concatStr
   (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " fuel " ∷ show f ∷ " — ran " ∷ show runs
    ∷ " cases, " ∷ show (length (decided fails)) ∷ " failures, "
    ∷ show (length fails ∸ length (decided fails)) ∷ " undecided"
-   ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
+   ∷ "; obs-fold " ∷ show (proj₁ (proj₂ tally))
+   ∷ "; two plain arrivals with values " ∷ show (proj₂ (proj₂ tally)) ∷ "\ncensus " ∷ [])
    ++ᴸ censusPairs allFormers (proj₁ tally)
    ++ᴸ ("\n" ∷ dumpFails fails ∷ []))
 
 -- the cases are an ARGUMENT, so the stream and the summary read one list
-sweep : ℕ → ℕ → ℕ → ℕ → List (Marks × List (ℕ × String)) → IO Unit
+sweep : ℕ → ℕ → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
 sweep seed d f runs rs = streamCases runs 1 rs >>= λ _ → putStr (summaryOf seed d f runs (tallyOf rs))
 
 main : IO Unit
