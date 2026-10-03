@@ -1277,11 +1277,14 @@ verdictOf rs@(_ ∷ _) with decided rs
 ... | []    = "undecided"
 ... | _ ∷ _ = "FAIL"
 
+-- each case names its formers by the census's tags, so the stream reads
+-- a flag against a former where the census only counts the two apart
 streamCases : Bool → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
 streamCases ob n i []       = putErr ""
 streamCases ob n i (r ∷ rs) =
   putErr ("case " ++ show i ++ "/" ++ show n ++ " "
           ++ (if ob ∧ not (proj₁ (proj₂ (proj₁ r))) then "degenerate" else verdictOf (proj₂ r)) ++ "\n"
+          ++ "  formers" ++ concatStr (map (λ g → if carries g (proj₁ (proj₁ (proj₁ r))) then " " ++ formerTag g else "") allFormers) ++ "\n"
           ++ (if proj₁ (proj₂ (proj₁ r)) then "  bears on contiguity\n" else "")
           ++ (if proj₁ (proj₂ (proj₂ (proj₁ r))) then "  holds values back at the fuel\n" else "")
           ++ (if proj₂ (proj₂ (proj₂ (proj₁ r))) then "  groups values\n" else "")

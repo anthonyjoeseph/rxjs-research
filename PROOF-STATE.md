@@ -253,10 +253,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **SWEEP THE FOUR TOP-LINE LEAVES AT DEPTH 3, AT FUEL 1.** `make qc-fast
   QC_STMT=0` at seeds 12..15 decided 2485 of 2500; the one red refuted
   `batched-sandwich`'s one-past slack, since an arrival can be silent, and
-  it now names the batcher's own fuel, which the QuickCheck searches. Seed
-  15 held values back on 182 cases, every one agreeing. A counterexample
-  is a FALSITY with a smaller cone than the monster's and moves it there.
-  Next: count the cases whose values group, which bear on `batchable`.
+  it now names the batcher's own fuel, which the QuickCheck searches. Seeds
+  15..16 held values back on 328 cases and seed 16 grouped values on 457,
+  every one agreeing. A counterexample is a FALSITY with a smaller cone
+  than the monster's and moves it there. Next: the stream names each
+  case's formers, so read grouping against flatteners, `batchable`'s
+  region no probe reaches.
   Slow shapes: μ over a self-deferring merge, nested limited merges, a
   scan re-flattening a stream accumulator.
 

@@ -417,6 +417,9 @@ class Parsed:
     blocks: list[Block]
     options: list[int]  # line indices of leading OPTIONS pragmas
     module_line: int | None
+    # scc_of's answers, keyed by the member tuple: a parse is never edited
+    # after `parse` returns, and render_ctx asks once per ITEM
+    scc: dict = field(default_factory=dict, repr=False, compare=False)
 
 
 def open_clause(items: list[Item], name: str | None) -> int | None:
@@ -1063,7 +1066,18 @@ def scc_of(p: Parsed, members: list[str]) -> dict[str, int]:
     unrelated definitions.  Wet's 36 contain a real 14 and a real 3.
     Edges are textual (bodies and signatures, comments stripped), so a missed
     edge under-reports a cycle -- which is the safe direction for a diagnostic.
+
+    MEMOISED on the parse.  Uncached it was 229 of 251 s of QuickCheck's dev
+    check, against 13 s of Agda: a 1300-line module's block re-scanned by
+    regex once per item render_ctx emits.
     """
+    key = tuple(members)
+    if key not in p.scc:
+        p.scc[key] = _scc_of(p, members)
+    return p.scc[key]
+
+
+def _scc_of(p: Parsed, members: list[str]) -> dict[str, int]:
     S = set(members)
     g = {m: set() for m in members}
     for it in p.items:
