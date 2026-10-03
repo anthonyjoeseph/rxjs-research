@@ -242,7 +242,7 @@ tier about both machines at once, cutting the impl's arrivals into one run per
 plain arrival. The impl runs at its own fuel (Anthony). RULED OUT: one impl
 arrival per plain arrival, one instant per impl arrival, and a shared impl
 arrival at every late-subscribed `take` the bug cache aims at, and any
-decided counterexample at depth 2 seeds 13..36 or depth 3 seeds 1..8. Left:
+decided counterexample at depth 2 seeds 13..36 or depth 3 seeds 1..10. Left:
 whether every plain arrival's values come out CONTIGUOUSLY: no impl arrival
 carrying two plain arrivals' values, none interleaving them.
 
@@ -256,11 +256,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   counterexample refutes `arrival-runs` before the correspondence is
   stated over it; a green range is the evidence that lowers its class.
   Seeds 2–10: 1280 cases, no failure; of seeds 9–10's 400, all but four
-  decided, each untimed half apart from its timed one. Slow where the timed impl run outlasts the clock: μ over a merge
-  deferring itself, decided at fuel 8; merges under a concurrency limit
-  nested two deep, 100–300 s at any fuel, decided at 600 s. Blind:
-  a scan whose accumulator is a stream re-flattened each step, ×8 per
-  step at any fuel.
+  decided, each untimed half apart from its timed one. Slow where the
+  timed impl run outlasts the clock: μ over a merge deferring itself,
+  decided at fuel 8; merges under a concurrency limit nested two deep,
+  100–300 s at any fuel, decided at 600 s. Blind: a scan whose
+  accumulator is a stream re-flattened each step, ×8 per step at any
+  fuel.
 
 - **STATE THE CONFIGURATION CORRESPONDENCE.** The runs split recurses on
   a relation between the two machines' configurations, carrying the fuel
