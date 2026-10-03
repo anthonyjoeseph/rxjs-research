@@ -255,10 +255,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   compounding per nested flattener, not the elaborated term's size. An
   outer that emits a list and ends (`SyncOuter`) now skips the replay,
   taking a synchronous depth-3 impl case from past two minutes to six
-  seconds and its plain run from 35 s to a quarter of one. Left: the
-  replay under a mapped outer (`flatAllˢ`) and an inner's drains, still
-  about eightfold per impl level. Count the depth-3 sweep's undecided
-  cases before cutting further: what it decides is the measure.
+  seconds. `memoᶠ` holds the slot table, which had re-elaborated every
+  share at each budget check: a wide depth-3 case 85 s → 51 s, seed 2's
+  undecided 14 → 11 of 120. Left: the raw fold past a fall, the replay
+  under a mapped outer. Ruled out: the replay's dispatch moved onto the
+  source's ground ran slower lazy.
 
 - **SWEEP CONTIGUITY AT DEPTH 3.** `make qc-arrival-runs` at depth 3,
   in CI where it fits, reaches nestings no targeted row builds: a late

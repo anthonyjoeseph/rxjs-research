@@ -1,7 +1,7 @@
 module Rx.Evaluator where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
-open import Data.Fin     using (Fin; toℕ)
+open import Data.Fin     using (Fin; toℕ; zero; suc)
 open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
@@ -127,10 +127,23 @@ mkHot {Γ = Γ} ins i with ins i
 ... | scripted (cold _ _)  = []
 ... | shared _             = []
 
+-- A TABLE, NOT A FUNCTION.  A slot is computed where it is read, and a
+-- run reads every slot at every budget check, so a share's definition
+-- would be elaborated and stratification-checked again each time.
+-- `memoᶠ` builds one cell per index, each a thunk forced at most once:
+-- the partial application of `consᶠ` is what the run holds.
+consᶠ : ∀ {n} {P : Fin (suc n) → Set} → P zero → (∀ i → P (suc i)) → ∀ i → P i
+consᶠ x _ zero    = x
+consᶠ _ g (suc i) = g i
+
+memoᶠ : ∀ {n} {P : Fin n → Set} → (∀ i → P i) → ∀ i → P i
+memoᶠ {zero}  f ()
+memoᶠ {suc n} f = consᶠ (f zero) (memoᶠ (λ i → f (suc i)))
+
 sched-init : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Sched Γ
 sched-init {n = n} {Γ = Γ} e ins = record
   { mint = mint-init n
-  ; live = concat (tabulate (mkHot ins)) ; slots = ins }
+  ; live = concat (tabulate (mkHot ins)) ; slots = memoᶠ ins }
 
 -- pop the pending arrival minimal by (tick, ordinal), or report empty.
 -- The workers are TOP-LEVEL (not where-local of sched-next) so a proof
