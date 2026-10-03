@@ -167,8 +167,7 @@ code.
   exist. Find it and delete it.
 
 **The tier law and the risk classes are DEFINED IN CLAUDE.md** — the
-lowest-numbered tier below finishes first, strictly, and an emptied tier is
-DELETED rather than renumbered, so the numbers are names and not positions;
+lowest-numbered tier below finishes first, strictly;
 classes worst-first are FALSITY, SHAPE, VACUITY, DIFFICULTY, GRINDABLE. This
 file only ASSIGNS them, and schedules them into legs. Read that section
 before re-classifying anything: what counts as evidence for lowering a class, the
@@ -184,21 +183,29 @@ the row is DIFFICULTY.
 Main                                     four top-line statements, claimed
  │                                        side by side, meeting in raw values
  ├─ left-to-right                         Left-To-Right/Statement.agda — the
- │                                        batches, joined, are the plain
- │                                        program's values — tier 3
+ │   │                                    batches, joined, are the plain
+ │   │                                    program's values — tier 2
+ │   ├─ simulation                        Simulation/Statement.agda — the
+ │   │   │                                impl's run is the plain run, each
+ │   │   │                                value named by its arrival
+ │   │   └─ arrival-runs                  each plain arrival one impl
+ │   │       │                            arrival, one instant to it
+ │   │       └─ correspondence            schedules in step, stores related
+ │   │           ├─ machines              the stores' relation, kept by each
+ │   │           │                        subscribe and cascade
+ │   │           └─ cascade-mono          no cascade runs a counter back
+ │   └─ batched-sandwich                  the batcher against its own run
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
- │                                        group emits as the timed
- │                                        translation's packets do — tier 3
+ │   │                                    group emits as the timed
+ │   │                                    translation's packets do — tier 2
+ │   ├─ simulation                        at the timed program
+ │   └─ packets-name-arrivals             one packet per plain arrival
  ├─ batchable                             Batchable/Statement.agda — a second
  │                                        evaluator running the batcher over
  │                                        the run's emits gives the spec's
- │                                        grouping of them — tier 3
+ │                                        grouping of them — tier 2
  └─ timed-faithful                        Timed/Faithful.agda — the timed run
-                                          carries the plain run's values — tier 3
-
-  timed, timed-below                      Timed/Translation.agda — the translation the
-                                          packets come from; unwritten — tier 3
-
+                                          carries the plain run's values — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -218,126 +225,70 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 2 — an impl InstEmit the spec batches agree with
-
-**THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
-are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
-close without changing one of them, STOP and report that proof. The InstEmit's
-shape is free; TypeScript is out of scope this tier (Anthony).
-
-`QuickCheck` decides the top line's computable half on random programs, on
-the flat run: impl≡spec and left-to-right. **DONE IS THE AGDA
-QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
-`SExp.InstEmit`'s header; counterexamples go in the bug cache.
-
-### The monster
-
-(no monster) — the tier is one operator and its InstEmit against one
-executable check. There is no declaration here whose falsity a cone could
-bound.
-
-### Big picture tier roadmap
-
-- **GIVE `timed` A BODY OVER `flattenᵉ`.** Until it has one,
-  `timing-correct` compares stamps against packets nothing defines, and
-  `timed-faithful` is the only thing standing between it and `empty`. Port
-  the `echo` rule of `typescript/src/timed.ts`, whose packets match rxjs call
-  stacks on every generated program and which needs nothing `flattenᵉ`
-  does not give.
-
-- **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
-  A share's connect mints its own instant inside the subscribe frame, and a
-  spawned inner is stamped with the subscribe instant rather than its
-  trigger's; every FAIL so far falls there (bug-cache `seed 9
-  depth 1 case 2`, `seed 2 depth 1 case 15`). Fix the elaboration's stamping.
-
-- **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
-  The PLAIN rows: a switched-away inner stays subscribed (`seed 6 depth 1
-  case 4`), and an inner arriving while one is live is not dropped (`seed 7
-  depth 1 case 12`). Mirror the plain formers' bookkeeping in the InstEmit.
-
-- **BATCH A LATER ARRIVAL'S EMITS — POSSIBLY A QUESTION FOR ANTHONY.** Past
-  the subscribe frame `batchSimultaneousᵖ` batches each emit alone (bug-cache
-  row 4), and `batchable` hands it one emit per tick, so the InstEmit must
-  carry where each instant ends; the four routes tried are dead routes in
-  `SExp.InstEmit`'s header, and what is left may move `Rx.Exp` or the evaluator.
-
-- **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
-  Depth 1 is the sweep that fits, and some programs cost exponentially in
-  fuel, so a sweep bounds each CASE in wall clock
-  (`typecheck-performance-numbers.md`). Every counterexample becomes a
-  bug-cache row first. Three rows — an `of` pair merged inside a
-  delivery's inner — give no verdict in 60 s even at fuel 1, while the
-  same programs read plain run at once: the cost is the ELABORATION's.
-
-- **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
-  from the oracle's tree, as `qc-build` does, and the oracle job's `make
-  bug-cache` step with it. This leg closes the tier: the
-  check that decides tier 2 then guards it. Nothing in the job may be
-  narrowed to make it pass.
-
-### The ledger
-
-(empty — the tier's work is definitions, not postulates.)
-
-
-## Tier 3 — the top-line statements, and the translation
+## Tier 2 — proving the spec
 
 **WHERE THE IMPLEMENTATION IS ACTUALLY JUDGED.** Every row is a top-line
-statement or the translation one of them is stated over. Expect the
+statement or a leaf one is assembled over. Expect the
 elaboration and the batcher to move under contact, and report rather than push
 if that starts spiralling out rather than in.
 
-**STOP AND REPORT if this needs a new former in `Rx.Exp`** — same bar as tier
-2: only on certainty, never on suspicion.
+**`Rx.Exp` AND `SExp.Syntax` ARE OFF LIMITS (Anthony).** Both are fixed; a
+proof that needs either to move is a question for Anthony, never a patch.
+`make quickcheck`, locally or in CI, decides all four statements, the
+simulation and its leaf on drawn programs, and a case past its clock is
+undecided, never a failure (Anthony).
 
 ### The monster
 
-(no monster) — chosen when tier 2 closes, since the batcher the rows judge is
-still being rewritten there.
+`simulation` — the theorem both assembled top lines stand on, by induction on
+arrivals over `correspondence`: schedules in step, popping partnered sources
+by a proven lemma, and the leaf `machines`, a store relation each subscribe
+and cascade keeps, under which both send agreeing values, the impl's under one
+instant its source counter passes. RULED OUT: an impl arrival the plain
+schedule lacks, or a plain arrival split in two, on every bug-cache row and at
+depth 3 seeds 19, 20; a non-contiguous run at depth 2 seeds 13..36, depth 3
+seeds 1..11; an instant drawn outside its arrival's cascade, depth 3 seed 21.
+Left: the stores' relation, through every former.
+
+also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **PROBE `batchable` BEFORE ANY GRIND.** Both sides compute: instantiate it in
-  `agda/evidence/probed/` at the bug-cache programs, one row per fuel up to
-  each run's end, so every cut is a row. What it decides is whether the
-  statement's second evaluator — one emit per tick, run to completion — is a
-  setting any batcher can pass.
+- **RELATE THE STORES.** `machines` becomes a body: `Src` and `Store` made
+  concrete, pairing registry rows and node states per former and each live
+  source's payloads, with the root subscribe and one cascade stated over them
+  as leaves, so the monster drops to whichever former's cascade is
+  riskiest.
 
-- **CARRY `batchable`'S SECOND EVALUATOR INTO THE HARNESS.** The FAIL check in
-  `QuickCheck` and the bug cache still batch inside the program's own run,
-  as `left-to-right` does, so a green row there is not a green row of `batchable`. Port
-  `batchedᴮ` so the check decides the statement as written.
+- **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
+  instant and no two arrivals share one: a claim the impl's cascade makes
+  one former at a time. State it beside the values split so both recurse on the same
+  configuration, and the monster drops to whichever stays riskier.
 
-- **PORT `timed.ts` ONTO `flatten`.** The translation's flatteners become
-  `flatten` read by `last-seen`, and the `flatAllSrc` fast path that routes a
-  lane-only flatten to the old rules goes, so every flatten takes the `echo`
-  rule. `timed-fuzz.ts --selftest` and a 500-seed sweep hold `mismatched` at
-  zero. The TypeScript half of tier 2's `timed` leg.
-
-- **DELETE THE `max-` RULES.** With no flatten reaching them, the `max-`
-  rules, keys, trails and switch copies in `timed.ts` are dead; delete them
-  and the `timed-fuzz` fixtures that pin only them, keeping the ones that pin
-  the echo.
-
-- **`timed-below` AND `timed-faithful` ONCE `timed` HAS A BODY.** Both are
-  stated over tier 2's unwritten translation; probe each against the ported
-  body before grinding either.
+- **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
+  relation recursing on the type as `Red` does, reusing its descent for
+  the μ peel, the flattener's hop and a share's connect; the batcher's
+  leaves are list lemmas. A case the impl's one-past fuel slack in
+  `left-to-right` does not cover is a fuel finding for Anthony, not a
+  restatement.
 
 ### The ledger
 
-- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: the
-  elaborated `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third
-  leg.
-- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: stated
-  over an unwritten `timed`; tier 2's stamping leg is the impl's half of it.
-- **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: stated over
-  an unwritten `timed`.
-- **`timed-below`** (Timed.Translation) — FALSITY, `NO EVIDENCE`: stated over
-  an unwritten `timed`.
-- **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: nothing has
-  instantiated the second evaluator; the first leg.
-- **`timed`** (Timed.Translation) — VACUITY, `DEAD ROUTE`: a postulated
-  function asserts nothing; `λ _ → emptyˢ` inhabits it.
-- **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
-  `randFold`/`natMod` (QuickCheck). Carried, not counted.
+- **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
+  `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
+  fuel never less and one past it; the sweep, deciding it directly, reached
+  held-back values under a flattener with no red.
+- **`timed-faithful`** (Timed.Faithful) — DIFFICULTY, `PROBED`: probed
+  first-order; the sweep, deciding it directly, reached values on two arrivals
+  under a flattener with no red.
+- **`batchable`** (Batchable.Statement) — DIFFICULTY, `PROBED`: probed
+  first-order; the sweep, deciding it directly, reached values grouping under a
+  flattener and a `μ` with no red.
+- **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED`:
+  one packet per arrival, injectively; the sweep, deciding it directly, reached
+  values on two arrivals under a flattener with no red.
+- **`machines`** (Simulation.Statement) — DIFFICULTY, `PROBED`: some relation
+  between the stores each subscribe and cascade keeps, sending agreeing values,
+  the impl's under one instant its source counter passes.
+- **`cascade-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
+  never runs a mint counter back.

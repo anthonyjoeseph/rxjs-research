@@ -91,6 +91,15 @@ mutual
     emptyᵉ     : ∀ {t} → Exp Γ Δᵍ Δ Θ t
     takeᵉ      : ∀ {t} → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
                  -- count is a term: evaluated once, at subscription time
+    takeWhileᵉ : ∀ {t} → Fn Γ Δᵍ Δ Θ t boolᵗ → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
+                 -- rxjs `takeWhile(p , true)`: the first value failing
+                 -- the test leaves and then the stream ends, cut
+                 -- mid-burst as `takeᵉ` cuts.  It is the elaborated
+                 -- `take`'s ending, which reads a scan's own state and
+                 -- so cannot be an index fixed at subscription; ending
+                 -- on ONE subscription is what keeps a share upstream
+                 -- from handing the cut values the first one missed
+                 -- (Anthony's ruling).
     batchSyncᵉ : ∀ {t} → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ (t ×ᵗ listᵗ t)
                  -- THE ONE PLAIN OPERATOR THAT CAN SEE SYNCHRONY, AND IT
                  -- SEES EXACTLY ONE BIT OF IT.  The subscribe frame's
@@ -407,6 +416,7 @@ mutual
   renExp ρg ρd ρt (ofᵉ ts)       = ofᵉ (renTms ρg ρd ρt ts)
   renExp ρg ρd ρt emptyᵉ         = emptyᵉ
   renExp ρg ρd ρt (takeᵉ n e)    = takeᵉ (renTm ρg ρd ρt n) (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (takeWhileᵉ f e) = takeWhileᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (batchSyncᵉ e) = batchSyncᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (mapᵉ f e)     = mapᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (scanᵉ f i e)  = scanᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
@@ -524,6 +534,8 @@ mutual
   elimGExp Θl x cl (ofᵉ ts)       = ofᵉ (elimGTms Θl x cl ts)
   elimGExp Θl x cl emptyᵉ         = emptyᵉ
   elimGExp Θl x cl (takeᵉ n e)    = takeᵉ (elimGTm Θl x cl n) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (takeWhileᵉ f e) =
+    takeWhileᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGExp Θl x cl e)
   elimGExp Θl x cl (batchSyncᵉ e) = batchSyncᵉ (elimGExp Θl x cl e)
   elimGExp Θl x cl (mapᵉ f e)     =
     mapᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGExp Θl x cl e)
@@ -573,6 +585,8 @@ mutual
   elimDExp Θl x cl (ofᵉ ts)       = ofᵉ (elimDTms Θl x cl ts)
   elimDExp Θl x cl emptyᵉ         = emptyᵉ
   elimDExp Θl x cl (takeᵉ n e)    = takeᵉ (elimDTm Θl x cl n) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (takeWhileᵉ f e) =
+    takeWhileᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDExp Θl x cl e)
   elimDExp Θl x cl (batchSyncᵉ e) = batchSyncᵉ (elimDExp Θl x cl e)
   elimDExp Θl x cl (mapᵉ f e)     =
     mapᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDExp Θl x cl e)
@@ -704,6 +718,7 @@ mutual
   inputsBelowᵉ k (ofᵉ ts)        = inputsBelowᵗˢ k ts
   inputsBelowᵉ k emptyᵉ          = true
   inputsBelowᵉ k (takeᵉ c e)     = inputsBelowᵗ k c ∧ inputsBelowᵉ k e
+  inputsBelowᵉ k (takeWhileᵉ f e) = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (batchSyncᵉ e)  = inputsBelowᵉ k e
   inputsBelowᵉ k (mapᵉ f e)      = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (scanᵉ f z e)   =

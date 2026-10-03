@@ -142,8 +142,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Tick; Fuel; valueᵖ; completeᵖ; hot; cold)
 open import Rx.Exp using (Ty; obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
-  _×ᵗ_; _+ᵗ_; listᵗ; uniqᵗ;
-  Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
+  _×ᵗ_; _+ᵗ_; listᵗ; uniqᵗ; boolᵗ;
+  Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ;
   mapᵉ; scanᵉ; flattenᵉ; μᵉ; deferᵉ; mintᵉ;
   unitᵗ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
@@ -466,10 +466,21 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                     {κ : Path Γ lo u t} {now sched st nid r}
                 → evalWith count ρ ≡ suc k
                 → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                → subscribeE⇓ (Θ , b , ρ) (take-f nid ↠[ ≤-refl ] κ) now
+                → subscribeE⇓ (Θ , b , ρ) (take-f nothing nid ↠[ ≤-refl ] κ) now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                     (installNode nid (take-st (suc k)) st) r
                 → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ now sched st r
+
+  -- A TAKE-WHILE IS THE TAKE ARM AT A BUDGET OF ONE, which only a value
+  -- failing the test spends.  Its source is always subscribed: there is
+  -- no count to read as zero.
+  subs-takeWhile : ∀ {lo u Θ} {ρ : Env Γ Θ} {f : Fn Γ [] [] Θ u boolᵗ}
+                     {b : Exp Γ [] [] Θ u} {κ : Path Γ lo u t} {now sched st nid r}
+                 → freshId nodeᵏ (Sched.mint sched) ≡ nid
+                 → subscribeE⇓ (Θ , b , ρ) (take-f (just (Θ , f , ρ)) nid ↠[ ≤-refl ] κ) now
+                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+                     (installNode nid (take-st (suc zero)) st) r
+                 → subscribeE⇓ (Θ , takeWhileᵉ f b , ρ) κ now sched st r
 
   -- THE BRACKET IS OPENED BY THE INSTALL AND CLOSED WHEN THE
   -- SUBSCRIBE CALL RETURNS, WHICH IS WHERE THE BIT GOES DOWN AND THE
@@ -929,10 +940,10 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
                 (injectRoot (scanDispatch fn nid vals fin sched st
                   (lookupNode nid (EvalSt.nodes st))))
 
-  step-take : ∀ {s lo nid} {κ : Path Γ lo s t}
+  step-take : ∀ {s lo w nid} {κ : Path Γ lo s t}
                 {now} {vals : List (Val Γ s)} {fin sched st}
-            → stepFrame⇓ now (take-f nid) κ vals fin sched st
-                (injectRoot (takeDispatch nid vals fin sched st
+            → stepFrame⇓ now (take-f w nid) κ vals fin sched st
+                (injectRoot (takeDispatch w nid vals fin sched st
                   (lookupNode nid (EvalSt.nodes st))))
 
   step-batchSync : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}

@@ -1,15 +1,14 @@
 module SExp.Syntax where
 
-open import Data.Nat     using (ℕ)
+open import Data.Nat     using (ℕ; _+_)
 open import Data.Bool    using (Bool)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Vec     using (Vec; lookup; zipWith) renaming (map to mapⱽ)
+open import Data.Vec     using (Vec; lookup; zipWith) renaming (map to mapⱽ; _++_ to _++ⱽ_)
 open import Data.Fin     using (Fin)
-open import Data.Maybe   using (Maybe)
 
 open import Rx.Exp      using (Ty; Ctx; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_;
-                               listᵗ; obs; PrimOp)
+                               listᵗ; obs; PrimOp; FlatOp)
 open import SExp.InstEmit using (machineEmitᵗ)
 
 ------------------------------------------------------------------
@@ -36,9 +35,16 @@ open import SExp.InstEmit using (machineEmitᵗ)
 -- — the wrapper appears exactly once, at the boundary between the two
 -- trees, instead of being threaded through a program's own types.
 --
--- THE PALETTE IS THE TYPESCRIPT ONE, NAME FOR NAME, which is what makes
--- the two implementations comparable at all rather than merely
--- analogous.  `share` is absent from both for the same reason: a shared
+-- THE FORMERS ARE `Exp`'S, FORMER FOR FORMER, less the two that only an
+-- elaboration may write (`batchSyncᵉ`, `mintᵉ`) (Anthony).  That is what
+-- lets a translation out of this tree build the SAME KIND of tree it
+-- read: `timed` rewrites a program into another program, and a palette
+-- narrower than `Exp`'s would leave it holding shapes the plain run
+-- builds and it cannot.  So the flattener is the one `flattenᵉ`, echo
+-- lane and all, and rxjs's three named flatteners are that former with
+-- the echo absent.  The TypeScript twin is the same palette, which is
+-- what makes the two implementations comparable at all rather than
+-- merely analogous.  `share` is absent from both for the same reason: a shared
 -- observable is a BINDING and not an expression, so it lives in the
 -- slot telescope and is referenced with `inputˢ`.  The two pure-function
 -- formers are `mapˢ` and `scanˢ` for the reason their plain
@@ -53,12 +59,12 @@ mutual
     ofˢ         : ∀ {t} → List (STm Γ Δᵍ Δ Θ t) → SExp Γ Δᵍ Δ Θ t
     emptyˢ      : ∀ {t} → SExp Γ Δᵍ Δ Θ t
     takeˢ       : ∀ {t} → STm Γ Δᵍ Δ Θ natᵗ → SExp Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ t
+    takeWhileˢ  : ∀ {t} → SFn Γ Δᵍ Δ Θ t boolᵗ → SExp Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ t
     mapˢ        : ∀ {s t} → SFn Γ Δᵍ Δ Θ s t → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
     scanˢ       : ∀ {s t} → SFn Γ Δᵍ Δ Θ (t ×ᵗ s) t
                 → STm Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
-    mergeAllˢ   : ∀ {t} → Maybe ℕ → SExp Γ Δᵍ Δ Θ (obs t) → SExp Γ Δᵍ Δ Θ t
-    switchAllˢ exhaustAllˢ :
-                  ∀ {t} → SExp Γ Δᵍ Δ Θ (obs t) → SExp Γ Δᵍ Δ Θ t
+    flattenˢ    : ∀ {t} → FlatOp
+                → SExp Γ Δᵍ Δ Θ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) → SExp Γ Δᵍ Δ Θ t
     μˢ          : ∀ {t} → SExp Γ (t ∷ Δᵍ) Δ Θ t → SExp Γ Δᵍ Δ Θ t
     varˢ        : ∀ {t} → t ∈ Δ → SExp Γ Δᵍ Δ Θ t
     deferˢ      : ∀ {t} → SExp Γ [] (Δᵍ ++ Δ) Θ t → SExp Γ Δᵍ Δ Θ t
@@ -143,21 +149,31 @@ emitᶜ ts = map emitᵗ ts
 -- defined by another srxjs program; the ELABORATION cares, because the
 -- two arrive in different shapes, so the kinds are an argument to
 -- `toInstEmit` and nothing above it changes.
+--
+-- A HOT SCRIPT AND A COLD ONE ARE TWO KINDS, BECAUSE THEY WRAP AT TWO
+-- ARITIES.  One hot arrival is one instant however many subscribe (the
+-- README's diamond), so a hot script is wrapped ONCE, in a share every
+-- reference reads; a cold one is a fresh source per subscription, so it
+-- is wrapped per reference.  The elaboration has to know which before
+-- it sees the table.
 data Kind : Set where
-  scriptedᵏ : Kind   -- an external source: bare payloads, `inputᵖ` wraps them
-  sharedᵏ   : Kind   -- another srxjs program: already elaborated
+  hotᵏ    : Kind   -- a script anchored at tick zero: wrapped once, shared
+  coldᵏ   : Kind   -- a script re-run per subscription: `inputᵖ` wraps each
+  sharedᵏ : Kind   -- another srxjs program: already elaborated
 
 Kinds : ℕ → Set
 Kinds n = Vec Kind n
 
 -- WHAT A SLOT STANDS AT, NOW PER SLOT RATHER THAN UNIFORMLY.
 --
--- A SCRIPTED SLOT STANDS AT THE PAYLOAD, and it has to: a script is
--- arbitrary, so standing it at the InstEmit would let a table name an
--- instant past the counter and reach the output through `input`
--- untouched -- exactly how `evaluate-accepted` was refuted.  `inputᵖ`
--- wrapping it is what makes a claim about inputs a lemma about the
--- elaboration rather than a hypothesis about the table.
+-- A SCRIPT STANDS AT THE PAYLOAD WHERE THE TABLE SUPPLIES IT, and it
+-- has to: a script is arbitrary, so standing it at the InstEmit would
+-- let a table name an instant past the counter and reach the output
+-- through `input` untouched -- exactly how `evaluate-accepted` was
+-- refuted.  `inputᵖ` wrapping it is what makes a claim about inputs a
+-- lemma about the elaboration rather than a hypothesis about the table.
+-- A hot slot's InstEmit stream is that wrapping, put in the table by
+-- the IMPL and not by whoever wrote the script.
 --
 -- THE TYPESCRIPT MIRROR IS WHAT SETTLES IT RATHER THAN THE PROOF'S
 -- CONVENIENCE.  `input-source.ts`'s `makeInputSource` takes an
@@ -187,10 +203,21 @@ Kinds n = Vec Kind n
 -- wrapping.  Wrapping it twice is what refuted `mapᵉ laneᵛ ∘
 -- elaborate` as a reading, over an empty inner and so structurally.
 slotTy : Ty → Kind → Ty
-slotTy t scriptedᵏ = plainᵗ t
-slotTy t sharedᵏ   = emitᵗ t
+slotTy t hotᵏ    = emitᵗ t
+slotTy t coldᵏ   = plainᵗ t
+slotTy t sharedᵏ = emitᵗ t
 
--- the context an elaborated program stands in: the author's types,
--- read through the kinds
-plainᵏ : ∀ {n} → Ctx n → Kinds n → Ctx n
-plainᵏ Γ κ = zipWith slotTy Γ κ
+-- what the RAW half holds: a hot script itself, below the share that
+-- wraps it, and nothing a program reads for the other two kinds
+rawTy : Ty → Kind → Ty
+rawTy t hotᵏ    = plainᵗ t
+rawTy t coldᵏ   = unitᵗ
+rawTy t sharedᵏ = unitᵗ
+
+-- THE CONTEXT AN ELABORATED PROGRAM STANDS IN IS TWO HALVES, AND THE
+-- RAW ONE COMES FIRST.  A share may read only the slots below it, so
+-- the share wrapping hot script i stands at `n + i` over the script at
+-- `i`.  The author's slot i is the STAMPED half's slot `n + i`, read
+-- through the kinds; the raw half is the elaboration's own.
+plainᵏ : ∀ {n} → Ctx n → Kinds n → Ctx (n + n)
+plainᵏ Γ κ = zipWith rawTy Γ κ ++ⱽ zipWith slotTy Γ κ

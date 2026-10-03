@@ -181,6 +181,11 @@ export type Exp =
   | { type: "map"; ty: Ty; fn: Fn; src: Exp }
   | { type: "scan"; ty: Ty; fn: Fn; init: Tm; src: Exp }
   | { type: "take"; ty: Ty; count: Tm; src: Exp } // count evaluated once, at subscription time
+  // predicate evaluated per value; the first value for which it returns false
+  // is emitted (inclusive) and then the stream completes — mirrors rxjs
+  // takeWhile(p, true). Cut semantics identical to take's: closes open
+  // registrations, raises fin.
+  | { type: "takeWhile"; ty: Ty; fn: Fn; src: Exp }
   // NOTE: share is NOT an Exp node — share identity is a binding, not
   // an expression. Shared observables live in the slot telescope
   // (prop-test's Slot) and are referenced with `input`, exactly like
@@ -503,6 +508,12 @@ const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
         count: substMuTm(exp.count, st, knot),
         src: substMuExp(exp.src, st, knot),
       };
+    case "takeWhile":
+      return {
+        ...exp,
+        fn: substMuTm(exp.fn, st, knot),
+        src: substMuExp(exp.src, st, knot),
+      };
     case "flatten":
     case "batchSync":
       return { ...exp, src: substMuExp(exp.src, st, knot) };
@@ -599,6 +610,12 @@ const shiftExp = (exp: Exp, cutoff: number, by: number): Exp => {
       return {
         ...exp,
         count: shiftTm(exp.count, cutoff, by),
+        src: shiftExp(exp.src, cutoff, by),
+      };
+    case "takeWhile":
+      return {
+        ...exp,
+        fn: shiftTm(exp.fn, cutoff + 1, by), // fn binds the arriving value as Θ-var 0
         src: shiftExp(exp.src, cutoff, by),
       };
     case "flatten":

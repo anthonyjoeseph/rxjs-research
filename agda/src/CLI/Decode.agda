@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm; []ᵉ;
-  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; batchSyncᵉ; flattenᵉ; μᵉ;
+  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ; flattenᵉ; μᵉ;
   varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
@@ -189,6 +189,10 @@ mutual
       (getField "count" j >>=? decodeTm fuel Γ Δᵍ Δ Θ natᵗ >>=? λ c →
        getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ t >>=? λ src →
        just (takeᵉ c src))
+    else if tag is "takeWhile" then
+      (getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ (t ∷ Θ) boolᵗ >>=? λ fn →
+       getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ t >>=? λ src →
+       just (takeWhileᵉ fn src))
     else if tag is "flatten" then
       (getField "op" j >>=? decodeFlatOp >>=? λ op →
        getField "src" j

@@ -18,10 +18,9 @@ open import Data.Bool using (Bool; true; false; T; _∨_)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty using (⊥-elim)
 open import Data.Fin using (Fin; toℕ)
-open import Data.Maybe using (Maybe; nothing)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; suc; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; n≤1+n; <-≤-trans; <-irrefl)
@@ -42,7 +41,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   innerFinish⇓; innerReact⇓; stepFrame⇓; subscribeAll⇓; subscribeSharedSlot⇓; foldPath⇓; dispatchShare⇓;
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
-  subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan;
+  subs-take-zero; subs-take-suc; subs-takeWhile; subs-batchSync; subs-map; subs-scan;
   subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
@@ -52,7 +51,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
 open import Rx.Evaluator.Reducible.Support using (Sound; sound; ruled; ends; fresh-path; distinct; termini; Agree; rowThrough; rowEnd;
   push-sound; Distinct; endOf; ∨-T; ∨-Tˡ; ∨-Tʳ; node-one; node-in₁; node-eq; node-cases;
   self-node; drop-ot; head-on; sub-ot; sink-sound; lower-nodes; lower-end; lower-distinct;
-  register-sound; admit-row; admit-ot; admit-agree; kill-sub; switchKill-ct; wrap-ot;
+  register-sound; ∈-register; admit-row; admit-ot; admit-agree; kill-sub; switchKill-ct; wrap-ot;
   fresh-inner; fresh-sound; scanCt; scanReg; takeCt; takeReg; batchCt; batchReg)
 open import Rx.Evaluator.Reducible.Floor using (drop-sub)
 
@@ -127,9 +126,9 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     where
     ea′ : ∀ k → T (pathHasNode k κ₂) → ∀ {r} → r ∈ EvalSt.registry (register rid rs p st)
         → T (rowThrough k r) → rowEnd r ≡ endOf κ₂
-    ea′ k h₂ a th with ∈-++⁻ (EvalSt.registry st) a
-    ... | inj₁ a′          = ends so₂ k h₂ a′ th
-    ... | inj₂ (here refl) = trans ee (ag k (nk k th) h₂)
+    ea′ k h₂ a th with ∈-register {st = st} rid rs p a
+    ... | inj₁ a′    = ends so₂ k h₂ a′ th
+    ... | inj₂ refl  = trans ee (ag k (nk k th) h₂)
 
   -- a slot's row: the walked path with its floor lowered
   slot-kept : ∀ {lo} (i : Fin n) (below : toℕ i < lo) {κ : Path Γ lo (lookup Γ i) t} {sched sched′ : Sched Γ} {st : EvalSt e}
@@ -258,9 +257,13 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   subscribeE-rule (subs-empty f)          so = foldPath-rule f so
   subscribeE-rule (subs-take-zero _ f)    so = foldPath-rule f so
   subscribeE-rule {κ = κ} {sched = sched} (subs-take-suc _ refl sub) so κ₂ so₂ ag =
-    subscribeE-rule sub (fresh-sound (take-f (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
+    subscribeE-rule sub (fresh-sound (take-f nothing (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
       (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
-      (fresh-agree (take-f (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
+      (fresh-agree (take-f nothing (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
+  subscribeE-rule {κ = κ} {sched = sched} (subs-takeWhile {Θ = Θ} {ρ = ρ} {f = fn} refl sub) so κ₂ so₂ ag =
+    subscribeE-rule sub (fresh-sound (take-f (just (Θ , fn , ρ)) (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
+      (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
+      (fresh-agree (take-f (just (Θ , fn , ρ)) (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
   subscribeE-rule {κ = κ} {sched = sched} (subs-batchSync refl sub f) so κ₂ so₂ ag =
     foldPath-rule f (sub-ot (λ r∈ → r∈) ≤-refl (subscribeE-rule sub soπ _ soπ (λ _ _ _ → refl))) κ₂
       (sub-ot (λ r∈ → r∈) ≤-refl (subscribeE-rule sub soπ κ₂ (sub-ot (λ r∈ → r∈) (n≤1+n _) so₂) ag′)) ag′
@@ -314,9 +317,9 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   stepFrame-rule le (step-scan {fn = fn} {nid = c} {vals = vals} {fin} {sched} {st}) so κ₂ so₂ ag =
     sub-ot (λ r∈ → subst (_ ∈_) (scanReg fn c vals fin sched st (lookupNode c (EvalSt.nodes st))) r∈)
            (≤-reflexive (sym (scanCt fn c vals fin sched st (lookupNode c (EvalSt.nodes st))))) so₂
-  stepFrame-rule le (step-take {nid = c} {vals = vals} {fin} {sched} {st}) so κ₂ so₂ ag =
-    sub-ot (takeReg c (lookupNode c (EvalSt.nodes st)) vals fin sched st)
-           (≤-reflexive (sym (takeCt c (lookupNode c (EvalSt.nodes st)) vals fin sched st))) so₂
+  stepFrame-rule le (step-take {w = w} {nid = c} {vals = vals} {fin} {sched} {st}) so κ₂ so₂ ag =
+    sub-ot (takeReg w c (lookupNode c (EvalSt.nodes st)) vals fin sched st)
+           (≤-reflexive (sym (takeCt w c (lookupNode c (EvalSt.nodes st)) vals fin sched st))) so₂
   stepFrame-rule le (step-batchSync {nid = c} {vals = vals} {fin} {sched} {st}) so κ₂ so₂ ag =
     sub-ot (λ r∈ → subst (_ ∈_) (batchReg c vals fin sched st (lookupNode c (EvalSt.nodes st))) r∈)
            (≤-reflexive (sym (batchCt c vals fin sched st (lookupNode c (EvalSt.nodes st))))) so₂

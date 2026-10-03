@@ -1,4 +1,4 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs qc-batched-sandwich qc-packets-name-arrivals qc-same-clock
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -10,6 +10,8 @@ export LANG := C.UTF-8
 # first use leaves that rule depending on nothing.
 AGDA_SRC := $(shell find agda/src -name '*.agda')
 ORACLE_BIN := agda/_oracle/_cli
+# the runners' GHC flags, read from where the oracle's cache key covers them
+ORACLE_GHC = $(shell scripts/oracle-mirror.py --ghc-flags)
 
 # ─────────────────────────────────────────────────────────────────────────
 # THE AGDA INVOCATION — ONE DEFINITION, USED BY EVERY TARGET, AND BY
@@ -55,7 +57,7 @@ all: help
 # The two differential-test workflows:
 #
 #   make oracle       rxjs (TS) vs the Agda oracle, per generated program
-#   make quickcheck   impl- vs spec-batchSimultaneous, all in Agda
+#   make quickcheck   the four statements of Main, each at its own sides, all in Agda
 #
 # Both accept arguments after ARGS=. See each target below for the exact syntax
 # and seed examples. `make help` shows the descriptions.
@@ -174,13 +176,18 @@ help:
 	@echo "  cli-build     the oracle's tree (erasure markers made real), then its two"
 	@echo "                  runners: $(ORACLE_BIN)/Main and $(ORACLE_BIN)/Bug-Cache"
 	@echo "  oracle-key    print the oracle build's cache key (its runners' cone)"
+	@echo "  qc-key        print the QuickCheck binary's cache key (its own cone)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
 	@echo "                  make oracle                   (full seed sweep)"
 	@echo "                  make oracle ARGS='--seed 1'   (ONE seed only)"
 	@echo "                  make oracle ARGS='--operator mergeAll'"
 	@echo "  qc-build      compile the all-Agda QuickCheck binary ($(ORACLE_BIN)/QuickCheck)"
-	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs)"
-	@echo "  quickcheck    all-Agda QuickCheck: impl- vs spec-batchSimultaneous"
+	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs,"
+	@echo "                  QC_FUEL=n, QC_STMT=1..6 for one statement (Main's four, the simulation, its leaf), 0 for all,"
+	@echo "                  QC_CASE=secs per case, 0 for none, QC_BEAR=1 to decide only cases bearing on contiguity)"
+	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful / qc-simulation / qc-arrival-runs / qc-batched-sandwich / qc-packets-name-arrivals / qc-same-clock"
+	@echo "                qc-fast on that one statement"
+	@echo "  quickcheck    all-Agda QuickCheck: Main's four statements, the simulation and its leaf, caching counterexamples"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
 	@echo "                  make quickcheck ARGS='1 500 300 5' (seeds 1..500, 300 runs, depth 5)"
@@ -255,8 +262,11 @@ agda-dev-selftest:
 # which is a counterexample, and one inside a single walk of the corpus would
 # take every later verdict with it and hold the job to its timeout.  A row
 # over budget is a FAIL named by the row, whose name the runner flushes
-# before the run starts.
-BUG_CACHE_ROW_BUDGET ?= 60
+# before the run starts.  The budget is set by the DEAREST row, since a
+# slow case gets a longer clock: every statement runs in the one process,
+# and the simulation reads the timed program's plain run at every fuel up
+# to the row's own.
+BUG_CACHE_ROW_BUDGET ?= 300
 
 #
 # SUSPENDED WHILE THE CANDIDATE HAS LIVE LEAVES (Anthony: "suspend,
@@ -561,7 +571,7 @@ imports-selftest:
 	  diff -q scripts/imports-selftest/Quiet.agda $$tmp/Quiet.agda >/dev/null \
 	    || { echo "SELFTEST FAIL: --fix rewrote the file it must not touch"; fail=1; }; \
 	  rm -rf $$tmp; \
-	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module; and so is a name the source module merely BORROWED and then spent, which its body tokens cannot tell from one it declares, reported against the module it was borrowed from; and a MODULE of this tree that has no file is PHANTOM too, while an out-of-tree namespace is not)"; \
+	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module; and so is a name the source module merely BORROWED and then spent, which its body tokens cannot tell from one it declares, reported against the module it was borrowed from, unless the module ALSO declares it as a constructor, which Agda overloads silently; and a MODULE of this tree that has no file is PHANTOM too, while an out-of-tree namespace is not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # PROVES dup-check IS LOAD-BEARING, against a fixture outside agda/src.  It
@@ -675,10 +685,14 @@ wiring-selftest:
 	    echo "$$out" | grep -q "    $$n$$" && { echo "SELFTEST FAIL: $$n reported, but it is legitimately wired"; fail=1; }; \
 	  done; \
 	  echo "$$out" | grep -q "^    \.\.\." && { echo "SELFTEST FAIL: a bare \`...\` node surfaced as a definition — with-arm owners must be per-site and exempt"; fail=1; }; \
+	  echo "$$out" | grep -q "^    #-}$$" && { echo "SELFTEST FAIL: a nested pragma's outer \`#-}\` surfaced as a definition — block comments must nest"; fail=1; }; \
 	  led=$$(scripts/check-wiring.py --postulates --src scripts/wiring-selftest 2>&1); \
 	  echo "$$led" | grep -q "^sealed-gap " || { echo "SELFTEST FAIL: sealed-gap missing from the ledger — a nested block opener is being sliced off the RAW line, so members of a postulate block inside a seal are invisible"; fail=1; }; \
 	  echo "$$led" | grep -qE "^(te|ct|al|te) " && { echo "SELFTEST FAIL: a keyword tail registered as a postulate — the nested opener is sliced off the RAW line"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger)"; \
+	  echo "$$led" | grep -q "^ffi-bound " && { echo "SELFTEST FAIL: ffi-bound on the ledger — a CLI postulate with a COMPILE GHC body is not remaining work"; fail=1; }; \
+	  echo "$$led" | grep -q "^ffi-unbound " || { echo "SELFTEST FAIL: ffi-unbound missing from the ledger — the FFI exemption swallowed a CLI postulate with no binding"; fail=1; }; \
+	  echo "$$led" | grep -q "^ffi-outside " || { echo "SELFTEST FAIL: ffi-outside missing from the ledger — a binding outside CLI/ must earn nothing"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
 	  else echo "$$out"; exit 1; fi
 
 # THE ACCEPTANCE TEST, cheap checks FIRST.  Ordering is the point: an orphan
@@ -1599,14 +1613,17 @@ oracle-tree: stripped
 oracle-key: stripped
 	@scripts/oracle-mirror.py --key
 
+qc-key: stripped
+	@scripts/oracle-mirror.py --qc-key
+
 $(ORACLE_BIN)/Main: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/Main.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli $(ORACLE_GHC) src/CLI/Main.agda
 	@touch $@
 
 $(ORACLE_BIN)/Bug-Cache: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/Unit-Test/Bug-Cache.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli $(ORACLE_GHC) src/CLI/Unit-Test/Bug-Cache.agda
 	@touch $@
 
 # BOTH HALVES, IN ORDER: `oracle-tree` copies the cone and turns every
@@ -1657,7 +1674,7 @@ oracle-pinned: $(ORACLE_BIN)/Main
 # evaluator's values, and the tower is what checks it terminates.
 $(ORACLE_BIN)/QuickCheck: $(AGDA_SRC) scripts/oracle-mirror.py
 	@$(MAKE) --no-print-directory oracle-tree
-	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli src/CLI/QuickCheck.agda
+	@cd agda/_oracle && $(AGDA) --compile --compile-dir=_cli $(ORACLE_GHC) src/CLI/QuickCheck.agda
 	@touch $@
 
 qc-build: $(ORACLE_BIN)/QuickCheck
@@ -1668,22 +1685,60 @@ quickcheck: qc-build
 # THE DEV LOOP: one sweep under a HARD time budget.  Over budget is a
 # failure, not a wait -- the budget is what keeps the loop a loop, and it
 # is raised only once the operator passes at the current one.
-# QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds.
+# QC = "SEED RUNS DEPTH"; QC_BUDGET in seconds; QC_FUEL 0 is the binary's
+# default fuel.  QC_CASE is the wall clock per CASE in seconds, unset for
+# the binary's default and 0 for none: a case past it is UNDECIDED, never
+# a failure (Anthony) -- counted, printed with its paste row, and the
+# sweep goes on.  QC_BEAR=1 decides only the cases bearing on contiguity
+# and streams the rest as `degenerate`; it needs QC_CASE, since the
+# binary reads its arguments by position.
 #
-# IT GATES ON EVERY CHECK.  Each is one top-line statement, decided on
-# one program's run, and every one of them is
-# a claim about the implementation -- so any of them failing is a known
-# counterexample, printed with its count and samples.
+# EVERY CASE IS STREAMED TO $(QC_STREAM) AS IT IS DECIDED, so a sweep the
+# budget kills still says what it decided: how many cases agreed, and
+# every row that failed or went undecided.  A FAIL in a killed sweep is
+# as red as one in a finished sweep.
+#
+# ONE QUICKCHECK PER STATEMENT `Main` IMPORTS, ONE FOR THE SIMULATION
+# two of them stand on, and one for `arrival-runs`, the leaf it stands
+# on.  Each decides that statement's own sides on one program's run, so
+# any of them failing is a known counterexample to it, printed with its
+# count and samples.  QC_STMT names one, in `Main`'s order, the
+# simulation fifth and its leaf sixth; 0 gates on all of them.  9 is
+# `same-clock`, the two schedules' keys one for one, a candidate
+# invariant that 0 does not include.
 QC ?= 1 15 1
 QC_BUDGET ?= 120
+QC_FUEL ?= 0
+QC_STMT ?= 0
+QC_CASE ?=
+QC_BEAR ?=
 QC_LOG := agda/_oracle/qc.log
+QC_STREAM := agda/_oracle/qc.stream
+QC_IN = $(word 1,$(QC)) $(or $(word 2,$(QC)),200) $(or $(word 3,$(QC)),4) 0 0 0 $(QC_FUEL) $(QC_STMT) $(if $(QC_BEAR),$(or $(QC_CASE),$(error QC_BEAR needs QC_CASE)) $(QC_BEAR),$(QC_CASE))
+qc-left-to-right:  ; @$(MAKE) --no-print-directory qc-fast QC_STMT=1
+qc-timing-correct: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=2
+qc-batchable:      ; @$(MAKE) --no-print-directory qc-fast QC_STMT=3
+qc-timed-faithful: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=4
+qc-simulation:     ; @$(MAKE) --no-print-directory qc-fast QC_STMT=5
+qc-arrival-runs:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=6
+qc-batched-sandwich: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=7
+qc-packets-name-arrivals: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=8
+qc-same-clock:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=9
 qc-fast: qc-build
-	@printf '%s\n' "$(QC)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG); \
+	@printf '%s\n' "$(QC_IN)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG) 2> $(QC_STREAM); \
 	ec=$$?; head -c 6000 $(QC_LOG); \
-	if [ $$ec = 124 ]; then echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)'"; exit 1; fi; \
+	if [ $$ec = 124 ]; then \
+	  echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)' -- decided before the kill:"; \
+	  for v in agree FAIL undecided degenerate; do \
+	    echo "  $$v $$(grep -c "^case [0-9]*/[0-9]* $$v$$" $(QC_STREAM))"; done; \
+	  echo "  bearing on contiguity $$(grep -c '^  bears on contiguity$$' $(QC_STREAM))"; \
+	  echo "  holding values back at the fuel $$(grep -c '^  holds values back at the fuel$$' $(QC_STREAM))"; \
+	  echo "  grouping values $$(grep -c '^  groups values$$' $(QC_STREAM))"; \
+	  grep -A40 "^case [0-9]*/[0-9]* FAIL$$" $(QC_STREAM) | head -c 6000; \
+	  echo "  (every decided case: $(QC_STREAM))"; exit 1; fi; \
 	if [ $$ec != 0 ]; then echo "qc-fast: binary exited $$ec"; exit 1; fi; \
 	grep -q '(all agree)' $(QC_LOG) || { echo "qc-fast: RED on '$(QC)'"; exit 1; }; \
-	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s"
+	echo "qc-fast: GREEN on '$(QC)' within $(QC_BUDGET)s, $$(grep -o '[0-9]* undecided' $(QC_LOG) | head -1), $$(grep -c '^  bears on contiguity$$' $(QC_STREAM)) bearing on contiguity, $$(grep -c '^  holds values back at the fuel$$' $(QC_STREAM)) holding values back at the fuel, $$(grep -c '^  groups values$$' $(QC_STREAM)) grouping values"
 
 
 # THE ONE TO POLL.  Exits 3 while running, 1 when red -- but never loop on it

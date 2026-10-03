@@ -1,5 +1,8 @@
 module Thy where
 
+-- NESTED: a GHC pragma inside an Agda one, whose first `#-}` is not its close.
+{-# FOREIGN GHC {-# LANGUAGE StrictData #-} #-}
+
 postulate Nat : Set
 
 -- WIRED: applied by a real body that Main reaches.

@@ -31,7 +31,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel; Id; valueᵖ; completeᵖ; after_,_; hot)
 open import Rx.Exp       using (Ctx; Ty; Val; isData; input)
-open import SExp.Syntax      using (SExp; Kinds; emitᵗ)
+open import SExp.Syntax      using (SExp; Kinds; emitᵗ; plainᵗ)
 open import Rx.Slots     using (Slots; scripted)
 open import SExp.Simul-Slots using (SimulSlots)
 open import SExp.InstEmit  using (machineEmitᵗ)
@@ -39,7 +39,7 @@ open import Rx.Evaluator using (Burst)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import SExp.Plain     using (unplainᵈ)
 open import SExp.Batch     using (batchSimultaneousᵖ)
-open import SExp.Pipeline using (emitsᴵ; runᴵ)
+open import SExp.Pipeline using (emitsᴵ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 import Spec
@@ -69,12 +69,32 @@ batchedᴮ t ok xs =
   slots : Slots (Γᴮ t)
   slots zero = scripted {ok = emitData t ok} (hot (map (λ x → after 0 , x) xs))
 
+-- BOTH SIDES ARE FUNCTIONS OF ONE RUN'S EMITS: the second evaluator's
+-- batches of them, and the spec's grouping of the same emits decoded
+batchedᴱ : ∀ {n} {Γ′ : Ctx n} t → T (isData t) → Burst Γ′ (emitᵗ t) → List (List (Val (Γᴮ t) t))
+batchedᴱ t ok es = batchedᴮ t ok (emitsᴮ t ok es)
+
+groupedᴱ : ∀ {n} {Γ′ : Ctx n} t → T (isData t) → Burst Γ′ (emitᵗ t) → List (List (Val (Γᴮ t) t))
+groupedᴱ t ok es =
+  spec-batchSimultaneous (map (map₂ (unplainᵈ t ok)) (instExtract (decodeEmits {a = plainᵗ t} es)))
+
 Batchable : Set
 Batchable =
   ∀ {n} {Γ : Ctx n} {t} (ok : T (isData t)) (κ : Kinds n) (fuel : Fuel)
     (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) →
-  batchedᴮ t ok (emitsᴮ t ok (emitsᴵ κ fuel e ins))
-    ≡ spec-batchSimultaneous (map (map₂ (unplainᵈ t ok)) (instExtract (runᴵ κ fuel e ins)))
+  batchedᴱ t ok (emitsᴵ κ fuel e ins) ≡ groupedᴱ t ok (emitsᴵ κ fuel e ins)
 
 postulate
+  -- THE COMPILED SWEEP REACHES THE FLATTENERS, AND FOUND NOTHING.
+  -- `make qc-batchable` decides this statement itself; at depth 3, fuel
+  -- one, seeds 12..17 gave no red, and seed 17 alone had 338 cases
+  -- grouping values under an author flattener and 89 under a `μ`, every
+  -- one agreeing.  Those counts are read at fuel one only.
+  --
+  -- PROBED: `Probed.Batchable` -- by `refl` at fuel 30 over three first-order
+  --   programs: a scripted slot taken to one of two arrivals, the script's
+  --   two arrivals kept (two instants), and a literal of two values (one
+  --   instant).  Not a flattener, a share, a `μ` nor a cold slot: a
+  --   flattener's run does not reduce in the typechecker inside 8 GB at fuel
+  --   30 or 3, so those shapes are `make quickcheck`'s alone.
   batchable : Batchable

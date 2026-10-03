@@ -14,10 +14,12 @@ postulate
   _>>=_    : {A B : Set} → IO A → (A → IO B) → IO B
   getContents : IO String
   putStr      : String → IO Unit
+  putErr      : String → IO Unit
 {-# FOREIGN GHC import qualified Data.Text.IO as TIO #-}
 {-# FOREIGN GHC import qualified System.IO #-}
 {-# COMPILE GHC _>>=_ = \_ _ m k -> m >>= k #-}
 {-# COMPILE GHC getContents = TIO.getContents #-}
 {-# COMPILE GHC putStr = \s -> TIO.putStr s >> System.IO.hFlush System.IO.stdout >> return () #-}
+{-# COMPILE GHC putErr = \s -> TIO.hPutStr System.IO.stderr s >> System.IO.hFlush System.IO.stderr >> return () #-}
 
 infixl 1 _>>=_

@@ -1,7 +1,7 @@
 module Rx.Evaluator where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
-open import Data.Fin     using (Fin; toℕ)
+open import Data.Fin     using (Fin; toℕ; zero; suc)
 open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
@@ -18,7 +18,7 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Ordinal; Source; Timed; after_,_; hot; cold; PlainEvent)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; _+ᵗ_; unitᵗ; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _+ᵗ_; unitᵗ; boolᵗ; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
 
 variable
   lo : ℕ
@@ -127,10 +127,23 @@ mkHot {Γ = Γ} ins i with ins i
 ... | scripted (cold _ _)  = []
 ... | shared _             = []
 
+-- A TABLE, NOT A FUNCTION.  A slot is computed where it is read, and a
+-- run reads every slot at every budget check, so a share's definition
+-- would be elaborated and stratification-checked again each time.
+-- `memoᶠ` builds one cell per index, each a thunk forced at most once:
+-- the partial application of `consᶠ` is what the run holds.
+consᶠ : ∀ {n} {P : Fin (suc n) → Set} → P zero → (∀ i → P (suc i)) → ∀ i → P i
+consᶠ x _ zero    = x
+consᶠ _ g (suc i) = g i
+
+memoᶠ : ∀ {n} {P : Fin n → Set} → (∀ i → P i) → ∀ i → P i
+memoᶠ {zero}  f ()
+memoᶠ {suc n} f = consᶠ (f zero) (memoᶠ (λ i → f (suc i)))
+
 sched-init : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Sched Γ
 sched-init {n = n} {Γ = Γ} e ins = record
   { mint = mint-init n
-  ; live = concat (tabulate (mkHot ins)) ; slots = ins }
+  ; live = concat (tabulate (mkHot ins)) ; slots = memoᶠ ins }
 
 -- pop the pending arrival minimal by (tick, ordinal), or report empty.
 -- The workers are TOP-LEVEL (not where-local of sched-next) so a proof
@@ -208,7 +221,7 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- is named for what it HOLDS rather than for whichever
                -- former happens to be installed over it.  The type is
                -- existential, so each read pays a `_≟ᵗ_`.
-  take-st    : ℕ → NodeState Γ                  -- emissions remaining
+  take-st    : ℕ → NodeState Γ                  -- the budget remaining
   mergeAll-st : ∀ {t} → (limit : Maybe ℕ) (active : ℕ)
                (queued : List (Val Γ (obs t))) (outerDone : Bool) → NodeState Γ
                -- ONE state for every concurrency.  The two states this
@@ -309,7 +322,15 @@ data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
                -- raise fin, and neither can see the frame it is
                -- stepping — which is what keeps both expressible as the
                -- plain-rxjs operators they are named after.
-  take-f     : ∀ {s} → NodeId → Frame Γ s s
+  take-f     : ∀ {s} → Maybe (FnClo Γ s boolᵗ) → NodeId → Frame Γ s s
+               -- ONE FRAME FOR `take` AND `takeWhile`, BECAUSE THEY DIFFER
+               -- ONLY IN WHICH VALUE SPENDS THE BUDGET.  A count spends one
+               -- per value; a test leaves a budget of one unspent until a
+               -- value FAILS it, and that value still leaves -- rxjs's
+               -- inclusive `takeWhile(p , true)`.  Either way the value
+               -- that spends the last of it leaves, the frame cuts
+               -- mid-burst and the stream ends, so the node, the cut and
+               -- every fact about them are shared.
   batchSync-f : ∀ {s} → NodeId → Frame Γ s (s ×ᵗ listᵗ s)
                -- THE ONLY FRAME WHOSE OUTPUT TYPE IS NOT ITS INPUT'S
                -- OR A LAYER OFF IT, AND THE GROUPING IS WHY.  Values
@@ -408,7 +429,7 @@ lowerFloor le (f ↠[ h ] p)     = f ↠[ ≤-trans le h ] p
 frameNodes : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List NodeId
 frameNodes (map-f _)          = []
 frameNodes (scan-f _ k)       = k ∷ []
-frameNodes (take-f k)         = k ∷ []
+frameNodes (take-f _ k)       = k ∷ []
 frameNodes (batchSync-f k)    = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
 frameNodes (thru-outer _ k) = k ∷ []
@@ -491,10 +512,34 @@ record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
 -- and it rides on the schedule, which this function is not given; the
 -- caller reads `regᵏ` and advances it in the same breath, which is the
 -- shape node instances already have.
+--
+-- AND A CHAIN THROUGH A TAKE THAT HAS ALREADY CUT IS NOT REGISTERED AT
+-- ALL.  rxjs's take unsubscribes everything above it as it completes,
+-- so nothing upstream subscribes again: an `of` checks `closed` before
+-- each next item, and a flattener whose outer has been torn down never
+-- reaches its queued inners.  The evaluator answers a burst at a time,
+-- so a subscription the cut should have prevented can still be made
+-- later in the same instant -- a flattener's next inner behind a share
+-- whose fan-out the cut landed in.  Registered, it threads every
+-- flattener above the take, and each of them reads its completion as
+-- an inner still running.  Only the registry decides it, so every other
+-- field of the store is the caller's, unchanged.
+spentAt : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Bool
+spentAt (just (take-st zero)) = true
+spentAt _                     = false
+
+spentOn : ∀ {n} {Γ : Ctx n} {lo s t} → Path Γ lo s t → List (NodeId × NodeState Γ) → Bool
+spentOn root                  ns = false
+spentOn (share-sink i _)      ns = false
+spentOn (take-f _ k ↠[ _ ] p) ns = spentAt (lookupNode k ns) ∨ spentOn p ns
+spentOn (_ ↠[ _ ] p)          ns = spentOn p ns
+
 register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → RegId → (rs : RegSrc Γ) → Path Γ (regFloor rs) u t → EvalSt e → EvalSt e
 register {u = u} rid rs path st =
-  record st { registry = EvalSt.registry st ++ (rid , rs , u , path) ∷ [] }
+  record st { registry = if spentOn path (EvalSt.nodes st)
+                         then EvalSt.registry st
+                         else EvalSt.registry st ++ (rid , rs , u , path) ∷ [] }
 
 installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → NodeId → NodeState Γ → EvalSt e → EvalSt e
@@ -548,32 +593,40 @@ chainsOf a st = chainsGo a (EvalSt.registry st)
 -- limit.  Real `take` cuts MID-BURST rather than waiting for the burst
 -- to finish, which is what the third component says and what the
 -- dispatch below acts on.
-takeVals : ∀ {n} {Γ : Ctx n} {s} → ℕ → List (Val Γ s) → List (Val Γ s) × ℕ × Bool
-takeVals zero          _        = [] , zero , false
-takeVals (suc k)       []       = [] , suc k , false
-takeVals (suc zero)    (v ∷ _)  = v ∷ [] , zero , true
-takeVals (suc (suc k)) (v ∷ vs) =
-  takeVals (suc k) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
+spends : ∀ {n} {Γ : Ctx n} {s} → Maybe (FnClo Γ s boolᵗ) → Val Γ s → Bool
+spends nothing  _ = true
+spends (just p) v = not (applyClo p v)
+
+takeVals : ∀ {n} {Γ : Ctx n} {s} → Maybe (FnClo Γ s boolᵗ) → ℕ → List (Val Γ s)
+         → List (Val Γ s) × ℕ × Bool
+takeVals w zero          _        = [] , zero , false
+takeVals w (suc k)       []       = [] , suc k , false
+takeVals w (suc zero)    (v ∷ vs) with spends w v
+... | true  = v ∷ [] , zero , true
+... | false = takeVals w (suc zero) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
+takeVals w (suc (suc k)) (v ∷ vs) with spends w v
+... | true  = takeVals w (suc k) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
+... | false = takeVals w (suc (suc k)) vs |>′ λ (out , rem , didCut) → v ∷ out , rem , didCut
 
 -- take's whole step.  Non-cut passes the budgeted prefix through and
 -- threads the remaining count; the cut exhausts the budget, forces the
 -- end, and severs the registrations threaded through this node.
 takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-             → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
+             → Maybe (FnClo Γ s boolᵗ) → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
              → Maybe (NodeState Γ)
              → List (Val Γ s) × Bool × Sched Γ × EvalSt e
-takeDispatch nid vals fin sched st (just (take-st k)) =
-  if proj₂ (proj₂ (takeVals k vals))
+takeDispatch w nid vals fin sched st (just (take-st k)) =
+  if proj₂ (proj₂ (takeVals w k vals))
   then (cutThrough nid (EvalSt.registry st) |>′ λ (kept , cutRids) →
-        proj₁ (takeVals k vals) , true ,
+        proj₁ (takeVals w k vals) , true ,
            record sched { live = sweepLive kept (Sched.live sched) } ,
            record st { registry = kept
                      ; cancelled = cutRids ++ EvalSt.cancelled st
                      ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
-  else (proj₁ (takeVals k vals) , fin , sched ,
-        record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+  else (proj₁ (takeVals w k vals) , fin , sched ,
+        record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals w k vals))))
                                       (EvalSt.nodes st) })
-takeDispatch nid vals fin sched st _ = [] , fin , sched , st
+takeDispatch w nid vals fin sched st _ = [] , fin , sched , st
 
 -- scan's per-value fold: one running output per input, threading the
 -- accumulator.  Its output IS its carried state, which is what rxjs's

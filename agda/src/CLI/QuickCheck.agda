@@ -1,8 +1,10 @@
 -- An all-Agda QuickCheck: generate random well-typed programs (exp tree +
 -- scripted inputs) over a fixed 2-slot nat context, run them through the
--- evaluator, and decide every top-line statement that computes on the
--- run: the batcher's batches against the spec's, in raw values; the
--- batches joined back up against the plain program's values. A fast in-Agda dev loop for the implementation.
+-- real evaluator, and decide the four statements `Main` imports and the
+-- simulation two of them stand on, each at its own sides
+-- (`CLI.Unit-Test.Prelude`): one quickcheck per statement, selectable
+-- one at a time.  A fast in-Agda dev loop for the
+-- implementation.
 --
 --   agda --compile --compile-dir=_cli src/CLI/QuickCheck.agda
 --   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
@@ -50,31 +52,41 @@
 module CLI.QuickCheck where
 
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
+open import Data.Bool.ListAction using (any)
 open import Data.Char using (toℕ)
 open import Data.Fin using (Fin; zero; suc)
-open import Data.List using (List; []; _∷_; map; length; concat; take)
+open import Data.List using (List; []; _∷_; map; length; concat; concatMap; take; zipWith)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Maybe using (nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.String using (String; _++_; toList)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.String using (String; _++_; toList) renaming (length to lengthˢ)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim using (after_,_; Timed; ObservableInput; hot; cold; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ;
+open import Rx.Exp using (Ty; Ctx; boolᵗ; natᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ;
+  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Exp; Tm; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
+  flattenᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; foldᵗ; nilᵗ; consᵗ; pairᵗ; fstᵗ;
+  sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
+open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ;
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import CLI.Emit-Eq using (eqBatches)
-open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; runOf; implBatchesOf;
-  specBatchesOf; specOf; plainOf; plainAgreesᵇ; agrees)
+open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
+open import SExp.Pipeline using (runᴵ; elaborateImpl)
+open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
+  left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
+  batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
+  same-clockˢ; sameClockᵇ; Key;
+  ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
+  Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; lockstepᵇ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
-open import CLI.IO using (_>>=_; getContents; putStr; Unit)
+open import CLI.IO using (_>>=_; getContents; putStr; putErr; Unit)
 
 ------------------------------------------------------------------------
 -- randomness (FFI: a pure LCG over Integer, no unary-ℕ blowup)
@@ -92,6 +104,25 @@ postulate randFold : {A : Set} → ℕ → ℕ → (ℕ → A → A) → A → A
 
 postulate natMod : ℕ → ℕ → ℕ
 {-# COMPILE GHC natMod = \a b -> if b == 0 then 0 else a `mod` b #-}
+
+-- A WALL CLOCK AROUND ONE PURE VALUE: `within s n x d` is `x` when `n`,
+-- a number whose evaluation forces `x`, finishes within `s` seconds, and
+-- `d` otherwise.  It is the
+-- harness's one cap, because it is the one that does not change what is
+-- run; zero seconds is no bound at all.
+{-# FOREIGN GHC import qualified System.Timeout #-}
+{-# FOREIGN GHC import qualified Control.Exception #-}
+{-# FOREIGN GHC import qualified System.IO.Unsafe #-}
+{-# FOREIGN GHC
+withinH :: Integer -> Integer -> a -> a -> a
+withinH s n x d
+  | s == 0    = x
+  | otherwise = System.IO.Unsafe.unsafePerformIO
+      (maybe d id <$> System.Timeout.timeout (fromInteger (s * 1000000))
+                        (Control.Exception.evaluate n >> return x))
+#-}
+postulate within : {A : Set} → ℕ → ℕ → A → A → A
+{-# COMPILE GHC within = \_ -> withinH #-}
 
 randList : ℕ → ℕ → List ℕ
 randList seed count = randFold seed count _∷_ []
@@ -224,34 +255,61 @@ genFn = genB 4 >>=G λ c → genNat >>=G λ k →
     else if c ≡ᵇ 2 then primˢ mul (pairˢ (varˢᵗ (here refl)) (natˢ k))
     else natˢ k)
 
+-- a `takeWhile` predicate: below a bound, or anything but one value
+genPredFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ boolᵗ)
+genPredFn = genB 2 >>=G λ c → genNat >>=G λ k →
+  pureG (if c ≡ᵇ 0 then primˢ ltᵖ (pairˢ (varˢᵗ (here refl)) (natˢ k))
+    else primˢ notᵖ (primˢ eqᵖ (pairˢ (varˢᵗ (here refl)) (natˢ k))))
+
 -- scan step (acc, cur) → acc + cur
 genScanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) natᵗ)
 genScanFn = pureG (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl)))
                                     (sndˢ (varˢᵗ (here refl)))))
 
--- THE STEP THAT CHANGES AN EMIT'S VALUE COUNT, WHICH IS NOW A FLATTEN
--- AND NOT A STEP AT ALL.  `mapᵉ` and `scanᵉ` are both per-VALUE, so the
+-- THE STEP THAT CHANGES AN EMIT'S VALUE COUNT, WHICH IS A FLATTEN AND
+-- NOT A STEP AT ALL.  `mapᵉ` and `scanᵉ` are both per-VALUE, so the
 -- list they hand back is always as long as the one they were given, and
 -- a sweep built only out of them never changes a count.  Zero-or-more
--- out is `mergeAllˢ` over a step returning LITERAL SYNTAX — rxjs's own
--- `mergeMap(x => …)` — so this generates the step and the lane spends
--- it under a flattener.  The arms are a lattice over what happens to
--- the count: emptied, doubled, one longer, filtered, and unchanged.
+-- out is `flattenˢ` over a step returning an ELEMENT — an optional echo
+-- beside an optional lane of LITERAL SYNTAX, rxjs's own
+-- `mergeMap(x => …)` when the echo is absent — so this generates the
+-- step and the fan arm spends it under a drawn policy.  The lane arms
+-- are a lattice over what happens to the count: emptied, doubled, one
+-- longer, filtered, and unchanged; the echo arms are the same lattice
+-- spent WITHOUT a lane, which no policy sees, and one arm carrying both.
 --
--- THE IDENTITY ARM IS DELIBERATE, on the reasoning `genFn` records: a
+-- THE IDENTITY ARMS ARE DELIBERATE, on the reasoning `genFn` records: a
 -- generator whose every arm exercises the interesting shape cannot
 -- produce the program that distinguishes a step which ignores its input
 -- from one that does not.
-genFanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ (obs natᵗ))
-genFanFn = genB 5 >>=G λ c → genNat >>=G λ k →
+genFanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ)))
+genFanFn = genB 9 >>=G λ c → genNat >>=G λ k →
   let x = varˢᵗ (here refl)
+      lane : ∀ {Δᵍ Δ Θ} → STm Γ₂ Δᵍ Δ Θ (obs natᵗ) → STm Γ₂ Δᵍ Δ Θ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ))
+      lane o = pairˢ (inlˢ unitˢ) (inrˢ o)
+      none = pairˢ (inlˢ unitˢ) (inlˢ unitˢ)
+      echo = pairˢ (inrˢ x) (inlˢ unitˢ)
   in pureG
-    (      if c ≡ᵇ 0 then strmˢ emptyˢ
-      else if c ≡ᵇ 1 then strmˢ (ofˢ (x ∷ x ∷ []))
-      else if c ≡ᵇ 2 then strmˢ (ofˢ (x ∷ natˢ k ∷ []))
+    (      if c ≡ᵇ 0 then lane (strmˢ emptyˢ)
+      else if c ≡ᵇ 1 then lane (strmˢ (ofˢ (x ∷ x ∷ [])))
+      else if c ≡ᵇ 2 then lane (strmˢ (ofˢ (x ∷ natˢ k ∷ [])))
       else if c ≡ᵇ 3 then
-        ifˢ (primˢ ltᵖ (pairˢ x (natˢ k))) (strmˢ emptyˢ) (strmˢ (ofˢ (x ∷ [])))
-      else strmˢ (ofˢ (x ∷ [])))
+        ifˢ (primˢ ltᵖ (pairˢ x (natˢ k))) (lane (strmˢ emptyˢ)) (lane (strmˢ (ofˢ (x ∷ []))))
+      else if c ≡ᵇ 4 then lane (strmˢ (ofˢ (x ∷ [])))
+      else if c ≡ᵇ 5 then none
+      else if c ≡ᵇ 6 then ifˢ (primˢ ltᵖ (pairˢ x (natˢ k))) none echo
+      else if c ≡ᵇ 7 then pairˢ (inrˢ x) (inrˢ (strmˢ (ofˢ (natˢ k ∷ []))))
+      else echo)
+
+-- A FLATTENER'S POLICY, each of rxjs's named ones and the bounded merge
+-- between them
+genOp : Gen FlatOp
+genOp = genB 5 >>=G λ c → genB 3 >>=G λ k →
+  pureG (      if c ≡ᵇ 0 then mergeᶠ nothing
+          else if c ≡ᵇ 1 then mergeᶠ (just (suc k))
+          else if c ≡ᵇ 2 then switchᶠ
+          else if c ≡ᵇ 3 then exhaustᶠ
+          else mergeᶠ nothing)
 
 -- THE ACCUMULATOR AT OBSERVABLE TYPE, WHICH IS THE ONE BINDER THAT
 -- BREAKS A DATA ENVIRONMENT.  Substituting a value of observable type
@@ -271,12 +329,12 @@ genObsScanFn = genB 6 >>=G λ c → genNat >>=G λ k →
   let acc = fstˢ (varˢᵗ (here refl))
       cur = sndˢ (varˢᵗ (here refl))
   in pureG
-    (      if c ≡ᵇ 0 then strmˢ (mergeAllˢ nothing (ofˢ (acc ∷ [])))
+    (      if c ≡ᵇ 0 then strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ (acc ∷ [])))
       else if c ≡ᵇ 1 then acc
       else if c ≡ᵇ 2 then strmˢ (ofˢ (cur ∷ []))
       else if c ≡ᵇ 3 then strmˢ emptyˢ
-      else if c ≡ᵇ 4 then strmˢ (switchAllˢ (ofˢ (acc ∷ [])))
-      else strmˢ (mergeAllˢ nothing
+      else if c ≡ᵇ 4 then strmˢ (flatAllˢ switchᶠ (ofˢ (acc ∷ [])))
+      else strmˢ (flatAllˢ (mergeᶠ nothing)
              (ofˢ (acc ∷ strmˢ (ofˢ (natˢ k ∷ [])) ∷ []))))
 
 -- the fold's own seed, at observable type.  `emptyᵉ` is the shallowest
@@ -336,30 +394,32 @@ genLeafAt g u sl = genB 3 >>=G λ c →
   else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofˢ (natˢ a ∷ natˢ b ∷ [])))
 
 genExpAt g u sl zero    = genLeafAt g u sl
-genExpAt g u sl (suc d) = genB 12 >>=G λ c →
+genExpAt g u sl (suc d) = genB 13 >>=G λ c →
   if c ≡ᵇ 0 then genLeafAt g u sl
   else if c ≡ᵇ 1 then genLeafAt g u sl
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt g u sl d >>=G λ e → pureG (mapˢ f e))
   else if c ≡ᵇ 3 then
     (genScanFn >>=G λ f → genNat >>=G λ z → genExpAt g u sl d >>=G λ e →
      pureG (scanˢ f (natˢ z) e))
-  else if c ≡ᵇ 4 then (genObsAt g u sl d >>=G λ t → pureG (mergeAllˢ nothing t))
+  else if c ≡ᵇ 4 then (genObsAt g u sl d >>=G λ t → pureG (flatAllˢ (mergeᶠ nothing) t))
   else if c ≡ᵇ 5 then
     -- the limit axis, which is where bounded concurrency gets sampled:
     -- 1 is the old concat, 2 and 3 are the middle nothing here could
     -- previously reach.  Two lanes with three parked inners is the
     -- smallest shape whose drain refills more than one lane in a
     -- single instant, so `genB 3` is the floor and not a taste
-    (genB 3 >>=G λ k → genObsAt g u sl d >>=G λ t → pureG (mergeAllˢ (just (suc k)) t))
-  else if c ≡ᵇ 6 then (genObsAt g u sl d >>=G λ t → pureG (switchAllˢ t))
-  else if c ≡ᵇ 7 then (genObsAt g u sl d >>=G λ t → pureG (exhaustAllˢ t))
+    (genB 3 >>=G λ k → genObsAt g u sl d >>=G λ t → pureG (flatAllˢ (mergeᶠ (just (suc k))) t))
+  else if c ≡ᵇ 6 then (genObsAt g u sl d >>=G λ t → pureG (flatAllˢ switchᶠ t))
+  else if c ≡ᵇ 7 then (genObsAt g u sl d >>=G λ t → pureG (flatAllˢ exhaustᶠ t))
   else if c ≡ᵇ 8 then (genSpineG g u sl d >>=G λ b → pureG (μˢ b))
   else if c ≡ᵇ 9 then (genExpAt 0 (g + u) sl d >>=G λ b → pureG (gate g u b))
   else if c ≡ᵇ 10 then
     (genNat >>=G λ k → genExpAt g u sl d >>=G λ e → pureG (takeˢ (natˢ k) e))
+  else if c ≡ᵇ 11 then
+    (genPredFn >>=G λ f → genExpAt g u sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
-    (genFanFn >>=G λ f → genExpAt g u sl d >>=G λ e →
-     pureG (mergeAllˢ nothing (mapˢ f e)))
+    (genOp >>=G λ op → genFanFn >>=G λ f → genExpAt g u sl d >>=G λ e →
+     pureG (flattenˢ op (mapˢ f e)))
 
 genInners g u sl d zero    = pureG []
 genInners g u sl d (suc n) =
@@ -400,7 +460,7 @@ genObsAt g u sl d =
 
 -- past the gate: the var is in scope and this subtree plants exactly one
 genSpineD w sl zero    = pureG (varˢ (here refl))
-genSpineD w sl (suc d) = genB 9 >>=G λ c →
+genSpineD w sl (suc d) = genB 10 >>=G λ c →
   if c ≡ᵇ 0 then pureG (varˢ (here refl))
   else if c ≡ᵇ 1 then (genFn >>=G λ f → genSpineD w sl d >>=G λ e → pureG (mapˢ f e))
   else if c ≡ᵇ 2 then
@@ -409,29 +469,31 @@ genSpineD w sl (suc d) = genB 9 >>=G λ c →
   else if c ≡ᵇ 3 then
     (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
-     pureG (mergeAllˢ nothing (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ (mergeᶠ nothing) (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 4 then
     (genB 3 >>=G λ k → genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
-     pureG (mergeAllˢ (just (suc k)) (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ (mergeᶠ (just (suc k))) (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 5 then
     (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
-     pureG (switchAllˢ (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ switchᶠ (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 6 then
-    (genFanFn >>=G λ f → genSpineD w sl d >>=G λ e →
-     pureG (mergeAllˢ nothing (mapˢ f e)))
+    (genOp >>=G λ op → genFanFn >>=G λ f → genSpineD w sl d >>=G λ e →
+     pureG (flattenˢ op (mapˢ f e)))
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineD w sl d >>=G λ e →
      pureG (takeˢ (natˢ (suc k)) e))
+  else if c ≡ᵇ 8 then
+    (genPredFn >>=G λ f → genSpineD w sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
     (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
-     pureG (exhaustAllˢ (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ exhaustᶠ (ofˢ (strmˢ e ∷ rest))))
 
 -- before the gate: the binder is guarded, so every route ends in a `deferᵉ`
 genSpineG g u sl zero    = pureG (gate (suc g) u (varˢ (here refl)))
-genSpineG g u sl (suc d) = genB 9 >>=G λ c →
+genSpineG g u sl (suc d) = genB 10 >>=G λ c →
   if c ≡ᵇ 0 then (genSpineD (g + u) sl d >>=G λ b → pureG (gate (suc g) u b))
   else if c ≡ᵇ 1 then (genSpineD (g + u) sl d >>=G λ b → pureG (gate (suc g) u b))
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genSpineG g u sl d >>=G λ e → pureG (mapˢ f e))
@@ -441,21 +503,23 @@ genSpineG g u sl (suc d) = genB 9 >>=G λ c →
   else if c ≡ᵇ 4 then
     (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u sl d (suc extra) >>=G λ rest →
-     pureG (mergeAllˢ nothing (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ (mergeᶠ nothing) (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 5 then
     (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u sl d (suc extra) >>=G λ rest →
-     pureG (switchAllˢ (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ switchᶠ (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 6 then
-    (genFanFn >>=G λ f → genSpineG g u sl d >>=G λ e →
-     pureG (mergeAllˢ nothing (mapˢ f e)))
+    (genOp >>=G λ op → genFanFn >>=G λ f → genSpineG g u sl d >>=G λ e →
+     pureG (flattenˢ op (mapˢ f e)))
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineG g u sl d >>=G λ e →
      pureG (takeˢ (natˢ (suc k)) e))
+  else if c ≡ᵇ 8 then
+    (genPredFn >>=G λ f → genSpineG g u sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
     (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u sl d (suc extra) >>=G λ rest →
-     pureG (exhaustAllˢ (ofˢ (strmˢ e ∷ rest))))
+     pureG (flatAllˢ exhaustᶠ (ofˢ (strmˢ e ∷ rest))))
 
 -- the PROGRAM's slot bound is the whole table: a program, unlike a def,
 -- sits above every slot and may read any of them
@@ -479,7 +543,7 @@ genExp d = genExpAt 0 0 2 d
 -- decoder and the TypeScript union spell.
 data Former : Set where
   fInput fOf fEmpty fTake fMap fScan fFlatten fMu fVar fDefer fMint
-    fBatchSync : Former
+    fBatchSync fTakeWhile : Former
 
 formerTag : Former → String
 formerTag fInput      = "input"
@@ -494,10 +558,11 @@ formerTag fVar        = "varE"
 formerTag fDefer      = "defer"
 formerTag fMint       = "mint"
 formerTag fBatchSync  = "batchSync"
+formerTag fTakeWhile  = "takeWhile"
 
 allFormers : List Former
 allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fMap ∷ fScan ∷ fFlatten
-           ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ fBatchSync ∷ []
+           ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ fBatchSync ∷ fTakeWhile ∷ []
 
 formerIx : Former → ℕ
 formerIx fInput      = 0
@@ -512,6 +577,7 @@ formerIx fVar        = 8
 formerIx fDefer      = 9
 formerIx fMint       = 10
 formerIx fBatchSync  = 11
+formerIx fTakeWhile  = 12
 
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
@@ -539,6 +605,7 @@ marksˢ (inputˢ i)       = one fInput
 marksˢ (ofˢ ts)         = one fOf ⊕ marksˢᵗˢ ts
 marksˢ emptyˢ           = one fEmpty
 marksˢ (takeˢ c e)      = one fTake ⊕ marksˢᵗ c ⊕ marksˢ e
+marksˢ (takeWhileˢ f e) = one fTakeWhile ⊕ marksˢᵗ f ⊕ marksˢ e
 -- the second component reads the CARRIED state's type, which is the former's
 -- own accumulator: `isData (obs _)` is false, so it fires exactly when the
 -- former re-binds something the run could subscribe
@@ -546,9 +613,7 @@ marksˢ (mapˢ f e)       = one fMap ⊕ marksˢᵗ f ⊕ marksˢ e
 marksˢ (scanˢ {t = t} f z e) =
   one fScan ⊕ ([] , not (isData t)) ⊕ marksˢᵗ f ⊕ marksˢᵗ z ⊕ marksˢ e
 -- the author's three flatteners are each one `flattenᵉ` over a `mapᵉ`
-marksˢ (mergeAllˢ _ e)  = one fFlatten ⊕ one fMap ⊕ marksˢ e
-marksˢ (switchAllˢ e)   = one fFlatten ⊕ one fMap ⊕ marksˢ e
-marksˢ (exhaustAllˢ e)  = one fFlatten ⊕ one fMap ⊕ marksˢ e
+marksˢ (flattenˢ _ e)   = one fFlatten ⊕ marksˢ e
 marksˢ (μˢ e)           = one fMu ⊕ marksˢ e
 marksˢ (varˢ x)         = one fVar
 marksˢ (deferˢ e)       = one fDefer ⊕ marksˢ e
@@ -572,6 +637,49 @@ marksˢᵗ (strmˢ e)     = marksˢ e
 
 marksˢᵗˢ []       = noMarks
 marksˢᵗˢ (y ∷ ys) = marksˢᵗ y ⊕ marksˢᵗˢ ys
+
+-- THE FORMERS ONLY AN ELABORATION MAY WRITE are counted where they
+-- are written: in the tree the case's program elaborates to, since no
+-- author program can carry one (`SExp.Syntax`).  Only those, because
+-- every other former is the author's and is counted above, where a
+-- second count off the elaborated tree would double it.
+elabMarksᵉ  : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → Marks
+elabMarksᵗ  : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → Marks
+elabMarksᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → Marks
+
+elabMarksᵉ (input i)      = noMarks
+elabMarksᵉ (ofᵉ ts)       = elabMarksᵗˢ ts
+elabMarksᵉ emptyᵉ         = noMarks
+elabMarksᵉ (takeᵉ c e)    = elabMarksᵗ c ⊕ elabMarksᵉ e
+elabMarksᵉ (takeWhileᵉ f e) = elabMarksᵗ f ⊕ elabMarksᵉ e
+elabMarksᵉ (batchSyncᵉ e) = one fBatchSync ⊕ elabMarksᵉ e
+elabMarksᵉ (mapᵉ f e)     = elabMarksᵗ f ⊕ elabMarksᵉ e
+elabMarksᵉ (scanᵉ f z e)  = elabMarksᵗ f ⊕ elabMarksᵗ z ⊕ elabMarksᵉ e
+elabMarksᵉ (flattenᵉ _ e) = elabMarksᵉ e
+elabMarksᵉ (μᵉ e)         = elabMarksᵉ e
+elabMarksᵉ (varᵉ x)       = noMarks
+elabMarksᵉ (deferᵉ e)     = elabMarksᵉ e
+elabMarksᵉ (mintᵉ e)      = one fMint ⊕ elabMarksᵉ e
+
+elabMarksᵗ (varᵗ x)      = noMarks
+elabMarksᵗ unit̂          = noMarks
+elabMarksᵗ (bool̂ _)      = noMarks
+elabMarksᵗ (nat̂ _)       = noMarks
+elabMarksᵗ (foldᵗ l z f) = elabMarksᵗ l ⊕ elabMarksᵗ z ⊕ elabMarksᵗ f
+elabMarksᵗ nilᵗ          = noMarks
+elabMarksᵗ (consᵗ a bs)  = elabMarksᵗ a ⊕ elabMarksᵗ bs
+elabMarksᵗ (pairᵗ a b)   = elabMarksᵗ a ⊕ elabMarksᵗ b
+elabMarksᵗ (fstᵗ p)      = elabMarksᵗ p
+elabMarksᵗ (sndᵗ p)      = elabMarksᵗ p
+elabMarksᵗ (inlᵗ a)      = elabMarksᵗ a
+elabMarksᵗ (inrᵗ a)      = elabMarksᵗ a
+elabMarksᵗ (caseᵗ s l r) = elabMarksᵗ s ⊕ elabMarksᵗ l ⊕ elabMarksᵗ r
+elabMarksᵗ (ifᵗ c a b)   = elabMarksᵗ c ⊕ elabMarksᵗ a ⊕ elabMarksᵗ b
+elabMarksᵗ (primᵗ _ a)   = elabMarksᵗ a
+elabMarksᵗ (strmᵗ e)     = elabMarksᵉ e
+
+elabMarksᵗˢ []       = noMarks
+elabMarksᵗˢ (y ∷ ys) = elabMarksᵗ y ⊕ elabMarksᵗˢ ys
 
 ------------------------------------------------------------------------
 -- a compact dump of both sides' batches (for failure reports)
@@ -634,8 +742,17 @@ showPrim ltᵖ  = "ltᵖ"
 showPrim eqᵘ  = "eqᵘ"
 showPrim notᵖ = "notᵖ"
 
+-- the limit prints as the `Maybe ℕ` it IS, not as the ∞ a reader would
+-- prefer: a witness is printed to be PASTED, and the corpus is Agda
+showFlatOp : FlatOp → String
+showFlatOp (mergeᶠ nothing)  = "(mergeᶠ nothing)"
+showFlatOp (mergeᶠ (just k)) = "(mergeᶠ (just " ++ show k ++ "))"
+showFlatOp switchᶠ           = "switchᶠ"
+showFlatOp exhaustᶠ          = "exhaustᶠ"
+
 showSExp : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → String
 showSTm  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → String
+showFlat : ∀ {Δᵍ Δ Θ u} → FlatOp → SExp Γ₂ Δᵍ Δ Θ u → String
 
 showSTmList : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → String
 showSTmList []       = "[]"
@@ -673,19 +790,22 @@ showSExp (inputˢ i)      = "(inputˢ " ++ showFin i ++ ")"
 showSExp (ofˢ items)     = "(ofˢ (" ++ showSTmList items ++ "))"
 showSExp emptyˢ          = "emptyˢ"
 showSExp (takeˢ n e)     = "(takeˢ " ++ showSTm n ++ " " ++ showSExp e ++ ")"
+showSExp (takeWhileˢ f e) = "(takeWhileˢ " ++ showSTm f ++ " " ++ showSExp e ++ ")"
 showSExp (mapˢ f e)      = "(mapˢ " ++ showSTm f ++ " " ++ showSExp e ++ ")"
 showSExp (scanˢ f z e)   =
   "(scanˢ " ++ showSTm f ++ " " ++ showSTm z ++ " " ++ showSExp e ++ ")"
--- the limit prints as the `Maybe ℕ` it IS, not as the ∞ a reader would
--- prefer: a witness is printed to be PASTED, and the corpus is Agda
-showSExp (mergeAllˢ nothing s)  = "(mergeAllˢ nothing " ++ showSExp s ++ ")"
-showSExp (mergeAllˢ (just k) s) =
-  "(mergeAllˢ (just " ++ show k ++ ") " ++ showSExp s ++ ")"
-showSExp (switchAllˢ s)  = "(switchAllˢ " ++ showSExp s ++ ")"
-showSExp (exhaustAllˢ s) = "(exhaustAllˢ " ++ showSExp s ++ ")"
+showSExp (flattenˢ op s) = showFlat op s
 showSExp (μˢ e)          = "(μˢ " ++ showSExp e ++ ")"
 showSExp (varˢ x)        = "(varˢ " ++ showIx x ++ ")"
 showSExp (deferˢ e)      = "(deferˢ " ++ showSExp e ++ ")"
+
+-- rxjs's named flatteners print as the corpus's `flatAllˢ`, which is
+-- what they expand to, and every other flatten prints as itself.  It
+-- takes its argument at ANY type because printing reads none: at the
+-- element type an `inputˢ`'s lookup cannot be unified against a pair.
+showFlat op (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (varˢᵗ (here refl)))) s) =
+  "(flatAllˢ " ++ showFlatOp op ++ " " ++ showSExp s ++ ")"
+showFlat op s = "(flattenˢ " ++ showFlatOp op ++ " " ++ showSExp s ++ ")"
 
 ------------------------------------------------------------------------
 -- one case, a run, and reporting
@@ -702,13 +822,19 @@ showSExp (deferˢ e)      = "(deferˢ " ++ showSExp e ++ ")"
 -- reached only by paying for it.  `scripts/gen-unit-tests.sh` therefore
 -- bounds a SEED in wall clock and reports the ones it could not run.
 --
--- What retires it is the ROOT CAP, not a budget read from here: the
--- prelude's `capProg` puts a `takeᵉ` above every elaborated tree, which
--- unsubscribes the fixpoint instead of letting it be performed and then
--- discarded.  The wall-clock bound stays on as a backstop for whatever
--- the cap does not cut.
+-- AND NOTHING CUTS THE RUN FROM INSIDE, because every check is a
+-- statement's own sides at the drawn program, and a `takeᵉ` above it is
+-- a different program.  An author's `takeˢ` above it IS an instance, and
+-- was measured: it buys nothing, since the cases that outrun a sweep
+-- spend it inside the subscribe frame, at fuel 1, before any value.  So
+-- the cap is a WALL CLOCK PER CASE (`CASE`, stdin's ninth number): a case
+-- that outruns it is reported as a `timeout`, with its paste row, and the
+-- sweep goes on to the next.
 FUEL : ℕ
 FUEL = 30
+
+CASE : ℕ
+CASE = 10
 
 -- A PASTE-READY BUG-CACHE ROW: the block IS a row of
 -- `CLI.Unit-Test.cases`, trailing `∷` included, so the script
@@ -717,9 +843,9 @@ FUEL = 30
 -- typecheck as it stands; the script substitutes the seed.  Line 2 --
 -- the program -- is the dedup key.
 --
--- ONE SHAPE FOR BOTH CHECKS, and that is what makes the key work: the
--- cache holds every row to BOTH properties, so a program that fails
--- either one wants the same row, and a program that fails both dedups
+-- ONE SHAPE FOR EVERY CHECK, and that is what makes the key work: the
+-- cache holds every row to every statement, so a program that fails
+-- any one wants the same row, and a program that fails several dedups
 -- to it instead of being cached twice.
 --
 -- THE SLOT TABLE IS RENDERED RATHER THAN NAMED, because the sweep
@@ -727,36 +853,128 @@ FUEL = 30
 -- from the one that failed.  Both definitions are printed through the
 -- same `showSExp` the program goes through, and `mkSlots` is in the
 -- prelude so the corpus can see the name.
-pasteRow : SExp Γ₂ [] [] [] natᵗ
-         → Script → SExp Γ₂ [] [] [] natᵗ → String
-pasteRow e d₀ d₁ =
-  "\n-- <<<PASTE\n  cached \"?\" " ++ show FUEL ++ "\n          "
+--
+-- AN UNDECIDED CASE PRINTS THE SAME ROW UNDER ITS OWN MARKERS, because
+-- the script appends every `PASTE` block to the corpus and the corpus
+-- holds known counterexamples only: a case past its clock is not one
+-- (Anthony), and a row of it would be red until the evaluator got
+-- faster rather than until anything was fixed.
+rowIn : String → ℕ → SExp Γ₂ [] [] [] natᵗ
+      → Script → SExp Γ₂ [] [] [] natᵗ → String
+rowIn m f e d₀ d₁ =
+  "\n-- <<<" ++ m ++ "\n  cached \"?\" " ++ show f ++ "\n          "
        ++ showSExp e ++ "\n          (mkSlots (" ++ showScript d₀ ++ ")\n"
-       ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- PASTE>>>\n"
+       ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- " ++ m ++ ">>>\n"
 
-report : String → SExp Γ₂ [] [] [] natᵗ
-       → Script → SExp Γ₂ [] [] [] natᵗ
-       → List (List ℕ) → List (List ℕ) → List (InstEmit ℕ) → String
-report tag e d₀ d₁ impl spec raw =
-  "  " ++ tag ++ "\n    impl = " ++ showBatches impl
-       ++ "\n    spec = " ++ showBatches spec
-       ++ "\n    raw  = " ++ showStream raw ++ pasteRow e d₀ d₁
+pasteRow : ℕ → SExp Γ₂ [] [] [] natᵗ
+         → Script → SExp Γ₂ [] [] [] natᵗ → String
+pasteRow = rowIn "PASTE"
 
--- the batches joined back up against the plain program's values
-reportPlain : SExp Γ₂ [] [] [] natᵗ
-            → Script → SExp Γ₂ [] [] [] natᵗ
-            → List (List ℕ) → List ℕ → List (InstEmit ℕ) → String
-reportPlain e d₀ d₁ impl plain run =
-  "  PLAIN\n    impl  = " ++ showBatches impl
-       ++ "\n    plain = " ++ showVals plain
-       ++ "\n    raw   = " ++ showStream run ++ pasteRow e d₀ d₁
+-- what a case was drawn from: the program and its slot table
+Drawn : Set
+Drawn = SExp Γ₂ [] [] [] natᵗ × Script × SExp Γ₂ [] [] [] natᵗ
 
--- one count per former, in `allFormers` order, plus the obs-fold count
+showPair : {A : Set} → (A → String) → A × A → String
+showPair f (l , r) = "lhs = " ++ f l ++ "\n    rhs = " ++ f r
+
+showStamps : List (ℕ × List ℕ) → String
+showStamps []            = ""
+showStamps ((i , p) ∷ ps) = "@" ++ show i ++ showVals p ++ " " ++ showStamps ps
+
+-- ONE STATEMENT ON ONE CASE: whether it holds, and its sides rendered.
+-- EACH TAKES ITS SIDES AS ONE ARGUMENT.  A `let` is substituted at
+-- compile time, so a name used in the verdict and again in the report
+-- is two evaluations; a function argument is one shared thunk.
+pairᴸ : List ℕ × List ℕ → Bool × String
+pairᴸ (l , r) = eqListℕ l r , showPair showVals (l , r)
+
+-- the plain run between the joined runs at the fuel and one past it
+sandwichᴸ : List ℕ × List ℕ × List ℕ → Bool × String
+sandwichᴸ (l , p , l′) =
+  prefixListℕ l p ∧ prefixListℕ p l′ ,
+  "joined = " ++ showVals l ++ "\n    plain = " ++ showVals p ++ "\n    joined at one more fuel = " ++ showVals l′
+
+pairᴮ : List (List ℕ) × List (List ℕ) → Bool × String
+pairᴮ (l , r) = eqBatches l r , showPair showBatches (l , r)
+
+pairsᵀ : List (ℕ × List ℕ) → Bool × String
+pairsᵀ ps = allPairsᵇ ps , "stamped = " ++ showStamps ps
+
+namesᵀ : List ℕ × List (List ℕ) → Bool × String
+namesᵀ (ar , ps) = namesᵇ (ar , ps) ,
+  "@arrival packet = " ++ showStamps (zipWith (λ a q → a , q) ar ps)
+  ++ "\n    " ++ show (length ar) ++ " arrivals, " ++ show (length ps) ++ " packets"
+
+showItem : Item → String
+showItem (p , inj₁ a) = showVals p ++ ":" ++ show a
+showItem (p , inj₂ _) = showVals p ++ ":END"
+
+-- a program's two runs cut at their arrivals, one slice to a bracket
+showArr : {A : Set} → (A → String) → Arr A → String
+showArr sh (is , dry , ps , ik , pk , cl) =
+  "impl slices = " ++ commaJoin (map (λ i → "[" ++ commaJoin (map (λ p → "@" ++ show (proj₁ p) ++ " " ++ sh (proj₂ p)) i) ++ "]") is) ++
+  (if dry then " (queue dry)" else " (at the fuel cap)") ++
+  "\n    plain slices = " ++ commaJoin (map (λ p → "[" ++ commaJoin (map sh p) ++ "]") ps) ++
+  "\n    impl keys = " ++ showKeys ik ++ "\n    plain keys = " ++ showKeys pk ++
+  "\n    impl clocks = " ++ commaJoin (map show cl)
+  where
+    showKeys : List Key → String
+    showKeys ks = commaJoin (map (λ k → show (proj₁ k) ++ "/" ++ show (proj₂ k)) ks)
+
+-- A STATEMENT IS DECIDED IN HALVES WHERE ITS RUNS ARE INDEPENDENT: what
+-- reads the program's own run, and what reads its timed translation's.
+-- The timed impl run can outlast any clock where the program's own run
+-- takes a tenth of a second, and under one clock a failing untimed half
+-- was reported as undecided, since its report prints both runs.  So a
+-- sweep decides every cheap half first and every dear one after,
+-- stopping at the first past its clock: a slow case still costs one
+-- clock, and only what reads the slow run goes undecided.
+halves : Case → Statement → List (Bool × String) × List (Bool × String)
+halves c left-to-rightˢ  = sandwichᴸ (ltrSides c) ∷ [] , []
+halves c timing-correctˢ = [] , pairsᵀ (stampsOf c) ∷ []
+halves c batchableˢ      = pairᴮ (batchableSides c) ∷ [] , []
+halves c timed-faithfulˢ = [] , pairᴸ (faithfulSides c) ∷ []
+halves c simulationˢ     =
+  (simᵇ _≡ᵇ_ (arrPlain c) , showArr show (arrPlain c)) ∷ []
+  , (simᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
+halves c arrival-runsˢ   =
+  (lockstepᵇ _≡ᵇ_ (arrPlain c) , showArr show (arrPlain c)) ∷ []
+  , (lockstepᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
+halves c batched-sandwichˢ = sandwichᴸ (bsSides c) ∷ [] , []
+halves c packets-name-arrivalsˢ = [] , namesᵀ (namingSides c) ∷ []
+halves c same-clockˢ     =
+  (sameClockᵇ (arrPlain c) , showArr show (arrPlain c)) ∷ []
+  , (sameClockᵇ (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
+
+joinᴴ : List (Bool × String) → Bool × String
+joinᴴ []             = true , ""
+joinᴴ (h ∷ [])       = h
+joinᴴ ((b , r) ∷ hs) with joinᴴ hs
+... | b′ , r′ = b ∧ b′ , r ++ "\n    " ++ r′
+
+decide : Case → Statement → Bool × String
+decide c s = joinᴴ (proj₁ (halves c s) ++ᴸ proj₂ (halves c s))
+
+-- a report counts statements in `Main`'s order
+indexOf : Statement → ℕ
+indexOf left-to-rightˢ  = 0
+indexOf timing-correctˢ = 1
+indexOf batchableˢ      = 2
+indexOf timed-faithfulˢ = 3
+indexOf simulationˢ     = 4
+indexOf arrival-runsˢ = 5
+indexOf batched-sandwichˢ = 6
+indexOf packets-name-arrivalsˢ = 7
+indexOf same-clockˢ = 8
+
+-- one count per former, in `allFormers` order, plus the obs-fold count,
+-- the count of cases bearing on contiguity and of those holding values
+-- back at the fuel
 Tally : Set
-Tally = List ℕ × ℕ
+Tally = List ℕ × ℕ × ℕ × ℕ × ℕ
 
 zeroTally : Tally
-zeroTally = map (λ _ → 0) allFormers , 0
+zeroTally = map (λ _ → 0) allFormers , 0 , 0 , 0 , 0
 
 carries : Former → List Former → Bool
 carries f []       = false
@@ -768,49 +986,158 @@ bumpEach fs (g ∷ gs) []       = []
 bumpEach fs (g ∷ gs) (c ∷ cs) =
   (if carries g fs then suc c else c) ∷ bumpEach fs gs cs
 
-bump : Marks → Tally → Tally
-bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
+-- a case's marks, whether it bears on contiguity, whether its batcher
+-- holds values back at the fuel, whether its values group, and whether
+-- an impl arrival matches no plain one
+Seen : Set
+Seen = Marks × Bool × Bool × Bool × Bool
 
--- EACH RUN IS AN ARGUMENT, SO IT IS COMPUTED ONCE.  A `let` is
--- substituted at compile time, so a name used in three checks is three
--- evaluations; a function argument is one shared thunk.
---
+bump : Seen → Tally → Tally
+bump ((fs , o) , b , h , g , _) (cs , p , q , r , u) =
+  bumpEach fs allFormers cs , (if o then suc p else p) , (if b then suc q else q)
+  , (if h then suc r else r) , (if g then suc u else u)
+
 -- ONE CHECK PER STATEMENT, so a report says which claim a program
--- breaks rather than that it breaks one: FAIL is `batchable`, PLAIN is
--- `left-to-right`.
+-- breaks rather than that it breaks one.
 check : ℕ → Bool → String → List (ℕ × String)
 check k true  r = []
 check k false r = (k , r) ∷ []
 
-verdict : SExp Γ₂ [] [] [] natᵗ → Script → SExp Γ₂ [] [] [] natᵗ
-        → List (List ℕ) → List (InstEmit ℕ) → List ℕ
-        → List (ℕ × String)
-verdict e d₀ d₁ impl run plain =
-  check 0 (eqBatches impl spec) (report "FAIL" e d₀ d₁ impl spec run)
-  ++ᴸ check 1 (plainAgreesᵇ run impl plain) (reportPlain e d₀ d₁ impl plain run)
-  where
-  spec = specOf run
+judgeOf : ℕ → Drawn → Statement → Bool × String → List (ℕ × String)
+judgeOf f (e , d₀ , d₁) s (b , body) =
+  check (indexOf s) b ("  " ++ statementName s ++ "\n    " ++ body ++ pasteRow f e d₀ d₁)
 
-oneCase : ℕ → Gen (Marks × List (ℕ × String))
--- THE DRAWN TREE IS WHAT IS COUNTED AND WHAT IS PRINTED, AND THE CAP IS
--- NEITHER.  It is applied above the elaboration, so it is not a former
--- of the author's tree at all and cannot inflate a census; and a cached
--- row names the author's program, since the cap is the harness's and
--- `runOf` re-applies it wherever the row is run.
-oneCase d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
-  in pureG (marksˢ e , verdict e (proj₁ ds) (proj₂ ds)
-                               (implBatchesOf c) (runOf c) (plainOf c))
 
--- accumulate EVERY failing case's reports, in generation order, and tally
--- which recursion constructors the corpus actually reached
-runN : ℕ → ℕ → Gen (Tally × List (ℕ × String))
-runN zero    d = pureG (zeroTally , [])
-runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
-  pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
+-- forcing a case's reports forces every verdict, since `check` matches
+-- on each before it knows whether there is a report
+forced : List (ℕ × String) → ℕ
+forced []             = 0
+forced ((k , r) ∷ rs) = k + lengthˢ r + forced rs
+
+-- a case past its wall clock: one report of its own kind, after the
+-- statements', carrying the row that reproduces it
+TIMEOUT : ℕ
+TIMEOUT = 9
+
+timedOut : ℕ → ℕ → Drawn → List (ℕ × String)
+timedOut s f (e , d₀ , d₁) =
+  (TIMEOUT , "  timeout\n    no verdict within " ++ show s ++ "s" ++ rowIn "UNDECIDED" f e d₀ d₁) ∷ []
+
+-- the reports are an ARGUMENT, so forcing them and returning them share
+-- one evaluation
+boundedBy : ℕ → List (ℕ × String) → List (ℕ × String) → List (ℕ × String)
+boundedBy s rs d = within s (forced rs) rs d
+
+-- every statement's cheap halves, then every statement's dear ones
+ordered : Case → List Statement → List (Statement × (Bool × String))
+ordered c ss = concatMap (λ s → map (s ,_) (proj₁ (halves c s))) ss
+            ++ᴸ concatMap (λ s → map (s ,_) (proj₂ (halves c s))) ss
+
+ranOut : List (ℕ × String) → Bool
+ranOut []             = false
+ranOut ((k , _) ∷ rs) = (k ≡ᵇ TIMEOUT) ∨ ranOut rs
+
+boundedEach : ℕ → ℕ → Drawn → List (Statement × (Bool × String)) → List (ℕ × String)
+boundedEach s f x []              = []
+boundedEach s f x ((st , h) ∷ hs) with boundedBy s (judgeOf f x st h) (timedOut s f x)
+... | r = if ranOut r then r else r ++ᴸ boundedEach s f x hs
+
+bounded : ℕ → ℕ → Drawn → List Statement → List (ℕ × String)
+bounded s f (e , d₀ , d₁) ss =
+  boundedEach s f (e , d₀ , d₁) (ordered (cached "?" f e (mkSlots d₀ d₁)) ss)
+
+-- A CASE BEARS ON CONTIGUITY WHEN TWO PLAIN ARRIVALS DELIVER VALUES:
+-- only then can one impl arrival carry both, or a run interleave them,
+-- so a green case that does not is a row that could not have failed.
+-- Read off the untimed program's plain run under the case's clock, and
+-- past it counted as bearing on nothing.
+valued : {A : Set} → List (List A) → ℕ
+valued []             = 0
+valued ([] ∷ ps)      = valued ps
+valued ((_ ∷ _) ∷ ps) = suc (valued ps)
+
+bearsOn : ℕ → ℕ → Bool
+bearsOn s n = within s n (2 ≤ᵇ n) false
+
+bears : ℕ → ℕ → Drawn → Bool
+bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₁ (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots d₀ d₁)))))))
+
+-- A CASE TESTS THE ONE-PAST SLACK WHEN THE BATCHER HOLDS VALUES BACK AT
+-- ITS FUEL: the joined run at the searched witness shorter than the
+-- elaborated run's values, so only the joined run at one more fuel can
+-- cover it.  That is `batched-sandwich`'s second prefix, which says
+-- nothing anywhere else, read off the leaf's own sides rather than
+-- `left-to-right`'s.  Past the case's clock it counts as holding nothing.
+holdsBack : ℕ → List ℕ × List ℕ × List ℕ → Bool
+holdsBack s (l , p , _) with length p ∸ length l
+... | n = within s n (1 ≤ᵇ n) false
+
+slack : ℕ → ℕ → Drawn → Bool
+slack s f (e , d₀ , d₁) = holdsBack s (bsSides (cached "?" f e (mkSlots d₀ d₁)))
+
+-- A CASE BEARS ON `batchable` WHEN ITS VALUES GROUP: the grouping the
+-- statement compares against holds a batch of two values or two batches
+-- holding any, so a batcher that split an instant or merged two could
+-- answer differently.  A case short of that can still fail by a value
+-- the batcher lost or invented, which `left-to-right` decides too.
+-- Read off the grouped side under the case's clock, and past it counted
+-- as grouping nothing.
+groupsOn : List (List ℕ) → Bool
+groupsOn bs = (2 ≤ᵇ valued bs) ∨ any (λ b → 2 ≤ᵇ length b) bs
+
+groups : ℕ → ℕ → Drawn → Bool
+groups s f (e , d₀ , d₁) with proj₂ (batchableSides (cached "?" f e (mkSlots d₀ d₁)))
+... | bs = within s (length (concat bs)) (groupsOn bs) false
+
+-- A CASE'S CLOCKS PART WHEN SOME IMPL ARRIVAL'S KEY IS NOT THE PLAIN
+-- ARRIVAL'S at the same position.  Read only where `same-clock` is being
+-- decided, since its timed half is the dear run; past the case's clock
+-- it counts as parting nothing.
+isClocked : Statement → Bool
+isClocked same-clockˢ = true
+isClocked _           = false
+
+splits : List Statement → ℕ → ℕ → Drawn → Bool
+splits ss s f (e , d₀ , d₁) with any isClocked ss
+... | false = false
+... | true  with cached "?" f e (mkSlots d₀ d₁)
+...   | c with sameClockᵇ (arrPlain c) ∧ sameClockᵇ (arrTimed c)
+...     | x = within s (if x then 0 else 1) (not x) false
+
+-- A SWEEP MAY DECIDE ONLY THE CASES THAT BEAR.  Whether one does is
+-- read before any statement is, so a sweep aimed at contiguity spends
+-- its clocks on cases that could fail it; one that does not bear is
+-- drawn, counted in the census and left undecided-by-choice.
+judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
+judged ob ss f s m x with bears s f x
+... | b = (m , b , slack s f x , groups s f x , splits ss s f x) , (if ob ∧ not b then [] else bounded s f x ss)
+
+oneCase : Bool → List Statement → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
+-- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
+-- the statement's sides at exactly the program a cached row names.
+oneCase ob ss f s d = genExp d >>=G λ e → genSlots >>=G λ ds →
+  pureG (judged ob ss f s (marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e))
+                (e , proj₁ ds , proj₂ ds))
+
+-- every case drawn, in generation order, its reports still unforced:
+-- drawing is cheap and upstream of every run, so the list is whole
+-- before the first case is run
+casesN : Bool → List Statement → ℕ → ℕ → ℕ → ℕ → Gen (List (Seen × List (ℕ × String)))
+casesN ob ss f s zero    d = pureG []
+casesN ob ss f s (suc k) d =
+  oneCase ob ss f s d >>=G λ r → casesN ob ss f s k d >>=G λ rs → pureG (r ∷ rs)
+
+-- EVERY failing case's reports, in generation order, and which recursion
+-- constructors the corpus actually reached
+joinT : Seen × List (ℕ × String) → Tally × List (ℕ × String) → Tally × List (ℕ × String)
+joinT r acc = bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc
+
+tallyOf : List (Seen × List (ℕ × String)) → Tally × List (ℕ × String)
+tallyOf []       = zeroTally , []
+tallyOf (r ∷ rs) = joinT r (tallyOf rs)
 
 ------------------------------------------------------------------------
--- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE]"
+-- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT] [CASE] [BEARING]"
 
 toCodes : String → List ℕ
 toCodes s = map toℕ (toList s)
@@ -861,7 +1188,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = "FAIL" ∷ "PLAIN" ∷ []
+kinds = map statementName (statements ++ᴸ same-clockˢ ∷ []) ++ᴸ "timeout" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -870,10 +1197,23 @@ counts k (t ∷ ts) fs = t ∷ " " ∷ show (length (ofKind k fs)) ∷ " " ∷ c
 samples : ℕ → List (ℕ × String) → String
 samples k fs = concatStr (take 2 (ofKind k fs))
 
+-- A TIMEOUT IS UNDECIDED, NEVER A FAILURE (Anthony).  Any wall clock
+-- has a case past it, so a clock cannot be what fails a sweep; what
+-- fails one is a statement that answered and disagreed.  The timeouts
+-- are still counted and their rows still printed, since a case nobody
+-- has decided is where an undecided counterexample would be.
+decided : List (ℕ × String) → List (ℕ × String)
+decided []             = []
+decided ((k , r) ∷ fs) = if k ≡ᵇ TIMEOUT then decided fs else (k , r) ∷ decided fs
+
+agreeing : List (ℕ × String) → String
+agreeing []      = "  (all agree)\n"
+agreeing (_ ∷ _) = ""
+
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
-dumpFails fs = concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs
+dumpFails fs = agreeing (decided fs) ++ concatStr (counts 0 kinds fs) ++ "\n"
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples 5 fs ++ samples 6 fs ++ samples 7 fs ++ samples 8 fs ++ samples TIMEOUT fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -895,57 +1235,119 @@ skipN zero    d = pureG 0
 skipN (suc k) d = genExp d >>=G λ _ → genSlots >>=G λ _ → skipN k d
 
 -- the paste row of ONE case, named by its 1-based index
-showAt : ℕ → ℕ → Gen String
-showAt n d = skipN (n ∸ 1) d >>=G λ _ →
+showAt : ℕ → ℕ → ℕ → Gen String
+showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
   genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (pasteRow e (proj₁ ds) (proj₂ ds))
+  pureG (pasteRow f e (proj₁ ds) (proj₂ ds))
 
 -- RUN ONE CASE, named the same way, so a case that hangs a sweep can be
 -- timed and re-run alone rather than by bisecting the count
-runAt : ℕ → ℕ → Gen (Marks × List (ℕ × String))
-runAt n d = skipN (n ∸ 1) d >>=G λ _ → oneCase d
+runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
+runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase false ss f s d
 
--- AND ONE SIDE OF IT, so a hang is attributed to the pipeline that owns
--- it: 1 the impl run, 2 the spec run, 4 the program read as plain rxjs,
--- anything else the raw run
-sideAt : ℕ → ℕ → ℕ → Gen String
-sideAt k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >>=G λ ds →
-  let c = cached "?" FUEL e (mkSlots (proj₁ ds) (proj₂ ds))
-  in pureG (if k ≡ᵇ 1 then showBatches (implBatchesOf c)
-            else if k ≡ᵇ 2 then showBatches (specBatchesOf c)
-            else if k ≡ᵇ 4 then showVals (plainOf c)
-            else showStream (runOf c))
+-- THE STATEMENT A NUMBER NAMES, in `Main`'s order, the simulation
+-- fifth and its leaf sixth, the two assembled top lines' leaves seventh
+-- and eighth; zero is all of them
+selected : ℕ → List Statement
+selected (suc zero)                   = left-to-rightˢ ∷ []
+selected (suc (suc zero))             = timing-correctˢ ∷ []
+selected (suc (suc (suc zero)))       = batchableˢ ∷ []
+selected (suc (suc (suc (suc zero)))) = timed-faithfulˢ ∷ []
+selected (suc (suc (suc (suc (suc zero))))) = simulationˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc zero)))))) = arrival-runsˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc (suc zero))))))) = batched-sandwichˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))) = packets-name-arrivalsˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc (suc (suc (suc zero))))))))) = same-clockˢ ∷ []
+selected _                            = statements
 
--- THE CORPUS, EVERY ROW WITH BOTH SIDES PRINTED WHETHER OR NOT THEY
+-- the impl's raw run, decoded, for reading a batchable failure by
+rawOf : Case → String
+rawOf c = showStream (runᴵ (Case.kinds c) (Case.fuel c) (Case.prog c) (Case.slots c))
+
+-- AND ONE SIDE OF IT, so a hang is attributed to the statement that owns
+-- it: 1 to 9 that statement's sides, in `selected`'s numbering,
+-- anything else the impl's raw run
+sidesOf : ℕ → Case → String
+sidesOf k c with selected k
+... | s ∷ [] = proj₂ (decide c s)
+... | _      = rawOf c
+
+sideAt : ℕ → ℕ → ℕ → ℕ → Gen String
+sideAt f k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >>=G λ ds →
+  pureG (sidesOf k (cached "?" f e (mkSlots (proj₁ ds) (proj₂ ds))))
+
+-- THE CORPUS, EVERY ROW WITH EVERY SIDE PRINTED WHETHER OR NOT THEY
 -- AGREE.  A row is a probe before it is a guard, and a probe is read for
 -- its shape as much as for its verdict -- which the bug-cache runner,
 -- printing only failures, cannot show.  Zero generated cases asks for it.
-showRow : Case → String
-showRow c = Case.name c ++ (if agrees c then ": agree" else ": FAIL")
-  ++ "\n    impl = " ++ showBatches (implBatchesOf c)
-  ++ "\n    spec = " ++ showBatches (specBatchesOf c)
-  ++ "\n    raw  = " ++ showStream (runOf c) ++ "\n"
+lineOf : Statement → Bool × String → String
+lineOf s (b , body) =
+  "  " ++ statementName s ++ (if b then ": agree" else ": FAIL") ++ "\n    " ++ body ++ "\n"
+
+showRow : List Statement → Case → String
+showRow []       c = ""
+showRow (s ∷ ss) c = lineOf s (decide c s) ++ showRow ss c
 
 -- one row at a time, so a row that hangs is named by what printed before
 -- it; `k` picks one row, 1-based, and 0 runs them all
--- and `side` names one pipeline of it, as it does for a generated case
+-- and `side` names one statement of it, as it does for a generated case
 sideRow : ℕ → Case → String
-sideRow k c = Case.name c ++ ": " ++
-  (if k ≡ᵇ 1 then showBatches (implBatchesOf c)
-   else if k ≡ᵇ 2 then showBatches (specBatchesOf c)
-   else if k ≡ᵇ 4 then showVals (plainOf c)
-   else showStream (runOf c)) ++ "\n"
+sideRow k c = Case.name c ++ ": " ++ sidesOf k c ++ "\n"
 
 -- and a nonzero `f` runs every row at that fuel instead of its own
-printRows : ℕ → ℕ → ℕ → ℕ → List Case → IO Unit
-printRows f sd k i []       = putStr ""
-printRows f sd k i (c ∷ cs) =
+printRows : List Statement → ℕ → ℕ → ℕ → ℕ → List Case → IO Unit
+printRows ss f sd k i []       = putStr ""
+printRows ss f sd k i (c ∷ cs) =
   (if (k ≡ᵇ 0) ∨ (k ≡ᵇ i)
-   then putStr (if sd ≡ᵇ 0 then showRow c′ else sideRow sd c′)
+   then putStr (if sd ≡ᵇ 0 then Case.name c′ ++ "\n" ++ showRow ss c′ else sideRow sd c′)
    else putStr "") >>= λ _ →
-  printRows f sd k (suc i) cs
+  printRows ss f sd k (suc i) cs
   where
   c′ = if f ≡ᵇ 0 then c else record c { fuel = f }
+
+-- EACH CASE IS REPORTED THE MOMENT IT IS DECIDED, on stderr, because the
+-- summary can only be printed once the last case is: a sweep killed by
+-- its budget otherwise leaves nothing behind, every case it had decided
+-- included.  A case that does not agree streams its reports verbatim,
+-- paste and undecided blocks and all, so a killed run's stream is read
+-- by the same splitter as a finished run's summary.
+verdictOf : List (ℕ × String) → String
+verdictOf []         = "agree"
+verdictOf rs@(_ ∷ _) with decided rs
+... | []    = "undecided"
+... | _ ∷ _ = "FAIL"
+
+-- each case names its formers by the census's tags, so the stream reads
+-- a flag against a former where the census only counts the two apart
+streamCases : Bool → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
+streamCases ob n i []       = putErr ""
+streamCases ob n i (r ∷ rs) =
+  putErr ("case " ++ show i ++ "/" ++ show n ++ " "
+          ++ (if ob ∧ not (proj₁ (proj₂ (proj₁ r))) then "degenerate" else verdictOf (proj₂ r)) ++ "\n"
+          ++ "  formers" ++ concatStr (map (λ g → if carries g (proj₁ (proj₁ (proj₁ r))) then " " ++ formerTag g else "") allFormers) ++ "\n"
+          ++ (if proj₁ (proj₂ (proj₁ r)) then "  bears on contiguity\n" else "")
+          ++ (if proj₁ (proj₂ (proj₂ (proj₁ r))) then "  holds values back at the fuel\n" else "")
+          ++ (if proj₁ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  groups values\n" else "")
+          ++ (if proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  parts the two clocks\n" else "")
+          ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
+  streamCases ob n (suc i) rs
+
+-- the summary, over the tally of the cases the stream already forced
+summaryOf : ℕ → ℕ → ℕ → ℕ → Tally × List (ℕ × String) → String
+summaryOf seed d f runs (tally , fails) = concatStr
+  (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " fuel " ∷ show f ∷ " — ran " ∷ show runs
+   ∷ " cases, " ∷ show (length (decided fails)) ∷ " failures, "
+   ∷ show (length fails ∸ length (decided fails)) ∷ " undecided"
+   ∷ "; obs-fold " ∷ show (proj₁ (proj₂ tally))
+   ∷ "; two plain arrivals with values " ∷ show (proj₁ (proj₂ (proj₂ tally)))
+   ∷ "; values held back at the fuel " ∷ show (proj₁ (proj₂ (proj₂ (proj₂ tally))))
+   ∷ "; values grouped " ∷ show (proj₂ (proj₂ (proj₂ (proj₂ tally)))) ∷ "\ncensus " ∷ [])
+   ++ᴸ censusPairs allFormers (proj₁ tally)
+   ++ᴸ ("\n" ∷ dumpFails fails ∷ []))
+
+-- the cases are an ARGUMENT, so the stream and the summary read one list
+sweep : Bool → ℕ → ℕ → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
+sweep ob seed d f runs rs = streamCases ob runs 1 rs >>= λ _ → putStr (summaryOf seed d f runs (tallyOf rs))
 
 main : IO Unit
 main = getContents >>= λ s →
@@ -957,20 +1359,16 @@ main = getContents >>= λ s →
       only  = numAt 4 0 cs
       side  = numAt 5 0 cs
       fuelʳ = numAt 6 0 cs
-      res   = proj₁ (runN runs d (randList seed 2000000))
-      tally = proj₁ res
-      fails = proj₂ res
+      ss    = selected (numAt 7 0 cs)
+      f     = if fuelʳ ≡ᵇ 0 then FUEL else fuelʳ
+      secs  = numAt 8 CASE cs
+      ob    = numAt 9 0 cs ≡ᵇ 1
   in if runs ≡ᵇ 0
-     then printRows fuelʳ side only 1 cases
+     then printRows ss fuelʳ side only 1 cases
      else if not (side ≡ᵇ 0)
-     then putStr (proj₁ (sideAt side only d (randList seed 2000000)) ++ "\n")
+     then putStr (proj₁ (sideAt f side only d (randList seed 2000000)) ++ "\n")
      else if not (only ≡ᵇ 0)
-     then putStr (dumpFails (proj₂ (proj₁ (runAt only d (randList seed 2000000)))))
+     then putStr (dumpFails (proj₂ (proj₁ (runAt ss f secs only d (randList seed 2000000)))))
      else if not (at ≡ᵇ 0)
-     then putStr (proj₁ (showAt at d (randList seed 2000000)))
-     else putStr (concatStr
-       (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs
-        ∷ " cases, " ∷ show (length fails) ∷ " failures"
-        ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
-        ++ᴸ censusPairs allFormers (proj₁ tally)
-        ++ᴸ ("\n" ∷ dumpFails fails ∷ [])))
+     then putStr (proj₁ (showAt f at d (randList seed 2000000)))
+     else sweep ob seed d f runs (proj₁ (casesN ob ss f secs runs d (randList seed 2000000)))

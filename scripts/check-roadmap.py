@@ -16,8 +16,7 @@ classes down a tier never improves and then worsens.  Order WITHIN a class is
 a judgement call about what unblocks more, and no machine should pretend to
 know it.
 
-A row whose text names no class is not a work item (the FFI row, "carried,
-not counted").  Those are skipped for ordering but REPORTED, so an item
+A row whose text names no class is not a work item.  Those are skipped for ordering but REPORTED, so an item
 cannot dodge the check by omitting its class.
 
 SECOND CHECK — COVERAGE: every live postulate in agda/src is named by some

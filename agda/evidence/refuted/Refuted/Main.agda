@@ -59,3 +59,10 @@ open import Refuted.Domain-Predicate using
 -- that pop, so the funding conclusion is refuted outright rather than
 -- merely unproven.
 open import Refuted.Room-Backlog using (room-zero; saw-room-cannot-fund)
+
+-- THE BATCHER'S SLACK IS NOT ONE UNIT OF FUEL PAST THE RUN IT BATCHES.
+-- A unit of fuel is an arrival and an arrival can be silent, so a batch
+-- whose instant only the arrival after next closes is missing from the
+-- joined run one unit past.
+open import Refuted.Batched-Sandwich using (one-past-sandwich-false)
+

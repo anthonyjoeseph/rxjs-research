@@ -656,6 +656,62 @@ export const take = <A>(
     rxMap((state) => state.out as InstEmit<A>), // the seed is never emitted, so out is set
   );
 
+// takeWhile-f: forward values while the predicate holds, plus the first value
+// for which it returns false, then cut. The cut is INCLUSIVE: the failing
+// value is in the output, then the stream completes. Cut semantics are
+// identical to take's: per-victim closes from the ledger (cutVictimCloses),
+// fin raised on the cutting emit. Count zero has no analogue here — the
+// predicate is never vacuously false before any subscription.
+export const takeWhilePrim = <A>(
+  obs: Observable<InstEmit<A>>,
+  pred: (a: A) => boolean,
+): Observable<InstEmit<A>> =>
+  obs.pipe(
+    rxScan<
+      InstEmit<A>,
+      {
+        cut: boolean;
+        open: SourceId[];
+        ledger: CutLedger;
+        out?: InstEmit<A>;
+      }
+    >(
+      (state, emit) => {
+        const { bookkeeping, values, fin } = splitEmit(emit);
+        const open = openAfter(emit, state.open, false);
+        const ledger = cutLedgerStep(emit, state.ledger);
+        // find the first value that fails the predicate
+        const cutIdx = values.findIndex((v) => !pred(v));
+        if (cutIdx === -1) {
+          // all values pass; no cut yet
+          return {
+            cut: false,
+            open,
+            ledger,
+            out: reassemble(emit, bookkeeping, [], values, fin),
+          };
+        }
+        // include values up to and including the failing one, then cut
+        const taken = values.slice(0, cutIdx + 1);
+        return {
+          cut: true,
+          open: [],
+          ledger,
+          out: reassemble(
+            emit,
+            bookkeeping,
+            cutVictimCloses(open, ledger, emit.instant),
+            taken,
+            true,
+          ),
+        };
+      },
+      { cut: false, open: [], ledger: emptyCutLedger },
+    ),
+    takeWhile((state) => !state.cut, true), // include the cutting emit, then complete
+    rxMap((state) => state.out as InstEmit<A>),
+  );
+
 // the ROOT materializes the fin bit as a `complete` EVENT on the
 // DELIVERY emit that closes the last live registration (Agda
 // foldPath's root clause — it only runs on arrival cascades; in the

@@ -6,40 +6,55 @@
 -- verification module because it is an operator and not a claim -- the
 -- harness runs it, and the proof quantifies over it.
 --
--- ONE INSTEMIT OUT PER GROUP IN, AND THE GROUP IS WHAT `batchSyncᵉ`
--- HANDS OVER.  The subscribe frame's emits arrive as ONE group, so the
--- whole of burst 0 is in hand at once and is batched as a list: one
--- batch per instant, in order of the instant's first emit, holding every value that instant carried, and
--- no batch for an instant with no values.  The batches ride ONE output
--- InstEmit as its value events, so an InstEmit may carry several
--- batches or none -- the subscriber sees the batches, and the InstEmit
--- around them is bookkeeping the top line never compares.
+-- IT CUTS WHERE THE SPEC CUTS: a batch is a maximal run of values under
+-- one instant.  So one scan carries the open instant and its values,
+-- and an emit under any other instant closes the batch -- valued or
+-- not, since an instant's emits are contiguous in a run, so another
+-- instant's emit, even an empty one, says this one is over.  An instant
+-- arriving as several emits is one batch, which is why nothing here
+-- groups by synchrony.  Each batch rides an output InstEmit as one value
+-- event under its own instant; an InstEmit closing nothing carries no
+-- events, and is bookkeeping the top line never compares.
 --
--- THE INSTEMIT'S TOKENS ARE FORWARDED FROM THE GROUP'S FIRST EMIT,
--- because `uniqᵗ` has no term former: only `mintᵉ` introduces one, so
--- that no program can forge a token in use.  A group is nonempty by
--- construction, which is what makes the forwarding total.
+-- THE LAST BATCH LEAVES WHEN THE RUN COMPLETES, AND THE RUN SAYS SO
+-- ONLY OUT OF BAND.  The twin batches on completion (`toArray`), and no
+-- emit is obliged to carry the completion in its events.  So the run is
+-- concatenated with a one-emit marker -- a merging `flattenᵉ` at one
+-- lane subscribes it exactly when the run completes -- and the marker
+-- closes the open batch.  A run that never completes is one a deferred
+-- hop keeps alive, and every hop opens with an emit under its own
+-- instant, which closes the batch before it.
 --
--- WHAT THIS DOES NOT YET DO is batch a LATER arrival's emits: after the
--- subscribe frame `batchSyncᵉ` hands over singletons, and each is
--- batched alone.
+-- WHAT IS LEFT OPEN IS A BATCH NOTHING FOLLOWS: the run's last instant,
+-- when the fuel cuts it off rather than the run completing.
+--
+-- THE TOKENS COME FROM THE STREAM, because `uniqᵗ` has no term former:
+-- only `mintᵉ` introduces one, so that no program can forge a token in
+-- use.  The one mint here stands for the instant open before anything
+-- arrived, which no emit can carry.
+--
+-- DEAD ROUTE: close an instant on an empty emit TRAILING its source's
+--   own, sent from the arrival stamp, the deferred hop or the root
+--   frame.  It travels depth-first behind everything its predecessor
+--   caused, except what a COMPLETION subscribes: a source that ends
+--   with that arrival completes after its trailer, and a queued lane
+--   or a concat tail it frees subscribes in the same instant after the
+--   batch has closed, splitting it.
 module SExp.Batch where
 
-open import Data.List using (List; _∷_)
+open import Data.List using (List; []; _∷_)
 open import Data.Bool using (true; false)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Maybe using (just)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp      using (Ctx; Ty; Exp; Tm; listᵗ; uniqᵗ; boolᵗ; _×ᵗ_; varᵗ; bool̂; fstᵗ; sndᵗ;
-  pairᵗ; nilᵗ; consᵗ; foldᵗ; ifᵗ; primᵗ; eqᵘ; appendᵗ; revᵗ; renTm; mapᵉ; batchSyncᵉ)
-open import SExp.InstEmit using (machineEmitᵗ; eventsᵛ; instantᵛ; sourceᵛ; kindᵛ; instEmitᵛ;
-  valueᵛ; splitEventsᵛ)
+open import Rx.Exp      using (Ctx; Ty; Exp; Tm; listᵗ; uniqᵗ; boolᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; varᵗ;
+  bool̂; unit̂; fstᵗ; sndᵗ; pairᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; eqᵘ; appendᵗ;
+  strmᵗ; renExp; ofᵉ; mapᵉ; scanᵉ; mintᵉ; flattenᵉ; mergeᶠ)
+open import SExp.InstEmit using (machineEmitᵗ; instEventᵗ; eventsᵛ; instantᵛ; sourceᵛ; kindᵛ;
+  instEmitᵛ; valueᵛ; splitEventsᵛ)
 
 module _ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} where
-
-  -- past the element and the accumulator a `foldᵗ` body binds
-  ⇑ : ∀ {Θ x y r} → Tm Γ Δᵍ Δ Θ r → Tm Γ Δᵍ Δ (x ∷ y ∷ Θ) r
-  ⇑ = renTm (λ z → z) (λ z → z) (λ z → there (there z))
 
   -- this emit's own payloads, at the author's type
   payloadsᵇ : ∀ {Θ a} → Tm Γ Δᵍ Δ Θ (machineEmitᵗ a) → Tm Γ Δᵍ Δ Θ (listᵗ a)
@@ -47,50 +62,64 @@ module _ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} where
   -- nothing else would determine the retagging type
   payloadsᵇ {a = a} e = fstᵗ (sndᵗ (splitEventsᵛ {b = a} (eventsᵛ e)))
 
-  memberᵇ : ∀ {Θ} → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ (listᵗ uniqᵗ) → Tm Γ Δᵍ Δ Θ boolᵗ
-  memberᵇ u us = foldᵗ us (bool̂ false)
-    (ifᵗ (varᵗ (there (here refl))) (bool̂ true)
-         (primᵗ eqᵘ (pairᵗ (varᵗ (here refl)) (⇑ u))))
-
   nullᵇ : ∀ {Θ s} → Tm Γ Δᵍ Δ Θ (listᵗ s) → Tm Γ Δᵍ Δ Θ boolᵗ
   nullᵇ xs = foldᵗ xs (bool̂ true) (bool̂ false)
 
-  -- every value the list's emits carry under instant u
-  valuesAtᵇ : ∀ {Θ a} → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ (listᵗ (machineEmitᵗ a))
-            → Tm Γ Δᵍ Δ Θ (listᵗ a)
-  valuesAtᵇ u es = foldᵗ es nilᵗ
-    (ifᵗ (primᵗ eqᵘ (pairᵗ (instantᵛ (varᵗ (here refl))) (⇑ u)))
-         (appendᵗ (varᵗ (there (here refl))) (payloadsᵇ (varᵗ (here refl))))
-         (varᵗ (there (here refl))))
-
-  -- a list's batches, values only: the instants seen so far
-  -- and the batches so far, reversed while the fold runs
-  batchesᵇ : ∀ {Θ a} → Tm Γ Δᵍ Δ Θ (listᵗ (machineEmitᵗ a)) → Tm Γ Δᵍ Δ Θ (listᵗ (listᵗ a))
-  batchesᵇ {Θ} {a} es = revᵗ (sndᵗ (foldᵗ es (pairᵗ nilᵗ nilᵗ) body))
-    where
-    A : Ty
-    A = listᵗ uniqᵗ ×ᵗ listᵗ (listᵗ a)
-
-    body : Tm Γ Δᵍ Δ (machineEmitᵗ a ∷ A ∷ Θ) A
-    body = ifᵗ (memberᵇ i (fstᵗ acc)) acc
-               (pairᵗ (consᵗ i (fstᵗ acc))
-                      (ifᵗ (nullᵇ vs) (sndᵗ acc) (consᵗ vs (sndᵗ acc))))
-      where
-      acc = varᵗ (there (here refl))
-      i   = instantᵛ (varᵗ (here refl))
-      vs  = valuesAtᵇ i (⇑ es)
-
-  -- one group in, one InstEmit out: a value event per batch, under the
-  -- group's first emit's tokens
-  groupEmitᵇ : ∀ {Θ a} → Tm Γ Δᵍ Δ Θ (machineEmitᵗ a ×ᵗ listᵗ (machineEmitᵗ a))
-             → Tm Γ Δᵍ Δ Θ (machineEmitᵗ (listᵗ a))
-  groupEmitᵇ g =
-    instEmitᵛ (foldᵗ (revᵗ (batchesᵇ (consᵗ (fstᵗ g) (sndᵗ g)))) nilᵗ
-                     (consᵗ (valueᵛ (varᵗ (here refl))) (varᵗ (there (here refl)))))
-              (instantᵛ (fstᵗ g)) (sourceᵛ (fstᵗ g)) (kindᵛ (fstᵗ g))
+  -- one batch, as an InstEmit's events: none when it is empty
+  batchEventsᵇ : ∀ {Θ a} → Tm Γ Δᵍ Δ Θ (listᵗ a) → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ (listᵗ a)))
+  batchEventsᵇ vs = ifᵗ (nullᵇ vs) nilᵗ (consᵗ (valueᵛ vs) nilᵗ)
 
 batchSimultaneousᵖ :
   ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {a : Ty}
   → Exp Γ Δᵍ Δ Θ (machineEmitᵗ a)
   → Exp Γ Δᵍ Δ Θ (machineEmitᵗ (listᵗ a))
-batchSimultaneousᵖ e = mapᵉ (groupEmitᵇ (varᵗ (here refl))) (batchSyncᵉ e)
+batchSimultaneousᵖ {Γ = Γ} {Δᵍ} {Δ} {Θ} {a} e =
+  mintᵉ (mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed marked))
+  where
+  -- an emit of the run, or the marker that it completed
+  X : Ty
+  X = machineEmitᵗ a +ᵗ unitᵗ
+
+  lane : Exp Γ Δᵍ Δ (uniqᵗ ∷ Θ) X → Tm Γ Δᵍ Δ (uniqᵗ ∷ Θ) ((unitᵗ +ᵗ X) ×ᵗ (unitᵗ +ᵗ obs X))
+  lane x = pairᵗ (inlᵗ unit̂) (inrᵗ (strmᵗ x))
+
+  marked : Exp Γ Δᵍ Δ (uniqᵗ ∷ Θ) X
+  marked = flattenᵉ (mergeᶠ (just 1)) (ofᵉ (
+    lane (mapᵉ (inlᵗ (varᵗ (here refl))) (renExp (λ z → z) (λ z → z) there e)) ∷
+    lane (ofᵉ (inrᵗ unit̂ ∷ [])) ∷ []))
+
+  -- the open instant and its values, and the InstEmit put out
+  S : Ty
+  S = (uniqᵗ ×ᵗ listᵗ a) ×ᵗ machineEmitᵗ (listᵗ a)
+
+  seed : Tm Γ Δᵍ Δ (uniqᵗ ∷ Θ) S
+  seed = pairᵗ (pairᵗ tok nilᵗ) (instEmitᵛ nilᵗ tok tok (inlᵗ unit̂))
+    where
+    tok = varᵗ (here refl)
+
+  step : Tm Γ Δᵍ Δ ((S ×ᵗ X) ∷ uniqᵗ ∷ Θ) S
+  step = caseᵗ (sndᵗ (varᵗ (here refl))) onEmit onEnd
+    where
+    -- inside an arm: the arm's own binder, then the step's argument
+    open′ : ∀ {x} → Tm Γ Δᵍ Δ (x ∷ (S ×ᵗ X) ∷ uniqᵗ ∷ Θ) (uniqᵗ ×ᵗ listᵗ a)
+    open′ = fstᵗ (fstᵗ (varᵗ (there (here refl))))
+
+    o : ∀ {x} → Tm Γ Δᵍ Δ (x ∷ (S ×ᵗ X) ∷ uniqᵗ ∷ Θ) uniqᵗ
+    o = fstᵗ open′
+
+    os : ∀ {x} → Tm Γ Δᵍ Δ (x ∷ (S ×ᵗ X) ∷ uniqᵗ ∷ Θ) (listᵗ a)
+    os = sndᵗ open′
+
+    onEmit : Tm Γ Δᵍ Δ (machineEmitᵗ a ∷ (S ×ᵗ X) ∷ uniqᵗ ∷ Θ) S
+    onEmit =
+      ifᵗ (primᵗ eqᵘ (pairᵗ (instantᵛ em) o))
+          (pairᵗ (pairᵗ o (appendᵗ os vs)) nothing′)
+          (pairᵗ (pairᵗ (instantᵛ em) vs)
+                 (instEmitᵛ (batchEventsᵇ os) o (sourceᵛ em) (kindᵛ em)))
+      where
+      em = varᵗ (here refl)
+      vs = payloadsᵇ em
+      nothing′ = instEmitᵛ nilᵗ (instantᵛ em) (sourceᵛ em) (kindᵛ em)
+
+    onEnd : Tm Γ Δᵍ Δ (unitᵗ ∷ (S ×ᵗ X) ∷ uniqᵗ ∷ Θ) S
+    onEnd = pairᵗ (pairᵗ o nilᵗ) (instEmitᵛ (batchEventsᵇ os) o o (inlᵗ unit̂))

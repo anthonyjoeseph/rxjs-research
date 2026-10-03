@@ -70,6 +70,7 @@ export type SExp =
   | { type: "map"; ty: Ty; fn: SFn; src: SExp }
   | { type: "scan"; ty: Ty; fn: SFn; init: STm; src: SExp }
   | { type: "take"; ty: Ty; count: STm; src: SExp }
+  | { type: "takeWhile"; ty: Ty; fn: SFn; src: SExp }
   | { type: "mergeAll"; ty: Ty; limit?: number; src: SExp }
   | { type: "switchAll"; ty: Ty; src: SExp }
   | { type: "exhaustAll"; ty: Ty; src: SExp }

@@ -181,29 +181,28 @@ SKIP_HEAD_TOKENS = {
 def strip_block_comments(raw_lines):
     """Blank out {- ... -} spans (including pragmas {-# ... #-}), across
     line boundaries, preserving line count and non-comment characters'
-    positions so indentation/columns stay meaningful."""
+    positions so indentation/columns stay meaningful.
+
+    They NEST, as Agda's do: a `FOREIGN GHC` pragma carrying a GHC
+    `{-# LANGUAGE … #-}` closes on its OWN `#-}`, and a first `-}` taken as
+    the close leaves the outer one standing as a phantom definition."""
     out = []
-    in_block = False
+    depth = 0
     for line in raw_lines:
         buf = []
         i, n = 0, len(line)
         while i < n:
-            if in_block:
-                if line[i : i + 2] == "-}":
-                    buf.append("  ")
-                    i += 2
-                    in_block = False
-                else:
-                    buf.append(" ")
-                    i += 1
+            if line[i : i + 2] == "{-":
+                buf.append("  ")
+                i += 2
+                depth += 1
+            elif depth and line[i : i + 2] == "-}":
+                buf.append("  ")
+                i += 2
+                depth -= 1
             else:
-                if line[i : i + 2] == "{-":
-                    buf.append("  ")
-                    i += 2
-                    in_block = True
-                else:
-                    buf.append(line[i])
-                    i += 1
+                buf.append(" " if depth else line[i])
+                i += 1
         out.append("".join(buf))
     return out
 
@@ -255,6 +254,24 @@ class Def:
         self.file = file
         self.line = line
         self.kind = kind  # 'def' | 'data/record' | 'postulate'
+
+
+# THE HARNESS'S FFI IS NOT REMAINING WORK (Anthony).  A postulate in `CLI/`
+# bound by a `COMPILE GHC` pragma HAS a body -- the Haskell one the binary
+# runs -- and no proof may depend on the harness, so it leaves the ledger.
+# Outside `CLI/` a binding earns nothing: a proof could cite it.
+COMPILE_RE = re.compile(r"\{-#\s*COMPILE\s+GHC\s+(\S+)\s*=")
+
+
+def ffi_bindings(src_dir, files):
+    """-> {file: set of names bound by `COMPILE GHC`}, for files in CLI/."""
+    out = {}
+    for f in files:
+        if not f.replace(os.sep, "/").startswith("CLI/"):
+            continue
+        with open(os.path.join(src_dir, f), encoding="utf-8") as h:
+            out[f] = set(COMPILE_RE.findall(h.read()))
+    return out
 
 
 def find_agda_files(src_dir):
@@ -1296,10 +1313,13 @@ def main():
         extract_definitions(src_dir, files)
 
     if args.postulates:
-        for name in sorted(postulate_names):
+        ffi = ffi_bindings(src_dir, files)
+        ledger = sorted(n for n in postulate_names
+                        if n not in ffi.get(postulate_sites[n][0], ()))
+        for name in ledger:
             f, ln = postulate_sites[name]
             print(f"{name}  {f}:{ln}")
-        print(f"-- {len(postulate_names)} postulate(s)")
+        print(f"-- {len(ledger)} postulate(s)")
         return
 
     corpus = build_corpus(src_dir, files)

@@ -13,7 +13,7 @@
 
 module Rx.Evaluator.Reducible.Floor where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (Bool; true; false; T; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Fin using (Fin; toℕ)
@@ -39,7 +39,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠[_]_;
   from-inner; thru-outer; echoᵗ; NodeState; NodeId; RegId; RegSrc; RegRow; regFloor; lookupNode;
   setNode; frameNodes; pathHasNode; installNode; lowerFloor; AllOp; mergeAllᵒ; switch-st;
   exhaust-st; mergeAll-st; shareAdmit; shareDying; shareFinish; switchKill; thruWrap; drainSt;
-  regSource; sameSource; dropSource)
+  regSource; sameSource; dropSource; spentOn)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above; <→≢ᵇ)
 open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert; room-keeps; fell-keeps; keeps-refl)
 open import Rx.Evaluator.Keeps using (Keeps; subscribeE-keeps; subscribeSharedSlot-keeps; subscribeAll-keeps;
@@ -50,7 +50,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   innerFinish⇓; innerReact⇓; stepFrame⇓; subscribeAll⇓; subscribeSharedSlot⇓; foldPath⇓; dispatchShare⇓;
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
-  subs-take-zero; subs-take-suc; subs-batchSync; subs-map; subs-scan;
+  subs-take-zero; subs-take-suc; subs-takeWhile; subs-batchSync; subs-map; subs-scan;
   subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
@@ -142,7 +142,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   FrameOK : ∀ {s u} → Frame Γ s u → Set
   FrameOK f@(map-f fn)         = NotIn f
   FrameOK f@(scan-f fn k)      = NotIn f
-  FrameOK f@(take-f k)         = NotIn f
+  FrameOK f@(take-f _ k)       = NotIn f
   FrameOK f@(batchSync-f k)    = NotIn f
   FrameOK f@(from-inner _ _ _) = fed ≡ false → NotIn f
   FrameOK f@(thru-outer _ k) = NotIn f
@@ -202,7 +202,7 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   frame-ok : ∀ {s u} (f : Frame Γ s u) → NotIn f → FrameOK f
   frame-ok (map-f _)          ni = ni
   frame-ok (scan-f _ _)       ni = ni
-  frame-ok (take-f _)         ni = ni
+  frame-ok (take-f _ _)       ni = ni
   frame-ok (batchSync-f _)    ni = ni
   frame-ok (from-inner _ _ _) ni = λ _ → ni
   frame-ok (thru-outer _ _) ni = ni
@@ -261,11 +261,15 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   ea-sub : ∀ {R R′ : List (RegRow Γ t)} → (∀ {r} → r ∈ R′ → r ∈ R) → EA R → EA R′
   ea-sub sb ea′ r∈ th = ea′ (sb r∈) th
 
-  ea-reg : ∀ {R : List (RegRow Γ t)} {u rid} {rs : RegSrc Γ} {p : Path Γ (regFloor rs) u t}
-         → EA R → (T (pathHasNode nid p) → endOf p ≡ x) → EA (R ++ (rid , rs , u , p) ∷ [])
-  ea-reg {R} ea′ h r∈ th with ∈-++⁻ R r∈
-  ... | inj₁ a           = ea′ a th
-  ... | inj₂ (here refl) = h th
+  ea-reg : ∀ {R : List (RegRow Γ t)} {ns : List (NodeId × NodeState Γ)} {u rid} {rs : RegSrc Γ}
+             {p : Path Γ (regFloor rs) u t}
+         → EA R → (T (pathHasNode nid p) → endOf p ≡ x)
+         → EA (if spentOn p ns then R else R ++ (rid , rs , u , p) ∷ [])
+  ea-reg {R} {ns} {p = p} ea′ h r∈ th with spentOn p ns
+  ... | true  = ea′ r∈ th
+  ... | false with ∈-++⁻ R r∈
+  ...   | inj₁ a           = ea′ a th
+  ...   | inj₂ (here refl) = h th
 
   lower-on : ∀ {lo lo′ u} (le : lo′ ≤ lo) (κ : Path Γ lo u t) → PI κ
            → T (pathHasNode nid (lowerFloor le κ)) → endOf (lowerFloor le κ) ≡ x
@@ -418,6 +422,8 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   subscribeE-floor (subs-take-zero _ f)    ph (inj₂ s) = foldPath-floor f ph (inj₂ s)
   subscribeE-floor (subs-take-suc {k = k} _ refl sub) ph (inj₂ s) =
     subscribeE-floor sub (push (fresh-off (lt s)) (fresh-off (lt s)) ph) (inj₂ (fresh-SI _ s))
+  subscribeE-floor (subs-takeWhile refl sub) ph (inj₂ s) =
+    subscribeE-floor sub (push (fresh-off (lt s)) (fresh-off (lt s)) ph) (inj₂ (fresh-SI _ s))
   subscribeE-floor (subs-batchSync refl sub f) ph (inj₂ s) =
     let ph′ = push (fresh-off (lt s)) (fresh-off (lt s)) ph
     in foldPath-floor f ph′
@@ -457,11 +463,11 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (ea-sub (λ r∈ → subst (_ ∈_) (scanReg fn c vals fin sched st (lookupNode c (EvalSt.nodes st))) r∈) (ea s))
              (subst (nid <_) (sym (scanCt fn c vals fin sched st (lookupNode c (EvalSt.nodes st)))) (lt s))
              (room-keeps (scanDispatch-keeps fn c vals fin sched st (lookupNode c (EvalSt.nodes st))) (rm s)))
-  stepFrame-floor (step-take {nid = c} {vals = vals} {fin} {sched} {st}) pf (inj₂ s) =
-    inj₂ (si (NI-eq (takeOff c (lookupNode c (EvalSt.nodes st)) vals fin sched st nid (notIn₁ {c} {nid} (proj₁ pf))) (ni s))
-             (ea-sub (takeReg c (lookupNode c (EvalSt.nodes st)) vals fin sched st) (ea s))
-             (subst (nid <_) (sym (takeCt c (lookupNode c (EvalSt.nodes st)) vals fin sched st)) (lt s))
-             (room-keeps (takeDispatch-keeps c vals fin sched st (lookupNode c (EvalSt.nodes st))) (rm s)))
+  stepFrame-floor (step-take {w = w} {nid = c} {vals = vals} {fin} {sched} {st}) pf (inj₂ s) =
+    inj₂ (si (NI-eq (takeOff w c (lookupNode c (EvalSt.nodes st)) vals fin sched st nid (notIn₁ {c} {nid} (proj₁ pf))) (ni s))
+             (ea-sub (takeReg w c (lookupNode c (EvalSt.nodes st)) vals fin sched st) (ea s))
+             (subst (nid <_) (sym (takeCt w c (lookupNode c (EvalSt.nodes st)) vals fin sched st)) (lt s))
+             (room-keeps (takeDispatch-keeps w c vals fin sched st (lookupNode c (EvalSt.nodes st))) (rm s)))
   stepFrame-floor (step-batchSync {nid = c} {vals = vals} {fin} {sched} {st}) pf (inj₂ s) =
     inj₂ (si (NI-eq (batchOff c vals fin sched st (lookupNode c (EvalSt.nodes st)) nid (notIn₁ {c} {nid} (proj₁ pf))) (ni s))
              (ea-sub (λ r∈ → subst (_ ∈_) (batchReg c vals fin sched st (lookupNode c (EvalSt.nodes st))) r∈) (ea s))
@@ -621,6 +627,7 @@ subscribeE-ct (subs-of f)                        = foldPath-ct f
 subscribeE-ct (subs-empty f)                     = foldPath-ct f
 subscribeE-ct (subs-take-zero _ f)               = foldPath-ct f
 subscribeE-ct (subs-take-suc _ refl sub)         = ≤-trans (n≤1+n _) (subscribeE-ct sub)
+subscribeE-ct (subs-takeWhile refl sub)          = ≤-trans (n≤1+n _) (subscribeE-ct sub)
 subscribeE-ct (subs-batchSync refl sub f)        = ≤-trans (n≤1+n _) (≤-trans (subscribeE-ct sub) (foldPath-ct f))
 subscribeE-ct (subs-map sub)                     = subscribeE-ct sub
 subscribeE-ct (subs-scan refl sub)               = ≤-trans (n≤1+n _) (subscribeE-ct sub)
@@ -640,7 +647,7 @@ subscribeInner-ct (inner refl sub) = ≤-trans (n≤1+n _) (subscribeE-ct sub)
 stepFrame-ct step-map = ≤-refl
 stepFrame-ct (step-scan {fn = fn} {nid = c} {vals = vals} {fin} {sched} {st}) =
   ≤-reflexive (sym (scanCt fn c vals fin sched st (lookupNode c (EvalSt.nodes st))))
-stepFrame-ct (step-take {nid = c} {vals = vals} {fin} {sched} {st}) = ≤-reflexive (sym (takeCt c (lookupNode c (EvalSt.nodes st)) vals fin sched st))
+stepFrame-ct (step-take {w = w} {nid = c} {vals = vals} {fin} {sched} {st}) = ≤-reflexive (sym (takeCt w c (lookupNode c (EvalSt.nodes st)) vals fin sched st))
 stepFrame-ct (step-batchSync {nid = c} {vals = vals} {fin} {sched} {st}) =
   ≤-reflexive (sym (batchCt c vals fin sched st (lookupNode c (EvalSt.nodes st))))
 stepFrame-ct (step-from-inner r) = innerReact-ct r
