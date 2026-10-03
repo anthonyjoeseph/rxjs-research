@@ -946,13 +946,14 @@ indexOf timed-faithfulˢ = 3
 indexOf simulationˢ     = 4
 indexOf arrival-runsˢ = 5
 
--- one count per former, in `allFormers` order, plus the obs-fold count
--- and the count of cases bearing on contiguity
+-- one count per former, in `allFormers` order, plus the obs-fold count,
+-- the count of cases bearing on contiguity and of those holding values
+-- back at the fuel
 Tally : Set
-Tally = List ℕ × ℕ × ℕ
+Tally = List ℕ × ℕ × ℕ × ℕ
 
 zeroTally : Tally
-zeroTally = map (λ _ → 0) allFormers , 0 , 0
+zeroTally = map (λ _ → 0) allFormers , 0 , 0 , 0
 
 carries : Former → List Former → Bool
 carries f []       = false
@@ -964,13 +965,15 @@ bumpEach fs (g ∷ gs) []       = []
 bumpEach fs (g ∷ gs) (c ∷ cs) =
   (if carries g fs then suc c else c) ∷ bumpEach fs gs cs
 
--- a case's marks, and whether it bears on contiguity
+-- a case's marks, whether it bears on contiguity, and whether its
+-- batcher holds values back at the fuel
 Seen : Set
-Seen = Marks × Bool
+Seen = Marks × Bool × Bool
 
 bump : Seen → Tally → Tally
-bump ((fs , o) , b) (cs , p , q) =
+bump ((fs , o) , b , h) (cs , p , q , r) =
   bumpEach fs allFormers cs , (if o then suc p else p) , (if b then suc q else q)
+  , (if h then suc r else r)
 
 -- ONE CHECK PER STATEMENT, so a report says which claim a program
 -- breaks rather than that it breaks one.
@@ -1037,13 +1040,26 @@ bearsOn s n = within s n (2 ≤ᵇ n) false
 bears : ℕ → ℕ → Drawn → Bool
 bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots d₀ d₁))))))
 
+-- A CASE TESTS THE ONE-PAST SLACK WHEN THE BATCHER HOLDS VALUES BACK AT
+-- THE FUEL: the joined run shorter than the plain run, so only the
+-- joined run at one more fuel can cover it.  That slack is the one
+-- `left-to-right` takes from `batched-sandwich`'s second prefix, which
+-- says nothing anywhere else.  Read off the untimed side under the
+-- case's clock, and past it counted as holding nothing.
+holdsBack : ℕ → List ℕ × List ℕ × List ℕ → Bool
+holdsBack s (l , p , _) with length p ∸ length l
+... | n = within s n (1 ≤ᵇ n) false
+
+slack : ℕ → ℕ → Drawn → Bool
+slack s f (e , d₀ , d₁) = holdsBack s (ltrSides (cached "?" f e (mkSlots d₀ d₁)))
+
 -- A SWEEP MAY DECIDE ONLY THE CASES THAT BEAR.  Whether one does is
 -- read before any statement is, so a sweep aimed at contiguity spends
 -- its clocks on cases that could fail it; one that does not bear is
 -- drawn, counted in the census and left undecided-by-choice.
 judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 judged ob ss f s m x with bears s f x
-... | b = (m , b) , (if ob ∧ not b then [] else bounded s f x ss)
+... | b = (m , b , slack s f x) , (if ob ∧ not b then [] else bounded s f x ss)
 
 oneCase : Bool → List Statement → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
@@ -1250,8 +1266,9 @@ streamCases : Bool → ℕ → ℕ → List (Seen × List (ℕ × String)) → I
 streamCases ob n i []       = putErr ""
 streamCases ob n i (r ∷ rs) =
   putErr ("case " ++ show i ++ "/" ++ show n ++ " "
-          ++ (if ob ∧ not (proj₂ (proj₁ r)) then "degenerate" else verdictOf (proj₂ r)) ++ "\n"
-          ++ (if proj₂ (proj₁ r) then "  bears on contiguity\n" else "")
+          ++ (if ob ∧ not (proj₁ (proj₂ (proj₁ r))) then "degenerate" else verdictOf (proj₂ r)) ++ "\n"
+          ++ (if proj₁ (proj₂ (proj₁ r)) then "  bears on contiguity\n" else "")
+          ++ (if proj₂ (proj₂ (proj₁ r)) then "  holds values back at the fuel\n" else "")
           ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
   streamCases ob n (suc i) rs
 
@@ -1262,7 +1279,8 @@ summaryOf seed d f runs (tally , fails) = concatStr
    ∷ " cases, " ∷ show (length (decided fails)) ∷ " failures, "
    ∷ show (length fails ∸ length (decided fails)) ∷ " undecided"
    ∷ "; obs-fold " ∷ show (proj₁ (proj₂ tally))
-   ∷ "; two plain arrivals with values " ∷ show (proj₂ (proj₂ tally)) ∷ "\ncensus " ∷ [])
+   ∷ "; two plain arrivals with values " ∷ show (proj₁ (proj₂ (proj₂ tally)))
+   ∷ "; values held back at the fuel " ∷ show (proj₂ (proj₂ (proj₂ tally))) ∷ "\ncensus " ∷ [])
    ++ᴸ censusPairs allFormers (proj₁ tally)
    ++ᴸ ("\n" ∷ dumpFails fails ∷ []))
 
