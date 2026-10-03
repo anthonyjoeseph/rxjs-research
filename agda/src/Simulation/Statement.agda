@@ -20,7 +20,7 @@
 -- the InstEmit -- and an observable value is a closure over its own.
 -- What an observable does is compared where it is run, as its emits.
 --
--- THE IMPL'S SHARED-SLOT FALLBACK IS OWED BY `correspondence`.
+-- THE IMPL'S SHARED-SLOT FALLBACK IS OWED BY `machines`.
 -- `embedSlotsImpl` checks stratification of the elaborated definition
 -- and falls back to `empty` if it fails; the table only certifies the
 -- plain one, so the values are where "the check never fails" is paid.
@@ -48,7 +48,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open Relation.Binary.PropositionalEquality.≡-Reasoning
 
 open import Rx.Prim      using (Fuel; Id; PlainEvent; valueᵖ; completeᵖ; InstEmit)
-open import Rx.Exp       using (Ctx; Val; isData; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
+open import Rx.Exp       using (Ctx; Closed; Val; isData; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import SExp.InstEmit using (instEmitᵗ)
@@ -57,10 +57,13 @@ open import SExp.Plain   using (unplainᵈ; ∧ˡ; ∧ʳ; plainExp; plainValues)
 open import SExp.Pipeline using (runᴵ; runᴾ; elaborateImpl; embedSlotsImpl)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
-open import Simulation.Lockstep using (Conf; start; opening; out; next; iter; run-opening; run-snoc;
+open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc;
   concat-++; values-++; decode-++; extract-++)
-open import Rx.Evaluator using (Stream)
-open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; schedGo; sched-next)
+open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
+open import Rx.Mint      using (MintKey; counter; sourceᵏ)
+open import Simulation.Schedules using (Sync; Popped; sched-pop)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -187,6 +190,66 @@ record Correspondence {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] 
     step-clock  : ∀ {c d} → Corr c d → clock d ≤ clock (next d)
     step-stamps : ∀ {c d} → Corr c d → OneIn (clock d) (clock (next d)) (readᴵ (out d))
 
+-- THE IMPL'S CLOCK IS ITS SOURCE COUNTER.  Every instant a run stamps
+-- is a token one of its mints drew, and every mint draws at that key.
+clockᴵ : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} → Conf e → ℕ
+clockᴵ d = counter (Sched.mint (Conf.sched d)) sourceᵏ
+
+live : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} → Conf e → List (LiveSource Γ′)
+live c = Sched.live (Conf.sched c)
+
+-- a pop leaves the mint where it was
+pop-mint : ∀ {m} {Γ′ : Ctx m} (s : Sched Γ′) {a s′} → sched-next s ≡ inj₂ (a , s′) → Sched.mint s′ ≡ Sched.mint s
+pop-mint s eq with schedGo (Sched.live s)
+pop-mint s ()   | inj₁ _
+pop-mint s refl | inj₂ _ = refl
+
+postulate
+  -- NO STEP OF A CASCADE MOVES A COUNTER BACK.  Every edge of the
+  -- evaluator leaves the mint alone or writes one key with one past what
+  -- it read there.
+  --
+  -- TWIN: `Rx.Evaluator.Keeps`, whose `subscribeE-keeps` family walks
+  --   every relation a cascade reaches, each clause reflexivity or one
+  --   step, which is this family's shape at a counter.
+  cascade-mono : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (sched : Sched Γ′) (st : EvalSt e)
+                   ({-@0-}ru : Rule sched st) (k : MintKey)
+               → counter (Sched.mint sched) k ≤ counter (Sched.mint (proj₁ (proj₂ (Σ⁰.fst⁰ (cascade! a sched st ru))))) k
+
+-- so one arrival never runs the impl's clock back
+clock-on : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (d : Conf e) (x : ⊤ ⊎ (Arrival Γ′ × Sched Γ′))
+           (eqn : sched-next (Conf.sched d) ≡ x) → clockᴵ d ≤ clockᴵ (proj₂ (stepOn d x eqn))
+clock-on d (inj₁ _)          eqn = ≤-refl
+clock-on d (inj₂ (a , s′)) eqn =
+  subst (_≤ clockᴵ (proj₂ (stepOn d (inj₂ (a , s′)) eqn)))
+        (cong (λ μ → counter μ sourceᵏ) (pop-mint (Conf.sched d) eqn))
+        (cascade-mono a s′ (Conf.st d) (pop-rule eqn (Conf.ru d)) sourceᵏ)
+
+-- THE TWO MACHINES, RELATED: a relation between their stores, one
+-- between their live sources that the stores keep, and what each arrival
+-- does to them.  The schedules are related outside it, by `Sync`, so a
+-- pop is `sched-pop`'s and the leaf is the subscribe and the cascade.
+record Machines {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) : Set₁ where
+  field
+    Src   : LiveSource Γ → LiveSource (plainᵏ Γ κ) → Set
+    Store : Conf (plainExp e) → Conf (elaborateImpl κ e) → Set
+    store-src   : ∀ {c d} → Store c d → Pointwise Src (live c) (live d)
+    open-sync   : Sync (live (start (plainExp e) (plainSlots ins))) (live (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+    open-store  : Store (start (plainExp e) (plainSlots ins)) (start (elaborateImpl κ e) (embedSlotsImpl ins))
+    open-agree  : Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)
+                            (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
+                            (readᴾ (opening (plainExp e) (plainSlots ins)))
+    open-stamps : OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+                          (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
+    step-sync   : ∀ {c d} → Store c d → Popped Src (live c) (live d) (schedGo (live c)) (schedGo (live d))
+                → Sync (live (next c)) (live (next d))
+    step-store  : ∀ {c d} → Store c d → Popped Src (live c) (live d) (schedGo (live c)) (schedGo (live d))
+                → Store (next c) (next d)
+    step-agree  : ∀ {c d} → Store c d → Popped Src (live c) (live d) (schedGo (live c)) (schedGo (live d))
+                → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ (out d)) (readᴾ (out c))
+    step-stamps : ∀ {c d} → Store c d → Popped Src (live c) (live d) (schedGo (live c)) (schedGo (live d))
+                → OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
+
 postulate
   -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
   -- HAVE, or one plain arrival's values delivered across two.  Either is
@@ -204,6 +267,13 @@ postulate
   -- arrival's with none unmatched between: seed 20, 300 cases, 299
   -- agreeing and one undecided at its clock; seed 19, 60, all agreeing.
   --
+  -- EACH ARRIVAL'S INSTANT IS DRAWN WHILE IT CASCADES.  The compiled
+  -- sweep reads the impl's source counter after the subscribe and after
+  -- every arrival, and finds each arrival's instants between the counter
+  -- it entered with and the one it left, the subscribe's below the
+  -- first: seed 21 at depth 3, 120 cases, 103 decided and 66 of those
+  -- grouping values, none outside.
+  --
   -- PROBED: `Probed.Simulation`, read back by
   --   `git show 3d8872c4:agda/evidence/probed/Probed/Simulation.agda`.
   --   Its rows pin `arrival-runs`'s conclusion -- every slice through fuel
@@ -211,8 +281,30 @@ postulate
   --   all over a hot slot with the map the identity, the empty slices
   --   included, each slice's instant its arrival plus a shift -- so they
   --   reach this leaf only along the run from the root subscribes.
-  correspondence : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
-                 → Correspondence κ e ins
+  machines : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+           → Machines κ e ins
+
+-- THE CORRESPONDENCE IS THE SCHEDULES IN STEP AND THE STORES RELATED.
+-- An arrival pops partnered sources from schedules in step
+-- (`sched-pop`), and the leaf carries the stores across the cascade.
+correspondence : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+               → Correspondence κ e ins
+correspondence κ e ins = record
+  { Corr        = λ c d → Sync (live c) (live d) × Store c d
+  ; clock       = clockᴵ
+  ; open-corr   = open-sync , open-store
+  ; open-agree  = open-agree
+  ; open-stamps = open-stamps
+  ; step-corr   = λ (sy , st) → step-sync st (popped sy st) , step-store st (popped sy st)
+  ; step-agree  = λ (sy , st) → step-agree st (popped sy st)
+  ; step-clock  = λ {c} {d} _ → clock-on d (sched-next (Conf.sched d)) refl
+  ; step-stamps = λ (sy , st) → step-stamps st (popped sy st)
+  }
+  where
+    open Machines (machines κ e ins)
+    popped : ∀ {c d} → Sync (live c) (live d) → Store c d
+           → Popped Src (live c) (live d) (schedGo (live c)) (schedGo (live d))
+    popped sy st = sched-pop sy (store-src st)
 
 readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
 readᴾ-++ xs ys = trans (cong plainValues (concat-++ xs ys)) (values-++ (concat xs) (concat ys))

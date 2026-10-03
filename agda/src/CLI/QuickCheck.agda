@@ -911,11 +911,12 @@ showItem (p , inj₂ _) = showVals p ++ ":END"
 
 -- a program's two runs cut at their arrivals, one slice to a bracket
 showArr : {A : Set} → (A → String) → Arr A → String
-showArr sh (is , dry , ps , ik , pk) =
+showArr sh (is , dry , ps , ik , pk , cl) =
   "impl slices = " ++ commaJoin (map (λ i → "[" ++ commaJoin (map (λ p → "@" ++ show (proj₁ p) ++ " " ++ sh (proj₂ p)) i) ++ "]") is) ++
   (if dry then " (queue dry)" else " (at the fuel cap)") ++
   "\n    plain slices = " ++ commaJoin (map (λ p → "[" ++ commaJoin (map sh p) ++ "]") ps) ++
-  "\n    impl keys = " ++ showKeys ik ++ "\n    plain keys = " ++ showKeys pk
+  "\n    impl keys = " ++ showKeys ik ++ "\n    plain keys = " ++ showKeys pk ++
+  "\n    impl clocks = " ++ commaJoin (map show cl)
   where
     showKeys : List Key → String
     showKeys ks = commaJoin (map (λ k → show (proj₁ k) ++ "/" ++ show (proj₂ k)) ks)

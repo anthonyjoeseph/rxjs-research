@@ -190,8 +190,10 @@ Main                                     four top-line statements, claimed
  │   │   │                                value named by its arrival
  │   │   └─ arrival-runs                  each plain arrival one impl
  │   │       │                            arrival, one instant to it
- │   │       └─ correspondence            a relation each arrival keeps,
- │   │                                    sending agreeing values
+ │   │       └─ correspondence            schedules in step, stores related
+ │   │           ├─ machines              the stores' relation, kept by each
+ │   │           │                        subscribe and cascade
+ │   │           └─ cascade-mono          no cascade runs a counter back
  │   └─ batched-sandwich                  the batcher against its own run
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
  │   │                                    group emits as the timed
@@ -238,25 +240,25 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — the one theorem both assembled top lines stand on, a real body
-by induction on arrivals over one leaf, `correspondence`: a relation between
-the two machines' configurations each arrival keeps, under which the two send
-agreeing values, the impl's under one rising instant. The impl runs at its own
-fuel (Anthony). RULED OUT: an impl arrival the plain schedule
-lacks, or a plain arrival split across two, on every bug-cache row and at depth
-3 seeds 19 and 20; a non-contiguous run at depth 2 seeds 13..36 or depth 3
-seeds 1..11. Every top-line leaf went green under flatteners, decided itself,
-at depth 3, fuel 1. Left: the relation itself, through every former.
+`simulation` — the theorem both assembled top lines stand on, by induction on
+arrivals over `correspondence`: schedules in step, popping partnered sources
+by a proven lemma, and the leaf `machines`, a store relation each subscribe
+and cascade keeps, under which both send agreeing values, the impl's under one
+instant its source counter passes. RULED OUT: an impl arrival the plain
+schedule lacks, or a plain arrival split in two, on every bug-cache row and at
+depth 3 seeds 19, 20; a non-contiguous run at depth 2 seeds 13..36, depth 3
+seeds 1..11; an instant drawn outside its arrival's cascade, depth 3 seed 21.
+Left: the stores' relation, through every former.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **DEFINE THE CORRESPONDENCE.** `correspondence` becomes a body: a
-  concrete relation pairing live sources, registry rows and node states per
-  former, schedules ticking together as `make qc-same-clock` decides, with
-  the subscribe, the pop and the cascade stated over it as leaves, so the
-  monster drops to whichever of them is riskiest.
+- **RELATE THE STORES.** `machines` becomes a body: `Src` and `Store` made
+  concrete, pairing registry rows and node states per former and each live
+  source's payloads, with the root subscribe and one cascade stated over them
+  as leaves, so the monster drops to whichever former's cascade is
+  riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: a claim the impl's cascade makes
@@ -273,18 +275,20 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### The ledger
 
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
-  `REFUTED, PROBED`: the unbatched values between the joined run at a
-  batcher fuel never less and one past it; the sweep, deciding it
-  directly, reached held-back values under a flattener with no red.
+  `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
+  fuel never less and one past it; the sweep, deciding it directly, reached
+  held-back values under a flattener with no red.
 - **`timed-faithful`** (Timed.Faithful) — DIFFICULTY, `PROBED`: probed
-  first-order; the sweep, deciding it directly, reached values on two
-  arrivals under a flattener with no red.
+  first-order; the sweep, deciding it directly, reached values on two arrivals
+  under a flattener with no red.
 - **`batchable`** (Batchable.Statement) — DIFFICULTY, `PROBED`: probed
-  first-order; the sweep, deciding it directly, reached values grouping
-  under a flattener and a `μ` with no red.
+  first-order; the sweep, deciding it directly, reached values grouping under a
+  flattener and a `μ` with no red.
 - **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED`:
-  one packet per arrival, injectively; the sweep, deciding it directly,
-  reached values on two arrivals under a flattener with no red.
-- **`correspondence`** (Simulation.Statement) — DIFFICULTY, `PROBED`: some
-  relation between the machines' configurations each arrival keeps, sending
-  agreeing values, the impl's under one instant its clock passes.
+  one packet per arrival, injectively; the sweep, deciding it directly, reached
+  values on two arrivals under a flattener with no red.
+- **`machines`** (Simulation.Statement) — DIFFICULTY, `PROBED`: some relation
+  between the stores each subscribe and cascade keeps, sending agreeing values,
+  the impl's under one instant its source counter passes.
+- **`cascade-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
+  never runs a mint counter back.

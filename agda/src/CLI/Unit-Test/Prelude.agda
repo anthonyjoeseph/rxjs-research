@@ -26,7 +26,7 @@ open import Data.Unit using (⊤; tt)
 open import Data.Maybe using (Maybe; just; nothing)
 import Data.Maybe
 open import Data.List using (List; []; _∷_; _++_; map; length; zipWith; concat; take; drop; replicate)
-open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_; _+_)
+open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_; _≤ᵇ_; _+_)
 open import Data.Fin using (zero; suc)
 open import Data.String using (String)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -42,6 +42,7 @@ open import Rx.Slots using (Slots)
 open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; hotᵏ; coldᵏ; sharedᵏ; emptyˢ; emitᵗ;
   flattenˢ; mapˢ; pairˢ; inlˢ; inrˢ; unitˢ; varˢᵗ)
 open import Rx.Evaluator using (Burst; Stream; Sched; EvalSt; Arrival; sched-next)
+open import Rx.Mint using (counter; sourceᵏ)
 open import Rx.Evaluator.Builder using (drain!; drainOn; cascade!; pop-rule; subscribe!; evaluate↓)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; _,_; Rule)
 open import SExp.Plain using (plainExp; plainValues)
@@ -253,15 +254,15 @@ rankFrom n seen ((t , s) ∷ ks) with s <ᵇ n | posOf s seen
 mutual
   chunks! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st)
-          → Σ⁰ (List (Stream Γ t) × List Key × Bool) λ r → concat (proj₁ r) ≡ Σ⁰.fst⁰ (drain! fuel sched st ru)
-  chunks! zero    sched st ru = ([] , [] , false) , refl
+          → Σ⁰ (List (Stream Γ t) × List Key × List ℕ × Bool) λ r → concat (proj₁ r) ≡ Σ⁰.fst⁰ (drain! fuel sched st ru)
+  chunks! zero    sched st ru = ([] , [] , [] , false) , refl
   chunks! (suc k) sched st ru = chunksOn k sched st ru (sched-next sched) refl
 
   chunksOn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (k : Fuel) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st)
            → (x : ⊤ ⊎ (Arrival Γ × Sched Γ)) ({-@0-}eqn : sched-next sched ≡ x)
-           → Σ⁰ (List (Stream Γ t) × List Key × Bool) λ r → concat (proj₁ r) ≡ Σ⁰.fst⁰ (drainOn k sched st ru x eqn)
-  chunksOn k sched st ru (inj₁ _)            eqn = ([] , [] , true) , refl
+           → Σ⁰ (List (Stream Γ t) × List Key × List ℕ × Bool) λ r → concat (proj₁ r) ≡ Σ⁰.fst⁰ (drainOn k sched st ru x eqn)
+  chunksOn k sched st ru (inj₁ _)            eqn = ([] , [] , [] , true) , refl
   chunksOn k sched st ru (inj₂ (a , sched′)) eqn =
     then! k ((Arrival.tick a , Arrival.source a) ∷ []) (cascade! a sched′ st (pop-rule eqn ru))
 
@@ -269,14 +270,15 @@ mutual
   then! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {D : Stream Γ t × Sched Γ × EvalSt e → Set} (k : Fuel)
           (ks : List Key)
           (r : Σ⁰ (Stream Γ t × Sched Γ × EvalSt e) λ r → D r × Rule (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-        → Σ⁰ (List (Stream Γ t) × List Key × Bool) λ x →
+        → Σ⁰ (List (Stream Γ t) × List Key × List ℕ × Bool) λ x →
             concat (proj₁ x) ≡ proj₁ (Σ⁰.fst⁰ r) ++
               Σ⁰.fst⁰ (drain! k (proj₁ (proj₂ (Σ⁰.fst⁰ r))) (proj₂ (proj₂ (Σ⁰.fst⁰ r))) (proj₂ (Σ⁰.snd⁰ r)))
   then! k ks ((out , sched′ , st′) , _ , ru′) =
-    chunks! k sched′ st′ ru′ |>′ λ ((cs , ks′ , dry) , eq) → (out ∷ cs , ks ++ ks′ , dry) , cong (out ++_) eq
+    chunks! k sched′ st′ ru′ |>′ λ ((cs , ks′ , cl , dry) , eq) →
+      (out ∷ cs , ks ++ ks′ , counter (Sched.mint sched′) sourceᵏ ∷ cl , dry) , cong (out ++_) eq
 
 cut : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
-    → Σ⁰ (List (Stream Γ t) × List Key × Bool) λ r → concat (proj₁ r) ≡ evaluate↓ fuel e ins
+    → Σ⁰ (List (Stream Γ t) × List Key × List ℕ × Bool) λ r → concat (proj₁ r) ≡ evaluate↓ fuel e ins
 cut fuel e ins = then! fuel [] (subscribe! e ins)
 
 -- EACH ARRIVAL'S SLICE, read off the cut with the reading the statement
@@ -284,12 +286,12 @@ cut fuel e ins = then! fuel [] (subscribe! e ins)
 -- element by element, so it commutes with the cut.  The keys come back
 -- with their dynamic sources ranked.
 implSlices : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ
-           → List (List (Id × Val (plainᵏ Γ κ) (plainᵗ t))) × List Key × Bool
+           → List (List (Id × Val (plainᵏ Γ κ) (plainᵗ t))) × List Key × List ℕ × Bool
 implSlices {n} κ fuel e ins =
   readSlices (λ s → instExtract (decodeEmits (concat s))) (Σ⁰.fst⁰ (cut fuel (elaborateImpl κ e) (embedSlotsImpl ins)))
   where
-    readSlices : ∀ {A B : Set} → (A → B) → List A × List Key × Bool → List B × List Key × Bool
-    readSlices f (cs , ks , dry) = map f cs , rankFrom n [] ks , dry
+    readSlices : ∀ {A B : Set} → (A → B) → List A × List Key × List ℕ × Bool → List B × List Key × List ℕ × Bool
+    readSlices f (cs , ks , cl , dry) = map f cs , rankFrom n [] ks , cl , dry
 
 -- the plain run's, one per arrival through the fuel, an arrival past
 -- the queue's end sending nothing, and the keys one arrival further:
@@ -313,10 +315,10 @@ capOf f = suc (f + f)
 -- whether its queue ran dry first, the plain run's through the fuel, and
 -- each run's arrival keys
 Arr : Set → Set
-Arr A = List (List (ℕ × A)) × Bool × List (List A) × List Key × List Key
+Arr A = List (List (ℕ × A)) × Bool × List (List A) × List Key × List Key × List ℕ
 
-arrWith : {A : Set} → List (List (ℕ × A)) × List Key × Bool → List (List A) × List Key → Arr A
-arrWith (is , ik , dry) (ps , pk) = is , dry , ps , ik , pk
+arrWith : {A : Set} → List (List (ℕ × A)) × List Key × List ℕ × Bool → List (List A) × List Key → Arr A
+arrWith (is , ik , cl , dry) (ps , pk) = is , dry , ps , ik , pk , cl
 
 arrPlain : Case → Arr ℕ
 arrPlain c = arrWith (implSlices (kinds c) (capOf (fuel c)) (prog c) (slots c))
@@ -464,8 +466,19 @@ sameKeysᵇ []       _        = true
 sameKeysᵇ _        []       = true
 sameKeysᵇ (k ∷ ks) (q ∷ qs) = eqKey k q ∧ sameKeysᵇ ks qs
 
+-- AND EACH ARRIVAL'S INSTANT IS ONE THE IMPL MINTED WHILE CASCADING IT:
+-- between the source counter it entered with and the one it left, the
+-- subscribe's from zero.  A candidate for the correspondence's clock.
+betweenᵇ : {A : Set} → ℕ → ℕ → List (ℕ × A) → Bool
+betweenᵇ lo hi []            = true
+betweenᵇ lo hi ((i , _) ∷ r) = (lo ≤ᵇ i) ∧ (i <ᵇ hi) ∧ betweenᵇ lo hi r
+
+clockedᵇ : {A : Set} → ℕ → List (List (ℕ × A)) → List ℕ → Bool
+clockedᵇ lo (r ∷ rs) (hi ∷ hs) = betweenᵇ lo hi r ∧ clockedᵇ hi rs hs
+clockedᵇ lo _        _         = true
+
 sameClockᵇ : {A : Set} → Arr A → Bool
-sameClockᵇ (_ , _ , _ , ik , pk) = sameKeysᵇ ik pk
+sameClockᵇ (is , _ , _ , ik , pk , cl) = sameKeysᵇ ik pk ∧ clockedᵇ 0 is cl
 
 sameClockᴮ : Arr ℕ × Arr Item → Bool
 sameClockᴮ (p , t) = sameClockᵇ p ∧ sameClockᵇ t
