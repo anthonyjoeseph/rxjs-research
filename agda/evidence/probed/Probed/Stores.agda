@@ -11,7 +11,9 @@ open import Rx.Prim using (cold; after_,_)
 open import SExp.Syntax using (inputˢ; emptyˢ)
 open import Data.Sum using (inj₁)
 open import Data.Fin using (zero; suc)
-open import Data.Nat using (zero; suc)
+open import Data.Nat using (zero; suc; _<?_)
+open import Data.Unit using (tt)
+open import Relation.Nullary.Decidable using (toWitness)
 open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
@@ -24,7 +26,7 @@ open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
 open import Simulation.Walk using (walk-input; walk-defer; init-store; minted)
 open import Simulation.Schedules using ([]; _∷_)
-open import Simulation.Stores using (data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
+open import Simulation.Stores using (slot~; dyn~; data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
 open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals; defer-in)
 
 -- each subscribe row is the walk's arm for the program's one former, at
@@ -38,6 +40,7 @@ _ = record
   ; π-keys  = []
   ; π-vals  = []
   ; sources = data~ refl (refl ∷ refl ∷ []) ∷ []
+  ; numbers = slot~ zero refl ∷ []
   ; sync    = (refl , []) ∷ []
   ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl refl refl) refl) []
   ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
@@ -58,6 +61,7 @@ _ = record
   ; π-keys  = []
   ; π-vals  = []
   ; sources = data~ refl (refl ∷ []) ∷ []
+  ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ []
   ; sync    = (refl , []) ∷ []
   ; rows    = cold~ here (block {m1 = 2} {b = 1} {m2 = 0} refl refl refl) root~ refl ∷ []
   ; latches = λ { zero → (λ ()) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
@@ -76,6 +80,7 @@ _ = record
   ; π-keys  = [] ∷ []
   ; π-vals  = [] ∷ []
   ; sources = defer~ (hop (elab (inputˢ zero) (λ x → x) (λ ())) ∷ []) ∷ data~ refl (refl ∷ []) ∷ []
+  ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ slot~ zero refl ∷ []
   ; sync    = (refl , refl ∷ []) ∷ (refl , []) ∷ []
   ; rows    = defer~ here (here refl) refl refl root~ refl ∷ []
   ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }

@@ -49,7 +49,9 @@ open Relation.Binary.PropositionalEquality.≡-Reasoning
 
 open import Rx.Prim      using (Fuel; Id; PlainEvent; valueᵖ; completeᵖ; InstEmit)
 open import Rx.Exp       using (Ctx; Closed; Val; isData; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
-open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ)
+open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
+open import Data.Fin     using (toℕ; _↑ˡ_)
+open import Data.Vec     using (lookup)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
@@ -61,13 +63,13 @@ open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc;
   concat-++; values-++; decode-++; extract-++)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; schedGo; schedFinish; sched-next;
-  arrVal; chainsOf; cascadeOpen; cascadeClose; cascadeFinish)
+  arrVal; chainsOf; cascadeOpen; cascadeClose; cascadeFinish; schedHeadOf)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
-open import Simulation.Stores using (V) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Stores using (V; SrcNum; slot~; dyn~) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
@@ -258,21 +260,9 @@ postulate
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 
-  -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
-  -- HAVE, or one plain arrival's values delivered across two.  Either is
-  -- a former whose elaboration schedules something its plain program
-  -- does not, or answers an arrival a hop late.
-  --
-  -- THE TWO SCHEDULES ARE ONE WHERE THE COMPILED CHECKS REACH.  On every
-  -- row of the bug cache, untimed and timed, the impl's arrival keys --
-  -- tick and ranked source -- are the plain run's in order, as far as
-  -- both were read, and each impl slice holds as many values as its
-  -- plain slice.  Among them are the rows built to split an arrival: a
-  -- value and its END under a `take` of a cold, exhausted or merged, and
-  -- every way the cache subscribes a `take` late.  The compiled sweep at
-  -- depth 3, fuel one, matched each plain arrival's key to the next impl
-  -- arrival's with none unmatched between: seed 20, 300 cases, 299
-  -- agreeing and one undecided at its clock; seed 19, 60, all agreeing.
+  -- A HOT SCRIPT'S VALUE PASS: the plain run walks the slot's readers,
+  -- and the impl walks the one raw read, whose input block ends at the
+  -- share those readers' partners read.
   --
   -- THE TYPECHECKER DOES NOT REACH IT AT A REAL POP.  Instantiated at
   -- the first pop of a hot read's two arrivals, from the store its
@@ -280,11 +270,26 @@ postulate
   -- the row exhausted memory -- twice, the second with every implicit
   -- named off the run.  A coverage boundary: the compiled sweep,
   -- deciding `simulation`, is where a cascade is checked.
-  value-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  hot-pass   : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
     → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
     → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+    → ∀ i → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+    → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+    → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
+    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+    → Storeʳ κ sP₁ stP₁ sI₁ stI₁
+    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+
+  -- A MINTED SOURCE'S VALUE PASS: a cold script's or a deferred hop's,
+  -- each registration on one side partnered with one on the other.
+  dyn-pass   : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → Storeʳ κ sP stP sI stI
+    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+    → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+    → n < Arrival.source a → n + n < Arrival.source a′
     → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
     → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
     → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
@@ -345,6 +350,58 @@ readᴵ-++ xs ys =
   trans (cong (λ z → instExtract (decodeEmits z)) (concat-++ xs ys))
  (trans (cong instExtract (decode-++ (concat xs) (concat ys)))
         (extract-++ (decodeEmits (concat xs)) (decodeEmits (concat ys))))
+
+-- a popped arrival carries its source's number
+head-source : ∀ {k} {Δ : Ctx k} (l : LiveSource Δ) {a l₂} → schedHeadOf l ≡ inj₂ (a , l₂)
+            → Arrival.source a ≡ LiveSource.source l
+head-source l eq with LiveSource.pending l
+head-source l refl | _ ∷ _ = refl
+
+-- the two arrivals of a partnered pop are numbered as their sources are
+pop-kind : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+             {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+         → Storeʳ κ sP stP sI stI
+         → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+         → SrcNum κ (Arrival.source a) (Arrival.source a′)
+pop-kind {κ = κ} {sP = sP} {sI = sI} s ex ex′
+  with subst₂ (Popped (λ l l′ → SrcNum κ (LiveSource.source l) (LiveSource.source l′)) (Sched.live sP) (Sched.live sI))
+              ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.numbers s))
+... | pop {l = l} {l′ = l′} _ _ r (_ , h) (_ , h′) _ _ _ =
+  subst₂ (SrcNum κ) (sym (head-source l h)) (sym (head-source l′ h′)) r
+
+-- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
+-- HAVE, or one plain arrival's values delivered across two.  Either is
+-- a former whose elaboration schedules something its plain program
+-- does not, or answers an arrival a hop late.
+--
+-- THE TWO SCHEDULES ARE ONE WHERE THE COMPILED CHECKS REACH.  On every
+-- row of the bug cache, untimed and timed, the impl's arrival keys --
+-- tick and ranked source -- are the plain run's in order, as far as
+-- both were read, and each impl slice holds as many values as its
+-- plain slice.  Among them are the rows built to split an arrival: a
+-- value and its END under a `take` of a cold, exhausted or merged, and
+-- every way the cache subscribes a `take` late.  The compiled sweep at
+-- depth 3, fuel one, matched each plain arrival's key to the next impl
+-- arrival's with none unmatched between: seed 20, 300 cases, 299
+-- agreeing and one undecided at its clock; seed 19, 60, all agreeing.
+value-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+               {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → Storeʳ κ sP stP sI stI
+  → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+  → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+  → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+  → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
+  → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+  → Storeʳ κ sP₁ stP₁ sI₁ stI₁
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+value-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy {oP} {sP₁} {stP₁} {oI} {sI₁} {stI₁} go go′ =
+  by (pop-kind s ex ex′) refl refl
+  where
+    by : ∀ {x x′} → SrcNum κ x x′ → x ≡ Arrival.source a → x′ ≡ Arrival.source a′
+       → Storeʳ κ sP₁ stP₁ sI₁ stI₁
+       × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+    by (slot~ i h) e₁ e₂ = hot-pass κ e s ex ex′ ta sy i h (sym e₁) (sym e₂) go go′
+    by (dyn~ p q) refl refl = dyn-pass κ e s ex ex′ ta sy p q go go′
 
 -- a value pass ends a cascade unless the arrival is its source's last
 finish-run : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (s : Sched Γ′) (st : EvalSt e)

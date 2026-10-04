@@ -36,7 +36,7 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (Maybe; just; nothing)
-open import Data.Nat     using (ℕ; suc; _+_; _≤_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
@@ -60,6 +60,14 @@ open import SExp.Elaborate using (toInstEmit; plainᶜ⁺; deferBodyᵖ; stamped
 open import SExp.InstEmit using (machineEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmit)
 open import Batchable.Inst-Extract using (emitValues)
+
+-- A LIVE SOURCE'S NUMBER AGAINST ITS PARTNER'S.  The only slots live
+-- on either side are the hot scripts, the impl's read off its raw
+-- half under the same number, and every other source is minted above
+-- the slots: the plain run's above `n`, the impl's above `n + n`.
+data SrcNum {n} (κ : Kinds n) : Source → Source → Set where
+  slot~ : ∀ i → lookup κ i ≡ hotᵏ → SrcNum κ (toℕ i) (toℕ (i ↑ˡ n))
+  dyn~  : ∀ {s s′} → n < s → n + n < s′ → SrcNum κ s s′
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -433,6 +441,7 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     π-keys  : Unique (map proj₁ π)
     π-vals  : Unique (concatMap proj₂ π)
     sources : Pointwise (Src κ) (Sched.live sP) (Sched.live sI)
+    numbers : Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → SrcNum κ (LiveSource.source l) (LiveSource.source l′)) (Sched.live sP) (Sched.live sI)
     sync    : Sync (Sched.live sP) (Sched.live sI)
     rows    : RegRel κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
                 (EvalSt.registry stP) (EvalSt.registry stI)

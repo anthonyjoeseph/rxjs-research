@@ -26,7 +26,7 @@ open import Rx.Prim      using (Id)
 open import Rx.Exp       using (FlatOp)
 open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; sched-init; st-init)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Path; root; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
@@ -41,7 +41,7 @@ open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Schedules using (Sync)
-open import Simulation.Stores using (V; EnvRel; Lifts; PathRel; root~; map~; Store; Src; [])
+open import Simulation.Stores using (V; EnvRel; Lifts; PathRel; root~; map~; Store; Src; SrcNum; [])
 
 -- what a run sends to its root, read as values: the plain run's in
 -- order, the impl's decoded and each paired with its instant
@@ -155,6 +155,14 @@ postulate
             → Sync (Sched.live (sched-init (plainExp e) (plainSlots ins)))
                    (Sched.live (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)))
 
+-- WHERE IT CAN STILL FAIL: A HOT SCRIPT NUMBERED APART FROM ITS RAW
+-- READ.  Both lists are the slots' hot scripts, numbered by slot.
+postulate
+  init-numbers : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+               → Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → SrcNum κ (LiveSource.source l) (LiveSource.source l′))
+                           (Sched.live (sched-init (plainExp e) (plainSlots ins)))
+                           (Sched.live (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)))
+
 -- TWIN: `ib-renᵉ` -- the same walk over `renExp`'s clauses, a binder's
 --   `ext∈` the one place the identity is not definitional.
 postulate
@@ -171,6 +179,7 @@ init-store κ e ins μ = record
   ; π-keys  = []
   ; π-vals  = []
   ; sources = init-sources κ e ins
+  ; numbers = init-numbers κ e ins
   ; sync    = init-sync κ e ins
   ; rows    = []
   ; latches = λ _ → (λ _ → refl) , (λ _ → refl , refl)
