@@ -60,11 +60,12 @@ open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc;
   concat-++; values-++; decode-++; extract-++)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; schedGo; sched-next)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; schedGo; schedFinish; sched-next)
+open import Rx.Evaluator.Domain using (cascade⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
-open import Simulation.Schedules using (Sync; Popped; sched-pop)
+open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop; HeadOf; SameOrd)
 open import Simulation.Stores using (V) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 
@@ -280,20 +281,68 @@ postulate
   -- grouping values, none outside.  And the instants a run draws are
   -- contiguous: no gap at depth 2 seeds 13..36 nor depth 3 seeds 1..11.
   --
-  -- PROBED: `Probed.Stores` -- the STORE conjunct alone, by `Confirms`, at
-  --   the first pop of the hot read's two arrivals, from the store its
-  --   subscribe row relates and the `Popped` `sched-pop` builds: one
-  --   payload gone from the source on both sides, the `read~` and `hot~`
-  --   rows unchanged, the latches and both `WF`s.  Not a cascade that
-  --   moves a row, nor a later pop.  Not the `Sync`, agreement or stamps
-  --   conjuncts.
-  cascade-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                      {c : Conf (plainExp e)} {d : Conf (elaborateImpl κ e)}
-    → Storeˢ κ c d → Popped (Srcˢ κ) (live c) (live d) (schedGo (live c)) (schedGo (live d))
-    → Sync (live (next c)) (live (next d))
-    × Storeˢ κ (next c) (next d)
-    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ (out d)) (readᴾ (out c))
-    × OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
+  -- THE TYPECHECKER DOES NOT REACH IT AT A REAL POP.  Instantiated at
+  -- the first pop of a hot read's two arrivals, from the store its
+  -- subscribe row relates and the two derivations `cascade!` builds,
+  -- the row exhausted memory -- twice, the second with every implicit
+  -- named off the run.  A coverage boundary: the compiled sweep,
+  -- deciding `simulation`, is where a cascade is checked.
+  cascade-pop : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → Storeʳ κ sP stP sI stI
+    → ∀ {a a′ l l′ rs rs′} → Arrival.tick a ≡ Arrival.tick a′ → Arrival.isLast a ≡ Arrival.isLast a′
+    → Srcˢ κ l l′ → HeadOf {Γ = Γ} {Γ′ = plainᵏ Γ κ} l a → HeadOf {Γ = Γ} {Γ′ = plainᵏ Γ κ} l′ a′
+    → SameOrd (Sched.live sP) rs → SameOrd (Sched.live sI) rs′ → Sync rs rs′
+    → ∀ {oP sP′ stP′ oI sI′ stI′}
+    → cascade⇓ a (record sP { live = rs }) stP (oP , sP′ , stP′)
+    → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , sI′ , stI′)
+    → Storeʳ κ sP′ stP′ sI′ stI′
+    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+    × OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI′) sourceᵏ) (readᴵ oI)
+
+-- a step reads the cascade the schedule's pop names, by any proof of it
+step-at : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (c : Conf e) {x} (eqn : sched-next (Conf.sched c) ≡ x)
+        → stepOn c (sched-next (Conf.sched c)) refl ≡ stepOn c x eqn
+step-at c refl = refl
+
+-- WHAT ONE ARRIVAL KEEPS, read off the two steps
+Kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (d : Conf (elaborateImpl κ e))
+     → Stream Γ t × Conf (plainExp e) → Stream (plainᵏ Γ κ) (emitᵗ t) × Conf (elaborateImpl κ e) → Set
+Kept {Γ = Γ} {t} κ e d sc sd =
+    Storeˢ κ (proj₂ sc) (proj₂ sd)
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ (proj₁ sd)) (readᴾ (proj₁ sc))
+  × OneIn (clockᴵ d) (clockᴵ (proj₂ sd)) (readᴵ (proj₁ sd))
+
+-- BOTH DRY SENDS NOTHING AND KEEPS THE STORES; A POP IS THE LEAF, over
+-- the two cascades the steps run
+cascade-at : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+               {c : Conf (plainExp e)} {d : Conf (elaborateImpl κ e)}
+  → Storeˢ κ c d → ∀ {x x′} → schedGo (live c) ≡ x → schedGo (live d) ≡ x′
+  → Popped (Srcˢ κ) (live c) (live d) x x′
+  → Kept κ e d (stepOn c (sched-next (Conf.sched c)) refl) (stepOn d (sched-next (Conf.sched d)) refl)
+cascade-at κ e {c} {d} s ex ex′ dry =
+  subst₂ (Kept κ e d) (sym (step-at c (cong (schedFinish (Conf.sched c)) ex)))
+                      (sym (step-at d (cong (schedFinish (Conf.sched d)) ex′)))
+         (s , [] , tt)
+cascade-at κ e {c} {d} s {inj₂ (a , rs)} {inj₂ (a′ , rs′)} ex ex′ (pop ta la r h h′ so so′ sy) =
+  subst₂ (Kept κ e d) (sym (step-at c eqn)) (sym (step-at d eqn′))
+         (stores (proj₁ k) , proj₂ k)
+  where
+    eqn  = cong (schedFinish (Conf.sched c)) ex
+    eqn′ = cong (schedFinish (Conf.sched d)) ex′
+    k = cascade-pop κ e (Storeˢ.raw s) ta la r h h′ so so′ sy
+          (proj₁ (Σ⁰.snd⁰ (cascade! a (record (Conf.sched c) { live = rs }) (Conf.st c) (pop-rule eqn (Conf.ru c)))))
+          (proj₁ (Σ⁰.snd⁰ (cascade! a′ (record (Conf.sched d) { live = rs′ }) (Conf.st d) (pop-rule eqn′ (Conf.ru d)))))
+
+-- AN ARRIVAL KEEPS THE STORES RELATED and sends agreeing values under one
+-- instant the clock passes
+cascade-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                    {c : Conf (plainExp e)} {d : Conf (elaborateImpl κ e)}
+  → Storeˢ κ c d → Popped (Srcˢ κ) (live c) (live d) (schedGo (live c)) (schedGo (live d))
+  → Storeˢ κ (next c) (next d)
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ (out d)) (readᴾ (out c))
+  × OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
+cascade-related κ e s p = cascade-at κ e s refl refl p
 
 -- A RELATED VALUE AGREES: at data both are the same value, and `obs`
 -- is not compared
@@ -340,10 +389,10 @@ machines κ e ins = record
   ; open-store  = proj₁ (proj₂ (subscribe-related κ e ins))
   ; open-agree  = proj₁ (proj₂ (proj₂ (subscribe-related κ e ins)))
   ; open-stamps = proj₂ (proj₂ (proj₂ (subscribe-related κ e ins)))
-  ; step-sync   = λ s p → proj₁ (cascade-related κ e s p)
-  ; step-store  = λ s p → proj₁ (proj₂ (cascade-related κ e s p))
-  ; step-agree  = λ s p → proj₁ (proj₂ (proj₂ (cascade-related κ e s p)))
-  ; step-stamps = λ s p → proj₂ (proj₂ (proj₂ (cascade-related κ e s p)))
+  ; step-sync   = λ s p → Storeʳ.sync (Storeˢ.raw (proj₁ (cascade-related κ e s p)))
+  ; step-store  = λ s p → proj₁ (cascade-related κ e s p)
+  ; step-agree  = λ s p → proj₁ (proj₂ (cascade-related κ e s p))
+  ; step-stamps = λ s p → proj₂ (proj₂ (cascade-related κ e s p))
   }
 
 -- THE CORRESPONDENCE IS THE SCHEDULES IN STEP AND THE STORES RELATED.

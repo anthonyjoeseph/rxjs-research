@@ -257,9 +257,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
   over the program, one arm per former, `walk-flatten` its riskiest; what
-  remains is `cascade-related`'s store conjunct as a fold over the related
-  rows a pop reaches, one arm per `PathRel` constructor, mutual with the
-  walk where a cascade subscribes an inner. Each arm a leaf, so the monster
+  remains is `cascade-pop`, over the two derivations: per `cascade⇓` pass,
+  then a fold over the related rows a pop reaches, one arm per `PathRel`
+  constructor, mutual with the walk where a cascade subscribes an inner. Each arm a leaf, so the monster
   drops to whichever constructor's arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
@@ -276,10 +276,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`cascade-related`** (Simulation.Statement) — FALSITY, `PROBED`: one cascade
-  keeps the stores related and sends agreeing values under one instant the
-  clock passes; the store conjunct holds at a hot read's first pop, but no
-  cascade that moves a row checked.
+- **`cascade-pop`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: the
+  cascades of one partnered pop keep the stores related and send agreeing
+  values under one instant the clock passes; past the typechecker at a real
+  pop, so the compiled sweep is its only reach.
 - **`walk-*`** (Simulation.Walk) — FALSITY, `PROBED×7`: one former's subscribe
   keeps the stores related; holds at a hot, cold and deferred read. Riskiest is
   `walk-flatten`, past the typechecker: a one-lane merge only in normal form.

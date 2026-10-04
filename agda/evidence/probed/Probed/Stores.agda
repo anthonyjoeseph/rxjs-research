@@ -1,9 +1,8 @@
--- THE STORES THE ROOT SUBSCRIBES INSTALL, AND ONE CASCADE KEEPS, related
+-- THE STORES THE ROOT SUBSCRIBES INSTALL, related
 -- by hand at concrete programs: the relation `Simulation.Stores` states,
 -- inhabited against the registries the two runs actually compute.
 -- TARGET: walk-input @1ab710
 -- TARGET: walk-defer @cd22e2
--- TARGET: cascade-related @a3c004
 module Probed.Stores where
 
 open import Data.List using ([]; _∷_)
@@ -20,46 +19,25 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import SExp.Plain using (plainExp)
-open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (plainSlots)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
-open import Simulation.Lockstep using (start)
-open import Simulation.Statement using (cascade-related; Storeˢ; stores)
 open import Simulation.Walk using (walk-input; walk-defer; init-store; minted)
-open import Simulation.Schedules using (sched-pop; []; _∷_)
+open import Simulation.Schedules using ([]; _∷_)
 open import Simulation.Stores using (data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
 open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals; defer-in)
 
 -- each subscribe row is the walk's arm for the program's one former, at
 -- the empty stores and the two root derivations, as `root-walk` calls it
-store₀ : Confirms (proj₁ (walk-input (κᵖ two-arrivals) zero (λ x → x) (λ ())
+_ : Confirms (proj₁ (walk-input (κᵖ two-arrivals) zero (λ x → x) (λ ())
                             (init-store (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals) _) root~
                             (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals)))))
                             (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))))
-store₀ = record
-  { π       = []
-  ; π-keys  = []
-  ; π-vals  = []
-  ; sources = data~ refl (refl ∷ refl ∷ []) ∷ []
-  ; sync    = (refl , []) ∷ []
-  ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl refl refl) refl) []
-  ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
-  ; wfᴾ     = λ _ _ ()
-  ; wfᴵ     = λ { 0 _ refl → refl ; 1 _ () ; 2 _ refl → refl ; (suc (suc (suc _))) _ () }
-  }
-
--- the first cascade of the same run: one arrival popped from each side
-_ : Confirms (Storeˢ.raw (proj₁ (proj₂
-      (cascade-related (κᵖ two-arrivals) (Point.prog two-arrivals)
-         {start (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals))}
-         {start (elaborateImpl (κᵖ two-arrivals) (Point.prog two-arrivals)) (embedSlotsImpl (insᵖ two-arrivals))}
-         (stores store₀) (sched-pop ((refl , []) ∷ []) (data~ refl (refl ∷ refl ∷ []) ∷ []))))))
 _ = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
-  ; sources = data~ refl (refl ∷ []) ∷ []
+  ; sources = data~ refl (refl ∷ refl ∷ []) ∷ []
   ; sync    = (refl , []) ∷ []
   ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl refl refl) refl) []
   ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
