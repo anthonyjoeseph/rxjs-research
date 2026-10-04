@@ -31,7 +31,7 @@ open import Data.Bool    using (Bool; true; false; T)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Unit    using (⊤; tt)
 open import Data.List    using (List; []; _∷_; _++_; map; length; replicate; drop; concat)
-open import Data.List.Properties using (map-++; map-replicate; length-drop)
+open import Data.List.Properties using (map-++; map-replicate; length-drop; ++-identityʳ)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous.Properties using (fromPointwise)
   renaming (trans to prefix-trans)
@@ -63,14 +63,16 @@ open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; schedGo; schedFinish; sched-next; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; schedHeadOf)
-open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓)
+open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
+  disp; walk-more; walk-nil)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; HeadOf; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
-open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After)
+open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash;
+  _⨾_; fan-go; hot-start; hot-start-at; hot-adm)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -260,28 +262,6 @@ postulate
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 
-  -- A HOT SCRIPT'S VALUE PASS: the plain run walks the slot's readers,
-  -- and the impl walks the one raw read, whose input block ends at the
-  -- share those readers' partners read.
-  --
-  -- THE TYPECHECKER DOES NOT REACH IT AT A REAL POP.  Instantiated at
-  -- the first pop of a hot read's two arrivals, from the store its
-  -- subscribe row relates and the two derivations `cascade!` builds,
-  -- the row exhausted memory -- twice, the second with every implicit
-  -- named off the run.  A coverage boundary: the compiled sweep,
-  -- deciding `simulation`, is where a cascade is checked.
-  hot-pass   : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-    → Storeʳ κ sP stP sI stI
-    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-    → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
-    → ∀ i → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
-    → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
-    → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
-    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
-    → Storeʳ κ sP₁ stP₁ sI₁ stI₁
-    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
-
   -- A POP LEAVES THE STORES RELATED: the popped sources keep their
   -- numbers and places, each giving up one pending value, and the
   -- cascade's ledger opens empty on both sides.
@@ -354,9 +334,6 @@ postulate
     → ∀ {oI sI′ stI′} → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , sI′ , stI′)
     → OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI′) sourceᵏ) (readᴵ oI)
 
-clash : true ≡ false → ⊥
-clash ()
-
 -- a popped arrival carries its source's number
 head-source : ∀ {k} {Δ : Ctx k} (l : LiveSource Δ) {a l₂} → schedHeadOf l ≡ inj₂ (a , l₂)
             → Arrival.source a ≡ LiveSource.source l
@@ -391,16 +368,6 @@ v-agrees κ (s +ᵗ t)  {inj₂ _} {inj₁ _} ()
 v-agrees κ (listᵗ t) rs = Pointwise-map (v-agrees κ t) rs
 v-agrees κ (obs t)   _  = tt
 
--- a chain step marks its row delivered, which no relation reads
-delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-              {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-          → Storeʳ κ sP stP sI stI → ∀ {x y}
-          → Storeʳ κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
-delivered s = record
-  { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-  ; sync = sync ; rows = rows ; latches = latches ; wfᴾ = wfᴾ ; wfᴵ = wfᴵ }
-  where open Storeʳ s
-
 -- ONE PARTNERED CHAIN OF A MINTED SOURCE TAKES THE VALUE: the row the
 -- store pairs it with, passed, at the head both popped sources hand on
 dyn-chain : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
@@ -416,7 +383,7 @@ dyn-chain : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
       Pointwise (Paired (Storeʳ.rows s₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) a a′) chs chs′
     × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
 dyn-chain {t = t} κ e s {a = a} {a′} src h h′ ta pr ps dP dI =
-  After.store A , After.keeps A {a} {a′} ps , Pointwise-map (v-agrees κ t) (After.values A)
+  After.store A , Pointwise-map (λ {c} {c′} → After.keeps A {dynRow a c} {dynRow a′ c′}) ps , Pointwise-map (v-agrees κ t) (After.values A)
   where
     A = row-pass κ (delivered s) (head src h h′ refl refl) (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
           (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
@@ -469,6 +436,31 @@ dyn-pass κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy p q go go′
            → Pointwise (Paired (Storeʳ.rows s₀) [] [] a a′) chs chs′
     opened []       = []
     opened (r ∷ rs) = inj₂ (refl , refl , r) ∷ opened rs
+
+-- A HOT SCRIPT'S VALUE PASS: the impl's one chain runs its input block into
+-- the share, which fans out to the rows the plain run's readers are
+-- partnered with; the plain run walks those readers directly.
+hot-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+             {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → Storeʳ κ sP stP sI stI
+  → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+  → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+  → ∀ i → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+  → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+  → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
+  → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+  → Storeʳ κ sP₁ stP₁ sI₁ stI₁
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+hot-pass {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy i hk e₁ e₂ {oP = oP} go go′
+  with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
+... | pop _ _ src h h′ _ _ _
+  with hot-start κ (pop-store s ex ex′ sy) {a} {a′} {i} hk (head src h h′ e₁ e₂) go′
+... | hot-start-at {oB = oB} {εI = εI} A c (disp (walk-more {emits = em} g walk-nil)) refl =
+  After.store Z ,
+  subst (λ z → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ z) (readᴾ oP))
+        (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z))
+  where
+    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (hot-adm κ (After.store A) hk e₁) go g)
 
 -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
 -- HAVE, or one plain arrival's values delivered across two.  Either is

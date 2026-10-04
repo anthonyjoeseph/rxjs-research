@@ -257,9 +257,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
   over the program, one arm per former, `walk-flatten` its riskiest. A minted
-  source's chain is `path-pass`, one arm per plain frame; what remains is
-  `hot-pass` and `last-pass` onto the same fold, and splitting `outer-arm` and
-  `inner-arm` per constructor, so the monster drops to whichever arm is riskiest.
+  source's chain is `path-pass`, one arm per plain frame, and a hot slot's is
+  `fan-go` over the share's readers, each `slot-pass`; what remains is
+  `last-pass` onto the same fold, and splitting `outer-arm` and `inner-arm` per
+  constructor, so the monster drops to whichever arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -295,9 +296,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   source's chains pair up in order as partnered registrations.
 - **`pop-store`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a pop leaves
   the stores related, each popped source one pending value shorter.
-- **`hot-pass`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a hot slot's
-  value pass, the impl's one share chain fanning out to the reads the plain
-  pass walks directly; past the typechecker at a real pop.
+- **`hot-start`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a hot arrival's
+  one impl chain runs its input block alone and hands the share one emit
+  carrying the value; past the typechecker at a real pop.
+- **`hot-adm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the plain run's
+  readers at a hot slot and the rows its share admits are partnered, in order.
+- **`read-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a slot reader's
+  restamp moves the impl alone and keeps the emit's values.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot.

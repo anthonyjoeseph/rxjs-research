@@ -15,25 +15,29 @@
 module Simulation.Pass where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Fin     using (Fin; toℕ; _↑ʳ_)
+open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.Bool.ListAction using (any)
+open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map; concat)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
 open import Data.Maybe   using (nothing; just)
-open import Data.Nat     using (ℕ; _≤_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; suc; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (_⊎_)
+open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
-open import Rx.Exp       using (Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo)
+open import Rx.Exp       using (Ty; Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo; Tm; varᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; Path; Frame; share-sink;
-  _↠[_]_; scan-f; take-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn)
-open import Rx.Evaluator.Domain using (foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step)
-open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ)
+  _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf; shareAdmit)
+open import Rx.Evaluator.Domain using (foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step;
+  cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
+open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
+open import SExp.Elaborate using (restampᵛ; subscribeᵛ)
 open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import SExp.Plain   using (plainValues)
@@ -41,7 +45,7 @@ open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; EmitRel; Lifts; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
-  outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; RowRel; cold~; defer~; RegRel; Partners; Store)
+  outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store)
 open import Simulation.Walk using (readᴾ; readᴵ)
 
 readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
@@ -59,18 +63,47 @@ dynRow a (rid , lo , p) = rid , atDyn (Arrival.source a) lo , (arrTy a , p)
 
 -- A CHAIN PAIR THE PASS HAS NOT REACHED: cut on both sides, or on
 -- neither and partnered by the registries' relation
+PairedR : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
+        → RegRel κ π {t} NP NI LP LI rs rs′ → List RegId → List RegId
+        → RegRow Γ t → RegRow (plainᵏ Γ κ) (emitᵗ t) → Set
+PairedR {κ = κ} rr CP CI x x′ =
+    (any (_≡ᵇ proj₁ x) CP ≡ true × any (_≡ᵇ proj₁ x′) CI ≡ true)
+  ⊎ (any (_≡ᵇ proj₁ x) CP ≡ false × any (_≡ᵇ proj₁ x′) CI ≡ false
+     × Partners κ _ _ _ _ _ rr x x′)
+
+-- the same, for a minted source's chains
 Paired : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
        → RegRel κ π {t} NP NI LP LI rs rs′ → List RegId → List RegId → (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ))
        → RegId × AtFloor Γ (arrTy a) t → RegId × AtFloor (plainᵏ Γ κ) (arrTy a′) (emitᵗ t) → Set
-Paired {κ = κ} rr CP CI a a′ c c′ =
-    (any (_≡ᵇ proj₁ c) CP ≡ true × any (_≡ᵇ proj₁ c′) CI ≡ true)
-  ⊎ (any (_≡ᵇ proj₁ c) CP ≡ false × any (_≡ᵇ proj₁ c′) CI ≡ false
-     × Partners κ _ _ _ _ _ rr (dynRow a c) (dynRow a′ c′))
+Paired rr CP CI a a′ c c′ = PairedR rr CP CI (dynRow a c) (dynRow a′ c′)
+
+clash : true ≡ false → ⊥
+clash ()
 
 -- the fold a chain step runs
 unchain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ} {vs fin x sched st r}
         → chainStep⇓ {e = e} a vs fin x sched st r → foldPath⇓ (arrTick a) (proj₂ x) vs fin sched st r
 unchain (chain-step d) = d
+
+-- a chain step marks its row delivered, which no relation reads
+delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+              {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+          → Store κ sP stP sI stI → ∀ {x y}
+          → Store κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
+delivered s = record
+  { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+  ; sync = sync ; rows = rows ; latches = latches ; wfᴾ = wfᴾ ; wfᴵ = wfᴵ }
+  where open Store s
+
+-- A PLAIN CHAIN AT A SLOT AND THE REGISTRATION THE ELABORATION READ IT THROUGH:
+-- the stamped slot's share fans out to exactly the rows the plain run walks
+data SlotPair {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
+              (rr : RegRel κ π {t} NP NI LP LI rs rs′) (CP CI : List RegId) (i : Fin n) {u : Ty}
+            : RegId × AtFloor Γ u t
+            → RegId × Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) (lookup (plainᵏ Γ κ) (n ↑ʳ i)) (emitᵗ t) → Set where
+  slotpair : ∀ {rid rid′ p p′}
+           → PairedR rr CP CI (rid , atSlot i , (u , p)) (rid′ , atSlot (n ↑ʳ i) , (lookup (plainᵏ Γ κ) (n ↑ʳ i) , p′))
+           → SlotPair rr CP CI i (rid , suc (toℕ i) , p) (rid′ , p′)
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -109,9 +142,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     Keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁}
           → St sP stP sI stI → St sP₁ stP₁ sI₁ stI₁ → Set
     Keeps {stP = stP} {stI = stI} {stP₁ = stP₁} {stI₁ = stI₁} S S₁ =
-      ∀ {a a′ chs chs′}
-      → Pointwise (Paired (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′) chs chs′
-      → Pointwise (Paired (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) a a′) chs chs′
+      ∀ {x x′}
+      → PairedR (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) x x′
+      → PairedR (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) x x′
 
     -- WHAT A PASS KEEPS: related stores after, the unreached chains
     -- paired, and related values sent rootward
@@ -226,6 +259,107 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → stepFrame⇓ now (thru-outer mergeAllᵒ nid) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
                 → foldPath⇓ now (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) vs′ fin sI stI rI
                 → Arm S now oP sP₁ stP₁ p vs₁ fin₁ rI
+
+    -- A SLOT'S READER: the impl runs the restamp where the plain path runs
+    -- on, so the arm is the one frame the impl moves alone
+    postulate
+      read-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {Θ₀ ρ₀ ℓ′}
+                   {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {h : suc (toℕ (n ↑ʳ i)) ≤ ℓ′}
+                   {p : Path Γ (suc (toℕ i)) (lookup Γ i) t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ (lookup Γ i)) (emitᵗ t)}
+                 → lookup κ i ≡ hotᵏ ⊎ lookup κ i ≡ sharedᵏ
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → ∀ {now vs es fin rI} → Carries es vs
+                 → foldPath⇓ now (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ h ] q) es fin sI stI rI
+                 → Arm S now [] sP stP p vs fin rI
+
+    -- the emits of a stamped slot against the plain values, at types the
+    -- share's own is only propositionally the emit of
+    CarriesU : ∀ {u u′} → u′ ≡ emitᵗ u → List (Val (plainᵏ Γ κ) u′) → List (Val Γ u) → Set
+    CarriesU refl = Carries
+
+    -- a slot's partnered reader, by the row the store pairs it with
+    slot-pass : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {u u′ rid rid′}
+                  {p : Path Γ (suc (toℕ i)) u t} {p′ : Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) u′ (emitᵗ t)}
+                  {vs es} (εI : u′ ≡ emitᵗ u)
+              → RowRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
+                  (rid , atSlot i , (u , p)) (rid′ , atSlot (n ↑ʳ i) , (u′ , p′))
+              → CarriesU εI es vs
+              → ∀ {now fin rP rI} → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now p′ es fin sI stI rI
+              → After S rP rI
+    slot-pass S refl (read~ hk r refl) c dP dI = resume (read-arm S hk r c dI) dP
+
+    -- a partnered pair stays partnered once the store moves
+    slot-keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
+                   {c : RegId × AtFloor Γ u t} {d}
+               → Keeps S S₁
+               → SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i c d
+               → SlotPair (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i c d
+    slot-keeps K (slotpair x) = slotpair (K x)
+
+    -- the same pass, started from the store as it stood before the row was marked
+    rebase : ∀ {sP stP sI stI x y rP rI} {S : St sP stP sI stI}
+           → After (delivered S {x} {y}) rP rI → After S rP rI
+    rebase (after s k v) = after s k v
+
+    -- A SHARE'S FAN-OUT AGAINST THE PLAIN CASCADE OVER THE SAME READERS,
+    -- one reader at a time: the plain chain and the admitted row it is
+    -- partnered with, a cut one on both sides skipped
+    fan-go : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {a : Arrival Γ}
+               (εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)) {es now}
+           → CarriesU εI es (arrVal a ∷ []) → arrTick a ≡ now
+           → ∀ {chs adm}
+           → Pointwise (SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) chs adm
+           → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+           → cascadeGo⇓ a (arrVal a ∷ []) false chs sP stP (oP , sP₁ , stP₁)
+           → shareGo⇓ now (n ↑ʳ i) es false adm sI stI (oI , sI₁ , stI₁)
+           → After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁)
+    fan-go S εI c ta [] casc-nil go-nil = after S (λ x → x) []
+    fan-go S εI c ta (slotpair (inj₁ _) ∷ ps) (casc-cut _ g) (go-cut _ g′) = fan-go S εI c ta ps g g′
+    fan-go S εI c ta (slotpair (inj₁ (x , _)) ∷ _) (casc-live y _ _) _ = ⊥-elim (clash (trans (sym x) y))
+    fan-go S εI c ta (slotpair (inj₁ (_ , x)) ∷ _) (casc-cut _ _) (go-live y _ _) = ⊥-elim (clash (trans (sym x) y))
+    fan-go S εI c ta (slotpair (inj₂ (x , _)) ∷ _) (casc-cut y _) _ = ⊥-elim (clash (trans (sym y) x))
+    fan-go S εI c ta (slotpair (inj₂ (_ , x , _)) ∷ _) (casc-live _ _ _) (go-cut y _) = ⊥-elim (clash (trans (sym y) x))
+    fan-go S εI c refl (slotpair (inj₂ (_ , _ , pr)) ∷ ps) (casc-live _ dP g) (go-live _ dI g′) =
+      rebase (A ⨾ fan-go (After.store A) εI c refl (map-slot {S₀ = S} {S₁ = After.store A} (After.keeps A) ps) g g′)
+      where
+        A = slot-pass (delivered S) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c (unchain dP) dI
+
+        map-slot : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
+                     {cs : List (RegId × AtFloor Γ u t)} {ds}
+                 → Keeps S₀ S₁
+                 → Pointwise (SlotPair (Store.rows S₀) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) cs ds
+                 → Pointwise (SlotPair (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i) cs ds
+        map-slot K []       = []
+        map-slot {S₀ = S₀} {S₁ = S₁} K (r ∷ rs) = slot-keeps {S = S₀} {S₁ = S₁} K r ∷ map-slot {S₀ = S₀} {S₁ = S₁} K rs
+
+    -- WHAT A HOT ARRIVAL'S IMPL CHAIN DOES BEFORE THE SHARE: its input block
+    -- runs alone, the plain side not moving, and hands the share the one emit
+    -- that carries the arrival's value
+    data HotStart {sP stP sI stI} (S : St sP stP sI stI) (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ)) (i : Fin n)
+                  (oI : Stream (plainᵏ Γ κ) (emitᵗ t)) (sI₁ : Sched (plainᵏ Γ κ)) (stI₁ : EvalSt ei) : Set where
+      hot-start-at : ∀ {oB sI₂ stI₂ e lo rD} {below : lo ≤ toℕ (n ↑ʳ i)}
+                       {εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)}
+                   → (A : After S ([] , sP , stP) (oB , sI₂ , stI₂))
+                   → CarriesU εI (e ∷ []) (arrVal a ∷ [])
+                   → dispatchShare⇓ (arrTick a′) (n ↑ʳ i) below (e ∷ []) false sI₂ stI₂ rD
+                   → (oI , sI₁ , stI₁) ≡ (oB ++ proj₁ rD , proj₂ rD)
+                   → HotStart S a a′ i oI sI₁ stI₁
+
+    postulate
+      -- the impl's one chain at a hot arrival's raw slot
+      hot-start : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+                → lookup κ i ≡ hotᵏ
+                → Head (toℕ i) (toℕ (i ↑ˡ n)) {arrTy a} {arrTy a′} (arrVal a ∷ []) (arrVal a′ ∷ [])
+                → ∀ {oI sI₁ stI₁}
+                → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) sI stI (oI , sI₁ , stI₁)
+                → HotStart S a a′ i oI sI₁ stI₁
+
+      -- the readers the plain run walks and the rows the share admits are
+      -- partnered, in order, once the block has run
+      hot-adm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {i : Fin n}
+              → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i
+              → Pointwise (SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i)
+                  (chainsOf a stP) (shareAdmit (n ↑ʳ i) (EvalSt.registry stI))
 
     -- a minted source's partnered chain, by the row the store pairs it with
     row-pass : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u u′} {vs : List (Val Γ u)} {vs′ : List (Val (plainᵏ Γ κ) u′)}
