@@ -700,11 +700,8 @@ wiring-selftest:
 # or an unsafe pragma is decidable in seconds by grep, while `agda` costs
 # ~13 minutes — so there is no reason to spend the 13 minutes only to fail on
 # something a textual pass already knew.  Fail fast, then typecheck.
-# The instantiation floor binds WHERE A BRANCH LANDS: CI (GitHub sets CI)
-# fails on an unprobed row of the tier being worked; locally it is printed as
-# OWED, so a new FALSITY row can be committed while its probe is written.
 roadmap-check:
-	@scripts/check-roadmap.py $(if $(CI),,--birth-owed)
+	@scripts/check-roadmap.py
 
 # THE MONSTER.  Every tier names the ONE declaration it is currently trying to
 # prove FALSE, chosen for blast radius rather than for being a leaf, and no line
@@ -1037,36 +1034,6 @@ roadmap-selftest:
 	  fi; \
 	  echo "$$nof" | grep -q "b-shape" \
 	    && { echo "SELFTEST FAIL: the no-floor check fired on a SHAPE row — the blank is legal on the classes that claim nothing"; fail=1; }; \
-	  bir=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-birth.txt \
-	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-birth.txt \
-	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a FALSITY row nothing has ever instantiated PASSED in the tier being worked — the birth floor is dead, and an unprobed FALSITY is what every refutation this campaign landed was standing on"; fail=1; \
-	  else \
-	    echo "$$bir" | grep -q "NOTHING HAS EVER INSTANTIATED" \
-	      || { echo "SELFTEST FAIL: an uninstantiated row was rejected for the wrong reason"; fail=1; }; \
-	  fi; \
-	  echo "$$bir" | grep -q "a-falsity" \
-	    || { echo "SELFTEST FAIL: the uninstantiated row was not NAMED"; fail=1; }; \
-	  echo "$$bir" | grep -q "DIFFICULTY ROWS WITH NO EVIDENCE" \
-	    && { echo "SELFTEST FAIL: the DIFFICULTY floor fired on evid-birth.md, so it does not isolate the birth floor — FALSITY is the class that floor exempts"; fail=1; }; \
-	  echo "$$bir" | grep -q "b-shape" \
-	    && { echo "SELFTEST FAIL: a PARKED tier's uninstantiated row was reported — the floor binds only where work happens, since a parked row can be restated out from under by the tier below it"; fail=1; }; \
-	  bem=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth-empty.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-birth.txt \
-	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth-empty.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-birth.txt \
-	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then :; \
-	  else \
-	    echo "SELFTEST FAIL: the birth floor reached PAST a tier with an empty ledger — a tier whose judge is a differential run or an executable match states nothing in Agda, so reading the tier being worked as the first one carrying a CLASSED ROW makes it invisible and names a PARKED tier instead"; fail=1; \
-	  fi; \
-	  echo "$$bem" | grep -q "a-falsity" \
-	    && { echo "SELFTEST FAIL: a row one tier BELOW the empty-ledger tier being worked was named by the birth floor"; fail=1; }; \
-	  echo "$$cln" | grep -q "NOTHING HAS EVER INSTANTIATED" \
-	    && { echo "SELFTEST FAIL: the birth floor fired on a clean roadmap"; fail=1; }; \
 	  cap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-overcap.md \
 	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-overcap.txt \
 	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \

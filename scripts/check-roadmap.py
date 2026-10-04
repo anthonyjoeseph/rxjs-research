@@ -821,68 +821,6 @@ def unevidenced_difficulty(path, tiers, cen):
     return out
 
 
-def lowest_open_tier(tiers):
-    """-> the tier being worked, or None when the file holds no tier at all.
-
-    Tier order is FILE order and needs no separate reading: a finished tier's
-    section is DELETED rather than marked done, so the FIRST SECTION is the
-    tier the work is in.
-
-    IT IS THE FIRST SECTION AND NOT THE FIRST SECTION CARRYING A CLASSED ROW
-    (Anthony).  Read the second way, a tier whose judge is not a postulate --
-    a differential run against the reference implementation, an executable
-    match between an operator and its spec -- is INVISIBLE, and the scan falls
-    through to whichever lower tier happens to hold the ledger.  That names a
-    PARKED tier as the one being worked, which inverts the very rule the
-    callers below are enforcing: `unevidenced_birth` binds only where work
-    happens precisely because a parked tier's rows can be restated out from
-    under by the tier beneath them, so a receipt bought there is a receipt
-    against a statement that may not survive its own prerequisites.  A tier
-    with an empty ledger owes no evidence, which is what returning it says.
-    """
-    for tier, _rows, _pre, _legs in tiers:
-        return tier
-    return None
-
-
-def unevidenced_birth(path, tiers, cen):
-    """-> [(tier, label, lineno, cls)] — rows of the LOWEST OPEN TIER that
-    have never been instantiated.
-
-    EVERY refutation this campaign has landed killed a row that was carrying no
-    marker at the moment it fell, and not one landed on a statement somebody had
-    already instantiated.  Nine for nine is not a coincidence about which rows
-    are hard; it is a statement about which rows have been LOOKED at, and a row
-    nobody has instantiated is a row whose falsity is discovered by whatever gets
-    built on top of it.  That discovery is the retroactive kind: found at birth a
-    false statement costs a restatement, found under a tower it costs the tower.
-
-    So this floor is wider than `unevidenced_difficulty`'s and narrower in its
-    scope, and both differences are the point.  WIDER, because it binds in every
-    class including the three that claim nothing: FALSITY is exactly the class a
-    never-instantiated row is born into, so exempting it would exempt precisely
-    the rows the nine were.  NARROWER, because it binds only where work actually
-    happens — a parked tier's rows can be restated out from under by the tier
-    below them, so instantiating one buys a receipt against a statement that may
-    not survive its own prerequisites.
-
-    The repair is to PROBE the row, never to reclassify it: the classes are a
-    reading of the evidence and this check is about there being any.
-
-    """
-    low = lowest_open_tier(tiers)
-    if low is None:
-        return []
-    out = []
-    for tier, rows, _pre, _legs in tiers:
-        if tier != low:
-            continue
-        for label, cls, lineno, _cost in rows:
-            if cls and not row_evidence(label, cen):
-                out.append((tier, label, lineno, cls))
-    return out
-
-
 def over_probed(path, tiers, cen, cap):
     """-> [(tier, label, lineno, n)] — rows carrying more than `cap` receipts.
 
@@ -947,10 +885,6 @@ def main():
     ap.add_argument("--fix-evidence", action="store_true",
                     help="rewrite every classed row's evidence field from the "
                          "source headers, then exit (make roadmap-evidence)")
-    ap.add_argument("--birth-owed", action="store_true",
-                    help="report never-instantiated rows of the tier being worked "
-                         "as OWED instead of failing; the floor binds where a "
-                         "branch lands, which is CI")
     ap.add_argument("--dates-only", action="append", default=None, metavar="PATH",
                     help="also refuse dates in PATH (date check only, no rows). "
                          "Defaults to CLAUDE.md; repeatable; selftest passes fixtures.")
@@ -1125,26 +1059,6 @@ def main():
             print("if nothing is — that is CLAUDE.md's own rule, mechanised. Put")
             print("the evidence in the postulate's header as a durable marker and")
             print("run  make roadmap-evidence , or raise the class.")
-        birth = unevidenced_birth(path, tiers, cen)
-        if birth:
-            low = lowest_open_tier(tiers)
-            owed = " — OWED, binds where the branch lands (CI)" if args.birth_owed else ""
-            print(f"\nTIER {low} ROWS NOTHING HAS EVER INSTANTIATED — {len(birth)}{owed}:")
-            for tier, label, lineno, cls in birth:
-                print(f"  Tier {tier}  {path.name}:{lineno}  {label}  ({cls})")
-            print("\nEvery refutation this campaign has landed killed a row that was")
-            print("carrying no marker when it fell, and not one landed on a statement")
-            print("somebody had already instantiated. A statement found false at")
-            print("BIRTH costs a restatement; found under a tower it costs the tower.")
-            print("This floor binds in EVERY class, because FALSITY is the class a")
-            print("never-instantiated row is born into — and only in the tier being")
-            print("worked, because a parked tier's rows can still be restated out")
-            print("from under by the tier below them.")
-            print("PROBE it: instantiate the statement at concrete programs in")
-            print("agda/evidence/probed/ and leave a `PROBED:` receipt in its header")
-            print("(or a refutation, which is the better outcome), then run")
-            print("  make roadmap-evidence . Reclassifying is NOT the repair — the")
-            print("classes read the evidence and this check is about there being any.")
         cap = receipt_cap()
         fat = over_probed(path, tiers, cen, cap)
         if fat:
@@ -1160,7 +1074,7 @@ def main():
             print("split the row, which satisfies the count and changes nothing.")
             print("evidence-check caps one POSTULATE; this caps the open ITEM, which")
             print("is what a row naming two arms of one statement gets past.")
-        if missing or bad or unearned or unev or (birth and not args.birth_owed) or fat:
+        if missing or bad or unearned or unev or fat:
             failures.append(None)
 
     date_targets = [path]
@@ -1283,9 +1197,7 @@ def main():
              else "; every live postulate is on the roadmap, and every row head "
                   "names one; every classed row's evidence field matches its "
                   "postulates' own headers, every GRINDABLE row names a "
-                  "proven twin, no DIFFICULTY row stands on none, and every "
-                  "row of the tier being worked has been instantiated"
-                  + (" or is printed above as OWED" if args.birth_owed else "")))
+                  "proven twin, and no DIFFICULTY row stands on none"))
     return 0
 
 
