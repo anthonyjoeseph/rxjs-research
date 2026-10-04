@@ -259,8 +259,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   over the program, one arm per former, `walk-flatten` its riskiest. A minted
   source's chain is `path-pass`, one arm per plain frame, and a hot slot's is
   `fan-go` over the share's readers, each `slot-pass`; a minted source's end is
-  the same fold at an end head; an outer's and an inner's arms are one leaf per constructor; what remains is
-  `hot-end`, and `lane-arm` as a definition over `inner-arm` once `Arm` can
+  the same fold at an end head; an outer's and an inner's arms are one leaf per constructor; a hot slot's end is the same fan-out after the share is spent;
+  what remains is `lane-arm` as a definition over `inner-arm` once `Arm` can
   carry an impl-only step, so the monster drops to whichever arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
@@ -277,9 +277,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`hot-end`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a hot last
-  arrival's close, end pass and drop keep the stores related; the store
-  relation itself fails between the close and the end pass at a hot read.
+- **`hot-end-start`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a hot last
+  arrival's impl chain runs its block alone into the share, which it spends
+  while the plain run latches the slot; the stores are related again there.
+- **`hot-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the share's
+  registrations and the source's drop together keep the stores related.
 - **`{close,finish}-store`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
   minted source's close and drop keep the stores related.
 - **`dyn-chains-end`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: the

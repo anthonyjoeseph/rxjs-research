@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; Path; Frame; share-sink;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; cascadeFinish; shareSpend; shareDying; shareFinish; Path; Frame; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf; shareAdmit)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
@@ -342,13 +342,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- one reader at a time: the plain chain and the admitted row it is
     -- partnered with, a cut one on both sides skipped
     fan-go : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {a : Arrival Γ}
-               (εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)) {es now}
-           → CarriesU εI es (arrVal a ∷ []) → arrTick a ≡ now
+               (εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)) {es now vs fin}
+           → CarriesU εI es vs → arrTick a ≡ now
            → ∀ {chs adm}
            → Pointwise (SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) chs adm
            → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
-           → cascadeGo⇓ a (arrVal a ∷ []) false chs sP stP (oP , sP₁ , stP₁)
-           → shareGo⇓ now (n ↑ʳ i) es false adm sI stI (oI , sI₁ , stI₁)
+           → cascadeGo⇓ a vs fin chs sP stP (oP , sP₁ , stP₁)
+           → shareGo⇓ now (n ↑ʳ i) es fin adm sI stI (oI , sI₁ , stI₁)
            → After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁)
     fan-go S εI c ta [] casc-nil go-nil = after S (λ x → x) []
     fan-go S εI c ta (slotpair (inj₁ _) ∷ ps) (casc-cut _ g) (go-cut _ g′) = fan-go S εI c ta ps g g′
@@ -381,6 +381,39 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → dispatchShare⇓ (arrTick a′) (n ↑ʳ i) below (e ∷ []) false sI₂ stI₂ rD
                    → (oI , sI₁ , stI₁) ≡ (oB ++ proj₁ rD , proj₂ rD)
                    → HotStart S a a′ i oI sI₁ stI₁
+
+    -- WHAT A HOT ARRIVAL'S IMPL CHAIN DOES AT THE END: the same block runs
+    -- alone, the share is spent, and the end it hands the share is
+    -- dispatched.  The plain side has latched the slot and the impl the share,
+    -- which is where the latches meet again
+    data HotEnd {sP stP sI stI} (S : St sP stP sI stI) (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ)) (i : Fin n)
+                (eI : Stream (plainᵏ Γ κ) (emitᵗ t)) (sI₃ : Sched (plainᵏ Γ κ)) (stI₃ : EvalSt ei) : Set where
+      hot-end-at : ∀ {oB sI₂ stI₂ lo rD} {below : lo ≤ toℕ (n ↑ʳ i)}
+                     {εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)}
+                 → (A : After S ([] , sP , cascadeClose a stP)
+                              (oB , sI₂ , shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true stI₂)))
+                 → CarriesU εI [] []
+                 → dispatchShare⇓ (arrTick a′) (n ↑ʳ i) below [] true sI₂ stI₂ rD
+                 → (eI , sI₃ , stI₃) ≡ (oB ++ proj₁ rD , proj₂ rD)
+                 → HotEnd S a a′ i eI sI₃ stI₃
+
+    postulate
+      -- the impl's one chain at a hot arrival's raw slot, closing
+      hot-end-start : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+                    → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+                    → ∀ {eI sI₃ stI₃}
+                    → cascadeGo⇓ a′ [] true (chainsOf a′ stI) sI (cascadeClose a′ stI) (eI , sI₃ , stI₃)
+                    → HotEnd S a a′ i eI sI₃ stI₃
+
+      -- the share's registrations and the source's drop together
+      hot-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+                 → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+                 → ∀ {emits}
+                 → Store κ (proj₁ (cascadeFinish a sP stP)) (proj₂ (cascadeFinish a sP stP))
+                     (proj₁ (cascadeFinish a′ (proj₁ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))
+                                              (proj₂ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))))
+                     (proj₂ (cascadeFinish a′ (proj₁ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))
+                                              (proj₂ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))))
 
     postulate
       -- the impl's one chain at a hot arrival's raw slot

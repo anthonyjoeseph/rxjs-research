@@ -64,7 +64,7 @@ open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; 
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; schedGo; schedFinish; sched-next; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; schedHeadOf)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
-  disp; walk-more; walk-nil)
+  disp; walk-more; walk-nil; walk-end)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
@@ -72,7 +72,7 @@ open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
-  _⨾_; fan-go; hot-start; hot-start-at; hot-adm)
+  _⨾_; fan-go; hot-start; hot-start-at; hot-adm; hot-end-start; hot-end-at; hot-finish)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -288,35 +288,6 @@ postulate
     → Pointwise (λ c c′ → Partners κ _ _ _ _ _ (Storeʳ.rows s₀) (dynRow a c) (dynRow a′ c′))
                 (chainsOf a stP) (chainsOf a′ stI)
 
-  -- THE END OF A HOT ARRIVAL: the source latched closed, its end
-  -- walked over the chains the value pass left, and its registrations
-  -- dropped.  Stated over the value pass's own derivations, since what
-  -- relates the two arrivals is the pop, and the stores the pass left
-  -- are only related to each other.
-  --
-  -- THE STORE RELATION DOES NOT HOLD BETWEEN THE CLOSE AND THE END PASS.
-  -- A hot read's plain arrival is its slot's, and the impl's is the raw
-  -- slot's, so `cascadeClose` latches the slot on one side and the raw
-  -- slot on the other, while `LatchRel` compares the slot against the
-  -- share's.  The share is latched only when the end reaches it through
-  -- the input block, so the end pass is where the latches meet again,
-  -- and no relation over the stores alone names the state between.
-  hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-    → Storeʳ κ sP stP sI stI
-    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-    → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′ → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
-    → ∀ i → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
-    → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
-    → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
-    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
-    → ∀ {eP sP₂ stP₂ eI sI₂ stI₂}
-    → cascadeGo⇓ a [] true (chainsOf a stP₁) sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)
-    → cascadeGo⇓ a′ [] true (chainsOf a′ stI₁) sI₁ (cascadeClose a′ stI₁) (eI , sI₂ , stI₂)
-    → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
-               (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
-    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
-
   -- A DYN SOURCE'S CLOSE keeps the stores related: it latches a number no
   -- slot carries, and the latches compare slots only.
   close-store : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
@@ -522,6 +493,35 @@ value-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy {oP} {sP₁} {stP₁} {
     by (slot~ i h) e₁ e₂ = hot-pass κ e s ex ex′ ta sy i h (sym e₁) (sym e₂) go go′
     by (dyn~ p q) refl refl = dyn-pass κ e s ex ex′ ta sy p q go go′
 
+-- THE END OF A HOT ARRIVAL: the source latched closed, its end walked
+-- over the chains the value pass left, and its registrations dropped.
+-- The plain run latches the slot and the impl the raw slot, so the stores
+-- are only related again once the share is spent: the impl's block runs
+-- alone to that point, and the end then fans out to the readers as a value
+-- does.
+hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+            {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → Storeʳ κ sP stP sI stI
+  → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+  → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+  → ∀ i → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+  → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+  → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
+  → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+  → ∀ {eP sP₂ stP₂ eI sI₂ stI₂}
+  → cascadeGo⇓ a [] true (chainsOf a stP₁) sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)
+  → cascadeGo⇓ a′ [] true (chainsOf a′ stI₁) sI₁ (cascadeClose a′ stI₁) (eI , sI₂ , stI₂)
+  → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
+             (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
+hot-end {Γ = Γ} {t} κ e s {a} {a′} ex ex′ ta sy i hk e₁ e₂ go go′ end end′
+  with hot-end-start κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ end′
+... | hot-end-at {oB = oB} {εI = εI} A c (disp (walk-end {r = r} g)) refl =
+  hot-finish κ (After.store Z) {a} {a′} {i} hk e₁ e₂ {emits = proj₁ r} ,
+  Pointwise-map (v-agrees κ t) (After.values Z)
+  where
+    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (hot-adm κ (After.store A) hk e₁) end g)
+
 -- THE END OF A LAST ARRIVAL: a minted source's is the close, the end walked
 -- over the chains the value pass left as that pass walked them, and the
 -- drop; a hot one's stays whole
@@ -546,7 +546,7 @@ last-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁}
        → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
                   (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
        × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
-    by (slot~ i h) e₁ e₂ = hot-end κ e s ex ex′ ta sy ll ll′ i h (sym e₁) (sym e₂) go go′ end end′
+    by (slot~ i h) e₁ e₂ = hot-end κ e s ex ex′ ta sy i h (sym e₁) (sym e₂) go go′ end end′
     by (dyn~ p q) refl refl = finish-store {a = a} {a′ = a′} S₂ p q , proj₂ k
       where
         S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
