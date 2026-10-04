@@ -628,6 +628,28 @@ def extract_definitions(src_dir, files):
                 register(tokens[1], relpath, i + 1, "module-app")
                 i += 1
                 continue
+            # A NESTED `module … where` OPENS A SCOPE TOO — see scan_block's
+            # copy.  `module` is a SKIP_HEAD_TOKEN, so without this a module
+            # inside a module was skipped AND its deeper-indented body with
+            # it: every member invisible, its uses attributed to whichever
+            # definition preceded it.  Recurse at the body's own indent.
+            if tok0 == "module":
+                k, limit = i, min(end, i + 12)
+                while k < limit and visible[k].split("--", 1)[0].split()[-1:] != ["where"]:
+                    k += 1
+                if k < limit:
+                    j = k + 1
+                    inner_base = None
+                    while j < end:
+                        if visible[j].strip() != "":
+                            inner_base = leading_spaces(raw_lines[j])
+                            break
+                        j += 1
+                    if inner_base is not None and inner_base > base_indent:
+                        i = scan_sub_block(
+                            raw_lines, visible, j, end, inner_base, relpath, kind
+                        )
+                        continue
             if tok0 in SKIP_HEAD_TOKENS:
                 i += 1
                 continue

@@ -679,7 +679,8 @@ wiring-selftest:
 	  fail=0; \
 	  echo "$$out" | grep -q "bad-lemma" || { echo "SELFTEST FAIL: bad-lemma not reported — R2 has stopped firing"; fail=1; }; \
 	  echo "$$out" | grep -q "eta-lemma" || { echo "SELFTEST FAIL: eta-lemma not reported — R2 no longer sees through the mandated eta-expansion"; fail=1; }; \
-	  for n in good-lemma nested computed other top-line via-top via-mod both-mods run \
+	  echo "$$out" | grep -q "    deep-dead$$" || { echo "SELFTEST FAIL: deep-dead not reported — a module nested in a module is invisible again"; fail=1; }; \
+	  for n in good-lemma nested computed other top-line via-top via-mod both-mods run deep-live \
 	           consume with-only via-with nested-with-only via-nested-with \
 	           import-arg via-import-arg apply; do \
 	    echo "$$out" | grep -q "    $$n$$" && { echo "SELFTEST FAIL: $$n reported, but it is legitimately wired"; fail=1; }; \
@@ -699,8 +700,11 @@ wiring-selftest:
 # or an unsafe pragma is decidable in seconds by grep, while `agda` costs
 # ~13 minutes — so there is no reason to spend the 13 minutes only to fail on
 # something a textual pass already knew.  Fail fast, then typecheck.
+# The instantiation floor binds WHERE A BRANCH LANDS: CI (GitHub sets CI)
+# fails on an unprobed row of the tier being worked; locally it is printed as
+# OWED, so a new FALSITY row can be committed while its probe is written.
 roadmap-check:
-	@scripts/check-roadmap.py
+	@scripts/check-roadmap.py $(if $(CI),,--birth-owed)
 
 # THE MONSTER.  Every tier names the ONE declaration it is currently trying to
 # prove FALSE, chosen for blast radius rather than for being a leaf, and no line

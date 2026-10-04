@@ -102,8 +102,18 @@ module Scope where
   via-nested-with x with decide x
   ... | d = consume d (nested-with-only x)
 
+  -- A MODULE INSIDE A MODULE IS A SCOPE TOO: its members must be
+  -- registered, or `deep-dead` hides and `deep-live`'s uses are charged to
+  -- whatever was declared above it
+  module Deep (k : Nat) where
+    deep-dead : Nat → Nat
+    deep-dead x = x
+
+    deep-live : Nat → Nat
+    deep-live x = x
+
 both-mods : Nat → Nat
-both-mods w = TopInst.run (Scope.Inst.run (Scope.via-nested-with w))
+both-mods w = TopInst.run (Scope.Inst.run (Scope.via-nested-with (Scope.Deep.deep-live w w)))
 
 -- MODULE ARGUMENT ARM.  `import-arg` is passed to `Param` on the import line
 -- and used NOWHERE else, so it is reachable only if the scanner reads module

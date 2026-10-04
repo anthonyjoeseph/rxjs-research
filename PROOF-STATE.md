@@ -241,24 +241,29 @@ undecided, never a failure (Anthony).
 ### The monster
 
 `simulation` — the theorem both assembled top lines stand on, by induction on
-arrivals over `correspondence`: schedules in step, popping partnered sources
-by a proven lemma, and the leaf `machines`, a store relation each subscribe
-and cascade keeps, under which both send agreeing values, the impl's under one
-instant its source counter passes. RULED OUT: an impl arrival the plain
-schedule lacks, or a plain arrival split in two, on every bug-cache row and at
-depth 3 seeds 19, 20; a non-contiguous run at depth 2 seeds 13..36, depth 3
-seeds 1..11; an instant drawn outside its arrival's cascade, depth 3 seed 21.
-Left: the stores' relation, through every former.
+arrivals over `correspondence`: schedules in step, pops partnered, and the stores related by `Simulation.Stores`, which the root
+subscribes establish (`subscribe-related`) and each cascade keeps
+(`cascade-related`), both sending agreeing values under one instant. RULED
+OUT: an impl arrival the plain schedule lacks, a split arrival, a gap in a
+run's instants, an instant outside its cascade, an echo apart from its
+inners; a root subscribe installing a run the relation does not name, at a
+hot, cold and deferred read and a one-lane merge. Left: a deeper flattener's
+subscribe, and which former's cascade fails to keep it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **RELATE THE STORES.** `machines` becomes a body: `Src` and `Store` made
-  concrete, pairing registry rows and node states per former and each live
-  source's payloads, with the root subscribe and one cascade stated over them
-  as leaves, so the monster drops to whichever former's cascade is
-  riskiest.
+- **INSTANTIATE ONE CASCADE.** Build `cascade-related`'s `Store`
+  conjunct after the first pop of the hot read's two arrivals, from the
+  subscribe's own related stores: a pop whose stores leave the relation is a
+  refutation of what the cascade must keep, found before the per-former
+  split is cut along it.
+
+- **SPLIT THE STORE LEAVES PER FORMER.** `subscribe-related` becomes a walk
+  over the program and `cascade-related` a walk over a related path, each
+  arm a leaf about one constructor of `PathRel`, so the monster drops to
+  whichever former's arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: a claim the impl's cascade makes
@@ -274,6 +279,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
+- **`cascade-related`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: one
+  cascade keeps the stores related and sends agreeing values under one instant
+  the clock passes; the relation has never been instantiated.
+- **`subscribe-related`** (Simulation.Statement) — FALSITY, `PROBED`: the root
+  subscribes leave the stores related and the schedules in step; the store
+  conjunct holds at a hot, cold and deferred read, but no flattener checked.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
   `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached
@@ -287,8 +298,5 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED`:
   one packet per arrival, injectively; the sweep, deciding it directly, reached
   values on two arrivals under a flattener with no red.
-- **`machines`** (Simulation.Statement) — DIFFICULTY, `PROBED`: some relation
-  between the stores each subscribe and cascade keeps, sending agreeing values,
-  the impl's under one instant its source counter passes.
 - **`cascade-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
   never runs a mint counter back.

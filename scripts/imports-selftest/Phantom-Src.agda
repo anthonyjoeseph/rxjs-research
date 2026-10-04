@@ -24,16 +24,22 @@ module Phantom-Src where
 -- can be: Agda overloads constructors silently, so the record below exports
 -- `overloaded` while this line also brings Fixture.Deep's in.  Drop the
 -- `constructor` reading and the row in Phantom.agda fires falsely.
-open import Fixture.Deep using (hidden; borrowed; overloaded) renaming (deep to shallow)
+-- `data-overloaded` is the same through a DATA constructor, declared one
+-- scope down, which is how a relation of lists declares its `[]` and `_∷_`.
+open import Fixture.Deep using (hidden; borrowed; overloaded; data-overloaded) renaming (deep to shallow)
 
 real-thing : Set
 real-thing = Set
 
 spends-it : Set
-spends-it = borrowed overloaded
+spends-it = borrowed overloaded data-overloaded
 
 record Pair : Set where
   constructor overloaded
+
+module _ (A : Set) where
+  data Rel : Set where
+    data-overloaded : Rel
 
 module Sub-Mod where
   inner : Set

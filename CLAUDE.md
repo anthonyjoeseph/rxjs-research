@@ -28,7 +28,7 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `unsafe-check` | `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-check` | two declarations proving one fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
 | `imports-check` | an unused import, or an unused name in a surviving clause | [docs/imports-check.md](docs/imports-check.md) |
-| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, a wrong DERIVED evidence field, a DIFFICULTY row standing on nothing, or a row of the tier being worked that nothing has instantiated. `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, a wrong DERIVED evidence field, a DIFFICULTY row standing on nothing, or a row of the tier being worked that nothing has instantiated — that floor binds where a branch LANDS (CI), and locally prints the row as OWED so a new FALSITY row can be committed while its probe is written (Anthony). `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `monster-check` | a line ADDED to `agda/src` outside the lowest open tier's monster's own dependency CONE — what its statement and body REACH, read off the tree AS EDITED | [docs/monster.md](docs/monster.md) |
 | `roadmap-order` | discharging a GRINDABLE or DIFFICULTY row while its tier holds an open FALSITY or SHAPE. Only DISCHARGE is held — delete, rename, split, restate, reclassify stay free; a PREREQUISITE the risky statement names is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-moved` | a branch landing proof work with PROOF-STATE byte-identical to **main**. Baseline is the merge-base, so fix-ups inside a branch cost nothing | [docs/roadmap-check.md](docs/roadmap-check.md) |
@@ -82,8 +82,7 @@ The four top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) full
 - `touch` does NOT dirty a module — invalidation is by CONTENT.
 - **A proof body on the `budget-sufficient` spine must be sealed (`abstract`)** — three multi-hour OOMs came from unsealing one.
 - A mid-build RSS of 7–12 GB is normal and evidence of nothing.
-- **Cost model: mutual-BLOCK membership is everything; file size is nearly irrelevant.** Run `make agda-dev ARGS='--list <file>'` before believing it, and MEASURE on a coherent cache — a rebuilding dependency masquerading as module cost has produced four phantom diagnoses. Positivity splits are done; that question is closed.
-- **Second axis: a block member in NO cycle is never stubbed, so every focused check of every OTHER member re-proves it in full.** Tell: per-member times don't vary with the member. Hoisting means moving to ANOTHER module. Attribute before splitting. → [docs/agda-dev.md](docs/agda-dev.md)
+- **What makes a module slow, when a dev check says it is** → [docs/typecheck-cost.md](docs/typecheck-cost.md). Open it then, not before.
 - **All measured timings live in `typecheck-performance-numbers.md` and nowhere else.** `gate-heavy` and `agda-dev` append their own.
 
 ### `make agda-dev` — the iteration loop
@@ -97,7 +96,7 @@ make warm ARGS='<file>'                build a file's deps; unbudgeted
 
 - **`ARGS=` takes at most ONE file plus ONE focus member.** A second file is read as the focus member and reported absent, which reads as a proof failure.
 - **Dev-green means the types line up, not that the proof is valid — but only where something was STUBBED.** A module with no multi-member block is emitted VERBATIM, so the sweep is a real check there. Where a block is stubbed, termination of the real mutual recursion is not checked.
-- **A dev check that is not seconds is a FINDING, not a budget to raise.** Read `typecheck-performance-numbers.md` first. Work BOTTOM-UP. Third cause the other two hide: the module has outgrown the loop. Do NOT reach for `--only-scope-checking` — measured, buys nothing, removed.
+- **A dev check of a `src` module that is not seconds is a FINDING.** Read `typecheck-performance-numbers.md` first. Work BOTTOM-UP. Third cause the other two hide: the module has outgrown the loop. Do NOT reach for `--only-scope-checking` — measured, buys nothing, removed.
 - **A red `agda-dev` on any file in `src` is a P0 — fix it before the work you were doing.** Never route around it.
 - → [docs/agda-dev.md](docs/agda-dev.md) for the budget, `HOLES=1`, `NOT_DEV_CHECKABLE`.
 
@@ -232,6 +231,7 @@ Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not
 - **Provenance travels with the FINDING, not with the receipt.** Whether something came from instantiation or from reading the definitions belongs beside the claim it justifies, not above a `PROBED:` section where it reads as narrating the ledger.
 - **Determine computability by LOOKING, never from a remembered list.** An `abstract` block seals a family, and blocks get added for performance without the statements changing. Any list of "the computable ones" here would be a research finding pretending to be a rule — one was, and it named a family that had since been sealed.
 - **Hypothesis-side and conclusion-side computability are separate questions.** Say which SIDE is blocked; "sealed somewhere in the statement" does not imply symbolic-or-nothing.
+- **A probe the typechecker can't finish is a COVERAGE BOUNDARY, not a task (Anthony).** Land the rows that check, name the shape that didn't, and move on. Never engineer the checker or the evaluator to get a receipt through. A slow probe is not a finding: the evaluator is good enough, and if it is slow in some cases, it is what it is.
 - **Never extrapolate a probe past its shapes.** Say which were covered and which were not.
 - **Decide which axes CAN refute before sweeping any: only a measure-side axis can.** For `lhs ≤ rhs`, a parameter that moves only the RIGHT weakens the claim, so no instantiation of it can refute — unfalsifiable by construction, however tight the rows read. It runs the other way too: an axis with no coverage is a finding only if it moves the measure. Both errors were made on one row of this campaign.
 - **A row that could not have failed is not a row.** Label every row LOAD-BEARING or DEGENERATE and state what would make it fail. Three ways a probe lies green: **(1) vacuous rows** — the quantifier is empty (`all _ [] = true`, `0 ≤ᵇ _`), so name the covered CONJUNCTS, not the covered programs; **(2) hand-built states** — `record (st-init e) { … }` is not reachable, so reach states by RUNNING, and treat a constructed failing state as a refutation candidate whose reachability is the finding; **(3) reading an assembly backwards** — `P = P-core o₁ … oₖ` proves P FROM the core, never the core.

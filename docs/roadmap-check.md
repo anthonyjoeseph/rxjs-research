@@ -278,6 +278,13 @@ only move that clears it is to instantiate the statement, at concrete programs, 
 `agda/evidence/probed/`. The better outcome is a refutation, which is what this check is
 trying to buy earlier.
 
+**It binds where a branch LANDS, not on every commit (Anthony).** `make roadmap-check`
+passes `--birth-owed` unless `CI` is set, so a local run prints the row as OWED and
+exits green, and the PR's CI run fails it. A new FALSITY row can then be committed and
+pushed while its probe is written, without the probe becoming a commit blocker that
+pulls work into the checker instead of the statement. Same unit as `roadmap-moved`: the
+branch, not the keystroke.
+
 ## The receipt cap has two units, and the row is the one that was missing
 
 `make evidence-check` caps receipts at seven per POSTULATE. Check 13 caps the same

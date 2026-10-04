@@ -64,6 +64,7 @@ open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; sched-pop)
+open import Simulation.Stores using () renaming (Src to Srcˢ; Store to Storeˢ; module Store to Storeˢ)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -251,6 +252,37 @@ record Machines {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (in
                 → OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
 
 postulate
+  -- THE ROOT SUBSCRIBES LEAVE THE STORES RELATED, the schedules in step,
+  -- and what they sent agreeing under one instant below the clock.
+  -- Each former's subscribe installs the impl run `Simulation.Stores`
+  -- names for its plain frame, so this is a walk over the program.
+  --
+  -- A ONE-LANE MERGE OF THE HOT READ INSTALLS WHAT THE RELATION SAYS, read
+  -- off the normal forms of both start stores, not typechecked: the plain
+  -- row runs the lane into a merge node and the root; the impl row runs
+  -- the restamp, the lane's merge node, the flattener's cell and the root,
+  -- with the read's block on a second row into the share.  That is `read~`
+  -- through `inner~` and `merge~`, `π` pairing the plain merge node with
+  -- the impl's lane node and cell.  A literal `of` installs nothing on
+  -- either side, so its store is the empty relation.
+  --
+  -- PROBED: `Probed.Stores` -- the STORE conjunct alone, by `Confirms`, at
+  --   three one-source programs: the hot read (`read~` over `root~`, the
+  --   share's `InputBlock` as a `hot~` machine row), the cold read
+  --   (`cold~`, its block run straight to the root) and a deferred hot read
+  --   (`defer~` and a pending `hop`, `π` pairing the defer's merge nodes).
+  --   Each covers the source payloads, the latches and both `WF`s.  Not a
+  --   flattener: the merge row above did not finish typechecking, a coverage
+  --   boundary.  Not the `Sync`, agreement or stamps conjuncts.
+  subscribe-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+    → Sync (live (start (plainExp e) (plainSlots ins))) (live (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+    × Storeˢ κ (start (plainExp e) (plainSlots ins)) (start (elaborateImpl κ e) (embedSlotsImpl ins))
+    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)
+                (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
+                (readᴾ (opening (plainExp e) (plainSlots ins)))
+    × OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+              (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
+
   -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
   -- HAVE, or one plain arrival's values delivered across two.  Either is
   -- a former whose elaboration schedules something its plain program
@@ -272,17 +304,34 @@ postulate
   -- every arrival, and finds each arrival's instants between the counter
   -- it entered with and the one it left, the subscribe's below the
   -- first: seed 21 at depth 3, 120 cases, 103 decided and 66 of those
-  -- grouping values, none outside.
-  --
-  -- PROBED: `Probed.Simulation`, read back by
-  --   `git show 3d8872c4:agda/evidence/probed/Probed/Simulation.agda`.
-  --   Its rows pin `arrival-runs`'s conclusion -- every slice through fuel
-  --   3 over three first-order programs and the timed translations of two,
-  --   all over a hot slot with the map the identity, the empty slices
-  --   included, each slice's instant its arrival plus a shift -- so they
-  --   reach this leaf only along the run from the root subscribes.
-  machines : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
-           → Machines κ e ins
+  -- grouping values, none outside.  And the instants a run draws are
+  -- contiguous: no gap at depth 2 seeds 13..36 nor depth 3 seeds 1..11.
+  cascade-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                      {c : Conf (plainExp e)} {d : Conf (elaborateImpl κ e)}
+    → Storeˢ κ c d → Popped (Srcˢ κ) (live c) (live d) (schedGo (live c)) (schedGo (live d))
+    → Sync (live (next c)) (live (next d))
+    × Storeˢ κ (next c) (next d)
+    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ (out d)) (readᴾ (out c))
+    × OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
+
+-- THE MACHINES ARE RELATED BY `Simulation.Stores`: a live source by its
+-- payloads, a registration by the run of frames its former's
+-- elaboration installs, a node by the impl nodes `π` pairs it with.
+machines : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+         → Machines κ e ins
+machines κ e ins = record
+  { Src         = Srcˢ κ
+  ; Store       = Storeˢ κ
+  ; store-src   = Storeˢ.sources
+  ; open-sync   = proj₁ (subscribe-related κ e ins)
+  ; open-store  = proj₁ (proj₂ (subscribe-related κ e ins))
+  ; open-agree  = proj₁ (proj₂ (proj₂ (subscribe-related κ e ins)))
+  ; open-stamps = proj₂ (proj₂ (proj₂ (subscribe-related κ e ins)))
+  ; step-sync   = λ s p → proj₁ (cascade-related κ e s p)
+  ; step-store  = λ s p → proj₁ (proj₂ (cascade-related κ e s p))
+  ; step-agree  = λ s p → proj₁ (proj₂ (proj₂ (cascade-related κ e s p)))
+  ; step-stamps = λ s p → proj₂ (proj₂ (proj₂ (cascade-related κ e s p)))
+  }
 
 -- THE CORRESPONDENCE IS THE SCHEDULES IN STEP AND THE STORES RELATED.
 -- An arrival pops partnered sources from schedules in step

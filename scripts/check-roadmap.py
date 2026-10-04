@@ -947,6 +947,10 @@ def main():
     ap.add_argument("--fix-evidence", action="store_true",
                     help="rewrite every classed row's evidence field from the "
                          "source headers, then exit (make roadmap-evidence)")
+    ap.add_argument("--birth-owed", action="store_true",
+                    help="report never-instantiated rows of the tier being worked "
+                         "as OWED instead of failing; the floor binds where a "
+                         "branch lands, which is CI")
     ap.add_argument("--dates-only", action="append", default=None, metavar="PATH",
                     help="also refuse dates in PATH (date check only, no rows). "
                          "Defaults to CLAUDE.md; repeatable; selftest passes fixtures.")
@@ -1124,7 +1128,8 @@ def main():
         birth = unevidenced_birth(path, tiers, cen)
         if birth:
             low = lowest_open_tier(tiers)
-            print(f"\nTIER {low} ROWS NOTHING HAS EVER INSTANTIATED — {len(birth)}:")
+            owed = " — OWED, binds where the branch lands (CI)" if args.birth_owed else ""
+            print(f"\nTIER {low} ROWS NOTHING HAS EVER INSTANTIATED — {len(birth)}{owed}:")
             for tier, label, lineno, cls in birth:
                 print(f"  Tier {tier}  {path.name}:{lineno}  {label}  ({cls})")
             print("\nEvery refutation this campaign has landed killed a row that was")
@@ -1155,7 +1160,7 @@ def main():
             print("split the row, which satisfies the count and changes nothing.")
             print("evidence-check caps one POSTULATE; this caps the open ITEM, which")
             print("is what a row naming two arms of one statement gets past.")
-        if missing or bad or unearned or unev or birth or fat:
+        if missing or bad or unearned or unev or (birth and not args.birth_owed) or fat:
             failures.append(None)
 
     date_targets = [path]
@@ -1279,7 +1284,8 @@ def main():
                   "names one; every classed row's evidence field matches its "
                   "postulates' own headers, every GRINDABLE row names a "
                   "proven twin, no DIFFICULTY row stands on none, and every "
-                  "row of the tier being worked has been instantiated"))
+                  "row of the tier being worked has been instantiated"
+                  + (" or is printed above as OWED" if args.birth_owed else "")))
     return 0
 
 
