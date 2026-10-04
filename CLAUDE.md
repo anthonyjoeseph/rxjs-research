@@ -28,7 +28,7 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `unsafe-check` | `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-check` | two declarations proving one fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
 | `imports-check` | an unused import, or an unused name in a surviving clause | [docs/imports-check.md](docs/imports-check.md) |
-| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, a wrong DERIVED evidence field, a DIFFICULTY row standing on nothing, or a row of the tier being worked that nothing has instantiated — that floor binds where a branch LANDS (CI), and locally prints the row as OWED so a new FALSITY row can be committed while its probe is written (Anthony). `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, a wrong DERIVED evidence field, or a DIFFICULTY row standing on nothing. `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `monster-check` | a line ADDED to `agda/src` outside the lowest open tier's monster's own dependency CONE — what its statement and body REACH, read off the tree AS EDITED | [docs/monster.md](docs/monster.md) |
 | `roadmap-order` | discharging a GRINDABLE or DIFFICULTY row while its tier holds an open FALSITY or SHAPE. Only DISCHARGE is held — delete, rename, split, restate, reclassify stay free; a PREREQUISITE the risky statement names is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-moved` | a branch landing proof work with PROOF-STATE byte-identical to **main**. Baseline is the merge-base, so fix-ups inside a branch cost nothing | [docs/roadmap-check.md](docs/roadmap-check.md) |
@@ -216,9 +216,9 @@ Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not
 
 - **A machine refutation is worth as much as a proof — usually more, since it is cheaper.** False now costs a restatement; false under a tower costs the tower.
 - **Auditing statements for truth is the PRIORITY.** A `-- SUSPECT:` note is not the response to a doubt you can test: test it.
-- **PROBE BEFORE GRINDING.** If the sides compute, instantiate at concrete programs in `agda/evidence/probed/`, checked with `make agda-dev`, pinned by `refl`. Every probe ends in a refutation or a `-- PROBED:` receipt saying what shapes were covered. **An unprobed probeable postulate is the cheapest unmanaged risk in the repo.**
+- **Probe when there's a lot of uncertainty (Anthony).** If the sides compute, instantiate at concrete programs in `agda/evidence/probed/`, checked with `make agda-dev`, pinned by `refl`. Every probe ends in a refutation or a `-- PROBED:` receipt saying what shapes were covered.
 - **Probe the ASSEMBLY's conclusion, not only its leaves.** A real body over postulated leaves has a conclusion that COMPUTES, and nobody instantiates it because it typechecks. Its falsity is the retroactive kind. Tell that it is worth the minute: the leaf's bound and the assembly's bound are stated in the SAME currency.
-- **Assume a probe already existed until a search has failed (Anthony).** Binds on every row that is not GRINDABLE.
+- **Before writing a probe, assume one already existed until a search has failed (Anthony).**
   ```
   git log -S'<postulate name>' --all --format='%h %s'
   ```
