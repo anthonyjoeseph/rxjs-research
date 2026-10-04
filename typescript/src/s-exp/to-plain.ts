@@ -263,7 +263,7 @@ export const inputP = (i: number, a: Ty, frame: Tm): Exp => {
 // does InstEmit work of its own -- `ofP` brackets a one-shot burst
 // against the ambient frame, `mapP` rebuilds each emit under the
 // incoming InstEmit's own instant/source/kind, `mergeAllP` is
-// `flatAll merge . map laneV`, and so on. They are left as leaves here
+// a flattener over `map elemV` or `mergeAll(map explodeV)`, and so on. They are left as leaves here
 // because the point of this file is the shape of the recursion and the
 // one clause above, not a second transcription of the elaboration.
 export declare const ofP: (frame: Tm, items: Tm[], t: Ty) => Exp;
@@ -272,26 +272,22 @@ export declare const takeP: (frame: Tm, count: Tm, src: Exp, t: Ty) => Exp;
 export declare const takeWhileP: (fn: Fn, src: Exp, t: Ty) => Exp;
 export declare const mapP: (fn: Fn, src: Exp, t: Ty) => Exp;
 export declare const scanP: (fn: Fn, init: Tm, src: Exp, t: Ty) => Exp;
-// ONE OUTER EMIT'S LANE, and the type is the one you would reach for
-// by hand. `emitT (obs t)` unfolds through `plainT`'s observable clause,
-// so the outer emit's PAYLOAD is an observable of InstEmits -- the
-// argument is an InstEmit stream of InstEmit streams, i.e. exactly
+// ONE OUTER EMIT AS A RUN OF FLATTENER ELEMENTS, ONE PER INNER. An
+// outer emit can carry several payloads (a synchronous batch), and the
+// flattener's policy -- switch drops the earlier inner, exhaust ignores
+// the later -- is a policy over INNERS. Joining one emit's inners into
+// one lane would let a switch keep both. So `explodeV` returns the
+// emit's echo (bookkeeping and every echoed value) beside its first
+// inner, then one bare element per later inner: one emit out per emit
+// in, and the shape `join.ts` already accepts, one obs at a time.
+// Where no policy tells the two apart -- an unbounded merge, or an
+// outer that is an `of` under maps -- `elemV` keeps one element per
+// emit, its inners merged, since the split costs a subscription per
+// emit.
 //
-//   Observable<InstEmit<Observable<InstEmit<A>>>>
-//
-// `laneV` takes ONE of those outer InstEmits and returns the lane it
-// opens: the outer emit's own bookkeeping, re-stamped and payload-free,
-// followed by the inner streams that emit carried. Nothing mints here,
-// because BOTH layers arrive already stamped -- the inner's bookkeeping
-// rides the inner's own emits, and only the outer's has to be placed.
-//
-//   Agda: SExp.Elaborate.laneV
-//     Fn G Dg D Th (emitT (obs t)) (obs (emitT t))
-//
-// And `mergeAllP k e = flatAll (merge k) (map laneV e)` -- which is why a
-// forged inner reaches the wire untouched: the flattener SUBSCRIBES the
-// lane, and a lane's inners are whatever the payload held.
-export declare const laneV: (outer: Val) => Observable<Val>;
+//   Agda: SExp.Elaborate.explodeV, SExp.Elaborate.elemV
+export declare const explodeV: (outer: Val) => Observable<Val>;
+export declare const elemV: (outer: Val) => Val;
 
 export declare const mergeAllP: (
   limit: number | undefined,

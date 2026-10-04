@@ -224,4 +224,12 @@ cases =
           (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ (natˢ 3) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))) ∷ (strmˢ (ofˢ ((natˢ 99) ∷ []))) ∷ [])))
           (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
                    ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
+  cached "a cold's synchronous pair switched into two deferred ofs" 30
+          (flatAllˢ switchᶠ (mapˢ (strmˢ (deferˢ (ofˢ ((varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (cold (1 ∷ 2 ∷ []) [])
+                   emptyˢ) ∷
+  cached "a cold's synchronous pair exhausted into two deferred ofs" 30
+          (flatAllˢ exhaustᶠ (mapˢ (strmˢ (deferˢ (ofˢ ((varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (cold (1 ∷ 2 ∷ []) [])
+                   emptyˢ) ∷
   []

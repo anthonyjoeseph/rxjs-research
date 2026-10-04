@@ -1,6 +1,6 @@
 module SExp.Elaborate where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; true; false; not)
 open import Data.List using (List; []; _∷_; _++_; map; foldr)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
@@ -11,7 +11,7 @@ open import Data.Vec using (lookup; zipWith)
 open import Data.Vec.Properties using (lookup-zipWith; lookup-++ʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; refl; trans)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ;
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ;
   mintᵉ; mapᵉ; scanᵉ; FlatOp; mergeᶠ; flattenᵉ; batchSyncᵉ; unitᵗ; _+ᵗ_; varᵗ; unit̂; bool̂;
   nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ;
   revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; takeWhileᵉ)
@@ -709,8 +709,9 @@ takeWhileᵖ {Θ = Θ} {t = t} f e = cutᵖ unit̂ cutter e
 -- has NO lane rather than an empty one: under a switch an empty lane
 -- still cancels the live one.
 --
--- THE LANE IS PER EMIT AND NOT PER INNER: an emit carrying two inners
--- hands the flattener one lane, their merge.
+-- THE LANE IS PER EMIT, WHICH IS RIGHT ONLY WHERE NO POLICY TELLS ONE
+-- LANE FROM TWO: an unbounded merge, or an outer that never carries two
+-- inners in one emit.  `flattenᵖ` takes `explodeᵛ` everywhere else.
 elemᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
       → Fn Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)))
                     ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t)))
@@ -757,6 +758,87 @@ elemᵛ {Θ = Θ} {t = t} =
     vals   = fstᵗ (sndᵗ split)
     echoes = revᵗ (foldᵗ vals nilᵗ echoStep)
 
+-- ONE OUTER EMIT AS A RUN OF FLATTENER ELEMENTS, ONE PER INNER: the
+-- first is `elemᵛ`'s echo beside the first inner, and each later inner
+-- rides an element of its own with no echo.
+--
+-- THE LANE IS PER INNER, BECAUSE THE POLICY IS.  A switch over a
+-- synchronous pair keeps only the second inner live, and an exhaust
+-- drops the second while the first is open; one lane merging both would
+-- keep both.  The twin's join accepts each payload's inner on its own
+-- for the same reason.
+--
+-- AND THE ECHO IS NOT SPLIT WITH THEM.  One outer emit is one emit out,
+-- whatever it carried; an echo per payload multiplies emits through
+-- every flattener nested above, and the timed translation nests several
+-- per author flattener.
+explodeᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+         → Fn Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)))
+                       (obs ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t))))
+explodeᵛ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t} =
+  letᵗ elemᵛ (strmᵗ emptyᵉ)
+       (letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (varᵗ (there (here refl)))))
+             (strmᵗ emptyᵉ) body)
+  where
+  L : Ty
+  L = unitᵗ +ᵗ obs (emitᵗ t)
+
+  P : Ty
+  P = (unitᵗ +ᵗ plainᵗ t) ×ᵗ L
+
+  Elem : Ty
+  Elem = (unitᵗ +ᵗ emitᵗ t) ×ᵗ L
+
+  E : Ty
+  E = emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))
+
+  SP : Ty
+  SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ P ×ᵗ boolᵗ)
+
+  -- the first inner still unplaced, and whether a run follows it
+  Acc : Ty
+  Acc = L ×ᵗ (boolᵗ ×ᵗ obs Elem)
+
+  -- one element, then the rest
+  before : ∀ {Θ′} → Tm Γ Δᵍ Δ Θ′ Elem → Tm Γ Δᵍ Δ Θ′ (obs Elem) → Tm Γ Δᵍ Δ Θ′ (obs Elem)
+  before x rest = strmᵗ (flatAllᵉ (mergeᶠ nothing) (ofᵉ (strmᵗ (ofᵉ (x ∷ [])) ∷ rest ∷ [])))
+
+  -- one payload over the payloads reversed: its inner becomes the
+  -- unplaced one, and the one it displaces leads the run as a bare
+  -- element.  The payload, then the accumulator
+  laneStep : Tm Γ Δᵍ Δ (P ∷ Acc ∷ SP ∷ Elem ∷ E ∷ Θ) Acc
+  laneStep = caseᵗ (sndᵗ (varᵗ (here refl)))
+                   (varᵗ (there (there (here refl))))
+                   (pairᵗ (inrᵗ (varᵗ (here refl))) pushed)
+    where
+    -- the inner, the payload, then the accumulator
+    pushed : Tm Γ Δᵍ Δ (obs (emitᵗ t) ∷ P ∷ Acc ∷ SP ∷ Elem ∷ E ∷ Θ) (boolᵗ ×ᵗ obs Elem)
+    pushed = caseᵗ (fstᵗ (varᵗ (there (there (here refl)))))
+                   (sndᵗ (varᵗ (there (there (there (here refl))))))
+                   (pairᵗ (bool̂ true)
+                          (ifᵗ (fstᵗ (sndᵗ acc))
+                               (before bare (sndᵗ (sndᵗ acc)))
+                               (strmᵗ (ofᵉ (bare ∷ [])))))
+      where
+      acc  = varᵗ (there (there (there (here refl))))
+      bare = pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl)))
+
+  -- inside both `letᵗ`s: the split, `elemᵛ`'s element, the former's
+  -- argument, then Θ
+  body : Tm Γ Δᵍ Δ (SP ∷ Elem ∷ E ∷ Θ) (obs Elem)
+  body = letᵗ (foldᵗ (revᵗ vals) (pairᵗ (inlᵗ unit̂) (pairᵗ (bool̂ false) (strmᵗ emptyᵉ))) laneStep)
+              (strmᵗ emptyᵉ)
+              (ifᵗ (fstᵗ (sndᵗ acc))
+                   (before first (sndᵗ (sndᵗ acc)))
+                   (strmᵗ (ofᵉ (first ∷ []))))
+    where
+    vals = fstᵗ (sndᵗ (varᵗ (here refl)))
+
+    -- inside the third `letᵗ`: the accumulator, the split, then
+    -- `elemᵛ`'s element, whose echo the first inner rides beside
+    acc   = varᵗ (here refl)
+    first = pairᵗ (fstᵗ (varᵗ (there (there (here refl))))) (fstᵗ acc)
+
 -- A SUBSCRIBE BURST TAKES THE INSTANT OF WHATEVER SUBSCRIBED IT.  An
 -- emit of kind `subscribe` was stamped with the frame it was BUILT in,
 -- which is the root's; when the subscription happened inside a later
@@ -771,17 +853,36 @@ restampᵛ at as e =
       (instEmitᵛ (eventsᵛ e) at (sourceᵛ e) as)
       e
 
+-- WHETHER A FLATTENER NEEDS ONE ELEMENT PER INNER: only where its
+-- policy tells one lane from two, over an outer that can carry two
+-- inners in one emit.  An unbounded merge runs a merged lane exactly as
+-- it runs its parts, and an `ofˢ` under maps emits one value per emit.
+-- The split costs a subscription per emit, and every subscribing frame
+-- on the way down is replayed, so it is paid only where it is owed.
+oneInnerˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → SExp Γ Δᵍ Δ Θ t → Bool
+oneInnerˢ (ofˢ _)    = true
+oneInnerˢ (mapˢ _ e) = oneInnerˢ e
+oneInnerˢ _          = false
+
+perInnerˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → FlatOp → SExp Γ Δᵍ Δ Θ t → Bool
+perInnerˢ (mergeᶠ nothing) e = false
+perInnerˢ _                e = not (oneInnerˢ e)
+
 -- A LANE IS SUBSCRIBED IN THE LAST INSTANT THE FLATTENER PUT OUT: the
 -- echo of the outer emit that carried it, or the lane emit whose
 -- completion freed its slot.  So a scan over the output carries that
 -- instant and its kind, and every subscribe burst behind it takes them.
 -- Inside the root frame everything is the frame and nothing moves.
-flattenᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → FlatOp
+flattenᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → FlatOp → Bool
          → Tm Γ Δᵍ Δ Θ uniqᵗ
          → Exp Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-flattenᵖ {Θ = Θ} {t = t} op frame e =
-  mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed (flattenᵉ op (mapᵉ elemᵛ e)))
+flattenᵖ {Θ = Θ} {t = t} op perInner frame e =
+  mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed (flattenᵉ op (elems perInner)))
   where
+  elems : Bool → Exp _ _ _ Θ ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t)))
+  elems true  = flatAllᵉ (mergeᶠ nothing) (mapᵉ explodeᵛ e)
+  elems false = mapᵉ elemᵛ e
+
   -- the last instant and kind put out, and the emit put out
   S : Ty
   S = (uniqᵗ ×ᵗ emitKindᵗ) ×ᵗ emitᵗ t
@@ -970,7 +1071,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    toInstEmit (takeWhileˢ f e)    = takeWhileᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (mapˢ f e)          = mapᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (scanˢ f z e)       = scanᵖ (toInstEmitTm f) (toInstEmitTm z) (toInstEmit e)
-   toInstEmit {Θ = Θ} (flattenˢ op e) = flattenᵖ op (frameᵛ Θ) (toInstEmit e)
+   toInstEmit {Θ = Θ} (flattenˢ op e) = flattenᵖ op (perInnerˢ op e) (frameᵛ Θ) (toInstEmit e)
    toInstEmit (μˢ e)              = μᵉ (toInstEmit e)
    toInstEmit (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
    -- A DEFERRED HOP IS A NEW INSTANT, AND IT SAYS SO BEFORE ANYTHING
