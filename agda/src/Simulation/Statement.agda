@@ -70,6 +70,7 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Pop using (pop-store)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
   _⨾_; fan-go; hot-start; hot-start-at; hot-adm; hot-end-start; hot-end-at; hot-finish)
@@ -262,16 +263,6 @@ postulate
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 
-  -- A POP LEAVES THE STORES RELATED: the popped sources keep their
-  -- numbers and places, each giving up one pending value, and the
-  -- cascade's ledger opens empty on both sides.
-  pop-store  : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                 {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-    → Storeʳ κ sP stP sI stI
-    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-    → Sync rs rs′
-    → Storeʳ κ (record sP { live = rs }) (cascadeOpen stP) (record sI { live = rs′ }) (cascadeOpen stI)
-
   -- A MINTED SOURCE'S CHAINS PAIR UP, in order, as registrations the
   -- store relation partners.  Every plain row is partnered, and a row
   -- at a source numbered above the slots is a cold or deferred read
@@ -344,7 +335,7 @@ pop-kind : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clos
 pop-kind {κ = κ} {sP = sP} {sI = sI} s ex ex′
   with subst₂ (Popped (λ l l′ → SrcNum κ (LiveSource.source l) (LiveSource.source l′)) (Sched.live sP) (Sched.live sI))
               ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.numbers s))
-... | pop {l = l} {l′ = l′} _ _ r (_ , h) (_ , h′) _ _ _ =
+... | pop {l = l} {l′ = l′} _ _ r (_ , h) (_ , h′) _ _ _ _ =
   subst₂ (SrcNum κ) (sym (head-source l h)) (sym (head-source l′ h′)) r
 
 -- THE VALUE PASS OVER PAIRED CHAINS, one partnered chain at a time
@@ -424,10 +415,10 @@ dyn-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
 dyn-pass κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy p q go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
-... | pop _ _ src h h′ _ _ _ =
+... | pop _ _ src h h′ _ _ _ _ =
   pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ e s ex ex′ p q s₀)) go go′
   where
-    s₀ = pop-store s ex ex′ sy
+    s₀ = pop-store κ s ex ex′ sy
     opened : ∀ {chs chs′}
            → Pointwise (λ c c′ → Partners κ _ _ _ _ _ (Storeʳ.rows s₀) (dynRow a c) (dynRow a′ c′)) chs chs′
            → Pointwise (Paired (Storeʳ.rows s₀) [] [] a a′) chs chs′
@@ -450,8 +441,8 @@ hot-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
 hot-pass {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy i hk e₁ e₂ {oP = oP} go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
-... | pop _ _ src h h′ _ _ _
-  with hot-start κ (pop-store s ex ex′ sy) {a} {a′} {i} hk (head src h h′ e₁ e₂) go′
+... | pop _ _ src h h′ _ _ _ _
+  with hot-start κ (pop-store κ s ex ex′ sy) {a} {a′} {i} hk (head src h h′ e₁ e₂) go′
 ... | hot-start-at {oB = oB} {εI = εI} A c (disp (walk-more {emits = em} g walk-nil)) refl =
   After.store Z ,
   subst (λ z → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ z) (readᴾ oP))
@@ -625,7 +616,7 @@ cascade-at κ e {c} {d} s ex ex′ dry =
   subst₂ (Kept κ e d) (sym (step-at c (cong (schedFinish (Conf.sched c)) ex)))
                       (sym (step-at d (cong (schedFinish (Conf.sched d)) ex′)))
          (s , [] , tt)
-cascade-at κ e {c} {d} s {inj₂ (a , rs)} {inj₂ (a′ , rs′)} ex ex′ (pop ta la _ _ _ _ _ sy) =
+cascade-at κ e {c} {d} s {inj₂ (a , rs)} {inj₂ (a′ , rs′)} ex ex′ (pop ta la _ _ _ _ _ sy _) =
   subst₂ (Kept κ e d) (sym (step-at c eqn)) (sym (step-at d eqn′))
          (stores (proj₁ k) , proj₂ k)
   where

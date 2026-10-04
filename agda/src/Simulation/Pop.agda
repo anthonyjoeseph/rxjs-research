@@ -1,0 +1,120 @@
+------------------------------------------------------------------
+-- A POP LEAVES THE LIVE LISTS RELATED.  Both lists give up one value at
+-- the same place and every other source stays as it stood, so a relation
+-- that holds source for source holds again, a source keeps its number,
+-- and a registration that names a pair of sources at a place still names
+-- it.
+------------------------------------------------------------------
+module Simulation.Pop where
+
+open import Data.List    using (List; []; _∷_; map)
+open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
+open import Data.Sum     using (inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst; subst₂)
+
+open import Rx.Exp       using (Ctx; Closed)
+open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeId; NodeState; schedGo; schedHeadOf; cascadeOpen)
+open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
+open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there)
+open import Simulation.Stores using (Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store)
+  renaming (here to sp-here; there to sp-there)
+
+-- the rest of two lists a relation holds for, given their first elements
+pw-tail : ∀ {A B : Set} {R : A → B → Set} {xs ys x y xs′ ys′} → Pointwise R xs ys → xs ≡ x ∷ xs′ → ys ≡ y ∷ ys′ → Pointwise R xs′ ys′
+pw-tail (_ ∷ pw) refl refl = pw
+
+module _ {k} {Δ : Ctx k} where
+
+  -- what the head of a source shows of the rest: its first pending value
+  -- gone, everything else as it was
+  head-shape : ∀ (l : LiveSource Δ) {a l₂} → schedHeadOf l ≡ inj₂ (a , l₂)
+             → Σ _ λ t → Σ _ λ v → Σ _ λ ps → LiveSource.pending l ≡ (t , v) ∷ ps × l₂ ≡ record l { pending = ps }
+  head-shape l eq with LiveSource.pending l
+  head-shape l refl | (t , v) ∷ ps = t , v , ps , refl , refl
+
+  head-keeps : ∀ (l : LiveSource Δ) {a l₂} → schedHeadOf l ≡ inj₂ (a , l₂) → LiveSource.source l₂ ≡ LiveSource.source l
+  head-keeps l eq with head-shape l eq
+  ... | _ , _ , _ , _ , refl = refl
+
+module _ {k} {Δ : Ctx k} {k′} {Δ′ : Ctx k′} where
+
+  -- the sources a pop leaves are numbered as they were
+  pp-sources : ∀ {ls rs : List (LiveSource Δ)} {ls′ rs′ : List (LiveSource Δ′)} → PopPair ls rs ls′ rs′
+             → map LiveSource.source rs ≡ map LiveSource.source ls × map LiveSource.source rs′ ≡ map LiveSource.source ls′
+  pp-sources (here {l} {l₂} {l′} {l₂′} h h′) = cong (_∷ _) (head-keeps l h) , cong (_∷ _) (head-keeps l′ h′)
+  pp-sources (there pp) = cong (_ ∷_) (proj₁ (pp-sources pp)) , cong (_ ∷_) (proj₂ (pp-sources pp))
+
+  -- a relation that survives the popped pair surviving, source for source
+  pp-pointwise : ∀ {R : LiveSource Δ → LiveSource Δ′ → Set}
+                   (step : ∀ {l l′ a a′ l₂ l₂′} → R l l′ → schedHeadOf l ≡ inj₂ (a , l₂) → schedHeadOf l′ ≡ inj₂ (a′ , l₂′) → R l₂ l₂′)
+                   {ls rs ls′ rs′} → PopPair ls rs ls′ rs′ → Pointwise R ls ls′ → Pointwise R rs rs′
+  pp-pointwise step (here h h′) (r ∷ rs) = step r h h′ ∷ rs
+  pp-pointwise step (there pp)  (r ∷ rs) = r ∷ pp-pointwise step pp rs
+
+module _ {n} {Γ : Ctx n} (κ : Kinds n) where
+
+  -- two sources at one place in the live lists keep it
+  sp-pop : ∀ {ls rs : List (LiveSource Γ)} {ls′ rs′ : List (LiveSource (plainᵏ Γ κ))} {s s′} → PopPair ls rs ls′ rs′ → SrcPair κ ls ls′ s s′ → SrcPair κ rs rs′ s s′
+  sp-pop (here {l} {l₂} {l′} {l₂′} {ls} {ls′} h h′) sp-here =
+    subst₂ (SrcPair κ (l₂ ∷ ls) (l₂′ ∷ ls′)) (head-keeps l h) (head-keeps l′ h′) (sp-here {l = l₂} {l′ = l₂′})
+  sp-pop (here h h′) (sp-there q) = sp-there q
+  sp-pop (there pp)  sp-here      = sp-here
+  sp-pop (there pp)  (sp-there q) = sp-there (sp-pop pp q)
+
+  -- a source that gave up its first pending value is still related to its partner
+  src-pop : ∀ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) {a a′ l₂ l₂′} → Src κ l l′
+          → schedHeadOf l ≡ inj₂ (a , l₂) → schedHeadOf l′ ≡ inj₂ (a′ , l₂′) → Src κ l₂ l₂′
+  src-pop l l′ s h h′ with head-shape l h | head-shape l′ h′
+  src-pop l l′ (data~ eq pw)  h h′ | _ , _ , _ , pe , refl | _ , _ , _ , pe′ , refl = data~ eq (pw-tail pw pe′ pe)
+  src-pop l l′ (defer~ pw)    h h′ | _ , _ , _ , pe , refl | _ , _ , _ , pe′ , refl = defer~ (pw-tail pw pe′ pe)
+
+  num-pop : ∀ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) {a a′ l₂ l₂′}
+          → SrcNum κ (LiveSource.source l) (LiveSource.source l′)
+          → schedHeadOf l ≡ inj₂ (a , l₂) → schedHeadOf l′ ≡ inj₂ (a′ , l₂′)
+          → SrcNum κ (LiveSource.source l₂) (LiveSource.source l₂′)
+  num-pop l l′ nm h h′ = subst₂ (SrcNum κ) (sym (head-keeps l h)) (sym (head-keeps l′ h′)) nm
+
+  module _ {t} (π : List (NodeId × List NodeId)) (NP : List (NodeId × NodeState Γ)) (NI : List (NodeId × NodeState (plainᵏ Γ κ)))
+           {LP RS : List (LiveSource Γ)} {LI RS′ : List (LiveSource (plainᵏ Γ κ))} (pp : PopPair LP RS LI RS′) where
+
+    mach-pop : ∀ {r′} → MachRow κ π {t} NP NI LP LI r′ → MachRow κ π {t} NP NI RS RS′ r′
+    mach-pop (hot~ hot ib eq) = hot~ hot ib eq
+
+    row-pop : ∀ {r r′} → RowRel κ π {t} NP NI LP LI r r′ → RowRel κ π {t} NP NI RS RS′ r r′
+    row-pop (read~ hk pr eq)              = read~ hk pr eq
+    row-pop (cold~ sp ib pr eq)           = cold~ (sp-pop pp sp) ib pr eq
+    row-pop (defer~ sp pi ln lni pr eq)   = defer~ (sp-pop pp sp) pi ln lni pr eq
+
+    regrel-pop : ∀ {rg rg′} → RegRel κ π {t} NP NI LP LI rg rg′ → RegRel κ π {t} NP NI RS RS′ rg rg′
+    regrel-pop []         = []
+    regrel-pop (r ∷ q)    = row-pop r ∷ regrel-pop q
+    regrel-pop (mach m q) = mach (mach-pop m) (regrel-pop q)
+
+  -- A POP LEAVES THE STORES RELATED: the popped sources keep their
+  -- numbers and places, each giving up one pending value, and the
+  -- cascade's ledger opens empty on both sides.
+  pop-store : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+    → Store κ sP stP sI stI
+    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+    → Sync rs rs′
+    → Store κ (record sP { live = rs }) (cascadeOpen stP) (record sI { live = rs′ }) (cascadeOpen stI)
+  pop-store {sP = sP} {sI = sI} s ex ex′ sy
+    with subst₂ (Popped (Src κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Store.sync s) (Store.sources s))
+  ... | pop _ _ _ _ _ _ _ _ pp = record
+    { π        = Store.π s
+    ; π-keys   = Store.π-keys s
+    ; π-vals   = Store.π-vals s
+    ; sources  = pp-pointwise (λ {l} {l′} r h h′ → src-pop l l′ r h h′) pp (Store.sources s)
+    ; numbers  = pp-pointwise {R = λ l l′ → SrcNum κ (LiveSource.source l) (LiveSource.source l′)}
+                   (λ {l} {l′} r h h′ → num-pop l l′ r h h′) pp (Store.numbers s)
+    ; distinct = subst Unique (sym (proj₁ (pp-sources pp))) (proj₁ (Store.distinct s))
+               , subst Unique (sym (proj₂ (pp-sources pp))) (proj₂ (Store.distinct s))
+    ; sync     = sy
+    ; rows     = regrel-pop _ _ _ pp (Store.rows s)
+    ; latches  = Store.latches s
+    ; wfᴾ      = Store.wfᴾ s
+    ; wfᴵ      = Store.wfᴵ s
+    }

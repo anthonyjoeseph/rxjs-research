@@ -303,8 +303,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   sent to the root read as the plain group's values.
 - **`dyn-chains`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
   source's chains pair up in order as partnered registrations.
-- **`pop-store`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a pop leaves
-  the stores related, each popped source one pending value shorter.
 - **`hot-start`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a hot arrival's
   one impl chain runs its input block alone and hands the share one emit
   carrying the value; past the typechecker at a real pop.

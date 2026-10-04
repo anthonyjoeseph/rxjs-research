@@ -81,6 +81,13 @@ module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} where
     []  : Sync [] []
     _∷_ : ∀ {l l′ ls ls′} → ticks l ≡ ticks l′ × Ranked l l′ ls ls′ → Sync ls ls′ → Sync (l ∷ ls) (l′ ∷ ls′)
 
+  -- WHICH SOURCE EACH LIST GAVE UP A VALUE: the same place in both, every
+  -- other source left as it stood
+  data PopPair : List (LiveSource Γ) → List (LiveSource Γ) → List (LiveSource Γ′) → List (LiveSource Γ′) → Set where
+    here  : ∀ {l l₂ l′ l₂′ ls ls′ a a′} → schedHeadOf l ≡ inj₂ (a , l₂) → schedHeadOf l′ ≡ inj₂ (a′ , l₂′)
+          → PopPair (l ∷ ls) (l₂ ∷ ls) (l′ ∷ ls′) (l₂′ ∷ ls′)
+    there : ∀ {l l′ ls rs ls′ rs′} → PopPair ls rs ls′ rs′ → PopPair (l ∷ ls) (l ∷ rs) (l′ ∷ ls′) (l′ ∷ rs′)
+
   -- BOTH DRY, OR BOTH POP AT ONE TICK FROM PARTNERED SOURCES AND STAY IN
   -- STEP.  `R` is whatever the caller needs of the partners.
   data Popped (R : LiveSource Γ → LiveSource Γ′ → Set) (ls : List (LiveSource Γ)) (ls′ : List (LiveSource Γ′))
@@ -89,7 +96,7 @@ module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} where
     pop : ∀ {a a′ rs rs′} {l l′}
         → Arrival.tick a ≡ Arrival.tick a′ → Arrival.isLast a ≡ Arrival.isLast a′
         → R l l′ → HeadOf l a → HeadOf l′ a′
-        → SameOrd ls rs → SameOrd ls′ rs′ → Sync rs rs′
+        → SameOrd ls rs → SameOrd ls′ rs′ → Sync rs rs′ → PopPair ls rs ls′ rs′
         → Popped R ls ls′ (inj₂ (a , rs)) (inj₂ (a′ , rs′))
 
   ranked-moves : ∀ l l′ {ls rs : List (LiveSource Γ)} {ls′ rs′ : List (LiveSource Γ′)} → Ranked l l′ ls ls′ → SameOrd ls rs → SameOrd ls′ rs′ → Ranked l l′ rs rs′
@@ -131,17 +138,17 @@ module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} where
   sched-pop {R} {l ∷ ls} {l′ ∷ ls′} ((tk , rk) ∷ s) (r ∷ rs)
     with schedHeadOf l in eh | schedHeadOf l′ in eh′ | schedGo ls | schedGo ls′ | sched-pop s (both rs rk)
   ... | inj₁ _ | inj₁ _ | .(inj₁ tt) | .(inj₁ tt) | dry = dry
-  ... | inj₁ _ | inj₁ _ | .(inj₂ _) | .(inj₂ _) | pop ta la (rq , _) hb hb′ es es′ s′ =
-        pop ta la rq hb hb′ (refl ∷ es) (refl ∷ es′) ((tk , ranked-moves l l′ rk es es′) ∷ s′)
+  ... | inj₁ _ | inj₁ _ | .(inj₂ _) | .(inj₂ _) | pop ta la (rq , _) hb hb′ es es′ s′ pp =
+        pop ta la rq hb hb′ (refl ∷ es) (refl ∷ es′) ((tk , ranked-moves l l′ rk es es′) ∷ s′) (there pp)
   ... | inj₁ _ | inj₂ _ | _ | _ | _ = ⊥-elim (nil≢cons (trans (sym (head-none l eh)) (trans tk (proj₁ (head-some l′ eh′)))))
   ... | inj₂ _ | inj₁ _ | _ | _ | _ = ⊥-elim (nil≢cons (trans (sym (head-none l′ eh′)) (trans (sym tk) (proj₁ (head-some l eh)))))
   ... | inj₂ (a , l₂) | inj₂ (a′ , l₂′) | .(inj₁ tt) | .(inj₁ tt) | dry =
         let (tl , oa , o₂ , la) = head-some l eh ; (tl′ , oa′ , o₂′ , la′) = head-some l′ eh′
             (ta , t₂) = ∷-injʳ (trans (sym tl) (trans tk tl′))
         in pop ta (trans la (trans (cong null t₂) (sym la′))) r (l₂ , eh) (l₂′ , eh′)
-               (sym o₂ ∷ same-refl ls) (sym o₂′ ∷ same-refl ls′) ((t₂ , ranked-head l l₂ l′ l₂′ o₂ o₂′ rk) ∷ s)
+               (sym o₂ ∷ same-refl ls) (sym o₂′ ∷ same-refl ls′) ((t₂ , ranked-head l l₂ l′ l₂′ o₂ o₂′ rk) ∷ s) (here eh eh′)
   ... | inj₂ (a , l₂) | inj₂ (a′ , l₂′) | .(inj₂ (b , rs₂)) | .(inj₂ (b′ , rs₂′))
-      | pop {a = b} {b′} {rs₂} {rs₂′} {k} {k′} tb lb (rq , ok) (k₂ , hk) (k₂′ , hk′) es es′ s′
+      | pop {a = b} {b′} {rs₂} {rs₂′} {k} {k′} tb lb (rq , ok) (k₂ , hk) (k₂′ , hk′) es es′ s′ pp
         with schedEarlier a b | schedEarlier a′ b′
            | earlier-alike {l = l} {k} {l′} {k′} {a} {b} {a′} {b′}
                (proj₁ (∷-injʳ (trans (sym (proj₁ (head-some l eh))) (trans tk (proj₁ (head-some l′ eh′))))))
@@ -151,8 +158,8 @@ module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} where
         let (tl , oa , o₂ , la) = head-some l eh ; (tl′ , oa′ , o₂′ , la′) = head-some l′ eh′
             (ta , t₂) = ∷-injʳ (trans (sym tl) (trans tk tl′))
         in pop ta (trans la (trans (cong null t₂) (sym la′))) r (l₂ , eh) (l₂′ , eh′)
-               (sym o₂ ∷ same-refl ls) (sym o₂′ ∷ same-refl ls′) ((t₂ , ranked-head l l₂ l′ l₂′ o₂ o₂′ rk) ∷ s)
+               (sym o₂ ∷ same-refl ls) (sym o₂′ ∷ same-refl ls′) ((t₂ , ranked-head l l₂ l′ l₂′ o₂ o₂′ rk) ∷ s) (here eh eh′)
   ...   | false | false | _ =
-        pop tb lb rq (k₂ , hk) (k₂′ , hk′) (refl ∷ es) (refl ∷ es′) ((tk , ranked-moves l l′ rk es es′) ∷ s′)
+        pop tb lb rq (k₂ , hk) (k₂′ , hk′) (refl ∷ es) (refl ∷ es′) ((tk , ranked-moves l l′ rk es es′) ∷ s′) (there pp)
   ...   | true  | false | ()
   ...   | false | true  | ()
