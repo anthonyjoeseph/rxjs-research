@@ -54,6 +54,7 @@ open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeState; NodeId; Pa
 open import Rx.Evaluator.Domain using (flatOp)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; slotTy; hotᵏ; sharedᵏ)
 open import SExp.Plain   using (plainExp)
+open import Simulation.Schedules using (Sync)
 open import SExp.Elaborate using (toInstEmit; plainᶜ⁺; deferBodyᵖ; stampedSlot; restampᵛ; subscribeᵛ; deliveryᵛ; inputStampᵖ;
   ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ; flatStepᵛ; elemᵛ; explodeᵛ)
 open import SExp.InstEmit using (machineEmitᵗ)
@@ -432,6 +433,7 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     π-keys  : Unique (map proj₁ π)
     π-vals  : Unique (concatMap proj₂ π)
     sources : Pointwise (Src κ) (Sched.live sP) (Sched.live sI)
+    sync    : Sync (Sched.live sP) (Sched.live sI)
     rows    : RegRel κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
                 (EvalSt.registry stP) (EvalSt.registry stI)
     latches : LatchRel {Γ = Γ} κ (EvalSt.completedSources stP) (EvalSt.connectedShares stP)

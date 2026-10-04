@@ -40,6 +40,7 @@ open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
+open import Simulation.Schedules using (Sync)
 open import Simulation.Stores using (V; EnvRel; Lifts; PathRel; root~; map~; Store; Src; [])
 
 -- what a run sends to its root, read as values: the plain run's in
@@ -145,6 +146,15 @@ postulate
                → Pointwise (Src κ) (Sched.live (sched-init (plainExp e) (plainSlots ins)))
                                     (Sched.live (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)))
 
+-- WHERE IT CAN STILL FAIL: A HOT SCRIPT AT A DIFFERENT TICK OR RANK ON
+-- ONE SIDE.  Both lists are the slots' hot scripts in slot order.
+-- PROBED: `Probed.Opening` -- one hot script of two arrivals.  Not two
+--   hot slots, so no rank was compared.
+postulate
+  init-sync : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+            → Sync (Sched.live (sched-init (plainExp e) (plainSlots ins)))
+                   (Sched.live (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)))
+
 -- TWIN: `ib-renᵉ` -- the same walk over `renExp`'s clauses, a binder's
 --   `ext∈` the one place the identity is not definitional.
 postulate
@@ -161,6 +171,7 @@ init-store κ e ins μ = record
   ; π-keys  = []
   ; π-vals  = []
   ; sources = init-sources κ e ins
+  ; sync    = init-sync κ e ins
   ; rows    = []
   ; latches = λ _ → (λ _ → refl) , (λ _ → refl , refl)
   ; wfᴾ     = λ _ ()

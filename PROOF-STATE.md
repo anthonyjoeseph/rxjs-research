@@ -286,11 +286,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   No take, scan or `μ` run.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
-- **`init-sources`** (Simulation.Walk) — FALSITY, `PROBED`: the hot scripts
-  live before anything is subscribed are related source for source.
-- **`subscribe-{sync,stamps}`** (Simulation.Statement) — FALSITY, `PROBED`: the
-  root subscribes leave the schedules in step, sending under one instant; sync
-  holds at a hot and a deferred read; stamps are past the typechecker.
+- **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot
+  scripts live before anything is subscribed are related and in step, source
+  for source; one hot script only, so no rank compared.
+- **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
+  subscribes send under one instant below the clock; holds at an `of` of one
+  and two values. A cold read's decode is past the typechecker.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
   `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached

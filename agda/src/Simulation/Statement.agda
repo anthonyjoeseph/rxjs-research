@@ -254,20 +254,14 @@ record Machines {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (in
                 → OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
 
 postulate
-  -- THE ROOT SUBSCRIBES LEAVE THE SCHEDULES IN STEP: each former's
-  -- subscribe makes the sources live its plain frame does, at the ticks
-  -- and in the rank order its plain frame does.
-  -- PROBED: `Probed.Opening` -- a hot read's share, one source each side,
-  --   and a deferred hot read, its hop ranked against the script.  Not a
-  --   cold read, not a flattener's inners.
-  subscribe-sync : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
-    → Sync (live (start (plainExp e) (plainSlots ins))) (live (start (elaborateImpl κ e) (embedSlotsImpl ins)))
-
   -- WHAT THE ROOT SUBSCRIBES SEND CARRIES ONE INSTANT, drawn below the
-  -- clock they leave: the root frame's own token.  The typechecker does
-  -- not reach this: decoding what the impl's subscribe sends exhausted
-  -- memory at a one-value cold script, so the compiled sweep, deciding
-  -- `simulation`, is where it is checked.
+  -- clock they leave: the root frame's own token.  Decoding what the
+  -- impl's subscribe sends through an input block exhausted memory at a
+  -- one-value cold script, so a cold read's stamps are the compiled
+  -- sweep's, deciding `simulation`.
+  -- PROBED: `Probed.Opening` -- an `of` of one value and of two, so the
+  --   list is not empty and the shared instant is compared.  No cold
+  --   script, no flattener, nothing sent below a `defer`.
   subscribe-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
@@ -338,7 +332,7 @@ subscribe-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [
   × OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
             (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 subscribe-related {t = t} κ e ins =
-    subscribe-sync κ e ins
+    Storeʳ.sync (proj₁ (root-walk κ e ins))
   , stores (proj₁ (root-walk κ e ins))
   , Pointwise-map (v-agrees κ t) (proj₂ (root-walk κ e ins))
   , subscribe-stamps κ e ins
