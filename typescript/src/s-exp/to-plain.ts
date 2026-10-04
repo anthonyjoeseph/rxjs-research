@@ -277,13 +277,15 @@ export declare const scanP: (fn: Fn, init: Tm, src: Exp, t: Ty) => Exp;
 // flattener's policy -- switch drops the earlier inner, exhaust ignores
 // the later -- is a policy over INNERS. Joining one emit's inners into
 // one lane would let a switch keep both. So `explodeV` returns the
-// emit's echo (bookkeeping and every echoed value) beside its first
-// inner, then one bare element per later inner: one emit out per emit
-// in, and the shape `join.ts` already accepts, one obs at a time.
-// Where no policy tells the two apart -- an unbounded merge, or an
-// outer that is an `of` under maps -- `elemV` keeps one element per
-// emit, its inners merged, since the split costs a subscription per
-// emit.
+// emit's echo (bookkeeping and the echoed values up to its first inner)
+// beside that inner, then one element per later inner, echoing the
+// values that fall after the inner before it, and the values after the
+// last inner as one element with no lane: echoes are cut only at an
+// inner, because plain rxjs echoes a payload before subscribing its
+// inner. Where no policy tells the two apart -- an unbounded merge, or
+// an outer that is an `of` under maps -- `elemV` keeps one element per
+// emit, its inners merged, each led by the values echoed after it as
+// an `of` of their own, since the split costs a subscription per emit.
 //
 //   Agda: SExp.Elaborate.explodeV, SExp.Elaborate.elemV
 export declare const explodeV: (outer: Val) => Observable<Val>;

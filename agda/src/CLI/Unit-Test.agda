@@ -52,7 +52,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; varˢᵗ; natˢ;
-  primˢ; pairˢ; fstˢ; sndˢ; strmˢ; μˢ; deferˢ; varˢ)
+  primˢ; pairˢ; fstˢ; sndˢ; strmˢ; μˢ; deferˢ; varˢ; flattenˢ; inrˢ)
 open import Rx.Exp using (add; mergeᶠ; switchᶠ; exhaustᶠ)
 
 open import Rx.Prim using (hot; cold; after_,_)
@@ -230,6 +230,12 @@ cases =
                    emptyˢ) ∷
   cached "a cold's synchronous pair exhausted into two deferred ofs" 30
           (flatAllˢ exhaustᶠ (mapˢ (strmˢ (deferˢ (ofˢ ((varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (cold (1 ∷ 2 ∷ []) [])
+                   emptyˢ) ∷
+  cached "a cold's synchronous pair merged, each echoed beside an of" 30
+          (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inrˢ (varˢᵗ (here refl)))
+                                                 (inrˢ (strmˢ (ofˢ ((primˢ add (pairˢ (varˢᵗ (here refl)) (natˢ 10))) ∷ [])))))
+            (inputˢ zero)))
           (mkSlots (cold (1 ∷ 2 ∷ []) [])
                    emptyˢ) ∷
   []

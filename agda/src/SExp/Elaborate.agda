@@ -84,6 +84,58 @@ flatAllᵉ op e = flattenᵉ op (mapᵉ (pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ
 deliveryᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
 deliveryᵛ = inrᵗ (inlᵗ unit̂)
 
+-- the subscribe frame: the `init` and the frame's values, under the
+-- frame, tagged `subscribe`.  A later arrival: mint its instant and
+-- emit its value under it.
+inputStampᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {a : Ty}
+            → Tm Γ Δᵍ Δ Θ uniqᵗ
+            → Fn Γ Δᵍ Δ (uniqᵗ ∷ Θ) ((unitᵗ +ᵗ a) ×ᵗ listᵗ (unitᵗ +ᵗ a)) (obs (machineEmitᵗ a))
+inputStampᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {a = a} frame = stamp
+  where
+  m : Ty
+  m = unitᵗ +ᵗ a
+
+  -- under the SOURCE binder and the group
+  Θᵍ : List Ty
+  Θᵍ = (m ×ᵗ listᵗ m) ∷ uniqᵗ ∷ Θ
+
+  grp : Tm Γ Δᵍ Δ Θᵍ (m ×ᵗ listᵗ m)
+  grp = varᵗ (here refl)
+
+  src : Tm Γ Δᵍ Δ Θᵍ uniqᵗ
+  src = varᵗ (there (here refl))
+
+  frameᵍ : Tm Γ Δᵍ Δ Θᵍ uniqᵗ
+  frameᵍ = renTm (λ x → x) (λ x → x) (λ x → there (there x)) frame
+
+  -- the tail in arrival order (the `revᵗ` is what makes a cons-fold
+  -- rebuild the list rather than reverse it); a marker in it is
+  -- dropped, and only a group's head can be one
+  rest : Tm Γ Δᵍ Δ Θᵍ (listᵗ (instEventᵗ uniqᵗ a))
+  rest = foldᵗ (revᵗ (sndᵗ grp)) nilᵗ
+           (caseᵗ (varᵗ (here refl))
+                  (varᵗ (there (there (here refl))))
+                  (consᵗ (valueᵛ (varᵗ (here refl))) (varᵗ (there (there (here refl))))))
+
+  ↑ : ∀ {s r} → Tm Γ Δᵍ Δ Θᵍ r → Tm Γ Δᵍ Δ (s ∷ Θᵍ) r
+  ↑ = renTm (λ x → x) (λ x → x) there
+
+  ↑² : ∀ {s s′ r} → Tm Γ Δᵍ Δ Θᵍ r → Tm Γ Δᵍ Δ (s′ ∷ s ∷ Θᵍ) r
+  ↑² = renTm (λ x → x) (λ x → x) (λ x → there (there x))
+
+  stamp : Tm Γ Δᵍ Δ Θᵍ (obs (machineEmitᵗ a))
+  stamp = caseᵗ (fstᵗ grp)
+    (strmᵗ (ofᵉ (instEmitᵛ (consᵗ (initᵛ (↑ src)) (↑ rest)) (↑ frameᵍ) (↑ src) subscribeᵛ ∷ [])))
+    (strmᵗ (mintᵉ (ofᵉ (instEmitᵛ (consᵗ (valueᵛ (varᵗ (there (here refl)))) (↑² rest))
+                                 (varᵗ (here refl)) (↑² src) deliveryᵛ ∷ []))))
+
+-- the marker first, so the subscribe frame's group always exists and
+-- always leads with it; the input's own values behind it
+inputMarkedᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (i : Fin n) → Exp Γ Δᵍ Δ Θ (unitᵗ +ᵗ lookup Γ i)
+inputMarkedᵖ i = flatAllᵉ (mergeᶠ nothing)
+  (ofᵉ (strmᵗ (ofᵉ (inlᵗ unit̂ ∷ [])) ∷
+        strmᵗ (mapᵉ (inrᵗ (varᵗ (here refl))) (input i)) ∷ []))
+
 -- A COLD SOURCE IS ONE INSTEMIT PER VALUE, ALL UNDER THE FRAME TOKEN.
 -- Everything this former emits leaves in the subscribe burst — the
 -- `init` naming the source on the first emit, the author's values one
@@ -168,62 +220,7 @@ deliveryᵛ = inrᵗ (inlᵗ unit̂)
 inputᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (i : Fin n)
        → Tm Γ Δᵍ Δ Θ uniqᵗ
        → Exp Γ Δᵍ Δ Θ (machineEmitᵗ (lookup Γ i))
-inputᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i frame =
-  mintᵉ (flatAllᵉ (mergeᶠ nothing) (mapᵉ stamp (batchSyncᵉ marked)))
-  where
-  a : Ty
-  a = lookup Γ i
-
-  m : Ty
-  m = unitᵗ +ᵗ a
-
-  -- under the SOURCE binder
-  Θ¹ : List Ty
-  Θ¹ = uniqᵗ ∷ Θ
-
-  -- under the SOURCE binder and the group
-  Θᵍ : List Ty
-  Θᵍ = (m ×ᵗ listᵗ m) ∷ Θ¹
-
-  -- the marker first, so the subscribe frame's group always exists and
-  -- always leads with it; the input's own values behind it
-  marked : Exp Γ Δᵍ Δ Θ¹ m
-  marked = flatAllᵉ (mergeᶠ nothing)
-    (ofᵉ (strmᵗ (ofᵉ (inlᵗ unit̂ ∷ [])) ∷
-          strmᵗ (mapᵉ (inrᵗ (varᵗ (here refl))) (input i)) ∷ []))
-
-  grp : Tm Γ Δᵍ Δ Θᵍ (m ×ᵗ listᵗ m)
-  grp = varᵗ (here refl)
-
-  src : Tm Γ Δᵍ Δ Θᵍ uniqᵗ
-  src = varᵗ (there (here refl))
-
-  frameᵍ : Tm Γ Δᵍ Δ Θᵍ uniqᵗ
-  frameᵍ = renTm (λ x → x) (λ x → x) (λ x → there (there x)) frame
-
-  -- the tail in arrival order (the `revᵗ` is what makes a cons-fold
-  -- rebuild the list rather than reverse it); a marker in it is
-  -- dropped, and only a group's head can be one
-  rest : Tm Γ Δᵍ Δ Θᵍ (listᵗ (instEventᵗ uniqᵗ a))
-  rest = foldᵗ (revᵗ (sndᵗ grp)) nilᵗ
-           (caseᵗ (varᵗ (here refl))
-                  (varᵗ (there (there (here refl))))
-                  (consᵗ (valueᵛ (varᵗ (here refl))) (varᵗ (there (there (here refl))))))
-
-  ↑ : ∀ {s r} → Tm Γ Δᵍ Δ Θᵍ r → Tm Γ Δᵍ Δ (s ∷ Θᵍ) r
-  ↑ = renTm (λ x → x) (λ x → x) there
-
-  ↑² : ∀ {s s′ r} → Tm Γ Δᵍ Δ Θᵍ r → Tm Γ Δᵍ Δ (s′ ∷ s ∷ Θᵍ) r
-  ↑² = renTm (λ x → x) (λ x → x) (λ x → there (there x))
-
-  -- the subscribe frame: the `init` and the frame's values, under the
-  -- frame, tagged `subscribe`.  A later arrival: mint its instant and
-  -- emit its value under it.
-  stamp : Tm Γ Δᵍ Δ Θᵍ (obs (machineEmitᵗ a))
-  stamp = caseᵗ (fstᵗ grp)
-    (strmᵗ (ofᵉ (instEmitᵛ (consᵗ (initᵛ (↑ src)) (↑ rest)) (↑ frameᵍ) (↑ src) subscribeᵛ ∷ [])))
-    (strmᵗ (mintᵉ (ofᵉ (instEmitᵛ (consᵗ (valueᵛ (varᵗ (there (here refl)))) (↑² rest))
-                                 (varᵗ (here refl)) (↑² src) deliveryᵛ ∷ []))))
+inputᵖ i frame = mintᵉ (flatAllᵉ (mergeᶠ nothing) (mapᵉ (inputStampᵖ frame) (batchSyncᵉ (inputMarkedᵖ i))))
 
 ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
     → Tm Γ Δᵍ Δ Θ uniqᵗ
@@ -279,10 +276,9 @@ emptyᵖ frame = ofᵖ frame []
 -- and the `letᵗ`s are how a term language with no application hands an
 -- argument to a step.  The reversing pass each `foldᵗ` costs is paid
 -- once per level.
-mapᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
-     → Fn Γ Δᵍ Δ Θ (plainᵗ s) (plainᵗ t)
-     → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-mapᵖ {Θ = Θ} {s = s} {t = t} f e = mapᵉ step e
+mapStepᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+         → Fn Γ Δᵍ Δ Θ (plainᵗ s) (plainᵗ t) → Fn Γ Δᵍ Δ Θ (emitᵗ s) (emitᵗ t)
+mapStepᵖ {Θ = Θ} {s = s} {t = t} f = step
   where
   -- the split of one emit: its bookkeeping already retagged at the
   -- outgoing payload, its payloads, and whether it completes
@@ -313,49 +309,31 @@ mapᵖ {Θ = Θ} {s = s} {t = t} f e = mapᵉ step e
               (reassembleᵛ arg nilᵗ nilᵗ (bool̂ false))
               body
 
--- THE CARRIED VALUE IS A PAIR BECAUSE `scanᵉ`'S OUTPUT IS ITS STATE,
--- and what this former outputs is an EMIT while what the author's step
--- threads is a plain value.  So the plain scan carries both and a
--- `mapᵉ` projects, which is the same two-stage shape rxjs writes as
--- `scan` followed by `map`.
---
--- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE.  A scan emits the result
--- of its FIRST application and never the seed, so the tokens below are
--- read by nothing and claim no freshness.  The seed needs an INHABITANT
--- of `uniqᵗ` and nothing more; a binder supplies one at the cost of a
--- `mintᵉ` per `scanˢ` for a token nothing reads.
-scanᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
-      → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
-      → Tm Γ Δᵍ Δ Θ (plainᵗ t)
-      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
-  mintᵉ (mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed e'))
+mapᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+     → Fn Γ Δᵍ Δ Θ (plainᵗ s) (plainᵗ t)
+     → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+mapᵖ f e = mapᵉ (mapStepᵖ f) e
+
+-- the carried value: the author's state, and the emit built for the
+-- delivery that produced it
+ScanAᵗ : Ty → Ty
+ScanAᵗ t = plainᵗ t ×ᵗ emitᵗ t
+
+scanStepᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+          → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
+          → Fn Γ Δᵍ Δ (uniqᵗ ∷ Θ) (ScanAᵗ t ×ᵗ emitᵗ s) (ScanAᵗ t)
+scanStepᵖ {Θ = Θ} {s = s} {t = t} f = step
   where
-  -- the carried value: the author's state, and the emit built for the
-  -- delivery that produced it
   A : Ty
-  A = plainᵗ t ×ᵗ emitᵗ t
+  A = ScanAᵗ t
 
   -- the step's argument: the carried value and the arriving emit
   P : Ty
   P = A ×ᵗ emitᵗ s
 
-  -- the token bound by the enclosing mint, read by nothing
-  tok : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
-  tok = varᵗ (here refl)
-
-  -- shift the incoming arguments under the mint binder
-  z' : Tm _ _ _ (uniqᵗ ∷ Θ) (plainᵗ t)
-  z' = renTm (λ x → x) (λ x → x) there z
-
+  -- shift the author's step under the mint binder
   f' : Fn _ _ _ (uniqᵗ ∷ Θ) (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
   f' = renTm (λ x → x) (λ x → x) (ext∈ there) f
-
-  e' : Exp _ _ _ (uniqᵗ ∷ Θ) (emitᵗ s)
-  e' = renExp (λ x → x) (λ x → x) there e
-
-  seed : Tm _ _ _ (uniqᵗ ∷ Θ) A
-  seed = pairᵗ z' (instEmitᵛ nilᵗ tok tok (inlᵗ unit̂))
 
   S : Ty
   S = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ s) ×ᵗ boolᵗ)
@@ -406,6 +384,38 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
   step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ arg)))
               (fstᵗ arg)
               body
+
+-- THE CARRIED VALUE IS A PAIR BECAUSE `scanᵉ`'S OUTPUT IS ITS STATE,
+-- and what this former outputs is an EMIT while what the author's step
+-- threads is a plain value.  So the plain scan carries both and a
+-- `mapᵉ` projects, which is the same two-stage shape rxjs writes as
+-- `scan` followed by `map`.
+--
+-- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE.  A scan emits the result
+-- of its FIRST application and never the seed, so the tokens below are
+-- read by nothing and claim no freshness.  The seed needs an INHABITANT
+-- of `uniqᵗ` and nothing more; a binder supplies one at the cost of a
+-- `mintᵉ` per `scanˢ` for a token nothing reads.
+scanᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+      → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
+      → Tm Γ Δᵍ Δ Θ (plainᵗ t)
+      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
+  mintᵉ (mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ (scanStepᵖ f) seed e'))
+  where
+  -- the token bound by the enclosing mint, read by nothing
+  tok : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
+  tok = varᵗ (here refl)
+
+  -- shift the incoming arguments under the mint binder
+  z' : Tm _ _ _ (uniqᵗ ∷ Θ) (plainᵗ t)
+  z' = renTm (λ x → x) (λ x → x) there z
+
+  e' : Exp _ _ _ (uniqᵗ ∷ Θ) (emitᵗ s)
+  e' = renExp (λ x → x) (λ x → x) there e
+
+  seed : Tm _ _ _ (uniqᵗ ∷ Θ) (ScanAᵗ t)
+  seed = pairᵗ z' (instEmitᵛ nilᵗ tok tok (inlᵗ unit̂))
 
 -- THE LIST ROUTINES THE CUT IS WRITTEN OUT OF, AND THEY ARE HERE
 -- BECAUSE THE TERM LANGUAGE HAS NO LIBRARY.  `Tm` has one eliminator
@@ -550,12 +560,15 @@ CutSP t = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ t
 CutCtx : Ty → Ty → List Ty → List Ty
 CutCtx B t Θ = CutSP t ∷ (CutS B t ×ᵗ emitᵗ t) ∷ uniqᵗ ∷ Θ
 
-cutᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t B : Ty}
-     → Tm Γ Δᵍ Δ (uniqᵗ ∷ Θ) B
-     → (Tm Γ Δᵍ Δ (CutCtx B t Θ) B → Tm Γ Δᵍ Δ (CutCtx B t Θ) (listᵗ (plainᵗ t))
-        → Tm Γ Δᵍ Δ (CutCtx B t Θ) (listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ B)))
-     → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-cutᵖ {Θ = Θ} {t = t} {B = B} b₀ cutter e = mintᵉ (mapᵉ outᵛ (takeWhileᵉ open? counted))
+-- what a cutter is: handed the budget and one emit's payloads, the
+-- payloads let through, whether they end the stream, and the budget left
+Cutter : ∀ {n} → Ctx n → List Ty → List Ty → List Ty → Ty → Ty → Set
+Cutter Γ Δᵍ Δ Θ B t = Tm Γ Δᵍ Δ (CutCtx B t Θ) B → Tm Γ Δᵍ Δ (CutCtx B t Θ) (listᵗ (plainᵗ t))
+                    → Tm Γ Δᵍ Δ (CutCtx B t Θ) (listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ B))
+
+cutStepᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t B : Ty}
+         → Cutter Γ Δᵍ Δ Θ B t → Fn Γ Δᵍ Δ (uniqᵗ ∷ Θ) (CutS B t ×ᵗ emitᵗ t) (CutS B t)
+cutStepᵖ {Θ = Θ} {t = t} {B = B} cutter = step
   where
   S : Ty
   S = CutS B t
@@ -568,16 +581,6 @@ cutᵖ {Θ = Θ} {t = t} {B = B} b₀ cutter e = mintᵉ (mapᵉ outᵛ (takeWhi
 
   R : Ty
   R = listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ B)
-
-  e' : Exp _ _ _ (uniqᵗ ∷ Θ) (emitᵗ t)
-  e' = renExp (λ x → x) (λ x → x) there e
-
-  tok : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
-  tok = varᵗ (here refl)
-
-  seed : Tm _ _ _ (uniqᵗ ∷ Θ) S
-  seed = pairᵗ b₀ (pairᵗ (bool̂ false)
-                         (pairᵗ nilᵗ (instEmitᵛ nilᵗ tok tok subscribeᵛ)))
 
   -- inside the two `letᵗ`s: the cutter's answer, the split, the step's
   -- argument, the mint's token, then Θ
@@ -615,15 +618,39 @@ cutᵖ {Θ = Θ} {t = t} {B = B} b₀ cutter e = mintᵉ (mapᵉ outᵛ (takeWhi
   step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ (varᵗ (here refl)))))
               (fstᵗ (varᵗ (here refl))) body
 
-  outᵛ : Fn _ _ _ (uniqᵗ ∷ Θ) S (emitᵗ t)
-  outᵛ = sndᵗ (sndᵗ (sndᵗ (varᵗ (here refl))))
+cutOutᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t B : Ty} → Fn Γ Δᵍ Δ Θ (CutS B t) (emitᵗ t)
+cutOutᵛ = sndᵗ (sndᵗ (sndᵗ (varᵗ (here refl))))
 
-  counted : Exp _ _ _ (uniqᵗ ∷ Θ) S
-  counted = scanᵉ step seed e'
+-- open until the state whose cut has happened, which still leaves
+cutOpenᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t B : Ty} → Fn Γ Δᵍ Δ Θ (CutS B t) boolᵗ
+cutOpenᵛ = primᵗ notᵖ (fstᵗ (sndᵗ (varᵗ (here refl))))
 
-  -- open until the state whose cut has happened, which still leaves
-  open? : Fn _ _ _ (uniqᵗ ∷ Θ) S boolᵗ
-  open? = primᵗ notᵖ (fstᵗ (sndᵗ (varᵗ (here refl))))
+cutᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t B : Ty}
+     → Tm Γ Δᵍ Δ (uniqᵗ ∷ Θ) B → Cutter Γ Δᵍ Δ Θ B t
+     → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+cutᵖ {Θ = Θ} {t = t} {B = B} b₀ cutter e =
+  mintᵉ (mapᵉ cutOutᵛ (takeWhileᵉ cutOpenᵛ (scanᵉ (cutStepᵖ cutter) seed e')))
+  where
+  e' : Exp _ _ _ (uniqᵗ ∷ Θ) (emitᵗ t)
+  e' = renExp (λ x → x) (λ x → x) there e
+
+  tok : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
+  tok = varᵗ (here refl)
+
+  seed : Tm _ _ _ (uniqᵗ ∷ Θ) (CutS B t)
+  seed = pairᵗ b₀ (pairᵗ (bool̂ false)
+                         (pairᵗ nilᵗ (instEmitᵛ nilᵗ tok tok subscribeᵛ)))
+
+-- the quota's prefix of the payloads; the emit that fills the quota
+-- cuts
+countCutᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → Cutter Γ Δᵍ Δ Θ natᵗ t
+countCutᵖ rem vs =
+  letᵗ (takeListᵛ rem vs) (pairᵗ nilᵗ (pairᵗ (bool̂ false) rem))
+       (pairᵗ taken (pairᵗ (primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem↑))
+                           (primᵗ sub (pairᵗ rem↑ (lengthᵛ taken)))))
+  where
+  taken = varᵗ (here refl)
+  rem↑  = renTm (λ x → x) (λ x → x) there rem
 
 -- THE ENDING READS THE SCAN'S OWN STATE ON THE ONE SUBSCRIPTION, AND
 -- THE ONE SUBSCRIPTION IS OBSERVABLE.  An ending that subscribed the
@@ -653,23 +680,18 @@ cutᵖ {Θ = Θ} {t = t} {B = B} b₀ cutter e = mintᵉ (mapᵉ outᵛ (takeWhi
 takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
       → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ natᵗ
       → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-takeᵖ {Θ = Θ} {t = t} frame k e =
+takeᵖ frame k e =
   flatAllᵉ (mergeᶠ nothing)
     (ofᵉ (ifᵗ (primᵗ eqᵖ (pairᵗ k (nat̂ 0)))
               (strmᵗ (emptyᵖ frame))
-              (strmᵗ (cutᵖ (renTm (λ x → x) (λ x → x) there k) counter e)) ∷ []))
+              (strmᵗ (cutᵖ (renTm (λ x → x) (λ x → x) there k) countCutᵖ e)) ∷ []))
+
+whileCutᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+          → Fn Γ Δᵍ Δ Θ (plainᵗ t) boolᵗ → Cutter Γ Δᵍ Δ Θ unitᵗ t
+whileCutᵖ {Θ = Θ} {t = t} f _ vs = pairᵗ (fstᵗ (takeWhileListᵛ f↑ vs)) (pairᵗ (sndᵗ (takeWhileListᵛ f↑ vs)) unit̂)
   where
-  -- the quota's prefix of the payloads; the emit that fills the quota
-  -- cuts
-  counter : Tm _ _ _ (CutCtx natᵗ t Θ) natᵗ → Tm _ _ _ (CutCtx natᵗ t Θ) (listᵗ (plainᵗ t))
-          → Tm _ _ _ (CutCtx natᵗ t Θ) (listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ natᵗ))
-  counter rem vs =
-    letᵗ (takeListᵛ rem vs) (pairᵗ nilᵗ (pairᵗ (bool̂ false) rem))
-         (pairᵗ taken (pairᵗ (primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem↑))
-                             (primᵗ sub (pairᵗ rem↑ (lengthᵛ taken)))))
-    where
-    taken = varᵗ (here refl)
-    rem↑  = renTm (λ x → x) (λ x → x) there rem
+  f↑ : Tm _ _ _ (plainᵗ t ∷ CutCtx unitᵗ t Θ) boolᵗ
+  f↑ = renTm (λ x → x) (λ x → x) (ext∈ (λ x → there (there (there x)))) f
 
 -- rxjs `takeWhile(p, true)`: the payloads up to and including the first
 -- the author's predicate fails, and that failure cuts.  No budget, and
@@ -678,14 +700,45 @@ takeᵖ {Θ = Θ} {t = t} frame k e =
 takeWhileᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
            → Fn Γ Δᵍ Δ Θ (plainᵗ t) boolᵗ
            → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-takeWhileᵖ {Θ = Θ} {t = t} f e = cutᵖ unit̂ cutter e
-  where
-  f↑ : Tm _ _ _ (plainᵗ t ∷ CutCtx unitᵗ t Θ) boolᵗ
-  f↑ = renTm (λ x → x) (λ x → x) (ext∈ (λ x → there (there (there x)))) f
+takeWhileᵖ f e = cutᵖ unit̂ (whileCutᵖ f) e
 
-  cutter : Tm _ _ _ (CutCtx unitᵗ t Θ) unitᵗ → Tm _ _ _ (CutCtx unitᵗ t Θ) (listᵗ (plainᵗ t))
-         → Tm _ _ _ (CutCtx unitᵗ t Θ) (listᵗ (plainᵗ t) ×ᵗ (boolᵗ ×ᵗ unitᵗ))
-  cutter _ vs = pairᵗ (fstᵗ (takeWhileListᵛ f↑ vs)) (pairᵗ (sndᵗ (takeWhileListᵛ f↑ vs)) unit̂)
+-- insert one variable ABOVE everything in scope: what a term owes for
+-- each binder a `caseᵗ`, `foldᵗ` or `letᵗ` wrapped around it adds.
+upᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s r} → Tm Γ Δᵍ Δ Θ r → Tm Γ Δᵍ Δ (s ∷ Θ) r
+upᵛ = renTm (λ x → x) (λ x → x) there
+
+-- one payload's echo, if it has one, onto the echoes after it
+echoOntoᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
+          → Tm Γ Δᵍ Δ Θ (unitᵗ +ᵗ a) → Tm Γ Δᵍ Δ Θ (listᵗ a) → Tm Γ Δᵍ Δ Θ (listᵗ a)
+echoOntoᵛ e vs = caseᵗ e (upᵛ vs) (consᵗ (varᵗ (here refl)) (upᵛ vs))
+
+nullᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a} → Tm Γ Δᵍ Δ Θ (listᵗ a) → Tm Γ Δᵍ Δ Θ boolᵗ
+nullᵛ vs = foldᵗ vs (bool̂ true) (bool̂ false)
+
+-- echoes leaving between two inners: an emit of their own, under the
+-- outer emit's instant, source and kind and carrying none of its
+-- bookkeeping, which the first echo already put out
+segᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a b}
+     → Tm Γ Δᵍ Δ Θ (machineEmitᵗ a) → Tm Γ Δᵍ Δ Θ (listᵗ b) → Tm Γ Δᵍ Δ Θ (machineEmitᵗ b)
+segᵛ env vs = reassembleᵛ env nilᵗ vs (bool̂ false)
+
+mergeᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a} → List (Tm Γ Δᵍ Δ Θ (obs a)) → Tm Γ Δᵍ Δ Θ (obs a)
+mergeᵛ os = strmᵗ (flatAllᵉ (mergeᶠ nothing) (ofᵉ os))
+
+-- an inner, then the echoes after it as an `of` of their own, then the
+-- lane after those, merged in that order.  With no echoes between, the
+-- inner leads the lane bare, and a lone inner IS its lane.
+leadᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a b}
+      → Tm Γ Δᵍ Δ Θ (obs (machineEmitᵗ b)) → Tm Γ Δᵍ Δ Θ (machineEmitᵗ a)
+      → Tm Γ Δᵍ Δ Θ (listᵗ b) → Tm Γ Δᵍ Δ Θ (unitᵗ +ᵗ obs (machineEmitᵗ b))
+      → Tm Γ Δᵍ Δ Θ (obs (machineEmitᵗ b))
+leadᵛ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {b = b} o env vs l =
+  caseᵗ l (ifᵗ (nullᵛ (upᵛ vs)) (upᵛ o) (mergeᵛ (upᵛ o ∷ seg ∷ [])))
+          (ifᵗ (nullᵛ (upᵛ vs)) (mergeᵛ (upᵛ o ∷ varᵗ (here refl) ∷ []))
+                                (mergeᵛ (upᵛ o ∷ seg ∷ varᵗ (here refl) ∷ [])))
+  where
+  seg : ∀ {s} → Tm Γ Δᵍ Δ (s ∷ Θ) (obs (machineEmitᵗ b))
+  seg = strmᵗ (ofᵉ (segᵛ (upᵛ env) (upᵛ vs) ∷ []))
 
 -- ONE OUTER EMIT AS ONE FLATTENER ELEMENT: an echo carrying the emit's
 -- bookkeeping and its echoed values, beside a lane merging the inners it
@@ -709,6 +762,12 @@ takeWhileᵖ {Θ = Θ} {t = t} f e = cutᵖ unit̂ cutter e
 -- has NO lane rather than an empty one: under a switch an empty lane
 -- still cancels the live one.
 --
+-- THE ECHO IS CUT AT EACH INNER, BECAUSE THE PLAIN RUN INTERLEAVES THEM.
+-- A payload echoes before its inner is subscribed, so a payload after an
+-- inner echoes after that inner's synchronous emits.  The echo carries
+-- the values up to the first inner; each later run of them rides the
+-- lane between the inners it falls between.
+--
 -- THE LANE IS PER EMIT, WHICH IS RIGHT ONLY WHERE NO POLICY TELLS ONE
 -- LANE FROM TWO: an unbounded merge, or an outer that never carries two
 -- inners in one emit.  `flattenᵖ` takes `explodeᵛ` everywhere else.
@@ -725,42 +784,45 @@ elemᵛ {Θ = Θ} {t = t} =
   P : Ty
   P = (unitᵗ +ᵗ plainᵗ t) ×ᵗ L
 
+  E : Ty
+  E = emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))
+
   SP : Ty
   SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ P ×ᵗ boolᵗ)
 
-  -- one payload's echo consed onto the accumulated ones, reversed:
-  -- the payload, then the accumulator
-  echoStep : Tm _ _ _ (P ∷ listᵗ (plainᵗ t) ∷ SP ∷ emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) ∷ Θ)
-                (listᵗ (plainᵗ t))
-  echoStep = caseᵗ (fstᵗ (varᵗ (here refl)))
-                   (varᵗ (there (there (here refl))))
-                   (consᵗ (varᵗ (here refl)) (varᵗ (there (there (here refl)))))
+  -- the echoes waiting for an inner, then the lane they lead
+  A : Ty
+  A = listᵗ (plainᵗ t) ×ᵗ L
 
-  -- one payload's lane merged in FRONT of the accumulated one, over the
-  -- payloads reversed, so the first inner leads: the payload, then the
-  -- accumulator
-  laneStep : Tm _ _ _ (P ∷ L ∷ SP ∷ emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) ∷ Θ) L
-  laneStep = caseᵗ (sndᵗ (varᵗ (here refl)))
-                   (varᵗ (there (there (here refl))))
-                   (caseᵗ (varᵗ (there (there (here refl))))
-                          (inrᵗ (varᵗ (there (here refl))))
-                          (inrᵗ (strmᵗ (flatAllᵉ (mergeᶠ nothing)
-                                  (ofᵉ (varᵗ (there (here refl)) ∷ varᵗ (here refl) ∷ []))))))
+  -- one payload over the payloads reversed: an echo waits, and an inner
+  -- leads the echoes waiting and the lane after them.  The payload, then
+  -- the accumulator
+  laneStep : Tm _ _ _ (P ∷ A ∷ SP ∷ E ∷ Θ) A
+  laneStep = caseᵗ (sndᵗ p)
+                   (pairᵗ (echoOntoᵛ (fstᵗ (upᵛ p)) (fstᵗ (upᵛ acc))) (sndᵗ (upᵛ acc)))
+                   (pairᵗ (echoOntoᵛ (fstᵗ (upᵛ p)) nilᵗ)
+                          (inrᵗ (leadᵛ (varᵗ (here refl)) (upᵛ env) (fstᵗ (upᵛ acc)) (sndᵗ (upᵛ acc)))))
+    where
+    p   = varᵗ (here refl)
+    acc = varᵗ (there (here refl))
+    env = varᵗ (there (there (there (here refl))))
 
   -- inside the `letᵗ`: the split, the former's argument, then Θ
-  body : Tm _ _ _ (SP ∷ emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) ∷ Θ)
-            ((unitᵗ +ᵗ emitᵗ t) ×ᵗ L)
-  body = pairᵗ (inrᵗ (reassembleᵛ env (fstᵗ split) echoes (sndᵗ (sndᵗ split))))
-               (foldᵗ (revᵗ vals) (inlᵗ unit̂) laneStep)
+  body : Tm _ _ _ (SP ∷ E ∷ Θ) ((unitᵗ +ᵗ emitᵗ t) ×ᵗ L)
+  body = letᵗ (foldᵗ (revᵗ (fstᵗ (sndᵗ split))) (pairᵗ nilᵗ (inlᵗ unit̂)) laneStep)
+              (pairᵗ (inlᵗ unit̂) (inlᵗ unit̂))
+              (pairᵗ (inrᵗ (reassembleᵛ (upᵛ env) (fstᵗ (upᵛ split)) (fstᵗ acc) (sndᵗ (sndᵗ (upᵛ split)))))
+                     (sndᵗ acc))
     where
-    split  = varᵗ (here refl)
-    env    = varᵗ (there (here refl))
-    vals   = fstᵗ (sndᵗ split)
-    echoes = revᵗ (foldᵗ vals nilᵗ echoStep)
+    split = varᵗ (here refl)
+    env   = varᵗ (there (here refl))
+    acc   = varᵗ (here refl)
 
 -- ONE OUTER EMIT AS A RUN OF FLATTENER ELEMENTS, ONE PER INNER: the
--- first is `elemᵛ`'s echo beside the first inner, and each later inner
--- rides an element of its own with no echo.
+-- first carries the echo up to the first inner beside that inner, each
+-- later inner rides an element of its own whose echo is the values
+-- falling after the inner before it, and values after the last inner
+-- ride one element with no lane.
 --
 -- THE LANE IS PER INNER, BECAUSE THE POLICY IS.  A switch over a
 -- synchronous pair keeps only the second inner live, and an exhaust
@@ -768,17 +830,15 @@ elemᵛ {Θ = Θ} {t = t} =
 -- keep both.  The twin's join accepts each payload's inner on its own
 -- for the same reason.
 --
--- AND THE ECHO IS NOT SPLIT WITH THEM.  One outer emit is one emit out,
--- whatever it carried; an echo per payload multiplies emits through
--- every flattener nested above, and the timed translation nests several
--- per author flattener.
+-- AND THE ECHO IS CUT ONLY AT AN INNER.  Between two inners one outer
+-- emit is one emit out, whatever it carried; an echo per payload
+-- multiplies emits through every flattener nested above, and the timed
+-- translation nests several per author flattener.
 explodeᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
          → Fn Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)))
                        (obs ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t))))
 explodeᵛ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t} =
-  letᵗ elemᵛ (strmᵗ emptyᵉ)
-       (letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (varᵗ (there (here refl)))))
-             (strmᵗ emptyᵉ) body)
+  letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (varᵗ (here refl)))) (strmᵗ emptyᵉ) body
   where
   L : Ty
   L = unitᵗ +ᵗ obs (emitᵗ t)
@@ -795,49 +855,56 @@ explodeᵛ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {t = t} =
   SP : Ty
   SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ P ×ᵗ boolᵗ)
 
-  -- the first inner still unplaced, and whether a run follows it
+  -- the echoes waiting for an inner, the inner they follow still
+  -- unplaced, and whether a run follows it
   Acc : Ty
-  Acc = L ×ᵗ (boolᵗ ×ᵗ obs Elem)
+  Acc = listᵗ (plainᵗ t) ×ᵗ (L ×ᵗ (boolᵗ ×ᵗ obs Elem))
 
-  -- one element, then the rest
-  before : ∀ {Θ′} → Tm Γ Δᵍ Δ Θ′ Elem → Tm Γ Δᵍ Δ Θ′ (obs Elem) → Tm Γ Δᵍ Δ Θ′ (obs Elem)
-  before x rest = strmᵗ (flatAllᵉ (mergeᶠ nothing) (ofᵉ (strmᵗ (ofᵉ (x ∷ [])) ∷ rest ∷ [])))
+  -- one element, then the run if there is one
+  before : ∀ {Θ′} → Tm Γ Δᵍ Δ Θ′ Elem → Tm Γ Δᵍ Δ Θ′ (boolᵗ ×ᵗ obs Elem) → Tm Γ Δᵍ Δ Θ′ (obs Elem)
+  before x run = ifᵗ (fstᵗ run) (mergeᵛ (strmᵗ (ofᵉ (x ∷ [])) ∷ sndᵗ run ∷ []))
+                                (strmᵗ (ofᵉ (x ∷ [])))
 
-  -- one payload over the payloads reversed: its inner becomes the
-  -- unplaced one, and the one it displaces leads the run as a bare
-  -- element.  The payload, then the accumulator
-  laneStep : Tm Γ Δᵍ Δ (P ∷ Acc ∷ SP ∷ Elem ∷ E ∷ Θ) Acc
-  laneStep = caseᵗ (sndᵗ (varᵗ (here refl)))
-                   (varᵗ (there (there (here refl))))
-                   (pairᵗ (inrᵗ (varᵗ (here refl))) pushed)
+  -- echoes as an element's echo: none, or an emit of their own
+  segEchoᵛ : ∀ {Θ′} → Tm Γ Δᵍ Δ Θ′ E → Tm Γ Δᵍ Δ Θ′ (listᵗ (plainᵗ t)) → Tm Γ Δᵍ Δ Θ′ (unitᵗ +ᵗ emitᵗ t)
+  segEchoᵛ env vs = ifᵗ (nullᵛ vs) (inlᵗ unit̂) (inrᵗ (segᵛ env vs))
+
+  -- the unplaced inner, its echo the values waiting, onto the run;
+  -- values no inner follows ride an element of their own
+  pushᵛ : ∀ {Θ′} → Tm Γ Δᵍ Δ Θ′ E → Tm Γ Δᵍ Δ Θ′ Acc → Tm Γ Δᵍ Δ Θ′ (boolᵗ ×ᵗ obs Elem)
+  pushᵛ env acc =
+    caseᵗ (fstᵗ (sndᵗ acc))
+          (ifᵗ (nullᵛ (fstᵗ (upᵛ acc))) (sndᵗ (sndᵗ (upᵛ acc)))
+               (pairᵗ (bool̂ true) (before (pairᵗ (segEchoᵛ (upᵛ env) (fstᵗ (upᵛ acc))) (inlᵗ unit̂))
+                                          (sndᵗ (sndᵗ (upᵛ acc))))))
+          (pairᵗ (bool̂ true) (before (pairᵗ (segEchoᵛ (upᵛ env) (fstᵗ (upᵛ acc))) (inrᵗ (varᵗ (here refl))))
+                                     (sndᵗ (sndᵗ (upᵛ acc)))))
+
+  -- one payload over the payloads reversed: an echo waits, and an inner
+  -- pushes the unplaced one and takes its place.  The payload, then the
+  -- accumulator
+  laneStep : Tm Γ Δᵍ Δ (P ∷ Acc ∷ SP ∷ E ∷ Θ) Acc
+  laneStep = caseᵗ (sndᵗ p)
+                   (pairᵗ (echoOntoᵛ (fstᵗ (upᵛ p)) (fstᵗ (upᵛ acc))) (sndᵗ (upᵛ acc)))
+                   (pairᵗ (echoOntoᵛ (fstᵗ (upᵛ p)) nilᵗ)
+                          (pairᵗ (inrᵗ (varᵗ (here refl))) (pushᵛ (upᵛ env) (upᵛ acc))))
     where
-    -- the inner, the payload, then the accumulator
-    pushed : Tm Γ Δᵍ Δ (obs (emitᵗ t) ∷ P ∷ Acc ∷ SP ∷ Elem ∷ E ∷ Θ) (boolᵗ ×ᵗ obs Elem)
-    pushed = caseᵗ (fstᵗ (varᵗ (there (there (here refl)))))
-                   (sndᵗ (varᵗ (there (there (there (here refl))))))
-                   (pairᵗ (bool̂ true)
-                          (ifᵗ (fstᵗ (sndᵗ acc))
-                               (before bare (sndᵗ (sndᵗ acc)))
-                               (strmᵗ (ofᵉ (bare ∷ [])))))
-      where
-      acc  = varᵗ (there (there (there (here refl))))
-      bare = pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl)))
+    p   = varᵗ (here refl)
+    acc = varᵗ (there (here refl))
+    env = varᵗ (there (there (there (here refl))))
 
-  -- inside both `letᵗ`s: the split, `elemᵛ`'s element, the former's
-  -- argument, then Θ
-  body : Tm Γ Δᵍ Δ (SP ∷ Elem ∷ E ∷ Θ) (obs Elem)
-  body = letᵗ (foldᵗ (revᵗ vals) (pairᵗ (inlᵗ unit̂) (pairᵗ (bool̂ false) (strmᵗ emptyᵉ))) laneStep)
+  -- inside the `letᵗ`: the split, the former's argument, then Θ
+  body : Tm Γ Δᵍ Δ (SP ∷ E ∷ Θ) (obs Elem)
+  body = letᵗ (foldᵗ (revᵗ (fstᵗ (sndᵗ split)))
+                     (pairᵗ nilᵗ (pairᵗ (inlᵗ unit̂) (pairᵗ (bool̂ false) (strmᵗ emptyᵉ)))) laneStep)
               (strmᵗ emptyᵉ)
-              (ifᵗ (fstᵗ (sndᵗ acc))
-                   (before first (sndᵗ (sndᵗ acc)))
-                   (strmᵗ (ofᵉ (first ∷ []))))
+              (before first (sndᵗ (sndᵗ acc)))
     where
-    vals = fstᵗ (sndᵗ (varᵗ (here refl)))
-
-    -- inside the third `letᵗ`: the accumulator, the split, then
-    -- `elemᵛ`'s element, whose echo the first inner rides beside
+    split = varᵗ (here refl)
+    env   = varᵗ (there (here refl))
     acc   = varᵗ (here refl)
-    first = pairᵗ (fstᵗ (varᵗ (there (there (here refl))))) (fstᵗ acc)
+    first = pairᵗ (inrᵗ (reassembleᵛ (upᵛ env) (fstᵗ (upᵛ split)) (fstᵗ acc) (sndᵗ (sndᵗ (upᵛ split)))))
+                  (fstᵗ (sndᵗ acc))
 
 -- A SUBSCRIBE BURST TAKES THE INSTANT OF WHATEVER SUBSCRIBED IT.  An
 -- emit of kind `subscribe` was stamped with the frame it was BUILT in,
@@ -873,30 +940,40 @@ perInnerˢ _                e = not (oneInnerˢ e)
 -- completion freed its slot.  So a scan over the output carries that
 -- instant and its kind, and every subscribe burst behind it takes them.
 -- Inside the root frame everything is the frame and nothing moves.
+-- the last instant and kind put out, and the emit put out
+FlatSᵗ : Ty → Ty
+FlatSᵗ t = (uniqᵗ ×ᵗ emitKindᵗ) ×ᵗ emitᵗ t
+
+flatStepᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → Fn Γ Δᵍ Δ Θ (FlatSᵗ t ×ᵗ emitᵗ t) (FlatSᵗ t)
+flatStepᵛ = letᵗ (restampᵛ (fstᵗ (fstᵗ (fstᵗ arg))) (sndᵗ (fstᵗ (fstᵗ arg))) (sndᵗ arg))
+                 (fstᵗ arg)
+                 (pairᵗ (pairᵗ (instantᵛ (varᵗ (here refl))) (kindᵛ (varᵗ (here refl))))
+                        (varᵗ (here refl)))
+  where
+  arg = varᵗ (here refl)
+
 flattenᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → FlatOp → Bool
          → Tm Γ Δᵍ Δ Θ uniqᵗ
          → Exp Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 flattenᵖ {Θ = Θ} {t = t} op perInner frame e =
-  mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed (flattenᵉ op (elems perInner)))
+  mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ flatStepᵛ seed (flattenᵉ op (elems perInner)))
   where
   elems : Bool → Exp _ _ _ Θ ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t)))
   elems true  = flatAllᵉ (mergeᶠ nothing) (mapᵉ explodeᵛ e)
   elems false = mapᵉ elemᵛ e
 
-  -- the last instant and kind put out, and the emit put out
-  S : Ty
-  S = (uniqᵗ ×ᵗ emitKindᵗ) ×ᵗ emitᵗ t
-
-  seed : Tm _ _ _ Θ S
+  seed : Tm _ _ _ Θ (FlatSᵗ t)
   seed = pairᵗ (pairᵗ frame subscribeᵛ) (instEmitᵛ nilᵗ frame frame subscribeᵛ)
 
-  step : Tm _ _ _ ((S ×ᵗ emitᵗ t) ∷ Θ) S
-  step = letᵗ (restampᵛ (fstᵗ (fstᵗ (fstᵗ arg))) (sndᵗ (fstᵗ (fstᵗ arg))) (sndᵗ arg))
-              (fstᵗ arg)
-              (pairᵗ (pairᵗ (instantᵛ (varᵗ (here refl))) (kindᵛ (varᵗ (here refl))))
-                     (varᵗ (here refl)))
-    where
-    arg = varᵗ (here refl)
+-- what a deferred body runs as: its begin marker, then the body, each
+-- delivery restamped under the instant its arrival minted
+deferBodyᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {u : Ty}
+           → Exp Γ Δᵍ Δ Θ (machineEmitᵗ u) → Exp Γ Δᵍ Δ Θ (machineEmitᵗ u)
+deferBodyᵖ b =
+  mintᵉ (mapᵉ (restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)))
+    (flatAllᵉ (mergeᶠ nothing) (ofᵉ (
+      strmᵗ (ofᵉ (instEmitᵛ nilᵗ (varᵗ (here refl)) (varᵗ (here refl)) deliveryᵛ ∷ [])) ∷
+      strmᵗ (renExp (λ x → x) (λ x → x) there b) ∷ []))))
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.
@@ -1082,12 +1159,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    -- body rather than trailing it because a trailer is followed by
    -- whatever the body's completion subscribes, in this same instant.
    toInstEmit {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
-     deferᵉ (mintᵉ (mapᵉ (restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)))
-       (flatAllᵉ (mergeᶠ nothing) (ofᵉ (
-         strmᵗ (ofᵉ (instEmitᵛ nilᵗ (varᵗ (here refl)) (varᵗ (here refl)) deliveryᵛ ∷ [])) ∷
-         strmᵗ (renExp (λ x → x) (λ x → x) there
-           (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
-                  (map-++ emitᵗ Δᵍ Δ) (toInstEmit e))) ∷ [])))))
+     deferᵉ (deferBodyᵖ (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
+                              (map-++ emitᵗ Δᵍ Δ) (toInstEmit e)))
 
    toInstEmitTm : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
              → STm Γ Δᵍ Δ Θ t
