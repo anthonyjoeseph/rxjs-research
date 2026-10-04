@@ -160,10 +160,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            → Src (record { source = src ; ordinal = o ; elemTy = echoᵗ u ; pending = ps })
                  (record { source = src′ ; ordinal = o′ ; elemTy = echoᵗ (emitᵗ u) ; pending = ps′ })
 
-  -- two sources standing at the same place in the two live lists
-  data SrcPair : List (LiveSource Γ) → List (LiveSource Γ′) → Source → Source → Set where
-    here  : ∀ {l l′ LP LI} → SrcPair (l ∷ LP) (l′ ∷ LI) (LiveSource.source l) (LiveSource.source l′)
-    there : ∀ {l l′ LP LI s s′} → SrcPair LP LI s s′ → SrcPair (l ∷ LP) (l′ ∷ LI) s s′
+  -- two sources standing at the same place in the two live lists, and the
+  -- element types they hold
+  data SrcPair : List (LiveSource Γ) → List (LiveSource Γ′) → Source → Source → Ty → Ty → Set where
+    here  : ∀ {l l′ LP LI} → SrcPair (l ∷ LP) (l′ ∷ LI) (LiveSource.source l) (LiveSource.source l′) (LiveSource.elemTy l) (LiveSource.elemTy l′)
+    there : ∀ {l l′ LP LI s s′ u u′} → SrcPair LP LI s s′ u u′ → SrcPair (l ∷ LP) (l′ ∷ LI) s s′ u u′
 
   ----------------------------------------------------------------
   -- Paths
@@ -368,13 +369,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           -- a cold's asynchronous tail, at partnered sources
           cold~ : ∀ {rid rid′ src src′ lo lo′ s ℓ} {p : Path Γ lo s t}
                     {full : Path Γ′ lo′ (plainᵗ s) (emitᵗ t)} {q : Path Γ′ ℓ (emitᵗ s) (emitᵗ t)} {c′}
-                → SrcPair LP LI src src′ → InputBlock (plainᵗ s) full q → PathRel p q
+                → SrcPair LP LI src src′ s (plainᵗ s) → InputBlock (plainᵗ s) full q → PathRel p q
                 → c′ ≡ (plainᵗ s , full)
                 → RowRel (rid , atDyn src lo , (s , p)) (rid′ , atDyn src′ lo′ , c′)
           -- a deferred hop, not yet fired, at partnered sources
           defer~ : ∀ {rid rid′ src src′ lo lo′ ℓ ℓ′ u nid nid′} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                      {p : Path Γ ℓ u t} {q : Path Γ′ ℓ′ (emitᵗ u) (emitᵗ t)} {c′}
-                 → SrcPair LP LI src src′ → (nid , nid′ ∷ []) ∈ π
+                 → SrcPair LP LI src src′ (echoᵗ u) (echoᵗ (emitᵗ u)) → (nid , nid′ ∷ []) ∈ π
                  → lookupNode nid NP ≡ just (mergeAll-st {t = u} nothing 0 [] false)
                  → lookupNode nid′ NI ≡ just (mergeAll-st {t = emitᵗ u} nothing 0 [] false)
                  → PathRel p q

@@ -81,12 +81,12 @@ module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} where
     []  : Sync [] []
     _∷_ : ∀ {l l′ ls ls′} → ticks l ≡ ticks l′ × Ranked l l′ ls ls′ → Sync ls ls′ → Sync (l ∷ ls) (l′ ∷ ls′)
 
-  -- WHICH SOURCE EACH LIST GAVE UP A VALUE: the same place in both, every
-  -- other source left as it stood
-  data PopPair : List (LiveSource Γ) → List (LiveSource Γ) → List (LiveSource Γ′) → List (LiveSource Γ′) → Set where
+  -- WHICH SOURCE EACH LIST GAVE UP A VALUE, AND THE ARRIVAL IT OFFERED:
+  -- the same place in both, every other source left as it stood
+  data PopPair : Arrival Γ → Arrival Γ′ → List (LiveSource Γ) → List (LiveSource Γ) → List (LiveSource Γ′) → List (LiveSource Γ′) → Set where
     here  : ∀ {l l₂ l′ l₂′ ls ls′ a a′} → schedHeadOf l ≡ inj₂ (a , l₂) → schedHeadOf l′ ≡ inj₂ (a′ , l₂′)
-          → PopPair (l ∷ ls) (l₂ ∷ ls) (l′ ∷ ls′) (l₂′ ∷ ls′)
-    there : ∀ {l l′ ls rs ls′ rs′} → PopPair ls rs ls′ rs′ → PopPair (l ∷ ls) (l ∷ rs) (l′ ∷ ls′) (l′ ∷ rs′)
+          → PopPair a a′ (l ∷ ls) (l₂ ∷ ls) (l′ ∷ ls′) (l₂′ ∷ ls′)
+    there : ∀ {a a′ l l′ ls rs ls′ rs′} → PopPair a a′ ls rs ls′ rs′ → PopPair a a′ (l ∷ ls) (l ∷ rs) (l′ ∷ ls′) (l′ ∷ rs′)
 
   -- BOTH DRY, OR BOTH POP AT ONE TICK FROM PARTNERED SOURCES AND STAY IN
   -- STEP.  `R` is whatever the caller needs of the partners.
@@ -96,7 +96,7 @@ module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} where
     pop : ∀ {a a′ rs rs′} {l l′}
         → Arrival.tick a ≡ Arrival.tick a′ → Arrival.isLast a ≡ Arrival.isLast a′
         → R l l′ → HeadOf l a → HeadOf l′ a′
-        → SameOrd ls rs → SameOrd ls′ rs′ → Sync rs rs′ → PopPair ls rs ls′ rs′
+        → SameOrd ls rs → SameOrd ls′ rs′ → Sync rs rs′ → PopPair a a′ ls rs ls′ rs′
         → Popped R ls ls′ (inj₂ (a , rs)) (inj₂ (a′ , rs′))
 
   ranked-moves : ∀ l l′ {ls rs : List (LiveSource Γ)} {ls′ rs′ : List (LiveSource Γ′)} → Ranked l l′ ls ls′ → SameOrd ls rs → SameOrd ls′ rs′ → Ranked l l′ rs rs′

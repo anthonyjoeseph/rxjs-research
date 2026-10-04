@@ -301,8 +301,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   shared slot's subject fans out to related readers on both sides.
 - **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits
   sent to the root read as the plain group's values.
-- **`dyn-chains`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
-  source's chains pair up in order as partnered registrations.
 - **`hot-start`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a hot arrival's
   one impl chain runs its input block alone and hands the share one emit
   carrying the value; past the typechecker at a real pop.

@@ -70,6 +70,7 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Chains using (dyn-chains)
 open import Simulation.Pop using (pop-store)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
@@ -263,22 +264,6 @@ postulate
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 
-  -- A MINTED SOURCE'S CHAINS PAIR UP, in order, as registrations the
-  -- store relation partners.  Every plain row is partnered, and a row
-  -- at a source numbered above the slots is a cold or deferred read
-  -- whose partner sits at the partnered source; the live sources being
-  -- distinct on each side makes that partner the popped one.  Each
-  -- side's type test agrees with the other's because `plainᵗ` and
-  -- `emitᵗ` are injective.
-  dyn-chains : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-    → Storeʳ κ sP stP sI stI
-    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-    → n < Arrival.source a → n + n < Arrival.source a′
-    → (s₀ : Storeʳ κ (record sP { live = rs }) (cascadeOpen stP) (record sI { live = rs′ }) (cascadeOpen stI))
-    → Pointwise (λ c c′ → Partners κ _ _ _ _ _ (Storeʳ.rows s₀) (dynRow a c) (dynRow a′ c′))
-                (chainsOf a stP) (chainsOf a′ stI)
-
   -- A DYN SOURCE'S CLOSE keeps the stores related: it latches a number no
   -- slot carries, and the latches compare slots only.
   close-store : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
@@ -416,7 +401,7 @@ dyn-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
 dyn-pass κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy p q go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _ =
-  pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ e s ex ex′ p q s₀)) go go′
+  pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ s ex ex′ p q s₀)) go go′
   where
     s₀ = pop-store κ s ex ex′ sy
     opened : ∀ {chs chs′}
