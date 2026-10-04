@@ -256,11 +256,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### Big picture tier roadmap
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
-  over the program, one arm per former, `walk-flatten` its riskiest; what
-  remains is `hot-pass`, `dyn-chain` and `last-pass`: a fold over the related rows a
-  pop reaches, one arm per `PathRel`
-  constructor, mutual with the walk where a cascade subscribes an inner. Each arm a leaf, so the monster
-  drops to whichever constructor's arm is riskiest.
+  over the program, one arm per former, `walk-flatten` its riskiest. A minted
+  source's chain is `path-pass`, one arm per plain frame; what remains is
+  `hot-pass` and `last-pass` onto the same fold, and splitting `outer-arm` and
+  `inner-arm` per constructor, so the monster drops to whichever arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -279,10 +278,19 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`last-pass`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a last
   arrival's close, end pass and drop keep the stores related; the store
   relation itself fails between the close and the end pass at a hot read.
-- **`dyn-chain`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: one
-  partnered chain of a minted source takes the value: a cold read's input block
-  then its path, a deferred hop's body subscribed; a cut takes a pair on both
-  sides or neither.
+- **`outer-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's
+  step on both sides, every inner a sync outer hands the flattener subscribed.
+- **`inner-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: leaving an inner,
+  the flattener's lane, an impl-only lane merge and a deferred body's hop.
+- **`{block,hop}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
+  chain's input block hands its path the popped head; a deferred hop subscribes
+  its body on both sides.
+- **`{scan,take,takeWhile}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
+  cell, count or test steps alike on both sides; a cut takes rows on both.
+- **`sink-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group reaching a
+  shared slot's subject fans out to related readers on both sides.
+- **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits
+  sent to the root read as the plain group's values.
 - **`dyn-chains`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
   source's chains pair up in order as partnered registrations.
 - **`pop-store`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a pop leaves

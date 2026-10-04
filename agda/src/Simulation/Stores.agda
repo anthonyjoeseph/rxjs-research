@@ -404,6 +404,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         Partners (_∷_ {r = r} {r′ = r′} _ q) x x′ = (x ≡ r × x′ ≡ r′) ⊎ Partners q x x′
         Partners (mach _ q)                  x x′ = Partners q x x′
 
+        partner-row : ∀ {rs rs′} (q : RegRel rs rs′) {x x′} → Partners q x x′ → RowRel x x′
+        partner-row (r ∷ q)    (inj₁ (refl , refl)) = r
+        partner-row (r ∷ q)    (inj₂ p)             = partner-row q p
+        partner-row (mach _ q) p                    = partner-row q p
+
   -- the completion and connection latches, slot for stamped slot
   LatchRel : (CP SP CI SI : List Source) → Set
   LatchRel CP SP CI SI =
