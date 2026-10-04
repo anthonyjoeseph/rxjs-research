@@ -41,6 +41,7 @@ _ = record
   ; π-vals  = []
   ; sources = data~ refl (refl ∷ refl ∷ []) ∷ []
   ; numbers = slot~ zero refl ∷ []
+  ; distinct = ([] ∷ []) , ([] ∷ [])
   ; sync    = (refl , []) ∷ []
   ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl refl refl) refl) []
   ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
@@ -62,6 +63,7 @@ _ = record
   ; π-vals  = []
   ; sources = data~ refl (refl ∷ []) ∷ []
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ []
+  ; distinct = ([] ∷ []) , ([] ∷ [])
   ; sync    = (refl , []) ∷ []
   ; rows    = cold~ here (block {m1 = 2} {b = 1} {m2 = 0} refl refl refl) root~ refl ∷ []
   ; latches = λ { zero → (λ ()) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
@@ -81,6 +83,7 @@ _ = record
   ; π-vals  = [] ∷ []
   ; sources = defer~ (hop (elab (inputˢ zero) (λ x → x) (λ ())) ∷ []) ∷ data~ refl (refl ∷ []) ∷ []
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ slot~ zero refl ∷ []
+  ; distinct = (((λ ()) ∷ []) ∷ [] ∷ []) , (((λ ()) ∷ []) ∷ [] ∷ [])
   ; sync    = (refl , refl ∷ []) ∷ (refl , []) ∷ []
   ; rows    = defer~ here (here refl) refl refl root~ refl ∷ []
   ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }

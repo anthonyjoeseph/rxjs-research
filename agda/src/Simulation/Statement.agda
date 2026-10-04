@@ -31,6 +31,7 @@ open import Data.Bool    using (Bool; true; false; T)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Unit    using (⊤; tt)
 open import Data.List    using (List; []; _∷_; _++_; map; length; replicate; drop; concat)
+open import Data.Bool.ListAction using (any)
 open import Data.List.Properties using (map-++; map-replicate; length-drop)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous.Properties using (fromPointwise)
@@ -39,7 +40,7 @@ open import Data.List.Relation.Binary.Pointwise.Properties using (Pointwise-leng
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
   renaming (refl to pointwise-refl; map to Pointwise-map)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; _≤ᵇ_; _≡ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; ≤⇒≤′; ≤⇒≤ᵇ; ≤ᵇ⇒≤; <-≤-trans; <-irrefl; <-cmp; m≤m+n; +-cancelˡ-≡)
 open import Relation.Binary using (tri<; tri≈; tri>)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
@@ -63,13 +64,13 @@ open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc;
   concat-++; values-++; decode-++; extract-++)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; schedGo; schedFinish; sched-next;
-  arrVal; chainsOf; cascadeOpen; cascadeClose; cascadeFinish; schedHeadOf)
-open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓)
+  arrVal; arrTy; chainsOf; cascadeOpen; cascadeClose; cascadeFinish; schedHeadOf; RegId; RegRow; AtFloor; atDyn)
+open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
-open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
-open import Simulation.Stores using (V; SrcNum; slot~; dyn~) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Schedules using (Sync; Popped; HeadOf; dry; pop; sched-pop)
+open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
@@ -247,6 +248,20 @@ record Machines {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (in
     step-stamps : ∀ {c d} → Store c d → Popped Src (live c) (live d) (schedGo (live c)) (schedGo (live d))
                 → OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
 
+-- a minted source's chain, as the registration it was read from
+dynRow : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ) → RegId × AtFloor Γ (arrTy a) t → RegRow Γ t
+dynRow a (rid , lo , p) = rid , atDyn (Arrival.source a) lo , (arrTy a , p)
+
+-- A CHAIN PAIR THE PASS HAS NOT REACHED: cut on both sides, or on
+-- neither and partnered by the registries' relation
+Paired : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
+       → RegRel κ π {t} NP NI LP LI rs rs′ → List RegId → List RegId → (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ))
+       → RegId × AtFloor Γ (arrTy a) t → RegId × AtFloor (plainᵏ Γ κ) (arrTy a′) (emitᵗ t) → Set
+Paired {κ = κ} rr CP CI a a′ c c′ =
+    (any (_≡ᵇ proj₁ c) CP ≡ true × any (_≡ᵇ proj₁ c′) CI ≡ true)
+  ⊎ (any (_≡ᵇ proj₁ c) CP ≡ false × any (_≡ᵇ proj₁ c′) CI ≡ false
+     × Partners κ _ _ _ _ _ rr (dynRow a c) (dynRow a′ c′))
+
 postulate
   -- WHAT THE ROOT SUBSCRIBES SEND CARRIES ONE INSTANT, drawn below the
   -- clock they leave: the root frame's own token.  Decoding what the
@@ -282,19 +297,49 @@ postulate
     → Storeʳ κ sP₁ stP₁ sI₁ stI₁
     × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
 
-  -- A MINTED SOURCE'S VALUE PASS: a cold script's or a deferred hop's,
-  -- each registration on one side partnered with one on the other.
-  dyn-pass   : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  -- A POP LEAVES THE STORES RELATED: the popped sources keep their
+  -- numbers and places, each giving up one pending value, and the
+  -- cascade's ledger opens empty on both sides.
+  pop-store  : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                 {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
     → Storeʳ κ sP stP sI stI
     → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-    → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+    → Sync rs rs′
+    → Storeʳ κ (record sP { live = rs }) (cascadeOpen stP) (record sI { live = rs′ }) (cascadeOpen stI)
+
+  -- A MINTED SOURCE'S CHAINS PAIR UP, in order, as registrations the
+  -- store relation partners.  Every plain row is partnered, and a row
+  -- at a source numbered above the slots is a cold or deferred read
+  -- whose partner sits at the partnered source; the live sources being
+  -- distinct on each side makes that partner the popped one.  Each
+  -- side's type test agrees with the other's because `plainᵗ` and
+  -- `emitᵗ` are injective.
+  dyn-chains : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → Storeʳ κ sP stP sI stI
+    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
     → n < Arrival.source a → n + n < Arrival.source a′
+    → (s₀ : Storeʳ κ (record sP { live = rs }) (cascadeOpen stP) (record sI { live = rs′ }) (cascadeOpen stI))
+    → Pointwise (λ c c′ → Partners κ _ _ _ _ _ (Storeʳ.rows s₀) (dynRow a c) (dynRow a′ c′))
+                (chainsOf a stP) (chainsOf a′ stI)
+
+  -- ONE PARTNERED CHAIN OF A MINTED SOURCE TAKES THE VALUE: a cold
+  -- read's impl chain runs its input block and then the path its
+  -- partner runs; a deferred hop's subscribes the body, which is the
+  -- walk.  The stores stay related and the chains not yet reached stay
+  -- paired, a cut taking a pair on both sides or neither.
+  dyn-chain  : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → (s : Storeʳ κ sP stP sI stI)
+    → ∀ {l l′ a a′} → Srcˢ κ l l′ → HeadOf l a → HeadOf l′ a′
+    → ∀ {c c′ chs chs′} → Partners κ _ _ _ _ _ (Storeʳ.rows s) (dynRow a c) (dynRow a′ c′)
+    → Pointwise (Paired (Storeʳ.rows s) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′) chs chs′
     → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
-    → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
-    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
-    → Storeʳ κ sP₁ stP₁ sI₁ stI₁
-    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+    → chainStep⇓ a (arrVal a ∷ []) false (proj₂ c) sP (record stP { delivered = proj₁ c ∷ EvalSt.delivered stP }) (oP , sP₁ , stP₁)
+    → chainStep⇓ a′ (arrVal a′ ∷ []) false (proj₂ c′) sI (record stI { delivered = proj₁ c′ ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
+    → Σ (Storeʳ κ sP₁ stP₁ sI₁ stI₁) λ s₁ →
+        Pointwise (Paired (Storeʳ.rows s₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) a a′) chs chs′
+      × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
 
   -- THE END OF A LAST ARRIVAL: the source latched closed, its end
   -- walked over the chains the value pass left, and its registrations
@@ -351,6 +396,9 @@ readᴵ-++ xs ys =
  (trans (cong instExtract (decode-++ (concat xs) (concat ys)))
         (extract-++ (decodeEmits (concat xs)) (decodeEmits (concat ys))))
 
+clash : true ≡ false → ⊥
+clash ()
+
 -- a popped arrival carries its source's number
 head-source : ∀ {k} {Δ : Ctx k} (l : LiveSource Δ) {a l₂} → schedHeadOf l ≡ inj₂ (a , l₂)
             → Arrival.source a ≡ LiveSource.source l
@@ -368,6 +416,56 @@ pop-kind {κ = κ} {sP = sP} {sI = sI} s ex ex′
               ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.numbers s))
 ... | pop {l = l} {l′ = l′} _ _ r (_ , h) (_ , h′) _ _ _ =
   subst₂ (SrcNum κ) (sym (head-source l h)) (sym (head-source l′ h′)) r
+
+-- THE VALUE PASS OVER PAIRED CHAINS, one partnered chain at a time
+pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+            {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → (s : Storeʳ κ sP stP sI stI)
+  → ∀ {l l′ a a′} → Srcˢ κ l l′ → HeadOf l a → HeadOf l′ a′
+  → ∀ {chs chs′} → Pointwise (Paired (Storeʳ.rows s) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′) chs chs′
+  → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+  → cascadeGo⇓ a (arrVal a ∷ []) false chs sP stP (oP , sP₁ , stP₁)
+  → cascadeGo⇓ a′ (arrVal a′ ∷ []) false chs′ sI stI (oI , sI₁ , stI₁)
+  → Storeʳ κ sP₁ stP₁ sI₁ stI₁
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+pass-go κ e s src h h′ [] casc-nil casc-nil = s , []
+pass-go κ e s src h h′ (inj₁ _ ∷ ps) (casc-cut _ g) (casc-cut _ g′) = pass-go κ e s src h h′ ps g g′
+pass-go κ e s src h h′ (inj₁ (x , _) ∷ _) (casc-live y _ _) _ = ⊥-elim (clash (trans (sym x) y))
+pass-go κ e s src h h′ (inj₁ (_ , x) ∷ _) (casc-cut _ _) (casc-live y _ _) = ⊥-elim (clash (trans (sym x) y))
+pass-go κ e s src h h′ (inj₂ (x , _) ∷ _) (casc-cut y _) _ = ⊥-elim (clash (trans (sym y) x))
+pass-go κ e s src h h′ (inj₂ (_ , x , _) ∷ _) (casc-live _ _ _) (casc-cut y _) = ⊥-elim (clash (trans (sym y) x))
+pass-go {Γ = Γ} {t} κ e s src h h′ (inj₂ (_ , _ , pr) ∷ ps)
+        (casc-live {emits = eP} {rest = rP} _ st g) (casc-live {emits = eI} {rest = rI} _ st′ g′)
+  with dyn-chain κ e s src h h′ pr ps st st′
+... | s₁ , ps₁ , ag =
+  proj₁ k ,
+  subst₂ (Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)) (sym (readᴵ-++ eI rI)) (sym (readᴾ-++ eP rP))
+         (++⁺ ag (proj₂ k))
+  where k = pass-go κ e s₁ src h h′ ps₁ g g′
+
+-- a minted source's value pass: the chains pair up at the popped stores
+dyn-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+             {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → Storeʳ κ sP stP sI stI
+  → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+  → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+  → n < Arrival.source a → n + n < Arrival.source a′
+  → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+  → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
+  → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+  → Storeʳ κ sP₁ stP₁ sI₁ stI₁
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+dyn-pass κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy p q go go′
+  with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
+... | pop _ _ src h h′ _ _ _ =
+  pass-go κ e s₀ src h h′ (opened (dyn-chains κ e s ex ex′ p q s₀)) go go′
+  where
+    s₀ = pop-store s ex ex′ sy
+    opened : ∀ {chs chs′}
+           → Pointwise (λ c c′ → Partners κ _ _ _ _ _ (Storeʳ.rows s₀) (dynRow a c) (dynRow a′ c′)) chs chs′
+           → Pointwise (Paired (Storeʳ.rows s₀) [] [] a a′) chs chs′
+    opened []       = []
+    opened (r ∷ rs) = inj₂ (refl , refl , r) ∷ opened rs
 
 -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
 -- HAVE, or one plain arrival's values delivered across two.  Either is
@@ -424,12 +522,8 @@ cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
 cascade-kept κ e s {a} {a′} ex ex′ ta la sy (casc-run {sched′ = s₁} {st′ = t₁} nl go) (casc-run {sched′ = s₁′} {st′ = t₁′} nl′ go′)
   rewrite finish-run a s₁ t₁ nl | finish-run a′ s₁′ t₁′ nl′ = value-pass κ e s ex ex′ ta sy go go′
-cascade-kept κ e s ex ex′ ta la sy (casc-run nl _) (casc-run-last ll′ _ _) = ⊥-elim (clash (trans (sym nl) (trans la ll′)))
-  where clash : false ≡ true → ⊥
-        clash ()
+cascade-kept κ e s ex ex′ ta la sy (casc-run nl _) (casc-run-last ll′ _ _) = ⊥-elim (clash (sym (trans (sym nl) (trans la ll′))))
 cascade-kept κ e s ex ex′ ta la sy (casc-run-last ll _ _) (casc-run nl′ _) = ⊥-elim (clash (trans (sym ll) (trans la nl′)))
-  where clash : true ≡ false → ⊥
-        clash ()
 cascade-kept {Γ = Γ} {t} κ e s ex ex′ ta la sy (casc-run-last {emits = oP} {ends = eP} ll go end)
                                            (casc-run-last {emits = oI} {ends = eI} ll′ go′ end′) =
   proj₁ k ,

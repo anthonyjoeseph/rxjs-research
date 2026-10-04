@@ -65,6 +65,10 @@ module _ {k} {Δ : Ctx k} where
   same-refl []       = []
   same-refl (_ ∷ ls) = refl ∷ same-refl ls
 
+-- the arrival a source offers
+HeadOf : ∀ {k} {Δ : Ctx k} → LiveSource Δ → Arrival Δ → Set
+HeadOf l a = Σ _ λ l₂ → schedHeadOf l ≡ inj₂ (a , l₂)
+
 module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} where
 
   -- each later source on one side ordered against `l` as its partner is
@@ -76,10 +80,6 @@ module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} where
   data Sync : List (LiveSource Γ) → List (LiveSource Γ′) → Set where
     []  : Sync [] []
     _∷_ : ∀ {l l′ ls ls′} → ticks l ≡ ticks l′ × Ranked l l′ ls ls′ → Sync ls ls′ → Sync (l ∷ ls) (l′ ∷ ls′)
-
-  -- the arrival a source offers
-  HeadOf : ∀ {k} {Δ : Ctx k} → LiveSource Δ → Arrival Δ → Set
-  HeadOf l a = Σ _ λ l₂ → schedHeadOf l ≡ inj₂ (a , l₂)
 
   -- BOTH DRY, OR BOTH POP AT ONE TICK FROM PARTNERED SOURCES AND STAY IN
   -- STEP.  `R` is whatever the caller needs of the partners.

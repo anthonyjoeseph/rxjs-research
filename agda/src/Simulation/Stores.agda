@@ -398,6 +398,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           _∷_  : ∀ {r r′ rs rs′} → RowRel r r′ → RegRel rs rs′ → RegRel (r ∷ rs) (r′ ∷ rs′)
           mach : ∀ {rs r′ rs′} → MachRow r′ → RegRel rs rs′ → RegRel rs (r′ ∷ rs′)
 
+        -- two registrations the relation pairs
+        Partners : ∀ {rs rs′} → RegRel rs rs′ → RegRow Γ t → RegRow Γ′ (emitᵗ t) → Set
+        Partners []                          x x′ = ⊥
+        Partners (_∷_ {r = r} {r′ = r′} _ q) x x′ = (x ≡ r × x′ ≡ r′) ⊎ Partners q x x′
+        Partners (mach _ q)                  x x′ = Partners q x x′
+
   -- the completion and connection latches, slot for stamped slot
   LatchRel : (CP SP CI SI : List Source) → Set
   LatchRel CP SP CI SI =
@@ -442,6 +448,7 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     π-vals  : Unique (concatMap proj₂ π)
     sources : Pointwise (Src κ) (Sched.live sP) (Sched.live sI)
     numbers : Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → SrcNum κ (LiveSource.source l) (LiveSource.source l′)) (Sched.live sP) (Sched.live sI)
+    distinct : Unique (map LiveSource.source (Sched.live sP)) × Unique (map LiveSource.source (Sched.live sI))
     sync    : Sync (Sched.live sP) (Sched.live sI)
     rows    : RegRel κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
                 (EvalSt.registry stP) (EvalSt.registry stI)

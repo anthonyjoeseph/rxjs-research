@@ -257,7 +257,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
   over the program, one arm per former, `walk-flatten` its riskiest; what
-  remains is `hot-pass`, `dyn-pass` and `last-pass`: a fold over the related rows a
+  remains is `hot-pass`, `dyn-chain` and `last-pass`: a fold over the related rows a
   pop reaches, one arm per `PathRel`
   constructor, mutual with the walk where a cascade subscribes an inner. Each arm a leaf, so the monster
   drops to whichever constructor's arm is riskiest.
@@ -279,14 +279,20 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`last-pass`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a last
   arrival's close, end pass and drop keep the stores related; the store
   relation itself fails between the close and the end pass at a hot read.
-- **`dyn-pass`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
-  source's value pass keeps the stores related and sends agreeing values; its
-  chains pair one to one, which needs the live sources unique.
+- **`dyn-chain`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: one
+  partnered chain of a minted source takes the value: a cold read's input block
+  then its path, a deferred hop's body subscribed; a cut takes a pair on both
+  sides or neither.
+- **`dyn-chains`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
+  source's chains pair up in order as partnered registrations.
+- **`pop-store`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a pop leaves
+  the stores related, each popped source one pending value shorter.
 - **`hot-pass`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a hot slot's
   value pass, the impl's one share chain fanning out to the reads the plain
   pass walks directly; past the typechecker at a real pop.
-- **`init-numbers`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the hot
-  scripts live before anything is subscribed are numbered by their slots.
+- **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
+  hot scripts live before anything is subscribed are numbered by their slots,
+  one per slot.
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
 - **`walk-*`** (Simulation.Walk) — FALSITY, `PROBED×7`: one former's subscribe

@@ -19,6 +19,7 @@ open import Data.List    using (List; []; _∷_; map; concat)
 open import Data.List.Relation.Unary.AllPairs using ([])
 open import Data.Nat     using (ℕ; suc; _+_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
+open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
@@ -163,6 +164,12 @@ postulate
                            (Sched.live (sched-init (plainExp e) (plainSlots ins)))
                            (Sched.live (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)))
 
+-- the hot scripts live before anything is subscribed, one per slot
+postulate
+  init-distinct : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+                → Unique (map LiveSource.source (Sched.live (sched-init (plainExp e) (plainSlots ins))))
+                × Unique (map LiveSource.source (Sched.live (sched-init (elaborateImpl κ e) (embedSlotsImpl ins))))
+
 -- TWIN: `ib-renᵉ` -- the same walk over `renExp`'s clauses, a binder's
 --   `ext∈` the one place the identity is not definitional.
 postulate
@@ -180,6 +187,7 @@ init-store κ e ins μ = record
   ; π-vals  = []
   ; sources = init-sources κ e ins
   ; numbers = init-numbers κ e ins
+  ; distinct = init-distinct κ e ins
   ; sync    = init-sync κ e ins
   ; rows    = []
   ; latches = λ _ → (λ _ → refl) , (λ _ → refl , refl)
