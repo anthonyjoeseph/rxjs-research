@@ -16,7 +16,7 @@ module Simulation.Pass where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map; concat)
@@ -31,13 +31,13 @@ open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo; Tm; varᵗ)
+open import Rx.Exp       using (Ty; Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; Path; Frame; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf; shareAdmit)
-open import Rx.Evaluator.Domain using (foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step;
+open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
-open import SExp.Elaborate using (restampᵛ; subscribeᵛ)
+open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ)
 open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import SExp.Plain   using (plainValues)
@@ -211,12 +211,48 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → Steps (take-f nothing k) h p Q
       takeWhile-arm : ∀ {lo lo′ ℓ s} {P k} {h : lo ≤ ℓ} {p : Path Γ ℓ s t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
                     → Steps (take-f (just P) k) h p Q
+      -- an outer's element, one per emit, handed the flattener
+      outerElem-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+                    → Steps (thru-outer (flatOp op) m) h p
+                        (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ]
+                         (thru-outer (flatOp op) m′ ↠[ h₂ ]
+                          (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₃ ]
+                           (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q))))
       -- an outer's elements, each inner a sync outer hands the flattener
-      -- subscribed before the step returns: the walk, reached from a pass
-      outer-arm     : ∀ {lo lo′ ℓ u} {op m} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
-                    → Steps (thru-outer op m) h p Q
-      inner-arm     : ∀ {lo lo′ ℓ u} {op m j} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) _}
-                    → Steps (from-inner op m j) h p Q
+      -- subscribed before the step returns: the explode and its merge
+      outerExplode-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                           {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+                           {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                           {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+                       → Steps (thru-outer (flatOp op) m) h p
+                           (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                            (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                             (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                              (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                               (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
+                                (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
+      -- leaving an inner: the flattener's lane, then its restamp
+      inner-arm     : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                    → Steps (from-inner (flatOp op) m j) h p
+                        (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
+                         (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
+                          (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
+      -- an inner led with its echo: one more merge, impl only, in front of its lane
+      lane-arm      : ∀ {lo lo′ ℓ ℓ′ u op m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+                        {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+                    → Steps (from-inner (flatOp op) m j) h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+      -- a deferred body: the hop's marker merge, its restamp, the hop's node
+      deferInner-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                     → Steps (from-inner mergeAllᵒ nid j) h p
+                         (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                          (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                           (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
 
     mutual
       path-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Pass p q
@@ -226,11 +262,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S r@(scan~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (scan-arm S r b d dI) dP
       path-pass S r@(take~ _ _ _ _ _ _ _ _) b (fold-step d dP) dI = resume (take-arm S r b d dI) dP
       path-pass S r@(takeWhile~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (takeWhile-arm S r b d dI) dP
-      path-pass S r@(outerElem~ _ _) b (fold-step d dP) dI = resume (outer-arm S r b d dI) dP
-      path-pass S r@(outerExplode~ _ _) b (fold-step d dP) dI = resume (outer-arm S r b d dI) dP
+      path-pass S r@(outerElem~ _ _) b (fold-step d dP) dI = resume (outerElem-arm S r b d dI) dP
+      path-pass S r@(outerExplode~ _ _) b (fold-step d dP) dI = resume (outerExplode-arm S r b d dI) dP
       path-pass S r@(inner~ _ _ _) b (fold-step d dP) dI = resume (inner-arm S r b d dI) dP
-      path-pass S r@(lane~ _ _) b (fold-step d dP) dI = resume (inner-arm S r b d dI) dP
-      path-pass S r@(deferInner~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (inner-arm S r b d dI) dP
+      path-pass S r@(lane~ _ _) b (fold-step d dP) dI = resume (lane-arm S r b d dI) dP
+      path-pass S r@(deferInner~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (deferInner-arm S r b d dI) dP
 
       resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin rP rI}
              → Arm S now oP sP₁ stP₁ p vs fin rI → foldPath⇓ now p vs fin sP₁ stP₁ rP

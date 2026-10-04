@@ -259,8 +259,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   over the program, one arm per former, `walk-flatten` its riskiest. A minted
   source's chain is `path-pass`, one arm per plain frame, and a hot slot's is
   `fan-go` over the share's readers, each `slot-pass`; a minted source's end is
-  the same fold at an end head; what remains is `hot-end`, and splitting `outer-arm` and `inner-arm` per
-  constructor, so the monster drops to whichever arm is riskiest.
+  the same fold at an end head; an outer's and an inner's arms are one leaf per constructor; what remains is
+  `hot-end`, and `lane-arm` as a definition over `inner-arm` once `Arm` can
+  carry an impl-only step, so the monster drops to whichever arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -283,10 +284,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   minted source's close and drop keep the stores related.
 - **`dyn-chains-end`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: the
   chains a minted source's end walks pair up, the cut ones cut on both sides.
-- **`outer-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's
-  step on both sides, every inner a sync outer hands the flattener subscribed.
-- **`inner-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: leaving an inner,
-  the flattener's lane, an impl-only lane merge and a deferred body's hop.
+- **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
+  outer's step on both sides; the explode hands the flattener every inner a
+  sync outer subscribed before the step returns.
+- **`{inner,lane,deferInner}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
+  leaving an inner, the flattener's lane, an impl-only lane merge ahead of it
+  and a deferred body's hop.
 - **`{block,hop}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
   chain's input block hands its path the popped head; a deferred hop subscribes
   its body on both sides.
