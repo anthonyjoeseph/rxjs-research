@@ -31,7 +31,7 @@ open import Rx.Exp using (Ctx; isData; natᵗ; mergeᶠ; switchᶠ)
 open import Rx.Prim using (Fuel; ObservableInput; cold; after_,_)
 open import SExp.Syntax using (SExp; Kinds; inputˢ; ofˢ; emptyˢ; scanˢ; varˢᵗ; natˢ; fstˢ; strmˢ; deferˢ)
 open import SExp.Simul-Slots using (SimulSlots)
-open import Left-To-Right.Statement using (joinedᴵ; valsᴵ)
+open import SExp.Readings using (joinedᴵ; valsᴵ)
 open import CLI.Unit-Test.Prelude using (Γ₂; κOf; mkSlots; flatAllˢ)
 
 -- the batcher's sandwich read one unit of fuel past the run it batches

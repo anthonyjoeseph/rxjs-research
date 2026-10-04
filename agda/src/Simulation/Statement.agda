@@ -55,6 +55,7 @@ open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import SExp.Plain   using (unplainᵈ; ∧ˡ; ∧ʳ; plainExp; plainValues)
 open import SExp.Pipeline using (runᴵ; runᴾ; elaborateImpl; embedSlotsImpl)
+open import SExp.Readings using (arrivalsOf)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc;
@@ -108,17 +109,6 @@ module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
                 → map (unplainᵈ {Γ = Γ} {Γ′ = Γ′} t ok) (map proj₂ xs) ≡ ws
   agrees-values t ok []       = refl
   agrees-values t ok (p ∷ ps) = cong₂ _∷_ (agrees-unplain t ok p) (agrees-values t ok ps)
-
--- each plain value's ARRIVAL, given how many values the run has
--- delivered at each fuel: 0 for the subscription, k for the k-th drain
--- step
-arrivalsᴾ : (ℕ → ℕ) → ℕ → List ℕ
-arrivalsᴾ c zero    = replicate (c zero) zero
-arrivalsᴾ c (suc k) = arrivalsᴾ c k ++ replicate (c (suc k) ∸ c k) (suc k)
-
--- the plain run's arrivals at a fuel
-arrivalsOf : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → List ℕ
-arrivalsOf {κ = κ} fuel e ins = arrivalsᴾ (λ k → length (runᴾ {κ = κ} k e ins)) fuel
 
 -- THE IMPL RUNS AT ITS OWN FUEL, NEVER LESS THAN THE PLAIN RUN'S
 -- (Anthony).

@@ -30,7 +30,8 @@ open import SExp.Syntax      using (SExp; Kinds; plainᵏ; plainᵗ)
 open import SExp.Simul-Slots using (SimulSlots)
 open import Timed.Translation     using (timed; timedSlots; packetOf; timedᶜ; itemᵗ)
 open import SExp.Pipeline using (runᴵ; runᴾ)
-open import Simulation.Statement using (Agrees; simulation; arrivalsOf; stamped-prefix)
+open import Simulation.Statement using (Agrees; simulation; stamped-prefix)
+open import SExp.Readings using (arrivalsOf)
 open import Batchable.Inst-Extract using (instExtract)
 
 -- the impl's run of the timed program: each value with its stamp

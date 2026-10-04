@@ -40,7 +40,7 @@
 module Left-To-Right.Statement where
 
 open import Data.Bool    using (T)
-open import Data.List    using (List; []; concat; map)
+open import Data.List    using ([])
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.Nat     using (suc; _≤_)
 open import Data.Nat.Properties using (≤-trans)
@@ -48,28 +48,13 @@ open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst)
 
 open import Rx.Prim      using (Fuel)
-open import Rx.Exp        using (Ctx; Val; isData)
+open import Rx.Exp        using (Ctx; isData)
 open import SExp.Syntax      using (SExp; Kinds; plainᵏ)
-open import Rx.Evaluator.Builder using (evaluate↓)
-open import SExp.Plain     using (unplainᵈ)
 open import SExp.Simul-Slots using (SimulSlots)
-open import SExp.InstEmit.Decode using (decodeEmits)
-open import SExp.Batch     using (batchSimultaneousᵖ)
-open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl; runᴵ; runᴾ)
-open import Batchable.Inst-Extract using (instExtract)
+open import SExp.Pipeline using (runᴾ)
 open import Simulation.Statement using (simulation; agrees-values)
+open import SExp.Readings using (joinedᴵ; valsᴵ)
 
--- the batches, joined back up
-joinedᴵ : ∀ {n} {Γ : Ctx n} {t} → T (isData t) → (κ : Kinds n) → Fuel
-        → SExp Γ [] [] [] t → SimulSlots Γ κ → List (Val Γ t)
-joinedᴵ {t = t} ok κ fuel e ins =
-  map (unplainᵈ t ok) (concat (map proj₂ (instExtract (decodeEmits
-      (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborateImpl κ e)) (embedSlotsImpl ins)))))))
-
--- the elaborated run without the batcher, read at data
-valsᴵ : ∀ {n} {Γ : Ctx n} {t} → T (isData t) → (κ : Kinds n) → Fuel
-      → SExp Γ [] [] [] t → SimulSlots Γ κ → List (Val Γ t)
-valsᴵ {t = t} ok κ fuel e ins = map (unplainᵈ t ok) (map proj₂ (instExtract (runᴵ κ fuel e ins)))
 
 Left-To-Right : Set
 Left-To-Right =
