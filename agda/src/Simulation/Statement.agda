@@ -60,12 +60,13 @@ open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc;
   concat-++; values-++; decode-++; extract-++)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; schedGo; schedFinish; sched-next)
-open import Rx.Evaluator.Domain using (cascade⇓)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; schedGo; schedFinish; sched-next;
+  arrVal; chainsOf; cascadeOpen; cascadeClose; cascadeFinish)
+open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
-open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop; HeadOf; SameOrd)
+open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 
@@ -273,32 +274,128 @@ postulate
   -- arrival's with none unmatched between: seed 20, 300 cases, 299
   -- agreeing and one undecided at its clock; seed 19, 60, all agreeing.
   --
-  -- EACH ARRIVAL'S INSTANT IS DRAWN WHILE IT CASCADES.  The compiled
-  -- sweep reads the impl's source counter after the subscribe and after
-  -- every arrival, and finds each arrival's instants between the counter
-  -- it entered with and the one it left, the subscribe's below the
-  -- first: seed 21 at depth 3, 120 cases, 103 decided and 66 of those
-  -- grouping values, none outside.  And the instants a run draws are
-  -- contiguous: no gap at depth 2 seeds 13..36 nor depth 3 seeds 1..11.
-  --
   -- THE TYPECHECKER DOES NOT REACH IT AT A REAL POP.  Instantiated at
   -- the first pop of a hot read's two arrivals, from the store its
   -- subscribe row relates and the two derivations `cascade!` builds,
   -- the row exhausted memory -- twice, the second with every implicit
   -- named off the run.  A coverage boundary: the compiled sweep,
   -- deciding `simulation`, is where a cascade is checked.
-  cascade-pop : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  value-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
-    → ∀ {a a′ l l′ rs rs′} → Arrival.tick a ≡ Arrival.tick a′ → Arrival.isLast a ≡ Arrival.isLast a′
-    → Srcˢ κ l l′ → HeadOf {Γ = Γ} {Γ′ = plainᵏ Γ κ} l a → HeadOf {Γ = Γ} {Γ′ = plainᵏ Γ κ} l′ a′
-    → SameOrd (Sched.live sP) rs → SameOrd (Sched.live sI) rs′ → Sync rs rs′
-    → ∀ {oP sP′ stP′ oI sI′ stI′}
-    → cascade⇓ a (record sP { live = rs }) stP (oP , sP′ , stP′)
-    → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , sI′ , stI′)
-    → Storeʳ κ sP′ stP′ sI′ stI′
+    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+    → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+    → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+    → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
+    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+    → Storeʳ κ sP₁ stP₁ sI₁ stI₁
     × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
-    × OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI′) sourceᵏ) (readᴵ oI)
+
+  -- THE END OF A LAST ARRIVAL: the source latched closed, its end
+  -- walked over the chains the value pass left, and its registrations
+  -- dropped.  Stated over the value pass's own derivations, since what
+  -- relates the two arrivals is the pop, and the stores the pass left
+  -- are only related to each other.
+  --
+  -- THE STORE RELATION DOES NOT HOLD BETWEEN THE CLOSE AND THE END PASS.
+  -- A hot read's plain arrival is its slot's, and the impl's is the raw
+  -- slot's, so `cascadeClose` latches the slot on one side and the raw
+  -- slot on the other, while `LatchRel` compares the slot against the
+  -- share's.  The share is latched only when the end reaches it through
+  -- the input block, so the end pass is where the latches meet again,
+  -- and no relation over the stores alone names the state between.
+  last-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → Storeʳ κ sP stP sI stI
+    → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+    → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′ → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
+    → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+    → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
+    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+    → ∀ {eP sP₂ stP₂ eI sI₂ stI₂}
+    → cascadeGo⇓ a [] true (chainsOf a stP₁) sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)
+    → cascadeGo⇓ a′ [] true (chainsOf a′ stI₁) sI₁ (cascadeClose a′ stI₁) (eI , sI₂ , stI₂)
+    → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
+               (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
+    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
+
+  -- EACH ARRIVAL'S INSTANT IS DRAWN WHILE IT CASCADES, a claim about the
+  -- impl's run alone; the store says the state is one an elaboration
+  -- reaches.
+  --
+  -- The compiled sweep reads the impl's source counter after the
+  -- subscribe and after every arrival, and finds each arrival's instants
+  -- between the counter it entered with and the one it left, the
+  -- subscribe's below the first: seed 21 at depth 3, 120 cases, 103
+  -- decided and 66 of those grouping values, none outside.  And the
+  -- instants a run draws are contiguous: no gap at depth 2 seeds 13..36
+  -- nor depth 3 seeds 1..11.
+  cascade-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                     {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → Storeʳ κ sP stP sI stI
+    → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+    → ∀ {oI sI′ stI′} → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , sI′ , stI′)
+    → OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI′) sourceᵏ) (readᴵ oI)
+
+readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
+readᴾ-++ xs ys = trans (cong plainValues (concat-++ xs ys)) (values-++ (concat xs) (concat ys))
+
+readᴵ-++ : ∀ {m} {Γ′ : Ctx m} {t} (xs ys : Stream Γ′ (instEmitᵗ uniqᵗ t)) → readᴵ (xs ++ ys) ≡ readᴵ xs ++ readᴵ ys
+readᴵ-++ xs ys =
+  trans (cong (λ z → instExtract (decodeEmits z)) (concat-++ xs ys))
+ (trans (cong instExtract (decode-++ (concat xs) (concat ys)))
+        (extract-++ (decodeEmits (concat xs)) (decodeEmits (concat ys))))
+
+-- a value pass ends a cascade unless the arrival is its source's last
+finish-run : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (s : Sched Γ′) (st : EvalSt e)
+           → Arrival.isLast a ≡ false → cascadeFinish a s st ≡ (s , st)
+finish-run a s st eq with Arrival.isLast a
+finish-run a s st refl | false = refl
+finish-run a s st ()   | true
+
+-- THE CASCADES OF ONE PARTNERED POP: both a value pass, or both a value
+-- pass and an end, since the two arrivals are last together
+cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → Storeʳ κ sP stP sI stI
+  → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+  → Arrival.tick a ≡ Arrival.tick a′ → Arrival.isLast a ≡ Arrival.isLast a′ → Sync rs rs′
+  → ∀ {oP rP oI rI}
+  → cascade⇓ a (record sP { live = rs }) stP (oP , rP)
+  → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , rI)
+  → Storeʳ κ (proj₁ rP) (proj₂ rP) (proj₁ rI) (proj₂ rI)
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+cascade-kept κ e s {a} {a′} ex ex′ ta la sy (casc-run {sched′ = s₁} {st′ = t₁} nl go) (casc-run {sched′ = s₁′} {st′ = t₁′} nl′ go′)
+  rewrite finish-run a s₁ t₁ nl | finish-run a′ s₁′ t₁′ nl′ = value-pass κ e s ex ex′ ta sy go go′
+cascade-kept κ e s ex ex′ ta la sy (casc-run nl _) (casc-run-last ll′ _ _) = ⊥-elim (clash (trans (sym nl) (trans la ll′)))
+  where clash : false ≡ true → ⊥
+        clash ()
+cascade-kept κ e s ex ex′ ta la sy (casc-run-last ll _ _) (casc-run nl′ _) = ⊥-elim (clash (trans (sym ll) (trans la nl′)))
+  where clash : true ≡ false → ⊥
+        clash ()
+cascade-kept {Γ = Γ} {t} κ e s ex ex′ ta la sy (casc-run-last {emits = oP} {ends = eP} ll go end)
+                                           (casc-run-last {emits = oI} {ends = eI} ll′ go′ end′) =
+  proj₁ k ,
+  subst₂ (Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)) (sym (readᴵ-++ oI eI)) (sym (readᴾ-++ oP eP))
+         (++⁺ (proj₂ (value-pass κ e s ex ex′ ta sy go go′)) (proj₂ k))
+  where k = last-pass κ e s ex ex′ ta sy ll ll′ go go′ end end′
+
+-- THE CASCADES OF ONE PARTNERED POP keep the stores related and send
+-- agreeing values under one instant the clock passes
+cascade-pop : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → Storeʳ κ sP stP sI stI
+  → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+  → Arrival.tick a ≡ Arrival.tick a′ → Arrival.isLast a ≡ Arrival.isLast a′ → Sync rs rs′
+  → ∀ {oP sP′ stP′ oI sI′ stI′}
+  → cascade⇓ a (record sP { live = rs }) stP (oP , sP′ , stP′)
+  → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , sI′ , stI′)
+  → Storeʳ κ sP′ stP′ sI′ stI′
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+  × OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI′) sourceᵏ) (readᴵ oI)
+cascade-pop κ e s ex ex′ ta la sy dP dI =
+  proj₁ k , proj₂ k , cascade-stamps κ e s ex′ dI
+  where k = cascade-kept κ e s ex ex′ ta la sy dP dI
 
 -- a step reads the cascade the schedule's pop names, by any proof of it
 step-at : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (c : Conf e) {x} (eqn : sched-next (Conf.sched c) ≡ x)
@@ -324,13 +421,13 @@ cascade-at κ e {c} {d} s ex ex′ dry =
   subst₂ (Kept κ e d) (sym (step-at c (cong (schedFinish (Conf.sched c)) ex)))
                       (sym (step-at d (cong (schedFinish (Conf.sched d)) ex′)))
          (s , [] , tt)
-cascade-at κ e {c} {d} s {inj₂ (a , rs)} {inj₂ (a′ , rs′)} ex ex′ (pop ta la r h h′ so so′ sy) =
+cascade-at κ e {c} {d} s {inj₂ (a , rs)} {inj₂ (a′ , rs′)} ex ex′ (pop ta la _ _ _ _ _ sy) =
   subst₂ (Kept κ e d) (sym (step-at c eqn)) (sym (step-at d eqn′))
          (stores (proj₁ k) , proj₂ k)
   where
     eqn  = cong (schedFinish (Conf.sched c)) ex
     eqn′ = cong (schedFinish (Conf.sched d)) ex′
-    k = cascade-pop κ e (Storeˢ.raw s) ta la r h h′ so so′ sy
+    k = cascade-pop κ e (Storeˢ.raw s) ex ex′ ta la sy
           (proj₁ (Σ⁰.snd⁰ (cascade! a (record (Conf.sched c) { live = rs }) (Conf.st c) (pop-rule eqn (Conf.ru c)))))
           (proj₁ (Σ⁰.snd⁰ (cascade! a′ (record (Conf.sched d) { live = rs′ }) (Conf.st d) (pop-rule eqn′ (Conf.ru d)))))
 
@@ -416,15 +513,6 @@ correspondence κ e ins = record
     popped : ∀ {c d} → Sync (live c) (live d) → Store c d
            → Popped Src (live c) (live d) (schedGo (live c)) (schedGo (live d))
     popped sy st = sched-pop sy (store-src st)
-
-readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
-readᴾ-++ xs ys = trans (cong plainValues (concat-++ xs ys)) (values-++ (concat xs) (concat ys))
-
-readᴵ-++ : ∀ {m} {Γ′ : Ctx m} {t} (xs ys : Stream Γ′ (instEmitᵗ uniqᵗ t)) → readᴵ (xs ++ ys) ≡ readᴵ xs ++ readᴵ ys
-readᴵ-++ xs ys =
-  trans (cong (λ z → instExtract (decodeEmits z)) (concat-++ xs ys))
- (trans (cong instExtract (decode-++ (concat xs) (concat ys)))
-        (extract-++ (decodeEmits (concat xs)) (decodeEmits (concat ys))))
 
 drop-front : ∀ {A : Set} (xs ys : List A) → drop (length xs) (xs ++ ys) ≡ ys
 drop-front []       ys = refl

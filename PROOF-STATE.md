@@ -257,14 +257,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
   over the program, one arm per former, `walk-flatten` its riskiest; what
-  remains is `cascade-pop`, over the two derivations: per `cascade⇓` pass,
-  then a fold over the related rows a pop reaches, one arm per `PathRel`
+  remains is `value-pass` and `last-pass`: a fold over the related rows a
+  pop reaches, one arm per `PathRel`
   constructor, mutual with the walk where a cascade subscribes an inner. Each arm a leaf, so the monster
   drops to whichever constructor's arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
-  instant and no two arrivals share one: a claim the impl's cascade makes
-  one former at a time. State it beside the values split so both recurse on the same
+  instant and no two arrivals share one: `cascade-stamps`, a claim the
+  impl's cascade makes one former at a time. State it beside the values split so both recurse on the same
   configuration, and the monster drops to whichever stays riskier.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
@@ -276,10 +276,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`cascade-pop`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: the
-  cascades of one partnered pop keep the stores related and send agreeing
-  values under one instant the clock passes; past the typechecker at a real
-  pop, so the compiled sweep is its only reach.
+- **`last-pass`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a last
+  arrival's close, end pass and drop keep the stores related; the store
+  relation itself fails between the close and the end pass at a hot read.
+- **`value-pass`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: one
+  partnered pop's value pass keeps the stores related and sends agreeing
+  values; past the typechecker at a real pop.
+- **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an
+  impl cascade's values carry one instant between the counters it enters
+  and leaves.
 - **`walk-*`** (Simulation.Walk) — FALSITY, `PROBED×7`: one former's subscribe
   keeps the stores related; holds at a hot, cold and deferred read. Riskiest is
   `walk-flatten`, past the typechecker: a one-lane merge only in normal form.
