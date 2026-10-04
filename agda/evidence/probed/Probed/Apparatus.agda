@@ -64,7 +64,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (ObservableInput; hot; after_,_)
 open import Rx.Exp using (natᵗ)
-open import SExp.Syntax using (SExp; Kinds; inputˢ; ofˢ; emptyˢ; takeˢ; natˢ)
+open import SExp.Syntax using (SExp; Kinds; inputˢ; ofˢ; emptyˢ; takeˢ; natˢ; deferˢ)
 open import SExp.Simul-Slots using (SimulSlots)
 open import CLI.Unit-Test.Prelude using (Γ₂; κOf; mkSlots)
 -- contexts are Vecs; ∷/[] overload per type
@@ -122,4 +122,11 @@ of-two : Point
 of-two = record
   { d₀   = hot []
   ; prog = ofˢ (natˢ 9 ∷ natˢ 7 ∷ [])
+  ; d₁   = emptyˢ }
+
+-- a deferred hot read: the hop pending until the body is subscribed
+defer-in : Point
+defer-in = record
+  { d₀   = hot ((after 1 , 5) ∷ [])
+  ; prog = deferˢ (inputˢ zero)
   ; d₁   = emptyˢ }

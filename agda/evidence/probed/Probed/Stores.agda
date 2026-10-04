@@ -1,14 +1,15 @@
 -- THE STORES THE ROOT SUBSCRIBES INSTALL, AND ONE CASCADE KEEPS, related
 -- by hand at concrete programs: the relation `Simulation.Stores` states,
 -- inhabited against the registries the two runs actually compute.
--- TARGET: subscribe-related @70be7d
+-- TARGET: walk-input @1ab710
+-- TARGET: walk-defer @cd22e2
 -- TARGET: cascade-related @a3c004
 module Probed.Stores where
 
 open import Data.List using ([]; _∷_)
 open import Data.Product using (_,_; proj₁; proj₂)
-open import Rx.Prim using (hot; cold; after_,_)
-open import SExp.Syntax using (inputˢ; emptyˢ; deferˢ)
+open import Rx.Prim using (cold; after_,_)
+open import SExp.Syntax using (inputˢ; emptyˢ)
 open import Data.Sum using (inj₁)
 open import Data.Fin using (zero; suc)
 open import Data.Nat using (zero; suc)
@@ -18,12 +19,24 @@ open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Simulation.Statement using (subscribe-related; cascade-related)
+open import SExp.Plain using (plainExp)
+open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
+open import SExp.Simul-Slots using (plainSlots)
+open import Rx.Evaluator.Builder using (subscribe!)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰)
+open import Simulation.Lockstep using (start)
+open import Simulation.Statement using (cascade-related; Storeˢ; stores)
+open import Simulation.Walk using (walk-input; walk-defer; init-store; minted)
 open import Simulation.Schedules using (sched-pop; []; _∷_)
 open import Simulation.Stores using (data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
-open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals)
+open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals; defer-in)
 
-store₀ : Confirms (proj₁ (proj₂ (subscribe-related (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals))))
+-- each subscribe row is the walk's arm for the program's one former, at
+-- the empty stores and the two root derivations, as `root-walk` calls it
+store₀ : Confirms (proj₁ (walk-input (κᵖ two-arrivals) zero (λ x → x) (λ ())
+                            (init-store (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals) _) root~
+                            (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals)))))
+                            (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))))
 store₀ = record
   { π       = []
   ; π-keys  = []
@@ -36,8 +49,11 @@ store₀ = record
   }
 
 -- the first cascade of the same run: one arrival popped from each side
-_ : Confirms (proj₁ (proj₂ (cascade-related (κᵖ two-arrivals) (Point.prog two-arrivals) store₀
-                                            (sched-pop ((refl , []) ∷ []) (data~ refl (refl ∷ refl ∷ []) ∷ [])))))
+_ : Confirms (Storeˢ.raw (proj₁ (proj₂
+      (cascade-related (κᵖ two-arrivals) (Point.prog two-arrivals)
+         {start (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals))}
+         {start (elaborateImpl (κᵖ two-arrivals) (Point.prog two-arrivals)) (embedSlotsImpl (insᵖ two-arrivals))}
+         (stores store₀) (sched-pop ((refl , []) ∷ []) (data~ refl (refl ∷ refl ∷ []) ∷ []))))))
 _ = record
   { π       = []
   ; π-keys  = []
@@ -53,7 +69,10 @@ _ = record
 cold-in : Point
 cold-in = record { d₀ = cold (3 ∷ []) ((after 1 , 4) ∷ []) ; prog = inputˢ zero ; d₁ = emptyˢ }
 
-_ : Confirms (proj₁ (proj₂ (subscribe-related (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in))))
+_ : Confirms (proj₁ (walk-input (κᵖ cold-in) zero (λ x → x) (λ ())
+                       (init-store (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in) _) root~
+                       (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog cold-in)) (plainSlots (insᵖ cold-in)))))
+                       (proj₂ (minted (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in)))))
 _ = record
   { π       = []
   ; π-keys  = []
@@ -66,10 +85,11 @@ _ = record
   }
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
-defer-in : Point
-defer-in = record { d₀ = hot ((after 1 , 5) ∷ []) ; prog = deferˢ (inputˢ zero) ; d₁ = emptyˢ }
 
-_ : Confirms (proj₁ (proj₂ (subscribe-related (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in))))
+_ : Confirms (proj₁ (walk-defer (κᵖ defer-in) (inputˢ zero) (λ x → x) (λ ())
+                       (init-store (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in) _) root~
+                       (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog defer-in)) (plainSlots (insᵖ defer-in)))))
+                       (proj₂ (minted (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in)))))
 _ = record
   { π       = (0 , 0 ∷ []) ∷ []
   ; π-keys  = [] ∷ []

@@ -39,3 +39,9 @@ outer : ∀ (n : ℕ) → n * 1 ≡ n
 outer n = helper
   where
   helper : n + 3 ≡ suc (suc (suc n))
+
+-- MUST FIRE (exact) against A.flat-mul-comm: the copy sits under a
+-- parameterised module, whose `where` opens no local scope.
+module _ (k : ℕ) where
+  postulate
+    nested-mul-comm : ∀ (x y : ℕ) → x * y ≡ y * x

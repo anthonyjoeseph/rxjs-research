@@ -241,24 +241,26 @@ undecided, never a failure (Anthony).
 ### The monster
 
 `simulation` — the theorem both assembled top lines stand on, by induction on
-arrivals over `correspondence`: schedules in step, pops partnered, stores related by `Simulation.Stores`, which the root
+arrivals over `correspondence`: schedules in step, pops partnered, stores related, which the root
 subscribes establish (`subscribe-related`) and each cascade keeps
 (`cascade-related`), both sending agreeing values under one instant. RULED
 OUT: an impl arrival the plain schedule lacks, a split arrival, a gap in a
 run's instants, an instant outside its cascade, an echo apart from its
 inners; a subscribe installing a run the relation does not name (hot, cold,
-deferred read, one-lane merge); a read's pop unrelating it. Left: a
-deeper flattener's subscribe, and which former's cascade fails to keep it.
+deferred read, one-lane merge); a pop unrelating a read; a map step moving
+an instant. Left: a deeper flattener's subscribe, and which former's cascade
+fails to keep it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **SPLIT THE STORE LEAVES PER FORMER.** `subscribe-related` becomes a walk
-  over the program, one arm per `SExp` former, mutual with a fold over a
-  related path, one arm per `PathRel` constructor; `cascade-related` folds
-  the related rows a pop reaches.  Each arm a leaf, so the monster drops to
-  whichever former's arm is riskiest.
+- **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
+  over the program, one arm per former, `walk-flatten` its riskiest; what
+  remains is `cascade-related`'s store conjunct as a fold over the related
+  rows a pop reaches, one arm per `PathRel` constructor, mutual with the
+  walk where a cascade subscribes an inner. Each arm a leaf, so the monster
+  drops to whichever constructor's arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: a claim the impl's cascade makes
@@ -278,9 +280,17 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   keeps the stores related and sends agreeing values under one instant the
   clock passes; the store conjunct holds at a hot read's first pop, but no
   cascade that moves a row checked.
-- **`subscribe-related`** (Simulation.Statement) — FALSITY, `PROBED`: the root
-  subscribes leave the stores related and the schedules in step; the store
-  conjunct holds at a hot, cold and deferred read, but no flattener checked.
+- **`walk-*`** (Simulation.Walk) — FALSITY, `PROBED×7`: one former's subscribe
+  keeps the stores related; holds at a hot, cold and deferred read. Riskiest is
+  `walk-flatten`, past the typechecker: a one-lane merge only in normal form.
+  No take, scan or `μ` run.
+- **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
+  step keeps an emit's instant and maps its payloads as the plain map does.
+- **`init-sources`** (Simulation.Walk) — FALSITY, `PROBED`: the hot scripts
+  live before anything is subscribed are related source for source.
+- **`subscribe-{sync,stamps}`** (Simulation.Statement) — FALSITY, `PROBED`: the
+  root subscribes leave the schedules in step, sending under one instant; sync
+  holds at a hot and a deferred read; stamps are past the typechecker.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
   `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached
@@ -296,3 +306,5 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   values on two arrivals under a flattener with no red.
 - **`cascade-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
   never runs a mint counter back.
+- **`renExp-id`** (Simulation.Walk) — GRINDABLE, `TWIN`: renaming by the
+  identity is the identity, the impl's mint body against its elaboration.

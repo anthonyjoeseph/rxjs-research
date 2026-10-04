@@ -59,7 +59,6 @@ open import SExp.Elaborate using (toInstEmit; plainᶜ⁺; deferBodyᵖ; stamped
 open import SExp.InstEmit using (machineEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmit)
 open import Batchable.Inst-Extract using (emitValues)
-open import Simulation.Lockstep using (Conf)
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -424,17 +423,18 @@ WF reg nodes =
 -- The stores
 ------------------------------------------------------------------
 
+-- over the raw schedules and states, since a subscribe walks through
+-- states no configuration names
 record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-             (c : Conf ep) (d : Conf ei) : Set where
+             (sP : Sched Γ) (stP : EvalSt ep) (sI : Sched (plainᵏ Γ κ)) (stI : EvalSt ei) : Set where
   field
     π       : List (NodeId × List NodeId)
     π-keys  : Unique (map proj₁ π)
     π-vals  : Unique (concatMap proj₂ π)
-    sources : Pointwise (Src κ) (Sched.live (Conf.sched c)) (Sched.live (Conf.sched d))
-    rows    : RegRel κ π (EvalSt.nodes (Conf.st c)) (EvalSt.nodes (Conf.st d))
-                (Sched.live (Conf.sched c)) (Sched.live (Conf.sched d))
-                (EvalSt.registry (Conf.st c)) (EvalSt.registry (Conf.st d))
-    latches : LatchRel {Γ = Γ} κ (EvalSt.completedSources (Conf.st c)) (EvalSt.connectedShares (Conf.st c))
-                                     (EvalSt.completedSources (Conf.st d)) (EvalSt.connectedShares (Conf.st d))
-    wfᴾ     : WF (EvalSt.registry (Conf.st c)) (EvalSt.nodes (Conf.st c))
-    wfᴵ     : WF (EvalSt.registry (Conf.st d)) (EvalSt.nodes (Conf.st d))
+    sources : Pointwise (Src κ) (Sched.live sP) (Sched.live sI)
+    rows    : RegRel κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
+                (EvalSt.registry stP) (EvalSt.registry stI)
+    latches : LatchRel {Γ = Γ} κ (EvalSt.completedSources stP) (EvalSt.connectedShares stP)
+                                     (EvalSt.completedSources stI) (EvalSt.connectedShares stI)
+    wfᴾ     : WF (EvalSt.registry stP) (EvalSt.nodes stP)
+    wfᴵ     : WF (EvalSt.registry stI) (EvalSt.nodes stI)

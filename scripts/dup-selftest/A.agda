@@ -68,3 +68,6 @@ outer : ∀ (n : ℕ) → n + 1 ≡ suc n
 outer n = helper
   where
   helper : n + 3 ≡ suc (suc (suc n))
+
+-- MUST FIRE (exact) against B.nested-mul-comm, which is inside a module
+flat-mul-comm : ∀ (x y : ℕ) → x * y ≡ y * x

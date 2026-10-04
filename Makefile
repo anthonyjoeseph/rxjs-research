@@ -587,15 +587,15 @@ imports-selftest:
 dup-selftest:
 	@out=$$(scripts/check-duplicates.py --src scripts/dup-selftest 2>&1); \
 	  fail=0; \
-	  echo "$$out" | grep -q "4 exact + 2 up-to-binder" \
-	    || { echo "SELFTEST FAIL: expected 4 exact + 2 up-to-binder groups"; fail=1; }; \
-	  for n in twin-different-name shared-name annotated-binder implicit-binder synonym-rhs implicit-unannotated-a implicit-unannotated-b; do \
+	  echo "$$out" | grep -q "5 exact + 2 up-to-binder" \
+	    || { echo "SELFTEST FAIL: expected 5 exact + 2 up-to-binder groups"; fail=1; }; \
+	  for n in twin-different-name shared-name annotated-binder implicit-binder synonym-rhs implicit-unannotated-a implicit-unannotated-b nested-mul-comm; do \
 	    echo "$$out" | grep -q "$$n" || { echo "SELFTEST FAIL: $$n not reported — a real duplicate stopped firing"; fail=1; }; \
 	  done; \
 	  for n in op-and op-or sealed fld-a fld-b helper outer; do \
 	    echo "$$out" | grep -q "$$n" && { echo "SELFTEST FAIL: $$n reported, but it is not a duplicate"; fail=1; }; \
 	  done; \
-	  if [ $$fail -eq 0 ]; then echo "dup-selftest: PASS (fires on differing names, on one name in two modules, on binder spelling and on an unannotated implicit's letter; not on operators, record fields, where-locals or the -go alias)"; \
+	  if [ $$fail -eq 0 ]; then echo "dup-selftest: PASS (fires on differing names, on one name in two modules, on binder spelling, on an unannotated implicit's letter and inside a parameterised module; not on operators, record fields, where-locals or the -go alias)"; \
 	  else echo "$$out"; exit 1; fi
 
 # SEARCH FIRST, made cheap and impossible to scope wrong: search the declared

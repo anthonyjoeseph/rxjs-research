@@ -38,7 +38,7 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous.Properties using (fro
 open import Data.List.Relation.Binary.Pointwise.Properties using (Pointwise-length)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
-  renaming (refl to pointwise-refl)
+  renaming (refl to pointwise-refl; map to Pointwise-map)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; ≤⇒≤′; ≤⇒≤ᵇ; ≤ᵇ⇒≤; <-≤-trans; <-irrefl; <-cmp; m≤m+n; +-cancelˡ-≡)
 open import Relation.Binary using (tri<; tri≈; tri>)
@@ -49,7 +49,7 @@ open Relation.Binary.PropositionalEquality.≡-Reasoning
 
 open import Rx.Prim      using (Fuel; Id; PlainEvent; valueᵖ; completeᵖ; InstEmit)
 open import Rx.Exp       using (Ctx; Closed; Val; isData; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
-open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ)
+open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
@@ -64,7 +64,8 @@ open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; sched-pop)
-open import Simulation.Stores using () renaming (Src to Srcˢ; Store to Storeˢ; module Store to Storeˢ)
+open import Simulation.Stores using (V) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -159,12 +160,6 @@ Arrival-Runs =
       All (λ p → proj₁ p ≡ name k) (sliceAt (stampedAt κ e ins) k))
 
 -- what a run's arrival is read as, plain and stamped
-readᴾ : ∀ {n} {Γ : Ctx n} {t} → Stream Γ t → List (Val Γ t)
-readᴾ s = plainValues (concat s)
-
-readᴵ : ∀ {m} {Γ′ : Ctx m} {t} → Stream Γ′ (instEmitᵗ uniqᵗ t) → List (Id × Val Γ′ t)
-readᴵ s = instExtract (decodeEmits (concat s))
-
 -- ONE INSTANT TO AN ARRIVAL'S VALUES, minted between `lo` and `hi`
 OneIn : ∀ {A : Set} → ℕ → ℕ → List (Id × A) → Set
 OneIn lo hi []             = ⊤
@@ -230,6 +225,13 @@ clock-on d (inj₂ (a , s′)) eqn =
 -- between their live sources that the stores keep, and what each arrival
 -- does to them.  The schedules are related outside it, by `Sync`, so a
 -- pop is `sched-pop`'s and the leaf is the subscribe and the cascade.
+-- the stores of two configurations, a type of its own so a store names
+-- the configurations it relates
+record Storeˢ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+              (c : Conf ep) (d : Conf ei) : Set where
+  constructor stores
+  field raw : Storeʳ κ (Conf.sched c) (Conf.st c) (Conf.sched d) (Conf.st d)
+
 record Machines {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) : Set₁ where
   field
     Src   : LiveSource Γ → LiveSource (plainᵏ Γ κ) → Set
@@ -252,35 +254,22 @@ record Machines {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (in
                 → OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
 
 postulate
-  -- THE ROOT SUBSCRIBES LEAVE THE STORES RELATED, the schedules in step,
-  -- and what they sent agreeing under one instant below the clock.
-  -- Each former's subscribe installs the impl run `Simulation.Stores`
-  -- names for its plain frame, so this is a walk over the program.
-  --
-  -- A ONE-LANE MERGE OF THE HOT READ INSTALLS WHAT THE RELATION SAYS, read
-  -- off the normal forms of both start stores, not typechecked: the plain
-  -- row runs the lane into a merge node and the root; the impl row runs
-  -- the restamp, the lane's merge node, the flattener's cell and the root,
-  -- with the read's block on a second row into the share.  That is `read~`
-  -- through `inner~` and `merge~`, `π` pairing the plain merge node with
-  -- the impl's lane node and cell.  A literal `of` installs nothing on
-  -- either side, so its store is the empty relation.
-  --
-  -- PROBED: `Probed.Stores` -- the STORE conjunct alone, by `Confirms`, at
-  --   three one-source programs: the hot read (`read~` over `root~`, the
-  --   share's `InputBlock` as a `hot~` machine row), the cold read
-  --   (`cold~`, its block run straight to the root) and a deferred hot read
-  --   (`defer~` and a pending `hop`, `π` pairing the defer's merge nodes).
-  --   Each covers the source payloads, the latches and both `WF`s.  Not a
-  --   flattener: the merge row above did not finish typechecking, a coverage
-  --   boundary.  Not the `Sync`, agreement or stamps conjuncts.
-  subscribe-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+  -- THE ROOT SUBSCRIBES LEAVE THE SCHEDULES IN STEP: each former's
+  -- subscribe makes the sources live its plain frame does, at the ticks
+  -- and in the rank order its plain frame does.
+  -- PROBED: `Probed.Opening` -- a hot read's share, one source each side,
+  --   and a deferred hot read, its hop ranked against the script.  Not a
+  --   cold read, not a flattener's inners.
+  subscribe-sync : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
     → Sync (live (start (plainExp e) (plainSlots ins))) (live (start (elaborateImpl κ e) (embedSlotsImpl ins)))
-    × Storeˢ κ (start (plainExp e) (plainSlots ins)) (start (elaborateImpl κ e) (embedSlotsImpl ins))
-    × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)
-                (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
-                (readᴾ (opening (plainExp e) (plainSlots ins)))
-    × OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+
+  -- WHAT THE ROOT SUBSCRIBES SEND CARRIES ONE INSTANT, drawn below the
+  -- clock they leave: the root frame's own token.  The typechecker does
+  -- not reach this: decoding what the impl's subscribe sends exhausted
+  -- memory at a one-value cold script, so the compiled sweep, deciding
+  -- `simulation`, is where it is checked.
+  subscribe-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+    → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 
   -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
@@ -322,6 +311,38 @@ postulate
     × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ (out d)) (readᴾ (out c))
     × OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
 
+-- A RELATED VALUE AGREES: at data both are the same value, and `obs`
+-- is not compared
+v-agrees : ∀ {n} {Γ : Ctx n} (κ : Kinds n) t {v w} → V κ t v w → Agrees (plainᵏ Γ κ) Γ t v w
+v-agrees κ unitᵗ     r = r
+v-agrees κ boolᵗ     r = r
+v-agrees κ natᵗ      r = r
+v-agrees κ uniqᵗ     r = r
+v-agrees κ (s ×ᵗ t)  (a , b) = v-agrees κ s a , v-agrees κ t b
+v-agrees κ (s +ᵗ t)  {inj₁ _} {inj₁ _} r = v-agrees κ s r
+v-agrees κ (s +ᵗ t)  {inj₂ _} {inj₂ _} r = v-agrees κ t r
+v-agrees κ (s +ᵗ t)  {inj₁ _} {inj₂ _} ()
+v-agrees κ (s +ᵗ t)  {inj₂ _} {inj₁ _} ()
+v-agrees κ (listᵗ t) rs = Pointwise-map (v-agrees κ t) rs
+v-agrees κ (obs t)   _  = tt
+
+-- THE ROOT SUBSCRIBES LEAVE THE STORES RELATED, the schedules in step,
+-- and what they sent agreeing under one instant below the clock: the
+-- stores and values are the walk over the program, former by former.
+subscribe-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+  → Sync (live (start (plainExp e) (plainSlots ins))) (live (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+  × Storeˢ κ (start (plainExp e) (plainSlots ins)) (start (elaborateImpl κ e) (embedSlotsImpl ins))
+  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)
+              (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
+              (readᴾ (opening (plainExp e) (plainSlots ins)))
+  × OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+            (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
+subscribe-related {t = t} κ e ins =
+    subscribe-sync κ e ins
+  , stores (proj₁ (root-walk κ e ins))
+  , Pointwise-map (v-agrees κ t) (proj₂ (root-walk κ e ins))
+  , subscribe-stamps κ e ins
+
 -- THE MACHINES ARE RELATED BY `Simulation.Stores`: a live source by its
 -- payloads, a registration by the run of frames its former's
 -- elaboration installs, a node by the impl nodes `π` pairs it with.
@@ -330,7 +351,7 @@ machines : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins
 machines κ e ins = record
   { Src         = Srcˢ κ
   ; Store       = Storeˢ κ
-  ; store-src   = Storeˢ.sources
+  ; store-src   = λ s → Storeʳ.sources (Storeˢ.raw s)
   ; open-sync   = proj₁ (subscribe-related κ e ins)
   ; open-store  = proj₁ (proj₂ (subscribe-related κ e ins))
   ; open-agree  = proj₁ (proj₂ (proj₂ (subscribe-related κ e ins)))
