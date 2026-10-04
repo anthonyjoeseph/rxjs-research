@@ -306,6 +306,14 @@ postulate
   -- first: seed 21 at depth 3, 120 cases, 103 decided and 66 of those
   -- grouping values, none outside.  And the instants a run draws are
   -- contiguous: no gap at depth 2 seeds 13..36 nor depth 3 seeds 1..11.
+  --
+  -- PROBED: `Probed.Stores` -- the STORE conjunct alone, by `Confirms`, at
+  --   the first pop of the hot read's two arrivals, from the store its
+  --   subscribe row relates and the `Popped` `sched-pop` builds: one
+  --   payload gone from the source on both sides, the `read~` and `hot~`
+  --   rows unchanged, the latches and both `WF`s.  Not a cascade that
+  --   moves a row, nor a later pop.  Not the `Sync`, agreement or stamps
+  --   conjuncts.
   cascade-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                       {c : Conf (plainExp e)} {d : Conf (elaborateImpl κ e)}
     → Storeˢ κ c d → Popped (Srcˢ κ) (live c) (live d) (schedGo (live c)) (schedGo (live d))

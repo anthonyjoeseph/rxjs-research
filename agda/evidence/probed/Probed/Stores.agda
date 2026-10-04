@@ -1,7 +1,8 @@
--- THE STORES THE ROOT SUBSCRIBES INSTALL, related by hand at concrete
--- programs: the relation `Simulation.Stores` states, inhabited against
--- the registries the two subscribes actually compute.
+-- THE STORES THE ROOT SUBSCRIBES INSTALL, AND ONE CASCADE KEEPS, related
+-- by hand at concrete programs: the relation `Simulation.Stores` states,
+-- inhabited against the registries the two runs actually compute.
 -- TARGET: subscribe-related @70be7d
+-- TARGET: cascade-related @a3c004
 module Probed.Stores where
 
 open import Data.List using ([]; _∷_)
@@ -17,16 +18,31 @@ open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Simulation.Statement using (subscribe-related)
+open import Simulation.Statement using (subscribe-related; cascade-related)
+open import Simulation.Schedules using (sched-pop; []; _∷_)
 open import Simulation.Stores using (data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
 open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals)
 
-_ : Confirms (proj₁ (proj₂ (subscribe-related (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals))))
-_ = record
+store₀ : Confirms (proj₁ (proj₂ (subscribe-related (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals))))
+store₀ = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
   ; sources = data~ refl (refl ∷ refl ∷ []) ∷ []
+  ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl refl refl) refl) []
+  ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
+  ; wfᴾ     = λ _ _ ()
+  ; wfᴵ     = λ { 0 _ refl → refl ; 1 _ () ; 2 _ refl → refl ; (suc (suc (suc _))) _ () }
+  }
+
+-- the first cascade of the same run: one arrival popped from each side
+_ : Confirms (proj₁ (proj₂ (cascade-related (κᵖ two-arrivals) (Point.prog two-arrivals) store₀
+                                            (sched-pop ((refl , []) ∷ []) (data~ refl (refl ∷ refl ∷ []) ∷ [])))))
+_ = record
+  { π       = []
+  ; π-keys  = []
+  ; π-vals  = []
+  ; sources = data~ refl (refl ∷ []) ∷ []
   ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl refl refl) refl) []
   ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
   ; wfᴾ     = λ _ _ ()
