@@ -125,6 +125,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     head : ∀ {l l′ a a′} → Src κ l l′ → HeadOf l a → HeadOf l′ a′
          → Arrival.source a ≡ src → Arrival.source a′ ≡ src′
          → Head src src′ (arrVal a ∷ []) (arrVal a′ ∷ [])
+    nohead : ∀ {u u′} → Head src src′ {u} {u′} [] []
 
   -- the related values at the root: the emits' payloads in order
   postulate

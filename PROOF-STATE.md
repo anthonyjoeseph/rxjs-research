@@ -258,8 +258,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
   over the program, one arm per former, `walk-flatten` its riskiest. A minted
   source's chain is `path-pass`, one arm per plain frame, and a hot slot's is
-  `fan-go` over the share's readers, each `slot-pass`; what remains is
-  `last-pass` onto the same fold, and splitting `outer-arm` and `inner-arm` per
+  `fan-go` over the share's readers, each `slot-pass`; a minted source's end is
+  the same fold at an end head; what remains is `hot-end`, and splitting `outer-arm` and `inner-arm` per
   constructor, so the monster drops to whichever arm is riskiest.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
@@ -276,9 +276,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`last-pass`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a last
+- **`hot-end`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a hot last
   arrival's close, end pass and drop keep the stores related; the store
   relation itself fails between the close and the end pass at a hot read.
+- **`{close,finish}-store`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
+  minted source's close and drop keep the stores related.
+- **`dyn-chains-end`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: the
+  chains a minted source's end walks pair up, the cut ones cut on both sides.
 - **`outer-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's
   step on both sides, every inner a sync outer hands the flattener subscribed.
 - **`inner-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: leaving an inner,
