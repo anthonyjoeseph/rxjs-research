@@ -488,22 +488,39 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         × (lookup κ i ≡ sharedᵏ → memberSource (toℕ i) CP ≡ memberSource (toℕ (n ↑ʳ i)) CI
                                  × memberSource (toℕ i) SP ≡ memberSource (toℕ (n ↑ʳ i)) SI)
 
--- the inner a path's input block rides, if it starts with one
-blockInner : ∀ {m} {Δ : Ctx m} {lo s u} → Path Δ lo s u → Maybe NodeId
-blockInner (map-f _ ↠[ _ ] (from-inner mergeAllᵒ _ j ↠[ _ ] _)) = just j
-blockInner _                                                     = nothing
+-- the nodes a path's input block installs, if it starts with one: the
+-- marked merge, its inner, the bracket and the flattening merge
+-- (one frame per clause, so no split is at a computed element type)
+blockNodes : ∀ {m} {Δ : Ctx m} {lo s u} → Path Δ lo s u → List NodeId
+blockNodes = λ p → atInr p
+  where
+    atM2 atStamp atPair atB atM1 atInr : ∀ {m} {Δ : Ctx m} {lo s u} → Path Δ lo s u → List NodeId
+    atM2 (thru-outer mergeAllᵒ m2 ↠[ _ ] _) = m2 ∷ []
+    atM2 _                                  = []
+    atPair (map-f _ ↠[ _ ] p) = atM2 p
+    atPair _                  = []
+    atStamp (map-f _ ↠[ _ ] p) = atPair p
+    atStamp _                  = []
+    atB (batchSync-f b ↠[ _ ] p) = b ∷ atStamp p
+    atB _                        = []
+    atM1 (from-inner mergeAllᵒ m1 j ↠[ _ ] p) = m1 ∷ j ∷ atB p
+    atM1 _                                    = []
+    atInr (map-f _ ↠[ _ ] p) = atM1 p
+    atInr _                  = []
 
--- AN INPUT BLOCK'S INNER IS ITS OWN ROW'S, AND NO OTHER ROW THREADS IT.
--- The inner is minted at the read's subscribe, which registers the one
--- row of the script it reads, and a row registered later starts at its
--- own source, below the block.  It is what lets the row's end leave the
--- block: the inner's finish finds nothing alive through it.  Stamped
--- slots are exempt, since a reader's path is a restamp, and one inside a
--- deferred body leads with the hop's merge, which many rows thread
+-- AN INPUT BLOCK'S NODES ARE ITS OWN ROW'S, AND NO OTHER ROW THREADS
+-- THEM.  The block is minted at the read's subscribe, which registers the
+-- one row of the script it reads, and a row registered later starts at
+-- its own source, below the block; the flattening merge never subscribes
+-- an inner.  It is what lets the row's end leave the block: the inner's
+-- finish finds nothing alive through it, and what the end writes to the
+-- block's nodes no other row reads.  Stamped slots are exempt, since a
+-- reader's path is a restamp, and one inside a deferred body leads with
+-- the hop's merge, which many rows thread
 Owned : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} → List (RegRow (plainᵏ Γ κ) (emitᵗ t)) → Set
 Owned {n} κ K =
   All (λ r → (∀ (k : Fin n) → proj₁ (proj₂ r) ≡ atSlot (n ↑ʳ k) → ⊥)
-           → ∀ {j} → blockInner (proj₂ (proj₂ (proj₂ r))) ≡ just j
+           → ∀ {j} → j ∈ blockNodes (proj₂ (proj₂ (proj₂ r)))
            → All (λ r′ → pathHasNode j (proj₂ (proj₂ (proj₂ r′))) ≡ true → r′ ≡ r) K) K
 
 ------------------------------------------------------------------

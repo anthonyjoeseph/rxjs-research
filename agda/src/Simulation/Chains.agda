@@ -13,6 +13,8 @@ open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥-elim)
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Properties using (++-identityʳ)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_) renaming (map to pw-map)
 open import Data.List.Relation.Unary.All using (All; _∷_; [])
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
@@ -29,11 +31,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Closed; _≟ᵗ_)
-open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegId; RegRow; RegSrc; atDyn; atSlot; shareAdmit; regSource; regFloor; Path;
-  arrSource; arrTy; arrVal; schedHeadOf; chainsGo; chainsOf; sameSource; schedGo; cascadeOpen; cascadeClose; share-sink)
+open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegId; RegRow; RegSrc; atDyn; atSlot; shareAdmit;
+  regSource; regFloor; Path; arrSource; arrTy; arrVal; schedHeadOf; chainsGo; chainsOf;
+  sameSource; schedGo; cascadeOpen; share-sink)
 open import Rx.Evaluator.Domain using (cascadeGo⇓; casc-nil; casc-cut; casc-live)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
-open import Simulation.Pass using (dynRow; clash; Paired; SlotPair; slotpair; head; HotStart; hot-idle; hot-block; HotEnd; hot-end-idle; hot-end-block)
+open import Simulation.Pass using (dynRow; clash; Paired; SlotPair; slotpair; head; HotStart; hot-idle; hot-block)
 open import Simulation.Pop using (pp-popped)
 open import Simulation.Schedules using (Popped; pop; sched-pop; HeadOf)
 open import Simulation.Stores using (srcCount; InputBlock; Src; data~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr; SameAt;
@@ -434,13 +437,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            → InputBlock {Γ = Γ} κ π {t} NP NI (plainᵗ (lookup Γ i)) full
                (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
            → any (_≡ᵇ rid) CI ≡ false
+           → _∈_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full)) rg′
            → RawOne a′ i CI rg′
 
   raw-cons : ∀ {t π NP NI} {a′ : Arrival (plainᵏ Γ κ)} {i CI r′ rest}
            → chainsGo a′ (r′ ∷ rest) ≡ chainsGo a′ rest
            → RawOne {t} {π} {NP} {NI} a′ i CI rest → RawOne {t} {π} {NP} {NI} a′ i CI (r′ ∷ rest)
   raw-cons e (raw-mistyped ne c)  = raw-mistyped ne (trans e c)
-  raw-cons e (raw-at hot c d ib u) = raw-at hot (trans e c) d ib u
+  raw-cons e (raw-at hot c d ib u m) = raw-at hot (trans e c) d ib u (there m)
 
   raw-one : ∀ {t π NP NI LP LI rg rg′} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n} {CI}
           → arrSource a′ ≡ toℕ (i ↑ˡ n)
@@ -468,7 +472,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ne′ x = ne (toℕ-injective (trans (sym (toℕ-↑ˡ j n)) (trans (sym x) (toℕ-↑ˡ i n))))
   ... | yes refl with plainᵗ (lookup Γ i) ≟ᵗ arrTy a′
   ...   | yes ety with chains-slot a′ {i = i ↑ˡ n} e ety
-  ...     | c , h , d = raw-at hot (trans h (cong (_ ∷_) none)) d ib u₀
+  ...     | c , h , d = raw-at hot (trans h (cong (_ ∷_) none)) d ib u₀ (here refl)
     where
       none = raw-none a′ rs′ (subst (λ k → srcCount k rs′ ≡ 0) (sym e) (suc-injective (trans (sym (count-hit (toℕ (i ↑ˡ n)) r′ rs′ (same-refl (toℕ (i ↑ˡ n))))) z)))
   raw-one {a′ = a′} {i} e (mach {r′ = r′} {rs′ = rs′} (hot~ {i = j} hot ib refl) q) (_ ∷ ab) (u₀ ∷ us) z | yes refl | no ¬e =
@@ -559,7 +563,7 @@ hot-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src 
 ...   | raw-mistyped ne none =
   hot-idle (plain-mistyped {Γ = Γ} κ e₁ (λ x → ne (trans (head-ety {Γ = Γ} κ src h h′ e₁) (cong plainᵗ x))) (Store.rows S) (proj₁ (Store.above S)))
            (casc-empty (subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) none go))
-...   | raw-at hot ch d ib u
+...   | raw-at hot ch d ib u _
   with subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) ch go
 ...     | casc-cut y _ = ⊥-elim (clash (trans (sym y) u))
 ...     | casc-live _ d′ casc-nil =
@@ -567,33 +571,3 @@ hot-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src 
         (hot-block κ S hot (head src h h′ e₁ e₂)
                    (plainᵗ-inj (trans (sym (head-ety {Γ = Γ} κ src h h′ e₁)) (cong (λ r → proj₁ (proj₂ (proj₂ r))) d)))
                    d ib d′)
-
--- AND AT ITS END: none, and no plain reader, until the share has
--- connected; then the one raw row's, whose end step is the input block's
--- run.  A raw row at another type than the arrival's is not there, since
--- a slot's source holds its slot's type
-hot-end-start : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                  {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-              → (S : Store κ sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-              → lookup κ i ≡ hotᵏ
-              → ∀ {l l′} → Src κ l l′ → HeadOf l a → HeadOf l′ a′
-              → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
-              → ∀ {eI sI₃ stI₃}
-              → cascadeGo⇓ a′ [] true (chainsOf a′ stI) sI (cascadeClose a′ stI) (eI , sI₃ , stI₃)
-              → HotEnd κ S a a′ i eI sI₃ stI₃
-hot-end-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src h h′ e₁ e₂ {eI} {sI₃} {stI₃} go
-  with Store.census S i hk
-... | inj₂ (z₁ , z₂ , cd) =
-  hot-end-idle (plain-none {Γ = Γ} κ e₁ (Store.rows S) (proj₁ (Store.above S)) z₂) z₁ z₂ cd
-    (casc-empty (subst (λ c → cascadeGo⇓ a′ [] true c sI (cascadeClose a′ stI) (eI , sI₃ , stI₃))
-                       (raw-none a′ (EvalSt.registry stI) (subst (λ k → srcCount k (EvalSt.registry stI) ≡ 0) (sym e₂) z₁)) go))
-... | inj₁ (c , _) with raw-one {Γ = Γ} κ {CI = EvalSt.cancelled stI} e₂ (Store.rows S) (proj₂ (Store.above S)) (proj₂ (Store.uncut S)) c
-...   | raw-mistyped ne _ = ⊥-elim (ne (trans (head-ety {Γ = Γ} κ src h h′ e₁) (cong plainᵗ (slot-ty {Γ = Γ} κ src h e₁))))
-...   | raw-at hot ch d ib u
-  with subst (λ c → cascadeGo⇓ a′ [] true c sI (cascadeClose a′ stI) (eI , sI₃ , stI₃)) ch go
-...     | casc-cut y _ = ⊥-elim (clash (trans (sym y) u))
-...     | casc-live _ d′ casc-nil =
-  subst (λ o → HotEnd κ S a a′ i o sI₃ stI₃) (sym (++-identityʳ _))
-        (hot-end-block κ S hot e₁ e₂
-                       (plainᵗ-inj (trans (sym (head-ety {Γ = Γ} κ src h h′ e₁)) (cong (λ r → proj₁ (proj₂ (proj₂ r))) d)))
-                       d ib d′)

@@ -240,16 +240,16 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — what both assembled top lines stand on, by induction on
-arrivals over `correspondence`: schedules in step, pops partnered, stores related, which the root
-subscribes establish (`subscribe-related`) and each cascade keeps
-(`cascade-related`), both sending agreeing values under one instant. RULED
+`simulation` — what both top lines stand on, by induction on
+arrivals over `correspondence`: schedules in step, pops partnered, stores related; the root
+subscribes set them (`subscribe-related`) and each cascade keeps
+(`cascade-related`), both sending agreeing values in one instant. RULED
 OUT: an impl arrival the plain schedule lacks, a split arrival, a gap or
 stray in a cascade's instant, an echo apart from its inners; a subscribe
-installing a run the relation does not name (hot, cold, deferred read,
+installing a run the relation lacks (hot, cold, deferred read,
 one-lane merge); a pop unrelating a read; a map moving an instant; a close
-emptying a merge its rows name. Left: a deeper flattener's subscribe, and which former's cascade
-breaks it.
+emptying a merge its rows name; a hot end past its block.
+Left: a deeper flattener's subscribe, and which former's cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
@@ -260,7 +260,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   chain is `path-pass`, one arm per plain frame; a hot slot's is `fan-go` over
   the share's readers, paired by the proven `slot-chains`, after `hot-start`
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
-  alike: `finish-store` and `hot-finish` are proven. Left: the arms as real bodies, riskiest first, each owing the
+  alike: `finish-store` and `hot-finish` are proven, and a connected hot
+  end's store is proven over the evaluator's `hot-block-end`. Left: the arms as real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
   `inner-arm` once `Arm` carries an impl-only step; the monster drops to
   whichever arm fails.
@@ -279,9 +280,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`hot-end-block`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a connected
-  hot slot's raw row runs its block's end alone into the share, which it
-  spends while the plain run latches the slot; the stores meet again there.
+- **`hot-block-end`** (Simulation.Hot-End) — FALSITY, `NO EVIDENCE`: a block
+  no live row threads runs its end into the share writing only its own nodes,
+  which stay a block; schedule and every other part of the state stand.
 - **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   outer's step on both sides; the explode hands the flattener every inner a
   sync outer subscribed before the step returns.

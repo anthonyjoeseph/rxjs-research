@@ -423,24 +423,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → HotEnd S a a′ i eI sI₃ stI₃
 
     postulate
-      -- THE IMPL'S ONE CHAIN AT A HOT ARRIVAL'S RAW SLOT, CLOSING, ONCE ITS
-      -- SHARE HAS CONNECTED: the raw row's end step, its input block run
-      -- alone into the share.  What it owes is the block's run to the
-      -- share's end: the share spent and the end dispatched, the plain side
-      -- latched and not otherwise moving
-      hot-end-block : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-                    → (hot : lookup κ i ≡ hotᵏ) → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
-                    → arrTy a ≡ lookup Γ i
-                    → ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)}
-                    → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
-                    → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
-                        (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
-                    → ∀ {eI sI₃ stI₃}
-                    → chainStep⇓ a′ [] true (suc (toℕ (i ↑ˡ n)) , q) sI
-                        (record (cascadeClose a′ stI) { delivered = rid ∷ EvalSt.delivered (cascadeClose a′ stI) }) (eI , sI₃ , stI₃)
-                    → HotEnd S a a′ i eI sI₃ stI₃
-
-    postulate
       -- THE IMPL'S ONE CHAIN AT A HOT ARRIVAL'S RAW SLOT, ONCE ITS SHARE HAS
       -- CONNECTED: the raw row's step over the arrival's value, its input
       -- block run alone into the share.  What it owes is the block's run:

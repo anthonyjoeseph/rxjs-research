@@ -52,7 +52,7 @@ _ = record
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   ; census  = λ { zero _ → inj₁ (refl , refl) ; (suc zero) () }
-  ; owned   = (λ _ ()) ∷ (λ _ → λ { refl → (λ ()) ∷ (λ _ → refl) ∷ [] }) ∷ []
+  ; owned   = (λ _ ()) ∷ (λ _ _ → (λ ()) ∷ (λ _ → refl) ∷ []) ∷ []
   }
 
 -- a cold script: its subscribe runs the input block straight to the root
@@ -78,7 +78,7 @@ _ = record
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   ; census  = λ { zero () ; (suc zero) () }
-  ; owned   = (λ _ → λ { refl → (λ _ → refl) ∷ [] }) ∷ []
+  ; owned   = (λ _ _ → (λ _ → refl) ∷ []) ∷ []
   }
 
 -- a deferred hot read: the hop pending, its body not yet subscribed

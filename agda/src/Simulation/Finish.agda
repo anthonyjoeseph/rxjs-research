@@ -322,6 +322,10 @@ close-hit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) (st : Ev
           → Arrival.source a ≡ k → memberSource k (EvalSt.completedSources (cascadeClose a st)) ≡ true
 close-hit a st {k} refl = cong (_∨ any (sameSource k) (EvalSt.completedSources st)) (same-refl k)
 
+-- a latch list grown by another source reads one apart from it as before
+member-no : ∀ {m k} (xs : List Source) → m ≢ k → memberSource m (k ∷ xs) ≡ memberSource m xs
+member-no {m} xs ne = cong (_∨ any (sameSource m) xs) (sameSource-no ne)
+
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   -- a drop keeps every surviving block's inner its own row's
@@ -617,9 +621,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       CP = EvalSt.completedSources stP
       CI = EvalSt.completedSources stI
       SI = EvalSt.connectedShares stI
-
-      member-no : ∀ {m k} (xs : List Source) → m ≢ k → memberSource m (k ∷ xs) ≡ memberSource m xs
-      member-no {m} xs ne = cong (_∨ any (sameSource m) xs) (sameSource-no ne)
 
       hitP : memberSource (toℕ i) (Arrival.source a ∷ CP) ≡ true
       hitP = close-hit a stP e₁
