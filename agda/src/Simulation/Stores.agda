@@ -25,7 +25,7 @@
 ------------------------------------------------------------------
 module Simulation.Stores where
 
-open import Data.Bool    using (Bool; true; false; _∨_)
+open import Data.Bool    using (Bool; true; false; _∨_; T)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥)
 open import Data.Fin     using (toℕ; _↑ʳ_; _↑ˡ_)
@@ -37,19 +37,20 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (Maybe; just; nothing)
-open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_; _<ᵇ_)
+open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
 
 open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Prim      using (InstEmit; Tick; Source)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Env; Closed; lookupEnv;
   Ren∈; renExp; FnClo; applyClo; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; varᵗ; unit̂; pairᵗ; inlᵗ;
   inrᵗ; sndᵗ; Tm)
-open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeState; NodeId; Path; RegRow; atSlot; atDyn; root; share-sink;
+open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeState; NodeId; Path; RegRow; RegSrc; atSlot; atDyn; root; share-sink;
   _↠[_]_; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; mergeAllᵒ; cell-st;
   take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st; echoᵗ; lookupNode; memberSource;
   takeVals; scanVals; regSource; sameSource)
@@ -75,6 +76,15 @@ data SrcNum {n} (κ : Kinds n) : Source → Source → Set where
 -- is still at
 guardOf : ∀ {n} {Γ : Ctx n} {t} → List (RegRow Γ t) → LiveSource Γ → Bool
 guardOf {n = n} reg l = (LiveSource.source l <ᵇ n) ∨ any (λ p → sameSource (LiveSource.source l) (regSource (proj₁ (proj₂ p)))) reg
+
+-- WHETHER A REGISTRATION SITS WHERE ITS SOURCE WAS MINTED: a slot's at its
+-- slot, a minted source's above every slot
+aboveᵇ : ∀ {n} {Γ : Ctx n} → RegSrc Γ → Bool
+aboveᵇ (atSlot _)        = true
+aboveᵇ {n} (atDyn s _)   = n ≤ᵇ s
+
+above-≤ : ∀ {n s} → (n ≤ᵇ s) ≡ true → n ≤ s
+above-≤ {n} {s} e = ≤ᵇ⇒≤ n s (subst T (sym e) tt)
 
 -- the sweep reads a source's number alone
 guard-src : ∀ {n} {Γ : Ctx n} {t} (reg : List (RegRow Γ t)) {l l₂ : LiveSource Γ}
@@ -484,6 +494,8 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     -- a registration still in the registry is not a cascade's victim
     uncut   : All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) (EvalSt.registry stP)
             × All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) (EvalSt.registry stI)
+    -- a plain registration at a minted source is above every slot
+    above   : All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) (EvalSt.registry stP)
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other

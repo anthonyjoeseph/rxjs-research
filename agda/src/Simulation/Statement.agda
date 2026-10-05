@@ -70,13 +70,13 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
-open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop)
+open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains)
 open import Simulation.Close using (close-store; close-arr)
 open import Simulation.Finish using (finish-store; hot-finish; T-true)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
-  Persists; delivered-arr; _⨾_; fan-go; hot-start; hot-start-at; hot-adm; hot-end-start; hot-end-at)
+  Persists; delivered-arr; _⨾_; fan-go; hot-start; hot-start-at; hot-end-start; hot-end-at)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -413,12 +413,12 @@ hot-pass {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy 
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
   with hot-start κ (pop-store κ s ex ex′ sy) {a} {a′} {i} hk (head src h h′ e₁ e₂) go′
-... | hot-start-at {oB = oB} {εI = εI} A c (disp (walk-more {emits = em} g walk-nil)) refl =
+... | hot-start-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-more {emits = em} g walk-nil)) refl =
   After.store Z ,
   subst (λ z → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ z) (readᴾ oP))
         (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z))
   where
-    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (hot-adm κ (After.store A) hk e₁) go g)
+    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty) go g)
 
 -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
 -- HAVE, or one plain arrival's values delivered across two.  Either is
@@ -477,11 +477,11 @@ hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
 hot-end {Γ = Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ i hk e₁ e₂ go go′ end end′
   with hot-end-start κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ end′
-... | hot-end-at {oB = oB} {εI = εI} A c (disp (walk-end {r = r} g)) refl =
+... | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
   hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
-    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (hot-adm κ (After.store A) hk e₁) end g)
+    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty) end g)
 
 -- THE END OF A LAST ARRIVAL: a minted source's is the close, the end walked
 -- over the chains the value pass left as that pass walked them, and the

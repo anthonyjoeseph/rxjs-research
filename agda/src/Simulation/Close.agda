@@ -34,7 +34,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
   close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut
+    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
     ; latches = λ i → let h , sh = latches i
                           lt  = <-trans (toℕ<n i) na
                           lt′ = subst (_< Arrival.source a′) (sym (toℕ-↑ʳ n i)) (<-trans (+-monoʳ-< n (toℕ<n i)) na′)

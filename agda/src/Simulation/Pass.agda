@@ -33,7 +33,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; Path; Frame; share-sink;
-  _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf; shareAdmit)
+  _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
@@ -92,7 +92,7 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
           → Store κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
 delivered s = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut }
+  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above }
   where open Store s
 
 -- the arrival's pair against the rows is as it was, since the rows are
@@ -389,7 +389,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     data HotStart {sP stP sI stI} (S : St sP stP sI stI) (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ)) (i : Fin n)
                   (oI : Stream (plainᵏ Γ κ) (emitᵗ t)) (sI₁ : Sched (plainᵏ Γ κ)) (stI₁ : EvalSt ei) : Set where
       hot-start-at : ∀ {oB sI₂ stI₂ e lo rD} {below : lo ≤ toℕ (n ↑ʳ i)}
-                       {εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)}
+                       {εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)} {ty : arrTy a ≡ lookup Γ i}
                    → (A : After S ([] , sP , stP) (oB , sI₂ , stI₂))
                    → CarriesU εI (e ∷ []) (arrVal a ∷ [])
                    → dispatchShare⇓ (arrTick a′) (n ↑ʳ i) below (e ∷ []) false sI₂ stI₂ rD
@@ -403,7 +403,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     data HotEnd {sP stP sI stI} (S : St sP stP sI stI) (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ)) (i : Fin n)
                 (eI : Stream (plainᵏ Γ κ) (emitᵗ t)) (sI₃ : Sched (plainᵏ Γ κ)) (stI₃ : EvalSt ei) : Set where
       hot-end-at : ∀ {oB sI₂ stI₂ lo rD} {below : lo ≤ toℕ (n ↑ʳ i)}
-                     {εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)}
+                     {εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)} {ty : arrTy a ≡ lookup Γ i}
                  → (A : After S ([] , sP , cascadeClose a stP)
                               (oB , sI₂ , shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true stI₂)))
                  → CarriesU εI [] []
@@ -427,13 +427,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → ∀ {oI sI₁ stI₁}
                 → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) sI stI (oI , sI₁ , stI₁)
                 → HotStart S a a′ i oI sI₁ stI₁
-
-      -- the readers the plain run walks and the rows the share admits are
-      -- partnered, in order, once the block has run
-      hot-adm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {i : Fin n}
-              → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i
-              → Pointwise (SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i)
-                  (chainsOf a stP) (shareAdmit (n ↑ʳ i) (EvalSt.registry stI))
 
     -- a minted source's partnered chain, by the row the store pairs it with
     row-pass : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u u′} {vs : List (Val Γ u)} {vs′ : List (Val (plainᵏ Γ κ) u′)}

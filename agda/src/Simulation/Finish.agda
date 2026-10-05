@@ -295,6 +295,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; bounded = all-sweep _ LiveSource.source (proj₁ bounded) , all-sweep _ LiveSource.source (proj₂ bounded)
     ; swept = sweepL-pw pw pw
     ; uncut = all-drop s (proj₁ uncut) , all-drop s′ (proj₂ uncut)
+    ; above = all-drop s above
     }
     where
       open Store S
@@ -511,6 +512,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               , all-sweep g₂ LiveSource.source (all-sweep g₁ LiveSource.source (proj₂ bounded))
     ; swept = sweepL-pw A′ A′
     ; uncut = all-drop (toℕ i) (proj₁ uncut) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ uncut))
+    ; above = all-drop (toℕ i) above
     }
     where
       open Store S

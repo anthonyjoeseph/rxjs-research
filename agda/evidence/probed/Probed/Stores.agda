@@ -17,7 +17,7 @@ open import Relation.Nullary.Decidable using (toWitness)
 open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; all?)
-open import Data.Bool using (false; _≟_)
+open import Data.Bool using (true; false; _≟_)
 open import Data.Nat.Properties using (<-trans; n<1+n)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -50,6 +50,7 @@ _ = record
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
+  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   }
 
 -- a cold script: its subscribe runs the input block straight to the root
@@ -73,6 +74,7 @@ _ = record
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
+  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   }
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
@@ -94,4 +96,5 @@ _ = record
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
+  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   }

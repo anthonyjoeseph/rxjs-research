@@ -16,23 +16,26 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_) ren
 open import Data.List.Relation.Unary.All using (All; _∷_; [])
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.Nat     using (_+_; _<_; _≡ᵇ_; _≟_)
-open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ)
+open import Data.Nat     using (suc; _+_; _<_; _≡ᵇ_; _≟_)
+open import Data.Fin     using (Fin; toℕ; _↑ʳ_)
+open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; toℕ-injective; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Nat.Properties using (≡ᵇ⇒≡; ≡⇒≡ᵇ; <⇒≢; <-trans; <-≤-trans; +-monoʳ-<; m≤m+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂)
+open import Data.Sum     using (inj₁; inj₂; [_,_])
+open import Data.Vec     using (lookup)
 open import Data.Unit    using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst; subst₂)
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Exp       using (Ctx; Closed; _≟ᵗ_)
-open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegId; RegRow; RegSrc; atDyn; regSource; regFloor; Path;
+open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegId; RegRow; RegSrc; atDyn; atSlot; shareAdmit; regSource; regFloor; Path;
   arrSource; arrTy; chainsGo; chainsOf; sameSource; schedGo; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Pass using (dynRow; clash; Paired)
+open import Simulation.Pass using (dynRow; clash; Paired; SlotPair; slotpair)
 open import Simulation.Pop using (pp-popped)
 open import Simulation.Schedules using (Popped; pop; sched-pop)
-open import Simulation.Stores using (Src; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr; SameAt)
+open import Simulation.Stores using (Src; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr; SameAt;
+  hotEq; sharedEq; aboveᵇ; above-≤)
   renaming (here to sp-here; there to sp-there)
 
 -- a source number that sits under another is not it
@@ -242,3 +245,86 @@ dyn-chains-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei 
 dyn-chains-end κ {stP = stP} {stI = stI} {a = a} {a′} s na na′ ar =
   paired-zip (Store.rows s) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′ (chains-rows κ na na′ (Store.rows s) (Arr.rows ar))
     (chains-rids a (proj₁ (Store.uncut s))) (chains-rids a′ (proj₂ (Store.uncut s)))
+
+-- a row at the arrival's slot and type is its next chain
+chains-slot : ∀ {n} {Δ : Ctx n} {t} (a : Arrival Δ) {rid} {i : Fin n} {u} {p : Path Δ (suc (toℕ i)) u t} {rest}
+            → arrSource a ≡ toℕ i → (e′ : u ≡ arrTy a)
+            → Σ _ λ q → chainsGo a ((rid , atSlot i , (u , p)) ∷ rest) ≡ (rid , suc (toℕ i) , q) ∷ chainsGo a rest
+                        × _≡_ {A = RegRow Δ t} (rid , atSlot i , (arrTy a , q)) (rid , atSlot i , (u , p))
+chains-slot a {rid} {i} {p = p} e refl with sameSource (arrSource a) (toℕ i) in e₁ | arrTy a ≟ᵗ arrTy a
+... | true  | yes refl = p , refl , refl
+... | true  | no ¬p    = ⊥-elim (¬p refl)
+... | false | _        = ⊥-elim (subst T e₁ (≡⇒≡ᵇ (arrSource a) (toℕ i) e))
+
+-- a row at the share's own slot and type is admitted next
+admit-slot : ∀ {m} {Δ : Ctx m} {t} {k : Fin m} {rid u} {p : Path Δ (suc (toℕ k)) u t} {rest}
+           → (e′ : u ≡ lookup Δ k)
+           → Σ _ λ q → shareAdmit k ((rid , atSlot k , (u , p)) ∷ rest) ≡ (rid , q) ∷ shareAdmit k rest
+                       × _≡_ {A = RegRow Δ t} (rid , atSlot k , (lookup Δ k , q)) (rid , atSlot k , (u , p))
+admit-slot {Δ = Δ} {k = k} {rid} {p = p} refl with k ≟ᶠ k | lookup Δ k ≟ᵗ lookup Δ k
+... | yes refl | yes refl = p , refl , refl
+... | yes refl | no ¬p    = ⊥-elim (¬p refl)
+... | no ¬e    | _        = ⊥-elim (¬e refl)
+
+-- a row at another slot is not admitted
+admit-skip : ∀ {m} {Δ : Ctx m} {t} {k j : Fin m} {rid u} {p : Path Δ (suc (toℕ j)) u t} {rest}
+           → k ≢ j → shareAdmit k ((rid , atSlot j , (u , p)) ∷ rest) ≡ shareAdmit k rest
+admit-skip {Δ = Δ} {k = k} {j} {u = u} ne with k ≟ᶠ j | u ≟ᵗ lookup Δ k
+... | no _  | _ = refl
+... | yes e | _ = ⊥-elim (ne e)
+
+module _ {n} {Γ : Ctx n} (κ : Kinds n) where
+
+  -- a pair the tail of a relation partners, the whole relation does
+  slot-there : ∀ {t π NP NI LP LI r r′ rs rs′} (x : RowRel {Γ = Γ} κ π {t} NP NI LP LI r r′) {q : RegRel {Γ = Γ} κ π NP NI LP LI rs rs′}
+                 {CP CI i u c d}
+             → SlotPair q CP CI i {u} c d → SlotPair (x ∷ q) CP CI i c d
+  slot-there x (slotpair (inj₁ c))           = slotpair (inj₁ c)
+  slot-there x (slotpair (inj₂ (a , b , p))) = slotpair (inj₂ (a , b , inj₂ p))
+
+  slot-mach : ∀ {t π NP NI LP LI r′ rs rs′} (x : MachRow {Γ = Γ} κ π {t} NP NI LP LI r′) {q : RegRel {Γ = Γ} κ π NP NI LP LI rs rs′}
+                {CP CI i u c d}
+            → SlotPair q CP CI i {u} c d → SlotPair (mach x q) CP CI i c d
+  slot-mach x (slotpair p) = slotpair p
+
+  -- A HOT SLOT'S READERS PAIR UP, in order, with the rows its share
+  -- admits: a minted source's row sits above every slot, and the impl's
+  -- raw slot is below every stamped one
+  slot-rows : ∀ {t π NP NI LP LI rg rg′} {a : Arrival Γ} {i : Fin n} {CP CI}
+            → arrSource a ≡ toℕ i → arrTy a ≡ lookup Γ i
+            → (rr : RegRel {Γ = Γ} κ π {t} NP NI LP LI rg rg′)
+            → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rg
+            → All (λ r → any (_≡ᵇ proj₁ r) CP ≡ false) rg → All (λ r → any (_≡ᵇ proj₁ r) CI ≡ false) rg′
+            → Pointwise (SlotPair rr CP CI i) (chainsGo a rg) (shareAdmit (n ↑ʳ i) rg′)
+  slot-rows e ty [] _ _ _ = []
+  slot-rows {a = a} {i} e ty (read~ {i = j} hk pr refl ∷ q) (_ ∷ ab) (uP ∷ usP) (uI ∷ usI) with i ≟ᶠ j
+  ... | no ne =
+    cons-skip (chains-skip a (sameSource-no (λ x → ne (toℕ-injective (trans (sym e) x)))))
+              (admit-skip (λ x → ne (↑ʳ-injective n i j x)))
+              (pw-map (slot-there _) (slot-rows e ty q ab usP usI))
+  ... | yes refl with chains-slot a {i = i} e (sym ty) | admit-slot {k = n ↑ʳ i} (sym ([ hotEq {Γ = Γ} κ i , sharedEq {Γ = Γ} κ i ] hk))
+  ...   | c , h , d | c′ , h′ , d′ =
+    cons-take h h′ (slotpair (inj₂ (uP , uI , inj₁ (d , d′)))) (pw-map (slot-there _) (slot-rows e ty q ab usP usI))
+  slot-rows {a = a} {i} e ty (cold~ {src = src} sp ib pr refl ∷ q) (ab₀ ∷ ab) (_ ∷ usP) (_ ∷ usI) =
+    cons-skip (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
+              refl
+              (pw-map (slot-there _) (slot-rows e ty q ab usP usI))
+  slot-rows {a = a} {i} e ty (defer~ {src = src} sp pi lnP lnI pr refl ∷ q) (ab₀ ∷ ab) (_ ∷ usP) (_ ∷ usI) =
+    cons-skip (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
+              refl
+              (pw-map (slot-there _) (slot-rows e ty q ab usP usI))
+  slot-rows {i = i} e ty (mach x@(hot~ {i = j} hot ib refl) q) ab usP (_ ∷ usI) =
+    cons-skip refl
+              (admit-skip (λ y → <⇒≢ (<-≤-trans (toℕ<n j) (m≤m+n n (toℕ i)))
+                                     (sym (trans (sym (toℕ-↑ʳ n i)) (trans (cong toℕ y) (toℕ-↑ˡ j n))))))
+              (pw-map (slot-mach x) (slot-rows e ty q ab usP usI))
+
+-- A HOT SLOT'S CHAINS PAIR UP with the rows its share admits, as
+-- registrations the store relation partners, cut on neither side
+slot-chains : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+            → (S : Store κ sP stP sI stI) {a : Arrival Γ} {i : Fin n}
+            → arrSource a ≡ toℕ i → arrTy a ≡ lookup Γ i
+            → Pointwise (SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i)
+                (chainsOf a stP) (shareAdmit (n ↑ʳ i) (EvalSt.registry stI))
+slot-chains κ S e ty = slot-rows κ e ty (Store.rows S) (Store.above S) (proj₁ (Store.uncut S)) (proj₂ (Store.uncut S))
