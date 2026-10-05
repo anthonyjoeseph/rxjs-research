@@ -258,9 +258,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
   merge and an exhaust decide alike off related nodes, a node neither can
   use is no step, and what is left is the write (`flat-write`), the inner's
-  subscribe (`inner-pair`) and `consume-switch`. Next: restate `flat-write`
-  with the store field it lacks, then the switch through the same two
-  leaves. Narrows the monster to whether the subscribe walk and the pass
+  subscribe (`inner-pair`) and `consume-switch`; a lane's and an input
+  block's merges are `Unpaired`. Next: `flat-write` as the frame lemmas'
+  sibling, then the switch through the same two leaves. Narrows the monster to whether the subscribe walk and the pass
   share one invariant.
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
@@ -306,6 +306,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`inner-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
   inner subscribed on both sides, its lane taken, keeps the flattener and the
   path related.
+- **`flat-write`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a flattener's
+  node pair written alike keeps the stores and the walk related.
 - **`consume-switch`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a switch
   handed an element's inner on both sides cuts, names and subscribes alike.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
@@ -346,9 +348,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
-- **`flat-write`** (Simulation.Pass) — SHAPE, `NO EVIDENCE`: a flattener's
-  node pair written alike keeps the stores; no store field puts lane and
-  input-block merges apart from `π`.
 - **`fold-unmoved`** (Simulation.Pass) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.

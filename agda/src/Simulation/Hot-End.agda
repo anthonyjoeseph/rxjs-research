@@ -36,7 +36,6 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Relation.Nullary using (yes; no)
-open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; listᵗ; _×ᵗ_; unitᵗ; _+ᵗ_)
 open import SExp.InstEmit using (machineEmitᵗ)
@@ -52,7 +51,7 @@ open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr)
 open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame)
-open import Simulation.Pass using (CarriesU; []; HotEnd; hot-end-at; hot-end-idle; after; Keeps; Persists; clash)
+open import Simulation.Pass using (CarriesU; []; HotEnd; hot-end-at; hot-end-idle; after; Keeps; Persists; clash; usable-self)
 open import Simulation.Chains using (same-refl; count-hit; count-tail; raw≢stamped; raw-mistyped; raw-at; raw-one; raw-none;
   plain-none; head-ety; slot-ty; plainᵗ-inj; casc-empty)
 open import Simulation.Finish using (close-hit; member-no)
@@ -94,12 +93,6 @@ apart-off x k m out with x ≡ᵇ k in xk
 ... | false = refl
 ... | true with ≡ᵇ→≡ x k xk
 ...   | refl = ⊥-elim (out m)
-
--- a merge's finish reads its own node
-usable-self : ∀ {s} → ⌊ s ≟ᵗ s ⌋ ≡ false → ⊥
-usable-self {s = s} x with s ≟ᵗ s | x
-... | yes _ | ()
-... | no ne | _ = ne refl
 
 -- a one-lane merge's count drops to none
 pred-one : ∀ {a} → a ≤ 1 → (pred a ≡ᵇ 0) ≡ true
@@ -185,16 +178,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                               (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
                         × (∀ k → (k ∈ blockNodes full → ⊥) → lookupNode k NI′ ≡ lookupNode k (EvalSt.nodes st))
                         × dispatchShare⇓ now (n ↑ʳ i) h [] true sI (record st { nodes = NI′ }) r
-  block-end {i = i} hot {sI = sI} {st = st} refl (block {m1 = m1} {j1 = j1} {b = b} {m2 = m2} {a₁ = a₁} {d₂ = d₂} e₁ a≤ eb e₂) alive fp
+  block-end {i = i} hot {sI = sI} {st = st} refl (block {m1 = m1} {j1 = j1} {b = b} {m2 = m2} {a₁ = a₁} {d₂ = d₂} e₁ a≤ eb e₂ u₁ ub u₂) alive fp
     with map-nil fp
   ... | fold-step (step-from-inner (react-alive x)) _ = ⊥-elim (clash (trans (sym x) (alive (there (here refl)))))
   ... | fold-step (step-from-inner (react-dead _ F)) f
     with lookupNode m1 (EvalSt.nodes st) | e₁ | F
-  ...   | _ | refl | finish-nil x = ⊥-elim (usable-self x)
+  ...   | _ | refl | finish-nil x = ⊥-elim (clash (trans (sym (usable-self _)) x))
   ...   | _ | refl | finish-all-drain fv drain-spent
     with disp-quiet (sink-at (hotEq {Γ = Γ} κ i hot) (outer-nil (map-nil (map-nil (batch-nil fv eb)))))
   ...     | refl =
-    NI′ , block e₁′ (≤-trans pred[n]≤n a≤) eb′ (lookup-set m2 M2 N₂) , fr ,
+    NI′ , block e₁′ (≤-trans pred[n]≤n a≤) eb′ (lookup-set m2 M2 N₂) u₁ ub u₂ , fr ,
     sink-at (hotEq {Γ = Γ} κ i hot)
       (outer-end (map-nil (map-nil (batch-nil (fin-at (pred-one a≤) f) eb₁))) e₂′)
     where

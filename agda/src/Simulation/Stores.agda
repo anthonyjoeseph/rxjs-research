@@ -229,6 +229,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   module _ (π : List (NodeId × List NodeId)) where
 
+    -- AN IMPL-ONLY NODE A ROW READS IS NONE OF `π`'S: a write to a paired
+    -- node then reaches it only where the pairing does
+    Unpaired : NodeId → Set
+    Unpaired k = k ∈ concatMap proj₂ π → ⊥
+
     -- the switch's current inner, paired through `π`
     CurRel : Maybe NodeId → Maybe NodeId → Set
     CurRel nothing  nothing   = ⊤
@@ -368,7 +373,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         -- impl only, in front of the lane it rides
         lane~ : ∀ {lo lo′ ℓ ℓ′ u op m j mL jL aL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                   {p : Path Γ ℓ u t} {Q : Path Γ′ ℓ′ (emitᵗ u) (emitᵗ t)}
-              → lookupNode mL NI ≡ just (mergeAll-st {t = emitᵗ u} nothing aL [] true)
+              → lookupNode mL NI ≡ just (mergeAll-st {t = emitᵗ u} nothing aL [] true) → Unpaired mL
               → PathRel (from-inner (flatOp op) m j ↠[ h ] p) Q
               → PathRel (from-inner (flatOp op) m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
 
@@ -405,6 +410,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → lookupNode m1 NI ≡ just (mergeAll-st {t = unitᵗ +ᵗ a} nothing a₁ [] true) → a₁ ≤ 1
               → lookupNode b NI ≡ just (batchSync-st {s = unitᵗ +ᵗ a} false [] false)
               → lookupNode m2 NI ≡ just (mergeAll-st {t = machineEmitᵗ a} nothing 0 [] d₂)
+              → Unpaired m1 → Unpaired b → Unpaired m2
               → InputBlock a
                   (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ]
                    (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ]

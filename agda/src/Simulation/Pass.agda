@@ -481,14 +481,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A FLATTENER'S NODE PAIR WRITTEN ALIKE: the stores and the walk
       -- stay related with the two nodes moved to states that pair again.
-      --
-      -- AS STATED IT IS TOO STRONG: the rows read nodes at exact states.
-      -- Every plain one and every impl one in `π` is apart from `m` and
-      -- `m′` by `π`'s uniqueness, but a lane's merge (`lane~`) and an input block's
-      -- nodes (`InputBlock`) are in no `π` entry, and no store field
-      -- puts them apart from `π`'s values -- so a store whose lane merge
-      -- is `m′` meets the hypotheses and loses the lane to the write.
-      -- The repair is that field, not a hypothesis here.
+      -- Every node fact the rows state is at a node their own path names
+      -- (`Simulation.Frame`); one in `π` is apart from `m` and `m′` by
+      -- `π`'s uniqueness unless it is this flattener's own, and an
+      -- impl-only one is `Unpaired`
       flat-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₄ u op m m′ ks}
                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {y y′}
                  → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
@@ -798,7 +794,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-pass S r@(inner~ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
         let X = quiet-resume (quiet-inner S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
-      quiet-pass S r@(lane~ _ _) b e si (fold-step d₁ dq) = quiet-resume (quiet-lane S r b e d₁) (adv d₁ si) dq
+      quiet-pass S r@(lane~ _ _ _) b e si (fold-step d₁ dq) = quiet-resume (quiet-lane S r b e d₁) (adv d₁ si) dq
       quiet-pass S r@(deferInner~ _ _ _ _ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step step-map (fold-step {out₁ = o₃} d₃ dq))) =
         let X = quiet-resume (quiet-deferInner S r b e d₁ d₃) (adv d₃ (drop-ot _ _ _ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₃ _) (proj₁ X) , proj₂ X
@@ -974,7 +970,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S (outerElem~ fl r) b sp si (fold-step d dP) dI = resume (outerElem-arm S (fl , r) b sp si d dI) (adv d sp) dP
       path-pass S r@(outerExplode~ _ _) b sp si (fold-step d dP) dI = resume (outerExplode-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(inner~ _ _ _) b sp si (fold-step d dP) dI = resume (inner-arm S r b sp si d dI) (adv d sp) dP
-      path-pass S r@(lane~ _ _) b sp si (fold-step d dP) dI = resume (lane-arm S r b sp si d dI) (adv d sp) dP
+      path-pass S r@(lane~ _ _ _) b sp si (fold-step d dP) dI = resume (lane-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (deferInner-arm S r b sp si d dI) (adv d sp) dP
 
       resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin G rP rI}

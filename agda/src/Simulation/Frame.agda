@@ -89,8 +89,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     path-frame ag (inner~ {m′ = m′} {ks} {j′ = j′} (pm , x , x′ , lP , lI , fn , c , lk) ip r) =
       inner~ (pm , x , x′ , lP , trans (hd ag (first m′ (j′ ∷ []))) lI , fn , c , trans (hd (tail ag) (first ks [])) lk) ip
              (path-frame (tail (tail (tail ag))) r)
-    path-frame ag (lane~ {mL = mL} {jL} lL r) =
-      lane~ (trans (hd ag (first mL (jL ∷ []))) lL) (path-frame (tail ag) r)
+    path-frame ag (lane~ {mL = mL} {jL} lL uL r) =
+      lane~ (trans (hd ag (first mL (jL ∷ []))) lL) uL (path-frame (tail ag) r)
     path-frame ag (deferInner~ {nid′ = nid′} {j′ = j′} {m2 = m2} {j2 = j2} p₁ p₂ lP lI lm al r) =
       deferInner~ p₁ p₂ lP (trans (hd (tail (tail ag)) (first nid′ (j′ ∷ []))) lI)
                   (trans (hd ag (first m2 (j2 ∷ []))) lm) al
@@ -99,14 +99,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- an input block's nodes are its own frames', and its tail is on it
     block-frame : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
                 → Agree NI′ NI full → InputBlock {Γ = Γ} κ π {t} NP NI a {lo} {ℓ} full q → InputBlock {Γ = Γ} κ π NP NI′ a full q
-    block-frame ag (block {m1 = m1} {j1} {b} {m2} l₁ a₁ lb l₂) =
+    block-frame ag (block {m1 = m1} {j1} {b} {m2} l₁ a₁ lb l₂ u₁ ub u₂) =
       block (trans (hd (tail ag) (first m1 (j1 ∷ []))) l₁) a₁
             (trans (hd (tail (tail ag)) (first b [])) lb)
-            (trans (hd (tail (tail (tail (tail (tail ag))))) (first m2 [])) l₂)
+            (trans (hd (tail (tail (tail (tail (tail ag))))) (first m2 [])) l₂) u₁ ub u₂
 
     block-tail : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
                → InputBlock {Γ = Γ} κ π {t} NP NI a {lo} {ℓ} full q → Agree NI′ NI full → Agree NI′ NI q
-    block-tail (block _ _ _ _) ag = tail (tail (tail (tail (tail (tail ag)))))
+    block-tail (block _ _ _ _ _ _ _) ag = tail (tail (tail (tail (tail (tail ag)))))
 
     module _ {LP LI} where
 
