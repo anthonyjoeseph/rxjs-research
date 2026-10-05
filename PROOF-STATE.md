@@ -261,7 +261,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   the share's readers, paired by the proven `slot-chains`, after `hot-start`
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store` and `hot-finish` are proven, and a connected hot
-  end's store is proven over the evaluator's `hot-block-end`. Left: the arms as real bodies, riskiest first, each owing the
+  end is proven down to the evaluator. Left: the arms as real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
   `inner-arm` once `Arm` carries an impl-only step; the monster drops to
   whichever arm fails.
@@ -280,9 +280,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`hot-block-end`** (Simulation.Hot-End) — FALSITY, `NO EVIDENCE`: a block
-  no live row threads runs its end into the share writing only its own nodes,
-  which stay a block; schedule and every other part of the state stand.
 - **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   outer's step on both sides; the explode hands the flattener every inner a
   sync outer subscribed before the step returns.
