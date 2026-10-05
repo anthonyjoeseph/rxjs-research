@@ -255,6 +255,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
+- **GIVE THE STORE WHAT LOCALITY NEEDS.** `tail-misses` is true and short of
+  three facts: a node floor, `m` off its own tail, no sink reader through `m`.
+  Add them to the store, not a signature, and pay the cascade through its
+  producers; then prove `tail-misses`, `elem-{one,quiet}` by case on the
+  emit, and `consume-pair` one policy at a time. Narrows the monster to
+  whether the subscribe walk and the pass share one invariant.
+
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
   chain is `path-pass`, one arm per plain frame; a hot slot's is `fan-go` over
@@ -299,8 +306,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   lane subscribed on both sides keeps the flattener and the path related.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
-- **`tail-misses{ᴾ,ᴵ}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a tail's
-  fold leaves the flattener's own nodes as it found them.
 - **`elem-{one,quiet}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the
   impl's element map on an emit of one payload, or none, is an echo and at most
   one lane related to the plain element.
@@ -340,6 +345,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
+- **`tail-misses{ᴾ,ᴵ}`** (Simulation.Pass) — SHAPE, `NO EVIDENCE`: a tail's
+  fold leaves the flattener's own nodes; needs a node floor, `m` off `p`, and
+  no sink reader threading `m`, none carried.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
   `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached

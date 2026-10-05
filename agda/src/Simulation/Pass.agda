@@ -367,6 +367,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A TAIL'S FOLD WRITES NONE OF THE FLATTENER'S NODES: every node it
       -- reaches sits rootward of the outer's frame, or on another chain
+      --
+      -- TRUE, AND NOT PROVABLE FROM WHAT IT IS GIVEN: three facts no
+      -- hypothesis carries. A subscribing fold mints nodes, and nothing
+      -- puts `m` below the node counter. π's unique keys tell `m` from a
+      -- scan's or a count's node on `p`, not from a nested flattener's.
+      -- A fold ending at a share's sink walks its readers, and nothing
+      -- says no reader's chain threads `m` -- true since a slot reads
+      -- only lower slots, recorded nowhere. The floor is per node:
+      -- `Rx.Evaluator.Freshness` says why a per-run one is false.
       tail-missesᴾ : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₄ u op m m′ ks}
                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {vs fin rP}
                    → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
