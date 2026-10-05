@@ -44,6 +44,7 @@ open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Rx.Evaluator.Reducible.Support using (Rule)
 
 open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Prim      using (InstEmit; Tick; Source)
@@ -568,6 +569,9 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
                                           (memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI))
     -- each input block's inner, its own row's
     owned   : Owned {Γ = Γ} κ (EvalSt.registry stI)
+    -- each run keeps the evaluator's rule
+    ruleP   : Rule sP stP
+    ruleI   : Rule sI stI
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other

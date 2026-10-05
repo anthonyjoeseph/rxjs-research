@@ -50,7 +50,7 @@ open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Lifts; Flattener; FlatNodes; merge~; switch~; exhaust~; CurRel; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
   outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; hotEq; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
 open import Simulation.Walk using (readᴾ; readᴵ)
-open import Rx.Evaluator.Reducible.Support using (Sound; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; sub-ot; Agree; endOf; ∨-Tʳ)
+open import Rx.Evaluator.Reducible.Support using (Sound; sub-rule; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; sub-ot; Agree; endOf; ∨-Tʳ)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 
 readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
@@ -97,7 +97,8 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
           → Store κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
 delivered s = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; census = census ; owned = owned }
+  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; census = census ; owned = owned
+  ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
   where open Store s
 
 -- the arrival's pair against the rows is as it was, since the rows are
@@ -163,7 +164,7 @@ unthru {k = k} so = head-on _ _ _ k (self-node k []) so , drop-ot _ _ _ so
 
 -- and back, as the flattener's own path
 thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} {k} {κ : Path Γ lo u t} {sched} {st : EvalSt e}
-     → Clear k κ sched st → Sound (Thru k κ) sched st
+     → Clear k κ sched st → Sound (Thru {e = e} k κ) sched st
 thru {k = k} {κ = κ} (on , so) = push-thru mergeAllᵒ k ≤-refl κ so on
 
 -- A RUN KEEPING THE RULE FOR EVERY PATH AGREEING WITH ONE THAT ENDS
@@ -171,7 +172,7 @@ thru {k = k} {κ = κ} (on , so) = push-thru mergeAllᵒ k ≤-refl κ so on
 reclear : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo lo′ u s′} {k} {κ : Path Γ lo u t} {π : Path Γ lo′ s′ t}
             {sched sched′} {st st′ : EvalSt e}
         → endOf π ≡ endOf κ → Clear k κ sched st → RuleKept π sched st sched′ st′ → Clear k κ sched′ st′
-reclear {k = k} {κ = κ} eq c rk = unthru (rk (Thru k κ) (thru c) (λ _ _ _ → eq))
+reclear {e = e} {k = k} {κ = κ} eq c rk = unthru (rk (Thru {e = e} k κ) (thru c) (λ _ _ _ → eq))
 
 -- a step keeps a node off its own path
 step-clear : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u} {f : Frame Γ s u} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t}
@@ -192,7 +193,7 @@ consume-clear : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} {k} {κ : Path
                   {sched sched′ st st′ out}
               → thruConsume⇓ {e = e} op k κ now o sched st (out , sched′ , st′)
               → Clear k κ sched st → Clear k κ sched′ st′
-consume-clear {k = k} {κ = κ} d c = reclear {π = Thru k κ} refl c (thruConsume-rule d (thru c))
+consume-clear {e = e} {k = k} {κ = κ} d c = reclear {π = Thru {e = e} k κ} refl c (thruConsume-rule d (thru c))
 
 -- and the rule follows a step down its path
 adv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u} {f : Frame Γ s u} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t}
@@ -628,24 +629,24 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-pass S root~ b refl _ fold-root = after S (λ x → x) (λ x → x) (root-values b false) (λ x → x) , root~
       quiet-pass S r@(sink~ sh) b e si dI = quiet-sink sh S r b e si dI
       quiet-pass S (map~ L r) b e si (fold-step step-map dI) =
-        let X = quiet-pass S r (carries-map L b) e (adv step-map si) dI in proj₁ X , map~ L (proj₂ X)
+        let X = quiet-pass S r (carries-map L b) e (drop-ot _ _ _ si) dI in proj₁ X , map~ L (proj₂ X)
       quiet-pass S r@(scan~ _ _ _ _ _ _) b e si (fold-step d₁ (fold-step step-map dq)) =
-        quiet-resume (quiet-scan S r b e d₁) (adv step-map (adv d₁ si)) dq
+        quiet-resume (quiet-scan S r b e d₁) (drop-ot _ _ _ (adv d₁ si)) dq
       quiet-pass S r@(take~ _ _ _ _ _ _ _ _ _) b e si
                  (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map (fold-step {out₁ = o₄} d₄ dq)))) =
-        let X = quiet-resume (quiet-take S r b e d₁ d₂ d₄) (adv d₄ (adv step-map (adv d₂ (adv d₁ si)))) dq
+        let X = quiet-resume (quiet-take S r b e d₁ d₂ d₄) (adv d₄ (drop-ot _ _ _ (adv d₂ (adv d₁ si)))) dq
         in after-out (regroup₃ o₁ o₂ o₄ _) (proj₁ X) , proj₂ X
       quiet-pass S r@(takeWhile~ _ _ _ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
-        let X = quiet-resume (quiet-takeWhile S r b e d₁ d₂) (adv step-map (adv d₂ (adv d₁ si))) dq
+        let X = quiet-resume (quiet-takeWhile S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
       quiet-pass S (outerElem~ fl r) b e si dI = quiet-outer S (fl , r) b e si dI
       quiet-pass S r@(outerExplode~ _ _) b e si dI = quiet-explode S r b e si dI
       quiet-pass S r@(inner~ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
-        let X = quiet-resume (quiet-inner S r b e d₁ d₂) (adv step-map (adv d₂ (adv d₁ si))) dq
+        let X = quiet-resume (quiet-inner S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
       quiet-pass S r@(lane~ _ _) b e si (fold-step d₁ dq) = quiet-resume (quiet-lane S r b e d₁) (adv d₁ si) dq
       quiet-pass S r@(deferInner~ _ _ _ _ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step step-map (fold-step {out₁ = o₃} d₃ dq))) =
-        let X = quiet-resume (quiet-deferInner S r b e d₁ d₃) (adv d₃ (adv step-map (adv d₁ si))) dq
+        let X = quiet-resume (quiet-deferInner S r b e d₁ d₃) (adv d₃ (drop-ot _ _ _ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₃ _) (proj₁ X) , proj₂ X
 
       quiet-resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ′ u} {p : Path Γ ℓ u t} {G : Goal}
@@ -670,7 +671,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                           (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))
       quiet-outer S {op = op} {Θ₀ = Θ₀} {ρ₀} w b refl si
                   (fold-step step-map (fold-step dW@(step-thru-outer W) (fold-step d₁ (fold-step step-map dq)))) =
-        let si′ = adv step-map si
+        let si′ = drop-ot _ _ _ si
             X  = quiet-walk S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru si′) w b W
             c₁ = step-clear d₁ (unthru (step-kept _ dW si′))
             T  = quiet-tail (flat-echo (After.store (proj₁ X)) (proj₂ X) [] d₁) (tail-of c₁) dq
@@ -812,7 +813,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S root~ b _ _ (fold-root {fin = fin}) fold-root = after S (λ x → x) (λ x → x) (root-values b fin) (λ x → x) , root~
       path-pass S r@(sink~ sh) b sp si dP dI = sink-pass sh S r b sp si dP dI
       path-pass S (map~ L r) b sp si (fold-step step-map dP) (fold-step step-map dI) =
-        let X = path-pass S r (carries-map L b) (adv step-map sp) (adv step-map si) dP dI in proj₁ X , map~ L (proj₂ X)
+        let X = path-pass S r (carries-map L b) (drop-ot _ _ _ sp) (drop-ot _ _ _ si) dP dI in proj₁ X , map~ L (proj₂ X)
       path-pass S r@(scan~ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (scan-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(take~ _ _ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (take-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(takeWhile~ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (takeWhile-arm S r b sp si d dI) (adv d sp) dP
@@ -846,7 +847,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                         (λ π NP NI → PathRel κ π NP NI (thru-outer (flatOp op) m ↠[ h ] p)
                            (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))) rI
       outerElem-arm S {op = op} {Θ₀ = Θ₀} {ρ₀} {fin = fin} w b sp si dW@(step-thru-outer W) (fold-step step-map (fold-step dW′@(step-thru-outer W′) dR)) =
-        let si′ = adv step-map si
+        let si′ = drop-ot _ _ _ si
             X   = elem-walk S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru sp) (unthru si′) w b W W′
         in wrap-arm (proj₁ X) (unthru (step-kept _ dW sp))
              (outer-wrap (After.store (proj₁ X)) {op = op} {fin = fin} (proj₂ X) (unthru (step-kept _ dW′ si′)) dR)

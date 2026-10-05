@@ -24,7 +24,9 @@ open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Nat     using (suc; _+_; _<_; _<ᵇ_; _≟_)
-open import Data.Nat.Properties using (1+n≢0; ≡ᵇ⇒≡; <ᵇ⇒<; <⇒<ᵇ; <⇒≢; <-asym; <-trans; <-≤-trans; +-monoʳ-<; +-cancelˡ-≡; m≤m+n)
+open import Rx.Evaluator.Reducible.Support using (sub-rule)
+open import Rx.Evaluator.Reducible.Floor using (drop-sub)
+open import Data.Nat.Properties using (≤-refl; 1+n≢0; ≡ᵇ⇒≡; <ᵇ⇒<; <⇒<ᵇ; <⇒≢; <-asym; <-trans; <-≤-trans; +-monoʳ-<; +-cancelˡ-≡; m≤m+n)
 open import Relation.Nullary using (yes; no)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -354,6 +356,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; uncut = all-drop s (proj₁ uncut) , all-drop s′ (proj₂ uncut)
     ; above = all-drop s (proj₁ above) , all-drop s′ (proj₂ above)
     ; owned = owned-drop {t = t} s′ {K = EvalSt.registry stI} owned
+    ; ruleP = sub-rule (drop-sub s (EvalSt.registry stP)) ≤-refl ruleP
+    ; ruleI = sub-rule (drop-sub s′ (EvalSt.registry stI)) ≤-refl ruleI
     ; census = λ i h → census-drop s′ (EvalSt.registry stI) (mach-lt {Γ = Γ} κ i na′)
                          (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ʳ n i)) (+-monoʳ-< n (toℕ<n i))) na′))
                          (census i h)
@@ -576,6 +580,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; above = all-drop (toℕ i) (proj₁ above) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ above))
     ; census = hot-census
     ; owned = owned-drop {Γ = Γ} κ {t = t} (toℕ (i ↑ˡ n)) {K = dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)} (owned-drop {Γ = Γ} κ {t = t} (toℕ (n ↑ʳ i)) {K = EvalSt.registry stI} owned)
+    ; ruleP = sub-rule (drop-sub (toℕ i) (EvalSt.registry stP)) ≤-refl ruleP
+    ; ruleI = sub-rule (λ r∈ → drop-sub (toℕ (n ↑ʳ i)) (EvalSt.registry stI) (drop-sub (toℕ (i ↑ˡ n)) (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)) r∈)) ≤-refl ruleI
     }
     where
       open Store S
@@ -615,7 +621,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
-    ; latches = lat ; census = cen ; owned = owned }
+    ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
     where
       open Store S
       CP = EvalSt.completedSources stP

@@ -29,7 +29,8 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (just; nothing)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat     using (suc; pred; _≤_; z≤n; s≤s; _≡ᵇ_)
-open import Data.Nat.Properties using (1+n≢0; ≤-trans; pred[n]≤n)
+open import Data.Nat.Properties using (1+n≢0; ≤-refl; ≤-trans; pred[n]≤n)
+open import Rx.Evaluator.Reducible.Support using (sub-rule)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Vec     using (lookup)
@@ -349,7 +350,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       end-store = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
         ; sync = sync ; rows = reg-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows ; bounded = bounded ; swept = swept
-        ; uncut = uncut ; above = above ; latches = lat ; census = cen ; owned = owned }
+        ; uncut = uncut ; above = above ; latches = lat ; census = cen ; owned = owned
+        ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
         where
           lat : LatchRel {Γ = Γ} κ (Arrival.source a ∷ CP) (EvalSt.connectedShares stP) CI′ SI
           lat j with j ≟ᶠ i

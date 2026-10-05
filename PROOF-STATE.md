@@ -255,12 +255,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **GIVE THE STORE WHAT LOCALITY NEEDS.** `tail-misses` is true and short of
-  three facts: a node floor, `m` off its own tail, no sink reader through `m`.
-  Add them to the store, not a signature, and pay the cascade through its
-  producers; then prove `tail-misses`, `elem-{one,quiet}` by case on the
-  emit, and `consume-pair` one policy at a time. Narrows the monster to
-  whether the subscribe walk and the pass share one invariant.
+- **CASE THE ELEMENT ON ITS EMIT.** The store carries each run's rule and
+  the arms carry their paths' soundness, so a tail's fold missing the
+  flattener's nodes is `fold-unmoved`, the candidate's own `Kept`. Next:
+  `elem-{one,quiet}` by case on the emit, then `consume-pair` one policy at
+  a time. Narrows the monster to whether the subscribe walk and the pass
+  share one invariant.
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
@@ -345,9 +345,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
-- **`tail-misses{ᴾ,ᴵ}`** (Simulation.Pass) — SHAPE, `NO EVIDENCE`: a tail's
-  fold leaves the flattener's own nodes; needs a node floor, `m` off `p`, and
-  no sink reader threading `m`, none carried.
+- **`fold-unmoved`** (Simulation.Pass) — DIFFICULTY, `NO EVIDENCE`: a fold
+  leaves a node off its own sound path as it found it, one clause per
+  constructor as `foldPath-rule`.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
   `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached

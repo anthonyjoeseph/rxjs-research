@@ -37,7 +37,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Path; root; s
 open import Rx.Slots     using (Slots; scripted; shared)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint)
 open import Rx.Evaluator.Builder using (subscribe!)
-open import Rx.Evaluator.Reducible.Support using (Σ⁰)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
 open import Data.Fin     using (Fin)
 open import SExp.Syntax  using (SExp; STm; SFn; Kinds; plainᵏ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
@@ -229,6 +229,8 @@ init-store κ {t} e ins μ big = record
   ; above   = [] , []
   ; census  = λ _ _ → inj₂ (refl , refl , λ ())
   ; owned   = []
+  ; ruleP   = rule (λ k ()) (λ ()) (λ ())
+  ; ruleI   = rule (λ k ()) (λ ()) (λ ())
   }
 
 -- THE IMPL'S ROOT SUBSCRIBE IS ITS MINT'S BODY'S, at the token the mint
