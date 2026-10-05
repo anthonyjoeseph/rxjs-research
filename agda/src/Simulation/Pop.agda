@@ -14,14 +14,14 @@ open import Data.List.Relation.Unary.All using (All) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Nat     using (_<_)
 open import Data.Sum     using (inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; NodeId; NodeState; schedGo; schedHeadOf; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there)
-open import Simulation.Stores using (Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store)
+open import Simulation.Stores using (guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store)
   renaming (here to sp-here; there to sp-there)
 
 -- the rest of two lists a relation holds for, given their first elements
@@ -118,7 +118,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
     → Sync rs rs′
     → Store κ (record sP { live = rs }) (cascadeOpen stP) (record sI { live = rs′ }) (cascadeOpen stI)
-  pop-store {sP = sP} {sI = sI} s ex ex′ sy
+  pop-store {sP = sP} {stP = stP} {sI = sI} {stI = stI} s ex ex′ sy
     with subst₂ (Popped (Src κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Store.sync s) (Store.sources s))
   ... | pop _ _ _ _ _ _ _ _ pp = record
     { π        = Store.π s
@@ -132,9 +132,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; sync     = sy
     ; rows     = regrel-pop _ _ _ pp (Store.rows s)
     ; latches  = Store.latches s
-    ; wfᴾ      = Store.wfᴾ s
-    ; wfᴵ      = Store.wfᴵ s
     ; bounded  = subst (All (_< counter (Sched.mint sP) sourceᵏ)) (sym (proj₁ (pp-sources pp))) (proj₁ (Store.bounded s))
                , subst (All (_< counter (Sched.mint sI) sourceᵏ)) (sym (proj₂ (pp-sources pp))) (proj₂ (Store.bounded s))
+    ; swept    = pp-pointwise {R = λ l l′ → guardOf (EvalSt.registry stP) l ≡ guardOf (EvalSt.registry stI) l′}
+                   (λ {l} {l′} {_} {_} {l₂} {l₂′} g h h′ → trans (guard-src (EvalSt.registry stP) {l} {l₂} (head-keeps l h))
+                                              (trans g (sym (guard-src (EvalSt.registry stI) {l′} {l₂′} (head-keeps l′ h′)))))
+                   pp (Store.swept s)
     ; uncut    = mapᵃ (λ _ → refl) (proj₁ (Store.uncut s)) , mapᵃ (λ _ → refl) (proj₂ (Store.uncut s))
     }

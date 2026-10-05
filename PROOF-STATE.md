@@ -260,7 +260,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   source's chain is `path-pass`, one arm per plain frame, and a hot slot's is
   `fan-go` over the share's readers, each `slot-pass`; a minted source's end
   is the same fold at an end head, standing on the arrival pair the value pass
-  hands on through `After`, so what stays is the drop (`finish-store`); an outer's and an inner's arms are one leaf per constructor; a hot slot's end is the same fan-out after the share is spent;
+  hands on through `After`, whose drop `finish-store` is proven over the store's `swept` and the arrival's `lists`; an outer's and an inner's arms are one leaf per constructor, each owing those two persisted; a hot slot's end is the same fan-out after the share is spent;
   what remains is `lane-arm` as a definition over `inner-arm` once `Arm` can
   carry an impl-only step, so the monster drops to whichever arm is riskiest.
 
@@ -322,10 +322,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
-- **`finish-store`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
-  source's drop keeps the stores related, given the arrival pair partnered
-  against the rows and both arrivals last; the sweep of the live lists and the
-  merge counts the drop leaves behind are unread.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
   `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached

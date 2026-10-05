@@ -45,8 +45,6 @@ _ = record
   ; sync    = (refl , []) ∷ []
   ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl refl refl) refl) []
   ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
-  ; wfᴾ     = λ _ _ ()
-  ; wfᴵ     = λ { 0 _ refl → refl ; 1 _ () ; 2 _ refl → refl ; (suc (suc (suc _))) _ () }
   }
 
 -- a cold script: its subscribe runs the input block straight to the root
@@ -67,8 +65,6 @@ _ = record
   ; sync    = (refl , []) ∷ []
   ; rows    = cold~ here (block {m1 = 2} {b = 1} {m2 = 0} refl refl refl) root~ refl ∷ []
   ; latches = λ { zero → (λ ()) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
-  ; wfᴾ     = λ _ _ ()
-  ; wfᴵ     = λ { 0 _ refl → refl ; 1 _ () ; 2 _ refl → refl ; (suc (suc (suc _))) _ () }
   }
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
@@ -87,6 +83,4 @@ _ = record
   ; sync    = (refl , refl ∷ []) ∷ (refl , []) ∷ []
   ; rows    = defer~ here (here refl) refl refl root~ refl ∷ []
   ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
-  ; wfᴾ     = λ { 0 _ refl → refl ; (suc _) _ () }
-  ; wfᴵ     = λ { 0 _ refl → refl ; (suc _) _ () }
   }

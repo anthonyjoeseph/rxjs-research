@@ -72,6 +72,7 @@ open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop)
 open import Simulation.Close using (close-store; close-arr)
+open import Simulation.Finish using (finish-store)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
@@ -264,20 +265,6 @@ postulate
   subscribe-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
-
-  -- A MINTED SOURCE'S REGISTRATIONS DROPPED keep the stores related.
-  --
-  -- The conclusion needs the arrival pair being the rows' partners, which
-  -- the value pass hands on, and that both arrivals are last: one side
-  -- dropping a source's registrations while the other keeps them unrelates
-  -- the registries.
-  finish-store : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                   {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
-    → (s : Storeʳ κ sP stP sI stI) → n < Arrival.source a → n + n < Arrival.source a′
-    → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
-    → Arr s (Arrival.source a) (Arrival.source a′) (arrTy a) (arrTy a′)
-    → Storeʳ κ (proj₁ (cascadeFinish a sP stP)) (proj₂ (cascadeFinish a sP stP))
-               (proj₁ (cascadeFinish a′ sI stI)) (proj₂ (cascadeFinish a′ sI stI))
 
   -- EACH ARRIVAL'S INSTANT IS DRAWN WHILE IT CASCADES, a claim about the
   -- impl's run alone; the store says the state is one an elaboration

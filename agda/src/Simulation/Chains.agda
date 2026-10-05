@@ -32,7 +32,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Pass using (dynRow; clash; Paired)
 open import Simulation.Pop using (pp-popped)
 open import Simulation.Schedules using (Popped; pop; sched-pop)
-open import Simulation.Stores using (Src; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr)
+open import Simulation.Stores using (Src; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr; SameAt)
   renaming (here to sp-here; there to sp-there)
 
 -- a source number that sits under another is not it
@@ -158,6 +158,33 @@ sp-bound′ : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {LP : List (LiveSource Γ)} {L
 sp-bound′ (x ∷ _)  sp-here      = x
 sp-bound′ (_ ∷ ab) (sp-there q) = sp-bound′ ab q
 
+-- a number the lists give a source before the popped pair's place is not the pair's
+sp-ne : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′ x}
+      → SrcPair κ LP LI s s′ u u′ → All (x ≢_) (map LiveSource.source LP) → x ≢ s
+sp-ne sp-here      (ne ∷ _) = ne
+sp-ne (sp-there q) (_ ∷ ne) = sp-ne q ne
+
+sp-ne′ : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′ x}
+       → SrcPair κ LP LI s s′ u u′ → All (x ≢_) (map LiveSource.source LI) → x ≢ s′
+sp-ne′ sp-here      (ne ∷ _) = ne
+sp-ne′ (sp-there q) (_ ∷ ne) = sp-ne′ q ne
+
+-- after the pair's place, no source carries either number
+tail-same : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {s s′} {ls : List (LiveSource Γ)} {ls′ : List (LiveSource (plainᵏ Γ κ))}
+          → Pointwise (Src κ) ls ls′ → All (s ≢_) (map LiveSource.source ls) → All (s′ ≢_) (map LiveSource.source ls′)
+          → Pointwise (λ l l′ → SameAt s s′ (LiveSource.source l) (LiveSource.source l′)) ls ls′
+tail-same []       []        []         = []
+tail-same (_ ∷ rs) (ne ∷ nl) (ne′ ∷ nl′) = ((λ e → ⊥-elim (ne (sym e))) , (λ e → ⊥-elim (ne′ (sym e)))) ∷ tail-same rs nl nl′
+
+-- the popped pair is the only pair of sources carrying its numbers
+arr-lists : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {s s′ u u′} {ls : List (LiveSource Γ)} {ls′ : List (LiveSource (plainᵏ Γ κ))}
+          → Pointwise (Src κ) ls ls′ → SrcPair κ ls ls′ s s′ u u′
+          → Unique (map LiveSource.source ls) → Unique (map LiveSource.source ls′)
+          → Pointwise (λ l l′ → SameAt s s′ (LiveSource.source l) (LiveSource.source l′)) ls ls′
+arr-lists (_ ∷ rs) sp-here      (nl ∷ _) (nl′ ∷ _)  = ((λ _ → refl) , (λ _ → refl)) ∷ tail-same rs nl nl′
+arr-lists (_ ∷ rs) (sp-there q) (nl ∷ ul) (nl′ ∷ ul′) =
+  ((λ e → ⊥-elim (sp-ne q nl e)) , (λ e → ⊥-elim (sp-ne′ q nl′ e))) ∷ arr-lists rs q ul ul′
+
 -- THE PAIR A POP TOOK FROM IS PARTNERED AT THE STORE IT LEAVES
 arr-pop : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
             {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {s s′ u u′}
@@ -165,7 +192,8 @@ arr-pop : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Close
 arr-pop κ S pk = record
   { boundP = sp-bound (proj₁ (Store.bounded S)) pk
   ; boundI = sp-bound′ (proj₂ (Store.bounded S)) pk
-  ; rows   = arr-rows κ (proj₁ (Store.distinct S)) (proj₂ (Store.distinct S)) pk (Store.rows S) }
+  ; rows   = arr-rows κ (proj₁ (Store.distinct S)) (proj₂ (Store.distinct S)) pk (Store.rows S)
+  ; lists  = arr-lists (Store.sources S) pk (proj₁ (Store.distinct S)) (proj₂ (Store.distinct S)) }
 
 -- the chains of a registry none of whose rows a list of ids has: none of the ids
 chains-rids : ∀ {n} {Δ : Ctx n} {t} (a : Arrival Δ) {P : RegId → Set} {rg : List (RegRow Δ t)}

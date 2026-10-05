@@ -25,11 +25,11 @@
 ------------------------------------------------------------------
 module Simulation.Stores where
 
-open import Data.Bool    using (true; false; T; if_then_else_)
+open import Data.Bool    using (Bool; true; false; _∨_)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥)
 open import Data.Fin     using (toℕ; _↑ʳ_; _↑ˡ_)
-open import Data.List    using (List; []; _∷_; _++_; map; concatMap; length; deduplicateᵇ)
+open import Data.List    using (List; []; _∷_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-map⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
@@ -37,7 +37,7 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (Maybe; just; nothing)
-open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_; _<ᵇ_)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
@@ -49,10 +49,10 @@ open import Rx.Prim      using (InstEmit; Tick; Source)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Env; Closed; lookupEnv;
   Ren∈; renExp; FnClo; applyClo; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; varᵗ; unit̂; pairᵗ; inlᵗ;
   inrᵗ; sndᵗ; Tm)
-open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeState; NodeId; Path; RegRow;
-  atSlot; atDyn; root; share-sink; _↠[_]_; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
-  mergeAllᵒ; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st; echoᵗ;
-  lookupNode; memberSource; pathHasNode; takeVals; scanVals)
+open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeState; NodeId; Path; RegRow; atSlot; atDyn; root; share-sink;
+  _↠[_]_; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; mergeAllᵒ; cell-st;
+  take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st; echoᵗ; lookupNode; memberSource;
+  takeVals; scanVals; regSource; sameSource)
 open import Rx.Evaluator.Domain using (flatOp)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; slotTy; hotᵏ; sharedᵏ)
 open import SExp.Plain   using (plainExp)
@@ -70,6 +70,20 @@ open import Batchable.Inst-Extract using (emitValues)
 data SrcNum {n} (κ : Kinds n) : Source → Source → Set where
   slot~ : ∀ i → lookup κ i ≡ hotᵏ → SrcNum κ (toℕ i) (toℕ (i ↑ˡ n))
   dyn~  : ∀ {s s′} → n < s → n + n < s′ → SrcNum κ s s′
+
+-- WHETHER THE SWEEP KEEPS A LIVE SOURCE: a slot's, or one some registration
+-- is still at
+guardOf : ∀ {n} {Γ : Ctx n} {t} → List (RegRow Γ t) → LiveSource Γ → Bool
+guardOf {n = n} reg l = (LiveSource.source l <ᵇ n) ∨ any (λ p → sameSource (LiveSource.source l) (regSource (proj₁ (proj₂ p)))) reg
+
+-- the sweep reads a source's number alone
+guard-src : ∀ {n} {Γ : Ctx n} {t} (reg : List (RegRow Γ t)) {l l₂ : LiveSource Γ}
+          → LiveSource.source l₂ ≡ LiveSource.source l → guardOf reg l₂ ≡ guardOf reg l
+guard-src {n = n} reg {l} {l₂} e = cong (λ x → (x <ᵇ n) ∨ any (λ p → sameSource x (regSource (proj₁ (proj₂ p)))) reg) e
+
+-- two sources' numbers against the arrival's pair: one is the arrival's exactly when the other is
+SameAt : Source → Source → Source → Source → Set
+SameAt s s′ x x′ = (x ≡ s → x′ ≡ s′) × (x′ ≡ s′ → x ≡ s)
 
 -- an arrival's pair of sources against one pair of rows' sources: the
 -- arrival is the row's exactly when it is the partner's, and then the
@@ -436,34 +450,17 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                                  × memberSource (toℕ i) SP ≡ memberSource (toℕ (n ↑ʳ i)) SI)
 
 ------------------------------------------------------------------
--- Each machine's own invariant
-------------------------------------------------------------------
-
--- the inner instances a path leaves through a merge node
-pathInners : ∀ {k} {Δ : Ctx k} {lo s t} → NodeId → Path Δ lo s t → List NodeId
-pathInners m root                                = []
-pathInners m (share-sink _ _)                    = []
-pathInners m (from-inner mergeAllᵒ k j ↠[ _ ] p) = (if k ≡ᵇ m then j ∷ [] else []) ++ pathInners m p
-pathInners m (_ ↠[ _ ] p)                        = pathInners m p
-
-innersOf : ∀ {k} {Δ : Ctx k} {t} → NodeId → List (RegRow Δ t) → List NodeId
-innersOf m reg = concatMap (λ r → pathInners m (proj₂ (proj₂ (proj₂ r)))) reg
-
--- A MERGE COUNTS ITS LIVE LANES, which are the inner instances some
--- registration leaves through it.  Only a node some registration
--- still passes is held to it: a cut leaves its nodes behind.
-WF : ∀ {k} {Δ : Ctx k} {t} → List (RegRow Δ t) → List (NodeId × NodeState Δ) → Set
-WF reg nodes =
-  ∀ m {u lim act q od} → T (any (λ r → pathHasNode m (proj₂ (proj₂ (proj₂ r)))) reg)
-  → lookupNode m nodes ≡ just (mergeAll-st {t = u} lim act q od)
-  → act ≡ length (deduplicateᵇ _≡ᵇ_ (innersOf m reg))
-
-------------------------------------------------------------------
 -- The stores
 ------------------------------------------------------------------
 
 -- over the raw schedules and states, since a subscribe walks through
 -- states no configuration names
+--
+-- DEAD ROUTE: a field counting a merge's lanes exactly against the
+--   registry.  The end walk decrements a merge's active count once no
+--   registration is alive through the inner, while the dying source's rows
+--   stay registered until the end's drop, so the field fails between the walk
+--   and the drop on any program that ends an inner.
 record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
              (sP : Sched Γ) (stP : EvalSt ep) (sI : Sched (plainᵏ Γ κ)) (stI : EvalSt ei) : Set where
   field
@@ -478,11 +475,12 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
                 (EvalSt.registry stP) (EvalSt.registry stI)
     latches : LatchRel {Γ = Γ} κ (EvalSt.completedSources stP) (EvalSt.connectedShares stP)
                                      (EvalSt.completedSources stI) (EvalSt.connectedShares stI)
-    wfᴾ     : WF (EvalSt.registry stP) (EvalSt.nodes stP)
-    wfᴵ     : WF (EvalSt.registry stI) (EvalSt.nodes stI)
     -- every live source was minted: below its run's counter
     bounded : All (_< counter (Sched.mint sP) sourceᵏ) (map LiveSource.source (Sched.live sP))
             × All (_< counter (Sched.mint sI) sourceᵏ) (map LiveSource.source (Sched.live sI))
+    -- a pair of live sources is swept alike
+    swept   : Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → guardOf (EvalSt.registry stP) l ≡ guardOf (EvalSt.registry stI) l′)
+                (Sched.live sP) (Sched.live sI)
     -- a registration still in the registry is not a cascade's victim
     uncut   : All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) (EvalSt.registry stP)
             × All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) (EvalSt.registry stI)
@@ -499,3 +497,5 @@ record Arr {n} {Γ : Ctx n} {κ : Kinds n} {t} {ep : Closed Γ t} {ei : Closed (
     boundP : s < counter (Sched.mint sP) sourceᵏ
     boundI : s′ < counter (Sched.mint sI) sourceᵏ
     rows   : ArrRows κ (Store.π S) _ _ _ _ (Store.rows S) s s′ u u′
+    lists  : Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → SameAt s s′ (LiveSource.source l) (LiveSource.source l′))
+               (Sched.live sP) (Sched.live sI)

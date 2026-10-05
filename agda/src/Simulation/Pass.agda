@@ -92,7 +92,7 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
           → Store κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
 delivered s = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-  ; sync = sync ; rows = rows ; latches = latches ; wfᴾ = wfᴾ ; wfᴵ = wfᴵ ; bounded = bounded ; uncut = uncut }
+  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut }
   where open Store s
 
 -- the arrival's pair against the rows is as it was, since the rows are
@@ -100,7 +100,7 @@ delivered-arr : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei :
                   {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
                   {S : Store κ sP stP sI stI} {x y s s′ u u′}
               → Arr S s s′ u u′ → Arr (delivered S {x} {y}) s s′ u u′
-delivered-arr ar = record { boundP = boundP ; boundI = boundI ; rows = rows } where open Arr ar
+delivered-arr ar = record { boundP = boundP ; boundI = boundI ; rows = rows ; lists = lists } where open Arr ar
 
 -- A PLAIN CHAIN AT A SLOT AND THE REGISTRATION THE ELABORATION READ IT THROUGH:
 -- the stamped slot's share fans out to exactly the rows the plain run walks

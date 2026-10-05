@@ -20,12 +20,13 @@ open import Data.List.Relation.Unary.AllPairs using ([])
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.All.Properties using (map⁺; concat⁺; tabulate⁺)
+open import Data.Bool    using (T; true; _∨_)
 open import Data.Nat     using (ℕ; suc; _+_; _<_)
-open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive)
-open import Data.List.Relation.Binary.Pointwise using (Pointwise)
+open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; <⇒<ᵇ)
+open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ; _∷_ to _∷ᵖ_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Rx.Prim      using (Id; hot; cold)
 open import Rx.Exp       using (FlatOp)
@@ -47,7 +48,7 @@ open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Schedules using (Sync)
-open import Simulation.Stores using (V; EnvRel; Lifts; PathRel; root~; map~; Store; Src; SrcNum; [])
+open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; PathRel; root~; map~; Store; Src; SrcNum; [])
 
 -- what a run sends to its root, read as values: the plain run's in
 -- order, the impl's decoded and each paired with its instant
@@ -190,6 +191,19 @@ mkHot-below ins i with ins i
 init-below : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → All (_< n) (map LiveSource.source (Sched.live (sched-init e ins)))
 init-below e ins = map⁺ (concat⁺ (tabulate⁺ (mkHot-below ins)))
 
+-- no registration yet, so the sweep keeps the slots alone: and both lists hold slots only
+guard-slot : ∀ {n} {Γ : Ctx n} {t} {l : LiveSource Γ} → LiveSource.source l < n → guardOf {t = t} [] l ≡ true
+guard-slot lt = ∨-true _ _ (<⇒<ᵇ lt)
+  where
+    ∨-true : ∀ a b → T a → (a ∨ b) ≡ true
+    ∨-true true b _ = refl
+
+init-swept : ∀ {n m} {Γ : Ctx n} {Γ′ : Ctx m} {t t′} {R : LiveSource Γ → LiveSource Γ′ → Set} {ls ls′}
+           → Pointwise R ls ls′ → All (_< n) (map LiveSource.source ls) → All (_< m) (map LiveSource.source ls′)
+           → Pointwise (λ l l′ → guardOf {t = t} [] l ≡ guardOf {t = t′} [] l′) ls ls′
+init-swept []ᵖ        []         []           = []ᵖ
+init-swept {t = t} {t′} (_∷ᵖ_ {l} {l′} _ rs) (lt ∷ lts) (lt′ ∷ lts′) = trans (guard-slot {t = t} {l = l} lt) (sym (guard-slot {t = t′} {l = l′} lt′)) ∷ᵖ init-swept {t = t} {t′ = t′} rs lts lts′
+
 -- BEFORE ANYTHING IS SUBSCRIBED THE STORES ARE EMPTY, and the impl's
 -- mint touches only the counter, which the relation does not read.
 init-store : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) (μ : Mint)
@@ -197,7 +211,7 @@ init-store : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (i
            → Store κ (sched-init (plainExp e) (plainSlots ins)) (st-init (plainExp e))
                      (record (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)) { mint = μ })
                      (st-init (elaborateImpl κ e))
-init-store κ e ins μ big = record
+init-store κ {t} e ins μ big = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
@@ -207,10 +221,9 @@ init-store κ e ins μ big = record
   ; sync    = init-sync κ e ins
   ; rows    = []
   ; latches = λ _ → (λ _ → refl) , (λ _ → refl , refl)
-  ; wfᴾ     = λ _ ()
-  ; wfᴵ     = λ _ ()
   ; bounded = mapᵃ (λ lt → <-trans lt (n<1+n _)) (init-below (plainExp e) (plainSlots ins))
             , mapᵃ (λ lt → <-trans lt big) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
+  ; swept   = init-swept {t = t} {t′ = emitᵗ t} (init-sources κ e ins) (init-below (plainExp e) (plainSlots ins)) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; uncut   = [] , []
   }
 
