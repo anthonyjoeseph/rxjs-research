@@ -50,6 +50,7 @@ open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Lifts; Flattener; FlatNodes; merge~; switch~; exhaust~; CurRel; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
   outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; hotEq; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
 open import Simulation.Walk using (readᴾ; readᴵ)
+open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
 open import Rx.Evaluator.Reducible.Support using (Sound; sub-rule; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; sub-ot; Agree; endOf; ∨-Tʳ)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 
@@ -269,9 +270,40 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   data QuietElem {u} : Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u)) → Set where
     quiet-elem : ∀ {x a} → Bare {u} x → QuietElem (inj₂ x , inj₁ a)
 
-  postulate
-    elem-one   : ∀ {u Θ ρ} e′ {w} → EmitRel κ (echoᵗ u) e′ (w ∷ []) → Elem w (applyClo (Θ , elemᵛ , ρ) e′)
-    elem-quiet : ∀ {u Θ ρ} e′ → Bare {echoᵗ u} e′ → QuietElem {u} (applyClo (Θ , elemᵛ , ρ) e′)
+  echo-rel : ∀ {u} {i : ℕ} e′ e → V κ (unitᵗ +ᵗ u) e′ e
+           → Pointwise (λ x w → V κ u (proj₂ x) w) (map (i ,_) (echoList e′)) (echoOf e)
+  echo-rel (inj₁ _) (inj₁ _) _ = []
+  echo-rel (inj₂ _) (inj₂ _) r = r ∷ []
+  echo-rel (inj₁ _) (inj₂ _) ()
+  echo-rel (inj₂ _) (inj₁ _) ()
+
+  lane-rel : ∀ {u} l′ l → V κ (unitᵗ +ᵗ obs u) l′ l → LaneRel l′ l
+  lane-rel (inj₁ _) (inj₁ _) _ = no-lane
+  lane-rel (inj₂ _) (inj₂ _) r = a-lane r
+  lane-rel (inj₁ _) (inj₂ _) ()
+  lane-rel (inj₂ _) (inj₁ _) ()
+
+  elem-one : ∀ {u Θ ρ} e′ {w} → EmitRel κ (echoᵗ u) e′ (w ∷ []) → Elem w (applyClo (Θ , elemᵛ , ρ) e′)
+  elem-one {u} {ρ = ρ} e′ {w} r =
+    subst (Elem w) (sym (proj₁ (proj₂ run)))
+          (elem (subst (λ l → Pointwise (λ x v → V κ u (proj₂ x) v) l (echoOf (proj₁ w))) (sym (proj₂ (proj₂ run)))
+                       (echo-rel {i = proj₁ (proj₂ e′)} (proj₁ (proj₁ pw)) (proj₁ w) (proj₁ (proj₂ (proj₂ pw)))))
+                (lane-rel (proj₂ (proj₁ pw)) (proj₂ w) (proj₂ (proj₂ (proj₂ pw)))))
+    where
+    pw = pw-one (paysOf {Γ = plainᵏ Γ κ} {a = plainᵗ (echoᵗ u)} (proj₁ e′))
+                (subst (λ l → Pointwise (λ x v → V κ (echoᵗ u) (proj₂ x) v) l (w ∷ []))
+                       (values-decode {Γ = plainᵏ Γ κ} {a = plainᵗ (echoᵗ u)} (proj₁ e′) (proj₁ (proj₂ e′)) (proj₁ (proj₂ (proj₂ e′))) (proj₂ (proj₂ (proj₂ e′)))) r)
+    run = elem-run {t = u} ρ e′ (proj₁ (proj₁ pw)) (proj₂ (proj₁ pw)) (proj₁ (proj₂ pw))
+
+  elem-quiet : ∀ {u Θ ρ} e′ → Bare {echoᵗ u} e′ → QuietElem {u} (applyClo (Θ , elemᵛ , ρ) e′)
+  elem-quiet {u} {ρ = ρ} e′ b =
+    subst (QuietElem {u}) (sym (proj₁ (proj₂ run)))
+          (quiet-elem (subst (λ l → Pointwise (λ x v → V κ u (proj₂ x) v) l []) (sym (proj₂ (proj₂ run))) []))
+    where
+    run = quiet-run {t = u} ρ e′
+            (pw-none (paysOf {Γ = plainᵏ Γ κ} {a = plainᵗ (echoᵗ u)} (proj₁ e′))
+                     (subst (λ l → Pointwise (λ x v → V κ (echoᵗ u) (proj₂ x) v) l [])
+                            (values-decode {Γ = plainᵏ Γ κ} {a = plainᵗ (echoᵗ u)} (proj₁ e′) (proj₁ (proj₂ e′)) (proj₁ (proj₂ (proj₂ e′))) (proj₂ (proj₂ (proj₂ e′)))) b))
 
   -- THE VALUE A POPPED SOURCE HANDS ITS CHAINS, on both sides: the head
   -- of each partnered source's pending list, at the row's source

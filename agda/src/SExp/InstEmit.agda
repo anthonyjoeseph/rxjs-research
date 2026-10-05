@@ -198,6 +198,33 @@ instEmitᵛ evs inst src k = pairᵗ evs (pairᵗ inst (pairᵗ src k))
 -- The two halves of every elaborated operator's InstEmit handling.
 ------------------------------------------------------------------
 
+-- the bookkeeping and the payloads, both reversed while the fold runs,
+-- and whether a completion passed
+splitAccᵗ : Ty → Ty → Ty → Ty
+splitAccᵗ u a b = listᵗ (instEventᵗ u b) ×ᵗ (listᵗ a ×ᵗ boolᵗ)
+
+-- one event of the split, NAMED because a lemma about the fold it
+-- drives has to say which step it folds
+splitStepᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u a b}
+           → Tm Γ Δᵍ Δ (instEventᵗ u a ∷ splitAccᵗ u a b ∷ Θ) (splitAccᵗ u a b)
+splitStepᵛ {Θ = Θ} {u = u} {a = a} {b = b} = eventCaseᵛ (varᵗ (here refl))
+  (keep (initᵛ (varᵗ (here refl))))
+  (pairᵗ (fstᵗ acc)
+         (pairᵗ (consᵗ (varᵗ (here refl)) (fstᵗ (sndᵗ acc)))
+                (sndᵗ (sndᵗ acc))))
+  (keep (closeᵛ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl)))))
+  (keep (handoffᵛ (varᵗ (here refl))))
+  (pairᵗ (fstᵗ acc) (pairᵗ (fstᵗ (sndᵗ acc)) (bool̂ true)))
+  where
+  -- inside an arm: the event's own payload, then the fold's element
+  -- and accumulator, then Θ
+  acc : ∀ {x} → Tm _ _ _ (x ∷ instEventᵗ u a ∷ splitAccᵗ u a b ∷ Θ) (splitAccᵗ u a b)
+  acc = varᵗ (there (there (here refl)))
+
+  keep : ∀ {x} → Tm _ _ _ (x ∷ instEventᵗ u a ∷ splitAccᵗ u a b ∷ Θ) (instEventᵗ u b)
+       → Tm _ _ _ (x ∷ instEventᵗ u a ∷ splitAccᵗ u a b ∷ Θ) (splitAccᵗ u a b)
+  keep ev = pairᵗ (consᵗ ev (fstᵗ acc)) (sndᵗ acc)
+
 -- SPLITTING IS A REBUILD AND NOT A FILTER, WHICH IS THE ONE THING THIS
 -- MIRROR DOES NOT SHARE WITH ITS TYPESCRIPT TWIN.  An event's TYPE
 -- mentions the payload, so the bookkeeping of an incoming emit does not
@@ -210,33 +237,13 @@ splitEventsᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u a b}
              → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ u a))
              → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ u b) ×ᵗ (listᵗ a ×ᵗ boolᵗ))
 splitEventsᵛ {Θ = Θ} {u = u} {a = a} {b = b} evs =
-  letᵗ (foldᵗ evs seed body) seed unreverse
+  letᵗ (foldᵗ evs seed splitStepᵛ) seed unreverse
   where
-  -- the bookkeeping and the payloads, both reversed while the fold runs
   Acc : Ty
-  Acc = listᵗ (instEventᵗ u b) ×ᵗ (listᵗ a ×ᵗ boolᵗ)
+  Acc = splitAccᵗ u a b
 
   seed : Tm _ _ _ Θ Acc
   seed = pairᵗ nilᵗ (pairᵗ nilᵗ (bool̂ false))
-
-  body : Tm _ _ _ (instEventᵗ u a ∷ Acc ∷ Θ) Acc
-  body = eventCaseᵛ (varᵗ (here refl))
-    (keep (initᵛ (varᵗ (here refl))))
-    (pairᵗ (fstᵗ acc)
-           (pairᵗ (consᵗ (varᵗ (here refl)) (fstᵗ (sndᵗ acc)))
-                  (sndᵗ (sndᵗ acc))))
-    (keep (closeᵛ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl)))))
-    (keep (handoffᵛ (varᵗ (here refl))))
-    (pairᵗ (fstᵗ acc) (pairᵗ (fstᵗ (sndᵗ acc)) (bool̂ true)))
-    where
-    -- inside an arm: the event's own payload, then the fold's element
-    -- and accumulator, then Θ
-    acc : ∀ {x} → Tm _ _ _ (x ∷ instEventᵗ u a ∷ Acc ∷ Θ) Acc
-    acc = varᵗ (there (there (here refl)))
-
-    keep : ∀ {x} → Tm _ _ _ (x ∷ instEventᵗ u a ∷ Acc ∷ Θ) (instEventᵗ u b)
-         → Tm _ _ _ (x ∷ instEventᵗ u a ∷ Acc ∷ Θ) Acc
-    keep ev = pairᵗ (consᵗ ev (fstᵗ acc)) (sndᵗ acc)
 
   unreverse : Tm _ _ _ (Acc ∷ Θ) Acc
   unreverse = pairᵗ (revᵗ (fstᵗ (varᵗ (here refl))))

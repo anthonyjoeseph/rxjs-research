@@ -245,7 +245,7 @@ arrivals over `correspondence`: schedules in step, pops partnered, stores relate
 subscribes set them (`subscribe-related`) and each cascade keeps
 (`cascade-related`), both sending agreeing values in one instant. RULED
 OUT: an impl arrival plain lacks, a split arrival, a gap or
-stray in a cascade's instant, an echo apart from its inners; a subscribe
+stray in an instant, an echo apart from its inners or its payload; a subscribe
 installing a run the relation lacks (hot, cold, deferred read,
 one-lane merge); a pop unrelating a read; a map moving instants; a close
 emptying a merge its rows name; a hot end past its block; a two-value emit.
@@ -255,12 +255,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **CASE THE ELEMENT ON ITS EMIT.** The store carries each run's rule and
-  the arms carry their paths' soundness, so a tail's fold missing the
-  flattener's nodes is `fold-unmoved`, the candidate's own `Kept`. Next:
-  `elem-{one,quiet}` by case on the emit, then `consume-pair` one policy at
-  a time. Narrows the monster to whether the subscribe walk and the pass
-  share one invariant.
+- **CONSUME THE PAIR ONE POLICY AT A TIME.** The store carries each run's
+  rule, a tail's fold missing the flattener's nodes is `fold-unmoved`, and
+  what an outer emit hands the flattener is read off the evaluator. Left:
+  `consume-pair`, what the flattener does with that lane, merge first.
+  Narrows the monster to whether the subscribe walk and the pass share one
+  invariant.
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
@@ -306,9 +306,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   lane subscribed on both sides keeps the flattener and the path related.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
-- **`elem-{one,quiet}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the impl's
-  element map on an emit of one payload, or none, is an echo and at most one
-  lane related to the plain element.
 - **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   exploded outer's step on both sides.
 - **`{inner,lane,deferInner}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:

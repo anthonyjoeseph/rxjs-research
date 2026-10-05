@@ -18,7 +18,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; 
 open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ; instantᵛ; sourceᵛ; kindᵛ;
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
-                               machineEmitᵗ)
+                               machineEmitᵗ; splitAccᵗ)
 open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; hotᵏ; coldᵏ; sharedᵏ; slotTy;
@@ -740,6 +740,53 @@ leadᵛ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {b = b} o env vs l =
   seg : ∀ {s} → Tm Γ Δᵍ Δ (s ∷ Θ) (obs (machineEmitᵗ b))
   seg = strmᵗ (ofᵉ (segᵛ (upᵛ env) (upᵛ vs) ∷ []))
 
+-- `elemᵛ` below, inside its `letᵗ`: the split, the former's argument,
+-- then Θ.  NAMED
+-- because a lemma transporting the split's result through it has to
+-- say what it is transported through
+elemBodyᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+          → Tm Γ Δᵍ Δ (splitAccᵗ uniqᵗ (plainᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))) (plainᵗ t)
+                       ∷ emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)) ∷ Θ)
+                      ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t)))
+elemBodyᵛ {Θ = Θ} {t = t} =
+  letᵗ (foldᵗ (revᵗ (fstᵗ (sndᵗ split))) (pairᵗ nilᵗ (inlᵗ unit̂)) laneStep)
+       (pairᵗ (inlᵗ unit̂) (inlᵗ unit̂))
+       (pairᵗ (inrᵗ (reassembleᵛ (upᵛ arg) (fstᵗ (upᵛ split)) (fstᵗ out) (sndᵗ (sndᵗ (upᵛ split)))))
+              (sndᵗ out))
+  where
+  L : Ty
+  L = unitᵗ +ᵗ obs (emitᵗ t)
+
+  P : Ty
+  P = (unitᵗ +ᵗ plainᵗ t) ×ᵗ L
+
+  E : Ty
+  E = emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))
+
+  SP : Ty
+  SP = splitAccᵗ uniqᵗ P (plainᵗ t)
+
+  split = varᵗ (here refl)
+  arg   = varᵗ (there (here refl))
+  out   = varᵗ (here refl)
+
+  -- the echoes waiting for an inner, then the lane they lead
+  A : Ty
+  A = listᵗ (plainᵗ t) ×ᵗ L
+
+  -- one payload over the payloads reversed: an echo waits, and an inner
+  -- leads the echoes waiting and the lane after them.  The payload, then
+  -- the accumulator
+  laneStep : Tm _ _ _ (P ∷ A ∷ SP ∷ E ∷ Θ) A
+  laneStep = caseᵗ (sndᵗ p)
+                   (pairᵗ (echoOntoᵛ (fstᵗ (upᵛ p)) (fstᵗ (upᵛ acc))) (sndᵗ (upᵛ acc)))
+                   (pairᵗ (echoOntoᵛ (fstᵗ (upᵛ p)) nilᵗ)
+                          (inrᵗ (leadᵛ (varᵗ (here refl)) (upᵛ env) (fstᵗ (upᵛ acc)) (sndᵗ (upᵛ acc)))))
+    where
+    p   = varᵗ (here refl)
+    acc = varᵗ (there (here refl))
+    env = varᵗ (there (there (there (here refl))))
+
 -- ONE OUTER EMIT AS ONE FLATTENER ELEMENT: an echo carrying the emit's
 -- bookkeeping and its echoed values, beside a lane merging the inners it
 -- carried.  The flattener is `flattenᵉ` itself, at the author's policy,
@@ -774,49 +821,9 @@ leadᵛ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {b = b} o env vs l =
 elemᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
       → Fn Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)))
                     ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t)))
-elemᵛ {Θ = Θ} {t = t} =
+elemᵛ {t = t} =
   letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (varᵗ (here refl))))
-       (pairᵗ (inlᵗ unit̂) (inlᵗ unit̂)) body
-  where
-  L : Ty
-  L = unitᵗ +ᵗ obs (emitᵗ t)
-
-  P : Ty
-  P = (unitᵗ +ᵗ plainᵗ t) ×ᵗ L
-
-  E : Ty
-  E = emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))
-
-  SP : Ty
-  SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ P ×ᵗ boolᵗ)
-
-  -- the echoes waiting for an inner, then the lane they lead
-  A : Ty
-  A = listᵗ (plainᵗ t) ×ᵗ L
-
-  -- one payload over the payloads reversed: an echo waits, and an inner
-  -- leads the echoes waiting and the lane after them.  The payload, then
-  -- the accumulator
-  laneStep : Tm _ _ _ (P ∷ A ∷ SP ∷ E ∷ Θ) A
-  laneStep = caseᵗ (sndᵗ p)
-                   (pairᵗ (echoOntoᵛ (fstᵗ (upᵛ p)) (fstᵗ (upᵛ acc))) (sndᵗ (upᵛ acc)))
-                   (pairᵗ (echoOntoᵛ (fstᵗ (upᵛ p)) nilᵗ)
-                          (inrᵗ (leadᵛ (varᵗ (here refl)) (upᵛ env) (fstᵗ (upᵛ acc)) (sndᵗ (upᵛ acc)))))
-    where
-    p   = varᵗ (here refl)
-    acc = varᵗ (there (here refl))
-    env = varᵗ (there (there (there (here refl))))
-
-  -- inside the `letᵗ`: the split, the former's argument, then Θ
-  body : Tm _ _ _ (SP ∷ E ∷ Θ) ((unitᵗ +ᵗ emitᵗ t) ×ᵗ L)
-  body = letᵗ (foldᵗ (revᵗ (fstᵗ (sndᵗ split))) (pairᵗ nilᵗ (inlᵗ unit̂)) laneStep)
-              (pairᵗ (inlᵗ unit̂) (inlᵗ unit̂))
-              (pairᵗ (inrᵗ (reassembleᵛ (upᵛ env) (fstᵗ (upᵛ split)) (fstᵗ acc) (sndᵗ (sndᵗ (upᵛ split)))))
-                     (sndᵗ acc))
-    where
-    split = varᵗ (here refl)
-    env   = varᵗ (there (here refl))
-    acc   = varᵗ (here refl)
+       (pairᵗ (inlᵗ unit̂) (inlᵗ unit̂)) elemBodyᵛ
 
 -- ONE OUTER EMIT AS A RUN OF FLATTENER ELEMENTS, ONE PER INNER: the
 -- first carries the echo up to the first inner beside that inner, each
