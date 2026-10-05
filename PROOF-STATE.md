@@ -259,10 +259,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   field at every arrival boundary of both runs, `π` inferred, every closure
   clause unread. Seeds 1–4 (490 programs, depth ≤ 4, fuel 30, a flatten in
   over 300) held at every boundary, and an off-by-one impl node read fails 19
-  of 40, so the rows are read. Left: restrictions on the draw (former weights,
-  slot kinds, a must-reach former) to land a sweep in one `Simulation.Pass`
-  leaf's region, and a shrinker printing a red as a refutation row; a green
-  per leaf's region then answers the monster's "which cascade" structurally.
+  of 40, so the rows are read. `QC_DRAW` aims a sweep (arm weights, slot
+  kinds, a must-reach former; seed 5 put flatten and μ in 60 of 60). Left: one
+  aimed sweep per `Simulation.Pass` leaf's region, and a shrinker printing a
+  red as a refutation row; a green per leaf's region then answers the
+  monster's "which cascade" structurally.
 
 - **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
   merge and an exhaust decide alike off related nodes, a node neither can

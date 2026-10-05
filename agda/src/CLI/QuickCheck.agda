@@ -52,17 +52,17 @@
 module CLI.QuickCheck where
 
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
-open import Data.Bool.ListAction using (any)
-open import Data.Char using (toℕ)
+open import Data.Bool.ListAction using (any; all)
+open import Data.Char using (toℕ; fromℕ)
 open import Data.Fin using (Fin; zero; suc)
 open import Data.List using (List; []; _∷_; map; length; concat; concatMap; take; zipWith)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
-open import Data.Maybe using (nothing; just)
+open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
-open import Data.String using (String; _++_; toList) renaming (length to lengthˢ)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.String using (String; _++_; toList; fromList) renaming (length to lengthˢ)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
@@ -77,6 +77,7 @@ open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; t
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
+open import CLI.JSON using (JSON; jnum; jstr; jarr; jobj; parseJSON)
 open import SExp.Pipeline using (runᴵ; elaborateImpl)
 open import CLI.Store-Check using (storeSides)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
@@ -131,20 +132,83 @@ randList seed count = randFold seed count _∷_ []
 ------------------------------------------------------------------------
 -- generator monad: consume randoms from a List ℕ
 
+-- A DRAW IS AIMED BY WEIGHTING THE ARMS IT PICKS BETWEEN, NEVER BY
+-- FILTERING WHAT IT DREW.  Each `Knob` is one arm choice of the generator
+-- below, named by the key a restriction spells it with; a weight list
+-- replaces that choice's uniform pick, so a zero weight is an arm the
+-- sweep never takes and the draw stays a draw.  An absent knob is the
+-- uniform pick and consumes exactly what it always did, which is what
+-- keeps every unrestricted seed the program it was.
+data Knob : Set where
+  kExp kSpineD kSpineG kOp kFan kScript kSlot kLeaf kObs : Knob
+
+arity : Knob → ℕ
+arity kExp    = 13
+arity kSpineD = 10
+arity kSpineG = 10
+arity kOp     = 5
+arity kFan    = 9
+arity kScript = 4
+arity kSlot   = 4
+arity kLeaf   = 3
+arity kObs    = 4
+
+knobName : Knob → String
+knobName kExp    = "exp"
+knobName kSpineD = "spineD"
+knobName kSpineG = "spineG"
+knobName kOp     = "op"
+knobName kFan    = "fan"
+knobName kScript = "script"
+knobName kSlot   = "slot"
+knobName kLeaf   = "leaf"
+knobName kObs    = "obs"
+
+allKnobs : List Knob
+allKnobs = kExp ∷ kSpineD ∷ kSpineG ∷ kOp ∷ kFan ∷ kScript ∷ kSlot ∷ kLeaf ∷ kObs ∷ []
+
+-- the weights, the former tags every accepted case must carry, and how
+-- many draws a case may spend finding one that does
+record Draw : Set where
+  field
+    weights : Knob → List ℕ
+    reach   : List (List ℕ)
+    tries   : ℕ
+
+anyDraw : Draw
+anyDraw = record { weights = λ _ → [] ; reach = [] ; tries = 1 }
+
 Gen : Set → Set
-Gen A = List ℕ → A × List ℕ
+Gen A = Draw → List ℕ → A × List ℕ
 
 pureG : {A : Set} → A → Gen A
-pureG x rs = x , rs
+pureG x W rs = x , rs
 
 _>>=G_ : {A B : Set} → Gen A → (A → Gen B) → Gen B
-(g >>=G f) rs with g rs
-... | (a , rs′) = f a rs′
+(g >>=G f) W rs with g W rs
+... | (a , rs′) = f a W rs′
 infixl 1 _>>=G_
 
+askG : Gen Draw
+askG W rs = W , rs
+
 genB : ℕ → Gen ℕ
-genB bound []       = 0 , []
-genB bound (r ∷ rs) = natMod r bound , rs
+genB bound W []       = 0 , []
+genB bound W (r ∷ rs) = natMod r bound , rs
+
+sumℕ : List ℕ → ℕ
+sumℕ []       = 0
+sumℕ (x ∷ xs) = x + sumℕ xs
+
+-- the arm a point of the weights' total lands in
+pick : List ℕ → ℕ → ℕ
+pick []       r = 0
+pick (w ∷ ws) r = if suc r ≤ᵇ w then 0 else suc (pick ws (r ∸ w))
+
+genW : Knob → Gen ℕ
+genW k W rs with Draw.weights W k
+... | []       = genB (arity k) W rs
+... | ws@(_ ∷ _) = (genB (sumℕ ws) >>=G λ r → pureG (pick ws r)) W rs
 
 ------------------------------------------------------------------------
 -- THE TREE THE SWEEP DRAWS IS THE AUTHOR'S, WHICH IS WHAT PUTS THE
@@ -194,7 +258,7 @@ genNat = genB 10
 -- it already did with the constant table.  The other arms give slot
 -- zero something to say, so the forwarding has traffic to forward.
 genSlotDef : ℕ → Gen (SExp Γ₂ [] [] [] natᵗ)
-genSlotDef k = genB 4 >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
+genSlotDef k = genW kSlot >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
        if c ≡ᵇ 0 then genSlotRef k
   else if c ≡ᵇ 1 then pureG emptyˢ
   else if c ≡ᵇ 2 then pureG (ofˢ (natˢ x ∷ []))
@@ -223,7 +287,7 @@ showScript (hot ts)     = "hot " ++ showTimed ts
 showScript (cold ss ts) = "cold " ++ showNats ss ++ " " ++ showTimed ts
 
 genScript : Gen Script
-genScript = genB 4 >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
+genScript = genW kScript >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
   genB 2 >>=G λ w →
        if c ≡ᵇ 0 then pureG (hot ((after w , x) ∷ []))
   else if c ≡ᵇ 1 then pureG (hot ((after 0 , x) ∷ (after w , y) ∷ []))
@@ -284,7 +348,7 @@ genScanFn = pureG (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl)))
 -- produce the program that distinguishes a step which ignores its input
 -- from one that does not.
 genFanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ)))
-genFanFn = genB 9 >>=G λ c → genNat >>=G λ k →
+genFanFn = genW kFan >>=G λ c → genNat >>=G λ k →
   let x = varˢᵗ (here refl)
       lane : ∀ {Δᵍ Δ Θ} → STm Γ₂ Δᵍ Δ Θ (obs natᵗ) → STm Γ₂ Δᵍ Δ Θ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ))
       lane o = pairˢ (inlˢ unitˢ) (inrˢ o)
@@ -305,7 +369,7 @@ genFanFn = genB 9 >>=G λ c → genNat >>=G λ k →
 -- A FLATTENER'S POLICY, each of rxjs's named ones and the bounded merge
 -- between them
 genOp : Gen FlatOp
-genOp = genB 5 >>=G λ c → genB 3 >>=G λ k →
+genOp = genW kOp >>=G λ c → genB 3 >>=G λ k →
   pureG (      if c ≡ᵇ 0 then mergeᶠ nothing
           else if c ≡ᵇ 1 then mergeᶠ (just (suc k))
           else if c ≡ᵇ 2 then switchᶠ
@@ -389,13 +453,13 @@ genSpineG  : ∀ g u → ℕ → ℕ → Gen (SExp Γ₂ (nats (suc g)) (nats u)
 genSpineD  : ∀ w   → ℕ → ℕ → Gen (SExp Γ₂ [] (nats (suc w)) [] natᵗ)
 
 genLeafAt : ∀ g u → ℕ → Gen (SExp Γ₂ (nats g) (nats u) [] natᵗ)
-genLeafAt g u sl = genB 3 >>=G λ c →
+genLeafAt g u sl = genW kLeaf >>=G λ c →
   if c ≡ᵇ 0 then genSlotRef sl
   else if c ≡ᵇ 1 then pureG emptyˢ
   else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofˢ (natˢ a ∷ natˢ b ∷ [])))
 
 genExpAt g u sl zero    = genLeafAt g u sl
-genExpAt g u sl (suc d) = genB 13 >>=G λ c →
+genExpAt g u sl (suc d) = genW kExp >>=G λ c →
   if c ≡ᵇ 0 then genLeafAt g u sl
   else if c ≡ᵇ 1 then genLeafAt g u sl
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt g u sl d >>=G λ e → pureG (mapˢ f e))
@@ -451,7 +515,7 @@ genInners g u sl d (suc n) =
 genObsAt g u sl d =
   let inners = genB 2 >>=G λ extra → genInners g u sl d (suc (suc extra)) >>=G λ items →
                  pureG (ofˢ items)
-  in genB 4 >>=G λ c →
+  in genW kObs >>=G λ c →
      if c ≡ᵇ 0
      then (if d ≡ᵇ 0
            then (genObsScanFn >>=G λ f → genObsSeed sl >>=G λ z →
@@ -461,7 +525,7 @@ genObsAt g u sl d =
 
 -- past the gate: the var is in scope and this subtree plants exactly one
 genSpineD w sl zero    = pureG (varˢ (here refl))
-genSpineD w sl (suc d) = genB 10 >>=G λ c →
+genSpineD w sl (suc d) = genW kSpineD >>=G λ c →
   if c ≡ᵇ 0 then pureG (varˢ (here refl))
   else if c ≡ᵇ 1 then (genFn >>=G λ f → genSpineD w sl d >>=G λ e → pureG (mapˢ f e))
   else if c ≡ᵇ 2 then
@@ -494,7 +558,7 @@ genSpineD w sl (suc d) = genB 10 >>=G λ c →
 
 -- before the gate: the binder is guarded, so every route ends in a `deferᵉ`
 genSpineG g u sl zero    = pureG (gate (suc g) u (varˢ (here refl)))
-genSpineG g u sl (suc d) = genB 10 >>=G λ c →
+genSpineG g u sl (suc d) = genW kSpineG >>=G λ c →
   if c ≡ᵇ 0 then (genSpineD (g + u) sl d >>=G λ b → pureG (gate (suc g) u b))
   else if c ≡ᵇ 1 then (genSpineD (g + u) sl d >>=G λ b → pureG (gate (suc g) u b))
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genSpineG g u sl d >>=G λ e → pureG (mapˢ f e))
@@ -1115,12 +1179,42 @@ judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen ×
 judged ob ss f s m x with bears s f x
 ... | b = (m , b , slack s f x , groups s f x , splits ss s f x) , (if ob ∧ not b then [] else bounded s f x ss)
 
+-- ONE CASE IS ONE ACCEPTED DRAW.  A restriction's `reach` is the one
+-- filter, and it is spent HERE so that every route naming a case by its
+-- index -- the sweep, `skipN`, `showAt`, `runAt`, `sideAt` -- spends the
+-- same draws on it; the flag says whether the last one met it.
+drawOnce : ℕ → Gen (Marks × Drawn)
+drawOnce d = genExp d >>=G λ e → genSlots >>=G λ ds →
+  pureG (marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e) , e , proj₁ ds , proj₂ ds)
+
+carriesTag : List Former → List ℕ → Bool
+carriesTag fs t = any (λ g → eqListℕ (map toℕ (toList (formerTag g))) t) fs
+
+reaches : Draw → Marks → Bool
+reaches W m = all (carriesTag (proj₁ m)) (Draw.reach W)
+
+drawFor : ℕ → ℕ → Gen (Bool × Marks × Drawn)
+drawFor zero    d = askG >>=G λ W → drawOnce d >>=G λ x → pureG (reaches W (proj₁ x) , x)
+drawFor (suc k) d = askG >>=G λ W → drawOnce d >>=G λ x →
+  if reaches W (proj₁ x) then pureG (true , x) else drawFor k d
+
+drawCase : ℕ → Gen (Bool × Marks × Drawn)
+drawCase d = askG >>=G λ W → drawFor (Draw.tries W ∸ 1) d
+
+-- AN UNMET REACH IS UNDECIDED, NOT RUN: the case is not in the region the
+-- sweep was aimed at, so no statement is asked of it
+unreached : ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
+unreached f n m (e , d₀ , d₁) =
+  (m , false , false , false , false) ,
+  (TIMEOUT , "  unreached\n    no draw in " ++ show n ++ " tries carried every former the draw must reach"
+             ++ rowIn "UNDECIDED" f e d₀ d₁) ∷ []
+
 oneCase : Bool → List Statement → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
 -- THE DRAWN TREE IS WHAT IS COUNTED, PRINTED AND RUN.  Every check reads
 -- the statement's sides at exactly the program a cached row names.
-oneCase ob ss f s d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (judged ob ss f s (marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e))
-                (e , proj₁ ds , proj₂ ds))
+oneCase ob ss f s d = askG >>=G λ W → drawCase d >>=G λ where
+  (true  , m , x) → pureG (judged ob ss f s m x)
+  (false , m , x) → pureG (unreached f (Draw.tries W) m x)
 
 -- every case drawn, in generation order, its reports still unforced:
 -- drawing is cheap and upstream of every run, so the list is whole
@@ -1235,13 +1329,13 @@ dumpFails fs = agreeing (decided fs) ++ concatStr (counts 0 kinds fs) ++ "\n"
 -- step by construction.
 skipN : ℕ → ℕ → Gen ℕ
 skipN zero    d = pureG 0
-skipN (suc k) d = genExp d >>=G λ _ → genSlots >>=G λ _ → skipN k d
+skipN (suc k) d = drawCase d >>=G λ _ → skipN k d
 
 -- the paste row of ONE case, named by its 1-based index
 showAt : ℕ → ℕ → ℕ → Gen String
 showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
-  genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (pasteRow f e (proj₁ ds) (proj₂ ds))
+  drawCase d >>=G λ where
+    (_ , _ , e , d₀ , d₁) → pureG (pasteRow f e d₀ d₁)
 
 -- RUN ONE CASE, named the same way, so a case that hangs a sweep can be
 -- timed and re-run alone rather than by bisecting the count
@@ -1278,8 +1372,8 @@ sidesOf k c with selected k
 ... | _      = rawOf c
 
 sideAt : ℕ → ℕ → ℕ → ℕ → Gen String
-sideAt f k n d = skipN (n ∸ 1) d >>=G λ _ → genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (sidesOf k (cached "?" f e (mkSlots (proj₁ ds) (proj₂ ds))))
+sideAt f k n d = skipN (n ∸ 1) d >>=G λ _ → drawCase d >>=G λ where
+  (_ , _ , e , d₀ , d₁) → pureG (sidesOf k (cached "?" f e (mkSlots d₀ d₁)))
 
 -- THE CORPUS, EVERY ROW WITH EVERY SIDE PRINTED WHETHER OR NOT THEY
 -- AGREE.  A row is a probe before it is a guard, and a probe is read for
@@ -1354,10 +1448,120 @@ summaryOf seed d f runs (tally , fails) = concatStr
 sweep : Bool → ℕ → ℕ → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
 sweep ob seed d f runs rs = streamCases ob runs 1 rs >>= λ _ → putStr (summaryOf seed d f runs (tallyOf rs))
 
-main : IO Unit
-main = getContents >>= λ s →
-  let cs    = toCodes s
-      seed  = parseNat cs
+------------------------------------------------------------------------
+-- THE RESTRICTION, stdin's second line: one JSON object whose keys are
+-- the knobs' names, each a weight per arm, plus `reach`, the former tags
+-- every case must carry, and `tries`, the draws one case may spend on
+-- it.  Every key, length and tag is checked, because a misspelt knob
+-- read as "unrestricted" is a sweep aimed somewhere else that says it
+-- was aimed here.
+firstLine restLines : List ℕ → List ℕ
+firstLine []       = []
+firstLine (c ∷ cs) = if c ≡ᵇ 10 then [] else c ∷ firstLine cs
+restLines []       = []
+restLines (c ∷ cs) = if c ≡ᵇ 10 then cs else restLines cs
+
+fromCodes : List ℕ → String
+fromCodes cs = fromList (map fromℕ cs)
+
+blank : List ℕ → Bool
+blank = all (λ c → (c ≡ᵇ 32) ∨ (c ≡ᵇ 9) ∨ (c ≡ᵇ 10) ∨ (c ≡ᵇ 13))
+
+keyed : List ℕ → List (List ℕ × JSON) → Maybe JSON
+keyed k []             = nothing
+keyed k ((j , v) ∷ ms) = if eqListℕ k j then just v else keyed k ms
+
+numsOf : List JSON → Maybe (List ℕ)
+numsOf []            = just []
+numsOf (jnum n ∷ js) with numsOf js
+... | just ns = just (n ∷ ns)
+... | nothing = nothing
+numsOf (_ ∷ _)       = nothing
+
+strsOf : List JSON → Maybe (List (List ℕ))
+strsOf []            = just []
+strsOf (jstr t ∷ js) with strsOf js
+... | just ts = just (t ∷ ts)
+... | nothing = nothing
+strsOf (_ ∷ _)       = nothing
+
+knownKey : List ℕ → Bool
+knownKey k = any (λ n → eqListℕ (toCodes (knobName n)) k) allKnobs
+           ∨ eqListℕ (toCodes "reach") k ∨ eqListℕ (toCodes "tries") k
+
+isTag : List ℕ → Bool
+isTag t = carriesTag allFormers t
+
+-- the first thing wrong with one member, as the message main prints
+knobErr : List ℕ → JSON → Maybe String
+knobErr k (jarr js) with numsOf js
+... | nothing = just (fromCodes k ++ " is not a list of weights")
+... | just ws =
+  if not (any (λ n → eqListℕ (toCodes (knobName n)) k ∧ (length ws ≡ᵇ arity n)) allKnobs)
+  then just (fromCodes k ++ " needs one weight per arm")
+  else if sumℕ ws ≡ᵇ 0 then just (fromCodes k ++ " leaves no arm")
+  else nothing
+knobErr k _ = just (fromCodes k ++ " is not a list")
+
+reachErr : JSON → Maybe String
+reachErr (jarr js) with strsOf js
+... | nothing = just "reach is not a list of former tags"
+... | just ts = if all isTag ts then nothing else just "reach names a tag no former carries"
+reachErr _ = just "reach is not a list"
+
+triesErr : JSON → Maybe String
+triesErr (jnum (suc _)) = nothing
+triesErr _              = just "tries is not a positive number"
+
+memberErr : List ℕ × JSON → Maybe String
+memberErr (k , v) =
+  if not (knownKey k) then just ("unknown key " ++ fromCodes k)
+  else if eqListℕ (toCodes "tries") k then triesErr v
+  else if eqListℕ (toCodes "reach") k then reachErr v
+  else knobErr k v
+
+firstErr : List (List ℕ × JSON) → Maybe String
+firstErr []       = nothing
+firstErr (m ∷ ms) with memberErr m
+... | just e  = just e
+... | nothing = firstErr ms
+
+weightsIn : List (List ℕ × JSON) → Knob → List ℕ
+weightsIn ms k with keyed (toCodes (knobName k)) ms
+... | just (jarr js) with numsOf js
+...   | just ws = ws
+...   | nothing = []
+weightsIn ms k | _ = []
+
+drawIn : List (List ℕ × JSON) → Draw
+drawIn ms = record
+  { weights = weightsIn ms
+  ; reach   = reachIn (keyed (toCodes "reach") ms)
+  ; tries   = triesIn (keyed (toCodes "tries") ms) }
+  where
+  reachIn : Maybe JSON → List (List ℕ)
+  reachIn (just (jarr js)) with strsOf js
+  ... | just ts = ts
+  ... | nothing = []
+  reachIn _ = []
+  -- a reach with no tries given gets enough to find a rare former
+  triesIn : Maybe JSON → ℕ
+  triesIn (just (jnum n)) = n
+  triesIn _               = 1000
+
+-- the restriction stdin names, or why it names none
+drawOf : List ℕ → Draw ⊎ String
+drawOf cs with blank cs
+... | true  = inj₁ anyDraw
+... | false with parseJSON cs
+...   | just (jobj ms) with firstErr ms
+...     | nothing = inj₁ (drawIn ms)
+...     | just e  = inj₂ e
+drawOf cs | false | _ = inj₂ "the restriction is not one JSON object"
+
+run : List ℕ → Draw → IO Unit
+run cs W =
+  let seed  = parseNat cs
       runs  = numAt 1 200 cs
       d     = numAt 2 4 cs
       at    = numAt 3 0 cs
@@ -1371,9 +1575,16 @@ main = getContents >>= λ s →
   in if runs ≡ᵇ 0
      then printRows ss fuelʳ side only 1 cases
      else if not (side ≡ᵇ 0)
-     then putStr (proj₁ (sideAt f side only d (randList seed 2000000)) ++ "\n")
+     then putStr (proj₁ (sideAt f side only d W (randList seed 2000000)) ++ "\n")
      else if not (only ≡ᵇ 0)
-     then putStr (dumpFails (proj₂ (proj₁ (runAt ss f secs only d (randList seed 2000000)))))
+     then putStr (dumpFails (proj₂ (proj₁ (runAt ss f secs only d W (randList seed 2000000)))))
      else if not (at ≡ᵇ 0)
-     then putStr (proj₁ (showAt f at d (randList seed 2000000)))
-     else sweep ob seed d f runs (proj₁ (casesN ob ss f secs runs d (randList seed 2000000)))
+     then putStr (proj₁ (showAt f at d W (randList seed 2000000)))
+     else sweep ob seed d f runs (proj₁ (casesN ob ss f secs runs d W (randList seed 2000000)))
+
+main : IO Unit
+main = getContents >>= λ s → go (drawOf (restLines (toCodes s))) (firstLine (toCodes s))
+  where
+  go : Draw ⊎ String → List ℕ → IO Unit
+  go (inj₁ W) cs = run cs W
+  go (inj₂ e) cs = putStr ("restriction: " ++ e ++ "\n")

@@ -1678,7 +1678,15 @@ quickcheck: qc-build
 # `same-clock`, the two schedules' keys one for one, a candidate
 # invariant that 0 does not include; 10 is `store`, the simulation's
 # `Store` decided at every arrival boundary of both runs, likewise.
+#
+# QC_DRAW AIMS THE DRAW: one JSON object, unset for the uniform one.  A
+# key per arm choice of the generator (exp spineD spineG op fan script
+# slot leaf obs, each one weight per arm, a zero arm never taken), and
+# `reach`, the former tags every case must carry, found in at most
+# `tries` draws (default 1000) or reported undecided.  Unset, every seed
+# draws the program it always drew.  → docs/probe.md
 QC ?= 1 15 1
+QC_DRAW ?=
 QC_BUDGET ?= 120
 QC_FUEL ?= 0
 QC_STMT ?= 0
@@ -1698,7 +1706,7 @@ qc-packets-name-arrivals: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=8
 qc-same-clock:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=9
 qc-store:        ; @$(MAKE) --no-print-directory qc-fast QC_STMT=10
 qc-fast: qc-build
-	@printf '%s\n' "$(QC_IN)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG) 2> $(QC_STREAM); \
+	@printf '%s\n%s\n' "$(QC_IN)" '$(QC_DRAW)' | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG) 2> $(QC_STREAM); \
 	ec=$$?; head -c 6000 $(QC_LOG); \
 	if [ $$ec = 124 ]; then \
 	  echo "qc-fast: OVER BUDGET ($(QC_BUDGET)s) on '$(QC)' -- decided before the kill:"; \
