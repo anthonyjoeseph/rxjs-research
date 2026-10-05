@@ -78,10 +78,11 @@ open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; t
 open import Data.List.Membership.Propositional using (_∈_)
 open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import SExp.Pipeline using (runᴵ; elaborateImpl)
+open import CLI.Store-Check using (storeSides)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
-  same-clockˢ; sameClockᵇ; Key;
+  same-clockˢ; sameClockᵇ; Key; storeˢ;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
   Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; lockstepᵇ)
 open import CLI.Unit-Test using (cases)
@@ -942,6 +943,7 @@ halves c arrival-runsˢ   =
   , (lockstepᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
 halves c batched-sandwichˢ = sandwichᴸ (bsSides c) ∷ [] , []
 halves c packets-name-arrivalsˢ = [] , namesᵀ (namingSides c) ∷ []
+halves c storeˢ          = storeSides (Case.fuel c) (Case.prog c) (Case.slots c) ∷ [] , []
 halves c same-clockˢ     =
   (sameClockᵇ (arrPlain c) , showArr show (arrPlain c)) ∷ []
   , (sameClockᵇ (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
@@ -966,6 +968,7 @@ indexOf arrival-runsˢ = 5
 indexOf batched-sandwichˢ = 6
 indexOf packets-name-arrivalsˢ = 7
 indexOf same-clockˢ = 8
+indexOf storeˢ = 9
 
 -- one count per former, in `allFormers` order, plus the obs-fold count,
 -- the count of cases bearing on contiguity and of those holding values
@@ -1017,7 +1020,7 @@ forced ((k , r) ∷ rs) = k + lengthˢ r + forced rs
 -- a case past its wall clock: one report of its own kind, after the
 -- statements', carrying the row that reproduces it
 TIMEOUT : ℕ
-TIMEOUT = 9
+TIMEOUT = 10
 
 timedOut : ℕ → ℕ → Drawn → List (ℕ × String)
 timedOut s f (e , d₀ , d₁) =
@@ -1188,7 +1191,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = map statementName (statements ++ᴸ same-clockˢ ∷ []) ++ᴸ "timeout" ∷ []
+kinds = map statementName (statements ++ᴸ same-clockˢ ∷ storeˢ ∷ []) ++ᴸ "timeout" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -1213,7 +1216,7 @@ agreeing (_ ∷ _) = ""
 dumpFails : List (ℕ × String) → String
 dumpFails [] = "  (all agree)\n"
 dumpFails fs = agreeing (decided fs) ++ concatStr (counts 0 kinds fs) ++ "\n"
-  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples 5 fs ++ samples 6 fs ++ samples 7 fs ++ samples 8 fs ++ samples TIMEOUT fs
+  ++ samples 0 fs ++ samples 1 fs ++ samples 2 fs ++ samples 3 fs ++ samples 4 fs ++ samples 5 fs ++ samples 6 fs ++ samples 7 fs ++ samples 8 fs ++ samples 9 fs ++ samples TIMEOUT fs
 
 -- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
 -- costs more than the whole sweep it belongs to can still be READ.  Such
@@ -1247,7 +1250,8 @@ runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase false ss f s d
 
 -- THE STATEMENT A NUMBER NAMES, in `Main`'s order, the simulation
 -- fifth and its leaf sixth, the two assembled top lines' leaves seventh
--- and eighth; zero is all of them
+-- and eighth, the two invariants ninth and tenth; zero is all the
+-- statements
 selected : ℕ → List Statement
 selected (suc zero)                   = left-to-rightˢ ∷ []
 selected (suc (suc zero))             = timing-correctˢ ∷ []
@@ -1258,6 +1262,7 @@ selected (suc (suc (suc (suc (suc (suc zero)))))) = arrival-runsˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc zero))))))) = batched-sandwichˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))) = packets-name-arrivalsˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc (suc (suc zero))))))))) = same-clockˢ ∷ []
+selected (suc (suc (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))))) = storeˢ ∷ []
 selected _                            = statements
 
 -- the impl's raw run, decoded, for reading a batchable failure by
@@ -1265,7 +1270,7 @@ rawOf : Case → String
 rawOf c = showStream (runᴵ (Case.kinds c) (Case.fuel c) (Case.prog c) (Case.slots c))
 
 -- AND ONE SIDE OF IT, so a hang is attributed to the statement that owns
--- it: 1 to 9 that statement's sides, in `selected`'s numbering,
+-- it: 1 to 10 that statement's sides, in `selected`'s numbering,
 -- anything else the impl's raw run
 sidesOf : ℕ → Case → String
 sidesOf k c with selected k

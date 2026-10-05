@@ -55,6 +55,7 @@ open import Batchable.Inst-Extract using (instExtract)
 open import SExp.Readings using (joinedᴵ; valsᴵ; arrivalsOf)
 open import Batchable.Statement using (batchedᴱ; groupedᴱ)
 open import Timed.Faithful using (untimedᵀ)
+open import CLI.Store-Check using (storeSides)
 
 -- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
 -- the one an elaborated program stands in, where each slot holds the
@@ -153,13 +154,13 @@ cached n f e {κ} ins = record { name = n ; fuel = f ; prog = e ; kinds = κ ; s
 
 data Statement : Set where
   left-to-rightˢ timing-correctˢ batchableˢ timed-faithfulˢ simulationˢ arrival-runsˢ : Statement
-  batched-sandwichˢ packets-name-arrivalsˢ same-clockˢ : Statement
+  batched-sandwichˢ packets-name-arrivalsˢ same-clockˢ storeˢ : Statement
 
 -- in `Main`'s order, which is the order a report counts them in, then
 -- the simulation and the leaf it stands on, then the leaves the two
--- assembled top lines stand on beside it.  `same-clock` is not among
--- them: it decides a candidate invariant, not a statement, so no row of
--- the bug cache is held to it
+-- assembled top lines stand on beside it.  `same-clock` and `store` are
+-- not among them: each decides an invariant, not a statement, so no row
+-- of the bug cache is held to either
 statements : List Statement
 statements = left-to-rightˢ ∷ timing-correctˢ ∷ batchableˢ ∷ timed-faithfulˢ ∷ simulationˢ ∷ arrival-runsˢ
            ∷ batched-sandwichˢ ∷ packets-name-arrivalsˢ ∷ []
@@ -174,6 +175,7 @@ statementName arrival-runsˢ = "arrival-runs"
 statementName batched-sandwichˢ = "batched-sandwich"
 statementName packets-name-arrivalsˢ = "packets-name-arrivals"
 statementName same-clockˢ = "same-clock"
+statementName storeˢ = "store"
 
 -- `left-to-right`: the batches joined back up, the plain run, and the
 -- batches joined back up at one more unit of fuel, the joined runs at
@@ -503,6 +505,7 @@ holds arrival-runsˢ c p t = arrivalRunsᴮ (p , t)
 holds batched-sandwichˢ c p t = sandwichᴸ (bsSides c)
 holds packets-name-arrivalsˢ c p t = namesᵇ (namingSides c)
 holds same-clockˢ c p t = sameClockᴮ (p , t)
+holds storeˢ c p t = proj₁ (storeSides (fuel c) (prog c) (slots c))
 
 checksWith : List Statement → Case → Arr ℕ → Arr Item → List (String × Bool)
 checksWith ss c p t = map (λ s → statementName s , holds s c p t) ss

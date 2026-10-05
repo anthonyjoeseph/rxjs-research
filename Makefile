@@ -1,4 +1,4 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs qc-batched-sandwich qc-packets-name-arrivals qc-same-clock
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs qc-batched-sandwich qc-packets-name-arrivals qc-same-clock qc-store
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -185,7 +185,7 @@ help:
 	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs,"
 	@echo "                  QC_FUEL=n, QC_STMT=1..6 for one statement (Main's four, the simulation, its leaf), 0 for all,"
 	@echo "                  QC_CASE=secs per case, 0 for none, QC_BEAR=1 to decide only cases bearing on contiguity)"
-	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful / qc-simulation / qc-arrival-runs / qc-batched-sandwich / qc-packets-name-arrivals / qc-same-clock"
+	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful / qc-simulation / qc-arrival-runs / qc-batched-sandwich / qc-packets-name-arrivals / qc-same-clock / qc-store"
 	@echo "                qc-fast on that one statement"
 	@echo "  quickcheck    all-Agda QuickCheck: Main's four statements, the simulation and its leaf, caching counterexamples"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
@@ -1676,7 +1676,8 @@ quickcheck: qc-build
 # count and samples.  QC_STMT names one, in `Main`'s order, the
 # simulation fifth and its leaf sixth; 0 gates on all of them.  9 is
 # `same-clock`, the two schedules' keys one for one, a candidate
-# invariant that 0 does not include.
+# invariant that 0 does not include; 10 is `store`, the simulation's
+# `Store` decided at every arrival boundary of both runs, likewise.
 QC ?= 1 15 1
 QC_BUDGET ?= 120
 QC_FUEL ?= 0
@@ -1695,6 +1696,7 @@ qc-arrival-runs:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=6
 qc-batched-sandwich: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=7
 qc-packets-name-arrivals: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=8
 qc-same-clock:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=9
+qc-store:        ; @$(MAKE) --no-print-directory qc-fast QC_STMT=10
 qc-fast: qc-build
 	@printf '%s\n' "$(QC_IN)" | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG) 2> $(QC_STREAM); \
 	ec=$$?; head -c 6000 $(QC_LOG); \
