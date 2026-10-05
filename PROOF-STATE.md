@@ -255,14 +255,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
-  over the program, one arm per former, `walk-flatten` its riskiest. A minted
-  source's chain is `path-pass`, one arm per plain frame, and a hot slot's is
-  `fan-go` over the share's readers, each `slot-pass`; a minted source's end
-  is the same fold at an end head, standing on the arrival pair the value pass
-  hands on through `After`, whose drop `finish-store` is proven over the store's `swept` and the arrival's `lists`; an outer's and an inner's arms are one leaf per constructor, each owing those two persisted; a hot slot's end is the same fan-out after the share is spent;
-  what remains is `lane-arm` as a definition over `inner-arm` once `Arm` can
-  carry an impl-only step, so the monster drops to whichever arm is riskiest.
+- **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
+  program, one arm per former, `walk-flatten` its riskiest. A minted source's
+  chain is `path-pass`, one arm per plain frame; a hot slot's is `fan-go` over
+  the share's readers. Both ends drop alike: `finish-store` and `hot-finish`
+  are proven. Left: the arms as real bodies, riskiest first, each owing the
+  store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
+  `inner-arm` once `Arm` carries an impl-only step; the monster drops to
+  whichever arm fails.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -281,8 +281,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`hot-end-start`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a hot last
   arrival's impl chain runs its block alone into the share, which it spends
   while the plain run latches the slot; the stores are related again there.
-- **`hot-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the share's
-  registrations and the source's drop together keep the stores related.
 - **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   outer's step on both sides; the explode hands the flattener every inner a
   sync outer subscribed before the step returns.

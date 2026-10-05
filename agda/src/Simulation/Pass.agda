@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; cascadeFinish; shareSpend; shareDying; shareFinish; Path; Frame; share-sink;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; Path; Frame; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf; shareAdmit)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
@@ -418,16 +418,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → ∀ {eI sI₃ stI₃}
                     → cascadeGo⇓ a′ [] true (chainsOf a′ stI) sI (cascadeClose a′ stI) (eI , sI₃ , stI₃)
                     → HotEnd S a a′ i eI sI₃ stI₃
-
-      -- the share's registrations and the source's drop together
-      hot-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-                 → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
-                 → ∀ {emits}
-                 → Store κ (proj₁ (cascadeFinish a sP stP)) (proj₂ (cascadeFinish a sP stP))
-                     (proj₁ (cascadeFinish a′ (proj₁ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))
-                                              (proj₂ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))))
-                     (proj₂ (cascadeFinish a′ (proj₁ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))
-                                              (proj₂ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))))
 
     postulate
       -- the impl's one chain at a hot arrival's raw slot

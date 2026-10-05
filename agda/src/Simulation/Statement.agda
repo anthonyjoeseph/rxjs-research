@@ -72,11 +72,11 @@ open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop)
 open import Simulation.Close using (close-store; close-arr)
-open import Simulation.Finish using (finish-store)
+open import Simulation.Finish using (finish-store; hot-finish; T-true)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
-  Persists; delivered-arr; _⨾_; fan-go; hot-start; hot-start-at; hot-adm; hot-end-start; hot-end-at; hot-finish)
+  Persists; delivered-arr; _⨾_; fan-go; hot-start; hot-start-at; hot-adm; hot-end-start; hot-end-at)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -464,7 +464,7 @@ hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
             {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
   → Storeʳ κ sP stP sI stI
   → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-  → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
+  → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′ → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
   → ∀ i → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
   → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
   → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
@@ -475,10 +475,10 @@ hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
              (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
-hot-end {Γ = Γ} {t} κ e s {a} {a′} ex ex′ ta sy i hk e₁ e₂ go go′ end end′
+hot-end {Γ = Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ i hk e₁ e₂ go go′ end end′
   with hot-end-start κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ end′
 ... | hot-end-at {oB = oB} {εI = εI} A c (disp (walk-end {r = r} g)) refl =
-  hot-finish κ (After.store Z) {a} {a′} {i} hk e₁ e₂ {emits = proj₁ r} ,
+  hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
     Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (hot-adm κ (After.store A) hk e₁) end g)
@@ -507,7 +507,7 @@ last-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁}
        → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
                   (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
        × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
-    by (slot~ i h) e₁ e₂ = hot-end κ e s ex ex′ ta sy i h (sym e₁) (sym e₂) go go′ end end′
+    by (slot~ i h) e₁ e₂ = hot-end κ e s ex ex′ ta sy ll ll′ i h (sym e₁) (sym e₂) go go′ end end′
     by (dyn~ p q) refl refl = finish-store {a = a} {a′ = a′} S₂ p q ll ll′ (proj₂ (proj₂ k) ca) , proj₁ (proj₂ k)
       where
         W  = dyn-pass κ e s ex ex′ ta sy p q go go′
@@ -689,9 +689,6 @@ pick-cases false xs             d _            = inj₂ refl
 pick-cases true  []             d _            = inj₂ refl
 pick-cases true  ((i , _) ∷ xs) d (l , h , _) = inj₁ (tt , l , h)
 
-true-of : ∀ {b} → T b → b ≡ true
-true-of {true} _ = refl
-
 -- EACH PLAIN ARRIVAL IS ONE IMPL ARRIVAL, BY INDUCTION ON THE ARRIVALS.
 -- The correspondence holds `k` arrivals in, so the `k`-th arrivals send
 -- agreeing values; the clock never runs back, so an arrival's instant
@@ -773,7 +770,7 @@ arrival-runs {Γ = Γ} {t = t} κ fuel e ins = name , name-inj , λ k le → sli
 
     one : ∀ k → k ≤ fuel → All (λ p → proj₁ p ≡ name k) (sliceAt (stampedAt κ e ins) k)
     one k le = subst (All (λ p → proj₁ p ≡ name k)) (sym (sliceᴵ k))
-                     (pick-all (k ≤ᵇ fuel) (sentᴵ k) (BIG + k) (true-of (≤⇒≤ᵇ le)) (stamped k))
+                     (pick-all (k ≤ᵇ fuel) (sentᴵ k) (BIG + k) (T-true (≤⇒≤ᵇ le)) (stamped k))
 
     cases : ∀ k → (T (k ≤ᵇ fuel) × L k ≤ name k × name k < U k) ⊎ name k ≡ BIG + k
     cases k = pick-cases (k ≤ᵇ fuel) (sentᴵ k) (BIG + k) (stamped k)

@@ -13,18 +13,19 @@ open import Data.Bool    using (Bool; true; false; T; _∨_; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Empty   using (⊥-elim)
-open import Data.Fin     using (Fin; _↑ˡ_; toℕ)
+open import Data.Fin     using (Fin; _↑ˡ_; _↑ʳ_; toℕ)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ)
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_)
+open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_) renaming (map to pw-map)
 open import Data.List.Relation.Binary.Subset.Propositional using (_⊆_)
 open import Data.List.Relation.Unary.All using (All; _∷_; [])
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.Nat     using (zero; suc; _+_; _<_; _<ᵇ_)
-open import Data.Nat.Properties using (≡ᵇ⇒≡; <ᵇ⇒<; <-asym; <-trans; <-≤-trans; +-monoʳ-<; m≤m+n)
+open import Data.Nat     using (zero; suc; _+_; _<_; _<ᵇ_; _≟_)
+open import Data.Nat.Properties using (≡ᵇ⇒≡; <ᵇ⇒<; <⇒<ᵇ; <⇒≢; <-asym; <-trans; <-≤-trans; +-monoʳ-<; +-cancelˡ-≡; m≤m+n)
+open import Relation.Nullary using (yes; no)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (tt)
@@ -32,12 +33,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Prim      using (Source)
-open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegRow; regSource; sameSource; dropSource; sweepLive; cascadeFinish; arrSource; arrTy)
+open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegRow; regSource; sameSource; dropSource; sweepLive; cascadeFinish; shareFinish; arrSource; arrTy)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Chains using (sameSource-lt; sameSource-no)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
-open import Simulation.Stores using (guardOf; SameAt; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr)
+open import Simulation.Stores using (guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr)
   renaming (here to sp-here; there to sp-there)
 
 ------------------------------------------------------------------
@@ -315,3 +316,240 @@ finish-store {κ = κ} {sP = sP} {stP = stP} {sI = sI} {stI = stI} {a = a} {a′
     (cong (λ L → record sP { live = L }) (sym (sweep-eq (dropSource (arrSource a) (EvalSt.registry stP)) (Sched.live sP))))
     (cong (λ L → record sI { live = L }) (sym (sweep-eq (dropSource (arrSource a′) (EvalSt.registry stI)) (Sched.live sI))))
     (finish-go κ S na na′ ar)
+
+------------------------------------------------------------------
+-- A hot script's end
+------------------------------------------------------------------
+
+-- a filter run twice is run once
+sweepL-idem : ∀ {A : Set} (p : A → Bool) xs → sweepL p (sweepL p xs) ≡ sweepL p xs
+sweepL-idem p []       = refl
+sweepL-idem p (x ∷ xs) with p x in e
+... | true  rewrite e = cong (x ∷_) (sweepL-idem p xs)
+... | false = sweepL-idem p xs
+
+T-true : ∀ {b} → T b → b ≡ true
+T-true {true} _ = refl
+
+module _ {n} {Γ : Ctx n} {t} where
+
+  -- a slot's live entry is never swept
+  guard-low : ∀ (K : List (RegRow Γ t)) (l : LiveSource Γ) → LiveSource.source l < n → guardOf K l ≡ true
+  guard-low K l lt = cong (_∨ any (onSrc (LiveSource.source l)) K) (T-true (<⇒<ᵇ lt))
+
+  -- the impl's two drops, as one
+  drop₂ : Source → Source → List (RegRow Γ t) → List (RegRow Γ t)
+  drop₂ y₁ y₂ K = dropSource y₂ (dropSource y₁ K)
+
+  drop₂-keep : ∀ y₁ y₂ (r : RegRow Γ t) K
+             → sameSource y₁ (regSource (proj₁ (proj₂ r))) ≡ false → sameSource y₂ (regSource (proj₁ (proj₂ r))) ≡ false
+             → drop₂ y₁ y₂ (r ∷ K) ≡ r ∷ drop₂ y₁ y₂ K
+  drop₂-keep y₁ y₂ r K e₁ e₂ = trans (cong (dropSource y₂) (drop-keep y₁ r K e₁)) (drop-keep y₂ r (dropSource y₁ K) e₂)
+
+  drop₂-skip₁ : ∀ y₁ y₂ (r : RegRow Γ t) K → sameSource y₁ (regSource (proj₁ (proj₂ r))) ≡ true
+              → drop₂ y₁ y₂ (r ∷ K) ≡ drop₂ y₁ y₂ K
+  drop₂-skip₁ y₁ y₂ r K e₁ = cong (dropSource y₂) (drop-skip y₁ r K e₁)
+
+  drop₂-skip₂ : ∀ y₁ y₂ (r : RegRow Γ t) K
+              → sameSource y₁ (regSource (proj₁ (proj₂ r))) ≡ false → sameSource y₂ (regSource (proj₁ (proj₂ r))) ≡ true
+              → drop₂ y₁ y₂ (r ∷ K) ≡ drop₂ y₁ y₂ K
+  drop₂-skip₂ y₁ y₂ r K e₁ e₂ = trans (cong (dropSource y₂) (drop-keep y₁ r K e₁)) (drop-skip y₂ r (dropSource y₁ K) e₂)
+
+module _ {n} {Γ : Ctx n} (κ : Kinds n) where
+
+  -- a partnered pair of sources is numbered as its live entries are
+  pair-num : ∀ {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {src src′ u u′}
+           → Pointwise (λ l l′ → SrcNum κ (LiveSource.source l) (LiveSource.source l′)) LP LI
+           → SrcPair κ LP LI src src′ u u′ → SrcNum κ src src′
+  pair-num (x ∷ _)  sp-here       = x
+  pair-num (_ ∷ xs) (sp-there sp) = pair-num xs sp
+
+  private
+    -- a raw slot's number, and a stamped one's
+    raw< : (j : Fin n) → toℕ (j ↑ˡ n) < n + n
+    raw< j = subst (_< n + n) (sym (toℕ-↑ˡ j n)) (<-≤-trans (toℕ<n j) (m≤m+n n n))
+
+    raw≢ : (i j : Fin n) → toℕ (j ↑ˡ n) ≢ toℕ (n ↑ʳ i)
+    raw≢ i j eq = <⇒≢ (<-≤-trans (toℕ<n j) (m≤m+n n (toℕ i))) (trans (sym (toℕ-↑ˡ j n)) (trans eq (toℕ-↑ʳ n i)))
+
+    stamped≢ : (i j : Fin n) → toℕ i ≢ toℕ j → toℕ (n ↑ʳ i) ≢ toℕ (n ↑ʳ j)
+    stamped≢ i j ne eq = ne (+-cancelˡ-≡ n (toℕ i) (toℕ j) (trans (sym (toℕ-↑ʳ n i)) (trans eq (toℕ-↑ʳ n j))))
+
+    stamped≡ : (i j : Fin n) → toℕ j ≡ toℕ i → toℕ (n ↑ʳ i) ≡ toℕ (n ↑ʳ j)
+    stamped≡ i j eq = trans (toℕ-↑ʳ n i) (trans (cong (n +_) (sym eq)) (sym (toℕ-↑ʳ n j)))
+
+    raw≡ : (i j : Fin n) → toℕ j ≡ toℕ i → toℕ (i ↑ˡ n) ≡ toℕ (j ↑ˡ n)
+    raw≡ i j eq = trans (toℕ-↑ˡ i n) (trans (sym eq) (sym (toℕ-↑ˡ j n)))
+
+    raw≢′ : (i j : Fin n) → toℕ j ≢ toℕ i → toℕ (i ↑ˡ n) ≢ toℕ (j ↑ˡ n)
+    raw≢′ i j ne eq = ne (trans (sym (toℕ-↑ˡ j n)) (trans (sym eq) (toℕ-↑ˡ i n)))
+
+    -- a stamped slot's number sits above every raw one
+    raw-stamped : (i j : Fin n) → toℕ (i ↑ˡ n) ≢ toℕ (n ↑ʳ j)
+    raw-stamped i j = raw≢ j i
+
+    stamped< : (i : Fin n) → toℕ (n ↑ʳ i) < n + n
+    stamped< i = subst (_< n + n) (sym (toℕ-↑ʳ n i)) (+-monoʳ-< n (toℕ<n i))
+
+  -- A HOT SLOT'S DROPS TAKE THE SAME ROWS FROM BOTH REGISTRIES: the plain
+  -- run drops the slot's, the impl its stamped slot's and then its raw
+  -- slot's, and a pair of rows is at the slot on both sides or on neither
+  hot-rows : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {rs rs′} (i : Fin n)
+           → Pointwise (λ l l′ → SrcNum κ (LiveSource.source l) (LiveSource.source l′)) LP LI
+           → RegRel κ π {t} NP NI LP LI rs rs′
+           → RegRel κ π NP NI LP LI (dropSource (toℕ i) rs) (drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) rs′)
+  hot-rows i nums [] = []
+  hot-rows i nums (_∷_ {r = r} {r′ = r′} {rs = rs₀} {rs′ = rs₀′} rr@(read~ {i = j} _ _ refl) q) with toℕ j ≟ toℕ i
+  ... | yes eq = subst₂ (RegRel κ _ _ _ _ _) (sym (drop-skip (toℕ i) r rs₀ (same-yes (sym eq))))
+                        (sym (drop₂-skip₁ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′ (same-yes (stamped≡ i j eq))))
+                        (hot-rows i nums q)
+  ... | no ne  = subst₂ (RegRel κ _ _ _ _ _) (sym (drop-keep (toℕ i) r rs₀ (sameSource-no (λ e → ne (sym e)))))
+                        (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                               (sameSource-no (stamped≢ i j (λ e → ne (sym e)))) (sameSource-no (raw-stamped i j))))
+                        (rr ∷ hot-rows i nums q)
+  hot-rows i nums (_∷_ {r = r} {r′ = r′} {rs = rs₀} {rs′ = rs₀′} rr@(cold~ sp _ _ refl) q) = at (pair-num nums sp) refl refl
+    where
+      at : ∀ {x x′} → SrcNum κ x x′ → regSource (proj₁ (proj₂ r)) ≡ x → regSource (proj₁ (proj₂ r′)) ≡ x′
+         → RegRel κ _ _ _ _ _ (dropSource (toℕ i) (r ∷ rs₀)) (drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (r′ ∷ rs₀′))
+      at (slot~ j _) e e′ with toℕ j ≟ toℕ i
+      ... | yes eq = subst₂ (RegRel κ _ _ _ _ _) (sym (drop-skip (toℕ i) r rs₀ (same-yes (trans (sym eq) (sym e)))))
+                            (sym (drop₂-skip₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                                   (sameSource-no (λ x → raw≢ i j (trans (sym e′) (sym x))))
+                                   (same-yes (trans (raw≡ i j eq) (sym e′)))))
+                            (hot-rows i nums q)
+      ... | no ne  = subst₂ (RegRel κ _ _ _ _ _) (sym (drop-keep (toℕ i) r rs₀ (sameSource-no (λ x → ne (sym (trans x e))))))
+                            (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                                   (sameSource-no (λ x → raw≢ i j (trans (sym e′) (sym x))))
+                                   (sameSource-no (λ x → raw≢′ i j ne (trans x e′)))))
+                            (rr ∷ hot-rows i nums q)
+      at (dyn~ p p′) e e′ =
+        subst₂ (RegRel κ _ _ _ _ _) (sym (drop-keep (toℕ i) r rs₀ (sameSource-no (λ x → <⇒≢ (<-trans (toℕ<n i) p) (trans x e)))))
+               (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                      (sameSource-no (λ x → <⇒≢ (<-trans (stamped< i) p′) (trans x e′)))
+                      (sameSource-no (λ x → <⇒≢ (<-trans (raw< i) p′) (trans x e′)))))
+               (rr ∷ hot-rows i nums q)
+  hot-rows i nums (_∷_ {r = r} {r′ = r′} {rs = rs₀} {rs′ = rs₀′} rr@(defer~ sp _ _ _ _ refl) q) = at (pair-num nums sp) refl refl
+    where
+      at : ∀ {x x′} → SrcNum κ x x′ → regSource (proj₁ (proj₂ r)) ≡ x → regSource (proj₁ (proj₂ r′)) ≡ x′
+         → RegRel κ _ _ _ _ _ (dropSource (toℕ i) (r ∷ rs₀)) (drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (r′ ∷ rs₀′))
+      at (slot~ j _) e e′ with toℕ j ≟ toℕ i
+      ... | yes eq = subst₂ (RegRel κ _ _ _ _ _) (sym (drop-skip (toℕ i) r rs₀ (same-yes (trans (sym eq) (sym e)))))
+                            (sym (drop₂-skip₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                                   (sameSource-no (λ x → raw≢ i j (trans (sym e′) (sym x))))
+                                   (same-yes (trans (raw≡ i j eq) (sym e′)))))
+                            (hot-rows i nums q)
+      ... | no ne  = subst₂ (RegRel κ _ _ _ _ _) (sym (drop-keep (toℕ i) r rs₀ (sameSource-no (λ x → ne (sym (trans x e))))))
+                            (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                                   (sameSource-no (λ x → raw≢ i j (trans (sym e′) (sym x))))
+                                   (sameSource-no (λ x → raw≢′ i j ne (trans x e′)))))
+                            (rr ∷ hot-rows i nums q)
+      at (dyn~ p p′) e e′ =
+        subst₂ (RegRel κ _ _ _ _ _) (sym (drop-keep (toℕ i) r rs₀ (sameSource-no (λ x → <⇒≢ (<-trans (toℕ<n i) p) (trans x e)))))
+               (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                      (sameSource-no (λ x → <⇒≢ (<-trans (stamped< i) p′) (trans x e′)))
+                      (sameSource-no (λ x → <⇒≢ (<-trans (raw< i) p′) (trans x e′)))))
+               (rr ∷ hot-rows i nums q)
+  hot-rows i nums (mach {rs = rs₀} {r′ = r′} {rs′ = rs₀′} m@(hot~ {i = j} _ _ refl) q) with toℕ j ≟ toℕ i
+  ... | yes eq = subst (RegRel κ _ _ _ _ _ _)
+                       (sym (drop₂-skip₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                              (sameSource-no (λ x → raw≢ i j (sym x))) (same-yes (raw≡ i j eq))))
+                       (hot-rows i nums q)
+  ... | no ne  = subst (RegRel κ _ _ _ _ _ _)
+                       (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                              (sameSource-no (λ x → raw≢ i j (sym x))) (sameSource-no (raw≢′ i j ne))))
+                       (mach m (hot-rows i nums q))
+
+  -- AND THE GUARDS STILL AGREE, after the impl's first drop and after its
+  -- second: a slot's entry is kept on both sides, and a minted one's guard
+  -- reads no slot's rows
+  hot-guards : ∀ {t} {regP : List (RegRow Γ t)} {regI : List (RegRow (plainᵏ Γ κ) (emitᵗ t))} {LP LI} (i : Fin n)
+             → Pointwise (λ l l′ → SrcNum κ (LiveSource.source l) (LiveSource.source l′)) LP LI
+             → Pointwise (λ l l′ → guardOf regP l ≡ guardOf regI l′) LP LI
+             → Pointwise (λ l l′ → guardOf (dropSource (toℕ i) regP) l ≡ guardOf (dropSource (toℕ (n ↑ʳ i)) regI) l′
+                                 × guardOf (dropSource (toℕ i) regP) l ≡ guardOf (drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) regI) l′) LP LI
+  hot-guards i [] [] = []
+  hot-guards {regP = regP} {regI} i (_∷_ {l} {l′} x xs) (g ∷ gs) = at x refl refl ∷ hot-guards {regP = regP} {regI} i xs gs
+    where
+      K₁ = dropSource (toℕ (n ↑ʳ i)) regI
+      at : ∀ {s s′} → SrcNum κ s s′ → LiveSource.source l ≡ s → LiveSource.source l′ ≡ s′
+         → guardOf (dropSource (toℕ i) regP) l ≡ guardOf K₁ l′
+         × guardOf (dropSource (toℕ i) regP) l ≡ guardOf (dropSource (toℕ (i ↑ˡ n)) K₁) l′
+      at (slot~ j _) e e′ =
+          trans (guard-low (dropSource (toℕ i) regP) l (subst (_< n) (sym e) (toℕ<n j))) (sym (guard-low K₁ l′ (subst (_< n + n) (sym e′) (raw< j))))
+        , trans (guard-low (dropSource (toℕ i) regP) l (subst (_< n) (sym e) (toℕ<n j)))
+                (sym (guard-low (dropSource (toℕ (i ↑ˡ n)) K₁) l′ (subst (_< n + n) (sym e′) (raw< j))))
+      at (dyn~ p p′) e e′ =
+          trans GP (trans g (sym G₁))
+        , trans GP (trans g (sym (trans (guard-other K₁ l′ (sameSource-lt (subst (toℕ (i ↑ˡ n) <_) (sym e′) (<-trans (raw< i) p′)))) G₁)))
+        where
+          GP = guard-other regP l (sameSource-lt (subst (toℕ i <_) (sym e) (<-trans (toℕ<n i) p)))
+          G₁ = guard-other regI l′ (sameSource-lt (subst (toℕ (n ↑ʳ i) <_) (sym e′) (<-trans (stamped< i) p′)))
+
+  -- the store once the plain run drops a slot's rows and the impl drops
+  -- its stamped slot's and then its raw slot's, each side sweeping after
+  -- each of its drops
+  hot-go : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+             {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+         → (S : Store κ sP stP sI stI) (i : Fin n)
+         → Store κ (record sP { live = sweepL (guardOf (dropSource (toℕ i) (EvalSt.registry stP)))
+                                          (sweepL (guardOf (dropSource (toℕ i) (EvalSt.registry stP))) (Sched.live sP)) })
+                   (record stP { registry = dropSource (toℕ i) (EvalSt.registry stP) })
+                   (record sI { live = sweepL (guardOf (drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (EvalSt.registry stI)))
+                                          (sweepL (guardOf (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI))) (Sched.live sI)) })
+                   (record stI { registry = drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (EvalSt.registry stI) })
+  hot-go {stP = stP} {stI = stI} S i = record
+    { π = π ; π-keys = π-keys ; π-vals = π-vals
+    ; sources = sweepL-pw (sweepL-pw sources A) A′
+    ; numbers = sweepL-pw (sweepL-pw numbers A) A′
+    ; distinct = unique-sweep gP LiveSource.source (unique-sweep gP LiveSource.source (proj₁ distinct))
+               , unique-sweep g₂ LiveSource.source (unique-sweep g₁ LiveSource.source (proj₂ distinct))
+    ; sync = sync-sweep (sync-sweep sync A) A′
+    ; rows = regrel-sweep κ {K = KP} {K′ = K₂} A′ (λ m → m)
+               (regrel-sweep κ {K = KP} {K′ = K₁} A (λ m → m) (hot-rows i numbers rows))
+    ; latches = latches
+    ; bounded = all-sweep gP LiveSource.source (all-sweep gP LiveSource.source (proj₁ bounded))
+              , all-sweep g₂ LiveSource.source (all-sweep g₁ LiveSource.source (proj₂ bounded))
+    ; swept = sweepL-pw A′ A′
+    ; uncut = all-drop (toℕ i) (proj₁ uncut) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ uncut))
+    }
+    where
+      open Store S
+      KP = dropSource (toℕ i) (EvalSt.registry stP)
+      K₁ = dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)
+      K₂ = drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (EvalSt.registry stI)
+      gP = guardOf KP
+      g₁ = guardOf K₁
+      g₂ = guardOf K₂
+      G  = hot-guards {regP = EvalSt.registry stP} {regI = EvalSt.registry stI} i numbers swept
+      A  = pw-map proj₁ G
+      A′ = sweepL-pw (pw-map proj₂ G) A
+
+-- THE END OF A HOT LAST ARRIVAL: the share's registrations and the raw
+-- slot's dropped on the impl side, the slot's on the plain side
+hot-finish : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+               {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+  → (S : Store κ sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+  → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+  → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
+  → ∀ {emits}
+  → Store κ (proj₁ (cascadeFinish a sP stP)) (proj₂ (cascadeFinish a sP stP))
+      (proj₁ (cascadeFinish a′ (proj₁ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))
+                               (proj₂ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))))
+      (proj₂ (cascadeFinish a′ (proj₁ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))
+                               (proj₂ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))))
+hot-finish {n} κ {sP = sP} {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} e₁ e₂ ll ll′
+  with Arrival.isLast a | Arrival.isLast a′ | ll | ll′
+... | .true | .true | refl | refl =
+  subst₂ (λ x y → Store κ (record sP { live = x }) (record stP { registry = dropSource (arrSource a) regP })
+                          (record sI { live = y }) (record stI { registry = drop₂ (toℕ (n ↑ʳ i)) (arrSource a′) regI }))
+    (trans (sweepL-idem (guardOf (dropSource (arrSource a) regP)) (Sched.live sP)) (sym (sweep-eq (dropSource (arrSource a) regP) (Sched.live sP))))
+    (sym (trans (sweep-eq (drop₂ (toℕ (n ↑ʳ i)) (arrSource a′) regI) (sweepLive (dropSource (toℕ (n ↑ʳ i)) regI) (Sched.live sI)))
+                (cong (sweepL (guardOf (drop₂ (toℕ (n ↑ʳ i)) (arrSource a′) regI))) (sweep-eq (dropSource (toℕ (n ↑ʳ i)) regI) (Sched.live sI)))))
+    (subst₂ (λ x y → Store κ (record sP { live = sweepL (guardOf (dropSource x regP)) (sweepL (guardOf (dropSource x regP)) (Sched.live sP)) })
+                             (record stP { registry = dropSource x regP })
+                             (record sI { live = sweepL (guardOf (drop₂ (toℕ (n ↑ʳ i)) y regI)) (sweepL (guardOf (dropSource (toℕ (n ↑ʳ i)) regI)) (Sched.live sI)) })
+                             (record stI { registry = drop₂ (toℕ (n ↑ʳ i)) y regI }))
+            (sym e₁) (sym e₂) (hot-go κ S i))
+  where
+    regP = EvalSt.registry stP
+    regI = EvalSt.registry stI
