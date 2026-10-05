@@ -217,6 +217,7 @@ Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not
 
 - **Auditing statements for truth is the PRIORITY.** A `-- SUSPECT:` note is not the response to a doubt you can test: test it.
 - **Probe when there's a lot of uncertainty (Anthony).** If the sides compute, instantiate at concrete programs in `agda/evidence/probed/`, checked with `make agda-dev`, pinned by `refl`. Every probe ends in a refutation or a `-- PROBED:` receipt saying what shapes were covered.
+- **Compiled probe for VOLUME, typechecker probe to PIN (Anthony).** `make qc-<statement>`, aimed by `QC_DRAW`, red shrunk by `make qc-shrink`: hundreds of programs per region, may read evaluator internals. → [docs/probe.md](docs/probe.md)
 - **Probe the ASSEMBLY's conclusion, not only its leaves.** A real body over postulated leaves has a conclusion that COMPUTES, and nobody instantiates it because it typechecks. Its falsity is the retroactive kind. Tell that it is worth instantiating: the leaf's bound and the assembly's bound are stated in the SAME currency.
 - **Before writing a probe, assume one already existed until a search has failed (Anthony).**
   ```
