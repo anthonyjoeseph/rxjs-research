@@ -261,8 +261,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   the share's readers, paired by the proven `slot-chains`, after `hot-start`
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store` and `hot-finish` are proven, and a connected hot
-  end is proven down to the evaluator. Left: the arms as real bodies, riskiest first,
-  the outer's walk first since it refolds `p` per emit, each owing the
+  end is proven down to the evaluator. The outer's element is a real body
+  over its walk's leaves, `quiet-pass` the riskiest: the impl's valueless
+  echo. Left: that leaf first, then the other arms as
+  real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
   `inner-arm` once `Arm` carries an impl-only step; the monster drops to
   whichever arm fails.
@@ -281,11 +283,23 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
-  outer's step on both sides, an emit carrying one payload at most, so an
-  element's lane is one inner and its echo one value whatever the policy;
-  walked an emit at a time, it refolds `p` on the relation each `Pass`
-  hands back.
+- **`quiet-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a valueless
+  group folded down the impl's restamp tail moves no plain store and keeps the
+  path related; the impl's echo has no plain counterpart.
+- **`flat-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's echo
+  restamped by the flattener's scan, the flattener kept and one emit carrying
+  the echo's payload.
+- **`consume-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
+  lane subscribed on both sides keeps the flattener and the path related.
+- **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
+  folded down the restamp tail on both sides, the flattener kept.
+- **`tail-misses{ᴾ,ᴵ}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a tail's
+  fold leaves the flattener's own nodes as it found them.
+- **`elem-{one,quiet}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the
+  impl's element map on an emit of one payload, or none, is an echo and at most
+  one lane related to the plain element.
+- **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
+  exploded outer's step on both sides.
 - **`{inner,lane,deferInner}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   leaving an inner, the flattener's lane, an impl-only lane merge ahead of it
   and a deferred body's hop.

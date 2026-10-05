@@ -226,12 +226,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   hotEq : ∀ i → lookup κ i ≡ hotᵏ → lookup Γ′ (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)
   hotEq i h = trans (stampedSlot Γ κ i) (cong (slotTy (lookup Γ i)) h)
 
-  -- an unbounded merge counts lanes, which the elaboration groups; a
-  -- bounded one is handed one lane per inner and counts them alike
-  ActRel : Maybe ℕ → ℕ → ℕ → Set
-  ActRel nothing  _ _  = ⊤
-  ActRel (just _) a a′ = a ≡ a′
-
   module _ (π : List (NodeId × List NodeId)) where
 
     -- the switch's current inner, paired through `π`
@@ -242,8 +236,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- a flattener's own node against the impl's
     data FlatNodes (u : Ty) : FlatOp → NodeState Γ → NodeState Γ′ → Set where
-      merge~   : ∀ {lim a a′ q q′ od} → ActRel lim a a′ → Pointwise (λ x′ x → ObsRel u x′ x) q′ q
-               → FlatNodes u (mergeᶠ lim) (mergeAll-st {t = u} lim a q od) (mergeAll-st {t = emitᵗ u} lim a′ q′ od)
+      -- one count on both sides: an emit carries one payload at most, so
+      -- every lane, bounded or not, is one inner; the completion flags
+      -- read off the count agree
+      merge~   : ∀ {lim a q q′ od} → Pointwise (λ x′ x → ObsRel u x′ x) q′ q
+               → FlatNodes u (mergeᶠ lim) (mergeAll-st {t = u} lim a q od) (mergeAll-st {t = emitᵗ u} lim a q′ od)
       switch~  : ∀ {cur cur′ od} → CurRel cur cur′
                → FlatNodes u switchᶠ (switch-st cur od) (switch-st cur′ od)
       exhaust~ : ∀ {ia od} → FlatNodes u exhaustᶠ (exhaust-st ia od) (exhaust-st ia od)
