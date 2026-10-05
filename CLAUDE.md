@@ -206,7 +206,7 @@ Every live postulate carries exactly one. PROOF-STATE assigns them; this file de
 
 Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not by itself bad news.
 
-- **Converging** — the new FALSITY's risky region is strictly SMALLER (a sub-case of the same edge). Localisation is what buys probeability: a statement about one branch can usually be instantiated; one about a whole clause cannot.
+- **Converging** — the new FALSITY's risky region is strictly SMALLER (a sub-case of the same edge). Localisation is what buys probeability: a statement about one branch can usually be instantiated; one about a whole clause cannot. Probing is slow, on the order of hours, and proof is more useful.
 - **Spiralling** — not smaller, or reaching UPSTREAM into machinery already ground.
 - **Stop condition:** the SAME region producing FALSITY across three successive subdivisions. Wrong design in the mechanism underneath; reconsider it.
 
@@ -214,10 +214,9 @@ Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not
 
 ### Probing
 
-- **A machine refutation is worth as much as a proof — usually more, since it is cheaper.** False now costs a restatement; false under a tower costs the tower.
 - **Auditing statements for truth is the PRIORITY.** A `-- SUSPECT:` note is not the response to a doubt you can test: test it.
 - **Probe when there's a lot of uncertainty (Anthony).** If the sides compute, instantiate at concrete programs in `agda/evidence/probed/`, checked with `make agda-dev`, pinned by `refl`. Every probe ends in a refutation or a `-- PROBED:` receipt saying what shapes were covered.
-- **Probe the ASSEMBLY's conclusion, not only its leaves.** A real body over postulated leaves has a conclusion that COMPUTES, and nobody instantiates it because it typechecks. Its falsity is the retroactive kind. Tell that it is worth the minute: the leaf's bound and the assembly's bound are stated in the SAME currency.
+- **Probe the ASSEMBLY's conclusion, not only its leaves.** A real body over postulated leaves has a conclusion that COMPUTES, and nobody instantiates it because it typechecks. Its falsity is the retroactive kind. Tell that it is worth instantiating: the leaf's bound and the assembly's bound are stated in the SAME currency.
 - **Before writing a probe, assume one already existed until a search has failed (Anthony).**
   ```
   git log -S'<postulate name>' --all --format='%h %s'

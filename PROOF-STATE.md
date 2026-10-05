@@ -145,8 +145,8 @@ code.
   them, so the two cannot drift the way a duplicated receipt would. The blank is
   the point rather than a gap to fill — a row reading `NO EVIDENCE` says nobody
   has instantiated the statement, refuted a route through it, or found it a
-  twin, and an unprobed probeable postulate is the cheapest unmanaged risk in
-  the repo. It reads as nothing today only because absence had no marker.
+  twin — unmanaged risk; whether a probe, a proof attempt, or neither is the
+  cheapest way to manage it is priced per row.
 - **The ledger is the source of truth, not this file.** `make postulates` lists
   every live postulate by name; every one of them appears in exactly one tier
   below, and a name here that no longer greps is a bug in this file — fix on
