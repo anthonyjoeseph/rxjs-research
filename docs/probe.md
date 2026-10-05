@@ -63,6 +63,25 @@ Depth bounds every spine: at depth zero an `exp` is a leaf whatever the
 weights say, so a must-have former deeper than the depth allows comes back
 `unreached`.
 
+## Shrinking a red — `make qc-shrink`
+
+```
+make qc-shrink QC='SEED RUNS DEPTH' QC_AT=<case> QC_STMT=<n> [QC_DRAW=…] [QC_SHRINK=200]
+```
+
+It shrinks the DRAWS a case consumed, not the tree: blocks of 8, 4, 2 and 1
+deleted, entries zeroed, entries halved, and the case drawn again. Every
+candidate is a program the generator could draw, so it is well-typed and its
+paste row pastes. A candidate is run only if it prints strictly shorter than
+the incumbent (or as long over a smaller draw), and `QC_SHRINK` caps the
+runs. The output is the smallest failing case's reports with its paste row,
+which is the refutation's program. Pass the sweep's own `QC_DRAW`, or the
+case index names a different program.
+
+Measured on a planted failure (red at a third boundary): case 1 of seed 1
+went to `emptyˢ` over a two-arrival hot script in 13 runs, the smallest
+program that has one.
+
 ## Reading a sweep
 
 The summary's census counts formers per case, and each streamed case names

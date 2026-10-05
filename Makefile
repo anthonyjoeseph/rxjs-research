@@ -1,4 +1,4 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs qc-batched-sandwich qc-packets-name-arrivals qc-same-clock qc-store
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs qc-batched-sandwich qc-packets-name-arrivals qc-same-clock qc-store qc-shrink
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -187,6 +187,7 @@ help:
 	@echo "                  QC_CASE=secs per case, 0 for none, QC_BEAR=1 to decide only cases bearing on contiguity)"
 	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful / qc-simulation / qc-arrival-runs / qc-batched-sandwich / qc-packets-name-arrivals / qc-same-clock / qc-store"
 	@echo "                qc-fast on that one statement"
+	@echo "  qc-shrink     shrink one red case of a sweep (QC_AT=case, QC_STMT, QC_DRAW as the sweep, QC_SHRINK=runs)"
 	@echo "  quickcheck    all-Agda QuickCheck: Main's four statements, the simulation and its leaf, caching counterexamples"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
@@ -1695,6 +1696,16 @@ QC_BEAR ?=
 QC_LOG := agda/_oracle/qc.log
 QC_STREAM := agda/_oracle/qc.stream
 QC_IN = $(word 1,$(QC)) $(or $(word 2,$(QC)),200) $(or $(word 3,$(QC)),4) 0 0 0 $(QC_FUEL) $(QC_STMT) $(if $(QC_BEAR),$(or $(QC_CASE),$(error QC_BEAR needs QC_CASE)) $(QC_BEAR),$(QC_CASE))
+# SHRINK ONE RED CASE.  QC_AT names it by its index in the sweep QC and
+# QC_DRAW drew, QC_STMT the statement it fails, QC_SHRINK caps the runs
+# the search may spend.  It shrinks the DRAWS, so the program it prints is
+# one the generator could have drawn and its paste row pastes.
+QC_AT ?=
+QC_SHRINK ?= 200
+qc-shrink: qc-build
+	@test -n "$(QC_AT)" || { echo "usage: make qc-shrink QC='SEED RUNS DEPTH' QC_AT=<case> QC_STMT=<n> [QC_DRAW=...] [QC_SHRINK=<runs>]" >&2; exit 2; }
+	@printf '%s\n%s\n' "$(word 1,$(QC)) 1 $(or $(word 3,$(QC)),4) 0 $(QC_AT) 0 $(QC_FUEL) $(QC_STMT) $(or $(QC_CASE),10) 0 $(QC_SHRINK)" '$(QC_DRAW)' | $(ORACLE_BIN)/QuickCheck
+
 qc-left-to-right:  ; @$(MAKE) --no-print-directory qc-fast QC_STMT=1
 qc-timing-correct: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=2
 qc-batchable:      ; @$(MAKE) --no-print-directory qc-fast QC_STMT=3

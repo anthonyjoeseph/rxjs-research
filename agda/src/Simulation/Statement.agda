@@ -572,6 +572,16 @@ finish-run a s st ()   | true
 
 -- THE CASCADES OF ONE PARTNERED POP: both a value pass, or both a value
 -- pass and an end, since the two arrivals are last together
+--
+-- THE STORE CONJUNCT HOLDS ON EVERY POP A COMPILED SWEEP HAS DRAWN.
+-- `CLI.Store-Check` decides `Storeʳ` on both runs at every arrival
+-- boundary, its pairing inferred and every closure relation and both
+-- rules unread, so a green there says nothing about those fields.
+-- Uniform seeds 1-5 and one aimed sweep per policy at depth 4, fuel 30
+-- (`QC_DRAW`, seeds 11-16: switch, exhaust, bounded merge, a hot share,
+-- valueless fan steps, a μ; 80 programs each, every one with a flatten)
+-- held at every boundary.  Thin where an arrival carries values: from 6
+-- of 80 programs (switch) to 34 (hot).
 cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
   → Storeʳ κ sP stP sI stI

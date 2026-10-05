@@ -255,15 +255,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **PROBE COMPILED, AT THE STORE.** `make qc-store` decides `Store` field by
-  field at every arrival boundary of both runs, `π` inferred, every closure
-  clause unread. Seeds 1–4 (490 programs, depth ≤ 4, fuel 30, a flatten in
-  over 300) held at every boundary, and an off-by-one impl node read fails 19
-  of 40, so the rows are read. `QC_DRAW` aims a sweep (arm weights, slot
-  kinds, a must-reach former; seed 5 put flatten and μ in 60 of 60). Left: one
-  aimed sweep per `Simulation.Pass` leaf's region, and a shrinker printing a
-  red as a refutation row; a green per leaf's region then answers the
-  monster's "which cascade" structurally.
+- **AIM THE STORE PROBE AT ARRIVALS.** `make qc-store` aimed by `QC_DRAW`
+  at each policy, a hot share, valueless steps and a μ (seeds 11–16, 480
+  programs, depth 4) held `Store` at every boundary: no one policy's cascade
+  breaks it there. Thin where it counts: 6 to 34 of 80 put values on an
+  arrival. Next: leaves weighted to the scripted slot, two-arrival scripts,
+  depth 5; a red goes through `make qc-shrink` to a refutation. Then decide
+  the closure relations the decider leaves unread.
 
 - **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
   merge and an exhaust decide alike off related nodes, a node neither can

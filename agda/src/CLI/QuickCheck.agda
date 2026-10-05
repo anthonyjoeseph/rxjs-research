@@ -55,9 +55,9 @@ open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_
 open import Data.Bool.ListAction using (any; all)
 open import Data.Char using (toℕ; fromℕ)
 open import Data.Fin using (Fin; zero; suc)
-open import Data.List using (List; []; _∷_; map; length; concat; concatMap; take; zipWith)
+open import Data.List using (List; []; _∷_; map; length; concat; concatMap; take; drop; zipWith; upTo)
                       renaming (_++_ to _++ᴸ_)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_; ⌊_/2⌋)
 open import Data.Nat.Show using (show)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -1234,7 +1234,7 @@ tallyOf []       = zeroTally , []
 tallyOf (r ∷ rs) = joinT r (tallyOf rs)
 
 ------------------------------------------------------------------------
--- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT] [CASE] [BEARING]"
+-- stdin parsing: "SEED [RUNS] [DEPTH] [SHOW-AT] [RUN-AT] [SIDE] [FUEL] [STATEMENT] [CASE] [BEARING] [SHRINK]"
 
 toCodes : String → List ℕ
 toCodes s = map toℕ (toList s)
@@ -1341,6 +1341,75 @@ showAt f n d = skipN (n ∸ 1) d >>=G λ _ →
 -- timed and re-run alone rather than by bisecting the count
 runAt : List Statement → ℕ → ℕ → ℕ → ℕ → Gen (Seen × List (ℕ × String))
 runAt ss f s n d = skipN (n ∸ 1) d >>=G λ _ → oneCase false ss f s d
+
+-- SHRINKING IS DONE ON THE DRAWS, NOT ON THE TREE.  A case is a function
+-- of the randomness it consumes, so deleting, zeroing or halving that
+-- prefix and drawing again is a shrink for every statement and every
+-- restriction at once, and the program it lands on is well-typed because
+-- the generator drew it.  A low draw picks an early arm and the early arms
+-- are the leaves, so the search runs downhill.  A candidate is RUN only
+-- when the program it draws prints strictly shorter (or as long over a
+-- smaller prefix) than the incumbent, which is what bounds the search;
+-- `n` caps the runs.
+module Shrink (ss : List Statement) (f s d : ℕ) (W : Draw) (rest : List ℕ) where
+  runOn : List ℕ → Seen × List (ℕ × String)
+  runOn p = proj₁ (oneCase false ss f s d W (p ++ᴸ rest))
+
+  failsOn : List ℕ → Bool
+  failsOn p with decided (proj₂ (runOn p))
+  ... | []    = false
+  ... | _ ∷ _ = true
+
+  size : List ℕ → ℕ
+  size p with proj₁ (drawCase d W (p ++ᴸ rest))
+  ... | (_ , _ , e , d₀ , d₁) = lengthˢ (pasteRow f e d₀ d₁)
+
+  below : ℕ → List ℕ → List ℕ → Bool
+  below sz p c = (suc (size c) ≤ᵇ sz) ∨ ((size c ≡ᵇ sz) ∧ (suc (sumℕ c) ≤ᵇ sumℕ p))
+
+  setAt : ℕ → ℕ → List ℕ → List ℕ
+  setAt i v xs = take i xs ++ᴸ (v ∷ drop (suc i) xs)
+
+  nth : ℕ → List ℕ → ℕ
+  nth i xs with drop i xs
+  ... | []    = 0
+  ... | x ∷ _ = x
+
+  candidates : List ℕ → List (List ℕ)
+  candidates p =
+    concatMap (λ k → map (λ i → take i p ++ᴸ drop (i + k) p) (upTo (length p))) (8 ∷ 4 ∷ 2 ∷ 1 ∷ [])
+    ++ᴸ map (λ i → setAt i 0 p) (upTo (length p))
+    ++ᴸ map (λ i → setAt i ⌊ nth i p /2⌋ p) (upTo (length p))
+
+  firstFail : ℕ → ℕ → List ℕ → List (List ℕ) → ℕ × List ℕ
+  firstFail n       sz p []       = n , []
+  firstFail zero    sz p (_ ∷ _)  = 0 , []
+  firstFail (suc n) sz p (c ∷ cs) =
+    if below sz p c
+    then (if failsOn c then (n , c) else firstFail n sz p cs)
+    else firstFail (suc n) sz p cs
+
+  -- the passes are bounded by the run budget, which each one spends
+  loop : ℕ → ℕ → List ℕ → ℕ × List ℕ
+  loop zero    n p = n , p
+  loop (suc k) n p with firstFail n (size p) p (candidates p)
+  ... | n′ , []        = n′ , p
+  ... | n′ , c@(_ ∷ _) = loop k n′ c
+
+-- SHRINK ONE CASE, named as `runAt` names it: the smallest failing draw
+-- the budget found, its reports with the paste row of the program it
+-- draws, and how far it came
+shrinkAt : List Statement → ℕ → ℕ → ℕ → ℕ → ℕ → Draw → List ℕ → String
+shrinkAt ss f s n d budget W rs₀ with proj₂ (skipN (n ∸ 1) d W rs₀)
+... | rs with length rs ∸ length (proj₂ (drawCase d W rs))
+...   | used with Shrink.failsOn ss f s d W (drop used rs) (take used rs)
+...     | false = "case " ++ show n ++ " does not fail; nothing to shrink\n"
+...     | true  with Shrink.loop ss f s d W (drop used rs) budget budget (take used rs)
+...       | left , p =
+  "shrunk case " ++ show n ++ " in " ++ show (budget ∸ left) ++ " runs, printed size "
+  ++ show (Shrink.size ss f s d W (drop used rs) (take used rs)) ++ " → "
+  ++ show (Shrink.size ss f s d W (drop used rs) p) ++ "\n"
+  ++ dumpFails (proj₂ (Shrink.runOn ss f s d W (drop used rs) p))
 
 -- THE STATEMENT A NUMBER NAMES, in `Main`'s order, the simulation
 -- fifth and its leaf sixth, the two assembled top lines' leaves seventh
@@ -1572,10 +1641,13 @@ run cs W =
       f     = if fuelʳ ≡ᵇ 0 then FUEL else fuelʳ
       secs  = numAt 8 CASE cs
       ob    = numAt 9 0 cs ≡ᵇ 1
+      shr   = numAt 10 0 cs
   in if runs ≡ᵇ 0
      then printRows ss fuelʳ side only 1 cases
      else if not (side ≡ᵇ 0)
      then putStr (proj₁ (sideAt f side only d W (randList seed 2000000)) ++ "\n")
+     else if not (only ≡ᵇ 0) ∧ not (shr ≡ᵇ 0)
+     then putStr (shrinkAt ss f secs only d shr W (randList seed 2000000))
      else if not (only ≡ᵇ 0)
      then putStr (dumpFails (proj₂ (proj₁ (runAt ss f secs only d W (randList seed 2000000)))))
      else if not (at ≡ᵇ 0)
