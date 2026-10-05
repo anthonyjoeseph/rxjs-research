@@ -9,12 +9,12 @@
 ------------------------------------------------------------------
 module Simulation.Finish where
 
-open import Data.Bool    using (Bool; true; false; T; _∨_; if_then_else_)
+open import Data.Bool    using (Bool; true; false; T; _∨_; _∧_; if_then_else_)
 open import Data.Bool.ListAction using (any)
-open import Data.Bool.Properties using (∨-zeroʳ)
+open import Data.Bool.Properties using (∨-zeroʳ; ∧-zeroʳ)
 open import Data.Empty   using (⊥-elim)
-open import Data.Fin     using (Fin; _↑ˡ_; _↑ʳ_; toℕ)
-open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ)
+open import Data.Fin     using (Fin; _↑ˡ_; _↑ʳ_; toℕ) renaming (_≟_ to _≟ᶠ_)
+open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; toℕ-injective)
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_) renaming (map to pw-map)
@@ -24,7 +24,7 @@ open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Nat     using (suc; _+_; _<_; _<ᵇ_; _≟_)
-open import Data.Nat.Properties using (≡ᵇ⇒≡; <ᵇ⇒<; <⇒<ᵇ; <⇒≢; <-asym; <-trans; <-≤-trans; +-monoʳ-<; +-cancelˡ-≡; m≤m+n)
+open import Data.Nat.Properties using (1+n≢0; ≡ᵇ⇒≡; <ᵇ⇒<; <⇒<ᵇ; <⇒≢; <-asym; <-trans; <-≤-trans; +-monoʳ-<; +-cancelˡ-≡; m≤m+n)
 open import Relation.Nullary using (yes; no)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -33,13 +33,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Prim      using (Source)
-open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegRow; regSource; sameSource; dropSource; sweepLive; cascadeFinish; shareFinish; arrSource; arrTy)
-open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ)
+open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegRow; regSource; sameSource; memberSource; dropSource; sweepLive; cascadeFinish; cascadeClose; shareFinish; arrSource; arrTy)
+open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import Data.Vec     using (lookup)
 open import Simulation.Chains using (sameSource-lt; sameSource-no; same-refl; count-hit; count-pass)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
-open import Simulation.Stores using (srcCount; Census; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr)
+open import Simulation.Stores using (srcCount; Census; LatchRel; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr)
   renaming (here to sp-here; there to sp-there)
 
 ------------------------------------------------------------------
@@ -171,11 +171,25 @@ module _ {n} {Γ : Ctx n} {t} where
     go false e = trans (cong (srcCount k) (drop-keep k r K e))
                    (trans (count-pass k r (dropSource k K) e) (count-self k K))
 
+  -- a drop at a source nothing stands at takes nothing
+  drop-none : ∀ k (K : List (RegRow Γ t)) → srcCount k K ≡ 0 → dropSource k K ≡ K
+  drop-none k [] _ = refl
+  drop-none k (r ∷ K) z = go _ refl
+    where
+    go : ∀ b → sameSource k (regSource (proj₁ (proj₂ r))) ≡ b → dropSource k (r ∷ K) ≡ r ∷ K
+    go true  e = ⊥-elim (1+n≢0 (trans (sym (count-hit k r K e)) z))
+    go false e = trans (drop-keep k r K e) (cong (r ∷_) (drop-none k K (trans (sym (count-pass k r K e)) z)))
+
+  -- a census holds whatever the raw slot's latch, once that is set
+  census-done : ∀ {k₁ k₂ c d} {K : List (RegRow Γ t)} → Census k₁ k₂ K c d → Census k₁ k₂ K c true
+  census-done (inj₁ x)              = inj₁ x
+  census-done (inj₂ (e₁ , e₂ , _)) = inj₂ (e₁ , e₂ , λ _ → refl)
+
   -- and so keeps a census at two other sources
-  census-drop : ∀ {k₁ k₂} y (K : List (RegRow Γ t)) → sameSource y k₁ ≡ false → sameSource y k₂ ≡ false
-              → Census k₁ k₂ K → Census k₁ k₂ (dropSource y K)
-  census-drop y K n₁ n₂ (inj₁ e)         = inj₁ (trans (count-drop y K n₁) e)
-  census-drop y K n₁ n₂ (inj₂ (e₁ , e₂)) = inj₂ (trans (count-drop y K n₁) e₁ , trans (count-drop y K n₂) e₂)
+  census-drop : ∀ {k₁ k₂ c d} y (K : List (RegRow Γ t)) → sameSource y k₁ ≡ false → sameSource y k₂ ≡ false
+              → Census k₁ k₂ K c d → Census k₁ k₂ (dropSource y K) c d
+  census-drop y K n₁ n₂ (inj₁ (e , c))         = inj₁ (trans (count-drop y K n₁) e , c)
+  census-drop y K n₁ n₂ (inj₂ (e₁ , e₂ , f)) = inj₂ (trans (count-drop y K n₁) e₁ , trans (count-drop y K n₂) e₂ , f)
 
   -- a registration in a list puts its source's count up
   mem-any : ∀ {r : RegRow Γ t} {K} → r ∈ K → any (onSrc (regSource (proj₁ (proj₂ r)))) K ≡ true
@@ -302,6 +316,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 ------------------------------------------------------------------
 -- The store
 ------------------------------------------------------------------
+
+-- a close latches its own arrival's source
+close-hit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) (st : EvalSt e) {k}
+          → Arrival.source a ≡ k → memberSource k (EvalSt.completedSources (cascadeClose a st)) ≡ true
+close-hit a st {k} refl = cong (_∨ any (sameSource k) (EvalSt.completedSources st)) (same-refl k)
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -524,14 +543,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   -- each of its drops
   hot-go : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
              {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-         → (S : Store κ sP stP sI stI) (i : Fin n)
+         → (S : Store κ sP stP sI stI) (i : Fin n) → memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI) ≡ true
          → Store κ (record sP { live = sweepL (guardOf (dropSource (toℕ i) (EvalSt.registry stP)))
                                           (sweepL (guardOf (dropSource (toℕ i) (EvalSt.registry stP))) (Sched.live sP)) })
                    (record stP { registry = dropSource (toℕ i) (EvalSt.registry stP) })
                    (record sI { live = sweepL (guardOf (drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (EvalSt.registry stI)))
                                           (sweepL (guardOf (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI))) (Sched.live sI)) })
                    (record stI { registry = drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (EvalSt.registry stI) })
-  hot-go {stP = stP} {stI = stI} S i = record
+  hot-go {stP = stP} {stI = stI} S i dn = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals
     ; sources = sweepL-pw (sweepL-pw sources A) A′
     ; numbers = sweepL-pw (sweepL-pw numbers A) A′
@@ -562,13 +581,87 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- the slot's own share and raw slot are emptied, every other kept
       hot-census : ∀ j → lookup κ j ≡ hotᵏ → Census (toℕ (j ↑ˡ n)) (toℕ (n ↑ʳ j)) K₂
+                                                (memberSource (toℕ (n ↑ʳ j)) (EvalSt.connectedShares stI))
+                                                (memberSource (toℕ (j ↑ˡ n)) (EvalSt.completedSources stI))
       hot-census j h with toℕ j ≟ toℕ i
       ... | yes eq = inj₂ ( subst (λ k → srcCount k K₂ ≡ 0) (raw≡ i j eq) (count-self (toℕ (i ↑ˡ n)) K₁)
                           , trans (count-drop (toℕ (i ↑ˡ n)) K₁ (sameSource-no (raw-stamped i j)))
-                                  (subst (λ k → srcCount k K₁ ≡ 0) (stamped≡ i j eq) (count-self (toℕ (n ↑ʳ i)) (EvalSt.registry stI))) )
+                                  (subst (λ k → srcCount k K₁ ≡ 0) (stamped≡ i j eq) (count-self (toℕ (n ↑ʳ i)) (EvalSt.registry stI)))
+                          , λ _ → subst (λ k → memberSource k (EvalSt.completedSources stI) ≡ true) (raw≡ i j eq) dn )
       ... | no ne  = census-drop (toℕ (i ↑ˡ n)) K₁ (sameSource-no (raw≢′ i j ne)) (sameSource-no (raw-stamped i j))
                        (census-drop (toℕ (n ↑ʳ i)) (EvalSt.registry stI) (sameSource-no (λ x → raw≢ i j (sym x)))
                           (sameSource-no (stamped≢ i j (λ x → ne (sym x)))) (census j h))
+
+  -- A HOT SLOT'S END WITH NO RAW ROW: the plain run latches the slot and
+  -- the impl the raw slot, and the share stays as it was, spent exactly
+  -- if it connected
+  hot-close : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+            → (S : Store κ sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+            → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+            → (memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ true
+               → memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI) ≡ true)
+            → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
+  hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd = record
+    { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
+    ; latches = lat ; census = cen }
+    where
+      open Store S
+      CP = EvalSt.completedSources stP
+      CI = EvalSt.completedSources stI
+      SI = EvalSt.connectedShares stI
+
+      member-no : ∀ {m k} (xs : List Source) → m ≢ k → memberSource m (k ∷ xs) ≡ memberSource m xs
+      member-no {m} xs ne = cong (_∨ any (sameSource m) xs) (sameSource-no ne)
+
+      hitP : memberSource (toℕ i) (Arrival.source a ∷ CP) ≡ true
+      hitP = close-hit a stP e₁
+
+      hitI : memberSource (toℕ (i ↑ˡ n)) (Arrival.source a′ ∷ CI) ≡ true
+      hitI = close-hit a′ stI e₂
+
+      -- a share's number is no raw slot's
+      shr : ∀ j → memberSource (toℕ (n ↑ʳ j)) (Arrival.source a′ ∷ CI) ≡ memberSource (toℕ (n ↑ʳ j)) CI
+      shr j = member-no CI (subst (toℕ (n ↑ʳ j) ≢_) (sym e₂) (λ x → raw-stamped i j (sym x)))
+
+      -- the share spent exactly if it connected, once the raw slot is latched
+      spent : ∀ d c → (c ≡ true → d ≡ true) → d ∧ c ≡ true ∧ c
+      spent d false _ = ∧-zeroʳ d
+      spent d true  f = cong (_∧ true) (f refl)
+
+      clash : hotᵏ ≢ sharedᵏ
+      clash ()
+
+      lat : LatchRel {Γ = Γ} κ (Arrival.source a ∷ CP) (EvalSt.connectedShares stP) (Arrival.source a′ ∷ CI) SI
+      lat j with j ≟ᶠ i
+      ... | yes refl =
+            (λ _ → let _ , d = proj₁ (latches i) hk
+                   in trans hitP (sym hitI)
+                    , trans (shr i) (trans d (trans (spent _ _ cd) (cong (_∧ memberSource (toℕ (n ↑ʳ i)) SI) (sym hitI)))))
+          , (λ sk → ⊥-elim (clash (trans (sym hk) sk)))
+      ... | no ne =
+            (λ h → let c , d = proj₁ (latches j) h
+                   in trans skP (trans c (sym skR))
+                    , trans (shr j) (trans d (cong (_∧ memberSource (toℕ (n ↑ʳ j)) SI) (sym skR))))
+          , (λ sk → let c , d = proj₂ (latches j) sk in trans skP (trans c (sym (shr j))) , d)
+        where
+          ne′ : toℕ j ≢ toℕ i
+          ne′ x = ne (toℕ-injective x)
+          skP : memberSource (toℕ j) (Arrival.source a ∷ CP) ≡ memberSource (toℕ j) CP
+          skP = member-no CP (subst (toℕ j ≢_) (sym e₁) ne′)
+          skR : memberSource (toℕ (j ↑ˡ n)) (Arrival.source a′ ∷ CI) ≡ memberSource (toℕ (j ↑ˡ n)) CI
+          skR = member-no CI (subst (toℕ (j ↑ˡ n) ≢_) (sym e₂) (λ x → raw≢′ i j ne′ (sym x)))
+
+      cen : ∀ j → lookup κ j ≡ hotᵏ → Census (toℕ (j ↑ˡ n)) (toℕ (n ↑ʳ j)) (EvalSt.registry stI)
+                                        (memberSource (toℕ (n ↑ʳ j)) SI) (memberSource (toℕ (j ↑ˡ n)) (Arrival.source a′ ∷ CI))
+      cen j h with j ≟ᶠ i
+      ... | yes refl = subst (Census (toℕ (i ↑ˡ n)) (toℕ (n ↑ʳ i)) (EvalSt.registry stI) (memberSource (toℕ (n ↑ʳ i)) SI)) (sym hitI)
+                             (census-done {k₁ = toℕ (i ↑ˡ n)} {k₂ = toℕ (n ↑ʳ i)} {c = memberSource (toℕ (n ↑ʳ i)) SI}
+                                          {d = memberSource (toℕ (i ↑ˡ n)) CI} {K = EvalSt.registry stI} (census i h))
+      ... | no ne    = subst (Census (toℕ (j ↑ˡ n)) (toℕ (n ↑ʳ j)) (EvalSt.registry stI) (memberSource (toℕ (n ↑ʳ j)) SI))
+                             (sym (member-no CI (subst (toℕ (j ↑ˡ n) ≢_) (sym e₂) (λ x → raw≢′ i j (λ y → ne (toℕ-injective y)) (sym x)))))
+                             (census j h)
 
 -- THE END OF A HOT LAST ARRIVAL: the share's registrations and the raw
 -- slot's dropped on the impl side, the slot's on the plain side
@@ -577,13 +670,14 @@ hot-finish : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Cl
   → (S : Store κ sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
   → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
   → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
+  → memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI) ≡ true
   → ∀ {emits}
   → Store κ (proj₁ (cascadeFinish a sP stP)) (proj₂ (cascadeFinish a sP stP))
       (proj₁ (cascadeFinish a′ (proj₁ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))
                                (proj₂ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))))
       (proj₂ (cascadeFinish a′ (proj₁ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))
                                (proj₂ (proj₂ (shareFinish (n ↑ʳ i) true (emits , sI , stI))))))
-hot-finish {n} κ {sP = sP} {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} e₁ e₂ ll ll′
+hot-finish {n} κ {sP = sP} {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} e₁ e₂ ll ll′ dn
   with Arrival.isLast a | Arrival.isLast a′ | ll | ll′
 ... | .true | .true | refl | refl =
   subst₂ (λ x y → Store κ (record sP { live = x }) (record stP { registry = dropSource (arrSource a) regP })
@@ -595,7 +689,48 @@ hot-finish {n} κ {sP = sP} {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} e
                              (record stP { registry = dropSource x regP })
                              (record sI { live = sweepL (guardOf (drop₂ (toℕ (n ↑ʳ i)) y regI)) (sweepL (guardOf (dropSource (toℕ (n ↑ʳ i)) regI)) (Sched.live sI)) })
                              (record stI { registry = drop₂ (toℕ (n ↑ʳ i)) y regI }))
-            (sym e₁) (sym e₂) (hot-go κ S i))
+            (sym e₁) (sym e₂) (hot-go κ S i dn))
   where
     regP = EvalSt.registry stP
     regI = EvalSt.registry stI
+
+-- AND ONE WHOSE SHARE AND RAW SLOT HOLD NO ROW: the impl's drops take
+-- nothing but the raw slot's, and that takes nothing either
+hot-quiet : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+              {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+  → (S : Store κ sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+  → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+  → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
+  → memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI) ≡ true
+  → srcCount (toℕ (i ↑ˡ n)) (EvalSt.registry stI) ≡ 0 → srcCount (toℕ (n ↑ʳ i)) (EvalSt.registry stI) ≡ 0
+  → Store κ (proj₁ (cascadeFinish a sP stP)) (proj₂ (cascadeFinish a sP stP))
+            (proj₁ (cascadeFinish a′ sI stI)) (proj₂ (cascadeFinish a′ sI stI))
+hot-quiet {n} κ {sP = sP} {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} e₁ e₂ ll ll′ dn z₁ z₂
+  with Arrival.isLast a | Arrival.isLast a′ | ll | ll′
+... | .true | .true | refl | refl =
+  subst (λ x → Store κ (record sP { live = x }) (record stP { registry = dropSource (arrSource a) regP })
+                       (record sI { live = sweepLive (dropSource (arrSource a′) regI) (Sched.live sI) })
+                       (record stI { registry = dropSource (arrSource a′) regI }))
+    (trans (sweepL-idem (guardOf (dropSource (arrSource a) regP)) (Sched.live sP)) (sym (sweep-eq (dropSource (arrSource a) regP) (Sched.live sP))))
+    (subst₂ (λ x y → Store κ (record sP { live = sweepL (guardOf (dropSource x regP)) (sweepL (guardOf (dropSource x regP)) (Sched.live sP)) })
+                             (record stP { registry = dropSource x regP })
+                             (record sI { live = sweepLive (dropSource y regI) (Sched.live sI) })
+                             (record stI { registry = dropSource y regI }))
+            (sym e₁) (sym e₂)
+       (subst (λ L → Store κ (record sP { live = sweepL (guardOf (dropSource (toℕ i) regP)) (sweepL (guardOf (dropSource (toℕ i) regP)) (Sched.live sP)) })
+                             (record stP { registry = dropSource (toℕ i) regP })
+                             (record sI { live = L }) (record stI { registry = dropSource raw regI }))
+              live-eq
+          (subst (λ K → Store κ (record sP { live = sweepL (guardOf (dropSource (toℕ i) regP)) (sweepL (guardOf (dropSource (toℕ i) regP)) (Sched.live sP)) })
+                                (record stP { registry = dropSource (toℕ i) regP })
+                                (record sI { live = sweepL (guardOf (dropSource raw K)) (sweepL (guardOf K) (Sched.live sI)) })
+                                (record stI { registry = dropSource raw K }))
+                 (drop-none (toℕ (n ↑ʳ i)) regI z₂) (hot-go κ S i dn))))
+  where
+    regP = EvalSt.registry stP
+    regI = EvalSt.registry stI
+    raw  = toℕ (i ↑ˡ n)
+    live-eq : sweepL (guardOf (dropSource raw regI)) (sweepL (guardOf regI) (Sched.live sI)) ≡ sweepLive (dropSource raw regI) (Sched.live sI)
+    live-eq = subst (λ K → sweepL (guardOf K) (sweepL (guardOf regI) (Sched.live sI)) ≡ sweepLive K (Sched.live sI))
+                    (sym (drop-none raw regI z₁))
+                    (trans (sweepL-idem (guardOf regI) (Sched.live sI)) (sym (sweep-eq regI (Sched.live sI))))

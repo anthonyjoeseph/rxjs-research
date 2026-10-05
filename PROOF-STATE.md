@@ -259,7 +259,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
   chain is `path-pass`, one arm per plain frame; a hot slot's is `fan-go` over
   the share's readers, paired by the proven `slot-chains`, after `hot-start`
-  finds the impl's one raw chain by the store's census. Both ends drop
+  and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store` and `hot-finish` are proven. Left: the arms as real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
   `inner-arm` once `Arm` carries an impl-only step; the monster drops to
@@ -279,9 +279,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`hot-end-start`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a hot last
-  arrival's impl chain runs its block alone into the share, which it spends
-  while the plain run latches the slot; the stores are related again there.
+- **`hot-end-block`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a connected
+  hot slot's raw row runs its block's end alone into the share, which it
+  spends while the plain run latches the slot; the stores meet again there.
 - **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   outer's step on both sides; the explode hands the flattener every inner a
   sync outer subscribed before the step returns.
@@ -334,5 +334,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   values on two arrivals under a flattener with no red.
 - **`cascade-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
   never runs a mint counter back.
+- **`cascade-latched`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
+  never unlatches a completed source.
 - **`renExp-id`** (Simulation.Walk) — GRINDABLE, `TWIN`: renaming by the
   identity is the identity, the impl's mint body against its elaboration.

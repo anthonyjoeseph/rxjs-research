@@ -41,17 +41,17 @@ _ = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
-  ; sources = data~ refl (refl ∷ refl ∷ []) ∷ []
+  ; sources = data~ refl (refl ∷ refl ∷ []) (λ { zero refl → refl ; (suc zero) () }) ∷ []
   ; numbers = slot~ zero refl ∷ []
   ; distinct = ([] ∷ []) , ([] ∷ [])
   ; sync    = (refl , []) ∷ []
   ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl refl refl) refl) []
-  ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
+  ; latches = λ { zero → (λ _ → refl , refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
-  ; census  = λ { zero _ → inj₁ refl ; (suc zero) _ → inj₂ (refl , refl) }
+  ; census  = λ { zero _ → inj₁ (refl , refl) ; (suc zero) () }
   }
 
 -- a cold script: its subscribe runs the input block straight to the root
@@ -66,7 +66,7 @@ _ = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
-  ; sources = data~ refl (refl ∷ []) ∷ []
+  ; sources = data~ refl (refl ∷ []) (λ { zero () ; (suc zero) () }) ∷ []
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ []
   ; distinct = ([] ∷ []) , ([] ∷ [])
   ; sync    = (refl , []) ∷ []
@@ -76,7 +76,7 @@ _ = record
   ; swept   = refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
-  ; census  = λ { zero _ → inj₂ (refl , refl) ; (suc zero) _ → inj₂ (refl , refl) }
+  ; census  = λ { zero () ; (suc zero) () }
   }
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
@@ -89,15 +89,15 @@ _ = record
   { π       = (0 , 0 ∷ []) ∷ []
   ; π-keys  = [] ∷ []
   ; π-vals  = [] ∷ []
-  ; sources = defer~ (toWitness {a? = _ <? _} tt) (hop (elab (inputˢ zero) (λ x → x) (λ ())) ∷ []) ∷ data~ refl (refl ∷ []) ∷ []
+  ; sources = defer~ (toWitness {a? = _ <? _} tt) (hop (elab (inputˢ zero) (λ x → x) (λ ())) ∷ []) ∷ data~ refl (refl ∷ []) (λ { zero refl → refl ; (suc zero) () }) ∷ []
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ slot~ zero refl ∷ []
   ; distinct = (((λ ()) ∷ []) ∷ [] ∷ []) , (((λ ()) ∷ []) ∷ [] ∷ [])
   ; sync    = (refl , refl ∷ []) ∷ (refl , []) ∷ []
   ; rows    = defer~ here (here refl) refl refl root~ refl ∷ []
-  ; latches = λ { zero → (λ _ → refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
+  ; latches = λ { zero → (λ _ → refl , refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
-  ; census  = λ { zero _ → inj₂ (refl , refl) ; (suc zero) _ → inj₂ (refl , refl) }
+  ; census  = λ { zero _ → inj₂ (refl , refl , λ ()) ; (suc zero) () }
   }

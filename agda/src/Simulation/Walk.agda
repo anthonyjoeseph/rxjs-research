@@ -221,13 +221,13 @@ init-store κ {t} e ins μ big = record
   ; distinct = init-distinct κ e ins
   ; sync    = init-sync κ e ins
   ; rows    = []
-  ; latches = λ _ → (λ _ → refl) , (λ _ → refl , refl)
+  ; latches = λ _ → (λ _ → refl , refl) , (λ _ → refl , refl)
   ; bounded = mapᵃ (λ lt → <-trans lt (n<1+n _)) (init-below (plainExp e) (plainSlots ins))
             , mapᵃ (λ lt → <-trans lt big) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; swept   = init-swept {t = t} {t′ = emitᵗ t} (init-sources κ e ins) (init-below (plainExp e) (plainSlots ins)) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; uncut   = [] , []
   ; above   = [] , []
-  ; census  = λ _ _ → inj₂ (refl , refl)
+  ; census  = λ _ _ → inj₂ (refl , refl , λ ())
   }
 
 -- THE IMPL'S ROOT SUBSCRIBE IS ITS MINT'S BODY'S, at the token the mint

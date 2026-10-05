@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; Path; Frame; share-sink;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; memberSource; Path; Frame; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
@@ -44,7 +44,7 @@ open import SExp.Plain   using (plainValues)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
 open import Simulation.Schedules using (HeadOf)
-open import Simulation.Stores using (V; EmitRel; Lifts; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
+open import Simulation.Stores using (srcCount; V; EmitRel; Lifts; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
   outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; hotEq; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
 open import Simulation.Walk using (readᴾ; readᴵ)
 
@@ -413,13 +413,31 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → dispatchShare⇓ (arrTick a′) (n ↑ʳ i) below [] true sI₂ stI₂ rD
                  → (eI , sI₃ , stI₃) ≡ (oB ++ proj₁ rD , proj₂ rD)
                  → HotEnd S a a′ i eI sI₃ stI₃
+      -- or no row at the raw slot or the share, no plain reader, and the
+      -- impl only latching the raw slot; a share that connected is spent
+      hot-end-idle : chainsOf a stP ≡ []
+                   → srcCount (toℕ (i ↑ˡ n)) (EvalSt.registry stI) ≡ 0 → srcCount (toℕ (n ↑ʳ i)) (EvalSt.registry stI) ≡ 0
+                   → (memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ true
+                      → memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI) ≡ true)
+                   → (eI , sI₃ , stI₃) ≡ ([] , sI , cascadeClose a′ stI)
+                   → HotEnd S a a′ i eI sI₃ stI₃
 
     postulate
-      -- the impl's one chain at a hot arrival's raw slot, closing
-      hot-end-start : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-                    → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+      -- THE IMPL'S ONE CHAIN AT A HOT ARRIVAL'S RAW SLOT, CLOSING, ONCE ITS
+      -- SHARE HAS CONNECTED: the raw row's end step, its input block run
+      -- alone into the share.  What it owes is the block's run to the
+      -- share's end: the share spent and the end dispatched, the plain side
+      -- latched and not otherwise moving
+      hot-end-block : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+                    → (hot : lookup κ i ≡ hotᵏ) → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+                    → arrTy a ≡ lookup Γ i
+                    → ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)}
+                    → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
+                    → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
+                        (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
                     → ∀ {eI sI₃ stI₃}
-                    → cascadeGo⇓ a′ [] true (chainsOf a′ stI) sI (cascadeClose a′ stI) (eI , sI₃ , stI₃)
+                    → chainStep⇓ a′ [] true (suc (toℕ (i ↑ˡ n)) , q) sI
+                        (record (cascadeClose a′ stI) { delivered = rid ∷ EvalSt.delivered (cascadeClose a′ stI) }) (eI , sI₃ , stI₃)
                     → HotEnd S a a′ i eI sI₃ stI₃
 
     postulate

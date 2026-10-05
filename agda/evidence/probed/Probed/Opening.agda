@@ -8,6 +8,7 @@ module Probed.Opening where
 
 open import Data.List using ([]; _∷_)
 open import Data.Product using (_,_)
+open import Data.Fin using (zero; suc)
 open import Data.Nat using (z≤n; _<?_)
 open import Data.Unit using (tt)
 open import Relation.Nullary.Decidable using (toWitness)
@@ -26,7 +27,7 @@ open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals
 -- LOAD-BEARING: a hot script live before the subscribe, two payloads
 -- left on each side; fails if either side drops or reorders one
 _ : Confirms (init-sources (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals))
-_ = data~ refl (refl ∷ refl ∷ []) ∷ []
+_ = data~ refl (refl ∷ refl ∷ []) (λ { zero refl → refl ; (suc zero) () }) ∷ []
 
 -- LOAD-BEARING: one hot script live on each side before the subscribe,
 -- at the same ticks; fails if the impl's embedding moved or doubled it

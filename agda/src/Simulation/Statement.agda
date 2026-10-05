@@ -62,7 +62,7 @@ open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; schedGo; schedFinish; sched-next; arrVal;
-  chainsOf; cascadeOpen; cascadeClose; cascadeFinish)
+  chainsOf; cascadeOpen; cascadeClose; cascadeFinish; memberSource)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
   disp; walk-more; walk-nil; walk-end)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
@@ -70,13 +70,13 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
-open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source)
+open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; hot-end-start; casc-empty; head-source)
 open import Simulation.Close using (close-store; close-arr)
-open import Simulation.Finish using (finish-store; hot-finish; T-true)
+open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit; T-true)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
-  Persists; delivered-arr; _⨾_; fan-go; hot-start-at; hot-idle; hot-end-start; hot-end-at)
+  Persists; delivered-arr; _⨾_; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -211,6 +211,16 @@ postulate
   cascade-mono : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (sched : Sched Γ′) (st : EvalSt e)
                    ({-@0-}ru : Rule sched st) (k : MintKey)
                → counter (Sched.mint sched) k ≤ counter (Sched.mint (proj₁ (proj₂ (Σ⁰.fst⁰ (cascade! a sched st ru))))) k
+
+  -- NOR UNLATCHES A SOURCE.  Every edge of the evaluator leaves the
+  -- completion latch alone or conses one source onto it.
+  --
+  -- TWIN: `Rx.Evaluator.Keeps`, whose `subscribeE-keeps` family walks
+  --   every relation a cascade reaches, there at the connection latch.
+  cascade-latched : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} {a vs fin cs sched st r}
+                  → cascadeGo⇓ {e = e} a vs fin cs sched st r → ∀ {x}
+                  → memberSource x (EvalSt.completedSources st) ≡ true
+                  → memberSource x (EvalSt.completedSources (proj₂ (proj₂ r))) ≡ true
 
 -- so one arrival never runs the impl's clock back
 clock-on : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (d : Conf e) (x : ⊤ ⊎ (Arrival Γ′ × Sched Γ′))
@@ -471,13 +481,18 @@ hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
              (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
-hot-end {Γ = Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ i hk e₁ e₂ go go′ end end′
-  with hot-end-start κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ end′
-... | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
-  hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ {emits = proj₁ r} ,
+hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll′ i hk e₁ e₂ {sP₁ = sP₁} {stP₁ = stP₁} {stI₁ = stI₁} go go′ {eP = eP} {sP₂ = sP₂} {stP₂ = stP₂} end end′
+  with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
+... | pop _ _ src h h′ _ _ _ _
+  with hot-end-start κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ end′
+...   | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
+  hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ (cascade-latched end′ {toℕ (i ↑ˡ n)} (close-hit a′ stI₁ e₂)) {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
     Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty) end g)
+...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
+...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd) {a} {a′} {i}
+                           e₁ e₂ ll ll′ (close-hit a′ stI₁ e₂) z₁ z₂ , []
 
 -- THE END OF A LAST ARRIVAL: a minted source's is the close, the end walked
 -- over the chains the value pass left as that pass walked them, and the

@@ -25,10 +25,10 @@
 ------------------------------------------------------------------
 module Simulation.Stores where
 
-open import Data.Bool    using (Bool; true; false; _∨_; T; if_then_else_)
+open import Data.Bool    using (Bool; true; false; _∨_; _∧_; T; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥)
-open import Data.Fin     using (toℕ; _↑ʳ_; _↑ˡ_)
+open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.List    using (List; []; _∷_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-map⁺)
@@ -94,9 +94,12 @@ srcCount k ((_ , s , _) ∷ r) = if sameSource k (regSource s) then suc (srcCoun
 -- A HOT SLOT'S SHARE HAS CONNECTED ONCE OR NOT AT ALL.  The connect
 -- subscribes the raw slot once and never again, so one row stands at it;
 -- before the connect nothing reads the share, and once the share is spent
--- both are dropped and a later reader registers nothing.
-Census : ∀ {n} {Γ : Ctx n} {t} → Source → Source → List (RegRow Γ t) → Set
-Census raw stamped reg = srcCount raw reg ≡ 1 ⊎ (srcCount raw reg ≡ 0 × srcCount stamped reg ≡ 0)
+-- both are dropped and a later reader registers nothing.  The input block
+-- holds no cut, so a connected share loses its raw row only to the raw
+-- slot's own end: a connected share with no raw row has a latched one.
+Census : ∀ {n} {Γ : Ctx n} {t} → Source → Source → List (RegRow Γ t) → Bool → Bool → Set
+Census raw stamped reg conn done =
+  (srcCount raw reg ≡ 1 × conn ≡ true) ⊎ (srcCount raw reg ≡ 0 × srcCount stamped reg ≡ 0 × (conn ≡ true → done ≡ true))
 
 -- the sweep reads a source's number alone
 guard-src : ∀ {n} {Γ : Ctx n} {t} (reg : List (RegRow Γ t)) {l l₂ : LiveSource Γ}
@@ -199,6 +202,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     data~  : ∀ {l l′} (eq : LiveSource.elemTy l′ ≡ plainᵗ (LiveSource.elemTy l))
            → Pointwise (λ p′ p → V (LiveSource.elemTy l) (subst (Val Γ′) eq (proj₂ p′)) (proj₂ p))
                        (LiveSource.pending l′) (LiveSource.pending l)
+           -- a slot's source holds its slot's type
+           → (∀ (i : Fin n) → LiveSource.source l ≡ toℕ i → LiveSource.elemTy l ≡ lookup Γ i)
            → Src l l′
     defer~ : ∀ {u src src′ o o′ ps ps′} → n < src → Pointwise (DeferPend u) ps′ ps
            → Src (record { source = src ; ordinal = o ; elemTy = echoᵗ u ; pending = ps })
@@ -464,10 +469,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           ArrRel s s′ u u′ src src′ (echoᵗ x) (echoᵗ (emitᵗ x)) × ArrRows q s s′ u u′
         ArrRows (mach _ q)                                                          s s′ u u′ = ArrRows q s s′ u u′
 
-  -- the completion and connection latches, slot for stamped slot
+  -- the completion and connection latches, slot for stamped slot.  A hot
+  -- slot's latch is its raw slot's, since the raw slot ends whether or not
+  -- its share ever connected, and the share is spent exactly when it did
   LatchRel : (CP SP CI SI : List Source) → Set
   LatchRel CP SP CI SI =
-    ∀ i → (lookup κ i ≡ hotᵏ → memberSource (toℕ i) CP ≡ memberSource (toℕ (n ↑ʳ i)) CI)
+    ∀ i → (lookup κ i ≡ hotᵏ → memberSource (toℕ i) CP ≡ memberSource (toℕ (i ↑ˡ n)) CI
+                              × memberSource (toℕ (n ↑ʳ i)) CI ≡ memberSource (toℕ (i ↑ˡ n)) CI ∧ memberSource (toℕ (n ↑ʳ i)) SI)
         × (lookup κ i ≡ sharedᵏ → memberSource (toℕ i) CP ≡ memberSource (toℕ (n ↑ʳ i)) CI
                                  × memberSource (toℕ i) SP ≡ memberSource (toℕ (n ↑ʳ i)) SI)
 
@@ -511,6 +519,8 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
             × All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) (EvalSt.registry stI)
     -- each hot slot's raw row, and its readers only behind one
     census  : ∀ i → lookup κ i ≡ hotᵏ → Census (toℕ (i ↑ˡ n)) (toℕ (n ↑ʳ i)) (EvalSt.registry stI)
+                                          (memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI))
+                                          (memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI))
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other

@@ -84,7 +84,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   src-pop : ∀ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) {a a′ l₂ l₂′} → Src κ l l′
           → schedHeadOf l ≡ inj₂ (a , l₂) → schedHeadOf l′ ≡ inj₂ (a′ , l₂′) → Src κ l₂ l₂′
   src-pop l l′ s h h′ with head-shape l h | head-shape l′ h′
-  src-pop l l′ (data~ eq pw)  h h′ | _ , _ , _ , pe , refl | _ , _ , _ , pe′ , refl = data~ eq (pw-tail pw pe′ pe)
+  src-pop l l′ (data~ eq pw sty) h h′ | _ , _ , _ , pe , refl | _ , _ , _ , pe′ , refl = data~ eq (pw-tail pw pe′ pe) sty
   src-pop l l′ (defer~ lt pw) h h′ | _ , _ , _ , pe , refl | _ , _ , _ , pe′ , refl = defer~ lt (pw-tail pw pe′ pe)
 
   num-pop : ∀ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) {a a′ l₂ l₂′}

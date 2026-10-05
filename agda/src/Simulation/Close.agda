@@ -4,12 +4,13 @@
 ------------------------------------------------------------------
 module Simulation.Close where
 
-open import Data.Bool    using (_∨_)
-open import Data.Fin.Properties using (toℕ<n; toℕ-↑ʳ)
+open import Data.Bool    using (_∨_; _∧_)
+open import Data.Fin     using (toℕ; _↑ʳ_; _↑ˡ_)
+open import Data.Fin.Properties using (toℕ<n; toℕ-↑ʳ; toℕ-↑ˡ)
 open import Data.List    using (List; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Nat     using (_+_; _<_)
-open import Data.Nat.Properties using (<⇒≢; <-trans; +-monoʳ-<)
+open import Data.Nat.Properties using (<⇒≢; <-trans; <-≤-trans; m≤m+n; +-monoʳ-<)
 open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
 
@@ -18,7 +19,7 @@ open import Rx.Evaluator using (Arrival; Sched; EvalSt; memberSource; sameSource
 open import Rx.Prim      using (Source)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Chains using (sameSource-no)
-open import Simulation.Stores using (Store; Arr)
+open import Simulation.Stores using (Store; Arr; Census)
 
 -- a source number no slot has is not the slot's
 member-skip : ∀ {m k} (xs : List Source) → m < k → memberSource m (k ∷ xs) ≡ memberSource m xs
@@ -34,16 +35,25 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
   close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; census = census
+    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
+    ; census = λ i hk → subst (Census _ _ (EvalSt.registry stI) _) (sym (mr i)) (census i hk)
     ; latches = λ i → let h , sh = latches i
                           lt  = <-trans (toℕ<n i) na
                           lt′ = subst (_< Arrival.source a′) (sym (toℕ-↑ʳ n i)) (<-trans (+-monoʳ-< n (toℕ<n i)) na′)
                           mp  = member-skip (EvalSt.completedSources stP) lt
                           mi  = member-skip (EvalSt.completedSources stI) lt′
-                      in (λ hk → trans mp (trans (h hk) (sym mi)))
+                      in (λ hk → let c , d = h hk
+                                 in trans mp (trans c (sym (mr i)))
+                                  , trans mi (trans d (cong (_∧ memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI)) (sym (mr i)))))
                        , (λ sk → let c , d = sh sk in trans mp (trans c (sym mi)) , d)
     }
-    where open Store s
+    where
+      open Store s
+      -- a raw slot is below every minted number too
+      mr : ∀ i → memberSource (toℕ (i ↑ˡ n)) (Arrival.source a′ ∷ EvalSt.completedSources stI)
+               ≡ memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI)
+      mr i = member-skip (EvalSt.completedSources stI)
+               (subst (_< Arrival.source a′) (sym (toℕ-↑ˡ i n)) (<-trans (<-≤-trans (toℕ<n i) (m≤m+n n n)) na′))
 
   -- and the arrival's pair against the rows with it, since the rows are the same
   close-arr : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
