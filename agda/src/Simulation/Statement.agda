@@ -443,7 +443,7 @@ hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta
   where
     Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
-          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI (After.store A))))
+          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI {κ = κ} (After.store A))))
           go g)
 ... | hot-idle none refl with casc-empty (subst (λ c → cascadeGo⇓ a _ false c _ _ _) none go)
 ...   | refl = pop-store κ s ex ex′ sy , []
@@ -514,7 +514,7 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll�
     S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
     Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
-          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI (After.store A))))
+          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI {κ = κ} (After.store A))))
           end g)
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
 ...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd) {a} {a′} {i}
