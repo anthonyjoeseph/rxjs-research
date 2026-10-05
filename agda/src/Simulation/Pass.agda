@@ -20,7 +20,6 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map; concat)
-open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
 open import Data.Maybe   using (nothing; just)
@@ -114,17 +113,45 @@ data SlotPair {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
-  -- WHAT A GROUP OF EMITS CARRIES: each emit's values in turn, the
-  -- plain group they make joined
+  -- WHAT A GROUP OF EMITS CARRIES: each emit's value, if it has one,
+  -- in turn -- the plain group they make joined.
+  --
+  -- AN EMIT CARRIES AT MOST ONE VALUE, and the relation has to say so
+  -- because a share tells one emit of two values from two emits of one.
+  -- Its fan-out is value-major, so a plain group reaches every reader
+  -- value by value, while the impl's share, running the same loop at the
+  -- emit type, hands each reader a whole emit before the next reader
+  -- sees it: past two readers, a two-value emit reorders the root.  A
+  -- flattener's echo segment is the same gap from the other side -- the
+  -- plain walk folds an echo run one value at a time where the segment
+  -- folds once.  Read off the elaboration rather than instantiated:
+  -- every source puts out one value per emit (an arrival is one value,
+  -- `ofᵖ` splits its list), and every former keeps the count, a
+  -- flattener's echo and segment holding more only where its outer emit
+  -- already did.
+  Bare : ∀ {s} → Val (plainᵏ Γ κ) (emitᵗ s) → Set
+  Bare {s} e′ = EmitRel {Γ = Γ} κ s e′ []
+
   data Carries {s} : List (Val (plainᵏ Γ κ) (emitᵗ s)) → List (Val Γ s) → Set where
-    []  : Carries [] []
-    _∷_ : ∀ {e′ es′ ws vs} → EmitRel κ s e′ ws → Carries es′ vs → Carries (e′ ∷ es′) (ws ++ vs)
+    []    : Carries [] []
+    quiet : ∀ (e′ : Val (plainᵏ Γ κ) (emitᵗ s)) {es′ vs} → Bare {s} e′ → Carries es′ vs → Carries (e′ ∷ es′) vs
+    one   : ∀ (e′ : Val (plainᵏ Γ κ) (emitᵗ s)) {es′ w vs} → EmitRel κ s e′ (w ∷ []) → Carries es′ vs
+          → Carries (e′ ∷ es′) (w ∷ vs)
+
+  quiet-lift : ∀ {s u} {G′ : Val (plainᵏ Γ κ) (emitᵗ s) → Val (plainᵏ Γ κ) (emitᵗ u)} {f : Val Γ s → Val Γ u}
+             → Lifts κ s u G′ (map f) → ∀ e′ → Bare {s} e′ → Bare {u} (G′ e′)
+  quiet-lift L e′ r = proj₁ (L e′ [] r)
+
+  one-lift : ∀ {s u} {G′ : Val (plainᵏ Γ κ) (emitᵗ s) → Val (plainᵏ Γ κ) (emitᵗ u)} {f : Val Γ s → Val Γ u}
+           → Lifts κ s u G′ (map f) → ∀ e′ {w} → EmitRel κ s e′ (w ∷ []) → EmitRel κ u (G′ e′) (f w ∷ [])
+  one-lift L e′ {w} r = proj₁ (L e′ (w ∷ []) r)
 
   carries-map : ∀ {s u} {G′ : Val (plainᵏ Γ κ) (emitᵗ s) → Val (plainᵏ Γ κ) (emitᵗ u)} {f : Val Γ s → Val Γ u}
               → Lifts κ s u G′ (map f) → ∀ {es vs} → Carries es vs → Carries (map G′ es) (map f vs)
-  carries-map L []                        = []
-  carries-map {f = f} L (_∷_ {e′ = e′} {ws = ws} {vs = vs} r b) =
-    subst (Carries _) (sym (map-++ f ws vs)) (proj₁ (L e′ ws r) ∷ carries-map L b)
+  carries-map L []                      = []
+  carries-map {G′ = G′} {f} L (quiet e′ r b) = quiet (G′ e′) (quiet-lift {G′ = G′} {f} L e′ r) (carries-map L b)
+  carries-map {G′ = G′} {f} L (one e′ r b) = one (G′ e′) (one-lift {G′ = G′} {f} L e′ r) (carries-map L b)
+
 
   -- THE VALUE A POPPED SOURCE HANDS ITS CHAINS, on both sides: the head
   -- of each partnered source's pending list, at the row's source

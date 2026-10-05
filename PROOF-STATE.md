@@ -244,12 +244,12 @@ undecided, never a failure (Anthony).
 arrivals over `correspondence`: schedules in step, pops partnered, stores related; the root
 subscribes set them (`subscribe-related`) and each cascade keeps
 (`cascade-related`), both sending agreeing values in one instant. RULED
-OUT: an impl arrival the plain schedule lacks, a split arrival, a gap or
+OUT: an impl arrival plain lacks, a split arrival, a gap or
 stray in a cascade's instant, an echo apart from its inners; a subscribe
 installing a run the relation lacks (hot, cold, deferred read,
-one-lane merge); a pop unrelating a read; a map moving an instant; a close
-emptying a merge its rows name; a hot end past its block.
-Left: a deeper flattener's subscribe, and which former's cascade breaks it.
+one-lane merge); a pop unrelating a read; a map moving instants; a close
+emptying a merge its rows name; a hot end past its block; a two-value emit.
+Left: a deeper flattener's subscribe, and which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
@@ -281,8 +281,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### The ledger
 
 - **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
-  outer's step on both sides; the explode hands the flattener every inner a
-  sync outer subscribed before the step returns.
+  outer's step on both sides, an emit carrying one payload at most, so an
+  element's lane is one inner and its echo one value whatever the policy.
 - **`{inner,lane,deferInner}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   leaving an inner, the flattener's lane, an impl-only lane merge ahead of it
   and a deferred body's hop.
