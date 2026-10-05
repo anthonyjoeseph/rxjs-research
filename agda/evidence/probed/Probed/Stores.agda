@@ -9,7 +9,7 @@ open import Data.List using ([]; _∷_)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Rx.Prim using (cold; after_,_)
 open import SExp.Syntax using (inputˢ; emptyˢ)
-open import Data.Sum using (inj₁)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Fin using (zero; suc)
 open import Data.Nat using (zero; suc; _<?_)
 open import Data.Unit using (tt)
@@ -50,7 +50,8 @@ _ = record
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
-  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt
+  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
+  ; census  = λ { zero _ → inj₁ refl ; (suc zero) _ → inj₂ (refl , refl) }
   }
 
 -- a cold script: its subscribe runs the input block straight to the root
@@ -74,7 +75,8 @@ _ = record
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
-  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt
+  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
+  ; census  = λ { zero _ → inj₂ (refl , refl) ; (suc zero) _ → inj₂ (refl , refl) }
   }
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
@@ -87,7 +89,7 @@ _ = record
   { π       = (0 , 0 ∷ []) ∷ []
   ; π-keys  = [] ∷ []
   ; π-vals  = [] ∷ []
-  ; sources = defer~ (hop (elab (inputˢ zero) (λ x → x) (λ ())) ∷ []) ∷ data~ refl (refl ∷ []) ∷ []
+  ; sources = defer~ (toWitness {a? = _ <? _} tt) (hop (elab (inputˢ zero) (λ x → x) (λ ())) ∷ []) ∷ data~ refl (refl ∷ []) ∷ []
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ slot~ zero refl ∷ []
   ; distinct = (((λ ()) ∷ []) ∷ [] ∷ []) , (((λ ()) ∷ []) ∷ [] ∷ [])
   ; sync    = (refl , refl ∷ []) ∷ (refl , []) ∷ []
@@ -96,5 +98,6 @@ _ = record
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
-  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt
+  ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
+  ; census  = λ { zero _ → inj₂ (refl , refl) ; (suc zero) _ → inj₂ (refl , refl) }
   }

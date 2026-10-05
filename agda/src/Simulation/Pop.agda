@@ -85,7 +85,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           → schedHeadOf l ≡ inj₂ (a , l₂) → schedHeadOf l′ ≡ inj₂ (a′ , l₂′) → Src κ l₂ l₂′
   src-pop l l′ s h h′ with head-shape l h | head-shape l′ h′
   src-pop l l′ (data~ eq pw)  h h′ | _ , _ , _ , pe , refl | _ , _ , _ , pe′ , refl = data~ eq (pw-tail pw pe′ pe)
-  src-pop l l′ (defer~ pw)    h h′ | _ , _ , _ , pe , refl | _ , _ , _ , pe′ , refl = defer~ (pw-tail pw pe′ pe)
+  src-pop l l′ (defer~ lt pw) h h′ | _ , _ , _ , pe , refl | _ , _ , _ , pe′ , refl = defer~ lt (pw-tail pw pe′ pe)
 
   num-pop : ∀ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) {a a′ l₂ l₂′}
           → SrcNum κ (LiveSource.source l) (LiveSource.source l′)
@@ -140,4 +140,5 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    pp (Store.swept s)
     ; uncut    = mapᵃ (λ _ → refl) (proj₁ (Store.uncut s)) , mapᵃ (λ _ → refl) (proj₂ (Store.uncut s))
     ; above    = Store.above s
+    ; census   = Store.census s
     }

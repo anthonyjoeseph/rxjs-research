@@ -23,7 +23,7 @@ open import Data.List.Relation.Unary.All using (All; _∷_; [])
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.Nat     using (zero; suc; _+_; _<_; _<ᵇ_; _≟_)
+open import Data.Nat     using (suc; _+_; _<_; _<ᵇ_; _≟_)
 open import Data.Nat.Properties using (≡ᵇ⇒≡; <ᵇ⇒<; <⇒<ᵇ; <⇒≢; <-asym; <-trans; <-≤-trans; +-monoʳ-<; +-cancelˡ-≡; m≤m+n)
 open import Relation.Nullary using (yes; no)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -34,11 +34,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Prim      using (Source)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegRow; regSource; sameSource; dropSource; sweepLive; cascadeFinish; shareFinish; arrSource; arrTy)
-open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Chains using (sameSource-lt; sameSource-no)
+open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ)
+open import Data.Vec     using (lookup)
+open import Simulation.Chains using (sameSource-lt; sameSource-no; same-refl; count-hit; count-pass)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
-open import Simulation.Stores using (guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr)
+open import Simulation.Stores using (srcCount; Census; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr)
   renaming (here to sp-here; there to sp-there)
 
 ------------------------------------------------------------------
@@ -89,10 +90,6 @@ module _ {n m} {Γ : Ctx n} {Γ′ : Ctx m} {p : LiveSource Γ → Bool} {q : Li
 ------------------------------------------------------------------
 -- Source numbers
 ------------------------------------------------------------------
-
-same-refl : ∀ x → sameSource x x ≡ true
-same-refl zero    = refl
-same-refl (suc x) = same-refl x
 
 same-yes : ∀ {x y} → x ≡ y → sameSource x y ≡ true
 same-yes {x} refl = same-refl x
@@ -146,6 +143,39 @@ module _ {n} {Γ : Ctx n} {t} where
   all-drop s {r ∷ K} (p ∷ ps) with sameSource s (regSource (proj₁ (proj₂ r)))
   ... | true  = all-drop s ps
   ... | false = p ∷ all-drop s ps
+
+  -- a drop at another source leaves a count alone
+  count-drop : ∀ {k} y (K : List (RegRow Γ t)) → sameSource y k ≡ false → srcCount k (dropSource y K) ≡ srcCount k K
+  count-drop y [] _ = refl
+  count-drop {k} y (r ∷ K) ne = go _ refl _ refl
+    where
+    go : ∀ b₁ → sameSource y (regSource (proj₁ (proj₂ r))) ≡ b₁ → ∀ b₂ → sameSource k (regSource (proj₁ (proj₂ r))) ≡ b₂
+       → srcCount k (dropSource y (r ∷ K)) ≡ srcCount k (r ∷ K)
+    go true  e₁ true  e₂ = ⊥-elim (neq-of {y} {k} ne (trans (same-eq e₁) (sym (same-eq e₂))))
+    go true  e₁ false e₂ = trans (cong (srcCount k) (drop-skip y r K e₁))
+                             (trans (count-drop y K ne) (sym (count-pass k r K e₂)))
+    go false e₁ true  e₂ = trans (cong (srcCount k) (drop-keep y r K e₁))
+                             (trans (count-hit k r (dropSource y K) e₂)
+                               (trans (cong suc (count-drop y K ne)) (sym (count-hit k r K e₂))))
+    go false e₁ false e₂ = trans (cong (srcCount k) (drop-keep y r K e₁))
+                             (trans (count-pass k r (dropSource y K) e₂)
+                               (trans (count-drop y K ne) (sym (count-pass k r K e₂))))
+
+  -- a drop at a source leaves none there
+  count-self : ∀ k (K : List (RegRow Γ t)) → srcCount k (dropSource k K) ≡ 0
+  count-self k [] = refl
+  count-self k (r ∷ K) = go _ refl
+    where
+    go : ∀ b → sameSource k (regSource (proj₁ (proj₂ r))) ≡ b → srcCount k (dropSource k (r ∷ K)) ≡ 0
+    go true  e = trans (cong (srcCount k) (drop-skip k r K e)) (count-self k K)
+    go false e = trans (cong (srcCount k) (drop-keep k r K e))
+                   (trans (count-pass k r (dropSource k K) e) (count-self k K))
+
+  -- and so keeps a census at two other sources
+  census-drop : ∀ {k₁ k₂} y (K : List (RegRow Γ t)) → sameSource y k₁ ≡ false → sameSource y k₂ ≡ false
+              → Census k₁ k₂ K → Census k₁ k₂ (dropSource y K)
+  census-drop y K n₁ n₂ (inj₁ e)         = inj₁ (trans (count-drop y K n₁) e)
+  census-drop y K n₁ n₂ (inj₂ (e₁ , e₂)) = inj₂ (trans (count-drop y K n₁) e₁ , trans (count-drop y K n₂) e₂)
 
   -- a registration in a list puts its source's count up
   mem-any : ∀ {r : RegRow Γ t} {K} → r ∈ K → any (onSrc (regSource (proj₁ (proj₂ r)))) K ≡ true
@@ -295,7 +325,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; bounded = all-sweep _ LiveSource.source (proj₁ bounded) , all-sweep _ LiveSource.source (proj₂ bounded)
     ; swept = sweepL-pw pw pw
     ; uncut = all-drop s (proj₁ uncut) , all-drop s′ (proj₂ uncut)
-    ; above = all-drop s above
+    ; above = all-drop s (proj₁ above) , all-drop s′ (proj₂ above)
+    ; census = λ i h → census-drop s′ (EvalSt.registry stI) (mach-lt {Γ = Γ} κ i na′)
+                         (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ʳ n i)) (+-monoʳ-< n (toℕ<n i))) na′))
+                         (census i h)
     }
     where
       open Store S
@@ -512,7 +545,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               , all-sweep g₂ LiveSource.source (all-sweep g₁ LiveSource.source (proj₂ bounded))
     ; swept = sweepL-pw A′ A′
     ; uncut = all-drop (toℕ i) (proj₁ uncut) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ uncut))
-    ; above = all-drop (toℕ i) above
+    ; above = all-drop (toℕ i) (proj₁ above) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ above))
+    ; census = hot-census
     }
     where
       open Store S
@@ -525,6 +559,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       G  = hot-guards {regP = EvalSt.registry stP} {regI = EvalSt.registry stI} i numbers swept
       A  = pw-map proj₁ G
       A′ = sweepL-pw (pw-map proj₂ G) A
+
+      -- the slot's own share and raw slot are emptied, every other kept
+      hot-census : ∀ j → lookup κ j ≡ hotᵏ → Census (toℕ (j ↑ˡ n)) (toℕ (n ↑ʳ j)) K₂
+      hot-census j h with toℕ j ≟ toℕ i
+      ... | yes eq = inj₂ ( subst (λ k → srcCount k K₂ ≡ 0) (raw≡ i j eq) (count-self (toℕ (i ↑ˡ n)) K₁)
+                          , trans (count-drop (toℕ (i ↑ˡ n)) K₁ (sameSource-no (raw-stamped i j)))
+                                  (subst (λ k → srcCount k K₁ ≡ 0) (stamped≡ i j eq) (count-self (toℕ (n ↑ʳ i)) (EvalSt.registry stI))) )
+      ... | no ne  = census-drop (toℕ (i ↑ˡ n)) K₁ (sameSource-no (raw≢′ i j ne)) (sameSource-no (raw-stamped i j))
+                       (census-drop (toℕ (n ↑ʳ i)) (EvalSt.registry stI) (sameSource-no (λ x → raw≢ i j (sym x)))
+                          (sameSource-no (stamped≢ i j (λ x → ne (sym x)))) (census j h))
 
 -- THE END OF A HOT LAST ARRIVAL: the share's registrations and the raw
 -- slot's dropped on the impl side, the slot's on the plain side

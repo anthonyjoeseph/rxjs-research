@@ -45,7 +45,7 @@ open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; EmitRel; Lifts; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
-  outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
+  outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; hotEq; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
 open import Simulation.Walk using (readᴾ; readᴵ)
 
 readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
@@ -92,7 +92,7 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
           → Store κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
 delivered s = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above }
+  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; census = census }
   where open Store s
 
 -- the arrival's pair against the rows is as it was, since the rows are
@@ -395,6 +395,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → dispatchShare⇓ (arrTick a′) (n ↑ʳ i) below (e ∷ []) false sI₂ stI₂ rD
                    → (oI , sI₁ , stI₁) ≡ (oB ++ proj₁ rD , proj₂ rD)
                    → HotStart S a a′ i oI sI₁ stI₁
+      -- or no reader on either side, and the impl not moving
+      hot-idle : chainsOf a stP ≡ [] → (oI , sI₁ , stI₁) ≡ ([] , sI , stI)
+               → HotStart S a a′ i oI sI₁ stI₁
 
     -- WHAT A HOT ARRIVAL'S IMPL CHAIN DOES AT THE END: the same block runs
     -- alone, the share is spent, and the end it hands the share is
@@ -420,12 +423,21 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → HotEnd S a a′ i eI sI₃ stI₃
 
     postulate
-      -- the impl's one chain at a hot arrival's raw slot
-      hot-start : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-                → lookup κ i ≡ hotᵏ
+      -- THE IMPL'S ONE CHAIN AT A HOT ARRIVAL'S RAW SLOT, ONCE ITS SHARE HAS
+      -- CONNECTED: the raw row's step over the arrival's value, its input
+      -- block run alone into the share.  What it owes is the block's run:
+      -- the one stamped emit carrying the value, the plain side not moving
+      hot-block : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+                → (hot : lookup κ i ≡ hotᵏ)
                 → Head (toℕ i) (toℕ (i ↑ˡ n)) {arrTy a} {arrTy a′} (arrVal a ∷ []) (arrVal a′ ∷ [])
+                → arrTy a ≡ lookup Γ i
+                → ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)}
+                → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
+                → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
+                    (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
                 → ∀ {oI sI₁ stI₁}
-                → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) sI stI (oI , sI₁ , stI₁)
+                → chainStep⇓ a′ (arrVal a′ ∷ []) false (suc (toℕ (i ↑ˡ n)) , q) sI
+                    (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
                 → HotStart S a a′ i oI sI₁ stI₁
 
     -- a minted source's partnered chain, by the row the store pairs it with

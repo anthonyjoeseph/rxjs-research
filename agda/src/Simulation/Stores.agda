@@ -25,7 +25,7 @@
 ------------------------------------------------------------------
 module Simulation.Stores where
 
-open import Data.Bool    using (Bool; true; false; _∨_; T)
+open import Data.Bool    using (Bool; true; false; _∨_; T; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥)
 open import Data.Fin     using (toℕ; _↑ʳ_; _↑ˡ_)
@@ -85,6 +85,18 @@ aboveᵇ {n} (atDyn s _)   = n ≤ᵇ s
 
 above-≤ : ∀ {n s} → (n ≤ᵇ s) ≡ true → n ≤ s
 above-≤ {n} {s} e = ≤ᵇ⇒≤ n s (subst T (sym e) tt)
+
+-- HOW MANY REGISTRATIONS STAND AT ONE SOURCE
+srcCount : ∀ {n} {Γ : Ctx n} {t} → Source → List (RegRow Γ t) → ℕ
+srcCount k []              = 0
+srcCount k ((_ , s , _) ∷ r) = if sameSource k (regSource s) then suc (srcCount k r) else srcCount k r
+
+-- A HOT SLOT'S SHARE HAS CONNECTED ONCE OR NOT AT ALL.  The connect
+-- subscribes the raw slot once and never again, so one row stands at it;
+-- before the connect nothing reads the share, and once the share is spent
+-- both are dropped and a later reader registers nothing.
+Census : ∀ {n} {Γ : Ctx n} {t} → Source → Source → List (RegRow Γ t) → Set
+Census raw stamped reg = srcCount raw reg ≡ 1 ⊎ (srcCount raw reg ≡ 0 × srcCount stamped reg ≡ 0)
 
 -- the sweep reads a source's number alone
 guard-src : ∀ {n} {Γ : Ctx n} {t} (reg : List (RegRow Γ t)) {l l₂ : LiveSource Γ}
@@ -188,7 +200,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            → Pointwise (λ p′ p → V (LiveSource.elemTy l) (subst (Val Γ′) eq (proj₂ p′)) (proj₂ p))
                        (LiveSource.pending l′) (LiveSource.pending l)
            → Src l l′
-    defer~ : ∀ {u src src′ o o′ ps ps′} → Pointwise (DeferPend u) ps′ ps
+    defer~ : ∀ {u src src′ o o′ ps ps′} → n < src → Pointwise (DeferPend u) ps′ ps
            → Src (record { source = src ; ordinal = o ; elemTy = echoᵗ u ; pending = ps })
                  (record { source = src′ ; ordinal = o′ ; elemTy = echoᵗ (emitᵗ u) ; pending = ps′ })
 
@@ -494,8 +506,11 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     -- a registration still in the registry is not a cascade's victim
     uncut   : All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) (EvalSt.registry stP)
             × All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) (EvalSt.registry stI)
-    -- a plain registration at a minted source is above every slot
+    -- a registration at a minted source is above every slot
     above   : All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) (EvalSt.registry stP)
+            × All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) (EvalSt.registry stI)
+    -- each hot slot's raw row, and its readers only behind one
+    census  : ∀ i → lookup κ i ≡ hotᵏ → Census (toℕ (i ↑ˡ n)) (toℕ (n ↑ʳ i)) (EvalSt.registry stI)
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other

@@ -27,6 +27,7 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] t
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Data.Sum using (inj₂)
 
 open import Rx.Prim      using (Id; hot; cold)
 open import Rx.Exp       using (FlatOp)
@@ -225,7 +226,8 @@ init-store κ {t} e ins μ big = record
             , mapᵃ (λ lt → <-trans lt big) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; swept   = init-swept {t = t} {t′ = emitᵗ t} (init-sources κ e ins) (init-below (plainExp e) (plainSlots ins)) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; uncut   = [] , []
-  ; above   = []
+  ; above   = [] , []
+  ; census  = λ _ _ → inj₂ (refl , refl)
   }
 
 -- THE IMPL'S ROOT SUBSCRIBE IS ITS MINT'S BODY'S, at the token the mint

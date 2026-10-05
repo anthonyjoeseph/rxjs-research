@@ -8,33 +8,35 @@
 ------------------------------------------------------------------
 module Simulation.Chains where
 
-open import Data.Bool    using (true; false; T)
+open import Data.Bool    using (true; false; T; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥-elim)
 open import Data.List    using (List; []; _∷_; map)
+open import Data.List.Properties using (++-identityʳ)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_) renaming (map to pw-map)
 open import Data.List.Relation.Unary.All using (All; _∷_; [])
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.Nat     using (suc; _+_; _<_; _≡ᵇ_; _≟_)
-open import Data.Fin     using (Fin; toℕ; _↑ʳ_)
+open import Data.Nat     using (zero; suc; _+_; _<_; _≤_; _≡ᵇ_; _≟_)
+open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; toℕ-injective; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
-open import Data.Nat.Properties using (≡ᵇ⇒≡; ≡⇒≡ᵇ; <⇒≢; <-trans; <-≤-trans; +-monoʳ-<; m≤m+n)
+open import Data.Nat.Properties using (≡ᵇ⇒≡; ≡⇒≡ᵇ; <⇒≢; <-trans; <-≤-trans; <-asym; +-monoʳ-<; m≤m+n; 1+n≢0; suc-injective)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
 open import Data.Unit    using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Exp       using (Ctx; Closed; _≟ᵗ_)
+open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Closed; _≟ᵗ_)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegId; RegRow; RegSrc; atDyn; atSlot; shareAdmit; regSource; regFloor; Path;
-  arrSource; arrTy; chainsGo; chainsOf; sameSource; schedGo; cascadeOpen)
-open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Pass using (dynRow; clash; Paired; SlotPair; slotpair)
+  arrSource; arrTy; arrVal; schedHeadOf; chainsGo; chainsOf; sameSource; schedGo; cascadeOpen; share-sink)
+open import Rx.Evaluator.Domain using (cascadeGo⇓; casc-nil; casc-cut; casc-live)
+open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
+open import Simulation.Pass using (dynRow; clash; Paired; SlotPair; slotpair; head; HotStart; hot-idle; hot-block)
 open import Simulation.Pop using (pp-popped)
-open import Simulation.Schedules using (Popped; pop; sched-pop)
-open import Simulation.Stores using (Src; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr; SameAt;
+open import Simulation.Schedules using (Popped; pop; sched-pop; HeadOf)
+open import Simulation.Stores using (srcCount; InputBlock; Src; data~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr; SameAt;
   hotEq; sharedEq; aboveᵇ; above-≤)
   renaming (here to sp-here; there to sp-there)
 
@@ -327,4 +329,236 @@ slot-chains : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : C
             → arrSource a ≡ toℕ i → arrTy a ≡ lookup Γ i
             → Pointwise (SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i)
                 (chainsOf a stP) (shareAdmit (n ↑ʳ i) (EvalSt.registry stI))
-slot-chains κ S e ty = slot-rows κ e ty (Store.rows S) (Store.above S) (proj₁ (Store.uncut S)) (proj₂ (Store.uncut S))
+slot-chains κ S e ty = slot-rows κ e ty (Store.rows S) (proj₁ (Store.above S)) (proj₁ (Store.uncut S)) (proj₂ (Store.uncut S))
+
+------------------------------------------------------------------
+-- A HOT ARRIVAL'S RAW CHAIN
+------------------------------------------------------------------
+
+-- a source number against itself
+same-refl : ∀ x → sameSource x x ≡ true
+same-refl zero    = refl
+same-refl (suc x) = same-refl x
+
+module _ {m} {Δ : Ctx m} {t} where
+
+  -- a row elsewhere leaves a count alone, a row there raises it
+  count-hit : ∀ k (r : RegRow Δ t) K → sameSource k (regSource (proj₁ (proj₂ r))) ≡ true → srcCount k (r ∷ K) ≡ suc (srcCount k K)
+  count-hit k (rid , x , c) K e = cong (λ b → if b then suc (srcCount k K) else srcCount k K) e
+
+  count-pass : ∀ k (r : RegRow Δ t) K → sameSource k (regSource (proj₁ (proj₂ r))) ≡ false → srcCount k (r ∷ K) ≡ srcCount k K
+  count-pass k (rid , x , c) K e = cong (λ b → if b then suc (srcCount k K) else srcCount k K) e
+
+  -- none at a source, none behind the head either
+  count-tail : ∀ {k} (r : RegRow Δ t) K → srcCount k (r ∷ K) ≡ 0 → srcCount k K ≡ 0
+  count-tail {k} (rid , s , c) K z = go _ refl
+    where
+    go : ∀ b → sameSource k (regSource s) ≡ b → srcCount k K ≡ 0
+    go true  e = ⊥-elim (1+n≢0 (trans (sym (count-hit k (rid , s , c) K e)) z))
+    go false e = trans (sym (count-pass k (rid , s , c) K e)) z
+
+  -- no row at the arrival's source, no chain
+  raw-none : ∀ (a : Arrival Δ) (K : List (RegRow Δ t)) → srcCount (arrSource a) K ≡ 0 → chainsGo a K ≡ []
+  raw-none a [] _ = refl
+  raw-none a ((rid , s , (u , p)) ∷ K) z = go _ refl
+    where
+    go : ∀ b → sameSource (arrSource a) (regSource s) ≡ b → chainsGo a ((rid , s , (u , p)) ∷ K) ≡ []
+    go true  e = ⊥-elim (1+n≢0 (trans (sym (count-hit (arrSource a) (rid , s , (u , p)) K e)) z))
+    go false e = trans (chains-skip a e) (raw-none a K (trans (sym (count-pass (arrSource a) (rid , s , (u , p)) K e)) z))
+
+  -- a row at the arrival's source but not its type contributes no chain
+  chains-mistyped : ∀ (a : Arrival Δ) {rid} {s : RegSrc Δ} {u} {p : Path Δ (regFloor s) u t} {rest}
+                  → u ≢ arrTy a → chainsGo a ((rid , s , (u , p)) ∷ rest) ≡ chainsGo a rest
+  chains-mistyped a {s = s} {u} ne with sameSource (arrSource a) (regSource s) | u ≟ᵗ arrTy a
+  ... | false | _      = refl
+  ... | true  | no _   = refl
+  ... | true  | yes e  = ⊥-elim (ne e)
+
+module _ {n} {Γ : Ctx n} (κ : Kinds n) where
+
+  -- A HOT SLOT NO STAMPED ROW READS HAS NO PLAIN READER: every plain
+  -- reader of the slot is partnered with a row at its share
+  plain-none : ∀ {t π NP NI LP LI rg rg′} {a : Arrival Γ} {i : Fin n}
+             → arrSource a ≡ toℕ i
+             → (rr : RegRel {Γ = Γ} κ π {t} NP NI LP LI rg rg′)
+             → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rg
+             → srcCount (toℕ (n ↑ʳ i)) rg′ ≡ 0
+             → chainsGo a rg ≡ []
+  plain-none e [] _ _ = refl
+  plain-none {a = a} {i} e (_∷_ {r′ = r′} {rs′ = rs′} (read~ {i = j} hk pr refl) q) (_ ∷ ab) z with i ≟ᶠ j
+  ... | yes refl = ⊥-elim (1+n≢0 (trans (sym (count-hit (toℕ (n ↑ʳ i)) r′ rs′ (same-refl (toℕ (n ↑ʳ i))))) z))
+  ... | no ne    = trans (chains-skip a (sameSource-no (λ x → ne (toℕ-injective (trans (sym e) x)))))
+                         (plain-none e q ab (count-tail r′ rs′ z))
+  plain-none {a = a} {i} e (_∷_ {r′ = r′} {rs′ = rs′} (cold~ sp ib pr refl) q) (ab₀ ∷ ab) z =
+    trans (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
+          (plain-none e q ab (count-tail r′ rs′ z))
+  plain-none {a = a} {i} e (_∷_ {r′ = r′} {rs′ = rs′} (defer~ sp pi lnP lnI pr refl) q) (ab₀ ∷ ab) z =
+    trans (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
+          (plain-none e q ab (count-tail r′ rs′ z))
+  plain-none e (mach {r′ = r′} {rs′ = rs′} x q) ab z = plain-none e q ab (count-tail r′ rs′ z)
+
+  -- an arrival not at its slot's type has no plain reader either
+  plain-mistyped : ∀ {t π NP NI LP LI rg rg′} {a : Arrival Γ} {i : Fin n}
+                 → arrSource a ≡ toℕ i → arrTy a ≢ lookup Γ i
+                 → (rr : RegRel {Γ = Γ} κ π {t} NP NI LP LI rg rg′)
+                 → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rg
+                 → chainsGo a rg ≡ []
+  plain-mistyped e ne [] _ = refl
+  plain-mistyped {a = a} {i} e ne (read~ {i = j} hk pr refl ∷ q) (_ ∷ ab) with i ≟ᶠ j
+  ... | yes refl = trans (chains-mistyped a (λ x → ne (sym x))) (plain-mistyped e ne q ab)
+  ... | no ne′   = trans (chains-skip a (sameSource-no (λ x → ne′ (toℕ-injective (trans (sym e) x)))))
+                         (plain-mistyped e ne q ab)
+  plain-mistyped {a = a} {i} e ne (cold~ sp ib pr refl ∷ q) (ab₀ ∷ ab) =
+    trans (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
+          (plain-mistyped e ne q ab)
+  plain-mistyped {a = a} {i} e ne (defer~ sp pi lnP lnI pr refl ∷ q) (ab₀ ∷ ab) =
+    trans (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
+          (plain-mistyped e ne q ab)
+  plain-mistyped e ne (mach x q) ab = plain-mistyped e ne q ab
+
+  -- a raw slot's number is no stamped slot's
+  raw≢stamped : ∀ (i j : Fin n) → toℕ (i ↑ˡ n) ≢ toℕ (n ↑ʳ j)
+  raw≢stamped i j eq = <⇒≢ (<-≤-trans (toℕ<n i) (m≤m+n n (toℕ j))) (trans (sym (toℕ-↑ˡ i n)) (trans eq (toℕ-↑ʳ n j)))
+
+  raw<ₙ : ∀ (i : Fin n) → toℕ (i ↑ˡ n) < n + n
+  raw<ₙ i = subst (_< n + n) (sym (toℕ-↑ˡ i n)) (<-≤-trans (toℕ<n i) (m≤m+n n n))
+
+  -- THE IMPL'S CHAINS AT A HOT ARRIVAL ONCE ITS SHARE HAS CONNECTED: the
+  -- one raw row's, or none if the arrival is not at the slot's type
+  data RawOne {t π NP NI} (a′ : Arrival (plainᵏ Γ κ)) (i : Fin n) (CI : List RegId)
+              (rg′ : List (RegRow (plainᵏ Γ κ) (emitᵗ t))) : Set where
+    raw-mistyped : arrTy a′ ≢ plainᵗ (lookup Γ i) → chainsGo a′ rg′ ≡ [] → RawOne a′ i CI rg′
+    raw-at : ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)} (hot : lookup κ i ≡ hotᵏ)
+           → chainsGo a′ rg′ ≡ (rid , suc (toℕ (i ↑ˡ n)) , q) ∷ []
+           → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
+           → InputBlock {Γ = Γ} κ π {t} NP NI (plainᵗ (lookup Γ i)) full
+               (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
+           → any (_≡ᵇ rid) CI ≡ false
+           → RawOne a′ i CI rg′
+
+  raw-cons : ∀ {t π NP NI} {a′ : Arrival (plainᵏ Γ κ)} {i CI r′ rest}
+           → chainsGo a′ (r′ ∷ rest) ≡ chainsGo a′ rest
+           → RawOne {t} {π} {NP} {NI} a′ i CI rest → RawOne {t} {π} {NP} {NI} a′ i CI (r′ ∷ rest)
+  raw-cons e (raw-mistyped ne c)  = raw-mistyped ne (trans e c)
+  raw-cons e (raw-at hot c d ib u) = raw-at hot (trans e c) d ib u
+
+  raw-one : ∀ {t π NP NI LP LI rg rg′} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n} {CI}
+          → arrSource a′ ≡ toℕ (i ↑ˡ n)
+          → (rr : RegRel {Γ = Γ} κ π {t} NP NI LP LI rg rg′)
+          → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rg′
+          → All (λ r → any (_≡ᵇ proj₁ r) CI ≡ false) rg′
+          → srcCount (toℕ (i ↑ˡ n)) rg′ ≡ 1
+          → RawOne {t} {π} {NP} {NI} a′ i CI rg′
+  raw-one e [] _ _ ()
+  raw-one {a′ = a′} {i} e (_∷_ {r′ = r′} {rs′ = rs′} (read~ {i = j} hk pr refl) q) (_ ∷ ab) (_ ∷ us) z =
+    raw-cons (chains-skip a′ (sameSource-no (λ x → raw≢stamped i j (trans (sym e) x))))
+             (raw-one e q ab us (trans (sym (count-pass _ r′ rs′ (sameSource-no (raw≢stamped i j)))) z))
+  raw-one {a′ = a′} {i} e (_∷_ {r′ = r′} {rs′ = rs′} (cold~ sp ib pr refl) q) (ab₀ ∷ ab) (_ ∷ us) z =
+    raw-cons (chains-skip a′ (sameSource-no (λ x → <⇒≢ (<-≤-trans (raw<ₙ i) (above-≤ ab₀)) (trans (sym e) x))))
+             (raw-one e q ab us (trans (sym (count-pass _ r′ rs′ (sameSource-no (<⇒≢ (<-≤-trans (raw<ₙ i) (above-≤ ab₀)))))) z))
+  raw-one {a′ = a′} {i} e (_∷_ {r′ = r′} {rs′ = rs′} (defer~ sp pi lnP lnI pr refl) q) (ab₀ ∷ ab) (_ ∷ us) z =
+    raw-cons (chains-skip a′ (sameSource-no (λ x → <⇒≢ (<-≤-trans (raw<ₙ i) (above-≤ ab₀)) (trans (sym e) x))))
+             (raw-one e q ab us (trans (sym (count-pass _ r′ rs′ (sameSource-no (<⇒≢ (<-≤-trans (raw<ₙ i) (above-≤ ab₀)))))) z))
+  raw-one {a′ = a′} {i} e (mach {r′ = r′} {rs′ = rs′} (hot~ {i = j} hot ib refl) q) (_ ∷ ab) (u₀ ∷ us) z with j ≟ᶠ i
+  ... | no ne =
+    raw-cons (chains-skip a′ (sameSource-no (λ x → ne′ (trans (sym e) x))))
+             (raw-one e q ab us (trans (sym (count-pass _ r′ rs′ (sameSource-no ne′))) z))
+    where
+      ne′ : toℕ (i ↑ˡ n) ≢ toℕ (j ↑ˡ n)
+      ne′ x = ne (toℕ-injective (trans (sym (toℕ-↑ˡ j n)) (trans (sym x) (toℕ-↑ˡ i n))))
+  ... | yes refl with plainᵗ (lookup Γ i) ≟ᵗ arrTy a′
+  ...   | yes ety with chains-slot a′ {i = i ↑ˡ n} e ety
+  ...     | c , h , d = raw-at hot (trans h (cong (_ ∷_) none)) d ib u₀
+    where
+      none = raw-none a′ rs′ (subst (λ k → srcCount k rs′ ≡ 0) (sym e) (suc-injective (trans (sym (count-hit (toℕ (i ↑ˡ n)) r′ rs′ (same-refl (toℕ (i ↑ˡ n))))) z)))
+  raw-one {a′ = a′} {i} e (mach {r′ = r′} {rs′ = rs′} (hot~ {i = j} hot ib refl) q) (_ ∷ ab) (u₀ ∷ us) z | yes refl | no ¬e =
+    raw-mistyped (λ x → ¬e (sym x)) (trans (chains-mistyped a′ ¬e) none)
+    where
+      none = raw-none a′ rs′ (subst (λ k → srcCount k rs′ ≡ 0) (sym e) (suc-injective (trans (sym (count-hit (toℕ (i ↑ˡ n)) r′ rs′ (same-refl (toℕ (i ↑ˡ n))))) z)))
+
+-- a type is read back off its plain translation
+unplainᵗ : Ty → Ty
+unplainᵗ unitᵗ     = unitᵗ
+unplainᵗ boolᵗ     = boolᵗ
+unplainᵗ natᵗ      = natᵗ
+unplainᵗ uniqᵗ     = uniqᵗ
+unplainᵗ (s ×ᵗ t)  = unplainᵗ s ×ᵗ unplainᵗ t
+unplainᵗ (s +ᵗ t)  = unplainᵗ s +ᵗ unplainᵗ t
+unplainᵗ (listᵗ t) = listᵗ (unplainᵗ t)
+unplainᵗ (obs (listᵗ (_ +ᵗ (a +ᵗ _)) ×ᵗ _)) = obs (unplainᵗ a)
+unplainᵗ (obs x)   = obs x
+
+unplain-plain : ∀ t → unplainᵗ (plainᵗ t) ≡ t
+unplain-plain unitᵗ     = refl
+unplain-plain boolᵗ     = refl
+unplain-plain natᵗ      = refl
+unplain-plain uniqᵗ     = refl
+unplain-plain (s ×ᵗ t)  = cong₂ _×ᵗ_ (unplain-plain s) (unplain-plain t)
+unplain-plain (s +ᵗ t)  = cong₂ _+ᵗ_ (unplain-plain s) (unplain-plain t)
+unplain-plain (listᵗ t) = cong listᵗ (unplain-plain t)
+unplain-plain (obs t)   = cong obs (unplain-plain t)
+
+plainᵗ-inj : ∀ {s t} → plainᵗ s ≡ plainᵗ t → s ≡ t
+plainᵗ-inj {s} {t} e = trans (sym (unplain-plain s)) (trans (cong unplainᵗ e) (unplain-plain t))
+
+-- a popped arrival carries its source's number and type
+head-source : ∀ {k} {Δ : Ctx k} (l : LiveSource Δ) {a l₂} → schedHeadOf l ≡ inj₂ (a , l₂)
+            → Arrival.source a ≡ LiveSource.source l
+head-source l eq with LiveSource.pending l
+head-source l refl | _ ∷ _ = refl
+
+head-elem : ∀ {k} {Δ : Ctx k} (l : LiveSource Δ) {a l₂} → schedHeadOf l ≡ inj₂ (a , l₂)
+          → arrTy a ≡ LiveSource.elemTy l
+head-elem l eq with LiveSource.pending l
+head-elem l refl | _ ∷ _ = refl
+
+-- no chain, no step
+casc-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a vs fin s} {st : EvalSt e} {r}
+           → cascadeGo⇓ a vs fin [] s st r → r ≡ ([] , s , st)
+casc-empty casc-nil = refl
+
+module _ {n} {Γ : Ctx n} (κ : Kinds n) where
+
+  -- a slot's source holds its script's values, at the plain type
+  src-plain : ∀ {l l′} → Src {Γ = Γ} κ l l′ → LiveSource.source l < n → LiveSource.elemTy l′ ≡ plainᵗ (LiveSource.elemTy l)
+  src-plain (data~ eq _) _   = eq
+  src-plain (defer~ lt _) lt′ = ⊥-elim (<-asym lt lt′)
+
+  -- so a slot's arrival on the impl side is at the plain type of the plain one's
+  head-ety : ∀ {l l′ a a′} {i : Fin n} → Src {Γ = Γ} κ l l′ → HeadOf l a → HeadOf l′ a′
+           → Arrival.source a ≡ toℕ i → arrTy a′ ≡ plainᵗ (arrTy a)
+  head-ety {l} {l′} {i = i} src (_ , h) (_ , h′) e =
+    trans (head-elem l′ h′)
+          (trans (src-plain src (subst (_< n) (trans (sym e) (head-source l h)) (toℕ<n i)))
+                 (cong plainᵗ (sym (head-elem l h))))
+
+-- A HOT ARRIVAL'S IMPL CHAINS: none, and no plain reader either, until
+-- the share has connected; then the one raw row's, whose step is the
+-- input block's run
+hot-start : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+              {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+          → (S : Store κ sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+          → lookup κ i ≡ hotᵏ
+          → ∀ {l l′} → Src κ l l′ → HeadOf l a → HeadOf l′ a′
+          → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+          → ∀ {oI sI₁ stI₁}
+          → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) sI stI (oI , sI₁ , stI₁)
+          → HotStart κ S a a′ i oI sI₁ stI₁
+hot-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src h h′ e₁ e₂ {oI} {sI₁} {stI₁} go
+  with Store.census S i hk
+... | inj₂ (z₁ , z₂) =
+  hot-idle (plain-none {Γ = Γ} κ e₁ (Store.rows S) (proj₁ (Store.above S)) z₂)
+           (casc-empty (subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁))
+                              (raw-none a′ (EvalSt.registry stI) (subst (λ k → srcCount k (EvalSt.registry stI) ≡ 0) (sym e₂) z₁)) go))
+... | inj₁ c with raw-one {Γ = Γ} κ {CI = EvalSt.cancelled stI} e₂ (Store.rows S) (proj₂ (Store.above S)) (proj₂ (Store.uncut S)) c
+...   | raw-mistyped ne none =
+  hot-idle (plain-mistyped {Γ = Γ} κ e₁ (λ x → ne (trans (head-ety {Γ = Γ} κ src h h′ e₁) (cong plainᵗ x))) (Store.rows S) (proj₁ (Store.above S)))
+           (casc-empty (subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) none go))
+...   | raw-at hot ch d ib u
+  with subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) ch go
+...     | casc-cut y _ = ⊥-elim (clash (trans (sym y) u))
+...     | casc-live _ d′ casc-nil =
+  subst (λ o → HotStart κ S a a′ i o sI₁ stI₁) (sym (++-identityʳ _))
+        (hot-block κ S hot (head src h h′ e₁ e₂)
+                   (plainᵗ-inj (trans (sym (head-ety {Γ = Γ} κ src h h′ e₁)) (cong (λ r → proj₁ (proj₂ (proj₂ r))) d)))
+                   d ib d′)

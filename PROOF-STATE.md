@@ -258,7 +258,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
   chain is `path-pass`, one arm per plain frame; a hot slot's is `fan-go` over
-  the share's readers, paired by the proven `slot-chains`. Both ends drop
+  the share's readers, paired by the proven `slot-chains`, after `hot-start`
+  finds the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store` and `hot-finish` are proven. Left: the arms as real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
   `inner-arm` once `Arm` carries an impl-only step; the monster drops to
@@ -296,9 +297,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   a shared slot's subject fans out to related readers on both sides.
 - **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits
   sent to the root read as the plain group's values.
-- **`hot-start`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a hot arrival's
-  one impl chain runs its input block alone and hands the share one emit
-  carrying the value, at the slot's type; past the typechecker at a real pop.
+- **`hot-block`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a connected hot
+  slot's raw row steps its input block alone and hands the share one emit
+  carrying the value; the plain side does not move.
 - **`read-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a slot reader's
   restamp moves the impl alone and keeps the emit's values.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
