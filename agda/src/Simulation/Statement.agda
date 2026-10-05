@@ -436,14 +436,14 @@ hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
   with hot-start κ (pop-store κ s ex ex′ sy) {a} {a′} {i} hk src h h′ e₁ e₂ go′
-... | hot-start-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-more {emits = em} g walk-nil)) refl =
+... | hot-start-at {oB = oB} {sI₂ = sI₂} {εI = εI} {ty = ty} A c (disp (walk-more {emits = em} g walk-nil)) refl =
   After.store Z ,
   subst (λ z → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ z) (readᴾ oP))
         (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z))
   where
     Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
-          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI {κ = κ} (After.store A))))
+          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI {κ = κ} {sI = sI₂} (After.store A))))
           go g)
 ... | hot-idle none refl with casc-empty (subst (λ c → cascadeGo⇓ a _ false c _ _ _) none go)
 ...   | refl = pop-store κ s ex ex′ sy , []
@@ -507,14 +507,14 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll�
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
   with hot-end-start κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ end′
-...   | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
+...   | hot-end-at {oB = oB} {sI₂ = sI₂} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
   hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ (cascade-latched end′ {toℕ (i ↑ˡ n)} (close-hit a′ stI₁ e₂)) {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
     S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
     Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
-          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI {κ = κ} (After.store A))))
+          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI {κ = κ} {sI = sI₂} (After.store A))))
           end g)
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
 ...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd) {a} {a′} {i}
