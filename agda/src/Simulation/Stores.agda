@@ -53,7 +53,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; 
 open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeState; NodeId; Path; RegRow; RegSrc; atSlot; atDyn; root; share-sink;
   _↠[_]_; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; mergeAllᵒ; cell-st;
   take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st; echoᵗ; lookupNode; memberSource;
-  takeVals; scanVals; regSource; sameSource)
+  takeVals; scanVals; regSource; sameSource; pathHasNode)
 open import Rx.Evaluator.Domain using (flatOp)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; slotTy; hotᵏ; sharedᵏ)
 open import SExp.Plain   using (plainExp)
@@ -488,6 +488,24 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         × (lookup κ i ≡ sharedᵏ → memberSource (toℕ i) CP ≡ memberSource (toℕ (n ↑ʳ i)) CI
                                  × memberSource (toℕ i) SP ≡ memberSource (toℕ (n ↑ʳ i)) SI)
 
+-- the inner a path's input block rides, if it starts with one
+blockInner : ∀ {m} {Δ : Ctx m} {lo s u} → Path Δ lo s u → Maybe NodeId
+blockInner (map-f _ ↠[ _ ] (from-inner mergeAllᵒ _ j ↠[ _ ] _)) = just j
+blockInner _                                                     = nothing
+
+-- AN INPUT BLOCK'S INNER IS ITS OWN ROW'S, AND NO OTHER ROW THREADS IT.
+-- The inner is minted at the read's subscribe, which registers the one
+-- row of the script it reads, and a row registered later starts at its
+-- own source, below the block.  It is what lets the row's end leave the
+-- block: the inner's finish finds nothing alive through it.  Stamped
+-- slots are exempt, since a reader's path is a restamp, and one inside a
+-- deferred body leads with the hop's merge, which many rows thread
+Owned : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} → List (RegRow (plainᵏ Γ κ) (emitᵗ t)) → Set
+Owned {n} κ K =
+  All (λ r → (∀ (k : Fin n) → proj₁ (proj₂ r) ≡ atSlot (n ↑ʳ k) → ⊥)
+           → ∀ {j} → blockInner (proj₂ (proj₂ (proj₂ r))) ≡ just j
+           → All (λ r′ → pathHasNode j (proj₂ (proj₂ (proj₂ r′))) ≡ true → r′ ≡ r) K) K
+
 ------------------------------------------------------------------
 -- The stores
 ------------------------------------------------------------------
@@ -530,6 +548,8 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     census  : ∀ i → lookup κ i ≡ hotᵏ → Census (toℕ (i ↑ˡ n)) (toℕ (n ↑ʳ i)) (EvalSt.registry stI)
                                           (memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI))
                                           (memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI))
+    -- each input block's inner, its own row's
+    owned   : Owned {Γ = Γ} κ (EvalSt.registry stI)
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other

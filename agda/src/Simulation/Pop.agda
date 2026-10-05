@@ -141,4 +141,5 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; uncut    = mapᵃ (λ _ → refl) (proj₁ (Store.uncut s)) , mapᵃ (λ _ → refl) (proj₂ (Store.uncut s))
     ; above    = Store.above s
     ; census   = Store.census s
+    ; owned    = Store.owned s
     }

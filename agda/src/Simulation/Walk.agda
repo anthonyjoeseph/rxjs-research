@@ -228,6 +228,7 @@ init-store κ {t} e ins μ big = record
   ; uncut   = [] , []
   ; above   = [] , []
   ; census  = λ _ _ → inj₂ (refl , refl , λ ())
+  ; owned   = []
   }
 
 -- THE IMPL'S ROOT SUBSCRIBE IS ITS MINT'S BODY'S, at the token the mint

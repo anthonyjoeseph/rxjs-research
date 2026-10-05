@@ -92,7 +92,7 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
           → Store κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
 delivered s = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; census = census }
+  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; census = census ; owned = owned }
   where open Store s
 
 -- the arrival's pair against the rows is as it was, since the rows are

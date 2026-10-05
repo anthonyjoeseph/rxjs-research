@@ -19,7 +19,7 @@ open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_) renaming (map to pw-map)
 open import Data.List.Relation.Binary.Subset.Propositional using (_⊆_)
-open import Data.List.Relation.Unary.All using (All; _∷_; [])
+open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
@@ -39,7 +39,7 @@ open import Data.Vec     using (lookup)
 open import Simulation.Chains using (sameSource-lt; sameSource-no; same-refl; count-hit; count-pass)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
-open import Simulation.Stores using (srcCount; Census; LatchRel; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr)
+open import Simulation.Stores using (srcCount; Census; LatchRel; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr; Owned)
   renaming (here to sp-here; there to sp-there)
 
 ------------------------------------------------------------------
@@ -324,6 +324,10 @@ close-hit a st {k} refl = cong (_∨ any (sameSource k) (EvalSt.completedSources
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
+  -- a drop keeps every surviving block's inner its own row's
+  owned-drop : ∀ {t} s {K : List (RegRow (plainᵏ Γ κ) (emitᵗ t))} → Owned {Γ = Γ} κ K → Owned {Γ = Γ} κ (dropSource s K)
+  owned-drop s o = all-drop s (mapᵃ (λ f u {j} b → all-drop s (f u {j} b)) o)
+
   finish-go : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                 {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {s s′ u u′}
             → (S : Store κ sP stP sI stI) → n < s → n + n < s′ → Arr S s s′ u u′
@@ -331,7 +335,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                       (record stP { registry = dropSource s (EvalSt.registry stP) })
                       (record sI { live = sweepL (guardOf (dropSource s′ (EvalSt.registry stI))) (Sched.live sI) })
                       (record stI { registry = dropSource s′ (EvalSt.registry stI) })
-  finish-go {stP = stP} {stI = stI} {s} {s′} S na na′ ar = record
+  finish-go {t} {stP = stP} {stI = stI} {s} {s′} S na na′ ar = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals
     ; sources = sweepL-pw sources pw
     ; numbers = sweepL-pw numbers pw
@@ -345,6 +349,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; swept = sweepL-pw pw pw
     ; uncut = all-drop s (proj₁ uncut) , all-drop s′ (proj₂ uncut)
     ; above = all-drop s (proj₁ above) , all-drop s′ (proj₂ above)
+    ; owned = owned-drop {t = t} s′ {K = EvalSt.registry stI} owned
     ; census = λ i h → census-drop s′ (EvalSt.registry stI) (mach-lt {Γ = Γ} κ i na′)
                          (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ʳ n i)) (+-monoʳ-< n (toℕ<n i))) na′))
                          (census i h)
@@ -550,7 +555,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    (record sI { live = sweepL (guardOf (drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (EvalSt.registry stI)))
                                           (sweepL (guardOf (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI))) (Sched.live sI)) })
                    (record stI { registry = drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (EvalSt.registry stI) })
-  hot-go {stP = stP} {stI = stI} S i dn = record
+  hot-go {t} {stP = stP} {stI = stI} S i dn = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals
     ; sources = sweepL-pw (sweepL-pw sources A) A′
     ; numbers = sweepL-pw (sweepL-pw numbers A) A′
@@ -566,6 +571,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; uncut = all-drop (toℕ i) (proj₁ uncut) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ uncut))
     ; above = all-drop (toℕ i) (proj₁ above) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ above))
     ; census = hot-census
+    ; owned = owned-drop {Γ = Γ} κ {t = t} (toℕ (i ↑ˡ n)) {K = dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)} (owned-drop {Γ = Γ} κ {t = t} (toℕ (n ↑ʳ i)) {K = EvalSt.registry stI} owned)
     }
     where
       open Store S
@@ -605,7 +611,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
-    ; latches = lat ; census = cen }
+    ; latches = lat ; census = cen ; owned = owned }
     where
       open Store S
       CP = EvalSt.completedSources stP
