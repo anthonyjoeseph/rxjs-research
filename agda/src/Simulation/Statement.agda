@@ -580,8 +580,9 @@ finish-run a s st ()   | true
 -- Uniform seeds 1-5 and one aimed sweep per policy at depth 4, fuel 30
 -- (`QC_DRAW`, seeds 11-16: switch, exhaust, bounded merge, a hot share,
 -- valueless fan steps, a μ; 80 programs each, every one with a flatten)
--- held at every boundary.  Thin where an arrival carries values: from 6
--- of 80 programs (switch) to 34 (hot).
+-- held at every boundary, as did two aimed at arrivals carrying values
+-- (leaves on the scripted slot, two-arrival scripts; seed 21 at depth 4,
+-- 82 of 150 with such an arrival, seed 22 at depth 5, 51 of 80).
 cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
   → Storeʳ κ sP stP sI stI

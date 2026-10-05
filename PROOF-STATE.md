@@ -255,13 +255,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **AIM THE STORE PROBE AT ARRIVALS.** `make qc-store` aimed by `QC_DRAW`
-  at each policy, a hot share, valueless steps and a μ (seeds 11–16, 480
-  programs, depth 4) held `Store` at every boundary: no one policy's cascade
-  breaks it there. Thin where it counts: 6 to 34 of 80 put values on an
-  arrival. Next: leaves weighted to the scripted slot, two-arrival scripts,
-  depth 5; a red goes through `make qc-shrink` to a refutation. Then decide
-  the closure relations the decider leaves unread.
+- **DECIDE THE STORE'S CLOSURES.** `make qc-store`, aimed by `QC_DRAW` at
+  each policy, a hot share, valueless steps, a μ and arrivals carrying
+  values (seeds 11–16 and 21–22, 710 programs, depth ≤ 5) held `Store` at
+  every boundary: no cascade there breaks the fields it reads. Unread: the
+  closure relations and both rules, which is where the stores can still
+  part. Next: decide them in `CLI.Store-Check`, and a red through
+  `make qc-shrink` to a refutation.
 
 - **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
   merge and an exhaust decide alike off related nodes, a node neither can
