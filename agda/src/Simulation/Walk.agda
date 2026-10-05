@@ -17,17 +17,22 @@ module Simulation.Walk where
 
 open import Data.List    using (List; []; _∷_; map; concat)
 open import Data.List.Relation.Unary.AllPairs using ([])
-open import Data.Nat     using (ℕ; suc; _+_)
+open import Data.Fin.Properties using (toℕ<n)
+open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to mapᵃ)
+open import Data.List.Relation.Unary.All.Properties using (map⁺; concat⁺; tabulate⁺)
+open import Data.Nat     using (ℕ; suc; _+_; _<_)
+open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import Rx.Prim      using (Id)
+open import Rx.Prim      using (Id; hot; cold)
 open import Rx.Exp       using (FlatOp)
 open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ)
-open import Rx.Mint      using (Mint; setAt; sourceᵏ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Path; root; sched-init; st-init)
+open import Rx.Mint      using (Mint; setAt; sourceᵏ; counter)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Path; root; sched-init; st-init; mkHot)
+open import Rx.Slots     using (Slots; scripted; shared)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
@@ -175,13 +180,24 @@ postulate
 postulate
   renExp-id : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (x : Exp Γ Δᵍ Δ Θ t) → renExp (λ y → y) (λ y → y) (λ y → y) x ≡ x
 
+-- the hot scripts a slot table starts live are numbered by their slots
+mkHot-below : ∀ {n} {Γ : Ctx n} (ins : Slots Γ) (i : Fin n) → All (λ l → LiveSource.source l < n) (mkHot ins i)
+mkHot-below ins i with ins i
+... | scripted (hot async) = toℕ<n i ∷ []
+... | scripted (cold _ _)  = []
+... | shared _             = []
+
+init-below : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → All (_< n) (map LiveSource.source (Sched.live (sched-init e ins)))
+init-below e ins = map⁺ (concat⁺ (tabulate⁺ (mkHot-below ins)))
+
 -- BEFORE ANYTHING IS SUBSCRIBED THE STORES ARE EMPTY, and the impl's
 -- mint touches only the counter, which the relation does not read.
 init-store : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) (μ : Mint)
+           → n + n < counter μ sourceᵏ
            → Store κ (sched-init (plainExp e) (plainSlots ins)) (st-init (plainExp e))
                      (record (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)) { mint = μ })
                      (st-init (elaborateImpl κ e))
-init-store κ e ins μ = record
+init-store κ e ins μ big = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
@@ -193,12 +209,15 @@ init-store κ e ins μ = record
   ; latches = λ _ → (λ _ → refl) , (λ _ → refl , refl)
   ; wfᴾ     = λ _ ()
   ; wfᴵ     = λ _ ()
+  ; bounded = mapᵃ (λ lt → <-trans lt (n<1+n _)) (init-below (plainExp e) (plainSlots ins))
+            , mapᵃ (λ lt → <-trans lt big) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
+  ; uncut   = [] , []
   }
 
 -- THE IMPL'S ROOT SUBSCRIBE IS ITS MINT'S BODY'S, at the token the mint
 -- drew: the frame the elaboration closes over.
 minted : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
-       → Σ ℕ λ src →
+       → Σ ℕ λ src → n + n < src ×
          subscribeE⇓ {e = elaborateImpl κ e}
            (uniqᵗ ∷ [] , renExp (λ x → x) (λ x → x) (λ x → x) (toInstEmit κ e) , src ∷ᵉ []ᵉ) (root {lo = n + n}) 0
            (record (sched-init (elaborateImpl κ e) (embedSlotsImpl ins))
@@ -210,12 +229,12 @@ minted {n} κ e ins = go (proj₁ (Σ⁰.snd⁰ (subscribe! (elaborateImpl κ e)
 
   go : ∀ {rI} → subscribeE⇓ {e = elaborateImpl κ e} ([] , elaborateImpl κ e , []ᵉ) (root {lo = n + n}) 0
                     sI (st-init (elaborateImpl κ e)) rI
-     → Σ ℕ λ src →
+     → Σ ℕ λ src → n + n < src ×
        subscribeE⇓ {e = elaborateImpl κ e}
          (uniqᵗ ∷ [] , renExp (λ x → x) (λ x → x) (λ x → x) (toInstEmit κ e) , src ∷ᵉ []ᵉ) (root {lo = n + n}) 0
          (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) (st-init (elaborateImpl κ e)) rI
-  go {rI} (subs-mint {src = src} _ dI) =
-    src , subst (λ E → subscribeE⇓ {e = elaborateImpl κ e} (uniqᵗ ∷ [] , E , src ∷ᵉ []ᵉ) (root {lo = n + n}) 0
+  go {rI} (subs-mint {src = src} fresh dI) =
+    src , ≤-reflexive fresh , subst (λ E → subscribeE⇓ {e = elaborateImpl κ e} (uniqᵗ ∷ [] , E , src ∷ᵉ []ᵉ) (root {lo = n + n}) 0
                          (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) (st-init (elaborateImpl κ e)) rI)
                 (sym (renExp-id (toInstEmit κ e))) dI
 
@@ -229,5 +248,5 @@ root-walk : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (in
                       (readᴵ (proj₁ (Σ⁰.fst⁰ (subscribe! (elaborateImpl κ e) (embedSlotsImpl ins)))))
                       (readᴾ (proj₁ (Σ⁰.fst⁰ (subscribe! (plainExp e) (plainSlots ins)))))
 root-walk κ e ins =
-  walk κ e (λ x → x) (λ ()) (init-store κ e ins _) root~
-       (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp e) (plainSlots ins)))) (proj₂ (minted κ e ins))
+  walk κ e (λ x → x) (λ ()) (init-store κ e ins _ (<-trans (proj₁ (proj₂ (minted κ e ins))) (n<1+n _))) root~
+       (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp e) (plainSlots ins)))) (proj₂ (proj₂ (minted κ e ins)))

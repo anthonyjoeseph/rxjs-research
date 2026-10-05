@@ -33,6 +33,7 @@ open import Data.List    using (List; []; _∷_; _++_; map; concatMap; length; d
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-map⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
+open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -43,6 +44,7 @@ open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans; cong)
 
+open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Prim      using (InstEmit; Tick; Source)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Env; Closed; lookupEnv;
   Ren∈; renExp; FnClo; applyClo; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; varᵗ; unit̂; pairᵗ; inlᵗ;
@@ -68,6 +70,12 @@ open import Batchable.Inst-Extract using (emitValues)
 data SrcNum {n} (κ : Kinds n) : Source → Source → Set where
   slot~ : ∀ i → lookup κ i ≡ hotᵏ → SrcNum κ (toℕ i) (toℕ (i ↑ˡ n))
   dyn~  : ∀ {s s′} → n < s → n + n < s′ → SrcNum κ s s′
+
+-- an arrival's pair of sources against one pair of rows' sources: the
+-- arrival is the row's exactly when it is the partner's, and then the
+-- element types are the rows'
+ArrRel : Source → Source → Ty → Ty → Source → Source → Ty → Ty → Set
+ArrRel s s′ u u′ src src′ x x′ = (s ≡ src → s′ ≡ src′ × u ≡ x × u′ ≡ x′) × (s′ ≡ src′ → s ≡ src)
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -410,6 +418,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         partner-row (r ∷ q)    (inj₂ p)             = partner-row q p
         partner-row (mach _ q) p                    = partner-row q p
 
+        -- the same, at every minted source's row the registries pair
+        ArrRows : ∀ {rs rs′} → RegRel rs rs′ → Source → Source → Ty → Ty → Set
+        ArrRows []                                                                  s s′ u u′ = ⊤
+        ArrRows (read~ _ _ _ ∷ q)                                                   s s′ u u′ = ArrRows q s s′ u u′
+        ArrRows (cold~ {src = src} {src′ = src′} {s = x} _ _ _ _ ∷ q)               s s′ u u′ =
+          ArrRel s s′ u u′ src src′ x (plainᵗ x) × ArrRows q s s′ u u′
+        ArrRows (defer~ {src = src} {src′ = src′} {u = x} _ _ _ _ _ _ ∷ q)          s s′ u u′ =
+          ArrRel s s′ u u′ src src′ (echoᵗ x) (echoᵗ (emitᵗ x)) × ArrRows q s s′ u u′
+        ArrRows (mach _ q)                                                          s s′ u u′ = ArrRows q s s′ u u′
+
   -- the completion and connection latches, slot for stamped slot
   LatchRel : (CP SP CI SI : List Source) → Set
   LatchRel CP SP CI SI =
@@ -462,3 +480,22 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
                                      (EvalSt.completedSources stI) (EvalSt.connectedShares stI)
     wfᴾ     : WF (EvalSt.registry stP) (EvalSt.nodes stP)
     wfᴵ     : WF (EvalSt.registry stI) (EvalSt.nodes stI)
+    -- every live source was minted: below its run's counter
+    bounded : All (_< counter (Sched.mint sP) sourceᵏ) (map LiveSource.source (Sched.live sP))
+            × All (_< counter (Sched.mint sI) sourceᵏ) (map LiveSource.source (Sched.live sI))
+    -- a registration still in the registry is not a cascade's victim
+    uncut   : All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) (EvalSt.registry stP)
+            × All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) (EvalSt.registry stI)
+
+-- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
+-- source's row is the arrival's exactly when its partner is the other
+-- arrival's, and both sources were minted before the stores' counters.
+-- It is the pairing a cascade's second walk needs, and it is not part of
+-- a store: it names an arrival.
+record Arr {n} {Γ : Ctx n} {κ : Kinds n} {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+           (S : Store κ sP stP sI stI) (s s′ : Source) (u u′ : Ty) : Set where
+  field
+    boundP : s < counter (Sched.mint sP) sourceᵏ
+    boundI : s′ < counter (Sched.mint sI) sourceᵏ
+    rows   : ArrRows κ (Store.π S) _ _ _ _ (Store.rows S) s s′ u u′

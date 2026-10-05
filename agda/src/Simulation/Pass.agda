@@ -45,7 +45,7 @@ open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; EmitRel; Lifts; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
-  outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store)
+  outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
 open import Simulation.Walk using (readᴾ; readᴵ)
 
 readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
@@ -92,8 +92,15 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
           → Store κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
 delivered s = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-  ; sync = sync ; rows = rows ; latches = latches ; wfᴾ = wfᴾ ; wfᴵ = wfᴵ }
+  ; sync = sync ; rows = rows ; latches = latches ; wfᴾ = wfᴾ ; wfᴵ = wfᴵ ; bounded = bounded ; uncut = uncut }
   where open Store s
+
+-- the arrival's pair against the rows is as it was, since the rows are
+delivered-arr : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                  {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+                  {S : Store κ sP stP sI stI} {x y s s′ u u′}
+              → Arr S s s′ u u′ → Arr (delivered S {x} {y}) s s′ u u′
+delivered-arr ar = record { boundP = boundP ; boundI = boundI ; rows = rows } where open Arr ar
 
 -- A PLAIN CHAIN AT A SLOT AND THE REGISTRATION THE ELABORATION READ IT THROUGH:
 -- the stamped slot's share fans out to exactly the rows the plain run walks
@@ -147,8 +154,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       → PairedR (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) x x′
       → PairedR (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) x x′
 
+    -- the popped arrival's pair against the rows stays as it was
+    Persists : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁}
+             → St sP stP sI stI → St sP₁ stP₁ sI₁ stI₁ → Set
+    Persists S S₁ = ∀ {s s′ u u′} → Arr S s s′ u u′ → Arr S₁ s s′ u u′
+
     -- WHAT A PASS KEEPS: related stores after, the unreached chains
-    -- paired, and related values sent rootward
+    -- paired, the arrival's pair against the rows, and related values
+    -- sent rootward
     record After {sP stP sI stI} (S : St sP stP sI stI)
                  (rP : Stream Γ t × Sched Γ × EvalSt ep)
                  (rI : Stream (plainᵏ Γ κ) (emitᵗ t) × Sched (plainᵏ Γ κ) × EvalSt ei) : Set where
@@ -156,14 +169,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       field
         store  : Store κ (proj₁ (proj₂ rP)) (proj₂ (proj₂ rP)) (proj₁ (proj₂ rI)) (proj₂ (proj₂ rI))
         keeps  : Keeps S store
+        persists : Persists S store
         values : Pointwise (λ x w → V κ t (proj₂ x) w) (readᴵ (proj₁ rI)) (readᴾ (proj₁ rP))
 
     -- one pass, then another from where it left the stores
     _⨾_ : ∀ {sP stP sI stI} {S : St sP stP sI stI} {o₁ sP₁ stP₁ i₁ sI₁ stI₁ rP rI}
         → (A : After S (o₁ , sP₁ , stP₁) (i₁ , sI₁ , stI₁)) → After (After.store A) rP rI
         → After S (o₁ ++ proj₁ rP , proj₂ rP) (i₁ ++ proj₁ rI , proj₂ rI)
-    _⨾_ {o₁ = o₁} {i₁ = i₁} {rP = rP} {rI = rI} (after _ k₁ v₁) (after s₂ k₂ v₂) =
-      after s₂ (λ {a} {a′} x → k₂ {a} {a′} (k₁ {a} {a′} x))
+    _⨾_ {o₁ = o₁} {i₁ = i₁} {rP = rP} {rI = rI} (after _ k₁ q₁ v₁) (after s₂ k₂ q₂ v₂) =
+      after s₂ (λ {a} {a′} x → k₂ {a} {a′} (k₁ {a} {a′} x)) (λ ar → q₂ (q₁ ar))
         (subst₂ (Pointwise (λ x w → V κ t (proj₂ x) w)) (sym (readᴵ-++ i₁ (proj₁ rI))) (sym (readᴾ-++ o₁ (proj₁ rP)))
                 (++⁺ v₁ v₂))
 
@@ -256,7 +270,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     mutual
       path-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Pass p q
-      path-pass S root~ b (fold-root {fin = fin}) fold-root = after S (λ x → x) (root-values b fin)
+      path-pass S root~ b (fold-root {fin = fin}) fold-root = after S (λ x → x) (λ x → x) (root-values b fin)
       path-pass S r@(sink~ sh) b dP dI = sink-pass sh S r b dP dI
       path-pass S (map~ L r) b (fold-step step-map dP) (fold-step step-map dI) = path-pass S r (carries-map L b) dP dI
       path-pass S r@(scan~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (scan-arm S r b d dI) dP
@@ -336,7 +350,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- the same pass, started from the store as it stood before the row was marked
     rebase : ∀ {sP stP sI stI x y rP rI} {S : St sP stP sI stI}
            → After (delivered S {x} {y}) rP rI → After S rP rI
-    rebase (after s k v) = after s k v
+    rebase (after s k q v) = after s k (λ ar → q (delivered-arr ar)) v
 
     -- A SHARE'S FAN-OUT AGAINST THE PLAIN CASCADE OVER THE SAME READERS,
     -- one reader at a time: the plain chain and the admitted row it is
@@ -350,7 +364,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            → cascadeGo⇓ a vs fin chs sP stP (oP , sP₁ , stP₁)
            → shareGo⇓ now (n ↑ʳ i) es fin adm sI stI (oI , sI₁ , stI₁)
            → After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁)
-    fan-go S εI c ta [] casc-nil go-nil = after S (λ x → x) []
+    fan-go S εI c ta [] casc-nil go-nil = after S (λ x → x) (λ x → x) []
     fan-go S εI c ta (slotpair (inj₁ _) ∷ ps) (casc-cut _ g) (go-cut _ g′) = fan-go S εI c ta ps g g′
     fan-go S εI c ta (slotpair (inj₁ (x , _)) ∷ _) (casc-live y _ _) _ = ⊥-elim (clash (trans (sym x) y))
     fan-go S εI c ta (slotpair (inj₁ (_ , x)) ∷ _) (casc-cut _ _) (go-live y _ _) = ⊥-elim (clash (trans (sym x) y))

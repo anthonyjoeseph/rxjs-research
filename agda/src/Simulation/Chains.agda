@@ -9,10 +9,11 @@
 module Simulation.Chains where
 
 open import Data.Bool    using (true; false; T)
+open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥-elim)
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_) renaming (map to pw-map)
-open import Data.List.Relation.Unary.All using (All; _∷_)
+open import Data.List.Relation.Unary.All using (All; _∷_; [])
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Nat     using (_+_; _<_; _≡ᵇ_; _≟_)
@@ -25,13 +26,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Exp       using (Ctx; Closed; _≟ᵗ_)
-open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegRow; RegSrc; atDyn; regSource; regFloor; Path;
+open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegId; RegRow; RegSrc; atDyn; regSource; regFloor; Path;
   arrSource; arrTy; chainsGo; chainsOf; sameSource; schedGo; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Pass using (dynRow; clash)
+open import Simulation.Pass using (dynRow; clash; Paired)
 open import Simulation.Pop using (pp-popped)
 open import Simulation.Schedules using (Popped; pop; sched-pop)
-open import Simulation.Stores using (Src; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; Store)
+open import Simulation.Stores using (Src; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr)
   renaming (here to sp-here; there to sp-there)
 
 -- a source number that sits under another is not it
@@ -104,38 +105,85 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     take : ∀ c c′ → chainsGo a (r ∷ rest) ≡ c ∷ chainsGo a rest → chainsGo a′ (r′ ∷ rest′) ≡ c′ ∷ chainsGo a′ rest′
          → dynRow a c ≡ r → dynRow a′ c′ ≡ r′ → RowChain a a′ r r′ rest rest′
 
-  module _ {RS : List (LiveSource Γ)} {RS′ : List (LiveSource (plainᵏ Γ κ))} {a a′}
-           (pk : SrcPair κ RS RS′ (arrSource a) (arrSource a′) (arrTy a) (arrTy a′))
-           (ua : Unique (map LiveSource.source RS)) (ua′ : Unique (map LiveSource.source RS′)) where
+  module _ {a a′} where
 
     -- two rows at partnered sources: both are the popped source's, or neither
     dyn-row : ∀ {t rid rid′ src src′ lo lo′ u u′} {p : Path Γ lo u t} {p′ : Path (plainᵏ Γ κ) lo′ u′ (emitᵗ t)} {rest rest′}
-            → SrcPair κ RS RS′ src src′ u u′
+            → ArrRel (arrSource a) (arrSource a′) (arrTy a) (arrTy a′) src src′ u u′
             → RowChain a a′ (rid , atDyn src lo , (u , p)) (rid′ , atDyn src′ lo′ , (u′ , p′)) rest rest′
-    dyn-row {src = src} sp with arrSource a ≟ src | sp-fun ua ua′ pk sp
+    dyn-row {src = src} ar with arrSource a ≟ src | ar
     ... | yes eq | f , g with f eq
     ...   | eq′ , et , et′ with chains-take a (sym eq) (sym et) | chains-take a′ (sym eq′) (sym et′)
     ...     | c , h , d | c′ , h′ , d′ = take c c′ h h′ d d′
     dyn-row sp | no ne | f , g = skip (chains-skip a (sameSource-no ne)) (chains-skip a′ (sameSource-no (λ e′ → ne (g e′))))
 
-    chains-rows : ∀ {t π NP NI rg rg′} → n < arrSource a → n + n < arrSource a′
+    chains-rows : ∀ {t π NP NI RS RS′ rg rg′} → n < arrSource a → n + n < arrSource a′
                 → (rr : RegRel κ π {t} NP NI RS RS′ rg rg′)
+                → ArrRows κ _ _ _ _ _ rr (arrSource a) (arrSource a′) (arrTy a) (arrTy a′)
                 → Pointwise (λ c c′ → Partners κ π NP NI RS RS′ rr (dynRow a c) (dynRow a′ c′)) (chainsGo a rg) (chainsGo a′ rg′)
-    chains-rows na na′ [] = []
-    chains-rows na na′ (read~ {i = i} hk pr refl ∷ q) =
+    chains-rows na na′ [] _ = []
+    chains-rows na na′ (read~ {i = i} hk pr refl ∷ q) ars =
       cons-skip (chains-skip a (sameSource-lt (<-trans (toℕ<n i) na)))
                 (chains-skip a′ (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ʳ n i)) (+-monoʳ-< n (toℕ<n i))) na′)))
-                (pw-map inj₂ (chains-rows na na′ q))
-    chains-rows na na′ (cold~ sp ib pr refl ∷ q) with dyn-row sp
-    ... | skip e e′ = cons-skip e e′ (pw-map inj₂ (chains-rows na na′ q))
-    ... | take c c′ e e′ d d′ = cons-take e e′ (inj₁ (d , d′)) (pw-map inj₂ (chains-rows na na′ q))
-    chains-rows na na′ (defer~ sp pi lnP lnI pr refl ∷ q) with dyn-row sp
-    ... | skip e e′ = cons-skip e e′ (pw-map inj₂ (chains-rows na na′ q))
-    ... | take c c′ e e′ d d′ = cons-take e e′ (inj₁ (d , d′)) (pw-map inj₂ (chains-rows na na′ q))
-    chains-rows na na′ (mach (hot~ {i = i} hot ib refl) q) =
+                (pw-map inj₂ (chains-rows na na′ q ars))
+    chains-rows na na′ (cold~ sp ib pr refl ∷ q) (ar , ars) with dyn-row ar
+    ... | skip e e′ = cons-skip e e′ (pw-map inj₂ (chains-rows na na′ q ars))
+    ... | take c c′ e e′ d d′ = cons-take e e′ (inj₁ (d , d′)) (pw-map inj₂ (chains-rows na na′ q ars))
+    chains-rows na na′ (defer~ sp pi lnP lnI pr refl ∷ q) (ar , ars) with dyn-row ar
+    ... | skip e e′ = cons-skip e e′ (pw-map inj₂ (chains-rows na na′ q ars))
+    ... | take c c′ e e′ d d′ = cons-take e e′ (inj₁ (d , d′)) (pw-map inj₂ (chains-rows na na′ q ars))
+    chains-rows na na′ (mach (hot~ {i = i} hot ib refl) q) ars =
       cons-skip refl
                 (chains-skip a′ (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ˡ i n)) (<-≤-trans (toℕ<n i) (m≤m+n n n))) na′)))
-                (chains-rows na na′ q)
+                (chains-rows na na′ q ars)
+
+  -- what a registry's rows say of a popped pair of sources, from the pair's place in the live lists
+  arr-rows : ∀ {RS : List (LiveSource Γ)} {RS′ : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′}
+           → Unique (map LiveSource.source RS) → Unique (map LiveSource.source RS′) → SrcPair κ RS RS′ s s′ u u′
+           → ∀ {t π NP NI rg rg′} (rr : RegRel κ π {t} NP NI RS RS′ rg rg′) → ArrRows κ _ _ _ _ _ rr s s′ u u′
+  arr-rows ua ua′ pk []                    = tt
+  arr-rows ua ua′ pk (read~ _ _ _ ∷ q)     = arr-rows ua ua′ pk q
+  arr-rows ua ua′ pk (cold~ sp _ _ _ ∷ q)  = sp-fun ua ua′ pk sp , arr-rows ua ua′ pk q
+  arr-rows ua ua′ pk (defer~ sp _ _ _ _ _ ∷ q) = sp-fun ua ua′ pk sp , arr-rows ua ua′ pk q
+  arr-rows ua ua′ pk (mach _ q)            = arr-rows ua ua′ pk q
+
+-- the popped pair's place in the live lists bounds both numbers by the counters
+sp-bound : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′ c}
+         → All (_< c) (map LiveSource.source LP) → SrcPair κ LP LI s s′ u u′ → s < c
+sp-bound (x ∷ _)  sp-here      = x
+sp-bound (_ ∷ ab) (sp-there q) = sp-bound ab q
+
+sp-bound′ : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′ c}
+          → All (_< c) (map LiveSource.source LI) → SrcPair κ LP LI s s′ u u′ → s′ < c
+sp-bound′ (x ∷ _)  sp-here      = x
+sp-bound′ (_ ∷ ab) (sp-there q) = sp-bound′ ab q
+
+-- THE PAIR A POP TOOK FROM IS PARTNERED AT THE STORE IT LEAVES
+arr-pop : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+            {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {s s′ u u′}
+        → (S : Store κ sP stP sI stI) → SrcPair κ (Sched.live sP) (Sched.live sI) s s′ u u′ → Arr S s s′ u u′
+arr-pop κ S pk = record
+  { boundP = sp-bound (proj₁ (Store.bounded S)) pk
+  ; boundI = sp-bound′ (proj₂ (Store.bounded S)) pk
+  ; rows   = arr-rows κ (proj₁ (Store.distinct S)) (proj₂ (Store.distinct S)) pk (Store.rows S) }
+
+-- the chains of a registry none of whose rows a list of ids has: none of the ids
+chains-rids : ∀ {n} {Δ : Ctx n} {t} (a : Arrival Δ) {P : RegId → Set} {rg : List (RegRow Δ t)}
+            → All (λ r → P (proj₁ r)) rg → All (λ c → P (proj₁ c)) (chainsGo a rg)
+chains-rids a [] = []
+chains-rids a {rg = (rid , s , (u , p)) ∷ r} (px ∷ q) with sameSource (arrSource a) (regSource s) | u ≟ᵗ arrTy a
+... | false | _        = chains-rids a q
+... | true  | no  _    = chains-rids a q
+... | true  | yes refl = px ∷ chains-rids a q
+
+-- chains partnered and cut on neither side stand paired
+paired-zip : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′} (rr : RegRel κ π {t} NP NI LP LI rs rs′)
+               (CP CI : List RegId) (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ)) {cs cs′}
+           → Pointwise (λ c c′ → Partners κ π NP NI LP LI rr (dynRow a c) (dynRow a′ c′)) cs cs′
+           → All (λ c → any (_≡ᵇ proj₁ c) CP ≡ false) cs → All (λ c → any (_≡ᵇ proj₁ c) CI ≡ false) cs′
+           → Pointwise (Paired rr CP CI a a′) cs cs′
+paired-zip rr CP CI a a′ [] [] [] = []
+paired-zip rr CP CI a a′ (p ∷ ps) (u ∷ us) (u′ ∷ us′) = inj₂ (u , u′ , p) ∷ paired-zip rr CP CI a a′ ps us us′
 
 -- A MINTED SOURCE'S CHAINS PAIR UP, in order, as registrations the store
 -- relation partners
@@ -150,4 +198,19 @@ dyn-chains : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Cl
 dyn-chains κ {sP = sP} {sI = sI} s ex ex′ na na′ s₀
   with subst₂ (Popped (Src κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Store.sync s) (Store.sources s))
 ... | pop _ _ _ _ _ _ _ _ pp =
-  chains-rows κ (pp-popped κ pp) (proj₁ (Store.distinct s₀)) (proj₂ (Store.distinct s₀)) na na′ (Store.rows s₀)
+  chains-rows κ na na′ (Store.rows s₀)
+    (arr-rows κ (proj₁ (Store.distinct s₀)) (proj₂ (Store.distinct s₀)) (pp-popped κ pp) (Store.rows s₀))
+
+-- A MINTED SOURCE'S END WALKS THE CHAINS THAT ARE LEFT, which pair up as
+-- the value pass's did.  The rows the registries still hold are cut on
+-- neither side, and the popped pair's place against the rows is what the
+-- pass handed on.
+dyn-chains-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                   {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
+  → (s : Store κ sP stP sI stI)
+  → n < arrSource a → n + n < arrSource a′
+  → Arr s (arrSource a) (arrSource a′) (arrTy a) (arrTy a′)
+  → Pointwise (Paired (Store.rows s) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′) (chainsOf a stP) (chainsOf a′ stI)
+dyn-chains-end κ {stP = stP} {stI = stI} {a = a} {a′} s na na′ ar =
+  paired-zip (Store.rows s) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′ (chains-rows κ na na′ (Store.rows s) (Arr.rows ar))
+    (chains-rids a (proj₁ (Store.uncut s))) (chains-rids a′ (proj₂ (Store.uncut s)))

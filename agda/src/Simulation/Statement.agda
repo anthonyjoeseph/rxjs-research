@@ -69,13 +69,13 @@ open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
-open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
-open import Simulation.Chains using (dyn-chains)
-open import Simulation.Close using (close-store)
-open import Simulation.Pop using (pop-store)
+open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop)
+open import Simulation.Close using (close-store; close-arr)
+open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
-  _⨾_; fan-go; hot-start; hot-start-at; hot-adm; hot-end-start; hot-end-at; hot-finish)
+  Persists; delivered-arr; _⨾_; fan-go; hot-start; hot-start-at; hot-adm; hot-end-start; hot-end-at; hot-finish)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
@@ -265,30 +265,17 @@ postulate
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 
-  -- THE CHAINS A MINTED SOURCE'S END WALKS pair up as its value pass's did,
-  -- the cut ones cut on both sides.
+  -- A MINTED SOURCE'S REGISTRATIONS DROPPED keep the stores related.
   --
-  -- The conclusion needs two things no hypothesis carries.  An arrival
-  -- pair unrelated to the rows walks different chains on each side, so the
-  -- pair has to be the one the rows partner; and a row and its partner
-  -- stand cut together only because the value pass that left this store
-  -- cut them so.
-  dyn-chains-end : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                     {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
-    → (s : Storeʳ κ sP (cascadeClose a stP) sI (cascadeClose a′ stI))
-    → n < Arrival.source a → n + n < Arrival.source a′
-    → Pointwise (Paired (Storeʳ.rows s) (EvalSt.cancelled (cascadeClose a stP)) (EvalSt.cancelled (cascadeClose a′ stI)) a a′)
-                (chainsOf a stP) (chainsOf a′ stI)
-
-  -- AND ITS REGISTRATIONS DROPPED keep the stores related.
-  --
-  -- The conclusion needs what the one above does, the arrival pair being
-  -- the rows' partners, and that both arrivals are last: one side dropping
-  -- a source's registrations while the other keeps them unrelates the
-  -- registries.
+  -- The conclusion needs the arrival pair being the rows' partners, which
+  -- the value pass hands on, and that both arrivals are last: one side
+  -- dropping a source's registrations while the other keeps them unrelates
+  -- the registries.
   finish-store : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                    {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
-    → Storeʳ κ sP stP sI stI → n < Arrival.source a → n + n < Arrival.source a′
+    → (s : Storeʳ κ sP stP sI stI) → n < Arrival.source a → n + n < Arrival.source a′
+    → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
+    → Arr s (Arrival.source a) (Arrival.source a′) (arrTy a) (arrTy a′)
     → Storeʳ κ (proj₁ (cascadeFinish a sP stP)) (proj₂ (cascadeFinish a sP stP))
                (proj₁ (cascadeFinish a′ sI stI)) (proj₂ (cascadeFinish a′ sI stI))
 
@@ -359,8 +346,10 @@ dyn-chain : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Σ (Storeʳ κ sP₁ stP₁ sI₁ stI₁) λ s₁ →
       Pointwise (Paired (Storeʳ.rows s₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) a a′) chs chs′
     × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+    × Persists κ s s₁
 dyn-chain {t = t} κ e s {a = a} {a′} hd ta pr ps dP dI =
   After.store A , Pointwise-map (λ {c} {c′} → After.keeps A {dynRow a c} {dynRow a′ c′}) ps , Pointwise-map (v-agrees κ t) (After.values A)
+  , (λ ar → After.persists A (delivered-arr ar))
   where
     A = row-pass κ (delivered s) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
           (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
@@ -374,9 +363,10 @@ pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
   → cascadeGo⇓ a vs fin chs sP stP (oP , sP₁ , stP₁)
   → cascadeGo⇓ a′ vs′ fin chs′ sI stI (oI , sI₁ , stI₁)
-  → Storeʳ κ sP₁ stP₁ sI₁ stI₁
-  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
-pass-go κ e s hd ta [] casc-nil casc-nil = s , []
+  → Σ (Storeʳ κ sP₁ stP₁ sI₁ stI₁) λ s₁ →
+      Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+    × Persists κ s s₁
+pass-go κ e s hd ta [] casc-nil casc-nil = s , [] , (λ ar → ar)
 pass-go κ e s hd ta (inj₁ _ ∷ ps) (casc-cut _ g) (casc-cut _ g′) = pass-go κ e s hd ta ps g g′
 pass-go κ e s hd ta (inj₁ (x , _) ∷ _) (casc-live y _ _) _ = ⊥-elim (clash (trans (sym x) y))
 pass-go κ e s hd ta (inj₁ (_ , x) ∷ _) (casc-cut _ _) (casc-live y _ _) = ⊥-elim (clash (trans (sym x) y))
@@ -385,10 +375,11 @@ pass-go κ e s hd ta (inj₂ (_ , x , _) ∷ _) (casc-live _ _ _) (casc-cut y _)
 pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps)
         (casc-live {emits = eP} {rest = rP} _ st g) (casc-live {emits = eI} {rest = rI} _ st′ g′)
   with dyn-chain κ e s hd ta pr ps st st′
-... | s₁ , ps₁ , ag =
+... | s₁ , ps₁ , ag , q₁ =
   proj₁ k ,
   subst₂ (Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)) (sym (readᴵ-++ eI rI)) (sym (readᴾ-++ eP rP))
-         (++⁺ ag (proj₂ k))
+         (++⁺ ag (proj₁ (proj₂ k))) ,
+  (λ ar → proj₂ (proj₂ k) (q₁ ar))
   where k = pass-go κ e s₁ hd ta ps₁ g g′
 
 -- a minted source's value pass: the chains pair up at the popped stores
@@ -401,12 +392,13 @@ dyn-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
   → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a stP) (record sP { live = rs }) (cascadeOpen stP) (oP , sP₁ , stP₁)
   → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
-  → Storeʳ κ sP₁ stP₁ sI₁ stI₁
-  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+  → Σ (Storeʳ κ sP₁ stP₁ sI₁ stI₁) λ s₁ →
+      Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+    × Arr s₁ (Arrival.source a) (Arrival.source a′) (arrTy a) (arrTy a′)
 dyn-pass κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy p q go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
-... | pop _ _ src h h′ _ _ _ _ =
-  pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ s ex ex′ p q s₀)) go go′
+... | pop _ _ src h h′ _ _ _ pp =
+  proj₁ k , proj₁ (proj₂ k) , proj₂ (proj₂ k) (arr-pop κ s₀ (pp-popped κ pp))
   where
     s₀ = pop-store κ s ex ex′ sy
     opened : ∀ {chs chs′}
@@ -414,6 +406,7 @@ dyn-pass κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy p q go go′
            → Pointwise (Paired (Storeʳ.rows s₀) [] [] a a′) chs chs′
     opened []       = []
     opened (r ∷ rs) = inj₂ (refl , refl , r) ∷ opened rs
+    k = pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ s ex ex′ p q s₀)) go go′
 
 -- A HOT SCRIPT'S VALUE PASS: the impl's one chain runs its input block into
 -- the share, which fans out to the rows the plain run's readers are
@@ -472,7 +465,7 @@ value-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy {oP} {sP₁} {stP₁} {
        → Storeʳ κ sP₁ stP₁ sI₁ stI₁
        × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
     by (slot~ i h) e₁ e₂ = hot-pass κ e s ex ex′ ta sy i h (sym e₁) (sym e₂) go go′
-    by (dyn~ p q) refl refl = dyn-pass κ e s ex ex′ ta sy p q go go′
+    by (dyn~ p q) refl refl = proj₁ (dyn-pass κ e s ex ex′ ta sy p q go go′) , proj₁ (proj₂ (dyn-pass κ e s ex ex′ ta sy p q go go′))
 
 -- THE END OF A HOT ARRIVAL: the source latched closed, its end walked
 -- over the chains the value pass left, and its registrations dropped.
@@ -528,11 +521,14 @@ last-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁}
                   (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
        × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
     by (slot~ i h) e₁ e₂ = hot-end κ e s ex ex′ ta sy i h (sym e₁) (sym e₂) go go′ end end′
-    by (dyn~ p q) refl refl = finish-store {a = a} {a′ = a′} S₂ p q , proj₂ k
+    by (dyn~ p q) refl refl = finish-store {a = a} {a′ = a′} S₂ p q ll ll′ (proj₂ (proj₂ k) ca) , proj₁ (proj₂ k)
       where
-        S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
+        W  = dyn-pass κ e s ex ex′ ta sy p q go go′
+        S₁ = proj₁ W
+        ar₁ = proj₂ (proj₂ W)
+        ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁
         Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q
-        k  = pass-go κ e Sc nohead ta (dyn-chains-end {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} Sc p q) end end′
+        k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca) end end′
         S₂ = proj₁ k
 
 -- a value pass ends a cascade unless the arrival is its source's last

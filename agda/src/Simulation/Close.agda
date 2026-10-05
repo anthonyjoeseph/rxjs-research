@@ -18,7 +18,7 @@ open import Rx.Evaluator using (Arrival; Sched; EvalSt; memberSource; sameSource
 open import Rx.Prim      using (Source)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Chains using (sameSource-no)
-open import Simulation.Stores using (Store)
+open import Simulation.Stores using (Store; Arr)
 
 -- a source number no slot has is not the slot's
 member-skip : ∀ {m k} (xs : List Source) → m < k → memberSource m (k ∷ xs) ≡ memberSource m xs
@@ -34,7 +34,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
   close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
-    ; sync = sync ; rows = rows ; wfᴾ = wfᴾ ; wfᴵ = wfᴵ
+    ; sync = sync ; rows = rows ; wfᴾ = wfᴾ ; wfᴵ = wfᴵ ; bounded = bounded ; uncut = uncut
     ; latches = λ i → let h , sh = latches i
                           lt  = <-trans (toℕ<n i) na
                           lt′ = subst (_< Arrival.source a′) (sym (toℕ-↑ʳ n i)) (<-trans (+-monoʳ-< n (toℕ<n i)) na′)
@@ -44,3 +44,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                        , (λ sk → let c , d = sh sk in trans mp (trans c (sym mi)) , d)
     }
     where open Store s
+
+  -- and the arrival's pair against the rows with it, since the rows are the same
+  close-arr : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)}
+                {S : Store κ sP stP sI stI} (na : n < Arrival.source a) (na′ : n + n < Arrival.source a′) {s s′ u u′}
+    → Arr S s s′ u u′ → Arr (close-store {sP = sP} {stP = stP} {sI = sI} {stI = stI} {a = a} {a′ = a′} S na na′) s s′ u u′
+  close-arr na na′ ar = record { boundP = boundP ; boundI = boundI ; rows = rows } where open Arr ar

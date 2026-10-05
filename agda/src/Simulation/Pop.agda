@@ -10,11 +10,14 @@ module Simulation.Pop where
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.List.Relation.Unary.All using (All) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
+open import Data.Nat     using (_<_)
 open import Data.Sum     using (inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst; subst₂)
 
 open import Rx.Exp       using (Ctx; Closed)
+open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; NodeId; NodeState; schedGo; schedHeadOf; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there)
@@ -131,4 +134,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; latches  = Store.latches s
     ; wfᴾ      = Store.wfᴾ s
     ; wfᴵ      = Store.wfᴵ s
+    ; bounded  = subst (All (_< counter (Sched.mint sP) sourceᵏ)) (sym (proj₁ (pp-sources pp))) (proj₁ (Store.bounded s))
+               , subst (All (_< counter (Sched.mint sI) sourceᵏ)) (sym (proj₂ (pp-sources pp))) (proj₂ (Store.bounded s))
+    ; uncut    = mapᵃ (λ _ → refl) (proj₁ (Store.uncut s)) , mapᵃ (λ _ → refl) (proj₂ (Store.uncut s))
     }
