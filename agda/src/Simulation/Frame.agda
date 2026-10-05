@@ -79,14 +79,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       takeWhile~ pk lP (trans (hd ag (first k₁ [])) l₁)
                        (trans (hd (tail ag) (first k₂ [])) l₂)
                        cl (path-frame (tail (tail (tail ag))) r)
-    path-frame ag (outerElem~ {m′ = m′} (pm , x , x′ , lP , lI , fn) r) =
-      outerElem~ (pm , x , x′ , lP , trans (hd (tail ag) (first m′ [])) lI , fn)
+    path-frame ag (outerElem~ {m′ = m′} {ks} (pm , x , x′ , lP , lI , fn , c , lk) r) =
+      outerElem~ (pm , x , x′ , lP , trans (hd (tail ag) (first m′ [])) lI , fn , c , trans (hd (tail (tail ag)) (first ks [])) lk)
                  (path-frame (tail (tail (tail (tail ag)))) r)
-    path-frame ag (outerExplode~ {m′ = m′} (pm , x , x′ , lP , lI , fn) r) =
-      outerExplode~ (pm , x , x′ , lP , trans (hd (tail (tail (tail ag))) (first m′ [])) lI , fn)
+    path-frame ag (outerExplode~ {m′ = m′} {ks} (pm , x , x′ , lP , lI , fn , c , lk) r) =
+      outerExplode~ (pm , x , x′ , lP , trans (hd (tail (tail (tail ag))) (first m′ [])) lI , fn
+                    , c , trans (hd (tail (tail (tail (tail ag)))) (first ks [])) lk)
                     (path-frame (tail (tail (tail (tail (tail (tail ag)))))) r)
-    path-frame ag (inner~ {m′ = m′} {j′ = j′} (pm , x , x′ , lP , lI , fn) ip r) =
-      inner~ (pm , x , x′ , lP , trans (hd ag (first m′ (j′ ∷ []))) lI , fn) ip
+    path-frame ag (inner~ {m′ = m′} {ks} {j′ = j′} (pm , x , x′ , lP , lI , fn , c , lk) ip r) =
+      inner~ (pm , x , x′ , lP , trans (hd ag (first m′ (j′ ∷ []))) lI , fn , c , trans (hd (tail ag) (first ks [])) lk) ip
              (path-frame (tail (tail (tail ag))) r)
     path-frame ag (lane~ {mL = mL} {jL} lL r) =
       lane~ (trans (hd ag (first mL (jL ∷ []))) lL) (path-frame (tail ag) r)

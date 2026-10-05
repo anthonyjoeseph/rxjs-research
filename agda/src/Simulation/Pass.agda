@@ -252,7 +252,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → Steps (take-f nothing k) h p Q
       takeWhile-arm : ∀ {lo lo′ ℓ s} {P k} {h : lo ≤ ℓ} {p : Path Γ ℓ s t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
                     → Steps (take-f (just P) k) h p Q
-      -- an outer's element, one per emit, handed the flattener
+      -- an outer's element, one per emit, handed the flattener.  Walked
+      -- an emit at a time: its echo folded down `p` -- an impl echo with
+      -- no payload, where the plain emit echoes nothing, folded on the
+      -- impl side alone -- then its lane subscribed.  So `p` is folded
+      -- again per emit, and the walk needs `p` and `q` related after each
+      -- pass, which `Pass` does not hand back.
       outerElem-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}

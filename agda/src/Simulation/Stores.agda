@@ -59,7 +59,7 @@ open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; slotTy
 open import SExp.Plain   using (plainExp)
 open import Simulation.Schedules using (Sync)
 open import SExp.Elaborate using (toInstEmit; plainᶜ⁺; deferBodyᵖ; stampedSlot; restampᵛ; subscribeᵛ; deliveryᵛ; inputStampᵖ;
-  ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ; flatStepᵛ; elemᵛ; explodeᵛ)
+  ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
 open import SExp.InstEmit using (machineEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmit)
 open import Batchable.Inst-Extract using (emitValues)
@@ -256,12 +256,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     module _ {t : Ty} (NP : List (NodeId × NodeState Γ)) (NI : List (NodeId × NodeState Γ′)) where
 
-      -- a flattener's node pair, and the scan the elaboration restamps through
+      -- a flattener's node pair, and the scan the elaboration restamps
+      -- through, holding a cell of its own type: a scan finding anything
+      -- else puts out nothing, so without the cell the relation admits
+      -- an impl dropping every echo and lane emit the plain side delivers
       Flattener : ∀ u → FlatOp → NodeId → NodeId → NodeId → List NodeId → Set
       Flattener u op m m′ ks xs =
         (m , m′ ∷ ks ∷ xs) ∈ π
         × Σ (NodeState Γ) λ x → Σ (NodeState Γ′) λ x′ →
             lookupNode m NP ≡ just x × lookupNode m′ NI ≡ just x′ × FlatNodes u op x x′
+            × Σ (Val Γ′ (FlatSᵗ u)) λ c → lookupNode ks NI ≡ just (cell-st {t = FlatSᵗ u} c)
 
       -- WHAT ONE FORMER'S FRAMES ARE ON THE IMPL SIDE.  A plain frame
       -- and the run of impl frames its former's elaboration installs,

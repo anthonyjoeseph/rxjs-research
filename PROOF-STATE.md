@@ -261,7 +261,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   the share's readers, paired by the proven `slot-chains`, after `hot-start`
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store` and `hot-finish` are proven, and a connected hot
-  end is proven down to the evaluator. Left: the arms as real bodies, riskiest first, each owing the
+  end is proven down to the evaluator. Left: a pass handing back its path's
+  relation, which the outer's walk refolds; the arms as real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
   `inner-arm` once `Arm` carries an impl-only step; the monster drops to
   whichever arm fails.
@@ -282,7 +283,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   outer's step on both sides, an emit carrying one payload at most, so an
-  element's lane is one inner and its echo one value whatever the policy.
+  element's lane is one inner and its echo one value whatever the policy;
+  walked an emit at a time, it refolds `p` and waits on `Pass` handing back
+  the path's relation.
 - **`{inner,lane,deferInner}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   leaving an inner, the flattener's lane, an impl-only lane merge ahead of it
   and a deferred body's hop.
