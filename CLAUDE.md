@@ -8,6 +8,7 @@ Agda model (`agda/`) + TypeScript impl (`typescript/`). Agda's spec is gospel; T
 - **Never the auto-memory directory** (`~/.claude/projects/…/memory/`) or any other out-of-repo note. Outside the repo = no gate, no grep, invisible to every worker.
 - **Ask before changing this file (Anthony).** Draft the wording, show it, land it on his yes. An agent's own inference installed as law propagates further than any code change.
 - **Rules here; mechanics in `docs/`** (one file per tool, indexed by `docs/README.md`). Split by KIND, not length. This file carries only what must be obeyed *prophylactically* — before you'd have reason to open a doc.
+- **Fragments over paragraphs; omit rather than explain the omission (Anthony).** Every word here is paid on every turn.
 - **Rules, not citations.** State the *shape* of a trap, not a name that gets discharged next week. Specific instances live in source headers. Exceptions: the load-bearing documents and commands (this file, PROOF-STATE.md, EVIDENCE.md, `typecheck-performance-numbers.md`, `docs/`, `make` targets, `agda/src`, `agda/evidence`) — vocabulary, not instances.
 - **No calendar dates, including on a ruling (Anthony).** The name alone makes it unarguable; the timestamp does nothing. Conflicting rulings get MERGED, not ordered by date.
 - **No line numbers, here or in a source comment.** A stale name fails a grep loudly; a stale line number resolves, points at unrelated code, and is believed.
