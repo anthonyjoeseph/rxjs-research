@@ -22,7 +22,7 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map; concat)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
-open import Data.Maybe   using (nothing; just)
+open import Data.Maybe   using (Maybe; nothing; just)
 open import Data.Nat     using (ℕ; suc; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
@@ -30,14 +30,16 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤)
 open import Data.Vec     using (lookup)
 open import Data.List.Properties using (++-assoc)
+open import Relation.Nullary using (yes; no)
+open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; FnClo; applyClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
+open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; FnClo; applyClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; memberSource; Path; Frame; share-sink;
-  _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf)
+  _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap; setNode; exhaust-st; hasRoom; consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓; walk-nil; walk-echo; walk-cons;
-  thruConsume⇓; chainStep⇓; chain-step;
+  thruConsume⇓; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; subscribeInner⇓; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
@@ -85,6 +87,16 @@ Paired rr CP CI a a′ c c′ = PairedR rr CP CI (dynRow a c) (dynRow a′ c′)
 
 clash : true ≡ false → ⊥
 clash ()
+
+-- a node a consume can use, read as one it cannot
+unusable : ∀ {n} {Γ : Ctx n} op w {N N′ : Maybe (NodeState Γ)}
+         → N ≡ N′ → consumeUsable op w N ≡ false → consumeUsable op w N′ ≡ true → ⊥
+unusable _ _ refl f u = clash (trans (sym u) f)
+
+usable-self : ∀ u → ⌊ u ≟ᵗ u ⌋ ≡ true
+usable-self u with u ≟ᵗ u
+... | yes _ = refl
+... | no ¬e = ⊥-elim (¬e refl)
 
 -- the fold a chain step runs
 unchain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ} {vs fin x sched st r}
@@ -467,16 +479,47 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     xs false sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
                 → Restamped S op m m′ ks p q ws (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) fin₁ o₁ sI₁ stI₁
 
-      -- AN OUTER'S INNER HANDED THE FLATTENER ON BOTH SIDES, its lane on
-      -- the impl's: the policy reads related nodes and decides alike
-      consume-pair : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                       {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
-                   → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                   → ObsRel κ u o′ o
-                   → thruConsume⇓ (flatOp op) m p now o sP stP rP
-                   → thruConsume⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI rI
-                   → Σ (After S rP rI) λ A
-                       → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+      -- A FLATTENER'S NODE PAIR WRITTEN ALIKE: the stores and the walk
+      -- stay related with the two nodes moved to states that pair again.
+      --
+      -- AS STATED IT IS TOO STRONG: the rows read nodes at exact states.
+      -- Every plain one and every impl one in `π` is apart from `m` and
+      -- `m′` by `π`'s uniqueness, but a lane's merge (`lane~`) and an input block's
+      -- nodes (`InputBlock`) are in no `π` entry, and no store field
+      -- puts them apart from `π`'s values -- so a store whose lane merge
+      -- is `m′` meets the hypotheses and loses the lane to the write.
+      -- The repair is that field, not a hypothesis here.
+      flat-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₄ u op m m′ ks}
+                     {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {y y′}
+                 → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                 → FlatNodes {Γ = Γ} κ (Store.π S) u op y y′
+                 → Σ (After S ([] , sP , record stP { nodes = setNode m y (EvalSt.nodes stP) })
+                              ([] , sI , record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })) λ A
+                     → Walked op m m′ ks p q (Store.π (After.store A))
+                         (setNode m y (EvalSt.nodes stP)) (setNode m′ y′ (EvalSt.nodes stI))
+
+      -- AN OUTER'S INNER SUBSCRIBED ON BOTH SIDES, its lane already
+      -- taken and its lane on the impl's: the two subscribes keep the
+      -- flattener and the path related
+      inner-pair : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                     {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ j j′ rP rI}
+                 → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                 → ObsRel κ u o′ o
+                 → subscribeInner⇓ (flatOp op) m p now o sP stP (j , rP)
+                 → subscribeInner⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI (j′ , rI)
+                 → Σ (After S rP rI) λ A
+                     → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+
+      -- A SWITCH'S INNER HANDED IT ON BOTH SIDES: the cut, the current
+      -- inner named before it is subscribed, and the subscribe
+      consume-switch : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                         {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
+                     → Walked switchᶠ m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                     → ObsRel κ u o′ o
+                     → thruConsume⇓ switchᵒ m p now o sP stP rP
+                     → thruConsume⇓ switchᵒ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI rI
+                     → Σ (After S rP rI) λ A
+                         → Walked switchᶠ m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
 
       -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
       -- outer has and no lane is open or queued, read off related nodes,
@@ -492,6 +535,85 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      (proj₂ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI)))) r
                  → Wrapped S op m m′ ks p q fin now r
 
+
+    -- A MERGE'S NODE PAIR AS EACH CONSUME READS IT: one count, one bound
+    -- and the queues paired, so the two decide room alike, and a lane
+    -- taken or an element queued pairs again
+    room-agree : ∀ {π u lim x x′ l₁ a₁ q₁ d₁ l₂ a₂ q₂ d₂ b b′}
+               → FlatNodes {Γ = Γ} κ π u (mergeᶠ lim) x x′
+               → just x ≡ just (mergeAll-st {t = u} l₁ a₁ q₁ d₁) → just x′ ≡ just (mergeAll-st {t = emitᵗ u} l₂ a₂ q₂ d₂)
+               → hasRoom l₁ a₁ ≡ b → hasRoom l₂ a₂ ≡ b′ → b ≡ b′
+    room-agree (merge~ _) refl refl e e′ = trans (sym e) e′
+
+    lane-nodes : ∀ {π u lim x x′ l₁ a₁ q₁ d₁ l₂ a₂ q₂ d₂}
+               → FlatNodes {Γ = Γ} κ π u (mergeᶠ lim) x x′
+               → just x ≡ just (mergeAll-st {t = u} l₁ a₁ q₁ d₁) → just x′ ≡ just (mergeAll-st {t = emitᵗ u} l₂ a₂ q₂ d₂)
+               → FlatNodes {Γ = Γ} κ π u (mergeᶠ lim) (mergeAll-st {t = u} l₁ (suc a₁) q₁ d₁) (mergeAll-st {t = emitᵗ u} l₂ (suc a₂) q₂ d₂)
+    lane-nodes (merge~ ps) refl refl = merge~ ps
+
+    queue-nodes : ∀ {π u lim x x′ l₁ a₁ q₁ d₁ l₂ a₂ q₂ d₂ o o′}
+                → FlatNodes {Γ = Γ} κ π u (mergeᶠ lim) x x′
+                → just x ≡ just (mergeAll-st {t = u} l₁ a₁ q₁ d₁) → just x′ ≡ just (mergeAll-st {t = emitᵗ u} l₂ a₂ q₂ d₂)
+                → ObsRel κ u o′ o
+                → FlatNodes {Γ = Γ} κ π u (mergeᶠ lim) (mergeAll-st {t = u} l₁ a₁ (q₁ ++ o ∷ []) d₁)
+                                                       (mergeAll-st {t = emitᵗ u} l₂ a₂ (q₂ ++ o′ ∷ []) d₂)
+    queue-nodes (merge~ ps) refl refl r = merge~ (++⁺ ps (r ∷ []))
+
+    merge-usable : ∀ {π u lim x x′} → FlatNodes {Γ = Γ} κ π u (mergeᶠ lim) x x′
+                 → consumeUsable mergeAllᵒ u (just x) ≡ true × consumeUsable mergeAllᵒ (emitᵗ u) (just x′) ≡ true
+    merge-usable {u = u} (merge~ _) = usable-self u , usable-self (emitᵗ u)
+
+    -- an exhaust's pair is one flag and one end, read alike
+    idle-nodes : ∀ {π u x x′ d₁ d₂}
+               → FlatNodes {Γ = Γ} κ π u exhaustᶠ x x′
+               → just x ≡ just (exhaust-st false d₁) → just x′ ≡ just (exhaust-st false d₂)
+               → FlatNodes {Γ = Γ} κ π u exhaustᶠ (exhaust-st true d₁) (exhaust-st true d₂)
+    idle-nodes exhaust~ refl refl = exhaust~
+
+    idle-plain : ∀ {π u w x x′ d} → FlatNodes {Γ = Γ} κ π u exhaustᶠ x x′
+               → just x ≡ just (exhaust-st false d) → consumeUsable exhaustᵒ w (just x′) ≡ true
+    idle-plain exhaust~ refl = refl
+
+    idle-impl : ∀ {π u w x x′ d} → FlatNodes {Γ = Γ} κ π u exhaustᶠ x x′
+              → just x′ ≡ just (exhaust-st false d) → consumeUsable exhaustᵒ w (just x) ≡ true
+    idle-impl exhaust~ refl = refl
+
+    -- AN OUTER'S INNER HANDED THE FLATTENER ON BOTH SIDES, its lane on
+    -- the impl's: the policy reads related nodes and decides alike.  A
+    -- lane taken is a related write and then the inner's subscribe; an
+    -- element queued is the write alone; a node neither can use is no
+    -- step at all
+    consume-pair : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                     {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
+                 → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                 → ObsRel κ u o′ o
+                 → thruConsume⇓ (flatOp op) m p now o sP stP rP
+                 → thruConsume⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI rI
+                 → Σ (After S rP rI) λ A
+                     → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+    consume-pair S {op = switchᶠ} W ob dP dI = consume-switch S W ob dP dI
+    consume-pair S {op = mergeᶠ _} W@((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-all-sub eP _ dP) (consume-all-sub eI _ dI) =
+      let F = flat-write S W (lane-nodes fn (trans (sym lP) eP) (trans (sym lI) eI))
+          I = inner-pair (After.store (proj₁ F)) (proj₂ F) ob dP dI
+      in proj₁ F ⨾ proj₁ I , proj₂ I
+    consume-pair S {op = mergeᶠ _} W@((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-all-enqueue eP _) (consume-all-enqueue eI _) =
+      flat-write S W (queue-nodes fn (trans (sym lP) eP) (trans (sym lI) eI) ob)
+    consume-pair S {op = mergeᶠ _} W ob (consume-all-nil _) (consume-all-nil _) = after S (λ x → x) (λ x → x) [] (λ x → x) , W
+    consume-pair S {op = mergeᶠ _} ((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-all-sub eP hP _) (consume-all-enqueue eI hI) =
+      ⊥-elim (clash (room-agree fn (trans (sym lP) eP) (trans (sym lI) eI) hP hI))
+    consume-pair S {op = mergeᶠ _} ((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-all-enqueue eP hP) (consume-all-sub eI hI _) =
+      ⊥-elim (clash (sym (room-agree fn (trans (sym lP) eP) (trans (sym lI) eI) hP hI)))
+    consume-pair S {u = u} {op = mergeᶠ _} ((_ , _ , _ , _ , lI , fn , _) , _) ob _ (consume-all-nil n) = ⊥-elim (unusable mergeAllᵒ (emitᵗ u) lI n (proj₂ (merge-usable fn)))
+    consume-pair S {u = u} {op = mergeᶠ _} ((_ , _ , _ , lP , _ , fn , _) , _) ob (consume-all-nil n) _ = ⊥-elim (unusable mergeAllᵒ u lP n (proj₁ (merge-usable fn)))
+    consume-pair S {op = exhaustᶠ} W@((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-exhaust-sub eP dP) (consume-exhaust-sub eI dI) =
+      let F = flat-write S W (idle-nodes fn (trans (sym lP) eP) (trans (sym lI) eI))
+          I = inner-pair (After.store (proj₁ F)) (proj₂ F) ob dP dI
+      in proj₁ F ⨾ proj₁ I , proj₂ I
+    consume-pair S {op = exhaustᶠ} W ob (consume-exhaust-nil _) (consume-exhaust-nil _) = after S (λ x → x) (λ x → x) [] (λ x → x) , W
+    consume-pair S {u = u} {op = exhaustᶠ} ((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-exhaust-sub eP _) (consume-exhaust-nil n) =
+      ⊥-elim (unusable exhaustᵒ (emitᵗ u) lI n (idle-plain fn (trans (sym lP) eP)))
+    consume-pair S {u = u} {op = exhaustᶠ} ((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-exhaust-nil n) (consume-exhaust-sub eI _) =
+      ⊥-elim (unusable exhaustᵒ u lP n (idle-impl fn (trans (sym lI) eI)))
 
     ----------------------------------------------------------------
     -- A VALUELESS GROUP, ON THE IMPL SIDE ALONE.  An outer's emit whose

@@ -255,12 +255,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **CONSUME THE PAIR ONE POLICY AT A TIME.** The store carries each run's
-  rule, a tail's fold missing the flattener's nodes is `fold-unmoved`, and
-  what an outer emit hands the flattener is read off the evaluator. Left:
-  `consume-pair`, what the flattener does with that lane, merge first.
-  Narrows the monster to whether the subscribe walk and the pass share one
-  invariant.
+- **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
+  merge and an exhaust decide alike off related nodes, a node neither can
+  use is no step, and what is left is the write (`flat-write`), the inner's
+  subscribe (`inner-pair`) and `consume-switch`. Next: restate `flat-write`
+  with the store field it lacks, then the switch through the same two
+  leaves. Narrows the monster to whether the subscribe walk and the pass
+  share one invariant.
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
@@ -302,8 +303,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`flat-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
   scan stepped on an element's echo keeps the flattener, and the group it hands
   on carries the echo's values, still open.
-- **`consume-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
-  lane subscribed on both sides keeps the flattener and the path related.
+- **`inner-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
+  inner subscribed on both sides, its lane taken, keeps the flattener and the
+  path related.
+- **`consume-switch`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a switch
+  handed an element's inner on both sides cuts, names and subscribes alike.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
 - **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
@@ -342,6 +346,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
+- **`flat-write`** (Simulation.Pass) — SHAPE, `NO EVIDENCE`: a flattener's
+  node pair written alike keeps the stores; no store field puts lane and
+  input-block merges apart from `π`.
 - **`fold-unmoved`** (Simulation.Pass) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.
