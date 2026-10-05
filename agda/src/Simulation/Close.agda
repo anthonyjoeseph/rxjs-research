@@ -1,0 +1,46 @@
+------------------------------------------------------------------
+-- A MINTED SOURCE'S CLOSE keeps the stores related.  It latches a number
+-- no input slot carries, on each side, and the latches compare slots only.
+------------------------------------------------------------------
+module Simulation.Close where
+
+open import Data.Bool    using (_∨_)
+open import Data.Fin.Properties using (toℕ<n; toℕ-↑ʳ)
+open import Data.List    using (List; _∷_)
+open import Data.Bool.ListAction using (any)
+open import Data.Nat     using (_+_; _<_)
+open import Data.Nat.Properties using (<⇒≢; <-trans; +-monoʳ-<)
+open import Data.Product using (_,_)
+open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
+
+open import Rx.Exp       using (Ctx; Closed)
+open import Rx.Evaluator using (Arrival; Sched; EvalSt; memberSource; sameSource; cascadeClose)
+open import Rx.Prim      using (Source)
+open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
+open import Simulation.Chains using (sameSource-no)
+open import Simulation.Stores using (Store)
+
+-- a source number no slot has is not the slot's
+member-skip : ∀ {m k} (xs : List Source) → m < k → memberSource m (k ∷ xs) ≡ memberSource m xs
+member-skip {m} xs lt = cong (_∨ any (sameSource m) xs) (sameSource-no (<⇒≢ lt))
+
+module _ {n} {Γ : Ctx n} (κ : Kinds n) where
+
+  -- A DYN SOURCE'S CLOSE keeps the stores related: it latches a number
+  -- no slot carries, and the latches compare slots only.
+  close-store : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                  {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
+    → Store κ sP stP sI stI → n < Arrival.source a → n + n < Arrival.source a′
+    → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
+  close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ = record
+    { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+    ; sync = sync ; rows = rows ; wfᴾ = wfᴾ ; wfᴵ = wfᴵ
+    ; latches = λ i → let h , sh = latches i
+                          lt  = <-trans (toℕ<n i) na
+                          lt′ = subst (_< Arrival.source a′) (sym (toℕ-↑ʳ n i)) (<-trans (+-monoʳ-< n (toℕ<n i)) na′)
+                          mp  = member-skip (EvalSt.completedSources stP) lt
+                          mi  = member-skip (EvalSt.completedSources stI) lt′
+                      in (λ hk → trans mp (trans (h hk) (sym mi)))
+                       , (λ sk → let c , d = sh sk in trans mp (trans c (sym mi)) , d)
+    }
+    where open Store s

@@ -71,6 +71,7 @@ open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains)
+open import Simulation.Close using (close-store)
 open import Simulation.Pop using (pop-store)
 open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
 open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
@@ -264,15 +265,14 @@ postulate
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 
-  -- A DYN SOURCE'S CLOSE keeps the stores related: it latches a number no
-  -- slot carries, and the latches compare slots only.
-  close-store : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                  {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
-    → Storeʳ κ sP stP sI stI → n < Arrival.source a → n + n < Arrival.source a′
-    → Storeʳ κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
-
   -- THE CHAINS A MINTED SOURCE'S END WALKS pair up as its value pass's did,
   -- the cut ones cut on both sides.
+  --
+  -- The conclusion needs two things no hypothesis carries.  An arrival
+  -- pair unrelated to the rows walks different chains on each side, so the
+  -- pair has to be the one the rows partner; and a row and its partner
+  -- stand cut together only because the value pass that left this store
+  -- cut them so.
   dyn-chains-end : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                      {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
     → (s : Storeʳ κ sP (cascadeClose a stP) sI (cascadeClose a′ stI))
@@ -281,6 +281,11 @@ postulate
                 (chainsOf a stP) (chainsOf a′ stI)
 
   -- AND ITS REGISTRATIONS DROPPED keep the stores related.
+  --
+  -- The conclusion needs what the one above does, the arrival pair being
+  -- the rows' partners, and that both arrivals are last: one side dropping
+  -- a source's registrations while the other keeps them unrelates the
+  -- registries.
   finish-store : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                    {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
     → Storeʳ κ sP stP sI stI → n < Arrival.source a → n + n < Arrival.source a′
@@ -526,7 +531,7 @@ last-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁}
     by (dyn~ p q) refl refl = finish-store {a = a} {a′ = a′} S₂ p q , proj₂ k
       where
         S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
-        Sc = close-store {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q
+        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q
         k  = pass-go κ e Sc nohead ta (dyn-chains-end {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} Sc p q) end end′
         S₂ = proj₁ k
 

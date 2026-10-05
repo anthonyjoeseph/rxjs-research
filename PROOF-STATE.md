@@ -258,8 +258,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half is a walk
   over the program, one arm per former, `walk-flatten` its riskiest. A minted
   source's chain is `path-pass`, one arm per plain frame, and a hot slot's is
-  `fan-go` over the share's readers, each `slot-pass`; a minted source's end is
-  the same fold at an end head; an outer's and an inner's arms are one leaf per constructor; a hot slot's end is the same fan-out after the share is spent;
+  `fan-go` over the share's readers, each `slot-pass`; a minted source's end
+  is the same fold at an end head, standing on the arrival pair and the rows'
+  cuts the value pass leaves, which the store and `After` must hand on
+  (`dyn-chains-end`, `finish-store`); an outer's and an inner's arms are one leaf per constructor; a hot slot's end is the same fan-out after the share is spent;
   what remains is `lane-arm` as a definition over `inner-arm` once `Arm` can
   carry an impl-only step, so the monster drops to whichever arm is riskiest.
 
@@ -282,10 +284,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   while the plain run latches the slot; the stores are related again there.
 - **`hot-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the share's
   registrations and the source's drop together keep the stores related.
-- **`{close,finish}-store`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
-  minted source's close and drop keep the stores related.
-- **`dyn-chains-end`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: the
-  chains a minted source's end walks pair up, the cut ones cut on both sides.
 - **`outer{Elem,Explode}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   outer's step on both sides; the explode hands the flattener every inner a
   sync outer subscribed before the step returns.
@@ -297,8 +295,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   its body on both sides.
 - **`{scan,take,takeWhile}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
   cell, count or test steps alike on both sides; a cut takes rows on both.
-- **`sink-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group reaching a
-  shared slot's subject fans out to related readers on both sides.
+- **`sink-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group reaching
+  a shared slot's subject fans out to related readers on both sides.
 - **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits
   sent to the root read as the plain group's values.
 - **`hot-start`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a hot arrival's
@@ -325,6 +323,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
+- **`dyn-chains-end`** (Simulation.Statement) — SHAPE, `NO EVIDENCE`: the
+  chains a minted source's end walks pair up, the cut ones cut on both sides;
+  the arrival pair and the rows' cuts are in no hypothesis.
+- **`finish-store`** (Simulation.Statement) — SHAPE, `NO EVIDENCE`: a minted
+  source's drop keeps the stores related; the arrival pair and both arrivals
+  being last are in no hypothesis.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
   `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached
