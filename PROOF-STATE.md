@@ -262,8 +262,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store` and `hot-finish` are proven, and a connected hot
   end is proven down to the evaluator. The outer's element is a real body
-  over its walk's leaves, `quiet-pass` the riskiest: the impl's valueless
-  echo. Left: that leaf first, then the other arms as
+  over its walk's leaves, the impl's valueless echo one frame at a time,
+  `quiet-sink` its widest. Left: the arms as
   real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
   `inner-arm` once `Arm` carries an impl-only step; the monster drops to
@@ -283,12 +283,18 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`quiet-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a valueless
-  group folded down the impl's restamp tail moves no plain store and keeps the
-  path related; the impl's echo has no plain counterpart.
-- **`flat-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's echo
-  restamped by the flattener's scan, the flattener kept and one emit carrying
-  the echo's payload.
+- **`quiet-{sink,explode}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
+  valueless group through a share's readers, or an exploded outer, folded on
+  the impl side alone with the plain side still.
+- **`quiet-{scan,take,takeWhile}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
+  a cell, count or test stepped on emits carrying nothing stays related, its
+  cut unfired and the group open.
+- **`quiet-{inner,lane,deferInner}`** (Simulation.Pass) — FALSITY,
+  `NO EVIDENCE`: an inner's, a lane's or a deferred body's merge passes emits
+  carrying nothing on as they came.
+- **`flat-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
+  scan stepped on an element's echo keeps the flattener, and the group it
+  hands on carries the echo's values, still open.
 - **`consume-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
   lane subscribed on both sides keeps the flattener and the path related.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
