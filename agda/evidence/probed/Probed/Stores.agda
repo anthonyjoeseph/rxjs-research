@@ -46,7 +46,7 @@ _ = record
   ; numbers = slot~ zero refl ∷ []
   ; distinct = ([] ∷ []) , ([] ∷ [])
   ; sync    = (refl , []) ∷ []
-  ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl (s≤s z≤n) refl refl) refl) []
+  ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl (s≤s z≤n) refl refl (λ ()) (λ ()) (λ ())) refl) []
   ; latches = λ { zero → (λ _ → refl , refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
@@ -74,7 +74,7 @@ _ = record
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ []
   ; distinct = ([] ∷ []) , ([] ∷ [])
   ; sync    = (refl , []) ∷ []
-  ; rows    = cold~ here (block {m1 = 2} {b = 1} {m2 = 0} refl (s≤s z≤n) refl refl) root~ refl ∷ []
+  ; rows    = cold~ here (block {m1 = 2} {b = 1} {m2 = 0} refl (s≤s z≤n) refl refl (λ ()) (λ ()) (λ ())) root~ refl ∷ []
   ; latches = λ { zero → (λ ()) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
