@@ -24,6 +24,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import SExp.Plain using (plainExp)
 open import SExp.Simul-Slots using (plainSlots)
+open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
 open import Simulation.Walk using (walk-input; walk-defer; init-store; minted)
@@ -53,6 +54,8 @@ _ = record
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   ; census  = λ { zero _ → inj₁ (refl , refl) ; (suc zero) () }
   ; owned   = (λ _ ()) ∷ (λ _ _ → (λ ()) ∷ (λ _ → refl) ∷ []) ∷ []
+  ; ruleP   = proj₂ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals))))
+  ; ruleI   = proj₂ (Σ⁰.snd⁰ (subscribe! (elaborateImpl (κᵖ two-arrivals) (Point.prog two-arrivals)) (embedSlotsImpl (insᵖ two-arrivals))))
   }
 
 -- a cold script: its subscribe runs the input block straight to the root
@@ -79,6 +82,8 @@ _ = record
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   ; census  = λ { zero () ; (suc zero) () }
   ; owned   = (λ _ _ → (λ _ → refl) ∷ []) ∷ []
+  ; ruleP   = proj₂ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog cold-in)) (plainSlots (insᵖ cold-in))))
+  ; ruleI   = proj₂ (Σ⁰.snd⁰ (subscribe! (elaborateImpl (κᵖ cold-in) (Point.prog cold-in)) (embedSlotsImpl (insᵖ cold-in))))
   }
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
@@ -103,4 +108,6 @@ _ = record
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   ; census  = λ { zero _ → inj₂ (refl , refl , λ ()) ; (suc zero) () }
   ; owned   = (λ _ ()) ∷ []
+  ; ruleP   = proj₂ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog defer-in)) (plainSlots (insᵖ defer-in))))
+  ; ruleI   = proj₂ (Σ⁰.snd⁰ (subscribe! (elaborateImpl (κᵖ defer-in) (Point.prog defer-in)) (embedSlotsImpl (insᵖ defer-in))))
   }
