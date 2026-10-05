@@ -294,7 +294,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
         -- a count: the cut's scan, its test, its projection, and the
         -- one-lane merge that decided zero at subscribe
-        take~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j b b′ os em Θ₂ ρ₂ Θ₃ ρ₃}
+        take~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j b b′ os em Θ₂ ρ₂ Θ₃ ρ₃ aₘ}
                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                   {F₁ : FnClo Γ′ (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s)}
                   {p : Path Γ ℓ s t} {q : Path Γ′ ℓ₄ (emitᵗ s) (emitᵗ t)}
@@ -302,7 +302,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → lookupNode k NP ≡ just (take-st b)
               → lookupNode k₁ NI ≡ just (cell-st {t = CutS natᵗ s} (b′ , (false , (os , em))))
               → lookupNode k₂ NI ≡ just (take-st 1)
-              → lookupNode m NI ≡ just (mergeAll-st {t = emitᵗ s} nothing 1 [] true)
+              → lookupNode m NI ≡ just (mergeAll-st {t = emitᵗ s} nothing aₘ [] true) → aₘ ≤ 1
               → b′ ≡ b → CutLifts natᵗ s _≡_ F₁ nothing → PathRel p q
               → PathRel (take-f nothing k ↠[ h ] p)
                   (scan-f F₁ k₁ ↠[ h₁ ]
@@ -371,13 +371,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → PathRel (from-inner (flatOp op) m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
 
         -- a deferred body: the hop's marker merge, its restamp, the hop's node
-        deferInner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+        deferInner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                         {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₃ (emitᵗ u) (emitᵗ t)}
                     → (nid , nid′ ∷ []) ∈ π → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ π
-                    → lookupNode nid NP ≡ just (mergeAll-st {t = u} nothing 1 [] true)
-                    → lookupNode nid′ NI ≡ just (mergeAll-st {t = emitᵗ u} nothing 1 [] true)
-                    → lookupNode m2 NI ≡ just (mergeAll-st {t = emitᵗ u} nothing 1 [] true)
+                    → lookupNode nid NP ≡ just (mergeAll-st {t = u} nothing a [] true)
+                    → lookupNode nid′ NI ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true)
+                    → lookupNode m2 NI ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true) → a ≤ 1
                     → PathRel p q
                     → PathRel (from-inner mergeAllᵒ nid j ↠[ h ] p)
                         (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
@@ -387,13 +387,22 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- WHAT A SCRIPT READ BY THE ELABORATION RUNS THROUGH, `inputᵖ`:
       -- the marked merge, the subscribe bracket, the stamp, and the
       -- merge that flattens the stamped emits.  The block, then its tail
+      --
+      -- A ONE-LANE MERGE'S COUNT IS ONE OR ZERO, NEVER A LITERAL ONE, here
+      -- and at a count's and a deferred body's merges.  A source's close
+      -- cascade ends the inner its rows ride, and the inner's finish finds
+      -- no live row through it (the rows are dying and delivered), so the
+      -- merge drops to zero and its outer's bit goes up; the rows stay
+      -- registered until the finish drops them, and the stores must hold in
+      -- between.  Zero is also where an end leaves the merge again, so the
+      -- relation is closed under it
       data InputBlock (a : Ty) : ∀ {lo ℓ} → Path Γ′ lo a (emitᵗ t) → Path Γ′ ℓ (machineEmitᵗ a) (emitᵗ t) → Set where
-        block : ∀ {lo ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+        block : ∀ {lo ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄ a₁ d₂}
                   {h₁ : lo ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
                   {q : Path Γ′ ℓ₆ (machineEmitᵗ a) (emitᵗ t)}
-              → lookupNode m1 NI ≡ just (mergeAll-st {t = unitᵗ +ᵗ a} nothing 1 [] true)
+              → lookupNode m1 NI ≡ just (mergeAll-st {t = unitᵗ +ᵗ a} nothing a₁ [] true) → a₁ ≤ 1
               → lookupNode b NI ≡ just (batchSync-st {s = unitᵗ +ᵗ a} false [] false)
-              → lookupNode m2 NI ≡ just (mergeAll-st {t = machineEmitᵗ a} nothing 0 [] false)
+              → lookupNode m2 NI ≡ just (mergeAll-st {t = machineEmitᵗ a} nothing 0 [] d₂)
               → InputBlock a
                   (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ]
                    (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ]

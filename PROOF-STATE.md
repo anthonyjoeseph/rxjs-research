@@ -240,16 +240,16 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — the theorem both assembled top lines stand on, by induction on
+`simulation` — what both assembled top lines stand on, by induction on
 arrivals over `correspondence`: schedules in step, pops partnered, stores related, which the root
 subscribes establish (`subscribe-related`) and each cascade keeps
 (`cascade-related`), both sending agreeing values under one instant. RULED
-OUT: an impl arrival the plain schedule lacks, a split arrival, a gap in a
-run's instants, an instant outside its cascade, an echo apart from its
-inners; a subscribe installing a run the relation does not name (hot, cold,
-deferred read, one-lane merge); a pop unrelating a read; a map step moving
-an instant. Left: a deeper flattener's subscribe, and which former's cascade
-fails to keep it.
+OUT: an impl arrival the plain schedule lacks, a split arrival, a gap or
+stray in a cascade's instant, an echo apart from its inners; a subscribe
+installing a run the relation does not name (hot, cold, deferred read,
+one-lane merge); a pop unrelating a read; a map moving an instant; a close
+emptying a merge its rows name. Left: a deeper flattener's subscribe, and which former's cascade
+breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 

@@ -274,13 +274,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S r@(sink~ sh) b dP dI = sink-pass sh S r b dP dI
       path-pass S (map~ L r) b (fold-step step-map dP) (fold-step step-map dI) = path-pass S r (carries-map L b) dP dI
       path-pass S r@(scan~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (scan-arm S r b d dI) dP
-      path-pass S r@(take~ _ _ _ _ _ _ _ _) b (fold-step d dP) dI = resume (take-arm S r b d dI) dP
+      path-pass S r@(take~ _ _ _ _ _ _ _ _ _) b (fold-step d dP) dI = resume (take-arm S r b d dI) dP
       path-pass S r@(takeWhile~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (takeWhile-arm S r b d dI) dP
       path-pass S r@(outerElem~ _ _) b (fold-step d dP) dI = resume (outerElem-arm S r b d dI) dP
       path-pass S r@(outerExplode~ _ _) b (fold-step d dP) dI = resume (outerExplode-arm S r b d dI) dP
       path-pass S r@(inner~ _ _ _) b (fold-step d dP) dI = resume (inner-arm S r b d dI) dP
       path-pass S r@(lane~ _ _) b (fold-step d dP) dI = resume (lane-arm S r b d dI) dP
-      path-pass S r@(deferInner~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (deferInner-arm S r b d dI) dP
+      path-pass S r@(deferInner~ _ _ _ _ _ _ _) b (fold-step d dP) dI = resume (deferInner-arm S r b d dI) dP
 
       resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin rP rI}
              → Arm S now oP sP₁ stP₁ p vs fin rI → foldPath⇓ now p vs fin sP₁ stP₁ rP
