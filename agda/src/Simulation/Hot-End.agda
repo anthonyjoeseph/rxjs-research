@@ -401,7 +401,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     with hot-block-end hot d ib (alive S {a} {a′} {i} hot e₁ e₂ {h = h} mem) step
   ... | NI′ , ib′ , fr , dsp =
     hot-end-at {below = h} {εI = trans (hotEq {Γ = Γ} κ i hot) (cong emitᵗ (sym ety))} {ty = ety}
-      (after (end-store S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) (end-keeps S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) (end-persists S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) [])
+      (after (end-store S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) (end-keeps S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) (end-persists S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) [] (λ x → x))
       (carriesU-nil _) dsp refl
 
 -- AND AT ITS END: none, and no plain reader, until the share has

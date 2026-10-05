@@ -24,14 +24,15 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
 open import Data.Maybe   using (nothing; just)
 open import Data.Nat     using (ℕ; suc; _≤_; _≡ᵇ_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Unit    using (⊤)
 open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; uniqᵗ; _×ᵗ_; FnClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; memberSource; Path; Frame; share-sink;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; memberSource; Path; Frame; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
@@ -187,8 +188,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     Persists S S₁ = ∀ {s s′ u u′} → Arr S s s′ u u′ → Arr S₁ s s′ u u′
 
     -- WHAT A PASS KEEPS: related stores after, the unreached chains
-    -- paired, the arrival's pair against the rows, and related values
-    -- sent rootward
+    -- paired, the arrival's pair against the rows, related values sent
+    -- rootward, and every node pairing it found
     record After {sP stP sI stI} (S : St sP stP sI stI)
                  (rP : Stream Γ t × Sched Γ × EvalSt ep)
                  (rI : Stream (plainᵏ Γ κ) (emitᵗ t) × Sched (plainᵏ Γ κ) × EvalSt ei) : Set where
@@ -198,35 +199,55 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         keeps  : Keeps S store
         persists : Persists S store
         values : Pointwise (λ x w → V κ t (proj₂ x) w) (readᴵ (proj₁ rI)) (readᴾ (proj₁ rP))
+        grows  : ∀ {x} → x ∈ Store.π S → x ∈ Store.π store
 
     -- one pass, then another from where it left the stores
     _⨾_ : ∀ {sP stP sI stI} {S : St sP stP sI stI} {o₁ sP₁ stP₁ i₁ sI₁ stI₁ rP rI}
         → (A : After S (o₁ , sP₁ , stP₁) (i₁ , sI₁ , stI₁)) → After (After.store A) rP rI
         → After S (o₁ ++ proj₁ rP , proj₂ rP) (i₁ ++ proj₁ rI , proj₂ rI)
-    _⨾_ {o₁ = o₁} {i₁ = i₁} {rP = rP} {rI = rI} (after _ k₁ q₁ v₁) (after s₂ k₂ q₂ v₂) =
-      after s₂ (λ {a} {a′} x → k₂ {a} {a′} (k₁ {a} {a′} x)) (λ ar → q₂ (q₁ ar))
+    -- by projection, so that the two together leave the second's store
+    _⨾_ {o₁ = o₁} {i₁ = i₁} {rP = rP} {rI = rI} A B =
+      after (After.store B) (λ {a} {a′} x → After.keeps B {a} {a′} (After.keeps A {a} {a′} x))
+        (λ ar → After.persists B (After.persists A ar))
         (subst₂ (Pointwise (λ x w → V κ t (proj₂ x) w)) (sym (readᴵ-++ i₁ (proj₁ rI))) (sym (readᴾ-++ o₁ (proj₁ rP)))
-                (++⁺ v₁ v₂))
+                (++⁺ (After.values A) (After.values B)))
+        (λ x → After.grows B (After.grows A x))
 
-    -- WHAT AN ARM HANDS BACK: the pass so far, and the rest of the impl
-    -- fold standing on a tail related to the plain one's
+    -- what a relation over the whole path reads: the node pairing and
+    -- the two node tables a pass leaves
+    Goal : Set₁
+    Goal = List (NodeId × List NodeId) → List (NodeId × NodeState Γ) → List (NodeId × NodeState (plainᵏ Γ κ)) → Set
+
+    -- WHAT AN ARM HANDS BACK: the pass so far, the rest of the impl
+    -- fold standing on a tail related to the plain one's, and the whole
+    -- related again once the tails have folded -- the arm's own frames
+    -- being nodes a tail's fold does not write
     data Arm {sP stP sI stI} (S : St sP stP sI stI) (now : Tick) (oP : Stream Γ t) (sP₁ : Sched Γ) (stP₁ : EvalSt ep)
-             {ℓ u} (p : Path Γ ℓ u t) (vs : List (Val Γ u)) (fin : Bool)
+             {ℓ u} (p : Path Γ ℓ u t) (vs : List (Val Γ u)) (fin : Bool) (G : Goal)
            : Stream (plainᵏ Γ κ) (emitᵗ t) × Sched (plainᵏ Γ κ) × EvalSt ei → Set where
       arm : ∀ {ℓ′} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)} {oI es sI₁ stI₁ rI}
           → (A : After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁))
           → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP₁) (EvalSt.nodes stI₁) p q
           → Carries es vs
           → foldPath⇓ now q es fin sI₁ stI₁ rI
-          → Arm S now oP sP₁ stP₁ p vs fin (oI ++ proj₁ rI , proj₂ rI)
+          → (∀ {rP} → foldPath⇓ now p vs fin sP₁ stP₁ rP → (B : After (After.store A) rP rI)
+             → PathRel κ (Store.π (After.store B)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+             → G (Store.π (After.store B)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))))
+          → Arm S now oP sP₁ stP₁ p vs fin G (oI ++ proj₁ rI , proj₂ rI)
 
-    -- two related paths keep the pass
+    -- nothing asked of the whole
+    none : Goal
+    none _ _ _ = ⊤
+
+    -- TWO RELATED PATHS KEEP THE PASS, AND ARE RELATED AGAIN WHERE IT
+    -- LEAVES THEM: a flattener's outer folds its tail once per emit
     Pass : ∀ {lo lo′ s} → Path Γ lo s t → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t) → Set
     Pass p q =
       ∀ {now vs es fin sP stP sI stI rP rI} (S : St sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q → Carries es vs
       → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now q es fin sI stI rI
-      → After S rP rI
+      → Σ (After S rP rI) λ A
+          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
 
     -- one plain frame and the impl run its constructor pairs it with
     Steps : ∀ {lo lo′ ℓ s u} → Frame Γ s u → lo ≤ ℓ → Path Γ ℓ u t → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t) → Set
@@ -235,7 +256,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (f ↠[ h ] p) Q → Carries es vs
       → stepFrame⇓ now f p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
       → foldPath⇓ now Q es fin sI stI rI
-      → Arm S now oP sP₁ stP₁ p vs₁ fin₁ rI
+      → Arm S now oP sP₁ stP₁ p vs₁ fin₁ (λ π NP NI → PathRel κ π NP NI (f ↠[ h ] p) Q) rI
 
     -- ONE LEAF PER PLAIN FRAME A CONSTRUCTOR STARTS WITH.  A count and a
     -- test are one frame apart in what they cut on; an outer's two
@@ -256,8 +277,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- an emit at a time: its echo folded down `p` -- an impl echo with
       -- no payload, where the plain emit echoes nothing, folded on the
       -- impl side alone -- then its lane subscribed.  So `p` is folded
-      -- again per emit, and the walk needs `p` and `q` related after each
-      -- pass, which `Pass` does not hand back.
+      -- again per emit, on the relation each pass hands back.
       outerElem-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
@@ -302,9 +322,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     mutual
       path-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Pass p q
-      path-pass S root~ b (fold-root {fin = fin}) fold-root = after S (λ x → x) (λ x → x) (root-values b fin)
+      path-pass S root~ b (fold-root {fin = fin}) fold-root = after S (λ x → x) (λ x → x) (root-values b fin) (λ x → x) , root~
       path-pass S r@(sink~ sh) b dP dI = sink-pass sh S r b dP dI
-      path-pass S (map~ L r) b (fold-step step-map dP) (fold-step step-map dI) = path-pass S r (carries-map L b) dP dI
+      path-pass S (map~ L r) b (fold-step step-map dP) (fold-step step-map dI) =
+        let X = path-pass S r (carries-map L b) dP dI in proj₁ X , map~ L (proj₂ X)
       path-pass S r@(scan~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (scan-arm S r b d dI) dP
       path-pass S r@(take~ _ _ _ _ _ _ _ _ _) b (fold-step d dP) dI = resume (take-arm S r b d dI) dP
       path-pass S r@(takeWhile~ _ _ _ _ _ _) b (fold-step d dP) dI = resume (takeWhile-arm S r b d dI) dP
@@ -314,10 +335,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S r@(lane~ _ _) b (fold-step d dP) dI = resume (lane-arm S r b d dI) dP
       path-pass S r@(deferInner~ _ _ _ _ _ _ _) b (fold-step d dP) dI = resume (deferInner-arm S r b d dI) dP
 
-      resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin rP rI}
-             → Arm S now oP sP₁ stP₁ p vs fin rI → foldPath⇓ now p vs fin sP₁ stP₁ rP
-             → After S (oP ++ proj₁ rP , proj₂ rP) rI
-      resume (arm A r b dI) dP = A ⨾ path-pass (After.store A) r b dP dI
+      resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin G rP rI}
+             → Arm S now oP sP₁ stP₁ p vs fin G rI → foldPath⇓ now p vs fin sP₁ stP₁ rP
+             → Σ (After S (oP ++ proj₁ rP , proj₂ rP) rI) λ A
+                 → G (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+      resume (arm A r b dI rb) dP = let X = path-pass (After.store A) r b dP dI in A ⨾ proj₁ X , rb dP (proj₁ X) (proj₂ X)
 
     -- THE TWO ROWS A MINTED SOURCE'S CHAINS CAN BE.  A cold read's impl
     -- chain runs its input block before the path its partner runs; a
@@ -330,7 +352,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ s) full q
                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
                 → ∀ {now fin rI} → foldPath⇓ now full vs′ fin sI stI rI
-                → Arm S now [] sP stP p vs fin rI
+                → Arm S now [] sP stP p vs fin none rI
       hop-arm   : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u} {vs : List (Val Γ (echoᵗ u))} {vs′ : List (Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u)))}
                 → Head src src′ {echoᵗ u} {echoᵗ (emitᵗ u)} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ (echoᵗ u) (echoᵗ (emitᵗ u))
                 → ∀ {nid nid′} → (nid , nid′ ∷ []) ∈ Store.π S
@@ -341,7 +363,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → ∀ {now fin oP vs₁ fin₁ sP₁ stP₁ rI}
                 → stepFrame⇓ now (thru-outer mergeAllᵒ nid) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
                 → foldPath⇓ now (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) vs′ fin sI stI rI
-                → Arm S now oP sP₁ stP₁ p vs₁ fin₁ rI
+                → Arm S now oP sP₁ stP₁ p vs₁ fin₁ none rI
 
     -- A SLOT'S READER: the impl runs the restamp where the plain path runs
     -- on, so the arm is the one frame the impl moves alone
@@ -353,7 +375,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
                  → ∀ {now vs es fin rI} → Carries es vs
                  → foldPath⇓ now (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ h ] q) es fin sI stI rI
-                 → Arm S now [] sP stP p vs fin rI
+                 → Arm S now [] sP stP p vs fin none rI
 
     -- the emits of a stamped slot against the plain values, at types the
     -- share's own is only propositionally the emit of
@@ -369,7 +391,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → CarriesU εI es vs
               → ∀ {now fin rP rI} → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now p′ es fin sI stI rI
               → After S rP rI
-    slot-pass S refl (read~ hk r refl) c dP dI = resume (read-arm S hk r c dI) dP
+    slot-pass S refl (read~ hk r refl) c dP dI = proj₁ (resume (read-arm S hk r c dI) dP)
 
     -- a partnered pair stays partnered once the store moves
     slot-keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
@@ -382,7 +404,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- the same pass, started from the store as it stood before the row was marked
     rebase : ∀ {sP stP sI stI x y rP rI} {S : St sP stP sI stI}
            → After (delivered S {x} {y}) rP rI → After S rP rI
-    rebase (after s k q v) = after s k (λ ar → q (delivered-arr ar)) v
+    rebase (after s k q v g) = after s k (λ ar → q (delivered-arr ar)) v g
 
     -- A SHARE'S FAN-OUT AGAINST THE PLAIN CASCADE OVER THE SAME READERS,
     -- one reader at a time: the plain chain and the admitted row it is
@@ -396,7 +418,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            → cascadeGo⇓ a vs fin chs sP stP (oP , sP₁ , stP₁)
            → shareGo⇓ now (n ↑ʳ i) es fin adm sI stI (oI , sI₁ , stI₁)
            → After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁)
-    fan-go S εI c ta [] casc-nil go-nil = after S (λ x → x) (λ x → x) []
+    fan-go S εI c ta [] casc-nil go-nil = after S (λ x → x) (λ x → x) [] (λ x → x)
     fan-go S εI c ta (slotpair (inj₁ _) ∷ ps) (casc-cut _ g) (go-cut _ g′) = fan-go S εI c ta ps g g′
     fan-go S εI c ta (slotpair (inj₁ (x , _)) ∷ _) (casc-live y _ _) _ = ⊥-elim (clash (trans (sym x) y))
     fan-go S εI c ta (slotpair (inj₁ (_ , x)) ∷ _) (casc-cut _ _) (go-live y _ _) = ⊥-elim (clash (trans (sym x) y))
@@ -480,5 +502,5 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  (rid , atDyn src lo , (u , p)) (rid′ , atDyn src′ lo′ , (u′ , p′))
              → ∀ {now fin rP rI} → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now p′ vs′ fin sI stI rI
              → After S rP rI
-    row-pass S hd (cold~ sp blk r refl) dP dI = resume (block-arm S hd sp blk r dI) dP
-    row-pass S hd (defer~ sp k nP nI r refl) (fold-step d dP) dI = resume (hop-arm S hd sp k nP nI r d dI) dP
+    row-pass S hd (cold~ sp blk r refl) dP dI = proj₁ (resume (block-arm S hd sp blk r dI) dP)
+    row-pass S hd (defer~ sp k nP nI r refl) (fold-step d dP) dI = proj₁ (resume (hop-arm S hd sp k nP nI r d dI) dP)
