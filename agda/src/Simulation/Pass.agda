@@ -180,6 +180,20 @@ step-clear : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u} {f : Frame 
            → Clear k (f ↠[ le ] κ) sched st → Clear k (f ↠[ le ] κ) sched′ st′
 step-clear {f = f} {le = le} {κ = κ} d c = reclear {π = f ↠[ le ] κ} refl c (stepFrame-rule le d (proj₂ c))
 
+-- a fold down a sound path of the same end keeps it too
+fold-clear : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo lo′ u s′} {k} {κ : Path Γ lo u t} {π : Path Γ lo′ s′ t}
+               {now vals fin sched st r}
+           → foldPath⇓ {e = e} now π vals fin sched st r → Sound π sched st → endOf π ≡ endOf κ
+           → Clear k κ sched st → Clear k κ (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+fold-clear {π = π} d so eq c = reclear {π = π} eq c (fold-kept d so)
+
+-- and so does consuming an inner through it
+consume-clear : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} {k} {κ : Path Γ lo u t} {op now} {o : Val Γ (obs u)}
+                  {sched sched′ st st′ out}
+              → thruConsume⇓ {e = e} op k κ now o sched st (out , sched′ , st′)
+              → Clear k κ sched st → Clear k κ sched′ st′
+consume-clear {k = k} {κ = κ} d c = reclear {π = Thru k κ} refl c (thruConsume-rule d (thru c))
+
 -- and the rule follows a step down its path
 adv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo ℓ s u} {f : Frame Γ s u} {le : lo ≤ ℓ} {κ : Path Γ ℓ u t}
         {now vals fin sched st out vals′ fin′ sched′ st′}
@@ -655,10 +669,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                           (thru-outer (flatOp op) m ↠[ h ] p)
                           (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))
       quiet-outer S {op = op} {Θ₀ = Θ₀} {ρ₀} w b refl si
-                  (fold-step step-map (fold-step (step-thru-outer W) (fold-step d₁ (fold-step step-map dq)))) =
+                  (fold-step step-map (fold-step dW@(step-thru-outer W) (fold-step d₁ (fold-step step-map dq)))) =
         let si′ = adv step-map si
             X  = quiet-walk S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru si′) w b W
-            c₁ = step-clear d₁ (unthru (step-kept _ (step-thru-outer W) si′))
+            c₁ = step-clear d₁ (unthru (step-kept _ dW si′))
             T  = quiet-tail (flat-echo (After.store (proj₁ X)) (proj₂ X) [] d₁) (tail-of c₁) dq
         in proj₁ X ⨾ proj₁ T , outerElem~ (proj₁ (proj₂ T)) (proj₂ (proj₂ T))
 
@@ -687,7 +701,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-elem-step S cI w (quiet-elem bx) b (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) =
         let c₁ = step-clear d₁ cI
             E  = quiet-tail (flat-echo S w (quiet _ bx []) d₁) (tail-of c₁) dq
-            X  = quiet-walk (After.store (proj₁ E)) (reclear refl c₁ (fold-kept dq (proj₂ (proj₁ (tail-of c₁))))) (proj₂ E) b W′
+            X  = quiet-walk (After.store (proj₁ E)) (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b W′
         in proj₁ E ⨾ proj₁ X , proj₂ X
 
       -- a bare echo, restamped: down the impl's tail alone
@@ -831,11 +845,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                         (λ π NP NI → PathRel κ π NP NI (thru-outer (flatOp op) m ↠[ h ] p)
                            (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))) rI
-      outerElem-arm S {op = op} {Θ₀ = Θ₀} {ρ₀} {fin = fin} w b sp si (step-thru-outer W) (fold-step step-map (fold-step (step-thru-outer W′) dR)) =
+      outerElem-arm S {op = op} {Θ₀ = Θ₀} {ρ₀} {fin = fin} w b sp si dW@(step-thru-outer W) (fold-step step-map (fold-step dW′@(step-thru-outer W′) dR)) =
         let si′ = adv step-map si
             X   = elem-walk S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru sp) (unthru si′) w b W W′
-        in wrap-arm (proj₁ X) (unthru (step-kept _ (step-thru-outer W) sp))
-             (outer-wrap (After.store (proj₁ X)) {op = op} {fin = fin} (proj₂ X) (unthru (step-kept _ (step-thru-outer W′) si′)) dR)
+        in wrap-arm (proj₁ X) (unthru (step-kept _ dW sp))
+             (outer-wrap (After.store (proj₁ X)) {op = op} {fin = fin} (proj₂ X) (unthru (step-kept _ dW′ si′)) dR)
 
       -- THE OUTER'S WALK, an element at a time
       elem-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
@@ -866,7 +880,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-step S cP cI w (quiet-elem bx) b W (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) =
         let c₁ = step-clear d₁ cI
             E  = quiet-tail (flat-echo S w (quiet _ bx []) d₁) (tail-of c₁) dq
-            X  = elem-walk (After.store (proj₁ E)) cP (reclear refl c₁ (fold-kept dq (proj₂ (proj₁ (tail-of c₁))))) (proj₂ E) b W W′
+            X  = elem-walk (After.store (proj₁ E)) cP (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b W W′
         in proj₁ E ⨾ proj₁ X , proj₂ X
 
       -- an emit with one element: its echo, then its lane
@@ -883,30 +897,30 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       one-step S cP cI w (elem {w = inj₁ _} r no-lane) b W (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) =
         let c₁ = step-clear d₁ cI
             E  = quiet-tail (flat-echo S w (quiet _ r []) d₁) (tail-of c₁) dq
-            X  = elem-walk (After.store (proj₁ E)) cP (reclear refl c₁ (fold-kept dq (proj₂ (proj₁ (tail-of c₁))))) (proj₂ E) b W W′
+            X  = elem-walk (After.store (proj₁ E)) cP (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b W W′
         in proj₁ E ⨾ proj₁ X , proj₂ X
       one-step S cP cI w (elem {w = inj₁ _} r (a-lane ob)) b (walk-cons c W) (walk-echo (fold-step d₁ (fold-step step-map dq)) (walk-cons c′ W′)) =
         let c₁ = step-clear d₁ cI
             E  = quiet-tail (flat-echo S w (quiet _ r []) d₁) (tail-of c₁) dq
-            c₂ = reclear refl c₁ (fold-kept dq (proj₂ (proj₁ (tail-of c₁))))
+            c₂ = fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁
             C  = consume-pair (After.store (proj₁ E)) (proj₂ E) ob c c′
-            X  = elem-walk (After.store (proj₁ C)) (reclear refl cP (thruConsume-rule c (thru cP)))
-                   (reclear refl c₂ (thruConsume-rule c′ (thru c₂))) (proj₂ C) b W W′
+            X  = elem-walk (After.store (proj₁ C)) (consume-clear c cP)
+                   (consume-clear c′ c₂) (proj₂ C) b W W′
         in proj₁ E ⨾ (proj₁ C ⨾ proj₁ X) , proj₂ X
       one-step S cP cI w (elem {w = inj₂ _} r no-lane) b (walk-echo dv W) (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) =
         let c₁ = step-clear d₁ cI
             E  = echo-go dv cP (flat-echo S w (one _ r []) d₁) (tail-of c₁) dq
-            X  = elem-walk (After.store (proj₁ E)) (reclear refl cP (fold-kept dv (proj₂ cP)))
-                   (reclear refl c₁ (fold-kept dq (proj₂ (proj₁ (tail-of c₁))))) (proj₂ E) b W W′
+            X  = elem-walk (After.store (proj₁ E)) (fold-clear dv (proj₂ cP) refl cP)
+                   (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b W W′
         in proj₁ E ⨾ proj₁ X , proj₂ X
       one-step S cP cI w (elem {w = inj₂ _} r (a-lane ob)) b (walk-echo dv (walk-cons c W)) (walk-echo (fold-step d₁ (fold-step step-map dq)) (walk-cons c′ W′)) =
         let c₁  = step-clear d₁ cI
             E   = echo-go dv cP (flat-echo S w (one _ r []) d₁) (tail-of c₁) dq
-            cP₂ = reclear refl cP (fold-kept dv (proj₂ cP))
-            c₂  = reclear refl c₁ (fold-kept dq (proj₂ (proj₁ (tail-of c₁))))
+            cP₂ = fold-clear dv (proj₂ cP) refl cP
+            c₂  = fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁
             C   = consume-pair (After.store (proj₁ E)) (proj₂ E) ob c c′
-            X   = elem-walk (After.store (proj₁ C)) (reclear refl cP₂ (thruConsume-rule c (thru cP₂)))
-                    (reclear refl c₂ (thruConsume-rule c′ (thru c₂))) (proj₂ C) b W W′
+            X   = elem-walk (After.store (proj₁ C)) (consume-clear c cP₂)
+                    (consume-clear c′ c₂) (proj₂ C) b W W′
         in proj₁ E ⨾ (proj₁ C ⨾ proj₁ X) , proj₂ X
 
       -- a valued echo, restamped: down both tails

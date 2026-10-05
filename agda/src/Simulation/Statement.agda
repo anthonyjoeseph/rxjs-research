@@ -50,7 +50,9 @@ open Relation.Binary.PropositionalEquality.≡-Reasoning
 open import Rx.Prim      using (Fuel; Id; PlainEvent; valueᵖ; completeᵖ; InstEmit)
 open import Rx.Exp       using (Ctx; Closed; Val; isData; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
-open import Data.Fin     using (toℕ; _↑ˡ_)
+open import Data.Fin     using (toℕ; _↑ˡ_; _↑ʳ_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec     using (lookup)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import SExp.InstEmit using (instEmitᵗ)
@@ -65,8 +67,9 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrT
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; memberSource)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
   disp; walk-more; walk-nil; walk-end)
-open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule)
-open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule)
+open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule; chain-sound; chain-agree)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; termini; admit-ot; admit-agree)
+open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
@@ -332,6 +335,7 @@ dyn-chain : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Arrival.tick a ≡ Arrival.tick a′
   → ∀ {c c′ chs chs′} → Partners κ _ _ _ _ _ (Storeʳ.rows s) (dynRow a c) (dynRow a′ c′)
   → Pointwise (Paired (Storeʳ.rows s) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′) chs chs′
+  → Sound (proj₂ (proj₂ c)) sP stP → Sound (proj₂ (proj₂ c′)) sI stI
   → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
   → chainStep⇓ a vs fin (proj₂ c) sP (record stP { delivered = proj₁ c ∷ EvalSt.delivered stP }) (oP , sP₁ , stP₁)
   → chainStep⇓ a′ vs′ fin (proj₂ c′) sI (record stI { delivered = proj₁ c′ ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
@@ -339,12 +343,12 @@ dyn-chain : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
       Pointwise (Paired (Storeʳ.rows s₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) a a′) chs chs′
     × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
     × Persists κ s s₁
-dyn-chain {t = t} κ e s {a = a} {a′} hd ta pr ps dP dI =
+dyn-chain {t = t} κ e s {a = a} {a′} hd ta pr ps soP soI dP dI =
   After.store A , Pointwise-map (λ {c} {c′} → After.keeps A {dynRow a c} {dynRow a′ c′}) ps , Pointwise-map (v-agrees κ t) (After.values A)
   , (λ ar → After.persists A (delivered-arr ar))
   where
     A = row-pass κ (delivered s) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
-          (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
+          (sub-ot (λ r∈ → r∈) ≤-refl soP) (sub-ot (λ r∈ → r∈) ≤-refl soI) (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
 
 pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
             {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
@@ -352,27 +356,39 @@ pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → ∀ {a a′ vs vs′ fin} → Head κ (Arrival.source a) (Arrival.source a′) {arrTy a} {arrTy a′} vs vs′
   → Arrival.tick a ≡ Arrival.tick a′
   → ∀ {chs chs′} → Pointwise (Paired (Storeʳ.rows s) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′) chs chs′
+  → (∀ {x} → x ∈ chs → Sound (proj₂ (proj₂ x)) sP stP)
+  → (∀ {x y} → x ∈ chs → y ∈ chs → Agree (proj₂ (proj₂ x)) (proj₂ (proj₂ y)))
+  → (∀ {x} → x ∈ chs′ → Sound (proj₂ (proj₂ x)) sI stI)
+  → (∀ {x y} → x ∈ chs′ → y ∈ chs′ → Agree (proj₂ (proj₂ x)) (proj₂ (proj₂ y)))
   → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
   → cascadeGo⇓ a vs fin chs sP stP (oP , sP₁ , stP₁)
   → cascadeGo⇓ a′ vs′ fin chs′ sI stI (oI , sI₁ , stI₁)
   → Σ (Storeʳ κ sP₁ stP₁ sI₁ stI₁) λ s₁ →
       Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
     × Persists κ s s₁
-pass-go κ e s hd ta [] casc-nil casc-nil = s , [] , (λ ar → ar)
-pass-go κ e s hd ta (inj₁ _ ∷ ps) (casc-cut _ g) (casc-cut _ g′) = pass-go κ e s hd ta ps g g′
-pass-go κ e s hd ta (inj₁ (x , _) ∷ _) (casc-live y _ _) _ = ⊥-elim (clash (trans (sym x) y))
-pass-go κ e s hd ta (inj₁ (_ , x) ∷ _) (casc-cut _ _) (casc-live y _ _) = ⊥-elim (clash (trans (sym x) y))
-pass-go κ e s hd ta (inj₂ (x , _) ∷ _) (casc-cut y _) _ = ⊥-elim (clash (trans (sym y) x))
-pass-go κ e s hd ta (inj₂ (_ , x , _) ∷ _) (casc-live _ _ _) (casc-cut y _) = ⊥-elim (clash (trans (sym y) x))
-pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps)
+pass-go κ e s hd ta [] _ _ _ _ casc-nil casc-nil = s , [] , (λ ar → ar)
+pass-go κ e s hd ta (inj₁ _ ∷ ps) hP aP hI aI (casc-cut _ g) (casc-cut _ g′) =
+  pass-go κ e s hd ta ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
+pass-go κ e s hd ta (inj₁ (x , _) ∷ _) _ _ _ _ (casc-live y _ _) _ = ⊥-elim (clash (trans (sym x) y))
+pass-go κ e s hd ta (inj₁ (_ , x) ∷ _) _ _ _ _ (casc-cut _ _) (casc-live y _ _) = ⊥-elim (clash (trans (sym x) y))
+pass-go κ e s hd ta (inj₂ (x , _) ∷ _) _ _ _ _ (casc-cut y _) _ = ⊥-elim (clash (trans (sym y) x))
+pass-go κ e s hd ta (inj₂ (_ , x , _) ∷ _) _ _ _ _ (casc-live _ _ _) (casc-cut y _) = ⊥-elim (clash (trans (sym y) x))
+pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps) hP aP hI aI
         (casc-live {emits = eP} {rest = rP} _ st g) (casc-live {emits = eI} {rest = rI} _ st′ g′)
-  with dyn-chain κ e s hd ta pr ps st st′
+  with dyn-chain κ e s hd ta pr ps (hP (here refl)) (hI (here refl)) st st′
 ... | s₁ , ps₁ , ag , q₁ =
   proj₁ k ,
   subst₂ (Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)) (sym (readᴵ-++ eI rI)) (sym (readᴾ-++ eP rP))
          (++⁺ ag (proj₁ (proj₂ k))) ,
   (λ ar → proj₂ (proj₂ k) (q₁ ar))
-  where k = pass-go κ e s₁ hd ta ps₁ g g′
+  where
+    sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
+    sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
+    k = pass-go κ e s₁ hd ta ps₁
+          (λ m → fold-kept (unchain st) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
+          (λ m m′ → aP (there m) (there m′))
+          (λ m → fold-kept (unchain st′) sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))
+          (λ m m′ → aI (there m) (there m′)) g g′
 
 -- a minted source's value pass: the chains pair up at the popped stores
 dyn-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
@@ -398,7 +414,9 @@ dyn-pass κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy p q go go′
            → Pointwise (Paired (Storeʳ.rows s₀) [] [] a a′) chs chs′
     opened []       = []
     opened (r ∷ rs) = inj₂ (refl , refl , r) ∷ opened rs
-    k = pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ s ex ex′ p q s₀)) go go′
+    k = pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ s ex ex′ p q s₀))
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI s) x∈)) (chain-agree a′ (Storeʳ.ruleI s)) go go′
 
 -- A HOT SCRIPT'S VALUE PASS: the impl's one chain runs its input block into
 -- the share, which fans out to the rows the plain run's readers are
@@ -414,7 +432,7 @@ hot-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
   → Storeʳ κ sP₁ stP₁ sI₁ stI₁
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
-hot-pass {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy i hk e₁ e₂ {oP = oP} go go′
+hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy i hk e₁ e₂ {oP = oP} go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
   with hot-start κ (pop-store κ s ex ex′ sy) {a} {a′} {i} hk src h h′ e₁ e₂ go′
@@ -423,7 +441,10 @@ hot-pass {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy 
   subst (λ z → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ z) (readᴾ oP))
         (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z))
   where
-    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty) go g)
+    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
+          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI (After.store A))))
+          go g)
 ... | hot-idle none refl with casc-empty (subst (λ c → cascadeGo⇓ a _ false c _ _ _) none go)
 ...   | refl = pop-store κ s ex ex′ sy , []
 
@@ -490,7 +511,11 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll�
   hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ (cascade-latched end′ {toℕ (i ↑ˡ n)} (close-hit a′ stI₁ e₂)) {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
-    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty) end g)
+    S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
+    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
+          (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI (After.store A))) (admit-agree (n ↑ʳ i) _ (termini (Storeʳ.ruleI (After.store A))))
+          end g)
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
 ...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd) {a} {a′} {i}
                            e₁ e₂ ll ll′ (close-hit a′ stI₁ e₂) z₁ z₂ , []
@@ -527,7 +552,9 @@ last-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁}
         ar₁ = proj₂ (proj₂ W)
         ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁
         Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q
-        k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca) end end′
+        k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca)
+               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
+               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′
         S₂ = proj₁ k
 
 -- a value pass ends a cascade unless the arrival is its source's last
