@@ -300,15 +300,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `NO EVIDENCE`: an inner's, a lane's or a deferred body's merge passes emits
   carrying nothing on as they came.
 - **`flat-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
-  scan stepped on an element's echo keeps the flattener, and the group it
-  hands on carries the echo's values, still open.
+  scan stepped on an element's echo keeps the flattener, and the group it hands
+  on carries the echo's values, still open.
 - **`consume-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
   lane subscribed on both sides keeps the flattener and the path related.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
-- **`elem-{one,quiet}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the
-  impl's element map on an emit of one payload, or none, is an echo and at most
-  one lane related to the plain element.
+- **`elem-{one,quiet}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the impl's
+  element map on an emit of one payload, or none, is an echo and at most one
+  lane related to the plain element.
 - **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   exploded outer's step on both sides.
 - **`{inner,lane,deferInner}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
@@ -345,9 +345,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
-- **`fold-unmoved`** (Simulation.Pass) — DIFFICULTY, `NO EVIDENCE`: a fold
-  leaves a node off its own sound path as it found it, one clause per
-  constructor as `foldPath-rule`.
+- **`fold-unmoved`** (Simulation.Pass) — DIFFICULTY, `TWIN`: a fold leaves a
+  node off its own sound path as it found it, one clause per constructor as
+  `foldPath-rule`.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
   `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached
