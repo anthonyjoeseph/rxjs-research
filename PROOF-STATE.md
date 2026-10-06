@@ -257,7 +257,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### Big picture tier roadmap
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
-  program, one arm per former, `walk-flatten` its riskiest. A minted source's
+  program, one arm per former, `walk-take` blocked on its relation. A minted source's
   chain is `path-pass`, one arm per plain frame; a hot slot's is `fan-go` over
   the share's readers, paired by the proven `slot-chains`, after `hot-start`
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
@@ -347,9 +347,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   cascade's values carry one instant between the counters it enters and leaves.
 - **`walk-*`** (Simulation.Walk) — FALSITY, `DEAD ROUTE, PROBED×4`: one
   former's subscribe keeps what a pass keeps (`After`); holds at a hot, cold
-  and deferred read. Riskiest is `walk-flatten`, past the typechecker: a
-  one-lane merge only in normal form. No take or `μ` run; `walk-take`'s body is
-  not subscribed under `take~`.
+  and deferred read. No take or `μ` run; `walk-take`'s body is not subscribed
+  under `take~`.
+- **`flat-install{,-explode}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a
+  flattener's nodes and the impl's restamping cell, and per-inner merge,
+  installed on both sides pair in `π` and keep the tails related; a one-lane
+  merge read only in normal form.
 - **`lifts-scan`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the elaborated
   scan's step and seed read the author's variables past the mint's binder.
 - **`scan-install`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a scan's cell

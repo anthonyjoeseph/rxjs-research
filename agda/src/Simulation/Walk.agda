@@ -20,27 +20,27 @@ open import Data.List.Relation.Unary.AllPairs using ([])
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.All.Properties using (map⁺; concat⁺; tabulate⁺)
-open import Data.Bool    using (T; true; false; _∨_)
+open import Data.Bool    using (Bool; T; true; false; _∨_)
 open import Data.Unit    using (tt)
 open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (there)
-open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; <⇒<ᵇ; 1+n≢n)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; <⇒<ᵇ; <⇒≢; 1+n≢n)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ; _∷_ to _∷ᵖ_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Data.Sum using (inj₂)
-open import Data.Maybe using (just)
+open import Data.Maybe using (just; nothing)
 
 open import Rx.Prim      using (hot; cold)
-open import Rx.Exp       using (FlatOp)
-open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; mintᵉ; mapᵉ; scanᵉ; takeWhileᵉ; Fn; FnClo; Tm)
+open import Rx.Exp       using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; mintᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
-  mkHot; installNode; setNode; cell-st; take-st; lookupNode)
+  mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer)
 open import Rx.Slots     using (Slots; scripted; shared)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-scan; subs-takeWhile)
+open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-scan; subs-takeWhile; subs-flatten; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
@@ -48,14 +48,17 @@ open import Data.Fin     using (Fin)
 open import SExp.Syntax  using (SExp; STm; SFn; Kinds; plainᵏ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
 open import SExp.Plain   using (plainExp; plainTm)
-open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ)
+open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
+  FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ)
 open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import Simulation.Schedules using (Sync)
 open import Simulation.After using (readᴾ; readᴵ; module Kept)
 open import Simulation.Write using (apart)
 open Kept using (After; module After; _⨾_)
-open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~; spentWhile~; Store; Src; SrcNum; [])
+open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
+  spentWhile~; FlatNodes; merge~; switch~; exhaust~; outerElem~; outerExplode~; Store; Src;
+  SrcNum; [])
 
 
 -- TWIN: `ib-renᵉ` -- the same walk over `renExp`'s clauses, a binder's
@@ -154,15 +157,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   `take~` to hand the walk until the wrap has run, and the wrap
       --   runs after the walk returns.
       walk-take      : ∀ {Θ u} (k : STm Γ [] [] Θ _) (b : SExp Γ [] [] Θ u) → Elab-Walks (takeˢ k b)
-      -- the riskiest arm: the outer's frames, and every inner a sync
-      -- outer hands the flattener subscribed before the arm returns.
-      -- Read off normal forms, not instantiated: a one-lane merge of the
-      -- hot read installs what the relation says -- `read~` through
-      -- `inner~` and `merge~`, `π` pairing the plain merge node with the
-      -- impl's lane node and cell -- and a literal `of` outer installs
-      -- nothing on either side.  The typechecked row of the merge does
-      -- not finish: the coverage boundary of `Probed.Stores`.
-      walk-flatten   : ∀ {Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ _) → Elab-Walks {Θ} {u} (flattenˢ op b)
       -- an unrolling: the body under the substitution, on both sides
       walk-μ         : ∀ {Θ u} (b : SExp Γ (u ∷ []) [] Θ u) → Elab-Walks (μˢ b)
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
@@ -203,6 +197,77 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                         → (k , k₁ ∷ k₂ ∷ []) ∈ Store.π (After.store A)
                         × PathRel κ (Store.π (After.store A)) (setNode k (take-st 1) (EvalSt.nodes stP))
                             (setNode k₁ (cell-st {t = CutS unitᵗ u} c) (setNode k₂ (take-st 1) (EvalSt.nodes stI))) p q
+
+      -- A FLATTENER INSTALLED ON BOTH SIDES, the impl's restamping cell
+      -- under it: the triple joins `π` and the tails stay related.
+      -- Read off normal forms, not instantiated: a one-lane merge of the
+      -- hot read installs what the relation says -- `π` pairing the plain
+      -- merge node with the impl's lane node and cell -- and the
+      -- typechecked row of the merge does not finish, the coverage
+      -- boundary of `Probed.Stores`.
+      flat-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                       {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
+                       (op : FlatOp) {m m′ ks} (c : Val (plainᵏ Γ κ) (FlatSᵗ u))
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                   → freshId nodeᵏ (Sched.mint sP) ≡ m
+                   → freshId nodeᵏ (Sched.mint sI) ≡ ks
+                   → suc ks ≡ m′
+                   → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc m) (Sched.mint sP) } , installNode m (flatSt u op) stP)
+                                  ([] , record sI { mint = setAt nodeᵏ (suc m′) (setAt nodeᵏ (suc ks) (Sched.mint sI)) }
+                                      , installNode m′ (flatSt (emitᵗ u) op) (installNode ks (cell-st {t = FlatSᵗ u} c) stI))) λ A
+                       → (m , m′ ∷ ks ∷ []) ∈ Store.π (After.store A)
+                       × PathRel κ (Store.π (After.store A)) (setNode m (flatSt u op) (EvalSt.nodes stP))
+                           (setNode m′ (flatSt (emitᵗ u) op) (setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI))) p q
+
+      -- the same with the impl's per-inner merge under the flattener:
+      -- the merge's node rides the quadruple
+      flat-install-explode : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                               {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
+                               (op : FlatOp) {m m′ ks mX} (c : Val (plainᵏ Γ κ) (FlatSᵗ u))
+                           → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                           → freshId nodeᵏ (Sched.mint sP) ≡ m
+                           → freshId nodeᵏ (Sched.mint sI) ≡ ks
+                           → suc ks ≡ m′
+                           → suc m′ ≡ mX
+                           → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc m) (Sched.mint sP) } , installNode m (flatSt u op) stP)
+                                          ([] , record sI { mint = setAt nodeᵏ (suc mX) (setAt nodeᵏ (suc m′) (setAt nodeᵏ (suc ks) (Sched.mint sI))) }
+                                              , installNode mX (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing))
+                                                  (installNode m′ (flatSt (emitᵗ u) op) (installNode ks (cell-st {t = FlatSᵗ u} c) stI)))) λ A
+                               → (m , m′ ∷ ks ∷ mX ∷ []) ∈ Store.π (After.store A)
+                               × PathRel κ (Store.π (After.store A)) (setNode m (flatSt u op) (EvalSt.nodes stP))
+                                   (setNode mX (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing))
+                                     (setNode m′ (flatSt (emitᵗ u) op) (setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)))) p q
+
+    -- a fresh flattener's nodes, related
+    flat-init : ∀ {π} u op → FlatNodes {Γ = Γ} κ π u op (flatSt u op) (flatSt (emitᵗ u) op)
+    flat-init u (mergeᶠ _) = merge~ []ᵖ
+    flat-init u switchᶠ    = switch~ tt
+    flat-init u exhaustᶠ   = exhaust~
+
+    -- a flattener's frames walked, one element per emit: the tail related again
+    unflat : ∀ {X : Set} {π : X → List (NodeId × List NodeId)} {NP : X → List (NodeId × NodeState Γ)}
+               {NI : X → List (NodeId × NodeState (plainᵏ Γ κ))} {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u x y o o′ m m′ ks}
+               {G₀ : FnClo (plainᵏ Γ κ) (emitᵗ (echoᵗ u)) (echoᵗ x)} {G₁ : FnClo (plainᵏ Γ κ) (y ×ᵗ x) y}
+               {G₂ : FnClo (plainᵏ Γ κ) y (emitᵗ u)}
+               {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+               {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+           → Σ X (λ A → PathRel κ (π A) {t} (NP A) (NI A) (thru-outer o m ↠[ h ] p)
+                          (map-f G₀ ↠[ h₁ ] (thru-outer o′ m′ ↠[ h₂ ] (scan-f G₁ ks ↠[ h₃ ] (map-f G₂ ↠[ h₄ ] q)))))
+           → Σ X (λ A → PathRel κ (π A) (NP A) (NI A) p q)
+    unflat (A , outerElem~ _ pr) = A , pr
+
+    -- the same, one element per inner
+    unexplode : ∀ {X : Set} {π : X → List (NodeId × List NodeId)} {NP : X → List (NodeId × NodeState Γ)}
+                  {NI : X → List (NodeId × NodeState (plainᵏ Γ κ))} {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u w x y o o′ o″ m m′ ks mX}
+                  {G₀ : FnClo (plainᵏ Γ κ) (emitᵗ (echoᵗ u)) w} {G₅ : FnClo (plainᵏ Γ κ) w (echoᵗ (echoᵗ x))}
+                  {G₁ : FnClo (plainᵏ Γ κ) (y ×ᵗ x) y} {G₂ : FnClo (plainᵏ Γ κ) y (emitᵗ u)}
+                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                  {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+              → Σ X (λ A → PathRel κ (π A) {t} (NP A) (NI A) (thru-outer o m ↠[ h ] p)
+                             (map-f G₀ ↠[ h₁ ] (map-f G₅ ↠[ h₂ ] (thru-outer o″ mX ↠[ h₃ ]
+                               (thru-outer o′ m′ ↠[ h₄ ] (scan-f G₁ ks ↠[ h₅ ] (map-f G₂ ↠[ h₆ ] q)))))))
+              → Σ X (λ A → PathRel κ (π A) (NP A) (NI A) p q)
+    unexplode (A , outerExplode~ _ pr) = A , pr
 
     -- a test's frames walked: the tail related again
     unwhile : ∀ {X : Set} {π : X → List (NodeId × List NodeId)} {NP : X → List (NodeId × NodeState Γ)}
@@ -267,6 +332,63 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 dP (reExp fu dI)
       in unwhile (_⨾_ κ (proj₁ I) (proj₁ X) , proj₂ X)
 
+    -- a flattener's walk, one element per emit: the plain node
+    -- installed, the impl's cell and node installed, and the body walked
+    -- under them
+    walk-flat-elem : ∀ {Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks b
+                   → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+                   → ∀ {i : Tm (plainᵏ Γ κ) [] [] Θ′ (FlatSᵗ u)}
+                   → Walks (Θ′ , mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ flatStepᵛ i
+                                   (flattenᵉ op (mapᵉ elemᵛ (renExp (λ x → x) (λ x → x) w (toInstEmit κ b))))) , ρ′)
+                           (Θ , plainExp (flattenˢ op b) , ρ)
+    walk-flat-elem {u = u} op b wb w {ρ′} r {i} {stP = stP} {stI = stI} S pr (subs-flatten (sub-all {nid = m} frP dP))
+      (subs-map (subs-scan {nid = ks} frK (subs-flatten (sub-all {nid = m′} frM (subs-map dI))))) =
+      let c  = evalWith i ρ′
+          N  = setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)
+          I  = flat-install S op c pr frP frK frM
+          F  = proj₁ (proj₂ I) , flatSt u op , flatSt (emitᵗ u) op
+             , lookup-set m (flatSt u op) (EvalSt.nodes stP) , lookup-set m′ (flatSt (emitᵗ u) op) N , flat-init u op
+             , c , trans (set-above m′ ks (flatSt (emitᵗ u) op) N (apart m′ ks (λ e → 1+n≢n (trans frM (sym e)))))
+                         (lookup-set ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI))
+          X  = wb w r (After.store (proj₁ I)) (outerElem~ {op = op} F (proj₂ (proj₂ I))) dP dI
+      in unflat (_⨾_ κ (proj₁ I) (proj₁ X) , proj₂ X)
+
+    -- the same, one element per inner: the impl's per-inner merge
+    -- installed between its flattener and the body
+    walk-flat-explode : ∀ {Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks b
+                      → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+                      → ∀ {i : Tm (plainᵏ Γ κ) [] [] Θ′ (FlatSᵗ u)}
+                      → Walks (Θ′ , mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ flatStepᵛ i
+                                      (flattenᵉ op (flattenᵉ (mergeᶠ nothing) (mapᵉ (pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))))
+                                        (mapᵉ explodeᵛ (renExp (λ x → x) (λ x → x) w (toInstEmit κ b))))))) , ρ′)
+                              (Θ , plainExp (flattenˢ op b) , ρ)
+    walk-flat-explode {u = u} op b wb w {ρ′} r {i} {stP = stP} {stI = stI} S pr (subs-flatten (sub-all {nid = m} frP dP))
+      (subs-map (subs-scan {nid = ks} frK (subs-flatten (sub-all {nid = m′} frM (subs-flatten (sub-all {nid = mX} frX (subs-map (subs-map dI)))))))) =
+      let c  = evalWith i ρ′
+          N  = setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)
+          xX = flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing)
+          x′ = flatSt (emitᵗ u) op
+          I  = flat-install-explode S op c pr frP frK frM frX
+          F  = proj₁ (proj₂ I) , flatSt u op , x′
+             , lookup-set m (flatSt u op) (EvalSt.nodes stP)
+             , trans (set-above mX m′ xX (setNode m′ x′ N) (apart mX m′ (λ e → 1+n≢n (trans frX (sym e)))))
+                     (lookup-set m′ x′ N)
+             , flat-init u op
+             , c , trans (set-above mX ks xX (setNode m′ x′ N)
+                           (apart mX ks (λ e → <⇒≢ (<-trans (n<1+n ks) (n<1+n (suc ks))) (trans e (sym (trans (cong suc frM) frX))))))
+                         (trans (set-above m′ ks x′ N (apart m′ ks (λ e → 1+n≢n (trans frM (sym e)))))
+                                (lookup-set ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)))
+          X  = wb w r (After.store (proj₁ I)) (outerExplode~ {op = op} F (proj₂ (proj₂ I))) dP dI
+      in unexplode (_⨾_ κ (proj₁ I) (proj₁ X) , proj₂ X)
+
+    -- a flattener's walk at either elaboration
+    walk-flat : ∀ {Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks b → (pi : Bool)
+              → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+              → Walks (Θ′ , renExp (λ x → x) (λ x → x) w (flattenᵖ op pi (frameᵛ Θ) (toInstEmit κ b)) , ρ′)
+                      (Θ , plainExp (flattenˢ op b) , ρ)
+    walk-flat op b wb false w r = walk-flat-elem op b wb w r
+    walk-flat op b wb true  w r = walk-flat-explode op b wb w r
+
     walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
     walk (inputˢ i)       = walk-input i
     walk (ofˢ ts)         = walk-of ts
@@ -282,7 +404,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                   (lookup-set k′ (cell-st (evalWith iI (src ∷ᵉ ρ′))) (EvalSt.nodes stI)) (proj₂ L) (proj₁ L) (proj₂ (proj₂ I)))
                 dP (reExp (renExp-fuse there (ext∈ w) (toInstEmit κ b)) dI)
       in unscan (_⨾_ κ (proj₁ I) (proj₁ X) , proj₂ X)
-    walk (flattenˢ op b)  = walk-flatten op b
+    walk (flattenˢ op b) w r = walk-flat op b (walk b) (perInnerˢ op b) w r
     walk (μˢ b)           = walk-μ b
     walk (varˢ ())
     walk (deferˢ b)       = walk-defer b
