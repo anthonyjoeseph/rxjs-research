@@ -259,8 +259,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **REFUTE OR PROBE THE FINISHING ARMS.** `merge-finish` and
   `defer-finish` drain the queue a dead inner's merge holds, on both sides,
   and nothing has ever instantiated either: the least certain step left in
-  the cascade. Aim `make qc-store` at bounded merges whose inner dies with a
-  queue, then write `merge-finish` as a body over the drain's own leaf.
+  the cascade. `merge-finish` is a body over `merge-drain`, the drain
+  alone; give `defer-finish` the same, then make the decider read the
+  queued inners' relation and aim `make qc-store` at it.
   Ruled out: a drain unrelating the stores, 65 of 100 programs spending a
   queue (seed 31) and 80 deferring (seed 32); an open merge's window
   reordering rows; a merged lane; a deeper flattener's subscribe (seeds
@@ -293,9 +294,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`merge-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's dead
-  inner finishes on both sides, each folding the group down its tail and
-  draining the related queues.
+- **`merge-drain`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's
+  related queues drained on both sides leave related counts, queues, flattener
+  and tail.
 - **`defer-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead
   deferred body finishes on both sides, through the hop's marker merge's finish
   ahead of it.

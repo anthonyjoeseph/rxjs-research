@@ -8,6 +8,7 @@ open import Data.Bool    using (true; false)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Empty   using (⊥-elim)
+open import Data.Unit    using (tt)
 open import Data.List    using ([]; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
@@ -25,7 +26,8 @@ open import Rx.Exp       using (Ctx; Closed; applyClo)
 open import Rx.Evaluator using (Sched; EvalSt; Path; share-sink; _↠[_]_; map-f; thru-outer; echoᵗ; thruEvents; atSlot)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓;
   walk-nil; walk-echo; walk-cons; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓; disp;
-  shareWalk⇓; walk-end; walk-more; fold-sink)
+  shareWalk⇓; walk-end; walk-more; fold-sink; step-from-inner; react-false; react-alive; react-dead; innerFinish⇓;
+  finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; sharedᵏ)
 open import SExp.Elaborate using (elemᵛ)
 open import Simulation.Stores using (sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
@@ -65,8 +67,21 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S r@(spentWhile~ _ _ _ _) b sp si (fold-step d dP) dI = resume (takeWhile-arm S r b sp si d dI) (adv d sp) dP
       path-pass S (outerElem~ fl r) b sp si (fold-step d dP) dI = resume (outerElem-arm S (fl , r) b sp si d dI) (adv d sp) dP
       path-pass S (outerExplode~ fl r) b sp si (fold-step d dP) dI = resume (outerExplode-arm S (fl , r) b sp si d dI) (adv d sp) dP
-      path-pass S r@(inner~ refl _ _ _) b sp si (fold-step d dP) dI = resume (inner-arm S r b sp si d dI) (adv d sp) dP
+      path-pass S r@(inner~ {op = op} refl _ _ _) b sp si (fold-step d@(step-from-inner react-false) dP) dI =
+        resume (inner-pass {op = op} S r b sp si (inj₁ refl) dI) (adv d sp) dP
+      path-pass S r@(inner~ {op = op} refl _ _ _) b sp si (fold-step d@(step-from-inner (react-alive al)) dP) dI =
+        resume (inner-pass {op = op} S r b sp si (inj₂ al) dI) (adv d sp) dP
+      path-pass S r@(inner~ {op = op} refl _ _ _) b sp si (fold-step d@(step-from-inner (react-dead dd F)) dP) dI =
+        resume (inner-dies {op = op} S r b sp si dd F (tail-at F) dI) (adv d sp) dP
       path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (deferInner-arm S r b sp si d dI) (adv d sp) dP
+
+      -- a merge's finish folds its tail: the pass recurses on that fold
+      tail-at : ∀ {lo lo′ s op m j now vs sP mx r} {stP : EvalSt ep} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
+                (F : innerFinish⇓ op m j p now vs sP stP mx r) → TailAt q F
+      tail-at (finish-all-drain fP _) S r b sp si dq = path-pass S r b sp si fP dq
+      tail-at (finish-switch-clear _) = tt
+      tail-at finish-exhaust-clear    = tt
+      tail-at (finish-nil _)          = tt
 
       resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin G rP rI}
              → Arm S now oP sP₁ stP₁ p vs fin G rI → Sound p sP₁ stP₁ → foldPath⇓ now p vs fin sP₁ stP₁ rP
