@@ -11,7 +11,7 @@ open import Data.Bool    using (T)
 open import Data.Bool.ListAction using (any)
 open import Data.List    using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using (All; head; tabulate)
+open import Data.List.Relation.Unary.All using (All; head; tail; tabulate)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat     using (_<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≡⇒≡ᵇ; <-irrefl)
@@ -21,11 +21,11 @@ open import Data.Unit    using (⊤; tt)
 open import Data.Maybe   using (just; nothing)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp       using (Ctx; Ty; switchᶠ; mergeᶠ; exhaustᶠ)
+open import Rx.Exp       using (Ctx; Ty)
 open import Rx.Evaluator using (NodeId; NodeState; Path; root; share-sink; _↠[_]_; frameNodes; pathHasNode; RegRow)
 open import Rx.Evaluator.Reducible.Support using (rowThrough; ∨-Tˡ; ∨-Tʳ)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Stores using (Unpaired; CurRel; FlatNodes; merge~; switch~; exhaust~; InnerPair; Flattener; PathRel; root~;
+open import Simulation.Stores using (Unpaired; CurRel; FlatNodes; merge~; switch~; exhaust~; Flattener; PathRel; root~;
   sink~; map~; scan~; take~; takeWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~;
   cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows)
 
@@ -76,11 +76,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π π′ : List (NodeId × List NodeId
   nodes-grow (switch~ c) = switch~ (cur-grow c)
   nodes-grow exhaust~    = exhaust~
 
-  inner-grow : ∀ {op j j′} → InnerPair {Γ = Γ} κ π op j j′ → InnerPair {Γ = Γ} κ π′ op j j′
-  inner-grow {switchᶠ}  e = g e
-  inner-grow {mergeᶠ _} _ = tt
-  inner-grow {exhaustᶠ} _ = tt
-
   module _ {t : Ty} {NP : List (NodeId × NodeState Γ)} {NI : List (NodeId × NodeState (plainᵏ Γ κ))} where
 
     flatG : ∀ {u op m m′ ks xs} → Flattener κ π {t = t} NP NI u op m m′ ks xs → Flattener κ π′ {t = t} NP NI u op m m′ ks xs
@@ -98,20 +93,20 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π π′ : List (NodeId × List NodeId
     pathG o (outerElem~ f r)                 = outerElem~ (flatG f) (pathG (proj₂ (proj₂ (proj₂ (proj₂ o)))) r)
     pathG o (outerExplode~ f r)              =
       outerExplode~ (flatG f) (pathG (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ o)))))) r)
-    pathG o (inner~ e f ip r)                = inner~ e (flatG f) (inner-grow ip) (pathG (proj₂ (proj₂ (proj₂ o))) r)
-    pathG o (lane~ l un r)                   = lane~ l (head (proj₁ o) un) (pathG (proj₂ o) r)
+    pathG o (inner~ e f ip r)                = inner~ e (flatG f) (g ip) (pathG (proj₂ (proj₂ (proj₂ o))) r)
+    pathG o (lane~ l un uj r)                = lane~ l (head (proj₁ o) un) (head (tail (proj₁ o)) uj) (pathG (proj₂ o) r)
     pathG o (deferInner~ e₁ e₂ l l′ l₂ a≤ r) = deferInner~ (g e₁) (g e₂) l l′ l₂ a≤ (pathG (proj₂ (proj₂ (proj₂ o))) r)
 
     blockG : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
            → Off {Γ = Γ} κ π π′ full → InputBlock κ π NP NI a {lo} {ℓ} full q → InputBlock κ π′ NP NI a full q
-    blockG o (block l₁ a≤ lb l₂ u₁ ub u₂) =
-      block l₁ a≤ lb l₂ (head (proj₁ (proj₂ o)) u₁) (head (proj₁ (proj₂ (proj₂ o))) ub)
+    blockG o (block l₁ a≤ lb l₂ u₁ uj ub u₂) =
+      block l₁ a≤ lb l₂ (head (proj₁ (proj₂ o)) u₁) (head (tail (proj₁ (proj₂ o))) uj) (head (proj₁ (proj₂ (proj₂ o))) ub)
             (head (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ o)))))) u₂)
 
     -- what a block's tail names, its whole path names
     block-tail : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
                → InputBlock κ π NP NI a {lo} {ℓ} full q → Off {Γ = Γ} κ π π′ full → Off {Γ = Γ} κ π π′ q
-    block-tail (block _ _ _ _ _ _ _) o = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ o)))))
+    block-tail (block _ _ _ _ _ _ _ _) o = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ o)))))
 
     module _ {LP LI} where
 

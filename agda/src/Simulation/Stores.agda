@@ -34,6 +34,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-map⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
 open import Data.List.Relation.Unary.All using (All)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -42,12 +43,12 @@ open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; trans; cong)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Rx.Evaluator.Reducible.Support using (Rule)
 open import Rx.Evaluator.Freshness using (nodeCt)
 
-open import Rx.Mint      using (counter; sourceᵏ)
+open import Rx.Mint      using (counter; sourceᵏ; regᵏ)
 open import Rx.Prim      using (InstEmit; Tick; Source)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Env; Closed; lookupEnv;
   Ren∈; renExp; FnClo; applyClo; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; varᵗ; unit̂; pairᵗ; inlᵗ;
@@ -265,12 +266,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                → FlatNodes u switchᶠ (switch-st cur od) (switch-st cur′ od)
       exhaust~ : ∀ {ia od} → FlatNodes u exhaustᶠ (exhaust-st ia od) (exhaust-st ia od)
 
-    -- a switch pairs its inner instances, which its current one names
-    InnerPair : FlatOp → NodeId → NodeId → Set
-    InnerPair switchᶠ    j j′ = (j , j′ ∷ []) ∈ π
-    InnerPair (mergeᶠ _) _ _  = ⊤
-    InnerPair exhaustᶠ   _ _  = ⊤
-
     module _ {t : Ty} (NP : List (NodeId × NodeState Γ)) (NI : List (NodeId × NodeState Γ′)) where
 
       -- a flattener's node pair, and the scan the elaboration restamps
@@ -376,10 +371,17 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         -- leaving an inner: the flattener's lane, then its restamp.  The
         -- frame's operator is named apart from the former it is, so a
         -- relation over a lane's frames can be taken apart again
+        --
+        -- EVERY FLATTENER PAIRS ITS INNER INSTANCES, NOT ONLY A SWITCH.  A
+        -- switch's cut drops the rows through its current inner on both
+        -- sides, and they are the same rows only if no other node a row
+        -- names can be that inner: each plain node a path names is a key
+        -- of `π`, each impl node is its key's or `Unpaired`, and an inner
+        -- instance named by nothing would be neither
         inner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u a op m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                    {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₃ (emitᵗ u) (emitᵗ t)}
-               → a ≡ flatOp op → Flattener u op m m′ ks xs → InnerPair op j j′ → PathRel p q
+               → a ≡ flatOp op → Flattener u op m m′ ks xs → (j , j′ ∷ []) ∈ π → PathRel p q
                → PathRel (from-inner a m j ↠[ h ] p)
                    (from-inner a m′ j′ ↠[ h₁ ]
                     (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
@@ -389,7 +391,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         -- impl only, in front of the lane it rides
         lane~ : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL aL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                   {p : Path Γ ℓ u t} {Q : Path Γ′ ℓ′ (emitᵗ u) (emitᵗ t)}
-              → lookupNode mL NI ≡ just (mergeAll-st {t = emitᵗ u} nothing aL [] true) → Unpaired mL
+              → lookupNode mL NI ≡ just (mergeAll-st {t = emitᵗ u} nothing aL [] true) → Unpaired mL → Unpaired jL
               → PathRel (from-inner a m j ↠[ h ] p) Q
               → PathRel (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
 
@@ -426,7 +428,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → lookupNode m1 NI ≡ just (mergeAll-st {t = unitᵗ +ᵗ a} nothing a₁ [] true) → a₁ ≤ 1
               → lookupNode b NI ≡ just (batchSync-st {s = unitᵗ +ᵗ a} false [] false)
               → lookupNode m2 NI ≡ just (mergeAll-st {t = machineEmitᵗ a} nothing 0 [] d₂)
-              → Unpaired m1 → Unpaired b → Unpaired m2
+              → Unpaired m1 → Unpaired j1 → Unpaired b → Unpaired m2
               → InputBlock a
                   (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ]
                    (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ]
@@ -585,6 +587,11 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     -- a registration still in the registry is not a cascade's victim
     uncut   : All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) (EvalSt.registry stP)
             × All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) (EvalSt.registry stI)
+    -- registrations are told apart by their ids, each minted below its run's counter
+    rids    : AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) (EvalSt.registry stP)
+            × AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) (EvalSt.registry stI)
+    fresh-ids : All (λ r → proj₁ r < counter (Sched.mint sP) regᵏ) (EvalSt.registry stP)
+              × All (λ r → proj₁ r < counter (Sched.mint sI) regᵏ) (EvalSt.registry stI)
     -- a registration at a minted source is above every slot
     above   : All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) (EvalSt.registry stP)
             × All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) (EvalSt.registry stI)

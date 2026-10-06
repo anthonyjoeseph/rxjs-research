@@ -76,12 +76,13 @@ open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; p
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source)
 open import Simulation.Hot-End using (hot-end-start)
 open import Simulation.Close using (close-store; close-arr)
-open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit; T-true)
+open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit)
+open import Simulation.Sweep using (T-true; t≢f)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; module Kept)
 open Kept using (After; module After; Persists; _⨾_)
-open import Simulation.Pass using (dynRow; Paired; unchain; head; row-pass; delivered; clash; Head; nohead;
+open import Simulation.Pass using (dynRow; Paired; unchain; head; row-pass; delivered; Head; nohead;
   delivered-arr; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
@@ -377,10 +378,10 @@ pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
 pass-go κ e s hd ta [] _ _ _ _ casc-nil casc-nil = s , [] , (λ ar → ar)
 pass-go κ e s hd ta (inj₁ _ ∷ ps) hP aP hI aI (casc-cut _ g) (casc-cut _ g′) =
   pass-go κ e s hd ta ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
-pass-go κ e s hd ta (inj₁ (x , _) ∷ _) _ _ _ _ (casc-live y _ _) _ = ⊥-elim (clash (trans (sym x) y))
-pass-go κ e s hd ta (inj₁ (_ , x) ∷ _) _ _ _ _ (casc-cut _ _) (casc-live y _ _) = ⊥-elim (clash (trans (sym x) y))
-pass-go κ e s hd ta (inj₂ (x , _) ∷ _) _ _ _ _ (casc-cut y _) _ = ⊥-elim (clash (trans (sym y) x))
-pass-go κ e s hd ta (inj₂ (_ , x , _) ∷ _) _ _ _ _ (casc-live _ _ _) (casc-cut y _) = ⊥-elim (clash (trans (sym y) x))
+pass-go κ e s hd ta (inj₁ (x , _) ∷ _) _ _ _ _ (casc-live y _ _) _ = ⊥-elim (t≢f (trans (sym x) y))
+pass-go κ e s hd ta (inj₁ (_ , x) ∷ _) _ _ _ _ (casc-cut _ _) (casc-live y _ _) = ⊥-elim (t≢f (trans (sym x) y))
+pass-go κ e s hd ta (inj₂ (x , _) ∷ _) _ _ _ _ (casc-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
+pass-go κ e s hd ta (inj₂ (_ , x , _) ∷ _) _ _ _ _ (casc-live _ _ _) (casc-cut y _) = ⊥-elim (t≢f (trans (sym y) x))
 pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps) hP aP hI aI
         (casc-live {emits = eP} {rest = rP} _ st g) (casc-live {emits = eI} {rest = rI} _ st′ g′)
   with dyn-chain κ e s hd ta pr ps (hP (here refl)) (hI (here refl)) st st′
@@ -597,8 +598,8 @@ cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
 cascade-kept κ e s {a} {a′} ex ex′ ta la sy (casc-run {sched′ = s₁} {st′ = t₁} nl go) (casc-run {sched′ = s₁′} {st′ = t₁′} nl′ go′)
   rewrite finish-run a s₁ t₁ nl | finish-run a′ s₁′ t₁′ nl′ = value-pass κ e s ex ex′ ta sy go go′
-cascade-kept κ e s ex ex′ ta la sy (casc-run nl _) (casc-run-last ll′ _ _) = ⊥-elim (clash (sym (trans (sym nl) (trans la ll′))))
-cascade-kept κ e s ex ex′ ta la sy (casc-run-last ll _ _) (casc-run nl′ _) = ⊥-elim (clash (trans (sym ll) (trans la nl′)))
+cascade-kept κ e s ex ex′ ta la sy (casc-run nl _) (casc-run-last ll′ _ _) = ⊥-elim (t≢f (sym (trans (sym nl) (trans la ll′))))
+cascade-kept κ e s ex ex′ ta la sy (casc-run-last ll _ _) (casc-run nl′ _) = ⊥-elim (t≢f (trans (sym ll) (trans la nl′)))
 cascade-kept {Γ = Γ} {t} κ e s ex ex′ ta la sy (casc-run-last {emits = oP} {ends = eP} ll go end)
                                            (casc-run-last {emits = oI} {ends = eI} ll′ go′ end′) =
   proj₁ k ,

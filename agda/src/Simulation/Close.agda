@@ -19,7 +19,7 @@ open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Arrival; Sched; EvalSt; memberSource; sameSource; cascadeClose)
 open import Rx.Prim      using (Source)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Chains using (sameSource-no)
+open import Simulation.Sweep using (sameSource-no)
 open import Simulation.Stores using (Store; Arr; Census)
 
 -- a source number no slot has is not the slot's
@@ -36,7 +36,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
   close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
     ; census = λ i hk → subst (Census _ _ (EvalSt.registry stI) _) (sym (mr i)) (census i hk)
     ; latches = λ i → let h , sh = latches i
                           lt  = <-trans (toℕ<n i) na

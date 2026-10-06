@@ -142,6 +142,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                                               (trans g (sym (guard-src (EvalSt.registry stI) {l′} {l₂′} (head-keeps l′ h′)))))
                    pp (Store.swept s)
     ; uncut    = mapᵃ (λ _ → refl) (proj₁ (Store.uncut s)) , mapᵃ (λ _ → refl) (proj₂ (Store.uncut s))
+    ; rids     = Store.rids s
+    ; fresh-ids = Store.fresh-ids s
     ; above    = Store.above s
     ; census   = Store.census s
     ; owned    = Store.owned s

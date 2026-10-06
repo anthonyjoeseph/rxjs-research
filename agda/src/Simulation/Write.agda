@@ -205,14 +205,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     pathW (outerElem~ f r)                   = outerElem~ (flatW f) (pathW r)
     pathW (outerExplode~ f r)                = outerExplode~ (flatW f) (pathW r)
     pathW (inner~ e f ip r)                  = inner~ e (flatW f) ip (pathW r)
-    pathW (lane~ l un r)                     = lane~ (unpairedI un l) un (pathW r)
+    pathW (lane~ l un uj r)                  = lane~ (unpairedI un l) un uj (pathW r)
     pathW (deferInner~ e₁ e₂ l l′ l₂ a≤ r)   =
       deferInner~ e₁ e₂ (soloP e₁ l) (pairedI e₁ (here refl) (λ eq _ → solo-entry eq) l′)
                   (pairedI e₂ (there (here refl)) third-entry l₂) a≤ (pathW r)
 
     blockW : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
            → InputBlock κ π NP NI a {lo} {ℓ} full q → InputBlock κ π NP′ NI′ a full q
-    blockW (block l₁ a≤ lb l₂ u₁ ub u₂) = block (unpairedI u₁ l₁) a≤ (unpairedI ub lb) (unpairedI u₂ l₂) u₁ ub u₂
+    blockW (block l₁ a≤ lb l₂ u₁ uj ub u₂) = block (unpairedI u₁ l₁) a≤ (unpairedI ub lb) (unpairedI u₂ l₂) u₁ uj ub u₂
 
     module _ {LP LI} where
 

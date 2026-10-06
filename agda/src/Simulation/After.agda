@@ -123,30 +123,6 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
               (++⁺ (After.values A) (After.values B)))
       (λ x → After.grows B (After.grows A x))
 
-  -- AN INNER'S NODE MINTED ON BOTH SIDES: only the node counters move,
-  -- and every node `π` pairs stays below them
-  bump : ∀ {sP stP sI stI} → St sP stP sI stI
-       → St (record sP { mint = setAt nodeᵏ (suc (nodeCt sP)) (Sched.mint sP) }) stP
-            (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) }) stI
-  bump {sP} {sI = sI} S = record
-    { π = π ; π-keys = π-keys ; π-vals = π-vals
-    ; pairs-below = mapᵃ m<n⇒m<1+n (proj₁ pairs-below) , mapᵃ (mapᵃ m<n⇒m<1+n) (proj₂ pairs-below)
-    ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync ; rows = rows
-    ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
-    ; census = census ; owned = owned
-    ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) ruleP
-    ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) ruleI
-    }
-    where open Store S
-
-  -- a step from the bumped stores is one from the stores
-  unbump : ∀ {sP stP sI stI} {S : St sP stP sI stI} {rP rI} → After (bump S) rP rI → After S rP rI
-  unbump A =
-    after (After.store A) (After.keeps A)
-          (λ ar → After.persists A (record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
-                                             ; rows = Arr.rows ar ; lists = Arr.lists ar }))
-          (After.values A) (After.grows A)
-
   -- AN INNER'S PAIR MINTED ON BOTH SIDES: the node counters move, and
   -- the pair they hand out joins `π`, apart from every node a row names
   Minted : ∀ {sP stP sI stI} → St sP stP sI stI → List (NodeId × List NodeId)
@@ -167,7 +143,7 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
                   , (n<1+n (nodeCt sI) ∷ []) ∷ mapᵃ (mapᵃ m<n⇒m<1+n) (proj₂ pairs-below)
     ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
     ; rows = regG κ there (mint-off S) rows
-    ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
+    ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
     ; census = census ; owned = owned
     ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) ruleP
     ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) ruleI

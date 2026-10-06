@@ -51,10 +51,11 @@ open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr)
 open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame)
-open import Simulation.Pass using (CarriesU; []; HotEnd; hot-end-at; hot-end-idle; clash; usable-self)
+open import Simulation.Pass using (CarriesU; []; HotEnd; hot-end-at; hot-end-idle; usable-self)
 open import Simulation.After using (module Kept)
 open Kept using (after; Keeps; Persists)
-open import Simulation.Chains using (same-refl; count-hit; count-tail; raw≢stamped; raw-mistyped; raw-at; raw-one; raw-none;
+open import Simulation.Sweep using (t≢f; same-refl; count-hit; raw≢stamped)
+open import Simulation.Chains using (count-tail; raw-mistyped; raw-at; raw-one; raw-none;
   plain-none; head-ety; slot-ty; plainᵗ-inj; casc-empty)
 open import Simulation.Finish using (close-hit; member-no)
 open import Simulation.Schedules using (HeadOf)
@@ -157,7 +158,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
   -- source, never at a raw slot
   row-src : ∀ {π NP NI LP LI r r′} → RowRel {Γ = Γ} κ π {t} NP NI LP LI r r′
           → ∀ (k : Fin n) → proj₁ (proj₂ r′) ≡ atSlot (k ↑ˡ n) → ⊥
-  row-src (read~ {i = j} _ _ _) k e = raw≢stamped {Γ = Γ} κ k j (sym (cong regSource e))
+  row-src (read~ {i = j} _ _ _) k e = raw≢stamped k j (sym (cong regSource e))
   row-src (cold~ _ _ _ _) k ()
   row-src (defer~ _ _ _ _ _ _) k ()
 
@@ -180,16 +181,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                               (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
                         × (∀ k → (k ∈ blockNodes full → ⊥) → lookupNode k NI′ ≡ lookupNode k (EvalSt.nodes st))
                         × dispatchShare⇓ now (n ↑ʳ i) h [] true sI (record st { nodes = NI′ }) r
-  block-end {i = i} hot {sI = sI} {st = st} refl (block {m1 = m1} {j1 = j1} {b = b} {m2 = m2} {a₁ = a₁} {d₂ = d₂} e₁ a≤ eb e₂ u₁ ub u₂) alive fp
+  block-end {i = i} hot {sI = sI} {st = st} refl (block {m1 = m1} {j1 = j1} {b = b} {m2 = m2} {a₁ = a₁} {d₂ = d₂} e₁ a≤ eb e₂ u₁ uj ub u₂) alive fp
     with map-nil fp
-  ... | fold-step (step-from-inner (react-alive x)) _ = ⊥-elim (clash (trans (sym x) (alive (there (here refl)))))
+  ... | fold-step (step-from-inner (react-alive x)) _ = ⊥-elim (t≢f (trans (sym x) (alive (there (here refl)))))
   ... | fold-step (step-from-inner (react-dead _ F)) f
     with lookupNode m1 (EvalSt.nodes st) | e₁ | F
-  ...   | _ | refl | finish-nil x = ⊥-elim (clash (trans (sym (usable-self _)) x))
+  ...   | _ | refl | finish-nil x = ⊥-elim (t≢f (trans (sym (usable-self _)) x))
   ...   | _ | refl | finish-all-drain fv drain-spent
     with disp-quiet (sink-at (hotEq {Γ = Γ} κ i hot) (outer-nil (map-nil (map-nil (batch-nil fv eb)))))
   ...     | refl =
-    NI′ , block e₁′ (≤-trans pred[n]≤n a≤) eb′ (lookup-set m2 M2 N₂) u₁ ub u₂ , fr ,
+    NI′ , block e₁′ (≤-trans pred[n]≤n a≤) eb′ (lookup-set m2 M2 N₂) u₁ uj ub u₂ , fr ,
     sink-at (hotEq {Γ = Γ} κ i hot)
       (outer-end (map-nil (map-nil (batch-nil (fin-at (pred-one a≤) f) eb₁))) e₂′)
     where
@@ -261,7 +262,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
 
     -- the raw row's block nodes are threaded by it alone
     own-raw : ∀ {j} → j ∈ blockNodes full → All (λ r′ → pathHasNode j (proj₂ (proj₂ (proj₂ r′))) ≡ true → r′ ≡ rawRow) K
-    own-raw = lookupᵃ owned mem (λ k e → raw≢stamped {Γ = Γ} κ i k (cong regSource e))
+    own-raw = lookupᵃ owned mem (λ k e → raw≢stamped i k (cong regSource e))
 
     -- the raw row's count is one, so the share has connected
     live : srcCount raw K ≡ 1 × memberSource shr SI ≡ true
@@ -300,7 +301,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
           go : ∀ b → any (λ j → pathHasNode j (proj₂ (proj₂ (proj₂ r′)))) (blockNodes full) ≡ b → (r′ ≡ rawRow) ⊎ Agree {Γ = Γ} κ NI′ NI (proj₂ (proj₂ (proj₂ r′)))
           go true  e with any-in (λ j → pathHasNode j (proj₂ (proj₂ (proj₂ r′)))) (blockNodes full) e
           ... | j , jm , hj = inj₁ (lookupᵃ (own-raw jm) m′ hj)
-          go false e = inj₂ (agree (λ k hk → fr k (λ km → clash (trans (sym (any-out (λ j → pathHasNode j (proj₂ (proj₂ (proj₂ r′)))) km hk)) e))))
+          go false e = inj₂ (agree (λ k hk → fr k (λ km → t≢f (trans (sym (any-out (λ j → pathHasNode j (proj₂ (proj₂ (proj₂ r′)))) km hk)) e))))
 
       rows-ob : ∀ {r r′} → r′ ∈ K → RowRel {Γ = Γ} κ π {t} (EvalSt.nodes stP) NI (Sched.live sP) (Sched.live sI) r r′ → Agree {Γ = Γ} κ NI′ NI (proj₂ (proj₂ (proj₂ r′)))
       rows-ob m′ x with touch m′
@@ -319,7 +320,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
 
         -- a raw slot is no share
         skI : ∀ (j : Fin n) → memberSource (toℕ (j ↑ˡ n)) CI′ ≡ memberSource (toℕ (j ↑ˡ n)) (Arrival.source a′ ∷ CI)
-        skI j = member-no (Arrival.source a′ ∷ CI) (raw≢stamped {Γ = Γ} κ j i)
+        skI j = member-no (Arrival.source a′ ∷ CI) (raw≢stamped j i)
 
         rawI : memberSource raw CI′ ≡ true
         rawI = trans (skI i) (close-hit a′ stI e₂)
@@ -334,7 +335,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
 
         shJ : ∀ (j : Fin n) → toℕ j ≢ toℕ i → memberSource (toℕ (n ↑ʳ j)) CI′ ≡ memberSource (toℕ (n ↑ʳ j)) CI
         shJ j ne = trans (member-no (Arrival.source a′ ∷ CI) (λ x → ne (cong toℕ (↑ʳ-injective n j i (toℕ-injective x)))))
-                         (member-no CI (subst (toℕ (n ↑ʳ j) ≢_) (sym e₂) (λ x → raw≢stamped {Γ = Γ} κ i j (sym x))))
+                         (member-no CI (subst (toℕ (n ↑ʳ j) ≢_) (sym e₂) (λ x → raw≢stamped i j (sym x))))
 
         skP : ∀ (j : Fin n) → toℕ j ≢ toℕ i → memberSource (toℕ j) (Arrival.source a ∷ CP) ≡ memberSource (toℕ j) CP
         skP j ne = member-no CP (subst (toℕ j ≢_) (sym e₁) ne)
@@ -345,7 +346,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       end-store = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
         ; sync = sync ; rows = reg-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows ; bounded = bounded ; swept = swept
-        ; uncut = uncut ; above = above ; latches = lat ; census = cen ; owned = owned
+        ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; latches = lat ; census = cen ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
         where
           lat : LatchRel {Γ = Γ} κ (Arrival.source a ∷ CP) (EvalSt.connectedShares stP) CI′ SI
@@ -424,7 +425,7 @@ hot-end-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk 
 ...   | raw-mistyped ne _ = ⊥-elim (ne (trans (head-ety {Γ = Γ} κ src h h′ e₁) (cong plainᵗ (slot-ty {Γ = Γ} κ src h e₁))))
 ...   | raw-at hot ch d ib u mem
   with subst (λ c → cascadeGo⇓ a′ [] true c sI (cascadeClose a′ stI) (eI , sI₃ , stI₃)) ch go
-...     | casc-cut y _ = ⊥-elim (clash (trans (sym y) u))
+...     | casc-cut y _ = ⊥-elim (t≢f (trans (sym y) u))
 ...     | casc-live _ d′ casc-nil =
   subst (λ o → HotEnd κ S a a′ i o sI₃ stI₃) (sym (++-identityʳ _))
         (hot-end-block κ S hot e₁ e₂

@@ -47,7 +47,7 @@ open import Rx.Prim      using (Source; Fuel)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Closed; _≟ᵗ_;
   FnClo; applyClo; emptyᵉ; []ᵉ)
 open import Rx.Slots     using (Slots)
-open import Rx.Mint      using (counter; sourceᵏ)
+open import Rx.Mint      using (counter; sourceᵏ; regᵏ)
 open import Rx.Evaluator using (LiveSource; Sched; EvalSt; Stream; Arrival; sched-next; NodeState; NodeId; Path; RegRow;
   atSlot; atDyn; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st;
@@ -456,21 +456,21 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
     mshow lim a q od = "(limit " ++ˢ maybe′ show "none" lim ++ˢ ", active " ++ˢ show a ++ˢ ", queued " ++ˢ show q
                        ++ˢ ", outer " ++ˢ (if od then "done" else "live") ++ˢ ")"
 
-    -- `Flattener` and `FlatNodes`, with `InnerPair` where an inner is named
-    flatNodes : Ty → AllOp → Maybe (NodeId × NodeId) → Maybe (NodeState Γ) → Maybe (NodeState Γ′) → Res
-    flatNodes u op jj (just (mergeAll-st {t = s} lim a q od)) (just (mergeAll-st {t = s′} lim′ a′ q′ od′)) =
+    -- `Flattener` and `FlatNodes`, and `InnerPair` where an inner is named
+    flatNodes : Ty → AllOp → Maybe (NodeState Γ) → Maybe (NodeState Γ′) → Res
+    flatNodes u op (just (mergeAll-st {t = s} lim a q od)) (just (mergeAll-st {t = s′} lim′ a′ q′ od′)) =
       when (eqOp op mergeAllᵒ ∧ (s ≈ u) ∧ (s′ ≈ emitᵗ u) ∧ eqMb lim lim′ ∧ (a ≡ᵇ a′) ∧ (length q ≡ᵇ length q′) ∧ eqB od od′)
            ("flattener: merge nodes unrelated: plain " ++ˢ mshow lim a (length q) od ++ˢ ", impl " ++ˢ mshow lim′ a′ (length q′) od′) ok
-    flatNodes u op jj (just (switch-st cur od)) (just (switch-st cur′ od′)) =
-      when (eqOp op switchᵒ ∧ eqB od od′) "flattener: switch nodes unrelated" (curR cur cur′ ⊗ innerPair jj)
-    flatNodes u op jj (just (exhaust-st ia od)) (just (exhaust-st ia′ od′)) =
+    flatNodes u op (just (switch-st cur od)) (just (switch-st cur′ od′)) =
+      when (eqOp op switchᵒ ∧ eqB od od′) "flattener: switch nodes unrelated" (curR cur cur′)
+    flatNodes u op (just (exhaust-st ia od)) (just (exhaust-st ia′ od′)) =
       when (eqOp op exhaustᵒ ∧ eqB ia ia′ ∧ eqB od od′) "flattener: exhaust nodes unrelated" ok
-    flatNodes u op jj _ _ = breaks "flattener: node kinds"
+    flatNodes u op _ _ = breaks "flattener: node kinds"
 
     flat : Ty → AllOp → AllOp → NodeId → NodeId → NodeId → Res → Maybe (NodeId × NodeId) → Res
     flat u op op′ m m′ ks key jj =
       when (eqOp op op′) "flattener: ops differ"
-        (key ⊗ flatNodes u op jj (P m) (I m′) ⊗ on (cellOf (FlatSᵗ u) (I ks)) "flattener: restamp cell" (λ _ → ok))
+        (key ⊗ flatNodes u op (P m) (I m′) ⊗ innerPair jj ⊗ on (cellOf (FlatSᵗ u) (I ks)) "flattener: restamp cell" (λ _ → ok))
 
     -- the impl's leading lanes, peeled every way: each with the lanes it took
     mutual
@@ -478,8 +478,8 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       peel u q = ([] , pk q) ∷ more u q
 
       more : ∀ {l a b} → Ty → Path Γ′ l a b → List (List NodeId × IP)
-      more u (from-inner mergeAllᵒ mL _ ↠[ _ ] Q) =
-        if lane (mergeOf (emitᵗ u) (I mL)) then map (λ x → (mL ∷ proj₁ x) , proj₂ x) (peel u Q) else []
+      more u (from-inner mergeAllᵒ mL jL ↠[ _ ] Q) =
+        if lane (mergeOf (emitᵗ u) (I mL)) then map (λ x → (mL ∷ jL ∷ proj₁ x) , proj₂ x) (peel u Q) else []
       more u _ = []
 
     innerR : Ty → AllOp → NodeId → NodeId → (IP → Res) → IP → Res
@@ -601,7 +601,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
             when (not y ∧ (bl ≡ᵇ 0) ∧ not d) "block: bracket state" ok) ⊗
           on (mergeOf (machineEmitᵗ a) (I m2)) "block: flattening merge node" (λ (l , a₂ , ql , _) →
             when (is-nothing l ∧ (a₂ ≡ᵇ 0) ∧ (ql ≡ᵇ 0)) "block: flattening merge state" ok) ⊗
-          apart m1 ⊗ apart b ⊗ apart m2 ⊗ k q₆)
+          apart m1 ⊗ apart j1 ⊗ apart b ⊗ apart m2 ⊗ k q₆)
 
     -- `SrcPair`: one place in both live lists
     srcPair : List (LiveSource Γ) → List (LiveSource Γ′) → Source → Source → Ty → Ty → Bool
@@ -772,6 +772,9 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       ∷ ("swept" , pointwise (λ l l′ → eqB (guardOf RP l) (guardOf RI l′)) LP LI)
       ∷ ("uncut" , all (λ r → not (any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP))) RP
                  ∧ all (λ r → not (any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI))) RI)
+      ∷ ("rids" , unique (map proj₁ RP) ∧ unique (map proj₁ RI))
+      ∷ ("fresh-ids" , all (λ r → proj₁ r <ᵇ counter (Sched.mint sP) regᵏ) RP
+                     ∧ all (λ r → proj₁ r <ᵇ counter (Sched.mint sI) regᵏ) RI)
       ∷ ("above" , all (λ r → aboveᵇ (proj₁ (proj₂ r))) RP ∧ all (λ r → aboveᵇ (proj₁ (proj₂ r))) RI)
       ∷ ("census" , all (λ i → censusAt (lookup κ i) (toℕ i)) (allFin n))
       ∷ ("owned" , owned)

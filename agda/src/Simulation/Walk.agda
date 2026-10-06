@@ -227,6 +227,8 @@ init-store κ {t} e ins μ big = record
             , mapᵃ (λ lt → <-trans lt big) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; swept   = init-swept {t = t} {t′ = emitᵗ t} (init-sources κ e ins) (init-below (plainExp e) (plainSlots ins)) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; uncut   = [] , []
+  ; rids    = [] , []
+  ; fresh-ids = [] , []
   ; above   = [] , []
   ; census  = λ _ _ → inj₂ (refl , refl , λ ())
   ; owned   = []

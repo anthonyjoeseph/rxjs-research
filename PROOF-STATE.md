@@ -240,30 +240,21 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — what both top lines stand on, by induction on
+`simulation` — both top lines' ground, by induction on
 arrivals over `correspondence`: schedules in step, pops partnered, stores related; the root
 subscribes set them (`subscribe-related`) and each cascade keeps
-(`cascade-related`), both sending agreeing values. RULED
+(`cascade-related`), both with agreeing values. RULED
 OUT: an arrival plain lacks, a split one, a gap or
-stray in an instant, an echo apart from its inners or payload; a subscribe
-installing a run the relation lacks; a pop unrelating a read; a map moving instants; a close
+stray in an instant, an echo apart from inners or payload; a subscribe
+installing a run unrelated; a pop unrelating a read; a map moving instants; a close
 emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
-over a budget no take holds; a flattener's write moving a row.
+over a budget no take holds; a flatten write moving a row; a switch's cut
+parting a pair.
 Left: a deeper flattener's subscribe; which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
-  merge and an exhaust decide alike off related nodes, a node neither can
-  use is no step, and the write is proven (`Simulation.Write`: `π`'s
-  uniqueness and the nodes' kinds keep every other row's fact), and the
-  inner's subscribe is the walk's own arm, since walk and pass now keep one
-  invariant (`Simulation.After`); a switch's named subscribe mints the
-  pair into `π` first, then writes and walks (`Simulation.Grow`). Left:
-  the switch's cut (`switch-kill`). Narrows the monster to whether a
-  switch's cut keeps the rows it drops paired.
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
@@ -283,6 +274,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   instant and no two arrivals share one: `cascade-stamps`, a claim the
   impl's cascade makes one former at a time. State it beside the values split so both recurse on the same
   configuration, and the monster drops to whichever stays riskier.
+
+- **CUT AT A TAKE AS AT A SWITCH.** `Simulation.Cut` keeps the stores
+  under a cut through a node `π` pairs with one impl node: the two cuts take
+  the rows the relation pairs, ids apart. A take's node is paired with a
+  run, so `{take,takeWhile}-arm` need the cut stated at the run member the
+  impl's cut names. Decides whether a spent budget drops the same rows on
+  both sides.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -305,8 +303,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`flat-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
   scan stepped on an element's echo keeps the flattener, and the group it hands
   on carries the echo's values, still open.
-- **`switch-kill`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a switch's
-  running inner cut on both sides keeps the walk.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
 - **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an

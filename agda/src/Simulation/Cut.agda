@@ -1,0 +1,505 @@
+------------------------------------------------------------------
+-- A CUT ON BOTH SIDES.  A switch's cut drops every registration
+-- through its running inner, the plain run's through one node and the
+-- impl's through the node `π` pairs it with.  The two drop the rows the
+-- registries' relation pairs, because a related path names a paired
+-- node exactly when its partner names the node's pair: every plain
+-- node a path names is a key of `π` whose run of impl nodes the
+-- partner names, and every impl node is its key's or `Unpaired`.
+------------------------------------------------------------------
+module Simulation.Cut where
+
+open import Data.Bool    using (true; false; T; _∨_)
+open import Data.Bool.Properties using (∨-zeroʳ)
+open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Fin     using (Fin; toℕ; _↑ˡ_; _↑ʳ_)
+open import Data.Vec     using (lookup)
+open import Data.Maybe   using (just)
+open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
+open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup to lookupᵃ; tabulate to tabulateᵃ; map to mapᵃ)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
+open import Data.Nat     using (suc; _≡ᵇ_)
+open import Data.Nat.Properties using (≡ᵇ⇒≡; ≡⇒≡ᵇ; 1+n≢0; <⇒≢; <-≤-trans; ≤-refl)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Unit    using (tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
+
+open import Data.Bool.ListAction using (any)
+open import Rx.Exp       using (Ctx; Ty; Closed)
+open import Rx.Evaluator using (NodeId; RegRow; LiveSource; Sched; EvalSt; switchKill; regSource; sameSource; cutThrough; Path; root; share-sink; _↠[_]_; frameNodes; pathHasNode; thru-outer; mergeAllᵒ)
+open import Rx.Evaluator.Reducible.Support using (∨-Tˡ; ∨-Tʳ; sub-rule; cut-sub)
+open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
+open import Simulation.Stores using (PathRel; root~; sink~; map~; scan~; take~; takeWhile~; outerElem~; outerExplode~; inner~;
+  lane~; deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; ArrRows; Store; Arr; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq)
+open import Simulation.Grow using (mem-any)
+open import Simulation.Sweep using (T-true; t≢f; count-hit; count-pass; same-eq; raw≢stamped; raw<ₙ; sweepL; sweep-eq; sweepL-pw; all-sweep;
+  unique-sweep; sync-sweep; regrel-sweep; rows-guards; part-sweep; arr-sweep)
+open import Simulation.After using (module Kept; PairedR)
+open import Simulation.Write using (key-same; vals-same; ∈-vals)
+
+-- the nodes a path names, frame by frame
+nodesOf : ∀ {m} {Δ : Ctx m} {lo s u} → Path Δ lo s u → List NodeId
+nodesOf root             = []
+nodesOf (share-sink _ _) = []
+nodesOf (f ↠[ _ ] p)     = frameNodes f ++ nodesOf p
+
+any-mem : ∀ {k} xs → T (any (_≡ᵇ k) xs) → k ∈ xs
+any-mem {k} (x ∷ xs) h with x ≡ᵇ k in e
+... | true  = here (sym (≡ᵇ⇒≡ x k (subst T (sym e) tt)))
+... | false = there (any-mem xs h)
+
+has-node : ∀ {m} {Δ : Ctx m} {lo s u k} (p : Path Δ lo s u) → T (pathHasNode k p) → k ∈ nodesOf p
+has-node root             ()
+has-node (share-sink _ _) ()
+has-node {k = k} (f ↠[ _ ] p) h with any (_≡ᵇ k) (frameNodes f) in e
+... | true  = ∈-++⁺ˡ (any-mem (frameNodes f) (subst T (sym e) tt))
+... | false = ∈-++⁺ʳ (frameNodes f) (has-node p h)
+
+node-has : ∀ {m} {Δ : Ctx m} {lo s u k} (p : Path Δ lo s u) → k ∈ nodesOf p → T (pathHasNode k p)
+node-has root             ()
+node-has (share-sink _ _) ()
+node-has (f ↠[ _ ] p) m with ∈-++⁻ (frameNodes f) m
+... | inj₁ a = ∨-Tˡ (mem-any a)
+... | inj₂ b = ∨-Tʳ (node-has p b)
+
+T-≡ : ∀ {a b} → (T a → T b) → (T b → T a) → a ≡ b
+T-≡ {true}  {true}  _ _ = refl
+T-≡ {true}  {false} f _ = ⊥-elim (f tt)
+T-≡ {false} {true}  _ g = ⊥-elim (g tt)
+T-≡ {false} {false} _ _ = refl
+
+-- two paths name two nodes alike when each naming gives the other
+cut-by : ∀ {m m′} {Δ : Ctx m} {Δ′ : Ctx m′} {lo lo′ a b w w′ k k′} (p : Path Δ lo a w) (q : Path Δ′ lo′ b w′)
+       → (k ∈ nodesOf p → k′ ∈ nodesOf q) → (k′ ∈ nodesOf q → k ∈ nodesOf p) → pathHasNode k p ≡ pathHasNode k′ q
+cut-by p q f g = T-≡ (λ h → node-has q (f (has-node p h))) (λ h → node-has p (g (has-node q h)))
+
+-- a share's subject names nothing, however its type is rewritten
+no-sink : ∀ {m} {Δ : Ctx m} {lo b w} {i : Fin m} {h x} (e : lookup Δ i ≡ b)
+        → x ∈ nodesOf (subst (λ u → Path Δ lo u w) e (share-sink i h)) → ⊥
+no-sink refl ()
+
+------------------------------------------------------------------
+-- The cut as a filter
+------------------------------------------------------------------
+
+ᵇ-no : ∀ {i k} → i ≢ k → (i ≡ᵇ k) ≡ false
+ᵇ-no {i} {k} ne with i ≡ᵇ k in e
+... | false = refl
+... | true  = ⊥-elim (ne (≡ᵇ⇒≡ i k (subst T (sym e) tt)))
+
+∨-falseˡ : ∀ {a b} → a ∨ b ≡ false → a ≡ false
+∨-falseˡ {false} _ = refl
+∨-falseˡ {true}  ()
+
+∨-falseʳ : ∀ {a b} → a ∨ b ≡ false → b ≡ false
+∨-falseʳ {false} e = e
+∨-falseʳ {true}  ()
+
+-- an id among neither list is among neither joined
+none-++ : ∀ {k} xs {ys} → any (_≡ᵇ k) xs ≡ false → any (_≡ᵇ k) ys ≡ false → any (_≡ᵇ k) (xs ++ ys) ≡ false
+none-++         []       _ f = f
+none-++ {k} (x ∷ xs) h f = cong₂ _∨_ (∨-falseˡ h) (none-++ xs (∨-falseʳ {x ≡ᵇ k} h) f)
+
+-- and one among either is among both joined
+hit-++ : ∀ {k} xs {ys} → any (_≡ᵇ k) ys ≡ true → any (_≡ᵇ k) (xs ++ ys) ≡ true
+hit-++         []       h = h
+hit-++ {k} (x ∷ xs) h = trans (cong ((x ≡ᵇ k) ∨_) (hit-++ xs h)) (∨-zeroʳ _)
+
+hit-in : ∀ {k xs} ys → k ∈ xs → any (_≡ᵇ k) (xs ++ ys) ≡ true
+hit-in {k} {_ ∷ xs} ys (here refl) = cong (_∨ any (_≡ᵇ k) (xs ++ ys)) (T-true (≡⇒≡ᵇ k k refl))
+hit-in {k} {x ∷ xs} ys (there m)   = trans (cong ((x ≡ᵇ k) ∨_) (hit-in ys m)) (∨-zeroʳ _)
+
+module _ {m} {Δ : Ctx m} {t} (c : NodeId) where
+
+  -- ONE ROW OF THE CUT: through the node, gone and its id named; else kept
+  CutStep : RegRow Δ t → List (RegRow Δ t) → Set
+  CutStep r K =
+      (pathHasNode c (proj₂ (proj₂ (proj₂ r))) ≡ true
+       × proj₁ (cutThrough c (r ∷ K)) ≡ proj₁ (cutThrough c K)
+       × proj₂ (cutThrough c (r ∷ K)) ≡ proj₁ r ∷ proj₂ (cutThrough c K))
+    ⊎ (pathHasNode c (proj₂ (proj₂ (proj₂ r))) ≡ false
+       × proj₁ (cutThrough c (r ∷ K)) ≡ r ∷ proj₁ (cutThrough c K)
+       × proj₂ (cutThrough c (r ∷ K)) ≡ proj₂ (cutThrough c K))
+
+  cut-step : ∀ r K → CutStep r K
+  cut-step (rid , rs , x) K with pathHasNode c (proj₂ x) | cutThrough c K
+  ... | true  | _ , _ = inj₁ (refl , refl , refl)
+  ... | false | _ , _ = inj₂ (refl , refl , refl)
+
+  all-cut : ∀ {P : RegRow Δ t → Set} {K} → All P K → All P (proj₁ (cutThrough c K))
+  all-cut                 []       = []
+  all-cut {P = P} {r ∷ K} (p ∷ ps) with cut-step r K
+  ... | inj₁ (_ , e , _) = subst (All P) (sym e) (all-cut ps)
+  ... | inj₂ (_ , e , _) = subst (All P) (sym e) (p ∷ all-cut ps)
+
+  pairs-cut : ∀ {R : RegRow Δ t → RegRow Δ t → Set} {K} → AllPairs R K → AllPairs R (proj₁ (cutThrough c K))
+  pairs-cut                 []       = []
+  pairs-cut {R = R} {r ∷ K} (p ∷ ps) with cut-step r K
+  ... | inj₁ (_ , e , _) = subst (AllPairs R) (sym e) (pairs-cut ps)
+  ... | inj₂ (_ , e , _) = subst (AllPairs R) (sym e) (all-cut p ∷ pairs-cut ps)
+
+  -- a kept row was there and is not through the node
+  kept-in : ∀ {r} K → r ∈ proj₁ (cutThrough c K) → r ∈ K × pathHasNode c (proj₂ (proj₂ (proj₂ r))) ≡ false
+  kept-in []      ()
+  kept-in (k ∷ K) m with cut-step k K
+  ... | inj₁ (_ , e , _) = there (proj₁ (kept-in K (subst (_ ∈_) e m))) , proj₂ (kept-in K (subst (_ ∈_) e m))
+  ... | inj₂ (h , e , _) with subst (_ ∈_) e m
+  ...   | here refl = here refl , h
+  ...   | there m′  = there (proj₁ (kept-in K m′)) , proj₂ (kept-in K m′)
+
+  -- a row through the node has its id named
+  cut-named : ∀ {r} K → r ∈ K → pathHasNode c (proj₂ (proj₂ (proj₂ r))) ≡ true → proj₁ r ∈ proj₂ (cutThrough c K)
+  cut-named (k ∷ K) (here refl) h with cut-step k K
+  ... | inj₁ (_ , _ , e)  = subst (proj₁ k ∈_) (sym e) (here refl)
+  ... | inj₂ (h′ , _ , _) = ⊥-elim (t≢f (trans (sym h) h′))
+  cut-named {r} (k ∷ K) (there m) h with cut-step k K
+  ... | inj₁ (_ , _ , e) = subst (proj₁ r ∈_) (sym e) (there (cut-named K m h))
+  ... | inj₂ (_ , _ , e) = subst (proj₁ r ∈_) (sym e) (cut-named K m h)
+
+  -- an id apart from every row's is not named
+  ids-apart : ∀ {k} K → All (λ r → k ≢ proj₁ r) K → any (_≡ᵇ k) (proj₂ (cutThrough c K)) ≡ false
+  ids-apart          []      []       = refl
+  ids-apart {k} (r ∷ K) (ne ∷ a) with cut-step r K
+  ... | inj₁ (_ , _ , e) = subst (λ L → any (_≡ᵇ k) L ≡ false) (sym e)
+                             (cong₂ _∨_ (ᵇ-no (λ x → ne (sym x))) (ids-apart K a))
+  ... | inj₂ (_ , _ , e) = subst (λ L → any (_≡ᵇ k) L ≡ false) (sym e) (ids-apart K a)
+
+  -- so, ids apart, a kept row's id is not named
+  kept-apart : ∀ {x} K → AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) K → x ∈ K → pathHasNode c (proj₂ (proj₂ (proj₂ x))) ≡ false
+             → any (_≡ᵇ proj₁ x) (proj₂ (cutThrough c K)) ≡ false
+  kept-apart (k ∷ K) (a ∷ ps) (here refl) h with cut-step k K
+  ... | inj₁ (h′ , _)      = ⊥-elim (t≢f (trans (sym h′) h))
+  ... | inj₂ (_ , _ , e) = subst (λ L → any (_≡ᵇ proj₁ k) L ≡ false) (sym e) (ids-apart K a)
+  kept-apart {x} (k ∷ K) (a ∷ ps) (there m) h with cut-step k K
+  ... | inj₁ (_ , _ , e) = subst (λ L → any (_≡ᵇ proj₁ x) L ≡ false) (sym e)
+                             (cong₂ _∨_ (ᵇ-no (lookupᵃ a m)) (kept-apart K ps m h))
+  ... | inj₂ (_ , _ , e) = subst (λ L → any (_≡ᵇ proj₁ x) L ≡ false) (sym e) (kept-apart K ps m h)
+
+  -- a cut never raises a count, and leaves one alone where it takes no row at its source
+  count-cut-zero : ∀ k (K : List (RegRow Δ t)) → srcCount k K ≡ 0 → srcCount k (proj₁ (cutThrough c K)) ≡ 0
+  count-cut-zero k []      z = refl
+  count-cut-zero k (r ∷ K) z = go (cut-step r K) (sameSource k (regSource (proj₁ (proj₂ r)))) refl
+    where
+    go : CutStep r K → ∀ b → sameSource k (regSource (proj₁ (proj₂ r))) ≡ b → srcCount k (proj₁ (cutThrough c (r ∷ K))) ≡ 0
+    go _                  true  s = ⊥-elim (1+n≢0 (trans (sym (count-hit k r K s)) z))
+    go (inj₁ (_ , e , _)) false s = trans (cong (srcCount k) e) (count-cut-zero k K (trans (sym (count-pass k r K s)) z))
+    go (inj₂ (_ , e , _)) false s = trans (cong (srcCount k) e)
+                                      (trans (count-pass k r (proj₁ (cutThrough c K)) s) (count-cut-zero k K (trans (sym (count-pass k r K s)) z)))
+
+  count-cut-keep : ∀ k (K : List (RegRow Δ t))
+                 → All (λ r → sameSource k (regSource (proj₁ (proj₂ r))) ≡ true → pathHasNode c (proj₂ (proj₂ (proj₂ r))) ≡ false) K
+                 → srcCount k (proj₁ (cutThrough c K)) ≡ srcCount k K
+  count-cut-keep k []      _        = refl
+  count-cut-keep k (r ∷ K) (a ∷ as) = go (cut-step r K) (sameSource k (regSource (proj₁ (proj₂ r)))) refl
+    where
+    go : CutStep r K → ∀ b → sameSource k (regSource (proj₁ (proj₂ r))) ≡ b → srcCount k (proj₁ (cutThrough c (r ∷ K))) ≡ srcCount k (r ∷ K)
+    go (inj₁ (h , _))     true  s = ⊥-elim (t≢f (trans (sym h) (a s)))
+    go (inj₁ (_ , e , _)) false s = trans (cong (srcCount k) e) (trans (count-cut-keep k K as) (sym (count-pass k r K s)))
+    go (inj₂ (_ , e , _)) true  s = trans (cong (srcCount k) e)
+                                      (trans (count-hit k r (proj₁ (cutThrough c K)) s) (trans (cong suc (count-cut-keep k K as)) (sym (count-hit k r K s))))
+    go (inj₂ (_ , e , _)) false s = trans (cong (srcCount k) e)
+                                      (trans (count-pass k r (proj₁ (cutThrough c K)) s) (trans (count-cut-keep k K as) (sym (count-pass k r K s))))
+
+
+  -- a kept row's id is among neither the cut's nor those cancelled before
+  uncut-cut : ∀ {K CS} → AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) K → All (λ r → any (_≡ᵇ proj₁ r) CS ≡ false) K
+            → ∀ {r} → r ∈ proj₁ (cutThrough c K) → any (_≡ᵇ proj₁ r) (proj₂ (cutThrough c K) ++ CS) ≡ false
+  uncut-cut {K} ps us m =
+    none-++ (proj₂ (cutThrough c K)) (kept-apart K ps (proj₁ (kept-in K m)) (proj₂ (kept-in K m))) (lookupᵃ us (proj₁ (kept-in K m)))
+
+  -- a slot's census stands where the cut takes no row at its raw slot
+  census-cut : ∀ {raw stamped conn done} (K : List (RegRow Δ t)) → Census raw stamped K conn done
+             → All (λ r → sameSource raw (regSource (proj₁ (proj₂ r))) ≡ true → pathHasNode c (proj₂ (proj₂ (proj₂ r))) ≡ false) K
+             → Census raw stamped (proj₁ (cutThrough c K)) conn done
+  census-cut {raw} K (inj₁ (one , cn)) safe = inj₁ (trans (count-cut-keep raw K safe) one , cn)
+  census-cut {raw} {stamped} K (inj₂ (z₁ , z₂ , f)) _ = inj₂ (count-cut-zero raw K z₁ , count-cut-zero stamped K z₂ , f)
+
+------------------------------------------------------------------
+-- The cut on both sides
+------------------------------------------------------------------
+
+module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
+         (keys : Unique (map proj₁ π)) (vals : Unique (concatMap proj₂ π)) {c c′ : NodeId} (ce : (c , c′ ∷ []) ∈ π) where
+
+  -- a key paired with a run of impl nodes is not the cut's
+  not-c : ∀ {k x y ys} → (k , x ∷ y ∷ ys) ∈ π → k ≡ c → ⊥
+  not-c e refl with key-same keys e ce
+  ... | ()
+
+  -- a key paired with one impl node, if it is the cut's, is paired with the cut's
+  solo : ∀ {k k′} → (k , k′ ∷ []) ∈ π → k ≡ c → c′ ≡ k′
+  solo e refl with key-same keys e ce
+  ... | refl = refl
+
+  -- an entry naming the cut's impl node is the cut's
+  owner : ∀ {k xs} → (k , xs) ∈ π → c′ ∈ xs → c ≡ k
+  owner e m = cong proj₁ (vals-same vals ce e (here refl) m)
+
+  -- and no impl-only node is it
+  off : ∀ {k} → (k ∈ concatMap proj₂ π → ⊥) → c′ ≡ k → ⊥
+  off un refl = un (∈-vals ce (here refl))
+
+  module _ {t : Ty} {NP NI} where
+
+    -- a related path names the cut's node exactly when its partner names the pair
+    fwd : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
+        → PathRel κ π NP NI p q → c ∈ nodesOf p → c′ ∈ nodesOf q
+    fwd root~                            ()
+    fwd (sink~ _)                        ()
+    fwd (map~ _ r)                       m                      = fwd r m
+    fwd (scan~ e _ _ _ _ r)              (here eq)              = here (solo e (sym eq))
+    fwd (scan~ e _ _ _ _ r)              (there m)              = there (fwd r m)
+    fwd (take~ e _ _ _ _ _ _ _ r)        (here eq)              = ⊥-elim (not-c e (sym eq))
+    fwd (take~ e _ _ _ _ _ _ _ r)        (there m)              = there (there (there (there (fwd r m))))
+    fwd (takeWhile~ e _ _ _ _ r)         (here eq)              = ⊥-elim (not-c e (sym eq))
+    fwd (takeWhile~ e _ _ _ _ r)         (there m)              = there (there (fwd r m))
+    fwd (outerElem~ (pm , _) r)          (here eq)              = ⊥-elim (not-c pm (sym eq))
+    fwd (outerElem~ (pm , _) r)          (there m)              = there (there (fwd r m))
+    fwd (outerExplode~ (pm , _) r)       (here eq)              = ⊥-elim (not-c pm (sym eq))
+    fwd (outerExplode~ (pm , _) r)       (there m)              = there (there (there (fwd r m)))
+    fwd (inner~ _ (pm , _) ip r)         (here eq)              = ⊥-elim (not-c pm (sym eq))
+    fwd (inner~ _ (pm , _) ip r)         (there (here eq))      = there (here (solo ip (sym eq)))
+    fwd (inner~ _ (pm , _) ip r)         (there (there m))      = there (there (there (fwd r m)))
+    fwd (lane~ _ _ _ r)                  m                      = there (there (fwd r m))
+    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)              = there (there (here (solo e₁ (sym eq))))
+    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq))      = ⊥-elim (not-c e₂ (sym eq))
+    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there m))      = there (there (there (there (fwd r m))))
+
+    bwd : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
+        → PathRel κ π NP NI p q → c′ ∈ nodesOf q → c ∈ nodesOf p
+    bwd root~                            ()
+    bwd (sink~ {lo′ = lo′} {i = i} {h′ = h′} sh) m = ⊥-elim (no-sink {Δ = plainᵏ Γ κ} {lo = lo′} {w = emitᵗ t} {i = n ↑ʳ i} {h = h′} (sharedEq {Γ = Γ} κ i sh) m)
+    bwd (map~ _ r)                       m                      = bwd r m
+    bwd (scan~ e _ _ _ _ r)              (here eq)              = here (owner e (here eq))
+    bwd (scan~ e _ _ _ _ r)              (there m)              = there (bwd r m)
+    bwd (take~ e _ _ _ _ _ _ _ r)        (here eq)              = here (owner e (here eq))
+    bwd (take~ e _ _ _ _ _ _ _ r)        (there (here eq))      = here (owner e (there (here eq)))
+    bwd (take~ e _ _ _ _ _ _ _ r)        (there (there (here eq))) = here (owner e (there (there (here eq))))
+    bwd (take~ e _ _ _ _ _ _ _ r)        (there (there (there (here eq)))) = here (owner e (there (there (there (here eq)))))
+    bwd (take~ e _ _ _ _ _ _ _ r)        (there (there (there (there m)))) = there (bwd r m)
+    bwd (takeWhile~ e _ _ _ _ r)         (here eq)              = here (owner e (here eq))
+    bwd (takeWhile~ e _ _ _ _ r)         (there (here eq))      = here (owner e (there (here eq)))
+    bwd (takeWhile~ e _ _ _ _ r)         (there (there m))      = there (bwd r m)
+    bwd (outerElem~ (pm , _) r)          (here eq)              = here (owner pm (here eq))
+    bwd (outerElem~ (pm , _) r)          (there (here eq))      = here (owner pm (there (here eq)))
+    bwd (outerElem~ (pm , _) r)          (there (there m))      = there (bwd r m)
+    bwd (outerExplode~ (pm , _) r)       (here eq)              = here (owner pm (there (there (here eq))))
+    bwd (outerExplode~ (pm , _) r)       (there (here eq))      = here (owner pm (here eq))
+    bwd (outerExplode~ (pm , _) r)       (there (there (here eq))) = here (owner pm (there (here eq)))
+    bwd (outerExplode~ (pm , _) r)       (there (there (there m))) = there (bwd r m)
+    bwd (inner~ _ (pm , _) ip r)         (here eq)              = here (owner pm (here eq))
+    bwd (inner~ _ (pm , _) ip r)         (there (here eq))      = there (here (owner ip (here eq)))
+    bwd (inner~ _ (pm , _) ip r)         (there (there (here eq))) = here (owner pm (there (here eq)))
+    bwd (inner~ _ (pm , _) ip r)         (there (there (there m))) = there (there (bwd r m))
+    bwd (lane~ _ un _ r)                 (here eq)              = ⊥-elim (off un eq)
+    bwd (lane~ _ _ uj r)                 (there (here eq))      = ⊥-elim (off uj eq)
+    bwd (lane~ _ _ _ r)                  (there (there m))      = bwd r m
+    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)              = there (here (owner e₂ (there (here eq))))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq))      = there (here (owner e₂ (there (there (here eq)))))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there (here eq))) = here (owner e₁ (here eq))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there (there (here eq)))) = there (here (owner e₂ (here eq)))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there (there (there m)))) = there (there (bwd r m))
+
+    path-cut : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
+             → PathRel κ π NP NI p q → pathHasNode c p ≡ pathHasNode c′ q
+    path-cut {p = p} {q} r = cut-by p q (fwd r) (bwd r)
+
+    -- an input block names nothing `π` pairs, so its tail names what the whole does
+    block-in : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
+             → InputBlock κ π NP NI a {lo} {ℓ} full q → c′ ∈ nodesOf full → c′ ∈ nodesOf q
+    block-in (block _ _ _ _ u₁ _ _ _) (here eq)                         = ⊥-elim (off u₁ eq)
+    block-in (block _ _ _ _ _ uj _ _) (there (here eq))                 = ⊥-elim (off uj eq)
+    block-in (block _ _ _ _ _ _ ub _) (there (there (here eq)))         = ⊥-elim (off ub eq)
+    block-in (block _ _ _ _ _ _ _ u₂) (there (there (there (here eq)))) = ⊥-elim (off u₂ eq)
+    block-in (block _ _ _ _ _ _ _ _)  (there (there (there (there m)))) = m
+
+    block-out : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
+              → InputBlock κ π NP NI a {lo} {ℓ} full q → c′ ∈ nodesOf q → c′ ∈ nodesOf full
+    block-out (block _ _ _ _ _ _ _ _) m = there (there (there (there m)))
+
+    module _ {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} where
+
+      -- the rows the relation pairs are cut together
+      row-cut : ∀ {x x′} → RowRel κ π {t} NP NI LP LI x x′
+              → pathHasNode c (proj₂ (proj₂ (proj₂ x))) ≡ pathHasNode c′ (proj₂ (proj₂ (proj₂ x′)))
+      row-cut (read~ _ r refl)          = path-cut r
+      row-cut (cold~ {p = p} {full = full} _ b r refl) = cut-by p full (λ m → block-out b (fwd r m)) (λ m → bwd r (block-in b m))
+      row-cut (defer~ {nid = nid} {nid′ = nid′} {h = h} {h′ = h′} {p = p} {q = q} _ e _ _ r refl) =
+        cut-by (thru-outer mergeAllᵒ nid ↠[ h ] p) (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) d-fwd d-bwd
+        where
+          d-fwd : c ∈ nid ∷ nodesOf p → c′ ∈ nid′ ∷ nodesOf q
+          d-fwd (here eq) = here (solo e (sym eq))
+          d-fwd (there m) = there (fwd r m)
+          d-bwd : c′ ∈ nid′ ∷ nodesOf q → c ∈ nid ∷ nodesOf p
+          d-bwd (here eq) = here (owner e (here eq))
+          d-bwd (there m) = there (bwd r m)
+
+      -- and the impl's own rows are never cut
+      mach-cut : ∀ {x′} → MachRow κ π {t} NP NI LP LI x′ → pathHasNode c′ (proj₂ (proj₂ (proj₂ x′))) ≡ false
+      mach-cut (hot~ {i = i} {ℓ = ℓ} hot {h = h′} {full = full} b refl) =
+        T-≡ (λ h → ⊥-elim (no-sink {Δ = plainᵏ Γ κ} {lo = ℓ} {w = emitᵗ t} {i = n ↑ʳ i} {h = h′} (hotEq {Γ = Γ} κ i hot) (block-in b (has-node full h)))) (λ ())
+
+      RR : List (RegRow Γ t) → List (RegRow (plainᵏ Γ κ) (emitᵗ t)) → Set
+      RR = RegRel κ π {t} NP NI LP LI
+
+      -- two rows the relation partners are in the registries
+      partner-mem : ∀ {rs rs′} (q : RR rs rs′) {x x′} → Partners κ π NP NI LP LI q x x′ → x ∈ rs × x′ ∈ rs′
+      partner-mem (r ∷ q)    (inj₁ (refl , refl)) = here refl , here refl
+      partner-mem (r ∷ q)    (inj₂ p)             = there (proj₁ (partner-mem q p)) , there (proj₂ (partner-mem q p))
+      partner-mem (mach _ q) p                    = proj₁ (partner-mem q p) , there (proj₂ (partner-mem q p))
+
+      part-subst : ∀ {rs rs′ ks ks′} (e : rs ≡ ks) (e′ : rs′ ≡ ks′) (q : RR rs rs′) {x x′}
+                 → Partners κ π NP NI LP LI q x x′ → Partners κ π NP NI LP LI (subst₂ RR e e′ q) x x′
+      part-subst refl refl q p = p
+
+      arr-subst : ∀ {rs rs′ ks ks′} (e : rs ≡ ks) (e′ : rs′ ≡ ks′) (q : RR rs rs′) {s s′ u u′}
+                → ArrRows κ π NP NI LP LI q s s′ u u′ → ArrRows κ π NP NI LP LI (subst₂ RR e e′ q) s s′ u u′
+      arr-subst refl refl q a = a
+
+      -- an arrival's pair against a row and its tail, against the tail alone, and the row put back
+      arr-tail : ∀ {r r′ rs rs′} (rr : RowRel κ π {t} NP NI LP LI r r′) (q : RR rs rs′) {s s′ u u′}
+               → ArrRows κ π NP NI LP LI (rr ∷ q) s s′ u u′ → ArrRows κ π NP NI LP LI q s s′ u u′
+      arr-tail (read~ _ _ _)        q a       = a
+      arr-tail (cold~ _ _ _ _)      q (_ , a) = a
+      arr-tail (defer~ _ _ _ _ _ _) q (_ , a) = a
+
+      arr-cons : ∀ {r r′ rs rs′ ks ks′} (rr : RowRel κ π {t} NP NI LP LI r r′) (q : RR rs rs′) (q′ : RR ks ks′) {s s′ u u′}
+               → ArrRows κ π NP NI LP LI (rr ∷ q) s s′ u u′ → ArrRows κ π NP NI LP LI q′ s s′ u u′
+               → ArrRows κ π NP NI LP LI (rr ∷ q′) s s′ u u′
+      arr-cons (read~ _ _ _)        q q′ _       a = a
+      arr-cons (cold~ _ _ _ _)      q q′ (x , _) a = x , a
+      arr-cons (defer~ _ _ _ _ _ _) q q′ (x , _) a = x , a
+
+      -- THE ROWS THE CUT KEEPS ARE RELATED, partnered as before and
+      -- against an arrival's pair as before
+      CutRows : ∀ {rs rs′} → RR rs rs′ → Set
+      CutRows {rs} {rs′} q = Σ (RR (proj₁ (cutThrough c rs)) (proj₁ (cutThrough c′ rs′))) λ q′
+        → (∀ {x x′} → Partners κ π NP NI LP LI q x x′ → pathHasNode c (proj₂ (proj₂ (proj₂ x))) ≡ false
+                    → Partners κ π NP NI LP LI q′ x x′)
+        × (∀ {s s′ u u′} → ArrRows κ π NP NI LP LI q s s′ u u′ → ArrRows κ π NP NI LP LI q′ s s′ u u′)
+
+      cut-rows : ∀ {rs rs′} (q : RR rs rs′) → CutRows q
+      cut-rows [] = [] , (λ ()) , (λ _ → tt)
+      cut-rows (_∷_ {r = r} {r′ = r′} {rs = rs} {rs′ = rs′} rr q) with cut-rows q | cut-step c r rs | cut-step c′ r′ rs′
+      ... | q′ , P , A | inj₁ (h , e , _) | inj₁ (_ , e′ , _) =
+            subst₂ RR (sym e) (sym e′) q′
+          , (λ { (inj₁ (refl , refl)) hx → ⊥-elim (t≢f (trans (sym h) hx))
+               ; (inj₂ p) hx → part-subst (sym e) (sym e′) q′ (P p hx) })
+          , (λ a → arr-subst (sym e) (sym e′) q′ (A (arr-tail rr q a)))
+      ... | q′ , P , A | inj₂ (_ , e , _) | inj₂ (_ , e′ , _) =
+            subst₂ RR (sym e) (sym e′) (rr ∷ q′)
+          , (λ { (inj₁ eq) _ → part-subst (sym e) (sym e′) (rr ∷ q′) (inj₁ eq)
+               ; (inj₂ p) hx → part-subst (sym e) (sym e′) (rr ∷ q′) (inj₂ (P p hx)) })
+          , (λ a → arr-subst (sym e) (sym e′) (rr ∷ q′) (arr-cons rr q q′ a (A (arr-tail rr q a))))
+      ... | _ | inj₁ (h , _) | inj₂ (h′ , _) = ⊥-elim (t≢f (trans (sym h) (trans (row-cut rr) h′)))
+      ... | _ | inj₂ (h , _) | inj₁ (h′ , _) = ⊥-elim (t≢f (trans (sym h′) (trans (sym (row-cut rr)) h)))
+      cut-rows (mach {rs = rs} {r′ = r′} {rs′ = rs′} m q) with cut-rows q | cut-step c′ r′ rs′
+      ... | q′ , P , A | inj₂ (_ , e′ , _) =
+            subst₂ RR refl (sym e′) (mach m q′)
+          , (λ p hx → part-subst refl (sym e′) (mach m q′) (P p hx))
+          , (λ a → arr-subst refl (sym e′) (mach m q′) (A a))
+      ... | _ | inj₁ (h , _) = ⊥-elim (t≢f (trans (sym h) (mach-cut m)))
+
+      -- no row at a raw slot is through the impl's cut: a reader is at its
+      -- stamped slot, a minted source above every slot, and the impl's own
+      -- rows are never cut
+      raw-safe : ∀ (i : Fin n) {rs rs′} → RR rs rs′ → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rs′
+               → All (λ r → sameSource (toℕ (i ↑ˡ n)) (regSource (proj₁ (proj₂ r))) ≡ true
+                          → pathHasNode c′ (proj₂ (proj₂ (proj₂ r))) ≡ false) rs′
+      raw-safe i []                          []       = []
+      raw-safe i (read~ {i = j} _ _ _ ∷ q)   (_ ∷ as) = (λ e → ⊥-elim (raw≢stamped i j (same-eq e))) ∷ raw-safe i q as
+      raw-safe i (cold~ _ _ _ _ ∷ q)         (a ∷ as) = (λ e → ⊥-elim (<⇒≢ (<-≤-trans (raw<ₙ i) (above-≤ a)) (same-eq e))) ∷ raw-safe i q as
+      raw-safe i (defer~ _ _ _ _ _ _ ∷ q)    (a ∷ as) = (λ e → ⊥-elim (<⇒≢ (<-≤-trans (raw<ₙ i) (above-≤ a)) (same-eq e))) ∷ raw-safe i q as
+      raw-safe i (mach m q)                  (_ ∷ as) = (λ _ → mach-cut m) ∷ raw-safe i q as
+
+------------------------------------------------------------------
+-- The stores after the cut
+------------------------------------------------------------------
+
+module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
+
+  open Kept {Γ = Γ} κ {t} {ep} {ei}
+
+  module _ {sP stP sI stI} (S : St sP stP sI stI) {c c′} (ce : (c , c′ ∷ []) ∈ Store.π S) where
+
+    open Store S
+    module C = At {Γ = Γ} κ π-keys π-vals ce
+
+    KP : List (RegRow Γ t)
+    KP = proj₁ (cutThrough c (EvalSt.registry stP))
+
+    KI : List (RegRow (plainᵏ Γ κ) (emitᵗ t))
+    KI = proj₁ (cutThrough c′ (EvalSt.registry stI))
+
+    cr : C.CutRows rows
+    cr = C.cut-rows rows
+
+    G : Pointwise (λ l l′ → guardOf KP l ≡ guardOf KI l′) (Sched.live sP) (Sched.live sI)
+    G = rows-guards κ (proj₁ cr) (proj₁ distinct) (proj₂ distinct) numbers
+
+    -- THE STORES ONCE BOTH RUNS CUT AND SWEEP
+    cut-go : St (record sP { live = sweepL (guardOf KP) (Sched.live sP) })
+                (record stP { registry = KP ; cancelled = proj₂ (cutThrough c (EvalSt.registry stP)) ++ EvalSt.cancelled stP })
+                (record sI { live = sweepL (guardOf KI) (Sched.live sI) })
+                (record stI { registry = KI ; cancelled = proj₂ (cutThrough c′ (EvalSt.registry stI)) ++ EvalSt.cancelled stI })
+    cut-go = record
+      { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below
+      ; sources = sweepL-pw sources G
+      ; numbers = sweepL-pw numbers G
+      ; distinct = unique-sweep _ LiveSource.source (proj₁ distinct) , unique-sweep _ LiveSource.source (proj₂ distinct)
+      ; sync = sync-sweep sync G
+      ; rows = regrel-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr)
+      ; latches = latches
+      ; bounded = all-sweep _ LiveSource.source (proj₁ bounded) , all-sweep _ LiveSource.source (proj₂ bounded)
+      ; swept = sweepL-pw G G
+      ; uncut = tabulateᵃ (uncut-cut c (proj₁ rids) (proj₁ uncut)) , tabulateᵃ (uncut-cut c′ (proj₂ rids) (proj₂ uncut))
+      ; rids = pairs-cut c (proj₁ rids) , pairs-cut c′ (proj₂ rids)
+      ; fresh-ids = all-cut c (proj₁ fresh-ids) , all-cut c′ (proj₂ fresh-ids)
+      ; above = all-cut c (proj₁ above) , all-cut c′ (proj₂ above)
+      ; census = λ i h → census-cut c′ (EvalSt.registry stI) (census i h) (C.raw-safe i rows (proj₂ above))
+      ; owned = all-cut c′ (mapᵃ (λ f u {j} b → all-cut c′ (f u {j} b)) owned)
+      ; ruleP = sub-rule (λ {r} m → cut-sub c (EvalSt.registry stP) r m) ≤-refl ruleP
+      ; ruleI = sub-rule (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) ≤-refl ruleI
+      }
+
+    -- a pair through the cut leaves on both sides, any other stays partnered
+    cut-keeps : Keeps S cut-go
+    cut-keeps (inj₁ (a , b)) =
+      inj₁ (hit-++ (proj₂ (cutThrough c (EvalSt.registry stP))) a , hit-++ (proj₂ (cutThrough c′ (EvalSt.registry stI))) b)
+    cut-keeps {x} {x′} (inj₂ (a , b , pr)) = go (pathHasNode c (proj₂ (proj₂ (proj₂ x)))) refl
+      where
+        mx = C.partner-mem rows pr
+        rr = partner-row κ _ _ _ _ _ rows pr
+        go : ∀ v → pathHasNode c (proj₂ (proj₂ (proj₂ x))) ≡ v
+           → PairedR (Store.rows cut-go) (proj₂ (cutThrough c (EvalSt.registry stP)) ++ EvalSt.cancelled stP)
+                                         (proj₂ (cutThrough c′ (EvalSt.registry stI)) ++ EvalSt.cancelled stI) x x′
+        go true  h = inj₁ ( hit-in (EvalSt.cancelled stP) (cut-named c _ (proj₁ mx) h)
+                          , hit-in (EvalSt.cancelled stI) (cut-named c′ _ (proj₂ mx) (trans (sym (C.row-cut rr)) h)) )
+        go false h = inj₂ ( none-++ (proj₂ (cutThrough c (EvalSt.registry stP))) (kept-apart c _ (proj₁ rids) (proj₁ mx) h) a
+                          , none-++ (proj₂ (cutThrough c′ (EvalSt.registry stI)))
+                                    (kept-apart c′ _ (proj₂ rids) (proj₂ mx) (trans (sym (C.row-cut rr)) h)) b
+                          , part-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr) (proj₁ (proj₂ cr) pr h) )
+
+    cut-persists : Persists S cut-go
+    cut-persists ar = record
+      { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
+      ; rows = arr-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr) (proj₂ (proj₂ cr) (Arr.rows ar))
+      ; lists = sweepL-pw (Arr.lists ar) G
+      }
+
+    -- A SWITCH'S CUT ON BOTH SIDES, as the evaluator writes it: the
+    -- pairing is kept as it was
+    cut-kill : Σ (After S ([] , switchKill (just c) sP stP) ([] , switchKill (just c′) sI stI))
+                 (λ A → Store.π (After.store A) ≡ π)
+    cut-kill =
+      subst₂ (λ x y → Σ (After S ([] , x , proj₂ (switchKill (just c) sP stP)) ([] , y , proj₂ (switchKill (just c′) sI stI)))
+                        (λ A → Store.π (After.store A) ≡ π))
+        (cong (λ L → record sP { live = L }) (sym (sweep-eq KP (Sched.live sP))))
+        (cong (λ L → record sI { live = L }) (sym (sweep-eq KI (Sched.live sI))))
+        (after cut-go cut-keeps cut-persists []ᵖ (λ x → x) , refl)

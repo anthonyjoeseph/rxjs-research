@@ -8,7 +8,7 @@
 ------------------------------------------------------------------
 module Simulation.Chains where
 
-open import Data.Bool    using (true; false; T; if_then_else_)
+open import Data.Bool    using (true; false; T)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥-elim)
 open import Data.List    using (List; []; _∷_; map)
@@ -19,14 +19,13 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_) ren
 open import Data.List.Relation.Unary.All using (All; _∷_; [])
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.Nat     using (zero; suc; _+_; _<_; _≤_; _≡ᵇ_; _≟_)
+open import Data.Nat     using (suc; _+_; _<_; _≤_; _≡ᵇ_; _≟_)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; toℕ-injective; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
-open import Data.Nat.Properties using (≡ᵇ⇒≡; ≡⇒≡ᵇ; <⇒≢; <-trans; <-≤-trans; <-asym; +-monoʳ-<; m≤m+n; 1+n≢0; suc-injective)
+open import Data.Nat.Properties using (≡⇒≡ᵇ; <⇒≢; <-trans; <-≤-trans; <-asym; +-monoʳ-<; m≤m+n; 1+n≢0; suc-injective)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
-open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 open import Relation.Nullary using (yes; no)
 
@@ -36,23 +35,13 @@ open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegId; RegRo
   sameSource; schedGo; cascadeOpen; share-sink)
 open import Rx.Evaluator.Domain using (cascadeGo⇓; casc-nil; casc-cut; casc-live)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
-open import Simulation.Pass using (dynRow; clash; Paired; SlotPair; slotpair; head; HotStart; hot-idle; hot-block)
+open import Simulation.Pass using (dynRow; Paired; SlotPair; slotpair; head; HotStart; hot-idle; hot-block)
 open import Simulation.Pop using (pp-popped)
+open import Simulation.Sweep using (t≢f; sameSource-lt; sameSource-no; same-refl; count-hit; count-pass; arr-rows; raw≢stamped; raw<ₙ)
 open import Simulation.Schedules using (Popped; pop; sched-pop; HeadOf)
 open import Simulation.Stores using (srcCount; InputBlock; Src; data~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr; SameAt;
   hotEq; sharedEq; aboveᵇ; above-≤)
   renaming (here to sp-here; there to sp-there)
-
--- a source number that sits under another is not it
-sameSource-lt : ∀ {m k} → k < m → sameSource m k ≡ false
-sameSource-lt {m} {k} lt with m ≡ᵇ k in e
-... | false = refl
-... | true  = ⊥-elim (<⇒≢ lt (sym (≡ᵇ⇒≡ m k (subst T (sym e) tt))))
-
-sameSource-no : ∀ {m k} → m ≢ k → sameSource m k ≡ false
-sameSource-no {m} {k} ne with m ≡ᵇ k in e
-... | false = refl
-... | true  = ⊥-elim (ne (≡ᵇ⇒≡ m k (subst T (sym e) tt)))
 
 module _ {n} {Δ : Ctx n} {t} where
 
@@ -62,7 +51,7 @@ module _ {n} {Δ : Ctx n} {t} where
               → chainsGo a ((rid , s , (u , p)) ∷ rest) ≡ chainsGo a rest
   chains-skip a {s = s} {u} eq with sameSource (arrSource a) (regSource s) | u ≟ᵗ arrTy a
   ... | false | _ = refl
-  ... | true  | _ = ⊥-elim (clash eq)
+  ... | true  | _ = ⊥-elim (t≢f eq)
 
   -- a row at the arrival's source and type is its next chain
   chains-take : ∀ (a : Arrival Δ) {rid lo} {src u} {p : Path Δ lo u t} {rest}
@@ -84,27 +73,6 @@ cons-take : ∀ {A B : Set} {P : A → B → Set} {xs ys x y xs₁ ys₁} → xs
 cons-take refl refl p pw = p ∷ pw
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
-
-  -- a source the head of a list does not number is apart from the one a pair puts after it
-  sp-apart : ∀ {x} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′}
-           → All (x ≢_) (map LiveSource.source LP) → SrcPair κ LP LI s s′ u u′ → x ≢ s
-  sp-apart (x≢ ∷ _) sp-here      = x≢
-  sp-apart (_ ∷ ap) (sp-there q) = sp-apart ap q
-
-  sp-apart′ : ∀ {x} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′}
-            → All (x ≢_) (map LiveSource.source LI) → SrcPair κ LP LI s s′ u u′ → x ≢ s′
-  sp-apart′ (x≢ ∷ _) sp-here      = x≢
-  sp-apart′ (_ ∷ ap) (sp-there q) = sp-apart′ ap q
-
-  -- with the sources on each side distinct, two pairs at one source on one side are at the other's
-  sp-fun : ∀ {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′ t t′ w w′}
-         → Unique (map LiveSource.source LP) → Unique (map LiveSource.source LI)
-         → SrcPair κ LP LI s s′ u u′ → SrcPair κ LP LI t t′ w w′
-         → (s ≡ t → s′ ≡ t′ × u ≡ w × u′ ≡ w′) × (s′ ≡ t′ → s ≡ t)
-  sp-fun (_ ∷ _) (_ ∷ _) sp-here sp-here = (λ _ → refl , refl , refl) , λ _ → refl
-  sp-fun (a ∷ _) (a′ ∷ _) sp-here (sp-there q) = (λ e → ⊥-elim (sp-apart a q e)) , λ e′ → ⊥-elim (sp-apart′ a′ q e′)
-  sp-fun (a ∷ _) (a′ ∷ _) (sp-there p) sp-here = (λ e → ⊥-elim (sp-apart a p (sym e))) , λ e′ → ⊥-elim (sp-apart′ a′ p (sym e′))
-  sp-fun (_ ∷ ul) (_ ∷ ul′) (sp-there p) (sp-there q) = sp-fun ul ul′ p q
 
   -- WHAT A PAIR OF REGISTRATIONS DOES TO THE TWO CHAIN LISTS OF ONE ARRIVAL PAIR
   data RowChain {t} (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ)) (r : RegRow Γ t) (r′ : RegRow (plainᵏ Γ κ) (emitᵗ t))
@@ -144,16 +112,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       cons-skip refl
                 (chains-skip a′ (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ˡ i n)) (<-≤-trans (toℕ<n i) (m≤m+n n n))) na′)))
                 (chains-rows na na′ q ars)
-
-  -- what a registry's rows say of a popped pair of sources, from the pair's place in the live lists
-  arr-rows : ∀ {RS : List (LiveSource Γ)} {RS′ : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′}
-           → Unique (map LiveSource.source RS) → Unique (map LiveSource.source RS′) → SrcPair κ RS RS′ s s′ u u′
-           → ∀ {t π NP NI rg rg′} (rr : RegRel κ π {t} NP NI RS RS′ rg rg′) → ArrRows κ _ _ _ _ _ rr s s′ u u′
-  arr-rows ua ua′ pk []                    = tt
-  arr-rows ua ua′ pk (read~ _ _ _ ∷ q)     = arr-rows ua ua′ pk q
-  arr-rows ua ua′ pk (cold~ sp _ _ _ ∷ q)  = sp-fun ua ua′ pk sp , arr-rows ua ua′ pk q
-  arr-rows ua ua′ pk (defer~ sp _ _ _ _ _ ∷ q) = sp-fun ua ua′ pk sp , arr-rows ua ua′ pk q
-  arr-rows ua ua′ pk (mach _ q)            = arr-rows ua ua′ pk q
 
 -- the popped pair's place in the live lists bounds both numbers by the counters
 sp-bound : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {s s′ u u′ c}
@@ -338,19 +296,7 @@ slot-chains κ S e ty = slot-rows κ e ty (Store.rows S) (proj₁ (Store.above S
 -- A HOT ARRIVAL'S RAW CHAIN
 ------------------------------------------------------------------
 
--- a source number against itself
-same-refl : ∀ x → sameSource x x ≡ true
-same-refl zero    = refl
-same-refl (suc x) = same-refl x
-
 module _ {m} {Δ : Ctx m} {t} where
-
-  -- a row elsewhere leaves a count alone, a row there raises it
-  count-hit : ∀ k (r : RegRow Δ t) K → sameSource k (regSource (proj₁ (proj₂ r))) ≡ true → srcCount k (r ∷ K) ≡ suc (srcCount k K)
-  count-hit k (rid , x , c) K e = cong (λ b → if b then suc (srcCount k K) else srcCount k K) e
-
-  count-pass : ∀ k (r : RegRow Δ t) K → sameSource k (regSource (proj₁ (proj₂ r))) ≡ false → srcCount k (r ∷ K) ≡ srcCount k K
-  count-pass k (rid , x , c) K e = cong (λ b → if b then suc (srcCount k K) else srcCount k K) e
 
   -- none at a source, none behind the head either
   count-tail : ∀ {k} (r : RegRow Δ t) K → srcCount k (r ∷ K) ≡ 0 → srcCount k K ≡ 0
@@ -418,13 +364,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     trans (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
           (plain-mistyped e ne q ab)
   plain-mistyped e ne (mach x q) ab = plain-mistyped e ne q ab
-
-  -- a raw slot's number is no stamped slot's
-  raw≢stamped : ∀ (i j : Fin n) → toℕ (i ↑ˡ n) ≢ toℕ (n ↑ʳ j)
-  raw≢stamped i j eq = <⇒≢ (<-≤-trans (toℕ<n i) (m≤m+n n (toℕ j))) (trans (sym (toℕ-↑ˡ i n)) (trans eq (toℕ-↑ʳ n j)))
-
-  raw<ₙ : ∀ (i : Fin n) → toℕ (i ↑ˡ n) < n + n
-  raw<ₙ i = subst (_< n + n) (sym (toℕ-↑ˡ i n)) (<-≤-trans (toℕ<n i) (m≤m+n n n))
 
   -- THE IMPL'S CHAINS AT A HOT ARRIVAL ONCE ITS SHARE HAS CONNECTED: the
   -- one raw row's, or none if the arrival is not at the slot's type
@@ -565,7 +504,7 @@ hot-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src 
            (casc-empty (subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) none go))
 ...   | raw-at hot ch d ib u _
   with subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) ch go
-...     | casc-cut y _ = ⊥-elim (clash (trans (sym y) u))
+...     | casc-cut y _ = ⊥-elim (t≢f (trans (sym y) u))
 ...     | casc-live _ d′ casc-nil =
   subst (λ o → HotStart κ S a a′ i o sI₁ stI₁) (sym (++-identityʳ _))
         (hot-block κ S hot (head src h h′ e₁ e₂)
