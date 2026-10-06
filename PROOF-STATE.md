@@ -283,7 +283,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   (`cut-group`), and a test's cut severing a row its partner keeps
   (`while-cut`, over `cut-keeps`).
 
-- **WALK INSIDE THE PASS.** `walk-of`, `walk-empty` and `walk-μ` are
+- **WALK INSIDE THE PASS.** `walk-of` (`emptyˢ` is its `[]`) and `walk-μ` are
   `path-pass`, or `walk` again, past a derivation rather than the tree:
   `walk` joins `path-pass`'s cycle through `inner-walk`, terminating on the
   plain derivation, and `path-pass`'s `Sound` reaches `Walks` -- from the

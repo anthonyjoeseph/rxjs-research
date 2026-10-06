@@ -40,7 +40,7 @@ open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; reg
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
   mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Slots     using (Slots; scripted; shared)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-scan; subs-takeWhile; subs-flatten; subs-defer; sub-all; flatSt)
+open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
@@ -207,8 +207,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- it; and `path-pass` asks `Sound` of both paths, which `Walks`
       -- does not carry and `PathRel` does not imply.
       walk-of        : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) → Elab-Walks (ofˢ ts)
-      -- `walk-of`'s route, at no values
-      walk-empty     : ∀ {Θ u} → Elab-Walks {Θ} {u} emptyˢ
       -- NO RELATION HOLDS ALONG THE BODY'S PATH WHILE THE BODY IS
       -- SUBSCRIBED.  The impl subscribes the cut as the one inner of an
       -- `of` outer, so the merge reads `mergeAll-st nothing 1 [] false`
@@ -521,7 +519,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
     walk (inputˢ i)       = walk-input i (lookup κ i) refl
     walk (ofˢ ts)         = walk-of ts
-    walk emptyˢ           = walk-empty
+    walk {Θ} {u} emptyˢ w {ρ′} {ρ} r S pr (subs-empty f) dI = walk-of {Θ} {u} [] w {ρ′} {ρ} r S pr (subs-of {ts = []} f) dI
     walk (takeˢ k b)      = walk-take k b
     walk (takeWhileˢ f b) w r = walk-while f b (walk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
     walk (mapˢ f b) w r S pr (subs-map dP) (subs-map dI) = unmap (walk b w r S (map~ (lifts-map f w r) pr) dP dI)
