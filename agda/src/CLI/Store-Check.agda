@@ -808,6 +808,23 @@ lockstep κ k ((sP , stP) ∷ ps) ((sI , stI) ∷ is) with Decide.store? κ sP s
 ... | just w  = false , "boundary " ++ˢ show k ++ˢ " (0 is the subscribe): " ++ˢ w
 lockstep κ k _ _ = false , "lockstep: one run stopped at boundary " ++ˢ show k ++ˢ " and the other did not"
 
+-- HOW MANY QUEUED INNERS A STATE'S MERGES HOLD, and how many boundaries
+-- of a trace hold fewer than the one before: a sweep reaching a drain
+-- says so, since a green over programs that never queue is no evidence
+-- about a finish that drains
+queued : ∀ {m} {Δ : Ctx m} → List (NodeId × NodeState Δ) → ℕ
+queued []                                 = 0
+queued ((_ , mergeAll-st _ _ q _) ∷ r) = length q + queued r
+queued (_ ∷ r)                            = queued r
+
+drains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → ℕ → List (Sched Γ × EvalSt e) → ℕ
+drains k []              = 0
+drains k ((_ , st) ∷ r) =
+  (if queued (EvalSt.nodes st) <ᵇ k then 1 else 0) + drains (queued (EvalSt.nodes st)) r
+
 storeSides : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → Bool × String
 storeSides {κ = κ} f e ins =
   lockstep κ 0 (trace f (plainExp e) (plainSlots ins)) (trace f (elaborateImpl κ e) (embedSlotsImpl ins))
+
+storeDrains : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → ℕ
+storeDrains f e ins = drains 0 (trace f (plainExp e) (plainSlots ins))

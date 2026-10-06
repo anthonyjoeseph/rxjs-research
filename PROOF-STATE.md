@@ -261,11 +261,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   and nothing has ever instantiated either: the least certain step left in
   the cascade. Aim `make qc-store` at bounded merges whose inner dies with a
   queue, then write `merge-finish` as a body over the drain's own leaf.
-  Ruled out: an open merge's window reordering rows or sources; a liveness
-  parting a pair; a merged lane, so an outer carrying two inners explodes;
-  a deeper flattener's subscribe (seeds 21, 22); the quiet scan and open
-  test, now bodies over `scan-write` and `while-write`. Left: whether a
-  drained queue keeps the store.
+  Ruled out: a drain unrelating the stores, 65 of 100 programs spending a
+  queue (seed 31) and 80 deferring (seed 32); an open merge's window
+  reordering rows; a merged lane; a deeper flattener's subscribe (seeds
+  21, 22); the quiet scan and open test. Left: the queued inners'
+  relation, which no sweep reads.
 
 - **REFUTE OR CARRY `Sound` AT THE WALK.** `of-fold` (`walk-of`'s and
   `emptyˢ`'s fold) is `path-pass` past a derivation, which asks `Sound` of

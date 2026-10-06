@@ -85,6 +85,8 @@ program that has one.
 ## Reading a sweep
 
 The summary's census counts formers per case, and each streamed case names
-its own; a region claim cites the census, not the weights. Before trusting a
+its own; a region claim cites the census, not the weights. Under `qc-store` a case also
+says `drains a queue at N boundaries` when a merge spent its queue, the one
+region no former tag names. Before trusting a
 green on a new decider, break it on purpose (misread one index) and confirm it
 goes red: a decider that cannot fail is a probe that lies green.

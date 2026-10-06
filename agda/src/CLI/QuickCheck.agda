@@ -80,7 +80,7 @@ open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import CLI.JSON using (JSON; jnum; jstr; jarr; jobj; parseJSON)
 open import SExp.Pipeline using (runᴵ)
 open import SExp.Impl-Slots using (elaborateImpl)
-open import CLI.Store-Check using (storeSides)
+open import CLI.Store-Check using (storeSides; storeDrains)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ; takeˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
@@ -1075,9 +1075,10 @@ bumpEach fs (g ∷ gs) (c ∷ cs) =
 
 -- a case's marks, whether it bears on contiguity, whether its batcher
 -- holds values back at the fuel, whether its values group, and whether
--- an impl arrival matches no plain one
+-- an impl arrival matches no plain one, and how many boundaries of the
+-- plain run hold fewer queued inners than the one before
 Seen : Set
-Seen = Marks × Bool × Bool × Bool × Bool
+Seen = Marks × Bool × Bool × Bool × Bool × ℕ
 
 bump : Seen → Tally → Tally
 bump ((fs , o) , b , h , g , _) (cs , p , q , r , u) =
@@ -1191,13 +1192,26 @@ splits ss s f (e , d₀ , d₁) with any isClocked ss
 ...   | c with sameClockᵇ (arrPlain c) ∧ sameClockᵇ (arrTimed c)
 ...     | x = within s (if x then 0 else 1) (not x) false
 
+-- A CASE DRAINS A QUEUE WHEN A MERGE SPENDS ONE: read only where `store`
+-- is being decided, since a green there over programs that never queue
+-- says nothing about a finish that drains
+isStore : Statement → Bool
+isStore storeˢ = true
+isStore _      = false
+
+drained : List Statement → ℕ → Drawn → ℕ
+drained ss f (e , d₀ , d₁) with any isStore ss
+... | false = 0
+... | true  with cached "?" f e (mkSlots d₀ d₁)
+...   | c = storeDrains (Case.fuel c) (Case.prog c) (Case.slots c)
+
 -- A SWEEP MAY DECIDE ONLY THE CASES THAT BEAR.  Whether one does is
 -- read before any statement is, so a sweep aimed at contiguity spends
 -- its clocks on cases that could fail it; one that does not bear is
 -- drawn, counted in the census and left undecided-by-choice.
 judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 judged ob ss f s m x with bears s f x
-... | b = (m , b , slack s f x , groups s f x , splits ss s f x) , (if ob ∧ not b then [] else bounded s f x ss)
+... | b = (m , b , slack s f x , groups s f x , splits ss s f x , drained ss f x) , (if ob ∧ not b then [] else bounded s f x ss)
 
 -- ONE CASE IS ONE ACCEPTED DRAW.  A restriction's `reach` is the one
 -- filter, and it is spent HERE so that every route naming a case by its
@@ -1225,7 +1239,7 @@ drawCase d = askG >>=G λ W → drawFor (Draw.tries W ∸ 1) d
 -- sweep was aimed at, so no statement is asked of it
 unreached : ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 unreached f n m (e , d₀ , d₁) =
-  (m , false , false , false , false) ,
+  (m , false , false , false , false , 0) ,
   (TIMEOUT , "  unreached\n    no draw in " ++ show n ++ " tries carried every former the draw must reach"
              ++ rowIn "UNDECIDED" f e d₀ d₁) ∷ []
 
@@ -1505,6 +1519,10 @@ verdictOf rs@(_ ∷ _) with decided rs
 ... | []    = "undecided"
 ... | _ ∷ _ = "FAIL"
 
+drainLine : ℕ → String
+drainLine zero = ""
+drainLine k    = "  drains a queue at " ++ show k ++ " boundaries\n"
+
 -- each case names its formers by the census's tags, so the stream reads
 -- a flag against a former where the census only counts the two apart
 streamCases : Bool → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
@@ -1516,7 +1534,8 @@ streamCases ob n i (r ∷ rs) =
           ++ (if proj₁ (proj₂ (proj₁ r)) then "  bears on contiguity\n" else "")
           ++ (if proj₁ (proj₂ (proj₂ (proj₁ r))) then "  holds values back at the fuel\n" else "")
           ++ (if proj₁ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  groups values\n" else "")
-          ++ (if proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  parts the two clocks\n" else "")
+          ++ (if proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r))))) then "  parts the two clocks\n" else "")
+          ++ drainLine (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r))))))
           ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
   streamCases ob n (suc i) rs
 

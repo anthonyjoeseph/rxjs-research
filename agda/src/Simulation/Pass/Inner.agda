@@ -181,6 +181,13 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A MERGE'S INNER ENDED ON BOTH SIDES: each finish folds the group
       -- down its tail, then drains the queue its node holds, and the
       -- related nodes hold related queues
+      --
+      -- THE STORE HOLDS ACROSS EVERY DRAIN A COMPILED SWEEP HAS DRAWN.
+      -- `make qc-store` aimed at bounded merges over literal inners
+      -- (seed 31, depth 4, 100 programs) spent a queue in 65 of them, at
+      -- up to three boundaries each, and `CLI.Store-Check` related the
+      -- stores at every one; it reads a queue's length and the counts,
+      -- never the queued inners' own relation.
       merge-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
@@ -200,6 +207,11 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A DEAD DEFERRED BODY FINISHES ON BOTH SIDES: the plain merge's
       -- finish, against the hop's marker merge's and the restamp and hop
       -- node the group then reaches
+      --
+      -- THE STORE HOLDS AT EVERY BOUNDARY OF A SWEEP WHOSE EVERY PROGRAM
+      -- DEFERS: `make qc-store` at seed 32, depth 5, 80 programs each with
+      -- a defer and a flatten, 43 through a μ, 42 spending a queue.  Which
+      -- of those boundaries ended a deferred body was not counted.
       defer-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
