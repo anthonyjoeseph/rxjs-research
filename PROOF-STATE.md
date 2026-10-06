@@ -330,9 +330,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`defer-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
   body's inner is live on the plain side exactly when the hop's marker merge's
   inner is on the impl's.
-- **`block-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
-  chain's input block runs alone into a merge whose walk folds the path the
-  plain chain folds the popped head down, and the impl tail's end after it.
+- **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
+  a cold chain's input block, its inner open, alive or dead at the group, runs
+  alone into a merge whose walk folds the path the plain chain folds the popped
+  head down, and the impl tail's end after it.
 - **`hop-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
   hop's merge subscribes each emit's body on both sides, and its end meets the
   plain hop's.

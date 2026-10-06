@@ -1732,10 +1732,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- merge whose walk folds the path its partner runs; a deferred hop's
     -- walks the hop's merge on both sides.
     postulate
-      -- A COLD READ'S BLOCK WALKED: the impl alone runs the inner, the
-      -- bracket and the stamp, and its merge's walk folds the tail over
-      -- what the plain path folds the group into
-      block-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
+      -- A COLD READ'S BLOCK WALKED WITH ITS INNER OPEN: the impl's merge
+      -- hands the marked values on untouched, and its merge's walk folds
+      -- the tail over what the plain path folds the group into
+      block-open : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
                  → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
                  → ∀ {lo ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
                      {h₁ : lo ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
@@ -1743,10 +1743,47 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ s) (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) q
                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
                  → Sound p sP stP → Sound (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) sI stI
-                 → ∀ {now fin rP o₁ v₁ f₁ s₁ st₁ o₂ v₂ f₂ s₂ st₂ oW sW stW}
-                 → foldPath⇓ now p vs fin sP stP rP
-                 → stepFrame⇓ now (from-inner mergeAllᵒ m1 j1) (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))) (map (applyClo {s = plainᵗ s} {t = unitᵗ +ᵗ plainᵗ s} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) vs′)
-                     fin sI stI (o₁ , v₁ , f₁ , s₁ , st₁)
+                 → ∀ {now rP o₂ v₂ f₂ s₂ st₂ oW sW stW}
+                 → foldPath⇓ now p vs false sP stP rP
+                 → stepFrame⇓ now (batchSync-f b) (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q))) (map (applyClo {s = plainᵗ s} {t = unitᵗ +ᵗ plainᵗ s} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) vs′) false sI stI (o₂ , v₂ , f₂ , s₂ , st₂)
+                 → thruWalk⇓ mergeAllᵒ m2 q now
+                     (thruEvents (map (applyClo {s = obs (emitᵗ s)} {t = echoᵗ (emitᵗ s)} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
+                                   (map (applyClo {s = (unitᵗ +ᵗ plainᵗ s) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ s)} {t = obs (emitᵗ s)} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃)) v₂)))
+                     s₂ st₂ (oW , sW , stW)
+                 → After S rP (o₂ ++ oW , sW , stW)
+      -- the same at the plain end, the impl's inner still registered
+      block-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
+                 → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
+                 → ∀ {lo ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+                     {h₁ : lo ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                     {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ s) (emitᵗ t)}
+                 → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ s) (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) q
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → Sound p sP stP → Sound (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) sI stI
+                 → ∀ {now rP o₂ v₂ f₂ s₂ st₂ oW sW stW}
+                 → foldPath⇓ now p vs true sP stP rP
+                 → any (aliveThroughᶠ j1 stI) (EvalSt.registry stI) ≡ true
+                 → stepFrame⇓ now (batchSync-f b) (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q))) (map (applyClo {s = plainᵗ s} {t = unitᵗ +ᵗ plainᵗ s} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) vs′) false sI stI (o₂ , v₂ , f₂ , s₂ , st₂)
+                 → thruWalk⇓ mergeAllᵒ m2 q now
+                     (thruEvents (map (applyClo {s = obs (emitᵗ s)} {t = echoᵗ (emitᵗ s)} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
+                                   (map (applyClo {s = (unitᵗ +ᵗ plainᵗ s) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ s)} {t = obs (emitᵗ s)} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃)) v₂)))
+                     s₂ st₂ (oW , sW , stW)
+                 → After S rP (o₂ ++ oW , sW , stW)
+      -- AND WITH ITS INNER DEAD: the impl's merge finishes the inner at the
+      -- end, and what the finish hands on is walked the same way
+      block-dead : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
+                 → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
+                 → ∀ {lo ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+                     {h₁ : lo ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                     {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ s) (emitᵗ t)}
+                 → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ s) (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) q
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → Sound p sP stP → Sound (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) sI stI
+                 → ∀ {now rP o₁ v₁ f₁ s₁ st₁ o₂ v₂ f₂ s₂ st₂ oW sW stW}
+                 → foldPath⇓ now p vs true sP stP rP
+                 → any (aliveThroughᶠ j1 stI) (EvalSt.registry stI) ≡ false
+                 → innerFinish⇓ mergeAllᵒ m1 j1 (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))) now (map (applyClo {s = plainᵗ s} {t = unitᵗ +ᵗ plainᵗ s} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) vs′) sI stI
+                     (lookupNode m1 (EvalSt.nodes stI)) (o₁ , v₁ , f₁ , s₁ , st₁)
                  → stepFrame⇓ now (batchSync-f b) (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q))) v₁ f₁ s₁ st₁ (o₂ , v₂ , f₂ , s₂ , st₂)
                  → thruWalk⇓ mergeAllᵒ m2 q now
                      (thruEvents (map (applyClo {s = obs (emitᵗ s)} {t = echoᵗ (emitᵗ s)} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
@@ -1789,6 +1826,30 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → Arm S now oP (proj₁ (proj₂ (thruWrap mergeAllᵒ nid fin (sP′ , stP′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))))
                     p [] (proj₁ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))) none (oI ++ proj₁ r , proj₂ r)
 
+
+    -- A COLD READ'S BLOCK WALKED: the impl alone runs the inner, the
+    -- bracket and the stamp, by how its merge reacts to the group
+    block-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
+               → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
+               → ∀ {lo ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+                   {h₁ : lo ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                   {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ s) (emitᵗ t)}
+               → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ s) (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) q
+               → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+               → Sound p sP stP → Sound (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) sI stI
+               → ∀ {now fin rP o₁ v₁ f₁ s₁ st₁ o₂ v₂ f₂ s₂ st₂ oW sW stW}
+               → foldPath⇓ now p vs fin sP stP rP
+               → stepFrame⇓ now (from-inner mergeAllᵒ m1 j1) (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))) (map (applyClo {s = plainᵗ s} {t = unitᵗ +ᵗ plainᵗ s} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) vs′)
+                   fin sI stI (o₁ , v₁ , f₁ , s₁ , st₁)
+               → stepFrame⇓ now (batchSync-f b) (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q))) v₁ f₁ s₁ st₁ (o₂ , v₂ , f₂ , s₂ , st₂)
+               → thruWalk⇓ mergeAllᵒ m2 q now
+                   (thruEvents (map (applyClo {s = obs (emitᵗ s)} {t = echoᵗ (emitᵗ s)} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
+                                 (map (applyClo {s = (unitᵗ +ᵗ plainᵗ s) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ s)} {t = obs (emitᵗ s)} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃)) v₂)))
+                   s₂ st₂ (oW , sW , stW)
+               → After S rP (o₁ ++ (o₂ ++ oW) , sW , stW)
+    block-walk S hd sp ib r soP si dP (step-from-inner react-false) d₂ W = block-open S hd sp ib r soP si dP d₂ W
+    block-walk S hd sp ib r soP si dP (step-from-inner (react-alive al)) d₂ W = block-alive S hd sp ib r soP si dP al d₂ W
+    block-walk S hd sp ib r soP si dP (step-from-inner (react-dead dd F)) d₂ W = block-dead S hd sp ib r soP si dP dd F d₂ W
 
     -- a cold read's input block: the impl walks it alone into its
     -- merge, whose walk folds the tail, then ends it
