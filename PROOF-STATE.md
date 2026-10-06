@@ -243,31 +243,19 @@ undecided, never a failure (Anthony).
 `simulation` — both top lines' ground, by induction on
 arrivals over `correspondence`: schedules in step, pops partnered, stores related; the root
 subscribes set them (`subscribe-related`) and each cascade keeps
-(`cascade-related`), both with agreeing values. RULED
+(`cascade-related`), values agreeing. RULED
 OUT: an arrival plain lacks, a split one, an instant's gap or
-stray, an echo apart from inners or payload; a subscribe's
-run unrelated; a pop unrelating a read; a map moving instants; a close
-emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
+stray, an echo apart from inners or payload; a subscribe
+unrelated; a pop unrelating a read; a map moving instants; a close
+emptying a named merge; a hot end past its block; a two-value emit; a cut
 over a budget no test holds; a flatten write moving a row; a cut or
-liveness parting a pair; a merged lane.
+liveness parting pairs; a merged lane; a drain or a body's end (in a μ
+too) unrelating inners.
 Left: which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **REFUTE OR PROBE THE FINISHING ARMS.** `merge-finish` and
-  `defer-finish` drain the queue a dead inner's merge holds, on both sides,
-  and nothing has ever instantiated either: the least certain step
-  left. Both are bodies, over `merge-drain` and over `defer-end`
-  and `still-dead`; make the decider read the queued inners' relation and
-  aim `make qc-store` at it, then reach a body ending inside a μ.
-  Ruled out: a drain unrelating the stores, 65 of 100 programs spending a
-  queue (seed 31) and 80 deferring (seed 32); an open merge's window
-  reordering rows; a merged lane; a deeper flattener's subscribe (seeds
-  21, 22); the quiet scan and open test; a deferred body ending outside
-  a μ, 50 of 80 (seed 40). Left: the queued inners' relation, which no
-  sweep reads, and a body ending inside a μ.
 
 - **REFUTE OR CARRY `Sound` AT THE WALK.** `of-fold` (`walk-of`'s and
   `emptyˢ`'s fold) is `path-pass` past a derivation, which asks `Sound` of
@@ -295,6 +283,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
+- **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `DEAD ROUTE`: an `of`'s
+  emits carry its values one per emit, and the group folded and ended down
+  related paths keeps what a pass keeps, the impl's under its new source.
 - **`merge-drain`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's
   related queues drained on both sides leave related counts, queues, flattener
   and tail.
@@ -346,9 +337,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`μ-unfolds`** (Simulation.Walk) — FALSITY, `PROBED`: an unrolling is an
   author's program, its plain form and every renamed elaboration the
   unrollings; held at a μ-var under a defer, bare and under a map's binder.
-- **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `DEAD ROUTE`: an `of`'s
-  emits carry its values one per emit, and the group folded and ended down
-  related paths keeps what a pass keeps, the impl's under its new source.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
   `PROBED×2, RECOVERY`: a slot's plain subscribe against the impl's at its
   stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the

@@ -18,8 +18,9 @@
 -- SAMPLES; WHAT IS NOT IS A TERM.  `Lifts`, `ScanLifts` and `CutLifts`
 -- are read by applying both live steps to a few related inputs per
 -- type, so a green covers those inputs and a red is a counterexample.
--- `ObsRel`/`DeferRel`/`EnvRel` relate terms, and an `obs` value is
--- related to anything here.  `ruleP`/`ruleI` are the evaluator's own
+-- `ObsRel` and `EnvRel` relate terms, decided by `CLI.Obs-Match` to a
+-- depth: an observable nested past it is related to anything, and so
+-- is every `DeferRel`.  `ruleP`/`ruleI` are the evaluator's own
 -- rule, which its builders already carry.  A red is a candidate until
 -- a probe pins it.
 --
@@ -45,7 +46,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import Rx.Prim      using (Source; Fuel)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Closed; _≟ᵗ_;
-  FnClo; applyClo; emptyᵉ; []ᵉ)
+  FnClo; applyClo; emptyᵉ; []ᵉ; _∷ᵉ_; Env)
 open import Rx.Slots     using (Slots)
 open import Rx.Mint      using (counter; sourceᵏ; regᵏ)
 open import Rx.Evaluator using (LiveSource; Sched; EvalSt; Stream; Arrival; sched-next; NodeState; NodeId; Path; RegRow;
@@ -54,17 +55,18 @@ open import Rx.Evaluator using (LiveSource; Sched; EvalSt; Stream; Arrival; sche
   echoᵗ; lookupNode; memberSource; pathHasNode; takeVals; scanVals)
 open import Rx.Evaluator.Builder using (cascade!; pop-rule; subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; _,_; Rule)
-open import SExp.Syntax  using (SExp; Kind; hotᵏ; coldᵏ; sharedᵏ; Kinds; plainᵏ; plainᵗ; emitᵗ)
+open import SExp.Syntax  using (SExp; emptyˢ; Kind; hotᵏ; coldᵏ; sharedᵏ; Kinds; plainᵏ; plainᵗ; emitᵗ)
 open import SExp.InstEmit using (machineEmitᵗ; instEventᵗ)
 open import SExp.InstEmit.Decode using (decodeEmit)
 open import Batchable.Inst-Extract using (emitValues)
-open import SExp.Elaborate using (ScanAᵗ; CutS; FlatSᵗ)
+open import SExp.Elaborate using (ScanAᵗ; CutS; FlatSᵗ; toInstEmit)
 open import SExp.Plain   using (plainExp)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import Simulation.Stores using (guardOf; aboveᵇ; srcCount; blockNodes)
 open import Simulation.Schedules using (ticks)
 open import CLI.Emit-Eq  using (eqListℕ; prefixListℕ)
+open import CLI.Obs-Match using (unplain; matchExp; functional; image)
 
 ------------------------------------------------------------------
 -- Small decisions
@@ -111,6 +113,12 @@ castV {Δ = Δ} s t v with s ≟ᵗ t
 echoOf : Ty → Maybe Ty
 echoOf ((unitᵗ +ᵗ u) ×ᵗ (unitᵗ +ᵗ obs u′)) = if u ≈ u′ then just u else nothing
 echoOf _                                   = nothing
+
+-- an env's slot, with its type
+slotAt : ∀ {k} {Δ : Ctx k} {Θ} → Env Δ Θ → ℕ → Maybe (Σ Ty (Val Δ))
+slotAt []ᵉ                _       = nothing
+slotAt (_∷ᵉ_ {s = s} v _) zero    = just (s , v)
+slotAt (_ ∷ᵉ vs)          (suc i) = slotAt vs i
 
 indexed : ∀ {A : Set} → ℕ → List A → List (ℕ × A)
 indexed k []       = []
@@ -335,27 +343,56 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       go []       = nothing
       go (i ∷ is) = if toℕ i ≡ᵇ k then just i else go is
 
-  -- `V`, with an observable related to anything
+  mutual
+    -- `V`, with an observable nested past depth `d` related to anything
+    Vᵈ : ℕ → ∀ t → Val Γ′ (plainᵗ t) → Val Γ t → Bool
+    Vᵈ d unitᵗ     _        _        = true
+    Vᵈ d boolᵗ     v        w        = eqB v w
+    Vᵈ d natᵗ      v        w        = v ≡ᵇ w
+    Vᵈ d uniqᵗ     v        w        = v ≡ᵇ w
+    Vᵈ d (s ×ᵗ t)  (a , b)  (c , d′) = Vᵈ d s a c ∧ Vᵈ d t b d′
+    Vᵈ d (s +ᵗ t)  (inj₁ a) (inj₁ c) = Vᵈ d s a c
+    Vᵈ d (s +ᵗ t)  (inj₂ b) (inj₂ c) = Vᵈ d t b c
+    Vᵈ d (s +ᵗ t)  _        _        = false
+    Vᵈ d (listᵗ t) []       []       = true
+    Vᵈ d (listᵗ t) (v ∷ vs) (w ∷ ws) = Vᵈ d t v w ∧ Vᵈ d (listᵗ t) vs ws
+    Vᵈ d (listᵗ t) _        _        = false
+    Vᵈ zero    (obs t) _ _ = true
+    Vᵈ (suc d) (obs t) x y = obs? d t x y
+
+    -- `ObsRel`: the impl's term the plain one's tree elaborated and
+    -- renamed, and the env related through that renaming.  A slot no
+    -- term reads is read where the identity sends it.
+    obs? : ℕ → ∀ t → Val Γ′ (obs (emitᵗ t)) → Val Γ (obs t) → Bool
+    obs? d t (_ , e′ , ρ′) (_ , e , ρ) =
+      maybe′ (λ s → maybe′ (λ ps → functional ps ∧ env? d 0 ρ ρ′ ps) false (matchExp 0 (toInstEmit κ s) e′))
+             false (unplain e)
+
+    env? : ℕ → ∀ {Θ Θ′} → ℕ → Env Γ Θ → Env Γ′ Θ′ → List (ℕ × ℕ) → Bool
+    env? d i []ᵉ                 ρ′ ps = true
+    env? d i (_∷ᵉ_ {s = u} v ρ)  ρ′ ps = slot? d u v (slotAt ρ′ (image ps i)) ∧ env? d (suc i) ρ ρ′ ps
+
+    slot? : ℕ → ∀ u → Val Γ u → Maybe (Σ Ty (Val Γ′)) → Bool
+    slot? d u v nothing          = false
+    slot? d u v (just (u′ , v′)) = maybe′ (λ v″ → Vᵈ d u v″ v) false (castV u′ (plainᵗ u) v′)
+
   V? : ∀ t → Val Γ′ (plainᵗ t) → Val Γ t → Bool
-  V? unitᵗ     _        _        = true
-  V? boolᵗ     v        w        = eqB v w
-  V? natᵗ      v        w        = v ≡ᵇ w
-  V? uniqᵗ     v        w        = v ≡ᵇ w
-  V? (s ×ᵗ t)  (a , b)  (c , d)  = V? s a c ∧ V? t b d
-  V? (s +ᵗ t)  (inj₁ a) (inj₁ c) = V? s a c
-  V? (s +ᵗ t)  (inj₂ b) (inj₂ d) = V? t b d
-  V? (s +ᵗ t)  _        _        = false
-  V? (listᵗ t) []       []       = true
-  V? (listᵗ t) (v ∷ vs) (w ∷ ws) = V? t v w ∧ V? (listᵗ t) vs ws
-  V? (listᵗ t) _        _        = false
-  V? (obs t)   _        _        = true
+  V? = Vᵈ 3
+
+  -- a merge's queued inners, pointwise
+  queue? : ∀ u {s s′} → List (Val Γ (obs s)) → List (Val Γ′ (obs s′)) → Bool
+  queue? u         []       []       = true
+  queue? u {s} {s′} (x ∷ xs) (y ∷ ys) =
+    maybe′ (λ x₁ → maybe′ (λ y₁ → obs? 3 u y₁ x₁) false (castV (obs s′) (obs (emitᵗ u)) y)) false (castV (obs s) (obs u) x)
+    ∧ queue? u xs ys
+  queue? u         _        _        = false
 
   ----------------------------------------------------------------
   -- THE CLOSURE RELATIONS, DECIDED ON SAMPLES.  `Lifts`, `ScanLifts`
   -- and `CutLifts` quantify over every related input; these read the
   -- two live steps at a few related values per type, so a red is a
   -- counterexample and a green covers the samples.  An observable
-  -- sample is `emptyᵉ` on both sides, related only as `V?` relates one.
+  -- sample is `emptyˢ`, plain and elaborated.
   ----------------------------------------------------------------
 
   samp : ∀ t → List (Val Γ′ (plainᵗ t) × Val Γ t)
@@ -368,7 +405,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
   samp (s +ᵗ t)  = map (λ a → inj₁ (proj₁ a) , inj₁ (proj₂ a)) (take 2 (samp s))
                 ++ map (λ b → inj₂ (proj₁ b) , inj₂ (proj₂ b)) (take 2 (samp t))
   samp (listᵗ t) = ([] , []) ∷ map (λ xs → map proj₁ xs , map proj₂ xs) (take 1 (samp t) ∷ take 2 (samp t) ∷ [])
-  samp (obs t)   = (([] , emptyᵉ , []ᵉ) , ([] , emptyᵉ , []ᵉ)) ∷ []
+  samp (obs t)   = ((uniqᵗ ∷ [] , toInstEmit {Γ = Γ} κ (emptyˢ {Δᵍ = []} {Δ = []} {Θ = []} {t = t}) , (0 ∷ᵉ []ᵉ)) , ([] , emptyᵉ , []ᵉ)) ∷ []
 
   valEv : ∀ {a} → Val Γ′ a → Val Γ′ (instEventᵗ uniqᵗ a)
   valEv v = inj₂ (inj₁ v)
@@ -447,7 +484,8 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
     flatNodes : Ty → AllOp → Maybe (NodeState Γ) → Maybe (NodeState Γ′) → Res
     flatNodes u op (just (mergeAll-st {t = s} lim a q od)) (just (mergeAll-st {t = s′} lim′ a′ q′ od′)) =
       when (eqOp op mergeAllᵒ ∧ (s ≈ u) ∧ (s′ ≈ emitᵗ u) ∧ eqMb lim lim′ ∧ (a ≡ᵇ a′) ∧ (length q ≡ᵇ length q′) ∧ eqB od od′)
-           ("flattener: merge nodes unrelated: plain " ++ˢ mshow lim a (length q) od ++ˢ ", impl " ++ˢ mshow lim′ a′ (length q′) od′) ok
+           ("flattener: merge nodes unrelated: plain " ++ˢ mshow lim a (length q) od ++ˢ ", impl " ++ˢ mshow lim′ a′ (length q′) od′)
+           (when (queue? u q q′) "flattener: queued inners unrelated" ok)
     flatNodes u op (just (switch-st cur od)) (just (switch-st cur′ od′)) =
       when (eqOp op switchᵒ ∧ eqB od od′) "flattener: switch nodes unrelated" (curR cur cur′)
     flatNodes u op (just (exhaust-st ia od)) (just (exhaust-st ia′ od′)) =

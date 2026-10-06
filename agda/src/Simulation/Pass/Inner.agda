@@ -224,8 +224,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- `make qc-store` aimed at bounded merges over literal inners
       -- (seed 31, depth 4, 100 programs) spent a queue in 65 of them, at
       -- up to three boundaries each, and `CLI.Store-Check` related the
-      -- stores at every one; it reads a queue's length and the counts,
-      -- never the queued inners' own relation.
+      -- stores at every one.
+      --
+      -- AND THE QUEUED INNERS STAY `ObsRel`-RELATED THROUGH THEM.  With
+      -- `CLI.Obs-Match` deciding the queued inners' relation and every
+      -- observable's env, seed 31 again (51 of 100 draining) and seed 33
+      -- with observable folds drawn too (46 of 100 draining, 47 folding)
+      -- held at every boundary.  The check is live: a reversed impl queue
+      -- reds 23 of seed 31's programs, an env slot read one off 31.
       merge-drain : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim lim′ a q q′ od m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                       {p : Path Γ ℓ u t} {q̂ : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
@@ -266,9 +272,16 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       --
       -- AND OVER DEFERRED BODIES THAT END, OUTSIDE A μ: seed 40, depth 5,
       -- 80 programs whose only flattening former is a defer, 50 of them
-      -- ending the body at a boundary.  None queues.  A draw through a
-      -- μ's own defer with no flattener comes back with no input at all,
-      -- so a body ending inside a μ is unreached.
+      -- ending the body at a boundary.  None queues.  With the queued
+      -- inners' relation decided: seed 34, depth 5, 80 deferring, 68
+      -- ending an inner, 30 spending a queue.
+      --
+      -- AND INSIDE A μ, THINLY.  A μ's own defer with no flattener has
+      -- no input, so the draw takes switch and exhaust flatteners only
+      -- and every merge whose count falls is a hop's: seeds 37 and 38,
+      -- depth 4, fuel 12, 380 programs through a μ, five ending a body
+      -- there (`μ x. defer (switchAll (of [x, input]))` the smallest).
+      -- Fuel 30 at depth 5 runs a μ out of memory within eight cases.
       defer-end : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a}
                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                     {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {rQ}
