@@ -251,6 +251,20 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- impl's one-lane merge finishes on it, and its finish folds the
       -- tail itself before handing the end up on an empty group, where
       -- the plain count hands the tail the group and the end at once
+      --
+      -- SO `Arm`'S ONE TAIL FOLD CARRIES IT ONLY THROUGH A SPLIT: the
+      -- impl's tail folds the group open and then the bare end, the
+      -- plain's folds both at once, and the arm names one impl fold.  A
+      -- body needs that fold to land where the split pair does, or
+      -- `Arm` to carry the pair; the cut half is `while-cut`'s.
+      --
+      -- A SPLIT OVER EVERY TAIL IS FALSE, read off `innerReact⇓`: an
+      -- inner frame below that sees a sibling row alive before the
+      -- tail's fold, and cut by a take further down during it, is
+      -- finished by the split's bare end -- its merge's queue drained --
+      -- and never by the joint fold.  Here the first inner frame below
+      -- the count has every row through the count, all cut or dying by
+      -- the end, so the split owes that as a hypothesis.
       take-end : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j Θ₂ Θ₃}
                    {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}

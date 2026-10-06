@@ -277,10 +277,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **CUT AT A TAKE AS AT A SWITCH.** `Simulation.Cut` keeps the stores
   under a cut at either of the first two members of a key's run. Left:
-  `take-end`, where the impl's merge finish folds the tail on an open group
-  and hands the end up empty -- its cut half as `while-cut`'s, the finish its
-  own leaf. Ruled out: an impl cut cell spending anywhere but where the plain
-  count does (`cut-group`), and a test's cut severing a row its partner keeps
+  `take-end`, its cut half as `while-cut`'s; its finish folds the impl tail
+  open then bare where the plain folds once, so `Arm` must carry that split,
+  owing that every row through the first inner frame below is dead. Ruled
+  out: an impl cut cell spending anywhere but where the plain count does
+  (`cut-group`), and a test's cut severing a row its partner keeps
   (`while-cut`, over `cut-keeps`).
 
 - **WALK INSIDE THE PASS.** `walk-of`, `walk-empty` and `walk-μ` are
