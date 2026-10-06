@@ -33,7 +33,7 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-step; stepFrame
   finish-exhaust-clear; finish-nil; thruWalk⇓; thruConsume⇓; walk-nil; walk-echo; walk-cons)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ)
-open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; sharedEq; PathRel; inner~; lane~;
+open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; sharedEq; PathRel; inner~;
   deferInner~; []; _∷_; Store; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ)
 open import Simulation.Cut using (module At; module Third)
 open import Simulation.After using (module Kept)
@@ -189,45 +189,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                    → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                        (λ π NP NI → PathRel κ π NP NI (from-inner mergeAllᵒ m j ↠[ h ] p)
                           (from-inner mergeAllᵒ m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q)) (o₁ ++ proj₁ rI , proj₂ rI)
-      -- A LANE'S INNER IS LIVE EXACTLY WHERE ITS PLAIN INNER IS: the lane merge
-      -- sits in front of every impl chain the inner's pair runs
-      --
-      -- NOTHING THE STORE HOLDS SAYS SO.  `lane~` wraps one row's relation,
-      -- and its lane is `Unpaired`, so another row through the same plain
-      -- inner may relate it through `inner~` bare or behind another lane:
-      -- the conclusion needs every row through the inner to name one lane,
-      -- which no hypothesis carries.  The deferred body's marker merge is
-      -- the precedent, a lane recorded in `π` at the third member, where
-      -- `Third` reads it
-      lane-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
-                     {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
-                 → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ any (aliveThroughᶠ jL stI) (EvalSt.registry stI)
-      -- A LANE MERGE OVER AN INNER'S ARM STAYS ONE: impl only, idle, and
-      -- off every tail the arm folds
-      lane-wrap : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ′ u a m j mL jL vs rI} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
-                    {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
-                → Sound (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q) sI stI
-                → Arm S now [] sP stP p vs false (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) rI
-                → Arm S now [] sP stP p vs false
-                    (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)) rI
-      -- A DEAD INNER BEHIND A LANE MERGE FINISHES ON BOTH SIDES: the
-      -- plain flattener's finish, against the lane merge's and the inner
-      -- below it the group then reaches
-      lane-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ′ u a m j mL jL}
-                      {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                      {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
-                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
-                  → Carries es vs
-                  → Sound (from-inner a m j ↠[ h ] p) sP stP → Sound (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q) sI stI
-                  → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ false
-                  → innerFinish⇓ a m j p now vs sP stP (lookupNode m (EvalSt.nodes stP)) (oP , vs₁ , fin₁ , sP₁ , stP₁)
-                  → innerFinish⇓ mergeAllᵒ mL jL Q now es sI stI (lookupNode mL (EvalSt.nodes stI)) (o₁ , es₁ , f₁ , sI₁ , stI₁)
-                  → foldPath⇓ now Q es₁ f₁ sI₁ stI₁ rI
-                  → Arm S now oP sP₁ stP₁ p vs₁ fin₁
-                      (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q))
-                      (o₁ ++ proj₁ rI , proj₂ rI)
       -- A DELIVERED EMIT CARRIES WHAT IT CARRIED: the hop's restamp
       -- retags a subscribe as a delivery over its own events
       delivery-rel : ∀ {u Θx ρ₀} e′ {ws}
@@ -449,15 +410,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     inner-dies {op = op} S R b sp si dd F (fold-step d′@(step-from-inner (react-dead _ F′)) dR) =
       finish-by S (leave op R) b sp si (step-kept _ (step-from-inner (react-dead dd F)) sp) (step-kept _ d′ si) F F′ dR
 
-    -- AN INNER NO LIVE CHAIN RUNS THROUGH, BEHIND A LANE MERGE: the lane's
-    -- inner is dead too, and both sides finish it
-    lane-dies : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
-                  {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-              → InnerDies a m j h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
-    lane-dies S R b sp si dd F (fold-step (step-from-inner (react-alive al′)) _) =
-      ⊥-elim (t≢f (trans (sym al′) (trans (sym (lane-alive S R)) dd)))
-    lane-dies S R b sp si dd F (fold-step (step-from-inner (react-dead _ F′)) dR) = lane-finish S R b sp si dd F F′ dR
-
     -- A DEFERRED BODY NO LIVE CHAIN RUNS THROUGH: the hop's marker
     -- merge's inner is dead too, and both sides finish it
     deferInner-dies : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
@@ -527,20 +479,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     deferInner-pass S R b sp si (inj₁ ()) (fold-step (step-from-inner (react-dead _ _)) _)
     deferInner-pass S R@(deferInner~ _ ip₂ _ _ l2 _ _) b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
       ⊥-elim (t≢f (trans (sym (trans (sym (defer-alive S ip₂ l2)) al)) dd))
-
-    -- AN INNER LEFT OPEN, BY HOW ITS ELABORATION LED IT: a lane merge in
-    -- front lets the group past as the inner below it does
-    inner-any : ∀ {lo lo′ ℓ u a m j} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
-              → InnerPasses a m j h p Q
-    inner-any S R@(inner~ refl _ _ _) b sp si alv dI = inner-pass S R b sp si alv dI
-    inner-any S R@(deferInner~ _ _ _ _ _ _ _) b sp si alv dI = deferInner-pass S R b sp si alv dI
-    inner-any S R@(lane~ _ _ _ R′) b sp si _ (fold-step (step-from-inner react-false) dR) =
-      lane-wrap R si (inner-any S R′ b sp (drop-ot _ _ _ si) (inj₁ refl) dR)
-    inner-any S R@(lane~ _ _ _ R′) b sp si _ (fold-step (step-from-inner (react-alive _)) dR) =
-      lane-wrap R si (inner-any S R′ b sp (drop-ot _ _ _ si) (inj₁ refl) dR)
-    inner-any S (lane~ _ _ _ _) b sp si (inj₁ ()) (fold-step (step-from-inner (react-dead _ _)) _)
-    inner-any S R@(lane~ _ _ _ _) b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
-      ⊥-elim (t≢f (trans (sym (trans (sym (lane-alive S R)) al)) dd))
 
     -- AN OUTER'S ELEMENTS EXPLODED: each emit's run of elements is an
     -- inner the impl's merge subscribes, and its elements walk into the
@@ -645,13 +583,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     inner-arm {op = op} S R b sp si (step-from-inner react-false)        dI = inner-pass {op = op} S R b sp si (inj₁ refl) dI
     inner-arm {op = op} S R b sp si (step-from-inner (react-alive al))   dI = inner-pass {op = op} S R b sp si (inj₂ al) dI
     inner-arm {op = op} S R b sp si (step-from-inner (react-dead dd fz)) dI = inner-dies {op = op} S R b sp si dd fz dI
-
-    lane-arm      : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
-                      {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                  → Steps (from-inner a m j) h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
-    lane-arm S R b sp si (step-from-inner react-false)        dI = inner-any S R b sp si (inj₁ refl) dI
-    lane-arm S R b sp si (step-from-inner (react-alive al))   dI = inner-any S R b sp si (inj₂ al) dI
-    lane-arm S R b sp si (step-from-inner (react-dead dd fz)) dI = lane-dies S R b sp si dd fz dI
 
     deferInner-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}

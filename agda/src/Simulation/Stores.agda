@@ -261,8 +261,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- a flattener's own node against the impl's
     data FlatNodes (u : Ty) : FlatOp → NodeState Γ → NodeState Γ′ → Set where
-      -- one count on both sides: an emit carries one payload at most, so
-      -- every lane, bounded or not, is one inner; the completion flags
+      -- one count on both sides: the elaboration explodes every outer
+      -- that can carry two inners in one emit, so every lane, bounded or
+      -- not, is one inner; the completion flags
       -- read off the count agree.  One bound on both sides, the node's:
       -- the consume reads it there, never off the former
       merge~   : ∀ {lim lim′ a q q′ od} → Pointwise (λ x′ x → ObsRel u x′ x) q′ q
@@ -388,14 +389,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    (from-inner a m′ j′ ↠[ h₁ ]
                     (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
                      (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
-
-        -- an inner the elaboration led with its echo: one more merge,
-        -- impl only, in front of the lane it rides
-        lane~ : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL aL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
-                  {p : Path Γ ℓ u t} {Q : Path Γ′ ℓ′ (emitᵗ u) (emitᵗ t)}
-              → lookupNode mL NI ≡ just (mergeAll-st {t = emitᵗ u} nothing aL [] true) → Unpaired mL → Unpaired jL
-              → PathRel (from-inner a m j ↠[ h ] p) Q
-              → PathRel (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
 
         -- a deferred body: the hop's marker merge, its restamp, the hop's node
         deferInner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a}

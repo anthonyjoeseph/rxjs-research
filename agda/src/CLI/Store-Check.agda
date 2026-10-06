@@ -219,14 +219,6 @@ fails : String → Maybe String → Res
 fails w (just x) = breaks (w ++ˢ x)
 fails w nothing  = ok
 
-anyR : String → List Res → Res
-anyR w []       = breaks w
-anyR w (r ∷ rs) = r ⊕ anyR w rs
-
-aparts : List NodeId → Res
-aparts []       = ok
-aparts (k ∷ ks) = apart k ⊗ aparts ks
-
 tag : String → Res → Res
 tag p (breaks w) = breaks (p ++ˢ w)
 tag p r          = r
@@ -430,11 +422,6 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       firstJ (just w ∷ _)   = just w
       firstJ (nothing ∷ ws) = firstJ ws
 
-  -- a one-lane merge at rest: no limit, nothing queued, its outer done
-  lane : Maybe (Maybe ℕ × ℕ × ℕ × Bool) → Bool
-  lane (just (nothing , _ , q , od)) = (q ≡ᵇ 0) ∧ od
-  lane _                             = false
-
   module Nodes (NP : List (NodeId × NodeState Γ)) (NI : List (NodeId × NodeState Γ′)) where
 
     P : NodeId → Maybe (NodeState Γ)
@@ -471,16 +458,6 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
     flat u op op′ m m′ ks key jj =
       when (eqOp op op′) "flattener: ops differ"
         (key ⊗ flatNodes u op (P m) (I m′) ⊗ innerPair jj ⊗ on (cellOf (FlatSᵗ u) (I ks)) "flattener: restamp cell" (λ _ → ok))
-
-    -- the impl's leading lanes, peeled every way: each with the lanes it took
-    mutual
-      peel : ∀ {l a b} → Ty → Path Γ′ l a b → List (List NodeId × IP)
-      peel u q = ([] , pk q) ∷ more u q
-
-      more : ∀ {l a b} → Ty → Path Γ′ l a b → List (List NodeId × IP)
-      more u (from-inner mergeAllᵒ mL jL ↠[ _ ] Q) =
-        if lane (mergeOf (emitᵗ u) (I mL)) then map (λ x → (mL ∷ jL ∷ proj₁ x) , proj₂ x) (peel u Q) else []
-      more u _ = []
 
     innerR : Ty → AllOp → NodeId → NodeId → (IP → Res) → IP → Res
     innerR u op m j k q =
@@ -587,9 +564,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
         on (vMap q) "outer: no element map" λ q₁ →
           outerElem u op m (path p) q₁ ⊘ outerExplode u op m (path p) q₁
       path′ (_↠[_]_ {s = u} (from-inner op m j) _ p) q =
-        anyR "inner: no peel fits"
-          (map (λ uq → aparts (proj₁ uq) ⊗ (innerR u op m j (path p) (proj₂ uq) ⊘ deferR u op m j (path p) (proj₂ uq)))
-               (peel u (proj₂ (proj₂ (proj₂ q)))))
+        innerR u op m j (path p) q ⊘ deferR u op m j (path p) q
 
     -- `InputBlock`, then the tail
     blk : Ty → IP → (IP → Res) → Res

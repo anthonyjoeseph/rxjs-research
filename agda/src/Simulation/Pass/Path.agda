@@ -29,7 +29,7 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; sharedᵏ)
 open import SExp.Elaborate using (elemᵛ)
 open import Simulation.Stores using (sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
-  outerElem~; outerExplode~; inner~; lane~; deferInner~; RowRel; read~; []; _∷_; partner-row;
+  outerElem~; outerExplode~; inner~; deferInner~; RowRel; read~; []; _∷_; partner-row;
   Store)
 open import Simulation.After using (module Kept)
 open import Simulation.Take using (module Takes)
@@ -66,7 +66,6 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S (outerElem~ fl r) b sp si (fold-step d dP) dI = resume (outerElem-arm S (fl , r) b sp si d dI) (adv d sp) dP
       path-pass S (outerExplode~ fl r) b sp si (fold-step d dP) dI = resume (outerExplode-arm S (fl , r) b sp si d dI) (adv d sp) dP
       path-pass S r@(inner~ refl _ _ _) b sp si (fold-step d dP) dI = resume (inner-arm S r b sp si d dI) (adv d sp) dP
-      path-pass S r@(lane~ _ _ _ _) b sp si (fold-step d dP) dI = resume (lane-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (deferInner-arm S r b sp si d dI) (adv d sp) dP
 
       resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin G rP rI}

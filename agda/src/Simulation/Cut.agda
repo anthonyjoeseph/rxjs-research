@@ -36,7 +36,7 @@ open import Rx.Evaluator using (NodeId; RegRow; LiveSource; Sched; EvalSt; switc
 open import Rx.Evaluator.Reducible.Support using (∨-Tˡ; ∨-Tʳ; sub-rule; cut-sub)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
-  lane~; deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; partner-mem; ArrRows; Spent; spent-subst; Store; Arr; InputBlock; ᵇ-no; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq)
+  deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; partner-mem; ArrRows; Spent; spent-subst; Store; Arr; InputBlock; ᵇ-no; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq)
 open import Simulation.Grow using (mem-any)
 open import Simulation.Sweep using (T-true; t≢f; count-hit; count-pass; same-eq; raw≢stamped; raw<ₙ; sweepL; sweep-eq; sweepL-pw; all-sweep;
   unique-sweep; sync-sweep; regrel-sweep; rows-guards; part-sweep; arr-sweep; spent-sweep)
@@ -260,9 +260,6 @@ module Back {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     bwd (inner~ _ (pm , _) ip r)         (there (here eq))      = there (here (owner ip (here eq)))
     bwd (inner~ _ (pm , _) ip r)         (there (there (here eq))) = here (owner pm (there (here eq)))
     bwd (inner~ _ (pm , _) ip r)         (there (there (there m))) = there (there (bwd r m))
-    bwd (lane~ _ un _ r)                 (here eq)              = ⊥-elim (off un eq)
-    bwd (lane~ _ _ uj r)                 (there (here eq))      = ⊥-elim (off uj eq)
-    bwd (lane~ _ _ _ r)                  (there (there m))      = bwd r m
     bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)              = there (here (owner e₂ (there (here eq))))
     bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq))      = there (here (owner e₂ (there (there (here eq)))))
     bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there (here eq))) = here (owner e₁ (here eq))
@@ -438,7 +435,6 @@ module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     fwd (inner~ _ (pm , _) ip r)         (here eq)              = gap (hit pm (sym eq))
     fwd (inner~ _ (pm , _) ip r)         (there (here eq))      = there (∈-++⁺ˡ (hit ip (sym eq)))
     fwd (inner~ _ (pm , _) ip r)         (there (there m))      = there (there (there (fwd r m)))
-    fwd (lane~ _ _ _ r)                  m                      = there (there (fwd r m))
     fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)              = there (there (∈-++⁺ˡ (hit e₁ (sym eq))))
     fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq))      = hop (hit e₂ (sym eq))
     fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there m))      = there (there (there (there (fwd r m))))
@@ -504,7 +500,6 @@ module Third {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     fwd₃ (inner~ _ (pm , _ , _ , _ , _ , _ , _ , lk) ip r)   (here eq) = ⊥-elim (flat-off pm lk eq)
     fwd₃ (inner~ _ _ ip r)                (there (here eq)) = ⊥-elim (len1 (same ip eq))
     fwd₃ (inner~ _ _ ip r)                (there (there m)) = there (there (there (fwd₃ r m)))
-    fwd₃ (lane~ _ _ _ r)                  m                 = there (there (fwd₃ r m))
     fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)         = ⊥-elim (len1 (same e₁ eq))
     fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq)) = hop₃ (same e₂ eq)
     fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there m)) = there (there (there (there (fwd₃ r m))))

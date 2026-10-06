@@ -248,8 +248,8 @@ OUT: an arrival plain lacks, a split one, an instant's gap or
 stray, an echo apart from inners or payload; a subscribe's
 run unrelated; a pop unrelating a read; a map moving instants; a close
 emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
-over a budget no test holds; a flatten write moving a row; a cut or an
-inner's liveness parting a pair.
+over a budget no test holds; a flatten write moving a row; a cut or
+liveness parting a pair; a merged lane.
 Left: a deeper flattener's subscribe; which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
@@ -261,12 +261,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   arm per plain frame; a hot slot's is `fan-go` over the share's readers.
   Every arm on both halves is a body over leaves. Left: a deeper
   flattener's subscribe, the monster's remaining region, swept by
-  `make qc-store` aimed at nested flatteners; a red leaf names the arm.
+  `make qc-store` aimed at nested flatteners.
   Ruled out: an open merge's window reordering rows or sources; an
   inner's or a deferred body's liveness parting a pair, since the store
   relates each pair's delivery and dying, and a depth-6 sweep through a
-  flatten and a defer kept every store. Left there: a lane's, whose rows
-  the store does not tie to one lane.
+  flatten and a defer kept every store; a merged lane, which a cold's
+  burst refuted: an outer carrying two inners now explodes.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -295,15 +295,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`quiet-{scan,takeWhile}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
   cell or test stepped on emits carrying nothing stays related, its cut unfired
   and the group open.
-- **`quiet-{inner,lane,deferInner}`** (Simulation.Pass) — FALSITY,
-  `NO EVIDENCE`: an inner's, a lane's or a deferred body's merge passes emits
-  carrying nothing on as they came.
+- **`quiet-{inner,deferInner}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
+  inner's or a deferred body's merge passes emits carrying nothing on as they
+  came.
 - **`restamp-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
   scan stepped on a group keeps the flattener, and the group it hands on
   carries the same values and end.
-- **`lane-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an impl-only lane
-  merge in front of an inner's arm stays idle, unpaired and off every tail the
-  arm folds.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
 - **`explode-{quiet,one,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: one
@@ -312,9 +309,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`merge-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's dead
   inner finishes on both sides, each folding the group down its tail and
   draining the related queues.
-- **`{lane,defer}-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead
-  inner finishes on both sides, through an impl-only lane merge's finish ahead
-  of it or a deferred body's marker merge's.
+- **`defer-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead
+  deferred body finishes on both sides, through the hop's marker merge's finish
+  ahead of it.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   a cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped
@@ -375,10 +372,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
-- **`lane-alive`** (Simulation.Pass) — SHAPE, `NO EVIDENCE`: an inner is live
-  exactly where its lane's is, but no store invariant makes every row through
-  the inner name one lane; restate with the lane in `π` as a deferred body's
-  marker merge is.
 - **`fold-unmoved`** (Simulation.Arm) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.

@@ -281,10 +281,11 @@ export declare const scanP: (fn: Fn, init: Tm, src: Exp, t: Ty) => Exp;
 // values that fall after the inner before it, and the values after the
 // last inner as one element with no lane: echoes are cut only at an
 // inner, because plain rxjs echoes a payload before subscribing its
-// inner. Where no policy tells the two apart -- an unbounded merge, or
-// an outer that is an `of` under maps -- `elemV` keeps one element per
-// emit, its inners merged, each led by the values echoed after it as
-// an `of` of their own, since the split costs a subscription per emit.
+// inner. Only over an outer that is an `of` under maps, which never
+// carries two inners in one emit, does `elemV` keep one element per
+// emit, its inner led by the values echoed after it as an `of` of
+// their own. Even an unbounded merge, which runs a merged lane as it
+// runs its parts, explodes: the simulation relates inner to inner.
 //
 //   Agda: SExp.Elaborate.explodeV, SExp.Elaborate.elemV
 export declare const explodeV: (outer: Val) => Observable<Val>;

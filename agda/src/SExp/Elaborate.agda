@@ -748,9 +748,9 @@ elemBodyᵛ {Θ = Θ} {t = t} =
 -- the values up to the first inner; each later run of them rides the
 -- lane between the inners it falls between.
 --
--- THE LANE IS PER EMIT, WHICH IS RIGHT ONLY WHERE NO POLICY TELLS ONE
--- LANE FROM TWO: an unbounded merge, or an outer that never carries two
--- inners in one emit.  `flattenᵖ` takes `explodeᵛ` everywhere else.
+-- THE LANE IS PER EMIT, WHICH IS RIGHT ONLY OVER AN OUTER THAT NEVER
+-- CARRIES TWO INNERS IN ONE EMIT.  `flattenᵖ` takes `explodeᵛ`
+-- everywhere else.
 elemᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
       → Fn Γ Δᵍ Δ Θ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)))
                     ((unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t)))
@@ -860,20 +860,22 @@ restampᵛ at as e =
       (instEmitᵛ (eventsᵛ e) at (sourceᵛ e) as)
       e
 
--- WHETHER A FLATTENER NEEDS ONE ELEMENT PER INNER: only where its
--- policy tells one lane from two, over an outer that can carry two
--- inners in one emit.  An unbounded merge runs a merged lane exactly as
--- it runs its parts, and an `ofˢ` under maps emits one value per emit.
--- The split costs a subscription per emit, and every subscribing frame
--- on the way down is replayed, so it is paid only where it is owed.
+-- WHETHER A FLATTENER NEEDS ONE ELEMENT PER INNER: wherever its outer
+-- can carry two inners in one emit.  An `ofˢ` under maps emits one value
+-- per emit, so only there is the split not owed.
+--
+-- EVEN UNDER AN UNBOUNDED MERGE, which runs a merged lane exactly as it
+-- runs its parts: the simulation relates each plain inner to ONE impl
+-- inner, and a merge's active count to the other side's.  A cold's
+-- subscribe burst carries two payloads in one emit, so a merged lane
+-- left the plain merge two inners active against the impl's one.
 oneInnerˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → SExp Γ Δᵍ Δ Θ t → Bool
 oneInnerˢ (ofˢ _)    = true
 oneInnerˢ (mapˢ _ e) = oneInnerˢ e
 oneInnerˢ _          = false
 
 perInnerˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → FlatOp → SExp Γ Δᵍ Δ Θ t → Bool
-perInnerˢ (mergeᶠ nothing) e = false
-perInnerˢ _                e = not (oneInnerˢ e)
+perInnerˢ _ e = not (oneInnerˢ e)
 
 -- A LANE IS SUBSCRIBED IN THE LAST INSTANT THE FLATTENER PUT OUT: the
 -- echo of the outer emit that carried it, or the lane emit whose

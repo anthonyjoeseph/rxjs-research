@@ -42,7 +42,7 @@ open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (FlatSᵗ)
 open import Simulation.Stores using (Unpaired; FlatNodes; merge~; switch~; exhaust~; Flattener; PathRel; root~; sink~; map~; scan~;
-  takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~;
+  takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~;
   MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows; Spent)
 
 -- a node read back after a write elsewhere
@@ -200,7 +200,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     pathW (outerElem~ f r)                   = outerElem~ (flatW f) (pathW r)
     pathW (outerExplode~ f r)                = outerExplode~ (flatW f) (pathW r)
     pathW (inner~ e f ip r)                  = inner~ e (flatW f) ip (pathW r)
-    pathW (lane~ l un uj r)                  = lane~ (unpairedI un l) un uj (pathW r)
     pathW (deferInner~ e₁ e₂ l l′ l₂ a≤ r)   =
       deferInner~ e₁ e₂ (soloP e₁ l) (pairedI e₁ (here refl) (λ eq _ → solo-entry eq) l′)
                   (pairedI e₂ (there (here refl)) third-entry l₂) a≤ (pathW r)

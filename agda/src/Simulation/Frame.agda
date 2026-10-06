@@ -26,7 +26,7 @@ open import Rx.Exp       using (Ctx)
 open import Rx.Evaluator using (NodeId; NodeState; Path; Frame; _↠[_]_; frameNodes; pathHasNode; lookupNode; RegRow)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
-  lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows; Spent)
+  deferInner~; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows; Spent)
 
 -- a frame's first node is on it
 first : ∀ k (ks : List NodeId) → any (_≡ᵇ k) (k ∷ ks) ≡ true
@@ -86,8 +86,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     path-frame ag (inner~ {m′ = m′} {ks} {j′ = j′} e (pm , x , x′ , lP , lI , fn , c , lk) ip r) =
       inner~ e (pm , x , x′ , lP , trans (hd ag (first m′ (j′ ∷ []))) lI , fn , c , trans (hd (tail ag) (first ks [])) lk) ip
              (path-frame (tail (tail (tail ag))) r)
-    path-frame ag (lane~ {mL = mL} {jL} lL uL uJ r) =
-      lane~ (trans (hd ag (first mL (jL ∷ []))) lL) uL uJ (path-frame (tail ag) r)
     path-frame ag (deferInner~ {nid′ = nid′} {j′ = j′} {m2 = m2} {j2 = j2} p₁ p₂ lP lI lm al r) =
       deferInner~ p₁ p₂ lP (trans (hd (tail (tail ag)) (first nid′ (j′ ∷ []))) lI)
                   (trans (hd ag (first m2 (j2 ∷ []))) lm) al

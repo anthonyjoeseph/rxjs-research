@@ -45,7 +45,7 @@ open import SExp.Elaborate using (flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
   PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
-  inner~; lane~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
+  inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
   MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
 open import Simulation.Cut using (cut-kill)
@@ -424,11 +424,6 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     reop {op = exhaustᶠ} () (merge~ _)
     reop {op = exhaustᶠ} () (switch~ _)
 
-    -- no inner's frame is related to a restamp's scan
-    no-scan : ∀ {π NP NI ℓ ℓ′ lo lo′ u s a m j k F} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ s (emitᵗ t)}
-            → PathRel κ π {t} NP NI (from-inner a m j ↠[ h ] p) (scan-f F k ↠[ h′ ] Q) → ⊥
-    no-scan ()
-
     -- AN INNER'S SUBSCRIBE LEFT AGAIN: the lane's frames taken apart,
     -- the flattener as the walk left it, and the tails
     leave : ∀ {π NP NI lo lo′ ℓ ℓ₂ ℓ₃ ℓ₄ u} op {m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂} {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₂}
@@ -437,7 +432,6 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
               (from-inner (flatOp op) m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)
           → Σ (List NodeId) (λ xs → Flattener {Γ = Γ} κ π {t} NP NI u op m m′ ks xs) × (j , j′ ∷ []) ∈ π × PathRel κ π NP NI p q
     leave (mergeᶠ _) (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) ip pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , ip , pr
-    leave (mergeᶠ _) (lane~ _ _ _ pr) = ⊥-elim (no-scan pr)
     leave switchᶠ    (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) ip pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , ip , pr
     leave exhaustᶠ   (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) ip pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , ip , pr
 
@@ -806,19 +800,6 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                         (from-inner (flatOp op) m′ j′ ↠[ h₁ ] (scan-f F k ↠[ h₂ ] (map-f G ↠[ h₃ ] q))))
                       q (map (applyClo G) y₂) f₂ (o₁ ++ o₂) s₂ st₂
 
-      -- THE IMPL-ONLY MERGE IN FRONT OF A LANE passes emits carrying
-      -- nothing on as they came
-      quiet-lane : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ′ u a m j mL jL}
-                     {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                     {es fin o₁ y₁ f₁ s₁ st₁}
-                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p)
-                     (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
-                 → Carries es [] → fin ≡ false
-                 → stepFrame⇓ now (from-inner mergeAllᵒ mL jL) Q es fin sI stI (o₁ , y₁ , f₁ , s₁ , st₁)
-                 → QArm S now (from-inner a m j ↠[ h ] p)
-                     (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q))
-                     Q y₁ f₁ o₁ s₁ st₁
-
       -- A DEFERRED BODY'S EMITS CARRYING NOTHING pass the hop's marker
       -- merge, its restamp and the hop's node as they came
       quiet-deferInner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2}
@@ -855,7 +836,6 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-pass S r@(inner~ refl _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
         let X = quiet-resume (quiet-inner S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
-      quiet-pass S r@(lane~ _ _ _ _) b e si (fold-step d₁ dq) = quiet-resume (quiet-lane S r b e d₁) (adv d₁ si) dq
       quiet-pass S r@(deferInner~ _ _ _ _ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step step-map (fold-step {out₁ = o₃} d₃ dq))) =
         let X = quiet-resume (quiet-deferInner S r b e d₁ d₃) (adv d₃ (drop-ot _ _ _ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₃ _) (proj₁ X) , proj₂ X
