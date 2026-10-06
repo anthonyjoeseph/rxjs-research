@@ -18,6 +18,7 @@ open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Unit    using (tt)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
@@ -53,6 +54,7 @@ open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Flattener; Fl
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
 open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes)
+open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear; fold-clear; consume-clear; adv)
 open import Simulation.Sweep using (t≢f)
 open import Simulation.Write using (module Write; key-same)
@@ -128,6 +130,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ public
   open Takes {Γ = Γ} κ using (module Count)
+  open Scans {Γ = Γ} κ using (module Cells)
 
   -- WHAT `elemᵛ` MAKES OF AN OUTER EMIT CARRYING ONE ELEMENT: an echo
   -- always, carrying the element's echoed value if it has one, beside
@@ -202,6 +205,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     open Kept {Γ = Γ} κ {t} {ep} {ei}
     open Run {t} {ep} {ei} public
     open Count {t} {ep} {ei} using (take-arm; takeWhile-arm)
+    open Cells {t} {ep} {ei} using (scan-arm)
 
 
     ----------------------------------------------------------------
@@ -846,8 +850,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       sink-pass     : ∀ {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} (sh : lookup κ i ≡ sharedᵏ)
                     → Pass (share-sink i h)
                            (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sharedEq {Γ = Γ} κ i sh) (share-sink (n ↑ʳ i) h′))
-      scan-arm      : ∀ {lo lo′ ℓ s u} {F : FnClo Γ (u ×ᵗ s) u} {k} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
-                    → Steps (scan-f F k) h p Q
       -- an outer's elements, each inner a sync outer hands the flattener
       -- subscribed before the step returns: the explode and its merge
       outerExplode-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
@@ -1039,10 +1041,24 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → foldPath⇓ now (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) vs′ fin sI stI rI
                 → Arm S now oP sP₁ stP₁ p vs₁ fin₁ none rI
 
-    -- A SLOT'S READER: the impl runs the restamp where the plain path runs
-    -- on, so the arm is the one frame the impl moves alone
     postulate
-      read-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {Θ₀ ρ₀ ℓ′}
+      -- A RESTAMPED EMIT CARRIES WHAT IT CARRIED: the restamp rebuilds the
+      -- emit over its own events, so the values it holds are the ones
+      restamp-rel : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} e′ {ws}
+                  → EmitRel {Γ = Γ} κ (lookup Γ i) e′ ws
+                  → EmitRel {Γ = Γ} κ (lookup Γ i) (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) e′) ws
+
+    restamp-carries : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {es vs}
+                    → Carries {s = lookup Γ i} es vs
+                    → Carries (map (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀)) es) vs
+    restamp-carries []             = []
+    restamp-carries {i = i} {X = X} (quiet e′ r bs) = quiet _ (restamp-rel {i = i} {X = X} e′ r) (restamp-carries {i = i} {X = X} bs)
+    restamp-carries {i = i} {X = X} (one e′ r bs)   = one _ (restamp-rel {i = i} {X = X} e′ r) (restamp-carries {i = i} {X = X} bs)
+
+    -- A SLOT'S READER: the impl runs the restamp where the plain path runs
+    -- on, so the arm is the one frame the impl moves alone, and the plain
+    -- side has not moved
+    read-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {Θ₀ ρ₀ ℓ′}
                    {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {h : suc (toℕ (n ↑ʳ i)) ≤ ℓ′}
                    {p : Path Γ (suc (toℕ i)) (lookup Γ i) t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ (lookup Γ i)) (emitᵗ t)}
                  → lookup κ i ≡ hotᵏ ⊎ lookup κ i ≡ sharedᵏ
@@ -1051,6 +1067,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → Sound (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ h ] q) sI stI
                  → foldPath⇓ now (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ h ] q) es fin sI stI rI
                  → Arm S now [] sP stP p vs fin none rI
+    read-arm S {i = i} {X = X} _ r c si (fold-step step-map dq) =
+      arm (after S (λ x → x) (λ x → x) [] (λ x → x)) r (restamp-carries {i = i} {X = X} c) (drop-ot _ _ _ si) dq (λ _ _ _ → tt)
 
     -- the emits of a stamped slot against the plain values, at types the
     -- share's own is only propositionally the emit of

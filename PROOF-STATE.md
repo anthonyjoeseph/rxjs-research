@@ -314,8 +314,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`{block,hop}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
   chain's input block hands its path the popped head; a deferred hop subscribes
   its body on both sides.
-- **`scan-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cell steps
-  alike on both sides.
+- **`scan-write`** (Simulation.Scan) — FALSITY, `NO EVIDENCE`: a cell
+  written on both sides keeps the stores and the tails related.
 - **`take-{write,end,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
   count's nodes written open keep the stores and tails; a group that ends meets
   the impl merge's finish, which folds the tail before handing up the end; a
@@ -330,8 +330,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`hot-block`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a connected hot
   slot's raw row steps its input block alone and hands the share one emit
   carrying the value; the plain side does not move.
-- **`read-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a slot reader's
-  restamp moves the impl alone and keeps the emit's values.
+- **`restamp-rel`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a slot
+  reader's restamp keeps the values its emit carries.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot.
