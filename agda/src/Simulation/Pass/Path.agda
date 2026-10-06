@@ -38,7 +38,7 @@ open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (Clear; ClearI; missed; unthru; step-clear; fold-clear; consume-clear; adv)
 open import Simulation.Sweep using (t≢f)
-open import Rx.Evaluator.Reducible.Support using (Sound; fresh-path; drop-ot; sub-ot; Agree; admit-ot; sink-sound)
+open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; sub-ot; Agree; admit-ot; sink-sound)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Inner using (module PassI)
 open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sink-intro; sink-inv; sink-ok; slotpair; tail-of)
@@ -266,7 +266,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
         let c₁ = step-clear d₁ cI
             E  = quiet-tail (flat-echo S w (quiet _ r []) d₁) (proj₂ cP) (tail-of c₁) dq
             c₂ = fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁
-            C  = consume-pair (After.store (proj₁ E)) (proj₂ E) ob (fresh-path (proj₂ c₂)) c c′
+            C  = consume-pair (After.store (proj₁ E)) (proj₂ E) ob cP c₂ c c′
             X  = elem-walk (After.store (proj₁ C)) (consume-clear c cP)
                    (consume-clear c′ c₂) (proj₂ C) b W W′
         in proj₁ E ⨾ (proj₁ C ⨾ proj₁ X) , proj₂ X
@@ -281,7 +281,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
             E   = echo-go dv cP (flat-echo S w (one _ r []) d₁) (tail-of c₁) dq
             cP₂ = fold-clear dv (proj₂ cP) refl cP
             c₂  = fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁
-            C   = consume-pair (After.store (proj₁ E)) (proj₂ E) ob (fresh-path (proj₂ c₂)) c c′
+            C   = consume-pair (After.store (proj₁ E)) (proj₂ E) ob cP₂ c₂ c c′
             X   = elem-walk (After.store (proj₁ C)) (consume-clear c cP₂)
                     (consume-clear c′ c₂) (proj₂ C) b W W′
         in proj₁ E ⨾ (proj₁ C ⨾ proj₁ X) , proj₂ X

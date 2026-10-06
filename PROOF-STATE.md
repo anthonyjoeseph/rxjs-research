@@ -249,21 +249,22 @@ stray, an echo apart from inners or payload; a subscribe
 unrelated; a pop unrelating a read; a map moving instants; a close
 emptying a named merge; a hot end past its block; a two-value emit; a cut
 over a budget no test holds; a flatten write moving a row; a cut or
-liveness parting pairs; a merged lane; a drain or a body's end (in a μ
-too) unrelating inners.
+liveness unpairing; a merged lane; a drain or body end (μ too)
+unrelating inners; unsound walks.
 Left: which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **CARRY `Sound` THROUGH THE WALK.** `Refuted.Of-Fold-Sound` shows
-  `of-fold` false without `Sound` of both paths: a related path may pass
-  one merge twice. Restate `Walks` and `of-fold` to carry it as `Pass`
-  does, each arm minting its extended path's by `fresh-sound`, then test
-  the reads for the same shape. Ruled out: the walk's store standing on
-  `PathRel` alone; the μ peel needing the pass; `μ-unfolds` at the probed
-  binders, so a scan's or a test's binder is what is left.
+- **REFUTE THE READS WITHOUT `Sound`.** A read registers its path as a
+  row, so a related path through one merge twice gives the store a row
+  `Rule.distinct-rows` refuses, as `Refuted.Of-Fold-Sound` did through a
+  fold. Refute `shared-read` at that path, then `cold-read` and
+  `hot-read`; red licenses each taking the `Sound` its walk already
+  holds. Ruled out: the walk's store standing on `PathRel` alone;
+  `μ-unfolds` at the probed binders, so a scan's or a test's binder is
+  what is left.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -282,6 +283,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
+- **`of-fold`** (Simulation.Walk) — FALSITY, `REFUTED, DEAD ROUTE`: the group
+  folded and ended down related sound paths keeps what a pass keeps.
 - **`of-carries`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s emits
   carry its values, one per emit.
 - **`merge-drain`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's
@@ -362,9 +365,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
-- **`of-fold`** (Simulation.Walk) — SHAPE, `REFUTED, DEAD ROUTE`: the group
-  folded and ended down related paths keeps what a pass keeps, owed `Sound` of
-  both.
 - **`fold-unmoved`** (Simulation.Arm) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.
