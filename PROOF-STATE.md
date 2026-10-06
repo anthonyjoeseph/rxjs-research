@@ -263,11 +263,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store`, `hot-finish` and a connected hot
   end are proven. The outer's element, a shared
-  slot's subject and an open inner are real bodies over their walks' leaves, the impl's
+  slot's subject and an open inner, deferred or not, are real bodies over their walks' leaves, the impl's
   valueless echo one frame at a time. Left: the arms as
   real bodies, riskiest first, each owing the
-  store's `swept` and the arrival's `lists` persisted, and `deferInner-pass` as
-  `inner-pass` is; the monster drops to
+  store's `swept` and the arrival's `lists` persisted; the monster drops to
   whichever arm fails.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
@@ -326,9 +325,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `NO EVIDENCE`: an inner no live chain runs through finishes on both sides,
   through the flattener's lane, an impl-only lane merge ahead of it or a
   deferred body's hop.
-- **`deferInner-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
-  body still open or alive passes its group on as it came, the impl's tail
-  stepping alone.
+- **`defer-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
+  body's inner live on the plain side has the hop's marker merge's inner live
+  on the impl's.
 - **`block-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
   chain's input block runs alone into a merge whose walk folds the path the
   plain chain folds the popped head down, and the impl tail's end after it.
@@ -352,8 +351,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`hot-block`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a connected hot
   slot's raw row steps its input block alone and hands the share one emit
   carrying the value; the plain side does not move.
-- **`restamp-rel`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a slot reader's
-  restamp keeps the values its emit carries.
+- **`{restamp,delivery}-rel`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
+  slot reader's restamp and a hop's delivery keep the values an emit carries.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot.

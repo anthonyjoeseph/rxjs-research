@@ -59,7 +59,7 @@ open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
 open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
-open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear; fold-clear; consume-clear; adv)
+open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; fold-unmoved; on-drop; unthru; step-clear; fold-clear; consume-clear; adv)
 open import Simulation.Sweep using (t≢f)
 open import Simulation.Write using (module Write; key-same)
 open import Simulation.Walk using (walk)
@@ -1059,14 +1059,17 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       lane-dies     : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                         {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
                     → InnerDies a m j h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
-      -- a deferred body: the hop's marker merge, its restamp, the hop's node
-      deferInner-pass : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
-                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
-                          {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
-                      → InnerPasses mergeAllᵒ nid j h p
-                          (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
-                           (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
-                            (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+      -- A DEFERRED BODY'S INNER LIVE ON THE PLAIN SIDE HAS THE HOP'S
+      -- MARKER MERGE'S INNER LIVE ON THE IMPL'S
+      defer-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′ m2 j2}
+                  → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
+                  → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ true
+                  → any (aliveThroughᶠ j2 stI) (EvalSt.registry stI) ≡ true
+      -- A DELIVERED EMIT CARRIES WHAT IT CARRIED: the hop's restamp
+      -- retags a subscribe as a delivery over its own events
+      delivery-rel : ∀ {u Θx ρ₀} e′ {ws}
+                   → EmitRel {Γ = Γ} κ u e′ ws
+                   → EmitRel {Γ = Γ} κ u (applyClo (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) e′) ws
       deferInner-dies : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
                           {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                           {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
@@ -1113,6 +1116,63 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     inner-pass S R b sp si (inj₁ ()) (fold-step (step-from-inner (react-dead _ _)) _)
     inner-pass {op = op} S R b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
       ⊥-elim (t≢f (trans (sym (inner-alive S (proj₁ (proj₂ (leave op R))) al)) dd))
+
+    delivery-carries : ∀ {u Θx ρ₀} {es vs}
+                     → Carries {s = u} es vs
+                     → Carries (map (applyClo (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀)) es) vs
+    delivery-carries []              = []
+    delivery-carries (quiet e′ r bs) = quiet _ (delivery-rel e′ r) (delivery-carries bs)
+    delivery-carries (one e′ r bs)   = one _ (delivery-rel e′ r) (delivery-carries bs)
+
+    -- A DEFERRED BODY'S INNER LEFT OPEN: the hop's marker merge and its
+    -- node let the group past, and the restamp between moves no node
+    defer-on : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                 {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {vs es rI}
+             → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner mergeAllᵒ nid j ↠[ h ] p)
+                 (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                  (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                   (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+             → Carries es vs
+             → Sound (from-inner mergeAllᵒ nid j ↠[ h ] p) sP stP
+             → Sound (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                      (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                       (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q))) sI stI
+             → foldPath⇓ now q (map (applyClo (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀)) es)
+                 false sI stI rI
+             → Arm S now [] sP stP p vs false
+                 (λ π NP NI → PathRel κ π NP NI (from-inner mergeAllᵒ nid j ↠[ h ] p)
+                    (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                     (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                      (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))) rI
+    defer-on S {nid = nid} {nid′} {j} {j′} {m2} {j2} (deferInner~ ip₁ ip₂ lP lI l2 a1 pr) b sp si dq =
+      arm (after S (λ x → x) (λ x → x) [] (λ x → x)) pr (delivery-carries b) s3 dq λ {rP} dP B rel′ →
+        deferInner~ (After.grows B ip₁) (After.grows B ip₂) (trans (fold-unmoved dP cP) lP)
+                    (trans (fold-unmoved dq c′) lI) (trans (fold-unmoved dq c2) l2) a1 rel′
+      where
+      s2 = drop-ot _ _ _ (drop-ot _ _ _ si)
+      s3 = drop-ot _ _ _ s2
+      cP = head-on _ _ _ nid (self-node nid (j ∷ [])) sp , drop-ot _ _ _ sp
+      c′ = head-on _ _ _ nid′ (self-node nid′ (j′ ∷ [])) s2 , s3
+      c2 = on-drop (on-drop (head-on _ _ _ m2 (self-node m2 (j2 ∷ [])) si)) , s3
+
+    -- a deferred body: the hop's marker merge, its restamp, the hop's node
+    deferInner-pass : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                    → InnerPasses mergeAllᵒ nid j h p
+                        (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                         (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                          (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+    deferInner-pass S R b sp si _
+      (fold-step (step-from-inner react-false) (fold-step step-map (fold-step (step-from-inner react-false) dq))) =
+      defer-on S R b sp si dq
+    deferInner-pass S R b sp si _
+      (fold-step (step-from-inner (react-alive _)) (fold-step step-map (fold-step (step-from-inner react-false) dq))) =
+      defer-on S R b sp si dq
+    deferInner-pass S R b sp si (inj₁ ()) (fold-step (step-from-inner (react-dead _ _)) _)
+    deferInner-pass S R@(deferInner~ _ ip₂ _ _ _ _ _) b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
+      ⊥-elim (t≢f (trans (sym (defer-alive S ip₂ al)) dd))
 
     -- AN INNER LEFT OPEN, BY HOW ITS ELABORATION LED IT: a lane merge in
     -- front lets the group past as the inner below it does
