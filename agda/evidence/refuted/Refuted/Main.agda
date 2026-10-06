@@ -71,3 +71,9 @@ open import Refuted.Batched-Sandwich using (one-past-sandwich-false)
 -- step at zero and at one; a count's at zero cuts where the plain
 -- take's does not, and no plain take is installed at zero.
 open import Refuted.Cut-Budget using (cut-budget-false; cut-zero-false)
+
+-- A SLOT'S READ NEEDS ONE SCRIPT AT THE SLOT ON BOTH SIDES, AND A
+-- STORE NEVER READS THE SCHEDULES' SLOTS.  Two cold scripts that
+-- differ only in a tail are related at their openings by the empty
+-- store, and the plain read alone makes a live source.
+open import Refuted.Slot-Scripts using (slot-scripts-false)

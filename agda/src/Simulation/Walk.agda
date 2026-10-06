@@ -178,6 +178,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A COLD SLOT'S READ, AGAINST ITS STAMPED SLOT'S BLOCK: the plain
       -- subscribe at the slot, the impl's at the marked, batched and
       -- stamped read of the script under its mint
+      --
+      -- A STORE NEVER READS `Sched.slots`, so the two runs' scripts at the
+      -- slot are free of each other, and the conclusion needs them to be
+      -- one script.  The hot and shared reads stand on the same gap.
+      -- REFUTED: `Refuted.Slot-Scripts` -- both runs cold at the slot, the
+      --   plain one's with a tail, at their openings under the empty store:
+      --   the plain subscribe makes a live source the impl's does not.
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
       --   from empty stores: a cold script, its block run straight to the
       --   root (`cold~`).  Not under a binder, not the values conjunct.
