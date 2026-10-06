@@ -1040,10 +1040,22 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                         (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
                          (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
                           (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
-      -- an inner led with its echo: one more merge, impl only, in front of its lane
-      lane-pass     : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
-                        {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                    → InnerPasses a m j h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+      -- A LANE'S INNER IS LIVE WHERE ITS PLAIN INNER IS: the lane merge
+      -- sits in front of every impl chain the inner's pair runs
+      lane-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+                     {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+                 → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ true
+                 → any (aliveThroughᶠ jL stI) (EvalSt.registry stI) ≡ true
+      -- A LANE MERGE OVER AN INNER'S ARM STAYS ONE: impl only, idle, and
+      -- off every tail the arm folds
+      lane-wrap : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ′ u a m j mL jL vs rI} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+                    {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+                → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+                → Sound (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q) sI stI
+                → Arm S now [] sP stP p vs false (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) rI
+                → Arm S now [] sP stP p vs false
+                    (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)) rI
       lane-dies     : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                         {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
                     → InnerDies a m j h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
@@ -1102,6 +1114,20 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     inner-pass {op = op} S R b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
       ⊥-elim (t≢f (trans (sym (inner-alive S (proj₁ (proj₂ (leave op R))) al)) dd))
 
+    -- AN INNER LEFT OPEN, BY HOW ITS ELABORATION LED IT: a lane merge in
+    -- front lets the group past as the inner below it does
+    inner-any : ∀ {lo lo′ ℓ u a m j} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
+              → InnerPasses a m j h p Q
+    inner-any S R@(inner~ refl _ _ _) b sp si alv dI = inner-pass S R b sp si alv dI
+    inner-any S R@(deferInner~ _ _ _ _ _ _ _) b sp si alv dI = deferInner-pass S R b sp si alv dI
+    inner-any S R@(lane~ _ _ _ R′) b sp si _ (fold-step (step-from-inner react-false) dR) =
+      lane-wrap R si (inner-any S R′ b sp (drop-ot _ _ _ si) (inj₁ refl) dR)
+    inner-any S R@(lane~ _ _ _ R′) b sp si _ (fold-step (step-from-inner (react-alive _)) dR) =
+      lane-wrap R si (inner-any S R′ b sp (drop-ot _ _ _ si) (inj₁ refl) dR)
+    inner-any S (lane~ _ _ _ _) b sp si (inj₁ ()) (fold-step (step-from-inner (react-dead _ _)) _)
+    inner-any S R@(lane~ _ _ _ _) b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
+      ⊥-elim (t≢f (trans (sym (lane-alive S R al)) dd))
+
     -- an outer's elements, each inner a sync outer hands the flattener
     -- subscribed before the step returns: the explode and its merge
     outerExplode-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
@@ -1151,8 +1177,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     lane-arm      : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                       {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
                   → Steps (from-inner a m j) h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
-    lane-arm S R b sp si (step-from-inner react-false)        dI = lane-pass S R b sp si (inj₁ refl) dI
-    lane-arm S R b sp si (step-from-inner (react-alive al))   dI = lane-pass S R b sp si (inj₂ al) dI
+    lane-arm S R b sp si (step-from-inner react-false)        dI = inner-any S R b sp si (inj₁ refl) dI
+    lane-arm S R b sp si (step-from-inner (react-alive al))   dI = inner-any S R b sp si (inj₂ al) dI
     lane-arm S R b sp si (step-from-inner (react-dead dd fz)) dI = lane-dies S R b sp si dd fz dI
 
     deferInner-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
