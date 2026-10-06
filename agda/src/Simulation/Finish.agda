@@ -221,14 +221,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
              → (q : RegRel κ π {t} NP NI LP LI rs rs′) (ars : ArrRows κ π NP NI LP LI q s s′ u u′)
              → ∀ {dP dI} → Spent κ π NP NI LP LI q dP dI → Spent κ π NP NI LP LI (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) dP dI
   spent-drop na na′ [] _ d = d
-  spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (rr@(read~ {i = i} _ _ refl) ∷ q) ars (h , d) =
-    spent-keep₂ s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars)
+  spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (_∷_ {r = r₀} {r′ = r₀′} {rs = rs₀} {rs′ = rs₀′} rr@(read~ {i = i} _ _ refl) q) ars (h , d) =
+    spent-keep₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars)
       (sameSource-lt (<-trans (toℕ<n i) na))
       (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ʳ n i)) (+-monoʳ-< n (toℕ<n i))) na′))
       (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
-  spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (rr@(cold~ _ _ _ refl) ∷ q) (ar , ars) (h , d) with arr-dec ar
-  ... | inj₁ (e , e′) = spent-skip₂ s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
-  ... | inj₂ (e , e′) = spent-keep₂ s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
+  spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (_∷_ {r = r₀} {r′ = r₀′} {rs = rs₀} {rs′ = rs₀′} rr@(cold~ _ _ _ refl) q) (ar , ars) (h , d) with arr-dec ar
+  ... | inj₁ (e , e′) = spent-skip₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
+  ... | inj₂ (e , e′) = spent-keep₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
   spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (_∷_ {r = r₀} {r′ = r₀′} {rs = rs₀} {rs′ = rs₀′} rr@(defer~ _ _ _ _ _ refl) q) (ar , ars) (h , d) with arr-dec ar
   ... | inj₁ (e , e′) = spent-skip₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
   ... | inj₂ (e , e′) = spent-keep₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
