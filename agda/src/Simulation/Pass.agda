@@ -52,6 +52,7 @@ open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Lifts; Flattener; FlatNodes; merge~; switch~; exhaust~; CurRel; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
   outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; hotEq; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
 open import Simulation.Walk using (readᴾ; readᴵ)
+open import Simulation.Write using (module Write)
 open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
 open import Rx.Evaluator.Reducible.Support using (Sound; sub-rule; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; sub-ot; Agree; endOf; ∨-Tʳ)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
@@ -465,6 +466,32 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → foldPath⇓ now q [] (proj₁ (thruWrap (flatOp op) m fin (sP , stP))) sI₁ stI₁ r
               → Wrapped S op m m′ ks p q fin now r
 
+    -- A FLATTENER'S NODE PAIR WRITTEN ALIKE: the stores and the walk
+    -- stay related with the two nodes moved to states that pair again
+    flat-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₄ u op m m′ ks}
+                   {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {y y′}
+               → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+               → FlatNodes {Γ = Γ} κ (Store.π S) u op y y′
+               → Σ (After S ([] , sP , record stP { nodes = setNode m y (EvalSt.nodes stP) })
+                            ([] , sI , record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })) λ A
+                   → Walked op m m′ ks p q (Store.π (After.store A))
+                       (setNode m y (EvalSt.nodes stP)) (setNode m′ y′ (EvalSt.nodes stI))
+    flat-write {sP} {stP} {sI} {stI} S {m = m} {m′} {y = y} {y′} (f@(pm , _ , _ , lP , lI , fn , _ , lk) , r) fn′ =
+      after S′ (λ { (inj₁ c) → inj₁ c ; (inj₂ (a , b , pr)) → inj₂ (a , b , W.partW (Store.rows S) pr) })
+               (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
+                               ; rows = W.arrW (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
+               [] (λ x → x)
+      , W.flatW f , W.pathW r
+      where
+      module W = Write κ (Store.π-keys S) (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} pm lP lI fn lk fn′
+      open Store S
+      S′ : St sP (record stP { nodes = setNode m y (EvalSt.nodes stP) }) sI (record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })
+      S′ = record
+        { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+        ; sync = sync ; rows = W.regW rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
+        ; census = census ; owned = owned
+        ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
+
     postulate
       -- AN ECHO THROUGH THE RESTAMP: the scan's cell restamps it and
       -- keeps its payloads, and writes nothing but the cell, so the
@@ -478,21 +505,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
                     xs false sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
                 → Restamped S op m m′ ks p q ws (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) fin₁ o₁ sI₁ stI₁
-
-      -- A FLATTENER'S NODE PAIR WRITTEN ALIKE: the stores and the walk
-      -- stay related with the two nodes moved to states that pair again.
-      -- Every node fact the rows state is at a node their own path names
-      -- (`Simulation.Frame`); one in `π` is apart from `m` and `m′` by
-      -- `π`'s uniqueness unless it is this flattener's own, and an
-      -- impl-only one is `Unpaired`
-      flat-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₄ u op m m′ ks}
-                     {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {y y′}
-                 → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                 → FlatNodes {Γ = Γ} κ (Store.π S) u op y y′
-                 → Σ (After S ([] , sP , record stP { nodes = setNode m y (EvalSt.nodes stP) })
-                              ([] , sI , record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })) λ A
-                     → Walked op m m′ ks p q (Store.π (After.store A))
-                         (setNode m y (EvalSt.nodes stP)) (setNode m′ y′ (EvalSt.nodes stI))
 
       -- AN OUTER'S INNER SUBSCRIBED ON BOTH SIDES, its lane already
       -- taken and its lane on the impl's: the two subscribes keep the

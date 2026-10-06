@@ -246,33 +246,22 @@ subscribes set them (`subscribe-related`) and each cascade keeps
 (`cascade-related`), both sending agreeing values. RULED
 OUT: an arrival plain lacks, a split one, a gap or
 stray in an instant, an echo apart from its inners or payload; a subscribe
-installing a run the relation lacks (hot, cold, deferred,
-one-lane merge); a pop unrelating a read; a map moving instants; a close
+installing a run the relation lacks; a pop unrelating a read; a map moving instants; a close
 emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
-over a budget no take holds.
+over a budget no take holds; a flattener's write moving a row.
 Left: a deeper flattener's subscribe; which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **DECIDE THE STORE'S CLOSURES.** `CLI.Store-Check` now reads every
-  map, scan, take and takeWhile step on samples; both cut rows quantified
-  over plain budgets no row carries and are restated per
-  `Refuted.Cut-Budget`, after which seeds 1, 31, 32 (depth 4) and 33
-  (depth 5), aimed at each frame, held them. A merge's active count parting
-  at a subscribe was the evaluator's: a spent take passed a flattener's
-  later end through, and a limited merge above filled a lane early
-  (`spent-take-passes-a-completion`); seeds 33 and 41 hold since. Left:
-  `ObsRel`, `DeferRel` and `EnvRel`, undecided in `CLI.Store-Check`.
-
 - **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
   merge and an exhaust decide alike off related nodes, a node neither can
-  use is no step, and what is left is the write (`flat-write`), the inner's
-  subscribe (`inner-pair`) and `consume-switch`; a lane's and an input
-  block's merges are `Unpaired`. Next: `flat-write` as the frame lemmas'
-  sibling, then the switch through the same two leaves. Narrows the monster to whether the subscribe walk and the pass
-  share one invariant.
+  use is no step, and the write is proven (`Simulation.Write`: `π`'s
+  uniqueness and the nodes' kinds keep every other row's fact). Left: the
+  inner's subscribe (`inner-pair`) and `consume-switch` through it. Narrows
+  the monster to whether the subscribe walk and the pass share one
+  invariant.
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
@@ -317,8 +306,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`inner-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
   inner subscribed on both sides, its lane taken, keeps the flattener and the
   path related.
-- **`flat-write`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a flattener's
-  node pair written alike keeps the stores and the walk related.
 - **`consume-switch`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a switch
   handed an element's inner on both sides cuts, names and subscribes alike.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
