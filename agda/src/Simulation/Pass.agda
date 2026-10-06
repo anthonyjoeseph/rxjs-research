@@ -29,7 +29,7 @@ open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Vec     using (lookup)
-open import Data.List.Properties using (++-assoc)
+open import Data.List.Properties using (++-assoc; ++-identityʳ; map-id)
 open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
@@ -40,10 +40,10 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arriva
   shareSpend; shareDying; memberSource; Path; share-sink; _↠[_]_; scan-f; take-f; map-f; batchSync-f;
   thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap;
   setNode; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ; RegId;
-  RegRow; AtFloor; atDyn; atSlot; chainsOf)
+  RegRow; AtFloor; atDyn; atSlot; chainsOf; shareAdmit; shareFinish)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; step-from-inner; react-false; react-alive; react-dead; thruWalk⇓; walk-nil; walk-echo; walk-cons;
   thruConsume⇓; inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub; consume-switch-nil; subscribeInner⇓; subscribeE⇓; chainStep⇓; chain-step;
-  cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
+  cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓; disp; shareWalk⇓; walk-end; walk-more; fold-sink)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (inputStampᵖ; restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
 open import Simulation.Schedules using (HeadOf)
@@ -63,7 +63,7 @@ open import Simulation.Grow using (nodes-grow; flatG; pathG; fresh-off)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
 open import Rx.Evaluator.Reducible.Support using (Sound; fresh-path; FreshPath; switchKill-ct; sub-rule; switchKill-nodes; drop-ot; head-on;
-  self-node; sub-ot; Agree)
+  self-node; sub-ot; Agree; Rule; sink-sound; admit-ot; admit-agree; termini)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 
 -- a minted source's chain, as the registration it was read from
@@ -109,6 +109,46 @@ delivered-arr : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei :
               → Arr S s s′ u u′ → Arr (delivered S {x} {y}) s s′ u u′
 delivered-arr ar = record { boundP = boundP ; boundI = boundI ; rows = rows ; lists = lists } where open Arr ar
 
+-- a share marked dying on both sides, which no relation reads
+dying : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+          {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+      → Store κ sP stP sI stI → ∀ {x y}
+      → Store κ sP (record stP { dying = x }) sI (record stI { dying = y })
+dying s = record
+  { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
+  ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
+  ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
+  where open Store s
+
+dying-arr : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+              {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+              {S : Store κ sP stP sI stI} {x y s s′ u u′}
+          → Arr S s s′ u u′ → Arr (dying S {x} {y}) s s′ u u′
+dying-arr ar = record { boundP = boundP ; boundI = boundI ; rows = rows ; lists = lists } where open Arr ar
+
+module _ {m} {Δ : Ctx m} {t} {lo} {j : Fin m} {h : lo ≤ toℕ j} where
+
+  -- A STAMPED SHARE'S SINK, its fold read at the type the share holds
+  sink-inv : ∀ {e : Closed Δ t} {now u} (ε : lookup Δ j ≡ u) {es : List (Val Δ u)} {fin sched st r}
+           → foldPath⇓ {e = e} now (subst (λ u → Path Δ lo u t) ε (share-sink j h)) es fin sched st r
+           → dispatchShare⇓ now j h (map (subst (Val Δ) (sym ε)) es) fin sched st r
+  sink-inv refl {es} (fold-sink d) = subst (λ xs → dispatchShare⇓ _ j h xs _ _ _ _) (sym (map-id es)) d
+
+  sink-intro : ∀ {e : Closed Δ t} {now u} (ε : lookup Δ j ≡ u) {es : List (Val Δ u)} {fin sched st r}
+             → foldPath⇓ {e = e} now (share-sink j h) (map (subst (Val Δ) (sym ε)) es) fin sched st r
+             → foldPath⇓ now (subst (λ u → Path Δ lo u t) ε (share-sink j h)) es fin sched st r
+  sink-intro refl {es} d = subst (λ xs → foldPath⇓ _ (share-sink j h) xs _ _ _ _) (map-id es) d
+
+  sink-ok : ∀ {e : Closed Δ t} {u} (ε : lookup Δ j ≡ u) {sched st}
+          → Rule {e = e} sched st → Sound (subst (λ u → Path Δ lo u t) ε (share-sink j h)) sched st
+  sink-ok refl ru = sink-sound j h ru
+
+-- a share's admitted rows agree, by the rule's termini
+admit-agrees : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} (i : Fin m) {sched : Sched Δ} {st : EvalSt e} → Rule sched st
+             → ∀ {a b} → a ∈ shareAdmit i (EvalSt.registry st) → b ∈ shareAdmit i (EvalSt.registry st)
+             → Agree (proj₂ a) (proj₂ b)
+admit-agrees i {st = st} ru = admit-agree i st (termini ru)
+
 -- A PLAIN CHAIN AT A SLOT AND THE REGISTRATION THE ELABORATION READ IT THROUGH:
 -- the stamped slot's share fans out to exactly the rows the plain run walks
 data SlotPair {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
@@ -118,6 +158,13 @@ data SlotPair {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
   slotpair : ∀ {rid rid′ p p′}
            → PairedR rr CP CI (rid , atSlot i , (u , p)) (rid′ , atSlot (n ↑ʳ i) , (lookup (plainᵏ Γ κ) (n ↑ʳ i) , p′))
            → SlotPair rr CP CI i (rid , suc (toℕ i) , p) (rid′ , p′)
+
+-- a share's admitted reader, at the floor its slot puts it
+ShareSlot : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
+          → RegRel κ π {t} NP NI LP LI rs rs′ → List RegId → List RegId → (i : Fin n)
+          → RegId × Path Γ (suc (toℕ i)) (lookup Γ i) t
+          → RegId × Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) (lookup (plainᵏ Γ κ) (n ↑ʳ i)) (emitᵗ t) → Set
+ShareSlot rr CP CI i c d = SlotPair rr CP CI i (proj₁ c , suc (toℕ i) , proj₂ c) d
 
 -- the impl's tail below a restamp, read off the restamp's path
 tail-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {ℓ₂ ℓ₃ ℓ₄ s u w} {C : FnClo Γ (u ×ᵗ s) u} {D : FnClo Γ u w} {ks k}
@@ -846,10 +893,17 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- two constructors and an inner's three are split once their arm is
     -- the riskiest.
     postulate
-      -- a share's subject, fanning the group out to every reader
-      sink-pass     : ∀ {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} (sh : lookup κ i ≡ sharedᵏ)
-                    → Pass (share-sink i h)
-                           (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sharedEq {Γ = Γ} κ i sh) (share-sink (n ↑ʳ i) h′))
+      -- A SHARE'S READERS PAIR UP, in order, with the rows its stamped
+      -- share admits, as registrations the store partners
+      share-rows   : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
+                   → Pointwise (ShareSlot (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i)
+                       (shareAdmit i (EvalSt.registry stP)) (shareAdmit (n ↑ʳ i) (EvalSt.registry stI))
+      -- A SHARE CLOSED ON BOTH SIDES, before its end is delivered
+      share-spend  : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
+                   → After S ([] , sP , shareSpend i stP) ([] , sI , shareSpend (n ↑ʳ i) stI)
+      -- A SHARE'S READERS DROPPED ON BOTH SIDES, once its end is delivered
+      share-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
+                   → After S ([] , proj₂ (shareFinish i true ([] , sP , stP))) ([] , proj₂ (shareFinish (n ↑ʳ i) true ([] , sI , stI)))
       -- AN OUTER'S ELEMENTS EXPLODED: each emit's run of elements is an
       -- inner the impl's merge subscribes, and its elements walk into the
       -- flattener where the plain outer's walk hands them on
@@ -994,6 +1048,77 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     deferInner-arm S R b sp si (step-from-inner (react-alive al))   dI = deferInner-pass S R b sp si (inj₂ al) dI
     deferInner-arm S R b sp si (step-from-inner (react-dead dd fz)) dI = deferInner-dies S R b sp si dd fz dI
 
+    postulate
+      -- A RESTAMPED EMIT CARRIES WHAT IT CARRIED: the restamp rebuilds the
+      -- emit over its own events, so the values it holds are the ones
+      restamp-rel : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} e′ {ws}
+                  → EmitRel {Γ = Γ} κ (lookup Γ i) e′ ws
+                  → EmitRel {Γ = Γ} κ (lookup Γ i) (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) e′) ws
+
+    restamp-carries : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {es vs}
+                    → Carries {s = lookup Γ i} es vs
+                    → Carries (map (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀)) es) vs
+    restamp-carries []             = []
+    restamp-carries {i = i} {X = X} (quiet e′ r bs) = quiet _ (restamp-rel {i = i} {X = X} e′ r) (restamp-carries {i = i} {X = X} bs)
+    restamp-carries {i = i} {X = X} (one e′ r bs)   = one _ (restamp-rel {i = i} {X = X} e′ r) (restamp-carries {i = i} {X = X} bs)
+
+    -- A SLOT'S READER: the impl runs the restamp where the plain path runs
+    -- on, so the arm is the one frame the impl moves alone, and the plain
+    -- side has not moved
+    read-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {Θ₀ ρ₀ ℓ′}
+                   {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {h : suc (toℕ (n ↑ʳ i)) ≤ ℓ′}
+                   {p : Path Γ (suc (toℕ i)) (lookup Γ i) t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ (lookup Γ i)) (emitᵗ t)}
+                 → lookup κ i ≡ hotᵏ ⊎ lookup κ i ≡ sharedᵏ
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → ∀ {now vs es fin rI} → Carries es vs
+                 → Sound (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ h ] q) sI stI
+                 → foldPath⇓ now (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ h ] q) es fin sI stI rI
+                 → Arm S now [] sP stP p vs fin none rI
+    read-arm S {i = i} {X = X} _ r c si (fold-step step-map dq) =
+      arm (after S (λ x → x) (λ x → x) [] (λ x → x)) r (restamp-carries {i = i} {X = X} c) (drop-ot _ _ _ si) dq (λ _ _ _ → tt)
+
+    -- the emits of a stamped slot against the plain values, at types the
+    -- share's own is only propositionally the emit of
+    CarriesU : ∀ {u u′} → u′ ≡ emitᵗ u → List (Val (plainᵏ Γ κ) u′) → List (Val Γ u) → Set
+    CarriesU refl = Carries
+
+    carriesU-nil : ∀ {u u′} (e : u′ ≡ emitᵗ u) → CarriesU e [] []
+    carriesU-nil refl = []
+
+    -- a partnered pair stays partnered once the store moves
+    slot-keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
+                   {c : RegId × AtFloor Γ u t} {d}
+               → Keeps S S₁
+               → SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i c d
+               → SlotPair (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i c d
+    slot-keeps K (slotpair x) = slotpair (K x)
+
+    -- the same pass, started from the store as it stood before the row was marked
+    rebase : ∀ {sP stP sI stI x y rP rI} {S : St sP stP sI stI}
+           → After (delivered S {x} {y}) rP rI → After S rP rI
+    rebase (after s k q v g) = after s k (λ ar → q (delivered-arr ar)) v g
+
+    -- a fan-out's pairs stay paired once the store moves
+    share-keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {cs ds}
+                → Keeps S₀ S₁
+                → Pointwise (ShareSlot (Store.rows S₀) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) cs ds
+                → Pointwise (ShareSlot (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i) cs ds
+    share-keeps K []       = []
+    share-keeps {S₀ = S₀} {S₁ = S₁} K (r ∷ rs) = slot-keeps {S = S₀} {S₁ = S₁} K r ∷ share-keeps {S₀ = S₀} {S₁ = S₁} K rs
+
+    -- the share's emits at the type its stamped slot holds them
+    slot-cast : ∀ {i : Fin n} → lookup κ i ≡ sharedᵏ → Val (plainᵏ Γ κ) (emitᵗ (lookup Γ i)) → Val (plainᵏ Γ κ) (lookup (plainᵏ Γ κ) (n ↑ʳ i))
+    slot-cast {i} sh = subst (Val (plainᵏ Γ κ)) (sym (sharedEq {Γ = Γ} κ i sh))
+
+    carries-cast : ∀ {u u′} (ε : u′ ≡ emitᵗ u) {es : List (Val (plainᵏ Γ κ) (emitᵗ u))} {vs}
+                 → Carries es vs → CarriesU ε (map (subst (Val (plainᵏ Γ κ)) (sym ε)) es) vs
+    carries-cast refl {es} c = subst (λ xs → Carries xs _) (sym (map-id es)) c
+
+    -- a share marked dying on both sides
+    dying-after : ∀ {sP stP sI stI} (S : St sP stP sI stI) (i : Fin n)
+                → After S ([] , sP , shareDying i true stP) ([] , sI , shareDying (n ↑ʳ i) true stI)
+    dying-after S i = after (dying S) (λ x → x) dying-arr [] (λ x → x)
+
     mutual
       path-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Pass p q
       path-pass S root~ b _ _ (fold-root {fin = fin}) fold-root = after S (λ x → x) (λ x → x) (root-values b fin) (λ x → x) , root~
@@ -1016,6 +1141,103 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
              → Σ (After S (oP ++ proj₁ rP , proj₂ rP) rI) λ A
                  → G (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
       resume (arm A r b si dI rb) sp dP = let X = path-pass (After.store A) r b sp si dP dI in A ⨾ proj₁ X , rb dP (proj₁ X) (proj₂ X)
+
+      -- a slot's partnered reader, by the row the store pairs it with
+      slot-pass : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {u u′ rid rid′}
+                    {p : Path Γ (suc (toℕ i)) u t} {p′ : Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) u′ (emitᵗ t)}
+                    {vs es} (εI : u′ ≡ emitᵗ u)
+                → RowRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
+                    (rid , atSlot i , (u , p)) (rid′ , atSlot (n ↑ʳ i) , (u′ , p′))
+                → CarriesU εI es vs
+                → Sound p sP stP → Sound p′ sI stI
+                → ∀ {now fin rP rI} → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now p′ es fin sI stI rI
+                → After S rP rI
+      slot-pass S refl (read~ hk r refl) c sp si dP dI = proj₁ (resume (read-arm S hk r c si dI) sp dP)
+
+      -- A SHARE'S FAN-OUT ON BOTH SIDES, one partnered reader at a time,
+      -- a cut one on both sides skipped
+      share-go : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n}
+                   (εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)) {es now vs fin}
+               → CarriesU εI es vs
+               → ∀ {chs adm}
+               → Pointwise (ShareSlot (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) chs adm
+               → (∀ {x} → x ∈ chs → Sound (proj₂ x) sP stP)
+               → (∀ {x y} → x ∈ chs → y ∈ chs → Agree (proj₂ x) (proj₂ y))
+               → (∀ {x} → x ∈ adm → Sound (proj₂ x) sI stI)
+               → (∀ {x y} → x ∈ adm → y ∈ adm → Agree (proj₂ x) (proj₂ y))
+               → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
+               → shareGo⇓ now i vs fin chs sP stP (oP , sP₁ , stP₁)
+               → shareGo⇓ now (n ↑ʳ i) es fin adm sI stI (oI , sI₁ , stI₁)
+               → After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁)
+      share-go S εI c [] _ _ _ _ go-nil go-nil = after S (λ x → x) (λ x → x) [] (λ x → x)
+      share-go S εI c (slotpair (inj₁ _) ∷ ps) hP aP hI aI (go-cut _ g) (go-cut _ g′) =
+        share-go S εI c ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
+      share-go S εI c (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (go-live y _ _) _ = ⊥-elim (t≢f (trans (sym x) y))
+      share-go S εI c (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ _ (go-cut _ _) (go-live y _ _) = ⊥-elim (t≢f (trans (sym x) y))
+      share-go S εI c (slotpair (inj₂ (x , _)) ∷ _) _ _ _ _ (go-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
+      share-go S εI c (slotpair (inj₂ (_ , x , _)) ∷ _) _ _ _ _ (go-live _ _ _) (go-cut y _) = ⊥-elim (t≢f (trans (sym y) x))
+      share-go S {i = i} εI c (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live _ dI g′) =
+        rebase (A ⨾ share-go (After.store A) εI c (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
+                  (λ m → fold-kept dP sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
+                  (λ m m′ → aP (there m) (there m′))
+                  (λ m → fold-kept dI sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))
+                  (λ m m′ → aI (there m) (there m′)) g g′)
+        where
+          sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
+          sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
+          A = slot-pass (delivered S) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI
+
+      -- A SHARE'S WALK ON BOTH SIDES, one emit at a time: a value every
+      -- reader takes on both sides, an emit carrying none the impl's
+      -- readers take alone, and the end over the share closed
+      share-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)}
+                     (sh : lookup κ i ≡ sharedᵏ) {now es vs fin rP rI}
+                 → Carries es vs
+                 → shareWalk⇓ now i vs fin sP stP rP
+                 → shareWalk⇓ now (n ↑ʳ i) (map (slot-cast sh) es) fin sI stI rI
+                 → After S rP rI
+      share-walk S sh [] walk-nil walk-nil = after S (λ x → x) (λ x → x) [] (λ x → x)
+      share-walk S {i = i} sh [] (walk-end gP) (walk-end gI) = D ⨾ fan (After.store D) (carries-cast ε []) gP gI
+        where
+          ε = sharedEq {Γ = Γ} κ i sh
+          D = share-spend S sh
+          fan = λ S′ c → share-go S′ ε c (share-rows S′ sh) (admit-ot i _ _ (Store.ruleP S′)) (admit-agrees i (Store.ruleP S′))
+                           (admit-ot (n ↑ʳ i) _ _ (Store.ruleI S′)) (admit-agrees (n ↑ʳ i) (Store.ruleI S′))
+      share-walk S {i = i} {h = h} {h′ = h′} sh (quiet x b c) wP (walk-more gI wI) =
+        Q ⨾ share-walk (After.store Q) {h = h} {h′ = h′} sh c wP wI
+        where
+          ε = sharedEq {Γ = Γ} κ i sh
+          Q = after-out (++-identityʳ _)
+                (proj₁ (quiet-sink {h = h} {h′ = h′} sh S (sink~ sh) (quiet x b []) refl (sink-ok ε (Store.ruleI S))
+                          (sink-intro ε (fold-sink (disp (walk-more gI walk-nil))))))
+      share-walk S {i = i} {h = h} {h′ = h′} sh (one x r c) (walk-more gP wP) (walk-more gI wI) =
+        A ⨾ share-walk (After.store A) {h = h} {h′ = h′} sh c wP wI
+        where
+          ε = sharedEq {Γ = Γ} κ i sh
+          A = share-go S ε (carries-cast ε (one x r [])) (share-rows S sh)
+                (admit-ot i _ _ (Store.ruleP S)) (admit-agrees i (Store.ruleP S))
+                (admit-ot (n ↑ʳ i) _ _ (Store.ruleI S)) (admit-agrees (n ↑ʳ i) (Store.ruleI S)) gP gI
+
+      -- A SHARE'S DISPATCH: the walk, between the share marked dying and
+      -- its readers dropped when the group ends it
+      share-dispatch : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)}
+                         (sh : lookup κ i ≡ sharedᵏ) {now es vs fin rP rI}
+                     → Carries es vs
+                     → dispatchShare⇓ now i h vs fin sP stP rP
+                     → dispatchShare⇓ now (n ↑ʳ i) h′ (map (slot-cast sh) es) fin sI stI rI
+                     → After S rP rI
+      share-dispatch S {h = h} {h′ = h′} sh c (disp {fin = false} wP) (disp wI) = share-walk S {h = h} {h′ = h′} sh c wP wI
+      share-dispatch S {i = i} {h = h} {h′ = h′} sh c (disp {fin = true} wP) (disp wI) = W ⨾∅ share-finish (After.store W) sh
+        where
+          D = dying-after S i
+          W = D ⨾ share-walk (After.store D) {h = h} {h′ = h′} sh c wP wI
+
+      -- a share's subject, fanning the group out to every reader
+      sink-pass : ∀ {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} (sh : lookup κ i ≡ sharedᵏ)
+                → Pass (share-sink i h)
+                       (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sharedEq {Γ = Γ} κ i sh) (share-sink (n ↑ʳ i) h′))
+      sink-pass {i = i} {h = h} {h′ = h′} sh S _ b _ _ (fold-sink dP) dI =
+        share-dispatch S {h = h} {h′ = h′} sh b dP (sink-inv (sharedEq {Γ = Γ} κ i sh) dI) , sink~ sh
 
       -- AN OUTER'S ELEMENT, ONE PER EMIT, HANDED THE FLATTENER: the
       -- walk, then the outer's end, then the tail resumed on the empty
@@ -1224,64 +1446,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       let X = hop-walk S hd sp k nP nI r (unthru si) W W′
       in hop-end {fin = fin} (proj₁ X) (proj₂ X) (drop-ot _ _ _ (step-kept _ dW′ si)) dR
 
-    postulate
-      -- A RESTAMPED EMIT CARRIES WHAT IT CARRIED: the restamp rebuilds the
-      -- emit over its own events, so the values it holds are the ones
-      restamp-rel : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} e′ {ws}
-                  → EmitRel {Γ = Γ} κ (lookup Γ i) e′ ws
-                  → EmitRel {Γ = Γ} κ (lookup Γ i) (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) e′) ws
-
-    restamp-carries : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {es vs}
-                    → Carries {s = lookup Γ i} es vs
-                    → Carries (map (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀)) es) vs
-    restamp-carries []             = []
-    restamp-carries {i = i} {X = X} (quiet e′ r bs) = quiet _ (restamp-rel {i = i} {X = X} e′ r) (restamp-carries {i = i} {X = X} bs)
-    restamp-carries {i = i} {X = X} (one e′ r bs)   = one _ (restamp-rel {i = i} {X = X} e′ r) (restamp-carries {i = i} {X = X} bs)
-
-    -- A SLOT'S READER: the impl runs the restamp where the plain path runs
-    -- on, so the arm is the one frame the impl moves alone, and the plain
-    -- side has not moved
-    read-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {Θ₀ ρ₀ ℓ′}
-                   {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {h : suc (toℕ (n ↑ʳ i)) ≤ ℓ′}
-                   {p : Path Γ (suc (toℕ i)) (lookup Γ i) t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ (lookup Γ i)) (emitᵗ t)}
-                 → lookup κ i ≡ hotᵏ ⊎ lookup κ i ≡ sharedᵏ
-                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                 → ∀ {now vs es fin rI} → Carries es vs
-                 → Sound (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ h ] q) sI stI
-                 → foldPath⇓ now (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ h ] q) es fin sI stI rI
-                 → Arm S now [] sP stP p vs fin none rI
-    read-arm S {i = i} {X = X} _ r c si (fold-step step-map dq) =
-      arm (after S (λ x → x) (λ x → x) [] (λ x → x)) r (restamp-carries {i = i} {X = X} c) (drop-ot _ _ _ si) dq (λ _ _ _ → tt)
-
-    -- the emits of a stamped slot against the plain values, at types the
-    -- share's own is only propositionally the emit of
-    CarriesU : ∀ {u u′} → u′ ≡ emitᵗ u → List (Val (plainᵏ Γ κ) u′) → List (Val Γ u) → Set
-    CarriesU refl = Carries
-
-    -- a slot's partnered reader, by the row the store pairs it with
-    slot-pass : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {u u′ rid rid′}
-                  {p : Path Γ (suc (toℕ i)) u t} {p′ : Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) u′ (emitᵗ t)}
-                  {vs es} (εI : u′ ≡ emitᵗ u)
-              → RowRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
-                  (rid , atSlot i , (u , p)) (rid′ , atSlot (n ↑ʳ i) , (u′ , p′))
-              → CarriesU εI es vs
-              → Sound p sP stP → Sound p′ sI stI
-              → ∀ {now fin rP rI} → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now p′ es fin sI stI rI
-              → After S rP rI
-    slot-pass S refl (read~ hk r refl) c sp si dP dI = proj₁ (resume (read-arm S hk r c si dI) sp dP)
-
-    -- a partnered pair stays partnered once the store moves
-    slot-keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
-                   {c : RegId × AtFloor Γ u t} {d}
-               → Keeps S S₁
-               → SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i c d
-               → SlotPair (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i c d
-    slot-keeps K (slotpair x) = slotpair (K x)
-
-    -- the same pass, started from the store as it stood before the row was marked
-    rebase : ∀ {sP stP sI stI x y rP rI} {S : St sP stP sI stI}
-           → After (delivered S {x} {y}) rP rI → After S rP rI
-    rebase (after s k q v g) = after s k (λ ar → q (delivered-arr ar)) v g
 
     -- A SHARE'S FAN-OUT AGAINST THE PLAIN CASCADE OVER THE SAME READERS,
     -- one reader at a time: the plain chain and the admitted row it is

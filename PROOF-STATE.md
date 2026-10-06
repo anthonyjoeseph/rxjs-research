@@ -262,9 +262,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   the share's readers, paired by the proven `slot-chains`, after `hot-start`
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store` and `hot-finish` are proven, and a connected hot
-  end is proven down to the evaluator. The outer's element is a real body
-  over its walk's leaves, the impl's valueless echo one frame at a time,
-  `quiet-sink` its widest. Left: the arms as
+  end is proven. The outer's element and a shared
+  slot's subject are real bodies over their walks' leaves, the impl's
+  valueless echo one frame at a time. Left: the arms as
   real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-pass` over
   `inner-pass` once `Arm` carries an impl-only step; the monster drops to
@@ -338,8 +338,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
   test's nodes written open keep the stores and tails, and written spent keep
   what the cut left; a spent test passes nothing on both sides.
-- **`sink-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group reaching
-  a shared slot's subject fans out to related readers on both sides.
+- **`share-{rows,spend,finish}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
+  shared slot's readers pair in order with its stamped share's admitted rows,
+  and the stores stay related when both shares close and drop their readers.
 - **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits
   sent to the root read as the plain group's values.
 - **`hot-block`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a connected hot

@@ -50,7 +50,7 @@ open Relation.Binary.PropositionalEquality.≡-Reasoning
 open import Rx.Prim      using (Fuel; Id; PlainEvent; valueᵖ; completeᵖ; InstEmit)
 open import Rx.Exp       using (Ctx; Closed; Val; isData; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
-open import Data.Fin     using (Fin; toℕ; _↑ˡ_; _↑ʳ_)
+open import Data.Fin     using (toℕ; _↑ˡ_; _↑ʳ_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec     using (lookup)
@@ -63,12 +63,12 @@ open import SExp.Readings using (arrivalsOf)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
-open import Rx.Evaluator using (shareAdmit; Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; schedGo; schedFinish; sched-next; arrVal;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; schedGo; schedFinish; sched-next; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; memberSource)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
   disp; walk-more; walk-nil; walk-end)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule; chain-sound; chain-agree)
-open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; termini; admit-ot; admit-agree)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; admit-ot)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
@@ -82,7 +82,7 @@ open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; module Kept)
 open Kept using (After; module After; Persists; _⨾_)
-open import Simulation.Pass using (dynRow; Paired; unchain; head; row-pass; delivered; Head; nohead;
+open import Simulation.Pass using (dynRow; Paired; unchain; head; row-pass; delivered; Head; nohead; admit-agrees;
   delivered-arr; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
@@ -312,12 +312,6 @@ pop-kind {κ = κ} {sP = sP} {sI = sI} s ex ex′
               ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.numbers s))
 ... | pop {l = l} {l′ = l′} _ _ r (_ , h) (_ , h′) _ _ _ _ =
   subst₂ (SrcNum κ) (sym (head-source l h)) (sym (head-source l′ h′)) r
-
--- a share's admitted rows agree, by the rule's termini
-admit-agrees : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} (i : Fin m) {sched : Sched Δ} {st : EvalSt e} → Rule sched st
-             → ∀ {a b} → a ∈ shareAdmit i (EvalSt.registry st) → b ∈ shareAdmit i (EvalSt.registry st)
-             → Agree (proj₂ a) (proj₂ b)
-admit-agrees i {st = st} ru = admit-agree i st (termini ru)
 
 -- THE VALUE PASS OVER PAIRED CHAINS, one partnered chain at a time
 -- A RELATED VALUE AGREES: at data both are the same value, and `obs`

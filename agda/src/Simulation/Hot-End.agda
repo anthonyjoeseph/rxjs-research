@@ -51,7 +51,7 @@ open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr)
 open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame)
-open import Simulation.Pass using (CarriesU; HotEnd; hot-end-at; hot-end-idle; usable-self)
+open import Simulation.Pass using (carriesU-nil; HotEnd; hot-end-at; hot-end-idle; usable-self)
 open import Simulation.After using (module Kept)
 open Kept using (after; Keeps; Persists)
 open import Simulation.Sweep using (t≢f; same-refl; count-hit; raw≢stamped)
@@ -237,9 +237,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
   hot-block-end hot d ib alive (chain-step fp) = block-end hot d ib alive fp
 
   -- the emits of no values carry none
-  carriesU-nil : ∀ {u u′} (e : u′ ≡ emitᵗ u) → CarriesU κ {t} {ep} {ei} e [] []
-  carriesU-nil refl = []
-
   module _ {sP stP sI stI} (S : Store κ {t} {ep} {ei} sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
            (hot : lookup κ i ≡ hotᵏ) (e₁ : Arrival.source a ≡ toℕ i) (e₂ : Arrival.source a′ ≡ toℕ (i ↑ˡ n))
            {rid ℓ} {full : Path (plainᵏ Γ κ) (suc (toℕ (i ↑ˡ n))) (plainᵗ (lookup Γ i)) (emitᵗ t)} {h : ℓ ≤ toℕ (n ↑ʳ i)}
@@ -400,7 +397,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
   ... | NI′ , ib′ , fr , dsp =
     hot-end-at {below = h} {εI = trans (hotEq {Γ = Γ} κ i hot) (cong emitᵗ (sym ety))} {ty = ety}
       (after (end-store S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) (end-keeps S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) (end-persists S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) [] (λ x → x))
-      (carriesU-nil _) dsp refl
+      (carriesU-nil κ {t} {ep} {ei} _) dsp refl
 
 -- AND AT ITS END: none, and no plain reader, until the share has
 -- connected; then the one raw row's, whose end step is the input block's
