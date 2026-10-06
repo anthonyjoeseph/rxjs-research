@@ -35,18 +35,18 @@ open import Data.Maybe using (just; nothing)
 
 open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import Rx.Exp       using (natᵗ; Ctx; Val; Closed; Exp; obs; ofᵉ; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
+open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; ofᵉ; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
   mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Slots     using (Slots; scripted; shared)
-open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; subs-take-zero; subs-take-suc; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; sub-all; flatSt)
+open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
 open import Data.Fin     using (Fin; _↑ʳ_)
 open import Data.Vec     using (lookup)
-open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
+open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
 open import SExp.Plain   using (plainExp; plainTm; plainTms)
 open import Simulation.Arm using (module Arms)
@@ -231,49 +231,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      → Carries {u} es vs
                      → foldPath⇓ now p vs true sP stP rP
                      → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
-                     → Σ (After κ S rP rI) λ A
-                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-      -- A TAKE AT ZERO: the plain ends at once, the impl's merge picks
-      -- the empty lane, and neither subscribes the body
-      take-zero      : ∀ {Θ u} (k : STm Γ [] [] Θ natᵗ) (b : SExp Γ [] [] Θ u)
-                     → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
-                     → ∀ {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
-                         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
-                     → (S : Store κ sP stP sI stI)
-                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                     → evalWith (plainTm k) ρ ≡ 0
-                     → foldPath⇓ now p [] true sP stP rP
-                     → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (toInstEmit κ (takeˢ k b)) , ρ′) q now sI stI rI
-                     → Σ (After κ S rP rI) λ A
-                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-      -- NO RELATION HOLDS ALONG THE BODY'S PATH WHILE THE BODY IS
-      -- SUBSCRIBED.  The impl subscribes the cut as the one inner of an
-      -- `of` outer, so the merge reads `mergeAll-st nothing 1 [] false`
-      -- until the outer's wrap; `take~` asks for `true`, and `take-end`
-      -- reads that `true` to hand the end up at the cut.  A body that
-      -- cuts synchronously -- `take 1` of a two-value `of` -- ends the
-      -- plain path at the cut and the impl's at the wrap.
-      --
-      -- THE WINDOW REORDERS NOTHING THE STORE READS, at the one program
-      -- instantiated: a one-lane merge over a `take 1` of a merge of
-      -- `of(1,2)` and a cold read, then a second cold read.  Both runs
-      -- mint the body's source before the drained sibling's, and neither
-      -- registers a row past the cut, so `rows` and `sources` pair in
-      -- order on both sides of the window.
-      -- DEAD ROUTE: a body walking `b` under `take~` -- there is no
-      --   `take~` to hand the walk until the wrap has run, and the wrap
-      --   runs after the walk returns.
-      take-open      : ∀ {Θ u} (k : STm Γ [] [] Θ natᵗ) (b : SExp Γ [] [] Θ u) → Elab-Walks b
-                     → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
-                     → ∀ {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
-                         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI j nid}
-                     → (S : Store κ sP stP sI stI)
-                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                     → evalWith (plainTm k) ρ ≡ suc j
-                     → freshId nodeᵏ (Sched.mint sP) ≡ nid
-                     → subscribeE⇓ {e = ep} (Θ , plainExp b , ρ) (take-f nothing nid ↠[ ≤-refl ] p) now
-                         (record sP { mint = setAt nodeᵏ (suc nid) (Sched.mint sP) }) (installNode nid (take-st (suc j)) stP) rP
-                     → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (toInstEmit κ (takeˢ k b)) , ρ′) q now sI stI rI
                      → Σ (After κ S rP rI) λ A
                          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
       -- an unrolling: the body under the substitution, on both sides.
@@ -535,11 +492,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           X  = wb w r (After.store (proj₁ I)) (outerExplode~ {op = op} F (proj₂ (proj₂ I))) dP dI
       in unexplode (_⨾_ κ (proj₁ I) (proj₁ X) , proj₂ X)
 
-    -- a take's walk, by its count: at zero neither side subscribes the
-    -- body, and past it the body walks under the impl's open merge
-    walk-take : ∀ {Θ u} (k : STm Γ [] [] Θ natᵗ) (b : SExp Γ [] [] Θ u) → Elab-Walks b → Elab-Walks (takeˢ k b)
-    walk-take k b wb w r S pr (subs-take-zero z f) dI     = take-zero k b w r S pr z f dI
-    walk-take k b wb w r S pr (subs-take-suc c fr dP) dI = take-open k b wb w r S pr c fr dP dI
 
     -- a defer's walk: the hop's node, source and row on both sides
     walk-defer : ∀ {Θ u} (b : SExp Γ [] [] Θ u) → Elab-Walks (deferˢ b)
@@ -589,7 +541,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk (inputˢ i)       = walk-input i (lookup κ i) refl
     walk (ofˢ ts)         = walk-of ts
     walk {Θ} {u} emptyˢ w {ρ′} {ρ} r S pr (subs-empty f) dI = walk-of {Θ} {u} [] w {ρ′} {ρ} r S pr (subs-of {ts = []} f) dI
-    walk (takeˢ k b)      = walk-take k b (walk b)
     walk (takeWhileˢ f b) w r = walk-while f b (walk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
     walk (mapˢ f b) w r S pr (subs-map dP) (subs-map dI) = unmap (walk b w r S (map~ (lifts-map f w r) pr) dP dI)
     walk (scanˢ f z b) w {ρ′} {ρ} r {stP = stP} {stI = stI} S pr (subs-scan {nid = k} frP dP) (subs-mint {src = src} frS (subs-map (subs-scan {i = iI} {nid = k′} frI dI))) =

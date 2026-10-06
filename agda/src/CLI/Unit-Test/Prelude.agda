@@ -37,10 +37,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Function.Base using (_|>′_)
 
 open import Rx.Prim using (ObservableInput; hot; cold; Fuel; Id)
-open import Rx.Exp using (Ctx; Val; Closed; natᵗ; obs; inputsBelowᵉ; FlatOp)
+open import Rx.Exp using (Ctx; Val; Closed; natᵗ; obs; inputsBelowᵉ; FlatOp; mergeᶠ; ltᵖ; add)
 open import Rx.Slots using (Slots)
 open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; hotᵏ; coldᵏ; sharedᵏ; emptyˢ; emitᵗ;
-  flattenˢ; mapˢ; pairˢ; inlˢ; inrˢ; unitˢ; varˢᵗ)
+  flattenˢ; mapˢ; pairˢ; inlˢ; inrˢ; unitˢ; varˢᵗ; scanˢ; takeWhileˢ; primˢ; fstˢ; sndˢ; natˢ)
 open import Rx.Evaluator using (Burst; Stream; Sched; EvalSt; Arrival; sched-next)
 open import Rx.Mint using (counter; sourceᵏ)
 open import Rx.Evaluator.Builder using (drain!; drainOn; cascade!; pop-rule; subscribe!; evaluate↓)
@@ -124,6 +124,20 @@ mkSlots _            d₁ (suc (suc ()))
 flatAllˢ : ∀ {Δᵍ Δ Θ t} → FlatOp → SExp Γ₂ Δᵍ Δ Θ (obs t) → SExp Γ₂ Δᵍ Δ Θ t
 flatAllˢ op e = flattenˢ op (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (varˢᵗ (here refl)))) e)
 
+-- RXJS'S `take`, which the author's tree does not have as a former: a
+-- count scanned beside the value, cut by an inclusive test at the n-th,
+-- the value kept by an echo-only flatten.  The count is a LITERAL, so
+-- zero is decided here: `take(0)` never subscribes its source, which no
+-- program of the tree can do, and the empty program is what it is.
+takeˢ : ∀ {Δᵍ Δ Θ t} → ℕ → SExp Γ₂ Δᵍ Δ Θ t → SExp Γ₂ Δᵍ Δ Θ t
+takeˢ zero    e = emptyˢ
+takeˢ (suc k) e =
+  flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (sndˢ (varˢᵗ (here refl))) (inlˢ unitˢ))
+    (takeWhileˢ (primˢ ltᵖ (pairˢ (fstˢ (varˢᵗ (here refl))) (natˢ (suc k))))
+      (scanˢ (pairˢ (primˢ add (pairˢ (fstˢ (fstˢ (varˢᵗ (here refl)))) (natˢ 1)))
+                    (inrˢ (sndˢ (varˢᵗ (here refl)))))
+             (pairˢ (natˢ 0) (inlˢ unitˢ)) e)))
+
 -- one cached counterexample: a label, and the run that produced it
 record Case : Set where
   field
@@ -147,7 +161,7 @@ cached n f e {κ} ins = record { name = n ; fuel = f ; prog = e ; kinds = κ ; s
 -- apart: at `Γ₂`, the row's kinds, `natᵗ` and `tt`, what is compared here is what
 -- the statement says is equal.
 --
--- NO CAP.  A `takeᵉ` above the program -- counted in InstEmits or in
+-- NO CAP.  A `takeˢ` above the program -- counted in InstEmits or in
 -- values -- runs a different program from the one the row names, and a
 -- capped run is an instance of no statement.  The fuel is the one budget
 -- the statements quantify over, so it is the one a row may set.

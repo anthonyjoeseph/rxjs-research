@@ -44,7 +44,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ)
 open import SExp.Elaborate using (flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
-  PathRel; root~; sink~; map~; scan~; take~; takeWhile~; spent~; spentWhile~; outerElem~;
+  PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
   outerExplode~; inner~; lane~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel;
   []; _∷_; mach; MachRow; hot~; Store; Arr)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
@@ -215,7 +215,7 @@ cur-there {c = c} {c′} {j′ = j′} vals pc pj e with ≡ᵇ→≡ c′ j′ 
 module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ public
-  open Takes {Γ = Γ} κ using (module Count)
+  open Takes {Γ = Γ} κ using (module While)
   open Scans {Γ = Γ} κ using (module Cells)
 
   -- a pair the tail of a relation partners, the whole relation does
@@ -326,7 +326,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     open Kept {Γ = Γ} κ {t} {ep} {ei}
     open Run {t} {ep} {ei} public
-    open Count {t} {ep} {ei} using (take-arm; takeWhile-arm)
+    open While {t} {ep} {ei} using (takeWhile-arm)
     open Cells {t} {ep} {ei} using (scan-arm)
 
     -- a share's readers, as registrations the store partners
@@ -710,9 +710,6 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     regroup₂ : (o₁ o₂ y : Stream (plainᵏ Γ κ) (emitᵗ t)) → (o₁ ++ o₂) ++ y ≡ o₁ ++ (o₂ ++ y)
     regroup₂ o₁ o₂ y = ++-assoc o₁ o₂ y
 
-    regroup₃ : (o₁ o₂ o₃ y : Stream (plainᵏ Γ κ) (emitᵗ t)) → (o₁ ++ (o₂ ++ o₃)) ++ y ≡ o₁ ++ (o₂ ++ (o₃ ++ y))
-    regroup₃ o₁ o₂ o₃ y = trans (++-assoc o₁ (o₂ ++ o₃) y) (cong (o₁ ++_) (++-assoc o₂ o₃ y))
-
     -- A VALUELESS GROUP KEEPS THE PASS WITH THE PLAIN SIDE STILL, and
     -- the two paths related where the impl's fold leaves them
     Quiet : ∀ {lo lo′ s} → Path Γ lo s t → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t) → Set
@@ -760,24 +757,6 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → stepFrame⇓ now (scan-f F′ k′) (map-f G ↠[ h₂ ] q) es fin sI stI (o₁ , y₁ , f₁ , s₁ , st₁)
                  → QArm S now p (λ π NP NI → PathRel κ π NP NI (scan-f F k ↠[ h ] p) (scan-f F′ k′ ↠[ h₁ ] (map-f G ↠[ h₂ ] q)))
                      q (map (applyClo G) y₁) f₁ o₁ s₁ st₁
-
-      -- A COUNT'S CUT NEVER FIRES ON NOTHING: the cut's scan, its test,
-      -- its projection and the one-lane merge all pass the group on open
-      quiet-take : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s C k k₁ k₂ m j w}
-                     {F₁ : FnClo (plainᵏ Γ κ) (C ×ᵗ emitᵗ s) C} {G : FnClo (plainᵏ Γ κ) C (emitᵗ s)}
-                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                     {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ s) (emitᵗ t)}
-                     {es fin o₁ y₁ f₁ s₁ st₁ o₂ y₂ f₂ s₂ st₂ o₄ y₄ f₄ s₄ st₄}
-                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f nothing k ↠[ h ] p)
-                     (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] (from-inner mergeAllᵒ m j ↠[ h₄ ] q))))
-                 → Carries es [] → fin ≡ false
-                 → stepFrame⇓ now (scan-f F₁ k₁) (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] (from-inner mergeAllᵒ m j ↠[ h₄ ] q)))
-                     es fin sI stI (o₁ , y₁ , f₁ , s₁ , st₁)
-                 → stepFrame⇓ now (take-f w k₂) (map-f G ↠[ h₃ ] (from-inner mergeAllᵒ m j ↠[ h₄ ] q)) y₁ f₁ s₁ st₁ (o₂ , y₂ , f₂ , s₂ , st₂)
-                 → stepFrame⇓ now (from-inner mergeAllᵒ m j) q (map (applyClo G) y₂) f₂ s₂ st₂ (o₄ , y₄ , f₄ , s₄ , st₄)
-                 → QArm S now p (λ π NP NI → PathRel κ π NP NI (take-f nothing k ↠[ h ] p)
-                       (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] (from-inner mergeAllᵒ m j ↠[ h₄ ] q)))))
-                     q y₄ f₄ (o₁ ++ (o₂ ++ o₄)) s₄ st₄
 
       -- A TEST'S CUT NEVER FIRES ON NOTHING: no value to test
       quiet-takeWhile : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s C P k k₁ k₂ w}
@@ -862,17 +841,9 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
         let X = quiet-pass S r (carries-map L b) e (drop-ot _ _ _ si) dI in proj₁ X , map~ L (proj₂ X)
       quiet-pass S r@(scan~ _ _ _ _ _ _) b e si (fold-step d₁ (fold-step step-map dq)) =
         quiet-resume (quiet-scan S r b e d₁) (drop-ot _ _ _ (adv d₁ si)) dq
-      quiet-pass S r@(take~ _ _ _ _ _ _ _ _ _) b e si
-                 (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map (fold-step {out₁ = o₄} d₄ dq)))) =
-        let X = quiet-resume (quiet-take S r b e d₁ d₂ d₄) (adv d₄ (drop-ot _ _ _ (adv d₂ (adv d₁ si)))) dq
-        in after-out (regroup₃ o₁ o₂ o₄ _) (proj₁ X) , proj₂ X
       quiet-pass S r@(takeWhile~ _ _ _ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
         let X = quiet-resume (quiet-takeWhile S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
-      quiet-pass S r@(spent~ _ _ _ _) b e si
-                 (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map (fold-step {out₁ = o₄} d₄ dq)))) =
-        let X = quiet-resume (quiet-take S r b e d₁ d₂ d₄) (adv d₄ (drop-ot _ _ _ (adv d₂ (adv d₁ si)))) dq
-        in after-out (regroup₃ o₁ o₂ o₄ _) (proj₁ X) , proj₂ X
       quiet-pass S r@(spentWhile~ _ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
         let X = quiet-resume (quiet-takeWhile S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X

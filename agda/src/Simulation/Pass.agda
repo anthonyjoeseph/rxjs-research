@@ -85,14 +85,14 @@ disp-quiet (disp walk-nil) = refl
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassP {Γ = Γ} κ public
-  open Takes {Γ = Γ} κ using (module Count)
+  open Takes {Γ = Γ} κ using (module While)
   open Scans {Γ = Γ} κ using (module Cells)
 
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     open InP {t} {ep} {ei} public
     open Kept {Γ = Γ} κ {t} {ep} {ei}
-    open Count {t} {ep} {ei} using (take-arm; takeWhile-arm)
+    open While {t} {ep} {ei} using (takeWhile-arm)
     open Cells {t} {ep} {ei} using (scan-arm)
 
     -- THE TWO ROWS A MINTED SOURCE'S CHAINS CAN BE, each a walk and an

@@ -41,7 +41,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   innerFinish⇓; innerReact⇓; stepFrame⇓; subscribeAll⇓; subscribeSharedSlot⇓; foldPath⇓; dispatchShare⇓;
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
-  subs-take-zero; subs-take-suc; subs-takeWhile; subs-batchSync; subs-map; subs-scan;
+  subs-takeWhile; subs-batchSync; subs-map; subs-scan;
   subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
@@ -255,11 +255,6 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     rs  = atDyn (freshId sourceᵏ (Sched.mint sched)) lo
   subscribeE-rule (subs-of f)             so = foldPath-rule f so
   subscribeE-rule (subs-empty f)          so = foldPath-rule f so
-  subscribeE-rule (subs-take-zero _ f)    so = foldPath-rule f so
-  subscribeE-rule {κ = κ} {sched = sched} (subs-take-suc _ refl sub) so κ₂ so₂ ag =
-    subscribeE-rule sub (fresh-sound (take-f nothing (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
-      (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
-      (fresh-agree (take-f nothing (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
   subscribeE-rule {κ = κ} {sched = sched} (subs-takeWhile {Θ = Θ} {ρ = ρ} {f = fn} refl sub) so κ₂ so₂ ag =
     subscribeE-rule sub (fresh-sound (take-f (just (Θ , fn , ρ)) (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
       (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)

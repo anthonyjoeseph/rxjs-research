@@ -143,7 +143,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim using (Tick; Fuel; valueᵖ; completeᵖ; hot; cold)
 open import Rx.Exp using (Ty; obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
   _×ᵗ_; _+ᵗ_; listᵗ; uniqᵗ; boolᵗ;
-  Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ;
+  Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeWhileᵉ; batchSyncᵉ;
   mapᵉ; scanᵉ; flattenᵉ; μᵉ; deferᵉ; mintᵉ;
   unitᵗ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
@@ -448,30 +448,13 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
              → foldPath⇓ now κ [] true sched st r
              → subscribeE⇓ {u = u} (Θ , emptyᵉ , ρ) κ now sched st r
 
-  -- `take(0)` NEVER SUBSCRIBES ITS SOURCE, which was measured rather
-  -- than assumed: the operator completes on subscription and the
-  -- source is not touched at all.
-  subs-take-zero : ∀ {lo u Θ} {ρ : Env Γ Θ} {count} {b : Exp Γ [] [] Θ u}
-                     {κ : Path Γ lo u t} {now sched st r}
-                 → evalWith count ρ ≡ zero
-                 → foldPath⇓ now κ [] true sched st r
-                 → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ now sched st r
-
   -- A TRANSFORMER PUSHES ITS FRAME AND SUBSCRIBES ITS BODY, AND THAT
   -- IS ITS WHOLE ARM.  What the body produces crosses the frame inside
   -- the body's own fold, one group at a time and in the order the
   -- groups were produced, so there is nothing left for this arm to
   -- push afterwards and its answer is the body's answer.
-  subs-take-suc : ∀ {lo u Θ} {ρ : Env Γ Θ} {count k} {b : Exp Γ [] [] Θ u}
-                    {κ : Path Γ lo u t} {now sched st nid r}
-                → evalWith count ρ ≡ suc k
-                → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                → subscribeE⇓ (Θ , b , ρ) (take-f nothing nid ↠[ ≤-refl ] κ) now
-                    (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-                    (installNode nid (take-st (suc k)) st) r
-                → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ now sched st r
-
-  -- A TAKE-WHILE IS THE TAKE ARM AT A BUDGET OF ONE, which only a value
+  --
+  -- A TAKE-WHILE IS A COUNT AT A BUDGET OF ONE, which only a value
   -- failing the test spends.  Its source is always subscribed: there is
   -- no count to read as zero.
   subs-takeWhile : ∀ {lo u Θ} {ρ : Env Γ Θ} {f : Fn Γ [] [] Θ u boolᵗ}

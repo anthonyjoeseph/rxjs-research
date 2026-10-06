@@ -42,7 +42,7 @@ open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (FlatSᵗ)
 open import Simulation.Stores using (Unpaired; FlatNodes; merge~; switch~; exhaust~; Flattener; PathRel; root~; sink~; map~; scan~;
-  take~; takeWhile~; spent~; spentWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~;
+  takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~;
   MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows)
 
 -- a node read back after a write elsewhere
@@ -177,9 +177,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     third-entry : ∀ {j j′ k j₂} → (j , j′ ∷ k ∷ j₂ ∷ []) ≡ (m , m′ ∷ ks ∷ xs) → k ≡ m′ → ⊥
     third-entry refl e = ks-apart e
 
-    take-entry : ∀ {k ys b} → (k , ys) ≡ (m , m′ ∷ ks ∷ xs) → lookupNode k NP ≡ just (take-st b) → ⊥
-    take-entry refl l = take-flat (atP l)
-
     -- a flattener fact anywhere stays one
     flatW : ∀ {u₂ op₂ m₂ m′₂ ks₂ xs₂} → Flattener κ π {t = t} NP NI u₂ op₂ m₂ m′₂ ks₂ xs₂
           → Flattener κ π {t = t} NP′ NI′ u₂ op₂ m₂ m′₂ ks₂ xs₂
@@ -198,11 +195,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     pathW (sink~ sh)                         = sink~ sh
     pathW (map~ L r)                         = map~ L (pathW r)
     pathW (scan~ e l l′ v L r)               = scan~ e (cellP l) (cellI l′) v L (pathW r)
-    pathW (take~ e l l₁ l₂ lm a≤ b≡ L r)     =
-      take~ e (takeP l) (cellI l₁) (takeI l₂) (pairedI e (there (there (here refl))) (λ eq _ → take-entry eq l) lm)
-            a≤ b≡ L (pathW r)
     pathW (takeWhile~ e l l₁ l₂ L r)         = takeWhile~ e (takeP l) (cellI l₁) (takeI l₂) L (pathW r)
-    pathW (spent~ e l l₂ r)                  = spent~ e (takeP l) (takeI l₂) (pathW r)
     pathW (spentWhile~ e l l₂ r)             = spentWhile~ e (takeP l) (takeI l₂) (pathW r)
     pathW (outerElem~ f r)                   = outerElem~ (flatW f) (pathW r)
     pathW (outerExplode~ f r)                = outerExplode~ (flatW f) (pathW r)

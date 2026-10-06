@@ -28,7 +28,7 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step
   shareWalk⇓; walk-end; walk-more; fold-sink)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; sharedᵏ)
 open import SExp.Elaborate using (elemᵛ)
-open import Simulation.Stores using (sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~; spent~; spentWhile~;
+open import Simulation.Stores using (sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
   outerElem~; outerExplode~; inner~; lane~; deferInner~; RowRel; read~; []; _∷_; partner-row;
   Store)
 open import Simulation.After using (module Kept)
@@ -44,14 +44,14 @@ open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sin
 module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassI {Γ = Γ} κ public
-  open Takes {Γ = Γ} κ using (module Count)
+  open Takes {Γ = Γ} κ using (module While)
   open Scans {Γ = Γ} κ using (module Cells)
 
   module InP {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     open InI {t} {ep} {ei} public
     open Kept {Γ = Γ} κ {t} {ep} {ei}
-    open Count {t} {ep} {ei} using (take-arm; takeWhile-arm)
+    open While {t} {ep} {ei} using (takeWhile-arm)
     open Cells {t} {ep} {ei} using (scan-arm)
 
     mutual
@@ -61,9 +61,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S (map~ L r) b sp si (fold-step step-map dP) (fold-step step-map dI) =
         let X = path-pass S r (carries-map L b) (drop-ot _ _ _ sp) (drop-ot _ _ _ si) dP dI in proj₁ X , map~ L (proj₂ X)
       path-pass S r@(scan~ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (scan-arm S r b sp si d dI) (adv d sp) dP
-      path-pass S r@(take~ _ _ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (take-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(takeWhile~ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (takeWhile-arm S r b sp si d dI) (adv d sp) dP
-      path-pass S r@(spent~ _ _ _ _) b sp si (fold-step d dP) dI = resume (take-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(spentWhile~ _ _ _ _) b sp si (fold-step d dP) dI = resume (takeWhile-arm S r b sp si d dI) (adv d sp) dP
       path-pass S (outerElem~ fl r) b sp si (fold-step d dP) dI = resume (outerElem-arm S (fl , r) b sp si d dI) (adv d sp) dP
       path-pass S (outerExplode~ fl r) b sp si (fold-step d dP) dI = resume (outerExplode-arm S (fl , r) b sp si d dI) (adv d sp) dP

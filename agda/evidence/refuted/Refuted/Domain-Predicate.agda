@@ -43,7 +43,7 @@ open import Data.Product using (Σ; _,_)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Nullary using (¬_)
 
-open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ;
+open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_; input; ofᵉ; emptyᵉ; takeWhileᵉ; batchSyncᵉ;
   mapᵉ; scanᵉ; flattenᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 
 -- the structural domain predicate: one constructor per former, each
@@ -62,7 +62,6 @@ data Sub {n} {Γ : Ctx n} : ∀ {t} → Closed Γ t → Set where
   s-defer : ∀ {t body} → Sub (deferᵉ {Γ = Γ} {t = t} body)
   s-μ     : ∀ {t body} → Sub (μᵉ {Γ = Γ} {t = t} body)
   s-mint  : ∀ {t body} → Sub (mintᵉ {Γ = Γ} {t = t} body)
-  s-take  : ∀ {t} {c : Tm Γ [] [] [] _} {b} → Sub b → Sub (takeᵉ {t = t} c b)
   s-takeWhile : ∀ {t} {f : Fn Γ [] [] [] t boolᵗ} {b : Closed Γ t}
               → Sub b → Sub (takeWhileᵉ f b)
   s-map   : ∀ {s t} {f : Fn Γ [] [] [] s t} {b : Closed Γ s}
@@ -81,7 +80,6 @@ sub-total emptyᵉ            = s-empty
 sub-total (deferᵉ body)     = s-defer
 sub-total (μᵉ body)         = s-μ
 sub-total (mintᵉ body)      = s-mint
-sub-total (takeᵉ c b)       = s-take (sub-total b)
 sub-total (takeWhileᵉ f b)  = s-takeWhile (sub-total b)
 sub-total (mapᵉ f b)        = s-map (sub-total b)
 sub-total (scanᵉ f z b)     = s-scan (sub-total b)

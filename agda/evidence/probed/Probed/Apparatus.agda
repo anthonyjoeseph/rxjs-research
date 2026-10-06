@@ -64,9 +64,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (ObservableInput; hot; after_,_)
 open import Rx.Exp using (natᵗ)
-open import SExp.Syntax using (SExp; Kinds; inputˢ; ofˢ; emptyˢ; takeˢ; natˢ; deferˢ)
+open import SExp.Syntax using (SExp; Kinds; inputˢ; ofˢ; emptyˢ; natˢ; deferˢ)
 open import SExp.Simul-Slots using (SimulSlots)
-open import CLI.Unit-Test.Prelude using (Γ₂; κOf; mkSlots)
+open import CLI.Unit-Test.Prelude using (Γ₂; κOf; mkSlots; takeˢ)
 -- contexts are Vecs; ∷/[] overload per type
 
 
@@ -107,7 +107,7 @@ insᵖ p = mkSlots (Point.d₀ p) (Point.d₁ p)
 take-one : Point
 take-one = record
   { d₀   = hot ((after 1 , 5) ∷ (after 0 , 6) ∷ [])
-  ; prog = takeˢ (natˢ 1) (inputˢ zero)
+  ; prog = takeˢ 1 (inputˢ zero)
   ; d₁   = emptyˢ }
 
 -- two arrivals of the script, both kept: two items, two instants

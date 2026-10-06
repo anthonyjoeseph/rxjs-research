@@ -248,8 +248,8 @@ OUT: an arrival plain lacks, a split one, an instant's gap or
 stray, an echo apart from inners or payload; a subscribe's
 run unrelated; a pop unrelating a read; a map moving instants; a close
 emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
-over a budget no take holds; a flatten write moving a row; a switch's or
-take's cut parting a pair.
+over a budget no test holds; a flatten write moving a row; a switch's or
+test's cut parting a pair.
 Left: a deeper flattener's subscribe; which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
@@ -260,26 +260,16 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   program, one arm per former; a minted source's chain is `path-pass`, one
   arm per plain frame; a hot slot's is `fan-go` over the share's readers.
   Every arm on both halves is a body over leaves but `walk-μ`. Left:
-  `take-open`'s body runs under its merge with the outer
-  still open, so a synchronous cut ends the plain path at the cut and the
-  impl's at the wrap; give `PathRel` an open count owing its end and the arm
-  drops to a zero leaf, the install, the body's walk and the wrap. Ruled out:
-  the window reordering rows or sources. The monster drops to whichever half
-  fails.
+  instantiate the arm leaves at a deeper flattener's subscribe, the
+  monster's remaining region, with `make qc-store` aimed at nested
+  flatteners; a leaf that goes red names the arm that breaks. Ruled out:
+  an open merge's window reordering rows or sources. The monster drops to
+  whichever half fails.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
   impl's cascade makes one former at a time. State it beside the values split so both recurse on the same
   configuration, and the monster drops to whichever stays riskier.
-
-- **CUT AT A TAKE AS AT A SWITCH.** `Simulation.Cut` keeps the stores
-  under a cut at either of the first two members of a key's run. Left:
-  `take-end`, its cut half as `while-cut`'s; its finish folds the impl tail
-  open then bare where the plain folds once, so `Arm` must carry that split,
-  owing that every row through the first inner frame below is dead. Ruled
-  out: an impl cut cell spending anywhere but where the plain count does
-  (`cut-group`), and a test's cut severing a row its partner keeps
-  (`while-cut`, over `cut-keeps`).
 
 - **WALK INSIDE THE PASS.** `of-fold` (`walk-of`'s and `emptyˢ`'s fold) and `walk-μ` are
   `path-pass`, or `walk` again, past a derivation rather than the tree:
@@ -299,9 +289,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`quiet-{sink,explode}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
   valueless group through a share's readers, or an exploded outer, folded on
   the impl side alone with the plain side still.
-- **`quiet-{scan,take,takeWhile}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
-  a cell, count or test stepped on emits carrying nothing stays related, its
-  cut unfired and the group open.
+- **`quiet-{scan,takeWhile}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
+  cell or test stepped on emits carrying nothing stays related, its cut unfired
+  and the group open.
 - **`quiet-{inner,lane,deferInner}`** (Simulation.Pass) — FALSITY,
   `NO EVIDENCE`: an inner's, a lane's or a deferred body's merge passes emits
   carrying nothing on as they came.
@@ -337,10 +327,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   meets the plain hop's.
 - **`scan-write`** (Simulation.Scan) — FALSITY, `NO EVIDENCE`: a cell written
   on both sides keeps the stores and the tails related.
-- **`take-{write,end,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
-  count's nodes written open keep the stores and tails; a group that ends meets
-  the impl merge's finish, which folds the tail before handing up the end; a
-  spent count passes nothing on both sides.
 - **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
   test's nodes written open keep the stores and tails, and written spent keep
   what the cut left; a spent test passes nothing on both sides.
@@ -359,11 +345,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   one per slot.
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
-- **`take-open`** (Simulation.Walk) — FALSITY, `DEAD ROUTE`: a take's body
-  walked under the impl's open merge keeps what a pass keeps, though a
-  synchronous cut ends the plain path at the cut and the impl's at the wrap.
-- **`take-zero`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a take at zero
-  ends both paths with the body unsubscribed.
 - **`walk-μ`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an unrolling's
   subscribe keeps what a pass keeps (`After`); no μ run.
 - **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s

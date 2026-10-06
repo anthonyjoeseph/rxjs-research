@@ -50,7 +50,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Ren∈; ext∈;
                           elimGExp; elimGTm; elimGTms;
                           elimDExp; elimDTm; elimDTms;
                           unfoldμ; compare∈; ⊟-++ˡ; ⊟-++ʳ;
-                          input; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
+                          input; ofᵉ; emptyᵉ; takeWhileᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
                           flattenᵉ;
                           μᵉ; varᵉ; deferᵉ; mintᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
@@ -70,8 +70,6 @@ mutual
   ib-renᵉ k ρg ρd ρt (input i)       = refl
   ib-renᵉ k ρg ρd ρt (ofᵉ ts)        = ib-renᵗˢ k ρg ρd ρt ts
   ib-renᵉ k ρg ρd ρt emptyᵉ          = refl
-  ib-renᵉ k ρg ρd ρt (takeᵉ c e)     =
-    cong₂ _∧_ (ib-renᵗ k ρg ρd ρt c) (ib-renᵉ k ρg ρd ρt e)
   ib-renᵉ k ρg ρd ρt (takeWhileᵉ f e) =
     cong₂ _∧_ (ib-renᵗ k ρg ρd (ext∈ ρt) f) (ib-renᵉ k ρg ρd ρt e)
   ib-renᵉ k ρg ρd ρt (mapᵉ f e)      =
@@ -146,13 +144,6 @@ mutual
   ib-elimGᵉ k Θl x cl hcl (input i)       ok = ok
   ib-elimGᵉ k Θl x cl hcl (ofᵉ ts)        ok = ib-elimGᵗˢ k Θl x cl hcl ts ok
   ib-elimGᵉ k Θl x cl hcl emptyᵉ          ok = tt
-  ib-elimGᵉ k Θl x cl hcl (takeᵉ c e)     ok =
-    ∧⁺ (inputsBelowᵗ k (elimGTm Θl x cl c))
-       (inputsBelowᵉ k (elimGExp Θl x cl e))
-       (ib-elimGᵗ k Θl x cl hcl c
-         (∧ˡ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok))
-       (ib-elimGᵉ k Θl x cl hcl e
-         (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok))
   ib-elimGᵉ k Θl x cl hcl (takeWhileᵉ f e) ok =
     ∧⁺ (inputsBelowᵗ k (elimGTm (_ ∷ Θl) x cl f))
        (inputsBelowᵉ k (elimGExp Θl x cl e))
@@ -282,13 +273,6 @@ mutual
   ib-elimDᵉ k Θl x cl hcl (input i)       ok = ok
   ib-elimDᵉ k Θl x cl hcl (ofᵉ ts)        ok = ib-elimDᵗˢ k Θl x cl hcl ts ok
   ib-elimDᵉ k Θl x cl hcl emptyᵉ          ok = tt
-  ib-elimDᵉ k Θl x cl hcl (takeᵉ c e)     ok =
-    ∧⁺ (inputsBelowᵗ k (elimDTm Θl x cl c))
-       (inputsBelowᵉ k (elimDExp Θl x cl e))
-       (ib-elimDᵗ k Θl x cl hcl c
-         (∧ˡ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok))
-       (ib-elimDᵉ k Θl x cl hcl e
-         (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok))
   ib-elimDᵉ k Θl x cl hcl (takeWhileᵉ f e) ok =
     ∧⁺ (inputsBelowᵗ k (elimDTm (_ ∷ Θl) x cl f))
        (inputsBelowᵉ k (elimDExp Θl x cl e))
@@ -428,7 +412,6 @@ mutual
   ib-topᵉ (input i)       = <⇒<ᵇ (toℕ<n i)
   ib-topᵉ (ofᵉ ts)        = ib-topᵗˢ ts
   ib-topᵉ emptyᵉ          = tt
-  ib-topᵉ (takeᵉ c e)     = ∧⁺ _ _ (ib-topᵗ c) (ib-topᵉ e)
   ib-topᵉ (takeWhileᵉ f e) = ∧⁺ _ _ (ib-topᵗ f) (ib-topᵉ e)
   ib-topᵉ (mapᵉ f e)      = ∧⁺ _ _ (ib-topᵗ f) (ib-topᵉ e)
   ib-topᵉ (scanᵉ f z e)   = ∧⁺ _ _ (ib-topᵗ f) (∧⁺ _ _ (ib-topᵗ z) (ib-topᵉ e))

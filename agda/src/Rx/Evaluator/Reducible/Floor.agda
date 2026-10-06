@@ -50,7 +50,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   innerFinish⇓; innerReact⇓; stepFrame⇓; subscribeAll⇓; subscribeSharedSlot⇓; foldPath⇓; dispatchShare⇓;
   shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; subs-of; subs-empty;
-  subs-take-zero; subs-take-suc; subs-takeWhile; subs-batchSync; subs-map; subs-scan;
+  subs-takeWhile; subs-batchSync; subs-map; subs-scan;
   subs-flatten; subs-μ; subs-defer; subs-mint; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil; walk-echo; walk-cons;
   drain-spent; drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
@@ -419,9 +419,6 @@ module Watch {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     foldPath-floor f ph (inj₂ (si (ni s) (ea-reg (ea s) (PI.pon ph)) (lt s) (rm s)))
   subscribeE-floor (subs-of f)             ph (inj₂ s) = foldPath-floor f ph (inj₂ s)
   subscribeE-floor (subs-empty f)          ph (inj₂ s) = foldPath-floor f ph (inj₂ s)
-  subscribeE-floor (subs-take-zero _ f)    ph (inj₂ s) = foldPath-floor f ph (inj₂ s)
-  subscribeE-floor (subs-take-suc {k = k} _ refl sub) ph (inj₂ s) =
-    subscribeE-floor sub (push (fresh-off (lt s)) (fresh-off (lt s)) ph) (inj₂ (fresh-SI _ s))
   subscribeE-floor (subs-takeWhile refl sub) ph (inj₂ s) =
     subscribeE-floor sub (push (fresh-off (lt s)) (fresh-off (lt s)) ph) (inj₂ (fresh-SI _ s))
   subscribeE-floor (subs-batchSync refl sub f) ph (inj₂ s) =
@@ -625,8 +622,6 @@ subscribeE-ct (subs-cold-sync _ _ f)             = foldPath-ct f
 subscribeE-ct (subs-cold-async _ _ refl refl refl f) = foldPath-ct f
 subscribeE-ct (subs-of f)                        = foldPath-ct f
 subscribeE-ct (subs-empty f)                     = foldPath-ct f
-subscribeE-ct (subs-take-zero _ f)               = foldPath-ct f
-subscribeE-ct (subs-take-suc _ refl sub)         = ≤-trans (n≤1+n _) (subscribeE-ct sub)
 subscribeE-ct (subs-takeWhile refl sub)          = ≤-trans (n≤1+n _) (subscribeE-ct sub)
 subscribeE-ct (subs-batchSync refl sub f)        = ≤-trans (n≤1+n _) (≤-trans (subscribeE-ct sub) (foldPath-ct f))
 subscribeE-ct (subs-map sub)                     = subscribeE-ct sub

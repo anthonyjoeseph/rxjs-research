@@ -81,14 +81,14 @@ walk-clear {e = e} {k = k} {κ = κ} d c = reclear {π = Thru {e = e} k κ} refl
 module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassQ {Γ = Γ} κ public
-  open Takes {Γ = Γ} κ using (module Count)
+  open Takes {Γ = Γ} κ using (module While)
   open Scans {Γ = Γ} κ using (module Cells)
 
   module InI {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     open InQ {t} {ep} {ei} public
     open Kept {Γ = Γ} κ {t} {ep} {ei}
-    open Count {t} {ep} {ei} using (take-arm; takeWhile-arm)
+    open While {t} {ep} {ei} using (takeWhile-arm)
     open Cells {t} {ep} {ei} using (scan-arm)
 
     -- TWO RELATED PATHS KEEP THE PASS, AND ARE RELATED AGAIN WHERE IT

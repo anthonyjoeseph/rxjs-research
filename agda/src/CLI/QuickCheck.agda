@@ -69,10 +69,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Rx.Prim using (after_,_; Timed; ObservableInput; hot; cold; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; Ctx; boolᵗ; natᵗ; unitᵗ; obs; _×ᵗ_; _+ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ;
-  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Exp; Tm; ofᵉ; emptyᵉ; takeᵉ; takeWhileᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
+  FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Exp; Tm; ofᵉ; emptyᵉ; takeWhileᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
   flattenᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; foldᵗ; nilᵗ; consᵗ; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
-open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ;
+open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ;
   μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -81,7 +81,7 @@ open import CLI.JSON using (JSON; jnum; jstr; jarr; jobj; parseJSON)
 open import SExp.Pipeline using (runᴵ)
 open import SExp.Impl-Slots using (elaborateImpl)
 open import CLI.Store-Check using (storeSides)
-open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
+open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ; takeˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
   same-clockˢ; sameClockᵇ; Key; storeˢ;
@@ -480,7 +480,7 @@ genExpAt g u sl (suc d) = genW kExp >>=G λ c →
   else if c ≡ᵇ 8 then (genSpineG g u sl d >>=G λ b → pureG (μˢ b))
   else if c ≡ᵇ 9 then (genExpAt 0 (g + u) sl d >>=G λ b → pureG (gate g u b))
   else if c ≡ᵇ 10 then
-    (genNat >>=G λ k → genExpAt g u sl d >>=G λ e → pureG (takeˢ (natˢ k) e))
+    (genNat >>=G λ k → genExpAt g u sl d >>=G λ e → pureG (takeˢ k e))
   else if c ≡ᵇ 11 then
     (genPredFn >>=G λ f → genExpAt g u sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
@@ -549,7 +549,7 @@ genSpineD w sl (suc d) = genW kSpineD >>=G λ c →
      pureG (flattenˢ op (mapˢ f e)))
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineD w sl d >>=G λ e →
-     pureG (takeˢ (natˢ (suc k)) e))
+     pureG (takeˢ (suc k) e))
   else if c ≡ᵇ 8 then
     (genPredFn >>=G λ f → genSpineD w sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
@@ -579,7 +579,7 @@ genSpineG g u sl (suc d) = genW kSpineG >>=G λ c →
      pureG (flattenˢ op (mapˢ f e)))
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineG g u sl d >>=G λ e →
-     pureG (takeˢ (natˢ (suc k)) e))
+     pureG (takeˢ (suc k) e))
   else if c ≡ᵇ 8 then
     (genPredFn >>=G λ f → genSpineG g u sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
@@ -608,14 +608,13 @@ genExp d = genExpAt 0 0 2 d
 -- here, and `scripts/formers.tsv` holds these tags to the ones the
 -- decoder and the TypeScript union spell.
 data Former : Set where
-  fInput fOf fEmpty fTake fMap fScan fFlatten fMu fVar fDefer fMint
+  fInput fOf fEmpty fMap fScan fFlatten fMu fVar fDefer fMint
     fBatchSync fTakeWhile : Former
 
 formerTag : Former → String
 formerTag fInput      = "input"
 formerTag fOf         = "of"
 formerTag fEmpty      = "empty"
-formerTag fTake       = "take"
 formerTag fMap        = "map"
 formerTag fScan       = "scan"
 formerTag fFlatten    = "flatten"
@@ -627,23 +626,22 @@ formerTag fBatchSync  = "batchSync"
 formerTag fTakeWhile  = "takeWhile"
 
 allFormers : List Former
-allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fMap ∷ fScan ∷ fFlatten
+allFormers = fInput ∷ fOf ∷ fEmpty ∷ fMap ∷ fScan ∷ fFlatten
            ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ fBatchSync ∷ fTakeWhile ∷ []
 
 formerIx : Former → ℕ
 formerIx fInput      = 0
 formerIx fOf         = 1
 formerIx fEmpty      = 2
-formerIx fTake       = 3
-formerIx fMap        = 4
-formerIx fScan       = 5
-formerIx fFlatten    = 6
-formerIx fMu         = 7
-formerIx fVar        = 8
-formerIx fDefer      = 9
-formerIx fMint       = 10
-formerIx fBatchSync  = 11
-formerIx fTakeWhile  = 12
+formerIx fMap        = 3
+formerIx fScan       = 4
+formerIx fFlatten    = 5
+formerIx fMu         = 6
+formerIx fVar        = 7
+formerIx fDefer      = 8
+formerIx fMint       = 9
+formerIx fBatchSync  = 10
+formerIx fTakeWhile  = 11
 
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
@@ -670,7 +668,6 @@ marksˢᵗˢ : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → Marks
 marksˢ (inputˢ i)       = one fInput
 marksˢ (ofˢ ts)         = one fOf ⊕ marksˢᵗˢ ts
 marksˢ emptyˢ           = one fEmpty
-marksˢ (takeˢ c e)      = one fTake ⊕ marksˢᵗ c ⊕ marksˢ e
 marksˢ (takeWhileˢ f e) = one fTakeWhile ⊕ marksˢᵗ f ⊕ marksˢ e
 -- the second component reads the CARRIED state's type, which is the former's
 -- own accumulator: `isData (obs _)` is false, so it fires exactly when the
@@ -716,7 +713,6 @@ elabMarksᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ �
 elabMarksᵉ (input i)      = noMarks
 elabMarksᵉ (ofᵉ ts)       = elabMarksᵗˢ ts
 elabMarksᵉ emptyᵉ         = noMarks
-elabMarksᵉ (takeᵉ c e)    = elabMarksᵗ c ⊕ elabMarksᵉ e
 elabMarksᵉ (takeWhileᵉ f e) = elabMarksᵗ f ⊕ elabMarksᵉ e
 elabMarksᵉ (batchSyncᵉ e) = one fBatchSync ⊕ elabMarksᵉ e
 elabMarksᵉ (mapᵉ f e)     = elabMarksᵗ f ⊕ elabMarksᵉ e
@@ -819,6 +815,8 @@ showFlatOp exhaustᶠ          = "exhaustᶠ"
 showSExp : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → String
 showSTm  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → String
 showFlat : ∀ {Δᵍ Δ Θ u} → FlatOp → SExp Γ₂ Δᵍ Δ Θ u → String
+takeOf   : ∀ {Δᵍ Δ Θ u} → SExp Γ₂ Δᵍ Δ Θ u → Maybe (ℕ × String)
+scanOf   : ∀ {Δᵍ Δ Θ u} → SExp Γ₂ Δᵍ Δ Θ u → Maybe String
 
 showSTmList : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → String
 showSTmList []       = "[]"
@@ -855,7 +853,6 @@ showSTm (strmˢ e)      = "(strmˢ " ++ showSExp e ++ ")"
 showSExp (inputˢ i)      = "(inputˢ " ++ showFin i ++ ")"
 showSExp (ofˢ items)     = "(ofˢ (" ++ showSTmList items ++ "))"
 showSExp emptyˢ          = "emptyˢ"
-showSExp (takeˢ n e)     = "(takeˢ " ++ showSTm n ++ " " ++ showSExp e ++ ")"
 showSExp (takeWhileˢ f e) = "(takeWhileˢ " ++ showSTm f ++ " " ++ showSExp e ++ ")"
 showSExp (mapˢ f e)      = "(mapˢ " ++ showSTm f ++ " " ++ showSExp e ++ ")"
 showSExp (scanˢ f z e)   =
@@ -865,20 +862,35 @@ showSExp (μˢ e)          = "(μˢ " ++ showSExp e ++ ")"
 showSExp (varˢ x)        = "(varˢ " ++ showIx x ++ ")"
 showSExp (deferˢ e)      = "(deferˢ " ++ showSExp e ++ ")"
 
--- rxjs's named flatteners print as the corpus's `flatAllˢ`, which is
--- what they expand to, and every other flatten prints as itself.  It
+-- rxjs's named flatteners print as the corpus's `flatAllˢ`, and its
+-- `take` as `takeˢ`, which is what they expand to, and every other
+-- flatten prints as itself.  It
 -- takes its argument at ANY type because printing reads none: at the
 -- element type an `inputˢ`'s lookup cannot be unified against a pair.
+showFlat op@(mergeᶠ nothing) e@(mapˢ (pairˢ (sndˢ (varˢᵗ (here refl))) (inlˢ unitˢ)) s) with takeOf s
+... | just (n , body) = "(takeˢ " ++ show n ++ " " ++ body ++ ")"
+... | nothing         = "(flattenˢ " ++ showFlatOp op ++ " " ++ showSExp e ++ ")"
 showFlat op (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (varˢᵗ (here refl)))) s) =
   "(flatAllˢ " ++ showFlatOp op ++ " " ++ showSExp s ++ ")"
 showFlat op s = "(flattenˢ " ++ showFlatOp op ++ " " ++ showSExp s ++ ")"
+
+-- `takeˢ`'s count and body, read off its test and its scan.  Each is
+-- matched at ANY type, for `showFlat`'s reason: below a pair-typed node
+-- an `inputˢ`'s lookup cannot be unified against the pair.
+takeOf (takeWhileˢ (primˢ ltᵖ (pairˢ (fstˢ (varˢᵗ (here refl))) (natˢ n))) e) with scanOf e
+... | just body = just (n , body)
+... | nothing   = nothing
+takeOf _ = nothing
+
+scanOf (scanˢ _ _ e) = just (showSExp e)
+scanOf _             = nothing
 
 ------------------------------------------------------------------------
 -- one case, a run, and reporting
 
 -- THE FUEL IS AN EXPONENT FOR SOME PROGRAMS, WHICH IS WHY THE SWEEP HAS
 -- TO BE BOUNDED FROM OUTSIDE.  A guarded fixpoint under an unbounded
--- merging flattener with no `takeᵉ` above it emits once per unit of fuel; one
+-- merging flattener with no cut above it emits once per unit of fuel; one
 -- whose step hands back MORE elements than it was given doubles instead,
 -- and the corpus contains such programs because nothing in the generator
 -- declines to draw one.  The cost is inside `evaluate↓` rather than in
@@ -889,7 +901,7 @@ showFlat op s = "(flattenˢ " ++ showFlatOp op ++ " " ++ showSExp s ++ ")"
 -- bounds a SEED in wall clock and reports the ones it could not run.
 --
 -- AND NOTHING CUTS THE RUN FROM INSIDE, because every check is a
--- statement's own sides at the drawn program, and a `takeᵉ` above it is
+-- statement's own sides at the drawn program, and a cut above it is
 -- a different program.  An author's `takeˢ` above it IS an instance, and
 -- was measured: it buys nothing, since the cases that outrun a sweep
 -- spend it inside the subscribe frame, at fuel 1, before any value.  So

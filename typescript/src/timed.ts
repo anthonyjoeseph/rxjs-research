@@ -17,7 +17,6 @@ import {
   scan as rxScan,
   share as rxShare,
   switchAll,
-  take as rxTake,
   takeWhile as rxTakeWhile,
 } from "rxjs";
 import {
@@ -1037,18 +1036,6 @@ const compile = (
         ),
         rxMap((a) => a.out),
       );
-    }
-    case "take": {
-      // THE END IS LAST, SO `take` COUNTS IT CORRECTLY: a source that
-      // fills the quota is cut at its nth value, before any END, and
-      // completes in that value's instant, so the END is appended there;
-      // one that does not passes its END as an item within the quota.
-      const count = evalWith(exp.count, env);
-      if (typeof count !== "bigint")
-        throw new Error("take count did not evaluate to a nat");
-      return count === 0n
-        ? rxOf(end(HOLE))
-        : endAfter(recur(exp.src, "s").pipe(rxTake(Number(count))));
     }
     case "takeWhile": {
       // THE END IS LAST here too: values pass while the predicate holds;

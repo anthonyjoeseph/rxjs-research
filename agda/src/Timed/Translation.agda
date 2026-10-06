@@ -20,8 +20,7 @@
 -- A concat grafts its next inner on a completion, so what that inner
 -- emits synchronously belongs to the instant the completion did, and
 -- only the END item says which one that was: nothing the completed
--- inner emitted need carry it.  END is last, so `take` over a timed
--- stream counts values exactly as it does over the plain one.
+-- inner emitted need carry it.
 ------------------------------------------------------------------
 module Timed.Translation where
 
@@ -46,7 +45,7 @@ open import Rx.Exp   using (Ty; Ctx; Val; isData; inputsBelowᵉ; inputsBelowᵗ
   add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; FlatOp; mergeᶠ;
   unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
 open import SExp.Syntax  using (SExp; STm; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵗ;
-  inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ; varˢ; deferˢ;
+  inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ; varˢ; deferˢ;
   varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
   caseˢ; foldˢ; ifˢ; primˢ; strmˢ)
 open import SExp.Plain using (plainExp; plainTm; plainTms; mapInput; ∧ˡ; ∧ʳ; ∧-intro)
@@ -372,10 +371,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     τ d ρ (inputˢ i)                  = inputᵀ i
     τ d ρ (ofˢ ts)                    = ofˢ (τof ρ ts)
     τ d ρ emptyˢ                      = ofˢ (pairˢ nilˢ (inrˢ unitˢ) ∷ [])
-    -- the END is last, so a `take` cut ends at its last value and one
-    -- that is not passes its source's END
-    τ d ρ (takeˢ {t = t} k e)         = endAfterˢ {t = t} (takeˢ (τᵗ ρ k) (τ (suc d) ρ e))
-    -- and a `takeWhile` lets an END through, so one never failing the
+    -- a `takeWhile` lets an END through, so one never failing the
     -- predicate passes its source's
     τ d ρ (takeWhileˢ {t = t} f e)    =
       endAfterˢ {t = t} (takeWhileˢ (caseˢ (sndˢ v₀) (τᵗ (extᵀ (wkᵀ ρ)) f) (boolˢ true))
@@ -482,10 +478,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) (k : ℕ) where
         (subst-belowᵗ k (lookup-zipWith timedTy i Γ κ) (inputˢ i) p)
     τ-below d ρ (ofˢ ts) p = τof-below ρ ts p
     τ-below d ρ emptyˢ p = tt
-    τ-below d ρ (takeˢ c e) p =
-      conj-true (ibᵗ k (τᵗ κ ρ c) ∧ ib k (τ κ (suc d) ρ e))
-        (conj² (ibᵗ k c) (ib k e) (ibᵗ k (τᵗ κ ρ c)) (ib k (τ κ (suc d) ρ e))
-            (τᵗ-below ρ c) (τ-below (suc d) ρ e) p)
     τ-below d ρ (takeWhileˢ f e) p =
       conj-true ((ibᵗ k f′ ∧ true) ∧ ib k (τ κ (suc d) ρ e))
         (conj² (ibᵗ k f) (ib k e) (ibᵗ k f′ ∧ true) (ib k (τ κ (suc d) ρ e))

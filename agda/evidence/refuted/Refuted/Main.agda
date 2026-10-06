@@ -68,6 +68,5 @@ open import Refuted.Batched-Sandwich using (one-past-sandwich-false)
 
 -- A CUT'S ROW RELATES ONLY THE PLAIN BUDGETS A ROW CAN CARRY.  A
 -- test's cell carries none, so left free one impl step owes the plain
--- step at zero and at one; a count's at zero cuts where the plain
--- take's does not, and no plain take is installed at zero.
-open import Refuted.Cut-Budget using (cut-budget-false; cut-zero-false)
+-- step at zero and at one.
+open import Refuted.Cut-Budget using (cut-budget-false)

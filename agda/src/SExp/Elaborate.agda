@@ -11,7 +11,7 @@ open import Data.Vec using (lookup; zipWith)
 open import Data.Vec.Properties using (lookup-zipWith; lookup-++ʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; refl; trans)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ;
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ;
   mintᵉ; mapᵉ; scanᵉ; FlatOp; mergeᶠ; flattenᵉ; batchSyncᵉ; unitᵗ; _+ᵗ_; varᵗ; unit̂; bool̂;
   nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ;
   revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; takeWhileᵉ)
@@ -19,7 +19,7 @@ open import SExp.InstEmit using (instEventᵗ; closeReasonᵗ; emitKindᵗ; even
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
                                machineEmitᵗ; splitAccᵗ)
-open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ;
+open import SExp.Syntax using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; hotᵏ; coldᵏ; sharedᵏ; slotTy;
   rawTy; plainᵏ)
@@ -419,32 +419,10 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
 
 -- THE LIST ROUTINES THE CUT IS WRITTEN OUT OF, AND THEY ARE HERE
 -- BECAUSE THE TERM LANGUAGE HAS NO LIBRARY.  `Tm` has one eliminator
--- over lists and no application, so `take`, `takeWhile`, `length`, and a
--- multiset delete are each a fold with a pair-shaped accumulator rather than a
+-- over lists and no application, so `takeWhile` and a multiset delete
+-- are each a fold with a pair-shaped accumulator rather than a
 -- call.  The mirror spells the same routines inline as ordinary JavaScript,
 -- which is why nothing about them is a finding.
-
-takeListᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
-          → Tm Γ Δᵍ Δ Θ natᵗ → Tm Γ Δᵍ Δ Θ (listᵗ a)
-          → Tm Γ Δᵍ Δ Θ (listᵗ a)
-takeListᵛ {Θ = Θ} {a = a} m xs = revᵗ (sndᵗ (foldᵗ xs (pairᵗ m nilᵗ) body))
-  where
-  A : Ty
-  A = natᵗ ×ᵗ listᵗ a
-
-  acc : Tm _ _ _ (a ∷ A ∷ Θ) A
-  acc = varᵗ (there (here refl))
-
-  body : Tm _ _ _ (a ∷ A ∷ Θ) A
-  body = ifᵗ (primᵗ ltᵖ (pairᵗ (nat̂ 0) (fstᵗ acc)))
-             (pairᵗ (primᵗ sub (pairᵗ (fstᵗ acc) (nat̂ 1)))
-                    (consᵗ (varᵗ (here refl)) (sndᵗ acc)))
-             acc
-
-lengthᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
-        → Tm Γ Δᵍ Δ Θ (listᵗ a) → Tm Γ Δᵍ Δ Θ natᵗ
-lengthᵛ xs = foldᵗ xs (nat̂ 0)
-                   (primᵗ add (pairᵗ (varᵗ (there (here refl))) (nat̂ 1)))
 
 -- the prefix up to and including the first element failing the
 -- predicate, and whether one did
@@ -533,17 +511,17 @@ cutClosesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ b}
 cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
   (consᵗ (closeᵛ (varᵗ (here refl)) (inlᵗ unit̂)) (varᵗ (there (here refl)))))
 
--- THE PIPELINE THE MIRROR WRITES, OPERATOR FOR OPERATOR, FOR BOTH
--- CUTTING OPERATORS.  A scan carrying a budget, whether the cut has
+-- THE PIPELINE THE MIRROR WRITES, OPERATOR FOR OPERATOR, FOR THE
+-- CUTTING OPERATOR.  A scan carrying a budget, whether the cut has
 -- happened, the open registrations and the emit this delivery produced;
 -- an inclusive `takeWhileᵉ` ending on the state whose cut has happened;
 -- then a projection pulling the emit back out of the state.  Cutting the
 -- author's values out of one emit's list is a pure step's work, and the
 -- state carries the answer and the emit together because the palette
--- reads a value and nothing beside it.  What differs between `take` and
--- `takeWhile` is only that step: the CUTTER, handed the budget and one
--- emit's payloads, returns the payloads let through, whether they end
--- the stream, and the budget left.
+-- reads a value and nothing beside it.  The step's own decision is the
+-- CUTTER, handed the budget and one emit's payloads, which returns the
+-- payloads let through, whether they end the stream, and the budget
+-- left.
 --
 -- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, exactly as `scanᵖ`'s is: a
 -- scan emits the result of its FIRST application and never the seed, so
@@ -641,51 +619,6 @@ cutᵖ {Θ = Θ} {t = t} {B = B} b₀ cutter e =
   seed = pairᵗ b₀ (pairᵗ (bool̂ false)
                          (pairᵗ nilᵗ (instEmitᵛ nilᵗ tok tok subscribeᵛ)))
 
--- the quota's prefix of the payloads; the emit that fills the quota
--- cuts
-countCutᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty} → Cutter Γ Δᵍ Δ Θ natᵗ t
-countCutᵖ rem vs =
-  letᵗ (takeListᵛ rem vs) (pairᵗ nilᵗ (pairᵗ (bool̂ false) rem))
-       (pairᵗ taken (pairᵗ (primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem↑))
-                           (primᵗ sub (pairᵗ rem↑ (lengthᵛ taken)))))
-  where
-  taken = varᵗ (here refl)
-  rem↑  = renTm (λ x → x) (λ x → x) there rem
-
--- THE ENDING READS THE SCAN'S OWN STATE ON THE ONE SUBSCRIPTION, AND
--- THE ONE SUBSCRIPTION IS OBSERVABLE.  An ending that subscribed the
--- author's source a second time misses whatever a share upstream put
--- out to the first, so it cuts at a LATER source event than the
--- plain `take` -- the bug cache's row "the seeds 13..36 depth 2
--- sweep's counterexample".
---
--- AND THE BEHAVIOUR THE CUT MUST MIRROR IS MEASURED RATHER THAN
--- INFERRED (Anthony: "just run it in js").  Real rxjs `take` was run
--- against a four-item synchronous source, against a `mergeAll` of two
--- inner bursts, and at zero.  It emits the nth value and completes
--- AFTER it; it cuts mid-burst, so an inner's remaining values are
--- dropped rather than waited for; and at ZERO it never subscribes its
--- source at all, which is the fact a count-down silently gets wrong.
---
--- SO ZERO IS DECIDED AT SUBSCRIBE, BEFORE THE SOURCE EXISTS.  The count
--- is a term, so the choice is a one-lane flatten whose lane is picked
--- by `ifᵗ` when it is subscribed: `emptyᵖ` under the frame at zero, the
--- counted pipeline otherwise.  A pipeline that subscribes and cuts at
--- the source's first emit is wrong exactly when that emit is late, which
--- is the bug-cache row "the seeds 1..8 depth 3 sweep's counterexample".
---
--- DEAD ROUTE: cut with `takeᵉ` over a count the scan computes.  Nothing
---   converts a budget over values into the emit index a
---   subscription-time count has to name.
-takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-      → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ natᵗ
-      → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-takeᵖ frame k e =
-  flatAllᵉ (mergeᶠ nothing)
-    (ofᵉ (ifᵗ (primᵗ eqᵖ (pairᵗ k (nat̂ 0)))
-              (strmᵗ (emptyᵖ frame))
-              (strmᵗ (cutᵖ (renTm (λ x → x) (λ x → x) there k) countCutᵖ e)) ∷ []))
-
 whileCutᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
           → Fn Γ Δᵍ Δ Θ (plainᵗ t) boolᵗ → Cutter Γ Δᵍ Δ Θ unitᵗ t
 whileCutᵖ {Θ = Θ} {t = t} f _ vs = pairᵗ (fstᵗ (takeWhileListᵛ f↑ vs)) (pairᵗ (sndᵗ (takeWhileListᵛ f↑ vs)) unit̂)
@@ -695,8 +628,8 @@ whileCutᵖ {Θ = Θ} {t = t} f _ vs = pairᵗ (fstᵗ (takeWhileListᵛ f↑ vs
 
 -- rxjs `takeWhile(p, true)`: the payloads up to and including the first
 -- the author's predicate fails, and that failure cuts.  No budget, and
--- nothing to decide at subscribe: unlike `take 0`, rxjs's `takeWhile`
--- always subscribes its source.
+-- nothing to decide at subscribe: rxjs's `takeWhile` always subscribes
+-- its source.
 takeWhileᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
            → Fn Γ Δᵍ Δ Θ (plainᵗ t) boolᵗ
            → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
@@ -1151,7 +1084,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
    ... | sharedᵏ | eq = readStampedᵖ (n ↑ʳ i) eq (frameᵛ Θ)
    toInstEmit {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toInstEmitTms ts)
    toInstEmit {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
-   toInstEmit {Θ = Θ} (takeˢ k e) = takeᵖ (frameᵛ Θ) (toInstEmitTm k) (toInstEmit e)
    toInstEmit (takeWhileˢ f e)    = takeWhileᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (mapˢ f e)          = mapᵖ (toInstEmitTm f) (toInstEmit e)
    toInstEmit (scanˢ f z e)       = scanᵖ (toInstEmitTm f) (toInstEmitTm z) (toInstEmit e)

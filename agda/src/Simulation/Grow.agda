@@ -26,7 +26,7 @@ open import Rx.Evaluator using (NodeId; NodeState; Path; root; share-sink; _↠[
 open import Rx.Evaluator.Reducible.Support using (rowThrough; ∨-Tˡ; ∨-Tʳ)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Unpaired; CurRel; FlatNodes; merge~; switch~; exhaust~; Flattener; PathRel; root~;
-  sink~; map~; scan~; take~; takeWhile~; spent~; spentWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~;
+  sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~;
   cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows)
 
 -- a node below the counter is none of the pair it hands out
@@ -87,10 +87,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π π′ : List (NodeId × List NodeId
     pathG o (sink~ sh)                       = sink~ sh
     pathG o (map~ L r)                       = map~ L (pathG (proj₂ o) r)
     pathG o (scan~ e l l′ v L r)             = scan~ (g e) l l′ v L (pathG (proj₂ (proj₂ o)) r)
-    pathG o (take~ e l l₁ l₂ lm a≤ b≡ L r)   =
-      take~ (g e) l l₁ l₂ lm a≤ b≡ L (pathG (proj₂ (proj₂ (proj₂ (proj₂ o)))) r)
     pathG o (takeWhile~ e l l₁ l₂ L r)       = takeWhile~ (g e) l l₁ l₂ L (pathG (proj₂ (proj₂ (proj₂ o))) r)
-    pathG o (spent~ e l l₂ r)                = spent~ (g e) l l₂ (pathG (proj₂ (proj₂ (proj₂ (proj₂ o)))) r)
     pathG o (spentWhile~ e l l₂ r)           = spentWhile~ (g e) l l₂ (pathG (proj₂ (proj₂ (proj₂ o))) r)
     pathG o (outerElem~ f r)                 = outerElem~ (flatG f) (pathG (proj₂ (proj₂ (proj₂ (proj₂ o)))) r)
     pathG o (outerExplode~ f r)              =

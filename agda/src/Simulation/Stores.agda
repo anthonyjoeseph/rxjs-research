@@ -182,19 +182,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     × EmitRel u (proj₂ (applyClo F′ ((a′ , em) , e′))) (proj₁ (scanVals F a vs))
     × instantOf {u} (proj₂ (applyClo F′ ((a′ , em) , e′))) ≡ instantOf e′
 
-  -- the elaborated cut's step against the plain take: the budget kept
+  -- the elaborated cut's step against the plain test: the budget kept
   -- related while nothing cuts, the cut decided alike, and the prefix
   -- taken carried
   --
-  -- `Bud` RELATES ONLY THE PLAIN BUDGETS A ROW CAN CARRY, WHICH ARE
-  -- POSITIVE.  A plain take is installed at a positive count and a cut
-  -- clears the row, so zero is never one; a test's cell holds `tt`, so
-  -- its plain budget is pinned at one.  A cut leaves the plain budget at
-  -- zero, so the budget after is owed only on a step that does not cut.
+  -- `Bud` RELATES ONLY THE PLAIN BUDGETS A ROW CAN CARRY.  A test's cell
+  -- holds `tt`, so its plain budget is pinned at one, and a cut clears
+  -- the row.  A cut leaves the plain budget at zero, so the budget after
+  -- is owed only on a step that does not cut.
   -- REFUTED: `Refuted.Cut-Budget` -- a test's `Bud` at `⊤`: one impl
-  --   step owes the plain step at budget zero and at budget one; and a
-  --   count's at `_≡_`, where the elaborated cutter cuts at zero on an
-  --   emit carrying nothing.
+  --   step owes the plain step at budget zero and at budget one.
   CutLifts : ∀ B s → (Val Γ′ B → ℕ → Set) → FnClo Γ′ (CutS B s ×ᵗ emitᵗ s) (CutS B s)
            → Maybe (FnClo Γ s boolᵗ) → Set
   CutLifts B s Bud F′ P =
@@ -310,25 +307,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → PathRel (scan-f F k ↠[ h ] p)
                         (scan-f F′ k′ ↠[ h₁ ] (map-f (Θ₀ , sndᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ] q))
 
-        -- a count: the cut's scan, its test, its projection, and the
-        -- one-lane merge that decided zero at subscribe
-        take~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j b b′ os em Θ₂ ρ₂ Θ₃ ρ₃ aₘ}
-                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                  {F₁ : FnClo Γ′ (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s)}
-                  {p : Path Γ ℓ s t} {q : Path Γ′ ℓ₄ (emitᵗ s) (emitᵗ t)}
-              → (k , k₁ ∷ k₂ ∷ m ∷ j ∷ []) ∈ π
-              → lookupNode k NP ≡ just (take-st b)
-              → lookupNode k₁ NI ≡ just (cell-st {t = CutS natᵗ s} (b′ , (false , (os , em))))
-              → lookupNode k₂ NI ≡ just (take-st 1)
-              → lookupNode m NI ≡ just (mergeAll-st {t = emitᵗ s} nothing aₘ [] true) → aₘ ≤ 1
-              → b′ ≡ b × 0 < b → CutLifts natᵗ s (λ b′ b → b′ ≡ b × 0 < b) F₁ nothing → PathRel p q
-              → PathRel (take-f nothing k ↠[ h ] p)
-                  (scan-f F₁ k₁ ↠[ h₁ ]
-                   (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]
-                    (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ]
-                     (from-inner mergeAllᵒ m j ↠[ h₄ ] q))))
-
-        -- a test: the same run, with no merge, since nothing is decided at subscribe
+        -- a test: the cut's scan, its test and its projection
         takeWhile~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ os em Θ₂ ρ₂ Θ₃ ρ₃}
                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                        {P : FnClo Γ s boolᵗ} {F₁ : FnClo Γ′ (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
@@ -343,22 +322,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                         (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]
                          (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q)))
 
-        -- A SPENT COUNT, AND A SPENT TEST: the cut wrote zero at the plain
-        -- node and at the run's test, and both pass nothing after it
-        spent~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j Θ₂ ρ₂ Θ₃ ρ₃}
-                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                   {F₁ : FnClo Γ′ (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s)}
-                   {p : Path Γ ℓ s t} {q : Path Γ′ ℓ₄ (emitᵗ s) (emitᵗ t)}
-               → (k , k₁ ∷ k₂ ∷ m ∷ j ∷ []) ∈ π
-               → lookupNode k NP ≡ just (take-st 0)
-               → lookupNode k₂ NI ≡ just (take-st 0)
-               → PathRel p q
-               → PathRel (take-f nothing k ↠[ h ] p)
-                   (scan-f F₁ k₁ ↠[ h₁ ]
-                    (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]
-                     (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ]
-                      (from-inner mergeAllᵒ m j ↠[ h₄ ] q))))
-
+        -- A SPENT TEST: the cut wrote zero at the plain node and at the
+        -- run's test, and both pass nothing after it
         spentWhile~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ ρ₂ Θ₃ ρ₃}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                         {P : FnClo Γ s boolᵗ} {F₁ : FnClo Γ′ (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}

@@ -1,17 +1,17 @@
 ------------------------------------------------------------------
--- A COUNT'S ARM: the plain take steps once where the impl runs its
+-- A TEST'S ARM: the plain takeWhile steps once where the impl runs its
 -- cut cell's scan, the cell's test, the projection and the one-lane
--- merge.  The cell spends where the count does (`cut-group`), so an
--- open group leaves both sides open with the budget carried over; the
--- group that ends, and the spent count, are leaves.
+-- merge.  The cell spends where the test does, so an open group leaves
+-- both sides open at a budget of one; the group that ends, and the
+-- spent test, are leaves.
 ------------------------------------------------------------------
 module Simulation.Take where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map)
-open import Data.Maybe   using (Maybe; nothing; just)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; _<_; _<ᵇ_)
+open import Data.Maybe   using (Maybe; just)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; _<ᵇ_)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (tt)
@@ -19,10 +19,10 @@ open import Data.List.Properties using (++-identityʳ)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FnClo; boolᵗ; natᵗ; unitᵗ; _×ᵗ_; applyClo; _≟ᵗ_)
-open import Rx.Evaluator using (EvalSt; Sched; NodeId; NodeState; Path; _↠[_]_; scan-f; take-f; map-f; from-inner; mergeAllᵒ;
-  lookupNode; setNode; cell-st; take-st; mergeAll-st; takeVals; scanVals; spends; takeDispatch; cutThrough)
-open import Rx.Evaluator.Domain using (stepFrame⇓; foldPath⇓; fold-step; step-scan; step-take; step-map; step-from-inner; react-false; injectRoot)
+open import Rx.Exp       using (Ctx; Closed; Val; Env; FnClo; boolᵗ; unitᵗ; _×ᵗ_; applyClo; _≟ᵗ_)
+open import Rx.Evaluator using (EvalSt; Sched; NodeId; NodeState; Path; _↠[_]_; scan-f; take-f; map-f; lookupNode; setNode;
+  cell-st; take-st; takeVals; scanVals; spends; takeDispatch; cutThrough)
+open import Rx.Evaluator.Domain using (stepFrame⇓; foldPath⇓; fold-step; step-scan; step-take; step-map; injectRoot)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; head-on; self-node)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept)
@@ -31,14 +31,14 @@ open import SExp.Elaborate using (CutS; cutOpenᵛ; cutOutᵛ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Binary.Pointwise using () renaming ([] to []ᵖ)
-open import Simulation.Stores using (EmitRel; CutLifts; PathRel; take~; spent~; takeWhile~; spentWhile~; Store; guardOf)
+open import Simulation.Stores using (EmitRel; CutLifts; PathRel; takeWhile~; spentWhile~; Store; guardOf)
 open import Simulation.Sweep using (t≢f; sweepL; sweep-eq)
 open import Simulation.Cut using (cut-go; cut-keeps; cut-persists)
 open import Simulation.Write using (apart)
 open import Simulation.After using (module Kept)
 open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear)
 
--- A CELL'S SCAN AND A COUNT'S TAKE, AT THE STATE THE NODE HOLDS: the
+-- A CELL'S SCAN AND A TEST'S TAKE, AT THE STATE THE NODE HOLDS: the
 -- one step each derivation can be
 scan-at : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s u lo} {fn : FnClo Δ (u ×ᵗ s) u} {k} {κ′ : Path Δ lo u t}
             {now vals fin sc} {st : EvalSt e} {a r}
@@ -57,7 +57,7 @@ take-at : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s lo w k} {κ′ : Path Δ
         → r ≡ injectRoot (takeDispatch w k vals fin sc st (just (take-st b)))
 take-at e step-take rewrite e = refl
 
--- a count that does not cut writes what it leaves and passes the end on
+-- a test that does not cut writes what it leaves and passes the end on
 take-open-at : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s lo w k} {κ′ : Path Δ lo s t}
                  {now vals fin sc} {st : EvalSt e} {b r}
              → lookupNode k (EvalSt.nodes st) ≡ just (take-st b)
@@ -81,28 +81,10 @@ take-cut-at : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s lo w k} {κ′ : Pat
 take-cut-at {k = k} {sc = sc} {st = st} e h d
   rewrite take-at e d | h | sweep-eq (proj₁ (cutThrough k (EvalSt.registry st))) (Sched.live sc) = refl
 
--- an inner's merge on an open group passes it as it came
-react-open : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s lo op k j} {κ′ : Path Δ lo s t}
-               {now vals sc} {st : EvalSt e} {r}
-           → stepFrame⇓ now (from-inner op k j) κ′ vals false sc st r
-           → r ≡ ([] , vals , false , sc , st)
-react-open (step-from-inner react-false) = refl
-
 -- a cell and a count never share a node
 cell-take : ∀ {m} {Δ : Ctx m} {N : List (NodeId × NodeState Δ)} {k k′ u b} {a : Val Δ u}
           → lookupNode k N ≡ just (cell-st a) → lookupNode k′ N ≡ just (take-st b) → k′ ≡ k → ⊥
 cell-take l l′ refl with trans (sym l) l′
-... | ()
-
--- nor a merge and either
-merge-take : ∀ {m} {Δ : Ctx m} {N : List (NodeId × NodeState Δ)} {x y : NodeId} {u : Ty} {l a qs d c}
-           → lookupNode x N ≡ just (mergeAll-st {t = u} l a qs d) → lookupNode y N ≡ just (take-st c) → x ≡ y → ⊥
-merge-take l l′ refl with trans (sym l) l′
-... | ()
-
-merge-cell : ∀ {m} {Δ : Ctx m} {N : List (NodeId × NodeState Δ)} {x y : NodeId} {w u : Ty} {l a qs d} {c : Val Δ u}
-           → lookupNode x N ≡ just (mergeAll-st {t = w} l a qs d) → lookupNode y N ≡ just (cell-st c) → x ≡ y → ⊥
-merge-cell l l′ refl with trans (sym l) l′
 ... | ()
 
 module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
@@ -217,146 +199,10 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                          (carry-cons _ (proj₁ (proj₂ (proj₂ CL))) once [])
                  , sym eq , λ f → ⊥-elim (t≢f (trans (sym eq) f)) )
 
-  module Count {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
+  module While {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     open Kept {Γ = Γ} κ {t} {ep} {ei}
     open Run {t} {ep} {ei}
-
-    -- the impl's run for a count: the cut cell's scan, its test, the
-    -- projection and the one-lane merge
-    Cnt : ∀ {lo′ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s} → FnClo (plainᵏ Γ κ) (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s) → NodeId → NodeId → NodeId → NodeId
-        → ∀ {Θ₂ Θ₃} → Env (plainᵏ Γ κ) Θ₂ → Env (plainᵏ Γ κ) Θ₃
-        → lo′ ≤ ℓ₁ → ℓ₁ ≤ ℓ₂ → ℓ₂ ≤ ℓ₃ → ℓ₃ ≤ ℓ₄ → Path (plainᵏ Γ κ) ℓ₄ (emitᵗ s) (emitᵗ t) → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)
-    Cnt F₁ k₁ k₂ m j {Θ₂} {Θ₃} ρ₂ ρ₃ h₁ h₂ h₃ h₄ q =
-      scan-f F₁ k₁ ↠[ h₁ ] (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ] (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] (from-inner mergeAllᵒ m j ↠[ h₄ ] q)))
-
-    postulate
-      -- A COUNT'S NODES WRITTEN OPEN ON BOTH SIDES: the plain count to
-      -- what it leaves, the cell to an open state over the same budget
-      -- and its test to one, keep the stores and the tails related
-      take-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j Θ₂ Θ₃}
-                     {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
-                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                     {F₁ : FnClo (plainᵏ Γ κ) (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s)}
-                     {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ s) (emitᵗ t)}
-                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f nothing k ↠[ h ] p) (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q)
-                 → Sound (take-f nothing k ↠[ h ] p) sP stP → Sound (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q) sI stI
-                 → ∀ b c r → proj₁ (proj₂ c) ≡ false → proj₁ c ≡ b → 0 < b → r ≡ 1
-                 → Σ (After S ([] , sP , record stP { nodes = setNode k (take-st b) (EvalSt.nodes stP) })
-                              ([] , sI , record stI { nodes = setNode k₂ (take-st r) (setNode k₁ (cell-st {t = CutS natᵗ s} c) (EvalSt.nodes stI)) })) λ A
-                     → PathRel κ (Store.π (After.store A)) (setNode k (take-st b) (EvalSt.nodes stP))
-                         (setNode k₂ (take-st r) (setNode k₁ (cell-st {t = CutS natᵗ s} c) (EvalSt.nodes stI))) p q
-
-      -- A COUNT'S GROUP THAT ENDS: the source's end, or the cut.  The
-      -- impl's one-lane merge finishes on it, and its finish folds the
-      -- tail itself before handing the end up on an empty group, where
-      -- the plain count hands the tail the group and the end at once
-      --
-      -- SO `Arm`'S ONE TAIL FOLD CARRIES IT ONLY THROUGH A SPLIT: the
-      -- impl's tail folds the group open and then the bare end, the
-      -- plain's folds both at once, and the arm names one impl fold.  A
-      -- body needs that fold to land where the split pair does, or
-      -- `Arm` to carry the pair; the cut half is `while-cut`'s.
-      --
-      -- A SPLIT OVER EVERY TAIL IS FALSE, read off `innerReact⇓`: an
-      -- inner frame below that sees a sibling row alive before the
-      -- tail's fold, and cut by a take further down during it, is
-      -- finished by the split's bare end -- its merge's queue drained --
-      -- and never by the joint fold.  Here the first inner frame below
-      -- the count has every row through the count, all cut or dying by
-      -- the end, so the split owes that as a hypothesis.
-      take-end : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j Θ₂ Θ₃}
-                   {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
-                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                   {F₁ : FnClo (plainᵏ Γ κ) (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s)}
-                   {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ s) (emitᵗ t)}
-                   {vs es fin oP vs₁ fin₁ sP₁ stP₁ rI b}
-               → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f nothing k ↠[ h ] p) (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q)
-               → lookupNode k (EvalSt.nodes stP) ≡ just (take-st b)
-               → fin ≡ true ⊎ proj₂ (proj₂ (takeVals nothing b vs)) ≡ true
-               → Carries es vs
-               → Sound (take-f nothing k ↠[ h ] p) sP stP → Sound (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q) sI stI
-               → stepFrame⇓ now (take-f nothing k) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
-               → foldPath⇓ now (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q) es fin sI stI rI
-               → Arm S now oP sP₁ stP₁ p vs₁ fin₁
-                   (λ π NP NI → PathRel κ π NP NI (take-f nothing k ↠[ h ] p) (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q)) rI
-
-      -- A SPENT COUNT ON BOTH SIDES passes nothing, its end included,
-      -- and stays spent
-      take-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j Θ₂ Θ₃}
-                     {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
-                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                     {F₁ : FnClo (plainᵏ Γ κ) (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s)}
-                     {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ s) (emitᵗ t)}
-                     {vs es fin oP vs₁ fin₁ sP₁ stP₁ rI}
-                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f nothing k ↠[ h ] p) (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q)
-                 → lookupNode k (EvalSt.nodes stP) ≡ just (take-st 0)
-                 → Carries es vs
-                 → Sound (take-f nothing k ↠[ h ] p) sP stP → Sound (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q) sI stI
-                 → stepFrame⇓ now (take-f nothing k) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
-                 → foldPath⇓ now (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q) es fin sI stI rI
-                 → Arm S now oP sP₁ stP₁ p vs₁ fin₁
-                     (λ π NP NI → PathRel κ π NP NI (take-f nothing k ↠[ h ] p) (Cnt F₁ k₁ k₂ m j ρ₂ ρ₃ h₁ h₂ h₃ h₄ q)) rI
-
-    -- A COUNT STEPS ALIKE ON BOTH SIDES.  An open group that does not
-    -- cut leaves the cell open over the count's new budget and the
-    -- test at one, and the four impl frames write nothing the tails'
-    -- folds read
-    take-arm : ∀ {lo lo′ ℓ s} {k} {h : lo ≤ ℓ} {p : Path Γ ℓ s t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
-             → Steps (take-f nothing k) h p Q
-    take-arm S R@(spent~ _ lk _ _) bs sp si d dI = take-spent S R lk bs sp si d dI
-    take-arm {fin = true} S R@(take~ _ lk _ _ _ _ _ _ _) bs sp si d dI = take-end S R lk (inj₁ refl) bs sp si d dI
-    take-arm {vs = vs} {es = es} {fin = false} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
-             R@(take~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {m = m} {j = j} {b = b} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
-                      {h = h} {h₁ = h₁} {h₂ = h₂} {h₃ = h₃} {h₄ = h₄} {F₁ = F₁} {p = p} {q = q} e lk lk₁ lk₂ lkm am (refl , pos) CL r)
-             bs sp si d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map (fold-step d₄ dq))))
-      with proj₂ (proj₂ (takeVals nothing b vs)) in eqW
-    ... | true = take-end S R lk (inj₂ eqW) bs sp si d dI
-    ... | false
-      with cut-group {Bud = λ b′ b → b′ ≡ b × 0 < b} {F′ = F₁} {P = nothing} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃} CL bs (b , false , os , em) b refl (refl , pos)
-         | scan-at lk₁ d₁ | take-open-at lk eqW d
-    ... | cs , fe , rest | refl | refl
-      with rest eqW | take-open-at (trans (set-above k₁ k₂ (cell-st {t = CutS natᵗ s} (proj₂ (scanVals F₁ (b , false , os , em) es))) (EvalSt.nodes stI) (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂) (trans fe eqW) d₂
-    ... | r1 , fl , bud | refl
-      with react-open d₄
-    ... | refl =
-      arm (proj₁ TW) (proj₂ TW) cs soq dq λ {rP} dP B rel′ →
-        take~ (After.grows B (After.grows (proj₁ TW) e))
-          (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′)
-          (trans (fold-unmoved dq cm) (trans lkm′ lkm)) am bud CL rel′
-      where
-      remP = proj₁ (proj₂ (takeVals nothing b vs))
-      fc : Val (plainᵏ Γ κ) (CutS natᵗ s)
-      fc = proj₂ (scanVals F₁ (b , false , os , em) es)
-      r₂ = proj₁ (proj₂ (takeVals {s = CutS natᵗ s} (just (Θ₂ , cutOpenᵛ , ρ₂)) 1 (proj₁ (scanVals F₁ (b , false , os , em) es))))
-      N₁ = setNode k₁ (cell-st {t = CutS natᵗ s} fc) (EvalSt.nodes stI)
-      N₂ = setNode k₂ (take-st r₂) N₁
-      TW = take-write S R sp si remP fc r₂ fl (proj₁ bud) (proj₂ bud) r1
-      lkP : lookupNode k (setNode k (take-st remP) (EvalSt.nodes stP)) ≡ just (take-st remP)
-      lkP = lookup-set k (take-st remP) (EvalSt.nodes stP)
-      lk₁′ : lookupNode k₁ N₂ ≡ just (cell-st {t = CutS natᵗ s} (proj₁ fc , false , proj₂ (proj₂ fc)))
-      lk₁′ = trans (set-above k₂ k₁ (take-st r₂) N₁ (apart k₂ k₁ (λ x → cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂ (sym x))))
-                   (subst (λ f → lookupNode k₁ N₁ ≡ just (cell-st {t = CutS natᵗ s} (proj₁ fc , f , proj₂ (proj₂ fc))))
-                          fl (lookup-set k₁ (cell-st {t = CutS natᵗ s} fc) (EvalSt.nodes stI)))
-      lk₂′ : lookupNode k₂ N₂ ≡ just (take-st 1)
-      lk₂′ = subst (λ x → lookupNode k₂ N₂ ≡ just (take-st x)) r1 (lookup-set k₂ (take-st r₂) N₁)
-      lkm′ : lookupNode m N₂ ≡ lookupNode m (EvalSt.nodes stI)
-      lkm′ = trans (set-above k₂ m (take-st r₂) N₁ (apart k₂ m (merge-take {N = EvalSt.nodes stI} {x = m} {y = k₂} lkm lk₂)))
-                   (set-above k₁ m (cell-st {t = CutS natᵗ s} fc) (EvalSt.nodes stI) (apart k₁ m (merge-cell {N = EvalSt.nodes stI} {x = m} {y = k₁} lkm lk₁)))
-      -- the plain count off its tail, once stepped
-      spK = step-kept h d sp
-      cP : Clear k p sP _
-      cP = head-on (take-f nothing k) h p k (self-node k []) spK , drop-ot (take-f nothing k) h p spK
-      -- the impl's nodes off its tail, once stepped
-      so₁ = step-kept h₁ d₁ si
-      so₂ = step-kept h₂ d₂ (drop-ot _ _ _ so₁)
-      soq = drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ so₂))
-      c₁ : Clear k₁ q sI _
-      c₁ = on-drop (on-drop (on-drop (proj₁ (step-clear d₂ (head-on (scan-f F₁ k₁) h₁ _ k₁ (self-node k₁ []) so₁ , drop-ot _ _ _ so₁))))) , soq
-      c₂ : Clear k₂ q sI _
-      c₂ = on-drop (on-drop (head-on _ h₂ _ k₂ (self-node k₂ []) so₂)) , soq
-      cm : Clear m q sI _
-      cm = head-on (from-inner mergeAllᵒ m j) h₄ q m (self-node m (j ∷ [])) (drop-ot _ _ _ (drop-ot _ _ _ so₂)) , soq
 
     -- the impl's run for a test: the cut cell's scan, its test and the
     -- projection, with no merge

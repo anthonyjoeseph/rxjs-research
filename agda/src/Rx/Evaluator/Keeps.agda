@@ -41,7 +41,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   foldPath⇓; dispatchShare⇓; shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
-  subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-takeWhile;
+  subs-cold-async; subs-of; subs-empty; subs-map; subs-takeWhile;
   subs-batchSync; subs-scan; subs-flatten;
   subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
@@ -320,9 +320,7 @@ subscribeE-keeps (subs-cold-sync _ _ f)        = foldPath-keeps f
 subscribeE-keeps (subs-cold-async _ _ _ _ _ f) = foldPath-keeps f
 subscribeE-keeps (subs-of f)                   = foldPath-keeps f
 subscribeE-keeps (subs-empty f)                = foldPath-keeps f
-subscribeE-keeps (subs-take-zero _ f)          = foldPath-keeps f
 subscribeE-keeps (subs-map sub)                = subscribeE-keeps sub
-subscribeE-keeps (subs-take-suc _ refl sub)    = subscribeE-keeps sub
 subscribeE-keeps (subs-takeWhile refl sub)     = subscribeE-keeps sub
 subscribeE-keeps (subs-batchSync refl sub f)   =
   keeps-trans (subscribeE-keeps sub) (foldPath-keeps f)

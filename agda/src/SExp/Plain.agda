@@ -27,10 +27,10 @@ open import Data.Unit    using (tt)
 
 open import Rx.Prim  using (ObservableInput; hot; cold; after_,_; PlainEvent; valueᵖ; completeᵖ)
 open import Rx.Exp   using (unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; isData; Exp; Tm; input; ofᵉ;
-  emptyᵉ; takeᵉ; takeWhileᵉ; mapᵉ; scanᵉ; flattenᵉ; μᵉ; varᵉ; deferᵉ; varᵗ;
+  emptyᵉ; takeWhileᵉ; mapᵉ; scanᵉ; flattenᵉ; μᵉ; varᵉ; deferᵉ; varᵗ;
   unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ;
   strmᵗ)
-open import SExp.Syntax  using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ;
+open import SExp.Syntax  using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ)
 
@@ -39,7 +39,6 @@ mutual
   plainExp (inputˢ i)      = input i
   plainExp (ofˢ ts)        = ofᵉ (plainTms ts)
   plainExp emptyˢ          = emptyᵉ
-  plainExp (takeˢ k e)     = takeᵉ (plainTm k) (plainExp e)
   plainExp (takeWhileˢ f e) = takeWhileᵉ (plainTm f) (plainExp e)
   plainExp (mapˢ f e)      = mapᵉ (plainTm f) (plainExp e)
   plainExp (scanˢ f z e)   = scanᵉ (plainTm f) (plainTm z) (plainExp e)

@@ -268,7 +268,6 @@ export const inputP = (i: number, a: Ty, frame: Tm): Exp => {
 // one clause above, not a second transcription of the elaboration.
 export declare const ofP: (frame: Tm, items: Tm[], t: Ty) => Exp;
 export declare const emptyP: (frame: Tm, t: Ty) => Exp;
-export declare const takeP: (frame: Tm, count: Tm, src: Exp, t: Ty) => Exp;
 export declare const takeWhileP: (fn: Fn, src: Exp, t: Ty) => Exp;
 export declare const mapP: (fn: Fn, src: Exp, t: Ty) => Exp;
 export declare const scanP: (fn: Fn, init: Tm, src: Exp, t: Ty) => Exp;
@@ -387,13 +386,6 @@ export const toPlain = (exp: SExp, depth: number): Exp => {
       );
     case "empty":
       return emptyP(frameV(depth), emitT(exp.ty));
-    case "take":
-      return takeP(
-        frameV(depth),
-        toPlainTm(exp.count, depth),
-        rec(exp.src),
-        emitT(exp.ty),
-      );
     case "takeWhile":
       return takeWhileP(
         toPlainTm(exp.fn, depth + 1),
