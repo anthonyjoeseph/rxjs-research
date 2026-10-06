@@ -3,7 +3,7 @@
 -- inhabited against the registries the two runs actually compute.
 -- TARGET: walk-hot @fb6a38
 -- TARGET: walk-cold @013486
--- TARGET: walk-defer @cd22e2
+-- TARGET: defer-install @d90562
 module Probed.Stores where
 
 open import Data.List using ([]; _∷_)
@@ -28,7 +28,7 @@ open import SExp.Simul-Slots using (plainSlots)
 open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
-open import Simulation.Walk using (walk-hot; walk-cold; walk-defer; init-store; minted)
+open import Simulation.Walk using (walk-hot; walk-cold; defer-install; init-store; minted)
 open import Simulation.After using (module Kept)
 open Kept using (module After)
 open import Simulation.Schedules using ([]; _∷_)
@@ -97,10 +97,9 @@ _ = record
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
 
-_ : Confirms (After.store (proj₁ (walk-defer (κᵖ defer-in) (inputˢ zero) (λ x → x) (λ ())
-                       (init-store (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in) _ (<-trans (proj₁ (proj₂ (minted (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in)))) (n<1+n _))) root~
-                       (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog defer-in)) (plainSlots (insᵖ defer-in)))))
-                       (proj₂ (proj₂ (minted (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in)))))))
+_ : Confirms (After.store (proj₁ (defer-install (κᵖ defer-in) (inputˢ zero) (λ x → x) (λ ()) refl
+                       (init-store (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in) _ (<-trans (proj₁ (proj₂ (minted (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in)))) (n<1+n _)))
+                       {now = 0} root~ refl refl refl refl refl refl refl refl)))
 _ = record
   { π       = (0 , 0 ∷ []) ∷ []
   ; π-keys  = [] ∷ []

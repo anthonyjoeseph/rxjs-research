@@ -25,22 +25,22 @@ open import Data.Unit    using (tt)
 open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; <⇒<ᵇ; <⇒≢; 1+n≢n)
+open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; ≤-refl; <⇒<ᵇ; <⇒≢; 1+n≢n)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ; _∷_ to _∷ᵖ_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
-open import Data.Sum using (inj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Maybe using (just; nothing)
 
 open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; mintᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
-open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; counter; freshId)
+open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
+open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
-  mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer)
+  mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Slots     using (Slots; scripted; shared)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-scan; subs-takeWhile; subs-flatten; sub-all; flatSt)
+open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-scan; subs-takeWhile; subs-flatten; subs-defer; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
@@ -175,11 +175,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- `toInstEmit` commuting with the unrolling, and termination on
       -- the plain derivation rather than the tree -- `walk-of`'s cycle.
       walk-μ         : ∀ {Θ u} (b : SExp Γ (u ∷ []) [] Θ u) → Elab-Walks (μˢ b)
-      -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
-      --   from empty stores: a deferred hot read, its hop pending as a
-      --   `defer~` source and row and its body not yet subscribed.  Not
-      --   a defer under a flattener, not the values conjunct.
-      walk-defer     : ∀ {Θ u} (b : SExp Γ [] [] Θ u) → Elab-Walks (deferˢ b)
 
     postulate
       -- A CELL INSTALLED ON BOTH SIDES, the impl's under its mint: the
@@ -253,6 +248,43 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                                × PathRel κ (Store.π (After.store A)) (setNode m (flatSt u op) (EvalSt.nodes stP))
                                    (setNode mX (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing))
                                      (setNode m′ (flatSt (emitᵗ u) op) (setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)))) p q
+
+    postulate
+      -- A HOP INSTALLED ON BOTH SIDES, the body pending: the merge pair
+      -- joins `π`, the sources and rows pair as `defer~`, and the tails
+      -- stay related
+      -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
+      --   from empty stores: a deferred hot read, its hop pending as a
+      --   `defer~` source and row and its body not yet subscribed.  Not
+      --   a defer under a flattener, not the values conjunct.
+      defer-install : ∀ {Θ u} (b : SExp Γ [] [] Θ u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} {bI}
+                    → EnvRel κ Θ w ρ′ ρ
+                    → renExp (λ x → x) (λ x → x) w (toInstEmit κ {[]} {[]} (deferˢ b)) ≡ deferᵉ bI
+                    → ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                        {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now nid src ord rid nid′ src′ ord′ rid′}
+                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                    → freshId nodeᵏ (Sched.mint sP) ≡ nid → freshId sourceᵏ (Sched.mint sP) ≡ src
+                    → freshId ordinalᵏ (Sched.mint sP) ≡ ord → freshId regᵏ (Sched.mint sP) ≡ rid
+                    → freshId nodeᵏ (Sched.mint sI) ≡ nid′ → freshId sourceᵏ (Sched.mint sI) ≡ src′
+                    → freshId ordinalᵏ (Sched.mint sI) ≡ ord′ → freshId regᵏ (Sched.mint sI) ≡ rid′
+                    → let stP′ = register rid (atDyn src lo) (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] p)
+                                   (installNode nid (mergeAll-st {t = u} nothing 0 [] false) stP)
+                          stI′ = register rid′ (atDyn src′ lo′) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
+                                   (installNode nid′ (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI)
+                      in Σ (After κ S
+                             ( [] , record sP { mint = setAt regᵏ (suc rid) (setAt nodeᵏ (suc nid) (setAt sourceᵏ (suc src)
+                                                         (setAt ordinalᵏ (suc ord) (Sched.mint sP))))
+                                              ; live = record { source = src ; ordinal = ord ; elemTy = echoᵗ u
+                                                              ; pending = (suc now , (inj₁ tt , inj₂ (Θ , plainExp b , ρ))) ∷ [] }
+                                                       ∷ Sched.live sP }
+                             , stP′ )
+                             ( [] , record sI { mint = setAt regᵏ (suc rid′) (setAt nodeᵏ (suc nid′) (setAt sourceᵏ (suc src′)
+                                                         (setAt ordinalᵏ (suc ord′) (Sched.mint sI))))
+                                              ; live = record { source = src′ ; ordinal = ord′ ; elemTy = echoᵗ (emitᵗ u)
+                                                              ; pending = (suc now , (inj₁ tt , inj₂ (Θ′ , bI , ρ′))) ∷ [] }
+                                                       ∷ Sched.live sI }
+                             , stI′ )) λ A
+                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI′) p q
 
     -- a fresh flattener's nodes, related
     flat-init : ∀ {π} u op → FlatNodes {Γ = Γ} κ π u op (flatSt u op) (flatSt (emitᵗ u) op)
@@ -396,6 +428,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                                 (lookup-set ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)))
           X  = wb w r (After.store (proj₁ I)) (outerExplode~ {op = op} F (proj₂ (proj₂ I))) dP dI
       in unexplode (_⨾_ κ (proj₁ I) (proj₁ X) , proj₂ X)
+
+    -- a defer's walk: the hop's node, source and row on both sides
+    walk-defer : ∀ {Θ u} (b : SExp Γ [] [] Θ u) → Elab-Walks (deferˢ b)
+    walk-defer b w r S pr (subs-defer f₁ f₂ f₃ f₄) (subs-defer g₁ g₂ g₃ g₄) = defer-install b w r refl S pr f₁ f₂ f₃ f₄ g₁ g₂ g₃ g₄
 
     -- a flattener's walk at either elaboration
     walk-flat : ∀ {Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks b → (pi : Bool)
