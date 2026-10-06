@@ -256,23 +256,16 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
-  program, one arm per former; a minted source's chain is `path-pass`, one
-  arm per plain frame; a hot slot's is `fan-go` over the share's readers.
-  Every arm on both halves is a body over leaves. Ruled out: an open
-  merge's window reordering rows or sources; a liveness parting a pair; a
-  merged lane, which a cold's burst refuted, so an outer carrying two
-  inners now explodes; a deeper flattener's subscribe, `make qc-store`
-  green at depth 4 over every policy (seed 21) and at depth 5 through μ
-  and defer (seed 22). Left: which leaf's own step breaks the store.
-
-- **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
-  instant and no two arrivals share one: `cascade-stamps`, a claim the
-  impl's cascade makes one former at a time. State it beside the values split so both recurse on the same
-  configuration, and the monster drops to whichever stays riskier. Ruled
-  out: two instants in one arrival, `make qc-same-clock` now deciding
-  `OneIn` itself, green over a flattener with a cold's two-value burst
-  aimed (seeds 23, 24).
+- **REFUTE OR PROBE THE FINISHING ARMS.** `merge-finish` and
+  `defer-finish` drain the queue a dead inner's merge holds, on both sides,
+  and nothing has ever instantiated either: the least certain step left in
+  the cascade. Aim `make qc-store` at bounded merges whose inner dies with a
+  queue, then write `merge-finish` as a body over the drain's own leaf.
+  Ruled out: an open merge's window reordering rows or sources; a liveness
+  parting a pair; a merged lane, so an outer carrying two inners explodes;
+  a deeper flattener's subscribe (seeds 21, 22); the quiet scan and open
+  test, now bodies over `scan-write` and `while-write`. Left: whether a
+  drained queue keeps the store.
 
 - **REFUTE OR CARRY `Sound` AT THE WALK.** `of-fold` (`walk-of`'s and
   `emptyˢ`'s fold) is `path-pass` past a derivation, which asks `Sound` of
@@ -283,6 +276,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   the μ peel needing the pass; `μ-unfolds` at the probed binders, so a
   scan's or a test's binder is what is left.
 
+- **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
+  instant and no two arrivals share one: `cascade-stamps`, a claim the
+  impl's cascade makes one former at a time. State it beside the values split so both recurse on the same
+  configuration, and the monster drops to whichever stays riskier. Ruled
+  out: two instants in one arrival, `make qc-same-clock` now deciding
+  `OneIn` itself, green over a flattener with a cold's two-value burst
+  aimed (seeds 23, 24).
+
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
   the μ peel, the flattener's hop and a share's connect; the batcher's
@@ -292,6 +293,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
+- **`merge-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's dead
+  inner finishes on both sides, each folding the group down its tail and
+  draining the related queues.
+- **`defer-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead
+  deferred body finishes on both sides, through the hop's marker merge's finish
+  ahead of it.
 - **`quiet-{sink,explode}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
   valueless group through a share's readers, or an exploded outer, folded on
   the impl side alone with the plain side still.
@@ -309,12 +316,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`explode-{quiet,one,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: one
   exploded emit, carrying nothing or one value, walks into the flattener
   through the impl's merge, and the outer's end meets the plain outer's.
-- **`merge-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's dead
-  inner finishes on both sides, each folding the group down its tail and
-  draining the related queues.
-- **`defer-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead
-  deferred body finishes on both sides, through the hop's marker merge's finish
-  ahead of it.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   a cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped
