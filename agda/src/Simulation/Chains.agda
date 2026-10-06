@@ -35,7 +35,7 @@ open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; RegId; RegRo
   sameSource; schedGo; cascadeOpen; share-sink)
 open import Rx.Evaluator.Domain using (cascadeGo⇓; casc-nil; casc-cut; casc-live)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
-open import Simulation.Pass using (dynRow; Paired; SlotPair; slotpair; head; HotStart; hot-idle; hot-block)
+open import Simulation.Pass using (dynRow; Paired; SlotPair; slotpair; head; HotStart; hot-idle; hot-block; cons-skip; cons-take; admit-slot; admit-skip; slot-there; slot-mach)
 open import Simulation.Pop using (pp-popped)
 open import Simulation.Sweep using (t≢f; sameSource-lt; sameSource-no; same-refl; count-hit; count-pass; arr-rows; raw≢stamped; raw<ₙ)
 open import Simulation.Schedules using (Popped; pop; sched-pop; HeadOf)
@@ -63,14 +63,6 @@ module _ {n} {Δ : Ctx n} {t} where
   ... | true  | yes refl = (rid , lo , p) , refl , refl
   ... | true  | no ¬p    = ⊥-elim (¬p refl)
   ... | false | _        = ⊥-elim (subst T e₁ (≡⇒≡ᵇ (arrSource a) (arrSource a) refl))
-
--- two pointwise lists, one pair apart from a common tail
-cons-skip : ∀ {A B : Set} {P : A → B → Set} {xs ys xs′ ys′} → xs ≡ xs′ → ys ≡ ys′ → Pointwise P xs′ ys′ → Pointwise P xs ys
-cons-skip refl refl pw = pw
-
--- the same, for a pair that does contribute one chain on each side
-cons-take : ∀ {A B : Set} {P : A → B → Set} {xs ys x y xs₁ ys₁} → xs ≡ x ∷ xs₁ → ys ≡ y ∷ ys₁ → P x y → Pointwise P xs₁ ys₁ → Pointwise P xs ys
-cons-take refl refl p pw = p ∷ pw
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -219,36 +211,7 @@ chains-slot a {rid} {i} {p = p} e refl with sameSource (arrSource a) (toℕ i) i
 ... | true  | no ¬p    = ⊥-elim (¬p refl)
 ... | false | _        = ⊥-elim (subst T e₁ (≡⇒≡ᵇ (arrSource a) (toℕ i) e))
 
--- a row at the share's own slot and type is admitted next
-admit-slot : ∀ {m} {Δ : Ctx m} {t} {k : Fin m} {rid u} {p : Path Δ (suc (toℕ k)) u t} {rest}
-           → (e′ : u ≡ lookup Δ k)
-           → Σ _ λ q → shareAdmit k ((rid , atSlot k , (u , p)) ∷ rest) ≡ (rid , q) ∷ shareAdmit k rest
-                       × _≡_ {A = RegRow Δ t} (rid , atSlot k , (lookup Δ k , q)) (rid , atSlot k , (u , p))
-admit-slot {Δ = Δ} {k = k} {rid} {p = p} refl with k ≟ᶠ k | lookup Δ k ≟ᵗ lookup Δ k
-... | yes refl | yes refl = p , refl , refl
-... | yes refl | no ¬p    = ⊥-elim (¬p refl)
-... | no ¬e    | _        = ⊥-elim (¬e refl)
-
--- a row at another slot is not admitted
-admit-skip : ∀ {m} {Δ : Ctx m} {t} {k j : Fin m} {rid u} {p : Path Δ (suc (toℕ j)) u t} {rest}
-           → k ≢ j → shareAdmit k ((rid , atSlot j , (u , p)) ∷ rest) ≡ shareAdmit k rest
-admit-skip {Δ = Δ} {k = k} {j} {u = u} ne with k ≟ᶠ j | u ≟ᵗ lookup Δ k
-... | no _  | _ = refl
-... | yes e | _ = ⊥-elim (ne e)
-
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
-
-  -- a pair the tail of a relation partners, the whole relation does
-  slot-there : ∀ {t π NP NI LP LI r r′ rs rs′} (x : RowRel {Γ = Γ} κ π {t} NP NI LP LI r r′) {q : RegRel {Γ = Γ} κ π NP NI LP LI rs rs′}
-                 {CP CI i u c d}
-             → SlotPair q CP CI i {u} c d → SlotPair (x ∷ q) CP CI i c d
-  slot-there x (slotpair (inj₁ c))           = slotpair (inj₁ c)
-  slot-there x (slotpair (inj₂ (a , b , p))) = slotpair (inj₂ (a , b , inj₂ p))
-
-  slot-mach : ∀ {t π NP NI LP LI r′ rs rs′} (x : MachRow {Γ = Γ} κ π {t} NP NI LP LI r′) {q : RegRel {Γ = Γ} κ π NP NI LP LI rs rs′}
-                {CP CI i u c d}
-            → SlotPair q CP CI i {u} c d → SlotPair (mach x q) CP CI i c d
-  slot-mach x (slotpair p) = slotpair p
 
   -- A HOT SLOT'S READERS PAIR UP, in order, with the rows its share
   -- admits: a minted source's row sits above every slot, and the impl's
@@ -264,23 +227,23 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   ... | no ne =
     cons-skip (chains-skip a (sameSource-no (λ x → ne (toℕ-injective (trans (sym e) x)))))
               (admit-skip (λ x → ne (↑ʳ-injective n i j x)))
-              (pw-map (slot-there _) (slot-rows e ty q ab usP usI))
+              (pw-map (slot-there κ _) (slot-rows e ty q ab usP usI))
   ... | yes refl with chains-slot a {i = i} e (sym ty) | admit-slot {k = n ↑ʳ i} (sym ([ hotEq {Γ = Γ} κ i , sharedEq {Γ = Γ} κ i ] hk))
   ...   | c , h , d | c′ , h′ , d′ =
-    cons-take h h′ (slotpair (inj₂ (uP , uI , inj₁ (d , d′)))) (pw-map (slot-there _) (slot-rows e ty q ab usP usI))
+    cons-take h h′ (slotpair (inj₂ (uP , uI , inj₁ (d , d′)))) (pw-map (slot-there κ _) (slot-rows e ty q ab usP usI))
   slot-rows {a = a} {i} e ty (cold~ {src = src} sp ib pr refl ∷ q) (ab₀ ∷ ab) (_ ∷ usP) (_ ∷ usI) =
     cons-skip (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
               refl
-              (pw-map (slot-there _) (slot-rows e ty q ab usP usI))
+              (pw-map (slot-there κ _) (slot-rows e ty q ab usP usI))
   slot-rows {a = a} {i} e ty (defer~ {src = src} sp pi lnP lnI pr refl ∷ q) (ab₀ ∷ ab) (_ ∷ usP) (_ ∷ usI) =
     cons-skip (chains-skip a (sameSource-no (λ x → <⇒≢ (<-≤-trans (toℕ<n i) (above-≤ ab₀)) (trans (sym e) x))))
               refl
-              (pw-map (slot-there _) (slot-rows e ty q ab usP usI))
+              (pw-map (slot-there κ _) (slot-rows e ty q ab usP usI))
   slot-rows {i = i} e ty (mach x@(hot~ {i = j} hot ib refl) q) ab usP (_ ∷ usI) =
     cons-skip refl
               (admit-skip (λ y → <⇒≢ (<-≤-trans (toℕ<n j) (m≤m+n n (toℕ i)))
                                      (sym (trans (sym (toℕ-↑ʳ n i)) (trans (cong toℕ y) (toℕ-↑ˡ j n))))))
-              (pw-map (slot-mach x) (slot-rows e ty q ab usP usI))
+              (pw-map (slot-mach κ x) (slot-rows e ty q ab usP usI))
 
 -- A HOT SLOT'S CHAINS PAIR UP with the rows its share admits, as
 -- registrations the store relation partners, cut on neither side

@@ -21,18 +21,22 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Unit    using (tt)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
+open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
+open import Data.List.Relation.Unary.All using (All; _∷_)
+open import Data.Bool.ListAction using (any)
+open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; nothing; just)
-open import Data.Nat     using (ℕ; suc; _≤_; _<_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Nat     using (ℕ; suc; _≤_; _<_; _≡ᵇ_)
+open import Data.Nat.Properties using (≤-refl; <⇒≢; <-≤-trans; m≤m+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
-open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Vec     using (lookup)
 open import Data.List.Properties using (++-assoc; ++-identityʳ; map-id)
 open import Relation.Nullary using (yes; no)
+open import Function using (case_of_)
 open import Relation.Nullary.Decidable using (⌊_⌋)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; FnClo; applyClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
@@ -50,7 +54,7 @@ open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src;
   SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~; spent~;
   spentWhile~; outerElem~; outerExplode~; inner~; lane~; elab; deferInner~; InputBlock; block; hotEq;
-  RowRel; read~; cold~; defer~; RegRel; partner-row; Store; Arr)
+  RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach; MachRow; hot~; partner-row; Store; Arr)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
 open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes)
@@ -173,11 +177,72 @@ tail-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {ℓ₂ ℓ₃ ℓ₄ s u w
 tail-of {ks = ks} (on , so) =
   (on-drop (on-drop on) , drop-ot _ _ _ (drop-ot _ _ _ so)) , on-drop (head-on _ _ _ ks (self-node ks []) so)
 
+-- two pointwise lists, one pair apart from a common tail
+cons-skip : ∀ {A B : Set} {P : A → B → Set} {xs ys xs′ ys′} → xs ≡ xs′ → ys ≡ ys′ → Pointwise P xs′ ys′ → Pointwise P xs ys
+cons-skip refl refl pw = pw
+
+-- the same, for a pair that does contribute one chain on each side
+cons-take : ∀ {A B : Set} {P : A → B → Set} {xs ys x y xs₁ ys₁} → xs ≡ x ∷ xs₁ → ys ≡ y ∷ ys₁ → P x y → Pointwise P xs₁ ys₁ → Pointwise P xs ys
+cons-take refl refl p pw = p ∷ pw
+
+-- a row at the share's own slot and type is admitted next
+admit-slot : ∀ {m} {Δ : Ctx m} {t} {k : Fin m} {rid u} {p : Path Δ (suc (toℕ k)) u t} {rest}
+           → (e′ : u ≡ lookup Δ k)
+           → Σ _ λ q → shareAdmit k ((rid , atSlot k , (u , p)) ∷ rest) ≡ (rid , q) ∷ shareAdmit k rest
+                       × _≡_ {A = RegRow Δ t} (rid , atSlot k , (lookup Δ k , q)) (rid , atSlot k , (u , p))
+admit-slot {Δ = Δ} {k = k} {rid} {p = p} refl with k ≟ᶠ k | lookup Δ k ≟ᵗ lookup Δ k
+... | yes refl | yes refl = p , refl , refl
+... | yes refl | no ¬p    = ⊥-elim (¬p refl)
+... | no ¬e    | _        = ⊥-elim (¬e refl)
+
+-- a row at another slot is not admitted
+admit-skip : ∀ {m} {Δ : Ctx m} {t} {k j : Fin m} {rid u} {p : Path Δ (suc (toℕ j)) u t} {rest}
+           → k ≢ j → shareAdmit k ((rid , atSlot j , (u , p)) ∷ rest) ≡ shareAdmit k rest
+admit-skip {Δ = Δ} {k = k} {j} {u = u} ne with k ≟ᶠ j | u ≟ᵗ lookup Δ k
+... | no _  | _ = refl
+... | yes e | _ = ⊥-elim (ne e)
+
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ public
   open Takes {Γ = Γ} κ using (module Count)
   open Scans {Γ = Γ} κ using (module Cells)
+
+  -- a pair the tail of a relation partners, the whole relation does
+  slot-there : ∀ {t π NP NI LP LI r r′ rs rs′} (x : RowRel {Γ = Γ} κ π {t} NP NI LP LI r r′) {q : RegRel {Γ = Γ} κ π NP NI LP LI rs rs′}
+                 {CP CI i u c d}
+             → SlotPair q CP CI i {u} c d → SlotPair (x ∷ q) CP CI i c d
+  slot-there x (slotpair (inj₁ c))           = slotpair (inj₁ c)
+  slot-there x (slotpair (inj₂ (a , b , p))) = slotpair (inj₂ (a , b , inj₂ p))
+
+  slot-mach : ∀ {t π NP NI LP LI r′ rs rs′} (x : MachRow {Γ = Γ} κ π {t} NP NI LP LI r′) {q : RegRel {Γ = Γ} κ π NP NI LP LI rs rs′}
+                {CP CI i u c d}
+            → SlotPair q CP CI i {u} c d → SlotPair (mach x q) CP CI i c d
+  slot-mach x (slotpair p) = slotpair p
+
+  -- A SHARE'S READERS PAIR UP, in order, with the rows its stamped share
+  -- admits: a minted source's row is admitted by neither, and the impl's
+  -- raw slot is below every stamped one
+  share-rows′ : ∀ {t π NP NI LP LI rg rg′} {i : Fin n} {CP CI}
+              → (rr : RegRel {Γ = Γ} κ π {t} NP NI LP LI rg rg′)
+              → All (λ r → any (_≡ᵇ proj₁ r) CP ≡ false) rg → All (λ r → any (_≡ᵇ proj₁ r) CI ≡ false) rg′
+              → Pointwise (ShareSlot rr CP CI i) (shareAdmit i rg) (shareAdmit (n ↑ʳ i) rg′)
+  share-rows′ [] _ _ = []
+  share-rows′ {i = i} (read~ {i = j} hk pr refl ∷ q) (uP ∷ usP) (uI ∷ usI) = case i ≟ᶠ j of λ where
+    (no ne) →
+      cons-skip (admit-skip ne) (admit-skip (λ x → ne (↑ʳ-injective n i j x)))
+                (pw-map (slot-there _) (share-rows′ q usP usI))
+    (yes refl) →
+      let (_ , h , d)   = admit-slot {k = i} refl
+          (_ , h′ , d′) = admit-slot {k = n ↑ʳ i} (sym ([ hotEq {Γ = Γ} κ i , sharedEq {Γ = Γ} κ i ] hk))
+      in cons-take h h′ (slotpair (inj₂ (uP , uI , inj₁ (d , d′)))) (pw-map (slot-there _) (share-rows′ q usP usI))
+  share-rows′ (cold~ sp ib pr refl ∷ q) (_ ∷ usP) (_ ∷ usI) = pw-map (slot-there _) (share-rows′ q usP usI)
+  share-rows′ (defer~ sp pi lnP lnI pr refl ∷ q) (_ ∷ usP) (_ ∷ usI) = pw-map (slot-there _) (share-rows′ q usP usI)
+  share-rows′ {i = i} (mach x@(hot~ {i = j} hot ib refl) q) usP (_ ∷ usI) =
+    cons-skip refl
+              (admit-skip (λ y → <⇒≢ (<-≤-trans (toℕ<n j) (m≤m+n n (toℕ i)))
+                                     (sym (trans (sym (toℕ-↑ʳ n i)) (trans (cong toℕ y) (toℕ-↑ˡ j n))))))
+              (pw-map (slot-mach x) (share-rows′ q usP usI))
 
   -- WHAT `elemᵛ` MAKES OF AN OUTER EMIT CARRYING ONE ELEMENT: an echo
   -- always, carrying the element's echoed value if it has one, beside
@@ -253,6 +318,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     open Run {t} {ep} {ei} public
     open Count {t} {ep} {ei} using (take-arm; takeWhile-arm)
     open Cells {t} {ep} {ei} using (scan-arm)
+
+    -- a share's readers, as registrations the store partners
+    share-rows : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n}
+               → Pointwise (ShareSlot (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i)
+                   (shareAdmit i (EvalSt.registry stP)) (shareAdmit (n ↑ʳ i) (EvalSt.registry stI))
+    share-rows S = share-rows′ (Store.rows S) (proj₁ (Store.uncut S)) (proj₂ (Store.uncut S))
 
 
     ----------------------------------------------------------------
@@ -893,11 +964,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- two constructors and an inner's three are split once their arm is
     -- the riskiest.
     postulate
-      -- A SHARE'S READERS PAIR UP, in order, with the rows its stamped
-      -- share admits, as registrations the store partners
-      share-rows   : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
-                   → Pointwise (ShareSlot (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i)
-                       (shareAdmit i (EvalSt.registry stP)) (shareAdmit (n ↑ʳ i) (EvalSt.registry stI))
       -- A SHARE CLOSED ON BOTH SIDES, before its end is delivered
       share-spend  : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
                    → After S ([] , sP , shareSpend i stP) ([] , sI , shareSpend (n ↑ʳ i) stI)
@@ -1201,7 +1267,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         where
           ε = sharedEq {Γ = Γ} κ i sh
           D = share-spend S sh
-          fan = λ S′ c → share-go S′ ε c (share-rows S′ sh) (admit-ot i _ _ (Store.ruleP S′)) (admit-agrees i (Store.ruleP S′))
+          fan = λ S′ c → share-go S′ ε c (share-rows S′) (admit-ot i _ _ (Store.ruleP S′)) (admit-agrees i (Store.ruleP S′))
                            (admit-ot (n ↑ʳ i) _ _ (Store.ruleI S′)) (admit-agrees (n ↑ʳ i) (Store.ruleI S′))
       share-walk S {i = i} {h = h} {h′ = h′} sh (quiet x b c) wP (walk-more gI wI) =
         Q ⨾ share-walk (After.store Q) {h = h} {h′ = h′} sh c wP wI
@@ -1214,7 +1280,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         A ⨾ share-walk (After.store A) {h = h} {h′ = h′} sh c wP wI
         where
           ε = sharedEq {Γ = Γ} κ i sh
-          A = share-go S ε (carries-cast ε (one x r [])) (share-rows S sh)
+          A = share-go S ε (carries-cast ε (one x r [])) (share-rows S)
                 (admit-ot i _ _ (Store.ruleP S)) (admit-agrees i (Store.ruleP S))
                 (admit-ot (n ↑ʳ i) _ _ (Store.ruleI S)) (admit-agrees (n ↑ʳ i) (Store.ruleI S)) gP gI
 
