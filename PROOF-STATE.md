@@ -276,11 +276,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   configuration, and the monster drops to whichever stays riskier.
 
 - **CUT AT A TAKE AS AT A SWITCH.** `Simulation.Cut` keeps the stores
-  under a cut at either of the first two members of a key's run, so a
-  spent budget drops the same rows on both sides. Left: `{take,takeWhile}-arm`
-  as bodies over both folds, ending in `spent~`/`spentWhile~` once the two
-  nodes are written zero over kept rows naming neither. Decides whether the
-  impl's cut cell spends where the plain count does.
+  under a cut at either of the first two members of a key's run. Left:
+  `while-cut` as a body over `cut-go`/`cut-keeps`/`cut-persists` and a
+  zero-write leaf, ending in `spentWhile~`; then `take-end`, where the impl's
+  merge finish folds the tail on an open group and hands the end up empty.
+  Ruled out: an impl cut cell spending anywhere but where the plain count
+  does (`cut-group`).
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -313,8 +314,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`{block,hop}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
   chain's input block hands its path the popped head; a deferred hop subscribes
   its body on both sides.
-- **`{scan,take,takeWhile}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
-  cell, count or test steps alike on both sides; a cut takes rows on both.
+- **`scan-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cell steps
+  alike on both sides.
+- **`take-{write,end,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
+  count's nodes written open keep the stores and tails; a group that ends meets
+  the impl merge's finish, which folds the tail before handing up the end; a
+  spent count passes nothing on both sides.
+- **`while-{write,cut,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
+  test's nodes written open keep the stores and tails; a cut severs and zeroes
+  both tests; a spent test passes nothing on both sides.
 - **`sink-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group reaching
   a shared slot's subject fans out to related readers on both sides.
 - **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits
@@ -341,7 +349,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
-- **`fold-unmoved`** (Simulation.Pass) — DIFFICULTY, `TWIN`: a fold leaves a
+- **`fold-unmoved`** (Simulation.Arm) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
