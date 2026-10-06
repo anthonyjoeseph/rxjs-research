@@ -238,7 +238,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (_∷_ {r = r₀} {r′ = r₀′} {rs = rs₀} {rs′ = rs₀′} rr@(defer~ _ _ _ _ _ refl) q) (ar , ars) (h , d) with arr-dec ar
   ... | inj₁ (e , e′) = spent-skip₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
   ... | inj₂ (e , e′) = spent-keep₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
-  spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (mach {rs′ = rs₀′} {r′ = r₀′} m@(hot~ {i = i} _ _ refl) q) ars d =
+  spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (mach {r′ = r₀′} {rs′ = rs₀′} m@(hot~ {i = i} _ _ refl) q) ars d =
     spent-keepI {rs′ = rs₀′} {r′ = r₀′} s′ (mach m (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars)) (mach-lt i na′) (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
 
 ------------------------------------------------------------------
