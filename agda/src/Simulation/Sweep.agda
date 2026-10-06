@@ -29,7 +29,6 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Rx.Exp       using (Ctx)
 open import Rx.Prim      using (Source)
 open import Rx.Evaluator using (LiveSource; RegRow; regSource; sameSource; memberSource; sweepLive)
-open import Decide       using (≡ᵇ-sym)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
@@ -189,6 +188,12 @@ arr-same : ∀ {s s′ src src′ u u′ x x′} → ArrRel s s′ u u′ src sr
 arr-same ar with arr-dec ar
 ... | inj₁ (e , e′) = trans e (sym e′)
 ... | inj₂ (e , e′) = trans e (sym e′)
+
+≡ᵇ-sym : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ (k ≡ᵇ m)
+≡ᵇ-sym zero    zero    = refl
+≡ᵇ-sym zero    (suc k) = refl
+≡ᵇ-sym (suc m) zero    = refl
+≡ᵇ-sym (suc m) (suc k) = ≡ᵇ-sym m k
 
 -- a pair of one-source lists holds a pair of sources alike
 member-one : ∀ s s′ x x′ → sameSource s x ≡ sameSource s′ x′ → memberSource x (s ∷ []) ≡ memberSource x′ (s′ ∷ [])

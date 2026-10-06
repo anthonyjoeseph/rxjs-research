@@ -61,12 +61,6 @@ open import Relation.Binary.PropositionalEquality
 ≡ᵇ→≡ zero    zero    _ = refl
 ≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
 
-≡ᵇ-sym : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ (k ≡ᵇ m)
-≡ᵇ-sym zero    zero    = refl
-≡ᵇ-sym zero    (suc k) = refl
-≡ᵇ-sym (suc m) zero    = refl
-≡ᵇ-sym (suc m) (suc k) = ≡ᵇ-sym m k
-
 ------------------------------------------------------------------
 -- CONJUNCTION IN `T` FORM, AND THE BOOLS ARE EXPLICIT ON PURPOSE.
 -- `T` is a FUNCTION on `Bool`, not a datatype, so `T ?a =?= T (f k x)`
