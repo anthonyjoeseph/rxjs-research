@@ -44,14 +44,14 @@ open import Rx.Prim      using (Source)
 open import Rx.Evaluator using (Arrival; Sched; EvalSt; RegRow; atSlot; regSource; sameSource; memberSource; cascadeClose; shareSpend; shareDying;
   share-sink; Path; lookupNode; pathHasNode; aliveThroughᶠ; arrTy; arrTick; chainsOf; NodeId; NodeState; setNode; thruWrap;
   mergeAllᵒ; map-f; batchSync-f; thru-outer; _↠[_]_; mergeAll-st; batchSync-st)
-open import Rx.Evaluator.Domain using (chainStep⇓; dispatchShare⇓; cascadeGo⇓; casc-cut; casc-live; casc-nil; foldPath⇓; fold-step; fold-sink;
-  step-map; step-batchSync; step-from-inner; step-thru-outer; react-alive; react-dead; finish-all-drain; finish-nil; drain-spent; walk-nil;
-  disp; chain-step)
+open import Rx.Evaluator.Domain using (chainStep⇓; dispatchShare⇓; cascadeGo⇓; casc-cut; casc-live; casc-nil; foldPath⇓; fold-step;
+  step-map; step-batchSync; step-from-inner; step-thru-outer; react-alive; react-dead;
+  finish-all-drain; finish-nil; drain-spent; walk-nil; chain-step)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr)
 open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame)
-open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle)
+open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle; sink-at; disp-quiet)
 open import Simulation.Pass.Inner using (module PassI)
 open PassI.InI using (carriesU-nil)
 open import Simulation.Pass.Quiet using (usable-self)
@@ -141,19 +141,9 @@ outer-end : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo ℓ w now nid} {le : 
 outer-end {nid = nid} {st = st} fp e with lookupNode nid (EvalSt.nodes st) | e | outer-nil fp
 ... | _ | refl | f = f
 
-sink-at : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {ℓ now} {k : Fin m} {h : ℓ ≤ toℕ k} {w} (eq : lookup Δ k ≡ w) {fin sched st r}
-        → foldPath⇓ {e = e} now (subst (λ w → Path Δ ℓ w u) eq (share-sink k h)) [] fin sched st r
-        → dispatchShare⇓ now k h [] fin sched st r
-sink-at refl (fold-sink d) = d
-
 fin-at : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w now} {p : Path Δ lo w u} {vals c c′ sched st r}
        → c ≡ c′ → foldPath⇓ {e = e} now p vals c sched st r → foldPath⇓ now p vals c′ sched st r
 fin-at refl f = f
-
--- the share handed nothing, and no end, does nothing
-disp-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {ℓ now} {k : Fin m} {h : ℓ ≤ toℕ k} {sched st r}
-           → dispatchShare⇓ {e = e} now k h [] false sched st r → r ≡ ([] , sched , st)
-disp-quiet (disp walk-nil) = refl
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 

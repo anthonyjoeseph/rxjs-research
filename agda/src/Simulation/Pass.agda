@@ -25,6 +25,8 @@ open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (nothing; just)
+open import Data.List.Properties using (++-identityʳ)
+open import Relation.Nullary using (yes; no)
 open import Data.Nat     using (suc; _≤_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
@@ -32,15 +34,16 @@ open import Data.Sum     using (inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
-open import Rx.Exp       using (Ctx; Closed; Val; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ;
+open import Rx.Exp       using (Ctx; Closed; Val; Ty; _≟ᵗ_; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ;
   inrᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying;
   memberSource; Path; share-sink; _↠[_]_; map-f; batchSync-f; thru-outer; from-inner;
   mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap; RegId; RegRow; AtFloor;
-  atDyn; atSlot; chainsOf; aliveThroughᶠ)
+  atDyn; atSlot; chainsOf; aliveThroughᶠ; batchSync-st; batchVals; setNode)
 open import Rx.Evaluator.Domain using (foldPath⇓; fold-step; stepFrame⇓; step-map; step-thru-outer; step-from-inner; react-false;
   react-alive; react-dead; innerFinish⇓; thruWalk⇓; chainStep⇓; cascadeGo⇓; casc-nil; casc-cut;
-  casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
+  casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓; step-batchSync; fold-sink; disp; walk-nil;
+  chain-step)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
 open import SExp.Elaborate using (inputStampᵖ)
 open import Simulation.Stores using (srcCount; SrcPair; PathRel; InputBlock; block; hotEq; RowRel; cold~; defer~; []; _∷_;
@@ -54,6 +57,29 @@ open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; sub-ot; Agree)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Path using (module PassP)
 open import Simulation.Pass.Quiet using (SlotPair; delivered; slotpair; unchain)
+
+-- AN OPEN BRACKET FLUSHES WHAT IT IS HANDED, each value its own group,
+-- and rewrites its own node as it was
+batch-flush : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo s now nid} {p : Path Δ lo (s ×ᵗ listᵗ s) u}
+                {vals fin sched} {st : EvalSt e} {r}
+            → stepFrame⇓ now (batchSync-f nid) p vals fin sched st r
+            → lookupNode nid (EvalSt.nodes st) ≡ just (batchSync-st {s = s} false [] false)
+            → r ≡ ([] , batchVals false vals , fin , sched
+                  , record st { nodes = setNode nid (batchSync-st {s = s} false [] false) (EvalSt.nodes st) })
+batch-flush {s = s} {nid = nid} {st = st} step-batchSync e with lookupNode nid (EvalSt.nodes st) | e
+... | _ | refl with s ≟ᵗ s
+...   | yes refl = refl
+...   | no ne    = ⊥-elim (ne refl)
+
+sink-at : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {ℓ now} {k : Fin m} {h : ℓ ≤ toℕ k} {w} (eq : lookup Δ k ≡ w) {fin sched st r}
+        → foldPath⇓ {e = e} now (subst (λ w → Path Δ ℓ w u) eq (share-sink k h)) [] fin sched st r
+        → dispatchShare⇓ now k h [] fin sched st r
+sink-at refl (fold-sink d) = d
+
+-- the share handed nothing, and no end, does nothing
+disp-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {ℓ now} {k : Fin m} {h : ℓ ≤ toℕ k} {sched st r}
+           → dispatchShare⇓ {e = e} now k h [] false sched st r → r ≡ ([] , sched , st)
+disp-quiet (disp walk-nil) = refl
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -311,22 +337,55 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → HotEnd S a a′ i eI sI₃ stI₃
 
     postulate
-      -- THE IMPL'S ONE CHAIN AT A HOT ARRIVAL'S RAW SLOT, ONCE ITS SHARE HAS
-      -- CONNECTED: the raw row's step over the arrival's value, its input
-      -- block run alone into the share.  What it owes is the block's run:
-      -- the one stamped emit carrying the value, the plain side not moving
-      hot-block : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-                → (hot : lookup κ i ≡ hotᵏ)
-                → Head (toℕ i) (toℕ (i ↑ˡ n)) {arrTy a} {arrTy a′} (arrVal a ∷ []) (arrVal a′ ∷ [])
-                → arrTy a ≡ lookup Γ i
-                → ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)}
-                → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
-                → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
-                    (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
-                → ∀ {oI sI₁ stI₁}
-                → chainStep⇓ a′ (arrVal a′ ∷ []) false (suc (toℕ (i ↑ˡ n)) , q) sI
-                    (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
-                → HotStart S a a′ i oI sI₁ stI₁
+      -- THE HOT BLOCK PAST ITS BRACKET: the stamp the bracket's one group
+      -- makes is subscribed through the block's merge, and its value
+      -- reaches the share.  What it owes is the start's: the block's run
+      -- related, the one stamped emit carrying the value, the plain side
+      -- not moving
+      hot-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+               → (hot : lookup κ i ≡ hotᵏ)
+               → Head (toℕ i) (toℕ (i ↑ˡ n)) {arrTy a} {arrTy a′} (arrVal a ∷ []) (arrVal a′ ∷ [])
+               → arrTy a ≡ lookup Γ i
+               → ∀ {v} → _≡_ {A = Σ Ty (Val (plainᵏ Γ κ))} (arrTy a′ , arrVal a′) (plainᵗ (lookup Γ i) , v)
+               → ∀ {rid ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+                   {h₁ : suc (toℕ (i ↑ˡ n)) ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ}
+                   {h : ℓ ≤ toℕ (n ↑ʳ i)}
+               → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i))
+                   (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)))))))
+                   (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
+               → ∀ {oW sW stW}
+               → thruWalk⇓ mergeAllᵒ m2 (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)) (arrTick a′)
+                   (thruEvents (map (applyClo {s = obs (emitᵗ (lookup Γ i))} {t = echoᵗ (emitᵗ (lookup Γ i))} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
+                                 (map (applyClo {s = (unitᵗ +ᵗ plainᵗ (lookup Γ i)) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ (lookup Γ i))} {t = obs (emitᵗ (lookup Γ i))} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃))
+                                   (batchVals false (map (applyClo {s = plainᵗ (lookup Γ i)} {t = unitᵗ +ᵗ plainᵗ (lookup Γ i)} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) (v ∷ []))))))
+                   sI (record (record stI { delivered = rid ∷ EvalSt.delivered stI })
+                         { nodes = setNode b (batchSync-st {s = unitᵗ +ᵗ plainᵗ (lookup Γ i)} false [] false) (EvalSt.nodes stI) })
+                   (oW , sW , stW)
+               → HotStart S a a′ i oW sW stW
+
+    -- THE IMPL'S ONE CHAIN AT A HOT ARRIVAL'S RAW SLOT, ONCE ITS SHARE HAS
+    -- CONNECTED: the raw row's step over the arrival's value, its input
+    -- block run alone into the share.  With no end the inner reacts to
+    -- nothing, the bracket flushes the one value, and the tail below the
+    -- merge is handed nothing
+    hot-block : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+              → (hot : lookup κ i ≡ hotᵏ)
+              → Head (toℕ i) (toℕ (i ↑ˡ n)) {arrTy a} {arrTy a′} (arrVal a ∷ []) (arrVal a′ ∷ [])
+              → arrTy a ≡ lookup Γ i
+              → ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)}
+              → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
+              → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
+                  (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
+              → ∀ {oI sI₁ stI₁}
+              → chainStep⇓ a′ (arrVal a′ ∷ []) false (suc (toℕ (i ↑ˡ n)) , q) sI
+                  (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
+              → HotStart S a a′ i oI sI₁ stI₁
+    hot-block S {a′ = record { elemTy = _ ; payload = v }} {i = i} hot hd ty refl ib@(block _ _ eb _ _ _ _ _)
+      (chain-step (fold-step step-map (fold-step (step-from-inner react-false)
+        (fold-step SB (fold-step step-map (fold-step step-map (fold-step (step-thru-outer W) fq)))))))
+      with batch-flush SB eb
+    ... | refl with disp-quiet (sink-at (hotEq {Γ = Γ} κ i hot) fq)
+    ...   | refl = subst (λ o → HotStart S _ _ i o _ _) (sym (++-identityʳ _)) (hot-walk S hot hd ty refl ib W)
 
     -- a minted source's partnered chain, by the row the store pairs it with
     row-pass : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u u′} {vs : List (Val Γ u)} {vs′ : List (Val (plainᵏ Γ κ) u′)}

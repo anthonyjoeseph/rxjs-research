@@ -351,9 +351,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   readers.
 - **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits
   sent to the root read as the plain group's values.
-- **`hot-block`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a connected hot
-  slot's raw row steps its input block alone and hands the share one emit
-  carrying the value; the plain side does not move.
+- **`hot-walk`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: past a connected
+  hot slot's flushed bracket, the block's merge subscribes the one stamp and
+  hands the share one emit carrying the value; the plain side does not move.
 - **`{restamp,delivery}-rel`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
   slot reader's restamp and a hop's delivery keep the values an emit carries.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
