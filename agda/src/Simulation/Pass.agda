@@ -35,9 +35,9 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
-open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; FnClo; applyClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
+open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; FnClo; applyClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arrival; arrVal; arrTy; arrTick; cascadeClose;
-  shareSpend; shareDying; memberSource; Path; share-sink; _↠[_]_; scan-f; take-f; map-f;
+  shareSpend; shareDying; memberSource; Path; share-sink; _↠[_]_; scan-f; take-f; map-f; batchSync-f;
   thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap;
   setNode; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ; RegId;
   RegRow; AtFloor; atDyn; atSlot; chainsOf)
@@ -45,11 +45,11 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step
   thruConsume⇓; inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub; consume-switch-nil; subscribeInner⇓; subscribeE⇓; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
-open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
+open import SExp.Elaborate using (inputStampᵖ; restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src;
   SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~; spent~;
-  spentWhile~; outerElem~; outerExplode~; inner~; lane~; elab; deferInner~; InputBlock; hotEq;
+  spentWhile~; outerElem~; outerExplode~; inner~; lane~; elab; deferInner~; InputBlock; block; hotEq;
   RowRel; read~; cold~; defer~; RegRel; partner-row; Store; Arr)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
 open import Simulation.Cut using (cut-kill)
@@ -1125,19 +1125,41 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    (After.grows (proj₁ X)) (missed dv cP) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) fl
         in A ⨾ proj₁ X , F , proj₂ X
 
-    -- THE TWO ROWS A MINTED SOURCE'S CHAINS CAN BE.  A cold read's impl
-    -- chain runs its input block before the path its partner runs; a
-    -- deferred hop's walks the hop's merge on both sides, then ends it.
+    -- THE TWO ROWS A MINTED SOURCE'S CHAINS CAN BE, each a walk and an
+    -- end.  A cold read's impl chain runs its input block alone into a
+    -- merge whose walk folds the path its partner runs; a deferred hop's
+    -- walks the hop's merge on both sides.
     postulate
-      block-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
-                → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
-                → ∀ {lo′ ℓ ℓ′} {p : Path Γ ℓ s t} {full : Path (plainᵏ Γ κ) lo′ (plainᵗ s) (emitᵗ t)}
-                    {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ s) (emitᵗ t)}
-                → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ s) full q
-                → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                → Sound full sI stI
-                → ∀ {now fin rI} → foldPath⇓ now full vs′ fin sI stI rI
-                → Arm S now [] sP stP p vs fin none rI
+      -- A COLD READ'S BLOCK WALKED: the impl alone runs the inner, the
+      -- bracket and the stamp, and its merge's walk folds the tail over
+      -- what the plain path folds the group into
+      block-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
+                 → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
+                 → ∀ {lo ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+                     {h₁ : lo ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                     {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ s) (emitᵗ t)}
+                 → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ s) (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) q
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → Sound p sP stP → Sound (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))))) sI stI
+                 → ∀ {now fin rP o₁ v₁ f₁ s₁ st₁ o₂ v₂ f₂ s₂ st₂ oW sW stW}
+                 → foldPath⇓ now p vs fin sP stP rP
+                 → stepFrame⇓ now (from-inner mergeAllᵒ m1 j1) (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q)))) (map (applyClo {s = plainᵗ s} {t = unitᵗ +ᵗ plainᵗ s} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) vs′)
+                     fin sI stI (o₁ , v₁ , f₁ , s₁ , st₁)
+                 → stepFrame⇓ now (batchSync-f b) (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q))) v₁ f₁ s₁ st₁ (o₂ , v₂ , f₂ , s₂ , st₂)
+                 → thruWalk⇓ mergeAllᵒ m2 q now
+                     (thruEvents (map (applyClo {s = obs (emitᵗ s)} {t = echoᵗ (emitᵗ s)} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
+                                   (map (applyClo {s = (unitᵗ +ᵗ plainᵗ s) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ s)} {t = obs (emitᵗ s)} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃)) v₂)))
+                     s₂ st₂ (oW , sW , stW)
+                 → After S rP (o₁ ++ (o₂ ++ oW) , sW , stW)
+      -- THE BLOCK'S END: the merge wraps up and the impl's tail folds what
+      -- the wrap hands on, the plain path having ended already
+      block-end  : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now m2 ℓ s} {q : Path (plainᵏ Γ κ) ℓ (emitᵗ s) (emitᵗ t)}
+                     {rP o₁ o₂ oW sW stW fin r}
+                 → After S rP (o₁ ++ (o₂ ++ oW) , sW , stW)
+                 → Sound q (proj₁ (proj₂ (thruWrap mergeAllᵒ m2 fin (sW , stW)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ m2 fin (sW , stW))))
+                 → foldPath⇓ now q [] (proj₁ (thruWrap mergeAllᵒ m2 fin (sW , stW)))
+                     (proj₁ (proj₂ (thruWrap mergeAllᵒ m2 fin (sW , stW)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ m2 fin (sW , stW)))) r
+                 → After S rP (o₁ ++ (o₂ ++ (oW ++ proj₁ r)) , proj₂ r)
       -- A DEFERRED HOP'S WALK: the body each emit carries is subscribed
       -- through the hop's merge on both sides, the tails staying related
       hop-walk  : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u} {vs : List (Val Γ (echoᵗ u))} {vs′ : List (Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u)))}
@@ -1165,6 +1187,25 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → Arm S now oP (proj₁ (proj₂ (thruWrap mergeAllᵒ nid fin (sP′ , stP′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))))
                     p [] (proj₁ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))) none (oI ++ proj₁ r , proj₂ r)
 
+
+    -- a cold read's input block: the impl walks it alone into its
+    -- merge, whose walk folds the tail, then ends it
+    block-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
+              → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
+              → ∀ {lo′ ℓ ℓ′} {p : Path Γ ℓ s t} {full : Path (plainᵏ Γ κ) lo′ (plainᵗ s) (emitᵗ t)}
+                  {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ s) (emitᵗ t)}
+              → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ s) full q
+              → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+              → Sound p sP stP → Sound full sI stI
+              → ∀ {now fin rP rI} → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now full vs′ fin sI stI rI
+              → After S rP rI
+    block-arm S hd sp blk@(block {m2 = m2} _ _ _ _ _ _ _ _) r soP si dP
+              (fold-step step-map (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} {fin′ = f₂} d₂ (fold-step step-map (fold-step step-map
+                (fold-step {out₁ = oW} dW@(step-thru-outer W) dR)))))) =
+      let s₁ = drop-ot _ _ _ (step-kept _ d₁ (drop-ot _ _ _ si))
+          s₃ = drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ (step-kept _ d₂ s₁)))
+      in block-end {m2 = m2} {o₁ = o₁} {o₂ = o₂} {oW = oW} {fin = f₂}
+           (block-walk S hd sp blk r soP si dP d₁ d₂ W) (drop-ot _ _ _ (step-kept _ dW s₃)) dR
 
     -- a deferred hop subscribes its body on both sides
     hop-arm   : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u} {vs : List (Val Γ (echoᵗ u))} {vs′ : List (Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u)))}
@@ -1350,5 +1391,5 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
              → Sound p sP stP → Sound p′ sI stI
              → ∀ {now fin rP rI} → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now p′ vs′ fin sI stI rI
              → After S rP rI
-    row-pass S hd (cold~ sp blk r refl) soP soI dP dI = proj₁ (resume (block-arm S hd sp blk r soI dI) soP dP)
+    row-pass S hd (cold~ sp blk r refl) soP soI dP dI = block-arm S hd sp blk r soP soI dP dI
     row-pass S hd (defer~ sp k nP nI r refl) soP soI (fold-step d dP) dI = proj₁ (resume (hop-arm S hd sp k nP nI r soI d dI) (adv d soP) dP)

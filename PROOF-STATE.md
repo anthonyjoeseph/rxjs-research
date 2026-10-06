@@ -316,8 +316,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`{inner,lane,deferInner}-pass`** (Simulation.Pass) — FALSITY,
   `NO EVIDENCE`: an inner still open or alive passes its group on as it came,
   the impl's tail stepping alone.
-- **`block-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold chain's
-  input block hands its path the popped head.
+- **`block-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
+  chain's input block runs alone into a merge whose walk folds the path the
+  plain chain folds the popped head down, and the impl tail's end after it.
 - **`hop-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
   hop's merge subscribes each emit's body on both sides, and its end meets the
   plain hop's.
