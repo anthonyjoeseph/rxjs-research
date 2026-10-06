@@ -322,8 +322,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`hop-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
   hop's merge subscribes each emit's body on both sides, and its end meets the
   plain hop's.
-- **`scan-write`** (Simulation.Scan) — FALSITY, `NO EVIDENCE`: a cell
-  written on both sides keeps the stores and the tails related.
+- **`scan-write`** (Simulation.Scan) — FALSITY, `NO EVIDENCE`: a cell written
+  on both sides keeps the stores and the tails related.
 - **`take-{write,end,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
   count's nodes written open keep the stores and tails; a group that ends meets
   the impl merge's finish, which folds the tail before handing up the end; a
@@ -338,17 +338,21 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`hot-block`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a connected hot
   slot's raw row steps its input block alone and hands the share one emit
   carrying the value; the plain side does not move.
-- **`restamp-rel`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a slot
-  reader's restamp keeps the values its emit carries.
+- **`restamp-rel`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a slot reader's
+  restamp keeps the values its emit carries.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot.
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
-- **`walk-*`** (Simulation.Walk) — FALSITY, `PROBED×7`: one former's subscribe
-  keeps what a pass keeps (`After`); holds at a hot, cold and deferred read. Riskiest is
-  `walk-flatten`, past the typechecker: a one-lane merge only in normal form.
-  No take, scan or `μ` run.
+- **`walk-*`** (Simulation.Walk) — FALSITY, `PROBED×6`: one former's subscribe
+  keeps what a pass keeps (`After`); holds at a hot, cold and deferred read.
+  Riskiest is `walk-flatten`, past the typechecker: a one-lane merge only in
+  normal form. No take or `μ` run.
+- **`lifts-scan`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the elaborated
+  scan's step and seed read the author's variables past the mint's binder.
+- **`scan-install`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a scan's cell
+  installed on both sides pairs in `π` and keeps the tails related.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot
@@ -379,3 +383,5 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   never unlatches a completed source.
 - **`renExp-id`** (Simulation.Walk) — GRINDABLE, `TWIN`: renaming by the
   identity is the identity, the impl's mint body against its elaboration.
+- **`renExp-fuse`** (Simulation.Walk) — GRINDABLE, `TWIN`: two renamings in
+  turn are their composite, the scan's body under the mint.
