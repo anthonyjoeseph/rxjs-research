@@ -330,8 +330,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`share-{spend,finish}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the
   stores stay related when both shares of a shared slot close and drop their
   readers.
-- **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits
-  sent to the root read as the plain group's values.
 - **`hot-walk`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: past a connected
   hot slot's flushed bracket, the block's merge subscribes the one stamp and
   hands the share one emit carrying the value; the plain side does not move.

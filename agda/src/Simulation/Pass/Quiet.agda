@@ -22,11 +22,11 @@ open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Vec     using (lookup)
-open import Data.List.Properties using (++-assoc; map-id)
+open import Data.List.Properties using (++-assoc; ++-identityʳ; map-id)
 open import Relation.Nullary using (yes; no)
 open import Function using (case_of_)
 open import Relation.Nullary.Decidable using (⌊_⌋)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst; subst₂)
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; unitᵗ; _×ᵗ_; _+ᵗ_; obs;
@@ -48,6 +48,9 @@ open import Simulation.Stores using (V; EmitRel; ObsRel; Flattener; FlatNodes; C
   inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
   MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
+open import SExp.Plain   using (plainValues)
+open import SExp.InstEmit.Decode using (decodeEmits)
+open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
@@ -318,12 +321,26 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
          → Head src src′ (arrVal a ∷ []) (arrVal a′ ∷ [])
     nohead : ∀ {u u′} → Head src src′ {u} {u′} [] []
 
-  -- the related values at the root: the emits' payloads in order
-  postulate
-    root-values : ∀ {t es vs} → Carries {t} es vs → ∀ fin
-      → Pointwise (λ x w → V κ t (proj₂ x) w)
-          (readᴵ ((map valueᵖ es ++ (if fin then completeᵖ ∷ [] else [])) ∷ []))
-          (readᴾ ((map valueᵖ vs ++ (if fin then completeᵖ ∷ [] else [])) ∷ []))
+  -- the related values at the root: the emits' payloads in order, a
+  -- valueless emit decoding to none and the end to nothing on either side
+  carried : ∀ {t es vs} → Carries {t} es vs → ∀ fin
+    → Pointwise (λ x w → V κ t (proj₂ x) w)
+        (instExtract (decodeEmits (map valueᵖ es ++ (if fin then completeᵖ ∷ [] else []))))
+        (plainValues (map valueᵖ vs ++ (if fin then completeᵖ ∷ [] else [])))
+  carried []             false = []
+  carried []             true  = []
+  carried (quiet _ b c)  fin   = ++⁺ b (carried c fin)
+  carried (one _ r c)    fin   = ++⁺ r (carried c fin)
+
+  root-values : ∀ {t es vs} → Carries {t} es vs → ∀ fin
+    → Pointwise (λ x w → V κ t (proj₂ x) w)
+        (readᴵ ((map valueᵖ es ++ (if fin then completeᵖ ∷ [] else [])) ∷ []))
+        (readᴾ ((map valueᵖ vs ++ (if fin then completeᵖ ∷ [] else [])) ∷ []))
+  root-values {t} {es} {vs} c fin =
+    subst₂ (Pointwise (λ x w → V κ t (proj₂ x) w))
+      (cong (λ z → instExtract (decodeEmits z)) (sym (++-identityʳ (map valueᵖ es ++ (if fin then completeᵖ ∷ [] else [])))))
+      (cong plainValues (sym (++-identityʳ (map valueᵖ vs ++ (if fin then completeᵖ ∷ [] else [])))))
+      (carried c fin)
 
   module InQ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
