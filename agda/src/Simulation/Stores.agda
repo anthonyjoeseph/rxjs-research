@@ -319,7 +319,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → lookupNode k₁ NI ≡ just (cell-st {t = CutS natᵗ s} (b′ , (false , (os , em))))
               → lookupNode k₂ NI ≡ just (take-st 1)
               → lookupNode m NI ≡ just (mergeAll-st {t = emitᵗ s} nothing aₘ [] true) → aₘ ≤ 1
-              → b′ ≡ b → CutLifts natᵗ s (λ b′ b → b′ ≡ b × 0 < b) F₁ nothing → PathRel p q
+              → b′ ≡ b × 0 < b → CutLifts natᵗ s (λ b′ b → b′ ≡ b × 0 < b) F₁ nothing → PathRel p q
               → PathRel (take-f nothing k ↠[ h ] p)
                   (scan-f F₁ k₁ ↠[ h₁ ]
                    (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]

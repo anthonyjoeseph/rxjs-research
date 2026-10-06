@@ -11,11 +11,11 @@ open import Rx.Prim using (cold; after_,_)
 open import SExp.Syntax using (inputˢ; emptyˢ)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Fin using (zero; suc)
-open import Data.Nat using (zero; suc; _<?_; s≤s; z≤n)
+open import Data.Nat using (zero; suc; _<?_; s≤s; z≤n) renaming (_≟_ to _≟ℕ_)
 open import Data.Unit using (tt)
-open import Relation.Nullary.Decidable using (toWitness)
+open import Relation.Nullary.Decidable using (toWitness; ¬?)
 open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
-open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
+open import Data.List.Relation.Unary.AllPairs using ([]; _∷_; allPairs?)
 open import Data.List.Relation.Unary.All using ([]; _∷_; all?)
 open import Data.Bool using (true; false; _≟_)
 open import Data.Nat.Properties using (<-trans; n<1+n)
@@ -49,11 +49,13 @@ _ = record
   ; numbers = slot~ zero refl ∷ []
   ; distinct = ([] ∷ []) , ([] ∷ [])
   ; sync    = (refl , []) ∷ []
-  ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl (s≤s z≤n) refl refl (λ ()) (λ ()) (λ ())) refl) []
+  ; rows    = read~ (inj₁ refl) root~ refl ∷ mach (hot~ refl (block refl (s≤s z≤n) refl refl (λ ()) (λ ()) (λ ()) (λ ())) refl) []
   ; latches = λ { zero → (λ _ → refl , refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
+  ; rids    = toWitness {a? = allPairs? (λ r r′ → ¬? (proj₁ r ≟ℕ proj₁ r′)) _} tt , toWitness {a? = allPairs? (λ r r′ → ¬? (proj₁ r ≟ℕ proj₁ r′)) _} tt
+  ; fresh-ids = toWitness {a? = all? (λ r → proj₁ r <? _) _} tt , toWitness {a? = all? (λ r → proj₁ r <? _) _} tt
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   ; census  = λ { zero _ → inj₁ (refl , refl) ; (suc zero) () }
   ; owned   = (λ _ ()) ∷ (λ _ _ → (λ ()) ∷ (λ _ → refl) ∷ []) ∷ []
@@ -78,11 +80,13 @@ _ = record
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ []
   ; distinct = ([] ∷ []) , ([] ∷ [])
   ; sync    = (refl , []) ∷ []
-  ; rows    = cold~ here (block {m1 = 2} {b = 1} {m2 = 0} refl (s≤s z≤n) refl refl (λ ()) (λ ()) (λ ())) root~ refl ∷ []
+  ; rows    = cold~ here (block {m1 = 2} {b = 1} {m2 = 0} refl (s≤s z≤n) refl refl (λ ()) (λ ()) (λ ()) (λ ())) root~ refl ∷ []
   ; latches = λ { zero → (λ ()) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
+  ; rids    = toWitness {a? = allPairs? (λ r r′ → ¬? (proj₁ r ≟ℕ proj₁ r′)) _} tt , toWitness {a? = allPairs? (λ r r′ → ¬? (proj₁ r ≟ℕ proj₁ r′)) _} tt
+  ; fresh-ids = toWitness {a? = all? (λ r → proj₁ r <? _) _} tt , toWitness {a? = all? (λ r → proj₁ r <? _) _} tt
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   ; census  = λ { zero () ; (suc zero) () }
   ; owned   = (λ _ _ → (λ _ → refl) ∷ []) ∷ []
@@ -110,6 +114,8 @@ _ = record
   ; bounded = toWitness {a? = all? (_<? _) _} tt , toWitness {a? = all? (_<? _) _} tt
   ; swept   = refl ∷ refl ∷ []
   ; uncut   = toWitness {a? = all? (λ _ → _ ≟ false) _} tt , toWitness {a? = all? (λ _ → _ ≟ false) _} tt
+  ; rids    = toWitness {a? = allPairs? (λ r r′ → ¬? (proj₁ r ≟ℕ proj₁ r′)) _} tt , toWitness {a? = allPairs? (λ r r′ → ¬? (proj₁ r ≟ℕ proj₁ r′)) _} tt
+  ; fresh-ids = toWitness {a? = all? (λ r → proj₁ r <? _) _} tt , toWitness {a? = all? (λ r → proj₁ r <? _) _} tt
   ; above   = toWitness {a? = all? (λ _ → _ ≟ true) _} tt , toWitness {a? = all? (λ _ → _ ≟ true) _} tt
   ; census  = λ { zero _ → inj₂ (refl , refl , λ ()) ; (suc zero) () }
   ; owned   = (λ _ ()) ∷ []

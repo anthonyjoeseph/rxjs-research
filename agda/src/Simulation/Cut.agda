@@ -15,7 +15,7 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Fin     using (Fin; toℕ; _↑ˡ_; _↑ʳ_)
 open import Data.Vec     using (lookup)
 open import Data.Maybe   using (just)
-open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
+open import Data.List    using (List; []; _∷_; _++_; map; concatMap; take)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ)
@@ -224,26 +224,41 @@ module _ {m} {Δ : Ctx m} {t} (c : NodeId) where
 -- The cut on both sides
 ------------------------------------------------------------------
 
+-- THE IMPL'S CUT IS AT ONE OF THE FIRST TWO MEMBERS OF THE RUN `π`
+-- PAIRS THE PLAIN CUT'S NODE WITH, the two every path naming the key
+-- names: a switch's run is its one node, a count's cut is its second
 module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
-         (keys : Unique (map proj₁ π)) (vals : Unique (concatMap proj₂ π)) {c c′ : NodeId} (ce : (c , c′ ∷ []) ∈ π) where
+         (keys : Unique (map proj₁ π)) (vals : Unique (concatMap proj₂ π)) {c : NodeId} {cs} (ce : (c , cs) ∈ π)
+         {c′ : NodeId} (cm : c′ ∈ take 2 cs) where
 
-  -- a key paired with a run of impl nodes is not the cut's
-  not-c : ∀ {k x y ys} → (k , x ∷ y ∷ ys) ∈ π → k ≡ c → ⊥
-  not-c e refl with key-same keys e ce
-  ... | ()
+  front : ∀ {x : NodeId} (xs : List NodeId) → x ∈ take 2 xs → x ∈ xs
+  front (_ ∷ _)     (here eq)          = here eq
+  front (_ ∷ _ ∷ _) (there (here eq))  = there (here eq)
+  front (_ ∷ [])    (there ())
+  front (_ ∷ _ ∷ _) (there (there ()))
 
-  -- a key paired with one impl node, if it is the cut's, is paired with the cut's
-  solo : ∀ {k k′} → (k , k′ ∷ []) ∈ π → k ≡ c → c′ ≡ k′
-  solo e refl with key-same keys e ce
-  ... | refl = refl
+  -- the cut's key's run holds the cut's impl node up front
+  hit : ∀ {k xs} → (k , xs) ∈ π → k ≡ c → c′ ∈ take 2 xs
+  hit e refl = subst (λ ys → c′ ∈ take 2 ys) (sym (key-same keys e ce)) cm
 
   -- an entry naming the cut's impl node is the cut's
   owner : ∀ {k xs} → (k , xs) ∈ π → c′ ∈ xs → c ≡ k
-  owner e m = cong proj₁ (vals-same vals ce e (here refl) m)
+  owner e m = cong proj₁ (vals-same vals ce e (front cs cm) m)
 
   -- and no impl-only node is it
   off : ∀ {k} → (k ∈ concatMap proj₂ π → ⊥) → c′ ≡ k → ⊥
-  off un refl = un (∈-vals ce (here refl))
+  off un refl = un (∈-vals ce (front cs cm))
+
+  -- the two up front, where a frame order other than the run's names them
+  gap : ∀ {a b x ys} → c′ ∈ a ∷ b ∷ [] → c′ ∈ a ∷ x ∷ b ∷ ys
+  gap (here eq)         = here eq
+  gap (there (here eq)) = there (there (here eq))
+  gap (there (there ()))
+
+  hop : ∀ {x₀ x₁ x₂ y ys} → c′ ∈ x₀ ∷ x₁ ∷ [] → c′ ∈ x₁ ∷ x₂ ∷ y ∷ x₀ ∷ ys
+  hop (here eq)         = there (there (there (here eq)))
+  hop (there (here eq)) = here eq
+  hop (there (there ()))
 
   module _ {t : Ty} {NP NI} where
 
@@ -253,26 +268,26 @@ module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     fwd root~                            ()
     fwd (sink~ _)                        ()
     fwd (map~ _ r)                       m                      = fwd r m
-    fwd (scan~ e _ _ _ _ r)              (here eq)              = here (solo e (sym eq))
+    fwd (scan~ e _ _ _ _ r)              (here eq)              = ∈-++⁺ˡ (hit e (sym eq))
     fwd (scan~ e _ _ _ _ r)              (there m)              = there (fwd r m)
-    fwd (take~ e _ _ _ _ _ _ _ r)        (here eq)              = ⊥-elim (not-c e (sym eq))
+    fwd (take~ e _ _ _ _ _ _ _ r)        (here eq)              = ∈-++⁺ˡ (hit e (sym eq))
     fwd (take~ e _ _ _ _ _ _ _ r)        (there m)              = there (there (there (there (fwd r m))))
-    fwd (takeWhile~ e _ _ _ _ r)         (here eq)              = ⊥-elim (not-c e (sym eq))
+    fwd (takeWhile~ e _ _ _ _ r)         (here eq)              = ∈-++⁺ˡ (hit e (sym eq))
     fwd (takeWhile~ e _ _ _ _ r)         (there m)              = there (there (fwd r m))
-    fwd (spent~ e _ _ r)                 (here eq)              = ⊥-elim (not-c e (sym eq))
+    fwd (spent~ e _ _ r)                 (here eq)              = ∈-++⁺ˡ (hit e (sym eq))
     fwd (spent~ e _ _ r)                 (there m)              = there (there (there (there (fwd r m))))
-    fwd (spentWhile~ e _ _ r)            (here eq)              = ⊥-elim (not-c e (sym eq))
+    fwd (spentWhile~ e _ _ r)            (here eq)              = ∈-++⁺ˡ (hit e (sym eq))
     fwd (spentWhile~ e _ _ r)            (there m)              = there (there (fwd r m))
-    fwd (outerElem~ (pm , _) r)          (here eq)              = ⊥-elim (not-c pm (sym eq))
+    fwd (outerElem~ (pm , _) r)          (here eq)              = ∈-++⁺ˡ (hit pm (sym eq))
     fwd (outerElem~ (pm , _) r)          (there m)              = there (there (fwd r m))
-    fwd (outerExplode~ (pm , _) r)       (here eq)              = ⊥-elim (not-c pm (sym eq))
+    fwd (outerExplode~ (pm , _) r)       (here eq)              = there (∈-++⁺ˡ (hit pm (sym eq)))
     fwd (outerExplode~ (pm , _) r)       (there m)              = there (there (there (fwd r m)))
-    fwd (inner~ _ (pm , _) ip r)         (here eq)              = ⊥-elim (not-c pm (sym eq))
-    fwd (inner~ _ (pm , _) ip r)         (there (here eq))      = there (here (solo ip (sym eq)))
+    fwd (inner~ _ (pm , _) ip r)         (here eq)              = gap (hit pm (sym eq))
+    fwd (inner~ _ (pm , _) ip r)         (there (here eq))      = there (∈-++⁺ˡ (hit ip (sym eq)))
     fwd (inner~ _ (pm , _) ip r)         (there (there m))      = there (there (there (fwd r m)))
     fwd (lane~ _ _ _ r)                  m                      = there (there (fwd r m))
-    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)              = there (there (here (solo e₁ (sym eq))))
-    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq))      = ⊥-elim (not-c e₂ (sym eq))
+    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)              = there (there (∈-++⁺ˡ (hit e₁ (sym eq))))
+    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq))      = hop (hit e₂ (sym eq))
     fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there m))      = there (there (there (there (fwd r m))))
 
     bwd : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
@@ -346,7 +361,7 @@ module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
         cut-by (thru-outer mergeAllᵒ nid ↠[ h ] p) (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) d-fwd d-bwd
         where
           d-fwd : c ∈ nid ∷ nodesOf p → c′ ∈ nid′ ∷ nodesOf q
-          d-fwd (here eq) = here (solo e (sym eq))
+          d-fwd (here eq) = ∈-++⁺ˡ (hit e (sym eq))
           d-fwd (there m) = there (fwd r m)
           d-bwd : c′ ∈ nid′ ∷ nodesOf q → c ∈ nid ∷ nodesOf p
           d-bwd (here eq) = here (owner e (here eq))
@@ -438,10 +453,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
 
   open Kept {Γ = Γ} κ {t} {ep} {ei}
 
-  module _ {sP stP sI stI} (S : St sP stP sI stI) {c c′} (ce : (c , c′ ∷ []) ∈ Store.π S) where
+  module _ {sP stP sI stI} (S : St sP stP sI stI) {c cs} (ce : (c , cs) ∈ Store.π S) {c′} (cm : c′ ∈ take 2 cs) where
 
     open Store S
-    module C = At {Γ = Γ} κ π-keys π-vals ce
+    module C = At {Γ = Γ} κ π-keys π-vals ce cm
 
     KP : List (RegRow Γ t)
     KP = proj₁ (cutThrough c (EvalSt.registry stP))

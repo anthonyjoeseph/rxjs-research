@@ -526,7 +526,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → Walked switchᶠ m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP₁) (EvalSt.nodes stI₁)
         kill {nothing} {nothing} _ refl refl = after S (λ x → x) (λ x → x) [] (λ x → x) , W
         kill {just c}  {just c′} ce refl refl =
-          let K = cut-kill κ S ce
+          let K = cut-kill κ S ce (here refl)
           in proj₁ K , subst (λ π → Walked switchᶠ m m′ ks p q π (EvalSt.nodes stP) (EvalSt.nodes stI)) (sym (proj₂ K)) W
         kill {nothing} {just _}  () _ _
         kill {just _}  {nothing} () _ _

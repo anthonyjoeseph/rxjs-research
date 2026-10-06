@@ -244,12 +244,12 @@ undecided, never a failure (Anthony).
 arrivals over `correspondence`: schedules in step, pops partnered, stores related; the root
 subscribes set them (`subscribe-related`) and each cascade keeps
 (`cascade-related`), both with agreeing values. RULED
-OUT: an arrival plain lacks, a split one, a gap or
-stray in an instant, an echo apart from inners or payload; a subscribe
-installing a run unrelated; a pop unrelating a read; a map moving instants; a close
+OUT: an arrival plain lacks, a split one, an instant's gap or
+stray, an echo apart from inners or payload; a subscribe's
+run unrelated; a pop unrelating a read; a map moving instants; a close
 emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
-over a budget no take holds; a flatten write moving a row; a switch's cut
-parting a pair.
+over a budget no take holds; a flatten write moving a row; a switch's or
+take's cut parting a pair.
 Left: a deeper flattener's subscribe; which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
@@ -276,12 +276,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   configuration, and the monster drops to whichever stays riskier.
 
 - **CUT AT A TAKE AS AT A SWITCH.** `Simulation.Cut` keeps the stores
-  under a cut through a node `π` pairs with one impl node: the two cuts take
-  the rows the relation pairs, ids apart. A take's node is paired with a
-  run, so `{take,takeWhile}-arm` need the cut stated at the run member the
-  impl's cut names, and end in `spent~`/`spentWhile~`: both cuts write
-  zero, which `take~` cannot hold. Decides whether a spent budget drops the
-  same rows on both sides.
+  under a cut at either of the first two members of a key's run, so a
+  spent budget drops the same rows on both sides. Left: `{take,takeWhile}-arm`
+  as bodies over both folds, ending in `spent~`/`spentWhile~` once the two
+  nodes are written zero over kept rows naming neither. Decides whether the
+  impl's cut cell spends where the plain count does.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for

@@ -555,7 +555,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
             on (takeOf (P k)) "take: plain budget" (λ b →
               on (cellOf (CutS natᵗ s) (I k₁)) "take: cut cell" λ c →
               on (stepAt (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s) St) "take: impl step type" λ F₁ →
-                when ((proj₁ c ≡ᵇ b) ∧ not (proj₁ (proj₂ c))) "take: cut cell unrelated"
+                when ((proj₁ c ≡ᵇ b) ∧ (1 ≤ᵇ b) ∧ not (proj₁ (proj₂ c))) "take: cut cell unrelated"
                   (fails "take: CutLifts fails at "
                      (cutLifts? natᵗ s (λ b′ b → (b′ ≡ᵇ b) ∧ (1 ≤ᵇ b)) F₁ nothing (map (λ x → x , x) (b ∷ 1 ∷ 2 ∷ 3 ∷ []))
                        (proj₂ (proj₂ (proj₂ c)))))) ⊗
