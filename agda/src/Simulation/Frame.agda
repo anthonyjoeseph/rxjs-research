@@ -86,8 +86,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       outerExplode~ (pm , x , x′ , lP , trans (hd (tail (tail (tail ag))) (first m′ [])) lI , fn
                     , c , trans (hd (tail (tail (tail (tail ag)))) (first ks [])) lk)
                     (path-frame (tail (tail (tail (tail (tail (tail ag)))))) r)
-    path-frame ag (inner~ {m′ = m′} {ks} {j′ = j′} (pm , x , x′ , lP , lI , fn , c , lk) ip r) =
-      inner~ (pm , x , x′ , lP , trans (hd ag (first m′ (j′ ∷ []))) lI , fn , c , trans (hd (tail ag) (first ks [])) lk) ip
+    path-frame ag (inner~ {m′ = m′} {ks} {j′ = j′} e (pm , x , x′ , lP , lI , fn , c , lk) ip r) =
+      inner~ e (pm , x , x′ , lP , trans (hd ag (first m′ (j′ ∷ []))) lI , fn , c , trans (hd (tail ag) (first ks [])) lk) ip
              (path-frame (tail (tail (tail ag))) r)
     path-frame ag (lane~ {mL = mL} {jL} lL uL r) =
       lane~ (trans (hd ag (first mL (jL ∷ []))) lL) uL (path-frame (tail ag) r)

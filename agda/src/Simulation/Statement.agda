@@ -78,9 +78,11 @@ open import Simulation.Hot-End using (hot-end-start)
 open import Simulation.Close using (close-store; close-arr)
 open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit; T-true)
 open import Simulation.Pop using (pop-store; pp-popped)
-open import Simulation.Walk using (readᴾ; readᴵ; root-walk)
-open import Simulation.Pass using (readᴾ-++; readᴵ-++; dynRow; Paired; unchain; head; row-pass; After; module After; delivered; clash; Head; nohead;
-  Persists; delivered-arr; _⨾_; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
+open import Simulation.Walk using (root-walk)
+open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; module Kept)
+open Kept using (After; module After; Persists; _⨾_)
+open import Simulation.Pass using (dynRow; Paired; unchain; head; row-pass; delivered; clash; Head; nohead;
+  delivered-arr; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 

@@ -84,7 +84,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
   -- the pair's new states relate at every element type the old ones did
   retype : ∀ {u u₂ op op₂ x x′ y y′} → FlatNodes {Γ = Γ} κ π u op x x′ → FlatNodes {Γ = Γ} κ π u₂ op₂ x x′
          → FlatNodes {Γ = Γ} κ π u op y y′ → FlatNodes {Γ = Γ} κ π u₂ op₂ y y′
-  retype (merge~ _) (merge~ _) f           = f
+  retype (merge~ _) (merge~ _) (merge~ ps) = merge~ ps
   retype (switch~ _) (switch~ _) (switch~ c) = switch~ c
   retype exhaust~ exhaust~ exhaust~         = exhaust~
 
@@ -204,7 +204,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     pathW (takeWhile~ e l l₁ l₂ L r)         = takeWhile~ e (takeP l) (cellI l₁) (takeI l₂) L (pathW r)
     pathW (outerElem~ f r)                   = outerElem~ (flatW f) (pathW r)
     pathW (outerExplode~ f r)                = outerExplode~ (flatW f) (pathW r)
-    pathW (inner~ f ip r)                    = inner~ (flatW f) ip (pathW r)
+    pathW (inner~ e f ip r)                  = inner~ e (flatW f) ip (pathW r)
     pathW (lane~ l un r)                     = lane~ (unpairedI un l) un (pathW r)
     pathW (deferInner~ e₁ e₂ l l′ l₂ a≤ r)   =
       deferInner~ e₁ e₂ (soloP e₁ l) (pairedI e₁ (here refl) (λ eq _ → solo-entry eq) l′)

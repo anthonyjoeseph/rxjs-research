@@ -17,71 +17,50 @@ module Simulation.Pass where
 open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.List    using (List; []; _∷_; _++_; map; concat)
+open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
 open import Data.Maybe   using (Maybe; nothing; just)
-open import Data.Nat     using (ℕ; suc; _≤_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; suc; _≤_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
-open import Data.Unit    using (⊤)
+open import Data.Unit    using (⊤; tt)
+open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Vec     using (lookup)
 open import Data.List.Properties using (++-assoc)
 open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; FnClo; applyClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; memberSource; Path; Frame; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap; setNode; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓; walk-nil; walk-echo; walk-cons;
-  thruConsume⇓; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub; consume-switch-nil; subscribeInner⇓; chainStep⇓; chain-step;
+  thruConsume⇓; inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub; consume-switch-nil; subscribeInner⇓; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
-open import SExp.InstEmit using (instEmitᵗ)
-open import SExp.InstEmit.Decode using (decodeEmits)
-open import SExp.Plain   using (plainValues)
-open import Batchable.Inst-Extract using (instExtract)
-open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
 open import Simulation.Schedules using (HeadOf)
-open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Lifts; Flattener; FlatNodes; merge~; switch~; exhaust~; CurRel; Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~;
-  outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; hotEq; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
-open import Simulation.Walk using (readᴾ; readᴵ)
-open import Simulation.Write using (module Write)
+open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Lifts; Flattener; FlatNodes; merge~; switch~; exhaust~; CurRel;
+  Src; SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~; outerElem~;
+  outerExplode~; inner~; lane~; InnerPair; elab; deferInner~; InputBlock; hotEq; RowRel; read~;
+  cold~; defer~; RegRel; partner-row; Store; Arr)
+open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
+open import Simulation.Write using (module Write; key-same)
+open import Simulation.Walk using (walk)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
 open import Rx.Evaluator.Reducible.Support using (Sound; sub-rule; switchKill-nodes; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; sub-ot; Agree; endOf; ∨-Tʳ)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 
-readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
-readᴾ-++ xs ys = trans (cong plainValues (concat-++ xs ys)) (values-++ (concat xs) (concat ys))
-
-readᴵ-++ : ∀ {m} {Γ′ : Ctx m} {t} (xs ys : Stream Γ′ (instEmitᵗ uniqᵗ t)) → readᴵ (xs ++ ys) ≡ readᴵ xs ++ readᴵ ys
-readᴵ-++ xs ys =
-  trans (cong (λ z → instExtract (decodeEmits z)) (concat-++ xs ys))
- (trans (cong instExtract (decode-++ (concat xs) (concat ys)))
-        (extract-++ (decodeEmits (concat xs)) (decodeEmits (concat ys))))
-
 -- a minted source's chain, as the registration it was read from
 dynRow : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ) → RegId × AtFloor Γ (arrTy a) t → RegRow Γ t
 dynRow a (rid , lo , p) = rid , atDyn (Arrival.source a) lo , (arrTy a , p)
 
--- A CHAIN PAIR THE PASS HAS NOT REACHED: cut on both sides, or on
--- neither and partnered by the registries' relation
-PairedR : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
-        → RegRel κ π {t} NP NI LP LI rs rs′ → List RegId → List RegId
-        → RegRow Γ t → RegRow (plainᵏ Γ κ) (emitᵗ t) → Set
-PairedR {κ = κ} rr CP CI x x′ =
-    (any (_≡ᵇ proj₁ x) CP ≡ true × any (_≡ᵇ proj₁ x′) CI ≡ true)
-  ⊎ (any (_≡ᵇ proj₁ x) CP ≡ false × any (_≡ᵇ proj₁ x′) CI ≡ false
-     × Partners κ _ _ _ _ _ rr x x′)
-
--- the same, for a minted source's chains
+-- a minted source's chains, paired as `PairedR` pairs rows
 Paired : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
        → RegRel κ π {t} NP NI LP LI rs rs′ → List RegId → List RegId → (a : Arrival Γ) (a′ : Arrival (plainᵏ Γ κ))
        → RegId × AtFloor Γ (arrTy a) t → RegId × AtFloor (plainᵏ Γ κ) (arrTy a′) (emitᵗ t) → Set
@@ -336,47 +315,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
-    St : Sched Γ → EvalSt ep → Sched (plainᵏ Γ κ) → EvalSt ei → Set
-    St = Store κ
-
-    -- the chains not reached stay paired
-    Keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁}
-          → St sP stP sI stI → St sP₁ stP₁ sI₁ stI₁ → Set
-    Keeps {stP = stP} {stI = stI} {stP₁ = stP₁} {stI₁ = stI₁} S S₁ =
-      ∀ {x x′}
-      → PairedR (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) x x′
-      → PairedR (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) x x′
-
-    -- the popped arrival's pair against the rows stays as it was
-    Persists : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁}
-             → St sP stP sI stI → St sP₁ stP₁ sI₁ stI₁ → Set
-    Persists S S₁ = ∀ {s s′ u u′} → Arr S s s′ u u′ → Arr S₁ s s′ u u′
-
-    -- WHAT A PASS KEEPS: related stores after, the unreached chains
-    -- paired, the arrival's pair against the rows, related values sent
-    -- rootward, and every node pairing it found
-    record After {sP stP sI stI} (S : St sP stP sI stI)
-                 (rP : Stream Γ t × Sched Γ × EvalSt ep)
-                 (rI : Stream (plainᵏ Γ κ) (emitᵗ t) × Sched (plainᵏ Γ κ) × EvalSt ei) : Set where
-      constructor after
-      field
-        store  : Store κ (proj₁ (proj₂ rP)) (proj₂ (proj₂ rP)) (proj₁ (proj₂ rI)) (proj₂ (proj₂ rI))
-        keeps  : Keeps S store
-        persists : Persists S store
-        values : Pointwise (λ x w → V κ t (proj₂ x) w) (readᴵ (proj₁ rI)) (readᴾ (proj₁ rP))
-        grows  : ∀ {x} → x ∈ Store.π S → x ∈ Store.π store
-
-    -- one pass, then another from where it left the stores
-    _⨾_ : ∀ {sP stP sI stI} {S : St sP stP sI stI} {o₁ sP₁ stP₁ i₁ sI₁ stI₁ rP rI}
-        → (A : After S (o₁ , sP₁ , stP₁) (i₁ , sI₁ , stI₁)) → After (After.store A) rP rI
-        → After S (o₁ ++ proj₁ rP , proj₂ rP) (i₁ ++ proj₁ rI , proj₂ rI)
-    -- by projection, so that the two together leave the second's store
-    _⨾_ {o₁ = o₁} {i₁ = i₁} {rP = rP} {rI = rI} A B =
-      after (After.store B) (λ {a} {a′} x → After.keeps B {a} {a′} (After.keeps A {a} {a′} x))
-        (λ ar → After.persists B (After.persists A ar))
-        (subst₂ (Pointwise (λ x w → V κ t (proj₂ x) w)) (sym (readᴵ-++ i₁ (proj₁ rI))) (sym (readᴾ-++ o₁ (proj₁ rP)))
-                (++⁺ (After.values A) (After.values B)))
-        (λ x → After.grows B (After.grows A x))
+    open Kept {Γ = Γ} κ {t} {ep} {ei}
 
     -- what a relation over the whole path reads: the node pairing and
     -- the two node tables a pass leaves
@@ -426,7 +365,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- where the walk has got to: the flattener, and the tails it hands to
     Walked : ∀ {ℓ ℓ₄ u} → FlatOp → NodeId → NodeId → NodeId
            → Path Γ ℓ u t → Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t) → Goal
-    Walked {u = u} op m m′ ks p q π NP NI = Flattener κ π {t = t} NP NI u op m m′ ks [] × PathRel κ π NP NI p q
+    Walked {u = u} op m m′ ks p q π NP NI = Flattener {Γ = Γ} κ π {t = t} NP NI u op m m′ ks [] × PathRel {Γ = Γ} κ π NP NI p q
 
     cur-grow : ∀ {π π′} → (∀ {x} → x ∈ π → x ∈ π′) → ∀ {cur cur′} → CurRel {Γ = Γ} κ π cur cur′ → CurRel {Γ = Γ} κ π′ cur cur′
     cur-grow g {nothing} {nothing} c = c
@@ -441,7 +380,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     flat-move : ∀ {π π′ u op m m′ ks} (NP : List (NodeId × NodeState Γ)) (NI : List (NodeId × NodeState (plainᵏ Γ κ)))
                   (NP′ : List (NodeId × NodeState Γ)) (NI′ : List (NodeId × NodeState (plainᵏ Γ κ)))
               → (∀ {x} → x ∈ π → x ∈ π′) → Unmoved m NP′ NP → Unmoved m′ NI′ NI → Unmoved ks NI′ NI
-              → Flattener κ π {t = t} NP NI u op m m′ ks [] → Flattener κ π′ {t = t} NP′ NI′ u op m m′ ks []
+              → Flattener {Γ = Γ} κ π {t = t} NP NI u op m m′ ks [] → Flattener {Γ = Γ} κ π′ {t = t} NP′ NI′ u op m m′ ks []
     flat-move _ _ _ _ g (unmoved eP) (unmoved eI) (unmoved eK) (pm , x , x′ , lP , lI , fn , c , lk) =
       g pm , x , x′ , trans eP lP , trans eI lI , nodes-grow g fn , c , trans eK lk
 
@@ -493,6 +432,61 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         ; census = census ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
 
+    -- a flattener fact read at the frame's operator is one at the former's
+    reop : ∀ {π u op op₀ x x′} → flatOp op ≡ flatOp op₀ → FlatNodes {Γ = Γ} κ π u op₀ x x′ → FlatNodes {Γ = Γ} κ π u op x x′
+    reop {op = mergeᶠ _} _ (merge~ ps) = merge~ ps
+    reop {op = switchᶠ}  _ (switch~ c) = switch~ c
+    reop {op = exhaustᶠ} _ exhaust~    = exhaust~
+    reop {op = mergeᶠ _} () (switch~ _)
+    reop {op = mergeᶠ _} () exhaust~
+    reop {op = switchᶠ}  () (merge~ _)
+    reop {op = switchᶠ}  () exhaust~
+    reop {op = exhaustᶠ} () (merge~ _)
+    reop {op = exhaustᶠ} () (switch~ _)
+
+    -- no inner's frame is related to a restamp's scan
+    no-scan : ∀ {π NP NI ℓ ℓ′ lo lo′ u s a m j k F} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ s (emitᵗ t)}
+            → PathRel κ π {t} NP NI (from-inner a m j ↠[ h ] p) (scan-f F k ↠[ h′ ] Q) → ⊥
+    no-scan ()
+
+    -- AN INNER'S SUBSCRIBE LEFT AGAIN: the lane's frames taken apart,
+    -- the flattener as the walk left it, and the tails
+    leave : ∀ {π NP NI lo lo′ ℓ ℓ₂ ℓ₃ ℓ₄ u} op {m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂} {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₂}
+              {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+          → PathRel κ π {t} NP NI (from-inner (flatOp op) m j ↠[ h ] p)
+              (from-inner (flatOp op) m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)
+          → Σ (List NodeId) (λ xs → Flattener {Γ = Γ} κ π {t} NP NI u op m m′ ks xs) × PathRel κ π NP NI p q
+    leave (mergeᶠ _) (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) _ pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , pr
+    leave (mergeᶠ _) (lane~ _ _ pr) = ⊥-elim (no-scan pr)
+    leave switchᶠ    (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) _ pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , pr
+    leave exhaustᶠ   (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) _ pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , pr
+
+    -- the one row `π` keys by the flattener's node
+    only : ∀ {π NP NI u op m m′ ks xs} → Unique (map proj₁ π) → (m , m′ ∷ ks ∷ []) ∈ π
+         → Flattener {Γ = Γ} κ π {t} NP NI u op m m′ ks xs → Flattener {Γ = Γ} κ π {t} NP NI u op m m′ ks []
+    only keys pm₀ f@(pm , _) with key-same keys pm pm₀
+    ... | refl = f
+
+    -- AN OUTER'S INNER SUBSCRIBED ON BOTH SIDES, its lane already
+    -- taken and its lane on the impl's: the inner is minted, then the
+    -- walk of its elaboration leaves from the lane's frames.  A switch's
+    -- inner pairs through `π` before it is subscribed, which is what
+    -- relates the rows the subscribe registers through it
+    inner-pair : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ j j′ rP rI}
+               → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+               → InnerPair {Γ = Γ} κ (Store.π S) op j j′
+               → ObsRel κ u o′ o
+               → subscribeInner⇓ (flatOp op) m p now o sP stP (j , rP)
+               → subscribeInner⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI (j′ , rI)
+               → Σ (After S rP rI) λ A
+                   → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+    inner-pair S {op = op} {rP = rP} {rI} (f@(pm , _) , pr) ip (elab s w r) (inner refl dP) (inner refl dI) =
+      unbump (proj₁ B) , only {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} (Store.π-keys (After.store (proj₁ B))) (After.grows (proj₁ B) pm) (proj₂ (proj₁ L)) , proj₂ L
+      where
+      B = walk κ s w r (bump S) (inner~ refl f ip pr) dP dI
+      L = leave {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} op (proj₂ B)
+
     postulate
       -- AN ECHO THROUGH THE RESTAMP: the scan's cell restamps it and
       -- keeps its payloads, and writes nothing but the cell, so the
@@ -506,18 +500,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
                     xs false sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
                 → Restamped S op m m′ ks p q ws (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) fin₁ o₁ sI₁ stI₁
-
-      -- AN OUTER'S INNER SUBSCRIBED ON BOTH SIDES, its lane already
-      -- taken and its lane on the impl's: the two subscribes keep the
-      -- flattener and the path related
-      inner-pair : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                     {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ j j′ rP rI}
-                 → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                 → ObsRel κ u o′ o
-                 → subscribeInner⇓ (flatOp op) m p now o sP stP (j , rP)
-                 → subscribeInner⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI (j′ , rI)
-                 → Σ (After S rP rI) λ A
-                     → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
 
       -- A SWITCH'S RUNNING INNER CUT ON BOTH SIDES: the rows through the
       -- two inners `CurRel` pairs leave together, and the walk is kept
@@ -649,7 +631,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     consume-pair S {op = switchᶠ} W ob dP dI = consume-switch S W ob dP dI
     consume-pair S {op = mergeᶠ _} W@((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-all-sub eP _ dP) (consume-all-sub eI _ dI) =
       let F = flat-write S W (lane-nodes fn (trans (sym lP) eP) (trans (sym lI) eI))
-          I = inner-pair (After.store (proj₁ F)) (proj₂ F) ob dP dI
+          I = inner-pair (After.store (proj₁ F)) (proj₂ F) tt ob dP dI
       in proj₁ F ⨾ proj₁ I , proj₂ I
     consume-pair S {op = mergeᶠ _} W@((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-all-enqueue eP _) (consume-all-enqueue eI _) =
       flat-write S W (queue-nodes fn (trans (sym lP) eP) (trans (sym lI) eI) ob)
@@ -662,7 +644,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     consume-pair S {u = u} {op = mergeᶠ _} ((_ , _ , _ , lP , _ , fn , _) , _) ob (consume-all-nil n) _ = ⊥-elim (unusable mergeAllᵒ u lP n (proj₁ (merge-usable fn)))
     consume-pair S {op = exhaustᶠ} W@((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-exhaust-sub eP dP) (consume-exhaust-sub eI dI) =
       let F = flat-write S W (idle-nodes fn (trans (sym lP) eP) (trans (sym lI) eI))
-          I = inner-pair (After.store (proj₁ F)) (proj₂ F) ob dP dI
+          I = inner-pair (After.store (proj₁ F)) (proj₂ F) tt ob dP dI
       in proj₁ F ⨾ proj₁ I , proj₂ I
     consume-pair S {op = exhaustᶠ} W ob (consume-exhaust-nil _) (consume-exhaust-nil _) = after S (λ x → x) (λ x → x) [] (λ x → x) , W
     consume-pair S {u = u} {op = exhaustᶠ} ((_ , _ , _ , lP , lI , fn , _) , _) ob (consume-exhaust-sub eP _) (consume-exhaust-nil n) =
@@ -805,15 +787,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- THE IMPL-ONLY MERGE IN FRONT OF A LANE passes emits carrying
       -- nothing on as they came
-      quiet-lane : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ′ u op m j mL jL}
+      quiet-lane : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ′ u a m j mL jL}
                      {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
                      {es fin o₁ y₁ f₁ s₁ st₁}
-                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner (flatOp op) m j ↠[ h ] p)
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p)
                      (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
                  → Carries es [] → fin ≡ false
                  → stepFrame⇓ now (from-inner mergeAllᵒ mL jL) Q es fin sI stI (o₁ , y₁ , f₁ , s₁ , st₁)
-                 → QArm S now (from-inner (flatOp op) m j ↠[ h ] p)
-                     (λ π NP NI → PathRel κ π NP NI (from-inner (flatOp op) m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q))
+                 → QArm S now (from-inner a m j ↠[ h ] p)
+                     (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q))
                      Q y₁ f₁ o₁ s₁ st₁
 
       -- A DEFERRED BODY'S EMITS CARRYING NOTHING pass the hop's marker
@@ -850,7 +832,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
       quiet-pass S (outerElem~ fl r) b e si dI = quiet-outer S (fl , r) b e si dI
       quiet-pass S r@(outerExplode~ _ _) b e si dI = quiet-explode S r b e si dI
-      quiet-pass S r@(inner~ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
+      quiet-pass S r@(inner~ refl _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
         let X = quiet-resume (quiet-inner S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
       quiet-pass S r@(lane~ _ _ _) b e si (fold-step d₁ dq) = quiet-resume (quiet-lane S r b e d₁) (adv d₁ si) dq
@@ -1005,9 +987,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                          (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
                           (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
       -- an inner led with its echo: one more merge, impl only, in front of its lane
-      lane-arm      : ∀ {lo lo′ ℓ ℓ′ u op m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+      lane-arm      : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                         {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                    → Steps (from-inner (flatOp op) m j) h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+                    → Steps (from-inner a m j) h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
       -- a deferred body: the hop's marker merge, its restamp, the hop's node
       deferInner-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
@@ -1028,7 +1010,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S r@(takeWhile~ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (takeWhile-arm S r b sp si d dI) (adv d sp) dP
       path-pass S (outerElem~ fl r) b sp si (fold-step d dP) dI = resume (outerElem-arm S (fl , r) b sp si d dI) (adv d sp) dP
       path-pass S r@(outerExplode~ _ _) b sp si (fold-step d dP) dI = resume (outerExplode-arm S r b sp si d dI) (adv d sp) dP
-      path-pass S r@(inner~ _ _ _) b sp si (fold-step d dP) dI = resume (inner-arm S r b sp si d dI) (adv d sp) dP
+      path-pass S r@(inner~ refl _ _ _) b sp si (fold-step d dP) dI = resume (inner-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(lane~ _ _ _) b sp si (fold-step d dP) dI = resume (lane-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (deferInner-arm S r b sp si d dI) (adv d sp) dP
 

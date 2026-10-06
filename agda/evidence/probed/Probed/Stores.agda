@@ -28,16 +28,18 @@ open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
 open import Simulation.Walk using (walk-input; walk-defer; init-store; minted)
+open import Simulation.After using (module Kept)
+open Kept using (module After)
 open import Simulation.Schedules using ([]; _∷_)
 open import Simulation.Stores using (slot~; dyn~; data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
 open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals; defer-in)
 
 -- each subscribe row is the walk's arm for the program's one former, at
 -- the empty stores and the two root derivations, as `root-walk` calls it
-_ : Confirms (proj₁ (walk-input (κᵖ two-arrivals) zero (λ x → x) (λ ())
+_ : Confirms (After.store (proj₁ (walk-input (κᵖ two-arrivals) zero (λ x → x) (λ ())
                             (init-store (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals) _ (<-trans (proj₁ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))) (n<1+n _))) root~
                             (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals)))))
-                            (proj₂ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals))))))
+                            (proj₂ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))))))
 _ = record
   { π       = []
   ; π-keys  = []
@@ -63,10 +65,10 @@ _ = record
 cold-in : Point
 cold-in = record { d₀ = cold (3 ∷ []) ((after 1 , 4) ∷ []) ; prog = inputˢ zero ; d₁ = emptyˢ }
 
-_ : Confirms (proj₁ (walk-input (κᵖ cold-in) zero (λ x → x) (λ ())
+_ : Confirms (After.store (proj₁ (walk-input (κᵖ cold-in) zero (λ x → x) (λ ())
                        (init-store (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in) _ (<-trans (proj₁ (proj₂ (minted (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in)))) (n<1+n _))) root~
                        (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog cold-in)) (plainSlots (insᵖ cold-in)))))
-                       (proj₂ (proj₂ (minted (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in))))))
+                       (proj₂ (proj₂ (minted (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in)))))))
 _ = record
   { π       = []
   ; π-keys  = []
@@ -90,10 +92,10 @@ _ = record
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
 
-_ : Confirms (proj₁ (walk-defer (κᵖ defer-in) (inputˢ zero) (λ x → x) (λ ())
+_ : Confirms (After.store (proj₁ (walk-defer (κᵖ defer-in) (inputˢ zero) (λ x → x) (λ ())
                        (init-store (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in) _ (<-trans (proj₁ (proj₂ (minted (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in)))) (n<1+n _))) root~
                        (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog defer-in)) (plainSlots (insᵖ defer-in)))))
-                       (proj₂ (proj₂ (minted (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in))))))
+                       (proj₂ (proj₂ (minted (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in)))))))
 _ = record
   { π       = (0 , 0 ∷ []) ∷ []
   ; π-keys  = [] ∷ []

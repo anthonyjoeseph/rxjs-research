@@ -258,12 +258,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
   merge and an exhaust decide alike off related nodes, a node neither can
   use is no step, and the write is proven (`Simulation.Write`: `π`'s
-  uniqueness and the nodes' kinds keep every other row's fact). Left: the
-  inner's subscribe (`inner-pair`), and the switch's cut and named
-  subscribe (`switch-kill`, `switch-subscribe`), whose write names a node
-  before it is minted. Narrows
-  the monster to whether the subscribe walk and the pass share one
-  invariant.
+  uniqueness and the nodes' kinds keep every other row's fact), and the
+  inner's subscribe is the walk's own arm, since walk and pass now keep one
+  invariant (`Simulation.After`). Left: the switch's cut and named
+  subscribe (`switch-kill`, `switch-subscribe`), the latter as `π` grown
+  by the fresh pair, the node written, then the inner's walk. Narrows the
+  monster to whether a switch's cut keeps the rows it drops paired.
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
@@ -305,9 +305,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`flat-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
   scan stepped on an element's echo keeps the flattener, and the group it hands
   on carries the echo's values, still open.
-- **`inner-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
-  inner subscribed on both sides, its lane taken, keeps the flattener and the
-  path related.
 - **`switch-kill`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a switch's
   running inner cut on both sides keeps the walk.
 - **`switch-subscribe`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`: a switch
@@ -340,7 +337,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
 - **`walk-*`** (Simulation.Walk) — FALSITY, `PROBED×7`: one former's subscribe
-  keeps the stores related; holds at a hot, cold and deferred read. Riskiest is
+  keeps what a pass keeps (`After`); holds at a hot, cold and deferred read. Riskiest is
   `walk-flatten`, past the typechecker: a one-lane merge only in normal form.
   No take, scan or `μ` run.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map

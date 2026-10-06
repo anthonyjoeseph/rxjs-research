@@ -257,9 +257,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     data FlatNodes (u : Ty) : FlatOp → NodeState Γ → NodeState Γ′ → Set where
       -- one count on both sides: an emit carries one payload at most, so
       -- every lane, bounded or not, is one inner; the completion flags
-      -- read off the count agree
-      merge~   : ∀ {lim a q q′ od} → Pointwise (λ x′ x → ObsRel u x′ x) q′ q
-               → FlatNodes u (mergeᶠ lim) (mergeAll-st {t = u} lim a q od) (mergeAll-st {t = emitᵗ u} lim a q′ od)
+      -- read off the count agree.  One bound on both sides, the node's:
+      -- the consume reads it there, never off the former
+      merge~   : ∀ {lim lim′ a q q′ od} → Pointwise (λ x′ x → ObsRel u x′ x) q′ q
+               → FlatNodes u (mergeᶠ lim) (mergeAll-st {t = u} lim′ a q od) (mergeAll-st {t = emitᵗ u} lim′ a q′ od)
       switch~  : ∀ {cur cur′ od} → CurRel cur cur′
                → FlatNodes u switchᶠ (switch-st cur od) (switch-st cur′ od)
       exhaust~ : ∀ {ia od} → FlatNodes u exhaustᶠ (exhaust-st ia od) (exhaust-st ia od)
@@ -372,23 +373,25 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                               (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
                                (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
 
-        -- leaving an inner: the flattener's lane, then its restamp
-        inner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+        -- leaving an inner: the flattener's lane, then its restamp.  The
+        -- frame's operator is named apart from the former it is, so a
+        -- relation over a lane's frames can be taken apart again
+        inner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u a op m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                    {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₃ (emitᵗ u) (emitᵗ t)}
-               → Flattener u op m m′ ks xs → InnerPair op j j′ → PathRel p q
-               → PathRel (from-inner (flatOp op) m j ↠[ h ] p)
-                   (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
+               → a ≡ flatOp op → Flattener u op m m′ ks xs → InnerPair op j j′ → PathRel p q
+               → PathRel (from-inner a m j ↠[ h ] p)
+                   (from-inner a m′ j′ ↠[ h₁ ]
                     (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
                      (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
 
         -- an inner the elaboration led with its echo: one more merge,
         -- impl only, in front of the lane it rides
-        lane~ : ∀ {lo lo′ ℓ ℓ′ u op m j mL jL aL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+        lane~ : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL aL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                   {p : Path Γ ℓ u t} {Q : Path Γ′ ℓ′ (emitᵗ u) (emitᵗ t)}
               → lookupNode mL NI ≡ just (mergeAll-st {t = emitᵗ u} nothing aL [] true) → Unpaired mL
-              → PathRel (from-inner (flatOp op) m j ↠[ h ] p) Q
-              → PathRel (from-inner (flatOp op) m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+              → PathRel (from-inner a m j ↠[ h ] p) Q
+              → PathRel (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
 
         -- a deferred body: the hop's marker merge, its restamp, the hop's node
         deferInner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a}

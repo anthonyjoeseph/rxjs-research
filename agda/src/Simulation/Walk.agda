@@ -15,13 +15,13 @@
 ------------------------------------------------------------------
 module Simulation.Walk where
 
-open import Data.List    using (List; []; _∷_; map; concat)
+open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Relation.Unary.AllPairs using ([])
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.All.Properties using (map⁺; concat⁺; tabulate⁺)
 open import Data.Bool    using (T; true; _∨_)
-open import Data.Nat     using (ℕ; suc; _+_; _<_)
+open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_)
 open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; <⇒<ᵇ)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ; _∷_ to _∷ᵖ_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
@@ -29,11 +29,12 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Data.Sum using (inj₂)
 
-open import Rx.Prim      using (Id; hot; cold)
+open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp)
 open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; counter)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Path; root; sched-init; st-init; mkHot)
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
+  mkHot)
 open import Rx.Slots     using (Slots; scripted; shared)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint)
 open import Rx.Evaluator.Builder using (subscribe!)
@@ -41,23 +42,15 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
 open import Data.Fin     using (Fin)
 open import SExp.Syntax  using (SExp; STm; SFn; Kinds; plainᵏ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
-open import SExp.Plain   using (plainExp; plainTm; plainValues)
+open import SExp.Plain   using (plainExp; plainTm)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ)
 open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
-open import SExp.InstEmit using (instEmitᵗ)
-open import SExp.InstEmit.Decode using (decodeEmits)
-open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Schedules using (Sync)
+open import Simulation.After using (readᴾ; readᴵ; module Kept)
+open Kept using (After; module After)
 open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; PathRel; root~; map~; Store; Src; SrcNum; [])
 
--- what a run sends to its root, read as values: the plain run's in
--- order, the impl's decoded and each paired with its instant
-readᴾ : ∀ {n} {Γ : Ctx n} {t} → Stream Γ t → List (Val Γ t)
-readᴾ s = plainValues (concat s)
-
-readᴵ : ∀ {m} {Γ′ : Ctx m} {t} → Stream Γ′ (instEmitᵗ uniqᵗ t) → List (Id × Val Γ′ t)
-readᴵ s = instExtract (decodeEmits (concat s))
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -77,9 +70,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
-    -- WHAT ONE SUBSCRIBE KEEPS: from related stores and a related path,
-    -- the two derivations end in related stores, having sent the root
-    -- related values.
+    -- WHAT ONE SUBSCRIBE KEEPS: what a pass keeps, from related stores
+    -- and a related path, and the path related again after.
     Walks : ∀ {u} → Val (plainᵏ Γ κ) (obs (emitᵗ u)) → Val Γ (obs u) → Set
     Walks {u} x′ x =
       ∀ {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
@@ -87,8 +79,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       → (S : Store κ sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
       → subscribeE⇓ {e = ep} x p now sP stP rP → subscribeE⇓ {e = ei} x′ q now sI stI rI
-      → Store κ (proj₁ (proj₂ rP)) (proj₂ (proj₂ rP)) (proj₁ (proj₂ rI)) (proj₂ (proj₂ rI))
-      × Pointwise (λ a w → V κ t (proj₂ a) w) (readᴵ (proj₁ rI)) (readᴾ (proj₁ rP))
+      → Σ (After κ S rP rI) λ A
+          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
 
     -- the walk at one former, over any related environment
     Elab-Walks : ∀ {Θ u} → SExp Γ [] [] Θ u → Set
@@ -131,13 +123,21 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   a defer under a flattener, not the values conjunct.
       walk-defer     : ∀ {Θ u} (b : SExp Γ [] [] Θ u) → Elab-Walks (deferˢ b)
 
+    -- a map's frames walked: the tail related again
+    unmap : ∀ {X : Set} {π : X → List (NodeId × List NodeId)} {NP : X → List (NodeId × NodeState Γ)}
+              {NI : X → List (NodeId × NodeState (plainᵏ Γ κ))} {lo lo′ ℓ ℓ′ s u F G} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+              {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+          → Σ X (λ A → PathRel κ (π A) {t} (NP A) (NI A) {s = s} (map-f F ↠[ h ] p) (map-f G ↠[ h′ ] q))
+          → Σ X (λ A → PathRel κ (π A) (NP A) (NI A) p q)
+    unmap (A , map~ _ pr) = A , pr
+
     walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
     walk (inputˢ i)       = walk-input i
     walk (ofˢ ts)         = walk-of ts
     walk emptyˢ           = walk-empty
     walk (takeˢ k b)      = walk-take k b
     walk (takeWhileˢ f b) = walk-takeWhile f b
-    walk (mapˢ f b) w r S pr (subs-map dP) (subs-map dI) = walk b w r S (map~ (lifts-map f w r) pr) dP dI
+    walk (mapˢ f b) w r S pr (subs-map dP) (subs-map dI) = unmap (walk b w r S (map~ (lifts-map f w r) pr) dP dI)
     walk (scanˢ f z b)    = walk-scan f z b
     walk (flattenˢ op b)  = walk-flatten op b
     walk (μˢ b)           = walk-μ b
@@ -267,6 +267,7 @@ root-walk : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (in
           × Pointwise (λ a w → V κ t (proj₂ a) w)
                       (readᴵ (proj₁ (Σ⁰.fst⁰ (subscribe! (elaborateImpl κ e) (embedSlotsImpl ins)))))
                       (readᴾ (proj₁ (Σ⁰.fst⁰ (subscribe! (plainExp e) (plainSlots ins)))))
-root-walk κ e ins =
-  walk κ e (λ x → x) (λ ()) (init-store κ e ins _ (<-trans (proj₁ (proj₂ (minted κ e ins))) (n<1+n _))) root~
+root-walk κ e ins = After.store (proj₁ W) , After.values (proj₁ W)
+  where
+  W = walk κ e (λ x → x) (λ ()) (init-store κ e ins _ (<-trans (proj₁ (proj₂ (minted κ e ins))) (n<1+n _))) root~
        (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp e) (plainSlots ins)))) (proj₂ (proj₂ (minted κ e ins)))
