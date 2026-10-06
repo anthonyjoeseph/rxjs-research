@@ -82,8 +82,9 @@ open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; module Kept)
 open Kept using (After; module After; Persists; _⨾_)
-open import Simulation.Pass using (dynRow; Paired; unchain; head; row-pass; delivered; Head; nohead; admit-agrees;
-  delivered-arr; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
+open import Simulation.Pass using (row-pass; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
+open import Simulation.Pass.Quiet using (dynRow; Paired; unchain; delivered; admit-agrees; delivered-arr; module PassQ)
+open PassQ using (head; Head; nohead)
 
 module _ {n m} (Γ′ : Ctx m) (Γ : Ctx n) where
 
