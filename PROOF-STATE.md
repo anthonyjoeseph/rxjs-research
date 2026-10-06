@@ -259,8 +259,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former; a minted source's chain is `path-pass`, one
   arm per plain frame; a hot slot's is `fan-go` over the share's readers.
-  Every arm on both halves is a body over leaves but `walk-take` and
-  `walk-μ`. Left: `walk-take`'s body runs under its merge with the outer
+  Every arm on both halves is a body over leaves but `walk-μ`. Left:
+  `take-open`'s body runs under its merge with the outer
   still open, so a synchronous cut ends the plain path at the cut and the
   impl's at the wrap; give `PathRel` an open count owing its end and the arm
   drops to a zero leaf, the install, the body's walk and the wrap. Ruled out:
@@ -359,9 +359,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   one per slot.
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
-- **`walk-*`** (Simulation.Walk) — FALSITY, `DEAD ROUTE`: one former's
-  subscribe keeps what a pass keeps (`After`). No take or `μ` run;
-  `walk-take`'s body is not subscribed under `take~`.
+- **`take-open`** (Simulation.Walk) — FALSITY, `DEAD ROUTE`: a take's body
+  walked under the impl's open merge keeps what a pass keeps, though a
+  synchronous cut ends the plain path at the cut and the impl's at the wrap.
+- **`take-zero`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a take at zero
+  ends both paths with the body unsubscribed.
+- **`walk-μ`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an unrolling's
+  subscribe keeps what a pass keeps (`After`); no μ run.
 - **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s
   emits carry its values one per emit, and the group folded and ended down
   related paths keeps what a pass keeps, the impl's under its new source.
