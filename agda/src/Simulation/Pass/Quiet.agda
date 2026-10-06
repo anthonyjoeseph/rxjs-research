@@ -44,9 +44,9 @@ open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ)
 open import SExp.Elaborate using (flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
-  PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
-  outerExplode~; inner~; lane~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel;
-  []; _∷_; mach; MachRow; hot~; Store; Arr; Partners; pair-ids; Spent; spent-zip; dlvᵇ; dyingᵇ)
+  PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
+  inner~; lane~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
+  MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
 open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes)
