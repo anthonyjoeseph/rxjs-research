@@ -225,15 +225,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     spent-keep₂ s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars)
       (sameSource-lt (<-trans (toℕ<n i) na))
       (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ʳ n i)) (+-monoʳ-< n (toℕ<n i))) na′))
-      (h , spent-drop na na′ q ars d)
+      (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
   spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (rr@(cold~ _ _ _ refl) ∷ q) (ar , ars) (h , d) with arr-dec ar
-  ... | inj₁ (e , e′) = spent-skip₂ s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop na na′ q ars d)
-  ... | inj₂ (e , e′) = spent-keep₂ s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop na na′ q ars d)
+  ... | inj₁ (e , e′) = spent-skip₂ s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
+  ... | inj₂ (e , e′) = spent-keep₂ s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
   spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (rr@(defer~ _ _ _ _ _ refl) ∷ q) (ar , ars) (h , d) with arr-dec ar
-  ... | inj₁ (e , e′) = spent-skip₂ s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop na na′ q ars d)
-  ... | inj₂ (e , e′) = spent-keep₂ s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop na na′ q ars d)
+  ... | inj₁ (e , e′) = spent-skip₂ s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
+  ... | inj₂ (e , e′) = spent-keep₂ s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
   spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (mach m@(hot~ _ _ refl) q) ars d =
-    spent-substʳ κ _ _ _ _ _ _ (mach m (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars)) (spent-drop na na′ q ars d)
+    spent-substʳ κ _ _ _ _ _ _ (mach m (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars)) (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
 
 ------------------------------------------------------------------
 -- The store
