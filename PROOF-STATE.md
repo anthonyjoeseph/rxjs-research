@@ -260,10 +260,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   map, scan, take and takeWhile step on samples; both cut rows quantified
   over plain budgets no row carries and are restated per
   `Refuted.Cut-Budget`, after which seeds 1, 31, 32 (depth 4) and 33
-  (depth 5), aimed at each frame, held them. Left: a merge's active count
-  parting at a subscribe while values agree (seed 33 depth 5 case 58,
-  seed 41 depth 3 case 7), a spent take passing a later completion
-  through being the suspect; then `ObsRel`, `DeferRel` and `EnvRel`.
+  (depth 5), aimed at each frame, held them. A merge's active count parting
+  at a subscribe was the evaluator's: a spent take passed a flattener's
+  later end through, and a limited merge above filled a lane early
+  (`spent-take-passes-a-completion`); seeds 33 and 41 hold since. Left:
+  `ObsRel`, `DeferRel` and `EnvRel`, undecided in `CLI.Store-Check`.
 
 - **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
   merge and an exhaust decide alike off related nodes, a node neither can

@@ -611,6 +611,14 @@ takeVals w (suc (suc k)) (v ∷ vs) with spends w v
 -- take's whole step.  Non-cut passes the budgeted prefix through and
 -- threads the remaining count; the cut exhausts the budget, forces the
 -- end, and severs the registrations threaded through this node.
+--
+-- A SPENT TAKE PASSES NOTHING, ITS END INCLUDED.  The cut severs the
+-- registrations through this node, but a flattener below it whose last
+-- inner carried the cutting values reports its own end through the same
+-- path after them, and that end reaches the node at budget zero.  Real
+-- `take` unsubscribed at the cut and never sees it; forwarding it is a
+-- second completion, which a limited flattener above counts as a freed
+-- lane and fills early.  Pinned by `spent-take-passes-a-completion`.
 takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
              → Maybe (FnClo Γ s boolᵗ) → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
              → Maybe (NodeState Γ)
@@ -623,7 +631,7 @@ takeDispatch w nid vals fin sched st (just (take-st k)) =
            record st { registry = kept
                      ; cancelled = cutRids ++ EvalSt.cancelled st
                      ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
-  else (proj₁ (takeVals w k vals) , fin , sched ,
+  else (proj₁ (takeVals w k vals) , fin ∧ (0 <ᵇ k) , sched ,
         record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals w k vals))))
                                       (EvalSt.nodes st) })
 takeDispatch w nid vals fin sched st _ = [] , fin , sched , st
