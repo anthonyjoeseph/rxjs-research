@@ -41,7 +41,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arriva
   thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap;
   setNode; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ; RegId;
   RegRow; AtFloor; atDyn; atSlot; chainsOf)
-open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓; walk-nil; walk-echo; walk-cons;
+open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; step-from-inner; react-false; react-alive; react-dead; thruWalk⇓; walk-nil; walk-echo; walk-cons;
   thruConsume⇓; inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub; consume-switch-nil; subscribeInner⇓; subscribeE⇓; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
@@ -864,25 +864,73 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                                (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
                                 (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
       -- leaving an inner: the flattener's lane, then its restamp
-      inner-arm     : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+      inner-pass    : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
-                    → Steps (from-inner (flatOp op) m j) h p
+                    → InnerPasses (flatOp op) m j h p
+                        (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
+                         (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
+                          (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
+      inner-dies    : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                    → InnerDies (flatOp op) m j h p
                         (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
                          (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
                           (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
       -- an inner led with its echo: one more merge, impl only, in front of its lane
-      lane-arm      : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+      lane-pass     : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                         {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                    → Steps (from-inner a m j) h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+                    → InnerPasses a m j h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+      lane-dies     : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+                        {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+                    → InnerDies a m j h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
       -- a deferred body: the hop's marker merge, its restamp, the hop's node
-      deferInner-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
-                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
-                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
-                     → Steps (from-inner mergeAllᵒ nid j) h p
-                         (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
-                          (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
-                           (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+      deferInner-pass : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                          {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                      → InnerPasses mergeAllᵒ nid j h p
+                          (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                           (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                            (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+      deferInner-dies : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                          {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                      → InnerDies mergeAllᵒ nid j h p
+                          (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                           (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                            (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+
+    -- AN INNER'S STEP, by the rule its react takes: open or alive, it
+    -- passes the group on; dead, it finishes
+    inner-arm     : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                  → Steps (from-inner (flatOp op) m j) h p
+                      (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
+                       (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
+                        (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
+    inner-arm {op = op} S R b sp si (step-from-inner react-false)        dI = inner-pass {op = op} S R b sp si (inj₁ refl) dI
+    inner-arm {op = op} S R b sp si (step-from-inner (react-alive al))   dI = inner-pass {op = op} S R b sp si (inj₂ al) dI
+    inner-arm {op = op} S R b sp si (step-from-inner (react-dead dd fz)) dI = inner-dies {op = op} S R b sp si dd fz dI
+
+    lane-arm      : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+                      {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+                  → Steps (from-inner a m j) h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+    lane-arm S R b sp si (step-from-inner react-false)        dI = lane-pass S R b sp si (inj₁ refl) dI
+    lane-arm S R b sp si (step-from-inner (react-alive al))   dI = lane-pass S R b sp si (inj₂ al) dI
+    lane-arm S R b sp si (step-from-inner (react-dead dd fz)) dI = lane-dies S R b sp si dd fz dI
+
+    deferInner-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                       {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                   → Steps (from-inner mergeAllᵒ nid j) h p
+                       (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                        (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                         (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+    deferInner-arm S R b sp si (step-from-inner react-false)        dI = deferInner-pass S R b sp si (inj₁ refl) dI
+    deferInner-arm S R b sp si (step-from-inner (react-alive al))   dI = deferInner-pass S R b sp si (inj₂ al) dI
+    deferInner-arm S R b sp si (step-from-inner (react-dead dd fz)) dI = deferInner-dies S R b sp si dd fz dI
 
     mutual
       path-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Pass p q

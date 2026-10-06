@@ -266,8 +266,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   over its walk's leaves, the impl's valueless echo one frame at a time,
   `quiet-sink` its widest. Left: the arms as
   real bodies, riskiest first, each owing the
-  store's `swept` and the arrival's `lists` persisted, and `lane-arm` over
-  `inner-arm` once `Arm` carries an impl-only step; the monster drops to
+  store's `swept` and the arrival's `lists` persisted, and `lane-pass` over
+  `inner-pass` once `Arm` carries an impl-only step; the monster drops to
   whichever arm fails.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
@@ -308,9 +308,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   folded down the restamp tail on both sides, the flattener kept.
 - **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   exploded outer's step on both sides.
-- **`{inner,lane,deferInner}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
-  leaving an inner, the flattener's lane, an impl-only lane merge ahead of it
-  and a deferred body's hop.
+- **`{inner,lane,deferInner}-dies`** (Simulation.Pass) — FALSITY,
+  `NO EVIDENCE`: an inner no live chain runs through finishes on both sides,
+  through the flattener's lane, an impl-only lane merge ahead of it or a
+  deferred body's hop.
+- **`{inner,lane,deferInner}-pass`** (Simulation.Pass) — FALSITY,
+  `NO EVIDENCE`: an inner still open or alive passes its group on as it came,
+  the impl's tail stepping alone.
 - **`{block,hop}-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
   chain's input block hands its path the popped head; a deferred hop subscribes
   its body on both sides.
