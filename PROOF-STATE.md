@@ -334,9 +334,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   a cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped
   head down, and the impl tail's end after it.
-- **`hop-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
-  hop's merge subscribes each emit's body on both sides, and its end meets the
-  plain hop's.
+- **`hop-{one,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
+  hop's merge subscribes the one popped emit's body on both sides, and its end
+  meets the plain hop's.
 - **`scan-write`** (Simulation.Scan) — FALSITY, `NO EVIDENCE`: a cell written
   on both sides keeps the stores and the tails related.
 - **`take-{write,end,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
