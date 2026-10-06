@@ -104,8 +104,8 @@ pair-ids {κ = κ} (_∷_ {r = r} {r′ = r′} _ q) (a ∷ ap) (a′ ∷ ap′)
 pair-ids {κ = κ} (_∷_ _ q) (a ∷ ap) (a′ ∷ ap′) {x} {x′} (inj₂ p) =
     trans (ᵇ-no (λ e → lookupᵃ a (proj₁ (partner-mem κ _ _ _ _ _ q {x} {x′} p)) (sym e)))
           (sym (ᵇ-no (λ e → lookupᵃ a′ (proj₂ (partner-mem κ _ _ _ _ _ q {x} {x′} p)) (sym e))))
-  , pair-ids q ap ap′ {x} {x′} p
-pair-ids (mach _ q) ap (_ ∷ ap′) {x} {x′} p = pair-ids q ap ap′ {x} {x′} p
+  , pair-ids {κ = κ} q ap ap′ {x} {x′} p
+pair-ids {κ = κ} (mach _ q) ap (_ ∷ ap′) {x} {x′} p = pair-ids {κ = κ} q ap ap′ {x} {x′} p
 
 -- a chain step marks its partnered pair of rows delivered, alike
 delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
