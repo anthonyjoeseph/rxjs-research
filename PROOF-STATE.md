@@ -277,11 +277,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **CUT AT A TAKE AS AT A SWITCH.** `Simulation.Cut` keeps the stores
   under a cut at either of the first two members of a key's run. Left:
-  `while-cut` as a body over `cut-go`/`cut-keeps`/`cut-persists` and a
-  zero-write leaf, ending in `spentWhile~`; then `take-end`, where the impl's
-  merge finish folds the tail on an open group and hands the end up empty.
-  Ruled out: an impl cut cell spending anywhere but where the plain count
-  does (`cut-group`).
+  `take-end`, where the impl's merge finish folds the tail on an open group
+  and hands the end up empty -- its cut half as `while-cut`'s, the finish its
+  own leaf. Ruled out: an impl cut cell spending anywhere but where the plain
+  count does (`cut-group`), and a test's cut severing a row its partner keeps
+  (`while-cut`, over `cut-keeps`).
 
 - **WALK INSIDE THE PASS.** `walk-of`, `walk-empty` and `walk-μ` are
   `path-pass`, or `walk` again, past a derivation rather than the tree:
@@ -334,9 +334,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   count's nodes written open keep the stores and tails; a group that ends meets
   the impl merge's finish, which folds the tail before handing up the end; a
   spent count passes nothing on both sides.
-- **`while-{write,cut,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
-  test's nodes written open keep the stores and tails; a cut severs and zeroes
-  both tests; a spent test passes nothing on both sides.
+- **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
+  test's nodes written open keep the stores and tails, and written spent keep
+  what the cut left; a spent test passes nothing on both sides.
 - **`sink-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group reaching
   a shared slot's subject fans out to related readers on both sides.
 - **`root-values`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a group's emits

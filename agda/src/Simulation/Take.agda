@@ -20,16 +20,20 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FnClo; boolᵗ; natᵗ; unitᵗ; _×ᵗ_; applyClo; _≟ᵗ_)
-open import Rx.Evaluator using (EvalSt; NodeId; NodeState; Path; _↠[_]_; scan-f; take-f; map-f; from-inner; mergeAllᵒ;
-  lookupNode; setNode; cell-st; take-st; mergeAll-st; takeVals; scanVals; spends; takeDispatch)
+open import Rx.Evaluator using (EvalSt; Sched; NodeId; NodeState; Path; _↠[_]_; scan-f; take-f; map-f; from-inner; mergeAllᵒ;
+  lookupNode; setNode; cell-st; take-st; mergeAll-st; takeVals; scanVals; spends; takeDispatch; cutThrough)
 open import Rx.Evaluator.Domain using (stepFrame⇓; foldPath⇓; fold-step; step-scan; step-take; step-map; step-from-inner; react-false; injectRoot)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; head-on; self-node)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (CutS; cutOpenᵛ; cutOutᵛ)
-open import Simulation.Stores using (EmitRel; CutLifts; PathRel; take~; spent~; takeWhile~; spentWhile~; Store)
-open import Simulation.Sweep using (t≢f)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Binary.Pointwise using () renaming ([] to []ᵖ)
+open import Simulation.Stores using (EmitRel; CutLifts; PathRel; take~; spent~; takeWhile~; spentWhile~; Store; guardOf)
+open import Simulation.Sweep using (t≢f; sweepL; sweep-eq)
+open import Simulation.Cut using (cut-go; cut-keeps; cut-persists)
 open import Simulation.Write using (apart)
 open import Simulation.After using (module Kept)
 open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear)
@@ -62,6 +66,20 @@ take-open-at : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s lo w k} {κ′ : Pa
              → r ≡ ([] , proj₁ (takeVals w b vals) , fin ∧ (0 <ᵇ b) , sc
                    , record st { nodes = setNode k (take-st (proj₁ (proj₂ (takeVals w b vals)))) (EvalSt.nodes st) })
 take-open-at e h d rewrite take-at e d | h = refl
+
+-- and one that cuts severs the rows through its node, writes zero and ends
+take-cut-at : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s lo w k} {κ′ : Path Δ lo s t}
+                {now vals fin sc} {st : EvalSt e} {b r}
+            → lookupNode k (EvalSt.nodes st) ≡ just (take-st b)
+            → proj₂ (proj₂ (takeVals w b vals)) ≡ true
+            → stepFrame⇓ now (take-f w k) κ′ vals fin sc st r
+            → r ≡ ([] , proj₁ (takeVals w b vals) , true
+                  , record sc { live = sweepL (guardOf (proj₁ (cutThrough k (EvalSt.registry st)))) (Sched.live sc) }
+                  , record st { registry = proj₁ (cutThrough k (EvalSt.registry st))
+                              ; cancelled = proj₂ (cutThrough k (EvalSt.registry st)) ++ EvalSt.cancelled st
+                              ; nodes = setNode k (take-st 0) (EvalSt.nodes st) })
+take-cut-at {k = k} {sc = sc} {st = st} e h d
+  rewrite take-at e d | h | sweep-eq (proj₁ (cutThrough k (EvalSt.registry st))) (Sched.live sc) = refl
 
 -- an inner's merge on an open group passes it as it came
 react-open : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s lo op k j} {κ′ : Path Δ lo s t}
@@ -351,23 +369,29 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                       → PathRel κ (Store.π (After.store A)) (setNode k (take-st b) (EvalSt.nodes stP))
                           (setNode k₂ (take-st r) (setNode k₁ (cell-st {t = CutS unitᵗ s} c) (EvalSt.nodes stI))) p q
 
-      -- A TEST THAT CUTS ON BOTH SIDES: the plain test and the cell's
-      -- test each sever the registrations through their node and write
-      -- zero, and pass the same prefix and the end
-      while-cut : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
-                    {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
-                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
-                    {P : FnClo Γ s boolᵗ} {F₁ : FnClo (plainᵏ Γ κ) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
-                    {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
-                    {vs es fin oP vs₁ fin₁ sP₁ stP₁ rI}
-                → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)
-                → proj₂ (proj₂ (takeVals (just P) 1 vs)) ≡ true
-                → Carries es vs
-                → Sound (take-f (just P) k ↠[ h ] p) sP stP → Sound (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) sI stI
-                → stepFrame⇓ now (take-f (just P) k) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
-                → foldPath⇓ now (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) es fin sI stI rI
-                → Arm S now oP sP₁ stP₁ p vs₁ fin₁
-                    (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)) rI
+      -- A TEST'S NODES WRITTEN SPENT ONCE BOTH SIDES HAVE CUT: the plain
+      -- test and the cell's test to zero, the cell to what the scan
+      -- left, keep the stores the cut left and the tails related
+      while-zero : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
+                     {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
+                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                     {P : FnClo Γ s boolᵗ} {F₁ : FnClo (plainᵏ Γ κ) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
+                     {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
+                     (e : (k , k₁ ∷ k₂ ∷ []) ∈ Store.π S)
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)
+                 → Sound (take-f (just P) k ↠[ h ] p) sP stP → Sound (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) sI stI
+                 → ∀ c
+                 → Σ (After (cut-go κ S e (there (here refl)))
+                        ([] , record sP { live = sweepL (guardOf (proj₁ (cutThrough k (EvalSt.registry stP)))) (Sched.live sP) }
+                            , record stP { registry = proj₁ (cutThrough k (EvalSt.registry stP))
+                                         ; cancelled = proj₂ (cutThrough k (EvalSt.registry stP)) ++ EvalSt.cancelled stP
+                                         ; nodes = setNode k (take-st 0) (EvalSt.nodes stP) })
+                        ([] , record sI { live = sweepL (guardOf (proj₁ (cutThrough k₂ (EvalSt.registry stI)))) (Sched.live sI) }
+                            , record stI { registry = proj₁ (cutThrough k₂ (EvalSt.registry stI))
+                                         ; cancelled = proj₂ (cutThrough k₂ (EvalSt.registry stI)) ++ EvalSt.cancelled stI
+                                         ; nodes = setNode k₂ (take-st 0) (setNode k₁ (cell-st {t = CutS unitᵗ s} c) (EvalSt.nodes stI)) })) λ A
+                     → PathRel κ (Store.π (After.store A)) (setNode k (take-st 0) (EvalSt.nodes stP))
+                         (setNode k₂ (take-st 0) (setNode k₁ (cell-st {t = CutS unitᵗ s} c) (EvalSt.nodes stI))) p q
 
       -- A SPENT TEST ON BOTH SIDES passes nothing, its end included,
       -- and stays spent
@@ -385,6 +409,58 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                   → foldPath⇓ now (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) es fin sI stI rI
                   → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                       (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)) rI
+
+    -- A TEST THAT CUTS ON BOTH SIDES: the plain test and the cell's
+    -- test each sever the registrations through their node and write
+    -- zero, and pass the same prefix and the end
+    while-cut : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
+                  {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
+                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                  {P : FnClo Γ s boolᵗ} {F₁ : FnClo (plainᵏ Γ κ) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
+                  {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
+                  {vs es fin oP vs₁ fin₁ sP₁ stP₁ rI}
+              → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)
+              → proj₂ (proj₂ (takeVals (just P) 1 vs)) ≡ true
+              → Carries es vs
+              → Sound (take-f (just P) k ↠[ h ] p) sP stP → Sound (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) sI stI
+              → stepFrame⇓ now (take-f (just P) k) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
+              → foldPath⇓ now (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) es fin sI stI rI
+              → Arm S now oP sP₁ stP₁ p vs₁ fin₁
+                  (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)) rI
+    while-cut S R@(spentWhile~ _ lk _ _) _ bs sp si d dI = while-spent S R lk bs sp si d dI
+    while-cut {stP = stP} {sI = sI} {stI = stI} S {es = es}
+              R@(takeWhile~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
+                            {h = h} {h₁ = h₁} {h₂ = h₂} {h₃ = h₃} {P = P} {F₁ = F₁} {p = p} {q = q} e lk lk₁ lk₂ CL r)
+              eqW bs sp si d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
+      with cut-group {Bud = λ _ b → b ≡ 1} {F′ = F₁} {P = just P} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃} CL bs (tt , false , os , em) 1 refl refl
+         | scan-at lk₁ d₁ | take-cut-at lk eqW d
+    ... | cs , fe , _ | refl | refl
+      with take-cut-at (trans (set-above k₁ k₂ (cell-st {t = CutS unitᵗ s} (proj₂ (scanVals F₁ (tt , false , os , em) es))) (EvalSt.nodes stI)
+                                        (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
+                       (trans fe eqW) d₂
+    ... | refl =
+      arm A (proj₂ ZW) cs soq dq λ {rP} dP B rel′ →
+        spentWhile~ (After.grows B (After.grows A e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₂) lk₂′) rel′
+      where
+      fc : Val (plainᵏ Γ κ) (CutS unitᵗ s)
+      fc = proj₂ (scanVals F₁ (tt , false , os , em) es)
+      N₂ = setNode k₂ (take-st 0) (setNode k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI))
+      -- the cut on both sides, then its nodes written
+      ZW = while-zero S e R sp si fc
+      A = after (cut-go κ S e (there (here refl))) (cut-keeps κ S e (there (here refl))) (cut-persists κ S e (there (here refl))) []ᵖ (λ x → x)
+          ⨾∅ proj₁ ZW
+      lkP : lookupNode k (setNode k (take-st 0) (EvalSt.nodes stP)) ≡ just (take-st 0)
+      lkP = lookup-set k (take-st 0) (EvalSt.nodes stP)
+      lk₂′ : lookupNode k₂ N₂ ≡ just (take-st 0)
+      lk₂′ = lookup-set k₂ (take-st 0) (setNode k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI))
+      spK = step-kept h d sp
+      cP : Clear k p _ _
+      cP = head-on (take-f (just P) k) h p k (self-node k []) spK , drop-ot (take-f (just P) k) h p spK
+      so₁ = step-kept h₁ d₁ si
+      so₂ = step-kept h₂ d₂ (drop-ot _ _ _ so₁)
+      soq = drop-ot _ _ _ (drop-ot _ _ _ so₂)
+      c₂ : Clear k₂ q _ _
+      c₂ = on-drop (head-on _ h₂ _ k₂ (self-node k₂ []) so₂) , soq
 
     -- A TEST STEPS ALIKE ON BOTH SIDES.  A group that does not cut,
     -- whether or not it ends, leaves the cell open and both tests at
