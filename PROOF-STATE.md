@@ -260,10 +260,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   use is no step, and the write is proven (`Simulation.Write`: `π`'s
   uniqueness and the nodes' kinds keep every other row's fact), and the
   inner's subscribe is the walk's own arm, since walk and pass now keep one
-  invariant (`Simulation.After`). Left: the switch's cut and named
-  subscribe (`switch-kill`, `switch-subscribe`), the latter as `π` grown
-  by the fresh pair, the node written, then the inner's walk. Narrows the
-  monster to whether a switch's cut keeps the rows it drops paired.
+  invariant (`Simulation.After`); a switch's named subscribe mints the
+  pair into `π` first, then writes and walks (`Simulation.Grow`). Left:
+  the switch's cut (`switch-kill`). Narrows the monster to whether a
+  switch's cut keeps the rows it drops paired.
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former, `walk-flatten` its riskiest. A minted source's
@@ -307,9 +307,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   on carries the echo's values, still open.
 - **`switch-kill`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a switch's
   running inner cut on both sides keeps the walk.
-- **`switch-subscribe`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`: a switch
-  naming its next inner and subscribing it on both sides keeps the walk, the
-  pair joining `π` (`pairs-below` makes it fresh).
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
 - **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an

@@ -11,22 +11,26 @@ module Simulation.After where
 
 open import Data.Bool.ListAction using (any)
 open import Data.Bool    using (true; false)
-open import Data.List    using (List; _++_; concat)
+open import Data.List    using (List; []; _∷_; _++_; concat; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; ++⁺)
-open import Data.List.Relation.Unary.All using () renaming (map to mapᵃ)
-open import Data.Nat     using (suc; _≡ᵇ_)
-open import Data.Nat.Properties using (n≤1+n; m<n⇒m<1+n)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᵃ)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᵃ)
+open import Data.List.Relation.Unary.Any using (there)
+open import Data.List.Relation.Unary.AllPairs using (_∷_)
+open import Data.Nat     using (ℕ; suc; _<_; _≡ᵇ_)
+open import Data.Nat.Properties using (n≤1+n; n<1+n; m<n⇒m<1+n; <-irrefl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Sum     using (_⊎_)
+open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Empty   using (⊥)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst₂)
 
 open import Rx.Prim      using (Id)
 open import Rx.Exp       using (Ctx; Closed; Val; uniqᵗ)
 open import Rx.Mint      using (setAt; nodeᵏ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; RegId; RegRow)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; RegId; RegRow; NodeId)
 open import Rx.Evaluator.Freshness using (nodeCt)
-open import Rx.Evaluator.Reducible.Support using (sub-rule)
+open import Rx.Evaluator.Reducible.Support using (sub-rule; fresh-rows)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit using (instEmitᵗ)
@@ -34,6 +38,7 @@ open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
 open import Simulation.Stores using (V; RegRel; Partners; Store; Arr)
+open import Simulation.Grow using (OffRow; fresh-off-row; regG; partG; arrG)
 
 -- what a run sends to its root, read as values: the plain run's in
 -- order, the impl's decoded and each paired with its instant
@@ -51,6 +56,18 @@ readᴵ-++ xs ys =
   trans (cong (λ z → instExtract (decodeEmits z)) (concat-++ xs ys))
  (trans (cong instExtract (decode-++ (concat xs) (concat ys)))
         (extract-++ (decodeEmits (concat xs)) (decodeEmits (concat ys))))
+
+-- every node a pairing lists, below the counter, apart from it
+below-keys : ∀ {π : List (NodeId × List NodeId)} {c} → All (λ e → proj₁ e < c) π → All (_< c) (map proj₁ π)
+below-keys []       = []
+below-keys (a ∷ as) = a ∷ below-keys as
+
+below-vals : ∀ {π : List (NodeId × List NodeId)} {c} → All (λ e → All (_< c) (proj₂ e)) π → All (_< c) (concatMap proj₂ π)
+below-vals []       = []
+below-vals (a ∷ as) = ++⁺ᵃ a (below-vals as)
+
+apart : ∀ {c : ℕ} {xs} → All (_< c) xs → All (λ x → c ≡ x → ⊥) xs
+apart = mapᵃ (λ lt e → <-irrefl (sym e) lt)
 
 -- A CHAIN PAIR THE PASS HAS NOT REACHED: cut on both sides, or on
 -- neither and partnered by the registries' relation
@@ -129,3 +146,40 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
           (λ ar → After.persists A (record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
                                              ; rows = Arr.rows ar ; lists = Arr.lists ar }))
           (After.values A) (After.grows A)
+
+  -- AN INNER'S PAIR MINTED ON BOTH SIDES: the node counters move, and
+  -- the pair they hand out joins `π`, apart from every node a row names
+  Minted : ∀ {sP stP sI stI} → St sP stP sI stI → List (NodeId × List NodeId)
+  Minted {sP} {sI = sI} S = (nodeCt sP , nodeCt sI ∷ []) ∷ Store.π S
+
+  mint-off : ∀ {sP stP sI stI} (S : St sP stP sI stI) {r′} → r′ ∈ EvalSt.registry stI
+           → OffRow {Γ = Γ} κ (Store.π S) (Minted S) {emitᵗ t} r′
+  mint-off {sP} S {r′} r∈ = fresh-off-row {Γ = Γ} {κ = κ} {π = Store.π S} {j = nodeCt sP} r′ (fresh-rows (Store.ruleI S) r∈)
+
+  mint-pair : ∀ {sP stP sI stI} (S : St sP stP sI stI)
+            → St (record sP { mint = setAt nodeᵏ (suc (nodeCt sP)) (Sched.mint sP) }) stP
+                 (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) }) stI
+  mint-pair {sP} {sI = sI} S = record
+    { π = Minted S
+    ; π-keys = apart (below-keys (proj₁ pairs-below)) ∷ π-keys
+    ; π-vals = apart (below-vals (proj₂ pairs-below)) ∷ π-vals
+    ; pairs-below = n<1+n (nodeCt sP) ∷ mapᵃ m<n⇒m<1+n (proj₁ pairs-below)
+                  , (n<1+n (nodeCt sI) ∷ []) ∷ mapᵃ (mapᵃ m<n⇒m<1+n) (proj₂ pairs-below)
+    ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
+    ; rows = regG κ there (mint-off S) rows
+    ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
+    ; census = census ; owned = owned
+    ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) ruleP
+    ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) ruleI
+    }
+    where open Store S
+
+  -- a step from the minted stores is one from the stores
+  unmint : ∀ {sP stP sI stI} {S : St sP stP sI stI} {rP rI} → After (mint-pair S) rP rI → After S rP rI
+  unmint {S = S} A =
+    after (After.store A)
+          (λ { (inj₁ c) → After.keeps A (inj₁ c)
+             ; (inj₂ (a , b , pr)) → After.keeps A (inj₂ (a , b , partG κ there (mint-off S) (Store.rows S) pr)) })
+          (λ ar → After.persists A (record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
+                                             ; rows = arrG κ there (mint-off S) (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar }))
+          (After.values A) (λ x → After.grows A (there x))
