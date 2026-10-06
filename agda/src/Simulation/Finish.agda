@@ -197,6 +197,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         → RegRel κ π NP NI LP LI rs (dropSource s′ (r′ ∷ rs′))
   keepI {rs′ = rs′} {r′ = r′} s′ x e′ = subst (RegRel κ _ _ _ _ _ _) (sym (drop-keep s′ r′ rs′ e′)) x
 
+  spent-keepI : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {rs rs′}
+                  {r′ : RegRow (plainᵏ Γ κ) (emitᵗ t)} s′
+                  (x : RegRel κ π NP NI LP LI rs (r′ ∷ dropSource s′ rs′)) e′ {dP dI}
+              → Spent κ π NP NI LP LI x dP dI → Spent κ π NP NI LP LI (keepI {rs′ = rs′} s′ x e′) dP dI
+  spent-keepI {rs′ = rs′} {r′ = r′} s′ x e′ = spent-substʳ κ _ _ _ _ _ (sym (drop-keep s′ r′ rs′ e′)) x
+
   -- the registrations at the arrival's source go from both registries together
   drop-rows : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI : List (LiveSource (plainᵏ Γ κ))} {rs rs′ s s′ u u′} → n < s → n + n < s′
             → (q : RegRel κ π {t} NP NI LP LI rs rs′) → ArrRows κ π NP NI LP LI q s s′ u u′
@@ -232,8 +238,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (_∷_ {r = r₀} {r′ = r₀′} {rs = rs₀} {rs′ = rs₀′} rr@(defer~ _ _ _ _ _ refl) q) (ar , ars) (h , d) with arr-dec ar
   ... | inj₁ (e , e′) = spent-skip₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
   ... | inj₂ (e , e′) = spent-keep₂ {rs = rs₀} {rs′ = rs₀′} {r = r₀} {r′ = r₀′} s s′ (rr ∷ drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars) e e′ (h , spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
-  spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (mach m@(hot~ _ _ refl) q) ars d =
-    spent-substʳ κ _ _ _ _ _ _ (mach m (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars)) (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
+  spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ (mach {rs′ = rs₀′} {r′ = r₀′} m@(hot~ {i = i} _ _ refl) q) ars d =
+    spent-keepI {rs′ = rs₀′} {r′ = r₀′} s′ (mach m (drop-rows {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars)) (mach-lt i na′) (spent-drop {s = s} {s′ = s′} {u = u} {u′ = u′} na na′ q ars d)
 
 ------------------------------------------------------------------
 -- The store
