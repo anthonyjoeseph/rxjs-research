@@ -72,6 +72,14 @@ walk-head : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {w lo op nid} {κ : Path 
               × r ≡ (proj₁ r₁ ++ proj₁ r₂ , proj₂ r₂)
 walk-head x xs W = walk-split (thruEvents (x ∷ [])) (thruEvents xs) (subst (λ ys → thruWalk⇓ _ _ _ _ ys _ _ _) (events-cons x xs) W)
 
+-- AN EMIT'S RELATION NEVER READS ITS INSTANT: retagging every value's
+-- instant keeps the values related
+retag : ∀ {I A B : Set} {R : I × A → B → Set} {i j : I} {xs : List A} {ws : List B}
+      → (∀ {x w} → R (i , x) w → R (j , x) w)
+      → Pointwise R (map (i ,_) xs) ws → Pointwise R (map (j ,_) xs) ws
+retag {xs = []}     f []       = []
+retag {xs = _ ∷ _} f (r ∷ rs) = f r ∷ retag f rs
+
 -- a walk through a flattener keeps its node off the path below it
 walk-clear : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w} {k} {κ : Path Δ lo w u} {op now xs}
                {sched sched′ st st′ out}
@@ -189,11 +197,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                    → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                        (λ π NP NI → PathRel κ π NP NI (from-inner mergeAllᵒ m j ↠[ h ] p)
                           (from-inner mergeAllᵒ m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q)) (o₁ ++ proj₁ rI , proj₂ rI)
-      -- A DELIVERED EMIT CARRIES WHAT IT CARRIED: the hop's restamp
-      -- retags a subscribe as a delivery over its own events
-      delivery-rel : ∀ {u Θx ρ₀} e′ {ws}
-                   → EmitRel {Γ = Γ} κ u e′ ws
-                   → EmitRel {Γ = Γ} κ u (applyClo (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) e′) ws
       -- A DEAD DEFERRED BODY FINISHES ON BOTH SIDES: the plain merge's
       -- finish, against the hop's marker merge's and the restamp and hop
       -- node the group then reaches
@@ -222,6 +225,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                           (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
                            (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
                             (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))) (o₁ ++ proj₁ rI , proj₂ rI)
+
+    -- A DELIVERED EMIT CARRIES WHAT IT CARRIED: the hop's restamp
+    -- retags a subscribe as a delivery over its own events
+    delivery-rel : ∀ {u Θx ρ₀} e′ {ws}
+                 → EmitRel {Γ = Γ} κ u e′ ws
+                 → EmitRel {Γ = Γ} κ u (applyClo (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) e′) ws
+    delivery-rel (evs , i , s , inj₁ k) r = retag (λ q → q) r
+    delivery-rel (evs , i , s , inj₂ k) r = r
 
     -- A PAIR OF NODES EVERY PAIR OF ROWS NAMES ALIKE, AND THE IMPL'S OWN
     -- ROWS NEVER THE IMPL ONE, HAS A CHAIN RUNNING THROUGH IT ON BOTH SIDES
@@ -595,12 +606,13 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     deferInner-arm S R b sp si (step-from-inner (react-alive al))   dI = deferInner-pass S R b sp si (inj₂ al) dI
     deferInner-arm S R b sp si (step-from-inner (react-dead dd fz)) dI = deferInner-dies S R b sp si dd fz dI
 
-    postulate
-      -- A RESTAMPED EMIT CARRIES WHAT IT CARRIED: the restamp rebuilds the
-      -- emit over its own events, so the values it holds are the ones
-      restamp-rel : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} e′ {ws}
-                  → EmitRel {Γ = Γ} κ (lookup Γ i) e′ ws
-                  → EmitRel {Γ = Γ} κ (lookup Γ i) (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) e′) ws
+    -- A RESTAMPED EMIT CARRIES WHAT IT CARRIED: the restamp rebuilds the
+    -- emit over its own events, so the values it holds are the ones
+    restamp-rel : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} e′ {ws}
+                → EmitRel {Γ = Γ} κ (lookup Γ i) e′ ws
+                → EmitRel {Γ = Γ} κ (lookup Γ i) (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) e′) ws
+    restamp-rel (evs , i , s , inj₁ k) r = retag (λ q → q) r
+    restamp-rel (evs , i , s , inj₂ k) r = r
 
     restamp-carries : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {es vs}
                     → Carries {s = lookup Γ i} es vs

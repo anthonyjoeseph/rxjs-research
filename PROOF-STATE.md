@@ -333,8 +333,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`hot-walk`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: past a connected
   hot slot's flushed bracket, the block's merge subscribes the one stamp and
   hands the share one emit carrying the value; the plain side does not move.
-- **`{restamp,delivery}-rel`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
-  slot reader's restamp and a hop's delivery keep the values an emit carries.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot.
