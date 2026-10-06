@@ -243,25 +243,27 @@ undecided, never a failure (Anthony).
 `simulation` — what both top lines stand on, by induction on
 arrivals over `correspondence`: schedules in step, pops partnered, stores related; the root
 subscribes set them (`subscribe-related`) and each cascade keeps
-(`cascade-related`), both sending agreeing values in one instant. RULED
-OUT: an impl arrival plain lacks, a split arrival, a gap or
-stray in an instant, an echo apart from its inners or its payload; a subscribe
-installing a run the relation lacks (hot, cold, deferred read,
+(`cascade-related`), both sending agreeing values. RULED
+OUT: an arrival plain lacks, a split one, a gap or
+stray in an instant, an echo apart from its inners or payload; a subscribe
+installing a run the relation lacks (hot, cold, deferred,
 one-lane merge); a pop unrelating a read; a map moving instants; a close
-emptying a merge its rows name; a hot end past its block; a two-value emit.
-Left: a deeper flattener's subscribe, and which cascade breaks it.
+emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
+over a budget no take holds.
+Left: a deeper flattener's subscribe; which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **DECIDE THE STORE'S CLOSURES.** `make qc-store`, aimed by `QC_DRAW` at
-  each policy, a hot share, valueless steps, a μ and arrivals carrying
-  values (seeds 11–16 and 21–22, 710 programs, depth ≤ 5) held `Store` at
-  every boundary: no cascade there breaks the fields it reads. Unread: the
-  closure relations and both rules, which is where the stores can still
-  part. Next: decide them in `CLI.Store-Check`, and a red through
-  `make qc-shrink` to a refutation.
+- **DECIDE THE STORE'S CLOSURES.** `CLI.Store-Check` now reads every
+  map, scan, take and takeWhile step on samples; both cut rows quantified
+  over plain budgets no row carries and are restated per
+  `Refuted.Cut-Budget`, after which seeds 1, 31, 32 (depth 4) and 33
+  (depth 5), aimed at each frame, held them. Left: a merge's active count
+  parting at a subscribe while values agree (seed 33 depth 5 case 58,
+  seed 41 depth 3 case 7), a spent take passing a later completion
+  through being the suspect; then `ObsRel`, `DeferRel` and `EnvRel`.
 
 - **CONSUME THE PAIR ONE POLICY AT A TIME.** `consume-pair` is a body: a
   merge and an exhaust decide alike off related nodes, a node neither can

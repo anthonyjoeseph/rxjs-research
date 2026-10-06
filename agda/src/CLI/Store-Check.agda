@@ -14,14 +14,14 @@
 -- impl-only node a row reads is among.  A flattener's inner reads a
 -- PREFIX of its node's entry, since `Flattener` leaves the tail free.
 --
--- WHAT IS DECIDED IS EVERY STRUCTURAL CLAUSE; WHAT IS NOT IS EVERY
--- CLAUSE ABOUT A CLOSURE.  `Lifts`, `ScanLifts`, `CutLifts`, and
--- `ObsRel`/`DeferRel`/`EnvRel` at an observable value relate terms,
--- and a closure is compared nowhere here: an `obs` value is related to
--- anything, and a frame's term is never read.  `ruleP`/`ruleI` are the
--- evaluator's own rule, which its builders already carry.  A green is
--- therefore evidence about the structure and the data, never about a
--- step function; a red is a candidate until a probe pins it.
+-- WHAT IS DECIDED IS EVERY STRUCTURAL CLAUSE AND EVERY FRAME'S STEP ON
+-- SAMPLES; WHAT IS NOT IS A TERM.  `Lifts`, `ScanLifts` and `CutLifts`
+-- are read by applying both live steps to a few related inputs per
+-- type, so a green covers those inputs and a red is a counterexample.
+-- `ObsRel`/`DeferRel`/`EnvRel` relate terms, and an `obs` value is
+-- related to anything here.  `ruleP`/`ruleI` are the evaluator's own
+-- rule, which its builders already carry.  A red is a candidate until
+-- a probe pins it.
 --
 -- A COMBINATION SET IS CAPPED, so a red reading "no pairing fits" with
 -- the set at its cap is not yet a red.  The report says when it was.
@@ -32,29 +32,32 @@ open import Data.Bool    using (Bool; true; false; _∧_; _∨_; not; if_then_el
 open import Data.Bool.ListAction using (any; all)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.List    using (List; []; _∷_; map; length; take; concatMap; _++_; allFin)
-open import Data.Maybe   using (Maybe; just; nothing; is-nothing) renaming (map to mapᴹ)
+open import Data.Maybe   using (Maybe; just; nothing; is-nothing; maybe′) renaming (map to mapᴹ)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.String  using (String) renaming (_++_ to _++ˢ_)
-open import Data.Unit    using (⊤)
+open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
 open import Relation.Nullary using (does; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import Rx.Prim      using (Source; Fuel)
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Closed; _≟ᵗ_)
+open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Closed; _≟ᵗ_;
+  FnClo; applyClo; emptyᵉ; []ᵉ)
 open import Rx.Slots     using (Slots)
 open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Evaluator using (LiveSource; Sched; EvalSt; Stream; Arrival; sched-next; NodeState; NodeId; Path; RegRow;
   atSlot; atDyn; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st;
-  echoᵗ; lookupNode; memberSource; pathHasNode)
+  echoᵗ; lookupNode; memberSource; pathHasNode; takeVals; scanVals)
 open import Rx.Evaluator.Builder using (cascade!; pop-rule; subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; _,_; Rule)
 open import SExp.Syntax  using (SExp; Kind; hotᵏ; coldᵏ; sharedᵏ; Kinds; plainᵏ; plainᵗ; emitᵗ)
-open import SExp.InstEmit using (machineEmitᵗ)
+open import SExp.InstEmit using (machineEmitᵗ; instEventᵗ)
+open import SExp.InstEmit.Decode using (decodeEmit)
+open import Batchable.Inst-Extract using (emitValues)
 open import SExp.Elaborate using (ScanAᵗ; CutS; FlatSᵗ)
 open import SExp.Plain   using (plainExp)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
@@ -212,6 +215,10 @@ on : ∀ {A : Set} → Maybe A → String → (A → Res) → Res
 on (just a) w k = k a
 on nothing  w k = breaks w
 
+fails : String → Maybe String → Res
+fails w (just x) = breaks (w ++ˢ x)
+fails w nothing  = ok
+
 anyR : String → List Res → Res
 anyR w []       = breaks w
 anyR w (r ∷ rs) = r ⊕ anyR w rs
@@ -292,6 +299,23 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
   vMap (_ , _ , _ , (map-f _ ↠[ _ ] q)) = just (pk q)
   vMap _                                = nothing
 
+  -- a frame's step, with the types it was installed at
+  Step : Set
+  Step = Σ Ty λ a → Σ Ty λ b → FnClo Γ′ a b
+
+  vMapF : IP → Maybe (Step × IP)
+  vMapF (_ , _ , _ , (map-f F ↠[ _ ] q)) = just ((_ , _ , F) , pk q)
+  vMapF _                                = nothing
+
+  vScanF : IP → Maybe (Step × NodeId × IP)
+  vScanF (_ , _ , _ , (scan-f F k ↠[ _ ] q)) = just ((_ , _ , F) , k , pk q)
+  vScanF _                                   = nothing
+
+  stepAt : ∀ a′ b′ → Step → Maybe (FnClo Γ′ a′ b′)
+  stepAt a′ b′ (a , b , F) with a ≟ᵗ a′ | b ≟ᵗ b′
+  ... | yes refl | yes refl = just F
+  ... | _        | _        = nothing
+
   vScan : IP → Maybe (NodeId × IP)
   vScan (_ , _ , _ , (scan-f _ k ↠[ _ ] q)) = just (k , pk q)
   vScan _                                   = nothing
@@ -334,6 +358,78 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
   V? (listᵗ t) _        _        = false
   V? (obs t)   _        _        = true
 
+  ----------------------------------------------------------------
+  -- THE CLOSURE RELATIONS, DECIDED ON SAMPLES.  `Lifts`, `ScanLifts`
+  -- and `CutLifts` quantify over every related input; these read the
+  -- two live steps at a few related values per type, so a red is a
+  -- counterexample and a green covers the samples.  An observable
+  -- sample is `emptyᵉ` on both sides, related only as `V?` relates one.
+  ----------------------------------------------------------------
+
+  samp : ∀ t → List (Val Γ′ (plainᵗ t) × Val Γ t)
+  samp unitᵗ     = (tt , tt) ∷ []
+  samp boolᵗ     = (true , true) ∷ (false , false) ∷ []
+  samp natᵗ      = (0 , 0) ∷ (1 , 1) ∷ (3 , 3) ∷ []
+  samp uniqᵗ     = (0 , 0) ∷ (2 , 2) ∷ []
+  samp (s ×ᵗ t)  =
+    take 4 (concatMap (λ a → map (λ b → (proj₁ a , proj₁ b) , (proj₂ a , proj₂ b)) (samp t)) (samp s))
+  samp (s +ᵗ t)  = map (λ a → inj₁ (proj₁ a) , inj₁ (proj₂ a)) (take 2 (samp s))
+                ++ map (λ b → inj₂ (proj₁ b) , inj₂ (proj₂ b)) (take 2 (samp t))
+  samp (listᵗ t) = ([] , []) ∷ map (λ xs → map proj₁ xs , map proj₂ xs) (take 1 (samp t) ∷ take 2 (samp t) ∷ [])
+  samp (obs t)   = (([] , emptyᵉ , []ᵉ) , ([] , emptyᵉ , []ᵉ)) ∷ []
+
+  valEv : ∀ {a} → Val Γ′ a → Val Γ′ (instEventᵗ uniqᵗ a)
+  valEv v = inj₂ (inj₁ v)
+
+  -- an emit carrying values, bare and between an init and a close
+  bare wrapped : ∀ t → List (Val Γ′ (plainᵗ t)) → Val Γ′ (emitᵗ t)
+  bare    t vs = map valEv vs , 7 , 9 , inj₂ (inj₁ tt)
+  wrapped t vs = (inj₁ 7 ∷ map valEv vs ++ inj₂ (inj₂ (inj₁ (7 , inj₂ (inj₂ tt)))) ∷ []) , 7 , 9 , inj₁ tt
+
+  emits : ∀ t → List (Val Γ′ (emitᵗ t) × List (Val Γ t))
+  emits t = concatMap (λ xs → (bare t (map proj₁ xs) , map proj₂ xs) ∷ (wrapped t (map proj₁ xs) , map proj₂ xs) ∷ [])
+                      ([] ∷ take 1 (samp t) ∷ take 2 (samp t) ∷ [])
+
+  instE : ∀ t → Val Γ′ (emitᵗ t) → ℕ
+  instE t e = proj₁ (proj₂ e)
+
+  emitRel? : ∀ t → Val Γ′ (emitᵗ t) → List (Val Γ t) → Bool
+  emitRel? t e′ = pw (map proj₂ (emitValues (decodeEmit {Γ = Γ′} {a = plainᵗ t} e′)))
+    where
+      pw : List (Val Γ′ (plainᵗ t)) → List (Val Γ t) → Bool
+      pw []       []       = true
+      pw (x ∷ xs) (y ∷ ys) = V? t x y ∧ pw xs ys
+      pw _        _        = false
+
+  lifts? : ∀ s u → FnClo Γ′ (emitᵗ s) (emitᵗ u) → FnClo Γ s u → Bool
+  lifts? s u F′ F = all (λ (e′ , vs) → let o = applyClo F′ e′ in
+    emitRel? u o (map (applyClo F) vs) ∧ (instE u o ≡ᵇ instE s e′)) (emits s)
+
+  scanLifts? : ∀ s u → FnClo Γ′ (ScanAᵗ u ×ᵗ emitᵗ s) (ScanAᵗ u) → FnClo Γ (u ×ᵗ s) u
+             → List (Val Γ′ (plainᵗ u) × Val Γ u) → Val Γ′ (emitᵗ u) → Bool
+  scanLifts? s u F′ F as em = all (λ (a′ , a) → all (λ (e′ , vs) →
+    let o = applyClo F′ ((a′ , em) , e′) ; r = scanVals F a vs in
+    V? u (proj₁ o) (proj₂ r) ∧ emitRel? u (proj₂ o) (proj₁ r) ∧ (instE u (proj₂ o) ≡ᵇ instE s e′)) (emits s)) as
+
+  -- the first sample a cut step fails, named by its plain budget, the
+  -- number of values it carried and the conjunct
+  cutLifts? : ∀ B s → (Val Γ′ B → ℕ → Bool) → FnClo Γ′ (CutS B s ×ᵗ emitᵗ s) (CutS B s)
+            → Maybe (FnClo Γ s boolᵗ) → List (Val Γ′ B × ℕ) → Val Γ′ (emitᵗ s) → Maybe String
+  cutLifts? B s bud F′ P bs em = firstJ (concatMap (λ (b′ , b) → concatMap (λ os → map (λ (e′ , vs) →
+    let o = applyClo F′ ((b′ , (false , (os , em))) , e′) ; r = takeVals P b vs
+        at = "budget " ++ˢ show b ++ˢ ", " ++ˢ show (length vs) ++ˢ " values, " ++ˢ show (length os) ++ˢ " owed: " in
+    if not (bud b′ b) then nothing
+    else if not (proj₂ (proj₂ r) ∨ bud (proj₁ o) (proj₁ (proj₂ r))) then just (at ++ˢ "budget after")
+    else if not (eqB (proj₁ (proj₂ o)) (proj₂ (proj₂ r))) then just (at ++ˢ "cut flag")
+    else if not (emitRel? s (proj₂ (proj₂ (proj₂ o))) (proj₁ r)) then just (at ++ˢ "prefix")
+    else if not (instE s (proj₂ (proj₂ (proj₂ o))) ≡ᵇ instE s e′) then just (at ++ˢ "instant")
+    else nothing) (emits s)) ([] ∷ (4 ∷ []) ∷ [])) bs)
+    where
+      firstJ : List (Maybe String) → Maybe String
+      firstJ []             = nothing
+      firstJ (just w ∷ _)   = just w
+      firstJ (nothing ∷ ws) = firstJ ws
+
   -- a one-lane merge at rest: no limit, nothing queued, its outer done
   lane : Maybe (Maybe ℕ × ℕ × ℕ × Bool) → Bool
   lane (just (nothing , _ , q , od)) = (q ≡ᵇ 0) ∧ od
@@ -356,11 +452,15 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
     innerPair nothing          = ok
     innerPair (just (j , j′)) = pairs j (j′ ∷ [])
 
+    mshow : Maybe ℕ → ℕ → ℕ → Bool → String
+    mshow lim a q od = "(limit " ++ˢ maybe′ show "none" lim ++ˢ ", active " ++ˢ show a ++ˢ ", queued " ++ˢ show q
+                       ++ˢ ", outer " ++ˢ (if od then "done" else "live") ++ˢ ")"
+
     -- `Flattener` and `FlatNodes`, with `InnerPair` where an inner is named
     flatNodes : Ty → AllOp → Maybe (NodeId × NodeId) → Maybe (NodeState Γ) → Maybe (NodeState Γ′) → Res
     flatNodes u op jj (just (mergeAll-st {t = s} lim a q od)) (just (mergeAll-st {t = s′} lim′ a′ q′ od′)) =
       when (eqOp op mergeAllᵒ ∧ (s ≈ u) ∧ (s′ ≈ emitᵗ u) ∧ eqMb lim lim′ ∧ (a ≡ᵇ a′) ∧ (length q ≡ᵇ length q′) ∧ eqB od od′)
-           "flattener: merge nodes unrelated" ok
+           ("flattener: merge nodes unrelated: plain " ++ˢ mshow lim a (length q) od ++ˢ ", impl " ++ˢ mshow lim′ a′ (length q′) od′) ok
     flatNodes u op jj (just (switch-st cur od)) (just (switch-st cur′ od′)) =
       when (eqOp op switchᵒ ∧ eqB od od′) "flattener: switch nodes unrelated" (curR cur cur′ ⊗ innerPair jj)
     flatNodes u op jj (just (exhaust-st ia od)) (just (exhaust-st ia′ od′)) =
@@ -431,17 +531,22 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       path′ (share-sink i _) q =
         on (vSink q) "sink: impl path is no sink" λ j →
           when (isShared (lookup κ i) ∧ (j ≡ᵇ n + toℕ i)) "sink: slot" ok
-      path′ (map-f _ ↠[ _ ] p) q = on (vMap q) "map: no impl map" (path p)
-      path′ (_↠[_]_ {u = u} (scan-f _ k) _ p) q =
-        on (vScan q) "scan: no impl scan" λ (k′ , q₁) →
+      path′ (_↠[_]_ {s = s} {u = u} (map-f F) _ p) q =
+        on (vMapF q) "map: no impl map" λ (St , q₁) →
+        on (stepAt (emitᵗ s) (emitᵗ u) St) "map: impl step type" λ F′ →
+          when (lifts? s u F′ F) "map: Lifts fails" ok ⊗ path p q₁
+      path′ (_↠[_]_ {s = s} {u = u} (scan-f F k) _ p) q =
+        on (vScanF q) "scan: no impl scan" λ (St , k′ , q₁) →
         on (vMap q₁) "scan: no projection" λ q₂ →
           pairs k (k′ ∷ []) ⊗
           on (cellOf u (P k)) "scan: plain cell" (λ a →
             on (cellOf (ScanAᵗ u) (I k′)) "scan: impl cell" λ c →
-              when (V? u (proj₁ c) a) "scan: cells unrelated" ok) ⊗
+            on (stepAt (ScanAᵗ u ×ᵗ emitᵗ s) (ScanAᵗ u) St) "scan: impl step type" λ F′ →
+              when (V? u (proj₁ c) a) "scan: cells unrelated"
+                (when (scanLifts? s u F′ F ((proj₁ c , a) ∷ samp u) (proj₂ c)) "scan: ScanLifts fails" ok)) ⊗
           path p q₂
       path′ (_↠[_]_ {s = s} (take-f nothing k) _ p) q =
-        on (vScan q) "take: no cut scan" λ (k₁ , q₁) →
+        on (vScanF q) "take: no cut scan" λ (St , k₁ , q₁) →
         on (vTake q₁) "take: no cut test" λ (k₂ , q₂) →
         on (vMap q₂) "take: no cut projection" λ q₃ →
         on (vFrom q₃) "take: no zero merge" λ (o , m , j , q₄) →
@@ -449,19 +554,26 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
             pairs k (k₁ ∷ k₂ ∷ m ∷ j ∷ []) ⊗
             on (takeOf (P k)) "take: plain budget" (λ b →
               on (cellOf (CutS natᵗ s) (I k₁)) "take: cut cell" λ c →
-                when ((proj₁ c ≡ᵇ b) ∧ not (proj₁ (proj₂ c))) "take: cut cell unrelated" ok) ⊗
+              on (stepAt (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s) St) "take: impl step type" λ F₁ →
+                when ((proj₁ c ≡ᵇ b) ∧ not (proj₁ (proj₂ c))) "take: cut cell unrelated"
+                  (fails "take: CutLifts fails at "
+                     (cutLifts? natᵗ s (λ b′ b → (b′ ≡ᵇ b) ∧ (1 ≤ᵇ b)) F₁ nothing (map (λ x → x , x) (b ∷ 1 ∷ 2 ∷ 3 ∷ []))
+                       (proj₂ (proj₂ (proj₂ c)))))) ⊗
             when (is (takeOf (I k₂)) 1) "take: impl test budget" ok ⊗
             on (mergeOf (emitᵗ s) (I m)) "take: zero merge node" (λ (l , a , ql , od) →
               when (is-nothing l ∧ (a ≤ᵇ 1) ∧ (ql ≡ᵇ 0) ∧ od) "take: zero merge state" ok) ⊗
             path p q₄)
-      path′ (_↠[_]_ {s = s} (take-f (just _) k) _ p) q =
-        on (vScan q) "takeWhile: no cut scan" λ (k₁ , q₁) →
+      path′ (_↠[_]_ {s = s} (take-f (just Pr) k) _ p) q =
+        on (vScanF q) "takeWhile: no cut scan" λ (St , k₁ , q₁) →
         on (vTake q₁) "takeWhile: no cut test" λ (k₂ , q₂) →
         on (vMap q₂) "takeWhile: no cut projection" λ q₃ →
           pairs k (k₁ ∷ k₂ ∷ []) ⊗
           when (is (takeOf (P k)) 1) "takeWhile: plain budget" ok ⊗
           on (cellOf (CutS unitᵗ s) (I k₁)) "takeWhile: cut cell" (λ c →
-            when (not (proj₁ (proj₂ c))) "takeWhile: cut cell unrelated" ok) ⊗
+            on (stepAt (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s) St) "takeWhile: impl step type" λ F₁ →
+              when (not (proj₁ (proj₂ c))) "takeWhile: cut cell unrelated"
+                (fails "takeWhile: CutLifts fails at "
+                   (cutLifts? unitᵗ s (λ _ b → b ≡ᵇ 1) F₁ (just Pr) ((tt , 1) ∷ []) (proj₂ (proj₂ (proj₂ c)))))) ⊗
           when (is (takeOf (I k₂)) 1) "takeWhile: impl test budget" ok ⊗
           path p q₃
       path′ (batchSync-f _ ↠[ _ ] p) q = breaks "batchSync: no plain clause"

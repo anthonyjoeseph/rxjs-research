@@ -179,12 +179,24 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     × instantOf {u} (proj₂ (applyClo F′ ((a′ , em) , e′))) ≡ instantOf e′
 
   -- the elaborated cut's step against the plain take: the budget kept
-  -- related, the cut decided alike, and the prefix taken carried
+  -- related while nothing cuts, the cut decided alike, and the prefix
+  -- taken carried
+  --
+  -- `Bud` RELATES ONLY THE PLAIN BUDGETS A ROW CAN CARRY, WHICH ARE
+  -- POSITIVE.  A plain take is installed at a positive count and a cut
+  -- clears the row, so zero is never one; a test's cell holds `tt`, so
+  -- its plain budget is pinned at one.  A cut leaves the plain budget at
+  -- zero, so the budget after is owed only on a step that does not cut.
+  -- REFUTED: `Refuted.Cut-Budget` -- a test's `Bud` at `⊤`: one impl
+  --   step owes the plain step at budget zero and at budget one; and a
+  --   count's at `_≡_`, where the elaborated cutter cuts at zero on an
+  --   emit carrying nothing.
   CutLifts : ∀ B s → (Val Γ′ B → ℕ → Set) → FnClo Γ′ (CutS B s ×ᵗ emitᵗ s) (CutS B s)
            → Maybe (FnClo Γ s boolᵗ) → Set
   CutLifts B s Bud F′ P =
     ∀ b′ b os em e′ vs → Bud b′ b → EmitRel s e′ vs →
-      Bud (proj₁ (applyClo F′ ((b′ , (false , (os , em))) , e′))) (proj₁ (proj₂ (takeVals P b vs)))
+      (proj₂ (proj₂ (takeVals P b vs)) ≡ false
+        → Bud (proj₁ (applyClo F′ ((b′ , (false , (os , em))) , e′))) (proj₁ (proj₂ (takeVals P b vs))))
     × proj₁ (proj₂ (applyClo F′ ((b′ , (false , (os , em))) , e′))) ≡ proj₂ (proj₂ (takeVals P b vs))
     × EmitRel s (proj₂ (proj₂ (proj₂ (applyClo F′ ((b′ , (false , (os , em))) , e′))))) (proj₁ (takeVals P b vs))
     × instantOf {s} (proj₂ (proj₂ (proj₂ (applyClo F′ ((b′ , (false , (os , em))) , e′))))) ≡ instantOf e′
@@ -310,7 +322,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → lookupNode k₁ NI ≡ just (cell-st {t = CutS natᵗ s} (b′ , (false , (os , em))))
               → lookupNode k₂ NI ≡ just (take-st 1)
               → lookupNode m NI ≡ just (mergeAll-st {t = emitᵗ s} nothing aₘ [] true) → aₘ ≤ 1
-              → b′ ≡ b → CutLifts natᵗ s _≡_ F₁ nothing → PathRel p q
+              → b′ ≡ b → CutLifts natᵗ s (λ b′ b → b′ ≡ b × 0 < b) F₁ nothing → PathRel p q
               → PathRel (take-f nothing k ↠[ h ] p)
                   (scan-f F₁ k₁ ↠[ h₁ ]
                    (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]
@@ -326,7 +338,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → lookupNode k NP ≡ just (take-st 1)
                    → lookupNode k₁ NI ≡ just (cell-st {t = CutS unitᵗ s} (tt , (false , (os , em))))
                    → lookupNode k₂ NI ≡ just (take-st 1)
-                   → CutLifts unitᵗ s (λ _ _ → ⊤) F₁ (just P) → PathRel p q
+                   → CutLifts unitᵗ s (λ _ b → b ≡ 1) F₁ (just P) → PathRel p q
                    → PathRel (take-f (just P) k ↠[ h ] p)
                        (scan-f F₁ k₁ ↠[ h₁ ]
                         (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]
