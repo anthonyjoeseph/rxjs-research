@@ -250,11 +250,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --
       -- `Sound` holds along every derivation from the root:
       -- `fresh-sound` at each minted frame, `subscribe-kept` past each
-      -- subscribe, and the root path names no node.  So `Walks` could
-      -- carry it as `Pass` does, but that is a hypothesis, owed a
-      -- refutation of the form without.  `Pass` carries it for
-      -- `fold-unmoved`, and a path with a repeated cell, folded on both
-      -- sides, writes both cells alike, so no refutation is in sight.
+      -- subscribe, and the root path names no node.  Without it the
+      -- statement is false, so it and `Walks` are owed `Sound` of both
+      -- paths, as `Pass` carries it: a related path may pass one merge
+      -- twice, and a lane subscribed through it registers a row
+      -- `Rule.distinct-rows` refuses.
+      -- REFUTED: `Refuted.Of-Fold-Sound` -- a path through one merge as
+      --   outer and as its own lane, one emit carrying one lane.
       -- DEAD ROUTE: `Sound` from `Store` and `PathRel`.  The store holds
       --   the rule and `π`'s keys below the counter, which gives a
       --   pinned node's freshness, but neither record says where a

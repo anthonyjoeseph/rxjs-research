@@ -70,3 +70,8 @@ open import Refuted.Batched-Sandwich using (one-past-sandwich-false)
 -- test's cell carries none, so left free one impl step owes the plain
 -- step at zero and at one.
 open import Refuted.Cut-Budget using (cut-budget-false)
+
+-- A FOLD'S STORE OWES THE RULE, AND ONLY A DISTINCT PATH PAYS IT.  A
+-- path related frame by frame may still pass one merge twice, and a
+-- lane subscribed through it registers a row that does too.
+open import Refuted.Of-Fold-Sound using (of-fold-needs-sound)

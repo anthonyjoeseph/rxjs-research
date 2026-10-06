@@ -257,14 +257,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **REFUTE OR CARRY `Sound` AT THE WALK.** `of-fold` (`walk-of`'s and
-  `emptyˢ`'s fold) is `path-pass` past a derivation, which asks `Sound` of
-  both paths: the store and `PathRel` do not hold it, the derivation from
-  the root does. Refute `of-fold` without it at a related path whose
-  rows end elsewhere; red licenses `Walks` carrying it as `Pass` does, a
-  green probe says `fold-unmoved` should not need it either. Ruled out:
-  the μ peel needing the pass; `μ-unfolds` at the probed binders, so a
-  scan's or a test's binder is what is left.
+- **CARRY `Sound` THROUGH THE WALK.** `Refuted.Of-Fold-Sound` shows
+  `of-fold` false without `Sound` of both paths: a related path may pass
+  one merge twice. Restate `Walks` and `of-fold` to carry it as `Pass`
+  does, each arm minting its extended path's by `fresh-sound`, then test
+  the reads for the same shape. Ruled out: the walk's store standing on
+  `PathRel` alone; the μ peel needing the pass; `μ-unfolds` at the probed
+  binders, so a scan's or a test's binder is what is left.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -283,9 +282,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `DEAD ROUTE`: an `of`'s
-  emits carry its values one per emit, and the group folded and ended down
-  related paths keeps what a pass keeps, the impl's under its new source.
+- **`of-carries`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s emits
+  carry its values, one per emit.
 - **`merge-drain`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's
   related queues drained on both sides leave related counts, queues, flattener
   and tail.
@@ -364,6 +362,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
+- **`of-fold`** (Simulation.Walk) — SHAPE, `REFUTED, DEAD ROUTE`: the group
+  folded and ended down related paths keeps what a pass keeps, owed `Sound` of
+  both.
 - **`fold-unmoved`** (Simulation.Arm) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.
