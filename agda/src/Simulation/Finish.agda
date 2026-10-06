@@ -410,11 +410,24 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            → (rr : RowRel κ π NP NI LP LI r r′)
            → (q : RegRel κ π NP NI LP LI (dropSource (toℕ i) rs₀) (drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) rs₀′))
            → ∀ {x x′} (ns : SrcNum κ x x′) (e : regSource (proj₁ (proj₂ r)) ≡ x) (e′ : regSource (proj₁ (proj₂ r′)) ≡ x′)
-           → ∀ {dP dI} → dP r ≡ dI r′ → Spent κ π NP NI LP LI q dP dI → Spent κ π NP NI LP LI (hot-at i rr q ns e e′) dP dI
-  spent-at i rr q (slot~ j _) e e′ h d with toℕ j ≟ toℕ i
-  ... | yes eq = spent-subst κ _ _ _ _ _ _ _ q d
-  ... | no ne  = spent-subst κ _ _ _ _ _ _ _ (rr ∷ q) (h , d)
-  spent-at i rr q (dyn~ p p′) e e′ h d = spent-subst κ _ _ _ _ _ _ _ (rr ∷ q) (h , d)
+           → ∀ {dP dI} → dP r ≡ dI r′ → Spent κ π NP NI LP LI q dP dI → Spent κ π NP NI LP LI (hot-at {rs₀ = rs₀} {rs₀′ = rs₀′} i rr q ns e e′) dP dI
+  spent-at {rs₀ = rs₀} {rs₀′ = rs₀′} {r = r} {r′ = r′} i rr q (slot~ j _) e e′ h d with toℕ j ≟ toℕ i
+  ... | yes eq = spent-subst κ _ _ _ _ _ (sym (drop-skip (toℕ i) r rs₀ (same-yes (trans (sym eq) (sym e)))))
+                   (sym (drop₂-skip₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                          (sameSource-no (λ x → raw≢stamped j i (trans (sym e′) (sym x))))
+                          (same-yes (trans (raw≡ i j eq) (sym e′)))))
+                   q d
+  ... | no ne  = spent-subst κ _ _ _ _ _ (sym (drop-keep (toℕ i) r rs₀ (sameSource-no (λ x → ne (sym (trans x e))))))
+                   (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                          (sameSource-no (λ x → raw≢stamped j i (trans (sym e′) (sym x))))
+                          (sameSource-no (λ x → raw≢′ i j ne (trans x e′)))))
+                   (rr ∷ q) (h , d)
+  spent-at {rs₀ = rs₀} {rs₀′ = rs₀′} {r = r} {r′ = r′} i rr q (dyn~ p p′) e e′ h d =
+    spent-subst κ _ _ _ _ _ (sym (drop-keep (toℕ i) r rs₀ (sameSource-no (λ x → <⇒≢ (<-trans (toℕ<n i) p) (trans x e)))))
+      (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+             (sameSource-no (λ x → <⇒≢ (<-trans (stamped< i) p′) (trans x e′)))
+             (sameSource-no (λ x → <⇒≢ (<-trans (raw<ₙ i) p′) (trans x e′)))))
+      (rr ∷ q) (h , d)
 
   -- A HOT SLOT'S DROPS TAKE THE SAME ROWS FROM BOTH REGISTRIES: the plain
   -- run drops the slot's, the impl its stamped slot's and then its raw
