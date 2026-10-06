@@ -550,7 +550,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
         on (vTake q₁) "take: no cut test" λ (k₂ , q₂) →
         on (vMap q₂) "take: no cut projection" λ q₃ →
         on (vFrom q₃) "take: no zero merge" λ (o , m , j , q₄) →
-          when (eqOp o mergeAllᵒ) "take: zero merge op" (
+          when (eqOp o mergeAllᵒ) "take: zero merge op" ((
             pairs k (k₁ ∷ k₂ ∷ m ∷ j ∷ []) ⊗
             on (takeOf (P k)) "take: plain budget" (λ b →
               on (cellOf (CutS natᵗ s) (I k₁)) "take: cut cell" λ c →
@@ -563,11 +563,14 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
             on (mergeOf (emitᵗ s) (I m)) "take: zero merge node" (λ (l , a , ql , od) →
               when (is-nothing l ∧ (a ≤ᵇ 1) ∧ (ql ≡ᵇ 0) ∧ od) "take: zero merge state" ok) ⊗
             path p q₄)
+          ⊘ (pairs k (k₁ ∷ k₂ ∷ m ∷ j ∷ []) ⊗
+             when (is (takeOf (P k)) 0 ∧ is (takeOf (I k₂)) 0) "take: not spent" ok ⊗
+             path p q₄))
       path′ (_↠[_]_ {s = s} (take-f (just Pr) k) _ p) q =
         on (vScanF q) "takeWhile: no cut scan" λ (St , k₁ , q₁) →
         on (vTake q₁) "takeWhile: no cut test" λ (k₂ , q₂) →
         on (vMap q₂) "takeWhile: no cut projection" λ q₃ →
-          pairs k (k₁ ∷ k₂ ∷ []) ⊗
+          (pairs k (k₁ ∷ k₂ ∷ []) ⊗
           when (is (takeOf (P k)) 1) "takeWhile: plain budget" ok ⊗
           on (cellOf (CutS unitᵗ s) (I k₁)) "takeWhile: cut cell" (λ c →
             on (stepAt (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s) St) "takeWhile: impl step type" λ F₁ →
@@ -575,7 +578,10 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
                 (fails "takeWhile: CutLifts fails at "
                    (cutLifts? unitᵗ s (λ _ b → b ≡ᵇ 1) F₁ (just Pr) ((tt , 1) ∷ []) (proj₂ (proj₂ (proj₂ c)))))) ⊗
           when (is (takeOf (I k₂)) 1) "takeWhile: impl test budget" ok ⊗
-          path p q₃
+          path p q₃)
+          ⊘ (pairs k (k₁ ∷ k₂ ∷ []) ⊗
+             when (is (takeOf (P k)) 0 ∧ is (takeOf (I k₂)) 0) "takeWhile: not spent" ok ⊗
+             path p q₃)
       path′ (batchSync-f _ ↠[ _ ] p) q = breaks "batchSync: no plain clause"
       path′ (_↠[_]_ {u = u} (thru-outer op m) _ p) q =
         on (vMap q) "outer: no element map" λ q₁ →

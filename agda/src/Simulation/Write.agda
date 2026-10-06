@@ -42,7 +42,7 @@ open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (FlatSᵗ)
 open import Simulation.Stores using (Unpaired; FlatNodes; merge~; switch~; exhaust~; Flattener; PathRel; root~; sink~; map~; scan~;
-  take~; takeWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~;
+  take~; takeWhile~; spent~; spentWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~;
   MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows)
 
 -- a node read back after a write elsewhere
@@ -202,6 +202,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
       take~ e (takeP l) (cellI l₁) (takeI l₂) (pairedI e (there (there (here refl))) (λ eq _ → take-entry eq l) lm)
             a≤ b≡ L (pathW r)
     pathW (takeWhile~ e l l₁ l₂ L r)         = takeWhile~ e (takeP l) (cellI l₁) (takeI l₂) L (pathW r)
+    pathW (spent~ e l l₂ r)                  = spent~ e (takeP l) (takeI l₂) (pathW r)
+    pathW (spentWhile~ e l l₂ r)             = spentWhile~ e (takeP l) (takeI l₂) (pathW r)
     pathW (outerElem~ f r)                   = outerElem~ (flatW f) (pathW r)
     pathW (outerExplode~ f r)                = outerExplode~ (flatW f) (pathW r)
     pathW (inner~ e f ip r)                  = inner~ e (flatW f) ip (pathW r)

@@ -279,8 +279,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   under a cut through a node `π` pairs with one impl node: the two cuts take
   the rows the relation pairs, ids apart. A take's node is paired with a
   run, so `{take,takeWhile}-arm` need the cut stated at the run member the
-  impl's cut names. Decides whether a spent budget drops the same rows on
-  both sides.
+  impl's cut names, and end in `spent~`/`spentWhile~`: both cuts write
+  zero, which `take~` cannot hold. Decides whether a spent budget drops the
+  same rows on both sides.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for

@@ -341,6 +341,35 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                         (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]
                          (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q)))
 
+        -- A SPENT COUNT, AND A SPENT TEST: the cut wrote zero at the plain
+        -- node and at the run's test, and both pass nothing after it
+        spent~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ s k k₁ k₂ m j Θ₂ ρ₂ Θ₃ ρ₃}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+                   {F₁ : FnClo Γ′ (CutS natᵗ s ×ᵗ emitᵗ s) (CutS natᵗ s)}
+                   {p : Path Γ ℓ s t} {q : Path Γ′ ℓ₄ (emitᵗ s) (emitᵗ t)}
+               → (k , k₁ ∷ k₂ ∷ m ∷ j ∷ []) ∈ π
+               → lookupNode k NP ≡ just (take-st 0)
+               → lookupNode k₂ NI ≡ just (take-st 0)
+               → PathRel p q
+               → PathRel (take-f nothing k ↠[ h ] p)
+                   (scan-f F₁ k₁ ↠[ h₁ ]
+                    (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]
+                     (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ]
+                      (from-inner mergeAllᵒ m j ↠[ h₄ ] q))))
+
+        spentWhile~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ ρ₂ Θ₃ ρ₃}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                        {P : FnClo Γ s boolᵗ} {F₁ : FnClo Γ′ (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
+                        {p : Path Γ ℓ s t} {q : Path Γ′ ℓ₃ (emitᵗ s) (emitᵗ t)}
+                    → (k , k₁ ∷ k₂ ∷ []) ∈ π
+                    → lookupNode k NP ≡ just (take-st 0)
+                    → lookupNode k₂ NI ≡ just (take-st 0)
+                    → PathRel p q
+                    → PathRel (take-f (just P) k ↠[ h ] p)
+                        (scan-f F₁ k₁ ↠[ h₁ ]
+                         (take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂ ↠[ h₂ ]
+                          (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q)))
+
         -- a flattener's outer, one element per emit: `elemᵛ`, the
         -- flattener, and the scan that restamps what it puts out
         outerElem~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}

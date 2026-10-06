@@ -45,7 +45,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; shar
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Lifts; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src;
-  SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~; outerElem~;
+  SrcPair; sharedEq; PathRel; root~; sink~; map~; scan~; take~; takeWhile~; spent~; spentWhile~; outerElem~;
   outerExplode~; inner~; lane~; elab; deferInner~; InputBlock; hotEq; RowRel; read~;
   cold~; defer~; RegRel; partner-row; Store; Arr)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
@@ -868,6 +868,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-pass S r@(takeWhile~ _ _ _ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
         let X = quiet-resume (quiet-takeWhile S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
+      quiet-pass S r@(spent~ _ _ _ _) b e si
+                 (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map (fold-step {out₁ = o₄} d₄ dq)))) =
+        let X = quiet-resume (quiet-take S r b e d₁ d₂ d₄) (adv d₄ (drop-ot _ _ _ (adv d₂ (adv d₁ si)))) dq
+        in after-out (regroup₃ o₁ o₂ o₄ _) (proj₁ X) , proj₂ X
+      quiet-pass S r@(spentWhile~ _ _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
+        let X = quiet-resume (quiet-takeWhile S r b e d₁ d₂) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
+        in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
       quiet-pass S (outerElem~ fl r) b e si dI = quiet-outer S (fl , r) b e si dI
       quiet-pass S r@(outerExplode~ _ _) b e si dI = quiet-explode S r b e si dI
       quiet-pass S r@(inner~ refl _ _ _) b e si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
@@ -1046,6 +1053,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S r@(scan~ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (scan-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(take~ _ _ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (take-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(takeWhile~ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (takeWhile-arm S r b sp si d dI) (adv d sp) dP
+      path-pass S r@(spent~ _ _ _ _) b sp si (fold-step d dP) dI = resume (take-arm S r b sp si d dI) (adv d sp) dP
+      path-pass S r@(spentWhile~ _ _ _ _) b sp si (fold-step d dP) dI = resume (takeWhile-arm S r b sp si d dI) (adv d sp) dP
       path-pass S (outerElem~ fl r) b sp si (fold-step d dP) dI = resume (outerElem-arm S (fl , r) b sp si d dI) (adv d sp) dP
       path-pass S r@(outerExplode~ _ _) b sp si (fold-step d dP) dI = resume (outerExplode-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(inner~ refl _ _ _) b sp si (fold-step d dP) dI = resume (inner-arm S r b sp si d dI) (adv d sp) dP

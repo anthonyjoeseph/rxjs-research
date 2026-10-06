@@ -25,7 +25,7 @@ open import Decide       using (≡ᵇ-refl)
 open import Rx.Exp       using (Ctx)
 open import Rx.Evaluator using (NodeId; NodeState; Path; Frame; _↠[_]_; frameNodes; pathHasNode; lookupNode; RegRow)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Stores using (PathRel; root~; sink~; map~; scan~; take~; takeWhile~; outerElem~; outerExplode~; inner~;
+open import Simulation.Stores using (PathRel; root~; sink~; map~; scan~; take~; takeWhile~; spent~; spentWhile~; outerElem~; outerExplode~; inner~;
   lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows)
 
 -- a frame's first node is on it
@@ -79,6 +79,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       takeWhile~ pk lP (trans (hd ag (first k₁ [])) l₁)
                        (trans (hd (tail ag) (first k₂ [])) l₂)
                        cl (path-frame (tail (tail (tail ag))) r)
+    path-frame ag (spent~ {k₂ = k₂} pk lP l₂ r) =
+      spent~ pk lP (trans (hd (tail ag) (first k₂ [])) l₂) (path-frame (tail (tail (tail (tail ag)))) r)
+    path-frame ag (spentWhile~ {k₂ = k₂} pk lP l₂ r) =
+      spentWhile~ pk lP (trans (hd (tail ag) (first k₂ [])) l₂) (path-frame (tail (tail (tail ag))) r)
     path-frame ag (outerElem~ {m′ = m′} {ks} (pm , x , x′ , lP , lI , fn , c , lk) r) =
       outerElem~ (pm , x , x′ , lP , trans (hd (tail ag) (first m′ [])) lI , fn , c , trans (hd (tail (tail ag)) (first ks [])) lk)
                  (path-frame (tail (tail (tail (tail ag)))) r)
