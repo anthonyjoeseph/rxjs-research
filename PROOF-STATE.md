@@ -258,10 +258,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **REFUTE OR PROBE THE FINISHING ARMS.** `merge-finish` and
   `defer-finish` drain the queue a dead inner's merge holds, on both sides,
-  and nothing has ever instantiated either: the least certain step left in
-  the cascade. `merge-finish` is a body over `merge-drain`, the drain
-  alone; give `defer-finish` the same, then make the decider read the
-  queued inners' relation and aim `make qc-store` at it.
+  and nothing has ever instantiated either: the least certain step
+  left. Both are bodies, over `merge-drain` and over `defer-end`
+  and `still-dead`; make the decider read the queued inners' relation and
+  aim `make qc-store` at it, then reach a body ending inside a μ.
   Ruled out: a drain unrelating the stores, 65 of 100 programs spending a
   queue (seed 31) and 80 deferring (seed 32); an open merge's window
   reordering rows; a merged lane; a deeper flattener's subscribe (seeds
@@ -298,9 +298,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`merge-drain`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's
   related queues drained on both sides leave related counts, queues, flattener
   and tail.
-- **`defer-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead
-  deferred body finishes on both sides, through the hop's marker merge's finish
-  ahead of it.
+- **`defer-end`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead deferred
+  body's count falls on the plain side against the hop's marker merge's, a
+  quiet fold and the hop's node's on the impl's, one store across all three.
+- **`still-dead`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner no live
+  chain runs through stays so while its group folds down the tail below it.
 - **`quiet-{sink,explode}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
   valueless group through a share's readers, or an exploded outer, folded on
   the impl side alone with the plain side still.

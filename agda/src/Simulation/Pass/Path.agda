@@ -73,7 +73,12 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
         resume (inner-pass {op = op} S r b sp si (inj₂ al) dI) (adv d sp) dP
       path-pass S r@(inner~ {op = op} refl _ _ _) b sp si (fold-step d@(step-from-inner (react-dead dd F)) dP) dI =
         resume (inner-dies {op = op} S r b sp si dd F (tail-at F) dI) (adv d sp) dP
-      path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (deferInner-arm S r b sp si d dI) (adv d sp) dP
+      path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d@(step-from-inner react-false) dP) dI =
+        resume (deferInner-pass S r b sp si (inj₁ refl) dI) (adv d sp) dP
+      path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d@(step-from-inner (react-alive al)) dP) dI =
+        resume (deferInner-pass S r b sp si (inj₂ al) dI) (adv d sp) dP
+      path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d@(step-from-inner (react-dead dd F)) dP) dI =
+        resume (deferInner-dies S r b sp si dd F (tail-at F) dI) (adv d sp) dP
 
       -- a merge's finish folds its tail: the pass recurses on that fold
       tail-at : ∀ {lo lo′ s op m j now vs sP mx r} {stP : EvalSt ep} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
