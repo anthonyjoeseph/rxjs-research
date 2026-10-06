@@ -20,6 +20,7 @@ open import Data.Nat     using (ℕ; suc; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; <⇒≢; <-≤-trans; m≤m+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
+open import Data.Unit    using (tt)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Vec     using (lookup)
 open import Data.List.Properties using (++-assoc; ++-identityʳ; map-id)
@@ -33,7 +34,7 @@ open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; swi
   FnClo; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arrival; arrVal; arrTy; arrTick; Path; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st;
-  echoᵗ; thruEvents; thruWrap; setNode; cell-st; scanVals; exhaust-st; switch-st; switchKill; hasRoom;
+  echoᵗ; thruEvents; thruWrap; setNode; cell-st; scanVals; take-st; takeVals; exhaust-st; switch-st; switchKill; hasRoom;
   consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓;
   walk-nil; walk-echo; thruConsume⇓; inner; consume-all-sub; consume-all-enqueue;
@@ -41,7 +42,7 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step
   consume-switch-nil; subscribeInner⇓; subscribeE⇓; chainStep⇓; chain-step; dispatchShare⇓;
   fold-sink)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ)
-open import SExp.Elaborate using (flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ; ScanAᵗ)
+open import SExp.Elaborate using (flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ; ScanAᵗ; CutS; cutOpenᵛ)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
   PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
@@ -52,16 +53,16 @@ open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Cut using (cut-kill)
-open import Simulation.Take using (module Takes; scan-at)
+open import Simulation.Take using (module Takes; scan-at; take-open-at; cell-take)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear;
   fold-clear; adv; fold-unmoved)
 open import Simulation.Sweep using (t≢f; stamp-rows)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
-open import Simulation.Write using (module Write; key-same; vals-same)
+open import Simulation.Write using (module Write; key-same; vals-same; apart)
 open import Simulation.Walk using (walk)
 open import Simulation.Grow using (nodes-grow; flatG; pathG; fresh-off)
-open import Rx.Evaluator.Freshness using (nodeCt; lookup-set)
+open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
 open import Rx.Evaluator.Reducible.Support using (Sound; FreshPath; switchKill-ct; sub-rule; switchKill-nodes; drop-ot; head-on; self-node;
   Agree; Rule; sink-sound; admit-agree; termini)
@@ -230,7 +231,7 @@ cur-there {c = c} {c′} {j′ = j′} vals pc pj e with ≡ᵇ→≡ c′ j′ 
 module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ public
-  open Takes {Γ = Γ} κ using (module While)
+  open Takes {Γ = Γ} κ using (module While; cut-group)
   open Scans {Γ = Γ} κ using (module Cells; scan-group)
 
   -- a pair the tail of a relation partners, the whole relation does
@@ -355,7 +356,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     open Kept {Γ = Γ} κ {t} {ep} {ei}
     open Run {t} {ep} {ei} public
-    open While {t} {ep} {ei} using (takeWhile-arm)
+    open While {t} {ep} {ei} using (takeWhile-arm; while-write)
     open Cells {t} {ep} {ei} using (scan-arm; scan-write)
 
     -- a share's readers, as registrations the store partners
@@ -769,14 +770,16 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → Quiet (share-sink i h)
                      (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sharedEq {Γ = Γ} κ i sh) (share-sink (n ↑ʳ i) h′))
 
-      -- A TEST'S CUT NEVER FIRES ON NOTHING: no value to test
-      quiet-takeWhile : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s C P k k₁ k₂ w}
+      -- A SPENT TEST PASSES NOTHING ON NOTHING: the cell steps on the
+      -- impl side alone, and both tests stay spent
+      quiet-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s C P k k₁ k₂ w}
                           {F₁ : FnClo (plainᵏ Γ κ) (C ×ᵗ emitᵗ s) C} {G : FnClo (plainᵏ Γ κ) C (emitᵗ s)}
                           {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                           {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
                           {es fin o₁ y₁ f₁ s₁ st₁ o₂ y₂ f₂ s₂ st₂}
                       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f (just P) k ↠[ h ] p)
                           (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q)))
+                      → lookupNode k (EvalSt.nodes stP) ≡ just (take-st 0)
                       → Carries es [] → fin ≡ false
                       → stepFrame⇓ now (scan-f F₁ k₁) (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q)) es fin sI stI (o₁ , y₁ , f₁ , s₁ , st₁)
                       → stepFrame⇓ now (take-f w k₂) (map-f G ↠[ h₃ ] q) y₁ f₁ s₁ st₁ (o₂ , y₂ , f₂ , s₂ , st₂)
@@ -866,6 +869,64 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       c′ : Clear k′ q sI (record stI { nodes = NI })
       c′ = on-drop (head-on (scan-f F′ k′) h₁ _ k′ (self-node k′ []) so₁) , drop-ot _ _ _ (drop-ot _ _ _ so₁)
 
+    -- A TEST'S CUT NEVER FIRES ON NOTHING: no value to test, so an open
+    -- test's nodes are written open on both sides, the plain one with
+    -- the one it holds
+    quiet-takeWhile : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s C P k k₁ k₂ w}
+                        {F₁ : FnClo (plainᵏ Γ κ) (C ×ᵗ emitᵗ s) C} {G : FnClo (plainᵏ Γ κ) C (emitᵗ s)}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                        {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
+                        {es fin o₁ y₁ f₁ s₁ st₁ o₂ y₂ f₂ s₂ st₂}
+                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f (just P) k ↠[ h ] p)
+                        (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q)))
+                    → Carries es [] → fin ≡ false
+                    → Sound (take-f (just P) k ↠[ h ] p) sP stP
+                    → Sound (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q))) sI stI
+                    → stepFrame⇓ now (scan-f F₁ k₁) (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q)) es fin sI stI (o₁ , y₁ , f₁ , s₁ , st₁)
+                    → stepFrame⇓ now (take-f w k₂) (map-f G ↠[ h₃ ] q) y₁ f₁ s₁ st₁ (o₂ , y₂ , f₂ , s₂ , st₂)
+                    → QArm S now p (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p)
+                          (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q))))
+                        q (map (applyClo G) y₂) f₂ (o₁ ++ o₂) s₂ st₂
+    quiet-takeWhile S R@(spentWhile~ _ lk _ _) bs e _ _ d₁ d₂ = quiet-spent S R lk bs e d₁ d₂
+    quiet-takeWhile {sP = sP} {stP} {sI} {stI} S {es = es}
+                    R@(takeWhile~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
+                                  {h₁ = h₁} {h₂ = h₂} {P = P} {F₁ = F₁} {p = p} {q = q} e lk lk₁ lk₂ CL _)
+                    bs refl sp si d₁ d₂
+      with cut-group {Bud = λ _ b → b ≡ 1} {F′ = F₁} {P = just P} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃} CL bs (tt , false , os , em) 1 refl refl
+         | scan-at lk₁ d₁
+    ... | cs , fe , rest | refl
+      with rest refl
+         | take-open-at (trans (set-above k₁ k₂ (cell-st {t = CutS unitᵗ s} (proj₂ (scanVals F₁ (tt , false , os , em) es))) (EvalSt.nodes stI)
+                                          (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
+                        fe d₂
+    ... | r1 , fl , _ | refl =
+      qarm (proj₁ X) (proj₂ X) cs refl λ dq B rel′ →
+        takeWhile~ (After.grows B (After.grows (proj₁ X) e)) lk (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′) CL rel′
+      where
+      fc : Val (plainᵏ Γ κ) (CutS unitᵗ s)
+      fc = proj₂ (scanVals F₁ (tt , false , os , em) es)
+      r₂ = proj₁ (proj₂ (takeVals {s = CutS unitᵗ s} (just (Θ₂ , cutOpenᵛ , ρ₂)) 1 (proj₁ (scanVals F₁ (tt , false , os , em) es))))
+      N₁ = setNode k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI)
+      N₂ = setNode k₂ (take-st r₂) N₁
+      X : Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = N₂ })) λ A
+            → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) N₂ p q
+      X = subst (λ N → Σ (After S ([] , sP , record stP { nodes = N }) ([] , sI , record stI { nodes = N₂ })) λ A
+                         → PathRel κ (Store.π (After.store A)) N N₂ p q)
+                (set-same k (take-st 1) (EvalSt.nodes stP) lk) (while-write S R sp si 1 fc r₂ fl refl r1)
+      lk₁′ : lookupNode k₁ N₂ ≡ just (cell-st {t = CutS unitᵗ s} (tt , false , proj₂ (proj₂ fc)))
+      lk₁′ = trans (set-above k₂ k₁ (take-st r₂) N₁ (apart k₂ k₁ (λ x → cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂ (sym x))))
+                   (subst (λ f → lookupNode k₁ N₁ ≡ just (cell-st {t = CutS unitᵗ s} (tt , f , proj₂ (proj₂ fc))))
+                          fl (lookup-set k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI)))
+      lk₂′ : lookupNode k₂ N₂ ≡ just (take-st 1)
+      lk₂′ = subst (λ x → lookupNode k₂ N₂ ≡ just (take-st x)) r1 (lookup-set k₂ (take-st r₂) N₁)
+      so₁ = step-kept h₁ d₁ si
+      so₂ = step-kept h₂ d₂ (drop-ot _ _ _ so₁)
+      soq = drop-ot _ _ _ (drop-ot _ _ _ so₂)
+      c₁ : Clear k₁ q sI _
+      c₁ = on-drop (on-drop (proj₁ (step-clear d₂ (head-on (scan-f F₁ k₁) h₁ _ k₁ (self-node k₁ []) so₁ , drop-ot _ _ _ so₁)))) , soq
+      c₂ : Clear k₂ q sI _
+      c₂ = on-drop (head-on _ h₂ _ k₂ (self-node k₂ []) so₂) , soq
+
     mutual
       quiet-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Quiet p q
       quiet-pass S root~ b refl _ _ fold-root = after S (λ x → x) (λ x → x) (root-values b false) (λ x → x) , root~
@@ -875,10 +936,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-pass S r@(scan~ _ _ _ _ _ _) b e sp si (fold-step d₁ (fold-step step-map dq)) =
         quiet-resume (quiet-scan S r b e sp si d₁) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₁ si)) dq
       quiet-pass S r@(takeWhile~ _ _ _ _ _ _) b e sp si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
-        let X = quiet-resume (quiet-takeWhile S r b e d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
+        let X = quiet-resume (quiet-takeWhile S r b e sp si d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
       quiet-pass S r@(spentWhile~ _ _ _ _) b e sp si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
-        let X = quiet-resume (quiet-takeWhile S r b e d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
+        let X = quiet-resume (quiet-takeWhile S r b e sp si d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
       quiet-pass S (outerElem~ fl r) b e sp si dI = quiet-outer S (fl , r) b e sp si dI
       quiet-pass S r@(outerExplode~ _ _) b e sp si dI = quiet-explode S r b e sp si dI
