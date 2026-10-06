@@ -54,7 +54,7 @@ make qc-store QC='1 100 4' QC_FUEL=30 \
 | `spineG` (10), before it | 0–1 the defer · 2 map · 3 scan · 4 mergeAll · 5 switchAll · 6 flatten over a fan step · 7 take · 8 takeWhile · 9 exhaustAll |
 | `op` (5), a flatten's policy | 0 merge · 1 bounded merge · 2 switch · 3 exhaust · 4 merge |
 | `fan` (9), a flatten's step | lane: 0 empty · 1 `[x,x]` · 2 `[x,k]` · 3 filtered · 4 `[x]`; 5 nothing · 6 filtered echo · 7 echo and lane `[k]` · 8 echo |
-| `script` (4), slot zero | 0 hot, one arrival · 1 hot, two · 2 cold, one sync value and one arrival · 3 cold, two arrivals |
+| `script` (5), slot zero | 0 hot, one arrival · 1 hot, two · 2 cold, one sync value and one arrival · 3 cold, two arrivals · 4 cold, two sync values and one arrival — aimed only, the uniform pick never takes it |
 | `slot` (4), slot one | 0 forwards slot zero · 1 empty · 2 one value · 3 two values |
 | `leaf` (3) | 0 a slot · 1 empty · 2 two values |
 | `obs` (4), a stream of streams | 0 a fold at observable type (leaf level only, else a list) · 1–3 a literal list of inners |

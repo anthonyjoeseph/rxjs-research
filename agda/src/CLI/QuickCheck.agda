@@ -154,6 +154,12 @@ arity kSlot   = 4
 arity kLeaf   = 3
 arity kObs    = 4
 
+-- arms past `arity` that only an aimed draw takes: the uniform pick stays
+-- over `arity`, so an unrestricted seed draws the program it always did
+aimed : Knob → ℕ
+aimed kScript = 1
+aimed _       = 0
+
 knobName : Knob → String
 knobName kExp    = "exp"
 knobName kSpineD = "spineD"
@@ -293,7 +299,8 @@ genScript = genW kScript >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
        if c ≡ᵇ 0 then pureG (hot ((after w , x) ∷ []))
   else if c ≡ᵇ 1 then pureG (hot ((after 0 , x) ∷ (after w , y) ∷ []))
   else if c ≡ᵇ 2 then pureG (cold (x ∷ []) ((after w , y) ∷ []))
-  else                pureG (cold [] ((after w , x) ∷ (after 0 , y) ∷ []))
+  else if c ≡ᵇ 3 then pureG (cold [] ((after w , x) ∷ (after 0 , y) ∷ []))
+  else                pureG (cold (x ∷ y ∷ []) ((after w , y) ∷ []))
 
 -- THE TELESCOPE IS DRAWN IN ORDER, each slot seeing only the ones
 -- below it, which is exactly the argument `genSlotRef` takes.
@@ -1579,7 +1586,7 @@ knobErr : List ℕ → JSON → Maybe String
 knobErr k (jarr js) with numsOf js
 ... | nothing = just (fromCodes k ++ " is not a list of weights")
 ... | just ws =
-  if not (any (λ n → eqListℕ (toCodes (knobName n)) k ∧ (length ws ≡ᵇ arity n)) allKnobs)
+  if not (any (λ n → eqListℕ (toCodes (knobName n)) k ∧ (length ws ≡ᵇ arity n + aimed n)) allKnobs)
   then just (fromCodes k ++ " needs one weight per arm")
   else if sumℕ ws ≡ᵇ 0 then just (fromCodes k ++ " leaves no arm")
   else nothing
