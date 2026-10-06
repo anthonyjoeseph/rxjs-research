@@ -263,9 +263,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
   alike: `finish-store`, `hot-finish` and a connected hot
   end are proven. The outer's element, a shared
-  slot's subject and an open inner, deferred or not, are real bodies over their walks' leaves, the impl's
+  slot's subject, an open inner, deferred or not, and a switch's or exhaust's dead one are bodies over their walks' leaves, the impl's
   valueless echo one frame at a time. Left: the arms as
-  real bodies, riskiest first, each owing the
+  bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted; the monster drops to
   whichever arm fails.
 
@@ -309,10 +309,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   carrying nothing on as they came.
 - **`restamp-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
   scan stepped on a group keeps the flattener, and the group it hands on
-  carries the same values, still open.
+  carries the same values and end.
 - **`{inner,lane}-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner
-  a plain chain runs through has an impl chain running through its pair, and
-  through the lane merge in front of it.
+  a plain chain runs through is live exactly when its pair is, and the lane
+  merge in front of it.
 - **`lane-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an impl-only lane
   merge in front of an inner's arm stays idle, unpaired and off every tail the
   arm folds.
@@ -321,13 +321,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`explode-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   exploded outer's elements walk into the flattener through the impl's merge,
   and its end meets the plain outer's.
-- **`{inner,lane,deferInner}-dies`** (Simulation.Pass) — FALSITY,
-  `NO EVIDENCE`: an inner no live chain runs through finishes on both sides,
-  through the flattener's lane, an impl-only lane merge ahead of it or a
-  deferred body's hop.
+- **`merge-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's dead
+  inner finishes on both sides, each folding the group down its tail and
+  draining the related queues.
+- **`{lane,deferInner}-dies`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
+  inner no live chain runs through finishes on both sides, through an impl-only
+  lane merge ahead of it or a deferred body's hop.
 - **`defer-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
-  body's inner live on the plain side has the hop's marker merge's inner live
-  on the impl's.
+  body's inner is live on the plain side exactly when the hop's marker merge's
+  inner is on the impl's.
 - **`block-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
   chain's input block runs alone into a merge whose walk folds the path the
   plain chain folds the popped head down, and the impl tail's end after it.
