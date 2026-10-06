@@ -35,12 +35,12 @@ open import Data.Maybe using (just; nothing)
 
 open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
+open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; ofᵉ; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
   mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Slots     using (Slots; scripted; shared)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; sub-all; flatSt)
+open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
@@ -48,7 +48,8 @@ open import Data.Fin     using (Fin; _↑ʳ_)
 open import Data.Vec     using (lookup)
 open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
-open import SExp.Plain   using (plainExp; plainTm)
+open import SExp.Plain   using (plainExp; plainTm; plainTms)
+open import Simulation.Arm using (module Arms)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
   FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ; inputᵖ)
 open import SExp.InstEmit using (machineEmitᵗ)
@@ -129,6 +130,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → renExp (λ x → x) (λ x → x) w (toInstEmit κ (takeWhileˢ f b)) ≡ mintᵉ (mapᵉ g (takeWhileᵉ c (scanᵉ F i e″)))
                 → CutLifts κ unitᵗ s (λ _ n → n ≡ 1) (uniqᵗ ∷ Θ′ , F , src ∷ᵉ ρ′) (just (Θ , plainTm f , ρ))
 
+  open Arms {Γ = Γ} κ using (Carries)
+
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     -- WHAT ONE SUBSCRIBE KEEPS: what a pass keeps, from related stores
@@ -200,13 +203,29 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       hot-read       : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
       -- a shared slot's read, against its stamped slot's
       shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
-      -- A BODY IS `path-pass` OVER THE IMPL'S MINTED SOURCE, AND TWO
-      -- THINGS STAND BETWEEN IT AND HERE.  `walk` would join
-      -- `path-pass`'s cycle through `inner-walk`, terminating on the
-      -- plain derivation, so its helpers would call it rather than take
-      -- it; and `path-pass` asks `Sound` of both paths, which `Walks`
-      -- does not carry and `PathRel` does not imply.
-      walk-of        : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) → Elab-Walks (ofˢ ts)
+      -- AN `of`'S EMITS CARRY ITS VALUES: the impl's list under its mint,
+      -- one emit per value, the last also carrying the end, against the
+      -- plain values over related environments
+      of-carries     : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+                     → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
+                     → ∀ src → Carries {u} (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L) (map (λ tm → evalWith tm ρ) (plainTms ts))
+      -- THE GROUP FOLDED DOWN RELATED PATHS, ENDED, the impl's under its
+      -- new source.  A body is `path-pass`, and two things stand between
+      -- it and here.  `walk` would join `path-pass`'s cycle through
+      -- `inner-walk`, terminating on the plain derivation, so its helpers
+      -- would call it rather than take it; and `path-pass` asks `Sound`
+      -- of both paths, which `Walks` does not carry and `PathRel` does
+      -- not imply.
+      of-fold        : ∀ {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
+                         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI src es vs}
+                     → (S : Store κ sP stP sI stI)
+                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                     → freshId sourceᵏ (Sched.mint sI) ≡ src
+                     → Carries {u} es vs
+                     → foldPath⇓ now p vs true sP stP rP
+                     → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
+                     → Σ (After κ S rP rI) λ A
+                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
       -- NO RELATION HOLDS ALONG THE BODY'S PATH WHILE THE BODY IS
       -- SUBSCRIBED.  The impl subscribes the cut as the one inner of an
       -- `of` outer, so the merge reads `mergeAll-st nothing 1 [] false`
@@ -488,6 +507,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                       (Θ , plainExp (flattenˢ op b) , ρ)
     walk-flat op b wb false w r = walk-flat-elem op b wb w r
     walk-flat op b wb true  w r = walk-flat-explode op b wb w r
+
+    -- an `of`'s walk: the impl mints its source, and both fold the
+    -- group and end
+    walk-of : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) → Elab-Walks (ofˢ ts)
+    walk-of ts w r S pr (subs-of dP) (subs-mint {src = src} fr (subs-of dI)) = of-fold S pr fr (of-carries ts w r refl src) dP dI
 
     -- a cold slot's walk: the impl's read past the transport
     walk-cold : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Elab-Walks {Θ} (inputˢ i)

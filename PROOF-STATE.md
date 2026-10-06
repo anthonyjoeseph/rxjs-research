@@ -283,7 +283,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   (`cut-group`), and a test's cut severing a row its partner keeps
   (`while-cut`, over `cut-keeps`).
 
-- **WALK INSIDE THE PASS.** `walk-of` (`emptyˢ` is its `[]`) and `walk-μ` are
+- **WALK INSIDE THE PASS.** `of-fold` (`walk-of`'s and `emptyˢ`'s fold) and `walk-μ` are
   `path-pass`, or `walk` again, past a derivation rather than the tree:
   `walk` joins `path-pass`'s cycle through `inner-walk`, terminating on the
   plain derivation, and `path-pass`'s `Sound` reaches `Walks` -- from the
@@ -364,6 +364,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`walk-*`** (Simulation.Walk) — FALSITY, `DEAD ROUTE`: one former's
   subscribe keeps what a pass keeps (`After`). No take or `μ` run;
   `walk-take`'s body is not subscribed under `take~`.
+- **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s
+  emits carry its values one per emit, and the group folded and ended down
+  related paths keeps what a pass keeps, the impl's under its new source.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY, `PROBED×2`: a
   slot's plain subscribe against the impl's at its stamped slot, down the
   restamp or the cold mint, keeps what a pass keeps; holds at a hot and a cold
