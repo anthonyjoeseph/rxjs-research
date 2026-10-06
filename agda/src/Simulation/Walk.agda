@@ -22,10 +22,13 @@ open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to
 open import Data.List.Relation.Unary.All.Properties using (map⁺; concat⁺; tabulate⁺)
 open import Data.Bool    using (Bool; T; true; false; _∨_)
 open import Data.Unit    using (tt)
-open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_)
+open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_; s≤s)
+open import Data.Nat.Induction using (<-wellFounded)
+open import Induction.WellFounded using (Acc; acc)
+open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsize-unfoldμ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; ≤-refl; <⇒<ᵇ; <⇒≢; 1+n≢n)
+open import Data.Nat.Properties using (<-trans; n<1+n; m≤n+m; ≤-trans; ≤-reflexive; ≤-refl; <⇒<ᵇ; <⇒≢; 1+n≢n)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ; _∷_ to _∷ᵖ_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -35,12 +38,12 @@ open import Data.Maybe using (just; nothing)
 
 open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; ofᵉ; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
+open import Rx.Exp       using (Ctx; Val; Closed; Exp; unfoldμ; obs; ofᵉ; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
   mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Slots     using (Slots; scripted; shared)
-open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; sub-all; flatSt)
+open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; subs-μ; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
@@ -129,6 +132,23 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → EnvRel κ Θ w ρ′ ρ
                 → renExp (λ x → x) (λ x → x) w (toInstEmit κ (takeWhileˢ f b)) ≡ mintᵉ (mapᵉ g (takeWhileᵉ c (scanᵉ F i e″)))
                 → CutLifts κ unitᵗ s (λ _ n → n ≡ 1) (uniqᵗ ∷ Θ′ , F , src ∷ᵉ ρ′) (just (Θ , plainTm f , ρ))
+
+    -- AN UNROLLING IS AN AUTHOR'S PROGRAM: some tree whose plain form is
+    -- the plain unrolling and whose elaboration, at every renaming, is
+    -- the elaborated one.  The equations pin the tree.  Where it can
+    -- fail: a μ-var read under a defer under value binders, where the
+    -- elaboration's frame term reads the value telescope the unrolling's
+    -- weakening moved, and the defer's context transport.
+    -- PROBED: `Probed.Unfold` -- both equations by `refl`, the elaborated
+    --   one at an abstract renaming, at a μ-var straight under a defer and
+    --   at one under a defer under a map's binder.  Not a μ inside a μ,
+    --   not a var under a scan's or a test's binder, not a nonempty
+    --   outer telescope.
+    μ-unfolds : ∀ {Θ u} (b : SExp Γ (u ∷ []) [] Θ u)
+              → Σ (SExp Γ [] [] Θ u) λ s′ → plainExp s′ ≡ unfoldμ (plainExp b)
+                  × (∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′)
+                     → renExp (λ x → x) (λ x → x) w (toInstEmit κ s′)
+                       ≡ unfoldμ (renExp (ext∈ (λ x → x)) (λ x → x) w (toInstEmit κ b)))
 
   open Arms {Γ = Γ} κ using (Carries)
 
@@ -233,11 +253,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
                      → Σ (After κ S rP rI) λ A
                          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-      -- an unrolling: the body under the substitution, on both sides.
-      -- A body is `walk` at the unrolled tree, which owes `plainExp` and
-      -- `toInstEmit` commuting with the unrolling, and termination on
-      -- the plain derivation rather than the tree -- `walk-of`'s cycle.
-      walk-μ         : ∀ {Θ u} (b : SExp Γ (u ∷ []) [] Θ u) → Elab-Walks (μˢ b)
 
     postulate
       -- A CELL INSTALLED ON BOTH SIDES, the impl's under its mint: the
@@ -407,6 +422,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           → E ≡ E′ → subscribeE⇓ {e = ei} (Θ , E , ρ) q now s st r → subscribeE⇓ {e = ei} (Θ , E′ , ρ) q now s st r
     reExp refl d = d
 
+    -- and the plain side's
+    reExpᴾ : ∀ {Θ u lo} {ρ} {E E′ : Exp Γ [] [] Θ u} {p : Path Γ lo u t} {now s st r}
+           → E ≡ E′ → subscribeE⇓ {e = ep} (Θ , E , ρ) p now s st r → subscribeE⇓ {e = ep} (Θ , E′ , ρ) p now s st r
+    reExpᴾ refl d = d
+
     -- a map's frames walked: the tail related again
     unmap : ∀ {X : Set} {π : X → List (NodeId × List NodeId)} {NP : X → List (NodeId × NodeState Γ)}
               {NI : X → List (NodeId × NodeState (plainᵏ Γ κ))} {lo lo′ ℓ ℓ′ s u F G} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
@@ -537,24 +557,33 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-input i hotᵏ    e = walk-hot i e
     walk-input i sharedᵏ e = walk-shared i e
 
-    walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
-    walk (inputˢ i)       = walk-input i (lookup κ i) refl
-    walk (ofˢ ts)         = walk-of ts
-    walk {Θ} {u} emptyˢ w {ρ′} {ρ} r S pr (subs-empty f) dI = walk-of {Θ} {u} [] w {ρ′} {ρ} r S pr (subs-of {ts = []} f) dI
-    walk (takeWhileˢ f b) w r = walk-while f b (walk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
-    walk (mapˢ f b) w r S pr (subs-map dP) (subs-map dI) = unmap (walk b w r S (map~ (lifts-map f w r) pr) dP dI)
-    walk (scanˢ f z b) w {ρ′} {ρ} r {stP = stP} {stI = stI} S pr (subs-scan {nid = k} frP dP) (subs-mint {src = src} frS (subs-map (subs-scan {i = iI} {nid = k′} frI dI))) =
+    -- THE WALK DESCENDS THE PLAIN TREE'S GUARDED SIZE, not the tree: an
+    -- unrolling is no smaller, but it reads its μ-var only past a defer,
+    -- which the size does not count and the walk does not enter.
+    walk< : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Acc _<_ (gsizeᵉ (plainExp s)) → Elab-Walks s
+    walk< (inputˢ i) _     = walk-input i (lookup κ i) refl
+    walk< (ofˢ ts) _       = walk-of ts
+    walk< {Θ} {u} emptyˢ _ w {ρ′} {ρ} r S pr (subs-empty f) dI = walk-of {Θ} {u} [] w {ρ′} {ρ} r S pr (subs-of {ts = []} f) dI
+    walk< (takeWhileˢ f b) (acc rs) w r = walk-while f b (walk< b (rs (s≤s (m≤n+m _ _)))) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
+    walk< (mapˢ f b) (acc rs) w r S pr (subs-map dP) (subs-map dI) = unmap (walk< b (rs (s≤s (m≤n+m _ _))) w r S (map~ (lifts-map f w r) pr) dP dI)
+    walk< (scanˢ f z b) (acc rs) w {ρ′} {ρ} r {stP = stP} {stI = stI} S pr (subs-scan {nid = k} frP dP) (subs-mint {src = src} frS (subs-map (subs-scan {i = iI} {nid = k′} frI dI))) =
       let L = lifts-scan f z b w src {i = iI} r refl
           I = scan-install S (evalWith (plainTm z) ρ) (evalWith iI (src ∷ᵉ ρ′)) pr frP frS frI
-          X = walk b (λ y → there (w y)) r (After.store (proj₁ I))
+          X = walk< b (rs (s≤s (≤-trans (m≤n+m _ (gsizeᵗ (plainTm z))) (m≤n+m (gsizeᵗ (plainTm z) + gsizeᵉ (plainExp b)) (gsizeᵗ (plainTm f)))))) (λ y → there (w y)) r (After.store (proj₁ I))
                 (scan~ (proj₁ (proj₂ I)) (lookup-set k (cell-st (evalWith (plainTm z) ρ)) (EvalSt.nodes stP))
                   (lookup-set k′ (cell-st (evalWith iI (src ∷ᵉ ρ′))) (EvalSt.nodes stI)) (proj₂ L) (proj₁ L) (proj₂ (proj₂ I)))
                 dP (reExp (renExp-fuse there (ext∈ w) (toInstEmit κ b)) dI)
       in unscan (_⨾_ κ (proj₁ I) (proj₁ X) , proj₂ X)
-    walk (flattenˢ op b) w r = walk-flat op b (walk b) (perInnerˢ op b) w r
-    walk (μˢ b)           = walk-μ b
-    walk (varˢ ())
-    walk (deferˢ b)       = walk-defer b
+    walk< (flattenˢ op b) (acc rs) w r = walk-flat op b (walk< b (rs (n<1+n _))) (perInnerˢ op b) w r
+    walk< (μˢ b) (acc rs) w r S pr (subs-μ dP) (subs-μ dI) =
+      let (s′ , pe , ie) = μ-unfolds b
+      in walk< s′ (rs (s≤s (≤-reflexive (trans (cong gsizeᵉ pe) (gsize-unfoldμ (plainExp b))))))
+           w r S pr (reExpᴾ (sym pe) dP) (reExp (sym (ie w)) dI)
+    walk< (varˢ ()) _
+    walk< (deferˢ b) _     = walk-defer b
+
+    walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
+    walk s = walk< s (<-wellFounded _)
 
 -- WHERE IT CAN STILL FAIL: A HOT SCRIPT LIVE ON ONE SIDE ONLY, or two
 -- live at different places.  Both lists are the slots' hot scripts in

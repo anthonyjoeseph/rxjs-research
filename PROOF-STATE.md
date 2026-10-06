@@ -259,7 +259,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former; a minted source's chain is `path-pass`, one
   arm per plain frame; a hot slot's is `fan-go` over the share's readers.
-  Every arm on both halves is a body over leaves but `walk-μ`. Left:
+  Every arm on both halves is a body over leaves. Left:
   instantiate the arm leaves at a deeper flattener's subscribe, the
   monster's remaining region, with `make qc-store` aimed at nested
   flatteners; a leaf that goes red names the arm that breaks. Ruled out:
@@ -271,11 +271,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   impl's cascade makes one former at a time. State it beside the values split so both recurse on the same
   configuration, and the monster drops to whichever stays riskier.
 
-- **WALK INSIDE THE PASS.** `of-fold` (`walk-of`'s and `emptyˢ`'s fold) and `walk-μ` are
-  `path-pass`, or `walk` again, past a derivation rather than the tree:
-  `walk` joins `path-pass`'s cycle through `inner-walk`, terminating on the
-  plain derivation, and `path-pass`'s `Sound` reaches `Walks` -- from the
-  store and `PathRel` if they hold it, else a refutation of the form without.
+- **WALK INSIDE THE PASS.** `of-fold` (`walk-of`'s and `emptyˢ`'s fold) is
+  `path-pass` past a derivation rather than the tree: `path-pass`'s `Sound`
+  reaches it from the store and `PathRel` if they hold it, else a
+  refutation of the form without. Ruled out: the μ peel needing the pass;
+  `walk` descends the plain tree's guarded size, and `μ-unfolds` holds at
+  the probed binders, so a scan's or a test's binder is what is left.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -345,8 +346,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   one per slot.
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
-- **`walk-μ`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an unrolling's
-  subscribe keeps what a pass keeps (`After`); no μ run.
+- **`μ-unfolds`** (Simulation.Walk) — FALSITY, `PROBED`: an unrolling is an
+  author's program, its plain form and every renamed elaboration the
+  unrollings; held at a μ-var under a defer, bare and under a map's binder.
 - **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s
   emits carry its values one per emit, and the group folded and ended down
   related paths keeps what a pass keeps, the impl's under its new source.
