@@ -27,14 +27,14 @@ module Simulation.Stores where
 
 open import Data.Bool    using (Bool; true; false; _∨_; _∧_; T; if_then_else_)
 open import Data.Bool.ListAction using (any)
-open import Data.Empty   using (⊥)
+open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.List    using (List; []; _∷_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-map⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
-open import Data.List.Relation.Unary.All using (All; []; _∷_)
-open import Data.List.Relation.Unary.AllPairs using (AllPairs)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᵃ; lookup to lookupᵃ)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -44,7 +44,8 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; subst₂; trans; cong; cong₂)
-open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≡ᵇ⇒≡)
+open import Decide using (≡ᵇ-refl)
 open import Rx.Evaluator.Reducible.Support using (Rule)
 open import Rx.Evaluator.Freshness using (nodeCt)
 
@@ -120,6 +121,11 @@ SameAt s s′ x x′ = (x ≡ s → x′ ≡ s′) × (x′ ≡ s′ → x ≡ s
 -- element types are the rows'
 ArrRel : Source → Source → Ty → Ty → Source → Source → Ty → Ty → Set
 ArrRel s s′ u u′ src src′ x x′ = (s ≡ src → s′ ≡ src′ × u ≡ x × u′ ≡ x′) × (s′ ≡ src′ → s ≡ src)
+
+ᵇ-no : ∀ {i k} → i ≢ k → (i ≡ᵇ k) ≡ false
+ᵇ-no {i} {k} ne with i ≡ᵇ k in e
+... | false = refl
+... | true  = ⊥-elim (ne (≡ᵇ⇒≡ i k (subst T (sym e) tt)))
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -530,6 +536,23 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         spent-all []                          _          _          = tt
         spent-all (_∷_ {r = r} {r′ = r′} _ q) (oP ∷ oPs) (oI ∷ oIs) = trans oP (sym oI) , spent-all q oPs oIs
         spent-all (mach _ q)                  oPs        (_ ∷ oIs)  = spent-all q oPs oIs
+
+        -- A PAIR'S IDS PICK OUT THAT PAIR ALONE: registrations are told apart by
+        -- their ids on both sides, so a row at the plain id is partnered exactly
+        -- when its partner is at the impl id
+        pair-ids : ∀ {rs rs′} (q : RegRel rs rs′)
+                 → AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) rs → AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) rs′
+                 → ∀ {x x′} → Partners q x x′
+                 → Spent q (λ r → proj₁ x ≡ᵇ proj₁ r) (λ r′ → proj₁ x′ ≡ᵇ proj₁ r′)
+        pair-ids [] _ _ ()
+        pair-ids (_∷_ {r = r} {r′ = r′} _ q) (a ∷ ap) (a′ ∷ ap′) (inj₁ (refl , refl)) =
+            trans (≡ᵇ-refl (proj₁ r)) (sym (≡ᵇ-refl (proj₁ r′)))
+          , spent-all q (mapᵃ ᵇ-no a) (mapᵃ ᵇ-no a′)
+        pair-ids (_ ∷ q) (a ∷ ap) (a′ ∷ ap′) (inj₂ p) =
+            trans (ᵇ-no (λ e → lookupᵃ a (proj₁ (partner-mem q p)) (sym e)))
+                  (sym (ᵇ-no (λ e → lookupᵃ a′ (proj₂ (partner-mem q p)) (sym e))))
+          , pair-ids q ap ap′ p
+        pair-ids (mach _ q) ap (_ ∷ ap′) p = pair-ids q ap ap′ p
 
         -- and through a rewrite of either registry
         spent-subst : ∀ {rs rs′ ks ks′} (e : rs ≡ ks) (e′ : rs′ ≡ ks′) (q : RegRel rs rs′) {dP dI}

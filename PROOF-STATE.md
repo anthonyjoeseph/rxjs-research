@@ -264,9 +264,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   monster's remaining region, with `make qc-store` aimed at nested
   flatteners; a leaf that goes red names the arm that breaks. Ruled out:
   an open merge's window reordering rows or sources. The monster drops to
-  whichever half fails. Ruled out too: an inner's liveness parting a
-  pair, since the store relates each pair's delivery and dying; a depth-6
-  sweep with every case through a flatten and a defer kept every store.
+  whichever half fails. Ruled out too: an inner's or a deferred body's
+  liveness parting a pair, since the store relates each pair's delivery and
+  dying; a depth-6 sweep with every case through a flatten and a defer kept
+  every store. Left there: a lane's, whose rows the store does not tie to
+  one lane.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -301,9 +303,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`restamp-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
   scan stepped on a group keeps the flattener, and the group it hands on
   carries the same values and end.
-- **`lane-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner a
-  plain chain runs through is live exactly when the impl-only lane merge's
-  inner in front of its pair is.
 - **`lane-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an impl-only lane
   merge in front of an inner's arm stays idle, unpaired and off every tail the
   arm folds.
@@ -318,9 +317,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`{lane,defer}-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead
   inner finishes on both sides, through an impl-only lane merge's finish ahead
   of it or a deferred body's marker merge's.
-- **`defer-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
-  body's inner is live on the plain side exactly when the hop's marker merge's
-  inner is on the impl's.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   a cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped
@@ -381,6 +377,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
+- **`lane-alive`** (Simulation.Pass) — SHAPE, `NO EVIDENCE`: an inner is live
+  exactly where its lane's is, but no store invariant makes every row through
+  the inner name one lane; restate with the lane in `π` as a deferred body's
+  marker merge is.
 - **`fold-unmoved`** (Simulation.Arm) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.

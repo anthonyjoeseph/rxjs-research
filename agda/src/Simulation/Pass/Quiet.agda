@@ -12,8 +12,7 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
-open import Data.List.Relation.Unary.All using (All; _∷_) renaming (map to mapᵃ; lookup to lookupᵃ)
-open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
+open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; nothing; just)
@@ -47,9 +46,9 @@ open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
   PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
   outerExplode~; inner~; lane~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel;
-  []; _∷_; mach; MachRow; hot~; Store; Arr; Partners; partner-mem; Spent; spent-all; spent-zip; dlvᵇ; dyingᵇ)
+  []; _∷_; mach; MachRow; hot~; Store; Arr; Partners; pair-ids; Spent; spent-zip; dlvᵇ; dyingᵇ)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
-open import Simulation.Cut using (cut-kill; ᵇ-no)
+open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear;
@@ -90,23 +89,6 @@ unchain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ} {vs fin x 
         → chainStep⇓ {e = e} a vs fin x sched st r → foldPath⇓ (arrTick a) (proj₂ x) vs fin sched st r
 unchain (chain-step d) = d
 
--- A PAIR'S IDS PICK OUT THAT PAIR ALONE: registrations are told apart by
--- their ids on both sides, so a row at the plain id is partnered exactly
--- when its partner is at the impl id
-pair-ids : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′} (q : RegRel κ π {t} NP NI LP LI rs rs′)
-         → AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) rs → AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) rs′
-         → ∀ {x x′} → Partners κ π NP NI LP LI q x x′
-         → Spent κ π NP NI LP LI q (λ r → proj₁ x ≡ᵇ proj₁ r) (λ r′ → proj₁ x′ ≡ᵇ proj₁ r′)
-pair-ids [] _ _ ()
-pair-ids {κ = κ} (_∷_ {r = r} {r′ = r′} _ q) (a ∷ ap) (a′ ∷ ap′) (inj₁ (refl , refl)) =
-    trans (≡ᵇ-refl (proj₁ r)) (sym (≡ᵇ-refl (proj₁ r′)))
-  , spent-all κ _ _ _ _ _ q (mapᵃ (λ ne → ᵇ-no ne) a) (mapᵃ (λ ne → ᵇ-no ne) a′)
-pair-ids {κ = κ} (_∷_ _ q) (a ∷ ap) (a′ ∷ ap′) {x} {x′} (inj₂ p) =
-    trans (ᵇ-no (λ e → lookupᵃ a (proj₁ (partner-mem κ _ _ _ _ _ q {x} {x′} p)) (sym e)))
-          (sym (ᵇ-no (λ e → lookupᵃ a′ (proj₂ (partner-mem κ _ _ _ _ _ q {x} {x′} p)) (sym e))))
-  , pair-ids {κ = κ} q ap ap′ {x} {x′} p
-pair-ids {κ = κ} (mach _ q) ap (_ ∷ ap′) {x} {x′} p = pair-ids {κ = κ} q ap ap′ {x} {x′} p
-
 -- a chain step marks its partnered pair of rows delivered, alike
 delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
               {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
@@ -115,7 +97,7 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
 delivered {κ = κ} s {x} {x′} pr = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
   ; sync = sync ; rows = rows ; latches = latches
-  ; dlv-alike = spent-zip κ _ _ _ _ _ rows _∨_ (pair-ids rows (proj₁ rids) (proj₂ rids) {x} {x′} pr) dlv-alike ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
+  ; dlv-alike = spent-zip κ _ _ _ _ _ rows _∨_ (pair-ids κ _ _ _ _ _ rows (proj₁ rids) (proj₂ rids) {x} {x′} pr) dlv-alike ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
   ; scripts = scripts }
   where open Store s

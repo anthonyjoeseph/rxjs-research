@@ -21,21 +21,21 @@ open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
 open import Data.List.Properties using (map-id; ++-assoc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong; cong₂)
 
 open import Rx.Exp       using (Ctx; Closed; Val; mergeᶠ; switchᶠ; exhaustᶠ; uniqᵗ; obs; applyClo; Tm; varᵗ; unit̂; pairᵗ;
   inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (EvalSt; NodeId; shareSpend; shareDying; Path; _↠[_]_; scan-f; map-f; thru-outer; from-inner;
   mergeAllᵒ; lookupNode; echoᵗ; thruEvents; thruWrap; switchᵒ; exhaustᵒ; RegId; AtFloor;
-  shareFinish; aliveThroughᶠ; Sched)
+  shareFinish; aliveThroughᶠ; Sched; pathHasNode; mergeAll-st; cell-st)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-step; stepFrame⇓; step-map; step-thru-outer; step-from-inner;
   react-false; react-alive; react-dead; innerFinish⇓; finish-switch-clear;
   finish-exhaust-clear; finish-nil; thruWalk⇓; thruConsume⇓; walk-nil; walk-echo; walk-cons)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ)
 open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; sharedEq; PathRel; inner~; lane~;
-  deferInner~; []; _∷_; Store; Partners; RegRel; mach; Spent; dlvᵇ; dyingᵇ)
-open import Simulation.Cut using (module At)
+  deferInner~; []; _∷_; Store; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ)
+open import Simulation.Cut using (module At; module Third)
 open import Simulation.After using (module Kept)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
@@ -191,6 +191,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                           (from-inner mergeAllᵒ m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q)) (o₁ ++ proj₁ rI , proj₂ rI)
       -- A LANE'S INNER IS LIVE EXACTLY WHERE ITS PLAIN INNER IS: the lane merge
       -- sits in front of every impl chain the inner's pair runs
+      --
+      -- NOTHING THE STORE HOLDS SAYS SO.  `lane~` wraps one row's relation,
+      -- and its lane is `Unpaired`, so another row through the same plain
+      -- inner may relate it through `inner~` bare or behind another lane:
+      -- the conclusion needs every row through the inner to name one lane,
+      -- which no hypothesis carries.  The deferred body's marker merge is
+      -- the precedent, a lane recorded in `π` at the third member, where
+      -- `Third` reads it
       lane-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
                      {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
@@ -220,11 +228,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                   → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                       (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q))
                       (o₁ ++ proj₁ rI , proj₂ rI)
-      -- A DEFERRED BODY'S INNER IS LIVE ON THE PLAIN SIDE EXACTLY WHEN
-      -- THE HOP'S MARKER MERGE'S INNER IS ON THE IMPL'S
-      defer-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′ m2 j2}
-                  → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
-                  → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ any (aliveThroughᶠ j2 stI) (EvalSt.registry stI)
       -- A DELIVERED EMIT CARRIES WHAT IT CARRIED: the hop's restamp
       -- retags a subscribe as a delivery over its own events
       delivery-rel : ∀ {u Θx ρ₀} e′ {ws}
@@ -259,17 +262,19 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                            (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
                             (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))) (o₁ ++ proj₁ rI , proj₂ rI)
 
-    -- AN INNER HAS A CHAIN RUNNING THROUGH IT ON THE PLAIN SIDE EXACTLY
-    -- WHEN ITS PAIR DOES ON THE IMPL'S: a pair of rows names the pair of
-    -- nodes alike, neither is cancelled, and the two are delivered and
-    -- dying alike; the impl's own rows name no paired node
-    inner-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′}
-                → (j , j′ ∷ []) ∈ Store.π S
-                → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ any (aliveThroughᶠ j′ stI) (EvalSt.registry stI)
-    inner-alive {sP} {stP} {sI} {stI} S {j} {j′} ce = go rows (proj₁ uncut) (proj₂ uncut) dlv-alike dying-alike
+    -- A PAIR OF NODES EVERY PAIR OF ROWS NAMES ALIKE, AND THE IMPL'S OWN
+    -- ROWS NEVER THE IMPL ONE, HAS A CHAIN RUNNING THROUGH IT ON BOTH SIDES
+    -- OR ON NEITHER: neither row of a pair is cancelled, and the two are
+    -- delivered and dying alike
+    alive-by : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′}
+             → (∀ {x x′} → RowRel κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) x x′
+                         → pathHasNode j (proj₂ (proj₂ (proj₂ x))) ≡ pathHasNode j′ (proj₂ (proj₂ (proj₂ x′))))
+             → (∀ {x′} → MachRow κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) x′
+                         → pathHasNode j′ (proj₂ (proj₂ (proj₂ x′))) ≡ false)
+             → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ any (aliveThroughᶠ j′ stI) (EvalSt.registry stI)
+    alive-by {sP} {stP} {sI} {stI} S {j} {j′} rc mc = go rows (proj₁ uncut) (proj₂ uncut) dlv-alike dying-alike
       where
         open Store S
-        module C = At {Γ = Γ} κ π-keys π-vals ce (here refl)
 
         off : ∀ {a} b c → a ≡ false → (a ∧ b) ∨ c ≡ c
         off b c refl = refl
@@ -282,9 +287,33 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
            → any (aliveThroughᶠ j stP) rs ≡ any (aliveThroughᶠ j′ stI) rs′
         go [] _ _ _ _ = refl
         go (rr ∷ q) (u ∷ us) (u′ ∷ us′) (d , ds) (y , ys) =
-          cong₂ _∨_ (cong₂ _∧_ (C.row-cut rr) (cong₂ _∧_ (cong not (trans u (sym u′))) (cong₂ _∨_ (cong not y) (cong not d))))
+          cong₂ _∨_ (cong₂ _∧_ (rc rr) (cong₂ _∧_ (cong not (trans u (sym u′))) (cong₂ _∨_ (cong not y) (cong not d))))
                     (go q us us′ ds ys)
-        go (mach m q) us (_ ∷ us′) ds ys = trans (go q us us′ ds ys) (sym (off _ _ (C.mach-cut m)))
+        go (mach m q) us (_ ∷ us′) ds ys = trans (go q us us′ ds ys) (sym (off _ _ (mc m)))
+
+    -- AN INNER HAS A CHAIN RUNNING THROUGH IT ON THE PLAIN SIDE EXACTLY
+    -- WHEN ITS PAIR DOES ON THE IMPL'S: a pair of rows names the pair of
+    -- nodes alike, and the impl's own rows name no paired node
+    inner-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′}
+                → (j , j′ ∷ []) ∈ Store.π S
+                → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ any (aliveThroughᶠ j′ stI) (EvalSt.registry stI)
+    inner-alive S ce = alive-by S (λ rr → C.row-cut rr) (λ m → C.mach-cut m)
+      where module C = At {Γ = Γ} κ (Store.π-keys S) (Store.π-vals S) ce (here refl)
+
+    -- A DEFERRED BODY'S INNER IS LIVE ON THE PLAIN SIDE EXACTLY WHEN THE
+    -- HOP'S MARKER MERGE'S INNER IS ON THE IMPL'S: that inner is the third
+    -- of the run `π` pairs the body's inner with, and the marker merge
+    -- being a merge tells the run from an exploding flattener's
+    defer-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′ m2 j2 u a}
+                → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
+                → lookupNode m2 (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true)
+                → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ any (aliveThroughᶠ j2 stI) (EvalSt.registry stI)
+    defer-alive {stI = stI} S {m2 = m2} ce l2 = alive-by S (λ rr → D.row-cut ly rr) (λ m → D.mach-cut m)
+      where
+        module D = Third {Γ = Γ} κ (Store.π-keys S) (Store.π-vals S) ce
+        ly : ∀ {w} {v : Val (plainᵏ Γ κ) w} → lookupNode m2 (EvalSt.nodes stI) ≢ just (cell-st v)
+        ly lk with trans (sym l2) lk
+        ... | ()
 
     -- AN INNER LEFT OPEN: the impl's lets the group past as the plain one
     -- does, its restamp moves the cell alone, and the tails are related
@@ -438,8 +467,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                         (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
                          (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
                           (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
-    deferInner-dies S R@(deferInner~ _ ip₂ _ _ _ _ _) b sp si dd F (fold-step (step-from-inner (react-alive al′)) _) =
-      ⊥-elim (t≢f (trans (sym al′) (trans (sym (defer-alive S ip₂)) dd)))
+    deferInner-dies S R@(deferInner~ _ ip₂ _ _ l2 _ _) b sp si dd F (fold-step (step-from-inner (react-alive al′)) _) =
+      ⊥-elim (t≢f (trans (sym al′) (trans (sym (defer-alive S ip₂ l2)) dd)))
     deferInner-dies S R b sp si dd F (fold-step (step-from-inner (react-dead _ F′)) dR) = defer-finish S R b sp si dd F F′ dR
 
     delivery-carries : ∀ {u Θx ρ₀} {es vs}
@@ -496,8 +525,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       (fold-step (step-from-inner (react-alive _)) (fold-step step-map (fold-step (step-from-inner react-false) dq))) =
       defer-on S R b sp si dq
     deferInner-pass S R b sp si (inj₁ ()) (fold-step (step-from-inner (react-dead _ _)) _)
-    deferInner-pass S R@(deferInner~ _ ip₂ _ _ _ _ _) b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
-      ⊥-elim (t≢f (trans (sym (trans (sym (defer-alive S ip₂)) al)) dd))
+    deferInner-pass S R@(deferInner~ _ ip₂ _ _ l2 _ _) b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
+      ⊥-elim (t≢f (trans (sym (trans (sym (defer-alive S ip₂ l2)) al)) dd))
 
     -- AN INNER LEFT OPEN, BY HOW ITS ELABORATION LED IT: a lane merge in
     -- front lets the group past as the inner below it does
@@ -704,4 +733,4 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- a share marked dying on both sides
     dying-after : ∀ {sP stP sI stI} (S : St sP stP sI stI) (i : Fin n) → lookup κ i ≡ sharedᵏ
                 → After S ([] , sP , shareDying i true stP) ([] , sI , shareDying (n ↑ʳ i) true stI)
-    dying-after S i sh = after (dying S i sh) (λ x → x) dying-arr [] (λ x → x)
+    dying-after S i sh = after (dying S i sh) (λ x → x) (dying-arr {S = S} {i = i} {sh = sh}) [] (λ x → x)
