@@ -1127,7 +1127,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- THE TWO ROWS A MINTED SOURCE'S CHAINS CAN BE.  A cold read's impl
     -- chain runs its input block before the path its partner runs; a
-    -- deferred hop's subscribes the body on both sides.
+    -- deferred hop's walks the hop's merge on both sides, then ends it.
     postulate
       block-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
                 → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
@@ -1138,18 +1138,50 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → Sound full sI stI
                 → ∀ {now fin rI} → foldPath⇓ now full vs′ fin sI stI rI
                 → Arm S now [] sP stP p vs fin none rI
-      hop-arm   : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u} {vs : List (Val Γ (echoᵗ u))} {vs′ : List (Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u)))}
+      -- A DEFERRED HOP'S WALK: the body each emit carries is subscribed
+      -- through the hop's merge on both sides, the tails staying related
+      hop-walk  : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u} {vs : List (Val Γ (echoᵗ u))} {vs′ : List (Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u)))}
                 → Head src src′ {echoᵗ u} {echoᵗ (emitᵗ u)} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ (echoᵗ u) (echoᵗ (emitᵗ u))
                 → ∀ {nid nid′} → (nid , nid′ ∷ []) ∈ Store.π S
                 → lookupNode nid (EvalSt.nodes stP) ≡ just (mergeAll-st {t = u} nothing 0 [] false)
                 → lookupNode nid′ (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing 0 [] false)
-                → ∀ {ℓ ℓ′ lo′} {h′ : lo′ ≤ ℓ′} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+                → ∀ {ℓ ℓ′} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                → Sound (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) sI stI
-                → ∀ {now fin oP vs₁ fin₁ sP₁ stP₁ rI}
-                → stepFrame⇓ now (thru-outer mergeAllᵒ nid) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
-                → foldPath⇓ now (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) vs′ fin sI stI rI
-                → Arm S now oP sP₁ stP₁ p vs₁ fin₁ none rI
+                → Clear nid′ q sI stI
+                → ∀ {now rP rI}
+                → thruWalk⇓ mergeAllᵒ nid p now (thruEvents vs) sP stP rP
+                → thruWalk⇓ mergeAllᵒ nid′ q now (thruEvents vs′) sI stI rI
+                → Σ (After S rP rI) λ A
+                    → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+      -- THE HOP'S END: the hop's merge wraps up on both sides and the
+      -- impl's tail folds what its wrap hands on
+      hop-end   : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now nid nid′ ℓ ℓ′ u}
+                    {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)} {oP sP′ stP′ oI sI′ stI′ fin r}
+                → (A : After S (oP , sP′ , stP′) (oI , sI′ , stI′))
+                → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI′) p q
+                → Sound q (proj₁ (proj₂ (thruWrap mergeAllᵒ nid′ fin (sI′ , stI′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ nid′ fin (sI′ , stI′))))
+                → foldPath⇓ now q [] (proj₁ (thruWrap mergeAllᵒ nid′ fin (sI′ , stI′)))
+                    (proj₁ (proj₂ (thruWrap mergeAllᵒ nid′ fin (sI′ , stI′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ nid′ fin (sI′ , stI′)))) r
+                → Arm S now oP (proj₁ (proj₂ (thruWrap mergeAllᵒ nid fin (sP′ , stP′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))))
+                    p [] (proj₁ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))) none (oI ++ proj₁ r , proj₂ r)
+
+
+    -- a deferred hop subscribes its body on both sides
+    hop-arm   : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u} {vs : List (Val Γ (echoᵗ u))} {vs′ : List (Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u)))}
+              → Head src src′ {echoᵗ u} {echoᵗ (emitᵗ u)} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ (echoᵗ u) (echoᵗ (emitᵗ u))
+              → ∀ {nid nid′} → (nid , nid′ ∷ []) ∈ Store.π S
+              → lookupNode nid (EvalSt.nodes stP) ≡ just (mergeAll-st {t = u} nothing 0 [] false)
+              → lookupNode nid′ (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing 0 [] false)
+              → ∀ {ℓ ℓ′ lo′} {h′ : lo′ ≤ ℓ′} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+              → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+              → Sound (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) sI stI
+              → ∀ {now fin oP vs₁ fin₁ sP₁ stP₁ rI}
+              → stepFrame⇓ now (thru-outer mergeAllᵒ nid) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
+              → foldPath⇓ now (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) vs′ fin sI stI rI
+              → Arm S now oP sP₁ stP₁ p vs₁ fin₁ none rI
+    hop-arm S hd sp k nP nI r si {fin = fin} dW@(step-thru-outer W) (fold-step dW′@(step-thru-outer W′) dR) =
+      let X = hop-walk S hd sp k nP nI r (unthru si) W W′
+      in hop-end {fin = fin} (proj₁ X) (proj₂ X) (drop-ot _ _ _ (step-kept _ dW′ si)) dR
 
     postulate
       -- A RESTAMPED EMIT CARRIES WHAT IT CARRIED: the restamp rebuilds the
