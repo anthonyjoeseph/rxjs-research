@@ -448,8 +448,9 @@ module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
   ... | here x = x
   ... | there ()
 
-  module R {t NP NI} = B.Rows {t} {NP} {NI} (fwd {t} {NP} {NI}) one
-  open R public
+  module _ {t : Ty} {NP NI} where
+    module R = B.Rows {t} {NP} {NI} (fwd {t} {NP} {NI}) one
+    open R public
 
 -- A DEFERRED BODY'S RUN AT ITS THIRD MEMBER, the hop's marker merge's
 -- inner.  A run that long is a deferred body's or an exploding
@@ -507,8 +508,8 @@ module Third {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq)) = hop₃ (same e₂ eq)
     fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there m)) = there (there (there (there (fwd₃ r m))))
 
-  module R {t NP NI} (ly : ∀ {w} {v : Val (plainᵏ Γ κ) w} → lookupNode y NI ≢ just (cell-st v)) = B.Rows {t} {NP} {NI} (fwd₃ {t} {NP} {NI} ly) one₃
-  open R public
+    module R = B.Rows {t} {NP} {NI} fwd₃ one₃
+    open R public
 
 ------------------------------------------------------------------
 -- The stores after the cut
