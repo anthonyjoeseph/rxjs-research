@@ -36,7 +36,7 @@ open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (Clear; ClearI; missed; unthru; step-clear; fold-clear; consume-clear; adv)
 open import Simulation.Sweep using (t≢f)
-open import Rx.Evaluator.Reducible.Support using (Sound; fresh-path; drop-ot; sub-ot; Agree; admit-ot)
+open import Rx.Evaluator.Reducible.Support using (Sound; fresh-path; drop-ot; sub-ot; Agree; admit-ot; sink-sound)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Inner using (module PassI)
 open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sink-intro; sink-inv; sink-ok; slotpair; tail-of)
@@ -140,7 +140,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
         where
           ε = sharedEq {Γ = Γ} κ i sh
           Q = after-out (++-identityʳ _)
-                (proj₁ (quiet-sink {h = h} {h′ = h′} sh S (sink~ sh) (quiet x b []) refl (sink-ok ε (Store.ruleI S))
+                (proj₁ (quiet-sink {h = h} {h′ = h′} sh S (sink~ sh) (quiet x b []) refl (sink-sound i h (Store.ruleP S)) (sink-ok ε (Store.ruleI S))
                           (sink-intro ε (fold-sink (disp (walk-more gI walk-nil))))))
       share-walk S {i = i} {h = h} {h′ = h′} sh (one x r c) (walk-more gP wP) (walk-more gI wI) =
         A ⨾ share-walk (After.store A) {h = h} {h′ = h′} sh c wP wI
@@ -222,7 +222,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
                      → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
       quiet-step S cP cI w (quiet-elem bx) b W (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) =
         let c₁ = step-clear d₁ cI
-            E  = quiet-tail (flat-echo S w (quiet _ bx []) d₁) (tail-of c₁) dq
+            E  = quiet-tail (flat-echo S w (quiet _ bx []) d₁) (proj₂ cP) (tail-of c₁) dq
             X  = elem-walk (After.store (proj₁ E)) cP (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b W W′
         in proj₁ E ⨾ proj₁ X , proj₂ X
 
@@ -239,12 +239,12 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
                    → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
       one-step S cP cI w (elem {w = inj₁ _} r no-lane) b W (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) =
         let c₁ = step-clear d₁ cI
-            E  = quiet-tail (flat-echo S w (quiet _ r []) d₁) (tail-of c₁) dq
+            E  = quiet-tail (flat-echo S w (quiet _ r []) d₁) (proj₂ cP) (tail-of c₁) dq
             X  = elem-walk (After.store (proj₁ E)) cP (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b W W′
         in proj₁ E ⨾ proj₁ X , proj₂ X
       one-step S cP cI w (elem {w = inj₁ _} r (a-lane ob)) b (walk-cons c W) (walk-echo (fold-step d₁ (fold-step step-map dq)) (walk-cons c′ W′)) =
         let c₁ = step-clear d₁ cI
-            E  = quiet-tail (flat-echo S w (quiet _ r []) d₁) (tail-of c₁) dq
+            E  = quiet-tail (flat-echo S w (quiet _ r []) d₁) (proj₂ cP) (tail-of c₁) dq
             c₂ = fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁
             C  = consume-pair (After.store (proj₁ E)) (proj₂ E) ob (fresh-path (proj₂ c₂)) c c′
             X  = elem-walk (After.store (proj₁ C)) (consume-clear c cP)
