@@ -850,19 +850,48 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       sink-pass     : ∀ {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} (sh : lookup κ i ≡ sharedᵏ)
                     → Pass (share-sink i h)
                            (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sharedEq {Γ = Γ} κ i sh) (share-sink (n ↑ʳ i) h′))
-      -- an outer's elements, each inner a sync outer hands the flattener
-      -- subscribed before the step returns: the explode and its merge
-      outerExplode-arm : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
-                           {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                           {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
-                           {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                       → Steps (thru-outer (flatOp op) m) h p
-                           (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
-                            (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
-                             (thru-outer mergeAllᵒ mX ↠[ h₃ ]
-                              (thru-outer (flatOp op) m′ ↠[ h₄ ]
-                               (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
-                                (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
+      -- AN OUTER'S ELEMENTS EXPLODED: each emit's run of elements is an
+      -- inner the impl's merge subscribes, and its elements walk into the
+      -- flattener where the plain outer's walk hands them on
+      explode-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                       {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+                       {es vs rP rI}
+                   → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+                   → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                   → Carries {echoᵗ u} es vs
+                   → thruWalk⇓ (flatOp op) m p now (thruEvents vs) sP stP rP
+                   → thruWalk⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
+                       (thruEvents (map (applyClo {s = obs (echoᵗ (emitᵗ u))} {t = echoᵗ (echoᵗ (emitᵗ u))}
+                                                  (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅))
+                                        (map (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀)) es))) sI stI rI
+                   → Σ (After S rP rI) λ A
+                       → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                           u op m m′ ks (mX ∷ [])
+                         × PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+      -- THE EXPLODED OUTER'S END: the impl's merge ends where the plain
+      -- outer does, and the flattener's end follows on both sides
+      explode-end : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {oP sP′ stP′ oI sI′ stI′ fin r}
+                  → (A : After S (oP , sP′ , stP′) (oI , sI′ , stI′))
+                  → Clear m p (proj₁ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′)))) (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))
+                  → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP′) (EvalSt.nodes stI′) u op m m′ ks (mX ∷ [])
+                    × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI′) p q
+                  → Sound (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)
+                      (proj₁ (proj₂ (thruWrap mergeAllᵒ mX fin (sI′ , stI′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ mX fin (sI′ , stI′))))
+                  → foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) []
+                      (proj₁ (thruWrap mergeAllᵒ mX fin (sI′ , stI′)))
+                      (proj₁ (proj₂ (thruWrap mergeAllᵒ mX fin (sI′ , stI′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ mX fin (sI′ , stI′)))) r
+                  → Arm S now oP (proj₁ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))
+                      (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))
+                      p [] (proj₁ (thruWrap (flatOp op) m fin (sP′ , stP′)))
+                      (λ π NP NI → PathRel κ π NP NI (thru-outer (flatOp op) m ↠[ h ] p)
+                         (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                          (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                           (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                            (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)))))
+                      (oI ++ proj₁ r , proj₂ r)
       -- leaving an inner: the flattener's lane, then its restamp
       inner-pass    : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
@@ -900,6 +929,39 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                           (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
                            (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
                             (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+
+    -- an outer's elements, each inner a sync outer hands the flattener
+    -- subscribed before the step returns: the explode and its merge
+    outerExplode-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+                         {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+                         {vs es fin oP vs₁ fin₁ sP₁ stP₁ rI}
+                     → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                       × PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                     → Carries {echoᵗ u} es vs
+                     → Sound (thru-outer (flatOp op) m ↠[ h ] p) sP stP
+                     → Sound (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                               (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                                (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                                 (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)))) sI stI
+                     → stepFrame⇓ now (thru-outer (flatOp op) m) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
+                     → foldPath⇓ now (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                               (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                                (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                                 (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)))) es fin sI stI rI
+                     → Arm S now oP sP₁ stP₁ p vs₁ fin₁
+                         (λ π NP NI → PathRel κ π NP NI (thru-outer (flatOp op) m ↠[ h ] p)
+                            (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                             (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                              (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                               (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q))))) rI
+    outerExplode-arm S {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} {fin = fin} (fl , r) b sp si dW@(step-thru-outer W)
+                     (fold-step step-map (fold-step step-map (fold-step dW′@(step-thru-outer W′) dR))) =
+      let si′ = drop-ot _ _ _ (drop-ot _ _ _ si)
+          X   = explode-walk S {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} (unthru sp) (unthru si′) fl r b W W′
+      in explode-end {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} {fin = fin} (proj₁ X) (unthru (step-kept _ dW sp)) (proj₂ X)
+           (drop-ot _ _ _ (step-kept _ dW′ si′)) dR
 
     -- AN INNER'S STEP, by the rule its react takes: open or alive, it
     -- passes the group on; dead, it finishes
@@ -944,7 +1006,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass S r@(spent~ _ _ _ _) b sp si (fold-step d dP) dI = resume (take-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(spentWhile~ _ _ _ _) b sp si (fold-step d dP) dI = resume (takeWhile-arm S r b sp si d dI) (adv d sp) dP
       path-pass S (outerElem~ fl r) b sp si (fold-step d dP) dI = resume (outerElem-arm S (fl , r) b sp si d dI) (adv d sp) dP
-      path-pass S r@(outerExplode~ _ _) b sp si (fold-step d dP) dI = resume (outerExplode-arm S r b sp si d dI) (adv d sp) dP
+      path-pass S (outerExplode~ fl r) b sp si (fold-step d dP) dI = resume (outerExplode-arm S (fl , r) b sp si d dI) (adv d sp) dP
       path-pass S r@(inner~ refl _ _ _) b sp si (fold-step d dP) dI = resume (inner-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(lane~ _ _ _ _) b sp si (fold-step d dP) dI = resume (lane-arm S r b sp si d dI) (adv d sp) dP
       path-pass S r@(deferInner~ _ _ _ _ _ _ _) b sp si (fold-step d dP) dI = resume (deferInner-arm S r b sp si d dI) (adv d sp) dP

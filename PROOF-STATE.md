@@ -306,8 +306,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   on carries the echo's values, still open.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
-- **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
-  exploded outer's step on both sides.
+- **`explode-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
+  exploded outer's elements walk into the flattener through the impl's merge,
+  and its end meets the plain outer's.
 - **`{inner,lane,deferInner}-dies`** (Simulation.Pass) — FALSITY,
   `NO EVIDENCE`: an inner no live chain runs through finishes on both sides,
   through the flattener's lane, an impl-only lane merge ahead of it or a
