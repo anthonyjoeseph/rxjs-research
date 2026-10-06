@@ -257,17 +257,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### Big picture tier roadmap
 
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
-  program, one arm per former, `walk-take` blocked on its relation. A minted source's
-  chain is `path-pass`, one arm per plain frame; a hot slot's is `fan-go` over
-  the share's readers, paired by the proven `slot-chains`, after `hot-start`
-  and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
-  alike: `finish-store`, `hot-finish` and a connected hot
-  end are proven. The outer's element, a shared
-  slot's subject, an open inner, deferred or not, and a switch's or exhaust's dead one are bodies over their walks' leaves, the impl's
-  valueless echo one frame at a time. Left: the arms as
-  bodies, riskiest first, each owing the
-  store's `swept` and the arrival's `lists` persisted; the monster drops to
-  whichever arm fails.
+  program, one arm per former; a minted source's chain is `path-pass`, one
+  arm per plain frame; a hot slot's is `fan-go` over the share's readers.
+  Every arm on both halves is a body over leaves but `walk-take` and
+  `walk-μ`. Left: `walk-take`'s body runs under its merge with the outer
+  still open, so a synchronous cut ends the plain path at the cut and the
+  impl's at the wrap; give `PathRel` an open count owing its end and the arm
+  drops to a zero leaf, the install, the body's walk and the wrap. Ruled out:
+  the window reordering rows or sources. The monster drops to whichever half
+  fails.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the

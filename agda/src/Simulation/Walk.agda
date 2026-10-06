@@ -240,6 +240,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- reads that `true` to hand the end up at the cut.  A body that
       -- cuts synchronously -- `take 1` of a two-value `of` -- ends the
       -- plain path at the cut and the impl's at the wrap.
+      --
+      -- THE WINDOW REORDERS NOTHING THE STORE READS, at the one program
+      -- instantiated: a one-lane merge over a `take 1` of a merge of
+      -- `of(1,2)` and a cold read, then a second cold read.  Both runs
+      -- mint the body's source before the drained sibling's, and neither
+      -- registers a row past the cut, so `rows` and `sources` pair in
+      -- order on both sides of the window.
       -- DEAD ROUTE: a body walking `b` under `take~` -- there is no
       --   `take~` to hand the walk until the wrap has run, and the wrap
       --   runs after the walk returns.
