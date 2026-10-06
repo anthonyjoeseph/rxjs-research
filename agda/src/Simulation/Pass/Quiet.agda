@@ -101,21 +101,21 @@ pair-ids [] _ _ ()
 pair-ids {κ = κ} (_∷_ {r = r} {r′ = r′} _ q) (a ∷ ap) (a′ ∷ ap′) (inj₁ (refl , refl)) =
     trans (≡ᵇ-refl (proj₁ r)) (sym (≡ᵇ-refl (proj₁ r′)))
   , spent-all κ _ _ _ _ _ q (mapᵃ (λ ne → ᵇ-no ne) a) (mapᵃ (λ ne → ᵇ-no ne) a′)
-pair-ids {κ = κ} (_∷_ _ q) (a ∷ ap) (a′ ∷ ap′) (inj₂ p) =
-    trans (ᵇ-no (λ e → lookupᵃ a (proj₁ (partner-mem κ _ _ _ _ _ q p)) (sym e)))
-          (sym (ᵇ-no (λ e → lookupᵃ a′ (proj₂ (partner-mem κ _ _ _ _ _ q p)) (sym e))))
-  , pair-ids q ap ap′ p
-pair-ids (mach _ q) ap (_ ∷ ap′) p = pair-ids q ap ap′ p
+pair-ids {κ = κ} (_∷_ _ q) (a ∷ ap) (a′ ∷ ap′) {x} {x′} (inj₂ p) =
+    trans (ᵇ-no (λ e → lookupᵃ a (proj₁ (partner-mem κ _ _ _ _ _ q {x} {x′} p)) (sym e)))
+          (sym (ᵇ-no (λ e → lookupᵃ a′ (proj₂ (partner-mem κ _ _ _ _ _ q {x} {x′} p)) (sym e))))
+  , pair-ids q ap ap′ {x} {x′} p
+pair-ids (mach _ q) ap (_ ∷ ap′) {x} {x′} p = pair-ids q ap ap′ {x} {x′} p
 
 -- a chain step marks its partnered pair of rows delivered, alike
 delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
               {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
           → (S : Store κ sP stP sI stI) → ∀ {x x′} → Partners κ _ _ _ _ _ (Store.rows S) x x′
           → Store κ sP (record stP { delivered = proj₁ x ∷ EvalSt.delivered stP }) sI (record stI { delivered = proj₁ x′ ∷ EvalSt.delivered stI })
-delivered {κ = κ} s pr = record
+delivered {κ = κ} s {x} {x′} pr = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
   ; sync = sync ; rows = rows ; latches = latches
-  ; dlv-alike = spent-zip κ _ _ _ _ _ rows _∨_ (pair-ids rows (proj₁ rids) (proj₂ rids) pr) dlv-alike ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
+  ; dlv-alike = spent-zip κ _ _ _ _ _ rows _∨_ (pair-ids rows (proj₁ rids) (proj₂ rids) {x} {x′} pr) dlv-alike ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
   ; scripts = scripts }
   where open Store s
