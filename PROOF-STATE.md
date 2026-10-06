@@ -360,10 +360,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   one per slot.
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
-- **`walk-*`** (Simulation.Walk) — FALSITY, `DEAD ROUTE, PROBED×2`: one
-  former's subscribe keeps what a pass keeps (`After`); holds at a hot and cold
-  read, not a shared one. No take or `μ` run; `walk-take`'s body is not
-  subscribed under `take~`.
+- **`walk-*`** (Simulation.Walk) — FALSITY, `DEAD ROUTE, PROBED`: one former's
+  subscribe keeps what a pass keeps (`After`); holds at a cold read. No take or
+  `μ` run; `walk-take`'s body is not subscribed under `take~`.
+- **`{hot,shared}-read`** (Simulation.Walk) — FALSITY, `PROBED`: a hot or
+  shared slot's plain subscribe against the impl's at its stamped slot, down
+  the restamp, keeps what a pass keeps; holds at a hot read at the root.
 - **`defer-install`** (Simulation.Walk) — FALSITY, `PROBED`: a hop's merge,
   source and row installed on both sides pair as `defer~` and keep the tails
   related; holds at a deferred hot read at the root.

@@ -35,7 +35,7 @@ open import Data.Maybe using (just; nothing)
 
 open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
+open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
   mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
@@ -44,13 +44,13 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
-open import Data.Fin     using (Fin)
+open import Data.Fin     using (Fin; _↑ʳ_)
 open import Data.Vec     using (lookup)
 open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
 open import SExp.Plain   using (plainExp; plainTm)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
-  FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ)
+  FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ)
 open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import Simulation.Schedules using (Sync)
@@ -68,6 +68,14 @@ open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; ScanLifts; CutLi
 postulate
   renExp-fuse : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ₁ Θ₂ Θ₃ t} (σ : Ren∈ Θ₁ Θ₂) (ρ : Ren∈ Θ₂ Θ₃) (x : Exp Γ Δᵍ Δ Θ₁ t)
               → renExp (λ y → y) (λ y → y) ρ (renExp (λ y → y) (λ y → y) σ x) ≡ renExp (λ y → y) (λ y → y) (λ y → ρ (σ y)) x
+
+-- a read through a transported slot is a read of the slot, down the
+-- path transported back
+read-input : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {Θ Θ′} (w : Ren∈ Θ Θ′) {j : Fin m} {B} (eq : lookup Δ j ≡ B)
+               {ρ lo} {κq : Path Δ lo B t} {now s st r}
+           → subscribeE⇓ {e = e} (Θ′ , renExp (λ x → x) (λ x → x) w (subst (Exp Δ [] [] Θ) eq (input j)) , ρ) κq now s st r
+           → subscribeE⇓ {e = e} (Θ′ , input j , ρ) (subst (λ u → Path Δ lo u t) (sym eq) κq) now s st r
+read-input w refl d = d
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -133,6 +141,25 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
       → Walks (Θ′ , renExp (λ x → x) (λ x → x) w (toInstEmit κ s) , ρ′) (Θ , plainExp s , ρ)
 
+    -- A READ OF A SLOT THE IMPL STAMPED: both subscribes at the slot, the
+    -- impl's down the restamp
+    StampedRead : ∀ {Θ} (i : Fin n) → Set
+    StampedRead {Θ} i =
+      ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+      → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
+      → ∀ {lo lo′} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+          {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
+      → (S : Store κ sP stP sI stI)
+      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+      → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
+      → subscribeE⇓ {e = ei} (Θ′ , input (n ↑ʳ i) , ρ′)
+          (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sym eq)
+            (map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
+                           (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q))
+          now sI stI rI
+      → Σ (After κ S rP rI) λ A
+          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+
     -- ONE LEAF PER FORMER WHOSE ELABORATION INSTALLS MORE THAN IT READS.
     -- Each names the run of impl frames `PathRel` pairs with its plain
     -- frame, and the sources and nodes it registers.
@@ -142,14 +169,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   from empty stores: a cold script, its block run straight to the
       --   root (`cold~`).  Not under a binder, not the values conjunct.
       walk-cold      : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Elab-Walks {Θ} (inputˢ i)
-      -- a hot slot's read: its share's connect and machine row
+      -- A HOT SLOT'S READ, AGAINST ITS STAMPED SLOT'S: the plain
+      -- subscribe at the slot, the impl's at the share wrapping it, under
+      -- the restamp handing its subscribe-kind emits this program's frame
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
       --   from empty stores: a hot read of two arrivals, its share's
       --   `read~` and `hot~` machine row.  Not under a binder, not the
       --   values conjunct.
-      walk-hot       : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Elab-Walks {Θ} (inputˢ i)
-      -- a shared slot's stamped read
-      walk-shared    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Elab-Walks {Θ} (inputˢ i)
+      hot-read       : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
+      -- a shared slot's read, against its stamped slot's
+      shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
       -- A BODY IS `path-pass` OVER THE IMPL'S MINTED SOURCE, AND TWO
       -- THINGS STAND BETWEEN IT AND HERE.  `walk` would join
       -- `path-pass`'s cycle through `inner-walk`, terminating on the
@@ -440,6 +469,20 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                       (Θ , plainExp (flattenˢ op b) , ρ)
     walk-flat op b wb false w r = walk-flat-elem op b wb w r
     walk-flat op b wb true  w r = walk-flat-explode op b wb w r
+
+    -- a hot slot's walk: the impl's read peeled to its stamped slot
+    walk-hot : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Elab-Walks {Θ} (inputˢ i)
+    walk-hot i e w r S pr dP dI with lookup κ i in ek | stampedSlot Γ κ i
+    walk-hot i e w r S pr dP (subs-map dJ) | hotᵏ | eq = hot-read i ek w r eq S pr dP (read-input _ eq dJ)
+    walk-hot i () w r S pr dP dI | coldᵏ | _
+    walk-hot i () w r S pr dP dI | sharedᵏ | _
+
+    -- a shared slot's walk, the same
+    walk-shared : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Elab-Walks {Θ} (inputˢ i)
+    walk-shared i e w r S pr dP dI with lookup κ i in ek | stampedSlot Γ κ i
+    walk-shared i e w r S pr dP (subs-map dJ) | sharedᵏ | eq = shared-read i ek w r eq S pr dP (read-input _ eq dJ)
+    walk-shared i () w r S pr dP dI | coldᵏ | _
+    walk-shared i () w r S pr dP dI | hotᵏ | _
 
     -- the one arm that reads `κ`, one leaf per kind
     walk-input : ∀ {Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Elab-Walks {Θ} (inputˢ i)

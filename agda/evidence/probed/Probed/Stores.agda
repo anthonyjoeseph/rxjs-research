@@ -1,7 +1,7 @@
 -- THE STORES THE ROOT SUBSCRIBES INSTALL, related
 -- by hand at concrete programs: the relation `Simulation.Stores` states,
 -- inhabited against the registries the two runs actually compute.
--- TARGET: walk-hot @fb6a38
+-- TARGET: hot-read @64dd24
 -- TARGET: walk-cold @013486
 -- TARGET: defer-install @d90562
 module Probed.Stores where
@@ -19,28 +19,40 @@ open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Data.List.Relation.Unary.AllPairs using ([]; _∷_; allPairs?)
 open import Data.List.Relation.Unary.All using ([]; _∷_; all?)
 open import Data.Bool using (true; false; _≟_)
-open import Data.Nat.Properties using (<-trans; n<1+n)
+open import Data.Nat.Properties using (<-trans; n<1+n; ≤-refl)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import SExp.Plain using (plainExp)
+open import SExp.Elaborate using (stampedSlot)
+open import CLI.Unit-Test.Prelude using (Γ₂)
+open import Rx.Exp using (Ctx; Closed; Env; Fn; Exp; mapᵉ)
+open import Rx.Evaluator using (Path; map-f; _↠[_]_)
+open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map)
 open import SExp.Simul-Slots using (plainSlots)
 open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
-open import Simulation.Walk using (walk-hot; walk-cold; defer-install; init-store; minted)
+open import Simulation.Walk using (hot-read; read-input; walk-cold; defer-install; init-store; minted)
 open import Simulation.After using (module Kept)
 open Kept using (module After)
 open import Simulation.Schedules using ([]; _∷_)
 open import Simulation.Stores using (slot~; dyn~; data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
 open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals; defer-in)
 
+-- a map's subscribe is its body's, down the map's frame
+peel : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {Θ lo s u} {ρ : Env Δ Θ} {f : Fn Δ [] [] Θ s u} {b : Exp Δ [] [] Θ s}
+         {κ : Path Δ lo u t} {now sc st r}
+     → subscribeE⇓ {e = e} (Θ , mapᵉ f b , ρ) κ now sc st r → subscribeE⇓ {e = e} (Θ , b , ρ) (map-f (Θ , f , ρ) ↠[ ≤-refl ] κ) now sc st r
+peel (subs-map d) = d
+
 -- each subscribe row is the walk's arm for the program's one former, at
 -- the empty stores and the two root derivations, as `root-walk` calls it
-_ : Confirms (After.store (proj₁ (walk-hot (κᵖ two-arrivals) zero refl (λ x → x) (λ ())
+_ : Confirms (After.store (proj₁ (hot-read (κᵖ two-arrivals) zero refl (λ x → x) (λ ()) (stampedSlot Γ₂ (κᵖ two-arrivals) zero)
                             (init-store (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals) _ (<-trans (proj₁ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))) (n<1+n _))) root~
                             (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals)))))
-                            (proj₂ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))))))
+                            (read-input (λ x → x) (stampedSlot Γ₂ (κᵖ two-arrivals) zero)
+                              (peel (proj₂ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))))))))
 _ = record
   { π       = []
   ; π-keys  = []
