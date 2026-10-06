@@ -259,16 +259,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **SPLIT THE CASCADE PER PATH CONSTRUCTOR.** The subscribe half walks the
   program, one arm per former; a minted source's chain is `path-pass`, one
   arm per plain frame; a hot slot's is `fan-go` over the share's readers.
-  Every arm on both halves is a body over leaves. Left:
-  instantiate the arm leaves at a deeper flattener's subscribe, the
-  monster's remaining region, with `make qc-store` aimed at nested
-  flatteners; a leaf that goes red names the arm that breaks. Ruled out:
-  an open merge's window reordering rows or sources. The monster drops to
-  whichever half fails. Ruled out too: an inner's or a deferred body's
-  liveness parting a pair, since the store relates each pair's delivery and
-  dying; a depth-6 sweep with every case through a flatten and a defer kept
-  every store. Left there: a lane's, whose rows the store does not tie to
-  one lane.
+  Every arm on both halves is a body over leaves. Left: a deeper
+  flattener's subscribe, the monster's remaining region, swept by
+  `make qc-store` aimed at nested flatteners; a red leaf names the arm.
+  Ruled out: an open merge's window reordering rows or sources; an
+  inner's or a deferred body's liveness parting a pair, since the store
+  relates each pair's delivery and dying, and a depth-6 sweep through a
+  flatten and a defer kept every store. Left there: a lane's, whose rows
+  the store does not tie to one lane.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
