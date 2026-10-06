@@ -283,6 +283,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   Ruled out: an impl cut cell spending anywhere but where the plain count
   does (`cut-group`).
 
+- **WALK INSIDE THE PASS.** `walk-of`, `walk-empty` and `walk-μ` are
+  `path-pass`, or `walk` again, past a derivation rather than the tree:
+  `walk` joins `path-pass`'s cycle through `inner-walk`, terminating on the
+  plain derivation, and `path-pass`'s `Sound` reaches `Walks` -- from the
+  store and `PathRel` if they hold it, else a refutation of the form without.
+
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
   the μ peel, the flattener's hop and a share's connect; the batcher's

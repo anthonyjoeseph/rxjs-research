@@ -150,7 +150,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       walk-hot       : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Elab-Walks {Θ} (inputˢ i)
       -- a shared slot's stamped read
       walk-shared    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Elab-Walks {Θ} (inputˢ i)
+      -- A BODY IS `path-pass` OVER THE IMPL'S MINTED SOURCE, AND TWO
+      -- THINGS STAND BETWEEN IT AND HERE.  `walk` would join
+      -- `path-pass`'s cycle through `inner-walk`, terminating on the
+      -- plain derivation, so its helpers would call it rather than take
+      -- it; and `path-pass` asks `Sound` of both paths, which `Walks`
+      -- does not carry and `PathRel` does not imply.
       walk-of        : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) → Elab-Walks (ofˢ ts)
+      -- `walk-of`'s route, at no values
       walk-empty     : ∀ {Θ u} → Elab-Walks {Θ} {u} emptyˢ
       -- NO RELATION HOLDS ALONG THE BODY'S PATH WHILE THE BODY IS
       -- SUBSCRIBED.  The impl subscribes the cut as the one inner of an
@@ -163,7 +170,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   `take~` to hand the walk until the wrap has run, and the wrap
       --   runs after the walk returns.
       walk-take      : ∀ {Θ u} (k : STm Γ [] [] Θ _) (b : SExp Γ [] [] Θ u) → Elab-Walks (takeˢ k b)
-      -- an unrolling: the body under the substitution, on both sides
+      -- an unrolling: the body under the substitution, on both sides.
+      -- A body is `walk` at the unrolled tree, which owes `plainExp` and
+      -- `toInstEmit` commuting with the unrolling, and termination on
+      -- the plain derivation rather than the tree -- `walk-of`'s cycle.
       walk-μ         : ∀ {Θ u} (b : SExp Γ (u ∷ []) [] Θ u) → Elab-Walks (μˢ b)
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
       --   from empty stores: a deferred hot read, its hop pending as a
