@@ -345,10 +345,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   one per slot.
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
-- **`walk-*`** (Simulation.Walk) — FALSITY, `DEAD ROUTE, PROBED×4`: one
+- **`walk-*`** (Simulation.Walk) — FALSITY, `DEAD ROUTE, PROBED×3`: one
   former's subscribe keeps what a pass keeps (`After`); holds at a hot, cold
-  and deferred read. No take or `μ` run; `walk-take`'s body is not subscribed
-  under `take~`.
+  and deferred read, not a shared one. No take or `μ` run; `walk-take`'s body
+  is not subscribed under `take~`.
 - **`flat-install{,-explode}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a
   flattener's nodes and the impl's restamping cell, and per-inner merge,
   installed on both sides pair in `π` and keep the tails related; a one-lane

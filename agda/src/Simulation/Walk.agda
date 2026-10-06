@@ -45,7 +45,8 @@ open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
 open import Data.Fin     using (Fin)
-open import SExp.Syntax  using (SExp; STm; SFn; Kinds; plainᵏ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
+open import Data.Vec     using (lookup)
+open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
 open import SExp.Plain   using (plainExp; plainTm)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
@@ -136,14 +137,19 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- Each names the run of impl frames `PathRel` pairs with its plain
     -- frame, and the sources and nodes it registers.
     postulate
-      -- the one arm that reads `κ`: a cold's block, a hot's share
-      -- connect and machine row, a shared slot's stamped read
+      -- a cold slot's read: its block
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
-      --   from empty stores: a hot read of two arrivals (its share's
-      --   `read~` and `hot~` machine row) and a cold script (its block
-      --   run straight to the root, `cold~`).  Not a shared slot's read,
-      --   not under a binder, not the values conjunct.
-      walk-input     : ∀ {Θ} (i : Fin n) → Elab-Walks {Θ} (inputˢ i)
+      --   from empty stores: a cold script, its block run straight to the
+      --   root (`cold~`).  Not under a binder, not the values conjunct.
+      walk-cold      : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Elab-Walks {Θ} (inputˢ i)
+      -- a hot slot's read: its share's connect and machine row
+      -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
+      --   from empty stores: a hot read of two arrivals, its share's
+      --   `read~` and `hot~` machine row.  Not under a binder, not the
+      --   values conjunct.
+      walk-hot       : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Elab-Walks {Θ} (inputˢ i)
+      -- a shared slot's stamped read
+      walk-shared    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Elab-Walks {Θ} (inputˢ i)
       walk-of        : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) → Elab-Walks (ofˢ ts)
       walk-empty     : ∀ {Θ u} → Elab-Walks {Θ} {u} emptyˢ
       -- NO RELATION HOLDS ALONG THE BODY'S PATH WHILE THE BODY IS
@@ -389,8 +395,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-flat op b wb false w r = walk-flat-elem op b wb w r
     walk-flat op b wb true  w r = walk-flat-explode op b wb w r
 
+    -- the one arm that reads `κ`, one leaf per kind
+    walk-input : ∀ {Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Elab-Walks {Θ} (inputˢ i)
+    walk-input i coldᵏ   e = walk-cold i e
+    walk-input i hotᵏ    e = walk-hot i e
+    walk-input i sharedᵏ e = walk-shared i e
+
     walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
-    walk (inputˢ i)       = walk-input i
+    walk (inputˢ i)       = walk-input i (lookup κ i) refl
     walk (ofˢ ts)         = walk-of ts
     walk emptyˢ           = walk-empty
     walk (takeˢ k b)      = walk-take k b
