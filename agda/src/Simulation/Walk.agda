@@ -663,6 +663,8 @@ init-store κ {t} e ins μ big = record
   ; distinct = init-distinct κ e ins
   ; sync    = init-sync κ e ins
   ; rows    = []
+  ; dlv-alike = tt
+  ; dying-alike = tt
   ; latches = λ _ → (λ _ → refl , refl) , (λ _ → refl , refl)
   ; bounded = mapᵃ (λ lt → <-trans lt (n<1+n _)) (init-below (plainExp e) (plainSlots ins))
             , mapᵃ (λ lt → <-trans lt big) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))

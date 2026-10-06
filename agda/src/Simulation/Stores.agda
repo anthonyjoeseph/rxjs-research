@@ -33,7 +33,7 @@ open import Data.List    using (List; []; _∷_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-map⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
-open import Data.List.Relation.Unary.All using (All)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -43,7 +43,7 @@ open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; subst₂; trans; cong; cong₂)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Rx.Evaluator.Reducible.Support using (Rule)
 open import Rx.Evaluator.Freshness using (nodeCt)
@@ -490,6 +490,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         partner-row (r ∷ q)    (inj₂ p)             = partner-row q p
         partner-row (mach _ q) p                    = partner-row q p
 
+        -- two rows the relation partners are in the registries
+        partner-mem : ∀ {rs rs′} (q : RegRel rs rs′) {x x′} → Partners q x x′ → x ∈ rs × x′ ∈ rs′
+        partner-mem (r ∷ q)    (inj₁ (refl , refl)) = here refl , here refl
+        partner-mem (r ∷ q)    (inj₂ p)             = there (proj₁ (partner-mem q p)) , there (proj₂ (partner-mem q p))
+        partner-mem (mach _ q) p                    = proj₁ (partner-mem q p) , there (proj₂ (partner-mem q p))
+
         -- the same, at every minted source's row the registries pair
         ArrRows : ∀ {rs rs′} → RegRel rs rs′ → Source → Source → Ty → Ty → Set
         ArrRows []                                                                  s s′ u u′ = ⊤
@@ -499,6 +505,40 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         ArrRows (defer~ {src = src} {src′ = src′} {u = x} _ _ _ _ _ _ ∷ q)          s s′ u u′ =
           ArrRel s s′ u u′ src src′ (echoᵗ x) (echoᵗ (emitᵗ x)) × ArrRows q s s′ u u′
         ArrRows (mach _ q)                                                          s s′ u u′ = ArrRows q s s′ u u′
+
+        -- every pair of rows the relation partners, spent alike
+        Spent : ∀ {rs rs′} → RegRel rs rs′ → (RegRow Γ t → Bool) → (RegRow Γ′ (emitᵗ t) → Bool) → Set
+        Spent []                          dP dI = ⊤
+        Spent (_∷_ {r = r} {r′ = r′} _ q) dP dI = dP r ≡ dI r′ × Spent q dP dI
+        Spent (mach _ q)                  dP dI = Spent q dP dI
+
+        -- nothing spent on either side
+        spent-off : ∀ {rs rs′} (q : RegRel rs rs′) {dP dI} → (∀ r → dP r ≡ false) → (∀ r′ → dI r′ ≡ false) → Spent q dP dI
+        spent-off []         oP oI = tt
+        spent-off (_∷_ {r = r} {r′ = r′} _ q) oP oI = trans (oP r) (sym (oI r′)) , spent-off q oP oI
+        spent-off (mach _ q) oP oI = spent-off q oP oI
+
+        -- two spendings combined row by row
+        spent-zip : ∀ {rs rs′} (q : RegRel rs rs′) (f : Bool → Bool → Bool) {dP dI eP eI}
+                  → Spent q dP dI → Spent q eP eI → Spent q (λ r → f (dP r) (eP r)) (λ r′ → f (dI r′) (eI r′))
+        spent-zip []         f _        _        = tt
+        spent-zip (_ ∷ q)    f (d , ds) (e , es) = cong₂ f d e , spent-zip q f ds es
+        spent-zip (mach _ q) f ds       es       = spent-zip q f ds es
+
+        -- nothing in either registry spent
+        spent-all : ∀ {rs rs′} (q : RegRel rs rs′) {dP dI} → All (λ r → dP r ≡ false) rs → All (λ r′ → dI r′ ≡ false) rs′ → Spent q dP dI
+        spent-all []                          _          _          = tt
+        spent-all (_∷_ {r = r} {r′ = r′} _ q) (oP ∷ oPs) (oI ∷ oIs) = trans oP (sym oI) , spent-all q oPs oIs
+        spent-all (mach _ q)                  oPs        (_ ∷ oIs)  = spent-all q oPs oIs
+
+        -- and through a rewrite of either registry
+        spent-subst : ∀ {rs rs′ ks ks′} (e : rs ≡ ks) (e′ : rs′ ≡ ks′) (q : RegRel rs rs′) {dP dI}
+                    → Spent q dP dI → Spent (subst₂ RegRel e e′ q) dP dI
+        spent-subst refl refl q d = d
+
+        spent-substʳ : ∀ {rs rs′ ks′} (e′ : rs′ ≡ ks′) (q : RegRel rs rs′) {dP dI}
+                     → Spent q dP dI → Spent (subst (RegRel rs) e′ q) dP dI
+        spent-substʳ refl q d = d
 
   -- the completion and connection latches, slot for stamped slot.  A hot
   -- slot's latch is its raw slot's, since the raw slot ends whether or not
@@ -549,6 +589,14 @@ Owned {n} κ K =
 -- The stores
 ------------------------------------------------------------------
 
+-- A ROW'S CHAIN DELIVERED THIS CASCADE, and its source dying: together
+-- the one conjunct of `aliveThroughᶠ` no node decides
+dlvᵇ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → RegRow Γ t → Bool
+dlvᵇ st r = any (_≡ᵇ proj₁ r) (EvalSt.delivered st)
+
+dyingᵇ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → RegRow Γ t → Bool
+dyingᵇ st r = memberSource (regSource (proj₁ (proj₂ r))) (EvalSt.dying st)
+
 -- over the raw schedules and states, since a subscribe walks through
 -- states no configuration names
 --
@@ -572,6 +620,12 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     sync    : Sync (Sched.live sP) (Sched.live sI)
     rows    : RegRel κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
                 (EvalSt.registry stP) (EvalSt.registry stI)
+    -- A PAIR OF ROWS IS DELIVERED ALIKE AND DYING ALIKE, so a chain
+    -- through a pair of nodes is alive on both sides or on neither: the
+    -- liveness a finish reads is the path's node, the cut ledger `uncut`
+    -- settles, and these
+    dlv-alike   : Spent κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) rows (dlvᵇ stP) (dlvᵇ stI)
+    dying-alike : Spent κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) rows (dyingᵇ stP) (dyingᵇ stI)
     latches : LatchRel {Γ = Γ} κ (EvalSt.completedSources stP) (EvalSt.connectedShares stP)
                                      (EvalSt.completedSources stI) (EvalSt.connectedShares stI)
     -- every live source was minted: below its run's counter

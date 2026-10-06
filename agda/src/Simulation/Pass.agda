@@ -311,7 +311,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       where
         sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
         sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-        A = slot-pass (delivered S) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI
+        A = slot-pass (delivered S pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI
 
         map-slot : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
                      {cs : List (RegId × AtFloor Γ u t)} {ds}

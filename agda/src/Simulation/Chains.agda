@@ -39,7 +39,7 @@ open import Simulation.Pass using (HotStart; hot-idle; hot-block)
 open import Simulation.Pass.Quiet using (dynRow; Paired; SlotPair; slotpair; cons-skip; cons-take; admit-slot; admit-skip; module PassQ)
 open PassQ using (head; slot-there; slot-mach)
 open import Simulation.Pop using (pp-popped)
-open import Simulation.Sweep using (t≢f; sameSource-lt; sameSource-no; same-refl; count-hit; count-pass; arr-rows; raw≢stamped; raw<ₙ)
+open import Simulation.Sweep using (t≢f; sameSource-lt; sameSource-no; same-refl; count-hit; count-pass; count-tail; arr-rows; raw≢stamped; raw<ₙ)
 open import Simulation.Schedules using (Popped; pop; sched-pop; HeadOf)
 open import Simulation.Stores using (srcCount; InputBlock; Src; data~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRel; ArrRows; Store; Arr; SameAt;
   hotEq; sharedEq; aboveᵇ; above-≤)
@@ -262,14 +262,6 @@ slot-chains κ S e ty = slot-rows κ e ty (Store.rows S) (proj₁ (Store.above S
 ------------------------------------------------------------------
 
 module _ {m} {Δ : Ctx m} {t} where
-
-  -- none at a source, none behind the head either
-  count-tail : ∀ {k} (r : RegRow Δ t) K → srcCount k (r ∷ K) ≡ 0 → srcCount k K ≡ 0
-  count-tail {k} (rid , s , c) K z = go _ refl
-    where
-    go : ∀ b → sameSource k (regSource s) ≡ b → srcCount k K ≡ 0
-    go true  e = ⊥-elim (1+n≢0 (trans (sym (count-hit k (rid , s , c) K e)) z))
-    go false e = trans (sym (count-pass k (rid , s , c) K e)) z
 
   -- no row at the arrival's source, no chain
   raw-none : ∀ (a : Arrival Δ) (K : List (RegRow Δ t)) → srcCount (arrSource a) K ≡ 0 → chainsGo a K ≡ []

@@ -4,7 +4,7 @@
 ------------------------------------------------------------------
 module Simulation.Pass.Inner where
 
-open import Data.Bool    using (true; false)
+open import Data.Bool    using (true; false; not; _∧_; _∨_)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Empty   using (⊥-elim)
@@ -12,29 +12,30 @@ open import Data.Unit    using (tt)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
-open import Data.List.Relation.Unary.All using (_∷_)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (nothing; just)
-open import Data.Nat     using (suc; _≤_)
+open import Data.Nat     using (suc; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
 open import Data.List.Properties using (map-id; ++-assoc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
 open import Rx.Exp       using (Ctx; Closed; Val; mergeᶠ; switchᶠ; exhaustᶠ; uniqᵗ; obs; applyClo; Tm; varᵗ; unit̂; pairᵗ;
   inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (EvalSt; NodeId; shareSpend; shareDying; Path; _↠[_]_; scan-f; map-f; thru-outer; from-inner;
   mergeAllᵒ; lookupNode; echoᵗ; thruEvents; thruWrap; switchᵒ; exhaustᵒ; RegId; AtFloor;
-  shareFinish; aliveThroughᶠ)
+  shareFinish; aliveThroughᶠ; Sched)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-step; stepFrame⇓; step-map; step-thru-outer; step-from-inner;
   react-false; react-alive; react-dead; innerFinish⇓; finish-switch-clear;
   finish-exhaust-clear; finish-nil; thruWalk⇓; thruConsume⇓; walk-nil; walk-echo; walk-cons)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ)
 open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; sharedEq; PathRel; inner~; lane~;
-  deferInner~; []; _∷_; Store)
+  deferInner~; []; _∷_; Store; Partners; RegRel; mach; Spent; dlvᵇ; dyingᵇ)
+open import Simulation.Cut using (module At)
 open import Simulation.After using (module Kept)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
@@ -169,11 +170,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                            (thru-outer mergeAllᵒ mX ↠[ h₃ ]
                             (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)))))
                       (oI ++ proj₁ r , proj₂ r)
-      -- AN INNER HAS A CHAIN RUNNING THROUGH IT ON THE PLAIN SIDE EXACTLY
-      -- WHEN ITS PAIR DOES ON THE IMPL'S
-      inner-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′}
-                  → (j , j′ ∷ []) ∈ Store.π S
-                  → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ any (aliveThroughᶠ j′ stI) (EvalSt.registry stI)
       -- A MERGE'S INNER ENDED ON BOTH SIDES: each finish folds the group
       -- down its tail, then drains the queue its node holds, and the
       -- related nodes hold related queues
@@ -262,6 +258,33 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                           (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
                            (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
                             (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))) (o₁ ++ proj₁ rI , proj₂ rI)
+
+    -- AN INNER HAS A CHAIN RUNNING THROUGH IT ON THE PLAIN SIDE EXACTLY
+    -- WHEN ITS PAIR DOES ON THE IMPL'S: a pair of rows names the pair of
+    -- nodes alike, neither is cancelled, and the two are delivered and
+    -- dying alike; the impl's own rows name no paired node
+    inner-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′}
+                → (j , j′ ∷ []) ∈ Store.π S
+                → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ any (aliveThroughᶠ j′ stI) (EvalSt.registry stI)
+    inner-alive {sP} {stP} {sI} {stI} S {j} {j′} ce = go rows (proj₁ uncut) (proj₂ uncut) dlv-alike dying-alike
+      where
+        open Store S
+        module C = At {Γ = Γ} κ π-keys π-vals ce (here refl)
+
+        off : ∀ {a} b c → a ≡ false → (a ∧ b) ∨ c ≡ c
+        off b c refl = refl
+
+        go : ∀ {rs rs′} (q : RegRel κ π {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) rs rs′)
+           → All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) rs
+           → All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) rs′
+           → Spent κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) q (dlvᵇ stP) (dlvᵇ stI)
+           → Spent κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) q (dyingᵇ stP) (dyingᵇ stI)
+           → any (aliveThroughᶠ j stP) rs ≡ any (aliveThroughᶠ j′ stI) rs′
+        go [] _ _ _ _ = refl
+        go (rr ∷ q) (u ∷ us) (u′ ∷ us′) (d , ds) (y , ys) =
+          cong₂ _∨_ (cong₂ _∧_ (C.row-cut rr) (cong₂ _∧_ (cong not (trans u (sym u′))) (cong₂ _∨_ (cong not y) (cong not d))))
+                    (go q us us′ ds ys)
+        go (mach m q) us (_ ∷ us′) ds ys = trans (go q us us′ ds ys) (sym (off _ _ (C.mach-cut m)))
 
     -- AN INNER LEFT OPEN: the impl's lets the group past as the plain one
     -- does, its restamp moves the cell alone, and the tails are related
@@ -658,8 +681,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     slot-keeps K (slotpair x) = slotpair (K x)
 
     -- the same pass, started from the store as it stood before the row was marked
-    rebase : ∀ {sP stP sI stI x y rP rI} {S : St sP stP sI stI}
-           → After (delivered S {x} {y}) rP rI → After S rP rI
+    rebase : ∀ {sP stP sI stI x x′ rP rI} {S : St sP stP sI stI} {pr : Partners κ _ _ _ _ _ (Store.rows S) x x′}
+           → After (delivered S pr) rP rI → After S rP rI
     rebase (after s k q v g) = after s k (λ ar → q (delivered-arr ar)) v g
 
     -- a fan-out's pairs stay paired once the store moves
@@ -679,6 +702,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     carries-cast refl {es} c = subst (λ xs → Carries xs _) (sym (map-id es)) c
 
     -- a share marked dying on both sides
-    dying-after : ∀ {sP stP sI stI} (S : St sP stP sI stI) (i : Fin n)
+    dying-after : ∀ {sP stP sI stI} (S : St sP stP sI stI) (i : Fin n) → lookup κ i ≡ sharedᵏ
                 → After S ([] , sP , shareDying i true stP) ([] , sI , shareDying (n ↑ʳ i) true stI)
-    dying-after S i = after (dying S) (λ x → x) dying-arr [] (λ x → x)
+    dying-after S i sh = after (dying S i sh) (λ x → x) dying-arr [] (λ x → x)

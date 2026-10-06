@@ -18,8 +18,9 @@ open import Data.List.Relation.Unary.All using (All; _∷_; [])
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _<_; _<ᵇ_; _≡ᵇ_)
-open import Data.Nat.Properties using (≡ᵇ⇒≡; <ᵇ⇒<; <⇒<ᵇ; <⇒≢; <-asym; <-trans; <-≤-trans; m≤m+n; +-monoʳ-<)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _<_; _<ᵇ_; _≡ᵇ_; _≟_)
+open import Data.Nat.Properties using (≡ᵇ⇒≡; <ᵇ⇒<; <⇒<ᵇ; <⇒≢; <-asym; <-trans; <-≤-trans; m≤m+n; +-monoʳ-<; 1+n≢0; +-cancelˡ-≡)
+open import Relation.Nullary using (yes; no)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (tt)
@@ -27,11 +28,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 
 open import Rx.Exp       using (Ctx)
 open import Rx.Prim      using (Source)
-open import Rx.Evaluator using (LiveSource; RegRow; regSource; sameSource; sweepLive)
+open import Rx.Evaluator using (LiveSource; RegRow; regSource; sameSource; memberSource; sweepLive)
+open import Decide       using (≡ᵇ-sym)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
-open import Simulation.Stores using (srcCount; guardOf; SrcNum; slot~; dyn~; SrcPair; ArrRel; RowRel; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRows)
+open import Simulation.Stores using (srcCount; guardOf; aboveᵇ; above-≤; SrcNum; slot~; dyn~; SrcPair; ArrRel; RowRel; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRows; Spent)
   renaming (here to sp-here; there to sp-there)
 
 -- a source number that sits under another is not it
@@ -123,6 +125,14 @@ module _ {m} {Δ : Ctx m} {t} where
   count-pass : ∀ k (r : RegRow Δ t) K → sameSource k (regSource (proj₁ (proj₂ r))) ≡ false → srcCount k (r ∷ K) ≡ srcCount k K
   count-pass k (rid , x , c) K e = cong (λ b → if b then suc (srcCount k K) else srcCount k K) e
 
+  -- none at a source, none behind the head either
+  count-tail : ∀ {k} (r : RegRow Δ t) K → srcCount k (r ∷ K) ≡ 0 → srcCount k K ≡ 0
+  count-tail {k} (rid , s , c) K z = go _ refl
+    where
+    go : ∀ b → sameSource k (regSource s) ≡ b → srcCount k K ≡ 0
+    go true  e = ⊥-elim (1+n≢0 (trans (sym (count-hit k (rid , s , c) K e)) z))
+    go false e = trans (sym (count-pass k (rid , s , c) K e)) z
+
 T-true : ∀ {b} → T b → b ≡ true
 T-true {true} _ = refl
 
@@ -180,6 +190,10 @@ arr-same ar with arr-dec ar
 ... | inj₁ (e , e′) = trans e (sym e′)
 ... | inj₂ (e , e′) = trans e (sym e′)
 
+-- a pair of one-source lists holds a pair of sources alike
+member-one : ∀ s s′ x x′ → sameSource s x ≡ sameSource s′ x′ → memberSource x (s ∷ []) ≡ memberSource x′ (s′ ∷ [])
+member-one s s′ x x′ e = cong (_∨ false) (trans (≡ᵇ-sym x s) (trans e (≡ᵇ-sym s′ x′)))
+
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   -- a source the head of a list does not number is apart from the one a pair puts after it
@@ -224,6 +238,70 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   any-rows na na′ (defer~ _ _ _ _ _ _ ∷ q) (ar , ars) = cong₂ _∨_ (arr-same ar) (any-rows na na′ q ars)
   any-rows {s′ = s′} na na′ (mach {rs′ = rs′} (hot~ {i = i} _ _ _) q) ars =
     trans (any-rows na na′ q ars) (sym (cong (_∨ any (onSrc s′) rs′) (mach-lt i na′)))
+
+  -- and a pair of rows is at it alike
+  dies-rows : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI rs rs′ s s′ u u′} → n < s → n + n < s′
+            → (q : RegRel κ π {t} NP NI LP LI rs rs′) → ArrRows κ _ _ _ _ _ q s s′ u u′
+            → Spent κ _ _ _ _ _ q (λ r → memberSource (regSource (proj₁ (proj₂ r))) (s ∷ []))
+                                  (λ r′ → memberSource (regSource (proj₁ (proj₂ r′))) (s′ ∷ []))
+  dies-rows na na′ [] _ = tt
+  dies-rows {s = s} {s′ = s′} na na′ (read~ {i = i} _ _ _ ∷ q) ars =
+    member-one s s′ (toℕ i) (toℕ (n ↑ʳ i)) (trans (sameSource-lt (<-trans (toℕ<n i) na)) (sym (sameSource-lt (<-trans (stamped< i) na′)))) , dies-rows na na′ q ars
+  dies-rows {s = s} {s′ = s′} na na′ (cold~ {src = src} {src′ = src′} _ _ _ _ ∷ q) (ar , ars) = member-one s s′ src src′ (arr-same ar) , dies-rows na na′ q ars
+  dies-rows {s = s} {s′ = s′} na na′ (defer~ {src = src} {src′ = src′} _ _ _ _ _ _ ∷ q) (ar , ars) = member-one s s′ src src′ (arr-same ar) , dies-rows na na′ q ars
+  dies-rows na na′ (mach _ q) ars = dies-rows na na′ q ars
+
+  -- a slot's number against another's, and their stamps alike
+  stamp-same : ∀ (j i : Fin n) → sameSource (toℕ j) (toℕ i) ≡ sameSource (toℕ (n ↑ʳ j)) (toℕ (n ↑ʳ i))
+  stamp-same j i with toℕ j ≟ toℕ i
+  ... | yes e = trans (same-yes e) (sym (same-yes (trans (toℕ-↑ʳ n j) (trans (cong (n +_) e) (sym (toℕ-↑ʳ n i))))))
+  ... | no ne = trans (sameSource-no ne)
+                      (sym (sameSource-no (λ x → ne (+-cancelˡ-≡ n (toℕ j) (toℕ i) (trans (sym (toℕ-↑ʳ n j)) (trans x (toℕ-↑ʳ n i)))))))
+
+  -- A PAIR OF ROWS IS AT A SLOT EXACTLY WHEN ITS PARTNER IS AT THE SLOT'S
+  -- STAMP: a reader is stamped, and a minted source is above every slot
+  stamp-rows : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI rs rs′} (i : Fin n)
+            → (q : RegRel κ π {t} NP NI LP LI rs rs′)
+            → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rs → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rs′
+            → Spent κ _ _ _ _ _ q (λ r → sameSource (regSource (proj₁ (proj₂ r))) (toℕ i))
+                                  (λ r′ → sameSource (regSource (proj₁ (proj₂ r′))) (toℕ (n ↑ʳ i)))
+  stamp-rows i [] _ _ = tt
+  stamp-rows i (read~ {i = j} _ _ _ ∷ q) (_ ∷ as) (_ ∷ as′) = stamp-same j i , stamp-rows i q as as′
+  stamp-rows i (cold~ _ _ _ _ ∷ q) (a ∷ as) (a′ ∷ as′) =
+    trans (sameSource-lt (<-≤-trans (toℕ<n i) (above-≤ a))) (sym (sameSource-lt (<-≤-trans (stamped< i) (above-≤ a′)))) , stamp-rows i q as as′
+  stamp-rows i (defer~ _ _ _ _ _ _ ∷ q) (a ∷ as) (a′ ∷ as′) =
+    trans (sameSource-lt (<-≤-trans (toℕ<n i) (above-≤ a))) (sym (sameSource-lt (<-≤-trans (stamped< i) (above-≤ a′)))) , stamp-rows i q as as′
+  stamp-rows i (mach _ q) as (_ ∷ as′) = stamp-rows i q as as′
+
+  -- and no partnered impl row is at a raw slot
+  raw-rows : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI rs rs′} (i : Fin n)
+           → (q : RegRel κ π {t} NP NI LP LI rs rs′) → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rs′
+           → Spent κ _ _ _ _ _ q (λ _ → false) (λ r′ → sameSource (regSource (proj₁ (proj₂ r′))) (toℕ (i ↑ˡ n)))
+  raw-rows i [] _ = tt
+  raw-rows i (read~ {i = j} _ _ _ ∷ q) (_ ∷ as′) = sym (sameSource-no (λ x → raw≢stamped i j (sym x))) , raw-rows i q as′
+  raw-rows i (cold~ _ _ _ _ ∷ q) (a′ ∷ as′) = sym (sameSource-lt (<-≤-trans (raw<ₙ i) (above-≤ a′))) , raw-rows i q as′
+  raw-rows i (defer~ _ _ _ _ _ _ ∷ q) (a′ ∷ as′) = sym (sameSource-lt (<-≤-trans (raw<ₙ i) (above-≤ a′))) , raw-rows i q as′
+  raw-rows i (mach _ q) (_ ∷ as′) = raw-rows i q as′
+
+  -- and, with no stamped row, no pair is at the slot nor its raw slot
+  close-rows : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI rs rs′} (i : Fin n)
+             → (q : RegRel κ π {t} NP NI LP LI rs rs′)
+             → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rs → All (λ r → aboveᵇ (proj₁ (proj₂ r)) ≡ true) rs′
+             → srcCount (toℕ (n ↑ʳ i)) rs′ ≡ 0
+             → Spent κ _ _ _ _ _ q (λ r → sameSource (regSource (proj₁ (proj₂ r))) (toℕ i))
+                                   (λ r′ → sameSource (regSource (proj₁ (proj₂ r′))) (toℕ (i ↑ˡ n)))
+  close-rows i [] _ _ _ = tt
+  close-rows i (_∷_ {r′ = r′} {rs′ = rs′} (read~ {i = j} _ _ _) q) (_ ∷ as) (_ ∷ as′) z with toℕ j ≟ toℕ i
+  ... | yes e = ⊥-elim (1+n≢0 (trans (sym (count-hit (toℕ (n ↑ʳ i)) r′ rs′
+                  (same-yes (trans (toℕ-↑ʳ n i) (trans (cong (n +_) (sym e)) (sym (toℕ-↑ʳ n j))))))) z))
+  ... | no ne = trans (sameSource-no ne) (sym (sameSource-no (λ x → raw≢stamped i j (sym x)))) , close-rows i q as as′ (count-tail r′ rs′ z)
+  close-rows i (_∷_ {r′ = r′} {rs′ = rs′} (cold~ _ _ _ _) q) (a ∷ as) (a′ ∷ as′) z =
+    trans (sameSource-lt (<-≤-trans (toℕ<n i) (above-≤ a))) (sym (sameSource-lt (<-≤-trans (raw<ₙ i) (above-≤ a′))))
+    , close-rows i q as as′ (count-tail r′ rs′ z)
+  close-rows i (_∷_ {r′ = r′} {rs′ = rs′} (defer~ _ _ _ _ _ _) q) (a ∷ as) (a′ ∷ as′) z =
+    trans (sameSource-lt (<-≤-trans (toℕ<n i) (above-≤ a))) (sym (sameSource-lt (<-≤-trans (raw<ₙ i) (above-≤ a′))))
+    , close-rows i q as as′ (count-tail r′ rs′ z)
+  close-rows i (mach {r′ = r′} {rs′ = rs′} _ q) as (_ ∷ as′) z = close-rows i q as as′ (count-tail r′ rs′ z)
 
   -- SO THE GUARDS OF TWO RELATED REGISTRIES AGREE: a slot's entry is kept on
   -- both sides, and a minted pair of entries is read off the rows alike
@@ -290,6 +368,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   part-sweep g sub (r ∷ q)  (inj₁ e) = inj₁ e
   part-sweep {K = K} {K′ = K′} g sub (r ∷ q) (inj₂ p) = inj₂ (part-sweep {K = K} {K′ = K′} g (λ m → sub (there m)) q p)
   part-sweep {K = K} {K′ = K′} g sub (mach (hot~ h ib eq) q) p = part-sweep {K = K} {K′ = K′} g sub q p
+
+  spent-sweep : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI rs rs′} {K : List (RegRow Γ t)} {K′ : List (RegRow (plainᵏ Γ κ) (emitᵗ t))}
+              → (g : Pointwise (λ l l′ → guardOf K l ≡ guardOf K′ l′) LP LI) (sub : rs ⊆ K)
+              → (q : RegRel κ π NP NI LP LI rs rs′) → ∀ {dP dI} → Spent κ π NP NI LP LI q dP dI
+              → Spent κ π NP NI _ _ (regrel-sweep {K = K} {K′ = K′} g sub q) dP dI
+  spent-sweep g sub [] s = s
+  spent-sweep {K = K} {K′ = K′} g sub (r ∷ q) (e , s) = e , spent-sweep {K = K} {K′ = K′} g (λ m → sub (there m)) q s
+  spent-sweep {K = K} {K′ = K′} g sub (mach (hot~ h ib eq) q) s = spent-sweep {K = K} {K′ = K′} g sub q s
 
   arr-sweep : ∀ {t π NP NI} {LP : List (LiveSource Γ)} {LI rs rs′} {K : List (RegRow Γ t)} {K′ : List (RegRow (plainᵏ Γ κ) (emitᵗ t))}
             → (g : Pointwise (λ l l′ → guardOf K l ≡ guardOf K′ l′) LP LI) (sub : rs ⊆ K)

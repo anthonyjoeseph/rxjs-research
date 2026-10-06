@@ -36,10 +36,10 @@ open import Rx.Evaluator using (NodeId; RegRow; LiveSource; Sched; EvalSt; switc
 open import Rx.Evaluator.Reducible.Support using (∨-Tˡ; ∨-Tʳ; sub-rule; cut-sub)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
-  lane~; deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; ArrRows; Store; Arr; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq)
+  lane~; deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; partner-mem; ArrRows; Spent; spent-subst; Store; Arr; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq)
 open import Simulation.Grow using (mem-any)
 open import Simulation.Sweep using (T-true; t≢f; count-hit; count-pass; same-eq; raw≢stamped; raw<ₙ; sweepL; sweep-eq; sweepL-pw; all-sweep;
-  unique-sweep; sync-sweep; regrel-sweep; rows-guards; part-sweep; arr-sweep)
+  unique-sweep; sync-sweep; regrel-sweep; rows-guards; part-sweep; arr-sweep; spent-sweep)
 open import Simulation.After using (module Kept; PairedR)
 open import Simulation.Write using (key-same; vals-same; ∈-vals)
 
@@ -361,12 +361,6 @@ module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
       RR : List (RegRow Γ t) → List (RegRow (plainᵏ Γ κ) (emitᵗ t)) → Set
       RR = RegRel κ π {t} NP NI LP LI
 
-      -- two rows the relation partners are in the registries
-      partner-mem : ∀ {rs rs′} (q : RR rs rs′) {x x′} → Partners κ π NP NI LP LI q x x′ → x ∈ rs × x′ ∈ rs′
-      partner-mem (r ∷ q)    (inj₁ (refl , refl)) = here refl , here refl
-      partner-mem (r ∷ q)    (inj₂ p)             = there (proj₁ (partner-mem q p)) , there (proj₂ (partner-mem q p))
-      partner-mem (mach _ q) p                    = proj₁ (partner-mem q p) , there (proj₂ (partner-mem q p))
-
       part-subst : ∀ {rs rs′ ks ks′} (e : rs ≡ ks) (e′ : rs′ ≡ ks′) (q : RR rs rs′) {x x′}
                  → Partners κ π NP NI LP LI q x x′ → Partners κ π NP NI LP LI (subst₂ RR e e′ q) x x′
       part-subst refl refl q p = p
@@ -396,27 +390,31 @@ module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
         → (∀ {x x′} → Partners κ π NP NI LP LI q x x′ → pathHasNode c (proj₂ (proj₂ (proj₂ x))) ≡ false
                     → Partners κ π NP NI LP LI q′ x x′)
         × (∀ {s s′ u u′} → ArrRows κ π NP NI LP LI q s s′ u u′ → ArrRows κ π NP NI LP LI q′ s s′ u u′)
+        × (∀ {dP dI} → Spent κ π NP NI LP LI q dP dI → Spent κ π NP NI LP LI q′ dP dI)
 
       cut-rows : ∀ {rs rs′} (q : RR rs rs′) → CutRows q
-      cut-rows [] = [] , (λ ()) , (λ _ → tt)
+      cut-rows [] = [] , (λ ()) , (λ _ → tt) , (λ d → d)
       cut-rows (_∷_ {r = r} {r′ = r′} {rs = rs} {rs′ = rs′} rr q) with cut-rows q | cut-step c r rs | cut-step c′ r′ rs′
-      ... | q′ , P , A | inj₁ (h , e , _) | inj₁ (_ , e′ , _) =
+      ... | q′ , P , A , D | inj₁ (h , e , _) | inj₁ (_ , e′ , _) =
             subst₂ RR (sym e) (sym e′) q′
           , (λ { (inj₁ (refl , refl)) hx → ⊥-elim (t≢f (trans (sym h) hx))
                ; (inj₂ p) hx → part-subst (sym e) (sym e′) q′ (P p hx) })
           , (λ a → arr-subst (sym e) (sym e′) q′ (A (arr-tail rr q a)))
-      ... | q′ , P , A | inj₂ (_ , e , _) | inj₂ (_ , e′ , _) =
+          , (λ d → spent-subst κ π NP NI LP LI (sym e) (sym e′) q′ (D (proj₂ d)))
+      ... | q′ , P , A , D | inj₂ (_ , e , _) | inj₂ (_ , e′ , _) =
             subst₂ RR (sym e) (sym e′) (rr ∷ q′)
           , (λ { (inj₁ eq) _ → part-subst (sym e) (sym e′) (rr ∷ q′) (inj₁ eq)
                ; (inj₂ p) hx → part-subst (sym e) (sym e′) (rr ∷ q′) (inj₂ (P p hx)) })
           , (λ a → arr-subst (sym e) (sym e′) (rr ∷ q′) (arr-cons rr q q′ a (A (arr-tail rr q a))))
+          , (λ d → spent-subst κ π NP NI LP LI (sym e) (sym e′) (rr ∷ q′) (proj₁ d , D (proj₂ d)))
       ... | _ | inj₁ (h , _) | inj₂ (h′ , _) = ⊥-elim (t≢f (trans (sym h) (trans (row-cut rr) h′)))
       ... | _ | inj₂ (h , _) | inj₁ (h′ , _) = ⊥-elim (t≢f (trans (sym h′) (trans (sym (row-cut rr)) h)))
       cut-rows (mach {rs = rs} {r′ = r′} {rs′ = rs′} m q) with cut-rows q | cut-step c′ r′ rs′
-      ... | q′ , P , A | inj₂ (_ , e′ , _) =
+      ... | q′ , P , A , D | inj₂ (_ , e′ , _) =
             subst₂ RR refl (sym e′) (mach m q′)
           , (λ p hx → part-subst refl (sym e′) (mach m q′) (P p hx))
           , (λ a → arr-subst refl (sym e′) (mach m q′) (A a))
+          , (λ d → spent-subst κ π NP NI LP LI refl (sym e′) (mach m q′) (D d))
       ... | _ | inj₁ (h , _) = ⊥-elim (t≢f (trans (sym h) (mach-cut m)))
 
       -- no row at a raw slot is through the impl's cut: a reader is at its
@@ -468,6 +466,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; distinct = unique-sweep _ LiveSource.source (proj₁ distinct) , unique-sweep _ LiveSource.source (proj₂ distinct)
       ; sync = sync-sweep sync G
       ; rows = regrel-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr)
+      ; dlv-alike = spent-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr) (proj₂ (proj₂ (proj₂ cr)) dlv-alike)
+      ; dying-alike = spent-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr) (proj₂ (proj₂ (proj₂ cr)) dying-alike)
       ; latches = latches
       ; bounded = all-sweep _ LiveSource.source (proj₁ bounded) , all-sweep _ LiveSource.source (proj₂ bounded)
       ; swept = sweepL-pw G G
@@ -488,7 +488,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       inj₁ (hit-++ (proj₂ (cutThrough c (EvalSt.registry stP))) a , hit-++ (proj₂ (cutThrough c′ (EvalSt.registry stI))) b)
     cut-keeps {x} {x′} (inj₂ (a , b , pr)) = go (pathHasNode c (proj₂ (proj₂ (proj₂ x)))) refl
       where
-        mx = C.partner-mem rows pr
+        mx = partner-mem κ _ _ _ _ _ rows pr
         rr = partner-row κ _ _ _ _ _ rows pr
         go : ∀ v → pathHasNode c (proj₂ (proj₂ (proj₂ x))) ≡ v
            → PairedR (Store.rows cut-go) (proj₂ (cutThrough c (EvalSt.registry stP)) ++ EvalSt.cancelled stP)
@@ -503,7 +503,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     cut-persists : Persists S cut-go
     cut-persists ar = record
       { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
-      ; rows = arr-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr) (proj₂ (proj₂ cr) (Arr.rows ar))
+      ; rows = arr-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr) (proj₁ (proj₂ (proj₂ cr)) (Arr.rows ar))
       ; lists = sweepL-pw (Arr.lists ar) G
       }
 

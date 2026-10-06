@@ -43,7 +43,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (FlatSᵗ)
 open import Simulation.Stores using (Unpaired; FlatNodes; merge~; switch~; exhaust~; Flattener; PathRel; root~; sink~; map~; scan~;
   takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~;
-  MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows)
+  MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows; Spent)
 
 -- a node read back after a write elsewhere
 apart : ∀ m k → (k ≡ m → ⊥) → (m ≡ᵇ k) ≡ false
@@ -230,6 +230,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
       partW (_ ∷ q)    (inj₁ e) = inj₁ e
       partW (_ ∷ q)    (inj₂ p) = inj₂ (partW q p)
       partW (mach _ q) p        = partW q p
+
+      -- and spend them alike
+      spentW : ∀ {rs rs′} (q : RegRel κ π NP NI LP LI rs rs′) {dP dI} → Spent κ π NP NI LP LI q dP dI
+             → Spent κ π NP′ NI′ LP LI (regW q) dP dI
+      spentW []         s       = s
+      spentW (_ ∷ q)    (e , s) = e , spentW q s
+      spentW (mach _ q) s       = spentW q s
 
       -- and the same minted sources
       arrW : ∀ {rs rs′} (q : RegRel κ π NP NI LP LI rs rs′) {s s′ w w′} → ArrRows κ π NP NI LP LI q s s′ w w′

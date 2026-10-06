@@ -26,7 +26,7 @@ open import Rx.Exp       using (Ctx)
 open import Rx.Evaluator using (NodeId; NodeState; Path; Frame; _↠[_]_; frameNodes; pathHasNode; lookupNode; RegRow)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
-  lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows)
+  lane~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows; Spent)
 
 -- a frame's first node is on it
 first : ∀ k (ks : List NodeId) → any (_≡ᵇ k) (k ∷ ks) ≡ true
@@ -137,6 +137,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         partners-frame w (x ∷ q)    (inj₁ e) = inj₁ e
         partners-frame w (x ∷ q)    (inj₂ p) = inj₂ (partners-frame (λ m → w (there m)) q p)
         partners-frame w (mach x q) p        = partners-frame (λ m → w (there m)) q p
+
+        spent-frame : ∀ {rs rs′} (w : ∀ {r′} → r′ ∈ rs′ → r′ ∈ rs₀) (q : RegRel {Γ = Γ} κ π {t} NP NI LP LI rs rs′) {dP dI}
+                    → Spent {Γ = Γ} κ π NP NI LP LI q dP dI → Spent {Γ = Γ} κ π NP NI′ LP LI (reg-frame w q) dP dI
+        spent-frame w []         s       = s
+        spent-frame w (x ∷ q)    (e , s) = e , spent-frame (λ m → w (there m)) q s
+        spent-frame w (mach x q) s       = spent-frame (λ m → w (there m)) q s
 
         arr-frame : ∀ {rs rs′} (w : ∀ {r′} → r′ ∈ rs′ → r′ ∈ rs₀) (q : RegRel {Γ = Γ} κ π {t} NP NI LP LI rs rs′) {s s′ u u′}
                   → ArrRows {Γ = Γ} κ π NP NI LP LI q s s′ u u′ → ArrRows {Γ = Γ} κ π NP NI′ LP LI (reg-frame w q) s s′ u u′

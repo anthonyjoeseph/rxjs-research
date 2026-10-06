@@ -23,7 +23,7 @@ open import Rx.Evaluator.Reducible.Support using (sub-rule)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; NodeId; NodeState; schedGo; schedHeadOf; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there)
-open import Simulation.Stores using (guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store)
+open import Simulation.Stores using (guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store; spent-off)
   renaming (here to sp-here; there to sp-there)
 
 -- the rest of two lists a relation holds for, given their first elements
@@ -134,6 +134,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                , subst Unique (sym (proj₂ (pp-sources pp))) (proj₂ (Store.distinct s))
     ; sync     = sy
     ; rows     = regrel-pop _ _ _ pp (Store.rows s)
+    ; dlv-alike   = spent-off κ _ _ _ _ _ (regrel-pop _ _ _ pp (Store.rows s)) (λ _ → refl) (λ _ → refl)
+    ; dying-alike = spent-off κ _ _ _ _ _ (regrel-pop _ _ _ pp (Store.rows s)) (λ _ → refl) (λ _ → refl)
     ; latches  = Store.latches s
     ; bounded  = subst (All (_< counter (Sched.mint sP) sourceᵏ)) (sym (proj₁ (pp-sources pp))) (proj₁ (Store.bounded s))
                , subst (All (_< counter (Sched.mint sI) sourceᵏ)) (sym (proj₂ (pp-sources pp))) (proj₂ (Store.bounded s))

@@ -27,7 +27,7 @@ open import Rx.Evaluator.Reducible.Support using (rowThrough; ∨-Tˡ; ∨-Tʳ)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Unpaired; CurRel; FlatNodes; merge~; switch~; exhaust~; Flattener; PathRel; root~;
   sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; block; RowRel; read~;
-  cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows)
+  cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows; Spent)
 
 -- a node below the counter is none of the pair it hands out
 fresh-unpaired : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {π j j′ k} → k < j′
@@ -128,6 +128,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π π′ : List (NodeId × List NodeId
       partG o (_ ∷ q)    (inj₁ e) = inj₁ e
       partG o (_ ∷ q)    (inj₂ p) = inj₂ (partG (λ r∈ → o (there r∈)) q p)
       partG o (mach _ q) p        = partG (λ r∈ → o (there r∈)) q p
+
+      -- and spend them alike
+      spentG : ∀ {rs rs′} (o : ∀ {r′} → r′ ∈ rs′ → OffRow {Γ = Γ} κ π π′ {emitᵗ t} r′) (q : RegRel κ π NP NI LP LI rs rs′) {dP dI}
+             → Spent κ π NP NI LP LI q dP dI → Spent κ π′ NP NI LP LI (regG o q) dP dI
+      spentG o []         s       = s
+      spentG o (_ ∷ q)    (e , s) = e , spentG (λ r∈ → o (there r∈)) q s
+      spentG o (mach _ q) s       = spentG (λ r∈ → o (there r∈)) q s
 
       -- and the same minted sources
       arrG : ∀ {rs rs′} (o : ∀ {r′} → r′ ∈ rs′ → OffRow {Γ = Γ} κ π π′ {emitᵗ t} r′) (q : RegRel κ π NP NI LP LI rs rs′) {s s′ w w′}

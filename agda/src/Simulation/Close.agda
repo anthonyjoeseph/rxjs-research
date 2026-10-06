@@ -19,8 +19,8 @@ open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Arrival; Sched; EvalSt; memberSource; sameSource; cascadeClose)
 open import Rx.Prim      using (Source)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Sweep using (sameSource-no)
-open import Simulation.Stores using (Store; Arr; Census)
+open import Simulation.Stores using (Store; Arr; Census; spent-off)
+open import Simulation.Sweep using (sameSource-no; dies-rows)
 
 -- a source number no slot has is not the slot's
 member-skip : ∀ {m k} (xs : List Source) → m < k → memberSource m (k ∷ xs) ≡ memberSource m xs
@@ -32,12 +32,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   -- no slot carries, and the latches compare slots only.
   close-store : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                   {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a a′}
-    → Store κ sP stP sI stI → n < Arrival.source a → n + n < Arrival.source a′
+    → (s : Store κ sP stP sI stI) → (na : n < Arrival.source a) → (na′ : n + n < Arrival.source a′) → ∀ {u u′} → Arr s (Arrival.source a) (Arrival.source a′) u u′
     → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
-  close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ = record
+  close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ ar = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
     ; scripts = scripts
+    ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)
+    ; dying-alike = dies-rows κ na na′ rows (Arr.rows ar)
     ; census = λ i hk → subst (Census _ _ (EvalSt.registry stI) _) (sym (mr i)) (census i hk)
     ; latches = λ i → let h , sh = latches i
                           lt  = <-trans (toℕ<n i) na
@@ -60,6 +62,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   -- and the arrival's pair against the rows with it, since the rows are the same
   close-arr : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                 {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)}
-                {S : Store κ sP stP sI stI} (na : n < Arrival.source a) (na′ : n + n < Arrival.source a′) {s s′ u u′}
-    → Arr S s s′ u u′ → Arr (close-store {sP = sP} {stP = stP} {sI = sI} {stI = stI} {a = a} {a′ = a′} S na na′) s s′ u u′
+                {S : Store κ sP stP sI stI} (na : n < Arrival.source a) (na′ : n + n < Arrival.source a′) {u u′}
+    → (ar : Arr S (Arrival.source a) (Arrival.source a′) u u′)
+    → Arr (close-store {sP = sP} {stP = stP} {sI = sI} {stI = stI} {a = a} {a′ = a′} S na na′ ar) (Arrival.source a) (Arrival.source a′) u u′
   close-arr na na′ ar = record { boundP = boundP ; boundI = boundI ; rows = rows ; lists = lists } where open Arr ar

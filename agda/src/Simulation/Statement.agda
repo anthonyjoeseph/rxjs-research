@@ -352,7 +352,7 @@ dyn-chain {t = t} κ e s {a = a} {a′} hd ta pr ps soP soI dP dI =
   After.store A , Pointwise-map (λ {c} {c′} → After.keeps A {dynRow a c} {dynRow a′ c′}) ps , Pointwise-map (v-agrees κ t) (After.values A)
   , (λ ar → After.persists A (delivered-arr ar))
   where
-    A = row-pass κ (delivered s) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
+    A = row-pass κ (delivered s pr) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
           (sub-ot (λ r∈ → r∈) ≤-refl soP) (sub-ot (λ r∈ → r∈) ≤-refl soI) (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
 
 pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
@@ -522,7 +522,7 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll�
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           end g)
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
-...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd) {a} {a′} {i}
+...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd z₂) {a} {a′} {i}
                            e₁ e₂ ll ll′ (close-hit a′ stI₁ e₂) z₁ z₂ , []
 
 -- THE END OF A LAST ARRIVAL: a minted source's is the close, the end walked
@@ -556,7 +556,7 @@ last-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁}
         S₁ = proj₁ W
         ar₁ = proj₂ (proj₂ W)
         ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁
-        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q
+        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁
         k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca)
                (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
                (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′

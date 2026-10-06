@@ -18,6 +18,7 @@ open import Data.Bool    using (Bool; true; false; not; _∧_; _∨_)
 open import Data.Bool.ListAction using (any)
 open import Data.Bool.Properties using (∧-zeroʳ; ∨-zeroʳ)
 open import Data.Empty   using (⊥; ⊥-elim)
+open import Data.Unit    using (tt)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_) renaming (_≟_ to _≟ᶠ_)
 open import Data.Fin.Properties using (toℕ-↑ˡ; toℕ-injective; ↑ʳ-injective)
 open import Data.List    using (List; []; _∷_)
@@ -26,6 +27,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using ([])
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup to lookupᵃ)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.Maybe   using (just; nothing)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat     using (suc; pred; _≤_; z≤n; s≤s; _≡ᵇ_)
@@ -49,16 +51,16 @@ open import Rx.Evaluator.Domain using (chainStep⇓; dispatchShare⇓; cascadeGo
   finish-all-drain; finish-nil; drain-spent; walk-nil; chain-step)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
-open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr)
-open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame)
+open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach)
+open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame; spent-frame)
 open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle; sink-at; disp-quiet)
 open import Simulation.Pass.Inner using (module PassI)
 open PassI.InI using (carriesU-nil)
 open import Simulation.Pass.Quiet using (usable-self)
 open import Simulation.After using (module Kept)
 open Kept using (after; Keeps; Persists)
-open import Simulation.Sweep using (t≢f; same-refl; count-hit; raw≢stamped)
-open import Simulation.Chains using (count-tail; raw-mistyped; raw-at; raw-one; raw-none;
+open import Simulation.Sweep using (t≢f; same-refl; count-hit; count-tail; raw≢stamped; stamp-rows; raw-rows)
+open import Simulation.Chains using (raw-mistyped; raw-at; raw-one; raw-none;
   plain-none; head-ety; slot-ty; plainᵗ-inj; casc-empty)
 open import Simulation.Finish using (close-hit; member-no)
 open import Simulation.Schedules using (HeadOf)
@@ -78,6 +80,14 @@ any-out f {y ∷ xs} (there m)   e = trans (cong (f y ∨_) (any-out f m e)) (�
 all-false : ∀ {A : Set} (f : A → Bool) {xs : List A} → All (λ x → f x ≡ false) xs → any f xs ≡ false
 all-false f []       = refl
 all-false f (e ∷ es) = cong₂ _∨_ e (all-false f es)
+
+-- registrations told apart by their ids are one row at one id
+one-id : ∀ {m} {Δ : Ctx m} {u} {K : List (RegRow Δ u)} {x y} → AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) K
+       → x ∈ K → y ∈ K → proj₁ x ≡ proj₁ y → x ≡ y
+one-id (a ∷ _) (here refl) (here refl) e = refl
+one-id (a ∷ _) (here refl) (there m)   e = ⊥-elim (lookupᵃ a m e)
+one-id (a ∷ _) (there m)   (here refl) e = ⊥-elim (lookupᵃ a m (sym e))
+one-id (_ ∷ p) (there m)   (there m′)  e = one-id p m m′ e
 
 -- a member at a source counts there
 count-mem : ∀ {m} {Δ : Ctx m} {t} {k} {r : RegRow Δ t} {K} → r ∈ K
@@ -229,6 +239,18 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                             × dispatchShare⇓ (arrTick a′) (n ↑ʳ i) h [] true sI (record st { nodes = NI′ }) r
   hot-block-end hot d ib alive (chain-step fp) = block-end hot d ib alive fp
 
+  -- THE END OF A HOT SLOT DIES ALIKE: a reader of the slot dies on the
+  -- plain side as its partner at the share does on the impl's, and no
+  -- partnered row is at the raw slot
+  end-dies : ∀ {sP stP sI stI} (S : Store κ {t} {ep} {ei} sP stP sI stI) (i : Fin n)
+           → {s s′ : Source} → s ≡ toℕ i → s′ ≡ toℕ (i ↑ˡ n)
+           → Spent κ _ _ _ _ _ (Store.rows S) (λ r → memberSource (regSource (proj₁ (proj₂ r))) (s ∷ []))
+                                              (λ r′ → memberSource (regSource (proj₁ (proj₂ r′))) (toℕ (n ↑ʳ i) ∷ s′ ∷ []))
+  end-dies S i refl refl =
+    spent-zip κ _ _ _ _ _ rows _∨_ (stamp-rows κ i rows (proj₁ above) (proj₂ above))
+      (spent-zip κ _ _ _ _ _ rows _∨_ (raw-rows κ i rows (proj₂ above)) (spent-off κ _ _ _ _ _ rows (λ _ → refl) (λ _ → refl)))
+    where open Store S
+
   -- the emits of no values carry none
   module _ {sP stP sI stI} (S : Store κ {t} {ep} {ei} sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
            (hot : lookup κ i ≡ hotᵏ) (e₁ : Arrival.source a ≡ toℕ i) (e₂ : Arrival.source a′ ≡ toℕ (i ↑ˡ n))
@@ -338,8 +360,24 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         ; sync = sync ; rows = reg-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows ; bounded = bounded ; swept = swept
         ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; latches = lat ; census = cen ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-        ; scripts = scripts }
+        ; scripts = scripts
+        ; dlv-alike = spent-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows (spent-end (λ m → m) rows)
+        ; dying-alike = spent-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows (end-dies S i e₁ e₂) }
         where
+          -- the end delivers the raw row alone, and no partnered row is it
+          impl-off : ∀ {r r′} → r′ ∈ K → RowRel {Γ = Γ} κ π {t} (EvalSt.nodes stP) NI (Sched.live sP) (Sched.live sI) r r′
+                   → dlvᵇ (shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true (record St₀ { nodes = NI′ }))) r′ ≡ false
+          impl-off {r′ = r′} m′ x with rid ≡ᵇ proj₁ r′ in eq
+          ... | false = refl
+          ... | true  = ⊥-elim (row-src x i (cong (λ r → proj₁ (proj₂ r)) (one-id (proj₂ rids) m′ mem (sym (≡ᵇ→≡ rid (proj₁ r′) eq)))))
+
+          spent-end : ∀ {rs rs′} (w : ∀ {r′} → r′ ∈ rs′ → r′ ∈ K) (q : RegRel κ π (EvalSt.nodes stP) NI (Sched.live sP) (Sched.live sI) rs rs′)
+                    → Spent κ π (EvalSt.nodes stP) NI (Sched.live sP) (Sched.live sI) q (dlvᵇ (cascadeClose a stP))
+                        (dlvᵇ (shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true (record St₀ { nodes = NI′ }))))
+          spent-end w []         = tt
+          spent-end w (x ∷ q)    = sym (impl-off (w (here refl)) x) , spent-end (λ m → w (there m)) q
+          spent-end w (mach _ q) = spent-end (λ m → w (there m)) q
+
           lat : LatchRel {Γ = Γ} κ (Arrival.source a ∷ CP) (EvalSt.connectedShares stP) CI′ SI
           lat j with j ≟ᶠ i
           ... | yes refl =

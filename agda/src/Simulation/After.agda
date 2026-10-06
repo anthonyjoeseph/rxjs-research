@@ -38,7 +38,7 @@ open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
 open import Simulation.Stores using (V; RegRel; Partners; Store; Arr)
-open import Simulation.Grow using (OffRow; fresh-off-row; regG; partG; arrG)
+open import Simulation.Grow using (OffRow; fresh-off-row; regG; partG; arrG; spentG)
 
 -- what a run sends to its root, read as values: the plain run's in
 -- order, the impl's decoded and each paired with its instant
@@ -143,6 +143,7 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
                   , (n<1+n (nodeCt sI) ∷ []) ∷ mapᵃ (mapᵃ m<n⇒m<1+n) (proj₂ pairs-below)
     ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
     ; rows = regG κ there (mint-off S) rows
+    ; dlv-alike = spentG κ there (mint-off S) rows dlv-alike ; dying-alike = spentG κ there (mint-off S) rows dying-alike
     ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
     ; census = census ; owned = owned
     ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) ruleP

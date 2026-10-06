@@ -118,7 +118,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
         where
           sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
           sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-          A = slot-pass (delivered S) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI
+          A = slot-pass (delivered S pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI
 
       -- A SHARE'S WALK ON BOTH SIDES, one emit at a time: a value every
       -- reader takes on both sides, an emit carrying none the impl's
@@ -162,7 +162,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       share-dispatch S {h = h} {h′ = h′} sh c (disp {fin = false} wP) (disp wI) = share-walk S {h = h} {h′ = h′} sh c wP wI
       share-dispatch S {i = i} {h = h} {h′ = h′} sh c (disp {fin = true} wP) (disp wI) = W ⨾∅ share-finish (After.store W) sh
         where
-          D = dying-after S i
+          D = dying-after S i sh
           W = D ⨾ share-walk (After.store D) {h = h} {h′ = h′} sh c wP wI
 
       -- a share's subject, fanning the group out to every reader

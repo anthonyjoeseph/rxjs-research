@@ -249,7 +249,7 @@ stray, an echo apart from inners or payload; a subscribe's
 run unrelated; a pop unrelating a read; a map moving instants; a close
 emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
 over a budget no test holds; a flatten write moving a row; a switch's or
-test's cut parting a pair.
+test's cut parting a pair; an inner live on one side alone.
 Left: a deeper flattener's subscribe; which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
@@ -264,7 +264,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   monster's remaining region, with `make qc-store` aimed at nested
   flatteners; a leaf that goes red names the arm that breaks. Ruled out:
   an open merge's window reordering rows or sources. The monster drops to
-  whichever half fails.
+  whichever half fails. Ruled out too: an inner's liveness parting a
+  pair, since the store relates each pair's delivery and dying; a depth-6
+  sweep with every case through a flatten and a defer kept every store.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -299,9 +301,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`restamp-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
   scan stepped on a group keeps the flattener, and the group it hands on
   carries the same values and end.
-- **`{inner,lane}-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner
-  a plain chain runs through is live exactly when its pair is, and the lane
-  merge in front of it.
+- **`lane-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner a
+  plain chain runs through is live exactly when the impl-only lane merge's
+  inner in front of its pair is.
 - **`lane-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an impl-only lane
   merge in front of an inner's arm stays idle, unpaired and off every tail the
   arm folds.
