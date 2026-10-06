@@ -46,11 +46,12 @@ open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
 open import Data.Fin     using (Fin; _↑ʳ_)
 open import Data.Vec     using (lookup)
-open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
+open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
 open import SExp.Plain   using (plainExp; plainTm)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
-  FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ)
+  FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ; inputᵖ)
+open import SExp.InstEmit using (machineEmitᵗ)
 open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import Simulation.Schedules using (Sync)
@@ -76,6 +77,13 @@ read-input : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {Θ Θ′} (w : Ren∈ �
            → subscribeE⇓ {e = e} (Θ′ , renExp (λ x → x) (λ x → x) w (subst (Exp Δ [] [] Θ) eq (input j)) , ρ) κq now s st r
            → subscribeE⇓ {e = e} (Θ′ , input j , ρ) (subst (λ u → Path Δ lo u t) (sym eq) κq) now s st r
 read-input w refl d = d
+
+-- the same, for a term whose type the transport reaches through
+read-machine : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {Θ Θ′} (w : Ren∈ Θ Θ′) {A B} (eq : A ≡ B) (X : Exp Δ [] [] Θ (machineEmitᵗ A))
+                 {ρ lo} {κq : Path Δ lo (machineEmitᵗ B) t} {now s st r}
+             → subscribeE⇓ {e = e} (Θ′ , renExp (λ x → x) (λ x → x) w (subst (λ u → Exp Δ [] [] Θ (machineEmitᵗ u)) eq X) , ρ) κq now s st r
+             → subscribeE⇓ {e = e} (Θ′ , renExp (λ x → x) (λ x → x) w X , ρ) (subst (λ u → Path Δ lo (machineEmitᵗ u) t) (sym eq) κq) now s st r
+read-machine w refl X d = d
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -164,11 +172,24 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- Each names the run of impl frames `PathRel` pairs with its plain
     -- frame, and the sources and nodes it registers.
     postulate
-      -- a cold slot's read: its block
+      -- A COLD SLOT'S READ, AGAINST ITS STAMPED SLOT'S BLOCK: the plain
+      -- subscribe at the slot, the impl's at the marked, batched and
+      -- stamped read of the script under its mint
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
       --   from empty stores: a cold script, its block run straight to the
       --   root (`cold~`).  Not under a binder, not the values conjunct.
-      walk-cold      : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Elab-Walks {Θ} (inputˢ i)
+      cold-read      : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
+                     → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+                     → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
+                     → ∀ {lo lo′} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+                         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
+                     → (S : Store κ sP stP sI stI)
+                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                     → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
+                     → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
+                         (subst (λ u → Path (plainᵏ Γ κ) lo′ (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
+                     → Σ (After κ S rP rI) λ A
+                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
       -- A HOT SLOT'S READ, AGAINST ITS STAMPED SLOT'S: the plain
       -- subscribe at the slot, the impl's at the share wrapping it, under
       -- the restamp handing its subscribe-kind emits this program's frame
@@ -469,6 +490,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                       (Θ , plainExp (flattenˢ op b) , ρ)
     walk-flat op b wb false w r = walk-flat-elem op b wb w r
     walk-flat op b wb true  w r = walk-flat-explode op b wb w r
+
+    -- a cold slot's walk: the impl's read past the transport
+    walk-cold : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Elab-Walks {Θ} (inputˢ i)
+    walk-cold i e w r S pr dP dI with lookup κ i in ek | stampedSlot Γ κ i
+    walk-cold i e w r S pr dP dI | coldᵏ | eq = cold-read i ek w r eq S pr dP (read-machine w eq _ dI)
+    walk-cold i () w r S pr dP dI | hotᵏ | _
+    walk-cold i () w r S pr dP dI | sharedᵏ | _
 
     -- a hot slot's walk: the impl's read peeled to its stamped slot
     walk-hot : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Elab-Walks {Θ} (inputˢ i)

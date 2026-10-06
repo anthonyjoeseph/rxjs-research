@@ -2,7 +2,7 @@
 -- by hand at concrete programs: the relation `Simulation.Stores` states,
 -- inhabited against the registries the two runs actually compute.
 -- TARGET: hot-read @64dd24
--- TARGET: walk-cold @013486
+-- TARGET: cold-read @2c9170
 -- TARGET: defer-install @d90562
 module Probed.Stores where
 
@@ -33,7 +33,7 @@ open import SExp.Simul-Slots using (plainSlots)
 open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
-open import Simulation.Walk using (hot-read; read-input; walk-cold; defer-install; init-store; minted)
+open import Simulation.Walk using (hot-read; read-input; cold-read; read-machine; defer-install; init-store; minted)
 open import Simulation.After using (module Kept)
 open Kept using (module After)
 open import Simulation.Schedules using ([]; _∷_)
@@ -80,10 +80,10 @@ _ = record
 cold-in : Point
 cold-in = record { d₀ = cold (3 ∷ []) ((after 1 , 4) ∷ []) ; prog = inputˢ zero ; d₁ = emptyˢ }
 
-_ : Confirms (After.store (proj₁ (walk-cold (κᵖ cold-in) zero refl (λ x → x) (λ ())
+_ : Confirms (After.store (proj₁ (cold-read (κᵖ cold-in) zero refl (λ x → x) (λ ()) (stampedSlot Γ₂ (κᵖ cold-in) zero)
                        (init-store (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in) _ (<-trans (proj₁ (proj₂ (minted (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in)))) (n<1+n _))) root~
                        (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog cold-in)) (plainSlots (insᵖ cold-in)))))
-                       (proj₂ (proj₂ (minted (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in)))))))
+                       (read-machine (λ x → x) (stampedSlot Γ₂ (κᵖ cold-in) zero) _ (proj₂ (proj₂ (minted (κᵖ cold-in) (Point.prog cold-in) (insᵖ cold-in))))))))
 _ = record
   { π       = []
   ; π-keys  = []
