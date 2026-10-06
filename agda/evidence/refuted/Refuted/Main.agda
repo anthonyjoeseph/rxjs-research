@@ -75,3 +75,9 @@ open import Refuted.Cut-Budget using (cut-budget-false)
 -- path related frame by frame may still pass one merge twice, and a
 -- lane subscribed through it registers a row that does too.
 open import Refuted.Of-Fold-Sound using (of-fold-needs-sound)
+
+-- A SLOT'S READ OWES THE RULE ON THE SAME TERMS.  A shared slot and a
+-- hot slot each register the path their read runs under, so a path
+-- through one merge twice breaks the rule on either side.
+open import Refuted.Shared-Read-Sound using (shared-read-needs-sound)
+open import Refuted.Hot-Read-Sound using (hot-read-needs-sound)

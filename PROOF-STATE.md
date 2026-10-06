@@ -246,25 +246,25 @@ subscribes set them (`subscribe-related`) and each cascade keeps
 (`cascade-related`), values agreeing. RULED
 OUT: an arrival plain lacks, a split one, an instant's gap or
 stray, an echo apart from inners or payload; a subscribe
-unrelated; a pop unrelating a read; a map moving instants; a close
+unrelated; a pop unrelating a read; a map moving time; a close
 emptying a named merge; a hot end past its block; a two-value emit; a cut
-over a budget no test holds; a flatten write moving a row; a cut or
+over a testless budget; a flatten write moving a row; a cut or
 liveness unpairing; a merged lane; a drain or body end (μ too)
-unrelating inners; unsound walks.
+unrelating inners; unsound walks, reads.
 Left: which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **REFUTE THE READS WITHOUT `Sound`.** A read registers its path as a
-  row, so a related path through one merge twice gives the store a row
-  `Rule.distinct-rows` refuses, as `Refuted.Of-Fold-Sound` did through a
-  fold. Refute `shared-read` at that path, then `cold-read` and
-  `hot-read`; red licenses each taking the `Sound` its walk already
-  holds. Ruled out: the walk's store standing on `PathRel` alone;
-  `μ-unfolds` at the probed binders, so a scan's or a test's binder is
-  what is left.
+- **AIM THE STORE SWEEP AT READS UNDER A BINDER.** Every read's probe
+  stands at the root from empty stores, and `cold-read`'s `Sound` has no
+  refutation because the checker cannot hold its block's subscribe built by
+  hand. Aim `make qc-store` at hot, shared and cold reads under a
+  flattener's binder and a defer, two sync values a cold; red is a
+  refutation to shrink, green lowers the reads' rows. Ruled out: the walk's
+  store standing on `PathRel` alone; a hot or shared read down an unsound
+  path; `μ-unfolds` at the probed binders.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -341,7 +341,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
   `PROBED×2, RECOVERY`: a slot's plain subscribe against the impl's at its
   stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the
-  two scripts at the slot are one by `Store.scripts`.
+  two scripts at the slot are one by `Store.scripts`, the hot and shared paths
+  sound.
 - **`defer-install`** (Simulation.Walk) — FALSITY, `PROBED`: a hop's merge,
   source and row installed on both sides pair as `defer~` and keep the tails
   related; holds at a deferred hot read at the root.

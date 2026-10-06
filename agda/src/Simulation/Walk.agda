@@ -193,7 +193,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       → Walks (Θ′ , renExp (λ x → x) (λ x → x) w (toInstEmit κ s) , ρ′) (Θ , plainExp s , ρ)
 
     -- A READ OF A SLOT THE IMPL STAMPED: both subscribes at the slot, the
-    -- impl's down the restamp
+    -- impl's down the restamp.  `Sound` of both paths for the reason
+    -- `of-fold` takes it: the read registers its path as a row.
+    -- REFUTED: `Refuted.Shared-Read-Sound` -- a path through one merge as
+    --   two lanes, the read joining a connected share.
+    -- REFUTED: `Refuted.Hot-Read-Sound` -- the same path, the read of a
+    --   live hot joining its connected share.
     StampedRead : ∀ {Θ} (i : Fin n) → Set
     StampedRead {Θ} i =
       ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
@@ -202,6 +207,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
       → (S : Store κ sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+      → Sound p sP stP → Sound q sI stI
       → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
       → subscribeE⇓ {e = ei} (Θ′ , input (n ↑ʳ i) , ρ′)
           (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sym eq)
@@ -222,6 +228,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- THE TWO SCRIPTS AT THE SLOT ARE ONE, read off `Store.scripts`: both
       -- schedules' tables are one author's, the impl's embedded.  The hot
       -- and shared reads stand on it too.
+      --
+      -- NO `Sound` YET, though the plain read registers its path as the
+      -- hot and shared reads do: nothing refutes the unconditional form.
+      -- The refutation's impl side is the block's subscribe written by
+      -- hand, and the checker runs out of memory on it even down the
+      -- root path, so that refutation is a coverage boundary.
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
       --   from empty stores: a cold script, its block run straight to the
       --   root (`cold~`).  Not under a binder, not the values conjunct.
@@ -574,14 +586,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- a hot slot's walk: the impl's read peeled to its stamped slot
     walk-hot : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Elab-Walks {Θ} (inputˢ i)
     walk-hot i e w r S pr _ _ dP dI with lookup κ i in ek | stampedSlot Γ κ i
-    walk-hot i e w r S pr _ _ dP (subs-map dJ) | hotᵏ | eq = hot-read i ek w r eq S pr dP (read-input _ eq dJ)
+    walk-hot i e w r S pr oP oI dP (subs-map dJ) | hotᵏ | eq = hot-read i ek w r eq S pr oP oI dP (read-input _ eq dJ)
     walk-hot i () w r S pr _ _ dP dI | coldᵏ | _
     walk-hot i () w r S pr _ _ dP dI | sharedᵏ | _
 
     -- a shared slot's walk, the same
     walk-shared : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Elab-Walks {Θ} (inputˢ i)
     walk-shared i e w r S pr _ _ dP dI with lookup κ i in ek | stampedSlot Γ κ i
-    walk-shared i e w r S pr _ _ dP (subs-map dJ) | sharedᵏ | eq = shared-read i ek w r eq S pr dP (read-input _ eq dJ)
+    walk-shared i e w r S pr oP oI dP (subs-map dJ) | sharedᵏ | eq = shared-read i ek w r eq S pr oP oI dP (read-input _ eq dJ)
     walk-shared i () w r S pr _ _ dP dI | coldᵏ | _
     walk-shared i () w r S pr _ _ dP dI | hotᵏ | _
 
