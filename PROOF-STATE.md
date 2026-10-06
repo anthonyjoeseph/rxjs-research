@@ -248,8 +248,8 @@ OUT: an arrival plain lacks, a split one, an instant's gap or
 stray, an echo apart from inners or payload; a subscribe's
 run unrelated; a pop unrelating a read; a map moving instants; a close
 emptying a merge its rows name; a hot end past its block; a two-value emit; a cut
-over a budget no test holds; a flatten write moving a row; a switch's or
-test's cut parting a pair; an inner live on one side alone.
+over a budget no test holds; a flatten write moving a row; a cut or an
+inner's liveness parting a pair.
 Left: a deeper flattener's subscribe; which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
