@@ -259,7 +259,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   merge and an exhaust decide alike off related nodes, a node neither can
   use is no step, and the write is proven (`Simulation.Write`: `π`'s
   uniqueness and the nodes' kinds keep every other row's fact). Left: the
-  inner's subscribe (`inner-pair`) and `consume-switch` through it. Narrows
+  inner's subscribe (`inner-pair`), and the switch's cut and named
+  subscribe (`switch-kill`, `switch-subscribe`), whose write names a node
+  before it is minted. Narrows
   the monster to whether the subscribe walk and the pass share one
   invariant.
 
@@ -306,8 +308,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`inner-pair`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an element's
   inner subscribed on both sides, its lane taken, keeps the flattener and the
   path related.
-- **`consume-switch`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a switch
-  handed an element's inner on both sides cuts, names and subscribes alike.
+- **`switch-kill`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a switch's
+  running inner cut on both sides keeps the walk.
+- **`switch-subscribe`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`: a switch
+  naming its next inner and subscribing it on both sides keeps the walk, the
+  pair joining `π` (`pairs-below` makes it fresh).
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
 - **`outerExplode-arm`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an

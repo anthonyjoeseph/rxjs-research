@@ -45,6 +45,7 @@ open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Rx.Evaluator.Reducible.Support using (Rule)
+open import Rx.Evaluator.Freshness using (nodeCt)
 
 open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Prim      using (InstEmit; Tick; Source)
@@ -561,6 +562,9 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     π       : List (NodeId × List NodeId)
     π-keys  : Unique (map proj₁ π)
     π-vals  : Unique (concatMap proj₂ π)
+    -- every node `π` pairs was minted: below its run's node counter, so
+    -- a node the counter hands out next pairs apart from all of them
+    pairs-below : All (λ e → proj₁ e < nodeCt sP) π × All (λ e → All (_< nodeCt sI) (proj₂ e)) π
     sources : Pointwise (Src κ) (Sched.live sP) (Sched.live sI)
     numbers : Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → SrcNum κ (LiveSource.source l) (LiveSource.source l′)) (Sched.live sP) (Sched.live sI)
     distinct : Unique (map LiveSource.source (Sched.live sP)) × Unique (map LiveSource.source (Sched.live sI))

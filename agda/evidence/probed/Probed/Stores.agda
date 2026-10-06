@@ -42,6 +42,7 @@ _ = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
+  ; pairs-below = [] , []
   ; sources = data~ refl (refl ∷ refl ∷ []) (λ { zero refl → refl ; (suc zero) () }) ∷ []
   ; numbers = slot~ zero refl ∷ []
   ; distinct = ([] ∷ []) , ([] ∷ [])
@@ -70,6 +71,7 @@ _ = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
+  ; pairs-below = [] , []
   ; sources = data~ refl (refl ∷ []) (λ { zero () ; (suc zero) () }) ∷ []
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ []
   ; distinct = ([] ∷ []) , ([] ∷ [])
@@ -96,6 +98,7 @@ _ = record
   { π       = (0 , 0 ∷ []) ∷ []
   ; π-keys  = [] ∷ []
   ; π-vals  = [] ∷ []
+  ; pairs-below = toWitness {a? = all? (λ _ → _ <? _) _} tt , toWitness {a? = all? (λ _ → all? (_<? _) _) _} tt
   ; sources = defer~ (toWitness {a? = _ <? _} tt) (hop (elab (inputˢ zero) (λ x → x) (λ ())) ∷ []) ∷ data~ refl (refl ∷ []) (λ { zero refl → refl ; (suc zero) () }) ∷ []
   ; numbers = dyn~ (toWitness {a? = _ <? _} tt) (toWitness {a? = _ <? _} tt) ∷ slot~ zero refl ∷ []
   ; distinct = (((λ ()) ∷ []) ∷ [] ∷ []) , (((λ ()) ∷ []) ∷ [] ∷ [])

@@ -35,7 +35,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     → Store κ sP stP sI stI → n < Arrival.source a → n + n < Arrival.source a′
     → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
   close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ = record
-    { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+    { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
     ; census = λ i hk → subst (Census _ _ (EvalSt.registry stI) _) (sym (mr i)) (census i hk)
     ; latches = λ i → let h , sh = latches i

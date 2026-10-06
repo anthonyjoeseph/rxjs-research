@@ -341,7 +341,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       -- and its share spent, and the block's nodes rewritten under the rows
       end-store : Store κ sP (cascadeClose a stP) sI (shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true (record St₀ { nodes = NI′ })))
       end-store = record
-        { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
         ; sync = sync ; rows = reg-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows ; bounded = bounded ; swept = swept
         ; uncut = uncut ; above = above ; latches = lat ; census = cen ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }

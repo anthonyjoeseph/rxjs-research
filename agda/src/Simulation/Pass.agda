@@ -37,9 +37,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; FnClo; applyClo; Tm; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying; memberSource; Path; Frame; share-sink;
-  _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap; setNode; exhaust-st; hasRoom; consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf)
+  _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap; setNode; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; chainsOf)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓; walk-nil; walk-echo; walk-cons;
-  thruConsume⇓; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; subscribeInner⇓; chainStep⇓; chain-step;
+  thruConsume⇓; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub; consume-switch-nil; subscribeInner⇓; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
@@ -53,8 +53,9 @@ open import Simulation.Stores using (srcCount; V; EmitRel; ObsRel; Lifts; Flatte
   outerElem~; outerExplode~; inner~; lane~; deferInner~; InputBlock; hotEq; RowRel; read~; cold~; defer~; RegRel; Partners; partner-row; Store; Arr)
 open import Simulation.Walk using (readᴾ; readᴵ)
 open import Simulation.Write using (module Write)
+open import Rx.Evaluator.Freshness using (nodeCt)
 open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
-open import Rx.Evaluator.Reducible.Support using (Sound; sub-rule; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; sub-ot; Agree; endOf; ∨-Tʳ)
+open import Rx.Evaluator.Reducible.Support using (Sound; sub-rule; switchKill-nodes; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; sub-ot; Agree; endOf; ∨-Tʳ)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 
 readᴾ-++ : ∀ {n} {Γ : Ctx n} {t} (xs ys : Stream Γ t) → readᴾ (xs ++ ys) ≡ readᴾ xs ++ readᴾ ys
@@ -110,7 +111,7 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
           → Store κ sP stP sI stI → ∀ {x y}
           → Store κ sP (record stP { delivered = x }) sI (record stI { delivered = y })
 delivered s = record
-  { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+  { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
   ; sync = sync ; rows = rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
   where open Store s
@@ -487,7 +488,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       open Store S
       S′ : St sP (record stP { nodes = setNode m y (EvalSt.nodes stP) }) sI (record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })
       S′ = record
-        { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
         ; sync = sync ; rows = W.regW rows ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
         ; census = census ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
@@ -518,16 +519,38 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → Σ (After S rP rI) λ A
                      → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
 
-      -- A SWITCH'S INNER HANDED IT ON BOTH SIDES: the cut, the current
-      -- inner named before it is subscribed, and the subscribe
-      consume-switch : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                         {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
-                     → Walked switchᶠ m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                     → ObsRel κ u o′ o
-                     → thruConsume⇓ switchᵒ m p now o sP stP rP
-                     → thruConsume⇓ switchᵒ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI rI
-                     → Σ (After S rP rI) λ A
-                         → Walked switchᶠ m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+      -- A SWITCH'S RUNNING INNER CUT ON BOTH SIDES: the rows through the
+      -- two inners `CurRel` pairs leave together, and the walk is kept
+      switch-kill : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₄ u m m′ ks cur cur′ od od′ sP₁ stP₁ sI₁ stI₁}
+                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+                  → Walked switchᶠ m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                  → lookupNode m (EvalSt.nodes stP) ≡ just (switch-st cur od)
+                  → lookupNode m′ (EvalSt.nodes stI) ≡ just (switch-st cur′ od′)
+                  → switchKill cur sP stP ≡ (sP₁ , stP₁) → switchKill cur′ sI stI ≡ (sI₁ , stI₁)
+                  → Σ (After S ([] , sP₁ , stP₁) ([] , sI₁ , stI₁)) λ A
+                      → Walked switchᶠ m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP₁) (EvalSt.nodes stI₁)
+
+      -- A SWITCH NAMING ITS NEXT INNER AND SUBSCRIBING IT ON BOTH SIDES:
+      -- each names the node its counter hands out next, the subscribe
+      -- mints it, and the pair joins `π`
+      --
+      -- DEAD ROUTE: through `flat-write` and then `inner-pair`, as the
+      --   merge and the exhaust go.  The write names the inner before the
+      --   subscribe mints it, and `switch~` needs the pair in `π` at the
+      --   write; `pairs-below` cannot hold of a pair the counters have not
+      --   passed yet.
+      switch-subscribe : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u m m′ ks Θ₁ ρ₁ Θ₂ ρ₂ cur cur′ od od′}
+                           {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
+                       → Walked switchᶠ m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                       → lookupNode m (EvalSt.nodes stP) ≡ just (switch-st cur od)
+                       → lookupNode m′ (EvalSt.nodes stI) ≡ just (switch-st cur′ od′)
+                       → ObsRel κ u o′ o
+                       → subscribeInner⇓ switchᵒ m p now o sP
+                           (record stP { nodes = setNode m (switch-st (just (nodeCt sP)) od) (EvalSt.nodes stP) }) (nodeCt sP , rP)
+                       → subscribeInner⇓ switchᵒ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI
+                           (record stI { nodes = setNode m′ (switch-st (just (nodeCt sI)) od′) (EvalSt.nodes stI) }) (nodeCt sI , rI)
+                       → Σ (After S rP rI) λ A
+                           → Walked switchᶠ m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
 
       -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
       -- outer has and no lane is open or queued, read off related nodes,
@@ -585,6 +608,30 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     idle-impl : ∀ {π u w x x′ d} → FlatNodes {Γ = Γ} κ π u exhaustᶠ x x′
               → just x′ ≡ just (exhaust-st false d) → consumeUsable exhaustᵒ w (just x) ≡ true
     idle-impl exhaust~ refl = refl
+
+    -- A SWITCH'S CONSUME ON BOTH SIDES: a switch can always be used, so
+    -- both cut the running inner and then name and subscribe the next
+    consume-switch : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                       {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
+                   → Walked switchᶠ m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                   → ObsRel κ u o′ o
+                   → thruConsume⇓ switchᵒ m p now o sP stP rP
+                   → thruConsume⇓ switchᵒ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI rI
+                   → Σ (After S rP rI) λ A
+                       → Walked switchᶠ m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+    consume-switch {sP} {stP} {sI} {stI} S {m = m} {m′} W ob (consume-switch-sub {cur = cur} eP kP refl dP) (consume-switch-sub {cur = cur′} eI kI refl dI) =
+      let K = switch-kill S W eP eI kP kI
+          B = switch-subscribe (After.store (proj₁ K)) (proj₂ K) (cut-kept m cur sP stP kP eP) (cut-kept m′ cur′ sI stI kI eI) ob dP dI
+      in proj₁ K ⨾ proj₁ B , proj₂ B
+      where
+      cut-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} k (c : Maybe NodeId) (s : Sched Γ) (st : EvalSt e) {s₁ st₁ x}
+               → switchKill c s st ≡ (s₁ , st₁) → lookupNode k (EvalSt.nodes st) ≡ x → lookupNode k (EvalSt.nodes st₁) ≡ x
+      cut-kept k c s st refl e = trans (cong (lookupNode k) (switchKill-nodes c s st)) e
+    consume-switch S W ob (consume-switch-nil _) (consume-switch-nil _) = after S (λ x → x) (λ x → x) [] (λ x → x) , W
+    consume-switch S {u = u} ((_ , _ , _ , _ , lI , switch~ _ , _) , _) ob (consume-switch-sub _ _ _ _) (consume-switch-nil n) =
+      ⊥-elim (unusable switchᵒ (emitᵗ u) lI n refl)
+    consume-switch S {u = u} ((_ , _ , _ , lP , _ , switch~ _ , _) , _) ob (consume-switch-nil n) _ =
+      ⊥-elim (unusable switchᵒ u lP n refl)
 
     -- AN OUTER'S INNER HANDED THE FLATTENER ON BOTH SIDES, its lane on
     -- the impl's: the policy reads related nodes and decides alike.  A

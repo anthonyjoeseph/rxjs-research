@@ -126,6 +126,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     { π        = Store.π s
     ; π-keys   = Store.π-keys s
     ; π-vals   = Store.π-vals s
+    ; pairs-below = Store.pairs-below s
     ; sources  = pp-pointwise (λ {l} {l′} r h h′ → src-pop l l′ r h h′) pp (Store.sources s)
     ; numbers  = pp-pointwise {R = λ l l′ → SrcNum κ (LiveSource.source l) (LiveSource.source l′)}
                    (λ {l} {l′} r h h′ → num-pop l l′ r h h′) pp (Store.numbers s)

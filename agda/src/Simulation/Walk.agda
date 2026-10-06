@@ -216,6 +216,7 @@ init-store κ {t} e ins μ big = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
+  ; pairs-below = [] , []
   ; sources = init-sources κ e ins
   ; numbers = init-numbers κ e ins
   ; distinct = init-distinct κ e ins

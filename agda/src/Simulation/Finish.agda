@@ -342,7 +342,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                       (record sI { live = sweepL (guardOf (dropSource s′ (EvalSt.registry stI))) (Sched.live sI) })
                       (record stI { registry = dropSource s′ (EvalSt.registry stI) })
   finish-go {t} {stP = stP} {stI = stI} {s} {s′} S na na′ ar = record
-    { π = π ; π-keys = π-keys ; π-vals = π-vals
+    { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below
     ; sources = sweepL-pw sources pw
     ; numbers = sweepL-pw numbers pw
     ; distinct = unique-sweep _ LiveSource.source (proj₁ distinct) , unique-sweep _ LiveSource.source (proj₂ distinct)
@@ -564,7 +564,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                                           (sweepL (guardOf (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI))) (Sched.live sI)) })
                    (record stI { registry = drop₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) (EvalSt.registry stI) })
   hot-go {t} {stP = stP} {stI = stI} S i dn = record
-    { π = π ; π-keys = π-keys ; π-vals = π-vals
+    { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below
     ; sources = sweepL-pw (sweepL-pw sources A) A′
     ; numbers = sweepL-pw (sweepL-pw numbers A) A′
     ; distinct = unique-sweep gP LiveSource.source (unique-sweep gP LiveSource.source (proj₁ distinct))
@@ -619,7 +619,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                → memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI) ≡ true)
             → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
   hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd = record
-    { π = π ; π-keys = π-keys ; π-vals = π-vals ; sources = sources ; numbers = numbers ; distinct = distinct
+    { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; above = above
     ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
     where
