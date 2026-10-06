@@ -261,9 +261,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   chain is `path-pass`, one arm per plain frame; a hot slot's is `fan-go` over
   the share's readers, paired by the proven `slot-chains`, after `hot-start`
   and `hot-end-start` find the impl's one raw chain by the store's census. Both ends drop
-  alike: `finish-store` and `hot-finish` are proven, and a connected hot
-  end is proven. The outer's element and a shared
-  slot's subject are real bodies over their walks' leaves, the impl's
+  alike: `finish-store`, `hot-finish` and a connected hot
+  end are proven. The outer's element, a shared
+  slot's subject and an open inner are real bodies over their walks' leaves, the impl's
   valueless echo one frame at a time. Left: the arms as
   real bodies, riskiest first, each owing the
   store's `swept` and the arrival's `lists` persisted, and `lane-pass` over
@@ -308,9 +308,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`quiet-{inner,lane,deferInner}`** (Simulation.Pass) — FALSITY,
   `NO EVIDENCE`: an inner's, a lane's or a deferred body's merge passes emits
   carrying nothing on as they came.
-- **`flat-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
-  scan stepped on an element's echo keeps the flattener, and the group it hands
-  on carries the echo's values, still open.
+- **`restamp-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
+  scan stepped on a group keeps the flattener, and the group it hands on
+  carries the same values, still open.
+- **`inner-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner a
+  plain chain runs through has an impl chain running through its pair.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
 - **`explode-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
@@ -320,9 +322,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `NO EVIDENCE`: an inner no live chain runs through finishes on both sides,
   through the flattener's lane, an impl-only lane merge ahead of it or a
   deferred body's hop.
-- **`{inner,lane,deferInner}-pass`** (Simulation.Pass) — FALSITY,
-  `NO EVIDENCE`: an inner still open or alive passes its group on as it came,
-  the impl's tail stepping alone.
+- **`{lane,deferInner}-pass`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
+  inner still open or alive passes its group on as it came, the impl's tail
+  stepping alone.
 - **`block-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a cold
   chain's input block runs alone into a merge whose walk folds the path the
   plain chain folds the popped head down, and the impl tail's end after it.

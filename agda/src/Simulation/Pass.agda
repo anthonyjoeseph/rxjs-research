@@ -44,7 +44,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arriva
   shareSpend; shareDying; memberSource; Path; share-sink; _↠[_]_; scan-f; take-f; map-f; batchSync-f;
   thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap;
   setNode; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ; RegId;
-  RegRow; AtFloor; atDyn; atSlot; chainsOf; shareAdmit; shareFinish)
+  RegRow; AtFloor; atDyn; atSlot; chainsOf; shareAdmit; shareFinish; aliveThroughᶠ)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; step-from-inner; react-false; react-alive; react-dead; thruWalk⇓; walk-nil; walk-echo; walk-cons;
   thruConsume⇓; inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub; consume-switch-nil; subscribeInner⇓; subscribeE⇓; chainStep⇓; chain-step;
   cascadeGo⇓; casc-nil; casc-cut; casc-live; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓; disp; shareWalk⇓; walk-end; walk-more; fold-sink)
@@ -342,10 +342,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     Walked {u = u} op m m′ ks p q π NP NI = Flattener {Γ = Γ} κ π {t = t} NP NI u op m m′ ks [] × PathRel {Γ = Γ} κ π NP NI p q
 
     -- a flattener stays one where its nodes do and the pairing grows
-    flat-move : ∀ {π π′ u op m m′ ks} (NP : List (NodeId × NodeState Γ)) (NI : List (NodeId × NodeState (plainᵏ Γ κ)))
+    flat-move : ∀ {π π′ u op m m′ ks xs} (NP : List (NodeId × NodeState Γ)) (NI : List (NodeId × NodeState (plainᵏ Γ κ)))
                   (NP′ : List (NodeId × NodeState Γ)) (NI′ : List (NodeId × NodeState (plainᵏ Γ κ)))
               → (∀ {x} → x ∈ π → x ∈ π′) → Unmoved m NP′ NP → Unmoved m′ NI′ NI → Unmoved ks NI′ NI
-              → Flattener {Γ = Γ} κ π {t = t} NP NI u op m m′ ks [] → Flattener {Γ = Γ} κ π′ {t = t} NP′ NI′ u op m m′ ks []
+              → Flattener {Γ = Γ} κ π {t = t} NP NI u op m m′ ks xs → Flattener {Γ = Γ} κ π′ {t = t} NP′ NI′ u op m m′ ks xs
     flat-move _ _ _ _ g (unmoved eP) (unmoved eI) (unmoved eK) (pm , x , x′ , lP , lI , fn , c , lk) =
       g pm , x , x′ , trans eP lP , trans eI lI , nodes-grow {Γ = Γ} κ g fn , c , trans eK lk
 
@@ -420,11 +420,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
           → PathRel κ π {t} NP NI (from-inner (flatOp op) m j ↠[ h ] p)
               (from-inner (flatOp op) m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)
-          → Σ (List NodeId) (λ xs → Flattener {Γ = Γ} κ π {t} NP NI u op m m′ ks xs) × PathRel κ π NP NI p q
-    leave (mergeᶠ _) (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) _ pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , pr
+          → Σ (List NodeId) (λ xs → Flattener {Γ = Γ} κ π {t} NP NI u op m m′ ks xs) × (j , j′ ∷ []) ∈ π × PathRel κ π NP NI p q
+    leave (mergeᶠ _) (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) ip pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , ip , pr
     leave (mergeᶠ _) (lane~ _ _ _ pr) = ⊥-elim (no-scan pr)
-    leave switchᶠ    (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) _ pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , pr
-    leave exhaustᶠ   (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) _ pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , pr
+    leave switchᶠ    (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) ip pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , ip , pr
+    leave exhaustᶠ   (inner~ e (pm , x , x′ , lP , lI , fn , c , lk) ip pr) = (_ , pm , x , x′ , lP , lI , reop e fn , c , lk) , ip , pr
 
     -- the one row `π` keys by the flattener's node
     only : ∀ {π NP NI u op m m′ ks xs} → Unique (map proj₁ π) → (m , m′ ∷ ks ∷ []) ∈ π
@@ -444,7 +444,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                → Σ (After S rP rI) λ A
                    → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
     inner-walk S {op = op} {rP = rP} {rI} (f@(pm , _) , pr) ip (elab s w r) dP dI =
-      proj₁ B , only {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} (Store.π-keys (After.store (proj₁ B))) (After.grows (proj₁ B) pm) (proj₂ (proj₁ L)) , proj₂ L
+      proj₁ B , only {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} (Store.π-keys (After.store (proj₁ B))) (After.grows (proj₁ B) pm) (proj₂ (proj₁ L)) , proj₂ (proj₂ L)
       where
       B = walk κ s w r S (inner~ refl f ip pr) dP dI
       L = leave {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} op (proj₂ B)
@@ -454,14 +454,18 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- keeps its payloads, and writes nothing but the cell, so the
       -- flattener and the tails stay related with the cell moved on; the
       -- group it hands on stays open
-      flat-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                    {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {xs ws o₁ fin₁ sI₁ stI₁}
-                    {ys : List (Val (plainᵏ Γ κ) (FlatSᵗ u))}
-                → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                → Carries xs ws
-                → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
-                    xs false sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
-                → Restamped S op m m′ ks p q ws (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) fin₁ o₁ sI₁ stI₁
+      restamp-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
+                       {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es ws o₁ fin₁ sI₁ stI₁}
+                       {ys : List (Val (plainᵏ Γ κ) (FlatSᵗ u))}
+                   → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks xs
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                   → Carries es ws
+                   → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
+                       es false sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
+                   → Σ (After S ([] , sP , stP) (o₁ , sI₁ , stI₁)) λ A
+                       → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI₁) u op m m′ ks xs
+                       × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes stI₁) p q
+                       × Carries (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) ws × fin₁ ≡ false
 
       -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
       -- outer has and no lane is open or queued, read off related nodes,
@@ -476,6 +480,17 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      (proj₁ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
                      (proj₂ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI)))) r
                  → Wrapped S op m m′ ks p q fin now r
+
+    -- the same, at a walk
+    flat-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                  {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {xs ws o₁ fin₁ sI₁ stI₁}
+                  {ys : List (Val (plainᵏ Γ κ) (FlatSᵗ u))}
+              → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+              → Carries xs ws
+              → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
+                  xs false sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
+              → Restamped S op m m′ ks p q ws (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) fin₁ o₁ sI₁ stI₁
+    flat-echo S (f , r) c d = let (A , f′ , r′ , c′ , e) = restamp-echo S f r c d in restamped A (f′ , r′) c′ e
 
 
     -- A SWITCH'S RUNNING INNER CUT ON BOTH SIDES: the rows through the
@@ -1012,14 +1027,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                            (thru-outer mergeAllᵒ mX ↠[ h₃ ]
                             (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)))))
                       (oI ++ proj₁ r , proj₂ r)
-      -- leaving an inner: the flattener's lane, then its restamp
-      inner-pass    : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
-                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
-                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
-                    → InnerPasses (flatOp op) m j h p
-                        (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
-                         (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
-                          (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
+      -- AN INNER A CHAIN RUNS THROUGH ON THE PLAIN SIDE HAS ONE RUNNING
+      -- THROUGH ITS PAIR ON THE IMPL'S
+      inner-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′}
+                  → (j , j′ ∷ []) ∈ Store.π S
+                  → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ true
+                  → any (aliveThroughᶠ j′ stI) (EvalSt.registry stI) ≡ true
       inner-dies    : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
@@ -1049,6 +1062,45 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                           (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
                            (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
                             (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+
+    -- AN INNER LEFT OPEN: the impl's lets the group past as the plain one
+    -- does, its restamp moves the cell alone, and the tails are related
+    inner-on : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                 {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {vs es rI}
+             → Σ (List NodeId) (λ xs → Flattener {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks xs)
+               × (j , j′ ∷ []) ∈ Store.π S × PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+             → Carries es vs
+             → Sound (from-inner (flatOp op) m j ↠[ h ] p) sP stP
+             → Sound (from-inner (flatOp op) m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q) sI stI
+             → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q) es false sI stI rI
+             → Arm S now [] sP stP p vs false
+                 (λ π NP NI → PathRel κ π NP NI (from-inner (flatOp op) m j ↠[ h ] p)
+                    (from-inner (flatOp op) m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q)) rI
+    inner-on {sP} {stP} S {m = m} {m′} {j = j} {j′} ((_ , f) , ip , pr) b sp si (fold-step d₁ (fold-step step-map dq))
+      with restamp-echo S f pr b d₁
+    ... | A , f′ , pr′ , c′ , refl =
+      arm A pr′ c′ (proj₂ (proj₁ cI)) dq λ {rP} dP B rel′ →
+        inner~ refl (flat-move (EvalSt.nodes stP) _ (EvalSt.nodes (proj₂ (proj₂ rP))) _ (After.grows B)
+                       (missed dP (head-on _ _ _ m (self-node m (j ∷ [])) sp , drop-ot _ _ _ sp))
+                       (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′)
+               (After.grows B (After.grows A ip)) rel′
+      where
+      cI = tail-of (step-clear d₁ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si))
+
+    -- leaving an inner: the flattener's lane, then its restamp
+    inner-pass : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                   {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+               → InnerPasses (flatOp op) m j h p
+                   (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
+                    (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
+                     (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
+    inner-pass {op = op} S R b sp si _ (fold-step (step-from-inner react-false) dR) = inner-on S (leave op R) b sp si dR
+    inner-pass {op = op} S R b sp si _ (fold-step (step-from-inner (react-alive _)) dR) = inner-on S (leave op R) b sp si dR
+    inner-pass S R b sp si (inj₁ ()) (fold-step (step-from-inner (react-dead _ _)) _)
+    inner-pass {op = op} S R b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
+      ⊥-elim (t≢f (trans (sym (inner-alive S (proj₁ (proj₂ (leave op R))) al)) dd))
 
     -- an outer's elements, each inner a sync outer hands the flattener
     -- subscribed before the step returns: the explode and its merge
