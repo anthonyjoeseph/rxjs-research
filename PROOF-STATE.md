@@ -318,9 +318,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   arm folds.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
-- **`explode-{walk,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
-  exploded outer's elements walk into the flattener through the impl's merge,
-  and its end meets the plain outer's.
+- **`explode-{quiet,one,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: one
+  exploded emit, carrying nothing or one value, walks into the flattener
+  through the impl's merge, and the outer's end meets the plain outer's.
 - **`merge-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's dead
   inner finishes on both sides, each folding the group down its tail and
   draining the related queues.
