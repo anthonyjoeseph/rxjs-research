@@ -1082,9 +1082,22 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → Arm S now [] sP stP p vs false (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) rI
                 → Arm S now [] sP stP p vs false
                     (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)) rI
-      lane-dies     : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
-                        {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                    → InnerDies a m j h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+      -- A DEAD INNER BEHIND A LANE MERGE FINISHES ON BOTH SIDES: the
+      -- plain flattener's finish, against the lane merge's and the inner
+      -- below it the group then reaches
+      lane-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ′ u a m j mL jL}
+                      {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+                      {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
+                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+                  → Carries es vs
+                  → Sound (from-inner a m j ↠[ h ] p) sP stP → Sound (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q) sI stI
+                  → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ false
+                  → innerFinish⇓ a m j p now vs sP stP (lookupNode m (EvalSt.nodes stP)) (oP , vs₁ , fin₁ , sP₁ , stP₁)
+                  → innerFinish⇓ mergeAllᵒ mL jL Q now es sI stI (lookupNode mL (EvalSt.nodes stI)) (o₁ , es₁ , f₁ , sI₁ , stI₁)
+                  → foldPath⇓ now Q es₁ f₁ sI₁ stI₁ rI
+                  → Arm S now oP sP₁ stP₁ p vs₁ fin₁
+                      (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q))
+                      (o₁ ++ proj₁ rI , proj₂ rI)
       -- A DEFERRED BODY'S INNER IS LIVE ON THE PLAIN SIDE EXACTLY WHEN
       -- THE HOP'S MARKER MERGE'S INNER IS ON THE IMPL'S
       defer-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {j j′ m2 j2}
@@ -1095,13 +1108,34 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       delivery-rel : ∀ {u Θx ρ₀} e′ {ws}
                    → EmitRel {Γ = Γ} κ u e′ ws
                    → EmitRel {Γ = Γ} κ u (applyClo (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) e′) ws
-      deferInner-dies : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
-                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
-                          {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
-                      → InnerDies mergeAllᵒ nid j h p
+      -- A DEAD DEFERRED BODY FINISHES ON BOTH SIDES: the plain merge's
+      -- finish, against the hop's marker merge's and the restamp and hop
+      -- node the group then reaches
+      defer-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                       {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                       {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner mergeAllᵒ nid j ↠[ h ] p)
+                       (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                        (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                         (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+                   → Carries es vs
+                   → Sound (from-inner mergeAllᵒ nid j ↠[ h ] p) sP stP
+                   → Sound (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                            (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                             (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q))) sI stI
+                   → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ false
+                   → innerFinish⇓ mergeAllᵒ nid j p now vs sP stP (lookupNode nid (EvalSt.nodes stP)) (oP , vs₁ , fin₁ , sP₁ , stP₁)
+                   → innerFinish⇓ mergeAllᵒ m2 j2
+                       (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                        (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)) now es sI stI (lookupNode m2 (EvalSt.nodes stI)) (o₁ , es₁ , f₁ , sI₁ , stI₁)
+                   → foldPath⇓ now (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                       (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)) es₁ f₁ sI₁ stI₁ rI
+                   → Arm S now oP sP₁ stP₁ p vs₁ fin₁
+                       (λ π NP NI → PathRel κ π NP NI (from-inner mergeAllᵒ nid j ↠[ h ] p)
                           (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
                            (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
-                            (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+                            (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))) (o₁ ++ proj₁ rI , proj₂ rI)
 
     -- AN INNER LEFT OPEN: the impl's lets the group past as the plain one
     -- does, its restamp moves the cell alone, and the tails are related
@@ -1236,6 +1270,28 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ⊥-elim (t≢f (trans (sym al′) (trans (sym (inner-alive S (proj₁ (proj₂ (leave op R))))) dd)))
     inner-dies {op = op} S R b sp si dd F (fold-step d′@(step-from-inner (react-dead _ F′)) dR) =
       finish-by S (leave op R) b sp si (step-kept _ (step-from-inner (react-dead dd F)) sp) (step-kept _ d′ si) F F′ dR
+
+    -- AN INNER NO LIVE CHAIN RUNS THROUGH, BEHIND A LANE MERGE: the lane's
+    -- inner is dead too, and both sides finish it
+    lane-dies : ∀ {lo lo′ ℓ ℓ′ u a m j mL jL} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
+                  {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+              → InnerDies a m j h p (from-inner mergeAllᵒ mL jL ↠[ h′ ] Q)
+    lane-dies S R b sp si dd F (fold-step (step-from-inner (react-alive al′)) _) =
+      ⊥-elim (t≢f (trans (sym al′) (trans (sym (lane-alive S R)) dd)))
+    lane-dies S R b sp si dd F (fold-step (step-from-inner (react-dead _ F′)) dR) = lane-finish S R b sp si dd F F′ dR
+
+    -- A DEFERRED BODY NO LIVE CHAIN RUNS THROUGH: the hop's marker
+    -- merge's inner is dead too, and both sides finish it
+    deferInner-dies : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                    → InnerDies mergeAllᵒ nid j h p
+                        (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                         (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                          (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q)))
+    deferInner-dies S R@(deferInner~ _ ip₂ _ _ _ _ _) b sp si dd F (fold-step (step-from-inner (react-alive al′)) _) =
+      ⊥-elim (t≢f (trans (sym al′) (trans (sym (defer-alive S ip₂)) dd)))
+    deferInner-dies S R b sp si dd F (fold-step (step-from-inner (react-dead _ F′)) dR) = defer-finish S R b sp si dd F F′ dR
 
     delivery-carries : ∀ {u Θx ρ₀} {es vs}
                      → Carries {s = u} es vs

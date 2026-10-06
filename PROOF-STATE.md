@@ -324,9 +324,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`merge-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's dead
   inner finishes on both sides, each folding the group down its tail and
   draining the related queues.
-- **`{lane,deferInner}-dies`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
-  inner no live chain runs through finishes on both sides, through an impl-only
-  lane merge ahead of it or a deferred body's hop.
+- **`{lane,defer}-finish`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead
+  inner finishes on both sides, through an impl-only lane merge's finish ahead
+  of it or a deferred body's marker merge's.
 - **`defer-alive`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
   body's inner is live on the plain side exactly when the hop's marker merge's
   inner is on the impl's.
