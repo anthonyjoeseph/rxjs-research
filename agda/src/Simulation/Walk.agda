@@ -20,39 +20,42 @@ open import Data.List.Relation.Unary.AllPairs using ([])
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.All.Properties using (map⁺; concat⁺; tabulate⁺)
-open import Data.Bool    using (T; true; _∨_)
+open import Data.Bool    using (T; true; false; _∨_)
+open import Data.Unit    using (tt)
 open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (there)
-open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; <⇒<ᵇ)
+open import Data.Nat.Properties using (<-trans; n<1+n; ≤-reflexive; <⇒<ᵇ; 1+n≢n)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ; _∷_ to _∷ᵖ_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Data.Sum using (inj₂)
+open import Data.Maybe using (just)
 
 open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp)
-open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; _×ᵗ_; evalWith; mintᵉ; mapᵉ; scanᵉ; Fn; FnClo; Tm)
+open import Rx.Exp       using (Ctx; Val; Closed; Exp; obs; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; mintᵉ; mapᵉ; scanᵉ; takeWhileᵉ; Fn; FnClo; Tm)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; counter; freshId)
-open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
-  mkHot; installNode; setNode; cell-st)
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
+  mkHot; installNode; setNode; cell-st; take-st; lookupNode)
 open import Rx.Slots     using (Slots; scripted; shared)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-scan)
-open import Rx.Evaluator.Freshness using (lookup-set)
+open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map; subs-mint; subs-scan; subs-takeWhile)
+open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule)
 open import Data.Fin     using (Fin)
 open import SExp.Syntax  using (SExp; STm; SFn; Kinds; plainᵏ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
 open import SExp.Plain   using (plainExp; plainTm)
-open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ)
+open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ)
 open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import Simulation.Schedules using (Sync)
 open import Simulation.After using (readᴾ; readᴵ; module Kept)
+open import Simulation.Write using (apart)
 open Kept using (After; module After; _⨾_)
-open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; ScanLifts; PathRel; root~; map~; scan~; Store; Src; SrcNum; [])
+open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~; spentWhile~; Store; Src; SrcNum; [])
 
 
 -- TWIN: `ib-renᵉ` -- the same walk over `renExp`'s clauses, a binder's
@@ -92,6 +95,20 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                → ScanLifts κ s u (uniqᵗ ∷ Θ′ , F , src ∷ᵉ ρ′) (Θ , plainTm f , ρ)
                  × V κ u (proj₁ (evalWith i (src ∷ᵉ ρ′))) (evalWith (plainTm z) ρ)
 
+    -- WHERE IT CAN STILL FAIL: THE AUTHOR'S TEST READ AT SLOTS THE MINT'S
+    -- BINDER MOVED, or a cut the scan's step decides apart from the plain
+    -- test's.  The elaborated takeWhile, read off by its shape: its
+    -- cutter's step against the plain test at a budget of one.
+    lifts-while : ∀ {Θ s} (f : SFn Γ [] [] Θ s boolᵗ) (b : SExp Γ [] [] Θ s)
+                    {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} (src : ℕ)
+                    {g : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s) (emitᵗ s)}
+                    {c : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s) boolᵗ}
+                    {F : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
+                    {i : Tm (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s)} {e″ : Exp (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (emitᵗ s)}
+                → EnvRel κ Θ w ρ′ ρ
+                → renExp (λ x → x) (λ x → x) w (toInstEmit κ (takeWhileˢ f b)) ≡ mintᵉ (mapᵉ g (takeWhileᵉ c (scanᵉ F i e″)))
+                → CutLifts κ unitᵗ s (λ _ n → n ≡ 1) (uniqᵗ ∷ Θ′ , F , src ∷ᵉ ρ′) (just (Θ , plainTm f , ρ))
+
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     -- WHAT ONE SUBSCRIBE KEEPS: what a pass keeps, from related stores
@@ -127,7 +144,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       walk-of        : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) → Elab-Walks (ofˢ ts)
       walk-empty     : ∀ {Θ u} → Elab-Walks {Θ} {u} emptyˢ
       walk-take      : ∀ {Θ u} (k : STm Γ [] [] Θ _) (b : SExp Γ [] [] Θ u) → Elab-Walks (takeˢ k b)
-      walk-takeWhile : ∀ {Θ u} (f : SFn Γ [] [] Θ u _) (b : SExp Γ [] [] Θ u) → Elab-Walks (takeWhileˢ f b)
       -- the riskiest arm: the outer's frames, and every inner a sync
       -- outer hands the flattener subscribed before the arm returns.
       -- Read off normal forms, not instantiated: a one-lane merge of the
@@ -161,6 +177,35 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                        × PathRel κ (Store.π (After.store A)) (setNode k (cell-st {t = u} a) (EvalSt.nodes stP))
                            (setNode k′ (cell-st {t = ScanAᵗ u} aI) (EvalSt.nodes stI)) p q
 
+      -- A TEST INSTALLED ON BOTH SIDES, the impl's test and cell under
+      -- its mint: the triple joins `π` and the tails stay related
+      while-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                        {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
+                        {k k₁ k₂ src} (c : Val (plainᵏ Γ κ) (CutS unitᵗ u))
+                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                    → freshId nodeᵏ (Sched.mint sP) ≡ k
+                    → freshId sourceᵏ (Sched.mint sI) ≡ src
+                    → freshId nodeᵏ (setAt sourceᵏ (suc src) (Sched.mint sI)) ≡ k₂
+                    → suc k₂ ≡ k₁
+                    → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc k) (Sched.mint sP) } , installNode k (take-st 1) stP)
+                                   ([] , record sI { mint = setAt nodeᵏ (suc k₁) (setAt nodeᵏ (suc k₂) (setAt sourceᵏ (suc src) (Sched.mint sI))) }
+                                       , installNode k₁ (cell-st {t = CutS unitᵗ u} c) (installNode k₂ (take-st 1) stI))) λ A
+                        → (k , k₁ ∷ k₂ ∷ []) ∈ Store.π (After.store A)
+                        × PathRel κ (Store.π (After.store A)) (setNode k (take-st 1) (EvalSt.nodes stP))
+                            (setNode k₁ (cell-st {t = CutS unitᵗ u} c) (setNode k₂ (take-st 1) (EvalSt.nodes stI))) p q
+
+    -- a test's frames walked: the tail related again
+    unwhile : ∀ {X : Set} {π : X → List (NodeId × List NodeId)} {NP : X → List (NodeId × NodeState Γ)}
+                {NI : X → List (NodeId × NodeState (plainᵏ Γ κ))} {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ G₂ G₃}
+                {P : FnClo Γ s boolᵗ} {F₁ : FnClo (plainᵏ Γ κ) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
+                {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
+            → Σ X (λ A → PathRel κ (π A) {t} (NP A) (NI A) (take-f (just P) k ↠[ h ] p)
+                           (scan-f F₁ k₁ ↠[ h₁ ] (take-f (just G₂) k₂ ↠[ h₂ ] (map-f G₃ ↠[ h₃ ] q))))
+            → Σ X (λ A → PathRel κ (π A) (NP A) (NI A) p q)
+    unwhile (A , takeWhile~ _ _ _ _ _ pr) = A , pr
+    unwhile (A , spentWhile~ _ _ _ pr)    = A , pr
+
     -- a scan's frames walked: the tail related again
     unscan : ∀ {X : Set} {π : X → List (NodeId × List NodeId)} {NP : X → List (NodeId × NodeState Γ)}
                {NI : X → List (NodeId × NodeState (plainᵏ Γ κ))} {lo lo′ ℓ ℓ₁ ℓ₂ s u k k′ G}
@@ -184,12 +229,40 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           → Σ X (λ A → PathRel κ (π A) (NP A) (NI A) p q)
     unmap (A , map~ _ pr) = A , pr
 
+    -- a takeWhile's walk, at its elaboration's shape: the plain test
+    -- installed, the impl's source minted and its test and cell installed,
+    -- and the body walked under them
+    walk-while : ∀ {Θ s} (f : SFn Γ [] [] Θ s boolᵗ) (b : SExp Γ [] [] Θ s) → Elab-Walks b
+               → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+               → ∀ {F : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
+                   {i : Tm (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s)} {e″ : Exp (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (emitᵗ s)}
+               → renExp (λ x → x) (λ x → x) w (toInstEmit κ (takeWhileˢ f b)) ≡ mintᵉ (mapᵉ cutOutᵛ (takeWhileᵉ cutOpenᵛ (scanᵉ F i e″)))
+               → e″ ≡ renExp (λ x → x) (λ x → x) (λ y → there (w y)) (toInstEmit κ b)
+               → (∀ ρ″ → proj₁ (proj₂ (evalWith i ρ″)) ≡ false)
+               → Walks (Θ′ , mintᵉ (mapᵉ cutOutᵛ (takeWhileᵉ cutOpenᵛ (scanᵉ F i e″))) , ρ′) (Θ , plainExp (takeWhileˢ f b) , ρ)
+    walk-while f b wb w {ρ′} {ρ} r {F} {i} {e″} eq fu op {stP = stP} {stI = stI} S pr (subs-takeWhile {nid = k} frP dP)
+      (subs-mint {src = src} frS (subs-map (subs-takeWhile {nid = k₂} fr₂ (subs-scan {nid = k₁} fr₁ dI)))) =
+      let I = while-install S (evalWith i (src ∷ᵉ ρ′)) pr frP frS fr₂ fr₁
+          N₂ = setNode k₂ (take-st 1) (EvalSt.nodes stI)
+          v  = evalWith i (src ∷ᵉ ρ′)
+          k₁-set : lookupNode k₁ (setNode k₁ (cell-st v) N₂) ≡ just (cell-st {t = CutS unitᵗ _} (tt , (false , proj₂ (proj₂ v))))
+          k₁-set = trans (lookup-set k₁ (cell-st v) N₂) (cong (λ x → just (cell-st {t = CutS unitᵗ _} (tt , (x , proj₂ (proj₂ v))))) (op (src ∷ᵉ ρ′)))
+          k₂-set : lookupNode k₂ (setNode k₁ (cell-st (evalWith i (src ∷ᵉ ρ′))) N₂) ≡ just (take-st 1)
+          k₂-set = trans (set-above k₁ k₂ (cell-st (evalWith i (src ∷ᵉ ρ′))) N₂ (apart k₁ k₂ (λ e → 1+n≢n (trans fr₁ (sym e)))))
+                         (lookup-set k₂ (take-st 1) (EvalSt.nodes stI))
+          X = wb (λ y → there (w y)) r (After.store (proj₁ I))
+                (takeWhile~ (proj₁ (proj₂ I)) (lookup-set k (take-st 1) (EvalSt.nodes stP))
+                  k₁-set k₂-set
+                  (lifts-while f b w src r eq) (proj₂ (proj₂ I)))
+                dP (reExp fu dI)
+      in unwhile (_⨾_ κ (proj₁ I) (proj₁ X) , proj₂ X)
+
     walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
     walk (inputˢ i)       = walk-input i
     walk (ofˢ ts)         = walk-of ts
     walk emptyˢ           = walk-empty
     walk (takeˢ k b)      = walk-take k b
-    walk (takeWhileˢ f b) = walk-takeWhile f b
+    walk (takeWhileˢ f b) w r = walk-while f b (walk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
     walk (mapˢ f b) w r S pr (subs-map dP) (subs-map dI) = unmap (walk b w r S (map~ (lifts-map f w r) pr) dP dI)
     walk (scanˢ f z b) w {ρ′} {ρ} r {stP = stP} {stI = stI} S pr (subs-scan {nid = k} frP dP) (subs-mint {src = src} frS (subs-map (subs-scan {i = iI} {nid = k′} frI dI))) =
       let L = lifts-scan f z b w src {i = iI} r refl
