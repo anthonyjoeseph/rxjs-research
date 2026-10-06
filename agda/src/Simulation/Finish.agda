@@ -445,8 +445,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                         (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
                                (sameSource-no (stamped≢ i j (λ e → ne (sym e)))) (sameSource-no (raw-stamped i j))))
                         (rr ∷ hot-rows i nums q)
-  hot-rows i nums (rr@(cold~ sp _ _ refl) ∷ q)      = hot-at i rr (hot-rows i nums q) (pair-num nums sp) refl refl
-  hot-rows i nums (rr@(defer~ sp _ _ _ _ refl) ∷ q) = hot-at i rr (hot-rows i nums q) (pair-num nums sp) refl refl
+  hot-rows i nums (_∷_ {r = r} {r′ = r′} {rs = rs₀} {rs′ = rs₀′} rr@(cold~ sp _ _ refl) q)      = hot-at {rs₀ = rs₀} {rs₀′ = rs₀′} i rr (hot-rows i nums q) (pair-num nums sp) refl refl
+  hot-rows i nums (_∷_ {r = r} {r′ = r′} {rs = rs₀} {rs′ = rs₀′} rr@(defer~ sp _ _ _ _ refl) q) = hot-at {rs₀ = rs₀} {rs₀′ = rs₀′} i rr (hot-rows i nums q) (pair-num nums sp) refl refl
   hot-rows i nums (mach {rs = rs₀} {r′ = r′} {rs′ = rs₀′} m@(hot~ {i = j} _ _ refl) q) with toℕ j ≟ toℕ i
   ... | yes eq = subst (RegRel κ _ _ _ _ _ _)
                        (sym (drop₂-skip₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
@@ -463,16 +463,27 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
             → (q : RegRel κ π {t} NP NI LP LI rs rs′)
             → ∀ {dP dI} → Spent κ π NP NI LP LI q dP dI → Spent κ π NP NI LP LI (hot-rows i nums q) dP dI
   spent-hot i nums [] d = d
-  spent-hot i nums (rr@(read~ {i = j} _ _ refl) ∷ q) (h , d) with toℕ j ≟ toℕ i
-  ... | yes eq = spent-subst κ _ _ _ _ _ _ _ (hot-rows i nums q) (spent-hot i nums q d)
-  ... | no ne  = spent-subst κ _ _ _ _ _ _ _ (rr ∷ hot-rows i nums q) (h , spent-hot i nums q d)
-  spent-hot i nums (rr@(cold~ sp _ _ refl) ∷ q) (h , d) =
-    spent-at i rr (hot-rows i nums q) (pair-num nums sp) refl refl h (spent-hot i nums q d)
-  spent-hot i nums (rr@(defer~ sp _ _ _ _ refl) ∷ q) (h , d) =
-    spent-at i rr (hot-rows i nums q) (pair-num nums sp) refl refl h (spent-hot i nums q d)
-  spent-hot i nums (mach m@(hot~ {i = j} _ _ refl) q) d with toℕ j ≟ toℕ i
-  ... | yes eq = spent-substʳ κ _ _ _ _ _ _ (hot-rows i nums q) (spent-hot i nums q d)
-  ... | no ne  = spent-substʳ κ _ _ _ _ _ _ (mach m (hot-rows i nums q)) (spent-hot i nums q d)
+  spent-hot i nums (_∷_ {r = r} {r′ = r′} {rs = rs₀} {rs′ = rs₀′} rr@(read~ {i = j} _ _ refl) q) (h , d) with toℕ j ≟ toℕ i
+  ... | yes eq = spent-subst κ _ _ _ _ _ (sym (drop-skip (toℕ i) r rs₀ (same-yes (sym eq))))
+                   (sym (drop₂-skip₁ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′ (same-yes (stamped≡ i j eq))))
+                   (hot-rows i nums q) (spent-hot i nums q d)
+  ... | no ne  = spent-subst κ _ _ _ _ _ (sym (drop-keep (toℕ i) r rs₀ (sameSource-no (λ e → ne (sym e)))))
+                   (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                          (sameSource-no (stamped≢ i j (λ e → ne (sym e)))) (sameSource-no (raw-stamped i j))))
+                   (rr ∷ hot-rows i nums q) (h , spent-hot i nums q d)
+  spent-hot i nums (_∷_ {r = r} {r′ = r′} {rs = rs₀} {rs′ = rs₀′} rr@(cold~ sp _ _ refl) q) (h , d) =
+    spent-at {rs₀ = rs₀} {rs₀′ = rs₀′} i rr (hot-rows i nums q) (pair-num nums sp) refl refl h (spent-hot i nums q d)
+  spent-hot i nums (_∷_ {r = r} {r′ = r′} {rs = rs₀} {rs′ = rs₀′} rr@(defer~ sp _ _ _ _ refl) q) (h , d) =
+    spent-at {rs₀ = rs₀} {rs₀′ = rs₀′} i rr (hot-rows i nums q) (pair-num nums sp) refl refl h (spent-hot i nums q d)
+  spent-hot i nums (mach {r′ = r′} {rs′ = rs₀′} m@(hot~ {i = j} _ _ refl) q) d with toℕ j ≟ toℕ i
+  ... | yes eq = spent-substʳ κ _ _ _ _ _
+                   (sym (drop₂-skip₂ (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                          (sameSource-no (λ x → raw≢stamped j i (sym x))) (same-yes (raw≡ i j eq))))
+                   (hot-rows i nums q) (spent-hot i nums q d)
+  ... | no ne  = spent-substʳ κ _ _ _ _ _
+                   (sym (drop₂-keep (toℕ (n ↑ʳ i)) (toℕ (i ↑ˡ n)) r′ rs₀′
+                          (sameSource-no (λ x → raw≢stamped j i (sym x))) (sameSource-no (raw≢′ i j ne))))
+                   (mach m (hot-rows i nums q)) (spent-hot i nums q d)
 
   -- AND THE GUARDS STILL AGREE, after the impl's first drop and after its
   -- second: a slot's entry is kept on both sides, and a minted one's guard
