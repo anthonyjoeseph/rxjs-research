@@ -472,8 +472,9 @@ module Third {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
   len2 : ∀ {a b : NodeId} → _≢_ {A = List NodeId} (a ∷ b ∷ []) (x ∷ y ∷ c′ ∷ [])
   len2 ()
 
-  one₃ : ∀ {k k′} → (k , k′ ∷ []) ∈ π → c ≡ k → c′ ≡ k′
-  one₃ e eq = ⊥-elim (len1 (same e eq))
+  -- the run's key is no inner's
+  unkeyed : ∀ {k k′} → (k , k′ ∷ []) ∈ π → c ≢ k
+  unkeyed e eq = len1 (same e eq)
 
   hop₃ : ∀ {a b d : NodeId} {ys} → _≡_ {A = List NodeId} (a ∷ b ∷ d ∷ []) (x ∷ y ∷ c′ ∷ []) → c′ ∈ b ∷ d ∷ ys
   hop₃ refl = there (here refl)
@@ -508,7 +509,7 @@ module Third {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq)) = hop₃ (same e₂ eq)
     fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there m)) = there (there (there (there (fwd₃ r m))))
 
-    module R = B.Rows {t} {NP} {NI} fwd₃ one₃
+    module R = B.Rows {t} {NP} {NI} fwd₃ (λ {k} {k′} e eq → ⊥-elim (unkeyed {k} {k′} e eq))
     open R public
 
 ------------------------------------------------------------------
