@@ -482,15 +482,19 @@ sameKeysᵇ []       _        = true
 sameKeysᵇ _        []       = true
 sameKeysᵇ (k ∷ ks) (q ∷ qs) = eqKey k q ∧ sameKeysᵇ ks qs
 
--- AND EACH ARRIVAL'S INSTANT IS ONE THE IMPL MINTED WHILE CASCADING IT:
--- between the source counter it entered with and the one it left, the
--- subscribe's from zero.  A candidate for the correspondence's clock.
-betweenᵇ : {A : Set} → ℕ → ℕ → List (ℕ × A) → Bool
-betweenᵇ lo hi []            = true
-betweenᵇ lo hi ((i , _) ∷ r) = (lo ≤ᵇ i) ∧ (i <ᵇ hi) ∧ betweenᵇ lo hi r
+-- AND EACH ARRIVAL CARRIES ONE INSTANT, MINTED WHILE CASCADING IT:
+-- every value's the first's, between the source counter it entered with
+-- and the one it left, the subscribe's from zero.  `OneIn`, decided.
+sameIdᵇ : {A : Set} → ℕ → List (ℕ × A) → Bool
+sameIdᵇ i []            = true
+sameIdᵇ i ((j , _) ∷ r) = (i ≡ᵇ j) ∧ sameIdᵇ i r
+
+oneInᵇ : {A : Set} → ℕ → ℕ → List (ℕ × A) → Bool
+oneInᵇ lo hi []            = true
+oneInᵇ lo hi ((i , _) ∷ r) = (lo ≤ᵇ i) ∧ (i <ᵇ hi) ∧ sameIdᵇ i r
 
 clockedᵇ : {A : Set} → ℕ → List (List (ℕ × A)) → List ℕ → Bool
-clockedᵇ lo (r ∷ rs) (hi ∷ hs) = betweenᵇ lo hi r ∧ clockedᵇ hi rs hs
+clockedᵇ lo (r ∷ rs) (hi ∷ hs) = oneInᵇ lo hi r ∧ clockedᵇ hi rs hs
 clockedᵇ lo _        _         = true
 
 sameClockᵇ : {A : Set} → Arr A → Bool

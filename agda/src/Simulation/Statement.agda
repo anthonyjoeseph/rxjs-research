@@ -289,13 +289,14 @@ postulate
   -- impl's run alone; the store says the state is one an elaboration
   -- reaches.
   --
-  -- The compiled sweep reads the impl's source counter after the
-  -- subscribe and after every arrival, and finds each arrival's instants
-  -- between the counter it entered with and the one it left, the
-  -- subscribe's below the first: seed 21 at depth 3, 120 cases, 103
-  -- decided and 66 of those grouping values, none outside.  And the
-  -- instants a run draws are contiguous: no gap at depth 2 seeds 13..36
-  -- nor depth 3 seeds 1..11.
+  -- `make qc-same-clock` decides `OneIn` itself on each arrival's
+  -- impl values, counters read after the subscribe and after every
+  -- arrival: no red over a flattener in every case and a cold slot
+  -- bursting two sync values aimed, seed 24 at depth 3 (175 decided, 96
+  -- grouping values) and seed 23 at depth 4 (108 decided, 72 grouping).
+  -- A planted break of the one-instant conjunct goes red on 26 of 30.
+  -- And the instants a run draws are contiguous: no gap at depth 2
+  -- seeds 13..36 nor depth 3 seeds 1..11.
   cascade-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                      {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI

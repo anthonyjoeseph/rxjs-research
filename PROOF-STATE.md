@@ -269,7 +269,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
   impl's cascade makes one former at a time. State it beside the values split so both recurse on the same
-  configuration, and the monster drops to whichever stays riskier.
+  configuration, and the monster drops to whichever stays riskier. Ruled
+  out: two instants in one arrival, `make qc-same-clock` now deciding
+  `OneIn` itself, green over a flattener with a cold's two-value burst
+  aimed (seeds 23, 24).
 
 - **WALK INSIDE THE PASS.** `of-fold` (`walk-of`'s and `emptyˢ`'s fold) is
   `path-pass` past a derivation rather than the tree: `path-pass`'s `Sound`
