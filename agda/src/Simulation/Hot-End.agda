@@ -30,7 +30,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.Maybe   using (just; nothing)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat     using (suc; pred; _≤_; z≤n; s≤s; _≡ᵇ_)
+open import Data.Nat     using (suc; pred; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties using (1+n≢0; ≤-refl; ≤-trans; pred[n]≤n)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -54,7 +54,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; shar
 open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach; []; _∷_)
 open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame; spent-frame)
 open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle; sink-at; disp-quiet)
-open import Simulation.Pass.Inner using (module PassI)
+open import Simulation.Pass.Inner using (module PassI; pred-one; fin-at)
 open PassI.InI using (carriesU-nil)
 open import Simulation.Pass.Quiet using (usable-self)
 open import Simulation.After using (module Kept)
@@ -110,11 +110,6 @@ apart-off x k m out with x ≡ᵇ k in xk
 ... | true with ≡ᵇ→≡ x k xk
 ...   | refl = ⊥-elim (out m)
 
--- a one-lane merge's count drops to none
-pred-one : ∀ {a} → a ≤ 1 → (pred a ≡ᵇ 0) ≡ true
-pred-one z≤n       = refl
-pred-one (s≤s z≤n) = refl
-
 -- THE FRAMES OF AN INPUT BLOCK, FOLDED WITH NO VALUES.  A map hands the
 -- empty group on; an empty bracket flushes nothing and rewrites its own
 -- node as it was; a merge's outer walks nothing and only its end bit
@@ -150,10 +145,6 @@ outer-end : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo ℓ w now nid} {le : 
               (out , sched′ , st′)
 outer-end {nid = nid} {st = st} fp e with lookupNode nid (EvalSt.nodes st) | e | outer-nil fp
 ... | _ | refl | f = f
-
-fin-at : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w now} {p : Path Δ lo w u} {vals c c′ sched st r}
-       → c ≡ c′ → foldPath⇓ {e = e} now p vals c sched st r → foldPath⇓ now p vals c′ sched st r
-fin-at refl f = f
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 

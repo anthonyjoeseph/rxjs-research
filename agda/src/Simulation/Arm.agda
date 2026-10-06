@@ -16,7 +16,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim      using (Tick)
 open import Rx.Exp       using (Ctx; Closed; Val; obs)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Path; Frame; _↠[_]_; thru-outer; mergeAllᵒ; lookupNode; AllOp; from-inner; aliveThroughᶠ)
-open import Rx.Evaluator.Domain using (foldPath⇓; stepFrame⇓; thruConsume⇓; innerFinish⇓)
+open import Rx.Evaluator.Domain using (foldPath⇓; stepFrame⇓; thruConsume⇓)
 open import Rx.Evaluator.Reducible.Support using (Sound; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; endOf; ∨-Tʳ)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
@@ -197,8 +197,7 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
       → foldPath⇓ now Q es fin sI stI rI
       → Arm S now oP sP₁ stP₁ p vs₁ fin₁ (λ π NP NI → PathRel κ π NP NI (f ↠[ h ] p) Q) rI
 
-    -- AN INNER'S STEP, BY WHETHER IT ENDS: a group it passes on as it
-    -- came, open, and the finish of an inner no live chain runs through
+    -- AN INNER'S STEP THAT LEAVES IT OPEN: the group passed on as it came
     InnerPasses : ∀ {lo lo′ ℓ u} → AllOp → NodeId → NodeId → lo ≤ ℓ → Path Γ ℓ u t → Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t) → Set
     InnerPasses a m j h p Q =
       ∀ {now vs es fin sP stP sI stI rI} (S : St sP stP sI stI)
@@ -207,13 +206,3 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
       → fin ≡ false ⊎ any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ true
       → foldPath⇓ now Q es fin sI stI rI
       → Arm S now [] sP stP p vs false (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) rI
-
-    InnerDies : ∀ {lo lo′ ℓ u} → AllOp → NodeId → NodeId → lo ≤ ℓ → Path Γ ℓ u t → Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t) → Set
-    InnerDies a m j h p Q =
-      ∀ {now vs es sP stP sI stI oP vs₁ fin₁ sP₁ stP₁ rI} (S : St sP stP sI stI)
-      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) Q → Carries es vs
-      → Sound (from-inner a m j ↠[ h ] p) sP stP → Sound Q sI stI
-      → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ false
-      → innerFinish⇓ a m j p now vs sP stP (lookupNode m (EvalSt.nodes stP)) (oP , vs₁ , fin₁ , sP₁ , stP₁)
-      → foldPath⇓ now Q es true sI stI rI
-      → Arm S now oP sP₁ stP₁ p vs₁ fin₁ (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) rI

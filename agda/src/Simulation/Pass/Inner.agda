@@ -95,6 +95,16 @@ pw-null : ∀ {A B : Set} {R : A → B → Set} {xs ys} → Pointwise R xs ys �
 pw-null []      = refl
 pw-null (_ ∷ _) = refl
 
+-- a one-lane merge's count drops to none
+pred-one : ∀ {a} → a ≤ 1 → (pred a ≡ᵇ 0) ≡ true
+pred-one z≤n       = refl
+pred-one (s≤s z≤n) = refl
+
+-- a fold at an end known otherwise
+fin-at : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w now} {p : Path Δ lo w u} {vals c c′ sched st r}
+       → c ≡ c′ → foldPath⇓ {e = e} now p vals c sched st r → foldPath⇓ now p vals c′ sched st r
+fin-at refl f = f
+
 module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassQ {Γ = Γ} κ public
@@ -594,16 +604,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                            (from-inner mergeAllᵒ x j′ ↠[ h₃ ] q))))
                eq (∨-Tˡ (self-node m2 (j′ ∷ []))))
 
-    -- a one-lane count falls to nothing
-    one-falls : ∀ {a} → a ≤ 1 → (pred a ≡ᵇ 0) ≡ true
-    one-falls z≤n       = refl
-    one-falls (s≤s z≤n) = refl
-
-    -- an impl fold, and an impl finish, at an index known otherwise
-    fin-at : ∀ {lo s} {q : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {now vals f f′ sched} {st : EvalSt ei} {r}
-           → f ≡ f′ → foldPath⇓ now q vals f sched st r → foldPath⇓ now q vals f′ sched st r
-    fin-at refl d = d
-
+    -- an impl finish at an index known otherwise
     finish-at : ∀ {lo s op m j} {q : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {now vals sched} {st : EvalSt ei} {mx my r}
               → mx ≡ my → innerFinish⇓ op m j q now vals sched st mx r → innerFinish⇓ op m j q now vals sched st my r
     finish-at refl F = F
@@ -655,7 +656,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
           drain-spent) dR
       with tail S pr (delivery-carries b) (drop-ot _ _ _ sp) (drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))) dq
     ... | A₁ , pr₁
-      with fin-at (one-falls a1) dR
+      with fin-at (pred-one a1) dR
     ...   | fold-step step-map (fold-step (step-from-inner (react-alive al)) _) =
       ⊥-elim (t≢f (trans (sym al) (trans (sym (inner-alive (After.store A₁) (After.grows A₁ ip₂))) (still-dead sp dd fP))))
     ...   | fold-step step-map (fold-step d₂@(step-from-inner (react-dead _ F″)) dq₂)
