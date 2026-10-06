@@ -243,7 +243,23 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- would call it rather than take it; and `path-pass` asks `Sound`
       -- of both paths, which `Walks` does not carry and `PathRel` does
       -- not imply.
-      of-fold        : ∀ {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
+      --
+      -- The cycle is genuine: an `of` under a flattener's outer folds
+      -- its inners into the consume, which walks them.  The new source
+      -- moves only `Store.bounded`, which a larger counter keeps.
+      --
+      -- `Sound` holds along every derivation from the root:
+      -- `fresh-sound` at each minted frame, `subscribe-kept` past each
+      -- subscribe, and the root path names no node.  So `Walks` could
+      -- carry it as `Pass` does, but that is a hypothesis, owed a
+      -- refutation of the form without.  `Pass` carries it for
+      -- `fold-unmoved`, and a path with a repeated cell, folded on both
+      -- sides, writes both cells alike, so no refutation is in sight.
+      -- DEAD ROUTE: `Sound` from `Store` and `PathRel`.  The store holds
+      --   the rule and `π`'s keys below the counter, which gives a
+      --   pinned node's freshness, but neither record says where a
+      --   path's nodes' rows end, nor that its nodes are distinct.
+      of-fold       : ∀ {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
                          {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI src es vs}
                      → (S : Store κ sP stP sI stI)
                      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q

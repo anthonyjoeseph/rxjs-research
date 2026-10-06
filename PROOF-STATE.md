@@ -274,12 +274,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `OneIn` itself, green over a flattener with a cold's two-value burst
   aimed (seeds 23, 24).
 
-- **WALK INSIDE THE PASS.** `of-fold` (`walk-of`'s and `emptyˢ`'s fold) is
-  `path-pass` past a derivation rather than the tree: `path-pass`'s `Sound`
-  reaches it from the store and `PathRel` if they hold it, else a
-  refutation of the form without. Ruled out: the μ peel needing the pass;
-  `walk` descends the plain tree's guarded size, and `μ-unfolds` holds at
-  the probed binders, so a scan's or a test's binder is what is left.
+- **REFUTE OR CARRY `Sound` AT THE WALK.** `of-fold` (`walk-of`'s and
+  `emptyˢ`'s fold) is `path-pass` past a derivation, which asks `Sound` of
+  both paths: the store and `PathRel` do not hold it, the derivation from
+  the root does. Refute `of-fold` without it at a related path whose
+  rows end elsewhere; red licenses `Walks` carrying it as `Pass` does, a
+  green probe says `fold-unmoved` should not need it either. Ruled out:
+  the μ peel needing the pass; `μ-unfolds` at the probed binders, so a
+  scan's or a test's binder is what is left.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -343,7 +345,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`μ-unfolds`** (Simulation.Walk) — FALSITY, `PROBED`: an unrolling is an
   author's program, its plain form and every renamed elaboration the
   unrollings; held at a μ-var under a defer, bare and under a map's binder.
-- **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s
+- **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `DEAD ROUTE`: an `of`'s
   emits carry its values one per emit, and the group folded and ended down
   related paths keeps what a pass keeps, the impl's under its new source.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
