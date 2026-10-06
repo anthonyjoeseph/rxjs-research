@@ -13,7 +13,7 @@ open import Data.Nat     using (_+_; _<_)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
 open import Data.Nat.Properties using (≤-refl; <⇒≢; <-trans; <-≤-trans; m≤m+n; +-monoʳ-<)
 open import Data.Product using (_,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Arrival; Sched; EvalSt; memberSource; sameSource; cascadeClose)
