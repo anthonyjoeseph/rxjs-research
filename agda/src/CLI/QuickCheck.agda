@@ -1076,9 +1076,10 @@ bumpEach fs (g ∷ gs) (c ∷ cs) =
 -- a case's marks, whether it bears on contiguity, whether its batcher
 -- holds values back at the fuel, whether its values group, and whether
 -- an impl arrival matches no plain one, and how many boundaries of the
--- plain run hold fewer queued inners than the one before
+-- plain run hold fewer queued inners than the one before, and how many
+-- see a merge's active count fall
 Seen : Set
-Seen = Marks × Bool × Bool × Bool × Bool × ℕ
+Seen = Marks × Bool × Bool × Bool × Bool × ℕ × ℕ
 
 bump : Seen → Tally → Tally
 bump ((fs , o) , b , h , g , _) (cs , p , q , r , u) =
@@ -1199,9 +1200,9 @@ isStore : Statement → Bool
 isStore storeˢ = true
 isStore _      = false
 
-drained : List Statement → ℕ → Drawn → ℕ
+drained : List Statement → ℕ → Drawn → ℕ × ℕ
 drained ss f (e , d₀ , d₁) with any isStore ss
-... | false = 0
+... | false = 0 , 0
 ... | true  with cached "?" f e (mkSlots d₀ d₁)
 ...   | c = storeDrains (Case.fuel c) (Case.prog c) (Case.slots c)
 
@@ -1239,7 +1240,7 @@ drawCase d = askG >>=G λ W → drawFor (Draw.tries W ∸ 1) d
 -- sweep was aimed at, so no statement is asked of it
 unreached : ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 unreached f n m (e , d₀ , d₁) =
-  (m , false , false , false , false , 0) ,
+  (m , false , false , false , false , 0 , 0) ,
   (TIMEOUT , "  unreached\n    no draw in " ++ show n ++ " tries carried every former the draw must reach"
              ++ rowIn "UNDECIDED" f e d₀ d₁) ∷ []
 
@@ -1519,9 +1520,12 @@ verdictOf rs@(_ ∷ _) with decided rs
 ... | []    = "undecided"
 ... | _ ∷ _ = "FAIL"
 
-drainLine : ℕ → String
-drainLine zero = ""
-drainLine k    = "  drains a queue at " ++ show k ++ " boundaries\n"
+drainLine : ℕ × ℕ → String
+drainLine (k , j) = count "  drains a queue at " k ++ count "  finishes an inner at a merge at " j
+  where
+  count : String → ℕ → String
+  count _ zero = ""
+  count w k    = w ++ show k ++ " boundaries\n"
 
 -- each case names its formers by the census's tags, so the stream reads
 -- a flag against a former where the census only counts the two apart

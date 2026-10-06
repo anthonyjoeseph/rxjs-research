@@ -826,5 +826,21 @@ storeSides : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] 
 storeSides {κ = κ} f e ins =
   lockstep κ 0 (trace f (plainExp e) (plainSlots ins)) (trace f (elaborateImpl κ e) (embedSlotsImpl ins))
 
-storeDrains : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → ℕ
-storeDrains f e ins = drains 0 (trace f (plainExp e) (plainSlots ins))
+-- HOW MANY BOUNDARIES SEE A MERGE'S ACTIVE COUNT FALL: an inner
+-- finished there, whether or not a queue was waiting behind it
+actives : ∀ {m} {Δ : Ctx m} → List (NodeId × NodeState Δ) → List (NodeId × ℕ)
+actives []                                 = []
+actives ((k , mergeAll-st _ a _ _) ∷ r) = (k , a) ∷ actives r
+actives (_ ∷ r)                            = actives r
+
+fell : List (NodeId × ℕ) → List (NodeId × ℕ) → Bool
+fell before = any (λ ka → any (λ kb → (proj₁ ka ≡ᵇ proj₁ kb) ∧ (proj₂ ka <ᵇ proj₂ kb)) before)
+
+finishes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → List (NodeId × ℕ) → List (Sched Γ × EvalSt e) → ℕ
+finishes k []              = 0
+finishes k ((_ , st) ∷ r) =
+  (if fell k (actives (EvalSt.nodes st)) then 1 else 0) + finishes (actives (EvalSt.nodes st)) r
+
+storeDrains : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → ℕ × ℕ
+storeDrains f e ins = drains 0 tr , finishes [] tr
+  where tr = trace f (plainExp e) (plainSlots ins)

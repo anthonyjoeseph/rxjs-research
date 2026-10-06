@@ -265,8 +265,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   Ruled out: a drain unrelating the stores, 65 of 100 programs spending a
   queue (seed 31) and 80 deferring (seed 32); an open merge's window
   reordering rows; a merged lane; a deeper flattener's subscribe (seeds
-  21, 22); the quiet scan and open test. Left: the queued inners'
-  relation, which no sweep reads.
+  21, 22); the quiet scan and open test; a deferred body ending outside
+  a μ, 50 of 80 (seed 40). Left: the queued inners' relation, which no
+  sweep reads, and a body ending inside a μ.
 
 - **REFUTE OR CARRY `Sound` AT THE WALK.** `of-fold` (`walk-of`'s and
   `emptyˢ`'s fold) is `path-pass` past a derivation, which asks `Sound` of

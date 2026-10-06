@@ -237,8 +237,13 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       --
       -- THE STORE HOLDS AT EVERY BOUNDARY OF A SWEEP WHOSE EVERY PROGRAM
       -- DEFERS: `make qc-store` at seed 32, depth 5, 80 programs each with
-      -- a defer and a flatten, 43 through a μ, 42 spending a queue.  Which
-      -- of those boundaries ended a deferred body was not counted.
+      -- a defer and a flatten, 43 through a μ, 42 spending a queue.
+      --
+      -- AND OVER DEFERRED BODIES THAT END, OUTSIDE A μ: seed 40, depth 5,
+      -- 80 programs whose only flattening former is a defer, 50 of them
+      -- ending the body at a boundary.  None queues.  A draw through a
+      -- μ's own defer with no flattener comes back with no input at all,
+      -- so a body ending inside a μ is unreached.
       defer-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
