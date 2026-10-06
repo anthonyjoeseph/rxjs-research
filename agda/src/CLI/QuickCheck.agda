@@ -78,7 +78,8 @@ open import SExp.Syntax using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; t
 open import Data.List.Membership.Propositional using (_∈_)
 open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import CLI.JSON using (JSON; jnum; jstr; jarr; jobj; parseJSON)
-open import SExp.Pipeline using (runᴵ; elaborateImpl)
+open import SExp.Pipeline using (runᴵ)
+open import SExp.Impl-Slots using (elaborateImpl)
 open import CLI.Store-Check using (storeSides)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;

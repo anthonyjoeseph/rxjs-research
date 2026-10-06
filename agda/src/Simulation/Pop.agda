@@ -149,4 +149,5 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; owned    = Store.owned s
     ; ruleP    = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleP s)
     ; ruleI    = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleI s)
+    ; scripts  = Store.scripts s
     }

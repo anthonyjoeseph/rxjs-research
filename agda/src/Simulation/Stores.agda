@@ -56,10 +56,12 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; 
 open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeState; NodeId; Path; RegRow; RegSrc; atSlot; atDyn; root; share-sink;
   _↠[_]_; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; mergeAllᵒ; cell-st;
   take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st; echoᵗ; lookupNode; memberSource;
-  takeVals; scanVals; regSource; sameSource; pathHasNode)
+  takeVals; scanVals; regSource; sameSource; pathHasNode; memoᶠ)
 open import Rx.Evaluator.Domain using (flatOp)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; slotTy; hotᵏ; sharedᵏ)
 open import SExp.Plain   using (plainExp)
+open import SExp.Simul-Slots using (SimulSlots; plainSlots)
+open import SExp.Impl-Slots using (embedSlotsImpl)
 open import Simulation.Schedules using (Sync)
 open import SExp.Elaborate using (toInstEmit; plainᶜ⁺; deferBodyᵖ; stampedSlot; restampᵛ; subscribeᵛ; deliveryᵛ; inputStampᵖ;
   ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ)
@@ -633,6 +635,8 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     -- each run keeps the evaluator's rule
     ruleP   : Rule sP stP
     ruleI   : Rule sI stI
+    -- both runs read one author's table, the impl's embedded
+    scripts : Σ (SimulSlots Γ κ) λ ins → Sched.slots sP ≡ memoᶠ (plainSlots ins) × Sched.slots sI ≡ memoᶠ (embedSlotsImpl ins)
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other

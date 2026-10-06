@@ -493,6 +493,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; owned = all-cut c′ (mapᵃ (λ f u {j} b → all-cut c′ (f u {j} b)) owned)
       ; ruleP = sub-rule (λ {r} m → cut-sub c (EvalSt.registry stP) r m) ≤-refl ruleP
       ; ruleI = sub-rule (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) ≤-refl ruleI
+      ; scripts = scripts
       }
 
     -- a pair through the cut leaves on both sides, any other stays partnered

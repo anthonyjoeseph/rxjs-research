@@ -53,7 +53,7 @@ open import Simulation.Arm using (module Arms)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
   FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ; inputᵖ)
 open import SExp.InstEmit using (machineEmitᵗ)
-open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
+open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import Simulation.Schedules using (Sync)
 open import Simulation.After using (readᴾ; readᴵ; module Kept)
@@ -179,15 +179,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- subscribe at the slot, the impl's at the marked, batched and
       -- stamped read of the script under its mint
       --
-      -- A STORE NEVER READS `Sched.slots`, so the two runs' scripts at the
-      -- slot are free of each other, and the conclusion needs them to be
-      -- one script.  The hot and shared reads stand on the same gap.
-      -- REFUTED: `Refuted.Slot-Scripts` -- both runs cold at the slot, the
-      --   plain one's with a tail, at their openings under the empty store:
-      --   the plain subscribe makes a live source the impl's does not.
+      -- THE TWO SCRIPTS AT THE SLOT ARE ONE, read off `Store.scripts`: both
+      -- schedules' tables are one author's, the impl's embedded.  The hot
+      -- and shared reads stand on it too.
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
       --   from empty stores: a cold script, its block run straight to the
       --   root (`cold~`).  Not under a binder, not the values conjunct.
+      -- RECOVERY: git show ae5fd17e:agda/evidence/refuted/Refuted/Slot-Scripts.agda
+      --   restores the opening store at two cold tables, which refuted this
+      --   read over a store blind to the slots.
       cold-read      : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
                      → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                      → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
@@ -657,6 +657,7 @@ init-store κ {t} e ins μ big = record
   ; owned   = []
   ; ruleP   = rule (λ k ()) (λ ()) (λ ())
   ; ruleI   = rule (λ k ()) (λ ()) (λ ())
+  ; scripts = ins , refl , refl
   }
 
 -- THE IMPL'S ROOT SUBSCRIBE IS ITS MINT'S BODY'S, at the token the mint

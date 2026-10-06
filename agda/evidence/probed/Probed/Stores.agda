@@ -30,7 +30,7 @@ open import Rx.Exp using (Ctx; Closed; Env; Fn; Exp; mapᵉ)
 open import Rx.Evaluator using (Path; map-f; _↠[_]_)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map)
 open import SExp.Simul-Slots using (plainSlots)
-open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl)
+open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰)
 open import Simulation.Walk using (hot-read; read-input; cold-read; read-machine; defer-install; init-store; minted)
@@ -74,6 +74,7 @@ _ = record
   ; owned   = (λ _ ()) ∷ (λ _ _ → (λ ()) ∷ (λ _ → refl) ∷ []) ∷ []
   ; ruleP   = proj₂ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals))))
   ; ruleI   = proj₂ (Σ⁰.snd⁰ (subscribe! (elaborateImpl (κᵖ two-arrivals) (Point.prog two-arrivals)) (embedSlotsImpl (insᵖ two-arrivals))))
+  ; scripts = insᵖ two-arrivals , refl , refl
   }
 
 -- a cold script: its subscribe runs the input block straight to the root
@@ -105,6 +106,7 @@ _ = record
   ; owned   = (λ _ _ → (λ _ → refl) ∷ []) ∷ []
   ; ruleP   = proj₂ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog cold-in)) (plainSlots (insᵖ cold-in))))
   ; ruleI   = proj₂ (Σ⁰.snd⁰ (subscribe! (elaborateImpl (κᵖ cold-in) (Point.prog cold-in)) (embedSlotsImpl (insᵖ cold-in))))
+  ; scripts = insᵖ cold-in , refl , refl
   }
 
 -- a deferred hot read: the hop pending, its body not yet subscribed
@@ -133,4 +135,5 @@ _ = record
   ; owned   = (λ _ ()) ∷ []
   ; ruleP   = proj₂ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog defer-in)) (plainSlots (insᵖ defer-in))))
   ; ruleI   = proj₂ (Σ⁰.snd⁰ (subscribe! (elaborateImpl (κᵖ defer-in) (Point.prog defer-in)) (embedSlotsImpl (insᵖ defer-in))))
+  ; scripts = insᵖ defer-in , refl , refl
   }

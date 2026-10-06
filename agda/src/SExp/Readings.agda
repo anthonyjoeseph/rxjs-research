@@ -20,7 +20,8 @@ open import SExp.Plain   using (unplainᵈ)
 open import SExp.Simul-Slots using (SimulSlots)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import SExp.Batch   using (batchSimultaneousᵖ)
-open import SExp.Pipeline using (elaborateImpl; embedSlotsImpl; runᴵ; runᴾ)
+open import SExp.Pipeline using (runᴵ; runᴾ)
+open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import Batchable.Inst-Extract using (instExtract)
 
 -- the batches, joined back up

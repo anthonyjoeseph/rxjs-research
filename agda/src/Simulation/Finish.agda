@@ -247,6 +247,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; owned = owned-drop {t = t} s′ {K = EvalSt.registry stI} owned
     ; ruleP = sub-rule (drop-sub s (EvalSt.registry stP)) ≤-refl ruleP
     ; ruleI = sub-rule (drop-sub s′ (EvalSt.registry stI)) ≤-refl ruleI
+    ; scripts = scripts
     ; census = λ i h → census-drop s′ (EvalSt.registry stI) (mach-lt i na′)
                          (sameSource-lt (<-trans (subst (_< n + n) (sym (toℕ-↑ʳ n i)) (+-monoʳ-< n (toℕ<n i))) na′))
                          (census i h)
@@ -458,6 +459,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; owned = owned-drop {Γ = Γ} κ {t = t} (toℕ (i ↑ˡ n)) {K = dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)} (owned-drop {Γ = Γ} κ {t = t} (toℕ (n ↑ʳ i)) {K = EvalSt.registry stI} owned)
     ; ruleP = sub-rule (drop-sub (toℕ i) (EvalSt.registry stP)) ≤-refl ruleP
     ; ruleI = sub-rule (λ r∈ → drop-sub (toℕ (n ↑ʳ i)) (EvalSt.registry stI) (drop-sub (toℕ (i ↑ˡ n)) (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)) r∈)) ≤-refl ruleI
+    ; scripts = scripts
     }
     where
       open Store S
@@ -497,7 +499,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
-    ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI }
+    ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+    ; scripts = scripts }
     where
       open Store S
       CP = EvalSt.completedSources stP

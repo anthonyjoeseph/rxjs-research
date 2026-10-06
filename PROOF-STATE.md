@@ -367,6 +367,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`of-{carries,fold}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s
   emits carry its values one per emit, and the group folded and ended down
   related paths keeps what a pass keeps, the impl's under its new source.
+- **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
+  `PROBED×2, RECOVERY`: a slot's plain subscribe against the impl's at its
+  stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the
+  two scripts at the slot are one by `Store.scripts`.
 - **`defer-install`** (Simulation.Walk) — FALSITY, `PROBED`: a hop's merge,
   source and row installed on both sides pair as `defer~` and keep the tails
   related; holds at a deferred hot read at the root.
@@ -390,10 +394,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
-- **`{hot,shared,cold}-read`** (Simulation.Walk) — SHAPE, `REFUTED, PROBED×2`:
-  a slot's plain subscribe against the impl's at its stamped slot, down the
-  restamp or the cold mint, keeps what a pass keeps; needs the two runs'
-  scripts at the slot to be one, which no `Store` field says.
 - **`fold-unmoved`** (Simulation.Arm) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.
