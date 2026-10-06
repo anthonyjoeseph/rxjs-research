@@ -143,6 +143,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       walk-input     : ∀ {Θ} (i : Fin n) → Elab-Walks {Θ} (inputˢ i)
       walk-of        : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) → Elab-Walks (ofˢ ts)
       walk-empty     : ∀ {Θ u} → Elab-Walks {Θ} {u} emptyˢ
+      -- NO RELATION HOLDS ALONG THE BODY'S PATH WHILE THE BODY IS
+      -- SUBSCRIBED.  The impl subscribes the cut as the one inner of an
+      -- `of` outer, so the merge reads `mergeAll-st nothing 1 [] false`
+      -- until the outer's wrap; `take~` asks for `true`, and `take-end`
+      -- reads that `true` to hand the end up at the cut.  A body that
+      -- cuts synchronously -- `take 1` of a two-value `of` -- ends the
+      -- plain path at the cut and the impl's at the wrap.
+      -- DEAD ROUTE: a body walking `b` under `take~` -- there is no
+      --   `take~` to hand the walk until the wrap has run, and the wrap
+      --   runs after the walk returns.
       walk-take      : ∀ {Θ u} (k : STm Γ [] [] Θ _) (b : SExp Γ [] [] Θ u) → Elab-Walks (takeˢ k b)
       -- the riskiest arm: the outer's frames, and every inner a sync
       -- outer hands the flattener subscribed before the arm returns.
