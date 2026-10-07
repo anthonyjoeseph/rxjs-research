@@ -97,7 +97,7 @@ rel-unbatched (spentWhile~ _ _ _ r)          = rel-unbatched r
 rel-unbatched (outerElem~ _ r)               = rel-unbatched r
 rel-unbatched (outerExplode~ _ r)            = rel-unbatched r
 rel-unbatched (inner~ _ _ _ r)               = rel-unbatched r
-rel-unbatched (deferInner~ _ _ _ _ _ _ r)    = rel-unbatched r
+rel-unbatched (deferInner~ _ _ _ _ _ _ _ r)  = rel-unbatched r
 
 -- a frame's dispatch handed nothing, and no end, hands on nothing
 Hushed : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {u} → Sched Δ → List (Val Δ u) × Bool × Sched Δ × EvalSt e → Set

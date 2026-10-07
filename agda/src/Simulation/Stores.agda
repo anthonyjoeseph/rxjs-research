@@ -392,13 +392,19 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))
 
         -- a deferred body: the hop's marker merge, its restamp, the hop's node
-        deferInner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a}
+        --
+        -- THE MARKER'S COUNT IS ITS OWN, ONE OR ZERO, NOT THE HOP'S.  The
+        -- marker merge flattens one body, so its end always completes it
+        -- and hands the hop's node the end; the hop's count is the plain
+        -- merge's.  A row of another inner of the same hop names another
+        -- marker, which a write of this inner's end leaves alone
+        deferInner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a b}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                         {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₃ (emitᵗ u) (emitᵗ t)}
                     → (nid , nid′ ∷ []) ∈ π → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ π
                     → lookupNode nid NP ≡ just (mergeAll-st {t = u} nothing a [] true)
                     → lookupNode nid′ NI ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true)
-                    → lookupNode m2 NI ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true) → a ≤ 1
+                    → lookupNode m2 NI ≡ just (mergeAll-st {t = emitᵗ u} nothing b [] true) → a ≤ 1 → b ≤ 1
                     → PathRel p q
                     → PathRel (from-inner mergeAllᵒ nid j ↠[ h ] p)
                         (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]

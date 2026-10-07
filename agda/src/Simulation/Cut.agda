@@ -260,11 +260,11 @@ module Back {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     bwd (inner~ _ (pm , _) ip r)         (there (here eq))      = there (here (owner ip (here eq)))
     bwd (inner~ _ (pm , _) ip r)         (there (there (here eq))) = here (owner pm (there (here eq)))
     bwd (inner~ _ (pm , _) ip r)         (there (there (there m))) = there (there (bwd r m))
-    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)              = there (here (owner e₂ (there (here eq))))
-    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq))      = there (here (owner e₂ (there (there (here eq)))))
-    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there (here eq))) = here (owner e₁ (here eq))
-    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there (there (here eq)))) = there (here (owner e₂ (here eq)))
-    bwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there (there (there m)))) = there (there (bwd r m))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ _ r)    (here eq)              = there (here (owner e₂ (there (here eq))))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ _ r)    (there (here eq))      = there (here (owner e₂ (there (there (here eq)))))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ _ r)    (there (there (here eq))) = here (owner e₁ (here eq))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ _ r)    (there (there (there (here eq)))) = there (here (owner e₂ (here eq)))
+    bwd (deferInner~ e₁ e₂ _ _ _ _ _ r)    (there (there (there (there m)))) = there (there (bwd r m))
 
     -- an input block names nothing `π` pairs, so its tail names what the whole does
     block-in : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
@@ -435,9 +435,9 @@ module At {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     fwd (inner~ _ (pm , _) ip r)         (here eq)              = gap (hit pm (sym eq))
     fwd (inner~ _ (pm , _) ip r)         (there (here eq))      = there (∈-++⁺ˡ (hit ip (sym eq)))
     fwd (inner~ _ (pm , _) ip r)         (there (there m))      = there (there (there (fwd r m)))
-    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)              = there (there (∈-++⁺ˡ (hit e₁ (sym eq))))
-    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq))      = hop (hit e₂ (sym eq))
-    fwd (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there m))      = there (there (there (there (fwd r m))))
+    fwd (deferInner~ e₁ e₂ _ _ _ _ _ r)    (here eq)              = there (there (∈-++⁺ˡ (hit e₁ (sym eq))))
+    fwd (deferInner~ e₁ e₂ _ _ _ _ _ r)    (there (here eq))      = hop (hit e₂ (sym eq))
+    fwd (deferInner~ e₁ e₂ _ _ _ _ _ r)    (there (there m))      = there (there (there (there (fwd r m))))
 
   one : ∀ {k k′} → (k , k′ ∷ []) ∈ π → c ≡ k → c′ ≡ k′
   one e eq with hit e (sym eq)
@@ -500,9 +500,9 @@ module Third {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)}
     fwd₃ (inner~ _ (pm , _ , _ , _ , _ , _ , _ , lk) ip r)   (here eq) = ⊥-elim (flat-off pm lk eq)
     fwd₃ (inner~ _ _ ip r)                (there (here eq)) = ⊥-elim (len1 (same ip eq))
     fwd₃ (inner~ _ _ ip r)                (there (there m)) = there (there (there (fwd₃ r m)))
-    fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (here eq)         = ⊥-elim (len1 (same e₁ eq))
-    fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (there (here eq)) = hop₃ (same e₂ eq)
-    fwd₃ (deferInner~ e₁ e₂ _ _ _ _ r)    (there (there m)) = there (there (there (there (fwd₃ r m))))
+    fwd₃ (deferInner~ e₁ e₂ _ _ _ _ _ r)    (here eq)         = ⊥-elim (len1 (same e₁ eq))
+    fwd₃ (deferInner~ e₁ e₂ _ _ _ _ _ r)    (there (here eq)) = hop₃ (same e₂ eq)
+    fwd₃ (deferInner~ e₁ e₂ _ _ _ _ _ r)    (there (there m)) = there (there (there (there (fwd₃ r m))))
 
     module R = B.Rows {t} {NP} {NI} fwd₃ (λ {k} {k′} e eq → ⊥-elim (unkeyed {k} {k′} e eq))
     open R public

@@ -523,7 +523,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
         on (mergeOf (emitᵗ u) (I nid′)) "deferInner: impl hop node" λ (l₁ , a₁ , q₁ , d₁) →
         on (mergeOf (emitᵗ u) (I m2)) "deferInner: marker node" λ (l₂ , a₂ , q₂ , d₂) →
         when (is-nothing l₀ ∧ is-nothing l₁ ∧ is-nothing l₂ ∧ (q₀ ≡ᵇ 0) ∧ (q₁ ≡ᵇ 0) ∧ (q₂ ≡ᵇ 0) ∧ d₀ ∧ d₁ ∧ d₂
-              ∧ (a ≡ᵇ a₁) ∧ (a ≡ᵇ a₂) ∧ (a ≤ᵇ 1)) "deferInner: hop nodes unrelated" ok)
+              ∧ (a ≡ᵇ a₁) ∧ (a ≤ᵇ 1) ∧ (a₂ ≤ᵇ 1)) "deferInner: hop nodes unrelated" ok)
         ⊗ k q₃))
 
     outerElem : Ty → AllOp → NodeId → (IP → Res) → IP → Res

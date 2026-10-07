@@ -121,7 +121,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     Catch I f N (inner~ {u = u} {ks = ks} _ _ _ d) =
       Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
         × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I)
-    Catch I f N (deferInner~ {ρ₀ = ρ₀} _ _ _ _ _ _ d) = lookupEnv ρ₀ (here refl) ≡ I
+    Catch I f N (deferInner~ {ρ₀ = ρ₀} _ _ _ _ _ _ _ d) = lookupEnv ρ₀ (here refl) ≡ I
 
     -- WHAT A SUBSCRIBE LEAVES OF A CATCH: every restamp cell up to and
     -- including the one that catches holds the instant and kind it held
@@ -145,7 +145,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ∀ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
       → Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c′ → lookupNode ks N′ ≡ just (cell-st {t = FlatSᵗ u} c′)
           × proj₁ c′ ≡ proj₁ c × ByKind c (λ _ → Kept N N′ d) (λ _ → ⊤)
-    Kept N N′ (deferInner~ _ _ _ _ _ _ d) = ⊤
+    Kept N N′ (deferInner~ _ _ _ _ _ _ _ d) = ⊤
 
     -- A FLATTENER'S OUTER, TAKEN APART AT ANY OPERATOR: its own frames'
     -- operator is the policy's image, which no pattern can invert
@@ -266,7 +266,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         { cat = λ (c , l , b) → c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ e → e) b
         ; kep = λ k c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
         }
-    same (deferInner~ _ _ _ _ _ _ d) (deferInner~ _ _ _ _ _ _ d′) =
+    same (deferInner~ _ _ _ _ _ _ _ d) (deferInner~ _ _ _ _ _ _ _ d′) =
       let S = same d d′ in record { cat = λ e → e ; kep = λ _ → tt }
 
     catch-same : ∀ {I f N π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
@@ -288,7 +288,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     kept-refl (outerElem~ _ d)         = λ c l → c , l , refl , by-const c (kept-refl d) tt
     kept-refl (outerExplode~ _ d)      = λ c l → c , l , refl , by-const c (kept-refl d) tt
     kept-refl (inner~ _ _ _ d)         = λ c l → c , l , refl , by-const c (kept-refl d) tt
-    kept-refl (deferInner~ _ _ _ _ _ _ d) = tt
+    kept-refl (deferInner~ _ _ _ _ _ _ _ d) = tt
 
     kept-trans : ∀ {N₀ N₁ N₂ π NP NI lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
                  (d : PathRel κ π {t} NP NI p q) → Kept N₀ N₁ d → Kept N₁ N₂ d → Kept N₀ N₂ d
@@ -307,7 +307,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     kept-trans (inner~ _ _ _ d)         x y = λ c l →
       let (c′ , l′ , e , b) = x c l ; (c″ , l″ , e′ , b′) = y c′ l′
       in c″ , l″ , trans e′ e , by-zip c (kept-trans d) (λ _ _ → tt) b (by-tr c′ c (sym e) b′)
-    kept-trans (deferInner~ _ _ _ _ _ _ d) _ _ = tt
+    kept-trans (deferInner~ _ _ _ _ _ _ _ d) _ _ = tt
 
     -- A CATCH SURVIVES WHAT KEEPS IT: the cells up to the catch read the
     -- same instants and kinds at the new table
@@ -325,7 +325,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       let (c′ , l′ , e , kb) = k c l in c′ , l′ , by-tr c c′ e (by-zip c (λ {i} → kept-catch {f = i} d) (λ y _ → y) b kb)
     kept-catch (inner~ _ _ _ d) (c , l , b) k =
       let (c′ , l′ , e , kb) = k c l in c′ , l′ , by-tr c c′ e (by-zip c (λ {i} → kept-catch {f = i} d) (λ y _ → y) b kb)
-    kept-catch (deferInner~ _ _ _ _ _ _ d) x _ = x
+    kept-catch (deferInner~ _ _ _ _ _ _ _ d) x _ = x
 
     -- NOTHING WRITTEN AT A NODE THE PATH NAMES KEEPS EVERY CELL
     kept-unmoved : ∀ {N N′ π NP NI lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
@@ -346,7 +346,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     kept-unmoved (inner~ {ks = ks} _ _ _ d) H = λ c l →
       c , trans (H ks (past (at (here refl)))) l , refl
         , by-const c (kept-unmoved d (λ k h → H k (past (past (past h))))) tt
-    kept-unmoved (deferInner~ _ _ _ _ _ _ d) H = tt
+    kept-unmoved (deferInner~ _ _ _ _ _ _ _ d) H = tt
 
   -- WHAT ONE SUBSCRIBE OWES ITS CATCH: everything it sends to the root
   -- at the instant its path catches its frame, and every restamp cell up

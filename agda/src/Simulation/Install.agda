@@ -118,8 +118,8 @@ module Move {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} 
   pathM (outerElem~ f r)                 = outerElem~ (flatM f) (pathM r)
   pathM (outerExplode~ f r)              = outerExplode~ (flatM f) (pathM r)
   pathM (inner~ e f ip r)                = inner~ e (flatM f) (there ip) (pathM r)
-  pathM (deferInner~ e₁ e₂ l l′ l₂ a≤ r) =
-    deferInner~ (there e₁) (there e₂) (rdP (keyP e₁) l) (rdI (valI e₁ (here refl)) l′) (rdI (valI e₂ (there (here refl))) l₂) a≤ (pathM r)
+  pathM (deferInner~ e₁ e₂ l l′ l₂ a≤ b≤ r) =
+    deferInner~ (there e₁) (there e₂) (rdP (keyP e₁) l) (rdI (valI e₁ (here refl)) l′) (rdI (valI e₂ (there (here refl))) l₂) a≤ b≤ (pathM r)
 
   blockM : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
          → Low cI full → InputBlock κ π NP NI a {lo} {ℓ} full q → InputBlock κ ((j , xs) ∷ π) NP′ NI′ a full q

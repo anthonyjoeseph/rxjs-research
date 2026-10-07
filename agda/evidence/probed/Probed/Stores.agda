@@ -1,7 +1,7 @@
 -- THE STORES THE ROOT SUBSCRIBES INSTALL, related
 -- by hand at concrete programs: the relation `Simulation.Stores` states,
 -- inhabited against the registries the two runs actually compute.
--- TARGET: defer-install @d90562
+-- TARGET: defer-install @09d3d9
 module Probed.Stores where
 
 open import Data.List using ([]; _∷_)
@@ -24,7 +24,7 @@ open import SExp.Plain using (plainExp)
 open import SExp.Simul-Slots using (plainSlots)
 open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import Rx.Evaluator.Builder using (subscribe!)
-open import Rx.Evaluator.Reducible.Support using (Σ⁰)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule; sound)
 open import Simulation.Walk using (defer-install; init-store; minted)
 open import Simulation.After using (module Kept)
 open Kept using (module After)
@@ -36,7 +36,8 @@ open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; defer-in)
 
 _ : Confirms (After.store (proj₁ (defer-install (κᵖ defer-in) (inputˢ zero) (λ x → x) (λ ()) refl
                        (init-store (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in) _ (<-trans (proj₁ (proj₂ (minted (κᵖ defer-in) (Point.prog defer-in) (insᵖ defer-in)))) (n<1+n _)))
-                       {now = 0} root~ refl refl refl refl refl refl refl refl)))
+                       {now = 0} root~ (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) _) (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) _)
+                       refl refl refl refl refl refl refl refl)))
 _ = record
   { π       = (0 , 0 ∷ []) ∷ []
   ; π-keys  = [] ∷ []

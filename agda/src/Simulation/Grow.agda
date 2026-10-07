@@ -93,7 +93,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π π′ : List (NodeId × List NodeId
     pathG o (outerExplode~ f r)              =
       outerExplode~ (flatG f) (pathG (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ o)))))) r)
     pathG o (inner~ e f ip r)                = inner~ e (flatG f) (g ip) (pathG (proj₂ (proj₂ (proj₂ o))) r)
-    pathG o (deferInner~ e₁ e₂ l l′ l₂ a≤ r) = deferInner~ (g e₁) (g e₂) l l′ l₂ a≤ (pathG (proj₂ (proj₂ (proj₂ o))) r)
+    pathG o (deferInner~ e₁ e₂ l l′ l₂ a≤ b≤ r) = deferInner~ (g e₁) (g e₂) l l′ l₂ a≤ b≤ (pathG (proj₂ (proj₂ (proj₂ o))) r)
 
     blockG : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
            → Off {Γ = Γ} κ π π′ full → InputBlock κ π NP NI a {lo} {ℓ} full q → InputBlock κ π′ NP NI a full q

@@ -941,10 +941,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                      → QArm S now p (λ π NP NI → PathRel κ π NP NI (from-inner mergeAllᵒ nid j ↠[ h ] p)
                            (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ] (map-f G ↠[ h₂ ] (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q))))
                          q y₃ f₃ (o₁ ++ o₃) s₃ st₃
-    quiet-deferInner S {nid′ = nid′} {j′ = j′} {m2 = m2} {j2 = j2} (deferInner~ ip₁ ip₂ lP lI l2 a1 pr) b refl si
+    quiet-deferInner S {nid′ = nid′} {j′ = j′} {m2 = m2} {j2 = j2} (deferInner~ ip₁ ip₂ lP lI l2 a1 b1 pr) b refl si
                      (step-from-inner react-false) (step-from-inner react-false) =
       qarm (after S (λ x → x) (λ x → x) [] (λ x → x)) pr (delivery-carries b) refl λ dq B rel′ →
-        deferInner~ (After.grows B ip₁) (After.grows B ip₂) lP (trans (fold-unmoved dq c′) lI) (trans (fold-unmoved dq c2) l2) a1 rel′
+        deferInner~ (After.grows B ip₁) (After.grows B ip₂) lP (trans (fold-unmoved dq c′) lI) (trans (fold-unmoved dq c2) l2) a1 b1 rel′
       where
       s2 = drop-ot _ _ _ (drop-ot _ _ _ si)
       s3 = drop-ot _ _ _ s2
@@ -1093,7 +1093,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-pass S r@(inner~ refl _ _ _) b e sp si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
         let X = quiet-resume (quiet-inner S r b e si d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
-      quiet-pass S r@(deferInner~ _ _ _ _ _ _ _) b e sp si (fold-step {out₁ = o₁} d₁ (fold-step step-map (fold-step {out₁ = o₃} d₃ dq))) =
+      quiet-pass S r@(deferInner~ _ _ _ _ _ _ _ _) b e sp si (fold-step {out₁ = o₁} d₁ (fold-step step-map (fold-step {out₁ = o₃} d₃ dq))) =
         let X = quiet-resume (quiet-deferInner S r b e si d₁ d₃) (drop-ot _ _ _ sp) (adv d₃ (drop-ot _ _ _ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₃ _) (proj₁ X) , proj₂ X
 

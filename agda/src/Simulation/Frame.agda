@@ -86,9 +86,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     path-frame ag (inner~ {m′ = m′} {ks} {j′ = j′} e (pm , x , x′ , lP , lI , fn , c , lk) ip r) =
       inner~ e (pm , x , x′ , lP , trans (hd ag (first m′ (j′ ∷ []))) lI , fn , c , trans (hd (tail ag) (first ks [])) lk) ip
              (path-frame (tail (tail (tail ag))) r)
-    path-frame ag (deferInner~ {nid′ = nid′} {j′ = j′} {m2 = m2} {j2 = j2} p₁ p₂ lP lI lm al r) =
+    path-frame ag (deferInner~ {nid′ = nid′} {j′ = j′} {m2 = m2} {j2 = j2} p₁ p₂ lP lI lm al bl r) =
       deferInner~ p₁ p₂ lP (trans (hd (tail (tail ag)) (first nid′ (j′ ∷ []))) lI)
-                  (trans (hd ag (first m2 (j2 ∷ []))) lm) al
+                  (trans (hd ag (first m2 (j2 ∷ []))) lm) al bl
                   (path-frame (tail (tail (tail ag))) r)
 
     -- an input block's nodes are its own frames', and its tail is on it

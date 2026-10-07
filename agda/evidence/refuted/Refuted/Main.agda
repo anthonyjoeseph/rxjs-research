@@ -82,6 +82,10 @@ open import Refuted.Of-Fold-Sound using (of-fold-needs-sound)
 open import Refuted.Shared-Read-Sound using (shared-read-needs-sound)
 open import Refuted.Hot-Read-Sound using (hot-read-needs-sound)
 
+-- A HOP'S INSTALL OWES IT TOO: its row runs through the path it is
+-- installed over.
+open import Refuted.Defer-Install-Sound using (defer-install-needs-sound)
+
 -- A TAIL HANDED NOTHING IS QUIET ONLY WHILE NO BRACKET ON IT IS DOWN
 -- WITH A VALUE HELD.  The lowered bracket's first fold flushes its
 -- buffer whatever it is handed.

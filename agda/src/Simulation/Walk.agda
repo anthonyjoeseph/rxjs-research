@@ -482,6 +482,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A HOP INSTALLED ON BOTH SIDES, the body pending: the merge pair
       -- joins `π`, the sources and rows pair as `defer~`, and the tails
       -- stay related
+      --
+      -- `Sound` OF BOTH PATHS, AS EVERY WALK CARRIES IT: the hop's row
+      -- runs through the path, and only a distinct path whose rows end
+      -- where it does pays the rule for it.
+      -- REFUTED: `Refuted.Defer-Install-Sound` -- a path through one
+      --   merge as two of its lanes.
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
       --   from empty stores: a deferred hot read, its hop pending as a
       --   `defer~` source and row and its body not yet subscribed.  Not
@@ -492,6 +498,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
                         {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now nid src ord rid nid′ src′ ord′ rid′}
                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                    → Sound p sP stP → Sound q sI stI
                     → freshId nodeᵏ (Sched.mint sP) ≡ nid → freshId sourceᵏ (Sched.mint sP) ≡ src
                     → freshId ordinalᵏ (Sched.mint sP) ≡ ord → freshId regᵏ (Sched.mint sP) ≡ rid
                     → freshId nodeᵏ (Sched.mint sI) ≡ nid′ → freshId sourceᵏ (Sched.mint sI) ≡ src′
@@ -725,8 +732,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- a defer's walk: the hop's node, source and row on both sides
     walk-defer : ∀ {Θ u} (b : SExp Γ [] [] Θ u) → Elab-Walks (deferˢ b)
-    walk-defer b w r {q = q} {stI = stI} S pr _ oI (subs-defer f₁ f₂ f₃ f₄) (subs-defer g₁ g₂ g₃ g₄) =
-      let A = defer-install b w r refl S pr f₁ f₂ f₃ f₄ g₁ g₂ g₃ g₄
+    walk-defer b w r {q = q} {stI = stI} S pr oP oI (subs-defer f₁ f₂ f₃ f₄) (subs-defer g₁ g₂ g₃ g₄) =
+      let A = defer-install b w r refl S pr oP oI f₁ f₂ f₃ f₄ g₁ g₂ g₃ g₄
           fr : ∀ j → OnPath j q → j < _
           fr j o = subst (j <_) g₁ (fresh-path oI j (on-path o))
       in proj₁ A , proj₂ A , λ C → [] , kept-unmoved κ pr
