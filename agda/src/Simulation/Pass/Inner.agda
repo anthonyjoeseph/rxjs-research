@@ -43,9 +43,10 @@ open import Simulation.Size using (sz-foldPath; sz-mergeAllDrain; sz-innerFinish
 open import Simulation.After using (module Kept; readᴾ; readᴵ-++)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
-open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru)
+open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru; NoBatch; rel-unbatched)
 open import Simulation.Sweep using (t≢f)
-open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; drop-ot; head-on; self-node; off-path; ∨-Tˡ)
+open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; drop-ot; head-on; self-node; off-path; ∨-Tˡ; ∨-Tʳ; distinct; fresh-path)
+open import Rx.Evaluator.Reducible.Dead-Kept using (fold-dead; off-T)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Simulation.Write using (apart)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept; Thru; thruWalk-rule; subscribeInner-rule)
@@ -116,6 +117,20 @@ drain-self : ∀ {m} {Δ : Ctx m} u {l a od} {q : List (Val Δ (obs u))} → dra
 drain-self u with u ≟ᵗ u
 ... | yes refl = refl
 ... | no ¬e    = ⊥-elim (¬e refl)
+
+postulate
+  -- A QUIET FOLD RIDES PAST A WRITE OFF ITS PATH: run from a store with
+  -- that node written, it is the fold from the store without it, the
+  -- write laid over where that fold leaves the store.  Every frame
+  -- handed nothing writes only its own node, back to what it held.
+  --
+  -- TWIN: `quiet-fold` -- the same induction over a bracket-free path,
+  --   a clause per frame `step-quiet` reads.
+  fold-past : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} {κ : Path Δ lo s t} {k y now sched st r}
+            → NoBatch κ → Clear k κ sched st
+            → foldPath⇓ {e = e} now κ [] false sched (record st { nodes = setNode k y (EvalSt.nodes st) }) r
+            → Σ _ λ r′ → foldPath⇓ now κ [] false sched st r′
+                × r ≡ (proj₁ r′ , proj₁ (proj₂ r′) , record (proj₂ (proj₂ r′)) { nodes = setNode k y (EvalSt.nodes (proj₂ (proj₂ r′))) })
 
 module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -266,25 +281,12 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                → thruWalk⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now
                    (thruEvents (map (applyClo (Θ₀ , elemᵛ , ρ₀)) es)) sI stI rI
                → ∀ {I} → All (DelAt {echoᵗ u} I) es → Out I (proj₁ rI)
-      -- AN INNER NO LIVE CHAIN RUNS THROUGH STAYS SO while the group it
-      -- left folds down the tail below it: every row the fold registers
-      -- rides a path the tail's own frames begin, and every row it finds
-      -- keeps its cancelled, dying and delivered marks
-      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1],"reach":["scan","flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Case 25 switches past an inner that read the hot input at
-      --   subscribe, and both arrivals then fold below its dead row.
-      still-dead : ∀ {sP} {stP : EvalSt ep} {now lo ℓ u op m j} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {vs rP}
-                 → Sound (from-inner op m j ↠[ h ] p) sP stP
-                 → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ false
-                 → foldPath⇓ now p vs false sP stP rP
-                 → any (aliveThroughᶠ j (proj₂ (proj₂ rP))) (EvalSt.registry (proj₂ (proj₂ rP))) ≡ false
-      -- A DEAD DEFERRED BODY'S END, ONCE ITS GROUP HAS FOLDED: the plain
-      -- merge's count falls, against the hop's marker merge's, the empty
-      -- group the marker hands the hop's node, and that node's own fall.
-      -- One write on the plain side meets two on the impl's with a fold
-      -- between, and no store holds between them while a row through the
-      -- body is still registered: the three counts are one count
+      -- A DEFERRED BODY'S THREE COUNTS WRITTEN ALIKE: the plain merge's,
+      -- and the impl's marker merge and hop node, each one lower, so every
+      -- row through the body pairs again.  A row's facts at the three
+      -- come as one `deferInner~`; the risk is a second inner of the same
+      -- merge, whose marker merge is not written, which only a deferred
+      -- body's single subscribe rules out and no store field records
       --
       -- INSIDE A μ, THINLY: a μ's own defer with no flattener has no
       -- input, so every merge whose count falls is a hop's.  Fuel 30
@@ -312,28 +314,73 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- PROBED: make qc-store QC='38 380 4' QC_FUEL=12
       --   decided by `CLI.Store-Check`'s `store?`: same draw as seed 37.
       --   Draw unrecorded: the seed alone does not replay it.
-      defer-end : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a}
-                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
-                    {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {rQ}
-                → (nid , nid′ ∷ []) ∈ Store.π S → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
-                → lookupNode nid (EvalSt.nodes stP) ≡ just (mergeAll-st {t = u} nothing a [] true)
-                → lookupNode nid′ (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true)
-                → lookupNode m2 (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true) → a ≤ 1
-                → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ false
-                → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                → Sound (from-inner mergeAllᵒ nid j ↠[ h ] p) sP stP
-                → Sound (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
-                         (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
-                          (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q))) sI stI
-                → foldPath⇓ now q [] false sI
-                    (record stI { nodes = setNode m2 (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes stI) }) rQ
-                → Σ (After S ([] , sP , record stP { nodes = setNode nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stP) })
-                             (proj₁ rQ ++ [] , proj₁ (proj₂ rQ)
-                             , record (proj₂ (proj₂ rQ))
-                                 { nodes = setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes (proj₂ (proj₂ rQ))) }))
-                    λ A → PathRel κ (Store.π (After.store A))
-                            (setNode nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stP))
-                            (setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes (proj₂ (proj₂ rQ)))) p q
+      defer-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₃ u nid nid′ j j′ m2 j2 a}
+                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                  → (nid , nid′ ∷ []) ∈ Store.π S → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
+                  → lookupNode nid (EvalSt.nodes stP) ≡ just (mergeAll-st {t = u} nothing a [] true)
+                  → lookupNode nid′ (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true)
+                  → lookupNode m2 (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true) → a ≤ 1
+                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                  → Σ (After S ([] , sP , record stP { nodes = setNode nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stP) })
+                               ([] , sI , record stI { nodes = setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true)
+                                                                 (setNode m2 (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes stI)) }))
+                      λ A → PathRel κ (Store.π (After.store A))
+                              (setNode nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stP))
+                              (setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true)
+                                (setNode m2 (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes stI))) p q
+
+    -- AN INNER NO LIVE CHAIN RUNS THROUGH STAYS SO while the group it
+    -- left folds down the tail below it: its node is off the tail, which
+    -- the path's distinctness says, and below the counter, which its
+    -- freshness says, so every row the fold registers misses it
+    still-dead : ∀ {sP} {stP : EvalSt ep} {now lo ℓ u op m j} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {vs rP}
+               → Sound (from-inner op m j ↠[ h ] p) sP stP
+               → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ false
+               → foldPath⇓ now p vs false sP stP rP
+               → any (aliveThroughᶠ j (proj₂ (proj₂ rP))) (EvalSt.registry (proj₂ (proj₂ rP))) ≡ false
+    still-dead {m = m} {j} {p = p} so dd f =
+      fold-dead j f (off-T (λ hp → proj₁ (distinct so) j on hp)) (fresh-path so j (∨-Tˡ {b = pathHasNode j p} on)) dd
+      where on = ∨-Tʳ {a = m ≡ᵇ j} (self-node j [])
+
+    -- A DEAD DEFERRED BODY'S END, ONCE ITS GROUP HAS FOLDED: the plain
+    -- merge's count falls, against the hop's marker merge's, the empty
+    -- group the marker hands the hop's node, and that node's own fall.
+    -- The fold runs below both impl nodes, so the marker's write rides
+    -- past it and the three counts fall together
+    defer-end : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a}
+                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                  {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {rQ}
+              → (nid , nid′ ∷ []) ∈ Store.π S → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
+              → lookupNode nid (EvalSt.nodes stP) ≡ just (mergeAll-st {t = u} nothing a [] true)
+              → lookupNode nid′ (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true)
+              → lookupNode m2 (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true) → a ≤ 1
+              → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+              → Sound (from-inner mergeAllᵒ nid j ↠[ h ] p) sP stP
+              → Sound (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
+                       (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
+                        (from-inner mergeAllᵒ nid′ j′ ↠[ h₃ ] q))) sI stI
+              → foldPath⇓ now q [] false sI
+                  (record stI { nodes = setNode m2 (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes stI) }) rQ
+              → Σ (After S ([] , sP , record stP { nodes = setNode nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stP) })
+                           (proj₁ rQ ++ [] , proj₁ (proj₂ rQ)
+                           , record (proj₂ (proj₂ rQ))
+                               { nodes = setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes (proj₂ (proj₂ rQ))) }))
+                  λ A → PathRel κ (Store.π (After.store A))
+                          (setNode nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stP))
+                          (setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes (proj₂ (proj₂ rQ)))) p q
+    defer-end S {m2 = m2} {j2} ip₁ ip₂ lP lI l2 a1 pr sp si dq
+      with fold-past (rel-unbatched pr) (on-drop (on-drop (head-on _ _ _ m2 (self-node m2 (j2 ∷ [])) si)) ,
+                                         drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))) dq
+    ... | _ , d′ , refl
+      with quiet-pass S pr [] refl (drop-ot _ _ _ sp) (drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))) d′
+    ...   | A₁ , pr₁
+      with defer-write (After.store A₁) (After.grows A₁ ip₁) (After.grows A₁ ip₂) lP
+             (trans (fold-unmoved d′ (head-on _ _ _ _ (self-node _ (_ ∷ [])) (drop-ot _ _ _ (drop-ot _ _ _ si)) ,
+                                      drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si)))) lI)
+             (trans (fold-unmoved d′ (on-drop (on-drop (head-on _ _ _ m2 (self-node m2 (j2 ∷ [])) si)) ,
+                                      drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si)))) l2)
+             a1 pr₁
+    ...     | A₂ , pr₂ = A₁ ⨾ A₂ , pr₂
 
     -- A PAIR OF NODES EVERY PAIR OF ROWS NAMES ALIKE, AND THE IMPL'S OWN
     -- ROWS NEVER THE IMPL ONE, HAS A CHAIN RUNNING THROUGH IT ON BOTH SIDES
@@ -783,7 +830,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
              (trans (fold-unmoved dq (on-drop (on-drop (head-on _ _ _ m2 (self-node m2 (j2 ∷ [])) si)) ,
                                       drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))))
                     l2)
-             a1 (still-dead sp dd fP) pr₁
+             a1 pr₁
              (fold-kept fP (drop-ot _ _ _ sp) _ sp (λ _ _ _ → refl))
              (fold-kept dq (drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))) _ si (λ _ _ _ → refl))
              fq₀

@@ -10,7 +10,8 @@
 module Simulation.After where
 
 open import Data.Bool.ListAction using (any)
-open import Data.Bool    using (true; false)
+open import Data.Bool    using (true; false; _∧_; _∨_)
+open import Data.Bool.Properties using (∧-zeroʳ)
 open import Data.List    using (List; []; _∷_; _++_; concat; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; ++⁺)
@@ -23,12 +24,12 @@ open import Data.Nat.Properties using (n≤1+n; n<1+n; m<n⇒m<1+n; <-irrefl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Empty   using (⊥)
-open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; cong₂; subst₂)
 
 open import Rx.Prim      using (Id)
 open import Rx.Exp       using (Ctx; Closed; Val; uniqᵗ)
 open import Rx.Mint      using (setAt; nodeᵏ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; RegId; RegRow; NodeId)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; RegId; RegRow; NodeId; skipᵇ; regSource; memberSource)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Reducible.Support using (sub-rule; fresh-rows)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
@@ -37,7 +38,7 @@ open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
-open import Simulation.Stores using (V; RegRel; Partners; Store; Arr)
+open import Simulation.Stores using (V; RegRel; Partners; Store; Arr; spent-partner)
 open import Simulation.Grow using (OffRow; fresh-off-row; regG; partG; arrG; spentG)
 
 -- what a run sends to its root, read as values: the plain run's in
@@ -71,6 +72,25 @@ apart = mapᵃ (λ lt e → <-irrefl (sym e) lt)
 
 -- A CHAIN PAIR THE PASS HAS NOT REACHED: cut on both sides, or on
 -- neither and partnered by the registries' relation
+-- a cut chain is skipped; an uncut one, exactly when its source has
+-- ended and it took that end
+skip-cut : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s rid} {st : EvalSt e}
+         → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true → skipᵇ s rid st ≡ true
+skip-cut {s = s} {rid} {st} c =
+  cong (λ b → b ∨ (memberSource s (EvalSt.dying st) ∧ any (_≡ᵇ rid) (EvalSt.delivered st))) c
+
+skip-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s rid} {st : EvalSt e}
+          → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false
+          → skipᵇ s rid st ≡ (memberSource s (EvalSt.dying st) ∧ any (_≡ᵇ rid) (EvalSt.delivered st))
+skip-live {s = s} {rid} {st} c =
+  cong (λ b → b ∨ (memberSource s (EvalSt.dying st) ∧ any (_≡ᵇ rid) (EvalSt.delivered st))) c
+
+skip-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s rid} {st : EvalSt e}
+           → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false → any (_≡ᵇ rid) (EvalSt.delivered st) ≡ false
+           → skipᵇ s rid st ≡ false
+skip-quiet {s = s} {rid} {st} c d =
+  trans (skip-live {s = s} {rid} {st} c) (trans (cong (memberSource s (EvalSt.dying st) ∧_) d) (∧-zeroʳ _))
+
 PairedR : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {π NP NI LP LI rs rs′}
         → RegRel κ π {t} NP NI LP LI rs rs′ → List RegId → List RegId
         → RegRow Γ t → RegRow (plainᵏ Γ κ) (emitᵗ t) → Set
@@ -96,6 +116,19 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
   Persists : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁}
            → St sP stP sI stI → St sP₁ stP₁ sI₁ stI₁ → Set
   Persists S S₁ = ∀ {s s′ u u′} → Arr S s s′ u u′ → Arr S₁ s s′ u u′
+
+  -- a fan-out's skip test reads paired rows alike: both cut, or neither
+  -- and partners, whose ends and deliveries the stores spend alike
+  skip-alike : ∀ {sP stP sI stI} (S : St sP stP sI stI) {x x′}
+             → PairedR (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) x x′
+             → skipᵇ (regSource (proj₁ (proj₂ x))) (proj₁ x) stP ≡ skipᵇ (regSource (proj₁ (proj₂ x′))) (proj₁ x′) stI
+  skip-alike {stP = stP} {stI = stI} S {x} {x′} (inj₁ (c , c′)) =
+    trans (skip-cut {s = regSource (proj₁ (proj₂ x))} {proj₁ x} {stP} c) (sym (skip-cut {s = regSource (proj₁ (proj₂ x′))} {proj₁ x′} {stI} c′))
+  skip-alike {stP = stP} {stI = stI} S {x} {x′} (inj₂ (c , c′ , p)) =
+    trans (skip-live {s = regSource (proj₁ (proj₂ x))} {proj₁ x} {stP} c)
+          (trans (cong₂ _∧_ (spent-partner κ _ _ _ _ _ (Store.rows S) p (Store.dying-alike S))
+                            (spent-partner κ _ _ _ _ _ (Store.rows S) p (Store.dlv-alike S)))
+                 (sym (skip-live {s = regSource (proj₁ (proj₂ x′))} {proj₁ x′} {stI} c′)))
 
   -- WHAT A PASS KEEPS: related stores after, the unreached chains
   -- paired, the arrival's pair against the rows, related values sent

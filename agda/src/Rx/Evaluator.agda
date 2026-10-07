@@ -762,6 +762,17 @@ dlvIf true  rid ds = rid ∷ ds
 markDlv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Bool → RegId → EvalSt e → EvalSt e
 markDlv fin rid st = record st { delivered = dlvIf fin rid (EvalSt.delivered st) }
 
+-- A FAN-OUT PASSES OVER A CHAIN ITS SOURCE HAS ALREADY ENDED, as over a
+-- cut one: rxjs's subscriber is closed by its `complete` and takes
+-- nothing after it.  Each end reaches a chain once, so no run skips a
+-- chain here that the cut test alone would have folded; what the test
+-- buys is that a fold carries a dead chain's death forward
+-- without knowing where on the stack its source's end is.
+skipᵇ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Source → RegId → EvalSt e → Bool
+skipᵇ s rid st =
+  any (_≡ᵇ rid) (EvalSt.cancelled st)
+  ∨ (memberSource s (EvalSt.dying st) ∧ any (_≡ᵇ rid) (EvalSt.delivered st))
+
 -- IS THERE A FREE LANE?  `nothing` is rxjs's Infinity, so always.
 hasRoom : Maybe ℕ → ℕ → Bool
 hasRoom nothing  active = true

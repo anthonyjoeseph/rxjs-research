@@ -38,6 +38,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
 open import Simulation.Pass using (HotStart; hot-idle; hot-block)
 open import Simulation.Pass.Quiet using (dynRow; Paired; SlotPair; slotpair; cons-skip; cons-take; admit-slot; admit-skip; module PassQ)
 open PassQ using (head; slot-there; slot-mach)
+open import Simulation.After using (skip-quiet)
 open import Simulation.Pop using (pp-popped)
 open import Simulation.Sweep using (t≢f; sameSource-lt; sameSource-no; same-refl; count-hit; count-pass; count-tail; arr-rows; raw≢stamped; raw<ₙ)
 open import Simulation.Schedules using (Popped; pop; sched-pop; HeadOf)
@@ -446,10 +447,11 @@ hot-start : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Clo
           → lookup κ i ≡ hotᵏ
           → ∀ {l l′} → Src κ l l′ → HeadOf l a → HeadOf l′ a′
           → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
+          → EvalSt.delivered stI ≡ []
           → ∀ {oI sI₁ stI₁}
           → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) sI stI (oI , sI₁ , stI₁)
           → HotStart κ S a a′ i oI sI₁ stI₁
-hot-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src h h′ e₁ e₂ {oI} {sI₁} {stI₁} go
+hot-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src h h′ e₁ e₂ nd {oI} {sI₁} {stI₁} go
   with Store.census S i hk
 ... | inj₂ (z₁ , z₂ , _) =
   hot-idle (plain-none {Γ = Γ} κ e₁ (Store.rows S) (proj₁ (Store.above S)) z₂)
@@ -461,7 +463,7 @@ hot-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src 
            (casc-empty (subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) none go))
 ...   | raw-at hot ch d ib u _
   with subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) ch go
-...     | casc-cut y _ = ⊥-elim (t≢f (trans (sym y) u))
+...     | casc-cut {a = a₀} {rid = rid} {st₀ = st₀} y _ = ⊥-elim (t≢f (trans (sym y) (skip-quiet {s = arrSource a₀} {rid} {st₀} u (cong (any (_≡ᵇ _)) nd))))
 ...     | casc-live _ d′ casc-nil =
   subst (λ o → HotStart κ S a a′ i o sI₁ stI₁) (sym (++-identityʳ _))
         (hot-block κ S hot (head src h h′ e₁ e₂)

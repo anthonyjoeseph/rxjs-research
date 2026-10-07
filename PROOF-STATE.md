@@ -250,7 +250,7 @@ two-value emit; a testless cut; a write moving a row;
 cut, liveness, drain, body ends unpairing; unsound walks, reads; two
 stamp chains; `of` splits, folds; a `mintᵉ` stamp; a drain past a
 quiet cut; a hop's script; root stamps unwalked; a joiner off its catch;
-quiet folds, lanes, fan-outs; installs. Left: cascades.
+quiet folds, lanes, fan-outs; installs; a fold reviving a dead inner. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
@@ -263,10 +263,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   registered one by `Store.fresh-ids`. Turns a deferred subscribe's
   opening from probed at the root into proven under any store.
 
-- **PROVE THE FINISHING ARMS.** `still-dead` as a family over the fold's
-  relations: a dead row's marks only grow, and a fold registers rows only
-  down paths it folds, none through the dead inner; then `defer-end` over
-  it. Rules out a dying inner's end unpairing a store.
+- **PROVE THE FINISHING ARMS.** `defer-write` as `flat-write` is, over a
+  node-write module twinned on `Simulation.Write`. First decide its one gap:
+  a second inner of the same hop merge, whose marker is not written; no store
+  field says a hop merge's rows name one inner. Rules out a dying inner's end
+  unpairing a store.
 
 - **FINISH THE QUIET PASS.** `quiet-spent` as `quiet-takeWhile` runs an
   open test: the cell steps on the impl side alone and both tests stay
@@ -281,11 +282,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`defer-end`** (Simulation.Pass) — FALSITY, `PROBED×5`: a dead deferred
-  body's count falls on the plain side against the hop's marker merge's, a
-  quiet fold and the hop's node's on the impl's, one store across all three.
-- **`still-dead`** (Simulation.Pass) — FALSITY, `PROBED`: an inner no live
-  chain runs through stays so while its group folds down the tail below it.
+- **`defer-write`** (Simulation.Pass) — FALSITY, `PROBED×5`: a deferred
+  body's three counts, the plain merge's and the impl's marker merge and hop
+  node, written one lower together keep the store and the tails related.
 - **`quiet-spent`** (Simulation.Pass) — FALSITY, `PROBED`: a spent test's cell
   stepped on emits carrying nothing, on the impl side alone, stays related and
   passes nothing.
@@ -394,3 +393,5 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   identity is the identity, the impl's mint body against its elaboration.
 - **`renExp-fuse`** (Simulation.Walk) — GRINDABLE, `TWIN`: two renamings in
   turn are their composite, the scan's body under the mint.
+- **`fold-past`** (Simulation.Pass) — GRINDABLE, `TWIN`: a quiet fold from a
+  store written off its path is the fold without, the write laid over.

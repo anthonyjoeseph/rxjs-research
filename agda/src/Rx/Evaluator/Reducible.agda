@@ -132,7 +132,7 @@ open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Evaluator.Freshness using (nodeCt; pres; below; pres-write; lookup-set; set-above; <→≢ᵇ)
 open import Decide using (∧ˡ; ∧ʳ; ≡ᵇ-refl)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; markDlv; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; markDlv; skipᵇ; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f;
   batchSync-f; from-inner; thru-outer; echoᵗ; thruEvents; NodeState; lookupNode; frameNodes; register;
   installNode; atDyn; atSlot; lowerFloor; memberSource; mergeAll-st; mergeAllᵒ; AllOp; switchᵒ;
   exhaustᵒ; NodeId; cell-st; take-st; switch-st; exhaust-st; batchSync-st; setNode; hasRoom;
@@ -529,7 +529,7 @@ rawWalk i ac aM now (v ∷ vs) fin sched st rm ru =
 
 rawGo i ac aM now vals fin [] sched st rm ru ok ag = _ , go-nil , ru
 rawGo i ac aM now vals fin ((rid , p) ∷ ps) sched st rm ru ok ag =
-  by-bool (any (_≡ᵇ rid) (EvalSt.cancelled st)) (λ eqc →
+  by-bool (skipᵇ (toℕ i) rid st) (λ eqc →
   sub-ot (λ r∈ → r∈) ≤-refl (ok (here refl)) |>⁰ λ so →
   rawFold ac ≤-refl aM p now vals fin sched
                    (markDlv fin rid st) rm so |>′ λ (r₁ , d) →

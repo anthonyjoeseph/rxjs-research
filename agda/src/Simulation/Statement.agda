@@ -69,7 +69,7 @@ open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; markDlv; Arrival; arrTy; RegRow; Path; chainsGo; sameSource;
   regSource; schedGo; schedFinish; sched-next; arrVal; chainsOf; cascadeOpen; cascadeClose;
-  cascadeFinish; memberSource)
+  cascadeFinish; memberSource; arrSource)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓;
   foldPath⇓; disp; walk-more; walk-nil; walk-end; subscribeE⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule; chain-sound; chain-agree)
@@ -85,8 +85,8 @@ open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-qu
 open import Simulation.Sweep using (T-true; t≢f)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk; minted)
-open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; module Kept)
-open Kept using (After; module After; Persists; _⨾_)
+open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; skip-cut; module Kept)
+open Kept using (After; module After; Persists; _⨾_; skip-alike)
 open import Simulation.Pass using (row-pass; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
 open import Simulation.Arm using (Out; out-++; out-quiet)
 open import Simulation.Pass.Quiet using (dynRow; Paired; unchain; delivered; admit-agrees; delivered-arr; module PassQ)
@@ -488,14 +488,14 @@ pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
     × Persists κ s s₁
     × (fin ≡ false → length chs′ ≤ 1 → Out (counter (Sched.mint sI) sourceᵏ) oI)
 pass-go κ e s hd ta [] _ _ _ _ casc-nil casc-nil = s , [] , (λ ar → ar) , λ _ _ → []
-pass-go κ e s hd ta (inj₁ _ ∷ ps) hP aP hI aI (casc-cut _ g) (casc-cut _ g′) =
+pass-go κ e s hd ta (_ ∷ ps) hP aP hI aI (casc-cut _ g) (casc-cut _ g′) =
   proj₁ k , proj₁ (proj₂ k) , proj₁ (proj₂ (proj₂ k)) , λ f h → proj₂ (proj₂ (proj₂ k)) f (≤-trans (n≤1+n _) h)
   where
     k = pass-go κ e s hd ta ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
-pass-go κ e s hd ta (inj₁ (x , _) ∷ _) _ _ _ _ (casc-live y _ _) _ = ⊥-elim (t≢f (trans (sym x) y))
-pass-go κ e s hd ta (inj₁ (_ , x) ∷ _) _ _ _ _ (casc-cut _ _) (casc-live y _ _) = ⊥-elim (t≢f (trans (sym x) y))
-pass-go κ e s hd ta (inj₂ (x , _) ∷ _) _ _ _ _ (casc-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
-pass-go κ e s hd ta (inj₂ (_ , x , _) ∷ _) _ _ _ _ (casc-live _ _ _) (casc-cut y _) = ⊥-elim (t≢f (trans (sym y) x))
+pass-go κ e s hd ta (q ∷ _) _ _ _ _ (casc-cut y _) (casc-live y′ _ _) = ⊥-elim (t≢f (trans (sym y) (trans (skip-alike κ s q) y′)))
+pass-go κ e s hd ta (q ∷ _) _ _ _ _ (casc-live y _ _) (casc-cut y′ _) = ⊥-elim (t≢f (trans (sym y′) (trans (sym (skip-alike κ s q)) y)))
+pass-go κ e s hd ta (inj₁ (x , _) ∷ _) _ _ _ _ (casc-live {a = a₀} {rid = rid} {st₀ = st₀} y _ _) (casc-live _ _ _) =
+  ⊥-elim (t≢f (trans (sym (skip-cut {s = arrSource a₀} {rid} {st₀} x)) y))
 pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps) hP aP hI aI
         (casc-live {emits = eP} {rest = rP} _ st g) (casc-live {emits = eI} {rest = rI} _ st′ g′)
   with dyn-chain κ e s hd ta pr ps (hP (here refl)) (hI (here refl)) st st′
@@ -562,14 +562,14 @@ hot-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
 hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy i hk e₁ e₂ {oP = oP} go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
-  with hot-start κ (pop-store κ s ex ex′ sy) {a} {a′} {i} hk src h h′ e₁ e₂ go′
+  with hot-start κ (pop-store κ s ex ex′ sy) {a} {a′} {i} hk src h h′ e₁ e₂ refl go′
 ... | hot-start-at {oB = oB} {εI = εI} {ty = ty} A c (ob , du) (disp (walk-more {emits = em} g walk-nil)) refl =
   After.store Z ,
   subst (λ z → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ z) (readᴾ oP))
         (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z)) ,
   subst (Out _) (sym (cong (oB ++_) (++-identityʳ em))) (out-++ oB em ob (proj₂ F refl du))
   where
-    F = (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
+    F = (fan-go κ (After.store A) εI c ta e₁ (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           go g)
@@ -644,7 +644,7 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll�
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
     S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
-    Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
+    Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta e₁ (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           end g))

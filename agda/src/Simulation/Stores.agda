@@ -557,6 +557,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      → Spent q dP dI → Spent (subst (RegRel rs) e′ q) dP dI
         spent-substʳ refl q d = d
 
+        -- a pair the relation partners, spent alike
+        spent-partner : ∀ {rs rs′} (q : RegRel rs rs′) {dP dI x x′} → Partners q x x′ → Spent q dP dI → dP x ≡ dI x′
+        spent-partner (_ ∷ q)    (inj₁ (refl , refl)) (e , _) = e
+        spent-partner (_ ∷ q)    (inj₂ p)             (_ , s) = spent-partner q p s
+        spent-partner (mach _ q) p                    s       = spent-partner q p s
+
   -- the completion and connection latches, slot for stamped slot.  A hot
   -- slot's latch is its raw slot's, since the raw slot ends whether or not
   -- its share ever connected, and the share is spent exactly when it did

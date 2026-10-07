@@ -43,7 +43,7 @@ open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; listᵗ; _×ᵗ_; uni
 open import SExp.InstEmit using (machineEmitᵗ)
 open import Decide       using (≡ᵇ→≡)
 open import Rx.Prim      using (Source)
-open import Rx.Evaluator using (Arrival; Sched; EvalSt; RegRow; atSlot; regSource; sameSource; memberSource; cascadeClose; shareSpend; shareDying;
+open import Rx.Evaluator using (Arrival; arrSource; Sched; EvalSt; RegRow; atSlot; regSource; sameSource; memberSource; cascadeClose; shareSpend; shareDying;
   share-sink; Path; lookupNode; pathHasNode; aliveThroughᶠ; arrTy; arrTick; chainsOf; NodeId; NodeState; setNode; thruWrap;
   mergeAllᵒ; map-f; batchSync-f; thru-outer; _↠[_]_; mergeAll-st; batchSync-st)
 open import Rx.Evaluator.Domain using (chainStep⇓; dispatchShare⇓; cascadeGo⇓; casc-cut; casc-live; casc-nil; foldPath⇓; fold-step;
@@ -57,7 +57,7 @@ open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle; sink-at; di
 open import Simulation.Pass.Inner using (module PassI; pred-one; fin-at)
 open PassI.InI using (carriesU-nil)
 open import Simulation.Pass.Quiet using (usable-self)
-open import Simulation.After using (module Kept)
+open import Simulation.After using (skip-quiet; module Kept)
 open Kept using (after; Keeps; Persists)
 open import Simulation.Sweep using (t≢f; same-refl; count-hit; count-tail; raw≢stamped; stamp-rows; raw-rows)
 open import Simulation.Chains using (raw-mistyped; raw-at; raw-one; raw-none;
@@ -445,7 +445,7 @@ hot-end-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk 
 ...   | raw-mistyped ne _ = ⊥-elim (ne (trans (head-ety {Γ = Γ} κ src h h′ e₁) (cong plainᵗ (slot-ty {Γ = Γ} κ src h e₁))))
 ...   | raw-at hot ch d ib u mem
   with subst (λ c → cascadeGo⇓ a′ [] true c sI (cascadeClose a′ stI) (eI , sI₃ , stI₃)) ch go
-...     | casc-cut y _ = ⊥-elim (t≢f (trans (sym y) u))
+...     | casc-cut {a = a₀} {rid = rid} {st₀ = st₀} y _ = ⊥-elim (t≢f (trans (sym y) (skip-quiet {s = arrSource a₀} {rid} {st₀} u refl)))
 ...     | casc-live _ d′ casc-nil =
   subst (λ o → HotEnd κ S a a′ i o sI₃ stI₃) (sym (++-identityʳ _))
         (hot-end-block κ S hot e₁ e₂

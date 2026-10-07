@@ -151,7 +151,7 @@ open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit; markDlv;
   shareDying; shareSpend; shareFinish; from-inner; arrTick; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
-  RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve;
+  RegId; Arrival; AtFloor; arrTy; arrSource; memberSource; skipᵇ; register; installNode; resolve;
   atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; echoᵗ; thruEvents; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
@@ -1261,7 +1261,7 @@ data shareWalk⇓ {n} {Γ} {t} {e} where
             → shareWalk⇓ now i (v ∷ vs) fin sched₀ st₀
                 (emits ++ rest , sched₂ , st₂)
 
--- THE CANCELLATION TEST STAYS A PREMISE RATHER THAN A SIDE CONDITION.
+-- THE SKIP TEST STAYS A PREMISE RATHER THAN A SIDE CONDITION.
 -- It is decidable and it decides which of two clauses ran, so the
 -- relation carries the answer as an equation and the two arms cannot
 -- both apply.  `go-live` is where the threading shows: what the tail is
@@ -1272,14 +1272,14 @@ data shareGo⇓ {n} {Γ} {t} {e} where
 
   go-cut : ∀ {lo now} {i : Fin n} {vals fin rid}
              {p : Path Γ lo (lookup Γ i) t} {ps sched st r}
-         → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true
+         → skipᵇ (toℕ i) rid st ≡ true
          → shareGo⇓ now i vals fin ps sched st r
          → shareGo⇓ now i vals fin ((rid , p) ∷ ps) sched st r
 
   go-live : ∀ {lo now} {i : Fin n} {vals fin rid}
               {p : Path Γ lo (lookup Γ i) t} {ps sched₀ st₀}
               {emits sched₁ st₁ rest sched₂ st₂}
-          → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
+          → skipᵇ (toℕ i) rid st₀ ≡ false
           → foldPath⇓ now p vals fin sched₀
               (markDlv fin rid st₀)
               (emits , sched₁ , st₁)
@@ -1328,12 +1328,12 @@ data cascadeGo⇓ {n} {Γ} {t} {e} where
   casc-nil : ∀ {a vs fin sched₀ st₀}
            → cascadeGo⇓ a vs fin [] sched₀ st₀ ([] , sched₀ , st₀)
   casc-cut : ∀ {a vs fin rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀ r}
-           → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ true
+           → skipᵇ (arrSource a) rid st₀ ≡ true
            → cascadeGo⇓ a vs fin chains sched₀ st₀ r
            → cascadeGo⇓ a vs fin ((rid , c) ∷ chains) sched₀ st₀ r
   casc-live : ∀ {a vs fin rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀}
                 {emits sched₁ st₁ rest sched₂ st₂}
-            → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
+            → skipᵇ (arrSource a) rid st₀ ≡ false
             → chainStep⇓ a vs fin c sched₀
                 (markDlv fin rid st₀)
                 (emits , sched₁ , st₁)

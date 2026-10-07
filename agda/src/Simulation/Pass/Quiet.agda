@@ -48,7 +48,7 @@ open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattene
   PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
   inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
   MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip; partner-row)
-open import Simulation.After using (readᴾ; readᴵ; PairedR; module Kept)
+open import Simulation.After using (readᴾ; readᴵ; PairedR; skip-cut; module Kept)
 open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
@@ -1139,10 +1139,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                → ∀ {rI} → shareGo⇓ now (n ↑ʳ i) es false adm sI stI rI
                → After S ([] , sP , stP) rI
       quiet-go S F c [] _ _ _ go-nil = after S (λ x → x) (λ x → x) [] (λ x → x)
-      quiet-go S F c (slotpair (inj₁ _) ∷ ps) hP hI aI (go-cut _ g) =
+      quiet-go S F c (slotpair _ ∷ ps) hP hI aI (go-cut _ g) =
         quiet-go S F c ps (λ m → hP (there m)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g
-      quiet-go S F c (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ (go-live y _ _) = ⊥-elim (t≢f (trans (sym x) y))
-      quiet-go S F c (slotpair (inj₂ (_ , x , _)) ∷ _) _ _ _ (go-cut y _) = ⊥-elim (t≢f (trans (sym y) x))
+      quiet-go S F c (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ (go-live {i = i₀} {rid = rid} {st₀ = st₀} y _ _) =
+        ⊥-elim (t≢f (trans (sym (skip-cut {s = toℕ i₀} {rid} {st₀} x)) y))
       quiet-go S {i = i} F c (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP hI aI (go-live _ dI g) =
         A ⨾ quiet-go (After.store A) F c (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
               (λ m → hP (there m))

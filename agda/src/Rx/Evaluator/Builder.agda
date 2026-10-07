@@ -42,11 +42,10 @@
 module Rx.Evaluator.Builder where
 
 open import Data.Bool using (Bool; true; false; T)
-open import Data.Bool.ListAction using (any)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat using (zero; suc; _∸_; _≡ᵇ_)
+open import Data.Nat using (zero; suc; _∸_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -60,7 +59,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed; []ᵉ; Val; _≟ᵗ_)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; markDlv; Arrival; arrTick; arrTy; arrVal; arrSource; AtFloor;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; markDlv; skipᵇ; Arrival; arrTick; arrTy; arrVal; arrSource; AtFloor;
   RegId; RegRow; regSource; sameSource; pathHasNode; chainsGo; chainsOf; schedGo;
   cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
@@ -157,7 +156,7 @@ cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                cascadeGo⇓ {e = e} a vs fin chains sched st r × Rule (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 cascadeGo! a vs fin []               sched st ru sds ag = _ , casc-nil , ru
 cascadeGo! a vs fin ((rid , c) ∷ cs) sched st ru sds ag
-  with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
+  with skipᵇ (arrSource a) rid st in eqc
 ... | true  = cascadeGo! a vs fin cs sched st ru (λ x∈ → sds (there x∈))
                                     (λ x∈ y∈ → ag (there x∈) (there y∈)) |>′ λ (_ , g , ru′) →
               _ , casc-cut eqc g , ru′

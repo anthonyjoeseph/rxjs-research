@@ -36,7 +36,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Exp       using (Ctx; Closed; Val; Ty; _≟ᵗ_; uniqᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ;
   inrᵗ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; cascadeClose; shareSpend; shareDying;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; arrVal; arrTy; arrTick; arrSource; skipᵇ; cascadeClose; shareSpend; shareDying;
   memberSource; Path; share-sink; _↠[_]_; map-f; batchSync-f; thru-outer; from-inner;
   mergeAllᵒ; lookupNode; mergeAll-st; echoᵗ; thruEvents; thruWrap; RegId; RegRow; AtFloor;
   atDyn; atSlot; chainsOf; aliveThroughᶠ; batchSync-st; batchVals; setNode)
@@ -48,7 +48,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
 open import SExp.Elaborate using (inputStampᵖ)
 open import Simulation.Stores using (srcCount; SrcPair; Src; PathRel; InputBlock; block; hotEq; RowRel; cold~; defer~; []; _∷_;
   partner-row; Store)
-open import Simulation.After using (module Kept; readᴵ)
+open import Simulation.After using (module Kept; readᴵ; skip-cut)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (Clear; unthru; adv; Out; out-++; out-quiet; quiet-fold; NoBatch; rel-unbatched)
@@ -360,7 +360,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- partnered with, a cut one on both sides skipped
     fan-go : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {a : Arrival Γ}
                (εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)) {es now vs fin}
-           → CarriesU εI es vs → arrTick a ≡ now
+           → CarriesU εI es vs → arrTick a ≡ now → arrSource a ≡ toℕ i
            → ∀ {chs adm}
            → Pointwise (SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) chs adm
            → (∀ {x} → x ∈ chs → Sound (proj₂ (proj₂ x)) sP stP)
@@ -372,14 +372,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            → shareGo⇓ now (n ↑ʳ i) es fin adm sI stI (oI , sI₁ , stI₁)
            → After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁)
            × (fin ≡ false → ∀ {I} → DelU εI I es → Out I oI)
-    fan-go S εI c ta [] _ _ _ _ casc-nil go-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , λ _ _ → []
-    fan-go S εI c ta (slotpair (inj₁ _) ∷ ps) hP aP hI aI (casc-cut _ g) (go-cut _ g′) =
-      fan-go S εI c ta ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
-    fan-go S εI c ta (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (casc-live y _ _) _ = ⊥-elim (t≢f (trans (sym x) y))
-    fan-go S εI c ta (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ _ (casc-cut _ _) (go-live y _ _) = ⊥-elim (t≢f (trans (sym x) y))
-    fan-go S εI c ta (slotpair (inj₂ (x , _)) ∷ _) _ _ _ _ (casc-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
-    fan-go S εI c ta (slotpair (inj₂ (_ , x , _)) ∷ _) _ _ _ _ (casc-live _ _ _) (go-cut y _) = ⊥-elim (t≢f (trans (sym y) x))
-    fan-go S εI {fin = fin} c refl (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {emits = eI} _ dI g′) =
+    fan-go S εI c ta sa [] _ _ _ _ casc-nil go-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , λ _ _ → []
+    fan-go S εI c ta sa (slotpair _ ∷ ps) hP aP hI aI (casc-cut _ g) (go-cut _ g′) =
+      fan-go S εI c ta sa ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
+    fan-go S εI c ta sa (slotpair q ∷ _) _ _ _ _ (casc-cut y _) (go-live y′ _ _) =
+      ⊥-elim (t≢f (trans (sym y) (trans (cong (λ s → skipᵇ s _ _) sa) (trans (skip-alike S q) y′))))
+    fan-go S εI c ta sa (slotpair q ∷ _) _ _ _ _ (casc-live y _ _) (go-cut y′ _) =
+      ⊥-elim (t≢f (trans (sym y′) (trans (sym (trans (cong (λ s → skipᵇ s _ _) sa) (skip-alike S q))) y)))
+    fan-go S εI c ta sa (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (casc-live {a = a₀} {rid = rid} {st₀ = st₀} y _ _) (go-live _ _ _) =
+      ⊥-elim (t≢f (trans (sym (skip-cut {s = arrSource a₀} {rid} {st₀} x)) y))
+    fan-go S εI {fin = fin} c refl sa (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {emits = eI} _ dI g′) =
       rebase {fin = fin} (A ⨾ proj₁ R) , λ { refl d → out-++ eI _ (proj₂ X refl d) (proj₂ R refl d) }
       where
         sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
@@ -393,7 +395,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → Pointwise (SlotPair (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i) cs ds
         map-slot K []       = []
         map-slot {S₀ = S₀} {S₁ = S₁} K (r ∷ rs) = slot-keeps {S = S₀} {S₁ = S₁} K r ∷ map-slot {S₀ = S₀} {S₁ = S₁} K rs
-        R = fan-go (After.store A) εI c refl (map-slot {S₀ = S} {S₁ = After.store A} (After.keeps A) ps)
+        R = fan-go (After.store A) εI c refl sa (map-slot {S₀ = S} {S₁ = After.store A} (After.keeps A) ps)
               (λ m → fold-kept (unchain dP) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
               (λ m m′ → aP (there m) (there m′))
               (λ m → fold-kept dI sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))

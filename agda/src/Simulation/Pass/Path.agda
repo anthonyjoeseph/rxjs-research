@@ -37,7 +37,7 @@ open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Stores using (Lifts; sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
   outerElem~; outerExplode~; inner~; deferInner~; RowRel; read~; []; _∷_; partner-row;
   Store)
-open import Simulation.After using (module Kept)
+open import Simulation.After using (skip-cut; module Kept)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (Out; out-quiet; out-++; out-tail; Clear; ClearI; missed; unthru; step-clear; fold-clear; consume-clear; adv)
@@ -185,12 +185,12 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
                → sz-shareGo g < N
                → Σ (After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁)) λ _ → ∀ {I} → fin ≡ false → DelU εI I es → Out I oI
       share-go _ S εI c [] _ _ _ _ go-nil go-nil _ = after S (λ x → x) (λ x → x) [] (λ x → x) , λ _ _ → out-quiet [] refl
-      share-go wk S εI c (slotpair (inj₁ _) ∷ ps) hP aP hI aI (go-cut _ g) (go-cut _ g′) lt =
+      share-go wk S εI c (slotpair _ ∷ ps) hP aP hI aI (go-cut _ g) (go-cut _ g′) lt =
         share-go wk S εI c ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′ (sz-1 lt)
-      share-go _ S εI c (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (go-live y _ _) _ _ = ⊥-elim (t≢f (trans (sym x) y))
-      share-go _ S εI c (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ _ (go-cut _ _) (go-live y _ _) _ = ⊥-elim (t≢f (trans (sym x) y))
-      share-go _ S εI c (slotpair (inj₂ (x , _)) ∷ _) _ _ _ _ (go-cut y _) _ _ = ⊥-elim (t≢f (trans (sym y) x))
-      share-go _ S εI c (slotpair (inj₂ (_ , x , _)) ∷ _) _ _ _ _ (go-live _ _ _) (go-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
+      share-go _ S εI c (slotpair q ∷ _) _ _ _ _ (go-cut y _) (go-live y′ _ _) _ = ⊥-elim (t≢f (trans (sym y) (trans (skip-alike S q) y′)))
+      share-go _ S εI c (slotpair q ∷ _) _ _ _ _ (go-live y _ _) (go-cut y′ _) _ = ⊥-elim (t≢f (trans (sym y′) (trans (sym (skip-alike S q)) y)))
+      share-go _ S εI c (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (go-live {i = i₀} {rid = rid} {st₀ = st₀} y _ _) (go-live _ _ _) _ =
+        ⊥-elim (t≢f (trans (sym (skip-cut {s = toℕ i₀} {rid} {st₀} x)) y))
       share-go wk S {i = i} εI {fin = fin} c (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live {emits = eI} _ dI g′) lt =
         rebase {fin = fin} (A ⨾ proj₁ Y) , λ f ds → out-++ {Δ = plainᵏ Γ κ} {t = plainᵗ t} eI _ (proj₂ Z f ds) (proj₂ Y f ds)
         where
