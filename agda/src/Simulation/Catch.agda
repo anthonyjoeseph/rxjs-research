@@ -5,8 +5,9 @@
 -- restamp cell is not subscribe-kind restamps it there, a deferred
 -- body's restamp restamps it at the hop's token, and the root takes
 -- it at its own instant; a subscribe-kind cell restamps it at the
--- cell's own instant and passes it on.  A share's subject sends to rows
--- the derivation does not name, so nothing is caught there.
+-- cell's own instant and passes it on.  A share's subject sends a
+-- subscribe-kind emit to rows the derivation does not name, so nothing
+-- is caught there; any other emit keeps its instant through every frame.
 --
 -- The catch is read at a node table of its own, not the one the
 -- derivation is indexed by, so a walk's derivation can be read at the
@@ -102,20 +103,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   module _ {t : Ty} where
 
-    -- WHAT A RESTAMPED EMIT KEEPS ON ITS WAY UP: every frame but a
-    -- share's subject leaves a non-subscribe emit's instant alone
-    Delivers : ∀ {π NP NI lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → PathRel κ π {t} NP NI {lo} {lo′} {s} p q → Set
-    Delivers root~                     = ⊤
-    Delivers (sink~ _)                 = ⊥
-    Delivers (map~ _ d)                = Delivers d
-    Delivers (scan~ _ _ _ _ _ d)       = Delivers d
-    Delivers (takeWhile~ _ _ _ _ _ d)  = Delivers d
-    Delivers (spentWhile~ _ _ _ d)     = Delivers d
-    Delivers (outerElem~ _ d)          = Delivers d
-    Delivers (outerExplode~ _ d)       = Delivers d
-    Delivers (inner~ _ _ _ d)          = Delivers d
-    Delivers (deferInner~ _ _ _ _ _ _ d) = Delivers d
-
     -- AN EMIT SUBSCRIBE-KIND AT `f` LANDS AT `I`, read at the table `N`
     Catch : ℕ → ℕ → List (NodeId × NodeState (plainᵏ Γ κ))
           → ∀ {π NP NI lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → PathRel κ π {t} NP NI {lo} {lo′} {s} p q → Set
@@ -127,14 +114,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     Catch I f N (spentWhile~ _ _ _ d)    = Catch I f N d
     Catch I f N (outerElem~ {u = u} {ks = ks} _ d) =
       Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
-        × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I × Delivers d)
+        × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I)
     Catch I f N (outerExplode~ {u = u} {ks = ks} _ d) =
       Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
-        × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I × Delivers d)
+        × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I)
     Catch I f N (inner~ {u = u} {ks = ks} _ _ _ d) =
       Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
-        × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I × Delivers d)
-    Catch I f N (deferInner~ {ρ₀ = ρ₀} _ _ _ _ _ _ d) = lookupEnv ρ₀ (here refl) ≡ I × Delivers d
+        × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I)
+    Catch I f N (deferInner~ {ρ₀ = ρ₀} _ _ _ _ _ _ d) = lookupEnv ρ₀ (here refl) ≡ I
 
     -- WHAT A SUBSCRIBE LEAVES OF A CATCH: every restamp cell up to and
     -- including the one that catches holds the instant and kind it held
@@ -180,7 +167,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                → (d : PathRel κ π {t} NP NI (thru-outer o m ↠[ h ] p)
                         (map-f G₀ ↠[ h₁ ] (thru-outer o′ m′ ↠[ h₂ ] (scan-f G₁ ks ↠[ h₃ ] (map-f G₂ ↠[ h₄ ] q)))))
                → Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) (λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
-                   × ByKind c (λ i → Catch I i N (elem-tail d)) (λ i → i ≡ I × Delivers (elem-tail d)))
+                   × ByKind c (λ i → Catch I i N (elem-tail d)) (λ i → i ≡ I))
                → Catch I f N d
     elem-catch (outerElem~ _ d) x = x
 
@@ -196,16 +183,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      × proj₁ c′ ≡ proj₁ c × ByKind c (λ _ → Kept N N′ (elem-tail d)) (λ _ → ⊤))
               → Kept N N′ d
     elem-kept (outerElem~ _ d) x = x
-
-    elem-del : ∀ {π NP NI lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u x y o o′ m m′ ks}
-                 {G₀ : FnClo (plainᵏ Γ κ) (emitᵗ (echoᵗ u)) (echoᵗ x)} {G₁ : FnClo (plainᵏ Γ κ) (y ×ᵗ x) y}
-                 {G₂ : FnClo (plainᵏ Γ κ) y (emitᵗ u)}
-                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                 {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
-             → (d : PathRel κ π {t} NP NI (thru-outer o m ↠[ h ] p)
-                      (map-f G₀ ↠[ h₁ ] (thru-outer o′ m′ ↠[ h₂ ] (scan-f G₁ ks ↠[ h₃ ] (map-f G₂ ↠[ h₄ ] q)))))
-             → Delivers (elem-tail d) → Delivers d
-    elem-del (outerElem~ _ d) x = x
 
     -- the same, one element per inner
     explode-tail : ∀ {π NP NI lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u w x y o o′ o″ m m′ ks mX}
@@ -228,7 +205,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                            (map-f G₀ ↠[ h₁ ] (map-f G₅ ↠[ h₂ ] (thru-outer o″ mX ↠[ h₃ ]
                              (thru-outer o′ m′ ↠[ h₄ ] (scan-f G₁ ks ↠[ h₅ ] (map-f G₂ ↠[ h₆ ] q)))))))
                   → Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) (λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
-                      × ByKind c (λ i → Catch I i N (explode-tail d)) (λ i → i ≡ I × Delivers (explode-tail d)))
+                      × ByKind c (λ i → Catch I i N (explode-tail d)) (λ i → i ≡ I))
                   → Catch I f N d
     explode-catch (outerExplode~ _ d) x = x
 
@@ -246,17 +223,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → Kept N N′ d
     explode-kept (outerExplode~ _ d) x = x
 
-    explode-del : ∀ {π NP NI lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u w x y o o′ o″ m m′ ks mX}
-                    {G₀ : FnClo (plainᵏ Γ κ) (emitᵗ (echoᵗ u)) w} {G₅ : FnClo (plainᵏ Γ κ) w (echoᵗ (echoᵗ x))}
-                    {G₁ : FnClo (plainᵏ Γ κ) (y ×ᵗ x) y} {G₂ : FnClo (plainᵏ Γ κ) y (emitᵗ u)}
-                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
-                    {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                → (d : PathRel κ π {t} NP NI (thru-outer o m ↠[ h ] p)
-                         (map-f G₀ ↠[ h₁ ] (map-f G₅ ↠[ h₂ ] (thru-outer o″ mX ↠[ h₃ ]
-                           (thru-outer o′ m′ ↠[ h₄ ] (scan-f G₁ ks ↠[ h₅ ] (map-f G₂ ↠[ h₆ ] q)))))))
-                → Delivers (explode-tail d) → Delivers d
-    explode-del (outerExplode~ _ d) x = x
-
     -- a share's subject, at any impl path
     sink-kept : ∀ {N N′ π NP NI lo lo′ i h} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ (Data.Vec.lookup Γ i)) (emitᵗ t)}
                 (d : PathRel κ π {t} NP NI {lo} (share-sink i h) q) → Kept N N′ d
@@ -267,45 +233,41 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     record Same {π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
                 (d : PathRel κ π {t} NP NI p q) (d′ : PathRel κ π′ {t} NP′ NI′ p q) : Set where
       field
-        del : Delivers d → Delivers d′
         cat : ∀ {I f N} → Catch I f N d → Catch I f N d′
         kep : ∀ {N N′} → Kept N N′ d → Kept N N′ d′
 
     same : ∀ {π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
            (d : PathRel κ π {t} NP NI p q) (d′ : PathRel κ π′ {t} NP′ NI′ p q) → Same d d′
-    same root~ root~ = record { del = λ x → x ; cat = λ x → x ; kep = λ x → x }
-    same (sink~ _) d′ = record { del = λ () ; cat = λ () ; kep = λ _ → sink-kept d′ }
-    same (map~ _ d) (map~ _ d′) = let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+    same root~ root~ = record { cat = λ x → x ; kep = λ x → x }
+    same (sink~ _) d′ = record { cat = λ () ; kep = λ _ → sink-kept d′ }
+    same (map~ _ d) (map~ _ d′) = let S = same d d′ in record { cat = Same.cat S ; kep = Same.kep S }
     same (scan~ _ _ _ _ _ d) (scan~ _ _ _ _ _ d′) =
-      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+      let S = same d d′ in record { cat = Same.cat S ; kep = Same.kep S }
     same (takeWhile~ _ _ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) =
-      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+      let S = same d d′ in record { cat = Same.cat S ; kep = Same.kep S }
     same (takeWhile~ _ _ _ _ _ d) (spentWhile~ _ _ _ d′) =
-      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+      let S = same d d′ in record { cat = Same.cat S ; kep = Same.kep S }
     same (spentWhile~ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) =
-      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+      let S = same d d′ in record { cat = Same.cat S ; kep = Same.kep S }
     same (spentWhile~ _ _ _ d) (spentWhile~ _ _ _ d′) =
-      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+      let S = same d d′ in record { cat = Same.cat S ; kep = Same.kep S }
     same (outerElem~ _ d) d′ =
       let S = same d (elem-tail d′) in record
-        { del = λ x → elem-del d′ (Same.del S x)
-        ; cat = λ (c , l , b) → elem-catch d′ (c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ (e , x) → e , Same.del S x) b)
+        { cat = λ (c , l , b) → elem-catch d′ (c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ e → e) b)
         ; kep = λ k → elem-kept d′ λ c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
         }
     same (outerExplode~ _ d) d′ =
       let S = same d (explode-tail d′) in record
-        { del = λ x → explode-del d′ (Same.del S x)
-        ; cat = λ (c , l , b) → explode-catch d′ (c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ (e , x) → e , Same.del S x) b)
+        { cat = λ (c , l , b) → explode-catch d′ (c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ e → e) b)
         ; kep = λ k → explode-kept d′ λ c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
         }
     same (inner~ _ _ _ d) (inner~ _ _ _ d′) =
       let S = same d d′ in record
-        { del = Same.del S
-        ; cat = λ (c , l , b) → c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ (e , x) → e , Same.del S x) b
+        { cat = λ (c , l , b) → c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ e → e) b
         ; kep = λ k c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
         }
     same (deferInner~ _ _ _ _ _ _ d) (deferInner~ _ _ _ _ _ _ d′) =
-      let S = same d d′ in record { del = Same.del S ; cat = λ (e , x) → e , Same.del S x ; kep = λ _ → tt }
+      let S = same d d′ in record { cat = λ e → e ; kep = λ _ → tt }
 
     catch-same : ∀ {I f N π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
                  (d : PathRel κ π {t} NP NI p q) (d′ : PathRel κ π′ {t} NP′ NI′ p q) → Catch I f N d → Catch I f N d′
