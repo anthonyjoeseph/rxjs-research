@@ -328,6 +328,15 @@ postulate
   -- WITH: its input block's merge subscribes the stamp, whose mint
   -- draws that counter, and the share's readers carry the instant down.
   -- `hot-block`'s hypotheses, at the stamp instead of the values.
+  --
+  -- THE ROUTE IS A DRAW THEN A CARRY.  The draw is the block's alone and
+  -- inverts as `hot-block` does, down to the merge subscribing the
+  -- stamp's `mintᵉ`.  The carry is per former and owes a unary relation
+  -- on values by type: below the block every emit's instant is copied
+  -- (`mapStepᵖ`'s reassemble), or restamped by `flatStepᵛ` with the last
+  -- instant the flattener put out, which a filtered value still echoes;
+  -- a read's subscribe burst takes the frame and is restamped by the
+  -- flattener it runs under.
   hot-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                        {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
     → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
@@ -357,8 +366,9 @@ postulate
     → srcCount (Arrival.source a′) (EvalSt.registry stI) ≤ 1
 
   -- A MINTED SOURCE'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED WITH: a
-  -- cold script's input block draws the instant, a hop's body carries
-  -- it, and so does every frame below either.
+  -- cold script's input block draws the instant, a hop's body draws it
+  -- in `deferBodyᵖ`'s `mintᵉ`, and every frame below either carries it,
+  -- by `hot-chain-stamps`'s route.
   dyn-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                        {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI

@@ -250,27 +250,13 @@ bound or not, unrelated; a pop unrelating a read; a map moving time; a close
 emptying a named merge; a hot end past its block; a two-value emit; a cut
 over a testless budget; a flatten write moving a row; a cut or
 liveness unpairing; a drain or body end (μ too)
-unrelating inners; unsound walks or reads.
+unrelating inners; unsound walks or reads; two chains
+stamping one arrival.
 Left: which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **SPLIT EACH ARRIVAL'S ONE CHAIN BY ITS ROW.** `value-stamps` is a
-  body by arrival kind down to one chain: a connected hot slot's
-  (`hot-chain-stamps`) or a minted source's (`dyn-chain-stamps`, one by
-  `dyn-one`). Split the minted chain by its row, `cold~`'s block drawing
-  the instant and `defer~`'s hop carrying it, then `end-stamps` the same
-  way. Ruled out: two instants in one arrival from two chains; an instant
-  other than the entering counter, `make qc-same-clock` green on 91.
-
-- **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
-  relation recursing on the type as `Red` does, reusing its descent for
-  the μ peel, the flattener's hop and a share's connect; the batcher's
-  leaves are list lemmas. A case the impl's one-past fuel slack in
-  `left-to-right` does not cover is a fuel finding for Anthony, not a
-  restatement.
 
 - **PROBE THE WALK'S UNEVIDENCED LEAVES.** `of-carries` and
   `flat-install{,-explode}` have never been instantiated; both compute on
@@ -279,6 +265,20 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   flattener of each policy, and a red is a restatement before the grind
   inherits it. Ruled out: the reads, hot, shared and cold, swept green
   under flatteners and defers; `μ-unfolds` under every value binder.
+
+- **STATE THE STAMP'S CARRY.** Each arrival's value pass is one chain
+  (`hot-chain-stamps`, `dyn-chain-stamps`, `dyn-one` green on 160
+  programs). Restate both as the block's draw, proven by inverting the
+  chain as `hot-block` does, over a carry leaf per former below it, the
+  unary twin of the values' relation. `end-stamps` is impl-only, so its
+  one chain is owed at the value pass's state: state that bound first.
+
+- **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
+  relation recursing on the type as `Red` does, reusing its descent for
+  the μ peel, the flattener's hop and a share's connect; the batcher's
+  leaves are list lemmas. A case the impl's one-past fuel slack in
+  `left-to-right` does not cover is a fuel finding for Anthony, not a
+  restatement.
 
 ### The ledger
 
