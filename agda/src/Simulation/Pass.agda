@@ -375,10 +375,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     fan-go S εI c ta sa [] _ _ _ _ casc-nil go-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , λ _ _ → []
     fan-go S εI c ta sa (slotpair _ ∷ ps) hP aP hI aI (casc-cut _ g) (go-cut _ g′) =
       fan-go S εI c ta sa ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
-    fan-go S εI c ta sa (slotpair q ∷ _) _ _ _ _ (casc-cut y _) (go-live y′ _ _) =
-      ⊥-elim (t≢f (trans (sym y) (trans (cong (λ s → skipᵇ s _ _) sa) (trans (skip-alike S q) y′))))
-    fan-go S εI c ta sa (slotpair q ∷ _) _ _ _ _ (casc-live y _ _) (go-cut y′ _) =
-      ⊥-elim (t≢f (trans (sym y′) (trans (sym (trans (cong (λ s → skipᵇ s _ _) sa) (skip-alike S q))) y)))
+    fan-go S εI c ta sa (slotpair q ∷ _) _ _ _ _ (casc-cut {rid = rid} {st₀ = st₀} y _) (go-live y′ _ _) =
+      ⊥-elim (t≢f (trans (sym y) (trans (cong (λ s → skipᵇ s rid st₀) sa) (trans (skip-alike S q) y′))))
+    fan-go S εI c ta sa (slotpair q ∷ _) _ _ _ _ (casc-live {rid = rid} {st₀ = st₀} y _ _) (go-cut y′ _) =
+      ⊥-elim (t≢f (trans (sym y′) (trans (sym (trans (cong (λ s → skipᵇ s rid st₀) sa) (skip-alike S q))) y)))
     fan-go S εI c ta sa (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (casc-live {a = a₀} {rid = rid} {st₀ = st₀} y _ _) (go-live _ _ _) =
       ⊥-elim (t≢f (trans (sym (skip-cut {s = arrSource a₀} {rid} {st₀} x)) y))
     fan-go S εI {fin = fin} c refl sa (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {emits = eI} _ dI g′) =
