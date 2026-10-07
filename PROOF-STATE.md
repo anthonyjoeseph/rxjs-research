@@ -257,14 +257,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **TEST THE HOP BODY'S BURST, THEN STATE ITS CARRY.**
-  `hop-body-stamps` owes a deferred body's whole subscribe at the token,
-  and a cold read inside the body draws its own block's instant, so the
-  burst is at the token only if the body's restamp catches it. Bug-cache
-  rows run the shapes: a cold's synchronous value, a share the hop
-  connects, both merged. Red refutes the leaf; green aims its carry, the
-  restamp over subscribe-kind emits, then the hop's merge's inner frame
-  over `PathRel`.
+- **SPLIT THE HOP BODY AT ITS RESTAMP.** Bug-cache rows put every
+  body's synchronous burst at the hop's instant (a cold's value, a share
+  the hop connects, both merged), so `hop-body-stamps` is aimed, not
+  refuted. `restampᵛ` moves only subscribe-kind emits, so the leaf is two
+  claims: the body's own subscribe puts out subscribe-kind emits or
+  deliveries stamped inside the token's window, the risky one and the
+  leaf to keep; and the marker merge, the restamp map, the hop's merge's
+  inner frame and the tail carry that, which becomes a body.
 
 - **STATE THE CARRY.** One leaf per former: an emit's instant copied by
   every map, scan and cutter (each reassembles around the arriving emit),

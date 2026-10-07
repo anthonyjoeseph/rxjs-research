@@ -444,6 +444,12 @@ postulate
   -- body's instants on each hop arrival: seed 27 at depth 3, fuel 12, μ
   -- off, 74 agree and 26 undecided; seed 26 with μ on agreed on 42
   -- before a μ ran the binary out of memory.
+  --
+  -- The bug-cache rows "a deferred read of a cold with a synchronous
+  -- value", "… of a share its hop connects, over a cold" and "a deferred
+  -- cold read merged beside a read of the share it feeds" print each
+  -- body's synchronous burst, a share's connect included, at the hop's
+  -- own instant, and its later values at their own blocks' instants.
   hop-body-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
     → (S : Storeʳ κ sP stP sI stI)
