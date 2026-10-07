@@ -785,6 +785,16 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
                                              (blockNodes (proj₂ (proj₂ (proj₂ r)))))
                 (indexed 0 RI)
 
+    -- a deferred body's hop merge under its marker, as (hop , marker)
+    hopMarks : ∀ {lo s u} → Path Γ′ lo s u → List (NodeId × NodeId)
+    hopMarks (from-inner _ m2 _ ↠[ _ ] (map-f _ ↠[ _ ] (from-inner _ h _ ↠[ _ ] q))) = (h , m2) ∷ hopMarks q
+    hopMarks (_ ↠[ _ ] q) = hopMarks q
+    hopMarks _            = []
+
+    hopOne : Bool
+    hopOne = all (λ (a , b) → all (λ (c , d) → not (a ≡ᵇ c) ∨ (b ≡ᵇ d)) hs) hs
+      where hs = concatMap (λ r → hopMarks (proj₂ (proj₂ (proj₂ r)))) RI
+
     -- every field but the rows, first failure named
     plain : List (String × Bool)
     plain =
@@ -805,6 +815,8 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       ∷ ("census" , all (λ i → censusAt (lookup κ i) (toℕ i)) (allFin n))
       ∷ ("owned" , owned)
       -- not a field: `dyn-one`, a minted source's rows in the impl's registry
+      -- not a field: `hop-one`, every impl row through a hop merge under the one marker
+      ∷ ("hop-one" , hopOne)
       ∷ ("dyn-one" , all (λ l → not ((n + n) <ᵇ LiveSource.source l) ∨ (srcCount (LiveSource.source l) RI ≤ᵇ 1)) LI)
       ∷ []
 
