@@ -244,30 +244,30 @@ undecided, never a failure (Anthony).
 arrivals over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: an arrival plain lacks or split, an instant's gap or stray, an echo
-off inners, payload; a subscribe unrelated; a pop unrelating a read; a map
+off inners, payload; subscribes unrelated; a pop unrelating reads; a map
 moving time; a close emptying merges; a hot end past its block; a
 two-value emit; a testless cut; a write moving a row;
 a cut, liveness, drain or body end unpairing; unsound walks, reads; two
-stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain past a quiet
-cut; a hop's script; root stamps off the walk; a joiner off its catch;
-quiet folds. Left: a cascade.
+stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain past a
+quiet cut; a hop's script; root stamps unwalked; a joiner off its catch;
+quiet folds; installs. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
-  `while-install` write only at keys at or above the counters, and every
-  node a relation reads is a key or value of `π`, below them by
-  `Store.pairs-below`, or a registered row's, below them by the rule. A
-  generic fresh-write over `PathRel` and the registry, with `π` grown as
-  `mint-pair` grows it, gives all four bodies.
 
 - **PROVE THE QUIET FOLD.** `quiet-fold` by induction on the fold handed
   nothing: a map maps nothing, a scan's, test's and batch's dispatch on no
   values and no end sends nothing, an outer walks no events, an inner
   reacts to nothing, and the sink is `disp-quiet`. Turns every block's and
   hop's wrap the cascade passes from swept silent into proven silent.
+
+- **PROVE THE HOP INSTALL.** `defer-install` over `install`'s transport:
+  the merge pair joins `π` as a fresh install's does, the new sources pair
+  as `defer~`'s, numbered above every live one by `Store.bounded`, and the
+  new rows pair as `defer~` over the tails, their ids above every
+  registered one by `Store.fresh-ids`. Turns a deferred subscribe's
+  opening from probed at the root into proven under any store.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -360,16 +360,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`defer-install`** (Simulation.Walk) — FALSITY, `PROBED`: a hop's merge,
   source and row installed on both sides pair as `defer~` and keep the tails
   related; holds at a deferred hot read at the root.
-- **`flat-install{,-explode}`** (Simulation.Walk) — FALSITY, `PROBED×2`: a
-  flattener's nodes and the impl's restamping cell, and per-inner merge,
-  installed on both sides pair in `π` and keep the tails related; green at the
-  opening stores, not under a registered row.
-- **`scan-install`** (Simulation.Walk) — FALSITY, `PROBED`: a scan's cell
-  installed on both sides pairs in `π` and keeps the tails related; green at
-  the opening stores only.
-- **`while-install`** (Simulation.Walk) — FALSITY, `PROBED`: a takeWhile's test
-  and cell installed on both sides pair in `π` and keep the tails related;
-  green at the opening stores only.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot

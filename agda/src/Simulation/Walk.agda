@@ -16,7 +16,7 @@
 module Simulation.Walk where
 
 open import Data.List    using (List; []; _∷_; map)
-open import Data.List.Relation.Unary.AllPairs using ([])
+open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.All.Properties using (map⁺; concat⁺; tabulate⁺)
@@ -63,6 +63,7 @@ open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import Simulation.Schedules using (Sync)
 open import Simulation.After using (readᴾ; readᴵ; module Kept)
 open import Simulation.Write using (apart)
+open import Simulation.Install using (install; fresh-set)
 open import Simulation.Catch using (Kept; Stamps; AtFrame; OnPath; on-path; catch-same; kept-same; kept-trans; kept-catch;
   kept-unmoved; unmoved-set; by-sub; by-sub⁻)
 open Kept using (After; module After; _⨾_)
@@ -434,89 +435,93 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
                      → Stamps κ f pr stI rI
 
-    postulate
-      -- A CELL INSTALLED ON BOTH SIDES, the impl's under its mint: the
-      -- pair joins `π` and the tails stay related
-      -- PROBED: `Probed.Walk-Leaves` -- at the opening stores and root
-      --   paths: the pair joins `π` below the moved counters, the rule
-      --   kept.  No row registered, not below a frame.
-      scan-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
-                       {k k′ src} (a : Val Γ u) (aI : Val (plainᵏ Γ κ) (ScanAᵗ u))
-                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                   → freshId nodeᵏ (Sched.mint sP) ≡ k
-                   → freshId sourceᵏ (Sched.mint sI) ≡ src
-                   → freshId nodeᵏ (setAt sourceᵏ (suc src) (Sched.mint sI)) ≡ k′
-                   → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc k) (Sched.mint sP) } , installNode k (cell-st {t = u} a) stP)
-                                  ([] , record sI { mint = setAt nodeᵏ (suc k′) (setAt sourceᵏ (suc src) (Sched.mint sI)) }
-                                      , installNode k′ (cell-st {t = ScanAᵗ u} aI) stI)) λ A
-                       → (k , k′ ∷ []) ∈ Store.π (After.store A)
-                       × PathRel κ (Store.π (After.store A)) (setNode k (cell-st {t = u} a) (EvalSt.nodes stP))
-                           (setNode k′ (cell-st {t = ScanAᵗ u} aI) (EvalSt.nodes stI)) p q
+    -- A CELL INSTALLED ON BOTH SIDES, the impl's under its mint: the
+    -- pair joins `π` and the tails stay related
+    scan-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
+                     {k k′ src} (a : Val Γ u) (aI : Val (plainᵏ Γ κ) (ScanAᵗ u))
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → freshId nodeᵏ (Sched.mint sP) ≡ k
+                 → freshId sourceᵏ (Sched.mint sI) ≡ src
+                 → freshId nodeᵏ (setAt sourceᵏ (suc src) (Sched.mint sI)) ≡ k′
+                 → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc k) (Sched.mint sP) } , installNode k (cell-st {t = u} a) stP)
+                                ([] , record sI { mint = setAt nodeᵏ (suc k′) (setAt sourceᵏ (suc src) (Sched.mint sI)) }
+                                    , installNode k′ (cell-st {t = ScanAᵗ u} aI) stI)) λ A
+                     → (k , k′ ∷ []) ∈ Store.π (After.store A)
+                     × PathRel κ (Store.π (After.store A)) (setNode k (cell-st {t = u} a) (EvalSt.nodes stP))
+                         (setNode k′ (cell-st {t = ScanAᵗ u} aI) (EvalSt.nodes stI)) p q
+    scan-install {stP = stP} {stI = stI} S {u = u} a aI pr refl refl refl =
+      install κ S ≤-refl (n≤1+n _) (≤-refl ∷ []) (≤-refl ∷ []) ([] ∷ []) ≤-refl ≤-refl (n≤1+n _) ≤-refl
+        (fresh-set _ (cell-st {t = u} a) (EvalSt.nodes stP) ≤-refl) (fresh-set _ (cell-st {t = ScanAᵗ u} aI) (EvalSt.nodes stI) ≤-refl) pr
 
-      -- A TEST INSTALLED ON BOTH SIDES, the impl's test and cell under
-      -- its mint: the triple joins `π` and the tails stay related
-      -- PROBED: `Probed.Walk-Leaves` -- as `scan-install`, the test and
-      --   its cell apart.
-      while-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
-                        {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
-                        {k k₁ k₂ src} (c : Val (plainᵏ Γ κ) (CutS unitᵗ u))
-                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                    → freshId nodeᵏ (Sched.mint sP) ≡ k
-                    → freshId sourceᵏ (Sched.mint sI) ≡ src
-                    → freshId nodeᵏ (setAt sourceᵏ (suc src) (Sched.mint sI)) ≡ k₂
-                    → suc k₂ ≡ k₁
-                    → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc k) (Sched.mint sP) } , installNode k (take-st 1) stP)
-                                   ([] , record sI { mint = setAt nodeᵏ (suc k₁) (setAt nodeᵏ (suc k₂) (setAt sourceᵏ (suc src) (Sched.mint sI))) }
-                                       , installNode k₁ (cell-st {t = CutS unitᵗ u} c) (installNode k₂ (take-st 1) stI))) λ A
-                        → (k , k₁ ∷ k₂ ∷ []) ∈ Store.π (After.store A)
-                        × PathRel κ (Store.π (After.store A)) (setNode k (take-st 1) (EvalSt.nodes stP))
-                            (setNode k₁ (cell-st {t = CutS unitᵗ u} c) (setNode k₂ (take-st 1) (EvalSt.nodes stI))) p q
+    -- A TEST INSTALLED ON BOTH SIDES, the impl's test and cell under
+    -- its mint: the triple joins `π` and the tails stay related
+    while-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                      {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
+                      {k k₁ k₂ src} (c : Val (plainᵏ Γ κ) (CutS unitᵗ u))
+                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                  → freshId nodeᵏ (Sched.mint sP) ≡ k
+                  → freshId sourceᵏ (Sched.mint sI) ≡ src
+                  → freshId nodeᵏ (setAt sourceᵏ (suc src) (Sched.mint sI)) ≡ k₂
+                  → suc k₂ ≡ k₁
+                  → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc k) (Sched.mint sP) } , installNode k (take-st 1) stP)
+                                 ([] , record sI { mint = setAt nodeᵏ (suc k₁) (setAt nodeᵏ (suc k₂) (setAt sourceᵏ (suc src) (Sched.mint sI))) }
+                                     , installNode k₁ (cell-st {t = CutS unitᵗ u} c) (installNode k₂ (take-st 1) stI))) λ A
+                      → (k , k₁ ∷ k₂ ∷ []) ∈ Store.π (After.store A)
+                      × PathRel κ (Store.π (After.store A)) (setNode k (take-st 1) (EvalSt.nodes stP))
+                          (setNode k₁ (cell-st {t = CutS unitᵗ u} c) (setNode k₂ (take-st 1) (EvalSt.nodes stI))) p q
+    while-install {stP = stP} {stI = stI} S {u = u} c pr refl refl refl refl =
+      install κ S ≤-refl (≤-trans (n≤1+n _) (n≤1+n _)) (n≤1+n _ ∷ ≤-refl ∷ []) (≤-refl ∷ n≤1+n _ ∷ []) ((1+n≢n ∷ []) ∷ [] ∷ [])
+        ≤-refl ≤-refl (n≤1+n _) ≤-refl
+        (fresh-set _ (take-st 1) (EvalSt.nodes stP) ≤-refl)
+        (λ j lt → trans (fresh-set _ (cell-st {t = CutS unitᵗ u} c) (setNode _ (take-st 1) (EvalSt.nodes stI)) (n≤1+n _) j lt) (fresh-set _ (take-st 1) (EvalSt.nodes stI) ≤-refl j lt)) pr
 
-      -- A FLATTENER INSTALLED ON BOTH SIDES, the impl's restamping cell
-      -- under it: the triple joins `π` and the tails stay related.
-      -- Read off normal forms: a one-lane merge of the
-      -- hot read installs what the relation says -- `π` pairing the plain
-      -- merge node with the impl's lane node and cell -- and the
-      -- typechecked row of that merge under a live read does not finish,
-      -- a coverage boundary.
-      -- PROBED: `Probed.Walk-Leaves` -- every policy, at the opening
-      --   stores and root paths: the pair joins `π` apart and below the
-      --   counters, the rule kept.  No row registered, so no row runs
-      --   through a paired node; not below a frame.
-      flat-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
-                       {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
-                       (op : FlatOp) {m m′ ks} (c : Val (plainᵏ Γ κ) (FlatSᵗ u))
-                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                   → freshId nodeᵏ (Sched.mint sP) ≡ m
-                   → freshId nodeᵏ (Sched.mint sI) ≡ ks
-                   → suc ks ≡ m′
-                   → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc m) (Sched.mint sP) } , installNode m (flatSt u op) stP)
-                                  ([] , record sI { mint = setAt nodeᵏ (suc m′) (setAt nodeᵏ (suc ks) (Sched.mint sI)) }
-                                      , installNode m′ (flatSt (emitᵗ u) op) (installNode ks (cell-st {t = FlatSᵗ u} c) stI))) λ A
-                       → (m , m′ ∷ ks ∷ []) ∈ Store.π (After.store A)
-                       × PathRel κ (Store.π (After.store A)) (setNode m (flatSt u op) (EvalSt.nodes stP))
-                           (setNode m′ (flatSt (emitᵗ u) op) (setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI))) p q
+    -- A FLATTENER INSTALLED ON BOTH SIDES, the impl's restamping cell
+    -- under it: the triple joins `π` and the tails stay related
+    flat-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                     {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
+                     (op : FlatOp) {m m′ ks} (c : Val (plainᵏ Γ κ) (FlatSᵗ u))
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → freshId nodeᵏ (Sched.mint sP) ≡ m
+                 → freshId nodeᵏ (Sched.mint sI) ≡ ks
+                 → suc ks ≡ m′
+                 → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc m) (Sched.mint sP) } , installNode m (flatSt u op) stP)
+                                ([] , record sI { mint = setAt nodeᵏ (suc m′) (setAt nodeᵏ (suc ks) (Sched.mint sI)) }
+                                    , installNode m′ (flatSt (emitᵗ u) op) (installNode ks (cell-st {t = FlatSᵗ u} c) stI))) λ A
+                     → (m , m′ ∷ ks ∷ []) ∈ Store.π (After.store A)
+                     × PathRel κ (Store.π (After.store A)) (setNode m (flatSt u op) (EvalSt.nodes stP))
+                         (setNode m′ (flatSt (emitᵗ u) op) (setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI))) p q
+    flat-install {stP = stP} {stI = stI} S {u = u} op c pr refl refl refl =
+      install κ S ≤-refl (≤-trans (n≤1+n _) (n≤1+n _)) (n≤1+n _ ∷ ≤-refl ∷ []) (≤-refl ∷ n≤1+n _ ∷ []) ((1+n≢n ∷ []) ∷ [] ∷ [])
+        ≤-refl ≤-refl ≤-refl ≤-refl
+        (fresh-set _ (flatSt u op) (EvalSt.nodes stP) ≤-refl)
+        (λ j lt → trans (fresh-set _ (flatSt (emitᵗ u) op) (setNode _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)) (n≤1+n _) j lt) (fresh-set _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI) ≤-refl j lt)) pr
 
-      -- the same with the impl's per-inner merge under the flattener:
-      -- the merge's node rides the quadruple
-      -- PROBED: `Probed.Walk-Leaves` -- as `flat-install`, the merge's
-      --   node apart from the flattener's and its cell's.
-      flat-install-explode : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
-                               {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
-                               (op : FlatOp) {m m′ ks mX} (c : Val (plainᵏ Γ κ) (FlatSᵗ u))
-                           → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                           → freshId nodeᵏ (Sched.mint sP) ≡ m
-                           → freshId nodeᵏ (Sched.mint sI) ≡ ks
-                           → suc ks ≡ m′
-                           → suc m′ ≡ mX
-                           → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc m) (Sched.mint sP) } , installNode m (flatSt u op) stP)
-                                          ([] , record sI { mint = setAt nodeᵏ (suc mX) (setAt nodeᵏ (suc m′) (setAt nodeᵏ (suc ks) (Sched.mint sI))) }
-                                              , installNode mX (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing))
-                                                  (installNode m′ (flatSt (emitᵗ u) op) (installNode ks (cell-st {t = FlatSᵗ u} c) stI)))) λ A
-                               → (m , m′ ∷ ks ∷ mX ∷ []) ∈ Store.π (After.store A)
-                               × PathRel κ (Store.π (After.store A)) (setNode m (flatSt u op) (EvalSt.nodes stP))
-                                   (setNode mX (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing))
-                                     (setNode m′ (flatSt (emitᵗ u) op) (setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)))) p q
+    -- the same with the impl's per-inner merge under the flattener:
+    -- the merge's node rides the quadruple
+    flat-install-explode : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                             {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
+                             (op : FlatOp) {m m′ ks mX} (c : Val (plainᵏ Γ κ) (FlatSᵗ u))
+                         → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                         → freshId nodeᵏ (Sched.mint sP) ≡ m
+                         → freshId nodeᵏ (Sched.mint sI) ≡ ks
+                         → suc ks ≡ m′
+                         → suc m′ ≡ mX
+                         → Σ (After κ S ([] , record sP { mint = setAt nodeᵏ (suc m) (Sched.mint sP) } , installNode m (flatSt u op) stP)
+                                        ([] , record sI { mint = setAt nodeᵏ (suc mX) (setAt nodeᵏ (suc m′) (setAt nodeᵏ (suc ks) (Sched.mint sI))) }
+                                            , installNode mX (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing))
+                                                (installNode m′ (flatSt (emitᵗ u) op) (installNode ks (cell-st {t = FlatSᵗ u} c) stI)))) λ A
+                             → (m , m′ ∷ ks ∷ mX ∷ []) ∈ Store.π (After.store A)
+                             × PathRel κ (Store.π (After.store A)) (setNode m (flatSt u op) (EvalSt.nodes stP))
+                                 (setNode mX (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing))
+                                   (setNode m′ (flatSt (emitᵗ u) op) (setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)))) p q
+    flat-install-explode {stP = stP} {stI = stI} S {u = u} op c pr refl refl refl refl =
+      install κ S ≤-refl (≤-trans (n≤1+n _) (≤-trans (n≤1+n _) (n≤1+n _)))
+        (n≤1+n _ ∷ ≤-refl ∷ ≤-trans (n≤1+n _) (n≤1+n _) ∷ []) (n≤1+n _ ∷ ≤-trans (n≤1+n _) (n≤1+n _) ∷ ≤-refl ∷ [])
+        ((1+n≢n ∷ <⇒≢ ≤-refl ∷ []) ∷ (<⇒≢ (n≤1+n _) ∷ []) ∷ [] ∷ [])
+        ≤-refl ≤-refl ≤-refl ≤-refl
+        (fresh-set _ (flatSt u op) (EvalSt.nodes stP) ≤-refl)
+        (λ j lt → trans (fresh-set _ (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing)) (setNode _ (flatSt (emitᵗ u) op) (setNode _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI))) (≤-trans (n≤1+n _) (n≤1+n _)) j lt)
+                 (trans (fresh-set _ (flatSt (emitᵗ u) op) (setNode _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)) (n≤1+n _) j lt) (fresh-set _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI) ≤-refl j lt))) pr
 
     postulate
       -- A HOP INSTALLED ON BOTH SIDES, the body pending: the merge pair
