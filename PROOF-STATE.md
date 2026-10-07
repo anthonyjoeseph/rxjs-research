@@ -50,38 +50,7 @@ code.
   greps or it errors.
 - **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
   IT IS DRAWN FROM (Anthony).** Every tier opens with a
-  `### Big picture tier roadmap
-
-- **SPLIT THE STAMP WALKS INTO DRAW AND CARRY.** `hot-chain-stamps` is a
-  body down to `hot-walk-stamps`, whose walk subscribes the stamp's one
-  `mintᵉ (ofᵉ …)` and hands its emit to the share. Invert it into the
-  draw, computable at any store, and a leaf carrying one emit at the
-  drawn instant through the share's readers; take `dyn-chain-stamps` the
-  same way through a cold block and a hop's `deferBodyᵖ`. Ruled out: a
-  stamp drawn after anything in the chain before the walk.
-
-- **STATE THE CARRY.** One leaf per former: an emit's instant copied by
-  every map, scan and cutter (each reassembles around the arriving emit),
-  and a flattener's restamp cell set by the echo leaving ahead of its
-  lane, so a subscribe burst behind it takes the instant. `end-stamps` is
-  impl-only, so its one chain is owed at the value pass's state: state
-  that bound first.
-
-- **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
-  `while-install` write only at keys at or above the counters, and every
-  node a relation reads is a key or value of `π`, below them by
-  `Store.pairs-below`, or a registered row's, below them by the rule. A
-  generic fresh-write over `PathRel` and the registry, with `π` grown as
-  `mint-pair` grows it, gives all four bodies.
-
-- **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
-  relation recursing on the type as `Red` does, reusing its descent for
-  the μ peel, the flattener's hop and a share's connect; the batcher's
-  leaves are list lemmas. A case the impl's one-past fuel slack in
-  `left-to-right` does not cover is a fuel finding for Anthony, not a
-  restatement.
-
-### The ledger` carrying
+  `### Big picture tier roadmap` ... `### The ledger` carrying
   the rows. A leg is a GROUP: several postulates sharing a currency, a
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
@@ -289,22 +258,26 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **PROBE THE INSTALLS UNDER A LIVE ROW.** `flat-install{,-explode}`,
-  `scan-install` and `while-install` hold at the opening stores, where no
-  row runs through a node; their risk is a registered row's path read
-  over the tables the install writes. Build the store a scan of the hot
-  read leaves, its row through the paired cell, by hand as
-  `Probed.Stores` builds its rows, and install each above it; a red is a
-  restatement. Ruled out: an `of` mis-split; any install colliding nodes
-  at the opening stores; a scan or test reading the author's variables
-  at the slot the mint's binder took, at one payload.
+- **SPLIT THE STAMP WALKS INTO DRAW AND CARRY.** `hot-chain-stamps` is a
+  body down to `hot-carry-stamps`: one delivery-kind emit at the drawn
+  instant, folded out of the block's merge at its pinned state. Take
+  `dyn-chain-stamps` the same way through a cold block and a hop's
+  `deferBodyᵖ`. Ruled out: a hot stamp drawn anywhere but the stamp's
+  `mintᵉ`, or a queued inner in the block's merge drawing a second.
 
-- **STATE THE STAMP'S CARRY.** Each arrival's value pass is one chain
-  (`hot-chain-stamps`, `dyn-chain-stamps`, `dyn-one` green on 160
-  programs). Restate both as the block's draw, proven by inverting the
-  chain as `hot-block` does, over a carry leaf per former below it, the
-  unary twin of the values' relation. `end-stamps` is impl-only, so its
-  one chain is owed at the value pass's state: state that bound first.
+- **STATE THE CARRY.** One leaf per former: an emit's instant copied by
+  every map, scan and cutter (each reassembles around the arriving emit),
+  and a flattener's restamp cell set by the echo leaving ahead of its
+  lane, so a subscribe burst behind it takes the instant. `end-stamps` is
+  impl-only, so its one chain is owed at the value pass's state: state
+  that bound first.
+
+- **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
+  `while-install` write only at keys at or above the counters, and every
+  node a relation reads is a key or value of `π`, below them by
+  `Store.pairs-below`, or a registered row's, below them by the rule. A
+  generic fresh-write over `PathRel` and the registry, with `π` grown as
+  `mint-pair` grows it, gives all four bodies.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -363,9 +336,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot; one hot script only, so no two compared.
-- **`hot-walk-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: past a
-  connected hot slot's bracket, the merge's walk stamps at the counter the
-  chain entered with.
+- **`hot-carry-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: one
+  delivery-kind emit at the drawn instant, folded out of a hot block's merge,
+  leaves every emit at that instant.
 - **`dyn-one`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
   source has at most one row in the impl's registry.
 - **`dyn-chain-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a

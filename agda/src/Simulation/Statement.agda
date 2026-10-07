@@ -30,6 +30,10 @@ module Simulation.Statement where
 open import Data.Bool    using (Bool; true; false; T)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Unit    using (⊤; tt)
+open import Data.Maybe   using (just; nothing)
+open import Data.Maybe.Properties using (just-injective)
+open import Decide       using (≡ᵇ→≡)
+open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Data.List    using (List; []; _∷_; _++_; map; length; replicate; drop; concat)
 open import Data.List.Properties using (map-++; map-replicate; length-drop; ++-identityʳ)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
@@ -40,7 +44,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All-++⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
   renaming (refl to pointwise-refl; map to Pointwise-map)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; z≤n; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_; _∸_; _≤_; _<_; s≤s; z≤n; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤n⇒m≤1+n; n≤1+n; ≤⇒≤′; ≤⇒≤ᵇ; ≤ᵇ⇒≤; <-≤-trans; <-irrefl; <-cmp; m≤m+n; +-cancelˡ-≡)
 open import Relation.Binary using (tri<; tri≈; tri>)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
@@ -70,13 +74,14 @@ open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; RegRow; atSlot; Path; share-sink; chainsGo; sameSource; regSource; schedGo; schedFinish; sched-next; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; memberSource; arrTick; _↠[_]_; map-f; batchSync-f; thru-outer; from-inner; mergeAllᵒ;
-  echoᵗ; thruEvents; batchSync-st; batchVals; setNode)
+  echoᵗ; thruEvents; batchSync-st; batchVals; setNode; lookupNode; mergeAll-st; NodeState)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
-  disp; walk-more; walk-nil; walk-end; thruWalk⇓; chain-step; fold-step; step-map; step-from-inner; react-false; step-thru-outer)
+  disp; walk-more; walk-nil; walk-end; thruWalk⇓; chain-step; fold-step; step-map; step-from-inner; react-false; step-thru-outer;
+  walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil; inner; subs-mint; subs-of)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule; chain-sound; chain-agree)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; admit-ot)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
-open import Rx.Mint      using (MintKey; counter; sourceᵏ)
+open import Rx.Mint      using (MintKey; counter; sourceᵏ; nodeᵏ; setAt)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr; InputBlock; block; hotEq; srcCount) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source;
@@ -370,21 +375,18 @@ postulate
     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₂) sourceᵏ) (readᴵ eI)
 
 postulate
-  -- THE WALK PAST A CONNECTED HOT SLOT'S BRACKET STAMPS AT THE COUNTER
-  -- THE CHAIN ENTERED WITH: the block's merge subscribes the stamp's
-  -- `mintᵉ`, the chain's first draw, and the share's readers carry the
-  -- instant down.  `hot-walk`'s hypotheses, at the stamp instead of the
-  -- values.
+  -- ONE DELIVERY-KIND EMIT AT THE DRAWN INSTANT, FOLDED OUT OF THE HOT
+  -- BLOCK'S MERGE, LEAVES EVERY EMIT AT THAT INSTANT: the carry half of
+  -- `hot-walk-stamps`, at the state its draw leaves.
   --
-  -- THE ROUTE IS A DRAW THEN A CARRY.  The draw is the merge's subscribe
-  -- of the stamp's one `ofᵉ` under its `mintᵉ`.  The carry is per former
-  -- and owes a unary relation on values by type: below the block every
-  -- emit's instant is copied (`mapStepᵖ`'s reassemble, a scan's and a
-  -- cutter's alike), or restamped by `flatStepᵛ` with the last instant
-  -- the flattener put out, which the echo leaving ahead of its lane has
-  -- just set; a subscribe burst inside a cascade is subscribe-kind
-  -- throughout, its every flattener's cell freshly seeded so.
-  hot-walk-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+  -- The carry is per former and owes a unary relation on values by
+  -- type: below the block every emit's instant is copied (`mapStepᵖ`'s
+  -- reassemble, a scan's and a cutter's alike), or restamped by
+  -- `flatStepᵛ` with the last instant the flattener put out, which the
+  -- echo leaving ahead of its lane has just set; a subscribe burst
+  -- inside a cascade is subscribe-kind throughout, its every
+  -- flattener's cell freshly seeded so.
+  hot-carry-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
     → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
     → (hot : lookup κ i ≡ hotᵏ)
@@ -395,15 +397,63 @@ postulate
     → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i))
         (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)))))))
         (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
-    → ∀ {oW sW stW}
-    → thruWalk⇓ mergeAllᵒ m2 (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)) (arrTick a′)
-        (thruEvents (map (applyClo {s = obs (emitᵗ (lookup Γ i))} {t = echoᵗ (emitᵗ (lookup Γ i))} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
-                      (map (applyClo {s = (unitᵗ +ᵗ plainᵗ (lookup Γ i)) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ (lookup Γ i))} {t = obs (emitᵗ (lookup Γ i))} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃))
-                        (batchVals false (map (applyClo {s = plainᵗ (lookup Γ i)} {t = unitᵗ +ᵗ plainᵗ (lookup Γ i)} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) (v ∷ []))))))
-        sI (record (record stI { delivered = rid ∷ EvalSt.delivered stI })
-              { nodes = setNode b (batchSync-st {s = unitᵗ +ᵗ plainᵗ (lookup Γ i)} false [] false) (EvalSt.nodes stI) })
+    → ∀ {od} → lookupNode m2 (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ (lookup Γ i)} nothing 0 [] od)
+    → ∀ {src′ oW sW stW}
+    → foldPath⇓ (arrTick a′)
+        (from-inner mergeAllᵒ m2 (counter (Sched.mint sI) nodeᵏ) ↠[ ≤-refl ] subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
+        ((inj₂ (inj₁ v) ∷ [] , counter (Sched.mint sI) sourceᵏ , src′ , inj₂ (inj₁ tt)) ∷ []) true
+        (record sI { mint = setAt sourceᵏ (suc (counter (Sched.mint sI) sourceᵏ))
+                              (setAt nodeᵏ (suc (counter (Sched.mint sI) nodeᵏ)) (Sched.mint sI)) })
+        (record stI { delivered = rid ∷ EvalSt.delivered stI
+                    ; nodes = setNode m2 (mergeAll-st {t = emitᵗ (lookup Γ i)} nothing 1 [] od)
+                                (setNode b (batchSync-st {s = unitᵗ +ᵗ plainᵗ (lookup Γ i)} false [] false) (EvalSt.nodes stI)) })
         (oW , sW , stW)
     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sW) sourceᵏ) (readᴵ oW)
+
+-- the block's merge reads past the bracket's flush as it did before it
+past-flush : ∀ {m} {Γ′ : Ctx m} {b m2 N} {s u lim act q od lim′ act′ q′ od′}
+  → lookupNode m2 (setNode b (batchSync-st {Γ = Γ′} {s = s} false [] false) N) ≡ just (mergeAll-st {t = u} lim act q od)
+  → lookupNode m2 N ≡ just (mergeAll-st {t = u} lim′ act′ q′ od′)
+  → _≡_ {A = NodeState Γ′} (mergeAll-st {t = u} lim act q od) (mergeAll-st lim′ act′ q′ od′)
+past-flush {b = b} {m2} {N} l r with b ≡ᵇ m2 in bm
+... | false = just-injective (trans (sym l) (trans (set-above b m2 _ N bm) r))
+... | true with ≡ᵇ→≡ b m2 bm
+...   | refl with trans (sym (lookup-set b _ N)) l
+...     | ()
+
+-- THE WALK PAST A CONNECTED HOT SLOT'S BRACKET STAMPS AT THE COUNTER THE
+-- CHAIN ENTERED WITH: its one event is the stamp's lane, and the merge's
+-- subscribe of it draws the instant in the stamp's `mintᵉ` and folds
+-- its one `ofᵉ` out at it.
+hot-walk-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                    {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+  → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+  → (hot : lookup κ i ≡ hotᵏ)
+  → ∀ {v} → _≡_ {A = Σ Ty (Val (plainᵏ Γ κ))} (arrTy a′ , arrVal a′) (plainᵗ (lookup Γ i) , v)
+  → ∀ {rid ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+      {h₁ : suc (toℕ (i ↑ˡ n)) ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ}
+      {h : ℓ ≤ toℕ (n ↑ʳ i)}
+  → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i))
+      (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)))))))
+      (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
+  → ∀ {od} → lookupNode m2 (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ (lookup Γ i)} nothing 0 [] od)
+  → ∀ {oW sW stW}
+  → thruWalk⇓ mergeAllᵒ m2 (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)) (arrTick a′)
+      (thruEvents (map (applyClo {s = obs (emitᵗ (lookup Γ i))} {t = echoᵗ (emitᵗ (lookup Γ i))} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
+                    (map (applyClo {s = (unitᵗ +ᵗ plainᵗ (lookup Γ i)) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ (lookup Γ i))} {t = obs (emitᵗ (lookup Γ i))} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃))
+                      (batchVals false (map (applyClo {s = plainᵗ (lookup Γ i)} {t = unitᵗ +ᵗ plainᵗ (lookup Γ i)} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) (v ∷ []))))))
+      sI (record (record stI { delivered = rid ∷ EvalSt.delivered stI })
+            { nodes = setNode b (batchSync-st {s = unitᵗ +ᵗ plainᵗ (lookup Γ i)} false [] false) (EvalSt.nodes stI) })
+      (oW , sW , stW)
+  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sW) sourceᵏ) (readᴵ oW)
+hot-walk-stamps κ {stI = stI} S {a′} hot eq {b = b} {m2 = m2} ib e2 (walk-cons (consume-all-sub {out = oW} L _ (inner refl (subs-mint refl (subs-of FP)))) walk-nil)
+  with past-flush {b = b} {m2 = m2} {N = EvalSt.nodes stI} L e2
+... | refl = at-nil oW (hot-carry-stamps κ S {a′ = a′} hot eq ib e2 FP)
+  where
+  at-nil : ∀ {lo hi} o → At lo hi (readᴵ o) → At lo hi (readᴵ (o ++ []))
+  at-nil {lo} {hi} o = subst (λ z → At lo hi (readᴵ z)) (sym (++-identityʳ o))
+hot-walk-stamps κ S hot eq ib _ (walk-cons (consume-all-enqueue _ _) walk-nil) = [] , inj₁ refl
+hot-walk-stamps κ S hot eq ib _ (walk-cons (consume-all-nil _) walk-nil)       = [] , inj₁ refl
 
 -- A CONNECTED HOT SLOT'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED
 -- WITH: inverted as `hot-block` inverts it, down to the walk past the
@@ -420,12 +470,12 @@ hot-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {e
   → chainStep⇓ a′ (arrVal a′ ∷ []) false (suc (toℕ (i ↑ˡ n)) , q) sI
       (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
   → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-hot-chain-stamps {Γ = Γ} κ {sI = sI} S {a′ = a′@record { elemTy = _ ; payload = v }} {i = i} hot refl ib@(block _ _ eb _ _ _ _ _)
+hot-chain-stamps {Γ = Γ} κ {sI = sI} S {a′ = a′@record { elemTy = _ ; payload = v }} {i = i} hot refl ib@(block _ _ eb e2 _ _ _ _)
   (chain-step (fold-step step-map (fold-step (step-from-inner react-false)
     (fold-step SB (fold-step step-map (fold-step step-map (fold-step (step-thru-outer {out = oW} W) fq)))))))
   with batch-flush SB eb
 ... | refl with disp-quiet (sink-at (hotEq {Γ = Γ} κ i hot) fq)
-...   | refl = at-nil oW (hot-walk-stamps κ S {a′ = a′} hot refl ib W)
+...   | refl = at-nil oW (hot-walk-stamps κ S {a′ = a′} hot refl ib e2 W)
   where
   at-nil : ∀ {lo hi} o → At lo hi (readᴵ o) → At lo hi (readᴵ (o ++ []))
   at-nil {lo} {hi} o = subst (λ z → At lo hi (readᴵ z)) (sym (++-identityʳ o))
