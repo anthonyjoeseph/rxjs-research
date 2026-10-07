@@ -295,9 +295,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`quiet-{sink,explode}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
   valueless group through a share's readers, or an exploded outer, folded on
   the impl side alone with the plain side still.
-- **`quiet-spent`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a spent test's
-  cell stepped on emits carrying nothing, on the impl side alone, stays related
-  and passes nothing.
+- **`quiet-spent`** (Simulation.Pass) — FALSITY, `PROBED`: a spent test's cell
+  stepped on emits carrying nothing, on the impl side alone, stays related and
+  passes nothing.
 - **`quiet-{inner,deferInner}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   inner's or a deferred body's merge passes emits carrying nothing on as they
   came.

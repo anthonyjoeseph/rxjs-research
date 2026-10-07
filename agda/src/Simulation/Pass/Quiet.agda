@@ -784,6 +784,12 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A SPENT TEST PASSES NOTHING ON NOTHING: the cell steps on the
       -- impl side alone, and both tests stay spent
+      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0],"script":[0,1,0,0,0],"reach":["takeWhile","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 4 cuts a test over an exhaust at the hot input's first
+      --   arrival, whose lane carries the failing value, and the second
+      --   arrival's empty lane hands the spent test an emit carrying
+      --   nothing.
       quiet-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s C P k k₁ k₂ w}
                           {F₁ : FnClo (plainᵏ Γ κ) (C ×ᵗ emitᵗ s) C} {G : FnClo (plainᵏ Γ κ) C (emitᵗ s)}
                           {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
