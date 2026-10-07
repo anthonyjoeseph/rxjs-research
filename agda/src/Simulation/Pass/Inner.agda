@@ -46,7 +46,7 @@ open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; head-on; self-
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Simulation.Write using (apart)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept; Thru; thruWalk-rule)
-open import Simulation.Pass.Quiet using (module PassQ; ShareSlot; SlotPair; cur-here; cur-there; delivered; delivered-arr; dying; dying-arr; slotpair; tail-of; usable-self)
+open import Simulation.Pass.Quiet using (module PassQ; retag; ShareSlot; SlotPair; cur-here; cur-there; delivered; delivered-arr; dying; dying-arr; slotpair; tail-of; usable-self)
 
 -- A WALK OVER TWO RUNS OF EVENTS IS THE FIRST WALK, THEN THE SECOND
 -- from where it left the state
@@ -74,14 +74,6 @@ walk-head : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {w lo op nid} {κ : Path 
               × Σ _ λ r₂ → thruWalk⇓ op nid κ now (thruEvents xs) (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) r₂
               × r ≡ (proj₁ r₁ ++ proj₁ r₂ , proj₂ r₂)
 walk-head x xs W = walk-split (thruEvents (x ∷ [])) (thruEvents xs) (subst (λ ys → thruWalk⇓ _ _ _ _ ys _ _ _) (events-cons x xs) W)
-
--- AN EMIT'S RELATION NEVER READS ITS INSTANT: retagging every value's
--- instant keeps the values related
-retag : ∀ {I A B : Set} {R : I × A → B → Set} {i j : I} {xs : List A} {ws : List B}
-      → (∀ {x w} → R (i , x) w → R (j , x) w)
-      → Pointwise R (map (i ,_) xs) ws → Pointwise R (map (j ,_) xs) ws
-retag {xs = []}     f []       = []
-retag {xs = _ ∷ _} f (r ∷ rs) = f r ∷ retag f rs
 
 -- a walk through a flattener keeps its node off the path below it
 walk-clear : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w} {k} {κ : Path Δ lo w u} {op now xs}
@@ -169,22 +161,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       --   its connect.
       share-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
                    → After S ([] , proj₂ (shareFinish i true ([] , sP , stP))) ([] , proj₂ (shareFinish (n ↑ʳ i) true ([] , sI , stI)))
-      -- AN OUTER'S EMIT CARRYING NOTHING, EXPLODED: the impl's merge
-      -- subscribes its empty run of elements, and the plain side does not
-      -- move
-      explode-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                      {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                      {rI}
-                  → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                  → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                  → ∀ e′ → Bare {echoᵗ u} e′
-                  → thruConsume⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
-                      (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′) sI stI rI
-                  → Σ (After S ([] , sP , stP) rI) λ A
-                      → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-                          u op m m′ ks (mX ∷ [])
-                        × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
       -- AN OUTER'S EMIT CARRYING ONE VALUE, EXPLODED: the impl's merge
       -- subscribes its run of elements, and they walk into the flattener
       -- where the plain outer's walk hands the value's events on
@@ -367,14 +343,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                     λ A → PathRel κ (Store.π (After.store A))
                             (setNode nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stP))
                             (setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes (proj₂ (proj₂ rQ)))) p q
-
-    -- A DELIVERED EMIT CARRIES WHAT IT CARRIED: the hop's restamp
-    -- retags a subscribe as a delivery over its own events
-    delivery-rel : ∀ {u Θx ρ₀} e′ {ws}
-                 → EmitRel {Γ = Γ} κ u e′ ws
-                 → EmitRel {Γ = Γ} κ u (applyClo (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) e′) ws
-    delivery-rel (evs , i , s , inj₁ k) r = retag (λ q → q) r
-    delivery-rel (evs , i , s , inj₂ k) r = r
 
     -- A PAIR OF NODES EVERY PAIR OF ROWS NAMES ALIKE, AND THE IMPL'S OWN
     -- ROWS NEVER THE IMPL ONE, HAS A CHAIN RUNNING THROUGH IT ON BOTH SIDES
@@ -664,13 +632,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       ⊥-elim (t≢f (trans (sym al′) (trans (sym (inner-alive S (proj₁ (proj₂ (leave op R))))) dd)))
     inner-dies {op = op} S R b sp si dd F tail (fold-step d′@(step-from-inner (react-dead _ F′)) dR) =
       finish-by S (leave op R) b sp si (step-kept _ (step-from-inner (react-dead dd F)) sp) (step-kept _ d′ si) F tail F′ dR
-
-    delivery-carries : ∀ {u Θx ρ₀} {es vs}
-                     → Carries {s = u} es vs
-                     → Carries (map (applyClo (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀)) es) vs
-    delivery-carries []              = []
-    delivery-carries (quiet e′ r bs) = quiet _ (delivery-rel e′ r) (delivery-carries bs)
-    delivery-carries (one e′ r bs)   = one _ (delivery-rel e′ r) (delivery-carries bs)
 
     -- a delivery keeps its stamp through the hop's restamp, which moves
     -- only a subscribe

@@ -158,6 +158,7 @@ arity kObs    = 4
 -- over `arity`, so an unrestricted seed draws the program it always did
 aimed : Knob → ℕ
 aimed kScript = 1
+aimed kSlot   = 1
 aimed _       = 0
 
 knobName : Knob → String
@@ -257,20 +258,6 @@ genSlotRef (suc (suc _)) = genFin2 >>=G λ i → pureG (inputNat i)
 genNat : Gen ℕ
 genNat = genB 10
 
--- ONE SLOT'S DEFINITION.  `genSlotRef` is the FORWARDING arm -- slot
--- one reading slot zero -- and it is what makes the table a telescope
--- rather than two independent sources.  On its own it is not enough:
--- `genSlotRef 0` is `emptyˢ`, so a table drawn from it alone is silent
--- and the sweep would run every program against nothing, which is what
--- it already did with the constant table.  The other arms give slot
--- zero something to say, so the forwarding has traffic to forward.
-genSlotDef : ℕ → Gen (SExp Γ₂ [] [] [] natᵗ)
-genSlotDef k = genW kSlot >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
-       if c ≡ᵇ 0 then genSlotRef k
-  else if c ≡ᵇ 1 then pureG emptyˢ
-  else if c ≡ᵇ 2 then pureG (ofˢ (natˢ x ∷ []))
-  else                pureG (ofˢ (natˢ x ∷ natˢ y ∷ []))
-
 -- SLOT ZERO IS A SCRIPT, AND IT IS THE ONLY THING THAT SCHEDULES.  A
 -- share runs its definition inside whatever subscribed it, so a table of
 -- shares alone is a run that is its subscribe burst and nothing after;
@@ -301,12 +288,6 @@ genScript = genW kScript >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
   else if c ≡ᵇ 2 then pureG (cold (x ∷ []) ((after w , y) ∷ []))
   else if c ≡ᵇ 3 then pureG (cold [] ((after w , x) ∷ (after 0 , y) ∷ []))
   else                pureG (cold (x ∷ y ∷ []) ((after w , y) ∷ []))
-
--- THE TELESCOPE IS DRAWN IN ORDER, each slot seeing only the ones
--- below it, which is exactly the argument `genSlotRef` takes.
-genSlots : Gen (Script × SExp Γ₂ [] [] [] natᵗ)
-genSlots = genScript >>=G λ d₀ → genSlotDef 1 >>=G λ d₁ →
-  pureG (d₀ , d₁)
 
 -- value functions (natᵗ → natᵗ): identity, +k, *k, and a CONSTANT.
 --
@@ -598,6 +579,29 @@ genSpineG g u sl (suc d) = genW kSpineG >>=G λ c →
 -- sits above every slot and may read any of them
 genExp : ℕ → Gen (SExp Γ₂ [] [] [] natᵗ)
 genExp d = genExpAt 0 0 2 d
+
+-- ONE SLOT'S DEFINITION.  `genSlotRef` is the FORWARDING arm -- slot
+-- one reading slot zero -- and it is what makes the table a telescope
+-- rather than two independent sources.  On its own it is not enough:
+-- `genSlotRef 0` is `emptyˢ`, so a table drawn from it alone is silent
+-- and the sweep would run every program against nothing, which is what
+-- it already did with the constant table.  The other arms give slot
+-- zero something to say, so the forwarding has traffic to forward.
+-- The aimed arm is a drawn program over the slots below, which is the
+-- only way a share's subject is handed what a flattener emits.
+genSlotDef : ℕ → Gen (SExp Γ₂ [] [] [] natᵗ)
+genSlotDef k = genW kSlot >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
+       if c ≡ᵇ 0 then genSlotRef k
+  else if c ≡ᵇ 1 then pureG emptyˢ
+  else if c ≡ᵇ 2 then pureG (ofˢ (natˢ x ∷ []))
+  else if c ≡ᵇ 3 then pureG (ofˢ (natˢ x ∷ natˢ y ∷ []))
+  else                genExpAt 0 0 k 2
+
+-- THE TELESCOPE IS DRAWN IN ORDER, each slot seeing only the ones
+-- below it, which is exactly the argument `genSlotRef` takes.
+genSlots : Gen (Script × SExp Γ₂ [] [] [] natᵗ)
+genSlots = genScript >>=G λ d₀ → genSlotDef 1 >>=G λ d₁ →
+  pureG (d₀ , d₁)
 
 ------------------------------------------------------------------------
 -- WHICH FORMERS A PROGRAM ACTUALLY CARRIED.  A generator that CAN emit
@@ -1220,7 +1224,7 @@ judged ob ss f s m x with bears s f x
 -- same draws on it; the flag says whether the last one met it.
 drawOnce : ℕ → Gen (Marks × Drawn)
 drawOnce d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (marksˢ e ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e) , e , proj₁ ds , proj₂ ds)
+  pureG (marksˢ e ⊕ marksˢ (proj₂ ds) ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e) , e , proj₁ ds , proj₂ ds)
 
 carriesTag : List Former → List ℕ → Bool
 carriesTag fs t = any (λ g → eqListℕ (map toℕ (toList (formerTag g))) t) fs
