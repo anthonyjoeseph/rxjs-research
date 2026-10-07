@@ -355,8 +355,19 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       hot-read-stamps    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedReadStamps {Θ} i
       -- WHERE A SHARED READ'S EMITS LAND.  WHERE IT CAN STILL FAIL: a
       -- connect the read starts runs the share's definition to every row
-      -- on its subject, so the claim needs this path's row to be the only
-      -- one there when it connects
+      -- on its subject, joiners a value made mid-burst included, and what
+      -- reaches a joiner leaves down the joiner's path, not this one
+      -- PROBED: make qc-same-clock QC='48 200 1' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[0,0,0,1],"script":[0,0,1,0,1],"reach":["flatten","scan"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 34
+      --   agree, 0 fail, 20 undecided.  Case 45 merges a scan whose seed
+      --   and source both read a shared slot of two values and whose step
+      --   hands on its accumulator: the connect's first value hands the
+      --   share to the merge, which joins it mid-burst, and the second
+      --   value reaches both rows.
+      -- PROBED: make qc-same-clock QC='47 200 1' QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[1,0,1,1],"script":[0,0,1,0,1],"reach":["flatten","scan"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 12
+      --   agree, 0 fail, 4 undecided.  Cases 13 and 15: a joiner made
+      --   mid-burst by a one-value connect, reached by its end alone.
       shared-read-stamps : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedReadStamps {Θ} i
       -- AN `of`'S EMITS CARRY ITS VALUES: the impl's list under its mint,
       -- one emit per value, the last also carrying the end, against the

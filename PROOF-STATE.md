@@ -265,9 +265,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   carrying the instant its echo set, `cut-out` through the end a cut
   hands on. Swept green at a second instant: `explode-out` over two
   inners on one group, `elem-out` at a hot arrival, `cut-out` at one and
-  where its end subscribes queued inners. Left: a shared read's connect,
-  reaching rows off this path, deciding whether one catch per subscribe is
-  the shape.
+  where its end subscribes queued inners; a shared read's connect
+  reaching a joiner made mid-burst. Left: deciding whether one catch per
+  subscribe is the shape, now that a connect's emits leave down a
+  joiner's path too.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
@@ -349,10 +350,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
   pass's emits carry the instant its value pass drew.
-- **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY,
-  `NO EVIDENCE`: a slot read's subscribe sends only at its path's catch of the
-  program's frame and keeps the restamp cells up to it; a shared read's connect
-  reaches every row on the share's subject.
+- **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY, `PROBED×2`:
+  a slot read's subscribe sends only at its path's catch of the program's frame
+  and keeps the restamp cells up to it; a shared read's connect reaches every
+  row on the share's subject.
 - **`of-fold-stamps`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a group at
   one frame folded down the path lands at the path's catch of it, the restamp
   cells up to the catch kept.
