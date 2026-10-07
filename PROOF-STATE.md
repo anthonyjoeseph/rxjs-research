@@ -258,12 +258,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SPLIT THE STAMP WALKS INTO DRAW AND CARRY.** `hot-chain-stamps` is a
-  body down to `hot-carry-stamps`: one delivery-kind emit at the drawn
-  instant, folded out of the block's merge at its pinned state. Take
-  `dyn-chain-stamps` the same way through a cold block and a hop's
-  `deferBodyᵖ`. Ruled out: a hot stamp drawn anywhere but the stamp's
-  `mintᵉ`, or a queued inner in the block's merge drawing a second.
+- **SPLIT THE HOP'S STAMP WALK INTO DRAW AND CARRY.** Every input
+  block, hot or cold, is a body down to its tail's `Carry`, and a minted
+  source's chain down to its partnered row. Left: `hop-chain-stamps`,
+  inverted through the hop's `thru-outer` to `deferBodyᵖ`'s `mintᵉ`, then
+  `Carry` over the body's `PathRel` tail. Ruled out: a stamp drawn
+  anywhere but a `mintᵉ`, a queued inner in a block's merge drawing a
+  second, a hot slot's pop at a minted source.
 
 - **STATE THE CARRY.** One leaf per former: an emit's instant copied by
   every map, scan and cutter (each reassembles around the arriving emit),
@@ -341,8 +342,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   leaves every emit at that instant.
 - **`dyn-one`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
   source has at most one row in the impl's registry.
-- **`dyn-chain-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
-  minted source's one chain stamps at the counter it entered with.
+- **`cold-carry-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
+  cold block's `PathRel` tail carries the drawn instant to every emit.
+- **`hop-chain-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
+  deferred hop's one chain stamps at the counter it entered with.
+- **`quiet-fold`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: any tail
+  handed nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
   pass's emits carry the instant its value pass drew.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
