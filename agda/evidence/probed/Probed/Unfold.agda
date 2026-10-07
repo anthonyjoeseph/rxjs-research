@@ -5,13 +5,14 @@
 module Probed.Unfold where
 
 open import Data.List using ([]; _∷_)
+open import Data.Bool using (true)
 open import Data.Maybe using (nothing)
 open import Data.Product using (_,_)
 open import Data.Fin using (zero)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Rx.Exp using (natᵗ; mergeᶠ)
-open import SExp.Syntax using (SExp; inputˢ; mapˢ; flattenˢ; μˢ; varˢ; deferˢ; pairˢ; inlˢ; inrˢ; unitˢ; strmˢ)
+open import SExp.Syntax using (SExp; inputˢ; emptyˢ; mapˢ; scanˢ; takeWhileˢ; fstˢ; boolˢ; flattenˢ; μˢ; varˢ; varˢᵗ; deferˢ; pairˢ; inlˢ; inrˢ; unitˢ; strmˢ)
 
 open import Simulation.Walk using (μ-unfolds)
 open import CLI.Unit-Test.Prelude using (Γ₂)
@@ -36,3 +37,41 @@ _ = deferˢ (μˢ loop) , refl , λ w → refl
 _ : Confirms (μ-unfolds {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} lanes)
 _ = flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (deferˢ (μˢ lanes))))) (inputˢ zero))
   , refl , λ w → refl
+
+-- a lane per arrival of slot zero, each lane the whole program again,
+-- built as a scan's accumulator: the μ-var under a defer under the
+-- scan step's binder
+scanned : ∀ {Θ} → SExp Γ₂ (natᵗ ∷ []) [] Θ natᵗ
+scanned = flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (varˢᵗ (here refl))))
+            (scanˢ (strmˢ (deferˢ (varˢ (here refl)))) (strmˢ emptyˢ) (inputˢ zero)))
+
+-- LOAD-BEARING: fails if the inserted μ's frame term, elaborated under
+-- the scan step's binder, is not the outer frame weakened past it
+_ : Confirms (μ-unfolds {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} scanned)
+_ = flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (varˢᵗ (here refl))))
+      (scanˢ (strmˢ (deferˢ (μˢ scanned))) (strmˢ emptyˢ) (inputˢ zero)))
+  , refl , λ w → refl
+
+-- LOAD-BEARING: fails if the frame term reads a nonempty outer
+-- telescope the unrolling's weakening moved
+_ : Confirms (μ-unfolds {Γ = Γ₂} (κᵖ two-arrivals) {Θ = natᵗ ∷ []} lanes)
+_ = flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (deferˢ (μˢ lanes))))) (inputˢ zero))
+  , refl , λ w → refl
+
+-- the μ-var under a defer inside a test's predicate, under its binder
+tested : ∀ {Θ} → SExp Γ₂ (natᵗ ∷ []) [] Θ natᵗ
+tested = takeWhileˢ (fstˢ (pairˢ (boolˢ true) (strmˢ (deferˢ (varˢ (here refl)))))) (inputˢ zero)
+
+-- LOAD-BEARING: fails if the inserted μ's frame term, elaborated under
+-- the test's binder, is not the outer frame weakened past it
+_ : Confirms (μ-unfolds {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} tested)
+_ = takeWhileˢ (fstˢ (pairˢ (boolˢ true) (strmˢ (deferˢ (μˢ tested))))) (inputˢ zero) , refl , λ w → refl
+
+-- a μ inside a μ, the inner's defer reading the OUTER var
+nested : ∀ {Δ Θ} → SExp Γ₂ (natᵗ ∷ []) Δ Θ natᵗ
+nested = μˢ (deferˢ (varˢ (there (here refl))))
+
+-- LOAD-BEARING: fails if the substitution does not reach past the
+-- inner μ's binder
+_ : Confirms (μ-unfolds {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} (nested {Δ = []}))
+_ = μˢ (deferˢ (μˢ nested)) , refl , λ w → refl

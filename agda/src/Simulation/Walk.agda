@@ -159,10 +159,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- elaboration's frame term reads the value telescope the unrolling's
     -- weakening moved, and the defer's context transport.
     -- PROBED: `Probed.Unfold` -- both equations by `refl`, the elaborated
-    --   one at an abstract renaming, at a μ-var straight under a defer and
-    --   at one under a defer under a map's binder.  Not a μ inside a μ,
-    --   not a var under a scan's or a test's binder, not a nonempty
-    --   outer telescope.
+    --   one at an abstract renaming, at a μ-var straight under a defer,
+    --   under a defer under a map's, a scan step's and a test's binder,
+    --   past an inner μ's binder, and under a map's at a nonempty outer
+    --   telescope.  Not two vars read, not a μ-var under a flattener's
+    --   inner literal.
     μ-unfolds : ∀ {Θ u} (b : SExp Γ (u ∷ []) [] Θ u)
               → Σ (SExp Γ [] [] Θ u) λ s′ → plainExp s′ ≡ unfoldμ (plainExp b)
                   × (∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′)
@@ -234,6 +235,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- The refutation's impl side is the block's subscribe written by
       -- hand, and the checker runs out of memory on it even down the
       -- root path, so that refutation is a coverage boundary.
+      --
+      -- SWEPT GREEN UNDER BINDERS, all three reads: `make qc-store`, depth
+      -- 4, flatteners over literal inners and defers, a slot leaf
+      -- weighted up, 100 programs each -- hot scripts (seed 41), colds
+      -- with two sync values (seed 42), slot one forwarding slot zero
+      -- (seed 43).  Not inside a μ.
       -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
       --   from empty stores: a cold script, its block run straight to the
       --   root (`cold~`).  Not under a binder, not the values conjunct.

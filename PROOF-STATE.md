@@ -245,26 +245,17 @@ arrivals over `correspondence`: schedules in step, pops partnered, stores relate
 subscribes set them (`subscribe-related`) and each cascade keeps
 (`cascade-related`), values agreeing. RULED
 OUT: an arrival plain lacks, a split one, an instant's gap or
-stray, an echo apart from inners or payload; a subscribe
-unrelated; a pop unrelating a read; a map moving time; a close
+stray, an echo apart from inners or payload; a subscribe,
+bound or not, unrelated; a pop unrelating a read; a map moving time; a close
 emptying a named merge; a hot end past its block; a two-value emit; a cut
 over a testless budget; a flatten write moving a row; a cut or
-liveness unpairing; a merged lane; a drain or body end (μ too)
-unrelating inners; unsound walks, reads.
+liveness unpairing; a drain or body end (μ too)
+unrelating inners; unsound walks or reads.
 Left: which cascade breaks it.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **AIM THE STORE SWEEP AT READS UNDER A BINDER.** Every read's probe
-  stands at the root from empty stores, and `cold-read`'s `Sound` has no
-  refutation because the checker cannot hold its block's subscribe built by
-  hand. Aim `make qc-store` at hot, shared and cold reads under a
-  flattener's binder and a defer, two sync values a cold; red is a
-  refutation to shrink, green lowers the reads' rows. Ruled out: the walk's
-  store standing on `PathRel` alone; a hot or shared read down an unsound
-  path; `μ-unfolds` at the probed binders.
 
 - **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
   instant and no two arrivals share one: `cascade-stamps`, a claim the
@@ -280,6 +271,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   leaves are list lemmas. A case the impl's one-past fuel slack in
   `left-to-right` does not cover is a fuel finding for Anthony, not a
   restatement.
+
+- **PROBE THE WALK'S UNEVIDENCED LEAVES.** `of-carries` and
+  `flat-install{,-explode}` have never been instantiated; both compute on
+  a concrete `of` or flattener, so pin them by `refl` in
+  `agda/evidence/probed/` at an `of` of two values under a map and a
+  flattener of each policy, and a red is a restatement before the grind
+  inherits it. Ruled out: the reads, hot, shared and cold, swept green
+  under flatteners and defers; `μ-unfolds` under every value binder.
 
 ### The ledger
 
@@ -335,9 +334,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   one per slot.
 - **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   cascade's values carry one instant between the counters it enters and leaves.
-- **`μ-unfolds`** (Simulation.Walk) — FALSITY, `PROBED`: an unrolling is an
-  author's program, its plain form and every renamed elaboration the
-  unrollings; held at a μ-var under a defer, bare and under a map's binder.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
   `PROBED×2, RECOVERY`: a slot's plain subscribe against the impl's at its
   stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the
@@ -366,6 +362,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
+- **`μ-unfolds`** (Simulation.Walk) — DIFFICULTY, `PROBED`: an unrolling is an
+  author's program, its plain form and every renamed elaboration the
+  unrollings; held under every value binder and past an inner μ.
 - **`fold-unmoved`** (Simulation.Arm) — DIFFICULTY, `TWIN`: a fold leaves a
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.
