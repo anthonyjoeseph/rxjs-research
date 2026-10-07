@@ -419,8 +419,15 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
   emits t = concatMap (λ xs → (bare t (map proj₁ xs) , map proj₂ xs) ∷ (wrapped t (map proj₁ xs) , map proj₂ xs) ∷ [])
                       ([] ∷ take 1 (samp t) ∷ take 2 (samp t) ∷ [])
 
-  instE : ∀ t → Val Γ′ (emitᵗ t) → ℕ
+  -- an emit's stamp, its instant and its kind, read off its fields
+  instE kindE : ∀ t → Val Γ′ (emitᵗ t) → ℕ
   instE t e = proj₁ (proj₂ e)
+  kindE t (_ , _ , _ , inj₁ _)        = 0
+  kindE t (_ , _ , _ , inj₂ (inj₁ _)) = 1
+  kindE t (_ , _ , _ , inj₂ (inj₂ _)) = 2
+
+  sameStamp? : ∀ u s → Val Γ′ (emitᵗ u) → Val Γ′ (emitᵗ s) → Bool
+  sameStamp? u s o e′ = (instE u o ≡ᵇ instE s e′) ∧ (kindE u o ≡ᵇ kindE s e′)
 
   emitRel? : ∀ t → Val Γ′ (emitᵗ t) → List (Val Γ t) → Bool
   emitRel? t e′ = pw (map proj₂ (emitValues (decodeEmit {Γ = Γ′} {a = plainᵗ t} e′)))
@@ -432,13 +439,13 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
 
   lifts? : ∀ s u → FnClo Γ′ (emitᵗ s) (emitᵗ u) → FnClo Γ s u → Bool
   lifts? s u F′ F = all (λ (e′ , vs) → let o = applyClo F′ e′ in
-    emitRel? u o (map (applyClo F) vs) ∧ (instE u o ≡ᵇ instE s e′)) (emits s)
+    emitRel? u o (map (applyClo F) vs) ∧ sameStamp? u s o e′) (emits s)
 
   scanLifts? : ∀ s u → FnClo Γ′ (ScanAᵗ u ×ᵗ emitᵗ s) (ScanAᵗ u) → FnClo Γ (u ×ᵗ s) u
              → List (Val Γ′ (plainᵗ u) × Val Γ u) → Val Γ′ (emitᵗ u) → Bool
   scanLifts? s u F′ F as em = all (λ (a′ , a) → all (λ (e′ , vs) →
     let o = applyClo F′ ((a′ , em) , e′) ; r = scanVals F a vs in
-    V? u (proj₁ o) (proj₂ r) ∧ emitRel? u (proj₂ o) (proj₁ r) ∧ (instE u (proj₂ o) ≡ᵇ instE s e′)) (emits s)) as
+    V? u (proj₁ o) (proj₂ r) ∧ emitRel? u (proj₂ o) (proj₁ r) ∧ sameStamp? u s (proj₂ o) e′) (emits s)) as
 
   -- the first sample a cut step fails, named by its plain budget, the
   -- number of values it carried and the conjunct
@@ -451,7 +458,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
     else if not (proj₂ (proj₂ r) ∨ bud (proj₁ o) (proj₁ (proj₂ r))) then just (at ++ˢ "budget after")
     else if not (eqB (proj₁ (proj₂ o)) (proj₂ (proj₂ r))) then just (at ++ˢ "cut flag")
     else if not (emitRel? s (proj₂ (proj₂ (proj₂ o))) (proj₁ r)) then just (at ++ˢ "prefix")
-    else if not (instE s (proj₂ (proj₂ (proj₂ o))) ≡ᵇ instE s e′) then just (at ++ˢ "instant")
+    else if not (sameStamp? s s (proj₂ (proj₂ (proj₂ o))) e′) then just (at ++ˢ "stamp")
     else nothing) (emits s)) ([] ∷ (4 ∷ []) ∷ [])) bs)
     where
       firstJ : List (Maybe String) → Maybe String

@@ -14,7 +14,7 @@
 -- A FRAME IS RELATED BY WHAT IT DOES TO ONE EMIT, NOT BY ITS TERM.  A
 -- step the impl closed over a renamed elaboration is not syntactically
 -- the elaboration of anything; what the cascade needs is that it lifts
--- the plain step to emits, keeping the emit's instant, and that is
+-- the plain step to emits, keeping the emit's stamp, and that is
 -- stated once per kind of step (`Lifts`, `ScanLifts`, `CutLifts`).
 --
 -- STRUCTURE IS RELATED SYNTACTICALLY, BECAUSE THE CASCADE READS IT.
@@ -50,7 +50,7 @@ open import Rx.Evaluator.Reducible.Support using (Rule)
 open import Rx.Evaluator.Freshness using (nodeCt)
 
 open import Rx.Mint      using (counter; sourceᵏ; regᵏ)
-open import Rx.Prim      using (InstEmit; Tick; Source)
+open import Rx.Prim      using (InstEmit; EmitKind; Tick; Source)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Env; Closed; lookupEnv;
   Ren∈; renExp; FnClo; applyClo; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; varᵗ; unit̂; pairᵗ; inlᵗ;
   inrᵗ; sndᵗ; Tm)
@@ -172,12 +172,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   EmitRel : ∀ t → Val Γ′ (emitᵗ t) → List (Val Γ t) → Set
   EmitRel t e′ vs = Pointwise (λ x w → V t (proj₂ x) w) (emitValues (decodeEmit e′)) vs
 
-  instantOf : ∀ {t} → Val Γ′ (emitᵗ t) → ℕ
-  instantOf e′ = InstEmit.instant (decodeEmit e′)
+  -- an emit's stamp: the instant it belongs to and who minted it
+  stampOf : ∀ {t} → Val Γ′ (emitᵗ t) → ℕ × EmitKind
+  stampOf e′ = InstEmit.instant (decodeEmit e′) , InstEmit.kind (decodeEmit e′)
 
   -- an impl step on emits lifting a plain step on the values one carries
   Lifts : ∀ s u → (Val Γ′ (emitᵗ s) → Val Γ′ (emitᵗ u)) → (List (Val Γ s) → List (Val Γ u)) → Set
-  Lifts s u G′ G = ∀ e′ vs → EmitRel s e′ vs → EmitRel u (G′ e′) (G vs) × instantOf (G′ e′) ≡ instantOf e′
+  Lifts s u G′ G = ∀ e′ vs → EmitRel s e′ vs → EmitRel u (G′ e′) (G vs) × stampOf (G′ e′) ≡ stampOf e′
 
   -- the elaborated scan's step against the plain one: a related cell
   -- goes to a related cell, and the emit it carries holds the outputs
@@ -186,7 +187,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ∀ a′ em a e′ vs → V u a′ a → EmitRel s e′ vs →
       V u (proj₁ (applyClo F′ ((a′ , em) , e′))) (proj₂ (scanVals F a vs))
     × EmitRel u (proj₂ (applyClo F′ ((a′ , em) , e′))) (proj₁ (scanVals F a vs))
-    × instantOf {u} (proj₂ (applyClo F′ ((a′ , em) , e′))) ≡ instantOf e′
+    × stampOf {u} (proj₂ (applyClo F′ ((a′ , em) , e′))) ≡ stampOf e′
 
   -- the elaborated cut's step against the plain test: the budget kept
   -- related while nothing cuts, the cut decided alike, and the prefix
@@ -206,7 +207,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         → Bud (proj₁ (applyClo F′ ((b′ , (false , (os , em))) , e′))) (proj₁ (proj₂ (takeVals P b vs))))
     × proj₁ (proj₂ (applyClo F′ ((b′ , (false , (os , em))) , e′))) ≡ proj₂ (proj₂ (takeVals P b vs))
     × EmitRel s (proj₂ (proj₂ (proj₂ (applyClo F′ ((b′ , (false , (os , em))) , e′))))) (proj₁ (takeVals P b vs))
-    × instantOf {s} (proj₂ (proj₂ (proj₂ (applyClo F′ ((b′ , (false , (os , em))) , e′))))) ≡ instantOf e′
+    × stampOf {s} (proj₂ (proj₂ (proj₂ (applyClo F′ ((b′ , (false , (os , em))) , e′))))) ≡ stampOf e′
 
   ----------------------------------------------------------------
   -- Live sources

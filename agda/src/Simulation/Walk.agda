@@ -113,13 +113,13 @@ resrc = sub-ot (λ r∈ → r∈) ≤-refl
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
-  -- WHERE IT CAN STILL FAIL: A STEP THAT DOES NOT KEEP AN EMIT'S INSTANT,
+  -- WHERE IT CAN STILL FAIL: A STEP THAT DOES NOT KEEP AN EMIT'S STAMP,
   -- or reads the author's variables at slots the renaming moved.  The
   -- map's step splits each emit and applies the author's function to
   -- every payload, renamed under one more binder.
   -- PROBED: `Probed.Map-Step` -- `x + 1` over one hand-built emit, an
   --   `init` then two payloads, under no binder: both payloads mapped,
-  --   the instant kept.  Not an emit the impl produced, not a function
+  --   the stamp kept.  Not an emit the impl produced, not a function
   --   reading the author's variables.
   postulate
     lifts-map : ∀ {Θ s u} (f : SFn Γ [] [] Θ s u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ}

@@ -158,7 +158,7 @@ _ = exploded exhaustᶠ
 -- over an emit of one payload; fails if the step or the seed reads the
 -- author's variable at the slot the mint's binder took, the carried
 -- value drifts from the plain accumulator, an output is dropped, or the
--- instant moves
+-- stamp moves
 _ : Confirms (proj₁ (lifts-scan {Γ = Γ₂} (κᵖ two-arrivals)
                        (primˢ add (pairˢ (primˢ add (varˢᵗ (here refl))) (varˢᵗ (there (here refl)))))
                        (varˢᵗ (here refl)) (inputˢ zero) {Θ′ = natᵗ ∷ uniqᵗ ∷ []} (λ x → x)
@@ -178,7 +178,7 @@ _ = refl
 -- fails, then one it passes; fails if the cutter decides the cut apart from
 -- the plain test, keeps a value the plain prefix drops or drops one it
 -- keeps, leaves its budget unrelated when it does not cut, or moves the
--- instant
+-- stamp
 _ : Confirms (lifts-while {Γ = Γ₂} (κᵖ two-arrivals)
                 (primˢ ltᵖ (pairˢ (varˢᵗ (here refl)) (varˢᵗ (there (here refl))))) (inputˢ zero)
                 {Θ′ = natᵗ ∷ uniqᵗ ∷ []} (λ x → x) {ρ′ = 4 ∷ᵉ 0 ∷ᵉ []ᵉ} {ρ = 4 ∷ᵉ []ᵉ} 3 (λ { (here refl) → refl }) refl
