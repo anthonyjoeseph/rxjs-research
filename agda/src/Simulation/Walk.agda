@@ -323,10 +323,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A HOT SLOT'S READ, AGAINST ITS STAMPED SLOT'S: the plain
       -- subscribe at the slot, the impl's at the share wrapping it, under
       -- the restamp handing its subscribe-kind emits this program's frame
-      -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
-      --   from empty stores: a hot read of two arrivals, its share's
-      --   `read~` and `hot~` machine row.  Not under a binder, not the
-      --   values conjunct.
+      --
+      -- THE `Sound` PAIR AT A CONCRETE STORE IS PAST THE TYPECHECKER: the
+      -- row below, given `sound` over the opening store's two root
+      -- derivations, held a flat 6 GB for two hours in CI without a
+      -- verdict.  A coverage boundary; the compiled sweep covers it.
+      -- PROBED: git show 11e23e3e:agda/evidence/probed/Probed/Stores.agda
+      --   -- the STORE conjunct alone, at the root from empty stores, before
+      --   the `Sound` pair was a hypothesis: a hot read of two arrivals,
+      --   its share's `read~` and `hot~` machine row.  Not under a binder,
+      --   not the values conjunct.
       hot-read       : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
       -- a shared slot's read, against its stamped slot's
       shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
