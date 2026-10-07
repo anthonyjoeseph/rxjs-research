@@ -259,9 +259,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### Big picture tier roadmap
 
 - **SWEEP THE UNPROBED LEAVES.** Every `NO EVIDENCE` FALSITY row is a
-  statement nothing has instantiated: the quiet folds left, the
-  `block-*` leaves, `share-{spend,finish}`, `hot-walk`, `end-stamps`,
-  `of-fold-stamps`, `value-draws`, `quiet-fold`.
+  statement nothing has instantiated: the quiet folds left, `hot-walk`,
+  `end-stamps`, `of-fold-stamps`, `value-draws`, `quiet-fold`.
   Aim `qc-store` or `qc-same-clock` at each one's region, receipt the
   green ones, shrink a red into a refutation. Decides which leaves under
   `cascade-related` the monster's cascade can still fall through.
@@ -313,8 +312,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
-- **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
-  a cold chain's input block, its inner open, alive or dead at the group, runs
+- **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `PROBED×4`: a
+  cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped
   head down, then the impl tail's end; open, it sends at the chain's entry
   instant.
@@ -328,7 +327,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   what the cut left; a spent test passes nothing on both sides.
 - **`cut-out`** (Simulation.Take) — FALSITY, `PROBED×2`: a tail handed a
   nonempty group delivered at one instant, and the end, sends at that instant.
-- **`share-{spend,finish}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the
+- **`share-{spend,finish}`** (Simulation.Pass) — FALSITY, `PROBED×2`: the
   stores stay related when both shares of a shared slot close and drop their
   readers.
 - **`hot-walk`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: past a connected

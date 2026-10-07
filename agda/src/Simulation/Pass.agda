@@ -129,6 +129,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- arrival has already set.  Read off the bug cache's rows "a bounded
       -- merge's lane cut valueless by a takeWhile, then drained", hot and
       -- cold, whose `sides` print the drained burst at the cut's instant.
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 71 merges a cold read with a switch whose first cold read it
+      --   switched past at subscribe, so one script's arrivals and end walk
+      --   an open block and a dead one.
       block-open : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
                  → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
                  → ∀ {lo ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
@@ -146,6 +151,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      s₂ st₂ (oW , sW , stW)
                  → After S rP (o₂ ++ oW , sW , stW) × Out (counter (Sched.mint sI) sourceᵏ) (o₂ ++ oW)
       -- the same at the plain end, the impl's inner still registered
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 71 merges a cold read with a switch whose first cold read it
+      --   switched past at subscribe, so one script's arrivals and end walk
+      --   an open block and a dead one.
       block-alive : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
                  → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
                  → ∀ {lo ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
@@ -165,6 +175,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → After S rP (o₂ ++ oW , sW , stW)
       -- AND WITH ITS INNER DEAD: the impl's merge finishes the inner at the
       -- end, and what the finish hands on is walked the same way
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 71 merges a cold read with a switch whose first cold read it
+      --   switched past at subscribe, so one script's arrivals and end walk
+      --   an open block and a dead one.
       block-dead : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ s} {vs : List (Val Γ s)} {vs′ : List (Val (plainᵏ Γ κ) (plainᵗ s))}
                  → Head src src′ {s} {plainᵗ s} vs vs′ → SrcPair κ (Sched.live sP) (Sched.live sI) src src′ s (plainᵗ s)
                  → ∀ {lo ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
@@ -186,6 +201,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → After S rP (o₁ ++ (o₂ ++ oW) , sW , stW)
       -- THE BLOCK'S END: the merge wraps up and the impl's tail folds what
       -- the wrap hands on, the plain path having ended already
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 71's script ends through an open block and a dead one.
       block-end  : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now m2 ℓ s} {q : Path (plainᵏ Γ κ) ℓ (emitᵗ s) (emitᵗ t)}
                      {rP o₁ o₂ oW sW stW fin r}
                  → After S rP (o₁ ++ (o₂ ++ oW) , sW , stW)
