@@ -84,17 +84,15 @@ postulate
   -- instant -- not past it, or the joined run overtakes the run it was
   -- read against.
   --
-  -- THE COMPILED SWEEP REACHES THAT SLACK, AND FOUND NOTHING.
-  -- `make qc-batched-sandwich` decides this statement itself, searching
-  -- the witness upward from the fuel; at depth 3, fuel one, seed 19 had
-  -- 314 cases whose joined run at the witness holds values back, so
-  -- only the run one past it covers them -- 270 under an author
-  -- flattener, 98 under a `μ`, every one agreeing.  Those counts are
-  -- read at fuel one only.
-  --
   -- REFUTED: `Refuted.Batched-Sandwich` -- the slack fixed at one unit
   --   past the run's own fuel, false at fuel one where the second
   --   arrival is silent.
+  -- PROBED: make qc-batched-sandwich QC='19 2000 3' QC_FUEL=1
+  --   decided by `CLI.QuickCheck`'s `sandwichᴸ`: 314 cases whose joined
+  --   run at the witness holds values back (270 under an author
+  --   flattener, 98 under a `μ`), every one agreeing; counts at fuel
+  --   one only.
+  --   unaimed.
   -- PROBED: `Probed.Left-To-Right` -- both prefixes decided at fuel 30
   --   over the same three first-order programs, every run complete
   --   inside its fuel, and at the refutation's own program at fuel one

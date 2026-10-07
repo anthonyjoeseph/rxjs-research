@@ -347,11 +347,14 @@ postulate
   -- script or a deferred hop is minted per subscription, and only that
   -- subscription registers at it.
   --
-  -- `make qc-store`, deciding it at every live minted source on every
-  -- arrival boundary, is green on seed 31 at depth 4 (80 programs, a
-  -- flatten and a defer in each) and seed 32 at depth 3 (80, cold
-  -- scripts of several values aimed); a planted bound of 0 goes red
-  -- on 21 of 30, so the rows are there to count.
+  -- PROBED: make qc-store QC='31 80 4'
+  --   decided by `CLI.Store-Check`'s `store?`: 80 programs each with a
+  --   flatten and a defer; a planted bound of 0 reddens 21 of 30.
+  --   Draw unrecorded: the seed alone does not replay it.
+  -- PROBED: make qc-store QC='32 80 3'
+  --   decided by `CLI.Store-Check`'s `store?`: 80 programs, cold scripts
+  --   of several values aimed.
+  --   Draw unrecorded: the seed alone does not replay it.
   dyn-one : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
               {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI

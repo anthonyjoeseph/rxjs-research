@@ -287,10 +287,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **`of-fold`** (Simulation.Walk) — FALSITY, `REFUTED, DEAD ROUTE`: the group
   folded and ended down related sound paths keeps what a pass keeps.
-- **`merge-drain`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's
-  related queues drained on both sides leave related counts, queues, flattener
-  and tail.
-- **`defer-end`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a dead deferred
+- **`merge-drain`** (Simulation.Pass) — FALSITY, `PROBED`: a merge's related
+  queues drained on both sides leave related counts, queues, flattener and
+  tail.
+- **`defer-end`** (Simulation.Pass) — FALSITY, `PROBED×5`: a dead deferred
   body's count falls on the plain side against the hop's marker merge's, a
   quiet fold and the hop's node's on the impl's, one store across all three.
 - **`still-dead`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner no live
@@ -341,8 +341,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot; one hot script only, so no two compared.
-- **`dyn-one`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
-  source has at most one row in the impl's registry.
+- **`dyn-one`** (Simulation.Statement) — FALSITY, `PROBED×2`: a minted source
+  has at most one row in the impl's registry.
 - **`value-draws`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   value pass that sends leaves its counter past the one it started at.
 - **`quiet-fold`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: any tail handed
@@ -360,7 +360,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   at its program's frame, subscribe-kind; held at the root and under a value
   binder, not under a mint's binder.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
-  `PROBED×2, RECOVERY`: a slot's plain subscribe against the impl's at its
+  `PROBED×5, RECOVERY`: a slot's plain subscribe against the impl's at its
   stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the
   two scripts at the slot are one by `Store.scripts`, the hot and shared paths
   sound.
@@ -397,16 +397,16 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   node off its own sound path as it found it, one clause per constructor as
   `foldPath-rule`.
 - **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
-  `REFUTED, PROBED`: the unbatched values between the joined run at a batcher
+  `REFUTED, PROBED×2`: the unbatched values between the joined run at a batcher
   fuel never less and one past it; the sweep, deciding it directly, reached
   held-back values under a flattener with no red.
-- **`timed-faithful`** (Timed.Faithful) — DIFFICULTY, `PROBED`: probed
+- **`timed-faithful`** (Timed.Faithful) — DIFFICULTY, `PROBED×2`: probed
   first-order; the sweep, deciding it directly, reached values on two arrivals
   under a flattener with no red.
-- **`batchable`** (Batchable.Statement) — DIFFICULTY, `PROBED`: probed
+- **`batchable`** (Batchable.Statement) — DIFFICULTY, `PROBED×2`: probed
   first-order; the sweep, deciding it directly, reached values grouping under a
   flattener and a `μ` with no red.
-- **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED`:
+- **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED×2`:
   one packet per arrival, injectively; the sweep, deciding it directly, reached
   values on two arrivals under a flattener with no red.
 - **`go-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: one cascade pass

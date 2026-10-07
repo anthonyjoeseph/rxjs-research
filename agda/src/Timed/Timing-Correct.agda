@@ -61,12 +61,10 @@ Packets-Name-Arrivals =
       ≡ map pname (arrivalsOf {κ = κ} fuel (timed κ e) (timedSlots ins))
 
 postulate
-  -- THE COMPILED SWEEP REACHES THE FLATTENERS, AND FOUND NOTHING.
-  -- `make qc-packets-name-arrivals` decides this statement itself; at
-  -- depth 3, fuel one, seed 18 had 98 cases with values on two plain
-  -- arrivals under an author flattener, every one agreeing.  Those
-  -- counts are read at fuel one only.
-  --
+  -- PROBED: make qc-packets-name-arrivals QC='18 1000 3' QC_FUEL=1
+  --   decided by `CLI.QuickCheck`'s `namesᵀ`: 98 cases with values on
+  --   two plain arrivals under an author flattener, every one agreeing.
+  --   unaimed.
   -- PROBED: `Probed.Timing-Correct` -- one naming pinned at fuel 3 over
   --   the same three first-order programs.  No flattener, whose inner
   --   packets are where a naming could fail to be a function of the

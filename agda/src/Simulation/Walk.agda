@@ -282,14 +282,28 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- hand, and the checker runs out of memory on it even down the
       -- root path, so that refutation is a coverage boundary.
       --
-      -- SWEPT GREEN UNDER BINDERS, all three reads: `make qc-store`, depth
-      -- 4, flatteners over literal inners and defers, a slot leaf
-      -- weighted up, 100 programs each -- hot scripts (seed 41), colds
-      -- with two sync values (seed 42), slot one forwarding slot zero
-      -- (seed 43).  Not inside a μ.
-      -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
-      --   from empty stores: a cold script, its block run straight to the
-      --   root (`cold~`).  Not under a binder, not the values conjunct.
+      -- THE `Sound` PAIR AT A CONCRETE STORE IS PAST THE TYPECHECKER: the
+      -- row below, given `sound` over the opening store's two root
+      -- derivations, exhausted the checker's memory; a coverage boundary,
+      -- and the compiled sweep covers it.
+      -- PROBED: make qc-store QC='41 100 4'
+      --   decided by `CLI.Store-Check`'s `store?`: hot scripts, flatteners
+      --   over literal inners and defers, a slot leaf weighted up; 100
+      --   programs, not inside a μ.
+      --   Draw unrecorded: the seed alone does not replay it.
+      -- PROBED: make qc-store QC='42 100 4'
+      --   decided by `CLI.Store-Check`'s `store?`: colds with two sync
+      --   values; 100 programs, not inside a μ.
+      --   Draw unrecorded: the seed alone does not replay it.
+      -- PROBED: make qc-store QC='43 100 4'
+      --   decided by `CLI.Store-Check`'s `store?`: slot one forwarding slot
+      --   zero; 100 programs, not inside a μ.
+      --   Draw unrecorded: the seed alone does not replay it.
+      -- PROBED: git show 11e23e3e:agda/evidence/probed/Probed/Stores.agda
+      --   -- the STORE conjunct alone, at the root from empty stores, before
+      --   the `Sound` pair was a hypothesis: a cold script, its block run
+      --   straight to the root (`cold~`).  Not under a binder, not the
+      --   values conjunct.
       -- RECOVERY: git show ae5fd17e:agda/evidence/refuted/Refuted/Slot-Scripts.agda
       --   restores the opening store at two cold tables, which refuted this
       --   read over a store blind to the slots.

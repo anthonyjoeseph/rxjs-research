@@ -242,11 +242,18 @@ def sweep_fault(m, text, qc):
     if not re.search(r"\bQC='\d+ \d+ \d+'", text):
         return "carries no `QC='<seed> <runs> <depth>'` to replay"
     d = SWEEP_DRAW.search(text)
-    if d:
-        try:
-            json.loads(d.group(1))
-        except ValueError:
-            return "carries a `QC_DRAW` that is not JSON"
+    if d is None:
+        # An aimed sweep replayed without its draw draws other programs, so
+        # a receipt that lost its draw says so rather than reading replayable.
+        low = text.lower()
+        if "draw unrecorded" not in low and "unaimed" not in low:
+            return ("carries no `QC_DRAW` -- write the draw, or say `unaimed` "
+                    "or `draw unrecorded`")
+        return None
+    try:
+        json.loads(d.group(1))
+    except ValueError:
+        return "carries a `QC_DRAW` that is not JSON"
     return None
 
 
