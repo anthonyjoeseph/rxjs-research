@@ -32,12 +32,12 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subs-map)
 open import SExp.Simul-Slots using (plainSlots)
 open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import Rx.Evaluator.Builder using (subscribe!)
-open import Rx.Evaluator.Reducible.Support using (Σ⁰)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; sound)
 open import Simulation.Walk using (hot-read; read-input; cold-read; read-machine; defer-install; init-store; minted)
 open import Simulation.After using (module Kept)
 open Kept using (module After)
 open import Simulation.Schedules using ([]; _∷_)
-open import Simulation.Stores using (slot~; dyn~; data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
+open import Simulation.Stores using (Store; slot~; dyn~; data~; defer~; hop; elab; here; read~; cold~; root~; mach; hot~; block; []; _∷_)
 open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals; defer-in)
 
 -- a map's subscribe is its body's, down the map's frame
@@ -49,7 +49,7 @@ peel (subs-map d) = d
 -- each subscribe row is the walk's arm for the program's one former, at
 -- the empty stores and the two root derivations, as `root-walk` calls it
 _ : Confirms (After.store (proj₁ (hot-read (κᵖ two-arrivals) zero refl (λ x → x) (λ ()) (stampedSlot Γ₂ (κᵖ two-arrivals) zero)
-                            (init-store (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals) _ (<-trans (proj₁ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))) (n<1+n _))) root~
+                            (init-store (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals) _ (<-trans (proj₁ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))) (n<1+n _))) root~ (sound (Store.ruleP (init-store (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals) _ (<-trans (proj₁ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))) (n<1+n _)))) (λ k ()) (λ k ()) _) (sound (Store.ruleI (init-store (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals) _ (<-trans (proj₁ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))) (n<1+n _)))) (λ k ()) (λ k ()) _)
                             (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp (Point.prog two-arrivals)) (plainSlots (insᵖ two-arrivals)))))
                             (read-input (λ x → x) (stampedSlot Γ₂ (κᵖ two-arrivals) zero)
                               (peel (proj₂ (proj₂ (minted (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals)))))))))

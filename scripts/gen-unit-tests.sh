@@ -93,13 +93,13 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Exp using (add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; mergeᶠ; switchᶠ; exhaustᶠ)
-open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; flattenˢ;
+open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; mapˢ; scanˢ; flattenˢ; takeWhileˢ;
   μˢ; varˢ; deferˢ;
   varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; inlˢ; inrˢ; caseˢ; ifˢ;
   primˢ; nilˢ; consˢ; foldˢ; strmˢ)
 
 open import Rx.Prim using (hot; cold; after_,_)
-open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots; flatAllˢ)
+open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots; flatAllˢ; takeˢ)
 AGDA
 
 widen () {
