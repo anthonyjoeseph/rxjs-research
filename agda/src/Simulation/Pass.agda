@@ -444,6 +444,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- reaches the share.  What it owes is the start's: the block's run
       -- related, the one stamped emit carrying the value at the counter the
       -- chain entered with, the plain side not moving
+      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1],"reach":["scan","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 28's two hot arrivals reach a switch's last inner, a read
+      --   of the hot input connected at subscribe.
       hot-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {a : Arrival Γ} {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
                → (hot : lookup κ i ≡ hotᵏ)
                → Head (toℕ i) (toℕ (i ↑ˡ n)) {arrTy a} {arrTy a′} (arrVal a ∷ []) (arrVal a′ ∷ [])

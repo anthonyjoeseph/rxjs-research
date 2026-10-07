@@ -419,6 +419,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- WHERE A GROUP AT ONE FRAME LANDS, folded down the path: below the
       -- catch every restamp cell is subscribe-kind and hands the group
       -- its own instant, and the catch's cell hands the group the catch
+      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1],"script":[1,1,0,0,0]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 145 agree, 0 fail.
+      --   Cases 55 and 73 subscribe a lane's two-value `of` at a hot
+      --   arrival, its group folded down a flattener's restamp.
       of-fold-stamps : ∀ {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
                          {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI src es vs f}
                      → (S : Store κ sP stP sI stI)

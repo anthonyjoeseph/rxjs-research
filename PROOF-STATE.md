@@ -259,8 +259,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### Big picture tier roadmap
 
 - **SWEEP THE UNPROBED LEAVES.** Every `NO EVIDENCE` FALSITY row is a
-  statement nothing has instantiated: the quiet folds left, `hot-walk`,
-  `end-stamps`, `of-fold-stamps`, `value-draws`, `quiet-fold`.
+  statement nothing has instantiated: `quiet-fold` and the quiet
+  leaves, `quiet-sink` past what the generator draws, since a slot's
+  definition never flattens.
   Aim `qc-store` or `qc-same-clock` at each one's region, receipt the
   green ones, shrink a red into a refutation. Decides which leaves under
   `cascade-related` the monster's cascade can still fall through.
@@ -330,28 +331,28 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`share-{spend,finish}`** (Simulation.Pass) — FALSITY, `PROBED×2`: the
   stores stay related when both shares of a shared slot close and drop their
   readers.
-- **`hot-walk`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: past a connected
-  hot slot's flushed bracket, the block's merge subscribes the one stamp and
-  hands the share one emit carrying the value, delivered at the instant the
-  chain entered with; the plain side does not move.
+- **`hot-walk`** (Simulation.Pass) — FALSITY, `PROBED`: past a connected hot
+  slot's flushed bracket, the block's merge subscribes the one stamp and hands
+  the share one emit carrying the value, delivered at the instant the chain
+  entered with; the plain side does not move.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot; one hot script only, so no two compared.
 - **`dyn-one`** (Simulation.Statement) — FALSITY, `PROBED×2`: a minted source
   has at most one row in the impl's registry.
-- **`value-draws`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
-  value pass that sends leaves its counter past the one it started at.
+- **`value-draws`** (Simulation.Statement) — FALSITY, `PROBED`: an impl value
+  pass that sends leaves its counter past the one it started at.
 - **`quiet-fold`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: any tail handed
   nothing, no end, sends nothing and runs no clock back.
-- **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
+- **`end-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: an impl end
   pass's emits carry the instant its value pass drew.
 - **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY, `PROBED×4`:
   a slot read's subscribe sends only at its path's catch of the program's frame
   and keeps the restamp cells up to it; a shared read's connect reaches every
   row on the share's subject.
-- **`of-fold-stamps`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a group at
-  one frame folded down the path lands at the path's catch of it, the restamp
-  cells up to the catch kept.
+- **`of-fold-stamps`** (Simulation.Walk) — FALSITY, `PROBED`: a group at one
+  frame folded down the path lands at the path's catch of it, the restamp cells
+  up to the catch kept.
 - **`of-emits`** (Simulation.Walk) — FALSITY, `PROBED`: an `of`'s emits stand
   at its program's frame, subscribe-kind; held at the root and under a value
   binder, not under a mint's binder.
