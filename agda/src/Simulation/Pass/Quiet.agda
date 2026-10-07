@@ -946,13 +946,12 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → QArm S now p (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p)
                       (from-inner a m′ j′ ↠[ h₁ ] (scan-f F k ↠[ h₂ ] (map-f G ↠[ h₃ ] q))))
                     q (map (applyClo G) y₂) f₂ (o₁ ++ o₂) s₂ st₂
-    quiet-inner {stP = stP} S {m′ = m′} {j′ = j′} (inner~ e f ip pr) b refl si (step-from-inner react-false) d₂
-      with restamp-echo S f pr b d₂
-    ... | A , f′ , pr′ , c′ , refl , _ =
-      qarm A pr′ c′ refl λ {rI} dq B rel′ →
-        inner~ e (flat-move (EvalSt.nodes stP) _ (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) (After.grows B)
-                       (unmoved refl) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′)
-               (After.grows B (After.grows A ip)) rel′
+    quiet-inner {stP = stP} S {m′ = m′} {j′ = j′} (inner~ e f ip pr) b refl si (step-from-inner react-false) d₂ =
+      let (A , f′ , pr′ , c′ , e′ , _) = restamp-echo S f pr b d₂
+      in qarm A pr′ c′ e′ λ {rI} dq B rel′ →
+           inner~ e (flat-move (EvalSt.nodes stP) _ (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) (After.grows B)
+                          (unmoved refl) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′)
+                  (After.grows B (After.grows A ip)) rel′
       where
       cI = tail-of (step-clear d₂ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si))
 
@@ -1098,11 +1097,11 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                          × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
       explode-none S cp ci fl r [] walk-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , fl , r
       explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
-                   cp ci fl r (quiet e′ bare b) (walk-cons C W′)
-        with explode-quiet S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r e′ bare C
-      ... | X , fl′ , r′ with explode-none (After.store X) {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
-                                cp (consume-clear C ci) fl′ r′ b W′
-      ... | Y , rest = (X ⨾ Y) , rest
+                   cp ci fl r (quiet e′ bare b) (walk-cons C W′) =
+        let (X , fl′ , r′) = explode-quiet S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r e′ bare C
+            (Y , rest) = explode-none (After.store X) {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
+                                      cp (consume-clear C ci) fl′ r′ b W′
+        in (X ⨾ Y) , rest
 
       quiet-resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ′ u} {p : Path Γ ℓ u t} {G : Goal}
                        {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)} {es fin oI sI₁ stI₁ rI}
