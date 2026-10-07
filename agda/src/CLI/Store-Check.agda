@@ -797,6 +797,8 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       ∷ ("above" , all (λ r → aboveᵇ (proj₁ (proj₂ r))) RP ∧ all (λ r → aboveᵇ (proj₁ (proj₂ r))) RI)
       ∷ ("census" , all (λ i → censusAt (lookup κ i) (toℕ i)) (allFin n))
       ∷ ("owned" , owned)
+      -- not a field: `dyn-one`, a minted source's rows in the impl's registry
+      ∷ ("dyn-one" , all (λ l → not ((n + n) <ᵇ LiveSource.source l) ∨ (srcCount (LiveSource.source l) RI ≤ᵇ 1)) LI)
       ∷ []
 
     firstFail : List (String × Bool) → Maybe String

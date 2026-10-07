@@ -40,16 +40,17 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All-++⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
   renaming (refl to pointwise-refl; map to Pointwise-map)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; ≤⇒≤′; ≤⇒≤ᵇ; ≤ᵇ⇒≤; <-≤-trans; <-irrefl; <-cmp; m≤m+n; +-cancelˡ-≡)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; z≤n; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤n⇒m≤1+n; n≤1+n; ≤⇒≤′; ≤⇒≤ᵇ; ≤ᵇ⇒≤; <-≤-trans; <-irrefl; <-cmp; m≤m+n; +-cancelˡ-≡)
 open import Relation.Binary using (tri<; tri≈; tri>)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 open Relation.Binary.PropositionalEquality.≡-Reasoning
+open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Fuel; Id; PlainEvent; valueᵖ; completeᵖ; InstEmit)
-open import Rx.Exp       using (Ctx; Closed; Val; isData; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
+open import Rx.Exp       using (Ctx; Closed; Val; isData; _≟ᵗ_; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
 open import Data.Fin     using (Fin; toℕ; _↑ˡ_; _↑ʳ_)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -65,7 +66,7 @@ open import SExp.Readings using (arrivalsOf)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; RegRow; atSlot; Path; share-sink; schedGo; schedFinish; sched-next; arrVal;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; RegRow; atSlot; Path; share-sink; chainsGo; sameSource; regSource; schedGo; schedFinish; sched-next; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; memberSource)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
   disp; walk-more; walk-nil; walk-end)
@@ -340,16 +341,33 @@ postulate
         (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
 
-  -- A MINTED SOURCE'S VALUE PASS STAMPS AT THE COUNTER IT ENTERED WITH:
-  -- a cold script's per-subscription input block draws the instant,
-  -- and every chain the arrival reaches after it carries it.
-  dyn-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  -- A MINTED SOURCE HAS AT MOST ONE ROW IN THE IMPL'S REGISTRY: a cold
+  -- script or a deferred hop is minted per subscription, and only that
+  -- subscription registers at it.
+  --
+  -- `make qc-store`, deciding it at every live minted source on every
+  -- arrival boundary, is green on seed 31 at depth 4 (80 programs, a
+  -- flatten and a defer in each) and seed 32 at depth 3 (80, cold
+  -- scripts of several values aimed); a planted bound of 0 goes red
+  -- on 21 of 30, so the rows are there to count.
+  dyn-one : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+              {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
     → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′) → n + n < Arrival.source a′
-    → ∀ {oI sI₁ stI₁}
-    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
-    → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
+    → srcCount (Arrival.source a′) (EvalSt.registry stI) ≤ 1
+
+  -- A MINTED SOURCE'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED WITH: a
+  -- cold script's input block draws the instant, a hop's body carries
+  -- it, and so does every frame below either.
+  dyn-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                       {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → Storeʳ κ sP stP sI stI
+    → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′) → n + n < Arrival.source a′
+    → ∀ {rid c} → chainsOf a′ stI ≡ (rid , c) ∷ []
+    → ∀ {o sI₁ stI₁}
+    → chainStep⇓ a′ (arrVal a′ ∷ []) false c (record sI { live = rs′ })
+        (record (cascadeOpen stI) { delivered = rid ∷ EvalSt.delivered (cascadeOpen stI) }) (o , sI₁ , stI₁)
+    → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ o)
 
   -- THE END PASS'S EMITS CARRY THE SAME INSTANT, the one the value pass
   -- drew, not the counter where the end pass starts.  The sweeps under
@@ -363,6 +381,40 @@ postulate
     → ∀ {eI sI₂ stI₂}
     → cascadeGo⇓ a′ [] true (chainsOf a′ stI₁) sI₁ (cascadeClose a′ stI₁) (eI , sI₂ , stI₂)
     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₂) sourceᵏ) (readᴵ eI)
+
+-- an arrival has no more chains than rows at its source
+chains-count : ∀ {m} {Δ : Ctx m} {t} (a : Arrival Δ) (K : List (RegRow Δ t)) → length (chainsGo a K) ≤ srcCount (Arrival.source a) K
+chains-count a [] = z≤n
+chains-count a ((rid , s , (u , p)) ∷ K) with sameSource (Arrival.source a) (regSource s) | u ≟ᵗ arrTy a
+... | false | _        = chains-count a K
+... | true  | no _     = m≤n⇒m≤1+n (chains-count a K)
+... | true  | yes refl = s≤s (chains-count a K)
+
+-- A MINTED SOURCE'S VALUE PASS: its one chain's, or nothing
+dyn-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+               {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → Storeʳ κ sP stP sI stI
+  → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′) → n + n < Arrival.source a′
+  → ∀ {oI sI₁ stI₁}
+  → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
+dyn-stamps κ e {sI = sI} {stI = stI} s {a′} {rs′} ex′ q go = by (chainsOf a′ stI) refl go
+  where
+  two : ∀ {k} → suc (suc k) ≤ 1 → ⊥
+  two (s≤s ())
+
+  by : ∀ cs → chainsOf a′ stI ≡ cs → ∀ {r}
+     → cascadeGo⇓ a′ (arrVal a′ ∷ []) false cs (record sI { live = rs′ }) (cascadeOpen stI) r
+     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint (proj₁ (proj₂ r))) sourceᵏ) (readᴵ (proj₁ r))
+  by []                    _  casc-nil              = [] , inj₁ refl
+  by (_ ∷ [])              _  (casc-cut _ casc-nil) = [] , inj₁ refl
+  by ((rid , c) ∷ [])      eq (casc-live {emits = o} {sched₁ = s₁} _ d casc-nil) =
+    subst (λ z → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint s₁) sourceᵏ) (readᴵ z)) (sym (++-identityʳ o))
+          (dyn-chain-stamps κ e s ex′ q eq d)
+  by (_ ∷ _ ∷ _)           eq _ =
+    ⊥-elim (two (≤-trans (subst (λ l → length l ≤ srcCount (Arrival.source a′) (EvalSt.registry stI)) eq
+                                (chains-count a′ (EvalSt.registry stI)))
+                         (dyn-one κ e s ex′ q)))
 
 -- the two arrivals of a partnered pop are numbered as their sources are
 pop-kind : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
