@@ -257,21 +257,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SPLIT THE HOP BODY AT ITS RESTAMP.** Bug-cache rows put every
-  body's synchronous burst at the hop's instant (a cold's value, a share
-  the hop connects, both merged), so `hop-body-stamps` is aimed, not
-  refuted. `restampᵛ` moves only subscribe-kind emits, so the leaf is two
-  claims: the body's own subscribe puts out subscribe-kind emits or
-  deliveries stamped inside the token's window, the risky one and the
-  leaf to keep; and the marker merge, the restamp map, the hop's merge's
-  inner frame and the tail carry that, which becomes a body.
-
-- **STATE THE CARRY.** One leaf per former: an emit's instant copied by
-  every map, scan and cutter (each reassembles around the arriving emit),
-  and a flattener's restamp cell set by the echo leaving ahead of its
-  lane, so a subscribe burst behind it takes the instant. `end-stamps` is
-  impl-only, so its one chain is owed at the value pass's state: state
-  that bound first.
+- **RIDE THE STAMPS ON THE VALUES WALK.** A stamp leaf split at a frame
+  owes a tail claim over every state the subscribe folds at, and only the
+  values walk's `After` relates those: a `Sound` guard is false at a
+  planted queue or a lowered batch buffer. So `After` gains the instant
+  its impl outputs carry, each arm owing it beside its values, and the
+  stamp chains, `hop-body-stamps`, the block carries and
+  `subscribe-stamps` become projections of the walks they ride. Census
+  `After`'s producers first; the restamp and flattener-cell arms are the
+  risky ones, `end-stamps`' bound at the value pass's state the first.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
@@ -344,9 +338,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   source has at most one row in the impl's registry.
 - **`cold-carry-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
   cold block's `PathRel` tail carries the drawn instant to every emit.
-- **`hop-body-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
-  hop's body, its token drawn in `deferBodyᵖ`'s `mintᵉ`, stamps every emit
-  through the hop's merge and tail at the token.
+- **`hop-body-stamps`** (Simulation.Statement) — FALSITY, `DEAD ROUTE`: a hop's
+  body, its token drawn in `deferBodyᵖ`'s `mintᵉ`, stamps every emit through
+  the hop's merge and tail at the token.
 - **`quiet-fold`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: any tail
   handed nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end

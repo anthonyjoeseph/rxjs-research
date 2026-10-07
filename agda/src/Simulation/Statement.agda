@@ -450,6 +450,15 @@ postulate
   -- cold read merged beside a read of the share it feeds" print each
   -- body's synchronous burst, a share's connect included, at the hop's
   -- own instant, and its later values at their own blocks' instants.
+  --
+  -- DEAD ROUTE: split at `deferBodyᵖ`'s restamp, the body's subscribe
+  --   owing subscribe-kind or token-stamped emits to a tail that keeps a
+  --   token-stamped delivery at the token.  The tail folds at every state
+  --   the body's subscribe reaches, so its claim quantifies them: over
+  --   `Sound` states it is false at a planted queue (a drained inner
+  --   minting its own token) or a lowered batch buffer, and over
+  --   `Storeʳ`-related ones it needs the stores the values walk's `After`
+  --   hands out between folds, which an impl-only chain does not hold.
   hop-body-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
     → (S : Storeʳ κ sP stP sI stI)
