@@ -295,6 +295,10 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- left folds down the tail below it: every row the fold registers
       -- rides a path the tail's own frames begin, and every row it finds
       -- keeps its cancelled, dying and delivered marks
+      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1],"reach":["scan","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 25 switches past an inner that read the hot input at
+      --   subscribe, and both arrivals then fold below its dead row.
       still-dead : ∀ {sP} {stP : EvalSt ep} {now lo ℓ u op m j} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {vs rP}
                  → Sound (from-inner op m j ↠[ h ] p) sP stP
                  → any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ false

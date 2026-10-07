@@ -259,9 +259,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### Big picture tier roadmap
 
 - **SWEEP THE UNPROBED LEAVES.** Every `NO EVIDENCE` FALSITY row is a
-  statement nothing has instantiated: the quiet folds, `still-dead`,
-  `restamp-echo`, `outer-wrap`, the `block-*` leaves, `scan-write`,
-  `share-{spend,finish}`, `hot-walk`, `end-stamps`, `of-fold-stamps`.
+  statement nothing has instantiated: the quiet folds left, the
+  `block-*` leaves, `share-{spend,finish}`, `hot-walk`, `end-stamps`,
+  `of-fold-stamps`, `value-draws`, `quiet-fold`.
   Aim `qc-store` or `qc-same-clock` at each one's region, receipt the
   green ones, shrink a red into a refutation. Decides which leaves under
   `cascade-related` the monster's cascade can still fall through.
@@ -290,7 +290,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`defer-end`** (Simulation.Pass) — FALSITY, `PROBED×5`: a dead deferred
   body's count falls on the plain side against the hop's marker merge's, a
   quiet fold and the hop's node's on the impl's, one store across all three.
-- **`still-dead`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner no live
+- **`still-dead`** (Simulation.Pass) — FALSITY, `PROBED`: an inner no live
   chain runs through stays so while its group folds down the tail below it.
 - **`quiet-{sink,explode}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
   valueless group through a share's readers, or an exploded outer, folded on
@@ -301,10 +301,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`quiet-{inner,deferInner}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
   inner's or a deferred body's merge passes emits carrying nothing on as they
   came.
-- **`restamp-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
-  scan stepped on a group keeps the flattener, and the group it hands on
-  carries the same values and end, every delivery keeping its stamp.
-- **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
+- **`restamp-echo`** (Simulation.Pass) — FALSITY, `PROBED`: the restamp's scan
+  stepped on a group keeps the flattener, and the group it hands on carries the
+  same values and end, every delivery keeping its stamp.
+- **`outer-wrap`** (Simulation.Pass) — FALSITY, `PROBED`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
 - **`explode-{quiet,one,end,out}`** (Simulation.Pass) — FALSITY, `PROBED`: one
   exploded emit, carrying nothing or one value, walks into the flattener
@@ -321,8 +321,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`hop-{one,end}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`: a deferred
   hop's merge subscribes the one popped emit's body on both sides, sending at
   the hop's token, and its end meets the plain hop's.
-- **`scan-write`** (Simulation.Scan) — FALSITY, `NO EVIDENCE`: a cell written
-  on both sides keeps the stores and the tails related.
+- **`scan-write`** (Simulation.Scan) — FALSITY, `PROBED`: a cell written on
+  both sides keeps the stores and the tails related.
 - **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `PROBED×3`: a
   test's nodes written open keep the stores and tails, and written spent keep
   what the cut left; a spent test passes nothing on both sides.

@@ -76,6 +76,11 @@ module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
     postulate
       -- A CELL WRITTEN ON BOTH SIDES keeps the stores and the tails
       -- related
+      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1],"reach":["scan","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 15 writes two scans at subscribe, one over the other through
+      --   an echoing flattener; case 28 writes one at each of two hot
+      --   arrivals under a switch.
       scan-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ s u k k′ Θ₀ ρ₀}
                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂}
                      {F : FnClo Γ (u ×ᵗ s) u} {F′ : FnClo (plainᵏ Γ κ) (ScanAᵗ u ×ᵗ emitᵗ s) (ScanAᵗ u)}

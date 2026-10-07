@@ -497,6 +497,9 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- keeps its payloads, and writes nothing but the cell, so the
       -- flattener and the tails stay related with the cell moved on; the
       -- group it hands on keeps its end, and every delivery's stamp
+      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1],"reach":["scan","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 15 restamps an echo of a shared slot's value under a scan.
       restamp-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
                        {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es ws fin o₁ fin₁ sI₁ stI₁}
                        {ys : List (Val (plainᵏ Γ κ) (FlatSᵗ u))}
@@ -514,6 +517,11 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
       -- outer has and no lane is open or queued, read off related nodes,
       -- so the two ends agree; the restamp passes the empty group on
+      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1],"reach":["scan","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 28 ends a switch's literal outer while its last inner, a hot
+      --   read, stays open; case 25 ends a switch's literal outer of two
+      --   flatteners.
       outer-wrap : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
                      {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {fin r}
                  → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
