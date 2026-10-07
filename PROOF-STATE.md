@@ -251,24 +251,20 @@ over a testless budget; a flatten write moving a row; a cut,
 liveness, drain or body end unpairing; unsound walks, reads;
 two stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain
 past a valueless cut; a hop's script; root stamps
-off the walk.
+off the walk; a connect's joiner off its read's catch.
 Left: a cascade.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **RIDE THE STAMPS ON THE PASSES.** `Pass` carries `Out` for a group
-  delivered at one instant with no end, every arm's tail read through it,
-  so a share's reader sends at its delivery by projection. What sends is
-  now the leaves: `explode-out` and `elem-out` route through a consume
-  carrying the instant its echo set, `cut-out` through the end a cut
-  hands on. Swept green at a second instant: `explode-out` over two
-  inners on one group, `elem-out` at a hot arrival, `cut-out` at one and
-  where its end subscribes queued inners; a shared read's connect
-  reaching a joiner made mid-burst. Left: deciding whether one catch per
-  subscribe is the shape, now that a connect's emits leave down a
-  joiner's path too.
+- **SWEEP THE UNPROBED LEAVES.** Every `NO EVIDENCE` FALSITY row is a
+  statement nothing has instantiated: the quiet folds, `still-dead`,
+  `restamp-echo`, `outer-wrap`, the `block-*` and `while-*` writes,
+  `share-{spend,finish}`, `hot-walk`, `end-stamps`, `of-fold-stamps`.
+  Aim `qc-store` or `qc-same-clock` at each one's region, receipt the
+  green ones, shrink a red into a refutation. Decides which leaves under
+  `cascade-related` the monster's cascade can still fall through.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
