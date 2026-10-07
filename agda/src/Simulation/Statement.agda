@@ -378,6 +378,14 @@ postulate
 -- echo leaving ahead of its lane has just set; a subscribe burst
 -- inside a cascade is subscribe-kind throughout, its every
 -- flattener's cell freshly seeded so.
+--
+-- A RISKY SHAPE NO SWEEP HAS BEEN SEEN TO DRAW: a bounded merge's
+-- queued inner drained when a lane ends with nothing through the
+-- flattener in that cascade, a `takeWhile` cut, so its burst meets a
+-- cell no echo of this arrival set.  `make qc-same-clock` aimed at a
+-- bounded merge over `takeWhile` and two-arrival colds (seed 28, depth
+-- 3, fuel 12) agrees on 66 programs, 54 undecided; which of them drain
+-- that way it does not say.
 Carry : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
       → Storeʳ κ sP stP sI stI → Arrival (plainᵏ Γ κ) → (A : Ty) → ∀ {ℓ} → Path (plainᵏ Γ κ) ℓ (machineEmitᵗ A) (emitᵗ t) → Set
@@ -429,6 +437,11 @@ postulate
   -- A DEFERRED HOP'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED WITH: the
   -- hop's body draws the instant in `deferBodyᵖ`'s `mintᵉ`, and its tail
   -- carries it as a block's does.
+  --
+  -- `make qc-same-clock` with a defer in every program decides this
+  -- chain's instant on each hop arrival: seed 27 at depth 3, fuel 12, μ
+  -- off, 74 agree and 26 undecided; seed 26 with μ on agreed on 42
+  -- before a μ ran the binary out of memory.
   hop-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
     → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)}
