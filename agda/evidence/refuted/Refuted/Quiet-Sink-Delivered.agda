@@ -58,8 +58,8 @@ ep = plainExp (inputˢ zero)
 ei : Closed Γ′ (emitᵗ natᵗ)
 ei = elaborateImpl {Γ = Γ₂} κ₀ (inputˢ zero)
 
-open PassQ κ₀ using (Carries; quiet; [])
-open PassQ.InQ κ₀ {natᵗ} {ep} {ei} using (Quiet)
+open PassQ {Γ = Γ₂} κ₀ using (Carries; quiet; [])
+open PassQ.InQ {Γ = Γ₂} κ₀ {natᵗ} {ep} {ei} using (Quiet)
 
 -- one reader on each side, registered on the share and not yet delivered
 rowP : RegRow Γ₂ natᵗ
@@ -121,7 +121,7 @@ QuietSink = ∀ {lo lo′} {h : lo ≤ 1} {h′ : lo′ ≤ 3}
 
 -- the only relation between two one-row registries pairs the rows, and
 -- a pair delivered on one side alone is not spent alike
-unpaired : ∀ {π NP NI LP LI} {r r′} (q : RegRel κ₀ π NP NI LP LI (r ∷ []) (r′ ∷ [])) {dP dI}
+unpaired : ∀ {π NP NI LP LI} {r : RegRow Γ₂ natᵗ} {r′ : RegRow Γ′ (emitᵗ natᵗ)} (q : RegRel κ₀ π NP NI LP LI (r ∷ []) (r′ ∷ [])) {dP dI}
          → dP r ≡ false → dI r′ ≡ true → Spent κ₀ π NP NI LP LI q dP dI → ⊥
 unpaired (_ ∷ []) f t (d , _) with trans (sym f) (trans d t)
 ... | ()
