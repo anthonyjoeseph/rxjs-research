@@ -368,14 +368,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                   λ A → PathRel κ (Store.π (After.store A))
                           (setNode nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stP))
                           (setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true) (EvalSt.nodes (proj₂ (proj₂ rQ)))) p q
-    defer-end S {m2 = m2} {j2} ip₁ ip₂ lP lI l2 a1 pr sp si dq
+    defer-end S {nid′ = nid′} {j′ = j′} {m2 = m2} {j2} ip₁ ip₂ lP lI l2 a1 pr sp si dq
       with fold-past (rel-unbatched pr) (on-drop (on-drop (head-on _ _ _ m2 (self-node m2 (j2 ∷ [])) si)) ,
                                          drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))) dq
     ... | _ , d′ , refl
       with quiet-pass S pr [] refl (drop-ot _ _ _ sp) (drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))) d′
     ...   | A₁ , pr₁
       with defer-write (After.store A₁) (After.grows A₁ ip₁) (After.grows A₁ ip₂) lP
-             (trans (fold-unmoved d′ (head-on _ _ _ _ (self-node _ (_ ∷ [])) (drop-ot _ _ _ (drop-ot _ _ _ si)) ,
+             (trans (fold-unmoved d′ (head-on _ _ _ nid′ (self-node nid′ (j′ ∷ [])) (drop-ot _ _ _ (drop-ot _ _ _ si)) ,
                                       drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si)))) lI)
              (trans (fold-unmoved d′ (on-drop (on-drop (head-on _ _ _ m2 (self-node m2 (j2 ∷ [])) si)) ,
                                       drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si)))) l2)
