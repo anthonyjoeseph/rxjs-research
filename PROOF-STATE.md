@@ -240,17 +240,17 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — both top lines' ground, inducting on
-arrivals over `correspondence`: schedules in step, pops partnered, stores
+`simulation` — both top lines' ground, by arrival
+over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: an arrival plain lacks, split, a gap or stray, an echo
-off inners, payload; subscribes unrelated; a pop unrelating reads; a map
-moving time; a close emptying merges; hot ends past blocks; a
-two-value emit; a testless cut; a write moving a row;
+off inners, payload; subscribes unrelated; pops unrelating reads; maps
+moving time; closes emptying merges; hot ends past blocks;
+two-value emits; testless cuts; writes moving rows;
 cut, liveness, drain, body ends unpairing; unsound walks, reads; two
-stamp chains; `of` splits, folds; a `mintᵉ` stamp; a drain past a
-quiet cut; a hop's script; root stamps unwalked; a joiner off its catch;
-quiet folds, lanes, fan-outs; installs; a fold reviving a dead inner. Left: cascades.
+stamp chains; `of` splits, folds; a `mintᵉ` stamp; drains past
+quiet cuts; a hop's script; root stamps unwalked; a joiner off its catch;
+quiet folds, lanes, fan-outs; installs; dead inners revived. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
@@ -282,9 +282,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`defer-write`** (Simulation.Pass) — FALSITY, `PROBED×5`: a deferred
-  body's three counts, the plain merge's and the impl's marker merge and hop
-  node, written one lower together keep the store and the tails related.
+- **`defer-write`** (Simulation.Pass) — FALSITY, `PROBED×5`: a deferred body's
+  three counts, the plain merge's and the impl's marker merge and hop node,
+  written one lower together keep the store and the tails related.
 - **`quiet-spent`** (Simulation.Pass) — FALSITY, `PROBED`: a spent test's cell
   stepped on emits carrying nothing, on the impl side alone, stays related and
   passes nothing.
