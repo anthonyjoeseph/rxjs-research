@@ -17,24 +17,25 @@ open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (nothing; just)
 open import Data.Nat     using (ℕ; suc; pred; _≤_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; pred[n]≤n)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; pred[n]≤n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
-open import Data.List.Properties using (map-id; ++-assoc; ++-identityʳ)
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
+open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; subst₂; cong; cong₂)
 
-open import Rx.Exp       using (Ctx; Closed; Val; mergeᶠ; switchᶠ; exhaustᶠ; uniqᵗ; obs; applyClo; Tm; varᵗ; unit̂; pairᵗ;
+open import Rx.Exp       using (Ctx; Closed; Val; _≟ᵗ_; mergeᶠ; switchᶠ; exhaustᶠ; uniqᵗ; obs; applyClo; Tm; varᵗ; unit̂; pairᵗ;
   inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (EvalSt; NodeId; shareSpend; shareDying; Path; _↠[_]_; scan-f; map-f; thru-outer; from-inner;
-  mergeAllᵒ; lookupNode; echoᵗ; thruEvents; thruWrap; switchᵒ; exhaustᵒ; RegId; AtFloor;
-  shareFinish; aliveThroughᶠ; Sched; pathHasNode; mergeAll-st; cell-st; setNode)
+  mergeAllᵒ; lookupNode; echoᵗ; thruEvents; thruWrap; switchᵒ; exhaustᵒ; shareFinish;
+  aliveThroughᶠ; Sched; pathHasNode; mergeAll-st; cell-st; setNode; drainSt)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-step; stepFrame⇓; step-map; step-scan; step-thru-outer; step-from-inner;
   react-false; react-alive; react-dead; innerFinish⇓; finish-switch-clear;
-  finish-exhaust-clear; finish-nil; finish-all-drain; mergeAllDrain⇓; drain-spent; thruWalk⇓; thruConsume⇓; walk-nil; walk-echo; walk-cons)
+  finish-exhaust-clear; finish-nil; finish-all-drain; mergeAllDrain⇓; drain-spent; drain-nil; drain-no-room; drain-room; subscribeInner⇓; thruWalk⇓; thruConsume⇓; walk-nil; walk-echo; walk-cons)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ; elemᵛ)
-open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; merge~; ObsRel; V; sharedEq; PathRel; inner~;
+open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; merge~; ObsRel; V; PathRel; inner~;
   deferInner~; []; _∷_; Store; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ)
 open import Simulation.Cut using (module At; module Third)
 open import Simulation.After using (module Kept; readᴾ; readᴵ-++)
@@ -42,11 +43,12 @@ open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru)
 open import Simulation.Sweep using (t≢f)
-open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; head-on; self-node; off-path; ∨-Tˡ)
+open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; drop-ot; head-on; self-node; off-path; ∨-Tˡ)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Simulation.Write using (apart)
-open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept; Thru; thruWalk-rule)
-open import Simulation.Pass.Quiet using (module PassQ; retag; ShareSlot; SlotPair; cur-here; cur-there; delivered; delivered-arr; dying; dying-arr; slotpair; tail-of; usable-self)
+open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept; Thru; thruWalk-rule; subscribeInner-rule)
+open import Simulation.Pass.Quiet using (module PassQ; cur-here; cur-there; delivered; delivered-arr; dying; dying-arr; tail-of;
+  usable-self)
 
 -- A WALK OVER TWO RUNS OF EVENTS IS THE FIRST WALK, THEN THE SECOND
 -- from where it left the state
@@ -96,6 +98,22 @@ pred-one (s≤s z≤n) = refl
 fin-at : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w now} {p : Path Δ lo w u} {vals c c′ sched st r}
        → c ≡ c′ → foldPath⇓ {e = e} now p vals c sched st r → foldPath⇓ now p vals c′ sched st r
 fin-at refl f = f
+
+-- and so does a subscribe through it, from the node it writes
+sub-clear : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w} {k} {κ : Path Δ lo w u} {op now o y}
+              {sched sched′ st st′ inst out}
+          → subscribeInner⇓ {e = e} op k κ now o sched (record st { nodes = setNode k y (EvalSt.nodes st) }) (inst , out , sched′ , st′)
+          → Clear k κ sched st → Clear k κ sched′ st′
+sub-clear {e = e} {k = k} {κ = κ} {y = y} {sched = sched} {st = st} d c = unthru (subscribeInner-rule d so (Thru {e = e} k κ) so (λ _ _ _ → refl))
+  where
+  so : Sound (Thru {e = e} k κ) sched (record st { nodes = setNode k y (EvalSt.nodes st) })
+  so = sub-ot (λ r∈ → r∈) ≤-refl (thru c)
+
+-- a merge's node, as a drain re-reads it
+drain-self : ∀ {m} {Δ : Ctx m} u {l a od} {q : List (Val Δ (obs u))} → drainSt {Γ = Δ} u (just (mergeAll-st {t = u} l a q od)) ≡ (l , a , q , od)
+drain-self u with u ≟ᵗ u
+... | yes refl = refl
+... | no ¬e    = ⊥-elim (¬e refl)
 
 module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -242,39 +260,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                → thruWalk⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now
                    (thruEvents (map (applyClo (Θ₀ , elemᵛ , ρ₀)) es)) sI stI rI
                → ∀ {I} → All (DelAt {echoᵗ u} I) es → Out I (proj₁ rI)
-      -- A MERGE'S QUEUE DRAINED ON BOTH SIDES once its dying inner's group
-      -- has folded: each drain subscribes queued inners through the tail
-      -- while a lane is free, and leaves related counts and queues
-      --
-      -- THE QUEUED INNERS STAY `ObsRel`-RELATED THROUGH DRAINS: with
-      -- `CLI.Obs-Match` deciding their relation and every observable's
-      -- env, seed 31 again (51 of 100 draining) and seed 33 with
-      -- observable folds drawn too (46 of 100 draining, 47 folding)
-      -- held at every boundary.  The check is live: a reversed impl
-      -- queue reds 23 of seed 31's programs, an env slot read one off.
-      -- PROBED: make qc-store QC='31 100 4'
-      --   decided by `CLI.Store-Check`'s `store?`: bounded merges over
-      --   literal inners; 65 of 100 spent a queue, at up to three
-      --   boundaries each, stores related at every one.
-      --   Draw unrecorded: the seed alone does not replay it.
-      merge-drain : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim lim′ a q q′ od m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
-                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
-                      {p : Path Γ ℓ u t} {q̂ : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
-                      {out act qr sP₂ stP₂ out′ act′ qr′ sI₂ stI₂}
-                  → Flattener {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) u (mergeᶠ lim) m m′ ks xs
-                  → lookupNode m (EvalSt.nodes stP) ≡ just (mergeAll-st {t = u} lim′ a q od)
-                  → lookupNode m′ (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} lim′ a q′ od)
-                  → Pointwise (λ x′ x → ObsRel κ u x′ x) q′ q
-                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q̂
-                  → Sound (from-inner mergeAllᵒ m j ↠[ h ] p) sP stP
-                  → Sound (from-inner mergeAllᵒ m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q̂) sI stI
-                  → mergeAllDrain⇓ m p now q lim′ (pred a) od q sP stP (out , act , qr , sP₂ , stP₂)
-                  → mergeAllDrain⇓ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q̂) now q′ lim′ (pred a) od q′ sI stI
-                      (out′ , act′ , qr′ , sI₂ , stI₂)
-                  → Σ (After S (out , sP₂ , stP₂) (out′ , sI₂ , stI₂)) λ A
-                      → act ≡ act′ × Pointwise (λ x′ x → ObsRel κ u x′ x) qr′ qr
-                        × Flattener {Γ = Γ} κ (Store.π (After.store A)) {t} (EvalSt.nodes stP₂) (EvalSt.nodes stI₂) u (mergeᶠ lim) m m′ ks xs
-                        × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP₂) (EvalSt.nodes stI₂) p q̂
       -- AN INNER NO LIVE CHAIN RUNS THROUGH STAYS SO while the group it
       -- left folds down the tail below it: every row the fold registers
       -- rides a path the tail's own frames begin, and every row it finds
@@ -519,6 +504,65 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       subst (λ z → Arm S now o sP₁ stP₁ p vs fin G H (z , proj₂ r))
         (trans (++-assoc xs ys (proj₁ r)) (cong (_++ (ys ++ proj₁ r)) (sym (++-identityʳ xs))))
 
+    -- a merge's pair as a drain re-reads it: one bound, one count, one
+    -- end, and the queues related
+    drain-read : ∀ {π NP NI u lim m m′ ks xs l₂ a₂ q₂ od₂ l₂′ a₂′ q₂′ od₂′}
+               → Flattener {Γ = Γ} κ π {t} NP NI u (mergeᶠ lim) m m′ ks xs
+               → drainSt u (lookupNode m NP) ≡ (l₂ , a₂ , q₂ , od₂)
+               → drainSt (emitᵗ u) (lookupNode m′ NI) ≡ (l₂′ , a₂′ , q₂′ , od₂′)
+               → l₂ ≡ l₂′ × a₂ ≡ a₂′ × od₂ ≡ od₂′ × Pointwise (λ x′ x → ObsRel κ u x′ x) q₂′ q₂
+    drain-read {u = u} (_ , _ , _ , lP , lI , merge~ qs , _) eP eI
+      with trans (sym (drain-self u)) (trans (sym (cong (drainSt u) lP)) eP)
+         | trans (sym (drain-self (emitᵗ u))) (trans (sym (cong (drainSt (emitᵗ u)) lI)) eI)
+    ... | refl | refl = refl , refl , refl , qs
+
+    -- A MERGE'S QUEUE DRAINED ON BOTH SIDES: while a lane is free each
+    -- side spends its queue's head through the flattener's mint, and the
+    -- node each re-reads is the pair the mint left
+    drain-pair : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u lim m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+                   {fs fs′ l a od qs qs′ out act qr sP₂ stP₂ out′ act′ qr′ sI₂ stI₂}
+               → Walkedˣ xs (mergeᶠ lim) m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+               → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
+               → Pointwise (λ x′ x → ObsRel κ u x′ x) fs′ fs → Pointwise (λ x′ x → ObsRel κ u x′ x) qs′ qs
+               → mergeAllDrain⇓ m p now fs l a od qs sP stP (out , act , qr , sP₂ , stP₂)
+               → mergeAllDrain⇓ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now fs′ l a od qs′ sI stI (out′ , act′ , qr′ , sI₂ , stI₂)
+               → Σ (After S (out , sP₂ , stP₂) (out′ , sI₂ , stI₂)) λ A
+                   → act ≡ act′ × Pointwise (λ x′ x → ObsRel κ u x′ x) qr′ qr
+                     × Walkedˣ xs (mergeᶠ lim) m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP₂) (EvalSt.nodes stI₂)
+    drain-pair S W _ _ [] qw drain-spent drain-spent = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , qw , W
+    drain-pair S W _ _ (_ ∷ _) [] drain-nil drain-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , [] , W
+    drain-pair S W _ _ (_ ∷ _) qw@(_ ∷ _) (drain-no-room _) (drain-no-room _) = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , qw , W
+    drain-pair S W _ _ (_ ∷ _) (_ ∷ _) (drain-no-room eP) (drain-room eI _ _ _) = ⊥-elim (t≢f (trans (sym eI) eP))
+    drain-pair S W _ _ (_ ∷ _) (_ ∷ _) (drain-room eP _ _ _) (drain-no-room eI) = ⊥-elim (t≢f (trans (sym eP) eI))
+    drain-pair S W cP cI (_ ∷ fw) (ob ∷ qw) (drain-room {st₁ = s₁} _ c rP dr) (drain-room {st₁ = s₁′} _ c′ rI dr′)
+      with flat-mint S W cP cI (merge~ qw) ob c c′
+    ... | A₁ , W₁ with drain-read {NP = EvalSt.nodes s₁} {NI = EvalSt.nodes s₁′} (proj₁ W₁) rP rI
+    ...   | refl , refl , refl , qw₁ with drain-pair (After.store A₁) W₁ (sub-clear c cP) (sub-clear c′ cI) fw qw₁ dr dr′
+    ...     | A₂ , e , qr , W₂ = A₁ ⨾ A₂ , e , qr , W₂
+
+    -- A MERGE'S QUEUE DRAINED ON BOTH SIDES once its dying inner's group
+    -- has folded, from the queue its node holds
+    merge-drain : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim lim′ a q q′ od m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                    {p : Path Γ ℓ u t} {q̂ : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
+                    {out act qr sP₂ stP₂ out′ act′ qr′ sI₂ stI₂}
+                → Flattener {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) u (mergeᶠ lim) m m′ ks xs
+                → Pointwise (λ x′ x → ObsRel κ u x′ x) q′ q
+                → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q̂
+                → Sound (from-inner mergeAllᵒ m j ↠[ h ] p) sP stP
+                → Sound (from-inner mergeAllᵒ m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q̂) sI stI
+                → mergeAllDrain⇓ m p now q lim′ a od q sP stP (out , act , qr , sP₂ , stP₂)
+                → mergeAllDrain⇓ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q̂) now q′ lim′ a od q′ sI stI
+                    (out′ , act′ , qr′ , sI₂ , stI₂)
+                → Σ (After S (out , sP₂ , stP₂) (out′ , sI₂ , stI₂)) λ A
+                    → act ≡ act′ × Pointwise (λ x′ x → ObsRel κ u x′ x) qr′ qr
+                      × Flattener {Γ = Γ} κ (Store.π (After.store A)) {t} (EvalSt.nodes stP₂) (EvalSt.nodes stI₂) u (mergeᶠ lim) m m′ ks xs
+                      × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP₂) (EvalSt.nodes stI₂) p q̂
+    merge-drain S {m = m} {m′} {j = j} {j′} f qs pr sp si dP dI =
+      drain-pair S (f , pr) (head-on _ _ _ m (self-node m (j ∷ [])) sp , drop-ot _ _ _ sp)
+        (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si) qs qs dP dI
+
     -- A MERGE'S INNER ENDED ON BOTH SIDES: each finish folds the group
     -- down its tail, drains the queue its node holds, and writes the
     -- count and queue the drain left; the end then crosses the restamp
@@ -546,7 +590,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       ⊥-elim (t≢f (trans (sym (usable-self _)) e))
     merge-finish S f ip pr lP lI (merge~ _) b sp si _ _ (finish-all-drain _ _) _ refl (finish-nil e) _ =
       ⊥-elim (t≢f (trans (sym (usable-self _)) e))
-    merge-finish S {m = m} {m′} {j = j} {j′} f ip pr lP lI (merge~ qs) b sp si sp′ si′
+    merge-finish S {m = m} {m′} {j = j} {j′} f ip pr _ _ (merge~ qs) b sp si sp′ si′
         (finish-all-drain fP dP) tail refl (finish-all-drain fI@(fold-step d₁ (fold-step step-map dq)) dI) dR
       with restamp-echo S f pr b d₁
     ... | A , f′ , pr′ , c′ , refl , _
@@ -560,8 +604,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                (missed dq (proj₂ (tail-of (step-clear d₁ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si))) ,
                            proj₂ (proj₁ (tail-of (step-clear d₁ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si))))))
                f′)
-             (trans (fold-unmoved fP (head-on _ _ _ m (self-node m (j ∷ [])) sp , drop-ot _ _ _ sp)) lP)
-             (trans (fold-unmoved fI (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si)) lI)
              qs pr₁
              (fold-kept fP (drop-ot _ _ _ sp) _ sp (λ _ _ _ → refl))
              (fold-kept fI (drop-ot _ _ _ si) _ si (λ _ _ _ → refl)) dP dI
@@ -928,21 +970,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
            (drop-ot _ _ _ (step-kept _ dW′ si′)) dR
            λ { (f , ds) → explode-out S {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} (unthru si′) fl r b W′ ds , f }
 
-    -- A RESTAMPED EMIT CARRIES WHAT IT CARRIED: the restamp rebuilds the
-    -- emit over its own events, so the values it holds are the ones
-    restamp-rel : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} e′ {ws}
-                → EmitRel {Γ = Γ} κ (lookup Γ i) e′ ws
-                → EmitRel {Γ = Γ} κ (lookup Γ i) (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) e′) ws
-    restamp-rel (evs , i , s , inj₁ k) r = retag (λ q → q) r
-    restamp-rel (evs , i , s , inj₂ k) r = r
-
-    restamp-carries : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {es vs}
-                    → Carries {s = lookup Γ i} es vs
-                    → Carries (map (applyClo (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀)) es) vs
-    restamp-carries []             = []
-    restamp-carries {i = i} {X = X} (quiet e′ r bs) = quiet _ (restamp-rel {i = i} {X = X} e′ r) (restamp-carries {i = i} {X = X} bs)
-    restamp-carries {i = i} {X = X} (one e′ r bs)   = one _ (restamp-rel {i = i} {X = X} e′ r) (restamp-carries {i = i} {X = X} bs)
-
     -- and a read's restamp keeps a delivery's
     restamp-del : ∀ {i : Fin n} {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ} {I}
                     {es : List (Val (plainᵏ Γ κ) (emitᵗ (lookup Γ i)))}
@@ -967,42 +994,10 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       arm (after S (λ x → x) (λ x → x) [] (λ x → x)) r (restamp-carries {i = i} {X = X} c) (drop-ot _ _ _ si) dq (λ _ _ _ → tt)
         λ { (f , ds) → out-quiet [] refl , inj₂ (f , restamp-del {i = i} {ρ₀ = ρ₀} {X = X} ds) }
 
-    -- the emits of a stamped slot against the plain values, at types the
-    -- share's own is only propositionally the emit of
-    CarriesU : ∀ {u u′} → u′ ≡ emitᵗ u → List (Val (plainᵏ Γ κ) u′) → List (Val Γ u) → Set
-    CarriesU refl = Carries
-
-    carriesU-nil : ∀ {u u′} (e : u′ ≡ emitᵗ u) → CarriesU e [] []
-    carriesU-nil refl = []
-
-    -- a partnered pair stays partnered once the store moves
-    slot-keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
-                   {c : RegId × AtFloor Γ u t} {d}
-               → Keeps S S₁
-               → SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i c d
-               → SlotPair (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i c d
-    slot-keeps K (slotpair x) = slotpair (K x)
-
     -- the same pass, started from the store as it stood before the row was marked
     rebase : ∀ {sP stP sI stI fin x x′ rP rI} {S : St sP stP sI stI} {pr : Partners κ _ _ _ _ _ (Store.rows S) x x′}
            → After (delivered S {fin} pr) rP rI → After S rP rI
     rebase {fin = fin} (after s k q v g) = after s k (λ ar → q (delivered-arr {fin = fin} ar)) v g
-
-    -- a fan-out's pairs stay paired once the store moves
-    share-keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {cs ds}
-                → Keeps S₀ S₁
-                → Pointwise (ShareSlot (Store.rows S₀) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) cs ds
-                → Pointwise (ShareSlot (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i) cs ds
-    share-keeps K []       = []
-    share-keeps {S₀ = S₀} {S₁ = S₁} K (r ∷ rs) = slot-keeps {S = S₀} {S₁ = S₁} K r ∷ share-keeps {S₀ = S₀} {S₁ = S₁} K rs
-
-    -- the share's emits at the type its stamped slot holds them
-    slot-cast : ∀ {i : Fin n} → lookup κ i ≡ sharedᵏ → Val (plainᵏ Γ κ) (emitᵗ (lookup Γ i)) → Val (plainᵏ Γ κ) (lookup (plainᵏ Γ κ) (n ↑ʳ i))
-    slot-cast {i} sh = subst (Val (plainᵏ Γ κ)) (sym (sharedEq {Γ = Γ} κ i sh))
-
-    carries-cast : ∀ {u u′} (ε : u′ ≡ emitᵗ u) {es : List (Val (plainᵏ Γ κ) (emitᵗ u))} {vs}
-                 → Carries es vs → CarriesU ε (map (subst (Val (plainᵏ Γ κ)) (sym ε)) es) vs
-    carries-cast refl {es} c = subst (λ xs → Carries xs _) (sym (map-id es)) c
 
     -- a share marked dying on both sides
     dying-after : ∀ {sP stP sI stI} (S : St sP stP sI stI) (i : Fin n) → lookup κ i ≡ sharedᵏ

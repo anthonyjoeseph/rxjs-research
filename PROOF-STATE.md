@@ -243,14 +243,14 @@ undecided, never a failure (Anthony).
 `simulation` — both top lines' ground, inducting on
 arrivals over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
-OUT: an arrival plain lacks, split, an instant's gap or stray, an echo
+OUT: an arrival plain lacks, split, a gap or stray, an echo
 off inners, payload; subscribes unrelated; a pop unrelating reads; a map
 moving time; a close emptying merges; hot ends past blocks; a
 two-value emit; a testless cut; a write moving a row;
 cut, liveness, drain, body ends unpairing; unsound walks, reads; two
 stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain past a
 quiet cut; a hop's script; root stamps unwalked; a joiner off its catch;
-quiet folds, lanes; installs. Left: cascades.
+quiet folds, lanes, fan-outs; installs. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
@@ -263,12 +263,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   registered one by `Store.fresh-ids`. Turns a deferred subscribe's
   opening from probed at the root into proven under any store.
 
-- **FINISH THE QUIET PASS.** A delivery marks its reader only when it
-  carries the end, so a valueless emit through a share marks none and
-  `quiet-sink` is statable again. Sweep `qc-store` with slot one a drawn
-  flattening program (`slot` arm four) to hand a share's subject one, then
-  body it as the walk folding `quiet-pass` down each reader the store pairs.
-  Then `quiet-spent` as `quiet-takeWhile` runs an open test.
+- **PROVE THE FINISHING ARMS.** `still-dead` as a family over the fold's
+  relations: a dead row's marks only grow, and a fold registers rows only
+  down paths it folds, none through the dead inner; then `defer-end` over
+  it. Rules out a dying inner's end unpairing a store.
+
+- **FINISH THE QUIET PASS.** `quiet-spent` as `quiet-takeWhile` runs an
+  open test: the cell steps on the impl side alone and both tests stay
+  spent. Rules out the last quiet arm unpairing a store.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -281,17 +283,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **`of-fold`** (Simulation.Walk) — FALSITY, `REFUTED, DEAD ROUTE`: the group
   folded and ended down related sound paths keeps what a pass keeps.
-- **`merge-drain`** (Simulation.Pass) — FALSITY, `PROBED`: a merge's related
-  queues drained on both sides leave related counts, queues, flattener and
-  tail.
 - **`defer-end`** (Simulation.Pass) — FALSITY, `PROBED×5`: a dead deferred
   body's count falls on the plain side against the hop's marker merge's, a
   quiet fold and the hop's node's on the impl's, one store across all three.
 - **`still-dead`** (Simulation.Pass) — FALSITY, `PROBED`: an inner no live
   chain runs through stays so while its group folds down the tail below it.
-- **`quiet-sink`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a valueless
-  group through a share's readers, folded on the impl side alone with the plain
-  side still, marking no reader delivered.
 - **`quiet-spent`** (Simulation.Pass) — FALSITY, `PROBED`: a spent test's cell
   stepped on emits carrying nothing, on the impl side alone, stays related and
   passes nothing.
