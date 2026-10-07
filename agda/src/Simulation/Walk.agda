@@ -128,6 +128,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- VARIABLES AT SLOTS THE MINT'S BINDER MOVED.  The scan's elaboration,
     -- read off by its shape: its step against the author's, its seed's
     -- state against the author's seed.
+    -- PROBED: `Probed.Walk-Leaves` -- a running sum plus the author's
+    --   variable, seeded by it, past the mint's binder: the seed, and the
+    --   step over one payload.  Two payloads in one emit do not finish
+    --   in the typechecker, a coverage boundary.
     lifts-scan : ∀ {Θ s u} (f : SFn Γ [] [] Θ (u ×ᵗ s) u) (z : STm Γ [] [] Θ u) (b : SExp Γ [] [] Θ s)
                    {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} (src : ℕ)
                    {g : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (ScanAᵗ u) (emitᵗ u)}
@@ -142,6 +146,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- BINDER MOVED, or a cut the scan's step decides apart from the plain
     -- test's.  The elaborated takeWhile, read off by its shape: its
     -- cutter's step against the plain test at a budget of one.
+    -- PROBED: `Probed.Walk-Leaves` -- a test below the author's variable,
+    --   past the mint's binder, at one payload it fails and one it
+    --   passes.  A cut inside a two-payload emit does not finish in the
+    --   typechecker, a coverage boundary.
     lifts-while : ∀ {Θ s} (f : SFn Γ [] [] Θ s boolᵗ) (b : SExp Γ [] [] Θ s)
                     {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} (src : ℕ)
                     {g : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s) (emitᵗ s)}
@@ -311,6 +319,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     postulate
       -- A CELL INSTALLED ON BOTH SIDES, the impl's under its mint: the
       -- pair joins `π` and the tails stay related
+      -- PROBED: `Probed.Walk-Leaves` -- at the opening stores and root
+      --   paths: the pair joins `π` below the moved counters, the rule
+      --   kept.  No row registered, not below a frame.
       scan-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
                        {k k′ src} (a : Val Γ u) (aI : Val (plainᵏ Γ κ) (ScanAᵗ u))
                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
@@ -326,6 +337,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A TEST INSTALLED ON BOTH SIDES, the impl's test and cell under
       -- its mint: the triple joins `π` and the tails stay related
+      -- PROBED: `Probed.Walk-Leaves` -- as `scan-install`, the test and
+      --   its cell apart.
       while-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
                         {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
                         {k k₁ k₂ src} (c : Val (plainᵏ Γ κ) (CutS unitᵗ u))
@@ -670,6 +683,8 @@ postulate
 
 -- WHERE IT CAN STILL FAIL: A HOT SCRIPT NUMBERED APART FROM ITS RAW
 -- READ.  Both lists are the slots' hot scripts, numbered by slot.
+-- PROBED: `Probed.Walk-Leaves` -- one hot script, so no two slots
+--   compared.
 postulate
   init-numbers : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
                → Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → SrcNum κ (LiveSource.source l) (LiveSource.source l′))
@@ -677,6 +692,7 @@ postulate
                            (Sched.live (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)))
 
 -- the hot scripts live before anything is subscribed, one per slot
+-- PROBED: `Probed.Walk-Leaves` -- one hot script, so no two compared.
 postulate
   init-distinct : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
                 → Unique (map LiveSource.source (Sched.live (sched-init (plainExp e) (plainSlots ins))))
