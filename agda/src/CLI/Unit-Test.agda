@@ -52,8 +52,8 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; mapˢ; scanˢ; varˢᵗ; natˢ;
-  primˢ; pairˢ; fstˢ; sndˢ; strmˢ; μˢ; deferˢ; varˢ; flattenˢ; inrˢ)
-open import Rx.Exp using (add; mergeᶠ; switchᶠ; exhaustᶠ)
+  primˢ; pairˢ; fstˢ; sndˢ; strmˢ; μˢ; deferˢ; varˢ; flattenˢ; inrˢ; takeWhileˢ; inlˢ; unitˢ)
+open import Rx.Exp using (add; ltᵖ; mergeᶠ; switchᶠ; exhaustᶠ)
 
 open import Rx.Prim using (hot; cold; after_,_)
 open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots; flatAllˢ; takeˢ)
@@ -238,4 +238,24 @@ cases =
             (inputˢ zero)))
           (mkSlots (cold (1 ∷ 2 ∷ []) [])
                    emptyˢ) ∷
+  cached "a bounded merge's lane cut valueless by a takeWhile, then drained, cold" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inlˢ unitˢ)) (takeWhileˢ (primˢ ltᵖ (pairˢ (varˢᵗ (here refl)) (natˢ 5))) (inputˢ zero))))) ∷ (strmˢ (ofˢ ((natˢ 1) ∷ (natˢ 2) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 3) ∷ (after 1 , 9) ∷ []))
+                   emptyˢ) ∷
+  cached "a bounded merge's lane cut valueless by a takeWhile, then drained, hot" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inlˢ unitˢ)) (takeWhileˢ (primˢ ltᵖ (pairˢ (varˢᵗ (here refl)) (natˢ 5))) (inputˢ zero))))) ∷ (strmˢ (ofˢ ((natˢ 1) ∷ (natˢ 2) ∷ []))) ∷ [])))
+          (mkSlots (hot ((after 1 , 3) ∷ (after 1 , 9) ∷ []))
+                   emptyˢ) ∷
+  cached "a deferred read of a cold with a synchronous value" 30
+          (deferˢ (inputˢ zero))
+          (mkSlots (cold (2 ∷ []) ((after 1 , 5) ∷ []))
+                   emptyˢ) ∷
+  cached "a deferred read of a share its hop connects, over a cold" 30
+          (deferˢ (inputˢ (suc zero)))
+          (mkSlots (cold (2 ∷ []) ((after 1 , 5) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a deferred cold read merged beside a read of the share it feeds" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (deferˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ (suc zero))) ∷ []))))) ∷ [])))
+          (mkSlots (cold (2 ∷ 3 ∷ []) ((after 1 , 5) ∷ []))
+                   (ofˢ ((natˢ 7) ∷ []))) ∷
   []

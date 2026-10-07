@@ -241,30 +241,30 @@ undecided, never a failure (Anthony).
 ### The monster
 
 `simulation` — both top lines' ground, inducting on
-arrivals over `correspondence`: schedules in step, pops partnered, stores related; the root
-subscribes set them (`subscribe-related`) and each cascade keeps
-(`cascade-related`), values agreeing. RULED
+arrivals over `correspondence`: schedules in step, pops partnered, stores
+related; set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: an arrival plain lacks, a split one, an instant's gap or
-stray, an echo off inners, payload; any subscribe
+stray, an echo off inners, payload; a subscribe
 unrelated; a pop unrelating a read; a map moving time; a close
 emptying named merges; a hot end past its block; a two-value emit; a cut
-over a testless budget; a flatten write moving a row; a cut or
-liveness unpairing; a drain or body end (μ too)
-unpairing inners; unsound walks, reads; two stamping chains;
-an `of` mis-split.
+over a testless budget; a flatten write moving a row; a cut,
+liveness, drain or body end unpairing; unsound walks, reads;
+two stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain
+past a valueless cut; a hop's script.
 Left: a cascade.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **SPLIT THE HOP'S STAMP WALK INTO DRAW AND CARRY.** Every input
-  block, hot or cold, is a body down to its tail's `Carry`, and a minted
-  source's chain down to its partnered row. Left: `hop-chain-stamps`,
-  inverted through the hop's `thru-outer` to `deferBodyᵖ`'s `mintᵉ`, then
-  `Carry` over the body's `PathRel` tail. Ruled out: a stamp drawn
-  anywhere but a `mintᵉ`, a queued inner in a block's merge drawing a
-  second, a hot slot's pop at a minted source.
+- **TEST THE HOP BODY'S BURST, THEN STATE ITS CARRY.**
+  `hop-body-stamps` owes a deferred body's whole subscribe at the token,
+  and a cold read inside the body draws its own block's instant, so the
+  burst is at the token only if the body's restamp catches it. Bug-cache
+  rows run the shapes: a cold's synchronous value, a share the hop
+  connects, both merged. Red refutes the leaf; green aims its carry, the
+  restamp over subscribe-kind emits, then the hop's merge's inner frame
+  over `PathRel`.
 
 - **STATE THE CARRY.** One leaf per former: an emit's instant copied by
   every map, scan and cutter (each reassembles around the arriving emit),
@@ -344,8 +344,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   source has at most one row in the impl's registry.
 - **`cold-carry-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
   cold block's `PathRel` tail carries the drawn instant to every emit.
-- **`hop-chain-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
-  deferred hop's one chain stamps at the counter it entered with.
+- **`hop-body-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
+  hop's body, its token drawn in `deferBodyᵖ`'s `mintᵉ`, stamps every emit
+  through the hop's merge and tail at the token.
 - **`quiet-fold`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: any tail
   handed nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
