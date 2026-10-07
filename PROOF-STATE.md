@@ -240,30 +240,33 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — both top lines' ground, by induction on
+`simulation` — both top lines' ground, inducting on
 arrivals over `correspondence`: schedules in step, pops partnered, stores related; the root
 subscribes set them (`subscribe-related`) and each cascade keeps
 (`cascade-related`), values agreeing. RULED
 OUT: an arrival plain lacks, a split one, an instant's gap or
-stray, an echo apart from inners, payload; any subscribe
+stray, an echo off inners, payload; any subscribe
 unrelated; a pop unrelating a read; a map moving time; a close
 emptying named merges; a hot end past its block; a two-value emit; a cut
 over a testless budget; a flatten write moving a row; a cut or
 liveness unpairing; a drain or body end (μ too)
-unpairing inners; unsound walks, reads; two stamping chains.
-Left: which cascade breaks.
+unpairing inners; unsound walks, reads; two stamping chains;
+an `of` mis-split.
+Left: a cascade.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **PROBE THE WALK'S UNEVIDENCED LEAVES.** `of-carries` and
-  `flat-install{,-explode}` have never been instantiated; both compute on
-  a concrete `of` or flattener, so pin them by `refl` in
-  `agda/evidence/probed/` at an `of` of two values under a map and a
-  flattener of each policy, and a red is a restatement before the grind
-  inherits it. Ruled out: the reads, hot, shared and cold, swept green
-  under flatteners and defers; `μ-unfolds` under every value binder.
+- **PROBE THE WALK'S LAST UNEVIDENCED LEAVES.** `lifts-scan`,
+  `lifts-while`, `scan-install`, `while-install` and
+  `init-{numbers,distinct}` have never been instantiated; all compute at
+  a concrete step or store, so pin them by `refl` in
+  `Probed.Walk-Leaves`, the lifts as `Probed.Map-Step` pins the map's,
+  the installs at the opening stores as the flattener's are, and a red
+  is a restatement before the grind inherits it. Ruled out: an `of`
+  split otherwise than one value per emit; a flattener's nodes colliding
+  at install, every policy, exploded or not.
 
 - **STATE THE STAMP'S CARRY.** Each arrival's value pass is one chain
   (`hot-chain-stamps`, `dyn-chain-stamps`, `dyn-one` green on 160
@@ -283,8 +286,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **`of-fold`** (Simulation.Walk) — FALSITY, `REFUTED, DEAD ROUTE`: the group
   folded and ended down related sound paths keeps what a pass keeps.
-- **`of-carries`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an `of`'s emits
-  carry its values, one per emit.
 - **`merge-drain`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a merge's
   related queues drained on both sides leave related counts, queues, flattener
   and tail.
@@ -347,10 +348,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`defer-install`** (Simulation.Walk) — FALSITY, `PROBED`: a hop's merge,
   source and row installed on both sides pair as `defer~` and keep the tails
   related; holds at a deferred hot read at the root.
-- **`flat-install{,-explode}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a
+- **`flat-install{,-explode}`** (Simulation.Walk) — FALSITY, `PROBED×2`: a
   flattener's nodes and the impl's restamping cell, and per-inner merge,
-  installed on both sides pair in `π` and keep the tails related; a one-lane
-  merge read only in normal form.
+  installed on both sides pair in `π` and keep the tails related; green at the
+  opening stores, not under a registered row.
 - **`lifts-scan`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the elaborated
   scan's step and seed read the author's variables past the mint's binder.
 - **`scan-install`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a scan's cell
@@ -367,6 +368,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
   subscribes send under one instant below the clock; holds at an `of` of one
   and two values. A cold read's decode is past the typechecker.
+- **`of-carries`** (Simulation.Walk) — DIFFICULTY, `PROBED`: an `of`'s emits
+  carry its values, one per emit; held at none and at two under a binder.
 - **`μ-unfolds`** (Simulation.Walk) — DIFFICULTY, `PROBED`: an unrolling is an
   author's program, its plain form and every renamed elaboration the
   unrollings; held under every value binder and past an inner μ.

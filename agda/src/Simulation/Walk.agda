@@ -272,6 +272,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN `of`'S EMITS CARRY ITS VALUES: the impl's list under its mint,
       -- one emit per value, the last also carrying the end, against the
       -- plain values over related environments
+      -- PROBED: `Probed.Walk-Leaves` -- no values, and two with the first
+      --   read off a binder through the mint's renaming: one emit per
+      --   value, the end on the last.  Not a value of a sum or pair type,
+      --   not under a nonempty outer telescope.
       of-carries     : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                      → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
                      → ∀ src → Carries {u} (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L) (map (λ tm → evalWith tm ρ) (plainTms ts))
@@ -339,11 +343,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A FLATTENER INSTALLED ON BOTH SIDES, the impl's restamping cell
       -- under it: the triple joins `π` and the tails stay related.
-      -- Read off normal forms, not instantiated: a one-lane merge of the
+      -- Read off normal forms: a one-lane merge of the
       -- hot read installs what the relation says -- `π` pairing the plain
       -- merge node with the impl's lane node and cell -- and the
-      -- typechecked row of the merge does not finish, the coverage
-      -- boundary of `Probed.Stores`.
+      -- typechecked row of that merge under a live read does not finish,
+      -- a coverage boundary.
+      -- PROBED: `Probed.Walk-Leaves` -- every policy, at the opening
+      --   stores and root paths: the pair joins `π` apart and below the
+      --   counters, the rule kept.  No row registered, so no row runs
+      --   through a paired node; not below a frame.
       flat-install : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
                        {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
                        (op : FlatOp) {m m′ ks} (c : Val (plainᵏ Γ κ) (FlatSᵗ u))
@@ -360,6 +368,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- the same with the impl's per-inner merge under the flattener:
       -- the merge's node rides the quadruple
+      -- PROBED: `Probed.Walk-Leaves` -- as `flat-install`, the merge's
+      --   node apart from the flattener's and its cell's.
       flat-install-explode : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
                                {lo lo′ u} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)}
                                (op : FlatOp) {m m′ ks mX} (c : Val (plainᵏ Γ κ) (FlatSᵗ u))
