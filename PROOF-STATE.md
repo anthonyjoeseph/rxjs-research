@@ -264,10 +264,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   now the leaves: `explode-out` and `elem-out` route through a consume
   carrying the instant its echo set, `cut-out` through the end a cut
   hands on. Swept green at a second instant: `explode-out` over two
-  inners on one group, `elem-out` at a hot arrival, `cut-out` at one. Left:
-  a cut whose tail then subscribes a second inner on the group, and a
-  shared read's connect, reaching rows off this path, deciding whether one
-  catch per subscribe is the shape.
+  inners on one group, `elem-out` at a hot arrival, `cut-out` at one and
+  where its end subscribes queued inners. Left: a shared read's connect,
+  reaching rows off this path, deciding whether one catch per subscribe is
+  the shape.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
@@ -329,8 +329,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
   test's nodes written open keep the stores and tails, and written spent keep
   what the cut left; a spent test passes nothing on both sides.
-- **`cut-out`** (Simulation.Take) — FALSITY, `PROBED`: a tail handed a nonempty
-  group delivered at one instant, and the end, sends at that instant.
+- **`cut-out`** (Simulation.Take) — FALSITY, `PROBED×2`: a tail handed a
+  nonempty group delivered at one instant, and the end, sends at that instant.
 - **`share-{spend,finish}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the
   stores stay related when both shares of a shared slot close and drop their
   readers.
