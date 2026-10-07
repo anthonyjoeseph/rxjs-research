@@ -61,6 +61,12 @@ QuietTail e q = ∀ {now sched st o sched′ st′} → foldPath⇓ {e = e} now 
 
 postulate
   -- ANY TAIL IS QUIET HANDED NOTHING.
+  --
+  -- PROBED: make qc-same-clock QC='53 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,1,2,0,2,2,0,2,0,0,4],"fan":[1,1,0,1,1,6,1,1,1],"leaf":[2,0,1],"reach":["flatten"]}'
+  --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: over budget at 79
+  --   agree, 0 fail.  Cases 24 and 71 run a cold script's first of two
+  --   arrivals, whose block's merge wraps with no end and folds its tail
+  --   on nothing; case 71's under a deferred hop's wrap too.
   quiet-fold : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ (instEmitᵗ uniqᵗ t)} {ℓ u} {q : Path Δ ℓ u (instEmitᵗ uniqᵗ t)} → QuietTail e q
 
 -- WHAT A RUN SENDS AT ONE INSTANT: every value it puts out read at `I`

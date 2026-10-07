@@ -243,28 +243,18 @@ undecided, never a failure (Anthony).
 `simulation` — both top lines' ground, inducting on
 arrivals over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
-OUT: an arrival plain lacks, a split one, an instant's gap or
-stray, an echo off inners, payload; a subscribe
-unrelated; a pop unrelating a read; a map moving time; a close
-emptying named merges; a hot end past its block; a two-value emit; a cut
-over a testless budget; a flatten write moving a row; a cut,
-liveness, drain or body end unpairing; unsound walks, reads;
-two stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain
-past a valueless cut; a hop's script; root stamps
-off the walk; a connect's joiner off its read's catch.
-Left: a cascade.
+OUT: an arrival plain lacks or split, an instant's gap or stray, an echo
+off inners, payload; a subscribe unrelated; a pop unrelating a read; a map
+moving time; a close emptying merges; a hot end past its block; a
+two-value emit; a testless cut; a write moving a row;
+a cut, liveness, drain or body end unpairing; unsound walks, reads; two
+stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain past a quiet
+cut; a hop's script; root stamps off the walk; a joiner off its catch;
+quiet folds. Left: a cascade.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **SWEEP THE UNPROBED LEAVES.** Every `NO EVIDENCE` FALSITY row is a
-  statement nothing has instantiated: `quiet-fold` and the quiet
-  leaves, `quiet-sink` past what the generator draws, since a slot's
-  definition never flattens.
-  Aim `qc-store` or `qc-same-clock` at each one's region, receipt the
-  green ones, shrink a red into a refutation. Decides which leaves under
-  `cascade-related` the monster's cascade can still fall through.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
@@ -272,6 +262,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `Store.pairs-below`, or a registered row's, below them by the rule. A
   generic fresh-write over `PathRel` and the registry, with `π` grown as
   `mint-pair` grows it, gives all four bodies.
+
+- **PROVE THE QUIET FOLD.** `quiet-fold` by induction on the fold handed
+  nothing: a map maps nothing, a scan's, test's and batch's dispatch on no
+  values and no end sends nothing, an outer walks no events, an inner
+  reacts to nothing, and the sink is `disp-quiet`. Turns every block's and
+  hop's wrap the cascade passes from swept silent into proven silent.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -292,15 +288,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   quiet fold and the hop's node's on the impl's, one store across all three.
 - **`still-dead`** (Simulation.Pass) — FALSITY, `PROBED`: an inner no live
   chain runs through stays so while its group folds down the tail below it.
-- **`quiet-{sink,explode}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a
-  valueless group through a share's readers, or an exploded outer, folded on
-  the impl side alone with the plain side still.
+- **`quiet-sink`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a valueless
+  group through a share's readers, folded on the impl side alone with the plain
+  side still; past the generator, whose slot definitions never flatten.
 - **`quiet-spent`** (Simulation.Pass) — FALSITY, `PROBED`: a spent test's cell
   stepped on emits carrying nothing, on the impl side alone, stays related and
   passes nothing.
-- **`quiet-{inner,deferInner}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an
-  inner's or a deferred body's merge passes emits carrying nothing on as they
-  came.
+- **`quiet-{inner,deferInner,explode}`** (Simulation.Pass) — FALSITY,
+  `PROBED×3`: an inner's or a deferred body's merge passes emits carrying
+  nothing on as they came, and an exploded outer's explode into no inner.
 - **`restamp-echo`** (Simulation.Pass) — FALSITY, `PROBED`: the restamp's scan
   stepped on a group keeps the flattener, and the group it hands on carries the
   same values and end, every delivery keeping its stamp.
@@ -342,7 +338,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   has at most one row in the impl's registry.
 - **`value-draws`** (Simulation.Statement) — FALSITY, `PROBED`: an impl value
   pass that sends leaves its counter past the one it started at.
-- **`quiet-fold`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: any tail handed
+- **`quiet-fold`** (Simulation.Arm) — FALSITY, `PROBED`: any tail handed
   nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: an impl end
   pass's emits carry the instant its value pass drew.

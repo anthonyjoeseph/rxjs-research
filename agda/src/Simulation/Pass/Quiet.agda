@@ -815,6 +815,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- AN EXPLODED OUTER'S EMIT CARRYING NOTHING explodes into no
       -- inner, and its echo is restamped on the impl side alone
+      -- PROBED: make qc-store QC='53 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,1,2,0,2,2,0,2,0,0,4],"fan":[1,1,0,1,1,6,1,1,1],"leaf":[2,0,1],"reach":["flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 71 explodes each cold arrival into nothing inside a
+      --   deferred body, and that group meets an outer flatten's explode.
       quiet-explode : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                         {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
@@ -829,6 +833,11 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- AN INNER'S EMITS CARRYING NOTHING leave its lane as they came,
       -- the flattener's node unwritten, and are restamped
+      -- PROBED: make qc-store QC='53 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,1,2,0,2,2,0,2,0,0,4],"fan":[1,1,0,1,1,6,1,1,1],"leaf":[2,0,1],"reach":["flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 89 hands two nested mergeAll inners a hot arrival
+      --   exploded into nothing, and case 64 hands one to an exhaust's
+      --   live deferred inner.
       quiet-inner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u C op m m′ j j′ k}
                       {F : FnClo (plainᵏ Γ κ) (C ×ᵗ emitᵗ u) C} {G : FnClo (plainᵏ Γ κ) C (emitᵗ u)}
                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
@@ -845,6 +854,11 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A DEFERRED BODY'S EMITS CARRYING NOTHING pass the hop's marker
       -- merge, its restamp and the hop's node as they came
+      -- PROBED: make qc-store QC='53 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,1,2,0,2,2,0,2,0,0,4],"fan":[1,1,0,1,1,6,1,1,1],"leaf":[2,0,1],"reach":["flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Cases 64, 71 and 140 explode an arrival into nothing inside
+      --   a deferred body: hot under an exhaust, cold twice, and hot
+      --   through slot one's forward.
       quiet-deferInner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2}
                            {G : FnClo (plainᵏ Γ κ) (emitᵗ u) (emitᵗ u)}
                            {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
