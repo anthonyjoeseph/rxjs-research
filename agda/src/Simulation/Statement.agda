@@ -50,8 +50,10 @@ open Relation.Binary.PropositionalEquality.≡-Reasoning
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Fuel; Id; PlainEvent; valueᵖ; completeᵖ; InstEmit)
-open import Rx.Exp       using (Ctx; Closed; Val; isData; _≟ᵗ_; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
+open import Rx.Exp       using (Ctx; Closed; Val; Ty; isData; _≟ᵗ_; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; applyClo; varᵗ; unit̂;
+  pairᵗ; inlᵗ; inrᵗ)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
+open import SExp.Elaborate using (inputStampᵖ)
 open import Data.Fin     using (Fin; toℕ; _↑ˡ_; _↑ʳ_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -67,15 +69,16 @@ open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; RegRow; atSlot; Path; share-sink; chainsGo; sameSource; regSource; schedGo; schedFinish; sched-next; arrVal;
-  chainsOf; cascadeOpen; cascadeClose; cascadeFinish; memberSource)
+  chainsOf; cascadeOpen; cascadeClose; cascadeFinish; memberSource; arrTick; _↠[_]_; map-f; batchSync-f; thru-outer; from-inner; mergeAllᵒ;
+  echoᵗ; thruEvents; batchSync-st; batchVals; setNode)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
-  disp; walk-more; walk-nil; walk-end)
+  disp; walk-more; walk-nil; walk-end; thruWalk⇓; chain-step; fold-step; step-map; step-from-inner; react-false; step-thru-outer)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule; chain-sound; chain-agree)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; admit-ot)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
-open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr; InputBlock; hotEq; srcCount) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; Arr; InputBlock; block; hotEq; srcCount) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source;
   raw-none; raw-one; raw-mistyped; raw-at)
 open import Simulation.Hot-End using (hot-end-start)
@@ -86,7 +89,7 @@ open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; module Kept)
 open Kept using (After; module After; Persists; _⨾_)
-open import Simulation.Pass using (row-pass; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
+open import Simulation.Pass using (row-pass; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle; batch-flush; sink-at; disp-quiet)
 open import Simulation.Pass.Quiet using (dynRow; Paired; unchain; delivered; admit-agrees; delivered-arr; module PassQ)
 open PassQ using (head; Head; nohead)
 
@@ -324,32 +327,6 @@ postulate
           → cascadeGo⇓ {e = e} a vs fin cs sched st r → ∀ k
           → counter (Sched.mint sched) k ≤ counter (Sched.mint (proj₁ (proj₂ r))) k
 
-  -- A CONNECTED HOT SLOT'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED
-  -- WITH: its input block's merge subscribes the stamp, whose mint
-  -- draws that counter, and the share's readers carry the instant down.
-  -- `hot-block`'s hypotheses, at the stamp instead of the values.
-  --
-  -- THE ROUTE IS A DRAW THEN A CARRY.  The draw is the block's alone and
-  -- inverts as `hot-block` does, down to the merge subscribing the
-  -- stamp's `mintᵉ`.  The carry is per former and owes a unary relation
-  -- on values by type: below the block every emit's instant is copied
-  -- (`mapStepᵖ`'s reassemble), or restamped by `flatStepᵛ` with the last
-  -- instant the flattener put out, which a filtered value still echoes;
-  -- a read's subscribe burst takes the frame and is restamped by the
-  -- flattener it runs under.
-  hot-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-    → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-    → (hot : lookup κ i ≡ hotᵏ)
-    → ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)}
-    → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
-    → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
-        (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
-    → ∀ {oI sI₁ stI₁}
-    → chainStep⇓ a′ (arrVal a′ ∷ []) false (suc (toℕ (i ↑ˡ n)) , q) sI
-        (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
-    → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-
   -- A MINTED SOURCE HAS AT MOST ONE ROW IN THE IMPL'S REGISTRY: a cold
   -- script or a deferred hop is minted per subscription, and only that
   -- subscription registers at it.
@@ -391,6 +368,67 @@ postulate
     → ∀ {eI sI₂ stI₂}
     → cascadeGo⇓ a′ [] true (chainsOf a′ stI₁) sI₁ (cascadeClose a′ stI₁) (eI , sI₂ , stI₂)
     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₂) sourceᵏ) (readᴵ eI)
+
+postulate
+  -- THE WALK PAST A CONNECTED HOT SLOT'S BRACKET STAMPS AT THE COUNTER
+  -- THE CHAIN ENTERED WITH: the block's merge subscribes the stamp's
+  -- `mintᵉ`, the chain's first draw, and the share's readers carry the
+  -- instant down.  `hot-walk`'s hypotheses, at the stamp instead of the
+  -- values.
+  --
+  -- THE ROUTE IS A DRAW THEN A CARRY.  The draw is the merge's subscribe
+  -- of the stamp's one `ofᵉ` under its `mintᵉ`.  The carry is per former
+  -- and owes a unary relation on values by type: below the block every
+  -- emit's instant is copied (`mapStepᵖ`'s reassemble, a scan's and a
+  -- cutter's alike), or restamped by `flatStepᵛ` with the last instant
+  -- the flattener put out, which the echo leaving ahead of its lane has
+  -- just set; a subscribe burst inside a cascade is subscribe-kind
+  -- throughout, its every flattener's cell freshly seeded so.
+  hot-walk-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                      {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+    → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+    → (hot : lookup κ i ≡ hotᵏ)
+    → ∀ {v} → _≡_ {A = Σ Ty (Val (plainᵏ Γ κ))} (arrTy a′ , arrVal a′) (plainᵗ (lookup Γ i) , v)
+    → ∀ {rid ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+        {h₁ : suc (toℕ (i ↑ˡ n)) ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ}
+        {h : ℓ ≤ toℕ (n ↑ʳ i)}
+    → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i))
+        (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)))))))
+        (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
+    → ∀ {oW sW stW}
+    → thruWalk⇓ mergeAllᵒ m2 (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)) (arrTick a′)
+        (thruEvents (map (applyClo {s = obs (emitᵗ (lookup Γ i))} {t = echoᵗ (emitᵗ (lookup Γ i))} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
+                      (map (applyClo {s = (unitᵗ +ᵗ plainᵗ (lookup Γ i)) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ (lookup Γ i))} {t = obs (emitᵗ (lookup Γ i))} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃))
+                        (batchVals false (map (applyClo {s = plainᵗ (lookup Γ i)} {t = unitᵗ +ᵗ plainᵗ (lookup Γ i)} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) (v ∷ []))))))
+        sI (record (record stI { delivered = rid ∷ EvalSt.delivered stI })
+              { nodes = setNode b (batchSync-st {s = unitᵗ +ᵗ plainᵗ (lookup Γ i)} false [] false) (EvalSt.nodes stI) })
+        (oW , sW , stW)
+    → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sW) sourceᵏ) (readᴵ oW)
+
+-- A CONNECTED HOT SLOT'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED
+-- WITH: inverted as `hot-block` inverts it, down to the walk past the
+-- bracket, which nothing before it draws for.
+hot-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                     {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+  → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
+  → (hot : lookup κ i ≡ hotᵏ)
+  → ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)}
+  → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
+  → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
+      (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
+  → ∀ {oI sI₁ stI₁}
+  → chainStep⇓ a′ (arrVal a′ ∷ []) false (suc (toℕ (i ↑ˡ n)) , q) sI
+      (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
+  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
+hot-chain-stamps {Γ = Γ} κ {sI = sI} S {a′ = a′@record { elemTy = _ ; payload = v }} {i = i} hot refl ib@(block _ _ eb _ _ _ _ _)
+  (chain-step (fold-step step-map (fold-step (step-from-inner react-false)
+    (fold-step SB (fold-step step-map (fold-step step-map (fold-step (step-thru-outer {out = oW} W) fq)))))))
+  with batch-flush SB eb
+... | refl with disp-quiet (sink-at (hotEq {Γ = Γ} κ i hot) fq)
+...   | refl = at-nil oW (hot-walk-stamps κ S {a′ = a′} hot refl ib W)
+  where
+  at-nil : ∀ {lo hi} o → At lo hi (readᴵ o) → At lo hi (readᴵ (o ++ []))
+  at-nil {lo} {hi} o = subst (λ z → At lo hi (readᴵ z)) (sym (++-identityʳ o))
 
 -- an arrival has no more chains than rows at its source
 chains-count : ∀ {m} {Δ : Ctx m} {t} (a : Arrival Δ) (K : List (RegRow Δ t)) → length (chainsGo a K) ≤ srcCount (Arrival.source a) K
