@@ -264,56 +264,56 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- WHAT A RESTAMP CELL RECORDS IS A FACT ABOUT THE PATHS, so any two
     -- derivations of one pair of paths agree on all three
-    delivers-same : ∀ {π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
-                    (d : PathRel κ π {t} NP NI p q) (d′ : PathRel κ π′ {t} NP′ NI′ p q) → Delivers d → Delivers d′
-    delivers-same root~ root~ x = x
-    delivers-same (sink~ _) _ ()
-    delivers-same (map~ _ d) (map~ _ d′) x = delivers-same d d′ x
-    delivers-same (scan~ _ _ _ _ _ d) (scan~ _ _ _ _ _ d′) x = delivers-same d d′ x
-    delivers-same (takeWhile~ _ _ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) x = delivers-same d d′ x
-    delivers-same (takeWhile~ _ _ _ _ _ d) (spentWhile~ _ _ _ d′) x = delivers-same d d′ x
-    delivers-same (spentWhile~ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) x = delivers-same d d′ x
-    delivers-same (spentWhile~ _ _ _ d) (spentWhile~ _ _ _ d′) x = delivers-same d d′ x
-    delivers-same (outerElem~ _ d) d′ x = elem-del d′ (delivers-same d (elem-tail d′) x)
-    delivers-same (outerExplode~ _ d) d′ x = explode-del d′ (delivers-same d (explode-tail d′) x)
-    delivers-same (inner~ _ _ _ d) (inner~ _ _ _ d′) x = delivers-same d d′ x
-    delivers-same (deferInner~ _ _ _ _ _ _ d) (deferInner~ _ _ _ _ _ _ d′) x = delivers-same d d′ x
+    record Same {π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
+                (d : PathRel κ π {t} NP NI p q) (d′ : PathRel κ π′ {t} NP′ NI′ p q) : Set where
+      field
+        del : Delivers d → Delivers d′
+        cat : ∀ {I f N} → Catch I f N d → Catch I f N d′
+        kep : ∀ {N N′} → Kept N N′ d → Kept N N′ d′
+
+    same : ∀ {π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
+           (d : PathRel κ π {t} NP NI p q) (d′ : PathRel κ π′ {t} NP′ NI′ p q) → Same d d′
+    same root~ root~ = record { del = λ x → x ; cat = λ x → x ; kep = λ x → x }
+    same (sink~ _) d′ = record { del = λ () ; cat = λ () ; kep = λ _ → sink-kept d′ }
+    same (map~ _ d) (map~ _ d′) = let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+    same (scan~ _ _ _ _ _ d) (scan~ _ _ _ _ _ d′) =
+      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+    same (takeWhile~ _ _ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) =
+      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+    same (takeWhile~ _ _ _ _ _ d) (spentWhile~ _ _ _ d′) =
+      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+    same (spentWhile~ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) =
+      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+    same (spentWhile~ _ _ _ d) (spentWhile~ _ _ _ d′) =
+      let S = same d d′ in record { del = Same.del S ; cat = Same.cat S ; kep = Same.kep S }
+    same (outerElem~ _ d) d′ =
+      let S = same d (elem-tail d′) in record
+        { del = λ x → elem-del d′ (Same.del S x)
+        ; cat = λ (c , l , b) → elem-catch d′ (c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ (e , x) → e , Same.del S x) b)
+        ; kep = λ k → elem-kept d′ λ c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
+        }
+    same (outerExplode~ _ d) d′ =
+      let S = same d (explode-tail d′) in record
+        { del = λ x → explode-del d′ (Same.del S x)
+        ; cat = λ (c , l , b) → explode-catch d′ (c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ (e , x) → e , Same.del S x) b)
+        ; kep = λ k → explode-kept d′ λ c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
+        }
+    same (inner~ _ _ _ d) (inner~ _ _ _ d′) =
+      let S = same d d′ in record
+        { del = Same.del S
+        ; cat = λ (c , l , b) → c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ (e , x) → e , Same.del S x) b
+        ; kep = λ k c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
+        }
+    same (deferInner~ _ _ _ _ _ _ d) (deferInner~ _ _ _ _ _ _ d′) =
+      let S = same d d′ in record { del = Same.del S ; cat = λ (e , x) → e , Same.del S x ; kep = λ _ → tt }
 
     catch-same : ∀ {I f N π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
                  (d : PathRel κ π {t} NP NI p q) (d′ : PathRel κ π′ {t} NP′ NI′ p q) → Catch I f N d → Catch I f N d′
-    catch-same root~ root~ x = x
-    catch-same (sink~ _) _ ()
-    catch-same (map~ _ d) (map~ _ d′) x = catch-same d d′ x
-    catch-same (scan~ _ _ _ _ _ d) (scan~ _ _ _ _ _ d′) x = catch-same d d′ x
-    catch-same (takeWhile~ _ _ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) x = catch-same d d′ x
-    catch-same (takeWhile~ _ _ _ _ _ d) (spentWhile~ _ _ _ d′) x = catch-same d d′ x
-    catch-same (spentWhile~ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) x = catch-same d d′ x
-    catch-same (spentWhile~ _ _ _ d) (spentWhile~ _ _ _ d′) x = catch-same d d′ x
-    catch-same (outerElem~ _ d) d′ (c , l , b) = elem-catch d′
-      (c , l , by-map c (λ {i} → catch-same {f = i} d (elem-tail d′)) (λ (e , x) → e , delivers-same d (elem-tail d′) x) b)
-    catch-same (outerExplode~ _ d) d′ (c , l , b) = explode-catch d′
-      (c , l , by-map c (λ {i} → catch-same {f = i} d (explode-tail d′)) (λ (e , x) → e , delivers-same d (explode-tail d′) x) b)
-    catch-same (inner~ _ _ _ d) (inner~ _ _ _ d′) (c , l , b) =
-      c , l , by-map c (λ {i} → catch-same {f = i} d d′) (λ (e , x) → e , delivers-same d d′ x) b
-    catch-same (deferInner~ _ _ _ _ _ _ d) (deferInner~ _ _ _ _ _ _ d′) (e , x) = e , delivers-same d d′ x
+    catch-same d d′ = Same.cat (same d d′)
 
     kept-same : ∀ {N N′ π π′ NP NP′ NI NI′ lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
                 (d : PathRel κ π {t} NP NI p q) (d′ : PathRel κ π′ {t} NP′ NI′ p q) → Kept N N′ d → Kept N N′ d′
-    kept-same root~ root~ x = x
-    kept-same (sink~ _) d′ x = sink-kept d′
-    kept-same (map~ _ d) (map~ _ d′) x = kept-same d d′ x
-    kept-same (scan~ _ _ _ _ _ d) (scan~ _ _ _ _ _ d′) x = kept-same d d′ x
-    kept-same (takeWhile~ _ _ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) x = kept-same d d′ x
-    kept-same (takeWhile~ _ _ _ _ _ d) (spentWhile~ _ _ _ d′) x = kept-same d d′ x
-    kept-same (spentWhile~ _ _ _ d) (takeWhile~ _ _ _ _ _ d′) x = kept-same d d′ x
-    kept-same (spentWhile~ _ _ _ d) (spentWhile~ _ _ _ d′) x = kept-same d d′ x
-    kept-same (outerElem~ _ d) d′ k = elem-kept d′ λ c l →
-      let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (kept-same d (elem-tail d′)) (λ y → y) b
-    kept-same (outerExplode~ _ d) d′ k = explode-kept d′ λ c l →
-      let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (kept-same d (explode-tail d′)) (λ y → y) b
-    kept-same (inner~ _ _ _ d) (inner~ _ _ _ d′) k c l =
-      let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (kept-same d d′) (λ y → y) b
-    kept-same (deferInner~ _ _ _ _ _ _ d) (deferInner~ _ _ _ _ _ _ d′) x = tt
+    kept-same d d′ = Same.kep (same d d′)
 
     kept-refl : ∀ {N π NP NI lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
                 (d : PathRel κ π {t} NP NI p q) → Kept N N d

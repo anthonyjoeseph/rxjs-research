@@ -623,6 +623,27 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            let (al , ke) = proj₂ (proj₂ X) (kept-catch κ pr₁ (catch-same κ pr pr₁ C) K)
            in al , kept-same κ pr₁ pr (kept-trans κ pr₁ K ke)
 
+    -- a scan's walk: the plain cell installed, the impl's source minted
+    -- and its cell installed, and the body walked under them
+    walk-scan : ∀ {Θ s u} (f : SFn Γ [] [] Θ (u ×ᵗ s) u) (z : STm Γ [] [] Θ u) (b : SExp Γ [] [] Θ s)
+              → Elab-Walks b → Elab-Walks (scanˢ f z b)
+    walk-scan f z b wb w {ρ′} {ρ} r {q = q} {stP = stP} {stI = stI} S pr oP oI (subs-scan {nid = k} frP dP) (subs-mint {src = src} frS (subs-map (subs-scan {i = iI} {nid = k′} frI dI))) =
+      let L = lifts-scan f z b w src {i = iI} r refl
+          I = scan-install S (evalWith (plainTm z) ρ) (evalWith iI (src ∷ᵉ ρ′)) pr frP frS frI
+          X = wb (λ y → there (w y)) r (After.store (proj₁ I))
+                (scan~ (proj₁ (proj₂ I)) (lookup-set k (cell-st (evalWith (plainTm z) ρ)) (EvalSt.nodes stP))
+                  (lookup-set k′ (cell-st (evalWith iI (src ∷ᵉ ρ′))) (EvalSt.nodes stI)) (proj₂ L) (proj₁ L) (proj₂ (proj₂ I)))
+                (fresh-at refl frP oP) (fresh-at refl frI (bare (resrc oI)))
+                dP (reExp (renExp-fuse there (ext∈ w) (toInstEmit κ b)) dI)
+          pr₁ = proj₂ (proj₂ I)
+          fr : ∀ j → OnPath j q → j < k′
+          fr j o = subst (j <_) frI (fresh-path oI j (on-path o))
+          K  = kept-unmoved κ pr₁ (unmoved-set {Γ = Γ} κ {Q = λ j → OnPath j q} {N = EvalSt.nodes stI} {N′ = EvalSt.nodes stI} {m = k′}
+                 (cell-st (evalWith iI (src ∷ᵉ ρ′))) fr ≤-refl (λ _ _ → refl))
+      in pairS (unscan (_⨾_ κ (proj₁ I) (proj₁ X) , proj₁ (proj₂ X))) λ C →
+           let (al , ke) = proj₂ (proj₂ X) (kept-catch κ pr₁ (catch-same κ pr pr₁ C) K)
+           in al , kept-same κ pr₁ pr (kept-trans κ pr₁ K ke)
+
     -- a flattener's walk, one element per emit: the plain node
     -- installed, the impl's cell and node installed, and the body walked
     -- under them
@@ -766,22 +787,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk< (mapˢ f b) (acc rs) w r S pr oP oI (subs-map dP) (subs-map dI) =
       let X = walk< b (rs (s≤s (m≤n+m _ _))) w r S (map~ (lifts-map f w r) pr) (bare oP) (bare oI) dP dI
       in pairS (unmap (proj₁ X , proj₁ (proj₂ X))) (proj₂ (proj₂ X))
-    walk< (scanˢ f z b) (acc rs) w {ρ′} {ρ} r {q = q} {stP = stP} {stI = stI} S pr oP oI (subs-scan {nid = k} frP dP) (subs-mint {src = src} frS (subs-map (subs-scan {i = iI} {nid = k′} frI dI))) =
-      let L = lifts-scan f z b w src {i = iI} r refl
-          I = scan-install S (evalWith (plainTm z) ρ) (evalWith iI (src ∷ᵉ ρ′)) pr frP frS frI
-          X = walk< b (rs (s≤s (≤-trans (m≤n+m _ (gsizeᵗ (plainTm z))) (m≤n+m (gsizeᵗ (plainTm z) + gsizeᵉ (plainExp b)) (gsizeᵗ (plainTm f)))))) (λ y → there (w y)) r (After.store (proj₁ I))
-                (scan~ (proj₁ (proj₂ I)) (lookup-set k (cell-st (evalWith (plainTm z) ρ)) (EvalSt.nodes stP))
-                  (lookup-set k′ (cell-st (evalWith iI (src ∷ᵉ ρ′))) (EvalSt.nodes stI)) (proj₂ L) (proj₁ L) (proj₂ (proj₂ I)))
-                (fresh-at refl frP oP) (fresh-at refl frI (bare (resrc oI)))
-                dP (reExp (renExp-fuse there (ext∈ w) (toInstEmit κ b)) dI)
-          pr₁ = proj₂ (proj₂ I)
-          fr : ∀ j → OnPath j q → j < k′
-          fr j o = subst (j <_) frI (fresh-path oI j (on-path o))
-          K  = kept-unmoved κ pr₁ (unmoved-set {Γ = Γ} κ {Q = λ j → OnPath j q} {N = EvalSt.nodes stI} {N′ = EvalSt.nodes stI} {m = k′}
-                 (cell-st (evalWith iI (src ∷ᵉ ρ′))) fr ≤-refl (λ _ _ → refl))
-      in pairS (unscan (_⨾_ κ (proj₁ I) (proj₁ X) , proj₁ (proj₂ X))) λ C →
-           let (al , ke) = proj₂ (proj₂ X) (kept-catch κ pr₁ (catch-same κ pr pr₁ C) K)
-           in al , kept-same κ pr₁ pr (kept-trans κ pr₁ K ke)
+    walk< (scanˢ f z b) (acc rs) = walk-scan f z b (walk< b (rs (s≤s (≤-trans (m≤n+m _ (gsizeᵗ (plainTm z))) (m≤n+m (gsizeᵗ (plainTm z) + gsizeᵉ (plainExp b)) (gsizeᵗ (plainTm f)))))))
     walk< (flattenˢ op b) (acc rs) w r = walk-flat op b (walk< b (rs (n<1+n _))) (perInnerˢ op b) w r
     walk< (μˢ b) (acc rs) w r S pr oP oI (subs-μ dP) (subs-μ dI) =
       let (s′ , pe , ie) = μ-unfolds b
