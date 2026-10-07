@@ -22,6 +22,7 @@ open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
+open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_)
 
@@ -102,9 +103,9 @@ S = record
   ; above   = (refl ∷ []) , (refl ∷ [])
   ; census  = λ { zero _ → inj₂ (refl , refl , λ ()) ; (suc zero) () }
   ; owned   = (λ ns → ⊥-elim (ns (suc zero) refl)) ∷ []
-  ; ruleP   = rule (λ { k (here refl) _ () _ ; k (there ()) _ _ _ }) (λ { (here refl) k () ; (there ()) }) (λ { (here refl) → tt ; (there ()) })
+  ; ruleP   = rule (λ { k (here refl) _ () _ ; k (there ()) _ _ _ }) (λ { (here refl) k () ; (there ()) }) (λ { (here refl) → lift tt ; (there ()) })
   ; ruleI   = rule (λ { k (here refl) _ () _ ; k (there ()) _ _ _ }) (λ { (here refl) k () ; (there ()) })
-                   (λ { (here refl) → (λ k ()) , tt ; (there ()) })
+                   (λ { (here refl) → (λ k ()) , lift tt ; (there ()) })
   ; scripts = ins , refl , refl
   }
 
