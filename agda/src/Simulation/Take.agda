@@ -237,6 +237,10 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A TEST'S NODES WRITTEN OPEN ON BOTH SIDES: the plain test to
       -- one, the cell to an open state and its test to one, keep the
       -- stores and the tails related
+      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0],"script":[0,1,0,0,0],"reach":["takeWhile","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 2 passes two values of the hot input through an open test
+      --   under a merge.
       while-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
                       {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
@@ -253,6 +257,11 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A TEST'S NODES WRITTEN SPENT ONCE BOTH SIDES HAVE CUT: the plain
       -- test and the cell's test to zero, the cell to what the scan
       -- left, keep the stores the cut left and the tails related
+      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0],"script":[0,1,0,0,0],"reach":["takeWhile","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Cases 13 and 22 cut at the hot input's first arrival, under a
+      --   merge and a bounded merge of limit one; case 4 cuts at a value
+      --   an exhaust's lane carries.
       while-zero : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
                      {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
@@ -276,6 +285,10 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A SPENT TEST ON BOTH SIDES passes nothing, its end included,
       -- and stays spent
+      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0],"script":[0,1,0,0,0],"reach":["takeWhile","flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
+      --   Case 22's second arrival comes after its first spent the test,
+      --   on both sides.
       while-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
                       {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}

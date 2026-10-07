@@ -260,7 +260,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **SWEEP THE UNPROBED LEAVES.** Every `NO EVIDENCE` FALSITY row is a
   statement nothing has instantiated: the quiet folds, `still-dead`,
-  `restamp-echo`, `outer-wrap`, the `block-*` and `while-*` writes,
+  `restamp-echo`, `outer-wrap`, the `block-*` leaves, `scan-write`,
   `share-{spend,finish}`, `hot-walk`, `end-stamps`, `of-fold-stamps`.
   Aim `qc-store` or `qc-same-clock` at each one's region, receipt the
   green ones, shrink a red into a refutation. Decides which leaves under
@@ -323,7 +323,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   the hop's token, and its end meets the plain hop's.
 - **`scan-write`** (Simulation.Scan) — FALSITY, `NO EVIDENCE`: a cell written
   on both sides keeps the stores and the tails related.
-- **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
+- **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `PROBED×3`: a
   test's nodes written open keep the stores and tails, and written spent keep
   what the cut left; a spent test passes nothing on both sides.
 - **`cut-out`** (Simulation.Take) — FALSITY, `PROBED×2`: a tail handed a
