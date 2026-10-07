@@ -263,12 +263,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   registered one by `Store.fresh-ids`. Turns a deferred subscribe's
   opening from probed at the root into proven under any store.
 
-- **FINISH THE QUIET PASS.** `quiet-sink` is refuted: a valueless emit
-  through a share marks each impl reader delivered and no plain one. Sweep
-  the top lines with slot one a drawn flattening program (`slot` arm four),
-  the first draw to hand a share's subject one: a red is the evaluator's
-  `delivered` mark, a green that `Store` need relate it only where it is
-  read. Restate, then `quiet-spent` as `quiet-takeWhile` runs an open test.
+- **FINISH THE QUIET PASS.** A delivery marks its reader only when it
+  carries the end, so a valueless emit through a share marks none and
+  `quiet-sink` is statable again. Sweep `qc-store` with slot one a drawn
+  flattening program (`slot` arm four) to hand a share's subject one, then
+  body it as the walk folding `quiet-pass` down each reader the store pairs.
+  Then `quiet-spent` as `quiet-takeWhile` runs an open test.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -289,6 +289,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   quiet fold and the hop's node's on the impl's, one store across all three.
 - **`still-dead`** (Simulation.Pass) — FALSITY, `PROBED`: an inner no live
   chain runs through stays so while its group folds down the tail below it.
+- **`quiet-sink`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a valueless
+  group through a share's readers, folded on the impl side alone with the plain
+  side still, marking no reader delivered.
 - **`quiet-spent`** (Simulation.Pass) — FALSITY, `PROBED`: a spent test's cell
   stepped on emits carrying nothing, on the impl side alone, stays related and
   passes nothing.
@@ -358,9 +361,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; one hot script only, so no rank compared.
-- **`quiet-sink`** (Simulation.Pass) — SHAPE, `REFUTED`: a valueless group
-  through a share's readers, folded on the impl side alone with the plain side
-  still; the impl delivers to each reader, so `dlv-alike` breaks.
 - **`lifts-scan`** (Simulation.Walk) — DIFFICULTY, `PROBED`: the elaborated
   scan's step and seed read the author's variables past the mint's binder; held
   at one payload, two past the typechecker.

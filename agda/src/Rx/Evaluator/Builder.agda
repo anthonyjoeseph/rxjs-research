@@ -60,7 +60,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed; []ᵉ; Val; _≟ᵗ_)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; Arrival; arrTick; arrTy; arrVal; arrSource; AtFloor;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; markDlv; Arrival; arrTick; arrTy; arrVal; arrSource; AtFloor;
   RegId; RegRow; regSource; sameSource; pathHasNode; chainsGo; chainsOf; schedGo;
   cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
@@ -164,7 +164,7 @@ cascadeGo! a vs fin ((rid , c) ∷ cs) sched st ru sds ag
 ... | false =
       sub-ot (λ r∈ → r∈) ≤-refl (sds (here refl)) |>⁰ λ so →
       chainStep! a vs fin c sched
-              (record st { delivered = rid ∷ EvalSt.delivered st }) so |>′ λ ((emits , sched₁ , st₁) , s , kept) →
+              (markDlv fin rid st) so |>′ λ ((emits , sched₁ , st₁) , s , kept) →
       cascadeGo! a vs fin cs sched₁ st₁ (ruled (kept (proj₂ c) so (λ _ _ _ → refl)))
                             (λ x∈ → kept _ (sub-ot (λ r∈ → r∈) ≤-refl (sds (there x∈))) (ag (here refl) (there x∈)))
                             (λ x∈ y∈ → ag (there x∈) (there y∈)) |>′ λ (_ , g , ru′) →

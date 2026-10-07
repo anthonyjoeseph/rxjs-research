@@ -497,7 +497,7 @@ record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
                                         -- re-observable, completion is)
         -- per-cascade bookkeeping (reset by cascade, shared with any
         -- dispatchShare it triggers):
-        delivered       : List RegId    -- snapshot chains that have folded this cascade
+        delivered       : List RegId    -- snapshot chains that have folded this cascade's end
         cancelled       : List RegId    -- victims cut mid-cascade: their snapshot
                                         -- chains are skipped outright (an unsubscribed
                                         -- rxjs chain delivers nothing)
@@ -749,6 +749,18 @@ aliveThroughᶠ inst st (rid , rs , (w , p)) =
   ∧ not (any (_≡ᵇ rid) (EvalSt.cancelled st))
   ∧ (not (memberSource (regSource rs) (EvalSt.dying st))
      ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
+
+-- A CHAIN HAS SPENT ITS SOURCE ONLY ONCE THE END HAS REACHED IT.  A
+-- subscriber stays subscribed through every `next` and leaves on
+-- `complete`, so a delivery carrying values alone marks nothing: a
+-- dying share's reader is still live between its last value and its
+-- end walk.
+dlvIf : Bool → RegId → List RegId → List RegId
+dlvIf false rid ds = ds
+dlvIf true  rid ds = rid ∷ ds
+
+markDlv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Bool → RegId → EvalSt e → EvalSt e
+markDlv fin rid st = record st { delivered = dlvIf fin rid (EvalSt.delivered st) }
 
 -- IS THERE A FREE LANE?  `nothing` is rxjs's Infinity, so always.
 hasRoom : Maybe ℕ → ℕ → Bool

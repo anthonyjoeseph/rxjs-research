@@ -148,7 +148,7 @@ open import Rx.Exp using (Ty; obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyCl
   unitᵗ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit; markDlv;
   shareDying; shareSpend; shareFinish; from-inner; arrTick; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
   RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve;
@@ -1281,7 +1281,7 @@ data shareGo⇓ {n} {Γ} {t} {e} where
               {emits sched₁ st₁ rest sched₂ st₂}
           → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
           → foldPath⇓ now p vals fin sched₀
-              (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+              (markDlv fin rid st₀)
               (emits , sched₁ , st₁)
           → shareGo⇓ now i vals fin ps sched₁ st₁ (rest , sched₂ , st₂)
           → shareGo⇓ now i vals fin ((rid , p) ∷ ps) sched₀ st₀
@@ -1335,7 +1335,7 @@ data cascadeGo⇓ {n} {Γ} {t} {e} where
                 {emits sched₁ st₁ rest sched₂ st₂}
             → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
             → chainStep⇓ a vs fin c sched₀
-                (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+                (markDlv fin rid st₀)
                 (emits , sched₁ , st₁)
             → cascadeGo⇓ a vs fin chains sched₁ st₁ (rest , sched₂ , st₂)
             → cascadeGo⇓ a vs fin ((rid , c) ∷ chains) sched₀ st₀

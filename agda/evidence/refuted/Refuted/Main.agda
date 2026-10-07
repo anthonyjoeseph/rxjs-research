@@ -87,7 +87,3 @@ open import Refuted.Hot-Read-Sound using (hot-read-needs-sound)
 -- buffer whatever it is handed.
 open import Refuted.Quiet-Fold-Batch using (quiet-fold-false)
 
--- A SHARE'S READER TAKES AN EMIT CARRYING NOTHING ON THE IMPL SIDE
--- ALONE, and taking one is a delivery.  The store pairs readers and
--- asks a pair to be delivered alike.
-open import Refuted.Quiet-Sink-Delivered using (quiet-sink-false)

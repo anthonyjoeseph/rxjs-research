@@ -378,12 +378,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     fan-go S εI c ta (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ _ (casc-cut _ _) (go-live y _ _) = ⊥-elim (t≢f (trans (sym x) y))
     fan-go S εI c ta (slotpair (inj₂ (x , _)) ∷ _) _ _ _ _ (casc-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
     fan-go S εI c ta (slotpair (inj₂ (_ , x , _)) ∷ _) _ _ _ _ (casc-live _ _ _) (go-cut y _) = ⊥-elim (t≢f (trans (sym y) x))
-    fan-go S εI c refl (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {emits = eI} _ dI g′) =
-      rebase (A ⨾ proj₁ R) , λ { refl d → out-++ eI _ (proj₂ X refl d) (proj₂ R refl d) }
+    fan-go S εI {fin = fin} c refl (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {emits = eI} _ dI g′) =
+      rebase {fin = fin} (A ⨾ proj₁ R) , λ { refl d → out-++ eI _ (proj₂ X refl d) (proj₂ R refl d) }
       where
         sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
         sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-        X = slot-pass (delivered S pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI
+        X = slot-pass (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI
         A = proj₁ X
         map-slot : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
                      {cs : List (RegId × AtFloor Γ u t)} {ds}
@@ -453,7 +453,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                → Head (toℕ i) (toℕ (i ↑ˡ n)) {arrTy a} {arrTy a′} (arrVal a ∷ []) (arrVal a′ ∷ [])
                → arrTy a ≡ lookup Γ i
                → ∀ {v} → _≡_ {A = Σ Ty (Val (plainᵏ Γ κ))} (arrTy a′ , arrVal a′) (plainᵗ (lookup Γ i) , v)
-               → ∀ {rid ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
+               → ∀ {ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
                    {h₁ : suc (toℕ (i ↑ˡ n)) ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ}
                    {h : ℓ ≤ toℕ (n ↑ʳ i)}
                → InputBlock κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i))
@@ -464,7 +464,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    (thruEvents (map (applyClo {s = obs (emitᵗ (lookup Γ i))} {t = echoᵗ (emitᵗ (lookup Γ i))} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
                                  (map (applyClo {s = (unitᵗ +ᵗ plainᵗ (lookup Γ i)) ×ᵗ listᵗ (unitᵗ +ᵗ plainᵗ (lookup Γ i))} {t = obs (emitᵗ (lookup Γ i))} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃))
                                    (batchVals false (map (applyClo {s = plainᵗ (lookup Γ i)} {t = unitᵗ +ᵗ plainᵗ (lookup Γ i)} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) (v ∷ []))))))
-                   sI (record (record stI { delivered = rid ∷ EvalSt.delivered stI })
+                   sI (record stI
                          { nodes = setNode b (batchSync-st {s = unitᵗ +ᵗ plainᵗ (lookup Γ i)} false [] false) (EvalSt.nodes stI) })
                    (oW , sW , stW)
                → HotStart S a a′ i oW sW stW
@@ -484,7 +484,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                   (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
               → ∀ {oI sI₁ stI₁}
               → chainStep⇓ a′ (arrVal a′ ∷ []) false (suc (toℕ (i ↑ˡ n)) , q) sI
-                  (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
+                  stI (oI , sI₁ , stI₁)
               → HotStart S a a′ i oI sI₁ stI₁
     hot-block S {a′ = record { elemTy = _ ; payload = v }} {i = i} hot hd ty refl ib@(block _ _ eb _ _ _ _ _)
       (chain-step (fold-step step-map (fold-step (step-from-inner react-false)

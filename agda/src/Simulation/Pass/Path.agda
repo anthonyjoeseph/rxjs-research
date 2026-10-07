@@ -185,12 +185,12 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       share-go S εI c (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ _ (go-cut _ _) (go-live y _ _) = ⊥-elim (t≢f (trans (sym x) y))
       share-go S εI c (slotpair (inj₂ (x , _)) ∷ _) _ _ _ _ (go-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
       share-go S εI c (slotpair (inj₂ (_ , x , _)) ∷ _) _ _ _ _ (go-live _ _ _) (go-cut y _) = ⊥-elim (t≢f (trans (sym y) x))
-      share-go S {i = i} εI c (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live {emits = eI} _ dI g′) =
-        rebase (A ⨾ proj₁ Y) , λ f ds → out-++ {Δ = plainᵏ Γ κ} {t = plainᵗ t} eI _ (proj₂ Z f ds) (proj₂ Y f ds)
+      share-go S {i = i} εI {fin = fin} c (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live {emits = eI} _ dI g′) =
+        rebase {fin = fin} (A ⨾ proj₁ Y) , λ f ds → out-++ {Δ = plainᵏ Γ κ} {t = plainᵗ t} eI _ (proj₂ Z f ds) (proj₂ Y f ds)
         where
           sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
           sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-          Z = slot-pass (delivered S pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI
+          Z = slot-pass (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI
           A = proj₁ Z
           Y = share-go (After.store A) εI c (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
                 (λ m → fold-kept dP sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))

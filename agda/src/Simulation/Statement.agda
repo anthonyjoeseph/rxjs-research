@@ -67,7 +67,7 @@ open import SExp.Readings using (arrivalsOf)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; RegRow; Path; chainsGo; sameSource;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; markDlv; Arrival; arrTy; RegRow; Path; chainsGo; sameSource;
   regSource; schedGo; schedFinish; sched-next; arrVal; chainsOf; cascadeOpen; cascadeClose;
   cascadeFinish; memberSource)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓;
@@ -455,18 +455,18 @@ dyn-chain : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Pointwise (Paired (Storeʳ.rows s) (EvalSt.cancelled stP) (EvalSt.cancelled stI) a a′) chs chs′
   → Sound (proj₂ (proj₂ c)) sP stP → Sound (proj₂ (proj₂ c′)) sI stI
   → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
-  → chainStep⇓ a vs fin (proj₂ c) sP (record stP { delivered = proj₁ c ∷ EvalSt.delivered stP }) (oP , sP₁ , stP₁)
-  → chainStep⇓ a′ vs′ fin (proj₂ c′) sI (record stI { delivered = proj₁ c′ ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
+  → chainStep⇓ a vs fin (proj₂ c) sP (markDlv fin (proj₁ c) stP) (oP , sP₁ , stP₁)
+  → chainStep⇓ a′ vs′ fin (proj₂ c′) sI (markDlv fin (proj₁ c′) stI) (oI , sI₁ , stI₁)
   → Σ (Storeʳ κ sP₁ stP₁ sI₁ stI₁) λ s₁ →
       Pointwise (Paired (Storeʳ.rows s₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) a a′) chs chs′
     × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
     × Persists κ s s₁
     × (fin ≡ false → Out (counter (Sched.mint sI) sourceᵏ) oI)
-dyn-chain {t = t} κ e s {a = a} {a′} hd ta pr ps soP soI dP dI =
+dyn-chain {t = t} κ e s {a = a} {a′} {fin = fin} hd ta pr ps soP soI dP dI =
   After.store A , Pointwise-map (λ {c} {c′} → After.keeps A {dynRow a c} {dynRow a′ c′}) ps , Pointwise-map (v-agrees κ t) (After.values A)
-  , (λ ar → After.persists A (delivered-arr ar)) , proj₂ R
+  , (λ ar → After.persists A (delivered-arr {fin = fin} ar)) , proj₂ R
   where
-    R = row-pass κ (delivered s pr) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
+    R = row-pass κ (delivered s {fin} pr) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
           (sub-ot (λ r∈ → r∈) ≤-refl soP) (sub-ot (λ r∈ → r∈) ≤-refl soI) (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
     A = proj₁ R
 

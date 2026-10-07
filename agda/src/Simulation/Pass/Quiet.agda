@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; unitᵗ; _×ᵗ_; _+ᵗ_; obs;
   FnClo; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ; uniqᵗ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Arrival; arrVal; arrTy; arrTick; Path; share-sink;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; markDlv; NodeState; Arrival; arrVal; arrTy; arrTick; Path; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st;
   echoᵗ; thruEvents; thruWrap; setNode; cell-st; scanVals; take-st; takeVals; exhaust-st; switch-st; switchKill; hasRoom;
   consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying)
@@ -44,7 +44,7 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ; ScanAᵗ; CutS; cutOpenᵛ)
 open import Simulation.Schedules using (HeadOf)
-open import Simulation.Stores using (V; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
+open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
   PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
   inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
   MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip)
@@ -113,21 +113,26 @@ unchain (chain-step d) = d
 -- a chain step marks its partnered pair of rows delivered, alike
 delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
               {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-          → (S : Store κ sP stP sI stI) → ∀ {x x′} → Partners κ _ _ _ _ _ (Store.rows S) x x′
-          → Store κ sP (record stP { delivered = proj₁ x ∷ EvalSt.delivered stP }) sI (record stI { delivered = proj₁ x′ ∷ EvalSt.delivered stI })
-delivered {κ = κ} s {x} {x′} pr = record
+          → (S : Store κ sP stP sI stI) → ∀ {fin x x′} → Partners κ _ _ _ _ _ (Store.rows S) x x′
+          → Store κ sP (markDlv fin (proj₁ x) stP) sI (markDlv fin (proj₁ x′) stI)
+delivered {κ = κ} {sP = sP} {stP} {sI} {stI} s {fin} {x} {x′} pr = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
   ; sync = sync ; rows = rows ; latches = latches
-  ; dlv-alike = spent-zip κ _ _ _ _ _ rows _∨_ (pair-ids κ _ _ _ _ _ rows (proj₁ rids) (proj₂ rids) {x} {x′} pr) dlv-alike ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
+  ; dlv-alike = dlv fin ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
   ; scripts = scripts }
-  where open Store s
+  where
+    open Store s
+    dlv : (f : Bool) → Spent κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) rows
+                         (dlvᵇ (markDlv f (proj₁ x) stP)) (dlvᵇ (markDlv f (proj₁ x′) stI))
+    dlv false = dlv-alike
+    dlv true  = spent-zip κ _ _ _ _ _ rows _∨_ (pair-ids κ _ _ _ _ _ rows (proj₁ rids) (proj₂ rids) {x} {x′} pr) dlv-alike
 
 -- the arrival's pair against the rows is as it was, since the rows are
 delivered-arr : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                   {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-                  {S : Store κ sP stP sI stI} {x x′} {pr : Partners κ _ _ _ _ _ (Store.rows S) x x′} {s s′ u u′}
-              → Arr S s s′ u u′ → Arr (delivered S pr) s s′ u u′
+                  {S : Store κ sP stP sI stI} {fin x x′} {pr : Partners κ _ _ _ _ _ (Store.rows S) x x′} {s s′ u u′}
+              → Arr S s s′ u u′ → Arr (delivered S {fin} pr) s s′ u u′
 delivered-arr ar = record { boundP = boundP ; boundI = boundI ; rows = rows ; lists = lists } where open Arr ar
 
 -- a shared slot's share marked dying on both sides, a pair of rows at
@@ -793,11 +798,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- which its caller keeps, so the descent stays on the impl's fold.
     postulate
       -- A SHARE'S SUBJECT FANS A VALUELESS GROUP OUT TO EVERY READER, and
-      -- every reader's chain folds it on the impl side alone
-      --
-      -- REFUTED: `Refuted.Quiet-Sink-Delivered` -- the impl's walk marks
-      --   each reader delivered and the plain side marks none, so a store
-      --   pairing a live reader cannot relate the two after.
+      -- every reader's chain folds it on the impl side alone.  The walk
+      -- marks no reader delivered, since the group carries no end
       quiet-sink : ∀ {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} (sh : lookup κ i ≡ sharedᵏ)
                  → Quiet (share-sink i h)
                      (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sharedEq {Γ = Γ} κ i sh) (share-sink (n ↑ʳ i) h′))

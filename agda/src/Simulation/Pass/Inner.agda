@@ -984,9 +984,9 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     slot-keeps K (slotpair x) = slotpair (K x)
 
     -- the same pass, started from the store as it stood before the row was marked
-    rebase : ∀ {sP stP sI stI x x′ rP rI} {S : St sP stP sI stI} {pr : Partners κ _ _ _ _ _ (Store.rows S) x x′}
-           → After (delivered S pr) rP rI → After S rP rI
-    rebase (after s k q v g) = after s k (λ ar → q (delivered-arr ar)) v g
+    rebase : ∀ {sP stP sI stI fin x x′ rP rI} {S : St sP stP sI stI} {pr : Partners κ _ _ _ _ _ (Store.rows S) x x′}
+           → After (delivered S {fin} pr) rP rI → After S rP rI
+    rebase {fin = fin} (after s k q v g) = after s k (λ ar → q (delivered-arr {fin = fin} ar)) v g
 
     -- a fan-out's pairs stay paired once the store moves
     share-keeps : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {cs ds}
