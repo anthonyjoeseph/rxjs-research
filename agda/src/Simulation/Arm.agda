@@ -9,23 +9,28 @@ open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᵃ)
 open import Data.Bool.ListAction using (any)
-open import Data.Nat     using (ℕ; _≤_)
+open import Data.Nat     using (ℕ; _≤_; zero; suc)
+open import Data.Maybe   using (Maybe; nothing; just)
+open import Relation.Nullary using (yes; no)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit    using (⊤)
+open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Rx.Prim      using (Tick; EmitKind; subscribe; delivery; plumbing)
-open import Rx.Exp       using (Ctx; Closed; Val; obs; uniqᵗ)
+open import Rx.Exp       using (Ctx; Closed; Val; obs; uniqᵗ; FnClo; boolᵗ; _×ᵗ_; _≟ᵗ_)
 open import Rx.Mint      using (counter; sourceᵏ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Path; Frame; _↠[_]_; thru-outer; mergeAllᵒ; lookupNode; AllOp; from-inner; aliveThroughᶠ)
-open import Rx.Evaluator.Domain using (foldPath⇓; stepFrame⇓; thruConsume⇓)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Path; Frame; _↠[_]_; thru-outer; mergeAllᵒ; lookupNode; AllOp; from-inner; aliveThroughᶠ;
+  root; share-sink; map-f; scan-f; take-f; batchSync-f; scanDispatch; takeDispatch; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st)
+open import Rx.Evaluator.Domain using (foldPath⇓; stepFrame⇓; thruConsume⇓; fold-root; fold-sink; fold-step; step-map; step-scan; step-take;
+  step-batchSync; step-from-inner; step-thru-outer; react-false; walk-nil; disp)
 open import Rx.Evaluator.Reducible.Support using (Sound; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; endOf; ∨-Tʳ)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.InstEmit using (instEmitᵗ)
-open import Simulation.Stores using (EmitRel; Lifts; PathRel; Store; stampOf)
+open import Simulation.Stores using (EmitRel; Lifts; PathRel; Store; stampOf; sharedEq; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
+  outerElem~; outerExplode~; inner~; deferInner~)
 open import Simulation.After using (module Kept; readᴵ; readᴵ-++)
 
 -- a node a run left as it found it
@@ -59,15 +64,91 @@ QuietTail : ∀ {m} {Δ : Ctx m} {t} (e : Closed Δ (instEmitᵗ uniqᵗ t)) {�
 QuietTail e q = ∀ {now sched st o sched′ st′} → foldPath⇓ {e = e} now q [] false sched st (o , sched′ , st′)
               → readᴵ o ≡ [] × counter (Sched.mint sched) sourceᵏ ≤ counter (Sched.mint sched′) sourceᵏ
 
-postulate
-  -- ANY TAIL IS QUIET HANDED NOTHING.
-  --
-  -- PROBED: make qc-same-clock QC='53 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,1,2,0,2,2,0,2,0,0,4],"fan":[1,1,0,1,1,6,1,1,1],"leaf":[2,0,1],"reach":["flatten"]}'
-  --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: over budget at 79
-  --   agree, 0 fail.  Cases 24 and 71 run a cold script's first of two
-  --   arrivals, whose block's merge wraps with no end and folds its tail
-  --   on nothing; case 71's under a deferred hop's wrap too.
-  quiet-fold : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ (instEmitᵗ uniqᵗ t)} {ℓ u} {q : Path Δ ℓ u (instEmitᵗ uniqᵗ t)} → QuietTail e q
+-- A PATH WITH NO BRACKET ON IT.  A lowered bracket flushes its buffer
+-- on the first fold through it, whatever it is handed, so it is the one
+-- frame a fold handed nothing can make speak.
+--
+-- REFUTED: `Refuted.Quiet-Fold-Batch` -- quiet over every path, a
+--   lowered bracket holding a value sends it.
+NoBatch : ∀ {m} {Δ : Ctx m} {lo s u} → Path Δ lo s u → Set
+NoBatch root                        = ⊤
+NoBatch (share-sink _ _)            = ⊤
+NoBatch (batchSync-f _ ↠[ _ ] _)    = ⊥
+NoBatch (map-f _ ↠[ _ ] p)          = NoBatch p
+NoBatch (scan-f _ _ ↠[ _ ] p)       = NoBatch p
+NoBatch (take-f _ _ ↠[ _ ] p)       = NoBatch p
+NoBatch (from-inner _ _ _ ↠[ _ ] p) = NoBatch p
+NoBatch (thru-outer _ _ ↠[ _ ] p)   = NoBatch p
+
+unbatched-subst : ∀ {m} {Δ : Ctx m} {lo s s′ u} (eq : s ≡ s′) {p : Path Δ lo s u}
+                → NoBatch p → NoBatch (subst (λ w → Path Δ lo w u) eq p)
+unbatched-subst refl b = b
+
+-- the elaboration installs a bracket only in a read's input block, and
+-- a block is a row's, never a related path's
+rel-unbatched : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {π t NP NI lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
+              → PathRel κ π {t} NP NI p q → NoBatch q
+rel-unbatched root~                          = tt
+rel-unbatched {Γ = Γ} {κ = κ} (sink~ {i = i} sh) = unbatched-subst (sharedEq {Γ = Γ} κ i sh) tt
+rel-unbatched (map~ _ r)                     = rel-unbatched r
+rel-unbatched (scan~ _ _ _ _ _ r)            = rel-unbatched r
+rel-unbatched (takeWhile~ _ _ _ _ _ r)       = rel-unbatched r
+rel-unbatched (spentWhile~ _ _ _ r)          = rel-unbatched r
+rel-unbatched (outerElem~ _ r)               = rel-unbatched r
+rel-unbatched (outerExplode~ _ r)            = rel-unbatched r
+rel-unbatched (inner~ _ _ _ r)               = rel-unbatched r
+rel-unbatched (deferInner~ _ _ _ _ _ _ r)    = rel-unbatched r
+
+-- a frame's dispatch handed nothing, and no end, hands on nothing
+Hushed : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {u} → Sched Δ → List (Val Δ u) × Bool × Sched Δ × EvalSt e → Set
+Hushed sched r = proj₁ r ≡ [] × proj₁ (proj₂ r) ≡ false × proj₁ (proj₂ (proj₂ r)) ≡ sched
+
+scan-hush : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s u} (fn : FnClo Δ (u ×ᵗ s) u) nid sched (st : EvalSt e) x
+          → Hushed sched (scanDispatch fn nid [] false sched st x)
+scan-hush {u = u} fn nid sched st (just (cell-st {w} a)) with w ≟ᵗ u
+... | no  _    = refl , refl , refl
+... | yes refl = refl , refl , refl
+scan-hush fn nid sched st nothing                         = refl , refl , refl
+scan-hush fn nid sched st (just (take-st _))              = refl , refl , refl
+scan-hush fn nid sched st (just (mergeAll-st _ _ _ _))    = refl , refl , refl
+scan-hush fn nid sched st (just (switch-st _ _))          = refl , refl , refl
+scan-hush fn nid sched st (just (exhaust-st _ _))         = refl , refl , refl
+scan-hush fn nid sched st (just (batchSync-st _ _ _))     = refl , refl , refl
+
+take-hush : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s} (w : Maybe (FnClo Δ s boolᵗ)) nid sched (st : EvalSt e) x
+          → Hushed sched (takeDispatch w nid [] false sched st x)
+take-hush w nid sched st (just (take-st zero))            = refl , refl , refl
+take-hush w nid sched st (just (take-st (suc _)))         = refl , refl , refl
+take-hush w nid sched st nothing                          = refl , refl , refl
+take-hush w nid sched st (just (cell-st _))               = refl , refl , refl
+take-hush w nid sched st (just (mergeAll-st _ _ _ _))     = refl , refl , refl
+take-hush w nid sched st (just (switch-st _ _))           = refl , refl , refl
+take-hush w nid sched st (just (exhaust-st _ _))          = refl , refl , refl
+take-hush w nid sched st (just (batchSync-st _ _ _))      = refl , refl , refl
+
+-- one frame off a bracket-free path, handed nothing and no end
+step-quiet : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo ℓ s u} {f : Frame Δ s u} {le : lo ≤ ℓ} {q : Path Δ ℓ u t} {now sched st r}
+           → NoBatch (f ↠[ le ] q) → stepFrame⇓ {e = e} now f q [] false sched st r
+           → proj₁ r ≡ [] × proj₁ (proj₂ r) ≡ [] × proj₁ (proj₂ (proj₂ r)) ≡ false
+             × proj₁ (proj₂ (proj₂ (proj₂ r))) ≡ sched × NoBatch q
+step-quiet b step-map = refl , refl , refl , refl , b
+step-quiet b (step-scan {fn = fn} {nid = nid} {sched = sched} {st = st}) =
+  refl , proj₁ h , proj₁ (proj₂ h) , proj₂ (proj₂ h) , b
+  where h = scan-hush fn nid sched st (lookupNode nid (EvalSt.nodes st))
+step-quiet b (step-take {w = w} {nid = nid} {sched = sched} {st = st}) =
+  refl , proj₁ h , proj₁ (proj₂ h) , proj₂ (proj₂ h) , b
+  where h = take-hush w nid sched st (lookupNode nid (EvalSt.nodes st))
+step-quiet () step-batchSync
+step-quiet b (step-from-inner react-false) = refl , refl , refl , refl , b
+step-quiet b (step-thru-outer walk-nil)    = refl , refl , refl , refl , b
+
+-- ANY BRACKET-FREE TAIL IS QUIET HANDED NOTHING.
+quiet-fold : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ (instEmitᵗ uniqᵗ t)} {ℓ u} {q : Path Δ ℓ u (instEmitᵗ uniqᵗ t)}
+           → NoBatch q → QuietTail e q
+quiet-fold _ fold-root                   = refl , ≤-refl
+quiet-fold _ (fold-sink (disp walk-nil)) = refl , ≤-refl
+quiet-fold b (fold-step s d) with step-quiet b s
+... | refl , refl , refl , refl , b′ = quiet-fold b′ d
 
 -- WHAT A RUN SENDS AT ONE INSTANT: every value it puts out read at `I`
 Out : ∀ {m} {Δ : Ctx m} {t} → ℕ → Stream Δ (instEmitᵗ uniqᵗ t) → Set

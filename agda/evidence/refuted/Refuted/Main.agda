@@ -81,3 +81,8 @@ open import Refuted.Of-Fold-Sound using (of-fold-needs-sound)
 -- through one merge twice breaks the rule on either side.
 open import Refuted.Shared-Read-Sound using (shared-read-needs-sound)
 open import Refuted.Hot-Read-Sound using (hot-read-needs-sound)
+
+-- A TAIL HANDED NOTHING IS QUIET ONLY WHILE NO BRACKET ON IT IS DOWN
+-- WITH A VALUE HELD.  The lowered bracket's first fold flushes its
+-- buffer whatever it is handed.
+open import Refuted.Quiet-Fold-Batch using (quiet-fold-false)

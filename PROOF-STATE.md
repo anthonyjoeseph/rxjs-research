@@ -256,18 +256,19 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **PROVE THE QUIET FOLD.** `quiet-fold` by induction on the fold handed
-  nothing: a map maps nothing, a scan's, test's and batch's dispatch on no
-  values and no end sends nothing, an outer walks no events, an inner
-  reacts to nothing, and the sink is `disp-quiet`. Turns every block's and
-  hop's wrap the cascade passes from swept silent into proven silent.
-
 - **PROVE THE HOP INSTALL.** `defer-install` over `install`'s transport:
   the merge pair joins `π` as a fresh install's does, the new sources pair
   as `defer~`'s, numbered above every live one by `Store.bounded`, and the
   new rows pair as `defer~` over the tails, their ids above every
   registered one by `Store.fresh-ids`. Turns a deferred subscribe's
   opening from probed at the root into proven under any store.
+
+- **PROVE THE QUIET LANES.** `quiet-{inner,deferInner,explode}` over
+  `step-quiet`'s case split: emits carrying nothing reach an inner's lane,
+  a body's marker merge or an explode as values with no end, so each frame
+  hands its group on as it came and writes no node a related path reads
+  but the restamp's cell, which is `quiet-scan`'s write. Turns the
+  cascade's empty groups through flatteners from swept into proven.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -338,8 +339,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   has at most one row in the impl's registry.
 - **`value-draws`** (Simulation.Statement) — FALSITY, `PROBED`: an impl value
   pass that sends leaves its counter past the one it started at.
-- **`quiet-fold`** (Simulation.Arm) — FALSITY, `PROBED`: any tail handed
-  nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: an impl end
   pass's emits carry the instant its value pass drew.
 - **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY, `PROBED×4`:

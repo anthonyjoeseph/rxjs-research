@@ -51,7 +51,7 @@ open import Simulation.Stores using (srcCount; SrcPair; Src; PathRel; InputBlock
 open import Simulation.After using (module Kept; readᴵ)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
-open import Simulation.Arm using (Clear; unthru; adv; Out; out-++; out-quiet; quiet-fold)
+open import Simulation.Arm using (Clear; unthru; adv; Out; out-++; out-quiet; quiet-fold; NoBatch; rel-unbatched)
 open import Rx.Mint using (counter; sourceᵏ)
 open import SExp.InstEmit using (instEmitᵗ)
 open import Simulation.Sweep using (t≢f)
@@ -87,11 +87,11 @@ disp-quiet (disp walk-nil) = refl
 -- a merge's wrap with no end hands its tail none, which sends nothing
 quiet-wrap : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ (instEmitᵗ uniqᵗ t)} {ℓ u} {q : Path Δ ℓ u (instEmitᵗ uniqᵗ t)}
                {now r} op nid {f} sW stW
-           → f ≡ false
+           → f ≡ false → NoBatch q
            → foldPath⇓ {e = e} now q [] (proj₁ (thruWrap op nid f (sW , stW)))
                (proj₁ (proj₂ (thruWrap op nid f (sW , stW)))) (proj₂ (proj₂ (thruWrap op nid f (sW , stW)))) r
            → readᴵ (proj₁ r) ≡ []
-quiet-wrap _ _ _ _ refl d = proj₁ (quiet-fold d)
+quiet-wrap _ _ _ _ refl b d = proj₁ (quiet-fold b d)
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -314,7 +314,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
           X  = block-walk S hd sp blk r soP si eb dP d₁ d₂ W
       in block-end {m2 = m2} {o₁ = o₁} {o₂ = o₂} {oW = oW} {fin = f₂} (proj₁ X) (drop-ot _ _ _ (step-kept _ dW s₃)) dR ,
          λ e → subst (Out _) (trans (++-assoc o₁ (o₂ ++ oW) oR) (cong (o₁ ++_) (++-assoc o₂ oW oR)))
-                 (out-++ (o₁ ++ (o₂ ++ oW)) oR (proj₁ (proj₂ X e)) (out-quiet oR (quiet-wrap mergeAllᵒ m2 sW stW (proj₂ (proj₂ X e)) dR)))
+                 (out-++ (o₁ ++ (o₂ ++ oW)) oR (proj₁ (proj₂ X e)) (out-quiet oR (quiet-wrap mergeAllᵒ m2 sW stW (proj₂ (proj₂ X e)) (rel-unbatched r) dR)))
 
     -- A DEFERRED HOP'S WALK: the body each emit carries is subscribed
     -- through the hop's merge on both sides, the tails staying related.
@@ -505,4 +505,4 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     row-pass S hd (cold~ sp blk r refl) soP soI dP dI = block-arm S hd sp blk r soP soI dP dI
     row-pass S hd (defer~ sp k nP nI r refl) soP soI (fold-step d@(step-thru-outer W) dP) dI@(fold-step {out₁ = oH} {out₂ = oR} (step-thru-outer {op = op} {nid = nid} {sched′ = sW} {st′ = stW} W′) dR) =
       proj₁ (resume (hop-arm S hd sp k nP nI r soI d dI) (adv d soP) dP) ,
-      λ e → out-++ oH oR (proj₂ (proj₂ (hop-walk S hd sp k nP nI r (unthru soI) W W′))) (out-quiet oR (quiet-wrap op nid sW stW e dR))
+      λ e → out-++ oH oR (proj₂ (proj₂ (hop-walk S hd sp k nP nI r (unthru soI) W W′))) (out-quiet oR (quiet-wrap op nid sW stW e (rel-unbatched r) dR))
