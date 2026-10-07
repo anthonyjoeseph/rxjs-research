@@ -257,13 +257,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SPLIT THE INSTANTS PER FORMER.** An arrival's values carry one
-  instant and no two arrivals share one: `cascade-stamps`, a claim the
-  impl's cascade makes one former at a time. State it beside the values split so both recurse on the same
-  configuration, and the monster drops to whichever stays riskier. Ruled
-  out: two instants in one arrival, `make qc-same-clock` now deciding
-  `OneIn` itself, green over a flattener with a cold's two-value burst
-  aimed (seeds 23, 24).
+- **SPLIT THE VALUE PASS'S INSTANT PER CHAIN.** `cascade-stamps` is
+  now a body over `value-stamps` and `end-stamps`, which pin the instant
+  to the counter the cascade entered with. State `value-stamps` over
+  `pass-go`'s chains as the values split is: the first chain's block
+  draws the instant, every later chain carries it. Ruled out: two
+  instants in one arrival; an instant other than the entering counter,
+  `make qc-same-clock` tightened to it and green on 91 programs.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -332,8 +332,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot.
-- **`cascade-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
-  cascade's values carry one instant between the counters it enters and leaves.
+- **`value-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
+  value pass's emits carry exactly the source counter it entered with.
+- **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
+  pass's emits carry the instant its value pass drew.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
   `PROBED×2, RECOVERY`: a slot's plain subscribe against the impl's at its
   stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the
@@ -381,6 +383,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED`:
   one packet per arrival, injectively; the sweep, deciding it directly, reached
   values on two arrivals under a flattener with no red.
+- **`go-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: one cascade pass
+  never runs a mint counter back.
 - **`cascade-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
   never runs a mint counter back.
 - **`cascade-latched`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade

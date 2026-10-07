@@ -37,6 +37,7 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous.Properties using (fro
   renaming (trans to prefix-trans)
 open import Data.List.Relation.Binary.Pointwise.Properties using (Pointwise-length)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All-++⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
   renaming (refl to pointwise-refl; map to Pointwise-map)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
@@ -285,24 +286,98 @@ postulate
     → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
               (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 
-  -- EACH ARRIVAL'S INSTANT IS DRAWN WHILE IT CASCADES, a claim about the
-  -- impl's run alone; the store says the state is one an elaboration
-  -- reaches.
+
+-- EVERY EMIT AT EXACTLY `lo`, the counter where its cascade started,
+-- and drawn below `hi` when there is one.  Sharper than `OneIn`, and the
+-- sharpness is what composes: a later pass's emits carry the instant
+-- an earlier pass drew, which the counter where that pass starts no
+-- longer names.
+At : ∀ {A : Set} → ℕ → ℕ → List (Id × A) → Set
+At lo hi xs = All (λ p → proj₁ p ≡ lo) xs × (xs ≡ [] ⊎ lo < hi)
+
+at-oneIn : ∀ {A : Set} {lo hi} (xs : List (Id × A)) → At lo hi xs → OneIn lo hi xs
+at-oneIn []      _                    = tt
+at-oneIn (_ ∷ _) (refl ∷ al , inj₂ lt) = ≤-refl , lt , al
+at-oneIn (_ ∷ _) (_ , inj₁ ())
+
+at-++ : ∀ {A : Set} {lo h₁ h₂} (xs ys : List (Id × A)) → At lo h₁ xs → h₁ ≤ h₂ → At lo h₂ ys → At lo h₂ (xs ++ ys)
+at-++ []      ys _                 _ y = y
+at-++ (x ∷ xs) ys (ax , inj₂ lt) h (ay , _) = All-++⁺ ax ay , inj₂ (<-≤-trans lt h)
+at-++ (x ∷ xs) ys (_ , inj₁ ())   _ _
+
+-- a cascade's finish sweeps the live sources and leaves the mint
+finish-mint : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (s : Sched Γ′) (st : EvalSt e)
+            → Sched.mint (proj₁ (cascadeFinish a s st)) ≡ Sched.mint s
+finish-mint a s st with Arrival.isLast a
+... | false = refl
+... | true  = refl
+
+postulate
+  -- A PASS NEVER RUNS A COUNTER BACK, `cascade-mono` at one pass.
   --
-  -- `make qc-same-clock` decides `OneIn` itself on each arrival's
-  -- impl values, counters read after the subscribe and after every
-  -- arrival: no red over a flattener in every case and a cold slot
-  -- bursting two sync values aimed, seed 24 at depth 3 (175 decided, 96
-  -- grouping values) and seed 23 at depth 4 (108 decided, 72 grouping).
-  -- A planted break of the one-instant conjunct goes red on 26 of 30.
-  -- And the instants a run draws are contiguous: no gap at depth 2
-  -- seeds 13..36 nor depth 3 seeds 1..11.
-  cascade-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                     {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  -- TWIN: `Rx.Evaluator.Keeps`, whose `subscribeE-keeps` family walks
+  --   every relation a pass reaches, each clause reflexivity or one
+  --   step, which is this family's shape at a counter.
+  go-mono : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} {a vs fin cs sched st r}
+          → cascadeGo⇓ {e = e} a vs fin cs sched st r → ∀ k
+          → counter (Sched.mint sched) k ≤ counter (Sched.mint (proj₁ (proj₂ r))) k
+
+  -- THE VALUE PASS'S EMITS CARRY THE INSTANT THE ARRIVAL'S BLOCK DRAWS,
+  -- which is the first source the pass draws: the counter where it
+  -- started.  A claim about the impl's run alone; the store says the
+  -- state is one an elaboration reaches.
+  --
+  -- `make qc-same-clock`, tightened to this exact instant at every
+  -- arrival, decided 91 programs with no red, a planted `suc` reddening
+  -- 31 of 40: seed 24 at depth 3 (two-sync colds aimed), seed 25 at
+  -- depth 3 and seed 23 at depth 4 (both a flattener in every case).
+  -- The SUBSCRIBE's instant is not its counter: an `of` of two values
+  -- opens at 5 from a counter at 0.
+  value-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                   {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
     → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-    → ∀ {oI sI′ stI′} → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , sI′ , stI′)
-    → OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI′) sourceᵏ) (readᴵ oI)
+    → ∀ {oI sI₁ stI₁}
+    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+    → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
+
+  -- THE END PASS'S EMITS CARRY THE SAME INSTANT, the one the value pass
+  -- drew, not the counter where the end pass starts.  The sweeps under
+  -- `value-stamps` decided it in the same runs.
+  end-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → Storeʳ κ sP stP sI stI
+    → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′) → Arrival.isLast a′ ≡ true
+    → ∀ {oI sI₁ stI₁}
+    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+    → ∀ {eI sI₂ stI₂}
+    → cascadeGo⇓ a′ [] true (chainsOf a′ stI₁) sI₁ (cascadeClose a′ stI₁) (eI , sI₂ , stI₂)
+    → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₂) sourceᵏ) (readᴵ eI)
+
+-- EACH ARRIVAL'S INSTANT IS DRAWN WHILE IT CASCADES: the value pass's
+-- emits and the end pass's carry the one instant the value pass drew.
+--
+-- `make qc-same-clock` decides `OneIn` itself on each arrival's
+-- impl values, counters read after the subscribe and after every
+-- arrival: no red over a flattener in every case and a cold slot
+-- bursting two sync values aimed, seed 24 at depth 3 (175 decided, 96
+-- grouping values) and seed 23 at depth 4 (108 decided, 72 grouping).
+-- A planted break of the one-instant conjunct goes red on 26 of 30.
+-- And the instants a run draws are contiguous: no gap at depth 2
+-- seeds 13..36 nor depth 3 seeds 1..11.
+cascade-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                   {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+  → Storeʳ κ sP stP sI stI
+  → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+  → ∀ {oI rI} → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , rI)
+  → OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint (proj₁ rI)) sourceᵏ) (readᴵ oI)
+cascade-stamps κ e {sI = sI} s ex (casc-run {a = a} {emits = oI} {sched′ = s₁} {st′ = t₁} _ go) =
+  subst (λ μ → OneIn (counter (Sched.mint sI) sourceᵏ) (counter μ sourceᵏ) (readᴵ oI)) (sym (finish-mint a s₁ t₁))
+        (at-oneIn (readᴵ oI) (value-stamps κ e s ex go))
+cascade-stamps κ e {sI = sI} s ex (casc-run-last {a = a} {emits = oI} {sched₁ = s₁} {ends = eI} {sched₂ = s₂} {st₂ = t₂} ll go end) =
+  subst₂ (λ μ ys → OneIn (counter (Sched.mint sI) sourceᵏ) (counter μ sourceᵏ) ys) (sym (finish-mint a s₂ t₂)) (sym (readᴵ-++ oI eI))
+         (at-oneIn (readᴵ oI ++ readᴵ eI)
+           (at-++ (readᴵ oI) (readᴵ eI) (value-stamps κ e s ex go) (go-mono end sourceᵏ) (end-stamps κ e s ex ll go end)))
 
 -- the two arrivals of a partnered pop are numbered as their sources are
 pop-kind : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}

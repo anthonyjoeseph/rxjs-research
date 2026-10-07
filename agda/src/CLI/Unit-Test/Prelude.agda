@@ -497,8 +497,23 @@ clockedᵇ : {A : Set} → ℕ → List (List (ℕ × A)) → List ℕ → Bool
 clockedᵇ lo (r ∷ rs) (hi ∷ hs) = oneInᵇ lo hi r ∧ clockedᵇ hi rs hs
 clockedᵇ lo _        _         = true
 
+-- AN ARRIVAL'S INSTANT IS EXACTLY THE COUNTER IT ENTERED WITH, which
+-- `value-stamps` and `end-stamps` claim and `OneIn` does not.  Not the
+-- subscribe's: its burst draws other sources before its frame's token.
+exactᵇ : {A : Set} → ℕ → ℕ → List (ℕ × A) → Bool
+exactᵇ lo hi []            = true
+exactᵇ lo hi ((i , _) ∷ r) = (i ≡ᵇ lo) ∧ (i <ᵇ hi) ∧ sameIdᵇ i r
+
+exactsᵇ : {A : Set} → ℕ → List (List (ℕ × A)) → List ℕ → Bool
+exactsᵇ lo (r ∷ rs) (hi ∷ hs) = exactᵇ lo hi r ∧ exactsᵇ hi rs hs
+exactsᵇ lo _        _         = true
+
+afterOpenᵇ : {A : Set} → List (List (ℕ × A)) → List ℕ → Bool
+afterOpenᵇ (_ ∷ rs) (hi ∷ hs) = exactsᵇ hi rs hs
+afterOpenᵇ _        _         = true
+
 sameClockᵇ : {A : Set} → Arr A → Bool
-sameClockᵇ (is , _ , _ , ik , pk , cl) = sameKeysᵇ ik pk ∧ clockedᵇ 0 is cl
+sameClockᵇ (is , _ , _ , ik , pk , cl) = sameKeysᵇ ik pk ∧ clockedᵇ 0 is cl ∧ afterOpenᵇ is cl
 
 sameClockᴮ : Arr ℕ × Arr Item → Bool
 sameClockᴮ (p , t) = sameClockᵇ p ∧ sameClockᵇ t
