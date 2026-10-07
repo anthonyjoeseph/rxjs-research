@@ -323,6 +323,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- the program's frame, subscribe-kind, and the path catches it.
       -- Decoding what the block sends exhausted the checker's memory at a
       -- one-value cold script, so this region is the compiled sweep's.
+      -- PROBED: make qc-same-clock QC='47 200 1' QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[1,0,1,1],"script":[0,0,1,0,1],"reach":["flatten","scan"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 12
+      --   agree, 0 fail.  Cases 2 to 4 read a cold script of one or two
+      --   synchronous values under a scan the merge above subscribes.
       cold-read-stamps : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
                        → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                        → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
@@ -352,6 +356,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
       -- WHERE A HOT READ'S EMITS LAND: the restamp hands its own a frame
       -- and the path catches it; a live script joined sends nothing yet
+      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1],"script":[1,1,0,0,0]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 145 agree, 0 fail,
+      --   5 undecided.  Cases 73 and 104 read the hot input twice under
+      --   one merge, the second read joining the share the first
+      --   connected; case 55 reads it under an exhaust.
       hot-read-stamps    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedReadStamps {Θ} i
       -- WHERE A SHARED READ'S EMITS LAND.  WHERE IT CAN STILL FAIL: a
       -- connect the read starts runs the share's definition to every row

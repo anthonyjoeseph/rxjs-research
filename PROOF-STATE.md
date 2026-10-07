@@ -350,7 +350,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
   pass's emits carry the instant its value pass drew.
-- **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY, `PROBED×2`:
+- **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY, `PROBED×4`:
   a slot read's subscribe sends only at its path's catch of the program's frame
   and keeps the restamp cells up to it; a shared read's connect reaches every
   row on the share's subject.
