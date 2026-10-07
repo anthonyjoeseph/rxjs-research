@@ -250,7 +250,7 @@ wrap-false refl = refl
 module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ public
-  open Walkers κ using (Walker)
+  open Walkers {Γ = Γ} κ using (Walker)
   open Takes {Γ = Γ} κ using (module While; cut-group)
   open Scans {Γ = Γ} κ using (module Cells; scan-group)
 

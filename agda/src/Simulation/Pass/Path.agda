@@ -52,7 +52,7 @@ open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sin
 module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassI {Γ = Γ} κ public
-  open Walkers κ using (Walker)
+  open Walkers {Γ = Γ} κ using (Walker)
   open Takes {Γ = Γ} κ using (module While)
   open Scans {Γ = Γ} κ using (module Cells)
 

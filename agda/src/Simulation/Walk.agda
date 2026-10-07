@@ -188,7 +188,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ using (Carries)
 
-  open Walkers κ using (frameAt; Walker)
+  open Walkers {Γ = Γ} κ using (frameAt; Walker)
 
   postulate
     -- AN `of`'S EMITS STAND AT ITS PROGRAM'S FRAME, subscribe-kind
@@ -202,7 +202,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
-    open Walkers.On κ ep ei using (Walks; Walks<; Elab-Walks; Elab-Walks<)
+    open Walkers.On {Γ = Γ} κ ep ei using (Walks; Walks<; Elab-Walks; Elab-Walks<)
     open PassP.InP {Γ = Γ} κ {t} {ep} {ei} using (path-pass)
 
     -- A READ OF A SLOT THE IMPL STAMPED: both subscribes at the slot, the

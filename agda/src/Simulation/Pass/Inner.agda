@@ -120,7 +120,7 @@ drain-self u with u ≟ᵗ u
 module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassQ {Γ = Γ} κ public
-  open Walkers κ using (Walker)
+  open Walkers {Γ = Γ} κ using (Walker)
   open Takes {Γ = Γ} κ using (module While)
   open Scans {Γ = Γ} κ using (module Cells)
 
