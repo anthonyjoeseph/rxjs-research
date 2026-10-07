@@ -259,13 +259,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **RIDE THE STAMPS ON THE VALUES WALK.** A stamp leaf split at a frame
   owes a tail claim over every state the subscribe folds at, and only the
-  values walk's `After` relates those: a `Sound` guard is false at a
-  planted queue or a lowered batch buffer. So `After` gains the instant
-  its impl outputs carry, each arm owing it beside its values, and the
-  stamp chains, `hop-body-stamps`, the block carries and
-  `subscribe-stamps` become projections of the walks they ride. Census
-  `After`'s producers first; the restamp and flattener-cell arms are the
-  risky ones, `end-stamps`' bound at the value pass's state the first.
+  values walk relates those. `Store` gains the cascade's instant, `After`
+  its outputs at it, and `Walks` a catch over its `PathRel` derivation,
+  read at the node map it is indexed by: each restamp cell's instant and
+  kind say whether a subscribe-kind emit at the walk's frame lands at the
+  instant (`Lifts` owing the kind kept). The stamp chains, the block
+  carries, `hop-body-stamps` and `subscribe-stamps` become projections.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
