@@ -258,4 +258,20 @@ cases =
           (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (deferˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ (suc zero))) ∷ []))))) ∷ [])))
           (mkSlots (cold (2 ∷ 3 ∷ []) ((after 1 , 5) ∷ []))
                    (ofˢ ((natˢ 7) ∷ []))) ∷
+  cached "an inner reading twice a share whose two lanes end on one close, cold" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))) ∷ [])))
+          (mkSlots (cold (1 ∷ []) ((after 1 , 5) ∷ []))
+                   (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))) ∷
+  cached "an inner reading twice a share whose two lanes end on one close, hot" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))) ∷ [])))
+          (mkSlots (hot ((after 1 , 5) ∷ []))
+                   (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))) ∷
+  cached "a share whose two lanes end on one close, read twice and merged beside a value" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 4) ∷ []))) ∷ [])))
+          (mkSlots (cold (1 ∷ []) ((after 1 , 5) ∷ []))
+                   (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))) ∷
+  cached "a switched inner reading twice a share whose two lanes end on one close" 30
+          (flatAllˢ switchᶠ (mapˢ (strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))) (inputˢ zero)))
+          (mkSlots (cold (1 ∷ []) ((after 1 , 5) ∷ []))
+                   (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ zero))) ∷ [])))) ∷
   []
