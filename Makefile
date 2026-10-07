@@ -1163,10 +1163,12 @@ comments-selftest:
 	      echo '--   sha form, which is what a marker carries once `src` can no longer'; \
 	      echo '--   STATE the route and the witness has correctly been deleted.'; \
 	      printf -- '-- TWIN: `%s` is the proven counterpart whose clauses correspond.\n' "$$tn"; \
+	      echo "-- PROBED: make qc-same-clock QC='1 10 3' QC_DRAW='{\"exp\":[1,1]}'"; \
+	      echo '--   a sweep receipt: a declared target, a replayable seed, a draw that parses.'; \
 	      echo '-- RECOVERY: git show 2984f1e575d8699e8ce78975e23c530d803fc911 restores the predecessor and its whole cone.'; \
 	      echo 'postulate leaf : Set'; } > $$rd/RefOk.agda; \
 	    scripts/check-comments.py --dir $$rd > /dev/null 2>&1 \
-	      || { echo "SELFTEST FAIL: a TWIN naming the PROVEN definition $$tn, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
+	      || { echo "SELFTEST FAIL: a TWIN naming the PROVEN definition $$tn, a REFUTED naming a real refutation, a sweep PROBED and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
 	    rm -rf $$rd; \
 	  fi; \
 	  out=$$(scripts/check-comments.py --dir scripts/comments-selftest/ref-bad 2>&1); \
@@ -1177,6 +1179,8 @@ comments-selftest:
 	    || { echo "SELFTEST FAIL: an unresolvable TWIN was not reported"; fail=1; }; \
 	  echo "$$out" | grep -q 'RECOVERY carries no sha' \
 	    || { echo "SELFTEST FAIL: a bogus sha was not reported"; fail=1; }; \
+	  echo "$$out" | grep -q 'qc-no-such-sweep' \
+	    || { echo "SELFTEST FAIL: a sweep receipt naming an undeclared target was not reported"; fail=1; }; \
 	  pn=$$(scripts/check-wiring.py --postulates 2>/dev/null | grep '\.agda:' | head -1 | awk '{print $$1}'); \
 	  if [ -z "$$pn" ]; then \
 	    echo "SELFTEST FAIL: the postulate ledger is unreadable — the postulate-TWIN assertion cannot run"; fail=1; \

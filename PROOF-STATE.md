@@ -263,9 +263,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   so a share's reader sends at its delivery by projection. What sends is
   now the leaves: `explode-out` and `elem-out` route through a consume
   carrying the instant its echo set, `cut-out` through the end a cut
-  hands on. Instantiate those three over two inners on one group, where a
-  second instant would show; a shared read's connect, reaching rows off
-  this path, decides whether one catch per subscribe is the shape.
+  hands on. Swept green at a second instant: `explode-out` over two
+  inners on one group, `elem-out` at a hot arrival, `cut-out` at one. Left:
+  a cut whose tail then subscribes a second inner on the group, and a
+  shared read's connect, reaching rows off this path, deciding whether one
+  catch per subscribe is the shape.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
@@ -307,11 +309,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   carries the same values and end, every delivery keeping its stamp.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
-- **`explode-{quiet,one,end,out}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
-  one exploded emit, carrying nothing or one value, walks into the flattener
+- **`explode-{quiet,one,end,out}`** (Simulation.Pass) — FALSITY, `PROBED`: one
+  exploded emit, carrying nothing or one value, walks into the flattener
   through the impl's merge, and the outer's end meets the plain outer's; a
   group delivered at one instant sends at it.
-- **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
+- **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
@@ -327,8 +329,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
   test's nodes written open keep the stores and tails, and written spent keep
   what the cut left; a spent test passes nothing on both sides.
-- **`cut-out`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a tail handed a
-  nonempty group delivered at one instant, and the end, sends at that instant.
+- **`cut-out`** (Simulation.Take) — FALSITY, `PROBED`: a tail handed a nonempty
+  group delivered at one instant, and the end, sends at that instant.
 - **`share-{spend,finish}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the
   stores stay related when both shares of a shared slot close and drop their
   readers.
