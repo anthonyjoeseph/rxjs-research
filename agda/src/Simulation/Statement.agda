@@ -30,10 +30,6 @@ module Simulation.Statement where
 open import Data.Bool    using (Bool; true; false; T)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Unit    using (⊤; tt)
-open import Data.Maybe   using (just; nothing)
-open import Data.Maybe.Properties using (just-injective)
-open import Decide       using (≡ᵇ→≡)
-open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Data.List    using (List; []; _∷_; _++_; map; length; replicate; drop; concat)
 open import Data.List.Properties using (map-++; map-replicate; length-drop; ++-identityʳ)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
@@ -44,8 +40,9 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All-++⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺)
   renaming (refl to pointwise-refl; map to Pointwise-map)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_; _∸_; _≤_; _<_; s≤s; z≤n; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤n⇒m≤1+n; n≤1+n; ≤⇒≤′; ≤⇒≤ᵇ; ≤ᵇ⇒≤; <-≤-trans; <-trans; <-irrefl; <-cmp; m≤m+n; m≤n+m; +-cancelˡ-≡)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; z≤n; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤n⇒m≤1+n; n≤1+n; ≤⇒≤′; ≤⇒≤ᵇ; ≤ᵇ⇒≤; <-≤-trans; <-irrefl; <-cmp; m≤m+n;
+  +-cancelˡ-≡)
 open import Relation.Binary using (tri<; tri≈; tri>)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -54,17 +51,14 @@ open Relation.Binary.PropositionalEquality.≡-Reasoning
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Fuel; Id; PlainEvent; valueᵖ; completeᵖ; InstEmit)
-open import Rx.Exp       using (Ctx; Closed; Val; Ty; isData; _≟ᵗ_; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; applyClo; varᵗ; unit̂;
-  pairᵗ; inlᵗ; inrᵗ; Env; _∷ᵉ_; Ren∈; renExp; mintᵉ)
+open import Rx.Exp       using (Ctx; Closed; Val; isData; _≟ᵗ_; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
-open import SExp.Elaborate using (inputStampᵖ; deferBodyᵖ; toInstEmit; plainᶜ⁺)
-open import Data.Fin     using (Fin; toℕ; _↑ˡ_; _↑ʳ_)
-open import Data.Fin.Properties using (toℕ-↑ˡ; toℕ<n)
+open import Data.Fin     using (toℕ; _↑ˡ_; _↑ʳ_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec     using (lookup)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
-open import SExp.InstEmit using (instEmitᵗ; machineEmitᵗ)
+open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import SExp.Plain   using (unplainᵈ; ∧ˡ; ∧ʳ; plainExp; plainValues)
 open import SExp.Pipeline using (runᴵ; runᴾ)
@@ -73,20 +67,18 @@ open import SExp.Readings using (arrivalsOf)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; RegRow; atSlot; atDyn; Path; share-sink; chainsGo; sameSource; regSource; schedGo; schedFinish; sched-next; arrVal;
-  chainsOf; cascadeOpen; cascadeClose; cascadeFinish; memberSource; arrTick; _↠[_]_; map-f; batchSync-f; thru-outer; from-inner; mergeAllᵒ;
-  echoᵗ; thruEvents; batchSync-st; batchVals; setNode; lookupNode; mergeAll-st; NodeState)
-open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓; foldPath⇓;
-  disp; walk-more; walk-nil; walk-end; thruWalk⇓; chain-step; fold-step; step-map; step-from-inner; react-false; step-thru-outer;
-  walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil; inner; subs-mint; subs-of; subscribeE⇓)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; Arrival; arrTy; RegRow; Path; chainsGo; sameSource;
+  regSource; schedGo; schedFinish; sched-next; arrVal; chainsOf; cascadeOpen; cascadeClose;
+  cascadeFinish; memberSource)
+open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓;
+  foldPath⇓; disp; walk-more; walk-nil; walk-end; subscribeE⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule; chain-sound; chain-agree)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; admit-ot)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
-open import Rx.Mint      using (MintKey; counter; sourceᵏ; nodeᵏ; setAt)
-open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop; HeadOf)
+open import Rx.Mint      using (MintKey; counter; sourceᵏ)
+open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
-open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source; head-elem;
-  raw-none; raw-one; raw-mistyped; raw-at)
+open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source)
 open import Simulation.Hot-End using (hot-end-start)
 open import Simulation.Close using (close-store; close-arr)
 open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit)
@@ -95,7 +87,8 @@ open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk; minted)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; module Kept)
 open Kept using (After; module After; Persists; _⨾_)
-open import Simulation.Pass using (row-pass; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle; batch-flush; sink-at; disp-quiet)
+open import Simulation.Pass using (row-pass; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle)
+open import Simulation.Arm using (Out; out-++; out-quiet)
 open import Simulation.Pass.Quiet using (dynRow; Paired; unchain; delivered; admit-agrees; delivered-arr; module PassQ)
 open PassQ using (head; Head; nohead)
 
@@ -367,7 +360,7 @@ postulate
 
   -- THE END PASS'S EMITS CARRY THE SAME INSTANT, the one the value pass
   -- drew, not the counter where the end pass starts.  The sweeps under
-  -- `value-stamps` decided it in the same runs.
+  -- `cascade-kept` decided it in the same runs.
   end-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
@@ -378,273 +371,24 @@ postulate
     → cascadeGo⇓ a′ [] true (chainsOf a′ stI₁) sI₁ (cascadeClose a′ stI₁) (eI , sI₂ , stI₂)
     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₂) sourceᵏ) (readᴵ eI)
 
--- WHAT A BLOCK'S TAIL OWES THE MERGE'S DRAW: one delivery-kind emit at
--- the drawn instant, folded out of the block's merge at the state the
--- draw leaves, leaves every emit at that instant.
---
--- The carry is per former and owes a unary relation on values by
--- type: below the block every emit's instant is copied (`mapStepᵖ`'s
--- reassemble, a scan's and a cutter's alike), or restamped by
--- `flatStepᵛ` with the last instant the flattener put out, which the
--- echo leaving ahead of its lane has just set; a subscribe burst
--- inside a cascade is subscribe-kind throughout, its every
--- flattener's cell freshly seeded so.
---
--- A LANE'S END IS ITSELF AN EMIT THROUGH THE FLATTENER, so a bounded
--- merge's queued inner, drained when a lane ends, meets a cell this
--- arrival has already set: a lane cut with no value, and a delivery whose
--- value is dropped, each still put out an emit -- its close events, or
--- none -- at the arrival's instant.  Read off the bug cache's rows "a
--- bounded merge's lane cut valueless by a takeWhile, then drained", hot
--- and cold, whose `sides` print the drained burst at the cut's instant.
-Carry : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-          {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-      → Storeʳ κ sP stP sI stI → Arrival (plainᵏ Γ κ) → (A : Ty) → ∀ {ℓ} → Path (plainᵏ Γ κ) ℓ (machineEmitᵗ A) (emitᵗ t) → Set
-Carry {Γ = Γ} {t} κ {stP = stP} {sI = sI} {stI = stI} S a′ A {ℓ} q =
-  ∀ {v} → _≡_ {A = Σ Ty (Val (plainᵏ Γ κ))} (arrTy a′ , arrVal a′) (A , v)
-  → ∀ {rid lo ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
-      {h₁ : lo ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ}
-  → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) A
-      (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q))))))
-      q
-  → ∀ {od} → lookupNode m2 (EvalSt.nodes stI) ≡ just (mergeAll-st {t = machineEmitᵗ A} nothing 0 [] od)
-  → ∀ {src′ oW sW stW}
-  → foldPath⇓ (arrTick a′) (from-inner mergeAllᵒ m2 (counter (Sched.mint sI) nodeᵏ) ↠[ ≤-refl ] q)
-      ((inj₂ (inj₁ v) ∷ [] , counter (Sched.mint sI) sourceᵏ , src′ , inj₂ (inj₁ tt)) ∷ []) true
-      (record sI { mint = setAt sourceᵏ (suc (counter (Sched.mint sI) sourceᵏ))
-                            (setAt nodeᵏ (suc (counter (Sched.mint sI) nodeᵏ)) (Sched.mint sI)) })
-      (record stI { delivered = rid ∷ EvalSt.delivered stI
-                  ; nodes = setNode m2 (mergeAll-st {t = machineEmitᵗ A} nothing 1 [] od)
-                              (setNode b (batchSync-st {s = unitᵗ +ᵗ A} false [] false) (EvalSt.nodes stI)) })
-      (oW , sW , stW)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sW) sourceᵏ) (readᴵ oW)
-
--- a tail handed nothing, and no end, sends nothing and runs no clock back
-QuietTail : ∀ {m} {Δ : Ctx m} {t} (e : Closed Δ (instEmitᵗ uniqᵗ t)) {ℓ u} → Path Δ ℓ u (instEmitᵗ uniqᵗ t) → Set
-QuietTail e q = ∀ {now sched st o sched′ st′} → foldPath⇓ {e = e} now q [] false sched st (o , sched′ , st′)
-              → readᴵ o ≡ [] × counter (Sched.mint sched) sourceᵏ ≤ counter (Sched.mint sched′) sourceᵏ
-
-postulate
-  -- A HOT BLOCK'S SHARE CARRIES THE DRAW.
-  hot-carry-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                      {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-    → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-    → (hot : lookup κ i ≡ hotᵏ) → ∀ {ℓ} {h : ℓ ≤ toℕ (n ↑ʳ i)}
-    → Carry κ S a′ (plainᵗ (lookup Γ i)) (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
-
-  -- A COLD SCRIPT'S TAIL, ITS PLAIN READER'S FRAMES ELABORATED, CARRIES
-  -- THE DRAW.
-  cold-carry-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-    → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)}
-    → ∀ {src lo ℓ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) ℓ (emitᵗ s) (emitᵗ t)}
-    → SrcPair κ (Sched.live sP) (Sched.live sI) src (Arrival.source a′) s (plainᵗ s)
-    → PathRel κ (Storeʳ.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-    → Carry κ S a′ (plainᵗ s) q
-
-  -- ANY TAIL IS QUIET HANDED NOTHING.
-  quiet-fold : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ (instEmitᵗ uniqᵗ t)} {ℓ u} {q : Path Δ ℓ u (instEmitᵗ uniqᵗ t)} → QuietTail e q
-
-  -- A HOP'S BODY, ITS TOKEN DRAWN, STAMPS EVERY EMIT AT THE TOKEN: what
-  -- leaves `deferBodyᵖ`'s restamp map is at the token, a subscribe burst
-  -- restamped there and the begin marker minted there, and the hop's
-  -- merge's inner frame and its tail carry it as a block's tail does.
+  -- A VALUE PASS THAT SENDS HAS DRAWN: an emit at the counter the pass
+  -- started at leaves that counter behind, the block's or the hop's merge
+  -- having minted the instant before anything put it out.
   --
-  -- `make qc-same-clock` with a defer in every program decides this
-  -- body's instants on each hop arrival: seed 27 at depth 3, fuel 12, μ
-  -- off, 74 agree and 26 undecided; seed 26 with μ on agreed on 42
-  -- before a μ ran the binary out of memory.
-  --
-  -- The bug-cache rows "a deferred read of a cold with a synchronous
-  -- value", "… of a share its hop connects, over a cold" and "a deferred
-  -- cold read merged beside a read of the share it feeds" print each
-  -- body's synchronous burst, a share's connect included, at the hop's
-  -- own instant, and its later values at their own blocks' instants.
-  --
-  -- DEAD ROUTE: split at `deferBodyᵖ`'s restamp, the body's subscribe
-  --   owing subscribe-kind or token-stamped emits to a tail that keeps a
-  --   token-stamped delivery at the token.  The tail folds at every state
-  --   the body's subscribe reaches, so its claim quantifies them: over
-  --   `Sound` states it is false at a planted queue (a drained inner
-  --   minting its own token) or a lowered batch buffer, and over
-  --   `Storeʳ`-related ones it needs the stores the values walk's `After`
-  --   hands out between folds, which an impl-only chain does not hold.
-  hop-body-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                      {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-    → (S : Storeʳ κ sP stP sI stI)
-    → ∀ {ℓ ℓ′ u nid nid′} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-    → (nid , nid′ ∷ []) ∈ Storeʳ.π S
-    → lookupNode nid′ (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing 0 [] false)
-    → PathRel κ (Storeʳ.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-    → ∀ {Θ Θ′} (s : SExp Γ [] [] Θ u) (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {B}
-    → renExp (λ x → x) (λ x → x) w (deferBodyᵖ (toInstEmit κ s)) ≡ mintᵉ B
-    → ∀ {now rid o sched′ st′}
-    → subscribeE⇓ (uniqᵗ ∷ Θ′ , B , counter (Sched.mint sI) sourceᵏ ∷ᵉ ρ′)
-        (from-inner mergeAllᵒ nid′ (counter (Sched.mint sI) nodeᵏ) ↠[ ≤-refl ] q) now
-        (record sI { mint = setAt sourceᵏ (suc (counter (Sched.mint sI) sourceᵏ))
-                              (setAt nodeᵏ (suc (counter (Sched.mint sI) nodeᵏ)) (Sched.mint sI)) })
-        (record stI { delivered = rid ∷ EvalSt.delivered stI
-                    ; nodes = setNode nid′ (mergeAll-st {t = emitᵗ u} nothing 1 [] false) (EvalSt.nodes stI) })
-        (o , sched′ , st′)
-    → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sched′) sourceᵏ) (readᴵ o)
-
--- the block's merge reads past the bracket's flush as it did before it
-past-flush : ∀ {m} {Γ′ : Ctx m} {b m2 N} {s u lim act q od lim′ act′ q′ od′}
-  → lookupNode m2 (setNode b (batchSync-st {Γ = Γ′} {s = s} false [] false) N) ≡ just (mergeAll-st {t = u} lim act q od)
-  → lookupNode m2 N ≡ just (mergeAll-st {t = u} lim′ act′ q′ od′)
-  → _≡_ {A = NodeState Γ′} (mergeAll-st {t = u} lim act q od) (mergeAll-st lim′ act′ q′ od′)
-past-flush {b = b} {m2} {N} l r with b ≡ᵇ m2 in bm
-... | false = just-injective (trans (sym l) (trans (set-above b m2 _ N bm) r))
-... | true with ≡ᵇ→≡ b m2 bm
-...   | refl with trans (sym (lookup-set b _ N)) l
-...     | ()
-
--- THE WALK PAST AN INPUT BLOCK'S BRACKET STAMPS AT THE COUNTER THE CHAIN
--- ENTERED WITH: its one event is the stamp's lane, and the merge's
--- subscribe of it draws the instant in the stamp's `mintᵉ`, which the
--- tail carries.
-block-walk-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                      {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-  → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {A : Ty} {ℓ : ℕ} {q : Path (plainᵏ Γ κ) ℓ (machineEmitᵗ A) (emitᵗ t)}
-  → Carry κ S a′ A q
-  → ∀ {v} → _≡_ {A = Σ Ty (Val (plainᵏ Γ κ))} (arrTy a′ , arrVal a′) (A , v)
-  → ∀ {rid lo ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ m1 j1 b m2 Θ₀ ρ₀ Θ₃ fr ρ₃ Θ₄ ρ₄}
-      {h₁ : lo ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ}
-  → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) A
-      (map-f (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₁ ] (from-inner mergeAllᵒ m1 j1 ↠[ h₂ ] (batchSync-f b ↠[ h₃ ] (map-f (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃) ↠[ h₄ ] (map-f (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄) ↠[ h₅ ] (thru-outer mergeAllᵒ m2 ↠[ h₆ ] q))))))
-      q
-  → ∀ {od} → lookupNode m2 (EvalSt.nodes stI) ≡ just (mergeAll-st {t = machineEmitᵗ A} nothing 0 [] od)
-  → ∀ {oW sW stW}
-  → thruWalk⇓ mergeAllᵒ m2 q (arrTick a′)
-      (thruEvents (map (applyClo {s = obs (machineEmitᵗ A)} {t = echoᵗ (machineEmitᵗ A)} (Θ₄ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₄))
-                    (map (applyClo {s = (unitᵗ +ᵗ A) ×ᵗ listᵗ (unitᵗ +ᵗ A)} {t = obs (machineEmitᵗ A)} (uniqᵗ ∷ Θ₃ , inputStampᵖ fr , ρ₃))
-                      (batchVals false (map (applyClo {s = A} {t = unitᵗ +ᵗ A} (Θ₀ , inrᵗ (varᵗ (here refl)) , ρ₀)) (v ∷ []))))))
-      sI (record (record stI { delivered = rid ∷ EvalSt.delivered stI })
-            { nodes = setNode b (batchSync-st {s = unitᵗ +ᵗ A} false [] false) (EvalSt.nodes stI) })
-      (oW , sW , stW)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sW) sourceᵏ) (readᴵ oW)
-block-walk-stamps κ {stI = stI} S carry eq {b = b} {m2 = m2} ib e2 (walk-cons (consume-all-sub {out = oW} L _ (inner refl (subs-mint refl (subs-of FP)))) walk-nil)
-  with past-flush {b = b} {m2 = m2} {N = EvalSt.nodes stI} L e2
-... | refl = tail-at oW (carry eq ib e2 FP) refl ≤-refl
-block-walk-stamps κ S carry eq ib _ (walk-cons (consume-all-enqueue _ _) walk-nil) = [] , inj₁ refl
-block-walk-stamps κ S carry eq ib _ (walk-cons (consume-all-nil _) walk-nil)       = [] , inj₁ refl
-
--- AN INPUT BLOCK'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED WITH:
--- inverted as `hot-block` inverts it, down to the walk past the bracket,
--- which nothing before it draws for, and a tail handed nothing after it.
-block-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-  → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {A : Ty} {ℓ : ℕ} {q : Path (plainᵏ Γ κ) ℓ (machineEmitᵗ A) (emitᵗ t)}
-  → Carry κ S a′ A q → QuietTail ei q
-  → ∀ {lo p full} → _≡_ {A = Σ Ty (λ u → Path (plainᵏ Γ κ) lo u (emitᵗ t))} (arrTy a′ , p) (A , full)
-  → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) A full q
-  → ∀ {rid oI sI₁ stI₁}
-  → chainStep⇓ a′ (arrVal a′ ∷ []) false (lo , p) sI
-      (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-block-chain-stamps κ S {a′ = a′@record { elemTy = _ ; payload = v }} carry quiet refl ib@(block _ _ eb e2 _ _ _ _)
-  (chain-step (fold-step step-map (fold-step (step-from-inner react-false)
-    (fold-step SB (fold-step step-map (fold-step step-map (fold-step (step-thru-outer {out = oW} W) fq)))))))
-  with batch-flush SB eb
-... | refl with quiet fq
-...   | rq , mq = tail-at oW (block-walk-stamps κ S {a′ = a′} carry refl ib e2 W) rq mq
-
--- a tail handed nothing sends nothing off the instant
-quiet-chain : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ (instEmitᵗ uniqᵗ t)} {ℓ u} {q : Path Δ ℓ u (instEmitᵗ uniqᵗ t)}
-                {now sched st o sched′ st′ lo hi}
-            → foldPath⇓ {e = e} now q [] false sched st (o , sched′ , st′) → At lo hi (readᴵ o)
-quiet-chain {lo = lo} {hi = hi} fq = subst (At lo hi) (sym (proj₁ (quiet-fold fq))) ([] , inj₁ refl)
-
--- a type's constructor count: a type strictly inside another counts less
-szᵗ : Ty → ℕ
-szᵗ unitᵗ     = 1
-szᵗ boolᵗ     = 1
-szᵗ natᵗ      = 1
-szᵗ uniqᵗ     = 1
-szᵗ (s ×ᵗ t)  = suc (szᵗ s + szᵗ t)
-szᵗ (s +ᵗ t)  = suc (szᵗ s + szᵗ t)
-szᵗ (listᵗ t) = suc (szᵗ t)
-szᵗ (obs t)   = suc (szᵗ t)
-
--- A SCRIPT NEVER STANDS AT A HOP'S TYPE: its partner holds its plain
--- type, and the plain type of an echo holds the payload where the hop's
--- holds the payload's machine emit, which holds the payload inside it
-script-not-hop : ∀ u → plainᵗ (echoᵗ u) ≡ echoᵗ (emitᵗ u) → ⊥
-script-not-hop u e = <-irrefl (cong szᵗ (cong left e)) inside
-  where
-  left : Ty → Ty
-  left ((_ +ᵗ a) ×ᵗ _) = a
-  left _               = unitᵗ
-  Rᴱ = (uniqᵗ ×ᵗ (unitᵗ +ᵗ (unitᵗ +ᵗ unitᵗ))) +ᵗ (uniqᵗ +ᵗ unitᵗ)
-  Tᴱ = uniqᵗ ×ᵗ (uniqᵗ ×ᵗ (unitᵗ +ᵗ (unitᵗ +ᵗ unitᵗ)))
-  x = plainᵗ u
-  inside : szᵗ x < szᵗ (machineEmitᵗ x)
-  inside = <-trans (s≤s (m≤m+n (szᵗ x) (szᵗ Rᴱ)))
-             (<-trans (s≤s (m≤n+m (szᵗ (x +ᵗ Rᴱ)) 1))
-               (<-trans ≤-refl (s≤s (m≤m+n (szᵗ (listᵗ (uniqᵗ +ᵗ (x +ᵗ Rᴱ)))) (szᵗ Tᴱ)))))
-
--- the two heads a partnered pop pops, their sources related
-pop-src : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-            {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-        → Storeʳ κ sP stP sI stI
-        → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-        → Σ (LiveSource Γ × LiveSource (plainᵏ Γ κ)) λ ll → Srcˢ κ (proj₁ ll) (proj₂ ll) × HeadOf (proj₁ ll) a × HeadOf (proj₂ ll) a′
-pop-src {κ = κ} {sP = sP} {sI = sI} s ex ex′
-  with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
-... | pop _ _ r h h′ _ _ _ _ = _ , r , h , h′
-
--- A DEFERRED HOP'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED WITH: its
--- arrival carries the body the hop's source was minted with, and the
--- hop's merge subscribes it, drawing the token in `deferBodyᵖ`'s `mintᵉ`
--- before anything else draws.
-hop-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                     {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-  → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)}
-  → ∀ {l : LiveSource Γ} {l′ : LiveSource (plainᵏ Γ κ)} → Srcˢ κ l l′ → HeadOf l′ a′
-  → ∀ {ℓ lo′ ℓ′ u nid nid′} {p : Path Γ ℓ u t} {h′ : lo′ ≤ ℓ′} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-  → echoᵗ u ≡ LiveSource.elemTy l
-  → (nid , nid′ ∷ []) ∈ Storeʳ.π S
-  → lookupNode nid′ (EvalSt.nodes stI) ≡ just (mergeAll-st {t = emitᵗ u} nothing 0 [] false)
-  → PathRel κ (Storeʳ.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-  → ∀ {p′} → _≡_ {A = Σ Ty (λ w → Path (plainᵏ Γ κ) lo′ w (emitᵗ t))} (arrTy a′ , p′) (echoᵗ (emitᵗ u) , (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q))
-  → ∀ {rid oI sI₁ stI₁}
-  → chainStep⇓ a′ (arrVal a′ ∷ []) false (lo′ , p′) sI
-      (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-hop-chain-stamps κ S {l = l} {l′} (data~ eq _ _) (_ , h′) {u = u} ety _ _ _ e _ =
-  ⊥-elim (script-not-hop u (trans (cong plainᵗ ety) (trans (sym eq) (trans (sym (head-elem l′ h′)) (cong proj₁ e)))))
-hop-chain-stamps κ S (defer~ _ []) (_ , ())
-hop-chain-stamps κ S (defer~ _ (hop (elab s w _) ∷ _)) (_ , refl) refl nn nI pr refl
-  (chain-step (fold-step (step-thru-outer (walk-cons (consume-all-sub {out = oW} L _ (inner refl (subs-mint refl B))) walk-nil)) fq))
-  with trans (sym nI) L | quiet-fold fq
-... | refl | rq , mq = tail-at (oW ++ []) (tail-at oW (hop-body-stamps κ S nn nI pr s w refl B) refl ≤-refl) rq mq
-hop-chain-stamps κ S (defer~ _ (hop _ ∷ _)) (_ , refl) refl _ _ _ refl
-  (chain-step (fold-step (step-thru-outer (walk-cons (consume-all-enqueue _ _) walk-nil)) fq))
-  = quiet-chain fq
-hop-chain-stamps κ S (defer~ _ (hop _ ∷ _)) (_ , refl) refl _ _ _ refl
-  (chain-step (fold-step (step-thru-outer (walk-cons (consume-all-nil _) walk-nil)) fq))
-  = quiet-chain fq
-sink-quiet : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} {i : Fin n} (hot : lookup κ i ≡ hotᵏ)
-             {ℓ} {h : ℓ ≤ toℕ (n ↑ʳ i)}
-           → QuietTail ei (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
-sink-quiet {Γ = Γ} κ {i = i} hot fq with disp-quiet (sink-at (hotEq {Γ = Γ} κ i hot) fq)
-... | refl = refl , ≤-refl
-
--- A CONNECTED HOT SLOT'S ONE CHAIN is its input block's, into the share
-hot-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                     {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-  → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-  → (hot : lookup κ i ≡ hotᵏ)
-  → ∀ {rid q ℓ full} {h : ℓ ≤ toℕ (n ↑ʳ i)}
-  → _≡_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (arrTy a′ , q)) (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full))
-  → InputBlock {Γ = Γ} κ (Storeʳ.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
-      (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
-  → ∀ {oI sI₁ stI₁}
-  → chainStep⇓ a′ (arrVal a′ ∷ []) false (suc (toℕ (i ↑ˡ n)) , q) sI
-      (record stI { delivered = rid ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-hot-chain-stamps κ S {a′ = a′@record { elemTy = _ ; payload = _ }} hot refl ib d =
-  block-chain-stamps κ S {a′ = a′} (hot-carry-stamps κ S {a′ = a′} hot) (sink-quiet κ hot) refl ib d
+  -- `make qc-same-clock`, tightened to this exact instant at every
+  -- arrival, decided 91 programs with no red, a planted `suc` reddening
+  -- 31 of 40: seed 24 at depth 3 (two-sync colds aimed), seed 25 at
+  -- depth 3 and seed 23 at depth 4 (both a flattener in every case).
+  -- Aimed at a merge's drain (flatten and takeWhile in every case, seed
+  -- 51 at depth 4, fuel 30) it agreed on 20 and failed none, 50 of them
+  -- grouping values, before the budget killed it with 55 undecided.
+  value-draws : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
+                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
+    → Storeʳ κ sP stP sI stI
+    → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
+    → ∀ {oI sI₁ stI₁}
+    → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
+    → readᴵ oI ≡ [] ⊎ counter (Sched.mint sI) sourceᵏ < counter (Sched.mint sI₁) sourceᵏ
 
 -- the two arrivals of a partnered pop are numbered as their sources are
 pop-kind : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
@@ -658,66 +402,6 @@ pop-kind {κ = κ} {sP = sP} {sI = sI} s ex ex′
 ... | pop {l = l} {l′ = l′} _ _ r (_ , h) (_ , h′) _ _ _ _ =
   subst₂ (SrcNum κ) (sym (head-source l h)) (sym (head-source l′ h′)) r
 
--- the plain pop a store partners an impl pop with
-plain-pop : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-              {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-          → Storeʳ κ sP stP sI stI
-          → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-          → Σ (Arrival Γ × List (LiveSource Γ)) λ p → schedGo (Sched.live sP) ≡ inj₂ p × Sync (proj₂ p) rs′
-plain-pop {Γ = Γ} {κ = κ} {sP = sP} {sI = sI} s {a′} {rs′} ex′ =
-  go refl (subst (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI) (schedGo (Sched.live sP))) ex′
-                 (sched-pop (Storeʳ.sync s) (Storeʳ.sources s)))
-  where
-  go : ∀ {x} → schedGo (Sched.live sP) ≡ x → Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI) x (inj₂ (a′ , rs′))
-     → Σ (Arrival Γ × List (LiveSource Γ)) λ p → schedGo (Sched.live sP) ≡ inj₂ p × Sync (proj₂ p) rs′
-  go e (pop _ _ _ _ _ _ _ sy _) = _ , e , sy
-
--- A MINTED SOURCE'S PARTNERED ROW: a cold script's input block, or a
--- deferred hop
-dyn-row-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                   {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-  → (S : Storeʳ κ sP stP sI stI) {a′ : Arrival (plainᵏ Γ κ)}
-  → ∀ {x rid lo p}
-  → RowRel κ (Storeʳ.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) x
-      (rid , atDyn (Arrival.source a′) lo , (arrTy a′ , p))
-  → ∀ {l : LiveSource Γ} {l′ : LiveSource (plainᵏ Γ κ)} → Srcˢ κ l l′ → HeadOf l′ a′ → proj₁ (proj₂ (proj₂ x)) ≡ LiveSource.elemTy l
-  → ∀ {rid₀ oI sI₁ stI₁}
-  → chainStep⇓ a′ (arrVal a′ ∷ []) false (lo , p) sI
-      (record stI { delivered = rid₀ ∷ EvalSt.delivered stI }) (oI , sI₁ , stI₁)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-dyn-row-stamps κ S {a′} (cold~ sp ib pr e) _ _ _ d = block-chain-stamps κ S {a′ = a′} (cold-carry-stamps κ S {a′ = a′} sp pr) quiet-fold e ib d
-dyn-row-stamps κ S {a′} (defer~ _ nn _ nI pr e) sr hd ety d = hop-chain-stamps κ S {a′ = a′} sr hd ety nn nI pr e d
-
--- A MINTED SOURCE'S ONE CHAIN STAMPS AT THE COUNTER IT ENTERED WITH, by
--- the row the popped store partners it with: a hot slot's pop is never
--- at a minted source
-dyn-chain-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                     {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
-  → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′) → n + n < Arrival.source a′
-  → ∀ {rid c} → chainsOf a′ stI ≡ (rid , c) ∷ []
-  → ∀ {o sI₁ stI₁}
-  → chainStep⇓ a′ (arrVal a′ ∷ []) false c (record sI { live = rs′ })
-      (record (cascadeOpen stI) { delivered = rid ∷ EvalSt.delivered (cascadeOpen stI) }) (o , sI₁ , stI₁)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ o)
-dyn-chain-stamps {n} κ e {stP = stP} {sI = sI} s {a′} ex′ big {rid} {lo , p} eq {o} {sI₁} d with plain-pop s ex′
-... | (a , _) , ex , sy = by (pop-kind s ex ex′) refl
-  where
-  s₀ = pop-store κ s ex ex′ sy
-
-  go : ∀ {cs} → Pointwise (λ c c′ → Partners κ _ _ _ _ _ (Storeʳ.rows s₀) (dynRow a c) (dynRow a′ c′)) cs ((rid , lo , p) ∷ [])
-     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ o)
-  go (pr ∷ []) with pop-src s ex ex′
-  ... | (l , _) , r , h , h′ = dyn-row-stamps κ s₀ (partner-row κ _ _ _ _ _ (Storeʳ.rows s₀) pr) r h′ (head-elem l (proj₂ h)) d
-
-  by : ∀ {x} → SrcNum κ (Arrival.source a) x → x ≡ Arrival.source a′
-     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ o)
-  by (slot~ i _) e =
-    ⊥-elim (<-irrefl refl (<-trans (subst (n + n <_) (sym e) big) (subst (_< n + n) (sym (toℕ-↑ˡ i n)) (<-≤-trans (toℕ<n i) (m≤m+n n n)))))
-  by (dyn~ na _) _ =
-    go (subst (Pointwise (λ c c′ → Partners κ _ _ _ _ _ (Storeʳ.rows s₀) (dynRow a c) (dynRow a′ c′)) (chainsOf a stP)) eq
-              (dyn-chains κ s ex ex′ na big s₀))
-
 -- an arrival has no more chains than rows at its source
 chains-count : ∀ {m} {Δ : Ctx m} {t} (a : Arrival Δ) (K : List (RegRow Δ t)) → length (chainsGo a K) ≤ srcCount (Arrival.source a) K
 chains-count a [] = z≤n
@@ -726,109 +410,12 @@ chains-count a ((rid , s , (u , p)) ∷ K) with sameSource (Arrival.source a) (r
 ... | true  | no _     = m≤n⇒m≤1+n (chains-count a K)
 ... | true  | yes refl = s≤s (chains-count a K)
 
--- A MINTED SOURCE'S VALUE PASS: its one chain's, or nothing
-dyn-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-               {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
-  → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′) → n + n < Arrival.source a′
-  → ∀ {oI sI₁ stI₁}
-  → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-dyn-stamps κ e {sI = sI} {stI = stI} s {a′} {rs′} ex′ q go = by (chainsOf a′ stI) refl go
-  where
-  two : ∀ {k} → suc (suc k) ≤ 1 → ⊥
-  two (s≤s ())
+-- no chain, nothing sent
+none-sent : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} {a vs fin chs sched} {st : EvalSt e} {r}
+          → length chs ≤ 0 → cascadeGo⇓ a vs fin chs sched st r → proj₁ r ≡ []
+none-sent {chs = []}    _  g = cong proj₁ (casc-empty g)
+none-sent {chs = _ ∷ _} () _
 
-  by : ∀ cs → chainsOf a′ stI ≡ cs → ∀ {r}
-     → cascadeGo⇓ a′ (arrVal a′ ∷ []) false cs (record sI { live = rs′ }) (cascadeOpen stI) r
-     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint (proj₁ (proj₂ r))) sourceᵏ) (readᴵ (proj₁ r))
-  by []                    _  casc-nil              = [] , inj₁ refl
-  by (_ ∷ [])              _  (casc-cut _ casc-nil) = [] , inj₁ refl
-  by ((rid , c) ∷ [])      eq (casc-live {emits = o} {sched₁ = s₁} _ d casc-nil) =
-    subst (λ z → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint s₁) sourceᵏ) (readᴵ z)) (sym (++-identityʳ o))
-          (dyn-chain-stamps κ e s ex′ q eq d)
-  by (_ ∷ _ ∷ _)           eq _ =
-    ⊥-elim (two (≤-trans (subst (λ l → length l ≤ srcCount (Arrival.source a′) (EvalSt.registry stI)) eq
-                                (chains-count a′ (EvalSt.registry stI)))
-                         (dyn-one κ e s ex′ q)))
-
--- a run that sends nothing stamps nothing
-at-idle : ∀ {m} {Γ′ : Ctx m} {t} {B : Set} {lo hi} {oI : Stream Γ′ (instEmitᵗ uniqᵗ t)} {x y : B}
-        → _≡_ {A = Stream Γ′ (instEmitᵗ uniqᵗ t) × B} (oI , x) ([] , y) → At lo hi (readᴵ oI)
-at-idle refl = [] , inj₁ refl
-
--- A HOT ARRIVAL'S VALUE PASS: nothing until its share has connected or
--- off the slot's type, then the one raw chain's
-hot-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-               {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-           → Storeʳ κ sP stP sI stI → {a′ : Arrival (plainᵏ Γ κ)} {i : Fin n}
-           → lookup κ i ≡ hotᵏ → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
-           → ∀ {oI sI₁ stI₁}
-           → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) sI stI (oI , sI₁ , stI₁)
-           → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-hot-stamps {n} {Γ} κ {sI = sI} {stI = stI} S {a′} {i} hk e₂ {oI} {sI₁} {stI₁} go with Storeʳ.census S i hk
-... | inj₂ (z₁ , _) =
-  at-idle (casc-empty (subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁))
-                             (raw-none a′ (EvalSt.registry stI) (subst (λ k → srcCount k (EvalSt.registry stI) ≡ 0) (sym e₂) z₁)) go))
-... | inj₁ (c , _) with raw-one {Γ = Γ} κ {CI = EvalSt.cancelled stI} e₂ (Storeʳ.rows S) (proj₂ (Storeʳ.above S)) (proj₂ (Storeʳ.uncut S)) c
-...   | raw-mistyped _ none =
-  at-idle (casc-empty (subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) none go))
-...   | raw-at hot ch d ib u _
-  with subst (λ c → cascadeGo⇓ a′ (arrVal a′ ∷ []) false c sI stI (oI , sI₁ , stI₁)) ch go
-...     | casc-cut y _ = ⊥-elim (t≢f (trans (sym y) u))
-...     | casc-live {emits = o} _ d′ casc-nil =
-  subst (λ o → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ o)) (sym (++-identityʳ o))
-        (hot-chain-stamps κ S hot d ib {oI = o} d′)
-
--- THE VALUE PASS'S EMITS CARRY THE INSTANT THE ARRIVAL'S BLOCK DRAWS,
--- which is the first source the pass draws: the counter where it
--- started, by the arrival's kind.
---
--- `make qc-same-clock`, tightened to this exact instant at every
--- arrival, decided 91 programs with no red, a planted `suc` reddening
--- 31 of 40: seed 24 at depth 3 (two-sync colds aimed), seed 25 at
--- depth 3 and seed 23 at depth 4 (both a flattener in every case).
--- The SUBSCRIBE's instant is not its counter: an `of` of two values
--- opens at 5 from a counter at 0.
-value-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                 {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
-  → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-  → ∀ {oI sI₁ stI₁}
-  → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
-  → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-value-stamps {n} κ e {sI = sI} s {a′} ex′ {oI} {sI₁} go with plain-pop s ex′
-... | (a , rs) , ex , sy = by (pop-kind s ex ex′) refl
-  where
-  by : ∀ {x x′} → SrcNum κ x x′ → x′ ≡ Arrival.source a′
-     → At (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI₁) sourceᵏ) (readᴵ oI)
-  by (slot~ i h) e₂ = hot-stamps κ (pop-store κ s ex ex′ sy) h (sym e₂) go
-  by (dyn~ _ q) refl = dyn-stamps κ e s ex′ q go
-
--- EACH ARRIVAL'S INSTANT IS DRAWN WHILE IT CASCADES: the value pass's
--- emits and the end pass's carry the one instant the value pass drew.
---
--- `make qc-same-clock` decides `OneIn` itself on each arrival's
--- impl values, counters read after the subscribe and after every
--- arrival: no red over a flattener in every case and a cold slot
--- bursting two sync values aimed, seed 24 at depth 3 (175 decided, 96
--- grouping values) and seed 23 at depth 4 (108 decided, 72 grouping).
--- A planted break of the one-instant conjunct goes red on 26 of 30.
--- And the instants a run draws are contiguous: no gap at depth 2
--- seeds 13..36 nor depth 3 seeds 1..11.
-cascade-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                   {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
-  → ∀ {a′ rs′} → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-  → ∀ {oI rI} → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , rI)
-  → OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint (proj₁ rI)) sourceᵏ) (readᴵ oI)
-cascade-stamps κ e {sI = sI} s ex (casc-run {a = a} {emits = oI} {sched′ = s₁} {st′ = t₁} _ go) =
-  subst (λ μ → OneIn (counter (Sched.mint sI) sourceᵏ) (counter μ sourceᵏ) (readᴵ oI)) (sym (finish-mint a s₁ t₁))
-        (at-oneIn (readᴵ oI) (value-stamps κ e s ex go))
-cascade-stamps κ e {sI = sI} s ex (casc-run-last {a = a} {emits = oI} {sched₁ = s₁} {ends = eI} {sched₂ = s₂} {st₂ = t₂} ll go end) =
-  subst₂ (λ μ ys → OneIn (counter (Sched.mint sI) sourceᵏ) (counter μ sourceᵏ) ys) (sym (finish-mint a s₂ t₂)) (sym (readᴵ-++ oI eI))
-         (at-oneIn (readᴵ oI ++ readᴵ eI)
-           (at-++ (readᴵ oI) (readᴵ eI) (value-stamps κ e s ex go) (go-mono end sourceᵏ) (end-stamps κ e s ex ll go end)))
 
 -- THE VALUE PASS OVER PAIRED CHAINS, one partnered chain at a time
 -- A RELATED VALUE AGREES: at data both are the same value, and `obs`
@@ -863,12 +450,14 @@ dyn-chain : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
       Pointwise (Paired (Storeʳ.rows s₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) a a′) chs chs′
     × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
     × Persists κ s s₁
+    × (fin ≡ false → Out (counter (Sched.mint sI) sourceᵏ) oI)
 dyn-chain {t = t} κ e s {a = a} {a′} hd ta pr ps soP soI dP dI =
   After.store A , Pointwise-map (λ {c} {c′} → After.keeps A {dynRow a c} {dynRow a′ c′}) ps , Pointwise-map (v-agrees κ t) (After.values A)
-  , (λ ar → After.persists A (delivered-arr ar))
+  , (λ ar → After.persists A (delivered-arr ar)) , proj₂ R
   where
-    A = row-pass κ (delivered s pr) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
+    R = row-pass κ (delivered s pr) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
           (sub-ot (λ r∈ → r∈) ≤-refl soP) (sub-ot (λ r∈ → r∈) ≤-refl soI) (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
+    A = proj₁ R
 
 pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
             {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
@@ -886,9 +475,12 @@ pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Σ (Storeʳ κ sP₁ stP₁ sI₁ stI₁) λ s₁ →
       Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
     × Persists κ s s₁
-pass-go κ e s hd ta [] _ _ _ _ casc-nil casc-nil = s , [] , (λ ar → ar)
+    × (fin ≡ false → length chs′ ≤ 1 → Out (counter (Sched.mint sI) sourceᵏ) oI)
+pass-go κ e s hd ta [] _ _ _ _ casc-nil casc-nil = s , [] , (λ ar → ar) , λ _ _ → []
 pass-go κ e s hd ta (inj₁ _ ∷ ps) hP aP hI aI (casc-cut _ g) (casc-cut _ g′) =
-  pass-go κ e s hd ta ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
+  proj₁ k , proj₁ (proj₂ k) , proj₁ (proj₂ (proj₂ k)) , λ f h → proj₂ (proj₂ (proj₂ k)) f (≤-trans (n≤1+n _) h)
+  where
+    k = pass-go κ e s hd ta ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
 pass-go κ e s hd ta (inj₁ (x , _) ∷ _) _ _ _ _ (casc-live y _ _) _ = ⊥-elim (t≢f (trans (sym x) y))
 pass-go κ e s hd ta (inj₁ (_ , x) ∷ _) _ _ _ _ (casc-cut _ _) (casc-live y _ _) = ⊥-elim (t≢f (trans (sym x) y))
 pass-go κ e s hd ta (inj₂ (x , _) ∷ _) _ _ _ _ (casc-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
@@ -896,11 +488,12 @@ pass-go κ e s hd ta (inj₂ (_ , x , _) ∷ _) _ _ _ _ (casc-live _ _ _) (casc-
 pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps) hP aP hI aI
         (casc-live {emits = eP} {rest = rP} _ st g) (casc-live {emits = eI} {rest = rI} _ st′ g′)
   with dyn-chain κ e s hd ta pr ps (hP (here refl)) (hI (here refl)) st st′
-... | s₁ , ps₁ , ag , q₁ =
+... | s₁ , ps₁ , ag , q₁ , ou =
   proj₁ k ,
   subst₂ (Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)) (sym (readᴵ-++ eI rI)) (sym (readᴾ-++ eP rP))
          (++⁺ ag (proj₁ (proj₂ k))) ,
-  (λ ar → proj₂ (proj₂ k) (q₁ ar))
+  (λ ar → proj₁ (proj₂ (proj₂ k)) (q₁ ar)) ,
+  λ { f (s≤s h) → out-++ eI rI (ou f) (out-quiet rI (cong readᴵ (none-sent h g′))) }
   where
     sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
     sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
@@ -923,10 +516,12 @@ dyn-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Σ (Storeʳ κ sP₁ stP₁ sI₁ stI₁) λ s₁ →
       Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
     × Arr s₁ (Arrival.source a) (Arrival.source a′) (arrTy a) (arrTy a′)
-dyn-pass κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy p q go go′
+    × Out (counter (Sched.mint sI) sourceᵏ) oI
+dyn-pass κ e {sP = sP} {sI = sI} {stI = stI} s {a} {a′} ex ex′ ta sy p q go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ pp =
-  proj₁ k , proj₁ (proj₂ k) , proj₂ (proj₂ k) (arr-pop κ s₀ (pp-popped κ pp))
+  proj₁ k , proj₁ (proj₂ k) , proj₁ (proj₂ (proj₂ k)) (arr-pop κ s₀ (pp-popped κ pp)) ,
+  proj₂ (proj₂ (proj₂ k)) refl (≤-trans (chains-count a′ (EvalSt.registry stI)) (dyn-one κ e s ex′ q))
   where
     s₀ = pop-store κ s ex ex′ sy
     opened : ∀ {chs chs′}
@@ -952,21 +547,24 @@ hot-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
   → Storeʳ κ sP₁ stP₁ sI₁ stI₁
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+  × Out (counter (Sched.mint sI) sourceᵏ) oI
 hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy i hk e₁ e₂ {oP = oP} go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
   with hot-start κ (pop-store κ s ex ex′ sy) {a} {a′} {i} hk src h h′ e₁ e₂ go′
-... | hot-start-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-more {emits = em} g walk-nil)) refl =
+... | hot-start-at {oB = oB} {εI = εI} {ty = ty} A c (ob , du) (disp (walk-more {emits = em} g walk-nil)) refl =
   After.store Z ,
   subst (λ z → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ z) (readᴾ oP))
-        (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z))
+        (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z)) ,
+  subst (Out _) (sym (cong (oB ++_) (++-identityʳ em))) (out-++ oB em ob (proj₂ F refl du))
   where
-    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
+    F = (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           go g)
+    Z = _⨾_ κ A (proj₁ F)
 ... | hot-idle none refl with casc-empty (subst (λ c → cascadeGo⇓ a _ false c _ _ _) none go)
-...   | refl = pop-store κ s ex ex′ sy , []
+...   | refl = pop-store κ s ex ex′ sy , [] , []
 
 -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
 -- HAVE, or one plain arrival's values delivered across two.  Either is
@@ -993,14 +591,17 @@ value-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
   → Storeʳ κ sP₁ stP₁ sI₁ stI₁
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
-value-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy {oP} {sP₁} {stP₁} {oI} {sI₁} {stI₁} go go′ =
+  × Out (counter (Sched.mint sI) sourceᵏ) oI
+value-pass {n} {Γ} {t} κ e {sI = sI} s {a} {a′} ex ex′ ta sy {oP} {sP₁} {stP₁} {oI} {sI₁} {stI₁} go go′ =
   by (pop-kind s ex ex′) refl refl
   where
     by : ∀ {x x′} → SrcNum κ x x′ → x ≡ Arrival.source a → x′ ≡ Arrival.source a′
        → Storeʳ κ sP₁ stP₁ sI₁ stI₁
        × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
+       × Out (counter (Sched.mint sI) sourceᵏ) oI
     by (slot~ i h) e₁ e₂ = hot-pass κ e s ex ex′ ta sy i h (sym e₁) (sym e₂) go go′
-    by (dyn~ p q) refl refl = proj₁ (dyn-pass κ e s ex ex′ ta sy p q go go′) , proj₁ (proj₂ (dyn-pass κ e s ex ex′ ta sy p q go go′))
+    by (dyn~ p q) refl refl =
+      let D = dyn-pass κ e s ex ex′ ta sy p q go go′ in proj₁ D , proj₁ (proj₂ D) , proj₂ (proj₂ (proj₂ D))
 
 -- THE END OF A HOT ARRIVAL: the source latched closed, its end walked
 -- over the chains the value pass left, and its registrations dropped.
@@ -1032,10 +633,10 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll�
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
     S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
-    Z = _⨾_ κ A (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
+    Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
-          end g)
+          end g))
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
 ...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd z₂) {a} {a′} {i}
                            e₁ e₂ ll ll′ (close-hit a′ stI₁ e₂) z₁ z₂ , []
@@ -1065,11 +666,11 @@ last-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁}
                   (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
        × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
     by (slot~ i h) e₁ e₂ = hot-end κ e s ex ex′ ta sy ll ll′ i h (sym e₁) (sym e₂) go go′ end end′
-    by (dyn~ p q) refl refl = finish-store {a = a} {a′ = a′} S₂ p q ll ll′ (proj₂ (proj₂ k) ca) , proj₁ (proj₂ k)
+    by (dyn~ p q) refl refl = finish-store {a = a} {a′ = a′} S₂ p q ll ll′ (proj₁ (proj₂ (proj₂ k)) ca) , proj₁ (proj₂ k)
       where
         W  = dyn-pass κ e s ex ex′ ta sy p q go go′
         S₁ = proj₁ W
-        ar₁ = proj₂ (proj₂ W)
+        ar₁ = proj₁ (proj₂ (proj₂ W))
         ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁
         Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁
         k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca)
@@ -1084,8 +685,19 @@ finish-run a s st eq with Arrival.isLast a
 finish-run a s st refl | false = refl
 finish-run a s st ()   | true
 
--- THE CASCADES OF ONE PARTNERED POP: both a value pass, or both a value
--- pass and an end, since the two arrivals are last together
+-- THE CASCADES OF ONE PARTNERED POP keep the stores related and send
+-- agreeing values under one instant the clock passes: both a value
+-- pass, or both a value pass and an end, since the two arrivals are last
+-- together.
+--
+-- `make qc-same-clock` decides `OneIn` itself on each arrival's
+-- impl values, counters read after the subscribe and after every
+-- arrival: no red over a flattener in every case and a cold slot
+-- bursting two sync values aimed, seed 24 at depth 3 (175 decided, 96
+-- grouping values) and seed 23 at depth 4 (108 decided, 72 grouping).
+-- A planted break of the one-instant conjunct goes red on 26 of 30.
+-- And the instants a run draws are contiguous: no gap at depth 2
+-- seeds 13..36 nor depth 3 seeds 1..11.
 --
 -- THE STORE CONJUNCT HOLDS ON EVERY POP A COMPILED SWEEP HAS DRAWN.
 -- `CLI.Store-Check` decides `Storeʳ` on both runs at every arrival
@@ -1097,6 +709,9 @@ finish-run a s st ()   | true
 -- held at every boundary, as did two aimed at arrivals carrying values
 -- (leaves on the scripted slot, two-arrival scripts; seed 21 at depth 4,
 -- 82 of 150 with such an arrival, seed 22 at depth 5, 51 of 80).
+-- Aimed at a merge's drain (flatten and takeWhile, seed 51 at depth 4,
+-- fuel 30) it held on 100: 25 cases draining a queue, 37 finishing an
+-- inner at a merge.
 cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
   → Storeʳ κ sP stP sI stI
@@ -1107,33 +722,24 @@ cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , rI)
   → Storeʳ κ (proj₁ rP) (proj₂ rP) (proj₁ rI) (proj₂ rI)
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
-cascade-kept κ e s {a} {a′} ex ex′ ta la sy (casc-run {sched′ = s₁} {st′ = t₁} nl go) (casc-run {sched′ = s₁′} {st′ = t₁′} nl′ go′)
-  rewrite finish-run a s₁ t₁ nl | finish-run a′ s₁′ t₁′ nl′ = value-pass κ e s ex ex′ ta sy go go′
+  × OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint (proj₁ rI)) sourceᵏ) (readᴵ oI)
+cascade-kept κ e s {a} {a′} ex ex′ ta la sy (casc-run {sched′ = s₁} {st′ = t₁} nl go) (casc-run {emits = oI} {sched′ = s₁′} {st′ = t₁′} nl′ go′)
+  rewrite finish-run a s₁ t₁ nl | finish-run a′ s₁′ t₁′ nl′ =
+  proj₁ VP , proj₁ (proj₂ VP) , at-oneIn (readᴵ oI) (proj₂ (proj₂ VP) , value-draws κ e s ex′ go′)
+  where VP = value-pass κ e s ex ex′ ta sy go go′
 cascade-kept κ e s ex ex′ ta la sy (casc-run nl _) (casc-run-last ll′ _ _) = ⊥-elim (t≢f (sym (trans (sym nl) (trans la ll′))))
 cascade-kept κ e s ex ex′ ta la sy (casc-run-last ll _ _) (casc-run nl′ _) = ⊥-elim (t≢f (trans (sym ll) (trans la nl′)))
-cascade-kept {Γ = Γ} {t} κ e s ex ex′ ta la sy (casc-run-last {emits = oP} {ends = eP} ll go end)
-                                           (casc-run-last {emits = oI} {ends = eI} ll′ go′ end′) =
+cascade-kept {Γ = Γ} {t} κ e {sI = sI} s ex ex′ ta la sy (casc-run-last {emits = oP} {ends = eP} ll go end)
+                                           (casc-run-last {a = a′} {emits = oI} {ends = eI} {sched₂ = s₂} {st₂ = t₂} ll′ go′ end′) =
   proj₁ k ,
   subst₂ (Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)) (sym (readᴵ-++ oI eI)) (sym (readᴾ-++ oP eP))
-         (++⁺ (proj₂ (value-pass κ e s ex ex′ ta sy go go′)) (proj₂ k))
-  where k = last-pass κ e s ex ex′ ta sy ll ll′ go go′ end end′
-
--- THE CASCADES OF ONE PARTNERED POP keep the stores related and send
--- agreeing values under one instant the clock passes
-cascade-pop : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
-                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
-  → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
-  → Arrival.tick a ≡ Arrival.tick a′ → Arrival.isLast a ≡ Arrival.isLast a′ → Sync rs rs′
-  → ∀ {oP sP′ stP′ oI sI′ stI′}
-  → cascade⇓ a (record sP { live = rs }) stP (oP , sP′ , stP′)
-  → cascade⇓ a′ (record sI { live = rs′ }) stI (oI , sI′ , stI′)
-  → Storeʳ κ sP′ stP′ sI′ stI′
-  × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
-  × OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint sI′) sourceᵏ) (readᴵ oI)
-cascade-pop κ e s ex ex′ ta la sy dP dI =
-  proj₁ k , proj₂ k , cascade-stamps κ e s ex′ dI
-  where k = cascade-kept κ e s ex ex′ ta la sy dP dI
+         (++⁺ (proj₁ (proj₂ VP)) (proj₂ k)) ,
+  subst₂ (λ μ ys → OneIn (counter (Sched.mint sI) sourceᵏ) (counter μ sourceᵏ) ys) (sym (finish-mint a′ s₂ t₂)) (sym (readᴵ-++ oI eI))
+         (at-oneIn (readᴵ oI ++ readᴵ eI)
+           (at-++ (readᴵ oI) (readᴵ eI) (proj₂ (proj₂ VP) , value-draws κ e s ex′ go′) (go-mono end′ sourceᵏ) (end-stamps κ e s ex′ ll′ go′ end′)))
+  where
+    VP = value-pass κ e s ex ex′ ta sy go go′
+    k = last-pass κ e s ex ex′ ta sy ll ll′ go go′ end end′
 
 -- a step reads the cascade the schedule's pop names, by any proof of it
 step-at : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (c : Conf e) {x} (eqn : sched-next (Conf.sched c) ≡ x)
@@ -1165,7 +771,7 @@ cascade-at κ e {c} {d} s {inj₂ (a , rs)} {inj₂ (a′ , rs′)} ex ex′ (po
   where
     eqn  = cong (schedFinish (Conf.sched c)) ex
     eqn′ = cong (schedFinish (Conf.sched d)) ex′
-    k = cascade-pop κ e (Storeˢ.raw s) ex ex′ ta la sy
+    k = cascade-kept κ e (Storeˢ.raw s) ex ex′ ta la sy
           (proj₁ (Σ⁰.snd⁰ (cascade! a (record (Conf.sched c) { live = rs }) (Conf.st c) (pop-rule eqn (Conf.ru c)))))
           (proj₁ (Σ⁰.snd⁰ (cascade! a′ (record (Conf.sched d) { live = rs′ }) (Conf.st d) (pop-rule eqn′ (Conf.ru d)))))
 

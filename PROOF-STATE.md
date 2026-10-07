@@ -258,14 +258,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **RIDE THE STAMPS ON THE PASSES.** `Walks` carries `Stamps`: where its
-  `PathRel` catches the frame, what the subscribe sends lands at the
-  catch and the restamp cells up to it are `Kept`. Give `Pass` the same
-  conjunct at the instant a pass carries, the installs' freshness and the
-  flatteners' seeds already in hand, so the stamp chains, the block
-  carries and `hop-body-stamps` become projections and the chain under
-  them is deleted. A shared read's connect, reaching rows off this path,
-  is the leaf that decides whether one catch per subscribe is the shape.
+- **RIDE THE STAMPS ON THE PASSES.** The value pass carries `Out` at the
+  counter its chain entered with, read off `block-open`, `hop-one`,
+  `hot-walk` and `slot-out`. Give `Pass` that conjunct itself, guarded by
+  `fin ≡ false`, threaded through `path-pass` and the arms with the
+  installs' freshness and the flatteners' seeds already in hand, so
+  `slot-out` and the leaves' `Out` halves become projections. A shared
+  read's connect, reaching rows off this path, is the leaf that decides
+  whether one catch per subscribe is the shape.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
@@ -313,10 +313,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   a cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped
-  head down, and the impl tail's end after it.
-- **`hop-{one,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a deferred
-  hop's merge subscribes the one popped emit's body on both sides, and its end
-  meets the plain hop's.
+  head down, then the impl tail's end; open, it sends at the chain's entry
+  instant.
+- **`hop-{one,end}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`: a deferred
+  hop's merge subscribes the one popped emit's body on both sides, sending at
+  the hop's token, and its end meets the plain hop's.
 - **`scan-write`** (Simulation.Scan) — FALSITY, `NO EVIDENCE`: a cell written
   on both sides keeps the stores and the tails related.
 - **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
@@ -327,22 +328,20 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   readers.
 - **`hot-walk`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: past a connected
   hot slot's flushed bracket, the block's merge subscribes the one stamp and
-  hands the share one emit carrying the value; the plain side does not move.
+  hands the share one emit carrying the value, delivered at the instant the
+  chain entered with; the plain side does not move.
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot; one hot script only, so no two compared.
-- **`hot-carry-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: one
-  delivery-kind emit at the drawn instant, folded out of a hot block's merge,
-  leaves every emit at that instant.
 - **`dyn-one`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
   source has at most one row in the impl's registry.
-- **`cold-carry-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
-  cold block's `PathRel` tail carries the drawn instant to every emit.
-- **`hop-body-stamps`** (Simulation.Statement) — FALSITY, `DEAD ROUTE`: a hop's
-  body, its token drawn in `deferBodyᵖ`'s `mintᵉ`, stamps every emit through
-  the hop's merge and tail at the token.
-- **`quiet-fold`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: any tail
-  handed nothing, no end, sends nothing and runs no clock back.
+- **`slot-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a share's
+  partnered reader handed emits each delivered at one instant, and no end,
+  sends at that instant.
+- **`value-draws`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
+  value pass that sends leaves its counter past the one it started at.
+- **`quiet-fold`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: any tail handed
+  nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
   pass's emits carry the instant its value pass drew.
 - **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY,

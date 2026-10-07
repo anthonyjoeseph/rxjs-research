@@ -4,24 +4,29 @@
 module Simulation.Arm where
 
 open import Data.Bool    using (Bool; false; true)
+open import Data.Empty   using (⊥)
 open import Data.List    using (List; []; _∷_; _++_; map)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᵃ)
 open import Data.Bool.ListAction using (any)
-open import Data.Nat     using (_≤_)
+open import Data.Nat     using (ℕ; _≤_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤)
 open import Data.Sum     using (_⊎_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import Rx.Prim      using (Tick)
-open import Rx.Exp       using (Ctx; Closed; Val; obs)
+open import Rx.Prim      using (Tick; EmitKind; subscribe; delivery; plumbing)
+open import Rx.Exp       using (Ctx; Closed; Val; obs; uniqᵗ)
+open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Path; Frame; _↠[_]_; thru-outer; mergeAllᵒ; lookupNode; AllOp; from-inner; aliveThroughᶠ)
 open import Rx.Evaluator.Domain using (foldPath⇓; stepFrame⇓; thruConsume⇓)
 open import Rx.Evaluator.Reducible.Support using (Sound; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; endOf; ∨-Tʳ)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Stores using (EmitRel; Lifts; PathRel; Store)
-open import Simulation.After using (module Kept)
+open import SExp.InstEmit using (instEmitᵗ)
+open import Simulation.Stores using (EmitRel; Lifts; PathRel; Store; stampOf)
+open import Simulation.After using (module Kept; readᴵ; readᴵ-++)
 
 -- a node a run left as it found it
 data Unmoved {n} {Γ : Ctx n} (k : NodeId) (N′ N : List (NodeId × NodeState Γ)) : Set where
@@ -48,6 +53,26 @@ postulate
   fold-unmoved : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t} {k now vals fin sched st r}
                → foldPath⇓ {e = e} now κ vals fin sched st r → Clear k κ sched st
                → lookupNode k (EvalSt.nodes (proj₂ (proj₂ r))) ≡ lookupNode k (EvalSt.nodes st)
+
+-- A TAIL HANDED NOTHING, AND NO END, SENDS NOTHING and runs no clock back
+QuietTail : ∀ {m} {Δ : Ctx m} {t} (e : Closed Δ (instEmitᵗ uniqᵗ t)) {ℓ u} → Path Δ ℓ u (instEmitᵗ uniqᵗ t) → Set
+QuietTail e q = ∀ {now sched st o sched′ st′} → foldPath⇓ {e = e} now q [] false sched st (o , sched′ , st′)
+              → readᴵ o ≡ [] × counter (Sched.mint sched) sourceᵏ ≤ counter (Sched.mint sched′) sourceᵏ
+
+postulate
+  -- ANY TAIL IS QUIET HANDED NOTHING.
+  quiet-fold : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ (instEmitᵗ uniqᵗ t)} {ℓ u} {q : Path Δ ℓ u (instEmitᵗ uniqᵗ t)} → QuietTail e q
+
+-- WHAT A RUN SENDS AT ONE INSTANT: every value it puts out read at `I`
+Out : ∀ {m} {Δ : Ctx m} {t} → ℕ → Stream Δ (instEmitᵗ uniqᵗ t) → Set
+Out I o = All (λ y → proj₁ y ≡ I) (readᴵ o)
+
+out-++ : ∀ {m} {Δ : Ctx m} {t} {I} (xs ys : Stream Δ (instEmitᵗ uniqᵗ t)) → Out I xs → Out I ys → Out I (xs ++ ys)
+out-++ {I = I} xs ys a b = subst (All (λ y → proj₁ y ≡ I)) (sym (readᴵ-++ xs ys)) (++⁺ᵃ a b)
+
+-- a quiet run is at every instant
+out-quiet : ∀ {m} {Δ : Ctx m} {t} {I} (o : Stream Δ (instEmitᵗ uniqᵗ t)) → readᴵ o ≡ [] → Out I o
+out-quiet {I = I} o e = subst (All (λ y → proj₁ y ≡ I)) (sym e) []
 
 -- so a fold misses it
 missed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t} {k now vals fin sched st r}
@@ -141,6 +166,16 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
   one-lift : ∀ {s u} {G′ : Val (plainᵏ Γ κ) (emitᵗ s) → Val (plainᵏ Γ κ) (emitᵗ u)} {f : Val Γ s → Val Γ u}
            → Lifts κ s u G′ (map f) → ∀ e′ {w} → EmitRel κ s e′ (w ∷ []) → EmitRel κ u (G′ e′) (f w ∷ [])
   one-lift L e′ {w} r = proj₁ (L e′ (w ∷ []) r)
+
+  -- AN EMIT DELIVERED AT `I`: any kind but a subscribe's, which the
+  -- frame it lands at restamps
+  Del : ℕ → ℕ × EmitKind → Set
+  Del I (_ , subscribe) = ⊥
+  Del I (i , delivery)  = i ≡ I
+  Del I (i , plumbing)  = i ≡ I
+
+  DelAt : ∀ {s} → ℕ → Val (plainᵏ Γ κ) (emitᵗ s) → Set
+  DelAt {s} I e′ = Del I (stampOf {Γ = Γ} κ {s} e′)
 
   carries-map : ∀ {s u} {G′ : Val (plainᵏ Γ κ) (emitᵗ s) → Val (plainᵏ Γ κ) (emitᵗ u)} {f : Val Γ s → Val Γ u}
               → Lifts κ s u G′ (map f) → ∀ {es vs} → Carries es vs → Carries (map G′ es) (map f vs)

@@ -498,7 +498,7 @@ clockedᵇ lo (r ∷ rs) (hi ∷ hs) = oneInᵇ lo hi r ∧ clockedᵇ hi rs hs
 clockedᵇ lo _        _         = true
 
 -- AN ARRIVAL'S INSTANT IS EXACTLY THE COUNTER IT ENTERED WITH, which
--- `value-stamps` and `end-stamps` claim and `OneIn` does not.  Not the
+-- `value-pass`, `value-draws` and `end-stamps` claim and `OneIn` does not.  Not the
 -- subscribe's: its burst draws other sources before its frame's token.
 exactᵇ : {A : Set} → ℕ → ℕ → List (ℕ × A) → Bool
 exactᵇ lo hi []            = true
