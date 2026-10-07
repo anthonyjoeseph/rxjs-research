@@ -250,21 +250,22 @@ emptying named merges; a hot end past its block; a two-value emit; a cut
 over a testless budget; a flatten write moving a row; a cut,
 liveness, drain or body end unpairing; unsound walks, reads;
 two stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain
-past a valueless cut; a hop's script.
+past a valueless cut; a hop's script; root stamps
+off the walk.
 Left: a cascade.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **RIDE THE STAMPS ON THE VALUES WALK.** A stamp leaf split at a frame
-  owes a tail claim over every state the subscribe folds at, and only the
-  values walk relates those. `Store` gains the cascade's instant, `After`
-  its outputs at it, and `Walks` a catch over its `PathRel` derivation,
-  read at the node map it is indexed by: each restamp cell's instant and
-  kind say whether a subscribe-kind emit at the walk's frame lands at the
-  instant (`Lifts` owing the kind kept). The stamp chains, the block
-  carries, `hop-body-stamps` and `subscribe-stamps` become projections.
+- **RIDE THE STAMPS ON THE PASSES.** `Walks` carries `Stamps`: where its
+  `PathRel` catches the frame, what the subscribe sends lands at the
+  catch and the restamp cells up to it are `Kept`. Give `Pass` the same
+  conjunct at the instant a pass carries, the installs' freshness and the
+  flatteners' seeds already in hand, so the stamp chains, the block
+  carries and `hop-body-stamps` become projections and the chain under
+  them is deleted. A shared read's connect, reaching rows off this path,
+  is the leaf that decides whether one catch per subscribe is the shape.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
@@ -344,6 +345,16 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   handed nothing, no end, sends nothing and runs no clock back.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
   pass's emits carry the instant its value pass drew.
+- **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY,
+  `NO EVIDENCE`: a slot read's subscribe sends only at its path's catch of the
+  program's frame and keeps the restamp cells up to it; a shared read's connect
+  reaches every row on the share's subject.
+- **`of-fold-stamps`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a group at
+  one frame folded down the path lands at the path's catch of it, the restamp
+  cells up to the catch kept.
+- **`of-emits`** (Simulation.Walk) — FALSITY, `PROBED`: an `of`'s emits stand
+  at its program's frame, subscribe-kind; held at the root and under a value
+  binder, not under a mint's binder.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
   `PROBED×2, RECOVERY`: a slot's plain subscribe against the impl's at its
   stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the
@@ -367,9 +378,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; one hot script only, so no rank compared.
-- **`subscribe-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: the root
-  subscribes send under one instant below the clock; holds at an `of` of one
-  and two values. A cold read's decode is past the typechecker.
 - **`lifts-scan`** (Simulation.Walk) — DIFFICULTY, `PROBED`: the elaborated
   scan's step and seed read the author's variables past the mint's binder; held
   at one payload, two past the typechecker.
@@ -400,6 +408,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`go-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: one cascade pass
   never runs a mint counter back.
 - **`cascade-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
+  never runs a mint counter back.
+- **`subscribe-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a subscribe
   never runs a mint counter back.
 - **`cascade-latched`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
   never unlatches a completed source.

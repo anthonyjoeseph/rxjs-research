@@ -92,7 +92,7 @@ open import Simulation.Close using (close-store; close-arr)
 open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit)
 open import Simulation.Sweep using (T-true; t≢f)
 open import Simulation.Pop using (pop-store; pp-popped)
-open import Simulation.Walk using (root-walk)
+open import Simulation.Walk using (root-walk; minted)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; module Kept)
 open Kept using (After; module After; Persists; _⨾_)
 open import Simulation.Pass using (row-pass; fan-go; hot-start-at; hot-idle; hot-end-at; hot-end-idle; batch-flush; sink-at; disp-quiet)
@@ -233,6 +233,16 @@ postulate
                    ({-@0-}ru : Rule sched st) (k : MintKey)
                → counter (Sched.mint sched) k ≤ counter (Sched.mint (proj₁ (proj₂ (Σ⁰.fst⁰ (cascade! a sched st ru))))) k
 
+  -- NOR DOES A SUBSCRIBE, `cascade-mono` at the subscribe a cascade
+  -- opens with.
+  --
+  -- TWIN: `Rx.Evaluator.Keeps`, whose `subscribeE-keeps` family walks
+  --   every relation a subscribe reaches, each clause reflexivity or one
+  --   step, which is this family's shape at a counter.
+  subscribe-mono : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} {lo u} {x : Val Γ′ (obs u)} {p : Path Γ′ lo u t} {now sched st r}
+                 → subscribeE⇓ {e = e} x p now sched st r → ∀ k
+                 → counter (Sched.mint sched) k ≤ counter (Sched.mint (proj₁ (proj₂ r))) k
+
   -- NOR UNLATCHES A SOURCE.  Every edge of the evaluator leaves the
   -- completion latch alone or conses one source onto it.
   --
@@ -284,18 +294,18 @@ record Machines {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (in
     step-stamps : ∀ {c d} → Store c d → Popped Src (live c) (live d) (schedGo (live c)) (schedGo (live d))
                 → OneIn (clockᴵ d) (clockᴵ (next d)) (readᴵ (out d))
 
-postulate
-  -- WHAT THE ROOT SUBSCRIBES SEND CARRIES ONE INSTANT, drawn below the
-  -- clock they leave: the root frame's own token.  Decoding what the
-  -- impl's subscribe sends through an input block exhausted memory at a
-  -- one-value cold script, so a cold read's stamps are the compiled
-  -- sweep's, deciding `simulation`.
-  -- PROBED: `Probed.Opening` -- an `of` of one value and of two, so the
-  --   list is not empty and the shared instant is compared.  No cold
-  --   script, no flattener, nothing sent below a `defer`.
-  subscribe-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
-    → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
-              (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
+-- a list at one instant drawn below `hi` is in one
+at-frame : ∀ {A : Set} {i hi} {xs : List (Id × A)} → All (λ y → proj₁ y ≡ i) xs → suc i ≤ hi → OneIn 0 hi xs
+at-frame []          _  = tt
+at-frame (refl ∷ as) lt = z≤n , lt , as
+
+-- WHAT THE ROOT SUBSCRIBES SEND CARRIES ONE INSTANT, drawn below the
+-- clock they leave: the root frame's own token, which the walk catches
+-- at the root, and which the subscribe after the mint never runs back.
+subscribe-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+  → OneIn 0 (clockᴵ (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+            (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
+subscribe-stamps κ e ins = at-frame (proj₂ (proj₂ (root-walk κ e ins))) (subscribe-mono (proj₂ (proj₂ (minted κ e ins))) sourceᵏ)
 
 
 -- EVERY EMIT AT EXACTLY `lo`, the counter where its cascade started,
@@ -1183,7 +1193,7 @@ subscribe-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [
 subscribe-related {t = t} κ e ins =
     Storeʳ.sync (proj₁ (root-walk κ e ins))
   , stores (proj₁ (root-walk κ e ins))
-  , Pointwise-map (v-agrees κ t) (proj₂ (root-walk κ e ins))
+  , Pointwise-map (v-agrees κ t) (proj₁ (proj₂ (root-walk κ e ins)))
   , subscribe-stamps κ e ins
 
 -- THE MACHINES ARE RELATED BY `Simulation.Stores`: a live source by its

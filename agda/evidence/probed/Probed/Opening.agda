@@ -1,27 +1,25 @@
 -- WHAT THE ROOT SUBSCRIBES OPEN WITH AND SEND, outside the stores: the
 -- sources and schedules live before anything is subscribed, and the
--- instants of what the subscribes send, at concrete programs.
+-- instants an `of`'s emits carry, at concrete programs.
 -- TARGET: init-sources @8b0228
 -- TARGET: init-sync @75c849
--- TARGET: subscribe-stamps @57c779
+-- TARGET: of-emits @5de96e
 module Probed.Opening where
 
 open import Data.List using ([]; _∷_)
 open import Data.Product using (_,_)
 open import Data.Fin using (zero; suc)
-open import Data.Nat using (z≤n; _<?_)
-open import Data.Unit using (tt)
-open import Relation.Nullary.Decidable using (toWitness)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
-open import Rx.Prim using (hot; after_,_)
-open import SExp.Syntax using (ofˢ; natˢ; emptyˢ)
+open import Rx.Prim using (after_,_)
+open import SExp.Syntax using (natˢ)
+open import Rx.Exp using (natᵗ; []ᵉ; _∷ᵉ_)
+open import CLI.Unit-Test.Prelude using (Γ₂)
 open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Simulation.Statement using (subscribe-stamps)
 open import Simulation.Schedules using ([]; _∷_)
 open import Simulation.Stores using (data~)
-open import Simulation.Walk using (init-sources; init-sync)
+open import Simulation.Walk using (init-sources; init-sync; of-emits)
 open import Probed.Apparatus using (Confirms; Point; κᵖ; insᵖ; two-arrivals)
 
 -- LOAD-BEARING: a hot script live before the subscribe, two payloads
@@ -34,19 +32,13 @@ _ = data~ refl (refl ∷ refl ∷ []) (λ { zero refl → refl ; (suc zero) () }
 _ : Confirms (init-sync (κᵖ two-arrivals) (Point.prog two-arrivals) (insᵖ two-arrivals))
 _ = (refl , []) ∷ []
 
--- LOAD-BEARING: an `of` sends at subscribe, so the list is not empty and
--- `OneIn` is not ⊤; fails if the value's instant is not below the clock
--- the subscribe leaves
-of-one : Point
-of-one = record { d₀ = hot ((after 1 , 5) ∷ []) ; prog = ofˢ (natˢ 3 ∷ []) ; d₁ = emptyˢ }
+-- LOAD-BEARING: two values at the root, the frame 7 and the `of`'s own
+-- source 9 apart; fails if an emit carries the source, or any instant
+-- but the frame, or is not subscribe-kind
+_ : Confirms (of-emits {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} (natˢ 3 ∷ natˢ 4 ∷ []) (λ x → x) {ρ′ = 7 ∷ᵉ []ᵉ} refl 9)
+_ = refl ∷ refl ∷ []
 
-_ : Confirms (subscribe-stamps (κᵖ of-one) (Point.prog of-one) (insᵖ of-one))
-_ = z≤n , toWitness {a? = _ <? _} tt , []
-
--- LOAD-BEARING: two values sent by one subscribe; fails if the second
--- carries an instant of its own
-of-two : Point
-of-two = record { d₀ = hot ((after 1 , 5) ∷ []) ; prog = ofˢ (natˢ 3 ∷ natˢ 4 ∷ []) ; d₁ = emptyˢ }
-
-_ : Confirms (subscribe-stamps (κᵖ of-two) (Point.prog of-two) (insᵖ of-two))
-_ = z≤n , toWitness {a? = _ <? _} tt , refl ∷ []
+-- LOAD-BEARING: under one value binder, the frame read past the value
+-- 5; fails if the frame is read at the binder's slot
+_ : Confirms (of-emits {Γ = Γ₂} (κᵖ two-arrivals) {Θ = natᵗ ∷ []} (natˢ 3 ∷ []) (λ x → x) {ρ′ = 5 ∷ᵉ 7 ∷ᵉ []ᵉ} refl 9)
+_ = refl ∷ []

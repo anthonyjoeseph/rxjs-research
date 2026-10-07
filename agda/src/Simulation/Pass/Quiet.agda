@@ -485,7 +485,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       proj₁ B , only {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} (Store.π-keys (After.store (proj₁ B))) (After.grows (proj₁ B) pm) (proj₂ (proj₁ L)) , proj₂ (proj₂ L)
       where
       B = walk κ s w r S (inner~ refl f ip pr) oP oI dP dI
-      L = leave {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} op (proj₂ B)
+      L = leave {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} op (proj₁ (proj₂ B))
 
     postulate
       -- AN ECHO THROUGH THE RESTAMP: the scan's cell restamps it and
