@@ -1051,20 +1051,34 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                            (thru-outer a m′ ↠[ h₄ ]
                             (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
                              (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
-      quiet-explode {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {stP = stP} S (outerExplode~ {op = op} fl r) b refl sp si
-                    (fold-step step-map (fold-step step-map (fold-step dW@(step-thru-outer W) (fold-step dW′@(step-thru-outer walk-nil)
-                      (fold-step d₁ (fold-step step-map dq))))))
-        with explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} (unthru sp) (unthru (drop-ot _ _ _ (drop-ot _ _ _ si))) fl r b W
-      ... | X , fl′ , r′ with restamp-echo (After.store X) fl′ r′ [] d₁
-      ... | A , f′ , r″ , c′ , refl , _ with quiet-pass (After.store A) r″ c′ refl (proj₂ (unthru sp))
-                                  (proj₂ (proj₁ (tail-of (step-clear d₁ (unthru (step-kept _ dW′ (drop-ot _ _ _ (step-kept _ dW (drop-ot _ _ _ (drop-ot _ _ _ si)))))))))) dq
-      ... | B , rel =
-        X ⨾ (A ⨾ B) ,
-        outerExplode~ (flat-move (EvalSt.nodes stP) _ (EvalSt.nodes stP) _ (After.grows B) (unmoved refl)
-                        (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′)
-                      rel
-        where
-        cI = tail-of (step-clear d₁ (unthru (step-kept _ dW′ (drop-ot _ _ _ (step-kept _ dW (drop-ot _ _ _ (drop-ot _ _ _ si)))))))
+      quiet-explode {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} S (outerExplode~ {op = op} fl r) b refl sp si
+                    (fold-step step-map (fold-step step-map (fold-step dW@(step-thru-outer W) dR))) =
+        let si′ = drop-ot _ _ _ (drop-ot _ _ _ si)
+            X   = explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} (unthru sp) (unthru si′) fl r b W
+            T   = explode-tail (After.store (proj₁ X)) {op = op} (proj₂ (unthru sp)) (drop-ot _ _ _ (step-kept _ dW si′))
+                               (proj₁ (proj₂ X)) (proj₂ (proj₂ X)) dR
+        in proj₁ X ⨾ proj₁ T , outerExplode~ (proj₁ (proj₂ T)) (proj₂ (proj₂ T))
+
+      -- THE EXPLODED OUTER'S TAIL, handed the walk's empty group: the
+      -- flattener steps over it and the restamp echoes nothing
+      explode-tail : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂}
+                       {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {rI}
+                   → Sound p sP stP → Sound (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+                   → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                   → foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) [] false sI stI rI
+                   → Σ (After S ([] , sP , stP) rI) λ A
+                       → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                           u op m m′ ks (mX ∷ [])
+                         × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+      explode-tail {stP = stP} S sp si fl r (fold-step dW@(step-thru-outer walk-nil) (fold-step d₁ (fold-step step-map dq))) =
+        let cI = tail-of (step-clear d₁ (unthru (step-kept _ dW si)))
+            (A , f′ , r′ , c′ , e′ , _) = restamp-echo S fl r [] d₁
+            B  = quiet-pass (After.store A) r′ c′ e′ sp (proj₂ (proj₁ cI)) dq
+        in A ⨾ proj₁ B ,
+           flat-move (EvalSt.nodes stP) _ (EvalSt.nodes stP) _ (After.grows (proj₁ B)) (unmoved refl)
+                     (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′ ,
+           proj₂ B
 
       -- THE EXPLODED OUTER'S WALK, every emit carrying nothing
       explode-none : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
