@@ -24,13 +24,12 @@ open import Data.Bool    using (Bool; T; true; false; _∨_)
 open import Data.Bool.ListAction using (any)
 open import Data.Unit    using (tt)
 open import Rx.Evaluator.Reducible.Support using (fresh-path)
-open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_; s≤s; _≡ᵇ_)
+open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_; s<s⁻¹; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (Acc; acc)
-open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsize-unfoldμ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat.Properties using (<-trans; n<1+n; n≤1+n; m≤n+m; ≤-trans; ≤-reflexive; ≤-refl; <⇒<ᵇ; <⇒≢; 1+n≢n)
+open import Data.Nat.Properties using (<-trans; n<1+n; n≤1+n; ≤-trans; ≤-reflexive; ≤-refl; <⇒<ᵇ; <⇒≢; 1+n≢n; m<n⇒m<1+n)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ; _∷_ to _∷ᵖ_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -40,7 +39,9 @@ open import Data.Maybe using (just; nothing)
 
 open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import Rx.Exp       using (Ctx; Val; Env; Closed; Exp; unfoldμ; obs; ofᵉ; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ; unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ; varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
+open import Rx.Exp       using (Ctx; Val; Closed; Exp; unfoldμ; ofᵉ; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ;
+  unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ;
+  varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
   Frame; frameNodes; mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
@@ -48,7 +49,7 @@ open import Rx.Slots     using (Slots; scripted; shared)
 open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; subs-μ; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
-open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule; Sound; sound; fresh-sound; push-sound; sub-ot; node-eq)
+open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule; Sound; sound; fresh-sound; push-sound; sub-ot; node-eq; sub-rule)
 open import Data.Fin     using (Fin; _↑ʳ_)
 open import Data.Vec     using (lookup)
 open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ;
@@ -66,9 +67,12 @@ open import Simulation.Write using (apart)
 open import Simulation.Install using (install; fresh-set)
 open import Simulation.Catch using (Kept; Stamps; AtFrame; OnPath; on-path; catch-same; kept-same; kept-trans; kept-catch;
   kept-unmoved; unmoved-set; by-sub; by-sub⁻)
-open Kept using (After; module After; _⨾_)
+open Kept using (After; module After; _⨾_; after)
+open import Simulation.Walks using (module Walkers)
+open import Simulation.Size using (sz-subscribeE; sz-foldPath; sz-1)
+open import Simulation.Pass.Path using (module PassP)
 open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
-  spentWhile~; FlatNodes; merge~; switch~; exhaust~; outerElem~; outerExplode~; Store; Src;
+  spentWhile~; FlatNodes; merge~; switch~; exhaust~; outerElem~; outerExplode~; Store; Src; Arr;
   SrcNum; [])
 
 
@@ -184,10 +188,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ using (Carries)
 
-  -- THE FRAME A FORMER'S ELABORATION STAMPS ITS SUBSCRIBE WITH, read
-  -- through the renaming it was closed under
-  frameAt : ∀ {Θ Θ′} → Ren∈ (plainᶜ⁺ Θ) Θ′ → Env (plainᵏ Γ κ) Θ′ → ℕ
-  frameAt {Θ} w ρ′ = evalWith (renTm (λ x → x) (λ x → x) w (frameᵛ {Γ = plainᵏ Γ κ} {[]} {[]} Θ)) ρ′
+  open Walkers κ using (frameAt; Walker)
 
   postulate
     -- AN `of`'S EMITS STAND AT ITS PROGRAM'S FRAME, subscribe-kind
@@ -201,26 +202,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
-    -- WHAT ONE SUBSCRIBE KEEPS: what a pass keeps, from related stores
-    -- and related sound paths, and the paths related again after; and
-    -- what it sends lands where its path catches its frame `f`.
-    Walks : ∀ {u} → ℕ → Val (plainᵏ Γ κ) (obs (emitᵗ u)) → Val Γ (obs u) → Set
-    Walks {u} f x′ x =
-      ∀ {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
-        {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
-      → (S : Store κ sP stP sI stI)
-      → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)
-      → Sound p sP stP → Sound q sI stI
-      → subscribeE⇓ {e = ep} x p now sP stP rP → subscribeE⇓ {e = ei} x′ q now sI stI rI
-      → Σ (After κ S rP rI) λ A
-          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-          × Stamps κ f pr stI rI
-
-    -- the walk at one former, over any related environment
-    Elab-Walks : ∀ {Θ u} → SExp Γ [] [] Θ u → Set
-    Elab-Walks {Θ} s =
-      ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
-      → Walks (frameAt w ρ′) (Θ′ , renExp (λ x → x) (λ x → x) w (toInstEmit κ s) , ρ′) (Θ , plainExp s , ρ)
+    open Walkers.On κ ep ei using (Walks; Walks<; Elab-Walks; Elab-Walks<)
+    open PassP.InP {Γ = Γ} κ {t} {ep} {ei} using (path-pass)
 
     -- A READ OF A SLOT THE IMPL STAMPED: both subscribes at the slot, the
     -- impl's down the restamp.  `Sound` of both paths for the reason
@@ -389,34 +372,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       of-carries     : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                      → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
                      → ∀ src → Carries {u} (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L) (map (λ tm → evalWith tm ρ) (plainTms ts))
-      -- THE GROUP FOLDED DOWN RELATED PATHS, ENDED, the impl's under its
-      -- new source.  A body is `path-pass`, and `walk` would join its
-      -- cycle through `inner-walk`, terminating on the plain derivation,
-      -- so its helpers would call it rather than take it.  The cycle is
-      -- genuine: an `of` under a flattener's outer folds its inners into
-      -- the consume, which walks them.  The new source moves only
-      -- `Store.bounded`, which a larger counter keeps.
-      --
-      -- `Sound` OF BOTH PATHS, AS `Pass` CARRIES IT: without it a related
-      -- path may pass one merge twice, and a lane subscribed through it
-      -- registers a row `Rule.distinct-rows` refuses.
-      -- REFUTED: `Refuted.Of-Fold-Sound` -- a path through one merge as
-      --   outer and as its own lane, one emit carrying one lane.
-      -- DEAD ROUTE: `Sound` from `Store` and `PathRel`.  The store holds
-      --   the rule and `π`'s keys below the counter, which gives a
-      --   pinned node's freshness, but neither record says where a
-      --   path's nodes' rows end, nor that its nodes are distinct.
-      of-fold       : ∀ {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
-                         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI src es vs}
-                     → (S : Store κ sP stP sI stI)
-                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                     → Sound p sP stP → Sound q sI stI
-                     → freshId sourceᵏ (Sched.mint sI) ≡ src
-                     → Carries {u} es vs
-                     → foldPath⇓ now p vs true sP stP rP
-                     → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
-                     → Σ (After κ S rP rI) λ A
-                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
       -- WHERE A GROUP AT ONE FRAME LANDS, folded down the path: below the
       -- catch every restamp cell is subscribe-kind and hands the group
       -- its own instant, and the catch's cell hands the group the catch
@@ -638,16 +593,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- a takeWhile's walk, at its elaboration's shape: the plain test
     -- installed, the impl's source minted and its test and cell installed,
     -- and the body walked under them
-    walk-while : ∀ {Θ s} (f : SFn Γ [] [] Θ s boolᵗ) (b : SExp Γ [] [] Θ s) → Elab-Walks b
+    walk-while : ∀ {M Θ s} (f : SFn Γ [] [] Θ s boolᵗ) (b : SExp Γ [] [] Θ s) → Elab-Walks< M b
                → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                → ∀ {F : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
                    {i : Tm (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s)} {e″ : Exp (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (emitᵗ s)}
                → renExp (λ x → x) (λ x → x) w (toInstEmit κ (takeWhileˢ f b)) ≡ mintᵉ (mapᵉ cutOutᵛ (takeWhileᵉ cutOpenᵛ (scanᵉ F i e″)))
                → e″ ≡ renExp (λ x → x) (λ x → x) (λ y → there (w y)) (toInstEmit κ b)
                → (∀ ρ″ → proj₁ (proj₂ (evalWith i ρ″)) ≡ false)
-               → Walks (frameAt w ρ′) (Θ′ , mintᵉ (mapᵉ cutOutᵛ (takeWhileᵉ cutOpenᵛ (scanᵉ F i e″))) , ρ′) (Θ , plainExp (takeWhileˢ f b) , ρ)
+               → Walks< (suc M) (frameAt w ρ′) (Θ′ , mintᵉ (mapᵉ cutOutᵛ (takeWhileᵉ cutOpenᵛ (scanᵉ F i e″))) , ρ′) (Θ , plainExp (takeWhileˢ f b) , ρ)
     walk-while f b wb w {ρ′} {ρ} r {F} {i} {e″} eq fu op {q = q} {stP = stP} {stI = stI} S pr oP oI (subs-takeWhile {nid = k} frP dP)
-      (subs-mint {src = src} frS (subs-map (subs-takeWhile {nid = k₂} fr₂ (subs-scan {nid = k₁} fr₁ dI)))) =
+      (subs-mint {src = src} frS (subs-map (subs-takeWhile {nid = k₂} fr₂ (subs-scan {nid = k₁} fr₁ dI)))) lt =
       let I = while-install S (evalWith i (src ∷ᵉ ρ′)) pr frP frS fr₂ fr₁
           N₂ = setNode k₂ (take-st 1) (EvalSt.nodes stI)
           v  = evalWith i (src ∷ᵉ ρ′)
@@ -661,7 +616,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                   k₁-set k₂-set
                   (lifts-while f b w src r eq) (proj₂ (proj₂ I)))
                 (fresh-at refl frP oP) (fresh-at refl fr₁ (fresh-at refl fr₂ (bare (resrc oI))))
-                dP (reExp fu dI)
+                dP (reExp fu dI) (s<s⁻¹ lt)
           pr₁ = proj₂ (proj₂ I)
           fr : ∀ j → OnPath j q → j < k₂
           fr j o = subst (j <_) fr₂ (fresh-path oI j (on-path o))
@@ -675,15 +630,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- a scan's walk: the plain cell installed, the impl's source minted
     -- and its cell installed, and the body walked under them
     walk-scan : ∀ {Θ s u} (f : SFn Γ [] [] Θ (u ×ᵗ s) u) (z : STm Γ [] [] Θ u) (b : SExp Γ [] [] Θ s)
-              → Elab-Walks b → Elab-Walks (scanˢ f z b)
-    walk-scan f z b wb w {ρ′} {ρ} r {q = q} {stP = stP} {stI = stI} S pr oP oI (subs-scan {nid = k} frP dP) (subs-mint {src = src} frS (subs-map (subs-scan {i = iI} {nid = k′} frI dI))) =
+              → ∀ {M} → Elab-Walks< M b → Elab-Walks< (suc M) (scanˢ f z b)
+    walk-scan f z b wb w {ρ′} {ρ} r {q = q} {stP = stP} {stI = stI} S pr oP oI (subs-scan {nid = k} frP dP) (subs-mint {src = src} frS (subs-map (subs-scan {i = iI} {nid = k′} frI dI))) lt =
       let L = lifts-scan f z b w src {i = iI} r refl
           I = scan-install S (evalWith (plainTm z) ρ) (evalWith iI (src ∷ᵉ ρ′)) pr frP frS frI
           X = wb (λ y → there (w y)) r (After.store (proj₁ I))
                 (scan~ (proj₁ (proj₂ I)) (lookup-set k (cell-st (evalWith (plainTm z) ρ)) (EvalSt.nodes stP))
                   (lookup-set k′ (cell-st (evalWith iI (src ∷ᵉ ρ′))) (EvalSt.nodes stI)) (proj₂ L) (proj₁ L) (proj₂ (proj₂ I)))
                 (fresh-at refl frP oP) (fresh-at refl frI (bare (resrc oI)))
-                dP (reExp (renExp-fuse there (ext∈ w) (toInstEmit κ b)) dI)
+                dP (reExp (renExp-fuse there (ext∈ w) (toInstEmit κ b)) dI) (s<s⁻¹ lt)
           pr₁ = proj₂ (proj₂ I)
           fr : ∀ j → OnPath j q → j < k′
           fr j o = subst (j <_) frI (fresh-path oI j (on-path o))
@@ -696,14 +651,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- a flattener's walk, one element per emit: the plain node
     -- installed, the impl's cell and node installed, and the body walked
     -- under them
-    walk-flat-elem : ∀ {Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks b
+    walk-flat-elem : ∀ {M Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks< M b
                    → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                    → ∀ {i : Tm (plainᵏ Γ κ) [] [] Θ′ (FlatSᵗ u)} → proj₁ (evalWith i ρ′) ≡ (frameAt w ρ′ , inj₁ tt)
-                   → Walks (frameAt w ρ′) (Θ′ , mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ flatStepᵛ i
+                   → Walks< (suc M) (frameAt w ρ′) (Θ′ , mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ flatStepᵛ i
                                    (flattenᵉ op (mapᵉ elemᵛ (renExp (λ x → x) (λ x → x) w (toInstEmit κ b))))) , ρ′)
                            (Θ , plainExp (flattenˢ op b) , ρ)
     walk-flat-elem {u = u} op b wb w {ρ′} r {i} seed {q = q} {stP = stP} {stI = stI} S pr oP oI (subs-flatten (sub-all {nid = m} frP dP))
-      (subs-map (subs-scan {nid = ks} frK (subs-flatten (sub-all {nid = m′} frM (subs-map dI))))) =
+      (subs-map (subs-scan {nid = ks} frK (subs-flatten (sub-all {nid = m′} frM (subs-map dI))))) lt =
       let c  = evalWith i ρ′
           N  = setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)
           I  = flat-install S op c pr frP frK frM
@@ -713,7 +668,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
              , lookup-set m (flatSt u op) (EvalSt.nodes stP) , lookup-set m′ (flatSt (emitᵗ u) op) N , flat-init u op
              , c , lk
           X  = wb w r (After.store (proj₁ I)) (outerElem~ {op = op} F (proj₂ (proj₂ I)))
-                 (fresh-at refl frP oP) (bare (fresh-at refl frM (fresh-at refl frK (bare oI)))) dP dI
+                 (fresh-at refl frP oP) (bare (fresh-at refl frM (fresh-at refl frK (bare oI)))) dP dI (sz-1 (s<s⁻¹ lt))
           pr₁ = proj₂ (proj₂ I)
           fr : ∀ j → OnPath j q → j < ks
           fr j o = subst (j <_) frK (fresh-path oI j (on-path o))
@@ -727,15 +682,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- the same, one element per inner: the impl's per-inner merge
     -- installed between its flattener and the body
-    walk-flat-explode : ∀ {Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks b
+    walk-flat-explode : ∀ {M Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks< M b
                       → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                       → ∀ {i : Tm (plainᵏ Γ κ) [] [] Θ′ (FlatSᵗ u)} → proj₁ (evalWith i ρ′) ≡ (frameAt w ρ′ , inj₁ tt)
-                      → Walks (frameAt w ρ′) (Θ′ , mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ flatStepᵛ i
+                      → Walks< (suc M) (frameAt w ρ′) (Θ′ , mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ flatStepᵛ i
                                       (flattenᵉ op (flattenᵉ (mergeᶠ nothing) (mapᵉ (pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))))
                                         (mapᵉ explodeᵛ (renExp (λ x → x) (λ x → x) w (toInstEmit κ b))))))) , ρ′)
                               (Θ , plainExp (flattenˢ op b) , ρ)
     walk-flat-explode {u = u} op b wb w {ρ′} r {i} seed {q = q} {stP = stP} {stI = stI} S pr oP oI (subs-flatten (sub-all {nid = m} frP dP))
-      (subs-map (subs-scan {nid = ks} frK (subs-flatten (sub-all {nid = m′} frM (subs-flatten (sub-all {nid = mX} frX (subs-map (subs-map dI)))))))) =
+      (subs-map (subs-scan {nid = ks} frK (subs-flatten (sub-all {nid = m′} frM (subs-flatten (sub-all {nid = mX} frX (subs-map (subs-map dI)))))))) lt =
       let c  = evalWith i ρ′
           N  = setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)
           xX = flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing)
@@ -752,7 +707,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
              , flat-init u op
              , c , lk
           X  = wb w r (After.store (proj₁ I)) (outerExplode~ {op = op} F (proj₂ (proj₂ I)))
-                 (fresh-at refl frP oP) (bare (bare (fresh-at refl frX (fresh-at refl frM (fresh-at refl frK (bare oI)))))) dP dI
+                 (fresh-at refl frP oP) (bare (bare (fresh-at refl frX (fresh-at refl frM (fresh-at refl frK (bare oI)))))) dP dI (sz-1 (s<s⁻¹ lt))
           pr₁ = proj₂ (proj₂ I)
           fr : ∀ j → OnPath j q → j < ks
           fr j o = subst (j <_) frK (fresh-path oI j (on-path o))
@@ -778,18 +733,63 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            (unmoved-set {Γ = Γ} κ {Q = λ j → OnPath j q} {N = EvalSt.nodes stI} {N′ = EvalSt.nodes stI} _ fr ≤-refl (λ _ _ → refl))
 
     -- a flattener's walk at either elaboration
-    walk-flat : ∀ {Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks b → (pi : Bool)
+    walk-flat : ∀ {M Θ u} (op : FlatOp) (b : SExp Γ [] [] Θ (echoᵗ u)) → Elab-Walks< M b → (pi : Bool)
               → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
-              → Walks (frameAt w ρ′) (Θ′ , renExp (λ x → x) (λ x → x) w (flattenᵖ op pi (frameᵛ Θ) (toInstEmit κ b)) , ρ′)
+              → Walks< (suc M) (frameAt w ρ′) (Θ′ , renExp (λ x → x) (λ x → x) w (flattenᵖ op pi (frameᵛ Θ) (toInstEmit κ b)) , ρ′)
                       (Θ , plainExp (flattenˢ op b) , ρ)
     walk-flat op b wb false w r = walk-flat-elem op b wb w r refl
     walk-flat op b wb true  w r = walk-flat-explode op b wb w r refl
 
+    -- A SOURCE MINTED ON THE IMPL SIDE ALONE moves no store field: the
+    -- plain counter bounds the live sources, and the impl's node counter
+    -- stands
+    src-bump : ∀ {sP stP sI stI} → Store κ sP stP sI stI
+             → Store κ sP stP (record sI { mint = setAt sourceᵏ (suc (freshId sourceᵏ (Sched.mint sI))) (Sched.mint sI) }) stI
+    src-bump S = record S { ruleI = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleI S) }
+
+    -- and a pass from the bumped store is one from the store
+    unsrc : ∀ {sP stP sI stI} {S : Store κ sP stP sI stI} {rP rI} → After κ (src-bump S) rP rI → After κ S rP rI
+    unsrc A =
+      after (After.store A) (After.keeps A)
+            (λ ar → After.persists A (record { boundP = Arr.boundP ar ; boundI = m<n⇒m<1+n (Arr.boundI ar)
+                                               ; rows = Arr.rows ar ; lists = Arr.lists ar }))
+            (After.values A) (After.grows A)
+
+    -- THE GROUP FOLDED DOWN RELATED PATHS, ENDED, the impl's under its
+    -- new source.  The cycle is genuine: an `of` under a flattener's
+    -- outer folds its inners into the consume, which walks them, so
+    -- the pass is handed a walker under the fold's own size.
+    --
+    -- `Sound` OF BOTH PATHS, AS `Pass` CARRIES IT: without it a related
+    -- path may pass one merge twice, and a lane subscribed through it
+    -- registers a row `Rule.distinct-rows` refuses.
+    -- REFUTED: `Refuted.Of-Fold-Sound` -- a path through one merge as
+    --   outer and as its own lane, one emit carrying one lane.
+    -- DEAD ROUTE: `Sound` from `Store` and `PathRel`.  The store holds
+    --   the rule and `π`'s keys below the counter, which gives a
+    --   pinned node's freshness, but neither record says where a
+    --   path's nodes' rows end, nor that its nodes are distinct.
+    of-fold : ∀ {N} (wk : Walker ep ei N) {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
+                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI src es vs}
+                   → (S : Store κ sP stP sI stI)
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                   → Sound p sP stP → Sound q sI stI
+                   → freshId sourceᵏ (Sched.mint sI) ≡ src
+                   → Carries {u} es vs
+                   → (dP : foldPath⇓ now p vs true sP stP rP)
+                   → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
+                   → sz-foldPath dP < N
+                   → Σ (After κ S rP rI) λ A
+                       → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+    of-fold wk S pr oP oI refl c dP dI lt =
+      let X = path-pass wk (src-bump S) pr c oP (resrc oI) dP dI lt
+      in unsrc (proj₁ X) , proj₁ (proj₂ X)
+
     -- an `of`'s walk: the impl mints its source, and both fold the
     -- group and end
-    walk-of : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) → Elab-Walks (ofˢ ts)
-    walk-of ts w r S pr oP oI (subs-of dP) (subs-mint {src = src} fr (subs-of dI)) =
-      let A = of-fold S pr oP oI fr (of-carries ts w r refl src) dP dI
+    walk-of : ∀ {M Θ u} (ts : List (STm Γ [] [] Θ u)) → Walker ep ei M → Elab-Walks< (suc M) (ofˢ ts)
+    walk-of ts wk w r S pr oP oI (subs-of dP) (subs-mint {src = src} fr (subs-of dI)) lt =
+      let A = of-fold wk S pr oP oI fr (of-carries ts w r refl src) dP dI (s<s⁻¹ lt)
       in proj₁ A , proj₂ A , of-fold-stamps S pr oP oI fr (of-carries ts w r refl src) (of-emits ts w refl src) dP dI
 
     -- a cold slot's walk: the impl's read past the transport
@@ -825,28 +825,41 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-input i hotᵏ    e = walk-hot i e
     walk-input i sharedᵏ e = walk-shared i e
 
-    -- THE WALK DESCENDS THE PLAIN TREE'S GUARDED SIZE, not the tree: an
-    -- unrolling is no smaller, but it reads its μ-var only past a defer,
-    -- which the size does not count and the walk does not enter.
-    walk< : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Acc _<_ (gsizeᵉ (plainExp s)) → Elab-Walks s
-    walk< (inputˢ i) _     = walk-input i (lookup κ i) refl
-    walk< (ofˢ ts) _       = walk-of ts
-    walk< {Θ} {u} emptyˢ _ w {ρ′} {ρ} r S pr oP oI (subs-empty f) dI = walk-of {Θ} {u} [] w {ρ′} {ρ} r S pr oP oI (subs-of {ts = []} f) dI
-    walk< (takeWhileˢ f b) (acc rs) w r = walk-while f b (walk< b (rs (s≤s (m≤n+m _ _)))) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
-    walk< (mapˢ f b) (acc rs) w r S pr oP oI (subs-map dP) (subs-map dI) =
-      let X = walk< b (rs (s≤s (m≤n+m _ _))) w r S (map~ (lifts-map f w r) pr) (bare oP) (bare oI) dP dI
+    -- a renamed expression's derivation is the derivation
+    sz-reExpᴾ : ∀ {Θ u lo} {ρ} {E E′ : Exp Γ [] [] Θ u} {p : Path Γ lo u t} {now s st r} {M}
+                (eq : E ≡ E′) (d : subscribeE⇓ {e = ep} (Θ , E , ρ) p now s st r)
+              → sz-subscribeE d < M → sz-subscribeE (reExpᴾ eq d) < M
+    sz-reExpᴾ refl d lt = lt
+
+    -- ONE FORMER'S WALK, its sub-walks handed a walker under the
+    -- former's own plain size.  A μ's unrolling is no smaller a tree,
+    -- but its subscribe is a premise of the μ's.
+    at : ∀ {M Θ u} (s : SExp Γ [] [] Θ u) → Walker ep ei M → Elab-Walks< (suc M) s
+    at (inputˢ i) _ w r S pr oP oI dP dI _ = walk-input i (lookup κ i) refl w r S pr oP oI dP dI
+    at (ofˢ ts) wk         = walk-of ts wk
+    at {Θ = Θ} {u} emptyˢ wk w {ρ′} {ρ} r S pr oP oI (subs-empty f) dI lt = walk-of {Θ = Θ} {u} [] wk w {ρ′} {ρ} r S pr oP oI (subs-of {ts = []} f) dI lt
+    at (takeWhileˢ f b) wk w r = walk-while f b (wk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
+    at (mapˢ f b) wk w r S pr oP oI (subs-map dP) (subs-map dI) lt =
+      let X = wk b w r S (map~ (lifts-map f w r) pr) (bare oP) (bare oI) dP dI (s<s⁻¹ lt)
       in pairS (unmap (proj₁ X , proj₁ (proj₂ X))) (proj₂ (proj₂ X))
-    walk< (scanˢ f z b) (acc rs) = walk-scan f z b (walk< b (rs (s≤s (≤-trans (m≤n+m _ (gsizeᵗ (plainTm z))) (m≤n+m (gsizeᵗ (plainTm z) + gsizeᵉ (plainExp b)) (gsizeᵗ (plainTm f)))))))
-    walk< (flattenˢ op b) (acc rs) w r = walk-flat op b (walk< b (rs (n<1+n _))) (perInnerˢ op b) w r
-    walk< (μˢ b) (acc rs) w r S pr oP oI (subs-μ dP) (subs-μ dI) =
+    at (scanˢ f z b) wk    = walk-scan f z b (wk b)
+    at (flattenˢ op b) wk w r = walk-flat op b (wk b) (perInnerˢ op b) w r
+    at (μˢ b) wk w r S pr oP oI (subs-μ dP) (subs-μ dI) lt =
       let (s′ , pe , ie) = μ-unfolds b
-      in walk< s′ (rs (s≤s (≤-reflexive (trans (cong gsizeᵉ pe) (gsize-unfoldμ (plainExp b))))))
-           w r S pr oP oI (reExpᴾ (sym pe) dP) (reExp (sym (ie w)) dI)
-    walk< (varˢ ()) _
-    walk< (deferˢ b) _     = walk-defer b
+      in wk s′ w r S pr oP oI (reExpᴾ (sym pe) dP) (reExp (sym (ie w)) dI) (sz-reExpᴾ (sym pe) dP (s<s⁻¹ lt))
+    at (varˢ ()) _
+    at (deferˢ b) _ w r S pr oP oI dP dI _ = walk-defer b w r S pr oP oI dP dI
+
+    -- THE WALK DESCENDS THE PLAIN DERIVATION'S SIZE
+    walk< : ∀ {N} → Acc _<_ N → Walker ep ei N
+    walk< (acc rs) s w r S pr oP oI dP dI lt = at s (walk< (rs lt)) w r S pr oP oI dP dI (n<1+n _)
 
     walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
-    walk s = walk< s (<-wellFounded _)
+    walk s w r S pr oP oI dP dI = walk< (<-wellFounded _) s w r S pr oP oI dP dI (n<1+n _)
+
+    -- a walker under any bound, for a pass outside the cycle
+    walker : ∀ {N} → Walker ep ei N
+    walker s w r S pr oP oI dP dI _ = walk s w r S pr oP oI dP dI
 
 -- WHERE IT CAN STILL FAIL: A HOT SCRIPT LIVE ON ONE SIDE ONLY, or two
 -- live at different places.  Both lists are the slots' hot scripts in

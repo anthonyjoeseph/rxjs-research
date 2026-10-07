@@ -248,7 +248,7 @@ off inners, payload; subscribes unrelated; a pop unrelating reads; a map
 moving time; a close emptying merges; hot ends past blocks; a
 two-value emit; a testless cut; a write moving a row;
 cut, liveness, drain, body ends unpairing; unsound walks, reads; two
-stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain past a
+stamp chains; `of` splits, folds; a `mintᵉ` stamp; a drain past a
 quiet cut; a hop's script; root stamps unwalked; a joiner off its catch;
 quiet folds, lanes, fan-outs; installs. Left: cascades.
 
@@ -281,8 +281,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`of-fold`** (Simulation.Walk) — FALSITY, `REFUTED, DEAD ROUTE`: the group
-  folded and ended down related sound paths keeps what a pass keeps.
 - **`defer-end`** (Simulation.Pass) — FALSITY, `PROBED×5`: a dead deferred
   body's count falls on the plain side against the hop's marker merge's, a
   quiet fold and the hop's node's on the impl's, one store across all three.

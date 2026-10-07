@@ -28,7 +28,7 @@ open import Data.Maybe   using (nothing; just)
 open import Data.List.Properties using (++-identityʳ; ++-assoc)
 open import Relation.Nullary using (yes; no)
 open import Data.Nat     using (suc; _≤_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Nat.Properties using (≤-refl; n<1+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
@@ -59,6 +59,7 @@ open import Simulation.Schedules using (HeadOf)
 open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; sub-ot; Agree)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Path using (module PassP)
+open import Simulation.Walk using (walker)
 open import Simulation.Pass.Quiet using (SlotPair; delivered; slotpair; unchain)
 
 -- AN OPEN BRACKET FLUSHES WHAT IT IS HANDED, each value its own group,
@@ -383,7 +384,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       where
         sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
         sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-        X = slot-pass (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI
+        X = slot-pass (walker κ) (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI (n<1+n _)
         A = proj₁ X
         map-slot : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
                      {cs : List (RegId × AtFloor Γ u t)} {ds}
@@ -504,5 +505,5 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
              → After S rP rI × (fin ≡ false → Out (counter (Sched.mint sI) sourceᵏ) (proj₁ rI))
     row-pass S hd (cold~ sp blk r refl) soP soI dP dI = block-arm S hd sp blk r soP soI dP dI
     row-pass S hd (defer~ sp k nP nI r refl) soP soI (fold-step d@(step-thru-outer W) dP) dI@(fold-step {out₁ = oH} {out₂ = oR} (step-thru-outer {op = op} {nid = nid} {sched′ = sW} {st′ = stW} W′) dR) =
-      proj₁ (resume (hop-arm S hd sp k nP nI r soI d dI) (adv d soP) dP) ,
+      proj₁ (resume (walker κ) (hop-arm S hd sp k nP nI r soI d dI) (adv d soP) dP (n<1+n _)) ,
       λ e → out-++ oH oR (proj₂ (proj₂ (hop-walk S hd sp k nP nI r (unthru soI) W W′))) (out-quiet oR (quiet-wrap op nid sW stW e (rel-unbatched r) dR))

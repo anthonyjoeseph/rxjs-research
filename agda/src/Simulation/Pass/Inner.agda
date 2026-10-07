@@ -16,7 +16,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (nothing; just)
-open import Data.Nat     using (ℕ; suc; pred; _≤_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; suc; pred; _≤_; _<_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; pred[n]≤n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
@@ -38,6 +38,8 @@ open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatSte
 open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; merge~; ObsRel; V; PathRel; inner~;
   deferInner~; []; _∷_; Store; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ)
 open import Simulation.Cut using (module At; module Third)
+open import Simulation.Walks using (module Walkers)
+open import Simulation.Size using (sz-foldPath; sz-mergeAllDrain; sz-innerFinish; sz-l; sz-r)
 open import Simulation.After using (module Kept; readᴾ; readᴵ-++)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
@@ -118,6 +120,7 @@ drain-self u with u ≟ᵗ u
 module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassQ {Γ = Γ} κ public
+  open Walkers κ using (Walker)
   open Takes {Γ = Γ} κ using (module While)
   open Scans {Γ = Γ} κ using (module Cells)
 
@@ -129,13 +132,16 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     open Cells {t} {ep} {ei} using (scan-arm)
 
     -- TWO RELATED PATHS KEEP THE PASS, AND ARE RELATED AGAIN WHERE IT
-    -- LEAVES THEM: a flattener's outer folds its tail once per emit
-    Pass : ∀ {lo lo′ s} → Path Γ lo s t → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t) → Set
-    Pass p q =
+    -- LEAVES THEM: a flattener's outer folds its tail once per emit.  The
+    -- plain fold sits below `N`, the bound the walker it is handed walks
+    -- under.
+    Pass : ∀ {lo lo′ s} → ℕ → Path Γ lo s t → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t) → Set
+    Pass N p q =
       ∀ {now vs es fin sP stP sI stI rP rI} (S : St sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q → Carries es vs
       → Sound p sP stP → Sound q sI stI
-      → foldPath⇓ now p vs fin sP stP rP → foldPath⇓ now q es fin sI stI rI
+      → (dP : foldPath⇓ now p vs fin sP stP rP) → foldPath⇓ now q es fin sI stI rI
+      → sz-foldPath dP < N
       → Σ (After S rP rI) λ A
           → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
           × (∀ {I} → Dlv I fin es → Out I (proj₁ rI))
@@ -519,31 +525,32 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- A MERGE'S QUEUE DRAINED ON BOTH SIDES: while a lane is free each
     -- side spends its queue's head through the flattener's mint, and the
     -- node each re-reads is the pair the mint left
-    drain-pair : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u lim m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
+    drain-pair : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u lim m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
                    {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
                    {fs fs′ l a od qs qs′ out act qr sP₂ stP₂ out′ act′ qr′ sI₂ stI₂}
                → Walkedˣ xs (mergeᶠ lim) m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
                → Pointwise (λ x′ x → ObsRel κ u x′ x) fs′ fs → Pointwise (λ x′ x → ObsRel κ u x′ x) qs′ qs
-               → mergeAllDrain⇓ m p now fs l a od qs sP stP (out , act , qr , sP₂ , stP₂)
+               → (dP : mergeAllDrain⇓ m p now fs l a od qs sP stP (out , act , qr , sP₂ , stP₂))
                → mergeAllDrain⇓ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now fs′ l a od qs′ sI stI (out′ , act′ , qr′ , sI₂ , stI₂)
+               → sz-mergeAllDrain dP < N
                → Σ (After S (out , sP₂ , stP₂) (out′ , sI₂ , stI₂)) λ A
                    → act ≡ act′ × Pointwise (λ x′ x → ObsRel κ u x′ x) qr′ qr
                      × Walkedˣ xs (mergeᶠ lim) m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP₂) (EvalSt.nodes stI₂)
-    drain-pair S W _ _ [] qw drain-spent drain-spent = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , qw , W
-    drain-pair S W _ _ (_ ∷ _) [] drain-nil drain-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , [] , W
-    drain-pair S W _ _ (_ ∷ _) qw@(_ ∷ _) (drain-no-room _) (drain-no-room _) = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , qw , W
-    drain-pair S W _ _ (_ ∷ _) (_ ∷ _) (drain-no-room eP) (drain-room eI _ _ _) = ⊥-elim (t≢f (trans (sym eI) eP))
-    drain-pair S W _ _ (_ ∷ _) (_ ∷ _) (drain-room eP _ _ _) (drain-no-room eI) = ⊥-elim (t≢f (trans (sym eP) eI))
-    drain-pair S W cP cI (_ ∷ fw) (ob ∷ qw) (drain-room {st₁ = s₁} _ c rP dr) (drain-room {st₁ = s₁′} _ c′ rI dr′)
-      with flat-mint S W cP cI (merge~ qw) ob c c′
+    drain-pair _ S W _ _ [] qw drain-spent drain-spent _ = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , qw , W
+    drain-pair _ S W _ _ (_ ∷ _) [] drain-nil drain-nil _ = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , [] , W
+    drain-pair _ S W _ _ (_ ∷ _) qw@(_ ∷ _) (drain-no-room _) (drain-no-room _) _ = after S (λ x → x) (λ x → x) [] (λ x → x) , refl , qw , W
+    drain-pair _ S W _ _ (_ ∷ _) (_ ∷ _) (drain-no-room eP) (drain-room eI _ _ _) _ = ⊥-elim (t≢f (trans (sym eI) eP))
+    drain-pair _ S W _ _ (_ ∷ _) (_ ∷ _) (drain-room eP _ _ _) (drain-no-room eI) _ = ⊥-elim (t≢f (trans (sym eP) eI))
+    drain-pair wk S W cP cI (_ ∷ fw) (ob ∷ qw) (drain-room {st₁ = s₁} _ c rP dr) (drain-room {st₁ = s₁′} _ c′ rI dr′) lt
+      with flat-mint wk S W cP cI (merge~ qw) ob c c′ (sz-l lt)
     ... | A₁ , W₁ with drain-read {NP = EvalSt.nodes s₁} {NI = EvalSt.nodes s₁′} (proj₁ W₁) rP rI
-    ...   | refl , refl , refl , qw₁ with drain-pair (After.store A₁) W₁ (sub-clear c cP) (sub-clear c′ cI) fw qw₁ dr dr′
+    ...   | refl , refl , refl , qw₁ with drain-pair wk (After.store A₁) W₁ (sub-clear c cP) (sub-clear c′ cI) fw qw₁ dr dr′ (sz-r lt)
     ...     | A₂ , e , qr , W₂ = A₁ ⨾ A₂ , e , qr , W₂
 
     -- A MERGE'S QUEUE DRAINED ON BOTH SIDES once its dying inner's group
     -- has folded, from the queue its node holds
-    merge-drain : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim lim′ a q q′ od m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+    merge-drain : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim lim′ a q q′ od m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                     {p : Path Γ ℓ u t} {q̂ : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                     {out act qr sP₂ stP₂ out′ act′ qr′ sI₂ stI₂}
@@ -552,21 +559,22 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q̂
                 → Sound (from-inner mergeAllᵒ m j ↠[ h ] p) sP stP
                 → Sound (from-inner mergeAllᵒ m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q̂) sI stI
-                → mergeAllDrain⇓ m p now q lim′ a od q sP stP (out , act , qr , sP₂ , stP₂)
+                → (dP : mergeAllDrain⇓ m p now q lim′ a od q sP stP (out , act , qr , sP₂ , stP₂))
                 → mergeAllDrain⇓ m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q̂) now q′ lim′ a od q′ sI stI
                     (out′ , act′ , qr′ , sI₂ , stI₂)
+                → sz-mergeAllDrain dP < N
                 → Σ (After S (out , sP₂ , stP₂) (out′ , sI₂ , stI₂)) λ A
                     → act ≡ act′ × Pointwise (λ x′ x → ObsRel κ u x′ x) qr′ qr
                       × Flattener {Γ = Γ} κ (Store.π (After.store A)) {t} (EvalSt.nodes stP₂) (EvalSt.nodes stI₂) u (mergeᶠ lim) m m′ ks xs
                       × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP₂) (EvalSt.nodes stI₂) p q̂
-    merge-drain S {m = m} {m′} {j = j} {j′} f qs pr sp si dP dI =
-      drain-pair S (f , pr) (head-on _ _ _ m (self-node m (j ∷ [])) sp , drop-ot _ _ _ sp)
-        (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si) qs qs dP dI
+    merge-drain wk S {m = m} {m′} {j = j} {j′} f qs pr sp si dP dI lt =
+      drain-pair wk S (f , pr) (head-on _ _ _ m (self-node m (j ∷ [])) sp , drop-ot _ _ _ sp)
+        (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si) qs qs dP dI lt
 
     -- A MERGE'S INNER ENDED ON BOTH SIDES: each finish folds the group
     -- down its tail, drains the queue its node holds, and writes the
     -- count and queue the drain left; the end then crosses the restamp
-    merge-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂ x x′ mx}
+    merge-finish : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂ x x′ mx}
                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                      {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
@@ -583,21 +591,22 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                  → innerFinish⇓ mergeAllᵒ m′ j′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q) now es sI stI (just x′)
                      (o₁ , es₁ , f₁ , sI₁ , stI₁)
                  → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q) es₁ f₁ sI₁ stI₁ rI
+                 → sz-innerFinish F < N
                  → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                      (λ π NP NI → PathRel κ π NP NI (from-inner mergeAllᵒ m j ↠[ h ] p)
                         (from-inner mergeAllᵒ m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q)) Never (o₁ ++ proj₁ rI , proj₂ rI)
-    merge-finish S f ip pr lP lI (merge~ _) b sp si _ _ (finish-nil e) _ refl _ _ =
+    merge-finish _ S f ip pr lP lI (merge~ _) b sp si _ _ (finish-nil e) _ refl _ _ _ =
       ⊥-elim (t≢f (trans (sym (usable-self _)) e))
-    merge-finish S f ip pr lP lI (merge~ _) b sp si _ _ (finish-all-drain _ _) _ refl (finish-nil e) _ =
+    merge-finish _ S f ip pr lP lI (merge~ _) b sp si _ _ (finish-all-drain _ _) _ refl (finish-nil e) _ _ =
       ⊥-elim (t≢f (trans (sym (usable-self _)) e))
-    merge-finish S {m = m} {m′} {j = j} {j′} f ip pr _ _ (merge~ qs) b sp si sp′ si′
-        (finish-all-drain fP dP) tail refl (finish-all-drain fI@(fold-step d₁ (fold-step step-map dq)) dI) dR
+    merge-finish wk S {m = m} {m′} {j = j} {j′} f ip pr _ _ (merge~ qs) b sp si sp′ si′
+        (finish-all-drain fP dP) tail refl (finish-all-drain fI@(fold-step d₁ (fold-step step-map dq)) dI) dR lt
       with restamp-echo S f pr b d₁
     ... | A , f′ , pr′ , c′ , refl , _
       with tail (After.store A) pr′ c′ (drop-ot _ _ _ sp)
              (proj₂ (proj₁ (tail-of (step-clear d₁ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si))))) dq
     ...   | A₁ , pr₁
-      with merge-drain (After.store A₁)
+      with merge-drain wk (After.store A₁)
              (flat-move _ _ _ _ (After.grows A₁)
                (missed fP (head-on _ _ _ m (self-node m (j ∷ [])) sp , drop-ot _ _ _ sp))
                (missed dq (proj₁ (tail-of (step-clear d₁ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si)))))
@@ -606,7 +615,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                f′)
              qs pr₁
              (fold-kept fP (drop-ot _ _ _ sp) _ sp (λ _ _ _ → refl))
-             (fold-kept fI (drop-ot _ _ _ si) _ si (λ _ _ _ → refl)) dP dI
+             (fold-kept fI (drop-ot _ _ _ si) _ si (λ _ _ _ → refl)) dP dI (sz-r lt)
     ...     | D , refl , qs′ , f₂ , pr₂ =
       arm-after ((A ⨾ A₁) ⨾ D) (λ ()) (arm-weaken (λ ())
         (inner-on (proj₁ W) ((_ , proj₁ (proj₂ W)) , After.grows (proj₁ W) (After.grows D (After.grows A₁ (After.grows A ip))) , proj₂ (proj₂ W))
@@ -614,7 +623,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       where W = flat-write (After.store D) (f₂ , pr₂) (merge~ qs′)
 
     -- AN INNER ENDED ON BOTH SIDES, by its flattener's operator
-    finish-by : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+    finish-by : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                   {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                   {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
@@ -630,22 +639,23 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
               → innerFinish⇓ (flatOp op) m′ j′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q) now es sI stI (lookupNode m′ (EvalSt.nodes stI))
                   (o₁ , es₁ , f₁ , sI₁ , stI₁)
               → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q) es₁ f₁ sI₁ stI₁ rI
+              → sz-innerFinish F < N
               → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                   (λ π NP NI → PathRel κ π NP NI (from-inner (flatOp op) m j ↠[ h ] p)
                      (from-inner (flatOp op) m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q)) Never (o₁ ++ proj₁ rI , proj₂ rI)
-    finish-by S {op = mergeᶠ _} ((_ , f@(_ , _ , _ , lP , lI , fn , _)) , ip , pr) b sp si sp′ si′ F tail F′ dR =
-      merge-finish S f ip pr lP lI fn b sp si sp′ si′ F tail lP
-        (subst (λ ns → innerFinish⇓ _ _ _ _ _ _ _ _ ns _) lI F′) dR
-    finish-by S {op = switchᶠ} ((_ , f@(_ , _ , _ , lP , lI , fn , _)) , ip , pr) b _ _ sp si F _ F′ dR =
+    finish-by wk S {op = mergeᶠ _} ((_ , f@(_ , _ , _ , lP , lI , fn , _)) , ip , pr) b sp si sp′ si′ F tail F′ dR lt =
+      merge-finish wk S f ip pr lP lI fn b sp si sp′ si′ F tail lP
+        (subst (λ ns → innerFinish⇓ _ _ _ _ _ _ _ _ ns _) lI F′) dR lt
+    finish-by _ S {op = switchᶠ} ((_ , f@(_ , _ , _ , lP , lI , fn , _)) , ip , pr) b _ _ sp si F _ F′ dR _ =
       switch-finish S f ip pr fn b sp si (subst (λ ns → innerFinish⇓ _ _ _ _ _ _ _ _ ns _) lP F)
         (subst (λ ns → innerFinish⇓ _ _ _ _ _ _ _ _ ns _) lI F′) dR
-    finish-by S {op = exhaustᶠ} ((_ , f@(_ , _ , _ , lP , lI , fn , _)) , ip , pr) b _ _ sp si F _ F′ dR =
+    finish-by _ S {op = exhaustᶠ} ((_ , f@(_ , _ , _ , lP , lI , fn , _)) , ip , pr) b _ _ sp si F _ F′ dR _ =
       exhaust-finish S f ip pr fn b sp si (subst (λ ns → innerFinish⇓ _ _ _ _ _ _ _ _ ns _) lP F)
         (subst (λ ns → innerFinish⇓ _ _ _ _ _ _ _ _ ns _) lI F′) dR
 
     -- AN INNER NO LIVE CHAIN RUNS THROUGH: its pair is dead too, and
     -- both sides finish it
-    inner-dies : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+    inner-dies : ∀ {N} (wk : Walker ep ei N) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                    {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                    {now vs es sP stP sI stI oP vs₁ fin₁ sP₁ stP₁ rI} (S : St sP stP sI stI)
@@ -665,15 +675,16 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                    (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
                     (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
                      (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q))) es true sI stI rI
+               → sz-innerFinish F < N
                → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                    (λ π NP NI → PathRel κ π NP NI (from-inner (flatOp op) m j ↠[ h ] p)
                       (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
                        (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₂ ]
                         (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₃ ] q)))) Never rI
-    inner-dies {op = op} S R b sp si dd F _ (fold-step (step-from-inner (react-alive al′)) _) =
+    inner-dies _ {op = op} S R b sp si dd F _ (fold-step (step-from-inner (react-alive al′)) _) _ =
       ⊥-elim (t≢f (trans (sym al′) (trans (sym (inner-alive S (proj₁ (proj₂ (leave op R))))) dd)))
-    inner-dies {op = op} S R b sp si dd F tail (fold-step d′@(step-from-inner (react-dead _ F′)) dR) =
-      finish-by S (leave op R) b sp si (step-kept _ (step-from-inner (react-dead dd F)) sp) (step-kept _ d′ si) F tail F′ dR
+    inner-dies wk {op = op} S R b sp si dd F tail (fold-step d′@(step-from-inner (react-dead _ F′)) dR) lt =
+      finish-by wk S (leave op R) b sp si (step-kept _ (step-from-inner (react-dead dd F)) sp) (step-kept _ d′ si) F tail F′ dR lt
 
     -- a delivery keeps its stamp through the hop's restamp, which moves
     -- only a subscribe
