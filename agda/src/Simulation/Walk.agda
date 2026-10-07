@@ -743,13 +743,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- A SOURCE MINTED ON THE IMPL SIDE ALONE moves no store field: the
     -- plain counter bounds the live sources, and the impl's node counter
     -- stands
-    src-bump : ∀ {sP stP sI stI} → Store κ sP stP sI stI
+    src-bump : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} → Store κ sP stP sI stI
              → Store κ sP stP (record sI { mint = setAt sourceᵏ (suc (freshId sourceᵏ (Sched.mint sI))) (Sched.mint sI) }) stI
     src-bump S = record
       { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below
       ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
       ; rows = rows ; dlv-alike = dlv-alike ; dying-alike = dying-alike
-      ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
+      ; latches = latches ; bounded = proj₁ bounded , mapᵃ m<n⇒m<1+n (proj₂ bounded)
+      ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
       ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
       ; scripts = scripts
@@ -757,7 +758,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       where open Store S
 
     -- and a pass from the bumped store is one from the store
-    unsrc : ∀ {sP stP sI stI} {S : Store κ sP stP sI stI} {rP rI} → After κ (src-bump S) rP rI → After κ S rP rI
+    unsrc : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {S : Store κ sP stP sI stI} {rP rI} → After κ (src-bump S) rP rI → After κ S rP rI
     unsrc A =
       after (After.store A) (After.keeps A)
             (λ ar → After.persists A (record { boundP = Arr.boundP ar ; boundI = m<n⇒m<1+n (Arr.boundI ar)
