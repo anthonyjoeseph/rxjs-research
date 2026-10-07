@@ -239,6 +239,13 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- WALKED, SENDS AT IT: each element's echo crosses the restamp, so
       -- its lane is subscribed at that delivery.  The route is through the
       -- walk's echo and lane, a consume carrying the instant its echo set.
+      --
+      -- SWEPT GREEN AT A SECOND INSTANT.  `make qc-same-clock`, seed 43,
+      -- depth 3, 150 programs, aimed at nested flatteners over two-sync
+      -- colds (`QC_DRAW` exp 1,1,1,0,4,3,3,3,0,1,0,0,4, obs 0,3,1,0, fan
+      -- 0,4,2,0,1,0,0,2,2, script 0,2,0,0,3, reach flatten): 31 agree, 0
+      -- fail, 65 undecided.  Cases 7 and 39 walk an element group
+      -- delivered at a hot arrival, not at the subscribe instant.
       elem-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                    {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es vs rI}
                → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI

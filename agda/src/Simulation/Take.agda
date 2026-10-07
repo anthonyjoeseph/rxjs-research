@@ -294,6 +294,14 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A TAIL HANDED A DELIVERED GROUP AND THE END SENDS AT THAT
       -- INSTANT: what a cut hands on is never empty, so whatever the
       -- end subscribes is restamped to the group's own instant
+      --
+      -- SWEPT GREEN WITH A CUT AT AN ARRIVAL.  `make qc-same-clock`, seed
+      -- 44, depth 3, 150 programs (`QC_DRAW` exp 2,2,1,0,4,2,3,2,0,0,0,4,3,
+      -- obs 4,2,1,0, fan 0,3,2,1,1,0,1,2,2, script 0,3,0,0,2, reach
+      -- flatten), over budget at 60 agree, 0 fail, 59 undecided; 44 of
+      -- the agreements carry a `takeWhile`.  Case 41 cuts an exhaust's
+      -- first inner at the second of two hot arrivals.  Not covered: a
+      -- cut whose tail then subscribes a second inner on the same group.
       cut-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ′ s I} {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ s) (emitᵗ t)}
                   {es rI}
               → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q → Sound q sI stI
