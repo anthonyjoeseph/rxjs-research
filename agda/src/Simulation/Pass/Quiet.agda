@@ -1040,18 +1040,18 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN EXPLODED OUTER'S EMITS CARRYING NOTHING explode into no
       -- inner, the merge's walk subscribing each empty run, and its
       -- echo is restamped on the impl side alone
-      quiet-explode : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+      quiet-explode : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u a m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                         {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                    → Quiet (thru-outer (flatOp op) m ↠[ h ] p)
+                    → Quiet (thru-outer a m ↠[ h ] p)
                         (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
                          (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
                           (thru-outer mergeAllᵒ mX ↠[ h₃ ]
-                           (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                           (thru-outer a m′ ↠[ h₄ ]
                             (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
                              (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
-      quiet-explode {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {stP = stP} S (outerExplode~ fl r) b refl sp si
+      quiet-explode {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {stP = stP} S (outerExplode~ {op = op} fl r) b refl sp si
                     (fold-step step-map (fold-step step-map (fold-step dW@(step-thru-outer W) (fold-step dW′@(step-thru-outer walk-nil)
                       (fold-step d₁ (fold-step step-map dq))))))
         with explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} (unthru sp) (unthru (drop-ot _ _ _ (drop-ot _ _ _ si))) fl r b W
