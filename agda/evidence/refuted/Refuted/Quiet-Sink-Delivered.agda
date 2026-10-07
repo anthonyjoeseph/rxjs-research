@@ -26,7 +26,7 @@ open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_)
 
-open import Rx.Exp using (Closed; Val; FnClo; natᵗ; uniqᵗ; []ᵉ; _∷ᵉ_; varᵗ)
+open import Rx.Exp using (Closed; Val; natᵗ; uniqᵗ; []ᵉ; _∷ᵉ_; varᵗ)
 open import Rx.Mint using (setAt; regᵏ)
 open import Rx.Evaluator using (Sched; EvalSt; Path; RegRow; root; map-f; share-sink; _↠[_]_; atSlot; sched-init; st-init)
 open import Rx.Evaluator.Domain using (fold-root; fold-step; step-map; fold-sink; disp; walk-more; walk-nil; go-live; go-nil)

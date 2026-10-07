@@ -243,14 +243,14 @@ undecided, never a failure (Anthony).
 `simulation` — both top lines' ground, inducting on
 arrivals over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
-OUT: an arrival plain lacks or split, an instant's gap or stray, an echo
+OUT: an arrival plain lacks, split, an instant's gap or stray, an echo
 off inners, payload; subscribes unrelated; a pop unrelating reads; a map
-moving time; a close emptying merges; a hot end past its block; a
+moving time; a close emptying merges; hot ends past blocks; a
 two-value emit; a testless cut; a write moving a row;
-a cut, liveness, drain or body end unpairing; unsound walks, reads; two
+cut, liveness, drain, body ends unpairing; unsound walks, reads; two
 stamp chains; an `of` mis-split; a `mintᵉ` stamp; a drain past a
 quiet cut; a hop's script; root stamps unwalked; a joiner off its catch;
-quiet folds; installs; quiet lanes. Left: cascades.
+quiet folds, lanes; installs. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
@@ -358,9 +358,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; one hot script only, so no rank compared.
-- **`quiet-sink`** (Simulation.Pass) — SHAPE, `REFUTED`: a valueless
-  group through a share's readers, folded on the impl side alone with the plain
-  side still; the impl delivers to each reader, so `dlv-alike` breaks.
+- **`quiet-sink`** (Simulation.Pass) — SHAPE, `REFUTED`: a valueless group
+  through a share's readers, folded on the impl side alone with the plain side
+  still; the impl delivers to each reader, so `dlv-alike` breaks.
 - **`lifts-scan`** (Simulation.Walk) — DIFFICULTY, `PROBED`: the elaborated
   scan's step and seed read the author's variables past the mint's binder; held
   at one payload, two past the typechecker.
