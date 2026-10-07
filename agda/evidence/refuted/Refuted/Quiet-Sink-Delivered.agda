@@ -131,6 +131,6 @@ unpaired (mach _ ()) _ _ _
 quiet-sink-false : ¬ QuietSink
 quiet-sink-false QS = unpaired (Store.rows S′) refl refl (Store.dlv-alike S′)
   where
-  S′ = After.store (proj₁ (QS {h = z≤n} {h′ = z≤n} S (sink~ refl) (quiet e₀ [] []) refl
+  S′ = After.store (proj₁ (QS {h = z≤n} {h′ = z≤n} {now = 0} S (sink~ refl) (quiet e₀ [] []) refl
          (sink-sound (suc zero) z≤n (Store.ruleP S)) (sink-ok ε (Store.ruleI S))
          (sink-intro ε (fold-sink (disp (walk-more (go-live refl (fold-step step-map fold-root) go-nil) walk-nil))))))
