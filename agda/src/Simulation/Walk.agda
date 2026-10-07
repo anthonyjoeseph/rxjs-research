@@ -745,7 +745,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- stands
     src-bump : ∀ {sP stP sI stI} → Store κ sP stP sI stI
              → Store κ sP stP (record sI { mint = setAt sourceᵏ (suc (freshId sourceᵏ (Sched.mint sI))) (Sched.mint sI) }) stI
-    src-bump S = record S { ruleI = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleI S) }
+    src-bump S = record
+      { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below
+      ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
+      ; rows = rows ; dlv-alike = dlv-alike ; dying-alike = dying-alike
+      ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
+      ; census = census ; owned = owned
+      ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+      ; scripts = scripts
+      }
+      where open Store S
 
     -- and a pass from the bumped store is one from the store
     unsrc : ∀ {sP stP sI stI} {S : Store κ sP stP sI stI} {rP rI} → After κ (src-bump S) rP rI → After κ S rP rI
