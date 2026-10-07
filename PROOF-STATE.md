@@ -257,12 +257,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SPLIT THE VALUE PASS'S INSTANT PER CHAIN.** `cascade-stamps` is
-  now a body over `value-stamps` and `end-stamps`, which pin the instant
-  to the counter the cascade entered with. State `value-stamps` over
-  `pass-go`'s chains as the values split is: the first chain's block
-  draws the instant, every later chain carries it. Ruled out: two
-  instants in one arrival; an instant other than the entering counter,
+- **SPLIT THE MINTED SOURCE'S INSTANT PER CHAIN.** `value-stamps` is a
+  body by arrival kind: a hot arrival's idle and mistyped passes send
+  nothing, and its connected pass is `hot-chain-stamps`, one raw chain.
+  State `dyn-stamps` over `dyn-chains`' pairing as `dyn-pass` splits the
+  values: the cold block's chain draws the instant, every later chain
+  carries it. Then `end-stamps` the same way. Ruled out: two instants
+  in one hot arrival; an instant other than the entering counter,
   `make qc-same-clock` tightened to it and green on 91 programs.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
@@ -332,8 +333,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the
   hot scripts live before anything is subscribed are numbered by their slots,
   one per slot.
-- **`value-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
-  value pass's emits carry exactly the source counter it entered with.
+- **`hot-chain-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a
+  connected hot slot's one raw chain stamps at the counter it entered with.
+- **`dyn-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
+  source's value pass stamps at the counter it entered with.
 - **`end-stamps`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl end
   pass's emits carry the instant its value pass drew.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
