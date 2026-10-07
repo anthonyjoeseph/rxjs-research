@@ -17,7 +17,7 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (tt)
 open import Data.List.Properties using (++-identityʳ)
 open import Relation.Nullary using (yes; no)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst; subst₂)
 
 open import Rx.Exp       using (Ctx; Closed; Val; Env; FnClo; boolᵗ; unitᵗ; _×ᵗ_; applyClo; _≟ᵗ_)
 open import Rx.Evaluator using (EvalSt; Sched; NodeId; NodeState; Path; _↠[_]_; scan-f; take-f; map-f; lookupNode; setNode;
@@ -31,12 +31,13 @@ open import SExp.Elaborate using (CutS; cutOpenᵛ; cutOutᵛ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Binary.Pointwise using () renaming ([] to []ᵖ)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Simulation.Stores using (EmitRel; CutLifts; PathRel; takeWhile~; spentWhile~; Store; guardOf)
 open import Simulation.Sweep using (t≢f; sweepL; sweep-eq)
 open import Simulation.Cut using (cut-go; cut-keeps; cut-persists)
 open import Simulation.Write using (apart)
 open import Simulation.After using (module Kept)
-open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear)
+open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear; Out; out-quiet)
 
 -- A CELL'S SCAN AND A TEST'S TAKE, AT THE STATE THE NODE HOLDS: the
 -- one step each derivation can be
@@ -80,6 +81,21 @@ take-cut-at : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s lo w k} {κ′ : Pat
                               ; nodes = setNode k (take-st 0) (EvalSt.nodes st) })
 take-cut-at {k = k} {sc = sc} {st = st} e h d
   rewrite take-at e d | h | sweep-eq (proj₁ (cutThrough k (EvalSt.registry st))) (Sched.live sc) = refl
+
+cut-cons : ∀ {m} {Δ : Ctx m} {s} (w : Maybe (FnClo Δ s boolᵗ)) b (vs : List (Val Δ s))
+         → proj₂ (proj₂ (takeVals w b vs)) ≡ true → proj₁ (takeVals w b vs) ≢ []
+cut-cons w zero          _        ()
+cut-cons w (suc b)       []       ()
+cut-cons w (suc zero)    (v ∷ vs) _ with spends w v
+... | true  = λ ()
+... | false = λ ()
+cut-cons w (suc (suc b)) (v ∷ vs) _ with spends w v
+... | true  = λ ()
+... | false = λ ()
+
+map-cons : ∀ {A B : Set} (f : A → B) xs → xs ≢ [] → map f xs ≢ []
+map-cons f []       ne = ⊥-elim (ne refl)
+map-cons f (x ∷ xs) ne = λ ()
 
 -- a cell and a count never share a node
 cell-take : ∀ {m} {Δ : Ctx m} {N : List (NodeId × NodeState Δ)} {k k′ u b} {a : Val Δ u}
@@ -152,20 +168,23 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
   module _ {B s} {Bud : Val (plainᵏ Γ κ) B → ℕ → Set} {F′ : FnClo (plainᵏ Γ κ) (CutS B s ×ᵗ emitᵗ s) (CutS B s)}
            {P : Maybe (FnClo Γ s boolᵗ)} {Θ₂ ρ₂ Θ₃ ρ₃} (L : CutLifts κ B s Bud F′ P) where
 
-    Res : List (Val (plainᵏ Γ κ) (CutS B s)) × ℕ × Bool → List (Val Γ s) × ℕ × Bool → Val (plainᵏ Γ κ) (CutS B s) → Set
-    Res T W fc =
+    Res : List (Val (plainᵏ Γ κ) (emitᵗ s)) → List (Val (plainᵏ Γ κ) (CutS B s)) × ℕ × Bool → List (Val Γ s) × ℕ × Bool
+        → Val (plainᵏ Γ κ) (CutS B s) → Set
+    Res es T W fc =
         Carries (map (applyClo (Θ₃ , cutOutᵛ , ρ₃)) (proj₁ T)) (proj₁ W)
       × proj₂ (proj₂ T) ≡ proj₂ (proj₂ W)
       × (proj₂ (proj₂ W) ≡ false → proj₁ (proj₂ T) ≡ 1 × proj₁ (proj₂ fc) ≡ false × Bud (proj₁ fc) (proj₁ (proj₂ W)))
+      × (∀ {I} → All (DelAt I) es → All (DelAt I) (map (applyClo (Θ₃ , cutOutᵛ , ρ₃)) (proj₁ T)))
 
     Spent : Val (plainᵏ Γ κ) (CutS B s) → List (Val (plainᵏ Γ κ) (emitᵗ s)) → ℕ → List (Val Γ s) → Set
-    Spent c es b vs = Res (takeVals (just (Θ₂ , cutOpenᵛ , ρ₂)) 1 (proj₁ (scanVals F′ c es))) (takeVals P b vs) (proj₂ (scanVals F′ c es))
+    Spent c es b vs = Res es (takeVals (just (Θ₂ , cutOpenᵛ , ρ₂)) 1 (proj₁ (scanVals F′ c es))) (takeVals P b vs) (proj₂ (scanVals F′ c es))
 
     cut-group : ∀ {es vs} → Carries es vs → ∀ c b → proj₁ (proj₂ c) ≡ false → Bud (proj₁ c) b → Spent c es b vs
-    cut-group [] c b h bud rewrite take-nil P b = [] , refl , λ _ → refl , h , bud
+    cut-group [] c b h bud rewrite take-nil P b = [] , refl , (λ _ → refl , h , bud) , λ _ → []
     cut-group (quiet e′ {es′} {vs} r bs) (b′ , .false , os , em) b refl bud =
-      subst (λ T → Res T (takeVals P b vs) (proj₂ (scanVals F′ c₁ es′))) (sym (open-step {Θ = Θ₂} {ρ = ρ₂} c₁ (proj₁ (scanVals F′ c₁ es′)) h₁))
-            (quiet _ bare₁ (proj₁ IH) , proj₂ IH)
+      subst (λ T → Res (e′ ∷ es′) T (takeVals P b vs) (proj₂ (scanVals F′ c₁ es′))) (sym (open-step {Θ = Θ₂} {ρ = ρ₂} c₁ (proj₁ (scanVals F′ c₁ es′)) h₁))
+            ( quiet _ bare₁ (proj₁ IH) , proj₁ (proj₂ IH) , proj₁ (proj₂ (proj₂ IH))
+            , λ { (d ∷ ds) → del-keep (applyClo (Θ₃ , cutOutᵛ , ρ₃) c₁) e′ (proj₂ (proj₂ (proj₂ CL))) d ∷ proj₂ (proj₂ (proj₂ IH)) ds })
       where
         c₁   = applyClo F′ ((b′ , false , os , em) , e′)
         CL   = L b′ b os em e′ [] bud r
@@ -188,16 +207,18 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
         ... | inj₂ e = inj₂ (w , e)
         go : ∀ x → proj₂ (proj₂ W₀) ≡ x → Spent (b′ , false , os , em) (e′ ∷ es′) b (w ∷ vs)
         go false eq =
-          subst₂ (λ T W → Res T W (proj₂ (scanVals F′ c₁ es′))) (sym (open-step {Θ = Θ₂} {ρ = ρ₂} c₁ (proj₁ (scanVals F′ c₁ es′)) h₁)) (sym (take-go P b w vs eq))
-                 (carry-cons _ (proj₁ (proj₂ (proj₂ CL))) once (proj₁ IH) , proj₂ IH)
+          subst₂ (λ T W → Res (e′ ∷ es′) T W (proj₂ (scanVals F′ c₁ es′))) (sym (open-step {Θ = Θ₂} {ρ = ρ₂} c₁ (proj₁ (scanVals F′ c₁ es′)) h₁)) (sym (take-go P b w vs eq))
+                 ( carry-cons _ (proj₁ (proj₂ (proj₂ CL))) once (proj₁ IH) , proj₁ (proj₂ IH) , proj₁ (proj₂ (proj₂ IH))
+                 , λ { (d ∷ ds) → del-keep (applyClo (Θ₃ , cutOutᵛ , ρ₃) c₁) e′ (proj₂ (proj₂ (proj₂ CL))) d ∷ proj₂ (proj₂ (proj₂ IH)) ds })
           where
             h₁ = trans (proj₁ (proj₂ CL)) eq
             IH = cut-group bs c₁ (proj₁ (proj₂ W₀)) h₁ (proj₁ CL eq)
         go true eq =
-          subst₂ (λ T W → Res T W (proj₂ (scanVals F′ c₁ es′))) (sym (closed-step {Θ = Θ₂} {ρ = ρ₂} c₁ (proj₁ (scanVals F′ c₁ es′)) (trans (proj₁ (proj₂ CL)) eq))) (sym (take-stop P b w vs eq))
+          subst₂ (λ T W → Res (e′ ∷ es′) T W (proj₂ (scanVals F′ c₁ es′))) (sym (closed-step {Θ = Θ₂} {ρ = ρ₂} c₁ (proj₁ (scanVals F′ c₁ es′)) (trans (proj₁ (proj₂ CL)) eq))) (sym (take-stop P b w vs eq))
                  ( subst (Carries (applyClo (Θ₃ , cutOutᵛ , ρ₃) c₁ ∷ [])) (++-identityʳ (proj₁ W₀))
                          (carry-cons _ (proj₁ (proj₂ (proj₂ CL))) once [])
-                 , sym eq , λ f → ⊥-elim (t≢f (trans (sym eq) f)) )
+                 , sym eq , (λ f → ⊥-elim (t≢f (trans (sym eq) f)))
+                 , λ { (d ∷ _) → del-keep (applyClo (Θ₃ , cutOutᵛ , ρ₃) c₁) e′ (proj₂ (proj₂ (proj₂ CL))) d ∷ [] } )
 
   module While {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
@@ -268,7 +289,15 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                   → stepFrame⇓ now (take-f (just P) k) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
                   → foldPath⇓ now (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) es fin sI stI rI
                   → Arm S now oP sP₁ stP₁ p vs₁ fin₁
-                      (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)) rI
+                      (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)) (λ I → Dlv I fin es) rI
+
+      -- A TAIL HANDED A DELIVERED GROUP AND THE END SENDS AT THAT
+      -- INSTANT: what a cut hands on is never empty, so whatever the
+      -- end subscribes is restamped to the group's own instant
+      cut-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ′ s I} {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ s) (emitᵗ t)}
+                  {es rI}
+              → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q → Sound q sI stI
+              → foldPath⇓ now q es true sI stI rI → All (DelAt I) es → es ≢ [] → Out I (proj₁ rI)
 
     -- A TEST THAT CUTS ON BOTH SIDES: the plain test and the cell's
     -- test each sever the registrations through their node and write
@@ -286,7 +315,7 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
               → stepFrame⇓ now (take-f (just P) k) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
               → foldPath⇓ now (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) es fin sI stI rI
               → Arm S now oP sP₁ stP₁ p vs₁ fin₁
-                  (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)) rI
+                  (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)) (λ I → Dlv I fin es) rI
     while-cut S R@(spentWhile~ _ lk _ _) _ bs sp si d dI = while-spent S R lk bs sp si d dI
     while-cut {stP = stP} {sI = sI} {stI = stI} S {es = es}
               R@(takeWhile~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
@@ -294,13 +323,16 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
               eqW bs sp si d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
       with cut-group {Bud = λ _ b → b ≡ 1} {F′ = F₁} {P = just P} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃} CL bs (tt , false , os , em) 1 refl refl
          | scan-at lk₁ d₁ | take-cut-at lk eqW d
-    ... | cs , fe , _ | refl | refl
+    ... | cs , fe , _ , dl | refl | refl
       with take-cut-at (trans (set-above k₁ k₂ (cell-st {t = CutS unitᵗ s} (proj₂ (scanVals F₁ (tt , false , os , em) es))) (EvalSt.nodes stI)
                                         (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                        (trans fe eqW) d₂
     ... | refl =
-      arm A (proj₂ ZW) cs soq dq λ {rP} dP B rel′ →
-        spentWhile~ (After.grows B (After.grows A e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₂) lk₂′) rel′
+      arm A (proj₂ ZW) cs soq dq (λ {rP} dP B rel′ →
+        spentWhile~ (After.grows B (After.grows A e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₂) lk₂′) rel′)
+        λ { (_ , ds) → out-quiet [] refl
+                     , inj₁ (cut-out (After.store A) (proj₂ ZW) soq dq (dl ds)
+                              (map-cons (applyClo (Θ₃ , cutOutᵛ , ρ₃)) _ (cut-cons (just (Θ₂ , cutOpenᵛ , ρ₂)) 1 (proj₁ (scanVals F₁ (tt , false , os , em) es)) (trans fe eqW)))) }
       where
       fc : Val (plainᵏ Γ κ) (CutS unitᵗ s)
       fc = proj₂ (scanVals F₁ (tt , false , os , em) es)
@@ -337,15 +369,16 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
     ... | false
       with cut-group {Bud = λ _ b → b ≡ 1} {F′ = F₁} {P = just P} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃} CL bs (tt , false , os , em) 1 refl refl
          | scan-at lk₁ d₁ | take-open-at lk eqW d
-    ... | cs , fe , rest | refl | refl
+    ... | cs , fe , rest , dl | refl | refl
       with rest eqW
          | take-open-at (trans (set-above k₁ k₂ (cell-st {t = CutS unitᵗ s} (proj₂ (scanVals F₁ (tt , false , os , em) es))) (EvalSt.nodes stI)
                                           (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                         (trans fe eqW) d₂
     ... | r1 , fl , bud | refl =
-      arm (proj₁ TW) (proj₂ TW) cs soq dq λ {rP} dP B rel′ →
+      arm (proj₁ TW) (proj₂ TW) cs soq dq (λ {rP} dP B rel′ →
         takeWhile~ (After.grows B (After.grows (proj₁ TW) e))
-          (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′) CL rel′
+          (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′) CL rel′)
+        λ { (f , ds) → out-quiet [] refl , inj₂ (cong (λ x → x ∧ true) f , dl ds) }
       where
       remP = proj₁ (proj₂ (takeVals (just P) 1 vs))
       fc : Val (plainᵏ Γ κ) (CutS unitᵗ s)

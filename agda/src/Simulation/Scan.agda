@@ -8,10 +8,12 @@
 module Simulation.Scan where
 
 open import Data.List    using ([]; _∷_; map)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe   using (just)
 open import Data.Nat     using (_≤_)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
+open import Data.Sum     using (inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 
 open import Rx.Exp       using (Ctx; Closed; Val; FnClo; _×ᵗ_; applyClo; sndᵗ; varᵗ)
@@ -24,7 +26,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (ScanAᵗ)
 open import Simulation.Stores using (V; ScanLifts; PathRel; scan~; Store)
 open import Simulation.After using (module Kept)
-open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop)
+open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; out-quiet)
 open import Simulation.Take using (scan-at)
 
 module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
@@ -50,6 +52,21 @@ module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
       SL = L a′ em a e′ (w ∷ []) v r
       IH = scan-group {Θ₀ = Θ₀} {ρ₀ = ρ₀} L bs (proj₁ (applyClo F′ ((a′ , em) , e′))) (proj₂ (applyClo F′ ((a′ , em) , e′)))
                       (applyClo F (a , w)) (proj₁ SL)
+
+  -- AND KEEPS EVERY EMIT'S STAMP, so a group delivered at `I` stays so
+  scan-del : ∀ {s u} {F : FnClo Γ (u ×ᵗ s) u} {F′ : FnClo (plainᵏ Γ κ) (ScanAᵗ u ×ᵗ emitᵗ s) (ScanAᵗ u)} {Θ₀ ρ₀} {I}
+           → ScanLifts κ s u F′ F → ∀ {es vs} → Carries es vs → ∀ a′ em a → V κ u a′ a → All (DelAt I) es
+           → All (DelAt I) (map (applyClo {s = ScanAᵗ u} {t = emitᵗ u} (Θ₀ , sndᵗ (varᵗ (here refl)) , ρ₀)) (proj₁ (scanVals F′ (a′ , em) es)))
+  scan-del L [] a′ em a v [] = []
+  scan-del {F′ = F′} {Θ₀} {ρ₀} L (quiet e′ r bs) a′ em a v (d ∷ ds) =
+    del-keep (proj₂ (applyClo F′ ((a′ , em) , e′))) e′ (proj₂ (proj₂ SL)) d
+      ∷ scan-del {Θ₀ = Θ₀} {ρ₀ = ρ₀} L bs (proj₁ (applyClo F′ ((a′ , em) , e′))) (proj₂ (applyClo F′ ((a′ , em) , e′))) a (proj₁ SL) ds
+    where SL = L a′ em a e′ [] v r
+  scan-del {F = F} {F′} {Θ₀} {ρ₀} L (one e′ {w = w} r bs) a′ em a v (d ∷ ds) =
+    del-keep (proj₂ (applyClo F′ ((a′ , em) , e′))) e′ (proj₂ (proj₂ SL)) d
+      ∷ scan-del {Θ₀ = Θ₀} {ρ₀ = ρ₀} L bs (proj₁ (applyClo F′ ((a′ , em) , e′))) (proj₂ (applyClo F′ ((a′ , em) , e′)))
+                 (applyClo F (a , w)) (proj₁ SL) ds
+    where SL = L a′ em a e′ (w ∷ []) v r
 
   module Cells {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
@@ -83,8 +100,9 @@ module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
              bs sp si d dI@(fold-step d₁ (fold-step step-map dq))
       with scan-at lk d | scan-at lk′ d₁
     ... | refl | refl =
-      arm (proj₁ SW) (proj₂ SW) (proj₁ G) soq dq λ {rP} dP B rel′ →
+      arm (proj₁ SW) (proj₂ SW) (proj₁ G) soq dq (λ {rP} dP B rel′ →
         scan~ (After.grows B (After.grows (proj₁ SW) e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c′) lkI) (proj₂ G) L rel′
+      ) λ { (f , ds) → out-quiet [] refl , inj₂ (f , scan-del {Θ₀ = Θ₀} {ρ₀ = ρ₀} L bs a′ em a v ds) }
       where
       G = scan-group {Θ₀ = Θ₀} {ρ₀ = ρ₀} L bs a′ em a v
       aP : Val Γ u

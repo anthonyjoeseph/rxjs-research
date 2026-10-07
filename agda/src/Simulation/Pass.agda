@@ -21,13 +21,13 @@ open import Data.Empty   using (⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
-open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (nothing; just)
 open import Data.List.Properties using (++-identityʳ; ++-assoc)
 open import Relation.Nullary using (yes; no)
-open import Data.Nat     using (ℕ; suc; _≤_)
+open import Data.Nat     using (suc; _≤_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
@@ -105,11 +105,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     open Kept {Γ = Γ} κ {t} {ep} {ei}
     open While {t} {ep} {ei} using (takeWhile-arm)
     open Cells {t} {ep} {ei} using (scan-arm)
-
-    -- a share's emits each delivered at `I`, at the type its stamped slot
-    -- holds them
-    DelU : ∀ {u u′} → u′ ≡ emitᵗ u → ℕ → List (Val (plainᵏ Γ κ) u′) → Set
-    DelU refl I es = All (DelAt I) es
 
     -- THE TWO ROWS A MINTED SOURCE'S CHAINS CAN BE, each a walk and an
     -- end.  A cold read's impl chain runs its input block alone into a
@@ -198,20 +193,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → foldPath⇓ now q [] (proj₁ (thruWrap mergeAllᵒ m2 fin (sW , stW)))
                      (proj₁ (proj₂ (thruWrap mergeAllᵒ m2 fin (sW , stW)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ m2 fin (sW , stW)))) r
                  → After S rP (o₁ ++ (o₂ ++ (oW ++ proj₁ r)) , proj₂ r)
-      -- A SLOT'S PARTNERED READER, HANDED EMITS EACH DELIVERED AT ONE
-      -- INSTANT AND NO END, SENDS AT THAT INSTANT: a delivery sets every
-      -- restamp cell it crosses, so what a subscribe below it puts out is
-      -- restamped there too.  The conjunct the pass owes at a share's
-      -- reader, stated where the stores are in hand.
-      slot-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {u u′ rid rid′}
-                   {p : Path Γ (suc (toℕ i)) u t} {p′ : Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) u′ (emitᵗ t)}
-                   {vs es} (εI : u′ ≡ emitᵗ u)
-               → RowRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
-                   (rid , atSlot i , (u , p)) (rid′ , atSlot (n ↑ʳ i) , (u′ , p′))
-               → CarriesU εI es vs
-               → Sound p sP stP → Sound p′ sI stI
-               → ∀ {now rP rI} → foldPath⇓ now p vs false sP stP rP → foldPath⇓ now p′ es false sI stI rI
-               → ∀ {I} → DelU εI I es → Out I (proj₁ rI)
       -- A DEFERRED HOP'S WALK OVER ITS ONE POPPED VALUE: the body the emit
       -- carries is subscribed through the hop's merge on both sides, the
       -- tails staying related
@@ -265,7 +246,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → foldPath⇓ now q [] (proj₁ (thruWrap mergeAllᵒ nid′ fin (sI′ , stI′)))
                     (proj₁ (proj₂ (thruWrap mergeAllᵒ nid′ fin (sI′ , stI′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ nid′ fin (sI′ , stI′)))) r
                 → Arm S now oP (proj₁ (proj₂ (thruWrap mergeAllᵒ nid fin (sP′ , stP′)))) (proj₂ (proj₂ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))))
-                    p [] (proj₁ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))) none (oI ++ proj₁ r , proj₂ r)
+                    p [] (proj₁ (thruWrap mergeAllᵒ nid fin (sP′ , stP′))) none Never (oI ++ proj₁ r , proj₂ r)
 
 
     -- A COLD READ'S BLOCK WALKED: the impl alone runs the inner, the
@@ -349,7 +330,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               → ∀ {now fin oP vs₁ fin₁ sP₁ stP₁ rI}
               → stepFrame⇓ now (thru-outer mergeAllᵒ nid) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
               → foldPath⇓ now (thru-outer mergeAllᵒ nid′ ↠[ h′ ] q) vs′ fin sI stI rI
-              → Arm S now oP sP₁ stP₁ p vs₁ fin₁ none rI
+              → Arm S now oP sP₁ stP₁ p vs₁ fin₁ none Never rI
     hop-arm S hd sp k nP nI r si {fin = fin} dW@(step-thru-outer W) (fold-step dW′@(step-thru-outer W′) dR) =
       let X = hop-walk S hd sp k nP nI r (unthru si) W W′
       in hop-end {fin = fin} (proj₁ X) (proj₁ (proj₂ X)) (drop-ot _ _ _ (step-kept _ dW′ si)) dR
@@ -380,12 +361,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     fan-go S εI c ta (slotpair (inj₂ (x , _)) ∷ _) _ _ _ _ (casc-cut y _) _ = ⊥-elim (t≢f (trans (sym y) x))
     fan-go S εI c ta (slotpair (inj₂ (_ , x , _)) ∷ _) _ _ _ _ (casc-live _ _ _) (go-cut y _) = ⊥-elim (t≢f (trans (sym y) x))
     fan-go S εI c refl (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {emits = eI} _ dI g′) =
-      rebase (A ⨾ proj₁ R) , λ { refl d → out-++ eI _ (slot-out (delivered S pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI d)
-                                                      (proj₂ R refl d) }
+      rebase (A ⨾ proj₁ R) , λ { refl d → out-++ eI _ (proj₂ X refl d) (proj₂ R refl d) }
       where
         sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
         sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-        A = slot-pass (delivered S pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI
+        X = slot-pass (delivered S pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI
+        A = proj₁ X
         map-slot : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
                      {cs : List (RegId × AtFloor Γ u t)} {ds}
                  → Keeps S₀ S₁

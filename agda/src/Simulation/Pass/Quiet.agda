@@ -12,7 +12,7 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
-open import Data.List.Relation.Unary.All using (All; _∷_)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; nothing; just)
@@ -56,7 +56,7 @@ open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes; scan-at; take-open-at; cell-take)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear;
-  fold-clear; adv; fold-unmoved)
+  fold-clear; adv; fold-unmoved; Out)
 open import Simulation.Sweep using (t≢f; stamp-rows)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Simulation.Write using (module Write; key-same; vals-same; apart)
@@ -227,6 +227,11 @@ cur-there : ∀ {π : List (NodeId × List NodeId)} {c c′ j j′} → Unique (
 cur-there {c = c} {c′} {j′ = j′} vals pc pj e with ≡ᵇ→≡ c′ j′ e
 ... | refl with vals-same vals pc pj (here refl) (here refl)
 ...   | refl = ≡ᵇ-refl c
+
+-- AN OUTER'S END NOT YET COME leaves its flattener open
+wrap-false : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {op nid fin} {sc : Sched Δ} {st : EvalSt e}
+           → fin ≡ false → proj₁ (thruWrap op nid fin (sc , st)) ≡ false
+wrap-false refl = refl
 
 module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -491,7 +496,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN ECHO THROUGH THE RESTAMP: the scan's cell restamps it and
       -- keeps its payloads, and writes nothing but the cell, so the
       -- flattener and the tails stay related with the cell moved on; the
-      -- group it hands on keeps its end
+      -- group it hands on keeps its end, and every delivery's stamp
       restamp-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
                        {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es ws fin o₁ fin₁ sI₁ stI₁}
                        {ys : List (Val (plainᵏ Γ κ) (FlatSᵗ u))}
@@ -504,6 +509,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                        → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI₁) u op m m′ ks xs
                        × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes stI₁) p q
                        × Carries (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) ws × fin₁ ≡ fin
+                       × (∀ {I} → All (DelAt I) es → All (DelAt I) (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys))
 
       -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
       -- outer has and no lane is open or queued, read off related nodes,
@@ -528,7 +534,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
               → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
                   xs false sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
               → Restamped S op m m′ ks p q ws (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) fin₁ o₁ sI₁ stI₁
-    flat-echo S (f , r) c d = let (A , f′ , r′ , c′ , e) = restamp-echo S f r c d in restamped A (f′ , r′) c′ e
+    flat-echo S (f , r) c d = let (A , f′ , r′ , c′ , e , _) = restamp-echo S f r c d in restamped A (f′ , r′) c′ e
 
 
     -- A SWITCH'S RUNNING INNER CUT ON BOTH SIDES: the rows through the
@@ -900,7 +906,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                     bs refl sp si d₁ d₂
       with cut-group {Bud = λ _ b → b ≡ 1} {F′ = F₁} {P = just P} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃} CL bs (tt , false , os , em) 1 refl refl
          | scan-at lk₁ d₁
-    ... | cs , fe , rest | refl
+    ... | cs , fe , rest , _ | refl
       with rest refl
          | take-open-at (trans (set-above k₁ k₂ (cell-st {t = CutS unitᵗ s} (proj₂ (scanVals F₁ (tt , false , os , em) es))) (EvalSt.nodes stI)
                                           (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
@@ -1031,19 +1037,21 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- nodes are below the tail, so its fold leaves them where they were
     wrap-arm : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                 {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {oP sP′ stP′ oI sI′ stI′ fin r}
+                 {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {oP sP′ stP′ oI sI′ stI′ fin r} {H : ℕ → Set}
              → (A : After S (oP , sP′ , stP′) (oI , sI′ , stI′))
              → Clear m p (proj₁ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′)))) (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))
              → Wrapped (After.store A) op m m′ ks p q fin now r
+             → (∀ {I} → H I → Out I oI × fin ≡ false)
              → Arm S now oP (proj₁ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))
                  (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))
                  p [] (proj₁ (thruWrap (flatOp op) m fin (sP′ , stP′)))
                  (λ π NP NI → PathRel κ π NP NI (thru-outer (flatOp op) m ↠[ h ] p)
                     (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)))
-                 (oI ++ proj₁ r , proj₂ r)
-    wrap-arm {op = op} {m = m} {sP′ = sP′} {stP′ = stP′} {fin = fin} {r = r} A cP (wrapped {stI₁ = stI₁} A′ (fl , rel) cI dq) =
-      arm (A ⨾∅ A′) rel [] (proj₂ (proj₁ cI)) dq λ {rP} dP B rel′ →
+                 H (oI ++ proj₁ r , proj₂ r)
+    wrap-arm {op = op} {m = m} {sP′ = sP′} {stP′ = stP′} {fin = fin} {r = r} A cP (wrapped {stI₁ = stI₁} A′ (fl , rel) cI dq) g =
+      arm (A ⨾∅ A′) rel [] (proj₂ (proj₁ cI)) dq (λ {rP} dP B rel′ →
         let F  = flat-move (EvalSt.nodes (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))) (EvalSt.nodes stI₁)
                    (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ r)))
                    (After.grows B) (missed dP cP) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) fl
-        in outerElem~ F rel′
+        in outerElem~ F rel′)
+        λ h → proj₁ (g h) , inj₂ (wrap-false (proj₂ (g h)) , [])

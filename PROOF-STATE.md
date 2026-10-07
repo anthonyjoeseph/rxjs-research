@@ -258,14 +258,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **RIDE THE STAMPS ON THE PASSES.** The value pass carries `Out` at the
-  counter its chain entered with, read off `block-open`, `hop-one`,
-  `hot-walk` and `slot-out`. Give `Pass` that conjunct itself, guarded by
-  `fin ≡ false`, threaded through `path-pass` and the arms with the
-  installs' freshness and the flatteners' seeds already in hand, so
-  `slot-out` and the leaves' `Out` halves become projections. A shared
-  read's connect, reaching rows off this path, is the leaf that decides
-  whether one catch per subscribe is the shape.
+- **RIDE THE STAMPS ON THE PASSES.** `Pass` carries `Out` for a group
+  delivered at one instant with no end, every arm's tail read through it,
+  so a share's reader sends at its delivery by projection. What sends is
+  now the leaves: `explode-out` and `elem-out` route through a consume
+  carrying the instant its echo set, `cut-out` through the end a cut
+  hands on. Instantiate those three over two inners on one group, where a
+  second instant would show; a shared read's connect, reaching rows off
+  this path, decides whether one catch per subscribe is the shape.
 
 - **PROVE THE INSTALLS.** `flat-install{,-explode}`, `scan-install` and
   `while-install` write only at keys at or above the counters, and every
@@ -304,12 +304,16 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   came.
 - **`restamp-echo`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the restamp's
   scan stepped on a group keeps the flattener, and the group it hands on
-  carries the same values and end.
+  carries the same values and end, every delivery keeping its stamp.
 - **`outer-wrap`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the outer's end
   folded down the restamp tail on both sides, the flattener kept.
-- **`explode-{quiet,one,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: one
-  exploded emit, carrying nothing or one value, walks into the flattener
-  through the impl's merge, and the outer's end meets the plain outer's.
+- **`explode-{quiet,one,end,out}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
+  one exploded emit, carrying nothing or one value, walks into the flattener
+  through the impl's merge, and the outer's end meets the plain outer's; a
+  group delivered at one instant sends at it.
+- **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
+  delivered at one instant, its elements walked through the restamp, sends at
+  that instant.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   a cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped
@@ -323,6 +327,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a
   test's nodes written open keep the stores and tails, and written spent keep
   what the cut left; a spent test passes nothing on both sides.
+- **`cut-out`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a tail handed a
+  nonempty group delivered at one instant, and the end, sends at that instant.
 - **`share-{spend,finish}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: the
   stores stay related when both shares of a shared slot close and drop their
   readers.
@@ -335,9 +341,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   one per slot; one hot script only, so no two compared.
 - **`dyn-one`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: a minted
   source has at most one row in the impl's registry.
-- **`slot-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a share's
-  partnered reader handed emits each delivered at one instant, and no end,
-  sends at that instant.
 - **`value-draws`** (Simulation.Statement) — FALSITY, `NO EVIDENCE`: an impl
   value pass that sends leaves its counter past the one it started at.
 - **`quiet-fold`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: any tail handed

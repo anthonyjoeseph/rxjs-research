@@ -13,7 +13,7 @@ open import Data.Nat     using (ℕ; _≤_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤)
-open import Data.Sum     using (_⊎_)
+open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Rx.Prim      using (Tick; EmitKind; subscribe; delivery; plumbing)
@@ -69,6 +69,11 @@ Out I o = All (λ y → proj₁ y ≡ I) (readᴵ o)
 
 out-++ : ∀ {m} {Δ : Ctx m} {t} {I} (xs ys : Stream Δ (instEmitᵗ uniqᵗ t)) → Out I xs → Out I ys → Out I (xs ++ ys)
 out-++ {I = I} xs ys a b = subst (All (λ y → proj₁ y ≡ I)) (sym (readᴵ-++ xs ys)) (++⁺ᵃ a b)
+
+-- a tail read at `I`, once whatever else it might be is ruled out
+out-tail : ∀ {m} {Δ : Ctx m} {t} {I} {o : Stream Δ (instEmitᵗ uniqᵗ t)} {D : Set} → Out I o ⊎ D → (D → Out I o) → Out I o
+out-tail (inj₁ x) _ = x
+out-tail (inj₂ d) f = f d
 
 -- a quiet run is at every instant
 out-quiet : ∀ {m} {Δ : Ctx m} {t} {I} (o : Stream Δ (instEmitᵗ uniqᵗ t)) → readᴵ o ≡ [] → Out I o
@@ -177,6 +182,20 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
   DelAt : ∀ {s} → ℕ → Val (plainᵏ Γ κ) (emitᵗ s) → Set
   DelAt {s} I e′ = Del I (stampOf {Γ = Γ} κ {s} e′)
 
+  -- A GROUP ALL DELIVERED AT `I` AND NOT THE END: what a pass reads its
+  -- output's instant off
+  Dlv : ∀ {s} → ℕ → Bool → List (Val (plainᵏ Γ κ) (emitᵗ s)) → Set
+  Dlv I fin es = fin ≡ false × All (DelAt I) es
+
+  -- no instant asked of an arm whose tail ends
+  Never : ℕ → Set
+  Never _ = ⊥
+
+  -- a stamp kept is a delivery kept
+  del-keep : ∀ {s u} {I} (x : Val (plainᵏ Γ κ) (emitᵗ u)) (y : Val (plainᵏ Γ κ) (emitᵗ s))
+           → stampOf {Γ = Γ} κ {u} x ≡ stampOf {Γ = Γ} κ {s} y → DelAt I y → DelAt I x
+  del-keep {I = I} _ _ eq d = subst (Del I) (sym eq) d
+
   carries-map : ∀ {s u} {G′ : Val (plainᵏ Γ κ) (emitᵗ s) → Val (plainᵏ Γ κ) (emitᵗ u)} {f : Val Γ s → Val Γ u}
               → Lifts κ s u G′ (map f) → ∀ {es vs} → Carries es vs → Carries (map G′ es) (map f vs)
   carries-map L []                      = []
@@ -196,8 +215,11 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
     -- fold standing on a sound tail related to the plain one's, and the whole
     -- related again once the tails have folded -- the arm's own frames
     -- being nodes a tail's fold does not write
+    --
+    -- AND, AT EVERY INSTANT `H` NAMES, the arm's own output read there and
+    -- either the tail's or the group it hands the tail delivered there
     data Arm {sP stP sI stI} (S : St sP stP sI stI) (now : Tick) (oP : Stream Γ t) (sP₁ : Sched Γ) (stP₁ : EvalSt ep)
-             {ℓ u} (p : Path Γ ℓ u t) (vs : List (Val Γ u)) (fin : Bool) (G : Goal)
+             {ℓ u} (p : Path Γ ℓ u t) (vs : List (Val Γ u)) (fin : Bool) (G : Goal) (H : ℕ → Set)
            : Stream (plainᵏ Γ κ) (emitᵗ t) × Sched (plainᵏ Γ κ) × EvalSt ei → Set where
       arm : ∀ {ℓ′} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)} {oI es sI₁ stI₁ rI}
           → (A : After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁))
@@ -208,7 +230,13 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
           → (∀ {rP} → foldPath⇓ now p vs fin sP₁ stP₁ rP → (B : After (After.store A) rP rI)
              → PathRel κ (Store.π (After.store B)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
              → G (Store.π (After.store B)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))))
-          → Arm S now oP sP₁ stP₁ p vs fin G (oI ++ proj₁ rI , proj₂ rI)
+          → (∀ {I} → H I → Out I oI × (Out I (proj₁ rI) ⊎ Dlv I fin es))
+          → Arm S now oP sP₁ stP₁ p vs fin G H (oI ++ proj₁ rI , proj₂ rI)
+
+    -- an arm read at fewer instants
+    arm-weaken : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin G H H′ r}
+               → (∀ {I} → H′ I → H I) → Arm S now oP sP₁ stP₁ p vs fin G H r → Arm S now oP sP₁ stP₁ p vs fin G H′ r
+    arm-weaken w (arm A r b si dI rb o) = arm A r b si dI rb (λ h → o (w h))
 
     -- nothing asked of the whole
     none : Goal
@@ -230,7 +258,7 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
       → Sound (f ↠[ h ] p) sP stP → Sound Q sI stI
       → stepFrame⇓ now f p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
       → foldPath⇓ now Q es fin sI stI rI
-      → Arm S now oP sP₁ stP₁ p vs₁ fin₁ (λ π NP NI → PathRel κ π NP NI (f ↠[ h ] p) Q) rI
+      → Arm S now oP sP₁ stP₁ p vs₁ fin₁ (λ π NP NI → PathRel κ π NP NI (f ↠[ h ] p) Q) (λ I → Dlv I fin es) rI
 
     -- AN INNER'S STEP THAT LEAVES IT OPEN: the group passed on as it came
     InnerPasses : ∀ {lo lo′ ℓ u} → AllOp → NodeId → NodeId → lo ≤ ℓ → Path Γ ℓ u t → Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t) → Set
@@ -240,4 +268,4 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
       → Sound (from-inner a m j ↠[ h ] p) sP stP → Sound Q sI stI
       → fin ≡ false ⊎ any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ true
       → foldPath⇓ now Q es fin sI stI rI
-      → Arm S now [] sP stP p vs false (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) rI
+      → Arm S now [] sP stP p vs false (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) (λ I → Dlv I fin es) rI
