@@ -245,14 +245,13 @@ arrivals over `correspondence`: schedules in step, pops partnered, stores relate
 subscribes set them (`subscribe-related`) and each cascade keeps
 (`cascade-related`), values agreeing. RULED
 OUT: an arrival plain lacks, a split one, an instant's gap or
-stray, an echo apart from inners or payload; a subscribe,
-bound or not, unrelated; a pop unrelating a read; a map moving time; a close
-emptying a named merge; a hot end past its block; a two-value emit; a cut
+stray, an echo apart from inners, payload; any subscribe
+unrelated; a pop unrelating a read; a map moving time; a close
+emptying named merges; a hot end past its block; a two-value emit; a cut
 over a testless budget; a flatten write moving a row; a cut or
 liveness unpairing; a drain or body end (μ too)
-unrelating inners; unsound walks or reads; two chains
-stamping one arrival.
-Left: which cascade breaks it.
+unpairing inners; unsound walks, reads; two stamping chains.
+Left: which cascade breaks.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
