@@ -7,6 +7,7 @@
 -- statement quantified over every tail and every state it is folded in.
 module Refuted.Quiet-Fold-Batch where
 
+open import Data.Bool using (false)
 open import Data.Fin using (zero)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
