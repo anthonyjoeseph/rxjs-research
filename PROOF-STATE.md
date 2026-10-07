@@ -282,7 +282,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`defer-write`** (Simulation.Pass) — FALSITY, `PROBED×5`: a deferred body's
+- **`defer-write`** (Simulation.Pass) — FALSITY, `PROBED×6`: a deferred body's
   three counts, the plain merge's and the impl's marker merge and hop node,
   written one lower together keep the store and the tails related.
 - **`quiet-spent`** (Simulation.Pass) — FALSITY, `PROBED`: a spent test's cell

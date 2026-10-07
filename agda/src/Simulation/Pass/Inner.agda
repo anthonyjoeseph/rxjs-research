@@ -314,6 +314,11 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- PROBED: make qc-store QC='38 380 4' QC_FUEL=12
       --   decided by `CLI.Store-Check`'s `store?`: same draw as seed 37.
       --   Draw unrecorded: the seed alone does not replay it.
+      -- PROBED: make qc-store QC='1 300 4' QC_FUEL=30 QC_DRAW='{"exp":[1,1,1,1,3,1,1,1,3,6,1,1,2],"reach":["defer"]}'
+      --   decided by `CLI.Store-Check`'s `store?` with its `hop-one`
+      --   check, every impl row through a hop merge under one marker:
+      --   202 agree, 0 fail before the budget; every case defers.  How
+      --   many carried two rows through one hop is not counted.
       defer-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₃ u nid nid′ j j′ m2 j2 a}
                       {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                   → (nid , nid′ ∷ []) ∈ Store.π S → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
