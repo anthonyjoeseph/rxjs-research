@@ -88,8 +88,9 @@ above-unpaired {xs = xs} ax lt un k∈ with ∈-++⁻ xs k∈
 
 -- THE RELATIONS CARRIED TO THE GROWN `π` AND THE WRITTEN TABLES, each
 -- read moved by the bound its node already has
-module Move {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} {j : NodeId} {xs : List NodeId} {cP cI : ℕ}
-            (ax : All (cI ≤_) xs) (bP : All (λ e → proj₁ e < cP) π) (bI : All (λ e → All (_< cI) (proj₂ e)) π)
+module Move {n} {Γ : Ctx n} (κ : Kinds n) {π π′ : List (NodeId × List NodeId)} {cP cI : ℕ}
+            (sub : ∀ {x} → x ∈ π → x ∈ π′) (frsh : ∀ {k} → k < cI → Unpaired {Γ = Γ} κ π k → Unpaired {Γ = Γ} κ π′ k)
+            (bP : All (λ e → proj₁ e < cP) π) (bI : All (λ e → All (_< cI) (proj₂ e)) π)
             {t : Ty} {NP NP′ : List (NodeId × NodeState Γ)} {NI NI′ : List (NodeId × NodeState (plainᵏ Γ κ))}
             (aP : ∀ k → k < cP → lookupNode k NP′ ≡ lookupNode k NP)
             (aI : ∀ k → k < cI → lookupNode k NI′ ≡ lookupNode k NI) where
@@ -109,30 +110,30 @@ module Move {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} 
   rdI : ∀ {k v} → k < cI → lookupNode k NI ≡ v → lookupNode k NI′ ≡ v
   rdI {k} lt l = trans (aI k lt) l
 
-  fresh : ∀ {k} → k < cI → Unpaired {Γ = Γ} κ π k → Unpaired {Γ = Γ} κ ((j , xs) ∷ π) k
-  fresh = above-unpaired {Γ = Γ} {κ = κ} {π = π} {j = j} ax
+  fresh : ∀ {k} → k < cI → Unpaired {Γ = Γ} κ π k → Unpaired {Γ = Γ} κ π′ k
+  fresh = frsh
 
-  flatM : ∀ {u op m m′ ks ys} → Flattener κ π {t = t} NP NI u op m m′ ks ys → Flattener κ ((j , xs) ∷ π) {t = t} NP′ NI′ u op m m′ ks ys
+  flatM : ∀ {u op m m′ ks ys} → Flattener κ π {t = t} NP NI u op m m′ ks ys → Flattener κ π′ {t = t} NP′ NI′ u op m m′ ks ys
   flatM (pm , x , x′ , lP , lI , fn , c , lk) =
-    there pm , x , x′ , rdP (keyP pm) lP , rdI (valI pm (here refl)) lI , nodes-grow {Γ = Γ} κ there fn , c , rdI (valI pm (there (here refl))) lk
+    sub pm , x , x′ , rdP (keyP pm) lP , rdI (valI pm (here refl)) lI , nodes-grow {Γ = Γ} κ sub fn , c , rdI (valI pm (there (here refl))) lk
 
   pathM : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
-        → PathRel κ π NP NI p q → PathRel κ ((j , xs) ∷ π) NP′ NI′ p q
+        → PathRel κ π NP NI p q → PathRel κ π′ NP′ NI′ p q
   pathM root~                            = root~
   pathM (sink~ sh)                       = sink~ sh
   pathM (map~ L r)                       = map~ L (pathM r)
-  pathM (scan~ e l l′ v L r)             = scan~ (there e) (rdP (keyP e) l) (rdI (valI e (here refl)) l′) v L (pathM r)
+  pathM (scan~ e l l′ v L r)             = scan~ (sub e) (rdP (keyP e) l) (rdI (valI e (here refl)) l′) v L (pathM r)
   pathM (takeWhile~ e l l₁ l₂ L r)       =
-    takeWhile~ (there e) (rdP (keyP e) l) (rdI (valI e (here refl)) l₁) (rdI (valI e (there (here refl))) l₂) L (pathM r)
-  pathM (spentWhile~ e l l₂ r)           = spentWhile~ (there e) (rdP (keyP e) l) (rdI (valI e (there (here refl))) l₂) (pathM r)
+    takeWhile~ (sub e) (rdP (keyP e) l) (rdI (valI e (here refl)) l₁) (rdI (valI e (there (here refl))) l₂) L (pathM r)
+  pathM (spentWhile~ e l l₂ r)           = spentWhile~ (sub e) (rdP (keyP e) l) (rdI (valI e (there (here refl))) l₂) (pathM r)
   pathM (outerElem~ f r)                 = outerElem~ (flatM f) (pathM r)
   pathM (outerExplode~ f r)              = outerExplode~ (flatM f) (pathM r)
-  pathM (inner~ e f ip r)                = inner~ e (flatM f) (there ip) (pathM r)
+  pathM (inner~ e f ip r)                = inner~ e (flatM f) (sub ip) (pathM r)
   pathM (deferInner~ e₁ e₂ l l′ l₂ a≤ b≤ r) =
-    deferInner~ (there e₁) (there e₂) (rdP (keyP e₁) l) (rdI (valI e₁ (here refl)) l′) (rdI (valI e₂ (there (here refl))) l₂) a≤ b≤ (pathM r)
+    deferInner~ (sub e₁) (sub e₂) (rdP (keyP e₁) l) (rdI (valI e₁ (here refl)) l′) (rdI (valI e₂ (there (here refl))) l₂) a≤ b≤ (pathM r)
 
   blockM : ∀ {a lo ℓ} {full : Path (plainᵏ Γ κ) lo a (emitᵗ t)} {q}
-         → Low cI full → InputBlock κ π NP NI a {lo} {ℓ} full q → InputBlock κ ((j , xs) ∷ π) NP′ NI′ a full q
+         → Low cI full → InputBlock κ π NP NI a {lo} {ℓ} full q → InputBlock κ π′ NP′ NI′ a full q
   blockM o (block l₁ a≤ lb l₂ u₁ uj ub u₂) =
     block (rdI (head (proj₁ (proj₂ o))) l₁) a≤ (rdI (head (proj₁ (proj₂ (proj₂ o)))) lb)
           (rdI (head (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ o))))))) l₂)
@@ -141,36 +142,36 @@ module Move {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} 
 
   module _ {LP LI} where
 
-    rowM : ∀ {r r′} → Lw r′ → RowRel κ π NP NI LP LI r r′ → RowRel κ ((j , xs) ∷ π) NP′ NI′ LP LI r r′
+    rowM : ∀ {r r′} → Lw r′ → RowRel κ π NP NI LP LI r r′ → RowRel κ π′ NP′ NI′ LP LI r r′
     rowM o (read~ hs r refl)         = read~ hs (pathM r) refl
     rowM o (cold~ sp b r refl)       = cold~ sp (blockM o b) (pathM r) refl
-    rowM o (defer~ sp e l l′ r refl) = defer~ sp (there e) (rdP (keyP e) l) (rdI (valI e (here refl)) l′) (pathM r) refl
+    rowM o (defer~ sp e l l′ r refl) = defer~ sp (sub e) (rdP (keyP e) l) (rdI (valI e (here refl)) l′) (pathM r) refl
 
-    machM : ∀ {r′} → Lw r′ → MachRow κ π {t = t} NP NI LP LI r′ → MachRow κ ((j , xs) ∷ π) NP′ NI′ LP LI r′
+    machM : ∀ {r′} → Lw r′ → MachRow κ π {t = t} NP NI LP LI r′ → MachRow κ π′ NP′ NI′ LP LI r′
     machM o (hot~ hot b refl) = hot~ hot (blockM o b) refl
 
-    regM : ∀ {rs rs′} → (∀ {r′} → r′ ∈ rs′ → Lw r′) → RegRel κ π NP NI LP LI rs rs′ → RegRel κ ((j , xs) ∷ π) NP′ NI′ LP LI rs rs′
+    regM : ∀ {rs rs′} → (∀ {r′} → r′ ∈ rs′ → Lw r′) → RegRel κ π NP NI LP LI rs rs′ → RegRel κ π′ NP′ NI′ LP LI rs rs′
     regM o []         = []
     regM o (r ∷ q)    = rowM (o (here refl)) r ∷ regM (λ r∈ → o (there r∈)) q
     regM o (mach r q) = mach (machM (o (here refl)) r) (regM (λ r∈ → o (there r∈)) q)
 
     -- the registries pair the same rows
     partM : ∀ {rs rs′} (o : ∀ {r′} → r′ ∈ rs′ → Lw r′) (q : RegRel κ π NP NI LP LI rs rs′) {r r′}
-          → Partners κ π NP NI LP LI q r r′ → Partners κ ((j , xs) ∷ π) NP′ NI′ LP LI (regM o q) r r′
+          → Partners κ π NP NI LP LI q r r′ → Partners κ π′ NP′ NI′ LP LI (regM o q) r r′
     partM o (_ ∷ q)    (inj₁ e) = inj₁ e
     partM o (_ ∷ q)    (inj₂ p) = inj₂ (partM (λ r∈ → o (there r∈)) q p)
     partM o (mach _ q) p        = partM (λ r∈ → o (there r∈)) q p
 
     -- and spend them alike
     spentM : ∀ {rs rs′} (o : ∀ {r′} → r′ ∈ rs′ → Lw r′) (q : RegRel κ π NP NI LP LI rs rs′) {dP dI}
-           → Spent κ π NP NI LP LI q dP dI → Spent κ ((j , xs) ∷ π) NP′ NI′ LP LI (regM o q) dP dI
+           → Spent κ π NP NI LP LI q dP dI → Spent κ π′ NP′ NI′ LP LI (regM o q) dP dI
     spentM o []         s       = s
     spentM o (_ ∷ q)    (e , s) = e , spentM (λ r∈ → o (there r∈)) q s
     spentM o (mach _ q) s       = spentM (λ r∈ → o (there r∈)) q s
 
     -- and the same minted sources
     arrM : ∀ {rs rs′} (o : ∀ {r′} → r′ ∈ rs′ → Lw r′) (q : RegRel κ π NP NI LP LI rs rs′) {s s′ w w′}
-         → ArrRows κ π NP NI LP LI q s s′ w w′ → ArrRows κ ((j , xs) ∷ π) NP′ NI′ LP LI (regM o q) s s′ w w′
+         → ArrRows κ π NP NI LP LI q s s′ w w′ → ArrRows κ π′ NP′ NI′ LP LI (regM o q) s s′ w w′
     arrM o []                          _       = _
     arrM o (read~ _ _ refl ∷ q)        a       = arrM (λ r∈ → o (there r∈)) q a
     arrM o (cold~ _ _ _ refl ∷ q)      (r , a) = r , arrM (λ r∈ → o (there r∈)) q a
@@ -206,7 +207,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     , here refl , M.pathM pr
     where
     open Store S
-    module M = Move {Γ = Γ} κ {π = π} {j = nodeCt sP} {xs = xs} ax (proj₁ pairs-below) (proj₂ pairs-below) {t = t}
+    module M = Move {Γ = Γ} κ {π = π} {π′ = (nodeCt sP , xs) ∷ π} there (above-unpaired {Γ = Γ} {κ = κ} {π = π} {j = nodeCt sP} ax) (proj₁ pairs-below) (proj₂ pairs-below) {t = t}
                  {NP = EvalSt.nodes stP} {NP′ = NP} {NI = EvalSt.nodes stI} {NI′ = NI} aP aI
     o : ∀ {r′} → r′ ∈ EvalSt.registry stI → M.Lw r′
     o {r′} r∈ = low-row r′ (fresh-rows ruleI r∈)

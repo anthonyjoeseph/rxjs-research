@@ -259,11 +259,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **PROVE THE READS.** `hot-read`'s three pair leaves, `hot-read-join`
   first: both runs register one row at the slot, the impl's behind the
-  share, a pair `RegRel` takes as `read~`. Then `{shared,cold}-read` as
-  `hot-read` now is, over the `Walker` the reads now carry; decide first
-  whether a cold read's input block keeps `Store.owned` when its nodes
-  join the registry. Rules out a slot read unpairing a store under any
-  store, not only at the root.
+  share, a pair `RegRel` takes as `read~`. Then `shared-read` as
+  `hot-read` now is, then `cold-block`'s flush by inverting the impl's
+  block. Cold's `Store.owned` needed no field. Rules out a slot read
+  unpairing a store under any store, not only at the root.
 
 - **PROVE THE NODE WRITES.** `scan-write`, `while-{write,spent}` as
   `CellWrite` is: `Moves`' cell and count obligations cite the row's own
@@ -333,10 +332,16 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`of-emits`** (Simulation.Walk) — FALSITY, `PROBED`: an `of`'s emits stand
   at its program's frame, subscribe-kind; held at the root and under a value
   binder, not under a mint's binder.
-- **`{shared,cold}-read`** (Simulation.Walk) — FALSITY, `PROBED×4, RECOVERY`: a
-  slot's plain subscribe against the impl's at its stamped slot, down the
-  restamp or the cold mint, keeps what a pass keeps; the two scripts at the
-  slot are one by `Store.scripts`, the shared paths sound.
+- **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×4, RECOVERY`: a cold
+  read's impl subscribe over an asynchronous tail leaves its block's nodes
+  fresh, a partnered source, and its flush one fold of one group down the tail.
+- **`cold-read-end`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a cold read
+  below the floor or over an all-synchronous script folds its prefix and end on
+  both sides.
+- **`shared-read`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a slot's plain
+  subscribe against the impl's at its stamped slot, down the restamp, keeps
+  what a pass keeps; the two scripts at the slot are one by `Store.scripts`,
+  the shared paths sound.
 - **`hot-read-{join,connect-done,connect-live}`** (Simulation.Walk) — FALSITY,
   `PROBED`: a hot read's rule pair keeps what a pass keeps — both registering
   at the slot, or the impl connecting its share over an ended or a live script.

@@ -36,7 +36,7 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] t
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Maybe using (just; nothing)
 
 open import Rx.Prim      using (hot; cold)
@@ -46,7 +46,7 @@ open import Rx.Exp       using (Ctx; Val; Closed; Exp; unfoldμ; ofᵉ; Ren∈; 
   varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm; Env)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
-  Frame; frameNodes; mkHot; memoᶠ; Stream; memberSource; atSlot; lowerFloor; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
+  Frame; frameNodes; mkHot; memoᶠ; Stream; resolve; memberSource; atSlot; lowerFloor; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; fold-step; step-map; sharedConnect⇓; subs-floor; subs-shared; subs-hot-done; subs-hot-live;
   subs-cold-sync; subs-cold-async; slot-spent; slot-join; slot-connect; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; subs-μ; sub-all; flatSt)
@@ -63,12 +63,13 @@ open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStep
   FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ; inputᵖ)
 open import SExp.InstEmit using (machineEmitᵗ)
 open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl; embedAt; stampedSlotᵏ; hotSlotAt)
-open import SExp.Simul-Slots using (SimulSlots; SimulSlot; hotˢ; plainSlots)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; hotˢ; coldˢ; plainSlots)
 open import Simulation.Schedules using (Sync)
 open import Simulation.After using (readᴾ; readᴵ; module Kept)
 open import Simulation.Write using (apart)
 open import Simulation.Install using (install; fresh-set; weak; named-mint)
 open import Simulation.Hop using (hop-register)
+open import Simulation.Cold using (ColdBlock; cold-register)
 open import Simulation.Catch using (Kept; Stamps; AtFrame; OnPath; on-path; catch-same; kept-same; kept-trans; kept-catch;
   kept-unmoved; unmoved-set; by-sub; by-sub⁻)
 open Kept using (After; module After; _⨾_; after)
@@ -138,6 +139,12 @@ plain-hot-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j
                → Σ _ λ ok → Σ _ λ as → plainSlots ins j ≡ scripted {ok = ok} (hot as)
 plain-hot-slot {κ = κ} ins j ek with lookup κ j | ins j
 plain-hot-slot ins j refl | hotᵏ | hotˢ _ = _ , _ , refl
+
+-- A COLD SLOT READ PLAIN IS ITS SCRIPT, COLD
+plain-cold-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j : Fin m) → lookup κ j ≡ coldᵏ
+                → Σ _ λ ok → Σ _ λ ss → Σ _ λ as → plainSlots ins j ≡ scripted {ok = ok} (cold ss as)
+plain-cold-slot {κ = κ} ins j ek with lookup κ j | ins j
+plain-cold-slot ins j refl | coldᵏ | coldˢ _ _ = _ , _ , _ , refl
 
 scriptedᵇ : ∀ {m} {Δ : Ctx m} {k u} → Slot Δ k u → Bool
 scriptedᵇ (scripted _) = true
@@ -313,24 +320,22 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- Each names the run of impl frames `PathRel` pairs with its plain
     -- frame, and the sources and nodes it registers.
     postulate
-      -- A COLD SLOT'S READ, AGAINST ITS STAMPED SLOT'S BLOCK: the plain
-      -- subscribe at the slot, the impl's at the marked, batched and
-      -- stamped read of the script under its mint
+      -- A COLD READ'S INPUT BLOCK UP TO ITS FLUSH, at a script with an
+      -- asynchronous tail: the impl's subscribe of the marked, batched and
+      -- stamped read leaves the block's nodes at or above the counter, a
+      -- source partnered with the plain read's, and the flush one fold
+      -- down the tail of a group carrying the plain prefix.  What
+      -- `Simulation.Cold`'s `cold-register` needs to register both rows.
       --
       -- THE TWO SCRIPTS AT THE SLOT ARE ONE, read off `Store.scripts`: both
       -- schedules' tables are one author's, the impl's embedded.  The hot
       -- and shared reads stand on it too.
       --
-      -- NO `Sound` YET, though the plain read registers its path as the
-      -- hot and shared reads do: nothing refutes the unconditional form.
-      -- The refutation's impl side is the block's subscribe written by
-      -- hand, and the checker runs out of memory on it even down the
-      -- root path, so that refutation is a coverage boundary.
-      --
-      -- THE `Sound` PAIR AT A CONCRETE STORE IS PAST THE TYPECHECKER: the
-      -- row below, given `sound` over the opening store's two root
-      -- derivations, exhausted the checker's memory; a coverage boundary,
-      -- and the compiled sweep covers it.
+      -- WHERE IT CAN FAIL: the flush as ONE fold of ONE group from the
+      -- state the registration leaves.  The stamp, the pairing and the
+      -- flattening merge sit between the batch and the tail, and the merge
+      -- subscribes an inner, which mints and installs; each is a state
+      -- the field quantifies past.
       -- PROBED: make qc-store QC='41 100 4'
       --   decided by `CLI.Store-Check`'s `store?`: hot scripts, flatteners
       --   over literal inners and defers, a slot leaf weighted up; 100
@@ -352,18 +357,34 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- RECOVERY: git show ae5fd17e:agda/evidence/refuted/Refuted/Slot-Scripts.agda
       --   restores the opening store at two cold tables, which refuted this
       --   read over a store blind to the slots.
-      cold-read      : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
-                     → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
-                     → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
-                     → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
-                         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
-                     → (S : Store κ sP stP sI stI)
-                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                     → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
-                     → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
-                         (subst (λ u → Path (plainᵏ Γ κ) (n + lo) (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
-                     → Σ (After κ S rP rI) λ A
-                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+      cold-block : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
+                 → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′}
+                 → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
+                 → ∀ {lo} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+                     {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rI}
+                 → (S : Store κ sP stP sI stI)
+                 → ∀ {ok sync d ds} → toℕ i < lo → Sched.slots sP i ≡ scripted {ok = ok} (cold sync (d ∷ ds))
+                 → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
+                     (subst (λ u → Path (plainᵏ Γ κ) (n + lo) (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
+                 → ColdBlock κ S q now (record { source = freshId sourceᵏ (Sched.mint sP) ; ordinal = freshId ordinalᵏ (Sched.mint sP)
+                                               ; elemTy = lookup Γ i ; pending = resolve now (d ∷ ds) }) sync rI
+      -- A COLD READ WITH NOTHING TO REGISTER: below the floor, or a script
+      -- whose values are all synchronous.  Each run folds its prefix and
+      -- the end at once, the impl's through its block
+      cold-read-end : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
+                    → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                    → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
+                    → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+                        {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
+                    → (S : Store κ sP stP sI stI)
+                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                    → Sound p sP stP → Sound q sI stI
+                    → ∀ {vs} → (lo ≤ toℕ i × vs ≡ []) ⊎ (toℕ i < lo × Σ _ λ ok → Sched.slots sP i ≡ scripted {ok = ok} (cold vs []))
+                    → (fP : foldPath⇓ now p vs true sP stP rP)
+                    → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
+                        (subst (λ u → Path (plainᵏ Γ κ) (n + lo) (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
+                    → sz-foldPath fP < M
+                    → ReadAfter S rP rI p q
       -- WHERE A COLD READ'S EMITS LAND: its block stamps every one at
       -- the program's frame, subscribe-kind, and the path catches it.
       -- Decoding what the block sends exhausted the checker's memory at a
@@ -518,6 +539,21 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                                   (impl-hot-slot ins i ek)
     ...   | ()
 
+    -- NOR A COLD SLOT
+    cold-no-shared : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) (i : Fin n) → lookup κ i ≡ coldᵏ
+                   → ∀ {d ok} → Sched.slots sP i ≡ shared d {ok = ok} → ⊥
+    cold-no-shared S i ek x with Store.scripts S
+    ... | ins , eP , _ with plain-cold-slot ins i ek
+    ...   | _ , _ , _ , s with trans (sym s) (trans (sym (memoᶠ-at (plainSlots ins) i)) (trans (sym (cong (λ f → f i) eP)) x))
+    ...     | ()
+
+    cold-no-hot : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) (i : Fin n) → lookup κ i ≡ coldᵏ
+                → ∀ {ok as} → Sched.slots sP i ≡ scripted {ok = ok} (hot as) → ⊥
+    cold-no-hot S i ek x with Store.scripts S
+    ... | ins , eP , _ with plain-cold-slot ins i ek
+    ...   | _ , _ , _ , s with trans (sym s) (trans (sym (memoᶠ-at (plainSlots ins) i)) (trans (sym (cong (λ f → f i) eP)) x))
+    ...     | ()
+
     -- AN ENDED SCRIPT'S SHARE IS NOT JOINED, A LIVE ONE'S NOT SPENT: the
     -- stamped slot's latch is its raw slot's and its connection's
     done-unjoined : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) (i : Fin n) → lookup κ i ≡ hotᵏ
@@ -576,6 +612,38 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       hot-read-join i ek w {ρ′} {ρ} r eq S pr oP oI c sI fr fr′
     hot-read i ek wk w {ρ′} {ρ} r eq S pr oP oI (subs-hot-live _ _ c fr) (subs-shared x (slot-connect _ sI dc)) _ =
       hot-read-connect-live i ek w {ρ′} {ρ} r eq S pr oP oI c fr x sI dc
+
+    -- A COLD SLOT'S READ, AGAINST ITS STAMPED SLOT'S BLOCK: the plain
+    -- subscribe at the slot, the impl's at the marked, batched and
+    -- stamped read of the script under its mint.  With an asynchronous
+    -- tail both runs register a row, the block's flush folds what the
+    -- plain prefix folds, and the pass carries the stores past it.
+    cold-read : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
+              → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+              → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
+              → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+                  {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
+              → (S : Store κ sP stP sI stI)
+              → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+              → Sound p sP stP → Sound q sI stI
+              → (dP : subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP)
+              → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
+                  (subst (λ u → Path (plainᵏ Γ κ) (n + lo) (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
+              → sz-subscribeE dP < suc M
+              → ReadAfter S rP rI p q
+    cold-read i ek wk w {ρ′} {ρ} r eq S pr oP oI (subs-floor h fP) dI lt =
+      cold-read-end i ek wk w {ρ′} {ρ} r eq S pr oP oI (inj₁ (h , refl)) fP dI (s<s⁻¹ lt)
+    cold-read i ek wk w {ρ′} {ρ} r eq S pr oP oI (subs-cold-sync b x fP) dI lt =
+      cold-read-end i ek wk w {ρ′} {ρ} r eq S pr oP oI (inj₂ (b , _ , x)) fP dI (s<s⁻¹ lt)
+    cold-read i ek wk w r eq S pr oP oI (subs-cold-async b x refl refl refl fP) dI lt =
+      let B = cold-block i ek w eq S b x dI
+          C = cold-register κ S pr oP oI _ B
+          X = path-pass wk (After.store (proj₁ C)) (proj₁ (proj₂ C)) (ColdBlock.carries B)
+                (proj₁ (proj₂ (proj₂ C))) (proj₂ (proj₂ (proj₂ C))) fP (ColdBlock.fold B) (s<s⁻¹ lt)
+      in _⨾_ κ (proj₁ C) (proj₁ X) , proj₁ (proj₂ X)
+    cold-read i ek wk w r eq S pr oP oI (subs-shared x _) _ _        = ⊥-elim (cold-no-shared S i ek x)
+    cold-read i ek wk w r eq S pr oP oI (subs-hot-done _ x _ _) _ _  = ⊥-elim (cold-no-hot S i ek x)
+    cold-read i ek wk w r eq S pr oP oI (subs-hot-live _ x _ _) _ _  = ⊥-elim (cold-no-hot S i ek x)
 
     -- A CELL INSTALLED ON BOTH SIDES, the impl's under its mint: the
     -- pair joins `π` and the tails stay related
@@ -1003,13 +1071,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       in proj₁ A , proj₂ A , of-fold-stamps S pr oP oI fr (of-carries ts w r refl src) (of-emits ts w refl src) dP dI
 
     -- a cold slot's walk: the impl's read past the transport
-    walk-cold : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Elab-Walks {Θ} (inputˢ i)
-    walk-cold i e w r S pr _ _ dP dI with lookup κ i in ek | stampedSlot Γ κ i
-    walk-cold i e w r S pr _ _ dP dI | coldᵏ | eq =
-      let A = cold-read i ek w r eq S pr dP (read-machine w eq _ dI)
+    walk-cold : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-cold i e wk w r S pr oP oI dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
+    walk-cold i e wk w r S pr oP oI dP dI lt | coldᵏ | eq =
+      let A = cold-read i ek wk w r eq S pr oP oI dP (read-machine w eq _ dI) lt
       in proj₁ A , proj₂ A , cold-read-stamps i ek w r eq S pr dP (read-machine w eq _ dI)
-    walk-cold i () w r S pr _ _ dP dI | hotᵏ | _
-    walk-cold i () w r S pr _ _ dP dI | sharedᵏ | _
+    walk-cold i () wk w r S pr _ _ dP dI lt | hotᵏ | _
+    walk-cold i () wk w r S pr _ _ dP dI lt | sharedᵏ | _
 
     -- a hot slot's walk: the impl's read peeled to its stamped slot
     walk-hot : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
@@ -1031,7 +1099,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- the one arm that reads `κ`, one leaf per kind
     walk-input : ∀ {M Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
-    walk-input i coldᵏ   e _  w r S pr oP oI dP dI _ = walk-cold i e w r S pr oP oI dP dI
+    walk-input i coldᵏ   e wk = walk-cold i e wk
     walk-input i hotᵏ    e wk = walk-hot i e wk
     walk-input i sharedᵏ e wk = walk-shared i e wk
 
