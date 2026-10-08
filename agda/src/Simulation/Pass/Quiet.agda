@@ -1107,7 +1107,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     postulate
       -- AN OUTER'S EMIT CARRYING NOTHING, EXPLODED, SUBSCRIBED: the impl's
       -- merge takes its empty run of elements as an inner, the plain side
-      -- does not move, and the merge stays unbounded at the echo's type
+      -- does not move, and the merge stays unbounded at the echo's type.
+      -- False where the outer has ended, as `explode-one-sub` records
       explode-quiet-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                           {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                           {lim a qs od inst out sched₁ st₁}

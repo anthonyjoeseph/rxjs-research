@@ -262,14 +262,19 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   Decides whether `simulation`'s instant bookkeeping survives a value pass
   that now emits once per value.
 
-- **FIT THE EXPLODE.** Write `explode-out` and the two subscribe leaves as
-  bodies over smaller leaves; every fact a body needs that `Store` lacks
-  becomes a field, its consumers cascaded. The consume needed the explode's
-  merge unbounded at the echo's type; the end needed it idle, each `of`
-  inner over inside its own subscribe, so the merge's end is the plain
-  outer's. Decides whether `Store` carries what the flattener's outer walk
-  needs, where `simulation` is likeliest false as stated over unreached
-  states.
+- **THE LIVE OUTER.** `explode-quiet-sub` and `explode-one-sub` are false
+  where an emit reaches an explode whose outer has ended: no relation says a
+  row through a flattener is live, each being closed under its own end, and
+  an idempotent wrap only moves the falsity to the hot block's second end.
+  State it where rows are related, a registered row through `thru-outer m`
+  finding `m` not done, and find the end that breaks it. Decides whether
+  `simulation` holds only over reached states, which `Store` cannot yet tell
+  from unreached ones.
+
+- **FIT THE EXPLODE.** Then write `explode-out` and the two subscribe leaves
+  as bodies over smaller leaves, `Store` gaining each fact a body needs; the
+  end already holds over the idle merge. Decides whether `Store` carries what
+  the flattener's outer walk needs.
 
 - **EVERY SMALL EMIT.** `lifts?` holds at every emit up to three events,
   every event and kind in each position (seed 16's map draw, 200 agree, red
@@ -286,10 +291,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`explode-{quiet-sub,one-sub,out}`** (Simulation.Pass) — FALSITY, `PROBED`:
-  one exploded emit, carrying nothing or one value, subscribed by the impl's
-  idle merge, walks into the flattener; a group delivered at one instant sends
-  at it.
+- **`explode-{quiet-sub,one-sub,out}`** (Simulation.Pass) — FALSITY,
+  `DEAD ROUTE, PROBED`: one exploded emit, carrying nothing or one value,
+  subscribed by the impl's idle merge, walks into the flattener, false where
+  the outer has ended; a group delivered at one instant sends at it.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.

@@ -200,6 +200,25 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- impl's merge takes its run of elements as an inner, they walk into
       -- the flattener where the plain outer's walk hands the value's
       -- events on, and the merge stays unbounded at the echo's type
+      --
+      -- FALSE WHERE THE OUTER HAS ENDED.  `MergeAt` admits the merge done,
+      -- and nothing ties a consume here to a live outer.  There the `of`
+      -- inner's finish ends the merge again, that end reaches the
+      -- flattener's wrap, and an idle flattener sends a second end down
+      -- `q`: two where the plain flattener, its inner ending inside its
+      -- subscribe, sends one, and one where `explode-quiet-sub`'s sends
+      -- none.  Unreachable, since no row of an ended outer is live, but no
+      -- invariant says so: the liveness of a row through a flattener is
+      -- the missing fact.
+      --
+      -- DEAD ROUTE: a wrap that is a no-op on a node already done, rxjs's
+      --   idempotent `complete`, makes both leaves true once `od` at `mX`
+      --   forces it at `m′`, and moves the falsity to `Simulation.Hot-End`'s
+      --   `block-end`: `InputBlock` admits its merge done too, where the
+      --   plain slot's second end reaches its share and the impl's wrap now
+      --   sends nothing.  Each relation is closed under its own end so a
+      --   store holds between an end and the finish that drops its row, so
+      --   no evaluator repair alone serves both.
       explode-one-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                           {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                           {rP lim a qs od inst out sched₁ st₁}
