@@ -61,6 +61,16 @@ _ : Confirms (of-carries {Γ = Γ₂} (κᵖ two-arrivals) {natᵗ} {ofᵉ []} {
                          {ρ′ = 8 ∷ᵉ 4 ∷ᵉ 0 ∷ᵉ []ᵉ} {ρ = 4 ∷ᵉ []ᵉ} (λ { (here refl) → refl }) refl 3)
 _ = Carries.one _ ((refl , refl) ∷ []) Carries.[]
 
+-- LOAD-BEARING: two author binders, the pair reading the outer one
+-- first, at a renaming moving both past a value 8; fails if the outer
+-- variable is read at the inner's slot, at the mint's, or unrenamed
+_ : Confirms (of-carries {Γ = Γ₂} (κᵖ two-arrivals) {natᵗ} {ofᵉ []} {ofᵉ []}
+                         {u = natᵗ ×ᵗ natᵗ} (pairˢ (varˢᵗ (there (here refl))) (varˢᵗ (here refl)) ∷ [])
+                         {Θ′ = natᵗ ∷ natᵗ ∷ natᵗ ∷ uniqᵗ ∷ []} there
+                         {ρ′ = 8 ∷ᵉ 4 ∷ᵉ 6 ∷ᵉ 0 ∷ᵉ []ᵉ} {ρ = 4 ∷ᵉ 6 ∷ᵉ []ᵉ}
+                         (λ { (here refl) → refl ; (there (here refl)) → refl }) refl 3)
+_ = Carries.one _ ((refl , refl) ∷ []) Carries.[]
+
 -- LOAD-BEARING: a running sum plus the author's variable, seeded by it,
 -- over an emit of one payload; fails if the step or the seed reads the
 -- author's variable at the slot the mint's binder took, the carried

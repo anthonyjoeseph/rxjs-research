@@ -250,19 +250,25 @@ moving time; emptying closes; hot ends past block;
 body ends, 2nd hop inners apart; unsound walks/reads; 2 stamp chains;
 `of` splits, folds; `mintᵉ`, root stamps; quiet-cut drains; hop
 scripts; joiners off catch; quiet arms; installs+hops; inners revived;
-unaligned reads/connects/flushes; renamings; 2-script
-stores, values. Left: stated gaps.
+unaligned reads/connects/flushes; renames; 2-script
+stores, values. FALSE: a mid-emit join.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **GAPS UNDER A BINDER.** Every receipt's closing `Not …` names a region
-  no row reached. First the binder and values ones: `cold-block` and
-  `hot-read-connect-live` under a binder and on their values conjunct, and
-  `of-carries` under an outer telescope. Aim a typechecker row at each; a
-  red is a refutation and a restatement. Decides whether `simulation`'s
-  reads hold past the root.
+- **A SHARE JOINED MID-EMIT.** `CLI.Unit-Test`'s share-joiner rows: a lane
+  joining a share on any but the last value of one emit misses the rest,
+  since the share fans out an InstEmit, not a value; `left-to-right` and
+  `store` red. The repair splits each emit into one per value ahead of the
+  sink, which needs a list-to-stream `Exp` former (rxjs `from`): a question
+  for Anthony. Decides whether `simulation` holds at any share a lane reads.
+
+- **GAPS UNDER A BINDER.** What remains: `cold-block` under a binder on a
+  table with no share, since the cold-only sweep went red on the share
+  beside it, and both reads' values conjunct past the 12 cases a lane-read
+  same-clock sweep decided. A red is a refutation and a restatement.
+  Decides whether `simulation`'s reads hold past the root.
 
 - **GAPS IN THE ELABORATION.** The rest: `cold-block` inside a μ, and
   `lifts-map` at an emit the impl produced rather than one built by hand.
@@ -329,7 +335,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`of-emits`** (Simulation.Walk) — FALSITY, `PROBED`: an `of`'s emits stand
   at its program's frame, subscribe-kind; held at the root and under a value
   binder, not under a mint's binder.
-- **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×6, RECOVERY`: a cold
+- **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×7, RECOVERY`: a cold
   read's impl subscribe over an asynchronous tail leaves its block's nodes
   fresh, a partnered source, and its flush one fold of one group down the tail.
 - **`cold-read-end`** (Simulation.Walk) — FALSITY, `PROBED×3`: a cold read

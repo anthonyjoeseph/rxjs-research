@@ -262,4 +262,24 @@ cases =
           (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 4) ∷ []))) ∷ [])))
           (mkSlots (cold (1 ∷ []) ((after 1 , 5) ∷ []))
                    (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))) ∷
+  cached "a switch's lane reading a cold, over a merge whose lanes join the share the merge reads" 30
+          (flattenˢ switchᶠ (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ zero)))) (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ (suc zero))))) (inputˢ (suc zero))))))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a switch's lane reading a cold, over the share of that cold" 30
+          (flattenˢ switchᶠ (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ zero)))) (inputˢ (suc zero))))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a switch's lane reading a cold, over a read of that cold" 30
+          (flattenˢ switchᶠ (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ zero)))) (inputˢ zero)))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   emptyˢ) ∷
+  cached "a merge whose lanes join the share it reads, during the share's synchronous flush" 30
+          (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ (suc zero))))) (inputˢ (suc zero))))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a switch's literal lane, over a merge whose lanes join the share the merge reads" 30
+          (flattenˢ switchᶠ (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (ofˢ ((natˢ 1) ∷ (natˢ 4) ∷ []))))) (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ (suc zero))))) (inputˢ (suc zero))))))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   (inputˢ zero)) ∷
   []

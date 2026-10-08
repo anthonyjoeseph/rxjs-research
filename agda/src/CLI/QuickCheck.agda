@@ -159,6 +159,7 @@ arity kObs    = 4
 aimed : Knob → ℕ
 aimed kScript = 2
 aimed kSlot   = 2
+aimed kFan    = 1
 aimed _       = 0
 
 knobName : Knob → String
@@ -333,19 +334,21 @@ genScanFn = pureG (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl)))
 -- are a lattice over what happens to the count: emptied, doubled, one
 -- longer, filtered, and unchanged; the echo arms are the same lattice
 -- spent WITHOUT a lane, which no policy sees, and one arm carrying both.
+-- The aimed arm's lane READS A SLOT, the one read a step's binder is
+-- over, drawn last so no other arm's draw moves.
 --
 -- THE IDENTITY ARMS ARE DELIBERATE, on the reasoning `genFn` records: a
 -- generator whose every arm exercises the interesting shape cannot
 -- produce the program that distinguishes a step which ignores its input
 -- from one that does not.
-genFanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ)))
-genFanFn = genW kFan >>=G λ c → genNat >>=G λ k →
+genFanFn : ∀ {Δᵍ Δ Θ} → ℕ → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ)))
+genFanFn sl = genW kFan >>=G λ c → genNat >>=G λ k →
   let x = varˢᵗ (here refl)
       lane : ∀ {Δᵍ Δ Θ} → STm Γ₂ Δᵍ Δ Θ (obs natᵗ) → STm Γ₂ Δᵍ Δ Θ ((unitᵗ +ᵗ natᵗ) ×ᵗ (unitᵗ +ᵗ obs natᵗ))
       lane o = pairˢ (inlˢ unitˢ) (inrˢ o)
       none = pairˢ (inlˢ unitˢ) (inlˢ unitˢ)
       echo = pairˢ (inrˢ x) (inlˢ unitˢ)
-  in pureG
+  in if c ≡ᵇ 9 then (genSlotRef sl >>=G λ r → pureG (lane (strmˢ r))) else pureG
     (      if c ≡ᵇ 0 then lane (strmˢ emptyˢ)
       else if c ≡ᵇ 1 then lane (strmˢ (ofˢ (x ∷ x ∷ [])))
       else if c ≡ᵇ 2 then lane (strmˢ (ofˢ (x ∷ natˢ k ∷ [])))
@@ -474,7 +477,7 @@ genExpAt g u sl (suc d) = genW kExp >>=G λ c →
   else if c ≡ᵇ 11 then
     (genPredFn >>=G λ f → genExpAt g u sl d >>=G λ e → pureG (takeWhileˢ f e))
   else
-    (genOp >>=G λ op → genFanFn >>=G λ f → genExpAt g u sl d >>=G λ e →
+    (genOp >>=G λ op → genFanFn sl >>=G λ f → genExpAt g u sl d >>=G λ e →
      pureG (flattenˢ op (mapˢ f e)))
 
 genInners g u sl d zero    = pureG []
@@ -535,7 +538,7 @@ genSpineD w sl (suc d) = genW kSpineD >>=G λ c →
      genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
      pureG (flatAllˢ switchᶠ (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 6 then
-    (genOp >>=G λ op → genFanFn >>=G λ f → genSpineD w sl d >>=G λ e →
+    (genOp >>=G λ op → genFanFn sl >>=G λ f → genSpineD w sl d >>=G λ e →
      pureG (flattenˢ op (mapˢ f e)))
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineD w sl d >>=G λ e →
@@ -565,7 +568,7 @@ genSpineG g u sl (suc d) = genW kSpineG >>=G λ c →
      genInners (suc g) u sl d (suc extra) >>=G λ rest →
      pureG (flatAllˢ switchᶠ (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 6 then
-    (genOp >>=G λ op → genFanFn >>=G λ f → genSpineG g u sl d >>=G λ e →
+    (genOp >>=G λ op → genFanFn sl >>=G λ f → genSpineG g u sl d >>=G λ e →
      pureG (flattenˢ op (mapˢ f e)))
   else if c ≡ᵇ 7 then
     (genNat >>=G λ k → genSpineG g u sl d >>=G λ e →
@@ -1222,106 +1225,115 @@ drained ss f (e , d₀ , d₁) with any isStore ss
 -- read before any statement is, so a sweep aimed at contiguity spends
 -- its clocks on cases that could fail it; one that does not bear is
 -- drawn, counted in the census and left undecided-by-choice.
--- WHAT SLOT ONE HELD, since a script there is the only way a path reads
--- a script above the one it registered on, and a receipt over that
--- region has to count the cases that were in it
-slotsOf : Drawn → String
-slotsOf (_ , d₀ , inj₂ _) = ""
-slotsOf (e , d₀ , inj₁ d₁) = "  slots " ++ kd d₀ ++ " " ++ kd d₁ ++ "\n" ++ (if belowˢ e then "  reads slot one in an inner over slot zero\n" else "")
+-- A SLOT READ BY SHAPE, `h` saying which slots count
+onˢ   : ∀ {Δᵍ Δ Θ t} → (Fin 2 → Bool) → SExp Γ₂ Δᵍ Δ Θ t → Bool
+onˢᵗ  : ∀ {Δᵍ Δ Θ t} → (Fin 2 → Bool) → STm Γ₂ Δᵍ Δ Θ t → Bool
+onˢᵗˢ : ∀ {Δᵍ Δ Θ t} → (Fin 2 → Bool) → List (STm Γ₂ Δᵍ Δ Θ t) → Bool
+onˢ h (inputˢ i)       = h i
+onˢ h (ofˢ ts)         = onˢᵗˢ h ts
+onˢ h emptyˢ           = false
+onˢ h (takeWhileˢ f e) = onˢᵗ h f ∨ onˢ h e
+onˢ h (mapˢ f e)       = onˢᵗ h f ∨ onˢ h e
+onˢ h (scanˢ f z e)    = onˢᵗ h f ∨ onˢᵗ h z ∨ onˢ h e
+onˢ h (flattenˢ _ e)   = onˢ h e
+onˢ h (μˢ e)           = onˢ h e
+onˢ h (varˢ _)         = false
+onˢ h (deferˢ e)       = onˢ h e
+onˢᵗ h (varˢᵗ _)     = false
+onˢᵗ h unitˢ         = false
+onˢᵗ h (boolˢ _)     = false
+onˢᵗ h (natˢ _)      = false
+onˢᵗ h (pairˢ a b)   = onˢᵗ h a ∨ onˢᵗ h b
+onˢᵗ h (fstˢ p)      = onˢᵗ h p
+onˢᵗ h (sndˢ p)      = onˢᵗ h p
+onˢᵗ h (inlˢ a)      = onˢᵗ h a
+onˢᵗ h (inrˢ a)      = onˢᵗ h a
+onˢᵗ h (caseˢ s l r) = onˢᵗ h s ∨ onˢᵗ h l ∨ onˢᵗ h r
+onˢᵗ h (ifˢ c a b)   = onˢᵗ h c ∨ onˢᵗ h a ∨ onˢᵗ h b
+onˢᵗ h (primˢ _ a)   = onˢᵗ h a
+onˢᵗ h nilˢ          = false
+onˢᵗ h (consˢ a bs)  = onˢᵗ h a ∨ onˢᵗ h bs
+onˢᵗ h (foldˢ l z f) = onˢᵗ h l ∨ onˢᵗ h z ∨ onˢᵗ h f
+onˢᵗ h (strmˢ e)     = onˢ h e
+onˢᵗˢ h []       = false
+onˢᵗˢ h (y ∷ ys) = onˢᵗ h y ∨ onˢᵗˢ h ys
+
+-- a step along the spine reading a slot `h` counts: only an inner
+-- literal holds a read, and it is under the step's binder
+litOnˢ : ∀ {Δᵍ Δ Θ t} → (Fin 2 → Bool) → SExp Γ₂ Δᵍ Δ Θ t → Bool
+litOnˢ h (takeWhileˢ f e) = onˢᵗ h f ∨ litOnˢ h e
+litOnˢ h (mapˢ f e)       = onˢᵗ h f ∨ litOnˢ h e
+litOnˢ h (scanˢ f z e)    = onˢᵗ h f ∨ onˢᵗ h z ∨ litOnˢ h e
+litOnˢ h (flattenˢ _ e)   = litOnˢ h e
+litOnˢ h (μˢ e)           = litOnˢ h e
+litOnˢ h (deferˢ e)       = litOnˢ h e
+litOnˢ h _                = false
+
+-- the outer spine: the stream a flattener's literals ride on
+spine₀ : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
+spine₀ (inputˢ zero)    = true
+spine₀ (takeWhileˢ _ e) = spine₀ e
+spine₀ (mapˢ _ e)       = spine₀ e
+spine₀ (scanˢ _ _ e)    = spine₀ e
+spine₀ (flattenˢ _ e)   = spine₀ e
+spine₀ (μˢ e)           = spine₀ e
+spine₀ (deferˢ e)       = spine₀ e
+spine₀ _                = false
+
+slotOne : Fin 2 → Bool
+slotOne (suc zero) = true
+slotOne _          = false
+
+-- A READ BELOW THE FLOOR, BY SHAPE: an inner literal reading slot one,
+-- carried by a flattener whose outer spine reads slot zero.  The
+-- inner's path registered on slot zero, so its floor is one.
+belowˢ   : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
+belowˢᵗ  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → Bool
+belowˢᵗˢ : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → Bool
+belowˢ (flattenˢ _ e)   = (spine₀ e ∧ litOnˢ slotOne e) ∨ belowˢ e
+belowˢ (ofˢ ts)         = belowˢᵗˢ ts
+belowˢ (takeWhileˢ f e) = belowˢᵗ f ∨ belowˢ e
+belowˢ (mapˢ f e)       = belowˢᵗ f ∨ belowˢ e
+belowˢ (scanˢ f z e)    = belowˢᵗ f ∨ belowˢᵗ z ∨ belowˢ e
+belowˢ (μˢ e)           = belowˢ e
+belowˢ (deferˢ e)       = belowˢ e
+belowˢ _                = false
+belowˢᵗ (pairˢ a b)   = belowˢᵗ a ∨ belowˢᵗ b
+belowˢᵗ (fstˢ p)      = belowˢᵗ p
+belowˢᵗ (sndˢ p)      = belowˢᵗ p
+belowˢᵗ (inlˢ a)      = belowˢᵗ a
+belowˢᵗ (inrˢ a)      = belowˢᵗ a
+belowˢᵗ (caseˢ s l r) = belowˢᵗ s ∨ belowˢᵗ l ∨ belowˢᵗ r
+belowˢᵗ (ifˢ c a b)   = belowˢᵗ c ∨ belowˢᵗ a ∨ belowˢᵗ b
+belowˢᵗ (primˢ _ a)   = belowˢᵗ a
+belowˢᵗ (consˢ a bs)  = belowˢᵗ a ∨ belowˢᵗ bs
+belowˢᵗ (foldˢ l z f) = belowˢᵗ l ∨ belowˢᵗ z ∨ belowˢᵗ f
+belowˢᵗ (strmˢ e)     = belowˢ e
+belowˢᵗ _             = false
+belowˢᵗˢ []       = false
+belowˢᵗˢ (y ∷ ys) = belowˢᵗ y ∨ belowˢᵗˢ ys
+
+-- THE SHAPES A RECEIPT HAS TO COUNT: what slot one held, since a script
+-- there is the only way a path reads a script above the one it
+-- registered on; a read below the floor; and a slot read under a binder
+shapesOf : Drawn → String
+shapesOf (e , d₀ , d₁) = kinds d₁ ++ (if litOnˢ (λ _ → true) e then "  reads a slot under a binder\n" else "")
   where
   kd : Script → String
   kd (hot _)    = "hot"
   kd (cold _ _) = "cold"
 
-  -- A READ BELOW THE FLOOR, BY SHAPE: an inner literal reading slot one,
-  -- carried by a flattener whose outer spine reads slot zero.  The
-  -- inner's path registered on slot zero, so its floor is one.
-  on₁ˢ   : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
-  on₁ˢᵗ  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → Bool
-  on₁ˢᵗˢ : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → Bool
-  on₁ˢ (inputˢ (suc zero)) = true
-  on₁ˢ (inputˢ _)          = false
-  on₁ˢ (ofˢ ts)            = on₁ˢᵗˢ ts
-  on₁ˢ emptyˢ              = false
-  on₁ˢ (takeWhileˢ f e)    = on₁ˢᵗ f ∨ on₁ˢ e
-  on₁ˢ (mapˢ f e)          = on₁ˢᵗ f ∨ on₁ˢ e
-  on₁ˢ (scanˢ f z e)       = on₁ˢᵗ f ∨ on₁ˢᵗ z ∨ on₁ˢ e
-  on₁ˢ (flattenˢ _ e)      = on₁ˢ e
-  on₁ˢ (μˢ e)              = on₁ˢ e
-  on₁ˢ (varˢ _)            = false
-  on₁ˢ (deferˢ e)          = on₁ˢ e
-  on₁ˢᵗ (varˢᵗ _)     = false
-  on₁ˢᵗ unitˢ         = false
-  on₁ˢᵗ (boolˢ _)     = false
-  on₁ˢᵗ (natˢ _)      = false
-  on₁ˢᵗ (pairˢ a b)   = on₁ˢᵗ a ∨ on₁ˢᵗ b
-  on₁ˢᵗ (fstˢ p)      = on₁ˢᵗ p
-  on₁ˢᵗ (sndˢ p)      = on₁ˢᵗ p
-  on₁ˢᵗ (inlˢ a)      = on₁ˢᵗ a
-  on₁ˢᵗ (inrˢ a)      = on₁ˢᵗ a
-  on₁ˢᵗ (caseˢ s l r) = on₁ˢᵗ s ∨ on₁ˢᵗ l ∨ on₁ˢᵗ r
-  on₁ˢᵗ (ifˢ c a b)   = on₁ˢᵗ c ∨ on₁ˢᵗ a ∨ on₁ˢᵗ b
-  on₁ˢᵗ (primˢ _ a)   = on₁ˢᵗ a
-  on₁ˢᵗ nilˢ          = false
-  on₁ˢᵗ (consˢ a bs)  = on₁ˢᵗ a ∨ on₁ˢᵗ bs
-  on₁ˢᵗ (foldˢ l z f) = on₁ˢᵗ l ∨ on₁ˢᵗ z ∨ on₁ˢᵗ f
-  on₁ˢᵗ (strmˢ e)     = on₁ˢ e
-  on₁ˢᵗˢ []       = false
-  on₁ˢᵗˢ (y ∷ ys) = on₁ˢᵗ y ∨ on₁ˢᵗˢ ys
+  kinds : Def₁ → String
+  kinds (inj₂ _)  = ""
+  kinds (inj₁ d₁) = "  slots " ++ kd d₀ ++ " " ++ kd d₁ ++ "\n" ++ (if belowˢ e then "  reads slot one in an inner over slot zero\n" else "")
 
-  -- the outer spine: the stream a flattener's literals ride on
-  spine₀ : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
-  spine₀ (inputˢ zero)    = true
-  spine₀ (takeWhileˢ _ e) = spine₀ e
-  spine₀ (mapˢ _ e)       = spine₀ e
-  spine₀ (scanˢ _ _ e)    = spine₀ e
-  spine₀ (flattenˢ _ e)   = spine₀ e
-  spine₀ (μˢ e)           = spine₀ e
-  spine₀ (deferˢ e)       = spine₀ e
-  spine₀ _                = false
-
-  -- a literal along the spine reading slot one
-  lit₁ : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
-  lit₁ (takeWhileˢ f e) = on₁ˢᵗ f ∨ lit₁ e
-  lit₁ (mapˢ f e)       = on₁ˢᵗ f ∨ lit₁ e
-  lit₁ (scanˢ f z e)    = on₁ˢᵗ f ∨ on₁ˢᵗ z ∨ lit₁ e
-  lit₁ (flattenˢ _ e)   = lit₁ e
-  lit₁ (μˢ e)           = lit₁ e
-  lit₁ (deferˢ e)       = lit₁ e
-  lit₁ _                = false
-
-  belowˢ   : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
-  belowˢᵗ  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → Bool
-  belowˢᵗˢ : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → Bool
-  belowˢ (flattenˢ _ e)   = (spine₀ e ∧ lit₁ e) ∨ belowˢ e
-  belowˢ (ofˢ ts)         = belowˢᵗˢ ts
-  belowˢ (takeWhileˢ f e) = belowˢᵗ f ∨ belowˢ e
-  belowˢ (mapˢ f e)       = belowˢᵗ f ∨ belowˢ e
-  belowˢ (scanˢ f z e)    = belowˢᵗ f ∨ belowˢᵗ z ∨ belowˢ e
-  belowˢ (μˢ e)           = belowˢ e
-  belowˢ (deferˢ e)       = belowˢ e
-  belowˢ _                = false
-  belowˢᵗ (pairˢ a b)   = belowˢᵗ a ∨ belowˢᵗ b
-  belowˢᵗ (fstˢ p)      = belowˢᵗ p
-  belowˢᵗ (sndˢ p)      = belowˢᵗ p
-  belowˢᵗ (inlˢ a)      = belowˢᵗ a
-  belowˢᵗ (inrˢ a)      = belowˢᵗ a
-  belowˢᵗ (caseˢ s l r) = belowˢᵗ s ∨ belowˢᵗ l ∨ belowˢᵗ r
-  belowˢᵗ (ifˢ c a b)   = belowˢᵗ c ∨ belowˢᵗ a ∨ belowˢᵗ b
-  belowˢᵗ (primˢ _ a)   = belowˢᵗ a
-  belowˢᵗ (consˢ a bs)  = belowˢᵗ a ∨ belowˢᵗ bs
-  belowˢᵗ (foldˢ l z f) = belowˢᵗ l ∨ belowˢᵗ z ∨ belowˢᵗ f
-  belowˢᵗ (strmˢ e)     = belowˢ e
-  belowˢᵗ _             = false
-  belowˢᵗˢ []       = false
-  belowˢᵗˢ (y ∷ ys) = belowˢᵗ y ∨ belowˢᵗˢ ys
 
 withSlots : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ → String → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × String
 withSlots (k , j , a , l , o , d , s) w = k , j , a , l , o , d , s , w
 
 judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 judged ob ss f s m x with bears s f x
-... | b = (m , b , slack s f x , groups s f x , splits ss s f x , withSlots (drained ss f x) (slotsOf x)) , (if ob ∧ not b then [] else bounded s f x ss)
+... | b = (m , b , slack s f x , groups s f x , splits ss s f x , withSlots (drained ss f x) (shapesOf x)) , (if ob ∧ not b then [] else bounded s f x ss)
 
 -- ONE CASE IS ONE ACCEPTED DRAW.  A restriction's `reach` is the one
 -- filter, and it is spent HERE so that every route naming a case by its

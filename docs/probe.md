@@ -53,7 +53,7 @@ make qc-store QC='1 100 4' QC_FUEL=30 \
 | `spineD` (10), past a μ's defer | 0 the var · 1 map · 2 scan · 3 mergeAll · 4 bounded mergeAll · 5 switchAll · 6 flatten over a fan step · 7 take · 8 takeWhile · 9 exhaustAll |
 | `spineG` (10), before it | 0–1 the defer · 2 map · 3 scan · 4 mergeAll · 5 switchAll · 6 flatten over a fan step · 7 take · 8 takeWhile · 9 exhaustAll |
 | `op` (5), a flatten's policy | 0 merge · 1 bounded merge · 2 switch · 3 exhaust · 4 merge |
-| `fan` (9), a flatten's step | lane: 0 empty · 1 `[x,x]` · 2 `[x,k]` · 3 filtered · 4 `[x]`; 5 nothing · 6 filtered echo · 7 echo and lane `[k]` · 8 echo |
+| `fan` (10), a flatten's step | lane: 0 empty · 1 `[x,x]` · 2 `[x,k]` · 3 filtered · 4 `[x]`; 5 nothing · 6 filtered echo · 7 echo and lane `[k]` · 8 echo · 9 a lane reading a slot — aimed only |
 | `script` (6), slot zero | 0 hot, one arrival · 1 hot, two · 2 cold, one sync value and one arrival · 3 cold, two arrivals · 4 cold, two sync values and one arrival · 5 cold, two sync values and no arrival — 4 and 5 aimed only, the uniform pick never takes them |
 | `slot` (6), slot one | 0 forwards slot zero · 1 empty · 2 one value · 3 two values · 4 a drawn program of depth two over slot zero · 5 a script, drawn as slot zero's is, so no slot is shared — 4 and 5 aimed only, the uniform pick never takes them |
 | `leaf` (3) | 0 a slot · 1 empty · 2 two values |

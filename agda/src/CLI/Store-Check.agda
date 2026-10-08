@@ -742,6 +742,17 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
   sync? (l ∷ ls) (l′ ∷ ls′) = eqListℕ (ticks l) (ticks l′) ∧ ranked l l′ ls ls′ ∧ sync? ls ls′
   sync? _        _          = false
 
+  -- a run's live sources as `source@ordinal[ticks]`, what a `sources`
+  -- or `numbers` failure prints
+  liveName : ∀ {m} {Δ : Ctx m} → List (LiveSource Δ) → String
+  liveName []       = ""
+  liveName (l ∷ ls) = " " ++ˢ show (LiveSource.source l) ++ˢ "@" ++ˢ show (LiveSource.ordinal l)
+                    ++ˢ "[" ++ˢ tickNames (ticks l) ++ˢ "]" ++ˢ liveName ls
+    where
+    tickNames : List ℕ → String
+    tickNames []       = ""
+    tickNames (k ∷ ks) = show k ++ˢ "," ++ˢ tickNames ks
+
   module Fields {t} {ep : Closed Γ t} {ei : Closed Γ′ (emitᵗ t)}
                 (sP : Sched Γ) (stP : EvalSt ep) (sI : Sched Γ′) (stI : EvalSt ei) where
 
@@ -811,8 +822,8 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
     -- every field but the rows, first failure named
     plain : List (String × Bool)
     plain =
-        ("sources" , pointwise (λ l l′ → dataSrc l l′ ∨ deferSrc l l′) LP LI)
-      ∷ ("numbers" , pointwise srcNum LP LI)
+        ("sources: plain" ++ˢ liveName LP ++ˢ " / impl" ++ˢ liveName LI , pointwise (λ l l′ → dataSrc l l′ ∨ deferSrc l l′) LP LI)
+      ∷ ("numbers: plain" ++ˢ liveName LP ++ˢ " / impl" ++ˢ liveName LI , pointwise srcNum LP LI)
       ∷ ("distinct" , unique (map LiveSource.source LP) ∧ unique (map LiveSource.source LI))
       ∷ ("sync" , sync? LP LI)
       ∷ ("latches" , all (λ i → latchAt (lookup κ i) (toℕ i)) (allFin n))

@@ -353,12 +353,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   decided by `CLI.Store-Check`'s `store?`: slot one forwarding slot
       --   zero; 100 programs, not inside a μ.
       --   Draw unrecorded: the seed alone does not replay it.
-      -- PROBED: make qc-store QC='6 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
+      -- PROBED: make qc-store QC='6 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1,0],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Every case
       --   flattens a fan step over a cold read with an asynchronous tail,
       --   so the flushed values each subscribe a lane inner mid-flush; 42
       --   finish one at a merge, 190 group values.  Not inside a μ.
-      -- PROBED: make qc-same-clock QC='6 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
+      -- PROBED: make qc-same-clock QC='6 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1,0],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 98
       --   agree, 0 fail, 16 undecided: the same flushes' values, each
       --   through a lane inner, against the plain run's instants.
@@ -367,6 +367,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   the `Sound` pair was a hypothesis: a cold script, its block run
       --   straight to the root (`cold~`).  Not under a binder, not the
       --   values conjunct.
+      -- PROBED: make qc-store QC='11 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[1,1,1,1,0,0],"reach":["flatten","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  99 read a
+      --   slot from a fan lane, under the map's binder; cold and hot
+      --   scripts are not counted apart.
       -- RECOVERY: git show ae5fd17e:agda/evidence/refuted/Refuted/Slot-Scripts.agda
       --   restores the opening store at two cold tables, which refuted this
       --   read over a store blind to the slots.
@@ -545,7 +549,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   read off a binder through the mint's renaming: one emit per
       --   value, the end on the last; and a pair of the variable and a
       --   right sum at a renaming moving the variable past a value it
-      --   does not own.  Not under a nonempty outer telescope.
+      --   does not own; and a pair reading an outer binder before an
+      --   inner one, under the same renaming.
       of-carries     : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                      → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
                      → ∀ src → Carries {u} (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L) (map (λ tm → evalWith tm ρ) (plainTms ts))

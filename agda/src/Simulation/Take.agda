@@ -237,7 +237,7 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A TEST'S NODES WRITTEN OPEN ON BOTH SIDES: the plain test to
       -- one, the cell to an open state and its test to one, keep the
       -- stores and the tails related
-      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
+      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 2 passes two values of the hot input through an open test
       --   under a merge.
@@ -257,7 +257,7 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A TEST'S NODES WRITTEN SPENT ONCE BOTH SIDES HAVE CUT: the plain
       -- test and the cell's test to zero, the cell to what the scan
       -- left, keep the stores the cut left and the tails related
-      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
+      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Cases 13 and 22 cut at the hot input's first arrival, under a
       --   merge and a bounded merge of limit one; case 4 cuts at a value
@@ -285,7 +285,7 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A SPENT TEST ON BOTH SIDES passes nothing, its end included,
       -- and stays spent
-      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
+      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 22's second arrival comes after its first spent the test,
       --   on both sides.
@@ -308,12 +308,12 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- INSTANT: what a cut hands on is never empty, so whatever the
       -- end subscribes is restamped to the group's own instant
       --
-      -- PROBED: make qc-same-clock QC='44 150 3' QC_DRAW='{"exp":[2,2,1,0,4,2,3,2,0,0,0,4,3],"obs":[4,2,1,0],"fan":[0,3,2,1,1,0,1,2,2],"script":[0,3,0,0,2,0],"reach":["flatten"]}'
+      -- PROBED: make qc-same-clock QC='44 150 3' QC_DRAW='{"exp":[2,2,1,0,4,2,3,2,0,0,0,4,3],"obs":[4,2,1,0],"fan":[0,3,2,1,1,0,1,2,2,0],"script":[0,3,0,0,2,0],"reach":["flatten"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 60 agree,
       --   0 fail, 59 undecided; 44 agreements carry a `takeWhile`.  Case
       --   41 cuts an exhaust's first inner at the second of two hot
       --   arrivals.
-      -- PROBED: make qc-same-clock QC='46 80 3' QC_DRAW='{"exp":[4,4,1,0,1,5,1,1,0,0,0,5,0],"obs":[0,3,1,0],"fan":[0,3,2,1,1,0,1,2,2],"script":[0,4,0,0,0,0],"reach":["flatten","takeWhile"]}'
+      -- PROBED: make qc-same-clock QC='46 80 3' QC_DRAW='{"exp":[4,4,1,0,1,5,1,1,0,0,0,5,0],"obs":[0,3,1,0],"fan":[0,3,2,1,1,0,1,2,2,0],"script":[0,4,0,0,0,0],"reach":["flatten","takeWhile"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 54 agree, 0 fail, 26
       --   undecided.  Case 6 cuts a bounded merge's first inner, limit one,
       --   at the hot input's first arrival, and its end subscribes the
