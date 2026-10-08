@@ -75,3 +75,16 @@ nested = μˢ (deferˢ (varˢ (there (here refl))))
 -- inner μ's binder
 _ : Confirms (μ-unfolds {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} (nested {Δ = []}))
 _ = μˢ (deferˢ (μˢ nested)) , refl , λ w → refl
+
+-- the μ-var read twice: once under a defer at the root, once under a
+-- defer under the map's value binder
+twice : ∀ {Θ} → SExp Γ₂ (natᵗ ∷ []) [] Θ natᵗ
+twice = flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (deferˢ (varˢ (here refl))))))
+          (deferˢ (varˢ (here refl))))
+
+-- LOAD-BEARING: fails if the substitution or the frame term's weakening
+-- treats the two reads differently, or reaches only one
+_ : Confirms (μ-unfolds {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} twice)
+_ = flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (deferˢ (μˢ twice)))))
+      (deferˢ (μˢ twice)))
+  , refl , λ w → refl

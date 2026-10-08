@@ -240,8 +240,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     --   one at an abstract renaming, at a μ-var straight under a defer,
     --   under a defer under a map's, a scan step's and a test's binder,
     --   past an inner μ's binder, and under a map's at a nonempty outer
-    --   telescope.  Not two vars read, not a μ-var under a flattener's
-    --   inner literal.
+    --   telescope, and read twice, at the root and under a map's binder.
+    --   Not a μ-var under a flattener's inner literal.
     μ-unfolds : ∀ {Θ u} (b : SExp Γ (u ∷ []) [] Θ u)
               → Σ (SExp Γ [] [] Θ u) λ s′ → plainExp s′ ≡ unfoldμ (plainExp b)
                   × (∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′)
