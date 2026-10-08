@@ -133,26 +133,36 @@ export const markSync = <A>(src: Observable<A>): Observable<Marked<A>> =>
 // close and the completion, which is the ONE-SHOT burst: a source with
 // nothing left to deliver says everything it has to say inside the
 // frame that subscribed to it (Agda's oneShotBurst).
-const subscribeBurst = <A>(
-  driver: Driver,
+//
+// ONE EMIT PER VALUE, all under the frame (Agda's `perValueᵛ`): the
+// init rides the first, the close and completion the last, and a burst
+// with no value is one emit. Packing the burst into one emit is
+// observable — a share hands each emit to the subscribers it had when
+// the emit began, so a lane joining on the burst's first value would
+// miss the rest, where plain rxjs re-reads its subscribers per value.
+export const subscribeBurst = <A>(
   source: SourceId,
   body: InstEvent<A>[],
   spent: boolean,
-): InstEmit<A> => ({
-  events: [
-    { type: "init", source },
-    ...body,
-    ...(spent
-      ? [
-          { type: "close", source, reason: "exhausted" } as const,
-          { type: "complete" } as const,
-        ]
-      : []),
-  ],
-  instant: SUBSCRIBE_FRAME,
-  source,
-  kind: "subscribe",
-});
+): InstEmit<A>[] => {
+  const runs: InstEvent<A>[][] =
+    body.length === 0 ? [[]] : body.map((event) => [event]);
+  return runs.map((run, i) => ({
+    events: [
+      ...(i === 0 ? [{ type: "init", source } as const] : []),
+      ...run,
+      ...(spent && i === runs.length - 1
+        ? [
+            { type: "close", source, reason: "exhausted" } as const,
+            { type: "complete" } as const,
+          ]
+        : []),
+    ],
+    instant: SUBSCRIBE_FRAME,
+    source,
+    kind: "subscribe",
+  }));
+};
 
 // hot: minted once and live whether or not anyone is subscribed — a
 // delivery with no subscribers is dropped, and still costs fuel. A
@@ -185,8 +195,8 @@ export const hot = <A>(
   });
   return defer(() =>
     spent
-      ? of(subscribeBurst<A>(driver, source, [], true))
-      : merge(of(subscribeBurst<A>(driver, source, [], false)), live),
+      ? of(...subscribeBurst<A>(source, [], true))
+      : merge(of(...subscribeBurst<A>(source, [], false)), live),
   );
 };
 
@@ -225,8 +235,8 @@ export const cold = <A>(
   defer(() => {
     const source = driver.mintSourceId();
     const { sync, async } = produce(source);
-    const burst = subscribeBurst(driver, source, sync, async === undefined);
+    const burst = subscribeBurst(source, sync, async === undefined);
     return async === undefined
-      ? of(burst)
-      : merge(producer<InstEmit<A>>(async), of(burst));
+      ? of(...burst)
+      : merge(producer<InstEmit<A>>(async), of(...burst));
   });

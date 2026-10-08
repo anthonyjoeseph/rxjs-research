@@ -40,6 +40,7 @@ import {
   bracketSync,
   latch,
   markSync,
+  subscribeBurst,
 } from "./constructors.js";
 
 export { exhaustAll, mergeAllAll, switchAll } from "./join.js";
@@ -124,25 +125,21 @@ export const wrapCold: {
   return retval as never;
 };
 
-// a one-shot subscription burst (Agda's oneShotBurst): a source that
-// lives and dies inside its own subscribe frame — init, its values,
-// close, complete — one emit, minting a fresh source per subscription
-// and inheriting the instant live at subscribe time (id-inheritance).
+// a one-shot subscription burst (Agda's `ofᵖ`): a source that lives
+// and dies inside its own subscribe frame — init, its values, close,
+// complete — one emit per value, minting a fresh source per
+// subscription and inheriting the instant live at subscribe time
+// (id-inheritance).
 export const of = <A>(driver: Driver, input: A[]): Observable<InstEmit<A>> =>
-  rxDefer(() => {
-    const source = driver.mintSourceId();
-    return rxOf<InstEmit<A>>({
-      events: [
-        { type: "init", source },
-        ...input.map((value) => ({ type: "value", value }) as const),
-        { type: "close", source, reason: "exhausted" },
-        { type: "complete" },
-      ],
-      instant: SUBSCRIBE_FRAME,
-      source,
-      kind: "subscribe",
-    });
-  });
+  rxDefer(() =>
+    rxOf(
+      ...subscribeBurst<A>(
+        driver.mintSourceId(),
+        input.map((value) => ({ type: "value", value }) as const),
+        true,
+      ),
+    ),
+  );
 
 // oneShotBurst [] — init, close, complete, no values
 export const empty = (driver: Driver): Observable<InstEmit<never>> =>

@@ -84,9 +84,71 @@ flatAllᵉ op e = flattenᵉ op (mapᵉ (pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ
 deliveryᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
 deliveryᵛ = inrᵗ (inlᵗ unit̂)
 
--- the subscribe frame: the `init` and the frame's values, under the
--- frame, tagged `subscribe`.  A later arrival: mint its instant and
--- emit its value under it.
+-- ONE EMIT PER VALUE, ALL UNDER ONE INSTANT, the first carrying `pre`
+-- ahead of its value; no value is one emit of `pre` alone.  Packing a
+-- group into one emit is OBSERVABLE: a share hands each emit to the
+-- subscribers it had when the emit began, so a lane joining on a
+-- group's first value would miss the rest of the group, where plain
+-- rxjs re-reads its subscribers per value.  `ofᵖ` cuts the same way.
+-- The fold runs over the values reversed, holding the earliest seen so
+-- far apart from the run behind it, so the first is the one `pre`
+-- lands on.
+perValueᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {a : Ty}
+          → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ emitKindᵗ
+          → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ a)) → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ a))
+          → Tm Γ Δᵍ Δ Θ (obs (machineEmitᵗ a))
+perValueᵛ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {a = a} inst src k pre vs =
+  letᵗ (foldᵗ (revᵗ vs) (pairᵗ (inlᵗ unit̂) (inlᵗ unit̂)) step) (strmᵗ emptyᵉ)
+       (caseᵗ (fstᵗ acc)
+              (onto (emit ↑² (↑² pre)) (sndᵗ (varᵗ (there (here refl)))))
+              (onto (emit ↑² (appendᵗ (↑² pre) (consᵗ (varᵗ (here refl)) nilᵗ)))
+                    (sndᵗ (varᵗ (there (here refl))))))
+  where
+  Ev : Ty
+  Ev = instEventᵗ uniqᵗ a
+
+  Em : Ty
+  Em = machineEmitᵗ a
+
+  -- the earliest value seen, and the run of emits behind it
+  Acc : Ty
+  Acc = (unitᵗ +ᵗ Ev) ×ᵗ (unitᵗ +ᵗ obs Em)
+
+  ↑ : ∀ {s Θ′ r} → Tm Γ Δᵍ Δ Θ′ r → Tm Γ Δᵍ Δ (s ∷ Θ′) r
+  ↑ = renTm (λ x → x) (λ x → x) there
+
+  ↑² : ∀ {s s′ r} → Tm Γ Δᵍ Δ Θ r → Tm Γ Δᵍ Δ (s′ ∷ s ∷ Θ) r
+  ↑² = renTm (λ x → x) (λ x → x) (λ x → there (there x))
+
+  ↑³ : ∀ {s s′ s″ r} → Tm Γ Δᵍ Δ Θ r → Tm Γ Δᵍ Δ (s″ ∷ s′ ∷ s ∷ Θ) r
+  ↑³ = renTm (λ x → x) (λ x → x) (λ x → there (there (there x)))
+
+  acc : Tm Γ Δᵍ Δ (Acc ∷ Θ) Acc
+  acc = varᵗ (here refl)
+
+  emit : ∀ {Θ′} → (∀ {r} → Tm Γ Δᵍ Δ Θ r → Tm Γ Δᵍ Δ Θ′ r)
+       → Tm Γ Δᵍ Δ Θ′ (listᵗ Ev) → Tm Γ Δᵍ Δ Θ′ Em
+  emit up evs = instEmitᵛ evs (up inst) (up src) (up k)
+
+  -- an emit ahead of the run, if there is one
+  onto : ∀ {Θ′} → Tm Γ Δᵍ Δ Θ′ Em → Tm Γ Δᵍ Δ Θ′ (unitᵗ +ᵗ obs Em) → Tm Γ Δᵍ Δ Θ′ (obs Em)
+  onto e run = caseᵗ run (strmᵗ (ofᵉ (↑ e ∷ [])))
+                         (strmᵗ (flatAllᵉ (mergeᶠ nothing) (ofᵉ (strmᵗ (ofᵉ (↑ e ∷ [])) ∷ varᵗ (here refl) ∷ []))))
+
+  -- one value over the values reversed: it becomes the earliest, and
+  -- the one it displaces goes onto the run.  The value, then the
+  -- accumulator
+  step : Tm Γ Δᵍ Δ (Ev ∷ Acc ∷ Θ) Acc
+  step = pairᵗ (inrᵗ (varᵗ (here refl)))
+               (caseᵗ (fstᵗ (varᵗ (there (here refl))))
+                      (sndᵗ (varᵗ (there (there (here refl)))))
+                      (inrᵗ (onto (emit ↑³ (consᵗ (varᵗ (here refl)) nilᵗ))
+                                  (sndᵗ (varᵗ (there (there (here refl))))))))
+
+-- the subscribe frame: the `init` and the frame's values, one emit per
+-- value under the frame, tagged `subscribe`.  A later arrival: mint its
+-- instant and emit its value under it -- one value, since a script's
+-- arrivals are one per tick.
 inputStampᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {a : Ty}
             → Tm Γ Δᵍ Δ Θ uniqᵗ
             → Fn Γ Δᵍ Δ (uniqᵗ ∷ Θ) ((unitᵗ +ᵗ a) ×ᵗ listᵗ (unitᵗ +ᵗ a)) (obs (machineEmitᵗ a))
@@ -125,7 +187,7 @@ inputStampᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {a = a} frame = stam
 
   stamp : Tm Γ Δᵍ Δ Θᵍ (obs (machineEmitᵗ a))
   stamp = caseᵗ (fstᵗ grp)
-    (strmᵗ (ofᵉ (instEmitᵛ (consᵗ (initᵛ (↑ src)) (↑ rest)) (↑ frameᵍ) (↑ src) subscribeᵛ ∷ [])))
+    (perValueᵛ (↑ frameᵍ) (↑ src) subscribeᵛ (consᵗ (initᵛ (↑ src)) nilᵗ) (↑ rest))
     (strmᵗ (mintᵉ (ofᵉ (instEmitᵛ (consᵗ (valueᵛ (varᵗ (there (here refl)))) (↑² rest))
                                  (varᵗ (here refl)) (↑² src) deliveryᵛ ∷ []))))
 
@@ -148,8 +210,8 @@ inputMarkedᵖ i = flatAllᵉ (mergeᶠ nothing)
 -- emit carrying k inners is one element whose lane is their merge, so
 -- one emit for an `of` of k observables nests a flattener plain rxjs
 -- does not have, and the evaluator's cost is multiplicative in that
--- nesting (`typecheck-performance-numbers.md`).  The twin's `of` is one
--- emit; batching cannot tell the two apart, since both are one instant.
+-- nesting (`typecheck-performance-numbers.md`).  And a share can tell
+-- one emit from one per value, which `perValueᵛ` says why.
 --
 -- THE SOURCE TOKEN IS MINTED AT THIS NODE AND THE INSTANT IS NOT, AND
 -- the difference is the arity.  A source is a fresh identity per
@@ -179,14 +241,14 @@ inputMarkedᵖ i = flatAllᵉ (mergeᶠ nothing)
 
 -- THE SUBSCRIBE FRAME'S GROUP IS THE FRAME'S INSTANT, NOT A NEW ONE.
 -- One `subscribe()` call is one batch (README), so a cold's synchronous
--- values share the instant of whatever subscribed it, and the emit
+-- values share the instant of whatever subscribed it, and each emit
 -- says so by carrying the frame, tagged `subscribe` so an enclosing
 -- flattener re-instants it.  The group alone cannot say which one it
 -- is -- a one-value frame and a later arrival are both `(v , [])` --
 -- so a marker merged in AHEAD of the input makes the frame's group
 -- always exist and always lead with the marker, and no later group
--- can.  The `init` rides the same emit, which is why there is no
--- separate announcement.
+-- can.  The `init` rides the frame's first emit, which is why there is
+-- no separate announcement.
 --
 -- AND THE PER-ARRIVAL TOKEN COMES FROM THE MINT'S PLACEMENT, WHICH IS
 -- THE ARITY THAT LOOKED MISSING.  `mintᵉ` draws once per subscription

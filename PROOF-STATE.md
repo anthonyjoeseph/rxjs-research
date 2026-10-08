@@ -260,9 +260,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **A SHARE JOINED MID-EMIT.** `CLI.Unit-Test`'s share-joiner rows: a lane
   joining a share on any but the last value of one emit misses the rest,
   since the share fans out an InstEmit, not a value; `left-to-right` and
-  `store` red. The repair splits each emit into one per value ahead of the
-  sink, which needs a list-to-stream `Exp` former (rxjs `from`): a question
-  for Anthony. Decides whether `simulation` holds at any share a lane reads.
+  `store` red. The input's subscribe frame was the one packed emit; it now
+  leaves one emit per value under the frame (`perValueᵛ`), with no new
+  former. Left: the share-joiner rows and an aimed lane-read sweep green, then
+  the walk leaves over the frame re-swept. Decides whether `simulation` holds
+  at any share a lane reads.
 
 - **GAPS UNDER A BINDER.** What remains: `cold-block` under a binder on a
   table with no share, since the cold-only sweep went red on the share
