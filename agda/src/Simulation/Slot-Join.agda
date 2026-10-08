@@ -104,7 +104,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} where
   lower-rel le (takeWhile~ a b c d e r)      = takeWhile~ a b c d e r
   lower-rel le (spentWhile~ a b c r)         = spentWhile~ a b c r
   lower-rel le (outerElem~ a r)              = outerElem~ a r
-  lower-rel le (outerExplode~ a r)           = outerExplode~ a r
+  lower-rel le (outerExplode~ a x r)         = outerExplode~ a x r
   lower-rel le (inner~ a b c r)              = inner~ a b c r
   lower-rel le (deferInner~ a b c d e f g r) = deferInner~ a b c d e f g r
 

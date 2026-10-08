@@ -250,10 +250,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   rel-vals (outerElem~ (pm , _) r)            (here refl)                       = ∈-vals pm (here refl)
   rel-vals (outerElem~ (pm , _) r)            (there (here refl))               = ∈-vals pm (there (here refl))
   rel-vals (outerElem~ (pm , _) r)            (there (there m))                 = rel-vals r m
-  rel-vals (outerExplode~ (pm , _) r)         (here refl)                       = ∈-vals pm (there (there (here refl)))
-  rel-vals (outerExplode~ (pm , _) r)         (there (here refl))               = ∈-vals pm (here refl)
-  rel-vals (outerExplode~ (pm , _) r)         (there (there (here refl)))       = ∈-vals pm (there (here refl))
-  rel-vals (outerExplode~ (pm , _) r)         (there (there (there m)))         = rel-vals r m
+  rel-vals (outerExplode~ (pm , _) _ r)       (here refl)                       = ∈-vals pm (there (there (here refl)))
+  rel-vals (outerExplode~ (pm , _) _ r)       (there (here refl))               = ∈-vals pm (here refl)
+  rel-vals (outerExplode~ (pm , _) _ r)       (there (there (here refl)))       = ∈-vals pm (there (here refl))
+  rel-vals (outerExplode~ (pm , _) _ r)       (there (there (there m)))         = rel-vals r m
   rel-vals (inner~ _ (pm , _) ip r)           (here refl)                       = ∈-vals pm (here refl)
   rel-vals (inner~ _ (pm , _) ip r)           (there (here refl))               = ∈-vals ip (here refl)
   rel-vals (inner~ _ (pm , _) ip r)           (there (there (here refl)))       = ∈-vals pm (there (here refl))
@@ -275,7 +275,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   path-spent (takeWhile~ _ lk _ lk₂ _ r)       = cong₂ _∨_ (trans (cong spentAt lk) (sym (cong spentAt lk₂))) (path-spent r)
   path-spent (spentWhile~ _ lk lk₂ r)          = cong₂ _∨_ (trans (cong spentAt lk) (sym (cong spentAt lk₂))) (path-spent r)
   path-spent (outerElem~ _ r)                  = path-spent r
-  path-spent (outerExplode~ _ r)               = path-spent r
+  path-spent (outerExplode~ _ _ r)             = path-spent r
   path-spent (inner~ _ _ _ r)                  = path-spent r
   path-spent (deferInner~ _ _ _ _ _ _ _ r)     = path-spent r
 

@@ -115,7 +115,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     Catch I f N (outerElem~ {u = u} {ks = ks} _ d) =
       Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
         × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I)
-    Catch I f N (outerExplode~ {u = u} {ks = ks} _ d) =
+    Catch I f N (outerExplode~ {u = u} {ks = ks} _ _ d) =
       Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
         × ByKind c (λ i → Catch I i N d) (λ i → i ≡ I)
     Catch I f N (inner~ {u = u} {ks = ks} _ _ _ d) =
@@ -137,7 +137,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ∀ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
       → Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c′ → lookupNode ks N′ ≡ just (cell-st {t = FlatSᵗ u} c′)
           × proj₁ c′ ≡ proj₁ c × ByKind c (λ _ → Kept N N′ d) (λ _ → ⊤)
-    Kept N N′ (outerExplode~ {u = u} {ks = ks} _ d) =
+    Kept N N′ (outerExplode~ {u = u} {ks = ks} _ _ d) =
       ∀ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
       → Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c′ → lookupNode ks N′ ≡ just (cell-st {t = FlatSᵗ u} c′)
           × proj₁ c′ ≡ proj₁ c × ByKind c (λ _ → Kept N N′ d) (λ _ → ⊤)
@@ -194,7 +194,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      (map-f G₀ ↠[ h₁ ] (map-f G₅ ↠[ h₂ ] (thru-outer o″ mX ↠[ h₃ ]
                        (thru-outer o′ m′ ↠[ h₄ ] (scan-f G₁ ks ↠[ h₅ ] (map-f G₂ ↠[ h₆ ] q))))))
                  → PathRel κ π NP NI p q
-    explode-tail (outerExplode~ _ d) = d
+    explode-tail (outerExplode~ _ _ d) = d
 
     explode-catch : ∀ {I f N π NP NI lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u w x y o o′ o″ m m′ ks mX}
                       {G₀ : FnClo (plainᵏ Γ κ) (emitᵗ (echoᵗ u)) w} {G₅ : FnClo (plainᵏ Γ κ) w (echoᵗ (echoᵗ x))}
@@ -207,7 +207,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                   → Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) (λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c)
                       × ByKind c (λ i → Catch I i N (explode-tail d)) (λ i → i ≡ I))
                   → Catch I f N d
-    explode-catch (outerExplode~ _ d) x = x
+    explode-catch (outerExplode~ _ _ d) x = x
 
     explode-kept : ∀ {N N′ π NP NI lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u w x y o o′ o″ m m′ ks mX}
                      {G₀ : FnClo (plainᵏ Γ κ) (emitᵗ (echoᵗ u)) w} {G₅ : FnClo (plainᵏ Γ κ) w (echoᵗ (echoᵗ x))}
@@ -221,7 +221,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c′ → lookupNode ks N′ ≡ just (cell-st {t = FlatSᵗ u} c′)
                         × proj₁ c′ ≡ proj₁ c × ByKind c (λ _ → Kept N N′ (explode-tail d)) (λ _ → ⊤))
                  → Kept N N′ d
-    explode-kept (outerExplode~ _ d) x = x
+    explode-kept (outerExplode~ _ _ d) x = x
 
     -- a share's subject, at any impl path
     sink-kept : ∀ {N N′ π NP NI lo lo′ i h} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ (Data.Vec.lookup Γ i)) (emitᵗ t)}
@@ -256,7 +256,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         { cat = λ (c , l , b) → elem-catch d′ (c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ e → e) b)
         ; kep = λ k → elem-kept d′ λ c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
         }
-    same (outerExplode~ _ d) d′ =
+    same (outerExplode~ _ _ d) d′ =
       let S = same d (explode-tail d′) in record
         { cat = λ (c , l , b) → explode-catch d′ (c , l , by-map c (λ {i} → Same.cat S {f = i}) (λ e → e) b)
         ; kep = λ k → explode-kept d′ λ c l → let (c′ , l′ , e , b) = k c l in c′ , l′ , e , by-map c (Same.kep S) (λ y → y) b
@@ -286,7 +286,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     kept-refl (takeWhile~ _ _ _ _ _ d) = kept-refl d
     kept-refl (spentWhile~ _ _ _ d)    = kept-refl d
     kept-refl (outerElem~ _ d)         = λ c l → c , l , refl , by-const c (kept-refl d) tt
-    kept-refl (outerExplode~ _ d)      = λ c l → c , l , refl , by-const c (kept-refl d) tt
+    kept-refl (outerExplode~ _ _ d)      = λ c l → c , l , refl , by-const c (kept-refl d) tt
     kept-refl (inner~ _ _ _ d)         = λ c l → c , l , refl , by-const c (kept-refl d) tt
     kept-refl (deferInner~ _ _ _ _ _ _ _ d) = tt
 
@@ -301,7 +301,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     kept-trans (outerElem~ _ d)         x y = λ c l →
       let (c′ , l′ , e , b) = x c l ; (c″ , l″ , e′ , b′) = y c′ l′
       in c″ , l″ , trans e′ e , by-zip c (kept-trans d) (λ _ _ → tt) b (by-tr c′ c (sym e) b′)
-    kept-trans (outerExplode~ _ d)      x y = λ c l →
+    kept-trans (outerExplode~ _ _ d)      x y = λ c l →
       let (c′ , l′ , e , b) = x c l ; (c″ , l″ , e′ , b′) = y c′ l′
       in c″ , l″ , trans e′ e , by-zip c (kept-trans d) (λ _ _ → tt) b (by-tr c′ c (sym e) b′)
     kept-trans (inner~ _ _ _ d)         x y = λ c l →
@@ -321,7 +321,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     kept-catch (spentWhile~ _ _ _ d)    x k = kept-catch d x k
     kept-catch (outerElem~ _ d) (c , l , b) k =
       let (c′ , l′ , e , kb) = k c l in c′ , l′ , by-tr c c′ e (by-zip c (λ {i} → kept-catch {f = i} d) (λ y _ → y) b kb)
-    kept-catch (outerExplode~ _ d) (c , l , b) k =
+    kept-catch (outerExplode~ _ _ d) (c , l , b) k =
       let (c′ , l′ , e , kb) = k c l in c′ , l′ , by-tr c c′ e (by-zip c (λ {i} → kept-catch {f = i} d) (λ y _ → y) b kb)
     kept-catch (inner~ _ _ _ d) (c , l , b) k =
       let (c′ , l′ , e , kb) = k c l in c′ , l′ , by-tr c c′ e (by-zip c (λ {i} → kept-catch {f = i} d) (λ y _ → y) b kb)
@@ -340,7 +340,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     kept-unmoved (outerElem~ {ks = ks} _ d) H = λ c l →
       c , trans (H ks (past (past (at (here refl))))) l , refl
         , by-const c (kept-unmoved d (λ k h → H k (past (past (past (past h)))))) tt
-    kept-unmoved (outerExplode~ {ks = ks} _ d) H = λ c l →
+    kept-unmoved (outerExplode~ {ks = ks} _ _ d) H = λ c l →
       c , trans (H ks (past (past (past (past (at (here refl))))))) l , refl
         , by-const c (kept-unmoved d (λ k h → H k (past (past (past (past (past (past h)))))))) tt
     kept-unmoved (inner~ {ks = ks} _ _ _ d) H = λ c l →

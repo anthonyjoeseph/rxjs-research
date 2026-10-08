@@ -894,7 +894,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                              (map-f G₀ ↠[ h₁ ] (map-f G₅ ↠[ h₂ ] (thru-outer o″ mX ↠[ h₃ ]
                                (thru-outer o′ m′ ↠[ h₄ ] (scan-f G₁ ks ↠[ h₅ ] (map-f G₂ ↠[ h₆ ] q)))))))
               → Σ X (λ A → PathRel κ (π A) (NP A) (NI A) p q)
-    unexplode (A , outerExplode~ _ pr) = A , pr
+    unexplode (A , outerExplode~ _ _ pr) = A , pr
 
     -- a test's frames walked: the tail related again
     unwhile : ∀ {X : Set} {π : X → List (NodeId × List NodeId)} {NP : X → List (NodeId × NodeState Γ)}
@@ -1056,7 +1056,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      (lookup-set m′ x′ N)
              , flat-init u op
              , c , lk
-          X  = wb w r (After.store (proj₁ I)) (outerExplode~ {op = op} F (proj₂ (proj₂ I)))
+          X  = wb w r (After.store (proj₁ I)) (outerExplode~ {op = op} F (0 , [] , false , lookup-set mX xX (setNode m′ x′ N)) (proj₂ (proj₂ I)))
                  (fresh-at refl frP oP) (bare (bare (fresh-at refl frX (fresh-at refl frM (fresh-at refl frK (bare oI)))))) dP dI (sz-1 (s<s⁻¹ lt))
           pr₁ = proj₂ (proj₂ I)
           fr : ∀ j → OnPath j q → j < ks

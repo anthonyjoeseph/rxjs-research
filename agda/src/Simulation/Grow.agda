@@ -90,8 +90,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π π′ : List (NodeId × List NodeId
     pathG o (takeWhile~ e l l₁ l₂ L r)       = takeWhile~ (g e) l l₁ l₂ L (pathG (proj₂ (proj₂ (proj₂ o))) r)
     pathG o (spentWhile~ e l l₂ r)           = spentWhile~ (g e) l l₂ (pathG (proj₂ (proj₂ (proj₂ o))) r)
     pathG o (outerElem~ f r)                 = outerElem~ (flatG f) (pathG (proj₂ (proj₂ (proj₂ (proj₂ o)))) r)
-    pathG o (outerExplode~ f r)              =
-      outerExplode~ (flatG f) (pathG (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ o)))))) r)
+    pathG o (outerExplode~ f x r)            =
+      outerExplode~ (flatG f) x (pathG (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ o)))))) r)
     pathG o (inner~ e f ip r)                = inner~ e (flatG f) (g ip) (pathG (proj₂ (proj₂ (proj₂ o))) r)
     pathG o (deferInner~ e₁ e₂ l l′ l₂ a≤ b≤ r) = deferInner~ (g e₁) (g e₂) l l′ l₂ a≤ b≤ (pathG (proj₂ (proj₂ (proj₂ o))) r)
 

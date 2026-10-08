@@ -127,7 +127,8 @@ module Move {n} {Γ : Ctx n} (κ : Kinds n) {π π′ : List (NodeId × List Nod
     takeWhile~ (sub e) (rdP (keyP e) l) (rdI (valI e (here refl)) l₁) (rdI (valI e (there (here refl))) l₂) L (pathM r)
   pathM (spentWhile~ e l l₂ r)           = spentWhile~ (sub e) (rdP (keyP e) l) (rdI (valI e (there (here refl))) l₂) (pathM r)
   pathM (outerElem~ f r)                 = outerElem~ (flatM f) (pathM r)
-  pathM (outerExplode~ f r)              = outerExplode~ (flatM f) (pathM r)
+  pathM (outerExplode~ f (a , q , od , lX) r) =
+    outerExplode~ (flatM f) (a , q , od , rdI (valI (proj₁ f) (there (there (here refl)))) lX) (pathM r)
   pathM (inner~ e f ip r)                = inner~ e (flatM f) (sub ip) (pathM r)
   pathM (deferInner~ e₁ e₂ l l′ l₂ a≤ b≤ r) =
     deferInner~ (sub e₁) (sub e₂) (rdP (keyP e₁) l) (rdI (valI e₁ (here refl)) l′) (rdI (valI e₂ (there (here refl))) l₂) a≤ b≤ (pathM r)

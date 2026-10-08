@@ -24,7 +24,8 @@ open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
 open import Data.List.Relation.Unary.All using () renaming (lookup to all-lookup)
-open import Data.List.Relation.Unary.AllPairs using (_∷_)
+open import Data.List.Relation.Unary.All.Properties using (++⁻ˡ)
+open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Maybe   using (just; nothing)
@@ -44,7 +45,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (FlatSᵗ)
 open import Simulation.Stores using (Unpaired; FlatNodes; merge~; switch~; exhaust~; Flattener; PathRel; root~; sink~; map~; scan~;
   takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~;
-  MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows; Spent)
+  MachRow; hot~; RegRel; []; _∷_; mach; Partners; ArrRows; Spent; MergeAt)
 
 -- a node read back after a write elsewhere
 apart : ∀ m k → (k ≡ m → ⊥) → (m ≡ᵇ k) ≡ false
@@ -61,6 +62,10 @@ unique-++ʳ : ∀ {A : Set} (xs : List A) {ys} → Unique (xs ++ ys) → Unique 
 unique-++ʳ []       u       = u
 unique-++ʳ (_ ∷ xs) (_ ∷ u) = unique-++ʳ xs u
 
+unique-++ˡ : ∀ {A : Set} (xs : List A) {ys} → Unique (xs ++ ys) → Unique xs
+unique-++ˡ []       _       = []
+unique-++ˡ (_ ∷ xs) (a ∷ u) = ++⁻ˡ xs a ∷ unique-++ˡ xs u
+
 ∈-vals : ∀ {π : List (NodeId × List NodeId)} {a xs z} → (a , xs) ∈ π → z ∈ xs → z ∈ concatMap proj₂ π
 ∈-vals (here refl) zx = ∈-++⁺ˡ zx
 ∈-vals {π = (_ , ys) ∷ _} (there e) zx = ∈-++⁺ʳ ys (∈-vals e zx)
@@ -72,6 +77,17 @@ vals-same _ (here refl) (here refl) _ _ = refl
 vals-same u (here refl) (there q) zx zy = ⊥-elim (apart-++ u zx (∈-vals q zy))
 vals-same u (there p) (here refl) zx zy = ⊥-elim (apart-++ u zy (∈-vals p zx))
 vals-same {π = (_ , zs) ∷ _} u (there p) (there q) zx zy = vals-same (unique-++ʳ zs u) p q zx zy
+
+-- one entry's impl nodes are each other's apart
+entry-unique : ∀ {π : List (NodeId × List NodeId)} {a xs} → Unique (concatMap proj₂ π) → (a , xs) ∈ π → Unique xs
+entry-unique {π = (_ , ys) ∷ _} u (here refl) = unique-++ˡ ys u
+entry-unique {π = (_ , ys) ∷ _} u (there e)   = entry-unique (unique-++ʳ ys u) e
+
+-- so a flattener's merge is neither its node nor its cell
+merge-apart : ∀ {π : List (NodeId × List NodeId)} {a m′ ks k} → Unique (concatMap proj₂ π) → (a , m′ ∷ ks ∷ k ∷ []) ∈ π
+            → (k ≡ m′ → ⊥) × (k ≡ ks → ⊥)
+merge-apart u e with entry-unique u e
+... | a ∷ b ∷ _ = (λ eq → all-lookup a (there (here refl)) (sym eq)) , (λ eq → all-lookup b (here refl) (sym eq))
 
 -- and a plain node, once
 key-same : ∀ {π : List (NodeId × List NodeId)} {a xs ys} → Unique (map proj₁ π) → (a , xs) ∈ π → (a , ys) ∈ π → xs ≡ ys
@@ -163,7 +179,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
           → lookupNode nid NP ≡ just (mergeAll-st {t = u} nothing a [] true)
           → lookupNode nid′ NI ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true)
           → lookupNode m2 NI ≡ just (mergeAll-st {t = emitᵗ u} nothing b [] true) → a ≤ 1 → b ≤ 1
-          → Fired NP′ NI′ u nid nid′ m2) where
+          → Fired NP′ NI′ u nid nid′ m2)
+    (mergeW : ∀ {u m m′ ks k} → (m , m′ ∷ ks ∷ k ∷ []) ∈ π → MergeAt {Γ = Γ} κ NI u k → MergeAt {Γ = Γ} κ NI′ u k) where
 
     pathW : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
           → PathRel κ π NP NI p q → PathRel κ π NP′ NI′ p q
@@ -174,7 +191,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     pathW (takeWhile~ e l l₁ l₂ L r)         = takeWhile~ e (takeP l) (cellW e l l₁) (takeI l₂) L (pathW r)
     pathW (spentWhile~ e l l₂ r)             = spentWhile~ e (takeP l) (takeI l₂) (pathW r)
     pathW (outerElem~ f r)                   = outerElem~ (flatW f) (pathW r)
-    pathW (outerExplode~ f r)                = outerExplode~ (flatW f) (pathW r)
+    pathW (outerExplode~ f x r)              = outerExplode~ (flatW f) (mergeW (proj₁ f) x) (pathW r)
     pathW (inner~ e f ip r)                  = inner~ e (flatW f) ip (pathW r)
     pathW (deferInner~ e₁ e₂ l l′ l₂ a≤ b≤ r) =
       let (_ , _ , x , y , z , p , q) = hopW e₁ e₂ l l′ l₂ a≤ b≤ in deferInner~ e₁ e₂ x y z p q (pathW r)
@@ -312,7 +329,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     open Moves {t = t} {NP} {NP′} {NI} {NI′} cellP takeP (λ _ → cellI) (λ _ _ → cellI) takeI unpairedI flatW
       (λ e l l′ → soloP e l , pairedI e (here refl) (λ eq _ → solo-entry eq) l′)
       (λ e₁ e₂ l l′ l₂ a≤ b≤ → _ , _ , soloP e₁ l , pairedI e₁ (here refl) (λ eq _ → solo-entry eq) l′
-                                , pairedI e₂ (there (here refl)) third-entry l₂ , a≤ , b≤) public
+                                , pairedI e₂ (there (here refl)) third-entry l₂ , a≤ , b≤)
+      (λ e (a , q , od , l) → a , q , od
+         , pairedI e (there (there (here refl))) (λ eq k≡ → proj₁ (merge-apart vals e) (trans k≡ (sym (head₂ eq)))) l) public
 
   -- A FIRED HOP'S END WRITTEN: the plain merge and the impl's hop node
   -- one lower together, and the ending inner's marker merge one lower on
@@ -439,7 +458,19 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     hopW f g l l′ l₂ a≤ b≤ =
       let (a′ , x , y , p) = pairW f l l′ a≤ ; (b′ , z , q) = markW g l₂ b≤ in a′ , b′ , x , y , z , p , q
 
-    module M = Moves {t = t} {NP} {NP′} {NI} {NI′} cellP takeP (λ _ → cellI) (λ _ _ → cellI) takeI unpairedI flatW pendW hopW
+    -- an explode's merge is neither the hop's node nor its marker
+    third₂ : ∀ {i i′ z i2 k k′ ks₀ k₀ : NodeId} → (i , i′ ∷ z ∷ i2 ∷ []) ≡ (k , k′ ∷ ks₀ ∷ k₀ ∷ []) → z ≡ ks₀
+    third₂ refl = refl
+
+    mergeW : ∀ {u₀ k k′ ks₀ k₀} → (k , k′ ∷ ks₀ ∷ k₀ ∷ []) ∈ π → MergeAt {Γ = Γ} κ NI u₀ k₀ → MergeAt {Γ = Γ} κ NI′ u₀ k₀
+    mergeW {k₀ = k₀} f (a₀ , q , od , l) = a₀ , q , od , keepI n₁ n₂ l
+      where
+      n₁ : k₀ ≡ nid′ → ⊥
+      n₁ eq = solo-many (vals-same vals e₁ f (here refl) (there (there (here (sym eq)))))
+      n₂ : k₀ ≡ m2 → ⊥
+      n₂ eq = proj₂ (merge-apart vals f) (trans eq (third₂ (vals-same vals e₂ f (there (here refl)) (there (there (here (sym eq)))))))
+
+    module M = Moves {t = t} {NP} {NP′} {NI} {NI′} cellP takeP (λ _ → cellI) (λ _ _ → cellI) takeI unpairedI flatW pendW hopW mergeW
 
   -- AN IMPL CELL WRITTEN UNDER A SPENT TEST, ON THE IMPL SIDE ALONE.
   -- `π` pairs the cell once, in the test's entry, and a row reading a
@@ -515,6 +546,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     hopW _ _ l l′ l₂ a≤ b≤ = _ , _ , l , keepI (apartM l′) l′ , keepI (apartM l₂) l₂ , a≤ , b≤
 
     module M = Moves {t = t} {NP} {NP} {NI} {NI′} (λ l → l) (λ l → l) cellS cellW takeI unpairedI flatW pendW hopW
+                     (λ _ (a , q , od , l) → a , q , od , keepI (apartM l) l)
 
   -- the type a cell holds is the one its lookup says
   cell-ty : ∀ {w w₂} {a : Val (plainᵏ Γ κ) w} {b : Val (plainᵏ Γ κ) w₂} → just (cell-st {t = w} a) ≡ just (cell-st {t = w₂} b) → w ≡ w₂
@@ -604,3 +636,4 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     hopW _ _ l l′ l₂ a≤ b≤ = _ , _ , l , keepI (apartM l′) l′ , keepI (apartM l₂) l₂ , a≤ , b≤
 
     module M = Moves {t = t} {NP} {NP} {NI} {NI′} (λ l → l) (λ l → l) cellS cellW takeI unpairedI flatW pendW hopW
+                     (λ _ (a , q , od , l) → a , q , od , keepI (apartM l) l)

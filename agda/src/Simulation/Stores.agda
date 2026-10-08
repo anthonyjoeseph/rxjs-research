@@ -253,6 +253,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   hotEq : ∀ i → lookup κ i ≡ hotᵏ → lookup Γ′ (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)
   hotEq i h = trans (stampedSlot Γ κ i) (cong (slotTy (lookup Γ i)) h)
 
+  -- AN EXPLODE'S MERGE IS UNBOUNDED AT THE ECHO'S TYPE: a consume there
+  -- subscribes, never queues, and never finds the node unusable
+  MergeAt : List (NodeId × NodeState Γ′) → Ty → NodeId → Set
+  MergeAt NI u k = Σ ℕ λ a → Σ (List (Val Γ′ (obs (echoᵗ (emitᵗ u))))) λ q → Σ Bool λ od
+                 → lookupNode k NI ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing a q od)
+
   module _ (π : List (NodeId × List NodeId)) where
 
     -- AN IMPL-ONLY NODE A ROW READS IS NONE OF `π`'S: a write to a paired
@@ -373,7 +379,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                           {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ}
                           {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
                           {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₆ (emitᵗ u) (emitᵗ t)}
-                      → Flattener u op m m′ ks (mX ∷ []) → PathRel p q
+                      → Flattener u op m m′ ks (mX ∷ []) → MergeAt NI u mX → PathRel p q
                       → PathRel (thru-outer (flatOp op) m ↠[ h ] p)
                           (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
                            (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]

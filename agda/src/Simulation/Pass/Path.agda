@@ -121,7 +121,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass wk S r@(takeWhile~ _ _ _ _ _ _) b sp si (fold-step d dP) dI lt = resume wk (takeWhile-arm S r b sp si d dI) (adv d sp) dP (sz-r lt)
       path-pass wk S r@(spentWhile~ _ _ _ _) b sp si (fold-step d dP) dI lt = resume wk (takeWhile-arm S r b sp si d dI) (adv d sp) dP (sz-r lt)
       path-pass wk S (outerElem~ fl r) b sp si (fold-step d dP) dI lt = resume wk (outerElem-arm wk S (fl , r) b sp si d dI (sz-l lt)) (adv d sp) dP (sz-r lt)
-      path-pass wk S (outerExplode~ fl r) b sp si (fold-step d dP) dI lt = resume wk (outerExplode-arm S (fl , r) b sp si d dI) (adv d sp) dP (sz-r lt)
+      path-pass wk S (outerExplode~ fl x r) b sp si (fold-step d dP) dI lt = resume wk (outerExplode-arm S (fl , x , r) b sp si d dI) (adv d sp) dP (sz-r lt)
       path-pass wk S r@(inner~ {op = op} refl _ _ _) b sp si (fold-step d@(step-from-inner react-false) dP) dI lt =
         resume wk (inner-pass {op = op} S r b sp si (inj₁ refl) dI) (adv d sp) dP (sz-r lt)
       path-pass wk S r@(inner~ {op = op} refl _ _ _) b sp si (fold-step d@(step-from-inner (react-alive al)) dP) dI lt =

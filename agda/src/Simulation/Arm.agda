@@ -95,7 +95,7 @@ rel-unbatched (scan~ _ _ _ _ _ r)            = rel-unbatched r
 rel-unbatched (takeWhile~ _ _ _ _ _ r)       = rel-unbatched r
 rel-unbatched (spentWhile~ _ _ _ r)          = rel-unbatched r
 rel-unbatched (outerElem~ _ r)               = rel-unbatched r
-rel-unbatched (outerExplode~ _ r)            = rel-unbatched r
+rel-unbatched (outerExplode~ _ _ r)          = rel-unbatched r
 rel-unbatched (inner~ _ _ _ r)               = rel-unbatched r
 rel-unbatched (deferInner~ _ _ _ _ _ _ _ r)  = rel-unbatched r
 
