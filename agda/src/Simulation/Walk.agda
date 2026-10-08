@@ -400,12 +400,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- reaches it only at a cold slot above the source it registered on.
       -- PROBED: make qc-store QC='5 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2,0],"reach":["input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
-      --   alone: 197 agree, 0 fail, 3 undecided.  Every case reads a cold
+      --   alone: 196 agree, 0 fail, 4 undecided.  Every case reads a cold
       --   script of two synchronous values and no arrival, under maps,
       --   scans, every flattener and μ.  Not the below-floor disjunct.
       -- PROBED: make qc-same-clock QC='5 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2,0],"reach":["input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 74
-      --   agree, 0 fail, 24 undecided: the same scripts' values against
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 73
+      --   agree, 0 fail, 23 undecided: the same scripts' values against
       --   the plain run's instants.
       -- PROBED: make qc-store QC='8 200 3' QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,1,2,2,0,0,0,0,0],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[0,0,0,0,0,1],"reach":["flatten","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 200 agree, 0 fail, 0
@@ -485,7 +485,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
       --   18 undecided.  Read against `make qc-store` on the same line,
       --   47 of the 54 cases connecting a share at the subscribe agree.
-      -- PROBED: make qc-store QC='7 200 4' QC_BUDGET=120 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
+      -- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 132 agree, 0 fail, 1
       --   undecided.  Slot one a script in every program; 38 connect slot
       --   one's hot share, 14 of them beside a hot slot zero.

@@ -257,12 +257,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **RE-DRAW THE PACKED RECEIPTS.** Every receipt in `Simulation` whose draw
-  takes a cold script with two sync values (`script` 4 or 5) was decided on
-  the packed frame; replay each by its own command and restamp its counts. A
-  red is a refutation of the leaf it names. Decides whether `simulation`'s
-  evidence at the subscribe frame survives the frame's one-emit-per-value
-  shape.
+- **THE FRAME'S COST.** One emit per value pushed same-clock cases past
+  the ten-second case clock: seed 43's element groups at a hot arrival went
+  from decided to undecided, and seeds 43 and 44 decide a fifth of what they
+  did. Measure the evaluator on those cases and cut the cost, or re-aim each
+  receipt at a clock that decides its cited cases. Removes what stops
+  `simulation`'s inner-pass evidence being re-decided.
 
 - **THE RUN'S OWN EMITS.** `lifts?`, `scanLifts?` and `cutLifts?` decide
   their closure relations at sampled emits of every event and kind; decide
@@ -286,7 +286,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   exploded emit, carrying nothing or one value, walks into the flattener
   through the impl's merge, and the outer's end meets the plain outer's; a
   group delivered at one instant sends at it.
-- **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED`: an outer's group
+- **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×2`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `PROBED×4`: a

@@ -308,11 +308,10 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- INSTANT: what a cut hands on is never empty, so whatever the
       -- end subscribes is restamped to the group's own instant
       --
-      -- PROBED: make qc-same-clock QC='44 150 3' QC_DRAW='{"exp":[2,2,1,0,4,2,3,2,0,0,0,4,3],"obs":[4,2,1,0],"fan":[0,3,2,1,1,0,1,2,2,0],"script":[0,3,0,0,2,0],"reach":["flatten"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 60 agree,
-      --   0 fail, 59 undecided; 44 agreements carry a `takeWhile`.  Case
-      --   41 cuts an exhaust's first inner at the second of two hot
-      --   arrivals.
+      -- PROBED: make qc-same-clock QC='44 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,0,4,2,3,2,0,0,0,4,3],"obs":[4,2,1,0],"fan":[0,3,2,1,1,0,1,2,2,0],"script":[0,3,0,0,2,0],"reach":["flatten"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 24 agree,
+      --   0 fail, 37 undecided.  Case 41 cuts an exhaust's first inner at
+      --   the second of two hot arrivals.
       -- PROBED: make qc-same-clock QC='46 80 3' QC_DRAW='{"exp":[4,4,1,0,1,5,1,1,0,0,0,5,0],"obs":[0,3,1,0],"fan":[0,3,2,1,1,0,1,2,2,0],"script":[0,4,0,0,0,0],"reach":["flatten","takeWhile"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 54 agree, 0 fail, 26
       --   undecided.  Case 6 cuts a bounded merge's first inner, limit one,

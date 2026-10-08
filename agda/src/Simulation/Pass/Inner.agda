@@ -269,10 +269,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- its lane is subscribed at that delivery.  The route is through the
       -- walk's echo and lane, a consume carrying the instant its echo set.
       --
-      -- PROBED: make qc-same-clock QC='43 150 3' QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2,0],"script":[0,2,0,0,3,0],"reach":["flatten"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 31 agree, 0 fail, 65
-      --   undecided.  Cases 7 and 39 walk an element group delivered at a
-      --   hot arrival, not at the subscribe instant.
+      -- PROBED: make qc-same-clock QC='43 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2,0],"script":[0,2,0,0,3,0],"reach":["flatten"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 13
+      --   agree, 0 fail, 42 undecided; cases 7 and 39, which walk an
+      --   element group delivered at a hot arrival, go past the case clock.
+      -- PROBED: make qc-same-clock QC='43 40 3' QC_CASE=120 QC_BUDGET=2400 QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2,0],"script":[0,2,0,0,3,0],"reach":["flatten"]}'
+      --   the same draw at a longer case clock, killed after 11 cases: 5
+      --   agree, 0 fail, 6 undecided.  Case 7 agrees, an element group at
+      --   a hot arrival; case 39 was not reached.
       elem-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                    {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es vs rI}
                → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
