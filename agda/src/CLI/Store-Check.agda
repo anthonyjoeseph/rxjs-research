@@ -420,10 +420,47 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
                    ++ inj₂ (inj₂ (inj₁ (6 , inj₂ (inj₁ tt)))) ∷ inj₂ (inj₂ (inj₂ (inj₁ 8))) ∷ inj₂ (inj₂ (inj₂ (inj₂ tt))) ∷ [])
                , 7 , 9 , inj₂ (inj₂ tt)
 
+  -- every event, each with the plain value it carries if any: an init
+  -- and a close at the emit's own instant and source and at neither,
+  -- every close reason, a handoff, a complete, and two values
+  alphabet : ∀ t → List (Val Γ′ (instEventᵗ uniqᵗ (plainᵗ t)) × Maybe (Val Γ t))
+  alphabet t = (inj₁ 7 , nothing) ∷ (inj₁ 9 , nothing)
+    ∷ map (λ v → valEv (proj₁ v) , just (proj₂ v)) (take 2 (samp t))
+    ++ concatMap (λ k → map (λ r → inj₂ (inj₂ (inj₁ (k , r))) , nothing)
+                            (inj₁ tt ∷ inj₂ (inj₁ tt) ∷ inj₂ (inj₂ tt) ∷ [])) (7 ∷ 9 ∷ [])
+    ++ (inj₂ (inj₂ (inj₂ (inj₁ 8))) , nothing) ∷ (inj₂ (inj₂ (inj₂ (inj₂ tt))) , nothing) ∷ []
+
+  evKinds : List (Val Γ′ (unitᵗ +ᵗ (unitᵗ +ᵗ unitᵗ)))
+  evKinds = inj₁ tt ∷ inj₂ (inj₁ tt) ∷ inj₂ (inj₂ tt) ∷ []
+
+  evKindAt : ℕ → Val Γ′ (unitᵗ +ᵗ (unitᵗ +ᵗ unitᵗ))
+  evKindAt zero                = inj₁ tt
+  evKindAt (suc zero)          = inj₂ (inj₁ tt)
+  evKindAt (suc (suc zero))    = inj₂ (inj₂ tt)
+  evKindAt (suc (suc (suc i))) = evKindAt i
+
+  -- every word of at most two events at every kind, and every word of
+  -- three at one kind, the kinds taken in turn
+  small : ∀ t → List (Val Γ′ (emitᵗ t) × List (Val Γ t))
+  small t = concatMap (λ w → map (at w) evKinds) (upTo2 (alphabet t))
+         ++ map (λ (i , w) → at w (evKindAt i)) (indexed 0 (cube (alphabet t)))
+    where
+      Ev = Val Γ′ (instEventᵗ uniqᵗ (plainᵗ t)) × Maybe (Val Γ t)
+      upTo2 cube : List Ev → List (List Ev)
+      upTo2 A = [] ∷ map (_∷ []) A ++ concatMap (λ a → map (λ b → a ∷ b ∷ []) A) A
+      cube  A = concatMap (λ a → concatMap (λ b → map (λ c → a ∷ b ∷ c ∷ []) A) A) A
+      vals : List Ev → List (Val Γ t)
+      vals []                   = []
+      vals ((_ , just v)  ∷ es) = v ∷ vals es
+      vals ((_ , nothing) ∷ es) = vals es
+      at : List Ev → Val Γ′ (unitᵗ +ᵗ (unitᵗ +ᵗ unitᵗ)) → Val Γ′ (emitᵗ t) × List (Val Γ t)
+      at w k = (map proj₁ w , 7 , 9 , k) , vals w
+
   emits : ∀ t → List (Val Γ′ (emitᵗ t) × List (Val Γ t))
   emits t = concatMap (λ xs → let ps = map proj₁ xs ; qs = map proj₂ xs in
                         (bare t ps , qs) ∷ (wrapped t ps , qs) ∷ (tailed t ps , qs) ∷ [])
                       ([] ∷ take 1 (samp t) ∷ take 2 (samp t) ∷ [])
+            ++ small t
 
   -- an emit's stamp, its instant and its kind, read off its fields
   instE kindE : ∀ t → Val Γ′ (emitᵗ t) → ℕ

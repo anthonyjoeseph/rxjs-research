@@ -263,11 +263,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   counts as drawn. Decides whether `simulation`'s steps survive the emits
   only the elaboration writes, where the samples stop.
 
-- **EVERY SMALL EMIT.** The samples fix one shape per event and kind;
-  enumerate every emit up to three events, each event and kind in each
-  position, and decide `lifts?`, `scanLifts?` and `cutLifts?` at all of them.
-  Decides whether a closure relation `simulation` steps on fails at an
-  ordering the samples never wrote, short of what the impl run reaches.
+- **EVERY SMALL EMIT.** `lifts?` holds at every emit up to three events,
+  every event and kind in each position (seed 16's map draw, 200 agree, red
+  under a dropped value). Show the same mutation reaches `scanLifts?` and
+  `cutLifts?` (seeds 51, 50: green, reach unshown), then stamp their rows.
+  Decides whether `simulation`'s scan and cut steps fail at an ordering the
+  samples never wrote.
 
 - **LOWER BY EVIDENCE.** Each risky row whose receipts name its risky region
   is reclassified down in its header and here; each whose receipts stop short
