@@ -262,13 +262,14 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   Decides whether `simulation`'s instant bookkeeping survives a value pass
   that now emits once per value.
 
-- **FIT THE EXPLODE.** Write `explode-{end,out}` and the two subscribe
-  leaves as bodies over smaller leaves; every fact a body needs that `Store`
-  lacks becomes a field, its consumers cascaded. The consume needed one: the
-  explode's merge unbounded at the echo's type, on `outerExplode~`, which
-  rules out its queue and its unusable node. Decides whether `Store` carries
-  what the flattener's outer walk needs, where `simulation` is likeliest
-  false as stated over unreached states.
+- **FIT THE EXPLODE.** Write `explode-out` and the two subscribe leaves as
+  bodies over smaller leaves; every fact a body needs that `Store` lacks
+  becomes a field, its consumers cascaded. The consume needed the explode's
+  merge unbounded at the echo's type; the end needed it idle, each `of`
+  inner over inside its own subscribe, so the merge's end is the plain
+  outer's. Decides whether `Store` carries what the flattener's outer walk
+  needs, where `simulation` is likeliest false as stated over unreached
+  states.
 
 - **EVERY SMALL EMIT.** `lifts?` holds at every emit up to three events,
   every event and kind in each position (seed 16's map draw, 200 agree, red
@@ -285,10 +286,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`explode-{quiet-sub,one-sub,end,out}`** (Simulation.Pass) — FALSITY, `PROBED`: one
-  exploded emit, carrying nothing or one value, subscribed by the impl's
-  unbounded merge, walks into the flattener, and the outer's end meets the
-  plain outer's; a group delivered at one instant sends at it.
+- **`explode-{quiet-sub,one-sub,out}`** (Simulation.Pass) — FALSITY, `PROBED`:
+  one exploded emit, carrying nothing or one value, subscribed by the impl's
+  idle merge, walks into the flattener; a group delivered at one instant sends
+  at it.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.

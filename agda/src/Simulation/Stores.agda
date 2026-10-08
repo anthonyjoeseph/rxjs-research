@@ -253,11 +253,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   hotEq : ∀ i → lookup κ i ≡ hotᵏ → lookup Γ′ (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)
   hotEq i h = trans (stampedSlot Γ κ i) (cong (slotTy (lookup Γ i)) h)
 
-  -- AN EXPLODE'S MERGE IS UNBOUNDED AT THE ECHO'S TYPE: a consume there
-  -- subscribes, never queues, and never finds the node unusable
+  -- AN EXPLODE'S MERGE IS UNBOUNDED AT THE ECHO'S TYPE AND IDLE: a
+  -- consume there subscribes, never queues, and never finds the node
+  -- unusable; and every inner it takes is an `of` that ends inside its
+  -- own subscribe, so between steps none is running, and the outer's end
+  -- reaches the flattener exactly when it reaches the plain one
   MergeAt : List (NodeId × NodeState Γ′) → Ty → NodeId → Set
-  MergeAt NI u k = Σ ℕ λ a → Σ (List (Val Γ′ (obs (echoᵗ (emitᵗ u))))) λ q → Σ Bool λ od
-                 → lookupNode k NI ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing a q od)
+  MergeAt NI u k = Σ Bool λ od → lookupNode k NI ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] od)
 
   module _ (π : List (NodeId × List NodeId)) where
 

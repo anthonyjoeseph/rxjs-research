@@ -1056,7 +1056,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      (lookup-set m′ x′ N)
              , flat-init u op
              , c , lk
-          X  = wb w r (After.store (proj₁ I)) (outerExplode~ {op = op} F (0 , [] , false , lookup-set mX xX (setNode m′ x′ N)) (proj₂ (proj₂ I)))
+          X  = wb w r (After.store (proj₁ I)) (outerExplode~ {op = op} F (false , lookup-set mX xX (setNode m′ x′ N)) (proj₂ (proj₂ I)))
                  (fresh-at refl frP oP) (bare (bare (fresh-at refl frX (fresh-at refl frM (fresh-at refl frK (bare oI)))))) dP dI (sz-1 (s<s⁻¹ lt))
           pr₁ = proj₂ (proj₂ I)
           fr : ∀ j → OnPath j q → j < ks

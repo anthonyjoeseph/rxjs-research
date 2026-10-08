@@ -39,7 +39,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Decide       using (≡ᵇ→≡)
 open import Rx.Exp       using (Ty; Ctx; Val)
-open import Rx.Evaluator using (NodeId; NodeState; Path; cell-st; take-st; mergeAll-st; lookupNode; setNode)
+open import Rx.Evaluator using (NodeId; NodeState; Path; cell-st; take-st; mergeAll-st; echoᵗ; lookupNode; setNode)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (FlatSᵗ)
@@ -330,7 +330,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
       (λ e l l′ → soloP e l , pairedI e (here refl) (λ eq _ → solo-entry eq) l′)
       (λ e₁ e₂ l l′ l₂ a≤ b≤ → _ , _ , soloP e₁ l , pairedI e₁ (here refl) (λ eq _ → solo-entry eq) l′
                                 , pairedI e₂ (there (here refl)) third-entry l₂ , a≤ , b≤)
-      (λ e (a , q , od , l) → a , q , od
+      (λ e (od , l) → od
          , pairedI e (there (there (here refl))) (λ eq k≡ → proj₁ (merge-apart vals e) (trans k≡ (sym (head₂ eq)))) l) public
 
   -- A FIRED HOP'S END WRITTEN: the plain merge and the impl's hop node
@@ -463,7 +463,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     third₂ refl = refl
 
     mergeW : ∀ {u₀ k k′ ks₀ k₀} → (k , k′ ∷ ks₀ ∷ k₀ ∷ []) ∈ π → MergeAt {Γ = Γ} κ NI u₀ k₀ → MergeAt {Γ = Γ} κ NI′ u₀ k₀
-    mergeW {k₀ = k₀} f (a₀ , q , od , l) = a₀ , q , od , keepI n₁ n₂ l
+    mergeW {k₀ = k₀} f (od , l) = od , keepI n₁ n₂ l
       where
       n₁ : k₀ ≡ nid′ → ⊥
       n₁ eq = solo-many (vals-same vals e₁ f (here refl) (there (there (here (sym eq)))))
@@ -546,7 +546,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     hopW _ _ l l′ l₂ a≤ b≤ = _ , _ , l , keepI (apartM l′) l′ , keepI (apartM l₂) l₂ , a≤ , b≤
 
     module M = Moves {t = t} {NP} {NP} {NI} {NI′} (λ l → l) (λ l → l) cellS cellW takeI unpairedI flatW pendW hopW
-                     (λ _ (a , q , od , l) → a , q , od , keepI (apartM l) l)
+                     (λ _ (od , l) → od , keepI (apartM l) l)
 
   -- the type a cell holds is the one its lookup says
   cell-ty : ∀ {w w₂} {a : Val (plainᵏ Γ κ) w} {b : Val (plainᵏ Γ κ) w₂} → just (cell-st {t = w} a) ≡ just (cell-st {t = w₂} b) → w ≡ w₂
@@ -636,4 +636,82 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     hopW _ _ l l′ l₂ a≤ b≤ = _ , _ , l , keepI (apartM l′) l′ , keepI (apartM l₂) l₂ , a≤ , b≤
 
     module M = Moves {t = t} {NP} {NP} {NI} {NI′} (λ l → l) (λ l → l) cellS cellW takeI unpairedI flatW pendW hopW
-                     (λ _ (a , q , od , l) → a , q , od , keepI (apartM l) l)
+                     (λ _ (od , l) → od , keepI (apartM l) l)
+
+  -- the type a merge holds is the one its lookup says
+  merge-ty : ∀ {w w₂ l l₂ c c₂ q q₂ d d₂}
+           → just (mergeAll-st {Γ = plainᵏ Γ κ} {t = w} l c q d) ≡ just (mergeAll-st {t = w₂} l₂ c₂ q₂ d₂) → w ≡ w₂
+  merge-ty refl = refl
+
+  -- AN EXPLODE'S MERGE TOLD ITS OUTER IS DONE, ON THE IMPL SIDE ALONE.
+  -- `π` pairs the merge once, last in the explode's own entry, so no
+  -- cell, count, hop or other flattener's row names it, and the only
+  -- merge fact at it is the explode's own, which the write keeps idle
+  module MergeDone (vals : Unique (concatMap proj₂ π)) {t : Ty}
+                   {NP : List (NodeId × NodeState Γ)} {NI : List (NodeId × NodeState (plainᵏ Γ κ))}
+                   {u m m′ ks mX od} (pm : (m , m′ ∷ ks ∷ mX ∷ []) ∈ π)
+                   (lX : lookupNode mX NI ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] od)) where
+
+    NI′ : List (NodeId × NodeState (plainᵏ Γ κ))
+    NI′ = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] true) NI
+
+    keepI : ∀ {j v} → (j ≡ mX → ⊥) → lookupNode j NI ≡ just v → lookupNode j NI′ ≡ just v
+    keepI {j} ne l = trans (set-above mX j (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] true) NI (apart mX j ne)) l
+
+    cellI : ∀ {j s} {b : Val (plainᵏ Γ κ) s} → lookupNode j NI ≡ just (cell-st b) → lookupNode j NI′ ≡ just (cell-st b)
+    cellI {j} l with j ≟ mX
+    ... | yes refl = ⊥-elim (cell≢merge (trans (sym lX) l))
+    ... | no ne    = keepI ne l
+
+    takeI : ∀ {j b} → lookupNode j NI ≡ just (take-st b) → lookupNode j NI′ ≡ just (take-st b)
+    takeI {j} l with j ≟ mX
+    ... | yes refl = ⊥-elim (take≢merge (trans (sym lX) l))
+    ... | no ne    = keepI ne l
+
+    unpairedI : ∀ {j v} → Unpaired {Γ = Γ} κ π j → lookupNode j NI ≡ just v → lookupNode j NI′ ≡ just v
+    unpairedI {j} un l with j ≟ mX
+    ... | yes refl = ⊥-elim (un (∈-vals pm (there (there (here refl)))))
+    ... | no ne    = keepI ne l
+
+    third₃ : ∀ {i i′ z i2} → (i , i′ ∷ z ∷ i2 ∷ []) ≡ (m , m′ ∷ ks ∷ mX ∷ []) → z ≡ ks
+    third₃ refl = refl
+
+    -- a solo entry's impl node is not the merge
+    soloX : ∀ {k k′} → (k , k′ ∷ []) ∈ π → k′ ≡ mX → ⊥
+    soloX e refl = solo-many (vals-same vals e pm (here refl) (there (there (here refl))))
+
+    flatW : ∀ {u₀ op₀ m₀ m₀′ ks₀ xs₀} → Flattener κ π {t = t} NP NI u₀ op₀ m₀ m₀′ ks₀ xs₀ → Flattener κ π {t = t} NP NI′ u₀ op₀ m₀ m₀′ ks₀ xs₀
+    flatW {m₀′ = m₂′} (pm₂ , y , y′ , l , l′ , fn₂ , c₂ , lk₂) = pm₂ , y , y′ , l , keepI n₁ l′ , fn₂ , c₂ , cellI lk₂
+      where
+      n₁ : m₂′ ≡ mX → ⊥
+      n₁ refl = proj₁ (merge-apart vals pm) (head₂ (vals-same vals pm₂ pm (here refl) (there (there (here refl)))))
+
+    pendW : ∀ {u₀ j j′} → (j , j′ ∷ []) ∈ π
+          → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing 0 [] false)
+          → lookupNode j′ NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing 0 [] false)
+          → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing 0 [] false)
+            × lookupNode j′ NI′ ≡ just (mergeAll-st {t = emitᵗ u₀} nothing 0 [] false)
+    pendW e l l′ = l , keepI (soloX e) l′
+
+    hopW : ∀ {u₀ j j′ i i′ m₂ i2 a₀ b₀} → (j , j′ ∷ []) ∈ π → (i , i′ ∷ m₂ ∷ i2 ∷ []) ∈ π
+         → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing a₀ [] true)
+         → lookupNode j′ NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing a₀ [] true)
+         → lookupNode m₂ NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing b₀ [] true) → a₀ ≤ 1 → b₀ ≤ 1
+         → Fired NP NI′ u₀ j j′ m₂
+    hopW {m₂ = m₂} e₁ e₂ l l′ l₂ a≤ b≤ = _ , _ , l , keepI (soloX e₁) l′ , keepI n₂ l₂ , a≤ , b≤
+      where
+      n₂ : m₂ ≡ mX → ⊥
+      n₂ refl = proj₂ (merge-apart vals pm) (third₃ (vals-same vals e₂ pm (there (here refl)) (there (there (here refl)))))
+
+    -- every explode's merge kept, this one marked done and still idle
+    mergeW : ∀ {u₀ k k′ ks₀ k₀} → (k , k′ ∷ ks₀ ∷ k₀ ∷ []) ∈ π → MergeAt {Γ = Γ} κ NI u₀ k₀ → MergeAt {Γ = Γ} κ NI′ u₀ k₀
+    mergeW {k₀ = k₀} _ (od₀ , l) with k₀ ≟ mX
+    ... | no ne    = od₀ , keepI ne l
+    ... | yes refl = true , trans (lookup-set mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] true) NI)
+                                  (cong (λ w → just (mergeAll-st {Γ = plainᵏ Γ κ} {t = w} nothing 0 [] true)) (merge-ty (trans (sym lX) l)))
+
+    -- and the explode's own, at the write
+    mergeX : MergeAt {Γ = Γ} κ NI′ u mX
+    mergeX = true , lookup-set mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] true) NI
+
+    module M = Moves {t = t} {NP} {NP} {NI} {NI′} (λ l → l) (λ l → l) (λ _ → cellI) (λ _ _ → cellI) takeI unpairedI flatW pendW hopW mergeW
