@@ -531,8 +531,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- plain values over related environments
       -- PROBED: `Probed.Walk-Leaves` -- no values, and two with the first
       --   read off a binder through the mint's renaming: one emit per
-      --   value, the end on the last.  Not a value of a sum or pair type,
-      --   not under a nonempty outer telescope.
+      --   value, the end on the last; and a pair of the variable and a
+      --   right sum at a renaming moving the variable past a value it
+      --   does not own.  Not under a nonempty outer telescope.
       of-carries     : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                      → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
                      → ∀ src → Carries {u} (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L) (map (λ tm → evalWith tm ρ) (plainTms ts))

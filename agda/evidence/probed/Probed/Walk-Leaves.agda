@@ -20,8 +20,8 @@ open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
-open import Rx.Exp using (add; ltᵖ; natᵗ; uniqᵗ; ofᵉ; []ᵉ; _∷ᵉ_)
-open import SExp.Syntax using (varˢᵗ; natˢ; primˢ; pairˢ; inputˢ)
+open import Rx.Exp using (add; ltᵖ; natᵗ; unitᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; ofᵉ; []ᵉ; _∷ᵉ_)
+open import SExp.Syntax using (varˢᵗ; natˢ; primˢ; pairˢ; inrˢ; inputˢ)
 
 open import Simulation.Walk using (of-carries; lifts-scan; lifts-while; init-numbers; init-distinct)
 open import Simulation.Arm using (module Arms)
@@ -50,6 +50,16 @@ _ : Confirms (of-carries {Γ = Γ₂} (κᵖ two-arrivals) {natᵗ} {ofᵉ []} {
                          {u = natᵗ} [] {Θ′ = natᵗ ∷ uniqᵗ ∷ []} (λ x → x)
                          {ρ′ = 4 ∷ᵉ 0 ∷ᵉ []ᵉ} {ρ = 4 ∷ᵉ []ᵉ} (λ { (here refl) → refl }) refl 3)
 _ = Carries.quiet _ [] Carries.[]
+
+-- LOAD-BEARING: a pair reading the author's variable and a right sum,
+-- at a renaming moving the variable past a value 8 it does not own;
+-- fails if a component is read at its unrenamed slot, the sum's side
+-- flips, or the pair is split across emits
+_ : Confirms (of-carries {Γ = Γ₂} (κᵖ two-arrivals) {natᵗ} {ofᵉ []} {ofᵉ []}
+                         {u = natᵗ ×ᵗ (unitᵗ +ᵗ natᵗ)} (pairˢ (varˢᵗ (here refl)) (inrˢ (natˢ 7)) ∷ [])
+                         {Θ′ = natᵗ ∷ natᵗ ∷ uniqᵗ ∷ []} there
+                         {ρ′ = 8 ∷ᵉ 4 ∷ᵉ 0 ∷ᵉ []ᵉ} {ρ = 4 ∷ᵉ []ᵉ} (λ { (here refl) → refl }) refl 3)
+_ = Carries.one _ ((refl , refl) ∷ []) Carries.[]
 
 -- LOAD-BEARING: a running sum plus the author's variable, seeded by it,
 -- over an emit of one payload; fails if the step or the seed reads the
