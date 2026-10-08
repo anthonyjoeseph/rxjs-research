@@ -480,6 +480,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
       --   18 undecided.  Read against `make qc-store` on the same line,
       --   47 of the 54 cases connecting a share at the subscribe agree.
+      -- PROBED: make qc-store QC='7 200 4' QC_BUDGET=120 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 132 agree, 0 fail, 1
+      --   undecided.  Slot one a script in every program; 38 connect slot
+      --   one's hot share, 14 of them beside a hot slot zero.
+      -- PROBED: make qc-same-clock QC='9 100 3' QC_CASE=60 QC_BUDGET=1500 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,1,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 36
+      --   agree, 0 fail, 11 undecided: 21 with slot one a hot script, 7 of
+      --   them beside a hot slot zero.  Its connects are not counted.
       hot-read-connect-live : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
                    → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                    → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))

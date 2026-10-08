@@ -251,23 +251,23 @@ body ends, 2nd hop inners apart; unsound walks/reads; 2 stamp chains;
 `of` splits, folds; `mintᵉ`, root stamps; quiet-cut drains; hop
 scripts; joiners off catch; quiet arms; installs+hops; inners revived;
 unaligned reads/connects/flushes; renamings; 2-script
-stores. Left: 2-script values; gaps.
+stores, values. Left: stated gaps.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **TWO SCRIPTS' VALUES.** Slot one is drawn as a script, and the store
-  sweeps there are green: `init-*` at two hot slots, `cold-read-end` below
-  the floor. Only `store?` has seen those programs; aim `qc-same-clock` and
-  each top-line statement at them. Decides whether `simulation`'s values
-  conjunct holds across scripts, the region its stores were cleared in.
+- **GAPS UNDER A BINDER.** Every receipt's closing `Not …` names a region
+  no row reached. First the binder and values ones: `cold-block` and
+  `hot-read-connect-live` under a binder and on their values conjunct, and
+  `of-carries` under an outer telescope. Aim a typechecker row at each; a
+  red is a refutation and a restatement. Decides whether `simulation`'s
+  reads hold past the root.
 
-- **CLOSE THE STATED GAPS.** Every receipt's closing `Not …` names a region
-  no row reached: `cold-block` and `hot-read-connect-live` under a binder and
-  on their values conjunct, `cold-block` inside a μ, `lifts-map` at an emit
-  the impl produced, `of-carries` under an outer telescope. Aim a row at each;
-  a red is a refutation and a restatement.
+- **GAPS IN THE ELABORATION.** The rest: `cold-block` inside a μ, and
+  `lifts-map` at an emit the impl produced rather than one built by hand.
+  Same rule. Decides whether `simulation`'s leaves survive the shapes only
+  the elaboration writes.
 
 - **LOWER BY EVIDENCE.** Each risky row whose receipts name its risky region
   is reclassified down in its header and here; each whose receipts stop short
@@ -339,7 +339,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   subscribe against the impl's at its stamped slot, down the restamp, keeps
   what a pass keeps; the two scripts at the slot are one by `Store.scripts`,
   the shared paths sound.
-- **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED×5`: a
+- **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED×7`: a
   hot read whose impl connects its share over an ended or a live script keeps
   what a pass keeps.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
