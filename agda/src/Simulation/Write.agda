@@ -515,3 +515,92 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     hopW _ _ l l′ l₂ a≤ b≤ = _ , _ , l , keepI (apartM l′) l′ , keepI (apartM l₂) l₂ , a≤ , b≤
 
     module M = Moves {t = t} {NP} {NP} {NI} {NI′} (λ l → l) (λ l → l) cellS cellW takeI unpairedI flatW pendW hopW
+
+  -- the type a cell holds is the one its lookup says
+  cell-ty : ∀ {w w₂} {a : Val (plainᵏ Γ κ) w} {b : Val (plainᵏ Γ κ) w₂} → just (cell-st {t = w} a) ≡ just (cell-st {t = w₂} b) → w ≡ w₂
+  cell-ty refl = refl
+
+  cell-subst : ∀ {w w₂} (e : w ≡ w₂) (a : Val (plainᵏ Γ κ) w) → cell-st {t = w} a ≡ cell-st {t = w₂} (subst (Val (plainᵏ Γ κ)) e a)
+  cell-subst refl a = refl
+
+  -- A FLATTENER'S RESTAMP CELL WRITTEN, ON THE IMPL SIDE ALONE.  `π`
+  -- pairs the cell once, second in the flattener's own entry, so no
+  -- scan's, test's or other flattener's row names it, and a row naming
+  -- it as its restamp cell reads the new one at the type it already
+  -- held there
+  module FlatCellWrite (vals : Unique (concatMap proj₂ π)) {t : Ty}
+                       {NP : List (NodeId × NodeState Γ)} {NI : List (NodeId × NodeState (plainᵏ Γ κ))}
+                       {u op m m′ ks xs x x′} {c : Val (plainᵏ Γ κ) (FlatSᵗ u)}
+                       (pm : (m , m′ ∷ ks ∷ xs) ∈ π) (lI : lookupNode m′ NI ≡ just x′)
+                       (fn : FlatNodes {Γ = Γ} κ π u op x x′) (lk : lookupNode ks NI ≡ just (cell-st {t = FlatSᵗ u} c))
+                       (c′ : Val (plainᵏ Γ κ) (FlatSᵗ u)) where
+
+    NI′ : List (NodeId × NodeState (plainᵏ Γ κ))
+    NI′ = setNode ks (cell-st {t = FlatSᵗ u} c′) NI
+
+    keepI : ∀ {j v} → (j ≡ ks → ⊥) → lookupNode j NI ≡ just v → lookupNode j NI′ ≡ just v
+    keepI {j} ne l = trans (set-above ks j (cell-st {t = FlatSᵗ u} c′) NI (apart ks j ne)) l
+
+    at : ∀ {v} → lookupNode ks NI ≡ just v → cell-st {t = FlatSᵗ u} c ≡ v
+    at l = just-injective (trans (sym lk) l)
+
+    -- the cell is not the flattener's own impl node
+    ksm : ks ≡ m′ → ⊥
+    ksm refl = cell-flat′ (subst (FlatNodes {Γ = Γ} κ π u op x) (sym (at lI)) fn)
+
+    cellS : ∀ {kp j s} {b : Val (plainᵏ Γ κ) s} → (kp , j ∷ []) ∈ π
+          → lookupNode j NI ≡ just (cell-st b) → lookupNode j NI′ ≡ just (cell-st b)
+    cellS {j = j} f l with j ≟ ks
+    ... | yes refl = ⊥-elim (solo-many (vals-same vals f pm (here refl) (there (here refl))))
+    ... | no ne    = keepI ne l
+
+    cellW : ∀ {kp j j₂ s} {b : Val (plainᵏ Γ κ) s} → (kp , j ∷ j₂ ∷ []) ∈ π → lookupNode kp NP ≡ just (take-st 1)
+          → lookupNode j NI ≡ just (cell-st b) → lookupNode j NI′ ≡ just (cell-st b)
+    cellW {j = j} f _ l with j ≟ ks
+    ... | yes refl = ⊥-elim (ksm (head₂ (vals-same vals f pm (here refl) (there (here refl)))))
+    ... | no ne    = keepI ne l
+
+    takeI : ∀ {j b} → lookupNode j NI ≡ just (take-st b) → lookupNode j NI′ ≡ just (take-st b)
+    takeI {j} l with j ≟ ks
+    ... | no ne    = keepI ne l
+    ... | yes refl with at l
+    ...   | ()
+
+    unpairedI : ∀ {j v} → Unpaired {Γ = Γ} κ π j → lookupNode j NI ≡ just v → lookupNode j NI′ ≡ just v
+    unpairedI {j} un l with j ≟ ks
+    ... | yes refl = ⊥-elim (un (∈-vals pm (there (here refl))))
+    ... | no ne    = keepI ne l
+
+    apartM : ∀ {j u₀ l₀ c₀ q₀ d₀} → lookupNode j NI ≡ just (mergeAll-st {t = u₀} l₀ c₀ q₀ d₀) → j ≡ ks → ⊥
+    apartM l refl with at l
+    ... | ()
+
+    -- a restamp cell read back, the new one where it was written
+    cellK : ∀ {w} {b : Val (plainᵏ Γ κ) w} {j} → lookupNode j NI ≡ just (cell-st {t = w} b)
+          → Σ (Val (plainᵏ Γ κ) w) λ b′ → lookupNode j NI′ ≡ just (cell-st {t = w} b′)
+    cellK {j = j} l with j ≟ ks
+    ... | no ne    = _ , keepI ne l
+    ... | yes refl = let e = cell-ty (trans (sym lk) l) in
+      subst (Val (plainᵏ Γ κ)) e c′ , trans (lookup-set ks (cell-st {t = FlatSᵗ u} c′) NI) (cong just (cell-subst e c′))
+
+    flatW : ∀ {u₀ op m m′ ks xs} → Flattener κ π {t = t} NP NI u₀ op m m′ ks xs → Flattener κ π {t = t} NP NI′ u₀ op m m′ ks xs
+    flatW {m′ = m₂′} (pm₂ , y , y′ , l , l′ , fn₂ , c₂ , lk₂) = pm₂ , y , y′ , l , keepI n₁ l′ , fn₂ , cellK lk₂
+      where
+      n₁ : m₂′ ≡ ks → ⊥
+      n₁ refl = ksm (head₂ (vals-same vals pm₂ pm (here refl) (there (here refl))))
+
+    pendW : ∀ {u₀ j j′} → (j , j′ ∷ []) ∈ π
+          → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing 0 [] false)
+          → lookupNode j′ NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing 0 [] false)
+          → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing 0 [] false)
+            × lookupNode j′ NI′ ≡ just (mergeAll-st {t = emitᵗ u₀} nothing 0 [] false)
+    pendW _ l l′ = l , keepI (apartM l′) l′
+
+    hopW : ∀ {u₀ j j′ i i′ m i2 a₀ b₀} → (j , j′ ∷ []) ∈ π → (i , i′ ∷ m ∷ i2 ∷ []) ∈ π
+         → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing a₀ [] true)
+         → lookupNode j′ NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing a₀ [] true)
+         → lookupNode m NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing b₀ [] true) → a₀ ≤ 1 → b₀ ≤ 1
+         → Fired NP NI′ u₀ j j′ m
+    hopW _ _ l l′ l₂ a≤ b≤ = _ , _ , l , keepI (apartM l′) l′ , keepI (apartM l₂) l₂ , a≤ , b≤
+
+    module M = Moves {t = t} {NP} {NP} {NI} {NI′} (λ l → l) (λ l → l) cellS cellW takeI unpairedI flatW pendW hopW

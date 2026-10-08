@@ -262,11 +262,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   Decides whether `simulation`'s instant bookkeeping survives a value pass
   that now emits once per value.
 
-- **FIT THE EXPLODE.** Write `explode-{quiet,one,end,out}`, `restamp-echo` and
-  `outer-wrap` as bodies over smaller leaves; every fact a body needs that
-  `Store` lacks becomes a field, its consumers cascaded. Decides whether
-  `Store` carries what the flattener's outer walk needs, where `simulation`
-  is likeliest false as stated over unreached states.
+- **FIT THE EXPLODE.** Write `explode-{quiet,one,end,out}` as bodies over
+  smaller leaves; every fact a body needs that `Store` lacks becomes a field,
+  its consumers cascaded. The restamp and the outer's end needed none.
+  Decides whether `Store` carries what the flattener's outer walk needs,
+  where `simulation` is likeliest false as stated over unreached states.
 
 - **EVERY SMALL EMIT.** `lifts?` holds at every emit up to three events,
   every event and kind in each position (seed 16's map draw, 200 agree, red
@@ -283,11 +283,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`restamp-echo`** (Simulation.Pass) — FALSITY, `PROBED`: the restamp's scan
-  stepped on a group keeps the flattener, and the group it hands on carries the
-  same values and end, every delivery keeping its stamp.
-- **`outer-wrap`** (Simulation.Pass) — FALSITY, `PROBED`: the outer's end
-  folded down the restamp tail on both sides, the flattener kept.
 - **`explode-{quiet,one,end,out}`** (Simulation.Pass) — FALSITY, `PROBED`: one
   exploded emit, carrying nothing or one value, walks into the flattener
   through the impl's merge, and the outer's end meets the plain outer's; a

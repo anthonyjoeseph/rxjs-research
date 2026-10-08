@@ -5,17 +5,17 @@
 ------------------------------------------------------------------
 module Simulation.Pass.Quiet where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∨_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
+open import Data.List    using (List; []; _∷_; _++_; map; concatMap; null)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup to lookupᵃ)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective; toℕ-injective) renaming (_≟_ to _≟ᶠ_)
-open import Data.Maybe   using (Maybe; nothing; just)
+open import Data.Maybe   using (Maybe; nothing; just; is-nothing)
 open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; <⇒≢; <-≤-trans; <-trans; m≤m+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
@@ -60,7 +60,7 @@ open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; 
 open import Simulation.Sweep using (t≢f; stamp-rows; stamped<; sameSource-no)
 open import Rx.Mint using (counter; sourceᵏ; regᵏ)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
-open import Simulation.Write using (module Write; module CellWrite; key-same; vals-same; apart)
+open import Simulation.Write using (module Write; module CellWrite; module FlatCellWrite; key-same; vals-same; apart)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-subscribeE; sz-subscribeInner; sz-thruConsume; sz-1)
 open import Simulation.Grow using (nodes-grow; flatG; pathG; fresh-off)
@@ -585,46 +585,169 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       B = wk s w r S (inner~ refl f ip pr) oP oI dP dI lt
       L = leave {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} op (proj₁ (proj₂ B))
 
-    postulate
-      -- AN ECHO THROUGH THE RESTAMP: the scan's cell restamps it and
-      -- keeps its payloads, and writes nothing but the cell, so the
-      -- flattener and the tails stay related with the cell moved on; the
-      -- group it hands on keeps its end, and every delivery's stamp
-      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1,0],"reach":["scan","flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Case 15 restamps an echo of a shared slot's value under a scan.
-      restamp-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
-                       {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es ws fin o₁ fin₁ sI₁ stI₁}
-                       {ys : List (Val (plainᵏ Γ κ) (FlatSᵗ u))}
-                   → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks xs
-                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                   → Carries es ws
-                   → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
-                       es fin sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
-                   → Σ (After S ([] , sP , stP) (o₁ , sI₁ , stI₁)) λ A
-                       → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI₁) u op m m′ ks xs
-                       × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes stI₁) p q
-                       × Carries (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) ws × fin₁ ≡ fin
-                       × (∀ {I} → All (DelAt I) es → All (DelAt I) (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys))
+    -- A FLATTENER'S RESTAMP CELL WRITTEN: the stores and the tails stay
+    -- related, the plain side unmoved
+    restamp-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {u op m m′ ks xs} {c′ : Val (plainᵏ Γ κ) (FlatSᵗ u)} {ℓ ℓ′ s}
+                      {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ s) (emitᵗ t)}
+                  → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks xs
+                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                  → Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI) })) λ A
+                      → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI)) u op m m′ ks xs
+                      × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI)) p q
+    restamp-write {sP} {stP} {sI} {stI} S {u = u} {ks = ks} {c′ = c′} f@(pm , _ , _ , _ , lI , fn , _ , lk) r =
+      after S′ (λ { (inj₁ x) → inj₁ x ; (inj₂ (a , b , pr)) → inj₂ (a , b , W.M.partW (Store.rows S) pr) })
+               (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
+                               ; rows = W.M.arrW (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
+               [] (λ x → x)
+      , W.flatW f , W.M.pathW r
+      where
+      module W = FlatCellWrite κ (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} pm lI fn lk c′
+      open Store S
+      S′ : St sP stP sI (record stI { nodes = setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI) })
+      S′ = record
+        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
+        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = proj₁ named , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
+        ; census = census ; owned = owned
+        ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+        ; scripts = scripts }
 
-      -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
-      -- outer has and no lane is open or queued, read off related nodes,
-      -- so the two ends agree; the restamp passes the empty group on
-      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1,0],"reach":["scan","flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Case 28 ends a switch's literal outer while its last inner, a hot
-      --   read, stays open; case 25 ends a switch's literal outer of two
-      --   flatteners.
-      outer-wrap : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                     {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {fin r}
-                 → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                 → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
-                     (proj₂ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
-                 → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) []
-                     (proj₁ (thruWrap (flatOp op) m′ fin (sI , stI)))
-                     (proj₁ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
-                     (proj₂ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI)))) r
-                 → Wrapped S op m m′ ks p q fin now r
+    -- A RESTAMP KEEPS AN EMIT'S EVENTS, so its values, and moves only a
+    -- subscribe's stamp
+    flat-rel : ∀ {u Θ₁ ρ₁ Θ₂ ρ₂} (ac : Val (plainᵏ Γ κ) (FlatSᵗ u)) e′ {ws}
+             → EmitRel {Γ = Γ} κ u e′ ws
+             → EmitRel {Γ = Γ} κ u (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) (applyClo (Θ₁ , flatStepᵛ , ρ₁) (ac , e′))) ws
+    flat-rel _ (evs , i , s , inj₁ k) r = retag (λ q → q) r
+    flat-rel _ (evs , i , s , inj₂ k) r = r
+
+    flat-carries : ∀ {u Θ₁ ρ₁ Θ₂ ρ₂} (ac : Val (plainᵏ Γ κ) (FlatSᵗ u)) {es ws} → Carries es ws
+                 → Carries (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) (proj₁ (scanVals (Θ₁ , flatStepᵛ , ρ₁) ac es))) ws
+    flat-carries _ [] = []
+    flat-carries {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} ac (quiet e′ r bs) =
+      quiet _ (flat-rel {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} ac e′ r) (flat-carries {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} _ bs)
+    flat-carries {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} ac (one e′ r bs) =
+      one _ (flat-rel {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} ac e′ r) (flat-carries {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} _ bs)
+
+    flat-del : ∀ {u Θ₁ ρ₁ Θ₂ ρ₂} {I} (ac : Val (plainᵏ Γ κ) (FlatSᵗ u)) {es : List (Val (plainᵏ Γ κ) (emitᵗ u))} → All (DelAt I) es
+             → All (DelAt I) (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) (proj₁ (scanVals (Θ₁ , flatStepᵛ , ρ₁) ac es)))
+    flat-del _ {es = []} [] = []
+    flat-del _ {es = (_ , _ , _ , inj₁ _) ∷ _} (() ∷ _)
+    flat-del {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} _ {es = (_ , _ , _ , inj₂ _) ∷ _} (d ∷ ds) = d ∷ flat-del {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} _ ds
+
+    -- AN ECHO THROUGH THE RESTAMP: the scan's cell restamps it and
+    -- keeps its payloads, and writes nothing but the cell, so the
+    -- flattener and the tails stay related with the cell moved on; the
+    -- group it hands on keeps its end, and every delivery's stamp
+    restamp-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
+                     {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es ws fin o₁ fin₁ sI₁ stI₁}
+                     {ys : List (Val (plainᵏ Γ κ) (FlatSᵗ u))}
+                 → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks xs
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → Carries es ws
+                 → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
+                     es fin sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
+                 → Σ (After S ([] , sP , stP) (o₁ , sI₁ , stI₁)) λ A
+                     → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI₁) u op m m′ ks xs
+                     × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes stI₁) p q
+                     × Carries (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys) ws × fin₁ ≡ fin
+                     × (∀ {I} → All (DelAt I) es → All (DelAt I) (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) ys))
+    restamp-echo {sP} {stP} {sI} {stI} S {u = u} {op} {m} {m′} {ks} {xs} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {p = p} {q} {es} {ws} {fin}
+                 f@(_ , _ , _ , _ , _ , _ , c , lk) r cs d = at (scan-at lk d)
+      where
+      G = applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)
+      at : ∀ {o₁ ys fin₁ sI₁ stI₁}
+         → (o₁ , ys , fin₁ , sI₁ , stI₁) ≡ ([] , proj₁ (scanVals (Θ₁ , flatStepᵛ , ρ₁) c es) , fin , sI
+                                           , record stI { nodes = setNode ks (cell-st (proj₂ (scanVals (Θ₁ , flatStepᵛ , ρ₁) c es))) (EvalSt.nodes stI) })
+         → Σ (After S ([] , sP , stP) (o₁ , sI₁ , stI₁)) λ A
+             → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI₁) u op m m′ ks xs
+             × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes stI₁) p q
+             × Carries (map G ys) ws × fin₁ ≡ fin × (∀ {I} → All (DelAt I) es → All (DelAt I) (map G ys))
+      at refl =
+        let (A , f′ , r′) = restamp-write S f r
+        in A , f′ , r′ , flat-carries {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} c cs , refl , flat-del {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} c
+
+    -- the impl's queue is empty where the plain one is
+    pw-null : ∀ {A B : Set} {R : A → B → Set} {xs ys} → Pointwise R xs ys → null xs ≡ null ys
+    pw-null []      = refl
+    pw-null (_ ∷ _) = refl
+
+    cur-none : ∀ {π cur cur′} → CurRel {Γ = Γ} κ π cur cur′ → is-nothing cur ≡ is-nothing cur′
+    cur-none {cur = nothing} {nothing} _ = refl
+    cur-none {cur = just _}  {just _}  _ = refl
+
+    -- A FLATTENER'S PAIR WRAPPED ALIKE: the outer's end marks both
+    -- nodes, and each reads its own state's end the same way
+    wrap-at : ∀ {π u op x x′ m m′ sP sI} {stP : EvalSt ep} {stI : EvalSt ei}
+            → FlatNodes {Γ = Γ} κ π u op x x′
+            → lookupNode m (EvalSt.nodes stP) ≡ just x → lookupNode m′ (EvalSt.nodes stI) ≡ just x′
+            → Σ Bool λ b → Σ (NodeState Γ) λ y → Σ (NodeState (plainᵏ Γ κ)) λ y′ → FlatNodes {Γ = Γ} κ π u op y y′
+                × thruWrap (flatOp op) m true (sP , stP) ≡ (b , sP , record stP { nodes = setNode m y (EvalSt.nodes stP) })
+                × thruWrap (flatOp op) m′ true (sI , stI) ≡ (b , sI , record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })
+    wrap-at {m′ = m′} {sI = sI} {stI = stI} (merge~ {lim′ = lim′} {a} {q} {q′} ps) lP lI rewrite lP | lI =
+      _ , _ , _ , merge~ ps , refl
+      , cong (λ z → (a ≡ᵇ 0) ∧ z , sI , record stI { nodes = setNode m′ (mergeAll-st lim′ a q′ true) (EvalSt.nodes stI) }) (pw-null ps)
+    wrap-at {m′ = m′} {sI = sI} {stI = stI} (switch~ {cur′ = cur′} c) lP lI rewrite lP | lI =
+      _ , _ , _ , switch~ c , refl
+      , cong (λ z → z , sI , record stI { nodes = setNode m′ (switch-st cur′ true) (EvalSt.nodes stI) }) (sym (cur-none c))
+    wrap-at exhaust~ lP lI rewrite lP | lI = _ , _ , _ , exhaust~ , refl , refl
+
+    wrapped′ : ∀ {sP stP sI stI} {S : St sP stP sI stI} {ℓ ℓ₄ u op m m′ ks} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+                 {fin now sI₁ stI₁ r T}
+             → thruWrap (flatOp op) m fin (sP , stP) ≡ T
+             → (A : After S ([] , proj₂ T) ([] , sI₁ , stI₁))
+             → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ T))) (EvalSt.nodes stI₁)
+             → ClearI m′ ks q sI₁ stI₁ → foldPath⇓ now q [] (proj₁ T) sI₁ stI₁ r
+             → Wrapped S op m m′ ks p q fin now r
+    wrapped′ refl = wrapped
+
+    -- AN EMPTY GROUP THROUGH THE RESTAMP: the cell written as it was,
+    -- the tail handed nothing at the same end
+    wrap-tail : ∀ {sP stP sI stI} (S : St sP stP sI stI) {sP′ stP′ sI′ stI′} (A₀ : After S ([] , sP′ , stP′) ([] , sI′ , stI′))
+                  {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+                  {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {b r}
+              → Walked op m m′ ks p q (Store.π (After.store A₀)) (EvalSt.nodes stP′) (EvalSt.nodes stI′)
+              → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI′ stI′
+              → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) [] b sI′ stI′ r
+              → Σ (Sched (plainᵏ Γ κ)) λ sI₁ → Σ (EvalSt ei) λ stI₁ → Σ (After S ([] , sP′ , stP′) ([] , sI₁ , stI₁)) λ A
+                  → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI₁)
+                  × ClearI m′ ks q sI₁ stI₁ × foldPath⇓ now q [] b sI₁ stI₁ r
+    wrap-tail S {sP′} {stP′} {sI′} {stI′} A₀ {now} {u = u} {op} {m} {m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃} {h₄} {p} {q} {b}
+              (f@(_ , _ , _ , _ , _ , _ , c , lk) , pr) cl (fold-step d₁ (fold-step step-map dq)) =
+      go (scan-at lk d₁) dq (step-clear d₁ cl)
+      where
+      go : ∀ {o vs f′ s₁ st₁ out₂ s₂ st₂}
+         → (o , vs , f′ , s₁ , st₁) ≡ ([] , [] , b , sI′ , record stI′ { nodes = setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI′) })
+         → foldPath⇓ now q (map (applyClo {s = FlatSᵗ u} (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂)) vs) f′ s₁ st₁ (out₂ , s₂ , st₂)
+         → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) s₁ st₁
+         → Σ (Sched (plainᵏ Γ κ)) λ sI₁ → Σ (EvalSt ei) λ stI₁ → Σ (After S ([] , sP′ , stP′) ([] , sI₁ , stI₁)) λ A
+             → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI₁)
+             × ClearI m′ ks q sI₁ stI₁ × foldPath⇓ now q [] b sI₁ stI₁ (o ++ ([] ++ out₂) , s₂ , st₂)
+      go refl dq cl₁ =
+        let (A₁ , f₁ , r₁) = restamp-write (After.store A₀) {c′ = c} f pr
+        in _ , _ , A₀ ⨾ A₁ , (f₁ , r₁) , tail-of cl₁ , dq
+
+    -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
+    -- outer has and no lane is open or queued, read off related nodes,
+    -- so the two ends agree; the restamp passes the empty group on
+    outer-wrap : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {fin r}
+               → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+               → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
+                   (proj₂ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
+               → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) []
+                   (proj₁ (thruWrap (flatOp op) m′ fin (sI , stI)))
+                   (proj₁ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
+                   (proj₂ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI)))) r
+               → Wrapped S op m m′ ks p q fin now r
+    outer-wrap S {fin = false} W cl dR =
+      let (_ , _ , A , W′ , c , d) = wrap-tail S (after S (λ x → x) (λ x → x) [] (λ x → x)) W cl dR in wrapped A W′ c d
+    outer-wrap {sP} {stP} {sI} {stI} S {now} {m′ = m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃} {h₄} {q = q} {fin = true} {r}
+               W@((_ , _ , _ , lP , lI , fn , _) , _) cl dR =
+      let (b , y , y′ , fn′ , eP , eI) = wrap-at {sP = sP} {sI} {stP} {stI} fn lP lI
+          (A₀ , f₀ , r₀) = flat-write S W fn′
+          (_ , _ , A , W′ , c , d) = wrap-tail S A₀ (f₀ , r₀)
+            (subst (λ T → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ T)) (proj₂ (proj₂ T))) eI cl)
+            (subst (λ T → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) [] (proj₁ T) (proj₁ (proj₂ T)) (proj₂ (proj₂ T)) r) eI dR)
+      in wrapped′ eP A W′ c d
 
     -- the same, at a walk
     flat-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
