@@ -350,6 +350,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   decided by `CLI.Store-Check`'s `store?`: slot one forwarding slot
       --   zero; 100 programs, not inside a μ.
       --   Draw unrecorded: the seed alone does not replay it.
+      -- PROBED: make qc-store QC='6 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1],"reach":["flatten","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Every case
+      --   flattens a fan step over a cold read with an asynchronous tail,
+      --   so the flushed values each subscribe a lane inner mid-flush; 42
+      --   finish one at a merge, 190 group values.  Not inside a μ.
       -- PROBED: git show 11e23e3e:agda/evidence/probed/Probed/Stores.agda
       --   -- the STORE conjunct alone, at the root from empty stores, before
       --   the `Sound` pair was a hypothesis: a cold script, its block run
