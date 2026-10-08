@@ -257,18 +257,17 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **THE FRAME'S COST.** One emit per value pushed same-clock cases past
-  the ten-second case clock: seed 43's element groups at a hot arrival went
-  from decided to undecided, and seeds 43 and 44 decide a fifth of what they
-  did. Measure the evaluator on those cases and cut the cost, or re-aim each
-  receipt at a clock that decides its cited cases. Removes what stops
-  `simulation`'s inner-pass evidence being re-decided.
-
 - **THE RUN'S OWN EMITS.** `lifts?`, `scanLifts?` and `cutLifts?` decide
   their closure relations at sampled emits of every event and kind; decide
   them also at each emit the impl run hands the step, tokens and payload
   counts as drawn. Decides whether `simulation`'s steps survive the emits
   only the elaboration writes, where the samples stop.
+
+- **EVERY SMALL EMIT.** The samples fix one shape per event and kind;
+  enumerate every emit up to three events, each event and kind in each
+  position, and decide `lifts?`, `scanLifts?` and `cutLifts?` at all of them.
+  Decides whether a closure relation `simulation` steps on fails at an
+  ordering the samples never wrote, short of what the impl run reaches.
 
 - **LOWER BY EVIDENCE.** Each risky row whose receipts name its risky region
   is reclassified down in its header and here; each whose receipts stop short
@@ -286,7 +285,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   exploded emit, carrying nothing or one value, walks into the flattener
   through the impl's merge, and the outer's end meets the plain outer's; a
   group delivered at one instant sends at it.
-- **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×2`: an outer's group
+- **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `PROBED×4`: a
