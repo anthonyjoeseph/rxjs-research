@@ -340,19 +340,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- flattening merge sit between the batch and the tail, and the merge
       -- subscribes an inner, which mints and installs; each is a state
       -- the field quantifies past.
-      -- PROBED: make qc-store QC='41 100 4'
-      --   decided by `CLI.Store-Check`'s `store?`: hot scripts, flatteners
-      --   over literal inners and defers, a slot leaf weighted up; 100
-      --   programs, not inside a μ.
-      --   Draw unrecorded: the seed alone does not replay it.
-      -- PROBED: make qc-store QC='42 100 4'
-      --   decided by `CLI.Store-Check`'s `store?`: colds with two sync
-      --   values; 100 programs, not inside a μ.
-      --   Draw unrecorded: the seed alone does not replay it.
-      -- PROBED: make qc-store QC='43 100 4'
-      --   decided by `CLI.Store-Check`'s `store?`: slot one forwarding slot
-      --   zero; 100 programs, not inside a μ.
-      --   Draw unrecorded: the seed alone does not replay it.
       -- PROBED: make qc-store QC='6 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1,0],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Every case
       --   flattens a fan step over a cold read with an asynchronous tail,
@@ -371,6 +358,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  99 read a
       --   slot from a fan lane, under the map's binder; cold and hot
       --   scripts are not counted apart.
+      -- PROBED: make qc-store QC='12 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Cold
+      --   scripts only, every fan step a lane reading a slot under the
+      --   map's binder, slot one a share of slot zero or a second cold
+      --   script; per-case reads are not counted.
+      -- PROBED: make qc-same-clock QC='12 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 37
+      --   agree, 0 fail, 37 undecided: the same draw's values.
       -- RECOVERY: git show ae5fd17e:agda/evidence/refuted/Refuted/Slot-Scripts.agda
       --   restores the opening store at two cold tables, which refuted this
       --   read over a store blind to the slots.
@@ -470,11 +465,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A LIVE SCRIPT'S READ CONNECTING ITS SHARE: the plain read
       -- registers at the slot, the impl's runs the share's definition,
       -- whose read of the raw slot registers there
-      -- PROBED: git show 11e23e3e:agda/evidence/probed/Probed/Stores.agda
-      --   -- the STORE conjunct alone, at the root from empty stores, before
-      --   the `Sound` pair was a hypothesis: a hot read of two arrivals,
-      --   its share's `read~` and `hot~` machine row.  Not under a binder,
-      --   not the values conjunct.
       -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
       --   alone: 199 agree, 0 fail, 1 undecided.  76 cases connect a share
@@ -488,10 +478,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   decided by `CLI.Store-Check`'s `store?`: 132 agree, 0 fail, 1
       --   undecided.  Slot one a script in every program; 38 connect slot
       --   one's hot share, 14 of them beside a hot slot zero.
-      -- PROBED: make qc-same-clock QC='9 100 3' QC_CASE=60 QC_BUDGET=1500 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,1,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 36
-      --   agree, 0 fail, 11 undecided: 21 with slot one a hot script, 7 of
-      --   them beside a hot slot zero.  Its connects are not counted.
+      -- PROBED: make qc-store QC='13 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[1,1,0,0,0,0],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Hot
+      --   scripts only, every fan step a lane reading a slot under the
+      --   map's binder, slot one a share of slot zero or a second hot
+      --   script.  Its connects are not counted.
+      -- PROBED: make qc-same-clock QC='13 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[1,1,0,0,0,0],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 148 agree, 0 fail,
+      --   2 undecided, the same draw's values.
       hot-read-connect-live : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
                    → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                    → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))

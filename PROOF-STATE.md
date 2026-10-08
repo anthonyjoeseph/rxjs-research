@@ -257,12 +257,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **GAPS UNDER A BINDER.** What remains: `cold-block` under a binder on a
-  table with no share, since the cold-only sweep went red on the share
-  beside it, and both reads' values conjunct past the 12 cases a lane-read
-  same-clock sweep decided. A red is a refutation and a restatement.
-  Decides whether `simulation`'s reads hold past the root.
-
 - **GAPS IN THE ELABORATION.** The rest: `cold-block` inside a μ, and
   `lifts-map` at an emit the impl produced rather than one built by hand.
   Same rule. Decides whether `simulation`'s leaves survive the shapes only
@@ -272,6 +266,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   is reclassified down in its header and here; each whose receipts stop short
   stays and names the region. Turns "may be false" into a schedule of proofs,
   and leaves the rows `simulation` still bets on.
+
+- **RE-DRAW THE PACKED RECEIPTS.** Every receipt in `Simulation` whose draw
+  takes a cold script with two sync values (`script` 4 or 5) was decided on
+  the packed frame; replay each by its own command and restamp its counts. A
+  red is a refutation of the leaf it names. Decides whether `simulation`'s
+  evidence at the subscribe frame survives the frame's one-emit-per-value
+  shape.
 
 ### The ledger
 
@@ -328,7 +329,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`of-emits`** (Simulation.Walk) — FALSITY, `PROBED`: an `of`'s emits stand
   at its program's frame, subscribe-kind; held at the root and under a value
   binder, not under a mint's binder.
-- **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×7, RECOVERY`: a cold
+- **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×6, RECOVERY`: a cold
   read's impl subscribe over an asynchronous tail leaves its block's nodes
   fresh, a partnered source, and its flush one fold of one group down the tail.
 - **`cold-read-end`** (Simulation.Walk) — FALSITY, `PROBED×3`: a cold read
