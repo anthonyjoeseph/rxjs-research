@@ -92,6 +92,8 @@ S = record
   ; bounded = [] , []
   ; swept   = []
   ; uncut   = [] , []
+  ; named   = record { slots-below = ≤-refl ; ords-below = [] ; srcs-below = [] ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
+            , record { slots-below = ≤-refl ; ords-below = [] ; srcs-below = [] ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
   ; rids    = [] , []
   ; fresh-ids = [] , []
   ; above   = [] , []

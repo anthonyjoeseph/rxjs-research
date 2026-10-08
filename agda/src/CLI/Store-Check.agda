@@ -48,11 +48,11 @@ open import Rx.Prim      using (Source; Fuel)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Closed; _≟ᵗ_;
   FnClo; applyClo; emptyᵉ; []ᵉ; _∷ᵉ_; Env)
 open import Rx.Slots     using (Slots)
-open import Rx.Mint      using (counter; sourceᵏ; regᵏ)
+open import Rx.Mint      using (counter; sourceᵏ; regᵏ; ordinalᵏ)
 open import Rx.Evaluator using (LiveSource; Sched; EvalSt; Stream; Arrival; sched-next; NodeState; NodeId; Path; RegRow;
   atSlot; atDyn; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st;
-  echoᵗ; lookupNode; memberSource; pathHasNode; takeVals; scanVals)
+  echoᵗ; lookupNode; memberSource; pathHasNode; takeVals; scanVals; regSource)
 open import Rx.Evaluator.Builder using (cascade!; pop-rule; subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; _,_; Rule)
 open import SExp.Syntax  using (SExp; emptyˢ; Kind; hotᵏ; coldᵏ; sharedᵏ; Kinds; plainᵏ; plainᵗ; emitᵗ)
@@ -795,6 +795,13 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
     hopOne = all (λ (a , b) → all (λ (c , d) → not (a ≡ᵇ c) ∨ (b ≡ᵇ d)) hs) hs
       where hs = concatMap (λ r → hopMarks (proj₂ (proj₂ (proj₂ r)))) RI
 
+    named? : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} → ℕ → Sched Δ → EvalSt e → Bool
+    named? f sched st = (f <ᵇ c sourceᵏ) ∧ all (_<ᵇ c ordinalᵏ) (map LiveSource.ordinal (Sched.live sched))
+                      ∧ all (λ r → regSource (proj₁ (proj₂ r)) <ᵇ c sourceᵏ) (EvalSt.registry st)
+                      ∧ all (_<ᵇ c regᵏ) (EvalSt.cancelled st) ∧ all (_<ᵇ c regᵏ) (EvalSt.delivered st)
+                      ∧ all (_<ᵇ c sourceᵏ) (EvalSt.dying st)
+      where c = counter (Sched.mint sched)
+
     -- every field but the rows, first failure named
     plain : List (String × Bool)
     plain =
@@ -808,6 +815,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       ∷ ("swept" , pointwise (λ l l′ → eqB (guardOf RP l) (guardOf RI l′)) LP LI)
       ∷ ("uncut" , all (λ r → not (any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP))) RP
                  ∧ all (λ r → not (any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI))) RI)
+      ∷ ("named" , named? n sP stP ∧ named? (n + n) sI stI)
       ∷ ("rids" , unique (map proj₁ RP) ∧ unique (map proj₁ RI))
       ∷ ("fresh-ids" , all (λ r → proj₁ r <ᵇ counter (Sched.mint sP) regᵏ) RP
                      ∧ all (λ r → proj₁ r <ᵇ counter (Sched.mint sI) regᵏ) RI)

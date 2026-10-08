@@ -169,6 +169,8 @@ S = record
   ; bounded = [] , []
   ; swept   = []
   ; uncut   = [] , (refl ∷ [])
+  ; named   = record { slots-below = ≤-refl ; ords-below = [] ; srcs-below = [] ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
+            , record { slots-below = ≤-refl ; ords-below = [] ; srcs-below = s≤s z≤n ∷ [] ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
   ; rids    = [] , ([] ∷ [])
   ; fresh-ids = [] , (s≤s z≤n ∷ [])
   ; above   = [] , (refl ∷ [])

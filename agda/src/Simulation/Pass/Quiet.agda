@@ -12,12 +12,12 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
-open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup to lookupᵃ)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; nothing; just)
 open import Data.Nat     using (ℕ; suc; _≤_; _<_; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; <⇒≢; <-≤-trans; m≤m+n)
+open import Data.Nat.Properties using (≤-refl; ≤-reflexive; <⇒≢; <-≤-trans; <-trans; m≤m+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
 open import Data.Unit    using (tt)
@@ -47,7 +47,7 @@ open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
   PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
   inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
-  MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip; partner-row)
+  MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip; partner-row; partner-mem; Named; named-nodes)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; skip-cut; module Kept)
 open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit.Decode using (decodeEmits)
@@ -57,7 +57,8 @@ open import Simulation.Take using (module Takes; scan-at; take-open-at; cell-tak
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear;
   fold-clear; adv; fold-unmoved; consume-clear; Out)
-open import Simulation.Sweep using (t≢f; stamp-rows)
+open import Simulation.Sweep using (t≢f; stamp-rows; stamped<)
+open import Rx.Mint using (counter; sourceᵏ; regᵏ)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Simulation.Write using (module Write; key-same; vals-same; apart)
 open import Simulation.Walks using (module Walkers)
@@ -106,6 +107,18 @@ usable-self u with u ≟ᵗ u
 ... | yes _ = refl
 ... | no ¬e = ⊥-elim (¬e refl)
 
+-- a delivery or a dying share names what the run already had
+dlv-named : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f} {sched : Sched Γ} {st : EvalSt e} {rid} fin
+          → Named f sched st → rid < counter (Sched.mint sched) regᵏ → Named f sched (markDlv fin rid st)
+dlv-named false N _ = N
+dlv-named true  N b = record { slots-below = Named.slots-below N ; ords-below = Named.ords-below N ; srcs-below = Named.srcs-below N
+                             ; cut-below = Named.cut-below N ; dlv-below = b ∷ Named.dlv-below N ; dying-below = Named.dying-below N }
+
+dying-named : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f} {sched : Sched Γ} {st : EvalSt e} (i : Fin n)
+            → Named f sched st → toℕ i < counter (Sched.mint sched) sourceᵏ → Named f sched (shareDying i true st)
+dying-named i N b = record { slots-below = Named.slots-below N ; ords-below = Named.ords-below N ; srcs-below = Named.srcs-below N
+                           ; cut-below = Named.cut-below N ; dlv-below = Named.dlv-below N ; dying-below = b ∷ Named.dying-below N }
+
 -- the fold a chain step runs
 unchain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ} {vs fin x sched st r}
         → chainStep⇓ {e = e} a vs fin x sched st r → foldPath⇓ (arrTick a) (proj₂ x) vs fin sched st r
@@ -119,11 +132,13 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
 delivered {κ = κ} {sP = sP} {stP} {sI} {stI} s {fin} {x} {x′} pr = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
   ; sync = sync ; rows = rows ; latches = latches
-  ; dlv-alike = dlv fin ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
+  ; dlv-alike = dlv fin ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut
+  ; named = dlv-named fin (proj₁ named) (lookupᵃ (proj₁ fresh-ids) (proj₁ mx)) , dlv-named fin (proj₂ named) (lookupᵃ (proj₂ fresh-ids) (proj₂ mx)) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
   ; scripts = scripts }
   where
     open Store s
+    mx = partner-mem κ _ _ _ _ _ rows pr
     dlv : (f : Bool) → Spent κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) rows
                          (dlvᵇ (markDlv f (proj₁ x) stP)) (dlvᵇ (markDlv f (proj₁ x′) stI))
     dlv false = dlv-alike
@@ -142,10 +157,12 @@ dying : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed 
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
       → Store κ sP stP sI stI → (i : Fin n) → lookup κ i ≡ sharedᵏ
       → Store κ sP (shareDying i true stP) sI (shareDying (n ↑ʳ i) true stI)
-dying {κ = κ} s i _ = record
+dying {n} {κ = κ} s i _ = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
   ; sync = sync ; rows = rows ; latches = latches
-  ; dlv-alike = dlv-alike ; dying-alike = spent-zip κ _ _ _ _ _ rows _∨_ (stamp-rows κ i rows (proj₁ above) (proj₂ above)) dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
+  ; dlv-alike = dlv-alike ; dying-alike = spent-zip κ _ _ _ _ _ rows _∨_ (stamp-rows κ i rows (proj₁ above) (proj₂ above)) dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut
+  ; named = dying-named i (proj₁ named) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named)))
+          , dying-named (n ↑ʳ i) (proj₂ named) (<-trans (stamped< i) (Named.slots-below (proj₂ named))) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
   ; scripts = scripts }
   where open Store s
@@ -459,7 +476,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       S′ : St sP (record stP { nodes = setNode m y (EvalSt.nodes stP) }) sI (record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })
       S′ = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-        ; sync = sync ; rows = W.regW rows ; dlv-alike = W.spentW rows dlv-alike ; dying-alike = W.spentW rows dying-alike ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
+        ; sync = sync ; rows = W.regW rows ; dlv-alike = W.spentW rows dlv-alike ; dying-alike = W.spentW rows dying-alike ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
         ; census = census ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
         ; scripts = scripts }

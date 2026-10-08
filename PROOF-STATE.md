@@ -244,30 +244,28 @@ undecided, never a failure (Anthony).
 over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: an arrival plain lacks, split, a gap, stray, echo
-off inners, payload; subscribes unrelated; pops unrelating reads; maps
+off inners, payload; subscribes unrelated; pops unpairing reads; maps
 moving time; closes emptying merges; hot ends past blocks;
-two-value emits; testless cuts; writes moving rows;
-cut, liveness, drain, body ends, 2nd hop inners unpairing; unsound walks, reads; 2
+2-value emits; testless cuts; writes moving rows;
+cut, liveness, drain, body ends, 2nd hop inners unpaired; unsound walks, reads; 2
 stamp chains; `of` splits, folds; `mintᵉ` stamps; drains past
 quiet cuts; hop scripts; root stamps unwalked; joiners off catch;
-quiet folds, lanes, fan-outs; installs; dead inners revived. Left: cascades.
+quiet folds, lanes, fan-outs; installs+hops; dead inners revived. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **PROVE THE HOP INSTALL.** `defer-install` over `install`'s transport:
-  the merge pair joins `π` as a fresh install's does, the new sources pair
-  as `defer~`'s, numbered above every live one by `Store.bounded`, and the
-  new rows pair as `defer~` over the tails, their ids above every
-  registered one by `Store.fresh-ids`, the rule paid by both paths'
-  `Sound`. First decide `Store.uncut` for the new row: nothing in the
-  store bounds a cancelled id by the counter. Turns a deferred subscribe's
-  opening from probed at the root into proven under any store.
-
 - **FINISH THE QUIET PASS.** `quiet-spent` as `quiet-takeWhile` runs an
   open test: the cell steps on the impl side alone and both tests stay
   spent. Rules out the last quiet arm unpairing a store.
+
+- **PROVE THE READS.** `{hot,shared,cold}-read` as `defer-install` now
+  is: the slot's subscribe installs through `install` and registers
+  through `Simulation.Hop`'s row machinery, a `read~`/`cold~` row in place
+  of `defer~`. Decide first whether a cold read's input block keeps
+  `Store.owned` when its nodes join the registry. Rules out a slot read
+  unpairing a store under any store, not only at the root.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -339,10 +337,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the
   two scripts at the slot are one by `Store.scripts`, the hot and shared paths
   sound.
-- **`defer-install`** (Simulation.Walk) — FALSITY, `REFUTED, PROBED`: a hop's
-  merge, source and row installed on both sides over sound paths pair as
-  `defer~` and keep the tails related; holds at a deferred hot read at the
-  root.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot

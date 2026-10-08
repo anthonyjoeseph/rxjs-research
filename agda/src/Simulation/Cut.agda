@@ -20,10 +20,12 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ)
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup to lookupᵃ; tabulate to tabulateᵃ; map to mapᵃ)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᵃ)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.Nat     using (suc; _≡ᵇ_)
+open import Data.Nat     using (ℕ; suc; _<_; _≡ᵇ_)
+open import Rx.Mint      using (counter; regᵏ)
 open import Data.Nat.Properties using (≡ᵇ⇒≡; ≡⇒≡ᵇ; 1+n≢0; <⇒≢; <-≤-trans; ≤-refl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -35,7 +37,7 @@ open import Rx.Exp       using (Ctx; Ty; Closed; Val)
 open import Rx.Evaluator using (NodeId; RegRow; LiveSource; Sched; EvalSt; switchKill; regSource; sameSource; cutThrough; Path; root; share-sink; _↠[_]_; frameNodes; pathHasNode; thru-outer; mergeAllᵒ; lookupNode; cell-st)
 open import Rx.Evaluator.Reducible.Support using (∨-Tˡ; ∨-Tʳ; sub-rule; cut-sub)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Stores using (PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
+open import Simulation.Stores using (Named; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
   deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; partner-mem; ArrRows; Spent; spent-subst; Store; Arr; InputBlock; ᵇ-no; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq)
 open import Simulation.Grow using (mem-any)
 open import Simulation.Sweep using (T-true; t≢f; count-hit; count-pass; same-eq; raw≢stamped; raw<ₙ; sweepL; sweep-eq; sweepL-pw; all-sweep;
@@ -138,6 +140,24 @@ module _ {m} {Δ : Ctx m} {t} (c : NodeId) where
   pairs-cut {R = R} {r ∷ K} (p ∷ ps) with cut-step r K
   ... | inj₁ (_ , e , _) = subst (AllPairs R) (sym e) (pairs-cut ps)
   ... | inj₂ (_ , e , _) = subst (AllPairs R) (sym e) (all-cut p ∷ pairs-cut ps)
+
+  -- every id the cut names is a row's
+  named-cut : ∀ {P : ℕ → Set} {K : List (RegRow Δ t)} → All (λ r → P (proj₁ r)) K → All P (proj₂ (cutThrough c K))
+  named-cut                 []       = []
+  named-cut {P = P} {r ∷ K} (p ∷ ps) with cut-step r K
+  ... | inj₁ (_ , _ , e) = subst (All P) (sym e) (p ∷ named-cut ps)
+  ... | inj₂ (_ , _ , e) = subst (All P) (sym e) (named-cut ps)
+
+  -- WHAT THE CUT NAMES IS A ROW'S, so below the counter the rows' ids are
+  cut-named-st : ∀ {e : Closed Δ t} {f} {sched : Sched Δ} {st : EvalSt e} {g}
+               → All (λ r → proj₁ r < counter (Sched.mint sched) regᵏ) (EvalSt.registry st) → Named f sched st
+               → Named f (record sched { live = sweepL g (Sched.live sched) })
+                         (record st { registry = proj₁ (cutThrough c (EvalSt.registry st))
+                                    ; cancelled = proj₂ (cutThrough c (EvalSt.registry st)) ++ EvalSt.cancelled st })
+  cut-named-st {g = g} ids N = record
+    { slots-below = Named.slots-below N ; ords-below = all-sweep g LiveSource.ordinal (Named.ords-below N)
+    ; srcs-below = all-cut (Named.srcs-below N) ; cut-below = ++⁺ᵃ (named-cut ids) (Named.cut-below N)
+    ; dlv-below = Named.dlv-below N ; dying-below = Named.dying-below N }
 
   -- a kept row was there and is not through the node
   kept-in : ∀ {r} K → r ∈ proj₁ (cutThrough c K) → r ∈ K × pathHasNode c (proj₂ (proj₂ (proj₂ r))) ≡ false
@@ -550,6 +570,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; bounded = all-sweep _ LiveSource.source (proj₁ bounded) , all-sweep _ LiveSource.source (proj₂ bounded)
       ; swept = sweepL-pw G G
       ; uncut = tabulateᵃ (uncut-cut c (proj₁ rids) (proj₁ uncut)) , tabulateᵃ (uncut-cut c′ (proj₂ rids) (proj₂ uncut))
+      ; named = cut-named-st c (proj₁ fresh-ids) (proj₁ named) , cut-named-st c′ (proj₂ fresh-ids) (proj₂ named)
       ; rids = pairs-cut c (proj₁ rids) , pairs-cut c′ (proj₂ rids)
       ; fresh-ids = all-cut c (proj₁ fresh-ids) , all-cut c′ (proj₂ fresh-ids)
       ; above = all-cut c (proj₁ above) , all-cut c′ (proj₂ above)

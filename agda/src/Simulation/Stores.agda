@@ -49,7 +49,7 @@ open import Decide using (≡ᵇ-refl)
 open import Rx.Evaluator.Reducible.Support using (Rule)
 open import Rx.Evaluator.Freshness using (nodeCt)
 
-open import Rx.Mint      using (counter; sourceᵏ; regᵏ)
+open import Rx.Mint      using (counter; sourceᵏ; regᵏ; ordinalᵏ; setAt; nodeᵏ)
 open import Rx.Prim      using (InstEmit; EmitKind; Tick; Source)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Env; Closed; lookupEnv;
   Ren∈; renExp; FnClo; applyClo; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; varᵗ; unit̂; pairᵗ; inlᵗ;
@@ -166,7 +166,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   data DeferRel (u : Ty) : Val Γ′ (obs (emitᵗ u)) → Val Γ (obs u) → Set where
     elab : ∀ {Θ Θ′} (s : SExp Γ [] [] Θ u) (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env Γ′ Θ′} {ρ : Env Γ Θ}
          → EnvRel Θ w ρ′ ρ
-         → DeferRel u (Θ′ , renExp (λ x → x) (λ x → x) w (deferBodyᵖ (toInstEmit κ s)) , ρ′) (Θ , plainExp s , ρ)
+         → DeferRel u (Θ′ , renExp (λ ()) (λ x → x) w (deferBodyᵖ (toInstEmit κ s)) , ρ′) (Θ , plainExp s , ρ)
 
   -- one impl emit against the plain values it carries
   EmitRel : ∀ t → Val Γ′ (emitᵗ t) → List (Val Γ t) → Set
@@ -626,6 +626,30 @@ dlvᵇ st r = any (_≡ᵇ proj₁ r) (EvalSt.delivered st)
 dyingᵇ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → RegRow Γ t → Bool
 dyingᵇ st r = memberSource (regSource (proj₁ (proj₂ r))) (EvalSt.dying st)
 
+-- EVERYTHING A RUN HAS NAMED IS BELOW ITS COUNTERS, so what the
+-- counters hand out next is apart from all of it: the slots' numbers,
+-- the live ordinals, the sources the rows stand at, and the ids and
+-- sources a cascade has cut, delivered and is ending
+record Named {n} {Γ : Ctx n} {t} {e : Closed Γ t} (floor : ℕ) (sched : Sched Γ) (st : EvalSt e) : Set where
+  field
+    slots-below : floor < counter (Sched.mint sched) sourceᵏ
+    ords-below  : All (_< counter (Sched.mint sched) ordinalᵏ) (map LiveSource.ordinal (Sched.live sched))
+    srcs-below  : All (λ r → regSource (proj₁ (proj₂ r)) < counter (Sched.mint sched) sourceᵏ) (EvalSt.registry st)
+    cut-below   : All (_< counter (Sched.mint sched) regᵏ) (EvalSt.cancelled st)
+    dlv-below   : All (_< counter (Sched.mint sched) regᵏ) (EvalSt.delivered st)
+    dying-below : All (_< counter (Sched.mint sched) sourceᵏ) (EvalSt.dying st)
+
+-- a node written or minted names nothing a run counts
+named-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f} {sched : Sched Γ} {st : EvalSt e} {N}
+            → Named f sched st → Named f sched (record st { nodes = N })
+named-nodes N = record { slots-below = Named.slots-below N ; ords-below = Named.ords-below N ; srcs-below = Named.srcs-below N
+                       ; cut-below = Named.cut-below N ; dlv-below = Named.dlv-below N ; dying-below = Named.dying-below N }
+
+named-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f} {sched : Sched Γ} {st : EvalSt e} {k}
+           → Named f sched st → Named f (record sched { mint = setAt nodeᵏ k (Sched.mint sched) }) st
+named-node N = record { slots-below = Named.slots-below N ; ords-below = Named.ords-below N ; srcs-below = Named.srcs-below N
+                      ; cut-below = Named.cut-below N ; dlv-below = Named.dlv-below N ; dying-below = Named.dying-below N }
+
 -- over the raw schedules and states, since a subscribe walks through
 -- states no configuration names
 --
@@ -666,6 +690,8 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     -- a registration still in the registry is not a cascade's victim
     uncut   : All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) (EvalSt.registry stP)
             × All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) (EvalSt.registry stI)
+    -- everything each run has named, below its counters
+    named   : Named n sP stP × Named (n + n) sI stI
     -- registrations are told apart by their ids, each minted below its run's counter
     rids    : AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) (EvalSt.registry stP)
             × AllPairs (λ r r′ → proj₁ r ≢ proj₁ r′) (EvalSt.registry stI)

@@ -27,14 +27,14 @@ open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 
 open import Rx.Exp       using (Ctx; Ty; Closed)
-open import Rx.Mint      using (Mint; counter; sourceᵏ; regᵏ; nodeᵏ; freshId)
-open import Rx.Evaluator using (NodeId; NodeState; Sched; EvalSt; Path; root; share-sink; _↠[_]_; frameNodes; pathHasNode; RegRow; lookupNode; setNode)
+open import Rx.Mint      using (Mint; counter; sourceᵏ; regᵏ; nodeᵏ; ordinalᵏ; freshId)
+open import Rx.Evaluator using (NodeId; NodeState; Sched; EvalSt; regSource; Path; root; share-sink; _↠[_]_; frameNodes; pathHasNode; RegRow; lookupNode; setNode)
 open import Rx.Evaluator.Freshness using (nodeCt; set-above)
 open import Rx.Evaluator.Reducible.Support using (sub-rule; fresh-rows; rowThrough; ∨-Tˡ; ∨-Tʳ)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Unpaired; Flattener; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
   outerExplode~; inner~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach;
-  Partners; ArrRows; Spent; Store; Arr)
+  Partners; ArrRows; Spent; Store; Arr; Named)
 open import Simulation.Grow using (mem-any; nodes-grow)
 open import Simulation.Write using () renaming (apart to apart′)
 open import Simulation.After using (below-keys; below-vals; apart; module Kept)
@@ -68,6 +68,16 @@ weak le (p ∷ ps) = <-≤-trans p le ∷ weak le ps
 weak₂ : ∀ {A : Set} {f : A → List ℕ} {xs a b} → a ≤ b → All (λ x → All (_< a) (f x)) xs → All (λ x → All (_< b) (f x)) xs
 weak₂ le []       = []
 weak₂ le (p ∷ ps) = weak {f = λ x → x} le p ∷ weak₂ le ps
+
+-- what a run named stays below its counters as they rise
+named-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f} {sched : Sched Γ} {st : EvalSt e} {m : Mint} {N}
+           → counter (Sched.mint sched) sourceᵏ ≤ counter m sourceᵏ → counter (Sched.mint sched) ordinalᵏ ≤ counter m ordinalᵏ
+           → counter (Sched.mint sched) regᵏ ≤ counter m regᵏ
+           → Named f sched st → Named f (record sched { mint = m }) (record st { nodes = N })
+named-mint s≤ o≤ r≤ X = record
+  { slots-below = <-≤-trans (Named.slots-below X) s≤ ; ords-below = weak {f = λ x → x} o≤ (Named.ords-below X)
+  ; srcs-below = weak {f = λ r → regSource (proj₁ (proj₂ r))} s≤ (Named.srcs-below X) ; cut-below = weak {f = λ x → x} r≤ (Named.cut-below X)
+  ; dlv-below = weak {f = λ x → x} r≤ (Named.dlv-below X) ; dying-below = weak {f = λ x → x} s≤ (Named.dying-below X) }
 
 -- a node below a bound is none of a pair above it
 above-unpaired : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {π j xs k c} → All (c ≤_) xs → k < c
@@ -180,6 +190,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
           → All (nodeCt sI ≤_) xs → All (_< freshId nodeᵏ mI) xs → Unique xs
           → counter (Sched.mint sP) sourceᵏ ≤ counter mP sourceᵏ → counter (Sched.mint sP) regᵏ ≤ counter mP regᵏ
           → counter (Sched.mint sI) sourceᵏ ≤ counter mI sourceᵏ → counter (Sched.mint sI) regᵏ ≤ counter mI regᵏ
+          → counter (Sched.mint sP) ordinalᵏ ≤ counter mP ordinalᵏ → counter (Sched.mint sI) ordinalᵏ ≤ counter mI ordinalᵏ
           → (∀ k → k < nodeCt sP → lookupNode k NP ≡ lookupNode k (EvalSt.nodes stP))
           → (∀ k → k < nodeCt sI → lookupNode k NI ≡ lookupNode k (EvalSt.nodes stI))
           → ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)}
@@ -187,7 +198,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
           → Σ (After S ([] , record sP { mint = mP } , record stP { nodes = NP }) ([] , record sI { mint = mI } , record stI { nodes = NI })) λ A
               → (nodeCt sP , xs) ∈ Store.π (After.store A)
               × PathRel κ (Store.π (After.store A)) NP NI p q
-  install {sP} {stP} {sI} {stI} S {mP} {mI} {NP} {NI} {xs} kP kI ax ab ux sP≤ rP≤ sI≤ rI≤ aP aI pr =
+  install {sP} {stP} {sI} {stI} S {mP} {mI} {NP} {NI} {xs} kP kI ax ab ux sP≤ rP≤ sI≤ rI≤ oP≤ oI≤ aP aI pr =
     after S′ (λ { (inj₁ c) → inj₁ c ; (inj₂ (a , b , pr)) → inj₂ (a , b , M.partM o rows pr) })
              (λ ar → record { boundP = <-≤-trans (Arr.boundP ar) sP≤ ; boundI = <-≤-trans (Arr.boundI ar) sI≤
                              ; rows = M.arrM o rows (Arr.rows ar) ; lists = Arr.lists ar })
@@ -209,6 +220,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
       ; rows = M.regM o rows ; dlv-alike = M.spentM o rows dlv-alike ; dying-alike = M.spentM o rows dying-alike
       ; latches = latches ; bounded = weak {f = λ x → x} sP≤ (proj₁ bounded) , weak {f = λ x → x} sI≤ (proj₂ bounded) ; swept = swept ; uncut = uncut ; rids = rids
+      ; named = named-mint sP≤ oP≤ rP≤ (proj₁ named) , named-mint sI≤ oI≤ rI≤ (proj₂ named)
       ; fresh-ids = weak rP≤ (proj₁ fresh-ids) , weak rI≤ (proj₂ fresh-ids) ; above = above
       ; census = census ; owned = owned
       ; ruleP = sub-rule (λ r∈ → r∈) (<⇒≤ kP) ruleP ; ruleI = sub-rule (λ r∈ → r∈) kI ruleI

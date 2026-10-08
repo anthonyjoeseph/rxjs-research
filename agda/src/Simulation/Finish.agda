@@ -35,10 +35,10 @@ open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import Data.Vec     using (lookup)
 open import Simulation.Sweep using (close-rows; sameSource-lt; sameSource-no; same-refl; sweepL; sweep-eq; sweepL-pw; all-sweep;
   unique-sweep; sync-sweep; same-yes; same-eq; neq-of; lt-false; count-hit; count-pass; onSrc;
-  guard-low; regrel-sweep; spent-sweep; raw≢stamped; raw<ₙ; stamped<; mach-lt; arr-dec)
+  guard-low; regrel-sweep; spent-sweep; raw≢stamped; raw<ₙ; stamped<; mach-lt; arr-dec; close-named)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
-open import Simulation.Stores using (srcCount; Census; LatchRel; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr; Owned; Spent; spent-subst; spent-substʳ; spent-off; spent-zip)
+open import Simulation.Stores using (srcCount; Census; LatchRel; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr; Owned; Spent; spent-subst; spent-substʳ; spent-off; spent-zip; Named)
   renaming (here to sp-here; there to sp-there)
 
 ------------------------------------------------------------------
@@ -74,6 +74,17 @@ module _ {n} {Γ : Ctx n} {t} where
   all-drop s {r ∷ K} (p ∷ ps) with sameSource s (regSource (proj₁ (proj₂ r)))
   ... | true  = all-drop s ps
   ... | false = p ∷ all-drop s ps
+
+  -- a finish drops rows and sweeps sources, and names nothing new
+  named-drop : ∀ {e : Closed Γ t} {f} {sched : Sched Γ} {st : EvalSt e} s
+             → Named f sched st → Named f sched (record st { registry = dropSource s (EvalSt.registry st) })
+  named-drop s N = record { slots-below = Named.slots-below N ; ords-below = Named.ords-below N ; srcs-below = all-drop s (Named.srcs-below N)
+                          ; cut-below = Named.cut-below N ; dlv-below = Named.dlv-below N ; dying-below = Named.dying-below N }
+
+  named-sweep : ∀ {e : Closed Γ t} {f} {sched : Sched Γ} {st : EvalSt e} g
+              → Named f sched st → Named f (record sched { live = sweepL g (Sched.live sched) }) st
+  named-sweep g N = record { slots-below = Named.slots-below N ; ords-below = all-sweep g LiveSource.ordinal (Named.ords-below N)
+                           ; srcs-below = Named.srcs-below N ; cut-below = Named.cut-below N ; dlv-below = Named.dlv-below N ; dying-below = Named.dying-below N }
 
   -- and keeps every pair of them apart that was
   pairs-drop : ∀ {R : RegRow Γ t → RegRow Γ t → Set} s {K} → AllPairs R K → AllPairs R (dropSource s K)
@@ -288,6 +299,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; bounded = all-sweep _ LiveSource.source (proj₁ bounded) , all-sweep _ LiveSource.source (proj₂ bounded)
     ; swept = sweepL-pw pw pw
     ; uncut = all-drop s (proj₁ uncut) , all-drop s′ (proj₂ uncut)
+    ; named = named-sweep _ (named-drop s (proj₁ named)) , named-sweep _ (named-drop s′ (proj₂ named))
     ; rids = pairs-drop s (proj₁ rids) , pairs-drop s′ (proj₂ rids)
     ; fresh-ids = all-drop s (proj₁ fresh-ids) , all-drop s′ (proj₂ fresh-ids)
     ; above = all-drop s (proj₁ above) , all-drop s′ (proj₂ above)
@@ -541,6 +553,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
               , all-sweep g₂ LiveSource.source (all-sweep g₁ LiveSource.source (proj₂ bounded))
     ; swept = sweepL-pw A′ A′
     ; uncut = all-drop (toℕ i) (proj₁ uncut) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ uncut))
+    ; named = named-sweep gP (named-sweep gP (named-drop (toℕ i) (proj₁ named)))
+            , named-sweep g₂ (named-sweep g₁ (named-drop (toℕ (i ↑ˡ n)) (named-drop (toℕ (n ↑ʳ i)) (proj₂ named))))
     ; rids = pairs-drop (toℕ i) (proj₁ rids) , pairs-drop (toℕ (i ↑ˡ n)) (pairs-drop (toℕ (n ↑ʳ i)) (proj₂ rids))
     ; fresh-ids = all-drop (toℕ i) (proj₁ fresh-ids) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ fresh-ids))
     ; above = all-drop (toℕ i) (proj₁ above) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ above))
@@ -602,6 +616,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd z₂ = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
+    ; named = close-named (proj₁ named) (subst (_< _) (sym e₁) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named))))
+            , close-named (proj₂ named) (subst (_< _) (sym e₂) (<-trans (raw<ₙ i) (Named.slots-below (proj₂ named))))
     ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
     ; scripts = scripts
     ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)

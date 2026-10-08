@@ -10,7 +10,7 @@ module Simulation.Pop where
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.List.Relation.Unary.All using (All) renaming (map to mapᵃ)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Nat     using (_<_)
 open import Data.Sum     using (inj₂)
@@ -22,8 +22,8 @@ open import Data.Nat.Properties using (≤-refl)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; NodeId; NodeState; schedGo; schedHeadOf; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there)
-open import Simulation.Stores using (guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store; spent-off)
+open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there; SameOrd)
+open import Simulation.Stores using (Named; guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store; spent-off)
   renaming (here to sp-here; there to sp-there)
 
 -- the rest of two lists a relation holds for, given their first elements
@@ -111,6 +111,17 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     regrel-pop (r ∷ q)    = row-pop r ∷ regrel-pop q
     regrel-pop (mach m q) = mach (mach-pop m) (regrel-pop q)
 
+  -- a pop moves no ordinal, and the cascade it opens has named nothing yet
+  ords-same : ∀ {m} {Δ : Ctx m} {c} {ls rs : List (LiveSource Δ)} → SameOrd ls rs
+            → All (_< c) (map LiveSource.ordinal ls) → All (_< c) (map LiveSource.ordinal rs)
+  ords-same []          []       = []
+  ords-same (e ∷ es) (lt ∷ lts) = subst (_< _) e lt ∷ ords-same es lts
+
+  open-named : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {f} {sched : Sched Δ} {st : EvalSt e} {rs}
+             → Named f sched st → SameOrd (Sched.live sched) rs → Named f (record sched { live = rs }) (cascadeOpen st)
+  open-named N so = record { slots-below = Named.slots-below N ; ords-below = ords-same so (Named.ords-below N)
+                           ; srcs-below = Named.srcs-below N ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
+
   -- A POP LEAVES THE STORES RELATED: the popped sources keep their
   -- numbers and places, each giving up one pending value, and the
   -- cascade's ledger opens empty on both sides.
@@ -122,7 +133,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     → Store κ (record sP { live = rs }) (cascadeOpen stP) (record sI { live = rs′ }) (cascadeOpen stI)
   pop-store {sP = sP} {stP = stP} {sI = sI} {stI = stI} s ex ex′ sy
     with subst₂ (Popped (Src κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Store.sync s) (Store.sources s))
-  ... | pop _ _ _ _ _ _ _ _ pp = record
+  ... | pop _ _ _ _ _ so so′ _ pp = record
     { π        = Store.π s
     ; π-keys   = Store.π-keys s
     ; π-vals   = Store.π-vals s
@@ -144,6 +155,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                                               (trans g (sym (guard-src (EvalSt.registry stI) {l′} {l₂′} (head-keeps l′ h′)))))
                    pp (Store.swept s)
     ; uncut    = mapᵃ (λ _ → refl) (proj₁ (Store.uncut s)) , mapᵃ (λ _ → refl) (proj₂ (Store.uncut s))
+    ; named    = open-named (proj₁ (Store.named s)) so , open-named (proj₂ (Store.named s)) so′
     ; rids     = Store.rids s
     ; fresh-ids = Store.fresh-ids s
     ; above    = Store.above s

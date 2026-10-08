@@ -26,13 +26,14 @@ open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 
-open import Rx.Exp       using (Ctx)
+open import Rx.Exp       using (Ctx; Closed)
+open import Rx.Mint      using (counter; sourceᵏ)
 open import Rx.Prim      using (Source)
-open import Rx.Evaluator using (LiveSource; RegRow; regSource; sameSource; memberSource; sweepLive)
+open import Rx.Evaluator using (LiveSource; RegRow; regSource; sameSource; memberSource; sweepLive; Sched; EvalSt; Arrival; cascadeClose)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
-open import Simulation.Stores using (srcCount; guardOf; aboveᵇ; above-≤; SrcNum; slot~; dyn~; SrcPair; ArrRel; RowRel; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRows; Spent)
+open import Simulation.Stores using (srcCount; guardOf; aboveᵇ; above-≤; SrcNum; slot~; dyn~; SrcPair; ArrRel; RowRel; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Partners; ArrRows; Spent; Named)
   renaming (here to sp-here; there to sp-there)
 
 -- a source number that sits under another is not it
@@ -391,3 +392,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   arr-sweep {K = K} {K′ = K′} g sub (cold~ _ _ _ _ ∷ q) (x , a) = x , arr-sweep {K = K} {K′ = K′} g (λ m → sub (there m)) q a
   arr-sweep {K = K} {K′ = K′} g sub (defer~ _ _ _ _ _ _ ∷ q) (x , a) = x , arr-sweep {K = K} {K′ = K′} g (λ m → sub (there m)) q a
   arr-sweep {K = K} {K′ = K′} g sub (mach (hot~ h ib eq) q) a = arr-sweep {K = K} {K′ = K′} g sub q a
+
+-- a close names the closing source and nothing else
+close-named : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {f} {sched : Sched Δ} {st : EvalSt e} {a : Arrival Δ}
+            → Named f sched st → Arrival.source a < counter (Sched.mint sched) sourceᵏ → Named f sched (cascadeClose a st)
+close-named N b = record { slots-below = Named.slots-below N ; ords-below = Named.ords-below N ; srcs-below = Named.srcs-below N
+                         ; cut-below = Named.cut-below N ; dlv-below = [] ; dying-below = b ∷ [] }

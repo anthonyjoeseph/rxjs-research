@@ -64,7 +64,8 @@ open import SExp.Simul-Slots using (SimulSlots; plainSlots)
 open import Simulation.Schedules using (Sync)
 open import Simulation.After using (readᴾ; readᴵ; module Kept)
 open import Simulation.Write using (apart)
-open import Simulation.Install using (install; fresh-set)
+open import Simulation.Install using (install; fresh-set; weak; named-mint)
+open import Simulation.Hop using (hop-register)
 open import Simulation.Catch using (Kept; Stamps; AtFrame; OnPath; on-path; catch-same; kept-same; kept-trans; kept-catch;
   kept-unmoved; unmoved-set; by-sub; by-sub⁻)
 open Kept using (After; module After; _⨾_; after)
@@ -73,7 +74,7 @@ open import Simulation.Size using (sz-subscribeE; sz-foldPath; sz-1)
 open import Simulation.Pass.Path using (module PassP)
 open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
   spentWhile~; FlatNodes; merge~; switch~; exhaust~; outerElem~; outerExplode~; Store; Src; Arr;
-  SrcNum; [])
+  SrcNum; []; elab)
 
 
 -- TWIN: `ib-renᵉ` -- the same walk over `renExp`'s clauses, a binder's
@@ -405,7 +406,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      × PathRel κ (Store.π (After.store A)) (setNode k (cell-st {t = u} a) (EvalSt.nodes stP))
                          (setNode k′ (cell-st {t = ScanAᵗ u} aI) (EvalSt.nodes stI)) p q
     scan-install {stP = stP} {stI = stI} S {u = u} a aI pr refl refl refl =
-      install κ S ≤-refl (n≤1+n _) (≤-refl ∷ []) (≤-refl ∷ []) ([] ∷ []) ≤-refl ≤-refl (n≤1+n _) ≤-refl
+      install κ S ≤-refl (n≤1+n _) (≤-refl ∷ []) (≤-refl ∷ []) ([] ∷ []) ≤-refl ≤-refl (n≤1+n _) ≤-refl ≤-refl ≤-refl
         (fresh-set _ (cell-st {t = u} a) (EvalSt.nodes stP) ≤-refl) (fresh-set _ (cell-st {t = ScanAᵗ u} aI) (EvalSt.nodes stI) ≤-refl) pr
 
     -- A TEST INSTALLED ON BOTH SIDES, the impl's test and cell under
@@ -426,7 +427,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                           (setNode k₁ (cell-st {t = CutS unitᵗ u} c) (setNode k₂ (take-st 1) (EvalSt.nodes stI))) p q
     while-install {stP = stP} {stI = stI} S {u = u} c pr refl refl refl refl =
       install κ S ≤-refl (≤-trans (n≤1+n _) (n≤1+n _)) (n≤1+n _ ∷ ≤-refl ∷ []) (≤-refl ∷ n≤1+n _ ∷ []) ((1+n≢n ∷ []) ∷ [] ∷ [])
-        ≤-refl ≤-refl (n≤1+n _) ≤-refl
+        ≤-refl ≤-refl (n≤1+n _) ≤-refl ≤-refl ≤-refl
         (fresh-set _ (take-st 1) (EvalSt.nodes stP) ≤-refl)
         (λ j lt → trans (fresh-set _ (cell-st {t = CutS unitᵗ u} c) (setNode _ (take-st 1) (EvalSt.nodes stI)) (n≤1+n _) j lt) (fresh-set _ (take-st 1) (EvalSt.nodes stI) ≤-refl j lt)) pr
 
@@ -447,7 +448,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                          (setNode m′ (flatSt (emitᵗ u) op) (setNode ks (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI))) p q
     flat-install {stP = stP} {stI = stI} S {u = u} op c pr refl refl refl =
       install κ S ≤-refl (≤-trans (n≤1+n _) (n≤1+n _)) (n≤1+n _ ∷ ≤-refl ∷ []) (≤-refl ∷ n≤1+n _ ∷ []) ((1+n≢n ∷ []) ∷ [] ∷ [])
-        ≤-refl ≤-refl ≤-refl ≤-refl
+        ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
         (fresh-set _ (flatSt u op) (EvalSt.nodes stP) ≤-refl)
         (λ j lt → trans (fresh-set _ (flatSt (emitᵗ u) op) (setNode _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)) (n≤1+n _) j lt) (fresh-set _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI) ≤-refl j lt)) pr
 
@@ -473,54 +474,60 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       install κ S ≤-refl (≤-trans (n≤1+n _) (≤-trans (n≤1+n _) (n≤1+n _)))
         (n≤1+n _ ∷ ≤-refl ∷ ≤-trans (n≤1+n _) (n≤1+n _) ∷ []) (n≤1+n _ ∷ ≤-trans (n≤1+n _) (n≤1+n _) ∷ ≤-refl ∷ [])
         ((1+n≢n ∷ <⇒≢ ≤-refl ∷ []) ∷ (<⇒≢ (n≤1+n _) ∷ []) ∷ [] ∷ [])
-        ≤-refl ≤-refl ≤-refl ≤-refl
+        ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
         (fresh-set _ (flatSt u op) (EvalSt.nodes stP) ≤-refl)
         (λ j lt → trans (fresh-set _ (flatSt (echoᵗ (emitᵗ u)) (mergeᶠ nothing)) (setNode _ (flatSt (emitᵗ u) op) (setNode _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI))) (≤-trans (n≤1+n _) (n≤1+n _)) j lt)
                  (trans (fresh-set _ (flatSt (emitᵗ u) op) (setNode _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI)) (n≤1+n _) j lt) (fresh-set _ (cell-st {t = FlatSᵗ u} c) (EvalSt.nodes stI) ≤-refl j lt))) pr
 
-    postulate
-      -- A HOP INSTALLED ON BOTH SIDES, the body pending: the merge pair
-      -- joins `π`, the sources and rows pair as `defer~`, and the tails
-      -- stay related
-      --
-      -- `Sound` OF BOTH PATHS, AS EVERY WALK CARRIES IT: the hop's row
-      -- runs through the path, and only a distinct path whose rows end
-      -- where it does pays the rule for it.
-      -- REFUTED: `Refuted.Defer-Install-Sound` -- a path through one
-      --   merge as two of its lanes.
-      -- PROBED: `Probed.Stores` -- the STORE conjunct alone, at the root
-      --   from empty stores: a deferred hot read, its hop pending as a
-      --   `defer~` source and row and its body not yet subscribed.  Not
-      --   a defer under a flattener, not the values conjunct.
-      defer-install : ∀ {Θ u} (b : SExp Γ [] [] Θ u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} {bI}
-                    → EnvRel κ Θ w ρ′ ρ
-                    → renExp (λ x → x) (λ x → x) w (toInstEmit κ {[]} {[]} (deferˢ b)) ≡ deferᵉ bI
-                    → ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
-                        {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now nid src ord rid nid′ src′ ord′ rid′}
-                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                    → Sound p sP stP → Sound q sI stI
-                    → freshId nodeᵏ (Sched.mint sP) ≡ nid → freshId sourceᵏ (Sched.mint sP) ≡ src
-                    → freshId ordinalᵏ (Sched.mint sP) ≡ ord → freshId regᵏ (Sched.mint sP) ≡ rid
-                    → freshId nodeᵏ (Sched.mint sI) ≡ nid′ → freshId sourceᵏ (Sched.mint sI) ≡ src′
-                    → freshId ordinalᵏ (Sched.mint sI) ≡ ord′ → freshId regᵏ (Sched.mint sI) ≡ rid′
-                    → let stP′ = register rid (atDyn src lo) (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] p)
-                                   (installNode nid (mergeAll-st {t = u} nothing 0 [] false) stP)
-                          stI′ = register rid′ (atDyn src′ lo′) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
-                                   (installNode nid′ (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI)
-                      in Σ (After κ S
-                             ( [] , record sP { mint = setAt regᵏ (suc rid) (setAt nodeᵏ (suc nid) (setAt sourceᵏ (suc src)
-                                                         (setAt ordinalᵏ (suc ord) (Sched.mint sP))))
-                                              ; live = record { source = src ; ordinal = ord ; elemTy = echoᵗ u
-                                                              ; pending = (suc now , (inj₁ tt , inj₂ (Θ , plainExp b , ρ))) ∷ [] }
-                                                       ∷ Sched.live sP }
-                             , stP′ )
-                             ( [] , record sI { mint = setAt regᵏ (suc rid′) (setAt nodeᵏ (suc nid′) (setAt sourceᵏ (suc src′)
-                                                         (setAt ordinalᵏ (suc ord′) (Sched.mint sI))))
-                                              ; live = record { source = src′ ; ordinal = ord′ ; elemTy = echoᵗ (emitᵗ u)
-                                                              ; pending = (suc now , (inj₁ tt , inj₂ (Θ′ , bI , ρ′))) ∷ [] }
-                                                       ∷ Sched.live sI }
-                             , stI′ )) λ A
-                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI′) p q
+    -- A HOP INSTALLED ON BOTH SIDES, the body pending: the merge pair
+    -- joins `π`, the sources and rows pair as `defer~`, and the tails
+    -- stay related.  The merges go in first, then the hop's source and
+    -- row.
+    --
+    -- `Sound` OF BOTH PATHS, AS EVERY WALK CARRIES IT: the hop's row
+    -- runs through the path, and only a distinct path whose rows end
+    -- where it does pays the rule for it.
+    -- REFUTED: `Refuted.Defer-Install-Sound` -- a path through one
+    --   merge as two of its lanes.
+    defer-install : ∀ {Θ u} (b : SExp Γ [] [] Θ u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} {bI}
+                  → EnvRel κ Θ w ρ′ ρ
+                  → renExp (λ x → x) (λ x → x) w (toInstEmit κ {[]} {[]} (deferˢ b)) ≡ deferᵉ bI
+                  → ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                      {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now nid src ord rid nid′ src′ ord′ rid′}
+                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                  → Sound p sP stP → Sound q sI stI
+                  → freshId nodeᵏ (Sched.mint sP) ≡ nid → freshId sourceᵏ (Sched.mint sP) ≡ src
+                  → freshId ordinalᵏ (Sched.mint sP) ≡ ord → freshId regᵏ (Sched.mint sP) ≡ rid
+                  → freshId nodeᵏ (Sched.mint sI) ≡ nid′ → freshId sourceᵏ (Sched.mint sI) ≡ src′
+                  → freshId ordinalᵏ (Sched.mint sI) ≡ ord′ → freshId regᵏ (Sched.mint sI) ≡ rid′
+                  → let stP′ = register rid (atDyn src lo) (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] p)
+                                 (installNode nid (mergeAll-st {t = u} nothing 0 [] false) stP)
+                        stI′ = register rid′ (atDyn src′ lo′) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
+                                 (installNode nid′ (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI)
+                    in Σ (After κ S
+                           ( [] , record sP { mint = setAt regᵏ (suc rid) (setAt nodeᵏ (suc nid) (setAt sourceᵏ (suc src)
+                                                       (setAt ordinalᵏ (suc ord) (Sched.mint sP))))
+                                            ; live = record { source = src ; ordinal = ord ; elemTy = echoᵗ u
+                                                            ; pending = (suc now , (inj₁ tt , inj₂ (Θ , plainExp b , ρ))) ∷ [] }
+                                                     ∷ Sched.live sP }
+                           , stP′ )
+                           ( [] , record sI { mint = setAt regᵏ (suc rid′) (setAt nodeᵏ (suc nid′) (setAt sourceᵏ (suc src′)
+                                                       (setAt ordinalᵏ (suc ord′) (Sched.mint sI))))
+                                            ; live = record { source = src′ ; ordinal = ord′ ; elemTy = echoᵗ (emitᵗ u)
+                                                            ; pending = (suc now , (inj₁ tt , inj₂ (Θ′ , bI , ρ′))) ∷ [] }
+                                                     ∷ Sched.live sI }
+                           , stI′ )) λ A
+                       → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI′) p q
+    defer-install {u = u} b w r refl {sP} {stP} {sI} {stI} S pr soP soI refl refl refl refl refl refl refl refl =
+      let A = install κ S {mP = setAt nodeᵏ (suc (nodeCt sP)) (Sched.mint sP)} {mI = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI)}
+                {NP = setNode (nodeCt sP) (mergeAll-st {t = u} nothing 0 [] false) (EvalSt.nodes stP)}
+                {NI = setNode (nodeCt sI) (mergeAll-st {t = emitᵗ u} nothing 0 [] false) (EvalSt.nodes stI)} {xs = nodeCt sI ∷ []}
+                ≤-refl (n≤1+n _) (≤-refl ∷ []) (≤-refl ∷ []) ([] ∷ [])
+                ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
+                (fresh-set _ (mergeAll-st {t = u} nothing 0 [] false) (EvalSt.nodes stP) ≤-refl)
+                (fresh-set _ (mergeAll-st {t = emitᵗ u} nothing 0 [] false) (EvalSt.nodes stI) ≤-refl) pr
+          B = hop-register κ (After.store (proj₁ A)) (proj₁ (proj₂ A)) (proj₂ (proj₂ A)) soP soI (elab b w r)
+      in _⨾_ κ (proj₁ A) (proj₁ B) , proj₂ B
 
     -- a fresh flattener's nodes, related
     flat-init : ∀ {π} u op → FlatNodes {Γ = Γ} κ π u op (flatSt u op) (flatSt (emitᵗ u) op)
@@ -757,7 +764,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
       ; rows = rows ; dlv-alike = dlv-alike ; dying-alike = dying-alike
       ; latches = latches ; bounded = proj₁ bounded , mapᵃ m<n⇒m<1+n (proj₂ bounded)
-      ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
+      ; swept = swept ; uncut = uncut ; named = proj₁ named , named-mint (n≤1+n _) ≤-refl ≤-refl (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
       ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
       ; scripts = scripts
@@ -929,6 +936,16 @@ mkHot-below ins i with ins i
 init-below : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → All (_< n) (map LiveSource.source (Sched.live (sched-init e ins)))
 init-below e ins = map⁺ (concat⁺ (tabulate⁺ (mkHot-below ins)))
 
+-- and ordered by them
+mkHot-ords : ∀ {n} {Γ : Ctx n} (ins : Slots Γ) (i : Fin n) → All (λ l → LiveSource.ordinal l < n) (mkHot ins i)
+mkHot-ords ins i with ins i
+... | scripted (hot async) = toℕ<n i ∷ []
+... | scripted (cold _ _)  = []
+... | shared _             = []
+
+init-ords : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → All (_< n) (map LiveSource.ordinal (Sched.live (sched-init e ins)))
+init-ords e ins = map⁺ (concat⁺ (tabulate⁺ (mkHot-ords ins)))
+
 -- no registration yet, so the sweep keeps the slots alone: and both lists hold slots only
 guard-slot : ∀ {n} {Γ : Ctx n} {t} {l : LiveSource Γ} → LiveSource.source l < n → guardOf {t = t} [] l ≡ true
 guard-slot lt = ∨-true _ _ (<⇒<ᵇ lt)
@@ -945,11 +962,11 @@ init-swept {t = t} {t′} (_∷ᵖ_ {l} {l′} _ rs) (lt ∷ lts) (lt′ ∷ lts
 -- BEFORE ANYTHING IS SUBSCRIBED THE STORES ARE EMPTY, and the impl's
 -- mint touches only the counter, which the relation does not read.
 init-store : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) (μ : Mint)
-           → n + n < counter μ sourceᵏ
+           → n + n < counter μ sourceᵏ → n + n ≤ counter μ ordinalᵏ
            → Store κ (sched-init (plainExp e) (plainSlots ins)) (st-init (plainExp e))
                      (record (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)) { mint = μ })
                      (st-init (elaborateImpl κ e))
-init-store κ {t} e ins μ big = record
+init-store κ {t} e ins μ big ord = record
   { π       = []
   ; π-keys  = []
   ; π-vals  = []
@@ -966,6 +983,10 @@ init-store κ {t} e ins μ big = record
             , mapᵃ (λ lt → <-trans lt big) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; swept   = init-swept {t = t} {t′ = emitᵗ t} (init-sources κ e ins) (init-below (plainExp e) (plainSlots ins)) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; uncut   = [] , []
+  ; named   = record { slots-below = n<1+n _ ; ords-below = init-ords (plainExp e) (plainSlots ins)
+                     ; srcs-below = [] ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
+            , record { slots-below = big ; ords-below = weak {f = λ x → x} ord (init-ords (elaborateImpl κ e) (embedSlotsImpl ins))
+                     ; srcs-below = [] ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
   ; rids    = [] , []
   ; fresh-ids = [] , []
   ; above   = [] , []
@@ -1012,6 +1033,6 @@ root-walk : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (in
           × All (λ y → proj₁ y ≡ proj₁ (minted κ e ins)) (readᴵ (proj₁ (Σ⁰.fst⁰ (subscribe! (elaborateImpl κ e) (embedSlotsImpl ins)))))
 root-walk κ e ins = After.store (proj₁ W) , After.values (proj₁ W) , proj₁ (proj₂ (proj₂ W) refl)
   where
-  S₀ = init-store κ e ins _ (<-trans (proj₁ (proj₂ (minted κ e ins))) (n<1+n _))
+  S₀ = init-store κ e ins _ (<-trans (proj₁ (proj₂ (minted κ e ins))) (n<1+n _)) ≤-refl
   W = walk κ e (λ x → x) (λ ()) S₀ root~ (sound (Store.ruleP S₀) (λ k ()) (λ k ()) _) (sound (Store.ruleI S₀) (λ k ()) (λ k ()) _)
        (proj₁ (Σ⁰.snd⁰ (subscribe! (plainExp e) (plainSlots ins)))) (proj₂ (proj₂ (minted κ e ins)))

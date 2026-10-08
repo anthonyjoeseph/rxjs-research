@@ -20,7 +20,7 @@ open import Data.Bool.Properties using (∧-zeroʳ; ∨-zeroʳ)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Unit    using (tt)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_) renaming (_≟_ to _≟ᶠ_)
-open import Data.Fin.Properties using (toℕ-↑ˡ; toℕ-injective; ↑ʳ-injective)
+open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-injective; ↑ʳ-injective)
 open import Data.List    using (List; []; _∷_)
 open import Data.List.Properties using (++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -30,8 +30,8 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.Maybe   using (just; nothing)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat     using (suc; pred; _≤_; _≡ᵇ_)
-open import Data.Nat.Properties using (1+n≢0; ≤-refl; ≤-trans; pred[n]≤n)
+open import Data.Nat     using (suc; pred; _≤_; _<_; _≡ᵇ_)
+open import Data.Nat.Properties using (1+n≢0; ≤-refl; ≤-trans; <-trans; pred[n]≤n)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -51,7 +51,7 @@ open import Rx.Evaluator.Domain using (chainStep⇓; dispatchShare⇓; cascadeGo
   finish-all-drain; finish-nil; drain-spent; walk-nil; chain-step)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
-open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach; []; _∷_)
+open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach; Named; []; _∷_)
 open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame; spent-frame)
 open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle; sink-at; disp-quiet)
 open import Simulation.Pass.Inner using (module PassI; pred-one; fin-at)
@@ -59,7 +59,7 @@ open PassI.InI using (carriesU-nil)
 open import Simulation.Pass.Quiet using (usable-self)
 open import Simulation.After using (skip-quiet; module Kept)
 open Kept using (after; Keeps; Persists)
-open import Simulation.Sweep using (t≢f; same-refl; count-hit; count-tail; raw≢stamped; stamp-rows; raw-rows)
+open import Simulation.Sweep using (t≢f; same-refl; count-hit; count-tail; raw≢stamped; stamp-rows; raw-rows; raw<ₙ; stamped<; close-named)
 open import Simulation.Chains using (raw-mistyped; raw-at; raw-one; raw-none;
   plain-none; head-ety; slot-ty; plainᵗ-inj; casc-empty)
 open import Simulation.Finish using (close-hit; member-no)
@@ -349,6 +349,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       end-store = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
         ; sync = sync ; rows = reg-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows ; bounded = bounded ; swept = swept
+        ; named = close-named (proj₁ named) (subst (_< _) (sym e₁) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named))))
+                , record { slots-below = Named.slots-below (proj₂ named) ; ords-below = Named.ords-below (proj₂ named)
+                         ; srcs-below = Named.srcs-below (proj₂ named) ; cut-below = Named.cut-below (proj₂ named)
+                         ; dlv-below = lookupᵃ (proj₂ fresh-ids) mem ∷ []
+                         ; dying-below = <-trans (stamped< i) (Named.slots-below (proj₂ named))
+                                       ∷ subst (_< _) (sym e₂) (<-trans (raw<ₙ i) (Named.slots-below (proj₂ named))) ∷ [] }
         ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; latches = lat ; census = cen ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
         ; scripts = scripts
