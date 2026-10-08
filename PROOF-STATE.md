@@ -251,19 +251,17 @@ body ends, 2nd hop inners apart; unsound walks/reads; 2 stamp chains;
 `of` splits, folds; `mintᵉ`, root stamps; quiet-cut drains; hop
 scripts; joiners off catch; quiet arms; installs+hops; inners revived;
 unaligned reads/connects/flushes; renames; 2-script
-stores, values. FALSE: a mid-emit join.
+stores, values; mid-emit joins.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **A SHARE JOINED MID-EMIT.** `CLI.Unit-Test`'s share-joiner rows: a lane
-  joining a share on any but the last value of one emit misses the rest,
-  since the share fans out an InstEmit, not a value; `left-to-right` and
-  `store` red. The input's subscribe frame was the one packed emit; it now
-  leaves one emit per value under the frame (`perValueᵛ`), with no new
-  former. Left: the share-joiner rows and an aimed lane-read sweep green, then
-  the walk leaves over the frame re-swept. Decides whether `simulation` holds
+- **A SHARE JOINED MID-EMIT.** The input's subscribe frame leaves one emit
+  per value under the frame (`perValueᵛ`); the share-joiner rows and an aimed
+  lane-read sweep are green. Left: the walk leaves that read the frame
+  (`cold-block`, the input walks) re-swept over two-sync colds, since their
+  receipts were drawn on the packed emit. Decides whether `simulation` holds
   at any share a lane reads.
 
 - **GAPS UNDER A BINDER.** What remains: `cold-block` under a binder on a
