@@ -258,8 +258,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### Big picture tier roadmap
 
 - **SWEEP THE COLD FLUSH.** `cold-block`'s flush under a tail that subscribes
-  a new inner mid-flush, and `cold-read-end` over all-synchronous scripts, its
-  first evidence. Decides whether a cold read's block is one fold of one group.
+  a new inner mid-flush, and `cold-read-end`'s below-floor disjunct, a slot
+  read inside slot one's definition. Decides whether a cold read's block is one
+  fold of one group.
 
 - **SWEEP THE CONNECTS' VALUES.** The store sweep decided only the store
   conjunct of `hot-read-connect-{done,live}` and `shared-read`; aim
@@ -335,7 +336,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×4, RECOVERY`: a cold
   read's impl subscribe over an asynchronous tail leaves its block's nodes
   fresh, a partnered source, and its flush one fold of one group down the tail.
-- **`cold-read-end`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a cold read
+- **`cold-read-end`** (Simulation.Walk) — FALSITY, `PROBED×2`: a cold read
   below the floor or over an all-synchronous script folds its prefix and end on
   both sides.
 - **`shared-read`** (Simulation.Walk) — FALSITY, `PROBED`: a slot's plain

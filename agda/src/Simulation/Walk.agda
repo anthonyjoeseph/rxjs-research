@@ -372,6 +372,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A COLD READ WITH NOTHING TO REGISTER: below the floor, or a script
       -- whose values are all synchronous.  Each run folds its prefix and
       -- the end at once, the impl's through its block
+      -- PROBED: make qc-store QC='5 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2],"reach":["input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
+      --   alone: 197 agree, 0 fail, 3 undecided.  Every case reads a cold
+      --   script of two synchronous values and no arrival, under maps,
+      --   scans, every flattener and μ.  Not the below-floor disjunct.
+      -- PROBED: make qc-same-clock QC='5 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2],"reach":["input"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 74
+      --   agree, 0 fail, 24 undecided: the same scripts' values against
+      --   the plain run's instants.
       cold-read-end : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
                     → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                     → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))

@@ -157,7 +157,7 @@ arity kObs    = 4
 -- arms past `arity` that only an aimed draw takes: the uniform pick stays
 -- over `arity`, so an unrestricted seed draws the program it always did
 aimed : Knob → ℕ
-aimed kScript = 1
+aimed kScript = 2
 aimed kSlot   = 1
 aimed _       = 0
 
@@ -262,7 +262,8 @@ genNat = genB 10
 -- share runs its definition inside whatever subscribed it, so a table of
 -- shares alone is a run that is its subscribe burst and nothing after;
 -- a scripted source is what puts ARRIVALS in a run.  Hot and cold, with
--- and without synchronous values, one or two arrivals.
+-- and without synchronous values, one or two arrivals -- or none, a cold
+-- script read entirely at its subscribe.
 Script : Set
 Script = ObservableInput ℕ
 
@@ -287,7 +288,8 @@ genScript = genW kScript >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
   else if c ≡ᵇ 1 then pureG (hot ((after 0 , x) ∷ (after w , y) ∷ []))
   else if c ≡ᵇ 2 then pureG (cold (x ∷ []) ((after w , y) ∷ []))
   else if c ≡ᵇ 3 then pureG (cold [] ((after w , x) ∷ (after 0 , y) ∷ []))
-  else                pureG (cold (x ∷ y ∷ []) ((after w , y) ∷ []))
+  else if c ≡ᵇ 4 then pureG (cold (x ∷ y ∷ []) ((after w , y) ∷ []))
+  else                pureG (cold (x ∷ y ∷ []) [])
 
 -- value functions (natᵗ → natᵗ): identity, +k, *k, and a CONSTANT.
 --
