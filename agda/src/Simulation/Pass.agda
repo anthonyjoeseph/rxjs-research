@@ -238,6 +238,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   minting its own token) or a lowered batch buffer, and over
       --   `Storeʳ`-related ones it needs the stores the values walk's `After`
       --   hands out between folds, which an impl-only chain does not hold.
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct:
+      --   199 agree, 0 fail, 1 undecided.  A defer in every program, so a
+      --   hop popped in each; 79 connect a share after the subscribe.
+      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
+      --   18 undecided, the same hops' emits against the plain instants.
       hop-one   : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u} {v : Val Γ (echoᵗ u)} {v′ : Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u))}
                 → ∀ {l l′ a a′} → Src κ l l′ → HeadOf l a → HeadOf l′ a′ → Arrival.source a ≡ src → Arrival.source a′ ≡ src′
                 → _≡_ {A = Σ Ty (Val Γ)} (arrTy a , arrVal a) (echoᵗ u , v)
@@ -257,6 +264,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     × Out (counter (Sched.mint sI) sourceᵏ) (proj₁ rI)
       -- THE HOP'S END: the hop's merge wraps up on both sides and the
       -- impl's tail folds what its wrap hands on
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct:
+      --   199 agree, 0 fail, 1 undecided.  A defer in every program, so a
+      --   hop popped in each, its merge wrapped once the body is subscribed.
+      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
+      --   18 undecided, the same hops' emits against the plain instants.
       hop-end   : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now nid nid′ ℓ ℓ′ u}
                     {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)} {oP sP′ stP′ oI sI′ stI′ fin r}
                 → (A : After S (oP , sP′ , stP′) (oI , sI′ , stI′))

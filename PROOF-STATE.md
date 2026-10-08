@@ -291,9 +291,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   alone into a merge whose walk folds the path the plain chain folds the popped
   head down, then the impl tail's end; open, it sends at the chain's entry
   instant.
-- **`hop-{one,end}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`: a deferred
-  hop's merge subscribes the one popped emit's body on both sides, sending at
-  the hop's token, and its end meets the plain hop's.
+- **`hop-{one,end}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE, PROBED×4`: a
+  deferred hop's merge subscribes the one popped emit's body on both sides,
+  sending at the hop's token, and its end meets the plain hop's.
 - **`scan-write`** (Simulation.Scan) — FALSITY, `PROBED`: a cell written on
   both sides keeps the stores and the tails related.
 - **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `PROBED×3`: a
