@@ -184,8 +184,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   -- every payload, renamed under one more binder.
   -- PROBED: `Probed.Map-Step` -- `x + 1` over one hand-built emit, an
   --   `init` then two payloads, under no binder: both payloads mapped,
-  --   the stamp kept.  Not an emit the impl produced, not a function
-  --   reading the author's variables.
+  --   the stamp kept; and `x + y` reading the author's variable 4 past
+  --   the step's binder, once at the identity renaming and once at one
+  --   moving it a slot out past a value 8 it does not own.  Not an emit
+  --   the impl produced.
   postulate
     lifts-map : ∀ {Θ s u} (f : SFn Γ [] [] Θ s u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ}
               → EnvRel κ Θ w ρ′ ρ
@@ -254,8 +256,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- AN `of`'S EMITS STAND AT ITS PROGRAM'S FRAME, subscribe-kind
     -- PROBED: `Probed.Opening` -- two values at the root, and one under a
     --   value binder, the frame apart from the `of`'s source and from the
-    --   bound value.  Not under a mint's binder, not a renaming other than
-    --   the identity.
+    --   bound value; both again at a renaming moving the telescope a slot
+    --   out past a value 8 or 5 it does not own.  Not under a mint's
+    --   binder.
     of-emits : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′}
              → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
              → ∀ src → All (AtFrame {Γ = Γ} κ (frameAt w ρ′)) (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L)

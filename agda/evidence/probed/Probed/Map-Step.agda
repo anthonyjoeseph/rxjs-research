@@ -8,9 +8,9 @@ open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
-open import Rx.Exp using (add; uniqᵗ; []ᵉ; _∷ᵉ_)
+open import Rx.Exp using (add; natᵗ; uniqᵗ; []ᵉ; _∷ᵉ_)
 open import SExp.Syntax using (primˢ; pairˢ; varˢᵗ; natˢ)
 
 open import Simulation.Walk using (lifts-map)
@@ -24,4 +24,24 @@ _ : Confirms (lifts-map {Γ = Γ₂} (κᵖ two-arrivals) (primˢ add (pairˢ (v
                         {ρ′ = 0 ∷ᵉ []ᵉ} {ρ = []ᵉ} (λ ())
                         (inj₁ 9 ∷ inj₂ (inj₁ 3) ∷ inj₂ (inj₁ 4) ∷ [] , 5 , 9 , inj₂ (inj₁ tt))
                         (3 ∷ 4 ∷ []) (refl ∷ refl ∷ []))
+_ = (refl ∷ refl ∷ []) , refl
+
+-- LOAD-BEARING: the payload plus the author's variable, past the mint's
+-- binder; fails if the step reads the variable at the slot the binder
+-- took, so each payload would gain the mint's source instead
+_ : Confirms (lifts-map {Γ = Γ₂} (κᵖ two-arrivals) (primˢ add (pairˢ (varˢᵗ (here refl)) (varˢᵗ (there (here refl)))))
+                        {Θ′ = natᵗ ∷ uniqᵗ ∷ []} (λ x → x)
+                        {ρ′ = 4 ∷ᵉ 0 ∷ᵉ []ᵉ} {ρ = 4 ∷ᵉ []ᵉ} (λ { (here refl) → refl })
+                        (inj₁ 9 ∷ inj₂ (inj₁ 3) ∷ inj₂ (inj₁ 5) ∷ [] , 5 , 9 , inj₂ (inj₁ tt))
+                        (3 ∷ 5 ∷ []) (refl ∷ refl ∷ []))
+_ = (refl ∷ refl ∷ []) , refl
+
+-- LOAD-BEARING: the same step at a renaming that moves the author's
+-- variable one slot down, past a value it does not bind; fails if the
+-- step reads the slot the variable had before the renaming
+_ : Confirms (lifts-map {Γ = Γ₂} (κᵖ two-arrivals) (primˢ add (pairˢ (varˢᵗ (here refl)) (varˢᵗ (there (here refl)))))
+                        {Θ′ = natᵗ ∷ natᵗ ∷ uniqᵗ ∷ []} there
+                        {ρ′ = 8 ∷ᵉ 4 ∷ᵉ 0 ∷ᵉ []ᵉ} {ρ = 4 ∷ᵉ []ᵉ} (λ { (here refl) → refl })
+                        (inj₁ 9 ∷ inj₂ (inj₁ 3) ∷ inj₂ (inj₁ 5) ∷ [] , 5 , 9 , inj₂ (inj₁ tt))
+                        (3 ∷ 5 ∷ []) (refl ∷ refl ∷ []))
 _ = (refl ∷ refl ∷ []) , refl

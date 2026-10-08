@@ -10,9 +10,10 @@ open import Data.List using ([]; _∷_)
 open import Data.Product using (_,_)
 open import Data.Fin using (zero; suc)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
+open import Data.List.Relation.Unary.Any using (there)
 open import Rx.Prim using (after_,_)
 open import SExp.Syntax using (natˢ)
-open import Rx.Exp using (natᵗ; []ᵉ; _∷ᵉ_)
+open import Rx.Exp using (natᵗ; uniqᵗ; []ᵉ; _∷ᵉ_)
 open import CLI.Unit-Test.Prelude using (Γ₂)
 open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -41,4 +42,14 @@ _ = refl ∷ refl ∷ []
 -- LOAD-BEARING: under one value binder, the frame read past the value
 -- 5; fails if the frame is read at the binder's slot
 _ : Confirms (of-emits {Γ = Γ₂} (κᵖ two-arrivals) {Θ = natᵗ ∷ []} (natˢ 3 ∷ []) (λ x → x) {ρ′ = 5 ∷ᵉ 7 ∷ᵉ []ᵉ} refl 9)
+_ = refl ∷ []
+
+-- LOAD-BEARING: at the root, a renaming moving the frame past a value 5
+-- it does not own; fails if the frame is read at its unrenamed slot
+_ : Confirms (of-emits {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} (natˢ 3 ∷ natˢ 4 ∷ []) {Θ′ = natᵗ ∷ uniqᵗ ∷ []} there {ρ′ = 5 ∷ᵉ 7 ∷ᵉ []ᵉ} refl 9)
+_ = refl ∷ refl ∷ []
+
+-- LOAD-BEARING: under one value binder, a renaming moving both the bound
+-- value and the frame one slot out; fails if either is read unrenamed
+_ : Confirms (of-emits {Γ = Γ₂} (κᵖ two-arrivals) {Θ = natᵗ ∷ []} (natˢ 3 ∷ []) {Θ′ = natᵗ ∷ natᵗ ∷ uniqᵗ ∷ []} there {ρ′ = 8 ∷ᵉ 5 ∷ᵉ 7 ∷ᵉ []ᵉ} refl 9)
 _ = refl ∷ []
