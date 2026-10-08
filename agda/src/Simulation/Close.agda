@@ -7,7 +7,8 @@ module Simulation.Close where
 open import Data.Bool    using (_∨_; _∧_)
 open import Data.Fin     using (toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ʳ; toℕ-↑ˡ)
-open import Data.List    using (List; _∷_)
+open import Data.Empty   using (⊥-elim)
+open import Data.List    using (List; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Nat     using (_+_; _<_)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
@@ -20,7 +21,7 @@ open import Rx.Evaluator using (Arrival; Sched; EvalSt; memberSource; sameSource
 open import Rx.Prim      using (Source)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Store; Arr; Census; spent-off)
-open import Simulation.Sweep using (sameSource-no; dies-rows; close-named)
+open import Simulation.Sweep using (sameSource-no; dies-rows; close-named; t≢f)
 
 -- a source number no slot has is not the slot's
 member-skip : ∀ {m k} (xs : List Source) → m < k → memberSource m (k ∷ xs) ≡ memberSource m xs
@@ -40,6 +41,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; scripts = scripts
     ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)
     ; dying-alike = dies-rows κ na na′ rows (Arr.rows ar)
+    ; dying-done = λ i _ → (λ m → ⊥-elim (t≢f (trans (sym m) (member-skip [] (<-trans (toℕ<n i) na)))))
+                         , (λ m → ⊥-elim (t≢f (trans (sym m) (member-skip []
+                                    (subst (_< Arrival.source a′) (sym (toℕ-↑ʳ n i)) (<-trans (+-monoʳ-< n (toℕ<n i)) na′))))))
     ; census = λ i hk → subst (Census _ _ (EvalSt.registry stI) _) (sym (mr i)) (census i hk)
     ; latches = λ i → let h , sh = latches i
                           lt  = <-trans (toℕ<n i) na

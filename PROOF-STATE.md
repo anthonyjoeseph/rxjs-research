@@ -257,25 +257,26 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **PROVE THE READS.** `hot-read`'s three pair leaves, `hot-read-join`
-  first: both runs register one row at the slot, the impl's behind the
-  share, a pair `RegRel` takes as `read~`. Then `shared-read` as
-  `hot-read` now is, then `cold-block`'s flush by inverting the impl's
-  block. Cold's `Store.owned` needed no field. Rules out a slot read
-  unpairing a store under any store, not only at the root.
+- **SWEEP THE CONNECTS.** `Store.dying-done` decided in `CLI.Store-Check`
+  first, since every FALSITY row concluding a `Store` now asserts it. Then a
+  `qc-store` aimed at reads that connect or join a share: nested reads, a
+  share's definition reading another slot, a re-entrant connect. Tests
+  `hot-read-connect-{done,live}` and `shared-read` together; decides whether a
+  share's definition run inside a read can unpair the stores.
 
-- **PROVE THE NODE WRITES.** `scan-write`, `while-{write,spent}` as
-  `CellWrite` is: `Moves`' cell and count obligations cite the row's own
-  `π` entry on the plain side too, so a write at a row's nodes is apart
-  from every other row by `π`'s uniqueness. Rules out a both-sided write
-  moving a row the sweeps never drew.
+- **SWEEP THE COLD FLUSH.** `cold-block`'s flush under a tail that subscribes
+  a new inner mid-flush, and `cold-read-end` over all-synchronous scripts, its
+  first evidence. Decides whether a cold read's block is one fold of one group.
 
-- **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
-  relation recursing on the type as `Red` does, reusing its descent for
-  the μ peel, the flattener's hop and a share's connect; the batcher's
-  leaves are list lemmas. A case the impl's one-past fuel slack in
-  `left-to-right` does not cover is a fuel finding for Anthony, not a
-  restatement.
+- **ATTACK THE CASCADES.** The monster's last region: census
+  `cascade-related`'s leaves, and aim a sweep at each FALSITY row there with no
+  receipt reaching its risky region. Narrows what is left of `simulation` to
+  named, probed statements.
+
+- **SWEEP EVERY NO-EVIDENCE ROW.** Whatever the three above leave unprobed in
+  this tier, each aimed at its own risky region; a red is a refutation and a
+  restatement, never a proof attempt. Proof waits until no row is FALSITY for
+  want of a sweep.
 
 ### The ledger
 
@@ -342,9 +343,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   subscribe against the impl's at its stamped slot, down the restamp, keeps
   what a pass keeps; the two scripts at the slot are one by `Store.scripts`,
   the shared paths sound.
-- **`hot-read-{join,connect-done,connect-live}`** (Simulation.Walk) — FALSITY,
-  `PROBED`: a hot read's rule pair keeps what a pass keeps — both registering
-  at the slot, or the impl connecting its share over an ended or a live script.
+- **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED`: a
+  hot read whose impl connects its share over an ended or a live script keeps
+  what a pass keeps.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot

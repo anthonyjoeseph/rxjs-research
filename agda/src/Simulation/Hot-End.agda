@@ -51,7 +51,7 @@ open import Rx.Evaluator.Domain using (chainStep⇓; dispatchShare⇓; cascadeGo
   finish-all-drain; finish-nil; drain-spent; walk-nil; chain-step)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
-open import Simulation.Stores using (srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach; Named; []; _∷_)
+open import Simulation.Stores using (member-head; srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach; Named; []; _∷_)
 open import Simulation.Frame using (Agree; agree; first; mach-frame; reg-frame; partners-frame; arr-frame; spent-frame)
 open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle; sink-at; disp-quiet)
 open import Simulation.Pass.Inner using (module PassI; pred-one; fin-at)
@@ -356,6 +356,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                          ; dying-below = <-trans (stamped< i) (Named.slots-below (proj₂ named))
                                        ∷ subst (_< _) (sym e₂) (<-trans (raw<ₙ i) (Named.slots-below (proj₂ named))) ∷ [] }
         ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; latches = lat ; census = cen ; owned = owned
+        ; dying-done = λ j _ → member-head (toℕ j) _ CP , dd j
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
         ; scripts = scripts
         ; dlv-alike = spent-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows (spent-end (λ m → m) rows)
@@ -374,6 +375,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
           spent-end w []         = tt
           spent-end w (x ∷ q)    = sym (impl-off (w (here refl)) x) , spent-end (λ m → w (there m)) q
           spent-end w (mach _ q) = spent-end (λ m → w (there m)) q
+
+          -- the share and its raw slot die together, the raw slot latched
+          dd : ∀ j → memberSource (toℕ (n ↑ʳ j)) (shr ∷ Arrival.source a′ ∷ []) ≡ true → memberSource (toℕ (j ↑ˡ n)) CI′ ≡ true
+          dd j m with j ≟ᶠ i
+          ... | yes refl = rawI
+          ... | no ne    = ⊥-elim (t≢f (trans (sym m) (trans (member-no (Arrival.source a′ ∷ []) (λ x → ne (↑ʳ-injective n j i (toℕ-injective x))))
+                                                             (member-no [] (subst (toℕ (n ↑ʳ j) ≢_) (sym e₂) (λ x → raw≢stamped i j (sym x)))))))
 
           lat : LatchRel {Γ = Γ} κ (Arrival.source a ∷ CP) (EvalSt.connectedShares stP) CI′ SI
           lat j with j ≟ᶠ i

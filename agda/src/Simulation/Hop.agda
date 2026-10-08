@@ -390,7 +390,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         ; sync     = (refl , ranked-top sources (Named.ords-below (proj₁ named)) (Named.ords-below (proj₂ named))) ∷ˢ sync
         ; rows     = reg-cons {Γ = Γ} κ rows
         ; dlv-alike = spent-cons {Γ = Γ} κ rows dlv-alike ; dying-alike = spent-cons {Γ = Γ} κ rows dying-alike
-        ; latches  = latches
+        ; latches  = latches ; dying-done = dying-done
         ; bounded  = n<1+n _ ∷ᵃ mapᵃ m<n⇒m<1+n (proj₁ bounded) , n<1+n _ ∷ᵃ mapᵃ m<n⇒m<1+n (proj₂ bounded)
         ; swept    = trans (guard-none KP lP bP (Named.srcs-below (proj₁ named))) (sym (guard-none KI lI bI (Named.srcs-below (proj₂ named))))
                      ∷ᵖ swept
@@ -431,7 +431,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                         (trans (none-below (Named.dlv-below (proj₁ named))) (sym (none-below (Named.dlv-below (proj₂ named)))))
         ; dying-alike = spent-snoc {Γ = Γ} κ (reg-cons {Γ = Γ} κ rows) new-row (spent-cons {Γ = Γ} κ rows dying-alike)
                         (trans (member-below (Named.dying-below (proj₁ named))) (sym (member-below (Named.dying-below (proj₂ named)))))
-        ; latches  = latches
+        ; latches  = latches ; dying-done = dying-done
         ; bounded  = n<1+n _ ∷ᵃ mapᵃ m<n⇒m<1+n (proj₁ bounded) , n<1+n _ ∷ᵃ mapᵃ m<n⇒m<1+n (proj₂ bounded)
         ; swept    = trans (guard-new KP rowP lP (same-refl src)) (sym (guard-new KI rowI lI (same-refl src′)))
                      ∷ᵖ swept-snoc {K = KP} {KI} {rowP} {rowI} swept (proj₁ bounded) (proj₂ bounded)

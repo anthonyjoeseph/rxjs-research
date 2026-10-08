@@ -38,7 +38,7 @@ open import Simulation.Sweep using (close-rows; sameSource-lt; sameSource-no; sa
   guard-low; regrel-sweep; spent-sweep; raw≢stamped; raw<ₙ; stamped<; mach-lt; arr-dec; close-named)
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
-open import Simulation.Stores using (srcCount; Census; LatchRel; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr; Owned; Spent; spent-subst; spent-substʳ; spent-off; spent-zip; Named)
+open import Simulation.Stores using (member-head; srcCount; Census; LatchRel; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr; Owned; Spent; spent-subst; spent-substʳ; spent-off; spent-zip; Named)
   renaming (here to sp-here; there to sp-there)
 
 ------------------------------------------------------------------
@@ -295,7 +295,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                             {K = dropSource s (EvalSt.registry stP)} {K′ = dropSource s′ (EvalSt.registry stI)}
                             pw (λ m → m) (drop-rows κ {s = s} {s′ = s′} na na′ rows (Arr.rows ar))
                             (spent-drop κ {s = s} {s′ = s′} na na′ rows (Arr.rows ar) dying-alike)
-    ; latches = latches
+    ; latches = latches ; dying-done = dying-done
     ; bounded = all-sweep _ LiveSource.source (proj₁ bounded) , all-sweep _ LiveSource.source (proj₂ bounded)
     ; swept = sweepL-pw pw pw
     ; uncut = all-drop s (proj₁ uncut) , all-drop s′ (proj₂ uncut)
@@ -548,7 +548,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 (spent-sweep κ {K = KP} {K′ = K₁} A (λ m → m) (hot-rows i numbers rows) (spent-hot i numbers rows dlv-alike))
     ; dying-alike = spent-sweep κ {K = KP} {K′ = K₂} A′ (λ m → m) (regrel-sweep κ {K = KP} {K′ = K₁} A (λ m → m) (hot-rows i numbers rows))
                 (spent-sweep κ {K = KP} {K′ = K₁} A (λ m → m) (hot-rows i numbers rows) (spent-hot i numbers rows dying-alike))
-    ; latches = latches
+    ; latches = latches ; dying-done = dying-done
     ; bounded = all-sweep gP LiveSource.source (all-sweep gP LiveSource.source (proj₁ bounded))
               , all-sweep g₂ LiveSource.source (all-sweep g₁ LiveSource.source (proj₂ bounded))
     ; swept = sweepL-pw A′ A′
@@ -621,7 +621,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
     ; scripts = scripts
     ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)
-    ; dying-alike = hot-close-dies S i e₁ e₂ z₂ }
+    ; dying-alike = hot-close-dies S i e₁ e₂ z₂
+    ; dying-done = λ j _ → member-head (toℕ j) _ (EvalSt.completedSources stP)
+                         , λ m → ⊥-elim (t≢f (trans (sym m) (member-no [] (subst (toℕ (n ↑ʳ j) ≢_) (sym e₂) (λ x → raw≢stamped i j (sym x)))))) }
     where
       open Store S
       CP = EvalSt.completedSources stP

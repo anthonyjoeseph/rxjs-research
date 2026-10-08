@@ -566,7 +566,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; rows = regrel-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr)
       ; dlv-alike = spent-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr) (proj₂ (proj₂ (proj₂ cr)) dlv-alike)
       ; dying-alike = spent-sweep κ {K = KP} {K′ = KI} G (λ m → m) (proj₁ cr) (proj₂ (proj₂ (proj₂ cr)) dying-alike)
-      ; latches = latches
+      ; latches = latches ; dying-done = dying-done
       ; bounded = all-sweep _ LiveSource.source (proj₁ bounded) , all-sweep _ LiveSource.source (proj₂ bounded)
       ; swept = sweepL-pw G G
       ; uncut = tabulateᵃ (uncut-cut c (proj₁ rids) (proj₁ uncut)) , tabulateᵃ (uncut-cut c′ (proj₂ rids) (proj₂ uncut))

@@ -311,7 +311,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       S′ : St sP (record stP { nodes = W.NP′ }) sI (record stI { nodes = W.NI′ })
       S′ = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = Store.distinct S
-        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
+        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
         ; census = census ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
         ; scripts = scripts }

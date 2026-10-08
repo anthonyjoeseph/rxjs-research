@@ -767,6 +767,12 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
                       ∧ eqB (memberSource i SP) (memberSource (n + i) SI)
     latchAt coldᵏ   i = true
 
+    -- `Store.dying-done`, at slot `i`: a hot slot marked dying has latched
+    doneAt : Kind → ℕ → Bool
+    doneAt hotᵏ i = (not (memberSource i (EvalSt.dying stP)) ∨ memberSource i CP)
+                  ∧ (not (memberSource (n + i) (EvalSt.dying stI)) ∨ memberSource i CI)
+    doneAt _    i = true
+
     -- `Census`, at slot `i`: the raw row once and connected, or neither row and a spent share's slot done
     censusAt : Kind → ℕ → Bool
     censusAt hotᵏ i =
@@ -810,6 +816,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       ∷ ("distinct" , unique (map LiveSource.source LP) ∧ unique (map LiveSource.source LI))
       ∷ ("sync" , sync? LP LI)
       ∷ ("latches" , all (λ i → latchAt (lookup κ i) (toℕ i)) (allFin n))
+      ∷ ("dying-done" , all (λ i → doneAt (lookup κ i) (toℕ i)) (allFin n))
       ∷ ("bounded" , all (λ l → LiveSource.source l <ᵇ counter (Sched.mint sP) sourceᵏ) LP
                    ∧ all (λ l → LiveSource.source l <ᵇ counter (Sched.mint sI) sourceᵏ) LI)
       ∷ ("swept" , pointwise (λ l l′ → eqB (guardOf RP l) (guardOf RI l′)) LP LI)

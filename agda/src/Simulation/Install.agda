@@ -220,7 +220,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                     , ab ∷ weak₂ kI (proj₂ pairs-below)
       ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
       ; rows = M.regM o rows ; dlv-alike = M.spentM o rows dlv-alike ; dying-alike = M.spentM o rows dying-alike
-      ; latches = latches ; bounded = weak {f = λ x → x} sP≤ (proj₁ bounded) , weak {f = λ x → x} sI≤ (proj₂ bounded) ; swept = swept ; uncut = uncut ; rids = rids
+      ; latches = latches ; dying-done = dying-done ; bounded = weak {f = λ x → x} sP≤ (proj₁ bounded) , weak {f = λ x → x} sI≤ (proj₂ bounded) ; swept = swept ; uncut = uncut ; rids = rids
       ; named = named-mint sP≤ oP≤ rP≤ (proj₁ named) , named-mint sI≤ oI≤ rI≤ (proj₂ named)
       ; fresh-ids = weak rP≤ (proj₁ fresh-ids) , weak rI≤ (proj₂ fresh-ids) ; above = above
       ; census = census ; owned = owned

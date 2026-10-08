@@ -83,6 +83,12 @@ data SrcNum {n} (κ : Kinds n) : Source → Source → Set where
 guardOf : ∀ {n} {Γ : Ctx n} {t} → List (RegRow Γ t) → LiveSource Γ → Bool
 guardOf {n = n} reg l = (LiveSource.source l <ᵇ n) ∨ any (λ p → sameSource (LiveSource.source l) (regSource (proj₁ (proj₂ p)))) reg
 
+-- a source latched alone is latched among others
+member-head : ∀ x k (xs : List Source) → memberSource x (k ∷ []) ≡ true → memberSource x (k ∷ xs) ≡ true
+member-head x k xs h with sameSource x k
+... | true  = refl
+... | false = ⊥-elim (subst T (sym h) tt)
+
 -- WHETHER A REGISTRATION SITS WHERE ITS SOURCE WAS MINTED: a slot's at its
 -- slot, a minted source's above every slot
 aboveᵇ : ∀ {n} {Γ : Ctx n} → RegSrc Γ → Bool
@@ -685,6 +691,12 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     dying-alike : Spent κ π (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI) rows (dyingᵇ stP) (dyingᵇ stI)
     latches : LatchRel {Γ = Γ} κ (EvalSt.completedSources stP) (EvalSt.connectedShares stP)
                                      (EvalSt.completedSources stI) (EvalSt.connectedShares stI)
+    -- A HOT SLOT MARKED DYING HAS LATCHED: the plain slot dies only at
+    -- its own close, which latches it, and the impl's share only from its
+    -- raw slot's end, which that close latched first
+    dying-done : ∀ i → lookup κ i ≡ hotᵏ
+               → (memberSource (toℕ i) (EvalSt.dying stP) ≡ true → memberSource (toℕ i) (EvalSt.completedSources stP) ≡ true)
+               × (memberSource (toℕ (n ↑ʳ i)) (EvalSt.dying stI) ≡ true → memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI) ≡ true)
     -- every live source was minted: below its run's counter
     bounded : All (_< counter (Sched.mint sP) sourceᵏ) (map LiveSource.source (Sched.live sP))
             × All (_< counter (Sched.mint sI) sourceᵏ) (map LiveSource.source (Sched.live sI))

@@ -89,6 +89,7 @@ S = record
   ; dlv-alike = tt
   ; dying-alike = tt
   ; latches = λ { zero → (λ _ → refl , refl) , (λ ()) ; (suc zero) → (λ ()) , (λ _ → refl , refl) }
+  ; dying-done = λ _ _ → (λ ()) , (λ ())
   ; bounded = [] , []
   ; swept   = []
   ; uncut   = [] , []

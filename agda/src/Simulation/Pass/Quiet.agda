@@ -14,7 +14,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup to lookupᵃ)
 open import Data.Bool.ListAction using (any)
-open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
+open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective; toℕ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; nothing; just)
 open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; <⇒≢; <-≤-trans; <-trans; m≤m+n)
@@ -35,13 +35,13 @@ open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; Tm; FlatOp; mergeᶠ;
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; markDlv; NodeState; Arrival; arrVal; arrTy; arrTick; Path; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st;
   echoᵗ; thruEvents; thruWrap; setNode; cell-st; batchSync-st; scanVals; take-st; takeVals; exhaust-st; switch-st; switchKill; hasRoom;
-  consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying)
+  consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying; memberSource)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-scan; step-from-inner; react-false; step-thru-outer; thruWalk⇓;
   walk-nil; walk-echo; walk-cons; thruConsume⇓; inner; consume-all-sub; consume-all-enqueue;
   consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub;
   consume-switch-nil; subscribeInner⇓; subscribeE⇓; chainStep⇓; chain-step; dispatchShare⇓;
   fold-sink; disp; walk-more; shareWalk⇓; shareGo⇓; go-nil; go-cut; go-live)
-open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ)
+open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ; hotᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ; ScanAᵗ; CutS; cutOpenᵛ)
 open import Simulation.Schedules using (HeadOf)
 open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
@@ -57,7 +57,7 @@ open import Simulation.Take using (module Takes; scan-at; take-open-at; cell-tak
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear;
   fold-clear; adv; fold-unmoved; consume-clear; Out)
-open import Simulation.Sweep using (t≢f; stamp-rows; stamped<)
+open import Simulation.Sweep using (t≢f; stamp-rows; stamped<; sameSource-no)
 open import Rx.Mint using (counter; sourceᵏ; regᵏ)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Simulation.Write using (module Write; module CellWrite; key-same; vals-same; apart)
@@ -151,7 +151,7 @@ delivered : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Clo
           → Store κ sP (markDlv fin (proj₁ x) stP) sI (markDlv fin (proj₁ x′) stI)
 delivered {κ = κ} {sP = sP} {stP} {sI} {stI} s {fin} {x} {x′} pr = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-  ; sync = sync ; rows = rows ; latches = latches
+  ; sync = sync ; rows = rows ; latches = latches ; dying-done = dying-done
   ; dlv-alike = dlv fin ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut
   ; named = dlv-named fin (proj₁ named) (lookupᵃ (proj₁ fresh-ids) (proj₁ mx)) , dlv-named fin (proj₂ named) (lookupᵃ (proj₂ fresh-ids) (proj₂ mx)) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
@@ -177,15 +177,24 @@ dying : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed 
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
       → Store κ sP stP sI stI → (i : Fin n) → lookup κ i ≡ sharedᵏ
       → Store κ sP (shareDying i true stP) sI (shareDying (n ↑ʳ i) true stI)
-dying {n} {κ = κ} s i _ = record
+dying {n} {κ = κ} {stP = stP} {stI = stI} s i sk = record
   { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
   ; sync = sync ; rows = rows ; latches = latches
+  ; dying-done = λ j hj → (λ m → proj₁ (dying-done j hj) (trans (sym (mn (EvalSt.dying stP) (neP j hj))) m))
+                        , (λ m → proj₂ (dying-done j hj) (trans (sym (mn (EvalSt.dying stI) (λ e → neP j hj (cong toℕ (↑ʳ-injective n j i (toℕ-injective e)))))) m))
   ; dlv-alike = dlv-alike ; dying-alike = spent-zip κ _ _ _ _ _ rows _∨_ (stamp-rows κ i rows (proj₁ above) (proj₂ above)) dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut
   ; named = dying-named i (proj₁ named) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named)))
           , dying-named (n ↑ʳ i) (proj₂ named) (<-trans (stamped< i) (Named.slots-below (proj₂ named))) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
   ; scripts = scripts }
-  where open Store s
+  where
+  open Store s
+  mn : ∀ {x k : ℕ} xs → x ≢ k → memberSource x (k ∷ xs) ≡ memberSource x xs
+  mn {x} xs ne = cong (_∨ memberSource x xs) (sameSource-no ne)
+  neP : ∀ j → lookup κ j ≡ hotᵏ → toℕ j ≢ toℕ i
+  neP j hj e with toℕ-injective e
+  ... | refl with trans (sym hj) sk
+  ... | ()
 
 dying-arr : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
               {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
@@ -496,7 +505,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       S′ : St sP (record stP { nodes = setNode m y (EvalSt.nodes stP) }) sI (record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })
       S′ = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-        ; sync = sync ; rows = W.regW rows ; dlv-alike = W.spentW rows dlv-alike ; dying-alike = W.spentW rows dying-alike ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
+        ; sync = sync ; rows = W.regW rows ; dlv-alike = W.spentW rows dlv-alike ; dying-alike = W.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
         ; census = census ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
         ; scripts = scripts }
@@ -522,7 +531,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       S′ : St sP stP sI (record stI { nodes = setNode k₁ (cell-st c) (EvalSt.nodes stI) })
       S′ = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; named = proj₁ named , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
+        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = proj₁ named , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
         ; census = census ; owned = owned
         ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
         ; scripts = scripts }

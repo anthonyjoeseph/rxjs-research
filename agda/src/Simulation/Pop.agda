@@ -148,6 +148,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; dlv-alike   = spent-off κ _ _ _ _ _ (regrel-pop _ _ _ pp (Store.rows s)) (λ _ → refl) (λ _ → refl)
     ; dying-alike = spent-off κ _ _ _ _ _ (regrel-pop _ _ _ pp (Store.rows s)) (λ _ → refl) (λ _ → refl)
     ; latches  = Store.latches s
+    ; dying-done = λ _ _ → (λ ()) , (λ ())
     ; bounded  = subst (All (_< counter (Sched.mint sP) sourceᵏ)) (sym (proj₁ (pp-sources pp))) (proj₁ (Store.bounded s))
                , subst (All (_< counter (Sched.mint sI) sourceᵏ)) (sym (proj₂ (pp-sources pp))) (proj₂ (Store.bounded s))
     ; swept    = pp-pointwise {R = λ l l′ → guardOf (EvalSt.registry stP) l ≡ guardOf (EvalSt.registry stI) l′}

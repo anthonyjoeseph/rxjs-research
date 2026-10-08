@@ -70,6 +70,7 @@ open import Simulation.Write using (apart)
 open import Simulation.Install using (install; fresh-set; weak; named-mint)
 open import Simulation.Hop using (hop-register)
 open import Simulation.Cold using (ColdBlock; cold-register)
+open import Simulation.Slot-Join using (join-read)
 open import Simulation.Catch using (Kept; Stamps; AtFrame; OnPath; on-path; catch-same; kept-same; kept-trans; kept-catch;
   kept-unmoved; unmoved-set; by-sub; by-sub⁻)
 open Kept using (After; module After; _⨾_; after)
@@ -404,23 +405,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                        → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
                            (subst (λ u → Path (plainᵏ Γ κ) (n + lo) (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
                        → Stamps κ (frameAt w ρ′) pr stI rI
-      -- A LIVE SCRIPT'S READ JOINING ITS CONNECTED SHARE: each run
-      -- registers one row at the slot, the impl's down the restamp
-      hot-read-join : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
-                   → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
-                   → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
-                   → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)}
-                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rid rid′}
-                       {below : toℕ i < lo} {below′ : toℕ (n ↑ʳ i) < n + lo}
-                   → (S : Store κ sP stP sI stI)
-                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                   → Sound p sP stP → Sound q sI stI
-                   → memberSource (toℕ i) (EvalSt.completedSources stP) ≡ false
-                   → memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ true
-                   → freshId regᵏ (Sched.mint sP) ≡ rid → freshId regᵏ (Sched.mint sI) ≡ rid′
-                   → ReadAfter S ([] , record sP { mint = setAt regᵏ (suc rid) (Sched.mint sP) } , register rid (atSlot i) (lowerFloor below p) stP)
-                                 ([] , record sI { mint = setAt regᵏ (suc rid′) (Sched.mint sI) }
-                                     , register rid′ (atSlot (n ↑ʳ i)) (lowerFloor below′ (readPath Θ i w ρ′ eq q)) stI) p q
       -- AN ENDED SCRIPT'S READ CONNECTING ITS SHARE: the plain read folds
       -- the end, the impl's runs the share's definition, whose read of
       -- the raw slot folds it
@@ -570,6 +554,26 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     live-unspent {stI = stI} S i ek c s with proj₁ (Store.latches S i) ek
     ... | L₁ , L₂ with trans (sym s) (trans L₂ (cong (λ b → b ∧ memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI)) (trans (sym L₁) c)))
     ...   | ()
+
+    -- A LIVE SCRIPT'S READ JOINING ITS CONNECTED SHARE: each run
+    -- registers one row at the slot, the impl's down the restamp
+    hot-read-join : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
+                 → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                 → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
+                 → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)}
+                     {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rid rid′}
+                     {below : toℕ i < lo} {below′ : toℕ (n ↑ʳ i) < n + lo}
+                 → (S : Store κ sP stP sI stI)
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → Sound p sP stP → Sound q sI stI
+                 → memberSource (toℕ i) (EvalSt.completedSources stP) ≡ false
+                 → memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ true
+                 → freshId regᵏ (Sched.mint sP) ≡ rid → freshId regᵏ (Sched.mint sI) ≡ rid′
+                 → ReadAfter S ([] , record sP { mint = setAt regᵏ (suc rid) (Sched.mint sP) } , register rid (atSlot i) (lowerFloor below p) stP)
+                               ([] , record sI { mint = setAt regᵏ (suc rid′) (Sched.mint sI) }
+                                   , register rid′ (atSlot (n ↑ʳ i)) (lowerFloor below′ (readPath Θ i w ρ′ eq q)) stI) p q
+    hot-read-join i ek w r eq {below = below} {below′ = below′} S pr oP oI cP conn refl refl =
+      join-read κ S i ek cP conn below below′ eq pr oP oI
 
     -- A HOT SLOT'S READ, AGAINST ITS STAMPED SLOT'S: the plain
     -- subscribe at the slot, the impl's at the share wrapping it, under
@@ -1017,7 +1021,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below
       ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
       ; rows = rows ; dlv-alike = dlv-alike ; dying-alike = dying-alike
-      ; latches = latches ; bounded = proj₁ bounded , mapᵃ m<n⇒m<1+n (proj₂ bounded)
+      ; latches = latches ; dying-done = dying-done ; bounded = proj₁ bounded , mapᵃ m<n⇒m<1+n (proj₂ bounded)
       ; swept = swept ; uncut = uncut ; named = proj₁ named , named-mint (n≤1+n _) ≤-refl ≤-refl (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
       ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
@@ -1233,6 +1237,7 @@ init-store κ {t} e ins μ big ord = record
   ; dlv-alike = tt
   ; dying-alike = tt
   ; latches = λ _ → (λ _ → refl , refl) , (λ _ → refl , refl)
+  ; dying-done = λ _ _ → (λ ()) , (λ ())
   ; bounded = mapᵃ (λ lt → <-trans lt (n<1+n _)) (init-below (plainExp e) (plainSlots ins))
             , mapᵃ (λ lt → <-trans lt big) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))
   ; swept   = init-swept {t = t} {t′ = emitᵗ t} (init-sources κ e ins) (init-below (plainExp e) (plainSlots ins)) (init-below (elaborateImpl κ e) (embedSlotsImpl ins))

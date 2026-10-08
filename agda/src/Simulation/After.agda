@@ -177,7 +177,7 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
     ; sources = sources ; numbers = numbers ; distinct = distinct ; sync = sync
     ; rows = regG κ there (mint-off S) rows
     ; dlv-alike = spentG κ there (mint-off S) rows dlv-alike ; dying-alike = spentG κ there (mint-off S) rows dying-alike
-    ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-node (proj₁ named) , named-node (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
+    ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-node (proj₁ named) , named-node (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
     ; census = census ; owned = owned
     ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) ruleP
     ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) ruleI
