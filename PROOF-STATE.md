@@ -250,15 +250,11 @@ moving time; closes emptying merges; hot ends past blocks;
 cut, liveness, drain, body ends, 2nd hop inners unpaired; unsound walks, reads; 2
 stamp chains; `of` splits, folds; `mintᵉ` stamps; drains past
 quiet cuts; hop scripts; root stamps unwalked; joiners off catch;
-quiet folds, lanes, fan-outs; installs+hops; dead inners revived. Left: cascades.
+quiet arms but leaves; installs+hops; dead inners revived. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **FINISH THE QUIET PASS.** `quiet-spent` as `quiet-takeWhile` runs an
-  open test: the cell steps on the impl side alone and both tests stay
-  spent. Rules out the last quiet arm unpairing a store.
 
 - **PROVE THE READS.** `{hot,shared,cold}-read` as `defer-install` now
   is: the slot's subscribe installs through `install` and registers
@@ -266,6 +262,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   of `defer~`. Decide first whether a cold read's input block keeps
   `Store.owned` when its nodes join the registry. Rules out a slot read
   unpairing a store under any store, not only at the root.
+
+- **PROVE THE NODE WRITES.** `scan-write`, `while-{write,spent}` as
+  `CellWrite` is: `Moves`' cell and count obligations cite the row's own
+  `π` entry on the plain side too, so a write at a row's nodes is apart
+  from every other row by `π`'s uniqueness. Rules out a both-sided write
+  moving a row the sweeps never drew.
 
 - **ONLY THEN GRIND THE REST.** The per-former leaves by a two-run
   relation recursing on the type as `Red` does, reusing its descent for
@@ -276,9 +278,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`quiet-spent`** (Simulation.Pass) — FALSITY, `PROBED`: a spent test's cell
-  stepped on emits carrying nothing, on the impl side alone, stays related and
-  passes nothing.
 - **`restamp-echo`** (Simulation.Pass) — FALSITY, `PROBED`: the restamp's scan
   stepped on a group keeps the flattener, and the group it hands on carries the
   same values and end, every delivery keeping its stamp.

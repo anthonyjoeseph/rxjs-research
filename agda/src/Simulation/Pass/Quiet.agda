@@ -19,7 +19,7 @@ open import Data.Maybe   using (Maybe; nothing; just)
 open import Data.Nat     using (ℕ; suc; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; <⇒≢; <-≤-trans; <-trans; m≤m+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
-open import Data.Sum     using (inj₁; inj₂; [_,_])
+open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Unit    using (tt)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Vec     using (lookup)
@@ -34,9 +34,9 @@ open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; Tm; FlatOp; mergeᶠ;
   FnClo; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ; uniqᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; markDlv; NodeState; Arrival; arrVal; arrTy; arrTick; Path; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st;
-  echoᵗ; thruEvents; thruWrap; setNode; cell-st; scanVals; take-st; takeVals; exhaust-st; switch-st; switchKill; hasRoom;
+  echoᵗ; thruEvents; thruWrap; setNode; cell-st; batchSync-st; scanVals; take-st; takeVals; exhaust-st; switch-st; switchKill; hasRoom;
   consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying)
-open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-from-inner; react-false; step-thru-outer; thruWalk⇓;
+open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-scan; step-from-inner; react-false; step-thru-outer; thruWalk⇓;
   walk-nil; walk-echo; walk-cons; thruConsume⇓; inner; consume-all-sub; consume-all-enqueue;
   consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub;
   consume-switch-nil; subscribeInner⇓; subscribeE⇓; chainStep⇓; chain-step; dispatchShare⇓;
@@ -60,7 +60,7 @@ open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; 
 open import Simulation.Sweep using (t≢f; stamp-rows; stamped<)
 open import Rx.Mint using (counter; sourceᵏ; regᵏ)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
-open import Simulation.Write using (module Write; key-same; vals-same; apart)
+open import Simulation.Write using (module Write; module CellWrite; key-same; vals-same; apart)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-subscribeE; sz-subscribeInner; sz-thruConsume; sz-1)
 open import Simulation.Grow using (nodes-grow; flatG; pathG; fresh-off)
@@ -86,6 +86,26 @@ set-same nid ns ((k , s) ∷ r) e with k ≡ᵇ nid in eq
 ... | true with ≡ᵇ→≡ k nid eq | e
 ...   | refl | refl = refl
 set-same nid ns ((k , s) ∷ r) e | false = cong ((k , s) ∷_) (set-same nid ns r e)
+
+-- A SCAN'S STEP AT A NODE HOLDING NO ACCUMULATOR OF ITS OWN TYPE
+-- passes nothing and writes nothing; at one that does, it is `scan-at`'s
+scan-any : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {s u lo} {fn : FnClo Δ (u ×ᵗ s) u} {k} {κ′ : Path Δ lo u t}
+             {now vals fin sc} {st : EvalSt e} {r}
+         → stepFrame⇓ now (scan-f fn k) κ′ vals fin sc st r
+         → r ≡ ([] , [] , fin , sc , st)
+           ⊎ Σ (Val Δ u) λ a → lookupNode k (EvalSt.nodes st) ≡ just (cell-st a)
+               × r ≡ ([] , proj₁ (scanVals fn a vals) , fin , sc
+                     , record st { nodes = setNode k (cell-st (proj₂ (scanVals fn a vals))) (EvalSt.nodes st) })
+scan-any {u = u} {k = k} {st = st} step-scan with lookupNode k (EvalSt.nodes st)
+... | nothing                      = inj₁ refl
+... | just (take-st _)             = inj₁ refl
+... | just (mergeAll-st _ _ _ _)   = inj₁ refl
+... | just (switch-st _ _)         = inj₁ refl
+... | just (exhaust-st _ _)        = inj₁ refl
+... | just (batchSync-st _ _ _)    = inj₁ refl
+... | just (cell-st {w} a) with w ≟ᵗ u
+...   | yes refl = inj₂ (a , refl , refl)
+...   | no _     = inj₁ refl
 
 -- a minted source's chain, as the registration it was read from
 dynRow : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ) → RegId × AtFloor Γ (arrTy a) t → RegRow Γ t
@@ -479,6 +499,32 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
         ; sync = sync ; rows = W.regW rows ; dlv-alike = W.spentW rows dlv-alike ; dying-alike = W.spentW rows dying-alike ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
         ; census = census ; owned = owned
         ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+        ; scripts = scripts }
+
+    -- AN IMPL CELL WRITTEN UNDER A SPENT TEST: the stores and the tails
+    -- stay related, the plain side unmoved
+    spent-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ′ s k k₁ k₂ w} {a c : Val (plainᵏ Γ κ) w}
+                    {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ s) (emitᵗ t)}
+                → (k , k₁ ∷ k₂ ∷ []) ∈ Store.π S → lookupNode k (EvalSt.nodes stP) ≡ just (take-st 0)
+                → lookupNode k₁ (EvalSt.nodes stI) ≡ just (cell-st a)
+                → PathRel {Γ = Γ} κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                → Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = setNode k₁ (cell-st c) (EvalSt.nodes stI) })) λ A
+                    → PathRel {Γ = Γ} κ (Store.π (After.store A)) (EvalSt.nodes stP) (setNode k₁ (cell-st c) (EvalSt.nodes stI)) p q
+    spent-write {sP} {stP} {sI} {stI} S {k₁ = k₁} {c = c} e lP l₁ r =
+      after S′ (λ { (inj₁ x) → inj₁ x ; (inj₂ (a , b , pr)) → inj₂ (a , b , W.M.partW (Store.rows S) pr) })
+               (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
+                               ; rows = W.M.arrW (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
+               [] (λ x → x)
+      , W.M.pathW r
+      where
+      module W = CellWrite κ (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} {c = c} e lP l₁
+      open Store S
+      S′ : St sP stP sI (record stI { nodes = setNode k₁ (cell-st c) (EvalSt.nodes stI) })
+      S′ = record
+        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
+        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; bounded = bounded ; swept = swept ; uncut = uncut ; named = proj₁ named , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
+        ; census = census ; owned = owned
+        ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
         ; scripts = scripts }
 
     -- a flattener fact read at the frame's operator is one at the former's
@@ -880,29 +926,6 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- handed the steps of its constructor's run and not the tail's fold,
     -- which its caller keeps, so the descent stays on the impl's fold.
     postulate
-      -- A SPENT TEST PASSES NOTHING ON NOTHING: the cell steps on the
-      -- impl side alone, and both tests stay spent
-      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0],"script":[0,1,0,0,0],"reach":["takeWhile","flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Case 4 cuts a test over an exhaust at the hot input's first
-      --   arrival, whose lane carries the failing value, and the second
-      --   arrival's empty lane hands the spent test an emit carrying
-      --   nothing.
-      quiet-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s C P k k₁ k₂ w}
-                          {F₁ : FnClo (plainᵏ Γ κ) (C ×ᵗ emitᵗ s) C} {G : FnClo (plainᵏ Γ κ) C (emitᵗ s)}
-                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
-                          {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
-                          {es fin o₁ y₁ f₁ s₁ st₁ o₂ y₂ f₂ s₂ st₂}
-                      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f (just P) k ↠[ h ] p)
-                          (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q)))
-                      → lookupNode k (EvalSt.nodes stP) ≡ just (take-st 0)
-                      → Carries es [] → fin ≡ false
-                      → stepFrame⇓ now (scan-f F₁ k₁) (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q)) es fin sI stI (o₁ , y₁ , f₁ , s₁ , st₁)
-                      → stepFrame⇓ now (take-f w k₂) (map-f G ↠[ h₃ ] q) y₁ f₁ s₁ st₁ (o₂ , y₂ , f₂ , s₂ , st₂)
-                      → QArm S now p (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p)
-                            (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q))))
-                          q (map (applyClo G) y₂) f₂ (o₁ ++ o₂) s₂ st₂
-
       -- AN OUTER'S EMIT CARRYING NOTHING, EXPLODED: the impl's merge
       -- subscribes its empty run of elements, and the plain side does not
       -- move
@@ -1051,7 +1074,48 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → QArm S now p (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p)
                           (scan-f F₁ k₁ ↠[ h₁ ] (take-f w k₂ ↠[ h₂ ] (map-f G ↠[ h₃ ] q))))
                         q (map (applyClo G) y₂) f₂ (o₁ ++ o₂) s₂ st₂
-    quiet-takeWhile S R@(spentWhile~ _ lk _ _) bs e _ _ d₁ d₂ = quiet-spent S R lk bs e d₁ d₂
+    quiet-takeWhile {sP = sP} {stP} {sI} {stI} S {es = es}
+                    (spentWhile~ {k = k} {k₁ = k₁} {k₂ = k₂} {h₁ = h₁} {h₂ = h₂} {F₁ = F₁} {p = p} {q = q} e lk lk₂ r)
+                    bs refl sp si d₁ d₂
+      with scan-any d₁
+    ... | inj₁ refl with take-open-at lk₂ refl d₂
+    ...   | refl = qarm (proj₁ X) (proj₂ X) [] refl λ dq B rel′ →
+                     spentWhile~ (After.grows B (After.grows (proj₁ X) e)) lk (trans (fold-unmoved dq c₂) lk₂′) rel′
+      where
+      N₂ = setNode k₂ (take-st 0) (EvalSt.nodes stI)
+      X : Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = N₂ })) λ A
+            → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) N₂ p q
+      X = subst (λ N → Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = N })) λ A
+                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) N p q)
+                (sym (set-same k₂ (take-st 0) (EvalSt.nodes stI) lk₂)) (after S (λ x → x) (λ x → x) [] (λ x → x) , r)
+      lk₂′ : lookupNode k₂ N₂ ≡ just (take-st 0)
+      lk₂′ = lookup-set k₂ (take-st 0) (EvalSt.nodes stI)
+      so₂ = step-kept h₂ d₂ (drop-ot _ _ _ (step-kept h₁ d₁ si))
+      c₂ : Clear k₂ q sI _
+      c₂ = on-drop (head-on _ h₂ _ k₂ (self-node k₂ []) so₂) , drop-ot _ _ _ (drop-ot _ _ _ so₂)
+    quiet-takeWhile {sP = sP} {stP} {sI} {stI} S {es = es}
+                    (spentWhile~ {k = k} {k₁ = k₁} {k₂ = k₂} {h₁ = h₁} {h₂ = h₂} {F₁ = F₁} {p = p} {q = q} e lk lk₂ r)
+                    bs refl sp si d₁ d₂ | inj₂ (a , l₁ , refl)
+      with take-open-at (trans (set-above k₁ k₂ (cell-st (proj₂ (scanVals F₁ a es))) (EvalSt.nodes stI)
+                                 (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} l₁ lk₂))) lk₂) refl d₂
+    ...   | refl = qarm (proj₁ X) (proj₂ X) [] refl λ dq B rel′ →
+                     spentWhile~ (After.grows B (After.grows (proj₁ X) e)) lk (trans (fold-unmoved dq c₂) lk₂′) rel′
+      where
+      N₁ = setNode k₁ (cell-st (proj₂ (scanVals F₁ a es))) (EvalSt.nodes stI)
+      N₂ = setNode k₂ (take-st 0) N₁
+      lk₂₁ : lookupNode k₂ N₁ ≡ just (take-st 0)
+      lk₂₁ = trans (set-above k₁ k₂ (cell-st (proj₂ (scanVals F₁ a es))) (EvalSt.nodes stI)
+                     (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} l₁ lk₂))) lk₂
+      X : Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = N₂ })) λ A
+            → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) N₂ p q
+      X = subst (λ N → Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = N })) λ A
+                         → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) N p q)
+                (sym (set-same k₂ (take-st 0) N₁ lk₂₁)) (spent-write S e lk l₁ r)
+      lk₂′ : lookupNode k₂ N₂ ≡ just (take-st 0)
+      lk₂′ = lookup-set k₂ (take-st 0) N₁
+      so₂ = step-kept h₂ d₂ (drop-ot _ _ _ (step-kept h₁ d₁ si))
+      c₂ : Clear k₂ q sI _
+      c₂ = on-drop (head-on _ h₂ _ k₂ (self-node k₂ []) so₂) , drop-ot _ _ _ (drop-ot _ _ _ so₂)
     quiet-takeWhile {sP = sP} {stP} {sI} {stI} S {es = es}
                     R@(takeWhile~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
                                   {h₁ = h₁} {h₂ = h₂} {P = P} {F₁ = F₁} {p = p} {q = q} e lk lk₁ lk₂ CL _)

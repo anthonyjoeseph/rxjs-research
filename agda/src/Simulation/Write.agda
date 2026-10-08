@@ -102,6 +102,16 @@ one-many ()
 solo-many : ∀ {k k′ m m′ ks : NodeId} {xs : List NodeId} → (k , k′ ∷ []) ≡ (m , m′ ∷ ks ∷ xs) → ⊥
 solo-many ()
 
+one-two : ∀ {k k′ m m′ ks : NodeId} → (k , k′ ∷ []) ≡ (m , m′ ∷ ks ∷ []) → ⊥
+one-two ()
+
+-- one entry, read at its first impl node
+head₂ : ∀ {k m x y : NodeId} {xs ys : List NodeId} → (k , x ∷ xs) ≡ (m , y ∷ ys) → x ≡ y
+head₂ refl = refl
+
+one≢zero : ∀ {n} {Γ : Ctx n} → just (take-st {Γ = Γ} 1) ≡ just (take-st 0) → ⊥
+one≢zero ()
+
 module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} where
 
   -- the pair's new states relate at every element type the old ones did
@@ -137,7 +147,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
   module Moves {t : Ty} {NP NP′ : List (NodeId × NodeState Γ)} {NI NI′ : List (NodeId × NodeState (plainᵏ Γ κ))}
     (cellP : ∀ {k s} {a : Val Γ s} → lookupNode k NP ≡ just (cell-st a) → lookupNode k NP′ ≡ just (cell-st a))
     (takeP : ∀ {k b} → lookupNode k NP ≡ just (take-st b) → lookupNode k NP′ ≡ just (take-st b))
-    (cellI : ∀ {k s} {a : Val (plainᵏ Γ κ) s} → lookupNode k NI ≡ just (cell-st a) → lookupNode k NI′ ≡ just (cell-st a))
+    (cellS : ∀ {kp k s} {a : Val (plainᵏ Γ κ) s} → (kp , k ∷ []) ∈ π
+           → lookupNode k NI ≡ just (cell-st a) → lookupNode k NI′ ≡ just (cell-st a))
+    (cellW : ∀ {kp k k₂ s} {a : Val (plainᵏ Γ κ) s} → (kp , k ∷ k₂ ∷ []) ∈ π → lookupNode kp NP ≡ just (take-st 1)
+           → lookupNode k NI ≡ just (cell-st a) → lookupNode k NI′ ≡ just (cell-st a))
     (takeI : ∀ {k b} → lookupNode k NI ≡ just (take-st b) → lookupNode k NI′ ≡ just (take-st b))
     (unpairedI : ∀ {k v} → Unpaired {Γ = Γ} κ π k → lookupNode k NI ≡ just v → lookupNode k NI′ ≡ just v)
     (flatW : ∀ {u op m m′ ks xs} → Flattener κ π {t = t} NP NI u op m m′ ks xs → Flattener κ π {t = t} NP′ NI′ u op m m′ ks xs)
@@ -157,8 +170,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     pathW root~                              = root~
     pathW (sink~ sh)                         = sink~ sh
     pathW (map~ L r)                         = map~ L (pathW r)
-    pathW (scan~ e l l′ v L r)               = scan~ e (cellP l) (cellI l′) v L (pathW r)
-    pathW (takeWhile~ e l l₁ l₂ L r)         = takeWhile~ e (takeP l) (cellI l₁) (takeI l₂) L (pathW r)
+    pathW (scan~ e l l′ v L r)               = scan~ e (cellP l) (cellS e l′) v L (pathW r)
+    pathW (takeWhile~ e l l₁ l₂ L r)         = takeWhile~ e (takeP l) (cellW e l l₁) (takeI l₂) L (pathW r)
     pathW (spentWhile~ e l l₂ r)             = spentWhile~ e (takeP l) (takeI l₂) (pathW r)
     pathW (outerElem~ f r)                   = outerElem~ (flatW f) (pathW r)
     pathW (outerExplode~ f r)                = outerExplode~ (flatW f) (pathW r)
@@ -296,7 +309,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     flatW (pm₂ , x₂ , x₂′ , l₂ , l₂′ , fn₂ , c₂ , lk₂) | no ne =
       pm₂ , x₂ , x₂′ , keepP ne l₂ , pairedI pm₂ (here refl) (λ eq _ → ne (cong proj₁ eq)) l₂′ , fn₂ , c₂ , cellI lk₂
 
-    open Moves {t = t} {NP} {NP′} {NI} {NI′} cellP takeP cellI takeI unpairedI flatW
+    open Moves {t = t} {NP} {NP′} {NI} {NI′} cellP takeP (λ _ → cellI) (λ _ _ → cellI) takeI unpairedI flatW
       (λ e l l′ → soloP e l , pairedI e (here refl) (λ eq _ → solo-entry eq) l′)
       (λ e₁ e₂ l l′ l₂ a≤ b≤ → _ , _ , soloP e₁ l , pairedI e₁ (here refl) (λ eq _ → solo-entry eq) l′
                                 , pairedI e₂ (there (here refl)) third-entry l₂ , a≤ , b≤) public
@@ -426,4 +439,79 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     hopW f g l l′ l₂ a≤ b≤ =
       let (a′ , x , y , p) = pairW f l l′ a≤ ; (b′ , z , q) = markW g l₂ b≤ in a′ , b′ , x , y , z , p , q
 
-    module M = Moves {t = t} {NP} {NP′} {NI} {NI′} cellP takeP cellI takeI unpairedI flatW pendW hopW
+    module M = Moves {t = t} {NP} {NP′} {NI} {NI′} cellP takeP (λ _ → cellI) (λ _ _ → cellI) takeI unpairedI flatW pendW hopW
+
+  -- AN IMPL CELL WRITTEN UNDER A SPENT TEST, ON THE IMPL SIDE ALONE.
+  -- `π` pairs the cell once, in the test's entry, and a row reading a
+  -- cell there is an open test, whose plain count is one where this
+  -- one's is zero; a cell is no count, merge or flattener's state, and
+  -- a flattener's restamp cell is the second of its own entry
+  module CellWrite (vals : Unique (concatMap proj₂ π)) {t : Ty}
+                   {NP : List (NodeId × NodeState Γ)} {NI : List (NodeId × NodeState (plainᵏ Γ κ))}
+                   {k k₁ k₂ w} {a c : Val (plainᵏ Γ κ) w}
+                   (e : (k , k₁ ∷ k₂ ∷ []) ∈ π) (lP : lookupNode k NP ≡ just (take-st 0))
+                   (l₁ : lookupNode k₁ NI ≡ just (cell-st a)) where
+
+    NI′ : List (NodeId × NodeState (plainᵏ Γ κ))
+    NI′ = setNode k₁ (cell-st c) NI
+
+    keepI : ∀ {j v} → (j ≡ k₁ → ⊥) → lookupNode j NI ≡ just v → lookupNode j NI′ ≡ just v
+    keepI {j} ne l = trans (set-above k₁ j (cell-st c) NI (apart k₁ j ne)) l
+
+    -- what sits at the written node is the cell
+    at : ∀ {v} → lookupNode k₁ NI ≡ just v → cell-st a ≡ v
+    at l = just-injective (trans (sym l₁) l)
+
+    cellS : ∀ {kp j s} {b : Val (plainᵏ Γ κ) s} → (kp , j ∷ []) ∈ π
+          → lookupNode j NI ≡ just (cell-st b) → lookupNode j NI′ ≡ just (cell-st b)
+    cellS {j = j} f l with j ≟ k₁
+    ... | yes refl = ⊥-elim (one-two (vals-same vals f e (here refl) (here refl)))
+    ... | no ne    = keepI ne l
+
+    cellW : ∀ {kp j j₂ s} {b : Val (plainᵏ Γ κ) s} → (kp , j ∷ j₂ ∷ []) ∈ π → lookupNode kp NP ≡ just (take-st 1)
+          → lookupNode j NI ≡ just (cell-st b) → lookupNode j NI′ ≡ just (cell-st b)
+    cellW {j = j} f l1 l with j ≟ k₁
+    ... | yes refl = ⊥-elim (one≢zero (trans (sym l1) (subst (λ x → lookupNode x NP ≡ just (take-st 0))
+                                                               (sym (cong proj₁ (vals-same vals f e (here refl) (here refl)))) lP)))
+    ... | no ne    = keepI ne l
+
+    takeI : ∀ {j b} → lookupNode j NI ≡ just (take-st b) → lookupNode j NI′ ≡ just (take-st b)
+    takeI {j} l with j ≟ k₁
+    ... | no ne    = keepI ne l
+    ... | yes refl with at l
+    ...   | ()
+
+    unpairedI : ∀ {j v} → Unpaired {Γ = Γ} κ π j → lookupNode j NI ≡ just v → lookupNode j NI′ ≡ just v
+    unpairedI {j} un l with j ≟ k₁
+    ... | yes refl = ⊥-elim (un (∈-vals e (here refl)))
+    ... | no ne    = keepI ne l
+
+    -- a merge's node is not the cell
+    apartM : ∀ {j u₀ l₀ c₀ q₀ d₀} → lookupNode j NI ≡ just (mergeAll-st {t = u₀} l₀ c₀ q₀ d₀) → j ≡ k₁ → ⊥
+    apartM l refl with at l
+    ... | ()
+
+    flatW : ∀ {u₀ op m m′ ks xs} → Flattener κ π {t = t} NP NI u₀ op m m′ ks xs → Flattener κ π {t = t} NP NI′ u₀ op m m′ ks xs
+    flatW {u₀ = u₀} {op} {m} {m′} {ks} {xs} (pm , x , x′ , l , l′ , fn , c₂ , lk) =
+      pm , x , x′ , l , keepI n₁ l′ , fn , c₂ , keepI n₂ lk
+      where
+      n₁ : m′ ≡ k₁ → ⊥
+      n₁ refl = cell-flat′ (subst (FlatNodes {Γ = Γ} κ π u₀ op x) (sym (at l′)) fn)
+      n₂ : ks ≡ k₁ → ⊥
+      n₂ refl = n₁ (head₂ (vals-same vals pm e (there (here refl)) (here refl)))
+
+    pendW : ∀ {u₀ j j′} → (j , j′ ∷ []) ∈ π
+          → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing 0 [] false)
+          → lookupNode j′ NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing 0 [] false)
+          → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing 0 [] false)
+            × lookupNode j′ NI′ ≡ just (mergeAll-st {t = emitᵗ u₀} nothing 0 [] false)
+    pendW _ l l′ = l , keepI (apartM l′) l′
+
+    hopW : ∀ {u₀ j j′ i i′ m i2 a₀ b₀} → (j , j′ ∷ []) ∈ π → (i , i′ ∷ m ∷ i2 ∷ []) ∈ π
+         → lookupNode j NP ≡ just (mergeAll-st {t = u₀} nothing a₀ [] true)
+         → lookupNode j′ NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing a₀ [] true)
+         → lookupNode m NI ≡ just (mergeAll-st {t = emitᵗ u₀} nothing b₀ [] true) → a₀ ≤ 1 → b₀ ≤ 1
+         → Fired NP NI′ u₀ j j′ m
+    hopW _ _ l l′ l₂ a≤ b≤ = _ , _ , l , keepI (apartM l′) l′ , keepI (apartM l₂) l₂ , a≤ , b≤
+
+    module M = Moves {t = t} {NP} {NP} {NI} {NI′} (λ l → l) (λ l → l) cellS cellW takeI unpairedI flatW pendW hopW
