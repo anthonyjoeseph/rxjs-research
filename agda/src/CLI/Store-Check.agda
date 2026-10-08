@@ -34,7 +34,7 @@ open import Data.Bool.ListAction using (any; all)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.List    using (List; []; _∷_; map; length; take; concatMap; _++_; allFin)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing; maybe′) renaming (map to mapᴹ)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -915,6 +915,35 @@ finishes k []              = 0
 finishes k ((_ , st) ∷ r) =
   (if fell k (actives (EvalSt.nodes st)) then 1 else 0) + finishes (actives (EvalSt.nodes st)) r
 
-storeDrains : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → ℕ × ℕ
-storeDrains f e ins = drains 0 tr , finishes [] tr
-  where tr = trace f (plainExp e) (plainSlots ins)
+-- WHERE THE IMPL'S SHARES CONNECT AND ARE JOINED: a boundary whose
+-- connected set grows connected a share, at the subscribe or later; a
+-- stamped row beyond one per new connect is a read joining a share
+-- already connected.  A floor, not a count, since a cascade can drop a
+-- stamped row in the boundary that adds one
+stampedRows : ∀ {m} {Δ : Ctx m} {u} → ℕ → List (RegRow Δ u) → ℕ
+stampedRows n []                       = 0
+stampedRows n ((_ , atSlot k , _) ∷ r) = (if n ≤ᵇ toℕ k then 1 else 0) + stampedRows n r
+stampedRows n (_ ∷ r)                  = stampedRows n r
+
+-- A CONNECT OF AN ENDED SCRIPT'S SHARE is slot zero's, its raw slot
+-- completed at the boundary before; a connect of slot one's share is a
+-- read of the shared slot
+shareEvents : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} → ℕ → ℕ → ℕ → ℕ → List ℕ → List (Sched Δ × EvalSt e) → ℕ × ℕ × ℕ × ℕ × ℕ
+shareEvents n k c s₀ ds []              = 0 , 0 , 0 , 0 , 0
+shareEvents n k c s₀ ds ((_ , st) ∷ r) = step (shareEvents n (suc k) c′ s′ (EvalSt.completedSources st) r)
+  where
+  c′ = length (EvalSt.connectedShares st)
+  s′ = stampedRows n (EvalSt.registry st)
+  new = take (c′ ∸ c) (EvalSt.connectedShares st)
+  tick : Bool → ℕ → ℕ
+  tick b x = if b then suc x else x
+  step : ℕ × ℕ × ℕ × ℕ × ℕ → ℕ × ℕ × ℕ × ℕ × ℕ
+  step (a , l , j , d , o) = tick ((c <ᵇ c′) ∧ (k ≡ᵇ 0)) a , tick ((c <ᵇ c′) ∧ (0 <ᵇ k)) l
+                           , tick ((c′ ∸ c) <ᵇ (s′ ∸ s₀)) j
+                           , tick (any (_≡ᵇ n) new ∧ memberSource 0 ds) d
+                           , tick (any (λ x → x ≡ᵇ suc n) new) o
+
+storeDrains : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
+storeDrains {n} {κ = κ} f e ins = drains 0 tr , finishes [] tr , shareEvents n 0 0 0 [] trI
+  where tr  = trace f (plainExp e) (plainSlots ins)
+        trI = trace f (elaborateImpl κ e) (embedSlotsImpl ins)

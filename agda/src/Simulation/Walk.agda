@@ -408,6 +408,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN ENDED SCRIPT'S READ CONNECTING ITS SHARE: the plain read folds
       -- the end, the impl's runs the share's definition, whose read of
       -- the raw slot folds it
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
+      --   alone: 199 agree, 0 fail, 1 undecided.  39 cases connect slot
+      --   zero's share after its hot script completed, reads deferred
+      --   past the end.
       hot-read-connect-done : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
                    → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                    → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
@@ -432,6 +437,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   the `Sound` pair was a hypothesis: a hot read of two arrivals,
       --   its share's `read~` and `hot~` machine row.  Not under a binder,
       --   not the values conjunct.
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
+      --   alone: 199 agree, 0 fail, 1 undecided.  76 cases connect a share
+      --   at the subscribe, where the hot script is still live; which
+      --   slot's share is not counted apart.
       hot-read-connect-live : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
                    → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                    → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
@@ -448,6 +458,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → sharedConnect⇓ (n ↑ʳ i) d (readPath Θ i w ρ′ eq q) below′ now sI stI rI
                    → ReadAfter S ([] , record sP { mint = setAt regᵏ (suc rid) (Sched.mint sP) } , register rid (atSlot i) (lowerFloor below p) stP) rI p q
       -- a shared slot's read, against its stamped slot's
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
+      --   alone: 199 agree, 0 fail, 1 undecided.  106 cases connect slot
+      --   one's share, a definition forwarding slot zero's or a program over
+      --   it, at the subscribe and deferred past it.
       shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
       -- WHERE A HOT READ'S EMITS LAND: the restamp hands its own a frame
       -- and the path catches it; a live script joined sends nothing yet

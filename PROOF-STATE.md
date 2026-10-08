@@ -243,30 +243,29 @@ undecided, never a failure (Anthony).
 `simulation` — both top lines' ground, by arrival
 over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
-OUT: an arrival plain lacks, split, gap, stray, echo
+OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; subscribes unrelated; pops unpairing reads; maps
-moving time; closes emptying merges; hot ends past blocks;
-2-value emits; bare cuts; writes moving rows;
+moving time; closes emptying merges; hot ends past block;
+2-value emits, bare cuts; writes moving row;
 cut, liveness, drain, body ends, 2nd hop inners apart; unsound walks, reads; 2
 stamp chains; `of` splits, folds; `mintᵉ` stamps; drains past
 quiet cuts; hop scripts; root stamps unwalked; joiners off catch;
-quiet arms but leaves; installs+hops; dead inners revived; unaligned
-reads. Left: cascades.
+quiet arms but leaves; installs+hops; inners revived; unaligned
+reads, connects. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **SWEEP THE CONNECTS.** `Store.dying-done` decided in `CLI.Store-Check`
-  first, since every FALSITY row concluding a `Store` now asserts it. Then a
-  `qc-store` aimed at reads that connect or join a share: nested reads, a
-  share's definition reading another slot, a re-entrant connect. Tests
-  `hot-read-connect-{done,live}` and `shared-read` together; decides whether a
-  share's definition run inside a read can unpair the stores.
-
 - **SWEEP THE COLD FLUSH.** `cold-block`'s flush under a tail that subscribes
   a new inner mid-flush, and `cold-read-end` over all-synchronous scripts, its
   first evidence. Decides whether a cold read's block is one fold of one group.
+
+- **SWEEP THE CONNECTS' VALUES.** The store sweep decided only the store
+  conjunct of `hot-read-connect-{done,live}` and `shared-read`; aim
+  `qc-same-clock` at a read connecting an ended script's share and at slot
+  one's definition run inside a read. Decides whether a connect's values leave
+  down the reader's path, the half of the read the store cannot see.
 
 - **ATTACK THE CASCADES.** The monster's last region: census
   `cascade-related`'s leaves, and aim a sweep at each FALSITY row there with no
@@ -339,11 +338,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`cold-read-end`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a cold read
   below the floor or over an all-synchronous script folds its prefix and end on
   both sides.
-- **`shared-read`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a slot's plain
+- **`shared-read`** (Simulation.Walk) — FALSITY, `PROBED`: a slot's plain
   subscribe against the impl's at its stamped slot, down the restamp, keeps
   what a pass keeps; the two scripts at the slot are one by `Store.scripts`,
   the shared paths sound.
-- **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED`: a
+- **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED×3`: a
   hot read whose impl connects its share over an ended or a live script keeps
   what a pass keeps.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map

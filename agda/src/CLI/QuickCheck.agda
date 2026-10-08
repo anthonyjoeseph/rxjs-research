@@ -1083,7 +1083,7 @@ bumpEach fs (g ∷ gs) (c ∷ cs) =
 -- plain run hold fewer queued inners than the one before, and how many
 -- see a merge's active count fall
 Seen : Set
-Seen = Marks × Bool × Bool × Bool × Bool × ℕ × ℕ
+Seen = Marks × Bool × Bool × Bool × Bool × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
 
 bump : Seen → Tally → Tally
 bump ((fs , o) , b , h , g , _) (cs , p , q , r , u) =
@@ -1204,9 +1204,9 @@ isStore : Statement → Bool
 isStore storeˢ = true
 isStore _      = false
 
-drained : List Statement → ℕ → Drawn → ℕ × ℕ
+drained : List Statement → ℕ → Drawn → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
 drained ss f (e , d₀ , d₁) with any isStore ss
-... | false = 0 , 0
+... | false = 0 , 0 , 0 , 0 , 0 , 0 , 0
 ... | true  with cached "?" f e (mkSlots d₀ d₁)
 ...   | c = storeDrains (Case.fuel c) (Case.prog c) (Case.slots c)
 
@@ -1244,7 +1244,7 @@ drawCase d = askG >>=G λ W → drawFor (Draw.tries W ∸ 1) d
 -- sweep was aimed at, so no statement is asked of it
 unreached : ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 unreached f n m (e , d₀ , d₁) =
-  (m , false , false , false , false , 0 , 0) ,
+  (m , false , false , false , false , 0 , 0 , 0 , 0 , 0 , 0 , 0) ,
   (TIMEOUT , "  unreached\n    no draw in " ++ show n ++ " tries carried every former the draw must reach"
              ++ rowIn "UNDECIDED" f e d₀ d₁) ∷ []
 
@@ -1524,8 +1524,10 @@ verdictOf rs@(_ ∷ _) with decided rs
 ... | []    = "undecided"
 ... | _ ∷ _ = "FAIL"
 
-drainLine : ℕ × ℕ → String
-drainLine (k , j) = count "  drains a queue at " k ++ count "  finishes an inner at a merge at " j
+drainLine : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ → String
+drainLine (k , j , a , l , o , d , s) = count "  drains a queue at " k ++ count "  finishes an inner at a merge at " j
+  ++ count "  connects a share at the subscribe at " a ++ count "  connects a share later at " l ++ count "  joins a connected share at " o
+  ++ count "  connects an ended script's share at " d ++ count "  connects the shared slot's share at " s
   where
   count : String → ℕ → String
   count _ zero = ""
