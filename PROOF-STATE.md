@@ -251,26 +251,29 @@ cut, liveness, drain, body ends, 2nd hop inners apart; unsound walks, reads; 2
 stamp chains; `of` splits, folds; `mintᵉ` stamps; drains past
 quiet cuts; hop scripts; root stamps; joiners off catch;
 quiet arms but leaves; installs+hops; inners revived; unaligned
-reads, connects, cold flushes. Left: cascades.
+reads, connects, cold flushes; renamed leaves. Left: two-script reads.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **ATTACK THE CASCADES.** The monster's last region: census
-  `cascade-related`'s leaves, and aim a sweep at each FALSITY row there with no
-  receipt reaching its risky region. Narrows what is left of `simulation` to
-  named, probed statements.
-
 - **A SECOND SCRIPTED SLOT.** The QuickCheck schedules from slot zero alone,
   so no drawn program reads a script above the source it registered on:
-  `cold-read-end`'s below-floor disjunct and a share joined across two scripts
-  are past every sweep. Draw slot one as a script too, aimed only.
+  `cold-read-end`'s below-floor disjunct, a share joined across two scripts,
+  and `init-{sources,sync}` at two hot slots are past every sweep. Draw slot
+  one as a script too, aimed only. Decides whether `simulation` holds across
+  scripts, its last unreached region.
 
-- **SWEEP EVERY NO-EVIDENCE ROW.** Whatever the three above leave unprobed in
-  this tier, each aimed at its own risky region; a red is a refutation and a
-  restatement, never a proof attempt. Proof waits until no row is FALSITY for
-  want of a sweep.
+- **CLOSE THE STATED GAPS.** Every receipt's closing `Not …` names a region
+  no row reached: `cold-block` and `hot-read-connect-live` under a binder and
+  on their values conjunct, `cold-block` inside a μ, `lifts-map` at an emit
+  the impl produced, `of-carries` under an outer telescope. Aim a row at each;
+  a red is a refutation and a restatement.
+
+- **LOWER BY EVIDENCE.** Each risky row whose receipts name its risky region
+  is reclassified down in its header and here; each whose receipts stop short
+  stays and names the region. Turns "may be false" into a schedule of proofs,
+  and leaves the rows `simulation` still bets on.
 
 ### The ledger
 
