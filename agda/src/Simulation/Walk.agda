@@ -355,6 +355,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   flattens a fan step over a cold read with an asynchronous tail,
       --   so the flushed values each subscribe a lane inner mid-flush; 42
       --   finish one at a merge, 190 group values.  Not inside a μ.
+      -- PROBED: make qc-same-clock QC='6 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1],"reach":["flatten","input"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 98
+      --   agree, 0 fail, 16 undecided: the same flushes' values, each
+      --   through a lane inner, against the plain run's instants.
       -- PROBED: git show 11e23e3e:agda/evidence/probed/Probed/Stores.agda
       --   -- the STORE conjunct alone, at the root from empty stores, before
       --   the `Sound` pair was a hypothesis: a cold script, its block run
@@ -377,6 +381,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A COLD READ WITH NOTHING TO REGISTER: below the floor, or a script
       -- whose values are all synchronous.  Each run folds its prefix and
       -- the end at once, the impl's through its block
+      --
+      -- THE BELOW-FLOOR DISJUNCT IS A COVERAGE BOUNDARY OF THE SWEEP: a
+      -- registration on slot `k` lowers a path's floor to `suc k` and no
+      -- further, so a read reaches it only at a cold slot above the source
+      -- it registered on, and the QuickCheck's one cold slot is slot zero.
       -- PROBED: make qc-store QC='5 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2],"reach":["input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
       --   alone: 197 agree, 0 fail, 3 undecided.  Every case reads a cold
