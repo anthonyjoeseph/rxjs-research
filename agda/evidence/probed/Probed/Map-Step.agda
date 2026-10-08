@@ -45,3 +45,12 @@ _ : Confirms (lifts-map {Γ = Γ₂} (κᵖ two-arrivals) (primˢ add (pairˢ (v
                         (inj₁ 9 ∷ inj₂ (inj₁ 3) ∷ inj₂ (inj₁ 5) ∷ [] , 5 , 9 , inj₂ (inj₁ tt))
                         (3 ∷ 5 ∷ []) (refl ∷ refl ∷ []))
 _ = (refl ∷ refl ∷ []) , refl
+
+-- LOAD-BEARING: the same step under a mint's binder, the renaming moving
+-- the author's variable past a token 2; fails if the step reads the token
+_ : Confirms (lifts-map {Γ = Γ₂} (κᵖ two-arrivals) (primˢ add (pairˢ (varˢᵗ (here refl)) (varˢᵗ (there (here refl)))))
+                        {Θ′ = uniqᵗ ∷ natᵗ ∷ uniqᵗ ∷ []} there
+                        {ρ′ = 2 ∷ᵉ 4 ∷ᵉ 0 ∷ᵉ []ᵉ} {ρ = 4 ∷ᵉ []ᵉ} (λ { (here refl) → refl })
+                        (inj₁ 9 ∷ inj₂ (inj₁ 3) ∷ inj₂ (inj₁ 5) ∷ [] , 5 , 9 , inj₂ (inj₁ tt))
+                        (3 ∷ 5 ∷ []) (refl ∷ refl ∷ []))
+_ = (refl ∷ refl ∷ []) , refl

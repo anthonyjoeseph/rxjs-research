@@ -186,8 +186,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   --   `init` then two payloads, under no binder: both payloads mapped,
   --   the stamp kept; and `x + y` reading the author's variable 4 past
   --   the step's binder, once at the identity renaming and once at one
-  --   moving it a slot out past a value 8 it does not own.  Not an emit
-  --   the impl produced.
+  --   moving it a slot out past a value 8 it does not own, or past a
+  --   mint's token.  Not an emit the impl produced.
   postulate
     lifts-map : ∀ {Θ s u} (f : SFn Γ [] [] Θ s u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ}
               → EnvRel κ Θ w ρ′ ρ
