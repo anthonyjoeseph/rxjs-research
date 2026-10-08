@@ -188,6 +188,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   --   the step's binder, once at the identity renaming and once at one
   --   moving it a slot out past a value 8 it does not own, or past a
   --   mint's token.  Not an emit the impl produced.
+  -- PROBED: make qc-store QC='16 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,6,1,1,0,2,1,0,0,0,2,2],"fan":[1,1,1,1,1,0,1,1,1,0],"leaf":[3,1,1],"script":[1,1,1,1,1,1],"slot":[2,1,1,1,0,0],"reach":["map"]}'
+  --   decided by `CLI.Store-Check`'s `lifts?` at every map on a related
+  --   path: 200 agree, every case a map, drawn steps under binders, fan
+  --   lanes and cuts.  Sampled emits carry every event and every kind
+  --   the impl writes (a close at each reason, a handoff, a complete,
+  --   the plumbing kind) at zero to two payloads; not the run's own
+  --   emits.  Fails when `lifts?` is made to refuse the plumbing kind.
   postulate
     lifts-map : ∀ {Θ s u} (f : SFn Γ [] [] Θ s u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ}
               → EnvRel κ Θ w ρ′ ρ

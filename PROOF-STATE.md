@@ -257,21 +257,23 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **GAPS IN THE ELABORATION.** The rest: `lifts-map` at an emit the impl
-  produced rather than one built by hand. Same rule. Decides whether
-  `simulation`'s leaves survive the shapes only the elaboration writes.
-
-- **LOWER BY EVIDENCE.** Each risky row whose receipts name its risky region
-  is reclassified down in its header and here; each whose receipts stop short
-  stays and names the region. Turns "may be false" into a schedule of proofs,
-  and leaves the rows `simulation` still bets on.
-
 - **RE-DRAW THE PACKED RECEIPTS.** Every receipt in `Simulation` whose draw
   takes a cold script with two sync values (`script` 4 or 5) was decided on
   the packed frame; replay each by its own command and restamp its counts. A
   red is a refutation of the leaf it names. Decides whether `simulation`'s
   evidence at the subscribe frame survives the frame's one-emit-per-value
   shape.
+
+- **THE RUN'S OWN EMITS.** `lifts?`, `scanLifts?` and `cutLifts?` decide
+  their closure relations at sampled emits of every event and kind; decide
+  them also at each emit the impl run hands the step, tokens and payload
+  counts as drawn. Decides whether `simulation`'s steps survive the emits
+  only the elaboration writes, where the samples stop.
+
+- **LOWER BY EVIDENCE.** Each risky row whose receipts name its risky region
+  is reclassified down in its header and here; each whose receipts stop short
+  stays and names the region. Turns "may be false" into a schedule of proofs,
+  and leaves the rows `simulation` still bets on.
 
 ### The ledger
 
@@ -341,7 +343,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED×7`: a
   hot read whose impl connects its share over an ended or a live script keeps
   what a pass keeps.
-- **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
+- **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED×2`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
   scripts live before anything is subscribed are related and in step, source

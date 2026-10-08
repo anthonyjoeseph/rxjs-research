@@ -410,13 +410,19 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
   valEv : ∀ {a} → Val Γ′ a → Val Γ′ (instEventᵗ uniqᵗ a)
   valEv v = inj₂ (inj₁ v)
 
-  -- an emit carrying values, bare and between an init and a close
-  bare wrapped : ∀ t → List (Val Γ′ (plainᵗ t)) → Val Γ′ (emitᵗ t)
+  -- an emit carrying values: bare; between an init and a close; and
+  -- after a cut's close, before a handoff and a complete, at the
+  -- plumbing kind — every event and kind the impl writes
+  bare wrapped tailed : ∀ t → List (Val Γ′ (plainᵗ t)) → Val Γ′ (emitᵗ t)
   bare    t vs = map valEv vs , 7 , 9 , inj₂ (inj₁ tt)
   wrapped t vs = (inj₁ 7 ∷ map valEv vs ++ inj₂ (inj₂ (inj₁ (7 , inj₂ (inj₂ tt)))) ∷ []) , 7 , 9 , inj₁ tt
+  tailed  t vs = (inj₂ (inj₂ (inj₁ (5 , inj₁ tt))) ∷ map valEv vs
+                   ++ inj₂ (inj₂ (inj₁ (6 , inj₂ (inj₁ tt)))) ∷ inj₂ (inj₂ (inj₂ (inj₁ 8))) ∷ inj₂ (inj₂ (inj₂ (inj₂ tt))) ∷ [])
+               , 7 , 9 , inj₂ (inj₂ tt)
 
   emits : ∀ t → List (Val Γ′ (emitᵗ t) × List (Val Γ t))
-  emits t = concatMap (λ xs → (bare t (map proj₁ xs) , map proj₂ xs) ∷ (wrapped t (map proj₁ xs) , map proj₂ xs) ∷ [])
+  emits t = concatMap (λ xs → let ps = map proj₁ xs ; qs = map proj₂ xs in
+                        (bare t ps , qs) ∷ (wrapped t ps , qs) ∷ (tailed t ps , qs) ∷ [])
                       ([] ∷ take 1 (samp t) ∷ take 2 (samp t) ∷ [])
 
   -- an emit's stamp, its instant and its kind, read off its fields
