@@ -39,7 +39,7 @@ open import Function.Base using (_|>′_)
 open import Rx.Prim using (ObservableInput; hot; cold; Fuel; Id)
 open import Rx.Exp using (Ctx; Val; Closed; natᵗ; obs; inputsBelowᵉ; FlatOp; mergeᶠ; ltᵖ; add)
 open import Rx.Slots using (Slots)
-open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kinds; hotᵏ; coldᵏ; sharedᵏ; emptyˢ; emitᵗ;
+open import SExp.Syntax using (SExp; plainᵏ; plainᵗ; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; emptyˢ; emitᵗ;
   flattenˢ; mapˢ; pairˢ; inlˢ; inrˢ; unitˢ; varˢᵗ; scanˢ; takeWhileˢ; primˢ; fstˢ; sndˢ; natˢ)
 open import Rx.Evaluator using (Burst; Stream; Sched; EvalSt; Arrival; sched-next)
 open import Rx.Mint using (counter; sourceᵏ)
@@ -114,6 +114,31 @@ mkSlots (cold ss as) d₁ zero       = coldˢ {ok = tt} ss as
 mkSlots (hot _)      d₁ (suc zero) = slot₁ d₁
 mkSlots (cold _ _)   d₁ (suc zero) = slot₁ d₁
 mkSlots _            d₁ (suc (suc ()))
+
+-- SLOT ONE MAY BE A SCRIPT TOO, and then no slot is shared: two sources
+-- schedule arrivals, and a path registered on slot zero can read a
+-- script ABOVE it, which a single script cannot draw.  A program in
+-- slot one is the table `mkSlots` builds, by definition.
+Def₁ : Set
+Def₁ = ObservableInput ℕ ⊎ SExp Γ₂ [] [] [] natᵗ
+
+kindOf : ObservableInput ℕ → Kind
+kindOf (hot _)    = hotᵏ
+kindOf (cold _ _) = coldᵏ
+
+κOf₂ : ObservableInput ℕ → Def₁ → Kinds 2
+κOf₂ d₀ (inj₁ d₁) = kindOf d₀ ∷ⱽ kindOf d₁ ∷ⱽ []ⱽ
+κOf₂ d₀ (inj₂ _)  = κOf d₀
+
+scriptAt : ∀ {κ k} (d : ObservableInput ℕ) → SimulSlot Γ₂ κ k natᵗ (kindOf d)
+scriptAt (hot as)     = hotˢ {ok = tt} as
+scriptAt (cold ss as) = coldˢ {ok = tt} ss as
+
+mkSlots₂ : (d₀ : ObservableInput ℕ) (d₁ : Def₁) → SimulSlots Γ₂ (κOf₂ d₀ d₁)
+mkSlots₂ d₀ (inj₂ d₁) = mkSlots d₀ d₁
+mkSlots₂ d₀ (inj₁ d₁) zero          = scriptAt d₀
+mkSlots₂ d₀ (inj₁ d₁) (suc zero)    = scriptAt d₁
+mkSlots₂ d₀ (inj₁ d₁) (suc (suc ()))
 
 -- RXJS'S THREE NAMED FLATTENERS, which the author's tree does not have
 -- as formers: `flattenˢ` over a map making every element a lane and none

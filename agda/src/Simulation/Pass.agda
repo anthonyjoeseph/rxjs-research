@@ -130,7 +130,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- arrival has already set.  Read off the bug cache's rows "a bounded
       -- merge's lane cut valueless by a takeWhile, then drained", hot and
       -- cold, whose `sides` print the drained burst at the cut's instant.
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1,0]}'
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1,0,0],"script":[0,0,1,1,1,0]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 71 merges a cold read with a switch whose first cold read it
       --   switched past at subscribe, so one script's arrivals and end walk
@@ -152,7 +152,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      s₂ st₂ (oW , sW , stW)
                  → After S rP (o₂ ++ oW , sW , stW) × Out (counter (Sched.mint sI) sourceᵏ) (o₂ ++ oW)
       -- the same at the plain end, the impl's inner still registered
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1,0]}'
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1,0,0],"script":[0,0,1,1,1,0]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 71 merges a cold read with a switch whose first cold read it
       --   switched past at subscribe, so one script's arrivals and end walk
@@ -176,7 +176,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → After S rP (o₂ ++ oW , sW , stW)
       -- AND WITH ITS INNER DEAD: the impl's merge finishes the inner at the
       -- end, and what the finish hands on is walked the same way
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1,0]}'
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1,0,0],"script":[0,0,1,1,1,0]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 71 merges a cold read with a switch whose first cold read it
       --   switched past at subscribe, so one script's arrivals and end walk
@@ -202,7 +202,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → After S rP (o₁ ++ (o₂ ++ oW) , sW , stW)
       -- THE BLOCK'S END: the merge wraps up and the impl's tail folds what
       -- the wrap hands on, the plain path having ended already
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1,0]}'
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1,0,0],"script":[0,0,1,1,1,0]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 71's script ends through an open block and a dead one.
       block-end  : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now m2 ℓ s} {q : Path (plainᵏ Γ κ) ℓ (emitᵗ s) (emitᵗ t)}
@@ -238,11 +238,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   minting its own token) or a lowered batch buffer, and over
       --   `Storeʳ`-related ones it needs the stores the values walk's `After`
       --   hands out between folds, which an impl-only chain does not hold.
-      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct:
       --   199 agree, 0 fail, 1 undecided.  A defer in every program, so a
       --   hop popped in each; 79 connect a share after the subscribe.
-      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
       --   18 undecided, the same hops' emits against the plain instants.
       hop-one   : ∀ {sP stP sI stI} (S : St sP stP sI stI) {src src′ u} {v : Val Γ (echoᵗ u)} {v′ : Val (plainᵏ Γ κ) (echoᵗ (emitᵗ u))}
@@ -264,11 +264,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     × Out (counter (Sched.mint sI) sourceᵏ) (proj₁ rI)
       -- THE HOP'S END: the hop's merge wraps up on both sides and the
       -- impl's tail folds what its wrap hands on
-      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct:
       --   199 agree, 0 fail, 1 undecided.  A defer in every program, so a
       --   hop popped in each, its merge wrapped once the body is subscribed.
-      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
       --   18 undecided, the same hops' emits against the plain instants.
       hop-end   : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now nid nid′ ℓ ℓ′ u}

@@ -353,12 +353,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   decided by `CLI.Store-Check`'s `store?`: slot one forwarding slot
       --   zero; 100 programs, not inside a μ.
       --   Draw unrecorded: the seed alone does not replay it.
-      -- PROBED: make qc-store QC='6 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1],"reach":["flatten","input"]}'
+      -- PROBED: make qc-store QC='6 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Every case
       --   flattens a fan step over a cold read with an asynchronous tail,
       --   so the flushed values each subscribe a lane inner mid-flush; 42
       --   finish one at a merge, 190 group values.  Not inside a μ.
-      -- PROBED: make qc-same-clock QC='6 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1],"reach":["flatten","input"]}'
+      -- PROBED: make qc-same-clock QC='6 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 98
       --   agree, 0 fail, 16 undecided: the same flushes' values, each
       --   through a lane inner, against the plain run's instants.
@@ -385,19 +385,23 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- whose values are all synchronous.  Each run folds its prefix and
       -- the end at once, the impl's through its block
       --
-      -- THE BELOW-FLOOR DISJUNCT IS A COVERAGE BOUNDARY OF THE SWEEP: a
-      -- registration on slot `k` lowers a path's floor to `suc k` and no
-      -- further, so a read reaches it only at a cold slot above the source
-      -- it registered on, and the QuickCheck's one cold slot is slot zero.
-      -- PROBED: make qc-store QC='5 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2],"reach":["input"]}'
+      -- THE BELOW-FLOOR DISJUNCT NEEDS TWO SCRIPTED SLOTS: a registration on
+      -- slot `k` lowers a path's floor to `suc k` and no further, so a read
+      -- reaches it only at a cold slot above the source it registered on.
+      -- PROBED: make qc-store QC='5 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2,0],"reach":["input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
       --   alone: 197 agree, 0 fail, 3 undecided.  Every case reads a cold
       --   script of two synchronous values and no arrival, under maps,
       --   scans, every flattener and μ.  Not the below-floor disjunct.
-      -- PROBED: make qc-same-clock QC='5 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2],"reach":["input"]}'
+      -- PROBED: make qc-same-clock QC='5 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2,0],"reach":["input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 74
       --   agree, 0 fail, 24 undecided: the same scripts' values against
       --   the plain run's instants.
+      -- PROBED: make qc-store QC='8 200 3' QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,1,2,2,0,0,0,0,0],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[0,0,0,0,0,1],"reach":["flatten","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`: 200 agree, 0 fail, 0
+      --   undecided.  Both slots cold scripts in every program; 17 read
+      --   slot one in an inner over slot zero, the below-floor shape,
+      --   counted off the program rather than the derivation.
       cold-read-end : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
                     → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                     → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
@@ -416,7 +420,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- the program's frame, subscribe-kind, and the path catches it.
       -- Decoding what the block sends exhausted the checker's memory at a
       -- one-value cold script, so this region is the compiled sweep's.
-      -- PROBED: make qc-same-clock QC='47 200 1' QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[1,0,1,1],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
+      -- PROBED: make qc-same-clock QC='47 200 1' QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[1,0,1,1,0,0],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 12
       --   agree, 0 fail.  Cases 2 to 4 read a cold script of one or two
       --   synchronous values under a scan the merge above subscribes.
@@ -434,12 +438,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN ENDED SCRIPT'S READ CONNECTING ITS SHARE: the plain read folds
       -- the end, the impl's runs the share's definition, whose read of
       -- the raw slot folds it
-      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
       --   alone: 199 agree, 0 fail, 1 undecided.  39 cases connect slot
       --   zero's share after its hot script completed, reads deferred
       --   past the end.
-      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
       --   18 undecided.  Read against `make qc-store` on the same line,
       --   20 of the 20 cases connecting an ended script's share agree.
@@ -467,12 +471,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   the `Sound` pair was a hypothesis: a hot read of two arrivals,
       --   its share's `read~` and `hot~` machine row.  Not under a binder,
       --   not the values conjunct.
-      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
       --   alone: 199 agree, 0 fail, 1 undecided.  76 cases connect a share
       --   at the subscribe, where the hot script is still live; which
       --   slot's share is not counted apart.
-      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
       --   18 undecided.  Read against `make qc-store` on the same line,
       --   47 of the 54 cases connecting a share at the subscribe agree.
@@ -492,19 +496,19 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → sharedConnect⇓ (n ↑ʳ i) d (readPath Θ i w ρ′ eq q) below′ now sI stI rI
                    → ReadAfter S ([] , record sP { mint = setAt regᵏ (suc rid) (Sched.mint sP) } , register rid (atSlot i) (lowerFloor below p) stP) rI p q
       -- a shared slot's read, against its stamped slot's
-      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
       --   alone: 199 agree, 0 fail, 1 undecided.  106 cases connect slot
       --   one's share, a definition forwarding slot zero's or a program over
       --   it, at the subscribe and deferred past it.
-      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2],"reach":["defer","input"]}'
+      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
       --   18 undecided.  Read against `make qc-store` on the same line,
       --   59 of the 65 cases connecting slot one's share agree.
       shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
       -- WHERE A HOT READ'S EMITS LAND: the restamp hands its own a frame
       -- and the path catches it; a live script joined sends nothing yet
-      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1],"script":[1,1,0,0,0,0]}'
+      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 145 agree, 0 fail,
       --   5 undecided.  Cases 73 and 104 read the hot input twice under
       --   one merge, the second read joining the share the first
@@ -514,14 +518,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- connect the read starts runs the share's definition to every row
       -- on its subject, joiners a value made mid-burst included, and what
       -- reaches a joiner leaves down the joiner's path, not this one
-      -- PROBED: make qc-same-clock QC='48 200 1' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[0,0,0,1],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
+      -- PROBED: make qc-same-clock QC='48 200 1' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[0,0,0,1,0,0],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 34
       --   agree, 0 fail, 20 undecided.  Case 45 merges a scan whose seed
       --   and source both read a shared slot of two values and whose step
       --   hands on its accumulator: the connect's first value hands the
       --   share to the merge, which joins it mid-burst, and the second
       --   value reaches both rows.
-      -- PROBED: make qc-same-clock QC='47 200 1' QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[1,0,1,1],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
+      -- PROBED: make qc-same-clock QC='47 200 1' QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[1,0,1,1,0,0],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 12
       --   agree, 0 fail, 4 undecided.  Cases 13 and 15: a joiner made
       --   mid-burst by a one-value connect, reached by its end alone.
@@ -540,7 +544,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- WHERE A GROUP AT ONE FRAME LANDS, folded down the path: below the
       -- catch every restamp cell is subscribe-kind and hands the group
       -- its own instant, and the catch's cell hands the group the catch
-      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1],"script":[1,1,0,0,0,0]}'
+      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 145 agree, 0 fail.
       --   Cases 55 and 73 subscribe a lane's two-value `of` at a hot
       --   arrival, its group folded down a flattener's restamp.
@@ -1202,6 +1206,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 -- slot order, the impl's read off its raw half.
 -- PROBED: `Probed.Opening` -- one hot script of two arrivals, both
 --   payloads left on each side.  Not two hot slots, not a shared slot.
+-- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
+--   decided by `CLI.Store-Check`'s `store?`, its `sources` field at the
+--   first traced state, the live lists after the subscribe: 132 agree,
+--   0 fail, 1 undecided, killed at case 134.  Slot one a script in every
+--   program, 23 with two hot slots.
 postulate
   init-sources : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
                → Pointwise (Src κ) (Sched.live (sched-init (plainExp e) (plainSlots ins)))
@@ -1211,6 +1220,11 @@ postulate
 -- ONE SIDE.  Both lists are the slots' hot scripts in slot order.
 -- PROBED: `Probed.Opening` -- one hot script of two arrivals.  Not two
 --   hot slots, so no rank was compared.
+-- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
+--   decided by `CLI.Store-Check`'s `store?`, its `sync` field at the
+--   first traced state, the live lists after the subscribe: 132 agree,
+--   0 fail, 1 undecided, killed at case 134.  Slot one a script in every
+--   program, 23 with two hot slots.
 postulate
   init-sync : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
             → Sync (Sched.live (sched-init (plainExp e) (plainSlots ins)))
@@ -1220,6 +1234,11 @@ postulate
 -- READ.  Both lists are the slots' hot scripts, numbered by slot.
 -- PROBED: `Probed.Walk-Leaves` -- one hot script, so no two slots
 --   compared.
+-- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
+--   decided by `CLI.Store-Check`'s `store?`, its `numbers` field at the
+--   first traced state, the live lists after the subscribe: 132 agree,
+--   0 fail, 1 undecided, killed at case 134.  Slot one a script in every
+--   program, 23 with two hot slots.
 postulate
   init-numbers : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
                → Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → SrcNum κ (LiveSource.source l) (LiveSource.source l′))
@@ -1228,6 +1247,11 @@ postulate
 
 -- the hot scripts live before anything is subscribed, one per slot
 -- PROBED: `Probed.Walk-Leaves` -- one hot script, so no two compared.
+-- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
+--   decided by `CLI.Store-Check`'s `store?`, its `distinct` field at
+--   the first traced state, the live lists after the subscribe: 132
+--   agree, 0 fail, 1 undecided, killed at case 134.  Slot one a script
+--   in every program, 23 with two hot slots.
 postulate
   init-distinct : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
                 → Unique (map LiveSource.source (Sched.live (sched-init (plainExp e) (plainSlots ins))))

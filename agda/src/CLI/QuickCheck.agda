@@ -81,11 +81,11 @@ open import CLI.JSON using (JSON; jnum; jstr; jarr; jobj; parseJSON)
 open import SExp.Pipeline using (runᴵ)
 open import SExp.Impl-Slots using (elaborateImpl)
 open import CLI.Store-Check using (storeSides; storeDrains)
-open import CLI.Unit-Test.Prelude using (Γ₂; Case; mkSlots; cached; Statement; flatAllˢ; takeˢ;
+open import CLI.Unit-Test.Prelude using (Γ₂; Case; Def₁; mkSlots₂; cached; Statement; flatAllˢ; takeˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
   same-clockˢ; sameClockᵇ; Key; storeˢ;
-  ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf;
+  ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf₂;
   Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; lockstepᵇ)
 open import CLI.Unit-Test using (cases)
 open import Agda.Builtin.IO using (IO)
@@ -158,7 +158,7 @@ arity kObs    = 4
 -- over `arity`, so an unrestricted seed draws the program it always did
 aimed : Knob → ℕ
 aimed kScript = 2
-aimed kSlot   = 1
+aimed kSlot   = 2
 aimed _       = 0
 
 knobName : Knob → String
@@ -591,17 +591,20 @@ genExp d = genExpAt 0 0 2 d
 -- zero something to say, so the forwarding has traffic to forward.
 -- The aimed arm is a drawn program over the slots below, which is the
 -- only way a share's subject is handed what a flattener emits.
-genSlotDef : ℕ → Gen (SExp Γ₂ [] [] [] natᵗ)
+-- The second aimed arm is a SCRIPT, so two sources schedule arrivals
+-- and a path registered on slot zero can read a script above it.
+genSlotDef : ℕ → Gen Def₁
 genSlotDef k = genW kSlot >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
-       if c ≡ᵇ 0 then genSlotRef k
-  else if c ≡ᵇ 1 then pureG emptyˢ
-  else if c ≡ᵇ 2 then pureG (ofˢ (natˢ x ∷ []))
-  else if c ≡ᵇ 3 then pureG (ofˢ (natˢ x ∷ natˢ y ∷ []))
-  else                genExpAt 0 0 k 2
+       if c ≡ᵇ 0 then (genSlotRef k >>=G λ d → pureG (inj₂ d))
+  else if c ≡ᵇ 1 then pureG (inj₂ emptyˢ)
+  else if c ≡ᵇ 2 then pureG (inj₂ (ofˢ (natˢ x ∷ [])))
+  else if c ≡ᵇ 3 then pureG (inj₂ (ofˢ (natˢ x ∷ natˢ y ∷ [])))
+  else if c ≡ᵇ 4 then (genExpAt 0 0 k 2 >>=G λ d → pureG (inj₂ d))
+  else                (genScript >>=G λ d → pureG (inj₁ d))
 
 -- THE TELESCOPE IS DRAWN IN ORDER, each slot seeing only the ones
 -- below it, which is exactly the argument `genSlotRef` takes.
-genSlots : Gen (Script × SExp Γ₂ [] [] [] natᵗ)
+genSlots : Gen (Script × Def₁)
 genSlots = genScript >>=G λ d₀ → genSlotDef 1 >>=G λ d₁ →
   pureG (d₀ , d₁)
 
@@ -951,19 +954,22 @@ CASE = 10
 -- (Anthony), and a row of it would be red until the evaluator got
 -- faster rather than until anything was fixed.
 rowIn : String → ℕ → SExp Γ₂ [] [] [] natᵗ
-      → Script → SExp Γ₂ [] [] [] natᵗ → String
+      → Script → Def₁ → String
 rowIn m f e d₀ d₁ =
   "\n-- <<<" ++ m ++ "\n  cached \"?\" " ++ show f ++ "\n          "
-       ++ showSExp e ++ "\n          (mkSlots (" ++ showScript d₀ ++ ")\n"
-       ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- " ++ m ++ ">>>\n"
+       ++ showSExp e ++ "\n          (" ++ table d₁ ++ ") ∷\n-- " ++ m ++ ">>>\n"
+  where
+    table : Def₁ → String
+    table (inj₂ d) = "mkSlots (" ++ showScript d₀ ++ ")\n                   (" ++ showSExp d ++ ")"
+    table (inj₁ d) = "mkSlots₂ (" ++ showScript d₀ ++ ")\n                   (inj₁ (" ++ showScript d ++ "))"
 
 pasteRow : ℕ → SExp Γ₂ [] [] [] natᵗ
-         → Script → SExp Γ₂ [] [] [] natᵗ → String
+         → Script → Def₁ → String
 pasteRow = rowIn "PASTE"
 
 -- what a case was drawn from: the program and its slot table
 Drawn : Set
-Drawn = SExp Γ₂ [] [] [] natᵗ × Script × SExp Γ₂ [] [] [] natᵗ
+Drawn = SExp Γ₂ [] [] [] natᵗ × Script × Def₁
 
 showPair : {A : Set} → (A → String) → A × A → String
 showPair f (l , r) = "lhs = " ++ f l ++ "\n    rhs = " ++ f r
@@ -1085,7 +1091,7 @@ bumpEach fs (g ∷ gs) (c ∷ cs) =
 -- plain run hold fewer queued inners than the one before, and how many
 -- see a merge's active count fall
 Seen : Set
-Seen = Marks × Bool × Bool × Bool × Bool × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
+Seen = Marks × Bool × Bool × Bool × Bool × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × String
 
 bump : Seen → Tally → Tally
 bump ((fs , o) , b , h , g , _) (cs , p , q , r , u) =
@@ -1139,7 +1145,7 @@ boundedEach s f x ((st , h) ∷ hs) with boundedBy s (judgeOf f x st h) (timedOu
 
 bounded : ℕ → ℕ → Drawn → List Statement → List (ℕ × String)
 bounded s f (e , d₀ , d₁) ss =
-  boundedEach s f (e , d₀ , d₁) (ordered (cached "?" f e (mkSlots d₀ d₁)) ss)
+  boundedEach s f (e , d₀ , d₁) (ordered (cached "?" f e (mkSlots₂ d₀ d₁)) ss)
 
 -- A CASE BEARS ON CONTIGUITY WHEN TWO PLAIN ARRIVALS DELIVER VALUES:
 -- only then can one impl arrival carry both, or a run interleave them,
@@ -1155,7 +1161,7 @@ bearsOn : ℕ → ℕ → Bool
 bearsOn s n = within s n (2 ≤ᵇ n) false
 
 bears : ℕ → ℕ → Drawn → Bool
-bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₁ (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots d₀ d₁)))))))
+bears s f (e , d₀ , d₁) = bearsOn s (valued (proj₁ (proj₂ (proj₂ (arrPlain (cached "?" f e (mkSlots₂ d₀ d₁)))))))
 
 -- A CASE TESTS THE ONE-PAST SLACK WHEN THE BATCHER HOLDS VALUES BACK AT
 -- ITS FUEL: the joined run at the searched witness shorter than the
@@ -1168,7 +1174,7 @@ holdsBack s (l , p , _) with length p ∸ length l
 ... | n = within s n (1 ≤ᵇ n) false
 
 slack : ℕ → ℕ → Drawn → Bool
-slack s f (e , d₀ , d₁) = holdsBack s (bsSides (cached "?" f e (mkSlots d₀ d₁)))
+slack s f (e , d₀ , d₁) = holdsBack s (bsSides (cached "?" f e (mkSlots₂ d₀ d₁)))
 
 -- A CASE BEARS ON `batchable` WHEN ITS VALUES GROUP: the grouping the
 -- statement compares against holds a batch of two values or two batches
@@ -1181,7 +1187,7 @@ groupsOn : List (List ℕ) → Bool
 groupsOn bs = (2 ≤ᵇ valued bs) ∨ any (λ b → 2 ≤ᵇ length b) bs
 
 groups : ℕ → ℕ → Drawn → Bool
-groups s f (e , d₀ , d₁) with proj₂ (batchableSides (cached "?" f e (mkSlots d₀ d₁)))
+groups s f (e , d₀ , d₁) with proj₂ (batchableSides (cached "?" f e (mkSlots₂ d₀ d₁)))
 ... | bs = within s (length (concat bs)) (groupsOn bs) false
 
 -- A CASE'S CLOCKS PART WHEN SOME IMPL ARRIVAL'S KEY IS NOT THE PLAIN
@@ -1195,7 +1201,7 @@ isClocked _           = false
 splits : List Statement → ℕ → ℕ → Drawn → Bool
 splits ss s f (e , d₀ , d₁) with any isClocked ss
 ... | false = false
-... | true  with cached "?" f e (mkSlots d₀ d₁)
+... | true  with cached "?" f e (mkSlots₂ d₀ d₁)
 ...   | c with sameClockᵇ (arrPlain c) ∧ sameClockᵇ (arrTimed c)
 ...     | x = within s (if x then 0 else 1) (not x) false
 
@@ -1209,24 +1215,125 @@ isStore _      = false
 drained : List Statement → ℕ → Drawn → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
 drained ss f (e , d₀ , d₁) with any isStore ss
 ... | false = 0 , 0 , 0 , 0 , 0 , 0 , 0
-... | true  with cached "?" f e (mkSlots d₀ d₁)
+... | true  with cached "?" f e (mkSlots₂ d₀ d₁)
 ...   | c = storeDrains (Case.fuel c) (Case.prog c) (Case.slots c)
 
 -- A SWEEP MAY DECIDE ONLY THE CASES THAT BEAR.  Whether one does is
 -- read before any statement is, so a sweep aimed at contiguity spends
 -- its clocks on cases that could fail it; one that does not bear is
 -- drawn, counted in the census and left undecided-by-choice.
+-- WHAT SLOT ONE HELD, since a script there is the only way a path reads
+-- a script above the one it registered on, and a receipt over that
+-- region has to count the cases that were in it
+slotsOf : Drawn → String
+slotsOf (_ , d₀ , inj₂ _) = ""
+slotsOf (e , d₀ , inj₁ d₁) = "  slots " ++ kd d₀ ++ " " ++ kd d₁ ++ "\n" ++ (if belowˢ e then "  reads slot one in an inner over slot zero\n" else "")
+  where
+  kd : Script → String
+  kd (hot _)    = "hot"
+  kd (cold _ _) = "cold"
+
+  -- A READ BELOW THE FLOOR, BY SHAPE: an inner literal reading slot one,
+  -- carried by a flattener whose outer spine reads slot zero.  The
+  -- inner's path registered on slot zero, so its floor is one.
+  on₁ˢ   : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
+  on₁ˢᵗ  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → Bool
+  on₁ˢᵗˢ : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → Bool
+  on₁ˢ (inputˢ (suc zero)) = true
+  on₁ˢ (inputˢ _)          = false
+  on₁ˢ (ofˢ ts)            = on₁ˢᵗˢ ts
+  on₁ˢ emptyˢ              = false
+  on₁ˢ (takeWhileˢ f e)    = on₁ˢᵗ f ∨ on₁ˢ e
+  on₁ˢ (mapˢ f e)          = on₁ˢᵗ f ∨ on₁ˢ e
+  on₁ˢ (scanˢ f z e)       = on₁ˢᵗ f ∨ on₁ˢᵗ z ∨ on₁ˢ e
+  on₁ˢ (flattenˢ _ e)      = on₁ˢ e
+  on₁ˢ (μˢ e)              = on₁ˢ e
+  on₁ˢ (varˢ _)            = false
+  on₁ˢ (deferˢ e)          = on₁ˢ e
+  on₁ˢᵗ (varˢᵗ _)     = false
+  on₁ˢᵗ unitˢ         = false
+  on₁ˢᵗ (boolˢ _)     = false
+  on₁ˢᵗ (natˢ _)      = false
+  on₁ˢᵗ (pairˢ a b)   = on₁ˢᵗ a ∨ on₁ˢᵗ b
+  on₁ˢᵗ (fstˢ p)      = on₁ˢᵗ p
+  on₁ˢᵗ (sndˢ p)      = on₁ˢᵗ p
+  on₁ˢᵗ (inlˢ a)      = on₁ˢᵗ a
+  on₁ˢᵗ (inrˢ a)      = on₁ˢᵗ a
+  on₁ˢᵗ (caseˢ s l r) = on₁ˢᵗ s ∨ on₁ˢᵗ l ∨ on₁ˢᵗ r
+  on₁ˢᵗ (ifˢ c a b)   = on₁ˢᵗ c ∨ on₁ˢᵗ a ∨ on₁ˢᵗ b
+  on₁ˢᵗ (primˢ _ a)   = on₁ˢᵗ a
+  on₁ˢᵗ nilˢ          = false
+  on₁ˢᵗ (consˢ a bs)  = on₁ˢᵗ a ∨ on₁ˢᵗ bs
+  on₁ˢᵗ (foldˢ l z f) = on₁ˢᵗ l ∨ on₁ˢᵗ z ∨ on₁ˢᵗ f
+  on₁ˢᵗ (strmˢ e)     = on₁ˢ e
+  on₁ˢᵗˢ []       = false
+  on₁ˢᵗˢ (y ∷ ys) = on₁ˢᵗ y ∨ on₁ˢᵗˢ ys
+
+  -- the outer spine: the stream a flattener's literals ride on
+  spine₀ : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
+  spine₀ (inputˢ zero)    = true
+  spine₀ (takeWhileˢ _ e) = spine₀ e
+  spine₀ (mapˢ _ e)       = spine₀ e
+  spine₀ (scanˢ _ _ e)    = spine₀ e
+  spine₀ (flattenˢ _ e)   = spine₀ e
+  spine₀ (μˢ e)           = spine₀ e
+  spine₀ (deferˢ e)       = spine₀ e
+  spine₀ _                = false
+
+  -- a literal along the spine reading slot one
+  lit₁ : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
+  lit₁ (takeWhileˢ f e) = on₁ˢᵗ f ∨ lit₁ e
+  lit₁ (mapˢ f e)       = on₁ˢᵗ f ∨ lit₁ e
+  lit₁ (scanˢ f z e)    = on₁ˢᵗ f ∨ on₁ˢᵗ z ∨ lit₁ e
+  lit₁ (flattenˢ _ e)   = lit₁ e
+  lit₁ (μˢ e)           = lit₁ e
+  lit₁ (deferˢ e)       = lit₁ e
+  lit₁ _                = false
+
+  belowˢ   : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Bool
+  belowˢᵗ  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → Bool
+  belowˢᵗˢ : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → Bool
+  belowˢ (flattenˢ _ e)   = (spine₀ e ∧ lit₁ e) ∨ belowˢ e
+  belowˢ (ofˢ ts)         = belowˢᵗˢ ts
+  belowˢ (takeWhileˢ f e) = belowˢᵗ f ∨ belowˢ e
+  belowˢ (mapˢ f e)       = belowˢᵗ f ∨ belowˢ e
+  belowˢ (scanˢ f z e)    = belowˢᵗ f ∨ belowˢᵗ z ∨ belowˢ e
+  belowˢ (μˢ e)           = belowˢ e
+  belowˢ (deferˢ e)       = belowˢ e
+  belowˢ _                = false
+  belowˢᵗ (pairˢ a b)   = belowˢᵗ a ∨ belowˢᵗ b
+  belowˢᵗ (fstˢ p)      = belowˢᵗ p
+  belowˢᵗ (sndˢ p)      = belowˢᵗ p
+  belowˢᵗ (inlˢ a)      = belowˢᵗ a
+  belowˢᵗ (inrˢ a)      = belowˢᵗ a
+  belowˢᵗ (caseˢ s l r) = belowˢᵗ s ∨ belowˢᵗ l ∨ belowˢᵗ r
+  belowˢᵗ (ifˢ c a b)   = belowˢᵗ c ∨ belowˢᵗ a ∨ belowˢᵗ b
+  belowˢᵗ (primˢ _ a)   = belowˢᵗ a
+  belowˢᵗ (consˢ a bs)  = belowˢᵗ a ∨ belowˢᵗ bs
+  belowˢᵗ (foldˢ l z f) = belowˢᵗ l ∨ belowˢᵗ z ∨ belowˢᵗ f
+  belowˢᵗ (strmˢ e)     = belowˢ e
+  belowˢᵗ _             = false
+  belowˢᵗˢ []       = false
+  belowˢᵗˢ (y ∷ ys) = belowˢᵗ y ∨ belowˢᵗˢ ys
+
+withSlots : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ → String → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × String
+withSlots (k , j , a , l , o , d , s) w = k , j , a , l , o , d , s , w
+
 judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 judged ob ss f s m x with bears s f x
-... | b = (m , b , slack s f x , groups s f x , splits ss s f x , drained ss f x) , (if ob ∧ not b then [] else bounded s f x ss)
+... | b = (m , b , slack s f x , groups s f x , splits ss s f x , withSlots (drained ss f x) (slotsOf x)) , (if ob ∧ not b then [] else bounded s f x ss)
 
 -- ONE CASE IS ONE ACCEPTED DRAW.  A restriction's `reach` is the one
 -- filter, and it is spent HERE so that every route naming a case by its
 -- index -- the sweep, `skipN`, `showAt`, `runAt`, `sideAt` -- spends the
 -- same draws on it; the flag says whether the last one met it.
+defMarks : Def₁ → Marks
+defMarks (inj₁ _) = noMarks
+defMarks (inj₂ d) = marksˢ d
+
 drawOnce : ℕ → Gen (Marks × Drawn)
 drawOnce d = genExp d >>=G λ e → genSlots >>=G λ ds →
-  pureG (marksˢ e ⊕ marksˢ (proj₂ ds) ⊕ elabMarksᵉ (elaborateImpl (κOf (proj₁ ds)) e) , e , proj₁ ds , proj₂ ds)
+  pureG (marksˢ e ⊕ defMarks (proj₂ ds) ⊕ elabMarksᵉ (elaborateImpl (κOf₂ (proj₁ ds) (proj₂ ds)) e) , e , proj₁ ds , proj₂ ds)
 
 carriesTag : List Former → List ℕ → Bool
 carriesTag fs t = any (λ g → eqListℕ (map toℕ (toList (formerTag g))) t) fs
@@ -1246,7 +1353,7 @@ drawCase d = askG >>=G λ W → drawFor (Draw.tries W ∸ 1) d
 -- sweep was aimed at, so no statement is asked of it
 unreached : ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 unreached f n m (e , d₀ , d₁) =
-  (m , false , false , false , false , 0 , 0 , 0 , 0 , 0 , 0 , 0) ,
+  (m , false , false , false , false , 0 , 0 , 0 , 0 , 0 , 0 , 0 , "") ,
   (TIMEOUT , "  unreached\n    no draw in " ++ show n ++ " tries carried every former the draw must reach"
              ++ rowIn "UNDECIDED" f e d₀ d₁) ∷ []
 
@@ -1483,7 +1590,7 @@ sidesOf k c with selected k
 
 sideAt : ℕ → ℕ → ℕ → ℕ → Gen String
 sideAt f k n d = skipN (n ∸ 1) d >>=G λ _ → drawCase d >>=G λ where
-  (_ , _ , e , d₀ , d₁) → pureG (sidesOf k (cached "?" f e (mkSlots d₀ d₁)))
+  (_ , _ , e , d₀ , d₁) → pureG (sidesOf k (cached "?" f e (mkSlots₂ d₀ d₁)))
 
 -- THE CORPUS, EVERY ROW WITH EVERY SIDE PRINTED WHETHER OR NOT THEY
 -- AGREE.  A row is a probe before it is a guard, and a probe is read for
@@ -1526,8 +1633,8 @@ verdictOf rs@(_ ∷ _) with decided rs
 ... | []    = "undecided"
 ... | _ ∷ _ = "FAIL"
 
-drainLine : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ → String
-drainLine (k , j , a , l , o , d , s) = count "  drains a queue at " k ++ count "  finishes an inner at a merge at " j
+drainLine : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × String → String
+drainLine (k , j , a , l , o , d , s , w) = w ++ count "  drains a queue at " k ++ count "  finishes an inner at a merge at " j
   ++ count "  connects a share at the subscribe at " a ++ count "  connects a share later at " l ++ count "  joins a connected share at " o
   ++ count "  connects an ended script's share at " d ++ count "  connects the shared slot's share at " s
   where

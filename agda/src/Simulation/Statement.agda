@@ -364,7 +364,7 @@ postulate
   -- THE END PASS'S EMITS CARRY THE SAME INSTANT, the one the value pass
   -- drew, not the counter where the end pass starts.  The sweeps under
   -- `cascade-kept` decided it in the same runs.
-  -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1],"script":[1,1,0,0,0,0]}'
+  -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
   --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, whose `exactsᵇ` reads
   --   this instant at every arrival past the opening: 145 agree, 0 fail;
   --   every hot script's last arrival ends its chains, 145 programs.
@@ -389,7 +389,7 @@ postulate
   -- Aimed at a merge's drain (flatten and takeWhile in every case, seed
   -- 51 at depth 4, fuel 30) it agreed on 20 and failed none, 50 of them
   -- grouping values, before the budget killed it with 55 undecided.
-  -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1],"script":[1,1,0,0,0,0]}'
+  -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
   --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, whose `exactsᵇ` reads
   --   this instant at every arrival past the opening: 145 agree, 0 fail;
   --   two hot arrivals per program, under flatteners, 145 programs.

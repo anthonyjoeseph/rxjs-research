@@ -244,25 +244,24 @@ undecided, never a failure (Anthony).
 over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
-off inners, payload; subscribes unrelated; pops unpairing; maps
-moving time; closes emptying merges; hot ends past block;
-2-value emits, bare cuts; writes moving row;
-cut, liveness, drain, body ends, 2nd hop inners apart; unsound walks, reads; 2
-stamp chains; `of` splits, folds; `mintᵉ` stamps; drains past
-quiet cuts; hop scripts; root stamps; joiners off catch;
-quiet arms but leaves; installs+hops; inners revived; unaligned
-reads, connects, cold flushes; renamed leaves. Left: two-script reads.
+off inners, payload; subscribes unrelated; unpaired pops; maps
+moving time; emptying closes; hot ends past block;
+2-value emits, bare cuts; writes moving row; cut/liveness/drain/
+body ends, 2nd hop inners apart; unsound walks/reads; 2 stamp chains;
+`of` splits, folds; `mintᵉ`, root stamps; quiet-cut drains; hop
+scripts; joiners off catch; quiet arms; installs+hops; inners revived;
+unaligned reads/connects/flushes; renamings; 2-script
+stores. Left: 2-script values; gaps.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **A SECOND SCRIPTED SLOT.** The QuickCheck schedules from slot zero alone,
-  so no drawn program reads a script above the source it registered on:
-  `cold-read-end`'s below-floor disjunct, a share joined across two scripts,
-  and `init-{sources,sync}` at two hot slots are past every sweep. Draw slot
-  one as a script too, aimed only. Decides whether `simulation` holds across
-  scripts, its last unreached region.
+- **TWO SCRIPTS' VALUES.** Slot one is drawn as a script, and the store
+  sweeps there are green: `init-*` at two hot slots, `cold-read-end` below
+  the floor. Only `store?` has seen those programs; aim `qc-same-clock` and
+  each top-line statement at them. Decides whether `simulation`'s values
+  conjunct holds across scripts, the region its stores were cleared in.
 
 - **CLOSE THE STATED GAPS.** Every receipt's closing `Not …` names a region
   no row reached: `cold-block` and `hot-read-connect-live` under a binder and
@@ -311,9 +310,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   slot's flushed bracket, the block's merge subscribes the one stamp and hands
   the share one emit carrying the value, delivered at the instant the chain
   entered with; the plain side does not move.
-- **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the
+- **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the
   hot scripts live before anything is subscribed are numbered by their slots,
-  one per slot; one hot script only, so no two compared.
+  one per slot; swept at two hot slots, after the subscribe.
 - **`dyn-one`** (Simulation.Statement) — FALSITY, `PROBED×2`: a minted source
   has at most one row in the impl's registry.
 - **`value-draws`** (Simulation.Statement) — FALSITY, `PROBED`: an impl value
@@ -333,7 +332,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×6, RECOVERY`: a cold
   read's impl subscribe over an asynchronous tail leaves its block's nodes
   fresh, a partnered source, and its flush one fold of one group down the tail.
-- **`cold-read-end`** (Simulation.Walk) — FALSITY, `PROBED×2`: a cold read
+- **`cold-read-end`** (Simulation.Walk) — FALSITY, `PROBED×3`: a cold read
   below the floor or over an all-synchronous script folds its prefix and end on
   both sides.
 - **`shared-read`** (Simulation.Walk) — FALSITY, `PROBED×2`: a slot's plain
@@ -345,9 +344,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   what a pass keeps.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
-- **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot
+- **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
   scripts live before anything is subscribed are related and in step, source
-  for source; one hot script only, so no rank compared.
+  for source; swept at two hot slots, after the subscribe.
 - **`lifts-scan`** (Simulation.Walk) — DIFFICULTY, `PROBED`: the elaborated
   scan's step and seed read the author's variables past the mint's binder; held
   at one payload, two past the typechecker.

@@ -187,14 +187,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- the riskiest.
     postulate
       -- A SHARE CLOSED ON BOTH SIDES, before its end is delivered
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1,0]}'
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1,0,0],"script":[0,0,1,1,1,0]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 62 reads a shared slot whose one-value `of` ends inside
       --   its connect.
       share-spend  : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
                    → After S ([] , sP , shareSpend i stP) ([] , sI , shareSpend (n ↑ʳ i) stI)
       -- A SHARE'S READERS DROPPED ON BOTH SIDES, once its end is delivered
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1,0]}'
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1,0,0],"script":[0,0,1,1,1,0]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 62 reads a shared slot whose one-value `of` ends inside
       --   its connect.
