@@ -257,8 +257,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- PROBED: `Probed.Opening` -- two values at the root, and one under a
     --   value binder, the frame apart from the `of`'s source and from the
     --   bound value; both again at a renaming moving the telescope a slot
-    --   out past a value 8 or 5 it does not own.  Not under a mint's
-    --   binder.
+    --   out past a value 8 or 5 it does not own, and the root's past a
+    --   mint's token.  Not a `ofˢ` whose terms read a variable.
     of-emits : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′}
              → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
              → ∀ src → All (AtFrame {Γ = Γ} κ (frameAt w ρ′)) (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L)

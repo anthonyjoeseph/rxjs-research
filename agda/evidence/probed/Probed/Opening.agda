@@ -53,3 +53,8 @@ _ = refl ∷ refl ∷ []
 -- value and the frame one slot out; fails if either is read unrenamed
 _ : Confirms (of-emits {Γ = Γ₂} (κᵖ two-arrivals) {Θ = natᵗ ∷ []} (natˢ 3 ∷ []) {Θ′ = natᵗ ∷ natᵗ ∷ uniqᵗ ∷ []} there {ρ′ = 8 ∷ᵉ 5 ∷ᵉ 7 ∷ᵉ []ᵉ} refl 9)
 _ = refl ∷ []
+
+-- LOAD-BEARING: at the root under a mint's binder, the frame moved past a
+-- token 2; fails if the frame is read at the token's slot
+_ : Confirms (of-emits {Γ = Γ₂} (κᵖ two-arrivals) {Θ = []} (natˢ 3 ∷ natˢ 4 ∷ []) {Θ′ = uniqᵗ ∷ uniqᵗ ∷ []} there {ρ′ = 2 ∷ᵉ 7 ∷ᵉ []ᵉ} refl 9)
+_ = refl ∷ refl ∷ []
