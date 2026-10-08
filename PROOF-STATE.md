@@ -257,13 +257,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **A SHARE JOINED MID-EMIT.** The input's subscribe frame leaves one emit
-  per value under the frame (`perValueᵛ`); the share-joiner rows and an aimed
-  lane-read sweep are green. Left: the walk leaves that read the frame
-  (`cold-block`, the input walks) re-swept over two-sync colds, since their
-  receipts were drawn on the packed emit. Decides whether `simulation` holds
-  at any share a lane reads.
-
 - **GAPS UNDER A BINDER.** What remains: `cold-block` under a binder on a
   table with no share, since the cold-only sweep went red on the share
   beside it, and both reads' values conjunct past the 12 cases a lane-read
