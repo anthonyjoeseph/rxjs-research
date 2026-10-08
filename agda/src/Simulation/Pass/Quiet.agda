@@ -16,7 +16,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; nothing; just)
-open import Data.Nat     using (ℕ; suc; _≤_; _<_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; <⇒≢; <-≤-trans; <-trans; m≤m+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
@@ -558,8 +558,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- AN INNER'S WALK FROM STORES ALREADY MINTED: the walk of its
     -- elaboration, left again at the lane's frames
-    inner-walk : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
-                   {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ j j′ rP rI}
+    inner-walk : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ j j′ rP rI}
                → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                → (j , j′ ∷ []) ∈ Store.π S
                → ObsRel κ u o′ o
@@ -670,8 +670,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- The impl's tail is below its counter: without that, a tail naming
     -- the counter's next node as an impl-only merge would hold the node
     -- unpaired while the flattener pairs it
-    flat-mint : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂ y y′}
-                  {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ j j′ rP rI}
+    flat-mint : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂ y y′}
+                  {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ j j′ rP rI}
               → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
               → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
               → FlatNodes {Γ = Γ} κ (Minted S) u op y y′
@@ -696,8 +696,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
             dP dI (sz-1 lt)
 
     -- a switch's: the node names the inner it subscribes
-    switch-subscribe : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u m m′ ks Θ₁ ρ₁ Θ₂ ρ₂ cur cur′ od od′}
-                         {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
+    switch-subscribe : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u m m′ ks Θ₁ ρ₁ Θ₂ ρ₂ cur cur′ od od′}
+                         {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
                      → Walked switchᶠ m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                      → lookupNode m (EvalSt.nodes stP) ≡ just (switch-st cur od)
                      → lookupNode m′ (EvalSt.nodes stI) ≡ just (switch-st cur′ od′)
@@ -760,8 +760,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- A SWITCH'S CONSUME ON BOTH SIDES: a switch can always be used, so
     -- both cut the running inner and then name and subscribe the next
-    consume-switch : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                       {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
+    consume-switch : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                       {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
                    → Walked switchᶠ m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                    → ObsRel κ u o′ o
                    → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
@@ -793,8 +793,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- lane taken is a related write and then the inner's subscribe; an
     -- element queued is the write alone; a node neither can use is no
     -- step at all
-    consume-pair : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                     {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
+    consume-pair : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                     {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI}
                  → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                  → ObsRel κ u o′ o
                  → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
@@ -966,9 +966,9 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- REFUTED: `Refuted.Of-Fold-Sound` -- a tail related frame by frame
     --   may pass one merge twice, so what survives the tail's fold is
     --   owed only of a distinct impl path.
-    quiet-deferInner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2}
+    quiet-deferInner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2}
                          {G : FnClo (plainᵏ Γ κ) (emitᵗ u) (emitᵗ u)}
-                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                          {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                          {es fin o₁ y₁ f₁ s₁ st₁ o₃ y₃ f₃ s₃ st₃}
                      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner mergeAllᵒ nid j ↠[ h ] p)
@@ -1033,9 +1033,9 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- REFUTED: `Refuted.Of-Fold-Sound` -- a tail related frame by frame
     --   may pass one flattener twice, so what survives the tail's fold
     --   is owed only of a distinct impl path.
-    quiet-inner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u C a m m′ j j′ k}
+    quiet-inner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u C a m m′ j j′ k}
                     {F : FnClo (plainᵏ Γ κ) (C ×ᵗ emitᵗ u) C} {G : FnClo (plainᵏ Γ κ) C (emitᵗ u)}
-                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                     {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                     {es fin o₁ y₁ f₁ s₁ st₁ o₂ y₂ f₂ s₂ st₂}
                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p)
@@ -1249,9 +1249,9 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN EXPLODED OUTER'S EMITS CARRYING NOTHING explode into no
       -- inner, the merge's walk subscribing each empty run, and its
       -- echo is restamped on the impl side alone
-      quiet-explode : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u a m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
-                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                        {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+      quiet-explode : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u a m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ}
+                        {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                     → Quiet (thru-outer a m ↠[ h ] p)
                         (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
@@ -1322,8 +1322,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- AN OUTER'S EMITS CARRYING NOTHING, HANDED THE FLATTENER: every
       -- element a bare echo, restamped, then the open end restamped too
-      quiet-outer : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+      quiet-outer : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                       {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es fin rI}
                   → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) → Carries es [] → fin ≡ false
                   → Sound (thru-outer (flatOp op) m ↠[ h ] p) sP stP
@@ -1386,8 +1386,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- THE OUTER'S END, AS THE ARM ITS TAIL RESUMES: the flattener's
     -- nodes are below the tail, so its fold leaves them where they were
-    wrap-arm : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+    wrap-arm : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                  {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {oP sP′ stP′ oI sI′ stI′ fin r} {H : ℕ → Set}
              → (A : After S (oP , sP′ , stP′) (oI , sI′ , stI′))
              → Clear m p (proj₁ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′)))) (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))

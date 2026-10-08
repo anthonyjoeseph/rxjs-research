@@ -616,8 +616,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd z₂ = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
-    ; named = close-named (proj₁ named) (subst (_< _) (sym e₁) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named))))
-            , close-named (proj₂ named) (subst (_< _) (sym e₂) (<-trans (raw<ₙ i) (Named.slots-below (proj₂ named))))
+    ; named = close-named {a = a} (proj₁ named) (subst (_< _) (sym e₁) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named))))
+            , close-named {a = a′} (proj₂ named) (subst (_< _) (sym e₂) (<-trans (raw<ₙ i) (Named.slots-below (proj₂ named))))
     ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
     ; scripts = scripts
     ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)

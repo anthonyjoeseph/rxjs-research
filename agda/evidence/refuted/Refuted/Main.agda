@@ -91,3 +91,8 @@ open import Refuted.Defer-Install-Sound using (defer-install-needs-sound)
 -- buffer whatever it is handed.
 open import Refuted.Quiet-Fold-Batch using (quiet-fold-false)
 
+
+-- A READ OWES ALIGNED FLOORS.  A floor decides whether a read reads at
+-- all, so a plain read above its slot and an impl read at its stamped
+-- one's floor part ways at the first step.
+open import Refuted.Read-Floor using (hot-read-needs-floors)

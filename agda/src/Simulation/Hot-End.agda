@@ -349,7 +349,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       end-store = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
         ; sync = sync ; rows = reg-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows ; bounded = bounded ; swept = swept
-        ; named = close-named (proj₁ named) (subst (_< _) (sym e₁) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named))))
+        ; named = close-named {a = a} (proj₁ named) (subst (_< _) (sym e₁) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named))))
                 , record { slots-below = Named.slots-below (proj₂ named) ; ords-below = Named.ords-below (proj₂ named)
                          ; srcs-below = Named.srcs-below (proj₂ named) ; cut-below = Named.cut-below (proj₂ named)
                          ; dlv-below = lookupᵃ (proj₂ fresh-ids) mem ∷ []

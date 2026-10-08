@@ -17,7 +17,7 @@ open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (suc; s≤s; z≤n)
+open import Data.Nat using (_+_; suc; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -135,7 +135,7 @@ DeferInstall =
   → EnvRel {Γ = Γ₂} κ₀ Θ w ρ′ ρ
   → renExp (λ x → x) (λ x → x) w (toInstEmit κ₀ {[]} {[]} (deferˢ b)) ≡ deferᵉ bI
   → ∀ {sP : Sched Γ₂} {stP : EvalSt ep} {sI : Sched Γ′} {stI : EvalSt ei} (S : Store {Γ = Γ₂} κ₀ sP stP sI stI)
-      {lo lo′} {p : Path Γ₂ lo u natᵗ} {q : Path Γ′ lo′ (emitᵗ u) (emitᵗ natᵗ)} {now nid src ord rid nid′ src′ ord′ rid′}
+      {lo} {p : Path Γ₂ lo u natᵗ} {q : Path Γ′ (2 + lo) (emitᵗ u) (emitᵗ natᵗ)} {now nid src ord rid nid′ src′ ord′ rid′}
   → PathRel {Γ = Γ₂} κ₀ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
   → freshId nodeᵏ (Sched.mint sP) ≡ nid → freshId sourceᵏ (Sched.mint sP) ≡ src
   → freshId ordinalᵏ (Sched.mint sP) ≡ ord → freshId regᵏ (Sched.mint sP) ≡ rid
@@ -143,7 +143,7 @@ DeferInstall =
   → freshId ordinalᵏ (Sched.mint sI) ≡ ord′ → freshId regᵏ (Sched.mint sI) ≡ rid′
   → let stP′ = register rid (atDyn src lo) (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] p)
                  (installNode nid (mergeAll-st {t = u} nothing 0 [] false) stP)
-        stI′ = register rid′ (atDyn src′ lo′) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
+        stI′ = register rid′ (atDyn src′ (2 + lo)) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
                  (installNode nid′ (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI)
     in Σ (After {Γ = Γ₂} κ₀ S
            ( [] , record sP { mint = setAt regᵏ (suc rid) (setAt nodeᵏ (suc nid) (setAt sourceᵏ (suc src)

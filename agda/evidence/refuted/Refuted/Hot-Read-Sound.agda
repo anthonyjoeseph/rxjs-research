@@ -17,7 +17,7 @@ open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; suc; _≤_; _<_; _≡ᵇ_; s≤s; z≤n)
+open import Data.Nat using (_+_; ℕ; suc; _≤_; _<_; _≡ᵇ_; s≤s; z≤n)
 open import Data.Nat.Properties using (≡ᵇ⇒≡)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty using (⊥)
@@ -233,13 +233,13 @@ HotRead : Set
 HotRead =
   ∀ {Θ Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel {Γ = Γ₂} κ₀ Θ w ρ′ ρ
   → (eq : lookup Γ′ (2 ↑ʳ i) ≡ emitᵗ (lookup Γ₂ i))
-  → ∀ {lo lo′} {p : Path Γ₂ lo (lookup Γ₂ i) natᵗ} {q : Path Γ′ lo′ (emitᵗ (lookup Γ₂ i)) (emitᵗ natᵗ)} {now}
+  → ∀ {lo} {p : Path Γ₂ lo (lookup Γ₂ i) natᵗ} {q : Path Γ′ (2 + lo) (emitᵗ (lookup Γ₂ i)) (emitᵗ natᵗ)} {now}
       {sP : Sched Γ₂} {stP : EvalSt ep} {sI : Sched Γ′} {stI : EvalSt ei} {rP rI}
   → (S : Store {Γ = Γ₂} κ₀ sP stP sI stI)
   → PathRel {Γ = Γ₂} κ₀ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
   → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
   → subscribeE⇓ {e = ei} (Θ′ , input (2 ↑ʳ i) , ρ′)
-      (subst (λ u → Path Γ′ lo′ u (emitᵗ natᵗ)) (sym eq)
+      (subst (λ u → Path Γ′ (2 + lo) u (emitᵗ natᵗ)) (sym eq)
         (map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
                        (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q))
       now sI stI rI

@@ -15,7 +15,7 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++�
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᵃ)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
-open import Data.Nat     using (ℕ; suc; _≤_; _<_)
+open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
@@ -266,8 +266,8 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       -- walk, then the outer's end, then the tail resumed on the empty
       -- group.  Handed the flattener and the tails apart, since the frame's
       -- relation does not invert at a variable policy.
-      outerElem-arm : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+      outerElem-arm : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
                         {vs es fin oP vs₁ fin₁ sP₁ stP₁ rI}
                     → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) → Carries es vs
@@ -288,8 +288,8 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
              λ { (f , ds) → elem-out S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru si′) w b W′ ds , f }
 
       -- THE OUTER'S WALK, an element at a time
-      elem-walk : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                    {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es vs rP rI}
+      elem-walk : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                    {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es vs rP rI}
                 → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
                 → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                 → Carries {echoᵗ u} es vs
@@ -304,8 +304,8 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       elem-walk wk S {Θ₀ = Θ₀} {ρ₀} cP cI w (one e′ r b) W W′ lt = one-step wk S cP cI w (elem-one {Θ = Θ₀} {ρ₀} e′ r) b W W′ lt
 
       -- an emit with no element: its bare echo, on the impl side alone
-      quiet-step : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                     {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {z es vs rP rI}
+      quiet-step : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                     {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {z es vs rP rI}
                  → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
                  → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                  → QuietElem {u} z → Carries {echoᵗ u} es vs
@@ -322,8 +322,8 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
         in proj₁ E ⨾ proj₁ X , proj₂ X
 
       -- an emit with one element: its echo, then its lane
-      one-step : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                   {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {w z es vs rP rI}
+      one-step : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {w z es vs rP rI}
                → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
                → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                → Elem {u} w z → Carries {echoᵗ u} es vs

@@ -347,8 +347,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
         -- a flattener's outer, one element per emit: `elemᵛ`, the
         -- flattener, and the scan that restamps what it puts out
-        outerElem~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+        --
+        -- THE TAIL THE FLATTENER SUBSCRIBES ITS INNERS AT STANDS `n` ABOVE
+        -- THE PLAIN ONE'S FLOOR, as the stamped slots stand above theirs: an
+        -- inner's read decides by that floor, here and at a hop's tail
+        outerElem~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
                        {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₄ (emitᵗ u) (emitᵗ t)}
                    → Flattener u op m m′ ks [] → PathRel p q
                    → PathRel (thru-outer (flatOp op) m ↠[ h ] p)
@@ -359,9 +363,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
         -- one element per inner: `explodeᵛ`'s run of elements, merged
         -- into one outer for the flattener
-        outerExplode~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
-                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                          {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+        outerExplode~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ}
+                          {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
                           {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₆ (emitᵗ u) (emitᵗ t)}
                       → Flattener u op m m′ ks (mX ∷ []) → PathRel p q
                       → PathRel (thru-outer (flatOp op) m ↠[ h ] p)
@@ -382,8 +386,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         -- names can be that inner: each plain node a path names is a key
         -- of `π`, each impl node is its key's or `Unpaired`, and an inner
         -- instance named by nothing would be neither
-        inner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u a op m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
-                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+        inner~ : ∀ {lo lo′ ℓ ℓ₂ ℓ₃ u a op m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                    {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₃ (emitᵗ u) (emitᵗ t)}
                → a ≡ flatOp op → Flattener u op m m′ ks xs → (j , j′ ∷ []) ∈ π → PathRel p q
                → PathRel (from-inner a m j ↠[ h ] p)
@@ -398,8 +402,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         -- and hands the hop's node the end; the hop's count is the plain
         -- merge's.  A row of another inner of the same hop names another
         -- marker, which a write of this inner's end leaves alone
-        deferInner~ : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a b}
-                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+        deferInner~ : ∀ {lo lo′ ℓ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a b}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                         {p : Path Γ ℓ u t} {q : Path Γ′ ℓ₃ (emitᵗ u) (emitᵗ t)}
                     → (nid , nid′ ∷ []) ∈ π → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ π
                     → lookupNode nid NP ≡ just (mergeAll-st {t = u} nothing a [] true)
@@ -459,8 +463,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → c′ ≡ (plainᵗ s , full)
                 → RowRel (rid , atDyn src lo , (s , p)) (rid′ , atDyn src′ lo′ , c′)
           -- a deferred hop, not yet fired, at partnered sources
-          defer~ : ∀ {rid rid′ src src′ lo lo′ ℓ ℓ′ u nid nid′} {h : lo ≤ ℓ} {h′ : lo′ ≤ ℓ′}
-                     {p : Path Γ ℓ u t} {q : Path Γ′ ℓ′ (emitᵗ u) (emitᵗ t)} {c′}
+          defer~ : ∀ {rid rid′ src src′ lo lo′ ℓ u nid nid′} {h : lo ≤ ℓ} {h′ : lo′ ≤ n + ℓ}
+                     {p : Path Γ ℓ u t} {q : Path Γ′ (n + ℓ) (emitᵗ u) (emitᵗ t)} {c′}
                  → SrcPair LP LI src src′ (echoᵗ u) (echoᵗ (emitᵗ u)) → (nid , nid′ ∷ []) ∈ π
                  → lookupNode nid NP ≡ just (mergeAll-st {t = u} nothing 0 [] false)
                  → lookupNode nid′ NI ≡ just (mergeAll-st {t = emitᵗ u} nothing 0 [] false)

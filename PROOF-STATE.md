@@ -243,25 +243,27 @@ undecided, never a failure (Anthony).
 `simulation` — both top lines' ground, by arrival
 over `correspondence`: schedules in step, pops partnered, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
-OUT: an arrival plain lacks, split, a gap, stray, echo
+OUT: an arrival plain lacks, split, gap, stray, echo
 off inners, payload; subscribes unrelated; pops unpairing reads; maps
 moving time; closes emptying merges; hot ends past blocks;
-2-value emits; testless cuts; writes moving rows;
-cut, liveness, drain, body ends, 2nd hop inners unpaired; unsound walks, reads; 2
+2-value emits; bare cuts; writes moving rows;
+cut, liveness, drain, body ends, 2nd hop inners apart; unsound walks, reads; 2
 stamp chains; `of` splits, folds; `mintᵉ` stamps; drains past
 quiet cuts; hop scripts; root stamps unwalked; joiners off catch;
-quiet arms but leaves; installs+hops; dead inners revived. Left: cascades.
+quiet arms but leaves; installs+hops; dead inners revived; unaligned
+reads. Left: cascades.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
 - **PROVE THE READS.** `{hot,shared,cold}-read` as `defer-install` now
-  is: the slot's subscribe installs through `install` and registers
-  through `Simulation.Hop`'s row machinery, a `read~`/`cold~` row in place
-  of `defer~`. Decide first whether a cold read's input block keeps
-  `Store.owned` when its nodes join the registry. Rules out a slot read
-  unpairing a store under any store, not only at the root.
+  is, over paths at aligned floors (impl at `n + lo`): `hot-read`
+  dispatches its five rule pairs (floor, done/spent, done/connect,
+  live/join, live/connect), a shared read's connect needing a `Walker`.
+  Decide first whether a cold read's input block keeps `Store.owned`
+  when its nodes join the registry. Rules out a slot read unpairing a
+  store under any store, not only at the root.
 
 - **PROVE THE NODE WRITES.** `scan-write`, `while-{write,spent}` as
   `CellWrite` is: `Moves`' cell and count obligations cite the row's own
@@ -332,10 +334,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   at its program's frame, subscribe-kind; held at the root and under a value
   binder, not under a mint's binder.
 - **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
-  `PROBED×5, RECOVERY`: a slot's plain subscribe against the impl's at its
-  stamped slot, down the restamp or the cold mint, keeps what a pass keeps; the
-  two scripts at the slot are one by `Store.scripts`, the hot and shared paths
-  sound.
+  `REFUTED, PROBED×5, RECOVERY`: a slot's plain subscribe against the impl's at
+  its stamped slot, down the restamp or the cold mint, keeps what a pass keeps;
+  the two scripts at the slot are one by `Store.scripts`, the hot and shared
+  paths sound.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot

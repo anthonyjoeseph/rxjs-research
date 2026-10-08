@@ -308,7 +308,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
   open Kept {Γ = Γ} κ {t} {ep} {ei}
 
   module Hop {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {u}
-             {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now x′ x}
+             {lo} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ u) (emitᵗ t)} {now x′ x}
              (S : St (record sP { mint = setAt nodeᵏ (suc (nodeCt sP)) (Sched.mint sP) })
                      (installNode (nodeCt sP) (mergeAll-st {t = u} nothing 0 [] false) stP)
                      (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) })
@@ -339,7 +339,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     rowP : RegRow Γ t
     rowP = rid , atDyn src lo , echoᵗ u , thru-outer mergeAllᵒ nid ↠[ ≤-refl ] p
     rowI : RegRow (plainᵏ Γ κ) (emitᵗ t)
-    rowI = rid′ , atDyn src′ lo′ , echoᵗ (emitᵗ u) , thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q
+    rowI = rid′ , atDyn src′ (n + lo) , echoᵗ (emitᵗ u) , thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q
 
     KP = EvalSt.registry stP
     KI = EvalSt.registry stI
@@ -465,7 +465,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
   -- tails stay related.  `Sound` of both paths, at the stores before
   -- the merges were installed, as `register-sound` takes it.
   hop-register : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {u}
-                   {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now x′ x}
+                   {lo} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ u) (emitᵗ t)} {now x′ x}
                    (S : St (record sP { mint = setAt nodeᵏ (suc (nodeCt sP)) (Sched.mint sP) })
                            (installNode (nodeCt sP) (mergeAll-st {t = u} nothing 0 [] false) stP)
                            (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) })
@@ -479,7 +479,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                      nid′ = nodeCt sI ; src′ = freshId sourceᵏ (Sched.mint sI) ; ord′ = freshId ordinalᵏ (Sched.mint sI) ; rid′ = freshId regᵏ (Sched.mint sI)
                      stP′ = register rid (atDyn src lo) (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] p)
                               (installNode nid (mergeAll-st {t = u} nothing 0 [] false) stP)
-                     stI′ = register rid′ (atDyn src′ lo′) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
+                     stI′ = register rid′ (atDyn src′ (n + lo)) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
                               (installNode nid′ (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI)
                  in Σ (After S
                         ( [] , record sP { mint = setAt regᵏ (suc rid) (setAt nodeᵏ (suc nid) (setAt sourceᵏ (suc src)
@@ -495,14 +495,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                                                   ∷ Sched.live sI }
                         , stI′ )) λ B
                     → PathRel {Γ = Γ} κ (Store.π (After.store B)) (EvalSt.nodes stP′) (EvalSt.nodes stI′) p q
-  hop-register {sP} {stP} {sI} {stI} {u} {lo} {lo′} {p} {q} {now} {x′} {x} S pm pr soP soI rel =
+  hop-register {sP} {stP} {sI} {stI} {u} {lo} {p} {q} {now} {x′} {x} S pm pr soP soI rel =
     H.hop-at (spentOn p (EvalSt.nodes H.stP₁)) (spentOn q (EvalSt.nodes H.stI₁)) (path-spent {Γ = Γ} κ pr)
       (Sound.ruled (register-sound {κ = p} {sched = sP} {sched′ = H.sP₂} {st = H.stP₁} H.rid (atDyn H.src lo)
                       (thru-outer mergeAllᵒ H.nid ↠[ ≤-refl ] p) (n≤1+n _) refl (thru-cls mergeAllᵒ H.nid ≤-refl p)
                       (λ so → (λ k a h → <-irrefl (sym (node-eq a)) (Sound.fresh-path so k h)) , Sound.distinct so)
                       (sub-ot (λ r∈ → r∈) ≤-refl soP)))
-      (Sound.ruled (register-sound {κ = q} {sched = sI} {sched′ = H.sI₂} {st = H.stI₁} H.rid′ (atDyn H.src′ lo′)
+      (Sound.ruled (register-sound {κ = q} {sched = sI} {sched′ = H.sI₂} {st = H.stI₁} H.rid′ (atDyn H.src′ (n + lo))
                       (thru-outer mergeAllᵒ H.nid′ ↠[ ≤-refl ] q) (n≤1+n _) refl (thru-cls mergeAllᵒ H.nid′ ≤-refl q)
                       (λ so → (λ k a h → <-irrefl (sym (node-eq a)) (Sound.fresh-path so k h)) , Sound.distinct so)
                       (sub-ot (λ r∈ → r∈) ≤-refl soI)))
-    where module H = Hop {sP} {stP} {sI} {stI} {u} {lo} {lo′} {p} {q} {now} {x′} {x} S pm pr rel
+    where module H = Hop {sP} {stP} {sI} {stI} {u} {lo} {p} {q} {now} {x′} {x} S pm pr rel

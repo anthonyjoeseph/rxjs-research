@@ -9,7 +9,7 @@
 module Simulation.Walks where
 
 open import Data.List    using ([])
-open import Data.Nat     using (ℕ; _<_)
+open import Data.Nat     using (ℕ; _<_; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
 
 open import Rx.Exp       using (Ctx; Val; Env; Closed; Ren∈; renExp; renTm; evalWith; obs)
@@ -37,9 +37,13 @@ module Walkers {n} {Γ : Ctx n} (κ : Kinds n) where
     -- WHAT ONE SUBSCRIBE KEEPS: what a pass keeps, from related stores
     -- and related sound paths, and the paths related again after; and
     -- what it sends lands where its path catches its frame `f`.
+    --
+    -- THE IMPL'S PATH STANDS `n` ABOVE THE PLAIN ONE'S FLOOR, as the roots
+    -- do and a slot's stamped twin does: a read decides by its floor.
+    -- REFUTED: `Refuted.Read-Floor` -- a read over unrelated floors.
     Walks : ∀ {u} → ℕ → Val (plainᵏ Γ κ) (obs (emitᵗ u)) → Val Γ (obs u) → Set
     Walks {u} f x′ x =
-      ∀ {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
+      ∀ {lo} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ u) (emitᵗ t)} {now}
         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
       → (S : Store κ sP stP sI stI)
       → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)
@@ -52,7 +56,7 @@ module Walkers {n} {Γ : Ctx n} (κ : Kinds n) where
     -- the same, for a plain subscribe under a bound
     Walks< : ∀ {u} → ℕ → ℕ → Val (plainᵏ Γ κ) (obs (emitᵗ u)) → Val Γ (obs u) → Set
     Walks< {u} N f x′ x =
-      ∀ {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
+      ∀ {lo} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ u) (emitᵗ t)} {now}
         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
       → (S : Store κ sP stP sI stI)
       → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)

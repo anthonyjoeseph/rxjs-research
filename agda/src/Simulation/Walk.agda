@@ -217,14 +217,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     StampedRead {Θ} i =
       ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
       → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
-      → ∀ {lo lo′} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+      → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
       → (S : Store κ sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
       → Sound p sP stP → Sound q sI stI
       → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
       → subscribeE⇓ {e = ei} (Θ′ , input (n ↑ʳ i) , ρ′)
-          (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sym eq)
+          (subst (λ u → Path (plainᵏ Γ κ) (n + lo) u (emitᵗ t)) (sym eq)
             (map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
                            (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q))
           now sI stI rI
@@ -236,14 +236,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     StampedReadStamps {Θ} i =
       ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
       → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
-      → ∀ {lo lo′} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+      → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
       → (S : Store κ sP stP sI stI)
       → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)
       → Sound p sP stP → Sound q sI stI
       → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
       → subscribeE⇓ {e = ei} (Θ′ , input (n ↑ʳ i) , ρ′)
-          (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sym eq)
+          (subst (λ u → Path (plainᵏ Γ κ) (n + lo) u (emitᵗ t)) (sym eq)
             (map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
                            (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q))
           now sI stI rI
@@ -295,13 +295,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       cold-read      : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
                      → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                      → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
-                     → ∀ {lo lo′} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+                     → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
                          {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
                      → (S : Store κ sP stP sI stI)
                      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
                      → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
                      → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
-                         (subst (λ u → Path (plainᵏ Γ κ) lo′ (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
+                         (subst (λ u → Path (plainᵏ Γ κ) (n + lo) (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
                      → Σ (After κ S rP rI) λ A
                          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
       -- WHERE A COLD READ'S EMITS LAND: its block stamps every one at
@@ -315,13 +315,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       cold-read-stamps : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
                        → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                        → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
-                       → ∀ {lo lo′} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+                       → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
                            {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
                        → (S : Store κ sP stP sI stI)
                        → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)
                        → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
                        → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
-                           (subst (λ u → Path (plainᵏ Γ κ) lo′ (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
+                           (subst (λ u → Path (plainᵏ Γ κ) (n + lo) (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
                        → Stamps κ (frameAt w ρ′) pr stI rI
       -- A HOT SLOT'S READ, AGAINST ITS STAMPED SLOT'S: the plain
       -- subscribe at the slot, the impl's at the share wrapping it, under
@@ -331,6 +331,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- row below, given `sound` over the opening store's two root
       -- derivations, held a flat 6 GB for two hours in CI without a
       -- verdict.  A coverage boundary; the compiled sweep covers it.
+      -- REFUTED: `Refuted.Read-Floor` -- the plain read above the slot, the
+      --   impl's at its stamped one's floor.
       -- PROBED: git show 11e23e3e:agda/evidence/probed/Probed/Stores.agda
       --   -- the STORE conjunct alone, at the root from empty stores, before
       --   the `Sound` pair was a hypothesis: a hot read of two arrivals,
@@ -493,7 +495,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                   → EnvRel κ Θ w ρ′ ρ
                   → renExp (λ x → x) (λ x → x) w (toInstEmit κ {[]} {[]} (deferˢ b)) ≡ deferᵉ bI
                   → ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
-                      {lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now nid src ord rid nid′ src′ ord′ rid′}
+                      {lo} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ u) (emitᵗ t)} {now nid src ord rid nid′ src′ ord′ rid′}
                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
                   → Sound p sP stP → Sound q sI stI
                   → freshId nodeᵏ (Sched.mint sP) ≡ nid → freshId sourceᵏ (Sched.mint sP) ≡ src
@@ -502,7 +504,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                   → freshId ordinalᵏ (Sched.mint sI) ≡ ord′ → freshId regᵏ (Sched.mint sI) ≡ rid′
                   → let stP′ = register rid (atDyn src lo) (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] p)
                                  (installNode nid (mergeAll-st {t = u} nothing 0 [] false) stP)
-                        stI′ = register rid′ (atDyn src′ lo′) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
+                        stI′ = register rid′ (atDyn src′ (n + lo)) (thru-outer mergeAllᵒ nid′ ↠[ ≤-refl ] q)
                                  (installNode nid′ (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI)
                     in Σ (After κ S
                            ( [] , record sP { mint = setAt regᵏ (suc rid) (setAt nodeᵏ (suc nid) (setAt sourceᵏ (suc src)

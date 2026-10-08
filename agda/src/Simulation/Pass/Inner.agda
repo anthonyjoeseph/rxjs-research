@@ -16,7 +16,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (nothing; just)
-open import Data.Nat     using (ℕ; suc; pred; _≤_; _<_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; suc; pred; _+_; _≤_; _<_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; pred[n]≤n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
@@ -219,8 +219,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                         × PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
       -- THE EXPLODED OUTER'S END: the impl's merge ends where the plain
       -- outer does, and the flattener's end follows on both sides
-      explode-end : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
-                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+      explode-end : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ} {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
                       {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {oP sP′ stP′ oI sI′ stI′ fin r} {H : ℕ → Set}
                   → (A : After S (oP , sP′ , stP′) (oI , sI′ , stI′))
                   → Clear m p (proj₁ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′)))) (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))
@@ -334,8 +334,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- group the marker hands the hop's node, and that node's own fall.
     -- The fold runs below both impl nodes, so the marker's write rides
     -- past it and the three counts fall together
-    defer-end : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a b}
-                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    defer-end : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a b}
+                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                   {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {rQ}
               → (nid , nid′ ∷ []) ∈ Store.π S → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
               → lookupNode nid (EvalSt.nodes stP) ≡ just (mergeAll-st {t = u} nothing a [] true)
@@ -430,8 +430,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- AN INNER LEFT OPEN: the impl's lets the group past as the plain one
     -- does, its restamp moves the cell alone, and the tails are related
-    inner-on : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
-                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    inner-on : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now lo lo′ ℓ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                  {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {stP₁ stI₁ vs es fin rI}
              → (A₀ : After S ([] , sP , stP₁) ([] , sI , stI₁))
              → Σ (List NodeId) (λ xs → Flattener {Γ = Γ} κ (Store.π (After.store A₀)) {t} (EvalSt.nodes stP₁) (EvalSt.nodes stI₁) u op m m′ ks xs)
@@ -456,8 +456,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       cI = tail-of (step-clear d₁ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si))
 
     -- leaving an inner: the flattener's lane, then its restamp
-    inner-pass : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
-                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    inner-pass : ∀ {lo lo′ ℓ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                    {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                → InnerPasses (flatOp op) m j h p
                    (from-inner (flatOp op) m′ j′ ↠[ h₁ ]
@@ -472,8 +472,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- A SWITCH'S INNER ENDED: both sides clear their current inner and let
     -- the group on, or neither does -- `CurRel` pairs the two currents,
     -- so the dying inner is current on both sides or on neither
-    switch-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂ x x′}
-                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    switch-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂ x x′}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                    {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                    {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
                → Flattener {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) u switchᶠ m m′ ks xs
@@ -501,8 +501,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- AN EXHAUST'S INNER ENDED: both sides clear their lane and let the
     -- group on
-    exhaust-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂ x x′}
-                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    exhaust-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂ x x′}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                    {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                    {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
                → Flattener {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) u exhaustᶠ m m′ ks xs
@@ -559,8 +559,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- A MERGE'S QUEUE DRAINED ON BOTH SIDES: while a lane is free each
     -- side spends its queue's head through the flattener's mint, and the
     -- node each re-reads is the pair the mint left
-    drain-pair : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u lim m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
-                   {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+    drain-pair : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u lim m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
                    {fs fs′ l a od qs qs′ out act qr sP₂ stP₂ out′ act′ qr′ sI₂ stI₂}
                → Walkedˣ xs (mergeᶠ lim) m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
                → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
@@ -584,8 +584,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- A MERGE'S QUEUE DRAINED ON BOTH SIDES once its dying inner's group
     -- has folded, from the queue its node holds
-    merge-drain : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim lim′ a q q′ od m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
-                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    merge-drain : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u lim lim′ a q q′ od m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                     {p : Path Γ ℓ u t} {q̂ : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                     {out act qr sP₂ stP₂ out′ act′ qr′ sI₂ stI₂}
                 → Flattener {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) u (mergeᶠ lim) m m′ ks xs
@@ -608,8 +608,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- A MERGE'S INNER ENDED ON BOTH SIDES: each finish folds the group
     -- down its tail, drains the queue its node holds, and writes the
     -- count and queue the drain left; the end then crosses the restamp
-    merge-finish : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u lim m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂ x x′ mx}
-                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    merge-finish : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u lim m m′ ks xs j j′ Θ₁ ρ₁ Θ₂ ρ₂ x x′ mx}
+                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                      {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
                  → Flattener {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) u (mergeᶠ lim) m m′ ks xs
@@ -657,8 +657,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       where W = flat-write (After.store D) (f₂ , pr₂) (merge~ qs′)
 
     -- AN INNER ENDED ON BOTH SIDES, by its flattener's operator
-    finish-by : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
-                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    finish-by : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                  {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                   {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                   {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
               → Σ (List NodeId) (λ xs → Flattener {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks xs)
@@ -689,8 +689,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- AN INNER NO LIVE CHAIN RUNS THROUGH: its pair is dead too, and
     -- both sides finish it
-    inner-dies : ∀ {N} (wk : Walker ep ei N) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
-                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    inner-dies : ∀ {N} (wk : Walker ep ei N) {lo lo′ ℓ ℓ₂ ℓ₃ u op m m′ ks j j′ Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                    {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                    {now vs es sP stP sI stI oP vs₁ fin₁ sP₁ stP₁ rI} (S : St sP stP sI stI)
                → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner (flatOp op) m j ↠[ h ] p)
@@ -754,8 +754,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- restamp and the hop's node; the counts fall, the marker's end
     -- reaches the hop's node, whose inner is dead as the body's is, and
     -- that node's finish hands the tail the end
-    defer-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a b mx}
-                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    defer-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀ a b mx}
+                     {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                      {vs es oP vs₁ fin₁ sP₁ stP₁ o₁ es₁ f₁ sI₁ stI₁ rI}
                  → (nid , nid′ ∷ []) ∈ Store.π S → (j , j′ ∷ m2 ∷ j2 ∷ []) ∈ Store.π S
@@ -841,8 +841,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- A DEFERRED BODY NO LIVE CHAIN RUNS THROUGH: the hop's marker
     -- merge's inner is dead too, and both sides finish it
-    deferInner-dies : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
-                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    deferInner-dies : ∀ {lo lo′ ℓ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                         {now vs es sP stP sI stI oP vs₁ fin₁ sP₁ stP₁ rI} (S : St sP stP sI stI)
                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner mergeAllᵒ nid j ↠[ h ] p)
@@ -874,8 +874,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- A DEFERRED BODY'S INNER LEFT OPEN: the hop's marker merge and its
     -- node let the group past, and the restamp between moves no node
-    defer-on : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
-                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    defer-on : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                 {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                  {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {vs es rI}
              → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner mergeAllᵒ nid j ↠[ h ] p)
                  (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
@@ -906,8 +906,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       c2 = on-drop (on-drop (head-on _ _ _ m2 (self-node m2 (j2 ∷ [])) si)) , s3
 
     -- a deferred body: the hop's marker merge, its restamp, the hop's node
-    deferInner-pass : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
-                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+    deferInner-pass : ∀ {lo lo′ ℓ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2 Θx ρ₀}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ n + ℓ} {h₂ : n + ℓ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
                         {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)}
                     → InnerPasses mergeAllᵒ nid j h p
                         (from-inner mergeAllᵒ m2 j2 ↠[ h₁ ]
@@ -983,9 +983,9 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- an outer's elements, each inner a sync outer hands the flattener
     -- subscribed before the step returns: the explode and its merge
-    outerExplode-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
-                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                         {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+    outerExplode-arm : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ}
+                         {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
                          {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                          {vs es fin oP vs₁ fin₁ sP₁ stP₁ rI}
                      → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])

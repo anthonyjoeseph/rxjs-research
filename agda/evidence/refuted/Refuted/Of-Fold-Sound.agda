@@ -19,7 +19,7 @@ open import Data.List.Relation.Binary.Pointwise using ([]; _∷_)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (suc; s≤s; z≤n)
+open import Data.Nat using (_+_; suc; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -189,7 +189,7 @@ dI : Σ _ (foldPath⇓ 0 q (e′ ∷ []) true sI′ stI)
 dI = _ , fold-step step-map (proj₂ (Tail.tail (echoOf (map (applyClo ([] , elemᵛ , []ᵉ)) (e′ ∷ [])))))
 
 OfFold : Set
-OfFold = ∀ {u lo lo′} {p : Path Γ₂ lo u natᵗ} {q : Path Γ′ lo′ (emitᵗ u) (emitᵗ natᵗ)} {now}
+OfFold = ∀ {u lo} {p : Path Γ₂ lo u natᵗ} {q : Path Γ′ (2 + lo) (emitᵗ u) (emitᵗ natᵗ)} {now}
            {sP : Sched Γ₂} {stP : EvalSt ep} {sI : Sched Γ′} {stI : EvalSt ei} {rP rI src es vs}
        → (S : Store {Γ = Γ₂} κ₀ sP stP sI stI)
        → PathRel {Γ = Γ₂} κ₀ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
