@@ -257,11 +257,16 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **THE RUN'S OWN EMITS.** `lifts?`, `scanLifts?` and `cutLifts?` decide
-  their closure relations at sampled emits of every event and kind; decide
-  them also at each emit the impl run hands the step, tokens and payload
-  counts as drawn. Decides whether `simulation`'s steps survive the emits
-  only the elaboration writes, where the samples stop.
+- **RE-DRAW THE PASS STAMPS.** Seed 49 replays green on one emit per value;
+  still owed, a draw with several values per hot arrival under a flattener.
+  Decides whether `simulation`'s instant bookkeeping survives a value pass
+  that now emits once per value.
+
+- **FIT THE EXPLODE.** Write `explode-{quiet,one,end,out}`, `restamp-echo` and
+  `outer-wrap` as bodies over smaller leaves; every fact a body needs that
+  `Store` lacks becomes a field, its consumers cascaded. Decides whether
+  `Store` carries what the flattener's outer walk needs, where `simulation`
+  is likeliest false as stated over unreached states.
 
 - **EVERY SMALL EMIT.** `lifts?` holds at every emit up to three events,
   every event and kind in each position (seed 16's map draw, 200 agree, red
@@ -270,10 +275,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   Decides whether `simulation`'s scan and cut steps fail at an ordering the
   samples never wrote.
 
-- **LOWER BY EVIDENCE.** Each risky row whose receipts name its risky region
-  is reclassified down in its header and here; each whose receipts stop short
-  stays and names the region. Turns "may be false" into a schedule of proofs,
-  and leaves the rows `simulation` still bets on.
+- **THE RUN'S OWN EMITS.** `lifts?`, `scanLifts?` and `cutLifts?` decide
+  their closure relations at sampled emits of every event and kind; decide
+  them also at each emit the impl run hands the step, tokens and payload
+  counts as drawn. Decides whether `simulation`'s steps survive the emits
+  only the elaboration writes, where the samples stop.
 
 ### The ledger
 

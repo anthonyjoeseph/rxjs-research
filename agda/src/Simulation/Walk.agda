@@ -527,7 +527,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
       -- WHERE A HOT READ'S EMITS LAND: the restamp hands its own a frame
       -- and the path catches it; a live script joined sends nothing yet
-      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
+      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 145 agree, 0 fail,
       --   5 undecided.  Cases 73 and 104 read the hot input twice under
       --   one merge, the second read joining the share the first
@@ -564,7 +564,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- WHERE A GROUP AT ONE FRAME LANDS, folded down the path: below the
       -- catch every restamp cell is subscribe-kind and hands the group
       -- its own instant, and the catch's cell hands the group the catch
-      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
+      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 145 agree, 0 fail.
       --   Cases 55 and 73 subscribe a lane's two-value `of` at a hot
       --   arrival, its group folded down a flattener's restamp.
