@@ -257,13 +257,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **PROVE THE READS.** `{hot,shared,cold}-read` as `defer-install` now
-  is, over paths at aligned floors (impl at `n + lo`): `hot-read`
-  dispatches its five rule pairs (floor, done/spent, done/connect,
-  live/join, live/connect), a shared read's connect needing a `Walker`.
-  Decide first whether a cold read's input block keeps `Store.owned`
-  when its nodes join the registry. Rules out a slot read unpairing a
-  store under any store, not only at the root.
+- **PROVE THE READS.** `hot-read`'s three pair leaves, `hot-read-join`
+  first: both runs register one row at the slot, the impl's behind the
+  share, a pair `RegRel` takes as `read~`. Then `{shared,cold}-read` as
+  `hot-read` now is, over the `Walker` the reads now carry; decide first
+  whether a cold read's input block keeps `Store.owned` when its nodes
+  join the registry. Rules out a slot read unpairing a store under any
+  store, not only at the root.
 
 - **PROVE THE NODE WRITES.** `scan-write`, `while-{write,spent}` as
   `CellWrite` is: `Moves`' cell and count obligations cite the row's own
@@ -333,11 +333,13 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`of-emits`** (Simulation.Walk) — FALSITY, `PROBED`: an `of`'s emits stand
   at its program's frame, subscribe-kind; held at the root and under a value
   binder, not under a mint's binder.
-- **`{hot,shared,cold}-read`** (Simulation.Walk) — FALSITY,
-  `REFUTED, PROBED×5, RECOVERY`: a slot's plain subscribe against the impl's at
-  its stamped slot, down the restamp or the cold mint, keeps what a pass keeps;
-  the two scripts at the slot are one by `Store.scripts`, the hot and shared
-  paths sound.
+- **`{shared,cold}-read`** (Simulation.Walk) — FALSITY, `PROBED×4, RECOVERY`: a
+  slot's plain subscribe against the impl's at its stamped slot, down the
+  restamp or the cold mint, keeps what a pass keeps; the two scripts at the
+  slot are one by `Store.scripts`, the shared paths sound.
+- **`hot-read-{join,connect-done,connect-live}`** (Simulation.Walk) — FALSITY,
+  `PROBED`: a hot read's rule pair keeps what a pass keeps — both registering
+  at the slot, or the impl connecting its share over an ended or a live script.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
   step keeps an emit's instant and maps its payloads as the plain map does.
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×2`: the hot

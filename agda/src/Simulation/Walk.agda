@@ -17,10 +17,12 @@ module Simulation.Walk where
 
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
-open import Data.Fin.Properties using (toℕ<n)
+open import Data.Fin.Properties using (toℕ<n; toℕ-↑ʳ; splitAt-↑ʳ; splitAt⁻¹-↑ʳ)
+open import Data.Sum.Properties using (inj₂-injective)
 open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.All.Properties using (map⁺; concat⁺; tabulate⁺)
-open import Data.Bool    using (Bool; T; true; false; _∨_)
+open import Data.Bool    using (Bool; T; true; false; _∨_; _∧_)
+open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Bool.ListAction using (any)
 open import Data.Unit    using (tt)
 open import Rx.Evaluator.Reducible.Support using (fresh-path)
@@ -29,11 +31,11 @@ open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (Acc; acc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat.Properties using (<-trans; n<1+n; n≤1+n; ≤-trans; ≤-reflexive; ≤-refl; <⇒<ᵇ; <⇒≢; 1+n≢n; m<n⇒m<1+n)
+open import Data.Nat.Properties using (≤⇒≯; +-cancelˡ-≤; +-cancelˡ-<; <-trans; n<1+n; n≤1+n; ≤-trans; ≤-reflexive; ≤-refl; <⇒<ᵇ; <⇒≢; 1+n≢n; m<n⇒m<1+n)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise) renaming ([] to []ᵖ; _∷_ to _∷ᵖ_)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Maybe using (just; nothing)
 
@@ -41,16 +43,17 @@ open import Rx.Prim      using (hot; cold)
 open import Rx.Exp       using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Rx.Exp       using (Ctx; Val; Closed; Exp; unfoldμ; ofᵉ; Ren∈; ext∈; renExp; renTm; applyClo; []ᵉ; _∷ᵉ_; uniqᵗ;
   unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ;
-  varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm)
+  varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm; Env)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
-  Frame; frameNodes; mkHot; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
-open import Rx.Slots     using (Slots; scripted; shared)
-open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; subs-μ; sub-all; flatSt)
+  Frame; frameNodes; mkHot; memoᶠ; Stream; memberSource; atSlot; lowerFloor; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
+open import Rx.Slots     using (Slot; Slots; scripted; shared)
+open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; fold-step; step-map; sharedConnect⇓; subs-floor; subs-shared; subs-hot-done; subs-hot-live;
+  subs-cold-sync; subs-cold-async; slot-spent; slot-join; slot-connect; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; subs-μ; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule; Sound; sound; fresh-sound; push-sound; sub-ot; node-eq; sub-rule)
-open import Data.Fin     using (Fin; _↑ʳ_)
+open import Data.Fin     using (Fin; zero; suc; toℕ; splitAt; _↑ʳ_)
 open import Data.Vec     using (lookup)
 open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
@@ -59,8 +62,8 @@ open import Simulation.Arm using (module Arms)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
   FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ; inputᵖ)
 open import SExp.InstEmit using (machineEmitᵗ)
-open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
-open import SExp.Simul-Slots using (SimulSlots; plainSlots)
+open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl; embedAt; stampedSlotᵏ; hotSlotAt)
+open import SExp.Simul-Slots using (SimulSlots; SimulSlot; hotˢ; plainSlots)
 open import Simulation.Schedules using (Sync)
 open import Simulation.After using (readᴾ; readᴵ; module Kept)
 open import Simulation.Write using (apart)
@@ -116,6 +119,54 @@ bare {F = F} {κ} so = push-sound (map-f F) ≤-refl κ so (λ k ())
 resrc : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo u} {κ : Path Δ lo u t} {sched : Sched Δ} {st : EvalSt e} {v}
       → Sound κ sched st → Sound κ (record sched { mint = setAt sourceᵏ v (Sched.mint sched) }) st
 resrc = sub-ot (λ r∈ → r∈) ≤-refl
+
+-- a fold of nothing through a read's restamp is the fold past it
+peel-read : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {A B u lo} (eq : A ≡ B) {F : FnClo Δ B u} {q : Path Δ lo u t}
+              {now fin sched st out sched′ st′}
+          → foldPath⇓ {e = e} now (subst (λ v → Path Δ lo v t) (sym eq) (map-f F ↠[ ≤-refl ] q)) [] fin sched st (out , sched′ , st′)
+          → foldPath⇓ now q [] fin sched st (out , sched′ , st′)
+peel-read refl (fold-step step-map f) = f
+
+-- a table read at a slot is the slot
+memoᶠ-at : ∀ {m} {P : Fin m → Set} (f : ∀ j → P j) j → memoᶠ f j ≡ f j
+memoᶠ-at f zero    = refl
+memoᶠ-at f (suc j) = memoᶠ-at (λ j → f (suc j)) j
+
+-- A HOT SLOT READ PLAIN IS ITS SCRIPT, READ IMPL AT ITS STAMPED SLOT A
+-- SHARE: neither run's read of it takes the other kinds' rules
+plain-hot-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j : Fin m) → lookup κ j ≡ hotᵏ
+               → Σ _ λ ok → Σ _ λ as → plainSlots ins j ≡ scripted {ok = ok} (hot as)
+plain-hot-slot {κ = κ} ins j ek with lookup κ j | ins j
+plain-hot-slot ins j refl | hotᵏ | hotˢ _ = _ , _ , refl
+
+scriptedᵇ : ∀ {m} {Δ : Ctx m} {k u} → Slot Δ k u → Bool
+scriptedᵇ (scripted _) = true
+scriptedᵇ (shared _)   = false
+
+impl-hot-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j : Fin m) → lookup κ j ≡ hotᵏ
+              → scriptedᵇ (embedSlotsImpl ins (m ↑ʳ j)) ≡ false
+impl-hot-slot {m} {Δ} {κ} ins j ek = at (splitAt m (m ↑ʳ j)) refl
+  where
+    at-fin : ∀ {x y : Fin (m + m)} (p : x ≡ y) (s : Slot (plainᵏ Δ κ) (toℕ x) (lookup (plainᵏ Δ κ) x))
+           → scriptedᵇ s ≡ false → scriptedᵇ (subst (λ x′ → Slot (plainᵏ Δ κ) (toℕ x′) (lookup (plainᵏ Δ κ) x′)) p s) ≡ false
+    at-fin refl s f = f
+    at-ty : ∀ {k u u′} (p : u ≡ u′) (s : Slot (plainᵏ Δ κ) k u) → scriptedᵇ s ≡ false → scriptedᵇ (subst (Slot (plainᵏ Δ κ) k) p s) ≡ false
+    at-ty refl s f = f
+    hot-at : ∀ {j′} (k≡ : lookup κ j′ ≡ hotᵏ) b e → scriptedᵇ (hotSlotAt {Γ = Δ} κ j′ k≡ b e) ≡ false
+    hot-at k≡ true  _ = refl
+    hot-at k≡ false _ = refl
+    by-kind : ∀ {j′} kd (k≡ : lookup κ j′ ≡ kd) (s : SimulSlot Δ κ (toℕ j′) (lookup Δ j′) kd) → kd ≡ hotᵏ
+            → scriptedᵇ (stampedSlotᵏ κ j′ kd k≡ s) ≡ false
+    by-kind hotᵏ    k≡ (hotˢ _) _ = hot-at k≡ _ refl
+    by-kind coldᵏ   _ _ ()
+    by-kind sharedᵏ _ _ ()
+    at : ∀ s (e : splitAt m (m ↑ʳ j) ≡ s) → scriptedᵇ (embedAt ins (m ↑ʳ j) s e) ≡ false
+    at (inj₁ _) e with trans (sym e) (splitAt-↑ʳ m m j)
+    ... | ()
+    at (inj₂ j′) e =
+      at-fin (splitAt⁻¹-↑ʳ e) _
+        (at-ty (sym (stampedSlot Δ κ j′)) _
+          (by-kind (lookup κ j′) refl (ins j′) (subst (λ x → lookup κ x ≡ hotᵏ) (sym (inj₂-injective (trans (sym e) (splitAt-↑ʳ m m j)))) ek)))
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -187,7 +238,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      → renExp (λ x → x) (λ x → x) w (toInstEmit κ s′)
                        ≡ unfoldμ (renExp (ext∈ (λ x → x)) (λ x → x) w (toInstEmit κ b)))
 
-  open Arms {Γ = Γ} κ using (Carries)
+  open Arms {Γ = Γ} κ using (Carries) renaming ([] to []ᶜ)
 
   open Walkers {Γ = Γ} κ using (frameAt; Walker)
 
@@ -206,6 +257,23 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     open Walkers.On {Γ = Γ} κ ep ei using (Walks; Walks<; Elab-Walks; Elab-Walks<)
     open PassP.InP {Γ = Γ} κ {t} {ep} {ei} using (path-pass)
 
+    -- the impl read's path: the restamp handing a read's emits its frame
+    readPath : ∀ Θ {Θ′} (i : Fin n) (w : Ren∈ (plainᶜ⁺ Θ) Θ′) (ρ′ : Env (plainᵏ Γ κ) Θ′)
+               (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)) {lo}
+             → Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)
+             → Path (plainᵏ Γ κ) (n + lo) (lookup (plainᵏ Γ κ) (n ↑ʳ i)) (emitᵗ t)
+    readPath Θ {Θ′} i w ρ′ eq {lo} q =
+      subst (λ u → Path (plainᵏ Γ κ) (n + lo) u (emitᵗ t)) (sym eq)
+        (map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
+                       (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q)
+
+    -- what a read leaves: the stores related again, and the paths
+    ReadAfter : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                  (rP : Stream Γ t × Sched Γ × EvalSt ep) (rI : Stream (plainᵏ Γ κ) (emitᵗ t) × Sched (plainᵏ Γ κ) × EvalSt ei)
+                  {lo lo′ u} → Path Γ lo u t → Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t) → Set
+    ReadAfter S rP rI p q =
+      Σ (After κ S rP rI) λ A → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+
     -- A READ OF A SLOT THE IMPL STAMPED: both subscribes at the slot, the
     -- impl's down the restamp.  `Sound` of both paths for the reason
     -- `of-fold` takes it: the read registers its path as a row.
@@ -215,21 +283,17 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     --   live hot joining its connected share.
     StampedRead : ∀ {Θ} (i : Fin n) → Set
     StampedRead {Θ} i =
-      ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+      ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
       → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
       → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
       → (S : Store κ sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
       → Sound p sP stP → Sound q sI stI
-      → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
-      → subscribeE⇓ {e = ei} (Θ′ , input (n ↑ʳ i) , ρ′)
-          (subst (λ u → Path (plainᵏ Γ κ) (n + lo) u (emitᵗ t)) (sym eq)
-            (map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
-                           (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q))
-          now sI stI rI
-      → Σ (After κ S rP rI) λ A
-          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+      → (dP : subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP)
+      → subscribeE⇓ {e = ei} (Θ′ , input (n ↑ʳ i) , ρ′) (readPath Θ i w ρ′ eq q) now sI stI rI
+      → sz-subscribeE dP < suc M
+      → ReadAfter S rP rI p q
 
     -- WHERE THE SAME READ'S EMITS LAND
     StampedReadStamps : ∀ {Θ} (i : Fin n) → Set
@@ -242,11 +306,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)
       → Sound p sP stP → Sound q sI stI
       → subscribeE⇓ {e = ep} (Θ , input i , ρ) p now sP stP rP
-      → subscribeE⇓ {e = ei} (Θ′ , input (n ↑ʳ i) , ρ′)
-          (subst (λ u → Path (plainᵏ Γ κ) (n + lo) u (emitᵗ t)) (sym eq)
-            (map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
-                           (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q))
-          now sI stI rI
+      → subscribeE⇓ {e = ei} (Θ′ , input (n ↑ʳ i) , ρ′) (readPath Θ i w ρ′ eq q) now sI stI rI
       → Stamps κ (frameAt w ρ′) pr stI rI
 
     -- ONE LEAF PER FORMER WHOSE ELABORATION INSTALLS MORE THAN IT READS.
@@ -323,22 +383,65 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                        → subscribeE⇓ {e = ei} (Θ′ , renExp (λ x → x) (λ x → x) w (inputᵖ (n ↑ʳ i) (frameᵛ Θ)) , ρ′)
                            (subst (λ u → Path (plainᵏ Γ κ) (n + lo) (machineEmitᵗ u) (emitᵗ t)) (sym eq) q) now sI stI rI
                        → Stamps κ (frameAt w ρ′) pr stI rI
-      -- A HOT SLOT'S READ, AGAINST ITS STAMPED SLOT'S: the plain
-      -- subscribe at the slot, the impl's at the share wrapping it, under
-      -- the restamp handing its subscribe-kind emits this program's frame
-      --
-      -- THE `Sound` PAIR AT A CONCRETE STORE IS PAST THE TYPECHECKER: the
-      -- row below, given `sound` over the opening store's two root
-      -- derivations, held a flat 6 GB for two hours in CI without a
-      -- verdict.  A coverage boundary; the compiled sweep covers it.
-      -- REFUTED: `Refuted.Read-Floor` -- the plain read above the slot, the
-      --   impl's at its stamped one's floor.
+      -- A LIVE SCRIPT'S READ JOINING ITS CONNECTED SHARE: each run
+      -- registers one row at the slot, the impl's down the restamp
+      hot-read-join : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
+                   → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                   → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
+                   → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)}
+                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rid rid′}
+                       {below : toℕ i < lo} {below′ : toℕ (n ↑ʳ i) < n + lo}
+                   → (S : Store κ sP stP sI stI)
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                   → Sound p sP stP → Sound q sI stI
+                   → memberSource (toℕ i) (EvalSt.completedSources stP) ≡ false
+                   → memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ true
+                   → freshId regᵏ (Sched.mint sP) ≡ rid → freshId regᵏ (Sched.mint sI) ≡ rid′
+                   → ReadAfter S ([] , record sP { mint = setAt regᵏ (suc rid) (Sched.mint sP) } , register rid (atSlot i) (lowerFloor below p) stP)
+                                 ([] , record sI { mint = setAt regᵏ (suc rid′) (Sched.mint sI) }
+                                     , register rid′ (atSlot (n ↑ʳ i)) (lowerFloor below′ (readPath Θ i w ρ′ eq q)) stI) p q
+      -- AN ENDED SCRIPT'S READ CONNECTING ITS SHARE: the plain read folds
+      -- the end, the impl's runs the share's definition, whose read of
+      -- the raw slot folds it
+      hot-read-connect-done : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
+                   → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                   → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
+                   → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI d ok}
+                       {below′ : toℕ (n ↑ʳ i) < n + lo}
+                   → (S : Store κ sP stP sI stI)
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                   → Sound p sP stP → Sound q sI stI
+                   → memberSource (toℕ i) (EvalSt.completedSources stP) ≡ true
+                   → (fP : foldPath⇓ now p [] true sP stP rP)
+                   → Sched.slots sI (n ↑ʳ i) ≡ shared d {ok = ok}
+                   → memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ false
+                   → sharedConnect⇓ (n ↑ʳ i) d (readPath Θ i w ρ′ eq q) below′ now sI stI rI
+                   → sz-foldPath fP < M
+                   → ReadAfter S rP rI p q
+      -- A LIVE SCRIPT'S READ CONNECTING ITS SHARE: the plain read
+      -- registers at the slot, the impl's runs the share's definition,
+      -- whose read of the raw slot registers there
       -- PROBED: git show 11e23e3e:agda/evidence/probed/Probed/Stores.agda
       --   -- the STORE conjunct alone, at the root from empty stores, before
       --   the `Sound` pair was a hypothesis: a hot read of two arrivals,
       --   its share's `read~` and `hot~` machine row.  Not under a binder,
       --   not the values conjunct.
-      hot-read       : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
+      hot-read-connect-live : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
+                   → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                   → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
+                   → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
+                       {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rI rid d ok}
+                       {below : toℕ i < lo} {below′ : toℕ (n ↑ʳ i) < n + lo}
+                   → (S : Store κ sP stP sI stI)
+                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                   → Sound p sP stP → Sound q sI stI
+                   → memberSource (toℕ i) (EvalSt.completedSources stP) ≡ false
+                   → freshId regᵏ (Sched.mint sP) ≡ rid
+                   → Sched.slots sI (n ↑ʳ i) ≡ shared d {ok = ok}
+                   → memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ false
+                   → sharedConnect⇓ (n ↑ʳ i) d (readPath Θ i w ρ′ eq q) below′ now sI stI rI
+                   → ReadAfter S ([] , record sP { mint = setAt regᵏ (suc rid) (Sched.mint sP) } , register rid (atSlot i) (lowerFloor below p) stP) rI p q
       -- a shared slot's read, against its stamped slot's
       shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
       -- WHERE A HOT READ'S EMITS LAND: the restamp hands its own a frame
@@ -392,6 +495,87 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                      → foldPath⇓ now p vs true sP stP rP
                      → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
                      → Stamps κ f pr stI rI
+
+    -- NEITHER RUN READS A HOT SLOT BY ANOTHER KIND'S RULE
+    plain-no-shared : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) (i : Fin n) → lookup κ i ≡ hotᵏ
+                    → ∀ {d ok} → Sched.slots sP i ≡ shared d {ok = ok} → ⊥
+    plain-no-shared S i ek x with Store.scripts S
+    ... | ins , eP , _ with plain-hot-slot ins i ek
+    ...   | _ , _ , s with trans (sym s) (trans (sym (memoᶠ-at (plainSlots ins) i)) (trans (sym (cong (λ f → f i) eP)) x))
+    ...     | ()
+
+    plain-no-cold : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) (i : Fin n) → lookup κ i ≡ hotᵏ
+                  → ∀ {ok ss as} → Sched.slots sP i ≡ scripted {ok = ok} (cold ss as) → ⊥
+    plain-no-cold S i ek x with Store.scripts S
+    ... | ins , eP , _ with plain-hot-slot ins i ek
+    ...   | _ , _ , s with trans (sym s) (trans (sym (memoᶠ-at (plainSlots ins) i)) (trans (sym (cong (λ f → f i) eP)) x))
+    ...     | ()
+
+    impl-no-script : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) (i : Fin n) → lookup κ i ≡ hotᵏ
+                   → ∀ {ok sc} → Sched.slots sI (n ↑ʳ i) ≡ scripted {ok = ok} sc → ⊥
+    impl-no-script S i ek x with Store.scripts S
+    ... | ins , _ , eI with trans (cong scriptedᵇ (trans (sym x) (trans (cong (λ f → f (n ↑ʳ i)) eI) (memoᶠ-at (embedSlotsImpl ins) (n ↑ʳ i)))))
+                                  (impl-hot-slot ins i ek)
+    ...   | ()
+
+    -- AN ENDED SCRIPT'S SHARE IS NOT JOINED, A LIVE ONE'S NOT SPENT: the
+    -- stamped slot's latch is its raw slot's and its connection's
+    done-unjoined : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) (i : Fin n) → lookup κ i ≡ hotᵏ
+                  → memberSource (toℕ i) (EvalSt.completedSources stP) ≡ true
+                  → memberSource (toℕ (n ↑ʳ i)) (EvalSt.completedSources stI) ≡ false
+                  → memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ true → ⊥
+    done-unjoined S i ek c cI sI with proj₁ (Store.latches S i) ek
+    ... | L₁ , L₂ with trans (sym cI) (trans L₂ (cong₂ _∧_ (trans (sym L₁) c) sI))
+    ...   | ()
+
+    live-unspent : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI) (i : Fin n) → lookup κ i ≡ hotᵏ
+                 → memberSource (toℕ i) (EvalSt.completedSources stP) ≡ false
+                 → memberSource (toℕ (n ↑ʳ i)) (EvalSt.completedSources stI) ≡ true → ⊥
+    live-unspent {stI = stI} S i ek c s with proj₁ (Store.latches S i) ek
+    ... | L₁ , L₂ with trans (sym s) (trans L₂ (cong (λ b → b ∧ memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI)) (trans (sym L₁) c)))
+    ...   | ()
+
+    -- A HOT SLOT'S READ, AGAINST ITS STAMPED SLOT'S: the plain
+    -- subscribe at the slot, the impl's at the share wrapping it, under
+    -- the restamp handing its subscribe-kind emits this program's frame.
+    -- The floors are aligned, so the two runs read below the floor
+    -- together; above it the latches pair the script's rule with the
+    -- share's.
+    --
+    -- THE `Sound` PAIR AT A CONCRETE STORE IS PAST THE TYPECHECKER: the
+    -- row below, given `sound` over the opening store's two root
+    -- derivations, held a flat 6 GB for two hours in CI without a
+    -- verdict.  A coverage boundary; the compiled sweep covers it.
+    -- REFUTED: `Refuted.Read-Floor` -- the plain read above the slot, the
+    --   impl's at its stamped one's floor.
+    hot-read : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
+    hot-read i ek wk w r eq S pr oP oI (subs-floor _ fP) (subs-floor _ fI) lt =
+      let X = path-pass wk S pr []ᶜ oP oI fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+    hot-read i ek wk w r eq S pr oP oI (subs-floor h _) (subs-shared {below = b} _ _) _ =
+      ⊥-elim (≤⇒≯ h (+-cancelˡ-< n _ _ (subst (_< n + _) (toℕ-↑ʳ n i) b)))
+    hot-read i ek wk w r eq S pr oP oI _ (subs-hot-done _ x _ _) _          = ⊥-elim (impl-no-script S i ek x)
+    hot-read i ek wk w r eq S pr oP oI _ (subs-hot-live _ x _ _) _          = ⊥-elim (impl-no-script S i ek x)
+    hot-read i ek wk w r eq S pr oP oI _ (subs-cold-sync _ x _) _           = ⊥-elim (impl-no-script S i ek x)
+    hot-read i ek wk w r eq S pr oP oI _ (subs-cold-async _ x _ _ _ _) _    = ⊥-elim (impl-no-script S i ek x)
+    hot-read i ek wk w r eq S pr oP oI (subs-shared x _) _ _                = ⊥-elim (plain-no-shared S i ek x)
+    hot-read i ek wk w r eq S pr oP oI (subs-cold-sync _ x _) _ _           = ⊥-elim (plain-no-cold S i ek x)
+    hot-read i ek wk w r eq S pr oP oI (subs-cold-async _ x _ _ _ _) _ _    = ⊥-elim (plain-no-cold S i ek x)
+    hot-read i ek wk w r eq S pr oP oI (subs-hot-done b _ _ _) (subs-floor h _) _ =
+      ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
+    hot-read i ek wk w r eq S pr oP oI (subs-hot-live b _ _ _) (subs-floor h _) _ =
+      ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
+    hot-read i ek wk w r eq S pr oP oI (subs-hot-done _ _ _ fP) (subs-shared _ (slot-spent _ fI)) lt =
+      let X = path-pass wk S pr []ᶜ oP oI fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+    hot-read i ek wk w r eq S pr oP oI (subs-hot-done _ _ c _) (subs-shared _ (slot-join cI sI _)) _ =
+      ⊥-elim (done-unjoined S i ek c cI sI)
+    hot-read i ek wk w {ρ′} {ρ} r eq S pr oP oI (subs-hot-done _ _ c fP) (subs-shared x (slot-connect _ sI dc)) lt =
+      hot-read-connect-done i ek wk w {ρ′} {ρ} r eq S pr oP oI c fP x sI dc (s<s⁻¹ lt)
+    hot-read i ek wk w r eq S pr oP oI (subs-hot-live _ _ c _) (subs-shared _ (slot-spent s _)) _ =
+      ⊥-elim (live-unspent S i ek c s)
+    hot-read i ek wk w {ρ′} {ρ} r eq S pr oP oI (subs-hot-live _ _ c fr) (subs-shared _ (slot-join _ sI fr′)) _ =
+      hot-read-join i ek w {ρ′} {ρ} r eq S pr oP oI c sI fr fr′
+    hot-read i ek wk w {ρ′} {ρ} r eq S pr oP oI (subs-hot-live _ _ c fr) (subs-shared x (slot-connect _ sI dc)) _ =
+      hot-read-connect-live i ek w {ρ′} {ρ} r eq S pr oP oI c fr x sI dc
 
     -- A CELL INSTALLED ON BOTH SIDES, the impl's under its mint: the
     -- pair joins `π` and the tails stay related
@@ -828,28 +1012,28 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-cold i () w r S pr _ _ dP dI | sharedᵏ | _
 
     -- a hot slot's walk: the impl's read peeled to its stamped slot
-    walk-hot : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Elab-Walks {Θ} (inputˢ i)
-    walk-hot i e w r S pr _ _ dP dI with lookup κ i in ek | stampedSlot Γ κ i
-    walk-hot i e w r S pr oP oI dP (subs-map dJ) | hotᵏ | eq =
-      let A = hot-read i ek w r eq S pr oP oI dP (read-input _ eq dJ)
+    walk-hot : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-hot i e wk w r S pr _ _ dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
+    walk-hot i e wk w r S pr oP oI dP (subs-map dJ) lt | hotᵏ | eq =
+      let A = hot-read i ek wk w r eq S pr oP oI dP (read-input _ eq dJ) lt
       in proj₁ A , proj₂ A , hot-read-stamps i ek w r eq S pr oP oI dP (read-input _ eq dJ)
-    walk-hot i () w r S pr _ _ dP dI | coldᵏ | _
-    walk-hot i () w r S pr _ _ dP dI | sharedᵏ | _
+    walk-hot i () wk w r S pr _ _ dP dI lt | coldᵏ | _
+    walk-hot i () wk w r S pr _ _ dP dI lt | sharedᵏ | _
 
     -- a shared slot's walk, the same
-    walk-shared : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Elab-Walks {Θ} (inputˢ i)
-    walk-shared i e w r S pr _ _ dP dI with lookup κ i in ek | stampedSlot Γ κ i
-    walk-shared i e w r S pr oP oI dP (subs-map dJ) | sharedᵏ | eq =
-      let A = shared-read i ek w r eq S pr oP oI dP (read-input _ eq dJ)
+    walk-shared : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-shared i e wk w r S pr _ _ dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
+    walk-shared i e wk w r S pr oP oI dP (subs-map dJ) lt | sharedᵏ | eq =
+      let A = shared-read i ek wk w r eq S pr oP oI dP (read-input _ eq dJ) lt
       in proj₁ A , proj₂ A , shared-read-stamps i ek w r eq S pr oP oI dP (read-input _ eq dJ)
-    walk-shared i () w r S pr _ _ dP dI | coldᵏ | _
-    walk-shared i () w r S pr _ _ dP dI | hotᵏ | _
+    walk-shared i () wk w r S pr _ _ dP dI lt | coldᵏ | _
+    walk-shared i () wk w r S pr _ _ dP dI lt | hotᵏ | _
 
     -- the one arm that reads `κ`, one leaf per kind
-    walk-input : ∀ {Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Elab-Walks {Θ} (inputˢ i)
-    walk-input i coldᵏ   e = walk-cold i e
-    walk-input i hotᵏ    e = walk-hot i e
-    walk-input i sharedᵏ e = walk-shared i e
+    walk-input : ∀ {M Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-input i coldᵏ   e _  w r S pr oP oI dP dI _ = walk-cold i e w r S pr oP oI dP dI
+    walk-input i hotᵏ    e wk = walk-hot i e wk
+    walk-input i sharedᵏ e wk = walk-shared i e wk
 
     -- a renamed expression's derivation is the derivation
     sz-reExpᴾ : ∀ {Θ u lo} {ρ} {E E′ : Exp Γ [] [] Θ u} {p : Path Γ lo u t} {now s st r} {M}
@@ -861,7 +1045,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- former's own plain size.  A μ's unrolling is no smaller a tree,
     -- but its subscribe is a premise of the μ's.
     at : ∀ {M Θ u} (s : SExp Γ [] [] Θ u) → Walker ep ei M → Elab-Walks< (suc M) s
-    at (inputˢ i) _ w r S pr oP oI dP dI _ = walk-input i (lookup κ i) refl w r S pr oP oI dP dI
+    at (inputˢ i) wk = walk-input i (lookup κ i) refl wk
     at (ofˢ ts) wk         = walk-of ts wk
     at {Θ = Θ} {u} emptyˢ wk w {ρ′} {ρ} r S pr oP oI (subs-empty f) dI lt = walk-of {Θ = Θ} {u} [] wk w {ρ′} {ρ} r S pr oP oI (subs-of {ts = []} f) dI lt
     at (takeWhileˢ f b) wk w r = walk-while f b (wk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)

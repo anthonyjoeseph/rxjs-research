@@ -6,9 +6,10 @@
 module SExp.Impl-Slots where
 
 open import Data.Bool    using (true; false; T)
+open import Data.Nat     using (_+_)
 open import Data.Fin     using (Fin; toℕ; _↑ˡ_; _↑ʳ_; splitAt)
 open import Data.Fin.Properties using (splitAt⁻¹-↑ˡ; splitAt⁻¹-↑ʳ)
-open import Data.Sum     using (inj₁; inj₂)
+open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.List    using ([]; _∷_)
 open import Data.Unit    using (tt)
@@ -77,29 +78,37 @@ hotShareImpl {n} {Γ} κ i hot≡ =
 
 -- the share's stratification computes only at a concrete table, so it is
 -- checked, as `sharedᴵ`'s is
+hotSlotAt : ∀ {n} {Γ : Ctx n} (κ : Kinds n) (i : Fin n) (hot≡ : lookup κ i ≡ hotᵏ) b
+          → inputsBelowᵉ (toℕ (n ↑ʳ i)) (hotShareImpl {Γ = Γ} κ i hot≡) ≡ b
+          → Slot (plainᵏ Γ κ) (toℕ (n ↑ʳ i)) (emitᵗ (lookup Γ i))
+hotSlotAt {Γ = Γ} κ i hot≡ true  eq = shared (hotShareImpl {Γ = Γ} κ i hot≡) {ok = subst T (sym eq) tt}
+hotSlotAt {Γ = Γ} κ i hot≡ false _  = shared (elaborateImpl {Γ = Γ} κ emptyˢ) {ok = tt}
+
 hotSlotImpl : ∀ {n} {Γ : Ctx n} (κ : Kinds n) (i : Fin n) → lookup κ i ≡ hotᵏ
             → Slot (plainᵏ Γ κ) (toℕ (n ↑ʳ i)) (emitᵗ (lookup Γ i))
-hotSlotImpl {n} {Γ} κ i hot≡ with inputsBelowᵉ (toℕ (n ↑ʳ i)) (hotShareImpl {Γ = Γ} κ i hot≡) in eq
-... | true  = shared (hotShareImpl {Γ = Γ} κ i hot≡) {ok = subst T (sym eq) tt}
-... | false = shared (elaborateImpl {Γ = Γ} κ emptyˢ) {ok = tt}
+hotSlotImpl {Γ = Γ} κ i hot≡ = hotSlotAt {Γ = Γ} κ i hot≡ _ refl
 
--- THE STAMPED HALF: the author's slot i at `n ↑ʳ i`.
+-- THE STAMPED HALF: the author's slot i at `n ↑ʳ i`, by its kind
+stampedSlotᵏ : ∀ {n} {Γ : Ctx n} (κ : Kinds n) (i : Fin n) kd → lookup κ i ≡ kd → SimulSlot Γ κ (toℕ i) (lookup Γ i) kd
+             → Slot (plainᵏ Γ κ) (toℕ (n ↑ʳ i)) (slotTy (lookup Γ i) kd)
+stampedSlotᵏ {Γ = Γ} κ i hotᵏ    hot≡ (hotˢ _)                = hotSlotImpl {Γ = Γ} κ i hot≡
+stampedSlotᵏ         κ i coldᵏ   _    (coldˢ {ok = ok} ss as) = scripted {ok = ok} (cold ss as)
+stampedSlotᵏ {n}     κ i sharedᵏ _    (sharedˢ d)             = sharedᴵ κ (toℕ (n ↑ʳ i)) d
+
 stampedSlotImpl : ∀ {n} {Γ : Ctx n} {κ : Kinds n} → SimulSlots Γ κ → (i : Fin n)
                 → Slot (plainᵏ Γ κ) (toℕ (n ↑ʳ i)) (lookup (plainᵏ Γ κ) (n ↑ʳ i))
 stampedSlotImpl {n} {Γ = Γ} {κ = κ} ins i =
   subst (Slot (plainᵏ Γ κ) (toℕ (n ↑ʳ i))) (sym (stampedSlot Γ κ i))
-        (go (lookup κ i) refl (ins i))
-  where
-    go : ∀ kd → lookup κ i ≡ kd → SimulSlot Γ κ (toℕ i) (lookup Γ i) kd
-       → Slot (plainᵏ Γ κ) (toℕ (n ↑ʳ i)) (slotTy (lookup Γ i) kd)
-    go hotᵏ    hot≡ (hotˢ _)                 = hotSlotImpl {Γ = Γ} κ i hot≡
-    go coldᵏ   _    (coldˢ {ok = ok} ss as)  = scripted {ok = ok} (cold ss as)
-    go sharedᵏ _    (sharedˢ d)              = sharedᴵ κ (toℕ (n ↑ʳ i)) d
+        (stampedSlotᵏ κ i (lookup κ i) refl (ins i))
+
+-- one slot of the doubled table, by the half its index falls in
+embedAt : ∀ {n} {Γ : Ctx n} {κ : Kinds n} → SimulSlots Γ κ → (j : Fin (n + n)) (s : Fin n ⊎ Fin n) → splitAt n j ≡ s
+        → Slot (plainᵏ Γ κ) (toℕ j) (lookup (plainᵏ Γ κ) j)
+embedAt {Γ = Γ} {κ = κ} ins j (inj₁ i) eq =
+  subst (λ j′ → Slot (plainᵏ Γ κ) (toℕ j′) (lookup (plainᵏ Γ κ) j′)) (splitAt⁻¹-↑ˡ eq) (rawSlotImpl ins i)
+embedAt {Γ = Γ} {κ = κ} ins j (inj₂ i) eq =
+  subst (λ j′ → Slot (plainᵏ Γ κ) (toℕ j′) (lookup (plainᵏ Γ κ) j′)) (splitAt⁻¹-↑ʳ eq) (stampedSlotImpl ins i)
 
 embedSlotsImpl : ∀ {n} {Γ : Ctx n} {κ : Kinds n}
                → SimulSlots Γ κ → Slots (plainᵏ Γ κ)
-embedSlotsImpl {n} {Γ = Γ} {κ = κ} ins j with splitAt n j in eq
-... | inj₁ i = subst (λ j′ → Slot (plainᵏ Γ κ) (toℕ j′) (lookup (plainᵏ Γ κ) j′))
-                     (splitAt⁻¹-↑ˡ eq) (rawSlotImpl ins i)
-... | inj₂ i = subst (λ j′ → Slot (plainᵏ Γ κ) (toℕ j′) (lookup (plainᵏ Γ κ) j′))
-                     (splitAt⁻¹-↑ʳ eq) (stampedSlotImpl ins i)
+embedSlotsImpl {n} ins j = embedAt ins j (splitAt n j) refl
