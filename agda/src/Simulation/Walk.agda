@@ -354,10 +354,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       --   the `Sound` pair was a hypothesis: a cold script, its block run
       --   straight to the root (`cold~`).  Not under a binder, not the
       --   values conjunct.
-      -- PROBED: make qc-store QC='11 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[1,1,1,1,0,0],"reach":["flatten","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  99 read a
-      --   slot from a fan lane, under the map's binder; cold and hot
-      --   scripts are not counted apart.
       -- PROBED: make qc-store QC='12 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Cold
       --   scripts only, every fan step a lane reading a slot under the
@@ -366,6 +362,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- PROBED: make qc-same-clock QC='12 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 37
       --   agree, 0 fail, 37 undecided: the same draw's values.
+      -- PROBED: make qc-store QC='15 100 3' QC_FUEL=20 QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,0,0,0,4,0,0,0,1],"spineD":[0,0,0,3,0,0,3,0,0,0],"spineG":[3,3,0,0,1,0,1,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[4,0,1],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["mu","input"]}'
+      --   decided by `CLI.Store-Check`'s `store?`, over budget at 63 agree,
+      --   0 fail: cold scripts only, every case inside a μ whose spine
+      --   merges or flattens over lanes reading a slot; 39 subscribe an
+      --   input, 23 finish an inner at a merge, 10 join a connected share.
+      -- PROBED: make qc-same-clock QC='15 100 2' QC_FUEL=20 QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,0,0,0,4,0,0,0,1],"spineD":[0,0,0,3,0,0,3,0,0,0],"spineG":[3,3,0,0,1,0,1,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[4,0,1],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["mu","input"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 65 agree, 0 fail,
+      --   35 undecided: the same draw's values.
       -- RECOVERY: git show ae5fd17e:agda/evidence/refuted/Refuted/Slot-Scripts.agda
       --   restores the opening store at two cold tables, which refuted this
       --   read over a store blind to the slots.

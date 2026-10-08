@@ -246,21 +246,20 @@ related; set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; subscribes unrelated; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
-2-value emits, bare cuts; writes moving row; cut/liveness/drain/
+2-value emits; bare cuts; writes moving row; cut/liveness/drain/
 body ends, 2nd hop inners apart; unsound walks/reads; 2 stamp chains;
-`of` splits, folds; `mintᵉ`, root stamps; quiet-cut drains; hop
-scripts; joiners off catch; quiet arms; installs+hops; inners revived;
+`of` splits/folds; `mintᵉ`, root stamps; quiet arms/cut drains; hop
+scripts; joiners off catch; installs+hops; revived inners;
 unaligned reads/connects/flushes; renames; 2-script
-stores, values; mid-emit joins.
+stores/values; mid-emit joins; μ cold reads.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **GAPS IN THE ELABORATION.** The rest: `cold-block` inside a μ, and
-  `lifts-map` at an emit the impl produced rather than one built by hand.
-  Same rule. Decides whether `simulation`'s leaves survive the shapes only
-  the elaboration writes.
+- **GAPS IN THE ELABORATION.** The rest: `lifts-map` at an emit the impl
+  produced rather than one built by hand. Same rule. Decides whether
+  `simulation`'s leaves survive the shapes only the elaboration writes.
 
 - **LOWER BY EVIDENCE.** Each risky row whose receipts name its risky region
   is reclassified down in its header and here; each whose receipts stop short
@@ -329,7 +328,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`of-emits`** (Simulation.Walk) — FALSITY, `PROBED`: an `of`'s emits stand
   at its program's frame, subscribe-kind; held at the root and under a value
   binder, not under a mint's binder.
-- **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×6, RECOVERY`: a cold
+- **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×7, RECOVERY`: a cold
   read's impl subscribe over an asynchronous tail leaves its block's nodes
   fresh, a partnered source, and its flush one fold of one group down the tail.
 - **`cold-read-end`** (Simulation.Walk) — FALSITY, `PROBED×3`: a cold read
