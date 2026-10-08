@@ -187,14 +187,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- the riskiest.
     postulate
       -- A SHARE CLOSED ON BOTH SIDES, before its end is delivered
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1]}'
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1,0]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 62 reads a shared slot whose one-value `of` ends inside
       --   its connect.
       share-spend  : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
                    → After S ([] , sP , shareSpend i stP) ([] , sI , shareSpend (n ↑ʳ i) stI)
       -- A SHARE'S READERS DROPPED ON BOTH SIDES, once its end is delivered
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1]}'
+      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1],"script":[0,0,1,1,1,0]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 62 reads a shared slot whose one-value `of` ends inside
       --   its connect.
@@ -247,7 +247,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- restamped to it.  The route is through `explode-quiet` and
       -- `explode-one`, each sending at its own emit's instant.
       --
-      -- PROBED: make qc-same-clock QC='45 80 3' QC_DRAW='{"exp":[4,4,3,0,4,0,2,0,0,0,0,0,4],"obs":[0,3,0,0],"fan":[0,3,2,1,1,0,1,2,2],"script":[0,4,0,0,0],"reach":["flatten"]}'
+      -- PROBED: make qc-same-clock QC='45 80 3' QC_DRAW='{"exp":[4,4,3,0,4,0,2,0,0,0,0,0,4],"obs":[0,3,0,0],"fan":[0,3,2,1,1,0,1,2,2],"script":[0,4,0,0,0,0],"reach":["flatten"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 67 agree, 0 fail, 13
       --   undecided.  Thirteen agreements explode downstream of a hot
       --   input; case 15 explodes a merge of two reads of it, a group of
@@ -269,7 +269,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- its lane is subscribed at that delivery.  The route is through the
       -- walk's echo and lane, a consume carrying the instant its echo set.
       --
-      -- PROBED: make qc-same-clock QC='43 150 3' QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2],"script":[0,2,0,0,3],"reach":["flatten"]}'
+      -- PROBED: make qc-same-clock QC='43 150 3' QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2],"script":[0,2,0,0,3,0],"reach":["flatten"]}'
       --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 31 agree, 0 fail, 65
       --   undecided.  Cases 7 and 39 walk an element group delivered at a
       --   hot arrival, not at the subscribe instant.

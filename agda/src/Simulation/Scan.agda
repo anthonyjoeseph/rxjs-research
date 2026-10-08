@@ -76,7 +76,7 @@ module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
     postulate
       -- A CELL WRITTEN ON BOTH SIDES keeps the stores and the tails
       -- related
-      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1],"reach":["scan","flatten"]}'
+      -- PROBED: make qc-store QC='51 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,2,1,0,1,1,0,0,0,0,2],"leaf":[2,0,1],"script":[1,1,1,1,1,0],"reach":["scan","flatten"]}'
       --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
       --   Case 15 writes two scans at subscribe, one over the other through
       --   an echoing flattener; case 28 writes one at each of two hot

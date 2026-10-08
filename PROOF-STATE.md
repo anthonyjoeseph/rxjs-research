@@ -257,16 +257,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **SWEEP THE CONNECTS' VALUES.** The store sweep decided only the store
-  conjunct of `hot-read-connect-{done,live}` and `shared-read`; aim
-  `qc-same-clock` at a read connecting an ended script's share and at slot
-  one's definition run inside a read. Decides whether a connect's values leave
-  down the reader's path, the half of the read the store cannot see.
-
 - **ATTACK THE CASCADES.** The monster's last region: census
   `cascade-related`'s leaves, and aim a sweep at each FALSITY row there with no
   receipt reaching its risky region. Narrows what is left of `simulation` to
   named, probed statements.
+
+- **A SECOND SCRIPTED SLOT.** The QuickCheck schedules from slot zero alone,
+  so no drawn program reads a script above the source it registered on:
+  `cold-read-end`'s below-floor disjunct and a share joined across two scripts
+  are past every sweep. Draw slot one as a script too, aimed only.
 
 - **SWEEP EVERY NO-EVIDENCE ROW.** Whatever the three above leave unprobed in
   this tier, each aimed at its own risky region; a red is a refutation and a
@@ -334,11 +333,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`cold-read-end`** (Simulation.Walk) — FALSITY, `PROBED×2`: a cold read
   below the floor or over an all-synchronous script folds its prefix and end on
   both sides.
-- **`shared-read`** (Simulation.Walk) — FALSITY, `PROBED`: a slot's plain
+- **`shared-read`** (Simulation.Walk) — FALSITY, `PROBED×2`: a slot's plain
   subscribe against the impl's at its stamped slot, down the restamp, keeps
   what a pass keeps; the two scripts at the slot are one by `Store.scripts`,
   the shared paths sound.
-- **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED×3`: a
+- **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED×5`: a
   hot read whose impl connects its share over an ended or a live script keeps
   what a pass keeps.
 - **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED`: the elaborated map
