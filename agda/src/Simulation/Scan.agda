@@ -99,13 +99,13 @@ module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
     -- projection write the one cell, which the tails' folds do not read
     scan-arm : ∀ {lo lo′ ℓ s u} {F : FnClo Γ (u ×ᵗ s) u} {k} {h : lo ≤ ℓ} {p : Path Γ ℓ u t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
              → Steps (scan-f F k) h p Q
-    scan-arm {vs = vs} {es = es} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
+    scan-arm {Q = _ ↠[ hS ] qT} {vs = vs} {es = es} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
              R@(scan~ {u = u} {k = k} {k′ = k′} {a = a} {a′ = a′} {em = em} {Θ₀ = Θ₀} {ρ₀ = ρ₀}
                       {h = h} {h₁ = h₁} {h₂ = h₂} {F = F} {F′ = F′} {p = p} {q = q} e lk lk′ v L r)
              bs sp si g d dI@(fold-step d₁ (fold-step step-map dq))
       with scan-at lk d | scan-at lk′ d₁
     ... | refl | refl =
-      arm (proj₁ SW) (proj₂ SW) (proj₁ G) soq (λ e → gone-cell S scan-c (g e)) dq (λ {rP} dP B rel′ →
+      arm (proj₁ SW) (proj₂ SW) (proj₁ G) soq (λ e → gone-cell S {f = scan-f F′ k′} {h = hS} {q = qT} scan-c (g e)) dq (λ {rP} dP B rel′ →
         scan~ (After.grows B (After.grows (proj₁ SW) e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c′) lkI) (proj₂ G) L rel′
       ) λ { (f , ds) → out-quiet [] refl , inj₂ (f , scan-del {Θ₀ = Θ₀} {ρ₀ = ρ₀} L bs a′ em a v ds) }
       where

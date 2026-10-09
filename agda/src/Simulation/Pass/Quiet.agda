@@ -458,6 +458,14 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q =
       scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₃ ] (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
 
+    -- the restamp's scan is a cell, and its projection is transparent
+    gone-restamp : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ₂ ℓ₃ ℓ₄ u Θ₁ ρ₁ ks Θ₂ ρ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+                   {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+                 → Gone (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) stI → Gone q stI
+    gone-restamp S {u = u} {Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₃} {h₄} {q} =
+      gone-cell S {s = emitᵗ u} {u = FlatSᵗ u} {f = scan-f (Θ₁ , flatStepᵛ , ρ₁) ks} {h = h₃}
+        {q = map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q} scan-c
+
     -- where the walk has got to: the flattener, and the tails it hands to
     Walkedˣ : ∀ {ℓ ℓ₄ u} → List NodeId → FlatOp → NodeId → NodeId → NodeId
             → Path Γ ℓ u t → Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t) → Goal
@@ -780,7 +788,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
           (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru refl (gw refl)) (Store.live-outer S))
           (_ , _ , A , W′ , c , g , d) = wrap-tail S A₀ (f₀ , r₀)
             (subst (λ T → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ T)) (proj₂ (proj₂ T))) eI cl)
-            (λ e → gone-cell S scan-c (gone-wrap S (gw refl) (trans (cong proj₁ eI) e)))
+            (λ e → gone-restamp S {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₃} {h₄} {q} (gone-wrap S {o = flatOp op} {k = m′} {h = h₂} {q = Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} (gw refl) (trans (cong proj₁ eI) e)))
             (subst (λ T → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) [] (proj₁ T) (proj₁ (proj₂ T)) (proj₂ (proj₂ T)) r) eI dR)
       in wrapped′ eP A W′ c g d
 
