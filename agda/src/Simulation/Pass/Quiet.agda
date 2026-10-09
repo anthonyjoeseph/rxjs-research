@@ -585,6 +585,14 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- the pass carries no liveness from there to here, and what it ran
     -- in between can end an outer the path walks -- a fact of the pass
     -- the inner's hypotheses do not carry
+    -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
+    --   decided by `CLI.Walk-Check`'s `inner` tag at every inner's
+    --   subscribe on the impl run: 53762 walking an outer, 0 fail.
+    --   With the spent disjunct dropped, ended outers are met on taken
+    --   paths only.
+    -- PROBED: make walk WALK='1 40 3' WALK_SEEDS=30
+    --   the same tag, unaimed: 30207 such, 0 fail; 25 fail with the
+    --   spent disjunct dropped.
     postulate
       inner-live : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
                      {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {j′}

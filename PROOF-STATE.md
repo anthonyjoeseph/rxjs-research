@@ -350,8 +350,8 @@ also: `main` — the QuickCheck's entry point and the walk's, and every generato
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; swept at two hot slots, after the subscribe.
-- **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an inner's
-  path is live unless spent where its walk starts; the pass does not carry it.
+- **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `PROBED×2`: an inner's path
+  is live unless spent where its walk starts; the pass does not carry it.
 - **`idle-lanes`** (Simulation.Arm) — DIFFICULTY, `PROBED`: an idle flattener
   has no alive row down an inner lane; walked where a lane held a row.
 - **`gone-walk`** (Simulation.Arm) — DIFFICULTY, `PROBED×2`: an outer's walk

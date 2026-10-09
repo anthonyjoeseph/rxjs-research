@@ -34,6 +34,10 @@
 --               idle wrap (`gone-wrap`, over `gone-walk` and `idle-lanes`);
 --   `walk`      an outer's walk that starts with its path `Gone` ends with
 --               it `Gone` (`gone-walk`).
+--   `live`      a path being subscribed, unless a take on it is spent, walks
+--               no outer that has ended (`LiveIf`, what every walk is
+--               handed); `inner` the same at an inner's subscribe
+--               (`inner-live`), counted where the path walks an outer.
 --
 -- A check COUNTS where something could break it: an alive row meeting the
 -- path (at the walk's end, for `walk`), a lane holding a row, a dying mark
@@ -51,7 +55,7 @@ open import Data.String  using (String) renaming (_++_ to _++ˢ_)
 open import Rx.Prim      using (Fuel)
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (EvalSt; Path; RegRow; NodeId; _↠[_]_; Frame; map-f; from-inner; thru-outer;
-  memberSource; regSource; regFloor; skipᵇ; thruWrap)
+  memberSource; regSource; regFloor; skipᵇ; thruWrap; spentOn; lookupNode)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓; thruWalk⇓; mergeAllDrain⇓;
   innerFinish⇓; innerReact⇓; stepFrame⇓; subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓; dispatchShare⇓;
   shareWalk⇓; shareGo⇓; foldPath⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
@@ -73,13 +77,14 @@ open import SExp.Simul-Slots using (SimulSlots)
 open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import CLI.Emit-Eq  using (eqListℕ)
 open import CLI.Store-Check using (headKey; frameKey; skel)
+open import Simulation.Stores using (outerDoneᵇ; thruNodes)
 
 -- a check's tag, whether it held, whether anything could have broken it,
 -- and what to print if it did not hold
 Ev : Set
 Ev = ℕ × Bool × Bool × String
 
-carryᵗ lanesᵗ subscribeᵗ skippedᵗ dyingᵗ controlᵗ finishᵗ cutᵗ wrapᵗ walkᵗ : ℕ
+carryᵗ lanesᵗ subscribeᵗ skippedᵗ dyingᵗ controlᵗ finishᵗ cutᵗ wrapᵗ walkᵗ liveᵗ innerᵗ : ℕ
 carryᵗ     = 0
 lanesᵗ     = 1
 subscribeᵗ = 2
@@ -90,6 +95,8 @@ finishᵗ    = 6
 cutᵗ       = 7
 wrapᵗ      = 8
 walkᵗ      = 9
+liveᵗ      = 10
+innerᵗ     = 11
 
 tagName : ℕ → String
 tagName 0 = "carry"
@@ -101,7 +108,9 @@ tagName 5 = "control"
 tagName 6 = "finish"
 tagName 7 = "cut"
 tagName 8 = "wrap"
-tagName _ = "walk"
+tagName 9 = "walk"
+tagName 10 = "live"
+tagName _ = "inner"
 
 module Decide {m} {Δ : Ctx m} {u} {e : Closed Δ u} where
 
@@ -175,6 +184,17 @@ module Decide {m} {Δ : Ctx m} {u} {e : Closed Δ u} where
      any (λ r → lane k (rowPath r)) (EvalSt.registry st₀ ++ EvalSt.registry st) ,
      "lanes: flattener #" ++ˢ show k ++ˢ " reported idle with an alive lane" ++ˢ culprits st) ∷ []
 
+  liveAt : ℕ → ∀ {lo s} → Path Δ lo s u → EvalSt e → List Ev
+  liveAt tag q st =
+    (tag ,
+     spentOn q (EvalSt.nodes st) ∨ all (λ k → not (outerDoneᵇ (lookupNode k (EvalSt.nodes st)))) (thruNodes q) ,
+     not (length (thruNodes q) ≡ᵇ 0) ,
+     tagName tag ++ˢ ": an ended outer on " ++ˢ skel q) ∷ []
+
+  -- an inner's subscribe, read at the path its own derivation names
+  innerOf : ∀ {v lo X q now sched st r} → subscribeE⇓ {e = e} {u = v} {lo = lo} X q now sched st r → List Ev
+  innerOf {q = q} {st = st} _ = liveAt innerᵗ q st
+
   dyingAt : List ℕ → EvalSt e → List Ev
   dyingAt ds st =
     (dyingᵗ , all (λ d → memberSource d (EvalSt.dying st)) ds , not (length ds ≡ᵇ 0) ,
@@ -224,7 +244,7 @@ module Decide {m} {Δ : Ctx m} {u} {e : Closed Δ u} where
   wK  : ∀ {a sched st r} → cascade⇓ {e = e} a sched st r → List Ev
   wDr : ∀ {k sched st r} → drain⇓ {e = e} k sched st r → List Ev
 
-  wE {q = q} {st = st} d = goneAt subscribeᵗ q st ++ go d
+  wE {q = q} {st = st} d = goneAt subscribeᵗ q st ++ liveAt liveᵗ q st ++ go d
     where
     go : ∀ {v lo X q now sched st r} → subscribeE⇓ {e = e} {u = v} {lo = lo} X q now sched st r → List Ev
     go (subs-floor _ f)                  = wF f
@@ -244,7 +264,7 @@ module Decide {m} {Δ : Ctx m} {u} {e : Closed Δ u} where
     go (subs-defer _ _ _ _)              = []
     go (subs-mint _ s)                   = wE s
 
-  wI (inner _ s) = wE s
+  wI (inner _ s) = innerOf s ++ wE s
 
   wC (consume-all-sub _ _ s)      = wI s
   wC (consume-all-enqueue _ _)    = []
@@ -348,7 +368,7 @@ tallyOf tag ((t , ok , c , w) ∷ evs) with tallyOf tag evs
   else (k , n , f , w′)
 
 tags : List ℕ
-tags = carryᵗ ∷ lanesᵗ ∷ subscribeᵗ ∷ skippedᵗ ∷ dyingᵗ ∷ controlᵗ ∷ finishᵗ ∷ cutᵗ ∷ wrapᵗ ∷ walkᵗ ∷ []
+tags = carryᵗ ∷ lanesᵗ ∷ subscribeᵗ ∷ skippedᵗ ∷ dyingᵗ ∷ controlᵗ ∷ finishᵗ ∷ cutᵗ ∷ wrapᵗ ∷ walkᵗ ∷ liveᵗ ∷ innerᵗ ∷ []
 
 -- every tag's tally on one case's impl run
 walkSides : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → List (ℕ × Tally)
