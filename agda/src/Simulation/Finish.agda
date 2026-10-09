@@ -39,7 +39,7 @@ open import Simulation.Sweep using (t≢f; close-rows; sameSource-lt; sameSource
 open import Simulation.Schedules using (Sync; ord)
   renaming ([] to []ˢ; _∷_ to _∷ˢ_)
 open import Simulation.Stores using (member-head; srcCount; Census; LatchRel; guardOf; SameAt; SrcNum; slot~; dyn~; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; ArrRel; ArrRows; Store; Arr; Owned; Spent; spent-subst; spent-substʳ; spent-off; spent-zip; Named;
-  live-mono; close-live)
+  live-mono; close-live; DyingFree)
   renaming (here to sp-here; there to sp-there)
 
 ------------------------------------------------------------------
@@ -614,15 +614,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
             → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
             → (memberSource (toℕ (n ↑ʳ i)) (EvalSt.connectedShares stI) ≡ true
                → memberSource (toℕ (i ↑ˡ n)) (EvalSt.completedSources stI) ≡ true)
-            → srcCount (toℕ (n ↑ʳ i)) (EvalSt.registry stI) ≡ 0
+            → srcCount (toℕ (n ↑ʳ i)) (EvalSt.registry stI) ≡ 0 → DyingFree stI
             → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
-  hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd z₂ = record
+  hot-close {stP = stP} {stI = stI} S {a} {a′} {i} hk e₁ e₂ cd z₂ df = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
     ; named = close-named {a = a} (proj₁ named) (subst (_< _) (sym e₁) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named))))
             , close-named {a = a′} (proj₂ named) (subst (_< _) (sym e₂) (<-trans (raw<ₙ i) (Named.slots-below (proj₂ named))))
     ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-    ; scripts = scripts ; live-outer = close-live S a′
+    ; scripts = scripts ; live-outer = close-live S a′ df
     ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)
     ; dying-alike = hot-close-dies S i e₁ e₂ z₂
     ; dying-done = λ j _ → member-head (toℕ j) _ (EvalSt.completedSources stP)

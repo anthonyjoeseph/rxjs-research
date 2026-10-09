@@ -27,7 +27,7 @@
 ------------------------------------------------------------------
 module Simulation.Statement where
 
-open import Data.Bool    using (Bool; true; false; T)
+open import Data.Bool    using (Bool; true; false; T; _∨_)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Unit    using (⊤; tt)
 open import Data.List    using (List; []; _∷_; _++_; map; length; replicate; drop; concat)
@@ -69,7 +69,7 @@ open import Simulation.Prefix using (prefix-++; run-prefix)
 open import Simulation.Lockstep using (Conf; stepOn; start; opening; out; next; iter; run-opening; run-snoc)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; markDlv; Arrival; arrTy; RegRow; Path; chainsGo; sameSource;
   regSource; schedGo; schedFinish; sched-next; arrVal; chainsOf; cascadeOpen; cascadeClose;
-  cascadeFinish; memberSource; arrSource)
+  cascadeFinish; memberSource; arrSource; dropSource)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓;
   foldPath⇓; disp; walk-more; walk-nil; walk-end; subscribeE⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule; chain-sound; chain-agree)
@@ -77,12 +77,12 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
-open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount; DyingFree; dyingᵇ) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source)
 open import Simulation.Hot-End using (hot-end-start)
 open import Simulation.Close using (close-store; close-arr)
 open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit)
-open import Simulation.Sweep using (T-true; t≢f)
+open import Simulation.Sweep using (T-true; t≢f; ≡ᵇ-sym)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk; minted)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; skip-cut; module Kept)
@@ -255,6 +255,73 @@ clock-on d (inj₂ (a , s′)) eqn =
         (cong (λ μ → counter μ sourceᵏ) (pop-mint (Conf.sched d) eqn))
         (cascade-mono a s′ (Conf.st d) (pop-rule eqn (Conf.ru d)) sourceᵏ)
 
+postulate
+  -- A WALK MAKES NO REGISTERED ROW'S SOURCE NEWLY DYING: a share that
+  -- ends inside a walk drops its own rows before the walk is over, so a
+  -- row of a dying source at a walk's end was one at its start.
+  --
+  -- PROBED: make qc-store QC='77 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,1,0,3,2,2,2,0,0,0,4,3],"script":[1,1,2,1,4,4],"slot":[0,0,0,0,4,1],"obs":[2,3,3,1]}'
+  --   decided by `CLI.Store-Check`'s `pass-quiet` and `cascade-quiet` checks,
+  --   at the end of every value pass and every cascade: 200 agree, 0 fail;
+  --   137 hold a dying source at a boundary, so a share ended inside a walk.
+  --   The walk's own end is read only through those two consumers.
+  walk-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
+             → cascadeGo⇓ a vs fin cs sched st r
+             → ∀ {x} → x ∈ EvalSt.registry (proj₂ (proj₂ r)) → dyingᵇ (proj₂ (proj₂ r)) x ≡ true → dyingᵇ st x ≡ true
+
+  -- THE ROOT SUBSCRIBES LEAVE NO ROW OF A DYING SOURCE REGISTERED.
+  --
+  -- PROBED: make qc-store QC='77 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,1,0,3,2,2,2,0,0,0,4,3],"script":[1,1,2,1,4,4],"slot":[0,0,0,0,4,1],"obs":[2,3,3,1]}'
+  --   decided by `CLI.Store-Check`'s `cascade-quiet` at the trace's first
+  --   state, the subscribe's: 200 agree, 0 fail.
+  start-quiet : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+              → DyingFree (Conf.st (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+
+-- a value pass ends a cascade unless the arrival is its source's last
+finish-run : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (s : Sched Γ′) (st : EvalSt e)
+           → Arrival.isLast a ≡ false → cascadeFinish a s st ≡ (s , st)
+finish-run a s st eq with Arrival.isLast a
+finish-run a s st refl | false = refl
+finish-run a s st ()   | true
+
+-- and a last arrival's drops its source's rows
+finish-last : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (s : Sched Γ′) (st : EvalSt e)
+            → Arrival.isLast a ≡ true → proj₂ (cascadeFinish a s st) ≡ record st { registry = dropSource (arrSource a) (EvalSt.registry st) }
+finish-last a s st eq with Arrival.isLast a
+finish-last a s st refl | true  = refl
+finish-last a s st ()   | false
+
+-- a Boolean that cannot be true is false
+not-true : ∀ {b} → (b ≡ true → ⊥) → b ≡ false
+not-true {false} _ = refl
+not-true {true}  h = ⊥-elim (h refl)
+
+-- a row the drop keeps is not the dropped source's
+drop-off : ∀ {m} {Δ : Ctx m} {u} s (K : List (RegRow Δ u)) {x} → x ∈ dropSource s K
+         → sameSource s (regSource (proj₁ (proj₂ x))) ≡ false × x ∈ K
+drop-off s [] ()
+drop-off s ((rid , c , y) ∷ K) x∈ with sameSource s (regSource c) in eq
+... | true  = let d , m = drop-off s K x∈ in d , there m
+drop-off s ((rid , c , y) ∷ K) (here refl) | false = eq , here refl
+drop-off s ((rid , c , y) ∷ K) (there x∈)  | false = let d , m = drop-off s K x∈ in d , there m
+
+-- A VALUE PASS ENDS WITH NO ROW OF A DYING SOURCE: it opens with none dying
+pass-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
+           → cascadeGo⇓ a vs fin cs sched (cascadeOpen st) r → DyingFree (proj₂ (proj₂ r))
+pass-quiet g x∈ = not-true (λ w → t≢f (sym (walk-quiet g x∈ w)))
+
+-- AND SO DOES A CASCADE: its end walk opens with only the closed source
+-- dying, whose rows the finish drops
+cascade-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a sched} {st : EvalSt e} {r}
+              → cascade⇓ a sched st r → DyingFree (proj₂ (proj₂ r))
+cascade-quiet (casc-run {a = a} {sched′ = s₁} {st′ = t₁} nl g) =
+  subst (λ p → DyingFree (proj₂ p)) (sym (finish-run a s₁ t₁ nl)) (pass-quiet g)
+cascade-quiet (casc-run-last {a = a} {sched₂ = s₂} {st₂ = t₂} ll _ g′) =
+  subst (λ p → DyingFree (proj₂ p)) (sym (finish-last a s₂ t₂ ll)) λ {x} x∈ →
+    let d , m = drop-off (arrSource a) (EvalSt.registry t₂) x∈
+    in not-true (λ w → t≢f (trans (sym (walk-quiet g′ m w))
+                                  (cong (_∨ false) (trans (≡ᵇ-sym (regSource (proj₁ (proj₂ x))) (arrSource a)) d))))
+
 -- THE TWO MACHINES, RELATED: a relation between their stores, one
 -- between their live sources that the stores keep, and what each arrival
 -- does to them.  The schedules are related outside it, by `Sync`, so a
@@ -264,7 +331,9 @@ clock-on d (inj₂ (a , s′)) eqn =
 record Storeˢ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
               (c : Conf ep) (d : Conf ei) : Set where
   constructor stores
-  field raw : Storeʳ κ (Conf.sched c) (Conf.st c) (Conf.sched d) (Conf.st d)
+  field raw   : Storeʳ κ (Conf.sched c) (Conf.st c) (Conf.sched d) (Conf.st d)
+        -- between arrivals the impl holds no row of a dying source
+        quiet : DyingFree (Conf.st d)
 
 record Machines {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ) : Set₁ where
   field
@@ -517,7 +586,7 @@ pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps) hP aP hI aI
 -- a minted source's value pass: the chains pair up at the popped stores
 dyn-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
              {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
+  → Storeʳ κ sP stP sI stI → DyingFree stI
   → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
   → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
   → n < Arrival.source a → n + n < Arrival.source a′
@@ -528,13 +597,13 @@ dyn-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
       Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
     × Arr s₁ (Arrival.source a) (Arrival.source a′) (arrTy a) (arrTy a′)
     × Out (counter (Sched.mint sI) sourceᵏ) oI
-dyn-pass κ e {sP = sP} {sI = sI} {stI = stI} s {a} {a′} ex ex′ ta sy p q go go′
+dyn-pass κ e {sP = sP} {sI = sI} {stI = stI} s df {a} {a′} ex ex′ ta sy p q go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ pp =
   proj₁ k , proj₁ (proj₂ k) , proj₁ (proj₂ (proj₂ k)) (arr-pop κ s₀ (pp-popped κ pp)) ,
   proj₂ (proj₂ (proj₂ k)) refl (≤-trans (chains-count a′ (EvalSt.registry stI)) (dyn-one κ e s ex′ q))
   where
-    s₀ = pop-store κ s ex ex′ sy
+    s₀ = pop-store κ s df ex ex′ sy
     opened : ∀ {chs chs′}
            → Pointwise (λ c c′ → Partners κ _ _ _ _ _ (Storeʳ.rows s₀) (dynRow a c) (dynRow a′ c′)) chs chs′
            → Pointwise (Paired (Storeʳ.rows s₀) [] [] a a′) chs chs′
@@ -549,7 +618,7 @@ dyn-pass κ e {sP = sP} {sI = sI} {stI = stI} s {a} {a′} ex ex′ ta sy p q go
 -- partnered with; the plain run walks those readers directly.
 hot-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
              {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
+  → Storeʳ κ sP stP sI stI → DyingFree stI
   → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
   → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
   → ∀ i → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
@@ -559,10 +628,10 @@ hot-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Storeʳ κ sP₁ stP₁ sI₁ stI₁
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
   × Out (counter (Sched.mint sI) sourceᵏ) oI
-hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy i hk e₁ e₂ {oP = oP} go go′
+hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy i hk e₁ e₂ {oP = oP} go go′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
-  with hot-start κ (pop-store κ s ex ex′ sy) {a} {a′} {i} hk src h h′ e₁ e₂ refl go′
+  with hot-start κ (pop-store κ s df ex ex′ sy) {a} {a′} {i} hk src h h′ e₁ e₂ refl go′
 ... | hot-start-at {oB = oB} {εI = εI} {ty = ty} A c (ob , du) (disp (walk-more {emits = em} g walk-nil)) refl =
   After.store Z ,
   subst (λ z → Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ z) (readᴾ oP))
@@ -575,7 +644,7 @@ hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta
           go g)
     Z = _⨾_ κ A (proj₁ F)
 ... | hot-idle none refl with casc-empty (subst (λ c → cascadeGo⇓ a _ false c _ _ _) none go)
-...   | refl = pop-store κ s ex ex′ sy , [] , []
+...   | refl = pop-store κ s df ex ex′ sy , [] , []
 
 -- WHERE IT CAN STILL FAIL: AN IMPL ARRIVAL THE PLAIN SCHEDULE DOES NOT
 -- HAVE, or one plain arrival's values delivered across two.  Either is
@@ -594,7 +663,7 @@ hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta
 -- agreeing and one undecided at its clock; seed 19, 60, all agreeing.
 value-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
+  → Storeʳ κ sP stP sI stI → DyingFree stI
   → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
   → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′
   → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
@@ -603,16 +672,16 @@ value-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Storeʳ κ sP₁ stP₁ sI₁ stI₁
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
   × Out (counter (Sched.mint sI) sourceᵏ) oI
-value-pass {n} {Γ} {t} κ e {sI = sI} s {a} {a′} ex ex′ ta sy {oP} {sP₁} {stP₁} {oI} {sI₁} {stI₁} go go′ =
+value-pass {n} {Γ} {t} κ e {sI = sI} s df {a} {a′} ex ex′ ta sy {oP} {sP₁} {stP₁} {oI} {sI₁} {stI₁} go go′ =
   by (pop-kind s ex ex′) refl refl
   where
     by : ∀ {x x′} → SrcNum κ x x′ → x ≡ Arrival.source a → x′ ≡ Arrival.source a′
        → Storeʳ κ sP₁ stP₁ sI₁ stI₁
        × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
        × Out (counter (Sched.mint sI) sourceᵏ) oI
-    by (slot~ i h) e₁ e₂ = hot-pass κ e s ex ex′ ta sy i h (sym e₁) (sym e₂) go go′
+    by (slot~ i h) e₁ e₂ = hot-pass κ e s df ex ex′ ta sy i h (sym e₁) (sym e₂) go go′
     by (dyn~ p q) refl refl =
-      let D = dyn-pass κ e s ex ex′ ta sy p q go go′ in proj₁ D , proj₁ (proj₂ D) , proj₂ (proj₂ (proj₂ D))
+      let D = dyn-pass κ e s df ex ex′ ta sy p q go go′ in proj₁ D , proj₁ (proj₂ D) , proj₂ (proj₂ (proj₂ D))
 
 -- THE END OF A HOT ARRIVAL: the source latched closed, its end walked
 -- over the chains the value pass left, and its registrations dropped.
@@ -622,7 +691,7 @@ value-pass {n} {Γ} {t} κ e {sI = sI} s {a} {a′} ex ex′ ta sy {oP} {sP₁} 
 -- does.
 hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
             {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
+  → Storeʳ κ sP stP sI stI → DyingFree stI
   → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
   → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′ → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
   → ∀ i → lookup κ i ≡ hotᵏ → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
@@ -635,21 +704,21 @@ hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
              (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
-hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll′ i hk e₁ e₂ {sP₁ = sP₁} {stP₁ = stP₁} {stI₁ = stI₁} go go′ {eP = eP} {sP₂ = sP₂} {stP₂ = stP₂} end end′
+hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy ll ll′ i hk e₁ e₂ {sP₁ = sP₁} {stP₁ = stP₁} {stI₁ = stI₁} go go′ {eP = eP} {sP₂ = sP₂} {stP₂ = stP₂} end end′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
-  with hot-end-start κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ end′
+  with hot-end-start κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ (pass-quiet go′) end′
 ...   | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
   hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ (cascade-latched end′ {toℕ (i ↑ˡ n)} (close-hit a′ stI₁ e₂)) {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
-    S₁ = proj₁ (value-pass κ e s ex ex′ ta sy go go′)
+    S₁ = proj₁ (value-pass κ e s df ex ex′ ta sy go go′)
     Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta e₁ (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           end g))
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
-...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd z₂) {a} {a′} {i}
+...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd z₂ (pass-quiet go′)) {a} {a′} {i}
                            e₁ e₂ ll ll′ (close-hit a′ stI₁ e₂) z₁ z₂ , []
 
 -- THE END OF A LAST ARRIVAL: a minted source's is the close, the end walked
@@ -657,7 +726,7 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s {a} {a′} ex ex′ ta sy ll ll�
 -- drop; a hot one's stays whole
 last-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
               {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
+  → Storeʳ κ sP stP sI stI → DyingFree stI
   → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
   → Arrival.tick a ≡ Arrival.tick a′ → Sync rs rs′ → Arrival.isLast a ≡ true → Arrival.isLast a′ ≡ true
   → ∀ {oP sP₁ stP₁ oI sI₁ stI₁}
@@ -669,32 +738,25 @@ last-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
              (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
-last-pass {n} {Γ} {t} κ e s {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁} {stP₁ = stP₁} {sI₁ = sI₁} {stI₁ = stI₁} go go′ {eP = eP} {sP₂} {stP₂} {eI} {sI₂} {stI₂} end end′ =
+last-pass {n} {Γ} {t} κ e s df {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP₁} {stP₁ = stP₁} {sI₁ = sI₁} {stI₁ = stI₁} go go′ {eP = eP} {sP₂} {stP₂} {eI} {sI₂} {stI₂} end end′ =
   by (pop-kind s ex ex′) refl refl
   where
     by : ∀ {x x′} → SrcNum κ x x′ → x ≡ Arrival.source a → x′ ≡ Arrival.source a′
        → Storeʳ κ (proj₁ (cascadeFinish a sP₂ stP₂)) (proj₂ (cascadeFinish a sP₂ stP₂))
                   (proj₁ (cascadeFinish a′ sI₂ stI₂)) (proj₂ (cascadeFinish a′ sI₂ stI₂))
        × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ eI) (readᴾ eP)
-    by (slot~ i h) e₁ e₂ = hot-end κ e s ex ex′ ta sy ll ll′ i h (sym e₁) (sym e₂) go go′ end end′
+    by (slot~ i h) e₁ e₂ = hot-end κ e s df ex ex′ ta sy ll ll′ i h (sym e₁) (sym e₂) go go′ end end′
     by (dyn~ p q) refl refl = finish-store {a = a} {a′ = a′} S₂ p q ll ll′ (proj₁ (proj₂ (proj₂ k)) ca) , proj₁ (proj₂ k)
       where
-        W  = dyn-pass κ e s ex ex′ ta sy p q go go′
+        W  = dyn-pass κ e s df ex ex′ ta sy p q go go′
         S₁ = proj₁ W
         ar₁ = proj₁ (proj₂ (proj₂ W))
-        ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁
-        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁
+        ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁ (pass-quiet go′)
+        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁ (pass-quiet go′)
         k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca)
                (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
                (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′
         S₂ = proj₁ k
-
--- a value pass ends a cascade unless the arrival is its source's last
-finish-run : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (s : Sched Γ′) (st : EvalSt e)
-           → Arrival.isLast a ≡ false → cascadeFinish a s st ≡ (s , st)
-finish-run a s st eq with Arrival.isLast a
-finish-run a s st refl | false = refl
-finish-run a s st ()   | true
 
 -- THE CASCADES OF ONE PARTNERED POP keep the stores related and send
 -- agreeing values under one instant the clock passes: both a value
@@ -725,7 +787,7 @@ finish-run a s st ()   | true
 -- inner at a merge.
 cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
-  → Storeʳ κ sP stP sI stI
+  → Storeʳ κ sP stP sI stI → DyingFree stI
   → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
   → Arrival.tick a ≡ Arrival.tick a′ → Arrival.isLast a ≡ Arrival.isLast a′ → Sync rs rs′
   → ∀ {oP rP oI rI}
@@ -734,13 +796,13 @@ cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
   → Storeʳ κ (proj₁ rP) (proj₂ rP) (proj₁ rI) (proj₂ rI)
   × Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w) (readᴵ oI) (readᴾ oP)
   × OneIn (counter (Sched.mint sI) sourceᵏ) (counter (Sched.mint (proj₁ rI)) sourceᵏ) (readᴵ oI)
-cascade-kept κ e s {a} {a′} ex ex′ ta la sy (casc-run {sched′ = s₁} {st′ = t₁} nl go) (casc-run {emits = oI} {sched′ = s₁′} {st′ = t₁′} nl′ go′)
+cascade-kept κ e s df {a} {a′} ex ex′ ta la sy (casc-run {sched′ = s₁} {st′ = t₁} nl go) (casc-run {emits = oI} {sched′ = s₁′} {st′ = t₁′} nl′ go′)
   rewrite finish-run a s₁ t₁ nl | finish-run a′ s₁′ t₁′ nl′ =
   proj₁ VP , proj₁ (proj₂ VP) , at-oneIn (readᴵ oI) (proj₂ (proj₂ VP) , value-draws κ e s ex′ go′)
-  where VP = value-pass κ e s ex ex′ ta sy go go′
-cascade-kept κ e s ex ex′ ta la sy (casc-run nl _) (casc-run-last ll′ _ _) = ⊥-elim (t≢f (sym (trans (sym nl) (trans la ll′))))
-cascade-kept κ e s ex ex′ ta la sy (casc-run-last ll _ _) (casc-run nl′ _) = ⊥-elim (t≢f (trans (sym ll) (trans la nl′)))
-cascade-kept {Γ = Γ} {t} κ e {sI = sI} s ex ex′ ta la sy (casc-run-last {emits = oP} {ends = eP} ll go end)
+  where VP = value-pass κ e s df ex ex′ ta sy go go′
+cascade-kept κ e s _ ex ex′ ta la sy (casc-run nl _) (casc-run-last ll′ _ _) = ⊥-elim (t≢f (sym (trans (sym nl) (trans la ll′))))
+cascade-kept κ e s _ ex ex′ ta la sy (casc-run-last ll _ _) (casc-run nl′ _) = ⊥-elim (t≢f (trans (sym ll) (trans la nl′)))
+cascade-kept {Γ = Γ} {t} κ e {sI = sI} s df ex ex′ ta la sy (casc-run-last {emits = oP} {ends = eP} ll go end)
                                            (casc-run-last {a = a′} {emits = oI} {ends = eI} {sched₂ = s₂} {st₂ = t₂} ll′ go′ end′) =
   proj₁ k ,
   subst₂ (Pointwise (λ p w → Agrees (plainᵏ Γ κ) Γ t (proj₂ p) w)) (sym (readᴵ-++ oI eI)) (sym (readᴾ-++ oP eP))
@@ -749,8 +811,8 @@ cascade-kept {Γ = Γ} {t} κ e {sI = sI} s ex ex′ ta la sy (casc-run-last {em
          (at-oneIn (readᴵ oI ++ readᴵ eI)
            (at-++ (readᴵ oI) (readᴵ eI) (proj₂ (proj₂ VP) , value-draws κ e s ex′ go′) (go-mono end′ sourceᵏ) (end-stamps κ e s ex′ ll′ go′ end′)))
   where
-    VP = value-pass κ e s ex ex′ ta sy go go′
-    k = last-pass κ e s ex ex′ ta sy ll ll′ go go′ end end′
+    VP = value-pass κ e s df ex ex′ ta sy go go′
+    k = last-pass κ e s df ex ex′ ta sy ll ll′ go go′ end end′
 
 -- a step reads the cascade the schedule's pop names, by any proof of it
 step-at : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (c : Conf e) {x} (eqn : sched-next (Conf.sched c) ≡ x)
@@ -778,13 +840,14 @@ cascade-at κ e {c} {d} s ex ex′ dry =
          (s , [] , tt)
 cascade-at κ e {c} {d} s {inj₂ (a , rs)} {inj₂ (a′ , rs′)} ex ex′ (pop ta la _ _ _ _ _ sy _) =
   subst₂ (Kept κ e d) (sym (step-at c eqn)) (sym (step-at d eqn′))
-         (stores (proj₁ k) , proj₂ k)
+         (stores (proj₁ k) (cascade-quiet gI) , proj₂ k)
   where
     eqn  = cong (schedFinish (Conf.sched c)) ex
     eqn′ = cong (schedFinish (Conf.sched d)) ex′
-    k = cascade-kept κ e (Storeˢ.raw s) ex ex′ ta la sy
+    gI = proj₁ (Σ⁰.snd⁰ (cascade! a′ (record (Conf.sched d) { live = rs′ }) (Conf.st d) (pop-rule eqn′ (Conf.ru d))))
+    k = cascade-kept κ e (Storeˢ.raw s) (Storeˢ.quiet s) ex ex′ ta la sy
           (proj₁ (Σ⁰.snd⁰ (cascade! a (record (Conf.sched c) { live = rs }) (Conf.st c) (pop-rule eqn (Conf.ru c)))))
-          (proj₁ (Σ⁰.snd⁰ (cascade! a′ (record (Conf.sched d) { live = rs′ }) (Conf.st d) (pop-rule eqn′ (Conf.ru d)))))
+          gI
 
 -- AN ARRIVAL KEEPS THE STORES RELATED and sends agreeing values under one
 -- instant the clock passes
@@ -809,7 +872,7 @@ subscribe-related : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [
             (readᴵ (opening (elaborateImpl κ e) (embedSlotsImpl ins)))
 subscribe-related {t = t} κ e ins =
     Storeʳ.sync (proj₁ (root-walk κ e ins))
-  , stores (proj₁ (root-walk κ e ins))
+  , stores (proj₁ (root-walk κ e ins)) (start-quiet κ e ins)
   , Pointwise-map (v-agrees κ t) (proj₁ (proj₂ (root-walk κ e ins)))
   , subscribe-stamps κ e ins
 

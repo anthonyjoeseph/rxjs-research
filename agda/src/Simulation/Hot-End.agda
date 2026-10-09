@@ -52,7 +52,7 @@ open import Rx.Evaluator.Domain using (chainStep⇓; dispatchShare⇓; cascadeGo
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
 open import Simulation.Stores using (LiveAt; member-head; srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach; Named; []; _∷_;
-  LiveRows; live-agree; close-live; skip-le; skip-dying; ∨∧-mono; ∨ʳ) renaming (live to rows-live)
+  LiveRows; DyingFree; live-agree; close-live; skip-le; skip-dying; ∨∧-mono; ∨ʳ) renaming (live to rows-live)
 open import Simulation.Frame using (Agree; agree; at; first; mach-frame; reg-frame; partners-frame; arr-frame; spent-frame)
 open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle; sink-at; disp-quiet)
 open import Simulation.Pass.Inner using (module PassI; pred-one; fin-at)
@@ -296,7 +296,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
 
     module _ {NI′} (ib′ : InputBlock {Γ = Γ} κ π {t} (EvalSt.nodes stP) NI′ (plainᵗ (lookup Γ i)) full
                             (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h)))
-                   (fr : ∀ k → (k ∈ blockNodes full → ⊥) → lookupNode k NI′ ≡ lookupNode k NI) where
+                   (fr : ∀ k → (k ∈ blockNodes full → ⊥) → lookupNode k NI′ ≡ lookupNode k NI) (df : DyingFree stI) where
 
       -- A ROW IS THE RAW ROW, OR READS ITS NODES AS IT DID
       touch : ∀ {r′} → r′ ∈ K → (r′ ≡ rawRow) ⊎ Agree {Γ = Γ} κ NI′ NI (proj₂ (proj₂ (proj₂ r′)))
@@ -380,7 +380,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
           end-live : LiveAt (shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true (record St₀ { nodes = NI′ })))
           end-live {r} r∈ sk with touch r∈
           ... | inj₂ ag = live-agree (proj₂ (proj₂ (proj₂ r))) {NI} {NI′} (λ k h → at ag k (T-true h))
-                            (LiveRows.rows-live (close-live S a′) {r} r∈ (skip-le (grow (regSource (proj₁ (proj₂ r))) (proj₁ r)) sk))
+                            (LiveRows.rows-live (close-live S a′ df) {r} r∈ (skip-le (grow (regSource (proj₁ (proj₂ r))) (proj₁ r)) sk))
           ... | inj₁ refl = ⊥-elim (subst T sk (∨ʳ (any (_≡ᵇ rid) (EvalSt.cancelled stI))
                               (both (∨ʳ (sameSource raw shr)
                                       (subst T (sym (subst (λ s → memberSource raw (s ∷ []) ≡ true) (sym e₂) (cong (_∨ false) (same-refl raw)))) tt))
@@ -448,15 +448,15 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                 → _∈_ {A = RegRow (plainᵏ Γ κ) (emitᵗ t)} (rid , atSlot (i ↑ˡ n) , (plainᵗ (lookup Γ i) , full)) (EvalSt.registry stI)
                 → InputBlock {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) (plainᵗ (lookup Γ i)) full
                     (subst (λ u → Path (plainᵏ Γ κ) ℓ u (emitᵗ t)) (hotEq {Γ = Γ} κ i hot) (share-sink (n ↑ʳ i) h))
-                → ∀ {eI sI₃ stI₃}
+                → DyingFree stI → ∀ {eI sI₃ stI₃}
                 → chainStep⇓ a′ [] true (suc (toℕ (i ↑ˡ n)) , q) sI
                     (record (cascadeClose a′ stI) { delivered = rid ∷ EvalSt.delivered (cascadeClose a′ stI) }) (eI , sI₃ , stI₃)
                 → HotEnd κ S a a′ i eI sI₃ stI₃
-  hot-end-block S {a} {a′} {i} hot e₁ e₂ ety {h = h} d mem ib step
+  hot-end-block S {a} {a′} {i} hot e₁ e₂ ety {h = h} d mem ib df step
     with hot-block-end hot d ib (alive S {a} {a′} {i} hot e₁ e₂ {h = h} mem) step
   ... | NI′ , ib′ , fr , dsp =
     hot-end-at {below = h} {εI = trans (hotEq {Γ = Γ} κ i hot) (cong emitᵗ (sym ety))} {ty = ety}
-      (after (end-store S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) (end-keeps S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) (end-persists S {a} {a′} {i} hot e₁ e₂ mem ib′ fr) [] (λ x → x))
+      (after (end-store S {a} {a′} {i} hot e₁ e₂ mem ib′ fr df) (end-keeps S {a} {a′} {i} hot e₁ e₂ mem ib′ fr df) (end-persists S {a} {a′} {i} hot e₁ e₂ mem ib′ fr df) [] (λ x → x))
       (carriesU-nil κ {t} {ep} {ei} _) dsp refl
 
 -- AND AT ITS END: none, and no plain reader, until the share has
@@ -469,10 +469,10 @@ hot-end-start : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) {ep : Closed Γ t} {ei :
               → lookup κ i ≡ hotᵏ
               → ∀ {l l′} → Src κ l l′ → HeadOf l a → HeadOf l′ a′
               → Arrival.source a ≡ toℕ i → Arrival.source a′ ≡ toℕ (i ↑ˡ n)
-              → ∀ {eI sI₃ stI₃}
+              → DyingFree stI → ∀ {eI sI₃ stI₃}
               → cascadeGo⇓ a′ [] true (chainsOf a′ stI) sI (cascadeClose a′ stI) (eI , sI₃ , stI₃)
               → HotEnd κ S a a′ i eI sI₃ stI₃
-hot-end-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src h h′ e₁ e₂ {eI} {sI₃} {stI₃} go
+hot-end-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk src h h′ e₁ e₂ df {eI} {sI₃} {stI₃} go
   with Store.census S i hk
 ... | inj₂ (z₁ , z₂ , cd) =
   hot-end-idle (plain-none {Γ = Γ} κ e₁ (Store.rows S) (proj₁ (Store.above S)) z₂) z₁ z₂ cd
@@ -487,4 +487,4 @@ hot-end-start {n} {Γ} κ {stP = stP} {sI = sI} {stI = stI} S {a} {a′} {i} hk 
   subst (λ o → HotEnd κ S a a′ i o sI₃ stI₃) (sym (++-identityʳ _))
         (hot-end-block κ S hot e₁ e₂
                        (plainᵗ-inj (trans (sym (head-ety {Γ = Γ} κ src h h′ e₁)) (cong (λ r → proj₁ (proj₂ (proj₂ r))) d)))
-                       d mem ib d′)
+                       d mem ib df d′)

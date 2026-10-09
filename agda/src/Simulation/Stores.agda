@@ -883,15 +883,29 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     -- both runs read one author's table, the impl's embedded
     scripts : Σ (SimulSlots Γ κ) λ ins → Sched.slots sP ≡ memoᶠ (plainSlots ins) × Sched.slots sI ≡ memoᶠ (embedSlotsImpl ins)
 
--- A SOURCE'S CLOSE LEAVES EVERY ROW IT REVIVES WALKING LIVE OUTERS:
--- the close empties `delivered`, so a row the value pass skipped as
--- dying and delivered is walked again by the end pass.  No row is
--- cancelled (`uncut`), so after the close every row must walk live
--- outers, and `live-outer` speaks only of the rows that were unskipped
-postulate
-  close-live : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                 {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-             → Store κ sP stP sI stI → (a′ : Arrival (plainᵏ Γ κ)) → LiveRows (cascadeClose a′ stI)
+-- NO ROW OF A DYING SOURCE IS REGISTERED, so the only skip is a cut.
+-- Between walks it holds, since a share that ends mid-walk drops its own
+-- rows and the finish drops the closed source's; inside the end pass it
+-- does not, which is why `Store` cannot carry it
+DyingFree : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → Set
+DyingFree st = ∀ {r} → r ∈ EvalSt.registry st → dyingᵇ st r ≡ false
+
+-- a skip the close's empty ledger does not see is one the state before
+-- it did not see either, once its source was not dying
+unskip : ∀ c {x y} → c ∨ (x ∧ false) ≡ false → c ∨ (false ∧ y) ≡ false
+unskip false _ = refl
+unskip true  ()
+
+-- A SOURCE'S CLOSE LEAVES EVERY ROW IT REVIVES WALKING LIVE OUTERS: the
+-- close empties `delivered` and touches neither rows nor nodes, so with
+-- no row of a dying source it revives nothing `live-outer` skipped
+close-live : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+               {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+           → Store κ sP stP sI stI → (a′ : Arrival (plainᵏ Γ κ)) → DyingFree stI → LiveRows (cascadeClose a′ stI)
+close-live {stI = stI} S a′ q = live λ {r} r∈ sk →
+  LiveRows.rows-live (Store.live-outer S) {r} r∈
+    (trans (cong (λ d → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ∨ (d ∧ any (_≡ᵇ proj₁ r) (EvalSt.delivered stI))) (q r∈))
+           (unskip (any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI)) {y = true} sk))
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other

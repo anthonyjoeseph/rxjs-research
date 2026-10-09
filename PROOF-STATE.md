@@ -262,12 +262,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   Decides whether `simulation`'s instant bookkeeping survives a value pass
   that now emits once per value.
 
-- **THE LIVE OUTER.** `Store.live-outer` holds every undelivered row live
-  through its outers. The fold's stale write-back is ruled out: no boundary
-  clears a done flag over 202 cases finishing at an ended merge. Left:
-  count in `qc-store` the rows `close-live` and `open-live` revive under an
-  ended outer, and decide `LiveRows` there. Decides whether `simulation`'s
-  reached states are live, the fact the explode leaves are false without.
+- **THE LIVE OUTER.** A pop's open and a close revive no row walking an
+  ended outer, since `Storeˢ.quiet` keeps no row of a dying source registered
+  between arrivals; the fold's stale write-back is ruled out too. Left:
+  `walk-quiet`, a walk drops an ended share's rows before it ends; aim a sweep
+  at a share subscribed again after its end inside one walk, then body it over
+  the share's finish. Decides whether `simulation`'s reached skips are cuts.
 
 - **THE WALK'S LIVE PATH.** `hop-live`, `cold-live` and `join-live` each ask a
   walk to hand back the `LiveOn` of the path it registers; thread it through
@@ -297,11 +297,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `DEAD ROUTE, PROBED`: one exploded emit, carrying nothing or one value,
   subscribed by the impl's idle merge, walks into the flattener, false where
   the outer has ended; a group delivered at one instant sends at it.
-- **`close-live`** (Simulation.Stores) — FALSITY, `NO EVIDENCE`: a source's
-  close revives the rows skipped as delivered while dying, each live only if no
-  outer it walks has ended.
-- **`open-live`** (Simulation.Pop) — FALSITY, `NO EVIDENCE`: a popped arrival's
-  open clears every skip, each row live only if no outer it walks has ended.
+- **`walk-quiet`** (Simulation.Statement) — FALSITY, `PROBED`: a row of a
+  source dying at a walk's end was dying at its start.
+- **`start-quiet`** (Simulation.Statement) — FALSITY, `PROBED`: the root
+  subscribes leave no row of a dying source registered.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.

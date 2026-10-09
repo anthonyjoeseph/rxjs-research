@@ -10,11 +10,13 @@ module Simulation.Pop where
 open import Data.List    using (List; []; _∷_; map)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᵃ)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᵃ; lookup to lookupᵃ)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.Nat     using (_<_)
+open import Data.Nat     using (_<_; _≡ᵇ_)
+open import Data.Bool    using (_∨_; _∧_)
+open import Data.Bool.ListAction using (any)
 open import Data.Sum     using (inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Mint      using (counter; sourceᵏ)
@@ -23,7 +25,7 @@ open import Rx.Evaluator.Reducible.Support using (sub-rule)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; NodeId; NodeState; schedGo; schedHeadOf; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there; SameOrd)
-open import Simulation.Stores using (Named; guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store; spent-off; LiveRows)
+open import Simulation.Stores using (Named; guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store; spent-off; LiveRows; DyingFree) renaming (live to rows-live)
   renaming (here to sp-here; there to sp-there)
 
 -- the rest of two lists a relation holds for, given their first elements
@@ -122,24 +124,26 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   open-named N so = record { slots-below = Named.slots-below N ; ords-below = ords-same so (Named.ords-below N)
                            ; srcs-below = Named.srcs-below N ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
 
-  -- A POP LEAVES EVERY ROW WALKING LIVE OUTERS: the open empties
-  -- `delivered`, so a row the last cascade skipped as dying and
-  -- delivered is walked again -- unless its source's finish dropped it
-  postulate
-    open-live : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-                  {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-              → Store κ sP stP sI stI → LiveRows (cascadeOpen stI)
+  -- A POP LEAVES EVERY ROW WALKING LIVE OUTERS: the open empties the
+  -- ledger and touches neither rows nor nodes, so it revives a row only
+  -- if the last cascade skipped it, and with no cut row and no row of a
+  -- dying source it skipped none
+  open-live : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+            → Store κ sP stP sI stI → DyingFree stI → LiveRows (cascadeOpen stI)
+  open-live {stI = stI} s q = rows-live λ {r} r∈ _ → LiveRows.rows-live (Store.live-outer s) {r} r∈
+    (cong₂ (λ c d → c ∨ (d ∧ any (_≡ᵇ proj₁ r) (EvalSt.delivered stI))) (lookupᵃ (proj₂ (Store.uncut s)) r∈) (q r∈))
 
   -- A POP LEAVES THE STORES RELATED: the popped sources keep their
   -- numbers and places, each giving up one pending value, and the
   -- cascade's ledger opens empty on both sides.
   pop-store : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
                 {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-    → Store κ sP stP sI stI
+    → Store κ sP stP sI stI → DyingFree stI
     → ∀ {a a′ rs rs′} → schedGo (Sched.live sP) ≡ inj₂ (a , rs) → schedGo (Sched.live sI) ≡ inj₂ (a′ , rs′)
     → Sync rs rs′
     → Store κ (record sP { live = rs }) (cascadeOpen stP) (record sI { live = rs′ }) (cascadeOpen stI)
-  pop-store {sP = sP} {stP = stP} {sI = sI} {stI = stI} s ex ex′ sy
+  pop-store {sP = sP} {stP = stP} {sI = sI} {stI = stI} s q ex ex′ sy
     with subst₂ (Popped (Src κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Store.sync s) (Store.sources s))
   ... | pop _ _ _ _ _ so so′ _ pp = record
     { π        = Store.π s
@@ -173,5 +177,5 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; ruleP    = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleP s)
     ; ruleI    = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleI s)
     ; scripts  = Store.scripts s
-    ; live-outer = open-live s
+    ; live-outer = open-live s q
     }
