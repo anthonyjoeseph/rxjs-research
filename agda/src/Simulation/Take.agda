@@ -397,7 +397,7 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
     takeWhile-arm : ∀ {lo lo′ ℓ s} {P k} {h : lo ≤ ℓ} {p : Path Γ ℓ s t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
                   → Steps (take-f (just P) k) h p Q
     takeWhile-arm S R@(spentWhile~ _ lk _ _) bs sp si _ d dI = while-spent S R lk bs sp si d dI
-    takeWhile-arm {Q = _ ↠[ _ ] (fT ↠[ _ ] qT)} {vs = vs} {es = es} {fin = fin} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
+    takeWhile-arm {Q = _ ↠[ hS ] (fT ↠[ hT ] qT)} {vs = vs} {es = es} {fin = fin} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
                   R@(takeWhile~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
                                 {h = h} {h₁ = h₁} {h₂ = h₂} {h₃ = h₃} {P = P} {F₁ = F₁} {p = p} {q = q} e lk lk₁ lk₂ CL r)
                   bs sp si g d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
@@ -412,8 +412,8 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                                           (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                         (trans fe eqW) d₂
     ... | r1 , fl , bud | refl =
-      arm (proj₁ TW) (proj₂ TW) cs soq (λ e → gone-cell S {f = fT} {q = qT} take-c
-                                         (gone-cell S {f = scan-f F₁ k₁} {q = fT ↠[ h₂ ] qT} scan-c (g (trans (sym (∧-identityʳ fin)) e)))) dq (λ {rP} dP B rel′ →
+      arm (proj₁ TW) (proj₂ TW) cs soq (λ e → gone-cell S {f = fT} {h = hT} {q = qT} take-c
+                                         (gone-cell S {f = scan-f F₁ k₁} {h = hS} {q = fT ↠[ hT ] qT} scan-c (g (trans (sym (∧-identityʳ fin)) e)))) dq (λ {rP} dP B rel′ →
         takeWhile~ (After.grows B (After.grows (proj₁ TW) e))
           (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′) CL rel′)
         λ { (f , ds) → out-quiet [] refl , inj₂ (cong (λ x → x ∧ true) f , dl ds) }
