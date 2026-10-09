@@ -518,21 +518,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (setNode m y (EvalSt.nodes stP)) (setNode m′ y′ (EvalSt.nodes stI)) u op m m′ ks xs
                      × PathRel {Γ = Γ} κ (Store.π (After.store A)) (setNode m y (EvalSt.nodes stP)) (setNode m′ y′ (EvalSt.nodes stI)) p q
     flat-write {sP} {stP} {sI} {stI} S {m = m} {m′} {y = y} {y′} (f@(pm , _ , _ , lP , lI , fn , _ , lk) , r) fn′ lv =
-      after S′ (λ { (inj₁ c) → inj₁ c ; (inj₂ (a , b , pr)) → inj₂ (a , b , W.partW (Store.rows S) pr) })
-               (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
-                               ; rows = W.arrW (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
-               [] (λ x → x)
+      node-write S W.moved lv
       , W.flatW f , W.pathW r
       where
       module W = Write κ (Store.π-keys S) (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} pm lP lI fn lk fn′
-      open Store S
-      S′ : St sP (record stP { nodes = setNode m y (EvalSt.nodes stP) }) sI (record stI { nodes = setNode m′ y′ (EvalSt.nodes stI) })
-      S′ = record
-        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-        ; sync = sync ; rows = W.regW rows ; dlv-alike = W.spentW rows dlv-alike ; dying-alike = W.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
-        ; census = census ; owned = owned
-        ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-        ; scripts = scripts ; live-outer = lv }
 
     -- AN IMPL CELL WRITTEN UNDER A SPENT TEST: the stores and the tails
     -- stay related, the plain side unmoved
@@ -544,21 +533,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = setNode k₁ (cell-st c) (EvalSt.nodes stI) })) λ A
                     → PathRel {Γ = Γ} κ (Store.π (After.store A)) (EvalSt.nodes stP) (setNode k₁ (cell-st c) (EvalSt.nodes stI)) p q
     spent-write {sP} {stP} {sI} {stI} S {k₁ = k₁} {c = c} e lP l₁ r =
-      after S′ (λ { (inj₁ x) → inj₁ x ; (inj₂ (a , b , pr)) → inj₂ (a , b , W.M.partW (Store.rows S) pr) })
-               (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
-                               ; rows = W.M.arrW (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
-               [] (λ x → x)
+      node-write S W.M.moved (live-quiet k₁ refl (Store.live-outer S))
       , W.M.pathW r
       where
       module W = CellWrite κ (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} {c = c} e lP l₁
-      open Store S
-      S′ : St sP stP sI (record stI { nodes = setNode k₁ (cell-st c) (EvalSt.nodes stI) })
-      S′ = record
-        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = proj₁ named , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
-        ; census = census ; owned = owned
-        ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-        ; scripts = scripts ; live-outer = live-quiet k₁ refl live-outer }
 
     -- a flattener fact read at the frame's operator is one at the former's
     reop : ∀ {π u op op₀ x x′} → flatOp op ≡ flatOp op₀ → FlatNodes {Γ = Γ} κ π u op₀ x x′ → FlatNodes {Γ = Γ} κ π u op x x′
@@ -630,21 +608,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                       → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI)) u op m m′ ks xs
                       × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI)) p q
     restamp-write {sP} {stP} {sI} {stI} S {u = u} {ks = ks} {c′ = c′} f@(pm , _ , _ , _ , lI , fn , _ , lk) r =
-      after S′ (λ { (inj₁ x) → inj₁ x ; (inj₂ (a , b , pr)) → inj₂ (a , b , W.M.partW (Store.rows S) pr) })
-               (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
-                               ; rows = W.M.arrW (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
-               [] (λ x → x)
+      node-write S W.M.moved (live-quiet ks refl (Store.live-outer S))
       , W.flatW f , W.M.pathW r
       where
       module W = FlatCellWrite κ (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} pm lI fn lk c′
-      open Store S
-      S′ : St sP stP sI (record stI { nodes = setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI) })
-      S′ = record
-        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = proj₁ named , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
-        ; census = census ; owned = owned
-        ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-        ; scripts = scripts ; live-outer = live-quiet ks refl live-outer }
 
     -- A RESTAMP KEEPS AN EMIT'S EVENTS, so its values, and moves only a
     -- subscribe's stamp
@@ -811,21 +778,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                        (setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] true) (EvalSt.nodes stI))
                      × MergeAt {Γ = Γ} κ (setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] true) (EvalSt.nodes stI)) u mX
     merge-done {sP} {stP} {sI} {stI} S {u = u} {mX = mX} f@(pm , _) r lX lv =
-      after S′ (λ { (inj₁ x) → inj₁ x ; (inj₂ (a , b , pr)) → inj₂ (a , b , W.M.partW (Store.rows S) pr) })
-               (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
-                               ; rows = W.M.arrW (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
-               [] (λ x → x)
+      node-write S W.M.moved lv
       , (W.flatW f , W.M.pathW r) , W.mergeX
       where
       module W = MergeDone κ (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} pm lX
-      open Store S
-      S′ : St sP stP sI (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] true) (EvalSt.nodes stI) })
-      S′ = record
-        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = proj₁ named , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
-        ; census = census ; owned = owned
-        ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-        ; scripts = scripts ; live-outer = lv }
 
     -- the same, at a walk
     flat-echo : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}

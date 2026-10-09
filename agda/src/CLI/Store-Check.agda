@@ -21,8 +21,7 @@
 -- `ObsRel` and `EnvRel` relate terms, decided by `CLI.Obs-Match` to a
 -- depth: an observable nested past it is related to anything, and so
 -- is every `DeferRel`.  `ruleP`/`ruleI` are the evaluator's own
--- rule, which its builders already carry.  A red is a candidate until
--- a probe pins it.
+-- rule, which its builders already carry.
 --
 -- A COMBINATION SET IS CAPPED, so a red reading "no pairing fits" with
 -- the set at its cap is not yet a red.  The report says when it was.
@@ -32,7 +31,7 @@ module CLI.Store-Check where
 open import Data.Bool    using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.Bool.ListAction using (any; all)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.List    using (List; []; _∷_; map; length; take; concatMap; _++_; allFin)
+open import Data.List    using (List; []; _∷_; map; length; take; concatMap; _++_; allFin; filterᵇ)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing; maybe′) renaming (map to mapᴹ)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
@@ -164,6 +163,50 @@ module _ {m} {Δ : Ctx m} where
   liveOuter st = all (λ r → all (λ k → not (aliveThroughᶠ k st r) ∨ not (outerDone (lookupNode k (EvalSt.nodes st))))
                                 (thruNodes (proj₂ (proj₂ (proj₂ r)))))
                      (EvalSt.registry st)
+
+  innersAt : ∀ {lo s u} → NodeId → Path Δ lo s u → List NodeId
+  innersAt k (from-inner _ k′ j ↠[ _ ] q) = (if k′ ≡ᵇ k then j ∷ [] else []) ++ innersAt k q
+  innersAt k (_ ↠[ _ ] q)                = innersAt k q
+  innersAt k _                           = []
+
+  dedup : List ℕ → List ℕ
+  dedup []       = []
+  dedup (x ∷ xs) = if any (_≡ᵇ x) xs then dedup xs else x ∷ dedup xs
+
+  -- A FLATTENER'S COUNTERS ACCOUNT FOR ITS ALIVE ROWS: a merge's active
+  -- count is its alive inners, a switch's current inner and an
+  -- exhaust's bit are its one alive inner, and an outer not done has an
+  -- alive row through it.  A flattener no alive row runs through is
+  -- severed, by a cut rootward of it, and no end reaches it again
+  accounts : ∀ {u} {e : Closed Δ u} → EvalSt e → Maybe String
+  accounts st = firstJust (map (λ x → if any (aliveThroughᶠ (proj₁ x) st) (EvalSt.registry st) then one x else nothing)
+                               (EvalSt.nodes st))
+    where
+    firstJust : List (Maybe String) → Maybe String
+    firstJust []             = nothing
+    firstJust (just w  ∷ _)  = just w
+    firstJust (nothing ∷ ms) = firstJust ms
+    inners : NodeId → List ℕ
+    inners k = dedup (concatMap (λ r → if aliveThroughᶠ k st r then innersAt k (proj₂ (proj₂ (proj₂ r))) else [])
+                                (EvalSt.registry st))
+    outers : NodeId → ℕ
+    outers k = length (filterᵇ (λ r → aliveThroughᶠ k st r ∧ any (_≡ᵇ k) (thruNodes (proj₂ (proj₂ (proj₂ r)))))
+                               (EvalSt.registry st))
+    held : NodeId → Bool → Maybe String
+    held k od = if not od ∧ (outers k ≡ᵇ 0)
+                then just ("outer-held: flattener #" ++ˢ show k ++ˢ " not done, no alive outer row") else nothing
+    one : NodeId × NodeState Δ → Maybe String
+    one (k , mergeAll-st _ a _ od) = if a ≡ᵇ length (inners k) then held k od
+      else just ("merge-count: #" ++ˢ show k ++ˢ " active " ++ˢ show a ++ˢ ", inners alive " ++ˢ show (length (inners k)))
+    one (k , switch-st cur od) with inners k
+    ... | []     = if is-nothing cur then held k od else just ("switch-count: #" ++ˢ show k ++ˢ " current, no inner alive")
+    ... | j ∷ [] = if maybe′ (_≡ᵇ j) false cur then held k od else just ("switch-count: #" ++ˢ show k ++ˢ " current is not the alive inner")
+    ... | _      = just ("switch-count: #" ++ˢ show k ++ˢ " two inners alive")
+    one (k , exhaust-st act od) with inners k
+    ... | []    = if not act then held k od else just ("exhaust-count: #" ++ˢ show k ++ˢ " active, no inner alive")
+    ... | _ ∷ [] = if act then held k od else just ("exhaust-count: #" ++ˢ show k ++ˢ " inactive, an inner alive")
+    ... | _     = just ("exhaust-count: #" ++ˢ show k ++ˢ " two inners alive")
+    one _ = nothing
 
   opName : AllOp → String
   opName mergeAllᵒ = "merge"
@@ -1018,6 +1061,10 @@ countᵇ : ∀ {A : Set} → (A → Bool) → List A → ℕ
 countᵇ p []       = 0
 countᵇ p (x ∷ xs) = (if p x then 1 else 0) + countᵇ p xs
 
+firstAcc : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} → List (EvalSt e) → Maybe String
+firstAcc []       = nothing
+firstAcc (s ∷ ss) = maybe′ just (firstAcc ss) (accounts s)
+
 -- THE IMPL'S ROWS LIVE ONCE A LEDGER CLEARS: at every boundary as a pop
 -- opens it (`open-live`), and at every close (`close-live`)
 storeSides : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → Bool × String
@@ -1031,7 +1078,10 @@ storeSides {κ = κ} f e ins with lockstep κ 0 (trace f (plainExp e) (plainSlot
 ...       | false = false , "cascade-quiet: a boundary registers a row of a dying source"
 ...       | true  with all (λ x → dyingFree (proj₁ x)) (closes f (elaborateImpl κ e) (embedSlotsImpl ins))
 ...         | false = false , "pass-quiet: a value pass ends registering a row of a dying source"
-...         | true  = true , w
+...         | true  with firstAcc (map proj₂ (trace f (elaborateImpl κ e) (embedSlotsImpl ins))
+                              ++ concatMap (λ x → proj₁ x ∷ proj₂ x ∷ []) (closes f (elaborateImpl κ e) (embedSlotsImpl ins)))
+...           | just w′ = false , w′
+...           | nothing = true , w
 
 -- HOW MANY BOUNDARIES SEE A MERGE'S ACTIVE COUNT FALL: an inner
 -- finished there, whether or not a queue was waiting behind it

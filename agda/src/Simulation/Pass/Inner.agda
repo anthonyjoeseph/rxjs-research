@@ -316,26 +316,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                             (setNode nid′ (mergeAll-st {t = emitᵗ u} nothing (pred a) [] true)
                               (setNode m2 (mergeAll-st {t = emitᵗ u} nothing (pred b) [] true) (EvalSt.nodes stI))) p q
     defer-write {sP} {stP} {sI} {stI} S e₁ e₂ lP lI l2 r =
-      after S′ (λ { (inj₁ c) → inj₁ c ; (inj₂ (x , y , pr)) → inj₂ (x , y , W.M.partW (Store.rows S) pr) })
-               (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
-                               ; rows = W.M.arrW (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
-               [] (λ x → x)
-      , W.M.pathW r
-      where
-      module W = HopWrite κ (Store.π-keys S) (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} e₁ e₂ lP lI l2
-      open Store S
-      S′ : St sP (record stP { nodes = W.NP′ }) sI (record stI { nodes = W.NI′ })
-      S′ = record
-        { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = Store.distinct S
-        ; sync = sync ; rows = W.M.regW rows ; dlv-alike = W.M.spentW rows dlv-alike ; dying-alike = W.M.spentW rows dying-alike ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
-        ; census = census ; owned = owned
-        ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-        ; scripts = scripts
-        ; live-outer = live-mono {st = stI} {st′ = record stI { nodes = W.NI′ }} (λ r∈ → r∈) (λ _ _ h → h)
+      node-write S W.M.moved (live-mono {st = stI} {st′ = record stI { nodes = W.NI′ }} (λ r∈ → r∈) (λ _ _ h → h)
             (λ {_} {_} {q} l → live-set {q = q} _ W.yI W.NI₂
                 (λ h → trans (sym (cong outerDoneᵇ lI)) (od-back _ _ W.y2 (EvalSt.nodes stI) (λ ()) h))
                 (live-set {q = q} _ W.y2 (EvalSt.nodes stI) (λ h → trans (sym (cong outerDoneᵇ l2)) h) l))
-            live-outer }
+            (Store.live-outer S))
+      , W.M.pathW r
+      where
+      module W = HopWrite κ (Store.π-keys S) (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} e₁ e₂ lP lI l2
 
     -- AN INNER NO LIVE CHAIN RUNS THROUGH STAYS SO while the group it
     -- left folds down the tail below it: its node is off the tail, which

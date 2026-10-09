@@ -157,6 +157,18 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
     × lookupNode nid′ NI ≡ just (mergeAll-st {t = emitᵗ u} nothing a [] true)
     × lookupNode m2 NI ≡ just (mergeAll-st {t = emitᵗ u} nothing b [] true) × a ≤ 1 × b ≤ 1
 
+  -- WHAT A NODE MOVE KEEPS: the rows, their partners, their spending
+  -- and the arrival's rows, each read at the new nodes
+  record Moved {t : Ty} (NP NP′ : List (NodeId × NodeState Γ)) (NI NI′ : List (NodeId × NodeState (plainᵏ Γ κ))) : Set where
+    field
+      regW   : ∀ {LP LI rs rs′} → RegRel κ π {t} NP NI LP LI rs rs′ → RegRel κ π NP′ NI′ LP LI rs rs′
+      partW  : ∀ {LP LI rs rs′} (q : RegRel κ π {t} NP NI LP LI rs rs′) {r r′} → Partners κ π NP NI LP LI q r r′
+             → Partners κ π NP′ NI′ LP LI (regW q) r r′
+      spentW : ∀ {LP LI rs rs′} (q : RegRel κ π {t} NP NI LP LI rs rs′) {dP dI} → Spent κ π NP NI LP LI q dP dI
+             → Spent κ π NP′ NI′ LP LI (regW q) dP dI
+      arrW   : ∀ {LP LI rs rs′} (q : RegRel κ π {t} NP NI LP LI rs rs′) {s s′ w w′} → ArrRows κ π NP NI LP LI q s s′ w w′
+             → ArrRows κ π NP′ NI′ LP LI (regW q) s s′ w w′
+
   -- A WRITE KEEPS EVERY ROW WHEN IT KEEPS EVERY NODE FACT A ROW STATES:
   -- a cell, a count, a flattener's pair, a hop's merges pending or
   -- fired, and an impl node no entry pairs
@@ -237,6 +249,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {π : List (NodeId × List NodeId)} whe
       arrW (cold~ _ _ _ _ ∷ q)         (r , a) = r , arrW q a
       arrW (defer~ _ _ _ _ _ _ ∷ q)    (r , a) = r , arrW q a
       arrW (mach _ q)                  a       = arrW q a
+
+    moved : Moved {t = t} NP NP′ NI NI′
+    moved = record { regW = regW ; partW = partW ; spentW = spentW ; arrW = arrW }
 
   module Write (keys : Unique (map proj₁ π)) (vals : Unique (concatMap proj₂ π)) {t : Ty}
                {NP : List (NodeId × NodeState Γ)} {NI : List (NodeId × NodeState (plainᵏ Γ κ))}
