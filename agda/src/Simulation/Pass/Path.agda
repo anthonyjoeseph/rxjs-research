@@ -132,8 +132,8 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
              → shareGo⇓ {lo = lo} now i vals fin chs sched st r
              → memberSource k (EvalSt.dying st) ≡ true → memberSource k (EvalSt.dying (proj₂ (proj₂ r))) ≡ true
     go-dying go-nil d = d
-    go-dying (go-cut _ g) d = go-dying g d
-    go-dying (go-live _ f g) d = go-dying g (dying-kept f d)
+    go-dying {k = k} (go-cut _ g) d = go-dying {k = k} g d
+    go-dying {k = k} (go-live _ f g) d = go-dying {k = k} g (dying-kept {k = k} f d)
 
     -- a row marked delivered while its source is dying is skipped
     skip-marked : ∀ {fin s rid} {st : EvalSt ei} → fin ≡ true → memberSource s (EvalSt.dying st) ≡ true
@@ -227,14 +227,14 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       share-go _ S εI c _ (slotpair q ∷ _) _ _ _ _ (go-live y _ _) (go-cut y′ _) _ = ⊥-elim (t≢f (trans (sym y′) (trans (sym (skip-alike S q)) y)))
       share-go _ S εI c _ (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (go-live {i = i₀} {rid = rid} {st₀ = st₀} y _ _) (go-live _ _ _) _ =
         ⊥-elim (t≢f (trans (sym (skip-cut {s = toℕ i₀} {rid} {st₀} x)) y))
-      share-go wk S {i = i} εI {fin = fin} c dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live {emits = eI} _ dI g′) lt =
+      share-go wk S {i = i} εI {fin = fin} c dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live {rid = rI′} {emits = eI} _ dI g′) lt =
         rebase {fin = fin} (A ⨾ proj₁ Y) , λ f ds → out-++ {Δ = plainᵏ Γ κ} {t = plainᵗ t} eI _ (proj₂ Z f ds) (proj₂ Y f ds)
         where
           sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
           sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-          Z = slot-pass wk (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI (λ e → skip-marked e (dy e)) (sz-l lt)
+          Z = slot-pass wk (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI (λ e → skip-marked {s = toℕ (n ↑ʳ i)} {rid = rI′} e (dy e)) (sz-l lt)
           A = proj₁ Z
-          Y = share-go wk (After.store A) εI c (λ e → dying-kept dI (dy e)) (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
+          Y = share-go wk (After.store A) εI c (λ e → dying-kept {k = toℕ (n ↑ʳ i)} dI (dy e)) (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
                 (λ m → fold-kept dP sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
                 (λ m m′ → aP (there m) (there m′))
                 (λ m → fold-kept dI sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))
@@ -265,7 +265,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
           Q = after-out (++-identityʳ _)
                 (proj₁ (quiet-sink {h = h} {h′ = h′} sh S (sink~ sh) (quiet x b []) refl (sink-sound i h (Store.ruleP S)) (sink-ok ε (Store.ruleI S))
                           (sink-intro ε (fold-sink (disp (walk-more gI walk-nil))))))
-          Y = share-walk wk (After.store Q) {h = h} {h′ = h′} sh c (λ e → go-dying gI (dy e)) wP wI lt
+          Y = share-walk wk (After.store Q) {h = h} {h′ = h′} sh c (λ e → go-dying {k = toℕ (n ↑ʳ i)} gI (dy e)) wP wI lt
       share-walk wk S {i = i} {h = h} {h′ = h′} sh (one x r c) dy (walk-more gP wP) (walk-more {emits = eI} gI wI) lt =
         A ⨾ proj₁ Y , λ { (f , d ∷ ds) → out-++ {Δ = plainᵏ Γ κ} {t = plainᵗ t} eI _ (proj₂ Z refl (del-cast ε (d ∷ []))) (proj₂ Y (f , ds)) }
         where
@@ -274,7 +274,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
                 (admit-ot i _ _ (Store.ruleP S)) (admit-agrees i (Store.ruleP S))
                 (admit-ot (n ↑ʳ i) _ _ (Store.ruleI S)) (admit-agrees (n ↑ʳ i) (Store.ruleI S)) gP gI (sz-l lt)
           A = proj₁ Z
-          Y = share-walk wk (After.store A) {h = h} {h′ = h′} sh c (λ e → go-dying gI (dy e)) wP wI (sz-r lt)
+          Y = share-walk wk (After.store A) {h = h} {h′ = h′} sh c (λ e → go-dying {k = toℕ (n ↑ʳ i)} gI (dy e)) wP wI (sz-r lt)
 
       -- A SHARE'S DISPATCH: the walk, between the share marked dying and
       -- its readers dropped when the group ends it
@@ -323,7 +323,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
         let si′ = drop-ot _ _ _ si
             X   = elem-walk wk S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru sp) (unthru si′) w b W W′ (sz-1 lt)
         in wrap-arm (proj₁ X) (unthru (step-kept _ dW sp))
-             (outer-wrap (After.store (proj₁ X)) {op = op} {fin = fin} (proj₂ X) (λ e → gone-walk S {h = h₂} W′ (g e)) (unthru (step-kept _ dW′ si′)) dR)
+             (outer-wrap (After.store (proj₁ X)) {op = op} {h₂ = h₂} {fin = fin} (proj₂ X) (λ e → gone-walk S {h = h₂} W′ (g e)) (unthru (step-kept _ dW′ si′)) dR)
              λ { (f , ds) → elem-out S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru si′) w b W′ ds , f }
 
       -- THE OUTER'S WALK, an element at a time
