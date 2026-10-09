@@ -410,7 +410,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
               → Σ (After S rP (oI ++ proj₁ r , proj₂ r)) λ A
                   → Walked op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ r)))
       echo-go wk {stP = stP} {rP = rP} {stI₁ = stI₁} {r = r} dv cP (restamped A (fl , rel) c refl) cI dq lt =
-        let X  = path-pass wk (After.store A) rel c (proj₂ cP) (proj₂ (proj₁ cI)) dv dq lt
+        let X  = path-pass wk (After.store A) rel c (proj₂ cP) (proj₂ (proj₁ cI)) (λ ()) dv dq lt
             F  = flat-move (EvalSt.nodes stP) (EvalSt.nodes stI₁) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ r)))
                    (After.grows (proj₁ X)) (missed dv cP) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) fl
         in A ⨾ proj₁ X , F , proj₁ (proj₂ X)
