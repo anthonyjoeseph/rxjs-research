@@ -38,7 +38,7 @@ open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
-open import Simulation.Stores using (V; RegRel; Partners; Store; Arr; LiveRows; spent-partner; named-node; named-nodes)
+open import Simulation.Stores using (V; RegRel; Partners; Store; Arr; LiveRows; spent-partner; named-node; named-nodes; inv-write)
 open import Simulation.Write using (Moved)
 open import Simulation.Grow using (OffRow; fresh-off-row; regG; partG; arrG; spentG)
 
@@ -182,7 +182,7 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
     ; census = census ; owned = owned
     ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) ruleP
     ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) ruleI
-    ; scripts = scripts ; live-outer = live-outer
+    ; scripts = scripts ; inv = inv
     }
     where open Store S
 
@@ -207,7 +207,7 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
       ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
       ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-      ; scripts = scripts ; live-outer = lv }
+      ; scripts = scripts ; inv = inv-write lv inv }
 
   -- a step from the minted stores is one from the stores
   unmint : ∀ {sP stP sI stI} {S : St sP stP sI stI} {rP rI} → After (mint-pair S) rP rI → After S rP rI

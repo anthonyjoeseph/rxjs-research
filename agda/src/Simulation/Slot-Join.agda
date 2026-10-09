@@ -38,15 +38,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Exp       using (Ty; Ctx; Closed; Tm; uniqᵗ; varᵗ)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Rx.Mint      using (counter; setAt; regᵏ; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; pathHasNode; LiveSource; RegRow; regSource; sameSource; memberSource; Path; root; share-sink; _↠[_]_;
                                 map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; atSlot; register; spentOn; lowerFloor)
 open import Rx.Evaluator.Reducible.Support using (Rule; Sound; Distinct; endOf; register-sound; row-sound; lower-nodes; lower-end; lower-distinct)
 open import SExp.Syntax  using (Kinds; hotᵏ; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ)
-open import Simulation.Stores using (LiveAt; live; Store; Arr; PathRel; Named; Census; Unpaired; RowRel; ArrRows; _∷_; []; read~; root~; sink~;
-  map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; deferInner~; LiveOn; LiveIf; module LiveIf; LiveRows; thruNodes; live-thru)
+open import Simulation.Stores using (inv-snoc; Store; Arr; PathRel; Named; Census; Unpaired; RowRel; ArrRows; _∷_; []; read~; root~; sink~;
+  map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; deferInner~; LiveOn; LiveIf; module LiveIf; thruNodes; live-thru)
 open import Simulation.Sweep using (sameSource-no; t≢f; raw≢stamped; stamped<)
 open import Simulation.Cut   using (nodesOf; has-node; node-has)
 open import Simulation.Hop   using (none-below; guard-snoc; count-snoc; reg-snoc; part-snoc; spent-snoc; arr-snoc; reg-unp; path-spent; rel-vals)
@@ -186,11 +185,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                []ᵖ (λ m → m)
       , pr₀
       where
-      reg-live : LiveAt (record stI { registry = KI ++ rowI ∷ [] })
-      reg-live {r} r∈ sk with ∈-++⁻ KI r∈
-      ... | inj₁ m           = LiveRows.rows-live live-outer m sk
-      ... | inj₂ (here refl) = join-live
-
       S₂ : Store κ sP₂ (record stP { registry = KP ++ rowP ∷ [] }) sI₂ (record stI { registry = KI ++ rowI ∷ [] })
       S₂ = record
         { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below
@@ -215,7 +209,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         ; owned    = ++⁺ᵃ (tabulateᵃ (λ {r} r∈ ns {j} b → ++⁺ᵃ (lookupᵃ owned r∈ ns b)
                                         ((λ h → ⊥-elim (off (reg-unp {Γ = Γ} κ rows {r′ = r} r∈ ns b) (has-node {k = j} p′ (subst T (sym h) tt)))) ∷ᵃ []ᵃ)))
                           ((λ ns {_} _ → ⊥-elim (ns i refl)) ∷ᵃ []ᵃ)
-        ; ruleP    = rP ; ruleI = rI ; scripts = scripts ; live-outer = live reg-live
+        ; ruleP    = rP ; ruleI = rI ; scripts = scripts ; inv = inv-snoc rowI join-live inv
         }
 
     -- SPENT: the read's path already cut, so neither run registers it
@@ -235,7 +229,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         ; named = named-reg (proj₁ named) , named-reg (proj₂ named)
         ; rids = rids ; fresh-ids = mapᵃ m<n⇒m<1+n (proj₁ fresh-ids) , mapᵃ m<n⇒m<1+n (proj₂ fresh-ids)
         ; above = above ; census = census ; owned = owned
-        ; ruleP = rP ; ruleI = rI ; scripts = scripts ; live-outer = live-outer
+        ; ruleP = rP ; ruleI = rI ; scripts = scripts ; inv = inv
         }
 
     -- the two registrations agree on whether they are spent

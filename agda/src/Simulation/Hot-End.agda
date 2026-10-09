@@ -51,8 +51,8 @@ open import Rx.Evaluator.Domain using (chainStep⇓; dispatchShare⇓; cascadeGo
   finish-all-drain; finish-nil; drain-spent; walk-nil; chain-step)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ; sharedᵏ)
-open import Simulation.Stores using (LiveAt; member-head; srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach; Named; []; _∷_;
-  LiveRows; DyingFree; live-agree; close-live; skip-le; skip-dying; ∨∧-mono; ∨ʳ) renaming (live to rows-live)
+open import Simulation.Stores using (member-head; srcCount; Census; LatchRel; Src; InputBlock; block; MachRow; hot~; RowRel; read~; cold~; defer~; hotEq; blockNodes; Store; Arr; RegRel; Spent; spent-zip; spent-off; dlvᵇ; mach; Named; []; _∷_;
+  DyingFree; inv-agree; inv-spend; inv-dying; inv-dlv; inv-close; ∨ʳ)
 open import Simulation.Frame using (Agree; agree; at; first; mach-frame; reg-frame; partners-frame; arr-frame; spent-frame)
 open import Simulation.Pass using (HotEnd; hot-end-at; hot-end-idle; sink-at; disp-quiet)
 open import Simulation.Pass.Inner using (module PassI; pred-one; fin-at)
@@ -362,25 +362,17 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         ; scripts = scripts
         ; dlv-alike = spent-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows (spent-end (λ m → m) rows)
         ; dying-alike = spent-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows (end-dies S i e₁ e₂)
-        ; live-outer = rows-live end-live }
+        ; inv = inv-agree end-ag (inv-spend (n ↑ʳ i) (inv-dying (n ↑ʳ i) (inv-dlv true rid (inv-close a′ df inv)))) }
         where
           both : ∀ {x y} → T x → T y → T (x ∧ y)
           both {true} _ h = h
 
-          -- the end's writes only add to the ledger the close emptied
-          grow : ∀ s r₀ → T (skipᵇ s r₀ (cascadeClose a′ stI))
-               → T (skipᵇ s r₀ (shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true (record St₀ { nodes = NI′ }))))
-          grow s r₀ h = skip-dying (n ↑ʳ i) true {st = record St₀ { nodes = NI′ }} s r₀
-                          (∨∧-mono (any (_≡ᵇ r₀) (EvalSt.cancelled stI)) {memberSource s (EvalSt.dying (cascadeClose a′ stI))} {memberSource s (EvalSt.dying (cascadeClose a′ stI))}
-                                    {any (_≡ᵇ r₀) (EvalSt.delivered (cascadeClose a′ stI))} {any (_≡ᵇ r₀) (rid ∷ EvalSt.delivered (cascadeClose a′ stI))}
-                                    (λ x → x) (∨ʳ (rid ≡ᵇ r₀)) h)
-
           -- the raw row is dying and delivered, so the end skips it; every
           -- other row reads the block as it did
-          end-live : LiveAt (shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true (record St₀ { nodes = NI′ })))
-          end-live {r} r∈ sk with touch r∈
-          ... | inj₂ ag = live-agree (proj₂ (proj₂ (proj₂ r))) {NI} {NI′} (λ k h → at ag k (T-true h))
-                            (LiveRows.rows-live (close-live S a′ df) {r} r∈ (skip-le (grow (regSource (proj₁ (proj₂ r))) (proj₁ r)) sk))
+          end-ag : ∀ {r} → r ∈ K → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) (shareSpend (n ↑ʳ i) (shareDying (n ↑ʳ i) true St₀)) ≡ false
+                 → ∀ k → T (pathHasNode k (proj₂ (proj₂ (proj₂ r)))) → lookupNode k NI′ ≡ lookupNode k NI
+          end-ag r∈ sk k h with touch r∈
+          ... | inj₂ ag = at ag k (T-true h)
           ... | inj₁ refl = ⊥-elim (subst T sk (∨ʳ (any (_≡ᵇ rid) (EvalSt.cancelled stI))
                               (both (∨ʳ (sameSource raw shr)
                                       (subst T (sym (subst (λ s → memberSource raw (s ∷ []) ≡ true) (sym e₂) (cong (_∨ false) (same-refl raw)))) tt))

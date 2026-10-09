@@ -31,7 +31,7 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁻; ∈-map⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᵃ; lookup to lookupᵃ)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
@@ -58,7 +58,7 @@ open import Rx.Evaluator using (frameNodes; LiveSource; Sched; EvalSt; NodeState
   _↠[_]_; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; mergeAllᵒ; cell-st;
   take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st; echoᵗ; lookupNode; memberSource;
   takeVals; scanVals; regSource; sameSource; pathHasNode; memoᶠ; skipᵇ; markDlv; shareDying; RegId; setNode;
-  Arrival; cascadeClose; spentOn; spentAt; Frame)
+  Arrival; cascadeClose; cascadeOpen; shareSpend; st-init; spentOn; spentAt; Frame)
 open import Rx.Evaluator.Domain using (flatOp; flatSt)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; slotTy; hotᵏ; sharedᵏ)
 open import SExp.Plain   using (plainExp)
@@ -874,6 +874,97 @@ named-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f} {sched : Sched Γ} {
 named-node N = record { slots-below = Named.slots-below N ; ords-below = Named.ords-below N ; srcs-below = Named.srcs-below N
                       ; cut-below = Named.cut-below N ; dlv-below = Named.dlv-below N ; dying-below = Named.dying-below N }
 
+-- NO ROW OF A DYING SOURCE IS REGISTERED, so the only skip is a cut.
+-- Between walks it holds, since a share that ends mid-walk drops its own
+-- rows and the finish drops the closed source's; inside the end pass it
+-- does not, which is why `Inv` cannot carry it
+DyingFree : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → Set
+DyingFree st = ∀ {r} → r ∈ EvalSt.registry st → dyingᵇ st r ≡ false
+
+-- a skip the close's empty ledger does not see is one the state before
+-- it did not see either, once its source was not dying
+unskip : ∀ c {x y} → c ∨ (x ∧ false) ≡ false → c ∨ (false ∧ y) ≡ false
+unskip false _ = refl
+unskip true  ()
+
+-- THE IMPL'S OWN INVARIANTS: what its state alone keeps, read off nothing
+-- the plain run holds.  Each kind of move below keeps all of them, so a
+-- new one is a field here and a clause per move, not an edit at every
+-- store a pass builds
+record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t} (st : EvalSt e) : Set where
+  no-eta-equality
+  field
+    -- the rows a dispatch would walk find their outers live
+    live-outer : LiveRows st
+
+module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
+
+  inv-init : Inv (st-init e)
+  inv-init = record { live-outer = live (λ ()) }
+
+  -- a chain step's delivery and a share's death only grow the ledger
+  inv-dlv : (fin : Bool) (rid : RegId) {st : EvalSt e} → Inv st → Inv (markDlv fin rid st)
+  inv-dlv fin rid {st} I = record { live-outer = live-mono {st = st} (λ r∈ → r∈) (skip-dlv fin rid {st}) (λ l → l) (Inv.live-outer I) }
+
+  inv-dying : (i : Fin n) {st : EvalSt e} → Inv st → Inv (shareDying i true st)
+  inv-dying i {st} I = record { live-outer = live-mono {st = st} (λ r∈ → r∈) (skip-dying i true {st}) (λ l → l) (Inv.live-outer I) }
+
+  -- a latch reads nothing a row's walk does
+  inv-spend : (i : Fin n) {st : EvalSt e} → Inv st → Inv (shareSpend i st)
+  inv-spend i {st} I = record { live-outer = live-mono {st = st} (λ r∈ → r∈) (λ _ _ h → h) (λ l → l) (Inv.live-outer I) }
+
+  -- a cut keeps some rows and adds to the ledger
+  inv-cut : (xs : List RegId) {st : EvalSt e} {K : List (RegRow Γ t)} → (∀ {r} → r ∈ K → r ∈ EvalSt.registry st)
+          → Inv st → Inv (record st { registry = K ; cancelled = xs ++ EvalSt.cancelled st })
+  inv-cut xs {st} {K} sub I =
+    record { live-outer = live-mono {st = st} {st′ = record st { registry = K ; cancelled = xs ++ EvalSt.cancelled st }}
+                            sub (skip-cancel xs {st}) (λ l → l) (Inv.live-outer I) }
+
+  -- a drop keeps some rows
+  inv-drop : {st : EvalSt e} {K : List (RegRow Γ t)} → (∀ {r} → r ∈ K → r ∈ EvalSt.registry st)
+           → Inv st → Inv (record st { registry = K })
+  inv-drop {st} {K} sub I = record { live-outer = live-mono {st = st} {st′ = record st { registry = K }} sub (λ _ _ h → h) (λ l → l) (Inv.live-outer I) }
+
+  -- A REGISTRATION JOINS LAST, its path found live where the walk read it
+  inv-snoc : {st : EvalSt e} (row : RegRow Γ t) → LiveOn (proj₂ (proj₂ (proj₂ row))) (EvalSt.nodes st)
+           → Inv st → Inv (record st { registry = EvalSt.registry st ++ row ∷ [] })
+  inv-snoc {st} row l I = record { live-outer = live go }
+    where
+    go : LiveAt (record st { registry = EvalSt.registry st ++ row ∷ [] })
+    go {r} r∈ sk with ∈-++⁻ (EvalSt.registry st) r∈
+    ... | inj₁ m         = LiveRows.rows-live (Inv.live-outer I) m sk
+    ... | inj₂ (here refl) = l
+
+  -- A NODE TABLE EVERY UNSKIPPED ROW READS AS BEFORE
+  inv-agree : {st : EvalSt e} {N : List (NodeId × NodeState Γ)}
+            → (∀ {r} → r ∈ EvalSt.registry st → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st ≡ false
+               → ∀ k → T (pathHasNode k (proj₂ (proj₂ (proj₂ r)))) → lookupNode k N ≡ lookupNode k (EvalSt.nodes st))
+            → Inv st → Inv (record st { nodes = N })
+  inv-agree {st} {N} ag I = record { live-outer = live λ {r} r∈ sk →
+    live-agree (proj₂ (proj₂ (proj₂ r))) {EvalSt.nodes st} {N} (ag r∈ sk) (LiveRows.rows-live (Inv.live-outer I) {r} r∈ sk) }
+
+  -- A NODE WRITE, whose outers the writer vouches for
+  inv-write : {st : EvalSt e} {N : List (NodeId × NodeState Γ)} → LiveRows (record st { nodes = N })
+            → Inv st → Inv (record st { nodes = N })
+  inv-write lv _ = record { live-outer = lv }
+
+  -- A SOURCE'S CLOSE REVIVES NO ROW THROUGH AN ENDED OUTER: it empties
+  -- `delivered` and touches neither rows nor nodes, so with no row of a
+  -- dying source it revives nothing the state before it skipped
+  inv-close : (a : Arrival Γ) {st : EvalSt e} → DyingFree st → Inv st → Inv (cascadeClose a st)
+  inv-close a {st} q I = record { live-outer = live λ {r} r∈ sk →
+    LiveRows.rows-live (Inv.live-outer I) {r} r∈
+      (trans (cong (λ d → any (_≡ᵇ proj₁ r) (EvalSt.cancelled st) ∨ (d ∧ any (_≡ᵇ proj₁ r) (EvalSt.delivered st))) (q r∈))
+             (unskip (any (_≡ᵇ proj₁ r) (EvalSt.cancelled st)) {y = true} sk)) }
+
+  -- AND A POP'S OPEN: it empties the ledger, so it revives a row only if
+  -- the last cascade skipped it, and with no cut row and no row of a
+  -- dying source it skipped none
+  inv-open : {st : EvalSt e} → All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled st) ≡ false) (EvalSt.registry st)
+           → DyingFree st → Inv st → Inv (cascadeOpen st)
+  inv-open {st} u q I = record { live-outer = live λ {r} r∈ _ → LiveRows.rows-live (Inv.live-outer I) {r} r∈
+    (cong₂ (λ c d → c ∨ (d ∧ any (_≡ᵇ proj₁ r) (EvalSt.delivered st))) (lookupᵃ u r∈) (q r∈)) }
+
 -- over the raw schedules and states, since a subscribe walks through
 -- states no configuration names
 --
@@ -920,8 +1011,8 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     -- a registration still in the registry is not a cascade's victim
     uncut   : All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) (EvalSt.registry stP)
             × All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) (EvalSt.registry stI)
-    -- the impl's rows a dispatch would walk find their outers live
-    live-outer : LiveRows stI
+    -- what the impl's state alone keeps
+    inv     : Inv stI
     -- everything each run has named, below its counters
     named   : Named n sP stP × Named (n + n) sI stI
     -- registrations are told apart by their ids, each minted below its run's counter
@@ -943,30 +1034,6 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     ruleI   : Rule sI stI
     -- both runs read one author's table, the impl's embedded
     scripts : Σ (SimulSlots Γ κ) λ ins → Sched.slots sP ≡ memoᶠ (plainSlots ins) × Sched.slots sI ≡ memoᶠ (embedSlotsImpl ins)
-
--- NO ROW OF A DYING SOURCE IS REGISTERED, so the only skip is a cut.
--- Between walks it holds, since a share that ends mid-walk drops its own
--- rows and the finish drops the closed source's; inside the end pass it
--- does not, which is why `Store` cannot carry it
-DyingFree : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → Set
-DyingFree st = ∀ {r} → r ∈ EvalSt.registry st → dyingᵇ st r ≡ false
-
--- a skip the close's empty ledger does not see is one the state before
--- it did not see either, once its source was not dying
-unskip : ∀ c {x y} → c ∨ (x ∧ false) ≡ false → c ∨ (false ∧ y) ≡ false
-unskip false _ = refl
-unskip true  ()
-
--- A SOURCE'S CLOSE LEAVES EVERY ROW IT REVIVES WALKING LIVE OUTERS: the
--- close empties `delivered` and touches neither rows nor nodes, so with
--- no row of a dying source it revives nothing `live-outer` skipped
-close-live : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
-               {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
-           → Store κ sP stP sI stI → (a′ : Arrival (plainᵏ Γ κ)) → DyingFree stI → LiveRows (cascadeClose a′ stI)
-close-live {stI = stI} S a′ q = live λ {r} r∈ sk →
-  LiveRows.rows-live (Store.live-outer S) {r} r∈
-    (trans (cong (λ d → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ∨ (d ∧ any (_≡ᵇ proj₁ r) (EvalSt.delivered stI))) (q r∈))
-           (unskip (any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI)) {y = true} sk))
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other

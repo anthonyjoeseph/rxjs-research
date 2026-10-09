@@ -34,7 +34,7 @@ open import Rx.Evaluator.Reducible.Support using (sub-rule; fresh-rows; rowThrou
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Unpaired; Flattener; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
   outerExplode~; inner~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach;
-  Partners; ArrRows; Spent; Store; Arr; Named; live-agree; LiveRows; live)
+  Partners; ArrRows; Spent; Store; Arr; Named; inv-agree)
 open import Simulation.Grow using (mem-any; nodes-grow)
 open import Simulation.Write using () renaming (apart to apart′)
 open import Simulation.After using (below-keys; below-vals; apart; module Kept)
@@ -227,4 +227,4 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; census = census ; owned = owned
       ; ruleP = sub-rule (λ r∈ → r∈) (<⇒≤ kP) ruleP ; ruleI = sub-rule (λ r∈ → r∈) kI ruleI
       ; scripts = scripts
-      ; live-outer = live λ {r} r∈ sk → live-agree (proj₂ (proj₂ (proj₂ r))) {EvalSt.nodes stI} {NI} (λ k h → aI k (fresh-rows ruleI r∈ k h)) (LiveRows.rows-live live-outer {r} r∈ sk) }
+      ; inv = inv-agree (λ {r} r∈ _ k h → aI k (fresh-rows ruleI r∈ k h)) inv }

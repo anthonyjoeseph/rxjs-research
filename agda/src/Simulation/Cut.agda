@@ -39,7 +39,7 @@ open import Rx.Evaluator.Reducible.Support using (∨-Tˡ; ∨-Tʳ; sub-rule; cu
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Named; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
   deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; partner-mem; ArrRows; Spent; spent-subst; Store; Arr; InputBlock; ᵇ-no; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq;
-  live-mono; skip-cancel)
+  inv-cut)
 open import Simulation.Grow using (mem-any)
 open import Simulation.Sweep using (T-true; t≢f; count-hit; count-pass; same-eq; raw≢stamped; raw<ₙ; sweepL; sweep-eq; sweepL-pw; all-sweep;
   unique-sweep; sync-sweep; regrel-sweep; rows-guards; part-sweep; arr-sweep; spent-sweep)
@@ -580,8 +580,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; ruleP = sub-rule (λ {r} m → cut-sub c (EvalSt.registry stP) r m) ≤-refl ruleP
       ; ruleI = sub-rule (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) ≤-refl ruleI
       ; scripts = scripts
-      ; live-outer = live-mono {st = stI} {st′ = record stI { registry = KI ; cancelled = proj₂ (cutThrough c′ (EvalSt.registry stI)) ++ EvalSt.cancelled stI }}
-          (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) (skip-cancel (proj₂ (cutThrough c′ (EvalSt.registry stI))) {stI}) (λ l → l) live-outer
+      ; inv = inv-cut (proj₂ (cutThrough c′ (EvalSt.registry stI))) (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) inv
       }
 
     -- a pair through the cut leaves on both sides, any other stays partnered

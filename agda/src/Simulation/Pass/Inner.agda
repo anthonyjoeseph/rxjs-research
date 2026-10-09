@@ -36,7 +36,7 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-step; stepFrame
   consume-all-sub; consume-all-enqueue; consume-all-nil)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ; elemᵛ)
-open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; merge~; ObsRel; V; PathRel; inner~;
+open import Simulation.Stores using (Inv; EmitRel; Flattener; FlatNodes; switch~; exhaust~; merge~; ObsRel; V; PathRel; inner~;
   deferInner~; []; _∷_; Store; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ;
   MergeAt; outerDoneᵇ; live-mono; live-set; od-back)
 open import Simulation.Cut using (module At; module Third)
@@ -336,7 +336,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
             (λ {_} {_} {q} l → live-set {q = q} _ W.yI W.NI₂
                 (λ h → trans (sym (cong outerDoneᵇ lI)) (od-back _ _ W.y2 (EvalSt.nodes stI) (λ ()) h))
                 (live-set {q = q} _ W.y2 (EvalSt.nodes stI) (λ h → trans (sym (cong outerDoneᵇ l2)) h) l))
-            (Store.live-outer S))
+            (Inv.live-outer (Store.inv S)))
       , W.M.pathW r
       where
       module W = HopWrite κ (Store.π-keys S) (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} e₁ e₂ lP lI l2
@@ -1146,7 +1146,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     explode-end {op = op} {m′ = m′} {ks = ks} {mX = mX} {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃ = h₃} {h₄} {h₅} {h₆} {q = q} {sI′ = sI′} {stI′ = stI′} {fin = true} A cP (fl , r , (_ , lX)) cI gm dI g =
       let (B , W , x′) = merge-done (After.store A) fl r lX
                            (live-spent mX _ (gone-thru {st = stI′} {q = thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)} refl (gm refl))
-                              (Store.live-outer (After.store A)))
+                              (Inv.live-outer (Store.inv (After.store A))))
       in explode-wrapped {T = thruWrap mergeAllᵒ mX true (sI′ , stI′)} (sym (merge-wrap lX)) (A ⨾∅ B) cP W x′ cI
            (λ _ → gone-wrap (After.store A) {o = mergeAllᵒ} {k = mX} {h = h₃} {q = thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q}
                     (gm refl) (cong proj₁ (merge-wrap {s = sI′} {st = stI′} lX))) dI g

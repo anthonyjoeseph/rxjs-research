@@ -78,12 +78,12 @@ open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Rx.Evaluator.Quiet using (QuietC; go-quiet; subscribeE-quiet; drop-off)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
-open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount; DyingFree; dyingᵇ; Named) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount; DyingFree; dyingᵇ; Named; member-head) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source)
 open import Simulation.Hot-End using (hot-end-start)
 open import Simulation.Close using (close-store; close-arr)
 open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit)
-open import Simulation.Sweep using (T-true; t≢f; ≡ᵇ-sym)
+open import Simulation.Sweep using (T-true; t≢f; ≡ᵇ-sym; same-refl)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk; minted)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; skip-cut; module Kept)
@@ -638,7 +638,7 @@ hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′
         (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z)) ,
   subst (Out _) (sym (cong (oB ++_) (++-identityʳ em))) (out-++ oB em ob (proj₂ F refl du))
   where
-    F = (fan-go κ (After.store A) εI c ta e₁ (slot-chains κ (After.store A) e₁ ty)
+    F = (fan-go κ (After.store A) εI c ta e₁ (λ ()) (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           go g)
@@ -708,12 +708,13 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy ll 
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
   with hot-end-start κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ (pass-quiet refl (room s) go′) end′
-...   | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
+...   | hot-end-at {oB = oB} {stI₂ = stI₃} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
   hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ (cascade-latched end′ {toℕ (i ↑ˡ n)} (close-hit a′ stI₁ e₂)) {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
     S₁ = proj₁ (value-pass κ e s df ex ex′ ta sy go go′)
-    Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta e₁ (slot-chains κ (After.store A) e₁ ty)
+    Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta e₁
+          (λ _ → member-head (toℕ (n ↑ʳ i)) (toℕ (n ↑ʳ i)) (EvalSt.dying stI₃) (cong (_∨ false) (same-refl (toℕ (n ↑ʳ i))))) (slot-chains κ (After.store A) e₁ ty)
           (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           end g))

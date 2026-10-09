@@ -51,7 +51,7 @@ open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattene
   Src; sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
   outerExplode~; inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; [];
   _∷_; mach; MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip; partner-row;
-  partner-mem; Named; MergeAt; LiveRows; live; live-mono; skip-dlv; skip-dying; live-quiet;
+  partner-mem; Named; MergeAt; LiveRows; live; Inv; inv-dlv; inv-dying; live-quiet;
   live-keep; live-write; outerDoneᵇ; LiveIf; thruNodes)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; skip-cut; module Kept)
 open import SExp.Plain   using (plainValues)
@@ -166,7 +166,7 @@ delivered {κ = κ} {sP = sP} {stP} {sI} {stI} s {fin} {x} {x′} pr = record
   ; dlv-alike = dlv fin ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut
   ; named = dlv-named fin (proj₁ named) (lookupᵃ (proj₁ fresh-ids) (proj₁ mx)) , dlv-named fin (proj₂ named) (lookupᵃ (proj₂ fresh-ids) (proj₂ mx)) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-  ; scripts = scripts ; live-outer = live-mono {st = stI} (λ r∈ → r∈) (skip-dlv fin (proj₁ x′) {stI}) (λ l → l) live-outer }
+  ; scripts = scripts ; inv = inv-dlv fin (proj₁ x′) inv }
   where
     open Store s
     mx = partner-mem κ _ _ _ _ _ rows pr
@@ -197,7 +197,7 @@ dying {n} {κ = κ} {stP = stP} {stI = stI} s i sk = record
   ; named = dying-named i (proj₁ named) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named)))
           , dying-named (n ↑ʳ i) (proj₂ named) (<-trans (stamped< i) (Named.slots-below (proj₂ named))) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
   ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-  ; scripts = scripts ; live-outer = live-mono {st = stI} (λ r∈ → r∈) (skip-dying (n ↑ʳ i) true {stI}) (λ l → l) live-outer }
+  ; scripts = scripts ; inv = inv-dying (n ↑ʳ i) inv }
   where
   open Store s
   mn : ∀ {x k : ℕ} xs → x ≢ k → memberSource x (k ∷ xs) ≡ memberSource x xs
@@ -511,12 +511,12 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     keep-live : ∀ {sP stP sI stI} (S : St sP stP sI stI) (k : NodeId) {x y}
               → lookupNode k (EvalSt.nodes stI) ≡ just x → outerDoneᵇ (just y) ≡ outerDoneᵇ (just x)
               → LiveRows (record stI { nodes = setNode k y (EvalSt.nodes stI) })
-    keep-live {stI = stI} S k l e = live-keep {st = stI} k l e (Store.live-outer S)
+    keep-live {stI = stI} S k l e = live-keep {st = stI} k l e (Inv.live-outer (Store.inv S))
 
     write-live : ∀ {sP stP sI stI} (S : St sP stP sI stI) (k : NodeId) {y}
                → (outerDoneᵇ (lookupNode k (EvalSt.nodes stI)) ≡ false → outerDoneᵇ (just y) ≡ false)
                → LiveRows (record stI { nodes = setNode k y (EvalSt.nodes stI) })
-    write-live {stI = stI} S k w = live-write {st = stI} k w (Store.live-outer S)
+    write-live {stI = stI} S k w = live-write {st = stI} k w (Inv.live-outer (Store.inv S))
 
     -- A FLATTENER'S NODE PAIR WRITTEN ALIKE: the stores and the walk
     -- stay related with the two nodes moved to states that pair again
@@ -546,7 +546,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                 → Σ (After S ([] , sP , stP) ([] , sI , record stI { nodes = setNode k₁ (cell-st c) (EvalSt.nodes stI) })) λ A
                     → PathRel {Γ = Γ} κ (Store.π (After.store A)) (EvalSt.nodes stP) (setNode k₁ (cell-st c) (EvalSt.nodes stI)) p q
     spent-write {sP} {stP} {sI} {stI} S {k₁ = k₁} {c = c} e lP l₁ r =
-      node-write S W.M.moved (live-quiet k₁ refl (Store.live-outer S))
+      node-write S W.M.moved (live-quiet k₁ refl (Inv.live-outer (Store.inv S)))
       , W.M.pathW r
       where
       module W = CellWrite κ (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} {c = c} e lP l₁
@@ -621,7 +621,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                       → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI)) u op m m′ ks xs
                       × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (setNode ks (cell-st {t = FlatSᵗ u} c′) (EvalSt.nodes stI)) p q
     restamp-write {sP} {stP} {sI} {stI} S {u = u} {ks = ks} {c′ = c′} f@(pm , _ , _ , _ , lI , fn , _ , lk) r =
-      node-write S W.M.moved (live-quiet ks refl (Store.live-outer S))
+      node-write S W.M.moved (live-quiet ks refl (Inv.live-outer (Store.inv S)))
       , W.flatW f , W.M.pathW r
       where
       module W = FlatCellWrite κ (Store.π-vals S) {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} pm lI fn lk c′
@@ -800,7 +800,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     outer-wrap {sP} {stP} {sI} {stI} S {now} {op = op} {m′ = m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₂} {h₃} {h₄} {q = q} {fin = true} {r}
                W@((_ , _ , _ , lP , lI , fn , _) , _) gw cl dR =
       let (b , y , y′ , fn′ , eP , eI) = wrap-at {sP = sP} {sI} {stP} {stI} fn lP lI
-          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru {st = stI} {q = thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} refl (gw refl)) (Store.live-outer S))
+          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru {st = stI} {q = thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} refl (gw refl)) (Inv.live-outer (Store.inv S)))
           (_ , _ , A , W′ , c , g , d) = wrap-tail S A₀ (f₀ , r₀)
             (subst (λ T → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ T)) (proj₂ (proj₂ T))) eI cl)
             (λ e → gone-restamp S {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₃} {h₄} {q} (gone-wrap S {o = flatOp op} {k = m′} {h = h₂} {q = Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} (gw refl) (trans (cong proj₁ eI) e)))

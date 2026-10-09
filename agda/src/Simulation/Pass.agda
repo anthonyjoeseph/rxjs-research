@@ -375,6 +375,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     fan-go : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {a : Arrival Γ}
                (εI : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (arrTy a)) {es now vs fin}
            → CarriesU εI es vs → arrTick a ≡ now → arrSource a ≡ toℕ i
+           → (fin ≡ true → memberSource (toℕ (n ↑ʳ i)) (EvalSt.dying stI) ≡ true)
            → ∀ {chs adm}
            → Pointwise (SlotPair (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) chs adm
            → (∀ {x} → x ∈ chs → Sound (proj₂ (proj₂ x)) sP stP)
@@ -386,21 +387,21 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
            → shareGo⇓ now (n ↑ʳ i) es fin adm sI stI (oI , sI₁ , stI₁)
            → After S (oP , sP₁ , stP₁) (oI , sI₁ , stI₁)
            × (fin ≡ false → ∀ {I} → DelU εI I es → Out I oI)
-    fan-go S εI c ta sa [] _ _ _ _ casc-nil go-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , λ _ _ → []
-    fan-go S εI c ta sa (slotpair _ ∷ ps) hP aP hI aI (casc-cut _ g) (go-cut _ g′) =
-      fan-go S εI c ta sa ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
-    fan-go S εI c ta sa (slotpair q ∷ _) _ _ _ _ (casc-cut {rid = rid} {st₀ = st₀} y _) (go-live y′ _ _) =
+    fan-go S εI c ta sa _ [] _ _ _ _ casc-nil go-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , λ _ _ → []
+    fan-go S εI c ta sa dy (slotpair _ ∷ ps) hP aP hI aI (casc-cut _ g) (go-cut _ g′) =
+      fan-go S εI c ta sa dy ps (λ m → hP (there m)) (λ m m′ → aP (there m) (there m′)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g g′
+    fan-go S εI c ta sa _ (slotpair q ∷ _) _ _ _ _ (casc-cut {rid = rid} {st₀ = st₀} y _) (go-live y′ _ _) =
       ⊥-elim (t≢f (trans (sym y) (trans (cong (λ s → skipᵇ s rid st₀) sa) (trans (skip-alike S q) y′))))
-    fan-go S εI c ta sa (slotpair q ∷ _) _ _ _ _ (casc-live {rid = rid} {st₀ = st₀} y _ _) (go-cut y′ _) =
+    fan-go S εI c ta sa _ (slotpair q ∷ _) _ _ _ _ (casc-live {rid = rid} {st₀ = st₀} y _ _) (go-cut y′ _) =
       ⊥-elim (t≢f (trans (sym y′) (trans (sym (trans (cong (λ s → skipᵇ s rid st₀) sa) (skip-alike S q))) y)))
-    fan-go S εI c ta sa (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (casc-live {a = a₀} {rid = rid} {st₀ = st₀} y _ _) (go-live _ _ _) =
+    fan-go S εI c ta sa _ (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (casc-live {a = a₀} {rid = rid} {st₀ = st₀} y _ _) (go-live _ _ _) =
       ⊥-elim (t≢f (trans (sym (skip-cut {s = arrSource a₀} {rid} {st₀} x)) y))
-    fan-go S εI {fin = fin} c refl sa (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {emits = eI} _ dI g′) =
+    fan-go {stI = stI} S {i = i} εI {fin = fin} c refl sa dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {rid = rI′} {emits = eI} _ dI g′) =
       rebase {fin = fin} (A ⨾ proj₁ R) , λ { refl d → out-++ eI _ (proj₂ X refl d) (proj₂ R refl d) }
       where
         sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
         sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-        X = slot-pass (walker κ) (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI (n<1+n _)
+        X = slot-pass (walker κ) (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI (λ e → skip-marked {s = toℕ (n ↑ʳ i)} {rid = rI′} {st = stI} e (dy e)) (n<1+n _)
         A = proj₁ X
         map-slot : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
                      {cs : List (RegId × AtFloor Γ u t)} {ds}
@@ -409,7 +410,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → Pointwise (SlotPair (Store.rows S₁) (EvalSt.cancelled stP₁) (EvalSt.cancelled stI₁) i) cs ds
         map-slot K []       = []
         map-slot {S₀ = S₀} {S₁ = S₁} K (r ∷ rs) = slot-keeps {S = S₀} {S₁ = S₁} K r ∷ map-slot {S₀ = S₀} {S₁ = S₁} K rs
-        R = fan-go (After.store A) εI c refl sa (map-slot {S₀ = S} {S₁ = After.store A} (After.keeps A) ps)
+        R = fan-go (After.store A) εI c refl sa (λ e → dying-kept {k = toℕ (n ↑ʳ i)} dI (dy e)) (map-slot {S₀ = S} {S₁ = After.store A} (After.keeps A) ps)
               (λ m → fold-kept (unchain dP) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
               (λ m m′ → aP (there m) (there m′))
               (λ m → fold-kept dI sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))
