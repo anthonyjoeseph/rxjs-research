@@ -32,10 +32,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; Tm; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; unitᵗ; _×ᵗ_; _+ᵗ_; obs;
   FnClo; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ; uniqᵗ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; markDlv; NodeState; Arrival; arrVal; arrTy; arrTick; Path; share-sink;
-  _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st;
-  echoᵗ; thruEvents; thruWrap; setNode; cell-st; batchSync-st; scanVals; take-st; takeVals; exhaust-st; switch-st; switchKill; hasRoom;
-  consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying; memberSource; AllOp; skipᵇ; regSource)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; markDlv; NodeState; Arrival; arrVal; arrTy; arrTick; Path;
+  share-sink; _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode;
+  mergeAll-st; echoᵗ; thruEvents; thruWrap; setNode; cell-st; batchSync-st; scanVals; take-st;
+  takeVals; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ;
+  RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying; memberSource; skipᵇ;
+  regSource)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-scan; step-from-inner; react-false; step-thru-outer; thruWalk⇓;
   walk-nil; walk-echo; walk-cons; thruConsume⇓; inner; consume-all-sub; consume-all-enqueue;
   consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub;
@@ -44,11 +46,12 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ; hotᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; elemᵛ; explodeᵛ; FlatSᵗ; ScanAᵗ; CutS; cutOpenᵛ)
 open import Simulation.Schedules using (HeadOf)
-open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~; Src; sharedEq;
-  PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
-  inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
-  MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip; partner-row; partner-mem; Named; named-nodes; MergeAt;
-  LiveRows; live; live-mono; skip-dlv; skip-dying; live-quiet; live-keep; live-write; outerDoneᵇ; LiveIf; thruNodes)
+open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattener; FlatNodes; CurRel; merge~; switch~; exhaust~;
+  Src; sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
+  outerExplode~; inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; [];
+  _∷_; mach; MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip; partner-row;
+  partner-mem; Named; MergeAt; LiveRows; live; live-mono; skip-dlv; skip-dying; live-quiet;
+  live-keep; live-write; outerDoneᵇ; LiveIf; thruNodes)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; skip-cut; module Kept)
 open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit.Decode using (decodeEmits)

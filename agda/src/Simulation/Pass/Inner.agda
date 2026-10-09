@@ -37,8 +37,8 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-step; stepFrame
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ; elemᵛ)
 open import Simulation.Stores using (EmitRel; Flattener; FlatNodes; switch~; exhaust~; merge~; ObsRel; V; PathRel; inner~;
-  deferInner~; []; _∷_; Store; Arr; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ; named-nodes; MergeAt;
-  outerDoneᵇ; LiveRows; live-mono; live-set; od-back)
+  deferInner~; []; _∷_; Store; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ;
+  MergeAt; outerDoneᵇ; live-mono; live-set; od-back)
 open import Simulation.Cut using (module At; module Third)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-foldPath; sz-mergeAllDrain; sz-innerFinish; sz-l; sz-r)
@@ -47,7 +47,7 @@ open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru; NoBatch; rel-unbatched)
 open import Simulation.Sweep using (t≢f)
-open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; sub-rule; drop-ot; head-on; self-node; off-path; ∨-Tˡ; ∨-Tʳ; distinct; fresh-path)
+open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; drop-ot; head-on; self-node; off-path; ∨-Tˡ; ∨-Tʳ; distinct; fresh-path)
 open import Rx.Evaluator.Reducible.Dead-Kept using (fold-dead; off-T)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Simulation.Write using (module HopWrite; apart)
