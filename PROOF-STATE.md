@@ -259,8 +259,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### Big picture tier roadmap
 
 - **THE ENDED OUTER.** `{outer,merge}-spent` hold only where the walk's
-  `fin` does. Sweep `make qc-store` with the accounts and solo deciders on
-  flatten-reaching draws; on green, make both `Store` fields and carry
+  `fin` does; accounts and solo swept green (1000, 18 at two inners of one
+  flattener). Make both `Store` fields, postulated per move, and carry
   `fin ≡ true` to "no alive row passes this frame" through the walk. Decides
   whether `simulation`'s reached ends leave a row a later pass would walk.
 
@@ -357,8 +357,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; swept at two hot slots, after the subscribe.
-- **`{outer,merge}-spent`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: no
-  alive row walks the outer an end reaches; true only where the walk's `fin` is,
+- **`{outer,merge}-spent`** (Simulation.Pass.Quiet) — SHAPE, `PROBED`: no alive
+  row walks the outer an end reaches; true only where the walk's `fin` is,
   which no hypothesis carries.
 - **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an inner's
   path is live unless spent where its walk starts; the pass does not carry it.

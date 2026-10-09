@@ -753,6 +753,12 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- arrives true only once every alive row through the frame it
       -- reaches is spent; no hypothesis carries that.  The pass must:
       -- `fin ≡ true` against the frame the walk is at.
+      -- PROBED: make qc-store QC='3 1000 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,6,3,1,1,0,0,0,0,3],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?` with its `accounts` and
+      --   `solo`, the two facts that carry `fin` to "no alive row walks
+      --   this frame": 1000 agree, 0 fail.  18 cases hold two alive inners
+      --   of one flattener at once, counted by keying `solo` on the
+      --   flattener alone; that region is where `solo` could fail.
       outer-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₄ u op m m′ ks xs}
                       {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
                   → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
