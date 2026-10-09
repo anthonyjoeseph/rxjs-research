@@ -263,12 +263,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   that now emits once per value.
 
 - **THE LIVE OUTER.** `Store.live-outer` holds every undelivered row live
-  through its outers, kept at every site over `close-live`, `open-live`,
-  `end-live`, `{fold,drain}-keeps-od` and three walk leaves. Sweep before
-  grinding: decide `LiveRows` and the done flag's monotonicity in `qc-store`
-  at nested merges whose outer ends inside a fold; a red at
-  `fold-keeps-od` is an evaluator fix. Decides whether `simulation`'s reached
-  states are live, the fact the explode leaves are false without.
+  through its outers. The fold's stale write-back is ruled out: no boundary
+  clears a done flag over 202 cases finishing at an ended merge. Left:
+  count in `qc-store` the rows `close-live` and `open-live` revive under an
+  ended outer, and decide `LiveRows` there. Decides whether `simulation`'s
+  reached states are live, the fact the explode leaves are false without.
 
 - **THE WALK'S LIVE PATH.** `hop-live`, `cold-live` and `join-live` each ask a
   walk to hand back the `LiveOn` of the path it registers; thread it through
@@ -298,10 +297,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `DEAD ROUTE, PROBED`: one exploded emit, carrying nothing or one value,
   subscribed by the impl's idle merge, walks into the flattener, false where
   the outer has ended; a group delivered at one instant sends at it.
-- **`{fold,drain}-keeps-od`** (Simulation.Pass.Inner) — FALSITY, `NO EVIDENCE`:
-  a fold never lowers an outer's done flag, and a drain's carried flag is down
-  wherever its node's is; a nested merge's finish writes back a flag read
-  before its fold.
 - **`close-live`** (Simulation.Stores) — FALSITY, `NO EVIDENCE`: a source's
   close revives the rows skipped as delivered while dying, each live only if no
   outer it walks has ended.
@@ -380,6 +375,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`join-live`** (Simulation.Slot-Join) — SHAPE, `NO EVIDENCE`: a joiner's
   registered row finds every outer on its path live; the walk does not carry
   it.
+- **`{fold,drain}-keeps-od`** (Simulation.Pass.Inner) — DIFFICULTY, `PROBED×4`:
+  a fold never lowers an outer's done flag, and a drain's carried flag is down
+  wherever its node's is; a nested merge's finish writes back a flag read
+  before its fold.
 - **`lifts-scan`** (Simulation.Walk) — DIFFICULTY, `PROBED`: the elaborated
   scan's step and seed read the author's variables past the mint's binder; held
   at one payload, two past the typechecker.

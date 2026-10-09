@@ -988,6 +988,38 @@ finishes k []              = 0
 finishes k ((_ , st) ∷ r) =
   (if fell k (actives (EvalSt.nodes st)) then 1 else 0) + finishes (actives (EvalSt.nodes st)) r
 
+-- HOW MANY OF THOSE FALLS LEAVE THE MERGE'S OUTER ENDED: the finish ran
+-- with the done flag already set, where a stale write-back would clear it
+endedActives : ∀ {m} {Δ : Ctx m} → List (NodeId × NodeState Δ) → List (NodeId × ℕ)
+endedActives []                                    = []
+endedActives ((k , mergeAll-st _ a _ true) ∷ r) = (k , a) ∷ endedActives r
+endedActives (_ ∷ r)                               = endedActives r
+
+-- HOW MANY BOUNDARIES SEE A DONE FLAG CLEARED: a flattener whose outer
+-- had ended reads as live again, which no step of rxjs does
+dones : ∀ {m} {Δ : Ctx m} → List (NodeId × NodeState Δ) → List NodeId
+dones []                                    = []
+dones ((k , mergeAll-st _ _ _ true) ∷ r) = k ∷ dones r
+dones ((k , switch-st _ true) ∷ r)       = k ∷ dones r
+dones ((k , exhaust-st _ true) ∷ r)      = k ∷ dones r
+dones (_ ∷ r)                               = dones r
+
+reverts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → List NodeId → List (Sched Γ × EvalSt e) → ℕ
+reverts k []              = 0
+reverts k ((_ , st) ∷ r) =
+  (if any (λ j → isFalse (lookupNode j (EvalSt.nodes st))) k then 1 else 0) + reverts (dones (EvalSt.nodes st)) r
+  where
+  isFalse : ∀ {m} {Δ : Ctx m} → Maybe (NodeState Δ) → Bool
+  isFalse (just (mergeAll-st _ _ _ false)) = true
+  isFalse (just (switch-st _ false))       = true
+  isFalse (just (exhaust-st _ false))      = true
+  isFalse _                                = false
+
+endedFinishes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → List (NodeId × ℕ) → List (Sched Γ × EvalSt e) → ℕ
+endedFinishes k []              = 0
+endedFinishes k ((_ , st) ∷ r) =
+  (if fell k (endedActives (EvalSt.nodes st)) then 1 else 0) + endedFinishes (actives (EvalSt.nodes st)) r
+
 -- WHERE THE IMPL'S SHARES CONNECT AND ARE JOINED: a boundary whose
 -- connected set grows connected a share, at the subscribe or later; a
 -- stamped row beyond one per new connect is a read joining a share
@@ -1016,7 +1048,7 @@ shareEvents n k c s₀ ds ((_ , st) ∷ r) = step (shareEvents n (suc k) c′ s�
                            , tick (any (_≡ᵇ n) new ∧ memberSource 0 ds) d
                            , tick (any (λ x → x ≡ᵇ suc n) new) o
 
-storeDrains : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
-storeDrains {n} {κ = κ} f e ins = drains 0 tr , finishes [] tr , shareEvents n 0 0 0 [] trI
+storeDrains : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
+storeDrains {n} {κ = κ} f e ins = drains 0 tr , finishes [] tr , endedFinishes [] tr , reverts [] tr + reverts [] trI , shareEvents n 0 0 0 [] trI
   where tr  = trace f (plainExp e) (plainSlots ins)
         trI = trace f (elaborateImpl κ e) (embedSlotsImpl ins)

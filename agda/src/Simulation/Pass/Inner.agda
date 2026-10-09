@@ -584,6 +584,13 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- up.  The risk is a nested merge's finish, which writes back the
       -- flag it read BEFORE folding its group: if that fold ended the
       -- merge's own outer, the write lowers the flag again
+      -- An outer ends at most once, so a flag lowered inside a fold stays
+      -- down to the next boundary, where a revert is counted.
+      -- PROBED: make qc-store QC='72 300 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,4,4,3,3,0,0,0,0,4],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?` and its `reverts`: 300 agree, 0 fail;
+      --   144 finish an inner at a merge whose outer ended, 0 boundaries clear a done flag.
+      -- PROBED: make qc-store QC='73 120 5' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,4,4,3,3,0,0,0,0,4],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
+      --   decided the same way: 120 agree, 0 fail; 58 finish at an ended merge, 0 clear a flag.
       fold-keeps-od : ∀ {k now lo s} {p : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {vs f sched} {st : EvalSt ei} {r}
                     → foldPath⇓ now p vs f sched st r
                     → outerDoneᵇ (lookupNode k (EvalSt.nodes (proj₂ (proj₂ r)))) ≡ false
@@ -593,6 +600,13 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- carries is down wherever the node's flag is down when it stops.
       -- Each spend writes the carried flag, then subscribes, and a
       -- subscribe can reach the same stale write as a fold
+      -- An outer ends at most once, so a flag lowered inside a fold stays
+      -- down to the next boundary, where a revert is counted.
+      -- PROBED: make qc-store QC='72 300 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,4,4,3,3,0,0,0,0,4],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
+      --   decided by `CLI.Store-Check`'s `store?` and its `reverts`: 300 agree, 0 fail;
+      --   144 finish an inner at a merge whose outer ended, 0 boundaries clear a done flag.
+      -- PROBED: make qc-store QC='73 120 5' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,4,4,3,3,0,0,0,0,4],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
+      --   decided the same way: 120 agree, 0 fail; 58 finish at an ended merge, 0 clear a flag.
       drain-keeps-od : ∀ {k lo s} {p : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {now fs l a od qs sched} {st : EvalSt ei} {out a′ q′ sched₂ st₂}
                      → mergeAllDrain⇓ k p now fs l a od qs sched st (out , a′ , q′ , sched₂ , st₂)
                      → (outerDoneᵇ (lookupNode k (EvalSt.nodes st)) ≡ false → od ≡ false)
