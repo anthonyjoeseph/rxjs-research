@@ -972,42 +972,47 @@ drains k ((_ , st) ∷ r) =
   (if queued (EvalSt.nodes st) <ᵇ k then 1 else 0) + drains (queued (EvalSt.nodes st)) r
 
 -- THE STATE EACH CLOSE OPENS ON: a last arrival's value pass run alone,
--- closed.  `close-live` speaks of it, and no boundary shows it
-closeOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st) → List (EvalSt e)
-closeOf a sched st ru with Arrival.isLast a
+-- and what the close makes of it.  `close-live` speaks of the pair, and
+-- no boundary shows either
+closeOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st) → List (EvalSt e × EvalSt e)
+closeOf {Γ = Γ} {t} {e} a sched st ru with Arrival.isLast a
 ... | false = []
 ... | true  = mid (cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched (cascadeOpen st) (sub-rule (λ r∈ → r∈) ≤-refl ru)
                              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru x∈)) (chain-agree a ru))
   where
-  mid : ∀ {D : _ → Set} → Σ⁰ _ D → List _
-  mid ((_ , _ , st₁) , _) = cascadeClose a st₁ ∷ []
+  mid : ∀ {D : Stream Γ t × Sched Γ × EvalSt e → Set} → Σ⁰ (Stream Γ t × Sched Γ × EvalSt e) D → List (EvalSt e × EvalSt e)
+  mid ((_ , _ , st₁) , _) = (st₁ , cascadeClose a st₁) ∷ []
 
 mutual
   closes! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-            (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st) → List (EvalSt e)
+            (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st) → List (EvalSt e × EvalSt e)
   closes! zero    sched st ru = []
   closes! (suc k) sched st ru = closesOn k sched st ru (sched-next sched) refl
 
   closesOn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (k : Fuel) (sched : Sched Γ) (st : EvalSt e) ({-@0-}ru : Rule sched st)
-           → (x : ⊤ ⊎ (Arrival Γ × Sched Γ)) ({-@0-}eqn : sched-next sched ≡ x) → List (EvalSt e)
+           → (x : ⊤ ⊎ (Arrival Γ × Sched Γ)) ({-@0-}eqn : sched-next sched ≡ x) → List (EvalSt e × EvalSt e)
   closesOn k sched st ru (inj₁ _)            eqn = []
   closesOn k sched st ru (inj₂ (a , sched′)) eqn =
     closeOf a sched′ st (pop-rule eqn ru) ++ thenC k (cascade! a sched′ st (pop-rule eqn ru))
 
   thenC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {D : Stream Γ t × Sched Γ × EvalSt e → Set} (k : Fuel)
           (r : Σ⁰ (Stream Γ t × Sched Γ × EvalSt e) λ r → D r × Rule (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-        → List (EvalSt e)
+        → List (EvalSt e × EvalSt e)
   thenC k ((_ , sched′ , st′) , _ , ru′) = closes! k sched′ st′ ru′
 
--- HOW MANY ROWS WALK AN ENDED OUTER, cut, skipped or not: a state where
--- none does cannot fail `liveOuter` however its ledger is cleared
-throughEnded : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} → EvalSt e → Bool
-throughEnded st = any (λ r → any (λ k → outerDone (lookupNode k (EvalSt.nodes st))) (thruNodes (proj₂ (proj₂ (proj₂ r)))))
-                      (EvalSt.registry st)
-
-closes : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) → List (EvalSt e)
+closes : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) → List (EvalSt e × EvalSt e)
 closes fuel e ins = thenC fuel (subscribe! e ins)
+
+-- NO ROW OF A DYING SOURCE IS REGISTERED: what a close and an open need
+-- to revive nothing, since only a dying source's delivered row is skipped
+dyingFree : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} → EvalSt e → Bool
+dyingFree st = all (λ r → not (memberSource (regSource (proj₁ (proj₂ r))) (EvalSt.dying st))) (EvalSt.registry st)
+
+dyingSome : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} → EvalSt e → Bool
+dyingSome st with EvalSt.dying st
+... | []    = false
+... | _ ∷ _ = true
 
 countᵇ : ∀ {A : Set} → (A → Bool) → List A → ℕ
 countᵇ p []       = 0
@@ -1020,9 +1025,13 @@ storeSides {κ = κ} f e ins with lockstep κ 0 (trace f (plainExp e) (plainSlot
 ... | false , w = false , w
 ... | true  , w with all (λ x → liveOuter (cascadeOpen (proj₂ x))) (trace f (elaborateImpl κ e) (embedSlotsImpl ins))
 ...   | false = false , "open-live: a pop's open revives a row through an ended outer"
-...   | true  with all liveOuter (closes f (elaborateImpl κ e) (embedSlotsImpl ins))
+...   | true  with all (λ x → liveOuter (proj₂ x)) (closes f (elaborateImpl κ e) (embedSlotsImpl ins))
 ...     | false = false , "close-live: a close revives a row through an ended outer"
-...     | true  = true , w
+...     | true  with all (λ x → dyingFree (proj₂ x)) (trace f (elaborateImpl κ e) (embedSlotsImpl ins))
+...       | false = false , "cascade-quiet: a boundary registers a row of a dying source"
+...       | true  with all (λ x → dyingFree (proj₁ x)) (closes f (elaborateImpl κ e) (embedSlotsImpl ins))
+...         | false = false , "pass-quiet: a value pass ends registering a row of a dying source"
+...         | true  = true , w
 
 -- HOW MANY BOUNDARIES SEE A MERGE'S ACTIVE COUNT FALL: an inner
 -- finished there, whether or not a queue was waiting behind it
@@ -1101,6 +1110,6 @@ shareEvents n k c s₀ ds ((_ , st) ∷ r) = step (shareEvents n (suc k) c′ s�
 
 storeDrains : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} → Fuel → SExp Γ [] [] [] t → SimulSlots Γ κ → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
 storeDrains {n} {κ = κ} f e ins = drains 0 tr , finishes [] tr , endedFinishes [] tr , reverts [] tr + reverts [] trI
-                                , countᵇ (λ x → throughEnded (proj₂ x)) trI , countᵇ throughEnded (closes f (elaborateImpl κ e) (embedSlotsImpl ins)) , shareEvents n 0 0 0 [] trI
+                                , countᵇ (λ x → dyingSome (proj₂ x)) trI , countᵇ (λ x → dyingSome (proj₁ x)) (closes f (elaborateImpl κ e) (embedSlotsImpl ins)) , shareEvents n 0 0 0 [] trI
   where tr  = trace f (plainExp e) (plainSlots ins)
         trI = trace f (elaborateImpl κ e) (embedSlotsImpl ins)

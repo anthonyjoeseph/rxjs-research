@@ -1648,7 +1648,7 @@ verdictOf rs@(_ ∷ _) with decided rs
 drainLine : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × String → String
 drainLine (k , j , x , v , po , pc , a , l , o , d , s , w) = w ++ count "  drains a queue at " k ++ count "  finishes an inner at a merge at " j
   ++ count "  finishes an inner at a merge whose outer ended at " x ++ count "  CLEARS A FLATTENER'S DONE FLAG at " v
-  ++ count "  holds a row through an ended outer at a pop's open, at " po ++ count "  holds a row through an ended outer at a close, at " pc
+  ++ count "  holds a dying source at " po ++ count "  ends a value pass holding a dying source at " pc
   ++ count "  connects a share at the subscribe at " a ++ count "  connects a share later at " l ++ count "  joins a connected share at " o
   ++ count "  connects an ended script's share at " d ++ count "  connects the shared slot's share at " s
   where
