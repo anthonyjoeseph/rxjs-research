@@ -258,11 +258,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **THE ENDED OUTER.** `end-live` wants an outer's end to be its subtree's
-  last, an accounting `Store` does not carry. Census what a dispatch walks
-  past an ended outer on reached states, then restate over the field a fit
-  test names. Decides whether `simulation`'s reached ends leave a row a
-  later pass would walk.
+- **THE ENDED OUTER.** `{outer,merge}-spent` hold only where the walk's
+  `fin` does. Sweep `make qc-store` with the accounts and solo deciders on
+  flatten-reaching draws; on green, make both `Store` fields and carry
+  `fin ≡ true` to "no alive row passes this frame" through the walk. Decides
+  whether `simulation`'s reached ends leave a row a later pass would walk.
 
 - **THE PASS'S LIVE PATH.** `inner-live` asks the pass for the liveness the
   walk now carries down to every registration; thread `LiveIf` through `Pass`,
@@ -357,9 +357,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; swept at two hot slots, after the subscribe.
-- **`end-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an outer's end
-  leaves no row through it a dispatch would walk; that the end is the subtree's
-  last is an accounting `Store` does not carry.
+- **`{outer,merge}-spent`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: no
+  alive row walks the outer an end reaches; true only where the walk's `fin` is,
+  which no hypothesis carries.
 - **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an inner's
   path is live unless spent where its walk starts; the pass does not carry it.
 - **`{fold,drain}-keeps-od`** (Simulation.Pass.Inner) — DIFFICULTY, `PROBED×4`:

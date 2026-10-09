@@ -52,7 +52,7 @@ open import Rx.Evaluator using (LiveSource; Sched; EvalSt; Stream; Arrival; sche
   atSlot; atDyn; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st;
   echoᵗ; lookupNode; memberSource; pathHasNode; aliveThroughᶠ; takeVals; scanVals; regSource;
-  chainsOf; cascadeOpen; cascadeClose; arrVal)
+  chainsOf; cascadeOpen; cascadeClose; arrVal; skipᵇ; frameNodes)
 open import Rx.Evaluator.Builder using (cascade!; cascadeGo!; pop-rule; subscribe!; chain-sound; chain-agree)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; _,_; Rule; sub-rule; sub-ot)
 open import Data.Nat.Properties using (≤-refl)
@@ -125,6 +125,10 @@ indexed : ∀ {A : Set} → ℕ → List A → List (ℕ × A)
 indexed k []       = []
 indexed k (x ∷ xs) = (k , x) ∷ indexed (suc k) xs
 
+countᵇ : ∀ {A : Set} → (A → Bool) → List A → ℕ
+countᵇ p []       = 0
+countᵇ p (x ∷ xs) = (if p x then 1 else 0) + countᵇ p xs
+
 -- a node, read at the shape a clause names, its element type checked
 module _ {m} {Δ : Ctx m} where
 
@@ -173,14 +177,13 @@ module _ {m} {Δ : Ctx m} where
   dedup []       = []
   dedup (x ∷ xs) = if any (_≡ᵇ x) xs then dedup xs else x ∷ dedup xs
 
-  -- A FLATTENER'S COUNTERS ACCOUNT FOR ITS ALIVE ROWS: a merge's active
-  -- count is its alive inners, a switch's current inner and an
-  -- exhaust's bit are its one alive inner, and an outer not done has an
-  -- alive row through it.  A flattener no alive row runs through is
-  -- severed, by a cut rootward of it, and no end reaches it again
+  -- A FLATTENER'S COUNTERS COVER ITS ALIVE INNERS: a merge's active
+  -- count is at least its alive inners, and a switch's current inner and
+  -- an exhaust's bit are its one alive inner, if any.  The direction an
+  -- outer's end reads: an idle flattener has no alive inner row, so the
+  -- end it passes on leaves none through it
   accounts : ∀ {u} {e : Closed Δ u} → EvalSt e → Maybe String
-  accounts st = firstJust (map (λ x → if any (aliveThroughᶠ (proj₁ x) st) (EvalSt.registry st) then one x else nothing)
-                               (EvalSt.nodes st))
+  accounts st = firstJust (map one (EvalSt.nodes st))
     where
     firstJust : List (Maybe String) → Maybe String
     firstJust []             = nothing
@@ -189,24 +192,39 @@ module _ {m} {Δ : Ctx m} where
     inners : NodeId → List ℕ
     inners k = dedup (concatMap (λ r → if aliveThroughᶠ k st r then innersAt k (proj₂ (proj₂ (proj₂ r))) else [])
                                 (EvalSt.registry st))
-    outers : NodeId → ℕ
-    outers k = length (filterᵇ (λ r → aliveThroughᶠ k st r ∧ any (_≡ᵇ k) (thruNodes (proj₂ (proj₂ (proj₂ r)))))
-                               (EvalSt.registry st))
-    held : NodeId → Bool → Maybe String
-    held k od = if not od ∧ (outers k ≡ᵇ 0)
-                then just ("outer-held: flattener #" ++ˢ show k ++ˢ " not done, no alive outer row") else nothing
     one : NodeId × NodeState Δ → Maybe String
-    one (k , mergeAll-st _ a _ od) = if a ≡ᵇ length (inners k) then held k od
+    one (k , mergeAll-st _ a _ _) = if length (inners k) ≤ᵇ a then nothing
       else just ("merge-count: #" ++ˢ show k ++ˢ " active " ++ˢ show a ++ˢ ", inners alive " ++ˢ show (length (inners k)))
-    one (k , switch-st cur od) with inners k
-    ... | []     = if is-nothing cur then held k od else just ("switch-count: #" ++ˢ show k ++ˢ " current, no inner alive")
-    ... | j ∷ [] = if maybe′ (_≡ᵇ j) false cur then held k od else just ("switch-count: #" ++ˢ show k ++ˢ " current is not the alive inner")
+    one (k , switch-st cur _) with inners k
+    ... | []     = nothing
+    ... | j ∷ [] = if maybe′ (_≡ᵇ j) false cur then nothing else just ("switch-count: #" ++ˢ show k ++ˢ " an alive inner not current")
     ... | _      = just ("switch-count: #" ++ˢ show k ++ˢ " two inners alive")
-    one (k , exhaust-st act od) with inners k
-    ... | []    = if not act then held k od else just ("exhaust-count: #" ++ˢ show k ++ˢ " active, no inner alive")
-    ... | _ ∷ [] = if act then held k od else just ("exhaust-count: #" ++ˢ show k ++ˢ " inactive, an inner alive")
-    ... | _     = just ("exhaust-count: #" ++ˢ show k ++ˢ " two inners alive")
+    one (k , exhaust-st act _) with inners k
+    ... | []     = nothing
+    ... | _ ∷ [] = if act then nothing else just ("exhaust-count: #" ++ˢ show k ++ˢ " inactive, an inner alive")
+    ... | _      = just ("exhaust-count: #" ++ˢ show k ++ˢ " two inners alive")
     one _ = nothing
+
+  -- the first frame of a path naming a node, as the numbers naming it
+  headKey : ∀ {lo s u} → Path Δ lo s u → List ℕ
+  headKey (map-f _ ↠[ _ ] q)          = headKey q
+  headKey (from-inner _ k j ↠[ _ ] q) = 1 ∷ k ∷ j ∷ []
+  headKey (thru-outer _ k ↠[ _ ] q)   = 2 ∷ k ∷ []
+  headKey (f ↠[ _ ] q)                = 3 ∷ frameNodes f
+  headKey _                           = []
+
+  -- NO TWO ALIVE ROWS SHARE THEIR FIRST NODE: every row a dispatch
+  -- would walk is the only one through the first stateful frame it
+  -- reaches, so an end it carries there has nothing beside it
+  solo : ∀ {u} {e : Closed Δ u} → EvalSt e → Maybe String
+  solo st = if all (λ r → countᵇ (λ r′ → alive r′ ∧ eqListℕ (key r′) (key r)) (EvalSt.registry st) ≤ᵇ 1)
+                   (filterᵇ alive (EvalSt.registry st))
+            then nothing else just "solo: two alive rows share their first node"
+    where
+    alive : RegRow Δ u → Bool
+    alive r = not (skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st)
+    key : RegRow Δ u → List ℕ
+    key r = headKey (proj₂ (proj₂ (proj₂ r)))
 
   opName : AllOp → String
   opName mergeAllᵒ = "merge"
@@ -1057,13 +1075,9 @@ dyingSome st with EvalSt.dying st
 ... | []    = false
 ... | _ ∷ _ = true
 
-countᵇ : ∀ {A : Set} → (A → Bool) → List A → ℕ
-countᵇ p []       = 0
-countᵇ p (x ∷ xs) = (if p x then 1 else 0) + countᵇ p xs
-
 firstAcc : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} → List (EvalSt e) → Maybe String
 firstAcc []       = nothing
-firstAcc (s ∷ ss) = maybe′ just (firstAcc ss) (accounts s)
+firstAcc (s ∷ ss) = maybe′ just (maybe′ just (firstAcc ss) (solo s)) (accounts s)
 
 -- THE IMPL'S ROWS LIVE ONCE A LEDGER CLEARS: at every boundary as a pop
 -- opens it (`open-live`), and at every close (`close-live`)

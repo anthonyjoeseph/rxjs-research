@@ -1113,7 +1113,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     explode-end {fin = false} A cP (fl , r , x) cI dI g = explode-wrapped refl A cP (fl , r) x cI dI g
     explode-end {mX = mX} {sI′ = sI′} {stI′ = stI′} {fin = true} A cP (fl , r , (_ , lX)) cI dI g =
       let (B , W , x′) = merge-done (After.store A) fl r lX
-                           (subst (λ T → LiveRows (proj₂ (proj₂ T))) (merge-wrap {s = sI′} {st = stI′} lX) (end-live (After.store A) mergeAllᵒ mX))
+                           (live-spent mX _ (merge-spent (After.store A) fl r lX) (Store.live-outer (After.store A)))
       in explode-wrapped {T = thruWrap mergeAllᵒ mX true (sI′ , stI′)} (sym (merge-wrap lX)) (A ⨾∅ B) cP W x′ cI dI g
 
     -- an outer's elements, each inner a sync outer hands the flattener

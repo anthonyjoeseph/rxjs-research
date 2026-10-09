@@ -35,7 +35,7 @@ open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; Tm; FlatOp; mergeᶠ;
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; markDlv; NodeState; Arrival; arrVal; arrTy; arrTick; Path; share-sink;
   _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode; mergeAll-st;
   echoᵗ; thruEvents; thruWrap; setNode; cell-st; batchSync-st; scanVals; take-st; takeVals; exhaust-st; switch-st; switchKill; hasRoom;
-  consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying; memberSource; AllOp)
+  consumeUsable; switchᵒ; exhaustᵒ; RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying; memberSource; AllOp; skipᵇ; regSource)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-scan; step-from-inner; react-false; step-thru-outer; thruWalk⇓;
   walk-nil; walk-echo; walk-cons; thruConsume⇓; inner; consume-all-sub; consume-all-enqueue;
   consume-all-nil; consume-exhaust-sub; consume-exhaust-nil; consume-switch-sub;
@@ -48,7 +48,7 @@ open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattene
   PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
   inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
   MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip; partner-row; partner-mem; Named; named-nodes; MergeAt;
-  LiveRows; live-mono; skip-dlv; skip-dying; live-quiet; live-keep; live-write; outerDoneᵇ; LiveIf)
+  LiveRows; live; live-mono; skip-dlv; skip-dying; live-quiet; live-keep; live-write; outerDoneᵇ; LiveIf; thruNodes)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; skip-cut; module Kept)
 open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit.Decode using (decodeEmits)
@@ -723,15 +723,45 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
         let (A₁ , f₁ , r₁) = restamp-write (After.store A₀) {c′ = c} f pr
         in _ , _ , A₀ ⨾ A₁ , (f₁ , r₁) , tail-of cl₁ , dq
 
+    -- NO ROW A DISPATCH WOULD WALK RUNS THROUGH `k`'S OUTER
+    OuterSpent : NodeId → EvalSt ei → Set
+    OuterSpent k st = ∀ {r} → r ∈ EvalSt.registry st → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st ≡ false
+                    → All (λ j → (k ≡ᵇ j) ≡ false) (thruNodes (proj₂ (proj₂ (proj₂ r))))
+
+    -- AN OUTER'S END KEEPS THE ROWS LIVE when none walks that outer:
+    -- every other outer a row walks reads back as it did
+    live-spent : ∀ {st : EvalSt ei} (k : NodeId) (y : NodeState (plainᵏ Γ κ))
+               → OuterSpent k st → LiveRows st → LiveRows (record st { nodes = setNode k y (EvalSt.nodes st) })
+    live-spent {st} k y sp (live L) = live λ r∈ sk → go (sp r∈ sk) (L r∈ sk)
+      where
+      go : ∀ {js} → All (λ j → (k ≡ᵇ j) ≡ false) js → All (λ j → outerDoneᵇ (lookupNode j (EvalSt.nodes st)) ≡ false) js
+         → All (λ j → outerDoneᵇ (lookupNode j (setNode k y (EvalSt.nodes st))) ≡ false) js
+      go []               []       = []
+      go {j ∷ _} (a ∷ as) (h ∷ hs) = trans (cong outerDoneᵇ (set-above k j y (EvalSt.nodes st) a)) h ∷ go as hs
+
     postulate
-      -- AN OUTER'S END LEAVES NO ROW A DISPATCH WOULD WALK THROUGH IT: every
-      -- row its outer's subtree registered has spent its source, the one
-      -- carrying the end included, which the walk delivered first.  Nothing
-      -- here says the end is the subtree's last: that is an accounting of
-      -- rows through a flattener's outer, against its done flag, which
-      -- `Store` does not carry
-      end-live : ∀ {sP stP sI stI} (S : St sP stP sI stI) (op : AllOp) (k : NodeId)
-               → LiveRows (proj₂ (proj₂ (thruWrap op k true (sI , stI))))
+      -- AN OUTER'S END REACHES ITS FLATTENER ON ITS LAST ALIVE ROW: every
+      -- row the outer's subtree registered has spent its source, the one
+      -- carrying the end included, which the walk delivered first.
+      --
+      -- FALSE AS WRITTEN, wherever the outer still has an alive row: the
+      -- walked flattener is any one, and nothing here says an end reached
+      -- it.  What makes it true at `outer-wrap` is the walk's `fin`, which
+      -- arrives true only once every alive row through the frame it
+      -- reaches is spent; no hypothesis carries that.  The pass must:
+      -- `fin ≡ true` against the frame the walk is at.
+      outer-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₄ u op m m′ ks xs}
+                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+                  → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                  → OuterSpent m′ stI
+      -- AN EXPLODE'S MERGE ENDS ON ITS OUTER'S LAST ALIVE ROW: the same
+      -- fact at the impl's merge, false as written for the same reason
+      merge-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ′ u op m m′ ks mX od}
+                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
+                  → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                  → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] od)
+                  → OuterSpent mX stI
 
     -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
     -- outer has and no lane is open or queued, read off related nodes,
@@ -751,7 +781,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     outer-wrap {sP} {stP} {sI} {stI} S {now} {op = op} {m′ = m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃} {h₄} {q = q} {fin = true} {r}
                W@((_ , _ , _ , lP , lI , fn , _) , _) cl dR =
       let (b , y , y′ , fn′ , eP , eI) = wrap-at {sP = sP} {sI} {stP} {stI} fn lP lI
-          (A₀ , f₀ , r₀) = flat-write S W fn′ (subst (λ T → LiveRows (proj₂ (proj₂ T))) eI (end-live S (flatOp op) m′))
+          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (outer-spent S W) (Store.live-outer S))
           (_ , _ , A , W′ , c , d) = wrap-tail S A₀ (f₀ , r₀)
             (subst (λ T → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ T)) (proj₂ (proj₂ T))) eI cl)
             (subst (λ T → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) [] (proj₁ T) (proj₁ (proj₂ T)) (proj₂ (proj₂ T)) r) eI dR)
