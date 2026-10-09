@@ -311,9 +311,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                   (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)) {lo}
                   {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {st : EvalSt ei}
               → Gone (readPath Θ i w ρ′ eq q) st → Gone q st
-    gone-read Θ {Θ′} i w ρ′ eq {q = q} =
+    gone-read Θ {Θ′} i w ρ′ eq {q = q} {st} =
       gone-cast eq {q = map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
-                                     (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q}
+                                     (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q} {st = st}
 
     -- A READ OF A SLOT THE IMPL STAMPED: both subscribes at the slot, the
     -- impl's down the restamp.  `Sound` of both paths for the reason
@@ -691,8 +691,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- REFUTED: `Refuted.Read-Floor` -- the plain read above the slot, the
     --   impl's at its stamped one's floor.
     hot-read : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
-    hot-read {Θ} i ek wk w {ρ′} r eq {q = q} S pr oP oI lv (subs-floor _ fP) dI@(subs-floor _ fI) lt =
-      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} (gone-subscribed S dI)) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+    hot-read {Θ} i ek wk w {ρ′} r eq {q = q} {stI = stI} S pr oP oI lv (subs-floor _ fP) dI@(subs-floor _ fI) lt =
+      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} {st = stI} (gone-subscribed S dI)) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
     hot-read i ek wk w r eq S pr oP oI lv (subs-floor h _) (subs-shared {below = b} _ _) _ =
       ⊥-elim (≤⇒≯ h (+-cancelˡ-< n _ _ (subst (_< n + _) (toℕ-↑ʳ n i) b)))
     hot-read i ek wk w r eq S pr oP oI lv _ (subs-hot-done _ x _ _) _          = ⊥-elim (impl-no-script S i ek x)
@@ -706,8 +706,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
     hot-read i ek wk w r eq S pr oP oI lv (subs-hot-live b _ _ _) (subs-floor h _) _ =
       ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
-    hot-read {Θ} i ek wk w {ρ′} r eq {q = q} S pr oP oI lv (subs-hot-done _ _ _ fP) dI@(subs-shared _ (slot-spent _ fI)) lt =
-      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} (gone-subscribed S dI)) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+    hot-read {Θ} i ek wk w {ρ′} r eq {q = q} {stI = stI} S pr oP oI lv (subs-hot-done _ _ _ fP) dI@(subs-shared _ (slot-spent _ fI)) lt =
+      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} {st = stI} (gone-subscribed S dI)) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
     hot-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ _ c _) (subs-shared _ (slot-join cI sI _)) _ =
       ⊥-elim (done-unjoined S i ek c cI sI)
     hot-read i ek wk w {ρ′} {ρ} r eq S pr oP oI lv (subs-hot-done _ _ c fP) (subs-shared x (slot-connect _ sI dc)) lt =
