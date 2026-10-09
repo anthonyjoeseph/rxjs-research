@@ -96,3 +96,8 @@ open import Refuted.Quiet-Fold-Batch using (quiet-fold-false)
 -- all, so a plain read above its slot and an impl read at its stamped
 -- one's floor part ways at the first step.
 open import Refuted.Read-Floor using (hot-read-needs-floors)
+
+-- A WALK KEEPS NO ROW OF A SOURCE THAT DIED IN IT ONLY WHILE THE SOURCE
+-- COUNTER STANDS ABOVE THE SLOTS.  A share dies under its slot's number,
+-- and a `defer` subscribed after it mints the counter's.
+open import Refuted.Walk-Quiet-Mint using (walk-quiet-needs-counter)

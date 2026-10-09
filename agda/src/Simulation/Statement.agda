@@ -42,7 +42,7 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++�
   renaming (refl to pointwise-refl; map to Pointwise-map)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; s≤s; z≤n; _≤ᵇ_; _≤′_; ≤′-reflexive; ≤′-step)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤n⇒m≤1+n; n≤1+n; ≤⇒≤′; ≤⇒≤ᵇ; ≤ᵇ⇒≤; <-≤-trans; <-irrefl; <-cmp; m≤m+n;
-  +-cancelˡ-≡)
+  +-cancelˡ-≡; <⇒≤)
 open import Relation.Binary using (tri<; tri≈; tri>)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -77,7 +77,7 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
-open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount; DyingFree; dyingᵇ) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount; DyingFree; dyingᵇ; Named) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source)
 open import Simulation.Hot-End using (hot-end-start)
 open import Simulation.Close using (close-store; close-arr)
@@ -260,6 +260,13 @@ postulate
   -- ends inside a walk drops its own rows before the walk is over, so a
   -- row of a dying source at a walk's end was one at its start.
   --
+  -- WHILE THE SOURCE COUNTER STANDS ABOVE EVERY SLOT.  A share dies under
+  -- its slot's number and a minted source takes the counter's, so only
+  -- the counter keeps a source minted after the share's end from naming
+  -- it; nothing in the walk or its rule says so.
+  --
+  -- REFUTED: `Refuted.Walk-Quiet-Mint` -- the counter lowered to the
+  --   share's slot, and a `defer` subscribed after the share's end.
   -- PROBED: make qc-store QC='77 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,1,0,3,2,2,2,0,0,0,4,3],"script":[1,1,2,1,4,4],"slot":[0,0,0,0,4,1],"obs":[2,3,3,1]}'
   --   decided by `CLI.Store-Check`'s `pass-quiet` and `cascade-quiet` checks,
   --   at the end of every value pass and every cascade: 200 agree, 0 fail;
@@ -270,7 +277,7 @@ postulate
   --   boundary and 2 end a value pass holding one, a share ended inside the
   --   pass's own walk; 120 connect the shared slot's share, 63 join one.
   walk-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
-             → cascadeGo⇓ a vs fin cs sched st r
+             → m ≤ counter (Sched.mint sched) sourceᵏ → cascadeGo⇓ a vs fin cs sched st r
              → ∀ {x} → x ∈ EvalSt.registry (proj₂ (proj₂ r)) → dyingᵇ (proj₂ (proj₂ r)) x ≡ true → dyingᵇ st x ≡ true
 
   -- THE ROOT SUBSCRIBES LEAVE NO ROW OF A DYING SOURCE REGISTERED.
@@ -314,20 +321,14 @@ drop-off s ((rid , c , y) ∷ K) (there x∈)  | false = let d , m = drop-off s 
 
 -- A VALUE PASS ENDS WITH NO ROW OF A DYING SOURCE: it opens with none dying
 pass-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
-           → EvalSt.dying st ≡ [] → cascadeGo⇓ a vs fin cs sched st r → DyingFree (proj₂ (proj₂ r))
-pass-quiet z g {x} x∈ = not-true (λ w → t≢f (trans (sym (walk-quiet g x∈ w)) (cong (memberSource (regSource (proj₁ (proj₂ x)))) z)))
+           → EvalSt.dying st ≡ [] → m ≤ counter (Sched.mint sched) sourceᵏ → cascadeGo⇓ a vs fin cs sched st r → DyingFree (proj₂ (proj₂ r))
+pass-quiet z c g {x} x∈ = not-true (λ w → t≢f (trans (sym (walk-quiet c g x∈ w)) (cong (memberSource (regSource (proj₁ (proj₂ x)))) z)))
 
--- AND SO DOES A CASCADE: its end walk opens with only the closed source
--- dying, whose rows the finish drops
-cascade-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a sched} {st : EvalSt e} {r}
-              → cascade⇓ a sched st r → DyingFree (proj₂ (proj₂ r))
-cascade-quiet (casc-run {a = a} {sched′ = s₁} {st′ = t₁} nl g) =
-  subst (λ p → DyingFree (proj₂ p)) (sym (finish-run a s₁ t₁ nl)) (pass-quiet refl g)
-cascade-quiet (casc-run-last {a = a} {sched₂ = s₂} {st₂ = t₂} ll _ g′) =
-  subst DyingFree (sym (finish-last a s₂ t₂ ll)) λ {x} x∈ →
-    let d , m = drop-off (arrSource a) (EvalSt.registry t₂) x∈
-    in not-true (λ w → t≢f (trans (sym (walk-quiet g′ m w))
-                                  (cong (_∨ false) (trans (≡ᵇ-sym (regSource (proj₁ (proj₂ x))) (arrSource a)) d))))
+-- the impl's counter stands above its slots
+room : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+     → Storeʳ κ sP stP sI stI → n + n ≤ counter (Sched.mint sI) sourceᵏ
+room s = <⇒≤ (Named.slots-below (proj₂ (Storeʳ.named s)))
 
 -- THE TWO MACHINES, RELATED: a relation between their stores, one
 -- between their live sources that the stores keep, and what each arrival
@@ -476,6 +477,18 @@ postulate
     → ∀ {oI sI₁ stI₁}
     → cascadeGo⇓ a′ (arrVal a′ ∷ []) false (chainsOf a′ stI) (record sI { live = rs′ }) (cascadeOpen stI) (oI , sI₁ , stI₁)
     → readᴵ oI ≡ [] ⊎ counter (Sched.mint sI) sourceᵏ < counter (Sched.mint sI₁) sourceᵏ
+
+-- AND SO DOES A CASCADE: its end walk opens with only the closed source
+-- dying, whose rows the finish drops
+cascade-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a sched} {st : EvalSt e} {r}
+              → m ≤ counter (Sched.mint sched) sourceᵏ → cascade⇓ a sched st r → DyingFree (proj₂ (proj₂ r))
+cascade-quiet c (casc-run {a = a} {sched′ = s₁} {st′ = t₁} nl g) =
+  subst (λ p → DyingFree (proj₂ p)) (sym (finish-run a s₁ t₁ nl)) (pass-quiet refl c g)
+cascade-quiet c (casc-run-last {a = a} {sched₂ = s₂} {st₂ = t₂} ll g g′) =
+  subst DyingFree (sym (finish-last a s₂ t₂ ll)) λ {x} x∈ →
+    let d , m = drop-off (arrSource a) (EvalSt.registry t₂) x∈
+    in not-true (λ w → t≢f (trans (sym (walk-quiet (≤-trans c (go-mono g sourceᵏ)) g′ m w))
+                                  (cong (_∨ false) (trans (≡ᵇ-sym (regSource (proj₁ (proj₂ x))) (arrSource a)) d))))
 
 -- the two arrivals of a partnered pop are numbered as their sources are
 pop-kind : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
@@ -714,7 +727,7 @@ hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
 hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy ll ll′ i hk e₁ e₂ {sP₁ = sP₁} {stP₁ = stP₁} {stI₁ = stI₁} go go′ {eP = eP} {sP₂ = sP₂} {stP₂ = stP₂} end end′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
-  with hot-end-start κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ (pass-quiet refl go′) end′
+  with hot-end-start κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ (pass-quiet refl (room s) go′) end′
 ...   | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
   hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ (cascade-latched end′ {toℕ (i ↑ˡ n)} (close-hit a′ stI₁ e₂)) {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
@@ -725,7 +738,7 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy ll 
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           end g))
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
-...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd z₂ (pass-quiet refl go′)) {a} {a′} {i}
+...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd z₂ (pass-quiet refl (room s) go′)) {a} {a′} {i}
                            e₁ e₂ ll ll′ (close-hit a′ stI₁ e₂) z₁ z₂ , []
 
 -- THE END OF A LAST ARRIVAL: a minted source's is the close, the end walked
@@ -758,8 +771,8 @@ last-pass {n} {Γ} {t} κ e s df {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP�
         W  = dyn-pass κ e s df ex ex′ ta sy p q go go′
         S₁ = proj₁ W
         ar₁ = proj₁ (proj₂ (proj₂ W))
-        ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁ (pass-quiet refl go′)
-        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁ (pass-quiet refl go′)
+        ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁ (pass-quiet refl (room s) go′)
+        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁ (pass-quiet refl (room s) go′)
         k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca)
                (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
                (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′
@@ -847,7 +860,7 @@ cascade-at κ e {c} {d} s ex ex′ dry =
          (s , [] , tt)
 cascade-at κ e {c} {d} s {inj₂ (a , rs)} {inj₂ (a′ , rs′)} ex ex′ (pop ta la _ _ _ _ _ sy _) =
   subst₂ (Kept κ e d) (sym (step-at c eqn)) (sym (step-at d eqn′))
-         (stores (proj₁ k) (cascade-quiet gI) , proj₂ k)
+         (stores (proj₁ k) (cascade-quiet (room (Storeˢ.raw s)) gI) , proj₂ k)
   where
     eqn  = cong (schedFinish (Conf.sched c)) ex
     eqn′ = cong (schedFinish (Conf.sched d)) ex′
