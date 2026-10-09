@@ -307,17 +307,17 @@ drop-off s ((rid , c , y) ∷ K) (there x∈)  | false = let d , m = drop-off s 
 
 -- A VALUE PASS ENDS WITH NO ROW OF A DYING SOURCE: it opens with none dying
 pass-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
-           → cascadeGo⇓ a vs fin cs sched (cascadeOpen st) r → DyingFree (proj₂ (proj₂ r))
-pass-quiet g x∈ = not-true (λ w → t≢f (sym (walk-quiet g x∈ w)))
+           → EvalSt.dying st ≡ [] → cascadeGo⇓ a vs fin cs sched st r → DyingFree (proj₂ (proj₂ r))
+pass-quiet z g {x} x∈ = not-true (λ w → t≢f (trans (sym (walk-quiet g x∈ w)) (cong (memberSource (regSource (proj₁ (proj₂ x)))) z)))
 
 -- AND SO DOES A CASCADE: its end walk opens with only the closed source
 -- dying, whose rows the finish drops
 cascade-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a sched} {st : EvalSt e} {r}
               → cascade⇓ a sched st r → DyingFree (proj₂ (proj₂ r))
 cascade-quiet (casc-run {a = a} {sched′ = s₁} {st′ = t₁} nl g) =
-  subst (λ p → DyingFree (proj₂ p)) (sym (finish-run a s₁ t₁ nl)) (pass-quiet g)
+  subst (λ p → DyingFree (proj₂ p)) (sym (finish-run a s₁ t₁ nl)) (pass-quiet refl g)
 cascade-quiet (casc-run-last {a = a} {sched₂ = s₂} {st₂ = t₂} ll _ g′) =
-  subst (λ p → DyingFree (proj₂ p)) (sym (finish-last a s₂ t₂ ll)) λ {x} x∈ →
+  subst DyingFree (sym (finish-last a s₂ t₂ ll)) λ {x} x∈ →
     let d , m = drop-off (arrSource a) (EvalSt.registry t₂) x∈
     in not-true (λ w → t≢f (trans (sym (walk-quiet g′ m w))
                                   (cong (_∨ false) (trans (≡ᵇ-sym (regSource (proj₁ (proj₂ x))) (arrSource a)) d))))
@@ -707,7 +707,7 @@ hot-end : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
 hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy ll ll′ i hk e₁ e₂ {sP₁ = sP₁} {stP₁ = stP₁} {stI₁ = stI₁} go go′ {eP = eP} {sP₂ = sP₂} {stP₂ = stP₂} end end′
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
-  with hot-end-start κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ (pass-quiet go′) end′
+  with hot-end-start κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ (pass-quiet refl go′) end′
 ...   | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
   hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ (cascade-latched end′ {toℕ (i ↑ˡ n)} (close-hit a′ stI₁ e₂)) {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
@@ -718,7 +718,7 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy ll 
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           end g))
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
-...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd z₂ (pass-quiet go′)) {a} {a′} {i}
+...     | refl = hot-quiet κ (hot-close κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk e₁ e₂ cd z₂ (pass-quiet refl go′)) {a} {a′} {i}
                            e₁ e₂ ll ll′ (close-hit a′ stI₁ e₂) z₁ z₂ , []
 
 -- THE END OF A LAST ARRIVAL: a minted source's is the close, the end walked
@@ -751,8 +751,8 @@ last-pass {n} {Γ} {t} κ e s df {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP�
         W  = dyn-pass κ e s df ex ex′ ta sy p q go go′
         S₁ = proj₁ W
         ar₁ = proj₁ (proj₂ (proj₂ W))
-        ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁ (pass-quiet go′)
-        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁ (pass-quiet go′)
+        ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁ (pass-quiet refl go′)
+        Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁ (pass-quiet refl go′)
         k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca)
                (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
                (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′
