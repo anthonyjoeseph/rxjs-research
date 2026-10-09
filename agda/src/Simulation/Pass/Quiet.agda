@@ -48,7 +48,7 @@ open import Simulation.Stores using (V; Spent; dlvᵇ; EmitRel; ObsRel; Flattene
   PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~;
   inner~; elab; deferInner~; hotEq; RowRel; read~; cold~; defer~; RegRel; []; _∷_; mach;
   MachRow; hot~; Store; Arr; Partners; pair-ids; spent-zip; partner-row; partner-mem; Named; named-nodes; MergeAt;
-  LiveRows; live-mono; skip-dlv; skip-dying; live-quiet; live-keep; live-write; outerDoneᵇ)
+  LiveRows; live-mono; skip-dlv; skip-dying; live-quiet; live-keep; live-write; outerDoneᵇ; LiveIf)
 open import Simulation.After using (readᴾ; readᴵ; PairedR; skip-cut; module Kept)
 open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit.Decode using (decodeEmits)
@@ -589,6 +589,17 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     only keys pm₀ f@(pm , _) with key-same keys pm pm₀
     ... | refl = f
 
+    -- AN INNER'S PATH IS LIVE UNLESS SPENT WHERE ITS WALK STARTS.  The
+    -- value subscribing it came down a row a dispatch found live, but
+    -- the pass carries no liveness from there to here, and what it ran
+    -- in between can end an outer the path walks -- a fact of the pass
+    -- the inner's hypotheses do not carry
+    postulate
+      inner-live : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
+                     {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {j′}
+                 → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                 → LiveIf (from-inner (flatOp op) m′ j′ ↠[ ≤-refl ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI)
+
     -- AN INNER'S WALK FROM STORES ALREADY MINTED: the walk of its
     -- elaboration, left again at the lane's frames
     inner-walk : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
@@ -603,10 +614,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                → sz-subscribeE dP < N
                → Σ (After S rP rI) λ A
                    → Walkedˣ xs op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
-    inner-walk wk S {op = op} {rP = rP} {rI} (f@(pm , _) , pr) ip (elab s w r) oP oI dP dI lt =
+    inner-walk wk S {op = op} {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃} {h₄} {j′ = j′} {rP = rP} {rI} (f@(pm , _) , pr) ip (elab s w r) oP oI dP dI lt =
       proj₁ B , only {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} (Store.π-keys (After.store (proj₁ B))) (After.grows (proj₁ B) pm) (proj₂ (proj₁ L)) , proj₂ (proj₂ L)
       where
-      B = wk s w r S (inner~ refl f ip pr) oP oI dP dI lt
+      B = wk s w r S (inner~ refl f ip pr) oP oI (inner-live S {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃} {h₄} {j′ = j′} (f , pr)) dP dI lt
       L = leave {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} op (proj₁ (proj₂ B))
 
     -- A FLATTENER'S RESTAMP CELL WRITTEN: the stores and the tails stay

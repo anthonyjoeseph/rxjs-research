@@ -21,7 +21,7 @@ open import SExp.Plain   using (plainExp)
 open import SExp.Elaborate using (toInstEmit; plainᶜ⁺; frameᵛ)
 open import Simulation.After using (module Kept)
 open import Simulation.Catch using (Stamps)
-open import Simulation.Stores using (Store; PathRel; EnvRel)
+open import Simulation.Stores using (Store; PathRel; EnvRel; LiveIf)
 open import Simulation.Size using (sz-subscribeE)
 open Kept using (After; module After)
 
@@ -35,7 +35,8 @@ module Walkers {n} {Γ : Ctx n} (κ : Kinds n) where
   module On {t} (ep : Closed Γ t) (ei : Closed (plainᵏ Γ κ) (emitᵗ t)) where
 
     -- WHAT ONE SUBSCRIBE KEEPS: what a pass keeps, from related stores
-    -- and related sound paths, and the paths related again after; and
+    -- and related sound paths, the impl's live unless spent, and the
+    -- paths related again after; and
     -- what it sends lands where its path catches its frame `f`.
     --
     -- THE IMPL'S PATH STANDS `n` ABOVE THE PLAIN ONE'S FLOOR, as the roots
@@ -47,7 +48,7 @@ module Walkers {n} {Γ : Ctx n} (κ : Kinds n) where
         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
       → (S : Store κ sP stP sI stI)
       → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)
-      → Sound p sP stP → Sound q sI stI
+      → Sound p sP stP → Sound q sI stI → LiveIf q (EvalSt.nodes stI)
       → subscribeE⇓ {e = ep} x p now sP stP rP → subscribeE⇓ {e = ei} x′ q now sI stI rI
       → Σ (After κ S rP rI) λ A
           → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
@@ -60,7 +61,7 @@ module Walkers {n} {Γ : Ctx n} (κ : Kinds n) where
         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
       → (S : Store κ sP stP sI stI)
       → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)
-      → Sound p sP stP → Sound q sI stI
+      → Sound p sP stP → Sound q sI stI → LiveIf q (EvalSt.nodes stI)
       → (dP : subscribeE⇓ {e = ep} x p now sP stP rP) → subscribeE⇓ {e = ei} x′ q now sI stI rI
       → sz-subscribeE dP < N
       → Σ (After κ S rP rI) λ A

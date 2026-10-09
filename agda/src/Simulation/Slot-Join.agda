@@ -46,7 +46,7 @@ open import Rx.Evaluator.Reducible.Support using (Rule; Sound; Distinct; endOf; 
 open import SExp.Syntax  using (Kinds; hotᵏ; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ)
 open import Simulation.Stores using (LiveAt; live; Store; Arr; PathRel; Named; Census; Unpaired; RowRel; ArrRows; _∷_; []; read~; root~; sink~;
-  map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; deferInner~; LiveOn; LiveRows)
+  map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; deferInner~; LiveOn; LiveIf; module LiveIf; LiveRows; thruNodes; live-thru)
 open import Simulation.Sweep using (sameSource-no; t≢f; raw≢stamped; stamped<)
 open import Simulation.Cut   using (nodesOf; has-node; node-has)
 open import Simulation.Hop   using (none-below; guard-snoc; count-snoc; reg-snoc; part-snoc; spent-snoc; arr-snoc; reg-unp; path-spent; rel-vals)
@@ -92,6 +92,17 @@ lower-spent le (take-f _ _ ↠[ _ ] _)     ns = refl
 lower-spent le (batchSync-f _ ↠[ _ ] _)  ns = refl
 lower-spent le (from-inner _ _ _ ↠[ _ ] _) ns = refl
 lower-spent le (thru-outer _ _ ↠[ _ ] _) ns = refl
+
+-- and walks the outers it did
+lower-thru : ∀ {m} {Δ : Ctx m} {s u lo lo′} (le : lo′ ≤ lo) (p : Path Δ lo s u) → thruNodes (lowerFloor le p) ≡ thruNodes p
+lower-thru le root                      = refl
+lower-thru le (share-sink _ _)          = refl
+lower-thru le (map-f _ ↠[ _ ] _)        = refl
+lower-thru le (scan-f _ _ ↠[ _ ] _)     = refl
+lower-thru le (take-f _ _ ↠[ _ ] _)     = refl
+lower-thru le (batchSync-f _ ↠[ _ ] _)  = refl
+lower-thru le (from-inner _ _ _ ↠[ _ ] _) = refl
+lower-thru le (thru-outer _ _ ↠[ _ ] _) = refl
 
 module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} where
 
@@ -163,17 +174,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     ...   | yes e with toℕ-injective e
     ...     | refl = ⊥-elim (t≢f (trans (sym (f conn)) rawI))
 
-    -- A JOINER'S PATH WALKS LIVE OUTERS: the reader is subscribed by a
-    -- row walking it, and a walked row finds its outers live -- a fact
-    -- of the walk the join's hypotheses do not carry
-    postulate
-      join-live : LiveOn p′ (EvalSt.nodes stI)
-
-    -- REGISTERED: both rows join their registries last, paired as `read~`
-    registered : Rule sP₂ (record stP { registry = KP ++ rowP ∷ [] }) → Rule sI₂ (record stI { registry = KI ++ rowI ∷ [] })
+    -- REGISTERED: both rows join their registries last, paired as `read~`,
+    -- the impl's on a path its walk found live
+    registered : LiveOn p′ (EvalSt.nodes stI) → Rule sP₂ (record stP { registry = KP ++ rowP ∷ [] }) → Rule sI₂ (record stI { registry = KI ++ rowI ∷ [] })
                → Σ (After S ([] , sP₂ , record stP { registry = KP ++ rowP ∷ [] }) ([] , sI₂ , record stI { registry = KI ++ rowI ∷ [] })) λ B
                    → PathRel {Γ = Γ} κ (Store.π (After.store B)) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) p₀ q₀
-    registered rP rI =
+    registered join-live rP rI =
       after S₂ (λ { (inj₁ c) → inj₁ c ; (inj₂ (a , b , pp)) → inj₂ (a , b , part-snoc {Γ = Γ} κ rows new-row pp) })
                (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar ; rows = arr-snoc {Γ = Γ} κ rows new-row (Arr.rows ar) arr
                               ; lists = Arr.lists ar })
@@ -233,14 +239,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         }
 
     -- the two registrations agree on whether they are spent
-    join-at : (bP bI : Bool) → bP ≡ bI
+    join-at : (bP bI : Bool) → bP ≡ bI → (bI ≡ false → LiveOn p′ (EvalSt.nodes stI))
             → Rule sP₂ (record stP { registry = if bP then KP else KP ++ rowP ∷ [] })
             → Rule sI₂ (record stI { registry = if bI then KI else KI ++ rowI ∷ [] })
             → Σ (After S ([] , sP₂ , record stP { registry = if bP then KP else KP ++ rowP ∷ [] })
                          ([] , sI₂ , record stI { registry = if bI then KI else KI ++ rowI ∷ [] })) λ B
                 → PathRel {Γ = Γ} κ (Store.π (After.store B)) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) p₀ q₀
-    join-at true  true  refl = spent
-    join-at false false refl = registered
+    join-at true  true  refl _  = spent
+    join-at false false refl lq = registered (lq refl)
 
   -- a path retyped along an equation is the same pair of type and path
   sub-pair : ∀ {lo u A B} (e : A ≡ B) (y : Path (plainᵏ Γ κ) lo B u)
@@ -257,15 +263,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                   (below : toℕ i < lo) (below′ : toℕ (n ↑ʳ i) < n + lo)
                   (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)) {Θ₀ ρ₀} {X : Tm (plainᵏ Γ κ) [] [] (emitᵗ (lookup Γ i) ∷ Θ₀) uniqᵗ}
               → PathRel {Γ = Γ} κ (Store.π S) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-              → Sound p sP stP → Sound q sI stI
+              → Sound p sP stP → Sound q sI stI → LiveIf q (EvalSt.nodes stI)
               → let q′ = lowerFloor below′ (subst (λ v → Path (plainᵏ Γ κ) (n + lo) v (emitᵗ t)) (sym eq)
                                            (map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ ≤-refl ] q))
                     rid = freshId regᵏ (Sched.mint sP) ; rid′ = freshId regᵏ (Sched.mint sI)
                 in Σ (After S ([] , record sP { mint = setAt regᵏ (suc rid) (Sched.mint sP) } , register rid (atSlot i) (lowerFloor below p) stP)
                               ([] , record sI { mint = setAt regᵏ (suc rid′) (Sched.mint sI) } , register rid′ (atSlot (n ↑ʳ i)) q′ stI)) λ B
                      → PathRel {Γ = Γ} κ (Store.π (After.store B)) {t} (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-  join-read {sP} {stP} {sI} {stI} S i hk cP conn {lo} {p} {q} below below′ eq {Θ₀} {ρ₀} {X} pr soP soI =
+  join-read {sP} {stP} {sI} {stI} S i hk cP conn {lo} {p} {q} below below′ eq {Θ₀} {ρ₀} {X} pr soP soI lv =
     J.join-at (spentOn (lowerFloor below p) (EvalSt.nodes stP)) (spentOn q′ (EvalSt.nodes stI)) same
+              (λ s → live-thru q q′ {EvalSt.nodes stI} (sym thru′) (LiveIf.run lv (trans (sym spent′) s)))
               (Sound.ruled soP₂) (Sound.ruled soI₂)
     where
     y  = map-f (Θ₀ , restampᵛ X subscribeᵛ (varᵗ (here refl)) , ρ₀) ↠[ ≤-refl ] q
@@ -280,10 +287,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     off : ∀ {j} → Unpaired {Γ = Γ} κ (Store.π S) j → j ∈ nodesOf q′ → ⊥
     off u m = u (rel-vals {Γ = Γ} κ pr (has-node q (subst T (nodes′ _) (node-has q′ m))))
 
+    spent′ : spentOn q′ (EvalSt.nodes stI) ≡ spentOn q (EvalSt.nodes stI)
+    spent′ = trans (lower-spent below′ y₀ (EvalSt.nodes stI)) (cong (λ c → spentOn (proj₂ c) (EvalSt.nodes stI)) sp)
+
+    thru′ : thruNodes q′ ≡ thruNodes q
+    thru′ = trans (lower-thru below′ y₀) (cong (λ c → thruNodes (proj₂ c)) sp)
+
     same : spentOn (lowerFloor below p) (EvalSt.nodes stP) ≡ spentOn q′ (EvalSt.nodes stI)
-    same = trans (lower-spent below p (EvalSt.nodes stP))
-                 (trans (path-spent {Γ = Γ} κ pr)
-                        (sym (trans (lower-spent below′ y₀ (EvalSt.nodes stI)) (cong (λ c → spentOn (proj₂ c) (EvalSt.nodes stI)) sp))))
+    same = trans (lower-spent below p (EvalSt.nodes stP)) (trans (path-spent {Γ = Γ} κ pr) (sym spent′))
 
     module J = Join S i hk cP conn {p = lowerFloor below p} {p′ = q′}
                  (read~ (inj₁ hk) (lower-rel κ below pr) (cong (λ c → proj₁ c , lowerFloor below′ (proj₂ c)) sp))

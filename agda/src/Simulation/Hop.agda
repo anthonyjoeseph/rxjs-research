@@ -49,7 +49,7 @@ open import Simulation.Schedules using (ord) renaming (_∷_ to _∷ˢ_)
 open import Simulation.Stores using (LiveAt; live; Store; Arr; PathRel; DeferRel; Named; Census; srcCount; guardOf; Unpaired; InputBlock; block;
                                      RowRel; read~; cold~; defer~; hot~; RegRel; Src; []; _∷_; mach; Partners; Spent; ArrRows;
                                      root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~; deferInner~;
-                                     sharedEq; blockNodes; ᵇ-no; hop; dyn~; LiveOn; LiveRows; outerDoneᵇ)
+                                     sharedEq; blockNodes; ᵇ-no; hop; dyn~; LiveOn; LiveRows; outerDoneᵇ; LiveIf; module LiveIf; live-if-above)
   renaming (here to sp-here; there to sp-there)
 open import Simulation.Sweep using (sameSource-lt; sameSource-no; same-refl; lt-false; count-pass; T-true; raw<ₙ; stamped<)
 open import Simulation.Cut   using (nodesOf; has-node; no-sink)
@@ -317,7 +317,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
              (pm : (nodeCt sP , nodeCt sI ∷ []) ∈ Store.π S)
              (pr : PathRel {Γ = Γ} κ (Store.π S) (EvalSt.nodes (installNode (nodeCt sP) (mergeAll-st {t = u} nothing 0 [] false) stP))
                                          (EvalSt.nodes (installNode (nodeCt sI) (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI)) p q)
-             (rel : DeferRel κ u x′ x) where
+             (rel : DeferRel κ u x′ x)
+             (lv : LiveIf q (EvalSt.nodes (installNode (nodeCt sI) (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI))) where
 
     open Store S
 
@@ -373,12 +374,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; lists  = ((λ e → ⊥-elim (<-irrefl (sym e) (Arr.boundP ar))) , (λ e′ → ⊥-elim (<-irrefl (sym e′) (Arr.boundI ar))))
                  ∷ᵖ Arr.lists ar }
 
-    -- THE PATH A HOP JOINS WALKS LIVE OUTERS: the hop is subscribed by a
-    -- row walking it, and a walked row finds its outers live -- a fact of
-    -- the walk the hop's hypotheses do not carry
-    postulate
-      hop-live : LiveOn q (EvalSt.nodes stI₁)
-
     -- SPENT: the path through the merge already cut, so neither run
     -- registers it, and the pair is live with nothing to deliver to
     spent : Rule sP₂ (stP₂ KP) → Rule sI₂ (stI₂ KI)
@@ -411,10 +406,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         }
 
     -- REGISTERED: the rows join both registries last, paired as `defer~`
-    registered : Rule sP₂ (stP₂ (KP ++ rowP ∷ [])) → Rule sI₂ (stI₂ (KI ++ rowI ∷ []))
+    registered : LiveOn q (EvalSt.nodes stI₁) → Rule sP₂ (stP₂ (KP ++ rowP ∷ [])) → Rule sI₂ (stI₂ (KI ++ rowI ∷ []))
                → Σ (After S ([] , sP₂ , stP₂ (KP ++ rowP ∷ [])) ([] , sI₂ , stI₂ (KI ++ rowI ∷ []))) λ B
                    → PathRel {Γ = Γ} κ (Store.π (After.store B)) (EvalSt.nodes stP₁) (EvalSt.nodes stI₁) p q
-    registered rP rI =
+    registered hop-live rP rI =
       after S₂ (λ { (inj₁ c) → inj₁ c ; (inj₂ (a , b , pp)) → inj₂ (a , b , part-snoc {Γ = Γ} κ (reg-cons {Γ = Γ} κ rows) new-row (part-cons {Γ = Γ} κ rows pp)) })
                (persist (KP ++ rowP ∷ []) (KI ++ rowI ∷ []) S₂
                   (λ ar → arr-snoc {Γ = Γ} κ (reg-cons {Γ = Γ} κ rows) new-row (arr-cons {Γ = Γ} κ rows (Arr.rows ar))
@@ -466,12 +461,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         }
 
     -- the two registrations agree on whether they are spent
-    hop-at : (cP cI : Bool) → cP ≡ cI
+    hop-at : (cP cI : Bool) → cP ≡ cI → (cI ≡ false → LiveOn q (EvalSt.nodes stI₁))
            → Rule sP₂ (stP₂ (if cP then KP else KP ++ rowP ∷ [])) → Rule sI₂ (stI₂ (if cI then KI else KI ++ rowI ∷ []))
            → Σ (After S ([] , sP₂ , stP₂ (if cP then KP else KP ++ rowP ∷ [])) ([] , sI₂ , stI₂ (if cI then KI else KI ++ rowI ∷ []))) λ B
                → PathRel {Γ = Γ} κ (Store.π (After.store B)) (EvalSt.nodes stP₁) (EvalSt.nodes stI₁) p q
-    hop-at true  true  refl = spent
-    hop-at false false refl = registered
+    hop-at true  true  refl _  = spent
+    hop-at false false refl lq = registered (lq refl)
 
   -- THE HOP'S SOURCE AND ROW AGAINST ITS PARTNER'S: the pending pair
   -- relates as `defer~`, both rows through the paired merge, and the
@@ -486,7 +481,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                → (nodeCt sP , nodeCt sI ∷ []) ∈ Store.π S
                → PathRel {Γ = Γ} κ (Store.π S) (EvalSt.nodes (installNode (nodeCt sP) (mergeAll-st {t = u} nothing 0 [] false) stP))
                                        (EvalSt.nodes (installNode (nodeCt sI) (mergeAll-st {t = emitᵗ u} nothing 0 [] false) stI)) p q
-               → Sound p sP stP → Sound q sI stI
+               → Sound p sP stP → Sound q sI stI → LiveIf q (EvalSt.nodes stI)
                → DeferRel κ u x′ x
                → let nid = nodeCt sP ; src = freshId sourceᵏ (Sched.mint sP) ; ord = freshId ordinalᵏ (Sched.mint sP) ; rid = freshId regᵏ (Sched.mint sP)
                      nid′ = nodeCt sI ; src′ = freshId sourceᵏ (Sched.mint sI) ; ord′ = freshId ordinalᵏ (Sched.mint sI) ; rid′ = freshId regᵏ (Sched.mint sI)
@@ -508,8 +503,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                                                   ∷ Sched.live sI }
                         , stI′ )) λ B
                     → PathRel {Γ = Γ} κ (Store.π (After.store B)) (EvalSt.nodes stP′) (EvalSt.nodes stI′) p q
-  hop-register {sP} {stP} {sI} {stI} {u} {lo} {p} {q} {now} {x′} {x} S pm pr soP soI rel =
-    H.hop-at (spentOn p (EvalSt.nodes H.stP₁)) (spentOn q (EvalSt.nodes H.stI₁)) (path-spent {Γ = Γ} κ pr)
+  hop-register {sP} {stP} {sI} {stI} {u} {lo} {p} {q} {now} {x′} {x} S pm pr soP soI lv rel =
+    H.hop-at (spentOn p (EvalSt.nodes H.stP₁)) (spentOn q (EvalSt.nodes H.stI₁)) (path-spent {Γ = Γ} κ pr) (LiveIf.run lv₁)
       (Sound.ruled (register-sound {κ = p} {sched = sP} {sched′ = H.sP₂} {st = H.stP₁} H.rid (atDyn H.src lo)
                       (thru-outer mergeAllᵒ H.nid ↠[ ≤-refl ] p) (n≤1+n _) refl (thru-cls mergeAllᵒ H.nid ≤-refl p)
                       (λ so → (λ k a h → <-irrefl (sym (node-eq a)) (Sound.fresh-path so k h)) , Sound.distinct so)
@@ -518,4 +513,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                       (thru-outer mergeAllᵒ H.nid′ ↠[ ≤-refl ] q) (n≤1+n _) refl (thru-cls mergeAllᵒ H.nid′ ≤-refl q)
                       (λ so → (λ k a h → <-irrefl (sym (node-eq a)) (Sound.fresh-path so k h)) , Sound.distinct so)
                       (sub-ot (λ r∈ → r∈) ≤-refl soI)))
-    where module H = Hop {sP} {stP} {sI} {stI} {u} {lo} {p} {q} {now} {x′} {x} S pm pr rel
+    where
+    lv₁ = live-if-above q (nodeCt sI) (mergeAll-st {t = emitᵗ u} nothing 0 [] false) (EvalSt.nodes stI) (Sound.fresh-path soI) lv
+    module H = Hop {sP} {stP} {sI} {stI} {u} {lo} {p} {q} {now} {x′} {x} S pm pr rel lv₁

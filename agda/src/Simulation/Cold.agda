@@ -43,7 +43,7 @@ open import Rx.Evaluator.Reducible.Support using (Sound; Rule; Distinct; endOf; 
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ)
 open import Simulation.Schedules using (ticks) renaming (_∷_ to _∷ˢ_)
 open import Simulation.Stores using (LiveAt; live; Store; Arr; PathRel; Named; Unpaired; InputBlock; block; RowRel; read~; cold~; defer~; hot~;
-                                     RegRel; []; _∷_; mach; Src; blockNodes; dyn~; LiveOn; LiveRows; live-agree)
+                                     RegRel; []; _∷_; mach; Src; blockNodes; dyn~; LiveOn; LiveIf; module LiveIf; LiveRows; live-agree; live-if-agree)
   renaming (here to sp-here)
 open import Simulation.Sweep using (same-refl; sameSource-no; T-true; raw<ₙ; stamped<)
 open import Simulation.Cut   using (nodesOf; has-node; node-has)
@@ -135,7 +135,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
   -- its nodes installed at or above the node counter and every node
   -- below it as it was; a source, an ordinal and an id minted at or
   -- above the counters, the source live and partnered with the plain
-  -- read's; the read's path through the block about to be registered;
+  -- read's; the read's path through the block about to be registered,
+  -- whose flattening merge's outer is live while the flush has not run;
   -- and the flush one fold of a group carrying the plain prefix
   record ColdBlock {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : St sP stP sI stI)
                    {lo s} (q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ s) (emitᵗ t)) (now : ℕ) (lP : LiveSource Γ) (vs : List (Val Γ s))
@@ -154,6 +155,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       node≤    : nodeCt sI ≤ freshId nodeᵏ mI
       kept     : ∀ k → k < nodeCt sI → lookupNode k NI ≡ lookupNode k (EvalSt.nodes stI)
       dist     : Distinct q → Distinct full
+      walks-live : LiveOn q NI → LiveOn full NI
       src≤     : counter (Sched.mint sI) sourceᵏ ≤ src′
       src<     : src′ < counter mI sourceᵏ
       ord≤     : counter (Sched.mint sI) ordinalᵏ ≤ ordI
@@ -225,12 +227,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     old-live : LiveRows (stI₂ KI)
     old-live = live λ {r} r∈ sk → live-agree (proj₂ (proj₂ (proj₂ r))) {EvalSt.nodes stI} {NI} (λ k h → kept k (fresh-rows ruleI r∈ k h)) (LiveRows.rows-live live-outer {r} r∈ sk)
 
-    -- THE COLD'S ROW WALKS LIVE OUTERS: its block's nodes are written
-    -- fresh, and the path it subscribes onto is walked by a row that
-    -- found its outers live -- a fact of the walk the block does not carry
-    postulate
-      cold-live : LiveOn full NI
-
     persist : (R : List (RegRow Γ t)) (R′ : List (RegRow (plainᵏ Γ κ) (emitᵗ t)))
               (S₂ : Store κ sP₂ (stP₂ R) sI₁ (stI₂ R′))
             → (∀ {s s′ w w′} → Arr S s s′ w w′ → _)
@@ -274,11 +270,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         ; ruleP = rP ; ruleI = rI ; scripts = scripts ; live-outer = old-live
         }
 
-    -- REGISTERED: the rows join both registries last, paired as `cold~`
-    registered : Rule sP₂ (stP₂ (KP ++ rowP ∷ [])) → Rule sI₁ (stI₂ (KI ++ rowI ∷ []))
+    -- REGISTERED: the rows join both registries last, paired as `cold~`,
+    -- the impl's on a path its walk found live
+    registered : LiveOn full NI → Rule sP₂ (stP₂ (KP ++ rowP ∷ [])) → Rule sI₁ (stI₂ (KI ++ rowI ∷ []))
                → Σ (After S ([] , sP₂ , stP₂ (KP ++ rowP ∷ [])) ([] , sI₁ , stI₂ (KI ++ rowI ∷ []))) λ A
                    → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) NI p q
-    registered rP rI =
+    registered cold-live rP rI =
       after S₂ (λ { (inj₁ c) → inj₁ c ; (inj₂ (a , b , pp)) → inj₂ (a , b , part-snoc {Γ = Γ} κ (reg-cons {Γ = Γ} κ rows₁) new-row (part-cons {Γ = Γ} κ rows₁ (M.partM o rows pp))) })
                (persist (KP ++ rowP ∷ []) (KI ++ rowI ∷ []) S₂
                   (λ ar → arr-snoc {Γ = Γ} κ (reg-cons {Γ = Γ} κ rows₁) new-row (arr-cons {Γ = Γ} κ rows₁ (M.arrM o rows (Arr.rows ar)))
@@ -339,12 +336,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         }
 
     -- the two registrations agree on whether they are spent
-    at : (cP cI : Bool) → cP ≡ cI
+    at : (cP cI : Bool) → cP ≡ cI → (cI ≡ false → LiveOn full NI)
        → Rule sP₂ (stP₂ (if cP then KP else KP ++ rowP ∷ [])) → Rule sI₁ (stI₂ (if cI then KI else KI ++ rowI ∷ []))
        → Σ (After S ([] , sP₂ , stP₂ (if cP then KP else KP ++ rowP ∷ [])) ([] , sI₁ , stI₂ (if cI then KI else KI ++ rowI ∷ []))) λ A
            → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) NI p q
-    at true  true  refl = spent
-    at false false refl = registered
+    at true  true  refl _  = spent
+    at false false refl lq = registered (lq refl)
 
   -- A COLD READ'S ROWS REGISTERED: the plain row and the impl's through
   -- its block relate as `cold~`, the tails stay related, and both paths
@@ -352,7 +349,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
   cold-register : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : St sP stP sI stI)
                     {lo s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ s) (emitᵗ t)}
                 → (pr : PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q)
-                → Sound p sP stP → Sound q sI stI
+                → Sound p sP stP → Sound q sI stI → LiveIf q (EvalSt.nodes stI)
                 → ∀ {now} (pendP : List (ℕ × Val Γ s)) {vs rI}
                 → (B : ColdBlock S q now (record { source = freshId sourceᵏ (Sched.mint sP) ; ordinal = freshId ordinalᵏ (Sched.mint sP)
                                                  ; elemTy = s ; pending = pendP }) vs rI)
@@ -362,9 +359,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                   in Σ (After S ([] , R.sP₂ , stP′) ([] , R.sI₁ , stI′)) λ A
                        → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (ColdBlock.NI B) p q
                        × Sound p R.sP₂ stP′ × Sound q R.sI₁ stI′
-  cold-register {sP} {stP} {sI} {stI} S {lo} {s} {p} {q} pr soP soI pendP B =
+  cold-register {sP} {stP} {sI} {stI} S {lo} {s} {p} {q} pr soP soI lv pendP B =
     let X = R.at (spentOn p (EvalSt.nodes stP)) (spentOn full NI)
-                 (trans (path-spent {Γ = Γ} κ R.pr₁) (sym (ib-spent {Γ = Γ} κ blk NI))) (Sound.ruled soP′) (Sound.ruled soI′)
+                 (trans (path-spent {Γ = Γ} κ R.pr₁) (sym (ib-spent {Γ = Γ} κ blk NI)))
+                 (λ sp → walks-live (LiveIf.run (live-if-agree q {EvalSt.nodes stI} {NI} (λ k h → kept k (Sound.fresh-path soI k h)) lv)
+                                       (trans (sym (ib-spent {Γ = Γ} κ blk NI)) sp)))
+                 (Sound.ruled soP′) (Sound.ruled soI′)
     in proj₁ X , proj₂ X , soP′ , soI′
     where
     module R = Reg S pr pendP B

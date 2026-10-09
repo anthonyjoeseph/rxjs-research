@@ -47,7 +47,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≡ᵇ⇒≡)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Rx.Evaluator.Reducible.Support using (Rule)
-open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
+open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above; <→≢ᵇ)
 
 open import Rx.Mint      using (counter; sourceᵏ; regᵏ; ordinalᵏ; setAt; nodeᵏ)
 open import Rx.Prim      using (InstEmit; EmitKind; Tick; Source)
@@ -58,8 +58,8 @@ open import Rx.Evaluator using (frameNodes; LiveSource; Sched; EvalSt; NodeState
   _↠[_]_; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; mergeAllᵒ; cell-st;
   take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st; echoᵗ; lookupNode; memberSource;
   takeVals; scanVals; regSource; sameSource; pathHasNode; memoᶠ; skipᵇ; markDlv; shareDying; RegId; setNode;
-  Arrival; cascadeClose)
-open import Rx.Evaluator.Domain using (flatOp)
+  Arrival; cascadeClose; spentOn; spentAt; Frame)
+open import Rx.Evaluator.Domain using (flatOp; flatSt)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; slotTy; hotᵏ; sharedᵏ)
 open import SExp.Plain   using (plainExp)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
@@ -788,6 +788,67 @@ live-agree (f@(scan-f _ _) ↠[ _ ] q) {N} {N′}     ag l = live-agree q {N} {N
 live-agree (f@(take-f _ _) ↠[ _ ] q) {N} {N′}     ag l = live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) l
 live-agree (f@(batchSync-f _) ↠[ _ ] q) {N} {N′}  ag l = live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) l
 live-agree (f@(from-inner _ _ _) ↠[ _ ] q) {N} {N′} ag l = live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) l
+
+-- A PATH LIVE UNLESS SPENT: what a walk is handed where it subscribes.
+-- A cut's end reaches the outers below it, so a spent path's need not be
+record LiveIf {n} {Γ : Ctx n} {lo s t} (q : Path Γ lo s t) (N : List (NodeId × NodeState Γ)) : Set where
+  constructor live-if
+  field run : spentOn q N ≡ false → LiveOn q N
+
+-- a table reading every node a path walks as another did finds it as spent
+spent-agree : ∀ {n} {Γ : Ctx n} {lo s t} (q : Path Γ lo s t) {N N′ : List (NodeId × NodeState Γ)}
+            → (∀ k → T (pathHasNode k q) → lookupNode k N′ ≡ lookupNode k N) → spentOn q N′ ≡ spentOn q N
+spent-agree root              _ = refl
+spent-agree (share-sink _ _)  _ = refl
+spent-agree (f@(take-f _ k) ↠[ _ ] q) {N} {N′} ag =
+  cong₂ _∨_ (cong spentAt (ag k (subst (λ b → T ((b ∨ false) ∨ pathHasNode k q)) (sym (≡ᵇ-refl k)) tt)))
+            (spent-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)))
+spent-agree (f@(map-f _) ↠[ _ ] q) {N} {N′}          ag = spent-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h))
+spent-agree (f@(scan-f _ _) ↠[ _ ] q) {N} {N′}       ag = spent-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h))
+spent-agree (f@(batchSync-f _) ↠[ _ ] q) {N} {N′}    ag = spent-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h))
+spent-agree (f@(from-inner _ _ _) ↠[ _ ] q) {N} {N′} ag = spent-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h))
+spent-agree (f@(thru-outer _ _) ↠[ _ ] q) {N} {N′}   ag = spent-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h))
+
+live-if-agree : ∀ {n} {Γ : Ctx n} {lo s t} (q : Path Γ lo s t) {N N′ : List (NodeId × NodeState Γ)}
+              → (∀ k → T (pathHasNode k q) → lookupNode k N′ ≡ lookupNode k N) → LiveIf q N → LiveIf q N′
+live-if-agree q {N} {N′} ag l = live-if λ s → live-agree q {N} {N′} ag (LiveIf.run l (trans (sym (spent-agree q {N} {N′} ag)) s))
+
+-- and a write above every node it names keeps it so
+live-if-above : ∀ {n} {Γ : Ctx n} {lo s t} (q : Path Γ lo s t) (k : NodeId) (y : NodeState Γ) (N : List (NodeId × NodeState Γ))
+              → (∀ j → T (pathHasNode j q) → j < k) → LiveIf q N → LiveIf q (setNode k y N)
+live-if-above q k y N fr = live-if-agree q {N} {setNode k y N} (λ j h → set-above k j y N (<→≢ᵇ (fr j h)))
+
+-- a path walking the outers another walks is as live
+live-thru : ∀ {n} {Γ : Ctx n} {lo s t lo′ s′ t′} (p : Path Γ lo s t) (q : Path Γ lo′ s′ t′) {N : List (NodeId × NodeState Γ)}
+          → thruNodes p ≡ thruNodes q → LiveOn p N → LiveOn q N
+live-thru p q {N} e = subst (All (λ k → outerDoneᵇ (lookupNode k N) ≡ false)) e
+
+-- a frame on an unspent path leaves its tail unspent
+spent-tail : ∀ {n} {Γ : Ctx n} {lo ℓ s u t} (f : Frame Γ s u) (h : lo ≤ ℓ) (q : Path Γ ℓ u t) (N : List (NodeId × NodeState Γ))
+           → spentOn (f ↠[ h ] q) N ≡ false → spentOn q N ≡ false
+spent-tail (map-f _)          _ _ _ e = e
+spent-tail (scan-f _ _)       _ _ _ e = e
+spent-tail (take-f _ k)       _ q N e with spentAt (lookupNode k N)
+... | false = e
+spent-tail (batchSync-f _)    _ _ _ e = e
+spent-tail (from-inner _ _ _) _ _ _ e = e
+spent-tail (thru-outer _ _)   _ _ _ e = e
+
+-- so a frame walking no outer keeps a path live unless spent
+live-if-cons : ∀ {n} {Γ : Ctx n} {lo ℓ s u t} (f : Frame Γ s u) (h : lo ≤ ℓ) (q : Path Γ ℓ u t) {N : List (NodeId × NodeState Γ)}
+             → thruNodes (f ↠[ h ] q) ≡ thruNodes q → LiveIf q N → LiveIf (f ↠[ h ] q) N
+live-if-cons f h q {N} e l = live-if λ sp → live-thru q (f ↠[ h ] q) {N} (sym e) (LiveIf.run l (spent-tail f h q N sp))
+
+-- and one walking a live outer does too
+live-if-thru : ∀ {n} {Γ : Ctx n} {lo ℓ u t} {o} {k : NodeId} (h : lo ≤ ℓ) (q : Path Γ ℓ u t) {N : List (NodeId × NodeState Γ)}
+             → outerDoneᵇ (lookupNode k N) ≡ false → LiveIf q N → LiveIf (thru-outer {u = u} o k ↠[ h ] q) N
+live-if-thru h q od l = live-if λ sp → od ∷ LiveIf.run l sp
+
+-- a flattener installed fresh has its outer live
+flat-live : ∀ {n} {Γ : Ctx n} u op → outerDoneᵇ (just (flatSt {Γ = Γ} u op)) ≡ false
+flat-live u (mergeᶠ _) = refl
+flat-live u switchᶠ    = refl
+flat-live u exhaustᶠ   = refl
 
 -- EVERYTHING A RUN HAS NAMED IS BELOW ITS COUNTERS, so what the
 -- counters hand out next is apart from all of it: the slots' numbers,

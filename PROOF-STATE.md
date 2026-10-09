@@ -241,8 +241,8 @@ undecided, never a failure (Anthony).
 ### The monster
 
 `simulation` — both top lines' base, by arrival
-over `correspondence`: schedules in step, pops paired, stores
-related; set by `subscribe-related`, kept by `cascade-related`. RULED
+over `correspondence`: schedules, pops, stores in step;
+set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; subscribes unrelated; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
@@ -251,21 +251,25 @@ body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
 `of` splits/folds; `mintᵉ`/root stamps; quiet arms/cut drains; hop
 scripts; joiners off catch; installs+hops; revived inners;
 unaligned reads/connects/flushes; renames; 2-script
-stores/values; mid-emit joins; μ cold reads; dying rows.
+stores/values; mid-emit joins; μ cold reads; dying rows;
+dead outers.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **THE WALK'S LIVE PATH.** `hop-live`, `cold-live` and `join-live` each ask a
-  walk to hand back the `LiveOn` of the path it registers; thread it through
-  `Walks`. Decides whether liveness is a walk's fact or a store's.
 
 - **THE ENDED OUTER.** `end-live` wants an outer's end to be its subtree's
   last, an accounting `Store` does not carry. Census what a dispatch walks
   past an ended outer on reached states, then restate over the field a fit
   test names. Decides whether `simulation`'s reached ends leave a row a
   later pass would walk.
+
+- **THE PASS'S LIVE PATH.** `inner-live` asks the pass for the liveness the
+  walk now carries down to every registration; thread `LiveIf` through `Pass`,
+  leaving leaves only where it sequences values (consumes between values, the
+  drain loop). Those leaves and `end-live` state one fact, that an ended outer
+  has nothing active upstream. Decides whether the walk's liveness survives
+  `simulation`'s passes or needs that fact as a `Store` field.
 
 - **FIT THE EXPLODE.** Then write `explode-out` and the two subscribe leaves
   as bodies over smaller leaves, `Store` gaining each fact a body needs; the
@@ -356,14 +360,8 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`end-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an outer's end
   leaves no row through it a dispatch would walk; that the end is the subtree's
   last is an accounting `Store` does not carry.
-- **`hop-live`** (Simulation.Hop) — SHAPE, `NO EVIDENCE`: a hop's registered
-  row finds every outer on its path live; the walk does not carry it.
-- **`cold-live`** (Simulation.Cold) — SHAPE, `NO EVIDENCE`: a cold read's
-  registered row finds every outer on its path live; the walk does not carry
-  it.
-- **`join-live`** (Simulation.Slot-Join) — SHAPE, `NO EVIDENCE`: a joiner's
-  registered row finds every outer on its path live; the walk does not carry
-  it.
+- **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an inner's
+  path is live unless spent where its walk starts; the pass does not carry it.
 - **`{fold,drain}-keeps-od`** (Simulation.Pass.Inner) — DIFFICULTY, `PROBED×4`:
   a fold never lowers an outer's done flag, and a drain's carried flag is down
   wherever its node's is; a nested merge's finish writes back a flag read
