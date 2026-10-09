@@ -789,7 +789,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     outer-wrap {sP} {stP} {sI} {stI} S {now} {op = op} {m′ = m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₂} {h₃} {h₄} {q = q} {fin = true} {r}
                W@((_ , _ , _ , lP , lI , fn , _) , _) gw cl dR =
       let (b , y , y′ , fn′ , eP , eI) = wrap-at {sP = sP} {sI} {stP} {stI} fn lP lI
-          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru {q = thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} refl (gw refl)) (Store.live-outer S))
+          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru {st = stI} {q = thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} refl (gw refl)) (Store.live-outer S))
           (_ , _ , A , W′ , c , g , d) = wrap-tail S A₀ (f₀ , r₀)
             (subst (λ T → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ T)) (proj₂ (proj₂ T))) eI cl)
             (λ e → gone-restamp S {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₃} {h₄} {q} (gone-wrap S {o = flatOp op} {k = m′} {h = h₂} {q = Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} (gw refl) (trans (cong proj₁ eI) e)))

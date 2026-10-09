@@ -1145,7 +1145,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     explode-end {fin = false} A cP (fl , r , x) cI _ dI g = explode-wrapped refl A cP (fl , r) x cI (λ ()) dI g
     explode-end {op = op} {m′ = m′} {ks = ks} {mX = mX} {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃ = h₃} {h₄} {h₅} {h₆} {q = q} {sI′ = sI′} {stI′ = stI′} {fin = true} A cP (fl , r , (_ , lX)) cI gm dI g =
       let (B , W , x′) = merge-done (After.store A) fl r lX
-                           (live-spent mX _ (gone-thru {q = thru-outer mergeAllᵒ mX ↠[ h₃ ] thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q} refl (gm refl))
+                           (live-spent mX _ (gone-thru {st = stI′} {q = thru-outer mergeAllᵒ mX ↠[ h₃ ] thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q} refl (gm refl))
                               (Store.live-outer (After.store A)))
       in explode-wrapped {T = thruWrap mergeAllᵒ mX true (sI′ , stI′)} (sym (merge-wrap lX)) (A ⨾∅ B) cP W x′ cI
            (λ _ → gone-wrap (After.store A) {o = mergeAllᵒ} {k = mX} {h = h₃} {q = thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q}
