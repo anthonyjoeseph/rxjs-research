@@ -495,6 +495,19 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     inner-pass {op = op} S R b sp si (inj₂ al) (fold-step (step-from-inner (react-dead dd _)) _) =
       ⊥-elim (t≢f (trans (sym (trans (sym (inner-alive S (proj₁ (proj₂ (leave op R))))) al)) dd))
 
+    postulate
+      -- A FINISH THAT ENDS ITS FLATTENER LEFT NOTHING AT ITS TAIL: an
+      -- end leaves a finish only once the outer has ended and no inner is
+      -- alive, and every row through the tail's head came through the
+      -- outer or one of the inners.  A restamp's tail and a nested
+      -- merge's are both instances.  The store is the one the finish
+      -- leaves: a nested merge's finish writes its node before it starts,
+      -- and only the drain after it hands a store back.
+      gone-finish : ∀ {sP stP sI₁ stI₁} (S : St sP stP sI₁ stI₁) {now ℓ s op m′ j′ x}
+                      {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {es sI stI o₁ es₁ f₁}
+                  → innerFinish⇓ op m′ j′ q now es sI stI x (o₁ , es₁ , f₁ , sI₁ , stI₁)
+                  → f₁ ≡ true → Gone q stI₁
+
     -- A SWITCH'S INNER ENDED: both sides clear their current inner and let
     -- the group on, or neither does -- `CurRel` pairs the two currents,
     -- so the dying inner is current on both sides or on neither
@@ -585,18 +598,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     ... | refl | refl = refl , refl , refl , qs
 
     postulate
-      -- A FINISH THAT ENDS ITS FLATTENER LEFT NOTHING AT ITS TAIL: an
-      -- end leaves a finish only once the outer has ended and no inner is
-      -- alive, and every row through the tail's head came through the
-      -- outer or one of the inners.  A restamp's tail and a nested
-      -- merge's are both instances.  The store is the one the finish
-      -- leaves: a nested merge's finish writes its node before it starts,
-      -- and only the drain after it hands a store back.
-      gone-finish : ∀ {sP stP sI₁ stI₁} (S : St sP stP sI₁ stI₁) {now ℓ s op m′ j′ x}
-                      {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {es sI stI o₁ es₁ f₁}
-                  → innerFinish⇓ op m′ j′ q now es sI stI x (o₁ , es₁ , f₁ , sI₁ , stI₁)
-                  → f₁ ≡ true → Gone q stI₁
-
       -- A FOLD NEVER UN-ENDS AN OUTER: a node whose done flag is up stays
       -- up.  The risk is a nested merge's finish, which writes back the
       -- flag it read BEFORE folding its group: if that fold ended the
