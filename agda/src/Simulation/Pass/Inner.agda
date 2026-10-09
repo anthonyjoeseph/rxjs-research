@@ -469,10 +469,10 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
              → Arm S now [] sP stP₁ p vs fin
                  (λ π NP NI → PathRel κ π NP NI (from-inner (flatOp op) m j ↠[ h ] p)
                     (from-inner (flatOp op) m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q)) (λ I → Dlv I fin es) rI
-    inner-on {m = m} {m′} {ks = ks} {j = j} {j′} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₂ = h₂} {h₃} {q = q} {stP₁ = stP₁} A₀ ((_ , f) , ip , pr) b sp si g (fold-step d₁ (fold-step step-map dq))
+    inner-on {op = op} {m = m} {m′} {ks = ks} {j = j} {j′} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₂ = h₂} {h₃} {q = q} {stP₁ = stP₁} A₀ ((xs , f) , ip , pr) b sp si g (fold-step d₁ (fold-step step-map dq))
       with restamp-echo (After.store A₀) f pr b d₁
     ... | A , f′ , pr′ , c′ , refl , dl =
-      arm (A₀ ⨾ A) pr′ c′ (proj₂ (proj₁ cI)) (λ e → gone-echo f d₁ (gone-restamp (After.store A₀) {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₂} {h₃} {q} (g e))) dq (λ {rP} dP B rel′ →
+      arm (A₀ ⨾ A) pr′ c′ (proj₂ (proj₁ cI)) (λ e → gone-echo {π = Store.π (After.store A₀)} {NP = EvalSt.nodes stP₁} {op = op} {m = m} {m′ = m′} {xs = xs} f d₁ (gone-restamp (After.store A₀) {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₂} {h₃} {q} (g e))) dq (λ {rP} dP B rel′ →
         inner~ refl (flat-move (EvalSt.nodes stP₁) _ (EvalSt.nodes (proj₂ (proj₂ rP))) _ (After.grows B)
                        (missed dP (head-on _ _ _ m (self-node m (j ∷ [])) sp , drop-ot _ _ _ sp))
                        (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′)
