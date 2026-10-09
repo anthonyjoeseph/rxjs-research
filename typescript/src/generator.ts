@@ -6,6 +6,7 @@ import {
   Fn,
   PrimOp,
   ScriptVal,
+  takeMacro,
   Tm,
   Ty,
   mergeOp,
@@ -427,10 +428,11 @@ const genExp = (
         src: genExp(rng, ty, ctx, depth - 1),
       });
     },
-    take: () => ({
-      type: "take",
+    take: () => takeMacro(int(rng, 0, 4), ty, genExp(rng, ty, ctx, depth - 1)),
+    takeWhile: () => ({
+      type: "takeWhile",
       ty,
-      count: genTm(rng, natT, ctx, Math.min(depth, 2)),
+      fn: genFn(rng, ty, boolT, ctx, Math.min(depth, 2)),
       src: genExp(rng, ty, ctx, depth - 1),
     }),
     scan: () => {
@@ -630,12 +632,7 @@ const genExp = (
         () => share,
         () => share,
         () => bracket(share),
-        (): Exp => ({
-          type: "take",
-          ty,
-          count: { type: "natT", ty: natT, val: int(rng, 2, 4) },
-          src: share,
-        }),
+        (): Exp => takeMacro(int(rng, 2, 4), ty, share),
         // the joiner two levels down from the share
         (): Exp => ({
           type: "map",
@@ -649,12 +646,7 @@ const genExp = (
       const spawn: Exp = pick(rng, [
         () => share,
         () => share,
-        (): Exp => ({
-          type: "take",
-          ty,
-          count: { type: "natT", ty: natT, val: int(rng, 1, 3) },
-          src: share,
-        }),
+        (): Exp => takeMacro(int(rng, 1, 3), ty, share),
       ])();
       const src: Exp = {
         type: "map",

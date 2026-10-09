@@ -236,7 +236,7 @@ Three things E6 deliberately does not do. It does not check that the two
 candidates are the ones that **matter** — no machine can, and that judgement is
 the reason a fork gets written down at all. It does not check that `at` is
 **reachable**: a witness built by hand rather than by running is the failure
-under PROBE BEFORE GRINDING, unchanged and still yours. And it says nothing
+CLAUDE.md's probing rules name, unchanged and still yours. And it says nothing
 about a fork between two **statements** — two candidate shapes for a lemma,
 two currencies for a potential. Those are settled by refuting one side, which
 is `refuted/`'s job, with its own root and its own gate target; there is no

@@ -5,9 +5,7 @@ name: Gate
 # `quickcheck` each take the better part of an hour, and neither of the slow
 # two blocks the other — so a TypeScript error is red before the Agda
 # toolchain has finished building, and a counterexample is found on the same
-# run that types the tower instead of the one after it. Two of the four are
-# switched off while the evaluator is rewritten; each says so at its own
-# `if: false`, and the switch is the only edit either one carries.
+# run that types the tower instead of the one after it.
 #
 # `make gate` is this repo's merge gate (see CLAUDE.md). On a fresh checkout
 # there is never a `.gate-heavy-stamp` (it's gitignored — local dev-loop
@@ -28,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       qc_seeds:
-        description: "QuickCheck seed range and size: FIRST LAST RUNS DEPTH"
+        description: "QuickCheck seed range and size: FIRST LAST RUNS DEPTH SECS"
         required: false
         default: ""
 
@@ -214,50 +212,64 @@ jobs:
             done ) &
           make gate AGDA_PROFILE=--profile=definitions
 
-  # THE SWEEP THE BUG CACHE EXISTS FOR. `make gate` runs the cache's EXISTING
-  # rows and is green exactly when no KNOWN counterexample remains; nothing in
-  # it ever looks for a new one. This job does, on the same run rather than on
-  # whichever later session happens to type the command.
+  # THE SWEEP THE BUG CACHE EXISTS FOR. The oracle job's `make bug-cache`
+  # runs the cache's EXISTING rows and is green exactly when no KNOWN
+  # counterexample remains; nothing there ever looks for a new one. This job
+  # does, on the same run rather than on whichever later session happens to
+  # type the command: all four of `Main`'s statements and the simulation
+  # two of them stand on, decided on the real evaluator over drawn author
+  # programs.
   #
-  # DISABLED WHILE THE EVALUATOR IS REWRITTEN (Anthony: "we need to disable
-  # quickcheck in ci for now"), for the same reason the oracle below is. The
-  # machine it swept was the one being replaced; the replacement now runs,
-  # so that half of the reason is spent, but `mergeAllᵖ` is still a live
-  # postulate of the elaborator and this sweep is red on it on every push --
-  # a state of the work rather than a finding, and a red that reports the
-  # same known thing every run is a red nobody reads. It comes back ON,
-  # unchanged, when that arm lands: nothing here may be narrowed to make it
-  # pass.
+  # A CASE PAST THE BINARY'S PER-CASE CLOCK IS UNDECIDED, NEVER A FAILURE
+  # (Anthony). Any clock has a case past it, so a clock cannot be what turns
+  # this red; a statement that answered and disagreed is. Undecided rows are
+  # printed under their own markers, which the script never appends.
+  #
+  # IT BUILDS ON THE ORACLE'S TREE, as `make qc-build` does -- termination
+  # checking off, erasure markers real -- and caches the BINARY under a key
+  # hashing only its own cone (`make qc-key`), the way the oracle job caches
+  # its runners. No restore-keys: a near match is a binary of some other
+  # evaluator.
   quickcheck:
-    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Compute the binary's cache key
+        id: key
+        run: echo "key=$(make --no-print-directory qc-key)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the compiled QuickCheck
+        id: qc
+        uses: actions/cache/restore@v4
+        with:
+          path: agda/_oracle/_cli/QuickCheck
+          key: agda-qc-${{ runner.os }}-${{ steps.key.outputs.key }}
+
+      # A restored binary is OLDER than the fresh checkout, so without this
+      # `make` would rebuild what the key has just said is current.
+      - name: Mark the restored binary current
+        if: steps.qc.outputs.cache-hit == 'true'
+        run: touch agda/_oracle/_cli/QuickCheck
+
       - name: Set up Agda
+        if: steps.qc.outputs.cache-hit != 'true'
         uses: ./.github/actions/agda-toolchain
 
-      # RESTORE-ONLY, both of them: the gate job owns these keys (see its own
-      # comments for what they hold and why restoring one cannot make a check
-      # pass that should fail). A miss costs this job a cold build of the cone
-      # under `CLI/QuickCheck.agda` and nothing else.
-      - name: Restore Agda interfaces
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            agda/_stripped-comments/_build
-            agda/_stripped-comments/evidence/_build
-          key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            agda-interfaces-${{ runner.os }}-
+      - name: Build QuickCheck
+        if: steps.qc.outputs.cache-hit != 'true'
+        run: make qc-build
 
-      - name: Restore compiled MAlonzo objects
-        uses: actions/cache/restore@v4
+      # SAVED AS SOON AS IT IS BUILT, so a red sweep still leaves the next
+      # run a cache hit.
+      - name: Save the compiled QuickCheck
+        if: steps.qc.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
         with:
-          path: agda/_cli/MAlonzo
-          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+          path: agda/_oracle/_cli/QuickCheck
+          key: agda-qc-${{ runner.os }}-${{ steps.key.outputs.key }}
 
       # THE VERDICT IS THE CORPUS, NOT THE EXIT STATUS. `make quickcheck`
       # APPENDS whatever it finds to the bug cache and exits 0 either way --
@@ -274,9 +286,13 @@ jobs:
       # interpolated into the command: `${{ }}` inside `run:` is textual
       # substitution done before a shell ever sees it, so a value carrying a
       # quote or a semicolon is script rather than an argument.
+      #
+      # THE SWEEP IS SIZED TO THE JOB, and the size is HERE because it is
+      # this job's budget rather than the script's: seeds 1..12, 15 cases
+      # each, depth 2, a seed's wall clock 600 s. Widen it by dispatch.
       - name: make quickcheck
         env:
-          QC_SEEDS: ${{ inputs.qc_seeds }}
+          QC_SEEDS: ${{ inputs.qc_seeds || '1 12 15 2 600' }}
         run: make quickcheck ARGS="$QC_SEEDS"
 
       - name: New counterexamples?
@@ -465,10 +481,6 @@ jobs:
       # counterexample remains. LAST, and on `always()`, so it runs whatever
       # the sweep found and a red here never hides the sweep.
       #
-      # DISABLED WITH THE QUICKCHECK JOB ABOVE (Anthony): its rows are author
-      # programs checked through the elaboration, so it judges the SExp tree,
-      # which is tier 2's work; tier 1 is judged by the oracle alone. It
-      # comes back ON, unchanged, with the quickcheck job.
       - name: make bug-cache
-        if: false
+        if: always() && !cancelled()
         run: make bug-cache

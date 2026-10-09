@@ -47,7 +47,7 @@
 exp	input	input	yes	yes	source
 exp	ofᵉ	of	yes	yes	source
 exp	emptyᵉ	empty	yes	yes	source
-exp	takeᵉ	take	yes	yes	protocol
+exp	takeWhileᵉ	takeWhile	yes	yes	protocol
 exp	mapᵉ	map	yes	yes	pure
 exp	scanᵉ	scan	yes	yes	pure
 exp	flattenᵉ	flatten	yes	yes	flatten

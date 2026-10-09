@@ -74,4 +74,5 @@ yours. `gate-light` and `gate-heavy` force a path.
 | [typecheck-cost.md](typecheck-cost.md) | the cost model: what actually makes a module slow, and the `abstract` mandate |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
 | [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out, and why it may carry counts the roadmap may not |
+| [probe.md](probe.md) | `make qc-<statement>` — the compiled probe, and `QC_DRAW`, the restriction that aims its draw at one region |
 | [evidence.md](evidence.md) | `agda/evidence/` — the library boundary that makes a `src` import of a probe or a refutation unresolvable, and how a probe expires |

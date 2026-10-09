@@ -59,3 +59,45 @@ open import Refuted.Domain-Predicate using
 -- that pop, so the funding conclusion is refuted outright rather than
 -- merely unproven.
 open import Refuted.Room-Backlog using (room-zero; saw-room-cannot-fund)
+
+-- THE BATCHER'S SLACK IS NOT ONE UNIT OF FUEL PAST THE RUN IT BATCHES.
+-- A unit of fuel is an arrival and an arrival can be silent, so a batch
+-- whose instant only the arrival after next closes is missing from the
+-- joined run one unit past.
+open import Refuted.Batched-Sandwich using (one-past-sandwich-false)
+
+-- A CUT'S ROW RELATES ONLY THE PLAIN BUDGETS A ROW CAN CARRY.  A
+-- test's cell carries none, so left free one impl step owes the plain
+-- step at zero and at one.
+open import Refuted.Cut-Budget using (cut-budget-false)
+
+-- A FOLD'S STORE OWES THE RULE, AND ONLY A DISTINCT PATH PAYS IT.  A
+-- path related frame by frame may still pass one merge twice, and a
+-- lane subscribed through it registers a row that does too.
+open import Refuted.Of-Fold-Sound using (of-fold-needs-sound)
+
+-- A SLOT'S READ OWES THE RULE ON THE SAME TERMS.  A shared slot and a
+-- hot slot each register the path their read runs under, so a path
+-- through one merge twice breaks the rule on either side.
+open import Refuted.Shared-Read-Sound using (shared-read-needs-sound)
+open import Refuted.Hot-Read-Sound using (hot-read-needs-sound)
+
+-- A HOP'S INSTALL OWES IT TOO: its row runs through the path it is
+-- installed over.
+open import Refuted.Defer-Install-Sound using (defer-install-needs-sound)
+
+-- A TAIL HANDED NOTHING IS QUIET ONLY WHILE NO BRACKET ON IT IS DOWN
+-- WITH A VALUE HELD.  The lowered bracket's first fold flushes its
+-- buffer whatever it is handed.
+open import Refuted.Quiet-Fold-Batch using (quiet-fold-false)
+
+
+-- A READ OWES ALIGNED FLOORS.  A floor decides whether a read reads at
+-- all, so a plain read above its slot and an impl read at its stamped
+-- one's floor part ways at the first step.
+open import Refuted.Read-Floor using (hot-read-needs-floors)
+
+-- A WALK KEEPS NO ROW OF A SOURCE THAT DIED IN IT ONLY WHILE THE SOURCE
+-- COUNTER STANDS ABOVE THE SLOTS.  A share dies under its slot's number,
+-- and a `defer` subscribed after it mints the counter's.
+open import Refuted.Walk-Quiet-Mint using (walk-quiet-needs-counter)

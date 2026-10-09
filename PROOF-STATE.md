@@ -145,8 +145,8 @@ code.
   them, so the two cannot drift the way a duplicated receipt would. The blank is
   the point rather than a gap to fill — a row reading `NO EVIDENCE` says nobody
   has instantiated the statement, refuted a route through it, or found it a
-  twin, and an unprobed probeable postulate is the cheapest unmanaged risk in
-  the repo. It reads as nothing today only because absence had no marker.
+  twin — unmanaged risk; whether a probe, a proof attempt, or neither is the
+  cheapest way to manage it is priced per row.
 - **The ledger is the source of truth, not this file.** `make postulates` lists
   every live postulate by name; every one of them appears in exactly one tier
   below, and a name here that no longer greps is a bug in this file — fix on
@@ -167,8 +167,7 @@ code.
   exist. Find it and delete it.
 
 **The tier law and the risk classes are DEFINED IN CLAUDE.md** — the
-lowest-numbered tier below finishes first, strictly, and an emptied tier is
-DELETED rather than renumbered, so the numbers are names and not positions;
+lowest-numbered tier below finishes first, strictly;
 classes worst-first are FALSITY, SHAPE, VACUITY, DIFFICULTY, GRINDABLE. This
 file only ASSIGNS them, and schedules them into legs. Read that section
 before re-classifying anything: what counts as evidence for lowering a class, the
@@ -184,21 +183,29 @@ the row is DIFFICULTY.
 Main                                     four top-line statements, claimed
  │                                        side by side, meeting in raw values
  ├─ left-to-right                         Left-To-Right/Statement.agda — the
- │                                        batches, joined, are the plain
- │                                        program's values — tier 3
+ │   │                                    batches, joined, are the plain
+ │   │                                    program's values — tier 2
+ │   ├─ simulation                        Simulation/Statement.agda — the
+ │   │   │                                impl's run is the plain run, each
+ │   │   │                                value named by its arrival
+ │   │   └─ arrival-runs                  each plain arrival one impl
+ │   │       │                            arrival, one instant to it
+ │   │       └─ correspondence            schedules in step, stores related
+ │   │           ├─ machines              the stores' relation, kept by each
+ │   │           │                        subscribe and cascade
+ │   │           └─ cascade-mono          no cascade runs a counter back
+ │   └─ batched-sandwich                  the batcher against its own run
  ├─ timing-correct                        Timed/Timing-Correct.agda — stamps
- │                                        group emits as the timed
- │                                        translation's packets do — tier 3
+ │   │                                    group emits as the timed
+ │   │                                    translation's packets do — tier 2
+ │   ├─ simulation                        at the timed program
+ │   └─ packets-name-arrivals             one packet per plain arrival
  ├─ batchable                             Batchable/Statement.agda — a second
  │                                        evaluator running the batcher over
  │                                        the run's emits gives the spec's
- │                                        grouping of them — tier 3
+ │                                        grouping of them — tier 2
  └─ timed-faithful                        Timed/Faithful.agda — the timed run
-                                          carries the plain run's values — tier 3
-
-  timed, timed-below                      Timed/Translation.agda — the translation the
-                                          packets come from; unwritten — tier 3
-
+                                          carries the plain run's values — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -218,126 +225,185 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 2 — an impl InstEmit the spec batches agree with
-
-**THE BOUNDARY: `Rx.Exp`, its `Ty`/`Tm` language, `SExp.Syntax` and the evaluator
-are OFF LIMITS (Anthony).** If there is CONVINCING PROOF that the tier cannot
-close without changing one of them, STOP and report that proof. The InstEmit's
-shape is free; TypeScript is out of scope this tier (Anthony).
-
-`QuickCheck` decides the top line's computable half on random programs, on
-the flat run: impl≡spec and left-to-right. **DONE IS THE AGDA
-QUICKCHECK PASSING FULLY**, driven by `make qc-fast`. Dead routes go in
-`SExp.InstEmit`'s header; counterexamples go in the bug cache.
-
-### The monster
-
-(no monster) — the tier is one operator and its InstEmit against one
-executable check. There is no declaration here whose falsity a cone could
-bound.
-
-### Big picture tier roadmap
-
-- **GIVE `timed` A BODY OVER `flattenᵉ`.** Until it has one,
-  `timing-correct` compares stamps against packets nothing defines, and
-  `timed-faithful` is the only thing standing between it and `empty`. Port
-  the `echo` rule of `typescript/src/timed.ts`, whose packets match rxjs call
-  stacks on every generated program and which needs nothing `flattenᵉ`
-  does not give.
-
-- **ONE INSTANT PER SUBSCRIBE FRAME, AND A CASCADE INHERITS ITS TRIGGER'S.**
-  A share's connect mints its own instant inside the subscribe frame, and a
-  spawned inner is stamped with the subscribe instant rather than its
-  trigger's; every FAIL so far falls there (bug-cache `seed 9
-  depth 1 case 2`, `seed 2 depth 1 case 15`). Fix the elaboration's stamping.
-
-- **THE ELABORATED `switchAll` AND `exhaustAll` KEEP WHAT PLAIN RXJS DROPS.**
-  The PLAIN rows: a switched-away inner stays subscribed (`seed 6 depth 1
-  case 4`), and an inner arriving while one is live is not dropped (`seed 7
-  depth 1 case 12`). Mirror the plain formers' bookkeeping in the InstEmit.
-
-- **BATCH A LATER ARRIVAL'S EMITS — POSSIBLY A QUESTION FOR ANTHONY.** Past
-  the subscribe frame `batchSimultaneousᵖ` batches each emit alone (bug-cache
-  row 4), and `batchable` hands it one emit per tick, so the InstEmit must
-  carry where each instant ends; the four routes tried are dead routes in
-  `SExp.InstEmit`'s header, and what is left may move `Rx.Exp` or the evaluator.
-
-- **HOLD `qc-fast` GREEN UNDER THE 2-MINUTE CAP (Anthony), ON EVERY CHECK.**
-  Depth 1 is the sweep that fits, and some programs cost exponentially in
-  fuel, so a sweep bounds each CASE in wall clock
-  (`typecheck-performance-numbers.md`). Every counterexample becomes a
-  bug-cache row first. Three rows — an `of` pair merged inside a
-  delivery's inner — give no verdict in 60 s even at fuel 1, while the
-  same programs read plain run at once: the cost is the ELABORATION's.
-
-- **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false` and build it
-  from the oracle's tree, as `qc-build` does, and the oracle job's `make
-  bug-cache` step with it. This leg closes the tier: the
-  check that decides tier 2 then guards it. Nothing in the job may be
-  narrowed to make it pass.
-
-### The ledger
-
-(empty — the tier's work is definitions, not postulates.)
-
-
-## Tier 3 — the top-line statements, and the translation
+## Tier 2 — proving the spec
 
 **WHERE THE IMPLEMENTATION IS ACTUALLY JUDGED.** Every row is a top-line
-statement or the translation one of them is stated over. Expect the
+statement or a leaf one is assembled over. Expect the
 elaboration and the batcher to move under contact, and report rather than push
 if that starts spiralling out rather than in.
 
-**STOP AND REPORT if this needs a new former in `Rx.Exp`** — same bar as tier
-2: only on certainty, never on suspicion.
+**`Rx.Exp` AND `SExp.Syntax` ARE OFF LIMITS (Anthony).** Both are fixed; a
+proof that needs either to move is a question for Anthony, never a patch.
+`make quickcheck`, locally or in CI, decides all four statements, the
+simulation and its leaf on drawn programs, and a case past its clock is
+undecided, never a failure (Anthony).
 
 ### The monster
 
-(no monster) — chosen when tier 2 closes, since the batcher the rows judge is
-still being rewritten there.
+`simulation` — both top lines' base, by arrival
+over `correspondence`: schedules, pops, stores in step;
+set by `subscribe-related`, kept by `cascade-related`. RULED
+OUT: arrival plain lacks, split, gap, stray, echo
+off inners, payload; subscribes unrelated; unpaired pops; maps
+moving time; emptying closes; hot ends past block;
+2-value emits; bare cuts; writes moving row; cut/liveness/drain/
+body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
+`of` splits/folds; `mintᵉ`/root stamps; quiet arms/cut drains; hop
+scripts; joiners off catch; installs+hops; revived inners;
+unaligned reads/connects/flushes; renames; 2-script
+stores/values; mid-emit joins; μ cold reads; dying rows;
+dead outers.
+
+also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **PROBE `batchable` BEFORE ANY GRIND.** Both sides compute: instantiate it in
-  `agda/evidence/probed/` at the bug-cache programs, one row per fuel up to
-  each run's end, so every cut is a row. What it decides is whether the
-  statement's second evaluator — one emit per tick, run to completion — is a
-  setting any batcher can pass.
+- **THE ENDED OUTER.** `end-live` wants an outer's end to be its subtree's
+  last, an accounting `Store` does not carry. Census what a dispatch walks
+  past an ended outer on reached states, then restate over the field a fit
+  test names. Decides whether `simulation`'s reached ends leave a row a
+  later pass would walk.
 
-- **CARRY `batchable`'S SECOND EVALUATOR INTO THE HARNESS.** The FAIL check in
-  `QuickCheck` and the bug cache still batch inside the program's own run,
-  as `left-to-right` does, so a green row there is not a green row of `batchable`. Port
-  `batchedᴮ` so the check decides the statement as written.
+- **THE PASS'S LIVE PATH.** `inner-live` asks the pass for the liveness the
+  walk now carries down to every registration; thread `LiveIf` through `Pass`,
+  leaving leaves only where it sequences values (consumes between values, the
+  drain loop). Those leaves and `end-live` state one fact, that an ended outer
+  has nothing active upstream. Decides whether the walk's liveness survives
+  `simulation`'s passes or needs that fact as a `Store` field.
 
-- **PORT `timed.ts` ONTO `flatten`.** The translation's flatteners become
-  `flatten` read by `last-seen`, and the `flatAllSrc` fast path that routes a
-  lane-only flatten to the old rules goes, so every flatten takes the `echo`
-  rule. `timed-fuzz.ts --selftest` and a 500-seed sweep hold `mismatched` at
-  zero. The TypeScript half of tier 2's `timed` leg.
+- **FIT THE EXPLODE.** Then write `explode-out` and the two subscribe leaves
+  as bodies over smaller leaves, `Store` gaining each fact a body needs; the
+  end already holds over the idle merge. Decides whether `Store` carries what
+  the flattener's outer walk needs.
 
-- **DELETE THE `max-` RULES.** With no flatten reaching them, the `max-`
-  rules, keys, trails and switch copies in `timed.ts` are dead; delete them
-  and the `timed-fuzz` fixtures that pin only them, keeping the ones that pin
-  the echo.
+- **EVERY SMALL EMIT.** `lifts?` holds at every emit up to three events,
+  every event and kind in each position (seed 16's map draw, 200 agree, red
+  under a dropped value). Show the same mutation reaches `scanLifts?` and
+  `cutLifts?` (seeds 51, 50: green, reach unshown), then stamp their rows.
+  Decides whether `simulation`'s scan and cut steps fail at an ordering the
+  samples never wrote.
 
-- **`timed-below` AND `timed-faithful` ONCE `timed` HAS A BODY.** Both are
-  stated over tier 2's unwritten translation; probe each against the ported
-  body before grinding either.
+- **THE RUN'S OWN EMITS.** `lifts?`, `scanLifts?` and `cutLifts?` decide
+  their closure relations at sampled emits of every event and kind; decide
+  them also at each emit the impl run hands the step, tokens and payload
+  counts as drawn. Decides whether `simulation`'s steps survive the emits
+  only the elaboration writes, where the samples stop.
 
 ### The ledger
 
-- **`left-to-right`** (Left-To-Right.Statement) — FALSITY, `NO EVIDENCE`: the
-  elaborated `switchAll`/`exhaustAll` disagree with plain rxjs; tier 2's third
-  leg.
-- **`timing-correct`** (Timed.Timing-Correct) — FALSITY, `NO EVIDENCE`: stated
-  over an unwritten `timed`; tier 2's stamping leg is the impl's half of it.
-- **`timed-faithful`** (Timed.Faithful) — FALSITY, `NO EVIDENCE`: stated over
-  an unwritten `timed`.
-- **`timed-below`** (Timed.Translation) — FALSITY, `NO EVIDENCE`: stated over
-  an unwritten `timed`.
-- **`batchable`** (Batchable.Statement) — FALSITY, `NO EVIDENCE`: nothing has
-  instantiated the second evaluator; the first leg.
-- **`timed`** (Timed.Translation) — VACUITY, `DEAD ROUTE`: a postulated
-  function asserts nothing; `λ _ → emptyˢ` inhabits it.
-- **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
-  `randFold`/`natMod` (QuickCheck). Carried, not counted.
+- **`explode-{quiet-sub,one-sub,out}`** (Simulation.Pass) — FALSITY,
+  `DEAD ROUTE, PROBED`: one exploded emit, carrying nothing or one value,
+  subscribed by the impl's idle merge, walks into the flattener, false where
+  the outer has ended; a group delivered at one instant sends at it.
+- **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
+  delivered at one instant, its elements walked through the restamp, sends at
+  that instant.
+- **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `PROBED×4`: a
+  cold chain's input block, its inner open, alive or dead at the group, runs
+  alone into a merge whose walk folds the path the plain chain folds the popped
+  head down, then the impl tail's end; open, it sends at the chain's entry
+  instant.
+- **`hop-{one,end}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE, PROBED×4`: a
+  deferred hop's merge subscribes the one popped emit's body on both sides,
+  sending at the hop's token, and its end meets the plain hop's.
+- **`scan-write`** (Simulation.Scan) — FALSITY, `PROBED`: a cell written on
+  both sides keeps the stores and the tails related.
+- **`while-{write,zero,spent}`** (Simulation.Take) — FALSITY, `PROBED×3`: a
+  test's nodes written open keep the stores and tails, and written spent keep
+  what the cut left; a spent test passes nothing on both sides.
+- **`cut-out`** (Simulation.Take) — FALSITY, `PROBED×2`: a tail handed a
+  nonempty group delivered at one instant, and the end, sends at that instant.
+- **`share-{spend,finish}`** (Simulation.Pass) — FALSITY, `PROBED×2`: the
+  stores stay related when both shares of a shared slot close and drop their
+  readers.
+- **`hot-walk`** (Simulation.Pass) — FALSITY, `PROBED`: past a connected hot
+  slot's flushed bracket, the block's merge subscribes the one stamp and hands
+  the share one emit carrying the value, delivered at the instant the chain
+  entered with; the plain side does not move.
+- **`init-{numbers,distinct}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the
+  hot scripts live before anything is subscribed are numbered by their slots,
+  one per slot; swept at two hot slots, after the subscribe.
+- **`dyn-one`** (Simulation.Statement) — FALSITY, `PROBED×2`: a minted source
+  has at most one row in the impl's registry.
+- **`value-draws`** (Simulation.Statement) — FALSITY, `PROBED×2`: an impl value
+  pass that sends leaves its counter past the one it started at.
+- **`end-stamps`** (Simulation.Statement) — FALSITY, `PROBED×2`: an impl end
+  pass's emits carry the instant its value pass drew.
+- **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY, `PROBED×4`:
+  a slot read's subscribe sends only at its path's catch of the program's frame
+  and keeps the restamp cells up to it; a shared read's connect reaches every
+  row on the share's subject.
+- **`of-fold-stamps`** (Simulation.Walk) — FALSITY, `PROBED`: a group at one
+  frame folded down the path lands at the path's catch of it, the restamp cells
+  up to the catch kept.
+- **`of-emits`** (Simulation.Walk) — FALSITY, `PROBED`: an `of`'s emits stand
+  at its program's frame, subscribe-kind; held at the root and under a value
+  binder, not under a mint's binder.
+- **`cold-block`** (Simulation.Walk) — FALSITY, `PROBED×7, RECOVERY`: a cold
+  read's impl subscribe over an asynchronous tail leaves its block's nodes
+  fresh, a partnered source, and its flush one fold of one group down the tail.
+- **`cold-read-end`** (Simulation.Walk) — FALSITY, `PROBED×3`: a cold read
+  below the floor or over an all-synchronous script folds its prefix and end on
+  both sides.
+- **`shared-read`** (Simulation.Walk) — FALSITY, `PROBED×2`: a slot's plain
+  subscribe against the impl's at its stamped slot, down the restamp, keeps
+  what a pass keeps; the two scripts at the slot are one by `Store.scripts`,
+  the shared paths sound.
+- **`hot-read-connect-{done,live}`** (Simulation.Walk) — FALSITY, `PROBED×7`: a
+  hot read whose impl connects its share over an ended or a live script keeps
+  what a pass keeps.
+- **`lifts-map`** (Simulation.Walk) — FALSITY, `PROBED×2`: the elaborated map
+  step keeps an emit's instant and maps its payloads as the plain map does.
+- **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
+  scripts live before anything is subscribed are related and in step, source
+  for source; swept at two hot slots, after the subscribe.
+- **`end-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an outer's end
+  leaves no row through it a dispatch would walk; that the end is the subtree's
+  last is an accounting `Store` does not carry.
+- **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an inner's
+  path is live unless spent where its walk starts; the pass does not carry it.
+- **`{fold,drain}-keeps-od`** (Simulation.Pass.Inner) — DIFFICULTY, `PROBED×4`:
+  a fold never lowers an outer's done flag, and a drain's carried flag is down
+  wherever its node's is; a nested merge's finish writes back a flag read
+  before its fold.
+- **`lifts-scan`** (Simulation.Walk) — DIFFICULTY, `PROBED`: the elaborated
+  scan's step and seed read the author's variables past the mint's binder; held
+  at one payload, two past the typechecker.
+- **`lifts-while`** (Simulation.Walk) — DIFFICULTY, `PROBED`: the elaborated
+  takeWhile's cutter step decides the plain test's cut at a budget of one; held
+  at one payload, cut and uncut.
+- **`of-carries`** (Simulation.Walk) — DIFFICULTY, `PROBED`: an `of`'s emits
+  carry its values, one per emit; held at none and at two under a binder.
+- **`μ-unfolds`** (Simulation.Walk) — DIFFICULTY, `PROBED`: an unrolling is an
+  author's program, its plain form and every renamed elaboration the
+  unrollings; held under every value binder and past an inner μ.
+- **`fold-unmoved`** (Simulation.Arm) — DIFFICULTY, `TWIN`: a fold leaves a
+  node off its own sound path as it found it, one clause per constructor as
+  `foldPath-rule`.
+- **`batched-sandwich`** (Left-To-Right.Statement) — DIFFICULTY,
+  `REFUTED, PROBED×2`: the unbatched values between the joined run at a batcher
+  fuel never less and one past it; the sweep, deciding it directly, reached
+  held-back values under a flattener with no red.
+- **`timed-faithful`** (Timed.Faithful) — DIFFICULTY, `PROBED×2`: probed
+  first-order; the sweep, deciding it directly, reached values on two arrivals
+  under a flattener with no red.
+- **`batchable`** (Batchable.Statement) — DIFFICULTY, `PROBED×2`: probed
+  first-order; the sweep, deciding it directly, reached values grouping under a
+  flattener and a `μ` with no red.
+- **`packets-name-arrivals`** (Timed.Timing-Correct) — DIFFICULTY, `PROBED×2`:
+  one packet per arrival, injectively; the sweep, deciding it directly, reached
+  values on two arrivals under a flattener with no red.
+- **`go-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: one cascade pass
+  never runs a mint counter back.
+- **`cascade-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
+  never runs a mint counter back.
+- **`subscribe-mono`** (Simulation.Statement) — GRINDABLE, `TWIN`: a subscribe
+  never runs a mint counter back.
+- **`cascade-latched`** (Simulation.Statement) — GRINDABLE, `TWIN`: a cascade
+  never unlatches a completed source.
+- **`renExp-id`** (Simulation.Walk) — GRINDABLE, `TWIN`: renaming by the
+  identity is the identity, the impl's mint body against its elaboration.
+- **`renExp-fuse`** (Simulation.Walk) — GRINDABLE, `TWIN`: two renamings in
+  turn are their composite, the scan's body under the mint.
+- **`fold-past`** (Simulation.Pass) — GRINDABLE, `TWIN`: a quiet fold from a
+  store written off its path is the fold without, the write laid over.

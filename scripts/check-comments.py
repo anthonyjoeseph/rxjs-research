@@ -115,6 +115,7 @@ of the three forms fits it.
 """
 
 import argparse
+import json
 import pathlib
 import re
 import sys
@@ -224,6 +225,36 @@ def _module_ref_re(dirs):
     alt = "|".join(re.escape(n) for n in names)
     return re.compile(r"(?<![A-Za-z0-9_-])(?:" + alt + r"):\d+")
 GITLOG = re.compile(r"git log[^`\n]*agda/")
+SWEEP = re.compile(r"\bmake (qc-[a-z-]+)")
+SWEEP_DRAW = re.compile(r"QC_DRAW='([^']*)'")
+
+
+def qc_targets(root):
+    """Every `qc-*` target the Makefile declares."""
+    mk = (root / "Makefile").read_text(encoding="utf-8")
+    return set(re.findall(r"^(qc-[a-z-]+)\s*:", mk, re.M))
+
+
+def sweep_fault(m, text, qc):
+    """-> why a sweep receipt replays nothing, or None."""
+    if m.group(1) not in qc:
+        return "names `make " + m.group(1) + "`, which the Makefile does not declare"
+    if not re.search(r"\bQC='\d+ \d+ \d+'", text):
+        return "carries no `QC='<seed> <runs> <depth>'` to replay"
+    d = SWEEP_DRAW.search(text)
+    if d is None:
+        # An aimed sweep replayed without its draw draws other programs, so
+        # a receipt that lost its draw says so rather than reading replayable.
+        low = text.lower()
+        if "draw unrecorded" not in low and "unaimed" not in low:
+            return ("carries no `QC_DRAW` -- write the draw, or say `unaimed` "
+                    "or `draw unrecorded`")
+        return None
+    try:
+        json.loads(d.group(1))
+    except ValueError:
+        return "carries a `QC_DRAW` that is not JSON"
+    return None
 
 
 # FIFTH CHECK's vocabulary.  A structured section is a machine-checked
@@ -403,6 +434,7 @@ def check_refs(refs, root):
     ref = declared_names(root / "agda/evidence/refuted")
     prb = declared_names(root / "agda/evidence/probed")
     post = live_postulates(root) or set()
+    qc = qc_targets(root)
     shas = real_shas(root, {t for _, _, _, text in refs
                             for t in SHA_TOKEN.findall(text)})
 
@@ -431,10 +463,20 @@ def check_refs(refs, root):
                             "`agda/evidence/refuted` nor the sha holding a "
                             "refutation `src` can no longer state"))
         elif kind == "PROBED":
-            if not (toks & prb) and not (set(SHA_TOKEN.findall(text)) & shas):
+            sweep = SWEEP.search(text)
+            if sweep:
+                # A COMPILED SWEEP'S RECEIPT points at the command that replays
+                # it.  Its rows are the decider's reading of the statement, not
+                # the statement's, so the pointer is all a check can hold: the
+                # target must exist and the draw must parse, or the receipt
+                # replays nothing.
+                why = sweep_fault(sweep, text, qc)
+                if why:
+                    bad.append((f, lineno, kind, why))
+            elif not (toks & prb) and not (set(SHA_TOKEN.findall(text)) & shas):
                 bad.append((f, lineno, kind,
-                            "names neither a live probe nor the sha holding a "
-                            "deleted one"))
+                            "names neither a live probe, the sha holding a "
+                            "deleted one, nor a `make qc-*` sweep"))
         elif kind == "RECOVERY":
             if not (set(SHA_TOKEN.findall(text)) & shas) and not GITLOG.search(text):
                 bad.append((f, lineno, kind, "carries no sha git can resolve"))

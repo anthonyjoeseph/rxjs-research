@@ -228,7 +228,10 @@ def declarations(path):
         # `opaque` block headers are themselves at column 0.
         if where_indent is not None and (indent == 0 or indent < where_indent):
             where_indent = None
-        if re.search(r"(^|\s)where\s*$", line):
+        # A `module … where` opens no local scope: its body is top-level
+        # facts under the module's parameters, and skipping it hid every
+        # statement in a parameterised module from this scan and from E5.
+        if re.search(r"(^|\s)where\s*$", line) and not re.match(r"\s*module\s", line):
             if where_indent is None:
                 where_indent = indent
             i += 1

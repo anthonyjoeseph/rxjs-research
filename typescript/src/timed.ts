@@ -17,7 +17,7 @@ import {
   scan as rxScan,
   share as rxShare,
   switchAll,
-  take as rxTake,
+  takeWhile as rxTakeWhile,
 } from "rxjs";
 import {
   Closed,
@@ -1037,17 +1037,16 @@ const compile = (
         rxMap((a) => a.out),
       );
     }
-    case "take": {
-      // THE END IS LAST, SO `take` COUNTS IT CORRECTLY: a source that
-      // fills the quota is cut at its nth value, before any END, and
-      // completes in that value's instant, so the END is appended there;
-      // one that does not passes its END as an item within the quota.
-      const count = evalWith(exp.count, env);
-      if (typeof count !== "bigint")
-        throw new Error("take count did not evaluate to a nat");
-      return count === 0n
-        ? rxOf(end(HOLE))
-        : endAfter(recur(exp.src, "s").pipe(rxTake(Number(count))));
+    case "takeWhile": {
+      // THE END IS LAST here too: values pass while the predicate holds;
+      // the first false-predicate value is included and completes in its
+      // own instant (endAfter appends the END there); a source whose
+      // predicate never fails passes its own END as the final item.
+      const pred = (x: Item): boolean => {
+        if (x.end === true) return true; // END passes; endAfter handles it
+        return (evalWith(exp.fn, [x.v, ...env]) as boolean) === true;
+      };
+      return endAfter(recur(exp.src, "s").pipe(rxTakeWhile(pred, true)));
     }
     case "flatten": {
       // A `flatAll` IS TRANSLATED AS THE FLATTENER IT IS, with no connect:

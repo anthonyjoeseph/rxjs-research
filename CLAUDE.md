@@ -8,6 +8,7 @@ Agda model (`agda/`) + TypeScript impl (`typescript/`). Agda's spec is gospel; T
 - **Never the auto-memory directory** (`~/.claude/projects/…/memory/`) or any other out-of-repo note. Outside the repo = no gate, no grep, invisible to every worker.
 - **Ask before changing this file (Anthony).** Draft the wording, show it, land it on his yes. An agent's own inference installed as law propagates further than any code change.
 - **Rules here; mechanics in `docs/`** (one file per tool, indexed by `docs/README.md`). Split by KIND, not length. This file carries only what must be obeyed *prophylactically* — before you'd have reason to open a doc.
+- **Fragments over paragraphs; omit rather than explain the omission (Anthony).** Every word here is paid on every turn.
 - **Rules, not citations.** State the *shape* of a trap, not a name that gets discharged next week. Specific instances live in source headers. Exceptions: the load-bearing documents and commands (this file, PROOF-STATE.md, EVIDENCE.md, `typecheck-performance-numbers.md`, `docs/`, `make` targets, `agda/src`, `agda/evidence`) — vocabulary, not instances.
 - **No calendar dates, including on a ruling (Anthony).** The name alone makes it unarguable; the timestamp does nothing. Conflicting rulings get MERGED, not ordered by date.
 - **No line numbers, here or in a source comment.** A stale name fails a grep loudly; a stale line number resolves, points at unrelated code, and is believed.
@@ -28,7 +29,7 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `unsafe-check` | `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-check` | two declarations proving one fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
 | `imports-check` | an unused import, or an unused name in a surviving clause | [docs/imports-check.md](docs/imports-check.md) |
-| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, a wrong DERIVED evidence field, a DIFFICULTY row standing on nothing, or a row of the tier being worked that nothing has instantiated. `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, a wrong DERIVED evidence field, or a DIFFICULTY row standing on nothing. `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `monster-check` | a line ADDED to `agda/src` outside the lowest open tier's monster's own dependency CONE — what its statement and body REACH, read off the tree AS EDITED | [docs/monster.md](docs/monster.md) |
 | `roadmap-order` | discharging a GRINDABLE or DIFFICULTY row while its tier holds an open FALSITY or SHAPE. Only DISCHARGE is held — delete, rename, split, restate, reclassify stay free; a PREREQUISITE the risky statement names is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-moved` | a branch landing proof work with PROOF-STATE byte-identical to **main**. Baseline is the merge-base, so fix-ups inside a branch cost nothing | [docs/roadmap-check.md](docs/roadmap-check.md) |
@@ -72,6 +73,7 @@ The four top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) full
 
 - **`make gate` is the merge gate and it ROUTES — type it and let it decide.** It prints which path and why. Timings: `typecheck-performance-numbers.md`.
 - **Never run `gate-heavy` locally — push and let CI run the tower (Anthony).** Locally: `make gate-cheap` + `make agda-dev`.
+- **QuickCheck and the bug cache run locally (Anthony).** `make qc-<statement>`, `qc-fast`, `make quickcheck` and `make bug-cache` are ordinary builds: one at a time, through `make bg`, never while another build holds the cache. A local verdict is as good as CI's. A compiled check is checked by GHC and the FFI, so it is EVIDENCE, never a proof's dependency: a green sweep that reached a statement's risky region can lower that row's class. **A compiled sweep earns a `PROBED:` receipt whose pointer is the replayable command (target, `QC=` seeds/runs/depth, `QC_DRAW`) and the region it reached (Anthony).** It is evidence about the DECIDER's reading of the statement, so it names the decider.
 - `gate-heavy` is the only thing that sees TERMINATION, since the dev loop stubs mutual blocks.
 - **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. The flag must be identical in the Makefile and `agda_flags()`, changed in the same commit. → [docs/agda-build.md](docs/agda-build.md)
 - **Agda never checks `agda/src` — it checks the comment-stripped mirror, which is why a comment edit is free.** A direct `agda` run on `agda/src` is a second interface cache, alternating with the mirror's.
@@ -81,8 +83,7 @@ The four top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) full
 - `touch` does NOT dirty a module — invalidation is by CONTENT.
 - **A proof body on the `budget-sufficient` spine must be sealed (`abstract`)** — three multi-hour OOMs came from unsealing one.
 - A mid-build RSS of 7–12 GB is normal and evidence of nothing.
-- **Cost model: mutual-BLOCK membership is everything; file size is nearly irrelevant.** Run `make agda-dev ARGS='--list <file>'` before believing it, and MEASURE on a coherent cache — a rebuilding dependency masquerading as module cost has produced four phantom diagnoses. Positivity splits are done; that question is closed.
-- **Second axis: a block member in NO cycle is never stubbed, so every focused check of every OTHER member re-proves it in full.** Tell: per-member times don't vary with the member. Hoisting means moving to ANOTHER module. Attribute before splitting. → [docs/agda-dev.md](docs/agda-dev.md)
+- **What makes a module slow, when a dev check says it is** → [docs/typecheck-cost.md](docs/typecheck-cost.md). Open it then, not before.
 - **All measured timings live in `typecheck-performance-numbers.md` and nowhere else.** `gate-heavy` and `agda-dev` append their own.
 
 ### `make agda-dev` — the iteration loop
@@ -96,7 +97,7 @@ make warm ARGS='<file>'                build a file's deps; unbudgeted
 
 - **`ARGS=` takes at most ONE file plus ONE focus member.** A second file is read as the focus member and reported absent, which reads as a proof failure.
 - **Dev-green means the types line up, not that the proof is valid — but only where something was STUBBED.** A module with no multi-member block is emitted VERBATIM, so the sweep is a real check there. Where a block is stubbed, termination of the real mutual recursion is not checked.
-- **A dev check that is not seconds is a FINDING, not a budget to raise.** Read `typecheck-performance-numbers.md` first. Work BOTTOM-UP. Third cause the other two hide: the module has outgrown the loop. Do NOT reach for `--only-scope-checking` — measured, buys nothing, removed.
+- **A dev check of a `src` module that is not seconds is a FINDING.** Read `typecheck-performance-numbers.md` first. Work BOTTOM-UP. Third cause the other two hide: the module has outgrown the loop. Do NOT reach for `--only-scope-checking` — measured, buys nothing, removed.
 - **A red `agda-dev` on any file in `src` is a P0 — fix it before the work you were doing.** Never route around it.
 - → [docs/agda-dev.md](docs/agda-dev.md) for the budget, `HOLES=1`, `NOT_DEV_CHECKABLE`.
 
@@ -104,8 +105,7 @@ make warm ARGS='<file>'                build a file's deps; unbudgeted
 
 - **All new proof code in `agda/src`**, where reachability, the ⊤-postulate check and the claim graph see it from minute one. That is what makes "did we already prove this?" a grep.
 - The failure prevented is being UNCLAIMED, not being outside `src`. Work no claim root reaches is what parks itself for months and gets re-derived.
-- **Evidence goes outside `src`, and that is not an exemption (Anthony).** A refutation and a probe are not proof code; nothing may depend on either. Both live in `agda/evidence/`, each with its own claim root, gated in full; a `.agda-lib` boundary makes a `src` import unresolvable. **`EVIDENCE.md` is the law — read it before adding, retargeting or deleting either.**
-- Do not recreate the old bare `probe/` directory — it sat outside every claim graph.
+- **`agda/evidence/`: existing probes and refutations, closed to new files (Anthony).** Outside `src`, own claim roots, gated; nothing depends on them. `EVIDENCE.md` governs retargeting and deletion.
 
 ### Module granularity
 
@@ -206,7 +206,7 @@ Every live postulate carries exactly one. PROOF-STATE assigns them; this file de
 
 Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not by itself bad news.
 
-- **Converging** — the new FALSITY's risky region is strictly SMALLER (a sub-case of the same edge). Localisation is what buys probeability: a statement about one branch can usually be instantiated; one about a whole clause cannot.
+- **Converging** — the new FALSITY's risky region is strictly SMALLER (a sub-case of the same edge). Localisation is what buys probeability: a statement about one branch can usually be instantiated; one about a whole clause cannot. Probing is slow, on the order of hours, and proof is more useful.
 - **Spiralling** — not smaller, or reaching UPSTREAM into machinery already ground.
 - **Stop condition:** the SAME region producing FALSITY across three successive subdivisions. Wrong design in the mechanism underneath; reconsider it.
 
@@ -214,32 +214,20 @@ Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not
 
 ### Probing
 
-- **A machine refutation is worth as much as a proof — usually more, since it is cheaper.** False now costs a restatement; false under a tower costs the tower.
-- **Auditing statements for truth is the PRIORITY.** A `-- SUSPECT:` note is not the response to a doubt you can test: test it.
-- **PROBE BEFORE GRINDING.** If the sides compute, instantiate at concrete programs in `agda/evidence/probed/`, checked with `make agda-dev`, pinned by `refl`. Every probe ends in a refutation or a `-- PROBED:` receipt saying what shapes were covered. **An unprobed probeable postulate is the cheapest unmanaged risk in the repo.**
-- **Probe the ASSEMBLY's conclusion, not only its leaves.** A real body over postulated leaves has a conclusion that COMPUTES, and nobody instantiates it because it typechecks. Its falsity is the retroactive kind. Tell that it is worth the minute: the leaf's bound and the assembly's bound are stated in the SAME currency.
-- **Assume a probe already existed until a search has failed (Anthony).** Binds on every row that is not GRINDABLE.
-  ```
-  git log -S'<postulate name>' --all --format='%h %s'
-  ```
-  **Search by the TARGET'S NAME, never by the probe directory's path** — probes have not always lived where they live now, so a path-scoped search reports a false ALL-CLEAR. Then `git show <sha>^:<path>`. The receipt convention does not make this redundant: ten receipts in the tree against ninety-eight probe files deleted.
-- **What you recover is usually worth more than a verdict** — the HARNESS (real-evaluator plumbing, ⊔-shaped measures, refutation families already tried) and the BLOCKED/BOUNDED verdicts, which are findings about what CANNOT be probed.
-- **Read the recovered probe's STATEMENT, not its verdict.** A probe is expired by its target being discharged *or restated*, so what you find is usually evidence about a statement that is gone. A green on `A + B + C` says nothing about `(A + B) ⊔ C`.
-- **A probe expires with its target, mechanically.** `-- TARGET: <postulate>`, and `make evidence-check` fails the moment that name leaves the ledger. Then DELETE or retarget it; never relax the check. Probes and refutations decay differently and only one says so: a refutation dies when `src` can no longer STATE it and `make refuted` goes red that day; a probe dies when its target is PROVEN and nothing happens at all. **A probe that outlives its target because what it pins is the EVALUATOR is a unit test — its home is the bug cache.**
-- **A probe's TARGETS are what its ROWS are evidence about**, not everything its findings touch. A receipt naming a statement the rows never reached is a FALSE coverage claim. A FINDING is ordinary prose in whatever statement it CONSTRAINS — usually not the target, and often a definition, which cannot carry a receipt at all; name the probe module in backticks there.
-- **A probe informing N statements gets N one-line pointers, never N copies of its coverage claim.** Several `-- TARGET:` lines in one probe are supported.
-- **Provenance travels with the FINDING, not with the receipt.** Whether something came from instantiation or from reading the definitions belongs beside the claim it justifies, not above a `PROBED:` section where it reads as narrating the ledger.
-- **Determine computability by LOOKING, never from a remembered list.** An `abstract` block seals a family, and blocks get added for performance without the statements changing. Any list of "the computable ones" here would be a research finding pretending to be a rule — one was, and it named a family that had since been sealed.
-- **Hypothesis-side and conclusion-side computability are separate questions.** Say which SIDE is blocked; "sealed somewhere in the statement" does not imply symbolic-or-nothing.
-- **Never extrapolate a probe past its shapes.** Say which were covered and which were not.
-- **Decide which axes CAN refute before sweeping any: only a measure-side axis can.** For `lhs ≤ rhs`, a parameter that moves only the RIGHT weakens the claim, so no instantiation of it can refute — unfalsifiable by construction, however tight the rows read. It runs the other way too: an axis with no coverage is a finding only if it moves the measure. Both errors were made on one row of this campaign.
-- **A row that could not have failed is not a row.** Label every row LOAD-BEARING or DEGENERATE and state what would make it fail. Three ways a probe lies green: **(1) vacuous rows** — the quantifier is empty (`all _ [] = true`, `0 ≤ᵇ _`), so name the covered CONJUNCTS, not the covered programs; **(2) hand-built states** — `record (st-init e) { … }` is not reachable, so reach states by RUNNING, and treat a constructed failing state as a refutation candidate whose reachability is the finding; **(3) reading an assembly backwards** — `P = P-core o₁ … oₖ` proves P FROM the core, never the core.
+- **Auditing statements for truth is the PRIORITY.** A testable doubt gets tested, not a `-- SUSPECT:` note.
+- **Evidence: the compiled harness and the bug cache only (Anthony).** No typechecker probes, no typechecker refutations. `make qc-<statement>`, aimed by `QC_DRAW`; a statement no decider reaches gets a decider. → [docs/probe.md](docs/probe.md)
+- **A red: `make qc-shrink`.** Evaluator bug → bug-cache row. Statement false → restate; the replay command (target, `QC=`, `QC_AT`, `QC_DRAW`) goes in the restated row's header.
+- **Sweep the ASSEMBLY's conclusion, not only its leaves.** Worth it when leaf and assembly bounds share a currency.
+- **Search before writing a decider:** `git log -S'<postulate name>' --all --format='%h %s'` — by the target's NAME, never a path. Recovered evidence: read its STATEMENT, not its verdict.
+- **A receipt names only the statements its cases REACHED.** Never extrapolate past the regions covered.
+- **Only a measure-side axis can refute.** For `lhs ≤ rhs`, an axis moving only the right is unfalsifiable.
+- **A decider that cannot fail lies green.** Break it on purpose first. Count covered CONJUNCTS, not programs — an empty quantifier passes anything. States reached by RUNNING, never hand-built.
 
 ### Dead routes
 
-A refuted statement and a dead route are different findings, and only the first is machine-checkable — a dead route has no `⊥` to state. **When an attempt fails for a structural reason, add `-- DEAD ROUTE:` to the header of the postulate you were trying to discharge.** Say what was tried and **what structurally blocked it** — "tried X, didn't work" stops nobody.
+A refuted statement and a dead route are different findings. **When an attempt fails for a structural reason, add `-- DEAD ROUTE:` to the header of the postulate you were trying to discharge.** Say what was tried and **what structurally blocked it** — "tried X, didn't work" stops nobody.
 
-- **Machine-checked refutations live in `agda/evidence/refuted/`**, checked by `make refuted` and `make wiring-refuted`. **Keeping one in `src` is actively harmful** — `src` must then keep whatever machinery makes the dead route STATE-able, measured at seven live definitions held up by six refutations. `src` may name a refutation in a `-- REFUTED:` comment; it may never import one.
+- **Existing refutations: `agda/evidence/refuted/`**, checked by `make refuted`. `src` names one in `-- REFUTED:`, never imports it.
 - **A dead route is not a licence to weaken the statement.** Deleting a dead-route line requires the route shown WORKABLE, not merely untried again.
 
 ## THE MONSTER — the one thing each tier is trying to kill (Anthony)
