@@ -128,7 +128,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
                  → memberSource k (EvalSt.dying st) ≡ true → memberSource k (EvalSt.dying (proj₂ (proj₂ r))) ≡ true
 
     -- and so does a fan-out, one reader's fold at a time
-    go-dying : ∀ {lo now k} {i : Fin n} {vals fin chs sched} {st : EvalSt ei} {r}
+    go-dying : ∀ {lo now k} {i : Fin (n + n)} {vals fin chs sched} {st : EvalSt ei} {r}
              → shareGo⇓ {lo = lo} now i vals fin chs sched st r
              → memberSource k (EvalSt.dying st) ≡ true → memberSource k (EvalSt.dying (proj₂ (proj₂ r))) ≡ true
     go-dying go-nil d = d
