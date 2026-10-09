@@ -763,7 +763,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       go {p = share-sink _ _}           _  = []
       go {p = thru-outer _ j ↠[ _ ] p} np with k ≡ᵇ j in kj
       ... | true  = ⊥-elim (np (inj₁ (cong (λ x → 2 ∷ x ∷ []) (sym (≡ᵇ→≡ k j kj)))))
-      ... | false = refl ∷ go (λ ps → np (inj₂ ps))
+      ... | false = kj ∷ go (λ ps → np (inj₂ ps))
       go {p = f ↠[ _ ] p}              np = go (λ ps → np (inj₂ ps))
 
     -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
@@ -785,7 +785,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     outer-wrap {sP} {stP} {sI} {stI} S {now} {op = op} {m′ = m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₂} {h₃} {h₄} {q = q} {fin = true} {r}
                W@((_ , _ , _ , lP , lI , fn , _) , _) gw cl dR =
       let (b , y , y′ , fn′ , eP , eI) = wrap-at {sP = sP} {sI} {stP} {stI} fn lP lI
-          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru refl (gw refl)) (Store.live-outer S))
+          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru {q = thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} refl (gw refl)) (Store.live-outer S))
           (_ , _ , A , W′ , c , g , d) = wrap-tail S A₀ (f₀ , r₀)
             (subst (λ T → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ T)) (proj₂ (proj₂ T))) eI cl)
             (λ e → gone-restamp S {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₃} {h₄} {q} (gone-wrap S {o = flatOp op} {k = m′} {h = h₂} {q = Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} (gw refl) (trans (cong proj₁ eI) e)))

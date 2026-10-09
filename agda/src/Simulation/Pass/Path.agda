@@ -319,11 +319,11 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
                     → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                         (λ π NP NI → PathRel κ π NP NI (thru-outer (flatOp op) m ↠[ h ] p)
                            (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))) (λ I → Dlv {echoᵗ u} I fin es) rI
-      outerElem-arm wk S {op = op} {Θ₀ = Θ₀} {ρ₀} {fin = fin} w b sp si g dW@(step-thru-outer W) (fold-step step-map (fold-step dW′@(step-thru-outer W′) dR)) lt =
+      outerElem-arm wk S {op = op} {Θ₀ = Θ₀} {ρ₀} {h₂ = h₂} {fin = fin} w b sp si g dW@(step-thru-outer W) (fold-step step-map (fold-step dW′@(step-thru-outer W′) dR)) lt =
         let si′ = drop-ot _ _ _ si
             X   = elem-walk wk S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru sp) (unthru si′) w b W W′ (sz-1 lt)
         in wrap-arm (proj₁ X) (unthru (step-kept _ dW sp))
-             (outer-wrap (After.store (proj₁ X)) {op = op} {fin = fin} (proj₂ X) (λ e → gone-walk S W′ (g e)) (unthru (step-kept _ dW′ si′)) dR)
+             (outer-wrap (After.store (proj₁ X)) {op = op} {fin = fin} (proj₂ X) (λ e → gone-walk S {h = h₂} W′ (g e)) (unthru (step-kept _ dW′ si′)) dR)
              λ { (f , ds) → elem-out S {op = op} {Θ₀ = Θ₀} {ρ₀} (unthru si′) w b W′ ds , f }
 
       -- THE OUTER'S WALK, an element at a time

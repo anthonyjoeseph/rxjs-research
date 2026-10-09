@@ -45,7 +45,7 @@ open import Simulation.Size using (sz-foldPath; sz-mergeAllDrain; sz-innerFinish
 open import Simulation.After using (module Kept; readᴾ; readᴵ-++)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
-open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru; NoBatch; rel-unbatched; Gone; scan-c)
+open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru; NoBatch; rel-unbatched; Gone)
 open import Simulation.Sweep using (t≢f)
 open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; drop-ot; head-on; self-node; off-path; ∨-Tˡ; ∨-Tʳ; distinct; fresh-path)
 open import Rx.Evaluator.Reducible.Dead-Kept using (fold-dead; off-T)
@@ -469,10 +469,10 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
              → Arm S now [] sP stP₁ p vs fin
                  (λ π NP NI → PathRel κ π NP NI (from-inner (flatOp op) m j ↠[ h ] p)
                     (from-inner (flatOp op) m′ j′ ↠[ h₁ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q)) (λ I → Dlv I fin es) rI
-    inner-on {m = m} {m′} {j = j} {j′} {stP₁ = stP₁} A₀ ((_ , f) , ip , pr) b sp si g (fold-step d₁ (fold-step step-map dq))
+    inner-on {m = m} {m′} {ks = ks} {j = j} {j′} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₂ = h₂} {h₃} {q = q} {stP₁ = stP₁} A₀ ((_ , f) , ip , pr) b sp si g (fold-step d₁ (fold-step step-map dq))
       with restamp-echo (After.store A₀) f pr b d₁
     ... | A , f′ , pr′ , c′ , refl , dl =
-      arm (A₀ ⨾ A) pr′ c′ (proj₂ (proj₁ cI)) (λ e → gone-cell (After.store A₀) scan-c (g e)) dq (λ {rP} dP B rel′ →
+      arm (A₀ ⨾ A) pr′ c′ (proj₂ (proj₁ cI)) (λ e → gone-restamp (After.store A₀) {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₂} {h₃} {q} (g e)) dq (λ {rP} dP B rel′ →
         inner~ refl (flat-move (EvalSt.nodes stP₁) _ (EvalSt.nodes (proj₂ (proj₂ rP))) _ (After.grows B)
                        (missed dP (head-on _ _ _ m (self-node m (j ∷ [])) sp , drop-ot _ _ _ sp))
                        (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′)
@@ -1143,11 +1143,13 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                           (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q))))) H
                     (oI ++ proj₁ r , proj₂ r)
     explode-end {fin = false} A cP (fl , r , x) cI _ dI g = explode-wrapped refl A cP (fl , r) x cI (λ ()) dI g
-    explode-end {mX = mX} {sI′ = sI′} {stI′ = stI′} {fin = true} A cP (fl , r , (_ , lX)) cI gm dI g =
+    explode-end {op = op} {m′ = m′} {ks = ks} {mX = mX} {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃ = h₃} {h₄} {h₅} {h₆} {q = q} {sI′ = sI′} {stI′ = stI′} {fin = true} A cP (fl , r , (_ , lX)) cI gm dI g =
       let (B , W , x′) = merge-done (After.store A) fl r lX
-                           (live-spent mX _ (gone-thru refl (gm refl)) (Store.live-outer (After.store A)))
+                           (live-spent mX _ (gone-thru {q = thru-outer mergeAllᵒ mX ↠[ h₃ ] thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q} refl (gm refl))
+                              (Store.live-outer (After.store A)))
       in explode-wrapped {T = thruWrap mergeAllᵒ mX true (sI′ , stI′)} (sym (merge-wrap lX)) (A ⨾∅ B) cP W x′ cI
-           (λ _ → gone-wrap (After.store A) (gm refl) (cong proj₁ (merge-wrap lX))) dI g
+           (λ _ → gone-wrap (After.store A) {o = mergeAllᵒ} {k = mX} {h = h₃} {q = thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q}
+                    (gm refl) (cong proj₁ (merge-wrap lX))) dI g
 
     -- an outer's elements, each inner a sync outer hands the flattener
     -- subscribed before the step returns: the explode and its merge
@@ -1180,12 +1182,12 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                              (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
                               (thru-outer mergeAllᵒ mX ↠[ h₃ ]
                                (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q))))) (λ I → Dlv {echoᵗ u} I fin es) rI
-    outerExplode-arm S {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} {fin = fin} (fl , x , r) b sp si gn dW@(step-thru-outer W)
+    outerExplode-arm S {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} {h₃ = h₃} {fin = fin} (fl , x , r) b sp si gn dW@(step-thru-outer W)
                      (fold-step step-map (fold-step step-map (fold-step dW′@(step-thru-outer W′) dR))) =
       let si′ = drop-ot _ _ _ (drop-ot _ _ _ si)
           X   = explode-walk S {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} (unthru sp) (unthru si′) fl r x b W W′
       in explode-end {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} {fin = fin} (proj₁ X) (unthru (step-kept _ dW sp)) (proj₂ X)
-           (unthru (step-kept _ dW′ si′)) (λ e → gone-walk S W′ (gn e)) dR
+           (unthru (step-kept _ dW′ si′)) (λ e → gone-walk S {h = h₃} W′ (gn e)) dR
            λ { (f , ds) → explode-out S {op = op} {Θ₀ = Θ₀} {ρ₀} {Θ₅ = Θ₅} {ρ₅} (unthru si′) fl r b W′ ds , f }
 
     -- and a read's restamp keeps a delivery's
