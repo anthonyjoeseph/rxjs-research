@@ -1209,14 +1209,15 @@ splits ss s f (e , d₀ , d₁) with any isClocked ss
 ...     | x = within s (if x then 0 else 1) (not x) false
 
 -- A CASE DRAINS A QUEUE WHEN A MERGE SPENDS ONE: read only where `store`
--- is being decided, since a green there over programs that never queue
--- says nothing about a finish that drains
+-- or `same-clock` is being decided, since a green there over programs
+-- that never queue says nothing about a finish that drains, nor about
+-- the instant a parked inner is subscribed at
 isStore : Statement → Bool
 isStore storeˢ = true
 isStore _      = false
 
 drained : List Statement → ℕ → Drawn → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
-drained ss f (e , d₀ , d₁) with any isStore ss
+drained ss f (e , d₀ , d₁) with any (λ s → isStore s ∨ isClocked s) ss
 ... | false = 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0
 ... | true  with cached "?" f e (mkSlots₂ d₀ d₁)
 ...   | c = storeDrains (Case.fuel c) (Case.prog c) (Case.slots c)
