@@ -1423,7 +1423,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
         let X = quiet-resume (quiet-takeWhile S r b e sp si d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
       quiet-pass S (outerElem~ fl r) b e sp si dI = quiet-outer S (fl , r) b e sp si dI
-      quiet-pass S r@(outerExplode~ _ _ _) b e sp si dI = quiet-explode S r b e sp si dI
+      quiet-pass S (outerExplode~ fl x r) b e sp si dI = quiet-explode S fl x r b e sp si dI
       quiet-pass S r@(inner~ refl _ _ _) b e sp si (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
         let X = quiet-resume (quiet-inner S r b e si d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
         in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
@@ -1502,18 +1502,38 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN EXPLODED OUTER'S EMITS CARRYING NOTHING explode into no
       -- inner, the merge's walk subscribing each empty run, and its
       -- echo is restamped on the impl side alone
-      quiet-explode : ∀ {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u a m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+      quiet-explode : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
                         {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ}
                         {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
-                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                    → Quiet (thru-outer a m ↠[ h ] p)
-                        (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
-                         (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
-                          (thru-outer mergeAllᵒ mX ↠[ h₃ ]
-                           (thru-outer a m′ ↠[ h₄ ]
-                            (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
-                             (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
-      quiet-explode {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} S (outerExplode~ {op = op} fl x r) b refl sp si
+                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {es fin rI}
+                    → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                    → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
+                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                    → Carries es [] → fin ≡ false
+                    → Sound (thru-outer (flatOp op) m ↠[ h ] p) sP stP
+                    → Sound (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                             (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                              (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                               (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                                (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
+                                 (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q)))))) sI stI
+                    → foldPath⇓ now (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                                     (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                                      (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                                       (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                                        (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
+                                         (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
+                        es fin sI stI rI
+                    → Σ (After S ([] , sP , stP) rI) λ A
+                        → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                            (thru-outer (flatOp op) m ↠[ h ] p)
+                            (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                             (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                              (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                               (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                                (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
+                                 (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
+      quiet-explode S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} fl x r b refl sp si
                     (fold-step step-map (fold-step step-map (fold-step dW@(step-thru-outer W) dR))) =
         let si′ = drop-ot _ _ _ (drop-ot _ _ _ si)
             (X , fl′ , r′ , x′) = explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} (unthru sp) (unthru si′) fl r x b W
