@@ -1111,8 +1111,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                              (thru-outer mergeAllᵒ mX ↠[ h₃ ]
                               (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q))))) H
                         (oI ++ proj₁ r , proj₂ r)
-    explode-wrapped {op = op} {fin = fin} refl A cP W x cI gw (fold-step d@(step-thru-outer walk-nil) dR) g =
-      explode-arm A cP (outer-wrap (After.store A) {op = op} {fin = fin} W gw (unthru (step-kept _ d (proj₂ cI))) dR)
+    explode-wrapped {op = op} {h₄ = h₄} {fin = fin} refl A cP W x cI gw (fold-step d@(step-thru-outer walk-nil) dR) g =
+      explode-arm A cP (outer-wrap (After.store A) {op = op} {h₂ = h₄} {fin = fin} W gw (unthru (step-kept _ d (proj₂ cI))) dR)
         (merge-moved (missed (fold-step d dR) cI) x) g
 
     -- THE EXPLODED OUTER'S END: the impl's merge is idle, so it ends
@@ -1149,7 +1149,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                               (Store.live-outer (After.store A)))
       in explode-wrapped {T = thruWrap mergeAllᵒ mX true (sI′ , stI′)} (sym (merge-wrap lX)) (A ⨾∅ B) cP W x′ cI
            (λ _ → gone-wrap (After.store A) {o = mergeAllᵒ} {k = mX} {h = h₃} {q = thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q}
-                    (gm refl) (cong proj₁ (merge-wrap lX))) dI g
+                    (gm refl) (cong proj₁ (merge-wrap {s = sI′} {st = stI′} lX))) dI g
 
     -- an outer's elements, each inner a sync outer hands the flattener
     -- subscribed before the step returns: the explode and its merge
