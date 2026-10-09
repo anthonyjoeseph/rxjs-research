@@ -262,6 +262,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       --   undecided.  Thirteen agreements explode downstream of a hot
       --   input; case 15 explodes a merge of two reads of it, a group of
       --   two inners at each of two arrivals.
+      -- PROBED: make qc-same-clock QC='12 300 3' QC_BUDGET=3600 QC_DRAW='{"exp":[2,2,1,0,1,6,1,1,0,0,0,0,5],"leaf":[4,0,1],"op":[0,6,0,0,0],"fan":[0,2,2,0,2,0,0,0,0,4],"script":[1,3,2,2,2,0],"obs":[1,3,0,0],"reach":["flatten"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 115
+      --   agree, 0 fail, 155 undecided; 28 agreements drain a bounded
+      --   merge's queue at a later arrival, and 84 undecided cases do.
+      -- PROBED: make qc-same-clock QC='13 100 3' QC_CASE=90 QC_BUDGET=7000 QC_DRAW='{"exp":[2,2,1,0,1,6,1,1,0,0,0,0,5],"leaf":[4,0,1],"op":[0,6,0,0,0],"fan":[0,2,2,0,2,0,0,0,0,4],"script":[1,3,2,2,2,0],"obs":[1,3,0,0],"reach":["flatten"]}'
+      --   decided the same way, over budget at 37 agree, 0 fail, 31
+      --   undecided; 12 agreements drain a queue at a later arrival, 16
+      --   undecided cases do.
       explode-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
                       {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                       {es vs rI}
@@ -289,6 +297,14 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- PROBED: make qc-shrink QC='43 150 3' QC_AT=39 QC_STMT=9 QC_SHRINK=0 QC_CASE=0 QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2,0],"script":[0,2,0,0,3,0],"reach":["flatten"]}'
       --   `sameClockᵇ` at case 39 alone, with no case clock: agrees, and
       --   times out at the sweep's ten-second clock.
+      -- PROBED: make qc-same-clock QC='12 300 3' QC_BUDGET=3600 QC_DRAW='{"exp":[2,2,1,0,1,6,1,1,0,0,0,0,5],"leaf":[4,0,1],"op":[0,6,0,0,0],"fan":[0,2,2,0,2,0,0,0,0,4],"script":[1,3,2,2,2,0],"obs":[1,3,0,0],"reach":["flatten"]}'
+      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 115
+      --   agree, 0 fail, 155 undecided; 28 agreements drain a bounded
+      --   merge's queue at a later arrival, and 84 undecided cases do.
+      -- PROBED: make qc-same-clock QC='13 100 3' QC_CASE=90 QC_BUDGET=7000 QC_DRAW='{"exp":[2,2,1,0,1,6,1,1,0,0,0,0,5],"leaf":[4,0,1],"op":[0,6,0,0,0],"fan":[0,2,2,0,2,0,0,0,0,4],"script":[1,3,2,2,2,0],"obs":[1,3,0,0],"reach":["flatten"]}'
+      --   decided the same way, over budget at 37 agree, 0 fail, 31
+      --   undecided; 12 agreements drain a queue at a later arrival, 16
+      --   undecided cases do.
       elem-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                    {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es vs rI}
                → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI

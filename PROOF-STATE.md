@@ -292,10 +292,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 ### The ledger
 
 - **`explode-{quiet-sub,one-sub,out}`** (Simulation.Pass) — FALSITY,
-  `DEAD ROUTE, PROBED`: one exploded emit, carrying nothing or one value,
+  `DEAD ROUTE, PROBED×3`: one exploded emit, carrying nothing or one value,
   subscribed by the impl's idle merge, walks into the flattener, false where
   the outer has ended; a group delivered at one instant sends at it.
-- **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
+- **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×5`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `PROBED×4`: a
