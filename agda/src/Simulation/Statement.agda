@@ -72,10 +72,11 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; LiveSource; markDlv; Arri
   cascadeFinish; memberSource; arrSource; dropSource)
 open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓;
   foldPath⇓; disp; walk-more; walk-nil; walk-end; subscribeE⇓)
-open import Rx.Evaluator.Builder using (evaluate↓; cascade!; pop-rule; chain-sound; chain-agree)
+open import Rx.Evaluator.Builder using (evaluate↓; subscribe!; cascade!; pop-rule; chain-sound; chain-agree)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; admit-ot)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
+open import Rx.Evaluator.Quiet using (QuietC; go-quiet; subscribeE-quiet; drop-off)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
 open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount; DyingFree; dyingᵇ; Named) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source)
@@ -255,41 +256,13 @@ clock-on d (inj₂ (a , s′)) eqn =
         (cong (λ μ → counter μ sourceᵏ) (pop-mint (Conf.sched d) eqn))
         (cascade-mono a s′ (Conf.st d) (pop-rule eqn (Conf.ru d)) sourceᵏ)
 
-postulate
-  -- A WALK MAKES NO REGISTERED ROW'S SOURCE NEWLY DYING: a share that
-  -- ends inside a walk drops its own rows before the walk is over, so a
-  -- row of a dying source at a walk's end was one at its start.
-  --
-  -- WHILE THE SOURCE COUNTER STANDS ABOVE EVERY SLOT.  A share dies under
-  -- its slot's number and a minted source takes the counter's, so only
-  -- the counter keeps a source minted after the share's end from naming
-  -- it; nothing in the walk or its rule says so.
-  --
-  -- REFUTED: `Refuted.Walk-Quiet-Mint` -- the counter lowered to the
-  --   share's slot, and a `defer` subscribed after the share's end.
-  -- PROBED: make qc-store QC='77 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,1,0,3,2,2,2,0,0,0,4,3],"script":[1,1,2,1,4,4],"slot":[0,0,0,0,4,1],"obs":[2,3,3,1]}'
-  --   decided by `CLI.Store-Check`'s `pass-quiet` and `cascade-quiet` checks,
-  --   at the end of every value pass and every cascade: 200 agree, 0 fail;
-  --   137 hold a dying source at a boundary, so a share ended inside a walk.
-  --   The walk's own end is read only through those two consumers.
-  -- PROBED: make qc-store QC='78 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,3,1,3,1,0,0,0,3,4],"script":[3,3,1,0,1,0],"slot":[0,0,0,0,4,2],"fan":[0,1,0,0,1,0,0,1,0,6],"obs":[2,3,3,1],"reach":["flatten"]}'
-  --   decided the same way: 200 agree, 0 fail; 191 hold a dying source at a
-  --   boundary and 2 end a value pass holding one, a share ended inside the
-  --   pass's own walk; 120 connect the shared slot's share, 63 join one.
-  walk-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
-             → m ≤ counter (Sched.mint sched) sourceᵏ → cascadeGo⇓ a vs fin cs sched st r
-             → ∀ {x} → x ∈ EvalSt.registry (proj₂ (proj₂ r)) → dyingᵇ (proj₂ (proj₂ r)) x ≡ true → dyingᵇ st x ≡ true
-
-  -- THE ROOT SUBSCRIBES LEAVE NO ROW OF A DYING SOURCE REGISTERED.
-  --
-  -- PROBED: make qc-store QC='77 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,1,0,3,2,2,2,0,0,0,4,3],"script":[1,1,2,1,4,4],"slot":[0,0,0,0,4,1],"obs":[2,3,3,1]}'
-  --   decided by `CLI.Store-Check`'s `cascade-quiet` at the trace's first
-  --   state, the subscribe's: 200 agree, 0 fail.
-  -- PROBED: make qc-store QC='78 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,3,1,3,1,0,0,0,3,4],"script":[3,3,1,0,1,0],"slot":[0,0,0,0,4,2],"fan":[0,1,0,0,1,0,0,1,0,6],"obs":[2,3,3,1],"reach":["flatten"]}'
-  --   decided the same way: 200 agree, 0 fail; 120 connect the shared
-  --   slot's share at or after the subscribe.
-  start-quiet : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
-              → DyingFree (Conf.st (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+-- A WALK MAKES NO REGISTERED ROW'S SOURCE NEWLY DYING: a share that
+-- ends inside a walk drops its own rows before the walk is over, so a
+-- row of a dying source at a walk's end was one at its start.
+walk-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
+           → m ≤ counter (Sched.mint sched) sourceᵏ → cascadeGo⇓ a vs fin cs sched st r
+           → ∀ {x} → x ∈ EvalSt.registry (proj₂ (proj₂ r)) → dyingᵇ (proj₂ (proj₂ r)) x ≡ true → dyingᵇ st x ≡ true
+walk-quiet c g = QuietC.quiet (go-quiet c g)
 
 -- a value pass ends a cascade unless the arrival is its source's last
 finish-run : ∀ {m} {Γ′ : Ctx m} {t} {e : Closed Γ′ t} (a : Arrival Γ′) (s : Sched Γ′) (st : EvalSt e)
@@ -310,15 +283,6 @@ not-true : ∀ {b} → (b ≡ true → ⊥) → b ≡ false
 not-true {false} _ = refl
 not-true {true}  h = ⊥-elim (h refl)
 
--- a row the drop keeps is not the dropped source's
-drop-off : ∀ {m} {Δ : Ctx m} {u} s (K : List (RegRow Δ u)) {x} → x ∈ dropSource s K
-         → sameSource s (regSource (proj₁ (proj₂ x))) ≡ false × x ∈ K
-drop-off s [] ()
-drop-off s ((rid , c , y) ∷ K) x∈ with sameSource s (regSource c) in eq
-... | true  = let d , m = drop-off s K x∈ in d , there m
-drop-off s ((rid , c , y) ∷ K) (here refl) | false = eq , here refl
-drop-off s ((rid , c , y) ∷ K) (there x∈)  | false = let d , m = drop-off s K x∈ in d , there m
-
 -- A VALUE PASS ENDS WITH NO ROW OF A DYING SOURCE: it opens with none dying
 pass-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
            → EvalSt.dying st ≡ [] → m ≤ counter (Sched.mint sched) sourceᵏ → cascadeGo⇓ a vs fin cs sched st r → DyingFree (proj₂ (proj₂ r))
@@ -329,6 +293,14 @@ room : ∀ {n} {Γ : Ctx n} {t} {κ : Kinds n} {ep : Closed Γ t} {ei : Closed (
          {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
      → Storeʳ κ sP stP sI stI → n + n ≤ counter (Sched.mint sI) sourceᵏ
 room s = <⇒≤ (Named.slots-below (proj₂ (Storeʳ.named s)))
+
+-- THE ROOT SUBSCRIBE LEAVES NO ROW OF A DYING SOURCE: it opens with none
+-- dying, and the counter one past the slots
+start-quiet : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
+            → DyingFree (Conf.st (start (elaborateImpl κ e) (embedSlotsImpl ins)))
+start-quiet κ e ins x∈ =
+  not-true (λ w → t≢f (sym (QuietC.quiet (subscribeE-quiet (n≤1+n _)
+    (proj₁ (Σ⁰.snd⁰ (subscribe! (elaborateImpl κ e) (embedSlotsImpl ins))))) x∈ w)))
 
 -- THE TWO MACHINES, RELATED: a relation between their stores, one
 -- between their live sources that the stores keep, and what each arrival

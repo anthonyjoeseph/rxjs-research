@@ -240,18 +240,18 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — both top lines' ground, by arrival
-over `correspondence`: schedules in step, pops partnered, stores
+`simulation` — both top lines' base, by arrival
+over `correspondence`: schedules in step, pops paired, stores
 related; set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; subscribes unrelated; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
 2-value emits; bare cuts; writes moving row; cut/liveness/drain/
-body ends, 2nd hop inners apart; unsound walks/reads; 2 stamp chains;
-`of` splits/folds; `mintᵉ`, root stamps; quiet arms/cut drains; hop
+body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
+`of` splits/folds; `mintᵉ`/root stamps; quiet arms/cut drains; hop
 scripts; joiners off catch; installs+hops; revived inners;
 unaligned reads/connects/flushes; renames; 2-script
-stores/values; mid-emit joins; μ cold reads.
+stores/values; mid-emit joins; μ cold reads; dying rows.
 
 also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
 
@@ -261,14 +261,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   still owed, a draw with several values per hot arrival under a flattener.
   Decides whether `simulation`'s instant bookkeeping survives a value pass
   that now emits once per value.
-
-- **THE LIVE OUTER.** A pop's open and a close revive no row walking an
-  ended outer, since `Storeˢ.quiet` keeps no row of a dying source registered
-  between arrivals; no share ending inside a walk leaves a row behind (193
-  cases), but only while the source counter stands above the slots: a
-  `defer` minted after the share's end otherwise registers at its number.
-  Left: body `walk-quiet` over the share's finish and the counter. Decides
-  whether `simulation`'s reached skips are cuts.
 
 - **THE WALK'S LIVE PATH.** `hop-live`, `cold-live` and `join-live` each ask a
   walk to hand back the `LiveOn` of the path it registers; thread it through
@@ -298,11 +290,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `DEAD ROUTE, PROBED`: one exploded emit, carrying nothing or one value,
   subscribed by the impl's idle merge, walks into the flattener, false where
   the outer has ended; a group delivered at one instant sends at it.
-- **`walk-quiet`** (Simulation.Statement) — FALSITY, `REFUTED, PROBED×2`: a row
-  of a source dying at a walk's end was dying at its start, the counter above
-  the slots.
-- **`start-quiet`** (Simulation.Statement) — FALSITY, `PROBED×2`: the root
-  subscribes leave no row of a dying source registered.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
