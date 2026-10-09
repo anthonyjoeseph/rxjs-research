@@ -105,8 +105,7 @@ make warm ARGS='<file>'                build a file's deps; unbudgeted
 
 - **All new proof code in `agda/src`**, where reachability, the ⊤-postulate check and the claim graph see it from minute one. That is what makes "did we already prove this?" a grep.
 - The failure prevented is being UNCLAIMED, not being outside `src`. Work no claim root reaches is what parks itself for months and gets re-derived.
-- **Evidence goes outside `src`, and that is not an exemption (Anthony).** A refutation and a probe are not proof code; nothing may depend on either. Both live in `agda/evidence/`, each with its own claim root, gated in full; a `.agda-lib` boundary makes a `src` import unresolvable. **`EVIDENCE.md` is the law — read it before adding, retargeting or deleting either.**
-- Do not recreate the old bare `probe/` directory — it sat outside every claim graph.
+- **`agda/evidence/`: existing probes and refutations, closed to new files (Anthony).** Outside `src`, own claim roots, gated; nothing depends on them. `EVIDENCE.md` governs retargeting and deletion.
 
 ### Module granularity
 
@@ -215,33 +214,20 @@ Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not
 
 ### Probing
 
-- **Auditing statements for truth is the PRIORITY.** A `-- SUSPECT:` note is not the response to a doubt you can test: test it.
-- **Probe when there's a lot of uncertainty (Anthony).** If the sides compute, instantiate at concrete programs in `agda/evidence/probed/`, checked with `make agda-dev`, pinned by `refl`. Every probe ends in a refutation or a `-- PROBED:` receipt saying what shapes were covered.
-- **Compiled probe for VOLUME, typechecker probe to PIN (Anthony).** `make qc-<statement>`, aimed by `QC_DRAW`, red shrunk by `make qc-shrink`: hundreds of programs per region, may read evaluator internals. → [docs/probe.md](docs/probe.md)
-- **Probe the ASSEMBLY's conclusion, not only its leaves.** A real body over postulated leaves has a conclusion that COMPUTES, and nobody instantiates it because it typechecks. Its falsity is the retroactive kind. Tell that it is worth instantiating: the leaf's bound and the assembly's bound are stated in the SAME currency.
-- **Before writing a probe, assume one already existed until a search has failed (Anthony).**
-  ```
-  git log -S'<postulate name>' --all --format='%h %s'
-  ```
-  **Search by the TARGET'S NAME, never by the probe directory's path** — probes have not always lived where they live now, so a path-scoped search reports a false ALL-CLEAR. Then `git show <sha>^:<path>`. The receipt convention does not make this redundant: ten receipts in the tree against ninety-eight probe files deleted.
-- **What you recover is usually worth more than a verdict** — the HARNESS (real-evaluator plumbing, ⊔-shaped measures, refutation families already tried) and the BLOCKED/BOUNDED verdicts, which are findings about what CANNOT be probed.
-- **Read the recovered probe's STATEMENT, not its verdict.** A probe is expired by its target being discharged *or restated*, so what you find is usually evidence about a statement that is gone. A green on `A + B + C` says nothing about `(A + B) ⊔ C`.
-- **A probe expires with its target, mechanically.** `-- TARGET: <postulate>`, and `make evidence-check` fails the moment that name leaves the ledger. Then DELETE or retarget it; never relax the check. Probes and refutations decay differently and only one says so: a refutation dies when `src` can no longer STATE it and `make refuted` goes red that day; a probe dies when its target is PROVEN and nothing happens at all. **A probe that outlives its target because what it pins is the EVALUATOR is a unit test — its home is the bug cache.**
-- **A probe's TARGETS are what its ROWS are evidence about**, not everything its findings touch. A receipt naming a statement the rows never reached is a FALSE coverage claim. A FINDING is ordinary prose in whatever statement it CONSTRAINS — usually not the target, and often a definition, which cannot carry a receipt at all; name the probe module in backticks there.
-- **A probe informing N statements gets N one-line pointers, never N copies of its coverage claim.** Several `-- TARGET:` lines in one probe are supported.
-- **Provenance travels with the FINDING, not with the receipt.** Whether something came from instantiation or from reading the definitions belongs beside the claim it justifies, not above a `PROBED:` section where it reads as narrating the ledger.
-- **Determine computability by LOOKING, never from a remembered list.** An `abstract` block seals a family, and blocks get added for performance without the statements changing. Any list of "the computable ones" here would be a research finding pretending to be a rule — one was, and it named a family that had since been sealed.
-- **Hypothesis-side and conclusion-side computability are separate questions.** Say which SIDE is blocked; "sealed somewhere in the statement" does not imply symbolic-or-nothing.
-- **A probe the typechecker can't finish is a COVERAGE BOUNDARY, not a task (Anthony).** Land the rows that check, name the shape that didn't, and move on. Never engineer the checker or the evaluator to get a receipt through. A slow probe is not a finding: the evaluator is good enough, and if it is slow in some cases, it is what it is.
-- **Never extrapolate a probe past its shapes.** Say which were covered and which were not.
-- **Decide which axes CAN refute before sweeping any: only a measure-side axis can.** For `lhs ≤ rhs`, a parameter that moves only the RIGHT weakens the claim, so no instantiation of it can refute — unfalsifiable by construction, however tight the rows read. It runs the other way too: an axis with no coverage is a finding only if it moves the measure. Both errors were made on one row of this campaign.
-- **A row that could not have failed is not a row.** Label every row LOAD-BEARING or DEGENERATE and state what would make it fail. Three ways a probe lies green: **(1) vacuous rows** — the quantifier is empty (`all _ [] = true`, `0 ≤ᵇ _`), so name the covered CONJUNCTS, not the covered programs; **(2) hand-built states** — `record (st-init e) { … }` is not reachable, so reach states by RUNNING, and treat a constructed failing state as a refutation candidate whose reachability is the finding; **(3) reading an assembly backwards** — `P = P-core o₁ … oₖ` proves P FROM the core, never the core.
+- **Auditing statements for truth is the PRIORITY.** A testable doubt gets tested, not a `-- SUSPECT:` note.
+- **Evidence: the compiled harness and the bug cache only (Anthony).** No typechecker probes, no typechecker refutations. `make qc-<statement>`, aimed by `QC_DRAW`; a statement no decider reaches gets a decider. → [docs/probe.md](docs/probe.md)
+- **A red: `make qc-shrink`.** Evaluator bug → bug-cache row. Statement false → restate; the replay command (target, `QC=`, `QC_AT`, `QC_DRAW`) goes in the restated row's header.
+- **Sweep the ASSEMBLY's conclusion, not only its leaves.** Worth it when leaf and assembly bounds share a currency.
+- **Search before writing a decider:** `git log -S'<postulate name>' --all --format='%h %s'` — by the target's NAME, never a path. Recovered evidence: read its STATEMENT, not its verdict.
+- **A receipt names only the statements its cases REACHED.** Never extrapolate past the regions covered.
+- **Only a measure-side axis can refute.** For `lhs ≤ rhs`, an axis moving only the right is unfalsifiable.
+- **A decider that cannot fail lies green.** Break it on purpose first. Count covered CONJUNCTS, not programs — an empty quantifier passes anything. States reached by RUNNING, never hand-built.
 
 ### Dead routes
 
-A refuted statement and a dead route are different findings, and only the first is machine-checkable — a dead route has no `⊥` to state. **When an attempt fails for a structural reason, add `-- DEAD ROUTE:` to the header of the postulate you were trying to discharge.** Say what was tried and **what structurally blocked it** — "tried X, didn't work" stops nobody.
+A refuted statement and a dead route are different findings. **When an attempt fails for a structural reason, add `-- DEAD ROUTE:` to the header of the postulate you were trying to discharge.** Say what was tried and **what structurally blocked it** — "tried X, didn't work" stops nobody.
 
-- **Machine-checked refutations live in `agda/evidence/refuted/`**, checked by `make refuted` and `make wiring-refuted`. **Keeping one in `src` is actively harmful** — `src` must then keep whatever machinery makes the dead route STATE-able, measured at seven live definitions held up by six refutations. `src` may name a refutation in a `-- REFUTED:` comment; it may never import one.
+- **Existing refutations: `agda/evidence/refuted/`**, checked by `make refuted`. `src` names one in `-- REFUTED:`, never imports it.
 - **A dead route is not a licence to weaken the statement.** Deleting a dead-route line requires the route shown WORKABLE, not merely untried again.
 
 ## THE MONSTER — the one thing each tier is trying to kill (Anthony)

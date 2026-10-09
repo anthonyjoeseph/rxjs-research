@@ -1,13 +1,13 @@
 # Compiled probes — `make qc-<statement>` and `QC_DRAW`
 
-The typechecker probe (`agda/evidence/probed/`) pins ONE program per row by
-`refl` and costs minutes to hours a shape. The compiled probe is the
-high-volume one: `CLI/QuickCheck.agda` built by GHC, drawing hundreds of
+The only probe: `CLI/QuickCheck.agda` built by GHC, drawing hundreds of
 programs a minute and deciding one statement's two sides on each run.
 It is EVIDENCE, never a proof's dependency, and it carries no `PROBED:`
 receipt — nothing can fingerprint a binary. A green that reached a row's
 risky region is a FINDING named with the statement, the region and the seed
-range; a red is a CANDIDATE until its paste row typechecks as a refutation.
+range. A red, shrunk, is the refutation: an evaluator bug becomes a bug-cache
+row; a false statement is restated, and its replay command (target, `QC=`,
+`QC_AT`, `QC_DRAW`) goes in the restated row's header.
 
 ## Running one
 

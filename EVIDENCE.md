@@ -1,7 +1,9 @@
 # EVIDENCE.md — `agda/evidence/`, what is CHECKED but never CLAIMED
 
 Two trees live here, and one sentence covers both: **evidence is typechecked,
-and nothing in `src` may depend on it.**
+and nothing in `src` may depend on it.** Closed to new files: new evidence is
+a compiled sweep or a bug-cache row ([docs/probe.md](docs/probe.md)). What is
+here stays until it expires.
 
     agda/evidence/refuted/Refuted/   a proven `… → ⊥` — a route that CANNOT work
     agda/evidence/probed/Probed/     a `refl` receipt at concrete inputs — a
