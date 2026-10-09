@@ -35,7 +35,7 @@ open import SExp.Plain using (plainExp)
 open import SExp.Elaborate using (toInstEmit; flatStepᵛ; FlatSᵗ; plainᶜ⁺)
 open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
-open import Simulation.Stores using (Store; PathRel; Flattener; EnvRel; inner~; root~; merge~; [])
+open import Simulation.Stores using (live; Store; PathRel; Flattener; EnvRel; inner~; root~; merge~; [])
 open import Simulation.Schedules using ([])
 open import Simulation.After using (module Kept)
 open Kept using (After; module After)
@@ -103,6 +103,7 @@ S = record
   ; ruleP   = rule (λ k ()) (λ ()) (λ ())
   ; ruleI   = rule (λ k ()) (λ ()) (λ ())
   ; scripts = ins , refl , refl
+  ; live-outer = live (λ ())
   }
 
 -- THE PATH PASSES ITS MERGE TWICE, as two of its lanes.  Every frame is

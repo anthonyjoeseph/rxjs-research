@@ -23,7 +23,7 @@ open import Rx.Evaluator.Reducible.Support using (sub-rule)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; NodeId; NodeState; schedGo; schedHeadOf; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there; SameOrd)
-open import Simulation.Stores using (Named; guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store; spent-off)
+open import Simulation.Stores using (Named; guard-src; guardOf; Src; data~; SrcNum; SrcPair; RowRel; MachRow; hot~; RegRel; []; _∷_; read~; cold~; defer~; mach; Store; spent-off; LiveRows)
   renaming (here to sp-here; there to sp-there)
 
 -- the rest of two lists a relation holds for, given their first elements
@@ -122,6 +122,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   open-named N so = record { slots-below = Named.slots-below N ; ords-below = ords-same so (Named.ords-below N)
                            ; srcs-below = Named.srcs-below N ; cut-below = [] ; dlv-below = [] ; dying-below = [] }
 
+  -- A POP LEAVES EVERY ROW WALKING LIVE OUTERS: the open empties
+  -- `delivered`, so a row the last cascade skipped as dying and
+  -- delivered is walked again -- unless its source's finish dropped it
+  postulate
+    open-live : ∀ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                  {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+              → Store κ sP stP sI stI → LiveRows (cascadeOpen stI)
+
   -- A POP LEAVES THE STORES RELATED: the popped sources keep their
   -- numbers and places, each giving up one pending value, and the
   -- cascade's ledger opens empty on both sides.
@@ -165,4 +173,5 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; ruleP    = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleP s)
     ; ruleI    = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleI s)
     ; scripts  = Store.scripts s
+    ; live-outer = open-live s
     }

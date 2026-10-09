@@ -52,7 +52,7 @@ open import Rx.Mint      using (counter; sourceᵏ; regᵏ; ordinalᵏ)
 open import Rx.Evaluator using (LiveSource; Sched; EvalSt; Stream; Arrival; sched-next; NodeState; NodeId; Path; RegRow;
   atSlot; atDyn; root; share-sink; _↠[_]_; Frame; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st;
-  echoᵗ; lookupNode; memberSource; pathHasNode; takeVals; scanVals; regSource)
+  echoᵗ; lookupNode; memberSource; pathHasNode; aliveThroughᶠ; takeVals; scanVals; regSource)
 open import Rx.Evaluator.Builder using (cascade!; pop-rule; subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; _,_; Rule)
 open import SExp.Syntax  using (SExp; emptyˢ; Kind; hotᵏ; coldᵏ; sharedᵏ; Kinds; plainᵏ; plainᵗ; emitᵗ)
@@ -144,6 +144,24 @@ module _ {m} {Δ : Ctx m} where
   batchOf : Ty → Maybe (NodeState Δ) → Maybe (Bool × ℕ × Bool)
   batchOf ty (just (batchSync-st {s = s} y b d)) = if s ≈ ty then just (y , length b , d) else nothing
   batchOf ty _                                   = nothing
+
+  -- a flattener's outer ended, whatever its policy
+  outerDone : Maybe (NodeState Δ) → Bool
+  outerDone (just (mergeAll-st _ _ _ od)) = od
+  outerDone (just (switch-st _ od))       = od
+  outerDone (just (exhaust-st _ od))      = od
+  outerDone _                             = false
+
+  thruNodes : ∀ {lo s u} → Path Δ lo s u → List NodeId
+  thruNodes (thru-outer _ k ↠[ _ ] q) = k ∷ thruNodes q
+  thruNodes (_ ↠[ _ ] q)              = thruNodes q
+  thruNodes _                         = []
+
+  -- every alive row through a flattener's outer finds that outer live
+  liveOuter : ∀ {u} {e : Closed Δ u} → EvalSt e → Bool
+  liveOuter st = all (λ r → all (λ k → not (aliveThroughᶠ k st r) ∨ not (outerDone (lookupNode k (EvalSt.nodes st))))
+                                (thruNodes (proj₂ (proj₂ (proj₂ r)))))
+                     (EvalSt.registry st)
 
   opName : AllOp → String
   opName mergeAllᵒ = "merge"
@@ -886,6 +904,7 @@ module Decide {n} {Γ : Ctx n} (κ : Kinds n) where
       -- not a field: `dyn-one`, a minted source's rows in the impl's registry
       -- not a field: `hop-one`, every impl row through a hop merge under the one marker
       ∷ ("hop-one" , hopOne)
+      ∷ ("live-outer" , liveOuter stP ∧ liveOuter stI)
       ∷ ("dyn-one" , all (λ l → not ((n + n) <ᵇ LiveSource.source l) ∨ (srcCount (LiveSource.source l) RI ≤ᵇ 1)) LI)
       ∷ []
 

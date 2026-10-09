@@ -25,6 +25,7 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.List.Relation.Unary.AllPairs using () renaming ([] to []ᴾ; _∷_ to _∷ᴾ_)
 open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (++⁺ to ++⁺ᴾ)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_)
 open import Data.Nat.Properties using (≤-refl; n≤1+n; n<1+n; m<n⇒m<1+n; <⇒≢; <⇒≤; <⇒≱; <-≤-trans; ≤-trans; <-irrefl; ≤⇒≤ᵇ; <-trans)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -41,8 +42,8 @@ open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Reducible.Support using (Sound; Rule; Distinct; endOf; register-sound; sub-ot; fresh-rows)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ)
 open import Simulation.Schedules using (ticks) renaming (_∷_ to _∷ˢ_)
-open import Simulation.Stores using (Store; Arr; PathRel; Named; Unpaired; InputBlock; block; RowRel; read~; cold~; defer~; hot~;
-                                     RegRel; []; _∷_; mach; Src; blockNodes; dyn~)
+open import Simulation.Stores using (LiveAt; live; Store; Arr; PathRel; Named; Unpaired; InputBlock; block; RowRel; read~; cold~; defer~; hot~;
+                                     RegRel; []; _∷_; mach; Src; blockNodes; dyn~; LiveOn; LiveRows; live-agree)
   renaming (here to sp-here)
 open import Simulation.Sweep using (same-refl; sameSource-no; T-true; raw<ₙ; stamped<)
 open import Simulation.Cut   using (nodesOf; has-node; node-has)
@@ -220,6 +221,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     new-row : RowRel {Γ = Γ} κ π {t} (EvalSt.nodes stP) NI (lP ∷ Sched.live sP) (lI ∷ Sched.live sI) rowP rowI
     new-row = cold~ sp-here (block-at {Γ = Γ} κ (proj₂ pairs-below) (λ b → proj₁ (nodes-at b)) blk) pr₁ refl
 
+    -- an old row's nodes are below the counter, which the block wrote above
+    old-live : LiveRows (stI₂ KI)
+    old-live = live λ {r} r∈ sk → live-agree (proj₂ (proj₂ (proj₂ r))) {EvalSt.nodes stI} {NI} (λ k h → kept k (fresh-rows ruleI r∈ k h)) (LiveRows.rows-live live-outer {r} r∈ sk)
+
+    -- THE COLD'S ROW WALKS LIVE OUTERS: its block's nodes are written
+    -- fresh, and the path it subscribes onto is walked by a row that
+    -- found its outers live -- a fact of the walk the block does not carry
+    postulate
+      cold-live : LiveOn full NI
+
     persist : (R : List (RegRow Γ t)) (R′ : List (RegRow (plainᵏ Γ κ) (emitᵗ t)))
               (S₂ : Store κ sP₂ (stP₂ R) sI₁ (stI₂ R′))
             → (∀ {s s′ w w′} → Arr S s s′ w w′ → _)
@@ -260,7 +271,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
         ; rids = rids
         ; fresh-ids = mapᵃ m<n⇒m<1+n (proj₁ fresh-ids) , weak {f = λ r → proj₁ r} r≤ (proj₂ fresh-ids)
         ; above = above ; census = census ; owned = owned
-        ; ruleP = rP ; ruleI = rI ; scripts = scripts
+        ; ruleP = rP ; ruleI = rI ; scripts = scripts ; live-outer = old-live
         }
 
     -- REGISTERED: the rows join both registries last, paired as `cold~`
@@ -286,6 +297,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       -- the new row's block node is above every old row's
       new-old : ∀ {j} → j ∈ blockNodes full → ∀ {r′} → r′ ∈ KI → pathHasNode j (proj₂ (proj₂ (proj₂ r′))) ≡ true → ⊥
       new-old b r′∈ h = <⇒≱ (fresh-rows ruleI r′∈ _ (subst T (sym h) tt)) (proj₁ (nodes-at b))
+
+      reg-live : LiveAt (stI₂ (KI ++ rowI ∷ []))
+      reg-live {r} r∈ sk with ∈-++⁻ KI r∈
+      ... | inj₁ m           = LiveRows.rows-live old-live m sk
+      ... | inj₂ (here refl) = cold-live
 
       S₂ : Store κ sP₂ (stP₂ (KP ++ rowP ∷ [])) sI₁ (stI₂ (KI ++ rowI ∷ []))
       S₂ = record
@@ -319,7 +335,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                                          (census i h)
         ; owned = ++⁺ᵃ (tabulateᵃ (λ {r} r∈ ns {j} b → ++⁺ᵃ (lookupᵃ owned r∈ ns b) ((λ h → ⊥-elim (off-new r∈ ns b h)) ∷ᵃ []ᵃ)))
                        ((λ _ {j} b → ++⁺ᵃ (tabulateᵃ (λ r′∈ h → ⊥-elim (new-old b r′∈ h))) ((λ _ → refl) ∷ᵃ []ᵃ)) ∷ᵃ []ᵃ)
-        ; ruleP = rP ; ruleI = rI ; scripts = scripts
+        ; ruleP = rP ; ruleI = rI ; scripts = scripts ; live-outer = live reg-live
         }
 
     -- the two registrations agree on whether they are spent

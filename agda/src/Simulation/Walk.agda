@@ -77,7 +77,7 @@ open Kept using (After; module After; _⨾_; after)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-subscribeE; sz-foldPath; sz-1)
 open import Simulation.Pass.Path using (module PassP)
-open import Simulation.Stores using (guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
+open import Simulation.Stores using (live; guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
   spentWhile~; FlatNodes; merge~; switch~; exhaust~; outerElem~; outerExplode~; Store; Src; Arr;
   SrcNum; []; elab)
 
@@ -1103,7 +1103,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ; swept = swept ; uncut = uncut ; named = proj₁ named , named-mint (n≤1+n _) ≤-refl ≤-refl (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
       ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-      ; scripts = scripts
+      ; scripts = scripts ; live-outer = live-outer
       }
       where open Store S
 
@@ -1352,6 +1352,7 @@ init-store κ {t} e ins μ big ord = record
   ; ruleP   = rule (λ k ()) (λ ()) (λ ())
   ; ruleI   = rule (λ k ()) (λ ()) (λ ())
   ; scripts = ins , refl , refl
+  ; live-outer = live (λ ())
   }
 
 -- THE IMPL'S ROOT SUBSCRIBE IS ITS MINT'S BODY'S, at the token the mint

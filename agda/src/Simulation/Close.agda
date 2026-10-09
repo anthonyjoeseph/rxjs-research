@@ -20,7 +20,7 @@ open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Arrival; Sched; EvalSt; memberSource; sameSource; cascadeClose)
 open import Rx.Prim      using (Source)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import Simulation.Stores using (Store; Arr; Census; spent-off)
+open import Simulation.Stores using (Store; Arr; Census; spent-off; close-live)
 open import Simulation.Sweep using (sameSource-no; dies-rows; close-named; t≢f)
 
 -- a source number no slot has is not the slot's
@@ -38,7 +38,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ ar = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; named = close-named {a = a} (proj₁ named) (Arr.boundP ar) , close-named {a = a′} (proj₂ named) (Arr.boundI ar) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-    ; scripts = scripts
+    ; scripts = scripts ; live-outer = close-live s a′
     ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)
     ; dying-alike = dies-rows κ na na′ rows (Arr.rows ar)
     ; dying-done = λ i _ → (λ m → ⊥-elim (t≢f (trans (sym m) (member-skip [] (<-trans (toℕ<n i) na)))))

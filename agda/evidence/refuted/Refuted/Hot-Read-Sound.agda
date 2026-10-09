@@ -43,7 +43,7 @@ open import SExp.Plain using (plainExp)
 open import SExp.Elaborate using (flatStepᵛ; FlatSᵗ; plainᶜ⁺; frameᵛ; restampᵛ; subscribeᵛ; inputStampᵖ)
 open import SExp.Impl-Slots using (elaborateImpl; embedSlotsImpl)
 open import SExp.Simul-Slots using (SimulSlots; plainSlots)
-open import Simulation.Stores using (Store; PathRel; Flattener; EnvRel; hotEq; inner~; root~; merge~; mach; hot~; block; [])
+open import Simulation.Stores using (live; Store; PathRel; Flattener; EnvRel; hotEq; inner~; root~; merge~; mach; hot~; block; [])
 open import Simulation.Schedules using ([])
 open import Simulation.After using (module Kept)
 open Kept using (After; module After)
@@ -184,6 +184,7 @@ S = record
                                         , apart (batchSync-f 5) k₄ ((λ ()) ∷ []) , apart (map-f Fs) k₅ [] , apart (map-f Fp) k₆ []
                                         , apart (thru-outer mergeAllᵒ 6) sink ((λ ()) ∷ []) , _ })
   ; scripts = ins , refl , refl
+  ; live-outer = live λ { (here refl) _ → refl ∷ [] }
   }
 
 -- THE PATH PASSES ITS MERGE TWICE, as two of its lanes.  Every frame is

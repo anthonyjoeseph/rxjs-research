@@ -262,14 +262,17 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   Decides whether `simulation`'s instant bookkeeping survives a value pass
   that now emits once per value.
 
-- **THE LIVE OUTER.** `explode-quiet-sub` and `explode-one-sub` are false
-  where an emit reaches an explode whose outer has ended: no relation says a
-  row through a flattener is live, each being closed under its own end, and
-  an idempotent wrap only moves the falsity to the hot block's second end.
-  State it where rows are related, a registered row through `thru-outer m`
-  finding `m` not done, and find the end that breaks it. Decides whether
-  `simulation` holds only over reached states, which `Store` cannot yet tell
-  from unreached ones.
+- **THE LIVE OUTER.** `Store.live-outer` holds every undelivered row live
+  through its outers, kept at every site over `close-live`, `open-live`,
+  `end-live`, `{fold,drain}-keeps-od` and three walk leaves. Sweep before
+  grinding: decide `LiveRows` and the done flag's monotonicity in `qc-store`
+  at nested merges whose outer ends inside a fold; a red at
+  `fold-keeps-od` is an evaluator fix. Decides whether `simulation`'s reached
+  states are live, the fact the explode leaves are false without.
+
+- **THE WALK'S LIVE PATH.** `hop-live`, `cold-live` and `join-live` each ask a
+  walk to hand back the `LiveOn` of the path it registers; thread it through
+  `Walks`. Decides whether liveness is a walk's fact or a store's.
 
 - **FIT THE EXPLODE.** Then write `explode-out` and the two subscribe leaves
   as bodies over smaller leaves, `Store` gaining each fact a body needs; the
@@ -295,6 +298,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `DEAD ROUTE, PROBED`: one exploded emit, carrying nothing or one value,
   subscribed by the impl's idle merge, walks into the flattener, false where
   the outer has ended; a group delivered at one instant sends at it.
+- **`{fold,drain}-keeps-od`** (Simulation.Pass.Inner) — FALSITY, `NO EVIDENCE`:
+  a fold never lowers an outer's done flag, and a drain's carried flag is down
+  wherever its node's is; a nested merge's finish writes back a flag read
+  before its fold.
+- **`close-live`** (Simulation.Stores) — FALSITY, `NO EVIDENCE`: a source's
+  close revives the rows skipped as delivered while dying, each live only if no
+  outer it walks has ended.
+- **`open-live`** (Simulation.Pop) — FALSITY, `NO EVIDENCE`: a popped arrival's
+  open clears every skip, each row live only if no outer it walks has ended.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
@@ -357,6 +369,17 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; swept at two hot slots, after the subscribe.
+- **`end-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an outer's end
+  leaves no row through it a dispatch would walk; that the end is the subtree's
+  last is an accounting `Store` does not carry.
+- **`hop-live`** (Simulation.Hop) — SHAPE, `NO EVIDENCE`: a hop's registered
+  row finds every outer on its path live; the walk does not carry it.
+- **`cold-live`** (Simulation.Cold) — SHAPE, `NO EVIDENCE`: a cold read's
+  registered row finds every outer on its path live; the walk does not carry
+  it.
+- **`join-live`** (Simulation.Slot-Join) — SHAPE, `NO EVIDENCE`: a joiner's
+  registered row finds every outer on its path live; the walk does not carry
+  it.
 - **`lifts-scan`** (Simulation.Walk) — DIFFICULTY, `PROBED`: the elaborated
   scan's step and seed read the author's variables past the mint's binder; held
   at one payload, two past the typechecker.

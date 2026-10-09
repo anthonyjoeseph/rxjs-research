@@ -29,7 +29,7 @@ open import Data.Bool    using (Bool; true; false; _∨_; _∧_; T; if_then_else
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
-open import Data.List    using (List; []; _∷_; map; concatMap)
+open import Data.List    using (List; []; _∷_; _++_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-map⁺)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise)
@@ -45,19 +45,20 @@ open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; subst₂; trans; cong; cong₂)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≡ᵇ⇒≡)
-open import Decide using (≡ᵇ-refl)
+open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Rx.Evaluator.Reducible.Support using (Rule)
-open import Rx.Evaluator.Freshness using (nodeCt)
+open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 
 open import Rx.Mint      using (counter; sourceᵏ; regᵏ; ordinalᵏ; setAt; nodeᵏ)
 open import Rx.Prim      using (InstEmit; EmitKind; Tick; Source)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; Env; Closed; lookupEnv;
   Ren∈; renExp; FnClo; applyClo; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; varᵗ; unit̂; pairᵗ; inlᵗ;
   inrᵗ; sndᵗ; Tm)
-open import Rx.Evaluator using (LiveSource; Sched; EvalSt; NodeState; NodeId; Path; RegRow; RegSrc; atSlot; atDyn; root; share-sink;
+open import Rx.Evaluator using (frameNodes; LiveSource; Sched; EvalSt; NodeState; NodeId; Path; RegRow; RegSrc; atSlot; atDyn; root; share-sink;
   _↠[_]_; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; mergeAllᵒ; cell-st;
   take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st; echoᵗ; lookupNode; memberSource;
-  takeVals; scanVals; regSource; sameSource; pathHasNode; memoᶠ)
+  takeVals; scanVals; regSource; sameSource; pathHasNode; memoᶠ; skipᵇ; markDlv; shareDying; RegId; setNode;
+  Arrival; cascadeClose)
 open import Rx.Evaluator.Domain using (flatOp)
 open import SExp.Syntax  using (SExp; Kinds; plainᵏ; plainᵗ; emitᵗ; slotTy; hotᵏ; sharedᵏ)
 open import SExp.Plain   using (plainExp)
@@ -644,6 +645,150 @@ dlvᵇ st r = any (_≡ᵇ proj₁ r) (EvalSt.delivered st)
 dyingᵇ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → RegRow Γ t → Bool
 dyingᵇ st r = memberSource (regSource (proj₁ (proj₂ r))) (EvalSt.dying st)
 
+-- a flattener's outer ended, whatever its policy
+outerDoneᵇ : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Bool
+outerDoneᵇ (just (mergeAll-st _ _ _ od)) = od
+outerDoneᵇ (just (switch-st _ od))       = od
+outerDoneᵇ (just (exhaust-st _ od))      = od
+outerDoneᵇ _                             = false
+
+-- the flatteners whose outer a path walks
+thruNodes : ∀ {n} {Γ : Ctx n} {lo s t} → Path Γ lo s t → List NodeId
+thruNodes (thru-outer _ k ↠[ _ ] q) = k ∷ thruNodes q
+thruNodes (_ ↠[ _ ] q)              = thruNodes q
+thruNodes _                         = []
+
+-- EVERY FLATTENER A PATH WALKS THE OUTER OF HAS ITS OUTER LIVE.  A node
+-- table's fact, so a walk's own writes are what can break it
+LiveOn : ∀ {n} {Γ : Ctx n} {lo s t} → Path Γ lo s t → List (NodeId × NodeState Γ) → Set
+LiveOn q N = All (λ k → outerDoneᵇ (lookupNode k N) ≡ false) (thruNodes q)
+
+-- A ROW A DISPATCH WOULD WALK FINDS EVERY OUTER IT WALKS LIVE: an
+-- outer's end reaches its flattener on its last live row, and a row
+-- the end has reached is delivered first, so no consume reaches a
+-- flattener whose outer has ended
+LiveAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → Set
+LiveAt st = ∀ {r} → r ∈ EvalSt.registry st → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st ≡ false
+          → LiveOn (proj₂ (proj₂ (proj₂ r))) (EvalSt.nodes st)
+
+-- a record, so the state it is about is read off its type
+record LiveRows {n} {Γ : Ctx n} {t} {e : Closed Γ t} (st : EvalSt e) : Set where
+  no-eta-equality
+  pattern
+  constructor live
+  field rows-live : LiveAt st
+
+-- a node write that ends no outer keeps every outer a path walks live
+od-set : ∀ {n} {Γ : Ctx n} (k j : NodeId) (s : NodeState Γ) (N : List (NodeId × NodeState Γ))
+       → (outerDoneᵇ (lookupNode k N) ≡ false → outerDoneᵇ (just s) ≡ false)
+       → outerDoneᵇ (lookupNode j N) ≡ false → outerDoneᵇ (lookupNode j (setNode k s N)) ≡ false
+od-set k j s N w h with k ≡ᵇ j in e
+... | false rewrite set-above k j s N e = h
+... | true with ≡ᵇ→≡ k j e
+...   | refl rewrite lookup-set k s N = w h
+
+-- and a node read back from a write ending no outer ended none before it
+od-back : ∀ {n} {Γ : Ctx n} (k j : NodeId) (s : NodeState Γ) (N : List (NodeId × NodeState Γ))
+        → (outerDoneᵇ (just s) ≡ false → outerDoneᵇ (lookupNode k N) ≡ false)
+        → outerDoneᵇ (lookupNode j (setNode k s N)) ≡ false → outerDoneᵇ (lookupNode j N) ≡ false
+od-back k j s N w h with k ≡ᵇ j in e
+... | false rewrite set-above k j s N e = h
+... | true with ≡ᵇ→≡ k j e
+...   | refl rewrite lookup-set k s N = w h
+
+live-set : ∀ {n} {Γ : Ctx n} {lo u t} {q : Path Γ lo u t} (k : NodeId) (s : NodeState Γ) (N : List (NodeId × NodeState Γ))
+         → (outerDoneᵇ (lookupNode k N) ≡ false → outerDoneᵇ (just s) ≡ false)
+         → LiveOn q N → LiveOn q (setNode k s N)
+live-set k s N w = mapᵃ (λ {j} → od-set k j s N w)
+
+-- a test that grows in each disjunct grows
+∨∧-mono : ∀ c {d d′ x x′} → (T d → T d′) → (T x → T x′) → T (c ∨ d ∧ x) → T (c ∨ d′ ∧ x′)
+∨∧-mono true  _ _ _ = tt
+∨∧-mono false {true} {true}  {x′ = true}  _ _ _ = tt
+∨∧-mono false {true} {true}  {x′ = false} _ g h = ⊥-elim (g h)
+∨∧-mono false {true} {false} f _ _ = ⊥-elim (f tt)
+∨∧-mono false {false} _ _ ()
+
+∨ʳ : ∀ y {x} → T x → T (y ∨ x)
+∨ʳ true  _ = tt
+∨ʳ false h = h
+
+skip-le : ∀ {a b : Bool} → (T a → T b) → b ≡ false → a ≡ false
+skip-le {false} _ _    = refl
+skip-le {true}  f refl = ⊥-elim (f tt)
+
+-- A STEP THAT ONLY GROWS THE LEDGER AND SHRINKS THE REGISTRY keeps every
+-- row it leaves alive walking live outers, read at a table no write
+-- has ended an outer in
+live-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {st st′ : EvalSt e}
+          → (∀ {r} → r ∈ EvalSt.registry st′ → r ∈ EvalSt.registry st)
+          → (∀ s rid → T (skipᵇ s rid st) → T (skipᵇ s rid st′))
+          → (∀ {lo u} {q : Path Γ lo u t} → LiveOn q (EvalSt.nodes st) → LiveOn q (EvalSt.nodes st′))
+          → LiveRows st → LiveRows st′
+live-mono sub grow nd (live L) = live λ {r} r∈ sk → nd {q = proj₂ (proj₂ (proj₂ r))} (L (sub r∈) (skip-le (grow (regSource (proj₁ (proj₂ r))) (proj₁ r)) sk))
+
+-- a chain step's delivery and a share's death only grow the ledger
+skip-dlv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (fin : Bool) (rid′ : RegId) {st : EvalSt e}
+         → ∀ s rid → T (skipᵇ s rid st) → T (skipᵇ s rid (markDlv fin rid′ st))
+skip-dlv false rid′ s rid h = h
+skip-dlv true  rid′ {st} s rid h = ∨∧-mono (any (_≡ᵇ rid) (EvalSt.cancelled st)) (λ x → x) (∨ʳ (rid′ ≡ᵇ rid)) h
+
+skip-dying : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (i : Fin n) (b : Bool) {st : EvalSt e}
+           → ∀ s rid → T (skipᵇ s rid st) → T (skipᵇ s rid (shareDying i b st))
+skip-dying i false s rid h = h
+skip-dying i true  {st} s rid h = ∨∧-mono (any (_≡ᵇ rid) (EvalSt.cancelled st)) (∨ʳ (sameSource s (toℕ i))) (λ x → x) h
+
+any-++ʳ : (p : RegId → Bool) (xs : List RegId) {ys : List RegId} → T (any p ys) → T (any p (xs ++ ys))
+any-++ʳ p []       h = h
+any-++ʳ p (x ∷ xs) h = ∨ʳ (p x) (any-++ʳ p xs h)
+
+∨-monoˡ : ∀ {a a′} x → (T a → T a′) → T (a ∨ x) → T (a′ ∨ x)
+∨-monoˡ {true}  {true}  _ _ _ = tt
+∨-monoˡ {true}  {false} _ f _ = ⊥-elim (f tt)
+∨-monoˡ {false} {a′}    _ _ h = ∨ʳ a′ h
+
+skip-cancel : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (xs : List RegId) {st : EvalSt e}
+            → ∀ s rid → T (skipᵇ s rid st) → T (skipᵇ s rid (record st { cancelled = xs ++ EvalSt.cancelled st }))
+skip-cancel xs {st} s rid = ∨-monoˡ _ (any-++ʳ (_≡ᵇ rid) xs)
+
+-- A WRITE THAT ENDS NO OUTER keeps the rows: one written not done, and
+-- one keeping the flag the node held
+live-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {st : EvalSt e} (k : NodeId) {y : NodeState Γ}
+           → outerDoneᵇ (just y) ≡ false → LiveRows st → LiveRows (record st { nodes = setNode k y (EvalSt.nodes st) })
+live-quiet {st = st} k {y} e =
+  live-mono {st = st} {st′ = record st { nodes = setNode k y (EvalSt.nodes st) }} (λ r∈ → r∈) (λ _ _ h → h)
+    (λ {_} {_} {q} → live-set {q = q} k y (EvalSt.nodes st) (λ _ → e))
+
+live-keep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {st : EvalSt e} (k : NodeId) {x y : NodeState Γ}
+          → lookupNode k (EvalSt.nodes st) ≡ just x → outerDoneᵇ (just y) ≡ outerDoneᵇ (just x)
+          → LiveRows st → LiveRows (record st { nodes = setNode k y (EvalSt.nodes st) })
+live-keep {st = st} k {y = y} l e =
+  live-mono {st = st} {st′ = record st { nodes = setNode k y (EvalSt.nodes st) }} (λ r∈ → r∈) (λ _ _ h → h)
+    (λ {_} {_} {q} → live-set {q = q} k y (EvalSt.nodes st) (λ h → trans e (subst (λ z → outerDoneᵇ z ≡ false) l h)))
+
+-- a write live wherever the node it replaces was live
+live-write : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {st : EvalSt e} (k : NodeId) {y : NodeState Γ}
+           → (outerDoneᵇ (lookupNode k (EvalSt.nodes st)) ≡ false → outerDoneᵇ (just y) ≡ false)
+           → LiveRows st → LiveRows (record st { nodes = setNode k y (EvalSt.nodes st) })
+live-write {st = st} k {y} w =
+  live-mono {st = st} {st′ = record st { nodes = setNode k y (EvalSt.nodes st) }} (λ r∈ → r∈) (λ _ _ h → h)
+    (λ {_} {_} {q} → live-set {q = q} k y (EvalSt.nodes st) w)
+
+-- a table reading every node a path walks as another did finds its
+-- outers as live
+live-agree : ∀ {n} {Γ : Ctx n} {lo s t} (q : Path Γ lo s t) {N N′ : List (NodeId × NodeState Γ)}
+           → (∀ k → T (pathHasNode k q) → lookupNode k N′ ≡ lookupNode k N) → LiveOn q N → LiveOn q N′
+live-agree root              _  _ = []
+live-agree (share-sink _ _)  _  _ = []
+live-agree (f@(thru-outer _ k) ↠[ _ ] q) {N} {N′} ag (l ∷ ls) =
+  trans (cong outerDoneᵇ (ag k (subst (λ b → T ((b ∨ false) ∨ pathHasNode k q)) (sym (≡ᵇ-refl k)) tt))) l
+  ∷ live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) ls
+live-agree (f@(map-f _) ↠[ _ ] q) {N} {N′}        ag l = live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) l
+live-agree (f@(scan-f _ _) ↠[ _ ] q) {N} {N′}     ag l = live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) l
+live-agree (f@(take-f _ _) ↠[ _ ] q) {N} {N′}     ag l = live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) l
+live-agree (f@(batchSync-f _) ↠[ _ ] q) {N} {N′}  ag l = live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) l
+live-agree (f@(from-inner _ _ _) ↠[ _ ] q) {N} {N′} ag l = live-agree q {N} {N′} (λ j h → ag j (∨ʳ (any (_≡ᵇ j) (frameNodes f)) h)) l
+
 -- EVERYTHING A RUN HAS NAMED IS BELOW ITS COUNTERS, so what the
 -- counters hand out next is apart from all of it: the slots' numbers,
 -- the live ordinals, the sources the rows stand at, and the ids and
@@ -714,6 +859,8 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     -- a registration still in the registry is not a cascade's victim
     uncut   : All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stP) ≡ false) (EvalSt.registry stP)
             × All (λ r → any (_≡ᵇ proj₁ r) (EvalSt.cancelled stI) ≡ false) (EvalSt.registry stI)
+    -- the impl's rows a dispatch would walk find their outers live
+    live-outer : LiveRows stI
     -- everything each run has named, below its counters
     named   : Named n sP stP × Named (n + n) sI stI
     -- registrations are told apart by their ids, each minted below its run's counter
@@ -735,6 +882,16 @@ record Store {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed
     ruleI   : Rule sI stI
     -- both runs read one author's table, the impl's embedded
     scripts : Σ (SimulSlots Γ κ) λ ins → Sched.slots sP ≡ memoᶠ (plainSlots ins) × Sched.slots sI ≡ memoᶠ (embedSlotsImpl ins)
+
+-- A SOURCE'S CLOSE LEAVES EVERY ROW IT REVIVES WALKING LIVE OUTERS:
+-- the close empties `delivered`, so a row the value pass skipped as
+-- dying and delivered is walked again by the end pass.  No row is
+-- cancelled (`uncut`), so after the close every row must walk live
+-- outers, and `live-outer` speaks only of the rows that were unskipped
+postulate
+  close-live : ∀ {n} {Γ : Ctx n} {κ : Kinds n} {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)}
+                 {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei}
+             → Store κ sP stP sI stI → (a′ : Arrival (plainᵏ Γ κ)) → LiveRows (cascadeClose a′ stI)
 
 -- A POPPED ARRIVAL'S PAIR OF SOURCES AGAINST THE ROWS: every minted
 -- source's row is the arrival's exactly when its partner is the other
