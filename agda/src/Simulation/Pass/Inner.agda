@@ -713,7 +713,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       with restamp-echo S f pr b d₁
     ... | A , f′ , pr′ , c′ , refl , _
       with tail (After.store A) pr′ c′ (drop-ot _ _ _ sp)
-             (proj₂ (proj₁ (tail-of (step-clear d₁ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si))))) dq
+             (proj₂ (proj₁ (tail-of (step-clear d₁ (head-on _ _ _ m′ (self-node m′ (j′ ∷ [])) si , drop-ot _ _ _ si))))) (λ ()) dq
     ...   | A₁ , pr₁
       with merge-drain wk (After.store A₁)
              (flat-move _ _ _ _ (After.grows A₁)
@@ -872,7 +872,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
         ip₁ ip₂ lP lI l2 a1 b1 pr b sp si sp′ si′ dd (finish-all-drain {st₁ = stPf} fP drain-spent) tail refl
         (finish-all-drain (fold-step step-map (fold-step {out₂ = oI₁} {sched₂ = sIq} {st₂ = stIq} (step-from-inner react-false) dq))
           drain-spent) dR
-      with tail S pr (delivery-carries b) (drop-ot _ _ _ sp) (drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))) dq
+      with tail S pr (delivery-carries b) (drop-ot _ _ _ sp) (drop-ot _ _ _ (drop-ot _ _ _ (drop-ot _ _ _ si))) (λ ()) dq
     ... | A₁ , pr₁
       with fin-at (pred-one b1) dR
     ...   | fold-step step-map (fold-step (step-from-inner (react-alive al)) _) =
