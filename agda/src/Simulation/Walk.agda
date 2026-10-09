@@ -299,7 +299,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- registered only once its subscribe has run, and no two rows start
       -- at one node.
       gone-subscribed : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
-                          {X lo u} {q : Path (plainᵏ Γ κ) lo u (emitᵗ t)} {now rI}
+                          {lo u X} {q : Path (plainᵏ Γ κ) lo u (emitᵗ t)} {now rI}
                       → subscribeE⇓ {e = ei} X q now sI stI rI → Gone q stI
 
     -- the same, read through the read's cast and its transparent restamp
