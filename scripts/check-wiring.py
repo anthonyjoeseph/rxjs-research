@@ -909,6 +909,8 @@ MODULE_ROOTS = {
                    ("main",)),
     "CLI.Unit-Test.Bug-Cache": ("the bug cache's runner — `make bug-cache`",
                                            ("main",)),
+    "CLI.Walk": ("the derivation walk — `make walk-build` / `make walk`",
+                 ("main",)),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")

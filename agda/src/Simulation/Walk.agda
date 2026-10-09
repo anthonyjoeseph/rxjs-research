@@ -298,6 +298,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A PATH BEING SUBSCRIBED HAS NO ROW AT ITS FIRST NODE YET: a row is
       -- registered only once its subscribe has run, and no two rows start
       -- at one node.
+      -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
+      --   decided by `CLI.Walk-Check`'s `subscribe` tag at every
+      --   subscribe: 105915 with an alive row meeting the path, 0 fail.
+      -- PROBED: make walk WALK='1 40 3' WALK_SEEDS=30
+      --   the same tag, unaimed: 116622 such, 0 fail.
       gone-subscribed : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
                           {lo u X} {q : Path (plainᵏ Γ κ) lo u (emitᵗ t)} {now rI}
                       → subscribeE⇓ {e = ei} X q now sI stI rI → Gone q stI

@@ -91,3 +91,31 @@ says `drains a queue at N boundaries` when a merge spent its queue and
 fell, the regions no former tag names. Before trusting a
 green on a new decider, break it on purpose (misread one index) and confirm it
 goes red: a decider that cannot fail is a probe that lies green.
+
+## Walking a derivation — `make walk`
+
+```
+make walk WALK='SEED RUNS DEPTH [FUEL]' WALK_SEEDS=60 QC_DRAW='...'
+```
+
+The statements about states INSIDE a walk -- an end crossing a frame, an
+outer's wrap, a subscribe below a flattener -- are invisible at an arrival
+boundary, so `qc-store` cannot reach them. `CLI/Walk.agda` draws exactly as
+QuickCheck does (same `QC_DRAW`), runs the IMPL side through `evaluate!`, and
+walks its derivation with `CLI/Walk-Check.agda`, deciding each claim at the
+state the derivation binds. It prints one line per tag: how many checks ran,
+how many COUNTED (something alive could have broken them), how many failed,
+and the first failure.
+
+The derivation is erased in the oracle's tree, so the binary is built from
+its own, `agda/_walk` (`oracle-mirror.py --walk-sync`: markers left as
+comments, termination checking off). Its first build checks the whole cone.
+
+Each of `WALK_SEEDS` consecutive seeds runs under its own `WALK_BUDGET`
+seconds (`scripts/walk-sweep.sh`); a slow seed is reported over budget and
+its tallies are lost, the rest summed.
+
+The `control` tag is the built-in break-on-purpose: a value-only fold decided
+as if it carried an end, which an alive row walking its own path fails. A
+sweep whose `control` reports no failures reached nothing, and the sweep
+says so and goes red.

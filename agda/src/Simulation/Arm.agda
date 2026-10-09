@@ -427,6 +427,11 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
       -- switch with no current inner and an exhaust not active have none.
       -- The harness's `accounts` decides the counters' half at a boundary;
       -- no `Store` field carries it.
+      -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
+      --   decided by `CLI.Walk-Check`'s `lanes` tag at every outer end its
+      --   wrap reports idle: 112 where a lane held a row as the end arrived
+      --   or after the walk (a hot slot read by the outer and by its
+      --   inners, so both end in one arrival), 0 fail.
       idle-lanes : ∀ {sP stP sI stI} (S : St sP stP sI stI) {o k}
                  → proj₁ (thruWrap o k true (sI , stI)) ≡ true
                  → ∀ {r j} → r ∈ EvalSt.registry stI → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) stI ≡ false
@@ -434,6 +439,12 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN OUTER'S WALK LEAVES ITS GONE AS IT FOUND IT: every row the walk
       -- registers comes through an inner it subscribes, never through the
       -- outer, and a row it cuts or ends is skipped from then on
+      -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
+      --   decided by `CLI.Walk-Check`'s `walk` tag at every outer's walk
+      --   whose path started `Gone`: 61830 with an alive row meeting the
+      --   path once the walk was done, 0 fail.
+      -- PROBED: make walk WALK='1 40 3' WALK_SEEDS=30
+      --   the same tag, unaimed: 18448 such, 0 fail.
       gone-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {o k ℓ ℓ′ u now evs r} {h : ℓ ≤ ℓ′}
                     {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
                 → thruWalk⇓ o k q now evs sI stI r

@@ -241,8 +241,7 @@ undecided, never a failure (Anthony).
 ### The monster
 
 `simulation` — both top lines' base, by arrival
-over `correspondence`: schedules, pops, stores in step;
-set by `subscribe-related`, kept by `cascade-related`. RULED
+over `correspondence`, set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; subscribes unrelated; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
@@ -252,18 +251,11 @@ body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
 scripts; joiners off catch; installs+hops; revived inners;
 unaligned reads/connects/flushes; renames; 2-script
 stores/values; mid-emit joins; μ cold reads; dying rows;
-dead outers.
+dead outers; live rows past an end.
 
-also: `main` — the QuickCheck's entry point, and every generator and decider it calls: the sweep is how this tier's monster is measured, and no proof reads it.
+also: `main` — the QuickCheck's entry point and the walk's, and every generator and decider they call: the sweeps are how this tier's monster is measured, and no proof reads them.
 
 ### Big picture tier roadmap
-
-- **THE ENDED OUTER.** `Gone` carries `Fed`, so a cell and an idle wrap hand
-  it on by body. Left: where an end starts (`gone-finish`, `gone-cut`,
-  `gone-skipped`, `gone-subscribed`), each now owing `Fed` of its tail, and
-  `idle-lanes`. Restate each over the `Gone` its call site holds, then decide
-  `Fed` and `idle-lanes` in the harness at the step's own state. Decides
-  whether `simulation`'s reached ends leave a row a later pass would walk.
 
 - **THE PASS'S LIVE PATH.** `inner-live` asks the pass for the liveness the
   walk now carries down to every registration; thread `LiveIf` through `Pass`,
@@ -292,19 +284,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`idle-lanes`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: an idle flattener
-  has no alive row down an inner lane.
-- **`gone-walk`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: an outer's walk
-  leaves the outer it found empty empty, and every row below it came down it.
-- **`gone-finish`** (Simulation.Pass.Inner) — FALSITY, `NO EVIDENCE`: a finish
-  that ends its flattener leaves no row at its tail.
-- **`gone-cut`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a test that cuts
-  leaves no row below it.
-- **`gone-skipped`, `dying-kept`** (Simulation.Pass.Path) — FALSITY,
-  `NO EVIDENCE`: a reader its share ended leaves no row at its head; a fold
-  keeps a share's dying mark.
-- **`gone-subscribed`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a path
-  being subscribed has no row at its first node.
 - **`explode-{quiet-sub,one-sub,out}`** (Simulation.Pass) — FALSITY,
   `DEAD ROUTE, PROBED×3`: one exploded emit, carrying nothing or one value,
   subscribed by the impl's idle merge, walks into the flattener, false where
@@ -373,6 +352,19 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   for source; swept at two hot slots, after the subscribe.
 - **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an inner's
   path is live unless spent where its walk starts; the pass does not carry it.
+- **`idle-lanes`** (Simulation.Arm) — DIFFICULTY, `PROBED`: an idle flattener
+  has no alive row down an inner lane; walked where a lane held a row.
+- **`gone-walk`** (Simulation.Arm) — DIFFICULTY, `PROBED×2`: an outer's walk
+  leaves the outer it found empty empty, and every row below it came down it.
+- **`gone-finish`** (Simulation.Pass.Inner) — DIFFICULTY, `PROBED×2`: a finish
+  that ends its flattener leaves no row at its tail.
+- **`gone-cut`** (Simulation.Take) — DIFFICULTY, `PROBED×2`: a test that cuts
+  leaves no row below it.
+- **`gone-skipped`, `dying-kept`** (Simulation.Pass.Path) — DIFFICULTY,
+  `PROBED×3`: a reader its share ended leaves no row at its head; a fold keeps
+  a share's dying mark.
+- **`gone-subscribed`** (Simulation.Walk) — DIFFICULTY, `PROBED×2`: a path
+  being subscribed has no row at its first node.
 - **`{fold,drain}-keeps-od`** (Simulation.Pass.Inner) — DIFFICULTY, `PROBED×4`:
   a fold never lowers an outer's done flag, and a drain's carried flag is down
   wherever its node's is; a nested merge's finish writes back a flag read

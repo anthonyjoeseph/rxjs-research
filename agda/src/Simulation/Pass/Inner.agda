@@ -503,6 +503,12 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- merge's are both instances.  The store is the one the finish
       -- leaves: a nested merge's finish writes its node before it starts,
       -- and only the drain after it hands a store back.
+      -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
+      --   decided by `CLI.Walk-Check`'s `finish` tag at the tail of every
+      --   finish that ends its flattener, in the state it leaves: 3831
+      --   with an alive row meeting the tail, 0 fail.
+      -- PROBED: make walk WALK='1 40 3' WALK_SEEDS=30
+      --   the same tag, unaimed: 144 such, 0 fail.
       gone-finish : ∀ {sP stP sI₁ stI₁} (S : St sP stP sI₁ stI₁) {now ℓ s op m′ j′ x}
                       {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {es sI stI o₁ es₁ f₁}
                   → innerFinish⇓ op m′ j′ q now es sI stI x (o₁ , es₁ , f₁ , sI₁ , stI₁)

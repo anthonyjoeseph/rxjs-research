@@ -225,21 +225,26 @@ def _module_ref_re(dirs):
     alt = "|".join(re.escape(n) for n in names)
     return re.compile(r"(?<![A-Za-z0-9_-])(?:" + alt + r"):\d+")
 GITLOG = re.compile(r"git log[^`\n]*agda/")
-SWEEP = re.compile(r"\bmake (qc-[a-z-]+)")
+SWEEP = re.compile(r"\bmake (qc-[a-z-]+|walk)\b")
 SWEEP_DRAW = re.compile(r"QC_DRAW='([^']*)'")
 
 
 def qc_targets(root):
-    """Every `qc-*` target the Makefile declares."""
+    """Every compiled sweep the Makefile declares: the `qc-*` targets and
+    `walk`, the derivation walk."""
     mk = (root / "Makefile").read_text(encoding="utf-8")
-    return set(re.findall(r"^(qc-[a-z-]+)\s*:", mk, re.M))
+    return set(re.findall(r"^(qc-[a-z-]+|walk)\s*:", mk, re.M))
 
 
 def sweep_fault(m, text, qc):
     """-> why a sweep receipt replays nothing, or None."""
     if m.group(1) not in qc:
         return "names `make " + m.group(1) + "`, which the Makefile does not declare"
-    if not re.search(r"\bQC='\d+ \d+ \d+'", text):
+    if m.group(1) == "walk":
+        # the walk spans a seed RANGE, so its seed count is part of the replay
+        if not (re.search(r"\bWALK='\d+ \d+ \d+'", text) and re.search(r"\bWALK_SEEDS=\d+", text)):
+            return "carries no `WALK='<seed> <runs> <depth>' WALK_SEEDS=<n>` to replay"
+    elif not re.search(r"\bQC='\d+ \d+ \d+'", text):
         return "carries no `QC='<seed> <runs> <depth>'` to replay"
     d = SWEEP_DRAW.search(text)
     if d is None:
@@ -476,7 +481,7 @@ def check_refs(refs, root):
             elif not (toks & prb) and not (set(SHA_TOKEN.findall(text)) & shas):
                 bad.append((f, lineno, kind,
                             "names neither a live probe, the sha holding a "
-                            "deleted one, nor a `make qc-*` sweep"))
+                            "deleted one, nor a `make qc-*` or `make walk` sweep"))
         elif kind == "RECOVERY":
             if not (set(SHA_TOKEN.findall(text)) & shas) and not GITLOG.search(text):
                 bad.append((f, lineno, kind, "carries no sha git can resolve"))

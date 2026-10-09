@@ -61,3 +61,4 @@ agda/_stripped-comments/
 # gate notifications, so it stays out of the tree
 .ntfy-topic
 agda/_oracle/
+agda/_walk/

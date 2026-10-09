@@ -32,6 +32,13 @@ are the STRIPPED ones, so a comment edit invalidates nothing either.
   oracle-mirror.py --key    print the cache key: a hash of the runners' cone
   oracle-mirror.py --qc-key the same over the QuickCheck binary's cone
   oracle-mirror.py --ghc-flags   the compile's `--ghc-flag`s, which the key covers
+  oracle-mirror.py --walk-sync   write the WALK tree: `CLI.Walk`'s cone, markers
+                                 left as comments
+
+THE WALK TREE ERASES NOTHING.  `CLI.Walk` reads the evaluator's derivation,
+which the oracle's tree erases along with every proof built through it, so
+it gets a tree of its own (`agda/_walk`) with the markers still comments and
+only termination checking off.
 """
 from __future__ import annotations
 
@@ -62,6 +69,9 @@ LIB = ("name: rxjs-research-oracle\n"
        "include: src\n"
        "depend: standard-library-2.3\n"
        "flags: --guardedness\n")
+WALK_DEST = os.path.join(REPO, "agda", "_walk")
+WALK_ROOTS = ["CLI.Walk"]
+WALK_PRAGMA = "{-# OPTIONS --no-termination-check #-}\n"
 
 
 def _check_imports():
@@ -96,9 +106,10 @@ def oracle_text(text: str) -> str:
     return PRAGMA + text.replace(MARK, ERASED)
 
 
-def sync(files: dict[str, str]) -> None:
-    src = os.path.join(DEST, "src")
-    want = {os.path.join(src, rel): oracle_text(text)
+def sync(files: dict[str, str], dest: str = DEST, text_of=None) -> None:
+    text_of = text_of or oracle_text
+    src = os.path.join(dest, "src")
+    want = {os.path.join(src, rel): text_of(text)
             for rel, text in files.items()}
     for path, text in want.items():
         if os.path.isfile(path) and open(path, encoding="utf-8").read() == text:
@@ -111,7 +122,7 @@ def sync(files: dict[str, str]) -> None:
             p = os.path.join(root, f)
             if f.endswith(".agda") and p not in want:
                 os.remove(p)
-    lib = os.path.join(DEST, "rxjs-research-oracle.agda-lib")
+    lib = os.path.join(dest, "rxjs-research-oracle.agda-lib")
     if not os.path.isfile(lib) or open(lib).read() != LIB:
         with open(lib, "w") as f:
             f.write(LIB)
@@ -133,7 +144,13 @@ def main() -> int:
     g.add_argument("--key", action="store_true")
     g.add_argument("--qc-key", action="store_true")
     g.add_argument("--ghc-flags", action="store_true")
+    g.add_argument("--walk-sync", action="store_true")
     a = ap.parse_args()
+    if a.walk_sync:
+        files = cone(WALK_ROOTS)
+        sync(files, WALK_DEST, lambda text: WALK_PRAGMA + text)
+        print(f"oracle-mirror: {len(files)} modules in the walk tree")
+        return 0
     if a.ghc_flags:
         print(" ".join(f"--ghc-flag={f}" for f in GHC_FLAGS))
         return 0

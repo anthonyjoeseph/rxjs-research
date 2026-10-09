@@ -1,4 +1,4 @@
-.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs qc-batched-sandwich qc-packets-name-arrivals qc-same-clock qc-store qc-shrink
+.PHONY: walk walk-build oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs qc-batched-sandwich qc-packets-name-arrivals qc-same-clock qc-store qc-shrink
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -1654,6 +1654,26 @@ $(ORACLE_BIN)/QuickCheck: $(AGDA_SRC) scripts/oracle-mirror.py
 	@touch $@
 
 qc-build: $(ORACLE_BIN)/QuickCheck
+
+# THE WALK SWEEP: QuickCheck's draw, each impl run's DERIVATION walked and
+# every claim the simulation threads through a walk decided at the state the
+# walk hands it (`CLI.Walk-Check`).  Its own tree, since the oracle's erases
+# the derivation.  WALK = "SEED RUNS DEPTH [FUEL]", aimed by QC_DRAW, over
+# WALK_SEEDS consecutive seeds, each under WALK_BUDGET seconds.
+WALK_BIN := agda/_walk/_cli
+WALK ?= 1 40 3
+WALK_SEEDS ?= 10
+WALK_BUDGET ?= 60
+$(WALK_BIN)/Walk: $(AGDA_SRC) scripts/oracle-mirror.py
+	@$(MAKE) --no-print-directory stripped
+	@scripts/oracle-mirror.py --walk-sync
+	@cd agda/_walk && $(AGDA) --compile --compile-dir=_cli $(ORACLE_GHC) src/CLI/Walk.agda
+	@touch $@
+
+walk-build: $(WALK_BIN)/Walk
+
+walk: walk-build
+	@scripts/walk-sweep.sh $(WALK_BIN)/Walk "$(WALK)" $(WALK_SEEDS) $(WALK_BUDGET) '$(QC_DRAW)'
 
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)

@@ -327,6 +327,12 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A TEST THAT CUTS LEAVES NOTHING BELOW IT: every row a dispatch
       -- would walk past the test's tail reached it through the test, and
       -- the cut severed each of those
+      -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
+      --   decided by `CLI.Walk-Check`'s `cut` tag below every take that
+      --   cut with no end come into it, in the state the cut leaves: 41
+      --   with an alive row meeting the tail, 0 fail.
+      -- PROBED: make walk WALK='1 40 3' WALK_SEEDS=30
+      --   the same tag, unaimed: 7 such, 0 fail.
       gone-cut : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
                    {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
                    {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}

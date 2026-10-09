@@ -115,6 +115,9 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
     postulate
       -- A READER ITS SHARE HAS ENDED LEAVES NOTHING AT ITS HEAD: its own
       -- row is skipped, and no other row reaches the node it starts at.
+      -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
+      --   decided by `CLI.Walk-Check`'s `skipped` tag at every reader a
+      --   fan-out skipped: 228 with an alive row meeting its path, 0 fail.
       gone-skipped : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {u u′ rid rid′}
                        {p : Path Γ (suc (toℕ i)) u t} {p′ : Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) u′ (emitᵗ t)}
                    → RowRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
@@ -123,6 +126,11 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A FOLD KEEPS A SHARE'S DYING MARK: only the share's own finish
       -- retires it, and that runs after its walk.
+      -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
+      --   decided by `CLI.Walk-Check`'s `dying` tag over every fold:
+      --   373148 starting with a dying mark, 0 fail.
+      -- PROBED: make walk WALK='1 40 3' WALK_SEEDS=30
+      --   the same tag, unaimed: 686268 such, 0 fail.
       dying-kept : ∀ {now lo s k} {p : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {vs f sched} {st : EvalSt ei} {r}
                  → foldPath⇓ now p vs f sched st r
                  → memberSource k (EvalSt.dying st) ≡ true → memberSource k (EvalSt.dying (proj₂ (proj₂ r))) ≡ true
