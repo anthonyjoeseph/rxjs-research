@@ -680,6 +680,17 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
         let (A , f′ , r′) = restamp-write S f r
         in A , f′ , r′ , flat-carries {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} c cs , refl , flat-del {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} c
 
+    -- THE ECHO'S SCAN WRITES ONLY ITS CELL, which no row's skip reads,
+    -- so a tail gone before it stays gone
+    gone-echo : ∀ {π NP} {now ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂} {h₄ : ℓ₃ ≤ ℓ₄}
+                  {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es fin sI} {stI : EvalSt ei} {o₁ ys fin₁ sI₁ stI₁}
+              → Flattener {Γ = Γ} κ π {t = t} NP (EvalSt.nodes stI) u op m m′ ks xs
+              → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
+                  es fin sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
+              → Gone q stI → Gone q stI₁
+    gone-echo (_ , _ , _ , _ , _ , _ , _ , lk) d g with scan-at lk d
+    ... | refl = g
+
 
     cur-none : ∀ {π cur cur′} → CurRel {Γ = Γ} κ π cur cur′ → is-nothing cur ≡ is-nothing cur′
     cur-none {cur = nothing} {nothing} _ = refl
