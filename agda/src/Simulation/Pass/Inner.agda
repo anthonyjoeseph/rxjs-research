@@ -903,7 +903,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     ...       | A₂ , pr₂ =
       arm-shift oI₁ (oQ ++ [])
         (arm-after (A₁ ⨾ A₂) (λ ())
-          (arm (after (After.store A₂) (λ x → x) (λ x → x) [] (λ x → x)) pr₂ [] (drop-ot _ _ _ sN) (gone-finish (After.store A₂) F″) dq₂
+          (arm (after (After.store A₂) (λ x → x) (λ x → x) [] (λ x → x)) pr₂ [] (drop-ot _ _ _ sN) (gone-finish (After.store A₁) F″) dq₂
              (λ {rP} dP B rel′ →
                deferInner~ (After.grows B (After.grows A₂ (After.grows A₁ ip₁))) (After.grows B (After.grows A₂ (After.grows A₁ ip₂)))
                  (trans (fold-unmoved dP (head-on _ _ _ nid (self-node nid (j ∷ [])) sp′ , drop-ot _ _ _ sp′)) (lookup-set nid (mergeAll-st {t = u} nothing (pred a) [] true) (EvalSt.nodes stPf)))
