@@ -265,6 +265,10 @@ postulate
   --   at the end of every value pass and every cascade: 200 agree, 0 fail;
   --   137 hold a dying source at a boundary, so a share ended inside a walk.
   --   The walk's own end is read only through those two consumers.
+  -- PROBED: make qc-store QC='78 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,3,1,3,1,0,0,0,3,4],"script":[3,3,1,0,1,0],"slot":[0,0,0,0,4,2],"fan":[0,1,0,0,1,0,0,1,0,6],"obs":[2,3,3,1],"reach":["flatten"]}'
+  --   decided the same way: 200 agree, 0 fail; 191 hold a dying source at a
+  --   boundary and 2 end a value pass holding one, a share ended inside the
+  --   pass's own walk; 120 connect the shared slot's share, 63 join one.
   walk-quiet : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {a vs fin cs sched} {st : EvalSt e} {r}
              → cascadeGo⇓ a vs fin cs sched st r
              → ∀ {x} → x ∈ EvalSt.registry (proj₂ (proj₂ r)) → dyingᵇ (proj₂ (proj₂ r)) x ≡ true → dyingᵇ st x ≡ true
@@ -274,6 +278,9 @@ postulate
   -- PROBED: make qc-store QC='77 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,1,0,3,2,2,2,0,0,0,4,3],"script":[1,1,2,1,4,4],"slot":[0,0,0,0,4,1],"obs":[2,3,3,1]}'
   --   decided by `CLI.Store-Check`'s `cascade-quiet` at the trace's first
   --   state, the subscribe's: 200 agree, 0 fail.
+  -- PROBED: make qc-store QC='78 200 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,3,1,3,1,0,0,0,3,4],"script":[3,3,1,0,1,0],"slot":[0,0,0,0,4,2],"fan":[0,1,0,0,1,0,0,1,0,6],"obs":[2,3,3,1],"reach":["flatten"]}'
+  --   decided the same way: 200 agree, 0 fail; 120 connect the shared
+  --   slot's share at or after the subscribe.
   start-quiet : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
               → DyingFree (Conf.st (start (elaborateImpl κ e) (embedSlotsImpl ins)))
 

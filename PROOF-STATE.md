@@ -264,10 +264,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 - **THE LIVE OUTER.** A pop's open and a close revive no row walking an
   ended outer, since `Storeˢ.quiet` keeps no row of a dying source registered
-  between arrivals; the fold's stale write-back is ruled out too. Left:
-  `walk-quiet`, a walk drops an ended share's rows before it ends; aim a sweep
-  at a share subscribed again after its end inside one walk, then body it over
-  the share's finish. Decides whether `simulation`'s reached skips are cuts.
+  between arrivals; no share ending inside a walk leaves a row behind (193
+  cases). Left: count in `qc-store` a share subscribed again after its end
+  inside one walk, then body `walk-quiet` over the share's finish. Decides
+  whether `simulation`'s reached skips are cuts.
 
 - **THE WALK'S LIVE PATH.** `hop-live`, `cold-live` and `join-live` each ask a
   walk to hand back the `LiveOn` of the path it registers; thread it through
@@ -297,9 +297,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   `DEAD ROUTE, PROBED`: one exploded emit, carrying nothing or one value,
   subscribed by the impl's idle merge, walks into the flattener, false where
   the outer has ended; a group delivered at one instant sends at it.
-- **`walk-quiet`** (Simulation.Statement) — FALSITY, `PROBED`: a row of a
+- **`walk-quiet`** (Simulation.Statement) — FALSITY, `PROBED×2`: a row of a
   source dying at a walk's end was dying at its start.
-- **`start-quiet`** (Simulation.Statement) — FALSITY, `PROBED`: the root
+- **`start-quiet`** (Simulation.Statement) — FALSITY, `PROBED×2`: the root
   subscribes leave no row of a dying source registered.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `PROBED×3`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
