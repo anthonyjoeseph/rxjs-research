@@ -31,7 +31,7 @@ open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; f
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.InstEmit using (instEmitᵗ)
 open import Simulation.Stores using (EmitRel; Lifts; PathRel; Store; stampOf; sharedEq; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
-  outerElem~; outerExplode~; inner~; deferInner~)
+  outerElem~; outerExplode~; inner~; deferInner~; LiveFor)
 open import Simulation.After using (module Kept; readᴵ; readᴵ-++)
 
 -- a node a run left as it found it
@@ -388,6 +388,7 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
           → Carries es vs
           → Sound q sI₁ stI₁
           → (fin ≡ true → Gone q stI₁)
+          → LiveFor es q (EvalSt.nodes stI₁)
           → foldPath⇓ now q es fin sI₁ stI₁ rI
           → (∀ {rP} → foldPath⇓ now p vs fin sP₁ stP₁ rP → (B : After (After.store A) rP rI)
              → PathRel κ (Store.π (After.store B)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
@@ -398,7 +399,7 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
     -- an arm read at fewer instants
     arm-weaken : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin G H H′ r}
                → (∀ {I} → H′ I → H I) → Arm S now oP sP₁ stP₁ p vs fin G H r → Arm S now oP sP₁ stP₁ p vs fin G H′ r
-    arm-weaken w (arm A r b si g dI rb o) = arm A r b si g dI rb (λ h → o (w h))
+    arm-weaken w (arm A r b si g lv dI rb o) = arm A r b si g lv dI rb (λ h → o (w h))
 
     -- nothing asked of the whole
     none : Goal
@@ -465,7 +466,7 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
     Steps f h p Q =
       ∀ {now vs es fin sP stP sI stI oP vs₁ fin₁ sP₁ stP₁ rI} (S : St sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (f ↠[ h ] p) Q → Carries es vs
-      → Sound (f ↠[ h ] p) sP stP → Sound Q sI stI → (fin ≡ true → Gone Q stI)
+      → Sound (f ↠[ h ] p) sP stP → Sound Q sI stI → (fin ≡ true → Gone Q stI) → LiveFor es Q (EvalSt.nodes stI)
       → stepFrame⇓ now f p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
       → foldPath⇓ now Q es fin sI stI rI
       → Arm S now oP sP₁ stP₁ p vs₁ fin₁ (λ π NP NI → PathRel κ π NP NI (f ↠[ h ] p) Q) (λ I → Dlv I fin es) rI
@@ -475,7 +476,7 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
     InnerPasses a m j h p Q =
       ∀ {now vs es fin sP stP sI stI rI} (S : St sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) Q → Carries es vs
-      → Sound (from-inner a m j ↠[ h ] p) sP stP → Sound Q sI stI
+      → Sound (from-inner a m j ↠[ h ] p) sP stP → Sound Q sI stI → LiveFor es Q (EvalSt.nodes stI)
       → fin ≡ false ⊎ any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ true
       → foldPath⇓ now Q es fin sI stI rI
       → Arm S now [] sP stP p vs false (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) (λ I → Dlv I fin es) rI

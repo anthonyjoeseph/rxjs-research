@@ -14,17 +14,17 @@ open import Data.Maybe   using (just)
 open import Data.Nat     using (_≤_)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 
 open import Rx.Exp       using (Ctx; Closed; Val; FnClo; _×ᵗ_; applyClo; sndᵗ; varᵗ)
-open import Rx.Evaluator using (EvalSt; Path; _↠[_]_; scan-f; map-f; lookupNode; setNode; cell-st; scanVals)
+open import Rx.Evaluator using (EvalSt; Path; _↠[_]_; scan-f; map-f; lookupNode; setNode; cell-st; scanVals; spentAt)
 open import Rx.Evaluator.Domain using (fold-step; step-map)
 open import Rx.Evaluator.Freshness using (lookup-set)
 open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; head-on; self-node)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (ScanAᵗ)
-open import Simulation.Stores using (V; ScanLifts; PathRel; scan~; Store)
+open import Simulation.Stores using (V; ScanLifts; PathRel; scan~; Store; live-for; live-if-drop; live-if-set)
 open import Simulation.After using (module Kept)
 open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; out-quiet; scan-c; gone-nodes)
 open import Simulation.Take using (scan-at)
@@ -102,10 +102,10 @@ module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
     scan-arm {Q = _ ↠[ hS ] qT} {vs = vs} {es = es} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
              R@(scan~ {u = u} {k = k} {k′ = k′} {a = a} {a′ = a′} {em = em} {Θ₀ = Θ₀} {ρ₀ = ρ₀}
                       {h = h} {h₁ = h₁} {h₂ = h₂} {F = F} {F′ = F′} {p = p} {q = q} e lk lk′ v L r)
-             bs sp si g d dI@(fold-step d₁ (fold-step step-map dq))
+             bs sp si g lv d dI@(fold-step d₁ (fold-step step-map dq))
       with scan-at lk d | scan-at lk′ d₁
     ... | refl | refl =
-      arm (proj₁ SW) (proj₂ SW) (proj₁ G) soq (λ e → gone-nodes {q = qT} {st = stI} (gone-cell S {f = scan-f F′ k′} {h = hS} {q = qT} scan-c (g e))) dq (λ {rP} dP B rel′ →
+      arm (proj₁ SW) (proj₂ SW) (proj₁ G) soq (λ e → gone-nodes {q = qT} {st = stI} (gone-cell S {f = scan-f F′ k′} {h = hS} {q = qT} scan-c (g e))) LV dq (λ {rP} dP B rel′ →
         scan~ (After.grows B (After.grows (proj₁ SW) e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c′) lkI) (proj₂ G) L rel′
       ) λ { (f , ds) → out-quiet [] refl , inj₂ (f , scan-del {Θ₀ = Θ₀} {ρ₀ = ρ₀} L bs a′ em a v ds) }
       where
@@ -115,6 +115,13 @@ module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
       aI : Val (plainᵏ Γ κ) (ScanAᵗ u)
       aI = proj₂ (scanVals F′ (a′ , em) es)
       SW = scan-write S R sp si aP aI
+      -- the cell's write ends no outer and spends nothing
+      LV = live-for (λ { refl → refl })
+             (λ l → inj₂ (live-if-drop (map-f (Θ₀ , sndᵗ (varᵗ (here refl)) , ρ₀)) h₂ q refl refl
+                           (live-if-set (map-f (Θ₀ , sndᵗ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ] q) k′ (cell-st {t = ScanAᵗ u} aI) (EvalSt.nodes stI)
+                              (λ _ → refl) (λ _ → cong spentAt lk′)
+                              (live-if-drop (scan-f F′ k′) h₁ _ refl refl l))))
+             lv
       lkP : lookupNode k (setNode k (cell-st {t = u} aP) (EvalSt.nodes stP)) ≡ just (cell-st {t = u} aP)
       lkP = lookup-set k (cell-st {t = u} aP) (EvalSt.nodes stP)
       lkI : lookupNode k′ (setNode k′ (cell-st {t = ScanAᵗ u} aI) (EvalSt.nodes stI)) ≡ just (cell-st {t = ScanAᵗ u} (proj₁ aI , proj₂ aI))

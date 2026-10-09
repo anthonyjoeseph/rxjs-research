@@ -844,6 +844,74 @@ live-if-thru : ∀ {n} {Γ : Ctx n} {lo ℓ u t} {o} {k : NodeId} (h : lo ≤ �
              → outerDoneᵇ (lookupNode k N) ≡ false → LiveIf q N → LiveIf (thru-outer {u = u} o k ↠[ h ] q) N
 live-if-thru h q od l = live-if λ sp → od ∷ LiveIf.run l sp
 
+-- and its tail is live wherever it is
+live-if-under : ∀ {n} {Γ : Ctx n} {lo ℓ u t} {o} {k : NodeId} (h : lo ≤ ℓ) (q : Path Γ ℓ u t) {N : List (NodeId × NodeState Γ)}
+              → LiveIf (thru-outer {u = u} o k ↠[ h ] q) N → LiveIf q N
+live-if-under h q l = live-if λ sp → tail (LiveIf.run l sp)
+  where tail : ∀ {x xs} {P : NodeId → Set} → All P (x ∷ xs) → All P xs
+        tail (_ ∷ a) = a
+
+-- A PATH LIVE UNLESS SPENT WHEREVER IT CARRIES SOMETHING: a spent take
+-- hands its tail nothing, and the end it sent may have ended an outer
+-- there
+LiveFor : ∀ {n} {Γ : Ctx n} {lo s t} {A : Set} → List A → Path Γ lo s t → List (NodeId × NodeState Γ) → Set
+LiveFor es q N = es ≡ [] ⊎ LiveIf q N
+
+-- handed on: nothing carried stays nothing, and a live path hands its
+-- tail what the step leaves
+live-for : ∀ {n} {Γ : Ctx n} {lo s t lo′ s′ t′} {A B : Set} {es : List A} {es′ : List B} {q : Path Γ lo s t} {q′ : Path Γ lo′ s′ t′}
+             {N N′ : List (NodeId × NodeState Γ)}
+         → (es ≡ [] → es′ ≡ []) → (LiveIf q N → LiveFor es′ q′ N′) → LiveFor es q N → LiveFor es′ q′ N′
+live-for z _ (inj₁ e) = inj₁ (z e)
+live-for _ f (inj₂ l) = f l
+
+-- a take not spent is its tail's to liveness
+live-if-take : ∀ {n} {Γ : Ctx n} {lo ℓ s t} {w} {k : NodeId} (h : lo ≤ ℓ) (q : Path Γ ℓ s t) {N : List (NodeId × NodeState Γ)}
+             → spentAt (lookupNode k N) ≡ false → LiveIf (take-f w k ↠[ h ] q) N → LiveIf q N
+live-if-take {k = k} h q {N} e l = live-if λ sp → LiveIf.run l (cong₂ _∨_ e sp)
+
+-- a frame walking no outer and spending nothing is its tail's to liveness
+live-if-drop : ∀ {n} {Γ : Ctx n} {lo ℓ s u t} (f : Frame Γ s u) (h : lo ≤ ℓ) (q : Path Γ ℓ u t) {N : List (NodeId × NodeState Γ)}
+             → thruNodes (f ↠[ h ] q) ≡ thruNodes q → spentOn (f ↠[ h ] q) N ≡ spentOn q N → LiveIf (f ↠[ h ] q) N → LiveIf q N
+live-if-drop f h q {N} e s l = live-if λ sp → live-thru (f ↠[ h ] q) q {N} e (LiveIf.run l (trans s sp))
+
+∨-falseˡ : ∀ {a b} → a ∨ b ≡ false → a ≡ false
+∨-falseˡ {false} _ = refl
+∨-falseˡ {true}  ()
+
+∨-falseʳ : ∀ {a b} → a ∨ b ≡ false → b ≡ false
+∨-falseʳ {false} e = e
+∨-falseʳ {true}  ()
+
+-- a write un-spending no take finds nothing spent it did not find before
+spent-back : ∀ {n} {Γ : Ctx n} (k j : NodeId) (y : NodeState Γ) (N : List (NodeId × NodeState Γ))
+           → (spentAt (just y) ≡ false → spentAt (lookupNode k N) ≡ false)
+           → spentAt (lookupNode j (setNode k y N)) ≡ false → spentAt (lookupNode j N) ≡ false
+spent-back k j y N w h with k ≡ᵇ j in e
+... | false rewrite set-above k j y N e = h
+... | true with ≡ᵇ→≡ k j e
+...   | refl rewrite lookup-set k y N = w h
+
+spent-set : ∀ {n} {Γ : Ctx n} {lo s t} (q : Path Γ lo s t) (k : NodeId) (y : NodeState Γ) (N : List (NodeId × NodeState Γ))
+          → (spentAt (just y) ≡ false → spentAt (lookupNode k N) ≡ false)
+          → spentOn q (setNode k y N) ≡ false → spentOn q N ≡ false
+spent-set root                       _ _ _ _ _ = refl
+spent-set (share-sink _ _)           _ _ _ _ _ = refl
+spent-set (take-f _ j ↠[ _ ] q)      k y N w e = cong₂ _∨_ (spent-back k j y N w (∨-falseˡ e)) (spent-set q k y N w (∨-falseʳ e))
+spent-set (map-f _ ↠[ _ ] q)         k y N w e = spent-set q k y N w e
+spent-set (scan-f _ _ ↠[ _ ] q)      k y N w e = spent-set q k y N w e
+spent-set (batchSync-f _ ↠[ _ ] q)   k y N w e = spent-set q k y N w e
+spent-set (from-inner _ _ _ ↠[ _ ] q) k y N w e = spent-set q k y N w e
+spent-set (thru-outer _ _ ↠[ _ ] q)  k y N w e = spent-set q k y N w e
+
+-- A WRITE ENDING NO OUTER AND UN-SPENDING NO TAKE keeps a path live
+-- unless spent
+live-if-set : ∀ {n} {Γ : Ctx n} {lo s t} (q : Path Γ lo s t) (k : NodeId) (y : NodeState Γ) (N : List (NodeId × NodeState Γ))
+            → (outerDoneᵇ (lookupNode k N) ≡ false → outerDoneᵇ (just y) ≡ false)
+            → (spentAt (just y) ≡ false → spentAt (lookupNode k N) ≡ false)
+            → LiveIf q N → LiveIf q (setNode k y N)
+live-if-set q k y N wo ws l = live-if λ sp → live-set {q = q} k y N wo (LiveIf.run l (spent-set q k y N ws sp))
+
 -- a flattener installed fresh has its outer live
 flat-live : ∀ {n} {Γ : Ctx n} u op → outerDoneᵇ (just (flatSt {Γ = Γ} u op)) ≡ false
 flat-live u (mergeᶠ _) = refl

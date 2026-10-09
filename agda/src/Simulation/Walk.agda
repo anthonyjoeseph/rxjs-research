@@ -79,7 +79,7 @@ open import Simulation.Size using (sz-subscribeE; sz-foldPath; sz-1)
 open import Simulation.Pass.Path using (module PassP)
 open import Simulation.Stores using (inv-init; guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
   spentWhile~; FlatNodes; merge~; switch~; exhaust~; outerElem~; outerExplode~; Store; Src; Arr;
-  SrcNum; []; elab; LiveIf; live-if; live-if-above; live-if-cons; live-if-thru; flat-live; outerDoneᵇ)
+  SrcNum; []; elab; LiveIf; live-if; live-if-above; live-if-agree; live-if-cons; live-if-thru; flat-live; outerDoneᵇ)
 
 
 -- TWIN: `ib-renᵉ` -- the same walk over `renExp`'s clauses, a binder's
@@ -697,7 +697,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     --   impl's at its stamped one's floor.
     hot-read : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
     hot-read {Θ} i ek wk w {ρ′} r eq {q = q} {stI = stI} S pr oP oI lv (subs-floor _ fP) dI@(subs-floor _ fI) lt =
-      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} {st = stI} (gone-subscribed S dI)) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} {st = stI} (gone-subscribed S dI)) (inj₁ refl) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
     hot-read i ek wk w r eq S pr oP oI lv (subs-floor h _) (subs-shared {below = b} _ _) _ =
       ⊥-elim (≤⇒≯ h (+-cancelˡ-< n _ _ (subst (_< n + _) (toℕ-↑ʳ n i) b)))
     hot-read i ek wk w r eq S pr oP oI lv _ (subs-hot-done _ x _ _) _          = ⊥-elim (impl-no-script S i ek x)
@@ -712,7 +712,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     hot-read i ek wk w r eq S pr oP oI lv (subs-hot-live b _ _ _) (subs-floor h _) _ =
       ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
     hot-read {Θ} i ek wk w {ρ′} r eq {q = q} {stI = stI} S pr oP oI lv (subs-hot-done _ _ _ fP) dI@(subs-shared _ (slot-spent _ fI)) lt =
-      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} {st = stI} (gone-subscribed S dI)) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} {st = stI} (gone-subscribed S dI)) (inj₁ refl) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
     hot-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ _ c _) (subs-shared _ (slot-join cI sI _)) _ =
       ⊥-elim (done-unjoined S i ek c cI sI)
     hot-read i ek wk w {ρ′} {ρ} r eq S pr oP oI lv (subs-hot-done _ _ c fP) (subs-shared x (slot-connect _ sI dc)) lt =
@@ -746,11 +746,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       cold-read-end i ek wk w {ρ′} {ρ} r eq S pr oP oI (inj₁ (h , refl)) fP dI (s<s⁻¹ lt)
     cold-read i ek wk w {ρ′} {ρ} r eq S pr oP oI lv (subs-cold-sync b x fP) dI lt =
       cold-read-end i ek wk w {ρ′} {ρ} r eq S pr oP oI (inj₂ (b , _ , x)) fP dI (s<s⁻¹ lt)
-    cold-read i ek wk w r eq S pr oP oI lv (subs-cold-async b x refl refl refl fP) dI lt =
+    cold-read i ek wk w r eq {q = q} {stI = stI} S pr oP oI lv (subs-cold-async b x refl refl refl fP) dI lt =
       let B = cold-block i ek w eq S b x dI
           C = cold-register κ S pr oP oI lv _ B
           X = path-pass wk (After.store (proj₁ C)) (proj₁ (proj₂ C)) (ColdBlock.carries B)
-                (proj₁ (proj₂ (proj₂ C))) (proj₂ (proj₂ (proj₂ C))) (λ ()) fP (ColdBlock.fold B) (s<s⁻¹ lt)
+                (proj₁ (proj₂ (proj₂ C))) (proj₂ (proj₂ (proj₂ C))) (λ ())
+                (inj₂ (live-if-agree q {EvalSt.nodes stI} {ColdBlock.NI B} (λ k h → ColdBlock.kept B k (Sound.fresh-path oI k h)) lv)) fP (ColdBlock.fold B) (s<s⁻¹ lt)
       in _⨾_ κ (proj₁ C) (proj₁ X) , proj₁ (proj₂ X)
     cold-read i ek wk w r eq S pr oP oI lv (subs-shared x _) _ _        = ⊥-elim (cold-no-shared S i ek x)
     cold-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ x _ _) _ _  = ⊥-elim (cold-no-hot S i ek x)
@@ -1186,21 +1187,21 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → Sound p sP stP → Sound q sI stI
                    → freshId sourceᵏ (Sched.mint sI) ≡ src
                    → Carries {u} es vs
-                   → Gone q stI
+                   → Gone q stI → LiveIf q (EvalSt.nodes stI)
                    → (dP : foldPath⇓ now p vs true sP stP rP)
                    → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
                    → sz-foldPath dP < N
                    → Σ (After κ S rP rI) λ A
                        → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-    of-fold wk S pr oP oI refl c g dP dI lt =
-      let X = path-pass wk (src-bump S) pr c oP (resrc oI) (λ _ → g) dP dI lt
+    of-fold wk S pr oP oI refl c g l dP dI lt =
+      let X = path-pass wk (src-bump S) pr c oP (resrc oI) (λ _ → g) (inj₂ l) dP dI lt
       in unsrc (proj₁ X) , proj₁ (proj₂ X)
 
     -- an `of`'s walk: the impl mints its source, and both fold the
     -- group and end
     walk-of : ∀ {M Θ u} (ts : List (STm Γ [] [] Θ u)) → Walker ep ei M → Elab-Walks< (suc M) (ofˢ ts)
     walk-of ts wk w r S pr oP oI lv (subs-of dP) dS@(subs-mint {src = src} fr (subs-of dI)) lt =
-      let A = of-fold wk S pr oP oI fr (of-carries ts w r refl src) (gone-subscribed S dS) dP dI (s<s⁻¹ lt)
+      let A = of-fold wk S pr oP oI fr (of-carries ts w r refl src) (gone-subscribed S dS) lv dP dI (s<s⁻¹ lt)
       in proj₁ A , proj₂ A , of-fold-stamps S pr oP oI fr (of-carries ts w r refl src) (of-emits ts w refl src) dP dI
 
     -- a cold slot's walk: the impl's read past the transport

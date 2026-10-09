@@ -39,7 +39,7 @@ open import Rx.Evaluator.Reducible.Support using (∨-Tˡ; ∨-Tʳ; sub-rule; cu
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Named; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
   deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; partner-mem; ArrRows; Spent; spent-subst; Store; Arr; InputBlock; ᵇ-no; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq;
-  inv-cut)
+  inv-cut; ∨-falseˡ; ∨-falseʳ)
 open import Simulation.Grow using (mem-any)
 open import Simulation.Sweep using (T-true; t≢f; count-hit; count-pass; same-eq; raw≢stamped; raw<ₙ; sweepL; sweep-eq; sweepL-pw; all-sweep;
   unique-sweep; sync-sweep; regrel-sweep; rows-guards; part-sweep; arr-sweep; spent-sweep)
@@ -90,14 +90,6 @@ no-sink refl ()
 ------------------------------------------------------------------
 -- The cut as a filter
 ------------------------------------------------------------------
-
-∨-falseˡ : ∀ {a b} → a ∨ b ≡ false → a ≡ false
-∨-falseˡ {false} _ = refl
-∨-falseˡ {true}  ()
-
-∨-falseʳ : ∀ {a b} → a ∨ b ≡ false → b ≡ false
-∨-falseʳ {false} e = e
-∨-falseʳ {true}  ()
 
 -- an id among neither list is among neither joined
 none-++ : ∀ {k} xs {ys} → any (_≡ᵇ k) xs ≡ false → any (_≡ᵇ k) ys ≡ false → any (_≡ᵇ k) (xs ++ ys) ≡ false

@@ -251,18 +251,11 @@ body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
 scripts; joiners off catch; installs+hops; revived inners;
 unaligned reads/connects/flushes; renames; 2-script
 stores/values; mid-emit joins; μ cold reads; dying rows;
-dead outers; live rows past an end.
+dead outers; live rows past ends; dead inners.
 
 also: `main` — the QuickCheck's entry point and the walk's, and every generator and decider they call: the sweeps are how this tier's monster is measured, and no proof reads them.
 
 ### Big picture tier roadmap
-
-- **THE PASS'S LIVE PATH.** `inner-live` asks the pass for the liveness the
-  walk now carries down to every registration; thread `LiveIf` through `Pass`,
-  leaving leaves only where it sequences values (consumes between values, the
-  drain loop). Those leaves and `end-live` state one fact, that an ended outer
-  has nothing active upstream. Decides whether the walk's liveness survives
-  `simulation`'s passes or needs that fact as a `Store` field.
 
 - **FIT THE EXPLODE.** Then write `explode-out` and the two subscribe leaves
   as bodies over smaller leaves, `Store` gaining each fact a body needs; the
@@ -281,6 +274,13 @@ also: `main` — the QuickCheck's entry point and the walk's, and every generato
   them also at each emit the impl run hands the step, tokens and payload
   counts as drawn. Decides whether `simulation`'s steps survive the emits
   only the elaboration writes, where the samples stop.
+
+- **AN UNENDED FOLD ENDS NO OUTER.** `echo-live`, `consume-live` and
+  `drain-live` are one fact at three call sites: a tail run between an outer's
+  values marks no outer above it done unless a take it spends sent the end.
+  State it once over `foldPath⇓` and its mutual walks, the three as bodies
+  over it. Decides whether the liveness `simulation` now carries through its
+  passes rests on the evaluator alone or needs a `Store` field.
 
 ### The ledger
 
@@ -350,8 +350,11 @@ also: `main` — the QuickCheck's entry point and the walk's, and every generato
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; swept at two hot slots, after the subscribe.
-- **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `PROBED×2`: an inner's path
-  is live unless spent where its walk starts; the pass does not carry it.
+- **`{echo,consume}-live`** (Simulation.Pass.Path) — FALSITY, `NO EVIDENCE`: an
+  echo's tail fold, or an inner's consume, between an outer's values ends no
+  outer its flattener's path walks unless it spends that path.
+- **`drain-live`** (Simulation.Pass.Inner) — FALSITY, `NO EVIDENCE`: a drain
+  about to subscribe a queued inner finds its tail live unless spent.
 - **`idle-lanes`** (Simulation.Arm) — DIFFICULTY, `PROBED`: an idle flattener
   has no alive row down an inner lane; walked where a lane held a row.
 - **`gone-walk`** (Simulation.Arm) — DIFFICULTY, `PROBED×2`: an outer's walk

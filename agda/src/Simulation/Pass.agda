@@ -47,7 +47,7 @@ open import Rx.Evaluator.Domain using (foldPath⇓; fold-step; stepFrame⇓; ste
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; hotᵏ)
 open import SExp.Elaborate using (inputStampᵖ)
 open import Simulation.Stores using (srcCount; SrcPair; Src; PathRel; InputBlock; block; hotEq; RowRel; cold~; defer~; []; _∷_;
-  partner-row; Store)
+  partner-row; partner-mem; Store; LiveRows; Inv)
 open import Simulation.After using (module Kept; readᴵ; skip-cut)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
@@ -396,12 +396,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ⊥-elim (t≢f (trans (sym y′) (trans (sym (trans (cong (λ s → skipᵇ s rid st₀) sa) (skip-alike S q))) y)))
     fan-go S εI c ta sa _ (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (casc-live {a = a₀} {rid = rid} {st₀ = st₀} y _ _) (go-live _ _ _) =
       ⊥-elim (t≢f (trans (sym (skip-cut {s = arrSource a₀} {rid} {st₀} x)) y))
-    fan-go {stI = stI} S {i = i} εI {fin = fin} c refl sa dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {rid = rI′} {emits = eI} _ dI g′) =
+    fan-go {stI = stI} S {i = i} εI {fin = fin} c refl sa dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {rid = rI′} {emits = eI} y′ dI g′) =
       rebase {fin = fin} (A ⨾ proj₁ R) , λ { refl d → out-++ eI _ (proj₂ X refl d) (proj₂ R refl d) }
       where
         sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
         sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-        X = slot-pass (walker κ) (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI (λ e → skip-marked {s = toℕ (n ↑ʳ i)} {rid = rI′} {st = stI} e (dy e)) (n<1+n _)
+        X = slot-pass (walker κ) (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI (λ e → skip-marked {s = toℕ (n ↑ʳ i)} {rid = rI′} {st = stI} e (dy e))
+              (LiveRows.rows-live (Inv.live-outer (Store.inv S)) (proj₂ (partner-mem κ _ _ _ _ _ (Store.rows S) pr)) y′) (n<1+n _)
         A = proj₁ X
         map-slot : ∀ {sP stP sI stI sP₁ stP₁ sI₁ stI₁} {S₀ : St sP stP sI stI} {S₁ : St sP₁ stP₁ sI₁ stI₁} {i : Fin n} {u}
                      {cs : List (RegId × AtFloor Γ u t)} {ds}
