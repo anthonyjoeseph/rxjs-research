@@ -587,14 +587,15 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     ... | refl | refl = refl , refl , refl , qs
 
     postulate
-      -- A FINISH THAT ENDS ITS FLATTENER LEFT NOTHING AT ITS RESTAMP: an
+      -- A FINISH THAT ENDS ITS FLATTENER LEFT NOTHING AT ITS TAIL: an
       -- end leaves a finish only once the outer has ended and no inner is
-      -- alive, and every row through the restamp's scan came through the
-      -- outer or one of the inners.
-      gone-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ₂ ℓ₃ u op m′ ks j′ Θ₁ ρ₁ Θ₂ ρ₂ x}
-                      {h₂ : n + _ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ u) (emitᵗ t)} {es o₁ es₁ f₁ sI₁ stI₁}
-                  → innerFinish⇓ (flatOp op) m′ j′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q) now es sI stI x (o₁ , es₁ , f₁ , sI₁ , stI₁)
-                  → f₁ ≡ true → Gone (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₂ h₃ q) stI₁
+      -- alive, and every row through the tail's head came through the
+      -- outer or one of the inners.  A restamp's tail and a nested
+      -- merge's are both instances.
+      gone-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ s op m′ j′ x}
+                      {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {es o₁ es₁ f₁ sI₁ stI₁}
+                  → innerFinish⇓ op m′ j′ q now es sI stI x (o₁ , es₁ , f₁ , sI₁ , stI₁)
+                  → f₁ ≡ true → Gone q stI₁
 
       -- A FOLD NEVER UN-ENDS AN OUTER: a node whose done flag is up stays
       -- up.  The risk is a nested merge's finish, which writes back the

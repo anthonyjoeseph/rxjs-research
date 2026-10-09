@@ -295,7 +295,7 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   that left no row at a frame leaves none past a cell, past the outer it ends,
   or after that outer's walk.
 - **`gone-finish`** (Simulation.Pass.Inner) — FALSITY, `NO EVIDENCE`: a finish
-  that ends its flattener leaves no row at its restamp.
+  that ends its flattener leaves no row at its tail.
 - **`gone-cut`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a test that cuts
   leaves no row below it.
 - **`gone-skipped`, `dying-kept`** (Simulation.Pass.Path) — FALSITY,
