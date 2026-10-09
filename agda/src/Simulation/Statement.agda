@@ -417,6 +417,10 @@ postulate
   --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, whose `exactsᵇ` reads
   --   this instant at every arrival past the opening: 145 agree, 0 fail;
   --   every hot script's last arrival ends its chains, 145 programs.
+  -- PROBED: make qc-same-clock QC='103 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,0,0,2,1,1,1,0,0,0,0,4],"fan":[0,3,3,0,1,0,0,0,0,0],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[0,1,0,0,0,0],"reach":["flatten"]}'
+  --   decided by `CLI.QuickCheck`'s `sameClockᵇ` on the per-value frame:
+  --   141 agree, 0 fail, 9 undecided; every program a flatten over a hot
+  --   script of two arrivals, 140 grouping several values at one arrival.
   end-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
@@ -442,6 +446,10 @@ postulate
   --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, whose `exactsᵇ` reads
   --   this instant at every arrival past the opening: 145 agree, 0 fail;
   --   two hot arrivals per program, under flatteners, 145 programs.
+  -- PROBED: make qc-same-clock QC='103 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,0,0,2,1,1,1,0,0,0,0,4],"fan":[0,3,3,0,1,0,0,0,0,0],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[0,1,0,0,0,0],"reach":["flatten"]}'
+  --   decided by `CLI.QuickCheck`'s `sameClockᵇ` on the per-value frame:
+  --   141 agree, 0 fail, 9 undecided; every program a flatten over a hot
+  --   script of two arrivals, 140 grouping several values at one arrival.
   value-draws : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                   {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI

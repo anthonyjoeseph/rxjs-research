@@ -257,14 +257,15 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **RE-DRAW THE PASS STAMPS.** Seed 49 replays green on one emit per value;
-  still owed, a draw with several values per hot arrival under a flattener.
-  Decides whether `simulation`'s instant bookkeeping survives a value pass
-  that now emits once per value.
-
 - **THE WALK'S LIVE PATH.** `hop-live`, `cold-live` and `join-live` each ask a
   walk to hand back the `LiveOn` of the path it registers; thread it through
   `Walks`. Decides whether liveness is a walk's fact or a store's.
+
+- **THE ENDED OUTER.** `end-live` wants an outer's end to be its subtree's
+  last, an accounting `Store` does not carry. Census what a dispatch walks
+  past an ended outer on reached states, then restate over the field a fit
+  test names. Decides whether `simulation`'s reached ends leave a row a
+  later pass would walk.
 
 - **FIT THE EXPLODE.** Then write `explode-out` and the two subscribe leaves
   as bodies over smaller leaves, `Store` gaining each fact a body needs; the
@@ -320,9 +321,9 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
   one per slot; swept at two hot slots, after the subscribe.
 - **`dyn-one`** (Simulation.Statement) — FALSITY, `PROBED×2`: a minted source
   has at most one row in the impl's registry.
-- **`value-draws`** (Simulation.Statement) — FALSITY, `PROBED`: an impl value
+- **`value-draws`** (Simulation.Statement) — FALSITY, `PROBED×2`: an impl value
   pass that sends leaves its counter past the one it started at.
-- **`end-stamps`** (Simulation.Statement) — FALSITY, `PROBED`: an impl end
+- **`end-stamps`** (Simulation.Statement) — FALSITY, `PROBED×2`: an impl end
   pass's emits carry the instant its value pass drew.
 - **`{cold,hot,shared}-read-stamps`** (Simulation.Walk) — FALSITY, `PROBED×4`:
   a slot read's subscribe sends only at its path's catch of the program's frame
