@@ -6,7 +6,7 @@ module Simulation.Pass.Path where
 
 open import Data.Bool    using (true; false; if_then_else_; _∨_; _∧_)
 open import Data.Bool.Properties using (∨-zeroʳ)
-open import Data.List    using (any)
+open import Data.Bool.ListAction using (any)
 open import Data.Fin     using (Fin; toℕ; _↑ʳ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Empty   using (⊥-elim)
