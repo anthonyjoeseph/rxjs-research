@@ -217,7 +217,7 @@ module _ {m} {Δ : Ctx m} where
   -- would walk is the only one through the first stateful frame it
   -- reaches, so an end it carries there has nothing beside it
   solo : ∀ {u} {e : Closed Δ u} → EvalSt e → Maybe String
-  solo st = if all (λ r → countᵇ (λ r′ → alive r′ ∧ eqListℕ (key r′) (key r)) (EvalSt.registry st) ≤ᵇ 1)
+  solo {u} st = if all (λ r → countᵇ (λ r′ → alive r′ ∧ eqListℕ (key r′) (key r)) (EvalSt.registry st) ≤ᵇ 1)
                    (filterᵇ alive (EvalSt.registry st))
             then nothing else just "solo: two alive rows share their first node"
     where
