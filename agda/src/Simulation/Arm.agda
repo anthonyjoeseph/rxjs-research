@@ -14,9 +14,9 @@ open import Data.Maybe   using (Maybe; nothing; just)
 open import Relation.Nullary using (yes; no; ¬_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Nat.Properties using (≤-refl)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
-open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Rx.Prim      using (Tick; EmitKind; subscribe; delivery; plumbing)
@@ -116,13 +116,54 @@ Passes : ∀ {m} {Δ : Ctx m} {lo s u} → List ℕ → Path Δ lo s u → Set
 Passes key (f ↠[ _ ] q) = frameKey f ≡ key ⊎ Passes key q
 Passes key _            = ⊥
 
--- AN END THE WALK CARRIES HAS LEFT NOTHING AT THE FRAME IT REACHES: no
--- row a dispatch would walk passes the path's first node frame.  What
--- a flattener's outer needs to end with every row still walking its
--- outer live
+-- no row a dispatch would walk passes the path's first node frame
+Clean : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} → Path Δ lo s t → EvalSt e → Set
+Clean q st = ∀ {r} → r ∈ EvalSt.registry st → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st ≡ false
+           → ¬ Passes (headKey q) (proj₂ (proj₂ (proj₂ r)))
+
+-- a path came down a node frame: a flattener's by its outer or by any
+-- of its inner lanes
+Through : ∀ {m} {Δ : Ctx m} {lo s u s′ u′} → Frame Δ s u → Path Δ lo s′ u′ → Set
+Through (from-inner _ k _) p = Passes (2 ∷ k ∷ []) p ⊎ Σ ℕ λ j → Passes (1 ∷ k ∷ j ∷ []) p
+Through (thru-outer _ k)   p = Passes (2 ∷ k ∷ []) p ⊎ Σ ℕ λ j → Passes (1 ∷ k ∷ j ∷ []) p
+Through f                  p = Passes (frameKey f) p
+
+-- EVERY ROW BELOW A NODE FRAME CAME DOWN IT: a row a dispatch would walk
+-- through the first node frame past one reached it through that one.
+-- A frame an end left can say nothing of a row that joined below it,
+-- so this is what an end's absence is handed on by.
+Fed : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} → Path Δ lo s t → EvalSt e → Set
+Fed (map-f _ ↠[ _ ] q) st = Fed q st
+Fed (f ↠[ _ ] q)       st = (∀ {r} → r ∈ EvalSt.registry st → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st ≡ false
+                             → Passes (headKey q) (proj₂ (proj₂ (proj₂ r))) → Through f (proj₂ (proj₂ (proj₂ r))))
+                           × Fed q st
+Fed _                  st = ⊤
+
+-- AN END THE WALK CARRIES HAS LEFT NOTHING AT THE FRAME IT REACHES, and
+-- every row below came down the path.  What a flattener's outer needs to
+-- end with every row still walking its outer live.
+--
+-- WITHOUT `Fed` NO STEP HANDS IT ON: a frame's absence says nothing of
+-- the tail's first node, false at a frame whose node no row passes
+-- above a tail an alive row walks.
 Gone : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} → Path Δ lo s t → EvalSt e → Set
-Gone q st = ∀ {r} → r ∈ EvalSt.registry st → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st ≡ false
-          → ¬ Passes (headKey q) (proj₂ (proj₂ (proj₂ r)))
+Gone q st = Clean q st × Fed q st
+
+-- neither reads a node, so a table rewritten under them keeps both
+fed-nodes : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} (q : Path Δ lo s t) {st : EvalSt e} {N}
+          → Fed q st → Fed q (record st { nodes = N })
+fed-nodes (map-f _ ↠[ _ ] q) fd        = fed-nodes q fd
+fed-nodes (scan-f _ _ ↠[ _ ] q)      (fd , fq) = fd , fed-nodes q fq
+fed-nodes (take-f _ _ ↠[ _ ] q)      (fd , fq) = fd , fed-nodes q fq
+fed-nodes (batchSync-f _ ↠[ _ ] q)   (fd , fq) = fd , fed-nodes q fq
+fed-nodes (from-inner _ _ _ ↠[ _ ] q) (fd , fq) = fd , fed-nodes q fq
+fed-nodes (thru-outer _ _ ↠[ _ ] q)  (fd , fq) = fd , fed-nodes q fq
+fed-nodes root               _         = tt
+fed-nodes (share-sink _ _)   _         = tt
+
+gone-nodes : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} {q : Path Δ lo s t} {st : EvalSt e} {N}
+           → Gone q st → Gone q (record st { nodes = N })
+gone-nodes {q = q} (c , fd) = c , fed-nodes q fd
 
 -- a frame whose step writes its own cell and nothing else a row reads
 data Cell {m} {Δ : Ctx m} : ∀ {s u} → Frame Δ s u → Set where
@@ -371,22 +412,25 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
       after (After.store B) (λ {a} {a′} x → After.keeps B {a} {a′} (After.keeps A {a} {a′} x))
         (λ ar → After.persists B (After.persists A ar)) (After.values A) (λ x → After.grows B (After.grows A x))
 
+    -- A CELL'S FRAME HANDS AN END'S GONE ON: every row past the cell came
+    -- down it, and none is left there.  A cell writes no registry, so the
+    -- tail's state reads as the frame's.
+    gone-cell : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ′ s u} {f : Frame (plainᵏ Γ κ) s u} {h : ℓ ≤ ℓ′}
+                  {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
+              → Cell f → Gone (f ↠[ h ] q) stI → Gone q stI
+    gone-cell _ scan-c (c , fd , fq) = (λ r∈ sk ps → c r∈ sk (fd r∈ sk ps)) , fq
+    gone-cell _ take-c (c , fd , fq) = (λ r∈ sk ps → c r∈ sk (fd r∈ sk ps)) , fq
+
     postulate
-      -- A CELL'S FRAME HANDS AN END'S GONE ON: every row a dispatch would
-      -- walk past the cell's tail reached it through the cell, so none is
-      -- left there either.  A cell writes no registry, so the tail's
-      -- state reads as the frame's.
-      gone-cell : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ′ s u} {f : Frame (plainᵏ Γ κ) s u} {h : ℓ ≤ ℓ′}
-                    {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
-                → Cell f → Gone (f ↠[ h ] q) stI → Gone q stI
-      -- AN OUTER'S END THAT LEAVES ITS FLATTENER IDLE HANDS ITS GONE ON:
-      -- a row a dispatch would walk past the flattener came through its
-      -- outer, which the end left, or through an inner, and an idle
-      -- flattener has none alive.  The write marks the outer done and
-      -- touches no registry, so it is read at the state it starts from.
-      gone-wrap : ∀ {sP stP sI stI} (S : St sP stP sI stI) {o k ℓ ℓ′ u} {h : ℓ ≤ ℓ′}
-                    {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
-                → Gone (thru-outer o k ↠[ h ] q) stI → proj₁ (thruWrap o k true (sI , stI)) ≡ true → Gone q stI
+      -- AN IDLE FLATTENER HAS NO ROW DOWN AN INNER LANE: its counters
+      -- cover its alive inners, so a merge with none active or queued, a
+      -- switch with no current inner and an exhaust not active have none.
+      -- The harness's `accounts` decides the counters' half at a boundary;
+      -- no `Store` field carries it.
+      idle-lanes : ∀ {sP stP sI stI} (S : St sP stP sI stI) {o k}
+                 → proj₁ (thruWrap o k true (sI , stI)) ≡ true
+                 → ∀ {r j} → r ∈ EvalSt.registry stI → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) stI ≡ false
+                 → ¬ Passes (1 ∷ k ∷ j ∷ []) (proj₂ (proj₂ (proj₂ r)))
       -- AN OUTER'S WALK LEAVES ITS GONE AS IT FOUND IT: every row the walk
       -- registers comes through an inner it subscribes, never through the
       -- outer, and a row it cuts or ends is skipped from then on
@@ -394,6 +438,16 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
                     {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
                 → thruWalk⇓ o k q now evs sI stI r
                 → Gone (thru-outer o k ↠[ h ] q) stI → Gone (thru-outer o k ↠[ h ] q) (proj₂ (proj₂ r))
+
+    -- AN OUTER'S END THAT LEAVES ITS FLATTENER IDLE HANDS ITS GONE ON: a
+    -- row past the flattener came down its outer, which the end left, or
+    -- down a lane, and an idle flattener has none.  The write marks the
+    -- outer done and touches no registry, so it is read where it starts.
+    gone-wrap : ∀ {sP stP sI stI} (S : St sP stP sI stI) {o k ℓ ℓ′ u} {h : ℓ ≤ ℓ′}
+                  {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
+              → Gone (thru-outer o k ↠[ h ] q) stI → proj₁ (thruWrap o k true (sI , stI)) ≡ true → Gone q stI
+    gone-wrap S {o} {k} (c , fd , fq) w =
+      (λ r∈ sk ps → [ c r∈ sk , (λ (_ , p) → idle-lanes S {o} {k} w r∈ sk p) ] (fd r∈ sk ps)) , fq
 
     -- one plain frame and the impl run its constructor pairs it with
     Steps : ∀ {lo lo′ ℓ s u} → Frame Γ s u → lo ≤ ℓ → Path Γ ℓ u t → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t) → Set

@@ -45,7 +45,7 @@ open import Simulation.Size using (sz-foldPath; sz-mergeAllDrain; sz-innerFinish
 open import Simulation.After using (module Kept; readᴾ; readᴵ-++)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
-open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru; NoBatch; rel-unbatched; Gone)
+open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru; NoBatch; rel-unbatched; Gone; gone-nodes)
 open import Simulation.Sweep using (t≢f)
 open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; drop-ot; head-on; self-node; off-path; ∨-Tˡ; ∨-Tʳ; distinct; fresh-path)
 open import Rx.Evaluator.Reducible.Dead-Kept using (fold-dead; off-T)
@@ -1148,8 +1148,9 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                            (live-spent mX _ (gone-thru {st = stI′} {q = thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)} refl (gm refl))
                               (Inv.live-outer (Store.inv (After.store A))))
       in explode-wrapped {T = thruWrap mergeAllᵒ mX true (sI′ , stI′)} (sym (merge-wrap lX)) (A ⨾∅ B) cP W x′ cI
-           (λ _ → gone-wrap (After.store A) {o = mergeAllᵒ} {k = mX} {h = h₃} {q = thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q}
-                    (gm refl) (cong proj₁ (merge-wrap {s = sI′} {st = stI′} lX))) dI g
+           (λ _ → gone-nodes {q = thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q} {st = stI′}
+                    (gone-wrap (After.store A) {o = mergeAllᵒ} {k = mX} {h = h₃} {q = thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q}
+                       (gm refl) (cong proj₁ (merge-wrap {s = sI′} {st = stI′} lX)))) dI g
 
     -- an outer's elements, each inner a sync outer hands the flattener
     -- subscribed before the step returns: the explode and its merge

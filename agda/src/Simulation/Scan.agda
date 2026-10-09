@@ -26,7 +26,7 @@ open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (ScanAᵗ)
 open import Simulation.Stores using (V; ScanLifts; PathRel; scan~; Store)
 open import Simulation.After using (module Kept)
-open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; out-quiet; scan-c)
+open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; out-quiet; scan-c; gone-nodes)
 open import Simulation.Take using (scan-at)
 
 module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
@@ -105,7 +105,7 @@ module Scans {n} {Γ : Ctx n} (κ : Kinds n) where
              bs sp si g d dI@(fold-step d₁ (fold-step step-map dq))
       with scan-at lk d | scan-at lk′ d₁
     ... | refl | refl =
-      arm (proj₁ SW) (proj₂ SW) (proj₁ G) soq (λ e → gone-cell S {f = scan-f F′ k′} {h = hS} {q = qT} scan-c (g e)) dq (λ {rP} dP B rel′ →
+      arm (proj₁ SW) (proj₂ SW) (proj₁ G) soq (λ e → gone-nodes {q = qT} {st = stI} (gone-cell S {f = scan-f F′ k′} {h = hS} {q = qT} scan-c (g e))) dq (λ {rP} dP B rel′ →
         scan~ (After.grows B (After.grows (proj₁ SW) e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c′) lkI) (proj₂ G) L rel′
       ) λ { (f , ds) → out-quiet [] refl , inj₂ (f , scan-del {Θ₀ = Θ₀} {ρ₀ = ρ₀} L bs a′ em a v ds) }
       where

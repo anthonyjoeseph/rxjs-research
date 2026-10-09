@@ -258,11 +258,12 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **THE ENDED OUTER.** `Gone` now rides every `Pass` and `Arm` beside `fin`,
-  and the outer's end reads its spent rows off it; the `gone-*` leaves are
-  what remains. Decide `Gone` itself where a walk carries an end, aimed at
-  the finish and the cut, then lower or restate them. Decides whether
-  `simulation`'s reached ends leave a row a later pass would walk.
+- **THE ENDED OUTER.** `Gone` carries `Fed`, so a cell and an idle wrap hand
+  it on by body. Left: where an end starts (`gone-finish`, `gone-cut`,
+  `gone-skipped`, `gone-subscribed`), each now owing `Fed` of its tail, and
+  `idle-lanes`. Restate each over the `Gone` its call site holds, then decide
+  `Fed` and `idle-lanes` in the harness at the step's own state. Decides
+  whether `simulation`'s reached ends leave a row a later pass would walk.
 
 - **THE PASS'S LIVE PATH.** `inner-live` asks the pass for the liveness the
   walk now carries down to every registration; thread `LiveIf` through `Pass`,
@@ -291,9 +292,10 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
-- **`gone-{cell,wrap,walk}`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: an end
-  that left no row at a frame leaves none past a cell, past the outer it ends,
-  or after that outer's walk.
+- **`idle-lanes`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: an idle flattener
+  has no alive row down an inner lane.
+- **`gone-walk`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: an outer's walk
+  leaves the outer it found empty empty, and every row below it came down it.
 - **`gone-finish`** (Simulation.Pass.Inner) — FALSITY, `NO EVIDENCE`: a finish
   that ends its flattener leaves no row at its tail.
 - **`gone-cut`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a test that cuts

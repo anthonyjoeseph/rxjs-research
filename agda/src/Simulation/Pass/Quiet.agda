@@ -61,7 +61,7 @@ open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes; scan-at; take-open-at; cell-take)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear;
-  fold-clear; adv; fold-unmoved; consume-clear; Out; Gone; Passes; headKey; scan-c)
+  fold-clear; adv; fold-unmoved; consume-clear; Out; Gone; gone-nodes; Passes; headKey; scan-c)
 open import Simulation.Sweep using (t≢f; stamp-rows; stamped<; sameSource-no)
 open import Rx.Mint using (counter; sourceᵏ; regᵏ)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
@@ -688,8 +688,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
               → stepFrame⇓ now (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks) (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₄ ] q)
                   es fin sI stI (o₁ , ys , fin₁ , sI₁ , stI₁)
               → Gone q stI → Gone q stI₁
-    gone-echo (_ , _ , _ , _ , _ , _ , _ , lk) d g with scan-at lk d
-    ... | refl = g
+    gone-echo {q = q} {stI = stI} (_ , _ , _ , _ , _ , _ , _ , lk) d g with scan-at lk d
+    ... | refl = gone-nodes {q = q} {st = stI} g
 
 
     cur-none : ∀ {π cur cur′} → CurRel {Γ = Γ} κ π cur cur′ → is-nothing cur ≡ is-nothing cur′
@@ -746,7 +746,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
              × ClearI m′ ks q sI₁ stI₁ × (b ≡ true → Gone q stI₁) × foldPath⇓ now q [] b sI₁ stI₁ (o ++ ([] ++ out₂) , s₂ , st₂)
       go refl dq cl₁ =
         let (A₁ , f₁ , r₁) = restamp-write (After.store A₀) {c′ = c} f pr
-        in _ , _ , A₀ ⨾ A₁ , (f₁ , r₁) , tail-of cl₁ , gq , dq
+        in _ , _ , A₀ ⨾ A₁ , (f₁ , r₁) , tail-of cl₁ , (λ e → gone-nodes {q = q} {st = stI′} (gq e)) , dq
 
     -- NO ROW A DISPATCH WOULD WALK RUNS THROUGH `k`'S OUTER
     OuterSpent : NodeId → EvalSt ei → Set
@@ -767,7 +767,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- AN END THAT LEFT A FLATTENER'S OUTER LEFT EVERY ROW OFF IT
     gone-thru : ∀ {st : EvalSt ei} {ℓ s k} {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)}
               → headKey q ≡ 2 ∷ k ∷ [] → Gone q st → OuterSpent k st
-    gone-thru {k = k} e g r∈ sk = go (λ ps → g r∈ sk (subst (λ x → Passes x _) (sym e) ps))
+    gone-thru {k = k} e (g , _) r∈ sk = go (λ ps → g r∈ sk (subst (λ x → Passes x _) (sym e) ps))
       where
       go : ∀ {lo s′} {p : Path (plainᵏ Γ κ) lo s′ (emitᵗ t)} → ¬ Passes (2 ∷ k ∷ []) p → All (λ j → (k ≡ᵇ j) ≡ false) (thruNodes p)
       go {p = root}                     _  = []
@@ -803,7 +803,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
           (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru {st = stI} {q = thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} refl (gw refl)) (Inv.live-outer (Store.inv S)))
           (_ , _ , A , W′ , c , g , d) = wrap-tail S A₀ (f₀ , r₀)
             (subst (λ T → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ T)) (proj₂ (proj₂ T))) eI cl)
-            (λ e → gone-restamp S {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₃} {h₄} {q} (gone-wrap S {o = flatOp op} {k = m′} {h = h₂} {q = Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} (gw refl) (trans (cong proj₁ eI) e)))
+            (λ e → gone-nodes {q = q} {st = stI} (gone-restamp S {Θ₁ = Θ₁} {ρ₁} {ks} {Θ₂} {ρ₂} {h₃} {h₄} {q} (gone-wrap S {o = flatOp op} {k = m′} {h = h₂} {q = Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q} (gw refl) (trans (cong proj₁ eI) e))))
             (subst (λ T → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) [] (proj₁ T) (proj₁ (proj₂ T)) (proj₂ (proj₂ T)) r) eI dR)
       in wrapped′ eP A W′ c g d
 

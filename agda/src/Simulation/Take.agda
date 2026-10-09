@@ -38,7 +38,7 @@ open import Simulation.Sweep using (t≢f; sweepL; sweep-eq)
 open import Simulation.Cut using (cut-go; cut-keeps; cut-persists)
 open import Simulation.Write using (apart)
 open import Simulation.After using (module Kept)
-open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear; Out; out-quiet; Gone; scan-c; take-c)
+open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear; Out; out-quiet; Gone; gone-nodes; scan-c; take-c)
 
 -- A CELL'S SCAN AND A TEST'S TAKE, AT THE STATE THE NODE HOLDS: the
 -- one step each derivation can be
@@ -365,7 +365,8 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                                         (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                        (trans fe eqW) d₂
     ... | refl =
-      arm A (proj₂ ZW) cs soq (λ _ → gone-cut S R) dq (λ {rP} dP B rel′ →
+      arm A (proj₂ ZW) cs soq (λ _ → gone-nodes {q = q} {st = record stI { registry = proj₁ (cutThrough k₂ (EvalSt.registry stI))
+                                                         ; cancelled = proj₂ (cutThrough k₂ (EvalSt.registry stI)) ++ EvalSt.cancelled stI }} (gone-cut S R)) dq (λ {rP} dP B rel′ →
         spentWhile~ (After.grows B (After.grows A e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₂) lk₂′) rel′)
         λ { (_ , ds) → out-quiet [] refl
                      , inj₁ (cut-out (After.store A) (proj₂ ZW) soq dq (dl ds)
@@ -412,8 +413,8 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                                           (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                         (trans fe eqW) d₂
     ... | r1 , fl , bud | refl =
-      arm (proj₁ TW) (proj₂ TW) cs soq (λ e → gone-cell S {f = fT} {h = hT} {q = qT} take-c
-                                         (gone-cell S {f = scan-f F₁ k₁} {h = hS} {q = fT ↠[ hT ] qT} scan-c (g (trans (sym (∧-identityʳ fin)) e)))) dq (λ {rP} dP B rel′ →
+      arm (proj₁ TW) (proj₂ TW) cs soq (λ e → gone-nodes {q = qT} {st = stI} (gone-cell S {f = fT} {h = hT} {q = qT} take-c
+                                         (gone-cell S {f = scan-f F₁ k₁} {h = hS} {q = fT ↠[ hT ] qT} scan-c (g (trans (sym (∧-identityʳ fin)) e))))) dq (λ {rP} dP B rel′ →
         takeWhile~ (After.grows B (After.grows (proj₁ TW) e))
           (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′) CL rel′)
         λ { (f , ds) → out-quiet [] refl , inj₂ (cong (λ x → x ∧ true) f , dl ds) }
