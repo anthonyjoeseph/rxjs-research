@@ -24,7 +24,8 @@ open import Data.Unit    using (tt)
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Vec     using (lookup)
 open import Data.List.Properties using (++-assoc; ++-identityʳ; map-id)
-open import Relation.Nullary using (yes; no)
+open import Relation.Nullary using (yes; no; ¬_)
+open import Decide       using (≡ᵇ→≡)
 open import Function using (case_of_)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst; subst₂)
@@ -33,7 +34,7 @@ open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; Tm; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; unitᵗ; _×ᵗ_; _+ᵗ_; obs;
   FnClo; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ; uniqᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; markDlv; NodeState; Arrival; arrVal; arrTy; arrTick; Path;
-  share-sink; _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode;
+  root; share-sink; _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode;
   mergeAll-st; echoᵗ; thruEvents; thruWrap; setNode; cell-st; batchSync-st; scanVals; take-st;
   takeVals; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ;
   RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying; memberSource; skipᵇ;
@@ -60,7 +61,7 @@ open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes; scan-at; take-open-at; cell-take)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear;
-  fold-clear; adv; fold-unmoved; consume-clear; Out)
+  fold-clear; adv; fold-unmoved; consume-clear; Out; Gone; Passes; headKey; scan-c)
 open import Simulation.Sweep using (t≢f; stamp-rows; stamped<; sameSource-no)
 open import Rx.Mint using (counter; sourceᵏ; regᵏ)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
@@ -494,6 +495,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
               → Walkedˣ xs op m m′ ks p q (Store.π (After.store A))
                   (EvalSt.nodes (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP , stP))))) (EvalSt.nodes stI₁)
               → ClearI m′ ks q sI₁ stI₁
+              → (proj₁ (thruWrap (flatOp op) m fin (sP , stP)) ≡ true → Gone q stI₁)
               → foldPath⇓ now q [] (proj₁ (thruWrap (flatOp op) m fin (sP , stP))) sI₁ stI₁ r
               → Wrapped S xs op m m′ ks p q fin now r
 
@@ -696,7 +698,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
              → thruWrap (flatOp op) m fin (sP , stP) ≡ T
              → (A : After S ([] , proj₂ T) ([] , sI₁ , stI₁))
              → Walkedˣ xs op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ T))) (EvalSt.nodes stI₁)
-             → ClearI m′ ks q sI₁ stI₁ → foldPath⇓ now q [] (proj₁ T) sI₁ stI₁ r
+             → ClearI m′ ks q sI₁ stI₁ → (proj₁ T ≡ true → Gone q stI₁) → foldPath⇓ now q [] (proj₁ T) sI₁ stI₁ r
              → Wrapped S xs op m m′ ks p q fin now r
     wrapped′ refl = wrapped
 
@@ -707,12 +709,13 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                   {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {b r xs}
               → Walkedˣ xs op m m′ ks p q (Store.π (After.store A₀)) (EvalSt.nodes stP′) (EvalSt.nodes stI′)
               → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI′ stI′
+              → (b ≡ true → Gone q stI′)
               → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) [] b sI′ stI′ r
               → Σ (Sched (plainᵏ Γ κ)) λ sI₁ → Σ (EvalSt ei) λ stI₁ → Σ (After S ([] , sP′ , stP′) ([] , sI₁ , stI₁)) λ A
                   → Walkedˣ xs op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI₁)
-                  × ClearI m′ ks q sI₁ stI₁ × foldPath⇓ now q [] b sI₁ stI₁ r
+                  × ClearI m′ ks q sI₁ stI₁ × (b ≡ true → Gone q stI₁) × foldPath⇓ now q [] b sI₁ stI₁ r
     wrap-tail S {sP′} {stP′} {sI′} {stI′} A₀ {now} {u = u} {op} {m} {m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃} {h₄} {p} {q} {b} {xs = xs}
-              (f@(_ , _ , _ , _ , _ , _ , c , lk) , pr) cl (fold-step d₁ (fold-step step-map dq)) =
+              (f@(_ , _ , _ , _ , _ , _ , c , lk) , pr) cl gq (fold-step d₁ (fold-step step-map dq)) =
       go (scan-at lk d₁) dq (step-clear d₁ cl)
       where
       go : ∀ {o vs f′ s₁ st₁ out₂ s₂ st₂}
@@ -721,10 +724,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
          → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) s₁ st₁
          → Σ (Sched (plainᵏ Γ κ)) λ sI₁ → Σ (EvalSt ei) λ stI₁ → Σ (After S ([] , sP′ , stP′) ([] , sI₁ , stI₁)) λ A
              → Walkedˣ xs op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP′) (EvalSt.nodes stI₁)
-             × ClearI m′ ks q sI₁ stI₁ × foldPath⇓ now q [] b sI₁ stI₁ (o ++ ([] ++ out₂) , s₂ , st₂)
+             × ClearI m′ ks q sI₁ stI₁ × (b ≡ true → Gone q stI₁) × foldPath⇓ now q [] b sI₁ stI₁ (o ++ ([] ++ out₂) , s₂ , st₂)
       go refl dq cl₁ =
         let (A₁ , f₁ , r₁) = restamp-write (After.store A₀) {c′ = c} f pr
-        in _ , _ , A₀ ⨾ A₁ , (f₁ , r₁) , tail-of cl₁ , dq
+        in _ , _ , A₀ ⨾ A₁ , (f₁ , r₁) , tail-of cl₁ , gq , dq
 
     -- NO ROW A DISPATCH WOULD WALK RUNS THROUGH `k`'S OUTER
     OuterSpent : NodeId → EvalSt ei → Set
@@ -742,42 +745,26 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       go []               []       = []
       go {j ∷ _} (a ∷ as) (h ∷ hs) = trans (cong outerDoneᵇ (set-above k j y (EvalSt.nodes st) a)) h ∷ go as hs
 
-    postulate
-      -- AN OUTER'S END REACHES ITS FLATTENER ON ITS LAST ALIVE ROW: every
-      -- row the outer's subtree registered has spent its source, the one
-      -- carrying the end included, which the walk delivered first.
-      --
-      -- FALSE AS WRITTEN, wherever the outer still has an alive row: the
-      -- walked flattener is any one, and nothing here says an end reached
-      -- it.  What makes it true at `outer-wrap` is the walk's `fin`, which
-      -- arrives true only once every alive row through the frame it
-      -- reaches is spent; no hypothesis carries that.  The pass must:
-      -- `fin ≡ true` against the frame the walk is at.
-      -- PROBED: make qc-store QC='3 1000 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,6,3,1,1,0,0,0,0,3],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?` with its `accounts` and
-      --   `solo`, the two facts that carry `fin` to "no alive row walks
-      --   this frame": 1000 agree, 0 fail.  18 cases hold two alive inners
-      --   of one flattener at once, counted by keying `solo` on the
-      --   flattener alone; that region is where `solo` could fail.
-      outer-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ₄ u op m m′ ks xs}
-                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
-                  → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                  → OuterSpent m′ stI
-      -- AN EXPLODE'S MERGE ENDS ON ITS OUTER'S LAST ALIVE ROW: the same
-      -- fact at the impl's merge, false as written for the same reason
-      merge-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ′ u op m m′ ks mX od}
-                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)}
-                  → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                  → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] od)
-                  → OuterSpent mX stI
+    -- AN END THAT LEFT A FLATTENER'S OUTER LEFT EVERY ROW OFF IT
+    gone-thru : ∀ {st : EvalSt ei} {ℓ s k} {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)}
+              → headKey q ≡ 2 ∷ k ∷ [] → Gone q st → OuterSpent k st
+    gone-thru {k = k} e g r∈ sk = go (λ ps → g r∈ sk (subst (λ x → Passes x _) (sym e) ps))
+      where
+      go : ∀ {lo s′} {p : Path (plainᵏ Γ κ) lo s′ (emitᵗ t)} → ¬ Passes (2 ∷ k ∷ []) p → All (λ j → (k ≡ᵇ j) ≡ false) (thruNodes p)
+      go {p = root}                     _  = []
+      go {p = share-sink _ _}           _  = []
+      go {p = thru-outer _ j ↠[ _ ] p} np with k ≡ᵇ j in kj
+      ... | true  = ⊥-elim (np (inj₁ (cong (λ x → 2 ∷ x ∷ []) (sym (≡ᵇ→≡ k j kj)))))
+      ... | false = refl ∷ go (λ ps → np (inj₂ ps))
+      go {p = f ↠[ _ ] p}              np = go (λ ps → np (inj₂ ps))
 
     -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
     -- outer has and no lane is open or queued, read off related nodes,
     -- so the two ends agree; the restamp passes the empty group on
-    outer-wrap : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                   {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {fin r xs}
+    outer-wrap : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                   {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {fin r xs}
                → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+               → (fin ≡ true → Gone (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) stI)
                → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
                    (proj₂ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
                → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) []
@@ -785,16 +772,17 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                    (proj₁ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI))))
                    (proj₂ (proj₂ (thruWrap (flatOp op) m′ fin (sI , stI)))) r
                → Wrapped S xs op m m′ ks p q fin now r
-    outer-wrap S {fin = false} W cl dR =
-      let (_ , _ , A , W′ , c , d) = wrap-tail S (after S (λ x → x) (λ x → x) [] (λ x → x)) W cl dR in wrapped A W′ c d
-    outer-wrap {sP} {stP} {sI} {stI} S {now} {op = op} {m′ = m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃} {h₄} {q = q} {fin = true} {r}
-               W@((_ , _ , _ , lP , lI , fn , _) , _) cl dR =
+    outer-wrap S {fin = false} W _ cl dR =
+      let (_ , _ , A , W′ , c , g , d) = wrap-tail S (after S (λ x → x) (λ x → x) [] (λ x → x)) W cl (λ ()) dR in wrapped A W′ c g d
+    outer-wrap {sP} {stP} {sI} {stI} S {now} {op = op} {m′ = m′} {ks} {Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₂} {h₃} {h₄} {q = q} {fin = true} {r}
+               W@((_ , _ , _ , lP , lI , fn , _) , _) gw cl dR =
       let (b , y , y′ , fn′ , eP , eI) = wrap-at {sP = sP} {sI} {stP} {stI} fn lP lI
-          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (outer-spent S W) (Store.live-outer S))
-          (_ , _ , A , W′ , c , d) = wrap-tail S A₀ (f₀ , r₀)
+          (A₀ , f₀ , r₀) = flat-write S W fn′ (live-spent m′ y′ (gone-thru refl (gw refl)) (Store.live-outer S))
+          (_ , _ , A , W′ , c , g , d) = wrap-tail S A₀ (f₀ , r₀)
             (subst (λ T → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (proj₁ (proj₂ T)) (proj₂ (proj₂ T))) eI cl)
+            (λ e → gone-cell S scan-c (gone-wrap S (gw refl) (trans (cong proj₁ eI) e)))
             (subst (λ T → foldPath⇓ now (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) [] (proj₁ T) (proj₁ (proj₂ T)) (proj₂ (proj₂ T)) r) eI dR)
-      in wrapped′ eP A W′ c d
+      in wrapped′ eP A W′ c g d
 
     -- AN EXPLODE'S MERGE TOLD ITS OUTER HAS ENDED: idle, so it reads the
     -- end as it came and marks itself done
@@ -1644,8 +1632,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                  (λ π NP NI → PathRel κ π NP NI (thru-outer (flatOp op) m ↠[ h ] p)
                     (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)))
                  H (oI ++ proj₁ r , proj₂ r)
-    wrap-arm {op = op} {m = m} {sP′ = sP′} {stP′ = stP′} {fin = fin} {r = r} A cP (wrapped {stI₁ = stI₁} A′ (fl , rel) cI dq) g =
-      arm (A ⨾∅ A′) rel [] (proj₂ (proj₁ cI)) dq (λ {rP} dP B rel′ →
+    wrap-arm {op = op} {m = m} {sP′ = sP′} {stP′ = stP′} {fin = fin} {r = r} A cP (wrapped {stI₁ = stI₁} A′ (fl , rel) cI gq dq) g =
+      arm (A ⨾∅ A′) rel [] (proj₂ (proj₁ cI)) gq dq (λ {rP} dP B rel′ →
         let F  = flat-move (EvalSt.nodes (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))) (EvalSt.nodes stI₁)
                    (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ r)))
                    (After.grows B) (missed dP cP) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) fl
@@ -1672,8 +1660,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                          (thru-outer mergeAllᵒ mX ↠[ h₃ ]
                           (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q))))) H
                     (oI ++ proj₁ r , proj₂ r)
-    explode-arm {op = op} {m = m} {sP′ = sP′} {stP′ = stP′} {fin = fin} {r = r} A cP (wrapped {stI₁ = stI₁} A′ (fl , rel) cI dq) x g =
-      arm (A ⨾∅ A′) rel [] (proj₂ (proj₁ cI)) dq (λ {rP} dP B rel′ →
+    explode-arm {op = op} {m = m} {sP′ = sP′} {stP′ = stP′} {fin = fin} {r = r} A cP (wrapped {stI₁ = stI₁} A′ (fl , rel) cI gq dq) x g =
+      arm (A ⨾∅ A′) rel [] (proj₂ (proj₁ cI)) gq dq (λ {rP} dP B rel′ →
         let F  = flat-move (EvalSt.nodes (proj₂ (proj₂ (thruWrap (flatOp op) m fin (sP′ , stP′))))) (EvalSt.nodes stI₁)
                    (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ r)))
                    (After.grows B) (missed dP cP) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) fl

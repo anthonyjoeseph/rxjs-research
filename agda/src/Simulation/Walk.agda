@@ -58,7 +58,7 @@ open import Data.Vec     using (lookup)
 open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
 open import SExp.Plain   using (plainExp; plainTm; plainTms)
-open import Simulation.Arm using (module Arms)
+open import Simulation.Arm using (module Arms; Gone)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
   FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ; inputᵖ)
 open import SExp.InstEmit using (machineEmitᵗ)
@@ -293,6 +293,19 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                   {lo lo′ u} → Path Γ lo u t → Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t) → Set
     ReadAfter S rP rI p q =
       Σ (After κ S rP rI) λ A → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+
+    postulate
+      -- A PATH BEING SUBSCRIBED HAS NO ROW AT ITS FIRST NODE YET: a row is
+      -- registered only once its subscribe has run, and no two rows start
+      -- at one node.
+      gone-subscribed : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                          {X lo u} {q : Path (plainᵏ Γ κ) lo u (emitᵗ t)} {now rI}
+                      → subscribeE⇓ {e = ei} X q now sI stI rI → Gone q stI
+
+    -- the same, read through a cast of the path's element type
+    gone-subst : ∀ {u u′} (e : u′ ≡ u) {lo} {q : Path (plainᵏ Γ κ) lo u (emitᵗ t)} {st : EvalSt ei}
+               → Gone (subst (λ v → Path (plainᵏ Γ κ) lo v (emitᵗ t)) (sym e) q) st → Gone q st
+    gone-subst refl g = g
 
     -- A READ OF A SLOT THE IMPL STAMPED: both subscribes at the slot, the
     -- impl's down the restamp.  `Sound` of both paths for the reason
@@ -670,8 +683,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- REFUTED: `Refuted.Read-Floor` -- the plain read above the slot, the
     --   impl's at its stamped one's floor.
     hot-read : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
-    hot-read i ek wk w r eq S pr oP oI lv (subs-floor _ fP) (subs-floor _ fI) lt =
-      let X = path-pass wk S pr []ᶜ oP oI fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+    hot-read i ek wk w r eq S pr oP oI lv (subs-floor _ fP) dI@(subs-floor _ fI) lt =
+      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-subst eq (gone-subscribed S dI)) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
     hot-read i ek wk w r eq S pr oP oI lv (subs-floor h _) (subs-shared {below = b} _ _) _ =
       ⊥-elim (≤⇒≯ h (+-cancelˡ-< n _ _ (subst (_< n + _) (toℕ-↑ʳ n i) b)))
     hot-read i ek wk w r eq S pr oP oI lv _ (subs-hot-done _ x _ _) _          = ⊥-elim (impl-no-script S i ek x)
@@ -685,8 +698,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
     hot-read i ek wk w r eq S pr oP oI lv (subs-hot-live b _ _ _) (subs-floor h _) _ =
       ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
-    hot-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ _ _ fP) (subs-shared _ (slot-spent _ fI)) lt =
-      let X = path-pass wk S pr []ᶜ oP oI fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+    hot-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ _ _ fP) dI@(subs-shared _ (slot-spent _ fI)) lt =
+      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-subst eq (gone-subscribed S dI)) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
     hot-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ _ c _) (subs-shared _ (slot-join cI sI _)) _ =
       ⊥-elim (done-unjoined S i ek c cI sI)
     hot-read i ek wk w {ρ′} {ρ} r eq S pr oP oI lv (subs-hot-done _ _ c fP) (subs-shared x (slot-connect _ sI dc)) lt =
@@ -724,7 +737,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       let B = cold-block i ek w eq S b x dI
           C = cold-register κ S pr oP oI lv _ B
           X = path-pass wk (After.store (proj₁ C)) (proj₁ (proj₂ C)) (ColdBlock.carries B)
-                (proj₁ (proj₂ (proj₂ C))) (proj₂ (proj₂ (proj₂ C))) fP (ColdBlock.fold B) (s<s⁻¹ lt)
+                (proj₁ (proj₂ (proj₂ C))) (proj₂ (proj₂ (proj₂ C))) (λ ()) fP (ColdBlock.fold B) (s<s⁻¹ lt)
       in _⨾_ κ (proj₁ C) (proj₁ X) , proj₁ (proj₂ X)
     cold-read i ek wk w r eq S pr oP oI lv (subs-shared x _) _ _        = ⊥-elim (cold-no-shared S i ek x)
     cold-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ x _ _) _ _  = ⊥-elim (cold-no-hot S i ek x)
@@ -1160,20 +1173,21 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → Sound p sP stP → Sound q sI stI
                    → freshId sourceᵏ (Sched.mint sI) ≡ src
                    → Carries {u} es vs
+                   → Gone q stI
                    → (dP : foldPath⇓ now p vs true sP stP rP)
                    → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
                    → sz-foldPath dP < N
                    → Σ (After κ S rP rI) λ A
                        → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-    of-fold wk S pr oP oI refl c dP dI lt =
-      let X = path-pass wk (src-bump S) pr c oP (resrc oI) dP dI lt
+    of-fold wk S pr oP oI refl c g dP dI lt =
+      let X = path-pass wk (src-bump S) pr c oP (resrc oI) (λ _ → g) dP dI lt
       in unsrc (proj₁ X) , proj₁ (proj₂ X)
 
     -- an `of`'s walk: the impl mints its source, and both fold the
     -- group and end
     walk-of : ∀ {M Θ u} (ts : List (STm Γ [] [] Θ u)) → Walker ep ei M → Elab-Walks< (suc M) (ofˢ ts)
-    walk-of ts wk w r S pr oP oI lv (subs-of dP) (subs-mint {src = src} fr (subs-of dI)) lt =
-      let A = of-fold wk S pr oP oI fr (of-carries ts w r refl src) dP dI (s<s⁻¹ lt)
+    walk-of ts wk w r S pr oP oI lv (subs-of dP) dS@(subs-mint {src = src} fr (subs-of dI)) lt =
+      let A = of-fold wk S pr oP oI fr (of-carries ts w r refl src) (gone-subscribed S dS) dP dI (s<s⁻¹ lt)
       in proj₁ A , proj₂ A , of-fold-stamps S pr oP oI fr (of-carries ts w r refl src) (of-emits ts w refl src) dP dI
 
     -- a cold slot's walk: the impl's read past the transport

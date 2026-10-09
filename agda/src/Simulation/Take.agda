@@ -8,6 +8,7 @@
 module Simulation.Take where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
+open import Data.Bool.Properties using (∧-identityʳ)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.Maybe   using (Maybe; just)
@@ -37,7 +38,7 @@ open import Simulation.Sweep using (t≢f; sweepL; sweep-eq)
 open import Simulation.Cut using (cut-go; cut-keeps; cut-persists)
 open import Simulation.Write using (apart)
 open import Simulation.After using (module Kept)
-open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear; Out; out-quiet)
+open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear; Out; out-quiet; Gone; scan-c; take-c)
 
 -- A CELL'S SCAN AND A TEST'S TAKE, AT THE STATE THE NODE HOLDS: the
 -- one step each derivation can be
@@ -322,6 +323,19 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
               → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q → Sound q sI stI
               → foldPath⇓ now q es true sI stI rI → All (DelAt I) es → es ≢ [] → Out I (proj₁ rI)
 
+    postulate
+      -- A TEST THAT CUTS LEAVES NOTHING BELOW IT: every row a dispatch
+      -- would walk past the test's tail reached it through the test, and
+      -- the cut severed each of those
+      gone-cut : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
+                   {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                   {P : FnClo Γ s boolᵗ} {F₁ : FnClo (plainᵏ Γ κ) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
+                   {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
+               → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)
+               → Gone q (record stI { registry = proj₁ (cutThrough k₂ (EvalSt.registry stI))
+                                    ; cancelled = proj₂ (cutThrough k₂ (EvalSt.registry stI)) ++ EvalSt.cancelled stI })
+
     -- A TEST THAT CUTS ON BOTH SIDES: the plain test and the cell's
     -- test each sever the registrations through their node and write
     -- zero, and pass the same prefix and the end
@@ -351,7 +365,7 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                                         (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                        (trans fe eqW) d₂
     ... | refl =
-      arm A (proj₂ ZW) cs soq dq (λ {rP} dP B rel′ →
+      arm A (proj₂ ZW) cs soq (λ _ → gone-cut S R) dq (λ {rP} dP B rel′ →
         spentWhile~ (After.grows B (After.grows A e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₂) lk₂′) rel′)
         λ { (_ , ds) → out-quiet [] refl
                      , inj₁ (cut-out (After.store A) (proj₂ ZW) soq dq (dl ds)
@@ -382,11 +396,11 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
     -- one, and the three impl frames write nothing the tails' folds read
     takeWhile-arm : ∀ {lo lo′ ℓ s} {P k} {h : lo ≤ ℓ} {p : Path Γ ℓ s t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
                   → Steps (take-f (just P) k) h p Q
-    takeWhile-arm S R@(spentWhile~ _ lk _ _) bs sp si d dI = while-spent S R lk bs sp si d dI
+    takeWhile-arm S R@(spentWhile~ _ lk _ _) bs sp si _ d dI = while-spent S R lk bs sp si d dI
     takeWhile-arm {vs = vs} {es = es} {fin = fin} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
                   R@(takeWhile~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
                                 {h = h} {h₁ = h₁} {h₂ = h₂} {h₃ = h₃} {P = P} {F₁ = F₁} {p = p} {q = q} e lk lk₁ lk₂ CL r)
-                  bs sp si d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
+                  bs sp si g d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
       with proj₂ (proj₂ (takeVals (just P) 1 vs)) in eqW
     ... | true = while-cut S R eqW bs sp si d dI
     ... | false
@@ -398,7 +412,7 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                                           (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                         (trans fe eqW) d₂
     ... | r1 , fl , bud | refl =
-      arm (proj₁ TW) (proj₂ TW) cs soq dq (λ {rP} dP B rel′ →
+      arm (proj₁ TW) (proj₂ TW) cs soq (λ e → gone-cell S take-c (gone-cell S scan-c (g (trans (sym (∧-identityʳ fin)) e)))) dq (λ {rP} dP B rel′ →
         takeWhile~ (After.grows B (After.grows (proj₁ TW) e))
           (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′) CL rel′)
         λ { (f , ds) → out-quiet [] refl , inj₂ (cong (λ x → x ∧ true) f , dl ds) }

@@ -213,18 +213,52 @@ module _ {m} {Δ : Ctx m} where
   headKey (f ↠[ _ ] q)                = 3 ∷ frameNodes f
   headKey _                           = []
 
-  -- NO TWO ALIVE ROWS SHARE THEIR FIRST NODE: every row a dispatch
-  -- would walk is the only one through the first stateful frame it
+  -- NO ALIVE ROW SHARES ANOTHER ROW'S FIRST NODE: every row is the only
+  -- one a dispatch would walk through the first stateful frame it
   -- reaches, so an end it carries there has nothing beside it
   solo : ∀ {u} {e : Closed Δ u} → EvalSt e → Maybe String
-  solo {u} st = if all (λ r → countᵇ (λ r′ → alive r′ ∧ eqListℕ (key r′) (key r)) (EvalSt.registry st) ≤ᵇ 1)
-                   (filterᵇ alive (EvalSt.registry st))
-            then nothing else just "solo: two alive rows share their first node"
+  solo {u} st = if all (λ r → (countᵇ (λ r′ → alive r′ ∧ not (proj₁ r′ ≡ᵇ proj₁ r) ∧ eqListℕ (key r′) (key r)) (EvalSt.registry st) ≡ᵇ 0) ∨ eqListℕ (key r) [])
+                   (EvalSt.registry st)
+            then nothing else just "solo: an alive row shares another's first node"
     where
     alive : RegRow Δ u → Bool
     alive r = not (skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st)
     key : RegRow Δ u → List ℕ
     key r = headKey (proj₂ (proj₂ (proj₂ r)))
+
+  frameKey : ∀ {s u} → Frame Δ s u → List ℕ
+  frameKey (from-inner _ k j) = 1 ∷ k ∷ j ∷ []
+  frameKey (thru-outer _ k)   = 2 ∷ k ∷ []
+  frameKey f                  = 3 ∷ frameNodes f
+
+  -- each node frame's key, beside the node the frame before it names
+  -- (nothing at the head)
+  keyed : ∀ {lo s u} → Maybe ℕ → Path Δ lo s u → List (List ℕ × Maybe ℕ)
+  keyed prev (map-f _ ↠[ _ ] q) = keyed prev q
+  keyed prev (f ↠[ _ ] q) with frameNodes f
+  ... | []    = keyed prev q
+  ... | k ∷ _ = (frameKey f , prev) ∷ keyed (just k) q
+  keyed prev _ = []
+
+  -- ROWS MEET ONLY WHERE THEY CAME FROM ONE NODE: any row and an alive
+  -- row through one node frame reached it from the same node, or both
+  -- start there.  What carries an end down a walk: an alive row past a
+  -- frame an end left is past the node before it too
+  tree : ∀ {u} {e : Closed Δ u} → EvalSt e → Maybe String
+  tree {u} st = if all (λ x → all (λ y → not (eqListℕ (proj₁ x) (proj₁ y)) ∨ eqM (proj₂ x) (proj₂ y)) live) every
+            then nothing else just "tree: two rows reach one node from different nodes"
+    where
+    alive : RegRow Δ u → Bool
+    alive r = not (skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st)
+    keys : RegRow Δ u → List (List ℕ × Maybe ℕ)
+    keys r = keyed nothing (proj₂ (proj₂ (proj₂ r)))
+    every live : List (List ℕ × Maybe ℕ)
+    every = concatMap keys (EvalSt.registry st)
+    live  = concatMap keys (filterᵇ alive (EvalSt.registry st))
+    eqM : Maybe ℕ → Maybe ℕ → Bool
+    eqM (just a) (just b) = a ≡ᵇ b
+    eqM nothing  nothing  = true
+    eqM _        _        = false
 
   opName : AllOp → String
   opName mergeAllᵒ = "merge"
@@ -1077,7 +1111,7 @@ dyingSome st with EvalSt.dying st
 
 firstAcc : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} → List (EvalSt e) → Maybe String
 firstAcc []       = nothing
-firstAcc (s ∷ ss) = maybe′ just (maybe′ just (firstAcc ss) (solo s)) (accounts s)
+firstAcc (s ∷ ss) = maybe′ just (maybe′ just (maybe′ just (firstAcc ss) (tree s)) (solo s)) (accounts s)
 
 -- THE IMPL'S ROWS LIVE ONCE A LEDGER CLEARS: at every boundary as a pop
 -- opens it (`open-live`), and at every close (`close-live`)

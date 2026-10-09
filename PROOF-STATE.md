@@ -258,11 +258,11 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### Big picture tier roadmap
 
-- **THE ENDED OUTER.** `{outer,merge}-spent` hold only where the walk's
-  `fin` does; accounts and solo swept green (1000, 18 at two inners of one
-  flattener). Make both `Store` fields, postulated per move, and carry
-  `fin ≡ true` to "no alive row passes this frame" through the walk. Decides
-  whether `simulation`'s reached ends leave a row a later pass would walk.
+- **THE ENDED OUTER.** `Gone` now rides every `Pass` and `Arm` beside `fin`,
+  and the outer's end reads its spent rows off it; the `gone-*` leaves are
+  what remains. Decide `Gone` itself where a walk carries an end, aimed at
+  the finish and the cut, then lower or restate them. Decides whether
+  `simulation`'s reached ends leave a row a later pass would walk.
 
 - **THE PASS'S LIVE PATH.** `inner-live` asks the pass for the liveness the
   walk now carries down to every registration; thread `LiveIf` through `Pass`,
@@ -291,6 +291,18 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 
 ### The ledger
 
+- **`gone-{cell,wrap,walk}`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: an end
+  that left no row at a frame leaves none past a cell, past the outer it ends,
+  or after that outer's walk.
+- **`gone-finish`** (Simulation.Pass.Inner) — FALSITY, `NO EVIDENCE`: a finish
+  that ends its flattener leaves no row at its restamp.
+- **`gone-cut`** (Simulation.Take) — FALSITY, `NO EVIDENCE`: a test that cuts
+  leaves no row below it.
+- **`gone-skipped`, `dying-kept`** (Simulation.Pass.Path) — FALSITY,
+  `NO EVIDENCE`: a reader its share ended leaves no row at its head; a fold
+  keeps a share's dying mark.
+- **`gone-subscribed`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: a path
+  being subscribed has no row at its first node.
 - **`explode-{quiet-sub,one-sub,out}`** (Simulation.Pass) — FALSITY,
   `DEAD ROUTE, PROBED×3`: one exploded emit, carrying nothing or one value,
   subscribed by the impl's idle merge, walks into the flattener, false where
@@ -357,9 +369,6 @@ also: `main` — the QuickCheck's entry point, and every generator and decider i
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `PROBED×4`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; swept at two hot slots, after the subscribe.
-- **`{outer,merge}-spent`** (Simulation.Pass.Quiet) — SHAPE, `PROBED`: no alive
-  row walks the outer an end reaches; true only where the walk's `fin` is,
-  which no hypothesis carries.
 - **`inner-live`** (Simulation.Pass.Quiet) — SHAPE, `NO EVIDENCE`: an inner's
   path is live unless spent where its walk starts; the pass does not carry it.
 - **`{fold,drain}-keeps-od`** (Simulation.Pass.Inner) — DIFFICULTY, `PROBED×4`:
