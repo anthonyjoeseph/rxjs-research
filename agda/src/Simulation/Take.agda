@@ -412,7 +412,8 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                                           (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                         (trans fe eqW) d₂
     ... | r1 , fl , bud | refl =
-      arm (proj₁ TW) (proj₂ TW) cs soq (λ e → gone-cell S take-c (gone-cell S scan-c (g (trans (sym (∧-identityʳ fin)) e)))) dq (λ {rP} dP B rel′ →
+      arm (proj₁ TW) (proj₂ TW) cs soq (λ e → gone-cell S {f = take-f (just (Θ₂ , cutOpenᵛ , ρ₂)) k₂} {h = h₂} {q = map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q} take-c
+                                         (gone-cell S {f = scan-f F₁ k₁} {h = h₁} scan-c (g (trans (sym (∧-identityʳ fin)) e)))) dq (λ {rP} dP B rel′ →
         takeWhile~ (After.grows B (After.grows (proj₁ TW) e))
           (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′) CL rel′)
         λ { (f , ds) → out-quiet [] refl , inj₂ (cong (λ x → x ∧ true) f , dl ds) }
