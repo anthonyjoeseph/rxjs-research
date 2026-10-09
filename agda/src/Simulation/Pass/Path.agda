@@ -227,12 +227,12 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       share-go _ S εI c _ (slotpair q ∷ _) _ _ _ _ (go-live y _ _) (go-cut y′ _) _ = ⊥-elim (t≢f (trans (sym y′) (trans (sym (skip-alike S q)) y)))
       share-go _ S εI c _ (slotpair (inj₁ (x , _)) ∷ _) _ _ _ _ (go-live {i = i₀} {rid = rid} {st₀ = st₀} y _ _) (go-live _ _ _) _ =
         ⊥-elim (t≢f (trans (sym (skip-cut {s = toℕ i₀} {rid} {st₀} x)) y))
-      share-go wk S {i = i} εI {fin = fin} c dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live {rid = rI′} {emits = eI} _ dI g′) lt =
+      share-go wk {stI = stI} S {i = i} εI {fin = fin} c dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live {rid = rI′} {emits = eI} _ dI g′) lt =
         rebase {fin = fin} (A ⨾ proj₁ Y) , λ f ds → out-++ {Δ = plainᵏ Γ κ} {t = plainᵗ t} eI _ (proj₂ Z f ds) (proj₂ Y f ds)
         where
           sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
           sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
-          Z = slot-pass wk (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI (λ e → skip-marked {s = toℕ (n ↑ʳ i)} {rid = rI′} e (dy e)) (sz-l lt)
+          Z = slot-pass wk (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI (λ e → skip-marked {s = toℕ (n ↑ʳ i)} {rid = rI′} {st = stI} e (dy e)) (sz-l lt)
           A = proj₁ Z
           Y = share-go wk (After.store A) εI c (λ e → dying-kept {k = toℕ (n ↑ʳ i)} dI (dy e)) (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
                 (λ m → fold-kept dP sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
