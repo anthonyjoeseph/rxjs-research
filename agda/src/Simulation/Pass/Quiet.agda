@@ -34,7 +34,7 @@ open import Rx.Prim      using (Tick; valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Env; Tm; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; _≟ᵗ_; unitᵗ; _×ᵗ_; _+ᵗ_; obs;
   FnClo; applyClo; varᵗ; unit̂; pairᵗ; inlᵗ; inrᵗ; sndᵗ; uniqᵗ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; markDlv; NodeState; Arrival; arrVal; arrTy; arrTick; Path;
-  root; share-sink; _↠[_]_; scan-f; take-f; map-f; thru-outer; from-inner; mergeAllᵒ; lookupNode;
+  root; share-sink; _↠[_]_; scan-f; take-f; map-f; batchSync-f; thru-outer; from-inner; mergeAllᵒ; lookupNode;
   mergeAll-st; echoᵗ; thruEvents; thruWrap; setNode; cell-st; batchSync-st; scanVals; take-st;
   takeVals; exhaust-st; switch-st; switchKill; hasRoom; consumeUsable; switchᵒ; exhaustᵒ;
   RegId; RegRow; AtFloor; atDyn; atSlot; shareAdmit; shareDying; memberSource; skipᵇ;
@@ -764,7 +764,11 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       go {p = thru-outer _ j ↠[ _ ] p} np with k ≡ᵇ j in kj
       ... | true  = ⊥-elim (np (inj₁ (cong (λ x → 2 ∷ x ∷ []) (sym (≡ᵇ→≡ k j kj)))))
       ... | false = kj ∷ go (λ ps → np (inj₂ ps))
-      go {p = f ↠[ _ ] p}              np = go (λ ps → np (inj₂ ps))
+      go {p = map-f _ ↠[ _ ] p}         np = go (λ ps → np (inj₂ ps))
+      go {p = scan-f _ _ ↠[ _ ] p}      np = go (λ ps → np (inj₂ ps))
+      go {p = take-f _ _ ↠[ _ ] p}      np = go (λ ps → np (inj₂ ps))
+      go {p = batchSync-f _ ↠[ _ ] p}   np = go (λ ps → np (inj₂ ps))
+      go {p = from-inner _ _ _ ↠[ _ ] p} np = go (λ ps → np (inj₂ ps))
 
     -- THE OUTER'S END ON BOTH SIDES: a flattener completes once its
     -- outer has and no lane is open or queued, read off related nodes,
