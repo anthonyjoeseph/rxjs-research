@@ -1300,7 +1300,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- DEAD ROUTE: re-basing the fold off the written node by a frame
       --   lemma, then walking it by `quiet-elem-step`, does not descend:
       --   the walk recurses on the impl's derivation, and one a lemma
-      --   hands back is no subterm of the explode's.
+      --   hands back is no subterm of the explode's.  The body itself
+      --   typechecks off the cycle; on it, the termination checker
+      --   exhausts the dev loop's memory before ruling, so the paths the
+      --   cycle shrinks are no rescue either.  A size it can see is owed.
       inner-over : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂ x₀ y z}
                      {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {r}
                  → Sound p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
