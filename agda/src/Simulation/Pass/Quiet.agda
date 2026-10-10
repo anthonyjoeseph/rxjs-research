@@ -1318,7 +1318,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- MERGE WHOSE OUTER HAS ENDED: as `explode-quiet-sub`, at a merge
       -- marked done, which the pass's liveness does not rule out on a
       -- spent path.  The inner's finish ends the merge again and that end
-      -- reaches the flattener's wrap, which `explode-one-sub` records open
+      -- reaches the flattener's wrap, which `explode-one-ended` records open
       explode-quiet-ended : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                             {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                             {inst out sched₁ st₁}

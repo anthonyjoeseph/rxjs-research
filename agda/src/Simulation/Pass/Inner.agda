@@ -25,8 +25,8 @@ open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; subst₂; cong; cong₂)
 
-open import Rx.Exp       using (Ctx; Closed; Val; Ty; _≟ᵗ_; mergeᶠ; switchᶠ; exhaustᶠ; uniqᵗ; obs; applyClo; Tm; varᵗ; unit̂; pairᵗ;
-  inlᵗ; inrᵗ; sndᵗ)
+open import Rx.Exp       using (Ctx; Closed; Val; Ty; _≟ᵗ_; mergeᶠ; switchᶠ; exhaustᶠ; uniqᵗ; obs; applyClo; Tm; varᵗ; unit̂;
+  pairᵗ; inlᵗ; inrᵗ; sndᵗ)
 open import Rx.Evaluator using (EvalSt; NodeId; shareSpend; shareDying; Path; _↠[_]_; scan-f; map-f; thru-outer; from-inner;
   mergeAllᵒ; lookupNode; echoᵗ; thruEvents; thruWrap; switchᵒ; exhaustᵒ; shareFinish;
   aliveThroughᶠ; Sched; pathHasNode; NodeState; mergeAll-st; cell-st; take-st; switch-st;
@@ -40,20 +40,23 @@ open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ; elemᵛ)
 open import Simulation.Stores using (Inv; EmitRel; Flattener; FlatNodes; switch~; exhaust~; merge~; ObsRel; V; PathRel; inner~;
   deferInner~; []; _∷_; Store; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ;
-  MergeAt; outerDoneᵇ; live-mono; live-set; od-back; LiveIf; LiveFor; live-for; live-if-drop; live-if-set)
+  MergeAt; outerDoneᵇ; live-mono; live-set; od-back; LiveIf; LiveFor; live-for; live-if-drop;
+  live-if-set)
 open import Simulation.Cut using (module At; module Third)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-foldPath; sz-mergeAllDrain; sz-innerFinish; sz-l; sz-r)
 open import Simulation.After using (module Kept; readᴾ; readᴵ-++)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
-open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear; consume-clear; reclear; thru; NoBatch; rel-unbatched; Gone; gone-nodes)
+open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-unmoved; on-drop; unthru; step-clear;
+  consume-clear; thru; NoBatch; rel-unbatched; Gone; gone-nodes)
 open import Simulation.Sweep using (t≢f)
 open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; drop-ot; head-on; self-node; off-path; ∨-Tˡ; ∨-Tʳ; distinct; fresh-path)
 open import Rx.Evaluator.Reducible.Dead-Kept using (fold-dead; off-T)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Simulation.Write using (module HopWrite; apart)
-open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept; Thru; thruWalk-rule; subscribeInner-rule)
+open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept; Thru; subscribeInner-rule)
+open import Simulation.Pass.Explode using (module PassE; walk-clear)
 open import Simulation.Pass.Quiet using (module PassQ; cur-here; cur-there; delivered; delivered-arr; dying; dying-arr; tail-of;
   usable-self; unusable; no-queue; pw-null)
 
@@ -83,13 +86,6 @@ walk-head : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {w lo op nid} {κ : Path 
               × Σ _ λ r₂ → thruWalk⇓ op nid κ now (thruEvents xs) (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) r₂
               × r ≡ (proj₁ r₁ ++ proj₁ r₂ , proj₂ r₂)
 walk-head x xs W = walk-split (thruEvents (x ∷ [])) (thruEvents xs) (subst (λ ys → thruWalk⇓ _ _ _ _ ys _ _ _) (events-cons x xs) W)
-
--- a walk through a flattener keeps its node off the path below it
-walk-clear : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w} {k} {κ : Path Δ lo w u} {op now xs}
-               {sched sched′ st st′ out}
-           → thruWalk⇓ {e = e} op k κ now xs sched st (out , sched′ , st′)
-           → Clear k κ sched st → Clear k κ sched′ st′
-walk-clear {e = e} {k = k} {κ = κ} d c = reclear {π = Thru {e = e} k κ} refl c (thruWalk-rule d (thru c))
 
 -- a one-lane merge's count drops to none
 pred-one : ∀ {a} → a ≤ 1 → (pred a ≡ᵇ 0) ≡ true
@@ -146,6 +142,7 @@ postulate
 module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassQ {Γ = Γ} κ public
+  open PassE {Γ = Γ} κ using (module InE)
   open Walkers {Γ = Γ} κ using (Walker)
   open Takes {Γ = Γ} κ using (module While)
   open Scans {Γ = Γ} κ using (module Cells)
@@ -153,6 +150,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
   module InI {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     open InQ {t} {ep} {ei} public
+    open InE {t} {ep} {ei} using (explode-one-sub)
     open Kept {Γ = Γ} κ {t} {ep} {ei}
     open While {t} {ep} {ei} using (takeWhile-arm)
     open Cells {t} {ep} {ei} using (scan-arm)
@@ -203,55 +201,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A SHARE'S READERS DROPPED ON BOTH SIDES, once its end is delivered
       share-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
                    → After S ([] , proj₂ (shareFinish i true ([] , sP , stP))) ([] , proj₂ (shareFinish (n ↑ʳ i) true ([] , sI , stI)))
-      -- AN OUTER'S EMIT CARRYING ONE VALUE, EXPLODED, SUBSCRIBED: the
-      -- impl's merge takes its run of elements as an inner, they walk into
-      -- the flattener where the plain outer's walk hands the value's
-      -- events on, and the merge stays unbounded at the echo's type.  What
-      -- it sends, it sends at the emit's own delivery: the echo crosses
-      -- the restamp first and sets its cell to that delivery
-      --
-      -- OPEN WHERE THE MERGE'S PATH IS SPENT.  `MergeAt` admits the merge
-      -- done; an ended merge would let the `of` inner's finish end it
-      -- again, that end reach the flattener's wrap, and an idle flattener
-      -- send a second end down `q`: two where the plain flattener, its
-      -- inner ending inside its subscribe, sends one, and one where
-      -- `explode-quiet-ended`'s sends none.  The `LiveIf` on the merge's path
-      -- rules that out unless a cut below has spent the path, where it says
-      -- nothing.
-      --
-      -- DEAD ROUTE: a wrap that is a no-op on a node already done, rxjs's
-      --   idempotent `complete`, makes both leaves true once `od` at `mX`
-      --   forces it at `m′`, and moves the falsity to `Simulation.Hot-End`'s
-      --   `block-end`: `InputBlock` admits its merge done too, where the
-      --   plain slot's second end reaches its share and the impl's wrap now
-      --   sends nothing.  Each relation is closed under its own end so a
-      --   store holds between an end and the finish that drops its row, so
-      --   no evaluator repair alone serves both.
-      -- DEAD ROUTE: walking the inner's element into the flattener over the
-      --   pass's own steps needs a `Store` while the merge counts that
-      --   inner, where `MergeAt` reads count zero; `inner-over` meets the
-      --   same wall.
-      explode-one-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                          {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                          {rP lim a qs od inst out sched₁ st₁}
-                      → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                      → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                      → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
-                      → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
-                      → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} lim a qs od)
-                      → ∀ e′ {w} → EmitRel κ (echoᵗ u) e′ (w ∷ [])
-                      → thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP
-                      → subscribeInner⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
-                          (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′) sI
-                          (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} lim (suc a) qs od) (EvalSt.nodes stI) })
-                          (inst , out , sched₁ , st₁)
-                      → Σ (After S rP (out , sched₁ , st₁)) λ A
-                          → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes st₁)
-                              u op m m′ ks (mX ∷ [])
-                            × PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes st₁) p q
-                            × MergeAt {Γ = Γ} κ (EvalSt.nodes st₁) u mX
-                            × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I out)
       -- AN OUTER'S GROUP ALL DELIVERED AT ONE INSTANT, ITS ELEMENTS
       -- WALKED, SENDS AT IT: each element's echo crosses the restamp, so
       -- its lane is subscribed at that delivery.  The route is through the
@@ -265,6 +214,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                → thruWalk⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now
                    (thruEvents (map (applyClo (Θ₀ , elemᵛ , ρ₀)) es)) sI stI rI
                → ∀ {I} → All (DelAt {echoᵗ u} I) es → Out I (proj₁ rI)
+
     -- A DEFERRED BODY'S THREE COUNTS WRITTEN: the plain merge's and the
     -- impl's hop node, alike, and the marker merge's, each one lower.  π
     -- pairs the marker once and the hop's two nodes only with each other,

@@ -251,12 +251,12 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### Big picture tier roadmap
 
-- **AN EXPLODE'S INNER IN FLIGHT.** `explode-one-sub` as a body over the peel
-  `explode-quiet-sub` now has, the fresh inner dead and its finish draining
-  nothing, its walk a leaf beside `inner-over`; then `inner-over` by a quiet
+- **AN EXPLODE'S INNER IN FLIGHT.** `inner-over` and `inner-one-over` by a
   pass bounded by a size, not the derivation, so a fold re-based off the
-  merge's node walks. Rules out the inner's react, finish and drain; decides
-  whether `simulation`'s store survives the in-flight count as a frame.
+  merge's node walks; then `explode-run-one` by unfolding `explodeᵛ` at a lone
+  payload. The inner's react, finish and drain are ruled out on both explode
+  subscribes; decides whether `simulation`'s store survives the in-flight
+  count as a frame.
 
 - **THE ELABORATED STEPS.** `lifts-map`, `lifts-scan` and `lifts-while` as
   bodies by induction over the emit the step is handed, one clause per event
@@ -271,13 +271,15 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### The ledger
 
-- **`explode-{one-sub,quiet-ended}`** (Simulation.Pass) — FALSITY,
-  `DEAD ROUTE×2`: one exploded emit, carrying one value or nothing at a merge
-  marked done, subscribed by the impl's idle merge, walks into the flattener
-  and sends at its delivery; open where the merge's path is spent.
-- **`inner-over`** (Simulation.Pass) — FALSITY, `DEAD ROUTE×2`: an explode's
-  quiet element walks the flattener while its merge counts it, and with the
+- **`explode-{one-ended,quiet-ended}`** (Simulation.Pass) — FALSITY,
+  `DEAD ROUTE`: one exploded emit, carrying one value or nothing, subscribed at
+  a merge marked done, sends at its delivery; open where the merge's path is
+  spent.
+- **`inner-{over,one-over}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE×3`: an
+  explode's element walks the flattener while its merge counts it, and with the
   merge set back the stores and walk are related.
+- **`explode-run-one`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an emit
+  carrying one value explodes to an `of` of the element `elemᵛ` reads off it.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
