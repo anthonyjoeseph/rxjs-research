@@ -16,7 +16,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup
 open import Data.Bool.ListAction using (any)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective; toℕ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; nothing; just; is-nothing)
-open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _<_; _≡ᵇ_; s≤s; s≤s⁻¹)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; <⇒≢; <-≤-trans; <-trans; m≤m+n; n≤1+n; m<n⇒m<1+n; <-irrefl)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
@@ -68,7 +68,8 @@ open import Rx.Mint using (counter; sourceᵏ; regᵏ; nodeᵏ; setAt)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Simulation.Write using (module Write; module CellWrite; module FlatCellWrite; module MergeDone; key-same; vals-same; apart)
 open import Simulation.Walks using (module Walkers)
-open import Simulation.Size using (sz-subscribeE; sz-subscribeInner; sz-thruConsume; sz-1)
+open import Simulation.Size using (sz-subscribeE; sz-subscribeInner; sz-thruConsume; sz-1; sz-l; sz-r; sz-foldPath; sz-thruWalk;
+                                   sz-shareWalk; sz-shareGo; sz-innerFinish)
 open import Simulation.Grow using (nodes-grow; flatG; pathG; fresh-off)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
@@ -93,6 +94,25 @@ set-same nid ns ((k , s) ∷ r) e with k ≡ᵇ nid in eq
 ... | true with ≡ᵇ→≡ k nid eq | e
 ...   | refl | refl = refl
 set-same nid ns ((k , s) ∷ r) e | false = cong ((k , s) ∷_) (set-same nid ns r e)
+
+-- a node written twice holds the second write alone
+set-twice : ∀ {m} {Δ : Ctx m} (nid : NodeId) (a b : NodeState Δ) (ts : List (NodeId × NodeState Δ))
+          → setNode nid a (setNode nid b ts) ≡ setNode nid a ts
+set-twice nid a b [] rewrite ≡ᵇ-refl nid = refl
+set-twice nid a b ((k , s) ∷ r) with k ≡ᵇ nid in eq
+... | true rewrite ≡ᵇ-refl nid = refl
+... | false rewrite eq = cong ((k , s) ∷_) (set-twice nid a b r)
+
+postulate
+  -- A FOLD DOWN A PATH OFF A NODE IS FRAMED BY IT: run from a table
+  -- with that node rewritten, it is the fold from the table as it was,
+  -- of the same size, with the rewrite laid over where it ends
+  fold-off : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} {κ : Path Δ lo s t} {k y now vals fin sched st r}
+           → Clear k κ sched st
+           → (d : foldPath⇓ {e = e} now κ vals fin sched (record st { nodes = setNode k y (EvalSt.nodes st) }) r)
+           → Σ _ λ r′ → Σ (foldPath⇓ now κ vals fin sched st r′) λ d′
+               → sz-foldPath d′ ≡ sz-foldPath d
+               × r ≡ (proj₁ r′ , proj₁ (proj₂ r′) , record (proj₂ (proj₂ r′)) { nodes = setNode k y (EvalSt.nodes (proj₂ (proj₂ r′))) })
 
 -- A SCAN'S STEP AT A NODE HOLDING NO ACCUMULATOR OF ITS OWN TYPE
 -- passes nothing and writes nothing; at one that does, it is `scan-at`'s
@@ -1139,8 +1159,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → LiveIf (thru-outer o′ k ↠[ h ] q) (EvalSt.nodes (proj₂ (proj₂ (proj₂ r))))
 
     -- an echo's restamp, then its tail, keep the path live unless spent
-    echo-on : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
+    echo-on : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
+                {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
                 {ns ws es fin oI sI₁ stI₁ r}
             → Restamped S ns op m m′ ks p q ws es fin oI sI₁ stI₁ → foldPath⇓ now q es fin sI₁ stI₁ r
             → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI₁)
@@ -1287,36 +1307,11 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
               → mx ≡ my → innerFinish⇓ op m j q now vals sched st mx r → innerFinish⇓ op m j q now vals sched st my r
     finish-at refl F = F
 
-    postulate
-      -- AN EXPLODE'S QUIET ELEMENT WALKED WHILE ITS MERGE COUNTS IT: the
-      -- flattener's fold of the one element runs over the merge's node
-      -- holding the inner in flight, and with that node set back to what
-      -- it held, the stores and the walk are related where the fold
-      -- leaves them, the plain side still
-      --
-      -- DEAD ROUTE: walking it where the merge counts the inner needs a
-      --   `Store` there, and every row through the outer reads `MergeAt`
-      --   at count zero; the store holds only between steps.
-      -- DEAD ROUTE: re-basing the fold off the written node by a frame
-      --   lemma, then walking it by `quiet-elem-step`, does not descend:
-      --   the walk recurses on the impl's derivation, and one a lemma
-      --   hands back is no subterm of the explode's.  The body itself
-      --   typechecks off the cycle; on it, the termination checker
-      --   exhausts the dev loop's memory before ruling, so the paths the
-      --   cycle shrinks are no rescue either.  A size it can see is owed.
-      inner-over : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂ x₀ y z}
-                     {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {r}
-                 → Sound p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                 → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                 → lookupNode mX (EvalSt.nodes stI) ≡ just x₀
-                 → LiveIf (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (EvalSt.nodes stI)
-                 → QuietElem {u} z
-                 → foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (z ∷ []) false sI (record stI { nodes = setNode mX y (EvalSt.nodes stI) }) r
-                 → Σ (After S ([] , sP , stP)
-                        (proj₁ r , proj₁ (proj₂ r) , record (proj₂ (proj₂ r)) { nodes = setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))) })) λ A
-                     → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP)
-                         (setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))))
+    sz-at : ∀ {lo s op m j} {q : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {now vals sched} {st : EvalSt ei} {mx my r}
+            (e : mx ≡ my) (F : innerFinish⇓ op m j q now vals sched st mx r) → sz-innerFinish (finish-at e F) ≡ sz-innerFinish F
+    sz-at refl F = refl
 
+    postulate
       -- AN OUTER'S EMIT CARRYING NOTHING, EXPLODED AND SUBSCRIBED AT A
       -- MERGE WHOSE OUTER HAS ENDED: as `explode-quiet-sub`, at a merge
       -- marked done, which the pass's liveness does not rule out on a
@@ -1582,397 +1577,552 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       c₂ : Clear k₂ q sI _
       c₂ = on-drop (head-on _ h₂ _ k₂ (self-node k₂ []) so₂) , soq
 
-    mutual
-      quiet-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Quiet p q
-      quiet-pass S root~ b refl _ _ _ fold-root = after S (λ x → x) (λ x → x) (root-values b false) (λ x → x) , root~
-      quiet-pass S r@(sink~ sh) b e sp si lv dI = quiet-sink sh S r b e sp si lv dI
-      quiet-pass S (map~ L r) b e sp si lv (fold-step step-map dI) =
-        let X = quiet-pass S r (carries-map L b) e (drop-ot _ _ _ sp) (drop-ot _ _ _ si)
-                  (live-for (λ { refl → refl }) (λ l → inj₂ (live-if-drop _ _ _ refl refl l)) lv) dI in proj₁ X , map~ L (proj₂ X)
-      quiet-pass S r@(scan~ _ _ _ _ _ _) b e sp si lv (fold-step d₁ (fold-step step-map dq)) =
-        quiet-resume (quiet-scan S r b e sp si lv d₁) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₁ si)) dq
-      quiet-pass S r@(takeWhile~ _ _ _ _ _ _) b e sp si lv (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
-        let X = quiet-resume (quiet-takeWhile S r b e sp si lv d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
-        in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
-      quiet-pass S r@(spentWhile~ _ _ _ _) b e sp si lv (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
-        let X = quiet-resume (quiet-takeWhile S r b e sp si lv d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
-        in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
-      quiet-pass S (outerElem~ fl r) b e sp si lv dI = quiet-outer S (fl , r) b e sp si lv dI
-      quiet-pass S (outerExplode~ fl x r) b e sp si lv dI = quiet-explode S fl x r b e sp si lv dI
-      quiet-pass S r@(inner~ refl _ _ _) b e sp si lv (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) =
-        let X = quiet-resume (quiet-inner S r b e si lv d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq
-        in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
-      quiet-pass S r@(deferInner~ _ _ _ _ _ _ _ _) b e sp si lv (fold-step {out₁ = o₁} d₁ (fold-step step-map (fold-step {out₁ = o₃} d₃ dq))) =
-        let X = quiet-resume (quiet-deferInner S r b e si lv d₁ d₃) (drop-ot _ _ _ sp) (adv d₃ (drop-ot _ _ _ (adv d₁ si))) dq
-        in after-out (regroup₂ o₁ o₃ _) (proj₁ X) , proj₂ X
+    -- the explode's quiet element walked, for a fold below a size
+    InnerOver : ℕ → Set
+    InnerOver M = ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂ x₀ y z}
+                   {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {r}
+               → Sound p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+               → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+               → lookupNode mX (EvalSt.nodes stI) ≡ just x₀
+               → LiveIf (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (EvalSt.nodes stI)
+               → QuietElem {u} z
+               → (d : foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (z ∷ []) false sI (record stI { nodes = setNode mX y (EvalSt.nodes stI) }) r)
+               → sz-foldPath d < M
+               → Σ (After S ([] , sP , stP)
+                      (proj₁ r , proj₁ (proj₂ r) , record (proj₂ (proj₂ r)) { nodes = setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))) })) λ A
+                   → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP)
+                       (setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))))
 
-      -- A SHARE'S SUBJECT FANS A VALUELESS GROUP OUT TO EVERY READER, and
-      -- every reader's chain folds it on the impl side alone.  The walk
-      -- marks no reader delivered, since the group carries no end
-      quiet-sink : ∀ {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} (sh : lookup κ i ≡ sharedᵏ)
-                 → Quiet (share-sink i h)
-                     (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sharedEq {Γ = Γ} κ i sh) (share-sink (n ↑ʳ i) h′))
-      quiet-sink {i = i} sh S _ b refl _ _ _ dI = sink-quiet S (sharedEq {Γ = Γ} κ i sh) refl b dI , sink~ sh
+    module Bounded (M : ℕ) (IH : InnerOver M) where
+      -- `Quiet`, for a fold within the bound
+      Quiet≤ : ∀ {lo lo′ s} → Path Γ lo s t → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t) → Set
+      Quiet≤ p q =
+        ∀ {now es fin sP stP sI stI rI} (S : St sP stP sI stI)
+        → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q → Carries es [] → fin ≡ false
+        → Sound p sP stP → Sound q sI stI
+        → LiveFor es q (EvalSt.nodes stI)
+        → (dI : foldPath⇓ now q es fin sI stI rI) → sz-foldPath dI < suc M
+        → Σ (After S ([] , sP , stP) rI) λ A
+            → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
 
-      -- the subject's fold, read at the type the share holds: the cast
-      -- left as an equation the fold is matched under, so the walk is the
-      -- fold's own premise
-      sink-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo′} {i : Fin n} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} {w}
-                     (E : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ w) (F : w ≡ emitᵗ (lookup Γ i)) {now es rI}
+      mutual
+        quiet-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Quiet≤ p q
+        quiet-pass S root~ b refl _ _ _ fold-root _ = after S (λ x → x) (λ x → x) (root-values b false) (λ x → x) , root~
+        quiet-pass S r@(sink~ sh) b e sp si lv dI lt = quiet-sink sh S r b e sp si lv dI lt
+        quiet-pass S (map~ L r) b e sp si lv (fold-step step-map dI) lt =
+          let X = quiet-pass S r (carries-map L b) e (drop-ot _ _ _ sp) (drop-ot _ _ _ si)
+                    (live-for (λ { refl → refl }) (λ l → inj₂ (live-if-drop _ _ _ refl refl l)) lv) dI (sz-r lt) in proj₁ X , map~ L (proj₂ X)
+        quiet-pass S r@(scan~ _ _ _ _ _ _) b e sp si lv (fold-step d₁ (fold-step step-map dq)) lt =
+          quiet-resume (quiet-scan S r b e sp si lv d₁) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₁ si)) dq (sz-r (sz-r lt))
+        quiet-pass S r@(takeWhile~ _ _ _ _ _ _) b e sp si lv (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) lt =
+          let X = quiet-resume (quiet-takeWhile S r b e sp si lv d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq (sz-r (sz-r (sz-r lt)))
+          in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
+        quiet-pass S r@(spentWhile~ _ _ _ _) b e sp si lv (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) lt =
+          let X = quiet-resume (quiet-takeWhile S r b e sp si lv d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq (sz-r (sz-r (sz-r lt)))
+          in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
+        quiet-pass S (outerElem~ fl r) b e sp si lv dI lt = quiet-outer S (fl , r) b e sp si lv dI lt
+        quiet-pass S (outerExplode~ fl x r) b e sp si lv dI lt = quiet-explode S fl x r b e sp si lv dI lt
+        quiet-pass S r@(inner~ refl _ _ _) b e sp si lv (fold-step {out₁ = o₁} d₁ (fold-step {out₁ = o₂} d₂ (fold-step step-map dq))) lt =
+          let X = quiet-resume (quiet-inner S r b e si lv d₁ d₂) (drop-ot _ _ _ sp) (drop-ot _ _ _ (adv d₂ (adv d₁ si))) dq (sz-r (sz-r (sz-r lt)))
+          in after-out (regroup₂ o₁ o₂ _) (proj₁ X) , proj₂ X
+        quiet-pass S r@(deferInner~ _ _ _ _ _ _ _ _) b e sp si lv (fold-step {out₁ = o₁} d₁ (fold-step step-map (fold-step {out₁ = o₃} d₃ dq))) lt =
+          let X = quiet-resume (quiet-deferInner S r b e si lv d₁ d₃) (drop-ot _ _ _ sp) (adv d₃ (drop-ot _ _ _ (adv d₁ si))) dq (sz-r (sz-1 (sz-1 (sz-r lt))))
+          in after-out (regroup₂ o₁ o₃ _) (proj₁ X) , proj₂ X
+
+        -- A SHARE'S SUBJECT FANS A VALUELESS GROUP OUT TO EVERY READER, and
+        -- every reader's chain folds it on the impl side alone.  The walk
+        -- marks no reader delivered, since the group carries no end
+        quiet-sink : ∀ {lo lo′} {i : Fin n} {h : lo ≤ toℕ i} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} (sh : lookup κ i ≡ sharedᵏ)
+                   → Quiet≤ (share-sink i h)
+                       (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) (sharedEq {Γ = Γ} κ i sh) (share-sink (n ↑ʳ i) h′))
+        quiet-sink {i = i} sh S _ b refl _ _ _ dI lt = sink-quiet S (sharedEq {Γ = Γ} κ i sh) refl b dI lt , sink~ sh
+
+        -- the subject's fold, read at the type the share holds: the cast
+        -- left as an equation the fold is matched under, so the walk is the
+        -- fold's own premise
+        sink-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo′} {i : Fin n} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} {w}
+                       (E : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ w) (F : w ≡ emitᵗ (lookup Γ i)) {now es rI}
+                   → CarriesU F es []
+                   → (dI : foldPath⇓ now (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) E (share-sink (n ↑ʳ i) h′)) es false sI stI rI)
+                   → sz-foldPath dI < suc M
+                   → After S ([] , sP , stP) rI
+        sink-quiet S refl F c (fold-sink (disp w)) lt = quiet-share S F c w (sz-1 (sz-1 lt))
+
+        -- the walk, one emit at a time, each fanned out to the readers the
+        -- registry then admits
+        quiet-share : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} (F : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
+                        {now es rI}
+                    → CarriesU F es [] → (w : shareWalk⇓ now (n ↑ʳ i) es false sI stI rI) → sz-shareWalk w < suc M
+                    → After S ([] , sP , stP) rI
+        quiet-share S F c walk-nil _ = after S (λ x → x) (λ x → x) [] (λ x → x)
+        quiet-share S {i = i} F c (walk-more g w) lt = A ⨾ quiet-share (After.store A) F (cu-tail F c) w (sz-r lt)
+          where
+            A = quiet-go S F (cu-head F c) (share-rows S) (admit-ot i _ _ (Store.ruleP S))
+                  (admit-ot (n ↑ʳ i) _ _ (Store.ruleI S)) (admit-agrees (n ↑ʳ i) (Store.ruleI S)) g (sz-l lt)
+
+        -- ONE EMIT TO EVERY ADMITTED READER, the impl's alone: a cut pair
+        -- skipped, a live one folded down its reader's tail
+        quiet-go : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n}
+                     (F : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)) {es now}
                  → CarriesU F es []
-                 → foldPath⇓ now (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) E (share-sink (n ↑ʳ i) h′)) es false sI stI rI
+                 → ∀ {chs adm}
+                 → Pointwise (ShareSlot (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) chs adm
+                 → (∀ {x} → x ∈ chs → Sound (proj₂ x) sP stP)
+                 → (∀ {x} → x ∈ adm → Sound (proj₂ x) sI stI)
+                 → (∀ {x y} → x ∈ adm → y ∈ adm → Agree (proj₂ x) (proj₂ y))
+                 → ∀ {rI} → (g : shareGo⇓ now (n ↑ʳ i) es false adm sI stI rI) → sz-shareGo g < suc M
                  → After S ([] , sP , stP) rI
-      sink-quiet S refl F c (fold-sink (disp w)) = quiet-share S F c w
+        quiet-go S F c [] _ _ _ go-nil _ = after S (λ x → x) (λ x → x) [] (λ x → x)
+        quiet-go S F c (slotpair _ ∷ ps) hP hI aI (go-cut _ g) lt =
+          quiet-go S F c ps (λ m → hP (there m)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g (sz-1 lt)
+        quiet-go S F c (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ (go-live {i = i₀} {rid = rid} {st₀ = st₀} y _ _) _ =
+          ⊥-elim (t≢f (trans (sym (skip-cut {s = toℕ i₀} {rid} {st₀} x)) y))
+        quiet-go S {i = i} F c (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP hI aI (go-live y dI g) lt =
+          A ⨾ quiet-go (After.store A) F c (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
+                (λ m → hP (there m))
+                (λ m → fold-kept dI (hI (here refl)) _ (hI (there m)) (aI (here refl) (there m)))
+                (λ m m′ → aI (there m) (there m′)) g (sz-r lt)
+          where
+            A = slot-quiet S F (partner-row κ _ _ _ _ _ (Store.rows S) pr) c (hP (here refl)) (hI (here refl))
+                  (LiveRows.rows-live (Inv.live-outer (Store.inv S)) (proj₂ (partner-mem κ _ _ _ _ _ (Store.rows S) pr)) y) dI (sz-l lt)
 
-      -- the walk, one emit at a time, each fanned out to the readers the
-      -- registry then admits
-      quiet-share : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} (F : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
-                      {now es rI}
-                  → CarriesU F es [] → shareWalk⇓ now (n ↑ʳ i) es false sI stI rI → After S ([] , sP , stP) rI
-      quiet-share S F c walk-nil = after S (λ x → x) (λ x → x) [] (λ x → x)
-      quiet-share S {i = i} F c (walk-more g w) = A ⨾ quiet-share (After.store A) F (cu-tail F c) w
-        where
-          A = quiet-go S F (cu-head F c) (share-rows S) (admit-ot i _ _ (Store.ruleP S))
-                (admit-ot (n ↑ʳ i) _ _ (Store.ruleI S)) (admit-agrees (n ↑ʳ i) (Store.ruleI S)) g
+        -- a slot's partnered reader: the restamp on the impl side alone,
+        -- then the tail the store relates to the plain reader
+        slot-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {u u′ rid rid′}
+                       {p : Path Γ (suc (toℕ i)) u t} {p′ : Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) u′ (emitᵗ t)}
+                       {es} (F : u′ ≡ emitᵗ u)
+                   → RowRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
+                       (rid , atSlot i , (u , p)) (rid′ , atSlot (n ↑ʳ i) , (u′ , p′))
+                   → CarriesU F es []
+                   → Sound p sP stP → Sound p′ sI stI → LiveOn p′ (EvalSt.nodes stI)
+                   → ∀ {now rI} → (dI : foldPath⇓ now p′ es false sI stI rI) → sz-foldPath dI < suc M
+                   → After S ([] , sP , stP) rI
+        slot-quiet S {i = i} {p′ = p′} refl (read~ {X = X} _ r refl) c sp si L (fold-step step-map dq) lt =
+          proj₁ (quiet-pass S r (restamp-carries {i = i} {X = X} c) refl sp (drop-ot _ _ _ si)
+                   (inj₂ (live-if-drop _ _ _ refl refl (live-if {q = p′} (λ _ → L)))) dq (sz-r lt))
 
-      -- ONE EMIT TO EVERY ADMITTED READER, the impl's alone: a cut pair
-      -- skipped, a live one folded down its reader's tail
-      quiet-go : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n}
-                   (F : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)) {es now}
-               → CarriesU F es []
-               → ∀ {chs adm}
-               → Pointwise (ShareSlot (Store.rows S) (EvalSt.cancelled stP) (EvalSt.cancelled stI) i) chs adm
-               → (∀ {x} → x ∈ chs → Sound (proj₂ x) sP stP)
-               → (∀ {x} → x ∈ adm → Sound (proj₂ x) sI stI)
-               → (∀ {x y} → x ∈ adm → y ∈ adm → Agree (proj₂ x) (proj₂ y))
-               → ∀ {rI} → shareGo⇓ now (n ↑ʳ i) es false adm sI stI rI
-               → After S ([] , sP , stP) rI
-      quiet-go S F c [] _ _ _ go-nil = after S (λ x → x) (λ x → x) [] (λ x → x)
-      quiet-go S F c (slotpair _ ∷ ps) hP hI aI (go-cut _ g) =
-        quiet-go S F c ps (λ m → hP (there m)) (λ m → hI (there m)) (λ m m′ → aI (there m) (there m′)) g
-      quiet-go S F c (slotpair (inj₁ (_ , x)) ∷ _) _ _ _ (go-live {i = i₀} {rid = rid} {st₀ = st₀} y _ _) =
-        ⊥-elim (t≢f (trans (sym (skip-cut {s = toℕ i₀} {rid} {st₀} x)) y))
-      quiet-go S {i = i} F c (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP hI aI (go-live y dI g) =
-        A ⨾ quiet-go (After.store A) F c (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
-              (λ m → hP (there m))
-              (λ m → fold-kept dI (hI (here refl)) _ (hI (there m)) (aI (here refl) (there m)))
-              (λ m m′ → aI (there m) (there m′)) g
-        where
-          A = slot-quiet S F (partner-row κ _ _ _ _ _ (Store.rows S) pr) c (hP (here refl)) (hI (here refl))
-                (LiveRows.rows-live (Inv.live-outer (Store.inv S)) (proj₂ (partner-mem κ _ _ _ _ _ (Store.rows S) pr)) y) dI
+        -- AN EXPLODED OUTER'S EMITS CARRYING NOTHING explode into no
+        -- inner, the merge's walk subscribing each empty run, and its
+        -- echo is restamped on the impl side alone
+        quiet-explode : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                          {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ}
+                          {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
+                          {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {es fin rI}
+                      → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                      → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
+                      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                      → Carries es [] → fin ≡ false
+                      → Sound (thru-outer (flatOp op) m ↠[ h ] p) sP stP
+                      → Sound (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                               (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                                (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                                 (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                                  (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
+                                   (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q)))))) sI stI
+                      → LiveFor es (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                               (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                                (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                                 (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                                  (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
+                                   (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q)))))) (EvalSt.nodes stI)
+                      → (dI : foldPath⇓ now (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                                       (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                                        (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                                         (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                                          (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
+                                           (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
+                          es fin sI stI rI) → sz-foldPath dI < suc M
+                      → Σ (After S ([] , sP , stP) rI) λ A
+                          → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                              (thru-outer (flatOp op) m ↠[ h ] p)
+                              (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
+                               (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
+                                (thru-outer mergeAllᵒ mX ↠[ h₃ ]
+                                 (thru-outer (flatOp op) m′ ↠[ h₄ ]
+                                  (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
+                                   (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
+        quiet-explode S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} fl x r b refl sp si lv
+                      (fold-step step-map (fold-step step-map (fold-step dW@(step-thru-outer W) dR))) lt =
+          let si′ = drop-ot _ _ _ (drop-ot _ _ _ si)
+              (X , fl′ , r′ , x′) = explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} (unthru sp) (unthru si′) fl r x
+                                      (live-for (λ e → e) (λ l → inj₂ (live-if-drop _ _ _ refl refl (live-if-drop _ _ _ refl refl l))) lv) b W
+                                      (sz-l (sz-1 (sz-1 (sz-1 (sz-1 (sz-1 lt))))))
+              (T , fl″ , r″ , x″) = explode-tail (After.store X) {op = op} (proj₂ (unthru sp)) (unthru (step-kept _ dW si′)) fl′ r′ x′ dR (sz-r (sz-1 (sz-1 (sz-1 (sz-1 (sz-1 lt))))))
+          in X ⨾ T , outerExplode~ fl″ x″ r″
 
-      -- a slot's partnered reader: the restamp on the impl side alone,
-      -- then the tail the store relates to the plain reader
-      slot-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} {u u′ rid rid′}
-                     {p : Path Γ (suc (toℕ i)) u t} {p′ : Path (plainᵏ Γ κ) (suc (toℕ (n ↑ʳ i))) u′ (emitᵗ t)}
-                     {es} (F : u′ ≡ emitᵗ u)
-                 → RowRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (Sched.live sP) (Sched.live sI)
-                     (rid , atSlot i , (u , p)) (rid′ , atSlot (n ↑ʳ i) , (u′ , p′))
-                 → CarriesU F es []
-                 → Sound p sP stP → Sound p′ sI stI → LiveOn p′ (EvalSt.nodes stI)
-                 → ∀ {now rI} → foldPath⇓ now p′ es false sI stI rI
-                 → After S ([] , sP , stP) rI
-      slot-quiet S {i = i} {p′ = p′} refl (read~ {X = X} _ r refl) c sp si L (fold-step step-map dq) =
-        proj₁ (quiet-pass S r (restamp-carries {i = i} {X = X} c) refl sp (drop-ot _ _ _ si)
-                 (inj₂ (live-if-drop _ _ _ refl refl (live-if {q = p′} (λ _ → L)))) dq)
+        -- THE EXPLODED OUTER'S TAIL, handed the walk's empty group: the
+        -- flattener steps over it and the restamp echoes nothing
+        explode-tail : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂}
+                         {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {rI}
+                     → Sound p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+                     → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                     → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
+                     → (d : foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) [] false sI stI rI)
+                     → sz-foldPath d < suc M
+                     → Σ (After S ([] , sP , stP) rI) λ A
+                         → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                             u op m m′ ks (mX ∷ [])
+                           × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+                           × MergeAt {Γ = Γ} κ (EvalSt.nodes (proj₂ (proj₂ rI))) u mX
+        explode-tail {stP = stP} S {h₅ = h₅} sp ci fl r x d@(fold-step dW@(step-thru-outer walk-nil) (fold-step d₁ (fold-step step-map dq))) lt =
+          let cI = tail-of (step-clear d₁ (unthru (step-kept _ dW (proj₂ ci))))
+              (A , f′ , r′ , c′ , e′ , _) = restamp-echo S fl r [] d₁
+              B  = quiet-pass (After.store A) r′ c′ e′ sp (proj₂ (proj₁ cI)) (live-echo {π = Store.π S} {NP = EvalSt.nodes stP} {h₃ = h₅} fl d₁ (inj₁ refl)) dq
+                     (sz-1 (sz-1 (sz-r (sz-1 (sz-1 (sz-1 lt))))))
+          in A ⨾ proj₁ B ,
+             flat-move (EvalSt.nodes stP) _ (EvalSt.nodes stP) _ (After.grows (proj₁ B)) (unmoved refl)
+                       (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′ ,
+             proj₂ B , merge-moved (missed d ci) x
 
-      -- AN EXPLODED OUTER'S EMITS CARRYING NOTHING explode into no
-      -- inner, the merge's walk subscribing each empty run, and its
-      -- echo is restamped on the impl side alone
-      quiet-explode : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
-                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ}
-                        {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆}
-                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {es fin rI}
+        -- THE EXPLODED OUTER'S WALK, every emit carrying nothing
+        explode-none : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
+                         {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+                         {es rI}
+                     → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+                     → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                     → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
+                     → LiveFor es (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
+                     → Carries {echoᵗ u} es []
+                     → (W : thruWalk⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
+                         (thruEvents (map (applyClo {s = obs (echoᵗ (emitᵗ u))} {t = echoᵗ (echoᵗ (emitᵗ u))}
+                                                    (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅))
+                                          (map (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀)) es))) sI stI rI)
+                     → sz-thruWalk W < suc M
+                     → Σ (After S ([] , sP , stP) rI) λ A
+                         → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                             u op m m′ ks (mX ∷ [])
+                           × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+                           × MergeAt {Γ = Γ} κ (EvalSt.nodes (proj₂ (proj₂ rI))) u mX
+        explode-none S cp ci fl r x _ [] walk-nil _ = after S (λ y → y) (λ y → y) [] (λ y → y) , fl , r , x
+        explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
+                     cp ci fl r x lv (quiet e′ bare b) (walk-cons C W′) lt =
+          let l = live-cons lv
+              (X , fl′ , r′ , x′ , _) = explode-quiet S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r x l e′ bare C (sz-l lt)
+              (Y , rest) = explode-none (After.store X) {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
+                                        cp (consume-clear C ci) fl′ r′ x′ (inj₂ (consume-spares C l)) b W′ (sz-r lt)
+          in (X ⨾ Y) , rest
+
+        -- AN OUTER'S EMIT CARRYING NOTHING, EXPLODED: the merge is unbounded,
+        -- so its consume neither queues nor finds the node unusable, and
+        -- subscribes
+        explode-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+                        {rI}
+                    → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
                     → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                    → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
                     → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                    → Carries es [] → fin ≡ false
-                    → Sound (thru-outer (flatOp op) m ↠[ h ] p) sP stP
-                    → Sound (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
-                             (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
-                              (thru-outer mergeAllᵒ mX ↠[ h₃ ]
-                               (thru-outer (flatOp op) m′ ↠[ h₄ ]
-                                (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
-                                 (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q)))))) sI stI
-                    → LiveFor es (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
-                             (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
-                              (thru-outer mergeAllᵒ mX ↠[ h₃ ]
-                               (thru-outer (flatOp op) m′ ↠[ h₄ ]
-                                (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
-                                 (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q)))))) (EvalSt.nodes stI)
-                    → foldPath⇓ now (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
-                                     (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
-                                      (thru-outer mergeAllᵒ mX ↠[ h₃ ]
-                                       (thru-outer (flatOp op) m′ ↠[ h₄ ]
-                                        (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
-                                         (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
-                        es fin sI stI rI
+                    → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
+                    → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
+                    → ∀ e′ → Bare {echoᵗ u} e′
+                    → (C : thruConsume⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
+                        (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′) sI stI rI)
+                    → sz-thruConsume C < suc M
                     → Σ (After S ([] , sP , stP) rI) λ A
-                        → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-                            (thru-outer (flatOp op) m ↠[ h ] p)
-                            (map-f (Θ₀ , explodeᵛ , ρ₀) ↠[ h₁ ]
-                             (map-f (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅) ↠[ h₂ ]
-                              (thru-outer mergeAllᵒ mX ↠[ h₃ ]
-                               (thru-outer (flatOp op) m′ ↠[ h₄ ]
-                                (scan-f (Θ₁ , flatStepᵛ , ρ₁) ks ↠[ h₅ ]
-                                 (map-f (Θ₂ , sndᵗ (varᵗ (here refl)) , ρ₂) ↠[ h₆ ] q))))))
-      quiet-explode S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} fl x r b refl sp si lv
-                    (fold-step step-map (fold-step step-map (fold-step dW@(step-thru-outer W) dR))) =
-        let si′ = drop-ot _ _ _ (drop-ot _ _ _ si)
-            (X , fl′ , r′ , x′) = explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} (unthru sp) (unthru si′) fl r x
-                                    (live-for (λ e → e) (λ l → inj₂ (live-if-drop _ _ _ refl refl (live-if-drop _ _ _ refl refl l))) lv) b W
-            (T , fl″ , r″ , x″) = explode-tail (After.store X) {op = op} (proj₂ (unthru sp)) (unthru (step-kept _ dW si′)) fl′ r′ x′ dR
-        in X ⨾ T , outerExplode~ fl″ x″ r″
+                        → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                            u op m m′ ks (mX ∷ [])
+                          × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+                          × MergeAt {Γ = Γ} κ (EvalSt.nodes (proj₂ (proj₂ rI))) u mX
+                          × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I (proj₁ rI))
+        explode-quiet S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r x lv e′ b
+                      (consume-all-sub l _ c) lt =
+          explode-quiet-sub S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r x lv (trans (sym (proj₂ x)) l) e′ b c (sz-1 lt)
+        explode-quiet S cp ci fl r (_ , lX) _ e′ b (consume-all-enqueue l h) _ = ⊥-elim (no-queue (trans (sym lX) l) h)
+        explode-quiet S {u = u} cp ci fl r (_ , lX) _ e′ b (consume-all-nil e) _ =
+          ⊥-elim (unusable mergeAllᵒ (echoᵗ (emitᵗ u)) lX e (usable-self (echoᵗ (emitᵗ u))))
 
-      -- THE EXPLODED OUTER'S TAIL, handed the walk's empty group: the
-      -- flattener steps over it and the restamp echoes nothing
-      explode-tail : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂}
-                       {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {rI}
-                   → Sound p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                   → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                   → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
-                   → foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) [] false sI stI rI
-                   → Σ (After S ([] , sP , stP) rI) λ A
-                       → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-                           u op m m′ ks (mX ∷ [])
-                         × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-                         × MergeAt {Γ = Γ} κ (EvalSt.nodes (proj₂ (proj₂ rI))) u mX
-      explode-tail {stP = stP} S {h₅ = h₅} sp ci fl r x d@(fold-step dW@(step-thru-outer walk-nil) (fold-step d₁ (fold-step step-map dq))) =
-        let cI = tail-of (step-clear d₁ (unthru (step-kept _ dW (proj₂ ci))))
-            (A , f′ , r′ , c′ , e′ , _) = restamp-echo S fl r [] d₁
-            B  = quiet-pass (After.store A) r′ c′ e′ sp (proj₂ (proj₁ cI)) (live-echo {π = Store.π S} {NP = EvalSt.nodes stP} {h₃ = h₅} fl d₁ (inj₁ refl)) dq
-        in A ⨾ proj₁ B ,
-           flat-move (EvalSt.nodes stP) _ (EvalSt.nodes stP) _ (After.grows (proj₁ B)) (unmoved refl)
-                     (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′ ,
-           proj₂ B , merge-moved (missed d ci) x
+        -- AN OUTER'S EMIT CARRYING NOTHING, EXPLODED, SUBSCRIBED: the impl's
+        -- merge takes its one quiet element as an inner, the plain side
+        -- does not move, and the merge stays unbounded at the echo's type;
+        -- what it sends, it sends at the emit's own delivery.  The inner is
+        -- the counter's next node, so no row keeps it alive and it finishes
+        -- at once: its element walks the flattener, the merge's count falls
+        -- back, and the empty group the finish leaves folds the tail
+        explode-quiet-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                            {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+                            {lim a qs od inst out sched₁ st₁}
+                        → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+                        → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                        → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                        → (mg : MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX)
+                        → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
+                        → just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] (proj₁ mg)) ≡ just (mergeAll-st lim a qs od)
+                        → ∀ e′ → Bare {echoᵗ u} e′
+                        → (c : subscribeInner⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
+                            (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′) sI
+                            (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} lim (suc a) qs od) (EvalSt.nodes stI) })
+                            (inst , out , sched₁ , st₁))
+                        → sz-subscribeInner c < suc M
+                        → Σ (After S ([] , sP , stP) (out , sched₁ , st₁)) λ A
+                            → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes st₁) u op m m′ ks (mX ∷ [])
+                              × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes st₁) p q
+                              × MergeAt {Γ = Γ} κ (EvalSt.nodes st₁) u mX
+                              × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I out)
+        explode-quiet-sub S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r (true , lX) lv refl e′ b c _ =
+          explode-quiet-ended S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r lv lX e′ b c
+        explode-quiet-sub S {op = op} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r (false , lX) lv refl e′ b (inner refl sub) lt =
+          let (_ , _ , _ , eq , qz) = explode-run e′ b
+              (A , f , pr , x) = explode-fresh S {op = op} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r lX lv qz eq sub (sz-1 lt)
+          in A , f , pr , x , λ _ → nil-all (After.values A)
 
-      -- THE EXPLODED OUTER'S WALK, every emit carrying nothing
-      explode-none : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
-                       {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                       {es rI}
-                   → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                   → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                   → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                   → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
-                   → LiveFor es (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
-                   → Carries {echoᵗ u} es []
-                   → thruWalk⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
-                       (thruEvents (map (applyClo {s = obs (echoᵗ (emitᵗ u))} {t = echoᵗ (echoᵗ (emitᵗ u))}
-                                                  (Θ₅ , pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl))) , ρ₅))
-                                        (map (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀)) es))) sI stI rI
-                   → Σ (After S ([] , sP , stP) rI) λ A
-                       → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-                           u op m m′ ks (mX ∷ [])
-                         × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-                         × MergeAt {Γ = Γ} κ (EvalSt.nodes (proj₂ (proj₂ rI))) u mX
-      explode-none S cp ci fl r x _ [] walk-nil = after S (λ y → y) (λ y → y) [] (λ y → y) , fl , r , x
-      explode-none S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
-                   cp ci fl r x lv (quiet e′ bare b) (walk-cons C W′) =
-        let l = live-cons lv
-            (X , fl′ , r′ , x′ , _) = explode-quiet S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r x l e′ bare C
-            (Y , rest) = explode-none (After.store X) {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₅ = Θ₅} {ρ₅ = ρ₅} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
-                                      cp (consume-clear C ci) fl′ r′ x′ (inj₂ (consume-spares C l)) b W′
-        in (X ⨾ Y) , rest
-
-      -- AN OUTER'S EMIT CARRYING NOTHING, EXPLODED: the merge is unbounded,
-      -- so its consume neither queues nor finds the node unusable, and
-      -- subscribes
-      explode-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                      {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                      {rI}
-                  → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                  → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                  → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                  → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
-                  → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
-                  → ∀ e′ → Bare {echoᵗ u} e′
-                  → thruConsume⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
-                      (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′) sI stI rI
-                  → Σ (After S ([] , sP , stP) rI) λ A
-                      → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-                          u op m m′ ks (mX ∷ [])
-                        × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-                        × MergeAt {Γ = Γ} κ (EvalSt.nodes (proj₂ (proj₂ rI))) u mX
-                        × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I (proj₁ rI))
-      explode-quiet S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r x lv e′ b
-                    (consume-all-sub l _ c) =
-        explode-quiet-sub S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r x lv (trans (sym (proj₂ x)) l) e′ b c
-      explode-quiet S cp ci fl r (_ , lX) _ e′ b (consume-all-enqueue l h) = ⊥-elim (no-queue (trans (sym lX) l) h)
-      explode-quiet S {u = u} cp ci fl r (_ , lX) _ e′ b (consume-all-nil e) =
-        ⊥-elim (unusable mergeAllᵒ (echoᵗ (emitᵗ u)) lX e (usable-self (echoᵗ (emitᵗ u))))
-
-      -- AN OUTER'S EMIT CARRYING NOTHING, EXPLODED, SUBSCRIBED: the impl's
-      -- merge takes its one quiet element as an inner, the plain side
-      -- does not move, and the merge stays unbounded at the echo's type;
-      -- what it sends, it sends at the emit's own delivery.  The inner is
-      -- the counter's next node, so no row keeps it alive and it finishes
-      -- at once: its element walks the flattener, the merge's count falls
-      -- back, and the empty group the finish leaves folds the tail
-      explode-quiet-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+        -- THE EXPLODE'S INNER, ITS ONE QUIET ELEMENT IN HAND: the counter's
+        -- next node, so no row keeps it alive and it finishes at once; its
+        -- element walks the flattener, the merge's count falls back, and the
+        -- empty group the finish leaves folds the tail
+        explode-fresh : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂}
                           {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                          {lim a qs od inst out sched₁ st₁}
+                          {Θ′ ρ′} {tm : Tm (plainᵏ Γ κ) [] [] Θ′ (echoᵗ (emitᵗ u))} {o out sched₁ st₁}
                       → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
                       → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
                       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                      → (mg : MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX)
+                      → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] false)
                       → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
-                      → just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] (proj₁ mg)) ≡ just (mergeAll-st lim a qs od)
-                      → ∀ e′ → Bare {echoᵗ u} e′
-                      → subscribeInner⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
-                          (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′) sI
-                          (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} lim (suc a) qs od) (EvalSt.nodes stI) })
-                          (inst , out , sched₁ , st₁)
+                      → QuietElem {u} (evalWith tm ρ′)
+                      → o ≡ (Θ′ , ofᵉ (tm ∷ []) , ρ′)
+                      → (D : subscribeE⇓ o (from-inner mergeAllᵒ mX (nodeCt sI) ↠[ ≤-refl ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) now
+                          (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) })
+                          (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 1 [] false) (EvalSt.nodes stI) })
+                          (out , sched₁ , st₁))
+                      → sz-subscribeE D < suc M
                       → Σ (After S ([] , sP , stP) (out , sched₁ , st₁)) λ A
                           → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes st₁) u op m m′ ks (mX ∷ [])
                             × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes st₁) p q
                             × MergeAt {Γ = Γ} κ (EvalSt.nodes st₁) u mX
-                            × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I out)
-      explode-quiet-sub S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r (true , lX) lv refl e′ b c =
-        explode-quiet-ended S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r lv lX e′ b c
-      explode-quiet-sub S {op = op} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r (false , lX) lv refl e′ b (inner refl sub) =
-        let (_ , _ , _ , eq , qz) = explode-run e′ b
-            (A , f , pr , x) = explode-fresh S {op = op} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r lX lv qz eq sub
-        in A , f , pr , x , λ _ → nil-all (After.values A)
+        explode-fresh S cp ci fl r lX lv qz refl (subs-of (fold-step (step-from-inner (react-alive al)) _)) _ =
+          ⊥-elim (t≢f (trans (sym al) (fresh-dead (Store.ruleI S))))
+        explode-fresh {sI = sI} {stI = stI} S {op = op} {mX = mX} {Θ′ = Θ′} {ρ′ = ρ′} {tm = tm} cp ci fl r lX lv qz refl
+                      (subs-of (fold-step (step-from-inner (react-dead _ F′)) F₂)) lt =
+          explode-drain S {op = op} {mX = mX} {Θ′ = Θ′} {ρ′ = ρ′} {tm = tm} cp ci fl r lX lv qz
+            (finish-at (lookup-set mX _ (EvalSt.nodes stI)) F′) (subst (_< suc M) (sym (sz-at _ F′)) (sz-l (sz-1 (sz-1 (sz-1 lt)))))
+            F₂ (sz-r (sz-1 (sz-1 (sz-1 lt))))
 
-      -- THE EXPLODE'S INNER, ITS ONE QUIET ELEMENT IN HAND: the counter's
-      -- next node, so no row keeps it alive and it finishes at once; its
-      -- element walks the flattener, the merge's count falls back, and the
-      -- empty group the finish leaves folds the tail
-      explode-fresh : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂}
-                        {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                        {Θ′ ρ′} {tm : Tm (plainᵏ Γ κ) [] [] Θ′ (echoᵗ (emitᵗ u))} {o out sched₁ st₁}
-                    → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                    → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                    → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] false)
-                    → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
-                    → QuietElem {u} (evalWith tm ρ′)
-                    → o ≡ (Θ′ , ofᵉ (tm ∷ []) , ρ′)
-                    → subscribeE⇓ o (from-inner mergeAllᵒ mX (nodeCt sI) ↠[ ≤-refl ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) now
-                        (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) })
-                        (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 1 [] false) (EvalSt.nodes stI) })
-                        (out , sched₁ , st₁)
-                    → Σ (After S ([] , sP , stP) (out , sched₁ , st₁)) λ A
-                        → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes st₁) u op m m′ ks (mX ∷ [])
-                          × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes st₁) p q
-                          × MergeAt {Γ = Γ} κ (EvalSt.nodes st₁) u mX
-      explode-fresh S cp ci fl r lX lv qz refl (subs-of (fold-step (step-from-inner (react-alive al)) _)) =
-        ⊥-elim (t≢f (trans (sym al) (fresh-dead (Store.ruleI S))))
-      explode-fresh {sI = sI} {stI = stI} S {op = op} {mX = mX} {Θ′ = Θ′} {ρ′ = ρ′} {tm = tm} cp ci fl r lX lv qz refl
-                    (subs-of (fold-step (step-from-inner (react-dead _ F′)) F₂)) =
-        explode-drain S {op = op} {mX = mX} {Θ′ = Θ′} {ρ′ = ρ′} {tm = tm} cp ci fl r lX lv qz
-          (finish-at (lookup-set mX _ (EvalSt.nodes stI)) F′) F₂
+        -- the inner's finish read at the node it set, so its arms match
+        -- with no with-abstraction over the subscribe's context
+        explode-drain : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂}
+                          {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+                          {Θ′ ρ′} {tm : Tm (plainᵏ Γ κ) [] [] Θ′ (echoᵗ (emitᵗ u))} {r₁ out₂ sched₂ st₂}
+                      → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+                      → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                      → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                      → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] false)
+                      → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
+                      → QuietElem {u} (evalWith tm ρ′)
+                      → (F : innerFinish⇓ mergeAllᵒ mX (nodeCt sI) (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now (evalWith tm ρ′ ∷ [])
+                          (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) })
+                          (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 1 [] false) (EvalSt.nodes stI) })
+                          (just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 1 [] false)) r₁)
+                      → sz-innerFinish F < suc M
+                      → (F₂ : foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (proj₁ (proj₂ r₁)) (proj₁ (proj₂ (proj₂ r₁)))
+                          (proj₁ (proj₂ (proj₂ (proj₂ r₁)))) (proj₂ (proj₂ (proj₂ (proj₂ r₁)))) (out₂ , sched₂ , st₂))
+                      → sz-foldPath F₂ < suc M
+                      → Σ (After S ([] , sP , stP) (proj₁ r₁ ++ out₂ , sched₂ , st₂)) λ A
+                          → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes st₂) u op m m′ ks (mX ∷ [])
+                            × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes st₂) p q
+                            × MergeAt {Γ = Γ} κ (EvalSt.nodes st₂) u mX
+        explode-drain S cp ci fl r lX lv qz (finish-nil e) _ _ _ = ⊥-elim (t≢f (trans (sym (usable-self _)) e))
+        explode-drain {sI = sI} {stI = stI} S {op = op} {mX = mX} cp ci fl r lX lv qz (finish-all-drain {outV = outV} {st₁ = st₁′} fd drain-spent) lt F₂ lt₂ =
+          let ci′ = sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)
+              (A₁ , W₁) = IH (mint-impl S) (proj₂ cp) ci′ (fl , r) lX (live-if-under _ _ lv) qz fd (≤-trans (s≤s (m≤m+n _ _)) (s≤s⁻¹ lt))
+              c₁ = fold-clear fd (sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)) refl
+                     (sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci))
+              (T , fl₂ , r₂ , x₂) = explode-tail (After.store A₁) {op = op} (proj₂ cp)
+                                      (sub-on (λ r∈ → r∈) ≤-refl (proj₁ c₁) , sub-ot (λ r∈ → r∈) ≤-refl (proj₂ c₁))
+                                      (proj₁ W₁) (proj₂ W₁) (false , lookup-set mX _ (EvalSt.nodes st₁′)) F₂ lt₂
+          in after-out (cong (_++ _) (sym (++-identityʳ outV))) (unmintI A₁ ⨾ T) , fl₂ , r₂ , x₂
 
-      -- the inner's finish read at the node it set, so its arms match
-      -- with no with-abstraction over the subscribe's context
-      explode-drain : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂}
-                        {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
-                        {Θ′ ρ′} {tm : Tm (plainᵏ Γ κ) [] [] Θ′ (echoᵗ (emitᵗ u))} {r₁ out₂ sched₂ st₂}
-                    → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                    → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
-                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
-                    → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] false)
-                    → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
-                    → QuietElem {u} (evalWith tm ρ′)
-                    → innerFinish⇓ mergeAllᵒ mX (nodeCt sI) (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now (evalWith tm ρ′ ∷ [])
-                        (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) })
-                        (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 1 [] false) (EvalSt.nodes stI) })
-                        (just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 1 [] false)) r₁
-                    → foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (proj₁ (proj₂ r₁)) (proj₁ (proj₂ (proj₂ r₁)))
-                        (proj₁ (proj₂ (proj₂ (proj₂ r₁)))) (proj₂ (proj₂ (proj₂ (proj₂ r₁)))) (out₂ , sched₂ , st₂)
-                    → Σ (After S ([] , sP , stP) (proj₁ r₁ ++ out₂ , sched₂ , st₂)) λ A
-                        → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes st₂) u op m m′ ks (mX ∷ [])
-                          × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes st₂) p q
-                          × MergeAt {Γ = Γ} κ (EvalSt.nodes st₂) u mX
-      explode-drain S cp ci fl r lX lv qz (finish-nil e) _ = ⊥-elim (t≢f (trans (sym (usable-self _)) e))
-      explode-drain {sI = sI} {stI = stI} S {op = op} {mX = mX} cp ci fl r lX lv qz (finish-all-drain {outV = outV} {st₁ = st₁′} fd drain-spent) F₂ =
-        let ci′ = sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)
-            (A₁ , W₁) = inner-over (mint-impl S) (proj₂ cp) ci′ (fl , r) lX (live-if-under _ _ lv) qz fd
-            c₁ = fold-clear fd (sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)) refl
-                   (sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci))
-            (T , fl₂ , r₂ , x₂) = explode-tail (After.store A₁) {op = op} (proj₂ cp)
-                                    (sub-on (λ r∈ → r∈) ≤-refl (proj₁ c₁) , sub-ot (λ r∈ → r∈) ≤-refl (proj₂ c₁))
-                                    (proj₁ W₁) (proj₂ W₁) (false , lookup-set mX _ (EvalSt.nodes st₁′)) F₂
-        in after-out (cong (_++ _) (sym (++-identityʳ outV))) (unmintI A₁ ⨾ T) , fl₂ , r₂ , x₂
+        quiet-resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ′ u} {p : Path Γ ℓ u t} {G : Goal}
+                         {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)} {es fin oI sI₁ stI₁ rI}
+                     → QArm S now p G q es fin oI sI₁ stI₁ → Sound p sP stP → Sound q sI₁ stI₁
+                     → (dq : foldPath⇓ now q es fin sI₁ stI₁ rI) → sz-foldPath dq < suc M
+                     → Σ (After S ([] , sP , stP) (oI ++ proj₁ rI , proj₂ rI)) λ A
+                         → G (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+        quiet-resume (qarm A r b e lv rb) sp si dq lt = let X = quiet-pass (After.store A) r b e sp si lv dq lt in A ⨾ proj₁ X , rb dq (proj₁ X) (proj₂ X)
 
-      quiet-resume : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ′ u} {p : Path Γ ℓ u t} {G : Goal}
-                       {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ u) (emitᵗ t)} {es fin oI sI₁ stI₁ rI}
-                   → QArm S now p G q es fin oI sI₁ stI₁ → Sound p sP stP → Sound q sI₁ stI₁ → foldPath⇓ now q es fin sI₁ stI₁ rI
-                   → Σ (After S ([] , sP , stP) (oI ++ proj₁ rI , proj₂ rI)) λ A
-                       → G (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-      quiet-resume (qarm A r b e lv rb) sp si dq = let X = quiet-pass (After.store A) r b e sp si lv dq in A ⨾ proj₁ X , rb dq (proj₁ X) (proj₂ X)
+        -- AN OUTER'S EMITS CARRYING NOTHING, HANDED THE FLATTENER: every
+        -- element a bare echo, restamped, then the open end restamped too
+        quiet-outer : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
+                        {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es fin rI}
+                    → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) → Carries es [] → fin ≡ false
+                    → Sound (thru-outer (flatOp op) m ↠[ h ] p) sP stP
+                    → Sound (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)) sI stI
+                    → LiveFor es (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)) (EvalSt.nodes stI)
+                    → (dI : foldPath⇓ now (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))
+                        es fin sI stI rI) → sz-foldPath dI < suc M
+                    → Σ (After S ([] , sP , stP) rI) λ A
+                        → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                            (thru-outer (flatOp op) m ↠[ h ] p)
+                            (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))
+        quiet-outer {stP = stP} S {op = op} {Θ₀ = Θ₀} {ρ₀} {h₃ = h₃} w b refl sp si lv
+                    (fold-step step-map (fold-step dW@(step-thru-outer W) (fold-step d₁ (fold-step step-map dq)))) lt =
+          let si′ = drop-ot _ _ _ si
+              sp′ = proj₂ (unthru sp)
+              X  = quiet-walk S {op = op} {Θ₀ = Θ₀} {ρ₀} sp′ (unthru si′) w b
+                     (live-for (λ x → x) (λ l → inj₂ (live-if-drop _ _ _ refl refl l)) lv) W (sz-l (sz-1 (sz-1 (sz-1 lt))))
+              c₁ = step-clear d₁ (unthru (step-kept _ dW si′))
+              T  = quiet-tail (flat-echo (After.store (proj₁ X)) (proj₂ X) [] d₁) sp′ (tail-of c₁) (live-echo {π = Store.π (After.store (proj₁ X))} {NP = EvalSt.nodes stP} {h₃ = h₃} (proj₁ (proj₂ X)) d₁ (inj₁ refl)) dq
+                     (sz-1 (sz-1 (sz-r (sz-r (sz-1 (sz-1 (sz-1 lt)))))))
+          in proj₁ X ⨾ proj₁ T , outerElem~ (proj₁ (proj₂ T)) (proj₂ (proj₂ T))
 
-      -- AN OUTER'S EMITS CARRYING NOTHING, HANDED THE FLATTENER: every
-      -- element a bare echo, restamped, then the open end restamped too
-      quiet-outer : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄}
-                      {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es fin rI}
-                  → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) → Carries es [] → fin ≡ false
-                  → Sound (thru-outer (flatOp op) m ↠[ h ] p) sP stP
-                  → Sound (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)) sI stI
-                  → LiveFor es (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q)) (EvalSt.nodes stI)
-                  → foldPath⇓ now (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))
-                      es fin sI stI rI
-                  → Σ (After S ([] , sP , stP) rI) λ A
-                      → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-                          (thru-outer (flatOp op) m ↠[ h ] p)
-                          (map-f (Θ₀ , elemᵛ , ρ₀) ↠[ h₁ ] (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q))
-      quiet-outer {stP = stP} S {op = op} {Θ₀ = Θ₀} {ρ₀} {h₃ = h₃} w b refl sp si lv
-                  (fold-step step-map (fold-step dW@(step-thru-outer W) (fold-step d₁ (fold-step step-map dq)))) =
-        let si′ = drop-ot _ _ _ si
-            sp′ = proj₂ (unthru sp)
-            X  = quiet-walk S {op = op} {Θ₀ = Θ₀} {ρ₀} sp′ (unthru si′) w b
-                   (live-for (λ x → x) (λ l → inj₂ (live-if-drop _ _ _ refl refl l)) lv) W
-            c₁ = step-clear d₁ (unthru (step-kept _ dW si′))
-            T  = quiet-tail (flat-echo (After.store (proj₁ X)) (proj₂ X) [] d₁) sp′ (tail-of c₁) (live-echo {π = Store.π (After.store (proj₁ X))} {NP = EvalSt.nodes stP} {h₃ = h₃} (proj₁ (proj₂ X)) d₁ (inj₁ refl)) dq
-        in proj₁ X ⨾ proj₁ T , outerElem~ (proj₁ (proj₂ T)) (proj₂ (proj₂ T))
+        -- THE OUTER'S WALK, every element a bare echo
+        quiet-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                       {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {ns es rI}
+                   → Sound p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
+                   → Walkedˣ ns op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                   → Carries {echoᵗ u} es []
+                   → LiveFor es (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI)
+                   → (W : thruWalk⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now
+                       (thruEvents (map (applyClo (Θ₀ , elemᵛ , ρ₀)) es)) sI stI rI) → sz-thruWalk W < suc M
+                   → Σ (After S ([] , sP , stP) rI) λ A
+                       → Walkedˣ ns op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+        quiet-walk S sp cI w [] _ walk-nil _ = after S (λ x → x) (λ x → x) [] (λ x → x) , w
+        quiet-walk S {Θ₀ = Θ₀} {ρ₀} sp cI w (quiet e′ bq b) lv W lt = quiet-elem-step S sp cI w (elem-quiet {Θ = Θ₀} {ρ₀} e′ bq) b (live-cons lv) W lt
 
-      -- THE OUTER'S WALK, every element a bare echo
-      quiet-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                     {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {ns es rI}
-                 → Sound p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
-                 → Walkedˣ ns op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                 → Carries {echoᵗ u} es []
-                 → LiveFor es (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI)
-                 → thruWalk⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now
-                     (thruEvents (map (applyClo (Θ₀ , elemᵛ , ρ₀)) es)) sI stI rI
+        quiet-elem-step : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₁ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                            {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {ns z es rI}
+                        → Sound p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
+                        → Walkedˣ ns op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+                        → QuietElem {u} z → Carries {echoᵗ u} es []
+                        → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI)
+                        → (W : thruWalk⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now
+                            (thruEvents (z ∷ map (applyClo (Θ₀ , elemᵛ , ρ₀)) es)) sI stI rI) → sz-thruWalk W < suc M
+                        → Σ (After S ([] , sP , stP) rI) λ A
+                            → Walkedˣ ns op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+        quiet-elem-step {stP = stP} S sp cI w (quiet-elem bx) b l (walk-echo dF@(fold-step d₁ (fold-step step-map dq)) W′) lt =
+          let c₁ = step-clear d₁ cI
+              R  = flat-echo S w (quiet _ bx []) d₁
+              L₁ = live-echo-if {π = Store.π S} {NP = EvalSt.nodes stP} (proj₁ w) d₁ l
+              E  = quiet-tail R sp (tail-of c₁) (inj₂ (restamp-unlive (live-if-under _ _ L₁))) dq (sz-1 (sz-1 (sz-r (sz-l {a = sz-foldPath dF} {b = sz-thruWalk W′} lt))))
+              X  = quiet-walk (After.store (proj₁ E)) sp (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b (inj₂ (echo-on R dq L₁)) W′ (sz-r lt)
+          in proj₁ E ⨾ proj₁ X , proj₂ X
+
+        -- a bare echo, restamped: down the impl's tail alone
+        quiet-tail : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ₄ u op m m′ ks}
+                       {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {ns es fin oI sI₁ stI₁ r}
+                   → Restamped S ns op m m′ ks p q [] es fin oI sI₁ stI₁ → Sound p sP stP → ClearI m′ ks q sI₁ stI₁
+                   → LiveFor es q (EvalSt.nodes stI₁)
+                   → (dq : foldPath⇓ now q es fin sI₁ stI₁ r) → sz-foldPath dq < suc M
+                   → Σ (After S ([] , sP , stP) (oI ++ proj₁ r , proj₂ r)) λ A
+                       → Walkedˣ ns op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ r)))
+        quiet-tail {stP = stP} {stI₁ = stI₁} {r = r} (restamped A (fl , rel) c e) sp cI lv dq lt =
+          let X  = quiet-pass (After.store A) rel c e sp (proj₂ (proj₁ cI)) lv dq lt
+              F  = flat-move (EvalSt.nodes stP) (EvalSt.nodes stI₁) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ r)))
+                     (After.grows (proj₁ X)) (unmoved refl) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) fl
+          in A ⨾ proj₁ X , F , proj₂ X
+
+      -- the explode's quiet element walked with the merge's node as it was
+      inner-at : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂ z}
+                   {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {r}
+               → Sound p sP stP → Sound (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+               → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+               → LiveIf (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (EvalSt.nodes stI)
+               → QuietElem {u} z
+               → (d : foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (z ∷ []) false sI stI r)
+               → sz-foldPath d < suc M
+               → Σ (After S ([] , sP , stP) r) λ A
+                   → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ r)))
+      inner-at {stP = stP} S {Θ₁ = Θ₁} {ρ₁ = ρ₁} {h₅ = h₅} sp si w lv qz
+               (fold-step dW@(step-thru-outer W) (fold-step d₁ (fold-step step-map dq))) lt =
+        let X  = quiet-elem-step S {Θ₀ = Θ₁} {ρ₀ = ρ₁} sp (unthru si) w qz [] lv W (sz-l (sz-1 lt))
+            cI = tail-of (step-clear d₁ (unthru (step-kept _ dW si)))
+            (A , f′ , r′ , c′ , e′ , _) = restamp-echo (After.store (proj₁ X)) (proj₁ (proj₂ X)) (proj₂ (proj₂ X)) [] d₁
+            B  = quiet-pass (After.store A) r′ c′ e′ sp (proj₂ (proj₁ cI))
+                   (live-echo {π = Store.π (After.store (proj₁ X))} {NP = EvalSt.nodes stP} {h₃ = h₅} (proj₁ (proj₂ X)) d₁ (inj₁ refl)) dq
+                   (sz-1 (sz-1 (sz-r (sz-r (sz-1 lt)))))
+        in proj₁ X ⨾ (A ⨾ proj₁ B) ,
+           flat-move (EvalSt.nodes stP) _ (EvalSt.nodes stP) _ (After.grows (proj₁ B)) (unmoved refl)
+                     (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) f′ ,
+           proj₂ B
+
+    -- AN EXPLODE'S QUIET ELEMENT WALKED WHILE ITS MERGE COUNTS IT: the
+    -- flattener's fold of the one element runs over the merge's node
+    -- holding the inner in flight, and with that node set back to what
+    -- it held, the stores and the walk are related where the fold
+    -- leaves them, the plain side still
+    --
+    -- The fold is re-based off the written node by `fold-off`, which
+    -- keeps its size, and walked by the pass the bound one below.  The
+    -- cycle through the explode is this recursion on the bound, outside
+    -- `Bounded`, whose own recursion stays on the impl's derivation.
+    --
+    -- DEAD ROUTE: walking it where the merge counts the inner needs a
+    --   `Store` there, and every row through the outer reads `MergeAt`
+    --   at count zero; the store holds only between steps.
+    -- DEAD ROUTE: the same walk inside the pass's own mutual block does
+    --   not descend: a derivation a lemma hands back is no subterm of
+    --   the explode's, and the termination checker exhausts the dev
+    --   loop's memory before ruling, so the paths the cycle shrinks are
+    --   no rescue either.
+    inner-over-at : ∀ M → InnerOver M
+    inner-over-at zero S sp ci W lX lv qz d ()
+    inner-over-at (suc M) {sP} {stP} {sI} {stI} S {op = op} {m = m} {m′ = m′} {ks = ks} {mX = mX} {x₀ = x₀} {y = y} {p = p} {q = q}
+                  sp ci W lX lv qz d (s≤s lt) =
+      let (r′ , d′ , sz≡ , eq) = fold-off ci d
+          N′ = EvalSt.nodes (proj₂ (proj₂ r′))
+          E  = trans (set-twice mX x₀ y N′) (set-same mX x₀ N′ (trans (fold-unmoved d′ ci) lX))
+      in subst (λ r → Σ (After S ([] , sP , stP) (proj₁ r , proj₁ (proj₂ r) , record (proj₂ (proj₂ r)) { nodes = setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))) })) λ A
+                        → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r)))))
+               (sym eq)
+               (subst (λ Nd → Σ (After S ([] , sP , stP) (proj₁ r′ , proj₁ (proj₂ r′) , record (proj₂ (proj₂ r′)) { nodes = Nd })) λ A
+                               → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) Nd)
+                      (sym E)
+                      (Bounded.inner-at M (inner-over-at M) S sp (proj₂ ci) W lv qz d′ (s≤s (subst (_≤ M) (sym sz≡) lt))))
+
+    -- THE QUIET PASS, AND THE ARMS OTHER PASSES REACH, each bounded by its own fold
+    quiet-pass : ∀ {lo lo′ s} {p : Path Γ lo s t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t)} → Quiet p q
+    quiet-pass S r b e sp si lv dI = Bounded.quiet-pass (sz-foldPath dI) (inner-over-at (sz-foldPath dI)) S r b e sp si lv dI ≤-refl
+
+    explode-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                    {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+                    {rI}
+                → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+                → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
+                → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
+                → ∀ e′ → Bare {echoᵗ u} e′
+                → thruConsume⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
+                    (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′) sI stI rI
+                → Σ (After S ([] , sP , stP) rI) λ A
+                    → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                        u op m m′ ks (mX ∷ [])
+                      × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+                      × MergeAt {Γ = Γ} κ (EvalSt.nodes (proj₂ (proj₂ rI))) u mX
+                      × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I (proj₁ rI))
+    explode-quiet S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r x lv e′ b C =
+      Bounded.explode-quiet (sz-thruConsume C) (inner-over-at (sz-thruConsume C)) S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
+        cp ci fl r x lv e′ b C ≤-refl
+
+    explode-tail : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₁ ρ₁ Θ₂ ρ₂}
+                     {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {rI}
+                 → Sound p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+                 → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
+                 → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
+                 → MergeAt {Γ = Γ} κ (EvalSt.nodes stI) u mX
+                 → foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) [] false sI stI rI
                  → Σ (After S ([] , sP , stP) rI) λ A
-                     → Walkedˣ ns op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-      quiet-walk S sp cI w [] _ walk-nil = after S (λ x → x) (λ x → x) [] (λ x → x) , w
-      quiet-walk S {Θ₀ = Θ₀} {ρ₀} sp cI w (quiet e′ bq b) lv W = quiet-elem-step S sp cI w (elem-quiet {Θ = Θ₀} {ρ₀} e′ bq) b (live-cons lv) W
+                     → Flattener {Γ = Γ} κ (Store.π (After.store A)) {t = t} (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                         u op m m′ ks (mX ∷ [])
+                       × PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
+                       × MergeAt {Γ = Γ} κ (EvalSt.nodes (proj₂ (proj₂ rI))) u mX
+    explode-tail S {op = op} sp ci fl r x d = Bounded.explode-tail (sz-foldPath d) (inner-over-at (sz-foldPath d)) S {op = op} sp ci fl r x d ≤-refl
 
-      quiet-elem-step : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                          {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {ns z es rI}
-                      → Sound p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
-                      → Walkedˣ ns op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                      → QuietElem {u} z → Carries {echoᵗ u} es []
-                      → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI)
-                      → thruWalk⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now
-                          (thruEvents (z ∷ map (applyClo (Θ₀ , elemᵛ , ρ₀)) es)) sI stI rI
-                      → Σ (After S ([] , sP , stP) rI) λ A
-                          → Walkedˣ ns op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ rI)))
-      quiet-elem-step {stP = stP} S sp cI w (quiet-elem bx) b l (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) =
-        let c₁ = step-clear d₁ cI
-            R  = flat-echo S w (quiet _ bx []) d₁
-            L₁ = live-echo-if {π = Store.π S} {NP = EvalSt.nodes stP} (proj₁ w) d₁ l
-            E  = quiet-tail R sp (tail-of c₁) (inj₂ (restamp-unlive (live-if-under _ _ L₁))) dq
-            X  = quiet-walk (After.store (proj₁ E)) sp (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b (inj₂ (echo-on R dq L₁)) W′
-        in proj₁ E ⨾ proj₁ X , proj₂ X
+    quiet-tail : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ₄ u op m m′ ks}
+                   {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {ns es fin oI sI₁ stI₁ r}
+               → Restamped S ns op m m′ ks p q [] es fin oI sI₁ stI₁ → Sound p sP stP → ClearI m′ ks q sI₁ stI₁
+               → LiveFor es q (EvalSt.nodes stI₁)
+               → foldPath⇓ now q es fin sI₁ stI₁ r
+               → Σ (After S ([] , sP , stP) (oI ++ proj₁ r , proj₂ r)) λ A
+                   → Walkedˣ ns op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ r)))
+    quiet-tail R sp cI lv dq = Bounded.quiet-tail (sz-foldPath dq) (inner-over-at (sz-foldPath dq)) R sp cI lv dq ≤-refl
 
-      -- a bare echo, restamped: down the impl's tail alone
-      quiet-tail : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ₄ u op m m′ ks}
-                     {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {ns es fin oI sI₁ stI₁ r}
-                 → Restamped S ns op m m′ ks p q [] es fin oI sI₁ stI₁ → Sound p sP stP → ClearI m′ ks q sI₁ stI₁
-                 → LiveFor es q (EvalSt.nodes stI₁)
-                 → foldPath⇓ now q es fin sI₁ stI₁ r
-                 → Σ (After S ([] , sP , stP) (oI ++ proj₁ r , proj₂ r)) λ A
-                     → Walkedˣ ns op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ r)))
-      quiet-tail {stP = stP} {stI₁ = stI₁} {r = r} (restamped A (fl , rel) c e) sp cI lv dq =
-        let X  = quiet-pass (After.store A) rel c e sp (proj₂ (proj₁ cI)) lv dq
-            F  = flat-move (EvalSt.nodes stP) (EvalSt.nodes stI₁) (EvalSt.nodes stP) (EvalSt.nodes (proj₂ (proj₂ r)))
-                   (After.grows (proj₁ X)) (unmoved refl) (missed dq (proj₁ cI)) (missed dq (proj₂ cI , proj₂ (proj₁ cI))) fl
-        in A ⨾ proj₁ X , F , proj₂ X
+    sink-quiet : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo′} {i : Fin n} {h′ : lo′ ≤ toℕ (n ↑ʳ i)} {w}
+                   (E : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ w) (F : w ≡ emitᵗ (lookup Γ i)) {now es rI}
+               → CarriesU F es []
+               → foldPath⇓ now (subst (λ u → Path (plainᵏ Γ κ) lo′ u (emitᵗ t)) E (share-sink (n ↑ʳ i) h′)) es false sI stI rI
+               → After S ([] , sP , stP) rI
+    sink-quiet S {h′ = h′} E F c dI = Bounded.sink-quiet (sz-foldPath dI) (inner-over-at (sz-foldPath dI)) S {h′ = h′} E F c dI ≤-refl
 
     -- THE OUTER'S END, AS THE ARM ITS TAIL RESUMES: the flattener's
     -- nodes are below the tail, so its fold leaves them where they were

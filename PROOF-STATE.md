@@ -251,12 +251,18 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### Big picture tier roadmap
 
-- **AN EXPLODE'S INNER IN FLIGHT.** `inner-over` and `inner-one-over` by a
-  pass bounded by a size, not the derivation, so a fold re-based off the
-  merge's node walks. The inner's react, finish and drain are ruled out on
-  both explode subscribes, and a lone payload's run is `elemᵛ`'s element, so
-  the walk is all that is left of them; decides whether `simulation`'s store
-  survives the in-flight count as a frame.
+- **AN EXPLODE'S CARRYING INNER IN FLIGHT.** `inner-one-over` by the
+  ℕ-bounded pass `inner-over` now runs on, `fold-off` re-basing the fold off
+  the merge's node at its own size. Ruled out: termination as the obstacle,
+  and the in-flight count as a frame on the quiet side. Left: the carrying
+  element walks by `one-step`, above the explode in `Simulation.Pass.Path`,
+  so its walker must reach `explode-one-drain`; decides whether
+  `simulation`'s store survives the count where the element is carried.
+
+- **A FOLD OFF A NODE IS FRAMED BY IT.** `fold-off` as a body by induction
+  over the fold, a clause per frame, each frame writing only its own node and
+  `Clear` keeping the written one off the path. Decides whether the in-flight
+  count is a frame at all, which both explode inners now rest on.
 
 - **THE ELABORATED STEPS.** `lifts-map`, `lifts-scan` and `lifts-while` as
   bodies by induction over the emit the step is handed, one clause per event
@@ -275,9 +281,12 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
   `DEAD ROUTE`: one exploded emit, carrying one value or nothing, subscribed at
   a merge marked done, sends at its delivery; open where the merge's path is
   spent.
-- **`inner-{over,one-over}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE×3`: an
-  explode's element walks the flattener while its merge counts it, and with the
-  merge set back the stores and walk are related.
+- **`inner-one-over`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`: an
+  explode's carrying element walks the flattener while its merge counts it,
+  and with the merge set back the stores and walk are related.
+- **`fold-off`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a fold down a
+  path missing a node, run with that node written, is the fold without the
+  write, of the same size, the write laid over where it ends.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
