@@ -71,6 +71,7 @@ open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-subscribeE; sz-subscribeInner; sz-thruConsume; sz-1; sz-l; sz-r; sz-foldPath; sz-thruWalk;
                                    sz-shareWalk; sz-shareGo; sz-innerFinish)
 open import Simulation.Grow using (nodes-grow; flatG; pathG; fresh-off)
+open import Simulation.Off using (fold-off)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
 open import Rx.Evaluator.Reducible.Support using (Sound; fresh-path; fresh-inner; sub-ot; sub-on; kill-sub; switchKill-ct; sub-rule;
@@ -104,26 +105,6 @@ set-twice nid a b [] rewrite ≡ᵇ-refl nid = refl
 set-twice nid a b ((k , s) ∷ r) with k ≡ᵇ nid in eq
 ... | true rewrite ≡ᵇ-refl nid = refl
 ... | false rewrite eq = cong ((k , s) ∷_) (set-twice nid a b r)
-
-postulate
-  -- A FOLD DOWN A PATH OFF A NODE IS FRAMED BY IT: run from a table
-  -- holding that node, rewritten, it is the fold from the table as it
-  -- was, of the same size, with the rewrite laid over where it ends.
-  -- The node must be in the table: rewriting an absent one appends it,
-  -- and a node the fold installs then lands on the other side of it.
-  -- A share the fold connects has no reader but the one the connect
-  -- registers, which is the rule's `linked`.
-  --
-  -- REFUTED: `Refuted.Fold-Off-Absent`, read with
-  --   `git show d035ee48:agda/evidence/refuted/Refuted/Fold-Off-Absent.agda`
-  --   -- the node absent, a merge handed a `defer` installs past it.
-  fold-off : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} {κ : Path Δ lo s t} {k x y now vals fin sched st r}
-           → lookupNode k (EvalSt.nodes st) ≡ just x
-           → Clear k κ sched st
-           → (d : foldPath⇓ {e = e} now κ vals fin sched (record st { nodes = setNode k y (EvalSt.nodes st) }) r)
-           → Σ _ λ r′ → Σ (foldPath⇓ now κ vals fin sched st r′) λ d′
-               → sz-foldPath d′ ≡ sz-foldPath d
-               × r ≡ (proj₁ r′ , proj₁ (proj₂ r′) , record (proj₂ (proj₂ r′)) { nodes = setNode k y (EvalSt.nodes (proj₂ (proj₂ r′))) })
 
 -- A SCAN'S STEP AT A NODE HOLDING NO ACCUMULATOR OF ITS OWN TYPE
 -- passes nothing and writes nothing; at one that does, it is `scan-at`'s

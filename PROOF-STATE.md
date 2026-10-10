@@ -238,11 +238,11 @@ over `correspondence`, via `subscribe-related`/`cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; unrelated subs; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
-2-value emits; bare cuts; writes moving row; cut/liveness/drain/
+2-value emits; bare cuts; writes moving row/fold; cut/liveness/drain/
 body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
 of splits/folds; mintᵉ/root stamps; quiet arms/cut drains; hop
 scripts; joiners off catch; installs+hops; revived/dead/held inners;
-unaligned reads/connects/flushes; renames; 2-script
+unaligned reads/links/flushes; renames; 2-script
 stores+values; mid-emit joins; μ cold reads; dying rows;
 dead outers/rows past ends; Store echoes;
 absent/stale readers.
@@ -250,13 +250,6 @@ absent/stale readers.
 also: `main` — the QuickCheck's entry point, and every generator it calls: the sweep feeds the bug cache, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **A FOLD OFF A NODE IS FRAMED BY IT.** `fold-off` as a body by induction
-  over the fold, a clause per constructor rebuilt at the table without the
-  write, over the floor's watch that now proves `fold-unmoved`: no walked
-  path stands on the node, and a share the fold connects reads only rows it
-  registered. Decides whether the in-flight count is a frame at all, which
-  both explode inners now rest on.
 
 - **AN OUTER'S GROUP SENDS AT ITS INSTANT.** `elem-out` as a body over
   the restamp's walk, a clause per element, now read at an explode's merge in
@@ -280,9 +273,6 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
   `DEAD ROUTE`: one exploded emit, carrying one value or nothing, subscribed at
   a merge marked done, sends at its delivery; open where the merge's path is
   spent.
-- **`fold-off`** (Simulation.Pass) — FALSITY, `REFUTED`: a fold down a path
-  missing a node the table holds, run with that node rewritten, is the fold
-  without the write, of the same size, the write laid over where it ends.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.

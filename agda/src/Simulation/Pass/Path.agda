@@ -53,7 +53,8 @@ open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Inner using (module PassI)
 open import Simulation.Size using (sz-foldPath; sz-innerFinish; sz-shareGo; sz-shareWalk; sz-dispatchShare; sz-stepFrame; sz-thruWalk; sz-l; sz-r; sz-1)
-open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sink-intro; sink-inv; slotpair; tail-of; nil-all; fold-off; set-twice; set-same)
+open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sink-intro; sink-inv; slotpair; tail-of; nil-all; set-twice; set-same)
+open import Simulation.Off using (fold-off)
 open import Simulation.Pass.Explode using (module PassE; walk-clear)
 
 module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
