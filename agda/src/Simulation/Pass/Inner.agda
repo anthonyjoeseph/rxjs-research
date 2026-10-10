@@ -595,6 +595,12 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- SPENT: a merge holding a queue has not ended, so no outer its
       -- output walks into has, though the inners the drain already spent
       -- may have run the tail and the merge's own outer may be done
+      -- A fact about the STATE the drain starts in, not about a run: what
+      -- it owes is an invariant tying a merge's queue to its tail.
+      -- DEAD ROUTE: threading the tail's liveness through the drain's
+      --   spends, each over `inner-spares` -- that leaf's head is the
+      --   merge's outer frame, live, and a drain runs under an outer that
+      --   may already be done.
       drain-live : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u lim m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
                      {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
                      {f fs l a od o qs r}

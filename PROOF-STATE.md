@@ -233,29 +233,23 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — both top lines' base, by arrival
+`simulation` — both top lines' base by arrival
 over `correspondence`, set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; subscribes unrelated; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
 2-value emits; bare cuts; writes moving row; cut/liveness/drain/
 body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
-`of` splits/folds; `mintᵉ`/root stamps; quiet arms/cut drains; hop
-scripts; joiners off catch; installs+hops; revived inners;
+of splits/folds; mintᵉ/root stamps; quiet arms/cut drains; hop
+scripts; joiners off catch; installs+hops; revived/dead inners;
 unaligned reads/connects/flushes; renames; 2-script
 stores/values; mid-emit joins; μ cold reads; dying rows;
-dead outers; live rows past ends; dead inners.
+dead outers; live rows past ends;
+Store echoes.
 
 also: `main` — the QuickCheck's entry point, and every generator it calls: the sweep feeds the bug cache, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **AN UNENDED FOLD ENDS NO OUTER.** `echo-live`, `consume-live` and
-  `drain-live` are one fact at three call sites: a tail run between an outer's
-  values marks no outer above it done unless a take it spends sent the end.
-  State it once over `foldPath⇓` and its mutual walks, the three as bodies
-  over it. Decides whether the liveness `simulation` now carries through its
-  passes rests on the evaluator alone or needs a `Store` field.
 
 - **FIT THE EXPLODE.** Write `explode-out` and the two subscribe leaves
   as bodies over smaller leaves, `Store` gaining each fact a body needs; the
@@ -267,6 +261,11 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
   and kind, the payload read through the mint's binder. Decides whether
   `simulation`'s scan and cut steps hold at the emits only the elaboration
   writes.
+
+- **A QUEUE KEEPS ITS TAIL LIVE.** `drain-live` as a body over an invariant
+  the store carries: a merge holding a queue finds its tail live unless spent,
+  re-proven at every write to a queue or an outer. Decides whether
+  `simulation`'s drains read liveness off the store or need the registry.
 
 ### The ledger
 
@@ -336,11 +335,12 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 - **`init-{sources,sync}`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: the hot
   scripts live before anything is subscribed are related and in step, source
   for source; swept at two hot slots, after the subscribe.
-- **`{echo,consume}-live`** (Simulation.Pass.Path) — FALSITY, `NO EVIDENCE`: an
-  echo's tail fold, or an inner's consume, between an outer's values ends no
-  outer its flattener's path walks unless it spends that path.
-- **`drain-live`** (Simulation.Pass.Inner) — FALSITY, `NO EVIDENCE`: a drain
-  about to subscribe a queued inner finds its tail live unless spent.
+- **`fold-spares`, `inner-spares`** (Simulation.Pass.Path) — FALSITY,
+  `NO EVIDENCE`: an unended fold, or an inner subscribed under a flattener,
+  ends no standing outer of the flattener's path unless it spends it.
+- **`drain-live`** (Simulation.Pass.Inner) — FALSITY, `DEAD ROUTE`: a drain
+  about to subscribe a queued inner finds its tail live unless spent; a fact
+  about the state, not a run.
 - **`idle-lanes`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: an idle flattener
   has no alive row down an inner lane.
 - **`gone-walk`** (Simulation.Arm) — FALSITY, `NO EVIDENCE`: an outer's walk

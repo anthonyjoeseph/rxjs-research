@@ -18,7 +18,8 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᵃ)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Nat.Properties using (≤-refl; ≤-trans)
+open import Data.Maybe   using (just)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
@@ -27,9 +28,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim      using (valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ctx; Closed; Val; applyClo)
-open import Rx.Evaluator using (Sched; EvalSt; Path; share-sink; _↠[_]_; map-f; thru-outer; echoᵗ; thruEvents; atSlot; skipᵇ; markDlv; memberSource)
+open import Rx.Evaluator using (Sched; EvalSt; Path; lookupNode; spentAt; share-sink; _↠[_]_; map-f; thru-outer; echoᵗ; thruEvents; atSlot; skipᵇ; markDlv; memberSource)
 open import Decide using (≡ᵇ-refl)
-open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓; thruConsume⇓;
+open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; subscribeInner⇓;
+  consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓; thruConsume⇓;
   walk-nil; walk-echo; walk-cons; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓; disp;
   shareWalk⇓; walk-end; walk-more; fold-sink; step-from-inner; react-false; react-alive; react-dead; innerFinish⇓;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil)
@@ -39,13 +41,13 @@ open import SExp.InstEmit.Decode using (decodeEmit; decodeEmits)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Stores using (Lifts; sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
   outerElem~; outerExplode~; inner~; deferInner~; RowRel; read~; []; _∷_; partner-row; partner-mem;
-  Store; LiveOn; LiveIf; live-if; LiveFor; live-for; live-if-drop; live-if-under; LiveRows; Inv)
+  Store; LiveOn; LiveIf; live-if; LiveFor; live-for; live-if-drop; live-if-under; live-if-set; outerDoneᵇ; LiveRows; Inv)
 open import Simulation.After using (skip-cut; module Kept)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (Out; out-quiet; out-++; out-tail; Clear; ClearI; missed; unthru; step-clear; fold-clear; consume-clear; adv; Gone)
 open import Simulation.Sweep using (t≢f; same-refl)
-open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; sub-ot; Agree; admit-ot; sink-sound)
+open import Rx.Evaluator.Reducible.Support using (Sound; switchKill-nodes; drop-ot; sub-ot; Agree; admit-ot; sink-sound)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Inner using (module PassI)
 open import Simulation.Walks using (module Walkers)
@@ -127,25 +129,40 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
                  → foldPath⇓ now p vs f sched st r
                  → memberSource k (EvalSt.dying st) ≡ true → memberSource k (EvalSt.dying (proj₂ (proj₂ r))) ≡ true
 
-      -- AN ECHO'S TAIL ENDS NO OUTER ITS FLATTENER'S PATH WALKS UNLESS IT
-      -- SPENDS IT: an unended fold wraps no outer, and a take's end
-      -- reaching one spends the path above it
-      echo-live : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                    {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es r}
-                → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                → foldPath⇓ now q es false sI stI r
-                → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI)
-                → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes (proj₂ (proj₂ r)))
+      -- AN UNENDED FOLD ENDS NO STANDING OUTER UNLESS IT SPENDS ITS PATH:
+      -- an end reaches a flattener's outer only down a path a take on it
+      -- sent, and everything else the fold sets running is minted fresh
+      fold-spares : ∀ {now lo ℓ s o k x} {h : lo ≤ ℓ} {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {es sched} {st : EvalSt ei} {r}
+                  → foldPath⇓ now q es false sched st r
+                  → lookupNode k (EvalSt.nodes st) ≡ just x
+                  → LiveIf (thru-outer {u = s} o k ↠[ h ] q) (EvalSt.nodes st)
+                  → LiveIf (thru-outer o k ↠[ h ] q) (EvalSt.nodes (proj₂ (proj₂ r)))
 
-      -- AND SO DOES AN INNER'S CONSUME: the lane's subscribe runs the
-      -- inner's synchronous emits down the same tail, and its end only
-      -- frees the lane, its outer untouched
-      consume-live : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                       {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o r}
-                   → Walked op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                   → thruConsume⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o sI stI r
-                   → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI)
-                   → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes (proj₂ (proj₂ r)))
+      -- AND SO DOES AN INNER SUBSCRIBED UNDER THE FLATTENER: its end finds
+      -- the flattener's outer live, so it frees a lane and ends nothing
+      inner-spares : ∀ {now lo ℓ s op k o′} {h : lo ≤ ℓ} {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {o sched} {st : EvalSt ei} {r}
+                   → subscribeInner⇓ op k q now o sched st r
+                   → LiveIf (thru-outer {u = s} o′ k ↠[ h ] q) (EvalSt.nodes st)
+                   → LiveIf (thru-outer o′ k ↠[ h ] q) (EvalSt.nodes (proj₂ (proj₂ (proj₂ r))))
+
+    -- a consume takes its lane, ending nothing, then subscribes the inner
+    consume-spares : ∀ {now lo ℓ s op k o′} {h : lo ≤ ℓ} {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {o sched} {st : EvalSt ei} {r}
+                   → thruConsume⇓ op k q now o sched st r
+                   → LiveIf (thru-outer {u = s} o′ k ↠[ h ] q) (EvalSt.nodes st)
+                   → LiveIf (thru-outer o′ k ↠[ h ] q) (EvalSt.nodes (proj₂ (proj₂ r)))
+    consume-spares {k = k} {st = st} (consume-all-sub e _ d) l =
+      inner-spares d (live-if-set _ k _ (EvalSt.nodes st) (λ z → trans (sym (cong outerDoneᵇ e)) z) (λ _ → cong spentAt e) l)
+    consume-spares {k = k} {st = st} (consume-all-enqueue e _) l =
+      live-if-set _ k _ (EvalSt.nodes st) (λ z → trans (sym (cong outerDoneᵇ e)) z) (λ _ → cong spentAt e) l
+    consume-spares (consume-all-nil _) l = l
+    consume-spares {k = k} {st = st} (consume-switch-sub {sched₀ = s₀} {cur = cur} e refl _ d) l =
+      inner-spares d (live-if-set _ k _ _ (λ z → trans (sym (cong outerDoneᵇ e′)) z) (λ _ → cong spentAt e′)
+        (subst (LiveIf _) (sym (switchKill-nodes cur s₀ st)) l))
+      where e′ = trans (cong (lookupNode k) (switchKill-nodes cur s₀ st)) e
+    consume-spares (consume-switch-nil _) l = l
+    consume-spares {k = k} {st = st} (consume-exhaust-sub e d) l =
+      inner-spares d (live-if-set _ k _ (EvalSt.nodes st) (λ z → trans (sym (cong outerDoneᵇ e)) z) (λ _ → cong spentAt e) l)
+    consume-spares (consume-exhaust-nil _) l = l
 
     -- an echo's restamp, then its tail, keep the path live unless spent
     echo-on : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
@@ -154,7 +171,9 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
             → Restamped S op m m′ ks p q ws es fin oI sI₁ stI₁ → foldPath⇓ now q es fin sI₁ stI₁ r
             → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI₁)
             → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes (proj₂ (proj₂ r)))
-    echo-on (restamped A w _ refl) dq l = echo-live (After.store A) w dq l
+    echo-on {op = op} {h₂ = h₂} {h₃ = h₃} {h₄ = h₄} (restamped A w _ refl) dq l =
+      live-if (LiveIf.run (fold-spares {o = flatOp op} {h = ≤-trans h₂ (≤-trans h₃ h₄)} dq
+        (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ w)))))) (live-if (LiveIf.run l))))
 
     -- and so does a fan-out, one reader's fold at a time
     go-dying : ∀ {lo now k} {i : Fin (n + n)} {vals fin chs sched} {st : EvalSt ei} {r}
@@ -428,7 +447,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
             c₂ = fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁
             C  = consume-pair wk (After.store (proj₁ E)) (proj₂ E) ob cP c₂ (live-if-under _ _ L) c c′ (sz-l lt)
             X  = elem-walk wk (After.store (proj₁ C)) (consume-clear c cP)
-                   (consume-clear c′ c₂) (proj₂ C) b (inj₂ (consume-live (After.store (proj₁ E)) (proj₂ E) c′ L)) W W′ (sz-r lt)
+                   (consume-clear c′ c₂) (proj₂ C) b (inj₂ (consume-spares c′ L)) W W′ (sz-r lt)
         in proj₁ E ⨾ (proj₁ C ⨾ proj₁ X) , proj₂ X
       one-step wk {stP = stP} S cP cI w (elem {w = inj₂ _} r no-lane) b l (walk-echo dv W) (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) lt =
         let c₁ = step-clear d₁ cI
@@ -448,7 +467,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
             c₂  = fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁
             C   = consume-pair wk (After.store (proj₁ E)) (proj₂ E) ob cP₂ c₂ (live-if-under _ _ L) c c′ (sz-l (sz-r lt))
             X   = elem-walk wk (After.store (proj₁ C)) (consume-clear c cP₂)
-                    (consume-clear c′ c₂) (proj₂ C) b (inj₂ (consume-live (After.store (proj₁ E)) (proj₂ E) c′ L)) W W′ (sz-r (sz-r lt))
+                    (consume-clear c′ c₂) (proj₂ C) b (inj₂ (consume-spares c′ L)) W W′ (sz-r (sz-r lt))
         in proj₁ E ⨾ (proj₁ C ⨾ proj₁ X) , proj₂ X
 
       -- a valued echo, restamped: down both tails
