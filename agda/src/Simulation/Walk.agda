@@ -77,6 +77,7 @@ open Kept using (After; module After; _⨾_; after)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-subscribeE; sz-foldPath; sz-1)
 open import Simulation.Pass.Path using (module PassP)
+open import Simulation.Pass.Explode using (module PassE)
 open import Simulation.Stores using (inv-init; guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
   spentWhile~; FlatNodes; merge~; switch~; exhaust~; outerElem~; outerExplode~; Store; Src; Arr;
   SrcNum; []; elab; LiveIf; live-if; live-if-above; live-if-agree; live-if-cons; live-if-thru; flat-live; outerDoneᵇ)
@@ -230,7 +231,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ using (Carries) renaming ([] to []ᶜ)
 
-  open Walkers {Γ = Γ} κ using (frameAt; Walker)
+  open Walkers {Γ = Γ} κ using (frameAt)
 
   postulate
     -- AN `of`'S EMITS STAND AT ITS PROGRAM'S FRAME, subscribe-kind
@@ -241,7 +242,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     open Walkers.On {Γ = Γ} κ ep ei using (Walks; Walks<; Elab-Walks; Elab-Walks<)
-    open PassP.InP {Γ = Γ} κ {t} {ep} {ei} using (path-pass)
+    open PassP.InP {Γ = Γ} κ {t} {ep} {ei} using (path-pass; inner-one-at)
+    open PassE.InE {Γ = Γ} κ {t} {ep} {ei} using (Walker′; module Walker′)
 
     -- the impl read's path: the restamp handing a read's emits its frame
     readPath : ∀ Θ {Θ′} (i : Fin n) (w : Ren∈ (plainᶜ⁺ Θ) Θ′) (ρ′ : Env (plainᵏ Γ κ) Θ′)
@@ -296,7 +298,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     --   live hot joining its connected share.
     StampedRead : ∀ {Θ} (i : Fin n) → Set
     StampedRead {Θ} i =
-      ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+      ∀ {M} → Walker′ M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
       → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
       → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
@@ -364,7 +366,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- slot `k` lowers a path's floor to `suc k` and no further, so a read
       -- reaches it only at a cold slot above the source it registered on.
       cold-read-end : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
-                    → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                    → ∀ {M} → Walker′ M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                     → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
                     → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
                         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
@@ -394,7 +396,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- the end, the impl's runs the share's definition, whose read of
       -- the raw slot folds it
       hot-read-connect-done : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
-                   → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                   → ∀ {M} → Walker′ M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                    → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
                    → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
                        {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI d ok}
@@ -578,7 +580,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- tail both runs register a row, the block's flush folds what the
     -- plain prefix folds, and the pass carries the stores past it.
     cold-read : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
-              → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+              → ∀ {M} → Walker′ M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
               → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
               → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
                   {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
@@ -1032,7 +1034,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     --   the rule and `π`'s keys below the counter, which gives a
     --   pinned node's freshness, but neither record says where a
     --   path's nodes' rows end, nor that its nodes are distinct.
-    of-fold : ∀ {N} (wk : Walker ep ei N) {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
+    of-fold : ∀ {N} (wk : Walker′ N) {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
                        {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI src es vs}
                    → (S : Store κ sP stP sI stI)
                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
@@ -1051,13 +1053,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- an `of`'s walk: the impl mints its source, and both fold the
     -- group and end
-    walk-of : ∀ {M Θ u} (ts : List (STm Γ [] [] Θ u)) → Walker ep ei M → Elab-Walks< (suc M) (ofˢ ts)
+    walk-of : ∀ {M Θ u} (ts : List (STm Γ [] [] Θ u)) → Walker′ M → Elab-Walks< (suc M) (ofˢ ts)
     walk-of ts wk w r S pr oP oI lv (subs-of dP) dS@(subs-mint {src = src} fr (subs-of dI)) lt =
       let A = of-fold wk S pr oP oI fr (of-carries ts w r refl src) (gone-subscribed S dS) lv dP dI (s<s⁻¹ lt)
       in proj₁ A , proj₂ A , of-fold-stamps S pr oP oI fr (of-carries ts w r refl src) (of-emits ts w refl src) dP dI
 
     -- a cold slot's walk: the impl's read past the transport
-    walk-cold : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-cold : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Walker′ M → Elab-Walks< {Θ} (suc M) (inputˢ i)
     walk-cold i e wk w r S pr oP oI lv dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
     walk-cold i e wk w r S pr oP oI lv dP dI lt | coldᵏ | eq =
       let A = cold-read i ek wk w r eq S pr oP oI lv dP (read-machine w eq _ dI) lt
@@ -1066,7 +1068,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-cold i () wk w r S pr _ _ _ dP dI lt | sharedᵏ | _
 
     -- a hot slot's walk: the impl's read peeled to its stamped slot
-    walk-hot : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-hot : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Walker′ M → Elab-Walks< {Θ} (suc M) (inputˢ i)
     walk-hot i e wk w r S pr _ _ _ dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
     walk-hot i e wk w r S pr oP oI lv dP (subs-map dJ) lt | hotᵏ | eq =
       let A = hot-read i ek wk w r eq S pr oP oI lv dP (read-input _ eq dJ) lt
@@ -1075,7 +1077,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-hot i () wk w r S pr _ _ _ dP dI lt | sharedᵏ | _
 
     -- a shared slot's walk, the same
-    walk-shared : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-shared : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Walker′ M → Elab-Walks< {Θ} (suc M) (inputˢ i)
     walk-shared i e wk w r S pr _ _ _ dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
     walk-shared i e wk w r S pr oP oI lv dP (subs-map dJ) lt | sharedᵏ | eq =
       let A = shared-read i ek wk w r eq S pr oP oI lv dP (read-input _ eq dJ) lt
@@ -1084,7 +1086,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-shared i () wk w r S pr _ _ _ dP dI lt | hotᵏ | _
 
     -- the one arm that reads `κ`, one leaf per kind
-    walk-input : ∀ {M Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-input : ∀ {M Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Walker′ M → Elab-Walks< {Θ} (suc M) (inputˢ i)
     walk-input i coldᵏ   e wk = walk-cold i e wk
     walk-input i hotᵏ    e wk = walk-hot i e wk
     walk-input i sharedᵏ e wk = walk-shared i e wk
@@ -1098,32 +1100,34 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- ONE FORMER'S WALK, its sub-walks handed a walker under the
     -- former's own plain size.  A μ's unrolling is no smaller a tree,
     -- but its subscribe is a premise of the μ's.
-    at : ∀ {M Θ u} (s : SExp Γ [] [] Θ u) → Walker ep ei M → Elab-Walks< (suc M) s
+    at : ∀ {M Θ u} (s : SExp Γ [] [] Θ u) → Walker′ M → Elab-Walks< (suc M) s
     at (inputˢ i) wk = walk-input i (lookup κ i) refl wk
     at (ofˢ ts) wk         = walk-of ts wk
     at {Θ = Θ} {u} emptyˢ wk w {ρ′} {ρ} r S pr oP oI lv (subs-empty f) dI lt = walk-of {Θ = Θ} {u} [] wk w {ρ′} {ρ} r S pr oP oI lv (subs-of {ts = []} f) dI lt
-    at (takeWhileˢ f b) wk w r = walk-while f b (wk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
+    at (takeWhileˢ f b) wk w r = walk-while f b (Walker′.walks wk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
     at (mapˢ f b) wk w r S pr oP oI lv (subs-map dP) (subs-map dI) lt =
-      let X = wk b w r S (map~ (lifts-map f w r) pr) (bare oP) (bare oI) (live-if-cons _ _ _ refl lv) dP dI (s<s⁻¹ lt)
+      let X = Walker′.walks wk b w r S (map~ (lifts-map f w r) pr) (bare oP) (bare oI) (live-if-cons _ _ _ refl lv) dP dI (s<s⁻¹ lt)
       in pairS (unmap (proj₁ X , proj₁ (proj₂ X))) (proj₂ (proj₂ X))
-    at (scanˢ f z b) wk    = walk-scan f z b (wk b)
-    at (flattenˢ op b) wk w r = walk-flat op b (wk b) (perInnerˢ op b) w r
+    at (scanˢ f z b) wk    = walk-scan f z b (Walker′.walks wk b)
+    at (flattenˢ op b) wk w r = walk-flat op b (Walker′.walks wk b) (perInnerˢ op b) w r
     at (μˢ b) wk w r S pr oP oI lv (subs-μ dP) (subs-μ dI) lt =
       let (s′ , pe , ie) = μ-unfolds b
-      in wk s′ w r S pr oP oI lv (reExpᴾ (sym pe) dP) (reExp (sym (ie w)) dI) (sz-reExpᴾ (sym pe) dP (s<s⁻¹ lt))
+      in Walker′.walks wk s′ w r S pr oP oI lv (reExpᴾ (sym pe) dP) (reExp (sym (ie w)) dI) (sz-reExpᴾ (sym pe) dP (s<s⁻¹ lt))
     at (varˢ ()) _
     at (deferˢ b) _ w r S pr oP oI lv dP dI _ = walk-defer b w r S pr oP oI lv dP dI
 
     -- THE WALK DESCENDS THE PLAIN DERIVATION'S SIZE
-    walk< : ∀ {N} → Acc _<_ N → Walker ep ei N
-    walk< (acc rs) s w r S pr oP oI lv dP dI lt = at s (walk< (rs lt)) w r S pr oP oI lv dP dI (n<1+n _)
+    walk< : ∀ {N} → Acc _<_ N → Walker′ N
+    Walker′.walks (walk< (acc rs)) s w r S pr oP oI lv dP dI lt = at s (walk< (rs lt)) w r S pr oP oI lv dP dI (n<1+n _)
+    Walker′.ones (walk< (acc rs)) lt = inner-one-at (walk< (rs lt))
 
     walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
-    walk s w r S pr oP oI lv dP dI = walk< (<-wellFounded _) s w r S pr oP oI lv dP dI (n<1+n _)
+    walk s w r S pr oP oI lv dP dI = Walker′.walks (walk< (<-wellFounded _)) s w r S pr oP oI lv dP dI (n<1+n _)
 
     -- a walker under any bound, for a pass outside the cycle
-    walker : ∀ {N} → Walker ep ei N
-    walker s w r S pr oP oI lv dP dI _ = walk s w r S pr oP oI lv dP dI
+    walker : ∀ {N} → Walker′ N
+    Walker′.walks walker s w r S pr oP oI lv dP dI _ = walk s w r S pr oP oI lv dP dI
+    Walker′.ones walker {K} _ = inner-one-at (walk< (<-wellFounded K))
 
 -- WHERE IT CAN STILL FAIL: A HOT SCRIPT LIVE ON ONE SIDE ONLY, or two
 -- live at different places.  Both lists are the slots' hot scripts in

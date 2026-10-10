@@ -12,8 +12,8 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++�
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (nothing; just)
-open import Data.Nat     using (suc; _≤_)
-open import Data.Nat.Properties using (≤-refl; n≤1+n)
+open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_)
+open import Data.Nat.Properties using (≤-refl; n≤1+n; n<1+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using ([_,_]; inj₁; inj₂)
 open import Data.Unit    using (tt)
@@ -40,6 +40,8 @@ open import Rx.Evaluator.Freshness using (nodeCt; lookup-set)
 open import Rx.Mint using (nodeᵏ; setAt)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; thruWalk-rule)
 open import Simulation.Pass.Quiet using (module PassQ; usable-self; fresh-dead; nil-all)
+open import Simulation.Walks using (module Walkers)
+open import Simulation.Size using (sz-thruWalk)
 
 -- a walk through a flattener keeps its node off the path below it
 walk-clear : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w} {k} {κ : Path Δ lo w u} {op now xs}
@@ -129,6 +131,7 @@ module _ {m} {Δ : Ctx m} {t : Ty} {Θ} (ρ : Env Δ Θ) (e′ : Val Δ (emitᵗ
 module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassQ {Γ = Γ} κ
+  open Walkers {Γ = Γ} κ using (Walker)
 
   module InE {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
@@ -149,33 +152,44 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                   (subst (λ l → Pointwise (λ x v → V κ (echoᵗ u) (proj₂ x) v) l (w ∷ []))
                          (values-decode {Γ = plainᵏ Γ κ} {a = plainᵗ (echoᵗ u)} (proj₁ e′) (proj₁ (proj₂ e′)) (proj₁ (proj₂ (proj₂ e′))) (proj₂ (proj₂ (proj₂ e′)))) r)
 
-    postulate
-      -- AN EXPLODE'S CARRYING ELEMENT WALKED WHILE ITS MERGE COUNTS IT:
-      -- the flattener's fold of the one element runs over the merge's
-      -- node holding the inner in flight, the plain outer's walk hands the
-      -- value on, and with that node set back to what it held, the stores
-      -- and the walk are related where the two leave them.  The carrying
-      -- twin of `inner-over`
-      --
-      -- DEAD ROUTE: walking the element into the flattener over the pass's
-      --   own steps needs a `Store` while the merge counts that inner,
-      --   where `MergeAt` reads count zero.
-      inner-one-over : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂ x₀ y w z}
-                         {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {rP r}
-                     → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
-                     → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                     → lookupNode mX (EvalSt.nodes stI) ≡ just x₀
-                     → LiveIf (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (EvalSt.nodes stI)
-                     → ∀ e′ → EmitRel κ (echoᵗ u) e′ (w ∷ [])
-                     → thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP
-                     → z ≡ applyClo {s = emitᵗ (echoᵗ u)} {t = echoᵗ (emitᵗ u)} (Θ₀ , elemᵛ , ρ₀) e′
-                     → foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (z ∷ []) false sI
-                         (record stI { nodes = setNode mX y (EvalSt.nodes stI) }) r
-                     → Σ (After S rP (proj₁ r , proj₁ (proj₂ r) , record (proj₂ (proj₂ r)) { nodes = setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))) })) λ A
-                         → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP)))
-                             (setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))))
-                           × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I (proj₁ r))
+    -- AN EXPLODE'S CARRYING ELEMENT WALKED WHILE ITS MERGE COUNTS IT:
+    -- the flattener's fold of the one element runs over the merge's
+    -- node holding the inner in flight, the plain outer's walk hands the
+    -- value on, and with that node set back to what it held, the stores
+    -- and the walk are related where the two leave them.  The carrying
+    -- twin of `inner-over`, under a bound on the plain walk: the walk is
+    -- the pass's, above the explode, so it is handed in
+    IOO-at : ℕ → Set
+    IOO-at K = ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂ x₀ y w z}
+                 {h₄ : ℓ₃ ≤ n + ℓ} {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)} {rP r}
+             → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
+             → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
+             → lookupNode mX (EvalSt.nodes stI) ≡ just x₀
+             → LiveIf (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (EvalSt.nodes stI)
+             → ∀ e′ → EmitRel κ (echoᵗ u) e′ (w ∷ [])
+             → (W : thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP)
+             → z ≡ applyClo {s = emitᵗ (echoᵗ u)} {t = echoᵗ (emitᵗ u)} (Θ₀ , elemᵛ , ρ₀) e′
+             → foldPath⇓ now (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) (z ∷ []) false sI
+                 (record stI { nodes = setNode mX y (EvalSt.nodes stI) }) r
+             → sz-thruWalk W < K
+             → Σ (After S rP (proj₁ r , proj₁ (proj₂ r) , record (proj₂ (proj₂ r)) { nodes = setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))) })) λ A
+                 → Walkedˣ (mX ∷ []) op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP)))
+                     (setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))))
+                   × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I (proj₁ r))
 
+    -- the same at every bound below `N`
+    IOO< : ℕ → Set
+    IOO< N = ∀ {K} → K < N → IOO-at K
+
+    -- A WALKER THE EXPLODE CAN USE: the walk at every former, and the
+    -- carrying element's walk, both under `N`.  A record, so that two
+    -- modules' copies of it compare by their arguments.
+    record Walker′ (N : ℕ) : Set where
+      field
+        walks : Walker ep ei N
+        ones  : IOO< N
+
+    postulate
       -- AN OUTER'S EMIT CARRYING ONE VALUE, EXPLODED AND SUBSCRIBED AT A
       -- MERGE WHOSE OUTER HAS ENDED: `MergeAt` admits the merge done; the
       -- `of` inner's finish would end it again, that end reach the
@@ -261,8 +275,8 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
 
     -- the inner's finish read at the node it set, so its arms match
     -- with no with-abstraction over the subscribe's context
-    explode-one-drain : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                          {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+    explode-one-drain : ∀ {N} (io : IOO< N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                          {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ} {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                           {Θ′ ρ′} {tm : Tm (plainᵏ Γ κ) [] [] Θ′ (echoᵗ (emitᵗ u))} {w rP r₁ out₂ sched₂ st₂}
                       → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
                       → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
@@ -270,7 +284,8 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                       → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] false)
                       → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
                       → ∀ e′ → EmitRel κ (echoᵗ u) e′ (w ∷ [])
-                      → thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP
+                      → (W : thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP)
+                      → suc (sz-thruWalk W) < N
                       → evalWith tm ρ′ ≡ applyClo {s = emitᵗ (echoᵗ u)} {t = echoᵗ (emitᵗ u)} (Θ₀ , elemᵛ , ρ₀) e′
                       → innerFinish⇓ mergeAllᵒ mX (nodeCt sI) (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now (evalWith tm ρ′ ∷ [])
                           (record sI { mint = setAt nodeᵏ (suc (nodeCt sI)) (Sched.mint sI) })
@@ -284,10 +299,10 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                             × PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes st₂) p q
                             × MergeAt {Γ = Γ} κ (EvalSt.nodes st₂) u mX
                             × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I (proj₁ r₁ ++ out₂))
-    explode-one-drain S cp ci fl r lX lv e′ rel W ez (finish-nil e) _ = ⊥-elim (t≢f (trans (sym (usable-self _)) e))
-    explode-one-drain {sI = sI} {stI = stI} S {u = u} {op = op} {mX = mX} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {rP = rP} cp ci fl r lX lv e′ rel W ez (finish-all-drain {outV = outV} {st₁ = st₁′} fd drain-spent) F₂ =
+    explode-one-drain _ S cp ci fl r lX lv e′ rel W _ ez (finish-nil e) _ = ⊥-elim (t≢f (trans (sym (usable-self _)) e))
+    explode-one-drain io {sI = sI} {stI = stI} S {u = u} {op = op} {mX = mX} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {rP = rP} cp ci fl r lX lv e′ rel W lt ez (finish-all-drain {outV = outV} {st₁ = st₁′} fd drain-spent) F₂ =
       let ci′ = sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)
-          (A₁ , W₁ , o₁) = inner-one-over (mint-impl S) {u = u} {Θ₀ = Θ₀} {ρ₀ = ρ₀} cp ci′ (fl , r) lX (live-if-under _ _ lv) e′ rel W ez fd
+          (A₁ , W₁ , o₁) = io lt (mint-impl S) {u = u} {Θ₀ = Θ₀} {ρ₀ = ρ₀} cp ci′ (fl , r) lX (live-if-under _ _ lv) e′ rel W ez fd (n<1+n _)
           c₁ = fold-clear fd (sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)) refl
                  (sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci))
       in explode-one-close S {u = u} {op = op} {mX = mX} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {e′ = e′} {oV = outV} A₁ W₁ o₁ (proj₂ (walk-clear W cp))
@@ -299,8 +314,8 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
     -- once; its element walks the flattener beside the plain outer's
     -- walk, the merge's count falls back, and the empty group the finish
     -- leaves folds the tail
-    explode-one-fresh : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                          {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+    explode-one-fresh : ∀ {N} (io : IOO< N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                          {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ} {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                           {Θ′ ρ′} {tm : Tm (plainᵏ Γ κ) [] [] Θ′ (echoᵗ (emitᵗ u))} {w rP o out sched₁ st₁}
                       → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
                       → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
@@ -308,7 +323,8 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                       → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] false)
                       → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
                       → ∀ e′ → EmitRel κ (echoᵗ u) e′ (w ∷ [])
-                      → thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP
+                      → (W : thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP)
+                      → suc (sz-thruWalk W) < N
                       → evalWith tm ρ′ ≡ applyClo {s = emitᵗ (echoᵗ u)} {t = echoᵗ (emitᵗ u)} (Θ₀ , elemᵛ , ρ₀) e′
                       → o ≡ (Θ′ , ofᵉ (tm ∷ []) , ρ′)
                       → subscribeE⇓ o (from-inner mergeAllᵒ mX (nodeCt sI) ↠[ ≤-refl ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) now
@@ -321,17 +337,17 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                             × PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes st₁) p q
                             × MergeAt {Γ = Γ} κ (EvalSt.nodes st₁) u mX
                             × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I out)
-    explode-one-fresh S cp ci fl r lX lv e′ rel W ez refl (subs-of (fold-step (step-from-inner (react-alive al)) _)) =
+    explode-one-fresh _ S cp ci fl r lX lv e′ rel W _ ez refl (subs-of (fold-step (step-from-inner (react-alive al)) _)) =
       ⊥-elim (t≢f (trans (sym al) (fresh-dead (Store.ruleI S))))
-    explode-one-fresh {sI = sI} {stI = stI} S {u = u} {op = op} {mX = mX} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ′ = Θ′} {ρ′ = ρ′} {tm = tm} {rP = rP} cp ci fl r lX lv e′ rel W ez refl
+    explode-one-fresh io {sI = sI} {stI = stI} S {u = u} {op = op} {mX = mX} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ′ = Θ′} {ρ′ = ρ′} {tm = tm} {rP = rP} cp ci fl r lX lv e′ rel W lt ez refl
                       (subs-of (fold-step (step-from-inner (react-dead _ F′)) F₂)) =
-      explode-one-drain S {u = u} {op = op} {mX = mX} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ′ = Θ′} {ρ′ = ρ′} {tm = tm} {rP = rP} cp ci fl r lX lv e′ rel W ez
+      explode-one-drain io S {u = u} {op = op} {mX = mX} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ′ = Θ′} {ρ′ = ρ′} {tm = tm} {rP = rP} cp ci fl r lX lv e′ rel W lt ez
         (finish-at (lookup-set mX _ (EvalSt.nodes stI)) F′) F₂
 
     -- `explode-one-sub` over its subscribe at a value only EQUAL to the
     -- explode's application, so no clause unifies under that application
-    explode-one-at : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                        {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+    explode-one-at : ∀ {N} (io : IOO< N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ} {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                         {rP lim a qs od o inst out sched₁ st₁}
                     → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
                     → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
@@ -340,7 +356,8 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                     → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
                     → just (mergeAll-st {t = echoᵗ (emitᵗ u)} nothing 0 [] (proj₁ mg)) ≡ just (mergeAll-st lim a qs od)
                     → ∀ e′ {w} → EmitRel κ (echoᵗ u) e′ (w ∷ [])
-                    → thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP
+                    → (W : thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP)
+                    → suc (sz-thruWalk W) < N
                     → o ≡ applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′
                     → subscribeInner⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now o sI
                         (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} lim (suc a) qs od) (EvalSt.nodes stI) })
@@ -351,11 +368,11 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                           × PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes st₁) p q
                           × MergeAt {Γ = Γ} κ (EvalSt.nodes st₁) u mX
                           × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I out)
-    explode-one-at S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r (true , lX) lv refl e′ rel W ho c =
+    explode-one-at _ S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r (true , lX) lv refl e′ rel W _ ho c =
       explode-one-ended S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r lv lX e′ rel W ho c
-    explode-one-at S {u = u} {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r (false , lX) lv refl e′ rel W ho (inner refl sub) =
+    explode-one-at io S {u = u} {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r (false , lX) lv refl e′ rel W lt ho (inner refl sub) =
       let (_ , _ , _ , eq , ez) = explode-run-one {u = u} {Θ = Θ₀} {ρ = ρ₀} e′ rel
-      in explode-one-fresh S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r lX lv e′ rel W ez (trans ho eq) sub
+      in explode-one-fresh io S {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r lX lv e′ rel W lt ez (trans ho eq) sub
 
     -- AN OUTER'S EMIT CARRYING ONE VALUE, EXPLODED, SUBSCRIBED: the
     -- impl's merge takes its run of elements as an inner, they walk into
@@ -363,8 +380,8 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
     -- events on, and the merge stays unbounded at the echo's type.  What
     -- it sends, it sends at the emit's own delivery: the echo crosses
     -- the restamp first and sets its cell to that delivery
-    explode-one-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                        {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
+    explode-one-sub : ∀ {N} (io : IOO< N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
+                        {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ n + ℓ} {h₅ : n + ℓ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                         {rP lim a qs od inst out sched₁ st₁}
                     → Clear m p sP stP → Clear mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) sI stI
                     → Flattener {Γ = Γ} κ (Store.π S) {t = t} (EvalSt.nodes stP) (EvalSt.nodes stI) u op m m′ ks (mX ∷ [])
@@ -373,7 +390,8 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                     → LiveIf (thru-outer mergeAllᵒ mX ↠[ h₃ ] (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q)) (EvalSt.nodes stI)
                     → lookupNode mX (EvalSt.nodes stI) ≡ just (mergeAll-st {t = echoᵗ (emitᵗ u)} lim a qs od)
                     → ∀ e′ {w} → EmitRel κ (echoᵗ u) e′ (w ∷ [])
-                    → thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP
+                    → (W : thruWalk⇓ (flatOp op) m p now (thruEvents (w ∷ [])) sP stP rP)
+                    → suc (sz-thruWalk W) < N
                     → subscribeInner⇓ mergeAllᵒ mX (thru-outer (flatOp op) m′ ↠[ h₄ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₅ h₆ q) now
                         (applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ₀ , explodeᵛ , ρ₀) e′) sI
                         (record stI { nodes = setNode mX (mergeAll-st {t = echoᵗ (emitᵗ u)} lim (suc a) qs od) (EvalSt.nodes stI) })
@@ -384,5 +402,5 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                           × PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes st₁) p q
                           × MergeAt {Γ = Γ} κ (EvalSt.nodes st₁) u mX
                           × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I out)
-    explode-one-sub S {u = u} {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r mg lv l e′ rel W c =
-      explode-one-at S {u = u} {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r mg lv (trans (sym (proj₂ mg)) l) e′ rel W refl c
+    explode-one-sub io S {u = u} {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r mg lv l e′ rel W lt c =
+      explode-one-at io S {u = u} {op = op} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} cp ci fl r mg lv (trans (sym (proj₂ mg)) l) e′ rel W lt refl c

@@ -236,12 +236,12 @@ undecided, never a failure (Anthony).
 `simulation` — both top lines' base by arrival
 over `correspondence`, set by `subscribe-related`, kept by `cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
-off inners, payload; subscribes unrelated; unpaired pops; maps
+off inners, payload; unrelated subs; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
 2-value emits; bare cuts; writes moving row; cut/liveness/drain/
 body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
 of splits/folds; mintᵉ/root stamps; quiet arms/cut drains; hop
-scripts; joiners off catch; installs+hops; revived/dead inners;
+scripts; joiners off catch; installs+hops; revived/dead/held inners;
 unaligned reads/connects/flushes; renames; 2-script
 stores/values; mid-emit joins; μ cold reads; dying rows;
 dead outers; live rows past ends;
@@ -251,18 +251,15 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### Big picture tier roadmap
 
-- **AN EXPLODE'S CARRYING INNER IN FLIGHT.** `inner-one-over` by the
-  ℕ-bounded pass `inner-over` now runs on, `fold-off` re-basing the fold off
-  the merge's node at its own size. Ruled out: termination as the obstacle,
-  and the in-flight count as a frame on the quiet side. Left: the carrying
-  element walks by `one-step`, above the explode in `Simulation.Pass.Path`,
-  so its walker must reach `explode-one-drain`; decides whether
-  `simulation`'s store survives the count where the element is carried.
-
 - **A FOLD OFF A NODE IS FRAMED BY IT.** `fold-off` as a body by induction
   over the fold, a clause per frame, each frame writing only its own node and
   `Clear` keeping the written one off the path. Decides whether the in-flight
   count is a frame at all, which both explode inners now rest on.
+
+- **AN OUTER'S GROUP SENDS AT ITS INSTANT.** `elem-out` as a body over
+  the restamp's walk, a clause per element, now read at an explode's merge in
+  flight as well as at a quiet one. Decides whether `simulation`'s carried
+  elements deliver where the plain group does.
 
 - **THE ELABORATED STEPS.** `lifts-map`, `lifts-scan` and `lifts-while` as
   bodies by induction over the emit the step is handed, one clause per event
@@ -281,9 +278,6 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
   `DEAD ROUTE`: one exploded emit, carrying one value or nothing, subscribed at
   a merge marked done, sends at its delivery; open where the merge's path is
   spent.
-- **`inner-one-over`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`: an
-  explode's carrying element walks the flattener while its merge counts it,
-  and with the merge set back the stores and walk are related.
 - **`fold-off`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a fold down a
   path missing a node, run with that node written, is the fold without the
   write, of the same size, the write laid over where it ends.
