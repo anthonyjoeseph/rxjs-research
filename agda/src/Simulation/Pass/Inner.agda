@@ -215,7 +215,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- again, that end reach the flattener's wrap, and an idle flattener
       -- send a second end down `q`: two where the plain flattener, its
       -- inner ending inside its subscribe, sends one, and one where
-      -- `explode-quiet-sub`'s sends none.  The `LiveIf` on the merge's path
+      -- `explode-quiet-ended`'s sends none.  The `LiveIf` on the merge's path
       -- rules that out unless a cut below has spent the path, where it says
       -- nothing.
       --
@@ -229,8 +229,8 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       --   no evaluator repair alone serves both.
       -- DEAD ROUTE: walking the inner's element into the flattener over the
       --   pass's own steps needs a `Store` while the merge counts that
-      --   inner, where `MergeAt` reads count zero; `explode-quiet-sub`
-      --   meets the same wall.
+      --   inner, where `MergeAt` reads count zero; `inner-over` meets the
+      --   same wall.
       explode-one-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                           {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                           {rP lim a qs od inst out sched₁ st₁}
@@ -798,11 +798,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
                           (map-f (uniqᵗ ∷ Θx , restampᵛ (varᵗ (there (here refl))) deliveryᵛ (varᵗ (here refl)) , ρ₀) ↠[ h₂ ]
                            (from-inner mergeAllᵒ x j′ ↠[ h₃ ] q))))
                eq (∨-Tˡ (self-node m2 (j′ ∷ []))))
-
-    -- an impl finish at an index known otherwise
-    finish-at : ∀ {lo s op m j} {q : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {now vals sched} {st : EvalSt ei} {mx my r}
-              → mx ≡ my → innerFinish⇓ op m j q now vals sched st mx r → innerFinish⇓ op m j q now vals sched st my r
-    finish-at refl F = F
 
     -- a deferred body's liveness, past the marker merge, its restamp and
     -- the hop's node, none of which walks an outer or spends

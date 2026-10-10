@@ -52,7 +52,7 @@ open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Inner using (module PassI)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-foldPath; sz-innerFinish; sz-shareGo; sz-shareWalk; sz-dispatchShare; sz-stepFrame; sz-thruWalk; sz-l; sz-r; sz-1)
-open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sink-intro; sink-inv; slotpair; tail-of)
+open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sink-intro; sink-inv; slotpair; tail-of; nil-all)
 
 module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -90,10 +90,6 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
   del-map L []             []       = []
   del-map {G′ = G′} L (quiet e′ r b) (d ∷ ds) = del-keep (G′ e′) e′ (proj₂ (L e′ [] r)) d ∷ del-map L b ds
   del-map {G′ = G′} L (one e′ {w = w} r b) (d ∷ ds) = del-keep (G′ e′) e′ (proj₂ (L e′ (w ∷ []) r)) d ∷ del-map L b ds
-
-  -- nothing related to nothing
-  nil-all : ∀ {A B : Set} {R : A → B → Set} {P : A → Set} {xs} → Pointwise R xs [] → All P xs
-  nil-all [] = []
 
   module InP {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
@@ -427,7 +423,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       echo-go : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ₄ u op m m′ ks}
                   {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {v rP es fin oI sI₁ stI₁ r}
               → (dv : foldPath⇓ now p (v ∷ []) false sP stP rP) → Clear m p sP stP
-              → Restamped S op m m′ ks p q (v ∷ []) es fin oI sI₁ stI₁ → ClearI m′ ks q sI₁ stI₁
+              → Restamped S [] op m m′ ks p q (v ∷ []) es fin oI sI₁ stI₁ → ClearI m′ ks q sI₁ stI₁
               → LiveIf q (EvalSt.nodes stI₁) → foldPath⇓ now q es fin sI₁ stI₁ r
               → sz-foldPath dv < N
               → Σ (After S rP (oI ++ proj₁ r , proj₂ r)) λ A

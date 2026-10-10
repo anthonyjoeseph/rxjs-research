@@ -251,12 +251,12 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### Big picture tier roadmap
 
-- **AN EXPLODE'S INNER IN FLIGHT.** `Store` relating the sides while an
-  explode's merge counts the `of` inner it is subscribing, `MergeAt` read
-  against the merges in flight, so that inner's element walks the flattener
-  over a store and `explode-quiet-sub` and `explode-one-sub` become bodies.
-  Decides whether `simulation`'s store survives the explode's synchronous
-  inner, or the merge's idleness must be argued from the path's level.
+- **AN EXPLODE'S INNER IN FLIGHT.** `explode-one-sub` as a body over the peel
+  `explode-quiet-sub` now has, the fresh inner dead and its finish draining
+  nothing, its walk a leaf beside `inner-over`; then `inner-over` by a quiet
+  pass bounded by a size, not the derivation, so a fold re-based off the
+  merge's node walks. Rules out the inner's react, finish and drain; decides
+  whether `simulation`'s store survives the in-flight count as a frame.
 
 - **THE ELABORATED STEPS.** `lifts-map`, `lifts-scan` and `lifts-while` as
   bodies by induction over the emit the step is handed, one clause per event
@@ -271,10 +271,13 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### The ledger
 
-- **`explode-{quiet-sub,one-sub}`** (Simulation.Pass) — FALSITY,
-  `DEAD ROUTE×3`: one exploded emit, carrying nothing or one value, subscribed
-  by the impl's idle merge, walks into the flattener and sends at its delivery,
-  the merge's path live unless spent; open where that path is spent.
+- **`explode-{one-sub,quiet-ended}`** (Simulation.Pass) — FALSITY,
+  `DEAD ROUTE×2`: one exploded emit, carrying one value or nothing at a merge
+  marked done, subscribed by the impl's idle merge, walks into the flattener
+  and sends at its delivery; open where the merge's path is spent.
+- **`inner-over`** (Simulation.Pass) — FALSITY, `DEAD ROUTE×2`: an explode's
+  quiet element walks the flattener while its merge counts it, and with the
+  merge set back the stores and walk are related.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
@@ -395,3 +398,5 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
   turn are their composite, the scan's body under the mint.
 - **`fold-past`** (Simulation.Pass) — GRINDABLE, `TWIN`: a quiet fold from a
   store written off its path is the fold without, the write laid over.
+- **`explode-run`** (Simulation.Pass) — GRINDABLE, `TWIN`: an emit carrying
+  nothing explodes to an `of` of one bare element.
