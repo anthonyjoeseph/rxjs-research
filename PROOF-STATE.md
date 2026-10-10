@@ -239,22 +239,23 @@ OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; unrelated subs; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
 2-value emits; bare cuts; writes moving row/fold; cut/liveness/drain/
-body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
+body ends, 2 hops apart; unsound walks/reads; 2 stamp chains;
 of splits/folds; mintᵉ/root stamps; quiet arms/cut drains; hop
 scripts; joiners off catch; installs+hops; revived/dead/held inners;
 unaligned reads/links/flushes; renames; 2-script
 stores+values; mid-emit joins; μ cold reads; dying rows;
-dead outers/rows past ends; Store echoes;
+dead outers/rows past ends; Store/elem echoes;
 absent/stale readers.
 
 also: `main` — the QuickCheck's entry point, and every generator it calls: the sweep feeds the bug cache, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **AN OUTER'S GROUP SENDS AT ITS INSTANT.** `elem-out` as a body over
-  the restamp's walk, a clause per element, now read at an explode's merge in
-  flight as well as at a quiet one. Decides whether `simulation`'s carried
-  elements deliver where the plain group does.
+- **AN INNER SENDS AT ITS ECHO'S INSTANT.** `consume-out` as a body: the
+  lane's subscribe walked by the walker's stamps, each subscribe-kind emit
+  caught at the `inner~` frame by the cell its element's echo set. Decides
+  whether `simulation`'s carried elements deliver where the plain group does;
+  the echoes themselves already do.
 
 - **THE ELABORATED STEPS.** `lifts-map`, `lifts-scan` and `lifts-while` as
   bodies by induction over the emit the step is handed, one clause per event
@@ -273,9 +274,9 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
   `DEAD ROUTE`: one exploded emit, carrying one value or nothing, subscribed at
   a merge marked done, sends at its delivery; open where the merge's path is
   spent.
-- **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
-  delivered at one instant, its elements walked through the restamp, sends at
-  that instant.
+- **`consume-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner
+  subscribed while the restamp's cell restamps at an instant sends at that
+  instant.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   a cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped

@@ -37,7 +37,7 @@ open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-step; stepFrame
   drain-no-room; drain-room; subscribeInner⇓; thruWalk⇓; thruConsume⇓; walk-nil; walk-echo;
   walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; hotᵏ; sharedᵏ)
-open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ; elemᵛ)
+open import SExp.Elaborate using (restampᵛ; subscribeᵛ; deliveryᵛ; flatStepᵛ; explodeᵛ)
 open import Simulation.Stores using (Inv; EmitRel; Flattener; FlatNodes; switch~; exhaust~; merge~; ObsRel; V; PathRel; inner~;
   deferInner~; []; _∷_; Store; Partners; RegRel; RowRel; MachRow; mach; Spent; dlvᵇ; dyingᵇ;
   MergeAt; outerDoneᵇ; live-mono; live-set; od-back; LiveIf; LiveFor; live-for; live-if-drop;
@@ -211,19 +211,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A SHARE'S READERS DROPPED ON BOTH SIDES, once its end is delivered
       share-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
                    → After S ([] , proj₂ (shareFinish i true ([] , sP , stP))) ([] , proj₂ (shareFinish (n ↑ʳ i) true ([] , sI , stI)))
-      -- AN OUTER'S GROUP ALL DELIVERED AT ONE INSTANT, ITS ELEMENTS
-      -- WALKED, SENDS AT IT: each element's echo crosses the restamp, so
-      -- its lane is subscribed at that delivery.  The route is through the
-      -- walk's echo and lane, a consume carrying the instant its echo set.
-      --
-      elem-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
-                   {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {ns es vs rI}
-               → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
-               → Walkedˣ ns op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-               → Carries {echoᵗ u} es vs
-               → thruWalk⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now
-                   (thruEvents (map (applyClo (Θ₀ , elemᵛ , ρ₀)) es)) sI stI rI
-               → ∀ {I} → All (DelAt {echoᵗ u} I) es → Out I (proj₁ rI)
 
     -- A DEFERRED BODY'S THREE COUNTS WRITTEN: the plain merge's and the
     -- impl's hop node, alike, and the marker merge's, each one lower.  π
