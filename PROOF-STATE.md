@@ -253,10 +253,10 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 - **AN EXPLODE'S INNER IN FLIGHT.** `inner-over` and `inner-one-over` by a
   pass bounded by a size, not the derivation, so a fold re-based off the
-  merge's node walks; then `explode-run-one` by unfolding `explodeᵛ` at a lone
-  payload. The inner's react, finish and drain are ruled out on both explode
-  subscribes; decides whether `simulation`'s store survives the in-flight
-  count as a frame.
+  merge's node walks. The inner's react, finish and drain are ruled out on
+  both explode subscribes, and a lone payload's run is `elemᵛ`'s element, so
+  the walk is all that is left of them; decides whether `simulation`'s store
+  survives the in-flight count as a frame.
 
 - **THE ELABORATED STEPS.** `lifts-map`, `lifts-scan` and `lifts-while` as
   bodies by induction over the emit the step is handed, one clause per event
@@ -278,8 +278,6 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 - **`inner-{over,one-over}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE×3`: an
   explode's element walks the flattener while its merge counts it, and with the
   merge set back the stores and walk are related.
-- **`explode-run-one`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an emit
-  carrying one value explodes to an `of` of the element `elemᵛ` reads off it.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.

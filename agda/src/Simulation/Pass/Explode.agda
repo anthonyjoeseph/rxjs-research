@@ -7,7 +7,7 @@ module Simulation.Pass.Explode where
 
 open import Data.Bool    using (T; true; false)
 open import Data.Empty   using (⊥-elim)
-open import Data.List    using (List; []; _∷_; _++_)
+open import Data.List    using (List; []; _∷_; _++_; reverseAcc)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_; ++⁺) renaming (map to pw-map)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
@@ -15,17 +15,22 @@ open import Data.Maybe   using (nothing; just)
 open import Data.Nat     using (suc; _≤_)
 open import Data.Nat.Properties using (≤-refl; n≤1+n)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
-open import Data.Sum     using ([_,_])
+open import Data.Sum     using ([_,_]; inj₁; inj₂)
+open import Data.Unit    using (tt)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Properties using (++-identityʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import Rx.Exp       using (Ctx; Closed; Val; Ty; Env; ofᵉ; evalWith; obs; applyClo; Tm)
+open import Rx.Exp       using (Ctx; Closed; Val; Ty; Env; ofᵉ; evalWith; obs; applyClo; Tm; foldᵗ; consᵗ; nilᵗ; strmᵗ; emptyᵉ;
+  _∷ᵉ_; renTm; ext∈; unitᵗ; _+ᵗ_; _×ᵗ_; fstᵗ; varᵗ; foldVals; uniqᵗ)
+open import SExp.InstEmit using (splitAccᵗ; splitEventsᵛ; instEventᵗ)
 open import Rx.Evaluator using (EvalSt; Path; _↠[_]_; thru-outer; from-inner; mergeAllᵒ; lookupNode; echoᵗ; thruEvents;
   Sched; mergeAll-st; setNode)
 open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-step; step-from-inner; react-alive; react-dead; finish-nil;
   finish-all-drain; drain-spent; subscribeInner⇓; thruWalk⇓; subs-of; inner; subscribeE⇓; innerFinish⇓)
-open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
-open import SExp.Elaborate using (explodeᵛ; elemᵛ)
+open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ; plainᵗ)
+open import SExp.Elaborate using (explodeᵛ; elemᵛ; elemBodyᵛ)
+open import Simulation.Elem using (pw-one; paysOf; values-decode; split-eval; fold-rev; revStep)
 open import Simulation.Stores using (EmitRel; Flattener; V; PathRel; []; _∷_; Store; MergeAt; LiveIf; live-if-under)
 open import Simulation.After using (module Kept; readᴾ; readᴵ)
 open import Simulation.Arm using (Out; out-++; Clear; fold-clear; reclear; thru)
@@ -43,6 +48,84 @@ walk-clear : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w} {k} {κ : Path Δ
            → Clear k κ sched st → Clear k κ sched′ st′
 walk-clear {e = e} {k = k} {κ = κ} d c = reclear {π = Thru {e = e} k κ} refl c (thruWalk-rule d (thru c))
 
+-- a `letᵗ` read apart: the term it binds, its default, and the body
+-- under both
+data LetOf {m} {Δ : Ctx m} {Θ s u} : Tm Δ [] [] Θ u → Set where
+  letOf : ∀ (x : Tm Δ [] [] Θ s) d (b : Tm Δ [] [] (s ∷ u ∷ Θ) u) → LetOf (foldᵗ (consᵗ x nilᵗ) d b)
+
+letBody : ∀ {m} {Δ : Ctx m} {Θ s u} {x : Tm Δ [] [] Θ u} → LetOf {s = s} x → Tm Δ [] [] (s ∷ u ∷ Θ) u
+letBody (letOf _ _ b) = b
+
+-- WHAT `explodeᵛ` MAKES OF AN EMIT CARRYING ONE PAYLOAD: an `of` of one
+-- element, the one `elemᵛ` makes of the same emit.  Both are stuck only
+-- on the emit's split, so each is read over a split carrying that one
+-- payload; the two then differ only in the environment their
+-- bookkeeping's reversals fold under, which no reversal reads.
+module _ {m} {Δ : Ctx m} {t : Ty} {Θ} (ρ : Env Δ Θ) (e′ : Val Δ (emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t)))) where
+
+  private
+    P : Ty
+    P = plainᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))
+
+    Elm : Ty
+    Elm = (unitᵗ +ᵗ emitᵗ t) ×ᵗ (unitᵗ +ᵗ obs (emitᵗ t))
+
+    E : Ty
+    E = emitᵗ ((unitᵗ +ᵗ t) ×ᵗ (unitᵗ +ᵗ obs t))
+
+    SP : Ty
+    SP = splitAccᵗ uniqᵗ P (plainᵗ t)
+
+    env₀ : Env Δ (E ∷ Θ)
+    env₀ = e′ ∷ᵉ ρ
+
+    -- `explodeᵛ`'s body under its split
+    ex-body : Val Δ SP → Val Δ (obs Elm)
+    ex-body sp = evalWith (letBody {x = explodeᵛ {Δᵍ = []} {Δ = []} {Θ = Θ} {t = t}} (letOf _ _ _))
+                          (_∷ᵉ_ {s = SP} sp (_∷ᵉ_ {s = obs Elm} (evalWith {t = obs Elm} (strmᵗ emptyᵉ) env₀) env₀))
+
+    -- `elemᵛ`'s
+    el-body : Val Δ SP → Val Δ Elm
+    el-body sp = evalWith (renTm (λ x → x) (λ x → x) (ext∈ (there {x = Elm})) (elemBodyᵛ {t = t}))
+                          (_∷ᵉ_ {s = SP} sp (_∷ᵉ_ {s = Elm} (inj₁ tt , inj₁ tt) env₀))
+
+    -- `appendᵗ`'s two reversals of the bookkeeping, under any environment
+    rev-rev : ∀ {Θ′ s} (env : Env Δ Θ′) (xs : List (Val Δ s)) R
+            → foldVals (revStep {Θ = Θ′} {s = s}) env (foldVals (revStep {Θ = Θ′} {s = s}) env xs []) R ≡ reverseAcc R (reverseAcc [] xs)
+    rev-rev {Θ′} {s} env xs R =
+      trans (fold-rev {Θ = Θ′} {s = s} env (foldVals (revStep {Θ = Θ′} {s = s}) env xs []) R)
+            (cong (reverseAcc R) (fold-rev {Θ = Θ′} {s = s} env xs []))
+
+    -- an element carrying an echo of the emit's instant, beside a lane
+    Ev : Ty
+    Ev = instEventᵗ uniqᵗ (plainᵗ t)
+
+    K : Val Δ (unitᵗ +ᵗ obs (emitᵗ t)) → List (Val Δ Ev) → Val Δ Elm
+    K ln z = inj₂ (z , proj₁ (proj₂ e′) , proj₁ (proj₂ (proj₂ e′)) , proj₂ (proj₂ (proj₂ e′))) , ln
+
+    one-run : ∀ bk ps f ech ln → ps ≡ (ech , ln) ∷ []
+            → Σ (List Ty) λ Θ′ → Σ (Tm Δ [] [] Θ′ Elm) λ tm → Σ (Env Δ Θ′) λ ρ′
+                → ex-body (bk , ps , f) ≡ (Θ′ , ofᵉ (tm ∷ []) , ρ′) × evalWith tm ρ′ ≡ el-body (bk , ps , f)
+    one-run bk _ f (inj₁ _) ln@(inj₁ _) refl =
+      _ , _ , _ , refl , trans (cong (K ln) (rev-rev {s = Ev} _ bk _)) (sym (cong (K ln) (rev-rev {s = Ev} _ bk _)))
+    one-run bk _ f (inj₁ _) ln@(inj₂ _) refl =
+      _ , _ , _ , refl , trans (cong (K ln) (rev-rev {s = Ev} _ bk _)) (sym (cong (K ln) (rev-rev {s = Ev} _ bk _)))
+    one-run bk _ f (inj₂ _) ln@(inj₁ _) refl =
+      _ , _ , _ , refl , trans (cong (K ln) (rev-rev {s = Ev} _ bk _)) (sym (cong (K ln) (rev-rev {s = Ev} _ bk _)))
+    one-run bk _ f (inj₂ _) ln@(inj₂ _) refl =
+      _ , _ , _ , refl , trans (cong (K ln) (rev-rev {s = Ev} _ bk _)) (sym (cong (K ln) (rev-rev {s = Ev} _ bk _)))
+
+  explode-one-run : ∀ ech ln → paysOf {a = P} (proj₁ e′) ≡ (ech , ln) ∷ []
+                  → Σ (List Ty) λ Θ′ → Σ (Tm Δ [] [] Θ′ Elm) λ tm → Σ (Env Δ Θ′) λ ρ′
+                      → applyClo (Θ , explodeᵛ {t = t} , ρ) e′ ≡ (Θ′ , ofᵉ (tm ∷ []) , ρ′)
+                        × evalWith tm ρ′ ≡ applyClo (Θ , elemᵛ {t = t} , ρ) e′
+  explode-one-run ech ln eq = one-run (proj₁ S) (proj₁ (proj₂ S)) (proj₂ (proj₂ S)) ech ln (trans (proj₁ sv) eq)
+    where
+    S : Val Δ SP
+    S = evalWith (splitEventsᵛ {b = plainᵗ t} (fstᵗ (varᵗ (here refl)))) env₀
+
+    sv = split-eval {a = P} {b = plainᵗ t} (fstᵗ (varᵗ (here refl))) env₀
+
 module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open PassQ {Γ = Γ} κ
@@ -52,16 +135,21 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
     open InQ {t} {ep} {ei}
     open Kept {Γ = Γ} κ {t} {ep} {ei}
 
-    postulate
-      -- AN EMIT CARRYING ONE VALUE, EXPLODED: one element, the one `elemᵛ`
-      -- reads off the same emit, as an `of` of that element alone.  A lone
-      -- payload echoes before its own inner, so the run the explode cuts
-      -- is one element and no tail
-      explode-run-one : ∀ {u Θ ρ} e′ {w} → EmitRel {Γ = Γ} κ (echoᵗ u) e′ (w ∷ [])
-                      → Σ (List Ty) λ Θ′ → Σ (Tm (plainᵏ Γ κ) [] [] Θ′ (echoᵗ (emitᵗ u))) λ tm → Σ (Env (plainᵏ Γ κ) Θ′) λ ρ′
-                          → applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ , explodeᵛ , ρ) e′ ≡ (Θ′ , ofᵉ (tm ∷ []) , ρ′)
-                            × evalWith tm ρ′ ≡ applyClo {s = emitᵗ (echoᵗ u)} {t = echoᵗ (emitᵗ u)} (Θ , elemᵛ , ρ) e′
+    -- AN EMIT CARRYING ONE VALUE, EXPLODED: one element, the one `elemᵛ`
+    -- reads off the same emit, as an `of` of that element alone.  A lone
+    -- payload echoes before its own inner, so the run the explode cuts
+    -- is one element and no tail
+    explode-run-one : ∀ {u Θ ρ} e′ {w} → EmitRel {Γ = Γ} κ (echoᵗ u) e′ (w ∷ [])
+                    → Σ (List Ty) λ Θ′ → Σ (Tm (plainᵏ Γ κ) [] [] Θ′ (echoᵗ (emitᵗ u))) λ tm → Σ (Env (plainᵏ Γ κ) Θ′) λ ρ′
+                        → applyClo {s = emitᵗ (echoᵗ u)} {t = obs (echoᵗ (emitᵗ u))} (Θ , explodeᵛ , ρ) e′ ≡ (Θ′ , ofᵉ (tm ∷ []) , ρ′)
+                          × evalWith tm ρ′ ≡ applyClo {s = emitᵗ (echoᵗ u)} {t = echoᵗ (emitᵗ u)} (Θ , elemᵛ , ρ) e′
+    explode-run-one {u} {ρ = ρ} e′ {w} r = explode-one-run {t = u} ρ e′ (proj₁ (proj₁ pw)) (proj₂ (proj₁ pw)) (proj₁ (proj₂ pw))
+      where
+      pw = pw-one (paysOf {Γ = plainᵏ Γ κ} {a = plainᵗ (echoᵗ u)} (proj₁ e′))
+                  (subst (λ l → Pointwise (λ x v → V κ (echoᵗ u) (proj₂ x) v) l (w ∷ []))
+                         (values-decode {Γ = plainᵏ Γ κ} {a = plainᵗ (echoᵗ u)} (proj₁ e′) (proj₁ (proj₂ e′)) (proj₁ (proj₂ (proj₂ e′))) (proj₂ (proj₂ (proj₂ e′)))) r)
 
+    postulate
       -- AN EXPLODE'S CARRYING ELEMENT WALKED WHILE ITS MERGE COUNTS IT:
       -- the flattener's fold of the one element runs over the merge's
       -- node holding the inner in flight, the plain outer's walk hands the
