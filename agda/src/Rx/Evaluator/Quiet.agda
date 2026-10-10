@@ -16,7 +16,9 @@
 -- its slot's number and a minted source takes the counter's, so only
 -- the counter keeps a row minted after a share's end from naming it.
 --
--- REFUTED: `Refuted.Walk-Quiet-Mint` -- `quiet` without the counter:
+-- REFUTED: `Refuted.Walk-Quiet-Mint`, read with
+--   `git show c2e60cb8:agda/evidence/refuted/Refuted/Walk-Quiet-Mint.agda`
+--   -- `quiet` without the counter:
 --   the counter lowered to the share's slot, and a `defer` subscribed
 --   after the share's end.
 module Rx.Evaluator.Quiet where

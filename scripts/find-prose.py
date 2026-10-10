@@ -7,7 +7,7 @@ comment block or a markdown paragraph, and plain grep returns one line out
 of a forty-line header, which is a hit and not an answer.  This returns the
 BLOCK, which is the unit a finding is written in.
 
-Searched: every comment block in `agda/src` and `agda/evidence`, and every
+Searched: every comment block in `agda/src`, and every
 paragraph of the load-bearing documents.  An agda hit also prints the
 declaration the block sits above, since that is what the finding is about.
 
@@ -38,7 +38,7 @@ blocks = _load("check_comments",
 attic = _load("attic", pathlib.Path(__file__).resolve().parent / "attic.py")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-AGDA_TREES = ["agda/src", "agda/evidence"]
+AGDA_TREES = ["agda/src"]
 DOCS = ["CLAUDE.md", "PROOF-STATE.md", "EVIDENCE.md",
         "typecheck-performance-numbers.md"]
 

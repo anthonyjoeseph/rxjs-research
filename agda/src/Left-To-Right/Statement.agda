@@ -84,19 +84,11 @@ postulate
   -- instant -- not past it, or the joined run overtakes the run it was
   -- read against.
   --
-  -- REFUTED: `Refuted.Batched-Sandwich` -- the slack fixed at one unit
+  -- REFUTED: `Refuted.Batched-Sandwich`, read with
+  --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Batched-Sandwich.agda`
+  --   -- the slack fixed at one unit
   --   past the run's own fuel, false at fuel one where the second
   --   arrival is silent.
-  -- PROBED: make qc-batched-sandwich QC='19 2000 3' QC_FUEL=1
-  --   decided by `CLI.QuickCheck`'s `sandwichᴸ`: 314 cases whose joined
-  --   run at the witness holds values back (270 under an author
-  --   flattener, 98 under a `μ`), every one agreeing; counts at fuel
-  --   one only.
-  --   unaimed.
-  -- PROBED: `Probed.Left-To-Right` -- both prefixes decided at fuel 30
-  --   over the same three first-order programs, every run complete
-  --   inside its fuel, and at the refutation's own program at fuel one
-  --   with the batcher's witness at two, which is the silent arrival.
   batched-sandwich : Batched-Sandwich
 
 left-to-right : Left-To-Right

@@ -44,7 +44,7 @@ comment DELETED, so a comment-only edit leaves the mirror byte-identical and Agd
 rebuilds NOTHING.
 
 Why it exists: 29% of this tree is comment lines, and the campaign's rules
-*require* writing findings into headers (`-- PROBED`, `-- DEAD ROUTE`), so before
+*require* writing findings into headers (`-- DEAD ROUTE`, `-- TWIN`), so before
 the mirror every such line cost a full cone rebuild. Measured with the control run
 FIRST: a real definition appended to `Rx/Prim` rechecks its dependents; three
 comment lines inserted into the same module recheck **zero**.

@@ -35,11 +35,11 @@ crossing no re-weighting survives. The precedent against tightness was already
 one module away: a deliberately generous recursive max of every node's width
 measures, read rather than bracketed.
 
-- **`wrapped-row`** — DIFFICULTY: a row long enough to WRAP, so its second and
+- **`wrapped-row`** — FALSITY, `NO EVIDENCE`: a row long enough to WRAP, so its second and
   third lines are indented and carry no bullet — which is exactly what an
   independent scan of the section misreads as preamble text, reporting a number
   several times the truth.
-- **`short-row`** — GRINDABLE: one line.
+- **`short-row`** — GRINDABLE, `TWIN`: one line.
 
 ## Tier 1 — a preamble within budget, under rows that would break it if the
 
@@ -58,15 +58,15 @@ measures, read rather than bracketed.
 
 Parked behind tier 0, and this preamble says only that. Nothing more.
 
-- **`wrap-a`** — DIFFICULTY: a row that wraps over three lines and sits just
+- **`wrap-a`** — FALSITY, `NO EVIDENCE`: a row that wraps over three lines and sits just
   inside the row budget, so it is legal on its own; three of these together
   carry more prose than the tier budget allows a preamble, which is what makes
   this tier a test rather than a decoration.
-- **`wrap-b`** — DIFFICULTY: the second of the three, worded differently so no
+- **`wrap-b`** — FALSITY, `NO EVIDENCE`: the second of the three, worded differently so no
   deduplication could collapse them, and wrapped over the same three lines. A
   row is name plus class plus hook; these sit at the edge of that on purpose,
   because an edge is where a miscount shows first.
-- **`wrap-c`** — GRINDABLE: the third, and the one taking the total past the
+- **`wrap-c`** — GRINDABLE, `TWIN`: the third, and the one taking the total past the
   preamble budget if the parser ever reads an indented bullet-less line as
   section text. Not hypothetical — it is the bug this fixture was written
   after: a scan outside the row parser read one at several times size.

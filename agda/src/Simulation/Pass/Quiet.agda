@@ -1256,7 +1256,9 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- fold runs below the hop's node and the marker merge, so both
     -- survive it
     --
-    -- REFUTED: `Refuted.Of-Fold-Sound` -- a tail related frame by frame
+    -- REFUTED: `Refuted.Of-Fold-Sound`, read with
+    --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Of-Fold-Sound.agda`
+    --   -- a tail related frame by frame
     --   may pass one merge twice, so what survives the tail's fold is
     --   owed only of a distinct impl path.
     quiet-deferInner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u nid nid′ j j′ m2 j2}
@@ -1323,7 +1325,9 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- the flattener's node unwritten, and are restamped; the tail's fold
     -- runs below the flattener's node and its cell, so both survive it
     --
-    -- REFUTED: `Refuted.Of-Fold-Sound` -- a tail related frame by frame
+    -- REFUTED: `Refuted.Of-Fold-Sound`, read with
+    --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Of-Fold-Sound.agda`
+    --   -- a tail related frame by frame
     --   may pass one flattener twice, so what survives the tail's fold
     --   is owed only of a distinct impl path.
     quiet-inner : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₂ ℓ₃ u C a m m′ j j′ k}

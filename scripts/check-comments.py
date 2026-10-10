@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hold every comment in `agda/src` and `agda/evidence` to the source-comment law.
+"""Hold every comment in `agda/src` to the source-comment law.
 
 A source header is where the roadmap's character budget SENDS research: the
 hygiene rule "research lives in source comments" makes this file the
@@ -29,9 +29,9 @@ most of the history for free.
 
 SECOND CHECK — HISTORY: a fixed list of markers is refused by name.  The
 distinction that decides the list is not importance, it is SUBJECT.  A durable
-marker states something true about the STATEMENT — `PROBED` (coverage),
-`DEAD ROUTE` (a route that cannot work), `REFUTED` (a machine-checked witness),
-`RECOVERY` (where deleted apparatus went).  A historical marker states what
+marker states something true about the STATEMENT — `DEAD ROUTE` (a route that
+cannot work), `REFUTED` (a machine-checked witness), `RECOVERY` (where deleted
+apparatus went).  A historical marker states what
 HAPPENED TO THIS DECLARATION — it was split, restated, sealed, discharged,
 measured at some wall-clock.  That is git's subject, and git is better at it:
 `git log -S<name>` finds it, and it cannot rot, because it is not maintained.
@@ -56,7 +56,7 @@ BY DEFINITION, whatever follows them: a statement was restated, a `-core` was
 converted, apparatus was deleted, a wall-clock was measured.
 
 THIRD CHECK — SHAPE: the evidence sections of a block sit at its END, in the
-order REFUTED / DEAD ROUTE, then PROBED, then RECOVERY.  This is the check that
+order REFUTED / DEAD ROUTE / TWIN, then RECOVERY.  This is the check that
 actually makes a long header readable, and it is nearly free — measured at the
 sweep that introduced it, 31 blocks of 2357 violated it, and they were the same
 blocks the rule exists for: the 480-, 241- and 163-line essays.  A reader
@@ -115,15 +115,11 @@ of the three forms fits it.
 """
 
 import argparse
-import json
 import pathlib
 import re
 import sys
 
-# The two trees the law covers.  Both are claimed and gated; `evidence` is
-# included because a probe's header is a receipt like any other and decays the
-# same way.
-DEFAULT_DIRS = ["agda/src", "agda/evidence"]
+DEFAULT_DIRS = ["agda/src"]
 
 # Any ISO-ish or spelled date.  Kept deliberately identical in spirit to the
 # roadmap checker's: one scan, one law, two jurisdictions.
@@ -138,16 +134,16 @@ DATE_RE = re.compile(
     r")\b"
 )
 
-# The four markers whose subject is the STATEMENT.  Order here IS the mandated
+# The three markers whose subject is the STATEMENT.  Order here IS the mandated
 # order in a block's tail; `DEAD ROUTE` shares a rank with `REFUTED` because
 # both answer "what has been ruled out".
 # Rank 0 answers "what is ruled out, and what is the route" — a refutation, a
 # route that cannot work, a proven counterpart whose clauses correspond.  Rank 1
-# is coverage.  Rank 2 is where deleted apparatus went.
+# is where deleted apparatus went.
 DURABLE = [("REFUTED", 0), ("DEAD ROUTE", 0), ("TWIN", 0),
-           ("PROBED", 1), ("RECOVERY", 2)]
+           ("RECOVERY", 1)]
 DURABLE_RE = re.compile(
-    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)\b(?!-)"
+    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|RECOVERY)\b(?!-)"
 )
 
 # AN OBSCURED MARKER — `-- -- RECOVERY:` — IS A MARKER NO CHECK IN THIS REPO CAN
@@ -155,23 +151,21 @@ DURABLE_RE = re.compile(
 # so a doubled dash leaves the marker word sitting inside the comment TEXT: the
 # ordering rule reads it as prose and lets it stand mid-block, and the reference
 # pass never validates what it names.  Three were live in the tree when this
-# check was written, every one a `RECOVERY` naming a sha nothing resolved, and
-# `make evidence-check` had two more of its own in the `PROBED` spelling.
+# check was written, every one a `RECOVERY` naming a sha nothing resolved.
 #
 # It is worth a check of its own rather than a looser DURABLE_RE, and that is
 # the whole design: admitting the doubled form would make it LEGAL, and a
 # marker's job is to be the one shape a reader and a machine agree on.  A near
-# miss is reported so the author writes the canonical line -- the same reason E3
-# reports its own three near-miss spellings instead of counting zero receipts.
+# miss is reported so the author writes the canonical line.
 OBSCURED_RE = re.compile(
-    r"^(?:--\s*)+(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)\b"
+    r"^(?:--\s*)+(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|RECOVERY)\b"
 )
 
 # The markers whose text names something that can STOP EXISTING.  `DEAD ROUTE`
 # is deliberately absent and unvalidated: it has no referent by construction --
 # it records that a way of proving something cannot work, and there is no object
 # to resolve.  That is exactly why it got a prose convention instead of a check.
-VALIDATED = ("TWIN", "REFUTED", "PROBED", "RECOVERY")
+VALIDATED = ("TWIN", "REFUTED", "RECOVERY")
 
 # A reference is BACKTICKED or DOTTED, never a bare word, and that is a rule
 # about how the line is written rather than a parsing convenience: English prose
@@ -225,42 +219,6 @@ def _module_ref_re(dirs):
     alt = "|".join(re.escape(n) for n in names)
     return re.compile(r"(?<![A-Za-z0-9_-])(?:" + alt + r"):\d+")
 GITLOG = re.compile(r"git log[^`\n]*agda/")
-SWEEP = re.compile(r"\bmake (qc-[a-z-]+|walk)\b")
-SWEEP_DRAW = re.compile(r"QC_DRAW='([^']*)'")
-
-
-def qc_targets(root):
-    """Every compiled sweep the Makefile declares: the `qc-*` targets and
-    `walk`, the derivation walk."""
-    mk = (root / "Makefile").read_text(encoding="utf-8")
-    return set(re.findall(r"^(qc-[a-z-]+|walk)\s*:", mk, re.M))
-
-
-def sweep_fault(m, text, qc):
-    """-> why a sweep receipt replays nothing, or None."""
-    if m.group(1) not in qc:
-        return "names `make " + m.group(1) + "`, which the Makefile does not declare"
-    if m.group(1) == "walk":
-        # the walk spans a seed RANGE, so its seed count is part of the replay
-        if not (re.search(r"\bWALK='\d+ \d+ \d+'", text) and re.search(r"\bWALK_SEEDS=\d+", text)):
-            return "carries no `WALK='<seed> <runs> <depth>' WALK_SEEDS=<n>` to replay"
-    elif not re.search(r"\bQC='\d+ \d+ \d+'", text):
-        return "carries no `QC='<seed> <runs> <depth>'` to replay"
-    d = SWEEP_DRAW.search(text)
-    if d is None:
-        # An aimed sweep replayed without its draw draws other programs, so
-        # a receipt that lost its draw says so rather than reading replayable.
-        low = text.lower()
-        if "draw unrecorded" not in low and "unaimed" not in low:
-            return ("carries no `QC_DRAW` -- write the draw, or say `unaimed` "
-                    "or `draw unrecorded`")
-        return None
-    try:
-        json.loads(d.group(1))
-    except ValueError:
-        return "carries a `QC_DRAW` that is not JSON"
-    return None
-
 
 # FIFTH CHECK's vocabulary.  A structured section is a machine-checked
 # reference a few lines below, so prose that ALSO names its subject is paying
@@ -270,7 +228,6 @@ def sweep_fault(m, text, qc):
 # the check free of false positives: the duplication is then structural, not a
 # judgement about the writing.
 ECHO = {
-    "PROBED":     re.compile(r"\bprobe(?:s|d|es)?\b", re.I),
     "REFUTED":    re.compile(r"\brefut(?:ed|es|ation|ations)\b", re.I),
     "DEAD ROUTE": re.compile(r"\bdead (?:route|end)s?\b", re.I),
     "TWIN":       re.compile(r"\btwins?\b", re.I),
@@ -432,14 +389,9 @@ def sections(body):
 def check_refs(refs, root):
     """-> [(file, lineno, kind, why)] for every reference that resolves to
     nothing.  A marker naming something that can STOP EXISTING is only worth
-    the line it costs if its disappearance is a build failure -- the same law
-    `make evidence-check` already applies to a probe's `-- TARGET:`, arriving
-    here from the header's side."""
+    the line it costs if its disappearance is a build failure."""
     src = declared_names(root / "agda/src")
-    ref = declared_names(root / "agda/evidence/refuted")
-    prb = declared_names(root / "agda/evidence/probed")
     post = live_postulates(root) or set()
-    qc = qc_targets(root)
     shas = real_shas(root, {t for _, _, _, text in refs
                             for t in SHA_TOKEN.findall(text)})
 
@@ -456,32 +408,13 @@ def check_refs(refs, root):
                             "names `" + sorted(still)[0] + "`, which is STILL A "
                             "POSTULATE — a twin that is not proven earns no class"))
         elif kind == "REFUTED":
-            # A sha counts here for the same reason it counts for PROBED: a
-            # refutation dies when `src` can no longer STATE it, and deleting
-            # it then is CORRECT -- `src` must not keep machinery alive whose
-            # only purpose is making a dead route expressible.  The receipt is
-            # all that survives, so demanding a live declaration would demand
-            # that the tree keep the very thing the deletion rule removes.
-            if not (toks & ref) and not (set(SHA_TOKEN.findall(text)) & shas):
+            # A refutation dies when `src` can no longer STATE it, and deleting
+            # it then is CORRECT.  The receipt is all that survives, so a sha
+            # is sufficient.
+            if not (set(SHA_TOKEN.findall(text)) & shas):
                 bad.append((f, lineno, kind,
-                            "names neither a declaration in "
-                            "`agda/evidence/refuted` nor the sha holding a "
-                            "refutation `src` can no longer state"))
-        elif kind == "PROBED":
-            sweep = SWEEP.search(text)
-            if sweep:
-                # A COMPILED SWEEP'S RECEIPT points at the command that replays
-                # it.  Its rows are the decider's reading of the statement, not
-                # the statement's, so the pointer is all a check can hold: the
-                # target must exist and the draw must parse, or the receipt
-                # replays nothing.
-                why = sweep_fault(sweep, text, qc)
-                if why:
-                    bad.append((f, lineno, kind, why))
-            elif not (toks & prb) and not (set(SHA_TOKEN.findall(text)) & shas):
-                bad.append((f, lineno, kind,
-                            "names neither a live probe, the sha holding a "
-                            "deleted one, nor a `make qc-*` or `make walk` sweep"))
+                            "carries no sha git can resolve — a refutation whose "
+                            "tree is deleted is cited by the sha holding it"))
         elif kind == "RECOVERY":
             if not (set(SHA_TOKEN.findall(text)) & shas) and not GITLOG.search(text):
                 bad.append((f, lineno, kind, "carries no sha git can resolve"))
@@ -616,15 +549,15 @@ def main():
             print(f"  … and {len(hist) - 40} more")
         print("\nThese state what happened to the DECLARATION, not what is true of the")
         print("STATEMENT.  That is git's subject: `git log -S<name> --all` finds it and")
-        print("it cannot rot there.  Keep PROBED / DEAD ROUTE / REFUTED / RECOVERY,")
-        print("which say what was ruled out and what was covered; delete the rest.")
+        print("it cannot rot there.  Keep DEAD ROUTE / REFUTED / RECOVERY,")
+        print("which say what was ruled out and where deleted apparatus went; delete the rest.")
 
     if shape:
         print(f"\nEVIDENCE OUT OF PLACE — {len(shape)} block(s):")
         for f, lineno, why in shape:
             print(f"  {f}:{lineno}  {why}")
-        print("\nA block reads: explanation, then REFUTED / DEAD ROUTE, then PROBED,")
-        print("then RECOVERY.  Prose stranded behind the evidence has no landmark in")
+        print("\nA block reads: explanation, then REFUTED / DEAD ROUTE / TWIN, then RECOVERY.")
+        print("Prose stranded behind the evidence has no landmark in")
         print("front of it, which is what makes a long header unskimmable.  And a")
         print("marker is a LEDGER ENTRY — to mention a refutation mid-paragraph, name")
         print("its module in backticks instead of opening a `REFUTED:` section.")
@@ -646,16 +579,12 @@ def main():
             print(f"  {f}:{lineno}  {kind} {why}")
         print("\nA marker naming something that can STOP EXISTING is only worth its")
         print("line if the disappearance is a build failure — the same law")
-        print("`make evidence-check` puts on a probe's `-- TARGET:`, arriving here")
-        print("from the header's side, and closing the loop between them: that check")
-        print("expires a probe when its target is discharged, and this one catches")
-        print("the receipt left pointing at the probe it just deleted.")
         print("\nWrite the reference BACKTICKED or DOTTED — a bare word is not read as")
         print("one, because English is full of words this tree happens to declare. A")
         print("`TWIN` names a PROVEN definition, which is what earns a GRINDABLE row")
         print("its class; if the twin is still a postulate the class is wrong. A")
-        print("`PROBED` receipt for a DELETED probe names the sha holding it — that")
-        print("is what makes the `git log -S` recovery rule actually work.")
+        print("`REFUTED` names the sha holding the refutation tree.")
+        print("A `RECOVERY` names a sha git can resolve.")
 
     if echo:
         print(f"\nEXPLANATION ECHOES ITS OWN LEDGER — {len(echo)} block(s):")

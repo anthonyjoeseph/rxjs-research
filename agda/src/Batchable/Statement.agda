@@ -85,16 +85,4 @@ Batchable =
   batchedᴱ t ok (emitsᴵ κ fuel e ins) ≡ groupedᴱ t ok (emitsᴵ κ fuel e ins)
 
 postulate
-  -- Seeds 12..16 at depth 3, fuel one, also gave no red under
-  -- `make qc-batchable`.
-  -- PROBED: make qc-batchable QC='17 1000 3' QC_FUEL=1
-  --   decided by `CLI.QuickCheck`'s `pairᴮ`: 338 cases grouping values
-  --   under an author flattener and 89 under a `μ`, every one agreeing.
-  --   unaimed.
-  -- PROBED: `Probed.Batchable` -- by `refl` at fuel 30 over three first-order
-  --   programs: a scripted slot taken to one of two arrivals, the script's
-  --   two arrivals kept (two instants), and a literal of two values (one
-  --   instant).  Not a flattener, a share, a `μ` nor a cold slot: a
-  --   flattener's run does not reduce in the typechecker inside 8 GB at fuel
-  --   30 or 3, so those shapes are `make quickcheck`'s alone.
   batchable : Batchable

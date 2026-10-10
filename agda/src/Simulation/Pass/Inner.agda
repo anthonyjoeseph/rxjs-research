@@ -196,17 +196,9 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     -- the riskiest.
     postulate
       -- A SHARE CLOSED ON BOTH SIDES, before its end is delivered
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1,0,0],"script":[0,0,1,1,1,0]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Case 62 reads a shared slot whose one-value `of` ends inside
-      --   its connect.
       share-spend  : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
                    → After S ([] , sP , shareSpend i stP) ([] , sI , shareSpend (n ↑ʳ i) stI)
       -- A SHARE'S READERS DROPPED ON BOTH SIDES, once its end is delivered
-      -- PROBED: make qc-store QC='52 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,1,1,1,2,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[2,0,1,1,0,0],"script":[0,0,1,1,1,0]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Case 62 reads a shared slot whose one-value `of` ends inside
-      --   its connect.
       share-finish : ∀ {sP stP sI stI} (S : St sP stP sI stI) {i : Fin n} → lookup κ i ≡ sharedᵏ
                    → After S ([] , proj₂ (shareFinish i true ([] , sP , stP))) ([] , proj₂ (shareFinish (n ↑ʳ i) true ([] , sI , stI)))
       -- AN OUTER'S EMIT CARRYING ONE VALUE, EXPLODED, SUBSCRIBED: the
@@ -257,19 +249,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- restamped to it.  The route is through `explode-quiet` and
       -- `explode-one`, each sending at its own emit's instant.
       --
-      -- PROBED: make qc-same-clock QC='45 80 3' QC_DRAW='{"exp":[4,4,3,0,4,0,2,0,0,0,0,0,4],"obs":[0,3,0,0],"fan":[0,3,2,1,1,0,1,2,2,0],"script":[0,4,0,0,0,0],"reach":["flatten"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 67 agree, 0 fail, 13
-      --   undecided.  Thirteen agreements explode downstream of a hot
-      --   input; case 15 explodes a merge of two reads of it, a group of
-      --   two inners at each of two arrivals.
-      -- PROBED: make qc-same-clock QC='12 300 3' QC_BUDGET=3600 QC_DRAW='{"exp":[2,2,1,0,1,6,1,1,0,0,0,0,5],"leaf":[4,0,1],"op":[0,6,0,0,0],"fan":[0,2,2,0,2,0,0,0,0,4],"script":[1,3,2,2,2,0],"obs":[1,3,0,0],"reach":["flatten"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 115
-      --   agree, 0 fail, 155 undecided; 28 agreements drain a bounded
-      --   merge's queue at a later arrival, and 84 undecided cases do.
-      -- PROBED: make qc-same-clock QC='13 100 3' QC_CASE=90 QC_BUDGET=7000 QC_DRAW='{"exp":[2,2,1,0,1,6,1,1,0,0,0,0,5],"leaf":[4,0,1],"op":[0,6,0,0,0],"fan":[0,2,2,0,2,0,0,0,0,4],"script":[1,3,2,2,2,0],"obs":[1,3,0,0],"reach":["flatten"]}'
-      --   decided the same way, over budget at 37 agree, 0 fail, 31
-      --   undecided; 12 agreements drain a queue at a later arrival, 16
-      --   undecided cases do.
       explode-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₅ ρ₅ Θ₁ ρ₁ Θ₂ ρ₂}
                       {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                       {es vs rI}
@@ -287,24 +266,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- its lane is subscribed at that delivery.  The route is through the
       -- walk's echo and lane, a consume carrying the instant its echo set.
       --
-      -- PROBED: make qc-same-clock QC='43 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2,0],"script":[0,2,0,0,3,0],"reach":["flatten"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 13
-      --   agree, 0 fail, 42 undecided; cases 7 and 39, which walk an
-      --   element group delivered at a hot arrival, go past the case clock
-      --   and are decided one at a time below.
-      -- PROBED: make qc-shrink QC='43 150 3' QC_AT=7 QC_STMT=9 QC_SHRINK=0 QC_CASE=0 QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2,0],"script":[0,2,0,0,3,0],"reach":["flatten"]}'
-      --   `sameClockᵇ` at case 7 alone, with no case clock: agrees.
-      -- PROBED: make qc-shrink QC='43 150 3' QC_AT=39 QC_STMT=9 QC_SHRINK=0 QC_CASE=0 QC_DRAW='{"exp":[1,1,1,0,4,3,3,3,0,1,0,0,4],"obs":[0,3,1,0],"fan":[0,4,2,0,1,0,0,2,2,0],"script":[0,2,0,0,3,0],"reach":["flatten"]}'
-      --   `sameClockᵇ` at case 39 alone, with no case clock: agrees, and
-      --   times out at the sweep's ten-second clock.
-      -- PROBED: make qc-same-clock QC='12 300 3' QC_BUDGET=3600 QC_DRAW='{"exp":[2,2,1,0,1,6,1,1,0,0,0,0,5],"leaf":[4,0,1],"op":[0,6,0,0,0],"fan":[0,2,2,0,2,0,0,0,0,4],"script":[1,3,2,2,2,0],"obs":[1,3,0,0],"reach":["flatten"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 115
-      --   agree, 0 fail, 155 undecided; 28 agreements drain a bounded
-      --   merge's queue at a later arrival, and 84 undecided cases do.
-      -- PROBED: make qc-same-clock QC='13 100 3' QC_CASE=90 QC_BUDGET=7000 QC_DRAW='{"exp":[2,2,1,0,1,6,1,1,0,0,0,0,5],"leaf":[4,0,1],"op":[0,6,0,0,0],"fan":[0,2,2,0,2,0,0,0,0,4],"script":[1,3,2,2,2,0],"obs":[1,3,0,0],"reach":["flatten"]}'
-      --   decided the same way, over budget at 37 agree, 0 fail, 31
-      --   undecided; 12 agreements drain a queue at a later arrival, 16
-      --   undecided cases do.
       elem-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ u op m m′ ks Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                    {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {es vs rI}
                → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
@@ -509,12 +470,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- merge's are both instances.  The store is the one the finish
       -- leaves: a nested merge's finish writes its node before it starts,
       -- and only the drain after it hands a store back.
-      -- PROBED: make walk WALK='300 40 3' WALK_SEEDS=150 QC_DRAW='{"slot":[1,0,0,0,0,0],"script":[1,1,0,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"exp":[1,1,0,0,3,2,3,3,0,0,1,0,4]}'
-      --   decided by `CLI.Walk-Check`'s `finish` tag at the tail of every
-      --   finish that ends its flattener, in the state it leaves: 3831
-      --   with an alive row meeting the tail, 0 fail.
-      -- PROBED: make walk WALK='1 40 3' WALK_SEEDS=30
-      --   the same tag, unaimed: 144 such, 0 fail.
       gone-finish : ∀ {sP stP sI₁ stI₁} (S : St sP stP sI₁ stI₁) {now ℓ s op m′ j′ x}
                       {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {es sI stI o₁ es₁ f₁}
                   → innerFinish⇓ op m′ j′ q now es sI stI x (o₁ , es₁ , f₁ , sI₁ , stI₁)
@@ -620,11 +575,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- merge's own outer, the write lowers the flag again
       -- An outer ends at most once, so a flag lowered inside a fold stays
       -- down to the next boundary, where a revert is counted.
-      -- PROBED: make qc-store QC='72 300 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,4,4,3,3,0,0,0,0,4],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?` and its `reverts`: 300 agree, 0 fail;
-      --   144 finish an inner at a merge whose outer ended, 0 boundaries clear a done flag.
-      -- PROBED: make qc-store QC='73 120 5' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,4,4,3,3,0,0,0,0,4],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
-      --   decided the same way: 120 agree, 0 fail; 58 finish at an ended merge, 0 clear a flag.
       fold-keeps-od : ∀ {k now lo s} {p : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {vs f sched} {st : EvalSt ei} {r}
                     → foldPath⇓ now p vs f sched st r
                     → outerDoneᵇ (lookupNode k (EvalSt.nodes (proj₂ (proj₂ r)))) ≡ false
@@ -636,11 +586,6 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       -- subscribe can reach the same stale write as a fold
       -- An outer ends at most once, so a flag lowered inside a fold stays
       -- down to the next boundary, where a revert is counted.
-      -- PROBED: make qc-store QC='72 300 4' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,4,4,3,3,0,0,0,0,4],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?` and its `reverts`: 300 agree, 0 fail;
-      --   144 finish an inner at a merge whose outer ended, 0 boundaries clear a done flag.
-      -- PROBED: make qc-store QC='73 120 5' QC_FUEL=30 QC_BUDGET=5400 QC_DRAW='{"exp":[1,1,0,0,4,4,3,3,0,0,0,0,4],"script":[0,0,2,1,4,4],"obs":[2,3,3,1],"reach":["flatten"]}'
-      --   decided the same way: 120 agree, 0 fail; 58 finish at an ended merge, 0 clear a flag.
       drain-keeps-od : ∀ {k lo s} {p : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {now fs l a od qs sched} {st : EvalSt ei} {out a′ q′ sched₂ st₂}
                      → mergeAllDrain⇓ k p now fs l a od qs sched st (out , a′ , q′ , sched₂ , st₂)
                      → (outerDoneᵇ (lookupNode k (EvalSt.nodes st)) ≡ false → od ≡ false)

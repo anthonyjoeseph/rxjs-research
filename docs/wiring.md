@@ -24,23 +24,16 @@ and NOTHING for a type-level cache or probe module, which is held up entirely by
 anonymous `_ : T` pins.
 
 **It is the entries, not the module.** Seeding a root module wholesale exempted every
-internal helper in it, so a probe module or a binary could accumulate dead code
-forever while the gate read `unreachable 0` — measured with a canary in a probe module
-that went unreported. Anything those entries reach is covered automatically.
-
-The probes have since left this table altogether, which is the stronger fix: an entry
-here is a seed inside the PROOF's own scan, so a probe listed here counted as wired
-while nothing in the proof consumed it — and `make gate-heavy`, which compiles Main's cone
-and nothing else, never saw the file at all. They live in `agda/evidence/probed/` now,
-claimed by `Probed.Main` and held to this same law by `make wiring-probed`.
+internal helper in it so a binary could accumulate dead code forever while the gate
+read `unreachable 0`. Anything those entries reach is covered automatically.
 
 `make wiring` reads Main's `using` clauses to get its seeds, so a filename never earns
 an exemption and a claim cannot self-certify.
 
 **BUT ONE OF THE ROOTS THAT REMAIN IS TYPECHECKED BY NO GATE TARGET, AND THAT IS A
 LIVE GAP.** Being a seed here buys the reachability law over a cone, not a build:
-`gate-heavy` compiles Main's cone, then `refuted` and `probed`, then links the CLI and
-the bug-cache runner — which covers `CLI.Main` and `CLI.Unit-Test`.
+`gate-heavy` compiles Main's cone, then links the CLI and the bug-cache runner —
+which covers `CLI.Main` and `CLI.Unit-Test`.
 `QuickCheck` is built only by `qc-build`, which the gate does not run, so an impl or
 spec change can break the all-Agda QuickCheck loop with nothing going red until
 someone reaches for it — which is exactly the moment it is needed and the worst
@@ -101,29 +94,7 @@ only one of them was ever exercised by the real tree. No bare `...` may surface 
 definition. **R2 fires on nothing in `agda/src` today, so without the fixture it would
 rot untested**, and the `with`-arm case was invisible there for a sharper reason: the
 token `...` appears in nearly every file in `agda/src`, so the shared owner rode along
-accidentally reachable and the bug only surfaced in `agda/evidence/refuted`.
-
-## `make wiring-refuted`
-
-`agda/evidence/refuted/` is under the wiring law by its own root: the same checker with
-`--src agda/evidence/refuted --root Refuted/Main.agda`, so every witness and every helper out
-there must trace to a name `Refuted.Main` claims. It has no MODULE_ROOTS — no compiled
-binaries, just witnesses — so the whole tree hangs off that claim list, and
-"Refuted.Main names every witness" is enforced rather than merely stated. A refutation
-cannot self-exempt by choosing its name, which is what the old `*-absurd` suffix match
-allowed. Nothing in `src` may import it. The rules for that tree are in
-`EVIDENCE.md`.
-
-## `make wiring-probed`
-
-The same again for `agda/evidence/probed/`, rooted at `Probed/Main.agda`. It reads
-oddly at first — a probe's content is anonymous `_ : T` pins, which are seeded
-everywhere anyway, so what is there to be unreachable? The answer is the HELPERS: the
-program corpora, the abbreviations, the little decision procedures a probe accretes to
-state its rows. Those are ordinary definitions and they rot exactly like any other.
-And `Probed.Main` naming every probe module is what makes `make probed` a claim rather
-than a directory listing — the same reason `Main.agda` names definitions instead of
-carrying a bare `open import`.
+accidentally reachable and the bug only surfaced in a module outside `agda/src`.
 
 ## The four mechanics of writing an assembly
 

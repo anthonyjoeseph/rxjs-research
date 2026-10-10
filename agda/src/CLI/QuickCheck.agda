@@ -80,11 +80,10 @@ open import CLI.Emit-Eq using (eqListℕ; prefixListℕ; eqBatches)
 open import CLI.JSON using (JSON; jnum; jstr; jarr; jobj; parseJSON)
 open import SExp.Pipeline using (runᴵ)
 open import SExp.Impl-Slots using (elaborateImpl)
-open import CLI.Store-Check using (storeSides; storeDrains)
 open import CLI.Unit-Test.Prelude using (Γ₂; Case; Def₁; mkSlots₂; cached; Statement; flatAllˢ; takeˢ;
   left-to-rightˢ; timing-correctˢ; batchableˢ; timed-faithfulˢ; simulationˢ; arrival-runsˢ; statements; statementName;
   batched-sandwichˢ; packets-name-arrivalsˢ; bsSides; namingSides; namesᵇ;
-  same-clockˢ; sameClockᵇ; Key; storeˢ;
+  same-clockˢ; sameClockᵇ; Key;
   ltrSides; stampsOf; batchableSides; faithfulSides; allPairsᵇ; κOf₂;
   Item; Arr; arrPlain; arrTimed; eqItem; simᵇ; lockstepᵇ)
 open import CLI.Unit-Test using (cases)
@@ -1042,7 +1041,6 @@ halves c arrival-runsˢ   =
   , (lockstepᵇ eqItem (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
 halves c batched-sandwichˢ = sandwichᴸ (bsSides c) ∷ [] , []
 halves c packets-name-arrivalsˢ = [] , namesᵀ (namingSides c) ∷ []
-halves c storeˢ          = storeSides (Case.fuel c) (Case.prog c) (Case.slots c) ∷ [] , []
 halves c same-clockˢ     =
   (sameClockᵇ (arrPlain c) , showArr show (arrPlain c)) ∷ []
   , (sameClockᵇ (arrTimed c) , "timed: " ++ showArr showItem (arrTimed c)) ∷ []
@@ -1067,7 +1065,6 @@ indexOf arrival-runsˢ = 5
 indexOf batched-sandwichˢ = 6
 indexOf packets-name-arrivalsˢ = 7
 indexOf same-clockˢ = 8
-indexOf storeˢ = 9
 
 -- one count per former, in `allFormers` order, plus the obs-fold count,
 -- the count of cases bearing on contiguity and of those holding values
@@ -1094,7 +1091,7 @@ bumpEach fs (g ∷ gs) (c ∷ cs) =
 -- plain run hold fewer queued inners than the one before, and how many
 -- see a merge's active count fall
 Seen : Set
-Seen = Marks × Bool × Bool × Bool × Bool × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × String
+Seen = Marks × Bool × Bool × Bool × Bool × String
 
 bump : Seen → Tally → Tally
 bump ((fs , o) , b , h , g , _) (cs , p , q , r , u) =
@@ -1208,19 +1205,6 @@ splits ss s f (e , d₀ , d₁) with any isClocked ss
 ...   | c with sameClockᵇ (arrPlain c) ∧ sameClockᵇ (arrTimed c)
 ...     | x = within s (if x then 0 else 1) (not x) false
 
--- A CASE DRAINS A QUEUE WHEN A MERGE SPENDS ONE: read only where `store`
--- or `same-clock` is being decided, since a green there over programs
--- that never queue says nothing about a finish that drains, nor about
--- the instant a parked inner is subscribed at
-isStore : Statement → Bool
-isStore storeˢ = true
-isStore _      = false
-
-drained : List Statement → ℕ → Drawn → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
-drained ss f (e , d₀ , d₁) with any (λ s → isStore s ∨ isClocked s) ss
-... | false = 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0
-... | true  with cached "?" f e (mkSlots₂ d₀ d₁)
-...   | c = storeDrains (Case.fuel c) (Case.prog c) (Case.slots c)
 
 -- A SWEEP MAY DECIDE ONLY THE CASES THAT BEAR.  Whether one does is
 -- read before any statement is, so a sweep aimed at contiguity spends
@@ -1318,23 +1302,20 @@ belowˢᵗˢ (y ∷ ys) = belowˢᵗ y ∨ belowˢᵗˢ ys
 -- there is the only way a path reads a script above the one it
 -- registered on; a read below the floor; and a slot read under a binder
 shapesOf : Drawn → String
-shapesOf (e , d₀ , d₁) = kinds d₁ ++ (if litOnˢ (λ _ → true) e then "  reads a slot under a binder\n" else "")
+shapesOf (e , d₀ , d₁) = slotKinds d₁ ++ (if litOnˢ (λ _ → true) e then "  reads a slot under a binder\n" else "")
   where
   kd : Script → String
   kd (hot _)    = "hot"
   kd (cold _ _) = "cold"
 
-  kinds : Def₁ → String
-  kinds (inj₂ _)  = ""
-  kinds (inj₁ d₁) = "  slots " ++ kd d₀ ++ " " ++ kd d₁ ++ "\n" ++ (if belowˢ e then "  reads slot one in an inner over slot zero\n" else "")
+  slotKinds : Def₁ → String
+  slotKinds (inj₂ _)  = ""
+  slotKinds (inj₁ d₁) = "  slots " ++ kd d₀ ++ " " ++ kd d₁ ++ "\n" ++ (if belowˢ e then "  reads slot one in an inner over slot zero\n" else "")
 
-
-withSlots : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ → String → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × String
-withSlots (k , j , x , v , po , pc , a , l , o , d , s) w = k , j , x , v , po , pc , a , l , o , d , s , w
 
 judged : Bool → List Statement → ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 judged ob ss f s m x with bears s f x
-... | b = (m , b , slack s f x , groups s f x , splits ss s f x , withSlots (drained ss f x) (shapesOf x)) , (if ob ∧ not b then [] else bounded s f x ss)
+... | b = (m , b , slack s f x , groups s f x , splits ss s f x , shapesOf x) , (if ob ∧ not b then [] else bounded s f x ss)
 
 -- ONE CASE IS ONE ACCEPTED DRAW.  A restriction's `reach` is the one
 -- filter, and it is spent HERE so that every route naming a case by its
@@ -1366,7 +1347,7 @@ drawCase d = askG >>=G λ W → drawFor (Draw.tries W ∸ 1) d
 -- sweep was aimed at, so no statement is asked of it
 unreached : ℕ → ℕ → Marks → Drawn → Seen × List (ℕ × String)
 unreached f n m (e , d₀ , d₁) =
-  (m , false , false , false , false , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , "") ,
+  (m , false , false , false , false , "") ,
   (TIMEOUT , "  unreached\n    no draw in " ++ show n ++ " tries carried every former the draw must reach"
              ++ rowIn "UNDECIDED" f e d₀ d₁) ∷ []
 
@@ -1446,7 +1427,7 @@ ofKind k []             = []
 ofKind k ((j , r) ∷ fs) = if j ≡ᵇ k then r ∷ ofKind k fs else ofKind k fs
 
 kinds : List String
-kinds = map statementName (statements ++ᴸ same-clockˢ ∷ storeˢ ∷ []) ++ᴸ "timeout" ∷ []
+kinds = map statementName (statements ++ᴸ same-clockˢ ∷ []) ++ᴸ "timeout" ∷ []
 
 counts : ℕ → List String → List (ℕ × String) → List String
 counts k []       fs = []
@@ -1574,7 +1555,7 @@ shrinkAt ss f s n d budget W rs₀ with proj₂ (skipN (n ∸ 1) d W rs₀)
 
 -- THE STATEMENT A NUMBER NAMES, in `Main`'s order, the simulation
 -- fifth and its leaf sixth, the two assembled top lines' leaves seventh
--- and eighth, the two invariants ninth and tenth; zero is all the
+-- and eighth, the same-clock invariant ninth; zero is all the
 -- statements
 selected : ℕ → List Statement
 selected (suc zero)                   = left-to-rightˢ ∷ []
@@ -1586,7 +1567,6 @@ selected (suc (suc (suc (suc (suc (suc zero)))))) = arrival-runsˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc zero))))))) = batched-sandwichˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))) = packets-name-arrivalsˢ ∷ []
 selected (suc (suc (suc (suc (suc (suc (suc (suc (suc zero))))))))) = same-clockˢ ∷ []
-selected (suc (suc (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))))) = storeˢ ∷ []
 selected _                            = statements
 
 -- the impl's raw run, decoded, for reading a batchable failure by
@@ -1594,7 +1574,7 @@ rawOf : Case → String
 rawOf c = showStream (runᴵ (Case.kinds c) (Case.fuel c) (Case.prog c) (Case.slots c))
 
 -- AND ONE SIDE OF IT, so a hang is attributed to the statement that owns
--- it: 1 to 10 that statement's sides, in `selected`'s numbering,
+-- it: 1 to 9 that statement's sides, in `selected`'s numbering,
 -- anything else the impl's raw run
 sidesOf : ℕ → Case → String
 sidesOf k c with selected k
@@ -1646,17 +1626,6 @@ verdictOf rs@(_ ∷ _) with decided rs
 ... | []    = "undecided"
 ... | _ ∷ _ = "FAIL"
 
-drainLine : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × String → String
-drainLine (k , j , x , v , po , pc , a , l , o , d , s , w) = w ++ count "  drains a queue at " k ++ count "  finishes an inner at a merge at " j
-  ++ count "  finishes an inner at a merge whose outer ended at " x ++ count "  CLEARS A FLATTENER'S DONE FLAG at " v
-  ++ count "  holds a dying source at " po ++ count "  ends a value pass holding a dying source at " pc
-  ++ count "  connects a share at the subscribe at " a ++ count "  connects a share later at " l ++ count "  joins a connected share at " o
-  ++ count "  connects an ended script's share at " d ++ count "  connects the shared slot's share at " s
-  where
-  count : String → ℕ → String
-  count _ zero = ""
-  count w k    = w ++ show k ++ " boundaries\n"
-
 -- each case names its formers by the census's tags, so the stream reads
 -- a flag against a former where the census only counts the two apart
 streamCases : Bool → ℕ → ℕ → List (Seen × List (ℕ × String)) → IO Unit
@@ -1669,7 +1638,7 @@ streamCases ob n i (r ∷ rs) =
           ++ (if proj₁ (proj₂ (proj₂ (proj₁ r))) then "  holds values back at the fuel\n" else "")
           ++ (if proj₁ (proj₂ (proj₂ (proj₂ (proj₁ r)))) then "  groups values\n" else "")
           ++ (if proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r))))) then "  parts the two clocks\n" else "")
-          ++ drainLine (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r))))))
+          ++ proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ r)))))
           ++ concatStr (map proj₂ (proj₂ r))) >>= λ _ →
   streamCases ob n (suc i) rs
 

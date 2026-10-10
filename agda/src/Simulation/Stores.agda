@@ -204,7 +204,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   -- holds `tt`, so its plain budget is pinned at one, and a cut clears
   -- the row.  A cut leaves the plain budget at zero, so the budget after
   -- is owed only on a step that does not cut.
-  -- REFUTED: `Refuted.Cut-Budget` -- a test's `Bud` at `⊤`: one impl
+  -- REFUTED: `Refuted.Cut-Budget`, read with
+  --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Cut-Budget.agda`
+  --   -- a test's `Bud` at `⊤`: one impl
   --   step owes the plain step at budget zero and at budget one.
   CutLifts : ∀ B s → (Val Γ′ B → ℕ → Set) → FnClo Γ′ (CutS B s ×ᵗ emitᵗ s) (CutS B s)
            → Maybe (FnClo Γ s boolᵗ) → Set

@@ -33,10 +33,7 @@ reported orphaned 84 of 86 modules.
 It is ONE rule and not a list of blessed filenames, which is the part that
 matters: the claim root is DERIVED from the include root being scanned, so the
 exception cannot grow without adding a whole tree, and no ordinary module can
-ever acquire it.  There are two include roots and the law is the same over both
--- the refuted tree's root says of itself that a refutation not listed is not
-checked, "exactly as in src/Main.agda".  Every other file in either tree earns
-its imports by spending them.
+ever acquire it.  Every other file earns its imports by spending them.
 
 And then, for every file including the claim roots: AN EDGE WHOSE DELETION WOULD
 ORPHAN A MODULE IS NOT REPORTED AS DEAD -- it is reported as a WIRING finding and
@@ -106,8 +103,6 @@ def declared_ctors(text: str) -> set:
 # ROOT_REL.  CLAUDE.md also forbids touching src/Main.agda without approval.
 CLAIM_ROOT = {
     os.path.join("agda", "src"): "Main.agda",
-    os.path.join("agda", "evidence", "refuted"): os.path.join("Refuted", "Main.agda"),
-    os.path.join("agda", "evidence", "probed"): os.path.join("Probed", "Main.agda"),
 }
 DEFAULT_CLAIM_ROOT = "Main.agda"
 
@@ -120,7 +115,7 @@ TREES = list(CLAIM_ROOT)
 
 
 def claim_roots() -> set:
-    """The claim roots in play, as MODULE names, e.g. {"Main", "Refuted.Main"}."""
+    """The claim roots in play, as MODULE names, e.g. {"Main"}."""
     out = set()
     for t in TREES:
         rel = CLAIM_ROOT.get(t, DEFAULT_CLAIM_ROOT)
@@ -502,7 +497,7 @@ def rewrite(raw: str, stripped: str, dead_decls, dead_names) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--src", action="append", default=None,
-                    help="tree to walk (repeatable); default agda/src + agda/evidence/refuted")
+                    help="tree to walk (repeatable); default agda/src")
     ap.add_argument("--keep-names", action="store_true",
                     help="report only whole DEAD imports, skipping unused names "
                          "inside a surviving `using` clause.  Not what the gate "

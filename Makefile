@@ -1,4 +1,4 @@
-.PHONY: walk walk-build oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-left-to-right qc-timing-correct qc-batchable qc-timed-faithful qc-simulation qc-arrival-runs qc-batched-sandwich qc-packets-name-arrivals qc-same-clock qc-store qc-shrink
+.PHONY: oracle-pinned find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-build bug-cache-run oracle-tree oracle-key qc-key unsafe-check wiring wiring-selftest comments-check comments-selftest ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck qc-fast qc-shrink
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -146,14 +146,6 @@ help:
 	@echo "                  {-# #-}) and comment-insert invariance"
 	@echo "  unmap-selftest  proves the position filter still MOVES a line, in both"
 	@echo "                  spellings Agda gives a position (dot and comma)"
-	@echo "  ev            typecheck ONE evidence file by mirror-relative path:"
-	@echo "                  make ev ARGS='refuted/Refuted/X.agda'.  Nothing claims"
-	@echo "                  it — for a witness still being written"
-	@echo "  refuted       typecheck agda/evidence/refuted/ — the machine-checked '-> bottom'"
-	@echo "                  witnesses.  Separate include root: the tower never"
-	@echo "                  pays for it and 'make wiring' never sees it.  ~5 s"
-	@echo "                  inside gate-heavy, which runs it AFTER the tower (it"
-	@echo "                  imports src, so the cache is warm).  See EVIDENCE.md"
 	@echo "  bg            RUN EVERY LONG BUILD THROUGH THIS.  ALWAYS EXITS 7,"
 	@echo "                  green or red — a launcher status that is right most"
 	@echo "                  of the time gets believed, so this one is never"
@@ -185,8 +177,6 @@ help:
 	@echo "  qc-fast       dev-loop QuickCheck under a hard budget (QC='SEED RUNS DEPTH', QC_BUDGET=secs,"
 	@echo "                  QC_FUEL=n, QC_STMT=1..6 for one statement (Main's four, the simulation, its leaf), 0 for all,"
 	@echo "                  QC_CASE=secs per case, 0 for none, QC_BEAR=1 to decide only cases bearing on contiguity)"
-	@echo "  qc-left-to-right / qc-timing-correct / qc-batchable / qc-timed-faithful / qc-simulation / qc-arrival-runs / qc-batched-sandwich / qc-packets-name-arrivals / qc-same-clock / qc-store"
-	@echo "                qc-fast on that one statement"
 	@echo "  qc-shrink     shrink one red case of a sweep (QC_AT=case, QC_STMT, QC_DRAW as the sweep, QC_SHRINK=runs)"
 	@echo "  quickcheck    all-Agda QuickCheck: Main's four statements, the simulation and its leaf, caching counterexamples"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
@@ -337,15 +327,15 @@ bug-cache-run: $(ORACLE_BIN)/Bug-Cache
 # modules (Left-To-Right, Timed, Batchable) carry no postulates,
 # `agda --safe src/Main.agda` checks both halves at once.
 unsafe-check:
-	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ evidence/ \
+	@cd agda && hits=$$(grep -rn -E '\{-# *(TERMINATING|NON_TERMINATING|NO_POSITIVITY_CHECK|NO_UNIVERSE_CHECK|REWRITE)' src/ \
 	    --include='*.agda' | grep -v '^src/CLI/QuickCheck.agda:' || true); \
-	  opts=$$(grep -rn -E '\{-# *OPTIONS.*(--type-in-type|--no-termination-check|--no-positivity-check|--rewriting)' src/ evidence/ \
+	  opts=$$(grep -rn -E '\{-# *OPTIONS.*(--type-in-type|--no-termination-check|--no-positivity-check|--rewriting)' src/ \
 	    --include='*.agda' || true); \
 	  if [ -n "$$hits$$opts" ]; then \
-	    echo "UNSAFE PRAGMA ON THE PROOF PATH OR IN THE EVIDENCE — a soundness hole, not a shortcut:"; \
+	    echo "UNSAFE PRAGMA ON THE PROOF PATH — a soundness hole, not a shortcut:"; \
 	    echo "$$hits"; echo "$$opts"; exit 1; \
 	  else \
-	    echo "unsafe-check: clean in src and evidence (0 unsafe pragmas outside the documented CLI/QuickCheck.agda exemption)"; \
+	    echo "unsafe-check: clean in src (0 unsafe pragmas outside the documented CLI/QuickCheck.agda exemption)"; \
 	  fi
 
 # THE COMMENT-STRIPPED MIRROR -- what Agda actually checks, and why a
@@ -382,21 +372,6 @@ rc=$$(mktemp); \
 	 st=$$(cat $$rc); rm -f $$rc; exit $$st
 endef
 
-# THE SAME, FROM THE EVIDENCE ROOT.  The working directory is the whole
-# src/evidence boundary: Agda reads the .agda-lib of the directory it starts in,
-# so starting here picks up `include: refuted probed ../src` and starting one
-# level up picks up `include: src`.  That is why an evidence import in src does
-# not resolve (EVIDENCE.md, E1) -- and it costs no second interface cache,
-# because Agda derives a file's build directory from the nearest .agda-lib ABOVE
-# THE FILE, not from the invocation, so every src module still lands in the one
-# shared _build.
-define AGDA_RUN_EV
-rc=$$(mktemp); \
-	 { (cd agda/_stripped-comments/evidence && $(AGDA) $(1)); echo $$? > $$rc; } 2>&1 \
-	   | scripts/unmap-positions.py; \
-	 st=$$(cat $$rc); rm -f $$rc; exit $$st
-endef
-
 # The wiring law's mechanised check (see CLAUDE.md, "the wiring law: NEVER
 # LEAVE A PROOF HANGING").  Pure textual analysis of agda/src, no Agda
 # invocation — always exits 0, this is a report for a human to rule on.
@@ -407,26 +382,6 @@ wiring:
 # to Main, when a module is unreachable, or on a ⊤-typed postulate.
 wiring-gate:
 	scripts/check-wiring.py --gate
-
-# THE SAME LAW, APPLIED TO EACH EVIDENCE TREE (Anthony).  Rooted at that tree's
-# own claim root, no MODULE_ROOTS -- every witness and every probe must be
-# claimed there.  `wiring-probed` is what REPLACED the probes' MODULE_ROOTS
-# entries, each of which was a reachability seed inside the PROOF's own scan and
-# so let a probe read as wired to Main while Main could not reach it.  See
-# EVIDENCE.md.
-wiring-refuted:
-	scripts/check-wiring.py --src agda/evidence/refuted --root Refuted/Main.agda --gate
-
-wiring-probed:
-	scripts/check-wiring.py --src agda/evidence/probed --root Probed/Main.agda --gate
-
-# E1 (nothing in src imports evidence) and E2 (every probe names a LIVE
-# postulate).  Textual, sub-second, and in the cheap block.  See EVIDENCE.md.
-evidence-check:
-	@scripts/check-evidence.py --gate
-
-evidence-selftest:
-	@scripts/check-evidence.py --selftest
 
 # NO FACT IS PROVEN TWICE.  Compares the DECLARED TYPE of every definition and
 # postulate, up to renaming of bound variables — `sizeᵉ-pos` and `1≤sizeᵉ`, the
@@ -655,26 +610,6 @@ postulates:
 notify:
 	@scripts/notify.py "$(or $(V),manual)"
 
-# PROVES THE WIRING CHECK IS LOAD-BEARING, against a fixture outside agda/src.
-# R2 fires on nothing in the real tree today, so without the fixture it would
-# rot untested.  See docs/wiring.md.
-refuted: stripped
-	@$(call AGDA_RUN_EV,refuted/Refuted/Main.agda)
-
-# THE PROBES.  Same tree, same law, opposite decay: see EVIDENCE.md.
-probed: stripped
-	@$(call AGDA_RUN_EV,probed/Probed/Main.agda)
-
-# ONE EVIDENCE FILE, BY PATH -- the probe loop's fast path.  `make agda-dev`
-# resolves only src-relative names, so a probe under construction had no cheap
-# check at all and the only route was the whole claim root.  A file reached
-# this way is NOT claimed by anything; it is for a witness still being written,
-# and `make wiring-probed` remains what says it has a home.
-#   make ev ARGS='probed/Probed/Some-Probe.agda'
-ev: stripped
-	@test -n "$(ARGS)" || { echo "usage: make ev ARGS='probed/Probed/X.agda'" >&2; exit 2; }
-	@$(call AGDA_RUN_EV,$(ARGS))
-
 wiring-selftest:
 	@out=$$(scripts/check-wiring.py --src scripts/wiring-selftest 2>&1); \
 	  fail=0; \
@@ -794,8 +729,8 @@ recursion-cover-selftest:
 	    || { echo "SELFTEST FAIL: a recursion whose every cycle is declared was rejected"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "recursion-cover-selftest: OK"; else exit 1; fi
 
-# SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY or SHAPE row,
-# a commit may not BANK a GRINDABLE or DIFFICULTY row of that tier.  The pull
+# SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY row,
+# a commit may not BANK a GRINDABLE row of that tier.  The pull
 # it resists is structural rather than careless -- a risky leg often ends in a
 # finding, a finding-only commit reads as unfinished, and a mechanical row gets
 # closed alongside it to make the commit whole.  See docs/roadmap-check.md.
@@ -866,7 +801,7 @@ roadmap-selftest:
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: an out-of-order roadmap PASSED — the sort check is dead"; fail=1; \
 	  fi; \
-	  for n in b-falsity d-shape; do \
+	  for n in b-falsity d-falsity; do \
 	    echo "$$out" | grep -q "$$n" \
 	      || { echo "SELFTEST FAIL: $$n not reported — a real sort violation stopped firing"; fail=1; }; \
 	  done; \
@@ -1022,36 +957,6 @@ roadmap-selftest:
 	    echo "$$une" | grep -q "NAME NO PROVEN TWIN" \
 	      || { echo "SELFTEST FAIL: an unearned GRINDABLE was rejected for the wrong reason"; fail=1; }; \
 	  fi; \
-	  nof=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-nofloor.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-nofloor.txt \
-	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-nofloor.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-nofloor.txt \
-	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a DIFFICULTY row with NO EVIDENCE PASSED — the class with no floor under it is a parking space again"; fail=1; \
-	  else \
-	    echo "$$nof" | grep -q "DIFFICULTY ROWS WITH NO EVIDENCE" \
-	      || { echo "SELFTEST FAIL: an unevidenced DIFFICULTY was rejected for the wrong reason"; fail=1; }; \
-	  fi; \
-	  echo "$$nof" | grep -q "b-shape" \
-	    && { echo "SELFTEST FAIL: the no-floor check fired on a SHAPE row — the blank is legal on the classes that claim nothing"; fail=1; }; \
-	  cap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-overcap.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-overcap.txt \
-	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-overcap.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-overcap.txt \
-	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a row carrying EIGHT receipts PASSED — the cap binds only per postulate again, which a row naming two arms of one statement walks straight past"; fail=1; \
-	  else \
-	    echo "$$cap" | grep -q "OVER THE RECEIPT CAP" \
-	      || { echo "SELFTEST FAIL: an over-capped row was rejected for the wrong reason"; fail=1; }; \
-	  fi; \
-	  echo "$$cap" | grep -q "fam-{alpha,beta}" \
-	    || { echo "SELFTEST FAIL: the over-capped row was not NAMED"; fail=1; }; \
-	  echo "$$cap" | grep -q "a-falsity" \
-	    && { echo "SELFTEST FAIL: a row at the cap EXACTLY was reported — a coverage lattice is legitimate up to the cap"; fail=1; }; \
-	  echo "$$cln" | grep -q "OVER THE RECEIPT CAP" \
-	    && { echo "SELFTEST FAIL: the cap fired on a clean roadmap — a row with TWIN×9 is being charged, and only PROBED is capped"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and
@@ -1079,12 +984,11 @@ comments-check:
 # tests ONE thing; ref-ok and ref-bad are the two that resolve references.
 #
 # `clean` is the fixture that matters most: it is the MUST-NOT direction, and it
-# passes only if four precision properties hold at once -- an INDENTED
+# passes only if three precision properties hold at once -- an INDENTED
 # `ASSEMBLED`/`MEASURED` is a continuation and not a marker, an UNDATED
 # `SEALED:` is durable rationale and not history (the census found the marker
-# word does not separate the two -- the date does), an indented line after
-# `PROBED` is not stranded prose, and a `git show` pointer is not an
-# explanation.  `sha` pins that last one as load-bearing rather than
+# word does not separate the two -- the date does), and a `git show` pointer
+# is not an explanation.  `sha` pins that last one as load-bearing rather than
 # decorative: its raw comment total is well OVER budget and its charged total
 # well under, so dropping the exemption turns it red.
 #
@@ -1117,7 +1021,7 @@ comments-selftest:
 	    || { echo "SELFTEST FAIL: prose stranded behind the evidence was not reported"; fail=1; }; \
 	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/order 2>&1 \
 	    | grep -q 'evidence out of order' \
-	    || { echo "SELFTEST FAIL: PROBED before REFUTED was not reported — the order half is dead"; fail=1; }; \
+	    || { echo "SELFTEST FAIL: RECOVERY before REFUTED was not reported — the order half is dead"; fail=1; }; \
 	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/fat 2>&1 \
 	    | grep -q 'EXPLANATIONS OVER BUDGET' \
 	    || { echo "SELFTEST FAIL: an over-budget explanation was not reported"; fail=1; }; \
@@ -1163,12 +1067,10 @@ comments-selftest:
 	      echo '--   sha form, which is what a marker carries once `src` can no longer'; \
 	      echo '--   STATE the route and the witness has correctly been deleted.'; \
 	      printf -- '-- TWIN: `%s` is the proven counterpart whose clauses correspond.\n' "$$tn"; \
-	      echo "-- PROBED: make qc-same-clock QC='1 10 3' QC_DRAW='{\"exp\":[1,1]}'"; \
-	      echo '--   a sweep receipt: a declared target, a replayable seed, a draw that parses.'; \
 	      echo '-- RECOVERY: git show 2984f1e575d8699e8ce78975e23c530d803fc911 restores the predecessor and its whole cone.'; \
 	      echo 'postulate leaf : Set'; } > $$rd/RefOk.agda; \
 	    scripts/check-comments.py --dir $$rd > /dev/null 2>&1 \
-	      || { echo "SELFTEST FAIL: a TWIN naming the PROVEN definition $$tn, a REFUTED naming a real refutation, a sweep PROBED and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
+	      || { echo "SELFTEST FAIL: a TWIN naming the PROVEN definition $$tn, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
 	    rm -rf $$rd; \
 	  fi; \
 	  out=$$(scripts/check-comments.py --dir scripts/comments-selftest/ref-bad 2>&1); \
@@ -1179,8 +1081,6 @@ comments-selftest:
 	    || { echo "SELFTEST FAIL: an unresolvable TWIN was not reported"; fail=1; }; \
 	  echo "$$out" | grep -q 'RECOVERY carries no sha' \
 	    || { echo "SELFTEST FAIL: a bogus sha was not reported"; fail=1; }; \
-	  echo "$$out" | grep -q 'qc-no-such-sweep' \
-	    || { echo "SELFTEST FAIL: a sweep receipt naming an undeclared target was not reported"; fail=1; }; \
 	  pn=$$(scripts/check-wiring.py --postulates 2>/dev/null | grep '\.agda:' | head -1 | awk '{print $$1}'); \
 	  if [ -z "$$pn" ]; then \
 	    echo "SELFTEST FAIL: the postulate ledger is unreadable — the postulate-TWIN assertion cannot run"; fail=1; \
@@ -1194,16 +1094,15 @@ comments-selftest:
 	      || { echo "SELFTEST FAIL: a TWIN naming live postulate $$pn was not reported as one"; fail=1; }; \
 	    rm -rf $$d; \
 	  fi; \
-	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all eight checks fire, including a TWIN naming a live postulate read from the ledger and a marker doubled into the comment text; an indented marker, an undated SEALED, a sha pointer, a bare numeral, an approximate QUANTITY carrying its unit and a resolving reference do not)"; \
+	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all checks fire, including a TWIN naming a live postulate read from the ledger and a marker doubled into the comment text; an indented marker, an undated SEALED, a sha pointer, a bare numeral, an approximate QUANTITY carrying its unit and a resolving reference do not)"; \
 	  else exit 1; fi
 
 # Everything decidable without Agda: seconds, and deliberately FIRST, so a
 # textual violation never costs a full build to discover.  Both gates run it.
 # NOTHING ON IT COMPILES, which is the property the list exists for.
-GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
+GATE_CHEAP = wiring-selftest wiring-gate \
              unsafe-check dup-selftest dup-check \
              imports-selftest imports-check \
-             evidence-selftest evidence-check \
              roadmap-selftest roadmap-check \
              monster-selftest monster-check \
              roadmap-moved-selftest roadmap-moved \
@@ -1222,17 +1121,8 @@ gate-cheap:
 # THE LIGHT GATE.  The cheap checks, plus a real dev check of every module this
 # tree has touched — and `dev-changed` FAILS if the full build is still owed,
 # so this target cannot be used where it is not valid.  See docs/gate.md.
-#
-# AND IT CHECKS WHICHEVER EVIDENCE TREE THE CHANGED SET TOUCHED, which is what
-# lets an evidence change stay on this path at all.  Neither tree is
-# dev-checkable, but neither can break the tower either — no `src` file may
-# import one — so the tower is the wrong thing to buy for a probe.  Its own
-# root is the right thing, and it is a real check rather than a stubbed one.
 gate-light:
 	@$(MAKE) --no-print-directory gate-cheap || { scripts/notify.py "RED (light)"; exit 1; }
-	@for t in $$(scripts/dev-changed.py --owed-only); do \
-	  $(MAKE) --no-print-directory $$t || { scripts/notify.py "RED (light)"; exit 1; }; \
-	done
 	@$(MAKE) --no-print-directory dev-changed || { scripts/notify.py "RED (light)"; exit 1; }
 	@echo "gate-light: ALL GREEN"
 	@scripts/notify.py "GREEN (light)"
@@ -1281,8 +1171,6 @@ gate-heavy: stripped
 	 fi; \
 	 rm -f $$log $$rc; \
 	 [ "$$st" -eq 0 ] || { scripts/notify.py "RED (the tower)"; exit 1; }
-	@$(MAKE) --no-print-directory refuted
-	@$(MAKE) --no-print-directory probed
 	@$(MAKE) --no-print-directory agda/_cli/Main bug-cache-build
 	@scripts/dev-changed.py --stamp
 	@echo "gate-heavy: ALL GREEN"
@@ -1331,16 +1219,9 @@ dev-changed-selftest:
 	  out=$$(scripts/dev-changed.py --verdict-only --drift -1 --assume-stamp HEAD --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE.*commits since' \
 	    || { echo "SELFTEST FAIL: drift is invisible to --verdict-only — \`make gate\` routes on that verdict, so it would take the light path with the consumers long unchecked"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files agda/evidence/refuted/Refuted/Main.agda 2>&1); \
-	  echo "$$out" | grep -q 'ESCALATE' \
-	    && { echo "SELFTEST FAIL: an evidence file escalated to the tower — no src file may import that tree, so the tower cannot be broken by it and buying half an hour checks nothing about it"; fail=1; }; \
-	  echo "$$out" | grep -q 'OWED  make refuted' \
-	    || { echo "SELFTEST FAIL: an evidence change did not report its own tree's target as OWED — not escalating is only safe because the light gate then RUNS that target"; fail=1; }; \
-	  [ "$$(scripts/dev-changed.py --owed-only --files agda/evidence/probed/Probed/Main.agda)" = "probed" ] \
-	    || { echo "SELFTEST FAIL: --owed-only did not name the probed tree — gate-light reads exactly this to decide what to check"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files agda/nope/Other.agda 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE' \
-	    || { echo "SELFTEST FAIL: a file outside agda/src and outside every evidence tree did not escalate — nothing would have checked it"; fail=1; }; \
+	    || { echo "SELFTEST FAIL: a file outside agda/src did not escalate — nothing would have checked it"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'NOT the .* claim root(s) in the cone' \
 	    || { echo "SELFTEST FAIL: the cone sweep did not hold back the claim roots — EVERY cone contains them by the wiring law, so a sweep that checks them IS the tower it claims to be cheaper than"; fail=1; }; \
@@ -1369,7 +1250,7 @@ dev-changed-selftest:
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files 2>&1); \
 	  echo "$$out" | grep -q '0 changed .agda file(s)' \
 	    || { echo "SELFTEST FAIL: an empty changed set was not reported as empty — checking nothing must never read as a pass"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; an evidence file does NOT escalate but reports its own tree's target as OWED, while a file outside agda/src and outside every evidence tree does escalate; a cone member whose dev check would be STUBBED is named rather than silently dropped; a CHANGED claim root is held back exactly as a cone one is, since a root is a file and files get edited; and an empty changed set says so rather than passing quietly; and every case PINS the drift axis it is not testing, so the selftest cannot go red on a clock)"; \
+	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; a file outside agda/src does escalate; a cone member whose dev check would be STUBBED is named rather than silently dropped; a CHANGED claim root is held back exactly as a cone one is, since a root is a file and files get edited; and an empty changed set says so rather than passing quietly; and every case PINS the drift axis it is not testing, so the selftest cannot go red on a clock)"; \
 	  else exit 1; fi
 
 # Only the modules THIS TREE has touched since the last commit — a dev check is
@@ -1655,26 +1536,6 @@ $(ORACLE_BIN)/QuickCheck: $(AGDA_SRC) scripts/oracle-mirror.py
 
 qc-build: $(ORACLE_BIN)/QuickCheck
 
-# THE WALK SWEEP: QuickCheck's draw, each impl run's DERIVATION walked and
-# every claim the simulation threads through a walk decided at the state the
-# walk hands it (`CLI.Walk-Check`).  Its own tree, since the oracle's erases
-# the derivation.  WALK = "SEED RUNS DEPTH [FUEL]", aimed by QC_DRAW, over
-# WALK_SEEDS consecutive seeds, each under WALK_BUDGET seconds.
-WALK_BIN := agda/_walk/_cli
-WALK ?= 1 40 3
-WALK_SEEDS ?= 10
-WALK_BUDGET ?= 60
-$(WALK_BIN)/Walk: $(AGDA_SRC) scripts/oracle-mirror.py
-	@$(MAKE) --no-print-directory stripped
-	@scripts/oracle-mirror.py --walk-sync
-	@cd agda/_walk && $(AGDA) --compile --compile-dir=_cli $(ORACLE_GHC) src/CLI/Walk.agda
-	@touch $@
-
-walk-build: $(WALK_BIN)/Walk
-
-walk: walk-build
-	@scripts/walk-sweep.sh $(WALK_BIN)/Walk "$(WALK)" $(WALK_SEEDS) $(WALK_BUDGET) '$(QC_DRAW)'
-
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
 
@@ -1699,17 +1560,14 @@ quickcheck: qc-build
 # on.  Each decides that statement's own sides on one program's run, so
 # any of them failing is a known counterexample to it, printed with its
 # count and samples.  QC_STMT names one, in `Main`'s order, the
-# simulation fifth and its leaf sixth; 0 gates on all of them.  9 is
-# `same-clock`, the two schedules' keys one for one, a candidate
-# invariant that 0 does not include; 10 is `store`, the simulation's
-# `Store` decided at every arrival boundary of both runs, likewise.
+# simulation fifth and its leaf sixth; 0 gates on all of them.
 #
 # QC_DRAW AIMS THE DRAW: one JSON object, unset for the uniform one.  A
 # key per arm choice of the generator (exp spineD spineG op fan script
 # slot leaf obs, each one weight per arm, a zero arm never taken), and
 # `reach`, the former tags every case must carry, found in at most
 # `tries` draws (default 1000) or reported undecided.  Unset, every seed
-# draws the program it always drew.  → docs/probe.md
+# draws the program it always drew.  → docs/quickcheck.md
 QC ?= 1 15 1
 QC_DRAW ?=
 QC_BUDGET ?= 120
@@ -1730,16 +1588,6 @@ qc-shrink: qc-build
 	@test -n "$(QC_AT)" || { echo "usage: make qc-shrink QC='SEED RUNS DEPTH' QC_AT=<case> QC_STMT=<n> [QC_DRAW=...] [QC_SHRINK=<runs>]" >&2; exit 2; }
 	@printf '%s\n%s\n' "$(word 1,$(QC)) 1 $(or $(word 3,$(QC)),4) 0 $(QC_AT) 0 $(QC_FUEL) $(QC_STMT) $(or $(QC_CASE),10) 0 $(QC_SHRINK)" '$(QC_DRAW)' | $(ORACLE_BIN)/QuickCheck
 
-qc-left-to-right:  ; @$(MAKE) --no-print-directory qc-fast QC_STMT=1
-qc-timing-correct: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=2
-qc-batchable:      ; @$(MAKE) --no-print-directory qc-fast QC_STMT=3
-qc-timed-faithful: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=4
-qc-simulation:     ; @$(MAKE) --no-print-directory qc-fast QC_STMT=5
-qc-arrival-runs:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=6
-qc-batched-sandwich: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=7
-qc-packets-name-arrivals: ; @$(MAKE) --no-print-directory qc-fast QC_STMT=8
-qc-same-clock:   ; @$(MAKE) --no-print-directory qc-fast QC_STMT=9
-qc-store:        ; @$(MAKE) --no-print-directory qc-fast QC_STMT=10
 qc-fast: qc-build
 	@printf '%s\n%s\n' "$(QC_IN)" '$(QC_DRAW)' | timeout $(QC_BUDGET) $(ORACLE_BIN)/QuickCheck > $(QC_LOG) 2> $(QC_STREAM); \
 	ec=$$?; head -c 6000 $(QC_LOG); \

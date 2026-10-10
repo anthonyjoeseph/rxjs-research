@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY or SHAPE
-row, a commit may not DISCHARGE a GRINDABLE or DIFFICULTY row of that tier.
+"""SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY row, a
+commit may not DISCHARGE a GRINDABLE row of that tier.
 
 WHAT THIS DEFENDS, and it is a scheduling failure rather than a proof one.
 De-risk mode orders work by risk reduced per unit effort, and the roadmap's
@@ -72,9 +72,9 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-RISKY = ("FALSITY", "SHAPE")
-MECHANICAL = ("GRINDABLE", "DIFFICULTY")
-CLASSED = ("FALSITY", "SHAPE", "VACUITY", "DIFFICULTY", "GRINDABLE")
+RISKY = ("FALSITY",)
+MECHANICAL = ("GRINDABLE",)
+CLASSED = ("FALSITY", "GRINDABLE")
 
 
 def _load(name):
@@ -327,8 +327,8 @@ def main():
               f"discharge — its body still stands on {shown}")
 
     if not findings:
-        print(f"roadmap-order: OK — no mechanical row was banked under an open "
-              f"FALSITY or SHAPE row (against {against})")
+        print(f"roadmap-order: OK — no GRINDABLE row was banked under an open "
+              f"FALSITY row (against {against})")
         return 0
 
     print(f"roadmap-order: FAIL — {len(findings)} row(s) discharged while their "
@@ -336,9 +336,9 @@ def main():
     for tier, name, blockers in findings:
         shown = ", ".join(f"`{b}`" for b in blockers[:3])
         more = f", +{len(blockers) - 3} more" if len(blockers) > 3 else ""
-        print(f"\n  Tier {tier}: `{name}` was GRINDABLE/DIFFICULTY and is now a "
+        print(f"\n  Tier {tier}: `{name}` was GRINDABLE and is now a "
               f"proven definition,")
-        print(f"    but Tier {tier} still holds open FALSITY/SHAPE: {shown}{more}")
+        print(f"    but Tier {tier} still holds open FALSITY: {shown}{more}")
     print("\nSETTLE RISK NEAR THE TRUNK.  A mechanical row proven under an open")
     print("FALSITY is proven on ground that may still move: if the statement above")
     print("it is refuted, the work is not delayed, it is FORFEIT.  Work the tier's")

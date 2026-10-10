@@ -32,10 +32,6 @@ yours. `gate-light` and `gate-heavy` force a path.
 | --- | --- | --- |
 | `wiring-selftest` | [wiring.md](wiring.md) | ship a wiring checker that has stopped firing |
 | `wiring-gate` | [wiring.md](wiring.md) | leave a definition, postulate or module with no route to Main |
-| `wiring-refuted` | [wiring.md](wiring.md) | leave a refutation `Refuted.Main` does not claim |
-| `wiring-probed` | [evidence.md](evidence.md) | leave a probe `Probed.Main` does not claim |
-| `evidence-selftest` | [evidence.md](evidence.md) | ship an evidence checker that has stopped firing |
-| `evidence-check` | [evidence.md](evidence.md) | let proof code depend on a probe or a refutation, or keep a probe whose target is discharged |
 | `unsafe-check` | [unsafe-check.md](unsafe-check.md) | slip an unsafe pragma onto the proof path |
 | `dup-selftest` | [find.md](find.md) | ship a duplicate checker that has stopped firing |
 | `dup-check` | [find.md](find.md) | prove the same fact twice under two names |
@@ -51,10 +47,8 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `formers-selftest` | [formers-check.md](formers-check.md) | ship a former-correspondence checker that has stopped firing |
 | `formers-check` | [formers-check.md](formers-check.md) | let the two trees' former sets diverge, or leave a former the generator cannot reach undeclared |
 | `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
-| `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin or probe that is not there, re-say in charged prose what a section below already says resolvably, or let an explanation grow into an essay |
+| `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin that is not there, re-say in charged prose what a section below already says resolvably, or let an explanation grow into an essay |
 | the tower (inline in `gate-heavy`) | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
-| `refuted` | [evidence.md](evidence.md) | land a refutation that does not typecheck |
-| `probed` | [evidence.md](evidence.md) | land a probe that does not typecheck |
 | `bug-cache` | [bug-cache.md](bug-cache.md) | regress a known impl counterexample |
 
 ## The rest
@@ -69,10 +63,9 @@ yours. `gate-light` and `gate-heavy` force a path.
 | [formers-check.md](formers-check.md) | `make formers-check` — the Agda and TypeScript former sets held to one written-down pairing, and the `gen` column where a former nothing generates is counted |
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
 | [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, coverage boundaries, rulings, traps |
+| [quickcheck.md](quickcheck.md) | `make quickcheck` — the compiled sweep and shrinking a red into a bug-cache row |
 | [stub-proofs.md](stub-proofs.md) | `scripts/stub-proofs.py` — a `src` mirror with the proofs postulated; measured, and why it is not on the gate path |
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard, and why an edge costs |
 | [typecheck-cost.md](typecheck-cost.md) | the cost model: what actually makes a module slow, and the `abstract` mandate |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
 | [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out, and why it may carry counts the roadmap may not |
-| [probe.md](probe.md) | `make qc-<statement>` — the compiled probe, and `QC_DRAW`, the restriction that aims its draw at one region |
-| [evidence.md](evidence.md) | `agda/evidence/` — the library boundary that makes a `src` import of a probe or a refutation unresolvable, and how a probe expires |

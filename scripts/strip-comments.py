@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mirror agda/src + agda/evidence into agda/_stripped-comments/ with every
+"""Mirror agda/src into agda/_stripped-comments/ with every
 FULL-LINE `--` comment blanked, so that a comment-only edit does not change
 what Agda checks and therefore does not invalidate a single interface.
 
@@ -195,15 +195,9 @@ def sync(agda_dir, roots, dest, verbose=False):
     with open(os.path.join(dest, ".linemap.json"), "w", encoding="utf-8") as fh:
         json.dump(linemap, fh)
 
-    # THE LIBRARY FILES, MIRRORED RATHER THAN GENERATED.  Their include paths
-    # ARE the src/evidence boundary (EVIDENCE.md, E1): `rxjs-research.agda-lib`
-    # says `include: src` and nothing else, so from src's side the names
-    # `Refuted.*` and `Probed.*` do not exist.  Generating the mirror's lib
-    # from `roots` -- which is what this used to do -- would hand the MIRROR one
-    # library spanning both trees, and the mirror is what Agda actually checks:
-    # the boundary would then hold everywhere except where it counts.  Mirroring
-    # the real files keeps it stated in exactly one place, and a third tree with
-    # its own lib is covered the moment it lands.
+    # THE LIBRARY FILES, MIRRORED RATHER THAN GENERATED.  Mirroring keeps the
+    # include paths stated in exactly one place; a new tree with its own lib is
+    # covered the moment it lands.
     for dirpath, dirs, names in os.walk(agda_dir):
         dirs[:] = [d for d in dirs if not d.startswith("_")]
         for n in sorted(names):
@@ -352,7 +346,7 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--agda-dir", default=None)
     ap.add_argument("--dest", default=None)
-    ap.add_argument("--roots", nargs="*", default=["src", "evidence"])
+    ap.add_argument("--roots", nargs="*", default=["src"])
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()

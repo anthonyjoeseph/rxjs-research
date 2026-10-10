@@ -27,7 +27,7 @@ of such edits, which is noise; at 100 it never fires at all, missing `Measures`
 and so missing the case that prompted it.  50 is where the signal is.
 
 COMMENTS ARE STRIPPED BEFORE THE DIFF IS READ, and that is load-bearing rather
-than tidy: a `-- PROBED` receipt or a `-- DEAD ROUTE` line added to a deep
+than tidy: a `-- DEAD ROUTE` line added to a deep
 postulate's header is a purely additive edit to a deep module, and it costs
 NOTHING, because `agda/_stripped-comments/` is invariant under it.  A check
 that fired there would fire mainly on the evidence conventions this repo

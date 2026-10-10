@@ -13,15 +13,13 @@ first, this doc's author included. It is *which snapshot the prefix restore-key
 can see* — and the answer depends on what has merged recently, not on anything
 in the workflow file.
 
-## What is cached, and why it is two directories
+## What is cached, and why it is one directory
 
 Agda resolves a file's build directory by walking UP to the nearest enclosing
-`.agda-lib`. `agda/_stripped-comments/evidence/` has its own, so a `refuted` or
-`probed` file's interface lands under `evidence/_build` while everything in
-`src` lands in the top-level one. Caching only the top-level directory leaves
-the evidence trees cold on every run regardless of the cache — caught live, on a
-dispatched run against an unchanged commit that should have been instant and
-instead sat re-checking a nest-cascade refutation.
+`.agda-lib`. Everything in `src` lands in the top-level build directory.
+Caching that directory is sufficient; earlier versions of the gate also had a
+separate `evidence/_build` directory for the refuted and probed trees, but those
+trees are gone.
 
 ## The restore is not the light-gate bet, and confusing the two costs a diagnosis
 
@@ -29,9 +27,8 @@ instead sat re-checking a nest-cascade refutation.
 CATEGORIES; it is gitignored, so CI never has one and `make gate` always takes
 the full heavy path. The interface cache is a different thing entirely: every
 check still runs, every file is still considered, and Agda re-verifies each
-module's validity key itself. So **"CI takes the heavy path" explains why
-`refuted`, `probed` and the two runners' builds also run — it does NOT explain a slow
-tower.** A warm heavy gate skips unchanged modules. If the tower is slow, the
+module's validity key itself. So **"CI takes the heavy path" explains why the
+two runners' builds also run — it does NOT explain a slow tower.** A warm heavy gate skips unchanged modules. If the tower is slow, the
 cache is stale, and the routing is a red herring.
 
 ## THE TRAP: a PR-scoped cache is invisible to everything except that PR

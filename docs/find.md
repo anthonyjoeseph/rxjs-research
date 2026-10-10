@@ -5,9 +5,9 @@ make find Q='≤ slotsSize'        every STATEMENT whose type mentions it
 make find Q='syncSizeᵉ unfoldμ'  both words, in either order, type or name
 ```
 
-**Run it before you state a postulate, write a lemma, or commission a probe.** It
-walks the whole of `agda/src` and prints the declared TYPE of every match, which is
-the thing you need in order to answer "does this already exist?".
+**Run it before you state a postulate or write a lemma.** It walks the whole of
+`agda/src` and prints the declared TYPE of every match, which is the thing you need in
+order to answer "does this already exist?".
 
 ## It replaces a hand-rolled `grep`, and that is the point
 

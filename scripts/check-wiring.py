@@ -98,20 +98,10 @@ from collections import defaultdict
 #
 # The `*-absurd` REFUTATION WITNESSES used to be exempted here by SUFFIX,
 # which meant any definition could exempt itself from the wiring law by
-# choosing its name.  They now live in `agda/evidence/refuted/`, outside this
-# scan (Anthony, 2026-08-18) — checked by `make refuted`, imported by nothing in
-# src (the library layout makes that unresolvable), referred to from src only in
-# `-- REFUTED:` comments.
-#
-# THE PROBES LEFT FOR THE SAME REASON, AND IT IS THE SHARPER CASE (Anthony).
-# Three probe modules used to sit in this table.  A MODULE_ROOTS entry is a
-# reachability SEED inside the PROOF's own scan, so those probes and their whole
-# cone counted as wired while NOTHING in the proof consumed any of it — which is
-# how a probe came to read as reachable from Main when `make gate-heavy`, which
-# compiles Main's cone and nothing else, never saw the file at all.  They are
-# now `agda/evidence/probed/`, claimed by `Probed.Main` and held to this same law
-# by `make wiring-probed`.  A root-based claim cannot self-certify; a
-# name-based exemption always can.  So there is nothing left to exempt.
+# choosing its name.  Refutations and probes have since left the src tree;
+# the only roots remaining are the proof's own compiled binaries.  A root-based
+# claim cannot self-certify; a name-based exemption always can.  So there is
+# nothing left to exempt.
 # ---------------------------------------------------------------------------
 
 
@@ -537,9 +527,8 @@ def extract_definitions(src_dir, files):
                 # continuation would then be a self-reference of `f`.
                 # But registering every continuation under the single name
                 # `...` gave that node no route home, so a name used ONLY in
-                # continuations read as dead: measured in agda/evidence/refuted, where
-                # a refutation's two `with` arms are the only consumers of
-                # their own `2 ≤ cSize` helper.  Per-SITE synthetic name,
+                # continuations read as dead: a helper whose only
+                # consumers are two `with` arms.  Per-SITE synthetic name,
                 # never reported, always a reachability seed — whatever a
                 # continuation the typechecker checks uses IS used.
                 register(f"...#{relpath}:{i + 1}", relpath, i + 1, "anon")
@@ -708,9 +697,8 @@ def extract_definitions(src_dir, files):
                 # continuation would then be a self-reference of `f`.
                 # But registering every continuation under the single name
                 # `...` gave that node no route home, so a name used ONLY in
-                # continuations read as dead: measured in agda/evidence/refuted, where
-                # a refutation's two `with` arms are the only consumers of
-                # their own `2 ≤ cSize` helper.  Per-SITE synthetic name,
+                # continuations read as dead: a helper whose only
+                # consumers are two `with` arms.  Per-SITE synthetic name,
                 # never reported, always a reachability seed — whatever a
                 # continuation the typechecker checks uses IS used.
                 register(f"...#{relpath}:{i + 1}", relpath, i + 1, "anon")

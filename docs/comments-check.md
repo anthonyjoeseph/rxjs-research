@@ -1,10 +1,10 @@
 # `make comments-check` — the source-comment law
 
-Holds every line comment in `agda/src` and `agda/evidence` to six checks. Run
-by both gate paths, in the cheap block, so a violation never costs a build.
+Holds every line comment in `agda/src` to six checks. Run by both gate paths,
+in the cheap block, so a violation never costs a build.
 
 ```
-make comments-check                          the two trees
+make comments-check                          the src tree
 scripts/check-comments.py --dir <path>       one tree (repeatable)
 scripts/check-comments.py --budget <n>       try a different ceiling
 make comments-selftest                       prove the checker still fires
@@ -56,21 +56,16 @@ harness row may never claim.
 Deliberately **not** on it: `SEALED`, `SPLIT`, `RESOLVED`, `SETTLED`,
 `FRESHNESS`, `ASSEMBLY`.
 
-`PROBED-HISTORICAL` on that list once CONTRADICTED `make evidence-check`,
-which demanded exactly that spelling on a receipt whose statement had been
-proven — so the one marker E3 required at the moment of discharge was one this
-check refused to let anyone write. It was resolved in E3's favour of deleting
-rather than dating: a receipt has one legal tense, and on discharge it goes,
-its recoverable apparatus becoming a `RECOVERY:` pointer. Do not re-admit the
-spelling to make a stale receipt legal; delete the receipt.
+`PROBED-HISTORICAL` is on that list because probes are no longer part of the
+gate and a historical receipt for a probe is doubly stale. Do not re-admit the
+spelling; delete any such receipt.
 
 **3 — Shape.** A block's evidence sits at its end, in the order `REFUTED` /
-`DEAD ROUTE` / `TWIN`, then `PROBED`, then `RECOVERY`. Rank one is *what is
-ruled out and what the route is*, rank two *what was covered*, rank three
-*where deleted apparatus went*. Past the first marker a line may
-be another marker, a blank, or an indented continuation; flush-left prose down
-there is an explanation stranded behind the ledger with no landmark in front of
-it.
+`DEAD ROUTE` / `TWIN`, then `RECOVERY`. Rank one is *what is ruled out and what
+the route is*, rank two *where deleted apparatus went*. Past the first marker a
+line may be another marker, a blank, or an indented continuation; flush-left
+prose down there is an explanation stranded behind the ledger with no landmark
+in front of it.
 
 This is the check that actually makes a long header readable, and it is nearly
 free — at the sweep that introduced it, 31 blocks of 2357 violated it, and they
@@ -86,18 +81,14 @@ entry**, not emphasis. To mention a refutation mid-paragraph, name its module in
 backticks; reserve `REFUTED:` for the ledger at the foot of the block.
 
 **4 — References resolve.** Every section except `DEAD ROUTE` names an object
-that can be deleted, so its disappearance is a build failure. This is the same
-law `make evidence-check` puts on a probe's `-- TARGET:`, arriving from the
-header's side — and the two close a loop: E2 expires a probe when its target is
-discharged, and this catches the receipt left pointing at the probe it just
-deleted. That gap is one CLAUDE.md already names, at ten surviving receipts
-against ninety-eight deleted probe files.
+that can be deleted, so its disappearance is a build failure. A `RECOVERY:`
+pointer that names a deleted sha was the common failure before this check, and
+`REFUTED:` pointing at a deleted witness was the same shape one step removed.
 
 | section | referent | resolved against |
 | --- | --- | --- |
 | `TWIN:` | a **proven** definition | declared in `agda/src` **and not in the postulate ledger** |
 | `REFUTED:` | a refutation, live or spent | declared in `agda/evidence/refuted`, **or a git sha** |
-| `PROBED:` | a probe, live or spent | a module under `agda/evidence/probed`, **or a git sha** |
 | `RECOVERY:` | a commit | `git cat-file`, or a `git log … agda/…` form |
 | `DEAD ROUTE:` | *nothing* | not validated |
 
@@ -109,7 +100,7 @@ resolves by accident and reports a healthy reference where there is none.
 `TWIN:` is the sharp one. CLAUDE.md's *"EARNING THE CLASS: NAME THE
 PRECEDENT"* demanded a GRINDABLE row name its worked instance, and nothing
 checked it. **A twin that is itself still a postulate means the class is
-wrong** — the route has not been walked, so the row is DIFFICULTY. That is a
+wrong** — the route has not been walked, so the row is FALSITY. That is a
 mis-classification caught mechanically.
 
 `REFUTED:` takes a sha for the same reason, and the reason is a rule rather
@@ -119,20 +110,14 @@ purpose is making a dead route expressible, measured once at seven live
 definitions held up by six refutations. Demanding a live declaration would
 therefore demand the tree keep exactly what the deletion rule removes.
 
-`PROBED:` cannot demand a *live* probe, because a probe expiring with its
-target is correct and expected; "the probe is deleted" is a normal state and
-the receipt is all that survives. So the sha is the whole recovery route, and
-requiring it is what makes CLAUDE.md's `git log -S` rule work rather than
-aspire to.
-
 `--no-refs` skips this pass. Fixtures outside the real trees cannot be judged
 by it.
 
 **5 — Say it once.** An explanation may not name the subject of a section the
-same block already carries: no "probe" above a `PROBED`, no "refutation" above
-a `REFUTED`, no "dead end" above a `DEAD ROUTE`, no `git show` above a
-`RECOVERY`. The prose copy is spending charged characters on what the free part
-says, and saying it worse — the section resolves and the sentence does not.
+same block already carries: no "refutation" above a `REFUTED`, no "dead end"
+above a `DEAD ROUTE`, no `git show` above a `RECOVERY`. The prose copy is
+spending charged characters on what the free part says, and saying it worse —
+the section resolves and the sentence does not.
 
 The reason it is a *check* and not a style note is **drift**: the paragraph ages
 while the section stays live, so a block ends up carrying a refutation it no
@@ -141,8 +126,8 @@ sentence is current.
 
 **It fires only when the block ACTUALLY HAS that section**, which is what keeps
 it free of false positives — the duplication is then structural rather than a
-judgement about the writing, and prose naming a probe in a block with no
-`PROBED` section is the only place that fact could live. Marker lines and their
+judgement about the writing, and prose naming a refutation in a block with no
+`REFUTED` section is the only place that fact could live. Marker lines and their
 indented continuations are not explanation, so a section whose own text names
 its own subject cannot fire against itself. At the sweep that introduced it,
 2 blocks of 2357.
@@ -211,15 +196,13 @@ one that is not.
 
 Three were live in `agda/src` when the check was written, every one a
 `RECOVERY` naming a sha nothing resolved, and two of them in the file whose
-header the campaign was actively working in. `make evidence-check` had two more
-of its own, in the `PROBED` spelling, plus a third that trailed a parenthetical
-instead of ending in a colon.
+header the campaign was actively working in.
 
 **The doubled form is reported rather than admitted, and that is the design.**
 Loosening the marker pattern to accept it would make it *legal*, and a marker's
 whole job is to be the one shape a reader and a machine agree on. The same
-reasoning runs through E3's near-miss half in `make evidence-check`: report the
-spelling, keep the canon narrow.
+reasoning is the same as the one that keeps the durable-marker vocabulary narrow:
+report the near-miss spelling, keep the canon narrow.
 
 ## Where the budget comes from, and why it is not tighter
 
@@ -256,13 +239,13 @@ For calibration, the count it fires on at each ceiling: 2000 → 73 blocks,
 exactly one.
 
 The two that matter most are the **must-not** direction. `clean` passes only if
-six precision properties hold at once — an indented `ASSEMBLED`/`MEASURED` is a
+five precision properties hold at once — an indented `ASSEMBLED`/`MEASURED` is a
 continuation and not a marker, an undated `SEALED:` is rationale and not
-history, an indented line after `PROBED` is not stranded prose, a `git show`
-pointer is not an explanation, a bare numeral (`V = 4`, `21 against 20`) is not
-a citation, and neither is a signal (`Killed:9`) or a non-module prefix. `sha` pins that last one as load-bearing rather
-than decorative: its raw comment total is well over budget and its charged total
-well under, so dropping the exemption turns it red.
+history, a `git show` pointer is not an explanation, a bare numeral (`V = 4`,
+`21 against 20`) is not a citation, and neither is a signal (`Killed:9`) or a
+non-module prefix. `sha` pins that last one as load-bearing rather than
+decorative: its raw comment total is well over budget and its charged total well
+under, so dropping the exemption turns it red.
 
 **The postulate-twin assertion is generated at run time**, from the live
 ledger, and deliberately: a fixture naming a postulate by hand would go stale

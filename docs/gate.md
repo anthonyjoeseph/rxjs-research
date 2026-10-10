@@ -13,7 +13,7 @@ So there are three targets, and **`gate` is the one you type** — it routes:
 | --- | --- | --- |
 | `gate` | asks for the verdict, then takes the light path or the heavy one, and says which and why | either of the below |
 | `gate-light` | every cheap check, plus a real dev check of each module this tree has touched. Red when the heavy path is owed | seconds, plus one dev pass per changed module |
-| `gate-heavy` | the cheap checks, the full tower, the refutations, the CLI and bug-cache runners compiled — and stamps the commit | many minutes |
+| `gate-heavy` | the cheap checks, the full tower, the CLI and bug-cache runners compiled — and stamps the commit | many minutes |
 
 **`gate` routing is the whole point.** If the expensive target kept the
 plainest name, every session would reach for the tower by default, whatever a
@@ -42,17 +42,9 @@ which escalates:
   other members, so termination of the real mutual recursion is not checked and
   postulates do not reduce — and in this proof the mutual recursion IS the
   induction. This is the trigger the whole split exists for.
-- **A changed file is outside `agda/src` AND in no evidence tree.** Nothing on
-  the light path would look at it at all.
-  An evidence tree is *not* one of these. Neither `agda/evidence/refuted` nor
-  `agda/evidence/probed` is dev-checkable — each has its own include root — but
-  the tower is not what checks either, and cannot be broken by either: no `src`
-  file may import one (`evidence-check` E1, and the library layout makes the
-  import unresolvable). So a changed evidence file reports its own tree's target
-  as **OWED** and `gate-light` runs it, which is a real check rather than a
-  stubbed one. This used to escalate, and in de-risk mode nearly every leg lands
-  a probe or a refutation — so that one trigger was putting almost every commit
-  on the tower for a change the tower does not read.
+- **A changed file is outside `agda/src`.** Nothing on the light path would look
+  at it at all. This trigger escalates to the heavy path so the changed file is
+  not silently ignored.
 - **The changed set exceeds `--max-files` (default 6).** A dev check is cheap
   *singly*: run N of them sequentially, each rebuilding its own cone, and the
   full build buys the entire tower for about the same money — and checks the
