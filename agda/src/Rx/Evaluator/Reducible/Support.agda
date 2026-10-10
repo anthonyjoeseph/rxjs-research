@@ -41,7 +41,7 @@ open import Data.Unit using () renaming (tt to tt₀)
 open import Data.Vec using (lookup)
 open import Relation.Nullary using (yes; no)
 
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
 
 open import Rx.Prim using (Tick)
 open import Rx.Exp using (Ty; _×ᵗ_; obs; boolᵗ; Ctx; Closed; Val; FnClo; applyClo; _≟ᵗ_)
@@ -54,8 +54,10 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _
   exhaustᵒ; NodeId; RegRow; cell-st; take-st; switch-st; exhaust-st; batchSync-st; hasRoom;
   consumeUsable; finishUsable; thruWrap; switchKill; aliveThroughᶠ; RegId; RegSrc; regFloor;
   cutThrough; spends; takeVals; takeDispatch; scanVals; scanDispatch; batchDispatch; shareAdmit;
-  shareDying; drainSt)
-open import Rx.Evaluator.Unconn-Arith using (unconn)
+  shareDying; drainSt; memberSource)
+open import Rx.Evaluator.Unconn-Arith using (unconn; KeepsC; keeps-refl)
+open import Rx.Evaluator.Keeps using (Keeps)
+open import Rx.Slots using (Slot; scripted; shared)
 open import Rx.Evaluator.Domain using (foldPath⇓; fold-root; stepFrame⇓; step-map; injectRoot; thruConsume⇓; consume-all-nil;
   consume-switch-nil; consume-exhaust-nil; innerFinish⇓; innerReact⇓; react-dead; step-take)
 
@@ -230,6 +232,46 @@ FreshRows sched st = ∀ {r} → r ∈ EvalSt.registry st → ∀ k → T (rowTh
 FreshPath : ∀ {n} {Γ : Ctx n} {lo u t} → Path Γ lo u t → Sched Γ → Set
 FreshPath κ sched = ∀ k → T (pathHasNode k κ) → k < nodeCt sched
 
+-- A READER OF A SHARED SLOT READS A CONNECTED ONE.  A row admitted at a
+-- share is registered by the subscribe that joins it, which needs the
+-- share connected, or by the connect itself, which marks it connected
+-- before registering; and the set only grows.  Without it a row stands
+-- at a share nothing has connected, and the first fold that connects
+-- it dispatches the share's values down that row -- through nodes the
+-- fold never walked.
+--
+-- REFUTED: `Refuted.Stale-Reader`, read with
+--   `git show bfeec2bb:agda/evidence/refuted/Refuted/Stale-Reader.agda`
+--   -- a reader at an unconnected share, whose take a later connect moves.
+SlotLinked : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → RegSrc Γ → Set
+SlotLinked sched st (atSlot i)  =
+  ∀ {d ok} → Sched.slots sched i ≡ shared d {ok = ok}
+  → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ true
+SlotLinked sched st (atDyn _ _) = ⊤
+
+rowSrc : ∀ {n} {Γ : Ctx n} {t} → RegRow Γ t → RegSrc Γ
+rowSrc (_ , rs , _) = rs
+
+Linked : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → Set
+Linked sched st = ∀ {r} → r ∈ EvalSt.registry st → SlotLinked sched st (rowSrc r)
+
+-- a table that did not move and a connected set that only grew keep a
+-- reader linked
+linked-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {sched sched′ : Sched Γ} {st st′ : EvalSt e}
+               (rs : RegSrc Γ) → Keeps sched st sched′ st′ → SlotLinked sched st rs → SlotLinked sched′ st′ rs
+linked-keeps (atSlot i)  kp lk eq = KeepsC.mem kp (toℕ i) (lk (trans (cong (λ sl → sl i) (sym (KeepsC.table kp))) eq))
+linked-keeps (atDyn _ _) kp lk    = tt
+
+-- the connect marks its slot connected before it registers the reader
+connect-linked : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (i : Fin n) {sched : Sched Γ} (st : EvalSt e)
+               → SlotLinked sched (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }) (atSlot i)
+connect-linked i st _ = cong (_∨ memberSource (toℕ i) (EvalSt.connectedShares st)) (≡ᵇ-refl (toℕ i))
+
+-- and a scripted slot has no reader to link
+scripted≢shared : ∀ {n} {Γ : Ctx n} {k t ok x d ok′}
+                → _≡_ {A = Slot Γ k t} (scripted {ok = ok} x) (shared d {ok = ok′}) → ⊥
+scripted≢shared ()
+
 -- THE RULE, AS A FACT ABOUT THE STORE ALONE.
 record Rule {n} {Γ : Ctx n} {t} {e : Closed Γ t} (sched : Sched Γ) (st : EvalSt e) : Set where
   constructor rule
@@ -237,6 +279,7 @@ record Rule {n} {Γ : Ctx n} {t} {e : Closed Γ t} (sched : Sched Γ) (st : Eval
     termini       : Termini st
     fresh-rows    : FreshRows sched st
     distinct-rows : ∀ {r} → r ∈ EvalSt.registry st → rowDistinct r
+    linked        : Linked sched st
 open Rule public
 
 -- AND THE RULE FOR A CONTINUATION, which the store does not hold: every
@@ -362,14 +405,16 @@ head-on f le κ k h (sound _ ea fp (ap , _)) = node-on (ea k (∨-Tˡ h)) (fp k 
 -- keeps every rule it had
 sub-rule : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {sched sched′ : Sched Γ} {st st′ : EvalSt e}
          → (∀ {r} → r ∈ EvalSt.registry st′ → r ∈ EvalSt.registry st) → nodeCt sched ≤ nodeCt sched′
-         → Rule sched st → Rule sched′ st′
-sub-rule sb ct (rule tm fr dr) = rule (λ k a b → tm k (sb a) (sb b)) (λ a k h → <-≤-trans (fr (sb a) k h) ct) (λ a → dr (sb a))
+         → Keeps sched st sched′ st′ → Rule sched st → Rule sched′ st′
+sub-rule sb ct kp (rule tm fr dr lk) =
+  rule (λ k a b → tm k (sb a) (sb b)) (λ a k h → <-≤-trans (fr (sb a) k h) ct) (λ a → dr (sb a))
+       (λ {r} a → linked-keeps (rowSrc r) kp (lk (sb a)))
 
 sub-ot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t}
            {sched sched′ : Sched Γ} {st st′ : EvalSt e}
        → (∀ {r} → r ∈ EvalSt.registry st′ → r ∈ EvalSt.registry st) → nodeCt sched ≤ nodeCt sched′
-       → Sound κ sched st → Sound κ sched′ st′
-sub-ot sb ct (sound ru ea fp ds) = sound (sub-rule sb ct ru) (λ k h a → ea k h (sb a)) (λ k h → <-≤-trans (fp k h) ct) ds
+       → Keeps sched st sched′ st′ → Sound κ sched st → Sound κ sched′ st′
+sub-ot sb ct kp (sound ru ea fp ds) = sound (sub-rule sb ct kp ru) (λ k h a → ea k h (sb a)) (λ k h → <-≤-trans (fp k h) ct) ds
 
 sub-on : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {nid : NodeId} {κ : Path Γ lo s t}
            {sched sched′ : Sched Γ} {st st′ : EvalSt e}
@@ -441,17 +486,22 @@ lower-distinct le (f ↠[ h ] p)     d = d
 -- A ROW REGISTERED FOR A PATH THE RULE HOLDS FOR KEEPS IT, when the row
 -- ends where the path does, every node it runs through is either one of
 -- the path's or one the counter has just handed out, and the rule for
--- the path makes the row's own path distinct.
+-- the path makes the row's own path distinct, and a reader of a share
+-- reads a connected one.
 register-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s u} {κ : Path Γ lo s t}
                    {sched sched′ : Sched Γ} {st : EvalSt e}
                    (rid : RegId) (rs : RegSrc Γ) (p : Path Γ (regFloor rs) u t)
-               → nodeCt sched ≤ nodeCt sched′ → endOf p ≡ endOf κ
+               → nodeCt sched ≤ nodeCt sched′ → Keeps sched st sched′ st → endOf p ≡ endOf κ
                → (∀ k → T (pathHasNode k p) → T (pathHasNode k κ) ⊎ (nodeCt sched ≤ k × k < nodeCt sched′))
-               → (Sound κ sched st → Distinct p)
+               → (Sound κ sched st → Distinct p) → SlotLinked sched′ st rs
                → Sound κ sched st → Sound κ sched′ (register rid rs p st)
-register-sound {κ = κ} {sched} {sched′} {st} rid rs p ct ee cls dp so@(sound (rule tm fr dr) ea fp ds) =
-  sound (rule tm′ fr′ dr′) ea′ (λ k h → <-≤-trans (fp k h) ct) ds
+register-sound {κ = κ} {sched} {sched′} {st} rid rs p ct kp ee cls dp ln so@(sound (rule tm fr dr lk) ea fp ds) =
+  sound (rule tm′ fr′ dr′ lk′) ea′ (λ k h → <-≤-trans (fp k h) ct) ds
   where
+  lk′ : Linked sched′ (register rid rs p st)
+  lk′ {r} a with ∈-register {st = st} rid rs p a
+  ... | inj₁ a′    = linked-keeps (rowSrc r) kp (lk a′)
+  ... | inj₂ refl  = linked-keeps rs (keeps-refl _ _) ln
   old-new : ∀ k {r} → r ∈ EvalSt.registry st → T (rowThrough k r) → T (pathHasNode k p)
           → rowEnd r ≡ endOf p
   old-new k r∈ th hp with cls k hp
@@ -495,13 +545,13 @@ ends-register {st = st} rid rs p cls k k< ne ea a th with ∈-register {st = st}
 -- share's, keeps it
 row-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} (i : Fin n) (below : toℕ i < lo)
               (κ : Path Γ lo (lookup Γ i) t) (sched : Sched Γ) (st : EvalSt e)
-          → Sound κ sched st
+          → SlotLinked sched st (atSlot i) → Sound κ sched st
           → Sound κ (record sched { mint = setAt regᵏ (suc (freshId regᵏ (Sched.mint sched))) (Sched.mint sched) })
               (register (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ) st)
-row-sound i below κ sched st so =
+row-sound i below κ sched st ln so =
   register-sound {sched = sched} {st = st}
-    (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ) ≤-refl (lower-end below κ)
-    (λ k on → inj₁ (subst T (lower-nodes below κ k) on)) (λ so′ → lower-distinct below κ (distinct so′)) so
+    (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ) ≤-refl (keeps-refl _ _) (lower-end below κ)
+    (λ k on → inj₁ (subst T (lower-nodes below κ k) on)) (λ so′ → lower-distinct below κ (distinct so′)) ln so
 
 -- CONSISTENCY MOVES ACROSS A STATE THAT READS THE FRAME'S NODES BACK
 -- THE SAME.
@@ -1251,7 +1301,7 @@ wrap-ot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t
         → Sound κ (proj₁ (proj₂ (thruWrap op nid fin (sched , st)))) (proj₂ (proj₂ (thruWrap op nid fin (sched , st))))
 wrap-ot op nid false sched st so = so
 wrap-ot mergeAllᵒ nid true sched st so with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st _ _ _ _)  = sub-ot (λ r∈ → r∈) ≤-refl so
+... | just (mergeAll-st _ _ _ _)  = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so
 ... | just (cell-st _)            = so
 ... | just (take-st _)            = so
 ... | just (batchSync-st _ _ _)   = so
@@ -1259,7 +1309,7 @@ wrap-ot mergeAllᵒ nid true sched st so with lookupNode nid (EvalSt.nodes st)
 ... | just (exhaust-st _ _)       = so
 ... | nothing                     = so
 wrap-ot switchᵒ nid true sched st so with lookupNode nid (EvalSt.nodes st)
-... | just (switch-st _ _)        = sub-ot (λ r∈ → r∈) ≤-refl so
+... | just (switch-st _ _)        = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so
 ... | just (cell-st _)            = so
 ... | just (take-st _)            = so
 ... | just (batchSync-st _ _ _)   = so
@@ -1267,7 +1317,7 @@ wrap-ot switchᵒ nid true sched st so with lookupNode nid (EvalSt.nodes st)
 ... | just (exhaust-st _ _)       = so
 ... | nothing                     = so
 wrap-ot exhaustᵒ nid true sched st so with lookupNode nid (EvalSt.nodes st)
-... | just (exhaust-st _ _)       = sub-ot (λ r∈ → r∈) ≤-refl so
+... | just (exhaust-st _ _)       = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so
 ... | just (cell-st _)            = so
 ... | just (take-st _)            = so
 ... | just (batchSync-st _ _ _)   = so
@@ -1306,7 +1356,7 @@ wrap-reg exhaustᵒ nid true sched st r∈ with lookupNode nid (EvalSt.nodes st)
 dying-rule : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (i : Fin n) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
            → Rule sched st → Rule sched (shareDying i fin st)
 dying-rule i false sched st ru = ru
-dying-rule i true  sched st ru = sub-rule (λ r∈ → r∈) ≤-refl ru
+dying-rule i true  sched st ru = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ru
 
 -- an admitted path is the path of a row the registry holds
 admit-row : ∀ {n} {Γ : Ctx n} {t} (i : Fin n) (reg : List (RegRow Γ t))
@@ -1369,7 +1419,7 @@ fresh-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u} (op : AllOp) (ni
             → Sound κ sched st → NodeOn nid κ sched st
             → Sound (from-inner op nid (nodeCt sched) ↠[ ≤-refl ] κ) (bumpNode sched) st
 fresh-inner op nid κ sched {st} (sound ru ea fp ds) (node-on at lt op′) =
-  sound (sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sched)) ru)
+  sound (sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sched)) (keeps-refl _ _) ru)
     (λ k h → [ (λ fn → node-cases {x = nid} {y = nodeCt sched} fn
                          (λ eq → subst (λ j → EndsAt j (endOf κ) st) eq at)
                          (λ eq r∈ th → ⊥-elim (<-irrefl refl
@@ -1619,7 +1669,7 @@ fresh-sound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s u} (f : Frame Γ 
             → Sound κ sched st
             → Sound (f ↠[ ≤-refl ] κ) (bumpNode sched) (installNode (nodeCt sched) ns st)
 fresh-sound f κ ns {sched} {st} one so =
-  push-sound f ≤-refl κ (sub-ot (λ r∈ → r∈) (n≤1+n _) so)
+  push-sound f ≤-refl κ (sub-ot (λ r∈ → r∈) (n≤1+n _) (keeps-refl _ _) so)
     (λ k a → subst (λ j → NodeOn j κ (bumpNode sched) (installNode (nodeCt sched) ns st)) (one k a) (fresh-on κ ns so))
 
 cell-inj : ∀ {n} {Γ : Ctx n} {u} {a b : Val Γ u} → just (cell-st {Γ = Γ} a) ≡ just (cell-st b) → a ≡ b

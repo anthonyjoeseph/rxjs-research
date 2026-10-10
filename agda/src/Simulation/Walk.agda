@@ -26,6 +26,7 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Bool.ListAction using (any)
 open import Data.Unit    using (tt)
 open import Rx.Evaluator.Reducible.Support using (fresh-path)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_; s<s⁻¹; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (Acc; acc)
@@ -45,15 +46,17 @@ open import Rx.Exp       using (Ctx; Val; Closed; Exp; unfoldμ; ofᵉ; Ren∈; 
   unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ;
   varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm; Env)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
-open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
-  Frame; frameNodes; mkHot; memoᶠ; Stream; resolve; memberSource; atSlot; lowerFloor; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState;
+  sched-init; st-init; Frame; frameNodes; mkHot; Stream; resolve; memberSource; atSlot;
+  lowerFloor; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register;
+  atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; fold-step; step-map; sharedConnect⇓; subs-floor; subs-shared; subs-hot-done; subs-hot-live;
   subs-cold-sync; subs-cold-async; slot-spent; slot-join; slot-connect; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; subs-μ; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule; Sound; sound; fresh-sound; push-sound; sub-ot; node-eq; sub-rule)
-open import Data.Fin     using (Fin; zero; suc; toℕ; splitAt; _↑ʳ_)
+open import Data.Fin     using (Fin; suc; toℕ; splitAt; _↑ʳ_)
 open import Data.Vec     using (lookup)
 open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
@@ -70,7 +73,7 @@ open import Simulation.Write using (apart)
 open import Simulation.Install using (install; fresh-set; weak; named-mint)
 open import Simulation.Hop using (hop-register)
 open import Simulation.Cold using (ColdBlock; cold-register)
-open import Simulation.Slot-Join using (join-read)
+open import Simulation.Slot-Join using (join-read; memoᶠ-at; plain-hot-slot)
 open import Simulation.Catch using (Kept; Stamps; AtFrame; OnPath; on-path; catch-same; kept-same; kept-trans; kept-catch;
   kept-unmoved; unmoved-set; by-sub; by-sub⁻)
 open Kept using (After; module After; _⨾_; after)
@@ -121,7 +124,7 @@ bare {F = F} {κ} so = push-sound (map-f F) ≤-refl κ so (λ k ())
 -- a minted source moves no node counter
 resrc : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo u} {κ : Path Δ lo u t} {sched : Sched Δ} {st : EvalSt e} {v}
       → Sound κ sched st → Sound κ (record sched { mint = setAt sourceᵏ v (Sched.mint sched) }) st
-resrc = sub-ot (λ r∈ → r∈) ≤-refl
+resrc = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _)
 
 -- a fold of nothing through a read's restamp is the fold past it
 peel-read : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {A B u lo} (eq : A ≡ B) {F : FnClo Δ B u} {q : Path Δ lo u t}
@@ -129,18 +132,6 @@ peel-read : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {A B u lo} (eq : A ≡ B)
           → foldPath⇓ {e = e} now (subst (λ v → Path Δ lo v t) (sym eq) (map-f F ↠[ ≤-refl ] q)) [] fin sched st (out , sched′ , st′)
           → foldPath⇓ now q [] fin sched st (out , sched′ , st′)
 peel-read refl (fold-step step-map f) = f
-
--- a table read at a slot is the slot
-memoᶠ-at : ∀ {m} {P : Fin m → Set} (f : ∀ j → P j) j → memoᶠ f j ≡ f j
-memoᶠ-at f zero    = refl
-memoᶠ-at f (suc j) = memoᶠ-at (λ j → f (suc j)) j
-
--- A HOT SLOT READ PLAIN IS ITS SCRIPT, READ IMPL AT ITS STAMPED SLOT A
--- SHARE: neither run's read of it takes the other kinds' rules
-plain-hot-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j : Fin m) → lookup κ j ≡ hotᵏ
-               → Σ _ λ ok → Σ _ λ as → plainSlots ins j ≡ scripted {ok = ok} (hot as)
-plain-hot-slot {κ = κ} ins j ek with lookup κ j | ins j
-plain-hot-slot ins j refl | hotᵏ | hotˢ _ = _ , _ , refl
 
 -- A COLD SLOT READ PLAIN IS ITS SCRIPT, COLD
 plain-cold-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j : Fin m) → lookup κ j ≡ coldᵏ
@@ -1005,7 +996,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ; latches = latches ; dying-done = dying-done ; bounded = proj₁ bounded , mapᵃ m<n⇒m<1+n (proj₂ bounded)
       ; swept = swept ; uncut = uncut ; named = proj₁ named , named-mint (n≤1+n _) ≤-refl ≤-refl (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
-      ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+      ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
       ; scripts = scripts ; inv = inv
       }
       where open Store S
@@ -1230,8 +1221,8 @@ init-store κ {t} e ins μ big ord = record
   ; above   = [] , []
   ; census  = λ _ _ → inj₂ (refl , refl , λ ())
   ; owned   = []
-  ; ruleP   = rule (λ k ()) (λ ()) (λ ())
-  ; ruleI   = rule (λ k ()) (λ ()) (λ ())
+  ; ruleP   = rule (λ k ()) (λ ()) (λ ()) (λ ())
+  ; ruleI   = rule (λ k ()) (λ ()) (λ ()) (λ ())
   ; scripts = ins , refl , refl
   ; inv     = inv-init
   }

@@ -21,6 +21,7 @@ open import Data.List.Relation.Unary.All using (All; _∷_; []) renaming (map to
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
 open import Data.Nat     using (suc; _+_; _<_; _<ᵇ_; _≟_)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Reducible.Floor using (drop-sub)
 open import Data.Nat.Properties using (≤-refl; 1+n≢0; <⇒≢; <-trans; +-monoʳ-<; +-cancelˡ-≡)
 open import Relation.Nullary using (yes; no)
@@ -305,8 +306,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; fresh-ids = all-drop s (proj₁ fresh-ids) , all-drop s′ (proj₂ fresh-ids)
     ; above = all-drop s (proj₁ above) , all-drop s′ (proj₂ above)
     ; owned = owned-drop {t = t} s′ {K = EvalSt.registry stI} owned
-    ; ruleP = sub-rule (drop-sub s (EvalSt.registry stP)) ≤-refl ruleP
-    ; ruleI = sub-rule (drop-sub s′ (EvalSt.registry stI)) ≤-refl ruleI
+    ; ruleP = sub-rule (drop-sub s (EvalSt.registry stP)) ≤-refl (keeps-refl _ _) ruleP
+    ; ruleI = sub-rule (drop-sub s′ (EvalSt.registry stI)) ≤-refl (keeps-refl _ _) ruleI
     ; scripts = scripts
     ; inv = inv-drop (drop-sub s′ (EvalSt.registry stI)) inv
     ; census = λ i h → census-drop s′ (EvalSt.registry stI) (mach-lt i na′)
@@ -562,8 +563,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; above = all-drop (toℕ i) (proj₁ above) , all-drop (toℕ (i ↑ˡ n)) (all-drop (toℕ (n ↑ʳ i)) (proj₂ above))
     ; census = hot-census
     ; owned = owned-drop {Γ = Γ} κ {t = t} (toℕ (i ↑ˡ n)) {K = dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)} (owned-drop {Γ = Γ} κ {t = t} (toℕ (n ↑ʳ i)) {K = EvalSt.registry stI} owned)
-    ; ruleP = sub-rule (drop-sub (toℕ i) (EvalSt.registry stP)) ≤-refl ruleP
-    ; ruleI = sub-rule (λ r∈ → drop-sub (toℕ (n ↑ʳ i)) (EvalSt.registry stI) (drop-sub (toℕ (i ↑ˡ n)) (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)) r∈)) ≤-refl ruleI
+    ; ruleP = sub-rule (drop-sub (toℕ i) (EvalSt.registry stP)) ≤-refl (keeps-refl _ _) ruleP
+    ; ruleI = sub-rule (λ r∈ → drop-sub (toℕ (n ↑ʳ i)) (EvalSt.registry stI) (drop-sub (toℕ (i ↑ˡ n)) (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)) r∈)) ≤-refl (keeps-refl _ _) ruleI
     ; scripts = scripts
     ; inv = inv-drop (λ r∈ → drop-sub (toℕ (n ↑ʳ i)) (EvalSt.registry stI) (drop-sub (toℕ (i ↑ˡ n)) (dropSource (toℕ (n ↑ʳ i)) (EvalSt.registry stI)) r∈)) inv
     }
@@ -621,7 +622,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above
     ; named = close-named {a = a} (proj₁ named) (subst (_< _) (sym e₁) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named))))
             , close-named {a = a′} (proj₂ named) (subst (_< _) (sym e₂) (<-trans (raw<ₙ i) (Named.slots-below (proj₂ named))))
-    ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+    ; latches = lat ; census = cen ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
     ; scripts = scripts ; inv = inv-close a′ df inv
     ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)
     ; dying-alike = hot-close-dies S i e₁ e₂ z₂

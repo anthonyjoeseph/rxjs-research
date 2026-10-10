@@ -75,6 +75,8 @@ open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 open import Simulation.Elem using (pw-one; pw-none; paysOf; values-decode; echoList; elem-run; quiet-run)
 open import Rx.Evaluator.Reducible.Support using (Sound; fresh-path; fresh-inner; sub-ot; sub-on; kill-sub; switchKill-ct; sub-rule;
   switchKill-nodes; drop-ot; head-on; self-node; Agree; Rule; admit-agree; termini; admit-ot; fresh-rows)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
+open import Rx.Evaluator.Keeps using (switchKill-keeps)
 open import Rx.Evaluator.Reducible.Dead-Kept using (alive-dead)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 
@@ -105,9 +107,18 @@ set-twice nid a b ((k , s) ∷ r) with k ≡ᵇ nid in eq
 
 postulate
   -- A FOLD DOWN A PATH OFF A NODE IS FRAMED BY IT: run from a table
-  -- with that node rewritten, it is the fold from the table as it was,
-  -- of the same size, with the rewrite laid over where it ends
-  fold-off : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} {κ : Path Δ lo s t} {k y now vals fin sched st r}
+  -- holding that node, rewritten, it is the fold from the table as it
+  -- was, of the same size, with the rewrite laid over where it ends.
+  -- The node must be in the table: rewriting an absent one appends it,
+  -- and a node the fold installs then lands on the other side of it.
+  -- A share the fold connects has no reader but the one the connect
+  -- registers, which is the rule's `linked`.
+  --
+  -- REFUTED: `Refuted.Fold-Off-Absent`, read with
+  --   `git show d035ee48:agda/evidence/refuted/Refuted/Fold-Off-Absent.agda`
+  --   -- the node absent, a merge handed a `defer` installs past it.
+  fold-off : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} {κ : Path Δ lo s t} {k x y now vals fin sched st r}
+           → lookupNode k (EvalSt.nodes st) ≡ just x
            → Clear k κ sched st
            → (d : foldPath⇓ {e = e} now κ vals fin sched (record st { nodes = setNode k y (EvalSt.nodes st) }) r)
            → Σ _ λ r′ → Σ (foldPath⇓ now κ vals fin sched st r′) λ d′
@@ -197,7 +208,7 @@ delivered {κ = κ} {sP = sP} {stP} {sI} {stI} s {fin} {x} {x′} pr = record
   ; sync = sync ; rows = rows ; latches = latches ; dying-done = dying-done
   ; dlv-alike = dlv fin ; dying-alike = dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut
   ; named = dlv-named fin (proj₁ named) (lookupᵃ (proj₁ fresh-ids) (proj₁ mx)) , dlv-named fin (proj₂ named) (lookupᵃ (proj₂ fresh-ids) (proj₂ mx)) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
-  ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+  ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
   ; scripts = scripts ; inv = inv-dlv fin (proj₁ x′) inv }
   where
     open Store s
@@ -228,7 +239,7 @@ dying {n} {κ = κ} {stP = stP} {stI = stI} s i sk = record
   ; dlv-alike = dlv-alike ; dying-alike = spent-zip κ _ _ _ _ _ rows _∨_ (stamp-rows κ i rows (proj₁ above) (proj₂ above)) dying-alike ; bounded = bounded ; swept = swept ; uncut = uncut
   ; named = dying-named i (proj₁ named) (<-trans (toℕ<n i) (Named.slots-below (proj₁ named)))
           , dying-named (n ↑ʳ i) (proj₂ named) (<-trans (stamped< i) (Named.slots-below (proj₂ named))) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; census = census ; owned = owned
-  ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+  ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
   ; scripts = scripts ; inv = inv-dying (n ↑ʳ i) inv }
   where
   open Store s
@@ -980,8 +991,8 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
          , pathG {Γ = Γ} κ there {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} (proj₂ (proj₂ (fresh-off {Γ = Γ} {κ = κ} {π = Store.π S} {j = nodeCt sP} (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (fresh-path (proj₂ cI))))) pr
       Wr = flat-write (mint-pair S) W₁ fn lv
       B = inner-walk wk (After.store (proj₁ Wr)) (proj₂ Wr) (After.grows (proj₁ Wr) (here refl)) lq ob
-            (sub-ot (λ r∈ → r∈) ≤-refl (fresh-inner (flatOp op) m p sP (proj₂ cP) (proj₁ cP)))
-            (sub-ot (λ r∈ → r∈) ≤-refl (fresh-inner (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI (proj₂ cI) (proj₁ cI)))
+            (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (fresh-inner (flatOp op) m p sP (proj₂ cP) (proj₁ cP)))
+            (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (fresh-inner (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI (proj₂ cI) (proj₁ cI)))
             dP dI (sz-1 lt)
 
     -- a switch's: the node names the inner it subscribes
@@ -1076,7 +1087,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       kill-clear : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s′} {k} {π : Path Γ lo s′ t} (c : Maybe NodeId) (s : Sched Γ) (st : EvalSt e) {s₁ st₁}
                  → switchKill c s st ≡ (s₁ , st₁) → Clear k π s st → Clear k π s₁ st₁
       kill-clear c s st refl (on , so) =
-        sub-on (kill-sub c s st) (≤-reflexive (sym (switchKill-ct c s st))) on , sub-ot (kill-sub c s st) (≤-reflexive (sym (switchKill-ct c s st))) so
+        sub-on (kill-sub c s st) (≤-reflexive (sym (switchKill-ct c s st))) on , sub-ot (kill-sub c s st) (≤-reflexive (sym (switchKill-ct c s st))) (switchKill-keeps c s st refl) so
     consume-switch _ S W ob _ _ _ (consume-switch-nil _) (consume-switch-nil _) _ = after S (λ x → x) (λ x → x) [] (λ x → x) , W
     consume-switch _ S {u = u} ((_ , _ , _ , _ , lI , switch~ _ , _) , _) ob _ _ _ (consume-switch-sub _ _ _ _) (consume-switch-nil n) _ =
       ⊥-elim (unusable switchᵒ (emitᵗ u) lI n refl)
@@ -1291,7 +1302,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut
       ; named = proj₁ named , named-node (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
-      ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) ruleI
+      ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) ruleI
       ; scripts = scripts ; inv = inv
       }
       where open Store S
@@ -1922,12 +1933,12 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                             × MergeAt {Γ = Γ} κ (EvalSt.nodes st₂) u mX
         explode-drain S cp ci fl r lX lv qz (finish-nil e) _ _ _ = ⊥-elim (t≢f (trans (sym (usable-self _)) e))
         explode-drain {sI = sI} {stI = stI} S {op = op} {mX = mX} cp ci fl r lX lv qz (finish-all-drain {outV = outV} {st₁ = st₁′} fd drain-spent) lt F₂ lt₂ =
-          let ci′ = sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)
+          let ci′ = sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) (proj₂ ci)
               (A₁ , W₁) = IH (mint-impl S) (proj₂ cp) ci′ (fl , r) lX (live-if-under _ _ lv) qz fd (≤-trans (s≤s (m≤m+n _ _)) (s≤s⁻¹ lt))
-              c₁ = fold-clear fd (sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)) refl
-                     (sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci))
+              c₁ = fold-clear fd (sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) (proj₂ ci)) refl
+                     (sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) (proj₂ ci))
               (T , fl₂ , r₂ , x₂) = explode-tail (After.store A₁) {op = op} (proj₂ cp)
-                                      (sub-on (λ r∈ → r∈) ≤-refl (proj₁ c₁) , sub-ot (λ r∈ → r∈) ≤-refl (proj₂ c₁))
+                                      (sub-on (λ r∈ → r∈) ≤-refl (proj₁ c₁) , sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (proj₂ c₁))
                                       (proj₁ W₁) (proj₂ W₁) (false , lookup-set mX _ (EvalSt.nodes st₁′)) F₂ lt₂
           in after-out (cong (_++ _) (sym (++-identityʳ outV))) (unmintI A₁ ⨾ T) , fl₂ , r₂ , x₂
 
@@ -2058,7 +2069,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     inner-over-at zero S sp ci W lX lv qz d ()
     inner-over-at (suc M) {sP} {stP} {sI} {stI} S {op = op} {m = m} {m′ = m′} {ks = ks} {mX = mX} {x₀ = x₀} {y = y} {p = p} {q = q}
                   sp ci W lX lv qz d (s≤s lt) =
-      let (r′ , d′ , sz≡ , eq) = fold-off ci d
+      let (r′ , d′ , sz≡ , eq) = fold-off lX ci d
           N′ = EvalSt.nodes (proj₂ (proj₂ r′))
           E  = trans (set-twice mX x₀ y N′) (set-same mX x₀ N′ (trans (fold-unmoved d′ ci) lX))
       in subst (λ r → Σ (After S ([] , sP , stP) (proj₁ r , proj₁ (proj₂ r) , record (proj₂ (proj₂ r)) { nodes = setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))) })) λ A

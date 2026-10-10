@@ -52,7 +52,10 @@ open import Rx.Evaluator.Reducible.Support using (Sound; sound; ruled; ends; fre
   push-sound; Distinct; endOf; ∨-T; ∨-Tˡ; ∨-Tʳ; node-one; node-in₁; node-eq; node-cases;
   self-node; drop-ot; head-on; sub-ot; sink-sound; lower-nodes; lower-end; lower-distinct;
   register-sound; ∈-register; admit-row; admit-ot; admit-agree; kill-sub; switchKill-ct; wrap-ot;
-  fresh-inner; fresh-sound; scanCt; scanReg; takeCt; takeReg; batchCt; batchReg)
+  fresh-inner; fresh-sound; scanCt; scanReg; takeCt; takeReg; batchCt; batchReg; SlotLinked; scripted≢shared; connect-linked)
+open import Rx.Evaluator.Keeps using (Keeps; switchKill-keeps; scanDispatch-keeps; takeDispatch-keeps; batchDispatch-keeps;
+  shareFinish-keeps)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl; keeps-cons)
 open import Rx.Evaluator.Reducible.Floor using (drop-sub)
 
 module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
@@ -117,11 +120,11 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   -- keeps the rule for every path agreeing with `π`
   register-kept : ∀ {lo s u} {π : Path Γ lo s t} {sched sched′ : Sched Γ} {st : EvalSt e}
                     (rid : RegId) (rs : RegSrc Γ) (p : Path Γ (regFloor rs) u t)
-                → nodeCt sched ≤ nodeCt sched′ → endOf p ≡ endOf π
-                → (∀ k → T (pathHasNode k p) → T (pathHasNode k π)) → Distinct p
+                → nodeCt sched ≤ nodeCt sched′ → Keeps sched st sched′ st → endOf p ≡ endOf π
+                → (∀ k → T (pathHasNode k p) → T (pathHasNode k π)) → Distinct p → SlotLinked sched′ st rs
                 → Sound π sched st → RuleKept π sched st sched′ (register rid rs p st)
-  register-kept {π = π} {sched} {sched′} {st} rid rs p ct ee nk dp so κ₂ so₂ ag =
-    sound (ruled (register-sound {κ = π} {sched′ = sched′} rid rs p ct ee (λ k h → inj₁ (nk k h)) (λ _ → dp) so))
+  register-kept {π = π} {sched} {sched′} {st} rid rs p ct kp ee nk dp ln so κ₂ so₂ ag =
+    sound (ruled (register-sound {κ = π} {sched′ = sched′} rid rs p ct kp ee (λ k h → inj₁ (nk k h)) (λ _ → dp) ln so))
           ea′ (λ k h → <-≤-trans (fresh-path so₂ k h) ct) (distinct so₂)
     where
     ea′ : ∀ k → T (pathHasNode k κ₂) → ∀ {r} → r ∈ EvalSt.registry (register rid rs p st)
@@ -132,11 +135,11 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
 
   -- a slot's row: the walked path with its floor lowered
   slot-kept : ∀ {lo} (i : Fin n) (below : toℕ i < lo) {κ : Path Γ lo (lookup Γ i) t} {sched sched′ : Sched Γ} {st : EvalSt e}
-            → nodeCt sched ≤ nodeCt sched′ → Sound κ sched st
+            → nodeCt sched ≤ nodeCt sched′ → Keeps sched st sched′ st → SlotLinked sched′ st (atSlot i) → Sound κ sched st
             → RuleKept κ sched st sched′ (register (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ) st)
-  slot-kept i below {κ} {sched} ct so =
-    register-kept (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ) ct (lower-end below κ)
-      (λ k h → subst T (lower-nodes below κ k) h) (lower-distinct below κ (distinct so)) so
+  slot-kept i below {κ} {sched} ct kp ln so =
+    register-kept (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ) ct kp (lower-end below κ)
+      (λ k h → subst T (lower-nodes below κ k) h) (lower-distinct below κ (distinct so)) ln so
 
   -- an admitted row agrees with every path the rule holds for
   admit-agree₂ : ∀ (i : Fin n) {lo′ s′} {κ₂ : Path Γ lo′ s′ t} {sched : Sched Γ} {st : EvalSt e}
@@ -150,18 +153,18 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
           → switchKill {e = e} cur sched st ≡ (sched₁ , st₁) → Sound κ sched st → Sound κ sched₁ st₁
   kill-ot {κ = κ} cur {sched} {st = st} kl so =
     subst (λ p → Sound κ (proj₁ p) (proj₂ p)) kl
-      (sub-ot (kill-sub cur sched st) (≤-reflexive (sym (switchKill-ct cur sched st))) so)
+      (sub-ot (kill-sub cur sched st) (≤-reflexive (sym (switchKill-ct cur sched st))) (switchKill-keeps cur sched st refl) so)
 
   dying-ot : ∀ {lo s} {κ : Path Γ lo s t} (i : Fin n) (fin : Bool) {sched : Sched Γ} {st : EvalSt e}
            → Sound κ sched st → Sound κ sched (shareDying i fin st)
   dying-ot i false so = so
-  dying-ot i true  so = sub-ot (λ r∈ → r∈) ≤-refl so
+  dying-ot i true  so = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so
 
   finish-ot : ∀ {lo s} {κ : Path Γ lo s t} (i : Fin n) (fin : Bool) r
             → Sound κ (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
             → Sound κ (proj₁ (proj₂ (shareFinish {e = e} i fin r))) (proj₂ (proj₂ (shareFinish i fin r)))
   finish-ot i false r                 so = so
-  finish-ot i true  (emits , sc , st) so = sub-ot (drop-sub (toℕ i) (EvalSt.registry st)) ≤-refl so
+  finish-ot i true  (emits , sc , st) so = sub-ot (drop-sub (toℕ i) (EvalSt.registry st)) ≤-refl (shareFinish-keeps i true (emits , sc , st)) so
 
   -- THE FOURTEEN-MEMBER INDUCTION, in the shape of the floor's: every
   -- clause matches a constructor and recurses on its sub-derivations.
@@ -245,11 +248,12 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   subscribeE-rule (subs-floor _ f)        so = foldPath-rule f so
   subscribeE-rule (subs-shared _ slot)    so = subscribeSharedSlot-rule slot so
   subscribeE-rule (subs-hot-done _ _ _ f) so = foldPath-rule f so
-  subscribeE-rule {κ = κ} (subs-hot-live {i = i} below _ _ refl) so = slot-kept i below ≤-refl so
+  subscribeE-rule {κ = κ} (subs-hot-live {i = i} below sl _ refl) so =
+    slot-kept i below ≤-refl (keeps-refl _ _) (λ eq → ⊥-elim (scripted≢shared (trans (sym sl) eq))) so
   subscribeE-rule (subs-cold-sync _ _ f)  so = foldPath-rule f so
   subscribeE-rule {lo = lo} {κ = κ} {sched = sched} (subs-cold-async _ _ refl refl refl f) so κ₂ so₂ ag =
-    foldPath-rule f (register-kept {π = κ} rid rs κ ≤-refl refl (λ k h → h) (distinct so) so κ so (λ _ _ _ → refl))
-      κ₂ (register-kept {π = κ} rid rs κ ≤-refl refl (λ k h → h) (distinct so) so κ₂ so₂ ag) ag
+    foldPath-rule f (register-kept {π = κ} rid rs κ ≤-refl (keeps-refl _ _) refl (λ k h → h) (distinct so) _ so κ so (λ _ _ _ → refl))
+      κ₂ (register-kept {π = κ} rid rs κ ≤-refl (keeps-refl _ _) refl (λ k h → h) (distinct so) _ so κ₂ so₂ ag) ag
     where
     rid = freshId regᵏ (Sched.mint sched)
     rs  = atDyn (freshId sourceᵏ (Sched.mint sched)) lo
@@ -257,11 +261,11 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   subscribeE-rule (subs-empty f)          so = foldPath-rule f so
   subscribeE-rule {κ = κ} {sched = sched} (subs-takeWhile {Θ = Θ} {ρ = ρ} {f = fn} refl sub) so κ₂ so₂ ag =
     subscribeE-rule sub (fresh-sound (take-f (just (Θ , fn , ρ)) (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
-      (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
+      (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) (keeps-refl _ _) so₂)
       (fresh-agree (take-f (just (Θ , fn , ρ)) (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
   subscribeE-rule {κ = κ} {sched = sched} (subs-batchSync refl sub f) so κ₂ so₂ ag =
-    foldPath-rule f (sub-ot (λ r∈ → r∈) ≤-refl (subscribeE-rule sub soπ _ soπ (λ _ _ _ → refl))) κ₂
-      (sub-ot (λ r∈ → r∈) ≤-refl (subscribeE-rule sub soπ κ₂ (sub-ot (λ r∈ → r∈) (n≤1+n _) so₂) ag′)) ag′
+    foldPath-rule f (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (subscribeE-rule sub soπ _ soπ (λ _ _ _ → refl))) κ₂
+      (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (subscribeE-rule sub soπ κ₂ (sub-ot (λ r∈ → r∈) (n≤1+n _) (keeps-refl _ _) so₂) ag′)) ag′
     where
     soπ = fresh-sound (batchSync-f (nodeCt sched)) κ _ (λ k a → node-eq a) so
     ag′ = fresh-agree (batchSync-f (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag
@@ -269,55 +273,57 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     subscribeE-rule sub (push-sound (map-f _) ≤-refl κ so (λ k ()))
   subscribeE-rule {κ = κ} {sched = sched} (subs-scan {Θ = Θ} {ρ = ρ} {f = fn} refl sub) so κ₂ so₂ ag =
     subscribeE-rule sub (fresh-sound (scan-f (Θ , fn , ρ) (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
-      (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
+      (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) (keeps-refl _ _) so₂)
       (fresh-agree (scan-f (Θ , fn , ρ) (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
   subscribeE-rule (subs-flatten sa)       so = subscribeAll-rule sa so
   subscribeE-rule (subs-μ sub)            so = subscribeE-rule sub so
   subscribeE-rule {u = u} {lo = lo} {κ = κ} {sched = sched} (subs-defer refl refl refl refl) so κ₂ so₂ ag =
     register-kept {π = π} (freshId regᵏ (Sched.mint sched)) (atDyn (freshId sourceᵏ (Sched.mint sched)) lo) π
-      ≤-refl refl (λ k h → h) (distinct soπ) soπ κ₂ (sub-ot (λ r∈ → r∈) (n≤1+n _) so₂)
+      ≤-refl (keeps-refl _ _) refl (λ k h → h) (distinct soπ) _ soπ κ₂ (sub-ot (λ r∈ → r∈) (n≤1+n _) (keeps-refl _ _) so₂)
       (fresh-agree (thru-outer {u = u} mergeAllᵒ (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
     where
     π   = thru-outer mergeAllᵒ (nodeCt sched) ↠[ ≤-refl ] κ
     soπ = fresh-sound (thru-outer mergeAllᵒ (nodeCt sched)) κ (mergeAll-st {t = u} nothing 0 [] false) (λ k a → node-eq a) so
   subscribeE-rule (subs-mint refl sub)    so κ₂ so₂ ag =
-    subscribeE-rule sub (sub-ot (λ r∈ → r∈) ≤-refl so) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl so₂) ag
+    subscribeE-rule sub (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂) ag
 
   subscribeSharedSlot-rule (slot-spent _ f) so = foldPath-rule f so
-  subscribeSharedSlot-rule {i = i} {below = below} (slot-join _ _ refl) so = slot-kept i below ≤-refl so
+  subscribeSharedSlot-rule {i = i} {below = below} (slot-join _ cn refl) so = slot-kept i below ≤-refl (keeps-refl _ _) (λ _ → cn) so
   subscribeSharedSlot-rule {i = i} {κ = κ} {below = below} {sched = sched} {st = st} (slot-connect _ _ (connect refl sub)) so κ₂ so₂ ag =
-    subscribeE-rule sub (sink-sound i ≤-refl (ruled (slot-kept i below {κ = κ} {sched} {sched₁} {st₁} ≤-refl so₁ κ so₁ (λ _ _ _ → refl))))
-      κ₂ (slot-kept i below {κ = κ} {sched} {sched₁} {st₁} ≤-refl so₁ κ₂ (sub-ot {κ = κ₂} {st′ = st₁} (λ r∈ → r∈) ≤-refl so₂) ag) (λ k ())
+    subscribeE-rule sub (sink-sound i ≤-refl (ruled (slot-kept i below {κ = κ} {sched} {sched₁} {st₁} ≤-refl (keeps-refl _ _) ln so₁ κ so₁ (λ _ _ _ → refl))))
+      κ₂ (slot-kept i below {κ = κ} {sched} {sched₁} {st₁} ≤-refl (keeps-refl _ _) ln so₁ κ₂ (sub-ot {κ = κ₂} {st′ = st₁} (λ r∈ → r∈) ≤-refl (keeps-cons _ _ _) so₂) ag) (λ k ())
     where
     sched₁ : Sched Γ
     sched₁ = record sched { mint = setAt regᵏ (suc (freshId regᵏ (Sched.mint sched))) (Sched.mint sched) }
     st₁ : EvalSt e
     st₁ = record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }
     so₁ : Sound κ sched st₁
-    so₁ = sub-ot {st′ = st₁} (λ r∈ → r∈) ≤-refl so
+    so₁ = sub-ot {st′ = st₁} (λ r∈ → r∈) ≤-refl (keeps-cons _ _ _) so
+    ln : SlotLinked sched₁ st₁ (atSlot i)
+    ln = connect-linked i {sched₁} st
 
   subscribeAll-rule {op = op} {κ = κ} {sched = sched} (sub-all refl sub) so κ₂ so₂ ag =
     subscribeE-rule sub (fresh-sound (thru-outer op (nodeCt sched)) κ _ (λ k a → node-eq a) so) κ₂
-      (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
+      (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) (keeps-refl _ _) so₂)
       (fresh-agree (thru-outer op (nodeCt sched)) {le = ≤-refl} {κ = κ} {κ₂ = κ₂} {c = nodeCt sched} (λ k a → node-eq a) (fresh-path so₂) ag)
 
   subscribeInner-rule {op = op} {a = a} {κ = κ} {sched = sched} (inner refl sub) so κ₂ so₂ ag =
     subscribeE-rule sub
       (fresh-inner op a κ sched (drop-ot (thru-outer mergeAllᵒ a) ≤-refl κ so)
         (head-on (thru-outer mergeAllᵒ a) ≤-refl κ a (self-node a []) so))
-      κ₂ (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) so₂)
+      κ₂ (sub-ot {κ = κ₂} (λ r∈ → r∈) (n≤1+n _) (keeps-refl _ _) so₂)
       (inner-agree {op = op} {a = a} {c = nodeCt sched} {le = ≤-refl} {κ = κ} {κ₂ = κ₂} (fresh-path so₂) ag)
 
   stepFrame-rule le step-map so κ₂ so₂ ag = so₂
   stepFrame-rule le (step-scan {fn = fn} {nid = c} {vals = vals} {fin} {sched} {st}) so κ₂ so₂ ag =
     sub-ot (λ r∈ → subst (_ ∈_) (scanReg fn c vals fin sched st (lookupNode c (EvalSt.nodes st))) r∈)
-           (≤-reflexive (sym (scanCt fn c vals fin sched st (lookupNode c (EvalSt.nodes st))))) so₂
+           (≤-reflexive (sym (scanCt fn c vals fin sched st (lookupNode c (EvalSt.nodes st))))) (scanDispatch-keeps fn c vals fin sched st (lookupNode c (EvalSt.nodes st))) so₂
   stepFrame-rule le (step-take {w = w} {nid = c} {vals = vals} {fin} {sched} {st}) so κ₂ so₂ ag =
     sub-ot (takeReg w c (lookupNode c (EvalSt.nodes st)) vals fin sched st)
-           (≤-reflexive (sym (takeCt w c (lookupNode c (EvalSt.nodes st)) vals fin sched st))) so₂
+           (≤-reflexive (sym (takeCt w c (lookupNode c (EvalSt.nodes st)) vals fin sched st))) (takeDispatch-keeps w c vals fin sched st (lookupNode c (EvalSt.nodes st))) so₂
   stepFrame-rule le (step-batchSync {nid = c} {vals = vals} {fin} {sched} {st}) so κ₂ so₂ ag =
     sub-ot (λ r∈ → subst (_ ∈_) (batchReg c vals fin sched st (lookupNode c (EvalSt.nodes st))) r∈)
-           (≤-reflexive (sym (batchCt c vals fin sched st (lookupNode c (EvalSt.nodes st))))) so₂
+           (≤-reflexive (sym (batchCt c vals fin sched st (lookupNode c (EvalSt.nodes st))))) (batchDispatch-keeps c vals fin sched st (lookupNode c (EvalSt.nodes st))) so₂
   stepFrame-rule le {κ = κ} (step-from-inner {op = op} {allNid = a} {inst = inst} r) so κ₂ so₂ ag =
     innerReact-rule r (fi-thru {op = op} {a = a} {inst = inst} {le = le} {κ = κ} so) κ₂ so₂
       (fi-agree {op = op} {a = a} {inst = inst} {le = le} {κ = κ} {κ₂ = κ₂} ag)
@@ -333,15 +339,15 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     thruWalk-rule w (thruConsume-rule c so _ so (λ _ _ _ → refl)) κ₂ (thruConsume-rule c so κ₂ so₂ ag) ag
 
   thruConsume-rule (consume-all-sub _ _ c)  so κ₂ so₂ ag =
-    subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl so) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl so₂) ag
-  thruConsume-rule (consume-all-enqueue _ _) so κ₂ so₂ ag = sub-ot (λ r∈ → r∈) ≤-refl so₂
+    subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂) ag
+  thruConsume-rule (consume-all-enqueue _ _) so κ₂ so₂ ag = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂
   thruConsume-rule (consume-all-nil _)       so κ₂ so₂ ag = so₂
   thruConsume-rule (consume-switch-sub {cur = cur} _ kl _ c) so κ₂ so₂ ag =
-    subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl (kill-ot cur kl so)) κ₂
-      (sub-ot (λ r∈ → r∈) ≤-refl (kill-ot cur kl so₂)) ag
+    subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (kill-ot cur kl so)) κ₂
+      (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (kill-ot cur kl so₂)) ag
   thruConsume-rule (consume-switch-nil _)    so κ₂ so₂ ag = so₂
   thruConsume-rule (consume-exhaust-sub _ c) so κ₂ so₂ ag =
-    subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl so) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl so₂) ag
+    subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂) ag
   thruConsume-rule (consume-exhaust-nil _)   so κ₂ so₂ ag = so₂
 
   innerReact-rule react-false      so κ₂ so₂ ag = so₂
@@ -349,20 +355,20 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
   innerReact-rule (react-dead _ f) so κ₂ so₂ ag = innerFinish-rule f so κ₂ so₂ ag
 
   innerFinish-rule {a = a} {κ = κ} (finish-all-drain fp dr) so κ₂ so₂ ag =
-    sub-ot {κ = κ₂} (λ r∈ → r∈) ≤-refl
+    sub-ot {κ = κ₂} (λ r∈ → r∈) ≤-refl (keeps-refl _ _)
       (mergeAllDrain-rule dr (foldPath-rule fp (drop-ot (thru-outer mergeAllᵒ a) ≤-refl κ so) (Thru a κ) so (λ _ _ _ → refl)) κ₂
         (foldPath-rule fp (drop-ot (thru-outer mergeAllᵒ a) ≤-refl κ so) κ₂ so₂
           (λ k h h₂ → ag k (∨-Tʳ {a = any (_≡ᵇ k) (a ∷ [])} h) h₂)) ag)
-  innerFinish-rule (finish-switch-clear _) so κ₂ so₂ ag = sub-ot (λ r∈ → r∈) ≤-refl so₂
-  innerFinish-rule finish-exhaust-clear    so κ₂ so₂ ag = sub-ot (λ r∈ → r∈) ≤-refl so₂
+  innerFinish-rule (finish-switch-clear _) so κ₂ so₂ ag = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂
+  innerFinish-rule finish-exhaust-clear    so κ₂ so₂ ag = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂
   innerFinish-rule (finish-nil _)          so κ₂ so₂ ag = so₂
 
   mergeAllDrain-rule drain-spent       so κ₂ so₂ ag = so₂
   mergeAllDrain-rule drain-nil         so κ₂ so₂ ag = so₂
   mergeAllDrain-rule (drain-no-room _) so κ₂ so₂ ag = so₂
   mergeAllDrain-rule {a = a} {κ = κ} (drain-room _ c _ dr) so κ₂ so₂ ag =
-    mergeAllDrain-rule dr (subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl so) (Thru a κ) (sub-ot (λ r∈ → r∈) ≤-refl so) (λ _ _ _ → refl))
-      κ₂ (subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl so) κ₂ (sub-ot {κ = κ₂} (λ r∈ → r∈) ≤-refl so₂) ag) ag
+    mergeAllDrain-rule dr (subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so) (Thru a κ) (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so) (λ _ _ _ → refl))
+      κ₂ (subscribeInner-rule c (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so) κ₂ (sub-ot {κ = κ₂} (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂) ag) ag
 
   foldPath-rule fold-root     so κ₂ so₂ ag = so₂
   foldPath-rule (fold-sink d) so κ₂ so₂ ag = dispatchShare-rule d κ₂ so₂
@@ -374,8 +380,8 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
 
   shareWalk-rule walk-nil κ₂ so₂ = so₂
   shareWalk-rule {i = i} {sched = sched} {st = st} (walk-end g) κ₂ so₂ =
-    shareGo-rule g (λ a∈ → sub-ot (λ r∈ → r∈) ≤-refl (admit-ot i sched st (ruled so₂) a∈))
-      (admit-agree i st (termini (ruled so₂))) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl so₂) (admit-agree₂ i so₂)
+    shareGo-rule g (λ a∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (admit-ot i sched st (ruled so₂) a∈))
+      (admit-agree i st (termini (ruled so₂))) κ₂ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂) (admit-agree₂ i so₂)
   shareWalk-rule {i = i} {sched = sched} {st = st} (walk-more g w) κ₂ so₂ =
     shareWalk-rule w κ₂
       (shareGo-rule g (admit-ot i sched st (ruled so₂)) (admit-agree i st (termini (ruled so₂))) κ₂ so₂ (admit-agree₂ i so₂))
@@ -385,10 +391,10 @@ module _ {n} {Γ : Ctx n} {t} {e : Closed Γ t} where
     shareGo-rule g (λ m → hs (there m)) (λ m m′ → pa (there m) (there m′)) κ₂ so₂ (λ m → ak (there m))
   shareGo-rule {ps = (rid , p) ∷ ps} (go-live _ f g) hs pa κ₂ so₂ ak =
     shareGo-rule g
-      (λ {x} m → foldPath-rule f (sub-ot (λ r∈ → r∈) ≤-refl (hs (here refl))) (proj₂ x)
-                   (sub-ot {κ = proj₂ x} (λ r∈ → r∈) ≤-refl (hs (there m))) (pa (here refl) (there m)))
+      (λ {x} m → foldPath-rule f (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hs (here refl))) (proj₂ x)
+                   (sub-ot {κ = proj₂ x} (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hs (there m))) (pa (here refl) (there m)))
       (λ m m′ → pa (there m) (there m′)) κ₂
-      (foldPath-rule f (sub-ot (λ r∈ → r∈) ≤-refl (hs (here refl))) κ₂ (sub-ot {κ = κ₂} (λ r∈ → r∈) ≤-refl so₂) (ak (here refl)))
+      (foldPath-rule f (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hs (here refl))) κ₂ (sub-ot {κ = κ₂} (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so₂) (ak (here refl)))
       (λ m → ak (there m))
 
 -- THE THREE LEAVES THE CANDIDATE STANDS ON.

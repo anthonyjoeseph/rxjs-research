@@ -18,7 +18,7 @@ module Simulation.Slot-Join where
 open import Data.Bool    using (Bool; true; false; T; if_then_else_; _∨_)
 open import Data.Bool.ListAction using (any)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.Fin     using (Fin; toℕ; _↑ʳ_; _↑ˡ_)
+open import Data.Fin     using (Fin; zero; suc; toℕ; _↑ʳ_; _↑ˡ_)
 open import Data.Fin.Properties using (toℕ<n; toℕ-injective; ↑ʳ-injective)
 open import Data.Vec     using (lookup)
 open import Data.List    using (List; []; _∷_; _++_)
@@ -40,8 +40,13 @@ open import Rx.Exp       using (Ty; Ctx; Closed; Tm; uniqᵗ; varᵗ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Rx.Mint      using (counter; setAt; regᵏ; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; pathHasNode; LiveSource; RegRow; regSource; sameSource; memberSource; Path; root; share-sink; _↠[_]_;
-                                map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; atSlot; register; spentOn; lowerFloor)
-open import Rx.Evaluator.Reducible.Support using (Rule; Sound; Distinct; endOf; register-sound; row-sound; lower-nodes; lower-end; lower-distinct)
+                                map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer; atSlot; register; spentOn; lowerFloor; memoᶠ)
+open import Rx.Evaluator.Reducible.Support using (Rule; Sound; Distinct; endOf; register-sound; row-sound; lower-nodes; lower-end; lower-distinct;
+  scripted≢shared)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
+open import Rx.Prim      using (hot)
+open import Rx.Slots     using (scripted)
+open import SExp.Simul-Slots using (SimulSlots; hotˢ; plainSlots)
 open import SExp.Syntax  using (Kinds; hotᵏ; plainᵏ; emitᵗ)
 open import SExp.Elaborate using (restampᵛ; subscribeᵛ)
 open import Simulation.Stores using (inv-snoc; Store; Arr; PathRel; Named; Census; Unpaired; RowRel; ArrRows; _∷_; []; read~; root~; sink~;
@@ -50,6 +55,18 @@ open import Simulation.Sweep using (sameSource-no; t≢f; raw≢stamped; stamped
 open import Simulation.Cut   using (nodesOf; has-node; node-has)
 open import Simulation.Hop   using (none-below; guard-snoc; count-snoc; reg-snoc; part-snoc; spent-snoc; arr-snoc; reg-unp; path-spent; rel-vals)
 open import Simulation.After using (module Kept)
+
+-- a table read at a slot is the slot
+memoᶠ-at : ∀ {m} {P : Fin m → Set} (f : ∀ j → P j) j → memoᶠ f j ≡ f j
+memoᶠ-at f zero    = refl
+memoᶠ-at f (suc j) = memoᶠ-at (λ j → f (suc j)) j
+
+-- A HOT SLOT READ PLAIN IS ITS SCRIPT, READ IMPL AT ITS STAMPED SLOT A
+-- SHARE: neither run's read of it takes the other kinds' rules
+plain-hot-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j : Fin m) → lookup κ j ≡ hotᵏ
+               → Σ _ λ ok → Σ _ λ as → plainSlots ins j ≡ scripted {ok = ok} (hot as)
+plain-hot-slot {κ = κ} ins j ek with lookup κ j | ins j
+plain-hot-slot ins j refl | hotᵏ | hotˢ _ = _ , _ , refl
 
 -- the id counter moved past the id it handed out, and one row more
 -- stands at a source below the slots' bound
@@ -294,10 +311,16 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                  (read~ (inj₁ hk) (lower-rel κ below pr) (cong (λ c → proj₁ c , lowerFloor below′ (proj₂ c)) sp))
                  (λ {_} {_} {_} {_} → tt) off pr
 
-    soP₂ = row-sound i below p sP stP soP
+    soP₂ = row-sound i below p sP stP
+             (λ eq′ → ⊥-elim (scripted≢shared (trans (sym (proj₂ (proj₂ (plain-hot-slot ins i hk))))
+                        (trans (sym (memoᶠ-at (plainSlots ins) i)) (trans (sym (cong (λ f → f i) eP)) eq′)))))
+             soP
+      where
+      ins = proj₁ (Store.scripts S)
+      eP  = proj₁ (proj₂ (Store.scripts S))
     soI₂ : Sound q (record sI { mint = setAt regᵏ (suc (freshId regᵏ (Sched.mint sI))) (Sched.mint sI) }) (register (freshId regᵏ (Sched.mint sI)) (atSlot (n ↑ʳ i)) q′ stI)
-    soI₂ = register-sound {sched = sI} (freshId regᵏ (Sched.mint sI)) (atSlot (n ↑ʳ i)) q′ ≤-refl
+    soI₂ = register-sound {sched = sI} (freshId regᵏ (Sched.mint sI)) (atSlot (n ↑ʳ i)) q′ ≤-refl (keeps-refl _ _)
              (trans (lower-end below′ y₀) (cong (λ c → endOf (proj₂ c)) sp))
              (λ k h → inj₁ (subst T (nodes′ k) h))
              (λ so → lower-distinct below′ y₀ (subst (λ c → Distinct (proj₂ c)) (sym sp) ((λ _ ()) , Sound.distinct so)))
-             soI
+             (λ _ → conn) soI

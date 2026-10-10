@@ -233,8 +233,8 @@ undecided, never a failure (Anthony).
 
 ### The monster
 
-`simulation` — both top lines' base by arrival
-over `correspondence`, set by `subscribe-related`, kept by `cascade-related`. RULED
+`simulation` — top lines' base by arrival
+over `correspondence`, via `subscribe-related`/`cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; unrelated subs; unpaired pops; maps
 moving time; emptying closes; hot ends past block;
@@ -243,18 +243,20 @@ body ends, 2 hop inners apart; unsound walks/reads; 2 stamp chains;
 of splits/folds; mintᵉ/root stamps; quiet arms/cut drains; hop
 scripts; joiners off catch; installs+hops; revived/dead/held inners;
 unaligned reads/connects/flushes; renames; 2-script
-stores/values; mid-emit joins; μ cold reads; dying rows;
-dead outers; live rows past ends;
-Store echoes.
+stores+values; mid-emit joins; μ cold reads; dying rows;
+dead outers/rows past ends; Store echoes;
+absent/stale readers.
 
 also: `main` — the QuickCheck's entry point, and every generator it calls: the sweep feeds the bug cache, and no proof reads it.
 
 ### Big picture tier roadmap
 
-- **A FOLD OFF A NODE IS FRAMED BY IT.** `fold-off` as a body by induction
-  over the fold, a clause per frame, each frame writing only its own node and
-  `Clear` keeping the written one off the path. Decides whether the in-flight
-  count is a frame at all, which both explode inners now rest on.
+- **A FOLD OFF A NODE IS FRAMED BY IT.** `fold-off` and `fold-unmoved` as
+  bodies by induction over the fold, a clause per frame, each frame writing
+  only its own node, `Clear` keeping the written one off the path and the
+  rule's `linked` keeping a connect's fan-out on the reader it registers.
+  Decides whether the in-flight count is a frame at all, which both explode
+  inners now rest on.
 
 - **AN OUTER'S GROUP SENDS AT ITS INSTANT.** `elem-out` as a body over
   the restamp's walk, a clause per element, now read at an explode's merge in
@@ -278,9 +280,9 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
   `DEAD ROUTE`: one exploded emit, carrying one value or nothing, subscribed at
   a merge marked done, sends at its delivery; open where the merge's path is
   spent.
-- **`fold-off`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: a fold down a
-  path missing a node, run with that node written, is the fold without the
-  write, of the same size, the write laid over where it ends.
+- **`fold-off`** (Simulation.Pass) — FALSITY, `REFUTED`: a fold down a path
+  missing a node the table holds, run with that node rewritten, is the fold
+  without the write, of the same size, the write laid over where it ends.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.

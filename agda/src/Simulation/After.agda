@@ -32,6 +32,7 @@ open import Rx.Mint      using (setAt; nodeᵏ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; RegId; RegRow; NodeId; skipᵇ; regSource; memberSource)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Reducible.Support using (sub-rule; fresh-rows)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit using (instEmitᵗ)
@@ -180,8 +181,8 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
     ; dlv-alike = spentG κ there (mint-off S) rows dlv-alike ; dying-alike = spentG κ there (mint-off S) rows dying-alike
     ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-node (proj₁ named) , named-node (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
     ; census = census ; owned = owned
-    ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) ruleP
-    ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) ruleI
+    ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) (keeps-refl _ _) ruleP
+    ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) ruleI
     ; scripts = scripts ; inv = inv
     }
     where open Store S
@@ -206,7 +207,7 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
       ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut
       ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
-      ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+      ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
       ; scripts = scripts ; inv = inv-write lv inv }
 
   -- a step from the minted stores is one from the stores

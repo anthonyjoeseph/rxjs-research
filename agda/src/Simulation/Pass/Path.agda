@@ -49,6 +49,7 @@ open import Simulation.Arm using (Out; out-quiet; out-++; out-tail; Clear; Clear
   unmoved; fold-unmoved)
 open import Simulation.Sweep using (t≢f; same-refl)
 open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; sub-ot; Agree; admit-ot)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Inner using (module PassI)
 open import Simulation.Size using (sz-foldPath; sz-innerFinish; sz-shareGo; sz-shareWalk; sz-dispatchShare; sz-stepFrame; sz-thruWalk; sz-l; sz-r; sz-1)
@@ -231,15 +232,15 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       share-go wk {stI = stI} S {i = i} εI {fin = fin} c dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (go-live _ dP g) (go-live {rid = rI′} {emits = eI} y′ dI g′) lt =
         rebase {fin = fin} (A ⨾ proj₁ Y) , λ f ds → out-++ {Δ = plainᵏ Γ κ} {t = plainᵗ t} eI _ (proj₂ Z f ds) (proj₂ Y f ds)
         where
-          sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
-          sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
+          sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hP (here refl))
+          sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hI (here refl))
           Z = slot-pass wk (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ dP dI (λ e → skip-marked {s = toℕ (n ↑ʳ i)} {rid = rI′} {st = stI} e (dy e))
                 (LiveRows.rows-live (Inv.live-outer (Store.inv S)) (proj₂ (partner-mem κ _ _ _ _ _ (Store.rows S) pr)) y′) (sz-l lt)
           A = proj₁ Z
           Y = share-go wk (After.store A) εI c (λ e → dying-kept {k = toℕ (n ↑ʳ i)} dI (dy e)) (share-keeps {S₀ = S} {S₁ = After.store A} {i = i} (After.keeps A) ps)
-                (λ m → fold-kept dP sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
+                (λ m → fold-kept dP sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hP (there m))) (aP (here refl) (there m)))
                 (λ m m′ → aP (there m) (there m′))
-                (λ m → fold-kept dI sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))
+                (λ m → fold-kept dI sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hI (there m))) (aI (here refl) (there m)))
                 (λ m m′ → aI (there m) (there m′)) g g′ (sz-r lt)
 
       -- A SHARE'S WALK ON BOTH SIDES, one emit at a time: a value every
@@ -473,7 +474,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
     inner-one-at : ∀ {K} → Walker′ K → IOO-at K
     inner-one-at wk {sP} {stP} {sI} {stI} S {op = op} {m = m} {m′ = m′} {ks = ks} {mX = mX} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {x₀ = x₀} {y = y}
                  {p = p} {q = q} {rP = rP} cp ci w lX lv e′ rel W refl d lt =
-      let (r′ , d′ , _ , eq) = fold-off ci d
+      let (r′ , d′ , _ , eq) = fold-off lX ci d
           N′ = EvalSt.nodes (proj₂ (proj₂ r′))
           E  = trans (set-twice mX x₀ y N′) (set-same mX x₀ N′ (trans (fold-unmoved d′ ci) lX))
       in subst (λ r → Σ (After S rP (proj₁ r , proj₁ (proj₂ r) , record (proj₂ (proj₂ r)) { nodes = setNode mX x₀ (EvalSt.nodes (proj₂ (proj₂ r))) })) λ A

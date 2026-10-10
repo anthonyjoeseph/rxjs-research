@@ -31,6 +31,7 @@ open import Rx.Mint      using (Mint; counter; sourceᵏ; regᵏ; nodeᵏ; ordin
 open import Rx.Evaluator using (NodeId; NodeState; Sched; EvalSt; regSource; Path; root; share-sink; _↠[_]_; frameNodes; pathHasNode; RegRow; lookupNode; setNode)
 open import Rx.Evaluator.Freshness using (nodeCt; set-above)
 open import Rx.Evaluator.Reducible.Support using (sub-rule; fresh-rows; rowThrough; ∨-Tˡ; ∨-Tʳ)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Unpaired; Flattener; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
   outerExplode~; inner~; deferInner~; InputBlock; block; RowRel; read~; cold~; defer~; MachRow; hot~; RegRel; []; _∷_; mach;
@@ -225,6 +226,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; named = named-mint sP≤ oP≤ rP≤ (proj₁ named) , named-mint sI≤ oI≤ rI≤ (proj₂ named)
       ; fresh-ids = weak rP≤ (proj₁ fresh-ids) , weak rI≤ (proj₂ fresh-ids) ; above = above
       ; census = census ; owned = owned
-      ; ruleP = sub-rule (λ r∈ → r∈) (<⇒≤ kP) ruleP ; ruleI = sub-rule (λ r∈ → r∈) kI ruleI
+      ; ruleP = sub-rule (λ r∈ → r∈) (<⇒≤ kP) (keeps-refl _ _) ruleP ; ruleI = sub-rule (λ r∈ → r∈) kI (keeps-refl _ _) ruleI
       ; scripts = scripts
       ; inv = inv-agree (λ {r} r∈ _ k h → aI k (fresh-rows ruleI r∈ k h)) inv }

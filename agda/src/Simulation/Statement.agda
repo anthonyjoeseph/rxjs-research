@@ -74,6 +74,7 @@ open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; casc
   foldPath⇓; disp; walk-more; walk-nil; walk-end; subscribeE⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; subscribe!; cascade!; pop-rule; chain-sound; chain-agree)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; admit-ot)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Rx.Evaluator.Quiet using (QuietC; go-quiet; subscribeE-quiet; drop-off)
@@ -504,7 +505,7 @@ dyn-chain {t = t} κ e s {a = a} {a′} {fin = fin} hd ta pr ps soP soI dP dI =
   , (λ ar → After.persists A (delivered-arr {fin = fin} ar)) , proj₂ R
   where
     R = row-pass κ (delivered s {fin} pr) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
-          (sub-ot (λ r∈ → r∈) ≤-refl soP) (sub-ot (λ r∈ → r∈) ≤-refl soI) (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
+          (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) soP) (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) soI) (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
     A = proj₁ R
 
 pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
@@ -543,12 +544,12 @@ pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps) hP aP hI aI
   (λ ar → proj₁ (proj₂ (proj₂ k)) (q₁ ar)) ,
   λ { f (s≤s h) → out-++ eI rI (ou f) (out-quiet rI (cong readᴵ (none-sent h g′))) }
   where
-    sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
-    sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
+    sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hP (here refl))
+    sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hI (here refl))
     k = pass-go κ e s₁ hd ta ps₁
-          (λ m → fold-kept (unchain st) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
+          (λ m → fold-kept (unchain st) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hP (there m))) (aP (here refl) (there m)))
           (λ m m′ → aP (there m) (there m′))
-          (λ m → fold-kept (unchain st′) sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))
+          (λ m → fold-kept (unchain st′) sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hI (there m))) (aI (here refl) (there m)))
           (λ m m′ → aI (there m) (there m′)) g g′
 
 -- a minted source's value pass: the chains pair up at the popped stores
@@ -578,8 +579,8 @@ dyn-pass κ e {sP = sP} {sI = sI} {stI = stI} s df {a} {a′} ex ex′ ta sy p q
     opened []       = []
     opened (r ∷ rs) = inj₂ (refl , refl , r) ∷ opened rs
     k = pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ s ex ex′ p q s₀))
-          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
-          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI s) x∈)) (chain-agree a′ (Storeʳ.ruleI s)) go go′
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a′ (Storeʳ.ruleI s) x∈)) (chain-agree a′ (Storeʳ.ruleI s)) go go′
 
 -- A HOT SCRIPT'S VALUE PASS: the impl's one chain runs its input block into
 -- the share, which fans out to the rows the plain run's readers are
@@ -607,7 +608,7 @@ hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′
   subst (Out _) (sym (cong (oB ++_) (++-identityʳ em))) (out-++ oB em ob (proj₂ F refl du))
   where
     F = (fan-go κ (After.store A) εI c ta e₁ (λ ()) (slot-chains κ (After.store A) e₁ ty)
-          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           go g)
     Z = _⨾_ κ A (proj₁ F)
@@ -673,7 +674,7 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy ll 
     S₁ = proj₁ (value-pass κ e s df ex ex′ ta sy go go′)
     Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta e₁
           (λ _ → member-head (toℕ (n ↑ʳ i)) (toℕ (n ↑ʳ i)) (EvalSt.dying stI₃) (cong (_∨ false) (same-refl (toℕ (n ↑ʳ i))))) (slot-chains κ (After.store A) e₁ ty)
-          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           end g))
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
@@ -713,8 +714,8 @@ last-pass {n} {Γ} {t} κ e s df {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP�
         ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁ (pass-quiet refl (room s) go′)
         Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁ (pass-quiet refl (room s) go′)
         k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca)
-               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
-               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′
+               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
+               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′
         S₂ = proj₁ k
 
 -- THE CASCADES OF ONE PARTNERED POP keep the stores related and send

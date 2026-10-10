@@ -52,6 +52,7 @@ open import Simulation.Arm using (Out; out-quiet; out-++; Clear; missed; fold-un
   consume-clear; thru; NoBatch; rel-unbatched; Gone; gone-nodes)
 open import Simulation.Sweep using (t≢f)
 open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; drop-ot; head-on; self-node; off-path; ∨-Tˡ; ∨-Tʳ; distinct; fresh-path)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Reducible.Dead-Kept using (fold-dead; off-T)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Simulation.Write using (module HopWrite; apart)
@@ -114,7 +115,7 @@ sub-clear : ∀ {m} {Δ : Ctx m} {u} {e : Closed Δ u} {lo w} {k} {κ : Path Δ 
 sub-clear {e = e} {k = k} {κ = κ} {y = y} {sched = sched} {st = st} d c = unthru (subscribeInner-rule d so (Thru {e = e} k κ) so (λ _ _ _ → refl))
   where
   so : Sound (Thru {e = e} k κ) sched (record st { nodes = setNode k y (EvalSt.nodes st) })
-  so = sub-ot (λ r∈ → r∈) ≤-refl (thru c)
+  so = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (thru c)
 
 -- a merge's node, as a drain re-reads it
 drain-self : ∀ {m} {Δ : Ctx m} u {l a od} {q : List (Val Δ (obs u))} → drainSt {Γ = Δ} u (just (mergeAll-st {t = u} l a q od)) ≡ (l , a , q , od)

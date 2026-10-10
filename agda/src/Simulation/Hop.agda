@@ -43,6 +43,7 @@ open import Rx.Evaluator using (Sched; EvalSt; LiveSource; RegRow; regSource; sa
                                 atDyn; atSlot; thru-outer; mergeAllᵒ; AllOp; _↠[_]_; register; installNode; mergeAll-st; echoᵗ; spentOn; spentAt; pathHasNode)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set)
 open import Rx.Evaluator.Reducible.Support using (Sound; Rule; register-sound; sub-ot; ∨-T; node-eq)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (ord) renaming (_∷_ to _∷ˢ_)
 open import Simulation.Stores using (inv-snoc; Store; Arr; PathRel; DeferRel; Named; Census; srcCount; guardOf; Unpaired; InputBlock; block;
@@ -501,13 +502,13 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
   hop-register {sP} {stP} {sI} {stI} {u} {lo} {p} {q} {now} {x′} {x} S pm pr soP soI lv rel =
     H.hop-at (spentOn p (EvalSt.nodes H.stP₁)) (spentOn q (EvalSt.nodes H.stI₁)) (path-spent {Γ = Γ} κ pr) (LiveIf.run lv₁)
       (Sound.ruled (register-sound {κ = p} {sched = sP} {sched′ = H.sP₂} {st = H.stP₁} H.rid (atDyn H.src lo)
-                      (thru-outer mergeAllᵒ H.nid ↠[ ≤-refl ] p) (n≤1+n _) refl (thru-cls mergeAllᵒ H.nid ≤-refl p)
-                      (λ so → (λ k a h → <-irrefl (sym (node-eq a)) (Sound.fresh-path so k h)) , Sound.distinct so)
-                      (sub-ot (λ r∈ → r∈) ≤-refl soP)))
+                      (thru-outer mergeAllᵒ H.nid ↠[ ≤-refl ] p) (n≤1+n _) (keeps-refl _ _) refl (thru-cls mergeAllᵒ H.nid ≤-refl p)
+                      (λ so → (λ k a h → <-irrefl (sym (node-eq a)) (Sound.fresh-path so k h)) , Sound.distinct so) _
+                      (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) soP)))
       (Sound.ruled (register-sound {κ = q} {sched = sI} {sched′ = H.sI₂} {st = H.stI₁} H.rid′ (atDyn H.src′ (n + lo))
-                      (thru-outer mergeAllᵒ H.nid′ ↠[ ≤-refl ] q) (n≤1+n _) refl (thru-cls mergeAllᵒ H.nid′ ≤-refl q)
-                      (λ so → (λ k a h → <-irrefl (sym (node-eq a)) (Sound.fresh-path so k h)) , Sound.distinct so)
-                      (sub-ot (λ r∈ → r∈) ≤-refl soI)))
+                      (thru-outer mergeAllᵒ H.nid′ ↠[ ≤-refl ] q) (n≤1+n _) (keeps-refl _ _) refl (thru-cls mergeAllᵒ H.nid′ ≤-refl q)
+                      (λ so → (λ k a h → <-irrefl (sym (node-eq a)) (Sound.fresh-path so k h)) , Sound.distinct so) _
+                      (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) soI)))
     where
     lv₁ = live-if-above q (nodeCt sI) (mergeAll-st {t = emitᵗ u} nothing 0 [] false) (EvalSt.nodes stI) (Sound.fresh-path soI) lv
     module H = Hop {sP} {stP} {sI} {stI} {u} {lo} {p} {q} {now} {x′} {x} S pm pr rel lv₁

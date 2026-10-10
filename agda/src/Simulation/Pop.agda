@@ -20,6 +20,7 @@ open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Mint      using (counter; sourceᵏ)
 open import Data.Nat.Properties using (≤-refl)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator using (LiveSource; Arrival; Sched; EvalSt; NodeId; NodeState; schedGo; schedHeadOf; cascadeOpen)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Schedules using (Sync; Popped; pop; sched-pop; PopPair; here; there; SameOrd)
@@ -162,8 +163,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ; above    = Store.above s
     ; census   = Store.census s
     ; owned    = Store.owned s
-    ; ruleP    = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleP s)
-    ; ruleI    = sub-rule (λ r∈ → r∈) ≤-refl (Store.ruleI s)
+    ; ruleP    = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (Store.ruleP s)
+    ; ruleI    = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (Store.ruleI s)
     ; scripts  = Store.scripts s
     ; inv      = inv-open (proj₂ (Store.uncut s)) q (Store.inv s)
     }

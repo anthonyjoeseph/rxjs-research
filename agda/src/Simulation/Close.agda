@@ -12,6 +12,7 @@ open import Data.List    using (List; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Nat     using (_+_; _<_)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Data.Nat.Properties using (≤-refl; <⇒≢; <-trans; <-≤-trans; m≤m+n; +-monoʳ-<)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
@@ -37,7 +38,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     → DyingFree stI → Store κ sP (cascadeClose a stP) sI (cascadeClose a′ stI)
   close-store {stP = stP} {stI = stI} {a = a} {a′} s na na′ ar df = record
     { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
-    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; named = close-named {a = a} (proj₁ named) (Arr.boundP ar) , close-named {a = a′} (proj₂ named) (Arr.boundI ar) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+    ; sync = sync ; rows = rows ; bounded = bounded ; swept = swept ; uncut = uncut ; named = close-named {a = a} (proj₁ named) (Arr.boundP ar) , close-named {a = a′} (proj₂ named) (Arr.boundI ar) ; rids = rids ; fresh-ids = fresh-ids ; above = above ; owned = owned ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
     ; scripts = scripts ; inv = inv-close a′ df inv
     ; dlv-alike = spent-off κ π _ _ _ _ rows (λ _ → refl) (λ _ → refl)
     ; dying-alike = dies-rows κ na na′ rows (Arr.rows ar)

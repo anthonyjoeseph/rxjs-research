@@ -36,6 +36,7 @@ open import Data.Bool.ListAction using (any)
 open import Rx.Exp       using (Ctx; Ty; Closed; Val)
 open import Rx.Evaluator using (NodeId; RegRow; LiveSource; Sched; EvalSt; switchKill; regSource; sameSource; cutThrough; Path; root; share-sink; _↠[_]_; frameNodes; pathHasNode; thru-outer; mergeAllᵒ; lookupNode; cell-st)
 open import Rx.Evaluator.Reducible.Support using (∨-Tˡ; ∨-Tʳ; sub-rule; cut-sub)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Named; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
   deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; partner-mem; ArrRows; Spent; spent-subst; Store; Arr; InputBlock; ᵇ-no; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq;
@@ -569,8 +570,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; above = all-cut c (proj₁ above) , all-cut c′ (proj₂ above)
       ; census = λ i h → census-cut c′ (EvalSt.registry stI) (census i h) (C.raw-safe i rows (proj₂ above))
       ; owned = all-cut c′ (mapᵃ (λ f u {j} b → all-cut c′ (f u {j} b)) owned)
-      ; ruleP = sub-rule (λ {r} m → cut-sub c (EvalSt.registry stP) r m) ≤-refl ruleP
-      ; ruleI = sub-rule (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) ≤-refl ruleI
+      ; ruleP = sub-rule (λ {r} m → cut-sub c (EvalSt.registry stP) r m) ≤-refl (keeps-refl _ _) ruleP
+      ; ruleI = sub-rule (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) ≤-refl (keeps-refl _ _) ruleI
       ; scripts = scripts
       ; inv = inv-cut (proj₂ (cutThrough c′ (EvalSt.registry stI))) (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) inv
       }

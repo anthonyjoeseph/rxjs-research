@@ -33,6 +33,7 @@ open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat     using (suc; pred; _≤_; _<_; _≡ᵇ_)
 open import Data.Nat.Properties using (1+n≢0; ≤-refl; ≤-trans; <-trans; pred[n]≤n)
 open import Rx.Evaluator.Reducible.Support using (sub-rule)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Vec     using (lookup)
@@ -358,7 +359,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
                                        ∷ subst (_< _) (sym e₂) (<-trans (raw<ₙ i) (Named.slots-below (proj₂ named))) ∷ [] }
         ; uncut = uncut ; rids = rids ; fresh-ids = fresh-ids ; above = above ; latches = lat ; census = cen ; owned = owned
         ; dying-done = λ j _ → member-head (toℕ j) _ CP , dd j
-        ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
+        ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
         ; scripts = scripts
         ; dlv-alike = spent-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows (spent-end (λ m → m) rows)
         ; dying-alike = spent-frame {Γ = Γ} κ rows-ob machs-ob (λ m → m) rows (end-dies S i e₁ e₂)

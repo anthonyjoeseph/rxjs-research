@@ -52,7 +52,9 @@ postulate
   -- A FOLD LEAVES A NODE OFF ITS PATH AS IT FOUND IT, the node below
   -- the counter and its rows ending where the path does.  The
   -- candidate's `Kept` is this clause, proven of the evaluator's own
-  -- fold on standing ground; this owes it of every derivation.
+  -- fold on standing ground; this owes it of every derivation.  A
+  -- share the fold connects has no reader but the one the connect
+  -- registers, which is the rule's `linked`.
   --
   -- TWIN: `foldPath-rule` -- the same induction, a clause per
   --   constructor, there keeping the rule where this keeps the node.

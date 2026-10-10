@@ -36,6 +36,7 @@ open import Simulation.After using (module Kept; readᴾ; readᴵ)
 open import Simulation.Arm using (Out; out-++; Clear; fold-clear; reclear; thru)
 open import Simulation.Sweep using (t≢f)
 open import Rx.Evaluator.Reducible.Support using (Sound; sub-ot; sub-on)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set)
 open import Rx.Mint using (nodeᵏ; setAt)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; thruWalk-rule)
@@ -301,12 +302,12 @@ module PassE {n} {Γ : Ctx n} (κ : Kinds n) where
                             × (∀ {I} → DelAt {echoᵗ u} I e′ → Out I (proj₁ r₁ ++ out₂))
     explode-one-drain _ S cp ci fl r lX lv e′ rel W _ ez (finish-nil e) _ = ⊥-elim (t≢f (trans (sym (usable-self _)) e))
     explode-one-drain io {sI = sI} {stI = stI} S {u = u} {op = op} {mX = mX} {Θ₀ = Θ₀} {ρ₀ = ρ₀} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {rP = rP} cp ci fl r lX lv e′ rel W lt ez (finish-all-drain {outV = outV} {st₁ = st₁′} fd drain-spent) F₂ =
-      let ci′ = sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)
+      let ci′ = sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) (proj₂ ci)
           (A₁ , W₁ , o₁) = io lt (mint-impl S) {u = u} {Θ₀ = Θ₀} {ρ₀ = ρ₀} cp ci′ (fl , r) lX (live-if-under _ _ lv) e′ rel W ez fd (n<1+n _)
-          c₁ = fold-clear fd (sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci)) refl
-                 (sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₂ ci))
+          c₁ = fold-clear fd (sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) (proj₂ ci)) refl
+                 (sub-on (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (proj₁ ci) , sub-ot (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) (proj₂ ci))
       in explode-one-close S {u = u} {op = op} {mX = mX} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {e′ = e′} {oV = outV} A₁ W₁ o₁ (proj₂ (walk-clear W cp))
-           (sub-on (λ r∈ → r∈) ≤-refl (proj₁ c₁) , sub-ot (λ r∈ → r∈) ≤-refl (proj₂ c₁))
+           (sub-on (λ r∈ → r∈) ≤-refl (proj₁ c₁) , sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (proj₂ c₁))
            (lookup-set mX _ (EvalSt.nodes st₁′)) F₂
 
     -- THE EXPLODE'S INNER, ITS ONE CARRYING ELEMENT IN HAND: the

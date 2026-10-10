@@ -57,6 +57,7 @@ open import SExp.InstEmit using (instEmitᵗ)
 open import Simulation.Sweep using (t≢f)
 open import Simulation.Schedules using (HeadOf)
 open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; sub-ot; Agree)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Path using (module PassP)
 open import Simulation.Walk using (walker)
@@ -358,8 +359,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     fan-go {stI = stI} S {i = i} εI {fin = fin} c refl sa dy (slotpair (inj₂ (_ , _ , pr)) ∷ ps) hP aP hI aI (casc-live _ dP g) (go-live {rid = rI′} {emits = eI} y′ dI g′) =
       rebase {fin = fin} (A ⨾ proj₁ R) , λ { refl d → out-++ eI _ (proj₂ X refl d) (proj₂ R refl d) }
       where
-        sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
-        sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
+        sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hP (here refl))
+        sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hI (here refl))
         X = slot-pass (walker κ) (delivered S {fin} pr) εI (partner-row κ _ _ _ _ _ (Store.rows S) pr) c sP₀ sI₀ (unchain dP) dI (λ e → skip-marked {s = toℕ (n ↑ʳ i)} {rid = rI′} {st = stI} e (dy e))
               (LiveRows.rows-live (Inv.live-outer (Store.inv S)) (proj₂ (partner-mem κ _ _ _ _ _ (Store.rows S) pr)) y′) (n<1+n _)
         A = proj₁ X
@@ -371,9 +372,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
         map-slot K []       = []
         map-slot {S₀ = S₀} {S₁ = S₁} K (r ∷ rs) = slot-keeps {S = S₀} {S₁ = S₁} K r ∷ map-slot {S₀ = S₀} {S₁ = S₁} K rs
         R = fan-go (After.store A) εI c refl sa (λ e → dying-kept {k = toℕ (n ↑ʳ i)} dI (dy e)) (map-slot {S₀ = S} {S₁ = After.store A} (After.keeps A) ps)
-              (λ m → fold-kept (unchain dP) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
+              (λ m → fold-kept (unchain dP) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hP (there m))) (aP (here refl) (there m)))
               (λ m m′ → aP (there m) (there m′))
-              (λ m → fold-kept dI sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))
+              (λ m → fold-kept dI sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hI (there m))) (aI (here refl) (there m)))
               (λ m m′ → aI (there m) (there m′)) g g′
 
     -- WHAT A HOT ARRIVAL'S IMPL CHAIN DOES BEFORE THE SHARE: its input block

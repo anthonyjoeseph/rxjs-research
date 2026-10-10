@@ -39,6 +39,7 @@ open import Rx.Evaluator using (NodeId; NodeState; Sched; EvalSt; LiveSource; Re
 open import Rx.Evaluator.Domain using (foldPath⇓)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Reducible.Support using (Sound; Rule; Distinct; endOf; register-sound; sub-ot; fresh-rows)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ)
 open import Simulation.Schedules using (ticks) renaming (_∷_ to _∷ˢ_)
 open import Simulation.Stores using (Inv; inv-agree; inv-snoc; Store; Arr; PathRel; Named; Unpaired; InputBlock; block; RowRel; read~; cold~; defer~; hot~;
@@ -364,11 +365,11 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
     module R = Reg S pr pendP B
     open ColdBlock B
     soP′ : Sound p R.sP₂ (register R.rid (atDyn R.src lo) p stP)
-    soP′ = register-sound {κ = p} {sched = R.sP₂} {sched′ = R.sP₂} R.rid (atDyn R.src lo) p ≤-refl refl (λ k h → inj₁ h)
-             Sound.distinct (sub-ot (λ r∈ → r∈) ≤-refl soP)
+    soP′ = register-sound {κ = p} {sched = R.sP₂} {sched′ = R.sP₂} R.rid (atDyn R.src lo) p ≤-refl (keeps-refl _ _) refl (λ k h → inj₁ h)
+             Sound.distinct _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) soP)
     soI′ : Sound q R.sI₁ (register rid′ (atDyn src′ (n + lo)) full (record stI { nodes = NI }))
     soI′ = register-sound {κ = q} {sched = record sI { live = R.lI ∷ Sched.live sI }} {sched′ = R.sI₁} rid′ (atDyn src′ (n + lo)) full
-             node≤ (ib-end {Γ = Γ} κ blk) cls (λ so → dist (Sound.distinct so)) (sub-ot (λ r∈ → r∈) ≤-refl soI)
+             node≤ (keeps-refl _ _) (ib-end {Γ = Γ} κ blk) cls (λ so → dist (Sound.distinct so)) _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) soI)
       where
       cls : ∀ k → T (pathHasNode k full) → T (pathHasNode k q) ⊎ (nodeCt sI ≤ k × k < freshId nodeᵏ mI)
       cls k h with ib-split {Γ = Γ} κ blk (has-node full h)
