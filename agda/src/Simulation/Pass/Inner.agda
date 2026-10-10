@@ -227,6 +227,10 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
       --   sends nothing.  Each relation is closed under its own end so a
       --   store holds between an end and the finish that drops its row, so
       --   no evaluator repair alone serves both.
+      -- DEAD ROUTE: walking the inner's element into the flattener over the
+      --   pass's own steps needs a `Store` while the merge counts that
+      --   inner, where `MergeAt` reads count zero; `explode-quiet-sub`
+      --   meets the same wall.
       explode-one-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                           {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                           {rP lim a qs od inst out sched₁ st₁}

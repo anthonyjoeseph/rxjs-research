@@ -1245,6 +1245,13 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- does not move, and the merge stays unbounded at the echo's type;
       -- what it sends, it sends at the emit's own delivery.
       -- Open where the merge's path is spent, as `explode-one-sub` records
+      --
+      -- DEAD ROUTE: a body walking the inner's one quiet element into the
+      --   flattener by `quiet-elem-step` needs a `Store` at the state the
+      --   walk runs in, where the merge counts the inner it is subscribing,
+      --   and every row through the outer reads `MergeAt` at count zero.
+      --   The store holds only between steps; nothing here relates the
+      --   stores while an explode's inner is in flight.
       explode-quiet-sub : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₂ ℓ₃ ℓ₄ ℓ₅ ℓ₆ u op m m′ ks mX Θ₀ ρ₀ Θ₁ ρ₁ Θ₂ ρ₂}
                           {h₃ : ℓ₂ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {h₅ : ℓ₄ ≤ ℓ₅} {h₆ : ℓ₅ ≤ ℓ₆} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₆ (emitᵗ u) (emitᵗ t)}
                           {lim a qs od inst out sched₁ st₁}
