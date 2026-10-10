@@ -163,12 +163,12 @@ open import Rx.Evaluator.Reducible.Support using (Σ⁰; _⁰×_; _,_; _|>⁰_; 
   register-sound; room-wrap; row-sound; ruled; scanCons; scanCt; scanOff; scanReg; scanStepped; self-node; sink-sound;
   sounds; spend-or; ceil-or; standing; step; step-cons; step-ct; step-off; step-red; step-reg; step-⇓; st″; sub-on;
   sub-ot; sub-rule; switchKill-ct; switchKill-nodes; takeStep; termini; u-exhaust; u-merge; u-switch; unheadHolds;
-  unheadKept; unheadPre-head; usable; waiting; wrap-facts; wrap-ot; wrap-reg; wrapNode; ∨-T; connect-linked)
+  unheadKept; unheadPre-head; usable; waiting; wrap-facts; wrap-ot; wrap-reg; wrapNode; ∨-T; connect-linked; linked)
 open import Rx.Evaluator.Reducible.Trace using (Trace; []ᵗ; _∷ᵗ_; _++ᵗ_; end-++; endPre; endRP; endS; fellᵗ)
 open import Rx.Evaluator.Reducible.Candidate using (Arm; BatchHeld; Red; RedEnv; ScanHeld; Stage; SubStep; batchStep;
   batch₀; downHeld; fallenStage; red-scripted; redFoldVals; redLookup; scanRed; stage; stage-map; stage-nil;
   stage-rebase; stage-seq; writeStage)
-open import Rx.Evaluator.Reducible.Floor using (fold-refill-spends; raw-kept; refill-spends)
+open import Rx.Evaluator.Reducible.Floor using (fold-refill-bounded; raw-kept; refill-bounded)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept; fold-sound; step-kept; subscribe-kept)
 open import Rx.Evaluator.Reducible.Calls using (callStage; callStage-hd; fiStep; headCall; inner-after)
 
@@ -182,8 +182,7 @@ baseRP : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
 -- what one fold of the base answers: fallen where it connected, and the
 -- base again, over the store's columns, where it did not -- at the
 -- accessibility it was built over, the queue read back under the same
--- ceiling by `fold-refill-spends`, decided and not assumed as the
--- drain's bound is
+-- ceiling by `fold-refill-bounded`
 baseAns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
           ({-@0-}ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → {-@0-}Acc _<_ m
         → (op : AllOp) (nid inst : NodeId) (κ : Path Γ ℓ u t) {now : Tick} {vals : List (Val Γ u)} {fin : Bool}
@@ -239,12 +238,9 @@ rawInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m u lo ℓ}
              (subscribeE⇓ {e = e} o (from-inner op nid (nodeCt sched) ↠[ ≤-refl ] κ) now (bumpNode sched) st)
 
 -- a merge's queue drained raw, one inner a lane, on the fuel the finish
--- found it at: each inner is budgeted at the queue it leaves, and a
--- queue read back longer than that has spent room, so the drain goes on
--- at the ceiling the connect peeled.  The bound is decided, not assumed:
--- the evaluator runs this body, and a budget built from a postulate
--- would be forced by the next pop, so only a queue that overran with
--- nothing spent reaches `refill-spends`, and that is its refutation
+-- found it at: each inner is budgeted at the queue it leaves, which
+-- `refill-bounded` reads back no longer, and where the inner connected
+-- the drain goes on at the ceiling the connect peeled instead
 rawDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m s lo ℓ}
            ({-@0-}ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ) → {-@0-}Acc _<_ m
          → (nid : NodeId) (κ : Path Γ ℓ s t) (now : Tick) (fuel : List (Val Γ (obs s)))
@@ -278,7 +274,8 @@ rawDrain {s = s} ac le (acc rsM) nid κ now (_ ∷ fs) lim act od (o ∷ q) sche
                                        (proj₁ (proj₂ r₁)) (proj₂ (proj₂ r₁)) (room-keeps (subscribeE-keeps d₁) rm) (proj₁ sn₁) (proj₂ sn₁)
                                        (rs wq) bd |>′ λ (r₂ , d₂ , so₂ , nd₂) →
          _ , drain-room eqr (inner refl d₁) refl d₂ , so₂ , nd₂)
-     ]′ (spend-or (refill-spends mergeAllᵒ nid κ d₁ (sub-on (λ r∈ → r∈) ≤-refl nd)
+     ]′ (spend-or (λ _ → refill-bounded mergeAllᵒ nid κ d₁ (sub-on (λ r∈ → r∈) ≤-refl nd)
+                                 (linked (ruled (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so)))
                                  (lookup-set nid _ (EvalSt.nodes st))))
 
 -- one observable consumed raw: the store says which lane it takes
@@ -1385,15 +1382,15 @@ fold (baseRP ac le aM op nid inst κ (h , pfs) aq wq) tt now vals _ fin sched st
 -- copattern guards it; under a lambda handed to an eliminator it is an
 -- argument, which the copattern does not guard
 baseAns ac le aM op nid inst κ sched st rm so aq wq (out , sched′ , st′) d
-  with spend-or (fold-refill-spends op nid inst κ d so)
+  with spend-or (λ _ → fold-refill-bounded op nid inst κ d so)
 ... | inj₁ sp =
   ans out sched′ st′ d fallen (grounded (<-≤-trans sp rm) (fold-sound d so)) tt
       (fallenRP ac le aM (from-inner op nid inst ↠[ ≤-refl ] κ)) tt
-... | inj₂ (nsp , bd) =
+... | inj₂ (_ , bd) =
   let κ′  = from-inner op nid inst ↠[ ≤-refl ] κ
   in ans out sched′ st′ d (standing (colsOf κ′ st′))
          (fold-sound d so |>⁰ λ so′ → grounded (holdsOf κ′ {sched = sched′} {st = st′} (fresh-path so′) (distinct so′)) so′)
-         (raw-kept d nsp {pfs = colsOf κ′ st′})
+         (raw-kept d (linked (ruled so)) {pfs = colsOf κ′ st′})
          (baseRP ac le aM op nid inst κ (colsOf κ′ st′) aq (≤-trans bd wq)) tt
 
 ------------------------------------------------------------------

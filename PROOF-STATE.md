@@ -251,12 +251,12 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### Big picture tier roadmap
 
-- **A FOLD OFF A NODE IS FRAMED BY IT.** `fold-off` and `fold-unmoved` as
-  bodies by induction over the fold, a clause per frame, each frame writing
-  only its own node, `Clear` keeping the written one off the path and the
-  rule's `linked` keeping a connect's fan-out on the reader it registers.
-  Decides whether the in-flight count is a frame at all, which both explode
-  inners now rest on.
+- **A FOLD OFF A NODE IS FRAMED BY IT.** `fold-off` as a body by induction
+  over the fold, a clause per constructor rebuilt at the table without the
+  write, over the floor's watch that now proves `fold-unmoved`: no walked
+  path stands on the node, and a share the fold connects reads only rows it
+  registered. Decides whether the in-flight count is a frame at all, which
+  both explode inners now rest on.
 
 - **AN OUTER'S GROUP SENDS AT ITS INSTANT.** `elem-out` as a body over
   the restamp's walk, a clause per element, now read at an explode's merge in
@@ -377,9 +377,6 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 - **`μ-unfolds`** (Simulation.Walk) — FALSITY, `NO EVIDENCE`: an unrolling is
   an author's program, its plain form and every renamed elaboration the
   unrollings; held under every value binder and past an inner μ.
-- **`fold-unmoved`** (Simulation.Arm) — FALSITY, `TWIN`: a fold leaves a node
-  off its own sound path as it found it, one clause per constructor as
-  `foldPath-rule`.
 - **`batched-sandwich`** (Left-To-Right.Statement) — FALSITY, `REFUTED`: the
   unbatched values between the joined run at a batcher fuel never less and one
   past it.

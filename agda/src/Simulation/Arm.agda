@@ -26,7 +26,9 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Path; 
   root; share-sink; map-f; scan-f; take-f; batchSync-f; frameNodes; skipᵇ; regSource; scanDispatch; takeDispatch; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st)
 open import Rx.Evaluator.Domain using (foldPath⇓; stepFrame⇓; thruConsume⇓; thruWalk⇓; fold-root; fold-sink; fold-step; step-map; step-scan; step-take;
   step-batchSync; step-from-inner; step-thru-outer; react-false; walk-nil; disp)
-open import Rx.Evaluator.Reducible.Support using (Sound; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; endOf; ∨-Tʳ)
+open import Rx.Evaluator.Reducible.Support using (Sound; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; endOf; ∨-Tʳ;
+  linked; ruled; node-below; off-path; at-end)
+open import Rx.Evaluator.Reducible.Floor using (raw-at)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.InstEmit using (instEmitᵗ)
@@ -48,19 +50,14 @@ Clear k p sched st = NodeOn k p sched st × Sound p sched st
 ClearI : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} → NodeId → NodeId → Path Γ lo s t → Sched Γ → EvalSt e → Set
 ClearI k ks q sched st = Clear k q sched st × NodeOn ks q sched st
 
-postulate
-  -- A FOLD LEAVES A NODE OFF ITS PATH AS IT FOUND IT, the node below
-  -- the counter and its rows ending where the path does.  The
-  -- candidate's `Kept` is this clause, proven of the evaluator's own
-  -- fold on standing ground; this owes it of every derivation.  A
-  -- share the fold connects has no reader but the one the connect
-  -- registers, which is the rule's `linked`.
-  --
-  -- TWIN: `foldPath-rule` -- the same induction, a clause per
-  --   constructor, there keeping the rule where this keeps the node.
-  fold-unmoved : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t} {k now vals fin sched st r}
-               → foldPath⇓ {e = e} now κ vals fin sched st r → Clear k κ sched st
-               → lookupNode k (EvalSt.nodes (proj₂ (proj₂ r))) ≡ lookupNode k (EvalSt.nodes st)
+-- A FOLD LEAVES A NODE OFF ITS PATH AS IT FOUND IT, the node below the
+-- counter and its rows ending where the path does: the raw fold's own
+-- watch, a share the fold connects reading only the rows the fold
+-- registered by the rule's `linked`.
+fold-unmoved : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t} {k now vals fin sched st r}
+             → foldPath⇓ {e = e} now κ vals fin sched st r → Clear k κ sched st
+             → lookupNode k (EvalSt.nodes (proj₂ (proj₂ r))) ≡ lookupNode k (EvalSt.nodes st)
+fold-unmoved d (nd , so) = proj₁ (raw-at d (linked (ruled so)) _ (node-below nd) (off-path nd) (at-end nd))
 
 -- A TAIL HANDED NOTHING, AND NO END, SENDS NOTHING and runs no clock back
 QuietTail : ∀ {m} {Δ : Ctx m} {t} (e : Closed Δ (instEmitᵗ uniqᵗ t)) {ℓ u} → Path Δ ℓ u (instEmitᵗ uniqᵗ t) → Set

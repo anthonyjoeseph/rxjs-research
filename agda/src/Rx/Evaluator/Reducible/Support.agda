@@ -1529,11 +1529,6 @@ by-bool : ∀ {a} {A : Set a} (b : Bool) → (b ≡ false → A) → (b ≡ true
 by-bool false f t = f refl
 by-bool true  f t = t refl
 
--- A RUN SPENT ROOM: something it subscribed connected.
-Spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → Sched Γ → EvalSt e → Set
-Spends sched st sched′ st′ =
-  unconn (Sched.slots sched′) (EvalSt.connectedShares st′) < unconn (Sched.slots sched) (EvalSt.connectedShares st)
-
 -- what a run kept after a step that wrote nothing below the counter,
 -- it kept from before the step
 kept-before : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo u}
