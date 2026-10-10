@@ -18,8 +18,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᵃ)
 open import Data.Fin.Properties using (toℕ<n; toℕ-↑ˡ; toℕ-↑ʳ; ↑ʳ-injective) renaming (_≟_ to _≟ᶠ_)
 open import Data.Nat     using (ℕ; suc; _+_; _≤_; _<_; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans)
-open import Data.Maybe   using (just)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂; [_,_])
 open import Data.Vec     using (lookup)
@@ -28,31 +27,32 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim      using (valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ctx; Closed; Val; applyClo)
-open import Rx.Evaluator using (Sched; EvalSt; Path; lookupNode; spentAt; share-sink; _↠[_]_; map-f; thru-outer; echoᵗ; thruEvents; atSlot; skipᵇ; markDlv; memberSource)
+open import Rx.Evaluator using (Sched; EvalSt; Path; share-sink; _↠[_]_; map-f; thru-outer; echoᵗ; thruEvents; atSlot; skipᵇ;
+  markDlv; memberSource)
 open import Decide using (≡ᵇ-refl)
-open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; subscribeInner⇓;
-  consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓; thruConsume⇓;
+open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓;
   walk-nil; walk-echo; walk-cons; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓; disp;
-  shareWalk⇓; walk-end; walk-more; fold-sink; step-from-inner; react-false; react-alive; react-dead; innerFinish⇓;
-  finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil)
+  shareWalk⇓; walk-end; walk-more; fold-sink; step-from-inner; react-false; react-alive;
+  react-dead; innerFinish⇓; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
+  finish-nil)
 open import SExp.Syntax  using (Kinds; plainᵏ; plainᵗ; emitᵗ; sharedᵏ)
 open import SExp.Elaborate using (elemᵛ)
 open import SExp.InstEmit.Decode using (decodeEmit; decodeEmits)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
-open import Simulation.Stores using (Lifts; sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
-  outerElem~; outerExplode~; inner~; deferInner~; RowRel; read~; []; _∷_; partner-row; partner-mem;
-  Store; LiveOn; LiveIf; live-if; LiveFor; live-for; live-if-drop; live-if-under; live-if-set; outerDoneᵇ; LiveRows; Inv)
+open import Simulation.Stores using (Lifts; sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
+  outerExplode~; inner~; deferInner~; RowRel; read~; []; _∷_; partner-row; partner-mem; Store;
+  LiveOn; LiveIf; live-if; LiveFor; live-for; live-if-drop; live-if-under; LiveRows; Inv)
 open import Simulation.After using (skip-cut; module Kept)
 open import Simulation.Take using (module Takes)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (Out; out-quiet; out-++; out-tail; Clear; ClearI; missed; unthru; step-clear; fold-clear; consume-clear; adv; Gone)
 open import Simulation.Sweep using (t≢f; same-refl)
-open import Rx.Evaluator.Reducible.Support using (Sound; switchKill-nodes; drop-ot; sub-ot; Agree; admit-ot; sink-sound)
+open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; sub-ot; Agree; admit-ot)
 open import Rx.Evaluator.Reducible.Rule-Kept using (step-kept; fold-kept)
 open import Simulation.Pass.Inner using (module PassI)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-foldPath; sz-innerFinish; sz-shareGo; sz-shareWalk; sz-dispatchShare; sz-stepFrame; sz-thruWalk; sz-l; sz-r; sz-1)
-open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sink-intro; sink-inv; sink-ok; slotpair; tail-of)
+open import Simulation.Pass.Quiet using (ShareSlot; admit-agrees; delivered; sink-intro; sink-inv; slotpair; tail-of)
 
 module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
 
@@ -129,52 +129,6 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
                  → foldPath⇓ now p vs f sched st r
                  → memberSource k (EvalSt.dying st) ≡ true → memberSource k (EvalSt.dying (proj₂ (proj₂ r))) ≡ true
 
-      -- AN UNENDED FOLD ENDS NO STANDING OUTER UNLESS IT SPENDS ITS PATH:
-      -- an end reaches a flattener's outer only down a path a take on it
-      -- sent, and everything else the fold sets running is minted fresh
-      fold-spares : ∀ {now lo ℓ s o k x} {h : lo ≤ ℓ} {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {es sched} {st : EvalSt ei} {r}
-                  → foldPath⇓ now q es false sched st r
-                  → lookupNode k (EvalSt.nodes st) ≡ just x
-                  → LiveIf (thru-outer {u = s} o k ↠[ h ] q) (EvalSt.nodes st)
-                  → LiveIf (thru-outer o k ↠[ h ] q) (EvalSt.nodes (proj₂ (proj₂ r)))
-
-      -- AND SO DOES AN INNER SUBSCRIBED UNDER THE FLATTENER: its end finds
-      -- the flattener's outer live, so it frees a lane and ends nothing
-      inner-spares : ∀ {now lo ℓ s op k o′} {h : lo ≤ ℓ} {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {o sched} {st : EvalSt ei} {r}
-                   → subscribeInner⇓ op k q now o sched st r
-                   → LiveIf (thru-outer {u = s} o′ k ↠[ h ] q) (EvalSt.nodes st)
-                   → LiveIf (thru-outer o′ k ↠[ h ] q) (EvalSt.nodes (proj₂ (proj₂ (proj₂ r))))
-
-    -- a consume takes its lane, ending nothing, then subscribes the inner
-    consume-spares : ∀ {now lo ℓ s op k o′} {h : lo ≤ ℓ} {q : Path (plainᵏ Γ κ) ℓ s (emitᵗ t)} {o sched} {st : EvalSt ei} {r}
-                   → thruConsume⇓ op k q now o sched st r
-                   → LiveIf (thru-outer {u = s} o′ k ↠[ h ] q) (EvalSt.nodes st)
-                   → LiveIf (thru-outer o′ k ↠[ h ] q) (EvalSt.nodes (proj₂ (proj₂ r)))
-    consume-spares {k = k} {st = st} (consume-all-sub e _ d) l =
-      inner-spares d (live-if-set _ k _ (EvalSt.nodes st) (λ z → trans (sym (cong outerDoneᵇ e)) z) (λ _ → cong spentAt e) l)
-    consume-spares {k = k} {st = st} (consume-all-enqueue e _) l =
-      live-if-set _ k _ (EvalSt.nodes st) (λ z → trans (sym (cong outerDoneᵇ e)) z) (λ _ → cong spentAt e) l
-    consume-spares (consume-all-nil _) l = l
-    consume-spares {k = k} {st = st} (consume-switch-sub {sched₀ = s₀} {cur = cur} e refl _ d) l =
-      inner-spares d (live-if-set _ k _ _ (λ z → trans (sym (cong outerDoneᵇ e′)) z) (λ _ → cong spentAt e′)
-        (subst (LiveIf _) (sym (switchKill-nodes cur s₀ st)) l))
-      where e′ = trans (cong (lookupNode k) (switchKill-nodes cur s₀ st)) e
-    consume-spares (consume-switch-nil _) l = l
-    consume-spares {k = k} {st = st} (consume-exhaust-sub e d) l =
-      inner-spares d (live-if-set _ k _ (EvalSt.nodes st) (λ z → trans (sym (cong outerDoneᵇ e)) z) (λ _ → cong spentAt e) l)
-    consume-spares (consume-exhaust-nil _) l = l
-
-    -- an echo's restamp, then its tail, keep the path live unless spent
-    echo-on : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now ℓ ℓ₁ ℓ₃ ℓ₄ u op m m′ ks Θ₁ ρ₁ Θ₂ ρ₂}
-                {h₂ : ℓ₁ ≤ n + ℓ} {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)}
-                {ws es fin oI sI₁ stI₁ r}
-            → Restamped S op m m′ ks p q ws es fin oI sI₁ stI₁ → foldPath⇓ now q es fin sI₁ stI₁ r
-            → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI₁)
-            → LiveIf (thru-outer (flatOp op) m′ ↠[ h₂ ] Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes (proj₂ (proj₂ r)))
-    echo-on {op = op} {h₂ = h₂} {h₃ = h₃} {h₄ = h₄} (restamped A w _ refl) dq l =
-      live-if (LiveIf.run (fold-spares {o = flatOp op} {h = ≤-trans h₂ (≤-trans h₃ h₄)} dq
-        (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ w)))))) (live-if (LiveIf.run l))))
-
     -- and so does a fan-out, one reader's fold at a time
     go-dying : ∀ {lo now k} {i : Fin (n + n)} {vals fin chs sched} {st : EvalSt ei} {r}
              → shareGo⇓ {lo = lo} now i vals fin chs sched st r
@@ -204,7 +158,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       path-pass wk S r@(takeWhile~ _ _ _ _ _ _) b sp si g lv (fold-step d dP) dI lt = resume wk (takeWhile-arm S r b sp si g lv d dI) (adv d sp) dP (sz-r lt)
       path-pass wk S r@(spentWhile~ _ _ _ _) b sp si g lv (fold-step d dP) dI lt = resume wk (takeWhile-arm S r b sp si g lv d dI) (adv d sp) dP (sz-r lt)
       path-pass wk S (outerElem~ fl r) b sp si g lv (fold-step d dP) dI lt = resume wk (outerElem-arm wk S (fl , r) b sp si g lv d dI (sz-l lt)) (adv d sp) dP (sz-r lt)
-      path-pass wk S (outerExplode~ fl x r) b sp si g _ (fold-step d dP) dI lt = resume wk (outerExplode-arm S (fl , x , r) b sp si g d dI) (adv d sp) dP (sz-r lt)
+      path-pass wk S (outerExplode~ fl x r) b sp si g lv (fold-step d dP) dI lt = resume wk (outerExplode-arm S (fl , x , r) b sp si g lv d dI) (adv d sp) dP (sz-r lt)
       path-pass wk S r@(inner~ {op = op} refl _ _ _) b sp si g lv (fold-step d@(step-from-inner react-false) dP) dI lt =
         resume wk (inner-pass {op = op} S r b sp si lv (inj₁ refl) dI) (adv d sp) dP (sz-r lt)
       path-pass wk S r@(inner~ {op = op} refl _ _ _) b sp si g lv (fold-step d@(step-from-inner (react-alive al)) dP) dI lt =
@@ -314,8 +268,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
         where
           ε = sharedEq {Γ = Γ} κ i sh
           Q = after-out (++-identityʳ _)
-                (proj₁ (quiet-sink {h = h} {h′ = h′} sh S (sink~ sh) (quiet x b []) refl (sink-sound i h (Store.ruleP S)) (sink-ok ε (Store.ruleI S))
-                          (sink-intro ε (fold-sink (disp (walk-more gI walk-nil))))))
+                (sink-quiet S {h′ = h′} ε refl (quiet x b []) (sink-intro ε (fold-sink (disp (walk-more gI walk-nil)))))
           Y = share-walk wk (After.store Q) {h = h} {h′ = h′} sh c (λ e → go-dying {k = toℕ (n ↑ʳ i)} gI (dy e)) wP wI lt
       share-walk wk S {i = i} {h = h} {h′ = h′} sh (one x r c) dy (walk-more gP wP) (walk-more {emits = eI} gI wI) lt =
         A ⨾ proj₁ Y , λ { (f , d ∷ ds) → out-++ {Δ = plainᵏ Γ κ} {t = plainᵗ t} eI _ (proj₂ Z refl (del-cast ε (d ∷ []))) (proj₂ Y (f , ds)) }
@@ -414,7 +367,7 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       quiet-step wk {stP = stP} S cP cI w (quiet-elem bx) b l W (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) lt =
         let c₁ = step-clear d₁ cI
             R  = flat-echo S w (quiet _ bx []) d₁
-            E  = quiet-tail R (proj₂ cP) (tail-of c₁) dq
+            E  = quiet-tail R (proj₂ cP) (tail-of c₁) (inj₂ (restamp-unlive (live-if-under _ _ (live-echo-if {π = Store.π S} {NP = EvalSt.nodes stP} (proj₁ w) d₁ l)))) dq
             L  = echo-on R dq (live-echo-if {π = Store.π S} {NP = EvalSt.nodes stP} (proj₁ w) d₁ l)
             X  = elem-walk wk (After.store (proj₁ E)) cP (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b (inj₂ L) W W′ lt
         in proj₁ E ⨾ proj₁ X , proj₂ X
@@ -435,14 +388,14 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       one-step wk {stP = stP} S cP cI w (elem {w = inj₁ _} r no-lane) b l W (walk-echo (fold-step d₁ (fold-step step-map dq)) W′) lt =
         let c₁ = step-clear d₁ cI
             R  = flat-echo S w (quiet _ r []) d₁
-            E  = quiet-tail R (proj₂ cP) (tail-of c₁) dq
+            E  = quiet-tail R (proj₂ cP) (tail-of c₁) (inj₂ (restamp-unlive (live-if-under _ _ (live-echo-if {π = Store.π S} {NP = EvalSt.nodes stP} (proj₁ w) d₁ l)))) dq
             L  = echo-on R dq (live-echo-if {π = Store.π S} {NP = EvalSt.nodes stP} (proj₁ w) d₁ l)
             X  = elem-walk wk (After.store (proj₁ E)) cP (fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁) (proj₂ E) b (inj₂ L) W W′ lt
         in proj₁ E ⨾ proj₁ X , proj₂ X
       one-step wk {stP = stP} S cP cI w (elem {w = inj₁ _} r (a-lane ob)) b l (walk-cons c W) (walk-echo (fold-step d₁ (fold-step step-map dq)) (walk-cons c′ W′)) lt =
         let c₁ = step-clear d₁ cI
             R  = flat-echo S w (quiet _ r []) d₁
-            E  = quiet-tail R (proj₂ cP) (tail-of c₁) dq
+            E  = quiet-tail R (proj₂ cP) (tail-of c₁) (inj₂ (restamp-unlive (live-if-under _ _ (live-echo-if {π = Store.π S} {NP = EvalSt.nodes stP} (proj₁ w) d₁ l)))) dq
             L  = echo-on R dq (live-echo-if {π = Store.π S} {NP = EvalSt.nodes stP} (proj₁ w) d₁ l)
             c₂ = fold-clear dq (proj₂ (proj₁ (tail-of c₁))) refl c₁
             C  = consume-pair wk (After.store (proj₁ E)) (proj₂ E) ob cP c₂ (live-if-under _ _ L) c c′ (sz-l lt)

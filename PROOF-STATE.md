@@ -251,10 +251,12 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### Big picture tier roadmap
 
-- **FIT THE EXPLODE.** Write `explode-out` and the two subscribe leaves
-  as bodies over smaller leaves, `Store` gaining each fact a body needs; the
-  end already holds over the idle merge. Decides whether `Store` carries what
-  the flattener's outer walk needs.
+- **FIT THE EXPLODE.** `explode-quiet-sub` and `explode-one-sub` as bodies
+  over smaller leaves, `Store` gaining each fact a body needs: the merge's
+  consume, the inner's walk into the flattener, the restamp setting the cell
+  to the delivery, the merge path's liveness now read at both leaves. Decides
+  whether `Store` carries what the flattener's outer walk needs, a spent path
+  below the merge included.
 
 - **THE ELABORATED STEPS.** `lifts-map`, `lifts-scan` and `lifts-while` as
   bodies by induction over the emit the step is handed, one clause per event
@@ -269,10 +271,10 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
 
 ### The ledger
 
-- **`explode-{quiet-sub,one-sub,out}`** (Simulation.Pass) — FALSITY,
-  `DEAD ROUTE`: one exploded emit, carrying nothing or one value, subscribed by
-  the impl's idle merge, walks into the flattener, false where the outer has
-  ended; a group delivered at one instant sends at it.
+- **`explode-{quiet-sub,one-sub}`** (Simulation.Pass) — FALSITY, `DEAD ROUTE`:
+  one exploded emit, carrying nothing or one value, subscribed by the impl's
+  idle merge, walks into the flattener and sends at its delivery, the merge's
+  path live unless spent; open where that path is spent.
 - **`elem-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an outer's group
   delivered at one instant, its elements walked through the restamp, sends at
   that instant.
