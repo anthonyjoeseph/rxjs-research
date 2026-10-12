@@ -571,7 +571,7 @@ module PassI {n} {Γ : Ctx n} (κ : Kinds n) where
     drain-pair wk {stP = stP} {stI = stI} S {m′ = m′} W cP cI (_ ∷ fw) (ob ∷ qw) H (drain-room {st₁ = s₁} _ c rP dr) dI@(drain-room {st₁ = s₁′} eI c′ rI dr′) lt
       with flat-mint wk S W cP cI (merge~ qw) (write-live S m′ H)
              (live-if-set _ m′ _ _ H (λ _ → flat-unspent {π = Store.π S} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} (proj₁ W)) (drain-live S W eI dI)) ob c c′ (sz-l lt)
-    ... | A₁ , W₁ with drain-read {NP = EvalSt.nodes s₁} {NI = EvalSt.nodes s₁′} (proj₁ W₁) rP rI
+    ... | A₁ , W₁ , _ with drain-read {NP = EvalSt.nodes s₁} {NI = EvalSt.nodes s₁′} (proj₁ W₁) rP rI
     ...   | refl , refl , refl , qw₁ with drain-pair wk (After.store A₁) W₁ (sub-clear c cP) (sub-clear c′ cI) fw qw₁ (drain-od _ (lookupNode m′ (EvalSt.nodes s₁′)) rI) dr dr′ (sz-r lt)
     ...     | A₂ , e , qr , W₂ = A₁ ⨾ A₂ , e , qr , W₂
 

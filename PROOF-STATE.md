@@ -237,25 +237,19 @@ undecided, never a failure (Anthony).
 over `correspondence`, via `subscribe-related`/`cascade-related`. RULED
 OUT: arrival plain lacks, split, gap, stray, echo
 off inners, payload; unrelated subs; unpaired pops; maps
-moving time; emptying closes; hot ends past block;
+moving time; empty closes; hot ends past block;
 2-value emits; bare cuts; writes moving row/fold; cut/liveness/drain/
 body ends, 2 hops apart; unsound walks/reads; 2 stamp chains;
 of splits/folds; mintᵉ/root stamps; quiet arms/cut drains; hop
 scripts; joiners off catch; installs+hops; revived/dead/held inners;
 unaligned reads/links/flushes; renames; 2-script
 stores+values; mid-emit joins; μ cold reads; dying rows;
-dead outers/rows past ends; Store/elem echoes;
+dead outers/rows past ends; Store/elem/lane echoes;
 absent/stale readers.
 
 also: `main` — the QuickCheck's entry point, and every generator it calls: the sweep feeds the bug cache, and no proof reads it.
 
 ### Big picture tier roadmap
-
-- **AN INNER SENDS AT ITS ECHO'S INSTANT.** `consume-out` as a body: the
-  lane's subscribe walked by the walker's stamps, each subscribe-kind emit
-  caught at the `inner~` frame by the cell its element's echo set. Decides
-  whether `simulation`'s carried elements deliver where the plain group does;
-  the echoes themselves already do.
 
 - **THE ELABORATED STEPS.** `lifts-map`, `lifts-scan` and `lifts-while` as
   bodies by induction over the emit the step is handed, one clause per event
@@ -268,15 +262,18 @@ also: `main` — the QuickCheck's entry point, and every generator it calls: the
   re-proven at every write to a queue or an outer. Decides whether
   `simulation`'s drains read liveness off the store or need the registry.
 
+- **A COLD BLOCK SENDS AT ITS ENTRY.** `block-open`'s `Out` conjunct as a body:
+  the batch step and the stamp maps copy the instant the stamp's `mintᵉ` draws,
+  and the merge's walk reads it through the walker's stamps as the inner lanes
+  now do. Decides whether `simulation`'s cold reads deliver at the counter
+  their chain entered with, or a drained lane's cell restamps them later.
+
 ### The ledger
 
 - **`explode-{one-ended,quiet-ended}`** (Simulation.Pass) — FALSITY,
   `DEAD ROUTE`: one exploded emit, carrying one value or nothing, subscribed at
   a merge marked done, sends at its delivery; open where the merge's path is
   spent.
-- **`consume-out`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`: an inner
-  subscribed while the restamp's cell restamps at an instant sends at that
-  instant.
 - **`block-{open,alive,dead,end}`** (Simulation.Pass) — FALSITY, `NO EVIDENCE`:
   a cold chain's input block, its inner open, alive or dead at the group, runs
   alone into a merge whose walk folds the path the plain chain folds the popped

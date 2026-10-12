@@ -27,12 +27,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim      using (valueᵖ; completeᵖ)
 open import Rx.Exp       using (Ctx; Closed; Val; applyClo)
-open import Rx.Evaluator using (Sched; EvalSt; Path; share-sink; _↠[_]_; map-f; scan-f; thru-outer; echoᵗ; thruEvents; atSlot; skipᵇ;
-  markDlv; memberSource; setNode; NodeId; NodeState; lookupNode; cell-st; scanVals)
+open import Rx.Evaluator using (Sched; EvalSt; Path; share-sink; _↠[_]_; map-f; scan-f; thru-outer; echoᵗ; thruEvents;
+  atSlot; skipᵇ; markDlv; memberSource; setNode; lookupNode; cell-st; scanVals)
 open import Rx.Evaluator.Freshness using (lookup-set)
 open import Data.Maybe   using (just)
 open import Decide using (≡ᵇ-refl)
-open import Rx.Evaluator.Domain using (flatOp; thruConsume⇓; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓;
+open import Rx.Evaluator.Domain using (flatOp; foldPath⇓; fold-root; fold-step; stepFrame⇓; step-map; step-thru-outer; thruWalk⇓;
   walk-nil; walk-echo; walk-cons; shareGo⇓; go-nil; go-cut; go-live; dispatchShare⇓; disp;
   shareWalk⇓; walk-end; walk-more; fold-sink; step-from-inner; react-false; react-alive;
   react-dead; innerFinish⇓; finish-all-drain; finish-switch-clear; finish-exhaust-clear;
@@ -44,7 +44,8 @@ open import SExp.InstEmit.Decode using (decodeEmit; decodeEmits)
 open import Batchable.Inst-Extract using (instExtract; emitValues)
 open import Simulation.Stores using (Lifts; sharedEq; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~;
   outerExplode~; inner~; deferInner~; RowRel; read~; []; _∷_; partner-row; partner-mem; Store;
-  LiveOn; LiveIf; live-if; LiveFor; live-for; live-if-drop; live-if-under; LiveRows; Inv; EmitRel; ObsRel)
+  LiveOn; LiveIf; live-if; LiveFor; live-for; live-if-drop; live-if-under; LiveRows; Inv;
+  EmitRel)
 open import Simulation.After using (skip-cut; module Kept)
 open import Simulation.Take using (module Takes; scan-at)
 open import Simulation.Scan using (module Scans)
@@ -124,10 +125,6 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
     elem-at : ∀ {u Θ ρ I} e′ → DelAt {echoᵗ u} I e′ → EchoAt {u} I (applyClo {s = emitᵗ (echoᵗ u)} {t = echoᵗ (emitᵗ u)} (Θ , elemᵛ , ρ) e′)
     elem-at _ d = d
 
-    -- THE RESTAMP'S CELL RESTAMPING AT `I`, read at the table `N`
-    CellAt : ∀ {u} → NodeId → List (NodeId × NodeState (plainᵏ Γ κ)) → ℕ → Set
-    CellAt {u} ks N I = Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c) × ByKind {Γ = Γ} κ c (λ _ → ⊥) (λ i → i ≡ I)
-
     -- an echo delivered at `I` leaves its cell restamping there
     echo-kind : ∀ {u Θ ρ I} (c : Val (plainᵏ Γ κ) (FlatSᵗ u)) (x : Val (plainᵏ Γ κ) (emitᵗ u)) → DelAt I x
               → ByKind {Γ = Γ} κ (proj₂ (scanVals (Θ , flatStepᵛ {t = u} , ρ) c (x ∷ []))) (λ _ → ⊥) (λ i → i ≡ I)
@@ -159,20 +156,6 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
       dying-kept : ∀ {now lo s k} {p : Path (plainᵏ Γ κ) lo s (emitᵗ t)} {vs f sched} {st : EvalSt ei} {r}
                  → foldPath⇓ now p vs f sched st r
                  → memberSource k (EvalSt.dying st) ≡ true → memberSource k (EvalSt.dying (proj₂ (proj₂ r))) ≡ true
-
-      -- AN INNER SUBSCRIBED UNDER A CELL RESTAMPING AT `I` SENDS AT `I`:
-      -- what its subscribe puts out is subscribe-kind, which the cell
-      -- restamps, and nothing it reaches delivers anything else then.
-      consume-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
-                      {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ rP rI I}
-                  → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
-                  → ObsRel κ u o′ o
-                  → Clear m p sP stP → Clear m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) sI stI
-                  → LiveIf (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) (EvalSt.nodes stI)
-                  → thruConsume⇓ (flatOp op) m p now o sP stP rP
-                  → thruConsume⇓ (flatOp op) m′ (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) now o′ sI stI rI
-                  → CellAt {u} ks (EvalSt.nodes stI) I
-                  → Out I (proj₁ rI)
 
     -- and so does a fan-out, one reader's fold at a time
     go-dying : ∀ {lo now k} {i : Fin (n + n)} {vals fin chs sched} {st : EvalSt ei} {r}
@@ -454,11 +437,11 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
             c₂ = fold-clear dq (proj₂ (proj₁ t₁)) refl c₁
             C  = consume-pair (Walker′.walks wk) (After.store (proj₁ E)) (proj₂ E) ob cP c₂ (live-if-under _ _ L) c c′ (sz-l lt)
             X  = elem-walk wk (After.store (proj₁ C)) (consume-clear c cP)
-                   (consume-clear c′ c₂) (proj₂ C) b (inj₂ (consume-spares c′ L)) W W′ (sz-r lt)
+                   (consume-clear c′ c₂) (proj₁ (proj₂ C)) b (inj₂ (consume-spares c′ L)) W W′ (sz-r lt)
             lk = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ w)))))))
         in proj₁ E ⨾ (proj₁ C ⨾ proj₁ X) , proj₁ (proj₂ X) ,
            λ e ds → out-++ oe (oc ++ ow) (still-out (proj₁ E))
-                      (out-++ oc ow (consume-out (After.store (proj₁ E)) (proj₂ E) ob cP c₂ (live-if-under _ _ L) c c′
+                      (out-++ oc ow (proj₂ (proj₂ C)
                                        (cell-moved (missed dq (proj₂ t₁ , proj₂ (proj₁ t₁))) (echo-cell lk d₁ e)))
                                     (proj₂ (proj₂ X) ds))
       one-step wk {stP = stP} S cP cI w (elem {w = inj₂ _} r no-lane) b l (walk-echo dv W) (walk-echo {out₁ = oe} {out₂ = ow} (fold-step d₁ (fold-step step-map dq)) W′) lt =
@@ -482,12 +465,12 @@ module PassP {n} {Γ : Ctx n} (κ : Kinds n) where
             c₂  = fold-clear dq (proj₂ (proj₁ t₁)) refl c₁
             C   = consume-pair (Walker′.walks wk) (After.store (proj₁ E)) (proj₁ (proj₂ E)) ob cP₂ c₂ (live-if-under _ _ L) c c′ (sz-l (sz-r lt))
             X   = elem-walk wk (After.store (proj₁ C)) (consume-clear c cP₂)
-                    (consume-clear c′ c₂) (proj₂ C) b (inj₂ (consume-spares c′ L)) W W′ (sz-r (sz-r lt))
+                    (consume-clear c′ c₂) (proj₁ (proj₂ C)) b (inj₂ (consume-spares c′ L)) W W′ (sz-r (sz-r lt))
             dl  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (restamp-echo S (proj₁ w) (proj₂ w) (one _ r []) d₁)))))
             lk  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₁ w)))))))
         in proj₁ E ⨾ (proj₁ C ⨾ proj₁ X) , proj₁ (proj₂ X) ,
            λ e ds → out-++ oe (oc ++ ow) (proj₂ (proj₂ E) (dl (e ∷ [])))
-                      (out-++ oc ow (consume-out (After.store (proj₁ E)) (proj₁ (proj₂ E)) ob cP₂ c₂ (live-if-under _ _ L) c c′
+                      (out-++ oc ow (proj₂ (proj₂ C)
                                        (cell-moved (missed dq (proj₂ t₁ , proj₂ (proj₁ t₁))) (echo-cell lk d₁ e)))
                                     (proj₂ (proj₂ X) ds))
 

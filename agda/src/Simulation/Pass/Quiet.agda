@@ -62,7 +62,8 @@ open import Simulation.Cut using (cut-kill)
 open import Simulation.Take using (module Takes; scan-at; take-open-at; cell-take)
 open import Simulation.Scan using (module Scans)
 open import Simulation.Arm using (module Arms; Unmoved; unmoved; Clear; ClearI; missed; on-drop; unthru; step-clear;
-  fold-clear; adv; fold-unmoved; consume-clear; Out; Gone; gone-nodes; Passes; headKey; scan-c)
+  fold-clear; adv; fold-unmoved; consume-clear; Out; out-quiet; Gone; gone-nodes; Passes; headKey; scan-c)
+open import Simulation.Catch using (ByKind; by-map)
 open import Simulation.Sweep using (t≢f; stamp-rows; stamped<; sameSource-no)
 open import Rx.Mint using (counter; sourceᵏ; regᵏ; nodeᵏ; setAt)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
@@ -618,8 +619,20 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     only keys pm₀ f@(pm , _) with key-same keys pm pm₀
     ... | refl = f
 
+    -- THE RESTAMP'S CELL RESTAMPING AT `I`, read at the table `N`
+    CellAt : ∀ {u} → NodeId → List (NodeId × NodeState (plainᵏ Γ κ)) → ℕ → Set
+    CellAt {u} ks N I = Σ (Val (plainᵏ Γ κ) (FlatSᵗ u)) λ c → lookupNode ks N ≡ just (cell-st {t = FlatSᵗ u} c) × ByKind {Γ = Γ} κ c (λ _ → ⊥) (λ i → i ≡ I)
+
+    -- a flattener's node written leaves its restamp cell
+    cell-mint : ∀ {π NP NI u op m m′ ks xs y y′ I} → Unique (map proj₁ π) → Unique (concatMap proj₂ π)
+              → Flattener {Γ = Γ} κ π {t = t} NP NI u op m m′ ks xs → FlatNodes {Γ = Γ} κ π u op y y′
+              → CellAt {u} ks NI I → CellAt {u} ks (setNode m′ y′ NI) I
+    cell-mint {NP = NP} {NI} keys vals (pm , _ , _ , lP , lI , fn , _ , lk) fn′ (c , l , b) = c , W.cellI l , b
+      where module W = Write κ keys vals {t = t} {NP = NP} {NI = NI} pm lP lI fn lk fn′
+
     -- AN INNER'S WALK FROM STORES ALREADY MINTED: the walk of its
-    -- elaboration, left again at the lane's frames
+    -- elaboration, left again at the lane's frames; under a cell
+    -- restamping at `I`, what it sends is at `I`
     inner-walk : ∀ {N} (wk : Walker ep ei N) {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ₃ ℓ₄ u op m m′ ks xs Θ₁ ρ₁ Θ₂ ρ₂}
                    {h₃ : n + ℓ ≤ ℓ₃} {h₄ : ℓ₃ ≤ ℓ₄} {p : Path Γ ℓ u t} {q : Path (plainᵏ Γ κ) ℓ₄ (emitᵗ u) (emitᵗ t)} {o o′ j j′ rP rI}
                → Walkedˣ xs op m m′ ks p q (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI)
@@ -633,8 +646,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                → sz-subscribeE dP < N
                → Σ (After S rP rI) λ A
                    → Walkedˣ xs op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                   × (∀ {I} → CellAt {u} ks (EvalSt.nodes stI) I → Out I (proj₁ rI))
     inner-walk wk S {op = op} {m′ = m′} {ks = ks} {Θ₁ = Θ₁} {ρ₁} {Θ₂} {ρ₂} {h₃} {h₄} {q = q} {j′ = j′} {rP = rP} {rI} (f@(pm , _) , pr) ip lq (elab s w r) oP oI dP dI lt =
-      proj₁ B , only {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} (Store.π-keys (After.store (proj₁ B))) (After.grows (proj₁ B) pm) (proj₂ (proj₁ L)) , proj₂ (proj₂ L)
+      proj₁ B , (only {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} (Store.π-keys (After.store (proj₁ B))) (After.grows (proj₁ B) pm) (proj₂ (proj₁ L)) , proj₂ (proj₂ L))
+      , λ { (c , l , b) → proj₁ (proj₂ (proj₂ B) (c , l , by-map {Γ = Γ} κ c (λ ()) (λ e → e) b)) }
       where
       B = wk s w r S (inner~ refl f ip pr) oP oI (live-if-cons (from-inner (flatOp op) m′ j′) ≤-refl (Restamp Θ₁ ρ₁ ks Θ₂ ρ₂ h₃ h₄ q) refl lq) dP dI lt
       L = leave {NP = EvalSt.nodes (proj₂ (proj₂ rP))} {NI = EvalSt.nodes (proj₂ (proj₂ rI))} op (proj₁ (proj₂ B))
@@ -963,9 +978,11 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
               → sz-subscribeInner dP < N
               → Σ (After S rP rI) λ A
                   → Walkedˣ xs op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                   × (∀ {I} → CellAt {u} ks (EvalSt.nodes stI) I → Out I (proj₁ rI))
     flat-mint wk {sP} {stP} {sI} {stI} S {op = op} {m = m} {m′ = m′} {ks = ks} {xs = xs} {Θ₁ = Θ₁} {ρ₁ = ρ₁} {Θ₂ = Θ₂} {ρ₂ = ρ₂}
               {h₃ = h₃} {h₄ = h₄} {p = p} {q = q} (f , pr) cP cI fn lv lq ob (inner refl dP) (inner refl dI) lt =
-      unmint (proj₁ Wr ⨾ proj₁ B) , proj₂ B
+      unmint (proj₁ Wr ⨾ proj₁ B) , proj₁ (proj₂ B)
+      , λ cl → proj₂ (proj₂ B) (cell-mint {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} (Store.π-keys (mint-pair S)) (Store.π-vals (mint-pair S)) (proj₁ W₁) fn cl)
       where
       W₁ : Walkedˣ xs op m m′ ks p q (Store.π (mint-pair S)) (EvalSt.nodes stP) (EvalSt.nodes stI)
       W₁ = flatG {Γ = Γ} κ {π = Store.π S} {π′ = Store.π (mint-pair S)} there {t = t} {NP = EvalSt.nodes stP} {NI = EvalSt.nodes stI} f
@@ -992,6 +1009,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                      → sz-subscribeInner dP < N
                      → Σ (After S rP rI) λ A
                          → Walkedˣ xs switchᶠ m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                   × (∀ {I} → CellAt {u} ks (EvalSt.nodes stI) I → Out I (proj₁ rI))
     switch-subscribe wk {sP} {sI = sI} S {m′ = m′} {od = od} W@((_ , _ , _ , lP , lI , fn , _) , _) eP eI cP cI lq ob dP dI lt =
       flat-mint wk S W cP cI
         (subst (λ d → FlatNodes {Γ = Γ} κ (Minted S) _ switchᶠ (switch-st (just (nodeCt sP)) od) (switch-st (just (nodeCt sI)) d))
@@ -1053,11 +1071,9 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → sz-thruConsume dP < N
                    → Σ (After S rP rI) λ A
                        → Walkedˣ xs switchᶠ m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
-    consume-switch wk {sP} {stP} {sI} {stI} S {m = m} {m′} W ob cP cI lq (consume-switch-sub {cur = cur} eP kP refl dP) (consume-switch-sub {cur = cur′} eI kI refl dI) lt =
-      let K = switch-kill S W eP eI kP kI
-          B = switch-subscribe wk (After.store (proj₁ K)) (proj₂ K) (cut-kept m cur sP stP kP eP) (cut-kept m′ cur′ sI stI kI eI) (kill-clear cur sP stP kP cP) (kill-clear cur′ sI stI kI cI)
-                (subst (LiveIf _) (cut-nodes cur′ sI stI kI) lq) ob dP dI (sz-1 lt)
-      in proj₁ K ⨾ proj₁ B , proj₂ B
+                   × (∀ {I} → CellAt {u} ks (EvalSt.nodes stI) I → Out I (proj₁ rI))
+    consume-switch wk {sP} {stP} {sI} {stI} S {m = m} {m′} {ks} W ob cP cI lq (consume-switch-sub {cur = cur} eP kP refl dP) (consume-switch-sub {cur = cur′} eI kI refl dI) lt =
+      proj₁ K ⨾ proj₁ B , proj₁ (proj₂ B) , λ { (c , l , b) → proj₂ (proj₂ B) (c , cut-kept ks cur′ sI stI kI l , b) }
       where
       cut-kept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} k (c : Maybe NodeId) (s : Sched Γ) (st : EvalSt e) {s₁ st₁ x}
                → switchKill c s st ≡ (s₁ , st₁) → lookupNode k (EvalSt.nodes st) ≡ x → lookupNode k (EvalSt.nodes st₁) ≡ x
@@ -1069,7 +1085,10 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → switchKill c s st ≡ (s₁ , st₁) → Clear k π s st → Clear k π s₁ st₁
       kill-clear c s st refl (on , so) =
         sub-on (kill-sub c s st) (≤-reflexive (sym (switchKill-ct c s st))) on , sub-ot (kill-sub c s st) (≤-reflexive (sym (switchKill-ct c s st))) (switchKill-keeps c s st refl) so
-    consume-switch _ S W ob _ _ _ (consume-switch-nil _) (consume-switch-nil _) _ = after S (λ x → x) (λ x → x) [] (λ x → x) , W
+      K = switch-kill S W eP eI kP kI
+      B = switch-subscribe wk (After.store (proj₁ K)) (proj₂ K) (cut-kept m cur sP stP kP eP) (cut-kept m′ cur′ sI stI kI eI) (kill-clear cur sP stP kP cP) (kill-clear cur′ sI stI kI cI)
+            (subst (LiveIf _) (cut-nodes cur′ sI stI kI) lq) ob dP dI (sz-1 lt)
+    consume-switch _ S W ob _ _ _ (consume-switch-nil _) (consume-switch-nil _) _ = after S (λ x → x) (λ x → x) [] (λ x → x) , W , λ _ → out-quiet [] refl
     consume-switch _ S {u = u} ((_ , _ , _ , _ , lI , switch~ _ , _) , _) ob _ _ _ (consume-switch-sub _ _ _ _) (consume-switch-nil n) _ =
       ⊥-elim (unusable switchᵒ (emitᵗ u) lI n refl)
     consume-switch _ S {u = u} ((_ , _ , _ , lP , _ , switch~ _ , _) , _) ob _ _ _ (consume-switch-nil n) _ _ =
@@ -1091,13 +1110,15 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
                  → sz-thruConsume dP < N
                  → Σ (After S rP rI) λ A
                      → Walkedˣ xs op m m′ ks p q (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI)))
+                   × (∀ {I} → CellAt {u} ks (EvalSt.nodes stI) I → Out I (proj₁ rI))
     consume-pair wk S {op = switchᶠ} W ob cP cI lq dP dI lt = consume-switch wk S W ob cP cI lq dP dI lt
     consume-pair wk S {op = mergeᶠ _} W@((_ , _ , _ , lP , lI , fn , _) , _) ob cP cI lq (consume-all-sub eP _ dP) (consume-all-sub eI _ dI) lt =
       flat-mint wk S W cP cI (lane-nodes (nodes-grow {Γ = Γ} κ there fn) (trans (sym lP) eP) (trans (sym lI) eI))
         (keep-live S _ eI refl) (flat-live-if _ _ eI refl refl lq) ob dP dI (sz-1 lt)
     consume-pair _ S {op = mergeᶠ _} W@((_ , _ , _ , lP , lI , fn , _) , _) ob _ _ _ (consume-all-enqueue eP _) (consume-all-enqueue eI _) _ =
-      flat-write S W (queue-nodes fn (trans (sym lP) eP) (trans (sym lI) eI) ob) (keep-live S _ eI refl)
-    consume-pair _ S {op = mergeᶠ _} W ob _ _ _ (consume-all-nil _) (consume-all-nil _) _ = after S (λ x → x) (λ x → x) [] (λ x → x) , W
+      let F = flat-write S W (queue-nodes fn (trans (sym lP) eP) (trans (sym lI) eI) ob) (keep-live S _ eI refl)
+      in proj₁ F , proj₂ F , λ _ → out-quiet [] refl
+    consume-pair _ S {op = mergeᶠ _} W ob _ _ _ (consume-all-nil _) (consume-all-nil _) _ = after S (λ x → x) (λ x → x) [] (λ x → x) , W , λ _ → out-quiet [] refl
     consume-pair _ S {op = mergeᶠ _} ((_ , _ , _ , lP , lI , fn , _) , _) ob _ _ _ (consume-all-sub eP hP _) (consume-all-enqueue eI hI) _ =
       ⊥-elim (t≢f (room-agree fn (trans (sym lP) eP) (trans (sym lI) eI) hP hI))
     consume-pair _ S {op = mergeᶠ _} ((_ , _ , _ , lP , lI , fn , _) , _) ob _ _ _ (consume-all-enqueue eP hP) (consume-all-sub eI hI _) _ =
@@ -1107,7 +1128,7 @@ module PassQ {n} {Γ : Ctx n} (κ : Kinds n) where
     consume-pair wk S {op = exhaustᶠ} W@((_ , _ , _ , lP , lI , fn , _) , _) ob cP cI lq (consume-exhaust-sub eP dP) (consume-exhaust-sub eI dI) lt =
       flat-mint wk S W cP cI (idle-nodes (nodes-grow {Γ = Γ} κ there fn) (trans (sym lP) eP) (trans (sym lI) eI))
         (keep-live S _ eI refl) (flat-live-if _ _ eI refl refl lq) ob dP dI (sz-1 lt)
-    consume-pair _ S {op = exhaustᶠ} W ob _ _ _ (consume-exhaust-nil _) (consume-exhaust-nil _) _ = after S (λ x → x) (λ x → x) [] (λ x → x) , W
+    consume-pair _ S {op = exhaustᶠ} W ob _ _ _ (consume-exhaust-nil _) (consume-exhaust-nil _) _ = after S (λ x → x) (λ x → x) [] (λ x → x) , W , λ _ → out-quiet [] refl
     consume-pair _ S {u = u} {op = exhaustᶠ} ((_ , _ , _ , lP , lI , fn , _) , _) ob _ _ _ (consume-exhaust-sub eP _) (consume-exhaust-nil n) _ =
       ⊥-elim (unusable exhaustᵒ (emitᵗ u) lI n (idle-plain fn (trans (sym lP) eP)))
     consume-pair _ S {u = u} {op = exhaustᶠ} ((_ , _ , _ , lP , lI , fn , _) , _) ob _ _ _ (consume-exhaust-nil n) (consume-exhaust-sub eI _) _ =
