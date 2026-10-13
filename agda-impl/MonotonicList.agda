@@ -12,8 +12,10 @@
 -- of one.
 module MonotonicList where
 
-open import Data.Bool using (Bool)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; [])
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Product using (_×_; _,_)
 open import Data.Nat using (ℕ; zero; suc)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 
@@ -64,17 +66,23 @@ Timeline A = Lift (lsuc 0ℓ) (ML A)
 ------------------------------------------------------------------------
 -- The operators
 
+-- How `flattenᴰ` handles a lane arriving while others are live: merge
+-- (with an optional concurrency bound; `just 1` is concat), switch to it,
+-- or ignore it.
+data FlatOp : Set where
+  mergeᶠ           : Maybe ℕ → FlatOp
+  switchᶠ exhaustᶠ : FlatOp
+
+-- THE PRIMITIVES, and nothing derivable (see Derived, below).
 postulate
+  emptyᴰ     : ∀ {A} → MonotonicList A
   ofᴰ        : ∀ {A} → List A → MonotonicList A
   mapᴰ       : ∀ {A B} → (A → B) → MonotonicList A → MonotonicList B
   scanᴰ      : ∀ {A B} → (B → A → B) → B → MonotonicList A → MonotonicList B
   takeWhileᴰ : ∀ {A} → (A → Bool) → MonotonicList A → MonotonicList A
-  mergeᴰ     : ∀ {A} → MonotonicList A → MonotonicList A → MonotonicList A
-  -- Each inner is observed at the time of the outer emission that made it.
-  mergeMapᴰ  : ∀ {A B} → (A → MonotonicList B) → MonotonicList A → MonotonicList B
-  switchMapᴰ : ∀ {A B} → (A → MonotonicList B) → MonotonicList A → MonotonicList B
-  exhaustMapᴰ : ∀ {A B} → (A → MonotonicList B) → MonotonicList A → MonotonicList B
-  concatMapᴰ : ∀ {A B} → (A → MonotonicList B) → MonotonicList A → MonotonicList B
+  -- Each element is an optional ECHO, leaving as the element arrives,
+  -- beside an optional LANE, observed from the time of that element.
+  flattenᴰ   : ∀ {A} → FlatOp → MonotonicList (Maybe A × Maybe (MonotonicList A)) → MonotonicList A
   -- One `stall` at the head of the subscribe burst, then the body.  Not
   -- a delay: everything else stays in the same frame.
   deferᴰ     : ∀ {A} → MonotonicList A → MonotonicList A
@@ -115,7 +123,7 @@ iterate zero    f = ⊥ᴰ
 iterate (suc n) f = f (iterate n f)
 
 -- RECURSION.  Agda cannot accept `ones = mergeᴰ (ofᴰ [ 1 ]) (deferᴰ ones)`:
--- it never looks inside `mergeᴰ`, which could strip the guard.  So
+-- it never looks inside `flattenᴰ`, which could strip the guard.  So
 -- recursion here is a least fixed point, total for any `f`.
 fixᴰ : ∀ {A} → (MonotonicList A → MonotonicList A) → MonotonicList A
 fixᴰ f = lub λ n → iterate n f
@@ -127,6 +135,15 @@ postulate
   fix-unfold : ∀ {A} {f : MonotonicList A → MonotonicList A}
              → Continuous f → fixᴰ f ≈ f (fixᴰ f)
 
--- Emits 1 forever, synchronously.
+------------------------------------------------------------------------
+-- Derived
+
+mergeᴰ : ∀ {A} → MonotonicList A → MonotonicList A → MonotonicList A
+mergeᴰ s t = flattenᴰ (mergeᶠ nothing) (mapᴰ (λ b → nothing , just (if b then s else t)) (ofᴰ (true ∷ false ∷ [])))
+
+flatMapᴰ : ∀ {A B} → FlatOp → (A → MonotonicList B) → MonotonicList A → MonotonicList B
+flatMapᴰ op f s = flattenᴰ op (mapᴰ (λ a → nothing , just (f a)) s)
+
+-- Emits 1 forever, synchronously: the echo, then itself as the lane.
 ones : MonotonicList ℕ
-ones = fixᴰ λ x → mergeᴰ (ofᴰ (1 ∷ [])) (deferᴰ x)
+ones = fixᴰ λ x → flattenᴰ (mergeᶠ nothing) (ofᴰ ((just 1 , just (deferᴰ x)) ∷ []))

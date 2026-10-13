@@ -23,11 +23,13 @@ open import Data.List using (List; _∷_; [])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.Nat using (ℕ; zero; suc)
+open import Data.Maybe as Maybe using (Maybe; just; nothing)
+open import Data.Product using (_×_; _,_; map₂)
 open import Data.Unit using (tt)
 open import Level using (lower)
 
-open import AbstractObservable
-open import MonotonicList
+open import AbstractObservable hiding (ones; merge; flatMap)
+open import MonotonicList hiding (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Denote
 open import PureObservable
 open Run Pureᴾ
@@ -50,15 +52,20 @@ data RelEnv : ∀ {Γ} → Env Γ → DenEnv Γ → Set₁ where
   _∷_ : ∀ {Γ A} {st : ShareSt A} {x : MonotonicList A} {ρ : Env Γ} {δ : DenEnv Γ}
       → RelSh st x → RelEnv ρ δ → RelEnv (st ∷ ρ) (x ∷ δ)
 
+-- An element's echo is the same on both sides; its lane, if any, is related.
+data RelLane {B : Set} : Maybe B × Maybe (Subscribe B) → Maybe B × Maybe (MonotonicList B) → Set₁ where
+  none : ∀ {e}     → RelLane (e , nothing) (e , nothing)
+  some : ∀ {e s d} → Rel s d → RelLane (e , just s) (e , just d)
+
 postulate
   -- One per operator: the kernel and its denotation agree.
+  empty-rel     : ∀ {A} → Rel {A} emptyᴷ emptyᴰ
   of-rel        : ∀ {A} (xs : List A) → Rel (ofᴷ xs) (ofᴰ xs)
   map-rel       : ∀ {A B s d} (f : A → B) → Rel s d → Rel (mapᴷ f s) (mapᴰ f d)
   scan-rel      : ∀ {A B s d} (f : B → A → B) z → Rel s d → Rel (scanᴷ f z s) (scanᴰ f z d)
   takeWhile-rel : ∀ {A s d} p → Rel {A} s d → Rel (takeWhileᴷ p s) (takeWhileᴰ p d)
-  merge-rel     : ∀ {A s d t e} → Rel {A} s d → Rel t e → Rel (mergeᴷ s t) (mergeᴰ d e)
-  flatMap-rel   : ∀ {A B s d} op {f : A → Subscribe B} {g : A → MonotonicList B}
-                → (∀ a → Rel (f a) (g a)) → Rel s d → Rel (flatMapᴷ op f s) (flatMapᴰ op g d)
+  flatten-rel   : ∀ {A B s d} op {f : A → Maybe B × Maybe (Subscribe B)} {g}
+                → (∀ a → RelLane (f a) (g a)) → Rel s d → Rel (flattenᴷ op f s) (flattenᴰ (flatOp op) (mapᴰ g d))
   cold-rel      : ∀ {A} (c : Timeline A) → Rel (via (startCold c)) (cold (lower c))
   shared-rel    : ∀ {Γ A ρ δ} (i : A ∈ Γ) → RelEnv ρ δ
                 → Rel (joinᴷ (lookup ρ i)) (lookup δ i)
@@ -90,24 +97,28 @@ postulate
   exhaust : ∀ {A} (o : PureObs [] A) → (∀ n → cold (observe (⟦ o ⟧[ n ] []) 0) ⊑ run o)
           → run o ≈ cold (observe (⟦ o ⟧ []) 0)
 
--- THE FUNDAMENTAL LEMMA.  The recursion of `⟦_⟧[_]`: lexicographic on
--- (n , tree), so inductive — nothing here is guarded.
-fundamental : ∀ n {Γ A} (o : PureObs Γ A) {ρ : Env Γ} {δ : DenEnv Γ}
-            → RelEnv ρ δ → Rel (subscribe o ρ) (⟦ o ⟧[ n ] δ)
-fundamental n       (cold c)         e = cold-rel c
-fundamental n       (of xs)          e = of-rel xs
-fundamental n       (map f s)        e = map-rel f (child-rel (fundamental n s e))
-fundamental n       (scan f z s)     e = scan-rel f z (child-rel (fundamental n s e))
-fundamental n       (takeWhile p s)  e = takeWhile-rel p (child-rel (fundamental n s e))
-fundamental n       (merge s t)      e = merge-rel (child-rel (fundamental n s e))
-                                                   (child-rel (fundamental n t e))
-fundamental n       (flatMap op f s) e = flatMap-rel op (λ a → child-rel (fundamental n (f a) e))
-                                                        (child-rel (fundamental n s e))
-fundamental n       (share s b)      e = share-rel e (fundamental n s e)
-                                                   (λ r → child-rel (fundamental n b (r ∷ e)))
-fundamental n       (shared i)       e = shared-rel i e
-fundamental zero    (defer l)        e = bot-rel
-fundamental (suc n) (defer l)        e = defer-rel (child-rel (fundamental n (Later.force l) e))
+mutual
+  -- THE FUNDAMENTAL LEMMA.  The recursion of `⟦_⟧[_]`: lexicographic on
+  -- (n , tree), so inductive — nothing here is guarded.
+  fundamental : ∀ n {Γ A} (o : PureObs Γ A) {ρ : Env Γ} {δ : DenEnv Γ}
+              → RelEnv ρ δ → Rel (subscribe o ρ) (⟦ o ⟧[ n ] δ)
+  fundamental n       (cold c)         e = cold-rel c
+  fundamental n       empty            e = empty-rel
+  fundamental n       (of xs)          e = of-rel xs
+  fundamental n       (map f s)        e = map-rel f (child-rel (fundamental n s e))
+  fundamental n       (scan f z s)     e = scan-rel f z (child-rel (fundamental n s e))
+  fundamental n       (takeWhile p s)  e = takeWhile-rel p (child-rel (fundamental n s e))
+  fundamental n       (flatten op f s) e = flatten-rel op (λ a → lane-rel n (f a) e) (child-rel (fundamental n s e))
+  fundamental n       (share s b)      e = share-rel e (fundamental n s e)
+                                                     (λ r → child-rel (fundamental n b (r ∷ e)))
+  fundamental n       (shared i)       e = shared-rel i e
+  fundamental zero    (defer l)        e = bot-rel
+  fundamental (suc n) (defer l)        e = defer-rel (child-rel (fundamental n (Later.force l) e))
+
+  lane-rel : ∀ n {Γ B} (x : Maybe B × Maybe (PureObs Γ B)) {ρ : Env Γ} {δ : DenEnv Γ}
+           → RelEnv ρ δ → RelLane (map₂ (Maybe.map λ l → sub l ρ) x) (laneᴰ n x δ)
+  lane-rel n (b , nothing) e = none
+  lane-rel n (b , just l)  e = some (child-rel (fundamental n l e))
 
 -- Each approximant is sound for the run.
 sound : ∀ {A} (o : PureObs [] A) n → cold (observe (⟦ o ⟧[ n ] []) 0) ⊑ run o
