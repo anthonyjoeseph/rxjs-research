@@ -5,8 +5,8 @@ name: Gate
 # toolchain has finished building.
 #
 # `make gate` is this repo's merge gate (see CLAUDE.md): every cheap check,
-# then `make agda` on `agda-impl/Main.agda`.  The bug cache runs beside it,
-# from its own compiled binary.
+# then `make agda` on `agda-impl/Main.agda`.  The bug cache and the oracle
+# run beside it, each from its own compiled binary.
 
 on:
   push:
@@ -49,7 +49,7 @@ jobs:
 
   gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,7 +86,7 @@ jobs:
 
   bug-cache:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -104,3 +104,42 @@ jobs:
 
       - name: make bug-cache
         run: make bug-cache
+
+  # RED until Tier 1 lands: the oracle CLI and the TS port to the `Obs`
+  # tree.  Expected red is still red -- it is the tier's finish line.
+  oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Before any setup, so a missing CLI is red in seconds rather than
+      # after the toolchain.  `make oracle-build` repeats it; it is cheap.
+      - name: Oracle CLI exists?
+        run: |
+          test -f agda-impl/quickcheck/Oracle-CLI.agda || {
+            echo "oracle: RED — agda-impl/quickcheck/Oracle-CLI.agda does not exist yet (PROOF-STATE Tier 1: THE TYPESCRIPT ORACLE)"
+            exit 1; }
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+
+      - name: Install TypeScript deps
+        run: cd typescript && npm ci
+
+      - name: Set up Agda
+        uses: ./.github/actions/agda-toolchain
+
+      - name: Cache compiled MAlonzo objects
+        uses: actions/cache@v4
+        with:
+          path: agda-impl/_cli/MAlonzo
+          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+
+      - name: make oracle
+        run: make oracle

@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
@@ -35,6 +35,7 @@ help:
 	@echo "  gate-cheap    the textual checks alone (seconds, no Agda)"
 	@echo "  agda          typecheck $(SRC)/Main.agda — everything Main reaches"
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
+	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
@@ -77,6 +78,21 @@ gate:
 # THE BUG CACHE: every program that ever made the semantics disagree,
 # checked by a compiled runner rather than the typechecker, since the
 # corpus only grows.  Green exactly when no known counterexample remains.
+# THE ORACLE: typescript/'s differential test drives the compiled CLI over
+# NDJSON (typescript/src/agda-bridge.ts).  RED until Tier 1 writes
+# `quickcheck/Oracle-CLI.agda` and ports the TS side to the `Obs` tree --
+# the guard names that, rather than make's "no rule to make target".
+# ─────────────────────────────────────────────────────────────────────────
+ORACLE_CLI := $(SRC)/quickcheck/Oracle-CLI.agda
+ORACLE_BIN := $(SRC)/_cli/Oracle-CLI
+
+oracle-build:
+	@test -f $(ORACLE_CLI) || { echo "oracle: RED — $(ORACLE_CLI) does not exist yet (PROOF-STATE Tier 1: THE TYPESCRIPT ORACLE)"; exit 1; }
+	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Oracle-CLI.agda
+
+oracle: oracle-build
+	@cd typescript && AGDA_CLI_BIN=$(CURDIR)/$(ORACLE_BIN) npm run --silent oracle -- $(ARGS)
+
 # The runner prints a FAIL line per failing row and a closing `done` line;
 # a run without the `done` line died part-way and is red.  See
 # docs/bug-cache.md.

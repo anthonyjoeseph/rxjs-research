@@ -3,7 +3,7 @@
 # The source uses NodeNext .js import specifiers, so it can't run under node
 # directly — it must be compiled first. tsconfig stays noEmit:true; we emit to
 # a throwaway dir one level under typescript/ (so `node` still finds
-# node_modules, and agda-bridge's default ../../agda/_cli/Main path resolves)
+# node_modules, and agda-bridge's default ../../agda-impl/_cli/Oracle-CLI path resolves)
 # and delete it on ANY exit. Args pass straight through to prop-test, e.g.
 #   scripts/run-oracle.sh --seed 1
 #   scripts/run-oracle.sh --operator mergeAll
