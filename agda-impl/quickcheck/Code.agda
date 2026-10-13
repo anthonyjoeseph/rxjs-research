@@ -20,7 +20,9 @@ open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
+open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_)
+open import Data.String using (String; intersperse) renaming (_++_ to _⊕_)
 open import Data.Sum using (inj₁; inj₂)
 open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -28,8 +30,8 @@ open import Relation.Binary.PropositionalEquality using (refl)
 import Tree as T
 open import Tree using (Obs; Later; renameLater)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; close; Timeline)
-open import quickcheck.Ty using (Ty; boolᵗ; ⟦_⟧ᵀ; maybeᵗ)
-open import quickcheck.Tm using (Vals; Tm; if; ⟦_⟧ᵗ)
+open import quickcheck.Ty using (Ty; boolᵗ; listᵗ; ⟦_⟧ᵀ; maybeᵗ; showᵀ)
+open import quickcheck.Tm using (Vals; Tm; if; ⟦_⟧ᵗ; position; showTm)
 
 -- A cold, as data: frames at offsets from subscribe, then complete or not.
 record Script (t : Ty) : Set where
@@ -136,3 +138,41 @@ mutual
 
 timeline : Leaf Timeline
 timeline (script fs c) = lift (scriptML fs c)
+
+------------------------------------------------------------------------
+-- JSON, for the oracle: a node is an array headed by its constructor,
+-- each binder's variable a position counted from the innermost.
+
+private
+  showFrames : ∀ t → List (ℕ × List ⟦ t ⟧ᵀ) → List String
+  showFrames t []             = []
+  showFrames t ((k , xs) ∷ fs) = ("[" ⊕ showℕ k ⊕ "," ⊕ showᵀ (listᵗ t) xs ⊕ "]") ∷ showFrames t fs
+
+  showTms : ∀ {Θ t} → List (Tm Θ t) → List String
+  showTms []       = []
+  showTms (x ∷ xs) = showTm x ∷ showTms xs
+
+  showOp : T.FlatOp → String
+  showOp (T.mergeᶠ nothing)  = "[\"merge\"]"
+  showOp (T.mergeᶠ (just n)) = "[\"merge\"," ⊕ showℕ n ⊕ "]"
+  showOp T.switchᶠ           = "[\"switch\"]"
+  showOp T.exhaustᶠ          = "[\"exhaust\"]"
+
+  showBool : Bool → String
+  showBool true  = "true"
+  showBool false = "false"
+
+showCode : ∀ {Γ Δᵍ Δ Θ} t → Code Γ Δᵍ Δ Θ t → String
+showCode t (cold (script fs c)) = "[\"cold\",[" ⊕ intersperse "," (showFrames t fs) ⊕ "]," ⊕ showBool c ⊕ "]"
+showCode t empty                = "[\"empty\"]"
+showCode t (of xs)              = "[\"of\",[" ⊕ intersperse "," (showTms xs) ⊕ "]]"
+showCode t (map {s} f c)        = "[\"map\"," ⊕ showTm f ⊕ "," ⊕ showCode s c ⊕ "]"
+showCode t (scan {s} f z c)     = "[\"scan\"," ⊕ showTm f ⊕ "," ⊕ showTm z ⊕ "," ⊕ showCode s c ⊕ "]"
+showCode t (takeWhile p c)      = "[\"takeWhile\"," ⊕ showTm p ⊕ "," ⊕ showCode t c ⊕ "]"
+showCode t (flatten {s} op e h l c) =
+  "[\"flatten\"," ⊕ showOp op ⊕ "," ⊕ showTm e ⊕ "," ⊕ showTm h ⊕ "," ⊕ showCode t l ⊕ "," ⊕ showCode s c ⊕ "]"
+showCode t (connect {s} c b)    = "[\"connect\"," ⊕ showCode s c ⊕ "," ⊕ showCode t b ⊕ "]"
+showCode t (connected i)        = "[\"connected\"," ⊕ showℕ (position i) ⊕ "]"
+showCode t (μ c)                = "[\"mu\"," ⊕ showCode t c ⊕ "]"
+showCode t (var i)              = "[\"var\"," ⊕ showℕ (position i) ⊕ "]"
+showCode t (defer c)            = "[\"defer\"," ⊕ showCode t c ⊕ "]"

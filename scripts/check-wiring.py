@@ -907,6 +907,8 @@ VACUOUS_ALLOWLIST = {
 MODULE_ROOTS = {
     "quickcheck.Bug-Cache-Runner": ("the bug cache's runner — `make bug-cache`",
                                     ("main",)),
+    "quickcheck.Oracle-CLI": ("the oracle's Agda half — `make oracle`",
+                              ("main",)),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")

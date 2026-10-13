@@ -78,10 +78,9 @@ gate:
 # THE BUG CACHE: every program that ever made the semantics disagree,
 # checked by a compiled runner rather than the typechecker, since the
 # corpus only grows.  Green exactly when no known counterexample remains.
-# THE ORACLE: typescript/'s differential test drives the compiled CLI over
-# NDJSON (typescript/src/agda-bridge.ts).  RED until Tier 1 writes
-# `quickcheck/Oracle-CLI.agda` and ports the TS side to the `Obs` tree --
-# the guard names that, rather than make's "no rule to make target".
+# THE ORACLE: the compiled CLI prints each generated program with the
+# three engines' traces, and typescript/src/oracle.ts replays it in rxjs.
+# `make oracle ARGS="COUNT FROM"`.
 # ─────────────────────────────────────────────────────────────────────────
 ORACLE_CLI := $(SRC)/quickcheck/Oracle-CLI.agda
 ORACLE_BIN := $(SRC)/_cli/Oracle-CLI

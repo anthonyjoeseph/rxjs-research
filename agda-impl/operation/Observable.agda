@@ -104,8 +104,16 @@ record Slot : Set where
     spent    : IORef Bool
     tearDown : IORef (Maybe (IO ⊤))
 
+-- IO has one world, so every name is valid everywhere.  A record with no
+-- fields, so any two worlds are equal by eta and weakening is the identity.
+record One : Set₁ where
+
 IOᴾ : Prims
-IOᴾ = record { Ref = IORef ; Cold = IOCold ; Handle = Slot ; Sink = SinkSlot ; Eff = IO }
+IOᴾ = record
+  { World = One ; _⊑_ = λ _ _ → ⊤ ; ⊑-refl = tt ; _⨾_ = λ _ _ → tt
+  ; RefOf = λ _ _ → IORef ; Sink = λ _ → SinkSlot ; Handle = λ _ → Slot
+  ; wkRef = λ _ _ r → r ; wkSink = λ _ s → s ; wkHandle = λ _ h → h
+  ; Cold = IOCold ; Eff = IO }
 
 open Run IOᴾ
 
@@ -116,14 +124,14 @@ Observable = Obs IOCold []
 -- The runtime
 
 -- The engine's monad: IO, lifted to the universe its tables live in.
-M : Set → Set₁
-M A = IO (Lift (lsuc 0ℓ) A)
+M : One → Set → Set₁
+M _ A = IO (Lift (lsuc 0ℓ) A)
 
 private
-  ret : ∀ {A} → IO A → M A
+  ret : ∀ {w A} → IO A → M w A
   ret m = m >>= λ a → pure (lift a)
 
-  low : ∀ {A} → M A → IO A
+  low : ∀ {w A} → M w A → IO A
   low m = m >>= λ a → pure (lower a)
 
 -- The loop's state: the clock, and the timers in the order they fire.
@@ -178,13 +186,13 @@ IOᴿ lp = record
   { M          = M
   ; return     = λ a → pure (lift a)
   ; _>>=_      = λ m f → m >>= λ a → f (lower a)
-  ; newRefᴿ    = λ a → ret (newIORef a)
-  ; readRefᴿ   = λ r → ret (readIORef r)
+  ; newRefᴿ    = λ _ a k → newIORef a >>= k tt
+  ; readRefᴿ   = λ r k → readIORef r >>= k tt
   ; writeRefᴿ  = λ r a → ret (writeIORef r a)
-  ; registerᴿ  = λ run n c x → pure (lift (record { onNext = λ a → low (run (n a)) ; onComplete = low (run c) ; isClosed = low (run x) }))
+  ; registerᴿ  = λ run n c x k → k tt (record { onNext = λ a → low (run (n a)) ; onComplete = low (run c) ; isClosed = low (run x) })
   ; sendᴿ      = λ _ sk a → ret (SinkSlot.onNext sk a)
   ; finishᴿ    = λ _ sk → ret (SinkSlot.onComplete sk)
-  ; startColdᴿ = λ _ c sk → ret (playCold lp c sk)
+  ; startColdᴿ = λ _ c sk k → playCold lp c sk >>= k tt
   ; stopᴿ      = λ sl → ret (spend sl (pure tt))
   ; effᴿ       = ret
   ; divergeᴿ   = fix! λ d → d
@@ -228,28 +236,29 @@ fromTimeline {A} c = record
 
 -- The recursion, closed for real.
 deferred∞ : Deferred
-deferred∞ = fix! λ d {Γ} {A} l ρ → compileWith (λ {Γ′} {A′} → d {Γ′} {A′}) (Later.force l) ρ
+deferred∞ = fix! {A = Deferred} λ d l ρ → compileWith (λ l′ ρ′ → d l′ ρ′) (Later.force l) ρ
 
 module _ (lp : Loop) where
   open Engine (IOᴿ lp)
 
   private
     run∞ : RunAct
-    run∞ = fix! λ self {B} → interpret (λ {B′} → self {B′}) {B}
+    run∞ = fix! λ self {w} {B} → interpret (λ {w′} {B′} → self {w′} {B′}) {w} {B}
 
-    loop∞ : M ⊤
+    loop∞ : M _ ⊤
     loop∞ = fix! (loopStep run∞)
 
-  running : ∀ {A} → Observable A → (A → IO ⊤) → IO ⊤
-  running {A} o f = low (drive run∞ loop∞ (compileWith deferred∞ o []) observer)
+  running : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → IO ⊤
+  running {A} o f c = low (drive run∞ loop∞ (compileWith deferred∞ o []) observer)
     where
-      observer : Observer A
+      observer : Observer A _
       observer = record
-        { next     = λ a → eff (f a) λ _ → done tt
-        ; complete = done tt
+        { next     = λ a → eff (readIORef (Loop.clock lp) >>= λ t → f t a) λ _ → done tt
+        ; complete = eff c λ _ → done tt
         ; closed   = done false
         }
 
--- THE ENTRY POINT: runs until no timer is left.
-subscribe : ∀ {A} → Observable A → (A → IO ⊤) → IO ⊤
-subscribe o f = newIORef 0 >>= λ cl → newIORef [] >>= λ ts → running (record { clock = cl ; timers = ts }) o f
+-- THE ENTRY POINT: runs until no timer is left.  Each value is handed
+-- the loop's time at its arrival; the last argument runs on completion.
+subscribe : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → IO ⊤
+subscribe o f c = newIORef 0 >>= λ cl → newIORef [] >>= λ ts → running (record { clock = cl ; timers = ts }) o f c

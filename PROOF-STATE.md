@@ -160,29 +160,26 @@ point at one, the row is FALSITY.
 ## Tier 1 — the oracle passes on all three engines
 
 **THE ENGINE, MADE REAL.** One program, run on the denotation, the pure
-runtime and the IO runtime, prints the same trace as real rxjs. Every row is a
-piece one of the three engines needs before it can run at all. The TypeScript
+runtime and the IO runtime, prints the same trace as real rxjs. The TypeScript
 side of the oracle is part of this tier: it must print the new tree's programs
 and run them in rxjs.
 
 ### Big picture tier roadmap
 
-- **THE PURE HEAP.** `Pureᴿ` needs refs and sinks of every type in one
-  store, and safe Agda cannot read a cell back at its type. Decides the
-  pure runtime's shape: a world-indexed `Act` (refs typed by the store they
-  were made in) against the alternatives in `Pureᴿ`'s header.
-- **THE PURE RUNTIME.** `Pureᴿ` (virtual clock, timer queue, walk budget)
-  and `observing` over that store. With the kernels,
-  `quickcheck.Quickcheck.prop` compares the pure run against the
-  denotation on drawn programs.
+- **THE QUICKCHECK.** `quickcheck.Quickcheck.prop` runs the pure engine
+  against the denotation on drawn programs, both now real. Every seed they
+  disagree on is settled by real rxjs, becomes a bug-cache row, and is fixed
+  in whichever engine is wrong.
 - **THE TYPESCRIPT ORACLE.** Port the oracle's TS side to the new tree, with
-  rxjs's own `defer` and no `batchSync`, then compare all three Agda engines
-  against real rxjs; each divergence becomes a bug-cache row.
+  rxjs's own `defer` and no `batchSync`, and write `Oracle-CLI.agda` so one
+  program prints its trace from each Agda engine.
+- **THE THREE-ENGINE SWEEP.** Drawn programs on all three Agda engines
+  against real rxjs; each divergence becomes a bug-cache row, fixed before
+  the next sweep.
 
 ### The ledger
 
-- **`Pureᴿ`, `observing`** (operation.PureObservable) — FALSITY, `DEAD ROUTE`:
-  the pure runtime and its recorder.
+No postulates: all three engines run.
 
 ## Tier 2 — the adequacy theorem
 
@@ -205,8 +202,8 @@ solid before Tier 3 is written over it.
 
 ### The ledger
 
-- **`Rel`, `RelSubj`** (Adequacy) — FALSITY, `NO EVIDENCE`: the logical
-  relation between a kernel and a timeline.
+- **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
+  logical relation between a kernel and a timeline, stable as the heap grows.
 - **`_⊑_`, `_≃_`, `limit`, `⊑-trans`** (denotation.MonotonicList) — FALSITY,
   `NO EVIDENCE`: the information order on reported runs and its limits.
 - **`connect-rel`** (Adequacy) — FALSITY, `NO EVIDENCE`: the allocated subject

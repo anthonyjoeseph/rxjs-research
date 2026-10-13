@@ -5,11 +5,14 @@
 -- one into the real function the tree takes.
 module quickcheck.Tm where
 
-open import Data.Bool using (Bool; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming (_∷_ to _∷ᵛ_)
-open import Data.Nat using (ℕ; _+_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
+open import Data.Nat.Show using () renaming (show to showℕ)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.String using (String; _++_)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂; [_,_])
 open import Data.Unit using (tt)
@@ -52,3 +55,28 @@ data Tm (Θ : List Ty) : Ty → Set where
 ⟦ case e l r ⟧ᵗ θ = [ (λ a → ⟦ l ⟧ᵗ (a ∷ᵛ θ)) , (λ b → ⟦ r ⟧ᵗ (b ∷ᵛ θ)) ] (⟦ e ⟧ᵗ θ)
 ⟦ nil ⟧ᵗ        θ = []
 ⟦ cons a as ⟧ᵗ  θ = ⟦ a ⟧ᵗ θ ∷ ⟦ as ⟧ᵗ θ
+
+------------------------------------------------------------------------
+-- JSON, for the oracle: a term is an array headed by its constructor.
+
+position : ∀ {A : Set} {x : A} {xs} → x ∈ xs → ℕ
+position (here _)  = zero
+position (there i) = suc (position i)
+
+showTm : ∀ {Θ t} → Tm Θ t → String
+showTm (var i)      = "[\"var\"," ++ showℕ (position i) ++ "]"
+showTm unit         = "[\"unit\"]"
+showTm (bool true)  = "[\"bool\",true]"
+showTm (bool false) = "[\"bool\",false]"
+showTm (if c a b)   = "[\"if\"," ++ showTm c ++ "," ++ showTm a ++ "," ++ showTm b ++ "]"
+showTm (nat n)      = "[\"nat\"," ++ showℕ n ++ "]"
+showTm (plus a b)   = "[\"plus\"," ++ showTm a ++ "," ++ showTm b ++ "]"
+showTm (less a b)   = "[\"less\"," ++ showTm a ++ "," ++ showTm b ++ "]"
+showTm (pair a b)   = "[\"pair\"," ++ showTm a ++ "," ++ showTm b ++ "]"
+showTm (fst p)      = "[\"fst\"," ++ showTm p ++ "]"
+showTm (snd p)      = "[\"snd\"," ++ showTm p ++ "]"
+showTm (inl a)      = "[\"inl\"," ++ showTm a ++ "]"
+showTm (inr b)      = "[\"inr\"," ++ showTm b ++ "]"
+showTm (case e l r) = "[\"case\"," ++ showTm e ++ "," ++ showTm l ++ "," ++ showTm r ++ "]"
+showTm nil          = "[\"nil\"]"
+showTm (cons a as)  = "[\"cons\"," ++ showTm a ++ "," ++ showTm as ++ "]"
