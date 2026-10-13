@@ -42,7 +42,7 @@ const subscribed = (e: Exp, acc: Set<number>): void => {
       return;
     case "map":
     case "scan":
-    case "take":
+    case "takeWhile":
     case "flatten":
     case "batchSync":
       subscribed(e.src, acc);
@@ -78,8 +78,8 @@ const anywhere = (e: Exp, acc: Set<number>): void => {
       anywhereTm(e.init, acc);
       anywhere(e.src, acc);
       return;
-    case "take":
-      anywhereTm(e.count, acc);
+    case "takeWhile":
+      anywhereTm(e.fn, acc);
       anywhere(e.src, acc);
       return;
     case "flatten":
@@ -163,8 +163,8 @@ const spawned = (e: Exp, acc: Set<number>): void => {
       anywhereTm(e.init, acc);
       spawned(e.src, acc);
       return;
-    case "take":
-      anywhereTm(e.count, acc);
+    case "takeWhile":
+      anywhereTm(e.fn, acc);
       spawned(e.src, acc);
       return;
     case "flatten":
@@ -193,10 +193,6 @@ export const syncBurst = (e: Exp): number => {
       return syncBurst(e.src);
     case "mint":
       return syncBurst(e.body);
-    case "take":
-      return e.count.type === "natT"
-        ? Math.min(e.count.val, syncBurst(e.src))
-        : 0;
     // the bracket's whole point: a subscribe burst leaves as ONE group
     case "batchSync":
       return Math.min(1, syncBurst(e.src));
@@ -225,7 +221,7 @@ const flattenerSrcs = (e: Exp, acc: Exp[]): Exp[] => {
       return flattenerSrcs(e.src, acc);
     case "map":
     case "scan":
-    case "take":
+    case "takeWhile":
     case "batchSync":
       return flattenerSrcs(e.src, acc);
     case "mu":

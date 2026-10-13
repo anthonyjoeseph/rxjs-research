@@ -48,7 +48,7 @@ the row count. The oracle tree is built with termination checking off, so a
 row's run can fail to END — a counterexample like any other, but one that inside
 a single walk of the corpus would take every later verdict with it and hold the
 CI job to its timeout. So `make bug-cache` starts one process per row under
-`BUG_CACHE_ROW_BUDGET` seconds (default 60), and a row over budget is a `FAIL`
+`BUG_CACHE_ROW_BUDGET` seconds (default 300, set by the dearest row), and a row over budget is a `FAIL`
 named by the row: the runner prints and flushes the name before the run starts.
 
 ## The verdict is text, and the target demands it

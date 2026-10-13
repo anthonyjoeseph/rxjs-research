@@ -5,12 +5,10 @@
 -- means before anything is batched, and `left-to-right` holds the
 -- impl's batches to it value for value, in order.
 --
--- IT IS AN IDENTITY MAP BUT FOR THE FLATTENERS.  `SExp.Syntax` is
--- `Rx.Exp` minus the two formers only an elaboration writes
--- (`batchSyncᵉ`, `mintᵉ`), and with rxjs's three flatteners where
--- `Rx.Exp` has the one: each is `flatAllᵉ` at its policy, which is
--- what that operator is.  So no clause below has a choice to make, and
--- a clause that did would be a second semantics.
+-- IT IS AN IDENTITY MAP.  `SExp.Syntax` is `Rx.Exp` minus the two
+-- formers only an elaboration writes (`batchSyncᵉ`, `mintᵉ`), so no
+-- clause below has a choice to make, and a clause that did would be a
+-- second semantics.
 --
 -- A SHARED SLOT HOLDS AN AUTHOR'S PROGRAM TOO, so the table is read
 -- the same way: a script stays a script, a share is its definition
@@ -26,35 +24,25 @@ open import Data.List    using (List; []; _∷_; map)
 open import Data.Product using (_,_)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (tt)
-open import Data.List.Relation.Unary.Any using (here)
-open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim  using (ObservableInput; hot; cold; after_,_; PlainEvent; valueᵖ; completeᵖ)
 open import Rx.Exp   using (unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; Ctx; Val; isData; Exp; Tm; input; ofᵉ;
-  emptyᵉ; takeᵉ; mapᵉ; scanᵉ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flattenᵉ; μᵉ; varᵉ; deferᵉ; varᵗ;
+  emptyᵉ; takeWhileᵉ; mapᵉ; scanᵉ; flattenᵉ; μᵉ; varᵉ; deferᵉ; varᵗ;
   unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ;
   strmᵗ)
-open import SExp.Syntax  using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
+open import SExp.Syntax  using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ; flattenˢ; μˢ;
   varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
   foldˢ; ifˢ; primˢ; strmˢ; plainᵗ)
-
--- A FLATTENER OVER A SOURCE OF OBSERVABLES, which is what rxjs's
--- `mergeAll`, `switchAll` and `exhaustAll` are: `flattenᵉ` over a map
--- making every element a lane and none an echo.
-flatAllᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → FlatOp → Exp Γ Δᵍ Δ Θ (obs t) → Exp Γ Δᵍ Δ Θ t
-flatAllᵉ op e = flattenᵉ op (mapᵉ (pairᵗ (inlᵗ unit̂) (inrᵗ (varᵗ (here refl)))) e)
 
 mutual
   plainExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → SExp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
   plainExp (inputˢ i)      = input i
   plainExp (ofˢ ts)        = ofᵉ (plainTms ts)
   plainExp emptyˢ          = emptyᵉ
-  plainExp (takeˢ k e)     = takeᵉ (plainTm k) (plainExp e)
+  plainExp (takeWhileˢ f e) = takeWhileᵉ (plainTm f) (plainExp e)
   plainExp (mapˢ f e)      = mapᵉ (plainTm f) (plainExp e)
   plainExp (scanˢ f z e)   = scanᵉ (plainTm f) (plainTm z) (plainExp e)
-  plainExp (mergeAllˢ k e) = flatAllᵉ (mergeᶠ k) (plainExp e)
-  plainExp (switchAllˢ e)  = flatAllᵉ switchᶠ (plainExp e)
-  plainExp (exhaustAllˢ e) = flatAllᵉ exhaustᶠ (plainExp e)
+  plainExp (flattenˢ op e) = flattenᵉ op (plainExp e)
   plainExp (μˢ e)          = μᵉ (plainExp e)
   plainExp (varˢ x)        = varᵉ x
   plainExp (deferˢ e)      = deferᵉ (plainExp e)

@@ -64,7 +64,7 @@ data PrimOp : Ty → Ty → Set where
 -- THE QUEUE'S LIMIT IS RXJS'S OWN `concurrent` ARGUMENT.  `nothing` is
 -- Infinity, which is plain `mergeAll`; `just 1` is `concatAll`; `just k`
 -- for k ≥ 2 is the bounded `mergeMap(f , k)` that has no name of its own
--- in rxjs.  It is a `Maybe ℕ` and NOT a `Tm`, unlike `takeᵉ`'s count:
+-- in rxjs.  It is a `Maybe ℕ` and NOT a `Tm`:
 -- rxjs fixes `concurrent` when the pipeline is BUILT, not when it is
 -- subscribed, so a limit that varied per subscription would be a
 -- capability the real operator does not have.  `just 0` is degenerate but
@@ -89,8 +89,15 @@ mutual
     input      : (i : Fin n) → Exp Γ Δᵍ Δ Θ (lookup Γ i)
     ofᵉ        : ∀ {t} → List (Tm Γ Δᵍ Δ Θ t) → Exp Γ Δᵍ Δ Θ t
     emptyᵉ     : ∀ {t} → Exp Γ Δᵍ Δ Θ t
-    takeᵉ      : ∀ {t} → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
-                 -- count is a term: evaluated once, at subscription time
+    takeWhileᵉ : ∀ {t} → Fn Γ Δᵍ Δ Θ t boolᵗ → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
+                 -- rxjs `takeWhile(p , true)`: the first value failing
+                 -- the test leaves and then the stream ends, cut
+                 -- mid-burst.  It is the elaborated cut's ending, which
+                 -- reads a scan's own state and so cannot be an index
+                 -- fixed at subscription; ending
+                 -- on ONE subscription is what keeps a share upstream
+                 -- from handing the cut values the first one missed
+                 -- (Anthony's ruling).
     batchSyncᵉ : ∀ {t} → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ (t ×ᵗ listᵗ t)
                  -- THE ONE PLAIN OPERATOR THAT CAN SEE SYNCHRONY, AND IT
                  -- SEES EXACTLY ONE BIT OF IT.  The subscribe frame's
@@ -168,7 +175,7 @@ mutual
                  -- READS THE PROTOCOL'S OWN BOOKKEEPING, and that test
                  -- was run in TypeScript against real rxjs before it was
                  -- written here.
-                 -- `takeᵉ` is NOT absorbed, because it reads the open
+                 -- `takeWhileᵉ` is NOT absorbed, because it reads the open
                  -- registrations and the cut ledger and mints a close per
                  -- victim, so absorbing it would put source ids and close
                  -- reasons into the value language.  The flatteners cannot
@@ -182,7 +189,7 @@ mutual
                  -- later inherits the obligation to have one.  The sources
                  -- pass it trivially in the other direction — they produce
                  -- without reading anything and subscribe nothing — while
-                 -- `deferᵉ` fails it the way `takeᵉ` does, since what it
+                 -- `deferᵉ` fails it the way `takeWhileᵉ` does, since what it
                  -- moves is the SUBSCRIPTION, which is protocol and not
                  -- value.  `μᵉ` and `varᵉ` are not operators at all and the
                  -- test does not apply: they are the binding structure the
@@ -406,7 +413,7 @@ mutual
   renExp ρg ρd ρt (input i)      = input i
   renExp ρg ρd ρt (ofᵉ ts)       = ofᵉ (renTms ρg ρd ρt ts)
   renExp ρg ρd ρt emptyᵉ         = emptyᵉ
-  renExp ρg ρd ρt (takeᵉ n e)    = takeᵉ (renTm ρg ρd ρt n) (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (takeWhileᵉ f e) = takeWhileᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (batchSyncᵉ e) = batchSyncᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (mapᵉ f e)     = mapᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (scanᵉ f i e)  = scanᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
@@ -523,7 +530,8 @@ mutual
   elimGExp Θl x cl (input i)      = input i
   elimGExp Θl x cl (ofᵉ ts)       = ofᵉ (elimGTms Θl x cl ts)
   elimGExp Θl x cl emptyᵉ         = emptyᵉ
-  elimGExp Θl x cl (takeᵉ n e)    = takeᵉ (elimGTm Θl x cl n) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (takeWhileᵉ f e) =
+    takeWhileᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGExp Θl x cl e)
   elimGExp Θl x cl (batchSyncᵉ e) = batchSyncᵉ (elimGExp Θl x cl e)
   elimGExp Θl x cl (mapᵉ f e)     =
     mapᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGExp Θl x cl e)
@@ -572,7 +580,8 @@ mutual
   elimDExp Θl x cl (input i)      = input i
   elimDExp Θl x cl (ofᵉ ts)       = ofᵉ (elimDTms Θl x cl ts)
   elimDExp Θl x cl emptyᵉ         = emptyᵉ
-  elimDExp Θl x cl (takeᵉ n e)    = takeᵉ (elimDTm Θl x cl n) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (takeWhileᵉ f e) =
+    takeWhileᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDExp Θl x cl e)
   elimDExp Θl x cl (batchSyncᵉ e) = batchSyncᵉ (elimDExp Θl x cl e)
   elimDExp Θl x cl (mapᵉ f e)     =
     mapᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDExp Θl x cl e)
@@ -703,7 +712,7 @@ mutual
   inputsBelowᵉ k (input i)       = toℕ i <ᵇ k
   inputsBelowᵉ k (ofᵉ ts)        = inputsBelowᵗˢ k ts
   inputsBelowᵉ k emptyᵉ          = true
-  inputsBelowᵉ k (takeᵉ c e)     = inputsBelowᵗ k c ∧ inputsBelowᵉ k e
+  inputsBelowᵉ k (takeWhileᵉ f e) = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (batchSyncᵉ e)  = inputsBelowᵉ k e
   inputsBelowᵉ k (mapᵉ f e)      = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (scanᵉ f z e)   =

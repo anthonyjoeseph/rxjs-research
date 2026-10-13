@@ -36,6 +36,12 @@ eqListℕ (x ∷ xs) (y ∷ ys) = (x ≡ᵇ y) ∧ eqListℕ xs ys
 eqListℕ _        _        = false
 
 -- batches, in order
+-- whether the first list is a prefix of the second
+prefixListℕ : List ℕ → List ℕ → Bool
+prefixListℕ []       _        = true
+prefixListℕ (x ∷ xs) (y ∷ ys) = (x ≡ᵇ y) ∧ prefixListℕ xs ys
+prefixListℕ _        _        = false
+
 eqBatches : List (List ℕ) → List (List ℕ) → Bool
 eqBatches []       []       = true
 eqBatches (x ∷ xs) (y ∷ ys) = eqListℕ x y ∧ eqBatches xs ys

@@ -180,7 +180,11 @@ export type Exp =
   // from the other, which is why rxjs ships both.
   | { type: "map"; ty: Ty; fn: Fn; src: Exp }
   | { type: "scan"; ty: Ty; fn: Fn; init: Tm; src: Exp }
-  | { type: "take"; ty: Ty; count: Tm; src: Exp } // count evaluated once, at subscription time
+  // predicate evaluated per value; the first value for which it returns false
+  // is emitted (inclusive) and then the stream completes — mirrors rxjs
+  // takeWhile(p, true). Cut semantics identical to takeWhile-f's: closes open
+  // registrations, raises fin.
+  | { type: "takeWhile"; ty: Ty; fn: Fn; src: Exp }
   // NOTE: share is NOT an Exp node — share identity is a binding, not
   // an expression. Shared observables live in the slot telescope
   // (prop-test's Slot) and are referenced with `input`, exactly like
@@ -263,6 +267,130 @@ export const flatAllSrc = (exp: Exp & { type: "flatten" }): Exp | undefined => {
 
 export const mergeOp = (limit: number | undefined): FlatOp =>
   limit === undefined ? { how: "merge" } : { how: "merge", limit };
+
+// TAKE AS A MACRO over existing formers (no `take` node in Exp).
+// take 0 e     = empty
+// take (k+1) e = some(map(snd, takeWhile(c < k+1, scan(step, (0, inl unit), e))))
+// where `some` is the flatten-as-filter: an unbounded merge whose each element
+// is (x, inl unit) — the value is echoed when inr, silent when inl, no inner.
+// The scan accumulator is nat × (unit + ty); the step increments the nat and
+// wraps the incoming value as inr. takeWhile keeps acc[0] < count, inclusive.
+export const takeMacro = (count: number, ty: Ty, src: Exp): Exp => {
+  if (count === 0) return { type: "empty", ty };
+
+  const unitTy: Ty = { type: "unit" };
+  const natTy: Ty = { type: "nat" };
+  const boolTy: Ty = { type: "bool" };
+  const sumTy: Ty = { type: "sum", left: unitTy, right: ty }; // unit + ty
+  const stateTy: Ty = { type: "prod", fst: natTy, snd: sumTy }; // nat × (unit + ty)
+  const pairArgTy: Ty = { type: "prod", fst: stateTy, snd: ty }; // Θ-var 0 of scan step
+  const natPairTy: Ty = { type: "prod", fst: natTy, snd: natTy };
+  const obsTy: Ty = { type: "obs", elem: ty };
+  const optObsTy: Ty = { type: "sum", left: unitTy, right: obsTy };
+  const flatElemTy: Ty = { type: "prod", fst: sumTy, snd: optObsTy };
+
+  // scan step: (acc, v) => (fst(acc) + 1, inr v)
+  // Θ-var 0 = [acc, v] : stateTy × ty
+  const scanFn: Fn = {
+    type: "pairT",
+    ty: stateTy,
+    fst: {
+      type: "primT",
+      ty: natTy,
+      op: "add",
+      arg: {
+        type: "pairT",
+        ty: natPairTy,
+        fst: {
+          type: "fstT",
+          ty: natTy,
+          pair: {
+            type: "fstT",
+            ty: stateTy,
+            pair: { type: "varT", ty: pairArgTy, index: 0 },
+          },
+        },
+        snd: { type: "natT", ty: natTy, val: 1 },
+      },
+    },
+    snd: {
+      type: "inrT",
+      ty: sumTy,
+      val: {
+        type: "sndT",
+        ty,
+        pair: { type: "varT", ty: pairArgTy, index: 0 },
+      },
+    },
+  };
+
+  // scan init: (0, inl unit)
+  const scanned: Exp = {
+    type: "scan",
+    ty: stateTy,
+    fn: scanFn,
+    init: {
+      type: "pairT",
+      ty: stateTy,
+      fst: { type: "natT", ty: natTy, val: 0 },
+      snd: { type: "inlT", ty: sumTy, val: { type: "unitT", ty: unitTy } },
+    },
+    src,
+  };
+
+  // takeWhile predicate: fst(acc) < count — Θ-var 0 : stateTy
+  const filtered: Exp = {
+    type: "takeWhile",
+    ty: stateTy,
+    fn: {
+      type: "primT",
+      ty: boolTy,
+      op: "lt",
+      arg: {
+        type: "pairT",
+        ty: natPairTy,
+        fst: {
+          type: "fstT",
+          ty: natTy,
+          pair: { type: "varT", ty: stateTy, index: 0 },
+        },
+        snd: { type: "natT", ty: natTy, val: count },
+      },
+    },
+    src: scanned,
+  };
+
+  // map snd: state => snd(state) : unit + ty
+  const mappedToSum: Exp = {
+    type: "map",
+    ty: sumTy,
+    fn: {
+      type: "sndT",
+      ty: sumTy,
+      pair: { type: "varT", ty: stateTy, index: 0 },
+    },
+    src: filtered,
+  };
+
+  // some: flatten emitting only the inr component — each element x: unit + ty
+  // maps to (x, inl unit): echo x (present when inr, absent when inl), no inner
+  return {
+    type: "flatten",
+    ty,
+    op: { how: "merge" },
+    src: {
+      type: "map",
+      ty: flatElemTy,
+      fn: {
+        type: "pairT",
+        ty: flatElemTy,
+        fst: { type: "varT", ty: sumTy, index: 0 },
+        snd: { type: "inlT", ty: optObsTy, val: { type: "unitT", ty: unitTy } },
+      },
+      src: mappedToSum,
+    },
+  };
+};
 
 // Substitution plumbing — twins of Agda's evalTm/applyFn/unfoldμ,
 // used by the rx compiler: evalTm/applyFn turn Tm functions into host
@@ -497,10 +625,10 @@ const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
         init: substMuTm(exp.init, st, knot),
         src: substMuExp(exp.src, st, knot),
       };
-    case "take":
+    case "takeWhile":
       return {
         ...exp,
-        count: substMuTm(exp.count, st, knot),
+        fn: substMuTm(exp.fn, st, knot),
         src: substMuExp(exp.src, st, knot),
       };
     case "flatten":
@@ -595,10 +723,10 @@ const shiftExp = (exp: Exp, cutoff: number, by: number): Exp => {
         init: shiftTm(exp.init, cutoff, by),
         src: shiftExp(exp.src, cutoff, by),
       };
-    case "take":
+    case "takeWhile":
       return {
         ...exp,
-        count: shiftTm(exp.count, cutoff, by),
+        fn: shiftTm(exp.fn, cutoff + 1, by), // fn binds the arriving value as Θ-var 0
         src: shiftExp(exp.src, cutoff, by),
       };
     case "flatten":

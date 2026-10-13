@@ -122,6 +122,39 @@ def purely_additive(before, after):
     return all(any(x == ln for x in it) for ln in b)
 
 
+SIG = re.compile(r"^(\s*)([^\s(){};:]+)\s+:(?:\s|$)")
+TYPE = re.compile(r"^(\s*)(?:data|record)\s+([^\s(){};:]+)")
+OWNER = re.compile(r"^\s*(?:data|record|field)\b")
+
+
+def declared(text):
+    """The names `text` DECLARES -- a signature, a `data` or a `record` --
+    leaving out a constructor or a field, which belongs to the type above it.
+
+    A new constructor and a new clause are MODIFICATIONS of a definition that
+    already lives where it lives: a constructor cannot leave its `data`, and a
+    clause cannot leave its function, so neither has the choice of home this
+    rule exists to exercise.  Reading only the subsequence of lines, the first
+    cut of this check could not tell them from a new lemma, and fired on a new
+    expression former -- whose constructor and eliminator clauses are, by
+    construction, unrelocatable."""
+    lines = [ln for ln in text.split("\n") if ln.strip()]
+    out = set()
+    for i, ln in enumerate(lines):
+        if (m := TYPE.match(ln)):
+            out.add(m.group(2))
+            continue
+        m = SIG.match(ln)
+        if not m:
+            continue
+        ind = len(m.group(1))
+        parent = next((p for p in reversed(lines[:i])
+                       if len(p) - len(p.lstrip()) < ind), "")
+        if not OWNER.match(parent):
+            out.add(m.group(2))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD,
@@ -171,6 +204,8 @@ def main():
             continue                      # deleted — never an addition
         if after is None or not purely_additive(before, after):
             continue
+        if not (declared(after) - declared(before)):
+            continue                      # new clauses / constructors only
         mod = module_of(f)
         cone = cones.get(mod, 0)
         if cone >= args.threshold:

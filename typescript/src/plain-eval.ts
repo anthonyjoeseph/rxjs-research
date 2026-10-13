@@ -12,7 +12,7 @@ import {
   scan as rxScan,
   share as rxShare,
   switchAll,
-  take as rxTake,
+  takeWhile,
 } from "rxjs";
 import {
   Closed,
@@ -185,13 +185,15 @@ export const compilePlain = (
           evalWith(exp.init, env),
         ),
       );
-    case "take": {
-      const count = evalWith(exp.count, env);
-      if (typeof count !== "bigint")
-        throw new Error("take count did not evaluate to a nat");
-      // take 0 never subscribes its source, as in rxjs
-      return count === 0n ? EMPTY : recur(exp.src).pipe(rxTake(Number(count)));
-    }
+    case "takeWhile":
+      // values pass while the predicate holds; the first false-predicate value
+      // is emitted (inclusive) and then the stream completes
+      return recur(exp.src).pipe(
+        takeWhile(
+          (v) => (evalWith(exp.fn, [v, ...env]) as boolean) === true,
+          true,
+        ),
+      );
     case "flatten": {
       const lanes = flatAllSrc(exp);
       if (via === "native" && lanes !== undefined)

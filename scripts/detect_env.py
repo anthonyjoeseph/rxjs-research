@@ -47,8 +47,8 @@ def detect_env() -> str:
     return LOCAL
 
 
-# `make agda-dev`'s per-file budget (seconds).  The laptop's 45 is the
-# original, measured from a full 66-module cold scan sitting in the GAP the
+# `make agda-dev`'s per-file budget (seconds).  The laptop's original 45 was
+# measured from a full 66-module cold scan sitting in the GAP the
 # scan showed (docs/agda-dev.md: "the gap is what makes a budget safe, not
 # the margin") -- see typecheck-performance-numbers.md for that scan.
 #
@@ -64,9 +64,11 @@ def detect_env() -> str:
 # the sample is smaller.
 #
 # THE CLOUD FIGURE IS A RULING, NOT A DERIVATION (Anthony: "we can expand the
-# 120 sec budget to 160 - that number's a bit arbitrary").  Any number well
-# clear of 54.3s satisfies the argument above, and the argument does not pick
-# one -- 120 was as arbitrary as 160, which is the point.  So do not read it
+# 120 sec budget to 160 - that number's a bit arbitrary"; and again, raising
+# every figure by half: "a slow dev-check is still a finding, but maybe we
+# should increase the timeout on it").  Any number well clear of 54.3s
+# satisfies the argument above, and the argument does not pick one -- 120
+# was as arbitrary as 160 or 240, which is the point.  So do not read it
 # back as evidence about the container: it is the ceiling that says a dev
 # check has stopped being a dev check, and where that line sits is a call
 # about how long a loop may take, not a measurement.  Re-scan
@@ -84,9 +86,9 @@ def detect_env() -> str:
 # PR takes the light path, at which point this can be re-derived from that
 # evidence instead of borrowed from the cloud container's.
 AGDA_DEV_BUDGET = {
-    LOCAL: 45,
-    CLOUD: 160,
-    CI: 160,
+    LOCAL: 70,
+    CLOUD: 240,
+    CI: 240,
 }
 
 # `dev-changed --cone-budget`: the TOTAL wall-clock a whole cone sweep may
@@ -96,9 +98,9 @@ AGDA_DEV_BUDGET = {
 # moves WITH that figure for the same reason: a cone ceiling left behind
 # would fail a sweep of modules every one of which passed its own check.
 CONE_BUDGET = {
-    LOCAL: 300,
-    CLOUD: 1070,
-    CI: 1070,
+    LOCAL: 450,
+    CLOUD: 1600,
+    CI: 1600,
 }
 
 

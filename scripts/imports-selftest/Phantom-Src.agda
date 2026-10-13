@@ -20,13 +20,26 @@ module Phantom-Src where
 -- the arm that asks whether this module IMPORTS the name.  A name used in the
 -- body is a body token, so the token reading calls it exported and only that
 -- arm is left; mutate the arm away and this row is the one that goes quiet.
-open import Fixture.Deep using (hidden; borrowed) renaming (deep to shallow)
+-- AND `overloaded` IS BORROWED AND DECLARED BOTH, which only a CONSTRUCTOR
+-- can be: Agda overloads constructors silently, so the record below exports
+-- `overloaded` while this line also brings Fixture.Deep's in.  Drop the
+-- `constructor` reading and the row in Phantom.agda fires falsely.
+-- `data-overloaded` is the same through a DATA constructor, declared one
+-- scope down, which is how a relation of lists declares its `[]` and `_∷_`.
+open import Fixture.Deep using (hidden; borrowed; overloaded; data-overloaded) renaming (deep to shallow)
 
 real-thing : Set
 real-thing = Set
 
 spends-it : Set
-spends-it = borrowed
+spends-it = borrowed overloaded data-overloaded
+
+record Pair : Set where
+  constructor overloaded
+
+module _ (A : Set) where
+  data Rel : Set where
+    data-overloaded : Rel
 
 module Sub-Mod where
   inner : Set

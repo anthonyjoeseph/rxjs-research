@@ -16,6 +16,11 @@ private
   valuesᴱ (value v ∷ es) = v ∷ valuesᴱ es
   valuesᴱ (_       ∷ es) = valuesᴱ es
 
+-- one emit's share, named so a proof can say what two runs sharing an
+-- emit share
+emitValues : ∀ {A : Set} → InstEmit A → List (Id × A)
+emitValues x = map (InstEmit.instant x ,_) (valuesᴱ (InstEmit.events x))
+
 instExtract : ∀ {A : Set} → List (InstEmit A) → List (Id × A)
 instExtract []       = []
-instExtract (x ∷ xs) = map (InstEmit.instant x ,_) (valuesᴱ (InstEmit.events x)) ++ instExtract xs
+instExtract (x ∷ xs) = emitValues x ++ instExtract xs

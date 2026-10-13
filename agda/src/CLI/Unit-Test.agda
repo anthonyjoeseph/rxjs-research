@@ -51,77 +51,235 @@ open import Data.Maybe using (nothing; just)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; mergeAllˢ;
-  switchAllˢ; exhaustAllˢ; varˢᵗ; natˢ; primˢ; pairˢ; strmˢ)
-open import Rx.Exp using (add)
+open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; mapˢ; scanˢ; varˢᵗ; natˢ;
+  primˢ; pairˢ; fstˢ; sndˢ; strmˢ; μˢ; deferˢ; varˢ; flattenˢ; inrˢ; takeWhileˢ; inlˢ; unitˢ)
+open import Rx.Exp using (add; ltᵖ; mergeᶠ; switchᶠ; exhaustᶠ)
 
 open import Rx.Prim using (hot; cold; after_,_)
-open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots)
+open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots; flatAllˢ; takeˢ)
 -- IMPORTS>>>
 
 cases : List Case
 cases =
   cached "two ofs in one delivery" 30
-          (mergeAllˢ nothing (mapˢ (strmˢ (mergeAllˢ nothing (ofˢ (
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ (
               (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
               (strmˢ (ofˢ ((primˢ add (pairˢ (varˢᵗ (here refl)) (natˢ 1))) ∷ []))) ∷ []))))
             (inputˢ zero)))
           (mkSlots (hot ((after 1 , 5) ∷ []))
                    emptyˢ) ∷
   cached "one of, two values, per delivery" 30
-          (mergeAllˢ nothing (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ (varˢᵗ (here refl)) ∷ [])))
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ (varˢᵗ (here refl)) ∷ [])))
             (inputˢ zero)))
           (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
   cached "the script merged with itself" 30
-          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))
           (mkSlots (hot ((after 1 , 5) ∷ []))
                    emptyˢ) ∷
   cached "a share of the script merged with itself" 30
-          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
           (mkSlots (hot ((after 1 , 5) ∷ []))
                    (inputˢ zero)) ∷
   cached "a delivery subscribing the script again" 30
-          (mergeAllˢ nothing (mapˢ (strmˢ (inputˢ zero)) (inputˢ zero)))
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (inputˢ zero)) (inputˢ zero)))
           (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
   cached "a delivery switching to two ofs" 30
-          (switchAllˢ (mapˢ (strmˢ (mergeAllˢ nothing (ofˢ (
+          (flatAllˢ switchᶠ (mapˢ (strmˢ (flatAllˢ (mergeᶠ nothing) (ofˢ (
               (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
               (strmˢ (ofˢ ((natˢ 7) ∷ []))) ∷ []))))
             (inputˢ zero)))
           (mkSlots (cold (3 ∷ []) ((after 1 , 5) ∷ []))
                    emptyˢ) ∷
   cached "a delivery exhausting into two ofs" 30
-          (exhaustAllˢ (mapˢ (strmˢ (mergeAllˢ (just 1) (ofˢ (
+          (flatAllˢ exhaustᶠ (mapˢ (strmˢ (flatAllˢ (mergeᶠ (just 1)) (ofˢ (
               (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) ∷
               (strmˢ (ofˢ ((natˢ 7) ∷ []))) ∷ []))))
             (inputˢ zero)))
           (mkSlots (hot ((after 1 , 5) ∷ []))
                    emptyˢ) ∷
   cached "take one of the script" 30
-          (takeˢ (natˢ 1) (inputˢ zero))
+          (takeˢ 1 (inputˢ zero))
           (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
                    emptyˢ) ∷
   cached "seed 1 depth 1 case 108" 30
-          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ emptyˢ) ∷
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ emptyˢ) ∷
             (strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 3) ∷ []))) ∷ [])))
           (mkSlots (cold [] ((after 1 , 3) ∷ (after 0 , 7) ∷ []))
                    (ofˢ ((natˢ 5) ∷ (natˢ 7) ∷ []))) ∷
   cached "seed 6 depth 1 case 4" 30
-          (switchAllˢ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ emptyˢ) ∷ [])))
+          (flatAllˢ switchᶠ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ emptyˢ) ∷ [])))
           (mkSlots (hot ((after 0 , 1) ∷ ((after 1 , 1) ∷ [])))
                    (emptyˢ)) ∷
   cached "seed 7 depth 1 case 12" 30
-          (exhaustAllˢ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (ofˢ ((natˢ 4) ∷ (natˢ 6) ∷ []))) ∷ [])))
+          (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (ofˢ ((natˢ 4) ∷ (natˢ 6) ∷ []))) ∷ [])))
           (mkSlots (cold [] ((after 0 , 8) ∷ ((after 0 , 8) ∷ [])))
                    ((inputˢ zero))) ∷
   cached "seed 2 depth 1 case 15" 30
-          (mergeAllˢ nothing (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) (inputˢ zero)))
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (ofˢ ((varˢᵗ (here refl)) ∷ []))) (inputˢ zero)))
           (mkSlots (hot ((after 0 , 2) ∷ ((after 1 , 5) ∷ [])))
                    ((ofˢ ((natˢ 9) ∷ [])))) ∷
   cached "seed 9 depth 1 case 2" 30
-          (mergeAllˢ nothing (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 9) ∷ (natˢ 9) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 9) ∷ (natˢ 9) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
           (mkSlots (cold [] ((after 1 , 1) ∷ ((after 0 , 0) ∷ [])))
                    ((ofˢ ((natˢ 5) ∷ [])))) ∷
+  cached "seed 2 depth 1 timing-correct" 30
+          (flatAllˢ switchᶠ (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ emptyˢ) ∷ (strmˢ (inputˢ (suc zero))) ∷ [])))
+          (mkSlots (hot ((after 0 , 6) ∷ []))
+                   ((ofˢ ((natˢ 9) ∷ (natˢ 7) ∷ [])))) ∷
+  cached "seed 1 depth 2 case 1" 30
+          (flatAllˢ (mergeᶠ (just 2)) (ofˢ ((strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ (suc zero)))) ∷ (strmˢ (μˢ (deferˢ (varˢ (here refl))))) ∷ [])))
+          (mkSlots (cold (2 ∷ []) ((after 0 , 9) ∷ []))
+                   ((inputˢ zero))) ∷
+  cached "seed 1 depth 2 case 1 at fuel 1" 1
+          (flatAllˢ (mergeᶠ (just 2)) (ofˢ ((strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ (suc zero)))) ∷ (strmˢ (μˢ (deferˢ (varˢ (here refl))))) ∷ [])))
+          (mkSlots (cold (2 ∷ []) ((after 0 , 9) ∷ []))
+                   ((inputˢ zero))) ∷
+  cached "seed 1 depth 2 case 1 at fuel 2" 2
+          (flatAllˢ (mergeᶠ (just 2)) (ofˢ ((strmˢ (mapˢ (varˢᵗ (here refl)) (inputˢ (suc zero)))) ∷ (strmˢ (μˢ (deferˢ (varˢ (here refl))))) ∷ [])))
+          (mkSlots (cold (2 ∷ []) ((after 0 , 9) ∷ []))
+                   ((inputˢ zero))) ∷
+  cached "seed 5 depth 2 fuel 4 timing-correct" 4
+          (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 5) (ofˢ ((natˢ 3) ∷ (natˢ 9) ∷ [])))) ∷ (strmˢ (takeˢ 5 (inputˢ zero))) ∷ [])))
+          (mkSlots (cold (5 ∷ []) ((after 0 , 3) ∷ []))
+                   (emptyˢ)) ∷
+  cached "seed 5 depth 2 fuel 4 timing-correct, at fuel 30" 30
+          (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 5) (ofˢ ((natˢ 3) ∷ (natˢ 9) ∷ [])))) ∷ (strmˢ (takeˢ 5 (inputˢ zero))) ∷ [])))
+          (mkSlots (cold (5 ∷ []) ((after 0 , 3) ∷ []))
+                   (emptyˢ)) ∷
+  cached "a cold under two takes in one merge" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (takeˢ 1 (inputˢ zero))) ∷ (strmˢ (takeˢ 2 (inputˢ zero))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a share of a cold merged with a take of itself" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (takeˢ 1 (inputˢ (suc zero)))) ∷ [])))
+          (mkSlots (cold (3 ∷ []) ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a take of a cold exhausted beside an of" 30
+          (flatAllˢ exhaustᶠ (ofˢ ((strmˢ (ofˢ ((natˢ 4) ∷ []))) ∷ (strmˢ (takeˢ 2 (inputˢ zero))) ∷ [])))
+          (mkSlots (cold (5 ∷ []) ((after 0 , 3) ∷ (after 1 , 8) ∷ []))
+                   emptyˢ) ∷
+  cached "an of buffered behind a take of a cold" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ 1 (inputˢ zero))) ∷ (strmˢ (ofˢ ((natˢ 7) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a cold buffered behind a take of itself" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ 1 (inputˢ zero))) ∷ (strmˢ (inputˢ zero)) ∷ [])))
+          (mkSlots (cold (2 ∷ []) ((after 0 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of an of subscribed at each hot arrival, merged" 30
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (takeˢ 1 (ofˢ ((natˢ 7) ∷ (varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of an of subscribed at each hot arrival, switched" 30
+          (flatAllˢ switchᶠ (mapˢ (strmˢ (takeˢ 1 (ofˢ ((natˢ 7) ∷ (varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of a cold subscribed at each of its own arrivals" 30
+          (flatAllˢ (mergeᶠ nothing) (mapˢ (strmˢ (takeˢ 1 (inputˢ zero))) (inputˢ (suc zero))))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a take of a deferred self merged with a hot" 12
+          (μˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ 1 (deferˢ (varˢ (here refl))))) ∷ []))))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of a deferred self merged with a cold" 12
+          (μˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ 1 (deferˢ (varˢ (here refl))))) ∷ []))))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of a scan of a cold merged with the cold" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (takeˢ 1 (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (inputˢ zero)))) ∷ (strmˢ (inputˢ zero)) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a take of a scan of an of beside a take of a cold" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (takeˢ 2 (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (ofˢ ((natˢ 3) ∷ (natˢ 4) ∷ (natˢ 5) ∷ []))))) ∷ (strmˢ (takeˢ 1 (inputˢ zero))) ∷ [])))
+          (mkSlots (cold [] ((after 0 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a scan fed back through a take of a deferred self, hot" 12
+          (μˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ 1 (deferˢ (varˢ (here refl))))) ∷ [])))))
+          (mkSlots (hot ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "a scan fed back through a take of a deferred self, cold" 12
+          (μˢ (scanˢ (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl))) (sndˢ (varˢᵗ (here refl))))) (natˢ 0) (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (takeˢ 1 (deferˢ (varˢ (here refl))))) ∷ [])))))
+          (mkSlots (cold [] ((after 1 , 5) ∷ (after 0 , 6) ∷ []))
+                   emptyˢ) ∷
+  cached "the seeds 13..36 depth 2 sweep's counterexample" 30
+          (takeˢ 3 (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))
+          (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
+                   ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
+  cached "the seeds 1..8 depth 3 sweep's counterexample" 30
+          (takeˢ 0 (takeˢ 3 (μˢ (deferˢ (varˢ (here refl))))))
+          (mkSlots (cold [] ((after 1 , 8) ∷ ((after 0 , 3) ∷ [])))
+                   ((inputˢ zero))) ∷
+  cached "a take cut mid share fan-out, a merged inner still pending" 30
+          (takeˢ 4 (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))
+          (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
+                   ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
+  cached "the same cut take as a concat's first inner" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ 4 (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))) ∷ (strmˢ (ofˢ ((natˢ 99) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
+                   ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
+  cached "the same cut take, one value shorter, as a concat's first inner" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (takeˢ 3 (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (ofˢ ((natˢ 5) ∷ (natˢ 5) ∷ []))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ zero)) ∷ []))))) ∷ (strmˢ (ofˢ ((natˢ 99) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 2) ∷ ((after 0 , 8) ∷ [])))
+                   ((ofˢ ((natˢ 3) ∷ (natˢ 0) ∷ [])))) ∷
+  cached "a cold's synchronous pair switched into two deferred ofs" 30
+          (flatAllˢ switchᶠ (mapˢ (strmˢ (deferˢ (ofˢ ((varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (cold (1 ∷ 2 ∷ []) [])
+                   emptyˢ) ∷
+  cached "a cold's synchronous pair exhausted into two deferred ofs" 30
+          (flatAllˢ exhaustᶠ (mapˢ (strmˢ (deferˢ (ofˢ ((varˢᵗ (here refl)) ∷ [])))) (inputˢ zero)))
+          (mkSlots (cold (1 ∷ 2 ∷ []) [])
+                   emptyˢ) ∷
+  cached "a cold's synchronous pair merged, each echoed beside an of" 30
+          (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inrˢ (varˢᵗ (here refl)))
+                                                 (inrˢ (strmˢ (ofˢ ((primˢ add (pairˢ (varˢᵗ (here refl)) (natˢ 10))) ∷ [])))))
+            (inputˢ zero)))
+          (mkSlots (cold (1 ∷ 2 ∷ []) [])
+                   emptyˢ) ∷
+  cached "a bounded merge's lane cut valueless by a takeWhile, then drained, cold" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inlˢ unitˢ)) (takeWhileˢ (primˢ ltᵖ (pairˢ (varˢᵗ (here refl)) (natˢ 5))) (inputˢ zero))))) ∷ (strmˢ (ofˢ ((natˢ 1) ∷ (natˢ 2) ∷ []))) ∷ [])))
+          (mkSlots (cold [] ((after 1 , 3) ∷ (after 1 , 9) ∷ []))
+                   emptyˢ) ∷
+  cached "a bounded merge's lane cut valueless by a takeWhile, then drained, hot" 30
+          (flatAllˢ (mergeᶠ (just 1)) (ofˢ ((strmˢ (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inlˢ unitˢ)) (takeWhileˢ (primˢ ltᵖ (pairˢ (varˢᵗ (here refl)) (natˢ 5))) (inputˢ zero))))) ∷ (strmˢ (ofˢ ((natˢ 1) ∷ (natˢ 2) ∷ []))) ∷ [])))
+          (mkSlots (hot ((after 1 , 3) ∷ (after 1 , 9) ∷ []))
+                   emptyˢ) ∷
+  cached "a deferred read of a cold with a synchronous value" 30
+          (deferˢ (inputˢ zero))
+          (mkSlots (cold (2 ∷ []) ((after 1 , 5) ∷ []))
+                   emptyˢ) ∷
+  cached "a deferred read of a share its hop connects, over a cold" 30
+          (deferˢ (inputˢ (suc zero)))
+          (mkSlots (cold (2 ∷ []) ((after 1 , 5) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a deferred cold read merged beside a read of the share it feeds" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (deferˢ (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ (suc zero))) ∷ []))))) ∷ [])))
+          (mkSlots (cold (2 ∷ 3 ∷ []) ((after 1 , 5) ∷ []))
+                   (ofˢ ((natˢ 7) ∷ []))) ∷
+  cached "a share whose two lanes end on one close, read twice and merged beside a value" 30
+          (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ (suc zero))) ∷ (strmˢ (inputˢ (suc zero))) ∷ (strmˢ (ofˢ ((natˢ 4) ∷ []))) ∷ [])))
+          (mkSlots (cold (1 ∷ []) ((after 1 , 5) ∷ []))
+                   (flatAllˢ (mergeᶠ nothing) (ofˢ ((strmˢ (inputˢ zero)) ∷ (strmˢ (inputˢ zero)) ∷ [])))) ∷
+  cached "a switch's lane reading a cold, over a merge whose lanes join the share the merge reads" 30
+          (flattenˢ switchᶠ (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ zero)))) (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ (suc zero))))) (inputˢ (suc zero))))))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a switch's lane reading a cold, over the share of that cold" 30
+          (flattenˢ switchᶠ (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ zero)))) (inputˢ (suc zero))))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a switch's lane reading a cold, over a read of that cold" 30
+          (flattenˢ switchᶠ (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ zero)))) (inputˢ zero)))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   emptyˢ) ∷
+  cached "a merge whose lanes join the share it reads, during the share's synchronous flush" 30
+          (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ (suc zero))))) (inputˢ (suc zero))))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   (inputˢ zero)) ∷
+  cached "a switch's literal lane, over a merge whose lanes join the share the merge reads" 30
+          (flattenˢ switchᶠ (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (ofˢ ((natˢ 1) ∷ (natˢ 4) ∷ []))))) (flattenˢ (mergeᶠ nothing) (mapˢ (pairˢ (inlˢ unitˢ) (inrˢ (strmˢ (inputˢ (suc zero))))) (inputˢ (suc zero))))))
+          (mkSlots (cold (1 ∷ 4 ∷ []) ((after 0 , 4) ∷ []))
+                   (inputˢ zero)) ∷
   []

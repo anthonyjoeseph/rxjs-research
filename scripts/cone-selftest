@@ -30,7 +30,7 @@ cd "$TMP" || exit 1
 git init -q -b main .
 git config user.email t@t; git config user.name t
 
-printf 'module Rx.Deep where\nx : Set\nx = Set\n'      > agda/src/Rx/Deep.agda
+printf 'module Rx.Deep where\nx : Set\nx = Set\ndata D : Set where\n  a : D\nf : D -> D\nf a = a\n' > agda/src/Rx/Deep.agda
 printf 'module Rx.Shallow where\ny : Set\ny = Set\n'   > agda/src/Rx/Shallow.agda
 for i in 1 2 3 4 5 6 7 8 9 10; do
   printf 'module Rx.C%s where\nopen import Rx.Deep\n' "$i" > "agda/src/Rx/C$i.agda"
@@ -65,6 +65,16 @@ git checkout -q -- agda/src/Rx/Deep.agda
 printf 'w : Set\nw = Set\n' >> agda/src/Rx/Shallow.agda
 expect 0 "an addition to a shallow module fired"
 git checkout -q -- agda/src/Rx/Shallow.agda
+
+# QUIET: a new CONSTRUCTOR and a new CLAUSE of definitions that already
+# exist -- a constructor cannot leave its `data`, nor a clause its function,
+# so there is no other home to send them to.
+printf 'module Rx.Deep where\nx : Set\nx = Set\ndata D : Set where\n  a : D\n  b : D\nf : D -> D\nf a = a\nf b = b\n' > agda/src/Rx/Deep.agda
+expect 0 "a new constructor and clause of existing definitions fired"
+# FIRES: the same edit once it also declares a new name.
+printf 'g : D\ng = a\n' >> agda/src/Rx/Deep.agda
+expect 1 "a new signature beside new constructors did not fire"
+git checkout -q -- agda/src/Rx/Deep.agda
 
 # QUIET: a brand-new module, which is the repair the check ASKS for -- so it
 # must never itself be the finding.

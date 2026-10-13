@@ -40,6 +40,7 @@ import {
   bracketSync,
   latch,
   markSync,
+  subscribeBurst,
 } from "./constructors.js";
 
 export { exhaustAll, mergeAllAll, switchAll } from "./join.js";
@@ -124,25 +125,21 @@ export const wrapCold: {
   return retval as never;
 };
 
-// a one-shot subscription burst (Agda's oneShotBurst): a source that
-// lives and dies inside its own subscribe frame — init, its values,
-// close, complete — one emit, minting a fresh source per subscription
-// and inheriting the instant live at subscribe time (id-inheritance).
+// a one-shot subscription burst (Agda's `ofᵖ`): a source that lives
+// and dies inside its own subscribe frame — init, its values, close,
+// complete — one emit per value, minting a fresh source per
+// subscription and inheriting the instant live at subscribe time
+// (id-inheritance).
 export const of = <A>(driver: Driver, input: A[]): Observable<InstEmit<A>> =>
-  rxDefer(() => {
-    const source = driver.mintSourceId();
-    return rxOf<InstEmit<A>>({
-      events: [
-        { type: "init", source },
-        ...input.map((value) => ({ type: "value", value }) as const),
-        { type: "close", source, reason: "exhausted" },
-        { type: "complete" },
-      ],
-      instant: SUBSCRIBE_FRAME,
-      source,
-      kind: "subscribe",
-    });
-  });
+  rxDefer(() =>
+    rxOf(
+      ...subscribeBurst<A>(
+        driver.mintSourceId(),
+        input.map((value) => ({ type: "value", value }) as const),
+        true,
+      ),
+    ),
+  );
 
 // oneShotBurst [] — init, close, complete, no values
 export const empty = (driver: Driver): Observable<InstEmit<never>> =>
@@ -583,35 +580,20 @@ export const batchSync = <A>(
     rxMap((carried) => carried.out as InstEmit<[A, A[]]>),
   );
 
-// take-f: forward the first `emissions` values, then cut. The cut emit
-// carries the taken prefix plus a `close … cut` for EVERY registration
-// still open through this operator (Agda's cutThrough) — tracked from
-// the init/close bookkeeping that flowed through, this emit's own
-// events applied first (a registration whose exhausted close rides the
-// cutting emit is already closed, never closed twice) and plumbing
-// excluded (a share's connect traffic is not ours to cut). Then the
-// stream completes — rx teardown cancelling any scheduled deliveries
-// (Agda's sweepLive). Count 0 is routed to `empty` by the compiler
-// (Agda: take 0 never subscribes its source), so `emissions ≥ 1` here.
-//
-// AND IT IS NOT A PURE-FUNCTION FORMER, WHICH IS THE PALETTE'S DIVIDING
-// LINE DRAWN AT THE ONE OPERATOR THAT LOOKS LIKE IT SHOULD BE ONE.
-// `map` and `scan` pass the test because a step reading one value
-// decides everything they emit.  This one reads the open-registration
-// multiset and the cut ledger, MINTS bookkeeping (one close per victim,
-// with a per-victim reason), and raises fin on the emit that cuts.  A
-// step that could do that would be a step handed source ids, close
-// reasons and emit kinds -- the protocol's own vocabulary, in the value
-// language, writable by a program.  So `take` stays a former of its own.
-export const take = <A>(
+// takeWhile-f: forward values while the predicate holds, plus the first value
+// for which it returns false, then cut. The cut is INCLUSIVE: the failing
+// value is in the output, then the stream completes. Cut semantics are
+// identical to take's: per-victim closes from the ledger (cutVictimCloses),
+// fin raised on the cutting emit. Count zero has no analogue here — the
+// predicate is never vacuously false before any subscription.
+export const takeWhilePrim = <A>(
   obs: Observable<InstEmit<A>>,
-  emissions: number,
+  pred: (a: A) => boolean,
 ): Observable<InstEmit<A>> =>
   obs.pipe(
     rxScan<
       InstEmit<A>,
       {
-        remaining: number;
         cut: boolean;
         open: SourceId[];
         ledger: CutLedger;
@@ -622,22 +604,20 @@ export const take = <A>(
         const { bookkeeping, values, fin } = splitEmit(emit);
         const open = openAfter(emit, state.open, false);
         const ledger = cutLedgerStep(emit, state.ledger);
-        const taken = values.slice(0, state.remaining);
-        const didCut = taken.length === state.remaining; // filled the quota
-        if (!didCut)
+        // find the first value that fails the predicate
+        const cutIdx = values.findIndex((v) => !pred(v));
+        if (cutIdx === -1) {
+          // all values pass; no cut yet
           return {
-            remaining: state.remaining - taken.length,
             cut: false,
             open,
             ledger,
-            out: reassemble(emit, bookkeeping, [], taken, fin),
+            out: reassemble(emit, bookkeeping, [], values, fin),
           };
-        // per-victim reasons from the ledger (paid or born this
-        // instant ⇒ cut, else cutPending); the cut RAISES fin on this
-        // very emit (Agda take-f returns fin′ = true) — a downstream
-        // join absorbs it, the root keeps it
+        }
+        // include values up to and including the failing one, then cut
+        const taken = values.slice(0, cutIdx + 1);
         return {
-          remaining: 0,
           cut: true,
           open: [],
           ledger,
@@ -650,10 +630,10 @@ export const take = <A>(
           ),
         };
       },
-      { remaining: emissions, cut: false, open: [], ledger: emptyCutLedger },
+      { cut: false, open: [], ledger: emptyCutLedger },
     ),
     takeWhile((state) => !state.cut, true), // include the cutting emit, then complete
-    rxMap((state) => state.out as InstEmit<A>), // the seed is never emitted, so out is set
+    rxMap((state) => state.out as InstEmit<A>),
   );
 
 // the ROOT materializes the fin bit as a `complete` EVENT on the

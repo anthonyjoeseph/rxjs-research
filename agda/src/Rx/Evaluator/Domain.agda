@@ -142,16 +142,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Tick; Fuel; valueᵖ; completeᵖ; hot; cold)
 open import Rx.Exp using (Ty; obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
-  _×ᵗ_; _+ᵗ_; listᵗ; uniqᵗ;
-  Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
+  _×ᵗ_; _+ᵗ_; listᵗ; uniqᵗ; boolᵗ;
+  Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeWhileᵉ; batchSyncᵉ;
   mapᵉ; scanᵉ; flattenᵉ; μᵉ; deferᵉ; mintᵉ;
   unitᵗ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit; markDlv;
   shareDying; shareSpend; shareFinish; from-inner; arrTick; arrVal;
   chainsOf; cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
-  RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve;
+  RegId; Arrival; AtFloor; arrTy; arrSource; memberSource; skipᵇ; register; installNode; resolve;
   atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; echoᵗ; thruEvents; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
@@ -448,28 +448,22 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
              → foldPath⇓ now κ [] true sched st r
              → subscribeE⇓ {u = u} (Θ , emptyᵉ , ρ) κ now sched st r
 
-  -- `take(0)` NEVER SUBSCRIBES ITS SOURCE, which was measured rather
-  -- than assumed: the operator completes on subscription and the
-  -- source is not touched at all.
-  subs-take-zero : ∀ {lo u Θ} {ρ : Env Γ Θ} {count} {b : Exp Γ [] [] Θ u}
-                     {κ : Path Γ lo u t} {now sched st r}
-                 → evalWith count ρ ≡ zero
-                 → foldPath⇓ now κ [] true sched st r
-                 → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ now sched st r
-
   -- A TRANSFORMER PUSHES ITS FRAME AND SUBSCRIBES ITS BODY, AND THAT
   -- IS ITS WHOLE ARM.  What the body produces crosses the frame inside
   -- the body's own fold, one group at a time and in the order the
   -- groups were produced, so there is nothing left for this arm to
   -- push afterwards and its answer is the body's answer.
-  subs-take-suc : ∀ {lo u Θ} {ρ : Env Γ Θ} {count k} {b : Exp Γ [] [] Θ u}
-                    {κ : Path Γ lo u t} {now sched st nid r}
-                → evalWith count ρ ≡ suc k
-                → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                → subscribeE⇓ (Θ , b , ρ) (take-f nid ↠[ ≤-refl ] κ) now
-                    (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-                    (installNode nid (take-st (suc k)) st) r
-                → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ now sched st r
+  --
+  -- A TAKE-WHILE IS A COUNT AT A BUDGET OF ONE, which only a value
+  -- failing the test spends.  Its source is always subscribed: there is
+  -- no count to read as zero.
+  subs-takeWhile : ∀ {lo u Θ} {ρ : Env Γ Θ} {f : Fn Γ [] [] Θ u boolᵗ}
+                     {b : Exp Γ [] [] Θ u} {κ : Path Γ lo u t} {now sched st nid r}
+                 → freshId nodeᵏ (Sched.mint sched) ≡ nid
+                 → subscribeE⇓ (Θ , b , ρ) (take-f (just (Θ , f , ρ)) nid ↠[ ≤-refl ] κ) now
+                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+                     (installNode nid (take-st (suc zero)) st) r
+                 → subscribeE⇓ (Θ , takeWhileᵉ f b , ρ) κ now sched st r
 
   -- THE BRACKET IS OPENED BY THE INSTALL AND CLOSED WHEN THE
   -- SUBSCRIBE CALL RETURNS, WHICH IS WHERE THE BIT GOES DOWN AND THE
@@ -929,10 +923,10 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
                 (injectRoot (scanDispatch fn nid vals fin sched st
                   (lookupNode nid (EvalSt.nodes st))))
 
-  step-take : ∀ {s lo nid} {κ : Path Γ lo s t}
+  step-take : ∀ {s lo w nid} {κ : Path Γ lo s t}
                 {now} {vals : List (Val Γ s)} {fin sched st}
-            → stepFrame⇓ now (take-f nid) κ vals fin sched st
-                (injectRoot (takeDispatch nid vals fin sched st
+            → stepFrame⇓ now (take-f w nid) κ vals fin sched st
+                (injectRoot (takeDispatch w nid vals fin sched st
                   (lookupNode nid (EvalSt.nodes st))))
 
   step-batchSync : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
@@ -1267,7 +1261,7 @@ data shareWalk⇓ {n} {Γ} {t} {e} where
             → shareWalk⇓ now i (v ∷ vs) fin sched₀ st₀
                 (emits ++ rest , sched₂ , st₂)
 
--- THE CANCELLATION TEST STAYS A PREMISE RATHER THAN A SIDE CONDITION.
+-- THE SKIP TEST STAYS A PREMISE RATHER THAN A SIDE CONDITION.
 -- It is decidable and it decides which of two clauses ran, so the
 -- relation carries the answer as an equation and the two arms cannot
 -- both apply.  `go-live` is where the threading shows: what the tail is
@@ -1278,16 +1272,16 @@ data shareGo⇓ {n} {Γ} {t} {e} where
 
   go-cut : ∀ {lo now} {i : Fin n} {vals fin rid}
              {p : Path Γ lo (lookup Γ i) t} {ps sched st r}
-         → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true
+         → skipᵇ (toℕ i) rid st ≡ true
          → shareGo⇓ now i vals fin ps sched st r
          → shareGo⇓ now i vals fin ((rid , p) ∷ ps) sched st r
 
   go-live : ∀ {lo now} {i : Fin n} {vals fin rid}
               {p : Path Γ lo (lookup Γ i) t} {ps sched₀ st₀}
               {emits sched₁ st₁ rest sched₂ st₂}
-          → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
+          → skipᵇ (toℕ i) rid st₀ ≡ false
           → foldPath⇓ now p vals fin sched₀
-              (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+              (markDlv fin rid st₀)
               (emits , sched₁ , st₁)
           → shareGo⇓ now i vals fin ps sched₁ st₁ (rest , sched₂ , st₂)
           → shareGo⇓ now i vals fin ((rid , p) ∷ ps) sched₀ st₀
@@ -1334,14 +1328,14 @@ data cascadeGo⇓ {n} {Γ} {t} {e} where
   casc-nil : ∀ {a vs fin sched₀ st₀}
            → cascadeGo⇓ a vs fin [] sched₀ st₀ ([] , sched₀ , st₀)
   casc-cut : ∀ {a vs fin rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀ r}
-           → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ true
+           → skipᵇ (arrSource a) rid st₀ ≡ true
            → cascadeGo⇓ a vs fin chains sched₀ st₀ r
            → cascadeGo⇓ a vs fin ((rid , c) ∷ chains) sched₀ st₀ r
   casc-live : ∀ {a vs fin rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀}
                 {emits sched₁ st₁ rest sched₂ st₂}
-            → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
+            → skipᵇ (arrSource a) rid st₀ ≡ false
             → chainStep⇓ a vs fin c sched₀
-                (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+                (markDlv fin rid st₀)
                 (emits , sched₁ , st₁)
             → cascadeGo⇓ a vs fin chains sched₁ st₁ (rest , sched₂ , st₂)
             → cascadeGo⇓ a vs fin ((rid , c) ∷ chains) sched₀ st₀

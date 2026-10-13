@@ -92,14 +92,14 @@ open import Data.Maybe using (nothing; just)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ;
-  switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
+open import Rx.Exp using (add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; mergeᶠ; switchᶠ; exhaustᶠ)
+open import SExp.Syntax using (inputˢ; ofˢ; emptyˢ; mapˢ; scanˢ; flattenˢ; takeWhileˢ;
+  μˢ; varˢ; deferˢ;
   varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; inlˢ; inrˢ; caseˢ; ifˢ;
   primˢ; nilˢ; consˢ; foldˢ; strmˢ)
 
 open import Rx.Prim using (hot; cold; after_,_)
-open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots)
+open import CLI.Unit-Test.Prelude using (Case; cached; mkSlots; flatAllˢ; takeˢ)
 AGDA
 
 widen () {
@@ -117,31 +117,54 @@ widen () {
 export LC_ALL="${LC_ALL:-C.UTF-8}"
 export LANG="${LANG:-C.UTF-8}"
 
+# the counts below go to the build directory, which a fresh checkout lacks
+mkdir -p "$ROOT/agda/_cli"
+
 tmp="$(mktemp)"
 row="$(mktemp)"
 spl="$(mktemp)"
 cen="$(mktemp)"
-trap 'rm -f "$tmp" "$row" "$spl" "$cen"' EXIT
+str="$(mktemp)"
+trap 'rm -f "$tmp" "$row" "$spl" "$cen" "$str"' EXIT
 
 widen
 
 added=0
+undecided=0
 timedout=""
 for seed in $(seq "$FIRST" "$LAST"); do
   # stdin is: SEED RUNS DEPTH  (CLI/QuickCheck.agda's main: parseNat, numAt 1,
   # numAt 2 — runs before depth)
-  if printf '%s %s %s\n' "$seed" "$RUNS" "$DEPTH" | $TIMEOUT "$QC" > "$tmp"
+  # A SEED THE CLOCK KILLS IS READ OFF ITS STREAM.  The binary reports
+  # each case on stderr the moment it is decided, every disagreeing one
+  # with the same paste block the summary would carry, so the splice
+  # below caches what the killed seed found; only its census is lost.
+  killed=""
+  if printf '%s %s %s\n' "$seed" "$RUNS" "$DEPTH" | $TIMEOUT "$QC" > "$tmp" 2> "$str"
   then :; else
     rc=$?
     if [ "$rc" -eq 124 ]; then
-      echo "seed $seed depth $DEPTH — TIMED OUT after ${SECS}s; not checked"
+      n="$(grep -c '^case [0-9]*/[0-9]* ' "$str" || true)"
+      echo "seed $seed depth $DEPTH — TIMED OUT after ${SECS}s; ${n:-0} of $RUNS cases decided before it"
       timedout="$timedout $seed"
-      continue
+      killed=1
+      cp "$str" "$tmp"
+    else
+      echo "gen-unit-tests: seed $seed exited $rc" >&2
+      exit "$rc"
     fi
-    echo "gen-unit-tests: seed $seed exited $rc" >&2
-    exit "$rc"
   fi
-  head -1 "$tmp"
+  # a case past the binary's own per-case clock is UNDECIDED, never a
+  # failure (Anthony): its row is printed under `UNDECIDED` markers, which
+  # the splice below never reads, and only its count is kept
+  if [ -n "$killed" ]; then
+    u="$(grep -c '^case [0-9]*/[0-9]* undecided$' "$str" || true)"
+  else
+    head -1 "$tmp"
+    u="$(head -1 "$tmp" | grep -o '[0-9]* undecided' | grep -o '^[0-9]*' || true)"
+  fi
+  undecided=$((undecided + ${u:-0}))
+  awk '/^-- <<<UNDECIDED$/,/^-- UNDECIDED>>>$/' "$tmp"
   # one census line per run, banked for the aggregate below rather than
   # printed: per-seed counts are noise at 300 seeds, and the question the
   # census answers is about the SWEEP
@@ -158,8 +181,8 @@ for seed in $(seq "$FIRST" "$LAST"); do
     ' "$tmp" > "$row"
 
     # line 2 is the program, and it is the whole key: every row is held to
-    # BOTH properties, so a program that fails agreement and well-formedness
-    # at once dedups to one row rather than being cached twice
+    # every statement, so a program that fails several at once dedups
+    # to one row rather than being cached twice
     key="$(sed -n '2p' "$row")"
     if grep -Fqx -- "$key" "$CORPUS"; then
       continue
@@ -168,7 +191,7 @@ for seed in $(seq "$FIRST" "$LAST"); do
     # one seed can yield several blocks, and two seeds can find the same
     # shape, so the label is disambiguated rather than assumed unique
     label="$seed"; n=1
-    while grep -Fq -- "\"$label\" 30" "$CORPUS"; do
+    while grep -Fq -- "\"$label\" " "$CORPUS"; do
       n=$((n + 1)); label="$seed-$n"
     done
     sed -i "1s/\"?\"/\"$label\"/" "$row"
@@ -203,11 +226,18 @@ awk '{ for (i = 2; i < NF; i += 2) t[$i] += $(i + 1) }
 echo "gen-unit-tests: census over seeds $FIRST..$LAST -> ${CENSUS#"$ROOT"/}"
 awk '{ printf "  %-12s %s\n", $1, $2 }' "$CENSUS"
 
+if [ "$undecided" -gt 0 ]; then
+  echo "gen-unit-tests: $undecided case(s) UNDECIDED — past the per-case clock,"
+  echo "                so neither agreeing nor a counterexample (Anthony);"
+  echo "                their rows are printed under their seeds above"
+fi
+
 if [ -n "$timedout" ]; then
   echo "gen-unit-tests: TIMED OUT:$timedout"
   echo "                each of these seeds drew a program whose run does not"
-  echo "                finish in ${SECS}s, so its whole batch is unchecked —"
-  echo "                the census and the corpus below cover the rest."
+  echo "                finish in ${SECS}s, so its batch is checked only up to"
+  echo "                that case — what it decided is cached above, and the"
+  echo "                census covers the seeds that finished."
 fi
 
 unreached="$(awk '$2 == 0 { printf "%s ", $1 }' "$CENSUS")"

@@ -65,6 +65,40 @@ import sys
 # over-approximation of its tokens, which is the safe direction: a qualified use
 # `M.name` yields `name`, so it counts.
 SEP = re.compile(r"[\s.;(){}@\"]+")
+# A record's `constructor` line, which DECLARES its name in the enclosing module.
+CTOR = re.compile(r"^\s*constructor\s+(\S+)", re.M)
+DATA_HEAD = re.compile(r"^(\s*)data\s.*\bwhere\s*$")
+SIG_HEAD = re.compile(r"^\s*([^\s:][^:]*?)\s+:(\s|$)")
+
+
+def declared_ctors(text: str) -> set:
+    """Every constructor the file DECLARES: the record `constructor` lines, and
+    the signatures heading a `data … where` body at its own indent.  A data
+    constructor overloads an imported one as silently as a record's does
+    (`[]`, `_∷_`, `here` on a relation of lists), so both are names the module
+    exports while also borrowing them."""
+    out = set(CTOR.findall(text))
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        m = DATA_HEAD.match(ln.split("--", 1)[0].rstrip())
+        if not m:
+            continue
+        head = len(m.group(1))
+        base = None
+        for body in lines[i + 1:]:
+            code = body.split("--", 1)[0]
+            if not code.strip():
+                continue
+            ind = len(code) - len(code.lstrip())
+            if ind <= head:
+                break
+            if base is None:
+                base = ind
+            if ind == base:
+                s = SIG_HEAD.match(code)
+                if s:
+                    out.update(s.group(1).split())
+    return out
 
 # THE CLAIM ROOT of each include root -- the one file per tree whose imports ARE
 # the claim, so "unused" is its normal state.  Keyed by tree so the exemption is
@@ -538,17 +572,22 @@ def main() -> int:
     # module can export only what it DECLARES, so a name it brings into its own
     # unqualified scope by an `open import` is one it cannot hand on, whether or
     # not it spends it.  This asks that directly and owes the token reading
-    # nothing.  A module that both imported and declared one name would be the
-    # gap, and it is not reachable from here: Agda warns on the shadowing and a
-    # warning is a build failure.
+    # nothing.  A module that both imported and declared one name is the gap,
+    # and it is reachable only through a CONSTRUCTOR: Agda warns on any other
+    # shadowing, but overloads constructors silently, so a record whose
+    # constructor reuses an imported one's name (`_,_`) exports it while also
+    # borrowing it.  Those names are read off the `constructor` lines and
+    # taken back out of the borrowed set.
     #
     # It maps each borrowed name to the module it was borrowed FROM, because
     # that module is the repair.  The sibling arm cannot say where a name went
     # and says so; this one knows, and a finding that names the right import is
     # worth more than one that only rejects the wrong one.
     binds = {module_of(path): {nm: d.mod
-                               for d in res[2] if d.opened for nm in d.names}
-             for path, (_, res) in per_file.items()}
+                               for d in res[2] if d.opened for nm in d.names
+                               if nm not in ctors}
+             for path, (_, res) in per_file.items()
+             for ctors in [declared_ctors(res[1])]}
 
     # AND WHETHER THE MODULE IS THERE AT ALL, which is the strictly worse
     # failure of the two and the one nothing here could see.  A phantom NAME is

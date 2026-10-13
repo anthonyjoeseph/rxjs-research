@@ -30,7 +30,7 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _+ᵗ_; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _+ᵗ_; boolᵗ; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; echoᵗ; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
   switchKill; scanDispatch; takeDispatch; batchDispatch; thruWrap; shareDying; shareFinish;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
@@ -41,7 +41,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   foldPath⇓; dispatchShare⇓; shareWalk⇓; shareGo⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
-  subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc;
+  subs-cold-async; subs-of; subs-empty; subs-map; subs-takeWhile;
   subs-batchSync; subs-scan; subs-flatten;
   subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
@@ -96,23 +96,23 @@ scanDispatch-keeps fn nid vals fin sched st (just (exhaust-st _ _))      = keeps
 
 -- the truncation's cut severs registrations and rewrites its own node
 takeDispatch-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                       (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+                       (w : Maybe (FnClo Γ s boolᵗ)) (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
                        (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                    → Keeps {e = e} sched st
                        (proj₁ (proj₂ (proj₂
-                         (takeDispatch {e = e} nid vals fin sched st m))))
+                         (takeDispatch {e = e} w nid vals fin sched st m))))
                        (proj₂ (proj₂ (proj₂
-                         (takeDispatch {e = e} nid vals fin sched st m))))
-takeDispatch-keeps nid vals fin sched st (just (take-st k))
-  with proj₂ (proj₂ (takeVals k vals))
+                         (takeDispatch {e = e} w nid vals fin sched st m))))
+takeDispatch-keeps w nid vals fin sched st (just (take-st k))
+  with proj₂ (proj₂ (takeVals w k vals))
 ... | true  = keeps-refl _ _
 ... | false = keeps-refl _ _
-takeDispatch-keeps nid vals fin sched st nothing                      = keeps-refl _ _
-takeDispatch-keeps nid vals fin sched st (just (cell-st _))           = keeps-refl _ _
-takeDispatch-keeps nid vals fin sched st (just (batchSync-st _ _ _))      = keeps-refl _ _
-takeDispatch-keeps nid vals fin sched st (just (mergeAll-st _ _ _ _)) = keeps-refl _ _
-takeDispatch-keeps nid vals fin sched st (just (switch-st _ _))       = keeps-refl _ _
-takeDispatch-keeps nid vals fin sched st (just (exhaust-st _ _))      = keeps-refl _ _
+takeDispatch-keeps w nid vals fin sched st nothing                      = keeps-refl _ _
+takeDispatch-keeps w nid vals fin sched st (just (cell-st _))           = keeps-refl _ _
+takeDispatch-keeps w nid vals fin sched st (just (batchSync-st _ _ _))      = keeps-refl _ _
+takeDispatch-keeps w nid vals fin sched st (just (mergeAll-st _ _ _ _)) = keeps-refl _ _
+takeDispatch-keeps w nid vals fin sched st (just (switch-st _ _))       = keeps-refl _ _
+takeDispatch-keeps w nid vals fin sched st (just (exhaust-st _ _))      = keeps-refl _ _
 
 -- the bracket writes its buffer while the bit is up and empties it
 -- once after; only the node table moves either way
@@ -320,9 +320,8 @@ subscribeE-keeps (subs-cold-sync _ _ f)        = foldPath-keeps f
 subscribeE-keeps (subs-cold-async _ _ _ _ _ f) = foldPath-keeps f
 subscribeE-keeps (subs-of f)                   = foldPath-keeps f
 subscribeE-keeps (subs-empty f)                = foldPath-keeps f
-subscribeE-keeps (subs-take-zero _ f)          = foldPath-keeps f
 subscribeE-keeps (subs-map sub)                = subscribeE-keeps sub
-subscribeE-keeps (subs-take-suc _ refl sub)    = subscribeE-keeps sub
+subscribeE-keeps (subs-takeWhile refl sub)     = subscribeE-keeps sub
 subscribeE-keeps (subs-batchSync refl sub f)   =
   keeps-trans (subscribeE-keeps sub) (foldPath-keeps f)
 subscribeE-keeps (subs-scan refl sub)          = subscribeE-keeps sub
@@ -336,8 +335,8 @@ stepFrame-keeps (step-batchSync {nid = nid} {vals = vals} {fin} {sched} {st}) =
   batchDispatch-keeps nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 stepFrame-keeps (step-scan {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
   scanDispatch-keeps fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
-stepFrame-keeps (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) =
-  takeDispatch-keeps nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
+stepFrame-keeps (step-take {w = w} {nid = nid} {vals = vals} {fin} {sched} {st}) =
+  takeDispatch-keeps w nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 stepFrame-keeps (step-from-inner r) = innerReact-keeps r
 stepFrame-keeps (step-thru-outer {op = op} {nid} {fin = fin} w) =
   keeps-trans (thruWalk-keeps w) (thruWrap-keeps op nid fin _ _)
