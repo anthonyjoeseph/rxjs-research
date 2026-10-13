@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE ONE COPY OF THE OPERATIONAL SEMANTICS.  A program is a tree
--- (`Obs`, in `operation.abstraction.Tree`); compiling it gives `Act` programs, built from the operator
+-- (`Obs`, in `Tree`); compiling it gives `Act` programs, built from the operator
 -- kernels; an interpreter and an event loop run them.  All of that is
 -- here, written once, against a monad the runtime supplies (`Runtime`):
 -- `Observable` hands it IO, `PureObservable` a state monad over a heap
@@ -25,7 +25,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤; tt)
 
-open import operation.abstraction.Tree
+open import Tree
 
 ------------------------------------------------------------------------
 -- What a runtime supplies

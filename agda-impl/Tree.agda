@@ -3,7 +3,7 @@
 -- THE PROGRAM TREE.  Shared by both semantics: `operation.AbstractObservable`
 -- compiles it, `denotation.Denote` gives it a meaning.  Neither half of this
 -- module knows how a program runs.
-module operation.abstraction.Tree where
+module Tree where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; [])

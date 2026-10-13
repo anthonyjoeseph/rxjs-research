@@ -20,7 +20,7 @@ open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 open import Level using (Lift; lift; lower; 0ℓ) renaming (suc to lsuc)
 
-open import operation.abstraction.Tree
+open import Tree
 open import operation.AbstractObservable
 open import denotation.MonotonicList using (Timeline)
 

@@ -27,7 +27,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 
-open import operation.abstraction.Tree hiding (ones; merge; flatMap)
+open import Tree hiding (ones; merge; flatMap)
 open import operation.AbstractObservable
 open import operation.PureObservable
 open import denotation.MonotonicList hiding (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)

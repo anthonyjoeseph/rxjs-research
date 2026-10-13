@@ -17,7 +17,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 
-open import operation.abstraction.Tree as T using (Obs; Later;
+open import Tree as T using (Obs; Later;
   cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer)
 open import denotation.MonotonicList
 

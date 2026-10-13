@@ -18,7 +18,7 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Unit using (⊤)
 
-open import operation.abstraction.Tree
+open import Tree
 open import operation.AbstractObservable
 open import denotation.MonotonicList using (ML; Timeline)
 
