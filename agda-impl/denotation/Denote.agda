@@ -19,7 +19,7 @@ open import Level using (lower)
 
 import Tree as T
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer)
-open import denotation.MonotonicList using (MonotonicList; cold; Timeline; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flattenᴰ; deferᴰ; connectᴰ; ⊥ᴰ; lub)
+open import denotation.MonotonicList using (MonotonicList; coldᴰ; Timeline; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flattenᴰ; deferᴰ; connectᴰ; ⊥ᴰ; lub)
 
 -- A connect in scope means the handle `connectᴰ` passed its body.
 DenEnv : List Set → Set₁
@@ -36,7 +36,7 @@ flatOp T.exhaustᶠ   = exhaustᶠ
 -- (n , tree): `defer` drops n, everything else is structural.
 mutual
   approx : ∀ {Γ A} → ℕ → Obs Timeline Γ A → DenEnv Γ → MonotonicList A
-  approx n       (cold c)         ρ = cold (lower c)
+  approx n       (cold c)         ρ = coldᴰ (lower c)
   approx n       empty            ρ = emptyᴰ
   approx n       (of xs)          ρ = ofᴰ xs
   approx n       (map f s)        ρ = mapᴰ f (approx n s ρ)

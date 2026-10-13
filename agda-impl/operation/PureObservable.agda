@@ -45,8 +45,8 @@ postulate
 
   -- Runs `go` with a top-level observer recording each value into the
   -- frame the clock is on, and reads the frames off as a timeline: done
-  -- if the root completed, quiet if the queue ran dry, `spin` where the
-  -- budget ran out.
+  -- if the root completed, quiet if the queue ran dry, a burst that
+  -- stalls forever where the budget ran out.
   observing : ∀ n {A} → (Observer A → Runtime.M (Pureᴿ n) ⊤) → ML A
 
 -- Approximant n of the compiler: a `defer` nested more than n deep shows

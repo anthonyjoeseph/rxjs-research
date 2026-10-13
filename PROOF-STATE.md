@@ -171,28 +171,23 @@ and run them in rxjs.
   real `Act` programs. Shared by both runtimes, so a wrong kernel is wrong
   everywhere at once; decides whether `Act`'s vocabulary suffices for
   flatten's lane bookkeeping and connect's body-first subscription.
-- **THE DENOTATION'S OPERATORS.** `observe` and the
-  `{empty,of,map,scan,takeWhile,flatten,defer}ᴰ` primitives as functions over `ML`. Tier 2 and the
-  simultaneous spec are written over these, so the oracle's denotational
-  engine is where their semantics first meets rxjs.
+- **THE IO RUNTIME.** `IORef`, `SinkSlot`, `Slot`, the `*ᴿ'` primitives and
+  `fromTimeline` with `COMPILE GHC` pragmas, so `subscribe` runs for real.
+  Same-tick timers fire in creation order and a subject delivers in join
+  order, as the denotation's positions say; decides whether a plain FIFO
+  queue per tick is enough to match them.
 - **THE PURE RUNTIME.** `Pureᴿ` (virtual clock, frame queue, walk budget) and
   `observing`. With the kernels, `quickcheck.Quickcheck.prop` compares the pure
   run against the denotation on drawn programs.
-- **THE IO RUNTIME.** `IORef`, `SinkSlot`, `Slot`, the `*ᴿ'` primitives and
-  `fromTimeline` with `COMPILE GHC` pragmas, so `subscribe` runs for real.
-- **THE TYPESCRIPT ORACLE.** Port the oracle's TS side to the new tree, then
-  compare all three Agda engines against real rxjs; each divergence becomes a
-  bug-cache row.
+- **THE TYPESCRIPT ORACLE.** Port the oracle's TS side to the new tree, with
+  rxjs's own `defer` and no `batchSync`, then compare all three Agda engines
+  against real rxjs; each divergence becomes a bug-cache row.
 
 ### The ledger
 
 - **`{empty,of,map,scan,takeWhile,flatten,connect,join}ᴷ`**
   (operation.AbstractObservable) — FALSITY, `NO EVIDENCE`: the kernels, one per
   operator.
-- **`observe`** (denotation.MonotonicList) — FALSITY, `NO EVIDENCE`: where a
-  joining subscriber lands in a burst.
-- **`{empty,of,map,scan,takeWhile,flatten,defer}ᴰ`** (denotation.MonotonicList)
-  — FALSITY, `NO EVIDENCE`: the denotation's primitives.
 - **`Pureᴿ`, `observing`** (operation.PureObservable) — FALSITY, `NO EVIDENCE`:
   the pure runtime and its recorder.
 - **`IORef`, `SinkSlot`, `Slot`** (operation.Observable) — FALSITY,
@@ -206,35 +201,36 @@ and run them in rxjs.
 ## Tier 2 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-time 0. A fundamental lemma over approximants, one operator at a time, then one
+the root, positions forgotten down to ticks. A fundamental lemma over approximants, one operator at a time, then one
 argument about limits. Expect the denotation to move under contact; it must be
 solid before Tier 3 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE ORDER AND THE RELATION.** `_⊑_`, `_≈_`, `lub`, then `Rel` and
+- **THE ORDER AND THE RELATION.** `_⊑_`, `_≃_`, `limit`, then `Rel` and
   `RelSubj` as definitions. Every leaf below is stated in these, so a wrong
   relation is wrong everywhere; decides whether approximation (not equality)
   is enough for `connect`'s subject.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
 - **THE LIMITS.** `run-rel`, `diagonal`, `exhaust`, and `⊑-trans`.
-- **RECURSION.** `Continuous` as a definition, then `fix-unfold`.
+- **RECURSION.** `_≈_` and `lub` over positioned runs, `Continuous` as a
+  definition, then `fix-unfold`.
 
 ### The ledger
 
 - **`Rel`, `RelSubj`** (Adequacy) — FALSITY, `NO EVIDENCE`: the logical
   relation between a kernel and a timeline.
-- **`_⊑_`, `_≈_`, `lub`, `⊑-trans`** (denotation.MonotonicList) — FALSITY,
-  `NO EVIDENCE`: the information order and its limits.
+- **`_⊑_`, `_≃_`, `limit`, `⊑-trans`** (denotation.MonotonicList) — FALSITY,
+  `NO EVIDENCE`: the information order on reported runs and its limits.
 - **`connect-rel`** (Adequacy) — FALSITY, `NO EVIDENCE`: the allocated subject
   against the hot handle.
 - **`{empty,of,map,scan,takeWhile,flatten,cold,connected,defer,bot}-rel`**
   (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
 - **`run-rel`, `diagonal`, `exhaust`** (Adequacy) — FALSITY, `NO EVIDENCE`:
   from approximants to limits.
-- **`Continuous`, `fix-unfold`** (denotation.MonotonicList) — FALSITY,
-  `NO EVIDENCE`: recursion as a least fixed point.
+- **`_≈_`, `lub`, `Continuous`, `fix-unfold`** (denotation.MonotonicList) —
+  FALSITY, `NO EVIDENCE`: recursion as a least fixed point.
 
 ## Tier 3 — the simultaneous spec
 

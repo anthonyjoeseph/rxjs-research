@@ -1,7 +1,8 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE LINK.  The pure runtime and the denotation agree: the limit of the
--- pure run's approximants is the denotation's limit, observed at time 0.
+-- pure run's approximants is the denotation's limit, observed at the
+-- root, with positions forgotten down to ticks.
 --
 -- Both sides are chains of approximants built the same way — approximant
 -- n compiles n nested `defer`s, and past that shows nothing — so the
@@ -30,18 +31,18 @@ open import Level using (lower)
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer; Later)
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; PureObs; deferredᴺ; compileᴺ; runPure; toArray)
-open import denotation.MonotonicList using (MonotonicList; cold; observe; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flattenᴰ; deferᴰ; connectᴰ; ⊥ᴰ; _⊑_; ⊑-trans; _≈_; lub)
+open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flattenᴰ; deferᴰ; connectᴰ; ⊥ᴰ; _⊑_; ⊑-trans; _≃_; limit)
 open import denotation.Denote using (DenEnv; flatOp; laneᴰ; ⟦_⟧[_]; ⟦_⟧)
 open Run Pureᴾ
 
--- The pure run: the limit of its approximants, the root subscribed at 0.
-run : ∀ {A} → PureObs [] A → MonotonicList A
-run o = lub λ n → cold (toArray n o)
+-- The pure run: the limit of its approximants.
+run : ∀ {A} → PureObs [] A → ML A
+run o = limit λ n → toArray n o
 
 postulate
-  -- "Subscribing with `s` at any time t, in any heap, on an engine with
-  -- budget enough, shows at least what `d` shows a subscriber arriving
-  -- at t."
+  -- "Subscribing with `s` at any position p, in any heap, on an engine
+  -- with budget enough, shows at least what `d` shows a subscriber
+  -- arriving at p, ticks for ticks."
   Rel   : ∀ {A} → Subscribe A → MonotonicList A → Set₁
   -- A subject and the handle `connectᴰ` passed its body agree: joining
   -- one shows at least what the other shows, at any join time.
@@ -66,7 +67,7 @@ postulate
   takeWhile-rel : ∀ {A s d} p → Rel {A} s d → Rel (takeWhileᴷ p s) (takeWhileᴰ p d)
   flatten-rel   : ∀ {A B s d} op {f : A → Maybe B × Maybe (Subscribe B)} {g}
                 → (∀ a → RelLane (f a) (g a)) → Rel s d → Rel (flattenᴷ op f s) (flattenᴰ (flatOp op) (mapᴰ g d))
-  cold-rel      : ∀ {A} (c : Timeline A) → Rel (via (startCold c)) (cold (lower c))
+  cold-rel      : ∀ {A} (c : Timeline A) → Rel (via (startCold c)) (coldᴰ (lower c))
   connected-rel : ∀ {Γ A ρ δ} (i : A ∈ Γ) → RelEnv ρ δ
                 → Rel (joinᴷ (lookup ρ i)) (lookup δ i)
   -- The subject `connectᴷ` allocates, fed by the source after the body
@@ -76,25 +77,26 @@ postulate
                     {e : MonotonicList A → MonotonicList B}
                 → Rel s d → (∀ {st r} → RelSubj st r → Rel (b st) (e r))
                 → Rel (connectᴷ s b) (connectᴰ d e)
-  -- `deferᴰ` adds one `stall`, invisible to `_⊑_`.
+  -- `deferᴰ` adds one `skip`, a `stall` once reported, invisible to `_⊑_`.
   defer-rel     : ∀ {A} {s : Subscribe A} {d} → Rel s d → Rel s (deferᴰ d)
   -- A cut-off `defer` on both sides: ⊥ᴰ shows nothing.
   bot-rel       : ∀ {A} → Rel {A} ⊥ᴷ ⊥ᴰ
 
-  -- THE ENGINE'S FACT: running a related subscription at time 0 shows at
-  -- least what the timeline shows, in the limit of the run's budget.
+  -- THE ENGINE'S FACT: running a related subscription at the root shows
+  -- at least what the denotation shows there, in the limit of the run's
+  -- budget.
   run-rel : ∀ {A} {s : Subscribe A} {d}
-          → Rel s d → cold (observe d 0) ⊑ lub (λ m → cold (runPure m s))
+          → Rel s d → ticks (observe d root) ⊑ limit (λ m → runPure m s)
 
   -- More `defer`s compiled shows more, so running approximant n of the
   -- compiler is below the run, whose approximants compile ever more.
-  diagonal : ∀ {A} n (o : PureObs [] A) → lub (λ m → cold (runPure m (compileᴺ n o []))) ⊑ run o
+  diagonal : ∀ {A} n (o : PureObs [] A) → limit (λ m → runPure m (compileᴺ n o [])) ⊑ run o
 
   -- Every finite prefix of the run is reached at some finite budget, so
   -- some approximant of the denotation already shows it; with
   -- soundness, the two limits agree.  The one argument about limits.
-  exhaust : ∀ {A} (o : PureObs [] A) → (∀ n → cold (observe (⟦ o ⟧[ n ] []) 0) ⊑ run o)
-          → run o ≈ cold (observe (⟦ o ⟧ []) 0)
+  exhaust : ∀ {A} (o : PureObs [] A) → (∀ n → ticks (observe (⟦ o ⟧[ n ] []) root) ⊑ run o)
+          → run o ≃ ticks (observe (⟦ o ⟧ []) root)
 
 mutual
   -- THE FUNDAMENTAL LEMMA.  Approximant n against approximant n, by the
@@ -119,8 +121,8 @@ mutual
   lane-rel n (b , just l)  e = some (fundamental n l e)
 
 -- Each approximant of the denotation is sound for the run.
-sound : ∀ {A} (o : PureObs [] A) n → cold (observe (⟦ o ⟧[ n ] []) 0) ⊑ run o
+sound : ∀ {A} (o : PureObs [] A) n → ticks (observe (⟦ o ⟧[ n ] []) root) ⊑ run o
 sound o n = ⊑-trans (run-rel (fundamental n o [])) (diagonal n o)
 
-adequacy : ∀ {A} (o : PureObs [] A) → run o ≈ cold (observe (⟦ o ⟧ []) 0)
+adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)
 adequacy o = exhaust o (sound o)

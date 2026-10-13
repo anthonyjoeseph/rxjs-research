@@ -22,7 +22,7 @@ open import Data.String using (String; _++_; intersperse)
 open import Data.Unit using (⊤)
 open import IO.Primitive.Finite using (putStrLn)
 
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; observe)
+open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; observe; ticks; root)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using (toArray)
 open import operation.Observable using (subscribe; fromTimeline)
@@ -49,13 +49,14 @@ record Trace (A : Set) : Set where
     end    : End
 
 -- One step of budget per frame, value or `stall`: a burst that spins
--- forever is cut, not hung.
+-- forever is cut, not hung.  A frame that emits nothing is not printed:
+-- rxjs cannot show one.
 mutual
   traceML : ∀ {A} → ℕ → ML A → Trace A
   traceML zero    _        = [] ▸ cut
   traceML (suc n) done     = [] ▸ completed
   traceML (suc n) quiet    = [] ▸ silent
-  traceML (suc n) (at t b) = cons (tick t) (traceBurst n b)
+  traceML (suc n) (at t b) = opening t (traceBurst n b)
 
   traceBurst : ∀ {A} → ℕ → Burst A → Trace A
   traceBurst zero    _          = [] ▸ cut
@@ -65,6 +66,10 @@ mutual
 
   cons : ∀ {A} → Event A → Trace A → Trace A
   cons e (es ▸ x) = (e ∷ es) ▸ x
+
+  opening : ∀ {A} → Time → Trace A → Trace A
+  opening t ((val a ∷ es) ▸ x) = cons (tick t) ((val a ∷ es) ▸ x)
+  opening t tr                 = tr
 
 ------------------------------------------------------------------------
 -- Running
@@ -90,7 +95,7 @@ depth u p = suc u * suc (defers p)
 
 -- `u` bounds each `μ`'s unfolding; `n` bounds the trace.
 denoteTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
-denoteTrace u n p = traceML n (observe (⟦ toObs timeline u p [] [] [] ⟧[ depth u p ] []) 0)
+denoteTrace u n p = traceML n (ticks (observe (⟦ toObs timeline u p [] [] [] ⟧[ depth u p ] []) root))
 
 pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 -- The engine's approximant is taken past both the tree's depth and the
