@@ -12,7 +12,7 @@ failed here:
 
   * SCOPED WRONG.  On 2026-08-19 three lemmas were rewritten from
     scratch because the search was run against two named files instead
-    of the tree.  This walks the whole of agda/src, always; there is no
+    of the tree.  This walks the whole of agda-impl, always; there is no
     argument that narrows it.
   * SEARCHED FOR A NAME.  Names here are idiosyncratic
     (`frameStep-chain-suc` is a path-length lemma), so guessing one
@@ -27,16 +27,6 @@ still works.
 Output is the STATEMENT, not the matching line: what you need in order
 to answer "does this already exist?" is the type, and reading a
 signature is what the SEARCH FIRST rule asks for anyway.
-
-AND IT SEARCHES THE ATTIC, which is the third way the search has failed:
-SCOPED TO THE PRESENT.  A generation deleted wholesale is invisible to a
-walk of the tree, so the command that exists to make "did we already
-prove this?" a machine question answers NO about work that is merely not
-checked out.  `scripts/attic.txt` names the last commit still holding
-each such generation; every one is searched, and its hits print in their
-own section, never mixed with live ones -- an attic hit is apparatus to
-restate, not a fact to cite.  Blobs are materialised once under
-`agda/_attic/` (gitignored) so the second search costs nothing.
 """
 import os, re, sys
 import importlib.util
@@ -54,11 +44,6 @@ if _dup is None:                                    # module name has a dash
     _spec.loader.exec_module(_dup)
 
 SRC = _dup.SRC
-
-_attic_spec = importlib.util.spec_from_file_location(
-    "attic", os.path.join(HERE, "attic.py"))
-attic = importlib.util.module_from_spec(_attic_spec)
-_attic_spec.loader.exec_module(attic)
 
 
 def scan(root, terms):
@@ -102,7 +87,7 @@ def main():
     terms = [t for a in sys.argv[1:] for t in a.split() if t.strip()]
     if not terms:
         print("usage: make find Q='<term> [<term> ...]'")
-        print("  searches the DECLARED TYPE of every definition in agda/src")
+        print("  searches the DECLARED TYPE of every definition in agda-impl")
         return 2
 
     hits = scan(SRC, terms)
@@ -113,41 +98,11 @@ def main():
     print("find: %d statement(s) matching %s"
           % (len(hits), " AND ".join(repr(t) for t in terms)))
 
-    # THE ATTIC, in its own section and after the live one.  Kept separate
-    # because the two answer different questions: a live hit says the fact
-    # EXISTS, an attic hit says it existed under a mechanism that is gone,
-    # and the second is a lead to read rather than a name to cite.
-    attic_total = 0
-    for sha, label, root in attic.roots():
-        found = scan(root, terms)
-        attic_total += len(found)
-        if not found:
-            continue
-        print()
-        print("ATTIC %s — %s" % (sha, label))
-        print("  NOT IN THE TREE.  Restore with `git show %s:agda/src/<path>`;"
-              % sha)
-        print("  read the SIGNATURE, not the header — a module deleted with a")
-        print("  mechanism is usually a mix, and a body with no postulate in it")
-        print("  measured something the successor may still do.")
-        print()
-        for rel, line, name, ty in found:
-            print("  %s  %s" % (name, rel))
-            print("      %s" % wrap(ty, 88, "      "))
-            print()
-        print("  attic %s: %d statement(s)" % (sha, len(found)))
-
-    if not hits and not attic_total:
+    if not hits:
         print("find: nothing — but try a SHORTER term, or the operator "
               "rather than the name.")
         print("      A miss here is weak evidence; a miss on two "
               "different phrasings is strong.")
-    elif not hits:
-        print()
-        print("find: nothing live, but %d in the attic — which is the answer "
-              "this search" % attic_total)
-        print("      exists to give: the work was done and then deleted, "
-              "not never done.")
     return 0
 
 

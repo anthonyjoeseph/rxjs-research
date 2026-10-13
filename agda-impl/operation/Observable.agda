@@ -20,8 +20,8 @@ open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 open import Level using (Lift; lift; lower; 0ℓ) renaming (suc to lsuc)
 
-open import Tree
-open import operation.AbstractObservable
+open import Tree using (Obs; Later)
+open import operation.AbstractObservable using (Prims; module Run)
 open import denotation.MonotonicList using (Timeline)
 
 postulate
@@ -42,10 +42,20 @@ record Started (Internal : Set) : Set where
     subscription : IO Internal
     teardown     : Internal → IO ⊤
 
+-- What a cold is handed to emit with.
+record Emit (A : Set) : Set where
+  field
+    produce  : A → IO ⊤
+    complete : IO ⊤
+
+-- `create` takes an `Emit`, not `produce` and `complete` curried: with
+-- `Internal` erased MAlonzo compiles this record to a `newtype`, and GHC
+-- rejects a newtype whose field mentions `IO` bare — its kind-polymorphic
+-- arguments become existentials.
 record IOCold (A : Set) : Set₁ where
   field
     Internal : Set
-    create   : (produce : A → IO ⊤) → (complete : IO ⊤) → Started Internal
+    create   : Emit A → Started Internal
 
 IOᴾ : Prims
 IOᴾ = record { Ref = IORef ; Cold = IOCold ; Handle = Slot ; Sink = SinkSlot ; Eff = IO }
@@ -123,6 +133,3 @@ subscribe {A} o f = drive run∞ loop∞ (compileWith deferred∞ o []) observer
       { next     = λ a → eff (f a) λ _ → done tt
       ; complete = done tt
       }
-
-toIO : ∀ {Γ A} → Obs Timeline Γ A → Obs IOCold Γ A
-toIO = mapLeaves fromTimeline

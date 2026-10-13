@@ -102,7 +102,7 @@ def declared_ctors(text: str) -> set:
 # derived rather than enumerated; `check-wiring.py` parameterises the same fact as
 # ROOT_REL.  CLAUDE.md also forbids touching src/Main.agda without approval.
 CLAIM_ROOT = {
-    os.path.join("agda", "src"): "Main.agda",
+    os.path.join("agda-impl"): "Main.agda",
 }
 DEFAULT_CLAIM_ROOT = "Main.agda"
 
@@ -341,7 +341,7 @@ def module_decl(stripped: str):
 
 
 def module_of(path: str) -> str:
-    """`agda/src/A/B.agda` -> `A.B`, relative to whichever tree holds it."""
+    """`agda-impl/A/B.agda` -> `A.B`, relative to whichever tree holds it."""
     p = os.path.normpath(path)
     for base in sorted((os.path.normpath(t) for t in TREES), key=len, reverse=True):
         if p.startswith(base + os.sep):
@@ -497,7 +497,7 @@ def rewrite(raw: str, stripped: str, dead_decls, dead_names) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--src", action="append", default=None,
-                    help="tree to walk (repeatable); default agda/src")
+                    help="tree to walk (repeatable); default agda-impl")
     ap.add_argument("--keep-names", action="store_true",
                     help="report only whole DEAD imports, skipping unused names "
                          "inside a surviving `using` clause.  Not what the gate "

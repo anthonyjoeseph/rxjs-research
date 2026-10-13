@@ -5,16 +5,16 @@
 -- one into the real function the tree takes.
 module quickcheck.Tm where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; if_then_else_)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming (_∷_ to _∷ᵛ_)
-open import Data.Nat using (ℕ; suc; _+_; _<ᵇ_)
+open import Data.Nat using (ℕ; _+_; _<ᵇ_)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂; [_,_])
 open import Data.Unit using (tt)
 
-open import quickcheck.Ty
+open import quickcheck.Ty using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; listᵗ; ⟦_⟧ᵀ)
 
 Vals : List Ty → Set
 Vals = All ⟦_⟧ᵀ

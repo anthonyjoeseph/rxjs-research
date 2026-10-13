@@ -1,6 +1,6 @@
 # Working methodology
 
-Agda model (`agda/`) + TypeScript impl (`typescript/`). Agda's spec is gospel; TS conforms.
+Agda model (`agda-impl/`) + TypeScript impl (`typescript/`). Agda is gospel; TS conforms. **`agda/` is reference only** — never edited, to be deleted.
 
 ## This file
 
@@ -9,15 +9,15 @@ Agda model (`agda/`) + TypeScript impl (`typescript/`). Agda's spec is gospel; T
 - **Ask before changing this file (Anthony).** Draft the wording, show it, land it on his yes. An agent's own inference installed as law propagates further than any code change.
 - **Rules here; mechanics in `docs/`** (one file per tool, indexed by `docs/README.md`). Split by KIND, not length. This file carries only what must be obeyed *prophylactically* — before you'd have reason to open a doc.
 - **Fragments over paragraphs; omit rather than explain the omission (Anthony).** Every word here is paid on every turn.
-- **Rules, not citations.** State the *shape* of a trap, not a name that gets discharged next week. Specific instances live in source headers. Exceptions: the load-bearing documents and commands (this file, PROOF-STATE.md, `typecheck-performance-numbers.md`, `docs/`, `make` targets, `agda/src`) — vocabulary, not instances.
+- **Rules, not citations.** State the *shape* of a trap, not a name that gets discharged next week. Specific instances live in source headers. Exceptions: the load-bearing documents and commands (this file, PROOF-STATE.md, `docs/`, `make` targets, `agda-impl`) — vocabulary, not instances.
 - **No calendar dates, including on a ruling (Anthony).** The name alone makes it unarguable; the timestamp does nothing. Conflicting rulings get MERGED, not ordered by date.
 - **No line numbers, here or in a source comment.** A stale name fails a grep loudly; a stale line number resolves, points at unrelated code, and is believed.
-- `make roadmap-check` enforces dates on this file and `docs/`; `make comments-check` on `agda/src`. A date is a build failure.
+- `make roadmap-check` enforces dates on this file and `docs/`; `make comments-check` on `agda-impl`. A date is a build failure.
 - **Edit a single file with `Edit`, not `sed`/python heredoc (Anthony).** Auto mode's Bash preference does not extend to editing. Carve-out: a genuinely multi-hunk patch, with `assert old in s` per hunk, written once at the end.
 
 ## THE GATE — `make gate`
 
-Cheap textual checks run FIRST — seconds by grep vs. many minutes of Agda. **Run it rather than trusting a memo, including this one.**
+Cheap textual checks run FIRST, then `make agda` checks `agda-impl/Main.agda`. **Run it rather than trusting a memo, including this one.**
 
 Every `*-selftest` proves its checker still fires; they are not findings, they are the reason a green check means something.
 
@@ -28,84 +28,60 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `dup-check` | two declarations proving one fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
 | `imports-check` | an unused import, or an unused name in a surviving clause | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, or a wrong DERIVED evidence field. `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
-| `monster-check` | a line ADDED to `agda/src` outside the lowest open tier's monster's own dependency CONE — what its statement and body REACH, read off the tree AS EDITED | [docs/monster.md](docs/monster.md) |
 | `roadmap-order` | discharging a GRINDABLE row while its tier holds an open FALSITY. Only DISCHARGE is held — delete, rename, split, restate, reclassify stay free; a PREREQUISITE the risky statement names is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-moved` | a branch landing proof work with PROOF-STATE byte-identical to **main**. Baseline is the merge-base, so fix-ups inside a branch cost nothing | [docs/roadmap-check.md](docs/roadmap-check.md) |
-| `comments-check` | a date, a historical marker or a LINE NUMBER in `agda/src`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `TWIN`/`REFUTED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
-| `recursion-cover` | a cycle in the evaluator's call graph that no declared descent covers — so it names a termination failure in SECONDS, before any tower runs | [docs/recursion-cover.md](docs/recursion-cover.md) |
-| the tower (inline in `gate-heavy`) | **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
+| `comments-check` | a date, a historical marker or a LINE NUMBER in `agda-impl`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `TWIN`/`REFUTED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
+| `agda` | anything that does not typecheck from Main — **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 
-Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`, `make strip-selftest`, `make agda-dev-selftest`.
+Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`, `make bug-cache`.
 
 ## Autonomy
 
 Standing approval for any change that **does not alter the spec** — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
 
-**The `Exp` tree is FIXED, and the evaluator is not (Anthony).** Its formers are not the spec, so the standing approval above reads as licensing a new one — it does not. Evaluator internals are free: change the relation, the scheduling, the carrier, whatever makes it work and provable. A change that needs a new `Exp` former, or re-types an existing one, is a question instead.
+**The `Obs` tree (`Tree.agda`) is FIXED, and the engine is not (Anthony).** Its formers are not the spec, so the standing approval above reads as licensing a new one — it does not. Engine internals are free: the kernels, the runtimes, the relation, whatever makes it work and provable. A change that needs a new `Obs` former, or re-types an existing one, is a question instead.
 
 **The stop conditions are exhaustive — nothing else is one (Anthony: "never stop working until you hit a stop condition").** All three are questions only Anthony can answer:
 
-- **The spec must move** (`agda/src/Spec.agda`) — a question, never a patch.
+- **The semantics must move** — the denotation disagrees with real rxjs in a way that is not a bug in either, or Tier 3's statement needs restating. A question, never a patch.
 - **The proof is SPIRALLING** — the same region producing FALSITY across three successive subdivisions. Reconsider the mechanism, don't subdivide a fourth time.
 - **The impossibility pair** — two programs whose primitives produce byte-identical emit streams (same provenances, init/close, values, order) but that genuinely batch differently in real rxjs. **STOP and tell Anthony; do not act on it.** Not the same as "impl disagrees with spec", which is just a bug to fix in the impl.
 
 ## The goal
 
-The four top-line statement modules (`Left-To-Right`, `Timed`, `Batchable`) fully discharged, no postulates, everything typechecks, on every canonical program. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
+PROOF-STATE.md's four tiers, in order: (1) the oracle passing on all three engines against real rxjs; (2) the adequacy theorem proven; (3) the new simultaneous spec defined over the denotation; (4) that spec proven. No postulates, everything typechecks. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
 
 ## Delegation — the design session directs, Sonnet workers grind
 
 - **Workers run Sonnet 4.6, and `model: "sonnet"` does NOT get you there** — that alias resolves to Sonnet 5 here. Both levers apply only at session start, so a running session cannot change or verify its workers' model; say so plainly. → [docs/delegation.md](docs/delegation.md)
-- **Workers never babysit long builds.** Iterate with `make agda-dev`, land dev-green bodies, hand `make gate` back to the design session.
-- **A worker must kill any detached build before reporting**, and say nothing is running. Agda doesn't lock interfaces — two processes on one `.agdai` is a corrupt cache or a spurious failure. Covers `make agda-dev`, which shares the gate's cache.
+- **Workers never babysit long builds.** Hand `make gate` back to the design session.
+- **A worker must kill any detached build before reporting**, and say nothing is running. Agda doesn't lock interfaces — two processes on one `.agdai` is a corrupt cache or a spurious failure.
 - **Delegation has a FIXED context cost — amortise it or do it yourself (Anthony).** Delegate on BREADTH (several independent items, concurrently), REPETITION (one context, many similar obligations), or NARROWNESS (a small nameable slice). **Keep DEPTH:** one hard thing in a file already loaded is cheaper to do than to delegate.
 - **The tell, and it is reliable: if writing the directive required you to do the analysis, you have already done the expensive part.**
-- Parallel workers authorized; parallel Agda up to two heavyweight checks at once, cheap modules freely → [docs/typecheck-cost.md](docs/typecheck-cost.md).
+- Parallel workers authorized; Agda builds one at a time.
 - **Directives carry the law** — every worker prompt restates the rules it needs.
 - Workers don't commit. Land green work via a PR, never a direct push to main — ask first.
 - **Stage explicitly while a worker holds a file — never `git add -A` (Anthony).**
 - **Run continuously** (Anthony: "continue and continue, don't stop for context window or usage credits"). Review, merge, launch the next.
 
-## Long Agda builds
+## Agda builds
 
-- **`make gate` is the merge gate and it ROUTES — type it and let it decide.** It prints which path and why. Timings: `typecheck-performance-numbers.md`.
-- **Never run `gate-heavy` locally — push and let CI run the tower (Anthony).** Locally: `make gate-cheap` + `make agda-dev`.
-- **The bug cache and QuickCheck run locally (Anthony).** `make bug-cache`, `make quickcheck`: ordinary builds, one at a time, through `make bg`. Checked by GHC and the FFI — never a proof's dependency.
-- `gate-heavy` is the only thing that sees TERMINATION, since the dev loop stubs mutual blocks.
-- **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. The flag must be identical in the Makefile and `agda_flags()`, changed in the same commit. → [docs/agda-build.md](docs/agda-build.md)
-- **Agda never checks `agda/src` — it checks the comment-stripped mirror, which is why a comment edit is free.** A direct `agda` run on `agda/src` is a second interface cache, alternating with the mirror's.
+- **`make gate` is the merge gate:** `gate-cheap`, then `make agda` (`agda-impl/Main.agda`).
+- **The bug cache runs locally and in its own CI job (Anthony).** `make bug-cache`, through `make bg`. Checked by GHC and the FFI — never a proof's dependency.
+- **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. → [docs/agda-build.md](docs/agda-build.md)
 - **Two commands: `make bg T=<target>` as a BACKGROUND tool call, then `make bg-check T=<target>`.** `bg` blocks, logs, appends `EXIT=<code>`. `bg-check` reports GREEN / RED-with-tail / STILL-RUNNING. `bg-wait` is for a human. A `sleep N; tail` or `until` loop is the apparatus re-implemented worse. `make bg` always exits non-zero by design, so **a completion notification is never a result — `bg-check` is.**
 - **"Detached" means the Bash tool's background flag, never shell syntax (Anthony).** Type the command bare. No `&` (backgrounds a wrapper the harness already manages), no `>/dev/null 2>&1` (throws away WHERE the log is), **and never a pipe — a pipeline exits with the LAST command's status, so `make gate | tail` reports the tail's success over a RED build.** A foreground call is capped at 600 s and a build that outruns it is KILLED. **One build at a time.** → [docs/bg.md](docs/bg.md)
 - **The Bash tool's cwd persists between calls — pin it.** Absolute paths; never rely on a previous `cd`.
 - `touch` does NOT dirty a module — invalidation is by CONTENT.
-- **A proof body on the `budget-sufficient` spine must be sealed (`abstract`)** — three multi-hour OOMs came from unsealing one.
-- A mid-build RSS of 7–12 GB is normal and evidence of nothing.
-- **What makes a module slow, when a dev check says it is** → [docs/typecheck-cost.md](docs/typecheck-cost.md). Open it then, not before.
-- **All measured timings live in `typecheck-performance-numbers.md` and nowhere else.** `gate-heavy` and `agda-dev` append their own.
-
-### `make agda-dev` — the iteration loop
-
-```
-make agda-dev ARGS='<file> <member>'   one member ← the grind loop
-make agda-dev ARGS='<file>'            one module, every member
-make agda-dev ARGS='--list <file>'     free: which members are in which block
-make warm ARGS='<file>'                build a file's deps; unbudgeted
-```
-
-- **`ARGS=` takes at most ONE file plus ONE focus member.** A second file is read as the focus member and reported absent, which reads as a proof failure.
-- **Dev-green means the types line up, not that the proof is valid — but only where something was STUBBED.** A module with no multi-member block is emitted VERBATIM, so the sweep is a real check there. Where a block is stubbed, termination of the real mutual recursion is not checked.
-- **A dev check of a `src` module that is not seconds is a FINDING.** Read `typecheck-performance-numbers.md` first. Work BOTTOM-UP. Third cause the other two hide: the module has outgrown the loop. Do NOT reach for `--only-scope-checking` — measured, buys nothing, removed.
-- **A red `agda-dev` on any file in `src` is a P0 — fix it before the work you were doing.** Never route around it.
-- → [docs/agda-dev.md](docs/agda-dev.md) for the budget, `HOLES=1`, `NOT_DEV_CHECKABLE`.
 
 ## Where code goes
 
-- **All new proof code in `agda/src`**, where reachability, the ⊤-postulate check and the claim graph see it from minute one. That is what makes "did we already prove this?" a grep.
+- **All new proof code in `agda-impl`**, where reachability, the ⊤-postulate check and the claim graph see it from minute one. That is what makes "did we already prove this?" a grep.
 - The failure prevented is being UNCLAIMED, not being outside `src`. Work no claim root reaches is what parks itself for months and gets re-derived.
 
 ### Module granularity
 
-- **Cut at mutual-SCC boundaries.** A mutual block is an indivisible checking unit. **Never restructure genuine mutuality to shrink a module** — proof shape wins over check time. Target ≤20 s solo recheck for every non-SCC module. → [docs/typecheck-cost.md](docs/typecheck-cost.md)
+- **Cut at mutual-SCC boundaries.** A mutual block is an indivisible checking unit. **Never restructure genuine mutuality to shrink a module** — proof shape wins over check time.
 - **A new fact goes in the SHALLOWEST module reaching its consumers, not the deepest that could host it (Anthony).** A four-line lemma near the bottom invalidates that module's whole cone. Check the cone before placing it. Does not contradict `dup-check`'s "move the fact DOWN", which is about a fact that already exists twice.
 
 ## Agda traps
@@ -132,7 +108,7 @@ make find Q='≤ slotsSize'     every STATEMENT whose type mentions it
 make find-prose Q='...'       findings, which are prose by construction
 ```
 
-- **Run `make find` before you state a postulate or write a lemma.** It walks all of `agda/src` and takes no narrowing argument — which is the point: a hand-rolled `grep` was FOLLOWED and still failed, scoped to two arguments instead of the tree.
+- **Run `make find` before you state a postulate or write a lemma.** It walks all of `agda-impl` and takes no narrowing argument — which is the point: a hand-rolled `grep` was FOLLOWED and still failed, scoped to two arguments instead of the tree.
 - **Run `make find-prose` before picking up any row that is not GRINDABLE.** It answers *has anyone already been here* — dead routes, coverage boundaries, rulings, measured traps — none of which `make find` can see. Returns the BLOCK. → [docs/find-prose.md](docs/find-prose.md)
 - **Search the CONCLUSION's shape, not the name you imagine.** Names here are idiosyncratic. A miss is weak evidence; two misses on different phrasings is strong. **Read the SIGNATURE, never the header prose** — a header saying a route is dead is a claim about an attempt.
 - **`make dup-check`: a finding is two SITES, not two names.** Agda's `ClashingDefinition` says nothing when either copy is `private`. **When it fires, MOVE THE FACT DOWN — do not pick a winner**; deleting one copy at random re-creates it later. Keep ONE naming convention per class of fact.
@@ -179,7 +155,7 @@ Every live postulate carries one. PROOF-STATE assigns; this file defines.
 
 **`make roadmap-order` enforces it.** The pull is structural, not careless: `roadmap-moved` requires every commit to move the roadmap, a risky leg routinely ends in a FINDING rather than a discharge, and a finding-only commit reads as unfinished — so a mechanical row gets closed alongside it to make the commit feel whole. **Settle risk near the trunk:** work proven under an open FALSITY is not delayed but FORFEIT if that statement is refuted.
 
-**Only BANKING is held (Anthony).** Deleting, renaming, splitting, restating and reclassifying a row are all free. The one held move is a name leaving the postulate ledger while still declared in `agda/src`.
+**Only BANKING is held (Anthony).** Deleting, renaming, splitting, restating and reclassifying a row are all free. The one held move is a name leaving the postulate ledger while still declared in `agda-impl`.
 
 ### Tier order is law (Anthony)
 
@@ -205,17 +181,9 @@ A refuted statement and a dead route are different findings. **When an attempt f
 
 - **A dead route is not a licence to weaken the statement.** Deleting a dead-route line requires the route shown WORKABLE, not merely untried again.
 
-## THE MONSTER — the one thing each tier is trying to kill (Anthony)
+## The postulate count
 
-Rows are the ledger, legs are the schedule, the MONSTER is what the schedule is FOR. A NAME, because a name is what a machine can hold. `make monster-check` fails on a line added outside its dependency CONE.
-
-**Choosing one: as likely false as possible, as far down the tree as possible, with as big a blast radius as possible (Anthony).** Falsity and blast radius are both monotone UP the tree, so maximising those two alone returns the tier's top line forever. **Depth is the only pressure that selects anything else** — among nodes that could genuinely be false, take the DEEPEST that still takes its siblings and parents with it.
-
-**The floor under the descent is the cone itself**, which is the commit licence: a leaf is usually past it, since its cone is its statement's vocabulary and the assembly it serves is off-tree. **The monster need not be a postulate and usually is not** — a relation every leaf is stated in can be wrong in a way no ledger records.
-
-TOO HIGH is the cone percentage the check prints; TOO DEEP is an offender list that repeats until `also:`-ed in, so a growing `also:` ledger means the monster is misplaced. Exceptions are declared with an `also:` line in the tier's own section, never a flag. → [docs/monster.md](docs/monster.md)
-
-**A rising postulate count is the mechanism working, not a regression** (Anthony: *"the relentless mindset of reducing those numbers is very harmful"*). One vague postulate split into six specific ones is PROGRESS. The only number that matters is whether `The-Proof.agda` is discharged.
+**A rising postulate count is the mechanism working, not a regression** (Anthony: *"the relentless mindset of reducing those numbers is very harmful"*). One vague postulate split into six specific ones is PROGRESS. The only number that matters is whether the tiers are discharged.
 
 - **Do NOT minimise the count, do NOT apologise for it**, do not describe an increase as a cost or a trade.
 - **Do NOT weaken a statement to make it typecheck.** Postulate the full-strength statement and report the obstacle.
@@ -292,11 +260,11 @@ An assembly is CHECKED, greppable and counted; a paragraph is checked by nobody,
 
 **Every leg after the first may aim at the SAME postulates.** The legs are the next that many commits, not that many subjects. Pick the risk order first, then cut at commit boundaries.
 
-**The legs are AIMED AT THE MONSTER (Anthony).** A set of legs that does not narrow it is that many commits with nothing underneath it that got smaller. Write each leg so its own prose says what it decides about the monster.
+**The legs are AIMED AT THE TIER'S RISKIEST OPEN QUESTION (Anthony).** A set of legs that does not narrow it is that many commits with nothing underneath it that got smaller. Write each leg so its own prose says what it decides.
 
-**Narrowing counts — it is usually what a leg buys (Anthony).** The monster is not expected to FALL; it is expected to have a smaller region left. When a leg retires, write down what it RULED OUT. **Narrowing is not REPLACING**, which is what happens when the old monster falls or the tier descends past it.
+**Narrowing counts — it is usually what a leg buys (Anthony).** The question is not expected to FALL; it is expected to have a smaller region left. When a leg retires, write down what it RULED OUT.
 
-**One exception: a leg that removes a cost stopping the questions being worked at all** — a loop that is no longer a loop, a check that cannot run, apparatus a face needs before any of it can be instantiated. It narrows nothing and is still right, because the monster is unreachable until it lands. **Never more than one leg of the set** — a schedule that is all tooling is a tier that has stopped being worked.
+**One exception: a leg that removes a cost stopping the questions being worked at all** — a loop that is no longer a loop, a check that cannot run, apparatus a face needs before any of it can be instantiated. It narrows nothing and is still right, because the question is unreachable until it lands. **Never more than one leg of the set** — a schedule that is all tooling is a tier that has stopped being worked.
 
 **Three is a FLOOR, not a quota — write the fourth down (Anthony).** A route already worked out and cut into commit-sized pieces is the most expensive thing here to rediscover and the cheapest to type. Seven is the ceiling, past which the list has become a second copy of the ledger. **The legs do NOT cover the tier** — covering it is the ROWS' job.
 
@@ -315,9 +283,9 @@ Update it to its own header's hygiene rules, which are also part of the gate: on
 
 **Forbidden states.** An **unreachable definition** — a missing wire or dead weight, both findings, and leaving it undecided is not an option. A **lying comment** — prose describing an intent the code does not encode.
 
-**MAIN IS THE TOP-LINE PROOF (Anthony).** `agda/src/Main.agda` is the root of the consumption graph and the deletion exemption. **(1) Whatever Main imports sticks around. (2) Main names individual definitions — NEVER a bare `open import`. (3) Main is never touched without Anthony's explicit approval** — draft and ask. `make wiring` reads Main's `using` clauses, so a filename never earns an exemption.
+**MAIN IS THE TOP-LINE PROOF (Anthony).** `agda-impl/Main.agda` is the root of the consumption graph and the deletion exemption. **(1) Whatever Main imports sticks around. (2) Main names individual definitions — NEVER a bare `open import`. (3) Main is never touched without Anthony's explicit approval** — draft and ask. `make wiring` reads Main's `using` clauses, so a filename never earns an exemption.
 
-Main also defines the build's COVERAGE — **`make gate-heavy` IS the claim graph**, and anything outside it is not being checked. **Never close a coverage gap by re-adding a bulk import to Main.**
+Main also defines the build's COVERAGE — **`make agda` IS the claim graph**, and anything outside it is not being checked. **Never close a coverage gap by re-adding a bulk import to Main.**
 
 **Why this is law:** unwired proven work costs more than refutations. A proof nobody calls sits inert while the work it would have done is re-derived inline, so the same thing is proven twice; and a tower built without its consumer is a tower whose shape was never checked.
 
@@ -325,33 +293,28 @@ Main also defines the build's COVERAGE — **`make gate-heavy` IS the claim grap
 
 As purely functional as possible: no mutable state, no direct `.subscribe()`. Delegate IO/statefulness to rxjs operators like `scan`. Two reasons — cleanliness, and keeping the primitives and `batchSimultaneous` in near-direct correspondence with the Agda.
 
-## The change workflow — batchSimultaneous IMPLEMENTATION only
+## The change workflow — engine IMPLEMENTATION only
 
 Not for proof work, tooling or documentation.
 
 1. **Agda first**, before touching TypeScript.
-2. **QuickCheck dev loop** — `npm run agda:qc`. **The spec is gospel; when impl and spec disagree, the implementation is wrong by default.**
-3. **Ignore `The-Proof.agda`** during this phase; errors there are fine.
-4. **Port to TypeScript**, only once QuickCheck passes.
-5. **Oracle** — `npm run oracle`.
-6. **Formal verification last**, in phases, committing in-between results, until there are no gaps.
+2. **QuickCheck** — `quickcheck.Quickcheck`: the pure runtime against the denotation on drawn programs.
+3. **Port to TypeScript**, only once QuickCheck passes.
+4. **Oracle** — all three Agda engines against real rxjs. Every divergence becomes a bug-cache row.
+5. **Formal verification last**, in phases, committing in-between results, until there are no gaps.
 
-**Resolving ambiguity:** the README's semantics section first, then naive plain rxjs — actually run the example and see. If that doesn't settle it, surface the question with a TypeScript rxjs example that **avoids the `*All()` higher-order operators where possible**.
-
-**The README's semantics section is the reference for how the spec behaves (Anthony).** A question about behaviour is answered there first. Each edge case in it is a real Agda proof over the spec's statement.
+**Resolving ambiguity:** naive plain rxjs — actually run the example and see. If that doesn't settle it, surface the question with a TypeScript rxjs example that **avoids the `*All()` higher-order operators where possible**.
 
 **Batching never reorders (Anthony).** Values leave in exactly the order plain rxjs delivers them, and later in the array means later in time. For `1, 5, 3, 7, 0`: `[1,5] [3] [7,0]` is legal, and so are `[1] [5] [3,7,0]` and `[1,5,3,7,0]`. `[1,5,3,0,7]` never is.
 
 **Every example takes one form (Anthony):** input observables labelled up front, a combination of primitive operators, `.subscribe()` at the very end, and comments underneath showing what emits.
 
-**Authority ordering (Anthony, most → least): Anthony's discretion, then the root `README.md`'s semantics section, then the Agda spec. There is no fourth source.** `agda/README.autogenerated.md` is NOT an authority (Anthony: "I don't care about the readme.autogenerated, for the record") — nothing generates it, no gate reads it, nothing fails when the spec moves out from under it. Do not resolve an ambiguity by citing it, do not treat a case it is silent on as a gap, do not surface a conflict with it as a question.
+**Authority ordering (Anthony, most → least): Anthony's discretion, then real rxjs, then the Agda denotation. There is no fourth source.** Nothing under `agda/` (its READMEs included) is an authority.
 
 **The Agda impl MUST mirror the TS impl.** If the Agda relies on something TS cannot do, the correspondence is void. When in doubt about portability, **port it to TS and run the oracle before building on it.**
 
 ## Bug cache
 
-Capture an implementation bug immediately as a **row of the corpus** in `agda/src/CLI/Unit-Test.agda` — a program, not a claim about one. Dead simple: a wall of little entries, no fancy names, no abstraction. **Append-only**, and the invariant is **`make bug-cache` green ⟺ no known counterexample remains**.
+Capture an implementation bug immediately as a **row of the corpus** in `agda-impl/quickcheck/Bug-Cache.agda` — a label and a program, not a claim about one. Dead simple: a wall of little entries, no fancy names, no abstraction. **Append-only** — it is the list of tricky cases already overcome — and the invariant is **`make bug-cache` green ⟺ no known counterexample remains**.
 
-The run happens in a BINARY, not the typechecker — a row used to be a `refl` over a whole `evaluate` run, so an append-only corpus charged the gate forever. **It runs in CI's oracle job, not in `make gate`**: it checks the evaluator rather than the proof, so it runs beside the sweep, from the oracle's own build (termination checking off, cached as binaries keyed on the runners' import cone). Corollary: a green row is checked by the GHC backend and the FFI, so **no proof may ever depend on the cache**. Delete the module once `The-Proof.agda` is discharged. → [docs/bug-cache.md](docs/bug-cache.md)
-
-A new "naive rx" operator to fix an Agda-impl bug is allowed and encouraged when it is the best solution — but follow the port order: TypeScript first, as a proper rxjs-delegating, purely-functional operator.
+The run happens in a BINARY, not the typechecker, so an append-only corpus never charges the gate. **It runs in its own CI job, not in `make gate`.** A green row is checked by the GHC backend and the FFI, so **no proof may ever depend on the cache**. → [docs/bug-cache.md](docs/bug-cache.md)

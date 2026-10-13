@@ -17,9 +17,9 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 
-open import Tree as T using (Obs; Later;
-  cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer)
-open import denotation.MonotonicList
+import Tree as T
+open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer)
+open import denotation.MonotonicList using (MonotonicList; cold; Timeline; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flattenᴰ; deferᴰ; connectᴰ; ⊥ᴰ; lub)
 
 -- A connect in scope means the handle `connectᴰ` passed its body.
 DenEnv : List Set → Set₁

@@ -13,7 +13,7 @@ open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String; _++_; intersperse)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (⊤)
 
 infixr 5 _×ᵗ_ _+ᵗ_
 

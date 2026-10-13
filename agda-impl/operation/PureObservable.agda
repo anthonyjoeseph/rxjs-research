@@ -18,8 +18,8 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Unit using (⊤)
 
-open import Tree
-open import operation.AbstractObservable
+open import Tree using (Obs; Later)
+open import operation.AbstractObservable using (Prims; module Run)
 open import denotation.MonotonicList using (ML; Timeline)
 
 Addr : Set

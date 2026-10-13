@@ -16,10 +16,10 @@ open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import quickcheck.Ty
-open import quickcheck.Tm
-open import quickcheck.Code
-open import quickcheck.Oracle
+open import quickcheck.Ty using (boolᵗ; natᵗ; ⟦_⟧ᵀ; maybeᵗ; eqᵀ)
+open import quickcheck.Tm using (Tm; var; unit; nat; plus; less; inl; inr)
+open import quickcheck.Code using (Script; script; Code; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; μ; var; defer; Prog)
+open import quickcheck.Oracle using (Event; _▸_; tick; val; End; completed; silent; cut; Trace; denoteTrace; pureTrace)
 
 ------------------------------------------------------------------------
 -- The property

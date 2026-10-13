@@ -25,10 +25,11 @@ open import Data.Sum using (inj₁; inj₂)
 open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Tree as T using (Obs; Later; renameLater)
+import Tree as T
+open import Tree using (Obs; Later; renameLater)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; close; Timeline)
-open import quickcheck.Ty
-open import quickcheck.Tm
+open import quickcheck.Ty using (Ty; boolᵗ; ⟦_⟧ᵀ; maybeᵗ)
+open import quickcheck.Tm using (Vals; Tm; if; ⟦_⟧ᵗ)
 
 -- A cold, as data: frames at offsets from subscribe, then complete or not.
 record Script (t : Ty) : Set where

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hold every comment in `agda/src` to the source-comment law.
+"""Hold every comment in `agda-impl` to the source-comment law.
 
 A source header is where the roadmap's character budget SENDS research: the
 hygiene rule "research lives in source comments" makes this file the
@@ -119,7 +119,7 @@ import pathlib
 import re
 import sys
 
-DEFAULT_DIRS = ["agda/src"]
+DEFAULT_DIRS = ["agda-impl"]
 
 # Any ISO-ish or spelled date.  Kept deliberately identical in spirit to the
 # roadmap checker's: one scan, one law, two jurisdictions.
@@ -218,7 +218,7 @@ def _module_ref_re(dirs):
         return None
     alt = "|".join(re.escape(n) for n in names)
     return re.compile(r"(?<![A-Za-z0-9_-])(?:" + alt + r"):\d+")
-GITLOG = re.compile(r"git log[^`\n]*agda/")
+GITLOG = re.compile(r"git log[^`\n]*agda(?:-impl)?/")
 
 # FIFTH CHECK's vocabulary.  A structured section is a machine-checked
 # reference a few lines below, so prose that ALSO names its subject is paying
@@ -390,7 +390,7 @@ def check_refs(refs, root):
     """-> [(file, lineno, kind, why)] for every reference that resolves to
     nothing.  A marker naming something that can STOP EXISTING is only worth
     the line it costs if its disappearance is a build failure."""
-    src = declared_names(root / "agda/src")
+    src = declared_names(root / "agda-impl")
     post = live_postulates(root) or set()
     shas = real_shas(root, {t for _, _, _, text in refs
                             for t in SHA_TOKEN.findall(text)})
@@ -402,7 +402,7 @@ def check_refs(refs, root):
             hits = toks & src
             still = hits & post
             if not hits:
-                bad.append((f, lineno, kind, "names nothing declared in `agda/src`"))
+                bad.append((f, lineno, kind, "names nothing declared in `agda-impl`"))
             elif hits <= still:
                 bad.append((f, lineno, kind,
                             "names `" + sorted(still)[0] + "`, which is STILL A "
@@ -500,7 +500,7 @@ def main():
                          "a fixture outside them cannot be judged by it)")
     ap.add_argument("--sample-proven", action="store_true",
                     help="print one name a TWIN may legally carry -- declared in "
-                         "agda/src and not on the live postulate ledger -- so the "
+                         "agda-impl and not on the live postulate ledger -- so the "
                          "selftest's passing fixture is GENERATED rather than "
                          "naming a definition by hand, which rots the day that "
                          "definition is deleted")
@@ -514,7 +514,7 @@ def main():
         live = live_postulates(root) or set()
         # Length filters out the single letters a type telescope binds, which
         # resolve but read as nothing a header would ever claim as a twin.
-        ok = sorted(n for n in declared_names(root / "agda" / "src")
+        ok = sorted(n for n in declared_names(root / "agda-impl")
                     if n not in live and n.isidentifier() and len(n) >= 8)
         if not ok:
             return 1

@@ -25,7 +25,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤; tt)
 
-open import Tree
+open import Tree using (FlatOp; Obs; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer; Later)
 
 ------------------------------------------------------------------------
 -- What a runtime supplies

@@ -39,32 +39,41 @@ positives are the entire complaint.
 
 
 An unchanged roadmap is only a finding when there was proof work to report. A
-commit touching nothing under agda/ — CI tooling, docs, CLAUDE.md itself — has
+commit touching nothing under agda-impl/ — CI tooling, docs, CLAUDE.md itself — has
 no leg to retire or restate, so it is exempt; the exemption is read from the
 same two endpoints already used for the movement comparison, never from a
-separate rule about "which PR this is". "Touching agda/" means touching what
+separate rule about "which PR this is". "Touching agda-impl/" means touching what
 Agda actually checks: a comment-only edit there (a stale marker deleted, a
-`-- PROBED` line added) is already free by this repo's own design — the
-`agda/_stripped-comments/` mirror is invariant under it — so the exemption
-reuses `strip-comments.py`'s stripper rather than a raw path match, and a
-change that survives stripping still owes the roadmap a line.
+`-- DEAD ROUTE` line added) owes the roadmap nothing, so the exemption strips
+whole-line comments rather than matching paths, and a change that survives
+stripping still owes the roadmap a line.
 """
 import argparse
-import importlib.util
+import re
 import os
 import subprocess
 import sys
 
-_STRIP_MODULE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "strip-comments.py")
+# Agda's lexical rule for a whole-line `--` comment: two or more dashes, then
+# end of line or a character that is not a symbol.  A file with a block
+# comment is never stripped, since "is this line inside one?" is then a real
+# question.  Agda has no multi-line string literal, so the rule is line-local.
+SYMBOLS = set("-!#$%&*+./<=>?@\\^|~:;,'\"`")
+LINE_COMMENT = re.compile(r"^[ \t]*(-{2,})(.?)")
+BLOCK_OPEN = re.compile(r"\{-(?!#)")
 
 
-def _load_strip_text():
-    spec = importlib.util.spec_from_file_location("strip_comments_mod",
-                                                    _STRIP_MODULE_PATH)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.strip_text
+def strip_text(text):
+    """(text without its whole-line comments, None, skip reason or None)."""
+    if BLOCK_OPEN.search(text):
+        return text, None, "block comment"
+    out = []
+    for ln in text.split("\n"):
+        m = LINE_COMMENT.match(ln)
+        if m and (m.group(2) == "" or m.group(2) not in SYMBOLS):
+            continue
+        out.append(ln)
+    return "\n".join(out), None, None
 
 
 def norm(text):
@@ -137,7 +146,7 @@ def content_at(path, ref):
 
 
 def agda_content_changed(ref_from, ref_to, strip_text):
-    """True if any agda/ path differs from ref_from to ref_to (working tree
+    """True if any agda-impl/ path differs from ref_from to ref_to (working tree
     when ref_to is None) once full-line comments are stripped — i.e. there is
     something here Agda actually checks differently. A file Agda would refuse
     to strip (a block comment) or one that was added/removed is conservatively
@@ -146,7 +155,7 @@ def agda_content_changed(ref_from, ref_to, strip_text):
     if files is None:
         return True  # can't tell — don't let a shaky git call grant a pass
     for f in files:
-        if not f.startswith("agda/"):
+        if not f.startswith("agda-impl/"):
             continue
         before, after = content_at(f, ref_from), content_at(f, ref_to)
         if before is None or after is None:
@@ -261,10 +270,9 @@ def main():
 
     if norm(cur) == norm(base):
         if exempt_from is not None:
-            strip_text = _load_strip_text()
             if not agda_content_changed(exempt_from, exempt_to, strip_text):
                 print(f"roadmap-moved: SKIP — {args.file} unchanged against "
-                      f"{against}, but nothing under agda/ changed either "
+                      f"{against}, but nothing under agda-impl/ changed either "
                       f"(or only comments did) — no leg to report")
                 return 0
 

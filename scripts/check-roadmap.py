@@ -19,7 +19,7 @@ know it.
 A row whose text names no class is not a work item.  Those are skipped for ordering but REPORTED, so an item
 cannot dodge the check by omitting its class.
 
-SECOND CHECK — COVERAGE: every live postulate in agda/src is named by some
+SECOND CHECK — COVERAGE: every live postulate in agda-impl is named by some
 row.  PROOF-STATE.md has always asserted this ("every one of them appears in
 exactly one tier below"), and nothing enforced it, so a postulate could be
 added and never scheduled — invisible debt of exactly the kind the wiring law
@@ -99,7 +99,7 @@ syntax says which kind it is.  A head that is NOTHING BUT names — backticks an
 separators, `a` / `b`, `c` — is a CLAIM head, and every name in it must be a
 live postulate.  A head carrying prose — "`X`'s residue", "`HotLive`'s
 preservation leaves", "the `glob-*` family" — names a PARENT rather than a work
-item, so its names need only still EXIST in agda/src; that catches the parent
+item, so its names need only still EXIST in agda-impl; that catches the parent
 being deleted, which is the failure a descriptive head can have.
 
 The boundary, stated plainly because it is a real gap: a family row schedules
@@ -233,11 +233,6 @@ LEGS_MAX = 7
 # piece of work -- and there is no header for a group.
 LEG_BUDGET = 700
 
-# THE MONSTER SECTION IS NOT PREAMBLE, and its own checker owns its rules.
-# A preamble says what the tier IS; the monster says what it is trying to
-# KILL, which is a different question and is held by `make monster-check` --
-# the only check that can resolve the name it carries.
-MONSTER_RE = re.compile(r"^###\s+The monster\b", re.I)
 BACKTICK_SPAN_RE = re.compile(r"`[^`]*`")
 
 # Any ISO-ish or spelled date.  The roadmap has no legitimate use for one.
@@ -297,7 +292,6 @@ def parse(path):
     row = None  # (lineno, [text chunks])
     legs = None      # [(lineno, [text chunks])] for the roadmap subsection
     in_roadmap = False
-    in_monster = False
 
     def flush_pre():
         if pre is not None and pre[1]:
@@ -325,7 +319,6 @@ def parse(path):
                 tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre(), legs)
             row = None
             in_roadmap = False
-            in_monster = False
             cur = mt.group(1)
             rows = []
             legs = []
@@ -343,7 +336,6 @@ def parse(path):
             flush_row()
             row = None
             in_roadmap = bool(ROADMAP_RE.match(line))
-            in_monster = bool(MONSTER_RE.match(line))
             continue
         if ROW_START_RE.match(line):
             flush_row()
@@ -356,11 +348,11 @@ def parse(path):
             else:
                 flush_row()
                 row = None
-                if line.strip() and not in_monster:
+                if line.strip():
                     if pre[0] is None:
                         pre[0] = i
                     pre[1].append(line)
-        elif line.strip() and not in_monster:
+        elif line.strip():
             if pre[0] is None:
                 pre[0] = i
             pre[1].append(line)
@@ -441,7 +433,7 @@ def check_coverage(path, names):
     return sorted(n for n in names if not covered(n, claimed))
 
 
-# A declaration in agda/src: a type signature at any indentation, or a data /
+# A declaration in agda-impl: a type signature at any indentation, or a data /
 # record / module head.  Deliberately generous — its only job is to tell a
 # DELETED name from one that is merely no longer a postulate, and being
 # generous errs toward silence rather than toward a false stale report.
@@ -466,7 +458,7 @@ def decl_names(*roots):
 
 
 def src_decl_names(root):
-    return decl_names(root / "agda" / "src")
+    return decl_names(root / "agda-impl")
 
 
 # A head that is nothing but names and separators CLAIMS them; a head carrying
@@ -514,8 +506,8 @@ def check_stale(tiers, live, srcnames):
 
     `discharged` and `vanished` split a CLAIM head's dead names by what became of
     them, because the two want different repairs and the message should say which:
-    a name still declared in agda/src was DISCHARGED (delete the row), a name gone
-    from agda/src entirely was DELETED (delete the row, and the work it named is
+    a name still declared in agda-impl was DISCHARGED (delete the row), a name gone
+    from agda-impl entirely was DELETED (delete the row, and the work it named is
     not owed).  `gone_parents` is the descriptive-head case.
     """
     discharged, vanished, gone_parents = [], [], []
@@ -564,7 +556,7 @@ EVID_TOKEN_RE = re.compile(
 
 
 def census(root, names, fixture=None):
-    """-> {postulate name: {marker kind: count}} read from agda/src headers.
+    """-> {postulate name: {marker kind: count}} read from agda-impl headers.
 
     A block is associated with EVERY declaration that follows it until the
     next comment run or a line that is neither a declaration nor a block
@@ -588,7 +580,7 @@ def census(root, names, fixture=None):
 
     want = set(names)
     out = {n: {} for n in names}
-    src = root / "agda" / "src"
+    src = root / "agda-impl"
     for path in sorted(src.rglob("*.agda")) if src.exists() else []:
         block, prev_comment = [], False
         for line in path.read_text().splitlines():
@@ -798,11 +790,11 @@ def main():
                                   "used by make roadmap-selftest against fixtures")
     ap.add_argument("--ledger", help="file of postulate names to require coverage of, "
                                      "one 'name path.agda:N' per line; selftest only")
-    ap.add_argument("--src-names", help="file of names declared in agda/src, one "
+    ap.add_argument("--src-names", help="file of names declared in agda-impl, one "
                                        "per line, standing in for a scan of the "
                                        "tree; selftest only")
     ap.add_argument("--census", help="file of 'name: MARKER, MARKER×2' lines "
-                                     "standing in for a scan of agda/src headers; "
+                                     "standing in for a scan of agda-impl headers; "
                                      "selftest only")
     ap.add_argument("--fix-evidence", action="store_true",
                     help="rewrite every classed row's evidence field from the "
@@ -911,7 +903,7 @@ def main():
                   "that has been DISCHARGED:")
             for tier, lineno, label, name in discharged:
                 print(f"  Tier {tier}  {path.name}:{lineno}  {name}")
-                print(f"    in **{label}**  — still declared in agda/src, "
+                print(f"    in **{label}**  — still declared in agda-impl, "
                       "but no longer a postulate")
             print("\nCompleted items are DELETED, not marked complete — the roadmap's")
             print("own second hygiene rule. Delete the row. If the discharge left a")
@@ -920,12 +912,12 @@ def main():
             print("definition, which is what re-aims the next session.")
         if vanished:
             print(f"\nSTALE ROWS — {len(vanished)} row head(s) naming something that "
-                  "is NOT IN agda/src at all:")
+                  "is NOT IN agda-impl at all:")
             for tier, lineno, label, name in vanished:
                 print(f"  Tier {tier}  {path.name}:{lineno}  {name}")
                 print(f"    in **{label}**")
             print("\nNeither a live postulate nor a declaration: deleted, renamed, or")
-            print("misspelled. Delete the row, or fix the name to the one in agda/src.")
+            print("misspelled. Delete the row, or fix the name to the one in agda-impl.")
         if gone_parents:
             print(f"\nSTALE ROWS — {len(gone_parents)} descriptive head(s) naming a "
                   "parent that no longer exists:")
@@ -933,7 +925,7 @@ def main():
                 print(f"  Tier {tier}  {path.name}:{lineno}  {name}")
                 print(f"    in **{label}**")
             print("\nA head carrying prose names a PARENT, so it is held only to still")
-            print("existing in agda/src. This one does not. Delete the row or rename it.")
+            print("existing in agda-impl. This one does not. Delete the row or rename it.")
         if stale:
             failures.append(None)
 

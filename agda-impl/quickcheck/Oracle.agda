@@ -26,8 +26,8 @@ open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; qu
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using (toArray)
 open import operation.Observable using (subscribe; fromTimeline)
-open import quickcheck.Ty
-open import quickcheck.Code
+open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
+open import quickcheck.Code using (Code; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; μ; var; defer; Prog; toObs; timeline)
 
 data Engine : Set where
   denotational pureOp ioOp : Engine

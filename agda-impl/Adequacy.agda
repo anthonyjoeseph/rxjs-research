@@ -21,17 +21,17 @@ module Adequacy where
 
 open import Data.List using (List; _∷_; [])
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
+open import Data.Nat using (zero; suc)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 
-open import Tree hiding (ones; merge; flatMap)
-open import operation.AbstractObservable
-open import operation.PureObservable
-open import denotation.MonotonicList hiding (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Denote
+open import Tree using (cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer; Later)
+open import operation.AbstractObservable using (module Run)
+open import operation.PureObservable using (Pureᴾ; PureObs; deferredᴺ; compileᴺ; runPure; toArray)
+open import denotation.MonotonicList using (MonotonicList; cold; observe; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flattenᴰ; deferᴰ; connectᴰ; ⊥ᴰ; _⊑_; ⊑-trans; _≈_; lub)
+open import denotation.Denote using (DenEnv; flatOp; laneᴰ; ⟦_⟧[_]; ⟦_⟧)
 open Run Pureᴾ
 
 -- The pure run: the limit of its approximants, the root subscribed at 0.

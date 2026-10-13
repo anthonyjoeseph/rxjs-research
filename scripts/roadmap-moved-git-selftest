@@ -32,15 +32,15 @@ expect() {   # expect <want-exit> <label>
 cd "$TMP" || exit 1
 git init -q -b main .
 git config user.email t@t; git config user.name t
-mkdir -p agda/src
+mkdir -p agda-impl
 printf 'row A\n'       > PROOF-STATE.md
-printf 'module M where\nx = 1\n' > agda/src/M.agda
+printf 'module M where\nx = 1\n' > agda-impl/M.agda
 git add -A && git commit -qm base
 
 # A BRANCH THAT CHANGES AGDA AND SAYS NOTHING ABOUT THE PLAN -- the finding the
 # check exists for, and it must survive the move to a merge-base baseline.
 git checkout -qb leg
-printf 'y = 2\n' >> agda/src/M.agda
+printf 'y = 2\n' >> agda-impl/M.agda
 git commit -qam 'proof work, no roadmap'
 expect 1 "agda changed and the roadmap did not -- the check did not fire"
 
@@ -54,7 +54,7 @@ expect 0 "a branch whose roadmap moved was rejected"
 # agda/ and leaves the roadmap alone.  Against HEAD~1 that is a FAIL and the
 # branch is taxed per keystroke; against the merge-base the leg has already
 # said its piece and this costs nothing.
-printf 'z = 3\n' >> agda/src/M.agda
+printf 'z = 3\n' >> agda-impl/M.agda
 git commit -qam 'fix-up: repair the reassembly'
 expect 0 "a fix-up inside a branch that already moved the roadmap was rejected"
 
@@ -67,7 +67,7 @@ expect 0 "a branch touching nothing under agda/ was not exempt"
 # ON main ITSELF the merge-base is HEAD, so the per-commit fallback must still
 # hold a direct landing rather than passing it silently.
 git checkout -q main
-printf 'w = 4\n' >> agda/src/M.agda
+printf 'w = 4\n' >> agda-impl/M.agda
 git commit -qam 'direct landing on main, no roadmap'
 expect 1 "a direct commit to main with no roadmap move was not held"
 

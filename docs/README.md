@@ -3,30 +3,17 @@
 CLAUDE.md is the **file of record for directives**: rulings, standing rules, laws.
 It is read in full at the start of every session, so every byte in it is paid for
 by every worker. These files hold the part that is **not a directive** — how a
-tool works, what its flags mean, which trap cost a day, what a measurement
-showed. A session reads one of these when it is about to USE the thing.
+tool works, what its flags mean, which trap cost a day. A session reads one of
+these when it is about to USE the thing.
 
 **The split is by KIND, not by length.** A rule that must be obeyed
-prophylactically — before you have any reason to open a doc — stays in CLAUDE.md.
-Mechanics, error catalogues, and the evidence behind a rule come here.
+prophylactically stays in CLAUDE.md. Mechanics, error catalogues, and the
+evidence behind a rule come here.
 
 **These files are under the same no-dates rule as CLAUDE.md**, enforced by
-`make roadmap-check`. A tool doc describes the tool as it is; when it happened is
-not a property of the tool. The one file that legitimately carries dates is
-`typecheck-performance-numbers.md`, because a timing's age IS information about
-the timing — and that is why it is not in the scan.
+`make roadmap-check`.
 
-## Which gate — `make gate` routes
-
-Start at [gate.md](gate.md). **Type `make gate`** — it asks for a free verdict
-and takes the light path (the cheap block below, plus a real dev check of the
-modules this tree touched) or the heavy one (that block plus the full tower),
-printing which and why. The escalation triggers are a touched multi-member
-mutual block, a file outside `agda/src`, too many changed modules, or too many
-commits of drift since the last heavy run — so the choice is the machine's, not
-yours. `gate-light` and `gate-heavy` force a path.
-
-## The cheap block, in order — both paths run all of it
+## `make gate` — the cheap block, in order, then `make agda`
 
 | Target | Doc | What it will not let you do |
 | --- | --- | --- |
@@ -38,34 +25,25 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `imports-selftest` | [imports-check.md](imports-check.md) | ship an import checker that has stopped firing |
 | `imports-check` | [imports-check.md](imports-check.md) | leave an import no name in the file spends, or one that names nothing it takes |
 | `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
-| `monster-check` | [monster.md](monster.md) | add code to `agda/src` outside the lowest open tier's monster's cone |
-| `monster-selftest` | [monster.md](monster.md) | ship a monster checker that has stopped firing |
-| `dev-changed-selftest` | [gate.md](gate.md) | ship a light gate that passes while checking nothing |
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
-| `recursion-cover-selftest` | [recursion-cover.md](recursion-cover.md) | ship a recursion-cover checker that has stopped firing |
-| `recursion-cover` | [recursion-cover.md](recursion-cover.md) | open a cycle in the evaluator that no declared peel cuts and no declared structural descent carries |
-| `formers-selftest` | [formers-check.md](formers-check.md) | ship a former-correspondence checker that has stopped firing |
-| `formers-check` | [formers-check.md](formers-check.md) | let the two trees' former sets diverge, or leave a former the generator cannot reach undeclared |
+| `roadmap-moved` | [roadmap-check.md](roadmap-check.md) | land proof work on a branch without moving PROOF-STATE |
+| `roadmap-order` | [roadmap-check.md](roadmap-check.md) | discharge a GRINDABLE row while its tier holds an open FALSITY |
 | `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
-| `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin that is not there, re-say in charged prose what a section below already says resolvably, or let an explanation grow into an essay |
-| the tower (inline in `gate-heavy`) | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
-| `bug-cache` | [bug-cache.md](bug-cache.md) | regress a known impl counterexample |
+| `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin that is not there |
+| `ts-gate` | — | land TypeScript that does not typecheck or lint |
+| `agda` | [agda-build.md](agda-build.md) | land anything that does not typecheck from Main, warnings included |
+
+Beside the gate, in its own CI job: `bug-cache` — [bug-cache.md](bug-cache.md).
 
 ## The rest
 
 | Doc | Subject |
 | --- | --- |
-| [agda-build.md](agda-build.md) | the `AGDA` variable, `-W error`, and the comment-stripped mirror Agda actually checks |
-| [agda-dev.md](agda-dev.md) | `make agda-dev` — the per-member iteration loop |
-| [gate.md](gate.md) | `make gate` routing, `gate-light` / `gate-heavy` — the four escalation triggers, and the consumer cone the light path does not reach |
+| [agda-build.md](agda-build.md) | the `AGDA` variable, `-W error`, the GHC backend's own failures |
 | [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
-| [ci-cache.md](ci-cache.md) | the Actions interface cache — why a PR's snapshot reaches nobody else, the window in which main's is one merge stale, and the ceiling that evicts what you need |
-| [formers-check.md](formers-check.md) | `make formers-check` — the Agda and TypeScript former sets held to one written-down pairing, and the `gen` column where a former nothing generates is counted |
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
-| [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, coverage boundaries, rulings, traps |
-| [quickcheck.md](quickcheck.md) | `make quickcheck` — the compiled sweep and shrinking a red into a bug-cache row |
-| [stub-proofs.md](stub-proofs.md) | `scripts/stub-proofs.py` — a `src` mirror with the proofs postulated; measured, and why it is not on the gate path |
-| [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard, and why an edge costs |
-| [typecheck-cost.md](typecheck-cost.md) | the cost model: what actually makes a module slow, and the `abstract` mandate |
+| [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, rulings, traps |
+| [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
-| [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out, and why it may carry counts the roadmap may not |
+| [delegation.md](delegation.md) | worker model pinning and directives |
+| [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out |

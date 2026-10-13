@@ -30,9 +30,9 @@ row may be DELETED, RENAMED, SPLIT, RESTATED or RECLASSIFIED at any time --
 the proof must be free to take the shape it needs, and every one of those is
 the shape changing rather than a claim being banked.  A DISCHARGE is the one
 move that banks: the name stops being a live postulate and is STILL DECLARED
-in agda/src, i.e. the postulate became a proven definition.  That is the same
+in agda-impl, i.e. the postulate became a proven definition.  That is the same
 split `check-roadmap.py` draws between a discharged row and a vanished one,
-read here for a different purpose.  A name that left agda/src entirely is a
+read here for a different purpose.  A name that left agda-impl entirely is a
 deletion and is free; a name still on the postulate ledger under a different
 class is a reclassification and is free.
 
@@ -49,7 +49,7 @@ rows this check then reports as blockers: the leaves are discovered by
 writing the body, which is the whole payoff of the leaf-only form.
 
 The test is the one the exemption is named after and needs no list: read
-the banked name's own DEFINITION out of agda/src and ask whether it names a
+the banked name's own DEFINITION out of agda-impl and ask whether it names a
 live postulate.  Nothing can be gamed into it, because a definition that
 mentions an open statement IS one that proved nothing -- the same fact,
 read by a machine instead of claimed by a commit message.
@@ -136,7 +136,7 @@ def successors(base_tier, was_all, now_all):
 
 def discharged(groups, live, srcnames):
     """The names in `groups` that became PROVEN DEFINITIONS: no member is a
-    live postulate any more, and a member is still declared in agda/src.
+    live postulate any more, and a member is still declared in agda-impl.
 
     A group is a set of ALTERNATIVE readings of one head token, so it is
     discharged only when no reading of it is still open."""
@@ -167,7 +167,7 @@ def header_text(root, name):
     stated nor written down is the near miss the carve-out must not admit."""
     pat = re.compile(DECL_OF_RE.format(re.escape(name)))
     chunks = []
-    for f in sorted((root / "agda" / "src").rglob("*.agda")):
+    for f in sorted((root / "agda-impl").rglob("*.agda")):
         lines = f.read_text().splitlines()
         for i, line in enumerate(lines):
             if not pat.match(line):
@@ -184,14 +184,14 @@ def header_text(root, name):
 
 
 def definition_text(root, name):
-    """`name`'s DECLARATION AND ITS CLAUSES in agda/src — the type, plus every
+    """`name`'s DECLARATION AND ITS CLAUSES in agda-impl — the type, plus every
     line of the body.  `header_text` deliberately stops at the first column-0
     line, because a header is what sits ABOVE a statement; this is the other
     half, and it is what says whether the definition stands on anything open."""
     pat = re.compile(DECL_OF_RE.format(re.escape(name)))
     own = re.compile(r"^" + re.escape(name) + r"(?:[ \t]|$)")
     chunks = []
-    for f in sorted((root / "agda" / "src").rglob("*.agda")):
+    for f in sorted((root / "agda-impl").rglob("*.agda")):
         lines = f.read_text().splitlines()
         for i, line in enumerate(lines):
             if not pat.match(line):
@@ -257,11 +257,11 @@ def main():
     ap.add_argument("--ledger", default=None,
                     help="live-postulate names (selftest fixture)")
     ap.add_argument("--src-names", default=None,
-                    help="agda/src declared names (selftest fixture)")
+                    help="agda-impl declared names (selftest fixture)")
     ap.add_argument("--headers", default=None,
                     help="risky postulates' headers (selftest fixture)")
     ap.add_argument("--definitions", default=None,
-                    help="banked names' definitions in agda/src (selftest fixture)")
+                    help="banked names' definitions in agda-impl (selftest fixture)")
     args = ap.parse_args()
 
     try:

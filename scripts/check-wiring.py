@@ -246,18 +246,20 @@ class Def:
         self.kind = kind  # 'def' | 'data/record' | 'postulate'
 
 
-# THE HARNESS'S FFI IS NOT REMAINING WORK (Anthony).  A postulate in `CLI/`
-# bound by a `COMPILE GHC` pragma HAS a body -- the Haskell one the binary
-# runs -- and no proof may depend on the harness, so it leaves the ledger.
-# Outside `CLI/` a binding earns nothing: a proof could cite it.
+# THE HARNESS'S FFI IS NOT REMAINING WORK (Anthony).  A postulate in an FFI
+# zone bound by a `COMPILE GHC` pragma HAS a body -- the Haskell one the
+# binary runs -- and no proof may depend on the harness, so it leaves the
+# ledger.  The zones are `CLI/` and the IO runtime, which no proof imports.
+# Outside them a binding earns nothing: a proof could cite it.
+FFI_ZONES = ("CLI/", "operation/Observable.agda")
 COMPILE_RE = re.compile(r"\{-#\s*COMPILE\s+GHC\s+(\S+)\s*=")
 
 
 def ffi_bindings(src_dir, files):
-    """-> {file: set of names bound by `COMPILE GHC`}, for files in CLI/."""
+    """-> {file: set of names bound by `COMPILE GHC`}, for files in FFI_ZONES."""
     out = {}
     for f in files:
-        if not f.replace(os.sep, "/").startswith("CLI/"):
+        if not f.replace(os.sep, "/").startswith(FFI_ZONES):
             continue
         with open(os.path.join(src_dir, f), encoding="utf-8") as h:
             out[f] = set(COMPILE_RE.findall(h.read()))
@@ -571,7 +573,7 @@ def extract_definitions(src_dir, files):
     # postulates, and reading `tok0` alone put exactly one of them outside
     # the ledger the wiring law calls complete — invisible to `make
     # postulates`, unroutable by the reachability pass, and reported by
-    # `make roadmap-check` as a row head naming something not in `agda/src`
+    # `make roadmap-check` as a row head naming something not in `agda-impl`
     # when the roadmap tried to carry it.  Every name left of a standalone
     # `:` is a declaration; a CLAUSE has no such token, and a name carrying
     # a bracket is an argument pattern rather than a name being declared.
@@ -788,6 +790,12 @@ def import_span_lines(visible):
 
 
 _IMPORT_HEAD_RE = re.compile(r"^\s*(?:open\s+)?import\s+(\S+)(.*)$")
+# The same dependency without an import: a module applied in place
+# (`open Engine IOᴿ`), and a module's own parameter telescope
+# (`module Run (P : Prims) where`).  Every definition after either depends
+# on what it names.
+_OPEN_HEAD_RE = re.compile(r"^\s*open\s+(?!import\b)(\S+)(.*)$")
+_MODULE_HEAD_RE = re.compile(r"^\s*module\s+(\S+)(.*?)\bwhere\s*$")
 _ARG_STOP = {"using", "hiding", "renaming", "public", "as"}
 _IDENT_RE = re.compile(r"[^\s()\{\};]+")
 
@@ -809,7 +817,8 @@ def module_arg_names(visible):
     ends the application."""
     out = set()
     for line in visible:
-        m = _IMPORT_HEAD_RE.match(line)
+        m = (_IMPORT_HEAD_RE.match(line) or _OPEN_HEAD_RE.match(line)
+             or _MODULE_HEAD_RE.match(line))
         if not m:
             continue
         for tok in _IDENT_RE.findall(m.group(2)):
@@ -846,10 +855,15 @@ def mixfix_core_of(name):
     plain substring search for the underscored form therefore finds real
     uses in ~nothing but the operator's own declaration; searching for the
     core too is what makes such an operator's real infix uses count."""
-    if len(name) > 2 and name.startswith("_") and name.endswith("_"):
-        core = name[1:-1]
-        if core and not core.startswith("_") and not core.endswith("_"):
-            return core
+    # Every `_` in an Agda name is a hole, so this is any mixfix shape, not
+    # only infix: `⟦_⟧[_]` is used as `⟦ o ⟧[ n ]`.  The LONGEST part is
+    # searched (the last, on a tie), since a short one like `⟦` or `]` is
+    # shared by every operator of the family.
+    parts = [p for p in name.split("_") if p]
+    if "_" in name and parts:
+        best = max(reversed(parts), key=len)
+        if best != name:
+            return best
     return None
 
 
@@ -891,20 +905,14 @@ VACUOUS_ALLOWLIST = {
 # module is held up entirely by its pins, and any name a pin cannot reach
 # is dead.
 MODULE_ROOTS = {
-    "CLI.Main": ("the oracle CLI — compiled by `make cli-build`, run by `make oracle`",
-                 ("main",)),
-    "CLI.QuickCheck": ("the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
-                   ("main",)),
-    "CLI.Unit-Test.Bug-Cache": ("the bug cache's runner — `make bug-cache`",
-                                           ("main",)),
-    "CLI.Walk": ("the derivation walk — `make walk-build` / `make walk`",
-                 ("main",)),
+    "quickcheck.Bug-Cache-Runner": ("the bug cache's runner — `make bug-cache`",
+                                    ("main",)),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
 
 # ---------------------------------------------------------------------------
-# THE REACHABILITY ROOT, relative to --src.  `agda/src` roots at Main.agda;
+# THE REACHABILITY ROOT, relative to --src.  `agda-impl` roots at Main.agda;
 # `agda/evidence/refuted` roots at Refuted/Main.agda.  Parameterised rather than
 # hardcoded so the SAME law applies to both trees (Anthony, 2026-08-18):
 # a refutation nothing reaches is as dead as a lemma nothing reaches, and
@@ -1289,7 +1297,7 @@ def reachable_from(seed, edges):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--src", default=None,
-                        help="path to agda/src (default: inferred from this "
+                        help="path to agda-impl (default: inferred from this "
                              "script's location)")
     parser.add_argument("--root", default="Main.agda",
                         help="the reachability root, relative to --src "
@@ -1297,7 +1305,7 @@ def main():
                              "Refuted/Main.agda). Everything in the tree must "
                              "trace to a name this file claims.")
     parser.add_argument("--postulates", action="store_true",
-                        help="list every postulate in agda/src, one `name  "
+                        help="list every postulate in agda-impl, one `name  "
                              "file:line` per line, and exit. This is the "
                              "complete remaining-work ledger: a grep for "
                              "`^postulate` finds the BLOCK HEADERS, not the "
@@ -1314,7 +1322,7 @@ def main():
         src_dir = args.src
     else:
         here = os.path.dirname(os.path.abspath(__file__))
-        src_dir = os.path.join(here, "..", "agda", "src")
+        src_dir = os.path.join(here, "..", "agda-impl")
     src_dir = os.path.abspath(src_dir)
     if not os.path.isdir(src_dir):
         print(f"error: no such directory: {src_dir}", file=sys.stderr)

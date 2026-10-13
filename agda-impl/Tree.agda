@@ -104,9 +104,3 @@ flatMap op f = flatten op λ a → nothing , just (f a)
 -- the echo, then the same program again as the lane.
 ones : ∀ {C Γ} → Obs C Γ ℕ
 ones = flatten (mergeᶠ nothing) (λ _ → just 1 , just (defer λ where .Later.force → ones)) (of (tt ∷ []))
-
-postulate
-  -- Swap the leaves, keeping the tree.  This is how one program runs on
-  -- both runtimes: `operation.Observable.toIO` realises each pure timeline as an
-  -- IO cold.
-  mapLeaves : ∀ {C C′ Γ A} → (∀ {X} → C X → C′ X) → Obs C Γ A → Obs C′ Γ A

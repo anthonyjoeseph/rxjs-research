@@ -1,52 +1,32 @@
 name: Gate
 
 # THE JOBS RUN IN PARALLEL, AND THE SPLIT IS BY HOW LONG A FAILURE TAKES TO
-# ARRIVE RATHER THAN BY SUBJECT. `ts` answers in about a minute, `gate` and
-# `quickcheck` each take the better part of an hour, and neither of the slow
-# two blocks the other — so a TypeScript error is red before the Agda
-# toolchain has finished building, and a counterexample is found on the same
-# run that types the tower instead of the one after it.
+# ARRIVE RATHER THAN BY SUBJECT: a TypeScript error is red before the Agda
+# toolchain has finished building.
 #
-# `make gate` is this repo's merge gate (see CLAUDE.md). On a fresh checkout
-# there is never a `.gate-heavy-stamp` (it's gitignored — local dev-loop
-# state only), so `make gate` always finds itself in the "cold-cache case"
-# and takes the full `gate-heavy` path: every cheap check, the whole Agda
-# tower, and the two compiled runners. That is the point — CI always
-# gets the strong guarantee, never the light-gate bet on unchanged consumers.
+# `make gate` is this repo's merge gate (see CLAUDE.md): every cheap check,
+# then `make agda` on `agda-impl/Main.agda`.  The bug cache runs beside it,
+# from its own compiled binary.
 
 on:
   push:
     branches: [main]
-  # A `pull_request` filter names the BASE branch, not the head. Every leg
-  # targets main, so main is the whole list -- and a PR opened against any
-  # other base gets no run at all: no red, no queue, just a PR with no checks,
-  # which reads exactly like one with nothing left to wait for.
+  # A `pull_request` filter names the BASE branch, not the head.  A PR
+  # opened against any other base gets no run at all, which reads exactly
+  # like one with nothing left to wait for.
   pull_request:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      qc_seeds:
-        description: "QuickCheck seed range and size: FIRST LAST RUNS DEPTH SECS"
-        required: false
-        default: ""
+  workflow_dispatch: {}
 
-# Keyed on the PR: a push to a branch CANCELS the run already going on it
-# (Anthony), since a gate on a superseded commit answers a question nobody is
-# asking and holds a runner for the better part of an hour to do it. A
-# cancelled run saves no interface cache, so the new one starts from the
-# cache the last completed run left. Pushes to main are never cancelled --
-# each merge's gate runs to the end, so main's cache always advances.
+# A push to a PR CANCELS the run already going on it (Anthony).  Pushes to
+# main are never cancelled, so main's interface cache always advances.
 concurrency:
   group: gate-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # THE FAST SIGNAL. `make gate` runs `ts-gate` too, inside its cheap path,
-  # and that duplication is the point rather than an oversight: the gate must
-  # stay WHOLE — it is the merge gate, and a gate with a check carved out of
-  # it to be run elsewhere is a gate that no longer answers the question it is
-  # asked — while a tsc error has no business waiting on an Agda toolchain
-  # build to be reported. The duplicate costs seconds.
+  # THE FAST SIGNAL.  `make gate` runs `ts-gate` too; the gate stays WHOLE,
+  # and the duplicate costs seconds.
   ts:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -54,13 +34,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # `cache: npm` IS THE WHOLE OF WHAT THIS SIDE NEEDS. The key hits, and
-      # against it the install and the whole TS gate are each a few seconds,
-      # so caching `node_modules` on top or wiring up `tsc --incremental` and
-      # `eslint --cache` would buy about a second apiece and add a staleness
-      # surface to checks whose job is to be trusted. Measured, so the
-      # question is closed rather than re-asked:
-      # typecheck-performance-numbers.md, under *The gate in CI*.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -76,33 +49,14 @@ jobs:
 
   gate:
     runs-on: ubuntu-latest
-    # The 13m-35m range in typecheck-performance-numbers.md is a single
-    # fastest-recorded LOCAL run per tower size, not a CI reading -- the one
-    # completed CI run so far took ~74 min for `make gate` alone (~1h36m
-    # total, toolchain cache cold) on this shared runner. Generous on
-    # purpose; tighten once more real runs land.
-    timeout-minutes: 120
+    timeout-minutes: 60
     steps:
-      # fetch-depth: 0 (full history) -- comments-check resolves `RECOVERY:`
-      # shas with `git cat-file`, and those name ordinary ancestor commits
-      # that a shallow (default depth-1) clone simply does not have, so the
-      # lookup fails and a genuine, resolvable reference reads as dangling.
-      #
-      # AND IT BUYS ANCESTORS ONLY, WHICH IS THE TRAP: checkout fetches the
-      # full history OF THE CHECKED-OUT REF, not every branch. A sha on a
-      # feature branch resolves in the working copy that wrote it and is
-      # unreachable here the moment that branch is squash-merged -- the
-      # squash commit is a fresh object, so the branch's own commits never
-      # become ancestors of main. So a `RECOVERY:` sha must name a commit on
-      # MAIN. The local check cannot see this, because locally the branch is
-      # still there; it fails first in CI, on main, after the merge.
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          # `roadmap-moved` diffs PROOF-STATE against the merge-base with main
           fetch-depth: 0
 
-      # `make gate`'s cheap path includes `ts-gate`, so the TS toolchain has
-      # to be here before the gate runs, whatever the `ts` job above does.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -116,355 +70,37 @@ jobs:
       - name: Set up Agda
         uses: ./.github/actions/agda-toolchain
 
-      # This is NOT the light-gate bet the top-of-file comment refuses: that
-      # bet is `.gate-heavy-stamp`, a Makefile-level "skip whole check
-      # categories if history looks unchanged" shortcut, deliberately never
-      # given to CI. This is Agda's OWN interface cache (`.agdai` files)
-      # restored before `make gate` runs. `make gate` still runs the exact
-      # same full gate-heavy command, every check category, every file --
-      # nothing here changes what gets checked, only whether Agda has to
-      # re-elaborate a module whose content (source + imports + the `-W`
-      # flags baked into the interface's own validity key) is unchanged
-      # since the cached run. That is a per-module, content-hash decision
-      # Agda itself makes and re-verifies on every checkout; a stale or
-      # missing entry just means normal cold checking for that module, so a
-      # bad restore cannot pass something that should fail.
-      #
-      # Save key includes the commit so every green run leaves a fresh
-      # snapshot (cache entries are immutable per key); restore-keys drops
-      # the commit to pick up the newest prior snapshot regardless of exact
-      # match, and Agda decides per-module what in it is still valid.
-      #
-      # THIS JOB IS THE ONLY WRITER, and the quickcheck job restores the
-      # same entries read-only. Two savers on one key is not an error but
-      # it is a coin flip about which snapshot survives, and the gate's is
-      # the one worth keeping: it covers the whole tower, while the sweep
-      # touches only the cone under `CLI/QuickCheck.agda`.
+      # Keyed on the commit, restored from the newest prefix match: Agda
+      # invalidates by content, so a stale interface is rechecked, never
+      # trusted.  The `agda-interfaces-` prefix is what cache-prune.yml trims.
       - name: Cache Agda interfaces
         uses: actions/cache@v4
         with:
-          path: |
-            agda/_stripped-comments/_build
+          path: agda-impl/_build
           key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
 
-      # `make gate` compiles the CLI and the bug cache, each a GHC build of the whole
-      # MAlonzo cone, stdlib included -- a large fraction of a WARM gate, paid
-      # in full every run because this directory was cached by nothing.
-      # Restoring it pays because Agda's backend is incremental: it rewrites
-      # the `.hs` of the modules whose interfaces moved, and GHC then skips
-      # every module whose source did not change. The ones it skips are
-      # overwhelmingly the stdlib's, which is also where the bytes are.
-      #
-      # KEYED ON THE TOOLCHAIN, NOT THE COMMIT, and that is the design rather
-      # than a detail: the reusable part is the stdlib's objects, which move
-      # only when Agda or the stdlib does, while this repo's own modules are
-      # rebuilt every run whatever the cache holds. A commit-keyed entry would
-      # upload the tree per green run to store objects that are identical or
-      # about to be thrown away, competing for the repo-wide ceiling with
-      # interface snapshots worth more per byte. A fixed key hits, and
-      # `actions/cache` does not re-save on a hit.
-      #
-      # The linked binaries are excluded deliberately -- larger than the tree
-      # they link from, and relinked every run regardless.
-      #
-      # Safe for the same reason the interface cache is: GHC re-verifies every
-      # module's recompilation condition against the `.hs` Agda just wrote, so
-      # a stale or missing entry means ordinary recompilation, never a check
-      # that passes when it should fail.
-      #
-      # Numbers and the full argument: docs/ci-cache.md.
+      - name: make gate
+        run: make gate
+
+  bug-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Agda
+        uses: ./.github/actions/agda-toolchain
+
+      # GHC objects for the stdlib's modules dominate the compile; they move
+      # only with the toolchain.
       - name: Cache compiled MAlonzo objects
         uses: actions/cache@v4
         with:
-          path: agda/_cli/MAlonzo
+          path: agda-impl/_cli/MAlonzo
           key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
 
-      - name: make gate
-        # The profile is read off this log: per-definition times, after the tower.
-        #
-        # AND MEMORY IS READ OFF IT TOO, because a runner that runs out is
-        # killed from outside: the log just stops at "the runner has
-        # received a shutdown signal", and no later step runs to say why.
-        # A line every 30 s on this step's own output survives the kill,
-        # the way the rest of the log does. It never touches what the gate
-        # checks.
-        run: |
-          ( while sleep 30; do
-              echo "mem: $(free -m | awk 'NR==2{print $3"/"$2" MB used"} NR==3{print "swap "$3"/"$2" MB"}' | paste -sd' ') top: $(ps -eo rss=,comm= --sort=-rss | head -1 | awk '{print $2" "int($1/1024)" MB"}')"
-            done ) &
-          make gate AGDA_PROFILE=--profile=definitions
-
-  # THE SWEEP THE BUG CACHE EXISTS FOR. The oracle job's `make bug-cache`
-  # runs the cache's EXISTING rows and is green exactly when no KNOWN
-  # counterexample remains; nothing there ever looks for a new one. This job
-  # does, on the same run rather than on whichever later session happens to
-  # type the command: all four of `Main`'s statements and the simulation
-  # two of them stand on, decided on the real evaluator over drawn author
-  # programs.
-  #
-  # A CASE PAST THE BINARY'S PER-CASE CLOCK IS UNDECIDED, NEVER A FAILURE
-  # (Anthony). Any clock has a case past it, so a clock cannot be what turns
-  # this red; a statement that answered and disagreed is. Undecided rows are
-  # printed under their own markers, which the script never appends.
-  #
-  # IT BUILDS ON THE ORACLE'S TREE, as `make qc-build` does -- termination
-  # checking off, erasure markers real -- and caches the BINARY under a key
-  # hashing only its own cone (`make qc-key`), the way the oracle job caches
-  # its runners. No restore-keys: a near match is a binary of some other
-  # evaluator.
-  quickcheck:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Compute the binary's cache key
-        id: key
-        run: echo "key=$(make --no-print-directory qc-key)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore the compiled QuickCheck
-        id: qc
-        uses: actions/cache/restore@v4
-        with:
-          path: agda/_oracle/_cli/QuickCheck
-          key: agda-qc-${{ runner.os }}-${{ steps.key.outputs.key }}
-
-      # A restored binary is OLDER than the fresh checkout, so without this
-      # `make` would rebuild what the key has just said is current.
-      - name: Mark the restored binary current
-        if: steps.qc.outputs.cache-hit == 'true'
-        run: touch agda/_oracle/_cli/QuickCheck
-
-      - name: Set up Agda
-        if: steps.qc.outputs.cache-hit != 'true'
-        uses: ./.github/actions/agda-toolchain
-
-      - name: Build QuickCheck
-        if: steps.qc.outputs.cache-hit != 'true'
-        run: make qc-build
-
-      # SAVED AS SOON AS IT IS BUILT, so a red sweep still leaves the next
-      # run a cache hit.
-      - name: Save the compiled QuickCheck
-        if: steps.qc.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: agda/_oracle/_cli/QuickCheck
-          key: agda-qc-${{ runner.os }}-${{ steps.key.outputs.key }}
-
-      # THE VERDICT IS THE CORPUS, NOT THE EXIT STATUS. `make quickcheck`
-      # APPENDS whatever it finds to the bug cache and exits 0 either way --
-      # it is a discovery tool, and a run that finds something has succeeded
-      # at its job. So what this job reports red is the corpus having GROWN:
-      # a new counterexample exists, and the rows to land are printed here
-      # rather than needing the sweep re-run to recover them.
-      #
-      # The rows are a real product, so they are uploaded too: the script
-      # writes paste-ready Agda, and a red run whose only trace is scrollback
-      # makes the next session type the sweep again to get it back.
-      #
-      # The dispatch input goes through the ENVIRONMENT rather than being
-      # interpolated into the command: `${{ }}` inside `run:` is textual
-      # substitution done before a shell ever sees it, so a value carrying a
-      # quote or a semicolon is script rather than an argument.
-      #
-      # THE SWEEP IS SIZED TO THE JOB, and the size is HERE because it is
-      # this job's budget rather than the script's: seeds 1..12, 15 cases
-      # each, depth 2, a seed's wall clock 600 s. Widen it by dispatch.
-      - name: make quickcheck
-        env:
-          QC_SEEDS: ${{ inputs.qc_seeds || '1 12 15 2 600' }}
-        run: make quickcheck ARGS="$QC_SEEDS"
-
-      - name: New counterexamples?
-        id: found
-        run: |
-          added="$(cat agda/_cli/added.txt 2>/dev/null || echo unknown)"
-          if [ "$added" = unknown ]; then
-            echo "quickcheck: the sweep wrote no count to agda/_cli/added.txt"
-            echo "scripts/gen-unit-tests.sh writes one; its absence means the"
-            echo "sweep did not finish, so whether the corpus grew is unknown."
-            exit 1
-          fi
-          # THE COUNT, NOT A DIFF OF THE FILE. The sweep WIDENS the corpus's
-          # import block from its own list and prunes it back afterwards, so
-          # a run that found nothing still leaves the file textually changed
-          # when the two orders differ -- and this step then reported new
-          # rows under a diff that was one import list reordered. What is
-          # asked here is whether the corpus GREW, and the script counts that.
-          if [ "$added" -eq 0 ]; then
-            echo "quickcheck: no new counterexample — the corpus did not grow"
-            exit 0
-          fi
-          echo "quickcheck: THE SWEEP FOUND SOMETHING — new bug-cache row(s):"
-          echo
-          git --no-pager diff -- agda/src/CLI/Unit-Test.agda
-          echo
-          echo "Land these rows, then fix the implementation: 'make bug-cache'"
-          echo "is green exactly when no known counterexample remains, so it"
-          echo "is EXPECTED to fail from the moment they are committed."
-          exit 1
-
-      # THE PAIRING'S SILENCE, ONE LAYER IN. `make formers-check` decides that
-      # a former is GENERABLE -- every surface spells it, the decoder takes it,
-      # a generator has a lane -- and can say nothing about whether any run
-      # produced one. A former totalling zero here is covered by no sweep and
-      # no oracle run whatever all five surfaces report, which is how the tree
-      # came to have no raw lift lane at all after sixty thousand programs
-      # certified impl=spec without once changing an emit's values.
-      #
-      # IT RUNS EVEN WHEN THE SWEEP FOUND A COUNTEREXAMPLE, because the two
-      # findings are independent and a coverage hole reported only on green
-      # runs is reported exactly when nobody is reading. It is skipped only
-      # when the sweep never got far enough to write the file, where the job
-      # is already red for the reason that matters.
-      - name: Every former generated?
-        if: always() && steps.found.conclusion != 'skipped'
-        run: |
-          census=agda/_cli/census.txt
-          if [ ! -s "$census" ]; then
-            echo "quickcheck: the sweep wrote no census to $census"
-            echo "scripts/gen-unit-tests.sh reports one; its absence means the"
-            echo "sweep's coverage is unknown rather than complete."
-            exit 1
-          fi
-          cat "$census"
-          unreached="$(awk '$2 == 0 { printf "%s ", $1 }' "$census")"
-          [ -z "$unreached" ] && { echo "quickcheck: every former was generated"; exit 0; }
-          echo
-          echo "quickcheck: NEVER GENERATED: $unreached"
-          echo "The pairing proves these are generable; this sweep produced no"
-          echo "program carrying them, so neither side has been checked at one."
-          exit 1
-
-      - name: Upload the new rows
-        if: failure() && steps.found.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: quickcheck-counterexamples
-          path: agda/src/CLI/Unit-Test.agda
-          if-no-files-found: ignore
-
-  # THE OTHER DIFFERENTIAL LEG, AND THE ONE NOTHING WAS RUNNING. `quickcheck`
-  # compares Agda against Agda -- impl against spec -- and can say nothing
-  # about whether either resembles rxjs. The oracle is the only check in the
-  # tree that runs REAL rxjs, and until now it was a command a session typed:
-  # a green measured once is a receipt, and a receipt is not a check. What
-  # the plain tree and its evaluator claim rests on this job.
-  #
-  # IT IS ITS OWN JOB RATHER THAN A STEP OF `gate`, so a divergence reports
-  # as itself rather than as a red tower -- and it shares NOTHING with the
-  # gate, so it runs beside it rather than after it. It builds its own two
-  # runners, with termination checking off, from its own tree (`make
-  # oracle-tree`), and caches the BINARIES under a key that hashes only the
-  # runners' import cone: an edit to the proof leaves them standing, and so
-  # does any comment.
-  #
-  # A CASE GETS TWO MINUTES, not the harness's ten-second default. A crash is
-  # red, and the deep flattener nests the sweep draws take tens of seconds on
-  # a shared runner while agreeing with rxjs, so the default reports load as
-  # a finding. A case still running at two minutes is SLOW, not wrong
-  # (Anthony) -- and the repair is a faster evaluator, not a longer limit.
-  #
-  # NOTHING HERE MAY BE NARROWED TO MAKE IT PASS. A divergence is a finding
-  # about one of the two machines, and it is fixed in whichever of them
-  # drifted -- not by dropping
-  # a corpus row, and not by running the draw without the replay, which would
-  # put a green light on exactly the shape a random draw is thin on.
-  oracle:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      ORACLE_CASE_TIMEOUT_MS: "120000"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: typescript/package-lock.json
-
-      - name: Install TypeScript deps
-        run: cd typescript && npm ci
-
-      # THE KEY IS THE CONE, READ OFF THE STRIPPED MIRROR: the runners'
-      # transitive imports, the script that computes them, and the toolchain.
-      # No restore-keys -- a near match is a binary of some other evaluator.
-      - name: Compute the runners' cache key
-        id: key
-        run: echo "key=$(make --no-print-directory oracle-key)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore the compiled runners
-        id: runners
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            agda/_oracle/_cli/Main
-            agda/_oracle/_cli/Bug-Cache
-          key: agda-oracle-runners-${{ runner.os }}-${{ steps.key.outputs.key }}
-
-      # A restored binary is OLDER than the fresh checkout, so without this
-      # `make` would rebuild what the key has just said is current.
-      - name: Mark the restored runners current
-        if: steps.runners.outputs.cache-hit == 'true'
-        run: touch agda/_oracle/_cli/Main agda/_oracle/_cli/Bug-Cache
-
-      - name: Set up Agda
-        if: steps.runners.outputs.cache-hit != 'true'
-        uses: ./.github/actions/agda-toolchain
-
-      - name: Build the runners
-        if: steps.runners.outputs.cache-hit != 'true'
-        run: make cli-build
-
-      # SAVED AS SOON AS THEY ARE BUILT, not at the job's end, so a red sweep
-      # still leaves the next run a cache hit.
-      - name: Save the compiled runners
-        if: steps.runners.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            agda/_oracle/_cli/Main
-            agda/_oracle/_cli/Bug-Cache
-          key: agda-oracle-runners-${{ runner.os }}-${{ steps.key.outputs.key }}
-
-      # The corpus is drawn by rejection and the draw holds its own YIELD, so
-      # this is red on a divergence, on a corpus that came up short of
-      # emitting rows, and on a zero-case run -- the three ways the
-      # comparison stops being one. A failing case prints its whole program,
-      # so the log is the reproduction rather than an offset into a sweep.
-      - name: make oracle
-        run: make oracle
-
-      # AND THE PINNED ROWS, WHICH THE SWEEP IS NOT GUARANTEED TO REDRAW.
-      # `corpus/` holds programs that once separated the two machines; the
-      # draw is random and most of what it draws is silent, so a regression
-      # on one of them is exactly what a sweep can miss. Replaying them costs
-      # a second, and it runs even when the sweep went red, since the two
-      # findings are independent. EVERY file runs and the step fails at the
-      # end: the step's shell is `bash -e`, so a bare loop stops at the first
-      # red file and every file after it reads as never having been asked.
-      - name: replay the pinned corpus
-        if: always() && !cancelled()
-        run: |
-          red=""
-          for f in typescript/corpus/*.ndjson typescript/cases/*.ndjson; do
-            echo "== ${f#typescript/}"
-            make oracle ARGS="--cases ${f#typescript/}" || red="$red ${f#typescript/}"
-          done
-          if [ -n "$red" ]; then echo "red:$red"; exit 1; fi
-
-      # THE KNOWN COUNTEREXAMPLES, which check the evaluator rather than the
-      # proof, so they run here beside the sweep. Green exactly when no known
-      # counterexample remains. LAST, and on `always()`, so it runs whatever
-      # the sweep found and a red here never hides the sweep.
-      #
       - name: make bug-cache
-        if: always() && !cancelled()
         run: make bug-cache

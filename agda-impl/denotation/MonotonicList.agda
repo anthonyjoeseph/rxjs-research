@@ -43,12 +43,6 @@ mutual
     coinductive
     field force : ML A
 
-postulate
-  -- Frame times strictly increase, and the first frame of a cold is at
-  -- offset 0 when it bursts on subscribe.  Stated, not yet enforced by
-  -- the type.
-  Monotone : ∀ {A} → ML A → Set
-
 data MonotonicList (A : Set) : Set where
   hot  : ML A → MonotonicList A       -- times are absolute
   cold : ML A → MonotonicList A       -- times are relative to subscribe
