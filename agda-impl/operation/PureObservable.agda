@@ -37,10 +37,25 @@ PureObs = Obs Timeline
 
 postulate
   -- THE PURE MONAD at budget n.  A heap of refs and registered sinks, a
-  -- virtual clock, and a queue of pending frames, each a sink and the
-  -- rest of a timeline.  `startColdᴿ` delivers frame 0 inline and queues
-  -- each later frame at now + offset; `nextᴿ` pops the earliest.  A
-  -- burst is walked at most n elements before it reads as `diverge`.
+  -- virtual clock, and timers, each a sink and the rest of a timeline.
+  -- `startColdᴿ` delivers frame 0 inline and sets a timer for each later
+  -- frame where the burst before it ends; `nextᴿ` pops the earliest, ties
+  -- in the order they were set, as `operation.Observable` does.  A burst
+  -- is walked at most n elements before it reads as `diverge`.
+  --
+  -- THE HEAP IS THE OPEN QUESTION.  `Ref A` and `Sink A` are first-order
+  -- names for every `A` at once, and the kernels store user types (scan's
+  -- accumulator, flatten's queue) and sinks of user types.  A store that
+  -- serves them all is the only candidate left: refs indexed by the store
+  -- typing they were made in, weakened as it grows — `Act`, the kernels
+  -- and `Runtime` indexed by a world.  A code universe would serve the
+  -- kernels' own types but not the user's, which `Tree` keeps as `Set`.
+  --
+  -- DEAD ROUTE: one store of `Σ Set id` cells behind `Ref A = Addr`.
+  --   Reading a cell back at `A` needs `X ≡ A` for the cell's own `X`, and
+  --   `Set` has no decidable equality, so no total `readRefᴿ` exists; the
+  --   invariant that makes it true (cells never change type) is global and
+  --   no `Ref` can carry it.
   Pureᴿ : ℕ → Runtime
 
   -- Runs `go` with a top-level observer recording each value into the

@@ -167,36 +167,22 @@ and run them in rxjs.
 
 ### Big picture tier roadmap
 
-- **THE KERNELS.** `{empty,of,map,scan,takeWhile,flatten,connect,join}ᴷ` as
-  real `Act` programs. Shared by both runtimes, so a wrong kernel is wrong
-  everywhere at once; decides whether `Act`'s vocabulary suffices for
-  flatten's lane bookkeeping and connect's body-first subscription.
-- **THE IO RUNTIME.** `IORef`, `SinkSlot`, `Slot`, the `*ᴿ'` primitives and
-  `fromTimeline` with `COMPILE GHC` pragmas, so `subscribe` runs for real.
-  Same-tick timers fire in creation order and a subject delivers in join
-  order, as the denotation's positions say; decides whether a plain FIFO
-  queue per tick is enough to match them.
-- **THE PURE RUNTIME.** `Pureᴿ` (virtual clock, frame queue, walk budget) and
-  `observing`. With the kernels, `quickcheck.Quickcheck.prop` compares the pure
-  run against the denotation on drawn programs.
+- **THE PURE HEAP.** `Pureᴿ` needs refs and sinks of every type in one
+  store, and safe Agda cannot read a cell back at its type. Decides the
+  pure runtime's shape: a world-indexed `Act` (refs typed by the store they
+  were made in) against the alternatives in `Pureᴿ`'s header.
+- **THE PURE RUNTIME.** `Pureᴿ` (virtual clock, timer queue, walk budget)
+  and `observing` over that store. With the kernels,
+  `quickcheck.Quickcheck.prop` compares the pure run against the
+  denotation on drawn programs.
 - **THE TYPESCRIPT ORACLE.** Port the oracle's TS side to the new tree, with
   rxjs's own `defer` and no `batchSync`, then compare all three Agda engines
   against real rxjs; each divergence becomes a bug-cache row.
 
 ### The ledger
 
-- **`{empty,of,map,scan,takeWhile,flatten,connect,join}ᴷ`**
-  (operation.AbstractObservable) — FALSITY, `NO EVIDENCE`: the kernels, one per
-  operator.
-- **`Pureᴿ`, `observing`** (operation.PureObservable) — FALSITY, `NO EVIDENCE`:
+- **`Pureᴿ`, `observing`** (operation.PureObservable) — FALSITY, `DEAD ROUTE`:
   the pure runtime and its recorder.
-- **`IORef`, `SinkSlot`, `Slot`** (operation.Observable) — FALSITY,
-  `NO EVIDENCE`: the IO runtime's carriers.
--
-  **`{newRef,readRef,writeRef,register,send,finish,startCold,stop,diverge,next}ᴿ'`**
-  (operation.Observable) — FALSITY, `NO EVIDENCE`: the IO runtime's primitives.
-- **`fromTimeline`** (operation.Observable) — FALSITY, `NO EVIDENCE`: a pure
-  timeline played by a forked thread.
 
 ## Tier 2 — the adequacy theorem
 
