@@ -9,7 +9,7 @@ can see into build failures.
 
 1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, GRINDABLE). Priority
    that lives only in prose gets spent on whatever is nearest.
-2. **Coverage** — every live postulate in `agda/src` is named by some row. A branch of
+2. **Coverage** — every live postulate in `agda-impl` is named by some row. A branch of
    the proof cannot hide from the roadmap.
 3. **Staleness** — coverage run BACKWARDS: no row head names a postulate that is no
    longer live. This is the direction that has actually bitten — the two rows in the
@@ -96,9 +96,9 @@ over every backticked token would fire on all of them.
 So the head's own syntax says which kind it is. A head that is **nothing but names** —
 backticks and separators — CLAIMS them, and each must be a live postulate. A head
 carrying **prose** ("`X`'s residue", "the `glob-*` family") names a PARENT, so its
-names need only still exist in `agda/src`; that is the failure a descriptive head can
+names need only still exist in `agda-impl`; that is the failure a descriptive head can
 have. A claim head's dead names are split by what became of them, because the repair
-differs: still declared in `agda/src` means DISCHARGED, absent means deleted or
+differs: still declared in `agda-impl` means DISCHARGED, absent means deleted or
 misspelled.
 
 **The boundary, and it is a real gap.** A family row schedules its siblings in the
@@ -119,11 +119,9 @@ It is the half a machine can see with no judgement, and **it catches most of the
 by proxy**: history arrives WITH a timestamp attached, because the writer knows the
 reader will want to know when.
 
-The one file that legitimately carries dates is `typecheck-performance-numbers.md`,
-because a timing's age IS information about the timing. Source headers do NOT — a
-receipt's content is its coverage statement, and coverage is re-runnable, so the date
-adds nothing a reader can act on; `make comments-check` bans them there for the same
-reason this check bans them here.
+Source headers do NOT carry dates — a receipt's content is its coverage statement,
+and coverage is re-runnable, so the date adds nothing a reader can act on;
+`make comments-check` bans them there for the same reason this check bans them here.
 
 ## `make roadmap-selftest`
 
@@ -135,7 +133,7 @@ check, beside a clean fixture whose rows deliberately cite a proven precedent an
 a descriptive head, so the two exemptions are pinned as load-bearing rather than
 assumed. Two further fixtures pin the evidence field in both of its failing directions —
 a row with no field at all, and a row whose field disagrees with the census — against a
-`--census` fixture standing in for a scan of `agda/src`. A third pins the unearned
+`--census` fixture standing in for a scan of `agda-impl`. A third pins the unearned
 GRINDABLE, against a second census in which the fixture's twin is absent. Two more
 pin the legs, and each is built to isolate ONE of them: `legs-count.md` plans two legs in
 a tier with the rows for three while every leg is inside budget, and `legs-fat.md` names
@@ -251,12 +249,11 @@ landing on main is still held. Five details:
   branch, HEAD-vs-HEAD~1 where there is no divergence), there was no leg to
   retire or restate,
   and the check prints SKIP rather than FAIL. "Changed" means changed once
-  full-line comments are stripped, reusing `strip-comments.py`'s own
-  stripper — the same principle the `agda/_stripped-comments/` mirror already
-  rests on, that a comment-only edit is invisible to Agda. A file the stripper
-  refuses to touch (a block comment present) or one that was added or deleted
-  is conservatively treated as changed, since comment-only-ness cannot be
-  established. Any edit that survives stripping gets no pass, however small.
+  full-line comments are stripped before comparing — a comment-only edit is
+  invisible to Agda. A file with a block comment, or one that was added or
+  deleted, is conservatively treated as changed, since comment-only-ness
+  cannot be established. Any edit that survives stripping gets no pass,
+  however small.
 - **`make gate` runs from a clean CI checkout**, so in practice it is almost
   always the HEAD~1 branch that fires there; the disk-vs-ref branch is what
   the local dev loop exercises before a commit exists to fall back to.
@@ -301,10 +298,10 @@ DELETED, RENAMED, SPLIT, RESTATED or RECLASSIFIED at any time. Those are the
 proof changing shape, and a check that held them would be a worse failure than
 the one it prevents: it would stop the statement of the theorem from moving. The
 one move held is the one that BANKS a claim — the name is no longer a live
-postulate **and is still declared in `agda/src`**, i.e. the postulate became a
+postulate **and is still declared in `agda-impl`**, i.e. the postulate became a
 proven definition. That is the same split `check-roadmap.py`'s staleness check
 draws between a discharged row and a vanished one, read here for a different
-purpose: a name that left `agda/src` entirely was deleted and is free; a name
+purpose: a name that left `agda-impl` entirely was deleted and is free; a name
 still on the postulate ledger under another class was reclassified and is free.
 
 **The carve-out is validated, not asserted.** A mechanical row the risky row
@@ -340,7 +337,7 @@ whole PR banks, not what its latest commit happens to.
 
 **`make roadmap-order-selftest`** pins its directions. One is that the check
 FIRES on a banked row. The others are that it stays QUIET: on a roadmap that
-banked nothing, on a row DELETED from `agda/src`, on a RECLASSIFIED row, on a
+banked nothing, on a row DELETED from `agda-impl`, on a RECLASSIFIED row, on a
 discharge in a tier whose own risky rows are closed while another tier's are
 open, on a discharge in a RETIRED tier whose number another tier now carries,
 and on a prerequisite the risky header names. The five matter more than the

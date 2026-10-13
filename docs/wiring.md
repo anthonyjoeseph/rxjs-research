@@ -30,17 +30,10 @@ read `unreachable 0`. Anything those entries reach is covered automatically.
 `make wiring` reads Main's `using` clauses to get its seeds, so a filename never earns
 an exemption and a claim cannot self-certify.
 
-**BUT ONE OF THE ROOTS THAT REMAIN IS TYPECHECKED BY NO GATE TARGET, AND THAT IS A
-LIVE GAP.** Being a seed here buys the reachability law over a cone, not a build:
-`gate-heavy` compiles Main's cone, then links the CLI and the bug-cache runner —
-which covers `CLI.Main` and `CLI.Unit-Test`.
-`QuickCheck` is built only by `qc-build`, which the gate does not run, so an impl or
-spec change can break the all-Agda QuickCheck loop with nothing going red until
-someone reaches for it — which is exactly the moment it is needed and the worst
-moment to find it broken. `Harness.Main` is outside on purpose and CLAUDE.md prices
-it; `QuickCheck` is outside by omission. The repair is a gate target, and what it
-costs is one more compile on every run, which is why it is written down here rather
-than simply added.
+**`quickcheck.Bug-Cache-Runner` IS A LIVE GAP.** Being a seed here buys the
+reachability law over its cone, but `make agda` typechecks only what `Main.agda`
+reaches, and `Bug-Cache-Runner` is not among those imports — it is covered only by
+`make bug-cache`. An impl change can break the runner without the gate going red.
 
 **Two kinds of line own their span under a synthetic PER-SITE name, and both are
 seeds.** An anonymous `_ : T` pin, and a column-0 `... | p = body` `with` arm. Neither
@@ -86,15 +79,15 @@ exactly what the rule exists to report.
 
 ## `make wiring-selftest`
 
-Proves the check is load-bearing, against a fixture outside `agda/src`: R2 must fire
+Proves the check is load-bearing, against a fixture outside `agda-impl`: R2 must fire
 on a lemma passed bare to a postulate and on nothing else, a module application must
 still conduct reachability, and a helper used only inside a `with` arm must not be
 reported — at the file scope and one scope down, since two scanners register heads and
 only one of them was ever exercised by the real tree. No bare `...` may surface as a
-definition. **R2 fires on nothing in `agda/src` today, so without the fixture it would
+definition. **R2 fires on nothing in `agda-impl` today, so without the fixture it would
 rot untested**, and the `with`-arm case was invisible there for a sharper reason: the
-token `...` appears in nearly every file in `agda/src`, so the shared owner rode along
-accidentally reachable and the bug only surfaced in a module outside `agda/src`.
+token `...` appears in nearly every file in `agda-impl`, so the shared owner rode along
+accidentally reachable and the bug only surfaced in a module outside `agda-impl`.
 
 ## The four mechanics of writing an assembly
 
@@ -121,7 +114,7 @@ ledger. Do NOT substitute `grep '^postulate'`: that finds the block HEADERS, a t
 of the count, and a branch hidden inside a block is exactly how eight well-formedness
 postulates once went uncounted while the index claimed the campaign reduced to two.
 
-**The harness's FFI is not on it (Anthony).** A postulate in `CLI/` bound by a
-`COMPILE GHC` pragma has a body, the Haskell one the binary runs, and no proof may
-depend on the harness. A binding outside `CLI/` earns nothing, since a proof could
-cite it.
+**The FFI zones are not on the ledger (Anthony).** A postulate in `CLI/` or in
+`operation/Observable.agda` bound by a `COMPILE GHC` pragma has a body — the
+Haskell one the binary runs — and no proof may depend on the harness. A binding
+outside those zones earns nothing, since a proof could cite it.

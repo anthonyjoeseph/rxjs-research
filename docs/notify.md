@@ -24,7 +24,7 @@ app and add the topic there.
 ## What it sends
 
 ```
-Title:  gate GREEN (heavy) - about to commit
+Title:  gate GREEN - about to commit
 
 Tier 1 is the lowest open — 2 falsity, 21 difficulty
 across 2 falsity, 16 difficulty on the roadmap
@@ -74,8 +74,8 @@ four refutations pinning one statement's shape is four findings, not one.
 evidence fields**, by the same reader `make roadmap-check` uses. The two agree
 today only because that check fails when they do not, and reading the headers
 is what makes the agreement a fact rather than an assumption. A red gate sends the same body at high priority with the failing stage in
-the title (`RED (the tower)`, `RED (cheap checks)`, `RED (light)`), so a build
-that dies while nobody is watching still reports.
+the title (`RED (cheap checks)`, `RED (agda)`), so a build that dies while
+nobody is watching still reports.
 
 ## Why it computes rather than reads
 
@@ -91,5 +91,5 @@ then the notification and the gate would disagree about what a row is.
 
 ## Where it is wired
 
-The `gate-light` and `gate-heavy` recipes call it on both exits. `make notify`
-sends the same thing by hand; `make notify V=<label>` sets the title's verdict.
+The `gate` recipe calls it on both exits. `make notify` sends the same thing by
+hand; `make notify V=<label>` sets the title's verdict.

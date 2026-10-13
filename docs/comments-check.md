@@ -1,7 +1,7 @@
 # `make comments-check` — the source-comment law
 
-Holds every line comment in `agda/src` to six checks. Run by both gate paths,
-in the cheap block, so a violation never costs a build.
+Holds every line comment in `agda-impl` to six checks. Run in the cheap block,
+so a violation never costs a build.
 
 ```
 make comments-check                          the src tree
@@ -48,10 +48,10 @@ wearing two hats.
 
 What survives on the list is historical **by definition**, whatever follows:
 `PROBED-HISTORICAL`, `RESTATED`, `LEAF-ONLY`, `DELETED`, `DISCHARGED`,
-`ASSEMBLED`, `LANDED`, `RETIRED`, `SUPERSEDED`, `PREMISE WEAKENED`, plus the
-receipts whose home is elsewhere — `TIMING RECEIPT` and `MEASURED` belong in
-`typecheck-performance-numbers.md`, and `VERIFIED` is the false-green word a
-harness row may never claim.
+`ASSEMBLED`, `LANDED`, `RETIRED`, `SUPERSEDED`, `PREMISE WEAKENED`, plus
+`TIMING RECEIPT` and `MEASURED` (timing receipts with no current home —
+delete them), and `VERIFIED` (the false-green word a harness row may never
+claim).
 
 Deliberately **not** on it: `SEALED`, `SPLIT`, `RESOLVED`, `SETTLED`,
 `FRESHNESS`, `ASSEMBLY`.
@@ -87,8 +87,8 @@ pointer that names a deleted sha was the common failure before this check, and
 
 | section | referent | resolved against |
 | --- | --- | --- |
-| `TWIN:` | a **proven** definition | declared in `agda/src` **and not in the postulate ledger** |
-| `REFUTED:` | a refutation, live or spent | declared in `agda/evidence/refuted`, **or a git sha** |
+| `TWIN:` | a **proven** definition | declared in `agda-impl` **and not in the postulate ledger** |
+| `REFUTED:` | a refutation, live or spent | declared in the evidence tree, **or a git sha** |
 | `RECOVERY:` | a commit | `git cat-file`, or a `git log … agda/…` form |
 | `DEAD ROUTE:` | *nothing* | not validated |
 
@@ -104,11 +104,10 @@ wrong** — the route has not been walked, so the row is FALSITY. That is a
 mis-classification caught mechanically.
 
 `REFUTED:` takes a sha for the same reason, and the reason is a rule rather
-than a convenience: a refutation dies when `src` can no longer STATE it, and
-deleting it then is *correct* — `src` must not keep machinery alive whose only
-purpose is making a dead route expressible, measured once at seven live
-definitions held up by six refutations. Demanding a live declaration would
-therefore demand the tree keep exactly what the deletion rule removes.
+than a convenience: a refutation dies when the tree can no longer STATE it, and
+deleting it then is *correct* — the tree must not keep machinery alive whose only
+purpose is making a dead route expressible. Demanding a live declaration would
+demand the tree keep exactly what the deletion rule removes.
 
 `--no-refs` skips this pass. Fixtures outside the real trees cannot be judged
 by it.
@@ -181,9 +180,9 @@ cited file, which is the maintenance burden that produced the rot.
 blanket `Word:digits` pattern cannot have this form, because `Killed:9` is a
 signal and `V = 4` is a numeral — and a check that calls those line numbers is
 a check people learn to route around. So the pattern is built from the `.agda`
-stems in the two trees at run time: it fires on `Wet` because `Wet.agda` is
-there, and stays silent on anything that is not a module. That also makes it
-self-maintaining, the same way the postulate-twin fixture is.
+stems in `agda-impl` at run time: it fires on a module that is there, and stays
+silent on anything that is not a module. That also makes it self-maintaining,
+the same way the postulate-twin fixture is.
 
 **8 — Obscured markers.** A marker doubled into the comment text —
 `-- -- RECOVERY:` — is a finding, and it is the one check here that exists
@@ -194,9 +193,9 @@ reference pass never validates the sha it names. It is a marker that is
 invisible to every checker in this repo while reading, to a human, exactly like
 one that is not.
 
-Three were live in `agda/src` when the check was written, every one a
-`RECOVERY` naming a sha nothing resolved, and two of them in the file whose
-header the campaign was actively working in.
+Three were live when the check was written, every one a `RECOVERY` naming a sha
+nothing resolved, and two of them in the file whose header the campaign was
+actively working in.
 
 **The doubled form is reported rather than admitted, and that is the design.**
 Loosening the marker pattern to accept it would make it *legal*, and a marker's
@@ -206,7 +205,7 @@ report the near-miss spelling, keep the canon narrow.
 
 ## Where the budget comes from, and why it is not tighter
 
-Measured over `agda/src`: 2357 comment blocks, ~1.08M comment characters;
+Measured over the old tree: 2357 comment blocks, ~1.08M comment characters;
 explanation length median **187**, p90 **906**, p99 **3418**, max **13345**.
 
 The ceiling sits at the p99 **deliberately** — its job is to declare a block

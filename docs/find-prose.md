@@ -28,9 +28,8 @@ about what a block is.
 
 ## What it searches, and what it prints
 
-Every comment block in `agda/src` and `agda/evidence`, every paragraph, bullet
-and heading of `CLAUDE.md`, `PROOF-STATE.md`, `EVIDENCE.md`,
-`typecheck-performance-numbers.md`, and every file in `docs/`.
+Every comment block in `agda-impl`, every paragraph, bullet and heading of
+`CLAUDE.md`, `PROOF-STATE.md`, and every file in `docs/`.
 
 An agda hit prints the **declaration the block sits above** as a `▸` line. That
 is usually the whole answer: a finding is about the thing beneath it, and the
