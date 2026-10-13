@@ -185,10 +185,11 @@ export const compile = (s: Scope, code: Code): Observable<Value> => {
         ),
       );
     }
+    // inclusive, as the tree's: the failing value leaves, then completion
     case "takeWhile": {
       const p = code[1];
       return compile(s, code[2]).pipe(
-        takeWhile((a) => evalTm(p, [a, ...s.th]) === true),
+        takeWhile((a) => evalTm(p, [a, ...s.th]) === true, true),
       );
     }
     case "flatten": {

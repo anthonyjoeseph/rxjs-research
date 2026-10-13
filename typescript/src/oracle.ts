@@ -109,7 +109,7 @@ const check = async (row: Row): Promise<string[]> => {
 };
 
 const main = async (): Promise<void> => {
-  const count = Number(process.argv[2] ?? 300);
+  const count = Number(process.argv[2] ?? 1000);
   const start = Number(process.argv[3] ?? 0);
   const listing = cli(["prog", String(start), String(count)]);
   if (listing.failed !== undefined)

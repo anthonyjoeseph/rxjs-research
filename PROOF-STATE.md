@@ -166,16 +166,11 @@ and run them in rxjs.
 
 ### Big picture tier roadmap
 
-- **THE QUICKCHECK.** `quickcheck.Quickcheck.prop` runs the pure engine
-  against the denotation on drawn programs, both now real. Every seed they
-  disagree on is settled by real rxjs, becomes a bug-cache row, and is fixed
-  in whichever engine is wrong.
-- **THE TYPESCRIPT ORACLE.** Port the oracle's TS side to the new tree, with
-  rxjs's own `defer` and no `batchSync`, and write `Oracle-CLI.agda` so one
-  program prints its trace from each Agda engine.
-- **THE THREE-ENGINE SWEEP.** Drawn programs on all three Agda engines
-  against real rxjs; each divergence becomes a bug-cache row, fixed before
-  the next sweep.
+- **THE GENERATOR'S REACH.** `make oracle` agrees on 5000 of 5000 drawn
+  programs, which rules out a divergence the generator can draw; what it
+  cannot draw is the open region. `connected` reaches 3% of programs, a
+  `connect` inside a recursive lane 1%, and no trace hits the step budget.
+  Raise those, sweep again, and every divergence is a bug-cache row.
 
 ### The ledger
 

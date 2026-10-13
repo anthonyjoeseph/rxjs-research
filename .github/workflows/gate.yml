@@ -105,8 +105,8 @@ jobs:
       - name: make bug-cache
         run: make bug-cache
 
-  # RED until Tier 1 lands: the oracle CLI and the TS port to the `Obs`
-  # tree.  Expected red is still red -- it is the tier's finish line.
+  # Tier 1's finish line: every drawn program, on all three Agda engines,
+  # gives the trace real rxjs does.
   oracle:
     runs-on: ubuntu-latest
     timeout-minutes: 20
