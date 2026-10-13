@@ -152,7 +152,7 @@ private
       leaf 0 _ = pure empty
       leaf 1 _ = do a ← genNat 1 Θ ; b ← genNat 1 Θ ; pure (of (a ∷ b ∷ []))
       leaf 2 j with pick Γ j
-      ... | just i  = pure (shared i)
+      ... | just i  = pure (connected i)
       ... | nothing = do s ← genScript ; pure (cold s)
       leaf 3 j with pick Δ j
       ... | just i  = pure (var i)
@@ -180,7 +180,7 @@ private
         l ← gen d Γ Δᵍ Δ (natᵗ ∷ Θ)
         s ← gen d Γ Δᵍ Δ Θ
         pure (flatten op e h l s)
-      node 4 = do s ← gen d Γ Δᵍ Δ Θ ; b ← gen d (natᵗ ∷ Γ) Δᵍ Δ Θ ; pure (share s b)
+      node 4 = do s ← gen d Γ Δᵍ Δ Θ ; b ← gen d (natᵗ ∷ Γ) Δᵍ Δ Θ ; pure (connect s b)
       node 5 = do c ← gen d Γ (natᵗ ∷ Δᵍ) Δ Θ ; pure (μ c)
       node 6 = do c ← gen d Γ [] (Δᵍ ++ Δ) Θ ; pure (defer c)
       node _ = genLeaf Γ Δᵍ Δ Θ

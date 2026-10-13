@@ -6,7 +6,7 @@
 -- runtime.  `toObs` is the only bridge to the tree, and the tree never
 -- sees this module.
 --
--- Contexts: `Γ` shares in scope, `Δᵍ` recursion variables bound but not
+-- Contexts: `Γ` connects in scope, `Δᵍ` recursion variables bound but not
 -- yet usable, `Δ` usable ones, `Θ` values (an element, inside a lane).
 -- `μ` binds into `Δᵍ`, and `defer` is the one gate moving `Δᵍ` into `Δ`,
 -- so an unguarded self-reference is a type error rather than a hang.
@@ -48,8 +48,8 @@ data Code (Γ Δᵍ Δ Θ : List Ty) : Ty → Set where
   -- per element: its echo, whether it opens a lane, and that lane
   flatten   : ∀ {s t} → T.FlatOp → Tm (s ∷ Θ) (maybeᵗ t) → Tm (s ∷ Θ) boolᵗ
             → Code Γ Δᵍ Δ (s ∷ Θ) t → Code Γ Δᵍ Δ Θ s → Code Γ Δᵍ Δ Θ t
-  share     : ∀ {s t} → Code Γ Δᵍ Δ Θ s → Code (s ∷ Γ) Δᵍ Δ Θ t → Code Γ Δᵍ Δ Θ t
-  shared    : ∀ {t} → t ∈ Γ → Code Γ Δᵍ Δ Θ t
+  connect   : ∀ {s t} → Code Γ Δᵍ Δ Θ s → Code (s ∷ Γ) Δᵍ Δ Θ t → Code Γ Δᵍ Δ Θ t
+  connected : ∀ {t} → t ∈ Γ → Code Γ Δᵍ Δ Θ t
   μ         : ∀ {t} → Code Γ (t ∷ Δᵍ) Δ Θ t → Code Γ Δᵍ Δ Θ t
   var       : ∀ {t} → t ∈ Δ → Code Γ Δᵍ Δ Θ t
   defer     : ∀ {t} → Code Γ [] (Δᵍ ++ Δ) Θ t → Code Γ Δᵍ Δ Θ t
@@ -100,8 +100,8 @@ mutual
   toObs leaf n (flatten op e h l s) g d θ =
     T.flatten op (λ a → maybe (⟦ e ⟧ᵗ (a ∷ θ)) , (if ⟦ h ⟧ᵗ (a ∷ θ) then just (toObs leaf n l g d (a ∷ θ)) else nothing))
                  (toObs leaf n s g d θ)
-  toObs leaf n (share s b)       g d θ = T.share (toObs leaf n s g d θ) (toObs leaf n b (weaken g) (weaken d) θ)
-  toObs leaf n (shared i)        g d θ = T.shared (mem i)
+  toObs leaf n (connect s b)     g d θ = T.connect (toObs leaf n s g d θ) (toObs leaf n b (weaken g) (weaken d) θ)
+  toObs leaf n (connected i)     g d θ = T.connected (mem i)
   toObs leaf n (μ c)             g d θ = toObs leaf n c (knot leaf n c g d θ ∷ g) d θ
   toObs leaf n (var i)           g d θ = Later.force (lookup d i)
   toObs leaf n (defer c)         g d θ = T.defer (later leaf n c g d θ)
@@ -116,7 +116,7 @@ mutual
         → Rec C Γ Δᵍ → Rec C Γ Δ → Vals Θ → Later C ⟦ Γ ⟧ᴳ ⟦ t ⟧ᵀ
   later leaf n c g d θ .Later.force = toObs leaf n c [] (++⁺ g d) θ
 
-  -- a recursion variable bound outside a `share` is used inside it
+  -- a recursion variable bound outside a `connect` is used inside it
   weaken : ∀ {C Γ Δ s} → Rec C Γ Δ → Rec C (s ∷ Γ) Δ
   weaken = mapAll (renameLater there)
 

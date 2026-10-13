@@ -43,14 +43,14 @@ postulate
   -- requests unfolded by the loop, shows at least what `d` shows a
   -- subscriber arriving at t."
   Rel   : ∀ {A} → Subscribe A → MonotonicList A → Set₁
-  -- The share's state and the handle `shareᴰ` passed its body agree:
-  -- joining one shows at least what the other shows, at any join time.
-  RelSh : ∀ {A} → ShareSt A → MonotonicList A → Set₁
+  -- A subject and the handle `connectᴰ` passed its body agree: joining
+  -- one shows at least what the other shows, at any join time.
+  RelSubj : ∀ {A} → Subject A → MonotonicList A → Set₁
 
 data RelEnv : ∀ {Γ} → Env Γ → DenEnv Γ → Set₁ where
   []  : RelEnv [] []
-  _∷_ : ∀ {Γ A} {st : ShareSt A} {x : MonotonicList A} {ρ : Env Γ} {δ : DenEnv Γ}
-      → RelSh st x → RelEnv ρ δ → RelEnv (st ∷ ρ) (x ∷ δ)
+  _∷_ : ∀ {Γ A} {st : Subject A} {x : MonotonicList A} {ρ : Env Γ} {δ : DenEnv Γ}
+      → RelSubj st x → RelEnv ρ δ → RelEnv (st ∷ ρ) (x ∷ δ)
 
 -- An element's echo is the same on both sides; its lane, if any, is related.
 data RelLane {B : Set} : Maybe B × Maybe (Subscribe B) → Maybe B × Maybe (MonotonicList B) → Set₁ where
@@ -67,17 +67,15 @@ postulate
   flatten-rel   : ∀ {A B s d} op {f : A → Maybe B × Maybe (Subscribe B)} {g}
                 → (∀ a → RelLane (f a) (g a)) → Rel s d → Rel (flattenᴷ op f s) (flattenᴰ (flatOp op) (mapᴰ g d))
   cold-rel      : ∀ {A} (c : Timeline A) → Rel (via (startCold c)) (cold (lower c))
-  shared-rel    : ∀ {Γ A ρ δ} (i : A ∈ Γ) → RelEnv ρ δ
+  connected-rel : ∀ {Γ A ρ δ} (i : A ∈ Γ) → RelEnv ρ δ
                 → Rel (joinᴷ (lookup ρ i)) (lookup δ i)
-  -- The state `newShareᴷ` allocates agrees with the handle `shareᴰ`
-  -- passes; then the body runs under both.  The open design question
-  -- lives here and in `shared-rel`: `RelSh` must say what a ref-counted
-  -- join shows.
-  share-rel     : ∀ {Γ A B} {s : Obs Timeline Γ A} {ρ δ d} {b : ShareSt A → Subscribe B}
+  -- The subject `connectᴷ` allocates, fed by the source after the body
+  -- has subscribed, agrees with the hot handle `connectᴰ` passes; then
+  -- the body runs under both.
+  connect-rel   : ∀ {A B} {s : Subscribe A} {d} {b : Subject A → Subscribe B}
                     {e : MonotonicList A → MonotonicList B}
-                → RelEnv ρ δ → Rel (subscribe s ρ) d
-                → (∀ {st r} → RelSh st r → Rel (b st) (e r))
-                → Rel (λ o k → newShareᴷ s ρ λ st → b st o k) (shareᴰ d e)
+                → Rel s d → (∀ {st r} → RelSubj st r → Rel (b st) (e r))
+                → Rel (connectᴷ s b) (connectᴰ d e)
   -- `deferᴰ` adds one `stall`, invisible to `_⊑_`.
   defer-rel     : ∀ {A} {s : Subscribe A} {d} → Rel s d → Rel s (deferᴰ d)
 
@@ -109,9 +107,9 @@ mutual
   fundamental n       (scan f z s)     e = scan-rel f z (child-rel (fundamental n s e))
   fundamental n       (takeWhile p s)  e = takeWhile-rel p (child-rel (fundamental n s e))
   fundamental n       (flatten op f s) e = flatten-rel op (λ a → lane-rel n (f a) e) (child-rel (fundamental n s e))
-  fundamental n       (share s b)      e = share-rel e (fundamental n s e)
-                                                     (λ r → child-rel (fundamental n b (r ∷ e)))
-  fundamental n       (shared i)       e = shared-rel i e
+  fundamental n       (connect s b)    e = connect-rel (child-rel (fundamental n s e))
+                                                       (λ r → child-rel (fundamental n b (r ∷ e)))
+  fundamental n       (connected i)    e = connected-rel i e
   fundamental zero    (defer l)        e = bot-rel
   fundamental (suc n) (defer l)        e = defer-rel (child-rel (fundamental n (Later.force l) e))
 

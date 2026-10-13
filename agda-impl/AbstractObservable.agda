@@ -20,7 +20,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.Maybe as Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
-open import Data.Product using (Σ; _×_; _,_; map₂)
+open import Data.Product using (_×_; _,_; map₂)
 open import Data.Unit using (⊤; tt)
 
 ------------------------------------------------------------------------
@@ -33,10 +33,15 @@ data FlatOp : Set where
   mergeᶠ            : Maybe ℕ → FlatOp
   switchᶠ exhaustᶠ  : FlatOp
 
--- `C` is the cold leaf.  `Γ` lists the shares in scope: share is the one
--- operator with identity, and an Agda value has none, so a share is
--- BOUND (`share`) and referred to by position (`shared`) — two unrelated
--- shares cannot collide.
+-- `C` is the cold leaf.  `Γ` lists the connects in scope.  `connect`
+-- is rxjs's `connect(selector)`: subscribing it makes a fresh subject,
+-- subscribes the body with that subject as its handle, then subscribes
+-- the source into the subject, once.  The handle is BOUND by the body and
+-- referred to by position (`connected`), so it is the one operator with
+-- identity and still needs no names: the binder is the identity, and a
+-- `connect` inside a lane is a fresh one per subscription, as in rxjs.
+-- Every hot observable is a `connect`; a ref-counted `share` is not a
+-- primitive.
 --
 -- Recursion is Agda's own, guarded by `defer`, which is SYNCHRONOUS as in
 -- rxjs.  So a synchronous infinite loop is a legal program; the runtimes
@@ -59,15 +64,15 @@ mutual
     scan      : ∀ {Γ A B} → (B → A → B) → B → Obs C Γ A → Obs C Γ B
     takeWhile : ∀ {Γ A} → (A → Bool) → Obs C Γ A → Obs C Γ A
     flatten   : ∀ {Γ A B} → FlatOp → (A → Maybe B × Maybe (Obs C Γ B)) → Obs C Γ A → Obs C Γ B
-    share     : ∀ {Γ A B} → Obs C Γ A → Obs C (A ∷ Γ) B → Obs C Γ B
-    shared    : ∀ {Γ A} → A ∈ Γ → Obs C Γ A
+    connect   : ∀ {Γ A B} → Obs C Γ A → Obs C (A ∷ Γ) B → Obs C Γ B
+    connected : ∀ {Γ A} → A ∈ Γ → Obs C Γ A
     defer     : ∀ {Γ A} → Later C Γ A → Obs C Γ A
 
   record Later (C : Set → Set₁) (Γ : List Set) (A : Set) : Set₁ where
     coinductive
     field force : Obs C Γ A
 
--- Move a program to a larger share scope (a share bound around it).
+-- Move a program to a larger scope (a `connect` bound around it).
 -- Corecursive through `defer`: the renamed body is produced only when
 -- forced.
 mutual
@@ -79,12 +84,12 @@ mutual
   rename r (scan f z s)     = scan f z (rename r s)
   rename r (takeWhile p s)  = takeWhile p (rename r s)
   rename r (flatten op f s) = flatten op (λ a → renameLane r (f a)) (rename r s)
-  rename r (share s b)      = share (rename r s) (rename (ext r) b)
+  rename r (connect s b)    = connect (rename r s) (rename (ext r) b)
     where
       ext : ∀ {B Γ Δ} → (∀ {X} → X ∈ Γ → X ∈ Δ) → ∀ {X} → X ∈ B ∷ Γ → X ∈ B ∷ Δ
       ext r (here p)  = here p
       ext r (there i) = there (r i)
-  rename r (shared i)       = shared (r i)
+  rename r (connected i)   = connected (r i)
   rename r (defer l)        = defer (renameLater r l)
 
   renameLane : ∀ {C Γ Δ B} → (∀ {X} → X ∈ Γ → X ∈ Δ) → Maybe B × Maybe (Obs C Γ B) → Maybe B × Maybe (Obs C Δ B)
@@ -129,20 +134,16 @@ record Prims : Set₂ where
 module Run (P : Prims) where
   open Prims P
 
-  mutual
-    -- A share's state, kept in the environment.  First-order on purpose:
-    -- its subscriber list is a list of `Sink`s, not of callbacks, and its
-    -- source is the subtree to subscribe on first connect, not a
-    -- function that would subscribe it.
-    record ShareSt (A : Set) : Set₁ where
-      inductive
-      field
-        source      : Σ (List Set) λ Γ → Obs Cold Γ A × Env Γ
-        subscribers : Ref (List (Sink A))
-        connection  : Ref (Maybe Handle)
+  -- A connect's subject, kept in the environment.  First-order on
+  -- purpose: its subscribers are `Sink`s, not callbacks.  A sink joining
+  -- after the source has completed is completed at once, as in rxjs.
+  record Subject (A : Set) : Set where
+    field
+      subscribers : Ref (List (Sink A))
+      closed      : Ref Bool
 
-    Env : List Set → Set₁
-    Env = All ShareSt
+  Env : List Set → Set₁
+  Env = All Subject
 
   -- The free monad over the runtime's primitives.
   --
@@ -200,7 +201,7 @@ module Run (P : Prims) where
   -- THE OPERATORS.  Each is a kernel over its children's `Subscribe`, so
   -- each is written, and later proven, on its own.  Their bodies are
   -- ordinary `Act` programs: a `Ref` for scan's accumulator, flatten's
-  -- lane handles and completion count, share's subscribers.
+  -- lane handles and completion count, a subject's subscribers.
   postulate
     emptyᴷ     : ∀ {A} → Subscribe A
     ofᴷ        : ∀ {A} → List A → Subscribe A
@@ -208,12 +209,15 @@ module Run (P : Prims) where
     scanᴷ      : ∀ {A B} → (B → A → B) → B → Subscribe A → Subscribe B
     takeWhileᴷ : ∀ {A} → (A → Bool) → Subscribe A → Subscribe A
     flattenᴷ   : ∀ {A B} → FlatOp → (A → Maybe B × Maybe (Subscribe B)) → Subscribe A → Subscribe B
-    -- Allocates the share's refs when the `share` node is subscribed, so
-    -- a share bound outside a `defer` is the SAME share on every
+    -- Allocates the subject, subscribes the body over it, THEN the
+    -- source into it — body first, so the source's synchronous burst
+    -- reaches whatever the body joined synchronously.  Unsubscribing
+    -- stops both.  Allocated per subscription of the `connect` node, so
+    -- one bound outside a `defer` is the SAME subject on every
     -- re-subscription of the deferred body.
-    newShareᴷ  : ∀ {Γ A} → Obs Cold Γ A → Env Γ → (ShareSt A → Act ⊤) → Act ⊤
-    -- Joins: adds the sink; on the first join, connects the source.
-    joinᴷ      : ∀ {A} → ShareSt A → Subscribe A
+    connectᴷ   : ∀ {A B} → Subscribe A → (Subject A → Subscribe B) → Subscribe B
+    -- Adds the sink.  Nothing else: the source is already running.
+    joinᴷ      : ∀ {A} → Subject A → Subscribe A
 
   -- ONE LAYER.  The tree's shape picks the kernel; children are handed
   -- over as `child` requests, so nothing here recurses and `defer` is
@@ -226,6 +230,6 @@ module Run (P : Prims) where
   subscribe (scan f z s)     ρ = scanᴷ f z (sub s ρ)
   subscribe (takeWhile p s)  ρ = takeWhileᴷ p (sub s ρ)
   subscribe (flatten op f s) ρ = flattenᴷ op (λ a → map₂ (Maybe.map λ l → sub l ρ) (f a)) (sub s ρ)
-  subscribe (share s b)      ρ o k = newShareᴷ s ρ λ st → sub b (st ∷ ρ) o k
-  subscribe (shared i)       ρ = joinᴷ (lookup ρ i)
+  subscribe (connect s b)    ρ = connectᴷ (sub s ρ) λ st → sub b (st ∷ ρ)
+  subscribe (connected i)    ρ = joinᴷ (lookup ρ i)
   subscribe (defer l)        ρ = sub (Later.force l) ρ

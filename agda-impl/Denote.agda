@@ -18,10 +18,10 @@ open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 
 open import AbstractObservable as T using (Obs; Later;
-  cold; empty; of; map; scan; takeWhile; flatten; share; shared; defer)
+  cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer)
 open import MonotonicList
 
--- A share in scope means the handle `shareᴰ` passed its body.
+-- A connect in scope means the handle `connectᴰ` passed its body.
 DenEnv : List Set → Set₁
 DenEnv = All MonotonicList
 
@@ -43,8 +43,8 @@ mutual
   approx n       (scan f z s)     ρ = scanᴰ f z (approx n s ρ)
   approx n       (takeWhile p s)  ρ = takeWhileᴰ p (approx n s ρ)
   approx n       (flatten op f s) ρ = flattenᴰ (flatOp op) (mapᴰ (λ a → laneᴰ n (f a) ρ) (approx n s ρ))
-  approx n       (share s b)      ρ = shareᴰ (approx n s ρ) λ r → approx n b (r ∷ ρ)
-  approx n       (shared i)       ρ = lookup ρ i
+  approx n       (connect s b)    ρ = connectᴰ (approx n s ρ) λ r → approx n b (r ∷ ρ)
+  approx n       (connected i)    ρ = lookup ρ i
   approx zero    (defer l)        ρ = ⊥ᴰ
   approx (suc n) (defer l)        ρ = deferᴰ (approx n (Later.force l) ρ)
 

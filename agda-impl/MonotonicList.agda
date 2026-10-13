@@ -87,13 +87,16 @@ postulate
   -- a delay: everything else stays in the same frame.
   deferᴰ     : ∀ {A} → MonotonicList A → MonotonicList A
 
-  -- SHARE, as a binder: the body receives the shared handle, so a share
-  -- made inside a callback is a fresh share per call, as in rxjs.  Its
-  -- meaning is THE OPEN QUESTION — what a ref-counted consumer sees
-  -- depends on the others' subscribe times, which this domain does not
-  -- yet carry (a connection history per share, read by the share and
-  -- solved at the top).
-  shareᴰ     : ∀ {A B} → MonotonicList A → (MonotonicList A → MonotonicList B) → MonotonicList B
+-- CONNECT, as a binder: the body receives the source made hot, started
+-- the moment the connect is subscribed, so each consumer sees it from
+-- whenever it joins.  Not a primitive: with no reference counting, what
+-- the handle shows never depends on who joins, so it is a function.
+-- Inside the body, time is counted from the connect's subscription; the
+-- result is rebased to that origin, so a cold source gives a cold result.
+-- Where in the subscribe burst a consumer joins is `observe`'s business.
+connectᴰ : ∀ {A B} → MonotonicList A → (MonotonicList A → MonotonicList B) → MonotonicList B
+connectᴰ (cold m) f = cold (observe (f (hot m)) 0)
+connectᴰ (hot m)  f = f (hot m)
 
 ------------------------------------------------------------------------
 -- Approximation and recursion
