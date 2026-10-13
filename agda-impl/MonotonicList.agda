@@ -1,21 +1,21 @@
 {-# OPTIONS --guardedness #-}
 
--- THE DENOTATIONAL SEMANTICS.  An observable means a timeline: frames at
--- strictly increasing times, each frame a synchronous burst.  Everything
--- is coinductive — a timeline can have infinitely many frames, and a
--- single burst can be infinite (`ones`) or spin silently forever (a
--- deferred loop that emits nothing), so divergence is a VALUE here, not
--- an absence of one.
+-- THE DENOTATIONAL SEMANTICS, AS A LIBRARY.  An observable means a
+-- timeline, and every operator is an ordinary function on timelines —
+-- `takeWhileᴰ p xs` is a value, the way `2 * 3` is.  Nothing here knows
+-- about program trees; `Denote` maps a tree onto these functions.
+--
+-- A timeline is frames at strictly increasing times, each frame a
+-- synchronous burst.  Everything is coinductive — a timeline can have
+-- infinitely many frames, and a single burst can be infinite (`ones`) or
+-- spin silently forever — so divergence is a VALUE here, not an absence
+-- of one.
 module MonotonicList where
 
 open import Data.Bool using (Bool)
-open import Data.List using (List; _∷_)
-open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
+open import Data.List using (List; _∷_; [])
 open import Data.Nat using (ℕ; zero; suc)
-open import Level using (Lift; lower; 0ℓ) renaming (suc to lsuc)
-
-open import AbstractObservable using (Obs; Later; FlatOp;
-  cold; of; map; scan; takeWhile; merge; flatMap; share; shared; defer)
+open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 
 Time : Set
 Time = ℕ
@@ -56,14 +56,13 @@ postulate
   -- hot with everything before t dropped.
   observe : ∀ {A} → MonotonicList A → Time → ML A
 
--- The pure runtime's cold leaf IS a relative timeline, so a cold's
--- denotation is its own description.  Lifted only because the leaf slot
--- is `Set₁` (the IO leaf carries an existential `Internal`).
+-- A cold leaf is a relative timeline.  Lifted only because the leaf slot
+-- of a program tree is `Set₁` (the IO leaf carries an existential).
 Timeline : Set → Set₁
 Timeline A = Lift (lsuc 0ℓ) (ML A)
 
 ------------------------------------------------------------------------
--- The operators, as functions on timelines
+-- The operators
 
 postulate
   ofᴰ        : ∀ {A} → List A → MonotonicList A
@@ -71,66 +70,63 @@ postulate
   scanᴰ      : ∀ {A B} → (B → A → B) → B → MonotonicList A → MonotonicList B
   takeWhileᴰ : ∀ {A} → (A → Bool) → MonotonicList A → MonotonicList A
   mergeᴰ     : ∀ {A} → MonotonicList A → MonotonicList A → MonotonicList A
-  -- Each inner's timeline is observed at the time of the outer emission
-  -- that created it.
-  flatMapᴰ   : ∀ {A B} → FlatOp → (A → MonotonicList B) → MonotonicList A → MonotonicList B
-  -- No information yet: a subscribe burst that never closes.  The
-  -- bottom of the approximation order, and also the honest meaning of a
-  -- silent synchronous loop — the two coincide, as in any domain.
-  ⊥ᴰ         : ∀ {A} → MonotonicList A
+  -- Each inner is observed at the time of the outer emission that made it.
+  mergeMapᴰ  : ∀ {A B} → (A → MonotonicList B) → MonotonicList A → MonotonicList B
+  switchMapᴰ : ∀ {A B} → (A → MonotonicList B) → MonotonicList A → MonotonicList B
+  exhaustMapᴰ : ∀ {A B} → (A → MonotonicList B) → MonotonicList A → MonotonicList B
+  concatMapᴰ : ∀ {A B} → (A → MonotonicList B) → MonotonicList A → MonotonicList B
+  -- One `stall` at the head of the subscribe burst, then the body.  Not
+  -- a delay: everything else stays in the same frame.
+  deferᴰ     : ∀ {A} → MonotonicList A → MonotonicList A
 
-  -- SHARE IS THE OPEN QUESTION.  What a consumer of a ref-counted share
-  -- sees depends on when the FIRST consumer connected and whether the
-  -- count has since dropped to zero — facts about the other consumers,
-  -- which a denotation computed one subterm at a time cannot see.  So
-  -- the environment holds an abstract `Shared`, not a timeline, until
-  -- this is designed.
-  Shared     : Set → Set
-  shareᴰ     : ∀ {A} → MonotonicList A → Shared A
-  readShared : ∀ {A} → Shared A → MonotonicList A
-
-DenEnv : List Set → Set₁
-DenEnv = All Shared
+  -- SHARE, as a binder: the body receives the shared handle, so a share
+  -- made inside a callback is a fresh share per call, as in rxjs.  Its
+  -- meaning is THE OPEN QUESTION — what a ref-counted consumer sees
+  -- depends on the others' subscribe times, which this domain does not
+  -- yet carry (a connection history per share, read by the share and
+  -- solved at the top).
+  shareᴰ     : ∀ {A B} → MonotonicList A → (MonotonicList A → MonotonicList B) → MonotonicList B
 
 ------------------------------------------------------------------------
--- The denotation
+-- Approximation and recursion
 
--- APPROXIMANT n: the meaning with every path of more than n nested
--- `defer`s cut off at ⊥ᴰ.  The index is not gas — nothing runs out, and
--- no program's meaning depends on it — it is the approximation order
--- of domain theory, made explicit because the operators are opaque
--- functions here: a guarded `deferᴰ (♯ ⟦ l ⟧)` would be refused for the
--- same reason `subscribe` cannot recurse through `defer` — a total
--- operator may strip the guard.  (Sized types would hide the index in
--- the operators' types; Agda 2.8 refuses them under --safe --guardedness.)
---
--- Lexicographic on (n , tree): `defer` drops n, everything else is
--- structural.  The wiring, clause for clause the shape of `subscribe`.
-⟦_⟧[_] : ∀ {Γ A} → Obs Timeline Γ A → ℕ → DenEnv Γ → MonotonicList A
-⟦ o ⟧[ n ] = approx n o
-  where
-    approx : ∀ {Γ A} → ℕ → Obs Timeline Γ A → DenEnv Γ → MonotonicList A
-    approx n       (cold c)         ρ = cold (lower c)
-    approx n       (of xs)          ρ = ofᴰ xs
-    approx n       (map f s)        ρ = mapᴰ f (approx n s ρ)
-    approx n       (scan f z s)     ρ = scanᴰ f z (approx n s ρ)
-    approx n       (takeWhile p s)  ρ = takeWhileᴰ p (approx n s ρ)
-    approx n       (merge s t)      ρ = mergeᴰ (approx n s ρ) (approx n t ρ)
-    approx n       (flatMap op f s) ρ = flatMapᴰ op (λ a → approx n (f a) ρ) (approx n s ρ)
-    approx n       (share s b)      ρ = approx n b (shareᴰ (approx n s ρ) ∷ ρ)
-    approx n       (shared i)       ρ = readShared (lookup ρ i)
-    approx zero    (defer l)        ρ = ⊥ᴰ
-    approx (suc n) (defer l)        ρ = approx n (Later.force l) ρ
+-- No information yet: a subscribe burst that spins and never closes.
+-- The bottom of the approximation order, and also the honest meaning of a
+-- silent synchronous loop — the two coincide, as in any domain.
+spin : ∀ {A} → Burst A
+spin = stall λ where .Burst∞.force → spin
 
--- Information order on timelines: the left is the right with some
--- suffixes replaced by a burst that never closes, and finitely many
--- `stall`s inserted or dropped.
+⊥ᴰ : ∀ {A} → MonotonicList A
+⊥ᴰ = cold (at 0 spin)
+
 postulate
-  _⊑_ : ∀ {A} → ML A → ML A → Set
+  -- Information order: the left is the right with some suffixes replaced
+  -- by `spin`, and finitely many `stall`s inserted or dropped.
+  _⊑_ : ∀ {A} → MonotonicList A → MonotonicList A → Set
+  -- The same timeline, up to finitely many `stall`s.
+  _≈_ : ∀ {A} → MonotonicList A → MonotonicList A → Set
 
   -- The least upper bound of a chain of approximants.
   lub : ∀ {A} → (ℕ → MonotonicList A) → MonotonicList A
 
--- THE meaning of a program.
-⟦_⟧ : ∀ {Γ A} → Obs Timeline Γ A → DenEnv Γ → MonotonicList A
-⟦ o ⟧ ρ = lub λ n → ⟦ o ⟧[ n ] ρ
+-- Approximant n of a recursive definition: unfold it n times from ⊥ᴰ.
+iterate : ∀ {A} → ℕ → (MonotonicList A → MonotonicList A) → MonotonicList A
+iterate zero    f = ⊥ᴰ
+iterate (suc n) f = f (iterate n f)
+
+-- RECURSION.  Agda cannot accept `ones = mergeᴰ (ofᴰ [ 1 ]) (deferᴰ ones)`:
+-- it never looks inside `mergeᴰ`, which could strip the guard.  So
+-- recursion here is a least fixed point, total for any `f`.
+fixᴰ : ∀ {A} → (MonotonicList A → MonotonicList A) → MonotonicList A
+fixᴰ f = lub λ n → iterate n f
+
+postulate
+  -- Built from the operators, `f` preserves `_⊑_` and limits; that is
+  -- one lemma per operator, proven once.
+  Continuous : ∀ {A} → (MonotonicList A → MonotonicList A) → Set
+  fix-unfold : ∀ {A} {f : MonotonicList A → MonotonicList A}
+             → Continuous f → fixᴰ f ≈ f (fixᴰ f)
+
+-- Emits 1 forever, synchronously.
+ones : MonotonicList ℕ
+ones = fixᴰ λ x → mergeᴰ (ofᴰ (1 ∷ [])) (deferᴰ x)
