@@ -10,7 +10,7 @@
 -- infinitely many frames, and a single burst can be infinite (`ones`) or
 -- spin silently forever — so divergence is a VALUE here, not an absence
 -- of one.
-module MonotonicList where
+module denotation.MonotonicList where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; [])
@@ -114,6 +114,7 @@ postulate
   -- Information order: the left is the right with some suffixes replaced
   -- by `spin`, and finitely many `stall`s inserted or dropped.
   _⊑_ : ∀ {A} → MonotonicList A → MonotonicList A → Set
+  ⊑-trans : ∀ {A} {x y z : MonotonicList A} → x ⊑ y → y ⊑ z → x ⊑ z
   -- The same timeline, up to finitely many `stall`s.
   _≈_ : ∀ {A} → MonotonicList A → MonotonicList A → Set
 

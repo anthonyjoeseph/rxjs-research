@@ -8,8 +8,9 @@
 -- The two pure engines give a TRACE: frame times and values in order,
 -- then how it ended.  A timeline can be infinite, even inside one frame,
 -- so a trace is read under a step budget and may end `cut`.  The IO
--- engine gives what `toArray` gives — the values, once the program
--- completes; a program that never completes never returns.
+-- engine has no trace to give: `subscribe` prints each value as it
+-- arrives, one JSON line apiece, and returns once nothing is left to wait
+-- for — a program that never finishes never returns.
 module quickcheck.Oracle where
 
 open import Agda.Builtin.IO using (IO)
@@ -18,12 +19,13 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_; intersperse)
-open import IO.Primitive.Core using (pure; _>>=_)
+open import Data.Unit using (⊤)
+open import IO.Primitive.Finite using (putStrLn)
 
-open import MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; observe)
-open import Denote using (⟦_⟧[_])
-open import PureObservable using (runPure)
-open import Observable using (toArray; fromTimeline)
+open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; observe)
+open import denotation.Denote using (⟦_⟧[_])
+open import operation.PureObservable using (toArray)
+open import operation.Observable using (subscribe; fromTimeline)
 open import quickcheck.Ty
 open import quickcheck.Code
 
@@ -91,10 +93,9 @@ denoteTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 denoteTrace u n p = traceML n (observe (⟦ toObs timeline u p [] [] [] ⟧[ depth u p ] []) 0)
 
 pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
-pureTrace u n p = traceML n (runPure (toObs timeline u p [] [] []))
-
-ioValues : ∀ {t} → ℕ → Prog t → IO (List ⟦ t ⟧ᵀ)
-ioValues u p = toArray (toObs (λ s → fromTimeline (timeline s)) u p [] [] [])
+-- The engine's approximant is taken past both the tree's depth and the
+-- trace's budget, so neither cut is the engine's.
+pureTrace u n p = traceML n (toArray (n + depth u p) (toObs timeline u p [] [] []))
 
 ------------------------------------------------------------------------
 -- JSON
@@ -111,7 +112,9 @@ showEnd cut       = "\"cut\""
 showTrace : ∀ t → Trace ⟦ t ⟧ᵀ → String
 showTrace t (es ▸ x) = "{\"events\":[" ++ intersperse "," (mapL (showEvent t) es) ++ "],\"end\":" ++ showEnd x ++ "}"
 
-oracle : ∀ {t} → Engine → ℕ → ℕ → Prog t → IO String
-oracle {t} denotational u n p = pure (showTrace t (denoteTrace u n p))
-oracle {t} pureOp       u n p = pure (showTrace t (pureTrace u n p))
-oracle {t} ioOp         u n p = ioValues u p >>= λ xs → pure ("{\"values\":" ++ showᵀ (listᵗ t) xs ++ "}")
+oracle : ∀ {t} → Engine → ℕ → ℕ → Prog t → IO ⊤
+oracle {t} denotational u n p = putStrLn (showTrace t (denoteTrace u n p))
+oracle {t} pureOp       u n p = putStrLn (showTrace t (pureTrace u n p))
+oracle {t} ioOp         u n p =
+  subscribe (toObs (λ s → fromTimeline (timeline s)) u p [] [] [])
+            (λ a → putStrLn (showEvent t (val a)))

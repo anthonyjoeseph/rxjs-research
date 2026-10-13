@@ -25,8 +25,8 @@ open import Data.Sum using (inj₁; inj₂)
 open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import AbstractObservable as T using (Obs; Later; renameLater)
-open import MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; close; Timeline)
+open import operation.abstraction.Tree as T using (Obs; Later; renameLater)
+open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; close; Timeline)
 open import quickcheck.Ty
 open import quickcheck.Tm
 

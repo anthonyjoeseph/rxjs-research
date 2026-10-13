@@ -1,47 +1,47 @@
 {-# OPTIONS --guardedness #-}
 
--- THE LINK.  Running a program in the pure semantics yields exactly its
--- denotation, observed at time 0.
+-- THE LINK.  The pure runtime and the denotation agree: the limit of the
+-- pure run's approximants is the denotation's limit, observed at time 0.
 --
--- The route is a logical relation between a `Subscribe` and a timeline,
--- proven one operator at a time: each kernel preserves it.  The
--- fundamental lemma is then the same recursion as `⟦_⟧[_]`, and adequacy
--- is that lemma plus two facts about the loop.  No lemma ever mentions a
--- heap address belonging to another operator.
+-- Both sides are chains of approximants built the same way — approximant
+-- n compiles n nested `defer`s, and past that shows nothing — so the
+-- fundamental lemma compares approximant n with approximant n, by
+-- induction on (n , tree), one operator at a time: each kernel preserves
+-- a logical relation between a `Subscribe` and a timeline.  Nothing is
+-- coinductive except the last step, from approximants to limits.
 --
 -- The relation is APPROXIMATION, not equality: `Rel s d` says everything
--- `d` shows, running `s` shows too.  That is what lets the fundamental
--- lemma be inductive — at index zero a `defer` means ⊥ᴰ, which every
--- subscription approximates — and leaves all coinduction to the loop,
--- the one place it is productive.
+-- `d` shows, running `s` shows too, given budget enough.  No lemma ever
+-- mentions a heap address belonging to another operator.
 --
--- The IO runtime has no theorem: it runs the same `subscribe`, and the
--- oracle compares it to the TypeScript through `Observable.toIO`.
+-- The IO runtime has no theorem of its own, and needs none: it is the
+-- same engine over a different monad, with its recursion closed by `fix`
+-- rather than by unfolding.  The oracle compares it to the TypeScript.
 module Adequacy where
 
 open import Data.List using (List; _∷_; [])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Maybe as Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_; map₂)
-open import Data.Unit using (tt)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 
-open import AbstractObservable hiding (ones; merge; flatMap)
-open import MonotonicList hiding (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import Denote
-open import PureObservable
+open import operation.abstraction.Tree hiding (ones; merge; flatMap)
+open import operation.AbstractObservable
+open import operation.PureObservable
+open import denotation.MonotonicList hiding (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+open import denotation.Denote
 open Run Pureᴾ
 
--- The pure run, as a timeline: the root is subscribed at time 0.
+-- The pure run: the limit of its approximants, the root subscribed at 0.
 run : ∀ {A} → PureObs [] A → MonotonicList A
-run o = cold (runPure o)
+run o = lub λ n → cold (toArray n o)
 
 postulate
-  -- "Subscribing with `s` at any time t, in any heap, with its `child`
-  -- requests unfolded by the loop, shows at least what `d` shows a
-  -- subscriber arriving at t."
+  -- "Subscribing with `s` at any time t, in any heap, on an engine with
+  -- budget enough, shows at least what `d` shows a subscriber arriving
+  -- at t."
   Rel   : ∀ {A} → Subscribe A → MonotonicList A → Set₁
   -- A subject and the handle `connectᴰ` passed its body agree: joining
   -- one shows at least what the other shows, at any join time.
@@ -78,49 +78,49 @@ postulate
                 → Rel (connectᴷ s b) (connectᴰ d e)
   -- `deferᴰ` adds one `stall`, invisible to `_⊑_`.
   defer-rel     : ∀ {A} {s : Subscribe A} {d} → Rel s d → Rel s (deferᴰ d)
+  -- A cut-off `defer` on both sides: ⊥ᴰ shows nothing.
+  bot-rel       : ∀ {A} → Rel {A} ⊥ᴷ ⊥ᴰ
 
-  -- THE LOOP'S TWO FACTS.  Unfolding `child` is a `stall` and then the
-  -- subtree's own subscribe, and `stall`s are invisible to `_⊑_`.
-  child-rel : ∀ {Γ A} {s : Obs Timeline Γ A} {ρ d} → Rel (subscribe s ρ) d → Rel (sub s ρ) d
-  -- ⊥ᴰ shows nothing, so anything approximates it.
-  bot-rel   : ∀ {A} {s : Subscribe A} → Rel s ⊥ᴰ
+  -- THE ENGINE'S FACT: running a related subscription at time 0 shows at
+  -- least what the timeline shows, in the limit of the run's budget.
+  run-rel : ∀ {A} {s : Subscribe A} {d}
+          → Rel s d → cold (observe d 0) ⊑ lub (λ m → cold (runPure m s))
 
-  -- The loop turns a related subscription into a run at time 0.
-  loop-rel : ∀ {A} {s : Subscribe A} {d}
-           → Rel s d → cold (observe d 0) ⊑ cold (loop (λ sink → s (sinkObserver sink) λ _ → done tt))
+  -- More `defer`s compiled shows more, so running approximant n of the
+  -- compiler is below the run, whose approximants compile ever more.
+  diagonal : ∀ {A} n (o : PureObs [] A) → lub (λ m → cold (runPure m (compileᴺ n o []))) ⊑ run o
 
-  -- Every finite prefix of a run unfolds finitely many `child`s, so some
-  -- approximant already shows it; with soundness, the run is the lub.
-  -- The one coinductive argument in the development.
+  -- Every finite prefix of the run is reached at some finite budget, so
+  -- some approximant of the denotation already shows it; with
+  -- soundness, the two limits agree.  The one argument about limits.
   exhaust : ∀ {A} (o : PureObs [] A) → (∀ n → cold (observe (⟦ o ⟧[ n ] []) 0) ⊑ run o)
           → run o ≈ cold (observe (⟦ o ⟧ []) 0)
 
 mutual
-  -- THE FUNDAMENTAL LEMMA.  The recursion of `⟦_⟧[_]`: lexicographic on
-  -- (n , tree), so inductive — nothing here is guarded.
+  -- THE FUNDAMENTAL LEMMA.  Approximant n against approximant n, by the
+  -- recursion both share: lexicographic on (n , tree), so inductive.
   fundamental : ∀ n {Γ A} (o : PureObs Γ A) {ρ : Env Γ} {δ : DenEnv Γ}
-              → RelEnv ρ δ → Rel (subscribe o ρ) (⟦ o ⟧[ n ] δ)
+              → RelEnv ρ δ → Rel (compileᴺ n o ρ) (⟦ o ⟧[ n ] δ)
   fundamental n       (cold c)         e = cold-rel c
   fundamental n       empty            e = empty-rel
   fundamental n       (of xs)          e = of-rel xs
-  fundamental n       (map f s)        e = map-rel f (child-rel (fundamental n s e))
-  fundamental n       (scan f z s)     e = scan-rel f z (child-rel (fundamental n s e))
-  fundamental n       (takeWhile p s)  e = takeWhile-rel p (child-rel (fundamental n s e))
-  fundamental n       (flatten op f s) e = flatten-rel op (λ a → lane-rel n (f a) e) (child-rel (fundamental n s e))
-  fundamental n       (connect s b)    e = connect-rel (child-rel (fundamental n s e))
-                                                       (λ r → child-rel (fundamental n b (r ∷ e)))
+  fundamental n       (map f s)        e = map-rel f (fundamental n s e)
+  fundamental n       (scan f z s)     e = scan-rel f z (fundamental n s e)
+  fundamental n       (takeWhile p s)  e = takeWhile-rel p (fundamental n s e)
+  fundamental n       (flatten op f s) e = flatten-rel op (λ a → lane-rel n (f a) e) (fundamental n s e)
+  fundamental n       (connect s b)    e = connect-rel (fundamental n s e) (λ r → fundamental n b (r ∷ e))
   fundamental n       (connected i)    e = connected-rel i e
   fundamental zero    (defer l)        e = bot-rel
-  fundamental (suc n) (defer l)        e = defer-rel (child-rel (fundamental n (Later.force l) e))
+  fundamental (suc n) (defer l)        e = defer-rel (fundamental n (Later.force l) e)
 
   lane-rel : ∀ n {Γ B} (x : Maybe B × Maybe (PureObs Γ B)) {ρ : Env Γ} {δ : DenEnv Γ}
-           → RelEnv ρ δ → RelLane (map₂ (Maybe.map λ l → sub l ρ) x) (laneᴰ n x δ)
+           → RelEnv ρ δ → RelLane (lane (deferredᴺ n) x ρ) (laneᴰ n x δ)
   lane-rel n (b , nothing) e = none
-  lane-rel n (b , just l)  e = some (child-rel (fundamental n l e))
+  lane-rel n (b , just l)  e = some (fundamental n l e)
 
--- Each approximant is sound for the run.
+-- Each approximant of the denotation is sound for the run.
 sound : ∀ {A} (o : PureObs [] A) n → cold (observe (⟦ o ⟧[ n ] []) 0) ⊑ run o
-sound o n = loop-rel (fundamental n o [])
+sound o n = ⊑-trans (run-rel (fundamental n o [])) (diagonal n o)
 
 adequacy : ∀ {A} (o : PureObs [] A) → run o ≈ cold (observe (⟦ o ⟧ []) 0)
 adequacy o = exhaust o (sound o)

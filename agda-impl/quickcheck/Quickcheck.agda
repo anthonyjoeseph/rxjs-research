@@ -15,7 +15,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _%_; _/_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import AbstractObservable using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+open import operation.abstraction.Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import quickcheck.Ty
 open import quickcheck.Tm
 open import quickcheck.Code
