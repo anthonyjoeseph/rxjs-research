@@ -46,6 +46,9 @@ data FlatOp : Set where
 -- LANE.  The lane comes out of a function rather than an element of type
 -- `Obs`, because `Obs` lives in `Set₁` and an element type is a `Set`:
 -- the size of the universe, not taste, puts that `map` inside `flatten`.
+--
+-- `takeWhile`'s flag is rxjs's `inclusive`: whether the first failing
+-- value leaves before the completion.
 mutual
   data Obs (C : Set → Set₁) : List Set → Set → Set₁ where
     cold      : ∀ {Γ A} → C A → Obs C Γ A
@@ -53,7 +56,7 @@ mutual
     of        : ∀ {Γ A} → List A → Obs C Γ A
     map       : ∀ {Γ A B} → (A → B) → Obs C Γ A → Obs C Γ B
     scan      : ∀ {Γ A B} → (B → A → B) → B → Obs C Γ A → Obs C Γ B
-    takeWhile : ∀ {Γ A} → (A → Bool) → Obs C Γ A → Obs C Γ A
+    takeWhile : ∀ {Γ A} → Bool → (A → Bool) → Obs C Γ A → Obs C Γ A
     flatten   : ∀ {Γ A B} → FlatOp → (A → Maybe B × Maybe (Obs C Γ B)) → Obs C Γ A → Obs C Γ B
     connect   : ∀ {Γ A B} → Obs C Γ A → Obs C (A ∷ Γ) B → Obs C Γ B
     connected : ∀ {Γ A} → A ∈ Γ → Obs C Γ A
@@ -73,7 +76,7 @@ mutual
   rename r (of xs)          = of xs
   rename r (map f s)        = map f (rename r s)
   rename r (scan f z s)     = scan f z (rename r s)
-  rename r (takeWhile p s)  = takeWhile p (rename r s)
+  rename r (takeWhile i p s) = takeWhile i p (rename r s)
   rename r (flatten op f s) = flatten op (λ a → renameLane r (f a)) (rename r s)
   rename r (connect s b)    = connect (rename r s) (rename (ext r) b)
     where

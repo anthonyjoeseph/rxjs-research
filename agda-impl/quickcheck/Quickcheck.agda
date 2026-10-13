@@ -7,7 +7,7 @@
 module quickcheck.Quickcheck where
 
 open import Data.Bool using (Bool; true; false; _∧_; not)
-open import Data.List using (List; []; _∷_; _++_; filterᵇ; upTo)
+open import Data.List using (List; []; _∷_; _++_; filterᵇ; upTo; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -107,13 +107,15 @@ private
 
   genOp : Gen FlatOp
   genOp = do
-    k ← roll 3
+    k ← roll 5
     pure (op k)
     where
       op : ℕ → FlatOp
       op 0 = mergeᶠ nothing
       op 1 = mergeᶠ (just 1)
-      op 2 = switchᶠ
+      op 2 = mergeᶠ (just 2)
+      op 3 = mergeᶠ (just 3)
+      op 4 = switchᶠ
       op _ = exhaustᶠ
 
   genValues : ℕ → Gen (List ℕ)
@@ -148,16 +150,22 @@ private
     j ← roll 2
     leaf k j
     where
+      -- a `connect` in scope, when there is one
+      handle : ℕ → Gen (Code Γ Δᵍ Δ Θ natᵗ)
+      handle j with pick Γ (j % suc (length Γ)) | pick Γ 0
+      ... | just i | _      = pure (connected i)
+      ... | _      | just i = pure (connected i)
+      ... | _      | _      = do s ← genScript ; pure (cold s)
+
       leaf : ℕ → ℕ → Gen (Code Γ Δᵍ Δ Θ natᵗ)
       leaf 0 _ = pure empty
       leaf 1 _ = do a ← genNat 1 Θ ; b ← genNat 1 Θ ; pure (of (a ∷ b ∷ []))
-      leaf 2 j with pick Γ j
-      ... | just i  = pure (connected i)
-      ... | nothing = do s ← genScript ; pure (cold s)
+      leaf 2 j = handle j
       leaf 3 j with pick Δ j
       ... | just i  = pure (var i)
-      ... | nothing = do s ← genScript ; pure (cold s)
+      ... | nothing = handle j
       leaf _ _ = do s ← genScript ; pure (cold s)
+
 
   gen : ℕ → ∀ Γ Δᵍ Δ Θ → Gen (Code Γ Δᵍ Δ Θ natᵗ)
   gen zero    Γ Δᵍ Δ Θ = genLeaf Γ Δᵍ Δ Θ
@@ -172,7 +180,7 @@ private
         z ← genNat 1 Θ
         s ← gen d Γ Δᵍ Δ Θ
         pure (scan f z s)
-      node 2 = do p ← genBool (natᵗ ∷ Θ) ; s ← gen d Γ Δᵍ Δ Θ ; pure (takeWhile p s)
+      node 2 = do i ← roll 1 ; p ← genBool (natᵗ ∷ Θ) ; s ← gen d Γ Δᵍ Δ Θ ; pure (takeWhile (i ≡ᵇ 0) p s)
       node 3 = do
         op ← genOp
         e ← genEcho (natᵗ ∷ Θ)
@@ -183,6 +191,7 @@ private
       node 4 = do s ← gen d Γ Δᵍ Δ Θ ; b ← gen d (natᵗ ∷ Γ) Δᵍ Δ Θ ; pure (connect s b)
       node 5 = do c ← gen d Γ (natᵗ ∷ Δᵍ) Δ Θ ; pure (μ c)
       node 6 = do c ← gen d Γ [] (Δᵍ ++ Δ) Θ ; pure (defer c)
+      node 7 = do s ← gen d Γ Δᵍ Δ Θ ; b ← gen d (natᵗ ∷ Γ) Δᵍ Δ Θ ; pure (connect s b)
       node _ = genLeaf Γ Δᵍ Δ Θ
 
 -- The program a seed names.

@@ -70,7 +70,7 @@ postulate
   of-rel        : ∀ {A w} (xs : List A) → Rel {w = w} (ofᴷ xs) (ofᴰ xs)
   map-rel       : ∀ {A B w} {s : Subscribe A w} {d} (f : A → B) → Rel s d → Rel (mapᴷ f s) (mapᴰ f d)
   scan-rel      : ∀ {A B w} {s : Subscribe A w} {d} (f : B → A → B) z → Rel s d → Rel (scanᴷ f z s) (scanᴰ f z d)
-  takeWhile-rel : ∀ {A w} {s : Subscribe A w} {d} p → Rel s d → Rel (takeWhileᴷ p s) (takeWhileᴰ p d)
+  takeWhile-rel : ∀ {A w} {s : Subscribe A w} {d} i p → Rel s d → Rel (takeWhileᴷ i p s) (takeWhileᴰ i p d)
   flatten-rel   : ∀ {A B w} {s : Subscribe A w} {d} op {f : A → Lane B w} {g}
                 → (∀ a → RelLane (f a) (g a)) → Rel s d → Rel (flattenᴷ op f s) (flattenᴰ (flatOp op) (mapᴰ g d))
   cold-rel      : ∀ {A w} (c : Timeline A) → Rel {w = w} (via (startCold c)) (coldᴰ (lower c))
@@ -114,7 +114,7 @@ mutual
   fundamental n       (of xs)          e = of-rel xs
   fundamental n       (map f s)        e = map-rel f (fundamental n s e)
   fundamental n       (scan f z s)     e = scan-rel f z (fundamental n s e)
-  fundamental n       (takeWhile p s)  e = takeWhile-rel p (fundamental n s e)
+  fundamental n       (takeWhile i p s) e = takeWhile-rel i p (fundamental n s e)
   fundamental n       (flatten op f s) e = flatten-rel op (λ a → lane-rel n (f a) e) (fundamental n s e)
   fundamental n       (connect s b)    e = connect-rel (fundamental n s e) (λ σ r → fundamental n b (r ∷ wkRelEnv σ e))
   fundamental n       (connected i)    e = connected-rel i e

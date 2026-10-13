@@ -47,7 +47,8 @@ data Code (Γ Δᵍ Δ Θ : List Ty) : Ty → Set where
   map       : ∀ {s t} → Tm (s ∷ Θ) t → Code Γ Δᵍ Δ Θ s → Code Γ Δᵍ Δ Θ t
   -- the element, then the accumulator
   scan      : ∀ {s t} → Tm (s ∷ t ∷ Θ) t → Tm Θ t → Code Γ Δᵍ Δ Θ s → Code Γ Δᵍ Δ Θ t
-  takeWhile : ∀ {t} → Tm (t ∷ Θ) boolᵗ → Code Γ Δᵍ Δ Θ t → Code Γ Δᵍ Δ Θ t
+  -- whether inclusive, then the predicate
+  takeWhile : ∀ {t} → Bool → Tm (t ∷ Θ) boolᵗ → Code Γ Δᵍ Δ Θ t → Code Γ Δᵍ Δ Θ t
   -- per element: its echo, whether it opens a lane, and that lane
   flatten   : ∀ {s t} → T.FlatOp → Tm (s ∷ Θ) (maybeᵗ t) → Tm (s ∷ Θ) boolᵗ
             → Code Γ Δᵍ Δ (s ∷ Θ) t → Code Γ Δᵍ Δ Θ s → Code Γ Δᵍ Δ Θ t
@@ -99,7 +100,7 @@ mutual
   toObs leaf n (of ts)           g d θ = T.of (mapL (λ x → ⟦ x ⟧ᵗ θ) ts)
   toObs leaf n (map f s)         g d θ = T.map (λ a → ⟦ f ⟧ᵗ (a ∷ θ)) (toObs leaf n s g d θ)
   toObs leaf n (scan f z s)      g d θ = T.scan (λ acc a → ⟦ f ⟧ᵗ (a ∷ acc ∷ θ)) (⟦ z ⟧ᵗ θ) (toObs leaf n s g d θ)
-  toObs leaf n (takeWhile p s)   g d θ = T.takeWhile (λ a → ⟦ p ⟧ᵗ (a ∷ θ)) (toObs leaf n s g d θ)
+  toObs leaf n (takeWhile i p s) g d θ = T.takeWhile i (λ a → ⟦ p ⟧ᵗ (a ∷ θ)) (toObs leaf n s g d θ)
   toObs leaf n (flatten op e h l s) g d θ =
     T.flatten op (λ a → maybe (⟦ e ⟧ᵗ (a ∷ θ)) , (if ⟦ h ⟧ᵗ (a ∷ θ) then just (toObs leaf n l g d (a ∷ θ)) else nothing))
                  (toObs leaf n s g d θ)
@@ -168,7 +169,7 @@ showCode t empty                = "[\"empty\"]"
 showCode t (of xs)              = "[\"of\",[" ⊕ intersperse "," (showTms xs) ⊕ "]]"
 showCode t (map {s} f c)        = "[\"map\"," ⊕ showTm f ⊕ "," ⊕ showCode s c ⊕ "]"
 showCode t (scan {s} f z c)     = "[\"scan\"," ⊕ showTm f ⊕ "," ⊕ showTm z ⊕ "," ⊕ showCode s c ⊕ "]"
-showCode t (takeWhile p c)      = "[\"takeWhile\"," ⊕ showTm p ⊕ "," ⊕ showCode t c ⊕ "]"
+showCode t (takeWhile i p c)    = "[\"takeWhile\"," ⊕ showBool i ⊕ "," ⊕ showTm p ⊕ "," ⊕ showCode t c ⊕ "]"
 showCode t (flatten {s} op e h l c) =
   "[\"flatten\"," ⊕ showOp op ⊕ "," ⊕ showTm e ⊕ "," ⊕ showTm h ⊕ "," ⊕ showCode t l ⊕ "," ⊕ showCode s c ⊕ "]"
 showCode t (connect {s} c b)    = "[\"connect\"," ⊕ showCode s c ⊕ "," ⊕ showCode t b ⊕ "]"

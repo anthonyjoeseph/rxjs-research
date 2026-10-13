@@ -54,7 +54,7 @@ export type Code =
   | ["of", Tm[]]
   | ["map", Tm, Code]
   | ["scan", Tm, Tm, Code]
-  | ["takeWhile", Tm, Code]
+  | ["takeWhile", boolean, Tm, Code]
   | ["flatten", FlatOp, Tm, Tm, Code, Code]
   | ["connect", Code, Code]
   | ["connected", number]
@@ -185,11 +185,10 @@ export const compile = (s: Scope, code: Code): Observable<Value> => {
         ),
       );
     }
-    // inclusive, as the tree's: the failing value leaves, then completion
     case "takeWhile": {
-      const p = code[1];
-      return compile(s, code[2]).pipe(
-        takeWhile((a) => evalTm(p, [a, ...s.th]) === true, true),
+      const [, inclusive, p, src] = code;
+      return compile(s, src).pipe(
+        takeWhile((a) => evalTm(p, [a, ...s.th]) === true, inclusive),
       );
     }
     case "flatten": {

@@ -41,7 +41,7 @@ mutual
   approx n       (of xs)          ρ = ofᴰ xs
   approx n       (map f s)        ρ = mapᴰ f (approx n s ρ)
   approx n       (scan f z s)     ρ = scanᴰ f z (approx n s ρ)
-  approx n       (takeWhile p s)  ρ = takeWhileᴰ p (approx n s ρ)
+  approx n       (takeWhile i p s) ρ = takeWhileᴰ i p (approx n s ρ)
   approx n       (flatten op f s) ρ = flattenᴰ (flatOp op) (mapᴰ (λ a → laneᴰ n (f a) ρ) (approx n s ρ))
   approx n       (connect s b)    ρ = connectᴰ (approx n s ρ) λ r → approx n b (r ∷ ρ)
   approx n       (connected i)    ρ = lookup ρ i

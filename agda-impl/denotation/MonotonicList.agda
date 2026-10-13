@@ -249,17 +249,19 @@ private
   scanᴱ f z (end k)     = end k
   scanᴱ f z hush        = hush
 
-  -- Inclusive: the first failing value leaves, then the completion.
+  -- The first failing value leaves first only when inclusive; the
+  -- completion sits after its position either way.
   mutual
-    takeWhileᴱ : ∀ {A} → (A → Bool) → Events A → Events A
-    takeWhileᴱ p (out k a r) = out k a λ where .force → rest p k (p a) (force r)
-    takeWhileᴱ p (skip k r)  = skip k λ where .force → takeWhileᴱ p (force r)
-    takeWhileᴱ p (end k)     = end k
-    takeWhileᴱ p hush        = hush
+    takeWhileᴱ : ∀ {A} → Bool → (A → Bool) → Events A → Events A
+    takeWhileᴱ i p (out k a r) = taking i p k a (p a) r
+    takeWhileᴱ i p (skip k r)  = skip k λ where .force → takeWhileᴱ i p (force r)
+    takeWhileᴱ i p (end k)     = end k
+    takeWhileᴱ i p hush        = hush
 
-    rest : ∀ {A} → (A → Bool) → Pos → Bool → Events A → Events A
-    rest p k true  e = takeWhileᴱ p e
-    rest p k false e = end (k ++ [ last ])
+    taking : ∀ {A} → Bool → (A → Bool) → Pos → A → Bool → Events∞ A → Events A
+    taking i     p k a true  r = out k a λ where .force → takeWhileᴱ i p (force r)
+    taking true  p k a false r = out k a λ where .force → end (k ++ [ last ])
+    taking false p k a false r = end (k ++ [ last ])
 
   ofᴱ : ∀ {A} → Pos → ℕ → List A → Events A
   ofᴱ p i []       = end (p ++ [ last ])
@@ -277,8 +279,8 @@ mapᴰ f s = cold λ p → mapᴱ f (observe s p)
 scanᴰ : ∀ {A B} → (B → A → B) → B → MonotonicList A → MonotonicList B
 scanᴰ f z s = cold λ p → scanᴱ f z (observe s p)
 
-takeWhileᴰ : ∀ {A} → (A → Bool) → MonotonicList A → MonotonicList A
-takeWhileᴰ p s = cold λ q → takeWhileᴱ p (observe s q)
+takeWhileᴰ : ∀ {A} → Bool → (A → Bool) → MonotonicList A → MonotonicList A
+takeWhileᴰ i p s = cold λ q → takeWhileᴱ i p (observe s q)
 
 -- A `skip`, then the body: rxjs's own `defer`, synchronous.
 deferᴰ : ∀ {A} → MonotonicList A → MonotonicList A

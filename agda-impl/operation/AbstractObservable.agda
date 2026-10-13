@@ -302,12 +302,12 @@ module Run (P : Prims) where
     s (ρ ⨾ σ) (record { next = λ a → readB r λ b → writeRef r (f b a) (Observer.next o′ (f b a))
                       ; complete = Observer.complete o′ ; closed = Observer.closed o′ }) (wkKont σ k)
 
-  -- Inclusive: the failing value leaves, then the completion, then the
-  -- source is cut.
-  takeWhileᴷ : ∀ {A w} → (A → Bool) → Subscribe A w → Subscribe A w
-  takeWhileᴷ p s ρ o k = newCut λ σ c → let o′ = wkObs σ o in
+  -- The failing value leaves only when inclusive; then the completion,
+  -- then the source is cut.
+  takeWhileᴷ : ∀ {A w} → Bool → (A → Bool) → Subscribe A w → Subscribe A w
+  takeWhileᴷ i p s ρ o k = newCut λ σ c → let o′ = wkObs σ o in
     s (ρ ⨾ σ) (guarded c (record { next = λ a → if p a then Observer.next o′ a
-                                               else (Observer.next o′ a >>ᴬ Observer.complete o′ >>ᴬ cut c)
+                                               else (when i (Observer.next o′ a) >>ᴬ Observer.complete o′ >>ᴬ cut c)
                                  ; complete = Observer.complete o′ ; closed = Observer.closed o′ }))
       λ τ sub → attach (wkCut τ c) sub >>ᴬ k (σ ⨾ τ) (record { unsubscribe = cut (wkCut τ c) })
 
@@ -447,7 +447,7 @@ module Run (P : Prims) where
     compileWith d (of xs)          ρ = ofᴷ xs
     compileWith d (map f s)        ρ = mapᴷ f (compileWith d s ρ)
     compileWith d (scan f z s)     ρ = scanᴷ f z (compileWith d s ρ)
-    compileWith d (takeWhile p s)  ρ = takeWhileᴷ p (compileWith d s ρ)
+    compileWith d (takeWhile i p s) ρ = takeWhileᴷ i p (compileWith d s ρ)
     compileWith d (flatten op f s) ρ = flattenᴷ op (λ a → lane d (f a) ρ) (compileWith d s ρ)
     compileWith d (connect s b)    ρ = connectᴷ (compileWith d s ρ) λ σ st → compileWith d b (st ∷ wkEnv σ ρ)
     compileWith d (connected i)    ρ = joinᴷ (lookup ρ i)
