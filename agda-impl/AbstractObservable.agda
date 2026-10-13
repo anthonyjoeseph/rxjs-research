@@ -16,6 +16,7 @@ module AbstractObservable where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; [])
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.Maybe as Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
@@ -65,6 +66,33 @@ mutual
   record Later (C : Set → Set₁) (Γ : List Set) (A : Set) : Set₁ where
     coinductive
     field force : Obs C Γ A
+
+-- Move a program to a larger share scope (a share bound around it).
+-- Corecursive through `defer`: the renamed body is produced only when
+-- forced.
+mutual
+  rename : ∀ {C Γ Δ A} → (∀ {X} → X ∈ Γ → X ∈ Δ) → Obs C Γ A → Obs C Δ A
+  rename r (cold c)         = cold c
+  rename r empty            = empty
+  rename r (of xs)          = of xs
+  rename r (map f s)        = map f (rename r s)
+  rename r (scan f z s)     = scan f z (rename r s)
+  rename r (takeWhile p s)  = takeWhile p (rename r s)
+  rename r (flatten op f s) = flatten op (λ a → renameLane r (f a)) (rename r s)
+  rename r (share s b)      = share (rename r s) (rename (ext r) b)
+    where
+      ext : ∀ {B Γ Δ} → (∀ {X} → X ∈ Γ → X ∈ Δ) → ∀ {X} → X ∈ B ∷ Γ → X ∈ B ∷ Δ
+      ext r (here p)  = here p
+      ext r (there i) = there (r i)
+  rename r (shared i)       = shared (r i)
+  rename r (defer l)        = defer (renameLater r l)
+
+  renameLane : ∀ {C Γ Δ B} → (∀ {X} → X ∈ Γ → X ∈ Δ) → Maybe B × Maybe (Obs C Γ B) → Maybe B × Maybe (Obs C Δ B)
+  renameLane r (e , nothing) = e , nothing
+  renameLane r (e , just l)  = e , just (rename r l)
+
+  renameLater : ∀ {C Γ Δ A} → (∀ {X} → X ∈ Γ → X ∈ Δ) → Later C Γ A → Later C Δ A
+  renameLater r l .Later.force = rename r (Later.force l)
 
 ------------------------------------------------------------------------
 -- Derived
