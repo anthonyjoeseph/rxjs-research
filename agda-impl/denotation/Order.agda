@@ -72,6 +72,22 @@ data _≼_ {A : Set} : List A → List A → Set where
   []≼ : ∀ {ys} → [] ≼ ys
   ∷≼  : ∀ {x xs ys} → xs ≼ ys → (x ∷ xs) ≼ (x ∷ ys)
 
+-- A reader who saw a prefix saw each shorter one.
+mutual
+  shows-≼ : ∀ {A : Set} {x : ML A} {is js} → js ≼ is → Shows x is → Shows x js
+  shows-≼ []≼    _          = nil
+  shows-≼ (∷≼ p) done⁺      with p
+  ... | []≼ = done⁺
+  shows-≼ (∷≼ p) quiet⁺     with p
+  ... | []≼ = quiet⁺
+  shows-≼ p      (at⁺ s)    = at⁺ (showsIn-≼ p s)
+
+  showsIn-≼ : ∀ {A : Set} {t} {b : Burst A} {is js} → js ≼ is → ShowsIn t b is → ShowsIn t b js
+  showsIn-≼ []≼    _          = nil
+  showsIn-≼ (∷≼ p) (emit⁺ s)  = emit⁺ (showsIn-≼ p s)
+  showsIn-≼ p      (stall⁺ s) = stall⁺ (showsIn-≼ p s)
+  showsIn-≼ p      (close⁺ s) = close⁺ (shows-≼ p s)
+
 private
   ≼-refl : ∀ {A} (xs : List A) → xs ≼ xs
   ≼-refl []       = []≼
@@ -80,22 +96,6 @@ private
   ≼-trans : ∀ {A : Set} {xs ys zs : List A} → xs ≼ ys → ys ≼ zs → xs ≼ zs
   ≼-trans []≼     _       = []≼
   ≼-trans (∷≼ p) (∷≼ q) = ∷≼ (≼-trans p q)
-
-  -- A reader who saw a prefix saw each shorter one.
-  mutual
-    shows-≼ : ∀ {A : Set} {x : ML A} {is js} → js ≼ is → Shows x is → Shows x js
-    shows-≼ []≼    _          = nil
-    shows-≼ (∷≼ p) done⁺      with p
-    ... | []≼ = done⁺
-    shows-≼ (∷≼ p) quiet⁺     with p
-    ... | []≼ = quiet⁺
-    shows-≼ p      (at⁺ s)    = at⁺ (showsIn-≼ p s)
-
-    showsIn-≼ : ∀ {A : Set} {t} {b : Burst A} {is js} → js ≼ is → ShowsIn t b is → ShowsIn t b js
-    showsIn-≼ []≼    _          = nil
-    showsIn-≼ (∷≼ p) (emit⁺ s)  = emit⁺ (showsIn-≼ p s)
-    showsIn-≼ p      (stall⁺ s) = stall⁺ (showsIn-≼ p s)
-    showsIn-≼ p      (close⁺ s) = close⁺ (shows-≼ p s)
 
   -- What two readers of one run saw, one saw a prefix of.
   Comparable : ∀ {A : Set} → List A → List A → Set

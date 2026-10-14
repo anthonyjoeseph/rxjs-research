@@ -209,20 +209,20 @@ mutual
   ticks (end k)     = done
   ticks hush        = quiet
 
-  private
-    inFrame : ∀ {A} → Time → Events A → Burst A
-    inFrame t e = within t e (sameTick t e)
+  -- The rest of a frame at tick t: whatever comes no later than t.
+  inFrame : ∀ {A} → Time → Events A → Burst A
+  inFrame t e = within t e (sameTick t e)
 
-    sameTick : ∀ {A} → Time → Events A → Bool
-    sameTick t (out k _ _) = tick k <ᵇ suc t
-    sameTick t (skip k _)  = tick k <ᵇ suc t
-    sameTick t (end _)     = false
-    sameTick t hush        = false
+  sameTick : ∀ {A} → Time → Events A → Bool
+  sameTick t (out k _ _) = tick k <ᵇ suc t
+  sameTick t (skip k _)  = tick k <ᵇ suc t
+  sameTick t (end _)     = false
+  sameTick t hush        = false
 
-    within : ∀ {A} → Time → Events A → Bool → Burst A
-    within t (out k a r) true = emit a λ where .Burst∞.force → inFrame t (force r)
-    within t (skip k r)  true = stall λ where .Burst∞.force → inFrame t (force r)
-    within t e           _    = close λ where .ML∞.force → ticks e
+  within : ∀ {A} → Time → Events A → Bool → Burst A
+  within t (out k a r) true = emit a λ where .Burst∞.force → inFrame t (force r)
+  within t (skip k r)  true = stall λ where .Burst∞.force → inFrame t (force r)
+  within t e           _    = close λ where .ML∞.force → ticks e
 
 ------------------------------------------------------------------------
 -- The operators
