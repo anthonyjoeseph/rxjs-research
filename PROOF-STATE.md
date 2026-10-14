@@ -167,10 +167,12 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE RELATION.** `Rel` and `RelSubj` as definitions, over the proven order
-  in `denotation.Order`. Every leaf below is stated in these, so a wrong
-  relation is wrong everywhere; decides whether the bound half ("on any budget,
-  no more") holds of `connect`'s subject.
+- **THE RELATION.** `Rel` and `RelSubj` as definitions over the ghost
+  positions the pure run keeps. `make places` finds them to be the
+  denotation's on every seed, so a relation can match event for event, with
+  no reordering. Every leaf below is stated in these, so a wrong relation is
+  wrong everywhere. This leg decides whether the bound half ("on any budget, no
+  more") holds of `connect`'s subject.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
 - **THE ROOT.** `run-rel` and `run-bound`: `Rel`'s two halves read off at

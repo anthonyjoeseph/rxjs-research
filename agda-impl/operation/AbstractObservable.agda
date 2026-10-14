@@ -27,6 +27,7 @@ open import Data.Nat using (ℕ; suc; pred; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 
+open import denotation.MonotonicList using (Pos; ix; last) renaming (sub to subᴾ)
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 
 ------------------------------------------------------------------------
@@ -93,11 +94,12 @@ module Run (P : Prims) where
   wkR {t = t} = wkEl (ref t)
 
   -- A connect's subject, kept in the environment.  First-order on
-  -- purpose: its subscribers are `Sink`s, not callbacks.  A sink joining
+  -- purpose: its subscribers are `Sink`s, not callbacks, each with the
+  -- position it joined at, which places what it is delivered.  A sink joining
   -- after the source has completed is completed at once, as in rxjs.
   record Subject (A : Set) (w : World) : Set where
     field
-      subscribers : Ref w (list (sink A))
+      subscribers : Ref w (list (sink A ⊗ base Pos))
       closed      : Ref w (base Bool)
 
   wkSubject : ∀ {A w v} → w ⊑ v → Subject A w → Subject A v
@@ -135,6 +137,12 @@ module Run (P : Prims) where
     startCold : ∀ {w A B} → Cold A → Sink w A → (∀ {v} → w ⊑ v → Handle v → Act v B) → Act w B
     stop      : ∀ {w B} → Handle w → Act w B → Act w B
     eff       : ∀ {w A B} → Eff A → (A → Act w B) → Act w B
+    -- WHERE THE RUN IS, as `denotation.MonotonicList` places an event: a
+    -- ghost the pure runtime keeps and the IO runtime ignores.  A kernel
+    -- reads it when subscribed and moves it to the position the
+    -- denotation gives its next event; nothing ever branches on it.
+    here      : ∀ {w B} → (Pos → Act w B) → Act w B
+    goto      : ∀ {w B} → Pos → Act w B → Act w B
     -- No information: what an unfolding cut off by the pure runtime's
     -- budget does.  The IO runtime never reaches it.
     diverge   : ∀ {w B} → Act w B
@@ -157,6 +165,8 @@ module Run (P : Prims) where
   wkAct ρ (startCold c s k)        = startCold c (wkSink ρ s) λ σ → k (ρ ⨾ σ)
   wkAct ρ (stop h k)               = stop (wkHandle ρ h) (wkAct ρ k)
   wkAct ρ (eff e k)                = eff e λ a → wkAct ρ (k a)
+  wkAct ρ (here k)                 = here λ p → wkAct ρ (k p)
+  wkAct ρ (goto p k)               = goto p (wkAct ρ k)
   wkAct ρ diverge                  = diverge
   wkAct ρ (unfold l e n c x k m)   = unfold l (wkEnv ρ e) (λ a → wkAct ρ (n a)) (wkAct ρ c) (wkAct ρ x) (λ σ → k (ρ ⨾ σ)) (wkAct ρ m)
 
@@ -203,6 +213,10 @@ module Run (P : Prims) where
   ⊥ᴷ : ∀ {A w} → Subscribe A w
   ⊥ᴷ ρ o k = diverge
 
+  -- One level down, where `deferᴰ` puts its body: at p ++ [ ix 1 ].
+  deeper : ∀ {A w} → Subscribe A w → Subscribe A w
+  deeper s ρ o k = here λ p → goto (p ++ [ ix 1 ]) (s ρ o k)
+
   -- Sequencing, which the free monad gets by walking its continuations.
   infixl 1 _>>=ᴬ_ _>>ᴬ_
   _>>=ᴬ_ : ∀ {w A B} → Act w A → (A → Act w B) → Act w B
@@ -216,6 +230,8 @@ module Run (P : Prims) where
   startCold c s k  >>=ᴬ f = startCold c s λ σ h → k σ h >>=ᴬ λ x → wkAct σ (f x)
   stop h k         >>=ᴬ f = stop h (k >>=ᴬ f)
   eff e k          >>=ᴬ f = eff e λ a → k a >>=ᴬ f
+  here k           >>=ᴬ f = here λ p → k p >>=ᴬ f
+  goto p k         >>=ᴬ f = goto p (k >>=ᴬ f)
   diverge          >>=ᴬ f = diverge
   unfold l e n c x k m >>=ᴬ f = unfold l e n c x k (m >>=ᴬ f)
 
@@ -299,15 +315,16 @@ module Run (P : Prims) where
   -- delivers its whole burst before its continuation runs, as an rxjs
   -- `subscribe` returns only after it.
   emptyᴷ : ∀ {A w} → Subscribe A w
-  emptyᴷ ρ o k = Observer.complete o >>ᴬ k ⊑-refl noSub
+  emptyᴷ ρ o k = here (λ p → goto (p ++ [ last ]) (Observer.complete o)) >>ᴬ k ⊑-refl noSub
 
-  -- Each value, then the completion, while the observer stays open.
-  emitAll : ∀ {A w} → Observer A w → List A → Act w ⊤
-  emitAll o []       = Observer.complete o
-  emitAll o (x ∷ xs) = Observer.closed o >>=ᴬ λ c → when (not c) (Observer.next o x >>ᴬ emitAll o xs)
+  -- Each value, then the completion, while the observer stays open: the
+  -- i-th of a burst subscribed at p sits at p ++ [ ix i ].
+  emitAll : ∀ {A w} → Observer A w → Pos → ℕ → List A → Act w ⊤
+  emitAll o p i []       = goto (p ++ [ last ]) (Observer.complete o)
+  emitAll o p i (x ∷ xs) = Observer.closed o >>=ᴬ λ c → when (not c) (goto (p ++ [ ix i ]) (Observer.next o x) >>ᴬ emitAll o p (suc i) xs)
 
   ofᴷ : ∀ {A w} → List A → Subscribe A w
-  ofᴷ xs ρ o k = emitAll o xs >>ᴬ k ⊑-refl noSub
+  ofᴷ xs ρ o k = here (λ p → emitAll o p 0 xs) >>ᴬ k ⊑-refl noSub
 
   mapᴷ : ∀ {A B w} → (A → B) → Subscribe A w → Subscribe B w
   mapᴷ f s ρ o = s ρ (record { next = λ a → Observer.next o (f a) ; complete = Observer.complete o ; closed = Observer.closed o })
@@ -321,8 +338,8 @@ module Run (P : Prims) where
   -- then the source is cut.
   takeWhileᴷ : ∀ {A w} → Bool → (A → Bool) → Subscribe A w → Subscribe A w
   takeWhileᴷ i p s ρ o k = newCut λ σ c → let o′ = wkObs σ o in
-    s (ρ ⨾ σ) (guarded c (record { next = λ a → if p a then Observer.next o′ a
-                                               else (when i (Observer.next o′ a) >>ᴬ Observer.complete o′ >>ᴬ cut c)
+    s (ρ ⨾ σ) (guarded c (record { next = λ a → here λ q → if p a then Observer.next o′ a
+                                               else (when i (Observer.next o′ a) >>ᴬ goto (q ++ [ last ]) (Observer.complete o′) >>ᴬ cut c)
                                  ; complete = Observer.complete o′ ; closed = Observer.closed o′ }))
       λ τ sub → attach (wkCut τ c) sub >>ᴬ k (σ ⨾ τ) (record { unsubscribe = cut (wkCut τ c) })
 
@@ -378,8 +395,9 @@ module Run (P : Prims) where
                ; closed = Observer.closed o′ }
 
       start : Subscribe B w → Act w ⊤
-      start l = Observer.closed o >>=ᴬ λ cl → when (not cl) (modifyB active suc >>ᴬ newCut λ σ c →
-        modify (Flat.lanes (wkFlat σ st)) (λ τ cs → wkCut τ c ∷ cs) >>ᴬ l σ (guarded c (lane σ c)) λ τ → attach (wkCut τ c))
+      -- A lane started where the run is, q, is subscribed at q ++ [ ix 1 ].
+      start l = here λ q → Observer.closed o >>=ᴬ λ cl → when (not cl) (modifyB active suc >>ᴬ newCut λ σ c →
+        modify (Flat.lanes (wkFlat σ st)) (λ τ cs → wkCut τ c ∷ cs) >>ᴬ goto (q ++ [ ix 1 ]) (l σ (guarded c (lane σ c)) λ τ → attach (wkCut τ c)))
 
       dequeue : Act w ⊤
       dequeue = readB queue λ where
@@ -414,24 +432,26 @@ module Run (P : Prims) where
   -- node, so one bound outside a `defer` is the SAME subject on every
   -- re-subscription of the deferred body.
   connectᴷ : ∀ {A B w} → Subscribe A w → (∀ {v} → w ⊑ v → Subject A v → Subscribe B v) → Subscribe B w
-  connectᴷ {A} s b ρ o k = newRef (list (sink A)) [] λ σ subs → newB false λ τ cl →
+  connectᴷ {A} s b ρ o k = here λ p → newRef (list (sink A ⊗ base Pos)) [] λ σ subs → newB false λ τ cl →
     let st = record { subscribers = wkR τ subs ; closed = cl } in
-    b (ρ ⨾ σ ⨾ τ) st ⊑-refl (wkObs (σ ⨾ τ) o) λ π body → let st′ = wkSubject π st in
-    s (ρ ⨾ σ ⨾ τ ⨾ π) (record { next = λ a → readRef (Subject.subscribers st′) λ _ ss → each ss λ sk → send sk a skipᴬ
-                              ; complete = writeRef (Subject.closed st′) true (readRef (Subject.subscribers st′) λ _ ss → each ss λ sk → finish sk skipᴬ)
-                              ; closed = readB (Subject.closed st′) done })
-      λ υ src → k (σ ⨾ τ ⨾ π ⨾ υ) (record { unsubscribe = Subscription.unsubscribe src >>ᴬ Subscription.unsubscribe (wkSubn υ body) })
+    goto (p ++ [ ix 0 ]) (b (ρ ⨾ σ ⨾ τ) st ⊑-refl (wkObs (σ ⨾ τ) o) λ π body → let st′ = wkSubject π st in
+    goto (p ++ [ ix 1 ]) (s (ρ ⨾ σ ⨾ τ ⨾ π) (record
+      { next = λ a → here λ q → readRef (Subject.subscribers st′) λ _ ss → each ss λ j → goto (q ++ [ subᴾ (proj₂ j) ]) (send (proj₁ j) a skipᴬ)
+      ; complete = here λ c → writeRef (Subject.closed st′) true (readRef (Subject.subscribers st′) λ _ ss →
+                   each ss λ j → goto (c ++ [ subᴾ (proj₂ j) ]) (finish (proj₁ j) skipᴬ))
+      ; closed = readB (Subject.closed st′) done })
+      λ υ src → k (σ ⨾ τ ⨾ π ⨾ υ) (record { unsubscribe = Subscription.unsubscribe src >>ᴬ Subscription.unsubscribe (wkSubn υ body) })))
 
   -- Adds the sink, guarded so that unsubscribing silences it.  Nothing
   -- else: the source is already running.  Joining a completed subject
   -- completes at once.
   joinᴷ : ∀ {A w} → Subject A w → Subscribe A w
-  joinᴷ st ρ o k = readB (Subject.closed (wkSubject ρ st)) λ where
-    true  → Observer.complete o >>ᴬ k ⊑-refl noSub
+  joinᴷ st ρ o k = here λ j → readB (Subject.closed (wkSubject ρ st)) λ where
+    true  → goto (j ++ [ last ]) (Observer.complete o) >>ᴬ k ⊑-refl noSub
     false → newB true λ σ l → let o′ = wkObs σ o in
       register (λ a → readB l λ b → when b (Observer.next o′ a)) (readB l λ b → when b (Observer.complete o′))
                (readB l λ b → if b then Observer.closed o′ else done true) λ τ sk →
-      modify (Subject.subscribers (wkSubject (ρ ⨾ σ ⨾ τ) st)) (λ π ss → ss ++ [ wkSink π sk ]) >>ᴬ
+      modify (Subject.subscribers (wkSubject (ρ ⨾ σ ⨾ τ) st)) (λ π ss → ss ++ [ (wkSink π sk , j) ]) >>ᴬ
       k (σ ⨾ τ) (record { unsubscribe = writeRef (wkR τ l) false skipᴬ })
 
   -- What a `defer` turns into, and each runtime picks its own.  The pure
@@ -488,6 +508,8 @@ module Run (P : Prims) where
       startColdᴿ : (∀ {w B} → Act w B → M w B) → ∀ {w A B} → Cold A → Sink w A → (∀ {v} → w ⊑ v → Handle v → M v B) → M w B
       stopᴿ      : ∀ {w} → Handle w → M w ⊤
       effᴿ       : ∀ {w A} → Eff A → M w A
+      hereᴿ      : ∀ {w B} → (Pos → M w B) → M w B
+      gotoᴿ      : ∀ {w} → Pos → M w ⊤
       divergeᴿ   : ∀ {w A} → M w A
       -- Runs the next timer as one cascade; false when none is left.  Both
       -- runtimes pop the earliest, ties in the order they were set, as two
@@ -516,6 +538,8 @@ module Run (P : Prims) where
     interpret self (startCold c s k)  = startColdᴿ self c s λ σ h → interpret self (k σ h)
     interpret self (stop h k)         = stopᴿ h >>= λ _ → interpret self k
     interpret self (eff e k)          = effᴿ e >>= λ a → interpret self (k a)
+    interpret self (here k)           = hereᴿ λ p → interpret self (k p)
+    interpret self (goto p k)         = gotoᴿ p >>= λ _ → interpret self k
     interpret self diverge            = divergeᴿ
     interpret self (unfold l e n c x k m) =
       self (compile (Later.force l) e ⊑-refl (record { next = n ; complete = c ; closed = x }) λ σ sub →

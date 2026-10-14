@@ -23,7 +23,7 @@ open import Data.List.Relation.Unary.All using (All; []; lookup) renaming (_∷_
 open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Timeline; ML; Burst∞; ML∞; Time; at; emit; stall; close; done; quiet)
+open import denotation.MonotonicList using (Timeline; ML; Burst∞; ML∞; Time; at; emit; stall; close; done; quiet; Pos; ix; last) renaming (sub to subᴾ)
 open import denotation.Order using (Shows; ShowsIn; nil; at⁺; emit⁺; stall⁺; close⁺; _⊑_)
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import operation.AbstractObservable using (base; module Prims; module Run)
@@ -36,7 +36,7 @@ module Approx (R : Set) where
   open Kit
   open FlatKit
   open Pure R using (deferredᴺ; compileᴺ; Callbacks; Val; get; put; wkVal; wkAll; State; extend; Timer; wkTimer; mapList; insert; Res; res;
-                     M; ret; then; bind; shift; spent; spend; unlessSpent; module Play; Pureᴿ; runᴺ; loopᴺ; start; recorder; observe;
+                     M; ret; then; bind; shift; spent; spend; unlessSpent; hereᴾ; gotoᴾ; cascade; module Play; Pureᴿ; runᴺ; loopᴺ; start; recorder; observe;
                      frames; within; inFrame; later; ending; stalls; sameFrame; endOf; runPure; cutOff)
 
   ------------------------------------------------------------------------
@@ -56,6 +56,8 @@ module Approx (R : Set) where
     startCold≼ : ∀ {A} {c : Timeline A} {s} {k k′ : ∀ {v} → w ≤ʷ v → Handle v → Act v B} → (∀ {v} (σ : w ≤ʷ v) h → k σ h ≼ k′ σ h) → startCold c s k ≼ startCold c s k′
     stop≼      : ∀ {h k k′} → k ≼ k′ → stop h k ≼ stop h k′
     eff≼       : ∀ {A} {e : Out R A} {k k′} → (∀ a → k a ≼ k′ a) → eff e k ≼ eff e k′
+    here≼      : ∀ {k k′ : Pos → Act w B} → (∀ p → k p ≼ k′ p) → here k ≼ here k′
+    goto≼      : ∀ {p k k′} → k ≼ k′ → goto p k ≼ goto p k′
     unfold≼    : ∀ {Γ A} {l : Later Timeline Γ A} {e} {n n′ : A → Act w ⊤} {c c′ x x′ m m′} {k k′ : ∀ {v} → w ≤ʷ v → Sink v ⊤ → Act v ⊤}
                → (∀ a → n a ≼ n′ a) → c ≼ c′ → x ≼ x′ → (∀ {v} (σ : w ≤ʷ v) s → k σ s ≼ k′ σ s) → m ≼ m′
                → unfold l e n c x k m ≼ unfold l e n′ c′ x′ k′ m′
@@ -71,6 +73,8 @@ module Approx (R : Set) where
   ≼-refl (startCold c s k)      = startCold≼ λ σ h → ≼-refl (k σ h)
   ≼-refl (stop h k)             = stop≼ (≼-refl k)
   ≼-refl (eff e k)              = eff≼ λ a → ≼-refl (k a)
+  ≼-refl (here k)               = here≼ λ p → ≼-refl (k p)
+  ≼-refl (goto p k)             = goto≼ (≼-refl k)
   ≼-refl diverge                = ⊥≼
   ≼-refl (unfold l e n c x k m) = unfold≼ (λ a → ≼-refl (n a)) (≼-refl c) (≼-refl x) (λ σ s → ≼-refl (k σ s)) (≼-refl m)
 
@@ -86,6 +90,8 @@ module Approx (R : Set) where
   ≼-wk ρ (startCold≼ p)           = startCold≼ λ σ h → p (ρ ⨾ʷ σ) h
   ≼-wk ρ (stop≼ p)                = stop≼ (≼-wk ρ p)
   ≼-wk ρ (eff≼ p)                 = eff≼ λ a → ≼-wk ρ (p a)
+  ≼-wk ρ (here≼ p)                = here≼ λ q → ≼-wk ρ (p q)
+  ≼-wk ρ (goto≼ p)                = goto≼ (≼-wk ρ p)
   ≼-wk ρ (unfold≼ pn pc px pk pm) = unfold≼ (λ a → ≼-wk ρ (pn a)) (≼-wk ρ pc) (≼-wk ρ px) (λ σ s → pk (ρ ⨾ʷ σ) s) (≼-wk ρ pm)
 
   ≼-bind : ∀ {w A B} {m m′ : Act w A} {f f′ : A → Act w B} → m ≼ m′ → (∀ x → f x ≼ f′ x) → (m >>=ᴬ f) ≼ (m′ >>=ᴬ f′)
@@ -100,6 +106,8 @@ module Approx (R : Set) where
   ≼-bind (startCold≼ p)           q = startCold≼ λ σ h → ≼-bind (p σ h) λ x → ≼-wk σ (q x)
   ≼-bind (stop≼ p)                q = stop≼ (≼-bind p q)
   ≼-bind (eff≼ p)                 q = eff≼ λ a → ≼-bind (p a) q
+  ≼-bind (here≼ p)                q = here≼ λ x → ≼-bind (p x) q
+  ≼-bind (goto≼ p)                q = goto≼ (≼-bind p q)
   ≼-bind (unfold≼ pn pc px pk pm) q = unfold≼ pn pc px pk (≼-bind pm q)
 
   ≼-then : ∀ {w B} {m m′ : Act w ⊤} {n n′ : Act w B} → m ≼ m′ → n ≼ n′ → (m >>ᴬ n) ≼ (m′ >>ᴬ n′)
@@ -171,14 +179,14 @@ module Approx (R : Set) where
   via-≼ c σ p q = register≼ (next≼ p) (complete≼ p) (closed≼ p) λ τ s → startCold≼ λ υ h → q (τ ⨾ʷ υ) (stop≼ done≼)
 
   empty-≼ : ∀ {A w} → emptyᴷ {A} {w} ≼ˢ emptyᴷ
-  empty-≼ σ p q = ≼-then (complete≼ p) (q same done≼)
+  empty-≼ σ p q = ≼-then (here≼ λ r → goto≼ {p = r ++ [ last ]} (complete≼ p)) (q same done≼)
 
-  emitAll-≼ : ∀ {A w} {o o′ : Observer A w} → o ≼ᴼ o′ → ∀ xs → emitAll o xs ≼ emitAll o′ xs
-  emitAll-≼ p []       = complete≼ p
-  emitAll-≼ p (x ∷ xs) = ≼-bind (closed≼ p) λ c → when-≼ (not c) (≼-then (next≼ p x) (emitAll-≼ p xs))
+  emitAll-≼ : ∀ {A w} {o o′ : Observer A w} → o ≼ᴼ o′ → ∀ r i xs → emitAll o r i xs ≼ emitAll o′ r i xs
+  emitAll-≼ p r i []       = goto≼ (complete≼ p)
+  emitAll-≼ p r i (x ∷ xs) = ≼-bind (closed≼ p) λ c → when-≼ (not c) (≼-then (goto≼ (next≼ p x)) (emitAll-≼ p r (suc i) xs))
 
   of-≼ : ∀ {A w} (xs : List A) → ofᴷ {w = w} xs ≼ˢ ofᴷ xs
-  of-≼ xs σ p q = ≼-then (emitAll-≼ p xs) (q same done≼)
+  of-≼ xs σ p q = ≼-then (here≼ λ r → emitAll-≼ p r 0 xs) (q same done≼)
 
   map-≼ : ∀ {A B w} (f : A → B) {s s′ : Subscribe A w} → s ≼ˢ s′ → mapᴷ f s ≼ˢ mapᴷ f s′
   map-≼ f ps σ p q = ps σ (record { next≼ = λ a → next≼ p (f a) ; complete≼ = complete≼ p ; closed≼ = closed≼ p }) q
@@ -191,8 +199,8 @@ module Approx (R : Set) where
   takeWhile-≼ : ∀ {A w} i (f : A → Bool) {s s′ : Subscribe A w} → s ≼ˢ s′ → takeWhileᴷ i f s ≼ˢ takeWhileᴷ i f s′
   takeWhile-≼ i f ps σ p q = newCut-≼ λ τ c →
     ps (σ ⨾ʷ τ) (guarded-≼ c (record
-      { next≼ = λ a → ≼-if (f a) (next≼ (≼ᴼ-wk τ p) a)
-                        (≼-then (≼-then (when-≼ i (next≼ (≼ᴼ-wk τ p) a)) (complete≼ (≼ᴼ-wk τ p))) (≼-refl (cut c)))
+      { next≼ = λ a → here≼ λ r → ≼-if (f a) (next≼ (≼ᴼ-wk τ p) a)
+                        (≼-then (≼-then (when-≼ i (next≼ (≼ᴼ-wk τ p) a)) (goto≼ {p = r ++ [ last ]} (complete≼ (≼ᴼ-wk τ p)))) (≼-refl (cut c)))
       ; complete≼ = complete≼ (≼ᴼ-wk τ p) ; closed≼ = closed≼ (≼ᴼ-wk τ p) }))
       λ υ u → ≼-then (attach-≼ (wkCut υ c) u) (q (τ ⨾ʷ υ) (≼-refl (cut (wkCut υ c))))
 
@@ -216,8 +224,8 @@ module Approx (R : Set) where
       ; closed≼ = closed≼ (≼ᴼ-wk σ p) }
 
     start-≼ : ∀ {l l′ : Subscribe B w} → l ≼ˢ l′ → L.start l ≼ L′.start l′
-    start-≼ pl = ≼-bind (closed≼ p) λ cl → when-≼ (not cl) (≼-pre (modifyB (Flat.active st) suc) (newCut-≼ λ σ c →
-      ≼-pre (modify (Flat.lanes (wkFlat σ st)) (λ τ cs → wkCut τ c ∷ cs)) (pl σ (guarded-≼ c (lane-≼ σ c)) λ τ u → attach-≼ (wkCut τ c) u)))
+    start-≼ pl = here≼ λ r → ≼-bind (closed≼ p) λ cl → when-≼ (not cl) (≼-pre (modifyB (Flat.active st) suc) (newCut-≼ λ σ c →
+      ≼-pre (modify (Flat.lanes (wkFlat σ st)) (λ τ cs → wkCut τ c ∷ cs)) (goto≼ {p = r ++ [ ix 1 ]} (pl σ (guarded-≼ c (lane-≼ σ c)) λ τ u → attach-≼ (wkCut τ c) u))))
 
     dequeue-≼ : L.dequeue ≼ L′.dequeue
     dequeue-≼ = readB-≼ λ where
@@ -249,18 +257,18 @@ module Approx (R : Set) where
 
   connect-≼ : ∀ {A B w} {s s′ : Subscribe A w} {b b′ : ∀ {v} → w ≤ʷ v → Subject A v → Subscribe B v}
             → s ≼ˢ s′ → (∀ {v} (σ : w ≤ʷ v) st → b σ st ≼ˢ b′ σ st) → connectᴷ s b ≼ˢ connectᴷ s′ b′
-  connect-≼ ps pb ρ p q = newRef≼ λ σ subs → newRef≼ λ τ cl →
-    pb (ρ ⨾ʷ σ ⨾ʷ τ) _ same (≼ᴼ-wk (σ ⨾ʷ τ) p) λ π {body} {body′} pbody →
-      ps (ρ ⨾ʷ σ ⨾ʷ τ ⨾ʷ π) (record { next≼ = λ a → ≼-refl _ ; complete≼ = ≼-refl _ ; closed≼ = ≼-refl _ })
-        λ υ u → q (σ ⨾ʷ τ ⨾ʷ π ⨾ʷ υ) (≼-then u (≼-wk υ pbody))
+  connect-≼ ps pb ρ p q = here≼ λ r → newRef≼ λ σ subs → newRef≼ λ τ cl →
+    goto≼ {p = r ++ [ ix 0 ]} (pb (ρ ⨾ʷ σ ⨾ʷ τ) _ same (≼ᴼ-wk (σ ⨾ʷ τ) p) λ π {body} {body′} pbody →
+      goto≼ {p = r ++ [ ix 1 ]} (ps (ρ ⨾ʷ σ ⨾ʷ τ ⨾ʷ π) (record { next≼ = λ a → ≼-refl _ ; complete≼ = ≼-refl _ ; closed≼ = ≼-refl _ })
+        λ υ u → q (σ ⨾ʷ τ ⨾ʷ π ⨾ʷ υ) (≼-then u (≼-wk υ pbody))))
 
   join-≼ : ∀ {A w} (st : Subject A w) → joinᴷ st ≼ˢ joinᴷ st
-  join-≼ st ρ p q = readB-≼ λ where
-    true  → ≼-then (complete≼ p) (q same done≼)
+  join-≼ st ρ p q = here≼ λ j → readB-≼ λ where
+    true  → ≼-then (goto≼ {p = j ++ [ last ]} (complete≼ p)) (q same done≼)
     false → newRef≼ λ σ l → register≼ (λ a → readB-≼ λ b → when-≼ b (next≼ (≼ᴼ-wk σ p) a))
                                       (readB-≼ λ b → when-≼ b (complete≼ (≼ᴼ-wk σ p)))
                                       (readB-≼ λ b → ≼-if b (closed≼ (≼ᴼ-wk σ p)) done≼)
-                                      λ τ sk → ≼-pre (modify (Subject.subscribers (wkSubject (ρ ⨾ʷ σ ⨾ʷ τ) st)) (λ π ss → ss ++ [ wkSink π sk ]))
+                                      λ τ sk → ≼-pre (modify (Subject.subscribers (wkSubject (ρ ⨾ʷ σ ⨾ʷ τ) st)) (λ π ss → ss ++ [ (wkSink π sk , j) ]))
                                                  (q (σ ⨾ʷ τ) (≼-refl (writeRef (wkR τ l) false skipᴬ)))
 
   defer-≼ : ∀ {Γ A w} (l : Later Timeline Γ A) (ρ : Env Γ w) → deferᴷ l ρ ≼ˢ deferᴷ l ρ
@@ -286,7 +294,7 @@ module Approx (R : Set) where
 
   deferred-≼ : ∀ {n n′} → n Data.Nat.≤ n′ → deferredᴺ n ≼ᵈ deferredᴺ n′
   deferred-≼ {n′ = n′} Data.Nat.z≤n l ρ = ⊥-≼ {s = deferredᴺ n′ l ρ}
-  deferred-≼ (Data.Nat.s≤s p) l ρ = compile-≼ (deferred-≼ p) (Later.force l) ρ
+  deferred-≼ (Data.Nat.s≤s p) l ρ σ po pk = here≼ λ r → goto≼ {p = r ++ [ ix 1 ]} (compile-≼ (deferred-≼ p) (Later.force l) ρ σ po pk)
 
   -- A deeper approximant of the compiler.
   compileᴺ-≼ : ∀ {n n′} → n Data.Nat.≤ n′ → ∀ {Γ A w} (o : Obs Timeline Γ A) (ρ : Env Γ w) → compileᴺ n o ρ ≼ˢ compileᴺ n′ o ρ
@@ -369,14 +377,15 @@ module Approx (R : Set) where
       timers≡ : State.timers s ≡ State.timers s′
       log≡    : State.log s ≡ State.log s′
       ended≡  : State.ended s ≡ State.ended s′
+      pos≡    : State.pos s ≡ State.pos s′
   open StRel
 
   stRel-refl : ∀ {h} (s : State h) → StRel s s
-  stRel-refl s = record { heap≈ = heapRel-refl (State.heap s) ; clock≡ = refl ; timers≡ = refl ; log≡ = refl ; ended≡ = refl }
+  stRel-refl s = record { heap≈ = heapRel-refl (State.heap s) ; clock≡ = refl ; timers≡ = refl ; log≡ = refl ; ended≡ = refl ; pos≡ = refl }
 
   extend-rel : ∀ {h k} {s s′ : State h} {x y : Val (k ∷ h) k} → StRel s s′ → ValRel k x y → StRel (extend s x) (extend s′ y)
   extend-rel q p = record { heap≈ = p ∷ wkAll-rel new (heap≈ q) ; clock≡ = clock≡ q ; timers≡ = cong (mapList (wkTimer new)) (timers≡ q)
-                          ; log≡ = log≡ q ; ended≡ = ended≡ q }
+                          ; log≡ = log≡ q ; ended≡ = ended≡ q ; pos≡ = pos≡ q }
 
   grows-from : ∀ {h v} {s s′ : State h} {s″ : State v} → StRel s s′ → Grows s′ s″ → Grows s s″
   grows-from q g = subst₂ (λ e l → GrowsAt e l _ _) (sym (ended≡ q)) (sym (log≡ q)) g
@@ -456,7 +465,7 @@ module Approx (R : Set) where
   spent-grow hd = grows λ σ s → growsAt-refl _ _
 
   spend-sim : ∀ {w} (hd : Handle w) → Sim (spend hd) (spend hd)
-  spend-sim hd σ q = lock (stRel (put-rel (heap≈ q) (wk∋ σ hd) refl) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q))
+  spend-sim hd σ q = lock (stRel (put-rel (heap≈ q) (wk∋ σ hd) refl) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) (pos≡ q))
 
   spend-grow : ∀ {w} (hd : Handle w) → Grower (spend hd)
   spend-grow hd = grows λ σ s → growsAt-refl _ _
@@ -466,6 +475,18 @@ module Approx (R : Set) where
 
   unless-grow : ∀ {w} (hd : Handle w) {m : M w ⊤} → Grower m → Grower (unlessSpent hd m)
   unless-grow hd {m} gm = bind-grow {f = λ b → if b then ret tt else m} (spent-grow hd) (λ { true → ret-grow tt ; false → gm })
+
+  here-sim : ∀ {w B} {k k′ : Pos → M w B} → (∀ p → Sim (k p) (k′ p)) → Sim (hereᴾ k) (hereᴾ k′)
+  here-sim {k = k} {k′} pk σ {s} {s′} q = subst (λ x → ResRel (k (State.pos s) σ s) (k′ x σ s′)) (pos≡ q) (pk (State.pos s) σ q)
+
+  here-grow : ∀ {w B} {k : Pos → M w B} → (∀ p → Grower (k p)) → Grower (hereᴾ k)
+  here-grow gk = grows λ σ st → grow (gk (State.pos st)) σ st
+
+  goto-sim : ∀ {w} p → Sim {w} (gotoᴾ p) (gotoᴾ p)
+  goto-sim p σ q = lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) refl)
+
+  goto-grow : ∀ {w} p → Grower {w} (gotoᴾ p)
+  goto-grow p = grows λ σ st → growsAt-refl _ _
 
   note-grows : ∀ e xs c a → GrowsAt e xs e (if e then xs else xs ++ [ (c , a) ])
   note-grows true  xs c a = shut≈
@@ -491,34 +512,35 @@ module Approx (R : Set) where
     finish-grow : ∀ {w A} (s : Sink w A) → Grower (finishᴾ s)
     finish-grow s = runCb-grow s Callbacks.onComplete
 
-    schedule-grow : ∀ {w A} (s : Sink w A) (hd : Handle w) now m → Grower (schedule s hd now m)
-    schedule-grow s hd now done     = unless-grow hd (bind-grow (spend-grow hd) λ _ → finish-grow s)
-    schedule-grow s hd now quiet    = ret-grow tt
-    schedule-grow s hd now (at t b) = grows λ σ st → growsAt-refl _ _
+    schedule-grow : ∀ {w A} (s : Sink w A) (hd : Handle w) now e m → Grower (schedule s hd now e m)
+    schedule-grow s hd now e done     = unless-grow hd (bind-grow (spend-grow hd) λ _ → bind-grow (goto-grow e) λ _ → finish-grow s)
+    schedule-grow s hd now e quiet    = ret-grow tt
+    schedule-grow s hd now e (at t b) = grows λ σ st → growsAt-refl _ _
 
     mutual
-      burst-grow : ∀ f {w A} (s : Sink w A) (hd : Handle w) t b → Grower (burst f s hd t b)
-      burst-grow zero    s hd t b = grows λ σ st → growsAt-refl _ _
-      burst-grow (suc f) s hd t b = bind-grow {f = λ c → if c then ret tt else stepᴾ f s hd t b} (closed-grow s hd) λ { true → ret-grow tt ; false → step-grow f s hd t b }
+      burst-grow : ∀ f {w A} (s : Sink w A) (hd : Handle w) t r i b → Grower (burst f s hd t r i b)
+      burst-grow zero    s hd t r i b = grows λ σ st → growsAt-refl _ _
+      burst-grow (suc f) s hd t r i b = bind-grow {f = λ c → if c then ret tt else stepᴾ f s hd t r i b} (closed-grow s hd) λ { true → ret-grow tt ; false → step-grow f s hd t r i b }
 
-      step-grow : ∀ f {w A} (s : Sink w A) (hd : Handle w) t b → Grower (stepᴾ f s hd t b)
-      step-grow f s hd t (emit a k) = bind-grow (unless-grow hd (send-grow s a)) λ _ → unless-grow hd (burst-grow f s hd t (Burst∞.force k))
-      step-grow f s hd t (stall k)  = burst-grow f s hd t (Burst∞.force k)
-      step-grow f s hd t (close k)  = schedule-grow s hd t (ML∞.force k)
+      step-grow : ∀ f {w A} (s : Sink w A) (hd : Handle w) t r i b → Grower (stepᴾ f s hd t r i b)
+      step-grow f s hd t r i (emit a k) = bind-grow (unless-grow hd (bind-grow (goto-grow (r ++ [ ix i ])) λ _ → send-grow s a)) λ _ →
+                                            unless-grow hd (burst-grow f s hd t r (suc i) (Burst∞.force k))
+      step-grow f s hd t r i (stall k)  = burst-grow f s hd t r (suc i) (Burst∞.force k)
+      step-grow f s hd t r i (close k)  = schedule-grow s hd t (r ++ [ last ]) (ML∞.force k)
 
     first-grow : ∀ {w A} (s : Sink w A) (hd : Handle w) m → Grower (first s hd m)
-    first-grow s hd (at zero b)    = burst-grow n s hd 0 b
-    first-grow s hd (at (suc t) b) = schedule-grow s hd 0 (at (suc t) b)
-    first-grow s hd done           = schedule-grow s hd 0 done
-    first-grow s hd quiet          = schedule-grow s hd 0 quiet
+    first-grow s hd (at zero b)    = here-grow λ r → burst-grow n s hd 0 r 0 b
+    first-grow s hd (at (suc t) b) = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) (at (suc t) b)
+    first-grow s hd done           = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) done
+    first-grow s hd quiet          = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) quiet
 
     fire-grow : ∀ {h} ts (st : State h) → Grows st (Res.state (fire ts st))
     fire-grow []        st = growsAt-refl _ _
     fire-grow (tm ∷ ts) st = then-grow {g = λ _ _ st′ → res same st′ (just true)} st
-      (unlessSpent (Timer.handle tm) (burst n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (Timer.frame tm)) same
-        (record st { clock = Timer.due tm ; timers = ts }))
-      (grow (unless-grow (Timer.handle tm) (burst-grow n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (Timer.frame tm))) same
-        (record st { clock = Timer.due tm ; timers = ts }))
+      (unlessSpent (Timer.handle tm) (burst n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm)) same
+        (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }))
+      (grow (unless-grow (Timer.handle tm) (burst-grow n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm))) same
+        (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }))
       (λ _ → grows λ _ _ → growsAt-refl _ _)
 
     next-grow : ∀ {w} → Grower {w} (nextᴾ {w})
@@ -537,6 +559,8 @@ module Approx (R : Set) where
     interpret-grow (stop h k)             = bind-grow (spend-grow h) λ _ → interpret-grow k
     interpret-grow (eff (note a) k)       = bind-grow {m = Runtime.effᴿ (Pureᴿ n) (note a)} (grows λ σ st → note-grows (State.ended st) (State.log st) (State.clock st) a) λ x → interpret-grow (k x)
     interpret-grow (eff fin k)            = bind-grow {m = Runtime.effᴿ (Pureᴿ n) fin} (grows λ σ st → fin-grows (State.ended st) (State.log st)) λ x → interpret-grow (k x)
+    interpret-grow (here k)               = here-grow λ p → interpret-grow (k p)
+    interpret-grow (goto p k)             = bind-grow {m = Runtime.gotoᴿ (Pureᴿ n) p} (goto-grow p) λ _ → interpret-grow k
     interpret-grow diverge                = grows λ σ st → growsAt-refl _ _
     interpret-grow (unfold l e nx c x k m) = bind-grow (gr _) λ _ → interpret-grow m
 
@@ -561,41 +585,43 @@ module Approx (R : Set) where
     finish-sim : ∀ {w A} (s : Sink w A) → Sim (L.finishᴾ s) (L′.finishᴾ s)
     finish-sim s = runCb-sim s λ p → CbRel.onComplete≼ p
 
-    schedule-sim : ∀ {w A} (s : Sink w A) (hd : Handle w) now m → Sim (L.schedule s hd now m) (L′.schedule s hd now m)
-    schedule-sim s hd now done     = unless-sim hd (bind-sim (spend-sim hd) (λ _ → finish-sim s) (λ _ → G.finish-grow s))
-                                       (bind-grow (spend-grow hd) λ _ → G.finish-grow s)
-    schedule-sim s hd now quiet    = ret-sim tt
-    schedule-sim s hd now (at t b) = λ σ q → lock (stRel (heap≈ q) (clock≡ q) (cong₂ (λ c ts → insert (record
-      { due = c + (t ∸ now) ; sink = wk∋ σ s ; handle = wk∋ σ hd ; at′ = t ; frame = b }) ts) (clock≡ q) (timers≡ q)) (log≡ q) (ended≡ q))
+    schedule-sim : ∀ {w A} (s : Sink w A) (hd : Handle w) now e m → Sim (L.schedule s hd now e m) (L′.schedule s hd now e m)
+    schedule-sim s hd now e done     = unless-sim hd (bind-sim (spend-sim hd) (λ _ → bind-sim (goto-sim e) (λ _ → finish-sim s) (λ _ → G.finish-grow s))
+                                                               (λ _ → bind-grow (goto-grow e) λ _ → G.finish-grow s))
+                                         (bind-grow (spend-grow hd) λ _ → bind-grow (goto-grow e) λ _ → G.finish-grow s)
+    schedule-sim s hd now e quiet    = ret-sim tt
+    schedule-sim s hd now e (at t b) = λ σ q → lock (stRel (heap≈ q) (clock≡ q) (cong₂ (λ c ts → insert (record
+      { due = c + (t ∸ now) ; sink = wk∋ σ s ; handle = wk∋ σ hd ; at′ = t ; from = e ; frame = b }) ts) (clock≡ q) (timers≡ q)) (log≡ q) (ended≡ q) (pos≡ q))
 
     mutual
-      burst-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A} (s : Sink w A) (hd : Handle w) t b → Sim (L.burst f s hd t b) (L′.burst f′ s hd t b)
-      burst-sim {f′ = f′} z≤n s hd t b = diverge-sim (G.burst-grow f′ s hd t b)
-      burst-sim {f′ = suc f′} (s≤s p) s hd t b =
-        bind-sim {f = λ c → if c then ret tt else L.stepᴾ _ s hd t b} {f′ = λ c → if c then ret tt else L′.stepᴾ f′ s hd t b}
-                 (closed-sim s hd) (λ { true → ret-sim tt ; false → step-sim p s hd t b })
-                 (λ { true → ret-grow tt ; false → G.step-grow f′ s hd t b })
+      burst-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A} (s : Sink w A) (hd : Handle w) t r i b → Sim (L.burst f s hd t r i b) (L′.burst f′ s hd t r i b)
+      burst-sim {f′ = f′} z≤n s hd t r i b = diverge-sim (G.burst-grow f′ s hd t r i b)
+      burst-sim {f′ = suc f′} (s≤s p) s hd t r i b =
+        bind-sim {f = λ c → if c then ret tt else L.stepᴾ _ s hd t r i b} {f′ = λ c → if c then ret tt else L′.stepᴾ f′ s hd t r i b}
+                 (closed-sim s hd) (λ { true → ret-sim tt ; false → step-sim p s hd t r i b })
+                 (λ { true → ret-grow tt ; false → G.step-grow f′ s hd t r i b })
 
-      step-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A} (s : Sink w A) (hd : Handle w) t b → Sim (L.stepᴾ f s hd t b) (L′.stepᴾ f′ s hd t b)
-      step-sim {f′ = f′} p s hd t (emit a k) =
-        bind-sim (unless-sim hd (send-sim s a) (G.send-grow s a))
-                 (λ _ → unless-sim hd (burst-sim p s hd t (Burst∞.force k)) (G.burst-grow f′ s hd t (Burst∞.force k)))
-                 (λ _ → unless-grow hd (G.burst-grow f′ s hd t (Burst∞.force k)))
-      step-sim p s hd t (stall k) = burst-sim p s hd t (Burst∞.force k)
-      step-sim p s hd t (close k) = schedule-sim s hd t (ML∞.force k)
+      step-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A} (s : Sink w A) (hd : Handle w) t r i b → Sim (L.stepᴾ f s hd t r i b) (L′.stepᴾ f′ s hd t r i b)
+      step-sim {f′ = f′} p s hd t r i (emit a k) =
+        bind-sim (unless-sim hd (bind-sim (goto-sim (r ++ [ ix i ])) (λ _ → send-sim s a) (λ _ → G.send-grow s a))
+                                (bind-grow (goto-grow (r ++ [ ix i ])) λ _ → G.send-grow s a))
+                 (λ _ → unless-sim hd (burst-sim p s hd t r (suc i) (Burst∞.force k)) (G.burst-grow f′ s hd t r (suc i) (Burst∞.force k)))
+                 (λ _ → unless-grow hd (G.burst-grow f′ s hd t r (suc i) (Burst∞.force k)))
+      step-sim p s hd t r i (stall k) = burst-sim p s hd t r (suc i) (Burst∞.force k)
+      step-sim p s hd t r i (close k) = schedule-sim s hd t (r ++ [ last ]) (ML∞.force k)
 
     first-sim : ∀ {w A} (s : Sink w A) (hd : Handle w) m → Sim (L.first s hd m) (L′.first s hd m)
-    first-sim s hd (at zero b)    = burst-sim n≤ s hd 0 b
-    first-sim s hd (at (suc t) b) = schedule-sim s hd 0 (at (suc t) b)
-    first-sim s hd done           = schedule-sim s hd 0 done
-    first-sim s hd quiet          = schedule-sim s hd 0 quiet
+    first-sim s hd (at zero b)    = here-sim λ r → burst-sim n≤ s hd 0 r 0 b
+    first-sim s hd (at (suc t) b) = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) (at (suc t) b)
+    first-sim s hd done           = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) done
+    first-sim s hd quiet          = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) quiet
 
     fire-sim : ∀ {h} ts {s s′ : State h} → StRel s s′ → ResRel (L.fire ts s) (L′.fire ts s′)
     fire-sim []        q = lock q
     fire-sim (tm ∷ ts) q = then-rel {g = λ _ _ st′ → res same st′ (just true)} {g′ = λ _ _ st′ → res same st′ (just true)}
-      (unless-sim (Timer.handle tm) (burst-sim n≤ (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (Timer.frame tm))
-                  (G.burst-grow n′ (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (Timer.frame tm))
-                  same (stRel (heap≈ q) refl refl (log≡ q) (ended≡ q)))
+      (unless-sim (Timer.handle tm) (burst-sim n≤ (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm))
+                  (G.burst-grow n′ (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm))
+                  same (stRel (heap≈ q) refl refl (log≡ q) (ended≡ q) refl))
       (λ _ _ q′ → lock q′) (λ _ → grows λ _ _ → growsAt-refl _ _)
 
     next-sim : ∀ {w} → Sim {w} (L.nextᴾ {w}) (L′.nextᴾ {w})
@@ -613,7 +639,7 @@ module Approx (R : Set) where
       subst (λ y → ResRel (I (k σ (lower (get (State.heap s) (wk∋ σ r)))) same s) (I′ (k′ σ (lower y)) same s′))
             (get-rel (heap≈ q) (wk∋ σ r)) (interpret-sim (p σ _) same q)
     interpret-sim (writeRef≼ {r = r} {a = a} {k′ = k′} p) =
-      bind-sim {m = Runtime.writeRefᴿ (Pureᴿ n) r a} {m′ = Runtime.writeRefᴿ (Pureᴿ n′) r a} (λ σ q → lock (stRel (put-rel (heap≈ q) (wk∋ σ r) refl) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q))) (λ _ → interpret-sim p)
+      bind-sim {m = Runtime.writeRefᴿ (Pureᴿ n) r a} {m′ = Runtime.writeRefᴿ (Pureᴿ n′) r a} (λ σ q → lock (stRel (put-rel (heap≈ q) (wk∋ σ r) refl) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) (pos≡ q))) (λ _ → interpret-sim p)
                (λ _ → Grow.interpret-grow n′ gr′ k′)
     interpret-sim (register≼ pn pc px pk) σ q = shift-rel new (interpret-sim (pk (σ ⨾ʷ new) here) same (extend-rel q (record
       { onNext≼ = λ a → ≼-wk (σ ⨾ʷ new) (pn a) ; onComplete≼ = ≼-wk (σ ⨾ʷ new) pc ; isClosed≼ = ≼-wk (σ ⨾ʷ new) px })))
@@ -624,10 +650,13 @@ module Approx (R : Set) where
                 (λ _ → Grow.interpret-grow n′ gr′ (k′ (σ ⨾ʷ new) here)) same (extend-rel q refl))
     interpret-sim (stop≼ {h = h} {k′ = k′} p) = bind-sim (spend-sim h) (λ _ → interpret-sim p) (λ _ → Grow.interpret-grow n′ gr′ k′)
     interpret-sim (eff≼ {e = note a} {k′ = k′} p) =
-      bind-sim {m = Runtime.effᴿ (Pureᴿ n) (note a)} {m′ = Runtime.effᴿ (Pureᴿ n′) (note a)} (λ σ q → lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (cong₃ (λ e l c → if e then l else l ++ [ (c , a) ]) (ended≡ q) (log≡ q) (clock≡ q)) (ended≡ q)))
+      bind-sim {m = Runtime.effᴿ (Pureᴿ n) (note a)} {m′ = Runtime.effᴿ (Pureᴿ n′) (note a)} (λ σ q → lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (cong₃ (λ e l c → if e then l else l ++ [ (c , a) ]) (ended≡ q) (log≡ q) (clock≡ q)) (ended≡ q) (pos≡ q)))
                (λ x → interpret-sim (p x)) (λ x → Grow.interpret-grow n′ gr′ (k′ x))
     interpret-sim (eff≼ {e = fin} {k′ = k′} p) =
-      bind-sim {m = Runtime.effᴿ (Pureᴿ n) fin} {m′ = Runtime.effᴿ (Pureᴿ n′) fin} (λ σ q → lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (log≡ q) refl)) (λ x → interpret-sim (p x)) (λ x → Grow.interpret-grow n′ gr′ (k′ x))
+      bind-sim {m = Runtime.effᴿ (Pureᴿ n) fin} {m′ = Runtime.effᴿ (Pureᴿ n′) fin} (λ σ q → lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (log≡ q) refl (pos≡ q))) (λ x → interpret-sim (p x)) (λ x → Grow.interpret-grow n′ gr′ (k′ x))
+    interpret-sim (here≼ p) = here-sim λ x → interpret-sim (p x)
+    interpret-sim (goto≼ {p = p} {k′ = k′} q) =
+      bind-sim {m = Runtime.gotoᴿ (Pureᴿ n) p} {m′ = Runtime.gotoᴿ (Pureᴿ n′) p} (goto-sim p) (λ _ → interpret-sim q) (λ _ → Grow.interpret-grow n′ gr′ k′)
     interpret-sim (unfold≼ {l = l} {e = e} {m′ = m′} pn pc px pk pm) =
       bind-sim (sr (compile-refl (Later.force l) e same (record { next≼ = pn ; complete≼ = pc ; closed≼ = px })
                       λ σ pu → register≼ (λ _ → pu) done≼ done≼ λ τ sk → pk (σ ⨾ʷ τ) sk))

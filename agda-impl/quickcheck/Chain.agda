@@ -8,13 +8,15 @@
 -- stop changing.
 module quickcheck.Chain where
 
-open import Data.Bool using (Bool; true; false; _∧_; not)
-open import Data.List using (List; []; _∷_; filterᵇ; upTo) renaming (map to mapL)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
+open import Data.List using (List; []; _∷_; filterᵇ; upTo; length) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_; _⊓_)
+open import Data.Nat.ListAction using (sum)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; observe; root)
 open import denotation.Denote using (⟦_⟧[_])
+open import operation.PureObservable using (toMarks)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Oracle using (depth)
 open import quickcheck.Quickcheck using (program)
@@ -64,6 +66,40 @@ chain p = every (λ n → below 1000 (at n) (at (suc n)) ∧ agrees n (at n) (at
   where
     at : ℕ → Events ℕ
     at n = observe (⟦ toObs timeline 3 p [] [] [] ⟧[ n ] []) root
+
+-- THE GHOST POSITIONS, TESTED.  Where the pure run makes each entry of
+-- its record is where the denotation puts that event at the root: the
+-- kernels place what they deliver as `denotation.MonotonicList` does.
+-- Each side may be cut short of the other.
+private
+  shown : ℕ → Events ℕ → List Pos
+  shown zero    _           = []
+  shown (suc k) (out p _ r) = p ∷ shown k (Events∞.force r)
+  shown (suc k) (skip _ r)  = shown k (Events∞.force r)
+  shown (suc k) (end p)     = p ∷ []
+  shown (suc k) hush        = []
+
+  prefixᵖ : List Pos → List Pos → Bool
+  prefixᵖ []       _        = true
+  prefixᵖ (p ∷ ps) []       = false
+  prefixᵖ (p ∷ ps) (q ∷ qs) = samePos p q ∧ prefixᵖ ps qs
+
+places : Prog natᵗ → Bool
+places p = prefixᵖ marks denoted ∨ prefixᵖ denoted marks
+  where
+    marks denoted : List Pos
+    marks   = toMarks (500 + depth 3 p) (toObs timeline 3 p [] [] [])
+    denoted = shown 2000 (observe (⟦ toObs timeline 3 p [] [] [] ⟧[ depth 3 p ] []) root)
+
+placeFails : ℕ → ℕ → List ℕ
+placeFails from count = filterᵇ (λ s → not (places (program s))) (mapL (from +_) (upTo count))
+
+-- How many positions the seeds compared: a pass over empty records is no pass.
+placed : ℕ → ℕ → ℕ
+placed from count = sum (mapL (λ s → compared (program s)) (mapL (from +_) (upTo count)))
+  where
+    compared : Prog natᵗ → ℕ
+    compared p = length (toMarks (500 + depth 3 p) (toObs timeline 3 p [] [] [])) ⊓ length (shown 2000 (observe (⟦ toObs timeline 3 p [] [] [] ⟧[ depth 3 p ] []) root))
 
 -- The seeds from `from`, `count` of them, whose approximants are no chain.
 chainFails : ℕ → ℕ → List ℕ

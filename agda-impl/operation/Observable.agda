@@ -260,6 +260,8 @@ IOᴿ lp = record
   ; startColdᴿ = λ _ c sk k → playCold lp c sk >>= k tt
   ; stopᴿ      = λ sl → ret (spend sl (pure tt))
   ; effᴿ       = ret
+  ; hereᴿ      = λ k → k []
+  ; gotoᴿ      = λ _ → pure (lift tt)
   ; divergeᴿ   = fixIO′ (λ d _ → d tt) tt
   ; nextᴿ      = λ _ → ret (nextTimer lp)
   }
