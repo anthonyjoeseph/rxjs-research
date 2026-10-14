@@ -26,6 +26,7 @@ module Simulation where
 open import Data.List using ([]; _∷_; _++_; [_]; length)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; _∸_; z≤n; s≤s)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl)
@@ -34,7 +35,7 @@ open import Data.Unit using (⊤; tt)
 open import Induction.WellFounded using (Acc; acc)
 open import Level using (lift; lower)
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import denotation.MonotonicList using (Events; Events∞; Frame; Frame∞; From∞; Pos; ix; last; emit; stall; close; done; quiet; at; out; skip; end; hush; tick; observe; root)
 open import denotation.Order using (_⊑_; Chain)
@@ -44,12 +45,14 @@ open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
 open import operation.PureObservable using (PureObs; Sink; same; module Pure)
 open import Realize using (module Realizing)
+open import Focus using (module Focusing)
 
 module Sim (R : Set) where
   open Machine R using (Mach; ⟨_,_⟩; turn; burst; run; ret; loop; push; asked; sent; Stack; step; cbs; play; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
-  open Realizing R using (Calm; calm; bursting; Holding; firing; Sub; Phase; waiting; playing; nodeOf; setAt; spot-of; module At; dead; dry-hush; pop-dead; pop-live)
+  open Realizing R using (Calm; calm; bursting; Holding; firing; Sub; Phase; waiting; playing; nodeOf; spot-of; spot-step; forget; module At; dead; dry-hush; pop-dead; pop-live)
   open Pure R using (State; Timer; Callbacks; get; put; insert; cascade)
   open Pure R using (cutOff; frames)
+  open Focusing R using (module On; clear)
   open Read
 
   ------------------------------------------------------------------------
@@ -129,12 +132,19 @@ module Sim (R : Set) where
   -- The witness at a burst point, its firing cold's phase moved.
   moved : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
         → Holding (firing s hd τ r i b ∷ []) c st → Phase A → Sub h [] R
-  moved H = setAt (spot-of (Holding.tree H) (Holding.firing≡ H))
+  moved {st = st} H ph = At.stepAt (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) ph [] []
 
   -- … and every joiner's copy caught up with its source.
   settled : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
           → Holding (firing s hd τ r i b ∷ []) c st → Phase A → Sub h [] R
   settled {st = st} H ph = At.refresh (State.heap st) (moved H ph) [] [] []
+
+  -- What is running is `c′`, by the settled witness up to the sources the
+  -- meaning holds: a joiner's step drops an ending source in every
+  -- connect above it.
+  Settles : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+          → Holding (firing s hd τ r i b ∷ []) c st → Phase A → U.Node R → Set₁
+  Settles {h} {st = st} H ph c′ = Σ (Sub h [] R) λ t → forget t ≡ forget (settled H ph) × At.part (State.heap st) t [] [] ≡ just c′
 
   mapᴾ : ∀ {c} {P Q : U.Node R → Set₁} → (∀ {c′} → P c′ → Q c′) → Passes c P → Passes c Q
   mapᴾ f (passes e sk p) = passes e sk (f p)
@@ -148,19 +158,6 @@ module Sim (R : Set) where
                 → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
                 → ⟨ st , run (Callbacks.isClosed (cbs st s)) same K ⟩ ⇒ ⟨ st , ret false same K ⟩
 
-    -- A live firing cold's step silent at its own position: the meaning's
-    -- next step is it, lifted through the cold's context, to the witness
-    -- with the cold's phase moved and every joiner's copy where it was.
-    -- No other node's next event comes first: every other cold's is a
-    -- queued timer's, past the run's position and so past every step of
-    -- this frame (`Ordered`, `Timed`, `behind`); no gate above the cold
-    -- is closed (`gated`); a joiner's copy steps where its source does,
-    -- shown below it (`caught`).
-    cold-skip : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-              → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
-              → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
-              → Σ Pos λ p → Σ (U.Node R) λ c₁ → U.step c ≡ U.skipˢ p c₁ × At.part (State.heap st) (moved H ph) [] [] ≡ just c₁
-
     -- Then each joiner's copy of a source the step moved takes the same
     -- step, shown below its join point (`past`), silently: sources before
     -- their joiners, and joiners in the order they joined.
@@ -168,21 +165,21 @@ module Sim (R : Set) where
              → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
              → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
              → ∀ {c₁} → At.part (State.heap st) (moved H ph) [] [] ≡ just c₁
-             → Σ (U.Node R) λ c′ → Skips c₁ c′ × At.part (State.heap st) (settled H ph) [] [] ≡ just c′
+             → Σ (U.Node R) λ c′ → Skips c₁ c′ × Settles H ph c′
 
     -- The witness with the cold's phase moved by a silent step holds what
     -- is running: one step on, quiet, or its next frame queued.
     reheld-stall : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : Frame∞ A u}
                  → (H : Holding (firing s hd τ r i (stall k′) ∷ []) c st)
-                 → At.part (State.heap st) (settled H (playing τ r (suc i) (Frame∞.force k′))) [] [] ≡ just c′
+                 → Settles H (playing τ r (suc i) (Frame∞.force k′)) c′
                  → Holding (firing s hd τ r (suc i) (Frame∞.force k′) ∷ []) c′ st
     reheld-quiet : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
                  → (H : Holding (firing s hd τ r i (close k′) ∷ []) c st)
-                 → At.part (State.heap st) (settled H (waiting {u = suc u} τ (r ++ [ last ]) quiet)) [] [] ≡ just c′
+                 → Settles H (waiting {u = suc u} τ (r ++ [ last ]) quiet) c′
                  → Holding [] c′ st
     reheld-later : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {t} {le : suc u ≤ t} {b : Frame A t}
                  → (H : Holding (firing s hd τ r i (close k′) ∷ []) c st)
-                 → At.part (State.heap st) (settled H (waiting τ (r ++ [ last ]) (at t le b))) [] [] ≡ just c′
+                 → Settles H (waiting τ (r ++ [ last ]) (at t le b)) c′
                  → Holding [] c′ (record st { timers = insert (record { due = State.clock st + (t ∸ u) ; sink = s ; handle = hd
                                                                       ; at′ = t ; from = r ++ [ last ] ; frame = b })
                                                             (State.timers st) })
@@ -206,11 +203,23 @@ module Sim (R : Set) where
                                 (U.unfold c)
 
   -- A live firing cold's step silent at its own position: the meaning's
+  -- next step is it, lifted through the cold's context, to the witness
+  -- with the cold's phase moved, every connect above it stepped, and
+  -- every joiner's copy where it was.
+  cold-skip : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+            → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
+            → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
+            → Σ Pos λ p → Σ (U.Node R) λ c₁ → U.step c ≡ U.skipˢ p c₁ × At.part (State.heap st) (moved H ph) [] [] ≡ just c₁
+  cold-skip {st = st} H lv eq with On.lift-skip (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) {E = []} {ρ = []} lv (Holding.gated H)
+                                                 (clear H lv eq) (trans (spot-step (Holding.tree H) (Holding.firing≡ H)) eq)
+  ... | n , c₁ , open≡ , first , moved≡ = _ , c₁ , subst (λ x → U.step x ≡ _) (just-injective (trans (sym open≡) (Holding.open≡ H))) first , moved≡
+
+  -- A live firing cold's step silent at its own position: the meaning's
   -- next steps are it, then its joiners' copies catching up.
   focus-skip : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
              → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
              → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
-             → Passes c λ c′ → At.part (State.heap st) (settled H ph) [] [] ≡ just c′
+             → Passes c (Settles H ph)
   focus-skip H lv eq with cold-skip H lv eq
   ... | _ , _ , first , moved≡ with catch-up H lv eq moved≡
   ... | _ , rest , settled≡ = passes first rest settled≡

@@ -183,8 +183,12 @@ module Realizing (R : Set) where
       flatMapˢ   : ∀ {Δ A B} → T.FlatOp → (A → Obs Timeline Δ B) → Flat A h → Cut h → Sink h ⊤ → Sink h ⊤
                  → Sub h Δ A → List (Lane h Δ B) → Sub h Δ B
       -- The subject, the source's kill switch and attached unsubscribe,
-      -- the source as it started, the source, the body.
-      connectˢ   : ∀ {Δ A B} → Subject A h → Cut h → Sink h ⊤ → U.Node A → Sub h Δ A → Sub h (A ∷ Δ) B → Sub h Δ B
+      -- the source as it started, the source as the meaning holds it, the
+      -- source, the body.  The meaning drops a source with nothing left to
+      -- show the next time the connect steps, so it can hold one the run
+      -- has finished, and drop one the run has not.
+      connectˢ   : ∀ {Δ A B} → Subject A h → Cut h → Sink h ⊤ → U.Node A → Maybe (U.Node A) → Sub h Δ A → Sub h (A ∷ Δ) B
+                 → Sub h Δ B
       -- Joined at `j`, `i` of the source's events dropped: the registered
       -- sink and its flag, and its copy of the source as the meaning
       -- steps it, behind the source while a delivery reaches it.
@@ -208,7 +212,7 @@ module Realizing (R : Set) where
   unsub (scanˢ f r s)                    = unsub s
   unsub (takeWhileˢ i p c k s)           = cut c
   unsub (flatMapˢ op f fl oc k r so ls)  = cut oc >>ᴬ killAllᶜ fl
-  unsub (connectˢ S c k s₀ src body)     = unsub src >>ᴬ unsub body
+  unsub (connectˢ S c k s₀ m src body)   = unsub src >>ᴬ unsub body
   unsub (joinˢ j i sk l x cp)            = writeRef l false skipᴬ
   unsub (deferˢ k s)                     = send k tt (done tt)
 
@@ -235,7 +239,7 @@ module Realizing (R : Set) where
     names (scanˢ f r s)                   = (cell _ , r) ∷ names s
     names (takeWhileˢ i p c k s)          = cutNames c ++ (slot _ , k) ∷ names s
     names (flatMapˢ op f fl oc k r so ls) = flatNames fl ++ cutNames oc ++ (slot _ , k) ∷ (slot _ , r) ∷ names so ++ laneNames ls
-    names (connectˢ S c k s₀ src body)    = subjectNames S ++ cutNames c ++ (slot _ , k) ∷ names src ++ names body
+    names (connectˢ S c k s₀ m src body)  = subjectNames S ++ cutNames c ++ (slot _ , k) ∷ names src ++ names body
     names (joinˢ j i sk l x cp)           = (slot _ , sk) ∷ (cell _ , l) ∷ []
     names (deferˢ k s)                    = (slot _ , k) ∷ names s
 
@@ -285,7 +289,7 @@ module Realizing (R : Set) where
     firings (scanˢ f r s)                   = firings s
     firings (takeWhileˢ i p c k s)          = firings s
     firings (flatMapˢ op f fl oc k r so ls) = firings so ++ laneFirings ls
-    firings (connectˢ S c k s₀ src body)    = firings src ++ firings body
+    firings (connectˢ S c k s₀ m src body)  = firings src ++ firings body
     firings (joinˢ j i sk l x cp)           = []
     firings (deferˢ k s)                    = firings s
 
@@ -302,7 +306,7 @@ module Realizing (R : Set) where
     pendings (scanˢ f r s)                       = pendings s
     pendings (takeWhileˢ i p c k s)              = pendings s
     pendings (flatMapˢ op f fl oc k r so ls)     = pendings so ++ lanePendings ls
-    pendings (connectˢ S c k s₀ src body)        = pendings src ++ pendings body
+    pendings (connectˢ S c k s₀ m src body)      = pendings src ++ pendings body
     pendings (joinˢ j i sk l x cp)               = []
     pendings (deferˢ k s)                        = pendings s
 
@@ -310,7 +314,7 @@ module Realizing (R : Set) where
     lanePendings []                = []
     lanePendings (lane c k s ∷ ls) = pendings s ++ lanePendings ls
 
-  -- WHERE A COLD SITS in a witness, and the witness with its phase moved.
+  -- WHERE A COLD SITS in a witness.
   mutual
     data Spot {h} : ∀ {Δ A B} → Sub h Δ A → Sink h B → Handle h → Set₁ where
       cold-here : ∀ {Δ A} {s : Sink h A} {hd ph} → Spot {Δ = Δ} (coldˢ s hd ph) s hd
@@ -321,31 +325,15 @@ module Realizing (R : Set) where
                 → Spot t s hd → Spot (flatMapˢ op f fl oc k r t ls) s hd
       in-lanes  : ∀ {Δ A B C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {s : Sink h C} {hd}
                 → SpotLanes ls s hd → Spot (flatMapˢ op f fl oc k r t ls) s hd
-      in-source : ∀ {Δ A B C} {S c k s₀} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {s : Sink h C} {hd}
-                → Spot t s hd → Spot (connectˢ S c k s₀ t u) s hd
-      in-body   : ∀ {Δ A B C} {S c k s₀} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {s : Sink h C} {hd}
-                → Spot u s hd → Spot (connectˢ S c k s₀ t u) s hd
+      in-source : ∀ {Δ A B C} {S c k s₀ m} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {s : Sink h C} {hd}
+                → Spot t s hd → Spot (connectˢ S c k s₀ m t u) s hd
+      in-body   : ∀ {Δ A B C} {S c k s₀ m} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {s : Sink h C} {hd}
+                → Spot u s hd → Spot (connectˢ S c k s₀ m t u) s hd
       in-defer  : ∀ {Δ A C} {k} {t : Sub h Δ A} {s : Sink h C} {hd} → Spot t s hd → Spot (deferˢ k t) s hd
 
     data SpotLanes {h} : ∀ {Δ B C} → List (Lane h Δ B) → Sink h C → Handle h → Set₁ where
       this-lane : ∀ {Δ B C} {c k} {t : Sub h Δ B} {ls} {s : Sink h C} {hd} → Spot t s hd → SpotLanes (lane c k t ∷ ls) s hd
       next-lane : ∀ {Δ B C} {l} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → SpotLanes (l ∷ ls) s hd
-
-  mutual
-    setAt : ∀ {h Δ A B} {t : Sub h Δ A} {s : Sink h B} {hd} → Spot t s hd → Phase B → Sub h Δ A
-    setAt (cold-here {s = s} {hd})                                    ph = coldˢ s hd ph
-    setAt (in-map {f = f} p)                                          ph = mapˢ f (setAt p ph)
-    setAt (in-scan {f = f} {r} p)                                     ph = scanˢ f r (setAt p ph)
-    setAt (in-take {i = i} {q} {c} {k} p)                             ph = takeWhileˢ i q c k (setAt p ph)
-    setAt (in-outer {op = op} {f} {fl} {oc} {k} {r} {ls = ls} p)      ph = flatMapˢ op f fl oc k r (setAt p ph) ls
-    setAt (in-lanes {op = op} {f} {fl} {oc} {k} {r} {t} p)            ph = flatMapˢ op f fl oc k r t (setAtLanes p ph)
-    setAt (in-source {S = S} {c} {k} {s₀} {u = u} p)                  ph = connectˢ S c k s₀ (setAt p ph) u
-    setAt (in-body {S = S} {c} {k} {s₀} {t} p)                        ph = connectˢ S c k s₀ t (setAt p ph)
-    setAt (in-defer {k = k} p)                                        ph = deferˢ k (setAt p ph)
-
-    setAtLanes : ∀ {h Δ B C} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → Phase C → List (Lane h Δ B)
-    setAtLanes (this-lane {c = c} {k} {ls = ls} p) ph = lane c k (setAt p ph) ∷ ls
-    setAtLanes (next-lane {l = l} p)               ph = l ∷ setAtLanes p ph
 
   private
     one : ∀ {X : Set₁} {x : X} xs ys → xs ++ ys ≡ x ∷ [] → (xs ≡ x ∷ [] × ys ≡ []) ⊎ (xs ≡ [] × ys ≡ x ∷ [])
@@ -367,7 +355,7 @@ module Realizing (R : Set) where
     spot-of (flatMapˢ op f fl oc k r so ls) e with one (firings so) (laneFirings ls) e
     ... | inj₁ (e′ , _) = in-outer (spot-of so e′)
     ... | inj₂ (_ , e′) = in-lanes (spot-lanes ls e′)
-    spot-of (connectˢ S c k s₀ src body)    e with one (firings src) (firings body) e
+    spot-of (connectˢ S c k s₀ m src body)  e with one (firings src) (firings body) e
     ... | inj₁ (e′ , _) = in-source (spot-of src e′)
     ... | inj₂ (_ , e′) = in-body (spot-of body e′)
     spot-of (joinˢ j i sk l x cp)           ()
@@ -378,6 +366,50 @@ module Realizing (R : Set) where
     spot-lanes (lane c k t ∷ ls) e with one (firings t) (laneFirings ls) e
     ... | inj₁ (e′ , _) = this-lane (spot-of t e′)
     ... | inj₂ (_ , e′) = next-lane (spot-lanes ls e′)
+
+  -- The phase of the cold at a spot.
+  mutual
+    phaseAt : ∀ {h Δ A B} {t : Sub h Δ A} {s : Sink h B} {hd} → Spot t s hd → Phase B
+    phaseAt (cold-here {ph = ph}) = ph
+    phaseAt (in-map p)            = phaseAt p
+    phaseAt (in-scan p)           = phaseAt p
+    phaseAt (in-take p)           = phaseAt p
+    phaseAt (in-outer p)          = phaseAt p
+    phaseAt (in-lanes p)          = phaseAtLanes p
+    phaseAt (in-source p)         = phaseAt p
+    phaseAt (in-body p)           = phaseAt p
+    phaseAt (in-defer p)          = phaseAt p
+
+    phaseAtLanes : ∀ {h Δ B C} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → Phase C
+    phaseAtLanes (this-lane p) = phaseAt p
+    phaseAtLanes (next-lane p) = phaseAtLanes p
+
+  -- The one frame being burst is its cold's next step.
+  mutual
+    spot-step : ∀ {h Δ A} (t : Sub h Δ A) {f} (e : firings t ≡ f ∷ [])
+              → U.step (nodeOf (phaseAt (spot-of t e))) ≡ U.burstˢ (Firing.since f) (Firing.at′ f) (Firing.index f) (Firing.frame f)
+    spot-step (coldˢ s hd (waiting _ _ _))    ()
+    spot-step (coldˢ s hd (popped _ _ _ _ _)) refl = refl
+    spot-step (coldˢ s hd (playing _ _ _ _))  refl = refl
+    spot-step doneˢ                           ()
+    spot-step (mapˢ f t)                      e = spot-step t e
+    spot-step (scanˢ f r t)                   e = spot-step t e
+    spot-step (takeWhileˢ i p c k t)          e = spot-step t e
+    spot-step (flatMapˢ op f fl oc k r so ls) e with one (firings so) (laneFirings ls) e
+    ... | inj₁ (e′ , _) = spot-step so e′
+    ... | inj₂ (_ , e′) = spot-step-lanes ls e′
+    spot-step (connectˢ S c k s₀ m src body)  e with one (firings src) (firings body) e
+    ... | inj₁ (e′ , _) = spot-step src e′
+    ... | inj₂ (_ , e′) = spot-step body e′
+    spot-step (joinˢ j i sk l x cp)           ()
+    spot-step (deferˢ k t)                    e = spot-step t e
+
+    spot-step-lanes : ∀ {h Δ B} (ls : List (Lane h Δ B)) {f} (e : laneFirings ls ≡ f ∷ [])
+                    → U.step (nodeOf (phaseAtLanes (spot-lanes ls e))) ≡ U.burstˢ (Firing.since f) (Firing.at′ f) (Firing.index f) (Firing.frame f)
+    spot-step-lanes []                ()
+    spot-step-lanes (lane c k t ∷ ls) e with one (firings t) (laneFirings ls) e
+    ... | inj₁ (e′ , _) = spot-step t e′
+    ... | inj₂ (_ , e′) = spot-step-lanes ls e′
 
   -- A subject the tree holds, and a joiner of one.
   record Joiner (h : World) : Set₁ where
@@ -396,7 +428,7 @@ module Realizing (R : Set) where
     subjects (scanˢ f r s)                   = subjects s
     subjects (takeWhileˢ i p c k s)          = subjects s
     subjects (flatMapˢ op f fl oc k r so ls) = subjects so ++ laneSubjects ls
-    subjects (connectˢ S c k s₀ src body)    = (_ , S) ∷ subjects src ++ subjects body
+    subjects (connectˢ S c k s₀ m src body)  = (_ , S) ∷ subjects src ++ subjects body
     subjects (joinˢ j i sk l x cp)           = []
     subjects (deferˢ k s)                    = subjects s
 
@@ -412,13 +444,36 @@ module Realizing (R : Set) where
     joiners (scanˢ f r s)                   E = joiners s E
     joiners (takeWhileˢ i p c k s)          E = joiners s E
     joiners (flatMapˢ op f fl oc k r so ls) E = joiners so E ++ laneJoiners ls E
-    joiners (connectˢ S c k s₀ src body)    E = joiners src E ++ joiners body (S ∷ E)
+    joiners (connectˢ S c k s₀ m src body)  E = joiners src E ++ joiners body (S ∷ E)
     joiners (joinˢ j i sk l x cp)           E = joiner (lookup E x) sk j ∷ []
     joiners (deferˢ k s)                    E = joiners s E
 
     laneJoiners : ∀ {h Δ B} → List (Lane h Δ B) → Env Δ h → List (Joiner h)
     laneJoiners []                E = []
     laneJoiners (lane c k s ∷ ls) E = joiners s E ++ laneJoiners ls E
+
+  -- A step with nothing after it: an end, or a hush.
+  over : ∀ {A} → U.Step A → Bool
+  over (U.endˢ _) = true
+  over U.hushˢ    = true
+  over _          = false
+
+  -- A witness up to the sources the meaning holds.
+  mutual
+    forget : ∀ {h Δ A} → Sub h Δ A → Sub h Δ A
+    forget (coldˢ s hd ph)                 = coldˢ s hd ph
+    forget doneˢ                           = doneˢ
+    forget (mapˢ f s)                      = mapˢ f (forget s)
+    forget (scanˢ f r s)                   = scanˢ f r (forget s)
+    forget (takeWhileˢ i p c k s)          = takeWhileˢ i p c k (forget s)
+    forget (flatMapˢ op f fl oc k r so ls) = flatMapˢ op f fl oc k r (forget so) (forgetLanes ls)
+    forget (connectˢ S c k s₀ m src body)  = connectˢ S c k s₀ nothing (forget src) (forget body)
+    forget (joinˢ j i sk l x cp)           = joinˢ j i sk l x cp
+    forget (deferˢ k s)                    = deferˢ k (forget s)
+
+    forgetLanes : ∀ {h Δ B} → List (Lane h Δ B) → List (Lane h Δ B)
+    forgetLanes []                = []
+    forgetLanes (lane c k s ∷ ls) = lane c k (forget s) ∷ forgetLanes ls
 
   ------------------------------------------------------------------------
   -- Against a heap
@@ -451,8 +506,8 @@ module Realizing (R : Set) where
     merged op g nothing []       []       = nothing
     merged op g o       ls       qs       = just (U.flatMapᶜ op g o ls qs)
 
-    -- A connect is open while its body is; once its source has completed
-    -- the body runs alone, as the meaning drops a completed source.
+    -- A connect is open while its body is, beside the source the meaning
+    -- holds, if it holds one.
     connected : ∀ {A B} → Maybe (U.Node A) → Maybe (U.Node B) → Maybe (U.Node B)
     connected s        nothing  = nothing
     connected (just s) (just b) = just (U.connectᶜ b s)
@@ -483,13 +538,43 @@ module Realizing (R : Set) where
       part (takeWhileˢ i p c k s)          E ρ = if val (Kit.live c) then mapᴹ (U.takeWhileᶜ i p) (part s E ρ) else nothing
       part (flatMapˢ op f fl oc k r so ls) E ρ =
         merged op (λ a q → U.subscribe (f a) ρ q) (part so E ρ) (partLanes ls E ρ) (val (Flat.queue fl))
-      part (connectˢ S c k s₀ src body)    E ρ = connected (part src E ρ) (part body (S ∷ E) (s₀ ∷ ρ))
+      part (connectˢ S c k s₀ m src body)  E ρ = connected m (part body (S ∷ E) (s₀ ∷ ρ))
       part (joinˢ j i sk l x cp)           E ρ = if val l then just (U.joinᶜ j i cp) else nothing
       part (deferˢ k s)                    E ρ = part s E ρ
 
       partLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → List (U.Node B)
       partLanes []                E ρ = []
       partLanes (lane c k s ∷ ls) E ρ = if val (Kit.live c) then consᴹ (part s E ρ) (partLanes ls E ρ) else partLanes ls E ρ
+
+    ----------------------------------------------------------------------
+    -- A cold's phase moved, as the meaning steps it
+
+    -- A source the meaning holds, dropped if it has nothing left to show:
+    -- the connect stepped beside it.
+    pruned : ∀ {A} → Maybe (U.Node A) → Maybe (U.Node A)
+    pruned nothing  = nothing
+    pruned (just s) = if over (U.step s) then nothing else just s
+
+    -- The witness with the cold at a spot in phase `ph`: every connect
+    -- above it stepped, its source held as it now stands when the cold is
+    -- in it, pruned when the cold is in its body.
+    mutual
+      stepAt : ∀ {Δ A B} {t : Sub h Δ A} {s : Sink h B} {hd} → Spot t s hd → Phase B → Env Δ h → Srcs Δ → Sub h Δ A
+      stepAt (cold-here {s = s} {hd})                               ph E ρ = coldˢ s hd ph
+      stepAt (in-map {f = f} p)                                     ph E ρ = mapˢ f (stepAt p ph E ρ)
+      stepAt (in-scan {f = f} {r} p)                                ph E ρ = scanˢ f r (stepAt p ph E ρ)
+      stepAt (in-take {i = i} {q} {c} {k} p)                        ph E ρ = takeWhileˢ i q c k (stepAt p ph E ρ)
+      stepAt (in-outer {op = op} {f} {fl} {oc} {k} {r} {ls = ls} p) ph E ρ = flatMapˢ op f fl oc k r (stepAt p ph E ρ) ls
+      stepAt (in-lanes {op = op} {f} {fl} {oc} {k} {r} {t} p)       ph E ρ = flatMapˢ op f fl oc k r t (stepAtLanes p ph E ρ)
+      stepAt (in-source {S = S} {c} {k} {s₀} {u = u} p)             ph E ρ = connectˢ S c k s₀ (part src′ E ρ) src′ u
+        where src′ = stepAt p ph E ρ
+      stepAt (in-body {S = S} {c} {k} {s₀} {m} {t} p)              ph E ρ = connectˢ S c k s₀ (pruned m) t (stepAt p ph (S ∷ E) (s₀ ∷ ρ))
+      stepAt (in-defer {k = k} p)                                   ph E ρ = deferˢ k (stepAt p ph E ρ)
+
+      stepAtLanes : ∀ {Δ B C} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → Phase C → Env Δ h → Srcs Δ
+                  → List (Lane h Δ B)
+      stepAtLanes (this-lane {c = c} {k} {ls = ls} p) ph E ρ = lane c k (stepAt p ph E ρ) ∷ ls
+      stepAtLanes (next-lane {l = l} p)               ph E ρ = l ∷ stepAtLanes p ph E ρ
 
     ----------------------------------------------------------------------
     -- The joiners' copies
@@ -503,7 +588,7 @@ module Realizing (R : Set) where
       Caught (scanˢ f r s)                   E ρ ν = Caught s E ρ ν
       Caught (takeWhileˢ i p c k s)          E ρ ν = Caught s E ρ ν
       Caught (flatMapˢ op f fl oc k r so ls) E ρ ν = Caught so E ρ ν × CaughtLanes ls E ρ ν
-      Caught (connectˢ S c k s₀ src body)    E ρ ν = Caught src E ρ ν × Caught body (S ∷ E) (s₀ ∷ ρ) (part src E ρ ∷ ν)
+      Caught (connectˢ S c k s₀ m src body)  E ρ ν = Caught src E ρ ν × Caught body (S ∷ E) (s₀ ∷ ρ) (part src E ρ ∷ ν)
       Caught (joinˢ j i sk l x cp)           E ρ ν = val l ≡ true → lookup ν x ≡ just cp
       Caught (deferˢ k s)                    E ρ ν = Caught s E ρ ν
 
@@ -520,7 +605,7 @@ module Realizing (R : Set) where
       refresh (scanˢ f r s)                   E ρ ν = scanˢ f r (refresh s E ρ ν)
       refresh (takeWhileˢ i p c k s)          E ρ ν = takeWhileˢ i p c k (refresh s E ρ ν)
       refresh (flatMapˢ op f fl oc k r so ls) E ρ ν = flatMapˢ op f fl oc k r (refresh so E ρ ν) (refreshLanes ls E ρ ν)
-      refresh (connectˢ S c k s₀ src body)    E ρ ν = connectˢ S c k s₀ src′ (refresh body (S ∷ E) (s₀ ∷ ρ) (part src′ E ρ ∷ ν))
+      refresh (connectˢ S c k s₀ m src body)  E ρ ν = connectˢ S c k s₀ m src′ (refresh body (S ∷ E) (s₀ ∷ ρ) (part src′ E ρ ∷ ν))
         where src′ = refresh src E ρ ν
       refresh (joinˢ j i sk l x cp)           E ρ ν = joinˢ j i sk l x (fromMaybe cp (lookup ν x))
       refresh (deferˢ k s)                    E ρ ν = deferˢ k (refresh s E ρ ν)
@@ -536,13 +621,22 @@ module Realizing (R : Set) where
     Dead : ∀ {Δ A} → Sub h Δ A → Set₁
     Dead t = ∀ {B} {sk : Sink h B} {hd} → Spot t sk hd → spentʰ hd ≡ true
 
+    -- The source the meaning holds: the run's, or one with nothing left to
+    -- show, the run's still running or the meaning's kept.
+    Kept : ∀ {A} → Maybe (U.Node A) → Maybe (U.Node A) → Set₁
+    Kept (just s) (just s′) = s ≡ s′
+    Kept nothing  (just s′) = Lift _ (over (U.step s′) ≡ true)
+    Kept (just s) nothing   = Lift _ (over (U.step s) ≡ true)
+    Kept nothing  nothing   = Lift _ ⊤
+
     unended : ∀ {A} → Phase A → Bool
     unended (waiting _ _ doneᶠ) = false
     unended _                   = true
 
     -- Below a cut kill switch, a cut lane or a connect's closed body, every
-    -- cold is spent, a cut reaching what it unsubscribes; and no live cold
-    -- waits on its end, which its frame's last step delivers.
+    -- cold is spent, a cut reaching what it unsubscribes; no live cold
+    -- waits on its end, which its frame's last step delivers; and every
+    -- connect's held source is `Kept`.
     mutual
       Gated : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Set₁
       Gated (coldˢ s hd ph)                 E ρ = Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
@@ -551,8 +645,8 @@ module Realizing (R : Set) where
       Gated (scanˢ f r s)                   E ρ = Gated s E ρ
       Gated (takeWhileˢ i p c k s)          E ρ = (val (Kit.live c) ≡ false → Dead s) × Gated s E ρ
       Gated (flatMapˢ op f fl oc k r so ls) E ρ = Gated so E ρ × GatedLanes ls E ρ
-      Gated (connectˢ S c k s₀ src body)    E ρ =
-        (part body (S ∷ E) (s₀ ∷ ρ) ≡ nothing → Dead src) × Gated src E ρ × Gated body (S ∷ E) (s₀ ∷ ρ)
+      Gated (connectˢ S c k s₀ m src body)  E ρ =
+        Kept m (part src E ρ) × (part body (S ∷ E) (s₀ ∷ ρ) ≡ nothing → Dead src) × Gated src E ρ × Gated body (S ∷ E) (s₀ ∷ ρ)
       Gated (joinˢ j i sk l x cp)           E ρ = Lift _ ⊤
       Gated (deferˢ k s)                    E ρ = Gated s E ρ
 
@@ -576,7 +670,7 @@ module Realizing (R : Set) where
         × val (Flat.active fl) ≡ count ls
         × val (Flat.lanes fl) ≡ switches ls
         × HoldsLanes op f E o fl ls
-      Holds (connectˢ S c k s₀ src body)    E o =
+      Holds (connectˢ S c k s₀ m src body)  E o =
         heldIs c k (unsub src) × Holds src E (feeder S) × Holds body (S ∷ E) (bodyO c o)
       Holds (joinˢ j i sk l x cp)           E o = slotIs sk (joinerCb l o)
       Holds (deferˢ k s)                    E o = slotIs k (attachCb (unsub s)) × Holds s E o

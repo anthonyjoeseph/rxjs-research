@@ -168,14 +168,14 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE FOCUS.** `cold-skip`, then `catch-up`, as bodies: at a burst
+- **THE FOCUS.** `lift-skip`, `clear`, then `catch-up`: at a burst
   boundary the meaning's next step is the firing cold's, lifted through its
-  `Spot`, and each joiner's copy then takes it below its join point.
-  `Holding` carries the conjuncts the single statement was refuted without
-  — `caught`, `gated`, `past`, `behind`. The lift is a recursion over
-  `Spot`, its one lemma a bound on every other node's next event. Decides
-  whether those conjuncts pin the meaning's next event; both deliveries
-  stand on it.
+  `Spot` while every sibling on the way up steps later (`Clear`), and each
+  joiner's copy then takes it below its join point. `lift-skip` is a
+  recursion over `Spot` that pins `Clear`'s definition; `clear` is the
+  bound on every other node's next event from `Ordered`, `Timed`, `caught`,
+  `past`, `behind`. Decides whether those conjuncts pin the meaning's next
+  event; both deliveries stand on it.
 - **THE PHASE MOVED.** `pop-live`, `reheld-stall`, `reheld-quiet`,
   `reheld-later`: a cold's phase moved by `setAt`, its joiners `settled`,
   keeps every conjunct but `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a
@@ -213,8 +213,10 @@ contact; it must be solid before Tier 2 is written over it.
   on each side before a calm point.
 - **`done-seg`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing on its
   end, the completion delivered.
-- **`cold-skip`** (Simulation) — FALSITY, `NO EVIDENCE`: a firing cold's silent
-  step is the meaning's next, lifted.
+- **`lift-skip`** (Focus) — FALSITY, `NO EVIDENCE`: a cold's step, every
+  sibling clear, lifted to the root.
+- **`clear`** (Focus) — FALSITY, `NO EVIDENCE`: every sibling of a firing cold
+  steps after it.
 - **`catch-up`** (Simulation) — FALSITY, `NO EVIDENCE`: the joiners' copies
   take the same step, silently.
 - **`reheld-stall`** (Simulation) — FALSITY, `NO EVIDENCE`: a stalled cold's
