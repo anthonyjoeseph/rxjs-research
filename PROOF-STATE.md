@@ -160,36 +160,36 @@ point at one, the row is FALSITY.
 ## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-the root, positions forgotten down to ticks. A fundamental lemma over approximants, one operator at a time, then one
-argument about limits. Expect the denotation to move under contact; it must be
-solid before Tier 2 is written over it.
+the root, positions forgotten down to ticks. A two-sided fundamental lemma over
+approximants, one operator at a time, puts run n below approximant n below the
+run; `squeeze` meets the limits. Expect the denotation to move under contact; it
+must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
 - **THE ORDER AND THE RELATION.** `_⊑_`, `_≃_`, `limit`, then `Rel` and
   `RelSubj` as definitions. Every leaf below is stated in these, so a wrong
-  relation is wrong everywhere; decides whether approximation (not equality)
-  is enough for `connect`'s subject.
+  relation is wrong everywhere; decides whether the bound half ("on any budget,
+  no more") holds of `connect`'s subject.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
-- **THE LIMITS.** `run-rel`, `diagonal`, `exhaust`, and `⊑-trans`.
-- **RECURSION.** `_≈_` and `lub` over positioned runs, `Continuous` as a
-  definition, then `fix-unfold`.
+- **THE LIMITS.** `run-rel`, `run-bound`, `diagonal`, the two chains,
+  `⟦⟧-limit` from `lub-limit` once the approximants are `Settling` (as `make
+  chain` measures), then `squeeze` with `⊑-trans` and `≃-trans`.
 
 ### The ledger
 
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
-- **`_⊑_`, `_≃_`, `limit`, `⊑-trans`** (denotation.MonotonicList) — FALSITY,
-  `NO EVIDENCE`: the information order on reported runs and its limits.
+- **`_⊑_`, `_≃_`, `limit`, `⊑-trans`, `≃-trans`, `squeeze`**
+  (denotation.MonotonicList) — FALSITY, `NO EVIDENCE`: the information order on
+  reported runs and its limits.
 - **`connect-rel`** (Adequacy) — FALSITY, `NO EVIDENCE`: the allocated subject
   against the hot handle.
 - **`{empty,of,map,scan,takeWhile,flatMap,cold,connected,defer,bot}-rel`**
   (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
-- **`run-rel`, `diagonal`, `exhaust`** (Adequacy) — FALSITY, `NO EVIDENCE`:
-  from approximants to limits.
-- **`_≈_`, `lub`, `Continuous`, `fix-unfold`** (denotation.MonotonicList) —
-  FALSITY, `NO EVIDENCE`: recursion as a least fixed point.
+- **`run-rel`, `run-bound`, `diagonal`, `toArray-chain`, `approx-chain`,
+  `⟦⟧-limit`** (Adequacy) — FALSITY, `NO EVIDENCE`: from approximants to limits.
 
 ## Tier 2 — the simultaneous spec
 

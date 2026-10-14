@@ -11,8 +11,9 @@
 -- The one other difference is how recursion is closed.  Compiling a
 -- `defer`, running a stored callback and taking the loop's next turn are
 -- each written as one layer, open in the recursion.  The pure runtime
--- closes them by unfolding n times — approximant n, as `Denote` does —
--- and the IO runtime closes them for real, with Haskell's `fix`.
+-- closes them by unfolding n times — approximant n, as `Denote` does.
+-- The IO runtime leaves a `defer` to the interpreter, so the callbacks
+-- and the loop are all it closes, each an IO action.
 --
 -- The shared code is parametric in the runtime's types (`Prims`), so it
 -- can neither inspect a ref, nor look inside a cold, nor perform IO.
@@ -91,6 +92,24 @@ module Run (P : Prims) where
   wkR : ∀ {w v t} → w ⊑ v → Ref w t → Ref v t
   wkR {t = t} = wkEl (ref t)
 
+  -- A connect's subject, kept in the environment.  First-order on
+  -- purpose: its subscribers are `Sink`s, not callbacks.  A sink joining
+  -- after the source has completed is completed at once, as in rxjs.
+  record Subject (A : Set) (w : World) : Set where
+    field
+      subscribers : Ref w (list (sink A))
+      closed      : Ref w (base Bool)
+
+  wkSubject : ∀ {A w v} → w ⊑ v → Subject A w → Subject A v
+  wkSubject ρ st = record { subscribers = wkR ρ (Subject.subscribers st) ; closed = wkR ρ (Subject.closed st) }
+
+  Env : List Set → World → Set₁
+  Env Γ w = All (λ A → Subject A w) Γ
+
+  wkEnv : ∀ {Γ w v} → w ⊑ v → Env Γ w → Env Γ v
+  wkEnv ρ []         = []
+  wkEnv ρ (st ∷ sts) = wkSubject ρ st ∷ wkEnv ρ sts
+
   -- THE OPERATORS' LANGUAGE: the free monad over the runtime's
   -- primitives.  The kernels are written in it once, and every runtime
   -- runs those same programs.
@@ -119,6 +138,13 @@ module Run (P : Prims) where
     -- No information: what an unfolding cut off by the pure runtime's
     -- budget does.  The IO runtime never reaches it.
     diverge   : ∀ {w B} → Act w B
+    -- A `defer`, subscribed but not yet compiled: the tree, the connects
+    -- in scope, the observer's three parts, and what to do once the
+    -- subscription exists — its unsubscribe a registered sink, since an
+    -- `Act` cannot take an `Act` as an argument — then the rest.  The
+    -- pure runtime never makes one.
+    unfold    : ∀ {w Γ A B} → Later Cold Γ A → Env Γ w → (A → Act w ⊤) → Act w ⊤ → Act w Bool
+              → (∀ {v} → w ⊑ v → Sink v ⊤ → Act v ⊤) → Act w B → Act w B
 
   wkAct : ∀ {w v B} → w ⊑ v → Act w B → Act v B
   wkAct ρ (done b)                 = done b
@@ -132,6 +158,7 @@ module Run (P : Prims) where
   wkAct ρ (stop h k)               = stop (wkHandle ρ h) (wkAct ρ k)
   wkAct ρ (eff e k)                = eff e λ a → wkAct ρ (k a)
   wkAct ρ diverge                  = diverge
+  wkAct ρ (unfold l e n c x k m)   = unfold l (wkEnv ρ e) (λ a → wkAct ρ (n a)) (wkAct ρ c) (wkAct ρ x) (λ σ → k (ρ ⨾ σ)) (wkAct ρ m)
 
   -- `closed` is rxjs's `subscriber.closed`: a source polls it, and stops,
   -- so a cut reaches a source still inside its own subscribe burst.
@@ -167,24 +194,6 @@ module Run (P : Prims) where
   wkSub : ∀ {A w v} → w ⊑ v → Subscribe A w → Subscribe A v
   wkSub ρ s σ = s (ρ ⨾ σ)
 
-  -- A connect's subject, kept in the environment.  First-order on
-  -- purpose: its subscribers are `Sink`s, not callbacks.  A sink joining
-  -- after the source has completed is completed at once, as in rxjs.
-  record Subject (A : Set) (w : World) : Set where
-    field
-      subscribers : Ref w (list (sink A))
-      closed      : Ref w (base Bool)
-
-  wkSubject : ∀ {A w v} → w ⊑ v → Subject A w → Subject A v
-  wkSubject ρ st = record { subscribers = wkR ρ (Subject.subscribers st) ; closed = wkR ρ (Subject.closed st) }
-
-  Env : List Set → World → Set₁
-  Env Γ w = All (λ A → Subject A w) Γ
-
-  wkEnv : ∀ {Γ w v} → w ⊑ v → Env Γ w → Env Γ v
-  wkEnv ρ []         = []
-  wkEnv ρ (st ∷ sts) = wkSubject ρ st ∷ wkEnv ρ sts
-
   -- Subscribe through the runtime: register the observer, hand the
   -- runtime its sink, wrap the handle.
   via : ∀ {A w} → (∀ {v} → Sink v A → (∀ {u} → v ⊑ u → Handle u → Act u ⊤) → Act v ⊤) → Subscribe A w
@@ -208,6 +217,7 @@ module Run (P : Prims) where
   stop h k         >>=ᴬ f = stop h (k >>=ᴬ f)
   eff e k          >>=ᴬ f = eff e λ a → k a >>=ᴬ f
   diverge          >>=ᴬ f = diverge
+  unfold l e n c x k m >>=ᴬ f = unfold l e n c x k (m >>=ᴬ f)
 
   _>>ᴬ_ : ∀ {w B} → Act w ⊤ → Act w B → Act w B
   m >>ᴬ n = m >>=ᴬ λ _ → n
@@ -412,9 +422,11 @@ module Run (P : Prims) where
       modify (Subject.subscribers (wkSubject (ρ ⨾ σ ⨾ τ) st)) (λ π ss → ss ++ [ wkSink π sk ]) >>ᴬ
       k (σ ⨾ τ) (record { unsubscribe = writeRef (wkR τ l) false skipᴬ })
 
-  -- What a `defer` turns into.  Recursion lives only here, and each
-  -- runtime closes it its own way: the pure one by unfolding n times,
-  -- the IO one for real.
+  -- What a `defer` turns into, and each runtime picks its own.  The pure
+  -- one unfolds the tree n times as it compiles, so approximant n lines
+  -- up with the denotation's.  The IO one compiles a `defer` to an
+  -- `unfold` and its body when the interpreter reaches it, so that its
+  -- one recursion is the interpreter's, an IO action.
   Deferred : Set₁
   Deferred = ∀ {Γ A w} → Later Cold Γ A → Env Γ w → Subscribe A w
 
@@ -432,6 +444,14 @@ module Run (P : Prims) where
     compileWith d (connect s b)    ρ = connectᴷ (compileWith d s ρ) λ σ st → compileWith d b (st ∷ wkEnv σ ρ)
     compileWith d (connected i)    ρ = joinᴷ (lookup ρ i)
     compileWith d (defer l)        ρ = d l ρ
+
+  deferᴷ : Deferred
+  deferᴷ l ρ σ o k = unfold l (wkEnv σ ρ) (Observer.next o) (Observer.complete o) (Observer.closed o)
+                       (λ τ sk → k τ (record { unsubscribe = send sk tt (done tt) })) (done tt)
+
+  -- Every `defer` left to the interpreter.
+  compile : ∀ {Γ A w} → Obs Cold Γ A → Env Γ w → Subscribe A w
+  compile = compileWith deferᴷ
 
   -- THE MONAD, and the handful of things only it can do.  This is the
   -- whole of a runtime: `Observable` supplies IO, `PureObservable` a
@@ -471,7 +491,8 @@ module Run (P : Prims) where
     RunAct : Set₁
     RunAct = ∀ {w B} → Act w B → M w B
 
-    -- `self` runs a stored callback; everything else is structural.
+    -- `self` runs a stored callback, or a `defer`'s body once compiled;
+    -- everything else is structural.
     interpret : RunAct → RunAct
     interpret self (done b)           = return b
     interpret self (newRef t a k)     = newRefᴿ t a λ σ r → interpret self (k σ r)
@@ -484,6 +505,10 @@ module Run (P : Prims) where
     interpret self (stop h k)         = stopᴿ h >>= λ _ → interpret self k
     interpret self (eff e k)          = effᴿ e >>= λ a → interpret self (k a)
     interpret self diverge            = divergeᴿ
+    interpret self (unfold l e n c x k m) =
+      self (compile (Later.force l) e ⊑-refl (record { next = n ; complete = c ; closed = x }) λ σ sub →
+            register (λ _ → Subscription.unsubscribe sub) (done tt) (done false) λ τ sk → k (σ ⨾ τ) sk)
+      >>= λ _ → interpret self m
 
     -- One turn of the event loop; `again` is the rest of it.
     loopStep : RunAct → ∀ {w} → M w ⊤ → M w ⊤

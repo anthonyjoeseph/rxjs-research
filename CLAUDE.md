@@ -43,13 +43,13 @@ Standing approval for any change that **does not alter the spec** — impl edits
 
 **The stop conditions are exhaustive — nothing else is one (Anthony: "never stop working until you hit a stop condition").** All three are questions only Anthony can answer:
 
-- **The semantics must move** — the denotation disagrees with real rxjs in a way that is not a bug in either, or Tier 3's statement needs restating. A question, never a patch.
+- **The semantics must move** — the denotation disagrees with real rxjs in a way that is not a bug in either, or the spec's statement needs restating. A question, never a patch.
 - **The proof is SPIRALLING** — the same region producing FALSITY across three successive subdivisions. Reconsider the mechanism, don't subdivide a fourth time.
 - **The impossibility pair** — two programs whose primitives produce byte-identical emit streams (same provenances, init/close, values, order) but that genuinely batch differently in real rxjs. **STOP and tell Anthony; do not act on it.** Not the same as "impl disagrees with spec", which is just a bug to fix in the impl.
 
 ## The goal
 
-PROOF-STATE.md's four tiers, in order: (1) the oracle passing on all three engines against real rxjs; (2) the adequacy theorem proven; (3) the new simultaneous spec defined over the denotation; (4) that spec proven. No postulates, everything typechecks. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
+Every PROOF-STATE.md tier discharged: no postulates, everything typechecks. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
 
 ## Delegation — the design session directs, Sonnet workers grind
 

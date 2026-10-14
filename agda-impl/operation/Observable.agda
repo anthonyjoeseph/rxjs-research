@@ -9,12 +9,24 @@
 -- set.  Time is the loop's own counter, so a run takes no wall-clock
 -- time and two runs of one program agree.
 --
--- `subscribe` is the one place the rules bend.  The pure runtime closes
--- the engine's recursion by unfolding it n times; a real program needs
--- every unfolding, and IO cannot re-run to take the limit, so here it is
--- closed with Haskell's `fix`.  That is sound only because nothing in the
--- engine forces a `defer`, a stored callback or the loop's next turn
--- before it is reached — which laziness then delivers.
+-- DELIVERY IS ATOMIC PER SUBSCRIPTION.  A cold may `produce` from any
+-- thread, and any interleaving of emissions is legal; a state no
+-- interleaving produces is not.  So every entry into the engine — the
+-- subscribe burst, a `produce`, a `complete`, a timer — runs whole under
+-- one lock per `subscribe`, re-entrant on its own thread, since a
+-- cascade emits again synchronously.  A thread arriving mid-cascade
+-- blocks in `produce`, first come first served, and delivers after: as
+-- a JavaScript `next` returns only once delivered, nothing is dropped.
+-- The subscribing thread holds the lock through its burst, so a forked
+-- thread's emissions always land after it.  Code that blocks INSIDE a
+-- cascade waiting on another producer thread — a `subscription` awaiting
+-- its own fork, a subscriber awaiting a producer — deadlocks.
+--
+-- The pure runtime closes the engine's recursion by unfolding it n
+-- times; a real program needs every unfolding, and IO cannot re-run to
+-- take the limit, so here it is closed with `fixIO`.  Every fixpoint it
+-- takes is an IO action: one may run forever, but none is a value of any
+-- other type, so nothing here proves anything.
 module operation.Observable where
 
 open import Agda.Builtin.IO using (IO)
@@ -28,7 +40,7 @@ open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 open import Level using (Lift; lift; lower; 0ℓ) renaming (suc to lsuc)
 
-open import Tree using (Obs; Later)
+open import Tree using (Obs)
 open import operation.AbstractObservable using (Prims; module Run)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Timeline)
 
@@ -41,7 +53,26 @@ postulate
   readIORef  : ∀ {A} → IORef A → IO A
   writeIORef : ∀ {A} → IORef A → A → IO ⊤
 
-  fix! : ∀ {ℓ} {A : Set ℓ} → (A → A) → A
+-- A lock, re-entrant on the thread holding it, released on any exit.
+postulate
+  Lock     : Set
+  newLock  : IO Lock
+  withLock : ∀ {a} {A : Set a} → Lock → IO A → IO A
+
+-- Haskell's `fix` is untyped at the FFI, so it is bound at a simple
+-- type — and is unsound at most of them.  Its scope is this module, whose
+-- one export takes fixpoints of IO actions only.
+private
+  module FixIO where
+    private
+      postulate
+        fixᴴ : ∀ {a} {A : Set a} → (A → A) → A
+    {-# COMPILE GHC fixᴴ = \ _ _ -> Data.Function.fix #-}
+
+    fixIO : ∀ {a b} {X : Set a} {Y : X → Set b} → ((∀ x → IO (Y x)) → ∀ x → IO (Y x)) → ∀ x → IO (Y x)
+    fixIO = fixᴴ
+
+open FixIO using (fixIO)
 
 {-# FOREIGN GHC import qualified Data.IORef #-}
 {-# FOREIGN GHC import qualified Data.Function #-}
@@ -49,7 +80,33 @@ postulate
 {-# COMPILE GHC newIORef = \ _ -> Data.IORef.newIORef #-}
 {-# COMPILE GHC readIORef = \ _ -> Data.IORef.readIORef #-}
 {-# COMPILE GHC writeIORef = \ _ -> Data.IORef.writeIORef #-}
-{-# COMPILE GHC fix! = \ _ _ -> Data.Function.fix #-}
+{-# FOREIGN GHC
+import qualified Control.Concurrent
+import qualified Control.Concurrent.MVar
+import qualified Control.Exception
+
+data RxLock = RxLock (Control.Concurrent.MVar.MVar ()) (Data.IORef.IORef (Maybe Control.Concurrent.ThreadId))
+
+rxLockNew :: IO RxLock
+rxLockNew = do
+  m <- Control.Concurrent.MVar.newMVar ()
+  o <- Data.IORef.newIORef Nothing
+  return (RxLock m o)
+
+rxLockWith :: RxLock -> IO a -> IO a
+rxLockWith (RxLock m o) act = do
+  me  <- Control.Concurrent.myThreadId
+  cur <- Data.IORef.readIORef o
+  if cur == Just me then act else
+    Control.Exception.mask (\restore -> do
+      Control.Concurrent.MVar.takeMVar m
+      Data.IORef.writeIORef o (Just me)
+      restore act `Control.Exception.finally`
+        (Data.IORef.writeIORef o Nothing >> Control.Concurrent.MVar.putMVar m ()))
+#-}
+{-# COMPILE GHC Lock = type RxLock #-}
+{-# COMPILE GHC newLock = rxLockNew #-}
+{-# COMPILE GHC withLock = \ _ _ -> rxLockWith #-}
 
 private
   infixl 1 _>>_
@@ -58,6 +115,9 @@ private
 
   unless : IORef Bool → IO ⊤ → IO ⊤
   unless r m = readIORef r >>= λ b → if b then pure tt else m
+
+  fixIO′ : ∀ {a b} {X : Set a} {Y : Set b} → ((X → IO Y) → X → IO Y) → X → IO Y
+  fixIO′ {Y = Y} = fixIO {Y = λ _ → Y}
 
 ------------------------------------------------------------------------
 -- Colds
@@ -134,13 +194,18 @@ private
   low : ∀ {w A} → M w A → IO A
   low m = m >>= λ a → pure (lower a)
 
--- The loop's state: the clock, and the timers in the order they fire.
+-- The loop's state: the clock, the timers in the order they fire, and
+-- the subscription's lock.
 record Loop : Set where
   field
     clock  : IORef ℕ
     timers : IORef (List (ℕ × IO ⊤))
+    lock   : Lock
 
 private
+  atomically : ∀ {a} {X : Set a} → Loop → IO X → IO X
+  atomically lp = withLock (Loop.lock lp)
+
   -- After every timer due no later: two timers due together fire in the
   -- order they were set.
   insert : ℕ → IO ⊤ → List (ℕ × IO ⊤) → List (ℕ × IO ⊤)
@@ -168,9 +233,9 @@ private
     newIORef false >>= λ sp → newIORef nothing >>= λ td →
     let sl = record { spent = sp ; tearDown = td }
         st = IOCold.create c (record
-          { produce  = λ a → unless sp (SinkSlot.onNext sk a)
-          ; complete = spend sl (SinkSlot.onComplete sk)
-          ; closed   = readIORef sp >>= λ s → if s then pure true else SinkSlot.isClosed sk
+          { produce  = λ a → atomically lp (unless sp (SinkSlot.onNext sk a))
+          ; complete = atomically lp (spend sl (SinkSlot.onComplete sk))
+          ; closed   = atomically lp (readIORef sp >>= λ s → if s then pure true else SinkSlot.isClosed sk)
           ; after    = setTimer lp })
     in Started.subscription st >>= λ i →
        writeIORef td (just (Started.teardown st i)) >>
@@ -179,7 +244,7 @@ private
   nextTimer : Loop → IO Bool
   nextTimer lp = readIORef (Loop.timers lp) >>= λ where
     []             → pure false
-    ((t , a) ∷ ts) → writeIORef (Loop.timers lp) ts >> writeIORef (Loop.clock lp) t >> a >> pure true
+    ((t , a) ∷ ts) → writeIORef (Loop.timers lp) ts >> writeIORef (Loop.clock lp) t >> atomically lp a >> pure true
 
 IOᴿ : Loop → Runtime
 IOᴿ lp = record
@@ -195,7 +260,7 @@ IOᴿ lp = record
   ; startColdᴿ = λ _ c sk k → playCold lp c sk >>= k tt
   ; stopᴿ      = λ sl → ret (spend sl (pure tt))
   ; effᴿ       = ret
-  ; divergeᴿ   = fix! λ d → d
+  ; divergeᴿ   = fixIO′ (λ d _ → d tt) tt
   ; nextᴿ      = λ _ → ret (nextTimer lp)
   }
 
@@ -214,7 +279,7 @@ fromTimeline {A} c = record
   where
     -- `self` plays the frames after this burst.
     burst : Emit A → IORef Bool → (Time → ML A → IO ⊤) → Time → Burst A → IO ⊤
-    burst e off self t = fix! λ go b → Emit.closed e >>= λ c → if c then pure tt else step go b
+    burst e off self t = fixIO′ λ go b → Emit.closed e >>= λ c → if c then pure tt else step go b
       where
         step : (Burst A → IO ⊤) → Burst A → IO ⊤
         step go (emit a k) = Emit.produce e a >> unless off (go (Burst∞.force k))
@@ -222,10 +287,12 @@ fromTimeline {A} c = record
         step go (close k)  = self t (ML∞.force k)
 
     play : Emit A → IORef Bool → Time → ML A → IO ⊤
-    play e off = fix! λ self now → λ where
-      done     → Emit.complete e
-      quiet    → pure tt
-      (at t b) → Emit.after e (t ∸ now) (unless off (burst e off self t b))
+    play e off now m = fixIO′ step (now , m)
+      where
+        step : (Time × ML A → IO ⊤) → Time × ML A → IO ⊤
+        step self (now , done)   = Emit.complete e
+        step self (now , quiet)  = pure tt
+        step self (now , at t b) = Emit.after e (t ∸ now) (unless off (burst e off (λ t′ m′ → self (t′ , m′)) t b))
 
     first : Emit A → IORef Bool → ML A → IO ⊤
     first e off (at 0 b) = burst e off (play e off) 0 b
@@ -234,22 +301,30 @@ fromTimeline {A} c = record
 ------------------------------------------------------------------------
 -- The entry point
 
--- The recursion, closed for real.
-deferred∞ : Deferred
-deferred∞ = fix! {A = Deferred} λ d l ρ → compileWith (λ l′ ρ′ → d l′ ρ′) (Later.force l) ρ
+-- One `Act` to run, its world and result packed, so that `fixIO` can
+-- close the interpreter's recursion over every one of them.
+private
+  record Job : Set₁ where
+    constructor job
+    field
+      {w}  : One
+      {B}  : Set
+      act  : Act w B
 
 module _ (lp : Loop) where
   open Engine (IOᴿ lp)
 
   private
     run∞ : RunAct
-    run∞ = fix! λ self {w} {B} → interpret (λ {w′} {B′} → self {w′} {B′}) {w} {B}
+    run∞ a = fixIO {Y = λ j → Lift (lsuc 0ℓ) (Job.B j)} (λ self j → interpret (λ a′ → self (job a′)) (Job.act j)) (job a)
 
     loop∞ : M _ ⊤
-    loop∞ = fix! (loopStep run∞)
+    loop∞ = fixIO′ (λ again _ → loopStep run∞ (again tt)) tt
 
   running : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → IO ⊤
-  running {A} o f c = low (drive run∞ loop∞ (compileWith deferred∞ o []) observer)
+  -- The subscribe burst under the lock; then the loop, whose timers
+  -- each take it.
+  running {A} o f c = atomically lp (low (run∞ (compile o [] tt observer λ _ _ → done tt))) >>= λ _ → low loop∞
     where
       observer : Observer A _
       observer = record
@@ -261,4 +336,4 @@ module _ (lp : Loop) where
 -- THE ENTRY POINT: runs until no timer is left.  Each value is handed
 -- the loop's time at its arrival; the last argument runs on completion.
 subscribe : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → IO ⊤
-subscribe o f c = newIORef 0 >>= λ cl → newIORef [] >>= λ ts → running (record { clock = cl ; timers = ts }) o f c
+subscribe o f c = newLock >>= λ lk → newIORef 0 >>= λ cl → newIORef [] >>= λ ts → running (record { clock = cl ; timers = ts ; lock = lk }) o f c
