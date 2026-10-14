@@ -13,16 +13,15 @@
 -- wrong frame.
 module operation.Placed where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (true; false; T)
 open import Data.List using (List; []; _∷_; _++_; [_]) renaming (map to mapL)
 open import Data.Nat using (ℕ; suc; _≤_; s≤s; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-antisym; ≡ᵇ⇒≡; <ᵇ⇒<)
 open import Data.Product using (_×_; _,_)
-open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; at; emit; stall; close; done; quiet; Time; Pos; tick;
-                                            Events; Events∞; out; skip; end; hush; ticks; inFrame; within; sameTick)
+open import denotation.MonotonicList using (emit; stall; close; Time; Pos; tick; Events; Events∞; out; skip; end; hush; ticks; inFrame;
+  within)
 open import denotation.Order using (Item; val; fin; silent; Shows; ShowsIn; nil; done⁺; quiet⁺; at⁺; emit⁺; stall⁺; close⁺; _⊑_; shows-≼)
   renaming (_≼_ to _≼ˡ_; []≼ to []≼ˡ; ∷≼ to ∷≼ˡ)
 open import operation.PureObservable using (module Pure)

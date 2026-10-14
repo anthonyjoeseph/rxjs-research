@@ -167,40 +167,44 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
+- **THE BOUND HALF AS A CONFIGURATION.** `places` as a body: an invariant
+  over the pure state — every live observer's deliveries placed against the
+  events its subtree shows where it was subscribed, as `make ghosts`
+  measures — established at the root, kept by each loop turn, and read off
+  as `Recorded` when the loop stops. Decides whether `Rel`'s at-most half
+  is needed at all, or is only this invariant.
 - **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted three times,
   and each repair restates the top line, so all are Anthony's call. A cold
-  whose ticks go backwards (`cold-rel`): `ML` carries the increase,
-  `adequacy` assumes it, or the denotation clamps a late frame to now. A
-  `connect` source the body outlives (`connect-rel`), spinning or running
-  forever: the denotation keeps its events as skips, or `adequacy` assumes
-  none. The relation below is stated for the programs every repair keeps.
-- **THE RELATION.** `Rel` and `RelSubj` as definitions over the ghost
-  positions the pure run keeps. `make ghosts` finds every observer a run makes
-  — each operator's, each join to a subject — delivered a prefix of what its
-  subtree denotes where it was subscribed, so the bound half holds observer by
-  observer, the subject's included. Every leaf below is stated in these, so a
-  wrong relation is wrong everywhere; what is left to decide is how one
-  relation spans state the kernels share.
+  whose ticks fall (`rising`): `ML` carries the increase, `adequacy`
+  assumes it, or the denotation clamps a late frame to now. A `connect`
+  source the body outlives (`connect-rel`), spinning or running forever:
+  the denotation keeps its events as skips, or `adequacy` assumes none.
+- **THE RELATION.** `Rel` and `RelSubj` as definitions, the at-least half
+  only: with budget enough, the kernel shows everything its timeline does.
+  Every leaf below is stated in these, so a wrong relation is wrong
+  everywhere; what is left to decide is how one relation spans state the
+  kernels share, and whether `run-rel` reads it off at the root.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
-- **THE ROOT.** `run-rel` and `run-bound`: `Rel`'s two halves read off at
-  the root, through the pure runtime's observation; decides whether `Rel` is
-  stated where `runPure` can see it.
-- **THE DENOTATION'S LIMIT.** `approx-chain`, then `⟦⟧-limit` from
-  `lub-limit` once the approximants are `Settling` (as `make chain` measures);
-  `squeeze` then meets them.
+- **THE DENOTATION'S LIMIT.** `ticks-up` from `rising`, `approx-chain`, then
+  `⟦⟧-limit` from `lub-limit` once the approximants are `Settling` (as
+  `make chain` measures); `squeeze` then meets them.
 
 ### The ledger
 
+- **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
+  for a cold that falls, the repair Anthony's call.
+- **`places`** (Adequacy) — FALSITY, `NO EVIDENCE`: the engine leaves its
+  record placed against the root's events, value by value.
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
 - **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject
   against the hot handle; false for a source that spins or runs forever.
-- **`cold-rel`** (Adequacy) — FALSITY, `REFUTED`: false for a timeline whose
-  ticks go backwards; the repair restates `adequacy`, Anthony's call.
+- **`cold-rel`** (Adequacy) — FALSITY, `NO EVIDENCE`: a rising timeline against
+  its started cold.
 - **`{empty,of,map,scan,takeWhile,flatMap,connected,defer,bot}-rel`**
   (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
-- **`run-rel`, `run-bound`, `approx-chain`, `⟦⟧-limit`** (Adequacy) — FALSITY,
+- **`run-rel`, `ticks-up`, `approx-chain`, `⟦⟧-limit`** (Adequacy) — FALSITY,
   `NO EVIDENCE`: from approximants to limits.
 
 ## Tier 2 — the simultaneous spec

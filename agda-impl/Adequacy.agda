@@ -95,6 +95,7 @@ module Link (R : Set) where
     -- now, behind every timer already due.  Whether `ML` carries it,
     -- `adequacy` assumes it, or the denotation clamps a late frame to now
     -- is Anthony's call.
+    -- REFUTED: `git show 26f0a574` derives `⊥` from `rising`.
     rising : ∀ n (o : PureObs [] R) → Rising n o
 
     -- THE BOUND HALF, where the run can see it: approximant m of the
