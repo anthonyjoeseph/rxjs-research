@@ -530,33 +530,6 @@ fix-unfold {f = f} cf k p =
     iterates (suc n)   = cf (iterates n)
 
 ------------------------------------------------------------------------
--- Comparing runs
-
-postulate
-  -- Information order on reported timelines: the left is the right with
-  -- some suffixes replaced by a burst that stalls forever, and `stall`s
-  -- inserted or dropped, finitely many between any two other steps.
-  _⊑_ : ∀ {A} → ML A → ML A → Set
-  ⊑-trans : ∀ {A} {x y z : ML A} → x ⊑ y → y ⊑ z → x ⊑ z
-  -- The same timeline, up to `stall`s, finitely many between any two
-  -- other steps — so `ones`, a stall per unfolding, is its run.
-  _≃_ : ∀ {A} → ML A → ML A → Set
-  ≃-trans : ∀ {A} {x y z : ML A} → x ≃ y → y ≃ z → x ≃ z
-
-  -- The least upper bound of a chain of runs.
-  limit : ∀ {A} → (ℕ → ML A) → ML A
-
--- Each run shows at least what the one before it does.
-Chain : ∀ {A} → (ℕ → ML A) → Set
-Chain c = ∀ n → c n ⊑ c (suc n)
-
-postulate
-  -- Two chains, each below the other's limit term by term, meet: the
-  -- order's antisymmetry, at the limit.
-  squeeze : ∀ {A} {r a : ℕ → ML A} → Chain r → Chain a → (∀ n → a n ⊑ limit r) → (∀ n → r n ⊑ a n)
-          → limit r ≃ limit a
-
-------------------------------------------------------------------------
 -- Derived
 
 mergeᴰ : ∀ {A} → MonotonicList A → MonotonicList A → MonotonicList A
