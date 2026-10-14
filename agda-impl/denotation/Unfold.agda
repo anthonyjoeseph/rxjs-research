@@ -8,8 +8,8 @@
 -- approximants, recursion through `defer` included.
 --
 -- Each node but `connect` steps exactly as its operator in `MonotonicList`
--- does, clause for clause, positions included.  There a joiner observes a
--- copy of the source; here a `connect` steps its source once,
+-- does, clause for clause, positions included.  There a joiner reads the
+-- source's whole run ahead, rekeyed; here a `connect` steps its source once,
 -- beside its body, and feeds each value to the joiners the body holds,
 -- as an rxjs Subject's `next` does: a joiner shows what it was fed, at
 -- the value's position under its own.  A configuration is typed by the
