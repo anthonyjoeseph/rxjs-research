@@ -94,6 +94,13 @@ module Link (R : Set) where
     -- The subject `connectᴷ` allocates, fed by the source after the body
     -- has subscribed, agrees with the hot handle `connectᴰ` passes; then
     -- the body runs under both.
+    --
+    -- False for a source that spins: `connectᴰ` drops the source's events,
+    -- so a body that does not consume them shows past the spin, where the
+    -- engine — and rxjs, by overflowing — stops the whole run.  Whether
+    -- the denotation cuts the run at a spin anywhere, or `adequacy`
+    -- assumes none, is Anthony's call.
+    -- REFUTED: `git show f5256988` derives `⊥` from `run-rel`.
     connect-rel   : ∀ {A B w} {s : Subscribe A w} {d} {b : ∀ {v} → w ≤ʷ v → Subject A v → Subscribe B v}
                       {e : MonotonicList A → MonotonicList B}
                   → Rel s d → (∀ {v} (σ : w ≤ʷ v) {st r} → RelSubj st r → Rel (b σ st) (e r))
