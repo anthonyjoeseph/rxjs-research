@@ -170,9 +170,10 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 ### Big picture tier roadmap
 
-- **B'S POSITIONAL FIELD.** `Carried` gains a field placing every live
-  node's next shown event past the region the agenda owes, true at
-  `carried-begin`; then the feed's case of `kept` a body over it. The feeder
+- **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
+  turn; it gains a field placing every live node's next shown event past the
+  region the agenda owes, true at `carried-begin`; then the feed's case of
+  `kept` a body over it. The feeder
   itself is ruled out as a refutation: a snapshot's joiners match the
   meaning's drop criterion, joiners subscribed mid-feed or after the source
   ends, and a body completing mid-feed, all agree. Decides whether the

@@ -16,25 +16,30 @@
 -- of a cut one.
 module adequacy.Simulation where
 
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _++_; [_]; length)
 open import Data.List.Relation.Unary.All using ([])
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_; Σ)
+open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Nullary using (¬_)
 
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; observe; root)
+open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; observe; root; Pos)
 open import denotation.Order using (_⊑_; Chain)
-open import denotation.Unfold using (⟦_⟧; Node; subscribe; unfold; shown; outˢ; skipˢ; endˢ; hushˢ) renaming (step to stepᵁ; Step to Stepᵁ)
+open import denotation.Unfold using (⟦_⟧; Node; Srcs; subscribe; unfold; shown; outˢ; skipˢ; endˢ; hushˢ; ofᶜ; mapᶜ) renaming (step to stepᵁ; Step to Stepᵁ)
 open import adequacy.Carrier using (module Carrying)
 open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
 open import operation.PureObservable using (PureObs; module Pure)
 
 module Sim (R : Set) where
-  open Machine R using (Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix; Mach; Step; silent; value; complete; drained; step)
+  open Machine R using (Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix; Mach; ⟨_,_⟩; turn; Step; silent; value; complete; drained; step)
   open Machine R using () renaming (shown to shownᴹ)
-  open Carrying R using (Carried)
-  open Pure R using (cutOff; frames)
+  open Carrying R using (Carried; Owned; module At; module Against; Sub; Path; here; in-defer; spot; emitC
+                        ; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ)
+  open Pure R using (cutOff; frames; start)
   open Read
 
   ------------------------------------------------------------------------
@@ -98,6 +103,10 @@ module Sim (R : Set) where
     -- does not owe, so this step needs a field placing each live node's
     -- next shown event past the agenda's region.
     --
+    -- Every node due before the next turn is owed (`Owned`): without it a
+    -- state between turns with an `of` open steps drained while the
+    -- meaning shows the `of`'s value, and `unowned` keeps that state out.
+    --
     -- RECOVERY: `git show b75ee016` restores `adequacy.FeedTry`: an owed
     --   joiner reaches its delivery after its lag's silent steps
     --   (`joiner-delivers`); a lag behind the run's position is a lag
@@ -140,6 +149,47 @@ module Sim (R : Set) where
   --   burst's steps before its close, cascades never nesting.
   sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
   sim o = From.sim-from Carried kept (carried-begin o)
+
+  ------------------------------------------------------------------------
+  -- Nothing unowned is carried
+
+  -- At the empty heap, an open `of` is an `of` or a subscription not yet
+  -- begun, reached by `defer`s.
+  data Leaf {Δ A} (u : Sub [] Δ A) : Set₁ where
+    anOf     : ∀ {Δ′ A′ p i xs} → Path u (ofˢ {Δ = Δ′} {A′} p i xs) → Leaf u
+    aPending : ∀ {Δ′ A′ s q} → Path u (pendingˢ {Δ = Δ′} {A′} s q) → Leaf u
+
+  private
+    no-map : ∀ {A B} {f : A → B} (n : Maybe (Node A)) {p : Pos} {i xs} → At.mapᴹ [] (mapᶜ f) n ≡ just (ofᶜ p i xs) → ⊥
+    no-map nothing  ()
+    no-map (just _) ()
+
+    found : ∀ {Δ A p i xs} (u : Sub [] Δ A) (ρ : Srcs Δ) → At.part [] u ρ ≡ just (ofᶜ p i xs) → Leaf u
+    found (pendingˢ s q)                       ρ e = aPending here
+    found (coldˢ () hd ph)                     ρ e
+    found (ofˢ p i xs)                         ρ e = anOf here
+    found doneˢ                                ρ ()
+    found (mapˢ f s)                           ρ e = ⊥-elim (no-map (At.part [] s ρ) e)
+    found (scanˢ f () s)                       ρ e
+    found (takeWhileˢ i p (() , _) k tk s)     ρ e
+    found (flatMapˢ op f fl (() , _) k r s ls) ρ e
+    found (connectˢ s₁ p S (() , _) k fd s₀ m s b) ρ e
+    found (joinˢ j i () l x cp)                ρ e
+    found (deferˢ k s)                         ρ e with found s ρ e
+    ... | anOf π     = anOf (in-defer π)
+    ... | aPending π = aPending (in-defer π)
+
+  -- The state that refuted `kept` before ownership: between turns, an
+  -- `of` open with nothing owing its rest.
+  unowned : ∀ {p i xs} → ¬ Carried ⟨ start , turn ⟩ (ofᶜ p i xs)
+  unowned r with Carried.ctlAs r | Carried.owned r | found (Carried.tree r) [] (Carried.open≡ r)
+  ... | Against.calmAs | o | anOf π with Owned.ofs o π
+  ...   | ()
+  unowned r | Against.calmAs | o | aPending π with Owned.begun o π
+  ...   | ()
+
+  _ : ∀ {p i xs} → ¬ Carried ⟨ start , turn ⟩ (ofᶜ p i xs)
+  _ = unowned
 
   ------------------------------------------------------------------------
   -- Below: every prefix placed

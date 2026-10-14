@@ -317,6 +317,39 @@ module Carrying (R : Set) where
     walkLanes op f fl H (this-lane {c = c} p) = walk p (ctx (Flat′.laneO op f (env H) (obs H) fl c) (laneK c) (env H) (srcs H))
     walkLanes op f fl H (next-lane p)         = walkLanes op f fl H p
 
+  -- A node somewhere below `t`.
+  record Spot {h Δ₀ A₀} (t : Sub h Δ₀ A₀) : Set₁ where
+    constructor spot
+    field
+      {Δ}  : List Set
+      {A}  : Set
+      {u}  : Sub h Δ A
+      path : Path t u
+
+  -- The connects' sources a continuation handed to the node at the end
+  -- of a path begins: one for each connect body the path enters, from the
+  -- node up to the nearest lane, whose continuation only attaches.  The
+  -- flag says a lane was met.
+  mutual
+    chain : ∀ {h Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {x : Sub h Δ′ A′} {u : Sub h Δ″ A″}
+          → (∀ {Δ₁ A₁} {v : Sub h Δ₁ A₁} → Path x v → Path t v) → Path x u → List (Spot t) × Bool
+    chain mk here          = [] , false
+    chain mk (in-map p)    = chain (λ q → mk (in-map q)) p
+    chain mk (in-scan p)   = chain (λ q → mk (in-scan q)) p
+    chain mk (in-take p)   = chain (λ q → mk (in-take q)) p
+    chain mk (in-outer p)  = chain (λ q → mk (in-outer q)) p
+    chain mk (in-lanes p)  = proj₁ (chainLanes (λ q → mk (in-lanes q)) p) , true
+    chain mk (in-source p) = chain (λ q → mk (in-source q)) p
+    chain mk (in-defer p)  = chain (λ q → mk (in-defer q)) p
+    chain mk (in-body p) with chain (λ q → mk (in-body q)) p
+    ... | ss , true  = ss , true
+    ... | ss , false = spot (mk (in-source here)) ∷ ss , false
+
+    chainLanes : ∀ {h Δ A Δ′ B Δ″ A″} {t : Sub h Δ A} {ls : List (Lane h Δ′ B)} {u : Sub h Δ″ A″}
+               → (∀ {Δ₁ A₁} {v : Sub h Δ₁ A₁} → PathLanes ls v → Path t v) → PathLanes ls u → List (Spot t) × Bool
+    chainLanes mk (this-lane p) = chain (λ q → mk (this-lane q)) p
+    chainLanes mk (next-lane p) = chainLanes (λ q → mk (next-lane q)) p
+
   -- The root's observer, in any world: it only records.
   rootObs : ∀ {h} → Observer R h
   rootObs = record { next = λ a → eff (note a) λ _ → done tt ; complete = eff fin λ _ → done tt ; closed = done false }
@@ -364,8 +397,8 @@ module Carrying (R : Set) where
       loopAs : ∀ {w} {σ : w ⊑ h} → StackAs σ loop
       restAs : ∀ {u w B} {m : Act w B} {ρ : u ⊑ w} {σ : w ⊑ h} {K} (ks : List (Call t))
              → (∀ b → wkAct σ m ≗ (⟦ ks ⟧ >>ᴬ done b)) → StackAs (ρ ⨾ σ) K → StackAs σ (push (rest m) ρ K)
-      sentAs : ∀ {u w A v} {s : Sink w A} {hd τ τ′ r i} {b : Frame A v} {ρ : u ⊑ w} {σ : w ⊑ h} {K}
-             → Path t (coldˢ {Δ = []} (wk∋ σ s) (wk∋ σ hd) (playing τ′ r i b)) → StackAs (ρ ⨾ σ) K
+      sentAs : ∀ {u w Δ A v} {s : Sink w A} {hd τ τ′ r i} {b : Frame A v} {ρ : u ⊑ w} {σ : w ⊑ h} {K}
+             → Path t (coldˢ {Δ = Δ} (wk∋ σ s) (wk∋ σ hd) (playing τ′ r i b)) → StackAs (ρ ⨾ σ) K
              → StackAs σ (push (sent s hd τ r i b) ρ K)
 
     -- The states the simulation re-enters at: the loop between turns; a
@@ -380,8 +413,43 @@ module Carrying (R : Set) where
               → (Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ h) λ υ → wkEnv υ E′ ≡ env (walk π top)
                    × act ≗ (compile s E′ υ (obs (walk π top)) (kont (walk π top)) >>ᴬ ⟦ ks ⟧))
               → StackAs σ K → CtlAs (run act σ K)
-      burstAs : ∀ {w A v} {s : Sink h A} {hd τ τ′ r i} {b : Frame A v} {σ : w ⊑ h} {K}
-              → Path t (coldˢ {Δ = []} s hd (playing τ′ r i b)) → StackAs σ K → CtlAs (burst s hd τ r i b σ K)
+      burstAs : ∀ {w Δ A v} {s : Sink h A} {hd τ τ′ r i} {b : Frame A v} {σ : w ⊑ h} {K}
+              → Path t (coldˢ {Δ = Δ} s hd (playing τ′ r i b)) → StackAs σ K → CtlAs (burst s hd τ r i b σ K)
+
+    -- What is owed, gathered from the control and the stack: the calls on
+    -- the agenda, the bursts in flight, and the subscriptions reached and
+    -- not begun that the one under way, or a continuation the agenda
+    -- owes, begins.
+    stackCalls : ∀ {w X} {σ : w ⊑ h} {K : Stack w X} → StackAs σ K → List (Call t)
+    stackCalls loopAs          = []
+    stackCalls (restAs ks _ K) = ks ++ stackCalls K
+    stackCalls (sentAs _ K)    = stackCalls K
+
+    stackBursts : ∀ {w X} {σ : w ⊑ h} {K : Stack w X} → StackAs σ K → List (Spot t)
+    stackBursts loopAs         = []
+    stackBursts (restAs _ _ K) = stackBursts K
+    stackBursts (sentAs π K)   = spot π ∷ stackBursts K
+
+    agenda : ∀ {c} → CtlAs c → List (Call t)
+    agenda calmAs           = []
+    agenda (noteAs ks _ K)  = ks ++ stackCalls K
+    agenda (subAs _ ks _ K) = ks ++ stackCalls K
+    agenda (burstAs _ K)    = stackCalls K
+
+    bursts : ∀ {c} → CtlAs c → List (Spot t)
+    bursts calmAs          = []
+    bursts (noteAs _ _ K)  = stackBursts K
+    bursts (subAs _ _ _ K) = stackBursts K
+    bursts (burstAs π K)   = spot π ∷ stackBursts K
+
+    kontChains : List (Call t) → List (Spot t)
+    kontChains []             = []
+    kontChains (kontC π ∷ ks) = proj₁ (chain (λ q → q) π) ++ kontChains ks
+    kontChains (_ ∷ ks)       = kontChains ks
+
+    begins : ∀ {c} → CtlAs c → List (Spot t)
+    begins ca@(subAs π _ _ _) = spot π ∷ proj₁ (chain (λ q → q) π) ++ kontChains (agenda ca)
+    begins ca                 = kontChains (agenda ca)
 
   ------------------------------------------------------------------------
   -- Against a heap
@@ -725,28 +793,74 @@ module Carrying (R : Set) where
   Ordered st = Linked (λ t u → cascade t <ᵖ cascade u ≡ true) (State.timers st)
              × All (λ t → State.clock st ≤ Timer.due t × State.pos st <ᵖ cascade t ≡ true) (State.timers st)
 
+  -- EVERYTHING DUE BEFORE THE NEXT TURN IS OWED: an `of`'s rest to the
+  -- agenda; a playing cold's frame to a burst in flight; a subscription
+  -- reached and not begun to the one under way, or to a continuation the
+  -- agenda owes; a live takeWhile's completion and cut, and a connect's
+  -- feed, to the agenda.
+  record Owned {h} (H : All (Val h) h) (t : Sub h [] R) {ctl : Ctl h} (ca : Against.CtlAs t ctl) : Set₁ where
+    open At H
+    open Against t
+    field
+      ofs   : ∀ {Δ A p i xs} (π : Path t (ofˢ {Δ = Δ} {A} p i xs)) → emitC π ∈ agenda ca
+      plays : ∀ {Δ A s hd τ r i u} {b : Frame A u} (π : Path t (coldˢ {Δ = Δ} s hd (playing τ r i b)))
+            → spentʰ hd ≡ false → spot π ∈ bursts ca
+      begun : ∀ {Δ A s q} (π : Path t (pendingˢ {Δ = Δ} {A} s q)) → spot π ∈ begins ca
+      ends  : ∀ {Δ A i p c k q} {s : Sub h Δ A} (π : Path t (takeWhileˢ i p c k (ending q) s))
+            → val (Kit.live c) ≡ true → take1C π ∈ agenda ca
+      cuts  : ∀ {Δ A i p c k} {s : Sub h Δ A} (π : Path t (takeWhileˢ i p c k taken s))
+            → val (Kit.live c) ≡ true → take2C π ∈ agenda ca
+      feeds : ∀ {Δ A B s₁ q S c k x r ss s₀ m} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+            → (π : Path t (connectˢ s₁ q S c k (feeding x r ss) s₀ m s b)) → feedC π ∈ agenda ca
+      fins  : ∀ {Δ A B s₁ q S c k r ss s₀ m} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+            → (π : Path t (connectˢ s₁ q S c k (finishing r ss) s₀ m s b)) → finC π ∈ agenda ca
+
+  -- Every subscription against what its kernel registered; below a closed
+  -- gate, every cold spent.
+  record Kernels {h} (H : All (Val h) h) (t : Sub h [] R) : Set₁ where
+    open At H
+    field
+      holds : Holds t [] rootObs
+      gated : Gated t []
+
+  -- Every joiner's copy behind its source by what its feed owes it, every
+  -- source reached by its history.
+  record Meaning {h} (st : State h) (t : Sub h [] R) : Set₁ where
+    open At (State.heap st)
+    field
+      caught : Caught (State.pos st) t [] []
+
+  -- Every joiner joined no later than the run's position; the queue its
+  -- pending frames and dead ones, in order; the subjects' subscribers its
+  -- joiners.
+  record Queue {h} (st : State h) (t : Sub h [] R) : Set₁ where
+    open At (State.heap st)
+    field
+      past    : All (λ j → State.pos st <ᵖ Joiner.at′ j ≡ false) (joiners t [])
+      timed   : Timed (State.timers st) (pendings t)
+      joined  : Joined (subjects t) (joiners t [])
+      ordered : Ordered st
+
+  -- The names all distinct; the clock the run position's tick; the root
+  -- not done.
+  record Books {h} (st : State h) (t : Sub h [] R) : Set₁ where
+    field
+      fresh   : AllPairs _≢_ (names t)
+      clocked : State.clock st ≡ tick (State.pos st)
+      running : State.ended st ≡ false
+
   -- THE CONFIGURATION `c` IS WHAT IS RUNNING: a witness holding every
-  -- subscription the run reaches, against its kernel, whose open part is
-  -- `c`; the machine's control and stack the witness's agenda; every
-  -- joiner's copy behind its source by what its feed owes it, every
-  -- closed gate's subscriptions spent, every joiner joined no later than
-  -- the run's position; the queue its pending frames and dead ones, in
-  -- order; the subjects' subscribers its joiners; the names all
-  -- distinct; the clock the run position's tick; the root not done.
+  -- subscription the run reaches, whose open part is `c`, and the
+  -- machine's control and stack its agenda; then the invariants, one
+  -- record per concern.
   record Carried (m : Mach) (c : U.Node R) : Set₁ where
     open Mach m using (world; state; ctl)
-    open At (State.heap state)
     field
       tree    : Sub world [] R
       ctlAs   : Against.CtlAs tree ctl
-      holds   : Holds tree [] rootObs
-      open≡   : part tree [] ≡ just c
-      caught  : Caught (State.pos state) tree [] []
-      gated   : Gated tree []
-      past    : All (λ j → State.pos state <ᵖ Joiner.at′ j ≡ false) (joiners tree [])
-      timed   : Timed (State.timers state) (pendings tree)
-      joined  : Joined (subjects tree) (joiners tree [])
-      ordered : Ordered state
-      fresh   : AllPairs _≢_ (names tree)
-      clocked : State.clock state ≡ tick (State.pos state)
-      running : State.ended state ≡ false
+      open≡   : At.part (State.heap state) tree [] ≡ just c
+      owned   : Owned (State.heap state) tree ctlAs
+      kernels : Kernels (State.heap state) tree
+      meaning : Meaning state tree
+      queue   : Queue state tree
+      books   : Books state tree
