@@ -95,12 +95,17 @@ module Link (R : Set) where
     -- has subscribed, agrees with the hot handle `connectᴰ` passes; then
     -- the body runs under both.
     --
-    -- False for a source that spins: `connectᴰ` drops the source's events,
-    -- so a body that does not consume them shows past the spin, where the
-    -- engine — and rxjs, by overflowing — stops the whole run.  Whether
-    -- the denotation cuts the run at a spin anywhere, or `adequacy`
-    -- assumes none, is Anthony's call.
+    -- False wherever the source outlives what the body shows of it:
+    -- `connectᴰ` drops the source's events.  A body that does not consume
+    -- them shows past a source that spins, where the engine — and rxjs, by
+    -- overflowing — stops the whole run; and shows silence over a source
+    -- that runs forever, which the engine, still firing its timers, can
+    -- never report.  Cutting the run at a spin repairs only the first.
+    -- Keeping the source's events as `skip`s repairs both, but rxjs runs a
+    -- source's subscribe burst to its end even after the body has ended.
+    -- Which, or `adequacy` assuming neither, is Anthony's call.
     -- REFUTED: `git show f5256988` derives `⊥` from `run-rel`.
+    -- REFUTED: `git show e6c9d03a` derives `⊥` from `run-rel`.
     connect-rel   : ∀ {A B w} {s : Subscribe A w} {d} {b : ∀ {v} → w ≤ʷ v → Subject A v → Subscribe B v}
                       {e : MonotonicList A → MonotonicList B}
                   → Rel s d → (∀ {v} (σ : w ≤ʷ v) {st r} → RelSubj st r → Rel (b σ st) (e r))

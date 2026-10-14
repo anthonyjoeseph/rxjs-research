@@ -167,13 +167,13 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted twice, and
-  each repair restates the top line, so both are Anthony's call. A cold
+- **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted three times,
+  and each repair restates the top line, so all are Anthony's call. A cold
   whose ticks go backwards (`cold-rel`): `ML` carries the increase,
   `adequacy` assumes it, or the denotation clamps a late frame to now. A
-  `connect` source that spins (`connect-rel`): the denotation cuts the run
-  at a spin anywhere, or `adequacy` assumes none. The relation below is
-  stated for the programs every repair keeps.
+  `connect` source the body outlives (`connect-rel`), spinning or running
+  forever: the denotation keeps its events as skips, or `adequacy` assumes
+  none. The relation below is stated for the programs every repair keeps.
 - **THE RELATION.** `Rel` and `RelSubj` as definitions over the ghost
   positions the pure run keeps. `make ghosts` finds every observer a run makes
   — each operator's, each join to a subject — delivered a prefix of what its
@@ -194,8 +194,8 @@ must be solid before Tier 2 is written over it.
 
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
-- **`connect-rel`** (Adequacy) — FALSITY, `REFUTED`: the allocated subject
-  against the hot handle; false for a source that spins.
+- **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject
+  against the hot handle; false for a source that spins or runs forever.
 - **`cold-rel`** (Adequacy) — FALSITY, `REFUTED`: false for a timeline whose
   ticks go backwards; the repair restates `adequacy`, Anthony's call.
 - **`{empty,of,map,scan,takeWhile,flatMap,connected,defer,bot}-rel`**
