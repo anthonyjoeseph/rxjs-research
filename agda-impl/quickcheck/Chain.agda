@@ -8,7 +8,7 @@
 -- stop changing.
 module quickcheck.Chain where
 
-open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
+open import Data.Bool using (Bool; true; false; _∧_; not)
 open import Data.List using (List; []; _∷_; filterᵇ; upTo; length) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_; _⊓_)
@@ -16,7 +16,6 @@ open import Data.Nat.ListAction using (sum)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; observe; root)
 open import denotation.Denote using (⟦_⟧[_])
-open import operation.PureObservable using (toMarks)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Oracle using (depth)
 open import quickcheck.Quickcheck using (program)
@@ -67,11 +66,50 @@ chain p = every (λ n → below 1000 (at n) (at (suc n)) ∧ agrees n (at n) (at
     at : ℕ → Events ℕ
     at n = observe (⟦ toObs timeline 3 p [] [] [] ⟧[ n ] []) root
 
--- THE GHOST POSITIONS, TESTED.  Where the pure run makes each entry of
--- its record is where the denotation puts that event at the root: the
--- kernels place what they deliver as `denotation.MonotonicList` does.
--- Each side may be cut short of the other.
+-- THE RECORD, PLACED, TESTED: `Adequacy.places` decided.  Each value of
+-- the pure run's record sits at its own `out` of what the denotation shows
+-- the root, at the mark the run made it at, on that mark's tick, past
+-- `skip`s only; the run ends as the events do — its completion at their
+-- `end`, a queue run dry over `hush`, a cut anywhere.  On budgets small
+-- enough to cut, and the one the oracle runs.  And the events rise, as
+-- `ticks-up` needs.  Skips past the
+-- fuel read as a pass: only a `hush` they never reach could refute it.
 private
+  open import operation.PureObservable using (module Pure)
+  open import operation.AbstractObservable using (module Run)
+  open import operation.PureObservable using (Pureᴾ; same)
+  open import Data.Product using (_×_; _,_)
+  open import Data.Unit using (⊤)
+  open import denotation.MonotonicList using (tick; ix)
+  open Pure ℕ using (End; finished; dry; cutOff; Res; State; endOf; Pureᴿ; runᴺ; loopᴺ; recorder; start; compileᴺ)
+  open Run (Pureᴾ ℕ) using (module Engine)
+
+  placedᵇ : ℕ → End → List Pos → List (ℕ × ℕ) → Events ℕ → Bool
+  placedᵇ zero    _          _        _               _           = true
+  placedᵇ (suc k) (cutOff _) []       []              _           = true
+  placedᵇ (suc k) en         qs       xs              (skip _ r)  = placedᵇ k en qs xs (Events∞.force r)
+  placedᵇ (suc k) en         (q ∷ qs) ((t , a) ∷ xs) (out p b r) =
+    samePos q p ∧ (t ≡ᵇ tick p) ∧ (a ≡ᵇ b) ∧ placedᵇ k en qs xs (Events∞.force r)
+  placedᵇ (suc k) finished   (q ∷ []) []              (end p)     = samePos q p
+  placedᵇ (suc k) dry        []       []              hush        = true
+  placedᵇ (suc k) _          _        _               _           = false
+
+  ran : ℕ → Prog natᵗ → Res [] ⊤
+  ran m p = Engine.drive (Pureᴿ m) (runᴺ m m) (loopᴺ m m) (compileᴺ (depth 3 p) (toObs timeline 3 p [] [] []) []) recorder same start
+
+  -- `ticks-up`'s ground: each event at a position past the last, headed
+  -- by its tick, so ticks never fall.
+  headed : Pos → Bool
+  headed (ix _ ∷ _) = true
+  headed _          = false
+
+  rising : ℕ → Pos → Events ℕ → Bool
+  rising zero    _ _           = true
+  rising (suc k) q (out p _ r) = headed p ∧ (q <ᵖ p) ∧ rising k p (Events∞.force r)
+  rising (suc k) q (skip p r)  = headed p ∧ (q <ᵖ p) ∧ rising k p (Events∞.force r)
+  rising (suc k) q (end p)     = headed p ∧ (q <ᵖ p)
+  rising (suc k) q hush        = true
+
   shown : ℕ → Events ℕ → List Pos
   shown zero    _           = []
   shown (suc k) (out p _ r) = p ∷ shown k (Events∞.force r)
@@ -79,17 +117,15 @@ private
   shown (suc k) (end p)     = p ∷ []
   shown (suc k) hush        = []
 
-  prefixᵖ : List Pos → List Pos → Bool
-  prefixᵖ []       _        = true
-  prefixᵖ (p ∷ ps) []       = false
-  prefixᵖ (p ∷ ps) (q ∷ qs) = samePos p q ∧ prefixᵖ ps qs
-
 places : Prog natᵗ → Bool
-places p = prefixᵖ marks denoted ∨ prefixᵖ denoted marks
+places p = rising 4000 [] (observe (⟦ toObs timeline 3 p [] [] [] ⟧[ depth 3 p ] []) root)
+          ∧ every at (1 ∷ 2 ∷ 3 ∷ 5 ∷ 8 ∷ 13 ∷ 500 + depth 3 p ∷ [])
   where
-    marks denoted : List Pos
-    marks   = toMarks (500 + depth 3 p) (toObs timeline 3 p [] [] [])
-    denoted = shown 2000 (observe (⟦ toObs timeline 3 p [] [] [] ⟧[ depth 3 p ] []) root)
+    at : ℕ → Bool
+    at m = placedᵇ 4000 (endOf (State.ended st) (Res.value r) (State.clock st)) (State.marks st) (State.log st)
+                   (observe (⟦ toObs timeline 3 p [] [] [] ⟧[ depth 3 p ] []) root)
+      where r  = ran m p
+            st = Res.state r
 
 placeFails : ℕ → ℕ → List ℕ
 placeFails from count = filterᵇ (λ s → not (places (program s))) (mapL (from +_) (upTo count))
@@ -99,7 +135,7 @@ placed : ℕ → ℕ → ℕ
 placed from count = sum (mapL (λ s → compared (program s)) (mapL (from +_) (upTo count)))
   where
     compared : Prog natᵗ → ℕ
-    compared p = length (toMarks (500 + depth 3 p) (toObs timeline 3 p [] [] [])) ⊓ length (shown 2000 (observe (⟦ toObs timeline 3 p [] [] [] ⟧[ depth 3 p ] []) root))
+    compared p = length (State.marks (Res.state (ran (500 + depth 3 p) p))) ⊓ length (shown 2000 (observe (⟦ toObs timeline 3 p [] [] [] ⟧[ depth 3 p ] []) root))
 
 -- The seeds from `from`, `count` of them, whose approximants are no chain.
 chainFails : ℕ → ℕ → List ℕ

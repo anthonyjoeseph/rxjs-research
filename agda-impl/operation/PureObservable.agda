@@ -397,9 +397,3 @@ module Pure (R : Set) where
 toArray : ℕ → ∀ {A} → PureObs [] A → ML A
 toArray n {A} o = Pure.runPure A n (Pure.compileᴺ A n o [])
 
--- Where each entry of approximant n's record was made: the ghost
--- positions, which `quickcheck.Chain` holds to the denotation's.
-toMarks : ℕ → ∀ {A} → PureObs [] A → List Pos
-toMarks n {A} o = State.marks (Res.state (Engine.drive (Pureᴿ n) (runᴺ n n) (loopᴺ n n) (compileᴺ n o []) recorder same start))
-  where open Pure A
-        open Run (Pureᴾ A)

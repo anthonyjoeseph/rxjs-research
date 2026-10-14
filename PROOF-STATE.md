@@ -167,11 +167,14 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE BOUND HALF'S RELATION.** `Below` and `BelowSubj` as definitions:
-  an invariant over the pure state — each live observer's deliveries placed
-  against what its subtree shows where it subscribed, as `make ghosts`
-  measures — kept by every loop turn. Decides whether the dry clause, which
-  needs the at-least half, lets `Below` stand apart from `Rel` or merges them.
+- **THE BOUND HALF'S RELATION.** `Below` and `BelowSubj` as definitions.
+  Not a one-sided bound: `Placed` allows no gap and needs the dry clause,
+  and a `switch` cuts a lane whose timers are already set, so what a timer
+  will deliver is a fact about the future. The invariant relates the whole
+  configuration to the denotation's REMAINDER: each kernel's heap state
+  realizes its denotation's state (`go`'s lanes and queue, `scanᴱ`'s
+  accumulator, `rejoin`'s index, a cold's `frames`), and the timer queue's
+  order is the sorted merge's. Decides whether that is stateable per kernel.
 - **THE BOUND HALF, ONE OPERATOR AT A TIME.** The `*-below` leaves,
   `connect-below` first: the one whose state the kernels share; then
   `run-below`, `Below` read off as `Recorded`.
