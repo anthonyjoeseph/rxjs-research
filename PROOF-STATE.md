@@ -168,14 +168,15 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE FOCUS.** `catch-up`: the firing cold's step lifts to the root from
-  the witness alone (`clear`). Ruled out: a sibling stepping first, and a
-  refreshed witness as the target — a copy embeds held sources the meaning
-  steps, so `Settles` is the moved witness up to held sources and copies,
-  carrying `Caught` and `Gated`. Left: the merge — every lane and both
-  sides of a connect catching up under `q`, each finished one's next event
-  `Beyond q` (the cold's own by `rooted`), so the earliest is always one
-  still catching up. Decides whether `caught` pins a copy's every step.
+- **THE FOCUS.** `settle-at`: the firing cold's step lifts to the root from
+  the witness alone (`clear`), and `catch-up` reads the rest off one
+  `Settle` chain under `q`, the cold's own next event past it
+  (`cold-next`). Ruled out: a sibling stepping first, and a refreshed
+  witness as the target. Left: the merge — every lane and both sides of a
+  connect settling under `q`, each settled one's next event `Beyond q`, so
+  the earliest is always one still settling; off the cold's path a body's
+  copies lag their sources. Decides whether `caught` pins a copy's every
+  step.
 - **THE PHASE MOVED.** `pop-live`, `reheld-stall`, `reheld-quiet`,
   `reheld-later`: a cold's phase moved by `stepAt`, its joiners `settled`,
   keeps every conjunct but `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a
@@ -213,8 +214,8 @@ contact; it must be solid before Tier 2 is written over it.
   on each side before a calm point.
 - **`done-seg`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing on its
   end, the completion delivered.
-- **`catch-up`** (Simulation) — FALSITY, `NO EVIDENCE`: the joiners' copies
-  take the same step, silently.
+- **`settle-at`** (CatchUp) — FALSITY, `NO EVIDENCE`: the moved witness settles
+  under the cold's step, every copy caught up.
 - **`reheld-stall`** (Simulation) — FALSITY, `NO EVIDENCE`: a stalled cold's
   witness still holds.
 - **`reheld-quiet`** (Simulation) — FALSITY, `NO EVIDENCE`: a cold closed

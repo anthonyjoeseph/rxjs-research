@@ -329,6 +329,16 @@ private
 <ᵖ-ix-sub []      n x = refl
 <ᵖ-ix-sub (a ∷ p) n x rewrite refl-label a = <ᵖ-ix-sub p n x
 
+-- A burst's step comes before everything under its later steps, its
+-- close, and every later tick.
+<ᵖ-ix-lt : ∀ p m n Y Z → m < n → ((p ++ [ ix m ]) ++ Y) <ᵖ (p ++ ix n ∷ Z) ≡ true
+<ᵖ-ix-lt []      m n Y Z l rewrite ℕ-lt {m} {n} l = refl
+<ᵖ-ix-lt (a ∷ p) m n Y Z l rewrite refl-label a = <ᵖ-ix-lt p m n Y Z l
+
+<ᵖ-ix-last : ∀ p n Y Z → ((p ++ [ ix n ]) ++ Y) <ᵖ (p ++ last ∷ Z) ≡ true
+<ᵖ-ix-last []      n Y Z = refl
+<ᵖ-ix-last (a ∷ p) n Y Z rewrite refl-label a = <ᵖ-ix-last p n Y Z
+
 -- Cascades never nest: one past a point under the burst at a non-empty
 -- `x ∷ r` is past every step of that burst.
 <ᵖ-cascade : ∀ x r d i Y a e → (x ∷ r ++ d) <ᵖ (ix a ∷ sub e ∷ []) ≡ true → (x ∷ r ++ ix i ∷ Y) <ᵖ (ix a ∷ sub e ∷ []) ≡ true

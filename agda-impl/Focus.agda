@@ -61,6 +61,12 @@ Beside q (just x) = Leads q (U.step x)
 Beyond : Pos → Pos → Set
 Beyond F k = ∀ Y → (F ++ Y) <ᵖ k ≡ true
 
+-- A burst's next step is its next index.
+burst-head : ∀ {A t} τ r i (b : Frame A t) → U.headˢ (U.burstˢ τ r i b) ≡ just (r ++ [ ix i ])
+burst-head τ r i (emit _ _) = refl
+burst-head τ r i (stall _)  = refl
+burst-head τ r i (close _)  = refl
+
 private
   if-ok : ∀ {a p} {X : Set a} (P : X → Set p) b {x y : X} → P x → P y → P (if b then x else y)
   if-ok P true  px _  = px
@@ -142,10 +148,6 @@ private
             → U.aheadˢ b sb s Q s₁ (U.beforeˢ Q sb) ≡ U.skipˢ Q (U.connectᶜ b s₁)
   ahead-src b sb s Q s₁ h = cong (U.aheadˢ b sb s Q s₁) (before-after Q sb h)
 
-  burst-head : ∀ {A t} τ r i (b : Frame A t) → U.headˢ (U.burstˢ τ r i b) ≡ just (r ++ [ ix i ])
-  burst-head τ r i (emit _ _) = refl
-  burst-head τ r i (stall _)  = refl
-  burst-head τ r i (close _)  = refl
 
 -- Where a configuration's next events lie: `Ok`, for a run at `pos`.  A
 -- source a joiner copies steps past the run, its copy where `Ok` holds.
@@ -672,24 +674,17 @@ module Focusing (R : Set) where
                  (far-lanes (lane c k t ∷ []) (cong (_++ []) z) (d , g , up tt) (ct , up tt) fn
                             (++⁺ (++⁻ˡ (pendings t) pt) []) (++⁺ (++⁻ˡ (joiners t E) pj) []))
 
-  -- At a burst boundary every other node's next event comes after the
-  -- firing cold's step: another cold's is a queued timer's, past the
-  -- run's position (`Ordered`, `Timed`) and so past every step of the
-  -- frame (cascades never nest, `rooted`); a joiner's copy is its
-  -- source's (`caught`), shown below that source's step since it joined
-  -- at or before the run (`past`).
-  clear : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-        → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
-        → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
-        → On.Clear (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) [] [] q
-  clear {r = []} H lv eq with head (Holding.rooted H)
+  -- The run short of the cold's step at `q`, and every queued cascade
+  -- past every step under it: the queue is past the run (`Ordered`,
+  -- `Timed`), and cascades never nest (`rooted`).
+  ahead : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+        → (H : Holding (firing s hd τ r i b ∷ []) c st) → ∀ {q n} → U.burstˢ τ r i b ≡ U.skipˢ q n
+        → State.pos st <ᵖ q ≡ true
+        × All (λ tm → At.spentʰ (State.heap st) (Timer.handle tm) ≡ false → Beyond q (cascade tm)) (pendings (Holding.tree H))
+  ahead {r = []} H eq with head (Holding.rooted H)
   ... | _ , ()
-  clear {st = st} {τ = τ} {r = x ∷ r′} {i} {b} H lv {q} {ph} eq with head (Holding.behind H)
-  ... | (d , pd) , lt =
-    On.Clearing.clear-at (State.heap st) (State.pos st) q pF (Holding.tree H) (Holding.firing≡ H) {[]} {[]} {[]} {ph} lv
-                         (Holding.gated H) (Holding.caught H) tt
-                         (mapᴬ (λ {tm} h lv′ → beyond tm (proj₂ (lookup (proj₂ (Holding.ordered H)) (h lv′)))) (proj₂ (Holding.timed H)))
-                         (Holding.past H) (trans (spot-step (Holding.tree H) (Holding.firing≡ H)) eq)
+  ahead {st = st} {τ = τ} {r = x ∷ r′} {i} {b} H {q} eq with head (Holding.behind H)
+  ... | (d , pd) , lt = pF , mapᴬ (λ {tm} h lv′ → beyond tm (proj₂ (lookup (proj₂ (Holding.ordered H)) (h lv′)))) (proj₂ (Holding.timed H))
     where qe : (x ∷ r′) ++ [ ix i ] ≡ q
           qe = just-injective (trans (sym (burst-head τ (x ∷ r′) i b)) (cong U.headˢ eq))
           pF : State.pos st <ᵖ q ≡ true
@@ -699,3 +694,16 @@ module Focusing (R : Set) where
             subst (λ z → (z ++ Y) <ᵖ cascade tm ≡ true) qe
               (subst (λ z → z <ᵖ cascade tm ≡ true) (sym (++-assoc (x ∷ r′) [ ix i ] Y))
                 (<ᵖ-cascade x r′ d i Y (Timer.due tm) (Timer.from tm) (subst (λ z → z <ᵖ cascade tm ≡ true) pd pc)))
+
+  -- At a burst boundary every other node's next event comes after the
+  -- firing cold's step: another cold's is a queued timer's (`ahead`); a
+  -- joiner's copy is its source's (`caught`), shown below that source's
+  -- step since it joined at or before the run (`past`).
+  clear : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+        → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
+        → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
+        → On.Clear (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) [] [] q
+  clear {st = st} H lv {q} {ph} eq with ahead H eq
+  ... | pF , pend =
+    On.Clearing.clear-at (State.heap st) (State.pos st) q pF (Holding.tree H) (Holding.firing≡ H) {[]} {[]} {[]} {ph} lv
+                         (Holding.gated H) (Holding.caught H) tt pend (Holding.past H) (trans (spot-step (Holding.tree H) (Holding.firing≡ H)) eq)
