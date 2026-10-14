@@ -44,7 +44,7 @@ open import Data.List.Relation.Unary.AllPairs.Properties using (map⁻)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (Time; Pos; Burst; Timeline; last; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-ix; <ᵖ-irrefl; hush) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Time; Pos; Frame; Timeline; last; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-ix; <ᵖ-irrefl; hush) renaming (sub to subᴾ)
 open import operation.AbstractObservable using (base; sink; module Run)
 open import operation.PureObservable using (Pureᴾ; World; Kind; cell; slot; play; _∋_; Sink; Handle; same; note; fin; module Pure)
 open import operation.Budget using (module Approx)
@@ -124,8 +124,8 @@ module Realizing (R : Set) (n : ℕ) where
   -- it.
   data Phase (A : Set) : Set where
     idle   : Phase A
-    frame  : Time → Pos → Time → Burst A → Phase A
-    firing : Time → Pos → ℕ → Burst A → Phase A
+    frame  : Time → Pos → (t : Time) → Frame A t → Phase A
+    firing : ∀ {t} → Time → Pos → ℕ → Frame A t → Phase A
 
   -- A lane: its kill switch, the unsubscribe `attach` registered, and
   -- the subscription.
@@ -513,7 +513,7 @@ module Realizing (R : Set) (n : ℕ) where
 
   -- MID-FRAME: one cold, picked out, at step `i` of the frame at `r` on
   -- the timeline subscribed at `τ`; every other cold between frames.
-  record Playing {h} (c : Node [] R) (st : State h) {B} (s : Sink h B) (hd : Handle h) (τ : Time) (r : Pos) (i : ℕ) (b : Burst B) : Set₁ where
+  record Playing {h} (c : Node [] R) (st : State h) {B} (s : Sink h B) (hd : Handle h) (τ : Time) (r : Pos) (i : ℕ) {u : Time} (b : Frame B u) : Set₁ where
     constructor playing
     field
       before  : Sub h [] R
@@ -523,9 +523,9 @@ module Realizing (R : Set) (n : ℕ) where
       tree≡   : Holding.tree holding ≡ setAt spot (firing τ r i b)
 
   -- The firing cold's slot holds the observer above it.
-  playing-slot : ∀ {h c} {st : State h} {B} {s : Sink h B} {hd τ r i b} (pl : Playing c st s hd τ r i b)
+  playing-slot : ∀ {h c} {st : State h} {B} {s : Sink h B} {hd τ r i u} {b : Frame B u} (pl : Playing c st s hd τ r i b)
                → At.slotIs (State.heap st) s (cbOf (obsAt (Playing.spot pl) [] rootObs))
-  playing-slot {st = st} {τ = τ} {r} {i} {b} pl =
+  playing-slot {st = st} {τ = τ} {r} {i} {b = b} pl =
     At.holds-spot (State.heap st) (Playing.spot pl) (firing τ r i b)
       (subst (λ t → At.Holds (State.heap st) t [] rootObs) (Playing.tree≡ pl) (Holding.holds (Playing.holding pl)))
 
@@ -560,7 +560,7 @@ module Realizing (R : Set) (n : ℕ) where
       ; ordered = ordered-at (StRel.clock≡ q) (StRel.pos≡ q) (StRel.timers≡ q) (Holding.ordered z)
       ; fresh   = Holding.fresh z }
 
-    playing-rel : ∀ {c B} {sk : Sink h B} {hd τ r i b} → Playing c s′ sk hd τ r i b → Playing c s sk hd τ r i b
+    playing-rel : ∀ {c B} {sk : Sink h B} {hd τ r i u} {b : Frame B u} → Playing c s′ sk hd τ r i b → Playing c s sk hd τ r i b
     playing-rel (playing before calm spot z t≡) = playing before calm spot (holding-rel z) t≡
 
   ------------------------------------------------------------------------

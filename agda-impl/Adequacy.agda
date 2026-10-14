@@ -23,7 +23,6 @@
 module Adequacy where
 
 open import Data.List using (List; _∷_; [])
-open import Data.Product using (_,_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Nat using (ℕ; zero; suc; _⊔_)
@@ -32,7 +31,7 @@ open import Level using (lower)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import operation.Placed using (Up; module Ran)
-open import Bound using (Rises; ahead; Rising; module Places)
+open import Bound using (module Places)
 open import operation.AbstractObservable using (module Run)
 open import operation.Budget using (module Approx)
 open import operation.PureObservable using (Pureᴾ; PureObs; module Pure; toArray) renaming (_⊑_ to _≤ʷ_)
@@ -57,18 +56,8 @@ module Link (R : Set) where
   open Places R using (places)
 
   postulate
-    -- THE EDGE where `adequacy` meets a cold whose ticks fall.  `ML` says
-    -- its ticks increase and does not carry it, so this is false: the
-    -- denotation places a frame at its own tick, ahead of a sibling's
-    -- frame at the tick already reached; the engine sets its timer for
-    -- now, behind every timer already due.  Whether `ML` carries it,
-    -- `adequacy` assumes it, or the denotation clamps a late frame to now
-    -- is Anthony's call.
-    -- REFUTED: `git show 26f0a574` derives `⊥` from `rising`.
-    rising : ∀ n (o : PureObs [] R) → Rising n o
-
-    -- An approximant's ticks never fall, its colds' rising.
-    ticks-up : ∀ n (o : PureObs [] R) → Rising n o → Up 0 (observe (⟦ o ⟧[ n ] []) root)
+    -- An approximant's ticks never fall.
+    ticks-up : ∀ n (o : PureObs [] R) → Up 0 (observe (⟦ o ⟧[ n ] []) root)
 
     -- "Subscribing with `s` at any position p, in any heap, shows at least
     -- what `d` shows a subscriber arriving at p, ticks for ticks, on an
@@ -101,8 +90,7 @@ module Link (R : Set) where
                   → (∀ a → Rel (f a) (g a)) → Rel s d → Rel (flatMapᴷ op f s) (flatMapᴰ (flatOp op) g d)
     connected-rel : ∀ {Γ A w} {ρ : Env Γ w} {δ} (i : A ∈ Γ) → RelEnv ρ δ
                   → Rel (joinᴷ (lookup ρ i)) (lookup δ i)
-    -- Only for a timeline that rises: one that falls is `rising`'s edge.
-    cold-rel      : ∀ {A w} (c : Timeline A) → Rises 0 (ahead (lower c)) → Rel {w = w} (via (startCold c)) (coldᴰ (lower c))
+    cold-rel      : ∀ {A w} (c : Timeline A) → Rel {w = w} (via (startCold c)) (coldᴰ (lower c))
     -- The subject `connectᴷ` allocates, fed by the source after the body
     -- has subscribed, agrees with the hot handle `connectᴰ` passes; then
     -- the body runs under both.
@@ -153,27 +141,27 @@ module Link (R : Set) where
   mutual
     -- THE FUNDAMENTAL LEMMA.  Approximant n against approximant n, by the
     -- recursion both share: lexicographic on (n , tree), so inductive.
-    fundamental : ∀ n {Γ A w} (o : PureObs Γ A) → Rising n o → {ρ : Env Γ w} {δ : DenEnv Γ}
+    fundamental : ∀ n {Γ A w} (o : PureObs Γ A) → {ρ : Env Γ w} {δ : DenEnv Γ}
                 → RelEnv ρ δ → Rel (compileᴺ n o ρ) (⟦ o ⟧[ n ] δ)
-    fundamental n       (cold c)          u        e = cold-rel c u
-    fundamental n       empty             u        e = empty-rel
-    fundamental n       (of xs)           u        e = of-rel xs
-    fundamental n       (map f s)         u        e = map-rel f (fundamental n s u e)
-    fundamental n       (scan f z s)      u        e = scan-rel f z (fundamental n s u e)
-    fundamental n       (takeWhile i p s) u        e = takeWhile-rel i p (fundamental n s u e)
-    fundamental n       (flatMap op f s)  (v , u)  e = flatMap-rel op (λ a → fundamental n (f a) (v a) e) (fundamental n s u e)
-    fundamental n       (connect s b)     (u , v)  e = connect-rel (fundamental n s u e) (λ σ r → fundamental n b v (r ∷ wkRelEnv σ e))
-    fundamental n       (connected i)     u        e = connected-rel i e
-    fundamental zero    (defer l)         u        e = bot-rel
-    fundamental (suc n) (defer l)         u        e = defer-rel (fundamental n (Later.force l) u e)
+    fundamental n       (cold c)          e = cold-rel c
+    fundamental n       empty             e = empty-rel
+    fundamental n       (of xs)           e = of-rel xs
+    fundamental n       (map f s)         e = map-rel f (fundamental n s e)
+    fundamental n       (scan f z s)      e = scan-rel f z (fundamental n s e)
+    fundamental n       (takeWhile i p s) e = takeWhile-rel i p (fundamental n s e)
+    fundamental n       (flatMap op f s)  e = flatMap-rel op (λ a → fundamental n (f a) e) (fundamental n s e)
+    fundamental n       (connect s b)     e = connect-rel (fundamental n s e) (λ σ r → fundamental n b (r ∷ wkRelEnv σ e))
+    fundamental n       (connected i)     e = connected-rel i e
+    fundamental zero    (defer l)         e = bot-rel
+    fundamental (suc n) (defer l)         e = defer-rel (fundamental n (Later.force l) e)
 
   -- Each approximant of the denotation is below the run.
   sound : (o : PureObs [] R) (n : ℕ) → approxAt o n ⊑ run o
-  sound o n = ⊑-trans (run-rel (fundamental n o (rising n o) [])) (diagonal n o)
+  sound o n = ⊑-trans (run-rel (fundamental n o [])) (diagonal n o)
 
   -- Each approximant of the run is below the denotation's.
   complete : (o : PureObs [] R) (n : ℕ) → toArray n o ⊑ approxAt o n
-  complete o n = recorded-⊑ (ran n (compileᴺ n o [])) (ticks-up n o (rising n o)) (places n o (rising n o) n)
+  complete o n = recorded-⊑ (ran n (compileᴺ n o [])) (ticks-up n o) (places n o n)
 
 adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)
 adequacy {A} o = ≃-trans (squeeze (toArray-chain o) (approx-chain o) (sound o) (complete o)) (⟦⟧-limit o)

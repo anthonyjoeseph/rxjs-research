@@ -31,7 +31,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (MonotonicList; hot; Timeline; Time; Pos; Burst; Events; Events∞; out; skip; end; hush; burst;
+open import denotation.MonotonicList using (MonotonicList; hot; Timeline; Time; Pos; Frame; Events; Events∞; out; skip; end; hush; burst;
   rejoin; mapᴱ; scanᴱ; takeWhileᴱ; go; none; earliest)
 open import denotation.Denote using (approx; flatOp)
 
@@ -75,7 +75,7 @@ module Nodes (n : ℕ) where
     data Node : List Set → Set → Set₁ where
       -- A cold inside a frame, or about to start one: its burst at step
       -- `i` of the frame at `r`, on a timeline subscribed at tick `τ`.
-      coldᶜ      : ∀ {Δ A} → Time → Pos → ℕ → Burst A → Node Δ A
+      coldᶜ      : ∀ {Δ A t} → Time → Pos → ℕ → Frame A t → Node Δ A
       -- Nothing more, ever: a cold gone quiet.
       quietᶜ     : ∀ {Δ A} → Node Δ A
       mapᶜ       : ∀ {Δ A B} → (A → B) → Node Δ A → Node Δ B

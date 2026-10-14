@@ -24,7 +24,7 @@ open import Data.List.Relation.Unary.All using (All; []; lookup) renaming (_∷_
 open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Timeline; ML; Burst∞; ML∞; Time; at; emit; stall; close; done; quiet; Pos; ix; last) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Timeline; ML; From; Frame; Frame∞; From∞; Time; at; emit; stall; close; done; quiet; Pos; ix; last) renaming (sub to subᴾ)
 open import denotation.Order using (Shows; ShowsIn; nil; at⁺; emit⁺; stall⁺; close⁺; _⊑_)
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import operation.AbstractObservable using (base; module Prims; module Run)
@@ -528,27 +528,27 @@ module Approx (R : Set) where
     finish-grow : ∀ {w A} (s : Sink w A) → Grower (finishᴾ s)
     finish-grow s = runCb-grow s Callbacks.onComplete
 
-    schedule-grow : ∀ {w A} (s : Sink w A) (hd : Handle w) now e m → Grower (schedule s hd now e m)
+    schedule-grow : ∀ {w A u} (s : Sink w A) (hd : Handle w) now e (m : From A u) → Grower (schedule s hd now e m)
     schedule-grow s hd now e done     = unless-grow hd (bind-grow (spend-grow hd) λ _ → bind-grow (goto-grow e) λ _ → finish-grow s)
     schedule-grow s hd now e quiet    = ret-grow tt
-    schedule-grow s hd now e (at t b) = grows λ σ st → growsAt-refl _ _ _
+    schedule-grow s hd now e (at t _ b) = grows λ σ st → growsAt-refl _ _ _
 
     mutual
-      burst-grow : ∀ f {w A} (s : Sink w A) (hd : Handle w) t r i b → Grower (burst f s hd t r i b)
+      burst-grow : ∀ f {w A u} (s : Sink w A) (hd : Handle w) t r i (b : Frame A u) → Grower (burst f s hd t r i b)
       burst-grow zero    s hd t r i b = grows λ σ st → growsAt-refl _ _ _
       burst-grow (suc f) s hd t r i b = bind-grow {f = λ c → if c then ret tt else stepᴾ f s hd t r i b} (closed-grow s hd) λ { true → ret-grow tt ; false → step-grow f s hd t r i b }
 
-      step-grow : ∀ f {w A} (s : Sink w A) (hd : Handle w) t r i b → Grower (stepᴾ f s hd t r i b)
+      step-grow : ∀ f {w A u} (s : Sink w A) (hd : Handle w) t r i (b : Frame A u) → Grower (stepᴾ f s hd t r i b)
       step-grow f s hd t r i (emit a k) = bind-grow (unless-grow hd (bind-grow (goto-grow (r ++ [ ix i ])) λ _ → send-grow s a)) λ _ →
-                                            unless-grow hd (burst-grow f s hd t r (suc i) (Burst∞.force k))
-      step-grow f s hd t r i (stall k)  = burst-grow f s hd t r (suc i) (Burst∞.force k)
-      step-grow f s hd t r i (close k)  = schedule-grow s hd t (r ++ [ last ]) (ML∞.force k)
+                                            unless-grow hd (burst-grow f s hd t r (suc i) (Frame∞.force k))
+      step-grow f s hd t r i (stall k)  = burst-grow f s hd t r (suc i) (Frame∞.force k)
+      step-grow f s hd t r i (close k)  = schedule-grow s hd t (r ++ [ last ]) (From∞.force k)
 
     first-grow : ∀ {w A} (s : Sink w A) (hd : Handle w) m → Grower (first s hd m)
-    first-grow s hd (at zero b)    = here-grow λ r → burst-grow n s hd 0 r 0 b
-    first-grow s hd (at (suc t) b) = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) (at (suc t) b)
-    first-grow s hd done           = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) done
-    first-grow s hd quiet          = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) quiet
+    first-grow s hd (at zero _ b)    = here-grow λ r → burst-grow n s hd 0 r 0 b
+    first-grow s hd (at (suc t) p b) = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) (at (suc t) p b)
+    first-grow s hd m@done         = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) m
+    first-grow s hd m@quiet        = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) m
 
     fire-grow : ∀ {h} ts (st : State h) → Grows st (Res.state (fire ts st))
     fire-grow []        st = growsAt-refl _ _ _
@@ -601,36 +601,36 @@ module Approx (R : Set) where
     finish-sim : ∀ {w A} (s : Sink w A) → Sim (L.finishᴾ s) (L′.finishᴾ s)
     finish-sim s = runCb-sim s λ p → CbRel.onComplete≼ p
 
-    schedule-sim : ∀ {w A} (s : Sink w A) (hd : Handle w) now e m → Sim (L.schedule s hd now e m) (L′.schedule s hd now e m)
+    schedule-sim : ∀ {w A u} (s : Sink w A) (hd : Handle w) now e (m : From A u) → Sim (L.schedule s hd now e m) (L′.schedule s hd now e m)
     schedule-sim s hd now e done     = unless-sim hd (bind-sim (spend-sim hd) (λ _ → bind-sim (goto-sim e) (λ _ → finish-sim s) (λ _ → G.finish-grow s))
                                                                (λ _ → bind-grow (goto-grow e) λ _ → G.finish-grow s))
                                          (bind-grow (spend-grow hd) λ _ → bind-grow (goto-grow e) λ _ → G.finish-grow s)
     schedule-sim s hd now e quiet    = ret-sim tt
-    schedule-sim s hd now e (at t b) = λ σ q → lock (stRel (heap≈ q) (clock≡ q) (cong₂ (λ c ts → insert (record
+    schedule-sim s hd now e (at t _ b) = λ σ q → lock (stRel (heap≈ q) (clock≡ q) (cong₂ (λ c ts → insert (record
       { due = c + (t ∸ now) ; sink = wk∋ σ s ; handle = wk∋ σ hd ; at′ = t ; from = e ; frame = b }) ts) (clock≡ q) (timers≡ q)) (log≡ q) (ended≡ q) (pos≡ q) (marks≡ q))
 
     mutual
-      burst-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A} (s : Sink w A) (hd : Handle w) t r i b → Sim (L.burst f s hd t r i b) (L′.burst f′ s hd t r i b)
+      burst-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A u} (s : Sink w A) (hd : Handle w) t r i (b : Frame A u) → Sim (L.burst f s hd t r i b) (L′.burst f′ s hd t r i b)
       burst-sim {f′ = f′} z≤n s hd t r i b = diverge-sim (G.burst-grow f′ s hd t r i b)
       burst-sim {f′ = suc f′} (s≤s p) s hd t r i b =
         bind-sim {f = λ c → if c then ret tt else L.stepᴾ _ s hd t r i b} {f′ = λ c → if c then ret tt else L′.stepᴾ f′ s hd t r i b}
                  (closed-sim s hd) (λ { true → ret-sim tt ; false → step-sim p s hd t r i b })
                  (λ { true → ret-grow tt ; false → G.step-grow f′ s hd t r i b })
 
-      step-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A} (s : Sink w A) (hd : Handle w) t r i b → Sim (L.stepᴾ f s hd t r i b) (L′.stepᴾ f′ s hd t r i b)
+      step-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A u} (s : Sink w A) (hd : Handle w) t r i (b : Frame A u) → Sim (L.stepᴾ f s hd t r i b) (L′.stepᴾ f′ s hd t r i b)
       step-sim {f′ = f′} p s hd t r i (emit a k) =
         bind-sim (unless-sim hd (bind-sim (goto-sim (r ++ [ ix i ])) (λ _ → send-sim s a) (λ _ → G.send-grow s a))
                                 (bind-grow (goto-grow (r ++ [ ix i ])) λ _ → G.send-grow s a))
-                 (λ _ → unless-sim hd (burst-sim p s hd t r (suc i) (Burst∞.force k)) (G.burst-grow f′ s hd t r (suc i) (Burst∞.force k)))
-                 (λ _ → unless-grow hd (G.burst-grow f′ s hd t r (suc i) (Burst∞.force k)))
-      step-sim p s hd t r i (stall k) = burst-sim p s hd t r (suc i) (Burst∞.force k)
-      step-sim p s hd t r i (close k) = schedule-sim s hd t (r ++ [ last ]) (ML∞.force k)
+                 (λ _ → unless-sim hd (burst-sim p s hd t r (suc i) (Frame∞.force k)) (G.burst-grow f′ s hd t r (suc i) (Frame∞.force k)))
+                 (λ _ → unless-grow hd (G.burst-grow f′ s hd t r (suc i) (Frame∞.force k)))
+      step-sim p s hd t r i (stall k) = burst-sim p s hd t r (suc i) (Frame∞.force k)
+      step-sim p s hd t r i (close k) = schedule-sim s hd t (r ++ [ last ]) (From∞.force k)
 
     first-sim : ∀ {w A} (s : Sink w A) (hd : Handle w) m → Sim (L.first s hd m) (L′.first s hd m)
-    first-sim s hd (at zero b)    = here-sim λ r → burst-sim n≤ s hd 0 r 0 b
-    first-sim s hd (at (suc t) b) = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) (at (suc t) b)
-    first-sim s hd done           = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) done
-    first-sim s hd quiet          = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) quiet
+    first-sim s hd (at zero _ b)    = here-sim λ r → burst-sim n≤ s hd 0 r 0 b
+    first-sim s hd (at (suc t) p b) = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) (at (suc t) p b)
+    first-sim s hd m@done         = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) m
+    first-sim s hd m@quiet        = here-sim λ r → schedule-sim s hd 0 (r ++ [ last ]) m
 
     fire-sim : ∀ {h} ts {s s′ : State h} → StRel s s′ → ResRel (L.fire ts s) (L′.fire ts s′)
     fire-sim []        q = lock q

@@ -119,19 +119,19 @@ private
       more zero    = pure []
       more (suc _) = do x ← roll 4 ; xs ← genValues n ; pure (x ∷ xs)
 
-  -- frame times strictly increase
-  genFrames : ℕ → ℕ → Gen (List (ℕ × List ℕ))
-  genFrames t zero    = pure []
-  genFrames t (suc n) = do
+  -- each frame's gap after the one before
+  genFrames : ℕ → Gen (List (ℕ × List ℕ))
+  genFrames zero    = pure []
+  genFrames (suc n) = do
     k ← roll 2
     xs ← genValues 3
-    fs ← genFrames (t + suc k) n
-    pure ((t + k , xs) ∷ fs)
+    fs ← genFrames n
+    pure ((k , xs) ∷ fs)
 
   genScript : Gen (Script natᵗ)
   genScript = do
     n ← roll 3
-    fs ← genFrames 0 n
+    fs ← genFrames n
     c ← roll 1
     pure (script fs (c ≡ᵇ 0))
 

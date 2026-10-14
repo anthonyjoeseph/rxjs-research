@@ -28,7 +28,7 @@ open import Level using (Lift; lift; lower)
 
 open import Tree using (Obs; Later)
 open import operation.AbstractObservable using (Ty; Prims; module Run)
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last; root) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last; root) renaming (sub to subᴾ)
 
 ------------------------------------------------------------------------
 -- Worlds
@@ -139,7 +139,7 @@ module Pure (R : Set) where
       handle : Handle h
       at′    : Time
       from   : Pos
-      frame  : Burst A
+      frame  : Frame A at′
 
   wkTimer : ∀ {h v} → h ⊑ v → Timer h → Timer v
   wkTimer ρ tm = record { due = Timer.due tm ; sink = wk∋ ρ (Timer.sink tm) ; handle = wk∋ ρ (Timer.handle tm)
@@ -244,32 +244,32 @@ module Pure (R : Set) where
     finishᴾ : ∀ {w A} → Sink w A → M w ⊤
     finishᴾ s = runCb s Callbacks.onComplete
 
-    setTimer : ∀ {w A} → Sink w A → Handle w → ℕ → Time → Pos → Burst A → M w ⊤
+    setTimer : ∀ {w A} → Sink w A → Handle w → ℕ → (t : Time) → Pos → Frame A t → M w ⊤
     setTimer s hd d t e b = modifyState λ σ st → record st { timers = insert (record
       { due = State.clock st + d ; sink = wk∋ σ s ; handle = wk∋ σ hd ; at′ = t ; from = e ; frame = b }) (State.timers st) }
 
     -- The frames after one ending at tick `now` of the cold's timeline,
     -- at position e: the completion there, the next frame's timer set there.
-    schedule : ∀ {w A} → Sink w A → Handle w → Time → Pos → ML A → M w ⊤
-    schedule s hd now e done     = unlessSpent hd (bind (spend hd) λ _ → bind (gotoᴾ e) λ _ → finishᴾ s)
-    schedule s hd now e quiet    = ret tt
-    schedule s hd now e (at t b) = setTimer s hd (t ∸ now) t e b
+    schedule : ∀ {w A u} → Sink w A → Handle w → Time → Pos → From A u → M w ⊤
+    schedule s hd now e done       = unlessSpent hd (bind (spend hd) λ _ → bind (gotoᴾ e) λ _ → finishᴾ s)
+    schedule s hd now e quiet      = ret tt
+    schedule s hd now e (at t _ b) = setTimer s hd (t ∸ now) t e b
 
     -- A closed subscriber or a spent cold stops the playing.  A burst at
     -- r puts its i-th step at r ++ [ ix i ] and ends at r ++ [ last ].
     mutual
-      burst : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Pos → ℕ → Burst A → M w ⊤
+      burst : ∀ {w A u} → ℕ → Sink w A → Handle w → Time → Pos → ℕ → Frame A u → M w ⊤
       burst zero    s hd t r i b = λ σ st → res same st nothing
       burst (suc f) s hd t r i b = bind (closedᴾ s hd) λ c → if c then ret tt else stepᴾ f s hd t r i b
 
-      stepᴾ : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Pos → ℕ → Burst A → M w ⊤
+      stepᴾ : ∀ {w A u} → ℕ → Sink w A → Handle w → Time → Pos → ℕ → Frame A u → M w ⊤
       stepᴾ f s hd t r i (emit a k) = bind (unlessSpent hd (bind (gotoᴾ (r ++ [ ix i ])) λ _ → sendᴾ s a)) λ _ →
-                                        unlessSpent hd (burst f s hd t r (suc i) (Burst∞.force k))
-      stepᴾ f s hd t r i (stall k)  = burst f s hd t r (suc i) (Burst∞.force k)
-      stepᴾ f s hd t r i (close k)  = schedule s hd t (r ++ [ last ]) (ML∞.force k)
+                                        unlessSpent hd (burst f s hd t r (suc i) (Frame∞.force k))
+      stepᴾ f s hd t r i (stall k)  = burst f s hd t r (suc i) (Frame∞.force k)
+      stepᴾ f s hd t r i (close k)  = schedule s hd t (r ++ [ last ]) (From∞.force k)
 
-    first : ∀ {w A} → Sink w A → Handle w → ML A → M w ⊤
-    first s hd (at 0 b) = hereᴾ λ p → burst n s hd 0 p 0 b
+    first : ∀ {w A} → Sink w A → Handle w → From A 0 → M w ⊤
+    first s hd (at 0 _ b) = hereᴾ λ p → burst n s hd 0 p 0 b
     first s hd m        = hereᴾ λ p → schedule s hd 0 (p ++ [ last ]) m
 
     fire : ∀ {h} → List (Timer h) → State h → Res h Bool

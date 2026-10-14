@@ -34,15 +34,15 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; [])
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _+_; _∸_; _≤ᵇ_)
-open import Data.Product using (_×_; _,_)
+open import Data.Nat using (ℕ; suc; _+_; _∸_; _≤ᵇ_)
+open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 open import Level using (Lift; lift; lower; 0ℓ) renaming (suc to lsuc)
 
 open import Tree using (Obs)
 open import operation.AbstractObservable using (Prims; module Run)
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Timeline)
+open import denotation.MonotonicList using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline)
 
 ------------------------------------------------------------------------
 -- Haskell's refs
@@ -280,24 +280,24 @@ fromTimeline {A} c = record
   }
   where
     -- `self` plays the frames after this burst.
-    burst : Emit A → IORef Bool → (Time → ML A → IO ⊤) → Time → Burst A → IO ⊤
+    burst : Emit A → IORef Bool → (∀ t → From A (suc t) → IO ⊤) → ∀ t → Frame A t → IO ⊤
     burst e off self t = fixIO′ λ go b → Emit.closed e >>= λ c → if c then pure tt else step go b
       where
-        step : (Burst A → IO ⊤) → Burst A → IO ⊤
-        step go (emit a k) = Emit.produce e a >> unless off (go (Burst∞.force k))
-        step go (stall k)  = go (Burst∞.force k)
-        step go (close k)  = self t (ML∞.force k)
+        step : (Frame A t → IO ⊤) → Frame A t → IO ⊤
+        step go (emit a k) = Emit.produce e a >> unless off (go (Frame∞.force k))
+        step go (stall k)  = go (Frame∞.force k)
+        step go (close k)  = self t (From∞.force k)
 
-    play : Emit A → IORef Bool → Time → ML A → IO ⊤
-    play e off now m = fixIO′ step (now , m)
+    play : Emit A → IORef Bool → Time → ∀ {u} → From A u → IO ⊤
+    play e off now m = fixIO′ step (now , _ , m)
       where
-        step : (Time × ML A → IO ⊤) → Time × ML A → IO ⊤
-        step self (now , done)   = Emit.complete e
-        step self (now , quiet)  = pure tt
-        step self (now , at t b) = Emit.after e (t ∸ now) (unless off (burst e off (λ t′ m′ → self (t′ , m′)) t b))
+        step : (Time × Σ Time (From A) → IO ⊤) → Time × Σ Time (From A) → IO ⊤
+        step self (now , _ , done)     = Emit.complete e
+        step self (now , _ , quiet)    = pure tt
+        step self (now , _ , at t _ b) = Emit.after e (t ∸ now) (unless off (burst e off (λ t′ m′ → self (t′ , suc t′ , m′)) t b))
 
-    first : Emit A → IORef Bool → ML A → IO ⊤
-    first e off (at 0 b) = burst e off (play e off) 0 b
+    first : Emit A → IORef Bool → From A 0 → IO ⊤
+    first e off (at 0 _ b) = burst e off (λ t′ m′ → play e off t′ m′) 0 b
     first e off m        = play e off 0 m
 
 ------------------------------------------------------------------------

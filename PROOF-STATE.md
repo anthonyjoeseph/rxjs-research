@@ -168,24 +168,23 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE TIMELINE RISES BY CONSTRUCTION.** `ML` indexed by a lower bound on
-  its ticks: `at t′` needs `t ≤ t′`, the burst continues from `suc t′`. A
-  falling cold stops being expressible, so `rising`, `Rising`, `Rises` and
-  their threading go, and `timer-ok` is no longer false. Decides what the
-  index costs every site that builds or reads a timeline: `coldᴰ`, `Order`,
-  `Placed`, the engine's schedule, the generators, the bug-cache literals.
 - **THE DENOTATION, COINDUCTIVE.** `⟦_⟧` guarded by `defer`'s skip instead
   of indexed by depth, so there is no `lub`, no approximant and no
   `approx-chain`, `ticks-up` or `⟦⟧-limit`. Decides whether every operator's
   denotation is productive once guarded, `flatMap`'s merge and `connect`'s
   subject first.
-- **ONE BISIMULATION, NO FUEL.** A small-step engine that produces events,
-  and `adequacy` as one coinductive bisimulation between it and the
-  denotation observed at the root, over the configuration tree. Replaces
-  the per-operator `Rel`, which shared state between siblings contradicts,
-  and `squeeze`; keeps `Config`, `Holding` and the step lemmas. Fuel moves
-  to the test harness; the TS port and the oracle rerun. Decides whether
-  sibling state is carried by one global relation.
+- **THE ENGINE, SMALL-STEP.** The pure engine as a productive machine: an
+  explicit continuation stack, one step per event, a silent step where it
+  does work, so a run is a coinductive event stream with no burst budget,
+  callback depth or loop turns. Fuel moves into the test harness, which
+  reads a finite prefix; QuickCheck, the TS port and the oracle rerun.
+  Decides whether `runᴺ`'s nesting unwinds into a stack the TS can mirror.
+- **ONE BISIMULATION, NO FUEL.** `adequacy` as one coinductive bisimulation
+  between the small-step engine and the denotation observed at the root,
+  over the configuration tree. Replaces the per-operator `Rel`, which
+  shared state between siblings contradicts, and `squeeze`; keeps
+  `Config`, `Holding` and the step lemmas. Decides whether sibling state is
+  carried by one global relation.
 - **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over
   `Mid`, and a send runs alike to its observer's (`send-ok`); what is left
   is each kernel's own run, `send-canon` first: an emit must reach the root
@@ -199,8 +198,6 @@ must be solid before Tier 2 is written over it.
 
 ### The ledger
 
-- **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
-  for a cold that falls; goes when `ML` carries the increase.
 - **`send-canon`, `closed-ok`, `finish-ok`** (Bound) — FALSITY, `RECOVERY`: a
   firing cold's emit to its observer, closed check and completion, run through
   every kernel above it, keep `Mid`.

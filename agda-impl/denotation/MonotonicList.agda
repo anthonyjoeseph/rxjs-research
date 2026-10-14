@@ -31,9 +31,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 Time : Set
 Time = ℕ
 
--- Frames at strictly increasing ticks, each a synchronous burst.  A
--- cold leaf is one of these, with ticks relative to its subscription;
--- a runtime reports one, with ticks absolute.
+-- Frames, each a synchronous burst.  A runtime reports one, with ticks
+-- absolute.
 mutual
   data ML (A : Set) : Set where
     done  : ML A                      -- completed
@@ -53,10 +52,32 @@ mutual
     coinductive
     field force : ML A
 
+-- WHAT A COLD LEAF SAYS: frames at strictly increasing ticks, relative
+-- to its subscription, by construction.  Every frame of `From A t` is at
+-- `t` or later, and the timeline after a frame at `t′` is `From A (suc t′)`.
+mutual
+  data From (A : Set) (t : Time) : Set where
+    done  : From A t
+    quiet : From A t
+    at    : ∀ t′ → t ≤ t′ → Frame A t′ → From A t
+
+  data Frame (A : Set) (t : Time) : Set where
+    emit  : A → Frame∞ A t → Frame A t
+    stall : Frame∞ A t → Frame A t
+    close : From∞ A (suc t) → Frame A t
+
+  record Frame∞ (A : Set) (t : Time) : Set where
+    coinductive
+    field force : Frame A t
+
+  record From∞ (A : Set) (t : Time) : Set where
+    coinductive
+    field force : From A t
+
 -- Lifted only because the leaf slot of a program tree is `Set₁` (the
 -- IO leaf carries an existential).
 Timeline : Set → Set₁
-Timeline A = Lift (lsuc 0ℓ) (ML A)
+Timeline A = Lift (lsuc 0ℓ) (From A 0)
 
 ------------------------------------------------------------------------
 -- Positions
@@ -299,21 +320,21 @@ observe (cold f) p = f p
 -- created: after the burst and all it caused.  A frame at tick 0 is the
 -- subscribe burst, rooted at the subscription itself.
 mutual
-  frames : ∀ {A} → Time → Pos → ML A → Events A
-  frames τ e done     = end e
-  frames τ e quiet    = hush
-  frames τ e (at t b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+  frames : ∀ {A t} → Time → Pos → From A t → Events A
+  frames τ e done       = end e
+  frames τ e quiet      = hush
+  frames τ e (at t _ b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
 
-  burst : ∀ {A} → Time → Pos → ℕ → Burst A → Events A
-  burst τ r i (emit a k) = out (r ++ [ ix i ]) a (λ where .force → burst τ r (suc i) (Burst∞.force k))
-  burst τ r i (stall k)  = skip (r ++ [ ix i ]) (λ where .force → burst τ r (suc i) (Burst∞.force k))
-  burst τ r i (close k)  = skip (r ++ [ ix i ]) (λ where .force → frames τ (r ++ [ last ]) (ML∞.force k))
+  burst : ∀ {A t} → Time → Pos → ℕ → Frame A t → Events A
+  burst τ r i (emit a k) = out (r ++ [ ix i ]) a (λ where .force → burst τ r (suc i) (Frame∞.force k))
+  burst τ r i (stall k)  = skip (r ++ [ ix i ]) (λ where .force → burst τ r (suc i) (Frame∞.force k))
+  burst τ r i (close k)  = skip (r ++ [ ix i ]) (λ where .force → frames τ (r ++ [ last ]) (From∞.force k))
 
-start : ∀ {A} → Pos → ML A → Events A
-start p (at zero b) = burst (tick p) p 0 b
-start p m           = frames (tick p) (p ++ [ last ]) m
+start : ∀ {A} → Pos → From A 0 → Events A
+start p (at zero _ b) = burst (tick p) p 0 b
+start p m             = frames (tick p) (p ++ [ last ]) m
 
-coldᴰ : ∀ {A} → ML A → MonotonicList A
+coldᴰ : ∀ {A} → From A 0 → MonotonicList A
 coldᴰ m = cold λ p → start p m
 
 ------------------------------------------------------------------------
