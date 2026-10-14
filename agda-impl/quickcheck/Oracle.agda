@@ -29,6 +29,7 @@ open import IO.Primitive.Finite using (putStrLn)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; observe; ticks; root)
 open import denotation.Unfold using (⟦_⟧)
 open import operation.PureObservable using (toArray)
+open import operation.Machine using (module Machine)
 open import operation.Observable using (subscribe; fromTimeline; newIORef; readIORef; writeIORef)
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
 open import quickcheck.Code using (Code; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog; toObs; timeline)
@@ -102,6 +103,11 @@ pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 -- The engine's approximant is taken past both the tree's depth and the
 -- trace's budget, so neither cut is the engine's.
 pureTrace u n p = traceML n (toArray (n + depth u p) (toObs timeline u p [] [] []))
+
+-- The machine read for many more steps than the trace's budget: each
+-- value or stall of a frame is several steps of work.
+machineTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
+machineTrace {t} u n p = traceML n (Machine.prefix ⟦ t ⟧ᵀ (200 * n) (toObs timeline u p [] [] []))
 
 ------------------------------------------------------------------------
 -- JSON

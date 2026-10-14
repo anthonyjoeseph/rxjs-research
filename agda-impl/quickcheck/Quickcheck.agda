@@ -19,7 +19,7 @@ open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import quickcheck.Ty using (boolᵗ; natᵗ; ⟦_⟧ᵀ; eqᵀ)
 open import quickcheck.Tm using (Tm; var; nat; plus; less)
 open import quickcheck.Code using (Script; script; Code; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog)
-open import quickcheck.Oracle using (Event; _▸_; tick; val; End; completed; silent; cut; Trace; denoteTrace; pureTrace)
+open import quickcheck.Oracle using (Event; _▸_; tick; val; End; completed; silent; cut; Trace; denoteTrace; pureTrace; machineTrace)
 
 ------------------------------------------------------------------------
 -- The property
@@ -191,3 +191,8 @@ program seed with gen 4 [] [] [] [] seed
 -- The seeds below k on which the two semantics disagree.
 quickcheck : ℕ → List ℕ
 quickcheck k = filterᵇ (λ seed → not (prop (program seed))) (upTo k)
+
+-- The small-step machine against the denotation, on the seeds from f.
+machineFails : ℕ → ℕ → List ℕ
+machineFails f c = filterᵇ (λ seed → not (agrees natᵗ (denoteTrace 3 500 (program seed)) (machineTrace 3 500 (program seed))))
+                           (Data.List.map (f +_) (upTo c))

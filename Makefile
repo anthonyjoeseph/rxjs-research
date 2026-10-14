@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain places gets ghosts bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain places gets ghosts machine bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
@@ -103,6 +103,13 @@ chain: oracle-build
 	  echo "$$out" | grep -q '^chain: done ' || { echo "chain: RED — the run never finished"; exit 1; }; \
 	  if echo "$$out" | grep -q '^chain: FAIL '; then echo "chain: RED"; exit 1; fi; \
 	  echo "chain: GREEN"
+
+# The small-step machine against the denotation, on ARGS="FROM COUNT" seeds.
+machine: oracle-build
+	@out=$$($(ORACLE_BIN) machine $(ARGS)); echo "$$out"; \
+	  echo "$$out" | grep -q '^machine: done ' || { echo "machine: RED — the run never finished"; exit 1; }; \
+	  if echo "$$out" | grep -q '^machine: FAIL '; then echo "machine: RED"; exit 1; fi; \
+	  echo "machine: GREEN"
 
 # `Progress.gets` decided, on ARGS="FROM COUNT" seeds.
 gets: oracle-build

@@ -22,7 +22,13 @@ const UNFOLD = 3;
 type Event = { tick: number } | { val: Value };
 type End = "completed" | "silent" | "cut";
 type Trace = { events: Event[]; end: End };
-type Row = { seed: number; prog: Code; denote: Trace; pure: Trace };
+type Row = {
+  seed: number;
+  prog: Code;
+  denote: Trace;
+  pure: Trace;
+  machine: Trace;
+};
 
 const bin = process.env.AGDA_CLI_BIN ?? "../agda-impl/_cli/Oracle-CLI";
 const timeoutMs = Number(process.env.ORACLE_CASE_TIMEOUT_MS ?? 10000);
@@ -95,6 +101,7 @@ const check = async (row: Row): Promise<string[]> => {
   const bad = [
     ...(agrees(row.denote, rx) ? [] : [`denotation ${show(row.denote)}`]),
     ...(agrees(row.pure, rx) ? [] : [`pure       ${show(row.pure)}`]),
+    ...(agrees(row.machine, rx) ? [] : [`machine    ${show(row.machine)}`]),
     ...(ioTrace === undefined
       ? [`io         ${io.failed}`]
       : agrees(ioTrace, rx)

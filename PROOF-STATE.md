@@ -169,29 +169,23 @@ over it.
 
 ### Big picture tier roadmap
 
-- **THE UPPER HALF, FRAME BY FRAME.** `owe-fire` over the frame played
-  step by step: `burst-ok`'s block lifted out of `Bound` over a kit (what
-  a cut leaves, settled, mid-frame), both halves instantiating it. The
-  owing kit's steps need the bound half's to NAME the configuration after
-  the step, the meaning's successor up to skips, so `budget` falls by
-  what it showed; plus a fuel fact, a callback chain no deeper than the
-  configuration it climbs. Decides whether one relation serves both
-  halves. Most uncertain: a shared source's joiners, a `flatMap` refill.
-- **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over
-  `Mid`, and a send runs alike to its observer's (`send-ok`); what is left
-  is each kernel's own run, `send-canon` first: an emit must reach the root
-  through every node above the firing cold, each hop's stored callbacks
-  again alike to the kernel's. The upper half reuses these step lemmas.
-  Most uncertain: a `flatMap` lane's refill, then `connect`'s joiners.
+- **THE ENGINE, SMALL-STEP.** `operation.Machine` runs the pure engine as
+  a stack machine: one step per `Act` constructor or burst step, a run a
+  coinductive trace with a silent step per unit of work, fuel only in the
+  harness's `prefix`; it agrees with the denotation and rxjs. Left:
+  `toArray` reads the machine; the fuel engine and its proofs deleted; both
+  halves derived from one postulated weak bisimulation between the trace
+  and `shown`. Decides whether one relation serves both halves.
+- **THE SIMULATION, STEP BY STEP.** The bisimulation as a body over a
+  per-step invariant: the machine's state realizes a configuration, each
+  stack frame a node's pending work; a step is silent with the tree held or
+  one of its skips taken, or shows the tree's next event. Most uncertain:
+  what makes a run of silent steps finite (the stack and the tree's pending
+  work, never fuel); then a `flatMap` refill and `connect`'s joiners.
 - **THE STATEMENT'S EDGES.** A `connect` source the body outlives,
-  spinning or running forever: `owe-fire` is false there. The meaning keeps
+  spinning or running forever: the machine works silently forever where the
+  meaning is `hush`, so the bisimulation is false there. The meaning keeps
   its events as skips, or `adequacy` assumes none; Anthony's call.
-- **THE ENGINE, SMALL-STEP.** The pure engine as a productive machine: an
-  explicit continuation stack, one step per event, a silent step where it
-  does work, so a run is a coinductive event stream with no burst budget,
-  callback depth or loop turns. Fuel moves into the test harness, which
-  reads a finite prefix; QuickCheck, the TS port and the oracle rerun.
-  Decides whether `runᴺ`'s nesting unwinds into a stack the TS can mirror.
 
 ### The ledger
 
