@@ -44,7 +44,7 @@ same-⨾ (grow τ) = cong grow (same-⨾ τ)
 
 module Delivering (R : Set) where
   open Machine R using (⟨_,_⟩; turn; burst; run; ret; loop; push; sent; Stack; cbs; silent; shown; trace)
-  open Realizing R using (Calm; calm; bursting; Holding; firing; coldˢ; playing; waiting; _≗_)
+  open Realizing R using (Holding; firing; coldˢ; playing; waiting; _≗_)
   open Contexts R using (Ctx; obsC)
   open Middles R using (Mid; Back; module AtC)
   open Climbing R using (NextAt; DoneAt; delivers)

@@ -170,11 +170,11 @@ contact; it must be solid before Tier 2 is written over it.
 
 - **A CASCADE, GUARDED.** `next-source`, `done-source`, `next-outer` and
   `done-inner` deliver at a context deeper than their frame: a joiner in the
-  body, or a lane bursting inline. So `Above` cannot carry them. Each has
-  the meaning's skip as a guard, after which the run may deliver anywhere
-  by corecursion, and a postulate's argument cannot carry that recursion.
-  To do: restate the climb so the guard is taken in the assembly.
-  Decides whether a cascade's silent steps are finite.
+  body, or a lane bursting inline. After the meaning's skip, the run ends at
+  a `delivering` calm point there, which `resume` hands to `next-at`. Left:
+  `next-source` as a body: the connect's skip lifted through the context,
+  then a refocus from the source onto each joiner in join order, its copy
+  `Lagging` until fed. Decides whether a cascade's silent steps are finite.
 - **A FRAME, DELIVERED.** The frames `Above` does carry (`Climb`):
   `next-take` (a cut reaching the hole), `next-scan` (the accumulator
   written before the meaning steps), `next-inner`, `next-body`, `done-body`,

@@ -181,12 +181,13 @@ module Climbing (R : Set) where
     -- queued; a lane bursting inline delivers to the parent from a grown
     -- context.
     --
-    -- DEAD ROUTE: by `Above` alone.  The inline burst delivers at a hole
-    --   inside the new lane, a context deeper than this frame's, which no
-    --   delivery at `k` or a growth of it reaches.  The meaning's own step
-    --   here is a skip, so the run may take it as a guard and deliver
-    --   anywhere after it: corecursion, which a postulate's argument cannot
-    --   carry past Agda's guardedness check.
+    -- The inline burst delivers at a hole inside the new lane, a context
+    -- deeper than this frame's.  The meaning's own step here is a skip, so
+    -- the run takes it as a guard and ends at a `delivering` calm point
+    -- there, which the simulation resumes.
+    --
+    -- DEAD ROUTE: by `Above` alone.  No delivery at `k` or a growth of it
+    --   reaches a context deeper than this frame's.
     next-outer : ∀ {h Δ A B} {op} {f : A → Obs Timeline Δ B} {fl oc u r ls} {k : Ctx h Δ B} → Above k → NextAt (outerF op f fl oc u r ls ◂ k)
     -- Its end settles the flatMap.
     done-outer : ∀ {h Δ A B} {op} {f : A → Obs Timeline Δ B} {fl oc u r ls} {k : Ctx h Δ B} → Above k → DoneAt (outerF op f fl oc u r ls ◂ k)

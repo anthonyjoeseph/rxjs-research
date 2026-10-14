@@ -52,7 +52,7 @@ open import adequacy.deliver.Deliver using (module Delivering)
 
 module Sim (R : Set) where
   open Machine R using (Mach; ⟨_,_⟩; turn; burst; run; ret; loop; push; asked; sent; Stack; step; cbs; play; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
-  open Realizing R using (Calm; calm; bursting; Holding; firing; Sub; Phase; waiting; playing; nodeOf; spot-of; spot-step; forget; module At; dead; dry-hush; pop-dead; pop-live)
+  open Realizing R using (Holding; firing; Sub; Phase; waiting; playing; nodeOf; spot-of; spot-step; forget; module At; dead; dry-hush; pop-dead; pop-live)
   open Pure R using (State; Timer; Callbacks; get; put; insert; cascade)
   open Pure R using (cutOff; frames)
   open Focusing R using (module On; clear; ahead)
@@ -60,7 +60,7 @@ module Sim (R : Set) where
   open Read
   open Seg R
   open Seg∞
-  open Delivering R using (emit-seg; done-seg)
+  open Delivering R using (emit-seg; done-seg; next-at; done-at)
 
   ------------------------------------------------------------------------
   -- The relation
@@ -222,6 +222,8 @@ module Sim (R : Set) where
       ... | true  = tauˡ (if-true (λ m → Seg _ (shown (silent m)) _) sp (tauˡ (tauˡ (calm~ (calm (pop-dead h refl sp)) ≤-refl))))
       ... | false = tauˡ (burst-seg (proj₂ (pop-live h refl sp)) sp)
   resume (bursting h lv) = burst-seg h lv
+  resume (delivering M e p F a≗ κ) = next-at M e p F a≗ κ
+  resume (finishing M e p F a≗ κ) = done-at M e p F a≗ κ
 
   -- Segments glued at their calm points: each turn is a segment, and a run
   -- of unguarded ones pops a dead timer each, so ends.
