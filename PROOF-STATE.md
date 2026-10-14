@@ -168,7 +168,7 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE BOUND HALF, NODE BY NODE.** `live-start` and `live-turn` over the
+- **THE BOUND HALF, NODE BY NODE.** `live-start` and `live-fire` over the
   configuration as now defined (`Realize`), by node kind, the cold first from
   its recovered proof. It decides whether the witness can be carried: a slot
   held up to `_≼_` must survive the heap growing (a weakening law for
@@ -195,8 +195,8 @@ must be solid before Tier 2 is written over it.
 
 - **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
   for a cold that falls, the repair Anthony's call.
-- **`live-start`, `live-turn`** (Bound) — FALSITY, `RECOVERY`, `X`: subscribing
-  establishes `Live`, each turn of the loop keeps it.
+- **`live-start`, `live-fire`** (Bound) — FALSITY, `RECOVERY`, `X`: subscribing
+  establishes `Live`, each turn that fires a frame keeps it.
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
 - **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject

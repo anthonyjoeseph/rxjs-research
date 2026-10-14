@@ -24,9 +24,10 @@ module Realize where
 open import Data.Bool using (Bool; true; false; if_then_else_; not; _∧_)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
+open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup) renaming (map to mapᴬ)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
-open import Data.List.Relation.Unary.Linked using (Linked)
+open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_) renaming (tail to tailᴸ)
+open import Data.List.Relation.Unary.Linked.Properties using (Linked⇒All)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; _+_; _≤_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
@@ -39,7 +40,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (Time; Pos; Burst; Timeline; last; _<ᵖ_; hush) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Time; Pos; Burst; Timeline; last; _<ᵖ_; <ᵖ-trans; <ᵖ-ix; hush) renaming (sub to subᴾ)
 open import operation.AbstractObservable using (base; sink; module Run)
 open import operation.PureObservable using (Pureᴾ; World; Kind; cell; slot; play; _∋_; Sink; Handle; same; note; fin; module Pure)
 open import operation.Budget using (module Approx)
@@ -49,7 +50,7 @@ module Realizing (R : Set) (n : ℕ) where
   open Run (Pureᴾ R)
   open Kit
   open FlatKit
-  open Pure R using (State; Timer; Callbacks; get; cascade; compileᴺ; mapList)
+  open Pure R using (State; Val; Timer; Callbacks; get; cascade; compileᴺ; mapList)
   open Approx R using (CbRel)
   open Nodes n renaming (live to running)
 
@@ -244,16 +245,16 @@ module Realizing (R : Set) (n : ℕ) where
   ------------------------------------------------------------------------
   -- Against a state
 
-  module At {h : World} (st : State h) where
+  module At {h : World} (H : All (Val h) h) where
     val : ∀ {t} → Ref h t → El h t
-    val r = lower (get (State.heap st) r)
+    val r = lower (get H r)
 
     spentʰ : Handle h → Bool
-    spentʰ hd = lower (get (State.heap st) hd)
+    spentʰ hd = lower (get H hd)
 
     -- A registered observer, up to `_≼_` against `c`.
     slotIs : ∀ {A} → Sink h A → Callbacks A h → Set₁
-    slotIs s c = CbRel (get (State.heap st) s) c
+    slotIs s c = CbRel (get H s) c
 
     -- An unsubscribe attached to a kill switch.
     heldIs : Cut h → Sink h ⊤ → Act h ⊤ → Set₁
@@ -343,13 +344,13 @@ module Realizing (R : Set) (n : ℕ) where
                                                × (val (Kit.live c) ≡ true → isNothing (part s E) ≡ false) × HoldsLanes op f E o fl ls
 
     ----------------------------------------------------------------------
-    -- The queue, the subjects, the order
+    -- The queue, the subjects
 
     -- Every live timer is a pending frame's, and every pending frame of a
     -- cold not spent is queued.
-    Timed : List (Timer h) → Set₁
-    Timed ps = All (λ tm → spentʰ (Timer.handle tm) ≡ true ⊎ tm ∈ ps) (State.timers st)
-             × All (λ tm → spentʰ (Timer.handle tm) ≡ false → tm ∈ State.timers st) ps
+    Timed : List (Timer h) → List (Timer h) → Set₁
+    Timed ts ps = All (λ tm → spentʰ (Timer.handle tm) ≡ true ⊎ tm ∈ ps) ts
+                × All (λ tm → spentʰ (Timer.handle tm) ≡ false → tm ∈ ts) ps
 
     -- A subscriber no joiner the tree holds: silenced for good.
     Silenced : ∀ {A} → Sink h A × Pos → Set₁
@@ -363,14 +364,14 @@ module Realizing (R : Set) (n : ℕ) where
                         × Linked (λ x y → proj₂ x <ᵖ proj₂ y ≡ true) xs }) ss
                  × All (λ { (joiner S sk j) → (sk , j) ∈ val (Subject.subscribers S) }) js
 
-    -- Timers in the order their cascades sit, each due no earlier than
-    -- now, its cascade past where the run is.
-    Ordered : Set₁
-    Ordered = Linked (λ t u → cascade t <ᵖ cascade u ≡ true) (State.timers st)
-            × All (λ t → State.clock st ≤ Timer.due t × State.pos st <ᵖ cascade t ≡ true) (State.timers st)
-
   ------------------------------------------------------------------------
-  -- THE ROOT
+  -- THE ORDER, THE ROOT
+
+  -- Timers in the order their cascades sit, each due no earlier than
+  -- now, its cascade past where the run is.
+  Ordered : ∀ {h} → State h → Set₁
+  Ordered st = Linked (λ t u → cascade t <ᵖ cascade u ≡ true) (State.timers st)
+             × All (λ t → State.clock st ≤ Timer.due t × State.pos st <ᵖ cascade t ≡ true) (State.timers st)
 
   -- The root's observer, in any world: it only records.
   rootObs : ∀ {h} → Observer R h
@@ -389,21 +390,24 @@ module Realizing (R : Set) (n : ℕ) where
   --   forgotten; and a merge's order needs every sibling's pending
   --   positions, which an abstract subscription does not expose.
   record Realizes {h} (c : Node [] R) (st : State h) : Set₁ where
-    open At st
+    open At (State.heap st)
     field
       tree    : Sub h [] R
       holds   : Holds tree [] rootObs
       open≡   : part tree [] ≡ just c
-      timed   : Timed (pendings tree)
+      timed   : Timed (State.timers st) (pendings tree)
       joined  : Joined (subjects tree) (joiners tree [])
-      ordered : Ordered
+      ordered : Ordered st
       fresh   : AllPairs _≢_ (names tree)
 
   ------------------------------------------------------------------------
   -- With no timer left, nothing is pending
 
+  absurd : ∀ {a} {X : Set a} → true ≡ false → X
+  absurd ()
+
   module Dryness {h : World} (st : State h) where
-    open At st
+    open At (State.heap st)
 
     Spent : List (Timer h) → Set₁
     Spent = All (λ tm → spentʰ (Timer.handle tm) ≡ true)
@@ -422,9 +426,6 @@ module Realizing (R : Set) (n : ℕ) where
     merged-just op f nothing  []       (_ ∷ _)  refl = refl
     merged-just op f nothing  (_ ∷ _)  qs       refl = refl
     merged-just op f (just _) ls       qs       refl = refl
-
-    absurd : ∀ {X : Set} → true ≡ false → X
-    absurd ()
 
     mutual
       dry-part : ∀ {Δ A} (t : Sub h Δ A) {E : Env Δ h} {o ρ c} → Holds t E o → Hushed E ρ → Spent (pendings t)
@@ -480,3 +481,41 @@ module Realizing (R : Set) (n : ℕ) where
   realizes-dry : ∀ {h} {c : Node [] R} {st : State h} → Realizes c st → State.timers st ≡ [] → Dry c []
   realizes-dry {st = st} z e = dry-part (Realizes.tree z) (Realizes.holds z) (λ ()) (spent-all (pendings (Realizes.tree z)) (proj₂ (Realizes.timed z)) e) (Realizes.open≡ z)
     where open Dryness st
+
+  ------------------------------------------------------------------------
+  -- A spent timer's turn
+
+  -- Every timer queued behind the first sits past it.
+  linked-after : ∀ {h} {x : Timer h} {xs} → Linked (λ t u → cascade t <ᵖ cascade u ≡ true) (x ∷ xs)
+               → All (λ u → cascade x <ᵖ cascade u ≡ true) xs
+  linked-after [-]     = []
+  linked-after {x = x} (r ∷ l) =
+    Linked⇒All {R = λ t u → cascade t <ᵖ cascade u ≡ true} (λ {i} {j} {k} → <ᵖ-trans (cascade i) (cascade j) (cascade k)) {v = x} r l
+
+  -- A SPENT TIMER'S TURN moves nothing the configuration holds: the clock
+  -- reaches its due tick, and the queue behind it is still in order.
+  realizes-spent : ∀ {h} {c : Node [] R} {st : State h} {tm ts} → Realizes c st → State.timers st ≡ tm ∷ ts
+                 → lower (get (State.heap st) (Timer.handle tm)) ≡ true
+                 → Realizes c (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm })
+  realizes-spent {h} {st = st} {tm} {ts} z eq s = record
+    { tree    = tree
+    ; holds   = holds
+    ; open≡   = open≡
+    ; timed   = drop (subst (All Live) eq (proj₁ timed)) , mapᴬ keep (proj₂ timed)
+    ; joined  = joined
+    ; ordered = tailᴸ L , mapᴬ (λ {u} r → <ᵖ-ix (Timer.due tm) (Timer.due u) (subᴾ (Timer.from tm) ∷ []) (subᴾ (Timer.from u) ∷ []) r , r) (linked-after L)
+    ; fresh   = fresh
+    }
+    where
+      open Realizes z
+      open At (State.heap st)
+      Live : Timer h → Set₁
+      Live tm′ = spentʰ (Timer.handle tm′) ≡ true ⊎ tm′ ∈ pendings tree
+      drop : All Live (tm ∷ ts) → All Live ts
+      drop (_ ∷ a) = a
+      keep : ∀ {p} → (spentʰ (Timer.handle p) ≡ false → p ∈ State.timers st) → spentʰ (Timer.handle p) ≡ false → p ∈ ts
+      keep {p} f sp with subst (p ∈_) eq (f sp)
+      ... | here refl = absurd (trans (sym s) sp)
+      ... | there i   = i
+      L : Linked (λ t u → cascade t <ᵖ cascade u ≡ true) (tm ∷ ts)
+      L = subst (Linked _) eq (proj₁ ordered)

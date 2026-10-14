@@ -17,6 +17,12 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; ≤′-step)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
+open import Data.Bool using (T)
+open import Data.Nat using (_<_; _≤_)
+open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <⇒≤; <-trans; ≤-reflexive)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Unit using (tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong; cong₂)
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
@@ -123,6 +129,100 @@ private
 
 _<ᵖ_ : Pos → Pos → Bool
 p <ᵖ q = isLt (cmpPos p q)
+
+-- The order is an order: transitive, and led by the tick.
+private
+  lt-ℕ : ∀ {m n} → cmpℕ m n ≡ lt → m < n
+  lt-ℕ {m} {n} h with m <ᵇ n in e | n <ᵇ m
+  lt-ℕ {m} {n} h  | true  | _     = <ᵇ⇒< m n (subst T (sym e) tt)
+  lt-ℕ {m} {n} () | false | true
+  lt-ℕ {m} {n} () | false | false
+
+  ℕ-lt : ∀ {m n} → m < n → cmpℕ m n ≡ lt
+  ℕ-lt {m} {n} l with m <ᵇ n in e
+  ... | true  = refl
+  ... | false with subst T e (<⇒<ᵇ l)
+  ...   | ()
+
+  eq-ℕ : ∀ {m n} → cmpℕ m n ≡ eq → m ≡ n
+  eq-ℕ {m} {n} h with m <ᵇ n in e₁ | n <ᵇ m in e₂
+  eq-ℕ {m} {n} () | true  | _
+  eq-ℕ {m} {n} () | false | true
+  eq-ℕ {m} {n} h  | false | false =
+    ≤-antisym (≮⇒≥ λ l → subst T e₂ (<⇒<ᵇ l)) (≮⇒≥ λ l → subst T e₁ (<⇒<ᵇ l))
+
+  lexi-lt : ∀ c r → lexi c r ≡ lt → c ≡ lt ⊎ (c ≡ eq × r ≡ lt)
+  lexi-lt lt r h = inj₁ refl
+  lexi-lt eq r h = inj₂ (refl , h)
+  lexi-lt gt r ()
+
+  lexi-eq : ∀ c r → lexi c r ≡ eq → c ≡ eq × r ≡ eq
+  lexi-eq lt r ()
+  lexi-eq eq r h = refl , h
+  lexi-eq gt r ()
+
+  mutual
+    eq-label : ∀ a b → cmpLabel a b ≡ eq → a ≡ b
+    eq-label (ix m)  (ix n)  h = cong ix (eq-ℕ {m} {n} h)
+    eq-label (sub p) (sub q) h = cong sub (eq-pos p q h)
+    eq-label last    last    h = refl
+    eq-label (ix _)  (sub _) ()
+    eq-label (ix _)  last    ()
+    eq-label (sub _) (ix _)  ()
+    eq-label (sub _) last    ()
+    eq-label last    (ix _)  ()
+    eq-label last    (sub _) ()
+
+    eq-pos : ∀ p q → cmpPos p q ≡ eq → p ≡ q
+    eq-pos []      []      h = refl
+    eq-pos []      (_ ∷ _) ()
+    eq-pos (_ ∷ _) []      ()
+    eq-pos (a ∷ p) (b ∷ q) h with lexi-eq (cmpLabel a b) (cmpPos p q) h
+    ... | x , y = cong₂ _∷_ (eq-label a b x) (eq-pos p q y)
+
+  mutual
+    lt-label : ∀ a b c → cmpLabel a b ≡ lt → cmpLabel b c ≡ lt → cmpLabel a c ≡ lt
+    lt-label (ix m)  (ix n)  (ix k)  h₁ h₂ = ℕ-lt {m} {k} (<-trans (lt-ℕ {m} {n} h₁) (lt-ℕ {n} {k} h₂))
+    lt-label (ix _)  _       (sub _) _  _  = refl
+    lt-label (ix _)  _       last    _  _  = refl
+    lt-label (ix _)  (sub _) (ix _)  _  ()
+    lt-label (ix _)  last    (ix _)  _  ()
+    lt-label (sub p) (sub q) (sub r) h₁ h₂ = lt-pos p q r h₁ h₂
+    lt-label (sub _) _       last    _  _  = refl
+    lt-label (sub _) (ix _)  _       () _
+    lt-label (sub _) (sub _) (ix _)  _  ()
+    lt-label (sub _) last    (ix _)  _  ()
+    lt-label (sub _) last    (sub _) _  ()
+    lt-label last    (ix _)  _       () _
+    lt-label last    (sub _) _       () _
+    lt-label last    last    _       () _
+
+    lt-pos : ∀ p q r → cmpPos p q ≡ lt → cmpPos q r ≡ lt → cmpPos p r ≡ lt
+    lt-pos []      (_ ∷ _) (_ ∷ _) _  _  = refl
+    lt-pos []      []      _       () _
+    lt-pos (_ ∷ _) []      _       () _
+    lt-pos _       (_ ∷ _) []      _  ()
+    lt-pos (a ∷ p) (b ∷ q) (c ∷ r) h₁ h₂
+      with lexi-lt (cmpLabel a b) (cmpPos p q) h₁ | lexi-lt (cmpLabel b c) (cmpPos q r) h₂
+    ... | inj₁ x       | inj₁ y       rewrite lt-label a b c x y = refl
+    ... | inj₁ x       | inj₂ (y , _) rewrite subst (λ z → cmpLabel a z ≡ lt) (eq-label b c y) x = refl
+    ... | inj₂ (x , _) | inj₁ y       rewrite subst (λ z → cmpLabel z c ≡ lt) (sym (eq-label a b x)) y = refl
+    ... | inj₂ (x , u) | inj₂ (y , v)
+      rewrite subst (λ z → cmpLabel z c ≡ eq) (sym (eq-label a b x)) y | lt-pos p q r u v = refl
+
+  isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
+  isLt-lt {lt} h = refl
+  isLt-lt {eq} ()
+  isLt-lt {gt} ()
+
+<ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
+<ᵖ-trans p q r h₁ h₂ rewrite lt-pos p q r (isLt-lt h₁) (isLt-lt h₂) = refl
+
+-- An earlier position is at no later a tick.
+<ᵖ-ix : ∀ m n p q → (ix m ∷ p) <ᵖ (ix n ∷ q) ≡ true → m ≤ n
+<ᵖ-ix m n p q h with lexi-lt (cmpℕ m n) (cmpPos p q) (isLt-lt h)
+... | inj₁ x       = <⇒≤ (lt-ℕ {m} {n} x)
+... | inj₂ (x , _) = ≤-reflexive (eq-ℕ {m} {n} x)
 
 ------------------------------------------------------------------------
 -- What a subscriber sees

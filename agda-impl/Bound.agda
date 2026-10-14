@@ -16,10 +16,10 @@ open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_)
-open import Data.Product using (_×_; _,_; Σ)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Level using (lower)
-open import Relation.Binary.PropositionalEquality using (_≡_; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Pos; tick; Events; Events∞;
@@ -184,7 +184,7 @@ module Loop (R : Set) (E₀ : Events R) (N : ℕ) (Live : ∀ {h} → Pure.State
 
 module Places (R : Set) where
   open Ran R using (ran; Recorded)
-  open Pure R using (State; Res; res; start; recorder; compileᴺ; runᴺ; loopᴺ)
+  open Pure R using (State; Res; res; start; recorder; compileᴺ; runᴺ; loopᴺ; Timer; get; cascade)
   open import operation.AbstractObservable using (module Run)
   open Run (Pureᴾ R) using (done; eff; Observer; Env)
   open Prefix R using (_↝_; ≅-hush)
@@ -216,12 +216,33 @@ module Places (R : Set) where
     -- or cut.
     live-start : ∀ n (o : PureObs [] R) → Rising n o → ∀ N k
                → At.Post n o N (runᴺ N k (compileᴺ n o [] same recorder λ _ _ → done tt) same start)
-    -- One turn of the loop keeps it.
+    -- A turn that fires a frame keeps it.
     --
     -- RECOVERY: `git show 016c16a2` restores a cold at the root proven
     --   against the engine: its subscribe burst, each timer's turn, and
     --   the record placed, frame by frame.
-    live-turn : ∀ n o N k {h} (st : State h) {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts → At.Post n o N (At.turn n o N k st tm ts)
+    live-fire : ∀ n o N k {h} (st : State h) {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts
+              → lower (get (State.heap st) (Timer.handle tm)) ≡ false → At.Post n o N (At.turn n o N k st tm ts)
+
+  -- A spent timer's turn keeps it: nothing is played.
+  live-spent : ∀ n o {h} {st : State h} {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts
+             → lower (get (State.heap st) (Timer.handle tm)) ≡ true
+             → Live n o (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm })
+  live-spent n o {st = st} {tm} {ts} (config sofar rest) eq s = config (moved sofar) λ e →
+    proj₁ (rest e) , Realizing.realizes-spent R n (proj₁ (proj₂ (rest e))) eq s , proj₂ (proj₂ (rest e))
+    where
+      st′ = record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
+      moved : ∀ {r} → Ends.Root R (shown n o) r st → Ends.Root R (shown n o) r st′
+      moved (Ends.live e p) = Ends.live e p
+      moved (Ends.over e p) = Ends.over e p
+
+  -- One turn of the loop keeps it.
+  live-turn : ∀ n o N k {h} (st : State h) {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts → At.Post n o N (At.turn n o N k st tm ts)
+  live-turn n o N k st {tm} {ts} q eq = by (lower (get (State.heap st) (Timer.handle tm))) refl
+    where
+      by : ∀ b → lower (get (State.heap st) (Timer.handle tm)) ≡ b → At.Post n o N (At.turn n o N k st tm ts)
+      by true  s rewrite s = live-spent n o q eq s
+      by false s           = live-fire n o N k st q eq s
 
   -- With no timer left, a root not yet complete is shown nothing more.
   rest-dry : ∀ n {h} {r} {st : State h} → Rest n r st → State.ended st ≡ false → State.timers st ≡ [] → r ↝ hush
