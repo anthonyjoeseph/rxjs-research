@@ -4,10 +4,11 @@
 -- proof runs on, decided on a finite prefix.  Each value the machine
 -- records sits at the denotation's next `out`, at the same position, on
 -- that position's tick; its completion at the `end`, its queue run dry
--- over `hush`.  Silent steps on either side pass freely, so running out
--- of steps reads as a pass — except past a `hush`, where the machine must
--- run dry within a fixed number of steps: a meaning that says nothing
--- more will ever happen is refuted by a machine still working there.
+-- over `hush`.  Silent steps pass together while both sides have one,
+-- alone otherwise, so running out of steps reads as a pass — except at a
+-- `hush`, where the machine must run dry within a fixed number of steps:
+-- a meaning that says nothing more will ever happen is refuted by a
+-- machine still working there, however much it worked before.
 --
 -- And the events rise, as `ticks-up` needs: each at a position past the
 -- last, headed by its tick.
@@ -40,6 +41,7 @@ private
   placedᵇ : ℕ → Trace → Events ℕ → Bool
   placedᵇ zero    _             _           = true
   placedᵇ (suc k) m             hush        = drains 20000 m
+  placedᵇ (suc k) (tau _ l)     (skip _ r)  = placedᵇ k (Trace∞.force l) (Events∞.force r)
   placedᵇ (suc k) (tau _ l)     e           = placedᵇ k (Trace∞.force l) e
   placedᵇ (suc k) m             (skip _ r)  = placedᵇ k m (Events∞.force r)
   placedᵇ (suc k) (out t p a l) (out q b r) = samePos p q ∧ (t ≡ᵇ tick q) ∧ (a ≡ᵇ b) ∧ placedᵇ k (Trace∞.force l) (Events∞.force r)

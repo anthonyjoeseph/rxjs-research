@@ -22,9 +22,8 @@
 -- cascade waiting on another producer thread — a `subscription` awaiting
 -- its own fork, a subscriber awaiting a producer — deadlocks.
 --
--- The pure runtime closes the engine's recursion by unfolding it n
--- times; a real program needs every unfolding, and IO cannot re-run to
--- take the limit, so here it is closed with `fixIO`.  Every fixpoint it
+-- The engine's recursion — a stored callback, a `defer` compiled when
+-- reached, the loop's next turn — is closed here with `fixIO`.  Every fixpoint it
 -- takes is an IO action: one may run forever, but none is a value of any
 -- other type, so nothing here proves anything.
 module operation.Observable where

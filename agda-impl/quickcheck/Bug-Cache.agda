@@ -14,14 +14,18 @@ module quickcheck.Bug-Cache where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_)
+open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String)
 
+open import Tree using (mergeᶠ)
 open import quickcheck.Ty using (natᵗ)
-open import quickcheck.Code using (Prog; script; cold; connect)
+open import quickcheck.Code using (Prog; script; cold; flatMap; connect)
 
 cases : List (String × Prog natᵗ)
 cases =
   -- a looping source its body never joins: the meaning was silent
   ("connect, unjoined looping source" , connect (cold (script ((1 , 1 ∷ []) ∷ []) false true)) (cold (script [] false false)))
+  ∷ -- a body done later beside a looping source, in a lane of an outer gone quiet
+  ("connect, body done beside its looping source" , flatMap (mergeᶠ nothing) (connect (cold (script ((1 , 1 ∷ []) ∷ []) false true)) (cold (script ((2 , []) ∷ []) true false))) (cold (script ((0 , 0 ∷ []) ∷ []) false false)))
   ∷ []

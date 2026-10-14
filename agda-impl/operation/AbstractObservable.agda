@@ -2,18 +2,16 @@
 
 -- THE ONE COPY OF THE OPERATIONAL SEMANTICS.  A program is a tree
 -- (`Obs`, in `Tree`); compiling it gives `Act` programs, built from the operator
--- kernels; an interpreter and an event loop run them.  All of that is
--- here, written once, against a monad the runtime supplies (`Runtime`):
--- `Observable` hands it IO, `PureObservable` a state monad over a heap
--- and a virtual clock.  So the pure runtime IS the IO runtime, with a
--- different monad.
+-- kernels.  Both runtimes run those same programs: the IO one through
+-- the interpreter and event loop here, against a monad (`Runtime`) that
+-- `Observable` hands IO; the pure one as a small-step machine
+-- (`Machine`) over `PureObservable`'s heap and virtual clock.
 --
--- The one other difference is how recursion is closed.  Compiling a
--- `defer`, running a stored callback and taking the loop's next turn are
--- each written as one layer, open in the recursion.  The pure runtime
--- closes them by unfolding n times — approximant n, as `Denote` does.
--- The IO runtime leaves a `defer` to the interpreter, so the callbacks
--- and the loop are all it closes, each an IO action.
+-- A `defer` compiles to an `unfold`, its body compiled only when reached,
+-- so compiling is total.  Running a stored callback, reaching an `unfold`
+-- and taking the loop's next turn are each open in the recursion, and
+-- each runtime closes them its own way: the IO one with `fixIO`, the
+-- machine by stepping, its trace coinductive.
 --
 -- The shared code is parametric in the runtime's types (`Prims`), so it
 -- can neither inspect a ref, nor look inside a cold, nor perform IO.
@@ -143,14 +141,13 @@ module Run (P : Prims) where
     -- denotation gives its next event; nothing ever branches on it.
     here      : ∀ {w B} → (Pos → Act w B) → Act w B
     goto      : ∀ {w B} → Pos → Act w B → Act w B
-    -- No information: what an unfolding cut off by the pure runtime's
-    -- budget does.  The IO runtime never reaches it.
+    -- No information: what a ghost check's unfolding cut off at its
+    -- budget does.  A compiled tree never reaches it.
     diverge   : ∀ {w B} → Act w B
     -- A `defer`, subscribed but not yet compiled: the tree, the connects
     -- in scope, the observer's three parts, and what to do once the
     -- subscription exists — its unsubscribe a registered sink, since an
-    -- `Act` cannot take an `Act` as an argument — then the rest.  The
-    -- pure runtime never makes one.
+    -- `Act` cannot take an `Act` as an argument — then the rest.
     unfold    : ∀ {w Γ A B} → Later Cold Γ A → Env Γ w → (A → Act w ⊤) → Act w ⊤ → Act w Bool
               → (∀ {v} → w ⊑ v → Sink v ⊤ → Act v ⊤) → Act w B → Act w B
 
@@ -424,23 +421,25 @@ module Run (P : Prims) where
 
   -- Allocates the subject, subscribes the body over it, THEN the source
   -- into it — body first, so the source's synchronous burst reaches
-  -- whatever the body joined synchronously.  The source sees only the
-  -- subject's own closing, as in rxjs: cutting the body does not stop a
-  -- source still in its burst.  Each value goes to the
+  -- whatever the body joined synchronously.  The body's completion cuts
+  -- the source, as an rxjs subscriber's completion tears down what it
+  -- holds — a source subscribed after that runs its burst, then is cut,
+  -- and a source still in its burst runs it out.  Each value goes to the
   -- subscribers the subject had when that value arrived, as an rxjs
   -- Subject's `next` does.  Allocated per subscription of the `connect`
   -- node, so one bound outside a `defer` is the SAME subject on every
   -- re-subscription of the deferred body.
   connectᴷ : ∀ {A B w} → Subscribe A w → (∀ {v} → w ⊑ v → Subject A v → Subscribe B v) → Subscribe B w
-  connectᴷ {A} s b ρ o k = here λ p → newRef (list (sink A ⊗ base Pos)) [] λ σ subs → newB false λ τ cl →
-    let st = record { subscribers = wkR τ subs ; closed = cl } in
-    goto (p ++ [ ix 0 ]) (b (ρ ⨾ σ ⨾ τ) st ⊑-refl (wkObs (σ ⨾ τ) o) λ π body → let st′ = wkSubject π st in
-    goto (p ++ [ ix 1 ]) (s (ρ ⨾ σ ⨾ τ ⨾ π) (record
+  connectᴷ {A} s b ρ o k = here λ p → newRef (list (sink A ⊗ base Pos)) [] λ σ subs → newB false λ τ cl → newCut λ υ c →
+    let st = record { subscribers = wkR (τ ⨾ υ) subs ; closed = wkR υ cl } ; o′ = wkObs (σ ⨾ τ ⨾ υ) o in
+    goto (p ++ [ ix 0 ]) (b (ρ ⨾ σ ⨾ τ ⨾ υ) st ⊑-refl (record { next = Observer.next o′ ; complete = Observer.complete o′ >>ᴬ cut c ; closed = Observer.closed o′ })
+      λ π body → let st′ = wkSubject π st in
+    goto (p ++ [ ix 1 ]) (s (ρ ⨾ σ ⨾ τ ⨾ υ ⨾ π) (record
       { next = λ a → here λ q → readRef (Subject.subscribers st′) λ _ ss → each ss λ j → goto (q ++ [ subᴾ (proj₂ j) ]) (send (proj₁ j) a skipᴬ)
       ; complete = here λ c → writeRef (Subject.closed st′) true (readRef (Subject.subscribers st′) λ _ ss →
                    each ss λ j → goto (c ++ [ subᴾ (proj₂ j) ]) (finish (proj₁ j) skipᴬ))
       ; closed = readB (Subject.closed st′) done })
-      λ υ src → k (σ ⨾ τ ⨾ π ⨾ υ) (record { unsubscribe = Subscription.unsubscribe src >>ᴬ Subscription.unsubscribe (wkSubn υ body) })))
+      λ ψ src → attach (wkCut (π ⨾ ψ) c) src >>ᴬ k (σ ⨾ τ ⨾ υ ⨾ π ⨾ ψ) (record { unsubscribe = Subscription.unsubscribe src >>ᴬ Subscription.unsubscribe (wkSubn ψ body) })))
 
   -- Adds the sink, guarded so that unsubscribing silences it.  Nothing
   -- else: the source is already running.  Joining a completed subject
@@ -454,40 +453,25 @@ module Run (P : Prims) where
       modify (Subject.subscribers (wkSubject (ρ ⨾ σ ⨾ τ) st)) (λ π ss → ss ++ [ (wkSink π sk , j) ]) >>ᴬ
       k (σ ⨾ τ) (record { unsubscribe = writeRef (wkR τ l) false skipᴬ })
 
-  -- What a `defer` turns into, and each runtime picks its own.  The pure
-  -- one unfolds the tree n times as it compiles, so approximant n lines
-  -- up with the denotation's.  The IO one compiles a `defer` to an
-  -- `unfold` and its body when the interpreter reaches it, so that its
-  -- one recursion is the interpreter's, an IO action.
-  Deferred : Set₁
-  Deferred = ∀ {Γ A w} → Later Cold Γ A → Env Γ w → Subscribe A w
-
-  -- THE TREE, COMPILED.  Structural everywhere except `defer`, which is
-  -- handed to `d`, so this is total whatever recursion the tree holds.
-  mutual
-    compileWith : Deferred → ∀ {Γ A w} → Obs Cold Γ A → Env Γ w → Subscribe A w
-    compileWith d (cold c)         ρ = via (startCold c)
-    compileWith d empty            ρ = emptyᴷ
-    compileWith d (of xs)          ρ = ofᴷ xs
-    compileWith d (map f s)        ρ = mapᴷ f (compileWith d s ρ)
-    compileWith d (scan f z s)     ρ = scanᴷ f z (compileWith d s ρ)
-    compileWith d (takeWhile i p s) ρ = takeWhileᴷ i p (compileWith d s ρ)
-    compileWith d (flatMap op f s) ρ = flatMapᴷ op (λ a → compileWith d (f a) ρ) (compileWith d s ρ)
-    compileWith d (connect s b)    ρ = connectᴷ (compileWith d s ρ) λ σ st → compileWith d b (st ∷ wkEnv σ ρ)
-    compileWith d (connected i)    ρ = joinᴷ (lookup ρ i)
-    compileWith d (defer l)        ρ = d l ρ
-
-  deferᴷ : Deferred
-  deferᴷ l ρ σ o k = unfold l (wkEnv σ ρ) (Observer.next o) (Observer.complete o) (Observer.closed o)
-                       (λ τ sk → k τ (record { unsubscribe = send sk tt (done tt) })) (done tt)
-
-  -- Every `defer` left to the interpreter.
+  -- THE TREE, COMPILED.  Structural everywhere except `defer`, which
+  -- becomes an `unfold`: its body is compiled only when the runtime
+  -- reaches it, so this is total whatever recursion the tree holds, and
+  -- that recursion is the runtime's.
   compile : ∀ {Γ A w} → Obs Cold Γ A → Env Γ w → Subscribe A w
-  compile = compileWith deferᴷ
+  compile (cold c)          ρ = via (startCold c)
+  compile empty             ρ = emptyᴷ
+  compile (of xs)           ρ = ofᴷ xs
+  compile (map f s)         ρ = mapᴷ f (compile s ρ)
+  compile (scan f z s)      ρ = scanᴷ f z (compile s ρ)
+  compile (takeWhile i p s) ρ = takeWhileᴷ i p (compile s ρ)
+  compile (flatMap op f s)  ρ = flatMapᴷ op (λ a → compile (f a) ρ) (compile s ρ)
+  compile (connect s b)     ρ = connectᴷ (compile s ρ) λ σ st → compile b (st ∷ wkEnv σ ρ)
+  compile (connected i)     ρ = joinᴷ (lookup ρ i)
+  compile (defer l)         ρ σ o k = unfold l (wkEnv σ ρ) (Observer.next o) (Observer.complete o) (Observer.closed o)
+                                        (λ τ sk → k τ (record { unsubscribe = send sk tt (done tt) })) (done tt)
 
-  -- THE MONAD, and the handful of things only it can do.  This is the
-  -- whole of a runtime: `Observable` supplies IO, `PureObservable` a
-  -- state monad over a heap and a virtual clock.  The operations that
+  -- THE MONAD, and the handful of things only it can do: what
+  -- `Observable` supplies to run the engine in IO.  The operations that
   -- run a stored callback take the interpreter to run it with, since the
   -- callback lives in the runtime's tables.  Those that make a name hand
   -- it to a Kripke continuation, as `Act` does.
