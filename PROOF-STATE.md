@@ -168,19 +168,26 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE SIMULATION AS AN INVARIANT.** `sim` as a guarded body over a
-  relation between a machine and the denotation's unfolding node
-  (`denotation.Unfold`): the root realizes it, and a related pair steps to
-  a related pair whose next out, end or dry matches the node's. Leaves: the
-  start, and one step per `Step`. Decides whether a per-step relation can
-  be stated without a configuration of the whole program, which the fuel
-  proof needed (`sim`'s RECOVERY).
-- **SILENT RUNS FINITE.** `tauˡ` and `skipʳ` are inductive, so a run of
-  silent machine steps over a node showing nothing must end. A measure
-  from the stack and the tree's pending work, never fuel; a `flatMap`
-  refill and `connect`'s joiners the uncertain cases. Decides whether the
-  measure exists everywhere: a `connect` source now shows each step, so
-  none runs unseen.
+- **A FRAME, FIRED.** `fire` as a body: the popped cold's burst, a frame
+  step at a time, each running the observer chain its slot holds — to the
+  root, into a lane's subscription, through a subject to its joiners —
+  then the loop. Needs a mid-cascade invariant, the calm witness with one
+  cold firing and the stack's waiting frames, and is where a missing
+  conjunct of `Holding` shows. Decides whether `Realize`'s relation is
+  re-established after a turn, and whether a cascade's silent steps are
+  finite: a `flatMap` refill and `connect`'s joiners the uncertain cases.
+- **THE QUEUE, EMPTY OR DEAD.** `dry-hush` and `pop-dead`, over `Ordered`
+  and `Timed`: an empty queue leaves nothing to show, and a dead pop moves
+  only the clock. Decides whether the order the witness records is enough
+  to read the meaning's silence off the queue.
+- **THE CALLBACKS, EXTENSIONALLY.** A stored callback is its kernel's
+  canonical observer up to `_≗_`: weakening composes, and every kernel
+  commutes with it. The apparatus the turn's cases are written over;
+  narrows nothing, and nothing in the turn can be instantiated without it.
+- **THE START.** `start-seg`: the subscribe burst from an empty heap
+  reaches a calm point, by the same stepping as a turn. Decides whether a
+  `defer` reached synchronously, and a lane subscribed inside its parent's
+  burst, leave the witness `Holding` asks for.
 - **THE MEANING RISES.** `ticks-up` from the denotation's positions: each
   event at a position past the last, headed by its tick, as `make placing`
   checks. Rekeying a hot under `sub` keeps order only when no event sits
@@ -190,8 +197,14 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### The ledger
 
-- **`sim`** (Simulation) — FALSITY, `RECOVERY`: the machine's trace is the
-  root's events up to silent steps.
+- **`fire`** (Simulation) — FALSITY, `RECOVERY`: a live timer's frame shows a
+  step on each side before the loop.
+- **`dry-hush`** (Realize) — FALSITY, `NO EVIDENCE`: an empty queue, a
+  configuration with nothing to show.
+- **`pop-dead`** (Realize) — FALSITY, `NO EVIDENCE`: a dead timer popped keeps
+  the configuration.
+- **`start-seg`** (Simulation) — FALSITY, `NO EVIDENCE`: the subscribe burst
+  reaches a calm point.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 

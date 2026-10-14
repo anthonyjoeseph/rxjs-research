@@ -9,6 +9,12 @@
 -- in both is related.  A machine working forever where the events
 -- `hush` is not.
 --
+-- The relation is built by guarded corecursion up to CALM points
+-- (`Realize`): a segment of the run shows at least one step on each side,
+-- or reaches the loop again with fewer dead timers, related to what the
+-- meaning has left.  So the run is cut where the machine's state is a
+-- configuration, and nothing is related step by step inside a cascade.
+--
 -- Both halves of adequacy are read off the one relation.  Every prefix
 -- of the trace is `Placed` against the events, so shows nothing they do
 -- not; every item the events show is within some prefix.  The prefixes
@@ -16,21 +22,32 @@
 -- of a cut one.
 module Simulation where
 
-open import Data.List using ([]; _++_; [_]; length)
+open import Data.List using ([]; _∷_; _++_; [_]; length)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
+open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_; Σ)
+open import Data.Unit using (⊤)
+open import Induction.WellFounded using (Acc; acc)
+open import Level using (lower)
+open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; observe; root)
 open import denotation.Order using (_⊑_; Chain)
 open import denotation.Unfold using (⟦_⟧)
+import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
 open import operation.PureObservable using (PureObs; module Pure)
+open import Realize using (module Realizing)
 
 module Sim (R : Set) where
-  open Machine R using (Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
+  open Machine R using (Mach; ⟨_,_⟩; turn; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
+  open Realizing R using (Calm; calm; Holding; dead; dry-hush; pop-dead)
+  open Pure R using (State; Timer; get; cascade)
   open Pure R using (cutOff; frames)
   open Read
 
@@ -53,13 +70,89 @@ module Sim (R : Set) where
 
   open _~∞_
 
+  ------------------------------------------------------------------------
+  -- Up to calm points
+
+  -- A calm point inside a segment no guard has passed must have fewer
+  -- dead timers than where the segment began.
+  Below : Maybe ℕ → Mach → Set
+  Below (just k) m = dead m < k
+  Below nothing  m = ⊤
+
+  -- The relation's constructors, and a calm point to resume from.
+  mutual
+    data Seg (b : Maybe ℕ) : Trace → Events R → Set₁ where
+      out~  : ∀ {p a l r} → Seg∞ l r → Seg b (out (tick p) p a l) (out p a r)
+      tau~  : ∀ {t p l r} → Seg∞ l r → Seg b (tau t l) (skip p r)
+      tauˡ  : ∀ {t l e} → Seg b (Trace∞.force l) e → Seg b (tau t l) e
+      skipʳ : ∀ {m p r} → Seg b m (Events∞.force r) → Seg b m (skip p r)
+      end~  : ∀ {p} → Seg b (end p) (end p)
+      idle~ : Seg b idle hush
+      calm~ : ∀ {m e} → Calm m e → Below b m → Seg b (trace m) e
+
+    record Seg∞ (l : Trace∞) (r : Events∞ R) : Set₁ where
+      coinductive
+      field force : Seg nothing (Trace∞.force l) (Events∞.force r)
+
+  open Seg∞
+
   postulate
-    -- The program's run is what the root is shown.
+    -- The subscribe burst, up to the first calm point.
+    start-seg : (o : PureObs [] R) → Seg nothing (trace (begin o)) (observe (⟦ o ⟧ []) root)
+
+    -- A live timer popped from a calm point: its frame shows at least
+    -- one step on each side before the loop is reached again, so the
+    -- segment passes a guard first, whatever bound it is under.
     --
-    -- RECOVERY: `git show a2e0bb8b` restores `Config` and `Realize`, a
-    --   configuration of the whole running program realized by the fuel
-    --   engine's heap, and `Bound`'s frame-by-frame invariant over it.
-    sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
+    -- RECOVERY: `git show a2e0bb8b:agda-impl/Realize.agda` restores
+    --   `Spot`, `setAt`, `obsAt` and `Playing` — one cold picked out of the
+    --   witness mid-frame, and the observer its slot holds — over the fuel
+    --   engine's witness.
+    fire : ∀ {h c} {st : State h} {tm ts} → Holding c st → State.timers st ≡ tm ∷ ts
+         → lower (get (State.heap st) (Timer.handle tm)) ≡ false → ∀ {b} → Seg b (trace ⟨ st , turn ⟩) (U.unfold c)
+
+  if-true : ∀ {ℓ ℓ′} {X : Set ℓ} {x : Bool} {a b : X} (P : X → Set ℓ′) → x ≡ true → P a → P (if x then a else b)
+  if-true P refl p = p
+
+  -- One turn of the loop from a calm point: it shows a step on each side,
+  -- or returns to the loop having popped a dead timer.
+  turn-seg : ∀ {m e} → Calm m e → Seg (just (dead m)) (trace m) e
+  turn-seg (calm {st = st} h) = turning st h
+    where
+      turning : ∀ {h c} (st : State h) → Holding c st → Seg (just (dead ⟨ st , turn ⟩)) (trace ⟨ st , turn ⟩) (U.unfold c)
+      turning record { timers = [] } h =
+        subst (λ s → Seg _ idle (U.shown s)) (sym (dry-hush h refl)) idle~
+      turning record { heap = H ; timers = tm ∷ ts } h with lower (get H (Timer.handle tm)) in sp
+      ... | true  = tauˡ (if-true (λ m → Seg _ (shown (silent m)) _) sp (tauˡ (tauˡ (calm~ (calm (pop-dead h refl sp)) ≤-refl))))
+      ... | false = fire h refl sp
+
+  -- Segments glued at their calm points: each turn is a segment, and a run
+  -- of unguarded ones pops a dead timer each, so ends.
+  mutual
+    glue : ∀ {k l e} → Acc _<_ k → Seg (just k) l e → l ~ e
+    glue a (out~ s)            = out~ (glue∞ s)
+    glue a (tau~ s)            = tau~ (glue∞ s)
+    glue a (tauˡ s)            = tauˡ (glue a s)
+    glue a (skipʳ s)           = skipʳ (glue a s)
+    glue a end~                = end~
+    glue a idle~               = idle~
+    glue (acc rs) (calm~ c lt) = glue (rs lt) (turn-seg c)
+
+    glue∞ : ∀ {l r} → Seg∞ l r → l ~∞ r
+    force (glue∞ s) = glueⁿ (force s)
+
+    glueⁿ : ∀ {l e} → Seg nothing l e → l ~ e
+    glueⁿ (out~ s)             = out~ (glue∞ s)
+    glueⁿ (tau~ s)             = tau~ (glue∞ s)
+    glueⁿ (tauˡ s)             = tauˡ (glueⁿ s)
+    glueⁿ (skipʳ s)            = skipʳ (glueⁿ s)
+    glueⁿ end~                 = end~
+    glueⁿ idle~                = idle~
+    glueⁿ (calm~ {m} c _)      = glue (<-wellFounded (dead m)) (turn-seg c)
+
+  -- The program's run is what the root is shown.
+  sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
+  sim o = glueⁿ (start-seg o)
 
   ------------------------------------------------------------------------
   -- Below: every prefix placed
