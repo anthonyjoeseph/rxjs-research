@@ -27,8 +27,8 @@ open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; qu
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using (PureObs; Pureᴾ; same; _⊑_; _⨾_; module Pure)
 open import operation.Placed using (Placed; cut; quiets; sends; skips; module Ran)
-open import operation.PureObservable using (note; fin)
 open import Config using (_≅_; skipˡ; hush≅; module Nodes)
+open import Realize using (module Realizing)
 
 open Events∞
 
@@ -193,31 +193,10 @@ module Places (R : Set) where
   shown : ℕ → PureObs [] R → Events R
   shown n o = observe (⟦ o ⟧[ n ] []) root
 
-  -- The root's observer, in any world: it only records.
-  rootObs : ∀ {h} → Observer R h
-  rootObs = record { next = λ a → eff (note a) λ _ → done tt ; complete = eff fin λ _ → done tt ; closed = done false }
-
-  postulate
-    -- REALIZING A CONFIGURATION: the engine's state holds the tree `c`
-    -- with `o` its observer — every subscription's cells, timers and
-    -- registered observer against its node, the subjects in scope against
-    -- `ρ`.  One relation for the whole program, carried by the loop.
-    --
-    -- DEAD ROUTE: a relation per operator (a `Below s d`, against any
-    --   observer that keeps an abstract interface) cannot be carried.
-    --   Siblings that share one observer — a merge's lanes, a subject's
-    --   joiners — each hold a remainder only the shared state records, and
-    --   an abstract step returns its sibling's as an existential witness,
-    --   forgotten; and a merge's order needs every sibling's pending
-    --   positions, which an abstract subscription does not expose.
-    Realizes : ∀ n {Δ A h} → Nodes.Node n Δ A → Env Δ h → Observer A h → State h → Set₁
-    -- With no timer left, the tree has nothing pending.
-    realizes-dry : ∀ n {h} {c : Nodes.Node n [] R} {st : State h} → Realizes n c [] rootObs st → State.timers st ≡ [] → Nodes.Dry n c []
-
   -- THE CONFIGURATION: until the root completes, the state realizes a
   -- tree that means what is left of the root's events.
   Rest : ∀ (n : ℕ) {h} → Events R → State h → Set₁
-  Rest n r st = State.ended st ≡ false → Σ (Nodes.Node n [] R) λ c → Realizes n c [] rootObs st × r ≅ Nodes.⟦_⟧ᶜ n c []
+  Rest n r st = State.ended st ≡ false → Σ (Nodes.Node n [] R) λ c → Realizing.Realizes R n c st × r ≅ Nodes.⟦_⟧ᶜ n c []
 
   -- THE INVARIANT: the root's record so far, against the root's events,
   -- with what is left of them the configuration's.
@@ -247,7 +226,7 @@ module Places (R : Set) where
   -- With no timer left, a root not yet complete is shown nothing more.
   rest-dry : ∀ n {h} {r} {st : State h} → Rest n r st → State.ended st ≡ false → State.timers st ≡ [] → r ↝ hush
   rest-dry n {r = r} z e eq with z e
-  ... | c , q , b = ≅-hush (subst (r ≅_) (Nodes.dry-hush n c [] (realizes-dry n q eq)) b)
+  ... | c , q , b = ≅-hush (subst (r ≅_) (Nodes.dry-hush n c [] (Realizing.realizes-dry R n q eq)) b)
 
   -- A cut leaves the record a prefix.
   live-cut : ∀ n o {h} {st : State h} → Live n o st → At.CutOk n o 0 st
