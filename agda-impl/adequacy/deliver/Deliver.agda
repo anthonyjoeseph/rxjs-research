@@ -13,7 +13,7 @@
 -- taken every step under the one the frame took.  The frame's slot runs
 -- at least that one step, so a guard is passed before the continuation
 -- runs, and the continuation is unbounded.
-module Deliver where
+module adequacy.deliver.Deliver where
 
 open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.Nat using (ℕ; suc)
@@ -29,8 +29,8 @@ open import denotation.MonotonicList using (Time; Pos; Frame; Frame∞; From∞;
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Sink; Handle; same; grow; _⨾_; wk∋; module Pure) renaming (_⊑_ to _⊑ʷ_)
-open import Realize using (module Realizing)
-open import Segment using (module Seg)
+open import adequacy.Realize using (module Realizing)
+open import adequacy.Segment using (module Seg)
 
 -- Growing a world from where it stands.
 same-⨾ : ∀ {u v} (τ : u ⊑ʷ v) → same ⨾ τ ≡ τ

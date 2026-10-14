@@ -4,7 +4,7 @@
 -- the events the root is shown: a step on each side passes a guard, a
 -- silent one on either side alone passes finitely often, and a calm
 -- point resumes the run, unguarded only with fewer dead timers.
-module Segment where
+module adequacy.Segment where
 
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; _<_)
@@ -15,7 +15,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import denotation.MonotonicList using (Events; Events∞; Pos; out; skip; end; hush; tick)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
-open import Realize using (module Realizing)
+open import adequacy.Realize using (module Realizing)
 
 module Seg (R : Set) where
   open Machine R using (Mach; step; silent; shown; Trace; Trace∞; tau; out; end; idle; trace)

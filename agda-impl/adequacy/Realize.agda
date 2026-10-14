@@ -26,7 +26,7 @@
 -- joiners silenced, and only those two leave a trace the run still
 -- reads.  A spent timer is DEAD: popping it runs nothing, so the
 -- simulation's measure between two shows is the number of them.
-module Realize where
+module adequacy.Realize where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_])

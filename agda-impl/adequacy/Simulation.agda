@@ -21,7 +21,7 @@
 -- not; every item the events show is within some prefix.  The prefixes
 -- are a chain with no clock condition: a longer one extends the record
 -- of a cut one.
-module Simulation where
+module adequacy.Simulation where
 
 open import Data.List using ([]; _∷_; _++_; [_]; length)
 open import Data.List.Relation.Unary.All using ([])
@@ -44,11 +44,11 @@ import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
 open import operation.PureObservable using (PureObs; Sink; same; module Pure) renaming (_⊑_ to _⊑ʷ_)
-open import Realize using (module Realizing)
-open import Focus using (module Focusing)
-open import CatchUp using (Settle; stop; go; module Catching)
-open import Segment using (module Seg)
-open import Deliver using (module Delivering)
+open import adequacy.Realize using (module Realizing)
+open import adequacy.step.Focus using (module Focusing)
+open import adequacy.step.CatchUp using (Settle; stop; go; module Catching)
+open import adequacy.Segment using (module Seg)
+open import adequacy.deliver.Deliver using (module Delivering)
 
 module Sim (R : Set) where
   open Machine R using (Mach; ⟨_,_⟩; turn; burst; run; ret; loop; push; asked; sent; Stack; step; cbs; play; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)

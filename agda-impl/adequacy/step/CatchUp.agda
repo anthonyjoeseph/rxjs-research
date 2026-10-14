@@ -6,7 +6,7 @@
 -- source's own, at `ix 0`.  Every such step lies under `F` and every
 -- other next event past all of them (`Beyond F`), so the meaning takes
 -- exactly these, silently, in whatever order their positions give.
-module CatchUp where
+module adequacy.step.CatchUp where
 
 open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (All; head)
@@ -24,8 +24,8 @@ open import denotation.MonotonicList using (Pos; Frame; Frame∞; From; From∞;
 import denotation.Unfold as U
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; Sink; module Pure)
-open import Realize using (module Realizing)
-open import Focus using (Beyond; burst-head; module Shape)
+open import adequacy.Realize using (module Realizing)
+open import adequacy.step.Focus using (Beyond; burst-head; module Shape)
 
 -- Silent steps under `F`, to a node `P` holds of.
 data Settle {A : Set} (F : Pos) (P : U.Node A → Set) : U.Node A → U.Node A → Set₁ where

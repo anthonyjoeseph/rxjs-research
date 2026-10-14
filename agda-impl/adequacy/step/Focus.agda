@@ -6,7 +6,7 @@
 -- flatMap's other lanes and its outer, a connect's body beside its
 -- source, its source beside its body.  A connect shows its source's
 -- step below the source's own position, at `ix 0`.
-module Focus where
+module adequacy.step.Focus where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
@@ -29,7 +29,7 @@ import denotation.Unfold as U
 open import denotation.Unfold using (Srcs)
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; World; Sink; module Pure)
-open import Realize using (module Realizing)
+open import adequacy.Realize using (module Realizing)
 
 -- A next event, if any, after `q`.
 After : Pos → Maybe Pos → Set
