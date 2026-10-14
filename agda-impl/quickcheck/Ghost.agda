@@ -21,7 +21,8 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Unit using (tt)
 open import Data.Nat.Show using () renaming (show to showℕ)
-open import Data.String as S using (String)
+open import Data.String using (String)
+import Data.String as S
 
 import Tree as T
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)

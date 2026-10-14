@@ -160,123 +160,48 @@ point at one, the row is FALSITY.
 ## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-the root, positions forgotten down to ticks. Both halves are read off one weak
-simulation between the small-step machine's trace and the events the root is
-shown (`Simulation`): every prefix is placed below the meaning, and whatever
-the meaning shows some prefix shows. Expect the denotation to move under
-contact; it must be solid before Tier 2 is written over it.
+the root, positions forgotten down to ticks. Both halves are read off one
+weak simulation, `sim`, between the small-step machine's trace and the events
+the root is shown. The route, in `sim`'s header: every LIVE observer the
+machine has made is delivered exactly what its subtree's meaning shows before
+the run's position (B), kept one machine step at a time; and the run's
+position passes every one the root's meaning shows (C). Work the riskiest
+question first: try to REFUTE the route, and leave anything tractable last.
 
 ### Big picture tier roadmap
 
-- **A CASCADE, GUARDED.** `next-source` is a body (`feed`): the connect's
-  skip as the guard, then each subscriber in join order, a live joiner's
-  delivery a `delivering` calm point, finitely many silent steps between by
-  the list. Ruled out: a lagging copy free to show any value — `Lag` now
-  shows what the `Owed` list holds. Left: `feed-joiner`, the refocus from
-  the source up through the connect and down to a joiner in the body, and
-  back; then `feed-start`, `feed-pass`, `feed-end`; then the same shape
-  for `done-source`, `next-outer` and `done-inner`. Decides whether
-  `Owed` is enough to refocus.
-- **A FRAME, DELIVERED.** The frames `Above` does carry (`Climb`):
-  `next-take` (a cut reaching the hole), `next-scan` (the accumulator
-  written before the meaning steps), `next-inner`, `next-body`, `done-body`,
-  `done-take`, `done-outer`, and the root. `mid-start` and `back-sent`
-  bracket them. Ruled out: dropping a killed lane from the witness.
-- **THE FOCUS.** `settle-at`: the firing cold's step lifts to the root from
-  the witness alone (`clear`), and `catch-up` reads the rest off one
-  `Settle` chain under `q`, the cold's own next event past it
-  (`cold-next`). Ruled out: a sibling stepping first, and a refreshed
-  witness as the target. Left: the merge — every lane and both sides of a
-  connect settling under `q`, each settled one's next event `Beyond q`, so
-  the earliest is always one still settling; off the cold's path a body's
-  copies lag their sources. Decides whether `caught` pins a copy's every
-  step.
-- **THE PHASE MOVED, THE QUEUE.** `pop-live`, `reheld-stall`,
-  `reheld-quiet`, `reheld-later`: a cold's phase moved by `stepAt`, its
-  joiners `settled`, keeps every conjunct but `open≡`, the popped timer
-  pinned to one cold by `Timed` and `Ordered`, a later frame's timer queued
-  by `clocked`. Then `dry-hush` and `pop-dead`: an empty queue leaves
-  nothing to show, a dead pop moves only the clock. Decides whether the
-  order the queue keeps survives `insert`, and is enough to read the
-  meaning's silence off it.
-- **THE CALLBACKS, EXTENSIONALLY.** A stored callback is its kernel's
-  canonical observer up to `_≗_`: weakening composes, and every kernel
-  commutes with it; `≗-unweaken` and `closed-read` are its first uses. The apparatus the
-  turn's cases are written over; narrows nothing, and nothing in the turn
-  can be instantiated without it.
-- **THE START.** `start-seg`: the subscribe burst from an empty heap
-  reaches a calm point, by the same stepping as a turn. Decides whether a
-  `defer` reached synchronously, and a lane subscribed inside its parent's
-  burst, leave the witness `Holding` asks for.
-- **THE MEANING RISES.** `ticks-up` from the denotation's positions: each
-  event at a position past the last, headed by its tick, as `make placing`
-  checks. Rekeying a hot under `sub` keeps order only when no event sits
-  above another, so that prefix-freedom rides along. An induction over
-  `observe`'s unfolding, independent of the simulation; decides whether
-  the positions alone carry it.
+- **B AGAINST THE MEANING THE PROOF USES.** `Oracle-CLI exact` holds each
+  observer to `Denote`'s approximants; `sim` is stated over `Unfold`, whose
+  joiners step COPIES of their source. Re-run the check with each observer
+  held to its own `Unfold` node. A failure means the proof would have to go
+  through the approximants, the route already abandoned. Decides whether B
+  is true of the meaning `sim` names.
+- **B AT THE CONNECT FEED'S EDGES.** Hand-written programs aimed where both
+  earlier routes died, under `Oracle-CLI exact`: a joiner whose delivery
+  subscribes a new joiner to the same subject mid-feed (the list is read
+  once); the body completing mid-feed, cutting a source still owing its
+  joiners; a connect inside a joiner's lane; a joiner bursting inline, the
+  feed suspended. Decides whether random seeds were hiding a counterexample.
+- **C, REFUTED OR STATED.** C says the machine is silent forever at a fixed
+  position exactly when the meaning skips forever there. Try to break it: a
+  connect whose source spins while its body has later events, a lane that
+  spins on subscribe, a switch onto a spinning lane, a `takeWhile` cutting a
+  spinning source. If they agree, state C in Agda with its measure, what is
+  finite between two position advances. Decides whether a measure exists.
+- **B'S STEP AT THE FEEDER, IN AGDA.** `sim` over B and C as leaves, then
+  B's preservation through the feeder's loop, proved: each parent's node
+  built from its children's, every sibling past the position by B itself
+  rather than a separate invariant, a joiner not yet fed merely ahead of the
+  position. Decides whether the step both earlier routes failed is local.
+- **THE TRACTABLE REST, LAST.** Liveness in the heap's cut and closed flags;
+  B's steps at `map`, `scan` and `defer`; each kernel's state as a function
+  of what it was delivered; the root wiring; `ticks-up`. None is taken while
+  a leg above is open.
 
 ### The ledger
 
-- **`feed-joiner`** (Climb) — FALSITY, `NO EVIDENCE`: a live subscriber is the
-  tree's joiner, refocused from the source into the body, its copy owed the
-  value.
-- **`feed-pass`** (Climb) — FALSITY, `NO EVIDENCE`: a silenced subscriber's
-  position owed to no copy, the run past it moving no lag.
-- **`feed-start`** (Climb) — FALSITY, `NO EVIDENCE`: the source's event a skip
-  of the connect under the frames above, every subscriber owed it.
-- **`done-source`** (Climb) — FALSITY, `DEAD ROUTE`: a source's end, the
-  subject closed and each joiner finished.
-- **`next-outer`** (Climb) — FALSITY, `DEAD ROUTE`: an outer's value admitted,
-  a lane bursting inline from a grown context.
-- **`done-outer`** (Climb) — FALSITY, `NO EVIDENCE`: an outer's end settles the
-  flatMap.
-- **`next-take`** (Climb) — FALSITY, `NO EVIDENCE`: past the guard; a failing
-  value completes, then cuts the hole.
-- **`done-take`** (Climb) — FALSITY, `NO EVIDENCE`: an end past the guard.
-- **`next-inner`** (Climb) — FALSITY, `NO EVIDENCE`: a lane's value passed on
-  past its switch.
-- **`done-inner`** (Climb) — FALSITY, `DEAD ROUTE`: a lane's end handed on to
-  the queue.
-- **`feed-flag`** (Climb) — FALSITY, `NO EVIDENCE`: every subscriber the
-  subject holds is a join's sink, behind its flag.
-- **`feed-end`** (Climb) — FALSITY, `NO EVIDENCE`: every subscriber fed,
-  nothing owed but what was, the body past the source's event.
-- **`next-body`** (Climb) — FALSITY, `NO EVIDENCE`: a body's value is its
-  parent's.
-- **`done-body`** (Climb) — FALSITY, `NO EVIDENCE`: a body's end, then the
-  source cut.
-- **`next-scan`** (Climb) — FALSITY, `NO EVIDENCE`: the accumulator written
-  before the meaning's scan steps.
-- **`next-top`** (Climb) — FALSITY, `NO EVIDENCE`: the root records an emit.
-- **`done-top`** (Climb) — FALSITY, `NO EVIDENCE`: the root records the end.
-- **`mid-start`** (Deliver) — FALSITY, `RECOVERY`: a firing cold opened as the
-  hole, its slot the context's observer.
-- **`mid-start-done`** (Deliver) — FALSITY, `NO EVIDENCE`: a closing frame's
-  last skip taken, the cold spent at the hole.
-- **`back-sent`** (Deliver) — FALSITY, `NO EVIDENCE`: an emit's return closed
-  back to `Holding`, a cut cold's phase forgotten.
-- **`back-done`** (Deliver) — FALSITY, `NO EVIDENCE`: a completion's return
-  closed back to `Holding`, nothing firing.
-- **`settle-at`** (CatchUp) — FALSITY, `NO EVIDENCE`: the moved witness settles
-  under the cold's step, every copy caught up.
-- **`reheld-stall`** (Simulation) — FALSITY, `NO EVIDENCE`: a stalled cold's
-  witness still holds.
-- **`reheld-quiet`** (Simulation) — FALSITY, `NO EVIDENCE`: a cold closed
-  quiet, calm again.
-- **`reheld-later`** (Simulation) — FALSITY, `NO EVIDENCE`: a cold's next frame
-  queued, calm again.
-- **`≗-unweaken`** (Climb) — FALSITY, `NO EVIDENCE`: a program weakened to its
-  own world is itself, up to `_≗_`.
-- **`closed-read`** (Simulation) — FALSITY, `NO EVIDENCE`: a firing cold's
-  subscriber reads open, moving nothing.
-- **`pop-live`** (Realize) — FALSITY, `NO EVIDENCE`: a live timer popped, its
-  cold's frame burst from the same configuration.
-- **`dry-hush`** (Realize) — FALSITY, `NO EVIDENCE`: an empty queue, a
-  configuration with nothing to show.
-- **`pop-dead`** (Realize) — FALSITY, `NO EVIDENCE`: a dead timer popped keeps
-  the configuration.
-- **`start-seg`** (Simulation) — FALSITY, `NO EVIDENCE`: the subscribe burst
-  reaches a calm point.
+- **`sim`** (Simulation) — FALSITY, `DEAD ROUTE, RECOVERY`: the machine's trace
+  is the root's events up to silent steps; the route in its header.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 

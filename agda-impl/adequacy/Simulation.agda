@@ -9,13 +9,6 @@
 -- in both is related.  A machine working forever where the events
 -- `hush` is not.
 --
--- The relation is built by guarded corecursion up to CALM points
--- (`Realize`): a segment of the run shows at least one step on each side,
--- or reaches the loop again with fewer dead timers, related to what the
--- meaning has left.  So the run is cut where the machine's state is a
--- configuration — at its loop, or between two steps of a frame — and
--- nothing is related step by step inside a delivery.
---
 -- Both halves of adequacy are read off the one relation.  Every prefix
 -- of the trace is `Placed` against the events, so shows nothing they do
 -- not; every item the events show is within some prefix.  The prefixes
@@ -23,44 +16,23 @@
 -- of a cut one.
 module adequacy.Simulation where
 
-open import Data.List using ([]; _∷_; _++_; [_]; length)
+open import Data.List using ([]; _++_; [_]; length)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.Maybe using (just; nothing)
-open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; _∸_; z≤n; s≤s)
-open import Data.Nat.Induction using (<-wellFounded)
+open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl)
-open import Data.Product using (_,_; _×_; Σ; proj₂)
-open import Data.Unit using (tt)
-open import Induction.WellFounded using (Acc; acc)
-open import Level using (lower)
-open import Data.Bool using (Bool; true; false)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Data.Product using (_,_; Σ)
 
-open import denotation.MonotonicList using (Events; Events∞; Frame; Frame∞; From∞; Pos; ix; last; emit; stall; close; done; quiet; at; out; skip; end; hush; tick; observe; root)
+open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; observe; root)
 open import denotation.Order using (_⊑_; Chain)
 open import denotation.Unfold using (⟦_⟧)
-import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
-open import operation.PureObservable using (PureObs; Sink; same; module Pure) renaming (_⊑_ to _⊑ʷ_)
-open import adequacy.Realize using (module Realizing)
-open import adequacy.step.Focus using (module Focusing)
-open import adequacy.step.CatchUp using (Settle; stop; go; module Catching)
-open import adequacy.Segment using (module Seg)
-open import adequacy.deliver.Deliver using (module Delivering)
+open import operation.PureObservable using (PureObs; module Pure)
 
 module Sim (R : Set) where
-  open Machine R using (Mach; ⟨_,_⟩; turn; burst; run; ret; loop; push; asked; sent; Stack; step; cbs; play; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
-  open Realizing R using (Holding; firing; Sub; Phase; waiting; playing; nodeOf; spot-of; spot-step; forget; module At; dead; dry-hush; pop-dead; pop-live)
-  open Pure R using (State; Timer; Callbacks; get; put; insert; cascade)
+  open Machine R using (Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
   open Pure R using (cutOff; frames)
-  open Focusing R using (module On; clear; ahead)
-  open Catching R using (cold-next; module Under)
   open Read
-  open Seg R
-  open Seg∞
-  open Delivering R using (emit-seg; done-seg; next-at; done-at)
 
   ------------------------------------------------------------------------
   -- The relation
@@ -81,177 +53,32 @@ module Sim (R : Set) where
 
   open _~∞_
 
-  -- The witness at a burst point, its firing cold's phase moved.
-  moved : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-        → Holding (firing s hd τ r i b ∷ []) c st → Phase A → Sub h [] R
-  moved {st = st} H ph = At.stepAt (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) ph [] []
-
-  -- What is running is `c′`, by the moved witness up to the sources the
-  -- meaning holds: every joiner's copy caught up with its source, and a
-  -- held source dropped where a step beside it found it over.
-  Settles : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-          → Holding (firing s hd τ r i b ∷ []) c st → Phase A → U.Node R → Set₁
-  Settles {h} {st = st} H ph c′ = Σ (Sub h [] R) λ t → forget t ≡ forget (moved H ph)
-                                × At.Caught (State.heap st) t [] [] [] × At.Gated (State.heap st) t [] []
-                                × At.part (State.heap st) t [] [] ≡ just c′
-
-  -- A Settle chain is silent steps.
-  settle-skips : ∀ {F} {P : U.Node R → Set} {c c′} → Settle F P c c′ → Skips c c′
-  settle-skips (stop _)      = noneˢ
-  settle-skips (go _ e rest) = skipˢ e (settle-skips rest)
-
-  -- Then each joiner's copy of a source the step moved takes the same
-  -- steps, shown below its join point (`past`), silently: sources before
-  -- their joiners, every step under `q`, and every other next event past
-  -- them, the cold's own included (`cold-next`).  A cold left waiting on
-  -- its end is not `Gated`: that frame closes by `done-seg` instead.
-  catch-up : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-           → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
-           → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph) → At.unended (State.heap st) ph ≡ true
-           → ∀ {c₁} → At.part (State.heap st) (moved H ph) [] [] ≡ just c₁
-           → Σ (U.Node R) λ c′ → Skips c₁ c′ × Settles H ph c′
-  catch-up {st = st} H lv {q} {ph} eq un moved≡ with ahead H eq
-  ... | pF , pend
-    with U′.settle-at (Holding.tree H) (Holding.firing≡ H) {[]} {[]} {[]} {ph} lv un (cold-next H eq)
-                      (Holding.gated H) (Holding.caught H) tt pend (Holding.past H) (trans (spot-step (Holding.tree H) (Holding.firing≡ H)) eq)
-    where module U′ = Under (State.heap st) (State.pos st) q pF
-  ... | t′ , fg , ca , ga , rn with Under.runM-just (State.heap st) (State.pos st) q pF (At.part (State.heap st) t′ [] [])
-                                                     (subst (λ m → Under.RunM (State.heap st) (State.pos st) q pF m _) moved≡ rn)
-  ... | c′ , part≡ , sc = c′ , settle-skips sc , t′ , fg , ca , ga , part≡
-
   postulate
-    -- The subscribe burst, up to the first calm point.
-    start-seg : (o : PureObs [] R) → Seg nothing (trace (begin o)) (observe (⟦ o ⟧ []) root)
-
-    -- A firing cold's subscriber is read open, and reading it moves nothing.
-    closed-read : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u} {K : Stack h Bool}
-                → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-                → ⟨ st , run (Callbacks.isClosed (cbs st s)) same K ⟩ ⇒ ⟨ st , ret false same K ⟩
-
-    -- The witness with the cold's phase moved by a silent step holds what
-    -- is running: one step on, quiet, or its next frame queued.
-    reheld-stall : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : Frame∞ A u}
-                 → (H : Holding (firing s hd τ r i (stall k′) ∷ []) c st)
-                 → Settles H (playing τ r (suc i) (Frame∞.force k′)) c′
-                 → Holding (firing s hd τ r (suc i) (Frame∞.force k′) ∷ []) c′ st
-    reheld-quiet : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
-                 → (H : Holding (firing s hd τ r i (close k′) ∷ []) c st)
-                 → Settles H (waiting {u = suc u} τ (r ++ [ last ]) quiet) c′
-                 → Holding [] c′ st
-    reheld-later : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {t} {le : suc u ≤ t} {b : Frame A t}
-                 → (H : Holding (firing s hd τ r i (close k′) ∷ []) c st)
-                 → Settles H (waiting τ (r ++ [ last ]) (at t le b)) c′
-                 → Holding [] c′ (record st { timers = insert (record { due = State.clock st + (t ∸ u) ; sink = s ; handle = hd
-                                                                      ; at′ = t ; from = r ++ [ last ] ; frame = b })
-                                                            (State.timers st) })
-
-  -- A live firing cold's step silent at its own position: the meaning's
-  -- next step is it, lifted through the cold's context, to the witness
-  -- with the cold's phase moved, every connect above it stepped, and
-  -- every joiner's copy where it was.
-  cold-skip : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-            → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
-            → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
-            → Σ Pos λ p → Σ (U.Node R) λ c₁ → U.step c ≡ U.skipˢ p c₁ × At.part (State.heap st) (moved H ph) [] [] ≡ just c₁
-  cold-skip {st = st} H lv eq with On.lift-skip (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) {E = []} {ρ = []} lv (Holding.gated H)
-                                                 (clear H lv eq) (trans (spot-step (Holding.tree H) (Holding.firing≡ H)) eq)
-  ... | n , c₁ , open≡ , first , moved≡ = _ , c₁ , subst (λ x → U.step x ≡ _) (just-injective (trans (sym open≡) (Holding.open≡ H))) first , moved≡
-
-  -- A live firing cold's step silent at its own position: the meaning's
-  -- next steps are it, then its joiners' copies catching up.
-  focus-skip : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-             → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
-             → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph) → At.unended (State.heap st) ph ≡ true
-             → Passes c (Settles H ph)
-  focus-skip H lv eq un with cold-skip H lv eq
-  ... | _ , _ , first , moved≡ with catch-up H lv eq un moved≡
-  ... | _ , rest , settled≡ = passes first rest settled≡
-
-  -- A stall: the cold's step, silent at the root, and the next one stands.
-  stall-step : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : Frame∞ A u}
-             → Holding (firing s hd τ r i (stall k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-             → Passes c λ c′ → Holding (firing s hd τ r (suc i) (Frame∞.force k′) ∷ []) c′ st
-  stall-step H lv = mapᴾ (reheld-stall H) (focus-skip H lv refl refl)
-
-  -- A frame closing on a timeline gone quiet, or on a later frame, its
-  -- timer queued: silent at the root, and the loop is calm again.
-  quiet-step : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
-             → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ quiet
-             → Passes c λ c′ → Holding [] c′ st
-  quiet-step {u = u} {τ} {r = r} {i} H lv fk =
-    mapᴾ (reheld-quiet H) (focus-skip H lv {ph = waiting {u = suc u} τ (r ++ [ last ]) quiet}
-                                       (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk) refl)
-
-  later-step : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {t} {le : suc u ≤ t} {b : Frame A t}
-             → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ at t le b
-             → Passes c λ c′ → Holding [] c′ (record st { timers = insert (record { due = State.clock st + (t ∸ u) ; sink = s ; handle = hd
-                                                                                    ; at′ = t ; from = r ++ [ last ] ; frame = b })
-                                                                          (State.timers st) })
-  later-step {τ = τ} {r = r} {i} {t = t} {le} {b} H lv fk =
-    mapᴾ (reheld-later H) (focus-skip H lv {ph = waiting τ (r ++ [ last ]) (at t le b)}
-                                       (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk) refl)
-
-  -- A live cold's frame, burst from the loop, a step at a time: it shows
-  -- at least one step on each side before a calm point, so the segment
-  -- passes a guard first, whatever bound it is under.
-  played : ∀ {w h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} (b : Frame A u) {σ : w ⊑ʷ h}
-         → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-         → ∀ {bd} → Seg bd (shown (silent (play st s hd u r i b σ loop))) (U.unfold c)
-  played (emit a k′) h lv = if-false (λ m → Seg _ (shown (silent m)) _) lv (emit-seg h lv)
-  played (stall k′)  h lv = passing (stall-step h lv) λ h′ → calm~ (bursting h′ lv) tt
-  played (close k′)  h lv with From∞.force k′ in fk
-  ... | done      = if-false (λ m → Seg _ (shown (silent m)) _) lv (done-seg h lv fk)
-  ... | quiet     = passing (quiet-step h lv fk) λ h′ → tauˡ (calm~ (calm h′) tt)
-  ... | at t le b = passing (later-step h lv fk) λ h′ → tauˡ (calm~ (calm h′) tt)
-
-  burst-seg : ∀ {w h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u} {σ : w ⊑ʷ h}
-            → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-            → ∀ {bd} → Seg bd (trace ⟨ st , burst s hd u r i b σ loop ⟩) (U.unfold c)
-  burst-seg {b = b} h lv = tauˡ (if-false (λ m → Seg _ (trace m) _) lv (taus (closed-read h lv) (played b h lv)))
-
-  -- From a calm point: a turn of the loop shows a step on each side, or
-  -- returns to the loop having popped a dead timer; a burst shows a step
-  -- on each side.
-  resume : ∀ {m e} → Calm m e → Seg (just (dead m)) (trace m) e
-  resume (calm {st = st} h) = turning st h
-    where
-      turning : ∀ {h c} (st : State h) → Holding [] c st → Seg (just (dead ⟨ st , turn ⟩)) (trace ⟨ st , turn ⟩) (U.unfold c)
-      turning record { timers = [] } h =
-        subst (λ s → Seg _ idle (U.shown s)) (sym (dry-hush h refl)) idle~
-      turning record { heap = H ; timers = tm ∷ ts } h with lower (get H (Timer.handle tm)) in sp
-      ... | true  = tauˡ (if-true (λ m → Seg _ (shown (silent m)) _) sp (tauˡ (tauˡ (calm~ (calm (pop-dead h refl sp)) ≤-refl))))
-      ... | false = tauˡ (burst-seg (proj₂ (pop-live h refl sp)) sp)
-  resume (bursting h lv) = burst-seg h lv
-  resume (delivering M e p F a≗ κ) = next-at M e p F a≗ κ
-  resume (finishing M e p F a≗ κ) = done-at M e p F a≗ κ
-
-  -- Segments glued at their calm points: each turn is a segment, and a run
-  -- of unguarded ones pops a dead timer each, so ends.
-  mutual
-    glue : ∀ {k l e} → Acc _<_ k → Seg (just k) l e → l ~ e
-    glue a (out~ s)            = out~ (glue∞ s)
-    glue a (tau~ s)            = tau~ (glue∞ s)
-    glue a (tauˡ s)            = tauˡ (glue a s)
-    glue a (skipʳ s)           = skipʳ (glue a s)
-    glue a end~                = end~
-    glue a idle~               = idle~
-    glue (acc rs) (calm~ c lt) = glue (rs lt) (resume c)
-
-    glue∞ : ∀ {l r} → Seg∞ (Trace∞.force l) (Events∞.force r) → l ~∞ r
-    force (glue∞ s) = glueⁿ (force s)
-
-    glueⁿ : ∀ {l e} → Seg nothing l e → l ~ e
-    glueⁿ (out~ s)             = out~ (glue∞ s)
-    glueⁿ (tau~ s)             = tau~ (glue∞ s)
-    glueⁿ (tauˡ s)             = tauˡ (glueⁿ s)
-    glueⁿ (skipʳ s)            = skipʳ (glueⁿ s)
-    glueⁿ end~                 = end~
-    glueⁿ idle~                = idle~
-    glueⁿ (calm~ {m} c _)      = glue (<-wellFounded (dead m)) (resume c)
-
-  -- The program's run is what the root is shown.
-  sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
-  sim o = glueⁿ (start-seg o)
+    -- The program's run is what the root is shown.
+    --
+    -- The route: an invariant over every LIVE observer the machine has
+    -- made, each delivered exactly what its subtree's meaning shows at
+    -- positions before the run's (`Oracle-CLI exact`), kept by each step
+    -- of the machine, one observer at a time; and progress, the run's
+    -- position passing every one the root's meaning shows, the two
+    -- sides ending, falling quiet or spinning at the same point.  An
+    -- observer is dead once it completes, a switch moves off it, or the
+    -- observer that subscribed it is dead.
+    --
+    -- DEAD ROUTE: one exact relation at a single hole of the tree,
+    --   delivery climbing the context frame by frame.  A connect's feed
+    --   and a lane bursting inline deliver at a context deeper than the
+    --   frame's, and refocusing the hole there needs the whole invariant
+    --   rebuilt at every frame on the way up and down.
+    --
+    -- RECOVERY: `git show 94ae8083` restores the single-hole route
+    --   (`adequacy.Realize`, `adequacy.Segment`, `adequacy.deliver`,
+    --   `adequacy.step`): the heap realizing a configuration (`Holds`,
+    --   `Joined`, `Dead`), calm points and the glue over them.  The same commit restores
+    --   the order on positions in `denotation.MonotonicList`: strict,
+    --   transitive, total, past a position past everything under it, a
+    --   burst's steps before its close, cascades never nesting.
+    sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
 
   ------------------------------------------------------------------------
   -- Below: every prefix placed

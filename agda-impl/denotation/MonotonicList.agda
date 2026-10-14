@@ -19,11 +19,10 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; 
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n)
+open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong; cong₂)
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
@@ -231,125 +230,6 @@ private
     ... | inj₂ (x , _) | inj₁ y       rewrite subst (λ z → cmpLabel z c ≡ lt) (sym (eq-label a b x)) y = refl
     ... | inj₂ (x , u) | inj₂ (y , v)
       rewrite subst (λ z → cmpLabel z c ≡ eq) (sym (eq-label a b x)) y | lt-pos p q r u v = refl
-
-  refl-ℕ : ∀ m → cmpℕ m m ≡ eq
-  refl-ℕ m with m <ᵇ m in e
-  ... | true  = ⊥-elim (n≮n m (<ᵇ⇒< m m (subst T (sym e) tt)))
-  ... | false = refl
-
-  mutual
-    refl-label : ∀ a → cmpLabel a a ≡ eq
-    refl-label (ix m)  = refl-ℕ m
-    refl-label (sub p) = refl-pos p
-    refl-label last    = refl
-
-    refl-pos : ∀ p → cmpPos p p ≡ eq
-    refl-pos []      = refl
-    refl-pos (a ∷ p) rewrite refl-label a = refl-pos p
-
-  lt-ext : ∀ p q d → cmpPos p q ≡ lt → cmpPos p (q ++ d) ≡ lt
-  lt-ext []      (_ ∷ _) d _ = refl
-  lt-ext []      []      d ()
-  lt-ext (_ ∷ _) []      d ()
-  lt-ext (a ∷ p) (b ∷ q) d h with lexi-lt (cmpLabel a b) (cmpPos p q) h
-  ... | inj₁ x       rewrite x = refl
-  ... | inj₂ (x , y) rewrite x = lt-ext p q d y
-
-  isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
-  isLt-lt {lt} h = refl
-  isLt-lt {eq} ()
-  isLt-lt {gt} ()
-
-  isLt-not : ∀ c → (c ≡ lt → ⊥) → isLt c ≡ false
-  isLt-not lt n = ⊥-elim (n refl)
-  isLt-not eq n = refl
-  isLt-not gt n = refl
-
-  lt≢eq : lt ≡ eq → ⊥
-  lt≢eq ()
-
-  gt-ℕ′ : ∀ {m n} → cmpℕ m n ≡ gt → n < m
-  gt-ℕ′ {m} {n} h with m <ᵇ n | n <ᵇ m in e
-  gt-ℕ′ {m} {n} () | true  | _
-  gt-ℕ′ {m} {n} h  | false | true  = <ᵇ⇒< n m (subst T (sym e) tt)
-  gt-ℕ′ {m} {n} () | false | false
-
-  gt-ℕ : ∀ {m n} → cmpℕ m n ≡ gt → cmpℕ n m ≡ lt
-  gt-ℕ {m} {n} h = ℕ-lt {n} {m} (gt-ℕ′ {m} {n} h)
-
-  lexi-gt : ∀ c r → lexi c r ≡ gt → c ≡ gt ⊎ (c ≡ eq × r ≡ gt)
-  lexi-gt lt r ()
-  lexi-gt eq r h = inj₂ (refl , h)
-  lexi-gt gt r h = inj₁ refl
-
-  mutual
-    gt-label : ∀ a b → cmpLabel a b ≡ gt → cmpLabel b a ≡ lt
-    gt-label (ix m)  (ix n)  h = gt-ℕ {m} {n} h
-    gt-label (sub _) (ix _)  _ = refl
-    gt-label (sub p) (sub q) h = gt-pos p q h
-    gt-label last    (ix _)  _ = refl
-    gt-label last    (sub _) _ = refl
-    gt-label (ix _)  (sub _) ()
-    gt-label (ix _)  last    ()
-    gt-label (sub _) last    ()
-    gt-label last    last    ()
-
-    gt-pos : ∀ p q → cmpPos p q ≡ gt → cmpPos q p ≡ lt
-    gt-pos []      []      ()
-    gt-pos []      (_ ∷ _) ()
-    gt-pos (_ ∷ _) []      _ = refl
-    gt-pos (a ∷ p) (b ∷ q) h with lexi-gt (cmpLabel a b) (cmpPos p q) h
-    ... | inj₁ x       rewrite gt-label a b x = refl
-    ... | inj₂ (x , y) rewrite subst (λ z → cmpLabel b z ≡ eq) (sym (eq-label a b x)) (refl-label b) = gt-pos p q y
-
-  nil-lt : ∀ p → cmpPos p [] ≡ lt → ⊥
-  nil-lt []      ()
-  nil-lt (_ ∷ _) ()
-
--- Strict, and past a position is past everything under it.
-<ᵖ-asym : ∀ p q → p <ᵖ q ≡ true → q <ᵖ p ≡ false
-<ᵖ-asym p q h = isLt-not (cmpPos q p) λ e → lt≢eq (trans (sym (lt-pos p q p (isLt-lt h) e)) (refl-pos p))
-
-<ᵖ-ext : ∀ p q d → p <ᵖ q ≡ true → p <ᵖ (q ++ d) ≡ true
-<ᵖ-ext p q d h = cong isLt (lt-ext p q d (isLt-lt h))
-
-<ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
-<ᵖ-trans p q r h₁ h₂ = cong isLt (lt-pos p q r (isLt-lt h₁) (isLt-lt h₂))
-
--- Total: what `p` precedes, anything `p` is not before precedes too.
-<ᵖ-past : ∀ p j q → p <ᵖ j ≡ false → p <ᵖ q ≡ true → j <ᵖ q ≡ true
-<ᵖ-past p j q h₁ h₂ = go (cmpPos p j) refl h₁
-  where go : ∀ c → cmpPos p j ≡ c → isLt c ≡ false → j <ᵖ q ≡ true
-        go lt e ()
-        go eq e _ = subst (λ z → z <ᵖ q ≡ true) (eq-pos p j e) h₂
-        go gt e _ = cong isLt (lt-pos j p q (gt-pos p j e) (isLt-lt h₂))
-
--- An operator's effect comes before every subscription under it.
-<ᵖ-ix-sub : ∀ p n x → (p ++ [ ix n ]) <ᵖ (p ++ [ sub x ]) ≡ true
-<ᵖ-ix-sub []      n x = refl
-<ᵖ-ix-sub (a ∷ p) n x rewrite refl-label a = <ᵖ-ix-sub p n x
-
--- A burst's step comes before everything under its later steps, its
--- close, and every later tick.
-<ᵖ-ix-lt : ∀ p m n Y Z → m < n → ((p ++ [ ix m ]) ++ Y) <ᵖ (p ++ ix n ∷ Z) ≡ true
-<ᵖ-ix-lt []      m n Y Z l rewrite ℕ-lt {m} {n} l = refl
-<ᵖ-ix-lt (a ∷ p) m n Y Z l rewrite refl-label a = <ᵖ-ix-lt p m n Y Z l
-
-<ᵖ-ix-last : ∀ p n Y Z → ((p ++ [ ix n ]) ++ Y) <ᵖ (p ++ last ∷ Z) ≡ true
-<ᵖ-ix-last []      n Y Z = refl
-<ᵖ-ix-last (a ∷ p) n Y Z rewrite refl-label a = <ᵖ-ix-last p n Y Z
-
--- Cascades never nest: one past a point under the burst at a non-empty
--- `x ∷ r` is past every step of that burst.
-<ᵖ-cascade : ∀ x r d i Y a e → (x ∷ r ++ d) <ᵖ (ix a ∷ sub e ∷ []) ≡ true → (x ∷ r ++ ix i ∷ Y) <ᵖ (ix a ∷ sub e ∷ []) ≡ true
-<ᵖ-cascade x r d i Y a e h with lexi-lt (cmpLabel x (ix a)) (cmpPos (r ++ d) (sub e ∷ [])) (isLt-lt h)
-... | inj₁ l       rewrite l = refl
-... | inj₂ (l , m) rewrite l = below r m
-  where below : ∀ r → cmpPos (r ++ d) (sub e ∷ []) ≡ lt → isLt (cmpPos (r ++ ix i ∷ Y) (sub e ∷ [])) ≡ true
-        below []      _ = refl
-        below (y ∷ r) m with lexi-lt (cmpLabel y (sub e)) (cmpPos (r ++ d) []) m
-        ... | inj₁ l′      rewrite l′ = refl
-        ... | inj₂ (_ , n) = ⊥-elim (nil-lt (r ++ d) n)
 
 ------------------------------------------------------------------------
 -- What a subscriber sees
