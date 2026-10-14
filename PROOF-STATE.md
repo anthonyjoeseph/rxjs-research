@@ -173,9 +173,12 @@ must be solid before Tier 2 is written over it.
   no more") holds of `connect`'s subject.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
-- **THE LIMITS.** `run-rel`, `run-bound`, `diagonal`, the two chains,
-  `⟦⟧-limit` from `lub-limit` once the approximants are `Settling` (as `make
-  chain` measures); `squeeze` then meets them.
+- **THE ROOT.** `run-rel` and `run-bound`: `Rel`'s two halves read off at
+  the root, through the pure runtime's observation; decides whether `Rel` is
+  stated where `runPure` can see it.
+- **THE DENOTATION'S LIMIT.** `approx-chain`, then `⟦⟧-limit` from
+  `lub-limit` once the approximants are `Settling` (as `make chain` measures);
+  `squeeze` then meets them.
 
 ### The ledger
 
@@ -185,8 +188,8 @@ must be solid before Tier 2 is written over it.
   against the hot handle.
 - **`{empty,of,map,scan,takeWhile,flatMap,cold,connected,defer,bot}-rel`**
   (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
-- **`run-rel`, `run-bound`, `diagonal`, `toArray-chain`, `approx-chain`,
-  `⟦⟧-limit`** (Adequacy) — FALSITY, `NO EVIDENCE`: from approximants to limits.
+- **`run-rel`, `run-bound`, `approx-chain`, `⟦⟧-limit`** (Adequacy) —
+  FALSITY, `NO EVIDENCE`: from approximants to limits.
 
 ## Tier 2 — the simultaneous spec
 

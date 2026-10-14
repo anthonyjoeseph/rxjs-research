@@ -27,7 +27,7 @@ open import Data.Unit using (⊤; tt)
 open import Level using (Lift; lift; lower)
 
 open import Tree using (Obs; Later)
-open import operation.AbstractObservable using (Ty; base; Prims; module Run)
+open import operation.AbstractObservable using (Ty; Prims; module Run)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Timeline)
 
 ------------------------------------------------------------------------
@@ -241,25 +241,28 @@ module Pure (R : Set) where
     schedule s hd now (at t b) = setTimer s hd (t ∸ now) t b
 
     -- A closed subscriber or a spent cold stops the playing.
-    burst : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Burst A → M w ⊤
-    burst zero    s hd t b = λ σ st → res same st nothing
-    burst (suc f) s hd t b = bind (closedᴾ s hd) λ c → if c then ret tt else step b
-      where
-        step : Burst _ → M _ ⊤
-        step (emit a k) = bind (unlessSpent hd (sendᴾ s a)) λ _ → unlessSpent hd (burst f s hd t (Burst∞.force k))
-        step (stall k)  = burst f s hd t (Burst∞.force k)
-        step (close k)  = schedule s hd t (ML∞.force k)
+    mutual
+      burst : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Burst A → M w ⊤
+      burst zero    s hd t b = λ σ st → res same st nothing
+      burst (suc f) s hd t b = bind (closedᴾ s hd) λ c → if c then ret tt else stepᴾ f s hd t b
+
+      stepᴾ : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Burst A → M w ⊤
+      stepᴾ f s hd t (emit a k) = bind (unlessSpent hd (sendᴾ s a)) λ _ → unlessSpent hd (burst f s hd t (Burst∞.force k))
+      stepᴾ f s hd t (stall k)  = burst f s hd t (Burst∞.force k)
+      stepᴾ f s hd t (close k)  = schedule s hd t (ML∞.force k)
 
     first : ∀ {w A} → Sink w A → Handle w → ML A → M w ⊤
     first s hd (at 0 b) = burst n s hd 0 b
     first s hd m        = schedule s hd 0 m
 
+    fire : ∀ {h} → List (Timer h) → State h → Res h Bool
+    fire []        st = res same st (just false)
+    fire (tm ∷ ts) st = then (λ _ _ st′ → res same st′ (just true))
+                          (unlessSpent (Timer.handle tm) (burst n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (Timer.frame tm))
+                            same (record st { clock = Timer.due tm ; timers = ts }))
+
     nextᴾ : ∀ {w} → M w Bool
-    nextᴾ σ st with State.timers st
-    ... | []       = res same st (just false)
-    ... | tm ∷ ts = then (λ _ _ st′ → res same st′ (just true))
-                         (unlessSpent (Timer.handle tm) (burst n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (Timer.frame tm))
-                           same (record st { clock = Timer.due tm ; timers = ts }))
+    nextᴾ σ st = fire (State.timers st) st
 
   -- The record's effects.
   outcome : ∀ {h X} → Out R X → State h → Res h X
@@ -330,13 +333,14 @@ module Pure (R : Set) where
     ; complete = eff fin λ _ → done tt
     ; closed   = done false }
 
+  -- Whether the root completed, whether the run finished, the clock.
+  endOf : Bool → Maybe ⊤ → ℕ → End
+  endOf true  _        _ = finished
+  endOf false (just _) _ = dry
+  endOf false nothing  c = cutOff c
+
   observe : Res [] ⊤ → ML R
-  observe (res σ st v) = frames (State.log st) (end v (State.ended st))
-    where
-      end : Maybe ⊤ → Bool → End
-      end _        true  = finished
-      end (just _) false = dry
-      end nothing  false = cutOff (State.clock st)
+  observe (res σ st v) = frames (State.log st) (endOf (State.ended st) v (State.clock st))
 
   -- Approximant n of the compiler: a `defer` nested more than n deep shows
   -- nothing.  Lines up clause for clause with `denotation.Denote.approx`.

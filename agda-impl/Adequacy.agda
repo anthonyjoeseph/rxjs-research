@@ -25,12 +25,13 @@ module Adequacy where
 open import Data.List using (List; _∷_; [])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_)
+open import Data.Nat using (ℕ; zero; suc; _⊔_)
 open import Data.Nat.Properties using (≤-refl; n≤1+n; m≤m⊔n; m≤n⊔m)
 open import Level using (lower)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import operation.AbstractObservable using (module Run)
+open import operation.Budget using (module Approx)
 open import operation.PureObservable using (Pureᴾ; PureObs; module Pure; toArray) renaming (_⊑_ to _≤ʷ_)
 open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ)
 open import denotation.Order using (_⊑_; ⊑-trans; _≃_; ≃-trans; limit; Chain; squeeze; limit-ub; limit-least)
@@ -48,6 +49,7 @@ approxAt o n = ticks (observe (⟦ o ⟧[ n ] []) root)
 module Link (R : Set) where
   open Run (Pureᴾ R)
   open Pure R using (runPure; compileᴺ)
+  open Approx R using (runPure-mono)
 
   postulate
     -- "Subscribing with `s` at any position p, in any heap, shows what `d`
@@ -101,11 +103,6 @@ module Link (R : Set) where
             → Rel s d → ticks (observe d root) ⊑ limit (λ m → runPure m s)
     run-bound : ∀ {s : Subscribe R []} {d}
               → Rel s d → ∀ m → runPure m s ⊑ ticks (observe d root)
-
-    -- A bigger budget, running a deeper approximant of the compiler, shows
-    -- more: the budget only ever cuts a run short.
-    runPure-mono : ∀ {m m′ n n′} (o : PureObs [] R) → m ≤ m′ → n ≤ n′
-                 → runPure m (compileᴺ n o []) ⊑ runPure m′ (compileᴺ n′ o [])
 
     -- A deeper approximant of the denotation shows more.
     approx-chain  : (o : PureObs [] R) → Chain (approxAt o)
