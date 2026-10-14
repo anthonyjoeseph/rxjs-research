@@ -222,7 +222,9 @@ module Run (P : Prims) where
   _>>ᴬ_ : ∀ {w B} → Act w ⊤ → Act w B → Act w B
   m >>ᴬ n = m >>=ᴬ λ _ → n
 
-  private
+  -- The kernels' toolkit, named so that proofs about the kernels can
+  -- name it too.
+  module Kit where
     skipᴬ : ∀ {w} → Act w ⊤
     skipᴬ = done tt
 
@@ -290,6 +292,8 @@ module Run (P : Prims) where
     guarded c o = record { next = λ a → guard c (Observer.next o a) ; complete = guard c (Observer.complete o)
                          ; closed = readB (live c) λ b → if b then Observer.closed o else done true }
 
+  open Kit
+
   -- THE OPERATORS.  Each is a kernel over its children's `Subscribe`, so
   -- each is written, and later proven, on its own.  A synchronous source
   -- delivers its whole burst before its continuation runs, as an rxjs
@@ -297,12 +301,13 @@ module Run (P : Prims) where
   emptyᴷ : ∀ {A w} → Subscribe A w
   emptyᴷ ρ o k = Observer.complete o >>ᴬ k ⊑-refl noSub
 
+  -- Each value, then the completion, while the observer stays open.
+  emitAll : ∀ {A w} → Observer A w → List A → Act w ⊤
+  emitAll o []       = Observer.complete o
+  emitAll o (x ∷ xs) = Observer.closed o >>=ᴬ λ c → when (not c) (Observer.next o x >>ᴬ emitAll o xs)
+
   ofᴷ : ∀ {A w} → List A → Subscribe A w
-  ofᴷ {A} xs {v} ρ o k = go xs >>ᴬ k ⊑-refl noSub
-    where
-      go : List A → Act v ⊤
-      go []       = Observer.complete o
-      go (x ∷ xs) = Observer.closed o >>=ᴬ λ c → when (not c) (Observer.next o x >>ᴬ go xs)
+  ofᴷ xs ρ o k = emitAll o xs >>ᴬ k ⊑-refl noSub
 
   mapᴷ : ∀ {A B w} → (A → B) → Subscribe A w → Subscribe B w
   mapᴷ f s ρ o = s ρ (record { next = λ a → Observer.next o (f a) ; complete = Observer.complete o ; closed = Observer.closed o })
@@ -330,7 +335,7 @@ module Run (P : Prims) where
   -- recursion through a callback.  The knot is tied in the heap, not in
   -- Agda — `refill` is a registered sink whose callback dequeues — so
   -- each runtime closes it as it closes any stored callback.
-  private
+  module FlatKit where
     record Flat (A : Set) (w : World) : Set where
       field
         active    : Ref w (base ℕ)
@@ -360,16 +365,21 @@ module Run (P : Prims) where
 
       -- No lane is started for a closed subscriber: that is what stops a
       -- synchronous recursion once its output is cut.
+      -- A freed slot goes to the refill sink once it exists, else settles.
+      handOn : ∀ {v} → w ⊑ v → Maybe (Sink v ⊤) → Act v ⊤
+      handOn σ nothing  = wkAct σ settle
+      handOn σ (just r) = send r tt skipᴬ
+
+      -- A lane's observer: its completion frees its slot, and hands it on.
+      lane : ∀ {v} → w ⊑ v → Cut v → Observer B v
+      lane σ c = let st′ = wkFlat σ st ; o′ = wkObs σ o in
+        record { next = Observer.next o′
+               ; complete = writeRef (live c) false (modifyB (Flat.active st′) pred >>ᴬ readRef (Flat.refill st′) λ τ → handOn (σ ⨾ τ))
+               ; closed = Observer.closed o′ }
+
       start : Subscribe B w → Act w ⊤
       start l = Observer.closed o >>=ᴬ λ cl → when (not cl) (modifyB active suc >>ᴬ newCut λ σ c →
-        let st′ = wkFlat σ st ; o′ = wkObs σ o in
-        modify (Flat.lanes st′) (λ τ cs → wkCut τ c ∷ cs) >>ᴬ
-        l σ (guarded c (record { next = Observer.next o′
-                               ; complete = writeRef (live c) false (modifyB (Flat.active st′) pred >>ᴬ readRef (Flat.refill st′) λ τ → λ where
-                                   nothing  → wkAct (σ ⨾ τ) settle
-                                   (just r) → send r tt skipᴬ)
-                               ; closed = Observer.closed o′ }))
-          λ τ → attach (wkCut τ c))
+        modify (Flat.lanes (wkFlat σ st)) (λ τ cs → wkCut τ c ∷ cs) >>ᴬ l σ (guarded c (lane σ c)) λ τ → attach (wkCut τ c))
 
       dequeue : Act w ⊤
       dequeue = readB queue λ where
@@ -387,6 +397,8 @@ module Run (P : Prims) where
         s σ (guarded (wkCut σ oc) (record { next = λ a → wkAct σ (admit op a) ; complete = writeRef (Flat.outerDone (wkFlat σ st)) true (wkAct σ settle)
                                           ; closed = Observer.closed (wkObs σ o) }))
           λ τ sub → attach (wkCut (σ ⨾ τ) oc) sub >>ᴬ k (σ ⨾ τ) (record { unsubscribe = cut (wkCut (σ ⨾ τ) oc) >>ᴬ wkAct (σ ⨾ τ) killAll }))
+
+  open FlatKit
 
   flatMapᴷ : ∀ {A B w} → FlatOp → (A → Subscribe B w) → Subscribe A w → Subscribe B w
   flatMapᴷ op f s ρ o k = newFlat λ σ st → newCut λ τ oc →
