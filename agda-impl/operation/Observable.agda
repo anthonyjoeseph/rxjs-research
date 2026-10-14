@@ -9,12 +9,11 @@
 -- set.  Time is the loop's own counter, so a run takes no wall-clock
 -- time and two runs of one program agree.
 --
--- `subscribe` is the one place the rules bend.  The pure runtime closes
--- the engine's recursion by unfolding it n times; a real program needs
--- every unfolding, and IO cannot re-run to take the limit, so here it is
--- closed with Haskell's `fix`.  That is sound only because nothing in the
--- engine forces a `defer`, a stored callback or the loop's next turn
--- before it is reached — which laziness then delivers.
+-- The pure runtime closes the engine's recursion by unfolding it n
+-- times; a real program needs every unfolding, and IO cannot re-run to
+-- take the limit, so here it is closed with `fixIO`.  Every fixpoint it
+-- takes is an IO action: one may run forever, but none is a value of any
+-- other type, so nothing here proves anything.
 module operation.Observable where
 
 open import Agda.Builtin.IO using (IO)
@@ -28,7 +27,7 @@ open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 open import Level using (Lift; lift; lower; 0ℓ) renaming (suc to lsuc)
 
-open import Tree using (Obs; Later)
+open import Tree using (Obs)
 open import operation.AbstractObservable using (Prims; module Run)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Timeline)
 
@@ -41,7 +40,9 @@ postulate
   readIORef  : ∀ {A} → IORef A → IO A
   writeIORef : ∀ {A} → IORef A → A → IO ⊤
 
-  fix! : ∀ {ℓ} {A : Set ℓ} → (A → A) → A
+private
+  postulate
+    fixIO : ∀ {a b} {X : Set a} {Y : X → Set b} → ((∀ x → IO (Y x)) → ∀ x → IO (Y x)) → ∀ x → IO (Y x)
 
 {-# FOREIGN GHC import qualified Data.IORef #-}
 {-# FOREIGN GHC import qualified Data.Function #-}
@@ -49,7 +50,7 @@ postulate
 {-# COMPILE GHC newIORef = \ _ -> Data.IORef.newIORef #-}
 {-# COMPILE GHC readIORef = \ _ -> Data.IORef.readIORef #-}
 {-# COMPILE GHC writeIORef = \ _ -> Data.IORef.writeIORef #-}
-{-# COMPILE GHC fix! = \ _ _ -> Data.Function.fix #-}
+{-# COMPILE GHC fixIO = \ _ _ _ _ -> Data.Function.fix #-}
 
 private
   infixl 1 _>>_
@@ -58,6 +59,9 @@ private
 
   unless : IORef Bool → IO ⊤ → IO ⊤
   unless r m = readIORef r >>= λ b → if b then pure tt else m
+
+  fixIO′ : ∀ {a b} {X : Set a} {Y : Set b} → ((X → IO Y) → X → IO Y) → X → IO Y
+  fixIO′ {Y = Y} = fixIO {Y = λ _ → Y}
 
 ------------------------------------------------------------------------
 -- Colds
@@ -195,7 +199,7 @@ IOᴿ lp = record
   ; startColdᴿ = λ _ c sk k → playCold lp c sk >>= k tt
   ; stopᴿ      = λ sl → ret (spend sl (pure tt))
   ; effᴿ       = ret
-  ; divergeᴿ   = fix! λ d → d
+  ; divergeᴿ   = fixIO′ (λ d _ → d tt) tt
   ; nextᴿ      = λ _ → ret (nextTimer lp)
   }
 
@@ -214,7 +218,7 @@ fromTimeline {A} c = record
   where
     -- `self` plays the frames after this burst.
     burst : Emit A → IORef Bool → (Time → ML A → IO ⊤) → Time → Burst A → IO ⊤
-    burst e off self t = fix! λ go b → Emit.closed e >>= λ c → if c then pure tt else step go b
+    burst e off self t = fixIO′ λ go b → Emit.closed e >>= λ c → if c then pure tt else step go b
       where
         step : (Burst A → IO ⊤) → Burst A → IO ⊤
         step go (emit a k) = Emit.produce e a >> unless off (go (Burst∞.force k))
@@ -222,10 +226,12 @@ fromTimeline {A} c = record
         step go (close k)  = self t (ML∞.force k)
 
     play : Emit A → IORef Bool → Time → ML A → IO ⊤
-    play e off = fix! λ self now → λ where
-      done     → Emit.complete e
-      quiet    → pure tt
-      (at t b) → Emit.after e (t ∸ now) (unless off (burst e off self t b))
+    play e off now m = fixIO′ step (now , m)
+      where
+        step : (Time × ML A → IO ⊤) → Time × ML A → IO ⊤
+        step self (now , done)   = Emit.complete e
+        step self (now , quiet)  = pure tt
+        step self (now , at t b) = Emit.after e (t ∸ now) (unless off (burst e off (λ t′ m′ → self (t′ , m′)) t b))
 
     first : Emit A → IORef Bool → ML A → IO ⊤
     first e off (at 0 b) = burst e off (play e off) 0 b
@@ -234,22 +240,28 @@ fromTimeline {A} c = record
 ------------------------------------------------------------------------
 -- The entry point
 
--- The recursion, closed for real.
-deferred∞ : Deferred
-deferred∞ = fix! {A = Deferred} λ d l ρ → compileWith (λ l′ ρ′ → d l′ ρ′) (Later.force l) ρ
+-- One `Act` to run, its world and result packed, so that `fixIO` can
+-- close the interpreter's recursion over every one of them.
+private
+  record Job : Set₁ where
+    constructor job
+    field
+      {w}  : One
+      {B}  : Set
+      act  : Act w B
 
 module _ (lp : Loop) where
   open Engine (IOᴿ lp)
 
   private
     run∞ : RunAct
-    run∞ = fix! λ self {w} {B} → interpret (λ {w′} {B′} → self {w′} {B′}) {w} {B}
+    run∞ a = fixIO {Y = λ j → Lift (lsuc 0ℓ) (Job.B j)} (λ self j → interpret (λ a′ → self (job a′)) (Job.act j)) (job a)
 
     loop∞ : M _ ⊤
-    loop∞ = fix! (loopStep run∞)
+    loop∞ = fixIO′ (λ again _ → loopStep run∞ (again tt)) tt
 
   running : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → IO ⊤
-  running {A} o f c = low (drive run∞ loop∞ (compileWith deferred∞ o []) observer)
+  running {A} o f c = low (drive run∞ loop∞ (compile o []) observer)
     where
       observer : Observer A _
       observer = record

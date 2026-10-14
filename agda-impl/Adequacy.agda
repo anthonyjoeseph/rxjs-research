@@ -11,9 +11,11 @@
 -- a logical relation between a `Subscribe` and a timeline.  Nothing is
 -- coinductive except the last step, from approximants to limits.
 --
--- The relation is APPROXIMATION, not equality: `Rel s d` says everything
--- `d` shows, running `s` shows too, given budget enough.  No lemma ever
--- mentions a heap address belonging to another operator.
+-- The relation is TWO-SIDED.  `Rel s d`: with budget enough, running `s`
+-- shows everything `d` shows; on any budget, it shows nothing `d` does
+-- not.  The second half is what makes the limits meet: run n is below
+-- approximant n, which is below the run.  No lemma ever mentions a heap
+-- address belonging to another operator.
 --
 -- The IO runtime has no theorem of its own, and needs none: it is the
 -- same engine over a different monad, with its recursion closed by `fix`
@@ -23,13 +25,13 @@ module Adequacy where
 open import Data.List using (List; _∷_; [])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
-open import Data.Nat using (zero; suc)
+open import Data.Nat using (ℕ; zero; suc)
 open import Level using (lower)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; PureObs; deferredᴺ; compileᴺ; runPure; toArray) renaming (_⊑_ to _≤ʷ_)
-open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ; _⊑_; ⊑-trans; _≃_; limit)
+open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ; _⊑_; ⊑-trans; _≃_; ≃-trans; limit; Chain; squeeze)
 open import denotation.Denote using (DenEnv; flatOp; ⟦_⟧[_]; ⟦_⟧)
 open Run Pureᴾ
 
@@ -37,13 +39,18 @@ open Run Pureᴾ
 run : ∀ {A} → PureObs [] A → ML A
 run o = limit λ n → toArray n o
 
+-- Approximant n of the denotation, as the run reports one.
+approxAt : ∀ {A} → PureObs [] A → ℕ → ML A
+approxAt o n = ticks (observe (⟦ o ⟧[ n ] []) root)
+
 postulate
-  -- "Subscribing with `s` at any position p, in any heap, on an engine
-  -- with budget enough, shows at least what `d` shows a subscriber
-  -- arriving at p, ticks for ticks."
+  -- "Subscribing with `s` at any position p, in any heap, shows what `d`
+  -- shows a subscriber arriving at p, ticks for ticks: on an engine with
+  -- budget enough, at least that; on any budget, no more."
   Rel   : ∀ {A w} → Subscribe A w → MonotonicList A → Set₁
   -- A subject and the handle `connectᴰ` passed its body agree: joining
-  -- one shows at least what the other shows, at any join time.
+  -- one shows what joining the other shows, at any join time, both ways
+  -- as `Rel`.
   RelSubj : ∀ {A w} → Subject A w → MonotonicList A → Set₁
   -- A subject made in one world is the same subject in every later one.
   RelSubj-wk : ∀ {A w v} {st : Subject A w} {x} (σ : w ≤ʷ v) → RelSubj st x → RelSubj (wkSubject σ st) x
@@ -76,26 +83,31 @@ postulate
                     {e : MonotonicList A → MonotonicList B}
                 → Rel s d → (∀ {v} (σ : w ≤ʷ v) {st r} → RelSubj st r → Rel (b σ st) (e r))
                 → Rel (connectᴷ s b) (connectᴰ d e)
-  -- `deferᴰ` adds one `skip`, a `stall` once reported, invisible to `_⊑_`.
+  -- `deferᴰ` adds one `skip`, a `stall` once reported, invisible either way.
   defer-rel     : ∀ {A w} {s : Subscribe A w} {d} → Rel s d → Rel s (deferᴰ d)
-  -- A cut-off `defer` on both sides: ⊥ᴰ shows nothing.
+  -- A cut-off `defer` on both sides: each shows nothing.
   bot-rel       : ∀ {A w} → Rel {A} {w} ⊥ᴷ ⊥ᴰ
 
-  -- THE ENGINE'S FACT: running a related subscription at the root shows
-  -- at least what the denotation shows there, in the limit of the run's
-  -- budget.
+  -- THE ENGINE'S FACTS, `Rel`'s two halves at the root: in the limit of
+  -- its budget, a related run shows at least what the denotation shows
+  -- there; on any budget, no more.
   run-rel : ∀ {A} {s : Subscribe A []} {d}
           → Rel s d → ticks (observe d root) ⊑ limit (λ m → runPure m s)
+  run-bound : ∀ {A} {s : Subscribe A []} {d}
+            → Rel s d → ∀ m → runPure m s ⊑ ticks (observe d root)
 
   -- More `defer`s compiled shows more, so running approximant n of the
   -- compiler is below the run, whose approximants compile ever more.
   diagonal : ∀ {A} n (o : PureObs [] A) → limit (λ m → runPure m (compileᴺ n o [])) ⊑ run o
 
-  -- Every finite prefix of the run is reached at some finite budget, so
-  -- some approximant of the denotation already shows it; with
-  -- soundness, the two limits agree.  The one argument about limits.
-  exhaust : ∀ {A} (o : PureObs [] A) → (∀ n → ticks (observe (⟦ o ⟧[ n ] []) root) ⊑ run o)
-          → run o ≃ ticks (observe (⟦ o ⟧ []) root)
+  -- Both sides are chains: a bigger budget, or a deeper approximant,
+  -- shows more.
+  toArray-chain : ∀ {A} (o : PureObs [] A) → Chain (λ n → toArray n o)
+  approx-chain  : ∀ {A} (o : PureObs [] A) → Chain (approxAt o)
+
+  -- Observing at the root, then forgetting positions, commutes with the
+  -- limit that `⟦_⟧` takes.
+  ⟦⟧-limit : ∀ {A} (o : PureObs [] A) → limit (approxAt o) ≃ ticks (observe (⟦ o ⟧ []) root)
 
 mutual
   -- THE FUNDAMENTAL LEMMA.  Approximant n against approximant n, by the
@@ -114,9 +126,13 @@ mutual
   fundamental zero    (defer l)        e = bot-rel
   fundamental (suc n) (defer l)        e = defer-rel (fundamental n (Later.force l) e)
 
--- Each approximant of the denotation is sound for the run.
-sound : ∀ {A} (o : PureObs [] A) n → ticks (observe (⟦ o ⟧[ n ] []) root) ⊑ run o
+-- Each approximant of the denotation is below the run.
+sound : ∀ {A} (o : PureObs [] A) n → approxAt o n ⊑ run o
 sound o n = ⊑-trans (run-rel (fundamental n o [])) (diagonal n o)
 
+-- Each approximant of the run is below the denotation's.
+complete : ∀ {A} (o : PureObs [] A) n → toArray n o ⊑ approxAt o n
+complete o n = run-bound (fundamental n o []) n
+
 adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)
-adequacy o = exhaust o (sound o)
+adequacy o = ≃-trans (squeeze (toArray-chain o) (approx-chain o) (sound o) (complete o)) (⟦⟧-limit o)
