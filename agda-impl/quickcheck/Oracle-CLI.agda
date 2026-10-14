@@ -15,16 +15,25 @@
 --   Oracle-CLI ghosts FROM COUNT the seeds with an observer inside the run
 --                                delivered what its subtree's denotation
 --                                does not show (`quickcheck.Ghost`)
+--   Oracle-CLI exact FROM COUNT  the seeds with a live observer behind the
+--                                run (`quickcheck.Ghost`)
+--   Oracle-CLI why SEED          that check's record, entry by entry
+--   Oracle-CLI hand              those two and placing over `quickcheck.Adversary`
+--   Oracle-CLI why-hand N        the record of its Nth program
+--   Oracle-CLI spin              progress over `quickcheck.Spin`'s programs
+--   Oracle-CLI why-spin N K      its Nth program, each side's first K events
 --
 -- The IO engine runs one seed per process because a program that never
 -- finishes never returns: the caller's timeout is the only way out.
 module quickcheck.Oracle-CLI where
 
 open import Agda.Builtin.IO using (IO)
+open import Data.Bool using (_∧_; if_then_else_)
 open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _+_)
+open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Nat.Show using (readMaybe) renaming (show to showℕ)
+open import Data.Product using (_×_; _,_)
 open import Data.String using (String; _++_)
 open import Data.Unit using (⊤)
 open import IO.Primitive.Core using (pure; _>>=_)
@@ -32,12 +41,16 @@ open import IO.Primitive.Finite using (putStrLn)
 open import System.Environment.Primitive using (getArgs)
 
 open import quickcheck.Ty using (natᵗ)
-open import quickcheck.Code using (showCode)
+open import quickcheck.Code using (Prog; showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Chain using (chainFails)
-open import quickcheck.Ghost using (ghostFails; exactFails; exactWhy; watchedCount)
-open import quickcheck.Placing using (placingFails)
+open import quickcheck.Ghost using (ghosts; exact; ghostFails; exactFails; exactWhy; watchedCount)
+open import quickcheck.Adversary using (cases)
+import quickcheck.Spin as Spin
+open import Tree using (Obs)
+open import denotation.MonotonicList using (Timeline)
+open import quickcheck.Placing using (placing; placingFails)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -56,11 +69,24 @@ private
   io : ℕ → IO ⊤
   io s = oracle ioOp 3 500 (program s)
 
+  hand : List (String × Prog natᵗ) → IO ⊤
+  hand []             = putStrLn "hand: done"
+  hand ((l , p) ∷ cs) = putStrLn ((if exact p ∧ ghosts p ∧ placing p then "hand: ok   " else "hand: FAIL ") ++ l) >>= λ _ → hand cs
+
+  spins : List (String × Obs Timeline [] ℕ) → IO ⊤
+  spins []             = putStrLn "spin: done"
+  spins ((l , o) ∷ cs) = putStrLn ((if Spin.progress 12 o then "spin: ok   " else "spin: FAIL ") ++ l) >>= λ _ → spins cs
+
+  nth : ∀ {ℓ} {X : Set ℓ} → ℕ → List (String × X) → Maybe (String × X)
+  nth _       []       = nothing
+  nth zero    (c ∷ cs) = just c
+  nth (suc n) (c ∷ cs) = nth n cs
+
   nat : String → Maybe ℕ
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -88,6 +114,18 @@ private
   ... | just f′ | just c′ = each (placingFails f′ c′) (λ s → putStrLn ("placing: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("placing: done " ++ showℕ c′)
   ... | _       | _       = usage
+  dispatch ("hand" ∷ []) = hand cases
+  dispatch ("spin" ∷ []) = spins Spin.cases
+  dispatch ("why-spin" ∷ n ∷ k ∷ []) with nat n | nat k
+  ... | just n′ | just k′ with nth {X = Obs Timeline [] ℕ} n′ Spin.cases
+  ...   | just (l , o) = putStrLn l >>= λ _ → each′ (Spin.progressWhy k′ o)
+  ...   | nothing      = usage
+  dispatch ("why-spin" ∷ n ∷ k ∷ []) | _ | _ = usage
+  dispatch ("why-hand" ∷ n ∷ []) with nat n
+  ... | just n′ with nth {X = Prog natᵗ} n′ cases
+  ...   | just (l , p) = putStrLn l >>= λ _ → putStrLn (showCode natᵗ p) >>= λ _ → each′ (exactWhy p)
+  ...   | nothing      = usage
+  dispatch ("why-hand" ∷ n ∷ []) | nothing = usage
   dispatch _ = usage
 
 main : IO ⊤

@@ -6,8 +6,9 @@
 -- run is compiled to approximant n, every node's observer watched: what
 -- it is delivered, and where, goes on the record, tagged with the node, the
 -- position the node was subscribed at, and what the denotation shows a
--- subscriber there.  A `connected` node is held to the hot handle its
--- `connect` was subscribed with.  Each observer's deliveries must be a
+-- subscriber there: `denotation.Unfold`'s meaning, the one `sim` states.
+-- A `connected` node is held to its own copy of the source its `connect`
+-- subscribed, as the meaning joins one.  Each observer's deliveries must be a
 -- prefix of what it is shown, or extend it where the denotation was read
 -- only so far: no event the denotation does not have, none out of place.
 module quickcheck.Ghost where
@@ -29,8 +30,8 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; note)
 open import operation.Machine using (module Machine)
-open import denotation.MonotonicList using (MonotonicList; Label; sub; last; Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; observe; hot; Timeline)
-open import denotation.Denote using (DenEnv; ⟦_⟧[_])
+open import denotation.MonotonicList using (MonotonicList; Label; sub; last; Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; observe; Timeline)
+open import denotation.Unfold using (Srcs; ⟦_⟧; subscribe)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Oracle using (depth; until)
 open import quickcheck.Quickcheck using (program)
@@ -84,16 +85,17 @@ module Watched where
   isSwitch T.switchᶠ = true
   isSwitch _         = false
 
-  -- Approximant n, every node watched against the denotation's.  A connect's
-  -- handle is the hot run of its source, subscribed one step in.
+  -- Approximant n, every node watched against its meaning.  A connect's
+  -- source is the configuration it starts in, subscribed one step in; past
+  -- the approximant the run stops, so a cut costs coverage, never a pass.
   mutual
-    watched : ℕ → Key → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → DenEnv Γ → Subscribe A w
+    watched : ℕ → Key → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → Srcs Γ → Subscribe A w
     watched = watchedS false
 
-    watchedS : Bool → ℕ → Key → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → DenEnv Γ → Subscribe A w
-    watchedS sw n par π t ρ δ = watch sw par π (⟦ t ⟧[ n ] δ) λ me → node n me π t ρ δ
+    watchedS : Bool → ℕ → Key → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → Srcs Γ → Subscribe A w
+    watchedS sw n par π t ρ δ = watch sw par π (⟦ t ⟧ δ) λ me → node n me π t ρ δ
 
-    node : ℕ → Key → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → DenEnv Γ → Subscribe A w
+    node : ℕ → Key → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → Srcs Γ → Subscribe A w
     node n       me π (cold c)          ρ δ = via (startCold c)
     node n       me π empty             ρ δ = emptyᴷ
     node n       me π (of xs)           ρ δ = ofᴷ xs
@@ -103,7 +105,7 @@ module Watched where
     node n       me π (flatMap op f s)  ρ δ = flatMapᴷ op (λ a → watchedS (isSwitch op) n me (1 ∷ π) (f a) ρ δ) (watched n me (0 ∷ π) s ρ δ)
     node n       me π (connect s b)     ρ δ σ o k = here λ p →
       connectᴷ (watched n me (0 ∷ π) s ρ δ)
-               (λ τ st → watched n me (1 ∷ π) b (st ∷ wkEnv τ ρ) (hot (observe (⟦ s ⟧[ n ] δ) (p ++ [ ix 1 ])) ∷ δ)) σ o k
+               (λ τ st → watched n me (1 ∷ π) b (st ∷ wkEnv τ ρ) (subscribe s δ (p ++ [ ix 1 ]) ∷ δ)) σ o k
     node n       me π (connected i)     ρ δ = joinᴷ (lookup ρ i)
     node zero    me π (defer l)         ρ δ = ⊥ᴷ
     node (suc n) me π (defer l)         ρ δ = deeper (watched n me (0 ∷ π) (Later.force l) ρ δ)
@@ -255,18 +257,18 @@ exact p = every (exactAt nds) nds
 
 -- One seed's record, every entry: its number, position, observer, kind;
 -- a subscription with what it is shown.
+mutual
+  showL : Label → String
+  showL (ix n)  = showℕ n
+  showL (sub p) = "s(" S.++ showP p S.++ ")"
+  showL last    = "L"
+
+  showP : Pos → String
+  showP []       = ""
+  showP (l ∷ []) = showL l
+  showP (l ∷ ls) = showL l S.++ "." S.++ showP ls
+
 private
-  mutual
-    showL : Label → String
-    showL (ix n)  = showℕ n
-    showL (sub p) = "s(" S.++ showP p S.++ ")"
-    showL last    = "L"
-
-    showP : Pos → String
-    showP []       = ""
-    showP (l ∷ []) = showL l
-    showP (l ∷ ls) = showL l S.++ "." S.++ showP ls
-
   showK : Kind → String
   showK (subd b _) = if b then "SUB(sw)" else "SUB"
   showK val  = "val"
