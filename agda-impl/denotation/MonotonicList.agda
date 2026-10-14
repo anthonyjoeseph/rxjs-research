@@ -390,7 +390,9 @@ postulate
   -- The same meaning, up to finitely many `skip`s, at every subscription.
   _≈_ : ∀ {A} → MonotonicList A → MonotonicList A → Set
 
-  -- The least upper bound of a chain of approximants.
+  -- The least upper bound of a chain of approximants.  A program's
+  -- approximants are one: approximant n is approximant n+1 up to some
+  -- step, then `⊥ᴰ`'s spin, on every seed `make chain` draws.
   lub : ∀ {A} → (ℕ → MonotonicList A) → MonotonicList A
 
 -- Approximant n of a recursive definition: unfold it n times from ⊥ᴰ.

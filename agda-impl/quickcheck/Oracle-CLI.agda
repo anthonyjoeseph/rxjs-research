@@ -7,6 +7,8 @@
 --   Oracle-CLI prog FROM COUNT   one line per seed: the program, the
 --                                denotation's trace and the pure engine's
 --   Oracle-CLI io SEED           the IO engine's trace of one seed
+--   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
+--                                are no chain (`quickcheck.Chain`)
 --
 -- The IO engine runs one seed per process because a program that never
 -- finishes never returns: the caller's timeout is the only way out.
@@ -27,6 +29,7 @@ open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Code using (showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program)
+open import quickcheck.Chain using (chainFails)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -45,7 +48,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -54,6 +57,10 @@ private
   dispatch ("io" ∷ s ∷ []) with nat s
   ... | just s′ = io s′
   ... | nothing = usage
+  dispatch ("chain" ∷ f ∷ c ∷ []) with nat f | nat c
+  ... | just f′ | just c′ = each (chainFails f′ c′) (λ s → putStrLn ("chain: FAIL seed " ++ showℕ s))
+                            >>= λ _ → putStrLn ("chain: done " ++ showℕ c′)
+  ... | _       | _       = usage
   dispatch _ = usage
 
 main : IO ⊤
