@@ -36,10 +36,10 @@ open import Data.List.Relation.Unary.Linked using (Linked)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; _+_; _≤_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
-open import Data.Sum using (_⊎_)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Level using (Lift; lower)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 
 import Tree as T
 open import Tree using (Obs; Later)
@@ -248,8 +248,15 @@ module Realizing (R : Set) where
   timerOf s hd (popped _ _ _ _ _)       = []
   timerOf s hd (playing _ _ _ _)        = []
 
-  -- A frame the machine is bursting: its cold's sink and handle, the
-  -- frame's position, the step it stands before, what is left of it.
+  -- The configuration a cold's phase is.
+  nodeOf : ∀ {A} → Phase A → U.Node A
+  nodeOf (waiting τ e m)     = U.framesᶜ τ e m
+  nodeOf (popped τ e t le b) = U.framesᶜ τ e (at t le b)
+  nodeOf (playing τ r i b)   = U.burstᶜ τ r i b
+
+  -- A frame the machine is bursting: its cold's sink and handle, the tick
+  -- its timeline was subscribed at, the frame's position, the step it
+  -- stands before, what is left of it.
   record Firing (h : World) : Set₁ where
     constructor firing
     field
@@ -257,18 +264,15 @@ module Realizing (R : Set) where
       {u}    : Time
       sink   : Sink h A
       handle : Handle h
+      since  : Time
       at′    : Pos
       index  : ℕ
       frame  : Frame A u
 
-  -- The frame a timer pops, before its first step.
-  popping : ∀ {h} → Timer h → Firing h
-  popping tm = firing (Timer.sink tm) (Timer.handle tm) (cascade tm) 0 (Timer.frame tm)
-
   firingOf : ∀ {h A} → Sink h A → Handle h → Phase A → List (Firing h)
   firingOf s hd (waiting _ _ _)     = []
-  firingOf s hd (popped τ e t le b) = firing s hd (ix (τ + t) ∷ subᴾ e ∷ []) 0 b ∷ []
-  firingOf s hd (playing τ r i b)   = firing s hd r i b ∷ []
+  firingOf s hd (popped τ e t le b) = firing s hd τ (ix (τ + t) ∷ subᴾ e ∷ []) 0 b ∷ []
+  firingOf s hd (playing τ r i b)   = firing s hd τ r i b ∷ []
 
   -- The frames being burst.
   mutual
@@ -303,6 +307,75 @@ module Realizing (R : Set) where
     lanePendings : ∀ {h Δ B} → List (Lane h Δ B) → List (Timer h)
     lanePendings []                = []
     lanePendings (lane c k s ∷ ls) = pendings s ++ lanePendings ls
+
+  -- WHERE A COLD SITS in a witness, and the witness with its phase moved.
+  mutual
+    data Spot {h} : ∀ {Δ A B} → Sub h Δ A → Sink h B → Handle h → Set₁ where
+      cold-here : ∀ {Δ A} {s : Sink h A} {hd ph} → Spot {Δ = Δ} (coldˢ s hd ph) s hd
+      in-map    : ∀ {Δ A B C} {f : A → B} {t : Sub h Δ A} {s : Sink h C} {hd} → Spot t s hd → Spot (mapˢ f t) s hd
+      in-scan   : ∀ {Δ A B C} {f : B → A → B} {r} {t : Sub h Δ A} {s : Sink h C} {hd} → Spot t s hd → Spot (scanˢ f r t) s hd
+      in-take   : ∀ {Δ A C} {i p c k} {t : Sub h Δ A} {s : Sink h C} {hd} → Spot t s hd → Spot (takeWhileˢ i p c k t) s hd
+      in-outer  : ∀ {Δ A B C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {s : Sink h C} {hd}
+                → Spot t s hd → Spot (flatMapˢ op f fl oc k r t ls) s hd
+      in-lanes  : ∀ {Δ A B C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {s : Sink h C} {hd}
+                → SpotLanes ls s hd → Spot (flatMapˢ op f fl oc k r t ls) s hd
+      in-source : ∀ {Δ A B C} {S c k s₀} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {s : Sink h C} {hd}
+                → Spot t s hd → Spot (connectˢ S c k s₀ t u) s hd
+      in-body   : ∀ {Δ A B C} {S c k s₀} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {s : Sink h C} {hd}
+                → Spot u s hd → Spot (connectˢ S c k s₀ t u) s hd
+      in-defer  : ∀ {Δ A C} {k} {t : Sub h Δ A} {s : Sink h C} {hd} → Spot t s hd → Spot (deferˢ k t) s hd
+
+    data SpotLanes {h} : ∀ {Δ B C} → List (Lane h Δ B) → Sink h C → Handle h → Set₁ where
+      this-lane : ∀ {Δ B C} {c k} {t : Sub h Δ B} {ls} {s : Sink h C} {hd} → Spot t s hd → SpotLanes (lane c k t ∷ ls) s hd
+      next-lane : ∀ {Δ B C} {l} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → SpotLanes (l ∷ ls) s hd
+
+  mutual
+    setAt : ∀ {h Δ A B} {t : Sub h Δ A} {s : Sink h B} {hd} → Spot t s hd → Phase B → Sub h Δ A
+    setAt (cold-here {s = s} {hd})                                    ph = coldˢ s hd ph
+    setAt (in-map {f = f} p)                                          ph = mapˢ f (setAt p ph)
+    setAt (in-scan {f = f} {r} p)                                     ph = scanˢ f r (setAt p ph)
+    setAt (in-take {i = i} {q} {c} {k} p)                             ph = takeWhileˢ i q c k (setAt p ph)
+    setAt (in-outer {op = op} {f} {fl} {oc} {k} {r} {ls = ls} p)      ph = flatMapˢ op f fl oc k r (setAt p ph) ls
+    setAt (in-lanes {op = op} {f} {fl} {oc} {k} {r} {t} p)            ph = flatMapˢ op f fl oc k r t (setAtLanes p ph)
+    setAt (in-source {S = S} {c} {k} {s₀} {u = u} p)                  ph = connectˢ S c k s₀ (setAt p ph) u
+    setAt (in-body {S = S} {c} {k} {s₀} {t} p)                        ph = connectˢ S c k s₀ t (setAt p ph)
+    setAt (in-defer {k = k} p)                                        ph = deferˢ k (setAt p ph)
+
+    setAtLanes : ∀ {h Δ B C} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → Phase C → List (Lane h Δ B)
+    setAtLanes (this-lane {c = c} {k} {ls = ls} p) ph = lane c k (setAt p ph) ∷ ls
+    setAtLanes (next-lane {l = l} p)               ph = l ∷ setAtLanes p ph
+
+  private
+    one : ∀ {X : Set₁} {x : X} xs ys → xs ++ ys ≡ x ∷ [] → (xs ≡ x ∷ [] × ys ≡ []) ⊎ (xs ≡ [] × ys ≡ x ∷ [])
+    one []           ys e    = inj₂ (refl , e)
+    one (_ ∷ [])     []  refl = inj₁ (refl , refl)
+    one (_ ∷ [])     (_ ∷ _) ()
+    one (_ ∷ _ ∷ _)  ys  ()
+
+  -- The one frame being burst, found.
+  mutual
+    spot-of : ∀ {h Δ A} (t : Sub h Δ A) {f} → firings t ≡ f ∷ [] → Spot t (Firing.sink f) (Firing.handle f)
+    spot-of (coldˢ s hd (waiting _ _ _))    ()
+    spot-of (coldˢ s hd (popped _ _ _ _ _)) refl = cold-here
+    spot-of (coldˢ s hd (playing _ _ _ _))  refl = cold-here
+    spot-of doneˢ                           ()
+    spot-of (mapˢ f t)                      e = in-map (spot-of t e)
+    spot-of (scanˢ f r t)                   e = in-scan (spot-of t e)
+    spot-of (takeWhileˢ i p c k t)          e = in-take (spot-of t e)
+    spot-of (flatMapˢ op f fl oc k r so ls) e with one (firings so) (laneFirings ls) e
+    ... | inj₁ (e′ , _) = in-outer (spot-of so e′)
+    ... | inj₂ (_ , e′) = in-lanes (spot-lanes ls e′)
+    spot-of (connectˢ S c k s₀ src body)    e with one (firings src) (firings body) e
+    ... | inj₁ (e′ , _) = in-source (spot-of src e′)
+    ... | inj₂ (_ , e′) = in-body (spot-of body e′)
+    spot-of (joinˢ j i sk l x)              ()
+    spot-of (deferˢ k t)                    e = in-defer (spot-of t e)
+
+    spot-lanes : ∀ {h Δ B} (ls : List (Lane h Δ B)) {f} → laneFirings ls ≡ f ∷ [] → SpotLanes ls (Firing.sink f) (Firing.handle f)
+    spot-lanes []                ()
+    spot-lanes (lane c k t ∷ ls) e with one (firings t) (laneFirings ls) e
+    ... | inj₁ (e′ , _) = this-lane (spot-of t e′)
+    ... | inj₂ (_ , e′) = next-lane (spot-lanes ls e′)
 
   -- A subject the tree holds, and a joiner of one.
   record Joiner (h : World) : Set₁ where
@@ -402,9 +475,7 @@ module Realizing (R : Set) where
 
     mutual
       part : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Now Δ → Maybe (U.Node A)
-      part (coldˢ s hd (waiting τ e m))    E ρ ν = if spentʰ hd then nothing else just (U.framesᶜ τ e m)
-      part (coldˢ s hd (popped τ e t le b)) E ρ ν = if spentʰ hd then nothing else just (U.framesᶜ τ e (at t le b))
-      part (coldˢ s hd (playing τ r i b))   E ρ ν = if spentʰ hd then nothing else just (U.burstᶜ τ r i b)
+      part (coldˢ s hd ph)                 E ρ ν = if spentʰ hd then nothing else just (nodeOf ph)
       part doneˢ                           E ρ ν = nothing
       part (mapˢ f s)                      E ρ ν = mapᴹ (U.mapᶜ f) (part s E ρ ν)
       part (scanˢ f r s)                   E ρ ν = mapᴹ (U.scanᶜ f (val r)) (part s E ρ ν)
@@ -502,6 +573,7 @@ module Realizing (R : Set) where
       holds   : Holds tree [] rootObs
       open≡   : part tree [] [] [] ≡ just c
       firing≡ : firings tree ≡ fs
+      clocked : All (λ f → Firing.since f + Firing.u f ≡ State.clock st) fs
       timed   : Timed (State.timers st) (pendings tree)
       joined  : Joined (subjects tree) (joiners tree [])
       ordered : Ordered st
@@ -513,8 +585,8 @@ module Realizing (R : Set) where
   -- from it.
   data Calm : Mach → Events R → Set₁ where
     calm     : ∀ {h} {st : State h} {c} → Holding [] c st → Calm ⟨ st , turn ⟩ (U.unfold c)
-    bursting : ∀ {h} {st : State h} {c A u} {s : Sink h A} {hd r i} {b : Frame A u}
-             → Holding (firing s hd r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
+    bursting : ∀ {h} {st : State h} {c A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+             → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
              → Calm ⟨ st , burst s hd u r i b same loop ⟩ (U.unfold c)
 
   -- The timers whose cold is spent: popping one runs nothing.
@@ -541,4 +613,5 @@ module Realizing (R : Set) where
     -- next event either way.
     pop-live : ∀ {h c} {st : State h} {tm ts} → Holding [] c st → State.timers st ≡ tm ∷ ts
              → lower (get (State.heap st) (Timer.handle tm)) ≡ false
-             → Holding (popping tm ∷ []) c (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm })
+             → Σ Time λ τ → Holding (firing (Timer.sink tm) (Timer.handle tm) τ (cascade tm) 0 (Timer.frame tm) ∷ []) c
+                                     (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm })

@@ -29,12 +29,12 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; _∸_; z≤n; s≤s)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl)
-open import Data.Product using (_,_; Σ)
+open import Data.Product using (_,_; Σ; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Induction.WellFounded using (Acc; acc)
 open import Level using (lift; lower)
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
 
 open import denotation.MonotonicList using (Events; Events∞; Frame; Frame∞; From∞; Pos; ix; last; emit; stall; close; done; quiet; at; out; skip; end; hush; tick; observe; root)
 open import denotation.Order using (_⊑_; Chain)
@@ -47,7 +47,7 @@ open import Realize using (module Realizing)
 
 module Sim (R : Set) where
   open Machine R using (Mach; ⟨_,_⟩; turn; burst; run; ret; loop; push; asked; sent; Stack; step; cbs; play; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
-  open Realizing R using (Calm; calm; bursting; Holding; firing; dead; dry-hush; pop-dead; pop-live)
+  open Realizing R using (Calm; calm; bursting; Holding; firing; Sub; Phase; waiting; playing; nodeOf; setAt; spot-of; module At; dead; dry-hush; pop-dead; pop-live)
   open Pure R using (State; Timer; Callbacks; get; put; insert; cascade)
   open Pure R using (cutOff; frames)
   open Read
@@ -126,50 +126,90 @@ module Sim (R : Set) where
       rest    : Skips c₁ c′
       holds   : P c′
 
+  -- The witness at a burst point, its firing cold's phase moved.
+  moved : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+        → Holding (firing s hd τ r i b ∷ []) c st → Phase A → Sub h [] R
+  moved H = setAt (spot-of (Holding.tree H) (Holding.firing≡ H))
+
+  mapᴾ : ∀ {c} {P Q : U.Node R → Set₁} → (∀ {c′} → P c′ → Q c′) → Passes c P → Passes c Q
+  mapᴾ f (passes e sk p) = passes e sk (f p)
+
   postulate
     -- The subscribe burst, up to the first calm point.
     start-seg : (o : PureObs [] R) → Seg nothing (trace (begin o)) (observe (⟦ o ⟧ []) root)
 
     -- A firing cold's subscriber is read open, and reading it moves nothing.
-    closed-read : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} {b : Frame A u} {K : Stack h Bool}
-                → Holding (firing s hd r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
+    closed-read : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u} {K : Stack h Bool}
+                → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
                 → ⟨ st , run (Callbacks.isClosed (cbs st s)) same K ⟩ ⇒ ⟨ st , ret false same K ⟩
 
-    -- A stall: the cold's step, silent at the root, and the next one stands.
-    stall-step : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} {k′ : Frame∞ A u}
-               → Holding (firing s hd r i (stall k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-               → Passes c λ c′ → Holding (firing s hd r (suc i) (Frame∞.force k′) ∷ []) c′ st
+    -- A live firing cold's step silent at its own position: the meaning's
+    -- next steps are it, lifted through the cold's context, then each
+    -- joiner's copy's, and what is running is then the witness with the
+    -- cold's phase moved.
+    focus-skip : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+               → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
+               → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
+               → Passes c λ c′ → At.part (State.heap st) (moved H ph) [] [] [] ≡ just c′
 
-    -- A frame closing on a timeline gone quiet, or on a later frame, its
-    -- timer queued: silent at the root, and the loop is calm again.
-    quiet-step : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
-               → Holding (firing s hd r i (close k′) ∷ []) c st → From∞.force k′ ≡ quiet
-               → Passes c λ c′ → Holding [] c′ st
-    later-step : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {t le} {b : Frame A t}
-               → Holding (firing s hd r i (close k′) ∷ []) c st → From∞.force k′ ≡ at t le b
-               → Passes c λ c′ → Holding [] c′ (record st { timers = insert (record { due = State.clock st + (t ∸ u) ; sink = s ; handle = hd
-                                                                                      ; at′ = t ; from = r ++ [ last ] ; frame = b })
-                                                                            (State.timers st) })
+    -- The witness with the cold's phase moved by a silent step holds what
+    -- is running: one step on, quiet, or its next frame queued.
+    reheld-stall : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : Frame∞ A u}
+                 → (H : Holding (firing s hd τ r i (stall k′) ∷ []) c st)
+                 → At.part (State.heap st) (moved H (playing τ r (suc i) (Frame∞.force k′))) [] [] [] ≡ just c′
+                 → Holding (firing s hd τ r (suc i) (Frame∞.force k′) ∷ []) c′ st
+    reheld-quiet : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
+                 → (H : Holding (firing s hd τ r i (close k′) ∷ []) c st)
+                 → At.part (State.heap st) (moved H (waiting {u = suc u} τ (r ++ [ last ]) quiet)) [] [] [] ≡ just c′
+                 → Holding [] c′ st
+    reheld-later : ∀ {h c c′} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {t} {le : suc u ≤ t} {b : Frame A t}
+                 → (H : Holding (firing s hd τ r i (close k′) ∷ []) c st)
+                 → At.part (State.heap st) (moved H (waiting τ (r ++ [ last ]) (at t le b))) [] [] [] ≡ just c′
+                 → Holding [] c′ (record st { timers = insert (record { due = State.clock st + (t ∸ u) ; sink = s ; handle = hd
+                                                                      ; at′ = t ; from = r ++ [ last ] ; frame = b })
+                                                            (State.timers st) })
 
     -- An emit delivered down the observer chain the cold's slot holds.
     --
-    -- RECOVERY: `git show a2e0bb8b:agda-impl/Realize.agda` restores
-    --   `Spot`, `setAt`, `obsAt` and `Playing` — one cold picked out of the
-    --   witness mid-frame, and the observer its slot holds — over the fuel
-    --   engine's witness.
-    emit-seg : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} {a : A} {k′ : Frame∞ A u}
-             → Holding (firing s hd r i (emit a k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false
+    -- RECOVERY: `git show a2e0bb8b:agda-impl/Realize.agda` restores `obsAt`
+    --   — the observer a spot's slot holds — over the fuel engine's witness.
+    emit-seg : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {a : A} {k′ : Frame∞ A u}
+             → Holding (firing s hd τ r i (emit a k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false
              → ∀ {bd} → Seg bd (shown (silent ⟨ record st { pos = r ++ [ ix i ] }
                                               , run (Callbacks.onNext (cbs st s) a) same (push (sent s hd u r (suc i) (Frame∞.force k′)) same loop) ⟩))
                                 (U.unfold c)
 
     -- A frame closing on its timeline's end: the cold spent, its
     -- completion delivered.
-    done-seg : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
-             → Holding (firing s hd r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ done
+    done-seg : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
+             → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ done
              → ∀ {bd} → Seg bd (shown (silent ⟨ record st { heap = put (State.heap st) hd (lift true) ; pos = r ++ [ last ] }
                                               , run (Callbacks.onComplete (cbs st s)) same loop ⟩))
                                 (U.unfold c)
+
+  -- A stall: the cold's step, silent at the root, and the next one stands.
+  stall-step : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : Frame∞ A u}
+             → Holding (firing s hd τ r i (stall k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false
+             → Passes c λ c′ → Holding (firing s hd τ r (suc i) (Frame∞.force k′) ∷ []) c′ st
+  stall-step H lv = mapᴾ (reheld-stall H) (focus-skip H lv refl)
+
+  -- A frame closing on a timeline gone quiet, or on a later frame, its
+  -- timer queued: silent at the root, and the loop is calm again.
+  quiet-step : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
+             → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ quiet
+             → Passes c λ c′ → Holding [] c′ st
+  quiet-step {u = u} {τ} {r = r} {i} H lv fk =
+    mapᴾ (reheld-quiet H) (focus-skip H lv {ph = waiting {u = suc u} τ (r ++ [ last ]) quiet}
+                                       (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk))
+
+  later-step : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {t} {le : suc u ≤ t} {b : Frame A t}
+             → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ at t le b
+             → Passes c λ c′ → Holding [] c′ (record st { timers = insert (record { due = State.clock st + (t ∸ u) ; sink = s ; handle = hd
+                                                                                    ; at′ = t ; from = r ++ [ last ] ; frame = b })
+                                                                          (State.timers st) })
+  later-step {τ = τ} {r = r} {i} {t = t} {le} {b} H lv fk =
+    mapᴾ (reheld-later H) (focus-skip H lv {ph = waiting τ (r ++ [ last ]) (at t le b)}
+                                       (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk))
 
   if-true : ∀ {ℓ ℓ′} {X : Set ℓ} {x : Bool} {a b : X} (P : X → Set ℓ′) → x ≡ true → P a → P (if x then a else b)
   if-true P refl p = p
@@ -189,18 +229,18 @@ module Sim (R : Set) where
   -- A live cold's frame, burst from the loop, a step at a time: it shows
   -- at least one step on each side before a calm point, so the segment
   -- passes a guard first, whatever bound it is under.
-  played : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} (b : Frame A u)
-         → Holding (firing s hd r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
+  played : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} (b : Frame A u)
+         → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
          → ∀ {bd} → Seg bd (shown (silent (play st s hd u r i b same loop))) (U.unfold c)
   played (emit a k′) h lv = if-false (λ m → Seg _ (shown (silent m)) _) lv (emit-seg h lv)
   played (stall k′)  h lv = passing (stall-step h lv) λ h′ → calm~ (bursting h′ lv) tt
   played (close k′)  h lv with From∞.force k′ in fk
   ... | done      = if-false (λ m → Seg _ (shown (silent m)) _) lv (done-seg h lv fk)
-  ... | quiet     = passing (quiet-step h fk) λ h′ → tauˡ (calm~ (calm h′) tt)
-  ... | at t le b = passing (later-step h fk) λ h′ → tauˡ (calm~ (calm h′) tt)
+  ... | quiet     = passing (quiet-step h lv fk) λ h′ → tauˡ (calm~ (calm h′) tt)
+  ... | at t le b = passing (later-step h lv fk) λ h′ → tauˡ (calm~ (calm h′) tt)
 
-  burst-seg : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} {b : Frame A u}
-            → Holding (firing s hd r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
+  burst-seg : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+            → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
             → ∀ {bd} → Seg bd (trace ⟨ st , burst s hd u r i b same loop ⟩) (U.unfold c)
   burst-seg {b = b} h lv = tauˡ (if-false (λ m → Seg _ (trace m) _) lv (taus (closed-read h lv) (played b h lv)))
 
@@ -215,7 +255,7 @@ module Sim (R : Set) where
         subst (λ s → Seg _ idle (U.shown s)) (sym (dry-hush h refl)) idle~
       turning record { heap = H ; timers = tm ∷ ts } h with lower (get H (Timer.handle tm)) in sp
       ... | true  = tauˡ (if-true (λ m → Seg _ (shown (silent m)) _) sp (tauˡ (tauˡ (calm~ (calm (pop-dead h refl sp)) ≤-refl))))
-      ... | false = tauˡ (burst-seg (pop-live h refl sp) sp)
+      ... | false = tauˡ (burst-seg (proj₂ (pop-live h refl sp)) sp)
   resume (bursting h lv) = burst-seg h lv
 
   -- Segments glued at their calm points: each turn is a segment, and a run

@@ -168,22 +168,24 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE FOCUS.** `stall-step`, `quiet-step` and `later-step` as bodies
-  over one lemma: at a burst boundary the meaning's next step is the
-  firing cold's, lifted through its context, and its joiners' copies each
-  follow with theirs. Likely needs a coherence conjunct in `Holding` — a
-  live cold is visible, no closed gate above it. Decides whether `Holding`
-  pins the meaning's next event; both deliveries stand on it.
+- **THE FOCUS.** `focus-skip` as a body: at a burst boundary the
+  meaning's next step is the firing cold's, lifted through its `Spot`, and
+  its joiners' copies each follow with theirs. Needs a bound on every other
+  node's next event from `Ordered` and `Timed`, and likely coherence
+  conjuncts in `Holding` — a live cold visible, no closed gate above it, no
+  live cold waiting on `done`. Decides whether `Holding` pins the meaning's
+  next event; both deliveries stand on it.
+- **THE PHASE MOVED.** `pop-live`, `reheld-stall`, `reheld-quiet`,
+  `reheld-later`: a cold's phase moved by `setAt` keeps every conjunct but
+  `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a
+  later frame's timer queued by `clocked`. Decides whether the order the
+  queue keeps survives `insert`.
 - **A FRAME, DELIVERED.** `emit-seg` and `done-seg`: the observer chain
   the cold's slot holds run to the root, into a lane's subscription,
   through a subject to its joiners, then back to a calm point. Needs a
   mid-delivery invariant, `Holding` with the stack's waiting frames and
   joiner copies lagging. Decides whether a cascade's silent steps are
   finite: a `flatMap` refill and `connect`'s joiners the uncertain cases.
-- **THE POP.** `pop-live`: a popped live timer's cold moves to `popped`,
-  its part unchanged since the frame's first step is the meaning's next
-  event either way. Decides whether `Timed` and `Ordered` pin the popped
-  timer to exactly one cold.
 - **THE QUEUE, EMPTY OR DEAD.** `dry-hush` and `pop-dead`, over `Ordered`
   and `Timed`: an empty queue leaves nothing to show, and a dead pop moves
   only the clock. Decides whether the order the witness records is enough
@@ -210,12 +212,14 @@ contact; it must be solid before Tier 2 is written over it.
   on each side before a calm point.
 - **`done-seg`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing on its
   end, the completion delivered.
-- **`stall-step`** (Simulation) — FALSITY, `NO EVIDENCE`: a stall is the
-  meaning's next skips, the cold one step on.
-- **`quiet-step`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing
-  quiet, skips back to a calm point.
-- **`later-step`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing on a
-  later one, its timer queued.
+- **`focus-skip`** (Simulation) — FALSITY, `NO EVIDENCE`: a firing cold's
+  silent step is the meaning's next skips.
+- **`reheld-stall`** (Simulation) — FALSITY, `NO EVIDENCE`: a stalled cold's
+  witness still holds.
+- **`reheld-quiet`** (Simulation) — FALSITY, `NO EVIDENCE`: a cold closed
+  quiet, calm again.
+- **`reheld-later`** (Simulation) — FALSITY, `NO EVIDENCE`: a cold's next frame
+  queued, calm again.
 - **`closed-read`** (Simulation) — FALSITY, `NO EVIDENCE`: a firing cold's
   subscriber reads open, moving nothing.
 - **`pop-live`** (Realize) — FALSITY, `NO EVIDENCE`: a live timer popped, its
