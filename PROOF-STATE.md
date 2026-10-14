@@ -1,7 +1,7 @@
 # PROOF-STATE — the roadmap
 
 **What this file is.** The ordered worklist for the one goal: discharging the
-four tiers below — no postulates, everything typechecks. This file holds the SCHEDULE — each tier's
+three tiers below — no postulates, everything typechecks. This file holds the SCHEDULE — each tier's
 next legs — over a LEDGER of one-line hooks; everything else lives in the
 code.
 
@@ -157,38 +157,13 @@ its proven precedent in the postulate's own `TWIN:` — if the hook here cannot
 point at one, the row is FALSITY.
 
 
-## Tier 1 — the meaning
-
-**THE JOIN.** `⟦_⟧` is `lub` of a program's approximants, so until `lub` is a
-definition with its least-upper-bound facts proven, no program has a meaning:
-only its approximants do. Exports `lub`, an information order on positioned
-runs, the approximant chain in that order, and `fix-unfold`. Tier 2 states
-adequacy against them.
-
-### Big picture tier roadmap
-
-- **THE ORDER.** An information order on `MonotonicList` as a definition: the
-  same events up to some step, then a spin, as `make chain` measures it. The
-  approximant chain stated in it, `_≈_` as a definition. Decides what a stall
-  is, since `lub` must wait without committing a position.
-- **THE JOIN.** `lub` as a definition: commit what a deeper approximant shows
-  before its spin, stall while undecided. Its upper-bound and least facts
-  stated, transitivity of the order proven first: the likeliest to reshape it.
-- **RECURSION.** `Continuous` as a definition, then `fix-unfold` as a body over
-  the join's facts.
-
-### The ledger
-
-- **`_≈_`, `lub`, `Continuous`, `fix-unfold`** (denotation.MonotonicList) —
-  FALSITY, `NO EVIDENCE`: the meaning as a join, recursion as a least fixed point.
-
-## Tier 2 — the adequacy theorem
+## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
 the root, positions forgotten down to ticks. A two-sided fundamental lemma over
 approximants, one operator at a time, puts run n below approximant n below the
 run; `squeeze` meets the limits. Expect the denotation to move under contact; it
-must be solid before Tier 3 is written over it.
+must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
@@ -199,7 +174,8 @@ must be solid before Tier 3 is written over it.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
 - **THE LIMITS.** `run-rel`, `run-bound`, `diagonal`, the two chains,
-  `⟦⟧-limit`, then `squeeze` with `⊑-trans` and `≃-trans`.
+  `⟦⟧-limit` from `lub-limit` once the approximants are `Settling` (as `make
+  chain` measures), then `squeeze` with `⊑-trans` and `≃-trans`.
 
 ### The ledger
 
@@ -215,13 +191,13 @@ must be solid before Tier 3 is written over it.
 - **`run-rel`, `run-bound`, `diagonal`, `toArray-chain`, `approx-chain`,
   `⟦⟧-limit`** (Adequacy) — FALSITY, `NO EVIDENCE`: from approximants to limits.
 
-## Tier 3 — the simultaneous spec
+## Tier 2 — the simultaneous spec
 
 **THE STATEMENT.** Define the new "simultaneous" spec over the denotation,
 adapted from the old `agda/` tree's statement modules (reference only). No
 rows until the statements exist; each lands as a postulate here.
 
-## Tier 4 — the simultaneous spec, proven
+## Tier 3 — the simultaneous spec, proven
 
-**THE PROOF.** Discharge Tier 3's statements using the denotation and
-`adequacy`. No rows until Tier 3 states them.
+**THE PROOF.** Discharge Tier 2's statements using the denotation and
+`adequacy`. No rows until Tier 2 states them.

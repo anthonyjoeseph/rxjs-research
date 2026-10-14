@@ -15,7 +15,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; []; _++_; [_]; length)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
-open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; ≤′-step)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 
 ------------------------------------------------------------------------
@@ -386,14 +386,120 @@ private
 ⊥ᴰ : ∀ {A} → MonotonicList A
 ⊥ᴰ = cold λ p → spin p 0
 
-postulate
-  -- The same meaning, up to finitely many `skip`s, at every subscription.
-  _≈_ : ∀ {A} → MonotonicList A → MonotonicList A → Set
+-- AGREEING FOR k STEPS: the same first k steps, positions and values
+-- alike.  Approximants settle one step at a time, so this is what every
+-- limit below is measured in.
+data Agree {A : Set} : ℕ → Events A → Events A → Set where
+  stop  : ∀ {x y} → Agree zero x y
+  out⁼  : ∀ {k p a l r} → Agree k (force l) (force r) → Agree (suc k) (out p a l) (out p a r)
+  skip⁼ : ∀ {k p l r} → Agree k (force l) (force r) → Agree (suc k) (skip p l) (skip p r)
+  end⁼  : ∀ {k p} → Agree (suc k) (end p) (end p)
+  hush⁼ : ∀ {k} → Agree (suc k) hush hush
 
-  -- The least upper bound of a chain of approximants.  A program's
-  -- approximants are one: approximant n is approximant n+1 up to some
-  -- step, then `⊥ᴰ`'s spin, on every seed `make chain` draws.
-  lub : ∀ {A} → (ℕ → MonotonicList A) → MonotonicList A
+-- Agreeing for k steps at every subscription.
+_≈[_]_ : ∀ {A} → MonotonicList A → ℕ → MonotonicList A → Set
+x ≈[ k ] y = ∀ p → Agree k (observe x p) (observe y p)
+
+-- THE SAME MEANING: alike at every subscription, for any number of steps.
+_≈_ : ∀ {A} → MonotonicList A → MonotonicList A → Set
+x ≈ y = ∀ k → x ≈[ k ] y
+
+-- Each approximant agrees with the next for as many steps as its index.
+-- A program's approximants do, on every seed `make chain` draws: every
+-- cut in approximant n sits under n `defer`s, each a `skip` before it.
+Settling : ∀ {A} → (ℕ → MonotonicList A) → Set
+Settling c = ∀ n → c n ≈[ n ] c (suc n)
+
+private
+  agree-refl : ∀ {A} k (x : Events A) → Agree k x x
+  agree-refl zero    x           = stop
+  agree-refl (suc k) (out p a l) = out⁼ (agree-refl k (force l))
+  agree-refl (suc k) (skip p l)  = skip⁼ (agree-refl k (force l))
+  agree-refl (suc k) (end p)     = end⁼
+  agree-refl (suc k) hush        = hush⁼
+
+  agree-sym : ∀ {A k} {x y : Events A} → Agree k x y → Agree k y x
+  agree-sym stop      = stop
+  agree-sym (out⁼ a)  = out⁼ (agree-sym a)
+  agree-sym (skip⁼ a) = skip⁼ (agree-sym a)
+  agree-sym end⁼      = end⁼
+  agree-sym hush⁼     = hush⁼
+
+  agree-trans : ∀ {A k} {x y z : Events A} → Agree k x y → Agree k y z → Agree k x z
+  agree-trans stop      _         = stop
+  agree-trans (out⁼ a)  (out⁼ b)  = out⁼ (agree-trans a b)
+  agree-trans (skip⁼ a) (skip⁼ b) = skip⁼ (agree-trans a b)
+  agree-trans end⁼      end⁼      = end⁼
+  agree-trans hush⁼     hush⁼     = hush⁼
+
+  agree-pred : ∀ {A k} {x y : Events A} → Agree (suc k) x y → Agree k x y
+  agree-pred {k = zero}  _         = stop
+  agree-pred {k = suc k} (out⁼ a)  = out⁼ (agree-pred a)
+  agree-pred {k = suc k} (skip⁼ a) = skip⁼ (agree-pred a)
+  agree-pred {k = suc k} end⁼      = end⁼
+  agree-pred {k = suc k} hush⁼     = hush⁼
+
+  agree-≤ : ∀ {A m n} {x y : Events A} → m ≤′ n → Agree n x y → Agree m x y
+  agree-≤ ≤′-refl       a = a
+  agree-≤ (≤′-step m≤n) a = agree-≤ m≤n (agree-pred a)
+
+  -- Past the first step.
+  rest : ∀ {A} → Events A → Events A
+  rest (out _ _ r) = force r
+  rest (skip _ r)  = force r
+  rest e           = e
+
+  agree-rest : ∀ {A k} {x y : Events A} → Agree (suc k) x y → Agree k (rest x) (rest y)
+  agree-rest (out⁼ a)  = a
+  agree-rest (skip⁼ a) = a
+  agree-rest end⁼      = agree-refl _ _
+  agree-rest hush⁼     = agree-refl _ _
+
+  mutual
+    -- Step j of the limit, read off the (j+1)-th stream, each stream
+    -- already j steps in.
+    diag : ∀ {A} → (ℕ → Events A) → Events A
+    diag es = settle (es 1) es
+
+    settle : ∀ {A} → Events A → (ℕ → Events A) → Events A
+    settle (out p a _) es = out p a λ where .force → diag λ n → rest (es (suc n))
+    settle (skip p _)  es = skip p λ where .force → diag λ n → rest (es (suc n))
+    settle (end p)     es = end p
+    settle hush        es = hush
+
+  1≤′suc : ∀ m → 1 ≤′ suc m
+  1≤′suc zero    = ≤′-refl
+  1≤′suc (suc m) = ≤′-step (1≤′suc m)
+
+  -- A settling sequence of streams agrees with itself further on.
+  settled : ∀ {A} {es : ℕ → Events A} → (∀ n → Agree n (es n) (es (suc n)))
+          → ∀ {n m} → n ≤′ m → Agree n (es n) (es m)
+  settled s ≤′-refl                    = agree-refl _ _
+  settled s {m = suc m} (≤′-step n≤m) = agree-trans (settled s n≤m) (agree-≤ n≤m (s m))
+
+  settle-agree : ∀ {A k} {x y : Events A} {es} → Agree 1 x y
+               → Agree k (rest y) (diag λ n → rest (es (suc n))) → Agree (suc k) y (settle x es)
+  settle-agree (out⁼ _)  a = out⁼ a
+  settle-agree (skip⁼ _) a = skip⁼ a
+  settle-agree end⁼      a = end⁼
+  settle-agree hush⁼     a = hush⁼
+
+  diag-limit : ∀ {A} {es : ℕ → Events A} → (∀ n → Agree n (es n) (es (suc n))) → ∀ m → Agree m (es m) (diag es)
+  diag-limit s zero              = stop
+  diag-limit {es = es} s (suc m) =
+    settle-agree {es = es} (settled s (1≤′suc m))
+      (diag-limit {es = λ n → rest (es (suc n))} (λ n → agree-rest (s (suc n))) m)
+
+-- THE LIMIT of approximants that settle one step at a time: approximant
+-- n's first n steps are final, so step j is read off approximant j+1.
+-- Defined for any sequence; `lub-limit` says what it is of a settling one.
+lub : ∀ {A} → (ℕ → MonotonicList A) → MonotonicList A
+lub c = cold λ p → diag λ n → observe (c n) p
+
+-- A settling sequence agrees with its limit for as many steps as the
+-- approximant's index.
+lub-limit : ∀ {A} {c : ℕ → MonotonicList A} → Settling c → ∀ m → c m ≈[ m ] lub c
+lub-limit s m p = diag-limit (λ n → s n p) m
 
 -- Approximant n of a recursive definition: unfold it n times from ⊥ᴰ.
 iterate : ∀ {A} → ℕ → (MonotonicList A → MonotonicList A) → MonotonicList A
@@ -402,16 +508,26 @@ iterate (suc n) f = f (iterate n f)
 
 -- RECURSION.  Agda cannot accept `ones = mergeᴰ (ofᴰ [ 1 ]) (deferᴰ ones)`:
 -- it never looks inside `flatMapᴰ`, which could strip the guard.  So
--- recursion here is a least fixed point, total for any `f`.
+-- recursion here is the limit of `f`'s iterates from ⊥ᴰ, total for any `f`.
 fixᴰ : ∀ {A} → (MonotonicList A → MonotonicList A) → MonotonicList A
 fixᴰ f = lub λ n → iterate n f
 
-postulate
-  -- Built from the operators, `f` preserves the information order and
-  -- limits; that is one lemma per operator, proven once.
-  Continuous : ∀ {A} → (MonotonicList A → MonotonicList A) → Set
-  fix-unfold : ∀ {A} {f : MonotonicList A → MonotonicList A}
-             → Continuous f → fixᴰ f ≈ f (fixᴰ f)
+-- Settling one step more than its argument has: a recursion guarded the
+-- way a `defer` guards one.
+Contractive : ∀ {A} → (MonotonicList A → MonotonicList A) → Set
+Contractive f = ∀ {k x y} → x ≈[ k ] y → f x ≈[ suc k ] f y
+
+-- A contractive `f`'s limit is its fixed point.
+fix-unfold : ∀ {A} {f : MonotonicList A → MonotonicList A} → Contractive f → fixᴰ f ≈ f (fixᴰ f)
+fix-unfold {f = f} cf k p =
+  agree-trans (agree-sym (lub-limit {c = c} iterates k p))
+    (agree-trans (iterates k p) (agree-pred (cf (lub-limit {c = c} iterates k) p)))
+  where
+    c : ℕ → MonotonicList _
+    c n = iterate n f
+    iterates : Settling c
+    iterates zero    p = stop
+    iterates (suc n)   = cf (iterates n)
 
 ------------------------------------------------------------------------
 -- Comparing runs

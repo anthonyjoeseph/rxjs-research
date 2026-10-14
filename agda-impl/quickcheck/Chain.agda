@@ -1,11 +1,11 @@
 {-# OPTIONS --guardedness #-}
 
--- THE APPROXIMANTS FORM A CHAIN, TESTED.  `lub` joins approximant n of a
--- program's meaning with every deeper one, and that join means something
--- only if approximant n is approximant n+1 up to some step and `⊥ᴰ`'s
--- spin after it: the same events, then `skip`s forever.  Checked at the
--- root, for every n below the depth at which the approximants stop
--- changing.
+-- THE APPROXIMANTS SETTLE, TESTED.  `lub-limit` reads a program's meaning
+-- off its approximants only if they are `Settling`: approximant n agrees
+-- with approximant n+1 on its first n steps.  Checked at the root, with
+-- the stronger chain shape alongside: the same events, then `⊥ᴰ`'s spin of
+-- `skip`s forever.  For every n below the depth at which the approximants
+-- stop changing.
 module quickcheck.Chain where
 
 open import Data.Bool using (Bool; true; false; _∧_; not)
@@ -44,6 +44,15 @@ private
   below (suc k) hush        hush        = true
   below (suc k) l           r           = spins (suc k) l
 
+  -- `k` steps exactly alike.
+  agrees : ℕ → Events ℕ → Events ℕ → Bool
+  agrees zero    _           _           = true
+  agrees (suc k) (out p a l) (out q b r) = samePos p q ∧ (a ≡ᵇ b) ∧ agrees k (Events∞.force l) (Events∞.force r)
+  agrees (suc k) (skip p l)  (skip q r)  = samePos p q ∧ agrees k (Events∞.force l) (Events∞.force r)
+  agrees (suc k) (end p)     (end q)     = samePos p q
+  agrees (suc k) hush        hush        = true
+  agrees (suc k) _           _           = false
+
   every : (ℕ → Bool) → List ℕ → Bool
   every f []       = true
   every f (n ∷ ns) = f n ∧ every f ns
@@ -51,7 +60,7 @@ private
 -- Approximant n against n+1, for every n that can differ: `μ` unfolded
 -- 3 times and 1000 steps read, as `Quickcheck` reads 500.
 chain : Prog natᵗ → Bool
-chain p = every (λ n → below 1000 (at n) (at (suc n))) (upTo (depth 3 p))
+chain p = every (λ n → below 1000 (at n) (at (suc n)) ∧ agrees n (at n) (at (suc n))) (upTo (depth 3 p))
   where
     at : ℕ → Events ℕ
     at n = observe (⟦ toObs timeline 3 p [] [] [] ⟧[ n ] []) root
