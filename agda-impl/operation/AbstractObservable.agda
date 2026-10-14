@@ -550,6 +550,3 @@ module Run (P : Prims) where
     loopStep : RunAct → ∀ {w} → M w ⊤ → M w ⊤
     loopStep run again = nextᴿ run >>= λ more → if more then again else return tt
 
-    -- Subscribe at the root, then run the loop until nothing is left.
-    drive : RunAct → ∀ {w} → M w ⊤ → ∀ {A} → Subscribe A w → Observer A w → M w ⊤
-    drive run loop s o = run (s ⊑-refl o λ _ _ → done tt) >>= λ _ → loop

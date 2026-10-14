@@ -1,9 +1,9 @@
 {-# OPTIONS --guardedness #-}
 
--- EVERY OBSERVER, PLACED.  `make places` holds the root's record to the
--- denotation; this holds every observer the engine makes inside a run to
+-- EVERY OBSERVER, PLACED.  `make placing` holds the root's trace to the
+-- denotation; this holds every observer the machine makes inside a run to
 -- the denotation of the subtree it observes, subscribed where it is.  A
--- run is compiled as `compileᴺ` does, every node's observer watched: what
+-- run is compiled to approximant n, every node's observer watched: what
 -- it is delivered, and where, goes on the record, tagged with the node, the
 -- position the node was subscribed at, and what the denotation shows a
 -- subscriber there.  A `connected` node is held to the hot handle its
@@ -22,7 +22,8 @@ open import Data.Unit using (tt)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import operation.AbstractObservable using (module Run)
-open import operation.PureObservable using (Pureᴾ; module Pure; note; same)
+open import operation.PureObservable using (Pureᴾ; note)
+open import operation.Machine using (module Machine)
 open import denotation.MonotonicList using (MonotonicList; Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; observe; hot; Timeline)
 open import denotation.Denote using (DenEnv; ⟦_⟧[_])
 open import quickcheck.Code using (Prog; toObs; timeline)
@@ -55,7 +56,7 @@ private
 
 module Watched where
   open Run (Pureᴾ Tag)
-  open Pure Tag using (runᴺ; loopᴺ; start; Pureᴿ; Res; State)
+  open Machine Tag using (reading; trace; launch; Read)
 
   -- The node's observer, recording each delivery before passing it on.
   watch : ∀ {A w} → List ℕ → MonotonicList A → Subscribe A w → Subscribe A w
@@ -66,7 +67,7 @@ module Watched where
                 ; complete = eff (note (tag true)) λ _ → Observer.complete o
                 ; closed = Observer.closed o }) k
 
-  -- `compileᴺ n`, every node watched against approximant n.  A connect's
+  -- Approximant n, every node watched against the denotation's.  A connect's
   -- handle is the hot run of its source, subscribed one step in.
   mutual
     watched : ℕ → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → DenEnv Γ → Subscribe A w
@@ -91,11 +92,12 @@ module Watched where
   idle : ∀ {A} → Observer A []
   idle = record { next = λ _ → done tt ; complete = done tt ; closed = done false }
 
-  -- The record of approximant n, on a budget of b: each delivery, where.
+  -- The record of approximant n, over b steps of the machine: each
+  -- delivery, where.
   deliveries : ℕ → ℕ → ∀ {A} → Obs Timeline [] A → List (Pos × Tag)
-  deliveries n b t = zip (State.marks st) (mapL proj₂ (State.log st))
+  deliveries n b t = zip (Read.marks r) (mapL proj₂ (Read.log r))
     where
-      st = Res.state (Engine.drive (Pureᴿ b) (runᴺ b b) (loopᴺ b b) (watched n [] t [] []) idle same start)
+      r = reading b 0 (trace (launch (watched n [] t [] []) idle))
       zip : List Pos → List Tag → List (Pos × Tag)
       zip (p ∷ ps) (x ∷ xs) = (p , x) ∷ zip ps xs
       zip _        _        = []
@@ -137,7 +139,7 @@ private
   every f (x ∷ xs) = f x ∧ every f xs
 
   record′ : Prog natᵗ → List (Pos × Tag)
-  record′ p = Watched.deliveries (depth 3 p) (500 + depth 3 p) (toObs timeline 3 p [] [] [])
+  record′ p = Watched.deliveries (depth 3 p) 40000 (toObs timeline 3 p [] [] [])
 
 ghosts : Prog natᵗ → Bool
 ghosts p = every (λ d → holds (keyOf d) ds) ds

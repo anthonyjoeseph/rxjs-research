@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain places gets ghosts machine bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain ghosts placing bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
@@ -37,8 +37,7 @@ help:
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
-	@echo "  places        the pure run's record is placed against the root's events, `Bound.places` (ARGS=\"FROM COUNT\")"
-	@echo "  gets          the run reaches every item at the budget read off the meaning, `Progress.gets` (ARGS=\"FROM COUNT\")"
+	@echo "  placing       the machine's trace is placed against the root's events (ARGS=\"FROM COUNT\")"
 	@echo "  ghosts        every observer in the run is shown what its subtree denotes (ARGS=\"FROM COUNT\")"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
@@ -104,27 +103,13 @@ chain: oracle-build
 	  if echo "$$out" | grep -q '^chain: FAIL '; then echo "chain: RED"; exit 1; fi; \
 	  echo "chain: GREEN"
 
-# The small-step machine against the denotation, on ARGS="FROM COUNT" seeds.
-machine: oracle-build
-	@out=$$($(ORACLE_BIN) machine $(ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^machine: done ' || { echo "machine: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^machine: FAIL '; then echo "machine: RED"; exit 1; fi; \
-	  echo "machine: GREEN"
-
-# `Progress.gets` decided, on ARGS="FROM COUNT" seeds.
-gets: oracle-build
-	@out=$$($(ORACLE_BIN) gets $(ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^gets: done ' || { echo "gets: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^gets: FAIL '; then echo "gets: RED"; exit 1; fi; \
-	  echo "gets: GREEN"
-
-# `Bound.places` decided, on budgets small and large, on ARGS="FROM
-# COUNT" seeds: green when the run reaches its `done` line and no seed FAILs.
-places: oracle-build
-	@out=$$($(ORACLE_BIN) places $(ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^places: done ' || { echo "places: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^places: FAIL '; then echo "places: RED"; exit 1; fi; \
-	  echo "places: GREEN"
+# The machine's trace placed against the meaning, positions included, on
+# ARGS="FROM COUNT" seeds.
+placing: oracle-build
+	@out=$$($(ORACLE_BIN) placing $(ARGS)); echo "$$out"; \
+	  echo "$$out" | grep -q '^placing: done ' || { echo "placing: RED — the run never finished"; exit 1; }; \
+	  if echo "$$out" | grep -q '^placing: FAIL '; then echo "placing: RED"; exit 1; fi; \
+	  echo "placing: GREEN"
 
 # Every observer inside the run against its subtree's denotation, on
 # ARGS="FROM COUNT" seeds: green when the run reaches its `done` line and no

@@ -31,9 +31,9 @@ open import denotation.MonotonicList using (ML; From; Frame; Frame∞; From∞; 
 
 module Machine (R : Set) where
   open Run (Pureᴾ R) using (Act; newRef; readRef; writeRef; register; send; finish; startCold; stop; eff; here; goto; diverge; unfold;
-    Observer; Subscription; Env; compile; wkAct; wkEl)
+    Observer; Subscription; Subscribe; Env; compile; wkAct; wkEl)
   open Run (Pureᴾ R) using () renaming (done to doneᴬ)
-  open Pure R using (State; Callbacks; get; put; extend; Timer; insert; cascade; outcome; Res; recorder; start; End; finished; cutOff; frames)
+  open Pure R using (State; Callbacks; get; put; extend; Timer; insert; cascade; recorder; start; End; finished; cutOff; frames)
   open Pure R using () renaming (dry to dryᴱ)
 
   ------------------------------------------------------------------------
@@ -121,7 +121,8 @@ module Machine (R : Set) where
   effect : ∀ {h w B X} → State h → Out R X → (X → Act h B) → w ⊑ h → Stack w B → Step
   effect st (note a) k σ m with State.ended st
   ... | true  = silent ⟨ st , run (k tt) σ m ⟩
-  ... | false = value (State.clock st) (State.pos st) a ⟨ Res.state (outcome (note a) st) , run (k tt) σ m ⟩
+  ... | false = value (State.clock st) (State.pos st) a
+                  ⟨ record st { log = State.log st ++ [ (State.clock st , a) ] ; marks = State.marks st ++ [ State.pos st ] } , run (k tt) σ m ⟩
   effect st fin k σ m with State.ended st
   ... | true  = silent ⟨ st , run (k tt) σ m ⟩
   ... | false = complete (State.pos st)
@@ -189,21 +190,36 @@ module Machine (R : Set) where
     shown (complete p)    = end p
     shown drained         = idle
 
-  -- Subscribing the program at the root, then the loop.
-  begin : PureObs [] R → Mach
-  begin o = ⟨ start , run (compile o [] same recorder λ _ _ → doneᴬ tt) same loop ⟩
+  -- Subscribing at the root, then the loop.
+  launch : ∀ {A} → Subscribe A [] → Observer A [] → Mach
+  launch s o = ⟨ start , run (s same o λ _ _ → doneᴬ tt) same loop ⟩
 
-  -- THE TEST HARNESS'S FUEL: the record of the first n steps, and how it
-  -- stood — cut at the last clock seen, complete, or dry.
-  record′ : ℕ → Time → Trace → List (Time × R) × End
-  record′ zero    c _            = [] , cutOff c
-  record′ (suc n) c (tau t k)    = record′ n t (force k)
-  record′ (suc n) c (out t p a k) with record′ n t (force k)
-  ... | xs , e = (t , a) ∷ xs , e
-  record′ (suc n) c (end p)      = [] , finished
-  record′ (suc n) c idle         = [] , dryᴱ
+  begin : PureObs [] R → Mach
+  begin o = launch (compile o []) recorder
+
+  -- What a reader of the first n steps has: where each value was shown,
+  -- each value at its clock, and how the run stood — cut at the last clock
+  -- seen, complete, or dry.  A completion is placed too.
+  record Read : Set where
+    constructor read
+    field
+      marks  : List Pos
+      log    : List (Time × R)
+      ending : End
+  open Read
+
+  noted : Pos → Time × R → Read → Read
+  noted p x r = read (p ∷ marks r) (x ∷ log r) (ending r)
+
+  -- THE TEST HARNESS'S FUEL, and the adequacy proof's approximants.
+  reading : ℕ → Time → Trace → Read
+  reading zero    c _             = read [] [] (cutOff c)
+  reading (suc n) c (tau t k)     = reading n t (force k)
+  reading (suc n) c (out t p a k) = noted p (t , a) (reading n t (force k))
+  reading (suc n) c (end p)       = read [ p ] [] finished
+  reading (suc n) c idle          = read [] [] dryᴱ
 
   -- The first n steps of a program's run, read as a timeline.
   prefix : ℕ → PureObs [] R → ML R
-  prefix n o with record′ n 0 (trace (begin o))
-  ... | xs , e = frames xs e
+  prefix n o = frames (log r) (ending r)
+    where r = reading n 0 (trace (begin o))

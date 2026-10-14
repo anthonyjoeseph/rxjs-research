@@ -160,51 +160,41 @@ point at one, the row is FALSITY.
 ## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-the root, positions forgotten down to ticks. Both halves compare the run with
-the meaning itself over one configuration of the whole running program
-(`Config`): every run approximant is placed below the meaning (`Bound`), and
-whatever the meaning shows some approximant shows (`reaches`). Expect the
-denotation to move under contact; it must be solid before Tier 2 is written
-over it.
+the root, positions forgotten down to ticks. Both halves are read off one weak
+simulation between the small-step machine's trace and the events the root is
+shown (`Simulation`): every prefix is placed below the meaning, and whatever
+the meaning shows some prefix shows. Expect the denotation to move under
+contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE ENGINE, SMALL-STEP.** `operation.Machine` runs the pure engine as
-  a stack machine: one step per `Act` constructor or burst step, a run a
-  coinductive trace with a silent step per unit of work, fuel only in the
-  harness's `prefix`; it agrees with the denotation and rxjs. Left:
-  `toArray` reads the machine; the fuel engine and its proofs deleted; both
-  halves derived from one postulated weak bisimulation between the trace
-  and `shown`. Decides whether one relation serves both halves.
-- **THE SIMULATION, STEP BY STEP.** The bisimulation as a body over a
-  per-step invariant: the machine's state realizes a configuration, each
-  stack frame a node's pending work; a step is silent with the tree held or
-  one of its skips taken, or shows the tree's next event. Most uncertain:
-  what makes a run of silent steps finite (the stack and the tree's pending
-  work, never fuel); then a `flatMap` refill and `connect`'s joiners.
+- **THE SIMULATION AS AN INVARIANT.** `sim` as a guarded body over a
+  relation between a machine and the denotation's unfolding node
+  (`denotation.Unfold`): the root realizes it, and a related pair steps to
+  a related pair whose next out, end or dry matches the node's. Leaves: the
+  start, and one step per `Step`. Decides whether a per-step relation can
+  be stated without a configuration of the whole program, which the fuel
+  proof needed (`sim`'s RECOVERY).
+- **SILENT RUNS FINITE.** `tauˡ` and `skipʳ` are inductive, so a run of
+  silent machine steps over a node showing nothing must end. A measure
+  from the stack and the tree's pending work, never fuel; a `flatMap`
+  refill and `connect`'s joiners the uncertain cases. Decides whether the
+  measure exists everywhere off the edge below.
 - **THE STATEMENT'S EDGES.** A `connect` source the body outlives,
   spinning or running forever: the machine works silently forever where the
-  meaning is `hush`, so the bisimulation is false there. The meaning keeps
-  its events as skips, or `adequacy` assumes none; Anthony's call.
+  meaning is `hush`, so `sim` is false there. The meaning keeps its events
+  as skips, or `adequacy` assumes none; Anthony's call.
+- **THE MEANING RISES.** `ticks-up` from the denotation's positions: each
+  event at a position past the last, headed by its tick, as `make placing`
+  checks. An induction over `observe`'s unfolding, independent of the
+  simulation; decides whether the positions alone carry it.
 
 ### The ledger
 
-- **`owe-fire`** (Progress) — FALSITY, `DEAD ROUTE`: a turn firing a frame
-  spends a turn's worth of the items owed, never cutting first.
-- **`owe-start`, `owe-dry`** (Progress) — FALSITY, `NO EVIDENCE`: subscribing
-  within `budget` leaves the run owing; a dry queue pays what is owed.
-- **`send-canon`, `closed-ok`, `finish-ok`** (Bound) — FALSITY, `RECOVERY`: a
-  firing cold's emit to its observer, closed check and completion, run through
-  every kernel above it, keep `Mid`.
-- **`live-start`** (Bound) — FALSITY, `NO EVIDENCE`: subscribing establishes
-  `Live`.
-- **`mid-spent`, `stall-ok`, `quiet-ok`, `timer-ok`** (Bound) — FALSITY,
-  `NO EVIDENCE`: the firing cold moved a step, settled spent or quiet, or set
-  its next frame's timer.
-- **`holds-rel`, `part-rel`, `timed-rel`, `joined-rel`** (Realize) — FALSITY,
-  `NO EVIDENCE`: a heap alike, but where the left's callbacks may diverge,
-  holds the same tree.
-- **`ticks-up`** (Adequacy) — FALSITY, `NO EVIDENCE`: the meaning's ticks never
+- **`sim`** (Simulation) — FALSITY, `RECOVERY`: the machine's trace is the
+  root's events up to silent steps; false as stated past a `connect` source its
+  body outlives.
+- **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 
 ## Tier 2 — the simultaneous spec

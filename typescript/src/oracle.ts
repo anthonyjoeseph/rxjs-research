@@ -27,7 +27,6 @@ type Row = {
   prog: Code;
   denote: Trace;
   pure: Trace;
-  machine: Trace;
 };
 
 const bin = process.env.AGDA_CLI_BIN ?? "../agda-impl/_cli/Oracle-CLI";
@@ -101,7 +100,6 @@ const check = async (row: Row): Promise<string[]> => {
   const bad = [
     ...(agrees(row.denote, rx) ? [] : [`denotation ${show(row.denote)}`]),
     ...(agrees(row.pure, rx) ? [] : [`pure       ${show(row.pure)}`]),
-    ...(agrees(row.machine, rx) ? [] : [`machine    ${show(row.machine)}`]),
     ...(ioTrace === undefined
       ? [`io         ${io.failed}`]
       : agrees(ioTrace, rx)

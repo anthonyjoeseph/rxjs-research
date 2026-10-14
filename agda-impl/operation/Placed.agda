@@ -19,7 +19,6 @@ open import Data.Nat using (ℕ; suc; _≤_; s≤s; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-antisym; ≡ᵇ⇒≡; <ᵇ⇒<)
 open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Data.Unit using (⊤)
 
 open import denotation.MonotonicList using (emit; stall; close; Time; Pos; tick; Events; Events∞; out; skip; end; hush; ticks; inFrame;
   within)
@@ -103,7 +102,7 @@ mutual
 -- The record, against the events
 
 module _ {A : Set} where
-  open Pure A using (End; finished; dry; cutOff; frames; ending; sameFrame; stalls)
+  open Pure A using (End; finished; dry; cutOff; frames; ending; sameFrame; stalls; later)
                 renaming (inFrame to inFrameᴿ; within to withinᴿ)
 
   -- What the record shows: each value at its tick, then how it ended.
@@ -150,7 +149,7 @@ module _ {A : Set} where
       ... | true  = blank≼ p
       ... | false = closing p
         where
-          closing : ∀ {is} → ShowsIn t (close (Pure.later A (ending (cutOff c)))) is → is ≼ˡ []
+          closing : ∀ {is} → ShowsIn t (close (later (ending (cutOff c)))) is → is ≼ˡ []
           closing nil        = []≼ˡ
           closing (close⁺ s) = shown [] (cutOff c) s
       shownIn t []               finished nil        = []≼ˡ
@@ -166,7 +165,7 @@ module _ {A : Set} where
           sameIn (emit⁺ q) = ∷≼ˡ (shownIn t xs en q)
       shownIn t ((t′ , a) ∷ xs) en p | false = newIn p
         where
-          newIn : ∀ {is} → ShowsIn t (close (Pure.later A (frames ((t′ , a) ∷ xs) en))) is → is ≼ˡ items ((t′ , a) ∷ xs) en
+          newIn : ∀ {is} → ShowsIn t (close (later (frames ((t′ , a) ∷ xs) en))) is → is ≼ˡ items ((t′ , a) ∷ xs) en
           newIn nil        = []≼ˡ
           newIn (close⁺ s) = shown ((t′ , a) ∷ xs) en s
 
@@ -213,33 +212,43 @@ module _ {A : Set} where
   placed-⊑ : ∀ {f en qs xs e} → Up f e → Placed en qs xs e → frames xs en ⊑ ticks e
   placed-⊑ u p s = shows-≼ (shown _ _ s) (shows u p)
 
-------------------------------------------------------------------------
--- A whole run
+  -- What a reader sees of a record cut short.
+  private
+    ≡-nil : ∀ {x is} → is ≡ [] → Shows {A} x is
+    ≡-nil refl = nil
 
-module Ran (A : Set) where
-  open import operation.AbstractObservable using (module Run)
-  open import operation.PureObservable using (Pureᴾ; same)
-  open Run (Pureᴾ A) using (Subscribe; module Engine)
-  open Pure A using (Res; res; State; endOf; observe; Pureᴿ; runᴺ; loopᴺ; recorder; start)
+    ≡-nilIn : ∀ {t b is} → is ≡ [] → ShowsIn {A} t b is
+    ≡-nilIn refl = nil
 
-  -- What `runPure m` reads its record off.
-  ran : ℕ → Subscribe A [] → Res [] _
-  ran m s = Engine.drive (Pureᴿ m) (runᴺ m m) (loopᴺ m m) s recorder same start
+    stalls-nil : ∀ {t is} → ShowsIn {A} t (stall stalls) is → is ≡ []
+    stalls-nil nil        = refl
+    stalls-nil (stall⁺ s) = stalls-nil s
 
-  -- A run's record, placed against the events.
-  Recorded : Res [] _ → Events A → Set
-  Recorded (res σ st v) = Placed (endOf (State.ended st) v (State.clock st)) (State.marks st) (State.log st)
+    ending-nil : ∀ {c is} → Shows {A} (ending (cutOff c)) is → is ≡ []
+    ending-nil nil     = refl
+    ending-nil (at⁺ s) = stalls-nil s
 
-  recorded-⊑ : ∀ {f} r {e} → Up f e → Recorded r e → observe r ⊑ ticks e
-  recorded-⊑ (res σ st v) u p = placed-⊑ u p
+    sameFrame-nil : ∀ b c t {is} → ShowsIn {A} t (sameFrame b (stall stalls) (close (later (ending (cutOff c))))) is → is ≡ []
+    sameFrame-nil true  c t s          = stalls-nil s
+    sameFrame-nil false c t nil        = refl
+    sameFrame-nil false c t (close⁺ s) = ending-nil s
 
-  -- What a run's record shows: each value at its tick, then how it ended.
-  itemsOf : Res [] ⊤ → List (Item A)
-  itemsOf (res σ st v) = items (State.log st) (endOf (State.ended st) v (State.clock st))
+  mutual
+    -- A record cut short shows a prefix of any record extending it.
+    frames-cut : ∀ (xs ys : List (Time × A)) c e → frames xs (cutOff c) ⊑ frames (xs ++ ys) e
+    frames-cut []             ys c e s                 = ≡-nil (ending-nil s)
+    frames-cut ((t , a) ∷ xs) ys c e nil               = nil
+    frames-cut ((t , a) ∷ xs) ys c e (at⁺ nil)         = at⁺ nil
+    frames-cut ((t , a) ∷ xs) ys c e (at⁺ (emit⁺ s))   = at⁺ (emit⁺ (inFrame-cut t xs ys c e s))
 
-  observed : ∀ r → Shows (observe r) (itemsOf r)
-  observed (res σ st v) = framed (State.log st) _
+    inFrame-cut : ∀ t (xs ys : List (Time × A)) c e {is} → ShowsIn t (inFrameᴿ t xs (cutOff c)) is → ShowsIn t (inFrameᴿ t (xs ++ ys) e) is
+    inFrame-cut t []              ys c e s = ≡-nilIn (sameFrame-nil (c ≡ᵇ t) c t s)
+    inFrame-cut t ((t′ , a) ∷ xs) ys c e s = sameFrame-cut (t′ ≡ᵇ t) t t′ a xs ys c e s
 
-  -- Placed events show all of it.
-  recorded-shows : ∀ {f} r {e} → Up f e → Recorded r e → Shows (ticks e) (itemsOf r)
-  recorded-shows (res σ st v) u p = shows u p
+    sameFrame-cut : ∀ b t t′ (a : A) xs ys c e {is}
+                  → ShowsIn t (sameFrame b (emit a (withinᴿ t xs (cutOff c))) (close (later (frames ((t′ , a) ∷ xs) (cutOff c))))) is
+                  → ShowsIn t (sameFrame b (emit a (withinᴿ t (xs ++ ys) e)) (close (later (frames ((t′ , a) ∷ xs ++ ys) e)))) is
+    sameFrame-cut true  t t′ a xs ys c e nil        = nil
+    sameFrame-cut true  t t′ a xs ys c e (emit⁺ s)  = emit⁺ (inFrame-cut t xs ys c e s)
+    sameFrame-cut false t t′ a xs ys c e nil        = nil
+    sameFrame-cut false t t′ a xs ys c e (close⁺ s) = close⁺ (frames-cut ((t′ , a) ∷ xs) ys c e s)
