@@ -168,33 +168,39 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
+- **THE TIMELINE RISES BY CONSTRUCTION.** `ML` indexed by a lower bound on
+  its ticks: `at t′` needs `t ≤ t′`, the burst continues from `suc t′`. A
+  falling cold stops being expressible, so `rising`, `Rising`, `Rises` and
+  their threading go, and `timer-ok` is no longer false. Decides what the
+  index costs every site that builds or reads a timeline: `coldᴰ`, `Order`,
+  `Placed`, the engine's schedule, the generators, the bug-cache literals.
+- **THE DENOTATION, COINDUCTIVE.** `⟦_⟧` guarded by `defer`'s skip instead
+  of indexed by depth, so there is no `lub`, no approximant and no
+  `approx-chain`, `ticks-up` or `⟦⟧-limit`. Decides whether every operator's
+  denotation is productive once guarded, `flatMap`'s merge and `connect`'s
+  subject first.
+- **ONE BISIMULATION, NO FUEL.** A small-step engine that produces events,
+  and `adequacy` as one coinductive bisimulation between it and the
+  denotation observed at the root, over the configuration tree. Replaces
+  the per-operator `Rel`, which shared state between siblings contradicts,
+  and `squeeze`; keeps `Config`, `Holding` and the step lemmas. Fuel moves
+  to the test harness; the TS port and the oracle rerun. Decides whether
+  sibling state is carried by one global relation.
 - **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over
   `Mid`, and a send runs alike to its observer's (`send-ok`); what is left
   is each kernel's own run, `send-canon` first: an emit must reach the root
   through every node above the firing cold, each hop's stored callbacks
-  again alike to the kernel's. Most uncertain: a `flatMap` lane's refill,
-  then `connect`'s joiners. Then `live-start`, by the same kernels.
-- **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted three times,
-  and each repair restates the top line, so all are Anthony's call. A cold
-  whose ticks fall (`rising`): `ML` carries the increase, `adequacy`
-  assumes it, or the denotation clamps a late frame to now. A `connect`
-  source the body outlives (`connect-rel`), spinning or running forever:
-  the denotation keeps its events as skips, or `adequacy` assumes none.
-- **THE RELATION.** `Rel` and `RelSubj` as definitions, the at-least half
-  only: with budget enough, the kernel shows everything its timeline does.
-  Every leaf below is stated in these, so a wrong relation is wrong
-  everywhere; what is left to decide is how one relation spans state the
-  kernels share, and whether `run-rel` reads it off at the root.
-- **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
-  whose kernel and denotation are shaped least alike.
-- **THE DENOTATION'S LIMIT.** `ticks-up` from `rising`, `approx-chain`, then
-  `⟦⟧-limit` from `lub-limit` once the approximants are `Settling` (as
-  `make chain` measures); `squeeze` then meets them.
+  again alike to the kernel's. These are the step lemmas the bisimulation
+  keeps. Most uncertain: a `flatMap` lane's refill, then `connect`'s joiners.
+- **THE STATEMENT'S EDGES.** A `connect` source the body outlives
+  (`connect-rel`), spinning or running forever: the denotation keeps its
+  events as skips, or `adequacy` assumes none. Under the bisimulation this
+  is infinitely many skips against `hush`; Anthony's call.
 
 ### The ledger
 
 - **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
-  for a cold that falls, the repair Anthony's call.
+  for a cold that falls; goes when `ML` carries the increase.
 - **`send-canon`, `closed-ok`, `finish-ok`** (Bound) — FALSITY, `RECOVERY`: a
   firing cold's emit to its observer, closed check and completion, run through
   every kernel above it, keep `Mid`.
