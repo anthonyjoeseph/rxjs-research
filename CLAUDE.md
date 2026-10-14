@@ -289,12 +289,6 @@ Main also defines the build's COVERAGE — **`make agda` IS the claim graph**, a
 
 **Why this is law:** unwired proven work costs more than refutations. A proof nobody calls sits inert while the work it would have done is re-derived inline, so the same thing is proven twice; and a tower built without its consumer is a tower whose shape was never checked.
 
-## The IO runtime (Anthony)
-
-- **A cold is `create(produce, complete) → {subscription, teardown}`.** Nothing else is handed in.
-- **Synchronous = emitted while `subscription` is still blocking.** `subscribe`'s return closes the window.
-- **Nondeterminism under concurrency is a requirement, not a bug.** Any interleaving of emissions is legal; a state no interleaving produces is a bug. Delivery is atomic per subscription; a blocked `produce` waits, it never drops.
-
 ## TypeScript style
 
 As purely functional as possible: no mutable state, no direct `.subscribe()`. Delegate IO/statefulness to rxjs operators like `scan`. Two reasons — cleanliness, and keeping the primitives and `batchSimultaneous` in near-direct correspondence with the Agda.
