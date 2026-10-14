@@ -12,21 +12,20 @@
 module Bound where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _∸_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Level using (lower)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; subst₂)
-open import Data.List.Membership.Propositional using (_∈_)
+open import Level using (lower; lift)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Pos; tick; Events; Events∞;
-  out; skip; hush; observe; root)
+  out; skip; hush; observe; root; ix; last)
 open import denotation.Denote using (⟦_⟧[_])
-open import operation.PureObservable using (PureObs; Pureᴾ; same; _⊑_; _⨾_; module Pure)
+open import operation.PureObservable using (PureObs; Pureᴾ; same; grow; _⊑_; _⨾_; wk∋; Sink; Handle; module Pure)
 open import operation.Placed using (Placed; cut; quiets; sends; skips; module Ran)
 open import Config using (_≅_; skipˡ; hush≅; module Nodes)
 open import Realize using (module Realizing)
@@ -185,7 +184,8 @@ module Loop (R : Set) (E₀ : Events R) (N : ℕ) (Live : ∀ {h} → Pure.State
 
 module Places (R : Set) where
   open Ran R using (ran; Recorded)
-  open Pure R using (State; Res; res; shift; start; recorder; compileᴺ; runᴺ; loopᴺ; Timer; get; cascade; finished; module Play)
+  open Pure R using (State; Res; res; shift; start; recorder; compileᴺ; runᴺ; loopᴺ; Timer; get; put; cascade; insert; M; then; ret; unlessSpent;
+    module Callbacks; module Play)
   open import operation.AbstractObservable using (module Run)
   open Run (Pureᴾ R) using (done; eff; Observer; Env)
   open Prefix R using (_↝_; ≅-hush)
@@ -212,29 +212,71 @@ module Places (R : Set) where
     open Ends R (shown n o) public
     open Loop R (shown n o) N (Live n o) public
 
+  -- MID-FRAME: the root's record so far, and until the root completes, a
+  -- configuration whose one firing cold, at sink `s` and handle `hd`, is
+  -- at step `i` of the frame at `r`, the clock where its timeline,
+  -- subscribed at `τ`, puts tick `t`.
+  record Mid (n : ℕ) (o : PureObs [] R) {h} (st : State h) {B} (s : Sink h B) (hd : Handle h) (τ t : Time) (r : Pos) (i : ℕ) (b : Burst B) : Set₁ where
+    constructor mid
+    field
+      {left} : Events R
+      sofar  : Ends.Root R (shown n o) left st
+      rest   : State.ended st ≡ false
+             → Σ (Nodes.Node n [] R) λ c → Realizing.Playing R n c st s hd τ r i b × left ≅ Nodes.⟦_⟧ᶜ n c [] × State.clock st ≡ τ + t
+
+  -- A step's result judged: cut anywhere, or `P` where it reached.
+  Reach : ∀ n o {h A} → (∀ {v} → h ⊑ v → State v → A → Set₁) → Res h A → Set₁
+  Reach n o P (res g st nothing)  = Ends.CutOk R (shown n o) st
+  Reach n o P (res g st (just a)) = P g st a
+
+  -- The cold's subscriber read closed: the turn stops, the configuration
+  -- settled.  Read open: the frame plays on.
+  Closed : ∀ n o {h} → Bool → State h → ∀ {B} → Sink h B → Handle h → Time → Time → Pos → ℕ → Burst B → Set₁
+  Closed n o true  st s hd τ t r i b = Live n o st
+  Closed n o false st s hd τ t r i b = Mid n o st s hd τ t r i b
+
   postulate
     -- Subscribing the program at the root, on any budget, leaves it live
     -- or cut.
     live-start : ∀ n (o : PureObs [] R) → Rising n o → ∀ N k
                → At.Post n o N (runᴺ N k (compileᴺ n o [] same recorder λ _ _ → done tt) same start)
-    -- A turn from a run already complete leaves it complete, its record
-    -- untouched: the engine notes nothing once the root has ended.
-    turn-over : ∀ n o N k {h} (st : State h) {tm ts} → State.ended st ≡ true
-              → State.ended (Res.state (At.turn n o N k st tm ts)) ≡ true
-              × State.log (Res.state (At.turn n o N k st tm ts)) ≡ State.log st
-              × State.marks (Res.state (At.turn n o N k st tm ts)) ≡ State.marks st
-    -- A frame played from a configuration whose one firing cold is the
-    -- timer's keeps it: the clock at the timer's tick, the position at
-    -- its cascade, the root not yet complete.
+    -- A spent cold settles, whatever step of its frame it stood at.
+    mid-spent : ∀ n o {h} {st : State h} {B} {s : Sink h B} {hd τ t r i b} → Mid n o st s hd τ t r i b
+              → lower (get (State.heap st) hd) ≡ true → Live n o st
+    -- Asking a live cold's subscriber whether it is closed.
+    closed-ok : ∀ n o N k {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i b}
+              → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i b → lower (get (State.heap st) (wk∋ σ hd)) ≡ false
+              → Reach n o (λ g st′ c → Closed n o c st′ (wk∋ (σ ⨾ g) s) (wk∋ (σ ⨾ g) hd) τ t r i b)
+                      (Play.runCb N (runᴺ N k) s Callbacks.isClosed σ st)
+    -- An emit, sent from its own position, moves the cold a step on.
     --
     -- RECOVERY: `git show 016c16a2` restores a cold at the root proven
     --   against the engine: its subscribe burst, each timer's turn, and
     --   the record placed, frame by frame.
-    live-burst : ∀ n o N k {h} {st : State h} {tm} {r} {c} (σ : h ⊑ h) (t : Realizing.Sub R n h [] R) (p : tm ∈ Realizing.pendings R n t)
-               → Ends.Root R (shown n o) r st → State.ended st ≡ false
-               → (z : Realizing.Holding R n c st) → Realizing.Holding.tree z ≡ Realizing.fire R n t p → Realizing.Calm R n t
-               → r ≅ Nodes.⟦_⟧ᶜ n c [] → State.clock st ≡ Timer.due tm → State.pos st ≡ cascade tm
-               → At.Post n o N (Play.burst N (runᴺ N k) N (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) σ st)
+    send-ok : ∀ n o N k {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i a k′}
+            → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i (emit a k′) → lower (get (State.heap st) (wk∋ σ hd)) ≡ false
+            → Reach n o (λ g st′ _ → Mid n o st′ (wk∋ (σ ⨾ g) s) (wk∋ (σ ⨾ g) hd) τ t r (suc i) (Burst∞.force k′))
+                    (Play.sendᴾ N (runᴺ N k) s a σ (record st { pos = r ++ [ ix i ] }))
+    -- A stall moves it a step on, sending nothing.
+    stall-ok : ∀ n o {h} {st : State h} {B} {s : Sink h B} {hd τ t r i k′} → Mid n o st s hd τ t r i (stall k′)
+             → Mid n o st s hd τ t r (suc i) (Burst∞.force k′)
+    -- A frame closing on nothing more settles it.
+    quiet-ok : ∀ n o {h} {st : State h} {B} {s : Sink h B} {hd τ t r i k′} → Mid n o st s hd τ t r i (close k′)
+             → ML∞.force k′ ≡ quiet → Live n o st
+    -- A frame closing on the completion: the cold spent, the completion
+    -- sent from where the frame ends.
+    finish-ok : ∀ n o N k {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i k′}
+              → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i (close k′) → ML∞.force k′ ≡ done
+              → lower (get (State.heap st) (wk∋ σ hd)) ≡ false
+              → Reach n o (λ _ st′ _ → Live n o st′)
+                      (Play.finishᴾ N (runᴺ N k) s σ (record st { heap = put (State.heap st) (wk∋ σ hd) (lift true) ; pos = r ++ [ last ] }))
+    -- A frame closing on a later one sets its timer.  False for a cold
+    -- whose ticks fall (`rising`): the timer is due at the clock, not at
+    -- the tick the frame is pending for.
+    timer-ok : ∀ n o {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i k′ t′ b′}
+             → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i (close k′) → ML∞.force k′ ≡ at t′ b′
+             → Live n o (record st { timers = insert (record { due = State.clock st + (t′ ∸ t) ; sink = wk∋ σ s ; handle = wk∋ σ hd
+                                                            ; at′ = t′ ; from = r ++ [ last ] ; frame = b′ }) (State.timers st) })
 
   -- Popping a timer moves neither the record nor whether it is complete.
   moved : ∀ n o {h} {st : State h} {tm : Timer h} {ts} {r} → Ends.Root R (shown n o) r st
@@ -246,11 +288,109 @@ module Places (R : Set) where
   post-shift : ∀ n o N {h v} (ρ : h ⊑ v) (Y : Res v ⊤) → At.Post n o N Y → At.Post n o N (shift ρ Y)
   post-shift n o N ρ (res σ st b) q = q
 
-  -- A complete record keeps it, live or cut.
-  post-over : ∀ n o N {h} (Y : Res h ⊤) → State.ended (Res.state Y) ≡ true
-            → Placed finished (State.marks (Res.state Y)) (State.log (Res.state Y)) (shown n o) → At.Post n o N Y
-  post-over n o N (res σ st nothing)   e p = Ends.cutok {r = hush} (Ends.over e p)
-  post-over n o N (res σ st (just tt)) e p = config {left = hush} (Ends.over e p) λ f → Realizing.absurd R n (trans (sym e) f)
+  same-⨾ : ∀ {h v} (g : h ⊑ v) → same ⨾ g ≡ g
+  same-⨾ same     = refl
+  same-⨾ (grow g) = cong grow (same-⨾ g)
+
+  reach-shift : ∀ n o {h A} {P : ∀ {v} → h ⊑ v → State v → A → Set₁} (Y : Res h A) → Reach n o P Y → Reach n o P (shift same Y)
+  reach-shift n o (res g st nothing)  q = q
+  reach-shift n o {P = P} (res g st (just a)) q = subst (λ x → P x st a) (sym (same-⨾ g)) q
+
+  reach-post : ∀ n o N {h} (Y : Res h ⊤) → Reach n o (λ _ st′ _ → Live n o st′) Y → At.Post n o N Y
+  reach-post n o N (res g st nothing)   q = q
+  reach-post n o N (res g st (just tt)) q = q
+
+  -- A step, run on into the rest of the frame.
+  then-reach : ∀ n o N {w h A} (f : A → M w ⊤) (σ : w ⊑ h) (Y : Res h A) {P : ∀ {v} → h ⊑ v → State v → A → Set₁}
+             → Reach n o P Y → (∀ {v} (g : h ⊑ v) (st′ : State v) a → P g st′ a → At.Post n o N (f a (σ ⨾ g) st′))
+             → At.Post n o N (then (λ a τ → f a (σ ⨾ τ)) (shift same Y))
+  then-reach n o N f σ (res g st nothing)  q k = q
+  then-reach n o N f σ (res g st (just a)) q k rewrite same-⨾ g = post-shift n o N g (f a (σ ⨾ g) st) (k g st a q)
+
+  -- A spent cold plays nothing more.
+  spent-unless : ∀ n o N {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i b} (m : M w ⊤)
+               → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i b → lower (get (State.heap st) (wk∋ σ hd)) ≡ true
+               → At.Post n o N (unlessSpent hd m σ st)
+  spent-unless n o N s hd σ st m q e rewrite e = mid-spent n o q e
+
+  unless-false : ∀ n o N {w h} (hd : Handle w) (m : M w ⊤) (σ : w ⊑ h) (st : State h)
+               → lower (get (State.heap st) (wk∋ σ hd)) ≡ false → At.Post n o N (m σ st) → At.Post n o N (unlessSpent hd m σ st)
+  unless-false n o N hd m σ st e q rewrite e = post-shift n o N same (m σ st) q
+
+  -- THE FRAME PLAYED, step by step as the engine plays it.
+  mutual
+    burst-ok : ∀ n o N k f {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i b}
+             → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i b → At.Post n o N (Play.burst N (runᴺ N k) f s hd t r i b σ st)
+    burst-ok n o N k zero    s hd σ st q = Ends.cutok (Mid.sofar q)
+    burst-ok n o N k (suc f) s hd σ st {τ} {t} {r} {i} {b} q = by (lower (get (State.heap st) (wk∋ σ hd))) refl
+      where
+        after : ∀ {v} (g : _ ⊑ v) (st′ : State v) c → Closed n o c st′ (wk∋ (σ ⨾ g) s) (wk∋ (σ ⨾ g) hd) τ t r i b
+              → At.Post n o N ((if c then ret tt else Play.stepᴾ N (runᴺ N k) f s hd t r i b) (σ ⨾ g) st′)
+        after g st′ true  q′ = q′
+        after g st′ false q′ = step-ok n o N k f s hd (σ ⨾ g) st′ q′
+        by : ∀ x → lower (get (State.heap st) (wk∋ σ hd)) ≡ x → At.Post n o N (Play.burst N (runᴺ N k) (suc f) s hd t r i b σ st)
+        by true  e rewrite e = mid-spent n o q e
+        by false e rewrite e = then-reach n o N (λ c → if c then ret tt else Play.stepᴾ N (runᴺ N k) f s hd t r i b) σ
+                                 (Play.runCb N (runᴺ N k) s Callbacks.isClosed σ st) (closed-ok n o N k s hd σ st q e) after
+
+    step-ok : ∀ n o N k f {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i b}
+            → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i b → At.Post n o N (Play.stepᴾ N (runᴺ N k) f s hd t r i b σ st)
+    step-ok n o N k f s hd σ st {τ} {t} {r} {i} {emit a k′} q = by (lower (get (State.heap st) (wk∋ σ hd))) refl
+      where
+        by : ∀ x → lower (get (State.heap st) (wk∋ σ hd)) ≡ x → At.Post n o N (Play.stepᴾ N (runᴺ N k) f s hd t r i (emit a k′) σ st)
+        by true  e rewrite e = post-shift n o N same (unlessSpent hd (Play.burst N (runᴺ N k) f s hd t r (suc i) (Burst∞.force k′)) σ st)
+                                 (spent-unless n o N s hd σ st (Play.burst N (runᴺ N k) f s hd t r (suc i) (Burst∞.force k′)) q e)
+        by false e rewrite e = then-reach n o N (λ _ → unlessSpent hd (Play.burst N (runᴺ N k) f s hd t r (suc i) (Burst∞.force k′))) σ
+                                 (shift same (Play.sendᴾ N (runᴺ N k) s a σ (record st { pos = r ++ [ ix i ] })))
+                                 (reach-shift n o (Play.sendᴾ N (runᴺ N k) s a σ (record st { pos = r ++ [ ix i ] })) (send-ok n o N k s hd σ st q e))
+                                 λ g st′ _ q′ → unless-ok n o N k f s hd (σ ⨾ g) st′ q′
+    step-ok n o N k f s hd σ st {b = stall k′} q = burst-ok n o N k f s hd σ st (stall-ok n o q)
+    step-ok n o N k f s hd σ st {b = close k′} q = schedule-ok n o N k s hd σ st (ML∞.force k′) refl q
+
+    unless-ok : ∀ n o N k f {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i b}
+              → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i b
+              → At.Post n o N (unlessSpent hd (Play.burst N (runᴺ N k) f s hd t r i b) σ st)
+    unless-ok n o N k f s hd σ st {τ} {t} {r} {i} {b} q = by (lower (get (State.heap st) (wk∋ σ hd))) refl
+      where
+        by : ∀ x → lower (get (State.heap st) (wk∋ σ hd)) ≡ x
+           → At.Post n o N (unlessSpent hd (Play.burst N (runᴺ N k) f s hd t r i b) σ st)
+        by true  e = spent-unless n o N s hd σ st (Play.burst N (runᴺ N k) f s hd t r i b) q e
+        by false e = unless-false n o N hd (Play.burst N (runᴺ N k) f s hd t r i b) σ st e (burst-ok n o N k f s hd σ st q)
+
+    schedule-ok : ∀ n o N k {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i k′} (m : ML B)
+                → ML∞.force k′ ≡ m → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i (close k′)
+                → At.Post n o N (Play.schedule N (runᴺ N k) s hd t (r ++ [ last ]) m σ st)
+    schedule-ok n o N k s hd σ st {τ} {t} {r} {i} done m q = by (lower (get (State.heap st) (wk∋ σ hd))) refl
+      where
+        by : ∀ x → lower (get (State.heap st) (wk∋ σ hd)) ≡ x
+           → At.Post n o N (Play.schedule N (runᴺ N k) s hd t (r ++ [ last ]) done σ st)
+        st₂ = record st { heap = put (State.heap st) (wk∋ σ hd) (lift true) }
+        by true  e = spent-unless n o N s hd σ st (Pure.bind R (Pure.spend R hd) λ _ → Pure.bind R (Pure.gotoᴾ R (r ++ [ last ])) λ _ → Play.finishᴾ N (runᴺ N k) s) q e
+        by false e = unless-false n o N hd (Pure.bind R (Pure.spend R hd) λ _ → Pure.bind R (Pure.gotoᴾ R (r ++ [ last ])) λ _ → Play.finishᴾ N (runᴺ N k) s) σ st e
+          (post-shift n o N same (Pure.bind R (Pure.gotoᴾ R (r ++ [ last ])) (λ _ → Play.finishᴾ N (runᴺ N k) s) σ st₂)
+            (post-shift n o N same (Play.finishᴾ N (runᴺ N k) s σ (record st₂ { pos = r ++ [ last ] }))
+              (reach-post n o N (Play.finishᴾ N (runᴺ N k) s σ (record st₂ { pos = r ++ [ last ] })) (finish-ok n o N k s hd σ st q m e))))
+    schedule-ok n o N k s hd σ st quiet    m q = quiet-ok n o q m
+    schedule-ok n o N k s hd σ st (at t′ b′) m q = timer-ok n o s hd σ st q m
+
+  -- A turn that fires a frame keeps it: the frame played from the
+  -- configuration with its cold started, or from a run already complete.
+  live-fire : ∀ n o N k {h} (st : State h) {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts
+            → lower (get (State.heap st) (Timer.handle tm)) ≡ false → At.Post n o N (At.turn n o N k st tm ts)
+  live-fire n o N k st {tm} {ts} (config sofar rest) eq s rewrite s =
+    post-shift n o N same (Play.burst N (runᴺ N k) N (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) same st′)
+      (by (State.ended st) refl)
+    where
+      st′ = record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
+      by : ∀ x → State.ended st ≡ x
+         → At.Post n o N (Play.burst N (runᴺ N k) N (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) same st′)
+      by true e = burst-ok n o N k N (Timer.sink tm) (Timer.handle tm) same st′ {τ = 0}
+        (mid (moved n o {tm = tm} {ts} sofar) λ f → Realizing.absurd R n (trans (sym e) f))
+      by false e with rest e
+      ... | c , z , b with Realizing.firing-start R n (Realizing.Realizes.holding z) eq s
+      ... | p , z′ , teq with Realizing.fire-spot R n (Realizing.Holding.tree (Realizing.Realizes.holding z)) p
+      ... | τ , d , sp , feq = burst-ok n o N k N (Timer.sink tm) (Timer.handle tm) same st′ {τ = τ}
+        (mid (moved n o {tm = tm} {ts} sofar) λ _ → c , Realizing.playing _ (Realizing.Realizes.calm z) sp z′ (trans teq feq) , b , d)
 
   -- A spent timer's turn keeps it: nothing is played.
   live-spent : ∀ n o {h} {st : State h} {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts
@@ -258,28 +398,6 @@ module Places (R : Set) where
              → Live n o (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm })
   live-spent n o {st = st} {tm} {ts} (config sofar rest) eq s = config (moved n o {tm = tm} {ts} sofar) λ e →
     proj₁ (rest e) , Realizing.realizes-spent R n (proj₁ (proj₂ (rest e))) eq s , proj₂ (proj₂ (rest e))
-
-  -- A turn that fires a frame keeps it: complete already, or its cold
-  -- started and the frame played.
-  live-fire : ∀ n o N k {h} (st : State h) {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts
-            → lower (get (State.heap st) (Timer.handle tm)) ≡ false → At.Post n o N (At.turn n o N k st tm ts)
-  live-fire n o N k st {tm} {ts} (config sofar rest) eq s = by (State.ended st) refl
-    where
-      by : ∀ b → State.ended st ≡ b → At.Post n o N (At.turn n o N k st tm ts)
-      by true e = post-over n o N (At.turn n o N k st tm ts) (proj₁ ov)
-        (subst₂ (λ ms ls → Placed finished ms ls (shown n o)) (sym (proj₂ (proj₂ ov))) (sym (proj₁ (proj₂ ov))) (complete sofar))
-        where
-          ov = turn-over n o N k st {tm} {ts} e
-          complete : ∀ {r} → Ends.Root R (shown n o) r st → Placed finished (State.marks st) (State.log st) (shown n o)
-          complete (Ends.live f _) = Realizing.absurd R n (trans (sym e) f)
-          complete (Ends.over _ p) = p
-      by false e with rest e
-      ... | c , z , b with Realizing.firing-start R n (Realizing.Realizes.holding z) eq s
-      ... | p , z′ , teq rewrite s = post-shift n o N same
-            (Play.burst N (runᴺ N k) N (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) (same ⨾ same)
-              (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }))
-            (live-burst n o N k (same ⨾ same) (Realizing.Holding.tree (Realizing.Realizes.holding z)) p (moved n o {tm = tm} {ts} sofar) e z′ teq
-                        (Realizing.Realizes.calm z) b refl refl)
 
   -- One turn of the loop keeps it.
   live-turn : ∀ n o N k {h} (st : State h) {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts → At.Post n o N (At.turn n o N k st tm ts)

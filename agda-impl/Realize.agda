@@ -273,6 +273,40 @@ module Realizing (R : Set) (n : ℕ) where
     CalmLanes []                = ⊤
     CalmLanes (lane c k s ∷ ls) = Calm s × CalmLanes ls
 
+  -- A COLD PICKED OUT OF A TREE, by its sink and handle.
+  mutual
+    data Spot {h} : ∀ {Δ A B} → Sub h Δ A → Sink h B → Handle h → Set₁ where
+      cold-here : ∀ {Δ A} {s : Sink h A} {hd ph} → Spot {Δ = Δ} (coldˢ s hd ph) s hd
+      in-map    : ∀ {Δ A B C} {f : A → B} {t : Sub h Δ A} {s : Sink h C} {hd} → Spot t s hd → Spot (mapˢ f t) s hd
+      in-scan   : ∀ {Δ A B C} {f : B → A → B} {r} {t : Sub h Δ A} {s : Sink h C} {hd} → Spot t s hd → Spot (scanˢ f r t) s hd
+      in-take   : ∀ {Δ A C} {i p c k} {t : Sub h Δ A} {s : Sink h C} {hd} → Spot t s hd → Spot (takeWhileˢ i p c k t) s hd
+      in-outer  : ∀ {Δ A B C} {op} {f : A → Obs Timeline Δ B} {fl oc k r} {t : Sub h Δ A} {ls} {s : Sink h C} {hd}
+                → Spot t s hd → Spot (flatMapˢ op f fl oc k r t ls) s hd
+      in-lanes  : ∀ {Δ A B C} {op} {f : A → Obs Timeline Δ B} {fl oc k r} {t : Sub h Δ A} {ls} {s : Sink h C} {hd}
+                → SpotLanes ls s hd → Spot (flatMapˢ op f fl oc k r t ls) s hd
+      in-source : ∀ {Δ A B C} {S e} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {s : Sink h C} {hd} → Spot t s hd → Spot (connectˢ S e t u) s hd
+      in-body   : ∀ {Δ A B C} {S e} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {s : Sink h C} {hd} → Spot u s hd → Spot (connectˢ S e t u) s hd
+
+    data SpotLanes {h} : ∀ {Δ B C} → List (Lane h Δ B) → Sink h C → Handle h → Set₁ where
+      this-lane : ∀ {Δ B C} {c k} {t : Sub h Δ B} {ls} {s : Sink h C} {hd} → Spot t s hd → SpotLanes (lane c k t ∷ ls) s hd
+      next-lane : ∀ {Δ B C} {l} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → SpotLanes (l ∷ ls) s hd
+
+  -- The tree with the picked cold moved to phase `ph`.
+  mutual
+    setAt : ∀ {h Δ A B} {t : Sub h Δ A} {s : Sink h B} {hd} → Spot t s hd → Phase B → Sub h Δ A
+    setAt (cold-here {s = s} {hd}) ph                        = coldˢ s hd ph
+    setAt (in-map {f = f} {t} p) ph                          = mapˢ f (setAt p ph)
+    setAt (in-scan {f = f} {r} p) ph                         = scanˢ f r (setAt p ph)
+    setAt (in-take {i = i} {q} {c} {k} p) ph                 = takeWhileˢ i q c k (setAt p ph)
+    setAt (in-outer {op = op} {f} {fl} {oc} {k} {r} {ls = ls} p) ph = flatMapˢ op f fl oc k r (setAt p ph) ls
+    setAt (in-lanes {op = op} {f} {fl} {oc} {k} {r} {t} p) ph       = flatMapˢ op f fl oc k r t (setAtLanes p ph)
+    setAt (in-source {S = S} {e} {u = u} p) ph               = connectˢ S e (setAt p ph) u
+    setAt (in-body {S = S} {e} {t} p) ph                     = connectˢ S e t (setAt p ph)
+
+    setAtLanes : ∀ {h Δ B C} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → Phase C → List (Lane h Δ B)
+    setAtLanes (this-lane {c = c} {k} {ls = ls} p) ph = lane c k (setAt p ph) ∷ ls
+    setAtLanes (next-lane {l = l} p) ph              = l ∷ setAtLanes p ph
+
   ------------------------------------------------------------------------
   -- Against a state
 
@@ -437,6 +471,17 @@ module Realizing (R : Set) (n : ℕ) where
     field
       holding : Holding c st
       calm    : Calm (Holding.tree holding)
+
+  -- MID-FRAME: one cold, picked out, at step `i` of the frame at `r` on
+  -- the timeline subscribed at `τ`; every other cold between frames.
+  record Playing {h} (c : Node [] R) (st : State h) {B} (s : Sink h B) (hd : Handle h) (τ : Time) (r : Pos) (i : ℕ) (b : Burst B) : Set₁ where
+    constructor playing
+    field
+      before  : Sub h [] R
+      calm    : Calm before
+      spot    : Spot before s hd
+      holding : Holding c st
+      tree≡   : Holding.tree holding ≡ setAt spot (firing τ r i b)
 
   ------------------------------------------------------------------------
   -- With no timer left, nothing is pending
@@ -655,6 +700,40 @@ module Realizing (R : Set) (n : ℕ) where
     fireLanes (lane c k s ∷ ls) p with ∈-++⁻ (pendings s) p
     ... | inj₁ q = lane c k (fire s q) ∷ ls
     ... | inj₂ q = lane c k s ∷ fireLanes ls q
+
+  -- Starting it picks its cold out: the tree as it was, that cold inside
+  -- the frame, on the timeline subscribed at the tick the frame was due
+  -- from.
+  mutual
+    fire-spot : ∀ {h Δ A} {tm : Timer h} (t : Sub h Δ A) (p : tm ∈ pendings t)
+              → Σ Time λ τ → Timer.due tm ≡ τ + Timer.at′ tm
+                × Σ (Spot t (Timer.sink tm) (Timer.handle tm)) λ sp → fire t p ≡ setAt sp (firing τ (cascade tm) 0 (Timer.frame tm))
+    fire-spot (coldˢ s hd (frame τ e t b))     (here refl) = τ , refl , cold-here , refl
+    fire-spot (mapˢ f s)                       p with fire-spot s p
+    ... | τ , d , sp , eq = τ , d , in-map sp , cong (mapˢ f) eq
+    fire-spot (scanˢ f r s)                    p with fire-spot s p
+    ... | τ , d , sp , eq = τ , d , in-scan sp , cong (scanˢ f r) eq
+    fire-spot (takeWhileˢ i q c k s)           p with fire-spot s p
+    ... | τ , d , sp , eq = τ , d , in-take sp , cong (takeWhileˢ i q c k) eq
+    fire-spot (flatMapˢ op f fl oc k r so ls)  p with ∈-++⁻ (pendings so) p
+    ... | inj₁ q with fire-spot so q
+    ...   | τ , d , sp , eq = τ , d , in-outer sp , cong (λ x → flatMapˢ op f fl oc k r x ls) eq
+    fire-spot (flatMapˢ op f fl oc k r so ls)  p | inj₂ q with fire-spot-lanes ls q
+    ...   | τ , d , sp , eq = τ , d , in-lanes sp , cong (flatMapˢ op f fl oc k r so) eq
+    fire-spot (connectˢ S e src body)          p with ∈-++⁻ (pendings src) p
+    ... | inj₁ q with fire-spot src q
+    ...   | τ , d , sp , eq = τ , d , in-source sp , cong (λ x → connectˢ S e x body) eq
+    fire-spot (connectˢ S e src body)          p | inj₂ q with fire-spot body q
+    ...   | τ , d , sp , eq = τ , d , in-body sp , cong (connectˢ S e src) eq
+
+    fire-spot-lanes : ∀ {h Δ B} {tm : Timer h} (ls : List (Lane h Δ B)) (p : tm ∈ lanePendings ls)
+                    → Σ Time λ τ → Timer.due tm ≡ τ + Timer.at′ tm
+                      × Σ (SpotLanes ls (Timer.sink tm) (Timer.handle tm)) λ sp → fireLanes ls p ≡ setAtLanes sp (firing τ (cascade tm) 0 (Timer.frame tm))
+    fire-spot-lanes (lane c k s ∷ ls) p with ∈-++⁻ (pendings s) p
+    ... | inj₁ q with fire-spot s q
+    ...   | τ , d , sp , eq = τ , d , this-lane sp , cong (λ x → lane c k x ∷ ls) eq
+    fire-spot-lanes (lane c k s ∷ ls) p | inj₂ q with fire-spot-lanes ls q
+    ...   | τ , d , sp , eq = τ , d , next-lane sp , cong (lane c k s ∷_) eq
 
   -- Starting it takes its frame, and only its, off the pending.
   record Split {h} (tm : Timer h) (ps qs : List (Timer h)) : Set₁ where
