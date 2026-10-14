@@ -19,10 +19,11 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; 
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans)
+open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong; cong₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
+open import Data.Empty using (⊥; ⊥-elim)
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
@@ -230,6 +231,49 @@ private
     ... | inj₂ (x , _) | inj₁ y       rewrite subst (λ z → cmpLabel z c ≡ lt) (sym (eq-label a b x)) y = refl
     ... | inj₂ (x , u) | inj₂ (y , v)
       rewrite subst (λ z → cmpLabel z c ≡ eq) (sym (eq-label a b x)) y | lt-pos p q r u v = refl
+
+  refl-ℕ : ∀ m → cmpℕ m m ≡ eq
+  refl-ℕ m with m <ᵇ m in e
+  ... | true  = ⊥-elim (n≮n m (<ᵇ⇒< m m (subst T (sym e) tt)))
+  ... | false = refl
+
+  mutual
+    refl-label : ∀ a → cmpLabel a a ≡ eq
+    refl-label (ix m)  = refl-ℕ m
+    refl-label (sub p) = refl-pos p
+    refl-label last    = refl
+
+    refl-pos : ∀ p → cmpPos p p ≡ eq
+    refl-pos []      = refl
+    refl-pos (a ∷ p) rewrite refl-label a = refl-pos p
+
+  lt-ext : ∀ p q d → cmpPos p q ≡ lt → cmpPos p (q ++ d) ≡ lt
+  lt-ext []      (_ ∷ _) d _ = refl
+  lt-ext []      []      d ()
+  lt-ext (_ ∷ _) []      d ()
+  lt-ext (a ∷ p) (b ∷ q) d h with lexi-lt (cmpLabel a b) (cmpPos p q) h
+  ... | inj₁ x       rewrite x = refl
+  ... | inj₂ (x , y) rewrite x = lt-ext p q d y
+
+  isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
+  isLt-lt {lt} h = refl
+  isLt-lt {eq} ()
+  isLt-lt {gt} ()
+
+  isLt-not : ∀ c → (c ≡ lt → ⊥) → isLt c ≡ false
+  isLt-not lt n = ⊥-elim (n refl)
+  isLt-not eq n = refl
+  isLt-not gt n = refl
+
+  lt≢eq : lt ≡ eq → ⊥
+  lt≢eq ()
+
+-- Strict, and past a position is past everything under it.
+<ᵖ-asym : ∀ p q → p <ᵖ q ≡ true → q <ᵖ p ≡ false
+<ᵖ-asym p q h = isLt-not (cmpPos q p) λ e → lt≢eq (trans (sym (lt-pos p q p (isLt-lt h) e)) (refl-pos p))
+
+<ᵖ-ext : ∀ p q d → p <ᵖ q ≡ true → p <ᵖ (q ++ d) ≡ true
+<ᵖ-ext p q d h = cong isLt (lt-ext p q d (isLt-lt h))
 
 ------------------------------------------------------------------------
 -- What a subscriber sees
