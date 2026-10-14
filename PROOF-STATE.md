@@ -167,12 +167,14 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE BOUND HALF AS A CONFIGURATION.** `places` as a body: an invariant
-  over the pure state — every live observer's deliveries placed against the
-  events its subtree shows where it was subscribed, as `make ghosts`
-  measures — established at the root, kept by each loop turn, and read off
-  as `Recorded` when the loop stops. Decides whether `Rel`'s at-most half
-  is needed at all, or is only this invariant.
+- **THE BOUND HALF'S RELATION.** `Below` and `BelowSubj` as definitions:
+  an invariant over the pure state — each live observer's deliveries placed
+  against what its subtree shows where it subscribed, as `make ghosts`
+  measures — kept by every loop turn. Decides whether the dry clause, which
+  needs the at-least half, lets `Below` stand apart from `Rel` or merges them.
+- **THE BOUND HALF, ONE OPERATOR AT A TIME.** The `*-below` leaves,
+  `connect-below` first: the one whose state the kernels share; then
+  `run-below`, `Below` read off as `Recorded`.
 - **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted three times,
   and each repair restates the top line, so all are Anthony's call. A cold
   whose ticks fall (`rising`): `ML` carries the increase, `adequacy`
@@ -194,8 +196,14 @@ must be solid before Tier 2 is written over it.
 
 - **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
   for a cold that falls, the repair Anthony's call.
-- **`places`** (Adequacy) — FALSITY, `NO EVIDENCE`: the engine leaves its
-  record placed against the root's events, value by value.
+- **`Below`, `BelowSubj`, `BelowSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`:
+  the bound half, positionally, observer by observer.
+- **`connect-below`** (Adequacy) — FALSITY, `NO EVIDENCE`: every joiner of the
+  allocated subject held to the hot handle.
+- **`run-below`** (Adequacy) — FALSITY, `NO EVIDENCE`: `Below` at the root is
+  the run's record, placed.
+- **`{empty,of,map,scan,takeWhile,flatMap,connected,cold,defer,bot}-below`**
+  (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
 - **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject
