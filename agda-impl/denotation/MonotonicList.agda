@@ -395,8 +395,39 @@ deferᴰ s = cold λ p → skip (p ++ [ ix 0 ]) λ where .force → observe s (p
 -- the subject — so whatever the body joined synchronously sees the
 -- source's whole subscribe burst.  Not a primitive: what the handle
 -- shows a subscriber depends only on where it joins, so it is a value.
+--
+-- The source runs whether the body joins it or not, so its steps show
+-- between the body's as skips: a source the body never joins still
+-- works, and one working forever is never silent.  Each source step at
+-- `q` shows at its first effect, the subject taking it, before anything
+-- the subject delivers: so no event sits above another, which rekeying
+-- a hot under `sub` needs to keep the order.  The body's end ends both;
+-- once the source is done, the body runs alone.
+mutual
+  beside : ∀ {A B} → Events B → Events A → Events B
+  beside b (out q _ s) = ahead b (q ++ [ ix 0 ]) s (before (q ++ [ ix 0 ]) b)
+  beside b (skip q s)  = ahead b (q ++ [ ix 0 ]) s (before (q ++ [ ix 0 ]) b)
+  beside b (end _)     = b
+  beside b hush        = b
+
+  -- the source's next step, shown at `q`, and whether it comes before the body's
+  ahead : ∀ {A B} → Events B → Pos → Events∞ A → Bool → Events B
+  ahead b           q s true  = skip q λ where .force → beside b (force s)
+  ahead (out k a r) q s false = out k a λ where .force → ahead (force r) q s (before q (force r))
+  ahead (skip k r)  q s false = skip k λ where .force → ahead (force r) q s (before q (force r))
+  ahead (end c)     q s false = end c
+  ahead hush        q s false = hush
+
+  before : ∀ {B} → Pos → Events B → Bool
+  before q (out k _ _) = q <ᵖ k
+  before q (skip k _)  = q <ᵖ k
+  before q (end k)     = q <ᵖ k
+  before q hush        = true
+
 connectᴰ : ∀ {A B} → MonotonicList A → (MonotonicList A → MonotonicList B) → MonotonicList B
-connectᴰ s f = cold λ p → observe (f (hot (observe s (p ++ [ ix 1 ])))) (p ++ [ ix 0 ])
+connectᴰ s f = cold λ p → run (observe s (p ++ [ ix 1 ])) p
+  where run : _ → Pos → _
+        run e p = beside (observe (f (hot e)) (p ++ [ ix 0 ])) e
 
 -- FLATMAP: a sorted merge of the outer and its lanes in flight.  Each
 -- element's lane is subscribed at the element's second effect, its first

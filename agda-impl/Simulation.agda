@@ -54,9 +54,7 @@ module Sim (R : Set) where
   open _~∞_
 
   postulate
-    -- The program's run is what the root is shown.  False as stated where
-    -- a `connect` source the body never joins runs on forever: the machine
-    -- works silently where the events `hush`.
+    -- The program's run is what the root is shown.
     --
     -- RECOVERY: `git show a2e0bb8b` restores `Config` and `Realize`, a
     --   configuration of the whole running program realized by the fuel

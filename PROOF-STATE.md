@@ -179,21 +179,19 @@ contact; it must be solid before Tier 2 is written over it.
   silent machine steps over a node showing nothing must end. A measure
   from the stack and the tree's pending work, never fuel; a `flatMap`
   refill and `connect`'s joiners the uncertain cases. Decides whether the
-  measure exists everywhere off the edge below.
-- **THE STATEMENT'S EDGES.** A `connect` source the body outlives,
-  spinning or running forever: the machine works silently forever where the
-  meaning is `hush`, so `sim` is false there. The meaning keeps its events
-  as skips, or `adequacy` assumes none; Anthony's call.
+  measure exists everywhere: a `connect` source now shows each step, so
+  none runs unseen.
 - **THE MEANING RISES.** `ticks-up` from the denotation's positions: each
   event at a position past the last, headed by its tick, as `make placing`
-  checks. An induction over `observe`'s unfolding, independent of the
-  simulation; decides whether the positions alone carry it.
+  checks. Rekeying a hot under `sub` keeps order only when no event sits
+  above another, so that prefix-freedom rides along. An induction over
+  `observe`'s unfolding, independent of the simulation; decides whether
+  the positions alone carry it.
 
 ### The ledger
 
 - **`sim`** (Simulation) — FALSITY, `RECOVERY`: the machine's trace is the
-  root's events up to silent steps; false as stated past a `connect` source its
-  body outlives.
+  root's events up to silent steps.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 

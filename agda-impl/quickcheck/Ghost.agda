@@ -27,7 +27,7 @@ open import operation.Machine using (module Machine)
 open import denotation.MonotonicList using (MonotonicList; Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; observe; hot; Timeline)
 open import denotation.Denote using (DenEnv; ⟦_⟧[_])
 open import quickcheck.Code using (Prog; toObs; timeline)
-open import quickcheck.Oracle using (depth)
+open import quickcheck.Oracle using (depth; until)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (natᵗ)
 
@@ -92,12 +92,14 @@ module Watched where
   idle : ∀ {A} → Observer A []
   idle = record { next = λ _ → done tt ; complete = done tt ; closed = done false }
 
-  -- The record of approximant n, over b steps of the machine: each
+  -- The record of approximant n, over b steps of the machine up to the
+  -- horizon: each
   -- delivery, where.
   deliveries : ℕ → ℕ → ∀ {A} → Obs Timeline [] A → List (Pos × Tag)
   deliveries n b t = zip (Read.marks r) (mapL proj₂ (Read.log r))
     where
-      r = reading b 0 (trace (launch (watched n [] t [] []) idle))
+      run = trace (launch (watched n [] t [] []) idle)
+      r = reading (until b run) 0 run
       zip : List Pos → List Tag → List (Pos × Tag)
       zip (p ∷ ps) (x ∷ xs) = (p , x) ∷ zip ps xs
       zip _        _        = []

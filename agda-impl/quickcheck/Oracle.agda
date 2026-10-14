@@ -18,7 +18,7 @@ open import Data.List using (List; []; _∷_; reverse) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Bool using (true; false; if_then_else_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≡ᵇ_; _<ᵇ_)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_; intersperse)
 open import Data.Product using (_×_; _,_)
@@ -98,10 +98,28 @@ depth u p = suc u * suc (defers p)
 denoteTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 denoteTrace u n p = traceML n (ticks (observe (⟦ toObs timeline u p [] [] [] ⟧ []) root))
 
+-- How many of a run's first n steps come by tick `horizon`.  A looping
+-- program works forever, and its machine slows as its heap grows, so it is
+-- read up to a time, as the rxjs side reads it; every finite program is
+-- done well before.  A shorter read is only ever cut.
+horizon : Time
+horizon = 100
+
+module _ {R : Set} where
+  open Machine R using (tau; out; end; idle)
+
+  until : ℕ → Machine.Trace R → ℕ
+  until zero    _             = zero
+  until (suc n) (tau t k)     = if horizon <ᵇ t then zero else suc (until n (Machine.Trace∞.force k))
+  until (suc n) (out t _ _ k) = if horizon <ᵇ t then zero else suc (until n (Machine.Trace∞.force k))
+  until (suc n) (end _)       = 1
+  until (suc n) idle          = 1
+
 -- The machine read for many more steps than the trace's budget: each
 -- value or stall of a frame is several steps of work.
 pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
-pureTrace {t} u n p = traceML n (Machine.prefix ⟦ t ⟧ᵀ (200 * n) (toObs timeline u p [] [] []))
+pureTrace {t} u n p = traceML n (Machine.prefix ⟦ t ⟧ᵀ (until (200 * n) (Machine.trace ⟦ t ⟧ᵀ (Machine.begin ⟦ t ⟧ᵀ o))) o)
+  where o = toObs timeline u p [] [] []
 
 ------------------------------------------------------------------------
 -- JSON

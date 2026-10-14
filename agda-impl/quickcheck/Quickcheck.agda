@@ -6,7 +6,7 @@
 -- has to be a prefix of the other side's.
 module quickcheck.Quickcheck where
 
-open import Data.Bool using (Bool; true; false; _∧_; not)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
 open import Data.List using (List; []; _∷_; _++_; filterᵇ; upTo; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -43,6 +43,7 @@ private
   prefix t (x ∷ xs) (y ∷ ys) = eqEvent t x y ∧ prefix t xs ys
 
 agrees : ∀ t → Trace ⟦ t ⟧ᵀ → Trace ⟦ t ⟧ᵀ → Bool
+agrees t (xs ▸ cut) (ys ▸ cut) = prefix t xs ys ∨ prefix t ys xs
 agrees t (xs ▸ cut) (ys ▸ _)   = prefix t xs ys
 agrees t (xs ▸ _)   (ys ▸ cut) = prefix t ys xs
 agrees t (xs ▸ x)   (ys ▸ y)   = prefix t xs ys ∧ prefix t ys xs ∧ eqEnd x y
@@ -133,7 +134,8 @@ private
     n ← roll 3
     fs ← genFrames n
     c ← roll 1
-    pure (script fs (c ≡ᵇ 0))
+    l ← roll 3
+    pure (script fs (c ≡ᵇ 0) (l ≡ᵇ 0))
 
   genLeaf : ∀ Γ Δᵍ Δ Θ → Gen (Code Γ Δᵍ Δ Θ natᵗ)
   genLeaf Γ Δᵍ Δ Θ = do

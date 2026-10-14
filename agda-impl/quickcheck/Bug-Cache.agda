@@ -12,12 +12,16 @@
 -- where it came from and means nothing more.
 module quickcheck.Bug-Cache where
 
-open import Data.List using (List; [])
-open import Data.Product using (_×_)
+open import Data.Bool using (true; false)
+open import Data.List using (List; []; _∷_)
+open import Data.Product using (_×_; _,_)
 open import Data.String using (String)
 
 open import quickcheck.Ty using (natᵗ)
-open import quickcheck.Code using (Prog)
+open import quickcheck.Code using (Prog; script; cold; connect)
 
 cases : List (String × Prog natᵗ)
-cases = []
+cases =
+  -- a looping source its body never joins: the meaning was silent
+  ("connect, unjoined looping source" , connect (cold (script ((1 , 1 ∷ []) ∷ []) false true)) (cold (script [] false false)))
+  ∷ []

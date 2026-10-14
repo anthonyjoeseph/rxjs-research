@@ -10,8 +10,8 @@
 -- Each node steps exactly as its operator in `MonotonicList` does, clause
 -- for clause, positions included.  A `connect`'s source is held as the
 -- configuration it starts in; each joiner steps a copy of it and rejoins,
--- which shows the events a shared run would, since a configuration is a
--- value.
+-- and the `connect` steps one more beside its body, which shows the
+-- events a shared run would, since a configuration is a value.
 --
 -- DEAD ROUTE: `⟦_⟧` by guarded corecursion over the tree directly, the
 --   `defer` clause a `skip` whose tail is `⟦ force l ⟧`.  Agda refuses it:
@@ -54,6 +54,8 @@ mutual
     flatMapᶜ   : ∀ {A B} → T.FlatOp → (A → Pos → Node B) → Maybe (Node A) → List (Node B) → List A → Node B
     -- Joined at `p`, `i` events dropped so far, a copy of the source.
     joinᶜ      : ∀ {A} → Pos → ℕ → Node A → Node A
+    -- A connect's body, its own source running beside it.
+    connectᶜ   : ∀ {A B} → Node B → Node A → Node B
     deferᶜ     : ∀ {Γ A} → Later Timeline Γ A → Srcs Γ → Pos → Node A
 
   -- Each connect in scope, as the configuration its source starts in.
@@ -77,7 +79,9 @@ subscribe (map f s)         ρ p = mapᶜ f (subscribe s ρ p)
 subscribe (scan f z s)      ρ p = scanᶜ f z (subscribe s ρ p)
 subscribe (takeWhile i q s) ρ p = takeWhileᶜ i q (subscribe s ρ p)
 subscribe (flatMap op f s)  ρ p = flatMapᶜ op (λ a q → subscribe (f a) ρ q) (just (subscribe s ρ p)) [] []
-subscribe (connect s b)     ρ p = subscribe b (subscribe s ρ (p ++ [ ix 1 ]) ∷ ρ) (p ++ [ ix 0 ])
+subscribe (connect s b)     ρ p = connecting (subscribe s ρ (p ++ [ ix 1 ]))
+  where connecting : _ → _
+        connecting c = connectᶜ (subscribe b (c ∷ ρ) (p ++ [ ix 0 ])) c
 subscribe (connected i)     ρ p = joinᶜ p 0 (lookup ρ i)
 subscribe (defer l)         ρ p = deferᶜ l ρ p
 
@@ -144,6 +148,27 @@ rejoinˢ p i (skipˢ q c)  = shownˢ p i q nothing c (p <ᵖ q)
 rejoinˢ p i (endˢ c)     = if p <ᵖ c then endˢ (c ++ [ subᴾ p ]) else endˢ (p ++ [ last ])
 rejoinˢ p i hushˢ        = hushˢ
 
+-- `connect`'s body `b` and source `s` stepped, as `MonotonicList.beside`
+-- interleaves them; the source left unmoved when the body comes first.
+beforeˢ : ∀ {B} → Pos → Step B → Bool
+beforeˢ q (outˢ k _ _) = q <ᵖ k
+beforeˢ q (skipˢ k _)  = q <ᵖ k
+beforeˢ q (endˢ k)     = q <ᵖ k
+beforeˢ q hushˢ        = true
+
+aheadˢ : ∀ {A B} → Node B → Step B → Node A → Pos → Node A → Bool → Step B
+aheadˢ b sb             s q s′ true  = skipˢ q (connectᶜ b s′)
+aheadˢ b (outˢ k a b′)  s q s′ false = outˢ k a (connectᶜ b′ s)
+aheadˢ b (skipˢ k b′)   s q s′ false = skipˢ k (connectᶜ b′ s)
+aheadˢ b (endˢ c)       s q s′ false = endˢ c
+aheadˢ b hushˢ          s q s′ false = hushˢ
+
+besideˢ : ∀ {A B} → Node B → Step B → Node A → Step A → Step B
+besideˢ b sb s (outˢ q _ s′) = aheadˢ b sb s (q ++ [ ix 0 ]) s′ (beforeˢ (q ++ [ ix 0 ]) sb)
+besideˢ b sb s (skipˢ q s′)  = aheadˢ b sb s (q ++ [ ix 0 ]) s′ (beforeˢ (q ++ [ ix 0 ]) sb)
+besideˢ b sb s (endˢ _)      = sb
+besideˢ b sb s hushˢ         = sb
+
 -- A lane arriving, subscribed at `q`.
 admit : ∀ {A B : Set} → T.FlatOp → (A → Pos → Node B) → Pos → A → List (Node B) → List A → List (Node B) × List A
 admit (T.mergeᶠ nothing)  g q a ls       qs = g a q ∷ ls , qs
@@ -199,6 +224,7 @@ mutual
   step (takeWhileᶜ i p c)      = takeWhileˢ i p (step c)
   step (flatMapᶜ op g o ls qs) = goˢ op g o ls qs (earliest ls)
   step (joinᶜ p i c)           = rejoinˢ p i (step c)
+  step (connectᶜ b s)          = besideˢ b (step b) s (step s)
   step (deferᶜ l ρ p)          = skipˢ (p ++ [ ix 0 ]) (subscribe (Later.force l) ρ (p ++ [ ix 1 ]))
 
   earliest : ∀ {B} → List (Node B) → Earliest B

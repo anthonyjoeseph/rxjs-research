@@ -5,8 +5,9 @@
 -- records sits at the denotation's next `out`, at the same position, on
 -- that position's tick; its completion at the `end`, its queue run dry
 -- over `hush`.  Silent steps on either side pass freely, so running out
--- of steps reads as a pass: a machine that works forever where the
--- meaning is `hush` cannot be refuted here.
+-- of steps reads as a pass — except past a `hush`, where the machine must
+-- run dry within a fixed number of steps: a meaning that says nothing
+-- more will ever happen is refuted by a machine still working there.
 --
 -- And the events rise, as `ticks-up` needs: each at a position past the
 -- last, headed by its tick.
@@ -20,7 +21,8 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; tick; observe; root)
 open import denotation.Unfold using (⟦_⟧)
 open import operation.Machine using (module Machine)
-open import quickcheck.Code using (toObs; timeline)
+open import quickcheck.Code using (Prog; toObs; timeline)
+open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
 
 open Machine ℕ using (Trace; Trace∞; tau; out; end; idle; trace; begin)
@@ -29,13 +31,19 @@ private
   samePos : Pos → Pos → Bool
   samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
 
+  drains : ℕ → Trace → Bool
+  drains zero    _         = false
+  drains (suc j) (tau _ l) = drains j (Trace∞.force l)
+  drains (suc j) idle      = true
+  drains (suc j) _         = false
+
   placedᵇ : ℕ → Trace → Events ℕ → Bool
   placedᵇ zero    _             _           = true
+  placedᵇ (suc k) m             hush        = drains 20000 m
   placedᵇ (suc k) (tau _ l)     e           = placedᵇ k (Trace∞.force l) e
   placedᵇ (suc k) m             (skip _ r)  = placedᵇ k m (Events∞.force r)
   placedᵇ (suc k) (out t p a l) (out q b r) = samePos p q ∧ (t ≡ᵇ tick q) ∧ (a ≡ᵇ b) ∧ placedᵇ k (Trace∞.force l) (Events∞.force r)
   placedᵇ (suc k) (end p)       (end q)     = samePos p q
-  placedᵇ (suc k) idle          hush        = true
   placedᵇ (suc k) _             _           = false
 
   headed : Pos → Bool
@@ -49,8 +57,12 @@ private
   rising (suc k) q (end p)     = headed p ∧ (q <ᵖ p)
   rising (suc k) q hush        = true
 
+-- The machine's trace placed against the meaning, and the meaning rising.
+placing : Prog natᵗ → Bool
+placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e
+  where o = toObs timeline 3 p [] [] []
+        e = observe (⟦ o ⟧ []) root
+
 -- The seeds from f on which the machine's trace strays from the meaning.
 placingFails : ℕ → ℕ → List ℕ
-placingFails f c = filterᵇ (λ s → not (placed (program s))) (mapL (f +_) (upTo c))
-  where
-    placed = λ p → let o = toObs timeline 3 p [] [] [] ; e = observe (⟦ o ⟧ []) root in placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e
+placingFails f c = filterᵇ (λ s → not (placing (program s))) (mapL (f +_) (upTo c))
