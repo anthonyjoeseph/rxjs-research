@@ -203,7 +203,7 @@ solid before Tier 3 is written over it.
   `NO EVIDENCE`: the information order on reported runs and its limits.
 - **`connect-rel`** (Adequacy) — FALSITY, `NO EVIDENCE`: the allocated subject
   against the hot handle.
-- **`{empty,of,map,scan,takeWhile,flatten,cold,connected,defer,bot}-rel`**
+- **`{empty,of,map,scan,takeWhile,flatMap,cold,connected,defer,bot}-rel`**
   (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
 - **`run-rel`, `diagonal`, `exhaust`** (Adequacy) — FALSITY, `NO EVIDENCE`:
   from approximants to limits.

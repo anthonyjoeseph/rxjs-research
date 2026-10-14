@@ -154,6 +154,36 @@ def read_main_claims(src_dir):
     return claims, (not bare)
 
 
+def data_constructors(src_dir, files):
+    """constructor -> the `data` type declaring it.  Main may name a
+    constructor (`using (flatMap)`), which Agda resolves and this script's
+    definition scan never sees, since a `data` body is not a definition.
+    The claim is a claim of the type."""
+    owner = {}
+    for rel in files:
+        _, visible = load_file(src_dir, rel)
+        i = 0
+        while i < len(visible):
+            m = re.match(r"(\s*)data\s+(\S+)", visible[i])
+            i += 1
+            if not m:
+                continue
+            ind, ty = len(m.group(1)), m.group(2)
+            while i < len(visible):
+                line = visible[i]
+                if line.strip() == "":
+                    i += 1
+                    continue
+                if leading_spaces(line) <= ind:
+                    break
+                head = line.split(":", 1)
+                if len(head) == 2:
+                    for c in head[0].split():
+                        owner.setdefault(c, ty)
+                i += 1
+    return owner
+
+
 def is_boundary(ch):
     return ch is None or ch in BOUNDARY_CHARS
 
@@ -1346,6 +1376,8 @@ def main():
 
     corpus = build_corpus(src_dir, files)
     main_claims, main_ok = read_main_claims(src_dir)
+    ctors = data_constructors(src_dir, files)
+    main_claims = {c if c in defs else ctors.get(c, c) for c in main_claims}
     suppressed = postulate_arg_sites(src_dir, files, defs, def_lines,
                                      postulate_names)
     edges, consumers, seed = build_graph(

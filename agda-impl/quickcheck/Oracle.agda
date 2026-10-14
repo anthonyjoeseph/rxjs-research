@@ -31,7 +31,7 @@ open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using (toArray)
 open import operation.Observable using (subscribe; fromTimeline; newIORef; readIORef; writeIORef)
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
-open import quickcheck.Code using (Code; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; μ; var; defer; Prog; toObs; timeline)
+open import quickcheck.Code using (Code; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog; toObs; timeline)
 
 ------------------------------------------------------------------------
 -- Traces
@@ -84,7 +84,7 @@ defers (of _)                = 0
 defers (map _ s)             = defers s
 defers (scan _ _ s)          = defers s
 defers (takeWhile _ _ s)     = defers s
-defers (flatten _ _ _ l s)   = defers l + defers s
+defers (flatMap _ l s)       = defers l + defers s
 defers (connect s b)         = defers s + defers b
 defers (connected _)         = 0
 defers (μ c)                 = defers c

@@ -227,7 +227,7 @@ mutual
 ------------------------------------------------------------------------
 -- The operators
 
--- How `flattenᴰ` handles a lane arriving while others are live: merge
+-- How `flatMapᴰ` handles a lane arriving while others are live: merge
 -- (with an optional concurrency bound; `just 1` is concat), switch to it,
 -- or ignore it.
 data FlatOp : Set where
@@ -294,15 +294,12 @@ deferᴰ s = cold λ p → skip (p ++ [ ix 0 ]) λ where .force → observe s (p
 connectᴰ : ∀ {A B} → MonotonicList A → (MonotonicList A → MonotonicList B) → MonotonicList B
 connectᴰ s f = cold λ p → observe (f (hot (observe s (p ++ [ ix 1 ])))) (p ++ [ ix 0 ])
 
--- FLATTEN: a sorted merge of the outer and its lanes in flight.  Each
--- element is an optional ECHO, at its first effect, beside an optional
--- LANE, subscribed at its second.  A bounded merge queues a lane past
+-- FLATMAP: a sorted merge of the outer and its lanes in flight.  Each
+-- element's lane is subscribed at the element's second effect, its first
+-- being silent.  A bounded merge queues a lane past
 -- its bound and subscribes it where a lane completes; the whole
 -- completes where the last of the outer and its lanes does.
 private
-  Lane : Set → Set
-  Lane B = Maybe B × Maybe (MonotonicList B)
-
   head : ∀ {A} → Events A → Maybe Pos
   head (out k _ _) = just k
   head (skip k _)  = just k
@@ -325,29 +322,28 @@ private
       pick (just k) (found k′ bs c as) = if k <ᵖ k′ then found k [] l ls else found k′ (l ∷ bs) c as
 
   -- a lane arriving, subscribed at `q`
-  admit : ∀ {B} → FlatOp → Pos → Maybe (MonotonicList B) → List (Events B) → List (MonotonicList B)
+  admit : ∀ {B} → FlatOp → Pos → MonotonicList B → List (Events B) → List (MonotonicList B)
         → List (Events B) × List (MonotonicList B)
-  admit op                q nothing  ls        qs = ls , qs
-  admit (mergeᶠ nothing)  q (just m) ls        qs = observe m q ∷ ls , qs
-  admit (mergeᶠ (just n)) q (just m) ls        qs =
+  admit (mergeᶠ nothing)  q m ls        qs = observe m q ∷ ls , qs
+  admit (mergeᶠ (just n)) q m ls        qs =
     if length ls <ᵇ n then (observe m q ∷ ls , qs) else (ls , qs ++ [ m ])
-  admit switchᶠ           q (just m) ls        qs = [ observe m q ] , qs
-  admit exhaustᶠ          q (just m) []        qs = [ observe m q ] , qs
-  admit exhaustᶠ          q (just m) (l ∷ ls)  qs = l ∷ ls , qs
+  admit switchᶠ           q m ls        qs = [ observe m q ] , qs
+  admit exhaustᶠ          q m []        qs = [ observe m q ] , qs
+  admit exhaustᶠ          q m (l ∷ ls)  qs = l ∷ ls , qs
 
   -- `o` is the outer, `nothing` once it has completed; `ls` the lanes in
   -- flight; `qs` the queue.
   mutual
-    go : ∀ {B} → FlatOp → Maybe (Events (Lane B)) → List (Events B) → List (MonotonicList B) → Events B
+    go : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → List (MonotonicList B) → Events B
     go op o ls qs with earliest ls
     ... | none            = viaOuter op o ls qs
     ... | found k bs l as = race op o k bs l as qs
 
-    viaOuter : ∀ {B} → FlatOp → Maybe (Events (Lane B)) → List (Events B) → List (MonotonicList B) → Events B
+    viaOuter : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → List (MonotonicList B) → Events B
     viaOuter op nothing  ls qs = hush
     viaOuter op (just e) ls qs = outer op e ls qs
 
-    race : ∀ {B} → FlatOp → Maybe (Events (Lane B)) → Pos → List (Events B) → Events B → List (Events B)
+    race : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → Pos → List (Events B) → Events B → List (Events B)
          → List (MonotonicList B) → Events B
     race op nothing  k bs l as qs = lane op nothing bs l as qs
     race op (just e) k bs l as qs with head e
@@ -356,17 +352,15 @@ private
     ...   | true  = outer op e (bs ++ l ∷ as) qs
     ...   | false = lane op (just e) bs l as qs
 
-    outer : ∀ {B} → FlatOp → Events (Lane B) → List (Events B) → List (MonotonicList B) → Events B
-    outer op (out q (just b , m) r) ls qs with admit op (q ++ [ ix 1 ]) m ls qs
-    ... | ls′ , qs′ = out (q ++ [ ix 0 ]) b λ where .force → go op (just (force r)) ls′ qs′
-    outer op (out q (nothing , m) r) ls qs with admit op (q ++ [ ix 1 ]) m ls qs
+    outer : ∀ {B} → FlatOp → Events (MonotonicList B) → List (Events B) → List (MonotonicList B) → Events B
+    outer op (out q m r) ls qs with admit op (q ++ [ ix 1 ]) m ls qs
     ... | ls′ , qs′ = skip (q ++ [ ix 0 ]) λ where .force → go op (just (force r)) ls′ qs′
     outer op (skip q r) ls qs = skip q λ where .force → go op (just (force r)) ls qs
     outer op (end c)    [] [] = end c
     outer op (end c)    ls qs = skip c λ where .force → go op nothing ls qs
     outer op hush       ls qs = hush
 
-    lane : ∀ {B} → FlatOp → Maybe (Events (Lane B)) → List (Events B) → Events B → List (Events B)
+    lane : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → Events B → List (Events B)
          → List (MonotonicList B) → Events B
     lane op o bs (out k b r) as qs       = out k b λ where .force → go op o (bs ++ force r ∷ as) qs
     lane op o bs (skip k r)  as qs       = skip k λ where .force → go op o (bs ++ force r ∷ as) qs
@@ -376,8 +370,8 @@ private
     lane op o bs (end c)     as []       = skip c λ where .force → go op o (bs ++ as) []
     lane op o bs hush        as qs       = hush
 
-flattenᴰ : ∀ {A} → FlatOp → MonotonicList (Maybe A × Maybe (MonotonicList A)) → MonotonicList A
-flattenᴰ op s = cold λ p → go op (just (observe s p)) [] []
+flatMapᴰ : ∀ {A B} → FlatOp → (A → MonotonicList B) → MonotonicList A → MonotonicList B
+flatMapᴰ op f s = cold λ p → go op (just (observe (mapᴰ f s) p)) [] []
 
 ------------------------------------------------------------------------
 -- Approximation and recursion
@@ -405,7 +399,7 @@ iterate zero    f = ⊥ᴰ
 iterate (suc n) f = f (iterate n f)
 
 -- RECURSION.  Agda cannot accept `ones = mergeᴰ (ofᴰ [ 1 ]) (deferᴰ ones)`:
--- it never looks inside `flattenᴰ`, which could strip the guard.  So
+-- it never looks inside `flatMapᴰ`, which could strip the guard.  So
 -- recursion here is a least fixed point, total for any `f`.
 fixᴰ : ∀ {A} → (MonotonicList A → MonotonicList A) → MonotonicList A
 fixᴰ f = lub λ n → iterate n f
@@ -436,11 +430,8 @@ postulate
 -- Derived
 
 mergeᴰ : ∀ {A} → MonotonicList A → MonotonicList A → MonotonicList A
-mergeᴰ s t = flattenᴰ (mergeᶠ nothing) (mapᴰ (λ b → nothing , just (if b then s else t)) (ofᴰ (true ∷ false ∷ [])))
+mergeᴰ s t = flatMapᴰ (mergeᶠ nothing) (λ b → if b then s else t) (ofᴰ (true ∷ false ∷ []))
 
-flatMapᴰ : ∀ {A B} → FlatOp → (A → MonotonicList B) → MonotonicList A → MonotonicList B
-flatMapᴰ op f s = flattenᴰ op (mapᴰ (λ a → nothing , just (f a)) s)
-
--- Emits 1 forever, synchronously: the echo, then itself as the lane.
+-- Emits 1 forever, synchronously.
 ones : MonotonicList ℕ
-ones = fixᴰ λ x → flattenᴰ (mergeᶠ nothing) (ofᴰ ((just 1 , just (deferᴰ x)) ∷ []))
+ones = fixᴰ λ x → mergeᴰ (ofᴰ (1 ∷ [])) (deferᴰ x)

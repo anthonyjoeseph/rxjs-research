@@ -30,9 +30,6 @@ data Ty : Set where
 ⟦ s +ᵗ t ⟧ᵀ  = ⟦ s ⟧ᵀ ⊎ ⟦ t ⟧ᵀ
 ⟦ listᵗ t ⟧ᵀ = List ⟦ t ⟧ᵀ
 
-maybeᵗ : Ty → Ty
-maybeᵗ t = unitᵗ +ᵗ t
-
 eqᵀ : ∀ t → ⟦ t ⟧ᵀ → ⟦ t ⟧ᵀ → Bool
 eqᵀ unitᵗ     _        _        = true
 eqᵀ boolᵗ     true     true     = true

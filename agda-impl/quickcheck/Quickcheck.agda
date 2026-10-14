@@ -16,9 +16,9 @@ open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import quickcheck.Ty using (boolᵗ; natᵗ; ⟦_⟧ᵀ; maybeᵗ; eqᵀ)
-open import quickcheck.Tm using (Tm; var; unit; nat; plus; less; inl; inr)
-open import quickcheck.Code using (Script; script; Code; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; μ; var; defer; Prog)
+open import quickcheck.Ty using (boolᵗ; natᵗ; ⟦_⟧ᵀ; eqᵀ)
+open import quickcheck.Tm using (Tm; var; nat; plus; less)
+open import quickcheck.Code using (Script; script; Code; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog)
 open import quickcheck.Oracle using (Event; _▸_; tick; val; End; completed; silent; cut; Trace; denoteTrace; pureTrace)
 
 ------------------------------------------------------------------------
@@ -95,15 +95,6 @@ private
     a ← genNat 1 Θ
     b ← genNat 1 Θ
     pure (less a b)
-
-  genEcho : ∀ Θ → Gen (Tm Θ (maybeᵗ natᵗ))
-  genEcho Θ = do
-    k ← roll 2
-    if0 k
-    where
-      if0 : ℕ → Gen (Tm Θ (maybeᵗ natᵗ))
-      if0 zero    = pure (inl unit)
-      if0 (suc _) = do a ← genNat 1 Θ ; pure (inr a)
 
   genOp : Gen FlatOp
   genOp = do
@@ -183,11 +174,9 @@ private
       node 2 = do i ← roll 1 ; p ← genBool (natᵗ ∷ Θ) ; s ← gen d Γ Δᵍ Δ Θ ; pure (takeWhile (i ≡ᵇ 0) p s)
       node 3 = do
         op ← genOp
-        e ← genEcho (natᵗ ∷ Θ)
-        h ← genBool (natᵗ ∷ Θ)
         l ← gen d Γ Δᵍ Δ (natᵗ ∷ Θ)
         s ← gen d Γ Δᵍ Δ Θ
-        pure (flatten op e h l s)
+        pure (flatMap op l s)
       node 4 = do s ← gen d Γ Δᵍ Δ Θ ; b ← gen d (natᵗ ∷ Γ) Δᵍ Δ Θ ; pure (connect s b)
       node 5 = do c ← gen d Γ (natᵗ ∷ Δᵍ) Δ Θ ; pure (μ c)
       node 6 = do c ← gen d Γ [] (Δᵍ ++ Δ) Θ ; pure (defer c)

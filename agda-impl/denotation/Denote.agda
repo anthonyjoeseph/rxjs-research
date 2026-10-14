@@ -13,13 +13,11 @@ module denotation.Denote where
 open import Data.List using (List; _∷_)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 
 import Tree as T
-open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer)
-open import denotation.MonotonicList using (MonotonicList; coldᴰ; Timeline; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flattenᴰ; deferᴰ; connectᴰ; ⊥ᴰ; lub)
+open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import denotation.MonotonicList using (MonotonicList; coldᴰ; Timeline; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ; lub)
 
 -- A connect in scope means the handle `connectᴰ` passed its body.
 DenEnv : List Set → Set₁
@@ -42,16 +40,11 @@ mutual
   approx n       (map f s)        ρ = mapᴰ f (approx n s ρ)
   approx n       (scan f z s)     ρ = scanᴰ f z (approx n s ρ)
   approx n       (takeWhile i p s) ρ = takeWhileᴰ i p (approx n s ρ)
-  approx n       (flatten op f s) ρ = flattenᴰ (flatOp op) (mapᴰ (λ a → laneᴰ n (f a) ρ) (approx n s ρ))
+  approx n       (flatMap op f s) ρ = flatMapᴰ (flatOp op) (λ a → approx n (f a) ρ) (approx n s ρ)
   approx n       (connect s b)    ρ = connectᴰ (approx n s ρ) λ r → approx n b (r ∷ ρ)
   approx n       (connected i)    ρ = lookup ρ i
   approx zero    (defer l)        ρ = ⊥ᴰ
   approx (suc n) (defer l)        ρ = deferᴰ (approx n (Later.force l) ρ)
-
-  -- a separate function, so Agda can see the lane is a subterm
-  laneᴰ : ∀ {Γ B} → ℕ → Maybe B × Maybe (Obs Timeline Γ B) → DenEnv Γ → Maybe B × Maybe (MonotonicList B)
-  laneᴰ n (e , nothing) ρ = e , nothing
-  laneᴰ n (e , just l)  ρ = e , just (approx n l ρ)
 
 ⟦_⟧[_] : ∀ {Γ A} → Obs Timeline Γ A → ℕ → DenEnv Γ → MonotonicList A
 ⟦ o ⟧[ n ] = approx n o

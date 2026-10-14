@@ -24,15 +24,13 @@ open import Data.List using (List; _∷_; [])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Nat using (zero; suc)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 
-open import Tree using (cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer; Later)
+open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; PureObs; deferredᴺ; compileᴺ; runPure; toArray) renaming (_⊑_ to _≤ʷ_)
-open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flattenᴰ; deferᴰ; connectᴰ; ⊥ᴰ; _⊑_; ⊑-trans; _≃_; limit)
-open import denotation.Denote using (DenEnv; flatOp; laneᴰ; ⟦_⟧[_]; ⟦_⟧)
+open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ; _⊑_; ⊑-trans; _≃_; limit)
+open import denotation.Denote using (DenEnv; flatOp; ⟦_⟧[_]; ⟦_⟧)
 open Run Pureᴾ
 
 -- The pure run: the limit of its approximants.
@@ -59,11 +57,6 @@ wkRelEnv : ∀ {Γ w v} {ρ : Env Γ w} {δ : DenEnv Γ} (σ : w ≤ʷ v) → Re
 wkRelEnv σ []      = []
 wkRelEnv σ (r ∷ e) = RelSubj-wk σ r ∷ wkRelEnv σ e
 
--- An element's echo is the same on both sides; its lane, if any, is related.
-data RelLane {B : Set} {w} : Lane B w → Maybe B × Maybe (MonotonicList B) → Set₁ where
-  none : ∀ {e}     → RelLane (e , nothing) (e , nothing)
-  some : ∀ {e} {s : Subscribe B w} {d} → Rel s d → RelLane (e , just s) (e , just d)
-
 postulate
   -- One per operator: the kernel and its denotation agree.
   empty-rel     : ∀ {A w} → Rel {A} {w} emptyᴷ emptyᴰ
@@ -71,8 +64,8 @@ postulate
   map-rel       : ∀ {A B w} {s : Subscribe A w} {d} (f : A → B) → Rel s d → Rel (mapᴷ f s) (mapᴰ f d)
   scan-rel      : ∀ {A B w} {s : Subscribe A w} {d} (f : B → A → B) z → Rel s d → Rel (scanᴷ f z s) (scanᴰ f z d)
   takeWhile-rel : ∀ {A w} {s : Subscribe A w} {d} i p → Rel s d → Rel (takeWhileᴷ i p s) (takeWhileᴰ i p d)
-  flatten-rel   : ∀ {A B w} {s : Subscribe A w} {d} op {f : A → Lane B w} {g}
-                → (∀ a → RelLane (f a) (g a)) → Rel s d → Rel (flattenᴷ op f s) (flattenᴰ (flatOp op) (mapᴰ g d))
+  flatMap-rel   : ∀ {A B w} {s : Subscribe A w} {d} op {f : A → Subscribe B w} {g}
+                → (∀ a → Rel (f a) (g a)) → Rel s d → Rel (flatMapᴷ op f s) (flatMapᴰ (flatOp op) g d)
   cold-rel      : ∀ {A w} (c : Timeline A) → Rel {w = w} (via (startCold c)) (coldᴰ (lower c))
   connected-rel : ∀ {Γ A w} {ρ : Env Γ w} {δ} (i : A ∈ Γ) → RelEnv ρ δ
                 → Rel (joinᴷ (lookup ρ i)) (lookup δ i)
@@ -115,16 +108,11 @@ mutual
   fundamental n       (map f s)        e = map-rel f (fundamental n s e)
   fundamental n       (scan f z s)     e = scan-rel f z (fundamental n s e)
   fundamental n       (takeWhile i p s) e = takeWhile-rel i p (fundamental n s e)
-  fundamental n       (flatten op f s) e = flatten-rel op (λ a → lane-rel n (f a) e) (fundamental n s e)
+  fundamental n       (flatMap op f s) e = flatMap-rel op (λ a → fundamental n (f a) e) (fundamental n s e)
   fundamental n       (connect s b)    e = connect-rel (fundamental n s e) (λ σ r → fundamental n b (r ∷ wkRelEnv σ e))
   fundamental n       (connected i)    e = connected-rel i e
   fundamental zero    (defer l)        e = bot-rel
   fundamental (suc n) (defer l)        e = defer-rel (fundamental n (Later.force l) e)
-
-  lane-rel : ∀ n {Γ B w} (x : Maybe B × Maybe (PureObs Γ B)) {ρ : Env Γ w} {δ : DenEnv Γ}
-           → RelEnv ρ δ → RelLane (lane (deferredᴺ n) x ρ) (laneᴰ n x δ)
-  lane-rel n (b , nothing) e = none
-  lane-rel n (b , just l)  e = some (fundamental n l e)
 
 -- Each approximant of the denotation is sound for the run.
 sound : ∀ {A} (o : PureObs [] A) n → ticks (observe (⟦ o ⟧[ n ] []) root) ⊑ run o

@@ -7,10 +7,8 @@ import {
   connect,
   defer,
   exhaustMap,
-  filter,
   from,
   map,
-  merge,
   mergeMap,
   of,
   scan,
@@ -55,7 +53,7 @@ export type Code =
   | ["map", Tm, Code]
   | ["scan", Tm, Tm, Code]
   | ["takeWhile", boolean, Tm, Code]
-  | ["flatten", FlatOp, Tm, Tm, Code, Code]
+  | ["flatMap", FlatOp, Code, Code]
   | ["connect", Code, Code]
   | ["connected", number]
   | ["mu", Code]
@@ -136,11 +134,6 @@ const flatMapOf = (
   }
 };
 
-// The echo is not an rxjs operator, so a flatten that echoes is the
-// source shared between the echoes and the lanes, echoes subscribed
-// first: an element's echo leaves before its lane is handled.
-const isNoEcho = (e: Tm): boolean => e[0] === "inl" && e[1][0] === "unit";
-
 // The recursion variables, unfolded at most `n` more times; the last
 // unfolding is a cold that never emits, as `quickcheck.Code.knot` cuts it.
 type Rec = () => Observable<Value>;
@@ -191,23 +184,11 @@ export const compile = (s: Scope, code: Code): Observable<Value> => {
         takeWhile((a) => evalTm(p, [a, ...s.th]) === true, inclusive),
       );
     }
-    case "flatten": {
-      const [, op, e, h, l, src] = code;
-      const lanes = (o: Observable<Value>): Observable<Value> =>
-        o.pipe(
-          filter((a) => evalTm(h, [a, ...s.th]) === true),
-          flatMapOf(op, (a) => compile({ ...s, th: [a, ...s.th] }, l)),
-        );
-      const echoes = (o: Observable<Value>): Observable<Value> =>
-        o.pipe(
-          map((a) => evalTm(e, [a, ...s.th]) as { l: Value } | { r: Value }),
-          filter((m): m is { r: Value } => "r" in m),
-          map((m) => m.r),
-        );
-      const source = compile(s, src);
-      return isNoEcho(e)
-        ? lanes(source)
-        : source.pipe(connect((sh) => merge(echoes(sh), lanes(sh))));
+    case "flatMap": {
+      const [, op, l, src] = code;
+      return compile(s, src).pipe(
+        flatMapOf(op, (a) => compile({ ...s, th: [a, ...s.th] }, l)),
+      );
     }
     case "connect": {
       const b = code[2];

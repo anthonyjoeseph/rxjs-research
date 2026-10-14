@@ -26,7 +26,7 @@ open import Data.Nat using (ℕ; suc; pred; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 
-open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Obs; cold; empty; of; map; scan; takeWhile; flatten; connect; connected; defer; Later)
+open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 
 ------------------------------------------------------------------------
 -- What a runtime supplies
@@ -311,8 +311,7 @@ module Run (P : Prims) where
                                  ; complete = Observer.complete o′ ; closed = Observer.closed o′ }))
       λ τ sub → attach (wkCut τ c) sub >>ᴬ k (σ ⨾ τ) (record { unsubscribe = cut (wkCut τ c) })
 
-  -- FLATTEN.  Each element's echo leaves first, then its lane is
-  -- admitted.  A bounded merge queues the ELEMENT past its bound — a lane
+  -- FLATMAP.  Each element's lane is admitted.  A bounded merge queues the ELEMENT past its bound — a lane
   -- is a callback, so a `Ref` cannot hold one — and re-reads its lane
   -- when a running lane completes.  The whole completes once the outer
   -- has, with no lane running and none queued.
@@ -321,13 +320,6 @@ module Run (P : Prims) where
   -- recursion through a callback.  The knot is tied in the heap, not in
   -- Agda — `refill` is a registered sink whose callback dequeues — so
   -- each runtime closes it as it closes any stored callback.
-  Lane : Set → World → Set₁
-  Lane B w = Maybe B × Maybe (Subscribe B w)
-
-  wkLane : ∀ {B w v} → w ⊑ v → Lane B w → Lane B v
-  wkLane ρ (e , nothing) = e , nothing
-  wkLane ρ (e , just s)  = e , just (wkSub ρ s)
-
   private
     record Flat (A : Set) (w : World) : Set where
       field
@@ -346,7 +338,7 @@ module Run (P : Prims) where
       k (σ₁ ⨾ σ₂ ⨾ σ₃ ⨾ σ₄ ⨾ σ₅) (record { active = wkR (σ₂ ⨾ σ₃ ⨾ σ₄ ⨾ σ₅) a ; outerDone = wkR (σ₃ ⨾ σ₄ ⨾ σ₅) d
                                        ; queue = wkR (σ₄ ⨾ σ₅) q ; lanes = wkR σ₅ ls ; refill = r })
 
-    module Flatten {A B : Set} {w} (op : FlatOp) (f : A → Lane B w) (o : Observer B w) (st : Flat A w) where
+    module FlatMap {A B : Set} {w} (op : FlatOp) (f : A → Subscribe B w) (o : Observer B w) (st : Flat A w) where
       open Flat st
 
       settle : Act w ⊤
@@ -369,38 +361,26 @@ module Run (P : Prims) where
                                ; closed = Observer.closed o′ }))
           λ τ → attach (wkCut τ c))
 
-      queued : Maybe (Subscribe B w) → Act w ⊤
-      queued nothing  = settle
-      queued (just l) = start l
-
       dequeue : Act w ⊤
       dequeue = readB queue λ where
         []       → settle
-        (a ∷ as) → writeRef queue as (queued (proj₂ (f a)))
+        (a ∷ as) → writeRef queue as (start (f a))
 
-      admit : FlatOp → A → Maybe (Subscribe B w) → Act w ⊤
-      admit _                 a nothing  = skipᴬ
-      admit (mergeᶠ nothing)  a (just l) = start l
-      admit (mergeᶠ (just n)) a (just l) = readB active λ c → if c <ᵇ n then start l else modifyB queue (_++ [ a ])
-      admit switchᶠ           a (just l) = killAll >>ᴬ start l
-      admit exhaustᶠ          a (just l) = readB active λ c → when (c ≡ᵇ 0) (start l)
-
-      echo : Maybe B → Act w ⊤
-      echo nothing  = skipᴬ
-      echo (just b) = Observer.next o b
-
-      onOuter : A → Act w ⊤
-      onOuter a = echo (proj₁ (f a)) >>ᴬ admit op a (proj₂ (f a))
+      admit : FlatOp → A → Act w ⊤
+      admit (mergeᶠ nothing)  a = start (f a)
+      admit (mergeᶠ (just n)) a = readB active λ c → if c <ᵇ n then start (f a) else modifyB queue (_++ [ a ])
+      admit switchᶠ           a = killAll >>ᴬ start (f a)
+      admit exhaustᶠ          a = readB active λ c → when (c ≡ᵇ 0) (start (f a))
 
       run : Cut w → Subscribe A w → Kont w → Act w ⊤
       run oc s k = register (λ _ → dequeue) skipᴬ (done false) λ σ r → writeRef (Flat.refill (wkFlat σ st)) (just r) (
-        s σ (guarded (wkCut σ oc) (record { next = λ a → wkAct σ (onOuter a) ; complete = writeRef (Flat.outerDone (wkFlat σ st)) true (wkAct σ settle)
+        s σ (guarded (wkCut σ oc) (record { next = λ a → wkAct σ (admit op a) ; complete = writeRef (Flat.outerDone (wkFlat σ st)) true (wkAct σ settle)
                                           ; closed = Observer.closed (wkObs σ o) }))
           λ τ sub → attach (wkCut (σ ⨾ τ) oc) sub >>ᴬ k (σ ⨾ τ) (record { unsubscribe = cut (wkCut (σ ⨾ τ) oc) >>ᴬ wkAct (σ ⨾ τ) killAll }))
 
-  flattenᴷ : ∀ {A B w} → FlatOp → (A → Lane B w) → Subscribe A w → Subscribe B w
-  flattenᴷ op f s ρ o k = newFlat λ σ st → newCut λ τ oc →
-    Flatten.run op (λ a → wkLane (ρ ⨾ σ ⨾ τ) (f a)) (wkObs (σ ⨾ τ) o) (wkFlat τ st) oc (wkSub (ρ ⨾ σ ⨾ τ) s) (wkKont (σ ⨾ τ) k)
+  flatMapᴷ : ∀ {A B w} → FlatOp → (A → Subscribe B w) → Subscribe A w → Subscribe B w
+  flatMapᴷ op f s ρ o k = newFlat λ σ st → newCut λ τ oc →
+    FlatMap.run op (λ a → wkSub (ρ ⨾ σ ⨾ τ) (f a)) (wkObs (σ ⨾ τ) o) (wkFlat τ st) oc (wkSub (ρ ⨾ σ ⨾ τ) s) (wkKont (σ ⨾ τ) k)
 
   -- Allocates the subject, subscribes the body over it, THEN the source
   -- into it — body first, so the source's synchronous burst reaches
@@ -448,15 +428,10 @@ module Run (P : Prims) where
     compileWith d (map f s)        ρ = mapᴷ f (compileWith d s ρ)
     compileWith d (scan f z s)     ρ = scanᴷ f z (compileWith d s ρ)
     compileWith d (takeWhile i p s) ρ = takeWhileᴷ i p (compileWith d s ρ)
-    compileWith d (flatten op f s) ρ = flattenᴷ op (λ a → lane d (f a) ρ) (compileWith d s ρ)
+    compileWith d (flatMap op f s) ρ = flatMapᴷ op (λ a → compileWith d (f a) ρ) (compileWith d s ρ)
     compileWith d (connect s b)    ρ = connectᴷ (compileWith d s ρ) λ σ st → compileWith d b (st ∷ wkEnv σ ρ)
     compileWith d (connected i)    ρ = joinᴷ (lookup ρ i)
     compileWith d (defer l)        ρ = d l ρ
-
-    -- a separate function, so Agda can see the lane is a subterm
-    lane : ∀ {Γ B w} → Deferred → Maybe B × Maybe (Obs Cold Γ B) → Env Γ w → Lane B w
-    lane d (e , nothing) ρ = e , nothing
-    lane d (e , just l)  ρ = e , just (compileWith d l ρ)
 
   -- THE MONAD, and the handful of things only it can do.  This is the
   -- whole of a runtime: `Observable` supplies IO, `PureObservable` a

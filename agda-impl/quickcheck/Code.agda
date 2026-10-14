@@ -12,26 +12,25 @@
 -- so an unguarded self-reference is a type error rather than a hang.
 module quickcheck.Code where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup) renaming (map to mapAll)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String; intersperse) renaming (_++_ to _⊕_)
-open import Data.Sum using (inj₁; inj₂)
 open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 import Tree as T
 open import Tree using (Obs; Later; renameLater)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; close; Timeline)
-open import quickcheck.Ty using (Ty; boolᵗ; listᵗ; ⟦_⟧ᵀ; maybeᵗ; showᵀ)
-open import quickcheck.Tm using (Vals; Tm; if; ⟦_⟧ᵗ; position; showTm)
+open import quickcheck.Ty using (Ty; boolᵗ; listᵗ; ⟦_⟧ᵀ; showᵀ)
+open import quickcheck.Tm using (Vals; Tm; ⟦_⟧ᵗ; position; showTm)
 
 -- A cold, as data: frames at offsets from subscribe, then complete or not.
 record Script (t : Ty) : Set where
@@ -49,9 +48,8 @@ data Code (Γ Δᵍ Δ Θ : List Ty) : Ty → Set where
   scan      : ∀ {s t} → Tm (s ∷ t ∷ Θ) t → Tm Θ t → Code Γ Δᵍ Δ Θ s → Code Γ Δᵍ Δ Θ t
   -- whether inclusive, then the predicate
   takeWhile : ∀ {t} → Bool → Tm (t ∷ Θ) boolᵗ → Code Γ Δᵍ Δ Θ t → Code Γ Δᵍ Δ Θ t
-  -- per element: its echo, whether it opens a lane, and that lane
-  flatten   : ∀ {s t} → T.FlatOp → Tm (s ∷ Θ) (maybeᵗ t) → Tm (s ∷ Θ) boolᵗ
-            → Code Γ Δᵍ Δ (s ∷ Θ) t → Code Γ Δᵍ Δ Θ s → Code Γ Δᵍ Δ Θ t
+  -- the lane, over the element
+  flatMap   : ∀ {s t} → T.FlatOp → Code Γ Δᵍ Δ (s ∷ Θ) t → Code Γ Δᵍ Δ Θ s → Code Γ Δᵍ Δ Θ t
   connect   : ∀ {s t} → Code Γ Δᵍ Δ Θ s → Code (s ∷ Γ) Δᵍ Δ Θ t → Code Γ Δᵍ Δ Θ t
   connected : ∀ {t} → t ∈ Γ → Code Γ Δᵍ Δ Θ t
   μ         : ∀ {t} → Code Γ (t ∷ Δᵍ) Δ Θ t → Code Γ Δᵍ Δ Θ t
@@ -81,10 +79,6 @@ private
   mem (here refl) = here refl
   mem (there i)   = there (mem i)
 
-  maybe : ∀ {t} → ⟦ maybeᵗ t ⟧ᵀ → Maybe ⟦ t ⟧ᵀ
-  maybe (inj₁ _) = nothing
-  maybe (inj₂ x) = just x
-
 -- FUEL: how many times any one `μ` may unfold along a path.  The
 -- unfolded program is infinite, and Agda accepts a knot only when its
 -- self-reference is guarded by a copattern, never when passed as an
@@ -101,9 +95,7 @@ mutual
   toObs leaf n (map f s)         g d θ = T.map (λ a → ⟦ f ⟧ᵗ (a ∷ θ)) (toObs leaf n s g d θ)
   toObs leaf n (scan f z s)      g d θ = T.scan (λ acc a → ⟦ f ⟧ᵗ (a ∷ acc ∷ θ)) (⟦ z ⟧ᵗ θ) (toObs leaf n s g d θ)
   toObs leaf n (takeWhile i p s) g d θ = T.takeWhile i (λ a → ⟦ p ⟧ᵗ (a ∷ θ)) (toObs leaf n s g d θ)
-  toObs leaf n (flatten op e h l s) g d θ =
-    T.flatten op (λ a → maybe (⟦ e ⟧ᵗ (a ∷ θ)) , (if ⟦ h ⟧ᵗ (a ∷ θ) then just (toObs leaf n l g d (a ∷ θ)) else nothing))
-                 (toObs leaf n s g d θ)
+  toObs leaf n (flatMap op l s)  g d θ = T.flatMap op (λ a → toObs leaf n l g d (a ∷ θ)) (toObs leaf n s g d θ)
   toObs leaf n (connect s b)     g d θ = T.connect (toObs leaf n s g d θ) (toObs leaf n b (weaken g) (weaken d) θ)
   toObs leaf n (connected i)     g d θ = T.connected (mem i)
   toObs leaf n (μ c)             g d θ = toObs leaf n c (knot leaf n c g d θ ∷ g) d θ
@@ -170,8 +162,7 @@ showCode t (of xs)              = "[\"of\",[" ⊕ intersperse "," (showTms xs) �
 showCode t (map {s} f c)        = "[\"map\"," ⊕ showTm f ⊕ "," ⊕ showCode s c ⊕ "]"
 showCode t (scan {s} f z c)     = "[\"scan\"," ⊕ showTm f ⊕ "," ⊕ showTm z ⊕ "," ⊕ showCode s c ⊕ "]"
 showCode t (takeWhile i p c)    = "[\"takeWhile\"," ⊕ showBool i ⊕ "," ⊕ showTm p ⊕ "," ⊕ showCode t c ⊕ "]"
-showCode t (flatten {s} op e h l c) =
-  "[\"flatten\"," ⊕ showOp op ⊕ "," ⊕ showTm e ⊕ "," ⊕ showTm h ⊕ "," ⊕ showCode t l ⊕ "," ⊕ showCode s c ⊕ "]"
+showCode t (flatMap {s} op l c) = "[\"flatMap\"," ⊕ showOp op ⊕ "," ⊕ showCode t l ⊕ "," ⊕ showCode s c ⊕ "]"
 showCode t (connect {s} c b)    = "[\"connect\"," ⊕ showCode s c ⊕ "," ⊕ showCode t b ⊕ "]"
 showCode t (connected i)        = "[\"connected\"," ⊕ showℕ (position i) ⊕ "]"
 showCode t (μ c)                = "[\"mu\"," ⊕ showCode t c ⊕ "]"

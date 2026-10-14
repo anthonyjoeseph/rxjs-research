@@ -9,15 +9,13 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; [])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; nothing)
 open import Data.Nat using (ℕ)
-open import Data.Product using (_×_; _,_)
-open import Data.Unit using (tt)
 
 ------------------------------------------------------------------------
 -- Programs
 
--- How `flatten` handles a lane arriving while others are live: merge
+-- How `flatMap` handles a lane arriving while others are live: merge
 -- (with an optional concurrency bound; `just 1` is concat), switch to it,
 -- or ignore it.
 data FlatOp : Set where
@@ -38,14 +36,13 @@ data FlatOp : Set where
 -- rxjs.  So a synchronous infinite loop is a legal program; the runtimes
 -- report it as a burst that never closes, rather than refusing it.
 --
--- THE PRIMITIVES, and nothing derivable: merge, mergeMap, switchMap and
--- the rest are `flatten` (see Derived, below).
+-- THE PRIMITIVES, and nothing derivable: merge and filter are `flatMap`
+-- (see Derived, below).
 --
--- `flatten` reads each element as an optional ECHO — a value leaving as
--- the element arrives, before its lane is handled — beside an optional
--- LANE.  The lane comes out of a function rather than an element of type
--- `Obs`, because `Obs` lives in `Set₁` and an element type is a `Set`:
--- the size of the universe, not taste, puts that `map` inside `flatten`.
+-- `flatMap` is rxjs's `mergeMap` (with its concurrency bound),
+-- `switchMap` or `exhaustMap`.  It is the primitive rather than
+-- `mergeAll` and kin, because `Obs` lives in `Set₁` and an element type
+-- is a `Set`: the size of the universe, not taste, puts the `map` inside.
 --
 -- `takeWhile`'s flag is rxjs's `inclusive`: whether the first failing
 -- value leaves before the completion.
@@ -57,7 +54,7 @@ mutual
     map       : ∀ {Γ A B} → (A → B) → Obs C Γ A → Obs C Γ B
     scan      : ∀ {Γ A B} → (B → A → B) → B → Obs C Γ A → Obs C Γ B
     takeWhile : ∀ {Γ A} → Bool → (A → Bool) → Obs C Γ A → Obs C Γ A
-    flatten   : ∀ {Γ A B} → FlatOp → (A → Maybe B × Maybe (Obs C Γ B)) → Obs C Γ A → Obs C Γ B
+    flatMap   : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Obs C Γ A → Obs C Γ B
     connect   : ∀ {Γ A B} → Obs C Γ A → Obs C (A ∷ Γ) B → Obs C Γ B
     connected : ∀ {Γ A} → A ∈ Γ → Obs C Γ A
     defer     : ∀ {Γ A} → Later C Γ A → Obs C Γ A
@@ -77,7 +74,7 @@ mutual
   rename r (map f s)        = map f (rename r s)
   rename r (scan f z s)     = scan f z (rename r s)
   rename r (takeWhile i p s) = takeWhile i p (rename r s)
-  rename r (flatten op f s) = flatten op (λ a → renameLane r (f a)) (rename r s)
+  rename r (flatMap op f s) = flatMap op (λ a → rename r (f a)) (rename r s)
   rename r (connect s b)    = connect (rename r s) (rename (ext r) b)
     where
       ext : ∀ {B Γ Δ} → (∀ {X} → X ∈ Γ → X ∈ Δ) → ∀ {X} → X ∈ B ∷ Γ → X ∈ B ∷ Δ
@@ -86,10 +83,6 @@ mutual
   rename r (connected i)   = connected (r i)
   rename r (defer l)        = defer (renameLater r l)
 
-  renameLane : ∀ {C Γ Δ B} → (∀ {X} → X ∈ Γ → X ∈ Δ) → Maybe B × Maybe (Obs C Γ B) → Maybe B × Maybe (Obs C Δ B)
-  renameLane r (e , nothing) = e , nothing
-  renameLane r (e , just l)  = e , just (rename r l)
-
   renameLater : ∀ {C Γ Δ A} → (∀ {X} → X ∈ Γ → X ∈ Δ) → Later C Γ A → Later C Δ A
   renameLater r l .Later.force = rename r (Later.force l)
 
@@ -97,13 +90,11 @@ mutual
 -- Derived
 
 merge : ∀ {C Γ A} → Obs C Γ A → Obs C Γ A → Obs C Γ A
-merge s t = flatten (mergeᶠ nothing) (λ b → nothing , just (if b then s else t)) (of (true ∷ false ∷ []))
-
-flatMap : ∀ {C Γ A B} → FlatOp → (A → Obs C Γ B) → Obs C Γ A → Obs C Γ B
-flatMap op f = flatten op λ a → nothing , just (f a)
+merge s t = flatMap (mergeᶠ nothing) (λ b → if b then s else t) (of (true ∷ false ∷ []))
 
 -- The motivating example: no μ, no binder, no restriction on where the
--- self-reference sits beyond `defer`.  Emits 1 forever, synchronously:
--- the echo, then the same program again as the lane.
+-- self-reference sits beyond `defer`.  Emits 1 forever, synchronously.
+-- `merge (of [ 1 ]) (defer ones)` unfolded: Agda sees a guard only
+-- under constructors, never through `merge` or `if`.
 ones : ∀ {C Γ} → Obs C Γ ℕ
-ones = flatten (mergeᶠ nothing) (λ _ → just 1 , just (defer λ where .Later.force → ones)) (of (tt ∷ []))
+ones = flatMap (mergeᶠ nothing) (λ { true → of (1 ∷ []) ; false → defer (λ where .Later.force → ones) }) (of (true ∷ false ∷ []))
