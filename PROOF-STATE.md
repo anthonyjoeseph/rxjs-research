@@ -160,39 +160,40 @@ point at one, the row is FALSITY.
 ## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-the root, positions forgotten down to ticks. A two-sided fundamental lemma over
-approximants, one operator at a time, puts approximant n below the run, and
-their limit is the meaning; a simulation over the whole running program
-(`Bound`) puts every run approximant below the meaning itself. Expect the denotation to move under contact; it
-must be solid before Tier 2 is written over it.
+the root, positions forgotten down to ticks. Both halves compare the run with
+the meaning itself over one configuration of the whole running program
+(`Config`): every run approximant is placed below the meaning (`Bound`), and
+whatever the meaning shows some approximant shows (`reaches`). Expect the
+denotation to move under contact; it must be solid before Tier 2 is written
+over it.
 
 ### Big picture tier roadmap
 
+- **THE UPPER HALF OVER THE CONFIGURATION.** `progress` as a body over
+  `Live`: each turn of the loop, with budget enough, delivering the
+  configuration's next event as `denotation.Unfold`'s `step` finds it. Decides whether one global relation carries the state siblings
+  share, the question the per-operator relation died on. Most uncertain: a
+  joiner of a shared source against its own copy, then a `flatMap` refill.
+- **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over
+  `Mid`, and a send runs alike to its observer's (`send-ok`); what is left
+  is each kernel's own run, `send-canon` first: an emit must reach the root
+  through every node above the firing cold, each hop's stored callbacks
+  again alike to the kernel's. The upper half reuses these step lemmas.
+  Most uncertain: a `flatMap` lane's refill, then `connect`'s joiners.
+- **THE STATEMENT'S EDGES.** A `connect` source the body outlives,
+  spinning or running forever: `progress` is false there. The meaning keeps
+  its events as skips, or `adequacy` assumes none; Anthony's call.
 - **THE ENGINE, SMALL-STEP.** The pure engine as a productive machine: an
   explicit continuation stack, one step per event, a silent step where it
   does work, so a run is a coinductive event stream with no burst budget,
   callback depth or loop turns. Fuel moves into the test harness, which
   reads a finite prefix; QuickCheck, the TS port and the oracle rerun.
   Decides whether `runᴺ`'s nesting unwinds into a stack the TS can mirror.
-- **ONE BISIMULATION, NO FUEL.** `adequacy` as one coinductive bisimulation
-  between the small-step engine and the denotation observed at the root,
-  over the configuration tree. Replaces the per-operator `Rel`, which
-  shared state between siblings contradicts, and the approximants; keeps
-  `Config`, `Holding` and the step lemmas. Decides whether sibling state is
-  carried by one global relation.
-- **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over
-  `Mid`, and a send runs alike to its observer's (`send-ok`); what is left
-  is each kernel's own run, `send-canon` first: an emit must reach the root
-  through every node above the firing cold, each hop's stored callbacks
-  again alike to the kernel's. These are the step lemmas the bisimulation
-  keeps. Most uncertain: a `flatMap` lane's refill, then `connect`'s joiners.
-- **THE STATEMENT'S EDGES.** A `connect` source the body outlives
-  (`connect-rel`), spinning or running forever: the denotation keeps its
-  events as skips, or `adequacy` assumes none. Under the bisimulation this
-  is infinitely many skips against `hush`; Anthony's call.
 
 ### The ledger
 
+- **`progress`** (Adequacy) — FALSITY, `DEAD ROUTE`: whatever the meaning
+  shows, some run approximant shows as many items.
 - **`send-canon`, `closed-ok`, `finish-ok`** (Bound) — FALSITY, `RECOVERY`: a
   firing cold's emit to its observer, closed check and completion, run through
   every kernel above it, keep `Mid`.
@@ -204,16 +205,8 @@ must be solid before Tier 2 is written over it.
 - **`holds-rel`, `part-rel`, `timed-rel`, `joined-rel`** (Realize) — FALSITY,
   `NO EVIDENCE`: a heap alike, but where the left's callbacks may diverge,
   holds the same tree.
-- **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
-  logical relation between a kernel and a timeline, stable as the heap grows.
-- **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject
-  against the hot handle; false for a source that spins or runs forever.
-- **`cold-rel`** (Adequacy) — FALSITY, `NO EVIDENCE`: a rising timeline against
-  its started cold.
-- **`{empty,of,map,scan,takeWhile,flatMap,connected,defer,bot}-rel`**
-  (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
-- **`run-rel`, `ticks-up`, `approx-chain`, `⟦⟧-limit`** (Adequacy) — FALSITY,
-  `NO EVIDENCE`: from approximants to limits.
+- **`ticks-up`** (Adequacy) — FALSITY, `NO EVIDENCE`: the meaning's ticks never
+  fall.
 
 ## Tier 2 — the simultaneous spec
 

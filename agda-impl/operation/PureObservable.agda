@@ -9,7 +9,7 @@
 -- Recursion is closed by unfolding: approximant n compiles n nested
 -- `defer`s, runs callbacks n deep, takes n turns of the loop and walks a
 -- burst n steps, and past that shows nothing.  Every approximant is a
--- finite run; the program's meaning is their limit, as `Denote`'s is.
+-- finite run, and the program's run is their limit.
 --
 -- The heap is TYPED BY ITS WORLD: a list saying what each entry is, so
 -- reading a cell returns its content at its own type with no cast.

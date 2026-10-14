@@ -4,162 +4,75 @@
 -- pure run's approximants is the meaning, observed at the root, with
 -- positions forgotten down to ticks.
 --
--- BELOW: every approximant of the run is below the meaning itself.  Its
--- record, ghost positions and all, is placed against the events the root
--- is shown (`operation.Placed`), so it shows nothing they do not, by a
--- simulation over the whole running program (`Bound`).
--- ABOVE: the meaning is the limit of the denotation's approximants, and
--- each is below the run, by a logical relation between a `Subscribe` and
--- a timeline, by induction on (n , tree), one operator at a time: with
--- budget enough, the kernel shows everything its timeline does.
---
--- The IO runtime has no theorem of its own, and needs none: it is the
--- same engine over a different monad, with its recursion closed by `fix`
--- rather than by unfolding.  The oracle compares it to the TypeScript.
+-- Both halves compare the run against the meaning itself, over one
+-- configuration of the whole running program (`Config`, `Bound`).
+-- BELOW: every approximant of the run is below the meaning.  Its record,
+-- ghost positions and all, is placed against the events the root is
+-- shown (`operation.Placed`), so it shows nothing they do not.
+-- ABOVE: whatever the meaning shows, some approximant of the run shows.
 module Adequacy where
 
-open import Data.List using (List; _∷_; [])
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
-open import Data.Nat using (ℕ; zero; suc; _⊔_)
-open import Data.Nat.Properties using (≤-refl; n≤1+n; m≤m⊔n; m≤n⊔m)
-open import Data.Product using (_,_; proj₂)
-open import Level using (lower)
+open import Data.List using ([]; length)
+open import Data.List.Relation.Unary.All using ([])
+open import Data.Nat using (ℕ; _≤_)
+open import Data.Nat.Properties using (n≤1+n)
+open import Data.Product using (_,_; Σ; proj₁; proj₂)
 
-open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import operation.Placed using (Up; module Ran)
 open import Bound using (module Places)
-open import operation.AbstractObservable using (module Run)
 open import operation.Budget using (module Approx)
-open import operation.PureObservable using (Pureᴾ; PureObs; module Pure; toArray) renaming (_⊑_ to _≤ʷ_)
-open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ;
-  takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ)
-open import denotation.Order using (_⊑_; ⊑-trans; _≃_; limit; Chain; limit-ub; limit-least)
-open import denotation.Denote using (DenEnv; flatOp; ⟦_⟧[_])
+open import operation.PureObservable using (PureObs; module Pure; toArray)
+open import denotation.MonotonicList using (ML; observe; root; ticks)
+open import denotation.Order using (_⊑_; _≃_; Shows; limit; Chain; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
 open import denotation.Unfold using (⟦_⟧)
 
 -- The pure run: the limit of its approximants.
 run : ∀ {A} → PureObs [] A → ML A
 run o = limit λ n → toArray n o
 
--- Approximant n of the denotation, as the run reports one.
-approxAt : ∀ {A} → PureObs [] A → ℕ → ML A
-approxAt o n = ticks (observe (⟦ o ⟧[ n ] []) root)
-
 -- The meaning, as the run reports one.
 meaning : ∀ {A} → PureObs [] A → ML A
 meaning o = ticks (observe (⟦ o ⟧ []) root)
 
 module Link (R : Set) where
-  open Run (Pureᴾ R)
-  open Pure R using (runPure; compileᴺ)
+  open Pure R using (compileᴺ)
   open Approx R using (runPure-mono)
-  open Ran R using (ran; recorded-⊑)
+  open Ran R using (ran; recorded-⊑; itemsOf; observed; recorded-shows)
   open Places R using (places)
 
   postulate
     -- The meaning's ticks never fall.
     ticks-up : (o : PureObs [] R) → Up 0 (observe (⟦ o ⟧ []) root)
 
-    -- "Subscribing with `s` at any position p, in any heap, shows at least
-    -- what `d` shows a subscriber arriving at p, ticks for ticks, on an
-    -- engine with budget enough."
-    Rel   : ∀ {A w} → Subscribe A w → MonotonicList A → Set₁
-    -- A subject and the handle `connectᴰ` passed its body agree: joining
-    -- one shows what joining the other shows, at any join time, both ways
-    -- as `Rel`.
-    RelSubj : ∀ {A w} → Subject A w → MonotonicList A → Set₁
-    -- A subject made in one world is the same subject in every later one.
-    RelSubj-wk : ∀ {A w v} {st : Subject A w} {x} (σ : w ≤ʷ v) → RelSubj st x → RelSubj (wkSubject σ st) x
-
-  data RelEnv {w} : ∀ {Γ} → Env Γ w → DenEnv Γ → Set₁ where
-    []  : RelEnv [] []
-    _∷_ : ∀ {Γ A} {st : Subject A w} {x : MonotonicList A} {ρ : Env Γ w} {δ : DenEnv Γ}
-        → RelSubj st x → RelEnv ρ δ → RelEnv (st ∷ ρ) (x ∷ δ)
-
-  wkRelEnv : ∀ {Γ w v} {ρ : Env Γ w} {δ : DenEnv Γ} (σ : w ≤ʷ v) → RelEnv ρ δ → RelEnv (wkEnv σ ρ) δ
-  wkRelEnv σ []      = []
-  wkRelEnv σ (r ∷ e) = RelSubj-wk σ r ∷ wkRelEnv σ e
-
-  postulate
-    -- One per operator: the kernel and its denotation agree.
-    empty-rel     : ∀ {A w} → Rel {A} {w} emptyᴷ emptyᴰ
-    of-rel        : ∀ {A w} (xs : List A) → Rel {w = w} (ofᴷ xs) (ofᴰ xs)
-    map-rel       : ∀ {A B w} {s : Subscribe A w} {d} (f : A → B) → Rel s d → Rel (mapᴷ f s) (mapᴰ f d)
-    scan-rel      : ∀ {A B w} {s : Subscribe A w} {d} (f : B → A → B) z → Rel s d → Rel (scanᴷ f z s) (scanᴰ f z d)
-    takeWhile-rel : ∀ {A w} {s : Subscribe A w} {d} i p → Rel s d → Rel (takeWhileᴷ i p s) (takeWhileᴰ i p d)
-    flatMap-rel   : ∀ {A B w} {s : Subscribe A w} {d} op {f : A → Subscribe B w} {g}
-                  → (∀ a → Rel (f a) (g a)) → Rel s d → Rel (flatMapᴷ op f s) (flatMapᴰ (flatOp op) g d)
-    connected-rel : ∀ {Γ A w} {ρ : Env Γ w} {δ} (i : A ∈ Γ) → RelEnv ρ δ
-                  → Rel (joinᴷ (lookup ρ i)) (lookup δ i)
-    cold-rel      : ∀ {A w} (c : Timeline A) → Rel {w = w} (via (startCold c)) (coldᴰ (lower c))
-    -- The subject `connectᴷ` allocates, fed by the source after the body
-    -- has subscribed, agrees with the hot handle `connectᴰ` passes; then
-    -- the body runs under both.
+    -- THE RUN GETS AS FAR: whatever the meaning shows, some approximant
+    -- of the run shows as many items — a finite prefix needs only finite
+    -- budget.  Which items is the bound half's business (`reaches`).
     --
-    -- False wherever the source outlives what the body shows of it:
-    -- `connectᴰ` drops the source's events.  A body that does not consume
-    -- them shows past a source that spins, where the engine — and rxjs, by
-    -- overflowing — stops the whole run; and shows silence over a source
-    -- that runs forever, which the engine, still firing its timers, can
-    -- never report.  Cutting the run at a spin repairs only the first.
-    -- Keeping the source's events as `skip`s repairs both, but rxjs runs a
-    -- source's subscribe burst to its end even after the body has ended.
-    -- Which, or `adequacy` assuming neither, is Anthony's call.
-    -- REFUTED: `git show f5256988` derives `⊥` from `run-rel`.
-    -- REFUTED: `git show e6c9d03a` derives `⊥` from `run-rel`.
-    connect-rel   : ∀ {A B w} {s : Subscribe A w} {d} {b : ∀ {v} → w ≤ʷ v → Subject A v → Subscribe B v}
-                      {e : MonotonicList A → MonotonicList B}
-                  → Rel s d → (∀ {v} (σ : w ≤ʷ v) {st r} → RelSubj st r → Rel (b σ st) (e r))
-                  → Rel (connectᴷ s b) (connectᴰ d e)
-    -- `deferᴰ` adds one `skip`, a `stall` once reported, invisible either
-    -- way, and subscribes its body one level down, as `deeper` does.
-    defer-rel     : ∀ {A w} {s : Subscribe A w} {d} → Rel s d → Rel (deeper s) (deferᴰ d)
-    -- A cut-off `defer` on both sides: each shows nothing.
-    bot-rel       : ∀ {A w} → Rel {A} {w} ⊥ᴷ ⊥ᴰ
-
-    -- THE ENGINE'S FACT, `Rel` at the root: in the limit of its budget, a
-    -- related run shows at least what the denotation shows there.
-    run-rel : ∀ {s : Subscribe R []} {d}
-            → Rel s d → ticks (observe d root) ⊑ limit (λ m → runPure m s)
-
-    -- A deeper approximant of the denotation shows more.
-    approx-chain  : (o : PureObs [] R) → Chain (approxAt o)
-
-    -- The approximants' limit is the unfolded meaning, observed at the
-    -- root with positions forgotten.
-    ⟦⟧-limit : (o : PureObs [] R) → limit (approxAt o) ≃ meaning o
+    -- False wherever a `connect` source the body outlives stands between
+    -- the root and an event the meaning shows.  The meaning steps a
+    -- source only as its joiners copy it, so a body that never joins
+    -- shows past it; the engine runs the source inline, and a source
+    -- that spins stops the whole run there — as rxjs does, by
+    -- overflowing — while one that runs forever keeps the engine firing
+    -- its timers, so the silence the meaning shows after the body is
+    -- never reported.  The meaning keeping such a source's events, or
+    -- `adequacy` assuming none, is Anthony's call.
+    -- DEAD ROUTE: a logical relation per operator, by induction over
+    --   the tree's approximants, each kernel against its own timeline.  A
+    --   connect's subject is state its siblings share, which no relation
+    --   on one kernel at a time can carry.
+    progress : (o : PureObs [] R) → ∀ {is} → Shows (meaning o) is → Σ ℕ λ n → length is ≤ length (itemsOf (ran n (compileᴺ n o [])))
 
   -- The run's approximants are a chain.
   toArray-chain : (o : PureObs [] R) → Chain (λ n → toArray n o)
   toArray-chain o n = runPure-mono o (n≤1+n n) (n≤1+n n)
 
-  -- Running approximant n of the compiler is below the run, whose
-  -- approximants compile ever more.
-  diagonal : ∀ n (o : PureObs [] R) → limit (λ m → runPure m (compileᴺ n o [])) ⊑ run o
-  diagonal n o = limit-least (λ m → runPure-mono {n = n} o (n≤1+n m) ≤-refl)
-                   (λ m → ⊑-trans (runPure-mono {n = n} o (m≤m⊔n m n) (m≤n⊔m m n)) (limit-ub (toArray-chain o) (m ⊔ n)))
-
-  mutual
-    -- THE FUNDAMENTAL LEMMA.  Approximant n against approximant n, by the
-    -- recursion both share: lexicographic on (n , tree), so inductive.
-    fundamental : ∀ n {Γ A w} (o : PureObs Γ A) → {ρ : Env Γ w} {δ : DenEnv Γ}
-                → RelEnv ρ δ → Rel (compileᴺ n o ρ) (⟦ o ⟧[ n ] δ)
-    fundamental n       (cold c)          e = cold-rel c
-    fundamental n       empty             e = empty-rel
-    fundamental n       (of xs)           e = of-rel xs
-    fundamental n       (map f s)         e = map-rel f (fundamental n s e)
-    fundamental n       (scan f z s)      e = scan-rel f z (fundamental n s e)
-    fundamental n       (takeWhile i p s) e = takeWhile-rel i p (fundamental n s e)
-    fundamental n       (flatMap op f s)  e = flatMap-rel op (λ a → fundamental n (f a) e) (fundamental n s e)
-    fundamental n       (connect s b)     e = connect-rel (fundamental n s e) (λ σ r → fundamental n b (r ∷ wkRelEnv σ e))
-    fundamental n       (connected i)     e = connected-rel i e
-    fundamental zero    (defer l)         e = bot-rel
-    fundamental (suc n) (defer l)         e = defer-rel (fundamental n (Later.force l) e)
-
-  -- Each approximant of the denotation is below the run.
-  sound : (o : PureObs [] R) (n : ℕ) → approxAt o n ⊑ run o
-  sound o n = ⊑-trans (run-rel (fundamental n o [])) (diagonal n o)
+  -- THE UPPER HALF: whatever the meaning shows, some approximant of the
+  -- run shows.  It shows as many items, and they are the meaning's.
+  reaches : (o : PureObs [] R) → ∀ {is} → Shows (meaning o) is → Σ ℕ λ n → Shows (toArray n o) is
+  reaches o s with progress o s
+  ... | n , long = n , shows-≼ (cmp-long (shows-cmp s (recorded-shows (ran n (compileᴺ n o [])) (ticks-up o) (places n o n))) long)
+                                (observed (ran n (compileᴺ n o [])))
 
   -- Each approximant of the run is below the meaning.
   complete : (o : PureObs [] R) (n : ℕ) → toArray n o ⊑ meaning o
@@ -167,5 +80,5 @@ module Link (R : Set) where
 
 adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)
 adequacy {A} o = limit-least (toArray-chain o) (complete o)
-               , ⊑-trans (proj₂ (⟦⟧-limit o)) (limit-least (approx-chain o) (sound o))
+               , λ s → limit-ub (toArray-chain o) (proj₁ (reaches o s)) (proj₂ (reaches o s))
   where open Link A

@@ -19,6 +19,7 @@ open import Data.Nat using (ℕ; suc; _≤_; s≤s; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-antisym; ≡ᵇ⇒≡; <ᵇ⇒<)
 open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Data.Unit using (⊤)
 
 open import denotation.MonotonicList using (emit; stall; close; Time; Pos; tick; Events; Events∞; out; skip; end; hush; ticks; inFrame;
   within)
@@ -152,6 +153,23 @@ module _ {A : Set} where
     ... | true with ≤-antisym (up u) (≤-pred′ (<ᵇ⇒< (tick k) (suc t) (T-of eq)))
     ...   | refl = stall⁺ (showsIn (more u) p)
 
+  -- The record shows every item of its own.
+  mutual
+    framed : ∀ xs en → Shows (frames xs en) (items xs en)
+    framed []             finished   = done⁺
+    framed []             dry        = quiet⁺
+    framed []             (cutOff c) = nil
+    framed ((t , a) ∷ xs) en         = at⁺ (emit⁺ (framedIn t xs en))
+
+    framedIn : ∀ t xs en → ShowsIn t (inFrameᴿ t xs en) (items xs en)
+    framedIn t []               (cutOff c) = nil
+    framedIn t []               finished   = close⁺ done⁺
+    framedIn t []               dry        = close⁺ quiet⁺
+    framedIn t ((t′ , a) ∷ xs) en with t′ ≡ᵇ t in eq
+    ... | true with ≡ᵇ⇒≡ t′ t (T-of eq)
+    ...   | refl = emit⁺ (framedIn t xs en)
+    framedIn t ((t′ , a) ∷ xs) en | false = close⁺ (at⁺ (emit⁺ (framedIn t′ xs en)))
+
   -- THE RECORD SHOWS NOTHING THE EVENTS DO NOT.
   placed-⊑ : ∀ {f en qs xs e} → Up f e → Placed en qs xs e → frames xs en ⊑ ticks e
   placed-⊑ u p s = shows-≼ (shown _ _ s) (shows u p)
@@ -175,3 +193,14 @@ module Ran (A : Set) where
 
   recorded-⊑ : ∀ {f} r {e} → Up f e → Recorded r e → observe r ⊑ ticks e
   recorded-⊑ (res σ st v) u p = placed-⊑ u p
+
+  -- What a run's record shows: each value at its tick, then how it ended.
+  itemsOf : Res [] ⊤ → List (Item A)
+  itemsOf (res σ st v) = items (State.log st) (endOf (State.ended st) v (State.clock st))
+
+  observed : ∀ r → Shows (observe r) (itemsOf r)
+  observed (res σ st v) = framed (State.log st) _
+
+  -- Placed events show all of it.
+  recorded-shows : ∀ {f} r {e} → Up f e → Recorded r e → Shows (ticks e) (itemsOf r)
+  recorded-shows (res σ st v) u p = shows u p

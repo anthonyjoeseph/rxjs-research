@@ -13,7 +13,7 @@ module denotation.Order where
 
 open import Data.Bool using (true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_; _≤_; z≤n; s≤s; _⊔_; _≤′_; ≤′-refl; ≤′-step)
@@ -51,9 +51,6 @@ mutual
 _⊑_ : ∀ {A : Set} → ML A → ML A → Set
 x ⊑ y = ∀ {is} → Shows x is → Shows y is
 
-⊑-trans : ∀ {A : Set} {x y z : ML A} → x ⊑ y → y ⊑ z → x ⊑ z
-⊑-trans xy yz s = yz (xy s)
-
 -- The same run, up to what no reader sees.
 _≃_ : ∀ {A : Set} → ML A → ML A → Set
 x ≃ y = x ⊑ y × y ⊑ x
@@ -85,6 +82,39 @@ mutual
   showsIn-≼ p      (stall⁺ s) = stall⁺ (showsIn-≼ p s)
   showsIn-≼ p      (close⁺ s) = close⁺ (shows-≼ p s)
 
+-- What two readers of one run saw, one saw a prefix of.
+Comparable : ∀ {A : Set} → List A → List A → Set
+Comparable xs ys = xs ≼ ys ⊎ ys ≼ xs
+
+cons-cmp : ∀ {A : Set} {x : A} {xs ys} → Comparable xs ys → Comparable (x ∷ xs) (x ∷ ys)
+cons-cmp (inj₁ p) = inj₁ (∷≼ p)
+cons-cmp (inj₂ p) = inj₂ (∷≼ p)
+
+mutual
+  shows-cmp : ∀ {A : Set} {x : ML A} {is js} → Shows x is → Shows x js → Comparable is js
+  shows-cmp nil     _       = inj₁ []≼
+  shows-cmp _       nil     = inj₂ []≼
+  shows-cmp done⁺   done⁺   = inj₁ (∷≼ []≼)
+  shows-cmp quiet⁺  quiet⁺  = inj₁ (∷≼ []≼)
+  shows-cmp (at⁺ s) (at⁺ r) = showsIn-cmp s r
+
+  showsIn-cmp : ∀ {A : Set} {t} {b : Burst A} {is js} → ShowsIn t b is → ShowsIn t b js → Comparable is js
+  showsIn-cmp nil        _          = inj₁ []≼
+  showsIn-cmp _          nil        = inj₂ []≼
+  showsIn-cmp (emit⁺ s)  (emit⁺ r)  = cons-cmp (showsIn-cmp s r)
+  showsIn-cmp (stall⁺ s) (stall⁺ r) = showsIn-cmp s r
+  showsIn-cmp (close⁺ s) (close⁺ r) = shows-cmp s r
+
+-- A prefix no shorter than the other is all of it.
+cmp-long : ∀ {A : Set} {xs ys : List A} → Comparable xs ys → length xs ≤ length ys → xs ≼ ys
+cmp-long (inj₁ p) _ = p
+cmp-long (inj₂ p) l = long p l
+  where
+    long : ∀ {A : Set} {xs ys : List A} → ys ≼ xs → length xs ≤ length ys → xs ≼ ys
+    long {xs = []}    []≼    _       = []≼
+    long {xs = _ ∷ _} []≼    ()
+    long              (∷≼ p) (s≤s l) = ∷≼ (long p l)
+
 private
   ≼-refl : ∀ {A} (xs : List A) → xs ≼ xs
   ≼-refl []       = []≼
@@ -93,29 +123,6 @@ private
   ≼-trans : ∀ {A : Set} {xs ys zs : List A} → xs ≼ ys → ys ≼ zs → xs ≼ zs
   ≼-trans []≼     _       = []≼
   ≼-trans (∷≼ p) (∷≼ q) = ∷≼ (≼-trans p q)
-
-  -- What two readers of one run saw, one saw a prefix of.
-  Comparable : ∀ {A : Set} → List A → List A → Set
-  Comparable xs ys = xs ≼ ys ⊎ ys ≼ xs
-
-  cons-cmp : ∀ {A : Set} {x : A} {xs ys} → Comparable xs ys → Comparable (x ∷ xs) (x ∷ ys)
-  cons-cmp (inj₁ p) = inj₁ (∷≼ p)
-  cons-cmp (inj₂ p) = inj₂ (∷≼ p)
-
-  mutual
-    shows-cmp : ∀ {A : Set} {x : ML A} {is js} → Shows x is → Shows x js → Comparable is js
-    shows-cmp nil     _       = inj₁ []≼
-    shows-cmp _       nil     = inj₂ []≼
-    shows-cmp done⁺   done⁺   = inj₁ (∷≼ []≼)
-    shows-cmp quiet⁺  quiet⁺  = inj₁ (∷≼ []≼)
-    shows-cmp (at⁺ s) (at⁺ r) = showsIn-cmp s r
-
-    showsIn-cmp : ∀ {A : Set} {t} {b : Burst A} {is js} → ShowsIn t b is → ShowsIn t b js → Comparable is js
-    showsIn-cmp nil        _          = inj₁ []≼
-    showsIn-cmp _          nil        = inj₂ []≼
-    showsIn-cmp (emit⁺ s)  (emit⁺ r)  = cons-cmp (showsIn-cmp s r)
-    showsIn-cmp (stall⁺ s) (stall⁺ r) = showsIn-cmp s r
-    showsIn-cmp (close⁺ s) (close⁺ r) = shows-cmp s r
 
   -- The longer of two lists, when one is a prefix of the other.
   longer : ∀ {A : Set} → List A → List A → List A
