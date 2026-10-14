@@ -15,10 +15,10 @@ open import Data.List.Properties using (length-++)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤_; s≤s; z≤n)
-open import Data.Nat.Properties using (≤-trans; ≤-reflexive; m≤m+n; m≤n+m; m≤m⊔n)
+open import Data.Nat.Properties using (≤-trans; ≤-reflexive; ≤-pred; m≤m+n; m≤n+m; m≤m⊔n; +-suc)
 open import Data.Unit using (⊤; tt)
-open import Level using (Lift; lift)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong)
+open import Level using (Lift; lift; lower)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import denotation.MonotonicList using (root; Events)
 open import denotation.Unfold using (Node; Step; framesᶜ; burstᶜ; endᶜ; ofᶜ; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; joinᶜ; deferᶜ;
@@ -107,8 +107,8 @@ budget-pos c a = ≤-trans (depth-pos c) (≤-trans (m≤m⊔n (depth c) (deepes
 -- the turns left pay for them.
 
 module Owing (R : Set) (o : PureObs [] R) (N : ℕ) {k : ℕ} (a : Ahead (unfold (subscribe o [] root)) k) where
-  open Pure R using (State; Res; res; M; then; ret; loopᴺ; runᴺ; compileᴺ; recorder; start; endOf; cutOff)
-  open Places R using (Live) renaming (shown to root-shown)
+  open Pure R using (State; Res; res; M; Timer; get; cascade; then; ret; loopᴺ; runᴺ; compileᴺ; recorder; start; endOf; cutOff)
+  open Places R using (Live; moved) renaming (shown to root-shown)
   open Loop R (root-shown o) N (Live N o) using (turn)
   open Approx R using (Grows; GrowsAt; open≈; shut≈; loopᴺ-grow; module Grower)
   open Run (Pureᴾ R) using (done)
@@ -180,7 +180,7 @@ module Owing (R : Set) (o : PureObs [] R) (N : ℕ) {k : ℕ} (a : Ahead (unfold
     -- Subscribing the program at the root, within its budget, leaves it
     -- owing at most that budget.
     owe-start : budget (subscribe o [] root) a ≤ N → OwePost (runᴺ N N (compileᴺ N o [] same recorder λ _ _ → done tt) same start) N
-    -- A turn spends a turn's worth of what is owed.
+    -- A turn that fires a frame spends a turn's worth of what is owed.
     --
     -- False wherever a `connect` source the body outlives stands between
     -- the root and an event the meaning shows, and so is `owe-start`.
@@ -195,10 +195,34 @@ module Owing (R : Set) (o : PureObs [] R) (N : ℕ) {k : ℕ} (a : Ahead (unfold
     --   the tree's approximants, each kernel against its own timeline.  A
     --   connect's subject is state its siblings share, which no relation
     --   on one kernel at a time can carry.
-    owe-turn  : ∀ m {h} (st : State h) {tm ts} → Owing st (suc m) → State.timers st ≡ tm ∷ ts → OwePost (turn (suc m) st tm ts) m
+    owe-fire  : ∀ m {h} (st : State h) {tm ts} → Owing st (suc m) → State.timers st ≡ tm ∷ ts
+              → lower (get (State.heap st) (Timer.handle tm)) ≡ false → OwePost (turn (suc m) st tm ts) m
     -- With no timer left, the items owed are the silence the meaning ends in.
     owe-dry   : ∀ m {h} (st : State h) → Owing st m → State.timers st ≡ []
               → k ≤ length (items (State.log st) (endOf (State.ended st) (just tt) (State.clock st)))
+
+  -- A spent timer's turn plays nothing: the turn it spends is its own.
+  owing-spent : ∀ m {h} {st : State h} {tm ts} → Owing st (suc m) → State.timers st ≡ tm ∷ ts
+              → lower (get (State.heap st) (Timer.handle tm)) ≡ true
+              → Owing (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }) m
+  owing-spent m {st = st} {tm} {ts} w eq s = record
+    { sofar   = moved o {tm = tm} {ts} (Owing.sofar w)
+    ; unended = Owing.unended w
+    ; conf    = Owing.conf w
+    ; real    = Realizing.realizes-spent R N (Owing.real w) eq s
+    ; agree   = Owing.agree w
+    ; ahead   = Owing.ahead w
+    ; owed    = Owing.owed w
+    ; paid    = ≤-pred (≤-trans (≤-reflexive (sym (+-suc (budget (copy (Owing.conf w) []) (Owing.ahead w)) (length ts))))
+                                (subst (λ l → budget (copy (Owing.conf w) []) (Owing.ahead w) + length l ≤ suc m) eq (Owing.paid w))) }
+
+  -- One turn spends a turn's worth of what is owed.
+  owe-turn : ∀ m {h} (st : State h) {tm ts} → Owing st (suc m) → State.timers st ≡ tm ∷ ts → OwePost (turn (suc m) st tm ts) m
+  owe-turn m st {tm} {ts} w eq = by (lower (get (State.heap st) (Timer.handle tm))) refl
+    where
+      by : ∀ b → lower (get (State.heap st) (Timer.handle tm)) ≡ b → OwePost (turn (suc m) st tm ts) m
+      by true  s rewrite s = owing (owing-spent m w eq s)
+      by false s           = owe-fire m st w eq s
 
   again : ℕ → Bool → M [] ⊤
   again m b = if_then_else_ {A = M [] ⊤} b (loopᴺ N m) (ret tt)
