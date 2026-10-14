@@ -1,21 +1,17 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE LINK.  The pure runtime and the denotation agree: the limit of the
--- pure run's approximants is the denotation's limit, observed at the
--- root, with positions forgotten down to ticks.
+-- pure run's approximants is the meaning, observed at the root, with
+-- positions forgotten down to ticks.
 --
--- Both sides are chains of approximants built the same way — approximant
--- n compiles n nested `defer`s, and past that shows nothing — so each
--- half compares approximant n with approximant n.  Run n is below
--- approximant n, which is below the run, and `squeeze` meets the limits.
---
--- BELOW: the run's record, ghost positions and all, is placed against
--- the events the root is shown (`operation.Placed`), so it shows nothing
--- they do not, by a simulation over the whole running program (`Bound`).
--- ABOVE: a logical relation between a `Subscribe` and a
--- timeline, by induction on (n , tree), one operator at a time: with
--- budget enough, the kernel shows everything its timeline does.  Nothing
--- is coinductive except the last step, from approximants to limits.
+-- BELOW: every approximant of the run is below the meaning itself.  Its
+-- record, ghost positions and all, is placed against the events the root
+-- is shown (`operation.Placed`), so it shows nothing they do not, by a
+-- simulation over the whole running program (`Bound`).
+-- ABOVE: the meaning is the limit of the denotation's approximants, and
+-- each is below the run, by a logical relation between a `Subscribe` and
+-- a timeline, by induction on (n , tree), one operator at a time: with
+-- budget enough, the kernel shows everything its timeline does.
 --
 -- The IO runtime has no theorem of its own, and needs none: it is the
 -- same engine over a different monad, with its recursion closed by `fix`
@@ -27,6 +23,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Nat using (ℕ; zero; suc; _⊔_)
 open import Data.Nat.Properties using (≤-refl; n≤1+n; m≤m⊔n; m≤n⊔m)
+open import Data.Product using (_,_; proj₂)
 open import Level using (lower)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
@@ -37,7 +34,7 @@ open import operation.Budget using (module Approx)
 open import operation.PureObservable using (Pureᴾ; PureObs; module Pure; toArray) renaming (_⊑_ to _≤ʷ_)
 open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ;
   takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ)
-open import denotation.Order using (_⊑_; ⊑-trans; _≃_; ≃-trans; limit; Chain; squeeze; limit-ub; limit-least)
+open import denotation.Order using (_⊑_; ⊑-trans; _≃_; limit; Chain; limit-ub; limit-least)
 open import denotation.Denote using (DenEnv; flatOp; ⟦_⟧[_])
 open import denotation.Unfold using (⟦_⟧)
 
@@ -49,6 +46,10 @@ run o = limit λ n → toArray n o
 approxAt : ∀ {A} → PureObs [] A → ℕ → ML A
 approxAt o n = ticks (observe (⟦ o ⟧[ n ] []) root)
 
+-- The meaning, as the run reports one.
+meaning : ∀ {A} → PureObs [] A → ML A
+meaning o = ticks (observe (⟦ o ⟧ []) root)
+
 module Link (R : Set) where
   open Run (Pureᴾ R)
   open Pure R using (runPure; compileᴺ)
@@ -57,8 +58,8 @@ module Link (R : Set) where
   open Places R using (places)
 
   postulate
-    -- An approximant's ticks never fall.
-    ticks-up : ∀ n (o : PureObs [] R) → Up 0 (observe (⟦ o ⟧[ n ] []) root)
+    -- The meaning's ticks never fall.
+    ticks-up : (o : PureObs [] R) → Up 0 (observe (⟦ o ⟧ []) root)
 
     -- "Subscribing with `s` at any position p, in any heap, shows at least
     -- what `d` shows a subscriber arriving at p, ticks for ticks, on an
@@ -127,7 +128,7 @@ module Link (R : Set) where
 
     -- The approximants' limit is the unfolded meaning, observed at the
     -- root with positions forgotten.
-    ⟦⟧-limit : (o : PureObs [] R) → limit (approxAt o) ≃ ticks (observe (⟦ o ⟧ []) root)
+    ⟦⟧-limit : (o : PureObs [] R) → limit (approxAt o) ≃ meaning o
 
   -- The run's approximants are a chain.
   toArray-chain : (o : PureObs [] R) → Chain (λ n → toArray n o)
@@ -160,10 +161,11 @@ module Link (R : Set) where
   sound : (o : PureObs [] R) (n : ℕ) → approxAt o n ⊑ run o
   sound o n = ⊑-trans (run-rel (fundamental n o [])) (diagonal n o)
 
-  -- Each approximant of the run is below the denotation's.
-  complete : (o : PureObs [] R) (n : ℕ) → toArray n o ⊑ approxAt o n
-  complete o n = recorded-⊑ (ran n (compileᴺ n o [])) (ticks-up n o) (places n o n)
+  -- Each approximant of the run is below the meaning.
+  complete : (o : PureObs [] R) (n : ℕ) → toArray n o ⊑ meaning o
+  complete o n = recorded-⊑ (ran n (compileᴺ n o [])) (ticks-up o) (places n o n)
 
 adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)
-adequacy {A} o = ≃-trans (squeeze (toArray-chain o) (approx-chain o) (sound o) (complete o)) (⟦⟧-limit o)
+adequacy {A} o = limit-least (toArray-chain o) (complete o)
+               , ⊑-trans (proj₂ (⟦⟧-limit o)) (limit-least (approx-chain o) (sound o))
   where open Link A

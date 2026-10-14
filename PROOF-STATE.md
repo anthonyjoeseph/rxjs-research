@@ -161,19 +161,13 @@ point at one, the row is FALSITY.
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
 the root, positions forgotten down to ticks. A two-sided fundamental lemma over
-approximants, one operator at a time, puts approximant n below the run; a
-simulation over the whole running program (`Bound`) puts run n below
-approximant n; `squeeze` meets the limits. Expect the denotation to move under contact; it
+approximants, one operator at a time, puts approximant n below the run, and
+their limit is the meaning; a simulation over the whole running program
+(`Bound`) puts every run approximant below the meaning itself. Expect the denotation to move under contact; it
 must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **ONE CONFIGURATION TYPE.** `Config`'s tree and `denotation.Unfold`'s
-  configuration are one: the engine's state related to the very node the
-  meaning steps, `⟦_⟧ᶜ` its `unfold` rather than a composition of
-  approximants. Decides whether the engine-side tree (sources live or
-  finished, lanes, joiners) is the meaning's configuration plus ghost
-  state, or needs nodes the meaning lacks.
 - **THE ENGINE, SMALL-STEP.** The pure engine as a productive machine: an
   explicit continuation stack, one step per event, a silent step where it
   does work, so a run is a coinductive event stream with no burst budget,
@@ -183,7 +177,7 @@ must be solid before Tier 2 is written over it.
 - **ONE BISIMULATION, NO FUEL.** `adequacy` as one coinductive bisimulation
   between the small-step engine and the denotation observed at the root,
   over the configuration tree. Replaces the per-operator `Rel`, which
-  shared state between siblings contradicts, and `squeeze`; keeps
+  shared state between siblings contradicts, and the approximants; keeps
   `Config`, `Holding` and the step lemmas. Decides whether sibling state is
   carried by one global relation.
 - **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over

@@ -3,7 +3,7 @@
 -- A PROGRAM TREE'S APPROXIMANTS: each node replaced by its
 -- `MonotonicList` function, every path through more than n `defer`s cut
 -- off at ⊥ᴰ.  The meaning itself is `denotation.Unfold`'s; these exist for
--- `Adequacy`'s squeeze, whose limit is that meaning.
+-- `Adequacy`'s upper half, each below the run, their limit that meaning.
 module denotation.Denote where
 
 open import Data.List using (List; _∷_)

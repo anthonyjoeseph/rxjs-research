@@ -6,11 +6,12 @@
 -- `Bound` relates the engine's state to such a tree, and the root's
 -- remaining events to the tree's meaning.
 --
--- The tree's meaning is built from the denotation's own stream functions,
--- so a node means exactly what the denotation would show from where the
--- run stands: a cold its pending frames, a `flatMap` its sorted merge of
--- the outer and the lanes in flight, a joiner its subject's remaining
--- events rejoined.
+-- The tree is the meaning's own configuration (`denotation.Unfold`) plus
+-- one piece of ghost state: a connect's source is SHARED, held once with
+-- its joiners pointing at it by index, where the meaning gives each
+-- joiner its own copy.  A tree means the unfolding of its copy-out, each
+-- joiner copying the source as it stands now, each lane still queued
+-- subscribed against the sources as they stand now.
 --
 -- What is left of the root's events and the tree's meaning agree up to
 -- finitely many `skip`s between any two events (`_≅_`): a skip the run
@@ -19,21 +20,21 @@
 module Config where
 
 open import Data.Bool using (Bool)
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup) renaming (map to mapᴬ)
+open import Data.List.Relation.Unary.All using (_∷_; lookup)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤)
 open import Data.Empty using (⊥)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (MonotonicList; hot; Timeline; Time; Pos; Frame; Events; Events∞; out; skip; end; hush; burst;
-  rejoin; mapᴱ; scanᴱ; takeWhileᴱ; go; none; earliest)
-open import denotation.Denote using (approx; flatOp)
+open import denotation.MonotonicList using (Timeline; Time; Pos; Frame; Events; Events∞; out; skip; end; hush; quiet)
+import denotation.Unfold as U
+open import denotation.Unfold using (Srcs; step; hushˢ; headˢ; unfold; shown; subscribe; Earliest; earliest)
 
 open Events∞
 
@@ -60,129 +61,114 @@ mutual
 ------------------------------------------------------------------------
 -- The tree
 
--- The events each connect in scope is still to show its joiners: the
--- source's remainder, or its completion once it has completed.
-Hots : List Set → Set₁
-Hots = All Events
-
-hots : ∀ {Δ} → Hots Δ → All MonotonicList Δ
-hots = mapᴬ hot
-
-module Nodes (n : ℕ) where
+mutual
+  data Node : List Set → Set → Set₁ where
+    -- A cold inside a frame, or about to start one: its burst at step
+    -- `i` of the frame at `r`, on a timeline subscribed at tick `τ`.
+    coldᶜ      : ∀ {Δ A t} → Time → Pos → ℕ → Frame A t → Node Δ A
+    -- Nothing more, ever: a cold gone quiet.
+    quietᶜ     : ∀ {Δ A} → Node Δ A
+    mapᶜ       : ∀ {Δ A B} → (A → B) → Node Δ A → Node Δ B
+    -- The accumulator so far.
+    scanᶜ      : ∀ {Δ A B} → (B → A → B) → B → Node Δ A → Node Δ B
+    takeWhileᶜ : ∀ {Δ A} → Bool → (A → Bool) → Node Δ A → Node Δ A
+    -- The outer while it lasts, the lanes in flight newest first, and
+    -- the elements queued.
+    flatMapᶜ   : ∀ {Δ A B} → T.FlatOp → (A → Obs Timeline Δ B) → Maybe (Node Δ A) → List (Node Δ B) → List A → Node Δ B
+    connectᶜ   : ∀ {Δ A B} → Source Δ A → Node (A ∷ Δ) B → Node Δ B
+    -- Joined at `j`, the subject's first `m` events past.
+    joinᶜ      : ∀ {Δ A} → Pos → ℕ → A ∈ Δ → Node Δ A
 
   -- A connect's source: live, or completed at a position.
-  mutual
-    data Node : List Set → Set → Set₁ where
-      -- A cold inside a frame, or about to start one: its burst at step
-      -- `i` of the frame at `r`, on a timeline subscribed at tick `τ`.
-      coldᶜ      : ∀ {Δ A t} → Time → Pos → ℕ → Frame A t → Node Δ A
-      -- Nothing more, ever: a cold gone quiet.
-      quietᶜ     : ∀ {Δ A} → Node Δ A
-      mapᶜ       : ∀ {Δ A B} → (A → B) → Node Δ A → Node Δ B
-      -- The accumulator so far.
-      scanᶜ      : ∀ {Δ A B} → (B → A → B) → B → Node Δ A → Node Δ B
-      takeWhileᶜ : ∀ {Δ A} → Bool → (A → Bool) → Node Δ A → Node Δ A
-      -- The outer while it lasts, the lanes in flight newest first, and
-      -- the elements queued.
-      flatMapᶜ   : ∀ {Δ A B} → T.FlatOp → (A → Obs Timeline Δ B) → Maybe (Node Δ A) → List (Node Δ B) → List A → Node Δ B
-      connectᶜ   : ∀ {Δ A B} → Source Δ A → Node (A ∷ Δ) B → Node Δ B
-      -- Joined at `j`, the subject's first `m` events past.
-      joinᶜ      : ∀ {Δ A} → Pos → ℕ → A ∈ Δ → Node Δ A
+  data Source (Δ : List Set) (A : Set) : Set₁ where
+    live     : Node Δ A → Source Δ A
+    finished : Pos → Source Δ A
 
-    data Source (Δ : List Set) (A : Set) : Set₁ where
-      live     : Node Δ A → Source Δ A
-      finished : Pos → Source Δ A
+-- THE COPY-OUT: the meaning's configuration, given each source in scope
+-- as it stands now.
+mutual
+  copy : ∀ {Δ A} → Node Δ A → Srcs Δ → U.Node A
+  copy (coldᶜ τ r i b)         σ = U.burstᶜ τ r i b
+  copy quietᶜ                  σ = U.framesᶜ 0 [] (quiet {t = 0})
+  copy (mapᶜ f c)              σ = U.mapᶜ f (copy c σ)
+  copy (scanᶜ f z c)           σ = U.scanᶜ f z (copy c σ)
+  copy (takeWhileᶜ i p c)      σ = U.takeWhileᶜ i p (copy c σ)
+  copy (flatMapᶜ op f o ls qs) σ = U.flatMapᶜ op (λ a q → subscribe (f a) σ q) (copyᵒ o σ) (copyˡ ls σ) qs
+  copy (connectᶜ s b)          σ = copy b (copyˢ s σ ∷ σ)
+  copy (joinᶜ j m i)           σ = U.joinᶜ j m (lookup σ i)
 
-  -- WHAT A NODE MEANS: what is left of its events, given what is left of
-  -- each subject's.
-  mutual
-    ⟦_⟧ᶜ : ∀ {Δ A} → Node Δ A → Hots Δ → Events A
-    ⟦ coldᶜ τ r i b ⟧ᶜ          ρ = burst τ r i b
-    ⟦ quietᶜ ⟧ᶜ                 ρ = hush
-    ⟦ mapᶜ f c ⟧ᶜ               ρ = mapᴱ f (⟦ c ⟧ᶜ ρ)
-    ⟦ scanᶜ f z c ⟧ᶜ            ρ = scanᴱ f z (⟦ c ⟧ᶜ ρ)
-    ⟦ takeWhileᶜ i p c ⟧ᶜ       ρ = takeWhileᴱ i p (⟦ c ⟧ᶜ ρ)
-    ⟦ flatMapᶜ op f o ls qs ⟧ᶜ  ρ = go (flatOp op) (⟦ o ⟧ᵒ f ρ) (⟦ ls ⟧ˡ ρ) (map (λ a → approx n (f a) (hots ρ)) qs)
-    ⟦ connectᶜ s b ⟧ᶜ           ρ = ⟦ b ⟧ᶜ (⟦ s ⟧ˢ ρ ∷ ρ)
-    ⟦ joinᶜ j m i ⟧ᶜ            ρ = rejoin j m (lookup ρ i)
+  copyᵒ : ∀ {Δ A} → Maybe (Node Δ A) → Srcs Δ → Maybe (U.Node A)
+  copyᵒ nothing  σ = nothing
+  copyᵒ (just c) σ = just (copy c σ)
 
-    ⟦_⟧ᵒ : ∀ {Δ A B} → Maybe (Node Δ A) → (A → Obs Timeline Δ B) → Hots Δ → Maybe (Events (MonotonicList B))
-    ⟦ nothing ⟧ᵒ f ρ = nothing
-    ⟦ just c ⟧ᵒ  f ρ = just (mapᴱ (λ a → approx n (f a) (hots ρ)) (⟦ c ⟧ᶜ ρ))
+  copyˡ : ∀ {Δ A} → List (Node Δ A) → Srcs Δ → List (U.Node A)
+  copyˡ []       σ = []
+  copyˡ (c ∷ cs) σ = copy c σ ∷ copyˡ cs σ
 
-    ⟦_⟧ˡ : ∀ {Δ A} → List (Node Δ A) → Hots Δ → List (Events A)
-    ⟦ [] ⟧ˡ     ρ = []
-    ⟦ c ∷ cs ⟧ˡ ρ = ⟦ c ⟧ᶜ ρ ∷ ⟦ cs ⟧ˡ ρ
+  copyˢ : ∀ {Δ A} → Source Δ A → Srcs Δ → U.Node A
+  copyˢ (live c)     σ = copy c σ
+  copyˢ (finished p) σ = U.endᶜ p
 
-    ⟦_⟧ˢ : ∀ {Δ A} → Source Δ A → Hots Δ → Events A
-    ⟦ live c ⟧ˢ     ρ = ⟦ c ⟧ᶜ ρ
-    ⟦ finished p ⟧ˢ ρ = end p
+-- WHAT A NODE MEANS: what is left of its events.
+⟦_⟧ᶜ : ∀ {Δ A} → Node Δ A → Srcs Δ → Events A
+⟦ c ⟧ᶜ σ = unfold (copy c σ)
 
-  ------------------------------------------------------------------------
-  -- A tree with nothing pending
+------------------------------------------------------------------------
+-- A tree with nothing pending
 
-  -- NO FRAME TO COME: every cold gone quiet, every joiner's subject
-  -- silent.  A joiner of a completed subject is not dry — it has a
-  -- completion still to show.
-  mutual
-    Dry : ∀ {Δ A} → Node Δ A → Hots Δ → Set
-    Dry (coldᶜ τ r i b)         ρ = ⊥
-    Dry quietᶜ                  ρ = ⊤
-    Dry (mapᶜ f c)              ρ = Dry c ρ
-    Dry (scanᶜ f z c)           ρ = Dry c ρ
-    Dry (takeWhileᶜ i p c)      ρ = Dry c ρ
-    Dry (flatMapᶜ op f o ls qs) ρ = Dryᵒ o ρ × Dryˡ ls ρ
-    Dry (connectᶜ s b)          ρ = Dryˢ s ρ × Dry b (⟦ s ⟧ˢ ρ ∷ ρ)
-    Dry (joinᶜ j m i)           ρ = lookup ρ i ≡ hush
+-- A configuration with no event to come.
+Silent : ∀ {A} → U.Node A → Set
+Silent c = headˢ (step c) ≡ nothing
 
-    Dryᵒ : ∀ {Δ A} → Maybe (Node Δ A) → Hots Δ → Set
-    Dryᵒ nothing  ρ = ⊤
-    Dryᵒ (just c) ρ = Dry c ρ
+silent-hush : ∀ {A} (s : U.Step A) → headˢ s ≡ nothing → s ≡ hushˢ
+silent-hush hushˢ e = refl
 
-    Dryˡ : ∀ {Δ A} → List (Node Δ A) → Hots Δ → Set
-    Dryˡ []       ρ = ⊤
-    Dryˡ (c ∷ cs) ρ = Dry c ρ × Dryˡ cs ρ
+-- NO FRAME TO COME: every cold gone quiet, every joiner's subject
+-- silent.  A joiner of a completed subject is not dry — it has a
+-- completion still to show.
+mutual
+  Dry : ∀ {Δ A} → Node Δ A → Srcs Δ → Set
+  Dry (coldᶜ τ r i b)         σ = ⊥
+  Dry quietᶜ                  σ = ⊤
+  Dry (mapᶜ f c)              σ = Dry c σ
+  Dry (scanᶜ f z c)           σ = Dry c σ
+  Dry (takeWhileᶜ i p c)      σ = Dry c σ
+  Dry (flatMapᶜ op f o ls qs) σ = Dryᵒ o σ × Dryˡ ls σ
+  Dry (connectᶜ s b)          σ = Dryˢ s σ × Dry b (copyˢ s σ ∷ σ)
+  Dry (joinᶜ j m i)           σ = Silent (lookup σ i)
 
-    Dryˢ : ∀ {Δ A} → Source Δ A → Hots Δ → Set
-    Dryˢ (live c)     ρ = Dry c ρ
-    Dryˢ (finished p) ρ = ⊤
+  Dryᵒ : ∀ {Δ A} → Maybe (Node Δ A) → Srcs Δ → Set
+  Dryᵒ nothing  σ = ⊤
+  Dryᵒ (just c) σ = Dry c σ
 
-  -- An outer that is over, or silent.
-  data Silent {B : Set} : Maybe (Events (MonotonicList B)) → Set where
-    gone  : Silent nothing
-    quiet : Silent (just hush)
+  Dryˡ : ∀ {Δ A} → List (Node Δ A) → Srcs Δ → Set
+  Dryˡ []       σ = ⊤
+  Dryˡ (c ∷ cs) σ = Dry c σ × Dryˡ cs σ
 
-  earliest-hush : ∀ {B} {es : List (Events B)} → All (_≡ hush) es → earliest es ≡ none
-  earliest-hush []          = refl
-  earliest-hush (refl ∷ hs) rewrite earliest-hush hs = refl
+  Dryˢ : ∀ {Δ A} → Source Δ A → Srcs Δ → Set
+  Dryˢ (live c)     σ = Dry c σ
+  Dryˢ (finished p) σ = ⊤
 
-  go-hush : ∀ {B} op (o : Maybe (Events (MonotonicList B))) es qs → Silent o → All (_≡ hush) es → go op o es qs ≡ hush
-  go-hush op o es qs s hs with earliest es | earliest-hush hs
-  go-hush op .nothing      es qs gone  hs | .none | refl = refl
-  go-hush op .(just hush)  es qs quiet hs | .none | refl = refl
+-- A dry tree steps to silence.
+mutual
+  dry-step : ∀ {Δ A} (c : Node Δ A) (σ : Srcs Δ) → Dry c σ → step (copy c σ) ≡ hushˢ
+  dry-step (coldᶜ τ r i b) σ ()
+  dry-step quietᶜ          σ d = refl
+  dry-step (mapᶜ f c)      σ d rewrite dry-step c σ d = refl
+  dry-step (scanᶜ f z c)   σ d rewrite dry-step c σ d = refl
+  dry-step (takeWhileᶜ i p c) σ d rewrite dry-step c σ d = refl
+  dry-step (flatMapᶜ op f nothing ls qs) σ (_ , dl) rewrite dry-earliest ls σ dl = refl
+  dry-step (flatMapᶜ op f (just o) ls qs) σ (dᵒ , dl) rewrite dry-earliest ls σ dl | dry-step o σ dᵒ = refl
+  dry-step (connectᶜ s b)  σ (_ , d) = dry-step b (copyˢ s σ ∷ σ) d
+  dry-step (joinᶜ j m i)   σ d rewrite silent-hush (step (lookup σ i)) d = refl
 
-  -- A dry tree means silence.
-  mutual
-    dry-hush : ∀ {Δ A} (c : Node Δ A) (ρ : Hots Δ) → Dry c ρ → ⟦ c ⟧ᶜ ρ ≡ hush
-    dry-hush (coldᶜ τ r i b) ρ ()
-    dry-hush quietᶜ          ρ d = refl
-    dry-hush (mapᶜ f c)      ρ d with ⟦ c ⟧ᶜ ρ | dry-hush c ρ d
-    ... | .hush | refl = refl
-    dry-hush (scanᶜ f z c)   ρ d with ⟦ c ⟧ᶜ ρ | dry-hush c ρ d
-    ... | .hush | refl = refl
-    dry-hush (takeWhileᶜ i p c) ρ d with ⟦ c ⟧ᶜ ρ | dry-hush c ρ d
-    ... | .hush | refl = refl
-    dry-hush (flatMapᶜ op f o ls qs) ρ (dᵒ , dl) =
-      go-hush (flatOp op) (⟦ o ⟧ᵒ f ρ) (⟦ ls ⟧ˡ ρ) _ (dry-hushᵒ o f ρ dᵒ) (dry-hushˡ ls ρ dl)
-    dry-hush (connectᶜ s b)  ρ (_ , d) = dry-hush b (⟦ s ⟧ˢ ρ ∷ ρ) d
-    dry-hush (joinᶜ j m i)   ρ d with lookup ρ i | d
-    ... | .hush | refl = refl
+  dry-earliest : ∀ {Δ A} (cs : List (Node Δ A)) (σ : Srcs Δ) → Dryˡ cs σ → earliest (copyˡ cs σ) ≡ Earliest.none
+  dry-earliest []       σ d        = refl
+  dry-earliest (c ∷ cs) σ (d , ds) rewrite dry-step c σ d | dry-earliest cs σ ds = refl
 
-    dry-hushᵒ : ∀ {Δ A B} (o : Maybe (Node Δ A)) (f : A → Obs Timeline Δ B) (ρ : Hots Δ) → Dryᵒ o ρ → Silent (⟦ o ⟧ᵒ f ρ)
-    dry-hushᵒ nothing  f ρ d = gone
-    dry-hushᵒ (just c) f ρ d with ⟦ c ⟧ᶜ ρ | dry-hush c ρ d
-    ... | .hush | refl = quiet
+-- A dry tree means silence.
+dry-hush : ∀ {Δ A} (c : Node Δ A) (σ : Srcs Δ) → Dry c σ → ⟦ c ⟧ᶜ σ ≡ hush
+dry-hush c σ d = cong shown (dry-step c σ d)
 
-    dry-hushˡ : ∀ {Δ A} (cs : List (Node Δ A)) (ρ : Hots Δ) → Dryˡ cs ρ → All (_≡ hush) (⟦ cs ⟧ˡ ρ)
-    dry-hushˡ []       ρ d        = []
-    dry-hushˡ (c ∷ cs) ρ (d , ds) = dry-hush c ρ d ∷ dry-hushˡ cs ρ ds
+dry-silent : ∀ {Δ A} (c : Node Δ A) (σ : Srcs Δ) → Dry c σ → Silent (copy c σ)
+dry-silent c σ d = cong headˢ (dry-step c σ d)

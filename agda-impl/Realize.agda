@@ -48,7 +48,9 @@ open import denotation.MonotonicList using (Time; Pos; Frame; Timeline; last; ix
 open import operation.AbstractObservable using (base; sink; module Run)
 open import operation.PureObservable using (Pureᴾ; World; Kind; cell; slot; play; _∋_; Sink; Handle; same; note; fin; module Pure)
 open import operation.Budget using (module Approx)
-open import Config using (Hots; module Nodes)
+open import Config using (Node; finished; coldᶜ; quietᶜ; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; connectᶜ; joinᶜ; Silent; Dry; Dryᵒ; Dryˡ; dry-silent)
+  renaming (live to running)
+open import denotation.Unfold using (Srcs)
 
 module Realizing (R : Set) (n : ℕ) where
   open Run (Pureᴾ R)
@@ -56,7 +58,6 @@ module Realizing (R : Set) (n : ℕ) where
   open FlatKit
   open Pure R using (State; Val; Timer; Callbacks; get; cascade; compileᴺ; mapList)
   open Approx R using (CbRel; StRel)
-  open Nodes n renaming (live to running)
 
   ------------------------------------------------------------------------
   -- The observers a kernel builds, in the world the run has reached
@@ -576,10 +577,10 @@ module Realizing (R : Set) (n : ℕ) where
     Spent = All (λ tm → spentʰ (Timer.handle tm) ≡ true)
 
     -- A subject not yet complete is silent in the meaning's environment.
-    Hushed : ∀ {Δ} → Env Δ h → Hots Δ → Set₁
-    Hushed {Δ} E ρ = ∀ {A} (i : A ∈ Δ) → val (Subject.closed (lookup E i)) ≡ false → lookup ρ i ≡ hush
+    Hushed : ∀ {Δ} → Env Δ h → Srcs Δ → Set₁
+    Hushed {Δ} E ρ = ∀ {A} (i : A ∈ Δ) → val (Subject.closed (lookup E i)) ≡ false → Silent (lookup ρ i)
 
-    hushed-∷ : ∀ {Δ A} {S : Subject A h} {E : Env Δ h} {e ρ} → (val (Subject.closed S) ≡ false → e ≡ hush) → Hushed E ρ
+    hushed-∷ : ∀ {Δ A} {S : Subject A h} {E : Env Δ h} {e ρ} → (val (Subject.closed S) ≡ false → Silent e) → Hushed E ρ
              → Hushed (S ∷ E) (e ∷ ρ)
     hushed-∷ p q (here refl) c = p c
     hushed-∷ p q (there i)   c = q i c
@@ -611,7 +612,7 @@ module Realizing (R : Set) (n : ℕ) where
       dry-part (connectˢ S e src body) {E} (q , qb , cl , _) m u sp eq with part src E in es | part body (S ∷ E) in eb
       dry-part (connectˢ S e src body) {E} {ρ = ρ} (q , qb , cl , _) (m , mb) u sp refl | just s′ | just b′ =
         dry-part src q m u (++⁻ˡ (pendings src) sp) es
-        , dry-part body qb mb (hushed-∷ (λ _ → dry-hush s′ ρ (dry-part src q m u (++⁻ˡ (pendings src) sp) es)) u) (++⁻ʳ (pendings src) sp) eb
+        , dry-part body qb mb (hushed-∷ (λ _ → dry-silent s′ ρ (dry-part src q m u (++⁻ˡ (pendings src) sp) es)) u) (++⁻ʳ (pendings src) sp) eb
       dry-part (connectˢ S (just p) src body) {E} (q , qb , cl , _) (m , mb) u sp refl | nothing | just b′ =
         tt , dry-part body qb mb (hushed-∷ (λ c → absurd (trans (sym cl) c)) u) (++⁻ʳ (pendings src) sp) eb
       dry-part (joinˢ j sk l i) {E} q m u sp eq with val l | val (Subject.closed (lookup E i)) in ec

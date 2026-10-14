@@ -58,9 +58,6 @@ x ⊑ y = ∀ {is} → Shows x is → Shows y is
 _≃_ : ∀ {A : Set} → ML A → ML A → Set
 x ≃ y = x ⊑ y × y ⊑ x
 
-≃-trans : ∀ {A : Set} {x y z : ML A} → x ≃ y → y ≃ z → x ≃ z
-≃-trans (xy , yx) (yz , zy) = ⊑-trans xy yz , ⊑-trans zy yx
-
 -- Each run shows at least what the one before it does.
 Chain : ∀ {A : Set} → (ℕ → ML A) → Set
 Chain c = ∀ n → c n ⊑ c (suc n)
@@ -422,8 +419,3 @@ limit-ub ch k s with reached ch s
 limit-least : ∀ {A : Set} {c : ℕ → ML A} {y} → Chain c → (∀ k → c k ⊑ y) → limit c ⊑ y
 limit-least ch below s with from-sound ch {[]} {0} nil s
 ... | k , r = below k r
-
--- Two chains, each below the other's limit term by term, meet.
-squeeze : ∀ {A : Set} {r a : ℕ → ML A} → Chain r → Chain a → (∀ n → a n ⊑ limit r) → (∀ n → r n ⊑ a n)
-        → limit r ≃ limit a
-squeeze cr ca a≤r r≤a = limit-least cr (λ n s → limit-ub ca n (r≤a n s)) , limit-least ca a≤r
