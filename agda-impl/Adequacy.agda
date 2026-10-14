@@ -18,7 +18,7 @@ open import Data.Nat using (ℕ; _≤_)
 open import Data.Nat.Properties using (n≤1+n)
 open import Data.Product using (_,_; Σ; proj₁; proj₂)
 
-open import operation.Placed using (Up; module Ran)
+open import operation.Placed using (Up; Ahead; ahead; module Ran)
 open import Bound using (module Places)
 open import operation.Budget using (module Approx)
 open import operation.PureObservable using (PureObs; module Pure; toArray)
@@ -44,9 +44,10 @@ module Link (R : Set) where
     -- The meaning's ticks never fall.
     ticks-up : (o : PureObs [] R) → Up 0 (observe (⟦ o ⟧ []) root)
 
-    -- THE RUN GETS AS FAR: whatever the meaning shows, some approximant
-    -- of the run shows as many items — a finite prefix needs only finite
-    -- budget.  Which items is the bound half's business (`reaches`).
+    -- THE RUN GETS AS FAR: wherever the meaning's events reach, some
+    -- approximant of the run records as many items — finitely many events
+    -- need only finite budget.  Which items is the bound half's business
+    -- (`reaches`).
     --
     -- False wherever a `connect` source the body outlives stands between
     -- the root and an event the meaning shows.  The meaning steps a
@@ -61,7 +62,12 @@ module Link (R : Set) where
     --   the tree's approximants, each kernel against its own timeline.  A
     --   connect's subject is state its siblings share, which no relation
     --   on one kernel at a time can carry.
-    progress : (o : PureObs [] R) → ∀ {is} → Shows (meaning o) is → Σ ℕ λ n → length is ≤ length (itemsOf (ran n (compileᴺ n o [])))
+    enough : (o : PureObs [] R) → ∀ {k} → Ahead (observe (⟦ o ⟧ []) root) k → Σ ℕ λ n → k ≤ length (itemsOf (ran n (compileᴺ n o [])))
+
+  -- Whatever the meaning shows, some approximant of the run shows as many
+  -- items.
+  progress : (o : PureObs [] R) → ∀ {is} → Shows (meaning o) is → Σ ℕ λ n → length is ≤ length (itemsOf (ran n (compileᴺ n o [])))
+  progress o s = enough o (ahead s)
 
   -- The run's approximants are a chain.
   toArray-chain : (o : PureObs [] R) → Chain (λ n → toArray n o)

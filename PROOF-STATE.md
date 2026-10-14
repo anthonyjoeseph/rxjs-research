@@ -169,11 +169,14 @@ over it.
 
 ### Big picture tier roadmap
 
-- **THE UPPER HALF OVER THE CONFIGURATION.** `progress` as a body over
-  `Live`: each turn of the loop, with budget enough, delivering the
-  configuration's next event as `denotation.Unfold`'s `step` finds it. Decides whether one global relation carries the state siblings
-  share, the question the per-operator relation died on. Most uncertain: a
-  joiner of a shared source against its own copy, then a `flatMap` refill.
+- **THE UPPER HALF OVER THE CONFIGURATION.** `enough` as a body over
+  `Live`, its budget read off the meaning: the events up to the target,
+  and the deepest configuration `denotation.Unfold` passes on the way. At
+  that budget no cut lands first: each loop turn and each burst step is a
+  meaning event, each callback hop a node of the configuration. Decides
+  whether one global relation carries the state siblings share, the
+  question the per-operator relation died on. Most uncertain: callback
+  depth through a shared source's joiners, then a `flatMap` refill.
 - **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over
   `Mid`, and a send runs alike to its observer's (`send-ok`); what is left
   is each kernel's own run, `send-canon` first: an emit must reach the root
@@ -181,7 +184,7 @@ over it.
   again alike to the kernel's. The upper half reuses these step lemmas.
   Most uncertain: a `flatMap` lane's refill, then `connect`'s joiners.
 - **THE STATEMENT'S EDGES.** A `connect` source the body outlives,
-  spinning or running forever: `progress` is false there. The meaning keeps
+  spinning or running forever: `enough` is false there. The meaning keeps
   its events as skips, or `adequacy` assumes none; Anthony's call.
 - **THE ENGINE, SMALL-STEP.** The pure engine as a productive machine: an
   explicit continuation stack, one step per event, a silent step where it
@@ -192,8 +195,8 @@ over it.
 
 ### The ledger
 
-- **`progress`** (Adequacy) — FALSITY, `DEAD ROUTE`: whatever the meaning
-  shows, some run approximant shows as many items.
+- **`enough`** (Adequacy) — FALSITY, `DEAD ROUTE`: wherever the meaning's
+  events reach, some run approximant records as many items.
 - **`send-canon`, `closed-ok`, `finish-ok`** (Bound) — FALSITY, `RECOVERY`: a
   firing cold's emit to its observer, closed check and completion, run through
   every kernel above it, keep `Mid`.

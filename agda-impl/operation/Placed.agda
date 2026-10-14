@@ -14,7 +14,7 @@
 module operation.Placed where
 
 open import Data.Bool using (true; false; T)
-open import Data.List using (List; []; _∷_; _++_; [_]) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; [_]; length) renaming (map to mapL)
 open import Data.Nat using (ℕ; suc; _≤_; s≤s; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-antisym; ≡ᵇ⇒≡; <ᵇ⇒<)
 open import Data.Product using (_×_; _,_)
@@ -59,6 +59,45 @@ record Up {A} (t : Time) (e : Events A) : Set where
     up   : t ≤ headTick t e
     more : Up (headTick t e) (onward e)
 open Up
+
+------------------------------------------------------------------------
+-- How far a reader gets
+
+-- `e` shows k items, each within finitely many events.
+data Ahead {A : Set} : Events A → ℕ → Set where
+  none  : ∀ {e} → Ahead e 0
+  outᵃ  : ∀ {k a r n} → Ahead (force r) n → Ahead (out k a r) (suc n)
+  skipᵃ : ∀ {k r n} → Ahead (force r) n → Ahead (skip k r) n
+  endᵃ  : ∀ {k} → Ahead (end k) 1
+  hushᵃ : Ahead hush 1
+
+-- A reader of the ticks saw no more items than the events reach.
+mutual
+  ahead : ∀ {A} {e : Events A} {is} → Shows (ticks e) is → Ahead e (length is)
+  ahead {e = out k a r} nil             = none
+  ahead {e = out k a r} (at⁺ nil)       = none
+  ahead {e = out k a r} (at⁺ (emit⁺ s)) = outᵃ (aheadIn _ (force r) _ s)
+  ahead {e = skip k r}  nil             = none
+  ahead {e = skip k r}  (at⁺ nil)       = none
+  ahead {e = skip k r}  (at⁺ (stall⁺ s)) = skipᵃ (aheadIn _ (force r) _ s)
+  ahead {e = end k}     nil             = none
+  ahead {e = end k}     done⁺           = endᵃ
+  ahead {e = hush}      nil             = none
+  ahead {e = hush}      quiet⁺          = hushᵃ
+
+  aheadIn : ∀ {A} t (e : Events A) b {is} → ShowsIn t (within t e b) is → Ahead e (length is)
+  aheadIn t (out k a r) true  nil        = none
+  aheadIn t (out k a r) true  (emit⁺ s)  = outᵃ (aheadIn t (force r) _ s)
+  aheadIn t (out k a r) false nil        = none
+  aheadIn t (out k a r) false (close⁺ s) = ahead s
+  aheadIn t (skip k r)  true  nil        = none
+  aheadIn t (skip k r)  true  (stall⁺ s) = skipᵃ (aheadIn t (force r) _ s)
+  aheadIn t (skip k r)  false nil        = none
+  aheadIn t (skip k r)  false (close⁺ s) = ahead s
+  aheadIn t (end k)     b     nil        = none
+  aheadIn t (end k)     b     (close⁺ s) = ahead s
+  aheadIn t hush        b     nil        = none
+  aheadIn t hush        b     (close⁺ s) = ahead s
 
 ------------------------------------------------------------------------
 -- The record, against the events
