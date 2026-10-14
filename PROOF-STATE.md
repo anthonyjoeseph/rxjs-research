@@ -168,13 +168,17 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **A FRAME, FIRED.** `burst-seg` as a body, a frame step at a time: the
-  subscriber read open at a live cold, a stall and a close moving only the
-  cold's phase, an emit running the observer chain its slot holds — to the
-  root, into a lane's subscription, through a subject to its joiners —
-  then the loop. The emit needs a mid-delivery invariant, `Holding` with
-  the stack's waiting frames and joiner copies lagging, and is where a
-  missing conjunct shows. Decides whether a cascade's silent steps are
+- **THE FOCUS.** `stall-step`, `quiet-step` and `later-step` as bodies
+  over one lemma: at a burst boundary the meaning's next step is the
+  firing cold's, lifted through its context, and its joiners' copies each
+  follow with theirs. Likely needs a coherence conjunct in `Holding` — a
+  live cold is visible, no closed gate above it. Decides whether `Holding`
+  pins the meaning's next event; both deliveries stand on it.
+- **A FRAME, DELIVERED.** `emit-seg` and `done-seg`: the observer chain
+  the cold's slot holds run to the root, into a lane's subscription,
+  through a subject to its joiners, then back to a calm point. Needs a
+  mid-delivery invariant, `Holding` with the stack's waiting frames and
+  joiner copies lagging. Decides whether a cascade's silent steps are
   finite: a `flatMap` refill and `connect`'s joiners the uncertain cases.
 - **THE POP.** `pop-live`: a popped live timer's cold moves to `popped`,
   its part unchanged since the frame's first step is the meaning's next
@@ -186,8 +190,9 @@ contact; it must be solid before Tier 2 is written over it.
   to read the meaning's silence off the queue.
 - **THE CALLBACKS, EXTENSIONALLY.** A stored callback is its kernel's
   canonical observer up to `_≗_`: weakening composes, and every kernel
-  commutes with it. The apparatus the turn's cases are written over;
-  narrows nothing, and nothing in the turn can be instantiated without it.
+  commutes with it; `closed-read` is its first use. The apparatus the
+  turn's cases are written over; narrows nothing, and nothing in the turn
+  can be instantiated without it.
 - **THE START.** `start-seg`: the subscribe burst from an empty heap
   reaches a calm point, by the same stepping as a turn. Decides whether a
   `defer` reached synchronously, and a lane subscribed inside its parent's
@@ -201,8 +206,18 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### The ledger
 
-- **`burst-seg`** (Simulation) — FALSITY, `RECOVERY`: a live cold's frame shows
-  a step on each side before the loop.
+- **`emit-seg`** (Simulation) — FALSITY, `RECOVERY`: an emit delivered, a step
+  on each side before a calm point.
+- **`done-seg`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing on its
+  end, the completion delivered.
+- **`stall-step`** (Simulation) — FALSITY, `NO EVIDENCE`: a stall is the
+  meaning's next skips, the cold one step on.
+- **`quiet-step`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing
+  quiet, skips back to a calm point.
+- **`later-step`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing on a
+  later one, its timer queued.
+- **`closed-read`** (Simulation) — FALSITY, `NO EVIDENCE`: a firing cold's
+  subscriber reads open, moving nothing.
 - **`pop-live`** (Realize) — FALSITY, `NO EVIDENCE`: a live timer popped, its
   cold's frame burst from the same configuration.
 - **`dry-hush`** (Realize) — FALSITY, `NO EVIDENCE`: an empty queue, a

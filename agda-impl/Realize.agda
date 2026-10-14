@@ -55,7 +55,7 @@ module Realizing (R : Set) where
   open Kit
   open FlatKit
   open Pure R using (State; Timer; Callbacks; get; cascade)
-  open Machine R using (Mach; ⟨_,_⟩; turn)
+  open Machine R using (Mach; ⟨_,_⟩; turn; burst; loop)
 
   ------------------------------------------------------------------------
   -- The same program, whatever world its continuations reach
@@ -508,10 +508,14 @@ module Realizing (R : Set) where
       fresh   : AllPairs _≢_ (names tree)
       running : State.ended st ≡ false
 
-  -- BETWEEN TURNS: the machine at its loop, and what is running is what
-  -- the meaning has left to show.
+  -- CALM POINTS, where what is running is what the meaning has left to
+  -- show: the machine at its loop, or about to step a live cold's frame
+  -- from it.
   data Calm : Mach → Events R → Set₁ where
-    calm : ∀ {h} {st : State h} {c} → Holding [] c st → Calm ⟨ st , turn ⟩ (U.unfold c)
+    calm     : ∀ {h} {st : State h} {c} → Holding [] c st → Calm ⟨ st , turn ⟩ (U.unfold c)
+    bursting : ∀ {h} {st : State h} {c A u} {s : Sink h A} {hd r i} {b : Frame A u}
+             → Holding (firing s hd r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
+             → Calm ⟨ st , burst s hd u r i b same loop ⟩ (U.unfold c)
 
   -- The timers whose cold is spent: popping one runs nothing.
   spentIn : ∀ {h} → All (Pure.Val R h) h → List (Timer h) → ℕ
