@@ -21,11 +21,12 @@
 -- against the observer its kernel would build now from its parent's and
 -- its own names (`Canon`).
 --
--- What is no longer reachable is dropped from the witness: a lane killed
--- by a switch is unsubscribed whole, so its timers are spent and its
--- joiners silenced, and only those two leave a trace the run still
--- reads.  A spent timer is DEAD: popping it runs nothing, so the
--- simulation's measure between two shows is the number of them.
+-- A lane killed by a switch may stay in the witness, cut: the lanes cell
+-- is a prefix of the witness's lanes (a switch empties it, a new lane is
+-- prepended), and every lane past the prefix is cut.  It is unsubscribed
+-- whole, so its timers are spent and its joiners silenced.  A spent
+-- timer is DEAD: popping it runs nothing, so the simulation's measure
+-- between two shows is the number of them.
 module adequacy.Realize where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
@@ -581,22 +582,27 @@ module Realizing (R : Set) where
     ----------------------------------------------------------------------
     -- The joiners' copies
 
-    -- Every live joiner's copy is its source as it stands now.
-    mutual
-      Caught : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Now Δ → Set₁
-      Caught (coldˢ s hd ph)                 E ρ ν = Lift _ ⊤
-      Caught doneˢ                           E ρ ν = Lift _ ⊤
-      Caught (mapˢ f s)                      E ρ ν = Caught s E ρ ν
-      Caught (scanˢ f r s)                   E ρ ν = Caught s E ρ ν
-      Caught (takeWhileˢ i p c k s)          E ρ ν = Caught s E ρ ν
-      Caught (flatMapˢ op f fl oc k r so ls) E ρ ν = Caught so E ρ ν × CaughtLanes ls E ρ ν
-      Caught (connectˢ S c k s₀ m src body)  E ρ ν = Caught src E ρ ν × Caught body (S ∷ E) (s₀ ∷ ρ) (part src E ρ ∷ ν)
-      Caught (joinˢ j i sk l x cp)           E ρ ν = val l ≡ true → lookup ν x ≡ just cp
-      Caught (deferˢ k s)                    E ρ ν = Caught s E ρ ν
+    -- Every live joiner's copy against its source as it stands now, by
+    -- `J`, given where it joined.
+    module Catching (J : ∀ {A} → Pos → Maybe (U.Node A) → U.Node A → Set₁) where
+      mutual
+        Caught : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Now Δ → Set₁
+        Caught (coldˢ s hd ph)                 E ρ ν = Lift _ ⊤
+        Caught doneˢ                           E ρ ν = Lift _ ⊤
+        Caught (mapˢ f s)                      E ρ ν = Caught s E ρ ν
+        Caught (scanˢ f r s)                   E ρ ν = Caught s E ρ ν
+        Caught (takeWhileˢ i p c k s)          E ρ ν = Caught s E ρ ν
+        Caught (flatMapˢ op f fl oc k r so ls) E ρ ν = Caught so E ρ ν × CaughtLanes ls E ρ ν
+        Caught (connectˢ S c k s₀ m src body)  E ρ ν = Caught src E ρ ν × Caught body (S ∷ E) (s₀ ∷ ρ) (part src E ρ ∷ ν)
+        Caught (joinˢ j i sk l x cp)           E ρ ν = val l ≡ true → J j (lookup ν x) cp
+        Caught (deferˢ k s)                    E ρ ν = Caught s E ρ ν
 
-      CaughtLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → Now Δ → Set₁
-      CaughtLanes []                E ρ ν = Lift _ ⊤
-      CaughtLanes (lane c k s ∷ ls) E ρ ν = Caught s E ρ ν × CaughtLanes ls E ρ ν
+        CaughtLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → Now Δ → Set₁
+        CaughtLanes []                E ρ ν = Lift _ ⊤
+        CaughtLanes (lane c k s ∷ ls) E ρ ν = Caught s E ρ ν × CaughtLanes ls E ρ ν
+
+    -- Every live joiner's copy is its source as it stands now.
+    open Catching (λ _ s cp → s ≡ just cp) public
 
     ----------------------------------------------------------------------
     -- The gates
@@ -652,7 +658,7 @@ module Realizing (R : Set) where
         val (Flat.refill fl) ≡ just r × slotIs r (Flat′.refillCb op f E o fl)
         × heldIs oc k (unsub so) × Holds so E (Flat′.outerO op f E o fl oc)
         × val (Flat.active fl) ≡ count ls
-        × val (Flat.lanes fl) ≡ switches ls
+        × Σ (List (Cut h)) (λ gone → val (Flat.lanes fl) ++ gone ≡ switches ls × All (λ c → val (Kit.live c) ≡ false) gone)
         × HoldsLanes op f E o fl ls
       Holds (connectˢ S c k s₀ m src body)  E o =
         heldIs c k (unsub src) × Holds src E (feeder S) × Holds body (S ∷ E) (bodyO c o)
