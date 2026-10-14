@@ -11,33 +11,36 @@ open import Data.Bool using (true; false)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 import Data.List.Relation.Unary.All as All
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 import Data.List.Relation.Unary.Linked as Linked
 open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (_≤_)
+open import Data.Nat using (_≤_; _+_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst)
 
 open import denotation.MonotonicList using (Pos; _<ᵖ_; <ᵖ-trans; <ᵖ-tick) renaming (sub to subᴾ)
 open import denotation.Unfold using (Node; hushˢ; skipˢ) renaming (step to stepᵁ)
 open import operation.AbstractObservable using (module Run)
-open import operation.PureObservable using (Pureᴾ; World; _⊑_; Sink; Handle; module Pure)
+open import operation.PureObservable using (Pureᴾ; World; _⊑_; Sink; Handle; same; module Pure)
 open import operation.Machine using (module Machine)
-open import denotation.MonotonicList using (Frame)
+open import denotation.MonotonicList using (Frame; at)
 open import adequacy.Carrier using (module Carrying)
 open import adequacy.Wait using (module Waiting)
 
 module Keeping (R : Set) where
   open Run (Pureᴾ R) using (Act)
   open Pure R using (State; Timer; cascade)
-  open Machine R using (Mach; ⟨_,_⟩; Stack; run; ret; burst; turn; step; silent; drained; spent?)
-  open Carrying R using (Carried; module At; Lags; stay; skip; drop; Ordered; Sub; Lane; lane
+  open Machine R using (Mach; ⟨_,_⟩; Stack; loop; run; ret; burst; turn; step; silent; drained; spent?)
+  open Carrying R using (Carried; module At; module Against; Owned; Lags; stay; skip; drop; Ordered; Sub; Lane; lane
                         ; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ
-                        ; Meaning; Queue; Books; pendings; joiners; Joiner)
+                        ; waiting; playing; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
+                        ; this-lane; next-lane; Meaning; Kernels; Queue; Books; pendings; lanePendings; joiners; Joiner; firing)
   open Waiting R using (Wait; idles; left; right)
 
   ------------------------------------------------------------------------
@@ -104,6 +107,37 @@ module Keeping (R : Set) where
   quiets (hushes e) rewrite e = idles
   quiets (skips e q) rewrite e = right (quiets q)
 
+  -- The run moved to a timer's cascade, the queue's head dropped: the
+  -- meaning's copies, the joiners and the queue's order still hold.
+  module Moved {h} {st : State h} {tm : Timer h} {ts : List (Timer h)} (t : Sub h [] R) {fl} (q : Queue st t fl) (e : State.timers st ≡ tm ∷ ts) where
+    St′ : State h
+    St′ = record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
+
+    private
+      linked : Linked (λ t u → cascade t <ᵖ cascade u ≡ true) (tm ∷ ts)
+      linked = subst (Linked _) e (proj₁ (Queue.ordered q))
+
+      after : ∀ {t : Timer h} → cascade tm <ᵖ cascade t ≡ true → Timer.due tm ≤ Timer.due t × cascade tm <ᵖ cascade t ≡ true
+      after {t} lt = <ᵖ-tick (Timer.due tm) (Timer.due t) (subᴾ (Timer.from tm) ∷ []) (subᴾ (Timer.from t) ∷ []) lt , lt
+
+    pos< : State.pos st <ᵖ cascade tm ≡ true
+    pos< = go e (proj₂ (Queue.ordered q))
+      where go : ∀ {xs} → xs ≡ tm ∷ ts → All (λ t → State.clock st ≤ Timer.due t × State.pos st <ᵖ cascade t ≡ true) xs
+               → State.pos st <ᵖ cascade tm ≡ true
+            go refl ((_ , lt) ∷ _) = lt
+
+    meaning′ : Meaning st t → Meaning St′ t
+    meaning′ mn = record { caught = caught-later (State.heap st) pos< t [] [] (Meaning.caught mn) }
+
+    past′ : All (λ j → cascade tm <ᵖ Joiner.at′ j ≡ false) (joiners t [])
+    past′ = All.map (λ {j} → later-false (State.pos st) (cascade tm) (Joiner.at′ j) pos<) (Queue.past q)
+
+    ordered′ : Ordered St′
+    ordered′ = Linked.tail linked , All.map (λ {t} → after {t}) (linked-all (λ {a} {b} {c} → <ᵖ-trans (cascade a) (cascade b) (cascade c)) linked)
+
+    books′ : Books st t → Books St′ t
+    books′ bk = record { fresh = Books.fresh bk ; clocked = refl ; running = Books.running bk }
+
   -- A stale timer, its cold spent since it was set: the run moves to its
   -- cascade and on, and the meaning does not move.
   stale : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} → Carried ⟨ st , turn ⟩ c → State.timers st ≡ tm ∷ ts → spent? st (Timer.handle tm) ≡ true
@@ -114,26 +148,14 @@ module Keeping (R : Set) where
     ; open≡   = open≡
     ; owned   = owned
     ; kernels = kernels
-    ; meaning = record { caught = caught-later (State.heap st) pos< tree [] [] (Meaning.caught meaning) }
-    ; queue   = record { past = All.map (λ {j} → later-false (State.pos st) (cascade tm) (Joiner.at′ j) pos<) (Queue.past queue) ; timed = timed ; joined = Queue.joined queue
-                       ; ordered = Linked.tail linked , All.map (λ {t} → after {t}) (linked-all (λ {a} {b} {c} → <ᵖ-trans (cascade a) (cascade b) (cascade c)) linked) }
-    ; books   = record { fresh = Books.fresh books ; clocked = refl ; running = Books.running books }
+    ; meaning = meaning′ meaning
+    ; queue   = record { past = past′ ; timed = timed ; joined = Queue.joined queue ; ordered = ordered′ }
+    ; books   = books′ books
     }
     where
       open Carried r
       open At (State.heap st) using (spentʰ)
-
-      linked : Linked (λ t u → cascade t <ᵖ cascade u ≡ true) (tm ∷ ts)
-      linked = subst (Linked _) e (proj₁ (Queue.ordered queue))
-
-      pos< : State.pos st <ᵖ cascade tm ≡ true
-      pos< = go e (proj₂ (Queue.ordered queue))
-        where go : ∀ {xs} → xs ≡ tm ∷ ts → All (λ t → State.clock st ≤ Timer.due t × State.pos st <ᵖ cascade t ≡ true) xs
-                 → State.pos st <ᵖ cascade tm ≡ true
-              go refl ((_ , lt) ∷ _) = lt
-
-      after : ∀ {t} → cascade tm <ᵖ cascade t ≡ true → Timer.due tm ≤ Timer.due t × cascade tm <ᵖ cascade t ≡ true
-      after {t} lt = <ᵖ-tick (Timer.due tm) (Timer.due t) (subᴾ (Timer.from tm) ∷ []) (subᴾ (Timer.from t) ∷ []) lt , lt
+      open Moved tree queue e
 
       timed : At.Timed (State.heap st) ts (pendings tree)
       timed with subst (λ xs → At.Timed (State.heap st) xs (pendings tree)) e (Queue.timed queue)
@@ -145,27 +167,86 @@ module Keeping (R : Set) where
                       bad ()
               ... | there m   = m
 
+  -- A queued frame's cold, waiting on it.
+  data Pended {h Δ₀ A₀} (t : Sub h Δ₀ A₀) : Timer h → Set₁ where
+    pended : ∀ {Δ A u t′} {s : Sink h A} {hd τ e} {x : u ≤ t′} {b : Frame A t′} → Path t (coldˢ {Δ = Δ} s hd (waiting τ e (at t′ x b)))
+           → Pended t (record { due = τ + t′ ; sink = s ; handle = hd ; at′ = t′ ; from = e ; frame = b })
+
+  private
+    under : ∀ {h Δ₀ A₀ Δ₁ A₁} {t : Sub h Δ₀ A₀} {t′ : Sub h Δ₁ A₁} {tm} → (∀ {Δ C} {u : Sub h Δ C} → Path t u → Path t′ u) → Pended t tm → Pended t′ tm
+    under f (pended π) = pended (f π)
+
+  mutual
+    -- Every pending frame is a waiting cold's.
+    pended-at : ∀ {h Δ A tm} (t : Sub h Δ A) → tm ∈ pendings t → Pended t tm
+    pended-at (pendingˢ s q)                         ()
+    pended-at (coldˢ s hd (waiting τ e (at t′ x b))) (here refl) = pended here
+    pended-at (coldˢ s hd (waiting τ e (at t′ x b))) (there ())
+    pended-at (ofˢ p i xs)                           ()
+    pended-at doneˢ                                  ()
+    pended-at (mapˢ f s)                             m = under in-map (pended-at s m)
+    pended-at (scanˢ f r s)                          m = under in-scan (pended-at s m)
+    pended-at (takeWhileˢ i p cu k tk s)             m = under in-take (pended-at s m)
+    pended-at (flatMapˢ op f fl oc k r so ls)        m with ∈-++⁻ (pendings so) m
+    ... | inj₁ m′ = under in-outer (pended-at so m′)
+    ... | inj₂ m′ = laned-at ls in-lanes m′
+    pended-at (connectˢ s₁ p S cu k fd s₀ m₀ src body) m with ∈-++⁻ (pendings src) m
+    ... | inj₁ m′ = under in-source (pended-at src m′)
+    ... | inj₂ m′ = under in-body (pended-at body m′)
+    pended-at (joinˢ j i sk l x cp)                  ()
+    pended-at (deferˢ k s)                           m = under in-defer (pended-at s m)
+
+    laned-at : ∀ {h Δ₀ A₀ Δ B tm} {t′ : Sub h Δ₀ A₀} (ls : List (Lane h Δ B))
+             → (∀ {Δ C} {u : Sub h Δ C} → PathLanes ls u → Path t′ u) → tm ∈ lanePendings ls → Pended t′ tm
+    laned-at (lane cu k s ∷ ls) f m with ∈-++⁻ (pendings s) m
+    ... | inj₁ m′ = under (λ π → f (this-lane π)) (pended-at s m′)
+    ... | inj₂ m′ = laned-at ls (λ π → f (next-lane π)) m′
+
+  private
+    popped : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} (t : Sub h [] R) → At.part (State.heap st) t [] ≡ just c
+           → Owned (State.heap st) t Against.calmAs → Kernels (State.heap st) t → Meaning st t → (q : Queue st t []) → Books st t
+           → (e : State.timers st ≡ tm ∷ ts) → Pended t tm
+           → Carried ⟨ record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
+                    , burst (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) same loop ⟩ c
+    popped {st = st} {ts = ts} t o≡ ow ks mn q bk e (pended π) = record
+      { tree    = t
+      ; ctlAs   = Against.fireAs refl π Against.loopAs
+      ; open≡   = o≡
+      ; owned   = record { ofs = Owned.ofs ow ; plays = λ π′ l → there (Owned.plays ow π′ l) ; begun = Owned.begun ow
+                         ; ends = Owned.ends ow ; cuts = Owned.cuts ow ; feeds = Owned.feeds ow ; fins = Owned.fins ow }
+      ; kernels = ks
+      ; meaning = meaning′ mn
+      ; queue   = record { past = past′ ; timed = subst (λ xs → At.Timed (State.heap st) xs (pendings t)) e (Queue.timed q)
+                         ; joined = Queue.joined q ; ordered = ordered′ }
+      ; books   = books′ bk
+      }
+      where open Moved t q e
+
+  -- A live timer popped: the run moves to its cascade, bursting the frame
+  -- its cold still waits on, and the meaning does not move.
+  pop : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} → Carried ⟨ st , turn ⟩ c → State.timers st ≡ tm ∷ ts → spent? st (Timer.handle tm) ≡ false
+      → Carried ⟨ record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
+               , burst (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) same loop ⟩ c
+  pop {st = st} {c} {tm} {ts} r e sp = go (Carried.ctlAs r) (Carried.owned r) (Carried.queue r)
+    where
+      open Carried r using (tree; open≡; kernels; meaning; books)
+
+      queued : Queue st tree [] → tm ∈ pendings tree
+      queued q with subst (λ xs → At.Timed (State.heap st) xs (pendings tree)) e (Queue.timed q)
+      ... | (inj₁ dead ∷ _) , _ = ⊥-elim (bad (trans (sym sp) dead))
+        where bad : false ≡ true → _
+              bad ()
+      ... | (inj₂ m ∷ _) , _    = m
+
+      go : (ca : Against.CtlAs tree turn) → Owned (State.heap st) tree ca → Queue st tree (firing ca)
+         → Carried ⟨ record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
+                  , burst (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) same loop ⟩ c
+      go Against.calmAs ow q = popped tree open≡ ow kernels meaning q books e (pended-at tree (queued q))
+
   postulate
     -- No timer queued: every subscription still open waits on nothing,
     -- and its copies and held sources catch up by silent steps.
     calm-hush : ∀ {h} {st : State h} {c} → Carried ⟨ st , turn ⟩ c → State.timers st ≡ [] → Quiets c
-
-    -- The next timer's cold live: its frame's first step is the meaning's
-    -- next event at its cascade, everything else open waiting past it.
-    calm-fire : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} → Carried ⟨ st , turn ⟩ c → State.timers st ≡ tm ∷ ts → spent? st (Timer.handle tm) ≡ false
-              → Wait Carried (step ⟨ st , turn ⟩) (stepᵁ c)
-
-  -- A burst whose cold is spent returns at once.
-  burst-spent : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
-              → spent? st hd ≡ true → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , ret _ σ K ⟩
-  burst-spent e rewrite e = refl
-
-  calm : ∀ {h} (ts : List (Timer h)) {st : State h} {c} → State.timers st ≡ ts → Carried ⟨ st , turn ⟩ c → Wait Carried (step ⟨ st , turn ⟩) (stepᵁ c)
-  calm []        e r with calm-hush r e
-  ... | q rewrite e = quiets q
-  calm (tm ∷ ts) {st = st} {c} e r with spent? st (Timer.handle tm) in sp
-  ... | false = calm-fire r e sp
-  ... | true rewrite e = left (subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-spent sp)) (left (left (calm ts refl (stale r e sp)))))
 
   ------------------------------------------------------------------------
   -- B kept
@@ -187,9 +268,24 @@ module Keeping (R : Set) where
     kept-run : ∀ {h} {st : State h} {w B} {a : Act h B} {σ : w ⊑ h} {K : Stack w B} {c}
              → Carried ⟨ st , run a σ K ⟩ c → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
 
-    -- A cold's frame at its next step, its subscriber asked if closed.
+    -- A cold's frame at its next step, its subscriber asked if closed; or
+    -- a popped timer's at its first, its cold still waiting on it, so the
+    -- meaning's next event is that frame's first step at the timer's
+    -- cascade, everything else open waiting past it.
     kept-burst : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
                → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → Wait Carried (step ⟨ st , burst s hd τ p i b σ K ⟩) (stepᵁ c)
+
+  -- A burst whose cold is spent returns at once.
+  burst-spent : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
+              → spent? st hd ≡ true → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , ret _ σ K ⟩
+  burst-spent e rewrite e = refl
+
+  calm : ∀ {h} (ts : List (Timer h)) {st : State h} {c} → State.timers st ≡ ts → Carried ⟨ st , turn ⟩ c → Wait Carried (step ⟨ st , turn ⟩) (stepᵁ c)
+  calm []        e r with calm-hush r e
+  ... | q rewrite e = quiets q
+  calm (tm ∷ ts) {st = st} {c} e r with spent? st (Timer.handle tm) in sp
+  ... | false rewrite e = left (kept-burst (pop r e sp))
+  ... | true rewrite e = left (subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-spent sp)) (left (left (calm ts refl (stale r e sp)))))
 
   -- Every node due before the next turn is owed (`Owned`): without it a
   -- state between turns with an `of` open steps drained while the

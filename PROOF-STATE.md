@@ -172,9 +172,10 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 - **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
   turn; it gains a field placing every live node's next shown event past the
-  region the agenda owes, true at `carried-begin`. Between turns the agenda
-  is empty, so `calm-fire` is its first test: every open node waits past the
-  next timer's cascade. Then the feed's case of `kept-run`. The feeder itself
+  region the agenda owes, true at `carried-begin`. A popped timer's first
+  step, `kept-burst` with the cold still waiting, is its first test: the
+  agenda is empty, so every open node waits past the timer's cascade. Then
+  the feed's case of `kept-run`. The feeder itself
   is ruled out as a refutation: a snapshot's joiners match the meaning's drop
   criterion, joiners subscribed mid-feed or after the source ends, and a body
   completing mid-feed, all agree. Decides whether the position order alone
@@ -193,10 +194,8 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 - **`kept-run`** (Kept) — FALSITY, `RECOVERY`: code running, the agenda's next
   call or a subscription beginning; the connect's feed is here.
-- **`calm-fire`** (Kept) — FALSITY, `NO EVIDENCE`: the next timer's cold live,
-  its frame's first step the meaning's next event.
 - **`kept-burst`** (Kept) — FALSITY, `NO EVIDENCE`: a cold's frame at its next
-  step, its subscriber asked if closed.
+  step, or a popped timer's at its first, its subscriber asked if closed.
 - **`calm-hush`** (Kept) — FALSITY, `NO EVIDENCE`: no timer queued, the meaning
   falls quiet by silent steps.
 - **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program

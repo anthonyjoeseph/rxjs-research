@@ -52,7 +52,7 @@ module Carrying (R : Set) where
   open Kit
   open FlatKit
   open Pure R using (State; Timer; Callbacks; Val; get; cascade)
-  open Machine R using (Mach; ⟨_,_⟩; Ctl; run; burst; turn; Stack; loop; push; rest; sent)
+  open Machine R using (Mach; ⟨_,_⟩; Ctl; run; ret; burst; turn; Stack; loop; push; rest; sent)
 
   ------------------------------------------------------------------------
   -- The same program, whatever world its names were weakened through
@@ -404,7 +404,8 @@ module Carrying (R : Set) where
     -- The states the simulation re-enters at: the loop between turns; a
     -- value just recorded, the agenda left; a subscription about to
     -- begin at its pending node, compiled in some world its subjects were
-    -- weakened from; a cold's frame about to step.
+    -- weakened from; a cold's frame about to step; a timer just popped,
+    -- its cold still waiting on the frame now at its first step.
     data CtlAs : Ctl h → Set₁ where
       calmAs  : CtlAs turn
       noteAs  : ∀ {w} {act : Act h ⊤} {σ : w ⊑ h} {K} (ks : List (Call t))
@@ -415,6 +416,9 @@ module Carrying (R : Set) where
               → StackAs σ K → CtlAs (run act σ K)
       burstAs : ∀ {w Δ A v} {s : Sink h A} {hd τ τ′ r i} {b : Frame A v} {σ : w ⊑ h} {K}
               → Path t (coldˢ {Δ = Δ} s hd (playing τ′ r i b)) → StackAs σ K → CtlAs (burst s hd τ r i b σ K)
+      fireAs  : ∀ {w Δ A u t′} {s : Sink h A} {hd τ′ e r} {x : u ≤ t′} {b : Frame A t′} {σ : w ⊑ h} {K}
+              → r ≡ ix (τ′ + t′) ∷ subᴾ e ∷ [] → Path t (coldˢ {Δ = Δ} s hd (waiting τ′ e (at t′ x b))) → StackAs σ K
+              → CtlAs (burst s hd t′ r 0 b σ K)
 
     -- What is owed, gathered from the control and the stack: the calls on
     -- the agenda, the bursts in flight, and the subscriptions reached and
@@ -435,12 +439,14 @@ module Carrying (R : Set) where
     agenda (noteAs ks _ K)  = ks ++ stackCalls K
     agenda (subAs _ ks _ K) = ks ++ stackCalls K
     agenda (burstAs _ K)    = stackCalls K
+    agenda (fireAs _ _ K)   = stackCalls K
 
     bursts : ∀ {c} → CtlAs c → List (Spot t)
     bursts calmAs          = []
     bursts (noteAs _ _ K)  = stackBursts K
     bursts (subAs _ _ _ K) = stackBursts K
     bursts (burstAs π K)   = spot π ∷ stackBursts K
+    bursts (fireAs _ π K)  = spot π ∷ stackBursts K
 
     kontChains : List (Call t) → List (Spot t)
     kontChains []             = []
@@ -469,6 +475,14 @@ module Carrying (R : Set) where
   timerOf s hd (waiting τ e (at t _ b)) = record { due = τ + t ; sink = s ; handle = hd ; at′ = t ; from = e ; frame = b } ∷ []
   timerOf s hd (waiting τ e _)          = []
   timerOf s hd (playing _ _ _ _)        = []
+
+  -- The frame a popped timer bursts, out of the queue and still pending.
+  firing : ∀ {h} {t : Sub h [] R} {ctl : Ctl h} → Against.CtlAs t ctl → List (Timer h)
+  firing {ctl = turn}                     _                                                   = []
+  firing {ctl = run _ _ _}                _                                                   = []
+  firing {ctl = ret _ _ _}                _                                                   = []
+  firing {ctl = burst _ _ _ _ _ _ _ _}    (Against.burstAs _ _)                               = []
+  firing {ctl = burst _ _ _ _ _ _ _ _}    (Against.fireAs {s = s} {hd} {τ′} {e} {x = x} {b} _ _ _) = timerOf s hd (waiting τ′ e (at _ x b))
 
   -- A node reached by silent steps of the meaning, and by any steps.
   -- A joiner's copy behind its source, as a joiner at `j` steps it: by
@@ -830,14 +844,14 @@ module Carrying (R : Set) where
     field
       caught : Caught (State.pos st) t [] []
 
-  -- Every joiner joined no later than the run's position; the queue its
-  -- pending frames and dead ones, in order; the subjects' subscribers its
-  -- joiners.
-  record Queue {h} (st : State h) (t : Sub h [] R) : Set₁ where
+  -- Every joiner joined no later than the run's position; the queue, with
+  -- the frame popped and bursting, its pending frames and dead ones, the
+  -- queue in order; the subjects' subscribers its joiners.
+  record Queue {h} (st : State h) (t : Sub h [] R) (fl : List (Timer h)) : Set₁ where
     open At (State.heap st)
     field
       past    : All (λ j → State.pos st <ᵖ Joiner.at′ j ≡ false) (joiners t [])
-      timed   : Timed (State.timers st) (pendings t)
+      timed   : Timed (fl ++ State.timers st) (pendings t)
       joined  : Joined (subjects t) (joiners t [])
       ordered : Ordered st
 
@@ -862,5 +876,5 @@ module Carrying (R : Set) where
       owned   : Owned (State.heap state) tree ctlAs
       kernels : Kernels (State.heap state) tree
       meaning : Meaning state tree
-      queue   : Queue state tree
+      queue   : Queue state tree (firing ctlAs)
       books   : Books state tree
