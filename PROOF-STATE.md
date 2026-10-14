@@ -168,16 +168,17 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE FOCUS.** `focus-skip` as a body: at a burst boundary the
-  meaning's next step is the firing cold's, lifted through its `Spot`, and
-  its joiners' copies each follow with theirs. Needs a bound on every other
-  node's next event from `Ordered` and `Timed`, and likely coherence
-  conjuncts in `Holding` — a live cold visible, no closed gate above it, no
-  live cold waiting on `done`. Decides whether `Holding` pins the meaning's
-  next event; both deliveries stand on it.
+- **THE FOCUS.** `cold-skip`, then `catch-up`, as bodies: at a burst
+  boundary the meaning's next step is the firing cold's, lifted through its
+  `Spot`, and each joiner's copy then takes it below its join point.
+  `Holding` carries the conjuncts the single statement was refuted without
+  — `caught`, `gated`, `past`, `behind`. The lift is a recursion over
+  `Spot`, its one lemma a bound on every other node's next event. Decides
+  whether those conjuncts pin the meaning's next event; both deliveries
+  stand on it.
 - **THE PHASE MOVED.** `pop-live`, `reheld-stall`, `reheld-quiet`,
-  `reheld-later`: a cold's phase moved by `setAt` keeps every conjunct but
-  `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a
+  `reheld-later`: a cold's phase moved by `setAt`, its joiners `settled`,
+  keeps every conjunct but `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a
   later frame's timer queued by `clocked`. Decides whether the order the
   queue keeps survives `insert`.
 - **A FRAME, DELIVERED.** `emit-seg` and `done-seg`: the observer chain
@@ -212,8 +213,10 @@ contact; it must be solid before Tier 2 is written over it.
   on each side before a calm point.
 - **`done-seg`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing on its
   end, the completion delivered.
-- **`focus-skip`** (Simulation) — FALSITY, `NO EVIDENCE`: a firing cold's
-  silent step is the meaning's next skips.
+- **`cold-skip`** (Simulation) — FALSITY, `NO EVIDENCE`: a firing cold's silent
+  step is the meaning's next, lifted.
+- **`catch-up`** (Simulation) — FALSITY, `NO EVIDENCE`: the joiners' copies
+  take the same step, silently.
 - **`reheld-stall`** (Simulation) — FALSITY, `NO EVIDENCE`: a stalled cold's
   witness still holds.
 - **`reheld-quiet`** (Simulation) — FALSITY, `NO EVIDENCE`: a cold closed

@@ -11,9 +11,10 @@
 -- heap — a spent handle, a cut flag, a subject's `closed` — and the open
 -- part is the configuration (`part`), exactly, positions included.  The
 -- witness carries what the meaning keeps and the run does not: a
--- connect's source as it started, which every joiner's copy and every
--- lane subscribed later starts from; a joiner's count of events dropped;
--- a cold's timeline, subscription tick and position between frames.
+-- connect's source as it started, which every joiner and every lane
+-- subscribed later starts from; a joiner's copy of its source and count
+-- of events dropped; a cold's timeline, subscription tick and position
+-- between frames.
 --
 -- A registered observer is a callback, so it is related by what it is:
 -- up to `_≗_`, the same program whatever world its continuations reach,
@@ -33,7 +34,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Linked using (Linked)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; fromMaybe)
 open import Data.Nat using (ℕ; suc; _+_; _≤_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -43,7 +44,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 
 import Tree as T
 open import Tree using (Obs; Later)
-open import denotation.MonotonicList using (Events; Time; Pos; From; Frame; Timeline; at; last; ix; _<ᵖ_) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Events; Time; Pos; From; Frame; Timeline; at; last; ix; _<ᵖ_) renaming (sub to subᴾ; done to doneᶠ)
 import denotation.Unfold as U
 open import denotation.Unfold using (Srcs)
 open import operation.AbstractObservable using (base; module Run)
@@ -185,8 +186,9 @@ module Realizing (R : Set) where
       -- the source as it started, the source, the body.
       connectˢ   : ∀ {Δ A B} → Subject A h → Cut h → Sink h ⊤ → U.Node A → Sub h Δ A → Sub h (A ∷ Δ) B → Sub h Δ B
       -- Joined at `j`, `i` of the source's events dropped: the registered
-      -- sink and its flag.
-      joinˢ      : ∀ {Δ A} → Pos → ℕ → Sink h A → Ref h (base Bool) → A ∈ Δ → Sub h Δ A
+      -- sink and its flag, and its copy of the source as the meaning
+      -- steps it, behind the source while a delivery reaches it.
+      joinˢ      : ∀ {Δ A} → Pos → ℕ → Sink h A → Ref h (base Bool) → A ∈ Δ → U.Node A → Sub h Δ A
       -- A `defer` reached: the unsubscribe it registered, its body.
       deferˢ     : ∀ {Δ A} → Sink h ⊤ → Sub h Δ A → Sub h Δ A
 
@@ -207,7 +209,7 @@ module Realizing (R : Set) where
   unsub (takeWhileˢ i p c k s)           = cut c
   unsub (flatMapˢ op f fl oc k r so ls)  = cut oc >>ᴬ killAllᶜ fl
   unsub (connectˢ S c k s₀ src body)     = unsub src >>ᴬ unsub body
-  unsub (joinˢ j i sk l x)               = writeRef l false skipᴬ
+  unsub (joinˢ j i sk l x cp)            = writeRef l false skipᴬ
   unsub (deferˢ k s)                     = send k tt (done tt)
 
   -- What a name names.
@@ -234,7 +236,7 @@ module Realizing (R : Set) where
     names (takeWhileˢ i p c k s)          = cutNames c ++ (slot _ , k) ∷ names s
     names (flatMapˢ op f fl oc k r so ls) = flatNames fl ++ cutNames oc ++ (slot _ , k) ∷ (slot _ , r) ∷ names so ++ laneNames ls
     names (connectˢ S c k s₀ src body)    = subjectNames S ++ cutNames c ++ (slot _ , k) ∷ names src ++ names body
-    names (joinˢ j i sk l x)              = (slot _ , sk) ∷ (cell _ , l) ∷ []
+    names (joinˢ j i sk l x cp)           = (slot _ , sk) ∷ (cell _ , l) ∷ []
     names (deferˢ k s)                    = (slot _ , k) ∷ names s
 
     laneNames : ∀ {h Δ B} → List (Lane h Δ B) → List (Name h)
@@ -284,7 +286,7 @@ module Realizing (R : Set) where
     firings (takeWhileˢ i p c k s)          = firings s
     firings (flatMapˢ op f fl oc k r so ls) = firings so ++ laneFirings ls
     firings (connectˢ S c k s₀ src body)    = firings src ++ firings body
-    firings (joinˢ j i sk l x)              = []
+    firings (joinˢ j i sk l x cp)           = []
     firings (deferˢ k s)                    = firings s
 
     laneFirings : ∀ {h Δ B} → List (Lane h Δ B) → List (Firing h)
@@ -301,7 +303,7 @@ module Realizing (R : Set) where
     pendings (takeWhileˢ i p c k s)              = pendings s
     pendings (flatMapˢ op f fl oc k r so ls)     = pendings so ++ lanePendings ls
     pendings (connectˢ S c k s₀ src body)        = pendings src ++ pendings body
-    pendings (joinˢ j i sk l x)                  = []
+    pendings (joinˢ j i sk l x cp)               = []
     pendings (deferˢ k s)                        = pendings s
 
     lanePendings : ∀ {h Δ B} → List (Lane h Δ B) → List (Timer h)
@@ -368,7 +370,7 @@ module Realizing (R : Set) where
     spot-of (connectˢ S c k s₀ src body)    e with one (firings src) (firings body) e
     ... | inj₁ (e′ , _) = in-source (spot-of src e′)
     ... | inj₂ (_ , e′) = in-body (spot-of body e′)
-    spot-of (joinˢ j i sk l x)              ()
+    spot-of (joinˢ j i sk l x cp)           ()
     spot-of (deferˢ k t)                    e = in-defer (spot-of t e)
 
     spot-lanes : ∀ {h Δ B} (ls : List (Lane h Δ B)) {f} → laneFirings ls ≡ f ∷ [] → SpotLanes ls (Firing.sink f) (Firing.handle f)
@@ -395,7 +397,7 @@ module Realizing (R : Set) where
     subjects (takeWhileˢ i p c k s)          = subjects s
     subjects (flatMapˢ op f fl oc k r so ls) = subjects so ++ laneSubjects ls
     subjects (connectˢ S c k s₀ src body)    = (_ , S) ∷ subjects src ++ subjects body
-    subjects (joinˢ j i sk l x)              = []
+    subjects (joinˢ j i sk l x cp)           = []
     subjects (deferˢ k s)                    = subjects s
 
     laneSubjects : ∀ {h Δ B} → List (Lane h Δ B) → List (Σ Set λ A → Subject A h)
@@ -411,7 +413,7 @@ module Realizing (R : Set) where
     joiners (takeWhileˢ i p c k s)          E = joiners s E
     joiners (flatMapˢ op f fl oc k r so ls) E = joiners so E ++ laneJoiners ls E
     joiners (connectˢ S c k s₀ src body)    E = joiners src E ++ joiners body (S ∷ E)
-    joiners (joinˢ j i sk l x)              E = joiner (lookup E x) sk j ∷ []
+    joiners (joinˢ j i sk l x cp)           E = joiner (lookup E x) sk j ∷ []
     joiners (deferˢ k s)                    E = joiners s E
 
     laneJoiners : ∀ {h Δ B} → List (Lane h Δ B) → Env Δ h → List (Joiner h)
@@ -465,8 +467,7 @@ module Realizing (R : Set) where
     switches []                = []
     switches (lane c _ _ ∷ ls) = c ∷ switches ls
 
-    -- Each connect in scope, its source as it stands now: a joiner's copy
-    -- has caught up with it between turns.
+    -- Each connect in scope, its source as it stands now.
     Now : List Set → Set₁
     Now = All (λ A → Maybe (U.Node A))
 
@@ -474,25 +475,90 @@ module Realizing (R : Set) where
     -- What is still open: the configuration, exactly
 
     mutual
-      part : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Now Δ → Maybe (U.Node A)
-      part (coldˢ s hd ph)                 E ρ ν = if spentʰ hd then nothing else just (nodeOf ph)
-      part doneˢ                           E ρ ν = nothing
-      part (mapˢ f s)                      E ρ ν = mapᴹ (U.mapᶜ f) (part s E ρ ν)
-      part (scanˢ f r s)                   E ρ ν = mapᴹ (U.scanᶜ f (val r)) (part s E ρ ν)
-      part (takeWhileˢ i p c k s)          E ρ ν = if val (Kit.live c) then mapᴹ (U.takeWhileᶜ i p) (part s E ρ ν) else nothing
-      part (flatMapˢ op f fl oc k r so ls) E ρ ν =
-        merged op (λ a q → U.subscribe (f a) ρ q) (part so E ρ ν) (partLanes ls E ρ ν) (val (Flat.queue fl))
-      part (connectˢ S c k s₀ src body)    E ρ ν = connected s′ (part body (S ∷ E) (s₀ ∷ ρ) (s′ ∷ ν))
-        where s′ = part src E ρ ν
-      part (joinˢ j i sk l x)              E ρ ν = joining (val l) (lookup ν x)
-        where joining : Bool → Maybe (U.Node _) → Maybe (U.Node _)
-              joining true (just c) = just (U.joinᶜ j i c)
-              joining _    _        = nothing
-      part (deferˢ k s)                    E ρ ν = part s E ρ ν
+      part : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Maybe (U.Node A)
+      part (coldˢ s hd ph)                 E ρ = if spentʰ hd then nothing else just (nodeOf ph)
+      part doneˢ                           E ρ = nothing
+      part (mapˢ f s)                      E ρ = mapᴹ (U.mapᶜ f) (part s E ρ)
+      part (scanˢ f r s)                   E ρ = mapᴹ (U.scanᶜ f (val r)) (part s E ρ)
+      part (takeWhileˢ i p c k s)          E ρ = if val (Kit.live c) then mapᴹ (U.takeWhileᶜ i p) (part s E ρ) else nothing
+      part (flatMapˢ op f fl oc k r so ls) E ρ =
+        merged op (λ a q → U.subscribe (f a) ρ q) (part so E ρ) (partLanes ls E ρ) (val (Flat.queue fl))
+      part (connectˢ S c k s₀ src body)    E ρ = connected (part src E ρ) (part body (S ∷ E) (s₀ ∷ ρ))
+      part (joinˢ j i sk l x cp)           E ρ = if val l then just (U.joinᶜ j i cp) else nothing
+      part (deferˢ k s)                    E ρ = part s E ρ
 
-      partLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → Now Δ → List (U.Node B)
-      partLanes []                E ρ ν = []
-      partLanes (lane c k s ∷ ls) E ρ ν = if val (Kit.live c) then consᴹ (part s E ρ ν) (partLanes ls E ρ ν) else partLanes ls E ρ ν
+      partLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → List (U.Node B)
+      partLanes []                E ρ = []
+      partLanes (lane c k s ∷ ls) E ρ = if val (Kit.live c) then consᴹ (part s E ρ) (partLanes ls E ρ) else partLanes ls E ρ
+
+    ----------------------------------------------------------------------
+    -- The joiners' copies
+
+    -- Every live joiner's copy is its source as it stands now.
+    mutual
+      Caught : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Now Δ → Set₁
+      Caught (coldˢ s hd ph)                 E ρ ν = Lift _ ⊤
+      Caught doneˢ                           E ρ ν = Lift _ ⊤
+      Caught (mapˢ f s)                      E ρ ν = Caught s E ρ ν
+      Caught (scanˢ f r s)                   E ρ ν = Caught s E ρ ν
+      Caught (takeWhileˢ i p c k s)          E ρ ν = Caught s E ρ ν
+      Caught (flatMapˢ op f fl oc k r so ls) E ρ ν = Caught so E ρ ν × CaughtLanes ls E ρ ν
+      Caught (connectˢ S c k s₀ src body)    E ρ ν = Caught src E ρ ν × Caught body (S ∷ E) (s₀ ∷ ρ) (part src E ρ ∷ ν)
+      Caught (joinˢ j i sk l x cp)           E ρ ν = val l ≡ true → lookup ν x ≡ just cp
+      Caught (deferˢ k s)                    E ρ ν = Caught s E ρ ν
+
+      CaughtLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → Now Δ → Set₁
+      CaughtLanes []                E ρ ν = Lift _ ⊤
+      CaughtLanes (lane c k s ∷ ls) E ρ ν = Caught s E ρ ν × CaughtLanes ls E ρ ν
+
+    -- Every joiner's copy of a source still open set to it, sources first.
+    mutual
+      refresh : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Now Δ → Sub h Δ A
+      refresh (coldˢ s hd ph)                 E ρ ν = coldˢ s hd ph
+      refresh doneˢ                           E ρ ν = doneˢ
+      refresh (mapˢ f s)                      E ρ ν = mapˢ f (refresh s E ρ ν)
+      refresh (scanˢ f r s)                   E ρ ν = scanˢ f r (refresh s E ρ ν)
+      refresh (takeWhileˢ i p c k s)          E ρ ν = takeWhileˢ i p c k (refresh s E ρ ν)
+      refresh (flatMapˢ op f fl oc k r so ls) E ρ ν = flatMapˢ op f fl oc k r (refresh so E ρ ν) (refreshLanes ls E ρ ν)
+      refresh (connectˢ S c k s₀ src body)    E ρ ν = connectˢ S c k s₀ src′ (refresh body (S ∷ E) (s₀ ∷ ρ) (part src′ E ρ ∷ ν))
+        where src′ = refresh src E ρ ν
+      refresh (joinˢ j i sk l x cp)           E ρ ν = joinˢ j i sk l x (fromMaybe cp (lookup ν x))
+      refresh (deferˢ k s)                    E ρ ν = deferˢ k (refresh s E ρ ν)
+
+      refreshLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → Now Δ → List (Lane h Δ B)
+      refreshLanes []                E ρ ν = []
+      refreshLanes (lane c k s ∷ ls) E ρ ν = lane c k (refresh s E ρ ν) ∷ refreshLanes ls E ρ ν
+
+    ----------------------------------------------------------------------
+    -- The gates
+
+    -- Every cold below spent.
+    Dead : ∀ {Δ A} → Sub h Δ A → Set₁
+    Dead t = ∀ {B} {sk : Sink h B} {hd} → Spot t sk hd → spentʰ hd ≡ true
+
+    unended : ∀ {A} → Phase A → Bool
+    unended (waiting _ _ doneᶠ) = false
+    unended _                   = true
+
+    -- Below a cut kill switch, a cut lane or a connect's closed body, every
+    -- cold is spent, a cut reaching what it unsubscribes; and no live cold
+    -- waits on its end, which its frame's last step delivers.
+    mutual
+      Gated : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Set₁
+      Gated (coldˢ s hd ph)                 E ρ = Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
+      Gated doneˢ                           E ρ = Lift _ ⊤
+      Gated (mapˢ f s)                      E ρ = Gated s E ρ
+      Gated (scanˢ f r s)                   E ρ = Gated s E ρ
+      Gated (takeWhileˢ i p c k s)          E ρ = (val (Kit.live c) ≡ false → Dead s) × Gated s E ρ
+      Gated (flatMapˢ op f fl oc k r so ls) E ρ = Gated so E ρ × GatedLanes ls E ρ
+      Gated (connectˢ S c k s₀ src body)    E ρ =
+        (part body (S ∷ E) (s₀ ∷ ρ) ≡ nothing → Dead src) × Gated src E ρ × Gated body (S ∷ E) (s₀ ∷ ρ)
+      Gated (joinˢ j i sk l x cp)           E ρ = Lift _ ⊤
+      Gated (deferˢ k s)                    E ρ = Gated s E ρ
+
+      GatedLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → Set₁
+      GatedLanes []                E ρ = Lift _ ⊤
+      GatedLanes (lane c k s ∷ ls) E ρ = (val (Kit.live c) ≡ false → Dead s) × Gated s E ρ × GatedLanes ls E ρ
 
     ----------------------------------------------------------------------
     -- Every subscription against its kernel
@@ -512,7 +578,7 @@ module Realizing (R : Set) where
         × HoldsLanes op f E o fl ls
       Holds (connectˢ S c k s₀ src body)    E o =
         heldIs c k (unsub src) × Holds src E (feeder S) × Holds body (S ∷ E) (bodyO c o)
-      Holds (joinˢ j i sk l x)              E o = slotIs sk (joinerCb l o)
+      Holds (joinˢ j i sk l x cp)           E o = slotIs sk (joinerCb l o)
       Holds (deferˢ k s)                    E o = slotIs k (attachCb (unsub s)) × Holds s E o
 
       HoldsLanes : ∀ {Δ A B} → T.FlatOp → (A → Obs Timeline Δ B) → Env Δ h → Observer B h → Flat A h → List (Lane h Δ B) → Set₁
@@ -555,9 +621,12 @@ module Realizing (R : Set) where
 
   -- THE CONFIGURATION `c` IS WHAT IS RUNNING: a witness holding every
   -- subscription the run reaches, against its kernel, whose open part is
-  -- `c`; the frames being burst `fs`, the queue its pending frames and
-  -- dead ones, the subjects' subscribers its joiners, the names all
-  -- distinct, the root not done.
+  -- `c`; every joiner's copy caught up, every closed gate's subscriptions
+  -- spent, every joiner joined no later than the run's position; the
+  -- frames being burst `fs`, the run past each one's start and short of
+  -- its next step; the queue its pending frames and dead ones, the
+  -- subjects' subscribers its joiners, the names all distinct, the root
+  -- not done.
   --
   -- DEAD ROUTE: a relation per operator (a `Below s d`, against any
   --   observer that keeps an abstract interface) cannot be carried.
@@ -571,9 +640,14 @@ module Realizing (R : Set) where
     field
       tree    : Sub h [] R
       holds   : Holds tree [] rootObs
-      open≡   : part tree [] [] [] ≡ just c
+      open≡   : part tree [] [] ≡ just c
+      caught  : Caught tree [] [] []
+      gated   : Gated tree [] []
+      past    : All (λ j → State.pos st <ᵖ Joiner.at′ j ≡ false) (joiners tree [])
       firing≡ : firings tree ≡ fs
       clocked : All (λ f → Firing.since f + Firing.u f ≡ State.clock st) fs
+      behind  : All (λ f → Σ Pos (λ d → State.pos st ≡ Firing.at′ f ++ d)
+                         × State.pos st <ᵖ (Firing.at′ f ++ [ ix (Firing.index f) ]) ≡ true) fs
       timed   : Timed (State.timers st) (pendings tree)
       joined  : Joined (subjects tree) (joiners tree [])
       ordered : Ordered st
