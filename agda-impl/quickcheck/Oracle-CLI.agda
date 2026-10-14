@@ -11,6 +11,9 @@
 --                                are no chain (`quickcheck.Chain`)
 --   Oracle-CLI places FROM COUNT the seeds whose pure run places its
 --                                record where the denotation does not
+--   Oracle-CLI ghosts FROM COUNT the seeds with an observer inside the run
+--                                delivered what its subtree's denotation
+--                                does not show (`quickcheck.Ghost`)
 --
 -- The IO engine runs one seed per process because a program that never
 -- finishes never returns: the caller's timeout is the only way out.
@@ -32,6 +35,7 @@ open import quickcheck.Code using (showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Chain using (chainFails; placeFails; placed)
+open import quickcheck.Ghost using (ghostFails; watchedCount)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -50,7 +54,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI places FROM COUNT"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI places FROM COUNT | Oracle-CLI ghosts FROM COUNT"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -66,6 +70,10 @@ private
   dispatch ("places" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (placeFails f′ c′) (λ s → putStrLn ("places: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("places: done " ++ showℕ c′ ++ ", " ++ showℕ (placed f′ c′) ++ " positions compared")
+  ... | _       | _       = usage
+  dispatch ("ghosts" ∷ f ∷ c ∷ []) with nat f | nat c
+  ... | just f′ | just c′ = each (ghostFails f′ c′) (λ s → putStrLn ("ghosts: FAIL seed " ++ showℕ s))
+                            >>= λ _ → putStrLn ("ghosts: done " ++ showℕ c′ ++ ", " ++ showℕ (watchedCount f′ c′) ++ " deliveries compared")
   ... | _       | _       = usage
   dispatch _ = usage
 

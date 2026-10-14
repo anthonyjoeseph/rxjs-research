@@ -167,12 +167,19 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
+- **THE TIMELINE'S SHAPE.** `cold-rel` is refuted for a cold whose ticks do
+  not strictly increase, and with it `adequacy` as stated. Three repairs —
+  `ML` carries the increase, `adequacy` assumes it of every cold, or the
+  denotation clamps a late frame to now — each restates the top line, so
+  the choice is Anthony's. The relation below is stated for the increasing
+  timelines all three keep.
 - **THE RELATION.** `Rel` and `RelSubj` as definitions over the ghost
-  positions the pure run keeps. `make places` finds them to be the
-  denotation's on every seed, so a relation can match event for event, with
-  no reordering. Every leaf below is stated in these, so a wrong relation is
-  wrong everywhere. This leg decides whether the bound half ("on any budget, no
-  more") holds of `connect`'s subject.
+  positions the pure run keeps. `make ghosts` finds every observer a run makes
+  — each operator's, each join to a subject — delivered a prefix of what its
+  subtree denotes where it was subscribed, so the bound half holds observer by
+  observer, the subject's included. Every leaf below is stated in these, so a
+  wrong relation is wrong everywhere; what is left to decide is how one
+  relation spans state the kernels share.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
 - **THE ROOT.** `run-rel` and `run-bound`: `Rel`'s two halves read off at
@@ -188,10 +195,12 @@ must be solid before Tier 2 is written over it.
   logical relation between a kernel and a timeline, stable as the heap grows.
 - **`connect-rel`** (Adequacy) — FALSITY, `NO EVIDENCE`: the allocated subject
   against the hot handle.
-- **`{empty,of,map,scan,takeWhile,flatMap,cold,connected,defer,bot}-rel`**
+- **`cold-rel`** (Adequacy) — FALSITY, `REFUTED`: false for a timeline whose
+  ticks go backwards; the repair restates `adequacy`, Anthony's call.
+- **`{empty,of,map,scan,takeWhile,flatMap,connected,defer,bot}-rel`**
   (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
-- **`run-rel`, `run-bound`, `approx-chain`, `⟦⟧-limit`** (Adequacy) —
-  FALSITY, `NO EVIDENCE`: from approximants to limits.
+- **`run-rel`, `run-bound`, `approx-chain`, `⟦⟧-limit`** (Adequacy) — FALSITY,
+  `NO EVIDENCE`: from approximants to limits.
 
 ## Tier 2 — the simultaneous spec
 

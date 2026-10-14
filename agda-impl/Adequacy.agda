@@ -81,9 +81,16 @@ module Link (R : Set) where
     takeWhile-rel : ∀ {A w} {s : Subscribe A w} {d} i p → Rel s d → Rel (takeWhileᴷ i p s) (takeWhileᴰ i p d)
     flatMap-rel   : ∀ {A B w} {s : Subscribe A w} {d} op {f : A → Subscribe B w} {g}
                   → (∀ a → Rel (f a) (g a)) → Rel s d → Rel (flatMapᴷ op f s) (flatMapᴰ (flatOp op) g d)
-    cold-rel      : ∀ {A w} (c : Timeline A) → Rel {w = w} (via (startCold c)) (coldᴰ (lower c))
     connected-rel : ∀ {Γ A w} {ρ : Env Γ w} {δ} (i : A ∈ Γ) → RelEnv ρ δ
                   → Rel (joinᴷ (lookup ρ i)) (lookup δ i)
+    -- False for a timeline whose ticks do not strictly increase, with the
+    -- rest of `Link`: the denotation places a frame at its own tick, ahead
+    -- of a sibling's frame at the tick already reached; the engine sets
+    -- its timer for now, behind every timer already due.  `ML` says its
+    -- ticks increase and does not carry it.  Whether `ML` carries it,
+    -- `adequacy` assumes it, or the denotation clamps is Anthony's call.
+    -- REFUTED: `git show cfeeaa5c` derives `⊥` from `complete`.
+    cold-rel      : ∀ {A w} (c : Timeline A) → Rel {w = w} (via (startCold c)) (coldᴰ (lower c))
     -- The subject `connectᴷ` allocates, fed by the source after the body
     -- has subscribed, agrees with the hot handle `connectᴰ` passes; then
     -- the body runs under both.
