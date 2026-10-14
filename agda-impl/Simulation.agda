@@ -43,7 +43,7 @@ open import denotation.Unfold using (⟦_⟧)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
-open import operation.PureObservable using (PureObs; Sink; same; module Pure)
+open import operation.PureObservable using (PureObs; Sink; same; module Pure) renaming (_⊑_ to _⊑ʷ_)
 open import Realize using (module Realizing)
 open import Focus using (module Focusing)
 open import CatchUp using (Settle; stop; go; module Catching)
@@ -202,18 +202,18 @@ module Sim (R : Set) where
     --
     -- RECOVERY: `git show a2e0bb8b:agda-impl/Realize.agda` restores `obsAt`
     --   — the observer a spot's slot holds — over the fuel engine's witness.
-    emit-seg : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {a : A} {k′ : Frame∞ A u}
+    emit-seg : ∀ {w h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {a : A} {k′ : Frame∞ A u} {σ : w ⊑ʷ h}
              → Holding (firing s hd τ r i (emit a k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false
              → ∀ {bd} → Seg bd (shown (silent ⟨ record st { pos = r ++ [ ix i ] }
-                                              , run (Callbacks.onNext (cbs st s) a) same (push (sent s hd u r (suc i) (Frame∞.force k′)) same loop) ⟩))
+                                              , run (Callbacks.onNext (cbs st s) a) same (push (sent s hd u r (suc i) (Frame∞.force k′)) σ loop) ⟩))
                                 (U.unfold c)
 
     -- A frame closing on its timeline's end: the cold spent, its
     -- completion delivered.
-    done-seg : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)}
+    done-seg : ∀ {w h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {σ : w ⊑ʷ h}
              → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ done
              → ∀ {bd} → Seg bd (shown (silent ⟨ record st { heap = put (State.heap st) hd (lift true) ; pos = r ++ [ last ] }
-                                              , run (Callbacks.onComplete (cbs st s)) same loop ⟩))
+                                              , run (Callbacks.onComplete (cbs st s)) σ loop ⟩))
                                 (U.unfold c)
 
   -- A live firing cold's step silent at its own position: the meaning's
@@ -280,9 +280,9 @@ module Sim (R : Set) where
   -- A live cold's frame, burst from the loop, a step at a time: it shows
   -- at least one step on each side before a calm point, so the segment
   -- passes a guard first, whatever bound it is under.
-  played : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} (b : Frame A u)
+  played : ∀ {w h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} (b : Frame A u) {σ : w ⊑ʷ h}
          → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-         → ∀ {bd} → Seg bd (shown (silent (play st s hd u r i b same loop))) (U.unfold c)
+         → ∀ {bd} → Seg bd (shown (silent (play st s hd u r i b σ loop))) (U.unfold c)
   played (emit a k′) h lv = if-false (λ m → Seg _ (shown (silent m)) _) lv (emit-seg h lv)
   played (stall k′)  h lv = passing (stall-step h lv) λ h′ → calm~ (bursting h′ lv) tt
   played (close k′)  h lv with From∞.force k′ in fk
@@ -290,9 +290,9 @@ module Sim (R : Set) where
   ... | quiet     = passing (quiet-step h lv fk) λ h′ → tauˡ (calm~ (calm h′) tt)
   ... | at t le b = passing (later-step h lv fk) λ h′ → tauˡ (calm~ (calm h′) tt)
 
-  burst-seg : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+  burst-seg : ∀ {w h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u} {σ : w ⊑ʷ h}
             → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-            → ∀ {bd} → Seg bd (trace ⟨ st , burst s hd u r i b same loop ⟩) (U.unfold c)
+            → ∀ {bd} → Seg bd (trace ⟨ st , burst s hd u r i b σ loop ⟩) (U.unfold c)
   burst-seg {b = b} h lv = tauˡ (if-false (λ m → Seg _ (trace m) _) lv (taus (closed-read h lv) (played b h lv)))
 
   -- From a calm point: a turn of the loop shows a step on each side, or

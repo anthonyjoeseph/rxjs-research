@@ -168,6 +168,14 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
+- **A FRAME, DELIVERED.** `emit-seg` and `done-seg`: the observer chain
+  the cold's slot holds run to the root, into a lane's subscription,
+  through a subject to its joiners, then back to a calm point. Needs a
+  mid-delivery invariant, `Holding` with the stack's waiting frames and
+  joiner copies lagging. Ruled out: a frame resuming only in the world
+  it fired in — a lane started mid-delivery grows the heap, so `bursting`
+  takes any extension. Decides whether a cascade's silent steps are
+  finite: a `flatMap` refill and `connect`'s joiners the uncertain cases.
 - **THE FOCUS.** `settle-at`: the firing cold's step lifts to the root from
   the witness alone (`clear`), and `catch-up` reads the rest off one
   `Settle` chain under `q`, the cold's own next event past it
@@ -182,12 +190,6 @@ contact; it must be solid before Tier 2 is written over it.
   keeps every conjunct but `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a
   later frame's timer queued by `clocked`. Decides whether the order the
   queue keeps survives `insert`.
-- **A FRAME, DELIVERED.** `emit-seg` and `done-seg`: the observer chain
-  the cold's slot holds run to the root, into a lane's subscription,
-  through a subject to its joiners, then back to a calm point. Needs a
-  mid-delivery invariant, `Holding` with the stack's waiting frames and
-  joiner copies lagging. Decides whether a cascade's silent steps are
-  finite: a `flatMap` refill and `connect`'s joiners the uncertain cases.
 - **THE QUEUE, EMPTY OR DEAD.** `dry-hush` and `pop-dead`, over `Ordered`
   and `Timed`: an empty queue leaves nothing to show, and a dead pop moves
   only the clock. Decides whether the order the witness records is enough

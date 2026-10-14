@@ -736,12 +736,13 @@ module Realizing (R : Set) where
 
   -- CALM POINTS, where what is running is what the meaning has left to
   -- show: the machine at its loop, or about to step a live cold's frame
-  -- from it.
+  -- from it, in whatever world the frame's deliveries have grown the
+  -- heap to.
   data Calm : Mach → Events R → Set₁ where
     calm     : ∀ {h} {st : State h} {c} → Holding [] c st → Calm ⟨ st , turn ⟩ (U.unfold c)
-    bursting : ∀ {h} {st : State h} {c A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+    bursting : ∀ {w h} {st : State h} {c A u τ} {s : Sink h A} {hd r i} {b : Frame A u} {σ : w ⊑ h}
              → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-             → Calm ⟨ st , burst s hd u r i b same loop ⟩ (U.unfold c)
+             → Calm ⟨ st , burst s hd u r i b σ loop ⟩ (U.unfold c)
 
   -- The timers whose cold is spent: popping one runs nothing.
   spentIn : ∀ {h} → All (Pure.Val R h) h → List (Timer h) → ℕ
