@@ -168,12 +168,13 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE BOUND HALF, NODE BY NODE.** `live-start` and `live-fire` over the
-  configuration as now defined (`Realize`), by node kind, the cold first from
-  its recovered proof. It decides whether the witness can be carried: a slot
-  held up to `_≼_` must survive the heap growing (a weakening law for
-  `Holds`), and a turn must keep `Timed` and `Ordered` across the frame it
-  fires. Most uncertain: a `flatMap` lane's refill, then `connect`'s joiners.
+- **THE BOUND HALF, NODE BY NODE.** A firing turn now starts its cold
+  (`firing-start`); what is left is the frame played, `live-burst`, and
+  subscribing, `live-start`, by node kind, the cold first from its recovered
+  proof. It decides whether the witness can be carried: a slot held up to
+  `_≼_` must survive the heap growing (a weakening law for `Holds`), and an
+  emit must reach the root through every node above the firing cold. Most
+  uncertain: a `flatMap` lane's refill, then `connect`'s joiners.
 - **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted three times,
   and each repair restates the top line, so all are Anthony's call. A cold
   whose ticks fall (`rising`): `ML` carries the increase, `adequacy`
@@ -195,8 +196,9 @@ must be solid before Tier 2 is written over it.
 
 - **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
   for a cold that falls, the repair Anthony's call.
-- **`live-start`, `live-fire`** (Bound) — FALSITY, `RECOVERY`, `X`: subscribing
-  establishes `Live`, each turn that fires a frame keeps it.
+- **`live-start`, `live-burst`, `turn-over`** (Bound) — FALSITY, `RECOVERY`,
+  `X`: subscribing establishes `Live`, a frame played keeps it, a complete run
+  stays complete.
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
 - **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject

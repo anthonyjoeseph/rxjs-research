@@ -19,9 +19,10 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; 
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <⇒≤; <-trans; ≤-reflexive)
+open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <⇒≤; <-trans; ≤-reflexive; n≮n)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
+open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong; cong₂)
 
 ------------------------------------------------------------------------
@@ -210,6 +211,21 @@ private
     ... | inj₂ (x , u) | inj₂ (y , v)
       rewrite subst (λ z → cmpLabel z c ≡ eq) (sym (eq-label a b x)) y | lt-pos p q r u v = refl
 
+  refl-ℕ : ∀ m → cmpℕ m m ≡ eq
+  refl-ℕ m with m <ᵇ m in e
+  ... | true  = ⊥-elim (n≮n m (<ᵇ⇒< m m (subst T (sym e) tt)))
+  ... | false = refl
+
+  mutual
+    refl-label : ∀ a → cmpLabel a a ≡ eq
+    refl-label (ix m)  = refl-ℕ m
+    refl-label (sub p) = refl-pos p
+    refl-label last    = refl
+
+    refl-pos : ∀ p → cmpPos p p ≡ eq
+    refl-pos []      = refl
+    refl-pos (a ∷ p) rewrite refl-label a = refl-pos p
+
   isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
   isLt-lt {lt} h = refl
   isLt-lt {eq} ()
@@ -217,6 +233,9 @@ private
 
 <ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
 <ᵖ-trans p q r h₁ h₂ rewrite lt-pos p q r (isLt-lt h₁) (isLt-lt h₂) = refl
+
+<ᵖ-irrefl : ∀ p → p <ᵖ p ≡ false
+<ᵖ-irrefl p rewrite refl-pos p = refl
 
 -- An earlier position is at no later a tick.
 <ᵖ-ix : ∀ m n p q → (ix m ∷ p) <ᵖ (ix n ∷ q) ≡ true → m ≤ n

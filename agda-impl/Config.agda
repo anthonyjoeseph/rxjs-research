@@ -31,8 +31,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (MonotonicList; hot; Timeline; Time; Pos; Burst; at; Events; Events∞; out; skip; end; hush;
-  frames; rejoin; mapᴱ; scanᴱ; takeWhileᴱ; go; none; earliest)
+open import denotation.MonotonicList using (MonotonicList; hot; Timeline; Time; Pos; Burst; Events; Events∞; out; skip; end; hush; burst;
+  rejoin; mapᴱ; scanᴱ; takeWhileᴱ; go; none; earliest)
 open import denotation.Denote using (approx; flatOp)
 
 open Events∞
@@ -73,9 +73,9 @@ module Nodes (n : ℕ) where
   -- A connect's source: live, or completed at a position.
   mutual
     data Node : List Set → Set → Set₁ where
-      -- A cold's next frame, set at `e`, due at tick `t` of a timeline
-      -- subscribed at tick `τ`.
-      coldᶜ      : ∀ {Δ A} → Time → Pos → Time → Burst A → Node Δ A
+      -- A cold inside a frame, or about to start one: its burst at step
+      -- `i` of the frame at `r`, on a timeline subscribed at tick `τ`.
+      coldᶜ      : ∀ {Δ A} → Time → Pos → ℕ → Burst A → Node Δ A
       -- Nothing more, ever: a cold gone quiet.
       quietᶜ     : ∀ {Δ A} → Node Δ A
       mapᶜ       : ∀ {Δ A B} → (A → B) → Node Δ A → Node Δ B
@@ -97,7 +97,7 @@ module Nodes (n : ℕ) where
   -- each subject's.
   mutual
     ⟦_⟧ᶜ : ∀ {Δ A} → Node Δ A → Hots Δ → Events A
-    ⟦ coldᶜ τ e t b ⟧ᶜ          ρ = frames τ e (at t b)
+    ⟦ coldᶜ τ r i b ⟧ᶜ          ρ = burst τ r i b
     ⟦ quietᶜ ⟧ᶜ                 ρ = hush
     ⟦ mapᶜ f c ⟧ᶜ               ρ = mapᴱ f (⟦ c ⟧ᶜ ρ)
     ⟦ scanᶜ f z c ⟧ᶜ            ρ = scanᴱ f z (⟦ c ⟧ᶜ ρ)
@@ -126,7 +126,7 @@ module Nodes (n : ℕ) where
   -- completion still to show.
   mutual
     Dry : ∀ {Δ A} → Node Δ A → Hots Δ → Set
-    Dry (coldᶜ τ e t b)         ρ = ⊥
+    Dry (coldᶜ τ r i b)         ρ = ⊥
     Dry quietᶜ                  ρ = ⊤
     Dry (mapᶜ f c)              ρ = Dry c ρ
     Dry (scanᶜ f z c)           ρ = Dry c ρ
@@ -164,7 +164,7 @@ module Nodes (n : ℕ) where
   -- A dry tree means silence.
   mutual
     dry-hush : ∀ {Δ A} (c : Node Δ A) (ρ : Hots Δ) → Dry c ρ → ⟦ c ⟧ᶜ ρ ≡ hush
-    dry-hush (coldᶜ τ e t b) ρ ()
+    dry-hush (coldᶜ τ r i b) ρ ()
     dry-hush quietᶜ          ρ d = refl
     dry-hush (mapᶜ f c)      ρ d with ⟦ c ⟧ᶜ ρ | dry-hush c ρ d
     ... | .hush | refl = refl
