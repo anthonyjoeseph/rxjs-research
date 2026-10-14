@@ -15,16 +15,17 @@ module Adequacy where
 open import Data.List using ([]; length)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; _≤_)
-open import Data.Nat.Properties using (n≤1+n)
+open import Data.Nat.Properties using (n≤1+n; ≤-refl)
 open import Data.Product using (_,_; Σ; proj₁; proj₂)
 
 open import operation.Placed using (Up; Ahead; ahead; module Ran)
 open import Bound using (module Places)
+open import Progress using (budget; module Gets)
 open import operation.Budget using (module Approx)
 open import operation.PureObservable using (PureObs; module Pure; toArray)
 open import denotation.MonotonicList using (ML; observe; root; ticks)
 open import denotation.Order using (_⊑_; _≃_; Shows; limit; Chain; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
-open import denotation.Unfold using (⟦_⟧)
+open import denotation.Unfold using (⟦_⟧; subscribe)
 
 -- The pure run: the limit of its approximants.
 run : ∀ {A} → PureObs [] A → ML A
@@ -44,25 +45,13 @@ module Link (R : Set) where
     -- The meaning's ticks never fall.
     ticks-up : (o : PureObs [] R) → Up 0 (observe (⟦ o ⟧ []) root)
 
-    -- THE RUN GETS AS FAR: wherever the meaning's events reach, some
-    -- approximant of the run records as many items — finitely many events
-    -- need only finite budget.  Which items is the bound half's business
-    -- (`reaches`).
-    --
-    -- False wherever a `connect` source the body outlives stands between
-    -- the root and an event the meaning shows.  The meaning steps a
-    -- source only as its joiners copy it, so a body that never joins
-    -- shows past it; the engine runs the source inline, and a source
-    -- that spins stops the whole run there — as rxjs does, by
-    -- overflowing — while one that runs forever keeps the engine firing
-    -- its timers, so the silence the meaning shows after the body is
-    -- never reported.  The meaning keeping such a source's events, or
-    -- `adequacy` assuming none, is Anthony's call.
-    -- DEAD ROUTE: a logical relation per operator, by induction over
-    --   the tree's approximants, each kernel against its own timeline.  A
-    --   connect's subject is state its siblings share, which no relation
-    --   on one kernel at a time can carry.
-    enough : (o : PureObs [] R) → ∀ {k} → Ahead (observe (⟦ o ⟧ []) root) k → Σ ℕ λ n → k ≤ length (itemsOf (ran n (compileᴺ n o [])))
+  open Gets R using (gets)
+
+  -- THE RUN GETS AS FAR: wherever the meaning's events reach, some
+  -- approximant of the run records as many items.  Which items is the
+  -- bound half's business (`reaches`).
+  enough : (o : PureObs [] R) → ∀ {k} → Ahead (observe (⟦ o ⟧ []) root) k → Σ ℕ λ n → k ≤ length (itemsOf (ran n (compileᴺ n o [])))
+  enough o a = budget (subscribe o [] root) a , gets o a _ ≤-refl
 
   -- Whatever the meaning shows, some approximant of the run shows as many
   -- items.

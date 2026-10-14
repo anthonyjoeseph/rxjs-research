@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain places ghosts bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain places gets ghosts bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
@@ -38,6 +38,7 @@ help:
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
 	@echo "  places        the pure run's record is placed against the root's events, `Bound.places` (ARGS=\"FROM COUNT\")"
+	@echo "  gets          the run reaches every item at the budget read off the meaning, `Progress.gets` (ARGS=\"FROM COUNT\")"
 	@echo "  ghosts        every observer in the run is shown what its subtree denotes (ARGS=\"FROM COUNT\")"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
@@ -102,6 +103,13 @@ chain: oracle-build
 	  echo "$$out" | grep -q '^chain: done ' || { echo "chain: RED — the run never finished"; exit 1; }; \
 	  if echo "$$out" | grep -q '^chain: FAIL '; then echo "chain: RED"; exit 1; fi; \
 	  echo "chain: GREEN"
+
+# `Progress.gets` decided, on ARGS="FROM COUNT" seeds.
+gets: oracle-build
+	@out=$$($(ORACLE_BIN) gets $(ARGS)); echo "$$out"; \
+	  echo "$$out" | grep -q '^gets: done ' || { echo "gets: RED — the run never finished"; exit 1; }; \
+	  if echo "$$out" | grep -q '^gets: FAIL '; then echo "gets: RED"; exit 1; fi; \
+	  echo "gets: GREEN"
 
 # `Bound.places` decided, on budgets small and large, on ARGS="FROM
 # COUNT" seeds: green when the run reaches its `done` line and no seed FAILs.

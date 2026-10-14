@@ -140,3 +140,76 @@ placed from count = sum (mapL (λ s → compared (program s)) (mapL (from +_) (u
 -- The seeds from `from`, `count` of them, whose approximants are no chain.
 chainFails : ℕ → ℕ → List ℕ
 chainFails from count = filterᵇ (λ s → not (chain (program s))) (mapL (from +_) (upTo count))
+
+-- THE BUDGET, TESTED: `Progress.gets` decided.  At every item the
+-- meaning shows within its first 300 events, the run at exactly that
+-- item's budget records as many items.  A program with a source its body
+-- never mentions is skipped: the edge `Progress.gets` is false at.
+private
+  open import Data.Nat using (_≤ᵇ_)
+  open import Data.Product using (Σ)
+  open import denotation.Unfold using (Node; Step; outˢ; skipˢ; endˢ; hushˢ; step; unfold; subscribe) renaming (shown to shownᵘ)
+  open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; module Ran)
+  open import Progress using (budget)
+  open Ran ℕ using (itemsOf) renaming (ran to runAt)
+
+  -- Every item within `s` events, with the way there.
+  mutual
+    prefixes : ℕ → (c : Node ℕ) → List (Σ ℕ (Ahead (unfold c)))
+    prefixes zero    c = []
+    prefixes (suc s) c = prefixesˢ s (step c)
+
+    prefixesˢ : ℕ → (st : Step ℕ) → List (Σ ℕ (Ahead (shownᵘ st)))
+    prefixesˢ s (outˢ p a c) = (1 , outᵃ none) ∷ mapL (λ { (k , x) → suc k , outᵃ x }) (prefixes s c)
+    prefixesˢ s (skipˢ p c)  = mapL (λ { (k , x) → k , skipᵃ x }) (prefixes s c)
+    prefixesˢ s (endˢ p)     = (1 , endᵃ) ∷ []
+    prefixesˢ s hushˢ        = (1 , hushᵃ) ∷ []
+
+  everyᵃ : ∀ {X : Set} → (X → Bool) → List X → Bool
+  everyᵃ f []       = true
+  everyᵃ f (x ∷ xs) = f x ∧ everyᵃ f xs
+
+  open import Data.Bool using (_∨_)
+  open import Data.List.Membership.Propositional using (_∈_)
+  open import Data.List.Relation.Unary.Any using (here; there)
+  open import quickcheck.Code using (Code; map; scan; takeWhile; flatMap; connect; connected; μ; defer)
+
+  idx : ∀ {X : Set} {x : X} {xs} → x ∈ xs → ℕ
+  idx (here _)  = 0
+  idx (there i) = suc (idx i)
+
+  -- Whether the d-th connect out is joined anywhere in the code.
+  joins : ∀ {Γ Δᵍ Δ Θ t} → ℕ → Code Γ Δᵍ Δ Θ t → Bool
+  joins d (map f s)         = joins d s
+  joins d (scan f z s)      = joins d s
+  joins d (takeWhile i q s) = joins d s
+  joins d (flatMap op f s)  = joins d f ∨ joins d s
+  joins d (connect s b)     = joins d s ∨ joins (suc d) b
+  joins d (connected i)     = idx i ≡ᵇ d
+  joins d (μ c)             = joins d c
+  joins d (defer c)         = joins d c
+  joins d _                 = false
+
+  -- Whether every connect's body mentions its source: past the edge
+  -- `Progress.gets` records, a source its body never joins.
+  joined : ∀ {Γ Δᵍ Δ Θ t} → Code Γ Δᵍ Δ Θ t → Bool
+  joined (map f s)         = joined s
+  joined (scan f z s)      = joined s
+  joined (takeWhile i q s) = joined s
+  joined (flatMap op f s)  = joined f ∧ joined s
+  joined (connect s b)     = joins 0 b ∧ joined s ∧ joined b
+  joined (μ c)             = joined c
+  joined (defer c)         = joined c
+  joined _                 = true
+
+-- On programs whose every source is mentioned by its body.
+gets : Prog natᵗ → Bool
+gets p = not (joined p) ∨ everyᵃ reached (prefixes 300 c)
+  where
+    o = toObs timeline 3 p [] [] []
+    c = subscribe o [] root
+    reached : Σ ℕ (Ahead (unfold c)) → Bool
+    reached (k , a) = k ≤ᵇ length (itemsOf (runAt (budget c a) (compileᴺ (budget c a) o [])))
+
+getsFails : ℕ → ℕ → List ℕ
+getsFails from count = filterᵇ (λ s → not (gets (program s))) (mapL (from +_) (upTo count))

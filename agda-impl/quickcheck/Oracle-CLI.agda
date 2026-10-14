@@ -11,6 +11,9 @@
 --                                are no chain (`quickcheck.Chain`)
 --   Oracle-CLI places FROM COUNT the seeds whose pure run places its
 --                                record where the denotation does not
+--   Oracle-CLI gets FROM COUNT   the seeds whose pure run, at the budget
+--                                `Progress` reads off the meaning, falls
+--                                short of an item the meaning shows
 --   Oracle-CLI ghosts FROM COUNT the seeds with an observer inside the run
 --                                delivered what its subtree's denotation
 --                                does not show (`quickcheck.Ghost`)
@@ -34,7 +37,7 @@ open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Code using (showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program)
-open import quickcheck.Chain using (chainFails; placeFails; placed)
+open import quickcheck.Chain using (chainFails; placeFails; placed; getsFails)
 open import quickcheck.Ghost using (ghostFails; watchedCount)
 
 private
@@ -54,7 +57,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI places FROM COUNT | Oracle-CLI ghosts FROM COUNT"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI places FROM COUNT | Oracle-CLI gets FROM COUNT | Oracle-CLI ghosts FROM COUNT"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -70,6 +73,10 @@ private
   dispatch ("places" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (placeFails f′ c′) (λ s → putStrLn ("places: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("places: done " ++ showℕ c′ ++ ", " ++ showℕ (placed f′ c′) ++ " positions compared")
+  ... | _       | _       = usage
+  dispatch ("gets" ∷ f ∷ c ∷ []) with nat f | nat c
+  ... | just f′ | just c′ = each (getsFails f′ c′) (λ s → putStrLn ("gets: FAIL seed " ++ showℕ s))
+                            >>= λ _ → putStrLn ("gets: done " ++ showℕ c′)
   ... | _       | _       = usage
   dispatch ("ghosts" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (ghostFails f′ c′) (λ s → putStrLn ("ghosts: FAIL seed " ++ showℕ s))
