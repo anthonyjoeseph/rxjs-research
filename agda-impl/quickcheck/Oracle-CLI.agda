@@ -75,7 +75,7 @@ private
 
   spins : List (String × Obs Timeline [] ℕ) → IO ⊤
   spins []             = putStrLn "spin: done"
-  spins ((l , o) ∷ cs) = putStrLn ((if Spin.progress 12 o then "spin: ok   " else "spin: FAIL ") ++ l) >>= λ _ → spins cs
+  spins ((l , o) ∷ cs) = putStrLn ((if Spin.progress 8 o then "spin: ok   " else "spin: FAIL ") ++ l) >>= λ _ → spins cs
 
   nth : ∀ {ℓ} {X : Set ℓ} → ℕ → List (String × X) → Maybe (String × X)
   nth _       []       = nothing

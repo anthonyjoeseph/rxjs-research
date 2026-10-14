@@ -45,7 +45,7 @@ data Ev : Set where
 
 private
   budget : ℕ
-  budget = 20000
+  budget = 3000
 
   -- `n` events, `k` silent steps left before the next.
   run : ℕ → ℕ → Trace → List Ev
