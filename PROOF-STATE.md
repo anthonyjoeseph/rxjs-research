@@ -168,13 +168,14 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE FOCUS.** `catch-up`: the firing cold's step now lifts to the root
-  from the witness alone (`clear`, over `rooted`: no cascade sits below a
-  frame's later steps). Ruled out: a sibling stepping first. Left: whether
-  each joiner's copy of a moved source takes the same step below its join
-  point (`past`), silently and in join order, and whether the refreshed
-  tree is the one `settled` names. Decides whether `caught` pins a copy's
-  next event; both deliveries stand on it.
+- **THE FOCUS.** `catch-up`: the firing cold's step lifts to the root from
+  the witness alone (`clear`). Ruled out: a sibling stepping first, and a
+  refreshed witness as the target — a copy embeds held sources the meaning
+  steps, so `Settles` is the moved witness up to held sources and copies,
+  carrying `Caught` and `Gated`. Left: the merge — every lane and both
+  sides of a connect catching up under `q`, each finished one's next event
+  `Beyond q` (the cold's own by `rooted`), so the earliest is always one
+  still catching up. Decides whether `caught` pins a copy's every step.
 - **THE PHASE MOVED.** `pop-live`, `reheld-stall`, `reheld-quiet`,
   `reheld-later`: a cold's phase moved by `stepAt`, its joiners `settled`,
   keeps every conjunct but `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a

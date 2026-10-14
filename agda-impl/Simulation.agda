@@ -134,17 +134,14 @@ module Sim (R : Set) where
         → Holding (firing s hd τ r i b ∷ []) c st → Phase A → Sub h [] R
   moved {st = st} H ph = At.stepAt (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) ph [] []
 
-  -- … and every joiner's copy caught up with its source.
-  settled : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-          → Holding (firing s hd τ r i b ∷ []) c st → Phase A → Sub h [] R
-  settled {st = st} H ph = At.refresh (State.heap st) (moved H ph) [] [] []
-
-  -- What is running is `c′`, by the settled witness up to the sources the
-  -- meaning holds: a joiner's step drops an ending source in every
-  -- connect above it.
+  -- What is running is `c′`, by the moved witness up to the sources the
+  -- meaning holds: every joiner's copy caught up with its source, and a
+  -- held source dropped where a step beside it found it over.
   Settles : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
           → Holding (firing s hd τ r i b ∷ []) c st → Phase A → U.Node R → Set₁
-  Settles {h} {st = st} H ph c′ = Σ (Sub h [] R) λ t → forget t ≡ forget (settled H ph) × At.part (State.heap st) t [] [] ≡ just c′
+  Settles {h} {st = st} H ph c′ = Σ (Sub h [] R) λ t → forget t ≡ forget (moved H ph)
+                                × At.Caught (State.heap st) t [] [] [] × At.Gated (State.heap st) t [] []
+                                × At.part (State.heap st) t [] [] ≡ just c′
 
   mapᴾ : ∀ {c} {P Q : U.Node R → Set₁} → (∀ {c′} → P c′ → Q c′) → Passes c P → Passes c Q
   mapᴾ f (passes e sk p) = passes e sk (f p)
@@ -159,11 +156,14 @@ module Sim (R : Set) where
                 → ⟨ st , run (Callbacks.isClosed (cbs st s)) same K ⟩ ⇒ ⟨ st , ret false same K ⟩
 
     -- Then each joiner's copy of a source the step moved takes the same
-    -- step, shown below its join point (`past`), silently: sources before
-    -- their joiners, and joiners in the order they joined.
+    -- steps, shown below its join point (`past`), silently: sources before
+    -- their joiners, every step under `q`, and every other next event past
+    -- them, the cold's own included, as its frame is its tick's (`rooted`).
+    -- A cold left waiting on its end is not `Gated`: that frame closes by
+    -- `done-seg` instead.
     catch-up : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
              → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
-             → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
+             → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph) → At.unended (State.heap st) ph ≡ true
              → ∀ {c₁} → At.part (State.heap st) (moved H ph) [] [] ≡ just c₁
              → Σ (U.Node R) λ c′ → Skips c₁ c′ × Settles H ph c′
 
@@ -218,17 +218,17 @@ module Sim (R : Set) where
   -- next steps are it, then its joiners' copies catching up.
   focus-skip : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
              → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
-             → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
+             → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph) → At.unended (State.heap st) ph ≡ true
              → Passes c (Settles H ph)
-  focus-skip H lv eq with cold-skip H lv eq
-  ... | _ , _ , first , moved≡ with catch-up H lv eq moved≡
+  focus-skip H lv eq un with cold-skip H lv eq
+  ... | _ , _ , first , moved≡ with catch-up H lv eq un moved≡
   ... | _ , rest , settled≡ = passes first rest settled≡
 
   -- A stall: the cold's step, silent at the root, and the next one stands.
   stall-step : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : Frame∞ A u}
              → Holding (firing s hd τ r i (stall k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false
              → Passes c λ c′ → Holding (firing s hd τ r (suc i) (Frame∞.force k′) ∷ []) c′ st
-  stall-step H lv = mapᴾ (reheld-stall H) (focus-skip H lv refl)
+  stall-step H lv = mapᴾ (reheld-stall H) (focus-skip H lv refl refl)
 
   -- A frame closing on a timeline gone quiet, or on a later frame, its
   -- timer queued: silent at the root, and the loop is calm again.
@@ -237,7 +237,7 @@ module Sim (R : Set) where
              → Passes c λ c′ → Holding [] c′ st
   quiet-step {u = u} {τ} {r = r} {i} H lv fk =
     mapᴾ (reheld-quiet H) (focus-skip H lv {ph = waiting {u = suc u} τ (r ++ [ last ]) quiet}
-                                       (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk))
+                                       (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk) refl)
 
   later-step : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {t} {le : suc u ≤ t} {b : Frame A t}
              → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ at t le b
@@ -246,7 +246,7 @@ module Sim (R : Set) where
                                                                           (State.timers st) })
   later-step {τ = τ} {r = r} {i} {t = t} {le} {b} H lv fk =
     mapᴾ (reheld-later H) (focus-skip H lv {ph = waiting τ (r ++ [ last ]) (at t le b)}
-                                       (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk))
+                                       (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk) refl)
 
   if-true : ∀ {ℓ ℓ′} {X : Set ℓ} {x : Bool} {a b : X} (P : X → Set ℓ′) → x ≡ true → P a → P (if x then a else b)
   if-true P refl p = p

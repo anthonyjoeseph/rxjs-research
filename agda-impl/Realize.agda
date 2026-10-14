@@ -34,7 +34,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Linked using (Linked)
-open import Data.Maybe using (Maybe; just; nothing; fromMaybe)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; _+_; _≤_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -458,7 +458,9 @@ module Realizing (R : Set) where
   over U.hushˢ    = true
   over _          = false
 
-  -- A witness up to the sources the meaning holds.
+  -- A witness up to the sources the meaning holds: a connect's, and a
+  -- joiner's copy, which the meaning steps in an order the witness does
+  -- not record.
   mutual
     forget : ∀ {h Δ A} → Sub h Δ A → Sub h Δ A
     forget (coldˢ s hd ph)                 = coldˢ s hd ph
@@ -468,7 +470,7 @@ module Realizing (R : Set) where
     forget (takeWhileˢ i p c k s)          = takeWhileˢ i p c k (forget s)
     forget (flatMapˢ op f fl oc k r so ls) = flatMapˢ op f fl oc k r (forget so) (forgetLanes ls)
     forget (connectˢ S c k s₀ m src body)  = connectˢ S c k s₀ nothing (forget src) (forget body)
-    forget (joinˢ j i sk l x cp)           = joinˢ j i sk l x cp
+    forget (joinˢ j i sk l x cp)           = joinˢ j i sk l x (U.endᶜ [])
     forget (deferˢ k s)                    = deferˢ k (forget s)
 
     forgetLanes : ∀ {h Δ B} → List (Lane h Δ B) → List (Lane h Δ B)
@@ -595,24 +597,6 @@ module Realizing (R : Set) where
       CaughtLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → Now Δ → Set₁
       CaughtLanes []                E ρ ν = Lift _ ⊤
       CaughtLanes (lane c k s ∷ ls) E ρ ν = Caught s E ρ ν × CaughtLanes ls E ρ ν
-
-    -- Every joiner's copy of a source still open set to it, sources first.
-    mutual
-      refresh : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Now Δ → Sub h Δ A
-      refresh (coldˢ s hd ph)                 E ρ ν = coldˢ s hd ph
-      refresh doneˢ                           E ρ ν = doneˢ
-      refresh (mapˢ f s)                      E ρ ν = mapˢ f (refresh s E ρ ν)
-      refresh (scanˢ f r s)                   E ρ ν = scanˢ f r (refresh s E ρ ν)
-      refresh (takeWhileˢ i p c k s)          E ρ ν = takeWhileˢ i p c k (refresh s E ρ ν)
-      refresh (flatMapˢ op f fl oc k r so ls) E ρ ν = flatMapˢ op f fl oc k r (refresh so E ρ ν) (refreshLanes ls E ρ ν)
-      refresh (connectˢ S c k s₀ m src body)  E ρ ν = connectˢ S c k s₀ m src′ (refresh body (S ∷ E) (s₀ ∷ ρ) (part src′ E ρ ∷ ν))
-        where src′ = refresh src E ρ ν
-      refresh (joinˢ j i sk l x cp)           E ρ ν = joinˢ j i sk l x (fromMaybe cp (lookup ν x))
-      refresh (deferˢ k s)                    E ρ ν = deferˢ k (refresh s E ρ ν)
-
-      refreshLanes : ∀ {Δ B} → List (Lane h Δ B) → Env Δ h → Srcs Δ → Now Δ → List (Lane h Δ B)
-      refreshLanes []                E ρ ν = []
-      refreshLanes (lane c k s ∷ ls) E ρ ν = lane c k (refresh s E ρ ν) ∷ refreshLanes ls E ρ ν
 
     ----------------------------------------------------------------------
     -- The gates
@@ -742,8 +726,8 @@ module Realizing (R : Set) where
       clocked : All (λ f → Firing.since f + Firing.u f ≡ State.clock st) fs
       behind  : All (λ f → Σ Pos (λ d → State.pos st ≡ Firing.at′ f ++ d)
                          × State.pos st <ᵖ (Firing.at′ f ++ [ ix (Firing.index f) ]) ≡ true) fs
-      -- A frame being burst sits under the root or is a cascade.
-      rooted  : All (λ f → Firing.at′ f ≢ []) fs
+      -- A frame being burst is its timer's cascade, at the tick it plays.
+      rooted  : All (λ f → Σ Pos λ e → Firing.at′ f ≡ ix (Firing.since f + Firing.u f) ∷ subᴾ e ∷ []) fs
       timed   : Timed (State.timers st) (pendings tree)
       joined  : Joined (subjects tree) (joiners tree [])
       ordered : Ordered st

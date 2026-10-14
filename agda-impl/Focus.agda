@@ -8,7 +8,6 @@
 -- step below the source's own position, at `ix 0`.
 module Focus where
 
-open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Properties using (++-assoc; ++-conicalˡ; ++-conicalʳ; ++-identityʳ)
@@ -683,7 +682,8 @@ module Focusing (R : Set) where
         → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
         → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
         → On.Clear (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) [] [] q
-  clear {r = []} H lv eq = ⊥-elim (head (Holding.rooted H) refl)
+  clear {r = []} H lv eq with head (Holding.rooted H)
+  ... | _ , ()
   clear {st = st} {τ = τ} {r = x ∷ r′} {i} {b} H lv {q} {ph} eq with head (Holding.behind H)
   ... | (d , pd) , lt =
     On.Clearing.clear-at (State.heap st) (State.pos st) q pF (Holding.tree H) (Holding.firing≡ H) {[]} {[]} {[]} {ph} lv
