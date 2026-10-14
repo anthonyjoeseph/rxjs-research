@@ -9,7 +9,7 @@
 -- record, positions and all, is placed against those events
 -- (`operation.Placed`), so shows nothing they do not.  ABOVE: whatever
 -- the meaning shows lies within some prefix, which shows the same.
-module Adequacy where
+module adequacy.Adequacy where
 
 open import Data.List using ([])
 open import Data.List.Relation.Unary.All using ([])

@@ -9,7 +9,7 @@ module Main where
 
 -- THE THEOREM: the pure runtime's run is the denotation's, observed at
 -- time 0.  The IO runtime is the same engine over a different monad.
-open import Adequacy using (adequacy)
+open import adequacy.Adequacy using (adequacy)
 
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.
