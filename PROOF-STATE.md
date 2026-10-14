@@ -161,23 +161,23 @@ point at one, the row is FALSITY.
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
 the root, positions forgotten down to ticks. A two-sided fundamental lemma over
-approximants, one operator at a time, puts run n below approximant n below the
-run; `squeeze` meets the limits. Expect the denotation to move under contact; it
+approximants, one operator at a time, puts approximant n below the run; a
+simulation over the whole running program (`Bound`) puts run n below
+approximant n; `squeeze` meets the limits. Expect the denotation to move under contact; it
 must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE BOUND HALF'S RELATION.** `Below` and `BelowSubj` as definitions.
-  Not a one-sided bound: `Placed` allows no gap and needs the dry clause,
-  and a `switch` cuts a lane whose timers are already set, so what a timer
-  will deliver is a fact about the future. The invariant relates the whole
-  configuration to the denotation's REMAINDER: each kernel's heap state
-  realizes its denotation's state (`go`'s lanes and queue, `scanᴱ`'s
-  accumulator, `rejoin`'s index, a cold's `frames`), and the timer queue's
-  order is the sorted merge's. Decides whether that is stateable per kernel.
-- **THE BOUND HALF, ONE OPERATOR AT A TIME.** The `*-below` leaves,
-  `connect-below` first: the one whose state the kernels share; then
-  `run-below`, `Below` read off as `Recorded`.
+- **THE CONFIGURATION.** `Live` as a definition: the running program's
+  state against what is left of each part's events. Per subscription, its
+  heap cells, timers and observer against its denotation's remainder; the
+  root's record against the prefix of `shown n o` passed; and one ordering
+  invariant — every pending event past `pos`, the queue sorted by distinct
+  cascades. Most uncertain first: `flatMap`'s merge order across lanes, then
+  `connect`'s fan-out to joiners. Decides whether one invariant states both.
+- **THE BOUND HALF, NODE BY NODE.** `live-start` and `live-turn` by node kind,
+  the cold first from its recovered proof; then `live-cut` and `live-dry`,
+  read off the root's part of `Live`.
 - **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted three times,
   and each repair restates the top line, so all are Anthony's call. A cold
   whose ticks fall (`rising`): `ML` carries the increase, `adequacy`
@@ -199,14 +199,13 @@ must be solid before Tier 2 is written over it.
 
 - **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
   for a cold that falls, the repair Anthony's call.
-- **`Below`, `BelowSubj`, `BelowSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`:
-  the bound half, positionally, observer by observer.
-- **`connect-below`** (Adequacy) — FALSITY, `NO EVIDENCE`: every joiner of the
-  allocated subject held to the hot handle.
-- **`run-below`** (Adequacy) — FALSITY, `NO EVIDENCE`: `Below` at the root is
-  the run's record, placed.
-- **`{empty,of,map,scan,takeWhile,flatMap,connected,cold,defer,bot}-below`**
-  (Adequacy) — FALSITY, `NO EVIDENCE`: one per operator.
+- **`Live`** (Bound) — FALSITY, `DEAD ROUTE`, `X`: the running program's
+  configuration against its denotation's remainders, one relation for the whole
+  program.
+- **`live-start`, `live-turn`** (Bound) — FALSITY, `RECOVERY`, `X`: subscribing
+  establishes `Live`, each turn of the loop keeps it.
+- **`live-cut`, `live-dry`** (Bound) — FALSITY, `NO EVIDENCE`, `X`: a cut
+  leaves the record a prefix; a dry queue leaves events that show nothing more.
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
 - **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject

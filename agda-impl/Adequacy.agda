@@ -11,7 +11,8 @@
 --
 -- BELOW: the run's record, ghost positions and all, is placed against
 -- the events the root is shown (`operation.Placed`), so it shows nothing
--- they do not.  ABOVE: a logical relation between a `Subscribe` and a
+-- they do not, by a simulation over the whole running program (`Bound`).
+-- ABOVE: a logical relation between a `Subscribe` and a
 -- timeline, by induction on (n , tree), one operator at a time: with
 -- budget enough, the kernel shows everything its timeline does.  Nothing
 -- is coinductive except the last step, from approximants to limits.
@@ -22,20 +23,21 @@
 module Adequacy where
 
 open import Data.List using (List; _∷_; [])
-open import Data.Product using (_×_; _,_)
-open import Data.Unit using (⊤)
+open import Data.Product using (_,_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
-open import Data.Nat using (ℕ; zero; suc; _⊔_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _⊔_)
 open import Data.Nat.Properties using (≤-refl; n≤1+n; m≤m⊔n; m≤n⊔m)
 open import Level using (lower)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import operation.Placed using (Up; module Ran)
+open import Bound using (Rises; ahead; Rising; module Places)
 open import operation.AbstractObservable using (module Run)
 open import operation.Budget using (module Approx)
 open import operation.PureObservable using (Pureᴾ; PureObs; module Pure; toArray) renaming (_⊑_ to _≤ʷ_)
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ)
+open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ;
+  takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ)
 open import denotation.Order using (_⊑_; ⊑-trans; _≃_; ≃-trans; limit; Chain; squeeze; limit-ub; limit-least)
 open import denotation.Denote using (DenEnv; flatOp; ⟦_⟧[_]; ⟦_⟧)
 
@@ -47,45 +49,12 @@ run o = limit λ n → toArray n o
 approxAt : ∀ {A} → PureObs [] A → ℕ → ML A
 approxAt o n = ticks (observe (⟦ o ⟧[ n ] []) root)
 
--- A place along a cold's timeline: a frame to come, or inside one.
-data Along (A : Set) : Set where
-  ahead  : ML A → Along A
-  inside : Burst A → Along A
-
--- A TIMELINE THAT RISES: no frame before tick t, each after the last.
-mutual
-  record Rises {A : Set} (t : Time) (x : Along A) : Set where
-    coinductive
-    field rises : Rise t x
-
-  Rise : ∀ {A} → Time → Along A → Set
-  Rise t (ahead done)              = ⊤
-  Rise t (ahead quiet)             = ⊤
-  Rise t (ahead (at t′ b))         = t ≤ t′ × Rises (suc t′) (inside b)
-  Rise t (inside (emit _ k))       = Rises t (inside (Burst∞.force k))
-  Rise t (inside (stall k))        = Rises t (inside (Burst∞.force k))
-  Rise t (inside (close k))        = Rises t (ahead (ML∞.force k))
-
--- Every cold a program reaches within n `defer`s rises.
-Rising : ∀ {Γ A} → ℕ → PureObs Γ A → Set
-Rising n       (cold c)          = Rises 0 (ahead (lower c))
-Rising n       empty             = ⊤
-Rising n       (of xs)           = ⊤
-Rising n       (map f s)         = Rising n s
-Rising n       (scan f z s)      = Rising n s
-Rising n       (takeWhile i p s) = Rising n s
-Rising n       (flatMap op f s)  = (∀ a → Rising n (f a)) × Rising n s
-Rising n       (connect s b)     = Rising n s × Rising n b
-Rising n       (connected i)     = ⊤
-Rising zero    (defer l)         = ⊤
-Rising (suc n) (defer l)         = Rising n (Later.force l)
-
--- The fundamental lemma, for a run whose root observes `R`.
 module Link (R : Set) where
   open Run (Pureᴾ R)
   open Pure R using (runPure; compileᴺ)
   open Approx R using (runPure-mono)
-  open Ran R using (ran; Recorded; recorded-⊑)
+  open Ran R using (ran; recorded-⊑)
+  open Places R using (places)
 
   postulate
     -- THE EDGE where `adequacy` meets a cold whose ticks fall.  `ML` says
@@ -111,75 +80,6 @@ module Link (R : Set) where
     RelSubj : ∀ {A w} → Subject A w → MonotonicList A → Set₁
     -- A subject made in one world is the same subject in every later one.
     RelSubj-wk : ∀ {A w v} {st : Subject A w} {x} (σ : w ≤ʷ v) → RelSubj st x → RelSubj (wkSubject σ st) x
-
-  postulate
-    -- "Subscribing with `s` at any position p, in any heap, delivers its
-    -- observer each value at its own event of what `d` shows a subscriber
-    -- at p, in order, and its completion at the end; never anything past
-    -- them; and once nothing it set is left to run, nothing more."  The
-    -- bound half, positionally.  Not at-most alone: a run that goes dry
-    -- must meet a denotation that falls silent there, `Placed`'s `quiets`.
-    Below     : ∀ {A w} → Subscribe A w → MonotonicList A → Set₁
-    -- A subject and the handle `connectᴰ` passed its body agree as `Below`
-    -- for every join.
-    BelowSubj : ∀ {A w} → Subject A w → MonotonicList A → Set₁
-    BelowSubj-wk : ∀ {A w v} {st : Subject A w} {x} (σ : w ≤ʷ v) → BelowSubj st x → BelowSubj (wkSubject σ st) x
-
-  data BelowEnv {w} : ∀ {Γ} → Env Γ w → DenEnv Γ → Set₁ where
-    []  : BelowEnv [] []
-    _∷_ : ∀ {Γ A} {st : Subject A w} {x : MonotonicList A} {ρ : Env Γ w} {δ : DenEnv Γ}
-        → BelowSubj st x → BelowEnv ρ δ → BelowEnv (st ∷ ρ) (x ∷ δ)
-
-  wkBelowEnv : ∀ {Γ w v} {ρ : Env Γ w} {δ : DenEnv Γ} (σ : w ≤ʷ v) → BelowEnv ρ δ → BelowEnv (wkEnv σ ρ) δ
-  wkBelowEnv σ []      = []
-  wkBelowEnv σ (r ∷ e) = BelowSubj-wk σ r ∷ wkBelowEnv σ e
-
-  postulate
-    -- One per operator, each kernel's bound against its denotation.
-    empty-below     : ∀ {A w} → Below {A} {w} emptyᴷ emptyᴰ
-    of-below        : ∀ {A w} (xs : List A) → Below {w = w} (ofᴷ xs) (ofᴰ xs)
-    map-below       : ∀ {A B w} {s : Subscribe A w} {d} (f : A → B) → Below s d → Below (mapᴷ f s) (mapᴰ f d)
-    scan-below      : ∀ {A B w} {s : Subscribe A w} {d} (f : B → A → B) z → Below s d → Below (scanᴷ f z s) (scanᴰ f z d)
-    takeWhile-below : ∀ {A w} {s : Subscribe A w} {d} i p → Below s d → Below (takeWhileᴷ i p s) (takeWhileᴰ i p d)
-    flatMap-below   : ∀ {A B w} {s : Subscribe A w} {d} op {f : A → Subscribe B w} {g}
-                    → (∀ a → Below (f a) (g a)) → Below s d → Below (flatMapᴷ op f s) (flatMapᴰ (flatOp op) g d)
-    connected-below : ∀ {Γ A w} {ρ : Env Γ w} {δ} (i : A ∈ Γ) → BelowEnv ρ δ
-                    → Below (joinᴷ (lookup ρ i)) (lookup δ i)
-    -- A frame falling behind the clock is placed at the clock's tick by
-    -- the engine and at its own by the denotation: `rising`'s edge.
-    cold-below      : ∀ {A w} (c : Timeline A) → Rises 0 (ahead (lower c)) → Below {w = w} (via (startCold c)) (coldᴰ (lower c))
-    -- Every joiner of the allocated subject is held to the hot handle.
-    connect-below   : ∀ {A B w} {s : Subscribe A w} {d} {b : ∀ {v} → w ≤ʷ v → Subject A v → Subscribe B v}
-                        {e : MonotonicList A → MonotonicList B}
-                    → Below s d → (∀ {v} (σ : w ≤ʷ v) {st r} → BelowSubj st r → Below (b σ st) (e r))
-                    → Below (connectᴷ s b) (connectᴰ d e)
-    defer-below     : ∀ {A w} {s : Subscribe A w} {d} → Below s d → Below (deeper s) (deferᴰ d)
-    bot-below       : ∀ {A w} → Below {A} {w} ⊥ᴷ ⊥ᴰ
-
-    -- `Below` at the root, on every budget: the record the run leaves.
-    run-below : ∀ {s : Subscribe R []} {d} → Below s d → ∀ m → Recorded (ran m s) (observe d root)
-
-  -- THE BOUND HALF'S FUNDAMENTAL LEMMA, by the recursion `fundamental`
-  -- shares.
-  below : ∀ n {Γ A w} (o : PureObs Γ A) → Rising n o → {ρ : Env Γ w} {δ : DenEnv Γ}
-        → BelowEnv ρ δ → Below (compileᴺ n o ρ) (⟦ o ⟧[ n ] δ)
-  below n       (cold c)          u        e = cold-below c u
-  below n       empty             u        e = empty-below
-  below n       (of xs)           u        e = of-below xs
-  below n       (map f s)         u        e = map-below f (below n s u e)
-  below n       (scan f z s)      u        e = scan-below f z (below n s u e)
-  below n       (takeWhile i p s) u        e = takeWhile-below i p (below n s u e)
-  below n       (flatMap op f s)  (v , u)  e = flatMap-below op (λ a → below n (f a) (v a) e) (below n s u e)
-  below n       (connect s b)     (u , v)  e = connect-below (below n s u e) (λ σ r → below n b v (r ∷ wkBelowEnv σ e))
-  below n       (connected i)     u        e = connected-below i e
-  below zero    (defer l)         u        e = bot-below
-  below (suc n) (defer l)         u        e = defer-below (below n (Later.force l) u e)
-
-  -- THE BOUND HALF, where the run can see it: approximant m of the
-  -- engine leaves its record placed against the events approximant n of
-  -- the denotation shows the root, each value at its own event.
-  places : ∀ n (o : PureObs [] R) → Rising n o → ∀ m → Recorded (ran m (compileᴺ n o [])) (observe (⟦ o ⟧[ n ] []) root)
-  places n o u = run-below (below n o u [])
 
   data RelEnv {w} : ∀ {Γ} → Env Γ w → DenEnv Γ → Set₁ where
     []  : RelEnv [] []

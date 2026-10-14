@@ -37,7 +37,7 @@ help:
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
-	@echo "  places        the pure run's record is placed against the root's events, `Adequacy.places` (ARGS=\"FROM COUNT\")"
+	@echo "  places        the pure run's record is placed against the root's events, `Bound.places` (ARGS=\"FROM COUNT\")"
 	@echo "  ghosts        every observer in the run is shown what its subtree denotes (ARGS=\"FROM COUNT\")"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
@@ -103,7 +103,7 @@ chain: oracle-build
 	  if echo "$$out" | grep -q '^chain: FAIL '; then echo "chain: RED"; exit 1; fi; \
 	  echo "chain: GREEN"
 
-# `Adequacy.places` decided, on budgets small and large, on ARGS="FROM
+# `Bound.places` decided, on budgets small and large, on ARGS="FROM
 # COUNT" seeds: green when the run reaches its `done` line and no seed FAILs.
 places: oracle-build
 	@out=$$($(ORACLE_BIN) places $(ARGS)); echo "$$out"; \

@@ -66,7 +66,7 @@ chain p = every (λ n → below 1000 (at n) (at (suc n)) ∧ agrees n (at n) (at
     at : ℕ → Events ℕ
     at n = observe (⟦ toObs timeline 3 p [] [] [] ⟧[ n ] []) root
 
--- THE RECORD, PLACED, TESTED: `Adequacy.places` decided.  Each value of
+-- THE RECORD, PLACED, TESTED: `Bound.places` decided.  Each value of
 -- the pure run's record sits at its own `out` of what the denotation shows
 -- the root, at the mark the run made it at, on that mark's tick, past
 -- `skip`s only; the run ends as the events do — its completion at their

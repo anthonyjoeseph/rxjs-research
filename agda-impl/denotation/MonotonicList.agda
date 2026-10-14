@@ -180,20 +180,21 @@ observe (cold f) p = f p
 -- `r ++ [ last ]`, which is also where the timer for the next frame is
 -- created: after the burst and all it caused.  A frame at tick 0 is the
 -- subscribe burst, rooted at the subscription itself.
-mutual
-  frames : ∀ {A} → Time → Pos → ML A → Events A
-  frames τ e done     = end e
-  frames τ e quiet    = hush
-  frames τ e (at t b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+private
+  mutual
+    frames : ∀ {A} → Time → Pos → ML A → Events A
+    frames τ e done     = end e
+    frames τ e quiet    = hush
+    frames τ e (at t b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
 
-  burst : ∀ {A} → Time → Pos → ℕ → Burst A → Events A
-  burst τ r i (emit a k) = out (r ++ [ ix i ]) a (λ where .force → burst τ r (suc i) (Burst∞.force k))
-  burst τ r i (stall k)  = skip (r ++ [ ix i ]) (λ where .force → burst τ r (suc i) (Burst∞.force k))
-  burst τ r i (close k)  = skip (r ++ [ ix i ]) (λ where .force → frames τ (r ++ [ last ]) (ML∞.force k))
+    burst : ∀ {A} → Time → Pos → ℕ → Burst A → Events A
+    burst τ r i (emit a k) = out (r ++ [ ix i ]) a (λ where .force → burst τ r (suc i) (Burst∞.force k))
+    burst τ r i (stall k)  = skip (r ++ [ ix i ]) (λ where .force → burst τ r (suc i) (Burst∞.force k))
+    burst τ r i (close k)  = skip (r ++ [ ix i ]) (λ where .force → frames τ (r ++ [ last ]) (ML∞.force k))
 
-start : ∀ {A} → Pos → ML A → Events A
-start p (at zero b) = burst (tick p) p 0 b
-start p m           = frames (tick p) (p ++ [ last ]) m
+  start : ∀ {A} → Pos → ML A → Events A
+  start p (at zero b) = burst (tick p) p 0 b
+  start p m           = frames (tick p) (p ++ [ last ]) m
 
 coldᴰ : ∀ {A} → ML A → MonotonicList A
 coldᴰ m = cold λ p → start p m
