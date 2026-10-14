@@ -25,16 +25,16 @@ module Simulation where
 
 open import Data.List using ([]; _∷_; _++_; [_]; length)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just; nothing)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; _∸_; z≤n; s≤s)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_; _×_; Σ; proj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Induction.WellFounded using (Acc; acc)
-open import Level using (lift; lower)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Level using (lower)
+open import Data.Bool using (Bool; true; false)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import denotation.MonotonicList using (Events; Events∞; Frame; Frame∞; From∞; Pos; ix; last; emit; stall; close; done; quiet; at; out; skip; end; hush; tick; observe; root)
@@ -47,6 +47,8 @@ open import operation.PureObservable using (PureObs; Sink; same; module Pure) re
 open import Realize using (module Realizing)
 open import Focus using (module Focusing)
 open import CatchUp using (Settle; stop; go; module Catching)
+open import Segment using (module Seg)
+open import Deliver using (module Delivering)
 
 module Sim (R : Set) where
   open Machine R using (Mach; ⟨_,_⟩; turn; burst; run; ret; loop; push; asked; sent; Stack; step; cbs; play; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
@@ -56,6 +58,9 @@ module Sim (R : Set) where
   open Focusing R using (module On; clear; ahead)
   open Catching R using (cold-next; module Under)
   open Read
+  open Seg R
+  open Seg∞
+  open Delivering R using (emit-seg; done-seg)
 
   ------------------------------------------------------------------------
   -- The relation
@@ -76,61 +81,6 @@ module Sim (R : Set) where
 
   open _~∞_
 
-  ------------------------------------------------------------------------
-  -- Up to calm points
-
-  -- A calm point inside a segment no guard has passed must have fewer
-  -- dead timers than where the segment began.
-  Below : Maybe ℕ → Mach → Set
-  Below (just k) m = dead m < k
-  Below nothing  m = ⊤
-
-  -- The relation's constructors, and a calm point to resume from.
-  mutual
-    data Seg (b : Maybe ℕ) : Trace → Events R → Set₁ where
-      out~  : ∀ {p a l r} → Seg∞ (Trace∞.force l) (Events∞.force r) → Seg b (out (tick p) p a l) (out p a r)
-      tau~  : ∀ {t p l r} → Seg∞ (Trace∞.force l) (Events∞.force r) → Seg b (tau t l) (skip p r)
-      tauˡ  : ∀ {t l e} → Seg b (Trace∞.force l) e → Seg b (tau t l) e
-      skipʳ : ∀ {m p r} → Seg b m (Events∞.force r) → Seg b m (skip p r)
-      end~  : ∀ {p} → Seg b (end p) (end p)
-      idle~ : Seg b idle hush
-      calm~ : ∀ {m e} → Calm m e → Below b m → Seg b (trace m) e
-
-    record Seg∞ (l : Trace) (r : Events R) : Set₁ where
-      coinductive
-      field force : Seg nothing l r
-
-  open Seg∞
-
-  -- The machine passing silent steps only.
-  infix 4 _⇒_
-  data _⇒_ : Mach → Mach → Set₁ where
-    here⇒ : ∀ {m} → m ⇒ m
-    step⇒ : ∀ {m m₁ m′} → step m ≡ silent m₁ → m₁ ⇒ m′ → m ⇒ m′
-
-  taus : ∀ {b m m′ e} → m ⇒ m′ → Seg b (trace m′) e → Seg b (trace m) e
-  taus here⇒        s = s
-  taus (step⇒ eq r) s = subst (λ x → Seg _ (shown x) _) (sym eq) (tauˡ (taus r s))
-
-  -- The meaning passing silent steps only.
-  data Skips : U.Node R → U.Node R → Set₁ where
-    noneˢ : ∀ {c} → Skips c c
-    skipˢ : ∀ {c p c₁ c′} → U.step c ≡ U.skipˢ p c₁ → Skips c₁ c′ → Skips c c′
-
-  skipping : ∀ {b m c c′} → Skips c c′ → Seg b m (U.unfold c′) → Seg b m (U.unfold c)
-  skipping noneˢ         s = s
-  skipping (skipˢ eq sk) s = subst (λ x → Seg _ _ (U.shown x)) (sym eq) (skipʳ (skipping sk s))
-
-  -- At least one silent step of the meaning, to a configuration where `P`.
-  record Passes (c : U.Node R) (P : U.Node R → Set₁) : Set₁ where
-    constructor passes
-    field
-      {c₁ c′} : U.Node R
-      {p}     : Pos
-      first   : U.step c ≡ U.skipˢ p c₁
-      rest    : Skips c₁ c′
-      holds   : P c′
-
   -- The witness at a burst point, its firing cold's phase moved.
   moved : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
         → Holding (firing s hd τ r i b ∷ []) c st → Phase A → Sub h [] R
@@ -144,9 +94,6 @@ module Sim (R : Set) where
   Settles {h} {st = st} H ph c′ = Σ (Sub h [] R) λ t → forget t ≡ forget (moved H ph)
                                 × At.Caught (State.heap st) t [] [] [] × At.Gated (State.heap st) t [] []
                                 × At.part (State.heap st) t [] [] ≡ just c′
-
-  mapᴾ : ∀ {c} {P Q : U.Node R → Set₁} → (∀ {c′} → P c′ → Q c′) → Passes c P → Passes c Q
-  mapᴾ f (passes e sk p) = passes e sk (f p)
 
   -- A Settle chain is silent steps.
   settle-skips : ∀ {F} {P : U.Node R → Set} {c c′} → Settle F P c c′ → Skips c c′
@@ -198,24 +145,6 @@ module Sim (R : Set) where
                                                                       ; at′ = t ; from = r ++ [ last ] ; frame = b })
                                                             (State.timers st) })
 
-    -- An emit delivered down the observer chain the cold's slot holds.
-    --
-    -- RECOVERY: `git show a2e0bb8b:agda-impl/Realize.agda` restores `obsAt`
-    --   — the observer a spot's slot holds — over the fuel engine's witness.
-    emit-seg : ∀ {w h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {a : A} {k′ : Frame∞ A u} {σ : w ⊑ʷ h}
-             → Holding (firing s hd τ r i (emit a k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false
-             → ∀ {bd} → Seg bd (shown (silent ⟨ record st { pos = r ++ [ ix i ] }
-                                              , run (Callbacks.onNext (cbs st s) a) same (push (sent s hd u r (suc i) (Frame∞.force k′)) σ loop) ⟩))
-                                (U.unfold c)
-
-    -- A frame closing on its timeline's end: the cold spent, its
-    -- completion delivered.
-    done-seg : ∀ {w h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {k′ : From∞ A (suc u)} {σ : w ⊑ʷ h}
-             → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ done
-             → ∀ {bd} → Seg bd (shown (silent ⟨ record st { heap = put (State.heap st) hd (lift true) ; pos = r ++ [ last ] }
-                                              , run (Callbacks.onComplete (cbs st s)) σ loop ⟩))
-                                (U.unfold c)
-
   -- A live firing cold's step silent at its own position: the meaning's
   -- next step is it, lifted through the cold's context, to the witness
   -- with the cold's phase moved, every connect above it stepped, and
@@ -261,21 +190,6 @@ module Sim (R : Set) where
   later-step {τ = τ} {r = r} {i} {t = t} {le} {b} H lv fk =
     mapᴾ (reheld-later H) (focus-skip H lv {ph = waiting τ (r ++ [ last ]) (at t le b)}
                                        (cong (λ m → U.skipˢ (r ++ [ ix i ]) (U.framesᶜ τ (r ++ [ last ]) m)) fk) refl)
-
-  if-true : ∀ {ℓ ℓ′} {X : Set ℓ} {x : Bool} {a b : X} (P : X → Set ℓ′) → x ≡ true → P a → P (if x then a else b)
-  if-true P refl p = p
-
-  if-false : ∀ {ℓ ℓ′} {X : Set ℓ} {x : Bool} {a b : X} (P : X → Set ℓ′) → x ≡ false → P b → P (if x then a else b)
-  if-false P refl p = p
-
-  -- A segment resumed after a guard.
-  later : ∀ {m e} → Seg nothing m e → Seg∞ m e
-  force (later s) = s
-
-  -- A frame's step silent at the root, the run resuming at a calm point.
-  passing : ∀ {c m bd} {P : U.Node R → Set₁} → Passes c P → (∀ {c′} → P c′ → Seg nothing (trace m) (U.unfold c′))
-          → Seg bd (shown (silent m)) (U.unfold c)
-  passing (passes eq sk p) k = subst (λ x → Seg _ _ (U.shown x)) (sym eq) (tau~ (later (skipping sk (k p))))
 
   -- A live cold's frame, burst from the loop, a step at a time: it shows
   -- at least one step on each side before a calm point, so the segment
