@@ -36,13 +36,17 @@ open import quickcheck.Code using (showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Chain using (chainFails)
-open import quickcheck.Ghost using (ghostFails; watchedCount)
+open import quickcheck.Ghost using (ghostFails; exactFails; exactWhy; watchedCount)
 open import quickcheck.Placing using (placingFails)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
   each []       f = pure _
   each (x ∷ xs) f = f x >>= λ _ → each xs f
+
+  each′ : List String → IO ⊤
+  each′ []       = pure _
+  each′ (x ∷ xs) = putStrLn x >>= λ _ → each′ xs
 
   prog : ℕ → IO ⊤
   prog s = putStrLn ("{\"seed\":" ++ showℕ s ++ ",\"prog\":" ++ showCode natᵗ (program s)
@@ -73,6 +77,13 @@ private
   ... | just f′ | just c′ = each (ghostFails f′ c′) (λ s → putStrLn ("ghosts: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("ghosts: done " ++ showℕ c′ ++ ", " ++ showℕ (watchedCount f′ c′) ++ " deliveries compared")
   ... | _       | _       = usage
+  dispatch ("exact" ∷ f ∷ c ∷ []) with nat f | nat c
+  ... | just f′ | just c′ = each (exactFails f′ c′) (λ s → putStrLn ("exact: FAIL seed " ++ showℕ s))
+                            >>= λ _ → putStrLn ("exact: done " ++ showℕ c′ ++ ", " ++ showℕ (watchedCount f′ c′) ++ " entries")
+  ... | _       | _       = usage
+  dispatch ("why" ∷ s ∷ []) with nat s
+  ... | just s′ = putStrLn (showCode natᵗ (program s′)) >>= λ _ → each′ (exactWhy (program s′))
+  ... | nothing = usage
   dispatch ("placing" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (placingFails f′ c′) (λ s → putStrLn ("placing: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("placing: done " ++ showℕ c′)
