@@ -27,7 +27,7 @@ module Seg (R : Set) where
   open Machine R using (Mach; ⟨_,_⟩; turn; burst; loop; run; ret; Stack; step; silent; shown; Trace; Trace∞; tau; out; end; idle; trace)
   open Realizing R using (Holding; firing; dead; _≗_)
   open Contexts R using (Ctx; obsC)
-  open Middles R using (Mid; Back; module AtC)
+  open Middles R using (Mid; Back; Owed; module AtC)
   open Run (Pureᴾ R) using (Observer)
   open Pure R using (State; get)
 
@@ -62,13 +62,13 @@ module Seg (R : Set) where
       bursting   : ∀ {w h} {st : State h} {c A u τ} {s : Sink h A} {hd r i} {b : Frame A u} {σ : w ⊑ h}
                  → Holding (firing s hd τ r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
                  → Calm ⟨ st , burst s hd u r i b σ loop ⟩ (U.unfold c)
-      delivering : ∀ {h Δ A} {L : Pos → Set} {k : Ctx h Δ A} {t n fs c} {st : State h} {q a n′} {act w} {σ : w ⊑ h} {K : Stack w ⊤}
+      delivering : ∀ {h Δ A} {L : Owed} {k : Ctx h Δ A} {t n fs c} {st : State h} {q a n′} {act w} {σ : w ⊑ h} {K : Stack w ⊤}
                  → Mid L k t (just n) fs c st → U.step n ≡ U.outˢ q a n′ → State.pos st ≡ q → AtC.Fore (State.heap st) k q
                  → act ≗ Observer.next (obsC k) a
                  → (∀ {v} (τ : h ⊑ v) {st′ : State v} {c′} → Back L τ k t q (just n′) fs c′ st′
                     → Seg nothing (trace ⟨ st′ , ret tt (σ ⨾ τ) K ⟩) (U.unfold c′))
                  → Calm ⟨ st , run act σ K ⟩ (U.unfold c)
-      finishing  : ∀ {h Δ A} {L : Pos → Set} {k : Ctx h Δ A} {t n fs c} {st : State h} {q act w} {σ : w ⊑ h} {K : Stack w ⊤}
+      finishing  : ∀ {h Δ A} {L : Owed} {k : Ctx h Δ A} {t n fs c} {st : State h} {q act w} {σ : w ⊑ h} {K : Stack w ⊤}
                  → Mid L k t (just n) fs c st → U.step n ≡ U.endˢ q → State.pos st ≡ q → AtC.Fore (State.heap st) k q
                  → act ≗ Observer.complete (obsC k)
                  → (∀ {v} (τ : h ⊑ v) {st′ : State v} {c′} → Back L τ k t q nothing fs c′ st′

@@ -11,8 +11,8 @@
 -- Below the hole the witness is the run's, exactly.
 --
 -- A feeder's joiners are fed one at a time, so a joiner not yet fed holds
--- its copy one step behind its source, at a position `L` names and the
--- run has not reached (`Lagging`).  Before a delivery every sibling's next
+-- its copy one step behind its source, that step showing what `L` owes
+-- at a position the run has not reached (`Lagging`).  Before a delivery every sibling's next
 -- event is past every step under it (`Fore`); a connect's body is the
 -- exception, its joiners about to be shown the source's event.  After,
 -- every sibling's is (`Quiet`).
@@ -20,11 +20,12 @@ module adequacy.deliver.Mid where
 
 open import Data.Bool using (true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_]; map)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (_+_)
-open import Data.Product using (_×_; Σ)
+open import Data.Product using (_×_; Σ; _,_)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Level using (Lift)
@@ -55,6 +56,14 @@ module Middles (R : Set) where
   Past : ∀ {A} → Pos → Maybe (U.Node A) → Set
   Past q nothing  = ⊤
   Past q (just n) = Clears q (U.headˢ (U.step n))
+
+  -- What a feed part way through its joiners owes: at a position, a
+  -- value or an end.
+  Owing : Set₁
+  Owing = Σ Set λ X → Pos × Maybe X
+
+  Owed : Set₁
+  Owed = List Owing
 
   module AtC {h : World} (H : All (Pure.Val R h) h) where
     open At H
@@ -96,15 +105,16 @@ module Middles (R : Set) where
     ----------------------------------------------------------------------
     -- The joiners' copies, a feeder part way through its joiners
 
-    module Lagging (L : Pos → Set) (pos : Pos) where
-      -- A copy one step behind its source `s`, that step at `q`.
-      Behind : ∀ {A} → U.Node A → Pos → Maybe (U.Node A) → Set₁
-      Behind {A} cp q (just s) = Σ A λ a → U.step cp ≡ U.outˢ q a s
-      Behind     cp q nothing  = U.step cp ≡ U.endˢ q
+    module Lagging (L : Owed) (pos : Pos) where
+      -- A copy one step behind its source `s`, that step at `q`, showing
+      -- what `L` owes at `p`.
+      Behind : ∀ {A} → Pos → U.Node A → Pos → Maybe (U.Node A) → Set₁
+      Behind {A} p cp q (just s) = Σ A λ a → (A , p , just a) ∈ L × U.step cp ≡ U.outˢ q a s
+      Behind {A} p cp q nothing  = (A , p , nothing) ∈ L × U.step cp ≡ U.endˢ q
 
       -- Caught up, or behind by the step a feeder has yet to show it.
       Lag : ∀ {A} → Pos → Maybe (U.Node A) → U.Node A → Set₁
-      Lag j s cp = s ≡ just cp ⊎ Σ Pos λ q → L (q ++ [ subᴾ j ]) × pos <ᵖ (q ++ [ subᴾ j ]) ≡ true × Behind cp q s
+      Lag j s cp = s ≡ just cp ⊎ Σ Pos λ q → pos <ᵖ (q ++ [ subᴾ j ]) ≡ true × Behind (q ++ [ subᴾ j ]) cp q s
 
       open Catching Lag public renaming (Caught to CaughtL; CaughtLanes to CaughtLanesL)
 
@@ -181,7 +191,7 @@ module Middles (R : Set) where
   -- THE INVARIANT MID-DELIVERY: `Holding`'s, at a hole `k`, the witness
   -- there `t`, its meaning `m`.
 
-  record Mid {h Δ A} (L : Pos → Set) (k : Ctx h Δ A) (t : Sub h Δ A) (m : Maybe (U.Node A))
+  record Mid {h Δ A} (L : Owed) (k : Ctx h Δ A) (t : Sub h Δ A) (m : Maybe (U.Node A))
              (fs : List (Firing h)) (c : U.Node R) (st : State h) : Set₁ where
     open At (State.heap st)
     open AtC (State.heap st)
@@ -208,7 +218,7 @@ module Middles (R : Set) where
   -- ON A DELIVERY'S RETURN at `q`, in a world grown by `τ`: the frames
   -- and the hole moved as a delivery moves them, the invariant at the
   -- hole with its meaning `m′`, every sibling past `q`.
-  record Back {h v Δ A} (L : Pos → Set) (τ : h ⊑ v) (k : Ctx h Δ A) (t : Sub h Δ A) (q : Pos)
+  record Back {h v Δ A} (L : Owed) (τ : h ⊑ v) (k : Ctx h Δ A) (t : Sub h Δ A) (q : Pos)
               (m′ : Maybe (U.Node A)) (fs : List (Firing h)) (c′ : U.Node R) (st′ : State v) : Set₁ where
     constructor back
     field

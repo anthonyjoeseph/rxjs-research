@@ -168,13 +168,15 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **A CASCADE, GUARDED.** `next-source`, `done-source`, `next-outer` and
-  `done-inner` deliver at a context deeper than their frame: a joiner in the
-  body, or a lane bursting inline. After the meaning's skip, the run ends at
-  a `delivering` calm point there, which `resume` hands to `next-at`. Left:
-  `next-source` as a body: the connect's skip lifted through the context,
-  then a refocus from the source onto each joiner in join order, its copy
-  `Lagging` until fed. Decides whether a cascade's silent steps are finite.
+- **A CASCADE, GUARDED.** `next-source` is a body (`feed`): the connect's
+  skip as the guard, then each subscriber in join order, a live joiner's
+  delivery a `delivering` calm point, finitely many silent steps between by
+  the list. Ruled out: a lagging copy free to show any value — `Lag` now
+  shows what the `Owed` list holds. Left: `feed-head`, the refocus from the
+  source onto a joiner and back, `Joined` naming each subscriber; then
+  `feed-start` and `feed-end`; then the same shape for `done-source`,
+  `next-outer` and `done-inner`. Decides whether `Owed` is enough to
+  refocus.
 - **A FRAME, DELIVERED.** The frames `Above` does carry (`Climb`):
   `next-take` (a cut reaching the hole), `next-scan` (the accumulator
   written before the meaning steps), `next-inner`, `next-body`, `done-body`,
@@ -199,7 +201,7 @@ contact; it must be solid before Tier 2 is written over it.
   meaning's silence off it.
 - **THE CALLBACKS, EXTENSIONALLY.** A stored callback is its kernel's
   canonical observer up to `_≗_`: weakening composes, and every kernel
-  commutes with it; `closed-read` is its first use. The apparatus the
+  commutes with it; `≗-unweaken` and `closed-read` are its first uses. The apparatus the
   turn's cases are written over; narrows nothing, and nothing in the turn
   can be instantiated without it.
 - **THE START.** `start-seg`: the subscribe burst from an empty heap
@@ -215,8 +217,10 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### The ledger
 
-- **`next-source`** (Climb) — FALSITY, `DEAD ROUTE`: a source's value fed to
-  the subject's joiners in join order.
+- **`feed-head`** (Climb) — FALSITY, `NO EVIDENCE`: a subscriber the subject
+  holds is a joiner owed the source's value, refocused, or silenced.
+- **`feed-start`** (Climb) — FALSITY, `NO EVIDENCE`: the source's event a skip
+  of the connect under the frames above, every subscriber owed it.
 - **`done-source`** (Climb) — FALSITY, `DEAD ROUTE`: a source's end, the
   subject closed and each joiner finished.
 - **`next-outer`** (Climb) — FALSITY, `DEAD ROUTE`: an outer's value admitted,
@@ -230,6 +234,8 @@ contact; it must be solid before Tier 2 is written over it.
   past its switch.
 - **`done-inner`** (Climb) — FALSITY, `DEAD ROUTE`: a lane's end handed on to
   the queue.
+- **`feed-end`** (Climb) — FALSITY, `NO EVIDENCE`: every subscriber fed,
+  nothing owed but what was, the body past the source's event.
 - **`next-body`** (Climb) — FALSITY, `NO EVIDENCE`: a body's value is its
   parent's.
 - **`done-body`** (Climb) — FALSITY, `NO EVIDENCE`: a body's end, then the
@@ -254,6 +260,8 @@ contact; it must be solid before Tier 2 is written over it.
   quiet, calm again.
 - **`reheld-later`** (Simulation) — FALSITY, `NO EVIDENCE`: a cold's next frame
   queued, calm again.
+- **`≗-unweaken`** (Climb) — FALSITY, `NO EVIDENCE`: a program weakened to its
+  own world is itself, up to `_≗_`.
 - **`closed-read`** (Simulation) — FALSITY, `NO EVIDENCE`: a firing cold's
   subscriber reads open, moving nothing.
 - **`pop-live`** (Realize) — FALSITY, `NO EVIDENCE`: a live timer popped, its

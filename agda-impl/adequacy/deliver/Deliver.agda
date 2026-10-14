@@ -15,7 +15,6 @@
 -- runs, and the continuation is unbounded.
 module adequacy.deliver.Deliver where
 
-open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Nat using (ℕ; suc)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -24,7 +23,7 @@ open import Data.Unit using (⊤; tt)
 open import Data.Bool using (true; false)
 open import Data.Maybe using (just; nothing)
 open import Level using (lift; lower)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.MonotonicList using (Time; Pos; Frame; Frame∞; From∞; ix; last; done; emit; close)
 import denotation.Unfold as U
@@ -35,12 +34,7 @@ open import adequacy.Realize using (module Realizing)
 open import adequacy.Segment using (module Seg)
 open import adequacy.deliver.Context using (module Contexts)
 open import adequacy.deliver.Mid using (module Middles)
-open import adequacy.deliver.Climb using (module Climbing)
-
--- Growing a world from where it stands.
-same-⨾ : ∀ {u v} (τ : u ⊑ʷ v) → same ⨾ τ ≡ τ
-same-⨾ same     = refl
-same-⨾ (grow τ) = cong grow (same-⨾ τ)
+open import adequacy.deliver.Climb using (same-⨾; module Climbing)
 
 module Delivering (R : Set) where
   open Machine R using (⟨_,_⟩; turn; burst; run; ret; loop; push; sent; Stack; cbs; silent; shown; trace)
@@ -68,7 +62,7 @@ module Delivering (R : Set) where
     field
       {Δ}  : List Set
       ctx  : Ctx h Δ A
-      mid  : Mid (λ _ → ⊥) ctx (coldˢ s hd (playing τ r (suc i) (Frame∞.force k′))) (just (U.burstᶜ τ r i (emit a k′)))
+      mid  : Mid [] ctx (coldˢ s hd (playing τ r (suc i) (Frame∞.force k′))) (just (U.burstᶜ τ r i (emit a k′)))
                  (firing s hd τ r (suc i) (Frame∞.force k′) ∷ []) c (record st { pos = r ++ [ ix i ] })
       fore : AtC.Fore (State.heap st) ctx (r ++ [ ix i ])
       slot : Callbacks.onNext (cbs st s) a ≗ Observer.next (obsC ctx) a
@@ -81,7 +75,7 @@ module Delivering (R : Set) where
       {c₁}  : U.Node R
       ctx   : Ctx h Δ A
       skips : Skips c c₁
-      mid   : Mid (λ _ → ⊥) ctx (coldˢ s hd (waiting {u = u} τ (r ++ [ last ]) done)) (just (U.framesᶜ {t = u} τ (r ++ [ last ]) done)) [] c₁
+      mid   : Mid [] ctx (coldˢ s hd (waiting {u = u} τ (r ++ [ last ]) done)) (just (U.framesᶜ {t = u} τ (r ++ [ last ]) done)) [] c₁
                   (record st { heap = put (State.heap st) hd (lift true) ; pos = r ++ [ last ] })
       fore  : AtC.Fore (put (State.heap st) hd (lift true)) ctx (r ++ [ last ])
       slot  : Callbacks.onComplete (cbs st s) ≗ Observer.complete (obsC ctx)
@@ -105,12 +99,12 @@ module Delivering (R : Set) where
     -- The emit returned to the cold's frame: the cold live at its next
     -- step, or cut on the way and its phase forgotten.
     back-sent : ∀ {h v Δ} {A u τ₀} {s : Sink h A} {hd r i} {b : Frame A u} {k : Ctx h Δ A} {τ : h ⊑ʷ v} {c′} {st′ : State v}
-              → Back (λ _ → ⊥) τ k (coldˢ s hd (playing τ₀ r (suc i) b)) (r ++ [ ix i ]) (just (U.burstᶜ τ₀ r (suc i) b))
+              → Back [] τ k (coldˢ s hd (playing τ₀ r (suc i) b)) (r ++ [ ix i ]) (just (U.burstᶜ τ₀ r (suc i) b))
                      (firing s hd τ₀ r (suc i) b ∷ []) c′ st′
               → Sent s hd τ₀ r (suc i) b τ c′ st′
 
     back-done : ∀ {h v Δ} {A u τ₀} {s : Sink h A} {hd e} {k : Ctx h Δ A} {τ : h ⊑ʷ v} {c′} {st′ : State v}
-              → Back (λ _ → ⊥) τ k (coldˢ s hd (waiting {u = u} τ₀ e done)) e nothing [] c′ st′
+              → Back [] τ k (coldˢ s hd (waiting {u = u} τ₀ e done)) e nothing [] c′ st′
               → Holding [] c′ st′
 
   -- AN EMIT AT A HOLE, delivered to the hole's observer: the run up to
