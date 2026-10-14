@@ -11,6 +11,10 @@ module Main where
 -- time 0.  The IO runtime is the same engine over a different monad.
 open import adequacy.Adequacy using (adequacy)
 
+-- THE MEANING IS A FOLD: the theorem's denotation is the limit of each
+-- operator's `MonotonicList` function applied to its children's.
+open import denotation.Denote using (folded)
+
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.
 open import Tree using (merge; flatMap; ones)

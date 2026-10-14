@@ -27,7 +27,7 @@ open import IO.Primitive.Core using (pure; _>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; observe; ticks; root)
-open import denotation.Unfold using (⟦_⟧; [])
+open import denotation.Denote using (⟦_⟧[_])
 open import operation.Machine using (module Machine)
 open import operation.Observable using (subscribe; fromTimeline; newIORef; readIORef; writeIORef)
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
@@ -96,7 +96,7 @@ depth u p = suc u * suc (defers p)
 
 -- `u` bounds each `μ`'s unfolding; `n` bounds the trace.
 denoteTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
-denoteTrace u n p = traceML n (ticks (observe (⟦ toObs timeline u p [] [] [] ⟧ []) root))
+denoteTrace u n p = traceML n (ticks (observe (⟦ toObs timeline u p [] [] [] ⟧[ depth u p ] []) root))
 
 -- How many of a run's first n steps come by tick `horizon`.  A looping
 -- program works forever, and its machine slows as its heap grows, so it is

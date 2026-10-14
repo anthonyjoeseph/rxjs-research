@@ -2,6 +2,20 @@
 
 Agda model (`agda-impl/`) + TypeScript impl (`typescript/`). Agda is gospel; TS conforms. **`agda/` is reference only** — never edited, to be deleted.
 
+## The point of this repo (Anthony)
+
+The point of this repo is to be able to write proofs about actual executable programs written with Observable.
+
+There will always be gaps, because IO is non deterministic. That's why it's important to share as much code as possible between the pure operational semantics (PureObservable) and the io operational semantics (Observable). This shared engine is called AbstractObservable.
+
+A denotation is much easier to write proofs with than operational semantics - it's able to look at all emissions at once, rather than one at a time, and proofs written over top of it are compositional. The MonotonicList is this clairvoyant data structure.
+
+The point of "adequacy" is to link these two worlds, and give us what we want - simple, compositional proofs that have meaning on the IO side - the "real world" that can actually be executed.
+
+The Obs tree represents a minimal list of primitive operators that more complex operators can be built on top of. It's useful for proofs. It has three interpretations - denotational, pure-operational and io-operational. They all share a tree to facilitate this central idea.
+
+As we try to prove adequacy, it's important that we be able to change the implementations of MonotonicList and AbstractObservable, in order to make our job easier. But we always want to preserve four things - compositionality of the denotation, clairvoyance of MonotonicList, as much shared by PureObservable and Observable as possible, and all of these semantics must match the behavior of real rxjs exactly.
+
 ## This file
 
 - **File of record for every directive.** Ruling, standing rule, correction, "from now on" — here, in the section it belongs to, same commit. Not recorded until it is in this file; don't answer "noted" and carry it in context only.

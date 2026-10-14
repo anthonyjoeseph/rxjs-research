@@ -160,9 +160,10 @@ point at one, the row is FALSITY.
 ## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-the root, positions forgotten down to ticks. Both halves are read off one
-weak simulation, `sim`, between the small-step machine's trace and the events
-the root is shown. `sim` is a corecursion over `adequacy.Carrier`'s relation
+the root, positions forgotten down to ticks. The denotation is the
+compositional fold (`folded`); both halves are read off one weak simulation,
+`sim`, between the machine's trace and Unfold's stepper, and `unfolded`
+carries that to the fold. `sim` is a corecursion over `adequacy.Carrier`'s relation
 (B: every live observer held to its subtree's meaning, the machine's agenda
 located in the witness); its leaves are `kept`, B kept and each one-sided wait
 finite (C), and `carried-begin`. Work the riskiest
@@ -170,6 +171,13 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 ### Big picture tier roadmap
 
+- **THE FOLD AS THE SIMULATION'S TARGET.** The stepper is a second
+  one-event-at-a-time machine, and C, its lockstep with the machine, has no
+  measure. Measure the machine's silent steps per window between outputs
+  against the fold's steps over the same window. A bounded ratio makes the
+  fold's step count C's measure: restate `sim` against the fold, delete
+  Unfold and `unfolded`. Unbounded, the stepper stays and `unfolded` is the
+  leg. Decides which meaning the rest of the tier is worked against.
 - **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
   turn; it gains a field placing every live node's next shown event past the
   region the agenda owes, true at `carried-begin`. A popped timer's first
@@ -199,6 +207,8 @@ question first: try to REFUTE the route, and leave anything tractable last.
   falls quiet by silent steps.
 - **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program
   pending at the root, carried.
+- **`unfolded`** (Adequacy) — FALSITY, `NO EVIDENCE`: the stepper and the fold
+  show the same; they differ in how `connect` feeds its joiners.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 
