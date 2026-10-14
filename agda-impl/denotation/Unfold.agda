@@ -7,8 +7,9 @@
 -- it found.  So the meaning is productive without fuel and without
 -- approximants, recursion through `defer` included.
 --
--- Each node steps exactly as its operator in `MonotonicList` does, clause
--- for clause, positions included.  A `connect` steps its source once,
+-- Each node but `connect` steps exactly as its operator in `MonotonicList`
+-- does, clause for clause, positions included.  There a joiner observes a
+-- copy of the source; here a `connect` steps its source once,
 -- beside its body, and feeds each value to the joiners the body holds,
 -- as an rxjs Subject's `next` does: a joiner shows what it was fed, at
 -- the value's position under its own.  A configuration is typed by the
