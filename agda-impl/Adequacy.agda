@@ -38,7 +38,8 @@ open import operation.PureObservable using (Pureᴾ; PureObs; module Pure; toArr
 open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ;
   takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ)
 open import denotation.Order using (_⊑_; ⊑-trans; _≃_; ≃-trans; limit; Chain; squeeze; limit-ub; limit-least)
-open import denotation.Denote using (DenEnv; flatOp; ⟦_⟧[_]; ⟦_⟧)
+open import denotation.Denote using (DenEnv; flatOp; ⟦_⟧[_])
+open import denotation.Unfold using (⟦_⟧)
 
 -- The pure run: the limit of its approximants.
 run : ∀ {A} → PureObs [] A → ML A
@@ -124,8 +125,8 @@ module Link (R : Set) where
     -- A deeper approximant of the denotation shows more.
     approx-chain  : (o : PureObs [] R) → Chain (approxAt o)
 
-    -- Observing at the root, then forgetting positions, commutes with the
-    -- limit that `⟦_⟧` takes.
+    -- The approximants' limit is the unfolded meaning, observed at the
+    -- root with positions forgotten.
     ⟦⟧-limit : (o : PureObs [] R) → limit (approxAt o) ≃ ticks (observe (⟦ o ⟧ []) root)
 
   -- The run's approximants are a chain.

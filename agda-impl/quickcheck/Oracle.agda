@@ -27,7 +27,7 @@ open import IO.Primitive.Core using (pure; _>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; observe; ticks; root)
-open import denotation.Denote using (⟦_⟧[_])
+open import denotation.Unfold using (⟦_⟧)
 open import operation.PureObservable using (toArray)
 open import operation.Observable using (subscribe; fromTimeline; newIORef; readIORef; writeIORef)
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
@@ -96,7 +96,7 @@ depth u p = suc u * suc (defers p)
 
 -- `u` bounds each `μ`'s unfolding; `n` bounds the trace.
 denoteTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
-denoteTrace u n p = traceML n (ticks (observe (⟦ toObs timeline u p [] [] [] ⟧[ depth u p ] []) root))
+denoteTrace u n p = traceML n (ticks (observe (⟦ toObs timeline u p [] [] [] ⟧ []) root))
 
 pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 -- The engine's approximant is taken past both the tree's depth and the

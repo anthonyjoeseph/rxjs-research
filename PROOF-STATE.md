@@ -168,11 +168,12 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE DENOTATION, COINDUCTIVE.** `⟦_⟧` guarded by `defer`'s skip instead
-  of indexed by depth, so there is no `lub`, no approximant and no
-  `approx-chain`, `ticks-up` or `⟦⟧-limit`. Decides whether every operator's
-  denotation is productive once guarded, `flatMap`'s merge and `connect`'s
-  subject first.
+- **ONE CONFIGURATION TYPE.** `Config`'s tree and `denotation.Unfold`'s
+  configuration are one: the engine's state related to the very node the
+  meaning steps, `⟦_⟧ᶜ` its `unfold` rather than a composition of
+  approximants. Decides whether the engine-side tree (sources live or
+  finished, lanes, joiners) is the meaning's configuration plus ghost
+  state, or needs nodes the meaning lacks.
 - **THE ENGINE, SMALL-STEP.** The pure engine as a productive machine: an
   explicit continuation stack, one step per event, a silent step where it
   does work, so a run is a coinductive event stream with no burst budget,

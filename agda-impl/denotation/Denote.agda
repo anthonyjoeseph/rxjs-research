@@ -1,13 +1,9 @@
 {-# OPTIONS --guardedness #-}
 
--- A PROGRAM TREE'S MEANING: each node replaced by its `MonotonicList`
--- function.  This exists for `Adequacy`; nobody computing with timelines
--- needs it.
---
--- The tree has no fixpoint node — its recursion is Agda's own, through
--- `defer` — so there is no `λ x → …` to hand `fixᴰ`.  Instead the meaning
--- is built the way `fixᴰ` builds one: a chain of approximants, joined by
--- `lub`.
+-- A PROGRAM TREE'S APPROXIMANTS: each node replaced by its
+-- `MonotonicList` function, every path through more than n `defer`s cut
+-- off at ⊥ᴰ.  The meaning itself is `denotation.Unfold`'s; these exist for
+-- `Adequacy`'s squeeze, whose limit is that meaning.
 module denotation.Denote where
 
 open import Data.List using (List; _∷_)
@@ -17,7 +13,7 @@ open import Level using (lower)
 
 import Tree as T
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList using (MonotonicList; coldᴰ; Timeline; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ; lub)
+open import denotation.MonotonicList using (MonotonicList; coldᴰ; Timeline; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ)
 
 -- A connect in scope means the handle `connectᴰ` passed its body.
 DenEnv : List Set → Set₁
@@ -48,7 +44,3 @@ mutual
 
 ⟦_⟧[_] : ∀ {Γ A} → Obs Timeline Γ A → ℕ → DenEnv Γ → MonotonicList A
 ⟦ o ⟧[ n ] = approx n o
-
--- THE meaning of a program.
-⟦_⟧ : ∀ {Γ A} → Obs Timeline Γ A → DenEnv Γ → MonotonicList A
-⟦ o ⟧ ρ = lub λ n → ⟦ o ⟧[ n ] ρ
