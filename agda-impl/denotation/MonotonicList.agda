@@ -155,18 +155,17 @@ data MonotonicList (A : Set) : Set where
 -- joining after completion completes at once, both as an rxjs Subject.
 -- What the subject delivers is rekeyed under `sub p`.  The dropped
 -- prefix becomes skips just after `p`, before anything the join shows.
-private
-  mutual
-    rejoin : ∀ {A} → Pos → ℕ → Events A → Events A
-    rejoin p i (out q a k) = shown p i q (just a) k (p <ᵖ q)
-    rejoin p i (skip q k)  = shown p i q nothing k (p <ᵖ q)
-    rejoin p i (end c)     = if p <ᵖ c then end (c ++ [ sub p ]) else end (p ++ [ last ])
-    rejoin p i hush        = hush
+mutual
+  rejoin : ∀ {A} → Pos → ℕ → Events A → Events A
+  rejoin p i (out q a k) = shown p i q (just a) k (p <ᵖ q)
+  rejoin p i (skip q k)  = shown p i q nothing k (p <ᵖ q)
+  rejoin p i (end c)     = if p <ᵖ c then end (c ++ [ sub p ]) else end (p ++ [ last ])
+  rejoin p i hush        = hush
 
-    shown : ∀ {A} → Pos → ℕ → Pos → Maybe A → Events∞ A → Bool → Events A
-    shown p i q (just a) k true  = out (q ++ [ sub p ]) a λ where .force → rejoin p i (force k)
-    shown p i q nothing  k true  = skip (q ++ [ sub p ]) λ where .force → rejoin p i (force k)
-    shown p i q _        k false = skip (p ++ [ ix i ]) λ where .force → rejoin p (suc i) (force k)
+  shown : ∀ {A} → Pos → ℕ → Pos → Maybe A → Events∞ A → Bool → Events A
+  shown p i q (just a) k true  = out (q ++ [ sub p ]) a λ where .force → rejoin p i (force k)
+  shown p i q nothing  k true  = skip (q ++ [ sub p ]) λ where .force → rejoin p i (force k)
+  shown p i q _        k false = skip (p ++ [ ix i ]) λ where .force → rejoin p (suc i) (force k)
 
 -- What a subscriber arriving at position `p` sees.
 observe : ∀ {A} → MonotonicList A → Pos → Events A
@@ -180,21 +179,20 @@ observe (cold f) p = f p
 -- `r ++ [ last ]`, which is also where the timer for the next frame is
 -- created: after the burst and all it caused.  A frame at tick 0 is the
 -- subscribe burst, rooted at the subscription itself.
-private
-  mutual
-    frames : ∀ {A} → Time → Pos → ML A → Events A
-    frames τ e done     = end e
-    frames τ e quiet    = hush
-    frames τ e (at t b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+mutual
+  frames : ∀ {A} → Time → Pos → ML A → Events A
+  frames τ e done     = end e
+  frames τ e quiet    = hush
+  frames τ e (at t b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
 
-    burst : ∀ {A} → Time → Pos → ℕ → Burst A → Events A
-    burst τ r i (emit a k) = out (r ++ [ ix i ]) a (λ where .force → burst τ r (suc i) (Burst∞.force k))
-    burst τ r i (stall k)  = skip (r ++ [ ix i ]) (λ where .force → burst τ r (suc i) (Burst∞.force k))
-    burst τ r i (close k)  = skip (r ++ [ ix i ]) (λ where .force → frames τ (r ++ [ last ]) (ML∞.force k))
+  burst : ∀ {A} → Time → Pos → ℕ → Burst A → Events A
+  burst τ r i (emit a k) = out (r ++ [ ix i ]) a (λ where .force → burst τ r (suc i) (Burst∞.force k))
+  burst τ r i (stall k)  = skip (r ++ [ ix i ]) (λ where .force → burst τ r (suc i) (Burst∞.force k))
+  burst τ r i (close k)  = skip (r ++ [ ix i ]) (λ where .force → frames τ (r ++ [ last ]) (ML∞.force k))
 
-  start : ∀ {A} → Pos → ML A → Events A
-  start p (at zero b) = burst (tick p) p 0 b
-  start p m           = frames (tick p) (p ++ [ last ]) m
+start : ∀ {A} → Pos → ML A → Events A
+start p (at zero b) = burst (tick p) p 0 b
+start p m           = frames (tick p) (p ++ [ last ]) m
 
 coldᴰ : ∀ {A} → ML A → MonotonicList A
 coldᴰ m = cold λ p → start p m
@@ -236,36 +234,35 @@ data FlatOp : Set where
 
 -- Every operator subscribes its source where it is itself subscribed,
 -- so a stateful one (scan, takeWhile) starts afresh per subscriber.
-private
-  mapᴱ : ∀ {A B} → (A → B) → Events A → Events B
-  mapᴱ f (out k a r) = out k (f a) λ where .force → mapᴱ f (force r)
-  mapᴱ f (skip k r)  = skip k λ where .force → mapᴱ f (force r)
-  mapᴱ f (end k)     = end k
-  mapᴱ f hush        = hush
+mapᴱ : ∀ {A B} → (A → B) → Events A → Events B
+mapᴱ f (out k a r) = out k (f a) λ where .force → mapᴱ f (force r)
+mapᴱ f (skip k r)  = skip k λ where .force → mapᴱ f (force r)
+mapᴱ f (end k)     = end k
+mapᴱ f hush        = hush
 
-  scanᴱ : ∀ {A B} → (B → A → B) → B → Events A → Events B
-  scanᴱ f z (out k a r) = out k (f z a) λ where .force → scanᴱ f (f z a) (force r)
-  scanᴱ f z (skip k r)  = skip k λ where .force → scanᴱ f z (force r)
-  scanᴱ f z (end k)     = end k
-  scanᴱ f z hush        = hush
+scanᴱ : ∀ {A B} → (B → A → B) → B → Events A → Events B
+scanᴱ f z (out k a r) = out k (f z a) λ where .force → scanᴱ f (f z a) (force r)
+scanᴱ f z (skip k r)  = skip k λ where .force → scanᴱ f z (force r)
+scanᴱ f z (end k)     = end k
+scanᴱ f z hush        = hush
 
-  -- The first failing value leaves first only when inclusive; the
-  -- completion sits after its position either way.
-  mutual
-    takeWhileᴱ : ∀ {A} → Bool → (A → Bool) → Events A → Events A
-    takeWhileᴱ i p (out k a r) = taking i p k a (p a) r
-    takeWhileᴱ i p (skip k r)  = skip k λ where .force → takeWhileᴱ i p (force r)
-    takeWhileᴱ i p (end k)     = end k
-    takeWhileᴱ i p hush        = hush
+-- The first failing value leaves first only when inclusive; the
+-- completion sits after its position either way.
+mutual
+  takeWhileᴱ : ∀ {A} → Bool → (A → Bool) → Events A → Events A
+  takeWhileᴱ i p (out k a r) = taking i p k a (p a) r
+  takeWhileᴱ i p (skip k r)  = skip k λ where .force → takeWhileᴱ i p (force r)
+  takeWhileᴱ i p (end k)     = end k
+  takeWhileᴱ i p hush        = hush
 
-    taking : ∀ {A} → Bool → (A → Bool) → Pos → A → Bool → Events∞ A → Events A
-    taking i     p k a true  r = out k a λ where .force → takeWhileᴱ i p (force r)
-    taking true  p k a false r = out k a λ where .force → end (k ++ [ last ])
-    taking false p k a false r = end (k ++ [ last ])
+  taking : ∀ {A} → Bool → (A → Bool) → Pos → A → Bool → Events∞ A → Events A
+  taking i     p k a true  r = out k a λ where .force → takeWhileᴱ i p (force r)
+  taking true  p k a false r = out k a λ where .force → end (k ++ [ last ])
+  taking false p k a false r = end (k ++ [ last ])
 
-  ofᴱ : ∀ {A} → Pos → ℕ → List A → Events A
-  ofᴱ p i []       = end (p ++ [ last ])
-  ofᴱ p i (x ∷ xs) = out (p ++ [ ix i ]) x λ where .force → ofᴱ p (suc i) xs
+ofᴱ : ∀ {A} → Pos → ℕ → List A → Events A
+ofᴱ p i []       = end (p ++ [ last ])
+ofᴱ p i (x ∷ xs) = out (p ++ [ ix i ]) x λ where .force → ofᴱ p (suc i) xs
 
 emptyᴰ : ∀ {A} → MonotonicList A
 emptyᴰ = cold λ p → end (p ++ [ last ])
@@ -299,76 +296,75 @@ connectᴰ s f = cold λ p → observe (f (hot (observe s (p ++ [ ix 1 ])))) (p 
 -- being silent.  A bounded merge queues a lane past
 -- its bound and subscribes it where a lane completes; the whole
 -- completes where the last of the outer and its lanes does.
-private
-  head : ∀ {A} → Events A → Maybe Pos
-  head (out k _ _) = just k
-  head (skip k _)  = just k
-  head (end k)     = just k
-  head hush        = nothing
+head : ∀ {A} → Events A → Maybe Pos
+head (out k _ _) = just k
+head (skip k _)  = just k
+head (end k)     = just k
+head hush        = nothing
 
-  -- the lane whose next event comes first, with the lanes around it
-  data Earliest (B : Set) : Set where
-    none  : Earliest B
-    found : Pos → List (Events B) → Events B → List (Events B) → Earliest B
+-- the lane whose next event comes first, with the lanes around it
+data Earliest (B : Set) : Set where
+  none  : Earliest B
+  found : Pos → List (Events B) → Events B → List (Events B) → Earliest B
 
-  earliest : ∀ {B} → List (Events B) → Earliest B
-  earliest []       = none
-  earliest (l ∷ ls) = pick (head l) (earliest ls)
-    where
-      pick : Maybe Pos → Earliest _ → Earliest _
-      pick nothing  none               = none
-      pick nothing  (found k bs c as)  = found k (l ∷ bs) c as
-      pick (just k) none               = found k [] l ls
-      pick (just k) (found k′ bs c as) = if k <ᵖ k′ then found k [] l ls else found k′ (l ∷ bs) c as
+earliest : ∀ {B} → List (Events B) → Earliest B
+earliest []       = none
+earliest (l ∷ ls) = pick (head l) (earliest ls)
+  where
+    pick : Maybe Pos → Earliest _ → Earliest _
+    pick nothing  none               = none
+    pick nothing  (found k bs c as)  = found k (l ∷ bs) c as
+    pick (just k) none               = found k [] l ls
+    pick (just k) (found k′ bs c as) = if k <ᵖ k′ then found k [] l ls else found k′ (l ∷ bs) c as
 
-  -- a lane arriving, subscribed at `q`
-  admit : ∀ {B} → FlatOp → Pos → MonotonicList B → List (Events B) → List (MonotonicList B)
-        → List (Events B) × List (MonotonicList B)
-  admit (mergeᶠ nothing)  q m ls        qs = observe m q ∷ ls , qs
-  admit (mergeᶠ (just n)) q m ls        qs =
-    if length ls <ᵇ n then (observe m q ∷ ls , qs) else (ls , qs ++ [ m ])
-  admit switchᶠ           q m ls        qs = [ observe m q ] , qs
-  admit exhaustᶠ          q m []        qs = [ observe m q ] , qs
-  admit exhaustᶠ          q m (l ∷ ls)  qs = l ∷ ls , qs
+-- a lane arriving, subscribed at `q`
+admit : ∀ {B} → FlatOp → Pos → MonotonicList B → List (Events B) → List (MonotonicList B)
+      → List (Events B) × List (MonotonicList B)
+admit (mergeᶠ nothing)  q m ls        qs = observe m q ∷ ls , qs
+admit (mergeᶠ (just n)) q m ls        qs =
+  if length ls <ᵇ n then (observe m q ∷ ls , qs) else (ls , qs ++ [ m ])
+admit switchᶠ           q m ls        qs = [ observe m q ] , qs
+admit exhaustᶠ          q m []        qs = [ observe m q ] , qs
+admit exhaustᶠ          q m (l ∷ ls)  qs = l ∷ ls , qs
 
-  -- `o` is the outer, `nothing` once it has completed; `ls` the lanes in
-  -- flight; `qs` the queue.
-  mutual
-    go : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → List (MonotonicList B) → Events B
-    go op o ls qs with earliest ls
-    ... | none            = viaOuter op o ls qs
-    ... | found k bs l as = race op o k bs l as qs
+-- `o` is the outer, `nothing` once it has completed; `ls` the lanes in
+-- flight; `qs` the queue.
+mutual
+  go : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → List (MonotonicList B) → Events B
+  go op o ls qs with earliest ls
+  ... | none            = viaOuter op o ls qs
+  ... | found k bs l as = race op o k bs l as qs
 
-    viaOuter : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → List (MonotonicList B) → Events B
-    viaOuter op nothing  ls qs = hush
-    viaOuter op (just e) ls qs = outer op e ls qs
+  viaOuter : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → List (MonotonicList B) → Events B
+  viaOuter op nothing  ls qs = hush
+  viaOuter op (just e) ls qs = outer op e ls qs
 
-    race : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → Pos → List (Events B) → Events B → List (Events B)
-         → List (MonotonicList B) → Events B
-    race op nothing  k bs l as qs = lane op nothing bs l as qs
-    race op (just e) k bs l as qs with head e
-    ... | nothing = lane op (just e) bs l as qs
-    ... | just k′ with k′ <ᵖ k
-    ...   | true  = outer op e (bs ++ l ∷ as) qs
-    ...   | false = lane op (just e) bs l as qs
+  race : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → Pos → List (Events B) → Events B → List (Events B)
+       → List (MonotonicList B) → Events B
+  race op nothing  k bs l as qs = lane op nothing bs l as qs
+  race op (just e) k bs l as qs with head e
+  ... | nothing = lane op (just e) bs l as qs
+  ... | just k′ with k′ <ᵖ k
+  ...   | true  = outer op e (bs ++ l ∷ as) qs
+  ...   | false = lane op (just e) bs l as qs
 
-    outer : ∀ {B} → FlatOp → Events (MonotonicList B) → List (Events B) → List (MonotonicList B) → Events B
-    outer op (out q m r) ls qs with admit op (q ++ [ ix 1 ]) m ls qs
-    ... | ls′ , qs′ = skip (q ++ [ ix 0 ]) λ where .force → go op (just (force r)) ls′ qs′
-    outer op (skip q r) ls qs = skip q λ where .force → go op (just (force r)) ls qs
-    outer op (end c)    [] [] = end c
-    outer op (end c)    ls qs = skip c λ where .force → go op nothing ls qs
-    outer op hush       ls qs = hush
+  outer : ∀ {B} → FlatOp → Events (MonotonicList B) → List (Events B) → List (MonotonicList B) → Events B
+  outer op (out q m r) ls qs with admit op (q ++ [ ix 1 ]) m ls qs
+  ... | ls′ , qs′ = skip (q ++ [ ix 0 ]) λ where .force → go op (just (force r)) ls′ qs′
+  outer op (skip q r) ls qs = skip q λ where .force → go op (just (force r)) ls qs
+  outer op (end c)    [] [] = end c
+  outer op (end c)    ls qs = skip c λ where .force → go op nothing ls qs
+  outer op hush       ls qs = hush
 
-    lane : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → Events B → List (Events B)
-         → List (MonotonicList B) → Events B
-    lane op o bs (out k b r) as qs       = out k b λ where .force → go op o (bs ++ force r ∷ as) qs
-    lane op o bs (skip k r)  as qs       = skip k λ where .force → go op o (bs ++ force r ∷ as) qs
-    lane op o bs (end c)     as (m ∷ qs) =
-      skip (c ++ [ ix 0 ]) λ where .force → go op o (observe m (c ++ [ ix 1 ]) ∷ bs ++ as) qs
-    lane op nothing [] (end c) [] []     = end c
-    lane op o bs (end c)     as []       = skip c λ where .force → go op o (bs ++ as) []
-    lane op o bs hush        as qs       = hush
+  lane : ∀ {B} → FlatOp → Maybe (Events (MonotonicList B)) → List (Events B) → Events B → List (Events B)
+       → List (MonotonicList B) → Events B
+  lane op o bs (out k b r) as qs       = out k b λ where .force → go op o (bs ++ force r ∷ as) qs
+  lane op o bs (skip k r)  as qs       = skip k λ where .force → go op o (bs ++ force r ∷ as) qs
+  lane op o bs (end c)     as (m ∷ qs) =
+    skip (c ++ [ ix 0 ]) λ where .force → go op o (observe m (c ++ [ ix 1 ]) ∷ bs ++ as) qs
+  lane op nothing [] (end c) [] []     = end c
+  lane op o bs (end c)     as []       = skip c λ where .force → go op o (bs ++ as) []
+  lane op o bs hush        as qs       = hush
 
 flatMapᴰ : ∀ {A B} → FlatOp → (A → MonotonicList B) → MonotonicList A → MonotonicList B
 flatMapᴰ op f s = cold λ p → go op (just (observe (mapᴰ f s) p)) [] []

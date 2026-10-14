@@ -168,16 +168,15 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE CONFIGURATION.** `Rest` as a definition: what is left of the
-  running program against what is left of the root's events (`Live` pairs
-  it with the root's record, proven). Per subscription, its heap cells,
-  timers and observer against its denotation's remainder; and one ordering
-  invariant — every pending event past `pos`, the queue sorted by distinct
-  cascades. The heap holds callbacks, so a slot is related by what running
-  it does: step-indexed by callback depth. Most uncertain first: `flatMap`'s
-  merge order across lanes, then `connect`'s fan-out to joiners.
+- **THE CONFIGURATION.** `Realizes` as a definition: the engine's state
+  against a tree of live subscriptions (`Config`, whose meaning is proven to
+  be what `Rest` compares with the root's remainder). Per node, its cells,
+  timer and slot — a slot up to `_≼_` against the observer its kernel would
+  build now — dead timers and joiners allowed; and one ordering invariant,
+  every pending event past `pos`, the queue sorted by distinct cascades.
+  Most uncertain first: `flatMap`'s lanes, then `connect`'s joiners.
 - **THE BOUND HALF, NODE BY NODE.** `live-start` and `live-turn` by node kind,
-  the cold first from its recovered proof; then `rest-dry`, read off the
+  the cold first from its recovered proof; then `realizes-dry`, read off the
   configuration's timers.
 - **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted three times,
   and each repair restates the top line, so all are Anthony's call. A cold
@@ -200,13 +199,12 @@ must be solid before Tier 2 is written over it.
 
 - **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
   for a cold that falls, the repair Anthony's call.
-- **`Rest`** (Bound) — FALSITY, `DEAD ROUTE`, `X`: the running program's
-  configuration against what is left of the root's events, one relation for the
-  program.
+- **`Realizes`** (Bound) — FALSITY, `DEAD ROUTE`, `X`: the engine's state
+  against a configuration tree, one relation for the program.
 - **`live-start`, `live-turn`** (Bound) — FALSITY, `RECOVERY`, `X`: subscribing
   establishes `Live`, each turn of the loop keeps it.
-- **`rest-dry`** (Bound) — FALSITY, `NO EVIDENCE`, `X`: with no timer left, a
-  root not yet complete is shown nothing more.
+- **`realizes-dry`** (Bound) — FALSITY, `NO EVIDENCE`, `X`: with no timer left,
+  the realized tree has nothing pending.
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
 - **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject

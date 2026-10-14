@@ -16,10 +16,10 @@ open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
 open import Level using (lower)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; subst)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Pos; tick; Events; Events∞;
@@ -27,6 +27,8 @@ open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; qu
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using (PureObs; Pureᴾ; same; _⊑_; _⨾_; module Pure)
 open import operation.Placed using (Placed; cut; quiets; sends; skips; module Ran)
+open import operation.PureObservable using (note; fin)
+open import Config using (_≅_; skipˡ; hush≅; module Nodes)
 
 open Events∞
 
@@ -88,6 +90,11 @@ module Prefix (A : Set) where
   pre-cut c pnil      = cut
   pre-cut c (pskip p) = skips (pre-cut c p)
   pre-cut c (pout p)  = sends (pre-cut c p)
+
+  -- Agreeing with silence up to skips is reaching it through them.
+  ≅-hush : ∀ {r} → r ≅ hush → r ↝ hush
+  ≅-hush (skipˡ q) = past (≅-hush q)
+  ≅-hush hush≅     = stay
 
   -- Read off where the queue ran dry, over events that show nothing more.
   pre-dry : ∀ {qs xs E r} → Pre qs xs E r → r ↝ hush → Placed dry qs xs E
@@ -179,17 +186,22 @@ module Places (R : Set) where
   open Ran R using (ran; Recorded)
   open Pure R using (State; Res; res; start; recorder; compileᴺ; runᴺ; loopᴺ)
   open import operation.AbstractObservable using (module Run)
-  open Run (Pureᴾ R) using (done)
+  open Run (Pureᴾ R) using (done; eff; Observer; Env)
+  open Prefix R using (_↝_; ≅-hush)
 
   -- What the root is shown: approximant n of the program's denotation.
   shown : ℕ → PureObs [] R → Events R
   shown n o = observe (⟦ o ⟧[ n ] []) root
 
+  -- The root's observer, in any world: it only records.
+  rootObs : ∀ {h} → Observer R h
+  rootObs = record { next = λ a → eff (note a) λ _ → done tt ; complete = eff fin λ _ → done tt ; closed = done false }
+
   postulate
-    -- THE CONFIGURATION: the running program's state, related to `r`,
-    -- what is left of the root's events — every subscription's cells,
-    -- timers and observer against what is left of its own denotation.
-    -- One relation for the whole program, carried by the loop.
+    -- REALIZING A CONFIGURATION: the engine's state holds the tree `c`
+    -- with `o` its observer — every subscription's cells, timers and
+    -- registered observer against its node, the subjects in scope against
+    -- `ρ`.  One relation for the whole program, carried by the loop.
     --
     -- DEAD ROUTE: a relation per operator (a `Below s d`, against any
     --   observer that keeps an abstract interface) cannot be carried.
@@ -198,7 +210,14 @@ module Places (R : Set) where
     --   an abstract step returns its sibling's as an existential witness,
     --   forgotten; and a merge's order needs every sibling's pending
     --   positions, which an abstract subscription does not expose.
-    Rest : ∀ (n : ℕ) (o : PureObs [] R) {h} → Events R → State h → Set₁
+    Realizes : ∀ n {Δ A h} → Nodes.Node n Δ A → Env Δ h → Observer A h → State h → Set₁
+    -- With no timer left, the tree has nothing pending.
+    realizes-dry : ∀ n {h} {c : Nodes.Node n [] R} {st : State h} → Realizes n c [] rootObs st → State.timers st ≡ [] → Nodes.Dry n c []
+
+  -- THE CONFIGURATION: until the root completes, the state realizes a
+  -- tree that means what is left of the root's events.
+  Rest : ∀ (n : ℕ) {h} → Events R → State h → Set₁
+  Rest n r st = State.ended st ≡ false → Σ (Nodes.Node n [] R) λ c → Realizes n c [] rootObs st × r ≅ Nodes.⟦_⟧ᶜ n c []
 
   -- THE INVARIANT: the root's record so far, against the root's events,
   -- with what is left of them the configuration's.
@@ -207,7 +226,7 @@ module Places (R : Set) where
     field
       {left} : Events R
       sofar  : Ends.Root R (shown n o) left st
-      rest   : Rest n o left st
+      rest   : Rest n left st
 
   module At (n : ℕ) (o : PureObs [] R) (N : ℕ) where
     open Ends R (shown n o) public
@@ -224,8 +243,11 @@ module Places (R : Set) where
     --   against the engine: its subscribe burst, each timer's turn, and
     --   the record placed, frame by frame.
     live-turn : ∀ n o N k {h} (st : State h) {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts → At.Post n o N (At.turn n o N k st tm ts)
-    -- With no timer left, a root not yet complete is shown nothing more.
-    rest-dry  : ∀ n o {h} {r} {st : State h} → Rest n o r st → State.ended st ≡ false → State.timers st ≡ [] → Prefix._↝_ R r hush
+
+  -- With no timer left, a root not yet complete is shown nothing more.
+  rest-dry : ∀ n {h} {r} {st : State h} → Rest n r st → State.ended st ≡ false → State.timers st ≡ [] → r ↝ hush
+  rest-dry n {r = r} z e eq with z e
+  ... | c , q , b = ≅-hush (subst (r ≅_) (Nodes.dry-hush n c [] (realizes-dry n q eq)) b)
 
   -- A cut leaves the record a prefix.
   live-cut : ∀ n o {h} {st : State h} → Live n o st → At.CutOk n o 0 st
@@ -234,7 +256,7 @@ module Places (R : Set) where
 
   -- With no timer left, nothing more is shown.
   live-dry : ∀ n o {h} {st : State h} → Live n o st → State.timers st ≡ [] → At.Done n o 0 st
-  live-dry n o (config (Ends.live e p) z) eq = Ends.silent e p (rest-dry n o z e eq)
+  live-dry n o (config (Ends.live e p) z) eq = Ends.silent e p (rest-dry n z e eq)
   live-dry n o (config (Ends.over e p) z) eq = Ends.over e p
 
   -- THE BOUND HALF: approximant m of the engine leaves its record placed
