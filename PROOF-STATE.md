@@ -169,14 +169,14 @@ over it.
 
 ### Big picture tier roadmap
 
-- **THE UPPER HALF OVER THE CONFIGURATION.** `gets` as a body over
-  `Live` plus a measure: twice the events left to the target, plus the
-  deepest configuration left, never above the loop turns left. Each turn
-  spends a unit, a fired frame an event's, a spent timer the second unit
-  of the close that set it; each callback hop is a node of the
-  configuration. `make gets` finds `budget` enough past the edge. Decides
-  whether one global relation carries the state siblings share. Most
-  uncertain: a shared source's joiners, then a `flatMap` refill.
+- **THE UPPER HALF, TURN BY TURN.** `owe-turn` as a body over the frame
+  played step by step, the bound half's `burst-ok` shape with `Owing` for
+  `Mid`: each step spends what it shows, a fired frame an event's units, a
+  spent timer the unit its close set aside, a callback hop a node of the
+  configuration. Then `owe-start` over the same steps, `owe-dry` from
+  `rest-dry`. Decides whether one global relation carries the state
+  siblings share. Most uncertain: a shared source's joiners, then a
+  `flatMap` refill.
 - **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over
   `Mid`, and a send runs alike to its observer's (`send-ok`); what is left
   is each kernel's own run, `send-canon` first: an emit must reach the root
@@ -184,7 +184,7 @@ over it.
   again alike to the kernel's. The upper half reuses these step lemmas.
   Most uncertain: a `flatMap` lane's refill, then `connect`'s joiners.
 - **THE STATEMENT'S EDGES.** A `connect` source the body outlives,
-  spinning or running forever: `gets` is false there. The meaning keeps
+  spinning or running forever: `owe-turn` is false there. The meaning keeps
   its events as skips, or `adequacy` assumes none; Anthony's call.
 - **THE ENGINE, SMALL-STEP.** The pure engine as a productive machine: an
   explicit continuation stack, one step per event, a silent step where it
@@ -195,8 +195,10 @@ over it.
 
 ### The ledger
 
-- **`gets`** (Progress) — FALSITY, `DEAD ROUTE`: wherever the meaning's events
-  reach, the run at their `budget` records as many items.
+- **`owe-turn`** (Progress) — FALSITY, `DEAD ROUTE`: a loop turn spends a
+  turn's worth of the items owed, never cutting first.
+- **`owe-start`, `owe-dry`** (Progress) — FALSITY, `NO EVIDENCE`: subscribing
+  within `budget` leaves the run owing; a dry queue pays what is owed.
 - **`send-canon`, `closed-ok`, `finish-ok`** (Bound) — FALSITY, `RECOVERY`: a
   firing cold's emit to its observer, closed check and completion, run through
   every kernel above it, keep `Mid`.
