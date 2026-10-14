@@ -35,18 +35,18 @@ open import Level using (lower)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; observe; root)
+open import denotation.MonotonicList using (Events; Events∞; Frame; out; skip; end; hush; tick; observe; root)
 open import denotation.Order using (_⊑_; Chain)
 open import denotation.Unfold using (⟦_⟧)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
-open import operation.PureObservable using (PureObs; module Pure)
+open import operation.PureObservable using (PureObs; Sink; same; module Pure)
 open import Realize using (module Realizing)
 
 module Sim (R : Set) where
-  open Machine R using (Mach; ⟨_,_⟩; turn; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
-  open Realizing R using (Calm; calm; Holding; dead; dry-hush; pop-dead)
+  open Machine R using (Mach; ⟨_,_⟩; turn; burst; loop; silent; shown; Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
+  open Realizing R using (Calm; calm; Holding; firing; dead; dry-hush; pop-dead; pop-live)
   open Pure R using (State; Timer; get; cascade)
   open Pure R using (cutOff; frames)
   open Read
@@ -100,16 +100,17 @@ module Sim (R : Set) where
     -- The subscribe burst, up to the first calm point.
     start-seg : (o : PureObs [] R) → Seg nothing (trace (begin o)) (observe (⟦ o ⟧ []) root)
 
-    -- A live timer popped from a calm point: its frame shows at least
-    -- one step on each side before the loop is reached again, so the
-    -- segment passes a guard first, whatever bound it is under.
+    -- A live cold's frame, burst from the loop: it shows at least one step
+    -- on each side before the loop is reached again, so the segment
+    -- passes a guard first, whatever bound it is under.
     --
     -- RECOVERY: `git show a2e0bb8b:agda-impl/Realize.agda` restores
     --   `Spot`, `setAt`, `obsAt` and `Playing` — one cold picked out of the
     --   witness mid-frame, and the observer its slot holds — over the fuel
     --   engine's witness.
-    fire : ∀ {h c} {st : State h} {tm ts} → Holding c st → State.timers st ≡ tm ∷ ts
-         → lower (get (State.heap st) (Timer.handle tm)) ≡ false → ∀ {b} → Seg b (trace ⟨ st , turn ⟩) (U.unfold c)
+    burst-seg : ∀ {h c} {st : State h} {A u} {s : Sink h A} {hd r i} {b : Frame A u}
+              → Holding (firing s hd r i b ∷ []) c st → lower (get (State.heap st) hd) ≡ false
+              → ∀ {bd} → Seg bd (trace ⟨ st , burst s hd u r i b same loop ⟩) (U.unfold c)
 
   if-true : ∀ {ℓ ℓ′} {X : Set ℓ} {x : Bool} {a b : X} (P : X → Set ℓ′) → x ≡ true → P a → P (if x then a else b)
   if-true P refl p = p
@@ -119,12 +120,12 @@ module Sim (R : Set) where
   turn-seg : ∀ {m e} → Calm m e → Seg (just (dead m)) (trace m) e
   turn-seg (calm {st = st} h) = turning st h
     where
-      turning : ∀ {h c} (st : State h) → Holding c st → Seg (just (dead ⟨ st , turn ⟩)) (trace ⟨ st , turn ⟩) (U.unfold c)
+      turning : ∀ {h c} (st : State h) → Holding [] c st → Seg (just (dead ⟨ st , turn ⟩)) (trace ⟨ st , turn ⟩) (U.unfold c)
       turning record { timers = [] } h =
         subst (λ s → Seg _ idle (U.shown s)) (sym (dry-hush h refl)) idle~
       turning record { heap = H ; timers = tm ∷ ts } h with lower (get H (Timer.handle tm)) in sp
       ... | true  = tauˡ (if-true (λ m → Seg _ (shown (silent m)) _) sp (tauˡ (tauˡ (calm~ (calm (pop-dead h refl sp)) ≤-refl))))
-      ... | false = fire h refl sp
+      ... | false = tauˡ (burst-seg (pop-live h refl sp) sp)
 
   -- Segments glued at their calm points: each turn is a segment, and a run
   -- of unguarded ones pops a dead timer each, so ends.

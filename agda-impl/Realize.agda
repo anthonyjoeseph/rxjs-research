@@ -43,7 +43,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 
 import Tree as T
 open import Tree using (Obs; Later)
-open import denotation.MonotonicList using (Events; Time; Pos; From; Timeline; at; last; ix; _<ᵖ_) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Events; Time; Pos; From; Frame; Timeline; at; last; ix; _<ᵖ_) renaming (sub to subᴾ)
 import denotation.Unfold as U
 open import denotation.Unfold using (Srcs)
 open import operation.AbstractObservable using (base; module Run)
@@ -158,10 +158,14 @@ module Realizing (R : Set) where
   ------------------------------------------------------------------------
   -- Every subscription the run still reaches, with its names
 
-  -- A started cold between frames: its timeline from the frame it waits
-  -- for, subscribed at tick `τ`, the frame's timer set at `e`.
+  -- A started cold, subscribed at tick `τ`: between frames, its timeline
+  -- from the frame it waits for, the frame's timer set at `e`; its frame
+  -- at `t` popped from the queue and not yet stepped; at step `i` of the
+  -- frame at `r`.
   data Phase (A : Set) : Set where
     waiting : ∀ {u} → Time → Pos → From A u → Phase A
+    popped  : ∀ {u} → Time → Pos → (t : Time) → u ≤ t → Frame A t → Phase A
+    playing : ∀ {t} → Time → Pos → ℕ → Frame A t → Phase A
 
   mutual
     data Sub (h : World) : List Set → Set → Set₁ where
@@ -241,6 +245,47 @@ module Realizing (R : Set) where
   timerOf : ∀ {h A} → Sink h A → Handle h → Phase A → List (Timer h)
   timerOf s hd (waiting τ e (at t _ b)) = record { due = τ + t ; sink = s ; handle = hd ; at′ = t ; from = e ; frame = b } ∷ []
   timerOf s hd (waiting τ e _)          = []
+  timerOf s hd (popped _ _ _ _ _)       = []
+  timerOf s hd (playing _ _ _ _)        = []
+
+  -- A frame the machine is bursting: its cold's sink and handle, the
+  -- frame's position, the step it stands before, what is left of it.
+  record Firing (h : World) : Set₁ where
+    constructor firing
+    field
+      {A}    : Set
+      {u}    : Time
+      sink   : Sink h A
+      handle : Handle h
+      at′    : Pos
+      index  : ℕ
+      frame  : Frame A u
+
+  -- The frame a timer pops, before its first step.
+  popping : ∀ {h} → Timer h → Firing h
+  popping tm = firing (Timer.sink tm) (Timer.handle tm) (cascade tm) 0 (Timer.frame tm)
+
+  firingOf : ∀ {h A} → Sink h A → Handle h → Phase A → List (Firing h)
+  firingOf s hd (waiting _ _ _)     = []
+  firingOf s hd (popped τ e t le b) = firing s hd (ix (τ + t) ∷ subᴾ e ∷ []) 0 b ∷ []
+  firingOf s hd (playing τ r i b)   = firing s hd r i b ∷ []
+
+  -- The frames being burst.
+  mutual
+    firings : ∀ {h Δ A} → Sub h Δ A → List (Firing h)
+    firings (coldˢ s hd ph)                 = firingOf s hd ph
+    firings doneˢ                           = []
+    firings (mapˢ f s)                      = firings s
+    firings (scanˢ f r s)                   = firings s
+    firings (takeWhileˢ i p c k s)          = firings s
+    firings (flatMapˢ op f fl oc k r so ls) = firings so ++ laneFirings ls
+    firings (connectˢ S c k s₀ src body)    = firings src ++ firings body
+    firings (joinˢ j i sk l x)              = []
+    firings (deferˢ k s)                    = firings s
+
+    laneFirings : ∀ {h Δ B} → List (Lane h Δ B) → List (Firing h)
+    laneFirings []                = []
+    laneFirings (lane c k s ∷ ls) = firings s ++ laneFirings ls
 
   -- The frames pending.
   mutual
@@ -358,6 +403,8 @@ module Realizing (R : Set) where
     mutual
       part : ∀ {Δ A} → Sub h Δ A → Env Δ h → Srcs Δ → Now Δ → Maybe (U.Node A)
       part (coldˢ s hd (waiting τ e m))    E ρ ν = if spentʰ hd then nothing else just (U.framesᶜ τ e m)
+      part (coldˢ s hd (popped τ e t le b)) E ρ ν = if spentʰ hd then nothing else just (U.framesᶜ τ e (at t le b))
+      part (coldˢ s hd (playing τ r i b))   E ρ ν = if spentʰ hd then nothing else just (U.burstᶜ τ r i b)
       part doneˢ                           E ρ ν = nothing
       part (mapˢ f s)                      E ρ ν = mapᴹ (U.mapᶜ f) (part s E ρ ν)
       part (scanˢ f r s)                   E ρ ν = mapᴹ (U.scanᶜ f (val r)) (part s E ρ ν)
@@ -437,8 +484,9 @@ module Realizing (R : Set) where
 
   -- THE CONFIGURATION `c` IS WHAT IS RUNNING: a witness holding every
   -- subscription the run reaches, against its kernel, whose open part is
-  -- `c`; the queue its pending frames and dead ones, the subjects'
-  -- subscribers its joiners, the names all distinct, the root not done.
+  -- `c`; the frames being burst `fs`, the queue its pending frames and
+  -- dead ones, the subjects' subscribers its joiners, the names all
+  -- distinct, the root not done.
   --
   -- DEAD ROUTE: a relation per operator (a `Below s d`, against any
   --   observer that keeps an abstract interface) cannot be carried.
@@ -447,12 +495,13 @@ module Realizing (R : Set) where
   --   an abstract step returns its sibling's as an existential witness,
   --   forgotten; and a merge's order needs every sibling's pending
   --   positions, which an abstract subscription does not expose.
-  record Holding {h} (c : U.Node R) (st : State h) : Set₁ where
+  record Holding {h} (fs : List (Firing h)) (c : U.Node R) (st : State h) : Set₁ where
     open At (State.heap st)
     field
       tree    : Sub h [] R
       holds   : Holds tree [] rootObs
       open≡   : part tree [] [] [] ≡ just c
+      firing≡ : firings tree ≡ fs
       timed   : Timed (State.timers st) (pendings tree)
       joined  : Joined (subjects tree) (joiners tree [])
       ordered : Ordered st
@@ -462,7 +511,7 @@ module Realizing (R : Set) where
   -- BETWEEN TURNS: the machine at its loop, and what is running is what
   -- the meaning has left to show.
   data Calm : Mach → Events R → Set₁ where
-    calm : ∀ {h} {st : State h} {c} → Holding c st → Calm ⟨ st , turn ⟩ (U.unfold c)
+    calm : ∀ {h} {st : State h} {c} → Holding [] c st → Calm ⟨ st , turn ⟩ (U.unfold c)
 
   -- The timers whose cold is spent: popping one runs nothing.
   spentIn : ∀ {h} → All (Pure.Val R h) h → List (Timer h) → ℕ
@@ -475,10 +524,17 @@ module Realizing (R : Set) where
   postulate
     -- With no timer queued, what is running has nothing to show: every
     -- cold it holds gone quiet, every joiner's copy of a quiet source.
-    dry-hush : ∀ {h c} {st : State h} → Holding c st → State.timers st ≡ [] → U.step c ≡ U.hushˢ
+    dry-hush : ∀ {h c} {st : State h} → Holding [] c st → State.timers st ≡ [] → U.step c ≡ U.hushˢ
 
     -- A dead timer popped: the clock and the run's position move to it,
     -- and nothing else does.
-    pop-dead : ∀ {h c} {st : State h} {tm ts} → Holding c st → State.timers st ≡ tm ∷ ts
+    pop-dead : ∀ {h c} {st : State h} {tm ts} → Holding [] c st → State.timers st ≡ tm ∷ ts
              → lower (get (State.heap st) (Timer.handle tm)) ≡ true
-             → Holding c (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm })
+             → Holding [] c (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm })
+
+    -- A live timer popped: its cold's frame is being burst, and what is
+    -- running has not moved — the frame's first step is the meaning's
+    -- next event either way.
+    pop-live : ∀ {h c} {st : State h} {tm ts} → Holding [] c st → State.timers st ≡ tm ∷ ts
+             → lower (get (State.heap st) (Timer.handle tm)) ≡ false
+             → Holding (popping tm ∷ []) c (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm })

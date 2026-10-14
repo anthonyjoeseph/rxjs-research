@@ -168,14 +168,18 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **A FRAME, FIRED.** `fire` as a body: the popped cold's burst, a frame
-  step at a time, each running the observer chain its slot holds — to the
+- **A FRAME, FIRED.** `burst-seg` as a body, a frame step at a time: the
+  subscriber read open at a live cold, a stall and a close moving only the
+  cold's phase, an emit running the observer chain its slot holds — to the
   root, into a lane's subscription, through a subject to its joiners —
-  then the loop. Needs a mid-cascade invariant, the calm witness with one
-  cold firing and the stack's waiting frames, and is where a missing
-  conjunct of `Holding` shows. Decides whether `Realize`'s relation is
-  re-established after a turn, and whether a cascade's silent steps are
+  then the loop. The emit needs a mid-delivery invariant, `Holding` with
+  the stack's waiting frames and joiner copies lagging, and is where a
+  missing conjunct shows. Decides whether a cascade's silent steps are
   finite: a `flatMap` refill and `connect`'s joiners the uncertain cases.
+- **THE POP.** `pop-live`: a popped live timer's cold moves to `popped`,
+  its part unchanged since the frame's first step is the meaning's next
+  event either way. Decides whether `Timed` and `Ordered` pin the popped
+  timer to exactly one cold.
 - **THE QUEUE, EMPTY OR DEAD.** `dry-hush` and `pop-dead`, over `Ordered`
   and `Timed`: an empty queue leaves nothing to show, and a dead pop moves
   only the clock. Decides whether the order the witness records is enough
@@ -197,8 +201,10 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### The ledger
 
-- **`fire`** (Simulation) — FALSITY, `RECOVERY`: a live timer's frame shows a
-  step on each side before the loop.
+- **`burst-seg`** (Simulation) — FALSITY, `RECOVERY`: a live cold's frame shows
+  a step on each side before the loop.
+- **`pop-live`** (Realize) — FALSITY, `NO EVIDENCE`: a live timer popped, its
+  cold's frame burst from the same configuration.
 - **`dry-hush`** (Realize) — FALSITY, `NO EVIDENCE`: an empty queue, a
   configuration with nothing to show.
 - **`pop-dead`** (Realize) — FALSITY, `NO EVIDENCE`: a dead timer popped keeps
