@@ -28,7 +28,7 @@ open import Relation.Nullary using (¬_)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; observe; root; Pos)
 open import denotation.Order using (_⊑_; Chain)
-open import denotation.Unfold using (⟦_⟧; Node; Srcs; subscribe; unfold; shown; outˢ; skipˢ; endˢ; hushˢ; ofᶜ; mapᶜ) renaming (step to stepᵁ; Step to Stepᵁ)
+open import denotation.Unfold using (⟦_⟧; Node; []; subscribe; unfold; shown; outˢ; skipˢ; endˢ; hushˢ; ofᶜ; mapᶜ) renaming (step to stepᵁ; Step to Stepᵁ)
 open import adequacy.Carrier using (module Carrying)
 open import adequacy.Kept using (module Keeping)
 open import adequacy.Wait using (module Waiting)
@@ -69,7 +69,7 @@ module Sim (R : Set) where
   -- The corecursion
 
   -- `Rel` is where the corecursion re-enters.
-  module From {ℓ} {Rel : Mach → Node R → Set ℓ} (kept : ∀ {m c} → Rel m c → Wait Rel (step m) (stepᵁ c)) where
+  module From {ℓ} {Rel : Mach → Node [] R → Set ℓ} (kept : ∀ {m c} → Rel m c → Wait Rel (step m) (stepᵁ c)) where
     mutual
       sim-from : ∀ {m c} → Rel m c → trace m ~ unfold c
       sim-from r = go (kept r)
@@ -84,7 +84,7 @@ module Sim (R : Set) where
 
   postulate
     -- The run begins carried: the program pending at the root.
-    carried-begin : (o : PureObs [] R) → Carried (begin o) (subscribe o [] root)
+    carried-begin : (o : PureObs [] R) → Carried (begin o) (subscribe o root)
 
   -- The program's run is what the root is shown.
   --
@@ -95,7 +95,7 @@ module Sim (R : Set) where
   -- switch moves off it, or the observer that subscribed it is dead.
   --
   -- Tested, both halves, against `Unfold`'s own node meanings, each
-  -- joiner held to its own copy of the source: the invariant on drawn
+  -- node under a connect beside the source it is fed: the invariant on drawn
   -- seeds (`Oracle-CLI exact`) and at the connect feed's edges, a
   -- joiner subscribed or the body completing mid-feed
   -- (`quickcheck.Adversary`); progress on programs spinning with no
@@ -129,29 +129,29 @@ module Sim (R : Set) where
     aPending : ∀ {Δ′ A′ s q} → Path u (pendingˢ {Δ = Δ′} {A′} s q) → Leaf u
 
   private
-    no-map : ∀ {A B} {f : A → B} (n : Maybe (Node A)) {p : Pos} {i xs} → At.mapᴹ [] (mapᶜ f) n ≡ just (ofᶜ p i xs) → ⊥
+    no-map : ∀ {Δ A B} {f : A → B} (n : Maybe (Node Δ A)) {p : Pos} {i xs} → At.mapᴹ [] (mapᶜ f) n ≡ just (ofᶜ p i xs) → ⊥
     no-map nothing  ()
     no-map (just _) ()
 
-    found : ∀ {Δ A p i xs} (u : Sub [] Δ A) (ρ : Srcs Δ) → At.part [] u ρ ≡ just (ofᶜ p i xs) → Leaf u
-    found (pendingˢ s q)                       ρ e = aPending here
-    found (coldˢ () hd ph)                     ρ e
-    found (ofˢ p i xs)                         ρ e = anOf here
-    found doneˢ                                ρ ()
-    found (mapˢ f s)                           ρ e = ⊥-elim (no-map (At.part [] s ρ) e)
-    found (scanˢ f () s)                       ρ e
-    found (takeWhileˢ i p (() , _) k tk s)     ρ e
-    found (flatMapˢ op f fl (() , _) k r s ls) ρ e
-    found (connectˢ s₁ p S (() , _) k fd s₀ m s b) ρ e
-    found (joinˢ j i () l x cp)                ρ e
-    found (deferˢ k s)                         ρ e with found s ρ e
+    found : ∀ {Δ A p i xs} (u : Sub [] Δ A) → At.part [] u ≡ just (ofᶜ p i xs) → Leaf u
+    found (pendingˢ s q)                       e = aPending here
+    found (coldˢ () hd ph)                     e
+    found (ofˢ p i xs)                         e = anOf here
+    found doneˢ                                ()
+    found (mapˢ f s)                           e = ⊥-elim (no-map (At.part [] s) e)
+    found (scanˢ f () s)                       e
+    found (takeWhileˢ i p (() , _) k tk s)     e
+    found (flatMapˢ op f fl (() , _) k r s ls) e
+    found (connectˢ s₁ p S (() , _) k fd c s b) e
+    found (joinˢ j () l x st)                  e
+    found (deferˢ k s)                         e with found s e
     ... | anOf π     = anOf (in-defer π)
     ... | aPending π = aPending (in-defer π)
 
   -- The state that refuted `kept` before ownership: between turns, an
   -- `of` open with nothing owing its rest.
   unowned : ∀ {p i xs} → ¬ Carried ⟨ start , turn ⟩ (ofᶜ p i xs)
-  unowned r with Carried.ctlAs r | Carried.owned r | found (Carried.tree r) [] (Carried.open≡ r)
+  unowned r with Carried.ctlAs r | Carried.owned r | found (Carried.tree r) (Carried.open≡ r)
   ... | Against.calmAs | o | anOf π with Owned.ofs o π
   ...   | ()
   unowned r | Against.calmAs | o | aPending π with Owned.begun o π

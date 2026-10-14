@@ -7,8 +7,8 @@
 -- it is delivered, and where, goes on the record, tagged with the node, the
 -- position the node was subscribed at, and what the denotation shows a
 -- subscriber there: `denotation.Unfold`'s meaning, the one `sim` states.
--- A `connected` node is held to its own copy of the source its `connect`
--- subscribed, as the meaning joins one.  Each observer's deliveries must be a
+-- A node under a `connect` is held to its meaning beside the source the
+-- `connect` subscribed, fed to its joiners as the meaning feeds them.  Each observer's deliveries must be a
 -- prefix of what it is shown, or extend it where the denotation was read
 -- only so far: no event the denotation does not have, none out of place.
 module quickcheck.Ghost where
@@ -31,7 +31,7 @@ open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; note)
 open import operation.Machine using (module Machine)
 open import denotation.MonotonicList using (MonotonicList; Label; sub; last; Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; observe; Timeline)
-open import denotation.Unfold using (Srcs; ⟦_⟧; subscribe)
+open import denotation.Unfold using (Srcs; ⟦_⟧; subscribe; []; _∷_)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Oracle using (depth; until)
 open import quickcheck.Quickcheck using (program)
@@ -105,7 +105,7 @@ module Watched where
     node n       me π (flatMap op f s)  ρ δ = flatMapᴷ op (λ a → watchedS (isSwitch op) n me (1 ∷ π) (f a) ρ δ) (watched n me (0 ∷ π) s ρ δ)
     node n       me π (connect s b)     ρ δ σ o k = here λ p →
       connectᴷ (watched n me (0 ∷ π) s ρ δ)
-               (λ τ st → watched n me (1 ∷ π) b (st ∷ wkEnv τ ρ) (subscribe s δ (p ++ [ ix 1 ]) ∷ δ)) σ o k
+               (λ τ st → watched n me (1 ∷ π) b (st ∷ wkEnv τ ρ) (subscribe s (p ++ [ ix 1 ]) ∷ δ)) σ o k
     node n       me π (connected i)     ρ δ = joinᴷ (lookup ρ i)
     node zero    me π (defer l)         ρ δ = ⊥ᴷ
     node (suc n) me π (defer l)         ρ δ = deeper (watched n me (0 ∷ π) (Later.force l) ρ δ)

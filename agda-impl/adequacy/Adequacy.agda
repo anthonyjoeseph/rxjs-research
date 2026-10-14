@@ -12,7 +12,6 @@
 module adequacy.Adequacy where
 
 open import Data.List using ([])
-open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ)
 open import Data.Product using (_,_; Σ; proj₁; proj₂)
 
@@ -22,7 +21,7 @@ open import operation.PureObservable using (PureObs)
 open import adequacy.Simulation using (module Sim)
 open import denotation.MonotonicList using (ML; observe; root; ticks)
 open import denotation.Order using (_⊑_; _≃_; Shows; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
-open import denotation.Unfold using (⟦_⟧)
+open import denotation.Unfold using (⟦_⟧; [])
 
 -- The pure run: the limit of the machine's prefixes.
 run : ∀ {A} → PureObs [] A → ML A

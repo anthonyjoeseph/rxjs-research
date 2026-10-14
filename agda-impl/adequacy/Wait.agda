@@ -6,6 +6,7 @@
 -- `Rel` is where the corecursion re-enters.
 module adequacy.Wait where
 
+open import Data.List using ([])
 open import denotation.MonotonicList using (tick)
 open import denotation.Unfold using (Node; outˢ; skipˢ; endˢ; hushˢ) renaming (step to stepᵁ; Step to Stepᵁ)
 open import operation.Machine using (module Machine)
@@ -13,8 +14,8 @@ open import operation.Machine using (module Machine)
 module Waiting (R : Set) where
   open Machine R using (Mach; Step; silent; value; complete; drained; step)
 
-  module _ {ℓ} (Rel : Mach → Node R → Set ℓ) where
-    data Wait : Step → Stepᵁ R → Set ℓ where
+  module _ {ℓ} (Rel : Mach → Node [] R → Set ℓ) where
+    data Wait : Step → Stepᵁ [] R → Set ℓ where
       both  : ∀ {m c p} → Rel m c → Wait (silent m) (skipˢ p c)
       outs  : ∀ {m c p a} → Rel m c → Wait (value (tick p) p a m) (outˢ p a c)
       ends  : ∀ {p} → Wait (complete p) (endˢ p)

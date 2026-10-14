@@ -20,7 +20,7 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; tick; observe; root)
-open import denotation.Unfold using (⟦_⟧)
+open import denotation.Unfold using (⟦_⟧; [])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)

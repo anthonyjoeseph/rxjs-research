@@ -35,14 +35,14 @@ open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥)
 open import Level using (Lift; lower)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+import Data.List.Relation.Unary.Any as Any
 open import Relation.Nullary using (¬_)
 
 import Tree as T
 open import Tree using (Obs; Later)
 open import denotation.MonotonicList using (Time; Pos; From; Frame; Timeline; at; last; ix; tick; _<ᵖ_) renaming (sub to subᴾ; done to doneᶠ)
 import denotation.Unfold as U
-open import denotation.Unfold using (Srcs)
 open import operation.AbstractObservable using (base; module Run)
 open import operation.PureObservable using (Pureᴾ; World; _⊑_; Kind; cell; slot; play; _∋_; wk∋; Sink; Handle; same; _⨾_; note; fin; module Pure)
 open import operation.Machine using (module Machine)
@@ -228,14 +228,13 @@ module Carrying (R : Set) where
                  → Sub h Δ A → List (Lane h Δ B) → Sub h Δ B
       -- The source's program and where the connect was subscribed, the
       -- subject, the source's kill switch and attached unsubscribe, the
-      -- feed, the source as it started, the source as the meaning holds
-      -- it, the source, the body.
+      -- feed, where the source ended once it has, the source, the body.
       connectˢ   : ∀ {Δ A B} → Obs Timeline Δ A → Pos → Subject A h → Cut h → Maybe (Sink h ⊤) → Feed A h
-                 → U.Node A → Maybe (U.Node A) → Sub h Δ A → Sub h (A ∷ Δ) B → Sub h Δ B
-      -- Joined at `j`, `i` of the source's events dropped: the registered
-      -- sink and its flag, and its copy of the source as the meaning
-      -- steps it, gone once its completion is delivered.
-      joinˢ      : ∀ {Δ A} → Pos → ℕ → Sink h A → Ref h (base Bool) → A ∈ Δ → Maybe (U.Node A) → Sub h Δ A
+                 → Maybe Pos → Sub h Δ A → Sub h (A ∷ Δ) B → Sub h Δ B
+      -- Joined at `j`: the registered sink and its flag, and what the
+      -- meaning has fed it and not yet shown, with where it ends once
+      -- told; gone once its completion is delivered.
+      joinˢ      : ∀ {Δ A} → Pos → Sink h A → Ref h (base Bool) → A ∈ Δ → Maybe (List (Pos × A) × Maybe Pos) → Sub h Δ A
       -- A `defer` reached: the unsubscribe it registered once its body's
       -- subscription exists, its body.
       deferˢ     : ∀ {Δ A} → Maybe (Sink h ⊤) → Sub h Δ A → Sub h Δ A
@@ -259,8 +258,8 @@ module Carrying (R : Set) where
   unsub (scanˢ f r s)                        = unsub s
   unsub (takeWhileˢ i p c k tk s)            = cut c
   unsub (flatMapˢ op f fl oc k r so ls)      = cut oc >>ᴬ killAllᶜ fl
-  unsub (connectˢ s₁ p S c k fd s₀ m src body) = unsub src >>ᴬ unsub body
-  unsub (joinˢ j i sk l x cp)                = writeRef l false skipᴬ
+  unsub (connectˢ s₁ p S c k fd e src body) = unsub src >>ᴬ unsub body
+  unsub (joinˢ j sk l x st)                = writeRef l false skipᴬ
   unsub (deferˢ nothing s)                   = skipᴬ
   unsub (deferˢ (just k) s)                  = send k tt (done tt)
 
@@ -277,10 +276,10 @@ module Carrying (R : Set) where
                 → Path t u → Path (flatMapˢ op f fl oc k r t ls) u
       in-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C}
                 → PathLanes ls u → Path (flatMapˢ op f fl oc k r t ls) u
-      in-source : ∀ {Δ A B Δ′ C} {s₁ p S c k fd s₀ m} {t : Sub h Δ A} {b : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C}
-                → Path t u → Path (connectˢ s₁ p S c k fd s₀ m t b) u
-      in-body   : ∀ {Δ A B Δ′ C} {s₁ p S c k fd s₀ m} {t : Sub h Δ A} {b : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C}
-                → Path b u → Path (connectˢ s₁ p S c k fd s₀ m t b) u
+      in-source : ∀ {Δ A B Δ′ C} {s₁ p S c k fd e} {t : Sub h Δ A} {b : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C}
+                → Path t u → Path (connectˢ s₁ p S c k fd e t b) u
+      in-body   : ∀ {Δ A B Δ′ C} {s₁ p S c k fd e} {t : Sub h Δ A} {b : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C}
+                → Path b u → Path (connectˢ s₁ p S c k fd e t b) u
       in-defer  : ∀ {Δ A Δ′ C} {k} {t : Sub h Δ A} {u : Sub h Δ′ C} → Path t u → Path (deferˢ k t) u
 
     data PathLanes {h} : ∀ {Δ B Δ′ C} → List (Lane h Δ B) → Sub h Δ′ C → Set₁ where
@@ -288,33 +287,32 @@ module Carrying (R : Set) where
       next-lane : ∀ {Δ B Δ′ C} {l} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} → PathLanes ls u → PathLanes (l ∷ ls) u
 
   -- What a kernel at a node was handed: its observer, its continuation,
-  -- the subjects in scope, and the sources the meaning starts them from.
+  -- the subjects in scope.
   record Here (h : World) (Δ : List Set) (A : Set) : Set₁ where
     constructor ctx
     field
       obs  : Observer A h
       kont : Kont h
       env  : Env Δ h
-      srcs : Srcs Δ
   open Here
 
   mutual
     walk : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Here h Δ A → Here h Δ′ A′
     walk here                                     H = H
-    walk (in-map {f = f} p)                       H = walk p (ctx (mapO f (obs H)) (kont H) (env H) (srcs H))
-    walk (in-scan {f = f} {r} p)                  H = walk p (ctx (scanO f r (obs H)) (kont H) (env H) (srcs H))
-    walk (in-take {i = i} {q} {c} p)              H = walk p (ctx (takeWhileO i q c (obs H)) (takeK c (kont H)) (env H) (srcs H))
+    walk (in-map {f = f} p)                       H = walk p (ctx (mapO f (obs H)) (kont H) (env H))
+    walk (in-scan {f = f} {r} p)                  H = walk p (ctx (scanO f r (obs H)) (kont H) (env H))
+    walk (in-take {i = i} {q} {c} p)              H = walk p (ctx (takeWhileO i q c (obs H)) (takeK c (kont H)) (env H))
     walk (in-outer {op = op} {f} {fl} {oc} p)     H =
-      walk p (ctx (Flat′.outerO op f (env H) (obs H) fl oc) (flatK oc fl (kont H)) (env H) (srcs H))
+      walk p (ctx (Flat′.outerO op f (env H) (obs H) fl oc) (flatK oc fl (kont H)) (env H))
     walk (in-lanes {op = op} {f} {fl} p)          H = walkLanes op f fl H p
-    walk (in-source {S = S} {c} {b = b} p)        H = walk p (ctx (feeder S) (srcK c (unsubscribing (unsub b)) (kont H)) (env H) (srcs H))
-    walk (in-body {s₁ = s₁} {q} {S} {c} {s₀ = s₀} p) H =
-      walk p (ctx (bodyO c (obs H)) (bodyK s₁ (env H) S c q (kont H)) (S ∷ env H) (s₀ ∷ srcs H))
-    walk (in-defer p)                             H = walk p (ctx (obs H) (deferK (kont H)) (env H) (srcs H))
+    walk (in-source {S = S} {c} {b = b} p)        H = walk p (ctx (feeder S) (srcK c (unsubscribing (unsub b)) (kont H)) (env H))
+    walk (in-body {s₁ = s₁} {q} {S} {c} p)        H =
+      walk p (ctx (bodyO c (obs H)) (bodyK s₁ (env H) S c q (kont H)) (S ∷ env H))
+    walk (in-defer p)                             H = walk p (ctx (obs H) (deferK (kont H)) (env H))
 
     walkLanes : ∀ {h Δ A B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} → T.FlatOp → (A → Obs Timeline Δ B) → Flat A h
               → Here h Δ B → PathLanes ls u → Here h Δ′ C
-    walkLanes op f fl H (this-lane {c = c} p) = walk p (ctx (Flat′.laneO op f (env H) (obs H) fl c) (laneK c) (env H) (srcs H))
+    walkLanes op f fl H (this-lane {c = c} p) = walk p (ctx (Flat′.laneO op f (env H) (obs H) fl c) (laneK c) (env H))
     walkLanes op f fl H (next-lane p)         = walkLanes op f fl H p
 
   -- A node somewhere below `t`.
@@ -355,7 +353,7 @@ module Carrying (R : Set) where
   rootObs = record { next = λ a → eff (note a) λ _ → done tt ; complete = eff fin λ _ → done tt ; closed = done false }
 
   top : ∀ {h} → Here h [] R
-  top = ctx rootObs (λ _ _ → done tt) [] []
+  top = ctx rootObs (λ _ _ → done tt) []
 
   ------------------------------------------------------------------------
   -- What is owed once the current callback returns
@@ -369,11 +367,11 @@ module Carrying (R : Set) where
     kontC  : ∀ {Δ A} {u : Sub h Δ A} → Path t u → Call t
     take1C : ∀ {Δ A} {i p c k q} {s : Sub h Δ A} → Path t (takeWhileˢ i p c k (ending q) s) → Call t
     take2C : ∀ {Δ A} {i p c k} {s : Sub h Δ A} → Path t (takeWhileˢ i p c k taken s) → Call t
-    bodyC  : ∀ {Δ A B} {s₁ q S c k fd s₀ m} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B} → Path t (connectˢ s₁ q S c k fd s₀ m s b) → Call t
-    feedC  : ∀ {Δ A B} {s₁ q S c k x r ss s₀ m} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
-           → Path t (connectˢ s₁ q S c k (feeding x r ss) s₀ m s b) → Call t
-    finC   : ∀ {Δ A B} {s₁ q S c k r ss s₀ m} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
-           → Path t (connectˢ s₁ q S c k (finishing r ss) s₀ m s b) → Call t
+    bodyC  : ∀ {Δ A B} {s₁ q S c k fd e} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B} → Path t (connectˢ s₁ q S c k fd e s b) → Call t
+    feedC  : ∀ {Δ A B} {s₁ q S c k x r ss e} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+           → Path t (connectˢ s₁ q S c k (feeding x r ss) e s b) → Call t
+    finC   : ∀ {Δ A B} {s₁ q S c k r ss e} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+           → Path t (connectˢ s₁ q S c k (finishing r ss) e s b) → Call t
 
   code : ∀ {h} {t : Sub h [] R} → Call t → Act h ⊤
   code (emitC {p = p} {i} {xs} π)        = emitAll (obs (walk π top)) p i xs
@@ -460,13 +458,8 @@ module Carrying (R : Set) where
   ------------------------------------------------------------------------
   -- Against a heap
 
-  over : ∀ {A} → U.Step A → Bool
-  over (U.endˢ _) = true
-  over U.hushˢ    = true
-  over _          = false
-
   -- The configuration a cold's phase is.
-  nodeOf : ∀ {A} → Phase A → U.Node A
+  nodeOf : ∀ {Δ A} → Phase A → U.Node Δ A
   nodeOf (waiting τ e m)   = U.framesᶜ τ e m
   nodeOf (playing τ r i b) = U.burstᶜ τ r i b
 
@@ -484,25 +477,6 @@ module Carrying (R : Set) where
   firing {ctl = burst _ _ _ _ _ _ _ _}    (Against.burstAs _ _)                               = []
   firing {ctl = burst _ _ _ _ _ _ _ _}    (Against.fireAs {s = s} {hd} {τ′} {e} {x = x} {b} _ _ _) = timerOf s hd (waiting τ′ e (at _ x b))
 
-  -- A node reached by silent steps of the meaning, and by any steps.
-  -- A joiner's copy behind its source, as a joiner at `j` steps it: by
-  -- silent steps, and by values at positions not past `j`, which the
-  -- joiner drops.  A joiner subscribed after the source has shown values
-  -- starts from the source as it started, so it lags by those.
-  data Lags {A} (j : Pos) : U.Node A → U.Node A → Set₁ where
-    stay : ∀ {c} → Lags j c c
-    skip : ∀ {c c′ c″ q} → U.step c ≡ U.skipˢ q c′ → Lags j c′ c″ → Lags j c c″
-    drop : ∀ {c c′ c″ q a} → U.step c ≡ U.outˢ q a c′ → j <ᵖ q ≡ false → Lags j c′ c″ → Lags j c c″
-
-  data Steps {A} : U.Node A → U.Node A → Set₁ where
-    stay : ∀ {c} → Steps c c
-    skip : ∀ {c c′ c″ q} → U.step c ≡ U.skipˢ q c′ → Steps c′ c″ → Steps c c″
-    out  : ∀ {c c′ c″ q a} → U.step c ≡ U.outˢ q a c′ → Steps c′ c″ → Steps c c″
-
-  -- Each connect in scope: its source as the run holds it, and its feed.
-  Now : World → List Set → Set₁
-  Now h = All (λ A → Maybe (U.Node A) × Feed A h)
-
   -- What the joiners of each subject are, the frames pending.
   record Joiner (h : World) : Set₁ where
     constructor joiner
@@ -519,7 +493,7 @@ module Carrying (R : Set) where
     pendings (scanˢ f r s)                          = pendings s
     pendings (takeWhileˢ i p c k tk s)              = pendings s
     pendings (flatMapˢ op f fl oc k r so ls)        = pendings so ++ lanePendings ls
-    pendings (connectˢ s₁ p S c k fd s₀ m src body) = pendings src ++ pendings body
+    pendings (connectˢ s₁ p S c k fd e src body) = pendings src ++ pendings body
     pendings (deferˢ k s)                           = pendings s
     pendings _                                      = []
 
@@ -533,7 +507,7 @@ module Carrying (R : Set) where
     subjects (scanˢ f r s)                          = subjects s
     subjects (takeWhileˢ i p c k tk s)              = subjects s
     subjects (flatMapˢ op f fl oc k r so ls)        = subjects so ++ laneSubjects ls
-    subjects (connectˢ s₁ p S c k fd s₀ m src body) = (_ , S) ∷ subjects src ++ subjects body
+    subjects (connectˢ s₁ p S c k fd e src body) = (_ , S) ∷ subjects src ++ subjects body
     subjects (deferˢ k s)                           = subjects s
     subjects _                                      = []
 
@@ -547,8 +521,8 @@ module Carrying (R : Set) where
     joiners (scanˢ f r s)                          E = joiners s E
     joiners (takeWhileˢ i p c k tk s)              E = joiners s E
     joiners (flatMapˢ op f fl oc k r so ls)        E = joiners so E ++ laneJoiners ls E
-    joiners (connectˢ s₁ p S c k fd s₀ m src body) E = joiners src E ++ joiners body (S ∷ E)
-    joiners (joinˢ j i sk l x cp)                  E = joiner (lookup E x) sk j ∷ []
+    joiners (connectˢ s₁ p S c k fd e src body) E = joiners src E ++ joiners body (S ∷ E)
+    joiners (joinˢ j sk l x st)                  E = joiner (lookup E x) sk j ∷ []
     joiners (deferˢ k s)                           E = joiners s E
     joiners _                                      E = []
 
@@ -582,8 +556,8 @@ module Carrying (R : Set) where
     names (scanˢ f r s)                          = (cell _ , r) ∷ names s
     names (takeWhileˢ i p c k tk s)              = cutNames c ++ maybeName k ++ names s
     names (flatMapˢ op f fl oc k r so ls)        = flatNames fl ++ cutNames oc ++ maybeName k ++ (slot _ , r) ∷ names so ++ laneNames ls
-    names (connectˢ s₁ p S c k fd s₀ m src body) = subjectNames S ++ cutNames c ++ maybeName k ++ names src ++ names body
-    names (joinˢ j i sk l x cp)                  = (slot _ , sk) ∷ (cell _ , l) ∷ []
+    names (connectˢ s₁ p S c k fd e src body) = subjectNames S ++ cutNames c ++ maybeName k ++ names src ++ names body
+    names (joinˢ j sk l x st)                  = (slot _ , sk) ∷ (cell _ , l) ∷ []
     names (deferˢ k s)                           = maybeName k ++ names s
     names _                                      = []
 
@@ -621,18 +595,24 @@ module Carrying (R : Set) where
     consᴹ (just x) xs = x ∷ xs
 
     -- A flatMap is open while its outer, a lane or the queue is.
-    merged : ∀ {A B} → T.FlatOp → (A → Pos → U.Node B) → Maybe (U.Node A) → List (U.Node B) → List A → Maybe (U.Node B)
+    merged : ∀ {Δ A B} → T.FlatOp → (A → Pos → U.Node Δ B) → Maybe (U.Node Δ A) → List (U.Node Δ B) → List A → Maybe (U.Node Δ B)
     merged op g nothing []       []       = nothing
     merged op g o       ls       qs       = just (U.flatMapᶜ op g o ls qs)
 
-    -- A connect is open while its body is, beside the source the meaning
-    -- holds, if it holds one.
-    connected : ∀ {A B} → Maybe (U.Node A) → Maybe (U.Node B) → Maybe (U.Node B)
-    connected s        nothing  = nothing
-    connected (just s) (just b) = just (U.connectᶜ b s)
-    connected nothing  (just b) = just b
+    -- A connect is open while its body is, beside its source while that
+    -- runs; past the source's end, every joiner the body holds told so.
+    connected : ∀ {Δ A B} → Maybe Pos → Maybe (U.Node Δ A) → Maybe (U.Node (A ∷ Δ) B) → Maybe (U.Node Δ B)
+    connected e        s        nothing  = nothing
+    connected e        (just s) (just b) = just (U.connectᶜ b (U.live s))
+    connected (just c) nothing  (just b) = just (U.connectᶜ (U.shut (Any.here refl) c b) (U.ended c))
+    connected nothing  nothing  (just b) = nothing
 
-    taking? : ∀ {A} → Bool → (A → Bool) → Taking → Maybe (U.Node A) → Maybe (U.Node A)
+    -- A joiner shows what it holds until it is gone.
+    joinedᶜ : ∀ {Δ A} → A ∈ Δ → Pos → Maybe (List (Pos × A) × Maybe Pos) → Maybe (U.Node Δ A)
+    joinedᶜ x j nothing          = nothing
+    joinedᶜ x j (just (xs , e))  = just (U.joinᶜ x j xs e)
+
+    taking? : ∀ {Δ A} → Bool → (A → Bool) → Taking → Maybe (U.Node Δ A) → Maybe (U.Node Δ A)
     taking? i p taking     s = mapᴹ (U.takeWhileᶜ i p) s
     taking? i p (ending q) s = just (U.endᶜ q)
     taking? i p taken      s = nothing
@@ -650,26 +630,26 @@ module Carrying (R : Set) where
     -- What is still open: the configuration, exactly
 
     mutual
-      part : ∀ {Δ A} → Sub h Δ A → Srcs Δ → Maybe (U.Node A)
-      part (pendingˢ s q)                         ρ = just (U.subscribe s ρ q)
-      part (coldˢ s hd ph)                        ρ = if spentʰ hd then nothing else just (nodeOf ph)
-      part (ofˢ p i xs)                           ρ = just (U.ofᶜ p i xs)
-      part doneˢ                                  ρ = nothing
-      part (mapˢ f s)                             ρ = mapᴹ (U.mapᶜ f) (part s ρ)
-      part (scanˢ f r s)                          ρ = mapᴹ (U.scanᶜ f (val r)) (part s ρ)
-      part (takeWhileˢ i p c k tk s)              ρ = if val (Kit.live c) then taking? i p tk (part s ρ) else nothing
-      part (flatMapˢ op f fl oc k r so ls)        ρ =
-        merged op (λ a q → U.subscribe (f a) ρ q) (part so ρ) (partLanes ls ρ) (val (Flat.queue fl))
-      part (connectˢ s₁ p S c k fd s₀ m src body) ρ = connected m (part body (s₀ ∷ ρ))
-      part (joinˢ j i sk l x cp)                  ρ = if val l then mapᴹ (U.joinᶜ j i) cp else nothing
-      part (deferˢ k s)                           ρ = part s ρ
+      part : ∀ {Δ A} → Sub h Δ A → Maybe (U.Node Δ A)
+      part (pendingˢ s q)                        = just (U.subscribe s q)
+      part (coldˢ s hd ph)                       = if spentʰ hd then nothing else just (nodeOf ph)
+      part (ofˢ p i xs)                          = just (U.ofᶜ p i xs)
+      part doneˢ                                 = nothing
+      part (mapˢ f s)                            = mapᴹ (U.mapᶜ f) (part s)
+      part (scanˢ f r s)                         = mapᴹ (U.scanᶜ f (val r)) (part s)
+      part (takeWhileˢ i p c k tk s)             = if val (Kit.live c) then taking? i p tk (part s) else nothing
+      part (flatMapˢ op f fl oc k r so ls)       =
+        merged op (λ a q → U.subscribe (f a) q) (part so) (partLanes ls) (val (Flat.queue fl))
+      part (connectˢ s₁ p S c k fd e src body)   = connected e (part src) (part body)
+      part (joinˢ j sk l x st)                   = if val l then joinedᶜ x j st else nothing
+      part (deferˢ k s)                          = part s
 
-      partLanes : ∀ {Δ B} → List (Lane h Δ B) → Srcs Δ → List (U.Node B)
-      partLanes []                ρ = []
-      partLanes (lane c k s ∷ ls) ρ = if val (Kit.live c) then consᴹ (part s ρ) (partLanes ls ρ) else partLanes ls ρ
+      partLanes : ∀ {Δ B} → List (Lane h Δ B) → List (U.Node Δ B)
+      partLanes []                = []
+      partLanes (lane c k s ∷ ls) = if val (Kit.live c) then consᴹ (part s) (partLanes ls) else partLanes ls
 
     ----------------------------------------------------------------------
-    -- The joiners' copies
+    -- The joiners' feed
 
     -- Owed the feed's delivery.
     Owed : ∀ {A} → Feed A h → Sink h A → Pos → Set
@@ -677,42 +657,40 @@ module Carrying (R : Set) where
     Owed (feeding x q ss) sk j = (sk , j) ∈ ss
     Owed (finishing q ss) sk j = (sk , j) ∈ ss
 
-    -- A joiner's copy behind its source as the run holds it, by what the
-    -- feed still owes it: the value, the completion, or nothing but
-    -- silent steps.  A source the run holds no more has ended, and the
-    -- copy reaches an end the same way.
-    Behind : ∀ {A} → Pos → Feed A h → U.Node A → Maybe (U.Node A) → Set₁
-    Behind {A} j (feeding x q ss) cp (just n) = Σ (U.Node A) λ cp′ → Lags j cp cp′ × U.step cp′ ≡ U.outˢ q x n
-    Behind {A} j (feeding x q ss) cp nothing  = Lift _ ⊥
-    Behind {A} j (finishing q ss) cp _        = Σ (U.Node A) λ cp′ → Lags j cp cp′ × U.step cp′ ≡ U.endˢ q
-    Behind {A} j idle             cp (just n) = Lags j cp n
-    Behind {A} j idle             cp nothing  = Σ (U.Node A) λ cp′ → Lags j cp cp′ × over (U.step cp′) ≡ true
+    -- What the meaning has fed a joiner at `j` and the run still owes it:
+    -- the value, under the joiner's position; the completion, likewise.
+    owing : ∀ {A : Set} → Feed A h → Pos → Maybe (List (Pos × A) × Maybe Pos)
+    owing idle             j = just ([] , nothing)
+    owing (feeding x q ss) j = just ((q ++ [ subᴾ j ] , x) ∷ [] , nothing)
+    owing (finishing q ss) j = just ([] , just (q ++ [ subᴾ j ]))
 
-    -- A source's history, from where every joiner's copy starts: values
-    -- only at or before the run's position `p`, so a joiner subscribed
-    -- now drops them all.
-    History : ∀ {A} → Pos → U.Node A → Maybe (U.Node A) → Set₁
-    History p s₀ (just n) = Lags p s₀ n
-    History p s₀ nothing  = Lift _ ⊤
+    -- Owed nothing: still waiting while its source runs, gone once the
+    -- source has ended.
+    owingNone : ∀ {A : Set} → Maybe Pos → Maybe (List (Pos × A) × Maybe Pos)
+    owingNone nothing  = just ([] , nothing)
+    owingNone (just c) = nothing
 
-    -- Every live joiner whose copy has not ended, behind its source; every
-    -- connect's source reached from where it started, by its history.
+    -- Each connect in scope: its feed, and where its source ended.
+    Now : List Set → Set₁
+    Now = All (λ A → Feed A h × Maybe Pos)
+
+    -- EVERY LIVE JOINER HOLDS WHAT THE RUN OWES IT: the value or the
+    -- completion its feed has still to deliver it, and nothing else.
     mutual
-      Caught : ∀ {Δ A} → Pos → Sub h Δ A → Srcs Δ → Now h Δ → Set₁
-      Caught π (mapˢ f s)                             ρ ν = Caught π s ρ ν
-      Caught π (scanˢ f r s)                          ρ ν = Caught π s ρ ν
-      Caught π (takeWhileˢ i p c k tk s)              ρ ν = Caught π s ρ ν
-      Caught π (flatMapˢ op f fl oc k r so ls)        ρ ν = Caught π so ρ ν × CaughtLanes π ls ρ ν
-      Caught π (connectˢ s₁ p S c k fd s₀ m src body) ρ ν =
-        History π s₀ (part src ρ) × Caught π src ρ ν × Caught π body (s₀ ∷ ρ) ((part src ρ , fd) ∷ ν)
-      Caught π (joinˢ j i sk l x (just cp))           ρ ν = let (n , fd) = lookup ν x in
-        val l ≡ true → (Owed fd sk j → Behind j fd cp n) × (¬ Owed fd sk j → Behind j idle cp n)
-      Caught π (deferˢ k s)                           ρ ν = Caught π s ρ ν
-      Caught π _                                      ρ ν = Lift _ ⊤
+      Fed : ∀ {Δ A} → Sub h Δ A → Now Δ → Set₁
+      Fed (mapˢ f s)                           ν = Fed s ν
+      Fed (scanˢ f r s)                        ν = Fed s ν
+      Fed (takeWhileˢ i p c k tk s)            ν = Fed s ν
+      Fed (flatMapˢ op f fl oc k r so ls)      ν = Fed so ν × FedLanes ls ν
+      Fed (connectˢ s₁ p S c k fd e src body)  ν = Fed src ν × Fed body ((fd , e) ∷ ν)
+      Fed (joinˢ j sk l x st)                  ν = let (fd , e) = lookup ν x in
+        Lift _ (val l ≡ true → (Owed fd sk j → st ≡ owing fd j) × (¬ Owed fd sk j → st ≡ owingNone e))
+      Fed (deferˢ k s)                         ν = Fed s ν
+      Fed _                                    ν = Lift _ ⊤
 
-      CaughtLanes : ∀ {Δ B} → Pos → List (Lane h Δ B) → Srcs Δ → Now h Δ → Set₁
-      CaughtLanes π []                ρ ν = Lift _ ⊤
-      CaughtLanes π (lane c k s ∷ ls) ρ ν = Caught π s ρ ν × CaughtLanes π ls ρ ν
+      FedLanes : ∀ {Δ B} → List (Lane h Δ B) → Now Δ → Set₁
+      FedLanes []                ν = Lift _ ⊤
+      FedLanes (lane c k s ∷ ls) ν = Fed s ν × FedLanes ls ν
 
     ----------------------------------------------------------------------
     -- The gates
@@ -721,36 +699,28 @@ module Carrying (R : Set) where
     Dead : ∀ {Δ A} → Sub h Δ A → Set₁
     Dead t = ∀ {Δ′ B} {sk : Sink h B} {hd ph} → Path t (coldˢ {Δ = Δ′} sk hd ph) → spentʰ hd ≡ true
 
-    -- The source the meaning holds behind the run's by steps of the
-    -- meaning; past the run's end, at its own.
-    Kept : ∀ {A} → Maybe (U.Node A) → Maybe (U.Node A) → Set₁
-    Kept {A} (just s) (just s′) = Steps s s′
-    Kept {A} (just s) nothing   = Σ (U.Node A) λ s′ → Steps s s′ × over (U.step s′) ≡ true
-    Kept {A} nothing  (just s′) = Lift _ (over (U.step s′) ≡ true)
-    Kept {A} nothing  nothing   = Lift _ ⊤
-
     unended : ∀ {A} → Phase A → Bool
     unended (waiting _ _ doneᶠ) = false
     unended _                    = true
 
     -- Below a cut kill switch, a cut lane or a connect's closed body, every
     -- cold is spent; no live cold waits on its end, which its frame's
-    -- last step delivers; and every connect's held source is `Kept`.
+    -- last step delivers.
     mutual
-      Gated : ∀ {Δ A} → Sub h Δ A → Srcs Δ → Set₁
-      Gated (coldˢ s hd ph)                        ρ = Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
-      Gated (mapˢ f s)                             ρ = Gated s ρ
-      Gated (scanˢ f r s)                          ρ = Gated s ρ
-      Gated (takeWhileˢ i p c k tk s)              ρ = (val (Kit.live c) ≡ false → Dead s) × Gated s ρ
-      Gated (flatMapˢ op f fl oc k r so ls)        ρ = Gated so ρ × GatedLanes ls ρ
-      Gated (connectˢ s₁ p S c k fd s₀ m src body) ρ =
-        Kept m (part src ρ) × (part body (s₀ ∷ ρ) ≡ nothing → Dead src) × Gated src ρ × Gated body (s₀ ∷ ρ)
-      Gated (deferˢ k s)                           ρ = Gated s ρ
-      Gated _                                      ρ = Lift _ ⊤
+      Gated : ∀ {Δ A} → Sub h Δ A → Set₁
+      Gated (coldˢ s hd ph)                       = Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
+      Gated (mapˢ f s)                            = Gated s
+      Gated (scanˢ f r s)                         = Gated s
+      Gated (takeWhileˢ i p c k tk s)             = (val (Kit.live c) ≡ false → Dead s) × Gated s
+      Gated (flatMapˢ op f fl oc k r so ls)       = Gated so × GatedLanes ls
+      Gated (connectˢ s₁ p S c k fd e src body)   =
+        (part body ≡ nothing → Dead src) × Gated src × Gated body
+      Gated (deferˢ k s)                          = Gated s
+      Gated _                                     = Lift _ ⊤
 
-      GatedLanes : ∀ {Δ B} → List (Lane h Δ B) → Srcs Δ → Set₁
-      GatedLanes []                ρ = Lift _ ⊤
-      GatedLanes (lane c k s ∷ ls) ρ = (val (Kit.live c) ≡ false → Dead s) × Gated s ρ × GatedLanes ls ρ
+      GatedLanes : ∀ {Δ B} → List (Lane h Δ B) → Set₁
+      GatedLanes []                = Lift _ ⊤
+      GatedLanes (lane c k s ∷ ls) = (val (Kit.live c) ≡ false → Dead s) × Gated s × GatedLanes ls
 
     ----------------------------------------------------------------------
     -- Every subscription against its kernel
@@ -767,9 +737,9 @@ module Carrying (R : Set) where
         × val (Flat.active fl) ≡ count ls
         × Σ (List (Cut h)) (λ gone → val (Flat.lanes fl) ++ gone ≡ switches ls × All (λ c → val (Kit.live c) ≡ false) gone)
         × HoldsLanes op f E o fl ls
-      Holds (connectˢ s₁ p S c k fd s₀ m src body) E o =
+      Holds (connectˢ s₁ p S c k fd e src body) E o =
         Attached c k (unsub src) × Holds src E (feeder S) × Holds body (S ∷ E) (bodyO c o)
-      Holds (joinˢ j i sk l x cp)                  E o = slotIs sk (joinerCb l o)
+      Holds (joinˢ j sk l x st)                  E o = slotIs sk (joinerCb l o)
       Holds (deferˢ k s)                           E o = Registered k (unsub s) × Holds s E o
       Holds _                                      E o = Lift _ ⊤
 
@@ -824,10 +794,10 @@ module Carrying (R : Set) where
             → val (Kit.live c) ≡ true → take1C π ∈ agenda ca
       cuts  : ∀ {Δ A i p c k} {s : Sub h Δ A} (π : Path t (takeWhileˢ i p c k taken s))
             → val (Kit.live c) ≡ true → take2C π ∈ agenda ca
-      feeds : ∀ {Δ A B s₁ q S c k x r ss s₀ m} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
-            → (π : Path t (connectˢ s₁ q S c k (feeding x r ss) s₀ m s b)) → feedC π ∈ agenda ca
-      fins  : ∀ {Δ A B s₁ q S c k r ss s₀ m} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
-            → (π : Path t (connectˢ s₁ q S c k (finishing r ss) s₀ m s b)) → finC π ∈ agenda ca
+      feeds : ∀ {Δ A B s₁ q S c k x r ss e} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+            → (π : Path t (connectˢ s₁ q S c k (feeding x r ss) e s b)) → feedC π ∈ agenda ca
+      fins  : ∀ {Δ A B s₁ q S c k r ss e} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+            → (π : Path t (connectˢ s₁ q S c k (finishing r ss) e s b)) → finC π ∈ agenda ca
 
   -- Every subscription against what its kernel registered; below a closed
   -- gate, every cold spent.
@@ -835,14 +805,13 @@ module Carrying (R : Set) where
     open At H
     field
       holds : Holds t [] rootObs
-      gated : Gated t []
+      gated : Gated t
 
-  -- Every joiner's copy behind its source by what its feed owes it, every
-  -- source reached by its history.
-  record Meaning {h} (st : State h) (t : Sub h [] R) : Set₁ where
-    open At (State.heap st)
+  -- Every live joiner holding what its feed owes it.
+  record Meaning {h} (H : All (Val h) h) (t : Sub h [] R) : Set₁ where
+    open At H
     field
-      caught : Caught (State.pos st) t [] []
+      fed : Fed t []
 
   -- Every joiner joined no later than the run's position; the queue, with
   -- the frame popped and bursting, its pending frames and dead ones, the
@@ -867,14 +836,14 @@ module Carrying (R : Set) where
   -- subscription the run reaches, whose open part is `c`, and the
   -- machine's control and stack its agenda; then the invariants, one
   -- record per concern.
-  record Carried (m : Mach) (c : U.Node R) : Set₁ where
+  record Carried (m : Mach) (c : U.Node [] R) : Set₁ where
     open Mach m using (world; state; ctl)
     field
       tree    : Sub world [] R
       ctlAs   : Against.CtlAs tree ctl
-      open≡   : At.part (State.heap state) tree [] ≡ just c
+      open≡   : At.part (State.heap state) tree ≡ just c
       owned   : Owned (State.heap state) tree ctlAs
       kernels : Kernels (State.heap state) tree
-      meaning : Meaning state tree
+      meaning : Meaning (State.heap state) tree
       queue   : Queue state tree (firing ctlAs)
       books   : Books state tree

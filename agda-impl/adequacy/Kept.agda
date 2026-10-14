@@ -17,7 +17,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 import Data.List.Relation.Unary.Linked as Linked
 open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just)
 open import Data.Nat using (_≤_; _+_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -27,7 +27,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 open import denotation.MonotonicList using (Pos; _<ᵖ_; <ᵖ-trans; <ᵖ-tick) renaming (sub to subᴾ)
 open import denotation.Unfold using (Node; hushˢ; skipˢ) renaming (step to stepᵁ)
 open import operation.AbstractObservable using (module Run)
-open import operation.PureObservable using (Pureᴾ; World; _⊑_; Sink; Handle; same; module Pure)
+open import operation.PureObservable using (Pureᴾ; _⊑_; Sink; Handle; same; module Pure)
 open import operation.Machine using (module Machine)
 open import denotation.MonotonicList using (Frame; at)
 open import adequacy.Carrier using (module Carrying)
@@ -37,7 +37,7 @@ module Keeping (R : Set) where
   open Run (Pureᴾ R) using (Act)
   open Pure R using (State; Timer; cascade)
   open Machine R using (Mach; ⟨_,_⟩; Stack; loop; run; ret; burst; turn; step; silent; drained; spent?)
-  open Carrying R using (Carried; module At; module Against; Owned; Lags; stay; skip; drop; Ordered; Sub; Lane; lane
+  open Carrying R using (Carried; module At; module Against; Owned; Ordered; Sub; Lane; lane
                         ; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ
                         ; waiting; playing; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
                         ; this-lane; next-lane; Meaning; Kernels; Queue; Books; pendings; lanePendings; joiners; Joiner; firing)
@@ -53,39 +53,6 @@ module Keeping (R : Set) where
     ... | true  with trans (sym (<ᵖ-trans p q x pq qx)) px
     ...   | ()
 
-  -- A lag behind `p` is a lag behind any position past it.
-  lags-later : ∀ {A} {p q : Pos} {c n : Node A} → p <ᵖ q ≡ true → Lags p c n → Lags q c n
-  lags-later lt stay         = stay
-  lags-later lt (skip e l)   = skip e (lags-later lt l)
-  lags-later {p = p} {q} lt (drop {q = k} e nl l) = drop e (later-false p q k lt nl) (lags-later lt l)
-
-  module _ {h : World} (H : _) where
-    open At {h} H using (Caught; CaughtLanes; History; part)
-
-    history-later : ∀ {A p q} {s₀ : Node A} (m : Maybe (Node A)) → p <ᵖ q ≡ true → History p s₀ m → History q s₀ m
-    history-later (just n) lt l = lags-later lt l
-    history-later nothing  lt l = l
-
-    mutual
-      caught-later : ∀ {p q Δ A} → p <ᵖ q ≡ true → (t : Sub h Δ A) → ∀ ρ ν → Caught p t ρ ν → Caught q t ρ ν
-      caught-later lt (pendingˢ s q)                         ρ ν c = c
-      caught-later lt (coldˢ s hd ph)                        ρ ν c = c
-      caught-later lt (ofˢ p i xs)                           ρ ν c = c
-      caught-later lt doneˢ                                  ρ ν c = c
-      caught-later lt (mapˢ f s)                             ρ ν c = caught-later lt s ρ ν c
-      caught-later lt (scanˢ f r s)                          ρ ν c = caught-later lt s ρ ν c
-      caught-later lt (takeWhileˢ i p cu k tk s)             ρ ν c = caught-later lt s ρ ν c
-      caught-later lt (flatMapˢ op f fl oc k r so ls)        ρ ν (co , cl) = caught-later lt so ρ ν co , lanes-later lt ls ρ ν cl
-      caught-later lt (connectˢ s₁ p S cu k fd s₀ m src body) ρ ν (hi , cs , cb) =
-        history-later (part src ρ) lt hi , caught-later lt src ρ ν cs , caught-later lt body _ _ cb
-      caught-later lt (joinˢ j i sk l x (just cp))           ρ ν c = c
-      caught-later lt (joinˢ j i sk l x nothing)             ρ ν c = c
-      caught-later lt (deferˢ k s)                           ρ ν c = caught-later lt s ρ ν c
-
-      lanes-later : ∀ {p q Δ B} → p <ᵖ q ≡ true → (ls : List (Lane h Δ B)) → ∀ ρ ν → CaughtLanes p ls ρ ν → CaughtLanes q ls ρ ν
-      lanes-later lt []                ρ ν c        = c
-      lanes-later lt (lane cu k s ∷ ls) ρ ν (cs , cl) = caught-later lt s ρ ν cs , lanes-later lt ls ρ ν cl
-
   private
     linked-all : ∀ {ℓ} {X : Set ℓ} {_≺_ : X → X → Set} → (∀ {a b c} → a ≺ b → b ≺ c → a ≺ c)
                → ∀ {x xs} → Linked _≺_ (x ∷ xs) → All (x ≺_) xs
@@ -99,7 +66,7 @@ module Keeping (R : Set) where
   -- Between turns
 
   -- The meaning falls quiet after silent steps of its own.
-  data Quiets : Node R → Set₁ where
+  data Quiets : Node [] R → Set₁ where
     hushes : ∀ {c} → stepᵁ c ≡ hushˢ → Quiets c
     skips  : ∀ {c c′ q} → stepᵁ c ≡ skipˢ q c′ → Quiets c′ → Quiets c
 
@@ -108,7 +75,7 @@ module Keeping (R : Set) where
   quiets (skips e q) rewrite e = right (quiets q)
 
   -- The run moved to a timer's cascade, the queue's head dropped: the
-  -- meaning's copies, the joiners and the queue's order still hold.
+  -- joiners and the queue's order still hold.
   module Moved {h} {st : State h} {tm : Timer h} {ts : List (Timer h)} (t : Sub h [] R) {fl} (q : Queue st t fl) (e : State.timers st ≡ tm ∷ ts) where
     St′ : State h
     St′ = record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
@@ -125,9 +92,6 @@ module Keeping (R : Set) where
       where go : ∀ {xs} → xs ≡ tm ∷ ts → All (λ t → State.clock st ≤ Timer.due t × State.pos st <ᵖ cascade t ≡ true) xs
                → State.pos st <ᵖ cascade tm ≡ true
             go refl ((_ , lt) ∷ _) = lt
-
-    meaning′ : Meaning st t → Meaning St′ t
-    meaning′ mn = record { caught = caught-later (State.heap st) pos< t [] [] (Meaning.caught mn) }
 
     past′ : All (λ j → cascade tm <ᵖ Joiner.at′ j ≡ false) (joiners t [])
     past′ = All.map (λ {j} → later-false (State.pos st) (cascade tm) (Joiner.at′ j) pos<) (Queue.past q)
@@ -148,7 +112,7 @@ module Keeping (R : Set) where
     ; open≡   = open≡
     ; owned   = owned
     ; kernels = kernels
-    ; meaning = meaning′ meaning
+    ; meaning = meaning
     ; queue   = record { past = past′ ; timed = timed ; joined = Queue.joined queue ; ordered = ordered′ }
     ; books   = books′ books
     }
@@ -190,10 +154,10 @@ module Keeping (R : Set) where
     pended-at (flatMapˢ op f fl oc k r so ls)        m with ∈-++⁻ (pendings so) m
     ... | inj₁ m′ = under in-outer (pended-at so m′)
     ... | inj₂ m′ = laned-at ls in-lanes m′
-    pended-at (connectˢ s₁ p S cu k fd s₀ m₀ src body) m with ∈-++⁻ (pendings src) m
+    pended-at (connectˢ s₁ p S cu k fd e₀ src body) m with ∈-++⁻ (pendings src) m
     ... | inj₁ m′ = under in-source (pended-at src m′)
     ... | inj₂ m′ = under in-body (pended-at body m′)
-    pended-at (joinˢ j i sk l x cp)                  ()
+    pended-at (joinˢ j sk l x st)                   ()
     pended-at (deferˢ k s)                           m = under in-defer (pended-at s m)
 
     laned-at : ∀ {h Δ₀ A₀ Δ B tm} {t′ : Sub h Δ₀ A₀} (ls : List (Lane h Δ B))
@@ -203,8 +167,8 @@ module Keeping (R : Set) where
     ... | inj₂ m′ = laned-at ls (λ π → f (next-lane π)) m′
 
   private
-    popped : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} (t : Sub h [] R) → At.part (State.heap st) t [] ≡ just c
-           → Owned (State.heap st) t Against.calmAs → Kernels (State.heap st) t → Meaning st t → (q : Queue st t []) → Books st t
+    popped : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} (t : Sub h [] R) → At.part (State.heap st) t ≡ just c
+           → Owned (State.heap st) t Against.calmAs → Kernels (State.heap st) t → Meaning (State.heap st) t → (q : Queue st t []) → Books st t
            → (e : State.timers st ≡ tm ∷ ts) → Pended t tm
            → Carried ⟨ record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
                     , burst (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) same loop ⟩ c
@@ -215,7 +179,7 @@ module Keeping (R : Set) where
       ; owned   = record { ofs = Owned.ofs ow ; plays = λ π′ l → there (Owned.plays ow π′ l) ; begun = Owned.begun ow
                          ; ends = Owned.ends ow ; cuts = Owned.cuts ow ; feeds = Owned.feeds ow ; fins = Owned.fins ow }
       ; kernels = ks
-      ; meaning = meaning′ mn
+      ; meaning = mn
       ; queue   = record { past = past′ ; timed = subst (λ xs → At.Timed (State.heap st) xs (pendings t)) e (Queue.timed q)
                          ; joined = Queue.joined q ; ordered = ordered′ }
       ; books   = books′ bk
@@ -245,7 +209,7 @@ module Keeping (R : Set) where
 
   postulate
     -- No timer queued: every subscription still open waits on nothing,
-    -- and its copies and held sources catch up by silent steps.
+    -- so the meaning falls quiet by silent steps.
     calm-hush : ∀ {h} {st : State h} {c} → Carried ⟨ st , turn ⟩ c → State.timers st ≡ [] → Quiets c
 
   ------------------------------------------------------------------------
@@ -254,17 +218,12 @@ module Keeping (R : Set) where
   postulate
     -- Code running: the agenda's next call, or a subscription beginning.
     --
-    -- At a connect's feed the meaning's next shown event is the first
-    -- owed joiner's, at `q ++ [ sub j ]`, only if every other live node
-    -- reaches past it by silent steps; between the connect's own skip and
-    -- that delivery lie only the lag steps of joiners subscribed mid-feed.
-    -- `Carried` holds nothing positional for nodes the agenda does not
-    -- owe, so this step needs a field placing each live node's next shown
-    -- event past the agenda's region.
-    --
-    -- RECOVERY: `git show b75ee016` restores `adequacy.FeedTry`: an owed
-    --   joiner reaches its delivery after its lag's silent steps
-    --   (`joiner-delivers`).
+    -- At a connect's feed the meaning has fed every joiner at once, at
+    -- the connect's skip, and the first owed joiner's value at
+    -- `q ++ [ sub j ]` is its next shown event only if every other live
+    -- node's next is past it.  `Carried` holds nothing positional for
+    -- nodes the agenda does not owe, so this step needs a field placing
+    -- each live node's next shown event past the agenda's region.
     kept-run : ∀ {h} {st : State h} {w B} {a : Act h B} {σ : w ⊑ h} {K : Stack w B} {c}
              → Carried ⟨ st , run a σ K ⟩ c → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
 

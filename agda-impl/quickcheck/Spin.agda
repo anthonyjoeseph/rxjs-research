@@ -17,7 +17,6 @@ module quickcheck.Spin where
 
 open import Data.Bool using (Bool; true; false; _∧_; not)
 open import Data.List using (List; []; _∷_; _++_) renaming (map to mapL)
-open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing; just)
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
@@ -30,7 +29,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Tree using (Obs; Later; of; map; takeWhile; flatMap; connect; connected; defer; merge; ones; mergeᶠ; switchᶠ; exhaustᶠ)
 import Tree as T
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; observe; root; Timeline)
-open import denotation.Unfold using (⟦_⟧)
+open import denotation.Unfold using (⟦_⟧; [])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (script; timeline)
 open import quickcheck.Ghost using (showP)
