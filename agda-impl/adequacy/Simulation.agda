@@ -89,6 +89,20 @@ module Sim (R : Set) where
     -- B KEPT, C FINITE: a carried state's next step, against its
     -- configuration's, passes each side alone finitely often before the
     -- two meet again carried, or end, or fall quiet together.
+    --
+    -- At a connect's feed the meaning's next shown event is the first
+    -- owed joiner's, at `q ++ [ sub j ]`, only if every other live node
+    -- reaches past it by silent steps; between the connect's own skip
+    -- and that delivery lie only the lag steps of joiners subscribed
+    -- mid-feed.  `Carried` holds nothing positional for nodes the agenda
+    -- does not owe, so this step needs a field placing each live node's
+    -- next shown event past the agenda's region.
+    --
+    -- RECOVERY: `git show b75ee016` restores `adequacy.FeedTry`: an owed
+    --   joiner reaches its delivery after its lag's silent steps
+    --   (`joiner-delivers`); a lag behind the run's position is a lag
+    --   behind any joiner subscribed at or past it (`lags-later`); and
+    --   `<ᵖ-trans`.
     kept : ∀ {m c} → Carried m c → Wait Carried (step m) (stepᵁ c)
 
     -- The run begins carried: the program pending at the root.

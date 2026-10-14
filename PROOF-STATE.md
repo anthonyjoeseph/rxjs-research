@@ -170,11 +170,13 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 ### Big picture tier roadmap
 
-- **B'S STEP AT THE FEEDER, IN AGDA.** `kept` split by the machine's
-  control, the feed's case a body: a source's value read into `feeding`,
-  each joiner's delivery a step of its `Behind` copy, the connect's own
-  skip paired or passed. Decides whether `Feed`, `Behind` and the agenda
-  carry the step both earlier routes failed, or which field is missing.
+- **B'S POSITIONAL FIELD.** `Carried` gains a field placing every live
+  node's next shown event past the region the agenda owes, true at
+  `carried-begin`; then the feed's case of `kept` a body over it. The feeder
+  itself is ruled out as a refutation: a snapshot's joiners match the
+  meaning's drop criterion, joiners subscribed mid-feed or after the source
+  ends, and a body completing mid-feed, all agree. Decides whether the
+  position order alone orders the meaning's leaves against the machine.
 - **B'S STEP AT A DEATH, IN AGDA.** An observer dying mid-burst: a
   `takeWhile` cutting, a switch moving off its lane, a connect's body
   completing and its source stopped. The dead are owed nothing, so B must
@@ -187,10 +189,10 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 ### The ledger
 
-- **`kept`** (Simulation) — FALSITY, `NO EVIDENCE`: a carried state's step against
+- **`kept`** (Simulation) — FALSITY, `RECOVERY`: a carried state's step against
   its configuration's, each side alone finitely often; B and C at once.
-- **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program pending at
-  the root, carried.
+- **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program
+  pending at the root, carried.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 
