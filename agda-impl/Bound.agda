@@ -186,10 +186,9 @@ module Places (R : Set) where
   shown n o = observe (⟦ o ⟧[ n ] []) root
 
   postulate
-    -- THE CONFIGURATION: the running program's state, related to what is
-    -- left of the events each part of it shows — every subscription's
-    -- cells, timers and observer against its denotation's remainder, and
-    -- the root's record against the prefix of `shown n o` it has passed.
+    -- THE CONFIGURATION: the running program's state, related to `r`,
+    -- what is left of the root's events — every subscription's cells,
+    -- timers and observer against what is left of its own denotation.
     -- One relation for the whole program, carried by the loop.
     --
     -- DEAD ROUTE: a relation per operator (a `Below s d`, against any
@@ -199,7 +198,16 @@ module Places (R : Set) where
     --   an abstract step returns its sibling's as an existential witness,
     --   forgotten; and a merge's order needs every sibling's pending
     --   positions, which an abstract subscription does not expose.
-    Live : ∀ (n : ℕ) (o : PureObs [] R) {h} → State h → Set₁
+    Rest : ∀ (n : ℕ) (o : PureObs [] R) {h} → Events R → State h → Set₁
+
+  -- THE INVARIANT: the root's record so far, against the root's events,
+  -- with what is left of them the configuration's.
+  record Live (n : ℕ) (o : PureObs [] R) {h} (st : State h) : Set₁ where
+    constructor config
+    field
+      {left} : Events R
+      sofar  : Ends.Root R (shown n o) left st
+      rest   : Rest n o left st
 
   module At (n : ℕ) (o : PureObs [] R) (N : ℕ) where
     open Ends R (shown n o) public
@@ -210,16 +218,24 @@ module Places (R : Set) where
     -- or cut.
     live-start : ∀ n (o : PureObs [] R) → Rising n o → ∀ N k
                → At.Post n o N (runᴺ N k (compileᴺ n o [] same recorder λ _ _ → done tt) same start)
-    -- A cut leaves the record a prefix.
-    live-cut   : ∀ n o {h} {st : State h} → Live n o st → At.CutOk n o 0 st
-    -- With no timer left, nothing more is shown.
-    live-dry   : ∀ n o {h} {st : State h} → Live n o st → State.timers st ≡ [] → At.Done n o 0 st
     -- One turn of the loop keeps it.
     --
     -- RECOVERY: `git show 016c16a2` restores a cold at the root proven
     --   against the engine: its subscribe burst, each timer's turn, and
     --   the record placed, frame by frame.
     live-turn : ∀ n o N k {h} (st : State h) {tm ts} → Live n o st → State.timers st ≡ tm ∷ ts → At.Post n o N (At.turn n o N k st tm ts)
+    -- With no timer left, a root not yet complete is shown nothing more.
+    rest-dry  : ∀ n o {h} {r} {st : State h} → Rest n o r st → State.ended st ≡ false → State.timers st ≡ [] → Prefix._↝_ R r hush
+
+  -- A cut leaves the record a prefix.
+  live-cut : ∀ n o {h} {st : State h} → Live n o st → At.CutOk n o 0 st
+  live-cut n o (config q _) = cutok q
+    where open At n o 0
+
+  -- With no timer left, nothing more is shown.
+  live-dry : ∀ n o {h} {st : State h} → Live n o st → State.timers st ≡ [] → At.Done n o 0 st
+  live-dry n o (config (Ends.live e p) z) eq = Ends.silent e p (rest-dry n o z e eq)
+  live-dry n o (config (Ends.over e p) z) eq = Ends.over e p
 
   -- THE BOUND HALF: approximant m of the engine leaves its record placed
   -- against the events approximant n of the denotation shows the root,
