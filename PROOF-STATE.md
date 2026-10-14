@@ -169,11 +169,11 @@ must be solid before Tier 2 is written over it.
 ### Big picture tier roadmap
 
 - **THE BOUND HALF, NODE BY NODE.** The frame is played step by step over
-  `Mid`; what is left is each step's kernel run, `send-ok` first: an emit
-  must reach the root through every node above the firing cold, the slots
-  held surviving the heap growing (a weakening law for `Holds`). Most
-  uncertain: a `flatMap` lane's refill, then `connect`'s joiners. Then
-  `live-start`, which subscribes by the same kernels.
+  `Mid`, and a send runs alike to its observer's (`send-ok`); what is left
+  is each kernel's own run, `send-canon` first: an emit must reach the root
+  through every node above the firing cold, each hop's stored callbacks
+  again alike to the kernel's. Most uncertain: a `flatMap` lane's refill,
+  then `connect`'s joiners. Then `live-start`, by the same kernels.
 - **THE STATEMENT'S EDGES.** `adequacy` as stated is refuted three times,
   and each repair restates the top line, so all are Anthony's call. A cold
   whose ticks fall (`rising`): `ML` carries the increase, `adequacy`
@@ -195,14 +195,17 @@ must be solid before Tier 2 is written over it.
 
 - **`rising`** (Adequacy) — FALSITY, `REFUTED`: every cold's ticks rise; false
   for a cold that falls, the repair Anthony's call.
-- **`send-ok`, `closed-ok`, `finish-ok`** (Bound) — FALSITY, `RECOVERY`: a
-  firing cold's emit, closed check and completion, run through every kernel
-  above it, keep `Mid`.
+- **`send-canon`, `closed-ok`, `finish-ok`** (Bound) — FALSITY, `RECOVERY`: a
+  firing cold's emit to its observer, closed check and completion, run through
+  every kernel above it, keep `Mid`.
 - **`live-start`** (Bound) — FALSITY, `NO EVIDENCE`: subscribing establishes
   `Live`.
 - **`mid-spent`, `stall-ok`, `quiet-ok`, `timer-ok`** (Bound) — FALSITY,
   `NO EVIDENCE`: the firing cold moved a step, settled spent or quiet, or set
   its next frame's timer.
+- **`holds-rel`, `part-rel`, `timed-rel`, `joined-rel`** (Realize) — FALSITY,
+  `NO EVIDENCE`: a heap alike, but where the left's callbacks may diverge,
+  holds the same tree.
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
 - **`connect-rel`** (Adequacy) — FALSITY, `REFUTED×2`: the allocated subject

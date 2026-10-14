@@ -13,15 +13,16 @@
 module operation.Budget where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; not; _∧_)
-open import Data.List using (List; []; _∷_; _++_; [_]; null)
-open import Data.List.Properties using (++-assoc; ++-identityʳ)
+open import Data.List using (List; []; _∷_; _++_; [_]; null; length)
+open import Data.List.Properties using (++-assoc; ++-identityʳ; length-++)
 open import Data.Nat using (ℕ; zero; suc; pred; _<ᵇ_; _≡ᵇ_; _+_; _∸_; _≤_; z≤n; s≤s)
+open import Data.Nat.Properties using (+-suc)
 open import Data.Unit using (⊤; tt)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_,_; _×_)
 open import Data.List.Relation.Unary.All using (All; []; lookup) renaming (_∷_ to _∷ᴬ_)
 open import Level using (lift; lower)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; cong₂; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Timeline; ML; Burst∞; ML∞; Time; at; emit; stall; close; done; quiet; Pos; ix; last) renaming (sub to subᴾ)
 open import denotation.Order using (Shows; ShowsIn; nil; at⁺; emit⁺; stall⁺; close⁺; _⊑_)
@@ -307,21 +308,33 @@ module Approx (R : Set) where
   ------------------------------------------------------------------------
   -- The root's record only grows, and is frozen once the root has ended
 
-  data GrowsAt : Bool → List (Time × R) → Bool → List (Time × R) → Set where
-    open≈ : ∀ {xs ys e} zs → ys ≡ xs ++ zs → GrowsAt false xs e ys
-    shut≈ : ∀ {xs} → GrowsAt true xs true xs
+  -- A mark per value, and one more for the completion.
+  extra : Bool → ℕ → ℕ
+  extra false m = m
+  extra true  m = suc m
+
+  -- The marks and the values grow together.
+  data GrowsAt : Bool → List Pos → List (Time × R) → Bool → List Pos → List (Time × R) → Set where
+    open≈ : ∀ {ms xs ns ys e} ps zs → ns ≡ ms ++ ps → ys ≡ xs ++ zs → length ps ≡ extra e (length zs) → GrowsAt false ms xs e ns ys
+    shut≈ : ∀ {ms xs} → GrowsAt true ms xs true ms xs
 
   Grows : ∀ {h v} → State h → State v → Set
-  Grows s s′ = GrowsAt (State.ended s) (State.log s) (State.ended s′) (State.log s′)
+  Grows s s′ = GrowsAt (State.ended s) (State.marks s) (State.log s) (State.ended s′) (State.marks s′) (State.log s′)
 
-  growsAt-refl : ∀ e xs → GrowsAt e xs e xs
-  growsAt-refl false xs = open≈ [] (sym (++-identityʳ xs))
-  growsAt-refl true  xs = shut≈
+  growsAt-refl : ∀ e ms xs → GrowsAt e ms xs e ms xs
+  growsAt-refl false ms xs = open≈ [] [] (sym (++-identityʳ ms)) (sym (++-identityʳ xs)) refl
+  growsAt-refl true  ms xs = shut≈
 
-  growsAt-trans : ∀ {a b c xs ys zs} → GrowsAt a xs b ys → GrowsAt b ys c zs → GrowsAt a xs c zs
-  growsAt-trans (open≈ p refl) (open≈ q refl) = open≈ (p ++ q) (++-assoc _ p q)
-  growsAt-trans (open≈ p e)    shut≈          = open≈ p e
-  growsAt-trans shut≈          shut≈          = shut≈
+  extra-+ : ∀ e a b → a + extra e b ≡ extra e (a + b)
+  extra-+ false a b = refl
+  extra-+ true  a b = +-suc a b
+
+  growsAt-trans : ∀ {a b c ms xs ns ys os zs} → GrowsAt a ms xs b ns ys → GrowsAt b ns ys c os zs → GrowsAt a ms xs c os zs
+  growsAt-trans {c = c} (open≈ ps zs refl refl l) (open≈ ps′ zs′ refl refl l′) =
+    open≈ (ps ++ ps′) (zs ++ zs′) (++-assoc _ ps ps′) (++-assoc _ zs zs′)
+      (trans (length-++ ps) (trans (cong₂ _+_ l l′) (trans (extra-+ c (length zs) (length zs′)) (cong (extra c) (sym (length-++ zs))))))
+  growsAt-trans (open≈ ps zs p q l) shut≈ = open≈ ps zs p q l
+  growsAt-trans shut≈               shut≈ = shut≈
 
   ------------------------------------------------------------------------
   -- Two heaps alike, but where the left's callbacks diverge
@@ -378,17 +391,20 @@ module Approx (R : Set) where
       log≡    : State.log s ≡ State.log s′
       ended≡  : State.ended s ≡ State.ended s′
       pos≡    : State.pos s ≡ State.pos s′
+      marks≡  : State.marks s ≡ State.marks s′
   open StRel
 
   stRel-refl : ∀ {h} (s : State h) → StRel s s
-  stRel-refl s = record { heap≈ = heapRel-refl (State.heap s) ; clock≡ = refl ; timers≡ = refl ; log≡ = refl ; ended≡ = refl ; pos≡ = refl }
+  stRel-refl s = record { heap≈ = heapRel-refl (State.heap s) ; clock≡ = refl ; timers≡ = refl ; log≡ = refl ; ended≡ = refl ; pos≡ = refl ; marks≡ = refl }
 
   extend-rel : ∀ {h k} {s s′ : State h} {x y : Val (k ∷ h) k} → StRel s s′ → ValRel k x y → StRel (extend s x) (extend s′ y)
   extend-rel q p = record { heap≈ = p ∷ wkAll-rel new (heap≈ q) ; clock≡ = clock≡ q ; timers≡ = cong (mapList (wkTimer new)) (timers≡ q)
-                          ; log≡ = log≡ q ; ended≡ = ended≡ q ; pos≡ = pos≡ q }
+                          ; log≡ = log≡ q ; ended≡ = ended≡ q ; pos≡ = pos≡ q ; marks≡ = marks≡ q }
 
   grows-from : ∀ {h v} {s s′ : State h} {s″ : State v} → StRel s s′ → Grows s′ s″ → Grows s s″
-  grows-from q g = subst₂ (λ e l → GrowsAt e l _ _) (sym (ended≡ q)) (sym (log≡ q)) g
+  grows-from {s″ = s″} q g =
+    subst (λ e → GrowsAt e _ _ (State.ended s″) (State.marks s″) (State.log s″)) (sym (ended≡ q))
+      (subst₂ (λ m l → GrowsAt _ m l (State.ended s″) (State.marks s″) (State.log s″)) (sym (marks≡ q)) (sym (log≡ q)) g)
 
   private
     cong₃ : ∀ {a b c d} {A : Set a} {B : Set b} {C : Set c} {D : Set d} (f : A → B → C → D) {x x′ y y′ z z′}
@@ -449,7 +465,7 @@ module Approx (R : Set) where
   ret-sim b σ q = lock q
 
   ret-grow : ∀ {w B} (b : B) → Grower {w} (ret b)
-  ret-grow b = grows λ σ s → growsAt-refl _ _
+  ret-grow b = grows λ σ s → growsAt-refl _ _ _
 
   diverge-sim : ∀ {w B} {m′ : M w B} → Grower m′ → Sim (λ σ s → res same s nothing) m′
   diverge-sim {m′ = m′} g σ {s} {s′} q = short (grows-from {s = s} {s′} {Res.state (m′ σ s′)} q (grow g σ s′))
@@ -462,13 +478,13 @@ module Approx (R : Set) where
                                     (get-rel (heap≈ q) (wk∋ σ hd)) (lock q)
 
   spent-grow : ∀ {w} (hd : Handle w) → Grower (spent hd)
-  spent-grow hd = grows λ σ s → growsAt-refl _ _
+  spent-grow hd = grows λ σ s → growsAt-refl _ _ _
 
   spend-sim : ∀ {w} (hd : Handle w) → Sim (spend hd) (spend hd)
-  spend-sim hd σ q = lock (stRel (put-rel (heap≈ q) (wk∋ σ hd) refl) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) (pos≡ q))
+  spend-sim hd σ q = lock (stRel (put-rel (heap≈ q) (wk∋ σ hd) refl) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) (pos≡ q) (marks≡ q))
 
   spend-grow : ∀ {w} (hd : Handle w) → Grower (spend hd)
-  spend-grow hd = grows λ σ s → growsAt-refl _ _
+  spend-grow hd = grows λ σ s → growsAt-refl _ _ _
 
   unless-sim : ∀ {w} (hd : Handle w) {m m′ : M w ⊤} → Sim m m′ → Grower m′ → Sim (unlessSpent hd m) (unlessSpent hd m′)
   unless-sim hd {m} {m′} pm gm = bind-sim {f = λ b → if b then ret tt else m} {f′ = λ b → if b then ret tt else m′} (spent-sim hd) (λ { true → ret-sim tt ; false → pm }) (λ { true → ret-grow tt ; false → gm })
@@ -483,18 +499,18 @@ module Approx (R : Set) where
   here-grow gk = grows λ σ st → grow (gk (State.pos st)) σ st
 
   goto-sim : ∀ {w} p → Sim {w} (gotoᴾ p) (gotoᴾ p)
-  goto-sim p σ q = lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) refl)
+  goto-sim p σ q = lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) refl (marks≡ q))
 
   goto-grow : ∀ {w} p → Grower {w} (gotoᴾ p)
-  goto-grow p = grows λ σ st → growsAt-refl _ _
+  goto-grow p = grows λ σ st → growsAt-refl _ _ _
 
-  note-grows : ∀ e xs c a → GrowsAt e xs e (if e then xs else xs ++ [ (c , a) ])
-  note-grows true  xs c a = shut≈
-  note-grows false xs c a = open≈ [ (c , a) ] refl
+  note-grows : ∀ e ms xs p y → GrowsAt e ms xs e (if e then ms else ms ++ [ p ]) (if e then xs else xs ++ [ y ])
+  note-grows true  ms xs p y = shut≈
+  note-grows false ms xs p y = open≈ [ p ] [ y ] refl refl refl
 
-  fin-grows : ∀ e xs → GrowsAt e xs true xs
-  fin-grows true  xs = shut≈
-  fin-grows false xs = open≈ [] (sym (++-identityʳ xs))
+  fin-grows : ∀ e ms xs p → GrowsAt e ms xs true (if e then ms else ms ++ [ p ]) xs
+  fin-grows true  ms xs p = shut≈
+  fin-grows false ms xs p = open≈ [ p ] [] refl (sym (++-identityʳ xs)) refl
 
   -- Playing colds, on any budget, over any runner of stored callbacks.
   module Grow (n : ℕ) {run : RunM} (gr : GrowRun run) where
@@ -515,11 +531,11 @@ module Approx (R : Set) where
     schedule-grow : ∀ {w A} (s : Sink w A) (hd : Handle w) now e m → Grower (schedule s hd now e m)
     schedule-grow s hd now e done     = unless-grow hd (bind-grow (spend-grow hd) λ _ → bind-grow (goto-grow e) λ _ → finish-grow s)
     schedule-grow s hd now e quiet    = ret-grow tt
-    schedule-grow s hd now e (at t b) = grows λ σ st → growsAt-refl _ _
+    schedule-grow s hd now e (at t b) = grows λ σ st → growsAt-refl _ _ _
 
     mutual
       burst-grow : ∀ f {w A} (s : Sink w A) (hd : Handle w) t r i b → Grower (burst f s hd t r i b)
-      burst-grow zero    s hd t r i b = grows λ σ st → growsAt-refl _ _
+      burst-grow zero    s hd t r i b = grows λ σ st → growsAt-refl _ _ _
       burst-grow (suc f) s hd t r i b = bind-grow {f = λ c → if c then ret tt else stepᴾ f s hd t r i b} (closed-grow s hd) λ { true → ret-grow tt ; false → step-grow f s hd t r i b }
 
       step-grow : ∀ f {w A} (s : Sink w A) (hd : Handle w) t r i b → Grower (stepᴾ f s hd t r i b)
@@ -535,13 +551,13 @@ module Approx (R : Set) where
     first-grow s hd quiet          = here-grow λ r → schedule-grow s hd 0 (r ++ [ last ]) quiet
 
     fire-grow : ∀ {h} ts (st : State h) → Grows st (Res.state (fire ts st))
-    fire-grow []        st = growsAt-refl _ _
+    fire-grow []        st = growsAt-refl _ _ _
     fire-grow (tm ∷ ts) st = then-grow {g = λ _ _ st′ → res same st′ (just true)} st
       (unlessSpent (Timer.handle tm) (burst n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm)) same
         (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }))
       (grow (unless-grow (Timer.handle tm) (burst-grow n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm))) same
         (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }))
-      (λ _ → grows λ _ _ → growsAt-refl _ _)
+      (λ _ → grows λ _ _ → growsAt-refl _ _ _)
 
     next-grow : ∀ {w} → Grower {w} (nextᴾ {w})
     next-grow = grows λ σ st → fire-grow (State.timers st) st
@@ -550,18 +566,18 @@ module Approx (R : Set) where
     interpret-grow (done b)               = ret-grow b
     interpret-grow (newRef t a k)        = grows λ σ st → grow (interpret-grow (k (σ ⨾ʷ new) here)) same (extend st (lift (wkEl t (σ ⨾ʷ new) a)))
     interpret-grow (readRef r k)         = grows λ σ st → grow (interpret-grow (k σ (lower (get (State.heap st) (wk∋ σ r))))) same st
-    interpret-grow (writeRef r a k)       = bind-grow {m = Runtime.writeRefᴿ (Pureᴿ n) r a} (grows λ σ st → growsAt-refl _ _) λ _ → interpret-grow k
+    interpret-grow (writeRef r a k)       = bind-grow {m = Runtime.writeRefᴿ (Pureᴿ n) r a} (grows λ σ st → growsAt-refl _ _ _) λ _ → interpret-grow k
     interpret-grow (register nx c x k)   = grows λ σ st → grow (interpret-grow (k (σ ⨾ʷ new) here)) same (extend st _)
     interpret-grow (send s a k)           = bind-grow (send-grow s a) λ _ → interpret-grow k
     interpret-grow (finish s k)           = bind-grow (finish-grow s) λ _ → interpret-grow k
     interpret-grow (startCold c s k) = grows λ σ st →
       grow (bind-grow (first-grow (wk∋ new (wk∋ σ s)) here (lower c)) (λ _ → interpret-grow (k (σ ⨾ʷ new) here))) same (extend st (lift false))
     interpret-grow (stop h k)             = bind-grow (spend-grow h) λ _ → interpret-grow k
-    interpret-grow (eff (note a) k)       = bind-grow {m = Runtime.effᴿ (Pureᴿ n) (note a)} (grows λ σ st → note-grows (State.ended st) (State.log st) (State.clock st) a) λ x → interpret-grow (k x)
-    interpret-grow (eff fin k)            = bind-grow {m = Runtime.effᴿ (Pureᴿ n) fin} (grows λ σ st → fin-grows (State.ended st) (State.log st)) λ x → interpret-grow (k x)
+    interpret-grow (eff (note a) k)       = bind-grow {m = Runtime.effᴿ (Pureᴿ n) (note a)} (grows λ σ st → note-grows (State.ended st) (State.marks st) (State.log st) (State.pos st) (State.clock st , a)) λ x → interpret-grow (k x)
+    interpret-grow (eff fin k)            = bind-grow {m = Runtime.effᴿ (Pureᴿ n) fin} (grows λ σ st → fin-grows (State.ended st) (State.marks st) (State.log st) (State.pos st)) λ x → interpret-grow (k x)
     interpret-grow (here k)               = here-grow λ p → interpret-grow (k p)
     interpret-grow (goto p k)             = bind-grow {m = Runtime.gotoᴿ (Pureᴿ n) p} (goto-grow p) λ _ → interpret-grow k
-    interpret-grow diverge                = grows λ σ st → growsAt-refl _ _
+    interpret-grow diverge                = grows λ σ st → growsAt-refl _ _ _
     interpret-grow (unfold l e nx c x k m) = bind-grow (gr _) λ _ → interpret-grow m
 
   -- Two budgets, two runners of stored callbacks, in lockstep.
@@ -591,7 +607,7 @@ module Approx (R : Set) where
                                          (bind-grow (spend-grow hd) λ _ → bind-grow (goto-grow e) λ _ → G.finish-grow s)
     schedule-sim s hd now e quiet    = ret-sim tt
     schedule-sim s hd now e (at t b) = λ σ q → lock (stRel (heap≈ q) (clock≡ q) (cong₂ (λ c ts → insert (record
-      { due = c + (t ∸ now) ; sink = wk∋ σ s ; handle = wk∋ σ hd ; at′ = t ; from = e ; frame = b }) ts) (clock≡ q) (timers≡ q)) (log≡ q) (ended≡ q) (pos≡ q))
+      { due = c + (t ∸ now) ; sink = wk∋ σ s ; handle = wk∋ σ hd ; at′ = t ; from = e ; frame = b }) ts) (clock≡ q) (timers≡ q)) (log≡ q) (ended≡ q) (pos≡ q) (marks≡ q))
 
     mutual
       burst-sim : ∀ {f f′} → f ≤ f′ → ∀ {w A} (s : Sink w A) (hd : Handle w) t r i b → Sim (L.burst f s hd t r i b) (L′.burst f′ s hd t r i b)
@@ -621,8 +637,8 @@ module Approx (R : Set) where
     fire-sim (tm ∷ ts) q = then-rel {g = λ _ _ st′ → res same st′ (just true)} {g′ = λ _ _ st′ → res same st′ (just true)}
       (unless-sim (Timer.handle tm) (burst-sim n≤ (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm))
                   (G.burst-grow n′ (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm))
-                  same (stRel (heap≈ q) refl refl (log≡ q) (ended≡ q) refl))
-      (λ _ _ q′ → lock q′) (λ _ → grows λ _ _ → growsAt-refl _ _)
+                  same (stRel (heap≈ q) refl refl (log≡ q) (ended≡ q) refl (marks≡ q)))
+      (λ _ _ q′ → lock q′) (λ _ → grows λ _ _ → growsAt-refl _ _ _)
 
     next-sim : ∀ {w} → Sim {w} (L.nextᴾ {w}) (L′.nextᴾ {w})
     next-sim σ {s} {s′} q = subst (λ ts → ResRel (L.fire (State.timers s) s) (L′.fire ts s′)) (timers≡ q) (fire-sim (State.timers s) q)
@@ -639,7 +655,7 @@ module Approx (R : Set) where
       subst (λ y → ResRel (I (k σ (lower (get (State.heap s) (wk∋ σ r)))) same s) (I′ (k′ σ (lower y)) same s′))
             (get-rel (heap≈ q) (wk∋ σ r)) (interpret-sim (p σ _) same q)
     interpret-sim (writeRef≼ {r = r} {a = a} {k′ = k′} p) =
-      bind-sim {m = Runtime.writeRefᴿ (Pureᴿ n) r a} {m′ = Runtime.writeRefᴿ (Pureᴿ n′) r a} (λ σ q → lock (stRel (put-rel (heap≈ q) (wk∋ σ r) refl) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) (pos≡ q))) (λ _ → interpret-sim p)
+      bind-sim {m = Runtime.writeRefᴿ (Pureᴿ n) r a} {m′ = Runtime.writeRefᴿ (Pureᴿ n′) r a} (λ σ q → lock (stRel (put-rel (heap≈ q) (wk∋ σ r) refl) (clock≡ q) (timers≡ q) (log≡ q) (ended≡ q) (pos≡ q) (marks≡ q))) (λ _ → interpret-sim p)
                (λ _ → Grow.interpret-grow n′ gr′ k′)
     interpret-sim (register≼ pn pc px pk) σ q = shift-rel new (interpret-sim (pk (σ ⨾ʷ new) here) same (extend-rel q (record
       { onNext≼ = λ a → ≼-wk (σ ⨾ʷ new) (pn a) ; onComplete≼ = ≼-wk (σ ⨾ʷ new) pc ; isClosed≼ = ≼-wk (σ ⨾ʷ new) px })))
@@ -650,10 +666,12 @@ module Approx (R : Set) where
                 (λ _ → Grow.interpret-grow n′ gr′ (k′ (σ ⨾ʷ new) here)) same (extend-rel q refl))
     interpret-sim (stop≼ {h = h} {k′ = k′} p) = bind-sim (spend-sim h) (λ _ → interpret-sim p) (λ _ → Grow.interpret-grow n′ gr′ k′)
     interpret-sim (eff≼ {e = note a} {k′ = k′} p) =
-      bind-sim {m = Runtime.effᴿ (Pureᴿ n) (note a)} {m′ = Runtime.effᴿ (Pureᴿ n′) (note a)} (λ σ q → lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (cong₃ (λ e l c → if e then l else l ++ [ (c , a) ]) (ended≡ q) (log≡ q) (clock≡ q)) (ended≡ q) (pos≡ q)))
+      bind-sim {m = Runtime.effᴿ (Pureᴿ n) (note a)} {m′ = Runtime.effᴿ (Pureᴿ n′) (note a)} (λ σ q → lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (cong₃ (λ e l c → if e then l else l ++ [ (c , a) ]) (ended≡ q) (log≡ q) (clock≡ q)) (ended≡ q) (pos≡ q)
+        (cong₃ (λ e m p → if e then m else m ++ [ p ]) (ended≡ q) (marks≡ q) (pos≡ q))))
                (λ x → interpret-sim (p x)) (λ x → Grow.interpret-grow n′ gr′ (k′ x))
     interpret-sim (eff≼ {e = fin} {k′ = k′} p) =
-      bind-sim {m = Runtime.effᴿ (Pureᴿ n) fin} {m′ = Runtime.effᴿ (Pureᴿ n′) fin} (λ σ q → lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (log≡ q) refl (pos≡ q))) (λ x → interpret-sim (p x)) (λ x → Grow.interpret-grow n′ gr′ (k′ x))
+      bind-sim {m = Runtime.effᴿ (Pureᴿ n) fin} {m′ = Runtime.effᴿ (Pureᴿ n′) fin} (λ σ q → lock (stRel (heap≈ q) (clock≡ q) (timers≡ q) (log≡ q) refl (pos≡ q)
+        (cong₃ (λ e m p → if e then m else m ++ [ p ]) (ended≡ q) (marks≡ q) (pos≡ q)))) (λ x → interpret-sim (p x)) (λ x → Grow.interpret-grow n′ gr′ (k′ x))
     interpret-sim (here≼ p) = here-sim λ x → interpret-sim (p x)
     interpret-sim (goto≼ {p = p} {k′ = k′} q) =
       bind-sim {m = Runtime.gotoᴿ (Pureᴿ n) p} {m′ = Runtime.gotoᴿ (Pureᴿ n′) p} (goto-sim p) (λ _ → interpret-sim q) (λ _ → Grow.interpret-grow n′ gr′ k′)
@@ -666,7 +684,7 @@ module Approx (R : Set) where
   -- The engine's approximants
 
   runᴺ-grow : ∀ n k → GrowRun (runᴺ n k)
-  runᴺ-grow n zero    a = grows λ σ st → growsAt-refl _ _
+  runᴺ-grow n zero    a = grows λ σ st → growsAt-refl _ _ _
   runᴺ-grow n (suc k) a      = Grow.interpret-grow n (runᴺ-grow n k) a
 
   runᴺ-sim : ∀ {n n′ k k′} → n ≤ n′ → k ≤ k′ → SimRun (runᴺ n k) (runᴺ n′ k′)
@@ -682,7 +700,7 @@ module Approx (R : Set) where
                                              (λ { true → ga ; false → ret-grow tt })
 
   loopᴺ-grow : ∀ n k → Grower {[]} {⊤} (loopᴺ n k)
-  loopᴺ-grow n zero    = grows λ σ st → growsAt-refl _ _
+  loopᴺ-grow n zero    = grows λ σ st → growsAt-refl _ _ _
   loopᴺ-grow n (suc k) = loopStep-grow n (runᴺ-grow n (suc k)) (loopᴺ-grow n k)
 
   loopᴺ-sim : ∀ {n n′ k k′} → n ≤ n′ → k ≤ k′ → Sim {[]} {⊤} (loopᴺ n k) (loopᴺ n′ k′)
@@ -734,8 +752,8 @@ module Approx (R : Set) where
     sameFrame-cut false t t′ a xs ys c e (close⁺ s) = close⁺ (frames-cut ((t′ , a) ∷ xs) ys c e s)
 
   private
-    cut-obs : ∀ {e xs e′ ys} c b′ c′ → GrowsAt e xs e′ ys → frames xs (endOf e nothing c) ⊑ frames ys (endOf e′ b′ c′)
-    cut-obs {xs = xs} {e′ = e′} c b′ c′ (open≈ zs refl) = frames-cut xs zs c (endOf e′ b′ c′)
+    cut-obs : ∀ {e ms xs e′ ns ys} c b′ c′ → GrowsAt e ms xs e′ ns ys → frames xs (endOf e nothing c) ⊑ frames ys (endOf e′ b′ c′)
+    cut-obs {xs = xs} {e′ = e′} c b′ c′ (open≈ ps zs _ refl _) = frames-cut xs zs c (endOf e′ b′ c′)
     cut-obs c b′ c′ shut≈ s = s
 
   observe-mono : ∀ {x x′ : Res [] ⊤} → ResRel x x′ → observe x ⊑ observe x′

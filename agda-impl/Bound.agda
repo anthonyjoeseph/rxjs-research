@@ -12,21 +12,24 @@
 module Bound where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List.Properties using (length-++)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _∸_)
+open import Data.Nat.Properties using (+-cancelʳ-≡; +-suc; suc-injective; ≤-refl)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Level using (lower; lift)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; subst₂; cong)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Pos; tick; Events; Events∞;
   out; skip; hush; observe; root; ix; last)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using (PureObs; Pureᴾ; same; grow; _⊑_; _⨾_; wk∋; Sink; Handle; module Pure)
-open import operation.Placed using (Placed; cut; quiets; sends; skips; module Ran)
+open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; module Ran)
+open import operation.Budget using (module Approx)
 open import Config using (_≅_; skipˡ; hush≅; module Nodes)
 open import Realize using (module Realizing)
 
@@ -72,7 +75,7 @@ Rising (suc n) (defer l)         = Rising n (Later.force l)
 -- The record so far
 
 module Prefix (A : Set) where
-  open Pure A using (End; dry; cutOff)
+  open Pure A using (End; dry; cutOff; finished)
 
   -- Through skips only.
   data _↝_ : Events A → Events A → Set where
@@ -103,6 +106,39 @@ module Prefix (A : Set) where
   pre-dry (pskip p) s        = skips (pre-dry p s)
   pre-dry (pout p)  s        = sends (pre-dry p s)
 
+  -- A mark for each value, and one more once complete.
+  pre-len : ∀ {qs xs E r} → Pre qs xs E r → length qs ≡ length xs
+  pre-len pnil      = refl
+  pre-len (pskip p) = pre-len p
+  pre-len (pout p)  = cong suc (pre-len p)
+
+  placed-len : ∀ {qs xs E} → Placed finished qs xs E → length qs ≡ suc (length xs)
+  placed-len ends      = refl
+  placed-len (sends p) = cong suc (placed-len p)
+  placed-len (skips p) = placed-len p
+
+  -- What a longer record says of its prefix.
+  len-prefix : ∀ {X Y : Set} (ms : List X) (xs : List Y) ps k → length (ms ++ ps) ≡ length xs + k → length ps ≡ k → length ms ≡ length xs
+  len-prefix ms xs ps k e refl = +-cancelʳ-≡ (length ps) (length ms) (length xs) (trans (sym (length-++ ms)) e)
+
+  pre-prefix : ∀ ms xs {ps zs E r} → length ms ≡ length xs → Pre (ms ++ ps) (xs ++ zs) E r → Σ (Events A) (Pre ms xs E)
+  pre-prefix []       []       l p         = _ , pnil
+  pre-prefix (m ∷ ms) (x ∷ xs) l (pskip p) with pre-prefix (m ∷ ms) (x ∷ xs) l p
+  ... | r₀ , q = r₀ , pskip q
+  pre-prefix (m ∷ ms) (x ∷ xs) l (pout p) with pre-prefix ms xs (suc-injective l) p
+  ... | r₀ , q = r₀ , pout q
+  pre-prefix []       (x ∷ xs) () p
+  pre-prefix (m ∷ ms) []       () p
+
+  placed-prefix : ∀ ms xs {ps zs E} → length ms ≡ length xs → Placed finished (ms ++ ps) (xs ++ zs) E → Σ (Events A) (Pre ms xs E)
+  placed-prefix []       []       l p         = _ , pnil
+  placed-prefix (m ∷ ms) (x ∷ xs) l (skips p) with placed-prefix (m ∷ ms) (x ∷ xs) l p
+  ... | r₀ , q = r₀ , pskip q
+  placed-prefix (m ∷ ms) (x ∷ xs) l (sends p) with placed-prefix ms xs (suc-injective l) p
+  ... | r₀ , q = r₀ , pout q
+  placed-prefix []       (x ∷ xs) () p
+  placed-prefix (m ∷ ms) []       () p
+
 ------------------------------------------------------------------------
 -- How a run may stand, against the root's events `E₀`
 
@@ -124,6 +160,57 @@ module Ends (R : Set) (E₀ : Events R) where
   data Done {h} (st : State h) : Set₁ where
     silent : ∀ {r} → State.ended st ≡ false → Pre (State.marks st) (State.log st) E₀ r → r ↝ hush → Done st
     over   : State.ended st ≡ true → Placed finished (State.marks st) (State.log st) E₀ → Done st
+
+  open Approx R using (StRel; GrowsAt; Grows; open≈; shut≈)
+
+  -- Only the record and whether it is complete are judged.
+  root-rel : ∀ {h} {s s′ : State h} {r} → StRel s s′ → Root r s′ → Root r s
+  root-rel q (live e p) = live (trans (StRel.ended≡ q) e) (subst₂ (λ m x → Pre m x E₀ _) (sym (StRel.marks≡ q)) (sym (StRel.log≡ q)) p)
+  root-rel q (over e p) = over (trans (StRel.ended≡ q) e) (subst₂ (λ m x → Placed finished m x E₀) (sym (StRel.marks≡ q)) (sym (StRel.log≡ q)) p)
+
+  cut-rel : ∀ {h} {s s′ : State h} → StRel s s′ → CutOk s′ → CutOk s
+  cut-rel q (cutok p) = cutok (root-rel q p)
+
+  repos : ∀ {h} {st : State h} {r} p → Root r st → Root r (record st { pos = p })
+  repos p (live e q) = live e q
+  repos p (over e q) = over e q
+
+  -- The same, over the record alone.
+  data RootAt : Bool → List Pos → List (Time × R) → Events R → Set where
+    liveᵃ : ∀ {ms xs r} → Pre ms xs E₀ r → RootAt false ms xs r
+    overᵃ : ∀ {ms xs r} → Placed finished ms xs E₀ → RootAt true ms xs r
+
+  root-at : ∀ {h} {st : State h} {r} → Root r st → RootAt (State.ended st) (State.marks st) (State.log st) r
+  root-at {st = st} {r} (live e p) = subst (λ b → RootAt b (State.marks st) (State.log st) r) (sym e) (liveᵃ p)
+  root-at {st = st} {r} (over e p) = subst (λ b → RootAt b (State.marks st) (State.log st) r) (sym e) (overᵃ p)
+
+  at-root : ∀ {h} {st : State h} {b r} → State.ended st ≡ b → RootAt b (State.marks st) (State.log st) r → Root r st
+  at-root e (liveᵃ p) = live e p
+  at-root e (overᵃ p) = over e p
+
+  -- A record placed, cut back to where an earlier state stood.
+  back : ∀ {e ms xs e′ ns ys r} → GrowsAt e ms xs e′ ns ys → RootAt e′ ns ys r → Σ (Events R) (RootAt e ms xs)
+  back shut≈ q = _ , q
+  back {ms = ms} {xs} (open≈ ps zs refl refl l) (liveᵃ p)
+    with pre-prefix ms xs (len-prefix ms xs ps (length zs) (trans (pre-len p) (length-++ xs)) l) p
+  ... | r₀ , q = r₀ , liveᵃ q
+  back {ms = ms} {xs} (open≈ ps zs refl refl l) (overᵃ p)
+    with placed-prefix ms xs (len-prefix ms xs ps (suc (length zs)) (trans (placed-len p) (trans (cong suc (length-++ xs)) (sym (+-suc (length xs) (length zs))))) l) p
+  ... | r₀ , q = r₀ , liveᵃ q
+
+  cut-back : ∀ {h v} {s : State h} {s′ : State v} → Grows s s′ → CutOk s′ → CutOk s
+  cut-back g (cutok q) with back g (root-at q)
+  ... | r₀ , q₀ = cutok (at-root refl q₀)
+
+  -- A record complete stays as it is.
+  shut-fwd : ∀ {ms xs e′ ns ys r} → GrowsAt true ms xs e′ ns ys → RootAt true ms xs r → (e′ ≡ true) × RootAt e′ ns ys r
+  shut-fwd shut≈ q = refl , q
+
+  frozen : ∀ {h v} {s : State h} {s′ : State v} {r} → State.ended s ≡ true → Root r s → Grows s s′ → (State.ended s′ ≡ true) × Root r s′
+  frozen {s = s} {s′} {r} e q g
+    with shut-fwd (subst (λ b → GrowsAt b (State.marks s) (State.log s) (State.ended s′) (State.marks s′) (State.log s′)) e g)
+                  (subst (λ b → RootAt b (State.marks s) (State.log s) r) e (root-at q))
+  ... | e′ , q′ = e′ , at-root refl q′
 
 ------------------------------------------------------------------------
 -- THE LOOP, over any invariant `Live` it is handed: a run that keeps it
@@ -189,6 +276,7 @@ module Places (R : Set) where
   open import operation.AbstractObservable using (module Run)
   open Run (Pureᴾ R) using (done; eff; Observer; Env)
   open Prefix R using (_↝_; ≅-hush)
+  open Approx R using (StRel; ResRel; lock; short; Grows; CbRel; runᴺ-sim; runᴺ-grow; stRel-refl; module Grower)
 
   -- What the root is shown: approximant n of the program's denotation.
   shown : ℕ → PureObs [] R → Events R
@@ -248,15 +336,20 @@ module Places (R : Set) where
               → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i b → lower (get (State.heap st) (wk∋ σ hd)) ≡ false
               → Reach n o (λ g st′ c → Closed n o c st′ (wk∋ (σ ⨾ g) s) (wk∋ (σ ⨾ g) hd) τ t r i b)
                       (Play.runCb N (runᴺ N k) s Callbacks.isClosed σ st)
-    -- An emit, sent from its own position, moves the cold a step on.
+    -- An emit, delivered from its own position to the observer the
+    -- firing cold's subscription stands for, through every node above it
+    -- to the root, moves the cold a step on.
     --
     -- RECOVERY: `git show 016c16a2` restores a cold at the root proven
     --   against the engine: its subscribe burst, each timer's turn, and
     --   the record placed, frame by frame.
-    send-ok : ∀ n o N k {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i a k′}
-            → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i (emit a k′) → lower (get (State.heap st) (wk∋ σ hd)) ≡ false
-            → Reach n o (λ g st′ _ → Mid n o st′ (wk∋ (σ ⨾ g) s) (wk∋ (σ ⨾ g) hd) τ t r (suc i) (Burst∞.force k′))
-                    (Play.sendᴾ N (runᴺ N k) s a σ (record st { pos = r ++ [ ix i ] }))
+    send-canon : ∀ n o N k {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i a k′ left c}
+               → Ends.Root R (shown n o) left st → State.ended st ≡ false
+               → (pl : Realizing.Playing R n c st (wk∋ σ s) (wk∋ σ hd) τ r i (emit a k′)) → left ≅ Nodes.⟦_⟧ᶜ n c [] → State.clock st ≡ τ + t
+               → lower (get (State.heap st) (wk∋ σ hd)) ≡ false
+               → Reach n o (λ g st′ _ → Mid n o st′ (wk∋ (σ ⨾ g) s) (wk∋ (σ ⨾ g) hd) τ t r (suc i) (Burst∞.force k′))
+                       (runᴺ N k (Callbacks.onNext (Realizing.Canon.cbOf R n (Realizing.obsAt R n (Realizing.Playing.spot pl) [] (Realizing.rootObs R n))) a)
+                             same (record st { pos = r ++ [ ix i ] }))
     -- A stall moves it a step on, sending nothing.
     stall-ok : ∀ n o {h} {st : State h} {B} {s : Sink h B} {hd τ t r i k′} → Mid n o st s hd τ t r i (stall k′)
              → Mid n o st s hd τ t r (suc i) (Burst∞.force k′)
@@ -316,6 +409,50 @@ module Places (R : Set) where
   unless-false : ∀ n o N {w h} (hd : Handle w) (m : M w ⊤) (σ : w ⊑ h) (st : State h)
                → lower (get (State.heap st) (wk∋ σ hd)) ≡ false → At.Post n o N (m σ st) → At.Post n o N (unlessSpent hd m σ st)
   unless-false n o N hd m σ st e q rewrite e = post-shift n o N same (m σ st) q
+
+  -- A step judged against a run alike but where the left may diverge:
+  -- the same, or cut short of it.
+  reach-back : ∀ n o {h A} {P : ∀ {v} → h ⊑ v → State v → A → Set₁} {x x′ : Res h A}
+             → (∀ {v} {g : h ⊑ v} {s s′ : State v} {a} → StRel s s′ → P g s′ a → P g s a)
+             → (∀ {v} {g : h ⊑ v} {s : State v} {a} → P g s a → Ends.CutOk R (shown n o) s)
+             → ResRel x x′ → Reach n o P x′ → Reach n o P x
+  reach-back n o Pr Pc (lock {b = nothing} q)  c = Ends.cut-rel R (shown n o) q c
+  reach-back n o Pr Pc (lock {b = just a} q)   p = Pr q p
+  reach-back n o Pr Pc (short {b′ = nothing} g) c = Ends.cut-back R (shown n o) g c
+  reach-back n o Pr Pc (short {b′ = just a} g)  p = Ends.cut-back R (shown n o) g (Pc p)
+
+  mid-rel : ∀ n o {h} {s s′ : State h} {B} {sk : Sink h B} {hd τ t r i b} → StRel s s′ → Mid n o s′ sk hd τ t r i b → Mid n o s sk hd τ t r i b
+  mid-rel n o q (mid sofar rest) = mid (Ends.root-rel R (shown n o) q sofar) λ e →
+    let (c , pl , d , ck) = rest (trans (sym (StRel.ended≡ q)) e) in c , Realizing.Alike.playing-rel R n q pl , d , trans (StRel.clock≡ q) ck
+
+  -- A run already complete: whatever is played, the record stays.
+  frozen-reach : ∀ n o {h A} {P : ∀ {v} → h ⊑ v → State v → A → Set₁} {st : State h} {r} (x : Res h A)
+               → State.ended st ≡ true → Ends.Root R (shown n o) r st → Grows st (Res.state x)
+               → (∀ {v} (g : h ⊑ v) (st′ : State v) a → State.ended st′ ≡ true → Ends.Root R (shown n o) r st′ → P g st′ a)
+               → Reach n o P x
+  frozen-reach n o (res g st′ nothing)  e q gr k = Ends.cutok (proj₂ (Ends.frozen R (shown n o) e q gr))
+  frozen-reach n o (res g st′ (just a)) e q gr k with Ends.frozen R (shown n o) e q gr
+  ... | e′ , q′ = k g st′ a e′ q′
+
+  -- An emit, sent from its own position, moves the cold a step on: the
+  -- callbacks registered at its sink run alike to its observer's.
+  send-ok : ∀ n o N k {w h B} (s : Sink w B) (hd : Handle w) (σ : w ⊑ h) (st : State h) {τ t r i a k′}
+          → Mid n o st (wk∋ σ s) (wk∋ σ hd) τ t r i (emit a k′) → lower (get (State.heap st) (wk∋ σ hd)) ≡ false
+          → Reach n o (λ g st′ _ → Mid n o st′ (wk∋ (σ ⨾ g) s) (wk∋ (σ ⨾ g) hd) τ t r (suc i) (Burst∞.force k′))
+                  (Play.sendᴾ N (runᴺ N k) s a σ (record st { pos = r ++ [ ix i ] }))
+  send-ok n o N k s hd σ st {τ} {t} {r} {i} {a} {k′} q e = by (State.ended st) refl
+    where
+      st₁ = record st { pos = r ++ [ ix i ] }
+      act = Callbacks.onNext (get (State.heap st) (wk∋ σ s)) a
+      by : ∀ x → State.ended st ≡ x
+         → Reach n o (λ g st′ _ → Mid n o st′ (wk∋ (σ ⨾ g) s) (wk∋ (σ ⨾ g) hd) τ t r (suc i) (Burst∞.force k′)) (runᴺ N k act same st₁)
+      by true  x = frozen-reach n o (runᴺ N k act same st₁) x (Ends.repos R (shown n o) (r ++ [ ix i ]) (Mid.sofar q)) (Grower.grow (runᴺ-grow N k act) same st₁)
+                     λ g st′ _ e′ q′ → mid q′ λ e″ → Realizing.absurd R n (trans (sym e′) e″)
+      by false x with Mid.rest q x
+      ... | c , pl , d , ck =
+        reach-back n o (λ q′ m → mid-rel n o q′ m) (λ m → Ends.cutok (Mid.sofar m))
+          (runᴺ-sim {N} {N} {k} {k} ≤-refl ≤-refl (CbRel.onNext≼ (Realizing.playing-slot R n pl) a) same (stRel-refl st₁))
+          (send-canon n o N k s hd σ st (Mid.sofar q) x pl d ck e)
 
   -- THE FRAME PLAYED, step by step as the engine plays it.
   mutual

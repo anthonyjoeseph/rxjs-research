@@ -55,7 +55,7 @@ module Realizing (R : Set) (n : ℕ) where
   open Kit
   open FlatKit
   open Pure R using (State; Val; Timer; Callbacks; get; cascade; compileᴺ; mapList)
-  open Approx R using (CbRel)
+  open Approx R using (CbRel; StRel)
   open Nodes n renaming (live to running)
 
   ------------------------------------------------------------------------
@@ -307,6 +307,24 @@ module Realizing (R : Set) (n : ℕ) where
     setAtLanes (this-lane {c = c} {k} {ls = ls} p) ph = lane c k (setAt p ph) ∷ ls
     setAtLanes (next-lane {l = l} p) ph              = l ∷ setAtLanes p ph
 
+  -- The observer the picked cold delivers to: its subscription's, every
+  -- node above it applied.
+  mutual
+    obsAt : ∀ {h Δ A B} {t : Sub h Δ A} {s : Sink h B} {hd} → Spot t s hd → Env Δ h → Observer A h → Observer B h
+    obsAt cold-here                              E o = o
+    obsAt (in-map {f = f} p)                     E o = obsAt p E (mapO f o)
+    obsAt (in-scan {f = f} {r} p)                E o = obsAt p E (scanO f r o)
+    obsAt (in-take {i = i} {q} {c} p)            E o = obsAt p E (takeWhileO i q c o)
+    obsAt (in-outer {op = op} {f} {fl} {oc} p)   E o = obsAt p E (Flat′.outerO op f E o fl oc)
+    obsAt (in-lanes {op = op} {f} {fl} p)        E o = obsAtLanes p op f E o fl
+    obsAt (in-source {S = S} p)                  E o = obsAt p E (feeder S)
+    obsAt (in-body {S = S} p)                    E o = obsAt p (S ∷ E) o
+
+    obsAtLanes : ∀ {h Δ A B C} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd
+               → T.FlatOp → (A → Obs Timeline Δ B) → Env Δ h → Observer B h → Flat A h → Observer C h
+    obsAtLanes (this-lane {c = c} p) op f E o fl = obsAt p E (Flat′.laneO op f E o fl c)
+    obsAtLanes (next-lane p)         op f E o fl = obsAtLanes p op f E o fl
+
   ------------------------------------------------------------------------
   -- Against a state
 
@@ -430,6 +448,27 @@ module Realizing (R : Set) (n : ℕ) where
                         × Linked (λ x y → proj₂ x <ᵖ proj₂ y ≡ true) xs }) ss
                  × All (λ { (joiner S sk j) → (sk , j) ∈ val (Subject.subscribers S) }) js
 
+    ----------------------------------------------------------------------
+    -- A picked cold's slot holds the observer above it
+
+    mutual
+      holds-spot : ∀ {Δ A B} {t : Sub h Δ A} {s : Sink h B} {hd} (sp : Spot t s hd) (ph : Phase B) {E o}
+                 → Holds (setAt sp ph) E o → slotIs s (cbOf (obsAt sp E o))
+      holds-spot cold-here    ph q                                = q
+      holds-spot (in-map p)    ph q                               = holds-spot p ph q
+      holds-spot (in-scan p)   ph q                               = holds-spot p ph q
+      holds-spot (in-take p)   ph (_ , q)                         = holds-spot p ph q
+      holds-spot (in-outer p)  ph (_ , _ , _ , q , _)             = holds-spot p ph q
+      holds-spot (in-lanes {op = op} {f} {fl} p) ph {E} {o} (_ , _ , _ , _ , _ , _ , _ , q) = holds-lanes {op = op} {f = f} {E = E} {o} {fl} p ph q
+      holds-spot (in-source p) ph (q , _)                         = holds-spot p ph q
+      holds-spot (in-body p)   ph (_ , q , _)                     = holds-spot p ph q
+
+      holds-lanes : ∀ {Δ A B C} {op} {f : A → Obs Timeline Δ B} {E o fl} {ls : List (Lane h Δ B)} {s : Sink h C} {hd}
+                    (sp : SpotLanes ls s hd) (ph : Phase C)
+                  → HoldsLanes op f E o fl (setAtLanes sp ph) → slotIs s (cbOf (obsAtLanes sp op f E o fl))
+      holds-lanes (this-lane p) ph (_ , q , _)     = holds-spot p ph q
+      holds-lanes {op = op} {f} {E} {o} {fl} (next-lane p) ph (_ , _ , _ , q) = holds-lanes {op = op} {f = f} {E = E} {o} {fl} p ph q
+
   ------------------------------------------------------------------------
   -- THE ORDER, THE ROOT
 
@@ -482,6 +521,47 @@ module Realizing (R : Set) (n : ℕ) where
       spot    : Spot before s hd
       holding : Holding c st
       tree≡   : Holding.tree holding ≡ setAt spot (firing τ r i b)
+
+  -- The firing cold's slot holds the observer above it.
+  playing-slot : ∀ {h c} {st : State h} {B} {s : Sink h B} {hd τ r i b} (pl : Playing c st s hd τ r i b)
+               → At.slotIs (State.heap st) s (cbOf (obsAt (Playing.spot pl) [] rootObs))
+  playing-slot {st = st} {τ = τ} {r} {i} {b} pl =
+    At.holds-spot (State.heap st) (Playing.spot pl) (firing τ r i b)
+      (subst (λ t → At.Holds (State.heap st) t [] rootObs) (Playing.tree≡ pl) (Holding.holds (Playing.holding pl)))
+
+  ------------------------------------------------------------------------
+  -- Against a heap alike, but where the left's callbacks may diverge
+
+  ordered-at : ∀ {h} {c c′ : ℕ} {p p′ : Pos} {ts ts′ : List (Timer h)} → c ≡ c′ → p ≡ p′ → ts ≡ ts′
+             → Linked (λ t u → cascade t <ᵖ cascade u ≡ true) ts′ × All (λ t → c′ ≤ Timer.due t × p′ <ᵖ cascade t ≡ true) ts′
+             → Linked (λ t u → cascade t <ᵖ cascade u ≡ true) ts × All (λ t → c ≤ Timer.due t × p <ᵖ cascade t ≡ true) ts
+  ordered-at refl refl refl o = o
+
+  module Alike {h} {s s′ : State h} (q : StRel s s′) where
+    private
+      module L  = At (State.heap s)
+      module L′ = At (State.heap s′)
+
+    postulate
+      -- The callbacks registered, through `_≼_` on the way to the kernel's.
+      holds-rel  : ∀ {Δ A} (t : Sub h Δ A) {E o} → L′.Holds t E o → L.Holds t E o
+      -- What is open reads only cells and switches, which agree.
+      part-rel   : ∀ {Δ A} (t : Sub h Δ A) {E} → L.part t E ≡ L′.part t E
+      timed-rel  : ∀ {ts ps} → L′.Timed ts ps → L.Timed ts ps
+      joined-rel : ∀ {ss js} → L′.Joined ss js → L.Joined ss js
+
+    holding-rel : ∀ {c} → Holding c s′ → Holding c s
+    holding-rel z = record
+      { tree    = Holding.tree z
+      ; holds   = holds-rel (Holding.tree z) (Holding.holds z)
+      ; open≡   = trans (part-rel (Holding.tree z)) (Holding.open≡ z)
+      ; timed   = subst (λ ts → L.Timed ts (pendings (Holding.tree z))) (sym (StRel.timers≡ q)) (timed-rel (Holding.timed z))
+      ; joined  = joined-rel (Holding.joined z)
+      ; ordered = ordered-at (StRel.clock≡ q) (StRel.pos≡ q) (StRel.timers≡ q) (Holding.ordered z)
+      ; fresh   = Holding.fresh z }
+
+    playing-rel : ∀ {c B} {sk : Sink h B} {hd τ r i b} → Playing c s′ sk hd τ r i b → Playing c s sk hd τ r i b
+    playing-rel (playing before calm spot z t≡) = playing before calm spot (holding-rel z) t≡
 
   ------------------------------------------------------------------------
   -- With no timer left, nothing is pending
