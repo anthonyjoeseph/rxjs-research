@@ -403,9 +403,14 @@ module Carrying (R : Set) where
   timerOf s hd (playing _ _ _ _)        = []
 
   -- A node reached by silent steps of the meaning, and by any steps.
-  data Skips {A} : U.Node A → U.Node A → Set₁ where
-    stay : ∀ {c} → Skips c c
-    skip : ∀ {c c′ c″ q} → U.step c ≡ U.skipˢ q c′ → Skips c′ c″ → Skips c c″
+  -- A joiner's copy behind its source, as a joiner at `j` steps it: by
+  -- silent steps, and by values at positions not past `j`, which the
+  -- joiner drops.  A joiner subscribed after the source has shown values
+  -- starts from the source as it started, so it lags by those.
+  data Lags {A} (j : Pos) : U.Node A → U.Node A → Set₁ where
+    stay : ∀ {c} → Lags j c c
+    skip : ∀ {c c′ c″ q} → U.step c ≡ U.skipˢ q c′ → Lags j c′ c″ → Lags j c c″
+    drop : ∀ {c c′ c″ q a} → U.step c ≡ U.outˢ q a c′ → j <ᵖ q ≡ false → Lags j c′ c″ → Lags j c c″
 
   data Steps {A} : U.Node A → U.Node A → Set₁ where
     stay : ∀ {c} → Steps c c
@@ -594,29 +599,38 @@ module Carrying (R : Set) where
     -- feed still owes it: the value, the completion, or nothing but
     -- silent steps.  A source the run holds no more has ended, and the
     -- copy reaches an end the same way.
-    Behind : ∀ {A} → Feed A h → U.Node A → Maybe (U.Node A) → Set₁
-    Behind {A} (feeding x q ss) cp (just n) = Σ (U.Node A) λ cp′ → Skips cp cp′ × U.step cp′ ≡ U.outˢ q x n
-    Behind {A} (feeding x q ss) cp nothing  = Lift _ ⊥
-    Behind {A} (finishing q ss) cp _        = Σ (U.Node A) λ cp′ → Skips cp cp′ × U.step cp′ ≡ U.endˢ q
-    Behind {A} idle             cp (just n) = Skips cp n
-    Behind {A} idle             cp nothing  = Σ (U.Node A) λ cp′ → Skips cp cp′ × over (U.step cp′) ≡ true
+    Behind : ∀ {A} → Pos → Feed A h → U.Node A → Maybe (U.Node A) → Set₁
+    Behind {A} j (feeding x q ss) cp (just n) = Σ (U.Node A) λ cp′ → Lags j cp cp′ × U.step cp′ ≡ U.outˢ q x n
+    Behind {A} j (feeding x q ss) cp nothing  = Lift _ ⊥
+    Behind {A} j (finishing q ss) cp _        = Σ (U.Node A) λ cp′ → Lags j cp cp′ × U.step cp′ ≡ U.endˢ q
+    Behind {A} j idle             cp (just n) = Lags j cp n
+    Behind {A} j idle             cp nothing  = Σ (U.Node A) λ cp′ → Lags j cp cp′ × over (U.step cp′) ≡ true
 
-    -- Every live joiner whose copy has not ended, behind its source.
+    -- A source's history, from where every joiner's copy starts: values
+    -- only at or before the run's position `p`, so a joiner subscribed
+    -- now drops them all.
+    History : ∀ {A} → Pos → U.Node A → Maybe (U.Node A) → Set₁
+    History p s₀ (just n) = Lags p s₀ n
+    History p s₀ nothing  = Lift _ ⊤
+
+    -- Every live joiner whose copy has not ended, behind its source; every
+    -- connect's source reached from where it started, by its history.
     mutual
-      Caught : ∀ {Δ A} → Sub h Δ A → Srcs Δ → Now h Δ → Set₁
-      Caught (mapˢ f s)                             ρ ν = Caught s ρ ν
-      Caught (scanˢ f r s)                          ρ ν = Caught s ρ ν
-      Caught (takeWhileˢ i p c k tk s)              ρ ν = Caught s ρ ν
-      Caught (flatMapˢ op f fl oc k r so ls)        ρ ν = Caught so ρ ν × CaughtLanes ls ρ ν
-      Caught (connectˢ s₁ p S c k fd s₀ m src body) ρ ν = Caught src ρ ν × Caught body (s₀ ∷ ρ) ((part src ρ , fd) ∷ ν)
-      Caught (joinˢ j i sk l x (just cp))           ρ ν = let (n , fd) = lookup ν x in
-        val l ≡ true → (Owed fd sk j → Behind fd cp n) × (¬ Owed fd sk j → Behind idle cp n)
-      Caught (deferˢ k s)                           ρ ν = Caught s ρ ν
-      Caught _                                      ρ ν = Lift _ ⊤
+      Caught : ∀ {Δ A} → Pos → Sub h Δ A → Srcs Δ → Now h Δ → Set₁
+      Caught π (mapˢ f s)                             ρ ν = Caught π s ρ ν
+      Caught π (scanˢ f r s)                          ρ ν = Caught π s ρ ν
+      Caught π (takeWhileˢ i p c k tk s)              ρ ν = Caught π s ρ ν
+      Caught π (flatMapˢ op f fl oc k r so ls)        ρ ν = Caught π so ρ ν × CaughtLanes π ls ρ ν
+      Caught π (connectˢ s₁ p S c k fd s₀ m src body) ρ ν =
+        History π s₀ (part src ρ) × Caught π src ρ ν × Caught π body (s₀ ∷ ρ) ((part src ρ , fd) ∷ ν)
+      Caught π (joinˢ j i sk l x (just cp))           ρ ν = let (n , fd) = lookup ν x in
+        val l ≡ true → (Owed fd sk j → Behind j fd cp n) × (¬ Owed fd sk j → Behind j idle cp n)
+      Caught π (deferˢ k s)                           ρ ν = Caught π s ρ ν
+      Caught π _                                      ρ ν = Lift _ ⊤
 
-      CaughtLanes : ∀ {Δ B} → List (Lane h Δ B) → Srcs Δ → Now h Δ → Set₁
-      CaughtLanes []                ρ ν = Lift _ ⊤
-      CaughtLanes (lane c k s ∷ ls) ρ ν = Caught s ρ ν × CaughtLanes ls ρ ν
+      CaughtLanes : ∀ {Δ B} → Pos → List (Lane h Δ B) → Srcs Δ → Now h Δ → Set₁
+      CaughtLanes π []                ρ ν = Lift _ ⊤
+      CaughtLanes π (lane c k s ∷ ls) ρ ν = Caught π s ρ ν × CaughtLanes π ls ρ ν
 
     ----------------------------------------------------------------------
     -- The gates
@@ -727,7 +741,7 @@ module Carrying (R : Set) where
       ctlAs   : Against.CtlAs tree ctl
       holds   : Holds tree [] rootObs
       open≡   : part tree [] ≡ just c
-      caught  : Caught tree [] []
+      caught  : Caught (State.pos state) tree [] []
       gated   : Gated tree []
       past    : All (λ j → State.pos state <ᵖ Joiner.at′ j ≡ false) (joiners tree [])
       timed   : Timed (State.timers state) (pendings tree)

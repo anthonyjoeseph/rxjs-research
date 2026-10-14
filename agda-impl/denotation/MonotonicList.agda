@@ -231,6 +231,14 @@ private
     ... | inj₂ (x , u) | inj₂ (y , v)
       rewrite subst (λ z → cmpLabel z c ≡ eq) (sym (eq-label a b x)) y | lt-pos p q r u v = refl
 
+  isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
+  isLt-lt {lt} h = refl
+  isLt-lt {eq} ()
+  isLt-lt {gt} ()
+
+<ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
+<ᵖ-trans p q r h₁ h₂ rewrite lt-pos p q r (isLt-lt h₁) (isLt-lt h₂) = refl
+
 ------------------------------------------------------------------------
 -- What a subscriber sees
 
