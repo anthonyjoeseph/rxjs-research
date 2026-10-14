@@ -86,7 +86,7 @@ ORACLE_CLI := $(SRC)/quickcheck/Oracle-CLI.agda
 ORACLE_BIN := $(SRC)/_cli/Oracle-CLI
 
 oracle-build:
-	@test -f $(ORACLE_CLI) || { echo "oracle: RED — $(ORACLE_CLI) does not exist yet (PROOF-STATE Tier 1: THE TYPESCRIPT ORACLE)"; exit 1; }
+	@test -f $(ORACLE_CLI) || { echo "oracle: RED — $(ORACLE_CLI) does not exist yet"; exit 1; }
 	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Oracle-CLI.agda
 
 oracle: oracle-build

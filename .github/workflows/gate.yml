@@ -105,7 +105,7 @@ jobs:
       - name: make bug-cache
         run: make bug-cache
 
-  # Tier 1's finish line: every drawn program, on all three Agda engines,
+  # The oracle: every drawn program, on all three Agda engines,
   # gives the trace real rxjs does.
   oracle:
     runs-on: ubuntu-latest
@@ -119,7 +119,7 @@ jobs:
       - name: Oracle CLI exists?
         run: |
           test -f agda-impl/quickcheck/Oracle-CLI.agda || {
-            echo "oracle: RED — agda-impl/quickcheck/Oracle-CLI.agda does not exist yet (PROOF-STATE Tier 1: THE TYPESCRIPT ORACLE)"
+            echo "oracle: RED — agda-impl/quickcheck/Oracle-CLI.agda does not exist yet"
             exit 1; }
 
       - name: Set up Node

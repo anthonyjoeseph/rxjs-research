@@ -1,7 +1,7 @@
 # PROOF-STATE — the roadmap
 
 **What this file is.** The ordered worklist for the one goal: discharging the
-four tiers below — no postulates, everything typechecks. This file holds the SCHEDULE — each tier's
+three tiers below — no postulates, everything typechecks. This file holds the SCHEDULE — each tier's
 next legs — over a LEDGER of one-line hooks; everything else lives in the
 code.
 
@@ -157,31 +157,12 @@ its proven precedent in the postulate's own `TWIN:` — if the hook here cannot
 point at one, the row is FALSITY.
 
 
-## Tier 1 — the oracle passes on all three engines
-
-**THE ENGINE, MADE REAL.** One program, run on the denotation, the pure
-runtime and the IO runtime, prints the same trace as real rxjs. The TypeScript
-side of the oracle is part of this tier: it must print the new tree's programs
-and run them in rxjs.
-
-### Big picture tier roadmap
-
-- **THE GENERATOR'S REACH.** `make oracle` agrees on 5000 of 5000 drawn
-  programs, which rules out a divergence the generator can draw; what it
-  cannot draw is the open region. `connected` reaches 3% of programs, a
-  `connect` inside a recursive lane 1%, and no trace hits the step budget.
-  Raise those, sweep again, and every divergence is a bug-cache row.
-
-### The ledger
-
-No postulates: all three engines run.
-
-## Tier 2 — the adequacy theorem
+## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
 the root, positions forgotten down to ticks. A fundamental lemma over approximants, one operator at a time, then one
 argument about limits. Expect the denotation to move under contact; it must be
-solid before Tier 3 is written over it.
+solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
@@ -210,13 +191,13 @@ solid before Tier 3 is written over it.
 - **`_≈_`, `lub`, `Continuous`, `fix-unfold`** (denotation.MonotonicList) —
   FALSITY, `NO EVIDENCE`: recursion as a least fixed point.
 
-## Tier 3 — the simultaneous spec
+## Tier 2 — the simultaneous spec
 
 **THE STATEMENT.** Define the new "simultaneous" spec over the denotation,
 adapted from the old `agda/` tree's statement modules (reference only). No
 rows until the statements exist; each lands as a postulate here.
 
-## Tier 4 — the simultaneous spec, proven
+## Tier 3 — the simultaneous spec, proven
 
-**THE PROOF.** Discharge Tier 3's statements using the denotation and
-`adequacy`. No rows until Tier 3 states them.
+**THE PROOF.** Discharge Tier 2's statements using the denotation and
+`adequacy`. No rows until Tier 2 states them.
