@@ -168,14 +168,18 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **A FRAME, DELIVERED.** `next-at` and `done-at`, by recursion on the
-  hole's context (`Mid`): each frame's kernel run on the value, `Back`
-  rebuilt one frame up. `map` and `defer` only relabel; the uncertain frames
-  are a `takeWhile` cutting its source, a `flatMap` admitting a lane that
-  bursts inline, and a feeder's joiners fed one at a time (`Lagging`).
-  `mid-start` and `back-sent` bracket it. Ruled out: dropping a killed lane
-  from the witness; it stays, cut, so a frame survives a delivery as itself.
+- **A CASCADE, GUARDED.** `next-source`, `done-source`, `next-outer` and
+  `done-inner` deliver at a context deeper than their frame: a joiner in the
+  body, or a lane bursting inline. So `Above` cannot carry them. Each has
+  the meaning's skip as a guard, after which the run may deliver anywhere
+  by corecursion, and a postulate's argument cannot carry that recursion.
+  To do: restate the climb so the guard is taken in the assembly.
   Decides whether a cascade's silent steps are finite.
+- **A FRAME, DELIVERED.** The frames `Above` does carry (`Climb`):
+  `next-take` (a cut reaching the hole), `next-scan` (the accumulator
+  written before the meaning steps), `next-inner`, `next-body`, `done-body`,
+  `done-take`, `done-outer`, and the root. `mid-start` and `back-sent`
+  bracket them. Ruled out: dropping a killed lane from the witness.
 - **THE FOCUS.** `settle-at`: the firing cold's step lifts to the root from
   the witness alone (`clear`), and `catch-up` reads the rest off one
   `Settle` chain under `q`, the cold's own next event past it
@@ -185,15 +189,14 @@ contact; it must be solid before Tier 2 is written over it.
   the earliest is always one still settling; off the cold's path a body's
   copies lag their sources. Decides whether `caught` pins a copy's every
   step.
-- **THE PHASE MOVED.** `pop-live`, `reheld-stall`, `reheld-quiet`,
-  `reheld-later`: a cold's phase moved by `stepAt`, its joiners `settled`,
-  keeps every conjunct but `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a
-  later frame's timer queued by `clocked`. Decides whether the order the
-  queue keeps survives `insert`.
-- **THE QUEUE, EMPTY OR DEAD.** `dry-hush` and `pop-dead`, over `Ordered`
-  and `Timed`: an empty queue leaves nothing to show, and a dead pop moves
-  only the clock. Decides whether the order the witness records is enough
-  to read the meaning's silence off the queue.
+- **THE PHASE MOVED, THE QUEUE.** `pop-live`, `reheld-stall`,
+  `reheld-quiet`, `reheld-later`: a cold's phase moved by `stepAt`, its
+  joiners `settled`, keeps every conjunct but `open≡`, the popped timer
+  pinned to one cold by `Timed` and `Ordered`, a later frame's timer queued
+  by `clocked`. Then `dry-hush` and `pop-dead`: an empty queue leaves
+  nothing to show, a dead pop moves only the clock. Decides whether the
+  order the queue keeps survives `insert`, and is enough to read the
+  meaning's silence off it.
 - **THE CALLBACKS, EXTENSIONALLY.** A stored callback is its kernel's
   canonical observer up to `_≗_`: weakening composes, and every kernel
   commutes with it; `closed-read` is its first use. The apparatus the
@@ -212,10 +215,29 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### The ledger
 
-- **`next-at`** (Deliver) — FALSITY, `NO EVIDENCE`: an emit at a hole
-  delivered, the invariant back at the hole on return.
-- **`done-at`** (Deliver) — FALSITY, `NO EVIDENCE`: an end at a hole delivered
-  as a completion.
+- **`next-source`** (Climb) — FALSITY, `DEAD ROUTE`: a source's value fed to
+  the subject's joiners in join order.
+- **`done-source`** (Climb) — FALSITY, `DEAD ROUTE`: a source's end, the
+  subject closed and each joiner finished.
+- **`next-outer`** (Climb) — FALSITY, `DEAD ROUTE`: an outer's value admitted,
+  a lane bursting inline from a grown context.
+- **`done-outer`** (Climb) — FALSITY, `NO EVIDENCE`: an outer's end settles the
+  flatMap.
+- **`next-take`** (Climb) — FALSITY, `NO EVIDENCE`: past the guard; a failing
+  value completes, then cuts the hole.
+- **`done-take`** (Climb) — FALSITY, `NO EVIDENCE`: an end past the guard.
+- **`next-inner`** (Climb) — FALSITY, `NO EVIDENCE`: a lane's value passed on
+  past its switch.
+- **`done-inner`** (Climb) — FALSITY, `DEAD ROUTE`: a lane's end handed on to
+  the queue.
+- **`next-body`** (Climb) — FALSITY, `NO EVIDENCE`: a body's value is its
+  parent's.
+- **`done-body`** (Climb) — FALSITY, `NO EVIDENCE`: a body's end, then the
+  source cut.
+- **`next-scan`** (Climb) — FALSITY, `NO EVIDENCE`: the accumulator written
+  before the meaning's scan steps.
+- **`next-top`** (Climb) — FALSITY, `NO EVIDENCE`: the root records an emit.
+- **`done-top`** (Climb) — FALSITY, `NO EVIDENCE`: the root records the end.
 - **`mid-start`** (Deliver) — FALSITY, `RECOVERY`: a firing cold opened as the
   hole, its slot the context's observer.
 - **`mid-start-done`** (Deliver) — FALSITY, `NO EVIDENCE`: a closing frame's

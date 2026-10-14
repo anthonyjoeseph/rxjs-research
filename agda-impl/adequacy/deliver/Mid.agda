@@ -210,6 +210,7 @@ module Middles (R : Set) where
   -- hole with its meaning `m′`, every sibling past `q`.
   record Back {h v Δ A} (L : Pos → Set) (τ : h ⊑ v) (k : Ctx h Δ A) (t : Sub h Δ A) (q : Pos)
               (m′ : Maybe (U.Node A)) (fs : List (Firing h)) (c′ : U.Node R) (st′ : State v) : Set₁ where
+    constructor back
     field
       {k′}    : Ctx v Δ A
       {t′}    : Sub v Δ A

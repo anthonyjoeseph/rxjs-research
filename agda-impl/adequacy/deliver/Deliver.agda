@@ -19,7 +19,7 @@ open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Nat using (ℕ; suc)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Bool using (true; false)
 open import Data.Maybe using (just; nothing)
@@ -35,6 +35,7 @@ open import adequacy.Realize using (module Realizing)
 open import adequacy.Segment using (module Seg)
 open import adequacy.deliver.Context using (module Contexts)
 open import adequacy.deliver.Mid using (module Middles)
+open import adequacy.deliver.Climb using (module Climbing)
 
 -- Growing a world from where it stands.
 same-⨾ : ∀ {u v} (τ : u ⊑ʷ v) → same ⨾ τ ≡ τ
@@ -46,6 +47,7 @@ module Delivering (R : Set) where
   open Realizing R using (Calm; calm; bursting; Holding; firing; coldˢ; playing; waiting; _≗_)
   open Contexts R using (Ctx; obsC)
   open Middles R using (Mid; Back; module AtC)
+  open Climbing R using (NextAt; DoneAt; delivers)
   open Run (Pureᴾ R) using (Observer)
   open Pure R using (State; Callbacks; get; put)
   open Seg R
@@ -100,26 +102,6 @@ module Delivering (R : Set) where
                    → Holding (firing s hd τ r i (close k′) ∷ []) c st → lower (get (State.heap st) hd) ≡ false → From∞.force k′ ≡ done
                    → StartDone (suc u) s hd τ r c st
 
-    -- AN EMIT AT A HOLE, delivered to the hole's observer: the run up to
-    -- its return is the meaning's, and on return the invariant is back at
-    -- the hole, every sibling past the emit.
-    next-at : ∀ {h Δ A} {L : Pos → Set} {k : Ctx h Δ A} {t n fs c} {st : State h} {q a n′}
-            → Mid L k t (just n) fs c st → U.step n ≡ U.outˢ q a n′ → State.pos st ≡ q → AtC.Fore (State.heap st) k q
-            → ∀ {act} → act ≗ Observer.next (obsC k) a
-            → ∀ {w} {σ : w ⊑ʷ h} {K : Stack w ⊤}
-            → (∀ {v} (τ : h ⊑ʷ v) {st′ : State v} {c′} → Back L τ k t q (just n′) fs c′ st′
-               → Seg nothing (trace ⟨ st′ , ret tt (σ ⨾ τ) K ⟩) (U.unfold c′))
-            → ∀ {bd} → Seg bd (trace ⟨ st , run act σ K ⟩) (U.unfold c)
-
-    -- AN END AT A HOLE, delivered as a completion.
-    done-at : ∀ {h Δ A} {L : Pos → Set} {k : Ctx h Δ A} {t n fs c} {st : State h} {q}
-            → Mid L k t (just n) fs c st → U.step n ≡ U.endˢ q → State.pos st ≡ q → AtC.Fore (State.heap st) k q
-            → ∀ {act} → act ≗ Observer.complete (obsC k)
-            → ∀ {w} {σ : w ⊑ʷ h} {K : Stack w ⊤}
-            → (∀ {v} (τ : h ⊑ʷ v) {st′ : State v} {c′} → Back L τ k t q nothing fs c′ st′
-               → Seg nothing (trace ⟨ st′ , ret tt (σ ⨾ τ) K ⟩) (U.unfold c′))
-            → ∀ {bd} → Seg bd (trace ⟨ st , run act σ K ⟩) (U.unfold c)
-
     -- The emit returned to the cold's frame: the cold live at its next
     -- step, or cut on the way and its phase forgotten.
     back-sent : ∀ {h v Δ} {A u τ₀} {s : Sink h A} {hd r i} {b : Frame A u} {k : Ctx h Δ A} {τ : h ⊑ʷ v} {c′} {st′ : State v}
@@ -130,6 +112,16 @@ module Delivering (R : Set) where
     back-done : ∀ {h v Δ} {A u τ₀} {s : Sink h A} {hd e} {k : Ctx h Δ A} {τ : h ⊑ʷ v} {c′} {st′ : State v}
               → Back (λ _ → ⊥) τ k (coldˢ s hd (waiting {u = u} τ₀ e done)) e nothing [] c′ st′
               → Holding [] c′ st′
+
+  -- AN EMIT AT A HOLE, delivered to the hole's observer: the run up to
+  -- its return is the meaning's, and on return the invariant is back at
+  -- the hole, every sibling past the emit.
+  next-at : ∀ {h Δ A} {k : Ctx h Δ A} → NextAt k
+  next-at {k = k} = proj₁ (delivers k)
+
+  -- AN END AT A HOLE, delivered as a completion.
+  done-at : ∀ {h Δ A} {k : Ctx h Δ A} → DoneAt k
+  done-at {k = k} = proj₂ (delivers k)
 
   -- An emit delivered down the observer chain the cold's slot holds.
   deliver-next : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {a : A} {k′ : Frame∞ A u}
