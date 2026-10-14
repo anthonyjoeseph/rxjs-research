@@ -1,7 +1,7 @@
 #!/bin/bash
 # SessionStart hook (Claude Code on the web): rebuild the Agda toolchain and
-# TypeScript deps on a fresh container, and re-enable the swapfile a cold
-# `make gate-heavy` needs to survive its peak-RSS module without OOMing.
+# TypeScript deps on a fresh container, and re-enable the swapfile (headroom
+# for a large Agda or GHC build).
 # Idempotent — safe to re-run every session, including a warm one.
 set -euo pipefail
 
@@ -30,10 +30,8 @@ if [ -f typescript/package.json ]; then
 fi
 
 echo "=== Swapfile ==="
-# A cold `make gate-heavy` tower check has peaked near this container's
-# ~15GB memcg ceiling on one deeply-nested-mutual-block module and been
-# OOM-killed; 12GB of swap gave enough headroom for a retry to go green.
-# The file's bytes can survive a container rebuild but `swapon` state is
+# Headroom under this container's ~15GB memcg ceiling for a large Agda or
+# GHC build.  The file's bytes can survive a container rebuild but `swapon` state is
 # kernel/runtime state and does not, so this always re-checks it.
 SWAPFILE=/swapfile
 SWAP_SIZE_KB=12582912 # 12GiB, matches what was validated to work

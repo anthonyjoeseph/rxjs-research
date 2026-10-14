@@ -11,26 +11,29 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.Bool.ListAction using (any)
 open import Data.Nat     using (ℕ; _≤_; zero; suc)
 open import Data.Maybe   using (Maybe; nothing; just)
-open import Relation.Nullary using (yes; no)
+open import Relation.Nullary using (yes; no; ¬_)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Nat.Properties using (≤-refl)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
-open import Data.Sum     using (_⊎_; inj₁; inj₂)
+open import Data.Sum     using (_⊎_; inj₁; inj₂; [_,_])
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Rx.Prim      using (Tick; EmitKind; subscribe; delivery; plumbing)
 open import Rx.Exp       using (Ctx; Closed; Val; obs; uniqᵗ; FnClo; boolᵗ; _×ᵗ_; _≟ᵗ_)
 open import Rx.Mint      using (counter; sourceᵏ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Path; Frame; _↠[_]_; thru-outer; mergeAllᵒ; lookupNode; AllOp; from-inner; aliveThroughᶠ;
-  root; share-sink; map-f; scan-f; take-f; batchSync-f; scanDispatch; takeDispatch; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st)
-open import Rx.Evaluator.Domain using (foldPath⇓; stepFrame⇓; thruConsume⇓; fold-root; fold-sink; fold-step; step-map; step-scan; step-take;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; Path; Frame; _↠[_]_; thru-outer; thruWrap; mergeAllᵒ; lookupNode; AllOp; from-inner; aliveThroughᶠ;
+  root; share-sink; map-f; scan-f; take-f; batchSync-f; frameNodes; skipᵇ; regSource; scanDispatch; takeDispatch; cell-st; take-st; mergeAll-st; switch-st; exhaust-st; batchSync-st)
+open import Rx.Evaluator.Domain using (foldPath⇓; stepFrame⇓; thruConsume⇓; thruWalk⇓; fold-root; fold-sink; fold-step; step-map; step-scan; step-take;
   step-batchSync; step-from-inner; step-thru-outer; react-false; walk-nil; disp)
-open import Rx.Evaluator.Reducible.Support using (Sound; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; endOf; ∨-Tʳ)
+open import Rx.Evaluator.Reducible.Support using (Sound; NodeOn; node-on; drop-ot; head-on; self-node; push-thru; endOf; ∨-Tʳ;
+  linked; ruled; node-below; off-path; at-end)
+open import Rx.Evaluator.Reducible.Floor using (raw-at)
 open import Rx.Evaluator.Reducible.Rule-Kept using (Thru; RuleKept; step-kept; fold-kept; stepFrame-rule; thruConsume-rule)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.InstEmit using (instEmitᵗ)
 open import Simulation.Stores using (EmitRel; Lifts; PathRel; Store; stampOf; sharedEq; root~; sink~; map~; scan~; takeWhile~; spentWhile~;
-  outerElem~; outerExplode~; inner~; deferInner~)
+  outerElem~; outerExplode~; inner~; deferInner~; LiveFor)
 open import Simulation.After using (module Kept; readᴵ; readᴵ-++)
 
 -- a node a run left as it found it
@@ -47,17 +50,14 @@ Clear k p sched st = NodeOn k p sched st × Sound p sched st
 ClearI : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} → NodeId → NodeId → Path Γ lo s t → Sched Γ → EvalSt e → Set
 ClearI k ks q sched st = Clear k q sched st × NodeOn ks q sched st
 
-postulate
-  -- A FOLD LEAVES A NODE OFF ITS PATH AS IT FOUND IT, the node below
-  -- the counter and its rows ending where the path does.  The
-  -- candidate's `Kept` is this clause, proven of the evaluator's own
-  -- fold on standing ground; this owes it of every derivation.
-  --
-  -- TWIN: `foldPath-rule` -- the same induction, a clause per
-  --   constructor, there keeping the rule where this keeps the node.
-  fold-unmoved : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t} {k now vals fin sched st r}
-               → foldPath⇓ {e = e} now κ vals fin sched st r → Clear k κ sched st
-               → lookupNode k (EvalSt.nodes (proj₂ (proj₂ r))) ≡ lookupNode k (EvalSt.nodes st)
+-- A FOLD LEAVES A NODE OFF ITS PATH AS IT FOUND IT, the node below the
+-- counter and its rows ending where the path does: the raw fold's own
+-- watch, a share the fold connects reading only the rows the fold
+-- registered by the rule's `linked`.
+fold-unmoved : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo s} {κ : Path Γ lo s t} {k now vals fin sched st r}
+             → foldPath⇓ {e = e} now κ vals fin sched st r → Clear k κ sched st
+             → lookupNode k (EvalSt.nodes (proj₂ (proj₂ r))) ≡ lookupNode k (EvalSt.nodes st)
+fold-unmoved d (nd , so) = proj₁ (raw-at d (linked (ruled so)) _ (node-below nd) (off-path nd) (at-end nd))
 
 -- A TAIL HANDED NOTHING, AND NO END, SENDS NOTHING and runs no clock back
 QuietTail : ∀ {m} {Δ : Ctx m} {t} (e : Closed Δ (instEmitᵗ uniqᵗ t)) {ℓ u} → Path Δ ℓ u (instEmitᵗ uniqᵗ t) → Set
@@ -68,7 +68,9 @@ QuietTail e q = ∀ {now sched st o sched′ st′} → foldPath⇓ {e = e} now 
 -- on the first fold through it, whatever it is handed, so it is the one
 -- frame a fold handed nothing can make speak.
 --
--- REFUTED: `Refuted.Quiet-Fold-Batch` -- quiet over every path, a
+-- REFUTED: `Refuted.Quiet-Fold-Batch`, read with
+--   `git show c2e60cb8:agda/evidence/refuted/Refuted/Quiet-Fold-Batch.agda`
+--   -- quiet over every path, a
 --   lowered bracket holding a value sends it.
 NoBatch : ∀ {m} {Δ : Ctx m} {lo s u} → Path Δ lo s u → Set
 NoBatch root                        = ⊤
@@ -98,6 +100,76 @@ rel-unbatched (outerElem~ _ r)               = rel-unbatched r
 rel-unbatched (outerExplode~ _ _ r)          = rel-unbatched r
 rel-unbatched (inner~ _ _ _ r)               = rel-unbatched r
 rel-unbatched (deferInner~ _ _ _ _ _ _ _ r)  = rel-unbatched r
+
+-- the numbers naming a node frame: an inner's lane names its inner too
+frameKey : ∀ {m} {Δ : Ctx m} {s u} → Frame Δ s u → List ℕ
+frameKey (from-inner _ k j) = 1 ∷ k ∷ j ∷ []
+frameKey (thru-outer _ k)   = 2 ∷ k ∷ []
+frameKey f                  = 3 ∷ frameNodes f
+
+-- the first node frame a path reaches
+headKey : ∀ {m} {Δ : Ctx m} {lo s u} → Path Δ lo s u → List ℕ
+headKey (map-f _ ↠[ _ ] q) = headKey q
+headKey (f ↠[ _ ] q)       = frameKey f
+headKey _                  = []
+
+Passes : ∀ {m} {Δ : Ctx m} {lo s u} → List ℕ → Path Δ lo s u → Set
+Passes key (f ↠[ _ ] q) = frameKey f ≡ key ⊎ Passes key q
+Passes key _            = ⊥
+
+-- no row a dispatch would walk passes the path's first node frame
+Clean : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} → Path Δ lo s t → EvalSt e → Set
+Clean q st = ∀ {r} → r ∈ EvalSt.registry st → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st ≡ false
+           → ¬ Passes (headKey q) (proj₂ (proj₂ (proj₂ r)))
+
+-- a path came down a node frame: a flattener's by its outer or by any
+-- of its inner lanes
+Through : ∀ {m} {Δ : Ctx m} {lo s u s′ u′} → Frame Δ s u → Path Δ lo s′ u′ → Set
+Through (from-inner _ k _) p = Passes (2 ∷ k ∷ []) p ⊎ Σ ℕ λ j → Passes (1 ∷ k ∷ j ∷ []) p
+Through (thru-outer _ k)   p = Passes (2 ∷ k ∷ []) p ⊎ Σ ℕ λ j → Passes (1 ∷ k ∷ j ∷ []) p
+Through f                  p = Passes (frameKey f) p
+
+-- EVERY ROW BELOW A NODE FRAME CAME DOWN IT: a row a dispatch would walk
+-- through the first node frame past one reached it through that one.
+-- A frame an end left can say nothing of a row that joined below it,
+-- so this is what an end's absence is handed on by.
+Fed : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} → Path Δ lo s t → EvalSt e → Set
+Fed (map-f _ ↠[ _ ] q) st = Fed q st
+Fed (f ↠[ _ ] q)       st = (∀ {r} → r ∈ EvalSt.registry st → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) st ≡ false
+                             → Passes (headKey q) (proj₂ (proj₂ (proj₂ r))) → Through f (proj₂ (proj₂ (proj₂ r))))
+                           × Fed q st
+Fed _                  st = ⊤
+
+-- AN END THE WALK CARRIES HAS LEFT NOTHING AT THE FRAME IT REACHES, and
+-- every row below came down the path.  What a flattener's outer needs to
+-- end with every row still walking its outer live.
+--
+-- WITHOUT `Fed` NO STEP HANDS IT ON: a frame's absence says nothing of
+-- the tail's first node, false at a frame whose node no row passes
+-- above a tail an alive row walks.
+Gone : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} → Path Δ lo s t → EvalSt e → Set
+Gone q st = Clean q st × Fed q st
+
+-- neither reads a node, so a table rewritten under them keeps both
+fed-nodes : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} (q : Path Δ lo s t) {st : EvalSt e} {N}
+          → Fed q st → Fed q (record st { nodes = N })
+fed-nodes (map-f _ ↠[ _ ] q) fd        = fed-nodes q fd
+fed-nodes (scan-f _ _ ↠[ _ ] q)      (fd , fq) = fd , fed-nodes q fq
+fed-nodes (take-f _ _ ↠[ _ ] q)      (fd , fq) = fd , fed-nodes q fq
+fed-nodes (batchSync-f _ ↠[ _ ] q)   (fd , fq) = fd , fed-nodes q fq
+fed-nodes (from-inner _ _ _ ↠[ _ ] q) (fd , fq) = fd , fed-nodes q fq
+fed-nodes (thru-outer _ _ ↠[ _ ] q)  (fd , fq) = fd , fed-nodes q fq
+fed-nodes root               _         = tt
+fed-nodes (share-sink _ _)   _         = tt
+
+gone-nodes : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo s} {q : Path Δ lo s t} {st : EvalSt e} {N}
+           → Gone q st → Gone q (record st { nodes = N })
+gone-nodes {q = q} (c , fd) = c , fed-nodes q fd
+
+-- a frame whose step writes its own cell and nothing else a row reads
+data Cell {m} {Δ : Ctx m} : ∀ {s u} → Frame Δ s u → Set where
+  scan-c : ∀ {s u} {F : FnClo Δ (u ×ᵗ s) u} {k} → Cell (scan-f F k)
+  take-c : ∀ {s} {w : Maybe (FnClo Δ s boolᵗ)} {k} → Cell (take-f w k)
 
 -- a frame's dispatch handed nothing, and no end, hands on nothing
 Hushed : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {u} → Sched Δ → List (Val Δ u) × Bool × Sched Δ × EvalSt e → Set
@@ -303,6 +375,9 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
     -- related again once the tails have folded -- the arm's own frames
     -- being nodes a tail's fold does not write
     --
+    -- AN END IT HANDS THE TAIL HAS LEFT NOTHING at the tail's first node
+    -- frame
+    --
     -- AND, AT EVERY INSTANT `H` NAMES, the arm's own output read there and
     -- either the tail's or the group it hands the tail delivered there
     data Arm {sP stP sI stI} (S : St sP stP sI stI) (now : Tick) (oP : Stream Γ t) (sP₁ : Sched Γ) (stP₁ : EvalSt ep)
@@ -313,6 +388,8 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
           → PathRel κ (Store.π (After.store A)) (EvalSt.nodes stP₁) (EvalSt.nodes stI₁) p q
           → Carries es vs
           → Sound q sI₁ stI₁
+          → (fin ≡ true → Gone q stI₁)
+          → LiveFor es q (EvalSt.nodes stI₁)
           → foldPath⇓ now q es fin sI₁ stI₁ rI
           → (∀ {rP} → foldPath⇓ now p vs fin sP₁ stP₁ rP → (B : After (After.store A) rP rI)
              → PathRel κ (Store.π (After.store B)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
@@ -323,7 +400,7 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
     -- an arm read at fewer instants
     arm-weaken : ∀ {sP stP sI stI} {S : St sP stP sI stI} {now oP sP₁ stP₁ ℓ u} {p : Path Γ ℓ u t} {vs fin G H H′ r}
                → (∀ {I} → H′ I → H I) → Arm S now oP sP₁ stP₁ p vs fin G H r → Arm S now oP sP₁ stP₁ p vs fin G H′ r
-    arm-weaken w (arm A r b si dI rb o) = arm A r b si dI rb (λ h → o (w h))
+    arm-weaken w (arm A r b si g lv dI rb o) = arm A r b si g lv dI rb (λ h → o (w h))
 
     -- nothing asked of the whole
     none : Goal
@@ -337,12 +414,49 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
       after (After.store B) (λ {a} {a′} x → After.keeps B {a} {a′} (After.keeps A {a} {a′} x))
         (λ ar → After.persists B (After.persists A ar)) (After.values A) (λ x → After.grows B (After.grows A x))
 
+    -- A CELL'S FRAME HANDS AN END'S GONE ON: every row past the cell came
+    -- down it, and none is left there.  A cell writes no registry, so the
+    -- tail's state reads as the frame's.
+    gone-cell : ∀ {sP stP sI stI} (S : St sP stP sI stI) {ℓ ℓ′ s u} {f : Frame (plainᵏ Γ κ) s u} {h : ℓ ≤ ℓ′}
+                  {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
+              → Cell f → Gone (f ↠[ h ] q) stI → Gone q stI
+    gone-cell _ scan-c (c , fd , fq) = (λ r∈ sk ps → c r∈ sk (fd r∈ sk ps)) , fq
+    gone-cell _ take-c (c , fd , fq) = (λ r∈ sk ps → c r∈ sk (fd r∈ sk ps)) , fq
+
+    postulate
+      -- AN IDLE FLATTENER HAS NO ROW DOWN AN INNER LANE: its counters
+      -- cover its alive inners, so a merge with none active or queued, a
+      -- switch with no current inner and an exhaust not active have none.
+      -- The harness's `accounts` decides the counters' half at a boundary;
+      -- no `Store` field carries it.
+      idle-lanes : ∀ {sP stP sI stI} (S : St sP stP sI stI) {o k}
+                 → proj₁ (thruWrap o k true (sI , stI)) ≡ true
+                 → ∀ {r j} → r ∈ EvalSt.registry stI → skipᵇ (regSource (proj₁ (proj₂ r))) (proj₁ r) stI ≡ false
+                 → ¬ Passes (1 ∷ k ∷ j ∷ []) (proj₂ (proj₂ (proj₂ r)))
+      -- AN OUTER'S WALK LEAVES ITS GONE AS IT FOUND IT: every row the walk
+      -- registers comes through an inner it subscribes, never through the
+      -- outer, and a row it cuts or ends is skipped from then on
+      gone-walk : ∀ {sP stP sI stI} (S : St sP stP sI stI) {o k ℓ ℓ′ u now evs r} {h : ℓ ≤ ℓ′}
+                    {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
+                → thruWalk⇓ o k q now evs sI stI r
+                → Gone (thru-outer o k ↠[ h ] q) stI → Gone (thru-outer o k ↠[ h ] q) (proj₂ (proj₂ r))
+
+    -- AN OUTER'S END THAT LEAVES ITS FLATTENER IDLE HANDS ITS GONE ON: a
+    -- row past the flattener came down its outer, which the end left, or
+    -- down a lane, and an idle flattener has none.  The write marks the
+    -- outer done and touches no registry, so it is read where it starts.
+    gone-wrap : ∀ {sP stP sI stI} (S : St sP stP sI stI) {o k ℓ ℓ′ u} {h : ℓ ≤ ℓ′}
+                  {q : Path (plainᵏ Γ κ) ℓ′ u (emitᵗ t)}
+              → Gone (thru-outer o k ↠[ h ] q) stI → proj₁ (thruWrap o k true (sI , stI)) ≡ true → Gone q stI
+    gone-wrap S {o} {k} (c , fd , fq) w =
+      (λ r∈ sk ps → [ c r∈ sk , (λ (_ , p) → idle-lanes S {o} {k} w r∈ sk p) ] (fd r∈ sk ps)) , fq
+
     -- one plain frame and the impl run its constructor pairs it with
     Steps : ∀ {lo lo′ ℓ s u} → Frame Γ s u → lo ≤ ℓ → Path Γ ℓ u t → Path (plainᵏ Γ κ) lo′ (emitᵗ s) (emitᵗ t) → Set
     Steps f h p Q =
       ∀ {now vs es fin sP stP sI stI oP vs₁ fin₁ sP₁ stP₁ rI} (S : St sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (f ↠[ h ] p) Q → Carries es vs
-      → Sound (f ↠[ h ] p) sP stP → Sound Q sI stI
+      → Sound (f ↠[ h ] p) sP stP → Sound Q sI stI → (fin ≡ true → Gone Q stI) → LiveFor es Q (EvalSt.nodes stI)
       → stepFrame⇓ now f p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
       → foldPath⇓ now Q es fin sI stI rI
       → Arm S now oP sP₁ stP₁ p vs₁ fin₁ (λ π NP NI → PathRel κ π NP NI (f ↠[ h ] p) Q) (λ I → Dlv I fin es) rI
@@ -352,7 +466,7 @@ module Arms {n} {Γ : Ctx n} (κ : Kinds n) where
     InnerPasses a m j h p Q =
       ∀ {now vs es fin sP stP sI stI rI} (S : St sP stP sI stI)
       → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (from-inner a m j ↠[ h ] p) Q → Carries es vs
-      → Sound (from-inner a m j ↠[ h ] p) sP stP → Sound Q sI stI
+      → Sound (from-inner a m j ↠[ h ] p) sP stP → Sound Q sI stI → LiveFor es Q (EvalSt.nodes stI)
       → fin ≡ false ⊎ any (aliveThroughᶠ j stP) (EvalSt.registry stP) ≡ true
       → foldPath⇓ now Q es fin sI stI rI
       → Arm S now [] sP stP p vs false (λ π NP NI → PathRel κ π NP NI (from-inner a m j ↠[ h ] p) Q) (λ I → Dlv I fin es) rI

@@ -1,6 +1,6 @@
 name: Agda toolchain
 description: >
-  Swap, GHC/cabal, and a cached Agda 2.8.0 + stdlib on PATH — everything an
+  Swap, GHC, and the prebuilt Agda 2.8.0 + stdlib on PATH — everything an
   Agda-running job needs before it types `make`. Extracted because TWO jobs
   now need it and a second copy of sixty lines of setup is a second copy that
   drifts: the GHC pin, the cabal-update workaround and the swapfile dance are
@@ -14,8 +14,7 @@ runs:
   steps:
     # Runs first, before the expensive toolchain build: a broken swap step
     # should fail in seconds, not after a 20-minute cold Agda build.
-    # A cold full-tower check has peaked near this container's RAM ceiling
-    # on one deeply-nested-mutual-block module and been OOM-killed (see
+    # Headroom for a large Agda or GHC build (see
     # .claude/hooks/session-start.sh, which carries the same fix locally).
     # The runner image ships its own active swapfile at this same path, so
     # a bare fallocate here fails with "Text file busy" — drop it first.
@@ -29,6 +28,7 @@ runs:
         sudo mkswap /swapfile
         sudo swapon /swapfile
 
+    # GHC is for `--compile` (MAlonzo) only; Agda itself is a static binary.
     # Pin GHC/cabal explicitly rather than letting install-agda.sh's `apt-get
     # install ghc cabal-install` take whatever Ubuntu's apt repo currently
     # defaults to. That default drifts with the runner image — this failed
@@ -47,22 +47,6 @@ runs:
         ghc-version: "9.4.7"
         cabal-version: "3.8.1.0"
         cabal-update: false
-
-    # Building Agda 2.8.0 from source (cabal) is the expensive, cacheable
-    # part of toolchain setup; the stdlib clone is small but free to cache
-    # alongside it. Keyed on the install script so a version bump there
-    # busts the cache automatically. Both jobs read and write this one: it
-    # is keyed on the script rather than the commit, so the two agree on
-    # its contents and whichever saves first simply wins.
-    - name: Cache Agda toolchain
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cabal
-          ~/agda-stdlib-2.3
-        key: agda-toolchain-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
-        restore-keys: |
-          agda-toolchain-${{ runner.os }}-
 
     - name: Install Agda toolchain
       shell: bash

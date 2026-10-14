@@ -1,8 +1,8 @@
 # `make bg` — detaching a build that outlives a tool call
 
 ```
-make bg T=gate-heavy            ← launch, under the Bash tool's run_in_background
-make bg-check T=gate-heavy      ← LOOK ONCE: GREEN / RED + failing tail / STILL RUNNING
+make bg T=gate            ← launch, under the Bash tool's run_in_background
+make bg-check T=gate      ← LOOK ONCE: GREEN / RED + failing tail / STILL RUNNING
 make bg-wait T=gate       ← WAIT: blocks until terminal, then GREEN or RED + tail
 ```
 
@@ -22,14 +22,14 @@ never a result — `bg-check` is.**
 The bug it exists to close is the obvious hand-rolled wrapper:
 
 ```
-(make gate-heavy > /tmp/x.log 2>&1; echo EXIT=$? >> /tmp/x.log)
+(make gate > /tmp/x.log 2>&1; echo EXIT=$? >> /tmp/x.log)
 ```
 
 The subshell exits with ECHO's status, which is ALWAYS 0. So the launcher reports
 success no matter what happened, and a RED build is indistinguishable from a green
 one unless someone remembers to read the log — which is exactly the thing that did
-not happen. Same family as the `timeout … | tail` trap and the `make gate-heavy` run from
-the wrong directory: a green-looking lie.
+not happen. Same family as the `timeout … | tail` trap and a build run from the wrong
+directory: a green-looking lie.
 
 ## The signal trap is load-bearing
 
@@ -80,7 +80,7 @@ at any exit code.
 
 The concurrency rule the campaign runs under ("while a gate is live, run no other
 check") is only enforceable if you can SEE the live one, and the obvious pattern
-does not: Agda's command line is `.../bin/agda -W error src/Main.agda`, with no
+does not: Agda's command line is `.../bin/agda -W error agda-impl/Main.agda`, with no
 `--` in it, so a grep for `agda --` counts zero however many builds are running.
 A zero that means "my pattern is wrong" and a zero that means "the machine is
 quiet" are indistinguishable, and the wrong one licenses a second launch.

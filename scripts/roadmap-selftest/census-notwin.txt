@@ -1,11 +1,9 @@
 # fixture standing in for a scan of agda/src headers: which durable markers
 # each postulate's own comment block carries.  Absent names carry none.
-a-falsity: REFUTED, PROBED
+a-falsity: REFUTED
 d-grindable: TWIN
 fam-alpha: DEAD ROUTE
 e-difficulty: REFUTED×2
-c-difficulty: PROBED
-suf-nodry-loop: PROBED
 glob-one: TWIN
 glob-two: TWIN
 nonpostulate-parent: TWIN

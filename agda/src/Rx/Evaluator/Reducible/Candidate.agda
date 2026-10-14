@@ -54,7 +54,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; _↠[_]_; Frame; ba
   register; atDyn; atSlot; lowerFloor; memberSource; mergeAll-st; NodeId; cell-st; take-st;
   switch-st; exhaust-st; batchSync-st; setNode; scanVals; scanDispatch; batchVals;
   batchDispatch; batchDown; resolve)
-open import Rx.Evaluator.Unconn-Arith using (fell-keeps)
+open import Rx.Evaluator.Unconn-Arith using (fell-keeps; keeps-refl)
 open import Rx.Evaluator.Keeps using (Keeps)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async; foldPath⇓;
   stepFrame⇓; injectRoot; step-batchSync)
@@ -63,7 +63,7 @@ open import Rx.Evaluator.Reducible.Support using (Room; Fell; HeldF; PreFs; Pre;
   ends-register; holdsFs-step; holds-step; Kept; kept-step; call; RP; Ans; Answered; answer; joinPre; _⁰×_; Σ⁰; _|>⁰_;
   FrameStep; headPre; head-off; kept-refl; join-idem; join-chain; kept-join; kept-shift; kept-before; cell-inj;
   scanHeld; batchHeld; batchCons; batchOff; batchCt; batchReg; batchStepped; _,_; step-⇓; out; step-ct; step-off;
-  kept; der; step-reg; step; step-red; step-cons; distinct)
+  kept; der; step-reg; step; step-red; step-cons; distinct; scripted≢shared)
 open import Rx.Evaluator.Reducible.Trace using (Trace; []ᵗ; _∷ᵗ_; endPre; endRP; endS; _++ᵗ_; end-++)
 
 -- THE CANDIDATE.  At a data type it is trivial, because nothing about
@@ -278,8 +278,8 @@ writeStage f le κ p rp s₀ nid ns ownOff h′ {sched} {st} con h hs =
     grounded
       ( (con , fr) , ap
       , holdsFs-step κ pfs (λ k on _ → set-above nid k ns (EvalSt.nodes st) (ownOff k (λ onF → ap k onF on))) ≤-refl hs )
-      (sub-ot (λ r∈ → r∈) ≤-refl so)
-  writeHolds f le κ fallen nid ns ownOff h′ con h (grounded fell so) = grounded fell (sub-ot (λ r∈ → r∈) ≤-refl so)
+      (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so)
+  writeHolds f le κ fallen nid ns ownOff h′ con h (grounded fell so) = grounded fell (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) so)
   writeKept : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m} {lo ℓ s u}
               (f : Frame Γ s u) (le : lo ≤ ℓ) (κ : Path Γ ℓ u t) (p : Pre κ)
               (nid : NodeId) (ns : NodeState Γ)
@@ -395,8 +395,8 @@ red-scripted i ρ k ok aK κ below pre rp s now sched (hot async) slEq st aM rm 
       _ , subs-hot-live below slEq doneEq refl , []ᵗ
     , holds-step κ pre (λ _ _ _ → refl) ≤-refl (λ x → x)
         (register-sound {sched = sched} {st = st} (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ)
-           ≤-refl (lower-end below κ) (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on))
-           (λ so′ → lower-distinct below κ (distinct so′)))
+           ≤-refl (keeps-refl _ _) (lower-end below κ) (λ k′ on → inj₁ (subst T (lower-nodes below κ k′) on))
+           (λ so′ → lower-distinct below κ (distinct so′)) (λ eq → ⊥-elim (scripted≢shared (trans (sym slEq) eq))))
         h
     , kept-step κ pre (pres (λ _ _ → refl)) ≤-refl
         (ends-register {κ = κ} {sched = sched} {st = st} (freshId regᵏ (Sched.mint sched)) (atSlot i) (lowerFloor below κ)
@@ -417,7 +417,7 @@ red-scripted {Γ = Γ} {lo = lo} i ρ k ok aK κ below pre rp s now sched (cold 
       st₁    = register rid (atDyn src lo) κ st
   in answer rp s (call now sync (ofColumn κ pre (red-data (listᵗ _) oks sync)) false sched₁ st₁ rm
                    (holds-step κ pre {sched′ = sched₁} {st′ = st₁} (λ _ _ _ → refl) ≤-refl (λ x → x)
-                      (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl refl (λ k′ on → inj₁ on) (λ so′ → distinct so′))
+                      (register-sound {sched = sched} {sched′ = sched₁} {st = st} rid (atDyn src lo) κ ≤-refl (keeps-refl _ _) refl (λ k′ on → inj₁ on) (λ so′ → distinct so′) _)
                       h)) λ a →
   let an = Answered.an a
   in _ , subs-cold-async below slEq refl refl refl (der an) , a ∷ᵗ []ᵗ , Ans.holds′ an

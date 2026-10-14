@@ -74,16 +74,17 @@ open import Rx.Evaluator.Domain using (cascade⇓; casc-run; casc-run-last; casc
   foldPath⇓; disp; walk-more; walk-nil; walk-end; subscribeE⇓)
 open import Rx.Evaluator.Builder using (evaluate↓; subscribe!; cascade!; pop-rule; chain-sound; chain-agree)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; Rule; Sound; Agree; sub-ot; admit-ot)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 open import Rx.Mint      using (MintKey; counter; sourceᵏ)
 open import Rx.Evaluator.Quiet using (QuietC; go-quiet; subscribeE-quiet; drop-off)
 open import Simulation.Schedules using (Sync; Popped; dry; pop; sched-pop)
-open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount; DyingFree; dyingᵇ; Named) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
+open import Simulation.Stores using (V; SrcNum; slot~; dyn~; RegRel; Partners; partner-row; RowRel; cold~; defer~; PathRel; SrcPair; Arr; InputBlock; data~; hop; elab; block; hotEq; srcCount; DyingFree; dyingᵇ; Named; member-head) renaming (Src to Srcˢ; Store to Storeʳ; module Store to Storeʳ)
 open import Simulation.Chains using (dyn-chains; dyn-chains-end; arr-pop; slot-chains; hot-start; casc-empty; head-source)
 open import Simulation.Hot-End using (hot-end-start)
 open import Simulation.Close using (close-store; close-arr)
 open import Simulation.Finish using (finish-store; hot-finish; hot-close; hot-quiet; close-hit)
-open import Simulation.Sweep using (T-true; t≢f; ≡ᵇ-sym)
+open import Simulation.Sweep using (T-true; t≢f; ≡ᵇ-sym; same-refl)
 open import Simulation.Pop using (pop-store; pp-popped)
 open import Simulation.Walk using (root-walk; minted)
 open import Simulation.After using (readᴾ; readᴵ; readᴾ-++; readᴵ-++; skip-cut; module Kept)
@@ -396,14 +397,6 @@ postulate
   -- script or a deferred hop is minted per subscription, and only that
   -- subscription registers at it.
   --
-  -- PROBED: make qc-store QC='31 80 4'
-  --   decided by `CLI.Store-Check`'s `store?`: 80 programs each with a
-  --   flatten and a defer; a planted bound of 0 reddens 21 of 30.
-  --   Draw unrecorded: the seed alone does not replay it.
-  -- PROBED: make qc-store QC='32 80 3'
-  --   decided by `CLI.Store-Check`'s `store?`: 80 programs, cold scripts
-  --   of several values aimed.
-  --   Draw unrecorded: the seed alone does not replay it.
   dyn-one : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
               {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
@@ -411,16 +404,7 @@ postulate
     → srcCount (Arrival.source a′) (EvalSt.registry stI) ≤ 1
 
   -- THE END PASS'S EMITS CARRY THE SAME INSTANT, the one the value pass
-  -- drew, not the counter where the end pass starts.  The sweeps under
-  -- `cascade-kept` decided it in the same runs.
-  -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
-  --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, whose `exactsᵇ` reads
-  --   this instant at every arrival past the opening: 145 agree, 0 fail;
-  --   every hot script's last arrival ends its chains, 145 programs.
-  -- PROBED: make qc-same-clock QC='103 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,0,0,2,1,1,1,0,0,0,0,4],"fan":[0,3,3,0,1,0,0,0,0,0],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[0,1,0,0,0,0],"reach":["flatten"]}'
-  --   decided by `CLI.QuickCheck`'s `sameClockᵇ` on the per-value frame:
-  --   141 agree, 0 fail, 9 undecided; every program a flatten over a hot
-  --   script of two arrivals, 140 grouping several values at one arrival.
+  -- drew, not the counter where the end pass starts.
   end-stamps : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
@@ -434,22 +418,7 @@ postulate
   -- A VALUE PASS THAT SENDS HAS DRAWN: an emit at the counter the pass
   -- started at leaves that counter behind, the block's or the hop's merge
   -- having minted the instant before anything put it out.
-  --
-  -- `make qc-same-clock`, tightened to this exact instant at every
-  -- arrival, decided 91 programs with no red, a planted `suc` reddening
-  -- 31 of 40: seed 24 at depth 3 (two-sync colds aimed), seed 25 at
-  -- depth 3 and seed 23 at depth 4 (both a flattener in every case).
-  -- Aimed at a merge's drain (flatten and takeWhile in every case, seed
-  -- 51 at depth 4, fuel 30) it agreed on 20 and failed none, 50 of them
-  -- grouping values, before the budget killed it with 55 undecided.
-  -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
-  --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, whose `exactsᵇ` reads
-  --   this instant at every arrival past the opening: 145 agree, 0 fail;
-  --   two hot arrivals per program, under flatteners, 145 programs.
-  -- PROBED: make qc-same-clock QC='103 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,0,0,2,1,1,1,0,0,0,0,4],"fan":[0,3,3,0,1,0,0,0,0,0],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[0,1,0,0,0,0],"reach":["flatten"]}'
-  --   decided by `CLI.QuickCheck`'s `sameClockᵇ` on the per-value frame:
-  --   141 agree, 0 fail, 9 undecided; every program a flatten over a hot
-  --   script of two arrivals, 140 grouping several values at one arrival.
+
   value-draws : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                   {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
     → Storeʳ κ sP stP sI stI
@@ -536,7 +505,7 @@ dyn-chain {t = t} κ e s {a = a} {a′} {fin = fin} hd ta pr ps soP soI dP dI =
   , (λ ar → After.persists A (delivered-arr {fin = fin} ar)) , proj₂ R
   where
     R = row-pass κ (delivered s {fin} pr) hd (partner-row κ _ _ _ _ _ (Storeʳ.rows s) pr)
-          (sub-ot (λ r∈ → r∈) ≤-refl soP) (sub-ot (λ r∈ → r∈) ≤-refl soI) (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
+          (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) soP) (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) soI) (unchain dP) (subst (λ k → foldPath⇓ k _ _ _ _ _ _) (sym ta) (unchain dI))
     A = proj₁ R
 
 pass-go : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
@@ -575,12 +544,12 @@ pass-go {Γ = Γ} {t} κ e s hd ta (inj₂ (_ , _ , pr) ∷ ps) hP aP hI aI
   (λ ar → proj₁ (proj₂ (proj₂ k)) (q₁ ar)) ,
   λ { f (s≤s h) → out-++ eI rI (ou f) (out-quiet rI (cong readᴵ (none-sent h g′))) }
   where
-    sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (hP (here refl))
-    sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (hI (here refl))
+    sP₀ = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hP (here refl))
+    sI₀ = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hI (here refl))
     k = pass-go κ e s₁ hd ta ps₁
-          (λ m → fold-kept (unchain st) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hP (there m))) (aP (here refl) (there m)))
+          (λ m → fold-kept (unchain st) sP₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hP (there m))) (aP (here refl) (there m)))
           (λ m m′ → aP (there m) (there m′))
-          (λ m → fold-kept (unchain st′) sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (hI (there m))) (aI (here refl) (there m)))
+          (λ m → fold-kept (unchain st′) sI₀ _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (hI (there m))) (aI (here refl) (there m)))
           (λ m m′ → aI (there m) (there m′)) g g′
 
 -- a minted source's value pass: the chains pair up at the popped stores
@@ -610,8 +579,8 @@ dyn-pass κ e {sP = sP} {sI = sI} {stI = stI} s df {a} {a′} ex ex′ ta sy p q
     opened []       = []
     opened (r ∷ rs) = inj₂ (refl , refl , r) ∷ opened rs
     k = pass-go κ e s₀ (head src h h′ refl refl) ta (opened (dyn-chains κ s ex ex′ p q s₀))
-          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
-          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI s) x∈)) (chain-agree a′ (Storeʳ.ruleI s)) go go′
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a′ (Storeʳ.ruleI s) x∈)) (chain-agree a′ (Storeʳ.ruleI s)) go go′
 
 -- A HOT SCRIPT'S VALUE PASS: the impl's one chain runs its input block into
 -- the share, which fans out to the rows the plain run's readers are
@@ -638,8 +607,8 @@ hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′
         (sym (cong (oB ++_) (++-identityʳ em))) (Pointwise-map (v-agrees κ t) (After.values Z)) ,
   subst (Out _) (sym (cong (oB ++_) (++-identityʳ em))) (out-++ oB em ob (proj₂ F refl du))
   where
-    F = (fan-go κ (After.store A) εI c ta e₁ (slot-chains κ (After.store A) e₁ ty)
-          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
+    F = (fan-go κ (After.store A) εI c ta e₁ (λ ()) (slot-chains κ (After.store A) e₁ ty)
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a (Storeʳ.ruleP s) x∈)) (chain-agree a (Storeʳ.ruleP s))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           go g)
     Z = _⨾_ κ A (proj₁ F)
@@ -650,17 +619,7 @@ hot-pass {n} {Γ = Γ} {t = t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′
 -- HAVE, or one plain arrival's values delivered across two.  Either is
 -- a former whose elaboration schedules something its plain program
 -- does not, or answers an arrival a hop late.
---
--- THE TWO SCHEDULES ARE ONE WHERE THE COMPILED CHECKS REACH.  On every
--- row of the bug cache, untimed and timed, the impl's arrival keys --
--- tick and ranked source -- are the plain run's in order, as far as
--- both were read, and each impl slice holds as many values as its
--- plain slice.  Among them are the rows built to split an arrival: a
--- value and its END under a `take` of a cold, exhausted or merged, and
--- every way the cache subscribes a `take` late.  The compiled sweep at
--- depth 3, fuel one, matched each plain arrival's key to the next impl
--- arrival's with none unmatched between: seed 20, 300 cases, 299
--- agreeing and one undecided at its clock; seed 19, 60, all agreeing.
+
 value-pass : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
   → Storeʳ κ sP stP sI stI → DyingFree stI
@@ -708,13 +667,14 @@ hot-end {n} {Γ} {t} κ e {sP = sP} {sI = sI} s df {a} {a′} ex ex′ ta sy ll 
   with subst₂ (Popped (Srcˢ κ) (Sched.live sP) (Sched.live sI)) ex ex′ (sched-pop (Storeʳ.sync s) (Storeʳ.sources s))
 ... | pop _ _ src h h′ _ _ _ _
   with hot-end-start κ (proj₁ (value-pass κ e s df ex ex′ ta sy go go′)) {a} {a′} {i} hk src h h′ e₁ e₂ (pass-quiet refl (room s) go′) end′
-...   | hot-end-at {oB = oB} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
+...   | hot-end-at {oB = oB} {stI₂ = stI₃} {εI = εI} {ty = ty} A c (disp (walk-end {r = r} g)) refl =
   hot-finish κ (After.store Z) {a} {a′} {i} e₁ e₂ ll ll′ (cascade-latched end′ {toℕ (i ↑ˡ n)} (close-hit a′ stI₁ e₂)) {emits = proj₁ r} ,
   Pointwise-map (v-agrees κ t) (After.values Z)
   where
     S₁ = proj₁ (value-pass κ e s df ex ex′ ta sy go go′)
-    Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta e₁ (slot-chains κ (After.store A) e₁ ty)
-          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
+    Z = _⨾_ κ A (proj₁ (fan-go κ (After.store A) εI c ta e₁
+          (λ _ → member-head (toℕ (n ↑ʳ i)) (toℕ (n ↑ʳ i)) (EvalSt.dying stI₃) (cong (_∨ false) (same-refl (toℕ (n ↑ʳ i))))) (slot-chains κ (After.store A) e₁ ty)
+          (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
           (admit-ot (n ↑ʳ i) _ _ (Storeʳ.ruleI {κ = κ} (After.store A))) (admit-agrees (n ↑ʳ i) (Storeʳ.ruleI {κ = κ} (After.store A)))
           end g))
 ...   | hot-end-idle none z₁ z₂ cd refl with casc-empty (subst (λ c → cascadeGo⇓ a [] true c sP₁ (cascadeClose a stP₁) (eP , sP₂ , stP₂)) none end)
@@ -754,37 +714,15 @@ last-pass {n} {Γ} {t} κ e s df {a} {a′} ex ex′ ta sy ll ll′ {sP₁ = sP�
         ca = close-arr κ {a = a} {a′ = a′} {S = S₁} p q ar₁ (pass-quiet refl (room s) go′)
         Sc = close-store κ {sP = sP₁} {stP = stP₁} {sI = sI₁} {stI = stI₁} {a = a} {a′ = a′} S₁ p q ar₁ (pass-quiet refl (room s) go′)
         k  = pass-go κ e Sc nohead ta (dyn-chains-end κ {a = a} {a′ = a′} Sc p q ca)
-               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
-               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′
+               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a (Storeʳ.ruleP S₁) x∈)) (chain-agree a (Storeʳ.ruleP S₁))
+               (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a′ (Storeʳ.ruleI S₁) x∈)) (chain-agree a′ (Storeʳ.ruleI S₁)) end end′
         S₂ = proj₁ k
 
 -- THE CASCADES OF ONE PARTNERED POP keep the stores related and send
 -- agreeing values under one instant the clock passes: both a value
 -- pass, or both a value pass and an end, since the two arrivals are last
 -- together.
---
--- `make qc-same-clock` decides `OneIn` itself on each arrival's
--- impl values, counters read after the subscribe and after every
--- arrival: no red over a flattener in every case and a cold slot
--- bursting two sync values aimed, seed 24 at depth 3 (175 decided, 96
--- grouping values) and seed 23 at depth 4 (108 decided, 72 grouping).
--- A planted break of the one-instant conjunct goes red on 26 of 30.
--- And the instants a run draws are contiguous: no gap at depth 2
--- seeds 13..36 nor depth 3 seeds 1..11.
---
--- THE STORE CONJUNCT HOLDS ON EVERY POP A COMPILED SWEEP HAS DRAWN.
--- `CLI.Store-Check` decides `Storeʳ` on both runs at every arrival
--- boundary, its pairing inferred and every closure relation and both
--- rules unread, so a green there says nothing about those fields.
--- Uniform seeds 1-5 and one aimed sweep per policy at depth 4, fuel 30
--- (`QC_DRAW`, seeds 11-16: switch, exhaust, bounded merge, a hot share,
--- valueless fan steps, a μ; 80 programs each, every one with a flatten)
--- held at every boundary, as did two aimed at arrivals carrying values
--- (leaves on the scripted slot, two-arrival scripts; seed 21 at depth 4,
--- 82 of 150 with such an arrival, seed 22 at depth 5, 51 of 80).
--- Aimed at a merge's drain (flatten and takeWhile, seed 51 at depth 4,
--- fuel 30) it held on 100: 25 cases draining a queue, 37 finishing an
--- inner at a merge.
+
 cascade-kept : ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (e : SExp Γ [] [] [] t)
                  {sP : Sched Γ} {stP : EvalSt (plainExp e)} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt (elaborateImpl κ e)}
   → Storeʳ κ sP stP sI stI → DyingFree stI

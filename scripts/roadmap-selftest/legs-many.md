@@ -18,9 +18,9 @@
 
 ### The ledger
 
-- **`a-falsity`** — FALSITY, `REFUTED, PROBED`: worst class goes first.
-- **`b-shape`** — SHAPE, `NO EVIDENCE`: a restatement is owed.
-- **`c-difficulty`** — DIFFICULTY, `PROBED`: true, correctly stated, hard.
+- **`a-falsity`** — FALSITY, `REFUTED`: worst class goes first.
+- **`b-shape`** — FALSITY, `NO EVIDENCE`: a restatement is owed.
+- **`c-difficulty`** — FALSITY, `NO EVIDENCE`: true, correctly stated, hard.
 - **`d-grindable`** — GRINDABLE, `TWIN`: the shape is already known.
 
 ## Tier 1 — at the ceiling
@@ -37,6 +37,6 @@
 
 ### The ledger
 
-- **`e-difficulty`** — DIFFICULTY, `REFUTED×2`: true, correctly stated, hard.
+- **`e-difficulty`** — FALSITY, `REFUTED×2`: true, correctly stated, hard.
 - **`f-grindable`** — GRINDABLE, `TWIN`: mechanical because the PROVEN twin
   `a-proven-citation` did the same thing at the same indices.

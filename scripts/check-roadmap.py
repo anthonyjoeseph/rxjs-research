@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""PROOF-STATE.md's tiers must be sorted riskiest-class-first.
+"""PROOF-STATE.md's tiers must be sorted riskiest-class-first (FALSITY before GRINDABLE).
 
 WHY THIS IS A GATE AND NOT A CONVENTION.  The roadmap's order is the only
 thing in the repo that says what to work on next, so a stale sort silently
 re-aims the next session — and it re-aims toward the SAFE end, because
 grinding is what looks like progress.  Measured 2026-08-20: the anchor
-tier's sole SHAPE row sat in the NINTH slot behind four DIFFICULTY rows, and
-the session read the tier top-down, picked DIFFICULTY, and was about to fan
+tier's sole FALSITY row sat in the NINTH slot behind GRINDABLE rows, and
+the session read the tier top-down, picked GRINDABLE, and was about to fan
 the rest out as GRINDABLE — its riskiest row going untouched precisely
 because the list said it was ninth.  A rule you can satisfy while still
 failing is a rule that needs a machine (the same argument as `make find`).
@@ -19,7 +19,7 @@ know it.
 A row whose text names no class is not a work item.  Those are skipped for ordering but REPORTED, so an item
 cannot dodge the check by omitting its class.
 
-SECOND CHECK — COVERAGE: every live postulate in agda/src is named by some
+SECOND CHECK — COVERAGE: every live postulate in agda-impl is named by some
 row.  PROOF-STATE.md has always asserted this ("every one of them appears in
 exactly one tier below"), and nothing enforced it, so a postulate could be
 added and never scheduled — invisible debt of exactly the kind the wiring law
@@ -99,7 +99,7 @@ syntax says which kind it is.  A head that is NOTHING BUT names — backticks an
 separators, `a` / `b`, `c` — is a CLAIM head, and every name in it must be a
 live postulate.  A head carrying prose — "`X`'s residue", "`HotLive`'s
 preservation leaves", "the `glob-*` family" — names a PARENT rather than a work
-item, so its names need only still EXIST in agda/src; that catches the parent
+item, so its names need only still EXIST in agda-impl; that catches the parent
 being deleted, which is the failure a descriptive head can have.
 
 The boundary, stated plainly because it is a real gap: a family row schedules
@@ -120,7 +120,7 @@ which is this file.
 
 SIXTH CHECK — THE EVIDENCE FIELD: every classed row carries, directly after its
 risk class, a backticked field naming the durable markers its postulates' own
-headers carry — `REFUTED, PROBED`, `TWIN`, `REFUTED×2` — or `NO EVIDENCE`.
+headers carry — `REFUTED`, `TWIN`, `REFUTED×2` — or `NO EVIDENCE`.
 
 WHY IT IS MANDATORY WHEN THE HEADER SECTIONS IT SUMMARISES ARE NOT.  A source
 header's `TWIN:` is optional-when-absent on purpose: requiring one would produce
@@ -128,10 +128,8 @@ filler, and a filler `TWIN:` is worse than none because it earns a class the row
 has not earned.  That argument turns on the section being AUTHORED.  This field
 is DERIVED — recomputed from the headers on every run — so a mandatory field
 cannot be filled with anything, and the blank is the point rather than a defect.
-A row reading `DIFFICULTY, NO EVIDENCE` says nobody has instantiated this
-statement, refuted a route through it, or found it a twin: the cheapest
-unmanaged risk in the repo, and previously invisible, because absence had no
-marker to be absent.
+A row reading `FALSITY, NO EVIDENCE` says nobody has refuted a route through
+this statement or found it a twin: absence made visible.
 
 AND IT CANNOT ROT, WHICH IS THE ONLY REASON IT MAY LIVE HERE AT ALL.  Moving the
 receipts THEMSELVES into the roadmap would duplicate content, and duplicated
@@ -155,23 +153,10 @@ keep true for no decision it changes.
 SEVENTH CHECK — AN UNEARNED GRINDABLE: a GRINDABLE row whose postulates carry no
 `TWIN` fails.  This mechanises a rule that was already stated and already being
 broken -- GRINDABLE means "here is the worked instance", and absent one the row
-is DIFFICULTY.  Ten of twelve GRINDABLE rows named no twin when this was
-written, several of them naming a precedent in ROW PROSE, which resolves
-nowhere and is exactly the unchecked claim the class exists to prevent.  `TWIN`
-is the marker `make comments-check` refuses when its referent is itself still a
-postulate, so requiring it is what makes the precedent a WALKED route rather
-than a believed one.  It is checkable only now, because it needs the field
-above.
-
-EIGHTH CHECK — AN UNEVIDENCED DIFFICULTY: a DIFFICULTY row whose postulates
-carry no durable marker at all fails.  Same mechanisation one class up
-(Anthony: "mechanically outlaw a 'difficulty' or 'grindable' row with no
-evidence"): "true and correctly stated" is a claim about receipts exactly as
-GRINDABLE's is, and CLAUDE.md already rules that absent one the row is SHAPE
-if the gap is written down and FALSITY if nothing is.  DIFFICULTY is the class
-with no floor under it and the one that reads as safe, so it is where an
-unexamined row lands by gravity -- which is why the blank fires here and stays
-legal on FALSITY, SHAPE and VACUITY, the classes that CLAIM nothing.
+is FALSITY.  `TWIN` is the marker `make comments-check` refuses when its
+referent is itself still a postulate, so requiring it is what makes the
+precedent a WALKED route rather than a believed one.  It is checkable only now,
+because it needs the field above.
 """
 
 import argparse
@@ -182,7 +167,7 @@ import sys
 import pathlib
 
 # worst first — CLAUDE.md's ordering, and the index is the sort key
-CLASSES = ["FALSITY", "SHAPE", "VACUITY", "DIFFICULTY", "GRINDABLE"]
+CLASSES = ["FALSITY", "GRINDABLE"]
 CLASS_RE = re.compile(r"\b(" + "|".join(CLASSES) + r")\b")
 TIER_RE = re.compile(r"^##\s+Tier\s+(\S+)")
 
@@ -248,11 +233,6 @@ LEGS_MAX = 7
 # piece of work -- and there is no header for a group.
 LEG_BUDGET = 700
 
-# THE MONSTER SECTION IS NOT PREAMBLE, and its own checker owns its rules.
-# A preamble says what the tier IS; the monster says what it is trying to
-# KILL, which is a different question and is held by `make monster-check` --
-# the only check that can resolve the name it carries.
-MONSTER_RE = re.compile(r"^###\s+The monster\b", re.I)
 BACKTICK_SPAN_RE = re.compile(r"`[^`]*`")
 
 # Any ISO-ish or spelled date.  The roadmap has no legitimate use for one.
@@ -270,7 +250,7 @@ DATE_RE = re.compile(
 # and it spent its previous life as REFUTATION.md carrying two timestamps that
 # nothing checked -- which is the failure this scan is about.  Globs are expanded at
 # use, so a new docs/ page is covered the moment it lands.
-DATE_ONLY_FILES = ["CLAUDE.md", "EVIDENCE.md"]
+DATE_ONLY_FILES = ["CLAUDE.md"]
 DATE_ONLY_GLOBS = ["docs/*.md"]
 
 
@@ -312,7 +292,6 @@ def parse(path):
     row = None  # (lineno, [text chunks])
     legs = None      # [(lineno, [text chunks])] for the roadmap subsection
     in_roadmap = False
-    in_monster = False
 
     def flush_pre():
         if pre is not None and pre[1]:
@@ -340,7 +319,6 @@ def parse(path):
                 tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre(), legs)
             row = None
             in_roadmap = False
-            in_monster = False
             cur = mt.group(1)
             rows = []
             legs = []
@@ -358,7 +336,6 @@ def parse(path):
             flush_row()
             row = None
             in_roadmap = bool(ROADMAP_RE.match(line))
-            in_monster = bool(MONSTER_RE.match(line))
             continue
         if ROW_START_RE.match(line):
             flush_row()
@@ -371,11 +348,11 @@ def parse(path):
             else:
                 flush_row()
                 row = None
-                if line.strip() and not in_monster:
+                if line.strip():
                     if pre[0] is None:
                         pre[0] = i
                     pre[1].append(line)
-        elif line.strip() and not in_monster:
+        elif line.strip():
             if pre[0] is None:
                 pre[0] = i
             pre[1].append(line)
@@ -456,7 +433,7 @@ def check_coverage(path, names):
     return sorted(n for n in names if not covered(n, claimed))
 
 
-# A declaration in agda/src: a type signature at any indentation, or a data /
+# A declaration in agda-impl: a type signature at any indentation, or a data /
 # record / module head.  Deliberately generous — its only job is to tell a
 # DELETED name from one that is merely no longer a postulate, and being
 # generous errs toward silence rather than toward a false stale report.
@@ -481,7 +458,7 @@ def decl_names(*roots):
 
 
 def src_decl_names(root):
-    return decl_names(root / "agda" / "src")
+    return decl_names(root / "agda-impl")
 
 
 # A head that is nothing but names and separators CLAIMS them; a head carrying
@@ -529,8 +506,8 @@ def check_stale(tiers, live, srcnames):
 
     `discharged` and `vanished` split a CLAIM head's dead names by what became of
     them, because the two want different repairs and the message should say which:
-    a name still declared in agda/src was DISCHARGED (delete the row), a name gone
-    from agda/src entirely was DELETED (delete the row, and the work it named is
+    a name still declared in agda-impl was DISCHARGED (delete the row), a name gone
+    from agda-impl entirely was DELETED (delete the row, and the work it named is
     not owed).  `gone_parents` is the descriptive-head case.
     """
     discharged, vanished, gone_parents = [], [], []
@@ -556,28 +533,12 @@ def check_stale(tiers, live, srcnames):
 # list is the SAME vocabulary `make comments-check` validates, and the
 # order is that check's rank order, so a row reads in the order its
 # header does.
-DURABLE_KINDS = ["REFUTED", "DEAD ROUTE", "TWIN", "PROBED", "RECOVERY"]
+DURABLE_KINDS = ["REFUTED", "DEAD ROUTE", "TWIN", "RECOVERY"]
 DURABLE_MARK_RE = re.compile(
-    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)\b(?!-)"
+    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|RECOVERY)\b(?!-)"
 )
 NO_EVIDENCE = "NO EVIDENCE"
 
-
-def receipt_cap():
-    """The receipt cap, read from the checker that owns it.
-
-    `make evidence-check` caps receipts on one POSTULATE.  What stays open is
-    a ROW, and a row naming both arms of one statement carries both names'
-    receipts — so a pair can gather fourteen while neither name ever reaches
-    the per-name cap, and the reading that says the row is over-evidenced is
-    the one nothing was holding.  Same number, second unit; importing it is
-    what stops the two from drifting apart.
-    """
-    path = pathlib.Path(__file__).with_name("check-evidence.py")
-    spec = importlib.util.spec_from_file_location("check_evidence", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.RECEIPT_CAP
 
 # The field as it appears in a row: a backticked span directly after the
 # risk class.  BACKTICKED IS LOAD-BEARING TWICE.  It makes the field free
@@ -589,13 +550,13 @@ def receipt_cap():
 EVID_RE = re.compile(r"—\s*(?:" + "|".join(CLASSES) + r")\b")
 FIELD_RE = re.compile(r"\s*,\s*`([^`]*)`")
 EVID_TOKEN_RE = re.compile(
-    r"^(?:" + NO_EVIDENCE + r"|(?:REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)"
-    r"(?:×\d+)?(?:,\s*(?:REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)(?:×\d+)?)*)$"
+    r"^(?:" + NO_EVIDENCE + r"|(?:REFUTED|DEAD ROUTE|TWIN|RECOVERY)"
+    r"(?:×\d+)?(?:,\s*(?:REFUTED|DEAD ROUTE|TWIN|RECOVERY)(?:×\d+)?)*)$"
 )
 
 
 def census(root, names, fixture=None):
-    """-> {postulate name: {marker kind: count}} read from agda/src headers.
+    """-> {postulate name: {marker kind: count}} read from agda-impl headers.
 
     A block is associated with EVERY declaration that follows it until the
     next comment run or a line that is neither a declaration nor a block
@@ -619,7 +580,7 @@ def census(root, names, fixture=None):
 
     want = set(names)
     out = {n: {} for n in names}
-    src = root / "agda" / "src"
+    src = root / "agda-impl"
     for path in sorted(src.rglob("*.agda")) if src.exists() else []:
         block, prev_comment = [], False
         for line in path.read_text().splitlines():
@@ -745,7 +706,7 @@ def evidence_edit(line, want):
     """-> (line with the field set to `want`, field found or None).
 
     THE ANCHOR IS NOT ALWAYS THE CLASS.  Some heads carry the class INSIDE the
-    bold label (`**Real, probed, awaiting proof — DIFFICULTY**`); writing the
+    bold label (`**Real, awaiting proof — FALSITY**`); writing the
     field there would put it inside the row's NAME, where the coverage and
     staleness checks read it as a claimed postulate.  So a class inside the
     label anchors the field after the label's closing `**`.
@@ -785,13 +746,8 @@ def check_evidence(path, tiers, cen):
 def unearned_grindable(path, tiers, cen):
     """-> [(tier, label, lineno)] — GRINDABLE rows naming no proven twin.
 
-    CLAUDE.md already rules that a row without a named worked instance IS
-    DIFFICULTY; until the evidence field existed there was nothing to check it
-    against, and the class drifted into the place everything nobody wants to
-    think about gets parked -- ten of twelve GRINDABLE rows had no `TWIN:`
-    anywhere in their postulates\' headers when this check was written, several
-    naming a precedent in ROW PROSE, which no machine resolves.  `TWIN:` is the
-    one marker `make comments-check` refuses when its referent is itself still a
+    A row without a named worked instance is FALSITY.  `TWIN:` is the one
+    marker `make comments-check` refuses when its referent is itself still a
     postulate, so requiring it here is what makes "name the precedent" mean a
     walked route rather than a believed one.
     """
@@ -800,48 +756,6 @@ def unearned_grindable(path, tiers, cen):
         for label, cls, lineno, _cost in rows:
             if cls == "GRINDABLE" and "TWIN" not in row_evidence(label, cen):
                 out.append((tier, label, lineno))
-    return out
-
-
-def unevidenced_difficulty(path, tiers, cen):
-    """-> [(tier, label, lineno)] — DIFFICULTY rows whose postulates carry
-    no durable marker at all.
-
-    "True and correctly stated" is earned exactly as GRINDABLE's class is —
-    a probe that reached the risky region, a refutation pinning this form, a
-    proven mirror — and CLAUDE.md already rules that absent one the row is
-    SHAPE if the gap is written down and FALSITY if nothing is.  The blank
-    stays legal on the three classes that claim nothing.
-    """
-    out = []
-    for tier, rows, _pre, _legs in tiers:
-        for label, cls, lineno, _cost in rows:
-            if cls == "DIFFICULTY" and not row_evidence(label, cen):
-                out.append((tier, label, lineno))
-    return out
-
-
-def over_probed(path, tiers, cen, cap):
-    """-> [(tier, label, lineno, n)] — rows carrying more than `cap` receipts.
-
-    A probe AIMS a grind or REFUTES a statement, and past the cap the receipts
-    have stopped deciding anything while the row stays open — so what more
-    evidence buys is more evidence to delete on discharge.  The repair is to
-    DEFINE something, or to delete the receipts that no longer earn their
-    place; splitting the row in two satisfies the count and changes nothing,
-    which is the same laundering as merging probe files under the per-name cap.
-    Only PROBED is counted: a refutation KILLS a statement rather than
-    accumulating against a live one, and the other three markers name a route
-    rather than buy coverage.
-    """
-    out = []
-    for tier, rows, _pre, _legs in tiers:
-        for label, cls, lineno, _cost in rows:
-            if cls is None:
-                continue
-            n = row_evidence(label, cen).get("PROBED", 0)
-            if n > cap:
-                out.append((tier, label, lineno, n))
     return out
 
 
@@ -876,11 +790,11 @@ def main():
                                   "used by make roadmap-selftest against fixtures")
     ap.add_argument("--ledger", help="file of postulate names to require coverage of, "
                                      "one 'name path.agda:N' per line; selftest only")
-    ap.add_argument("--src-names", help="file of names declared in agda/src, one "
+    ap.add_argument("--src-names", help="file of names declared in agda-impl, one "
                                        "per line, standing in for a scan of the "
                                        "tree; selftest only")
     ap.add_argument("--census", help="file of 'name: MARKER, MARKER×2' lines "
-                                     "standing in for a scan of agda/src headers; "
+                                     "standing in for a scan of agda-impl headers; "
                                      "selftest only")
     ap.add_argument("--fix-evidence", action="store_true",
                     help="rewrite every classed row's evidence field from the "
@@ -989,7 +903,7 @@ def main():
                   "that has been DISCHARGED:")
             for tier, lineno, label, name in discharged:
                 print(f"  Tier {tier}  {path.name}:{lineno}  {name}")
-                print(f"    in **{label}**  — still declared in agda/src, "
+                print(f"    in **{label}**  — still declared in agda-impl, "
                       "but no longer a postulate")
             print("\nCompleted items are DELETED, not marked complete — the roadmap's")
             print("own second hygiene rule. Delete the row. If the discharge left a")
@@ -998,12 +912,12 @@ def main():
             print("definition, which is what re-aims the next session.")
         if vanished:
             print(f"\nSTALE ROWS — {len(vanished)} row head(s) naming something that "
-                  "is NOT IN agda/src at all:")
+                  "is NOT IN agda-impl at all:")
             for tier, lineno, label, name in vanished:
                 print(f"  Tier {tier}  {path.name}:{lineno}  {name}")
                 print(f"    in **{label}**")
             print("\nNeither a live postulate nor a declaration: deleted, renamed, or")
-            print("misspelled. Delete the row, or fix the name to the one in agda/src.")
+            print("misspelled. Delete the row, or fix the name to the one in agda-impl.")
         if gone_parents:
             print(f"\nSTALE ROWS — {len(gone_parents)} descriptive head(s) naming a "
                   "parent that no longer exists:")
@@ -1011,7 +925,7 @@ def main():
                 print(f"  Tier {tier}  {path.name}:{lineno}  {name}")
                 print(f"    in **{label}**")
             print("\nA head carrying prose names a PARENT, so it is held only to still")
-            print("existing in agda/src. This one does not. Delete the row or rename it.")
+            print("existing in agda-impl. This one does not. Delete the row or rename it.")
         if stale:
             failures.append(None)
 
@@ -1041,40 +955,13 @@ def main():
             for tier, label, lineno in unearned:
                 print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
             print("\nGRINDABLE is not 'feels easy', it is 'here is the worked")
-            print("instance' — and absent one the row is DIFFICULTY. A precedent")
+            print("instance' — and absent one the row is FALSITY. A precedent")
             print("named in this row's PROSE does not count: it resolves nowhere.")
             print("Put a `TWIN:` section in the postulate's own header naming a")
             print("PROVEN counterpart (comments-check refuses a twin that is itself")
             print("still a postulate), then run  make roadmap-evidence . Or demote")
-            print("the row to DIFFICULTY, which is what it is until then.")
-        unev = unevidenced_difficulty(path, tiers, cen)
-        if unev:
-            print(f"\nDIFFICULTY ROWS WITH NO EVIDENCE — {len(unev)}:")
-            for tier, label, lineno in unev:
-                print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
-            print("\n'True and correctly stated' is a claim about EVIDENCE — a")
-            print("probe that reached the risky region, a refutation pinning this")
-            print("form, or a proven mirror in a `TWIN:` section. Absent one, the")
-            print("row is SHAPE if the statement's gap is written down and FALSITY")
-            print("if nothing is — that is CLAUDE.md's own rule, mechanised. Put")
-            print("the evidence in the postulate's header as a durable marker and")
-            print("run  make roadmap-evidence , or raise the class.")
-        cap = receipt_cap()
-        fat = over_probed(path, tiers, cen, cap)
-        if fat:
-            print(f"\nROWS OVER THE RECEIPT CAP OF {cap} — {len(fat)}:")
-            for tier, label, lineno, n in fat:
-                print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
-                print(f"    {n} receipts on one open row")
-            print("\nA probe AIMS a grind or REFUTES a statement. Past the cap the")
-            print("receipts have stopped deciding anything and the row is still")
-            print("open, so what more evidence buys is more evidence to delete when")
-            print("the statement is discharged. Take the leap: DEFINE something, or")
-            print("delete the receipts that no longer earn their place — and never")
-            print("split the row, which satisfies the count and changes nothing.")
-            print("evidence-check caps one POSTULATE; this caps the open ITEM, which")
-            print("is what a row naming two arms of one statement gets past.")
-        if missing or bad or unearned or unev or fat:
+            print("the row to FALSITY, which is what it is until then.")
+        if missing or bad or unearned:
             failures.append(None)
 
     date_targets = [path]
@@ -1171,7 +1058,7 @@ def main():
     order_failures = [f for f in failures if f is not None]
     if order_failures:
         print("\nROADMAP OUT OF ORDER — every tier is sorted riskiest-class-first.")
-        print("Classes, worst first: " + ", ".join(CLASSES))
+        print("Classes: " + ", ".join(CLASSES))
         for tier, label, cls, prev_label, prev_cls, lineno in order_failures:
             print(f"\n  Tier {tier}  {path.name}:{lineno}")
             print(f"    {label} is {cls}")
@@ -1194,10 +1081,10 @@ def main():
                   + ", ".join(f.name for f in date_targets[:2])
                   + f" and {len(date_targets) - 2} more")
           + ("" if unscheduled is None
-             else "; every live postulate is on the roadmap, and every row head "
+             else "; every live postulate is on the roadmap and every row head "
                   "names one; every classed row's evidence field matches its "
-                  "postulates' own headers, every GRINDABLE row names a "
-                  "proven twin, and no DIFFICULTY row stands on none"))
+                  "postulates' own headers; every GRINDABLE row names a "
+                  "proven twin"))
     return 0
 
 

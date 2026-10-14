@@ -7,16 +7,10 @@ cannot help: there is no warning to promote.
 That is not a tidiness matter. An import is an **edge in the module graph**, and
 an edge decides two things that govern every build:
 
-- what a full `make gate-heavy` must check **before** this file, and
+- what Agda must check **before** this file, and
 - what an edit to the imported module **invalidates**.
 
-A name nobody reads still moves both. The numbers behind that claim, and the
-twelve-edge instance that paid for this checker, are in
-`typecheck-performance-numbers.md` — the short version is that all thirteen
-`Verify-Well-Formed/Part*` imported one name from the top of the
-budget-sufficient tower and exactly **one** of them used it, which is what made
-the critical path 41 levels deep instead of 29 and put twelve extra modules into
-the rebuild cone of every edit in the caps/walk grind lane.
+A name nobody reads still moves both.
 
 ## The three commands
 
@@ -29,7 +23,7 @@ make imports-selftest     the checker still fires, both ways   ← in the gate
 Directly, for a narrower scope:
 
 ```
-scripts/check-imports.py --src agda/src/Verify-Well-Formed --stats
+scripts/check-imports.py --src agda-impl/denotation --stats
 scripts/check-imports.py --src <one file> --fix
 scripts/check-imports.py --keep-names        # module edges only, no name-level
 ```
@@ -137,11 +131,9 @@ cost either way — many minutes down the tower — and the same milliseconds to
 decide from the disk.
 
 **The shape it catches is a module being SPLIT.** The old file goes; the tree
-the split was swept for is green, and a consumer in ANOTHER tree still names
-the module that no longer exists. That cross-tree half is what makes it easy to
-miss by hand: the sweep that found every reference in `agda/src` had no reason
-to be pointed at `agda/evidence/refuted`, and a single grep flag can hide the
-one line that mattered.
+the split was swept for is green, and a consumer somewhere still names the
+module that no longer exists. A single grep flag can hide the one line that
+mattered.
 
 **Askability is decided by the first namespace component**, and only that. A
 module whose root names a directory or file of one of the trees in play is a
@@ -169,12 +161,6 @@ Location of the error: __IMPOSSIBLE__, called at src/full/Agda/Interaction/Impor
 naming neither the file nor the import — the log's last line is the module
 Agda was checking when it tried to load the headerless one, which is a
 different, healthy file.
-
-**And `make agda-dev` cannot see it**, which is what makes this expensive:
-agda-dev checks a GENERATED copy under its own `Dev-…` module name, so the
-missing header is supplied by the generator and the module reports GREEN. A
-red gate plus a green dev check on the same file reads as a tooling problem,
-and this is the one shape where it is not.
 
 Bisecting it is fast once you suspect the import graph rather than the file:
 a two-line module that does nothing but `import M` reproduces in seconds, and
@@ -305,37 +291,31 @@ different currencies.
 
 **The claim roots are NOT exempt from this one**, and that is the one place the
 two rules collide: a claim root is skipped wholesale by the use check and still
-reported here. `src/Main.agda`'s own header has demanded `using` lists in prose
-since long before anything checked — "NO BARE `open import`. Individual
-definitions only." Main already complies; all six of its imports carry lists.
+reported here. `agda-impl/Main.agda`'s own header has demanded `using` lists in
+prose since long before anything checked — "NO BARE `open import`. Individual
+definitions only." Main already complies.
 
 ## The claim root, and it is the only exception (Anthony)
 
-**One file per include root is skipped wholesale: the claim root.** `agda/src`
-roots at `Main.agda`, `agda/evidence/refuted` at `Refuted/Main.agda`, and both files exist
-to NAME definitions rather than apply them — "individual definitions only, so
-that `imported` means `claimed`". So every import in one is locally unused *by
-design*, and `make wiring` reads precisely those `using` clauses to seed
-reachability. Pointing a use-based checker at a claim root makes it report the
-claim graph as dead weight: caught in simulation before the first `--fix` ever
-ran, and deleting what it reported orphaned **84 of 86 modules**.
+**One file per include root is skipped wholesale: the claim root.** `agda-impl`
+roots at `Main.agda`, which exists to NAME definitions rather than apply them —
+"individual definitions only, so that `imported` means `claimed`". So every
+import in it is locally unused *by design*, and `make wiring` reads precisely
+those `using` clauses to seed reachability. Pointing a use-based checker at a
+claim root makes it report the claim graph as dead weight.
 
 **It is one rule and not a list of blessed filenames**, which is the part worth
 keeping. The claim root is DERIVED from the include root being scanned
 (`CLAIM_ROOT`, keyed by tree, the same fact `check-wiring.py` carries as
 `ROOT_REL`), so the exception cannot grow without someone adding a whole tree,
-and no ordinary module can ever drift into it. Every other file in either tree
+and no ordinary module can ever drift into it. Every other file in the tree
 earns its imports by spending them.
-
-The refuted tree gets the law by being a tree, not by being named twice: its root
-says of itself that a refutation not listed is not checked, "exactly as in
-src/Main.agda".
 
 ## The orphan guard: a sole-route edge is a WIRING finding, not dead weight
 
 An unused import can still be the **only surviving route** to a module. Deleting
-that one does not tidy the graph — it hides a subtree from `make gate-heavy` and trips
-`wiring-gate` one step later. So the checker computes reachability first and
+that one does not tidy the graph — it orphans the subtree and trips `wiring-gate`.
+So the checker computes reachability first and
 **refuses to report such an edge as dead**: it prints a `WIRING` line instead, and
 `--fix` leaves the line alone and still exits non-zero, so the fixer cannot be
 used to launder a wiring finding into green.
@@ -431,7 +411,7 @@ regression turns three rows red at once.
 
 **The tree owns a claim root and a sole-route edge, because the real trees cannot
 test either.** `Main.agda` is the fixture's claim root and must be reported on not
-at all — pointing the checker at `src/Main.agda` instead proves only that it is
+at all — pointing the checker at `agda-impl/Main.agda` instead proves only that it is
 silent, never that it is silent for the right reason. `Guard-Root.agda` holds an
 unused import of `Guard-Leaf` that is the only route to it, and must come out as
 `WIRING`, never `DEAD`, with the line byte-identical after `--fix`. This is why

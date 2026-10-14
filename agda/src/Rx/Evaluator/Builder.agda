@@ -68,6 +68,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; chainStep⇓; cascadeGo⇓
 open import Rx.Evaluator.Reducible using (reducible; rawFold; red-env)
 open import Rx.Evaluator.Reducible.Floor using (drop-sub)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; _,_; _|>⁰_; rootRP; standing; Rule; rule; termini; fresh-rows; distinct-rows; Distinct; rowDistinct; Sound; sound; ruled; grounded; sounds; Agree; rowThrough; rowEnd; endOf; sub-rule; sub-ot)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Rx.Evaluator.Reducible.Rule-Kept using (fold-kept)
 
 ------------------------------------------------------------------
@@ -122,14 +123,14 @@ finish-rule : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) (sched
             → Rule sched st → Rule (proj₁ (cascadeFinish a sched st)) (proj₂ (cascadeFinish a sched st))
 finish-rule a sched st ru with Arrival.isLast a
 ... | false = ru
-... | true  = sub-rule (drop-sub (arrSource a) (EvalSt.registry st)) ≤-refl ru
+... | true  = sub-rule (drop-sub (arrSource a) (EvalSt.registry st)) ≤-refl (keeps-refl _ _) ru
 
 -- and popping an arrival moves only the queue
 pop-rule : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {sched sched′ : Sched Γ} {a : Arrival Γ} {st : EvalSt e}
          → sched-next sched ≡ inj₂ (a , sched′) → Rule sched st → Rule sched′ st
 pop-rule {sched = sched} eqn ru with schedGo (Sched.live sched)
 pop-rule {sched = sched} ()   ru | inj₁ _
-pop-rule {sched = sched} refl ru | inj₂ (a , ls) = sub-rule (λ r∈ → r∈) ≤-refl ru
+pop-rule {sched = sched} refl ru | inj₂ (a , ls) = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ru
 
 chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (a : Arrival Γ) (vs : List (Val Γ (arrTy a))) (fin : Bool)
@@ -161,11 +162,11 @@ cascadeGo! a vs fin ((rid , c) ∷ cs) sched st ru sds ag
                                     (λ x∈ y∈ → ag (there x∈) (there y∈)) |>′ λ (_ , g , ru′) →
               _ , casc-cut eqc g , ru′
 ... | false =
-      sub-ot (λ r∈ → r∈) ≤-refl (sds (here refl)) |>⁰ λ so →
+      sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (sds (here refl)) |>⁰ λ so →
       chainStep! a vs fin c sched
               (markDlv fin rid st) so |>′ λ ((emits , sched₁ , st₁) , s , kept) →
       cascadeGo! a vs fin cs sched₁ st₁ (ruled (kept (proj₂ c) so (λ _ _ _ → refl)))
-                            (λ x∈ → kept _ (sub-ot (λ r∈ → r∈) ≤-refl (sds (there x∈))) (ag (here refl) (there x∈)))
+                            (λ x∈ → kept _ (sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (sds (there x∈))) (ag (here refl) (there x∈)))
                             (λ x∈ y∈ → ag (there x∈) (there y∈)) |>′ λ (_ , g , ru′) →
       _ , casc-live eqc s g , ru′
 
@@ -176,16 +177,16 @@ cascade! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 cascade! a sched st ru with Arrival.isLast a in eql
 ... | false =
       cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched (cascadeOpen st)
-              (sub-rule (λ r∈ → r∈) ≤-refl ru)
-              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru x∈)) (chain-agree a ru) |>′ λ ((_ , sched′ , st′) , g , ru′) →
+              (sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ru)
+              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a ru x∈)) (chain-agree a ru) |>′ λ ((_ , sched′ , st′) , g , ru′) →
       _ , casc-run eql g , finish-rule a sched′ st′ ru′
 ... | true  =
       cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched (cascadeOpen st)
-              (sub-rule (λ r∈ → r∈) ≤-refl ru)
-              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru x∈)) (chain-agree a ru) |>′ λ ((_ , sched₁ , st₁) , g , ru₁) →
+              (sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ru)
+              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a ru x∈)) (chain-agree a ru) |>′ λ ((_ , sched₁ , st₁) , g , ru₁) →
       cascadeGo! a [] true (chainsOf a st₁) sched₁ (cascadeClose a st₁)
-              (sub-rule (λ r∈ → r∈) ≤-refl ru₁)
-              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (chain-sound a ru₁ x∈)) (chain-agree a ru₁) |>′ λ ((_ , sched₂ , st₂) , g′ , ru₂) →
+              (sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ru₁)
+              (λ x∈ → sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _) (chain-sound a ru₁ x∈)) (chain-agree a ru₁) |>′ λ ((_ , sched₂ , st₂) , g′ , ru₂) →
       _ , casc-run-last eql g g′ , finish-rule a sched₂ st₂ ru₂
 
 -- THE POP IS AN ARGUMENT RATHER THAN A `with`, so a proof comparing
@@ -223,7 +224,7 @@ subscribe! {n = n} {Γ = Γ} e ins =
   let aM = <-wellFounded _ in
   reducible aM e []ᵉ (red-env {Γ = Γ} aM []ᵉ) (root {lo = n}) (standing tt) rootRP tt 0
           (sched-init e ins) (st-init e) ≤-refl
-          (grounded tt (sound (rule (λ k ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt)) |>′ λ (r , s , _ , hs , _) →
+          (grounded tt (sound (rule (λ k ()) (λ ()) (λ ()) (λ ())) (λ k ()) (λ k ()) tt)) |>′ λ (r , s , _ , hs , _) →
   r , s , ruled (sounds hs)
 
 -- A RUN IS ITS ROOT SUBSCRIBE FOLLOWED BY ITS DRAIN, and the relation

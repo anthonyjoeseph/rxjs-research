@@ -14,8 +14,8 @@
 
 ### The ledger
 
-- **`a-falsity`** — FALSITY, `PROBED`: worst class goes first.
-- **`c-difficulty`** — DIFFICULTY, `NO EVIDENCE`: true, correctly stated, hard.
+- **`a-falsity`** — FALSITY, `NO EVIDENCE`: worst class goes first (stale — census says REFUTED).
+- **`c-difficulty`** — FALSITY, `NO EVIDENCE`: true, correctly stated, hard.
 - **`d-grindable`** — GRINDABLE, `TWIN`: the shape is already known.
 
 ## Tier 1 — parked
@@ -32,12 +32,11 @@
 
 ### The ledger
 
-- **`b-shape`** — SHAPE, `NO EVIDENCE`: a restatement is owed.
-- **`e-difficulty`** — DIFFICULTY, `REFUTED×2`: mentions the word GRINDABLE
-  later in its own prose, which must NOT be read as its class.
-- **`fam-{alpha,beta}`** — DIFFICULTY, `DEAD ROUTE`: brace expansion counts as
+- **`b-shape`** — FALSITY, `NO EVIDENCE`: a restatement is owed.
+- **`e-difficulty`** — FALSITY, `REFUTED×2`: true, correctly stated, hard.
+- **`fam-{alpha,beta}`** — FALSITY, `DEAD ROUTE`: brace expansion counts as
   naming both.
-- **`suf-nodry-loop` / `-nestRec`** — DIFFICULTY, `NO EVIDENCE`: a leading-dash
+- **`suf-nodry-loop` / `-nestRec`** — FALSITY, `NO EVIDENCE`: a leading-dash
   suffix after a sibling in the same row counts as naming `suf-nodry-nestRec`.
 - **`f-grindable`** — GRINDABLE, `NO EVIDENCE`: mechanical because the PROVEN
   twin `a-proven-citation` did the same thing at the same indices. A name CITED

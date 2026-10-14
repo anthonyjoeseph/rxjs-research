@@ -7,10 +7,9 @@ can see into build failures.
 
 ## Seventeen checks
 
-1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, SHAPE, VACUITY,
-   DIFFICULTY, GRINDABLE). Priority that lives only in prose gets spent on whatever is
-   nearest.
-2. **Coverage** — every live postulate in `agda/src` is named by some row. A branch of
+1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, GRINDABLE). Priority
+   that lives only in prose gets spent on whatever is nearest.
+2. **Coverage** — every live postulate in `agda-impl` is named by some row. A branch of
    the proof cannot hide from the roadmap.
 3. **Staleness** — coverage run BACKWARDS: no row head names a postulate that is no
    longer live. This is the direction that has actually bitten — the two rows in the
@@ -29,23 +28,17 @@ can see into build failures.
    its risk class, naming the durable markers its postulates' own headers carry, and
    matching them. `make roadmap-evidence` writes it; nobody types it.
 8. **An unearned GRINDABLE** — a GRINDABLE row whose postulates carry no `TWIN` fails.
-   The class means "here is the worked instance"; absent one the row is DIFFICULTY.
-9. **A DIFFICULTY row standing on nothing** — a DIFFICULTY row whose postulates carry no
-   marker at all fails. The class claims the statement is true and correctly stated, and
-   that is a claim about evidence; absent one the row is SHAPE or FALSITY.
+   The class means "here is the worked instance"; absent one the row is FALSITY.
 
-10. **The leg count** — each tier opens with a `### Big picture tier roadmap` naming
+9. **The leg count** — each tier opens with a `### Big picture tier roadmap` naming
     at least three legs and at most seven, the floor dropping only when the tier has
     fewer live postulates than that to plan over.
-11. **The leg budget** — each leg's prose is within `LEG_BUDGET`, which is several times
+10. **The leg budget** — each leg's prose is within `LEG_BUDGET`, which is several times
     `ROW_BUDGET`.
-12. **The row's receipt cap** — no row carries more `PROBED` receipts than
-    `make evidence-check` allows one postulate. The number is imported from that
-    checker, so the two cannot drift apart.
 
-13. **A question naming too few postulates** — under `QUESTION_NAMES_MIN`, it is one
+11. **A question naming too few postulates** — under `QUESTION_NAMES_MIN`, it is one
     row given a heading, and that row's research already has a home.
-14. **A stale relevant list** — every name a question names is still a live postulate,
+12. **A stale relevant list** — every name a question names is still a live postulate,
     is a row of that same tier, and is still FALSITY.
 
 ## The roadmap is the schedule; the rows are the ledger
@@ -103,9 +96,9 @@ over every backticked token would fire on all of them.
 So the head's own syntax says which kind it is. A head that is **nothing but names** —
 backticks and separators — CLAIMS them, and each must be a live postulate. A head
 carrying **prose** ("`X`'s residue", "the `glob-*` family") names a PARENT, so its
-names need only still exist in `agda/src`; that is the failure a descriptive head can
+names need only still exist in `agda-impl`; that is the failure a descriptive head can
 have. A claim head's dead names are split by what became of them, because the repair
-differs: still declared in `agda/src` means DISCHARGED, absent means deleted or
+differs: still declared in `agda-impl` means DISCHARGED, absent means deleted or
 misspelled.
 
 **The boundary, and it is a real gap.** A family row schedules its siblings in the
@@ -126,11 +119,9 @@ It is the half a machine can see with no judgement, and **it catches most of the
 by proxy**: history arrives WITH a timestamp attached, because the writer knows the
 reader will want to know when.
 
-The one file that legitimately carries dates is `typecheck-performance-numbers.md`,
-because a timing's age IS information about the timing. Source headers do NOT — a
-receipt's content is its coverage statement, and coverage is re-runnable, so the date
-adds nothing a reader can act on; `make comments-check` bans them there for the same
-reason this check bans them here.
+Source headers do NOT carry dates — a receipt's content is its coverage statement,
+and coverage is re-runnable, so the date adds nothing a reader can act on;
+`make comments-check` bans them there for the same reason this check bans them here.
 
 ## `make roadmap-selftest`
 
@@ -142,10 +133,8 @@ check, beside a clean fixture whose rows deliberately cite a proven precedent an
 a descriptive head, so the two exemptions are pinned as load-bearing rather than
 assumed. Two further fixtures pin the evidence field in both of its failing directions —
 a row with no field at all, and a row whose field disagrees with the census — against a
-`--census` fixture standing in for a scan of `agda/src`. A third pins the unearned
-GRINDABLE, against a second census in which the fixture's twin is absent, and a fourth
-the unevidenced DIFFICULTY, against a third census with the marker removed — that one
-also pins the must-NOT direction, since the blank stays legal on a SHAPE row. Two more
+`--census` fixture standing in for a scan of `agda-impl`. A third pins the unearned
+GRINDABLE, against a second census in which the fixture's twin is absent. Two more
 pin the legs, and each is built to isolate ONE of them: `legs-count.md` plans two legs in
 a tier with the rows for three while every leg is inside budget, and `legs-fat.md` names
 three legs of which one carries an argument instead of a reason, with the ROW budget
@@ -156,10 +145,10 @@ ceiling that works.
 
 ## The evidence field, and why a derived field may be mandatory
 
-A row reads `— SHAPE, `REFUTED`:` or `— DIFFICULTY, `NO EVIDENCE`:`. The field lists
-`REFUTED`, `DEAD ROUTE`, `TWIN`, `PROBED`, `RECOVERY` in that order — the same
-vocabulary and the same rank order `make comments-check` validates — with `×N` when a
-header carries a marker more than once.
+A row reads `— FALSITY, `REFUTED`:` or `— FALSITY, `NO EVIDENCE`:`. The field lists
+`REFUTED`, `DEAD ROUTE`, `TWIN`, `RECOVERY` in that order — the same vocabulary and
+the same rank order `make comments-check` validates — with `×N` when a header carries
+a marker more than once.
 
 **Write it with `make roadmap-evidence`.** The field is derived from the headers, and
 `roadmap-check` recomputes it and fails on any disagreement, so a hand-typed one is
@@ -178,10 +167,10 @@ rules stated elsewhere:
   duplicate content, and duplicated content drifts. A count is a function of the
   headers, so the two cannot disagree without the gate saying so.
 
-The field is also what makes checks 8 and 9 possible. A precedent named in a row's PROSE
+The field is also what makes check 8 possible. A precedent named in a row's PROSE
 resolves nowhere, so GRINDABLE drifted into the place rows nobody wants to think about
 get parked — ten of twelve carried no `TWIN` at all when the check was added, and were
-demoted to DIFFICULTY. Re-earning the class means putting a `TWIN:` section in the
+demoted to FALSITY. Re-earning the class means putting a `TWIN:` section in the
 postulate's own header, where `comments-check` refuses a twin that is itself still a
 postulate.
 
@@ -203,53 +192,22 @@ here, completed items DELETED rather than marked done, no dated narrative. Re-re
 header when you touch the file; every one of those rules exists because it was
 violated.
 
-## Why the two class checks are one law read from both ends
+## Why the class check is a law read from one end
 
-Check 8 and check 9 police the same sentence — a class is a property of EVIDENCE, not of
-confidence — at the two classes that make a positive claim. GRINDABLE says the shape is
-already known, so it owes a worked instance and nothing else will do: `TWIN`. DIFFICULTY
-says the statement is true and correctly stated, which any of the durable markers can
-buy — a probe that reached the risky region, a refutation pinning this form, a proven
-mirror.
+Check 8 polices the sentence — a class is a property of EVIDENCE, not of confidence —
+at the one class that makes a positive claim. GRINDABLE says the shape is already known,
+so it owes a worked instance and nothing else will do: `TWIN`.
 
-The three classes below them are exempt, and that is not leniency. FALSITY, SHAPE and
-VACUITY assert nothing about the statement being right, so `NO EVIDENCE` is the honest
-reading of a row nobody has instantiated, and a check demanding evidence there would
-demand it precisely where there is none to have. It is also what the repair looks like:
-a DIFFICULTY row that cannot name its evidence does not acquire a marker, it is
-reclassified down — SHAPE where the statement's own gap is written down, FALSITY where
-nothing is.
+FALSITY is exempt, and that is not leniency. FALSITY asserts nothing about the statement
+being right, so `NO EVIDENCE` is the honest reading of a row nobody has instantiated,
+and a check demanding evidence there would demand it precisely where there is none to
+have.
 
 What the check cannot see is whether a marker is evidence about THIS row. A row naming
 several postulates merges their markers, so one marked sibling covers a family — which
 is correct where the row really is one statement and wrong where it is a bag. When the
 census answers a family row with a single marker, the question to ask is whether the row
 should be SPLIT, and the answer is usually yes.
-
-## The receipt cap has two units, and the row is the one that was missing
-
-`make evidence-check` caps receipts at seven per POSTULATE. Check 12 caps the same
-number per ROW, and the second unit is not a stricter version of the first — it is the
-one that matches what the cap is FOR. A probe aims a grind or refutes a statement; past
-the cap the receipts have stopped deciding anything while the item stays open, so what
-more evidence buys is more evidence to delete on discharge. The item that stays open is
-a roadmap row.
-
-A row naming both arms of one statement walks straight past the per-name cap: five
-receipts on one arm and four on the other is nine on one open item, and neither name is
-over. That is the shape it was measured on, and it is the common shape — a statement
-with an inner and an outer face shares a row precisely because a restatement of either
-moves the other.
-
-The repair is to DEFINE something, or to delete the receipts that no longer earn their
-place. Splitting the row satisfies the count and changes nothing — the same laundering
-as merging probe files under the per-name cap, which E8 already names. Note this is the
-opposite direction from the split the section above recommends: split a row when its
-markers are evidence about DIFFERENT statements, never when its markers are too many.
-
-Only `PROBED` is counted. A refutation KILLS a statement rather than accumulating
-against a live one, and `TWIN`, `DEAD ROUTE` and `RECOVERY` name a route rather than buy
-coverage.
 
 ## `make roadmap-moved` — the roadmap cannot stay the same across a branch
 
@@ -291,12 +249,11 @@ landing on main is still held. Five details:
   branch, HEAD-vs-HEAD~1 where there is no divergence), there was no leg to
   retire or restate,
   and the check prints SKIP rather than FAIL. "Changed" means changed once
-  full-line comments are stripped, reusing `strip-comments.py`'s own
-  stripper — the same principle the `agda/_stripped-comments/` mirror already
-  rests on, that a comment-only edit is invisible to Agda. A file the stripper
-  refuses to touch (a block comment present) or one that was added or deleted
-  is conservatively treated as changed, since comment-only-ness cannot be
-  established. Any edit that survives stripping gets no pass, however small.
+  full-line comments are stripped before comparing — a comment-only edit is
+  invisible to Agda. A file with a block comment, or one that was added or
+  deleted, is conservatively treated as changed, since comment-only-ness
+  cannot be established. Any edit that survives stripping gets no pass,
+  however small.
 - **`make gate` runs from a clean CI checkout**, so in practice it is almost
   always the HEAD~1 branch that fires there; the disk-vs-ref branch is what
   the local dev loop exercises before a commit exists to fall back to.
@@ -314,10 +271,10 @@ still what we are doing?" actually gets asked.
 
 ## `make roadmap-order` — settle risk near the trunk
 
-**The law.** While a tier holds an open FALSITY or SHAPE row, a commit may not
-DISCHARGE a GRINDABLE or DIFFICULTY row of that tier. It is the machine behind
-CLAUDE.md's ordering rule, which was prose and was obeyed unevenly for a reason
-worth stating: the pull against it is structural, not careless.
+**The law.** While a tier holds an open FALSITY row, a commit may not DISCHARGE a
+GRINDABLE row of that tier. It is the machine behind CLAUDE.md's ordering rule,
+which was prose and was obeyed unevenly for a reason worth stating: the pull against it
+is structural, not careless.
 
 `roadmap-moved` requires every commit to move the roadmap. A risky leg routinely
 ends in a FINDING rather than a discharge. A finding-only commit reads as
@@ -333,8 +290,7 @@ not work. The commit this exists to stop *already writes evidence*: the finding
 is the evidence. So the disjunction is satisfied by precisely the commit it was
 drawn against, and the mechanical row rides along untouched. It would also fire
 on almost nothing, since nearly every commit here moves a row or touches a
-header, and it would push against `evidence-check`'s receipt cap, which exists
-because past seven receipts the probes have stopped deciding anything. The
+header, and it would push against every open row's receipt budget at once. The
 negative form has none of those problems: it names the forbidden move.
 
 **What counts as a discharge — the whole precision of the check.** A row may be
@@ -342,10 +298,10 @@ DELETED, RENAMED, SPLIT, RESTATED or RECLASSIFIED at any time. Those are the
 proof changing shape, and a check that held them would be a worse failure than
 the one it prevents: it would stop the statement of the theorem from moving. The
 one move held is the one that BANKS a claim — the name is no longer a live
-postulate **and is still declared in `agda/src`**, i.e. the postulate became a
+postulate **and is still declared in `agda-impl`**, i.e. the postulate became a
 proven definition. That is the same split `check-roadmap.py`'s staleness check
 draws between a discharged row and a vanished one, read here for a different
-purpose: a name that left `agda/src` entirely was deleted and is free; a name
+purpose: a name that left `agda-impl` entirely was deleted and is free; a name
 still on the postulate ledger under another class was reclassified and is free.
 
 **The carve-out is validated, not asserted.** A mechanical row the risky row
@@ -381,7 +337,7 @@ whole PR banks, not what its latest commit happens to.
 
 **`make roadmap-order-selftest`** pins its directions. One is that the check
 FIRES on a banked row. The others are that it stays QUIET: on a roadmap that
-banked nothing, on a row DELETED from `agda/src`, on a RECLASSIFIED row, on a
+banked nothing, on a row DELETED from `agda-impl`, on a RECLASSIFIED row, on a
 discharge in a tier whose own risky rows are closed while another tier's are
 open, on a discharge in a RETIRED tier whose number another tier now carries,
 and on a prerequisite the risky header names. The five matter more than the

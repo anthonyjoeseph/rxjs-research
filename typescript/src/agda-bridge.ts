@@ -21,10 +21,10 @@ import type { EvalResult } from "./prop-test.js";
 // the crash hit is a fragment, never a row.
 
 // the compiled binary: override with AGDA_CLI_BIN, else the default build
-// output (agda --compile of CLI.Main lands at agda/_cli/Main)
+// output (`make oracle-build` lands at agda-impl/_cli/Oracle-CLI)
 const defaultBin = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../../agda/_cli/Main",
+  "../../agda-impl/_cli/Oracle-CLI",
 );
 const binPath = (): string => process.env.AGDA_CLI_BIN ?? defaultBin;
 

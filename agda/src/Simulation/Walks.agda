@@ -41,7 +41,9 @@ module Walkers {n} {Γ : Ctx n} (κ : Kinds n) where
     --
     -- THE IMPL'S PATH STANDS `n` ABOVE THE PLAIN ONE'S FLOOR, as the roots
     -- do and a slot's stamped twin does: a read decides by its floor.
-    -- REFUTED: `Refuted.Read-Floor` -- a read over unrelated floors.
+    -- REFUTED: `Refuted.Read-Floor`, read with
+    --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Read-Floor.agda`
+    --   -- a read over unrelated floors.
     Walks : ∀ {u} → ℕ → Val (plainᵏ Γ κ) (obs (emitᵗ u)) → Val Γ (obs u) → Set
     Walks {u} f x′ x =
       ∀ {lo} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ u) (emitᵗ t)} {now}

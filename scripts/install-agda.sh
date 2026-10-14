@@ -1,62 +1,56 @@
 #!/usr/bin/env bash
-# Install the Agda toolchain this repo needs, from scratch, on a fresh
-# cloud box. Idempotent: re-running skips whatever is already in place.
+# Install the Agda toolchain this repo needs on a fresh box, in seconds.
+# Idempotent: re-running skips whatever is already in place.
 #
-#   Agda 2.8.0  (built with GHC's MAlonzo backend, so we need GHC)
-#   GHC 9.4.7 + cabal 3.8  (from apt — the GHCup domain is proxy-blocked here)
+#   Agda 2.8.0  — the OFFICIAL prebuilt binary from the agda/agda GitHub
+#                 release: statically linked, its data files embedded (written
+#                 to $XDG_DATA_HOME/agda on first run).  Building it with cabal
+#                 took the better part of an hour, every fresh container.
+#   GHC         — from apt, only for `--compile` (MAlonzo); the typechecker
+#                 does not need it.  The GHCup domain is proxy-blocked here.
 #   agda-stdlib 2.3  (registered in ~/.agda so `agda` finds it by default)
 #
-# WHY 2.8.0, upgraded from 2.7.0.1 on 2026-08-11: Agda's Positivity pass is
-# 86-91% of this repo's build cost, and 2.8 cuts it 2.6x — Subscribe-Face's
-# solo dirty check went 927s -> 384s.  It is the only lever that reduced that
-# pass at all (see agda-performance-roadmap.md; flags, pragmas and RTS knobs
-# were all measured and all failed).  stdlib moved 2.2 -> 2.3 in the same pass
-# because v2.3 is the version tested against BOTH 2.7 and 2.8, which let the
-# two upgrades be validated one axis at a time.
+# Installs to ~/.cabal/bin, where the cabal build used to land, so every PATH
+# line that already names it keeps working.
 #
 # After this, from repo root:
 #   export PATH="$HOME/.cabal/bin:$PATH"
 #   export LC_ALL=C.UTF-8 LANG=C.UTF-8      # the CLI emits em-dashes; avoid a
 #                                            # locale crash at runtime
-#   cd agda && agda src/Main.agda                       # typecheck everything
-#   agda --compile --compile-dir=_cli src/CLI/Main.agda # build the batch CLI
-#   agda --compile --compile-dir=_cli src/CLI/QuickCheck.agda
+#   make agda
 #
-# NEW AGENT, START HERE: run this script, then read CLAUDE.md for the
-# working methodology. The TS side lives in typescript/ (npm install; the
-# oracle is `npm run oracle`, the all-Agda QuickCheck is `npm run agda:qc`).
+# NEW AGENT, START HERE: run this script, then read CLAUDE.md.
 set -euo pipefail
 
 AGDA_VERSION=2.8.0
 STDLIB_VERSION=2.3
 STDLIB_DIR="$HOME/agda-stdlib-${STDLIB_VERSION}"
+BIN_DIR="$HOME/.cabal/bin"
+AGDA_URL="https://github.com/agda/agda/releases/download/v${AGDA_VERSION}/Agda-v${AGDA_VERSION}-linux.tar.xz"
 
 log() { printf '\n=== %s ===\n' "$1"; }
 
-log "GHC + cabal (apt)"
-if ! command -v ghc >/dev/null 2>&1 || ! command -v cabal >/dev/null 2>&1; then
+log "GHC (apt, for --compile only)"
+if ! command -v ghc >/dev/null 2>&1; then
   sudo apt-get update -y 2>&1 | grep -v "^Err:\|403\|Forbidden\|no longer signed" || true
-  sudo apt-get install -y ghc cabal-install
+  sudo apt-get install -y ghc
 else
-  echo "ghc $(ghc --numeric-version), cabal $(cabal --numeric-version) already present"
+  echo "ghc $(ghc --numeric-version) already present"
 fi
 
-export PATH="$HOME/.cabal/bin:$PATH"
+export PATH="$BIN_DIR:$PATH"
 
-log "Agda ${AGDA_VERSION} (cabal)"
+log "Agda ${AGDA_VERSION} (prebuilt release binary)"
 if command -v agda >/dev/null 2>&1 && [ "$(agda --numeric-version 2>/dev/null)" = "$AGDA_VERSION" ]; then
   echo "Agda ${AGDA_VERSION} already installed at $(command -v agda)"
 else
-  # cabal's default secure-repo (TUF) fetch reaches for CDN mirror hosts that
-  # some sandboxed environments block at the network-policy layer, even
-  # though hackage.haskell.org itself is reachable. Force legacy fetching
-  # (stays on that one host) before the first `cabal update`.
-  cabal user-config init -f >/dev/null 2>&1 || true
-  if [ -f "$HOME/.cabal/config" ] && ! grep -q '^\s*secure: False' "$HOME/.cabal/config"; then
-    sed -i '/^repository hackage.haskell.org/,/^$/ s/^\(\s*\)-- secure: True/\1secure: False/' "$HOME/.cabal/config"
-  fi
-  cabal update
-  cabal install "Agda-${AGDA_VERSION}" --overwrite-policy=always
+  mkdir -p "$BIN_DIR"
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  curl -fsSL --retry 4 --max-time 300 -o "$tmp/agda.tar.xz" "$AGDA_URL"
+  tar -xJf "$tmp/agda.tar.xz" -C "$tmp"
+  install -m 755 "$tmp/agda" "$BIN_DIR/agda"
+  echo "installed $(agda --version | head -1) at $BIN_DIR/agda"
 fi
 
 log "agda-stdlib ${STDLIB_VERSION}"

@@ -16,7 +16,7 @@
 
 - **`a-live`** — FALSITY, `NO EVIDENCE`: still a postulate, so this row is
   fine.
-- **`b-discharged`** — DIFFICULTY, `NO EVIDENCE`: became a real definition, and
+- **`b-discharged`** — FALSITY, `NO EVIDENCE`: became a real definition, and
   nobody deleted the row. The failure the check exists for.
 - **`c-vanished`** — GRINDABLE, `NO EVIDENCE`: gone from agda/src entirely —
   deleted, renamed, or misspelled.

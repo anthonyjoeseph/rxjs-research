@@ -57,7 +57,7 @@ The residue is small and every member of it is a real finding.
 import io, os, re, sys, collections
 
 SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                   "agda", "src")
+                   "agda-impl")
 
 # Pairs kept apart on purpose.  A frozenset of the two names -> why.
 # ADDING AN ENTRY IS A RULING, so it carries a REASON; an entry without

@@ -36,10 +36,11 @@ open import Data.Bool.ListAction using (any)
 open import Rx.Exp       using (Ctx; Ty; Closed; Val)
 open import Rx.Evaluator using (NodeId; RegRow; LiveSource; Sched; EvalSt; switchKill; regSource; sameSource; cutThrough; Path; root; share-sink; _↠[_]_; frameNodes; pathHasNode; thru-outer; mergeAllᵒ; lookupNode; cell-st)
 open import Rx.Evaluator.Reducible.Support using (∨-Tˡ; ∨-Tʳ; sub-rule; cut-sub)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import Simulation.Stores using (Named; PathRel; root~; sink~; map~; scan~; takeWhile~; spentWhile~; outerElem~; outerExplode~; inner~;
   deferInner~; srcCount; Census; aboveᵇ; above-≤; guardOf; RegRel; []; _∷_; mach; Partners; partner-row; partner-mem; ArrRows; Spent; spent-subst; Store; Arr; InputBlock; ᵇ-no; block; RowRel; read~; cold~; defer~; MachRow; hot~; sharedEq; hotEq;
-  live-mono; skip-cancel)
+  inv-cut; ∨-falseˡ; ∨-falseʳ)
 open import Simulation.Grow using (mem-any)
 open import Simulation.Sweep using (T-true; t≢f; count-hit; count-pass; same-eq; raw≢stamped; raw<ₙ; sweepL; sweep-eq; sweepL-pw; all-sweep;
   unique-sweep; sync-sweep; regrel-sweep; rows-guards; part-sweep; arr-sweep; spent-sweep)
@@ -90,14 +91,6 @@ no-sink refl ()
 ------------------------------------------------------------------
 -- The cut as a filter
 ------------------------------------------------------------------
-
-∨-falseˡ : ∀ {a b} → a ∨ b ≡ false → a ≡ false
-∨-falseˡ {false} _ = refl
-∨-falseˡ {true}  ()
-
-∨-falseʳ : ∀ {a b} → a ∨ b ≡ false → b ≡ false
-∨-falseʳ {false} e = e
-∨-falseʳ {true}  ()
 
 -- an id among neither list is among neither joined
 none-++ : ∀ {k} xs {ys} → any (_≡ᵇ k) xs ≡ false → any (_≡ᵇ k) ys ≡ false → any (_≡ᵇ k) (xs ++ ys) ≡ false
@@ -577,11 +570,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed (pl
       ; above = all-cut c (proj₁ above) , all-cut c′ (proj₂ above)
       ; census = λ i h → census-cut c′ (EvalSt.registry stI) (census i h) (C.raw-safe i rows (proj₂ above))
       ; owned = all-cut c′ (mapᵃ (λ f u {j} b → all-cut c′ (f u {j} b)) owned)
-      ; ruleP = sub-rule (λ {r} m → cut-sub c (EvalSt.registry stP) r m) ≤-refl ruleP
-      ; ruleI = sub-rule (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) ≤-refl ruleI
+      ; ruleP = sub-rule (λ {r} m → cut-sub c (EvalSt.registry stP) r m) ≤-refl (keeps-refl _ _) ruleP
+      ; ruleI = sub-rule (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) ≤-refl (keeps-refl _ _) ruleI
       ; scripts = scripts
-      ; live-outer = live-mono {st = stI} {st′ = record stI { registry = KI ; cancelled = proj₂ (cutThrough c′ (EvalSt.registry stI)) ++ EvalSt.cancelled stI }}
-          (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) (skip-cancel (proj₂ (cutThrough c′ (EvalSt.registry stI))) {stI}) (λ l → l) live-outer
+      ; inv = inv-cut (proj₂ (cutThrough c′ (EvalSt.registry stI))) (λ {r} m → cut-sub c′ (EvalSt.registry stI) r m) inv
       }
 
     -- a pair through the cut leaves on both sides, any other stays partnered

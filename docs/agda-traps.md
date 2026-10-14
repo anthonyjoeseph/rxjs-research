@@ -59,9 +59,9 @@ error message actively misdirects. Read the entry before reasoning from the erro
 
 - **Bisect a termination failure on a SUBSET of the block, not on the whole.** Stubbing
   every member except a chosen few as postulates leaves the termination checker only the
-  loops among those few, which takes seconds where the whole block takes the tower. A
-  loop that survives on five members is the real culprit; cutting one call edge at a
-  time, by routing it to a postulated copy of its callee, names the edge.
+  loops among those few, far faster than checking the whole block. A loop that survives
+  on five members is the real culprit; cutting one call edge at a time, by routing it to
+  a postulated copy of its callee, names the edge.
 
 - **The termination checker rejects `where`-bound abbreviations of the recursion
   pattern.** Inline it — write `suc (suc j)`, not a bound alias.
@@ -125,11 +125,9 @@ error message actively misdirects. Read the entry before reasoning from the erro
   because Agda never infers the type of an abstract definition, and a `where` binding
   under an `abstract` block is one. The message then prints the whole clause back
   desugared, as `mutual / abstract / syntax S ... / postulate S : _`, which reads like a
-  tool generating broken code and is in fact Agda's own rendering. Two consequences: the
-  fix is one signature per binding, and the desugared dump is NOT evidence that anything
-  mangled your source. Since the tower runs `-W error`, the warning is a build failure.
-  This bites specifically on the `budget-sufficient` spine, where the seal is mandatory
-  and staging a bound through named steps is the natural way to write it.
+  tool generating broken code and is in fact Agda's own rendering. The fix is one
+  signature per binding, and the desugared dump is NOT evidence that anything mangled
+  your source. Since the build runs `-W error`, the warning is a build failure.
 
 - **A CLOSED NUMERAL LARGE ENOUGH TO EXCEED WORD ARITHMETIC IS FINE UNTIL IT MEETS A
   FREE VARIABLE, AND THEN THE CHECKER PEELS IT ONE SUCCESSOR AT A TIME.** `_+_` and
@@ -146,8 +144,7 @@ error message actively misdirects. Read the entry before reasoning from the erro
   linear in the value: supply the implicits explicitly; state the step that introduces
   the free variable **over variables**, in its own lemma, and apply it at the
   obligation's own spellings so every comparison is syntactic; and take a `Σ` apart with
-  `proj₁`/`proj₂` rather than `with`. Measured on one refutation: seven minutes and
-  thirteen gigabytes down to thirteen seconds, with no change to what it proves.
+  `proj₁`/`proj₂` rather than `with`.
 
 - **AN IMPLICIT USED INSIDE AN `all`-PREDICATE LAMBDA IS SOLVED PER ELEMENT, AND THE
   ERROR LANDS ON THE LAMBDA.** A clause whose body is `all (λ v → P v) vs`, where `P`
@@ -172,8 +169,7 @@ error message actively misdirects. Read the entry before reasoning from the erro
   thousands and survives, thirty-one at degree five is millions and does not. The
   induction step is the same proof either way — one `suc` peel — and the premise `k ≤ S`
   is spent with `subst` over `m∸n+n≡m` at `S ∸ k` rather than a `k`-deep wall of `s≤s`.
-  Measured on one fifth-power threshold in this tree: over a hundred and sixty seconds,
-  killed by the dev budget, down to twelve and a half.
+
 
 - **A CONSTRUCTOR WHOSE TYPE INDEX IS EXISTENTIAL LEAVES A META NOTHING IN THE TERM CAN
   SOLVE, AND AGDA GOES LOOKING FOR IT IN THE CONCLUSION'S NORMAL FORM.** This tree's

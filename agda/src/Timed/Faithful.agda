@@ -31,16 +31,4 @@ Timed-Faithful =
   untimedᵀ ok κ fuel e ins ≡ runᴾ fuel e ins
 
 postulate
-  -- Seeds 12..16 at depth 3, fuel one, also gave no red under
-  -- `make qc-timed-faithful`.
-  -- PROBED: make qc-timed-faithful QC='17 1000 3' QC_FUEL=1
-  --   decided by `CLI.QuickCheck`'s `pairᴸ`: 107 cases with values on
-  --   two plain arrivals under an author flattener, every one agreeing.
-  --   unaimed.
-  -- PROBED: `Probed.Timed-Faithful` -- by `refl` at fuel 30 over three first-order
-  --   programs: a scripted slot taken to one of two arrivals, the script's
-  --   two arrivals kept (two instants), and a literal of two values (one
-  --   instant).  Not a flattener, a share, a `μ` nor a cold slot: a
-  --   flattener's run does not reduce in the typechecker inside 8 GB at fuel
-  --   30 or 3, so those shapes are `make quickcheck`'s alone.
   timed-faithful : Timed-Faithful

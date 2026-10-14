@@ -26,6 +26,7 @@ open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Bool.ListAction using (any)
 open import Data.Unit    using (tt)
 open import Rx.Evaluator.Reducible.Support using (fresh-path)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import Data.Nat     using (ℕ; suc; _+_; _<_; _≤_; s<s⁻¹; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (Acc; acc)
@@ -45,20 +46,22 @@ open import Rx.Exp       using (Ctx; Val; Closed; Exp; unfoldμ; ofᵉ; Ren∈; 
   unitᵗ; boolᵗ; _×ᵗ_; evalWith; input; mintᵉ; deferᵉ; mapᵉ; scanᵉ; takeWhileᵉ; flattenᵉ; sndᵗ;
   varᵗ; pairᵗ; inlᵗ; inrᵗ; unit̂; Fn; FnClo; Tm; Env)
 open import Rx.Mint      using (Mint; setAt; sourceᵏ; nodeᵏ; ordinalᵏ; regᵏ; counter; freshId)
-open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState; sched-init; st-init;
-  Frame; frameNodes; mkHot; memoᶠ; Stream; resolve; memberSource; atSlot; lowerFloor; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register; atDyn; mergeAll-st; mergeAllᵒ)
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; Path; root; map-f; scan-f; take-f; _↠[_]_; NodeId; NodeState;
+  sched-init; st-init; Frame; frameNodes; mkHot; Stream; resolve; memberSource; atSlot;
+  lowerFloor; installNode; setNode; cell-st; take-st; lookupNode; echoᵗ; thru-outer; register;
+  atDyn; mergeAll-st; mergeAllᵒ)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator.Domain using (subscribeE⇓; foldPath⇓; fold-step; step-map; sharedConnect⇓; subs-floor; subs-shared; subs-hot-done; subs-hot-live;
   subs-cold-sync; subs-cold-async; slot-spent; slot-join; slot-connect; subs-map; subs-mint; subs-of; subs-empty; subs-scan; subs-takeWhile; subs-flatten; subs-defer; subs-μ; sub-all; flatSt)
 open import Rx.Evaluator.Freshness using (nodeCt; lookup-set; set-above)
 open import Rx.Evaluator.Builder using (subscribe!)
 open import Rx.Evaluator.Reducible.Support using (Σ⁰; rule; Sound; sound; fresh-sound; push-sound; sub-ot; node-eq; sub-rule)
-open import Data.Fin     using (Fin; zero; suc; toℕ; splitAt; _↑ʳ_)
+open import Data.Fin     using (Fin; suc; toℕ; splitAt; _↑ʳ_)
 open import Data.Vec     using (lookup)
 open import SExp.Syntax  using (SExp; STm; SFn; Kind; Kinds; hotᵏ; coldᵏ; sharedᵏ; plainᵏ; plainᵗ; emitᵗ; inputˢ; ofˢ; emptyˢ; takeWhileˢ; mapˢ; scanˢ;
   flattenˢ; μˢ; varˢ; deferˢ)
 open import SExp.Plain   using (plainExp; plainTm; plainTms)
-open import Simulation.Arm using (module Arms)
+open import Simulation.Arm using (module Arms; Gone)
 open import SExp.Elaborate using (toInstEmit; toInstEmitTm; plainᶜ⁺; mapStepᵖ; ScanAᵗ; CutS; cutOpenᵛ; cutOutᵛ;
   FlatSᵗ; flatStepᵛ; elemᵛ; explodeᵛ; flattenᵖ; perInnerˢ; frameᵛ; stampedSlot; restampᵛ; subscribeᵛ; inputᵖ)
 open import SExp.InstEmit using (machineEmitᵗ)
@@ -70,16 +73,17 @@ open import Simulation.Write using (apart)
 open import Simulation.Install using (install; fresh-set; weak; named-mint)
 open import Simulation.Hop using (hop-register)
 open import Simulation.Cold using (ColdBlock; cold-register)
-open import Simulation.Slot-Join using (join-read)
+open import Simulation.Slot-Join using (join-read; memoᶠ-at; plain-hot-slot)
 open import Simulation.Catch using (Kept; Stamps; AtFrame; OnPath; on-path; catch-same; kept-same; kept-trans; kept-catch;
   kept-unmoved; unmoved-set; by-sub; by-sub⁻)
 open Kept using (After; module After; _⨾_; after)
 open import Simulation.Walks using (module Walkers)
 open import Simulation.Size using (sz-subscribeE; sz-foldPath; sz-1)
 open import Simulation.Pass.Path using (module PassP)
-open import Simulation.Stores using (live; guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
+open import Simulation.Pass.Explode using (module PassE)
+open import Simulation.Stores using (inv-init; guardOf; V; EnvRel; Lifts; ScanLifts; CutLifts; PathRel; root~; map~; scan~; takeWhile~;
   spentWhile~; FlatNodes; merge~; switch~; exhaust~; outerElem~; outerExplode~; Store; Src; Arr;
-  SrcNum; []; elab; LiveIf; live-if; live-if-above; live-if-cons; live-if-thru; flat-live; outerDoneᵇ)
+  SrcNum; []; elab; LiveIf; live-if; live-if-above; live-if-agree; live-if-cons; live-if-thru; flat-live; outerDoneᵇ)
 
 
 -- TWIN: `ib-renᵉ` -- the same walk over `renExp`'s clauses, a binder's
@@ -120,7 +124,7 @@ bare {F = F} {κ} so = push-sound (map-f F) ≤-refl κ so (λ k ())
 -- a minted source moves no node counter
 resrc : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {lo u} {κ : Path Δ lo u t} {sched : Sched Δ} {st : EvalSt e} {v}
       → Sound κ sched st → Sound κ (record sched { mint = setAt sourceᵏ v (Sched.mint sched) }) st
-resrc = sub-ot (λ r∈ → r∈) ≤-refl
+resrc = sub-ot (λ r∈ → r∈) ≤-refl (keeps-refl _ _)
 
 -- a fold of nothing through a read's restamp is the fold past it
 peel-read : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {A B u lo} (eq : A ≡ B) {F : FnClo Δ B u} {q : Path Δ lo u t}
@@ -128,18 +132,6 @@ peel-read : ∀ {m} {Δ : Ctx m} {t} {e : Closed Δ t} {A B u lo} (eq : A ≡ B)
           → foldPath⇓ {e = e} now (subst (λ v → Path Δ lo v t) (sym eq) (map-f F ↠[ ≤-refl ] q)) [] fin sched st (out , sched′ , st′)
           → foldPath⇓ now q [] fin sched st (out , sched′ , st′)
 peel-read refl (fold-step step-map f) = f
-
--- a table read at a slot is the slot
-memoᶠ-at : ∀ {m} {P : Fin m → Set} (f : ∀ j → P j) j → memoᶠ f j ≡ f j
-memoᶠ-at f zero    = refl
-memoᶠ-at f (suc j) = memoᶠ-at (λ j → f (suc j)) j
-
--- A HOT SLOT READ PLAIN IS ITS SCRIPT, READ IMPL AT ITS STAMPED SLOT A
--- SHARE: neither run's read of it takes the other kinds' rules
-plain-hot-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j : Fin m) → lookup κ j ≡ hotᵏ
-               → Σ _ λ ok → Σ _ λ as → plainSlots ins j ≡ scripted {ok = ok} (hot as)
-plain-hot-slot {κ = κ} ins j ek with lookup κ j | ins j
-plain-hot-slot ins j refl | hotᵏ | hotˢ _ = _ , _ , refl
 
 -- A COLD SLOT READ PLAIN IS ITS SCRIPT, COLD
 plain-cold-slot : ∀ {m} {Δ : Ctx m} {κ : Kinds m} (ins : SimulSlots Δ κ) (j : Fin m) → lookup κ j ≡ coldᵏ
@@ -182,21 +174,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   -- or reads the author's variables at slots the renaming moved.  The
   -- map's step splits each emit and applies the author's function to
   -- every payload, renamed under one more binder.
-  -- PROBED: `Probed.Map-Step` -- `x + 1` over one hand-built emit, an
-  --   `init` then two payloads, under no binder: both payloads mapped,
-  --   the stamp kept; and `x + y` reading the author's variable 4 past
-  --   the step's binder, once at the identity renaming and once at one
-  --   moving it a slot out past a value 8 it does not own, or past a
-  --   mint's token.  Not an emit the impl produced.
-  -- PROBED: make qc-store QC='16 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,1,6,1,1,0,2,1,0,0,0,2,2],"fan":[1,1,1,1,1,0,1,1,1,0],"leaf":[3,1,1],"script":[1,1,1,1,1,1],"slot":[2,1,1,1,0,0],"reach":["map"]}'
-  --   decided by `CLI.Store-Check`'s `lifts?` at every map on a related
-  --   path: 200 agree, every case a map, drawn steps under binders, fan
-  --   lanes and cuts.  Emits: every word of up to three events over
-  --   inits and closes at two tokens, each close reason, a handoff, a
-  --   complete and two payloads, at every kind, plus three longer
-  --   samples; not the run's own emits.  Fails when `lifts?` refuses
-  --   the plumbing kind, and when the enumerated emits' plain values
-  --   drop one.
   postulate
     lifts-map : ∀ {Θ s u} (f : SFn Γ [] [] Θ s u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ}
               → EnvRel κ Θ w ρ′ ρ
@@ -207,10 +184,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- VARIABLES AT SLOTS THE MINT'S BINDER MOVED.  The scan's elaboration,
     -- read off by its shape: its step against the author's, its seed's
     -- state against the author's seed.
-    -- PROBED: `Probed.Walk-Leaves` -- a running sum plus the author's
-    --   variable, seeded by it, past the mint's binder: the seed, and the
-    --   step over one payload.  Two payloads in one emit do not finish
-    --   in the typechecker, a coverage boundary.
     lifts-scan : ∀ {Θ s u} (f : SFn Γ [] [] Θ (u ×ᵗ s) u) (z : STm Γ [] [] Θ u) (b : SExp Γ [] [] Θ s)
                    {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} (src : ℕ)
                    {g : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (ScanAᵗ u) (emitᵗ u)}
@@ -225,10 +198,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- BINDER MOVED, or a cut the scan's step decides apart from the plain
     -- test's.  The elaborated takeWhile, read off by its shape: its
     -- cutter's step against the plain test at a budget of one.
-    -- PROBED: `Probed.Walk-Leaves` -- a test below the author's variable,
-    --   past the mint's binder, at one payload it fails and one it
-    --   passes.  A cut inside a two-payload emit does not finish in the
-    --   typechecker, a coverage boundary.
     lifts-while : ∀ {Θ s} (f : SFn Γ [] [] Θ s boolᵗ) (b : SExp Γ [] [] Θ s)
                     {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} (src : ℕ)
                     {g : Fn (plainᵏ Γ κ) [] [] (uniqᵗ ∷ Θ′) (CutS unitᵗ s) (emitᵗ s)}
@@ -245,12 +214,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- fail: a μ-var read under a defer under value binders, where the
     -- elaboration's frame term reads the value telescope the unrolling's
     -- weakening moved, and the defer's context transport.
-    -- PROBED: `Probed.Unfold` -- both equations by `refl`, the elaborated
-    --   one at an abstract renaming, at a μ-var straight under a defer,
-    --   under a defer under a map's, a scan step's and a test's binder,
-    --   past an inner μ's binder, and under a map's at a nonempty outer
-    --   telescope, and read twice, at the root and under a map's binder.
-    --   Not a μ-var under a flattener's inner literal.
     μ-unfolds : ∀ {Θ u} (b : SExp Γ (u ∷ []) [] Θ u)
               → Σ (SExp Γ [] [] Θ u) λ s′ → plainExp s′ ≡ unfoldμ (plainExp b)
                   × (∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′)
@@ -259,15 +222,10 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
   open Arms {Γ = Γ} κ using (Carries) renaming ([] to []ᶜ)
 
-  open Walkers {Γ = Γ} κ using (frameAt; Walker)
+  open Walkers {Γ = Γ} κ using (frameAt)
 
   postulate
     -- AN `of`'S EMITS STAND AT ITS PROGRAM'S FRAME, subscribe-kind
-    -- PROBED: `Probed.Opening` -- two values at the root, and one under a
-    --   value binder, the frame apart from the `of`'s source and from the
-    --   bound value; both again at a renaming moving the telescope a slot
-    --   out past a value 8 or 5 it does not own, and the root's past a
-    --   mint's token.  Not a `ofˢ` whose terms read a variable.
     of-emits : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′}
              → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
              → ∀ src → All (AtFrame {Γ = Γ} κ (frameAt w ρ′)) (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L)
@@ -275,7 +233,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
   module _ {t} {ep : Closed Γ t} {ei : Closed (plainᵏ Γ κ) (emitᵗ t)} where
 
     open Walkers.On {Γ = Γ} κ ep ei using (Walks; Walks<; Elab-Walks; Elab-Walks<)
-    open PassP.InP {Γ = Γ} κ {t} {ep} {ei} using (path-pass)
+    open PassP.InP {Γ = Γ} κ {t} {ep} {ei} using (path-pass; inner-one-at)
+    open PassE.InE {Γ = Γ} κ {t} {ep} {ei} using (Walker′; module Walker′)
 
     -- the impl read's path: the restamp handing a read's emits its frame
     readPath : ∀ Θ {Θ′} (i : Fin n) (w : Ren∈ (plainᶜ⁺ Θ) Θ′) (ρ′ : Env (plainᵏ Γ κ) Θ′)
@@ -294,18 +253,43 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     ReadAfter S rP rI p q =
       Σ (After κ S rP rI) λ A → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
 
+    postulate
+      -- A PATH BEING SUBSCRIBED HAS NO ROW AT ITS FIRST NODE YET: a row is
+      -- registered only once its subscribe has run, and no two rows start
+      -- at one node.
+      gone-subscribed : ∀ {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} (S : Store κ sP stP sI stI)
+                          {lo u X} {q : Path (plainᵏ Γ κ) lo u (emitᵗ t)} {now rI}
+                      → subscribeE⇓ {e = ei} X q now sI stI rI → Gone q stI
+
+    -- the same, read through the read's cast and its transparent restamp
+    gone-cast : ∀ {u u′} (e : u′ ≡ u) {lo} {q : Path (plainᵏ Γ κ) lo u (emitᵗ t)} {st : EvalSt ei}
+              → Gone (subst (λ v → Path (plainᵏ Γ κ) lo v (emitᵗ t)) (sym e) q) st → Gone q st
+    gone-cast refl g = g
+
+    gone-read : ∀ Θ {Θ′} (i : Fin n) (w : Ren∈ (plainᶜ⁺ Θ) Θ′) (ρ′ : Env (plainᵏ Γ κ) Θ′)
+                  (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i)) {lo}
+                  {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {st : EvalSt ei}
+              → Gone (readPath Θ i w ρ′ eq q) st → Gone q st
+    gone-read Θ {Θ′} i w ρ′ eq {q = q} {st} =
+      gone-cast eq {q = map-f (Θ′ , renTm (λ x → x) (λ x → x) (ext∈ w)
+                                     (restampᵛ (renTm (λ x → x) (λ x → x) there (frameᵛ Θ)) subscribeᵛ (varᵗ (here refl))) , ρ′) ↠[ ≤-refl ] q} {st = st}
+
     -- A READ OF A SLOT THE IMPL STAMPED: both subscribes at the slot, the
     -- impl's down the restamp.  `Sound` of both paths for the reason
     -- `of-fold` takes it: the read registers its path as a row.  And the
     -- impl's path live unless spent, for the same reason: a registered
     -- row walks live outers, and only the walk knows its own are.
-    -- REFUTED: `Refuted.Shared-Read-Sound` -- a path through one merge as
+    -- REFUTED: `Refuted.Shared-Read-Sound`, read with
+    --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Shared-Read-Sound.agda`
+    --   -- a path through one merge as
     --   two lanes, the read joining a connected share.
-    -- REFUTED: `Refuted.Hot-Read-Sound` -- the same path, the read of a
+    -- REFUTED: `Refuted.Hot-Read-Sound`, read with
+    --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Hot-Read-Sound.agda`
+    --   -- the same path, the read of a
     --   live hot joining its connected share.
     StampedRead : ∀ {Θ} (i : Fin n) → Set
     StampedRead {Θ} i =
-      ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+      ∀ {M} → Walker′ M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
       → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
       → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
           {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
@@ -351,36 +335,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- flattening merge sit between the batch and the tail, and the merge
       -- subscribes an inner, which mints and installs; each is a state
       -- the field quantifies past.
-      -- PROBED: make qc-store QC='6 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1,0],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Every case
-      --   flattens a fan step over a cold read with an asynchronous tail,
-      --   so the flushed values each subscribe a lane inner mid-flush; 42
-      --   finish one at a merge, 190 group values.  Not inside a μ.
-      -- PROBED: make qc-same-clock QC='6 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,0,1,1,1,0,0,0,0,5],"fan":[0,2,2,1,2,0,1,2,1,0],"leaf":[4,0,1],"script":[0,0,1,1,2,0],"slot":[2,0,0,0,1,0],"reach":["flatten","input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 96
-      --   agree, 0 fail, 18 undecided: the same flushes' values, each
-      --   through a lane inner, against the plain run's instants.
-      -- PROBED: git show 11e23e3e:agda/evidence/probed/Probed/Stores.agda
-      --   -- the STORE conjunct alone, at the root from empty stores, before
-      --   the `Sound` pair was a hypothesis: a cold script, its block run
-      --   straight to the root (`cold~`).  Not under a binder, not the
-      --   values conjunct.
-      -- PROBED: make qc-store QC='12 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Cold
-      --   scripts only, every fan step a lane reading a slot under the
-      --   map's binder, slot one a share of slot zero or a second cold
-      --   script; per-case reads are not counted.
-      -- PROBED: make qc-same-clock QC='12 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 37
-      --   agree, 0 fail, 37 undecided: the same draw's values.
-      -- PROBED: make qc-store QC='15 100 3' QC_FUEL=20 QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,0,0,0,4,0,0,0,1],"spineD":[0,0,0,3,0,0,3,0,0,0],"spineG":[3,3,0,0,1,0,1,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[4,0,1],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["mu","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`, over budget at 63 agree,
-      --   0 fail: cold scripts only, every case inside a μ whose spine
-      --   merges or flattens over lanes reading a slot; 39 subscribe an
-      --   input, 23 finish an inner at a merge, 10 join a connected share.
-      -- PROBED: make qc-same-clock QC='15 100 2' QC_FUEL=20 QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,0,0,0,4,0,0,0,1],"spineD":[0,0,0,3,0,0,3,0,0,0],"spineG":[3,3,0,0,1,0,1,0,0,0],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[4,0,1],"script":[0,0,1,1,1,1],"slot":[1,0,0,0,0,1],"reach":["mu","input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 65 agree, 0 fail,
-      --   35 undecided: the same draw's values.
       -- RECOVERY: git show ae5fd17e:agda/evidence/refuted/Refuted/Slot-Scripts.agda
       --   restores the opening store at two cold tables, which refuted this
       --   read over a store blind to the slots.
@@ -402,22 +356,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- THE BELOW-FLOOR DISJUNCT NEEDS TWO SCRIPTED SLOTS: a registration on
       -- slot `k` lowers a path's floor to `suc k` and no further, so a read
       -- reaches it only at a cold slot above the source it registered on.
-      -- PROBED: make qc-store QC='5 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2,0],"reach":["input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
-      --   alone: 196 agree, 0 fail, 4 undecided.  Every case reads a cold
-      --   script of two synchronous values and no arrival, under maps,
-      --   scans, every flattener and μ.  Not the below-floor disjunct.
-      -- PROBED: make qc-same-clock QC='5 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[0,0,0,0,0,1],"slot":[2,0,0,0,2,0],"reach":["input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 73
-      --   agree, 0 fail, 23 undecided: the same scripts' values against
-      --   the plain run's instants.
-      -- PROBED: make qc-store QC='8 200 3' QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,1,2,2,0,0,0,0,0],"leaf":[3,0,0],"script":[0,0,1,1,1,1],"slot":[0,0,0,0,0,1],"reach":["flatten","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 200 agree, 0 fail, 0
-      --   undecided.  Both slots cold scripts in every program; 17 read
-      --   slot one in an inner over slot zero, the below-floor shape,
-      --   counted off the program rather than the derivation.
       cold-read-end : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
-                    → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                    → ∀ {M} → Walker′ M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                     → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
                     → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
                         {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
@@ -432,12 +372,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                     → ReadAfter S rP rI p q
       -- WHERE A COLD READ'S EMITS LAND: its block stamps every one at
       -- the program's frame, subscribe-kind, and the path catches it.
-      -- Decoding what the block sends exhausted the checker's memory at a
-      -- one-value cold script, so this region is the compiled sweep's.
-      -- PROBED: make qc-same-clock QC='47 200 1' QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[1,0,1,1,0,0],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 12
-      --   agree, 0 fail.  Cases 2 to 4 read a cold script of one or two
-      --   synchronous values under a scan the merge above subscribes.
       cold-read-stamps : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
                        → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                        → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
@@ -452,17 +386,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- AN ENDED SCRIPT'S READ CONNECTING ITS SHARE: the plain read folds
       -- the end, the impl's runs the share's definition, whose read of
       -- the raw slot folds it
-      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
-      --   alone: 199 agree, 0 fail, 1 undecided.  39 cases connect slot
-      --   zero's share after its hot script completed, reads deferred
-      --   past the end.
-      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
-      --   18 undecided.  Read against `make qc-store` on the same line,
-      --   20 of the 20 cases connecting an ended script's share agree.
       hot-read-connect-done : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
-                   → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
+                   → ∀ {M} → Walker′ M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                    → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
                    → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
                        {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI d ok}
@@ -481,27 +406,6 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       -- registers at the slot, the impl's runs the share's definition,
       -- whose read of the raw slot registers there; the reader's path
       -- live unless spent, as `StampedRead` takes it
-      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
-      --   alone: 199 agree, 0 fail, 1 undecided.  76 cases connect a share
-      --   at the subscribe, where the hot script is still live; which
-      --   slot's share is not counted apart.
-      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
-      --   18 undecided.  Read against `make qc-store` on the same line,
-      --   47 of the 54 cases connecting a share at the subscribe agree.
-      -- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 132 agree, 0 fail, 1
-      --   undecided.  Slot one a script in every program; 38 connect slot
-      --   one's hot share, 14 of them beside a hot slot zero.
-      -- PROBED: make qc-store QC='13 200 3' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[1,1,0,0,0,0],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 200 agree.  Hot
-      --   scripts only, every fan step a lane reading a slot under the
-      --   map's binder, slot one a share of slot zero or a second hot
-      --   script.  Its connects are not counted.
-      -- PROBED: make qc-same-clock QC='13 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[1,0,1,0,1,1,1,1,0,0,0,0,4],"fan":[0,0,0,0,0,0,0,0,0,1],"leaf":[3,0,0],"script":[1,1,0,0,0,0],"slot":[1,0,0,0,0,1],"reach":["flatten","input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 148 agree, 0 fail,
-      --   2 undecided, the same draw's values.
       hot-read-connect-live : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ
                    → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ : Env (plainᵏ Γ κ) Θ′} {ρ : Env Γ Θ} → EnvRel κ Θ w ρ′ ρ
                    → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ emitᵗ (lookup Γ i))
@@ -518,59 +422,24 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
                    → sharedConnect⇓ (n ↑ʳ i) d (readPath Θ i w ρ′ eq q) below′ now sI stI rI
                    → ReadAfter S ([] , record sP { mint = setAt regᵏ (suc rid) (Sched.mint sP) } , register rid (atSlot i) (lowerFloor below p) stP) rI p q
       -- a shared slot's read, against its stamped slot's
-      -- PROBED: make qc-store QC='3 200 4' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
-      --   decided by `CLI.Store-Check`'s `store?`, the store conjunct
-      --   alone: 199 agree, 0 fail, 1 undecided.  106 cases connect slot
-      --   one's share, a definition forwarding slot zero's or a program over
-      --   it, at the subscribe and deferred past it.
-      -- PROBED: make qc-same-clock QC='3 150 2' QC_FUEL=30 QC_BUDGET=600 QC_DRAW='{"exp":[1,1,1,0,2,0,2,2,2,4,0,0,0],"leaf":[3,1,1],"script":[1,1,0,0,0,0],"slot":[2,0,0,0,2,0],"reach":["defer","input"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 132 agree, 0 fail,
-      --   18 undecided.  Read against `make qc-store` on the same line,
-      --   59 of the 65 cases connecting slot one's share agree.
       shared-read    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedRead {Θ} i
       -- WHERE A HOT READ'S EMITS LAND: the restamp hands its own a frame
       -- and the path catches it; a live script joined sends nothing yet
-      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 145 agree, 0 fail,
-      --   5 undecided.  Cases 73 and 104 read the hot input twice under
-      --   one merge, the second read joining the share the first
-      --   connected; case 55 reads it under an exhaust.
       hot-read-stamps    : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedReadStamps {Θ} i
       -- WHERE A SHARED READ'S EMITS LAND.  WHERE IT CAN STILL FAIL: a
       -- connect the read starts runs the share's definition to every row
       -- on its subject, joiners a value made mid-burst included, and what
       -- reaches a joiner leaves down the joiner's path, not this one
-      -- PROBED: make qc-same-clock QC='48 200 1' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[0,0,0,1,0,0],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 34
-      --   agree, 0 fail, 20 undecided.  Case 45 merges a scan whose seed
-      --   and source both read a shared slot of two values and whose step
-      --   hands on its accumulator: the connect's first value hands the
-      --   share to the merge, which joins it mid-burst, and the second
-      --   value reaches both rows.
-      -- PROBED: make qc-same-clock QC='47 200 1' QC_DRAW='{"exp":[0,0,0,0,1,0,0,0,0,0,0,0,0],"obs":[1,0,0,0],"leaf":[1,0,0],"slot":[1,0,1,1,0,0],"script":[0,0,1,0,1,0],"reach":["flatten","scan"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 12
-      --   agree, 0 fail, 4 undecided.  Cases 13 and 15: a joiner made
-      --   mid-burst by a one-value connect, reached by its end alone.
       shared-read-stamps : ∀ {Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → StampedReadStamps {Θ} i
       -- AN `of`'S EMITS CARRY ITS VALUES: the impl's list under its mint,
       -- one emit per value, the last also carrying the end, against the
       -- plain values over related environments
-      -- PROBED: `Probed.Walk-Leaves` -- no values, and two with the first
-      --   read off a binder through the mint's renaming: one emit per
-      --   value, the end on the last; and a pair of the variable and a
-      --   right sum at a renaming moving the variable past a value it
-      --   does not own; and a pair reading an outer binder before an
-      --   inner one, under the same renaming.
       of-carries     : ∀ {Θ u} (ts : List (STm Γ [] [] Θ u)) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
                      → ∀ {L} → renExp (λ x → x) (λ x → x) w (toInstEmit κ (ofˢ ts)) ≡ mintᵉ (ofᵉ L)
                      → ∀ src → Carries {u} (map (λ tm → evalWith tm (src ∷ᵉ ρ′)) L) (map (λ tm → evalWith tm ρ) (plainTms ts))
       -- WHERE A GROUP AT ONE FRAME LANDS, folded down the path: below the
       -- catch every restamp cell is subscribe-kind and hands the group
       -- its own instant, and the catch's cell hands the group the catch
-      -- PROBED: make qc-same-clock QC='49 150 2' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,0,2,1,1,1,0,0,0,0,1],"leaf":[3,0,1],"slot":[1,1,1,1,0,0],"script":[1,1,0,0,0,0]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 145 agree, 0 fail.
-      --   Cases 55 and 73 subscribe a lane's two-value `of` at a hot
-      --   arrival, its group folded down a flattener's restamp.
       of-fold-stamps : ∀ {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
                          {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI src es vs f}
                      → (S : Store κ sP stP sI stI)
@@ -662,16 +531,14 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- The floors are aligned, so the two runs read below the floor
     -- together; above it the latches pair the script's rule with the
     -- share's.
-    --
-    -- THE `Sound` PAIR AT A CONCRETE STORE IS PAST THE TYPECHECKER: the
-    -- row below, given `sound` over the opening store's two root
-    -- derivations, held a flat 6 GB for two hours in CI without a
-    -- verdict.  A coverage boundary; the compiled sweep covers it.
-    -- REFUTED: `Refuted.Read-Floor` -- the plain read above the slot, the
+
+    -- REFUTED: `Refuted.Read-Floor`, read with
+    --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Read-Floor.agda`
+    --   -- the plain read above the slot, the
     --   impl's at its stamped one's floor.
     hot-read : ∀ {Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → StampedRead {Θ} i
-    hot-read i ek wk w r eq S pr oP oI lv (subs-floor _ fP) (subs-floor _ fI) lt =
-      let X = path-pass wk S pr []ᶜ oP oI fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+    hot-read {Θ} i ek wk w {ρ′} r eq {q = q} {stI = stI} S pr oP oI lv (subs-floor _ fP) dI@(subs-floor _ fI) lt =
+      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} {st = stI} (gone-subscribed S dI)) (inj₁ refl) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
     hot-read i ek wk w r eq S pr oP oI lv (subs-floor h _) (subs-shared {below = b} _ _) _ =
       ⊥-elim (≤⇒≯ h (+-cancelˡ-< n _ _ (subst (_< n + _) (toℕ-↑ʳ n i) b)))
     hot-read i ek wk w r eq S pr oP oI lv _ (subs-hot-done _ x _ _) _          = ⊥-elim (impl-no-script S i ek x)
@@ -685,8 +552,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
     hot-read i ek wk w r eq S pr oP oI lv (subs-hot-live b _ _ _) (subs-floor h _) _ =
       ⊥-elim (≤⇒≯ (+-cancelˡ-≤ n _ _ (subst (n + _ ≤_) (toℕ-↑ʳ n i) h)) b)
-    hot-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ _ _ fP) (subs-shared _ (slot-spent _ fI)) lt =
-      let X = path-pass wk S pr []ᶜ oP oI fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
+    hot-read {Θ} i ek wk w {ρ′} r eq {q = q} {stI = stI} S pr oP oI lv (subs-hot-done _ _ _ fP) dI@(subs-shared _ (slot-spent _ fI)) lt =
+      let X = path-pass wk S pr []ᶜ oP oI (λ _ → gone-read Θ i w ρ′ eq {q = q} {st = stI} (gone-subscribed S dI)) (inj₁ refl) fP (peel-read eq fI) (s<s⁻¹ lt) in proj₁ X , proj₁ (proj₂ X)
     hot-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ _ c _) (subs-shared _ (slot-join cI sI _)) _ =
       ⊥-elim (done-unjoined S i ek c cI sI)
     hot-read i ek wk w {ρ′} {ρ} r eq S pr oP oI lv (subs-hot-done _ _ c fP) (subs-shared x (slot-connect _ sI dc)) lt =
@@ -704,7 +571,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- tail both runs register a row, the block's flush folds what the
     -- plain prefix folds, and the pass carries the stores past it.
     cold-read : ∀ {Θ} (i : Fin n) → lookup κ i ≡ coldᵏ
-              → ∀ {M} → Walker ep ei M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
+              → ∀ {M} → Walker′ M → ∀ {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} → EnvRel κ Θ w ρ′ ρ
               → (eq : lookup (plainᵏ Γ κ) (n ↑ʳ i) ≡ plainᵗ (lookup Γ i))
               → ∀ {lo} {p : Path Γ lo (lookup Γ i) t} {q : Path (plainᵏ Γ κ) (n + lo) (emitᵗ (lookup Γ i)) (emitᵗ t)} {now}
                   {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI}
@@ -720,11 +587,12 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       cold-read-end i ek wk w {ρ′} {ρ} r eq S pr oP oI (inj₁ (h , refl)) fP dI (s<s⁻¹ lt)
     cold-read i ek wk w {ρ′} {ρ} r eq S pr oP oI lv (subs-cold-sync b x fP) dI lt =
       cold-read-end i ek wk w {ρ′} {ρ} r eq S pr oP oI (inj₂ (b , _ , x)) fP dI (s<s⁻¹ lt)
-    cold-read i ek wk w r eq S pr oP oI lv (subs-cold-async b x refl refl refl fP) dI lt =
+    cold-read i ek wk w r eq {q = q} {stI = stI} S pr oP oI lv (subs-cold-async b x refl refl refl fP) dI lt =
       let B = cold-block i ek w eq S b x dI
           C = cold-register κ S pr oP oI lv _ B
           X = path-pass wk (After.store (proj₁ C)) (proj₁ (proj₂ C)) (ColdBlock.carries B)
-                (proj₁ (proj₂ (proj₂ C))) (proj₂ (proj₂ (proj₂ C))) fP (ColdBlock.fold B) (s<s⁻¹ lt)
+                (proj₁ (proj₂ (proj₂ C))) (proj₂ (proj₂ (proj₂ C))) (λ ())
+                (inj₂ (live-if-agree q {EvalSt.nodes stI} {ColdBlock.NI B} (λ k h → ColdBlock.kept B k (Sound.fresh-path oI k h)) lv)) fP (ColdBlock.fold B) (s<s⁻¹ lt)
       in _⨾_ κ (proj₁ C) (proj₁ X) , proj₁ (proj₂ X)
     cold-read i ek wk w r eq S pr oP oI lv (subs-shared x _) _ _        = ⊥-elim (cold-no-shared S i ek x)
     cold-read i ek wk w r eq S pr oP oI lv (subs-hot-done _ x _ _) _ _  = ⊥-elim (cold-no-hot S i ek x)
@@ -826,7 +694,9 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- `Sound` OF BOTH PATHS, AS EVERY WALK CARRIES IT: the hop's row
     -- runs through the path, and only a distinct path whose rows end
     -- where it does pays the rule for it.
-    -- REFUTED: `Refuted.Defer-Install-Sound` -- a path through one
+    -- REFUTED: `Refuted.Defer-Install-Sound`, read with
+    --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Defer-Install-Sound.agda`
+    --   -- a path through one
     --   merge as two of its lanes.
     defer-install : ∀ {Θ u} (b : SExp Γ [] [] Θ u) {Θ′} (w : Ren∈ (plainᶜ⁺ Θ) Θ′) {ρ′ ρ} {bI}
                   → EnvRel κ Θ w ρ′ ρ
@@ -1126,8 +996,8 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
       ; latches = latches ; dying-done = dying-done ; bounded = proj₁ bounded , mapᵃ m<n⇒m<1+n (proj₂ bounded)
       ; swept = swept ; uncut = uncut ; named = proj₁ named , named-mint (n≤1+n _) ≤-refl ≤-refl (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
       ; census = census ; owned = owned
-      ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl ruleI
-      ; scripts = scripts ; live-outer = live-outer
+      ; ruleP = ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
+      ; scripts = scripts ; inv = inv
       }
       where open Store S
 
@@ -1147,37 +1017,40 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- `Sound` OF BOTH PATHS, AS `Pass` CARRIES IT: without it a related
     -- path may pass one merge twice, and a lane subscribed through it
     -- registers a row `Rule.distinct-rows` refuses.
-    -- REFUTED: `Refuted.Of-Fold-Sound` -- a path through one merge as
+    -- REFUTED: `Refuted.Of-Fold-Sound`, read with
+    --   `git show c2e60cb8:agda/evidence/refuted/Refuted/Of-Fold-Sound.agda`
+    --   -- a path through one merge as
     --   outer and as its own lane, one emit carrying one lane.
     -- DEAD ROUTE: `Sound` from `Store` and `PathRel`.  The store holds
     --   the rule and `π`'s keys below the counter, which gives a
     --   pinned node's freshness, but neither record says where a
     --   path's nodes' rows end, nor that its nodes are distinct.
-    of-fold : ∀ {N} (wk : Walker ep ei N) {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
+    of-fold : ∀ {N} (wk : Walker′ N) {u lo lo′} {p : Path Γ lo u t} {q : Path (plainᵏ Γ κ) lo′ (emitᵗ u) (emitᵗ t)} {now}
                        {sP : Sched Γ} {stP : EvalSt ep} {sI : Sched (plainᵏ Γ κ)} {stI : EvalSt ei} {rP rI src es vs}
                    → (S : Store κ sP stP sI stI)
                    → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q
                    → Sound p sP stP → Sound q sI stI
                    → freshId sourceᵏ (Sched.mint sI) ≡ src
                    → Carries {u} es vs
+                   → Gone q stI → LiveIf q (EvalSt.nodes stI)
                    → (dP : foldPath⇓ now p vs true sP stP rP)
                    → foldPath⇓ now q es true (record sI { mint = setAt sourceᵏ (suc src) (Sched.mint sI) }) stI rI
                    → sz-foldPath dP < N
                    → Σ (After κ S rP rI) λ A
                        → PathRel κ (Store.π (After.store A)) (EvalSt.nodes (proj₂ (proj₂ rP))) (EvalSt.nodes (proj₂ (proj₂ rI))) p q
-    of-fold wk S pr oP oI refl c dP dI lt =
-      let X = path-pass wk (src-bump S) pr c oP (resrc oI) dP dI lt
+    of-fold wk S pr oP oI refl c g l dP dI lt =
+      let X = path-pass wk (src-bump S) pr c oP (resrc oI) (λ _ → g) (inj₂ l) dP dI lt
       in unsrc (proj₁ X) , proj₁ (proj₂ X)
 
     -- an `of`'s walk: the impl mints its source, and both fold the
     -- group and end
-    walk-of : ∀ {M Θ u} (ts : List (STm Γ [] [] Θ u)) → Walker ep ei M → Elab-Walks< (suc M) (ofˢ ts)
-    walk-of ts wk w r S pr oP oI lv (subs-of dP) (subs-mint {src = src} fr (subs-of dI)) lt =
-      let A = of-fold wk S pr oP oI fr (of-carries ts w r refl src) dP dI (s<s⁻¹ lt)
+    walk-of : ∀ {M Θ u} (ts : List (STm Γ [] [] Θ u)) → Walker′ M → Elab-Walks< (suc M) (ofˢ ts)
+    walk-of ts wk w r S pr oP oI lv (subs-of dP) dS@(subs-mint {src = src} fr (subs-of dI)) lt =
+      let A = of-fold wk S pr oP oI fr (of-carries ts w r refl src) (gone-subscribed S dS) lv dP dI (s<s⁻¹ lt)
       in proj₁ A , proj₂ A , of-fold-stamps S pr oP oI fr (of-carries ts w r refl src) (of-emits ts w refl src) dP dI
 
     -- a cold slot's walk: the impl's read past the transport
-    walk-cold : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-cold : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ coldᵏ → Walker′ M → Elab-Walks< {Θ} (suc M) (inputˢ i)
     walk-cold i e wk w r S pr oP oI lv dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
     walk-cold i e wk w r S pr oP oI lv dP dI lt | coldᵏ | eq =
       let A = cold-read i ek wk w r eq S pr oP oI lv dP (read-machine w eq _ dI) lt
@@ -1186,7 +1059,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-cold i () wk w r S pr _ _ _ dP dI lt | sharedᵏ | _
 
     -- a hot slot's walk: the impl's read peeled to its stamped slot
-    walk-hot : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-hot : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ hotᵏ → Walker′ M → Elab-Walks< {Θ} (suc M) (inputˢ i)
     walk-hot i e wk w r S pr _ _ _ dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
     walk-hot i e wk w r S pr oP oI lv dP (subs-map dJ) lt | hotᵏ | eq =
       let A = hot-read i ek wk w r eq S pr oP oI lv dP (read-input _ eq dJ) lt
@@ -1195,7 +1068,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-hot i () wk w r S pr _ _ _ dP dI lt | sharedᵏ | _
 
     -- a shared slot's walk, the same
-    walk-shared : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-shared : ∀ {M Θ} (i : Fin n) → lookup κ i ≡ sharedᵏ → Walker′ M → Elab-Walks< {Θ} (suc M) (inputˢ i)
     walk-shared i e wk w r S pr _ _ _ dP dI lt with lookup κ i in ek | stampedSlot Γ κ i
     walk-shared i e wk w r S pr oP oI lv dP (subs-map dJ) lt | sharedᵏ | eq =
       let A = shared-read i ek wk w r eq S pr oP oI lv dP (read-input _ eq dJ) lt
@@ -1204,7 +1077,7 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     walk-shared i () wk w r S pr _ _ _ dP dI lt | hotᵏ | _
 
     -- the one arm that reads `κ`, one leaf per kind
-    walk-input : ∀ {M Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Walker ep ei M → Elab-Walks< {Θ} (suc M) (inputˢ i)
+    walk-input : ∀ {M Θ} (i : Fin n) (k : Kind) → lookup κ i ≡ k → Walker′ M → Elab-Walks< {Θ} (suc M) (inputˢ i)
     walk-input i coldᵏ   e wk = walk-cold i e wk
     walk-input i hotᵏ    e wk = walk-hot i e wk
     walk-input i sharedᵏ e wk = walk-shared i e wk
@@ -1218,43 +1091,38 @@ module _ {n} {Γ : Ctx n} (κ : Kinds n) where
     -- ONE FORMER'S WALK, its sub-walks handed a walker under the
     -- former's own plain size.  A μ's unrolling is no smaller a tree,
     -- but its subscribe is a premise of the μ's.
-    at : ∀ {M Θ u} (s : SExp Γ [] [] Θ u) → Walker ep ei M → Elab-Walks< (suc M) s
+    at : ∀ {M Θ u} (s : SExp Γ [] [] Θ u) → Walker′ M → Elab-Walks< (suc M) s
     at (inputˢ i) wk = walk-input i (lookup κ i) refl wk
     at (ofˢ ts) wk         = walk-of ts wk
     at {Θ = Θ} {u} emptyˢ wk w {ρ′} {ρ} r S pr oP oI lv (subs-empty f) dI lt = walk-of {Θ = Θ} {u} [] wk w {ρ′} {ρ} r S pr oP oI lv (subs-of {ts = []} f) dI lt
-    at (takeWhileˢ f b) wk w r = walk-while f b (wk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
+    at (takeWhileˢ f b) wk w r = walk-while f b (Walker′.walks wk b) w r refl (renExp-fuse there (ext∈ w) (toInstEmit κ b)) (λ _ → refl)
     at (mapˢ f b) wk w r S pr oP oI lv (subs-map dP) (subs-map dI) lt =
-      let X = wk b w r S (map~ (lifts-map f w r) pr) (bare oP) (bare oI) (live-if-cons _ _ _ refl lv) dP dI (s<s⁻¹ lt)
+      let X = Walker′.walks wk b w r S (map~ (lifts-map f w r) pr) (bare oP) (bare oI) (live-if-cons _ _ _ refl lv) dP dI (s<s⁻¹ lt)
       in pairS (unmap (proj₁ X , proj₁ (proj₂ X))) (proj₂ (proj₂ X))
-    at (scanˢ f z b) wk    = walk-scan f z b (wk b)
-    at (flattenˢ op b) wk w r = walk-flat op b (wk b) (perInnerˢ op b) w r
+    at (scanˢ f z b) wk    = walk-scan f z b (Walker′.walks wk b)
+    at (flattenˢ op b) wk w r = walk-flat op b (Walker′.walks wk b) (perInnerˢ op b) w r
     at (μˢ b) wk w r S pr oP oI lv (subs-μ dP) (subs-μ dI) lt =
       let (s′ , pe , ie) = μ-unfolds b
-      in wk s′ w r S pr oP oI lv (reExpᴾ (sym pe) dP) (reExp (sym (ie w)) dI) (sz-reExpᴾ (sym pe) dP (s<s⁻¹ lt))
+      in Walker′.walks wk s′ w r S pr oP oI lv (reExpᴾ (sym pe) dP) (reExp (sym (ie w)) dI) (sz-reExpᴾ (sym pe) dP (s<s⁻¹ lt))
     at (varˢ ()) _
     at (deferˢ b) _ w r S pr oP oI lv dP dI _ = walk-defer b w r S pr oP oI lv dP dI
 
     -- THE WALK DESCENDS THE PLAIN DERIVATION'S SIZE
-    walk< : ∀ {N} → Acc _<_ N → Walker ep ei N
-    walk< (acc rs) s w r S pr oP oI lv dP dI lt = at s (walk< (rs lt)) w r S pr oP oI lv dP dI (n<1+n _)
+    walk< : ∀ {N} → Acc _<_ N → Walker′ N
+    Walker′.walks (walk< (acc rs)) s w r S pr oP oI lv dP dI lt = at s (walk< (rs lt)) w r S pr oP oI lv dP dI (n<1+n _)
+    Walker′.ones (walk< (acc rs)) lt = inner-one-at (walk< (rs lt))
 
     walk : ∀ {Θ u} (s : SExp Γ [] [] Θ u) → Elab-Walks s
-    walk s w r S pr oP oI lv dP dI = walk< (<-wellFounded _) s w r S pr oP oI lv dP dI (n<1+n _)
+    walk s w r S pr oP oI lv dP dI = Walker′.walks (walk< (<-wellFounded _)) s w r S pr oP oI lv dP dI (n<1+n _)
 
     -- a walker under any bound, for a pass outside the cycle
-    walker : ∀ {N} → Walker ep ei N
-    walker s w r S pr oP oI lv dP dI _ = walk s w r S pr oP oI lv dP dI
+    walker : ∀ {N} → Walker′ N
+    Walker′.walks walker s w r S pr oP oI lv dP dI _ = walk s w r S pr oP oI lv dP dI
+    Walker′.ones walker {K} _ = inner-one-at (walk< (<-wellFounded K))
 
 -- WHERE IT CAN STILL FAIL: A HOT SCRIPT LIVE ON ONE SIDE ONLY, or two
 -- live at different places.  Both lists are the slots' hot scripts in
 -- slot order, the impl's read off its raw half.
--- PROBED: `Probed.Opening` -- one hot script of two arrivals, both
---   payloads left on each side.  Not two hot slots, not a shared slot.
--- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
---   decided by `CLI.Store-Check`'s `store?`, its `sources` field at the
---   first traced state, the live lists after the subscribe: 132 agree,
---   0 fail, 1 undecided, killed at case 134.  Slot one a script in every
---   program, 23 with two hot slots.
 postulate
   init-sources : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
                → Pointwise (Src κ) (Sched.live (sched-init (plainExp e) (plainSlots ins)))
@@ -1262,13 +1130,6 @@ postulate
 
 -- WHERE IT CAN STILL FAIL: A HOT SCRIPT AT A DIFFERENT TICK OR RANK ON
 -- ONE SIDE.  Both lists are the slots' hot scripts in slot order.
--- PROBED: `Probed.Opening` -- one hot script of two arrivals.  Not two
---   hot slots, so no rank was compared.
--- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
---   decided by `CLI.Store-Check`'s `store?`, its `sync` field at the
---   first traced state, the live lists after the subscribe: 132 agree,
---   0 fail, 1 undecided, killed at case 134.  Slot one a script in every
---   program, 23 with two hot slots.
 postulate
   init-sync : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
             → Sync (Sched.live (sched-init (plainExp e) (plainSlots ins)))
@@ -1276,13 +1137,6 @@ postulate
 
 -- WHERE IT CAN STILL FAIL: A HOT SCRIPT NUMBERED APART FROM ITS RAW
 -- READ.  Both lists are the slots' hot scripts, numbered by slot.
--- PROBED: `Probed.Walk-Leaves` -- one hot script, so no two slots
---   compared.
--- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
---   decided by `CLI.Store-Check`'s `store?`, its `numbers` field at the
---   first traced state, the live lists after the subscribe: 132 agree,
---   0 fail, 1 undecided, killed at case 134.  Slot one a script in every
---   program, 23 with two hot slots.
 postulate
   init-numbers : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
                → Pointwise (λ (l : LiveSource Γ) (l′ : LiveSource (plainᵏ Γ κ)) → SrcNum κ (LiveSource.source l) (LiveSource.source l′))
@@ -1290,12 +1144,6 @@ postulate
                            (Sched.live (sched-init (elaborateImpl κ e) (embedSlotsImpl ins)))
 
 -- the hot scripts live before anything is subscribed, one per slot
--- PROBED: `Probed.Walk-Leaves` -- one hot script, so no two compared.
--- PROBED: make qc-store QC='7 200 4' QC_BUDGET=600 QC_DRAW='{"exp":[2,2,1,1,2,1,2,2,1,1,0,1,1],"leaf":[3,1,1],"script":[1,1,1,1,0,1],"slot":[0,0,0,0,0,1],"reach":["input"]}'
---   decided by `CLI.Store-Check`'s `store?`, its `distinct` field at
---   the first traced state, the live lists after the subscribe: 132
---   agree, 0 fail, 1 undecided, killed at case 134.  Slot one a script
---   in every program, 23 with two hot slots.
 postulate
   init-distinct : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {t} (e : SExp Γ [] [] [] t) (ins : SimulSlots Γ κ)
                 → Unique (map LiveSource.source (Sched.live (sched-init (plainExp e) (plainSlots ins))))
@@ -1373,10 +1221,10 @@ init-store κ {t} e ins μ big ord = record
   ; above   = [] , []
   ; census  = λ _ _ → inj₂ (refl , refl , λ ())
   ; owned   = []
-  ; ruleP   = rule (λ k ()) (λ ()) (λ ())
-  ; ruleI   = rule (λ k ()) (λ ()) (λ ())
+  ; ruleP   = rule (λ k ()) (λ ()) (λ ()) (λ ())
+  ; ruleI   = rule (λ k ()) (λ ()) (λ ()) (λ ())
   ; scripts = ins , refl , refl
-  ; live-outer = live (λ ())
+  ; inv     = inv-init
   }
 
 -- THE IMPL'S ROOT SUBSCRIBE IS ITS MINT'S BODY'S, at the token the mint

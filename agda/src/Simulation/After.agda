@@ -14,13 +14,13 @@ open import Data.Bool    using (true; false; _∧_; _∨_)
 open import Data.Bool.Properties using (∧-zeroʳ)
 open import Data.List    using (List; []; _∷_; _++_; concat; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Binary.Pointwise using (Pointwise; ++⁺)
+open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; ++⁺)
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᵃ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᵃ)
 open import Data.List.Relation.Unary.Any using (there)
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
 open import Data.Nat     using (ℕ; suc; _<_; _≡ᵇ_)
-open import Data.Nat.Properties using (n≤1+n; n<1+n; m<n⇒m<1+n; <-irrefl)
+open import Data.Nat.Properties using (n≤1+n; n<1+n; m<n⇒m<1+n; <-irrefl; ≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Empty   using (⊥)
@@ -32,13 +32,15 @@ open import Rx.Mint      using (setAt; nodeᵏ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; RegId; RegRow; NodeId; skipᵇ; regSource; memberSource)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Reducible.Support using (sub-rule; fresh-rows)
+open import Rx.Evaluator.Unconn-Arith using (keeps-refl)
 open import SExp.Syntax  using (Kinds; plainᵏ; emitᵗ)
 open import SExp.Plain   using (plainValues)
 open import SExp.InstEmit using (instEmitᵗ)
 open import SExp.InstEmit.Decode using (decodeEmits)
 open import Batchable.Inst-Extract using (instExtract)
 open import Simulation.Lockstep using (concat-++; values-++; decode-++; extract-++)
-open import Simulation.Stores using (V; RegRel; Partners; Store; Arr; spent-partner; named-node)
+open import Simulation.Stores using (V; RegRel; Partners; Store; Arr; LiveRows; spent-partner; named-node; named-nodes; inv-write)
+open import Simulation.Write using (Moved)
 open import Simulation.Grow using (OffRow; fresh-off-row; regG; partG; arrG; spentG)
 
 -- what a run sends to its root, read as values: the plain run's in
@@ -179,11 +181,34 @@ module Kept {n} {Γ : Ctx n} (κ : Kinds n) {t} {ep : Closed Γ t} {ei : Closed 
     ; dlv-alike = spentG κ there (mint-off S) rows dlv-alike ; dying-alike = spentG κ there (mint-off S) rows dying-alike
     ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut ; named = named-node (proj₁ named) , named-node (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
     ; census = census ; owned = owned
-    ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) ruleP
-    ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) ruleI
-    ; scripts = scripts ; live-outer = live-outer
+    ; ruleP = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sP)) (keeps-refl _ _) ruleP
+    ; ruleI = sub-rule (λ r∈ → r∈) (n≤1+n (nodeCt sI)) (keeps-refl _ _) ruleI
+    ; scripts = scripts ; inv = inv
     }
     where open Store S
+
+  -- A NODE MOVE KEEPS THE STORES when it keeps every row, read at the
+  -- new nodes, and the impl's rows stay live
+  node-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {NP′ NI′}
+             → Moved κ {π = Store.π S} {t = t} (EvalSt.nodes stP) NP′ (EvalSt.nodes stI) NI′
+             → LiveRows (record stI { nodes = NI′ })
+             → After S ([] , sP , record stP { nodes = NP′ }) ([] , sI , record stI { nodes = NI′ })
+  node-write {sP} {stP} {sI} {stI} S {NP′} {NI′} W lv =
+    after S′ (λ { (inj₁ c) → inj₁ c ; (inj₂ (a , b , pr)) → inj₂ (a , b , Moved.partW W (Store.rows S) pr) })
+             (λ ar → record { boundP = Arr.boundP ar ; boundI = Arr.boundI ar
+                             ; rows = Moved.arrW W (Store.rows S) (Arr.rows ar) ; lists = Arr.lists ar })
+             [] (λ x → x)
+    where
+    open Store S
+    S′ : St sP (record stP { nodes = NP′ }) sI (record stI { nodes = NI′ })
+    S′ = record
+      { π = π ; π-keys = π-keys ; π-vals = π-vals ; pairs-below = pairs-below ; sources = sources ; numbers = numbers ; distinct = distinct
+      ; sync = sync ; rows = Moved.regW W rows ; dlv-alike = Moved.spentW W rows dlv-alike ; dying-alike = Moved.spentW W rows dying-alike
+      ; latches = latches ; dying-done = dying-done ; bounded = bounded ; swept = swept ; uncut = uncut
+      ; named = named-nodes (proj₁ named) , named-nodes (proj₂ named) ; rids = rids ; fresh-ids = fresh-ids ; above = above
+      ; census = census ; owned = owned
+      ; ruleP = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleP ; ruleI = sub-rule (λ r∈ → r∈) ≤-refl (keeps-refl _ _) ruleI
+      ; scripts = scripts ; inv = inv-write lv inv }
 
   -- a step from the minted stores is one from the stores
   unmint : ∀ {sP stP sI stI} {S : St sP stP sI stI} {rP rI} → After (mint-pair S) rP rI → After S rP rI

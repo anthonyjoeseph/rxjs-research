@@ -7,16 +7,9 @@ comment block or a markdown paragraph, and plain grep returns one line out
 of a forty-line header, which is a hit and not an answer.  This returns the
 BLOCK, which is the unit a finding is written in.
 
-Searched: every comment block in `agda/src` and `agda/evidence`, and every
+Searched: every comment block in `agda-impl`, and every
 paragraph of the load-bearing documents.  An agda hit also prints the
 declaration the block sits above, since that is what the finding is about.
-
-AND THE ATTIC, in its own section.  A finding decays differently from a
-proof and worse: when a generation is deleted the statements go somewhere
-`git log -S<name>` can find them by name, while a dead route names nothing
-and a coverage boundary names a probe that is also gone -- so the one
-search that could surface either is this one, and scoped to the present it
-surfaces neither.  See `scripts/attic.py`.
 """
 import importlib.util
 import pathlib
@@ -35,12 +28,10 @@ def _load(name, path):
 # definition of what a block IS, so the searcher and the checker cannot drift
 blocks = _load("check_comments",
                pathlib.Path(__file__).resolve().parent / "check-comments.py").blocks
-attic = _load("attic", pathlib.Path(__file__).resolve().parent / "attic.py")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-AGDA_TREES = ["agda/src", "agda/evidence"]
-DOCS = ["CLAUDE.md", "PROOF-STATE.md", "EVIDENCE.md",
-        "typecheck-performance-numbers.md"]
+AGDA_TREES = ["agda-impl"]
+DOCS = ["CLAUDE.md", "PROOF-STATE.md"]
 
 
 def doc_blocks(path):
@@ -124,18 +115,6 @@ def main():
     print(f"find-prose: {hits} block(s) matching {sys.argv[1]!r} "
           f"in {len(files)} file(s)")
 
-    # THE ATTIC, after the live sweep and never mixed into it: a live block is
-    # a finding that still constrains something, an attic block is a finding
-    # about a mechanism that is gone, and reading the second as the first is
-    # how a dead route gets believed about code it was never written against.
-    for sha, label, root in attic.roots():
-        base = pathlib.Path(root)
-        old = sorted(base.rglob("*.agda"))
-        print()
-        print(f"ATTIC {sha} — {label}")
-        found = sweep(old, base, pat)
-        print(f"  attic {sha}: {found} block(s) in {len(old)} deleted file(s)")
-        print(f"  NOT IN THE TREE.  Read with `git show {sha}:agda/src/<path>`.")
     return 0
 
 

@@ -27,5 +27,5 @@
 
 ### The ledger
 
-- **`c-difficulty`** — DIFFICULTY.
-- **`d-shape`** — SHAPE: must be reported as out of order.
+- **`c-grindable`** — GRINDABLE: sits above a worse class.
+- **`d-falsity`** — FALSITY: must be reported as out of order.

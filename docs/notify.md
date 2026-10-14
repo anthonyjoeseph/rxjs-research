@@ -24,7 +24,7 @@ app and add the topic there.
 ## What it sends
 
 ```
-Title:  gate GREEN (heavy) - about to commit
+Title:  gate GREEN - about to commit
 
 Tier 1 is the lowest open — 2 falsity, 21 difficulty
 across 2 falsity, 16 difficulty on the roadmap
@@ -64,19 +64,18 @@ whether the plan still fits what the last run found. The per-tier breakdown
 below it says how far each tier has to go.
 
 **The evidence line is the other half of a risk class, and it is why the two
-are printed together.** A tier of fourteen DIFFICULTY rows standing on ten
-refutations and seven probes is a tier whose statements have been tested; the
-same fourteen rows with `no evidence` under them is a tier whose classes are
-opinions. Markers count with multiplicity — a row carrying `REFUTED×4`
-contributes four — because four refutations pinning one statement's shape is
-four findings, not one.
+are printed together.** A tier of fourteen FALSITY rows standing on ten
+refutations is a tier whose statements have been tested; the same fourteen rows
+with `no evidence` under them is a tier whose classes are opinions. Markers
+count with multiplicity — a row carrying `REFUTED×4` contributes four — because
+four refutations pinning one statement's shape is four findings, not one.
 
 **They are summed from the postulates' own headers, not from the roadmap's
 evidence fields**, by the same reader `make roadmap-check` uses. The two agree
 today only because that check fails when they do not, and reading the headers
 is what makes the agreement a fact rather than an assumption. A red gate sends the same body at high priority with the failing stage in
-the title (`RED (the tower)`, `RED (cheap checks)`, `RED (light)`), so a build
-that dies while nobody is watching still reports.
+the title (`RED (cheap checks)`, `RED (agda)`), so a build that dies while
+nobody is watching still reports.
 
 ## Why it computes rather than reads
 
@@ -92,5 +91,5 @@ then the notification and the gate would disagree about what a row is.
 
 ## Where it is wired
 
-The `gate-light` and `gate-heavy` recipes call it on both exits. `make notify`
-sends the same thing by hand; `make notify V=<label>` sets the title's verdict.
+The `gate` recipe calls it on both exits. `make notify` sends the same thing by
+hand; `make notify V=<label>` sets the title's verdict.

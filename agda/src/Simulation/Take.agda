@@ -8,6 +8,7 @@
 module Simulation.Take where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
+open import Data.Bool.Properties using (∧-identityʳ)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.Maybe   using (Maybe; just)
@@ -21,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 
 open import Rx.Exp       using (Ctx; Closed; Val; Env; FnClo; boolᵗ; unitᵗ; _×ᵗ_; applyClo; _≟ᵗ_)
 open import Rx.Evaluator using (EvalSt; Sched; NodeId; NodeState; Path; _↠[_]_; scan-f; take-f; map-f; lookupNode; setNode;
-  cell-st; take-st; takeVals; scanVals; spends; takeDispatch; cutThrough)
+  cell-st; take-st; takeVals; scanVals; spends; takeDispatch; cutThrough; spentAt)
 open import Rx.Evaluator.Domain using (stepFrame⇓; foldPath⇓; fold-step; step-scan; step-take; step-map; injectRoot)
 open import Rx.Evaluator.Freshness using (lookup-set; set-above)
 open import Rx.Evaluator.Reducible.Support using (Sound; drop-ot; head-on; self-node)
@@ -32,12 +33,13 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Binary.Pointwise using () renaming ([] to []ᵖ)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
-open import Simulation.Stores using (EmitRel; CutLifts; PathRel; takeWhile~; spentWhile~; Store; guardOf)
+open import Simulation.Stores using (EmitRel; CutLifts; PathRel; takeWhile~; spentWhile~; Store; guardOf; LiveFor; live-for; live-if-drop;
+  live-if-set; live-if-take)
 open import Simulation.Sweep using (t≢f; sweepL; sweep-eq)
 open import Simulation.Cut using (cut-go; cut-keeps; cut-persists)
 open import Simulation.Write using (apart)
 open import Simulation.After using (module Kept)
-open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear; Out; out-quiet)
+open import Simulation.Arm using (module Arms; Clear; fold-unmoved; on-drop; step-clear; Out; out-quiet; Gone; gone-nodes; scan-c; take-c)
 
 -- A CELL'S SCAN AND A TEST'S TAKE, AT THE STATE THE NODE HOLDS: the
 -- one step each derivation can be
@@ -237,10 +239,6 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A TEST'S NODES WRITTEN OPEN ON BOTH SIDES: the plain test to
       -- one, the cell to an open state and its test to one, keep the
       -- stores and the tails related
-      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Case 2 passes two values of the hot input through an open test
-      --   under a merge.
       while-write : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
                       {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
@@ -257,11 +255,6 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- A TEST'S NODES WRITTEN SPENT ONCE BOTH SIDES HAVE CUT: the plain
       -- test and the cell's test to zero, the cell to what the scan
       -- left, keep the stores the cut left and the tails related
-      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Cases 13 and 22 cut at the hot input's first arrival, under a
-      --   merge and a bounded merge of limit one; case 4 cuts at a value
-      --   an exhaust's lane carries.
       while-zero : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
                      {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
                      {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
@@ -285,10 +278,6 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
 
       -- A SPENT TEST ON BOTH SIDES passes nothing, its end included,
       -- and stays spent
-      -- PROBED: make qc-store QC='50 150 2' QC_BUDGET=500 QC_DRAW='{"exp":[0,0,0,0,0,0,0,0,0,0,0,1,1],"leaf":[1,0,0],"fan":[2,0,0,2,1,2,2,0,0,0],"script":[0,1,0,0,0,0],"reach":["takeWhile","flatten"]}'
-      --   decided by `CLI.Store-Check`'s `store?`: 150 agree, 0 fail.
-      --   Case 22's second arrival comes after its first spent the test,
-      --   on both sides.
       while-spent : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
                       {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
                       {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
@@ -308,19 +297,23 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       -- INSTANT: what a cut hands on is never empty, so whatever the
       -- end subscribes is restamped to the group's own instant
       --
-      -- PROBED: make qc-same-clock QC='44 150 3' QC_BUDGET=900 QC_DRAW='{"exp":[2,2,1,0,4,2,3,2,0,0,0,4,3],"obs":[4,2,1,0],"fan":[0,3,2,1,1,0,1,2,2,0],"script":[0,3,0,0,2,0],"reach":["flatten"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`, over budget at 24 agree,
-      --   0 fail, 37 undecided.  Case 41 cuts an exhaust's first inner at
-      --   the second of two hot arrivals.
-      -- PROBED: make qc-same-clock QC='46 80 3' QC_DRAW='{"exp":[4,4,1,0,1,5,1,1,0,0,0,5,0],"obs":[0,3,1,0],"fan":[0,3,2,1,1,0,1,2,2,0],"script":[0,4,0,0,0,0],"reach":["flatten","takeWhile"]}'
-      --   decided by `CLI.QuickCheck`'s `sameClockᵇ`: 54 agree, 0 fail, 26
-      --   undecided.  Case 6 cuts a bounded merge's first inner, limit one,
-      --   at the hot input's first arrival, and its end subscribes the
-      --   queued inners at that instant.
       cut-out : ∀ {sP stP sI stI} (S : St sP stP sI stI) {now ℓ ℓ′ s I} {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ′ (emitᵗ s) (emitᵗ t)}
                   {es rI}
               → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) p q → Sound q sI stI
               → foldPath⇓ now q es true sI stI rI → All (DelAt I) es → es ≢ [] → Out I (proj₁ rI)
+
+    postulate
+      -- A TEST THAT CUTS LEAVES NOTHING BELOW IT: every row a dispatch
+      -- would walk past the test's tail reached it through the test, and
+      -- the cut severed each of those
+      gone-cut : ∀ {sP stP sI stI} (S : St sP stP sI stI) {lo lo′ ℓ ℓ₁ ℓ₂ ℓ₃ s k k₁ k₂ Θ₂ Θ₃}
+                   {ρ₂ : Env (plainᵏ Γ κ) Θ₂} {ρ₃ : Env (plainᵏ Γ κ) Θ₃}
+                   {h : lo ≤ ℓ} {h₁ : lo′ ≤ ℓ₁} {h₂ : ℓ₁ ≤ ℓ₂} {h₃ : ℓ₂ ≤ ℓ₃}
+                   {P : FnClo Γ s boolᵗ} {F₁ : FnClo (plainᵏ Γ κ) (CutS unitᵗ s ×ᵗ emitᵗ s) (CutS unitᵗ s)}
+                   {p : Path Γ ℓ s t} {q : Path (plainᵏ Γ κ) ℓ₃ (emitᵗ s) (emitᵗ t)}
+               → PathRel κ (Store.π S) (EvalSt.nodes stP) (EvalSt.nodes stI) (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)
+               → Gone q (record stI { registry = proj₁ (cutThrough k₂ (EvalSt.registry stI))
+                                    ; cancelled = proj₂ (cutThrough k₂ (EvalSt.registry stI)) ++ EvalSt.cancelled stI })
 
     -- A TEST THAT CUTS ON BOTH SIDES: the plain test and the cell's
     -- test each sever the registrations through their node and write
@@ -335,15 +328,16 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
               → proj₂ (proj₂ (takeVals (just P) 1 vs)) ≡ true
               → Carries es vs
               → Sound (take-f (just P) k ↠[ h ] p) sP stP → Sound (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) sI stI
+              → LiveFor es (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) (EvalSt.nodes stI)
               → stepFrame⇓ now (take-f (just P) k) p vs fin sP stP (oP , vs₁ , fin₁ , sP₁ , stP₁)
               → foldPath⇓ now (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q) es fin sI stI rI
               → Arm S now oP sP₁ stP₁ p vs₁ fin₁
                   (λ π NP NI → PathRel κ π NP NI (take-f (just P) k ↠[ h ] p) (Wh F₁ k₁ k₂ ρ₂ ρ₃ h₁ h₂ h₃ q)) (λ I → Dlv I fin es) rI
-    while-cut S R@(spentWhile~ _ lk _ _) _ bs sp si d dI = while-spent S R lk bs sp si d dI
+    while-cut S R@(spentWhile~ _ lk _ _) _ bs sp si _ d dI = while-spent S R lk bs sp si d dI
     while-cut {stP = stP} {sI = sI} {stI = stI} S {es = es}
               R@(takeWhile~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
                             {h = h} {h₁ = h₁} {h₂ = h₂} {h₃ = h₃} {P = P} {F₁ = F₁} {p = p} {q = q} e lk lk₁ lk₂ CL r)
-              eqW bs sp si d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
+              eqW bs sp si lv d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
       with cut-group {Bud = λ _ b → b ≡ 1} {F′ = F₁} {P = just P} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃} CL bs (tt , false , os , em) 1 refl refl
          | scan-at lk₁ d₁ | take-cut-at lk eqW d
     ... | cs , fe , _ , dl | refl | refl
@@ -351,7 +345,8 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                                         (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                        (trans fe eqW) d₂
     ... | refl =
-      arm A (proj₂ ZW) cs soq dq (λ {rP} dP B rel′ →
+      arm A (proj₂ ZW) cs soq (λ _ → gone-nodes {q = q} {st = record stI { registry = proj₁ (cutThrough k₂ (EvalSt.registry stI))
+                                                         ; cancelled = proj₂ (cutThrough k₂ (EvalSt.registry stI)) ++ EvalSt.cancelled stI }} (gone-cut S R)) LV dq (λ {rP} dP B rel′ →
         spentWhile~ (After.grows B (After.grows A e)) (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₂) lk₂′) rel′)
         λ { (_ , ds) → out-quiet [] refl
                      , inj₁ (cut-out (After.store A) (proj₂ ZW) soq dq (dl ds)
@@ -360,6 +355,17 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       fc : Val (plainᵏ Γ κ) (CutS unitᵗ s)
       fc = proj₂ (scanVals F₁ (tt , false , os , em) es)
       N₂ = setNode k₂ (take-st 0) (setNode k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI))
+      -- the test was open, so its tail is live unless spent, and the
+      -- writes end no outer
+      LV = live-for (λ { refl → refl })
+             (λ l → inj₂ (live-if-drop (map-f (Θ₃ , cutOutᵛ , ρ₃)) h₃ q refl refl
+                           (live-if-set (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q) k₂ (take-st 0) (setNode k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI))
+                              (λ _ → refl) (λ ())
+                              (live-if-set (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q) k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI)
+                                 (λ _ → refl) (λ _ → cong spentAt lk₁)
+                                 (live-if-take h₂ (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q) (cong spentAt lk₂)
+                                    (live-if-drop (scan-f F₁ k₁) h₁ _ refl refl l))))))
+             lv
       -- the cut on both sides, then its nodes written
       ZW = while-zero S e R sp si fc
       A = after (cut-go κ S e (there (here refl))) (cut-keeps κ S e (there (here refl))) (cut-persists κ S e (there (here refl))) []ᵖ (λ x → x)
@@ -382,13 +388,13 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
     -- one, and the three impl frames write nothing the tails' folds read
     takeWhile-arm : ∀ {lo lo′ ℓ s} {P k} {h : lo ≤ ℓ} {p : Path Γ ℓ s t} {Q : Path (plainᵏ Γ κ) lo′ _ _}
                   → Steps (take-f (just P) k) h p Q
-    takeWhile-arm S R@(spentWhile~ _ lk _ _) bs sp si d dI = while-spent S R lk bs sp si d dI
-    takeWhile-arm {vs = vs} {es = es} {fin = fin} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
+    takeWhile-arm S R@(spentWhile~ _ lk _ _) bs sp si _ _ d dI = while-spent S R lk bs sp si d dI
+    takeWhile-arm {Q = _ ↠[ hS ] (fT ↠[ hT ] qT)} {vs = vs} {es = es} {fin = fin} {sP = sP} {stP = stP} {sI = sI} {stI = stI} S
                   R@(takeWhile~ {s = s} {k = k} {k₁ = k₁} {k₂ = k₂} {os = os} {em = em} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃}
                                 {h = h} {h₁ = h₁} {h₂ = h₂} {h₃ = h₃} {P = P} {F₁ = F₁} {p = p} {q = q} e lk lk₁ lk₂ CL r)
-                  bs sp si d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
+                  bs sp si g lv d dI@(fold-step d₁ (fold-step d₂ (fold-step step-map dq)))
       with proj₂ (proj₂ (takeVals (just P) 1 vs)) in eqW
-    ... | true = while-cut S R eqW bs sp si d dI
+    ... | true = while-cut S R eqW bs sp si lv d dI
     ... | false
       with cut-group {Bud = λ _ b → b ≡ 1} {F′ = F₁} {P = just P} {Θ₂ = Θ₂} {ρ₂ = ρ₂} {Θ₃ = Θ₃} {ρ₃ = ρ₃} CL bs (tt , false , os , em) 1 refl refl
          | scan-at lk₁ d₁ | take-open-at lk eqW d
@@ -398,7 +404,8 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
                                           (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂)
                         (trans fe eqW) d₂
     ... | r1 , fl , bud | refl =
-      arm (proj₁ TW) (proj₂ TW) cs soq dq (λ {rP} dP B rel′ →
+      arm (proj₁ TW) (proj₂ TW) cs soq (λ e → gone-nodes {q = qT} {st = stI} (gone-cell S {f = fT} {h = hT} {q = qT} take-c
+                                         (gone-cell S {f = scan-f F₁ k₁} {h = hS} {q = fT ↠[ hT ] qT} scan-c (g (trans (sym (∧-identityʳ fin)) e))))) LV dq (λ {rP} dP B rel′ →
         takeWhile~ (After.grows B (After.grows (proj₁ TW) e))
           (trans (fold-unmoved dP cP) lkP) (trans (fold-unmoved dq c₁) lk₁′) (trans (fold-unmoved dq c₂) lk₂′) CL rel′)
         λ { (f , ds) → out-quiet [] refl , inj₂ (cong (λ x → x ∧ true) f , dl ds) }
@@ -410,6 +417,18 @@ module Takes {n} {Γ : Ctx n} (κ : Kinds n) where
       N₁ = setNode k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI)
       N₂ = setNode k₂ (take-st r₂) N₁
       TW = while-write S R sp si remP fc r₂ fl bud r1
+      -- the test stays open, so the writes end no outer and spend nothing
+      LV = live-for (λ { refl → refl })
+             (λ l → inj₂ (live-if-drop (map-f (Θ₃ , cutOutᵛ , ρ₃)) h₃ q refl refl
+                           (live-if-set (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q) k₂ (take-st r₂) N₁
+                              (λ _ → refl)
+                              (λ _ → cong spentAt (trans (set-above k₁ k₂ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI)
+                                                            (apart k₁ k₂ (cell-take {N = EvalSt.nodes stI} {k = k₁} {k′ = k₂} lk₁ lk₂))) lk₂))
+                              (live-if-set (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q) k₁ (cell-st {t = CutS unitᵗ s} fc) (EvalSt.nodes stI)
+                                 (λ _ → refl) (λ _ → cong spentAt lk₁)
+                                 (live-if-take h₂ (map-f (Θ₃ , cutOutᵛ , ρ₃) ↠[ h₃ ] q) (cong spentAt lk₂)
+                                    (live-if-drop (scan-f F₁ k₁) h₁ _ refl refl l))))))
+             lv
       lkP : lookupNode k (setNode k (take-st remP) (EvalSt.nodes stP)) ≡ just (take-st 1)
       lkP = subst (λ x → lookupNode k (setNode k (take-st remP) (EvalSt.nodes stP)) ≡ just (take-st x)) bud
                   (lookup-set k (take-st remP) (EvalSt.nodes stP))

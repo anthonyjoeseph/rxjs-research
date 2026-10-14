@@ -1,0 +1,4 @@
+name: agda-impl
+include: .
+depend: standard-library-2.3
+flags: --guardedness
