@@ -172,11 +172,11 @@ contact; it must be solid before Tier 2 is written over it.
   skip as the guard, then each subscriber in join order, a live joiner's
   delivery a `delivering` calm point, finitely many silent steps between by
   the list. Ruled out: a lagging copy free to show any value — `Lag` now
-  shows what the `Owed` list holds. Left: `feed-head`, the refocus from the
-  source onto a joiner and back, `Joined` naming each subscriber; then
-  `feed-start` and `feed-end`; then the same shape for `done-source`,
-  `next-outer` and `done-inner`. Decides whether `Owed` is enough to
-  refocus.
+  shows what the `Owed` list holds. Left: `feed-joiner`, the refocus from
+  the source up through the connect and down to a joiner in the body, and
+  back; then `feed-start`, `feed-pass`, `feed-end`; then the same shape
+  for `done-source`, `next-outer` and `done-inner`. Decides whether
+  `Owed` is enough to refocus.
 - **A FRAME, DELIVERED.** The frames `Above` does carry (`Climb`):
   `next-take` (a cut reaching the hole), `next-scan` (the accumulator
   written before the meaning steps), `next-inner`, `next-body`, `done-body`,
@@ -217,8 +217,11 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### The ledger
 
-- **`feed-head`** (Climb) — FALSITY, `NO EVIDENCE`: a subscriber the subject
-  holds is a joiner owed the source's value, refocused, or silenced.
+- **`feed-joiner`** (Climb) — FALSITY, `NO EVIDENCE`: a live subscriber is the
+  tree's joiner, refocused from the source into the body, its copy owed the
+  value.
+- **`feed-pass`** (Climb) — FALSITY, `NO EVIDENCE`: a silenced subscriber's
+  position owed to no copy, the run past it moving no lag.
 - **`feed-start`** (Climb) — FALSITY, `NO EVIDENCE`: the source's event a skip
   of the connect under the frames above, every subscriber owed it.
 - **`done-source`** (Climb) — FALSITY, `DEAD ROUTE`: a source's end, the
@@ -234,6 +237,8 @@ contact; it must be solid before Tier 2 is written over it.
   past its switch.
 - **`done-inner`** (Climb) — FALSITY, `DEAD ROUTE`: a lane's end handed on to
   the queue.
+- **`feed-flag`** (Climb) — FALSITY, `NO EVIDENCE`: every subscriber the
+  subject holds is a join's sink, behind its flag.
 - **`feed-end`** (Climb) — FALSITY, `NO EVIDENCE`: every subscriber fed,
   nothing owed but what was, the body past the source's event.
 - **`next-body`** (Climb) — FALSITY, `NO EVIDENCE`: a body's value is its

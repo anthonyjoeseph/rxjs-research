@@ -49,6 +49,7 @@ module Climbing (R : Set) where
   open Kit
   open FlatKit
   open Realizing R
+  open Canon using (joinerCb)
   open Contexts R
   open Middles R
   open Pure R using (State; Callbacks)
@@ -272,9 +273,26 @@ module Climbing (R : Set) where
       left    : Σ (Subs v A) λ fed → Σ (Subs v A) λ new
                 → fed ++ ss ++ new ≡ At.val (State.heap st′) (Subject.subscribers (wkSubject τ S))
 
-  -- The next subscriber of a feed, its position `j` the run's: silenced,
-  -- or a joiner in the body about to be shown `a`, the feed resuming on
-  -- the delivery's return.
+  -- A live joiner at the head of a feed, its flag `l`, refocused: about to
+  -- be shown `a` at its position `j`, the feed resuming on the delivery's
+  -- return.
+  record Joining {h v Δ A B} (L : Owed) (S : Subject A h) (c : Cut h) (u : Sink h ⊤) (s₀ : U.Node A) (mm : Maybe (U.Node A))
+                 (body : Sub h (A ∷ Δ) B) (k : Ctx h Δ B) (t : Sub h Δ A) (q : Pos) (a : A) (n′ : U.Node A) (fs : List (Firing h))
+                 (τ : h ⊑ʷ v) (sk : Sink v A) (j : Pos) (ss : Subs v A) (c′ : U.Node R) (st′ : State v) (l : Ref v (base Bool)) : Set₁ where
+    field
+      {Δj}       : List Set
+      {kj}       : Ctx v Δj A
+      {tj}       : Sub v Δj A
+      {nj nj′}   : U.Node A
+      slot       : Callbacks.onNext (cbs st′ sk) a ≗ readB l (λ b → when b (Observer.next (obsC kj) a))
+      mid        : Mid (Pend L q a ((sk , j) ∷ ss)) kj tj (just nj) (map (wkFiring τ) fs) c′ (record st′ { pos = q ++ [ subᴾ j ] })
+      shows      : U.step nj ≡ U.outˢ (q ++ [ subᴾ j ]) a nj′
+      fore       : AtC.Fore (State.heap st′) kj (q ++ [ subᴾ j ])
+      onward     : ∀ {v′} (τ′ : v ⊑ʷ v′) {st″ : State v′} {c″}
+                 → Back (Pend L q a ((sk , j) ∷ ss)) τ′ kj tj (q ++ [ subᴾ j ]) (just nj′) (map (wkFiring τ) fs) c″ st″
+                 → Feeding L S c u s₀ mm body k t q a n′ fs (τ ⨾ τ′) (wkSubs τ′ ss) c″ st″
+
+  -- The next subscriber of a feed: silenced, or a live joiner.
   data Head {h v Δ A B} (L : Owed) (S : Subject A h) (c : Cut h) (u : Sink h ⊤) (s₀ : U.Node A) (mm : Maybe (U.Node A))
             (body : Sub h (A ∷ Δ) B) (k : Ctx h Δ B) (t : Sub h Δ A) (q : Pos) (a : A) (n′ : U.Node A) (fs : List (Firing h))
             (τ : h ⊑ʷ v) (sk : Sink v A) (j : Pos) (ss : Subs v A) (c′ : U.Node R) (st′ : State v) : Set₁ where
@@ -282,13 +300,8 @@ module Climbing (R : Set) where
            → At.val (State.heap st′) l ≡ false → Callbacks.onNext (cbs st′ sk) a ≗ readB l (λ b → when b X)
            → Feeding L S c u s₀ mm body k t q a n′ fs τ ss c′ (record st′ { pos = q ++ [ subᴾ j ] })
            → Head L S c u s₀ mm body k t q a n′ fs τ sk j ss c′ st′
-    joins  : ∀ {Δj} {kj : Ctx v Δj A} {tj nj nj′} {l : Ref v (base Bool)}
-           → At.val (State.heap st′) l ≡ true → Callbacks.onNext (cbs st′ sk) a ≗ readB l (λ b → when b (Observer.next (obsC kj) a))
-           → Mid (Pend L q a ((sk , j) ∷ ss)) kj tj (just nj) (map (wkFiring τ) fs) c′ (record st′ { pos = q ++ [ subᴾ j ] })
-           → U.step nj ≡ U.outˢ (q ++ [ subᴾ j ]) a nj′ → AtC.Fore (State.heap st′) kj (q ++ [ subᴾ j ])
-           → (∀ {v′} (τ′ : v ⊑ʷ v′) {st″ : State v′} {c″}
-              → Back (Pend L q a ((sk , j) ∷ ss)) τ′ kj tj (q ++ [ subᴾ j ]) (just nj′) (map (wkFiring τ) fs) c″ st″
-              → Feeding L S c u s₀ mm body k t q a n′ fs (τ ⨾ τ′) (wkSubs τ′ ss) c″ st″)
+    joins  : ∀ {l : Ref v (base Bool)} → At.val (State.heap st′) l ≡ true
+           → Joining L S c u s₀ mm body k t q a n′ fs τ sk j ss c′ st′ l
            → Head L S c u s₀ mm body k t q a n′ fs τ sk j ss c′ st′
 
   postulate
@@ -300,12 +313,27 @@ module Climbing (R : Set) where
                → AtC.Fore (State.heap st) (sourceF S c u s₀ mm body ◂ k) (State.pos st)
                → Passes c₀ (λ c₁ → Feeding L S c u s₀ mm body k t (State.pos st) a n′ fs same (At.val (State.heap st) (Subject.subscribers S)) c₁ st)
 
-    -- A subscriber the subject holds: a joiner the tree holds, whose copy
-    -- is owed `a`, or one silenced.
-    feed-head : ∀ {h v Δ A B L} {S : Subject A h} {c u s₀ mm} {body : Sub h (A ∷ Δ) B} {k : Ctx h Δ B} {t q a n′ fs} {τ : h ⊑ʷ v}
+    -- Every subscriber the subject holds is a join's sink, its flag `l`.
+    feed-flag : ∀ {h v Δ A B L} {S : Subject A h} {c u s₀ mm} {body : Sub h (A ∷ Δ) B} {k : Ctx h Δ B} {t q a n′ fs} {τ : h ⊑ʷ v}
                   {sk j ss c′} {st′ : State v}
               → Feeding L S c u s₀ mm body k t q a n′ fs τ ((sk , j) ∷ ss) c′ st′
-              → Head L S c u s₀ mm body k t q a n′ fs τ sk j ss c′ st′
+              → Σ (Ref v (base Bool)) λ l → Σ (Observer A v) λ o → At.slotIs (State.heap st′) sk (joinerCb l o)
+
+    -- A silenced subscriber: no copy the tree holds is owed `a` at `j`,
+    -- and the run past `j` moves no lag.
+    feed-pass : ∀ {h v Δ A B L} {S : Subject A h} {c u s₀ mm} {body : Sub h (A ∷ Δ) B} {k : Ctx h Δ B} {t q a n′ fs} {τ : h ⊑ʷ v}
+                  {sk j ss c′} {st′ : State v} {l o}
+              → Feeding L S c u s₀ mm body k t q a n′ fs τ ((sk , j) ∷ ss) c′ st′
+              → At.slotIs (State.heap st′) sk (joinerCb l o) → At.val (State.heap st′) l ≡ false
+              → Feeding L S c u s₀ mm body k t q a n′ fs τ ss c′ (record st′ { pos = q ++ [ subᴾ j ] })
+
+    -- A live subscriber: the joiner the tree holds, refocused from the
+    -- source into the body, its copy owed `a` at `j`; and back.
+    feed-joiner : ∀ {h v Δ A B L} {S : Subject A h} {c u s₀ mm} {body : Sub h (A ∷ Δ) B} {k : Ctx h Δ B} {t q a n′ fs} {τ : h ⊑ʷ v}
+                    {sk j ss c′} {st′ : State v} {l o}
+                → Feeding L S c u s₀ mm body k t q a n′ fs τ ((sk , j) ∷ ss) c′ st′
+                → At.slotIs (State.heap st′) sk (joinerCb l o) → At.val (State.heap st′) l ≡ true
+                → Joining L S c u s₀ mm body k t q a n′ fs τ sk j ss c′ st′ l
 
     -- Every subscriber fed: nothing owed but what was, the body past `q`.
     feed-end : ∀ {h v Δ A B L} {S : Subject A h} {c u s₀ mm} {body : Sub h (A ∷ Δ) B} {k : Ctx h Δ B} {t q a n′ fs} {τ : h ⊑ʷ v}
@@ -315,6 +343,18 @@ module Climbing (R : Set) where
 
     -- Up to `_≗_`, a program in the world it was made in is itself.
     ≗-unweaken : ∀ {w B} {m m′ : Act w B} → m ≗ wkAct same m′ → m ≗ m′
+
+  -- A subscriber's flag read: silenced, or a live joiner.
+  feed-head : ∀ {h v Δ A B L} {S : Subject A h} {c u s₀ mm} {body : Sub h (A ∷ Δ) B} {k : Ctx h Δ B} {t q a n′ fs} {τ : h ⊑ʷ v}
+                {sk j ss c′} {st′ : State v}
+            → Feeding L S c u s₀ mm body k t q a n′ fs τ ((sk , j) ∷ ss) c′ st′
+            → Head L S c u s₀ mm body k t q a n′ fs τ sk j ss c′ st′
+  feed-head {a = a} {st′ = st′} Fd with feed-flag Fd
+  ... | l , o , slot = flag _ refl
+    where
+      flag : ∀ b → At.val (State.heap st′) l ≡ b → Head _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+      flag false e = hushed e (proj₁ slot a) (feed-pass Fd slot e)
+      flag true  e = joins e (feed-joiner Fd slot e)
 
   -- A silenced joiner's callback returns at once.
   hushed⇒ : ∀ {v} {st : State v} {l : Ref v (base Bool)} {X : Act v ⊤} {act : Act v ⊤} {kk : Act v ⊤} {w} {σ : w ⊑ʷ v} {K : Stack w ⊤}
@@ -353,9 +393,10 @@ module Climbing (R : Set) where
   feed (suc n) ((sk , j) ∷ ss) len Fd (goto≗ (send≗ r)) refl κ with feed-head Fd
   ... | hushed e cb Fd′ =
     tauˡ (tauˡ (taus (hushed⇒ cb e) (feed n ss (suc-injective len) Fd′ (subst (λ x → _ ≗ each x _) (wkSubs-same ss) (wk-each ss same r)) refl κ)))
-  feed {τ = τ} (suc n) ((sk , j) ∷ ss) len {σ = σ} {K = K} Fd (goto≗ (send≗ {k = kk} r)) refl κ | joins e cb M e′ F onward =
-    tauˡ (tauˡ (joined⇒ cb e M e′ refl F κ′))
+  feed {τ = τ} (suc n) ((sk , j) ∷ ss) len {σ = σ} {K = K} Fd (goto≗ (send≗ {k = kk} r)) refl κ | joins e J =
+    tauˡ (tauˡ (joined⇒ slot e mid shows refl fore κ′))
     where
+      open Joining J
       κ′ : ∀ {v′} (τ′ : _ ⊑ʷ v′) {st″ : State v′} {c″} → Back _ τ′ _ _ _ _ _ c″ st″
          → Seg nothing (trace ⟨ st″ , ret tt (same ⨾ τ′) (push (rest kk) (σ ⨾ τ) K) ⟩) (U.unfold c″)
       κ′ τ′ B rewrite same-⨾ τ′ = tauˡ (feed n (wkSubs τ′ ss) (trans (wkSubs-length τ′ ss) (suc-injective len)) (onward τ′ B) (wk-each ss τ′ r) (⨾-assoc σ τ τ′) κ)
