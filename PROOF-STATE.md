@@ -170,29 +170,24 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 ### Big picture tier roadmap
 
-- **B AGAINST THE MEANING THE PROOF USES.** `Oracle-CLI exact` holds each
-  observer to `Denote`'s approximants; `sim` is stated over `Unfold`, whose
-  joiners step COPIES of their source. Re-run the check with each observer
-  held to its own `Unfold` node. A failure means the proof would have to go
-  through the approximants, the route already abandoned. Decides whether B
-  is true of the meaning `sim` names.
-- **B AT THE CONNECT FEED'S EDGES.** Hand-written programs aimed where both
-  earlier routes died, under `Oracle-CLI exact`: a joiner whose delivery
-  subscribes a new joiner to the same subject mid-feed (the list is read
-  once); the body completing mid-feed, cutting a source still owing its
-  joiners; a connect inside a joiner's lane; a joiner bursting inline, the
-  feed suspended. Decides whether random seeds were hiding a counterexample.
-- **C, REFUTED OR STATED.** C says the machine is silent forever at a fixed
-  position exactly when the meaning skips forever there. Try to break it: a
-  connect whose source spins while its body has later events, a lane that
-  spins on subscribe, a switch onto a spinning lane, a `takeWhile` cutting a
-  spinning source. If they agree, state C in Agda with its measure, what is
-  finite between two position advances. Decides whether a measure exists.
-- **B'S STEP AT THE FEEDER, IN AGDA.** `sim` over B and C as leaves, then
-  B's preservation through the feeder's loop, proved: each parent's node
-  built from its children's, every sibling past the position by B itself
-  rather than a separate invariant, a joiner not yet fed merely ahead of the
-  position. Decides whether the step both earlier routes failed is local.
+- **SIM AS A GUARDED CORECURSION, C AS ITS MEASURE.** Write `sim`'s body:
+  a corecursion over a relation between the machine's state and an
+  `Unfold` node, silent steps on both sides paired, a one-sided wait an
+  inductive derivation. That derivation IS C's measure, and the relation
+  is B's carrier: define it, not postulate it, over the heap's live
+  observers and the nodes they are held to. Leaves: B kept by a step, and
+  the wait finite. Decides whether B and C, as `Oracle-CLI exact` and
+  `Oracle-CLI spin` test them, are what the corecursion consumes.
+- **B'S STEP AT THE FEEDER, IN AGDA.** B's preservation through the
+  feeder's loop, proved: each parent's node built from its children's,
+  every sibling past the position by B itself rather than a separate
+  invariant, a joiner not yet fed merely ahead of the position. Decides
+  whether the step both earlier routes failed is local.
+- **B'S STEP AT A DEATH, IN AGDA.** An observer dying mid-burst: a
+  `takeWhile` cutting, a switch moving off its lane, a connect's body
+  completing and its source stopped. The dead are owed nothing, so B must
+  drop them in the same step that kills them. Decides whether the death
+  rule is a function of the heap's flags.
 - **THE TRACTABLE REST, LAST.** Liveness in the heap's cut and closed flags;
   B's steps at `map`, `scan` and `defer`; each kernel's state as a function
   of what it was delivered; the root wiring; `ticks-up`. None is taken while

@@ -65,6 +65,15 @@ module Sim (R : Set) where
     -- observer is dead once it completes, a switch moves off it, or the
     -- observer that subscribed it is dead.
     --
+    -- Tested, both halves, against `Unfold`'s own node meanings, each
+    -- joiner held to its own copy of the source: the invariant on drawn
+    -- seeds (`Oracle-CLI exact`) and at the connect feed's edges, a
+    -- joiner subscribed or the body completing mid-feed
+    -- (`quickcheck.Adversary`); progress on programs spinning with no
+    -- budget, a source spinning beside its body's later events, a switch
+    -- onto a lane spinning on subscribe, a cut ending a source emitting
+    -- forever (`quickcheck.Spin`).
+    --
     -- DEAD ROUTE: one exact relation at a single hole of the tree,
     --   delivery climbing the context frame by frame.  A connect's feed
     --   and a lane bursting inline deliver at a context deeper than the
