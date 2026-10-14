@@ -31,7 +31,8 @@ open import Level using (lower)
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; PureObs; deferredᴺ; compileᴺ; runPure; toArray) renaming (_⊑_ to _≤ʷ_)
-open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ; _⊑_; ⊑-trans; _≃_; ≃-trans; limit; Chain; squeeze)
+open import denotation.MonotonicList using (ML; MonotonicList; coldᴰ; observe; root; ticks; Timeline; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; deferᴰ; connectᴰ; ⊥ᴰ)
+open import denotation.Order using (_⊑_; ⊑-trans; _≃_; ≃-trans; limit; Chain; squeeze)
 open import denotation.Denote using (DenEnv; flatOp; ⟦_⟧[_]; ⟦_⟧)
 open Run Pureᴾ
 

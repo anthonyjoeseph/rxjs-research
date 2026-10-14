@@ -167,23 +167,20 @@ must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE ORDER AND THE RELATION.** `_⊑_`, `_≃_`, `limit`, then `Rel` and
-  `RelSubj` as definitions. Every leaf below is stated in these, so a wrong
+- **THE RELATION.** `Rel` and `RelSubj` as definitions, over the proven order
+  in `denotation.Order`. Every leaf below is stated in these, so a wrong
   relation is wrong everywhere; decides whether the bound half ("on any budget,
   no more") holds of `connect`'s subject.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
 - **THE LIMITS.** `run-rel`, `run-bound`, `diagonal`, the two chains,
   `⟦⟧-limit` from `lub-limit` once the approximants are `Settling` (as `make
-  chain` measures), then `squeeze` with `⊑-trans` and `≃-trans`.
+  chain` measures); `squeeze` then meets them.
 
 ### The ledger
 
 - **`Rel`, `RelSubj`, `RelSubj-wk`** (Adequacy) — FALSITY, `NO EVIDENCE`: the
   logical relation between a kernel and a timeline, stable as the heap grows.
-- **`_⊑_`, `_≃_`, `limit`, `⊑-trans`, `≃-trans`, `squeeze`**
-  (denotation.MonotonicList) — FALSITY, `NO EVIDENCE`: the information order on
-  reported runs and its limits.
 - **`connect-rel`** (Adequacy) — FALSITY, `NO EVIDENCE`: the allocated subject
   against the hot handle.
 - **`{empty,of,map,scan,takeWhile,flatMap,cold,connected,defer,bot}-rel`**
