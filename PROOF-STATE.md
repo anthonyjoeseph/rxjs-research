@@ -172,12 +172,13 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 - **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
   turn; it gains a field placing every live node's next shown event past the
-  region the agenda owes, true at `carried-begin`; then the feed's case of
-  `kept` a body over it. The feeder
-  itself is ruled out as a refutation: a snapshot's joiners match the
-  meaning's drop criterion, joiners subscribed mid-feed or after the source
-  ends, and a body completing mid-feed, all agree. Decides whether the
-  position order alone orders the meaning's leaves against the machine.
+  region the agenda owes, true at `carried-begin`. Between turns the agenda
+  is empty, so `calm-fire` is its first test: every open node waits past the
+  next timer's cascade. Then the feed's case of `kept-run`. The feeder itself
+  is ruled out as a refutation: a snapshot's joiners match the meaning's drop
+  criterion, joiners subscribed mid-feed or after the source ends, and a body
+  completing mid-feed, all agree. Decides whether the position order alone
+  orders the meaning's leaves against the machine.
 - **B'S STEP AT A DEATH, IN AGDA.** An observer dying mid-burst: a
   `takeWhile` cutting, a switch moving off its lane, a connect's body
   completing and its source stopped. The dead are owed nothing, so B must
@@ -190,8 +191,14 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 ### The ledger
 
-- **`kept`** (Simulation) — FALSITY, `RECOVERY`: a carried state's step against
-  its configuration's, each side alone finitely often; B and C at once.
+- **`kept-run`** (Kept) — FALSITY, `RECOVERY`: code running, the agenda's next
+  call or a subscription beginning; the connect's feed is here.
+- **`calm-fire`** (Kept) — FALSITY, `NO EVIDENCE`: the next timer's cold live,
+  its frame's first step the meaning's next event.
+- **`kept-burst`** (Kept) — FALSITY, `NO EVIDENCE`: a cold's frame at its next
+  step, its subscriber asked if closed.
+- **`calm-hush`** (Kept) — FALSITY, `NO EVIDENCE`: no timer queued, the meaning
+  falls quiet by silent steps.
 - **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program
   pending at the root, carried.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never

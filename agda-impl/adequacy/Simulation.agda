@@ -30,6 +30,8 @@ open import denotation.MonotonicList using (Events; Events∞; out; skip; end; h
 open import denotation.Order using (_⊑_; Chain)
 open import denotation.Unfold using (⟦_⟧; Node; Srcs; subscribe; unfold; shown; outˢ; skipˢ; endˢ; hushˢ; ofᶜ; mapᶜ) renaming (step to stepᵁ; Step to Stepᵁ)
 open import adequacy.Carrier using (module Carrying)
+open import adequacy.Kept using (module Keeping)
+open import adequacy.Wait using (module Waiting)
 open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
 open import operation.PureObservable using (PureObs; module Pure)
@@ -37,6 +39,8 @@ open import operation.PureObservable using (PureObs; module Pure)
 module Sim (R : Set) where
   open Machine R using (Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix; Mach; ⟨_,_⟩; turn; Step; silent; value; complete; drained; step)
   open Machine R using () renaming (shown to shownᴹ)
+  open Waiting R using (Wait; both; outs; ends; idles; left; right)
+  open Keeping R using (kept)
   open Carrying R using (Carried; Owned; module At; module Against; Sub; Path; here; in-defer; spot; emitC
                         ; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ)
   open Pure R using (cutOff; frames; start)
@@ -64,56 +68,21 @@ module Sim (R : Set) where
   ------------------------------------------------------------------------
   -- The corecursion
 
-  -- The machine's next step against the meaning's: matched events and
-  -- paired silent steps guarded, a side's lone silent step inductive, so
-  -- each side passes finitely many alone.  `Rel` is where the
-  -- corecursion re-enters.
-  module _ {ℓ} (Rel : Mach → Node R → Set ℓ) where
-    data Wait : Step → Stepᵁ R → Set ℓ where
-      both  : ∀ {m c p} → Rel m c → Wait (silent m) (skipˢ p c)
-      outs  : ∀ {m c p a} → Rel m c → Wait (value (tick p) p a m) (outˢ p a c)
-      ends  : ∀ {p} → Wait (complete p) (endˢ p)
-      idles : Wait drained hushˢ
-      left  : ∀ {m s} → Wait (step m) s → Wait (silent m) s
-      right : ∀ {t c p} → Wait t (stepᵁ c) → Wait t (skipˢ p c)
+  -- `Rel` is where the corecursion re-enters.
+  module From {ℓ} {Rel : Mach → Node R → Set ℓ} (kept : ∀ {m c} → Rel m c → Wait Rel (step m) (stepᵁ c)) where
+    mutual
+      sim-from : ∀ {m c} → Rel m c → trace m ~ unfold c
+      sim-from r = go (kept r)
 
-    module From (kept : ∀ {m c} → Rel m c → Wait (step m) (stepᵁ c)) where
-      mutual
-        sim-from : ∀ {m c} → Rel m c → trace m ~ unfold c
-        sim-from r = go (kept r)
-
-        go : ∀ {t s} → Wait t s → shownᴹ t ~ shown s
-        go (both r)  = tau~ λ where .force → sim-from r
-        go (outs r)  = out~ λ where .force → sim-from r
-        go ends      = end~
-        go idles     = idle~
-        go (left w)  = tauˡ (go w)
-        go (right w) = skipʳ (go w)
+      go : ∀ {t s} → Wait Rel t s → shownᴹ t ~ shown s
+      go (both r)  = tau~ λ where .force → sim-from r
+      go (outs r)  = out~ λ where .force → sim-from r
+      go ends      = end~
+      go idles     = idle~
+      go (left w)  = tauˡ (go w)
+      go (right w) = skipʳ (go w)
 
   postulate
-    -- B KEPT, C FINITE: a carried state's next step, against its
-    -- configuration's, passes each side alone finitely often before the
-    -- two meet again carried, or end, or fall quiet together.
-    --
-    -- At a connect's feed the meaning's next shown event is the first
-    -- owed joiner's, at `q ++ [ sub j ]`, only if every other live node
-    -- reaches past it by silent steps; between the connect's own skip
-    -- and that delivery lie only the lag steps of joiners subscribed
-    -- mid-feed.  `Carried` holds nothing positional for nodes the agenda
-    -- does not owe, so this step needs a field placing each live node's
-    -- next shown event past the agenda's region.
-    --
-    -- Every node due before the next turn is owed (`Owned`): without it a
-    -- state between turns with an `of` open steps drained while the
-    -- meaning shows the `of`'s value, and `unowned` keeps that state out.
-    --
-    -- RECOVERY: `git show b75ee016` restores `adequacy.FeedTry`: an owed
-    --   joiner reaches its delivery after its lag's silent steps
-    --   (`joiner-delivers`); a lag behind the run's position is a lag
-    --   behind any joiner subscribed at or past it (`lags-later`); and
-    --   `<ᵖ-trans`.
-    kept : ∀ {m c} → Carried m c → Wait Carried (step m) (stepᵁ c)
-
     -- The run begins carried: the program pending at the root.
     carried-begin : (o : PureObs [] R) → Carried (begin o) (subscribe o [] root)
 
@@ -148,7 +117,7 @@ module Sim (R : Set) where
   --   transitive, total, past a position past everything under it, a
   --   burst's steps before its close, cascades never nesting.
   sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
-  sim o = From.sim-from Carried kept (carried-begin o)
+  sim o = From.sim-from kept (carried-begin o)
 
   ------------------------------------------------------------------------
   -- Nothing unowned is carried
