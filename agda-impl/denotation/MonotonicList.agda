@@ -268,12 +268,78 @@ private
   lt≢eq : lt ≡ eq → ⊥
   lt≢eq ()
 
+  gt-ℕ′ : ∀ {m n} → cmpℕ m n ≡ gt → n < m
+  gt-ℕ′ {m} {n} h with m <ᵇ n | n <ᵇ m in e
+  gt-ℕ′ {m} {n} () | true  | _
+  gt-ℕ′ {m} {n} h  | false | true  = <ᵇ⇒< n m (subst T (sym e) tt)
+  gt-ℕ′ {m} {n} () | false | false
+
+  gt-ℕ : ∀ {m n} → cmpℕ m n ≡ gt → cmpℕ n m ≡ lt
+  gt-ℕ {m} {n} h = ℕ-lt {n} {m} (gt-ℕ′ {m} {n} h)
+
+  lexi-gt : ∀ c r → lexi c r ≡ gt → c ≡ gt ⊎ (c ≡ eq × r ≡ gt)
+  lexi-gt lt r ()
+  lexi-gt eq r h = inj₂ (refl , h)
+  lexi-gt gt r h = inj₁ refl
+
+  mutual
+    gt-label : ∀ a b → cmpLabel a b ≡ gt → cmpLabel b a ≡ lt
+    gt-label (ix m)  (ix n)  h = gt-ℕ {m} {n} h
+    gt-label (sub _) (ix _)  _ = refl
+    gt-label (sub p) (sub q) h = gt-pos p q h
+    gt-label last    (ix _)  _ = refl
+    gt-label last    (sub _) _ = refl
+    gt-label (ix _)  (sub _) ()
+    gt-label (ix _)  last    ()
+    gt-label (sub _) last    ()
+    gt-label last    last    ()
+
+    gt-pos : ∀ p q → cmpPos p q ≡ gt → cmpPos q p ≡ lt
+    gt-pos []      []      ()
+    gt-pos []      (_ ∷ _) ()
+    gt-pos (_ ∷ _) []      _ = refl
+    gt-pos (a ∷ p) (b ∷ q) h with lexi-gt (cmpLabel a b) (cmpPos p q) h
+    ... | inj₁ x       rewrite gt-label a b x = refl
+    ... | inj₂ (x , y) rewrite subst (λ z → cmpLabel b z ≡ eq) (sym (eq-label a b x)) (refl-label b) = gt-pos p q y
+
+  nil-lt : ∀ p → cmpPos p [] ≡ lt → ⊥
+  nil-lt []      ()
+  nil-lt (_ ∷ _) ()
+
 -- Strict, and past a position is past everything under it.
 <ᵖ-asym : ∀ p q → p <ᵖ q ≡ true → q <ᵖ p ≡ false
 <ᵖ-asym p q h = isLt-not (cmpPos q p) λ e → lt≢eq (trans (sym (lt-pos p q p (isLt-lt h) e)) (refl-pos p))
 
 <ᵖ-ext : ∀ p q d → p <ᵖ q ≡ true → p <ᵖ (q ++ d) ≡ true
 <ᵖ-ext p q d h = cong isLt (lt-ext p q d (isLt-lt h))
+
+<ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
+<ᵖ-trans p q r h₁ h₂ = cong isLt (lt-pos p q r (isLt-lt h₁) (isLt-lt h₂))
+
+-- Total: what `p` precedes, anything `p` is not before precedes too.
+<ᵖ-past : ∀ p j q → p <ᵖ j ≡ false → p <ᵖ q ≡ true → j <ᵖ q ≡ true
+<ᵖ-past p j q h₁ h₂ = go (cmpPos p j) refl h₁
+  where go : ∀ c → cmpPos p j ≡ c → isLt c ≡ false → j <ᵖ q ≡ true
+        go lt e ()
+        go eq e _ = subst (λ z → z <ᵖ q ≡ true) (eq-pos p j e) h₂
+        go gt e _ = cong isLt (lt-pos j p q (gt-pos p j e) (isLt-lt h₂))
+
+-- An operator's effect comes before every subscription under it.
+<ᵖ-ix-sub : ∀ p n x → (p ++ [ ix n ]) <ᵖ (p ++ [ sub x ]) ≡ true
+<ᵖ-ix-sub []      n x = refl
+<ᵖ-ix-sub (a ∷ p) n x rewrite refl-label a = <ᵖ-ix-sub p n x
+
+-- Cascades never nest: one past a point under the burst at a non-empty
+-- `x ∷ r` is past every step of that burst.
+<ᵖ-cascade : ∀ x r d i Y a e → (x ∷ r ++ d) <ᵖ (ix a ∷ sub e ∷ []) ≡ true → (x ∷ r ++ ix i ∷ Y) <ᵖ (ix a ∷ sub e ∷ []) ≡ true
+<ᵖ-cascade x r d i Y a e h with lexi-lt (cmpLabel x (ix a)) (cmpPos (r ++ d) (sub e ∷ [])) (isLt-lt h)
+... | inj₁ l       rewrite l = refl
+... | inj₂ (l , m) rewrite l = below r m
+  where below : ∀ r → cmpPos (r ++ d) (sub e ∷ []) ≡ lt → isLt (cmpPos (r ++ ix i ∷ Y) (sub e ∷ [])) ≡ true
+        below []      _ = refl
+        below (y ∷ r) m with lexi-lt (cmpLabel y (sub e)) (cmpPos (r ++ d) []) m
+        ... | inj₁ l′      rewrite l′ = refl
+        ... | inj₂ (_ , n) = ⊥-elim (nil-lt (r ++ d) n)
 
 ------------------------------------------------------------------------
 -- What a subscriber sees

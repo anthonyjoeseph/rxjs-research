@@ -8,18 +8,24 @@
 -- step below the source's own position, at `ix 0`.
 module Focus where
 
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Properties using (++-assoc)
-open import Data.List.Relation.Unary.All using (All; []; _∷_; head)
-open import Data.List.Relation.Unary.All.Properties using (++⁺; ++⁻ʳ)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Properties using (++-assoc; ++-conicalˡ; ++-conicalʳ; ++-identityʳ)
+open import Data.List.Relation.Unary.All using (All; []; _∷_; head; lookup) renaming (map to mapᴬ)
+open import Data.List.Relation.Unary.All.Properties using (++⁺; ++⁻ˡ; ++⁻ʳ)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; Σ; _,_)
+open import Data.Maybe.Properties using (just-injective)
+open import Data.Product using (_×_; Σ; _,_; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Level using (Lift; lower; suc; zero) renaming (lift to up)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; trans; sym; subst)
 
-open import denotation.MonotonicList using (Pos; Frame; ix; _<ᵖ_; <ᵖ-asym; <ᵖ-ext)
+open import denotation.MonotonicList using (Pos; Frame; ix; sub; last; emit; stall; close; done; quiet; at; _<ᵖ_
+                                           ; <ᵖ-asym; <ᵖ-ext; <ᵖ-trans; <ᵖ-past; <ᵖ-ix-sub; <ᵖ-cascade)
 import denotation.Unfold as U
 open import denotation.Unfold using (Srcs)
 open import operation.AbstractObservable using (module Run)
@@ -41,7 +47,29 @@ Open : ∀ {A} → Pos → Maybe (U.Node A) → Set
 Open q nothing  = ⊤
 Open q (just n) = Later q n
 
+-- A step that shows something, after `q`.
+Leads : ∀ {A} → Pos → U.Step A → Set
+Leads q (U.outˢ k _ _) = q <ᵖ k ≡ true
+Leads q (U.skipˢ k _)  = q <ᵖ k ≡ true
+Leads q _              = ⊤
+
+-- A held source: one stepping beside a body, after `q`; one over, never shown.
+Beside : ∀ {A} → Pos → Maybe (U.Node A) → Set
+Beside q nothing  = ⊤
+Beside q (just x) = Leads q (U.step x)
+
+-- Past every step under `F`.
+Beyond : Pos → Pos → Set
+Beyond F k = ∀ Y → (F ++ Y) <ᵖ k ≡ true
+
 private
+  if-ok : ∀ {a p} {X : Set a} (P : X → Set p) b {x y : X} → P x → P y → P (if b then x else y)
+  if-ok P true  px _  = px
+  if-ok P false _  py = py
+
+  nope : ∀ {X : Set} → false ≡ true → X
+  nope ()
+
   -- The lane `earliest` finds, with the lanes around it.
   FoundIn : ∀ {B} → List (U.Node B) → U.Earliest B → Set₁
   FoundIn ls U.none                = Up ⊤
@@ -115,12 +143,159 @@ private
             → U.aheadˢ b sb s Q s₁ (U.beforeˢ Q sb) ≡ U.skipˢ Q (U.connectᶜ b s₁)
   ahead-src b sb s Q s₁ h = cong (U.aheadˢ b sb s Q s₁) (before-after Q sb h)
 
+  burst-head : ∀ {A t} τ r i (b : Frame A t) → U.headˢ (U.burstˢ τ r i b) ≡ just (r ++ [ ix i ])
+  burst-head τ r i (emit _ _) = refl
+  burst-head τ r i (stall _)  = refl
+  burst-head τ r i (close _)  = refl
+
+-- Where a configuration's next events lie: `Ok`, for a run at `pos`.  A
+-- source a joiner copies steps past the run, its copy where `Ok` holds.
+module Shape (pos : Pos) (Ok : Pos → Set) where
+  OkM : Maybe Pos → Set
+  OkM nothing  = ⊤
+  OkM (just k) = Ok k
+
+  Next : ∀ {A} → U.Node A → Set
+  Next n = OkM (U.headˢ (U.step n))
+
+  Opens : ∀ {A} → Maybe (U.Node A) → Set
+  Opens nothing  = ⊤
+  Opens (just n) = Next n
+
+  SrcM : Maybe Pos → Set
+  SrcM nothing  = ⊤
+  SrcM (just k) = pos <ᵖ k ≡ true × (∀ p → Ok (k ++ [ sub p ]))
+
+  Shows : ∀ {A} → Maybe (U.Node A) → Set
+  Shows nothing  = ⊤
+  Shows (just n) = SrcM (U.headˢ (U.step n))
+
+  Fine : ∀ {Δ} → All (λ A → Maybe (U.Node A)) Δ → Set
+  Fine []      = ⊤
+  Fine (m ∷ ν) = Shows m × Fine ν
+
+  fine-at : ∀ {Δ A} {ν : All (λ A → Maybe (U.Node A)) Δ} → Fine ν → (x : A ∈ Δ) → Shows (lookup ν x)
+  fine-at {ν = _ ∷ _} (s , _) (here refl) = s
+  fine-at {ν = _ ∷ _} (_ , f) (there x)   = fine-at f x
+
+weaken : ∀ {pos} {Ok Ok′ : Pos → Set} → (∀ {k} → Ok k → Ok′ k) → ∀ {Δ} (ν : All (λ A → Maybe (U.Node A)) Δ)
+       → Shape.Fine pos Ok ν → Shape.Fine pos Ok′ ν
+weaken w []           _       = tt
+weaken w (nothing ∷ ν) (_ , f) = tt , weaken w ν f
+weaken {pos} {Ok} {Ok′} w (just n ∷ ν) (s , f) = src (U.headˢ (U.step n)) s , weaken w ν f
+  where src : ∀ mk → Shape.SrcM pos Ok mk → Shape.SrcM pos Ok′ mk
+        src nothing  _        = tt
+        src (just k) (pk , o) = pk , λ p → w (o p)
+
+-- Every step a node takes lies below one of its parts' next events, or
+-- below the source a joiner copies.
+module Steps (pos : Pos) (Ok : Pos → Set) (ext : ∀ k X → Ok k → Ok (k ++ X)) (above : ∀ {k} → Ok k → pos <ᵖ k ≡ true) where
+  open Shape pos Ok
+
+  shows : ∀ {A} (m : Maybe (U.Node A)) → Opens m → Shows m
+  shows nothing  _ = tt
+  shows (just n) o = src (U.headˢ (U.step n)) o
+    where src : ∀ mk → OkM mk → SrcM mk
+          src nothing  _ = tt
+          src (just k) h = above h , λ p → ext k [ sub p ] h
+
+  burst-ok : ∀ {A t} τ r i (b : Frame A t) → Ok (r ++ [ ix i ]) → OkM (U.headˢ (U.burstˢ τ r i b))
+  burst-ok τ r i b h = subst OkM (sym (burst-head τ r i b)) h
+
+  map-ok : ∀ {A B} (f : A → B) (s : U.Step A) → OkM (U.headˢ s) → OkM (U.headˢ (U.mapˢ f s))
+  map-ok f (U.outˢ _ _ _) h = h
+  map-ok f (U.skipˢ _ _)  h = h
+  map-ok f (U.endˢ _)     h = h
+  map-ok f U.hushˢ        h = h
+
+  scan-ok : ∀ {A B} (f : B → A → B) z (s : U.Step A) → OkM (U.headˢ s) → OkM (U.headˢ (U.scanˢ f z s))
+  scan-ok f z (U.outˢ _ _ _) h = h
+  scan-ok f z (U.skipˢ _ _)  h = h
+  scan-ok f z (U.endˢ _)     h = h
+  scan-ok f z U.hushˢ        h = h
+
+  take-ok : ∀ {A} i (p : A → Bool) (s : U.Step A) → OkM (U.headˢ s) → OkM (U.headˢ (U.takeWhileˢ i p s))
+  take-ok i p (U.outˢ k a c) h = taking i (p a)
+    where taking : ∀ i b → OkM (U.headˢ (U.taking i p k a c b))
+          taking i     true  = h
+          taking true  false = h
+          taking false false = ext k [ last ] h
+  take-ok i p (U.skipˢ _ _) h = h
+  take-ok i p (U.endˢ _)    h = h
+  take-ok i p U.hushˢ       h = h
+
+  outer-ok : ∀ {A B} op (g : A → Pos → U.Node B) (s : U.Step A) ls qs → OkM (U.headˢ s) → OkM (U.headˢ (U.outerˢ op g s ls qs))
+  outer-ok op g (U.outˢ q a o) ls      qs      h = ext q [ ix 0 ] h
+  outer-ok op g (U.skipˢ q o)  ls      qs      h = h
+  outer-ok op g (U.endˢ c)     []      []      h = h
+  outer-ok op g (U.endˢ c)     []      (_ ∷ _) h = h
+  outer-ok op g (U.endˢ c)     (_ ∷ _) _       h = h
+  outer-ok op g U.hushˢ        ls      qs      h = tt
+
+  lane-ok : ∀ {A B} op (g : A → Pos → U.Node B) o bs (s : U.Step B) as qs → OkM (U.headˢ s) → OkM (U.headˢ (U.laneˢ op g o bs s as qs))
+  lane-ok op g o        bs      (U.outˢ k b c) as      qs       h = h
+  lane-ok op g o        bs      (U.skipˢ k c)  as      qs       h = h
+  lane-ok op g o        bs      (U.endˢ c)     as      (_ ∷ _)  h = ext c [ ix 0 ] h
+  lane-ok op g nothing  []      (U.endˢ c)     []      []       h = h
+  lane-ok op g nothing  []      (U.endˢ c)     (_ ∷ _) []       h = h
+  lane-ok op g nothing  (_ ∷ _) (U.endˢ c)     as      []       h = h
+  lane-ok op g (just _) bs      (U.endˢ c)     as      []       h = h
+  lane-ok op g o        bs      U.hushˢ        as      qs       h = tt
+
+  race-ok : ∀ {A B} op (g : A → Pos → U.Node B) o so mk k bs l (s : U.Step B) as qs → OkM (U.headˢ so) → OkM (U.headˢ s)
+          → OkM (U.headˢ (U.raceˢ op g o so mk k bs l s as qs))
+  race-ok op g o so nothing   k bs l s as qs ho hl = lane-ok op g (just o) bs s as qs hl
+  race-ok op g o so (just k′) k bs l s as qs ho hl =
+    if-ok (λ z → OkM (U.headˢ z)) (k′ <ᵖ k) (outer-ok op g so (bs ++ l ∷ as) qs ho) (lane-ok op g (just o) bs s as qs hl)
+
+  go-ok : ∀ {A B} op (g : A → Pos → U.Node B) (o : Maybe (U.Node A)) ls qs → Opens o → All Next ls
+        → (e : U.Earliest B) → FoundIn ls e → OkM (U.headˢ (U.goˢ op g o ls qs e))
+  go-ok op g nothing  ls qs _  _ U.none _ = tt
+  go-ok op g (just o) ls qs ho _ U.none _ = outer-ok op g (U.step o) ls qs ho
+  go-ok op g nothing  _  qs _  a (U.found k bs l s as) (refl , refl , _) = lane-ok op g nothing bs (U.step l) as qs (head (++⁻ʳ bs a))
+  go-ok op g (just o) _  qs ho a (U.found k bs l s as) (refl , refl , _) =
+    race-ok op g o (U.step o) (U.headˢ (U.step o)) k bs l (U.step l) as qs ho (head (++⁻ʳ bs a))
+
+  ahead-ok : ∀ {A B} (b : U.Node B) (sb : U.Step B) (x : U.Node A) Q x′ c → OkM (U.headˢ sb) → Ok Q
+           → OkM (U.headˢ (U.aheadˢ b sb x Q x′ c))
+  ahead-ok b sb             x Q x′ true  hb hq = hq
+  ahead-ok b (U.outˢ _ _ _) x Q x′ false hb hq = hb
+  ahead-ok b (U.skipˢ _ _)  x Q x′ false hb hq = hb
+  ahead-ok b (U.endˢ _)     x Q x′ false hb hq = hb
+  ahead-ok b U.hushˢ        x Q x′ false hb hq = tt
+
+  rejoin-ok : ∀ {A} j i (s : U.Step A) → pos <ᵖ j ≡ false → SrcM (U.headˢ s) → OkM (U.headˢ (U.rejoinˢ j i s))
+  rejoin-ok j i (U.outˢ q a c) pj (pq , o) = shown (j <ᵖ q) (<ᵖ-past pos j q pj pq)
+    where shown : ∀ b → b ≡ true → OkM (U.headˢ (U.shownˢ j i q (just a) c b))
+          shown true  _ = o j
+          shown false ()
+  rejoin-ok {A} j i (U.skipˢ q c) pj (pq , o) = shown (j <ᵖ q) (<ᵖ-past pos j q pj pq)
+    where shown : ∀ b → b ≡ true → OkM (U.headˢ (U.shownˢ {A} j i q nothing c b))
+          shown true  _ = o j
+          shown false ()
+  rejoin-ok {A} j i (U.endˢ c) pj (pc , o) = ended (j <ᵖ c) (<ᵖ-past pos j c pj pc)
+    where ended : ∀ b → b ≡ true → OkM (U.headˢ (if b then U.endˢ {A} (c ++ [ sub j ]) else U.endˢ (j ++ [ last ])))
+          ended true  _ = o j
+          ended false ()
+  rejoin-ok j i U.hushˢ _ _ = tt
+
+  opens-if : ∀ {A} b {m : Maybe (U.Node A)} → Opens m → Opens (if b then m else nothing)
+  opens-if true  h = h
+  opens-if false h = tt
+
+  live-or : ∀ {A} b {n : U.Node A} → (b ≡ false → Next n) → Opens (if b then nothing else just n)
+  live-or true  _ = tt
+  live-or false k = k refl
+
 module Focusing (R : Set) where
   open Run (Pureᴾ R) using (Env; module Kit; module FlatKit)
   open FlatKit using (Flat)
-  open Realizing R using (Sub; Lane; lane; Phase; nodeOf; Holding; firing; Spot; SpotLanes; cold-here; in-map; in-scan; in-take; in-outer
-                         ; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; spot-of; phaseAt; phaseAtLanes; over; module At)
-  open Pure R using (State; get)
+  open Realizing R using (Sub; Lane; lane; Phase; nodeOf; Holding; Firing; firing; Spot; SpotLanes; cold-here; in-map; in-scan; in-take
+                         ; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; spot-of; spot-lanes; spot-step
+                         ; phaseAt; phaseAtLanes; over; one; firings; laneFirings; pendings; lanePendings; joiners; laneJoiners
+                         ; Joiner; coldˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ
+                         ; waiting; popped; playing; module At)
+  open Pure R using (State; Timer; get; cascade)
 
   -- Where the cold's step at `q` is shown at the root.
   mutual
@@ -139,6 +314,24 @@ module Focusing (R : Set) where
     liftLanes (this-lane p) q = lift p q
     liftLanes (next-lane p) q = liftLanes p q
 
+  -- Lifted, the step stays under where it was.
+  mutual
+    lift-ext : ∀ {h Δ A B} {t : Sub h Δ A} {s : Sink h B} {hd} (sp : Spot t s hd) q → Σ Pos λ Y → lift sp q ≡ q ++ Y
+    lift-ext cold-here     q = [] , sym (++-identityʳ q)
+    lift-ext (in-map p)    q = lift-ext p q
+    lift-ext (in-scan p)   q = lift-ext p q
+    lift-ext (in-take p)   q = lift-ext p q
+    lift-ext (in-outer p)  q = lift-ext p q
+    lift-ext (in-lanes p)  q = lift-ext-lanes p q
+    lift-ext (in-source p) q with lift-ext p q
+    ... | Y , e = Y ++ [ ix 0 ] , trans (cong (_++ [ ix 0 ]) e) (++-assoc q Y [ ix 0 ])
+    lift-ext (in-body p)   q = lift-ext p q
+    lift-ext (in-defer p)  q = lift-ext p q
+
+    lift-ext-lanes : ∀ {h Δ B C} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} (sp : SpotLanes ls s hd) q → Σ Pos λ Y → liftLanes sp q ≡ q ++ Y
+    lift-ext-lanes (this-lane p) q = lift-ext p q
+    lift-ext-lanes (next-lane p) q = lift-ext-lanes p q
+
   module On {h : World} (H : All (Pure.Val R h) h) where
     open At H
 
@@ -153,7 +346,7 @@ module Focusing (R : Set) where
       Clear (in-lanes {t = so} p)                      E ρ q = ClearLanes p E ρ q × Up (Open (liftLanes p q) (part so E ρ))
       Clear (in-source {S = S} {s₀ = s₀} {u = u} p)    E ρ q =
         Clear p E ρ q × Up (Open (lift p q ++ [ ix 0 ]) (part u (S ∷ E) (s₀ ∷ ρ)))
-      Clear (in-body {S = S} {s₀ = s₀} {m = m} p)      E ρ q = Clear p (S ∷ E) (s₀ ∷ ρ) q × Up (Open (lift p q) m)
+      Clear (in-body {S = S} {s₀ = s₀} {m = m} p)      E ρ q = Clear p (S ∷ E) (s₀ ∷ ρ) q × Up (Beside (lift p q) m)
       Clear (in-defer p)                               E ρ q = Clear p E ρ q
 
       ClearLanes : ∀ {Δ B C} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → Env Δ h → Srcs Δ → Pos → Set₁
@@ -192,7 +385,7 @@ module Focusing (R : Set) where
       merged-lanes op g nothing  (_ ∷ _) n as qs = refl
 
       -- A connect's body steps first, the source it holds next stepping later.
-      beside-body : ∀ {A B} (b : U.Node B) {L b₁} (x : U.Node A) sx → U.step b ≡ U.skipˢ L b₁ → After L (U.headˢ sx)
+      beside-body : ∀ {A B} (b : U.Node B) {L b₁} (x : U.Node A) sx → U.step b ≡ U.skipˢ L b₁ → Leads L sx
                   → Σ (U.Node B) λ n₁ → U.besideˢ b (U.step b) x sx ≡ U.skipˢ L n₁
                                       × connected (if over sx then nothing else just x) (just b₁) ≡ just n₁
       beside-body b {L} {b₁} x (U.outˢ k _ x′) sb h =
@@ -283,13 +476,226 @@ module Focusing (R : Set) where
               spread : ∀ ls′ x → partLanes ls′ E ρ ≡ bs ++ x ∷ as → partLanes (lane c k t ∷ ls′) E ρ ≡ (L₀ ++ bs) ++ x ∷ as
               spread ls′ x pl′ = trans (lanes-split (lane c k t) ls′ E ρ) (trans (cong (L₀ ++_) pl′) (sym (++-assoc L₀ bs (x ∷ as))))
 
-  postulate
-    -- At a burst boundary every other node's next event comes after the
-    -- firing cold's step: another cold's is a queued timer's, past the
-    -- run's position (`Ordered`, `Timed`) and so past every step of a
-    -- frame the run is short of (`behind`); a joiner's copy is its
-    -- source's (`caught`), shown below its own join point (`past`).
-    clear : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
-          → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
-          → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
-          → On.Clear (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) [] [] q
+    -- With no cold firing in it, what is open next steps where `Ok`
+    -- holds, when every live cold's timer does and every source a joiner
+    -- copies is `Fine`: a joiner sits at or before the run (`past`), so
+    -- its copy is shown below its source's step.
+    module Far (pos : Pos) (Ok : Pos → Set) (ext : ∀ k X → Ok k → Ok (k ++ X)) (above : ∀ {k} → Ok k → pos <ᵖ k ≡ true) where
+      open Shape pos Ok
+      open Steps pos Ok ext above
+
+      merged-ok : ∀ {A B} op (g : A → Pos → U.Node B) o ls qs → Opens o → All Next ls → Opens (merged op g o ls qs)
+      merged-ok op g (just o) ls       qs       ho a = go-ok op g (just o) ls qs ho a (U.earliest ls) (found-in ls)
+      merged-ok op g nothing  (l ∷ ls) qs       ho a = go-ok op g nothing (l ∷ ls) qs ho a (U.earliest (l ∷ ls)) (found-in (l ∷ ls))
+      merged-ok op g nothing  []       []       ho a = tt
+      merged-ok op g nothing  []       (_ ∷ _)  ho a = tt
+
+      beside-ok : ∀ {A B} (b : U.Node B) (sb : U.Step B) (x : U.Node A) (sx : U.Step A) → OkM (U.headˢ sb)
+                → OkM (U.headˢ sx) ⊎ over sx ≡ true → OkM (U.headˢ (U.besideˢ b sb x sx))
+      beside-ok b sb x (U.outˢ q _ x′) hb (inj₁ h) = ahead-ok b sb x (q ++ [ ix 0 ]) x′ (U.beforeˢ (q ++ [ ix 0 ]) sb) hb (ext q [ ix 0 ] h)
+      beside-ok b sb x (U.outˢ q _ x′) hb (inj₂ ())
+      beside-ok b sb x (U.skipˢ q x′)  hb (inj₁ h) = ahead-ok b sb x (q ++ [ ix 0 ]) x′ (U.beforeˢ (q ++ [ ix 0 ]) sb) hb (ext q [ ix 0 ] h)
+      beside-ok b sb x (U.skipˢ q x′)  hb (inj₂ ())
+      beside-ok b sb x (U.endˢ _)      hb _ = hb
+      beside-ok b sb x U.hushˢ         hb _ = hb
+
+      conn-ok : ∀ {A B} (m ps : Maybe (U.Node A)) (pb : Maybe (U.Node B)) → Kept m ps → Opens ps → Opens pb → Opens (connected m pb)
+      conn-ok m        ps        nothing  _  _  _  = tt
+      conn-ok nothing  ps        (just b) _  _  hb = hb
+      conn-ok (just x) (just s′) (just b) refl hs hb = beside-ok b (U.step b) x (U.step x) hb (inj₁ hs)
+      conn-ok (just x) nothing   (just b) kp _  hb = beside-ok b (U.step b) x (U.step x) hb (inj₂ (lower kp))
+
+      opens-map : ∀ {A B} (f : U.Node A → U.Node B) (m : Maybe (U.Node A)) → (∀ n → Next n → Next (f n)) → Opens m → Opens (mapᴹ f m)
+      opens-map f nothing  _ _ = tt
+      opens-map f (just n) k h = k n h
+
+      cons-ok : ∀ {B} (m : Maybe (U.Node B)) {ls} → Opens m → All Next ls → All Next (consᴹ m ls)
+      cons-ok nothing  _ a = a
+      cons-ok (just n) h a = h ∷ a
+
+      mutual
+        far : ∀ {Δ A} (t : Sub h Δ A) {E ρ} {ν : Now Δ} → firings t ≡ [] → Gated t E ρ → Caught t E ρ ν → Fine ν
+            → All (λ tm → spentʰ (Timer.handle tm) ≡ false → Ok (cascade tm)) (pendings t)
+            → All (λ j → pos <ᵖ Joiner.at′ j ≡ false) (joiners t E)
+            → Opens (part t E ρ)
+        far (coldˢ s hd (waiting τ e (at t′ _ b))) _ _ _ _ (pt ∷ []) _ =
+          live-or (spentʰ hd) (λ lv → burst-ok τ _ 0 b (ext _ [ ix 0 ] (pt lv)))
+        far (coldˢ s hd (waiting τ e quiet))       _ _ _ _ _ _ = live-or (spentʰ hd) (λ _ → tt)
+        far (coldˢ s hd (waiting τ e done))        _ g _ _ _ _ = live-or (spentʰ hd) (λ lv → nope (lower g lv))
+        far (coldˢ s hd (popped _ _ _ _ _)) ()
+        far (coldˢ s hd (playing _ _ _ _))  ()
+        far doneˢ _ _ _ _ _ _ = tt
+        far (mapˢ f t) {E} {ρ} fz g c fn pt pj = opens-map (U.mapᶜ f) (part t E ρ) (λ n → map-ok f (U.step n)) (far t fz g c fn pt pj)
+        far (scanˢ f r t) {E} {ρ} fz g c fn pt pj =
+          opens-map (U.scanᶜ f (val r)) (part t E ρ) (λ n → scan-ok f (val r) (U.step n)) (far t fz g c fn pt pj)
+        far (takeWhileˢ i p c k t) {E} {ρ} fz (_ , g) cc fn pt pj =
+          opens-if (val (Kit.live c)) (opens-map (U.takeWhileᶜ i p) (part t E ρ) (λ n → take-ok i p (U.step n)) (far t fz g cc fn pt pj))
+        far (flatMapˢ op f fl oc k r so ls) {E} {ρ} fz (g , gl) (cs , cl) fn pt pj =
+          merged-ok op (λ a q → U.subscribe (f a) ρ q) (part so E ρ) (partLanes ls E ρ) (val (Flat.queue fl))
+            (far so (++-conicalˡ (firings so) _ fz) g cs fn (++⁻ˡ (pendings so) pt) (++⁻ˡ (joiners so E) pj))
+            (far-lanes ls (++-conicalʳ (firings so) _ fz) gl cl fn (++⁻ʳ (pendings so) pt) (++⁻ʳ (joiners so E) pj))
+        far (connectˢ S c k s₀ m src body) {E} {ρ} fz (km , _ , gs , gb) (cs , cb) fn pt pj =
+          conn-ok m (part src E ρ) (part body (S ∷ E) (s₀ ∷ ρ)) km hs
+            (far body (++-conicalʳ (firings src) _ fz) gb cb (shows (part src E ρ) hs , fn) (++⁻ʳ (pendings src) pt) (++⁻ʳ (joiners src E) pj))
+          where hs = far src (++-conicalˡ (firings src) _ fz) gs cs fn (++⁻ˡ (pendings src) pt) (++⁻ˡ (joiners src E) pj)
+        far (joinˢ j i sk l x cp) {ν = ν} _ _ cj fn _ (pj ∷ []) = join-ok (val l) cj
+          where join-ok : ∀ b → (b ≡ true → lookup ν x ≡ just cp) → Opens (if b then just (U.joinᶜ j i cp) else nothing)
+                join-ok false _ = tt
+                join-ok true  e = rejoin-ok j i (U.step cp) pj (subst (λ z → Shows z) (e refl) (fine-at fn x))
+        far (deferˢ k t) fz g c fn pt pj = far t fz g c fn pt pj
+
+        far-lanes : ∀ {Δ B} (ls : List (Lane h Δ B)) {E ρ} {ν : Now Δ} → laneFirings ls ≡ [] → GatedLanes ls E ρ → CaughtLanes ls E ρ ν → Fine ν
+                  → All (λ tm → spentʰ (Timer.handle tm) ≡ false → Ok (cascade tm)) (lanePendings ls)
+                  → All (λ j → pos <ᵖ Joiner.at′ j ≡ false) (laneJoiners ls E)
+                  → All Next (partLanes ls E ρ)
+        far-lanes [] _ _ _ _ _ _ = []
+        far-lanes (lane c k t ∷ ls) {E} {ρ} fz (_ , g , gl) (ct , cl) fn pt pj =
+          if-ok (All Next) (val (Kit.live c))
+                (cons-ok (part t E ρ) (far t (++-conicalˡ (firings t) _ fz) g ct fn (++⁻ˡ (pendings t) pt) (++⁻ˡ (joiners t E) pj)) rest) rest
+          where rest = far-lanes ls (++-conicalʳ (firings t) _ fz) gl cl fn (++⁻ʳ (pendings t) pt) (++⁻ʳ (joiners t E) pj)
+
+    -- Every sibling of the cold firing at `F` steps past the burst there,
+    -- the run at `pos` short of it: but a connect's body, its source
+    -- firing, steps after the source's step below its own position, its
+    -- joiners' copies shown below that step.
+    module Clearing (pos F : Pos) (pF : pos <ᵖ F ≡ true) where
+      beyond-ext : ∀ k X → Beyond F k → Beyond F (k ++ X)
+      beyond-ext k X h Y = <ᵖ-ext (F ++ Y) k X (h Y)
+
+      beyond-above : ∀ {k} → Beyond F k → pos <ᵖ k ≡ true
+      beyond-above {k} h = <ᵖ-trans pos F k pF (subst (λ z → z <ᵖ k ≡ true) (++-identityʳ F) (h []))
+
+      open Shape pos (Beyond F)
+      open Steps pos (Beyond F) beyond-ext beyond-above using (shows)
+      open Far pos (Beyond F) beyond-ext beyond-above
+
+      Under : Pos → Set
+      Under L = Σ Pos λ Y → L ≡ F ++ Y
+
+      under : ∀ {L} → Under L → pos <ᵖ L ≡ true
+      under (Y , refl) = <ᵖ-ext pos F Y pF
+
+      past : ∀ {L} → Under L → ∀ X {k} → Beyond F k → (L ++ X) <ᵖ k ≡ true
+      past (Y , refl) X {k} h = subst (λ z → z <ᵖ k ≡ true) (sym (++-assoc F Y X)) (h (Y ++ X))
+
+      later : ∀ {L} → Under L → ∀ mk → OkM mk → After L mk
+      later _        nothing  _ = tt
+      later (Y , refl) (just k) h = h Y
+
+      open-of : ∀ {A L} → Under L → (m : Maybe (U.Node A)) → Opens m → Open L m
+      open-of w nothing  _ = tt
+      open-of w (just n) h = later w (U.headˢ (U.step n)) h
+
+      leads : ∀ {A L} → Under L → (sx : U.Step A) → OkM (U.headˢ sx) ⊎ over sx ≡ true → Leads L sx
+      leads (Y , refl) (U.outˢ k _ _) (inj₁ h) = h Y
+      leads _          (U.outˢ k _ _) (inj₂ ())
+      leads (Y , refl) (U.skipˢ k _)  (inj₁ h) = h Y
+      leads _          (U.skipˢ k _)  (inj₂ ())
+      leads _          (U.endˢ _)     _ = tt
+      leads _          U.hushˢ        _ = tt
+
+      beside : ∀ {A L} → Under L → (m ps : Maybe (U.Node A)) → Kept m ps → Opens ps → Beside L m
+      beside w nothing  ps        _    _ = tt
+      beside w (just x) (just s′) refl h = leads w (U.step x) (inj₁ h)
+      beside w (just x) nothing   kp   _ = leads w (U.step x) (inj₂ (lower kp))
+
+      -- The body beside a source whose step at `L` comes first.
+      first : ∀ {L} → Under L → ∀ mk → Shape.OkM pos (λ k → (L ++ [ ix 0 ]) <ᵖ k ≡ true) mk → After (L ++ [ ix 0 ]) mk
+      first _ nothing  _ = tt
+      first _ (just k) h = h
+
+      mutual
+        clear-at : ∀ {Δ A} (t : Sub h Δ A) {f} (e : firings t ≡ f ∷ []) {E ρ} {ν : Now Δ} {ph : Phase (Firing.A f)}
+                 → spentʰ (Firing.handle f) ≡ false → Gated t E ρ → Caught t E ρ ν → Fine ν
+                 → All (λ tm → spentʰ (Timer.handle tm) ≡ false → Beyond F (cascade tm)) (pendings t)
+                 → All (λ j → pos <ᵖ Joiner.at′ j ≡ false) (joiners t E)
+                 → U.step (nodeOf (phaseAt (spot-of t e))) ≡ U.skipˢ F (nodeOf ph)
+                 → Clear (spot-of t e) E ρ F
+        clear-at (coldˢ s hd (waiting _ _ _))    ()
+        clear-at (coldˢ s hd (popped _ _ _ _ _)) refl _ _ _ _ _ _ _ = up tt
+        clear-at (coldˢ s hd (playing _ _ _ _))  refl _ _ _ _ _ _ _ = up tt
+        clear-at doneˢ ()
+        clear-at (mapˢ f t)             e lv g      c  fn pt pj sn = clear-at t e lv g c fn pt pj sn
+        clear-at (scanˢ f r t)          e lv g      c  fn pt pj sn = clear-at t e lv g c fn pt pj sn
+        clear-at (takeWhileˢ i p c k t) e lv (_ , g) cc fn pt pj sn = clear-at t e lv g cc fn pt pj sn
+        clear-at (flatMapˢ op f fl oc k r so ls) e {E} {ρ} lv (g , gl) (cs , cl) fn pt pj sn with one (firings so) (laneFirings ls) e
+        ... | inj₁ (e′ , z) =
+          clear-at so e′ lv g cs fn (++⁻ˡ (pendings so) pt) (++⁻ˡ (joiners so E) pj) sn
+          , mapᴬ (λ {n} h → later (lift-ext (spot-of so e′) F) (U.headˢ (U.step n)) h)
+                 (far-lanes ls z gl cl fn (++⁻ʳ (pendings so) pt) (++⁻ʳ (joiners so E) pj))
+        ... | inj₂ (z , e′) =
+          clear-lanes ls e′ lv gl cl fn (++⁻ʳ (pendings so) pt) (++⁻ʳ (joiners so E) pj) sn
+          , up (open-of (lift-ext-lanes (spot-lanes ls e′) F) (part so E ρ) (far so z g cs fn (++⁻ˡ (pendings so) pt) (++⁻ˡ (joiners so E) pj)))
+        clear-at (connectˢ S c k s₀ m src body) e {E} {ρ} {ν} {ph} lv (km , _ , gs , gb) (cs , cb) fn pt pj sn
+          with one (firings src) (firings body) e
+        ... | inj₁ (e′ , z) with clear-at src e′ lv gs cs fn (++⁻ˡ (pendings src) pt) (++⁻ˡ (joiners src E) pj) sn
+        ...   | cp with lift-skip (spot-of src e′) {E} {ρ} {F} {ph} lv gs cp sn
+        ...     | n , _ , o , st , _ =
+          cp , up (body-first (part body (S ∷ E) (s₀ ∷ ρ))
+                     (FS.far body z gb cb (src-first , weaken (past w [ ix 0 ]) ν fn)
+                             (mapᴬ (λ h lv′ → past w [ ix 0 ] (h lv′)) (++⁻ʳ (pendings src) pt)) (++⁻ʳ (joiners src E) pj)))
+          where L = lift (spot-of src e′) F
+                w = lift-ext (spot-of src e′) F
+                OkS : Pos → Set
+                OkS k = (L ++ [ ix 0 ]) <ᵖ k ≡ true
+                module FS = Far pos OkS (λ k X h → <ᵖ-ext (L ++ [ ix 0 ]) k X h)
+                                        (λ {k} h → <ᵖ-trans pos (L ++ [ ix 0 ]) k (<ᵖ-ext pos L [ ix 0 ] (under w)) h)
+                src-first : Shape.Shows pos OkS (part src E ρ)
+                src-first = subst (Shape.Shows pos OkS) (sym o)
+                                  (subst (Shape.SrcM pos OkS) (sym (cong U.headˢ st)) (under w , λ p → <ᵖ-ix-sub L 0 p))
+                body-first : ∀ {B} (mb : Maybe (U.Node B)) → Shape.Opens pos OkS mb → Open (L ++ [ ix 0 ]) mb
+                body-first nothing  _ = tt
+                body-first (just b) h = first w (U.headˢ (U.step b)) h
+        clear-at (connectˢ S c k s₀ m src body) e {E} {ρ} {ν} {ph} lv (km , _ , gs , gb) (cs , cb) fn pt pj sn
+            | inj₂ (z , e′) =
+          clear-at body e′ {S ∷ E} {s₀ ∷ ρ} {part src E ρ ∷ ν} lv gb cb (shows (part src E ρ) hs , fn)
+                   (++⁻ʳ (pendings src) pt) (++⁻ʳ (joiners src E) pj) sn
+          , up (beside (lift-ext (spot-of body e′) F) m (part src E ρ) km hs)
+          where hs = far src z gs cs fn (++⁻ˡ (pendings src) pt) (++⁻ˡ (joiners src E) pj)
+        clear-at (joinˢ j i sk l x cp) ()
+        clear-at (deferˢ k t) e lv g c fn pt pj sn = clear-at t e lv g c fn pt pj sn
+
+        clear-lanes : ∀ {Δ B} (ls : List (Lane h Δ B)) {f} (e : laneFirings ls ≡ f ∷ []) {E ρ} {ν : Now Δ} {ph : Phase (Firing.A f)}
+                    → spentʰ (Firing.handle f) ≡ false → GatedLanes ls E ρ → CaughtLanes ls E ρ ν → Fine ν
+                    → All (λ tm → spentʰ (Timer.handle tm) ≡ false → Beyond F (cascade tm)) (lanePendings ls)
+                    → All (λ j → pos <ᵖ Joiner.at′ j ≡ false) (laneJoiners ls E)
+                    → U.step (nodeOf (phaseAtLanes (spot-lanes ls e))) ≡ U.skipˢ F (nodeOf ph)
+                    → ClearLanes (spot-lanes ls e) E ρ F
+        clear-lanes [] ()
+        clear-lanes (lane c k t ∷ ls) e {E} {ρ} lv (d , g , gl) (ct , cl) fn pt pj sn with one (firings t) (laneFirings ls) e
+        ... | inj₁ (e′ , z) =
+          clear-at t e′ lv g ct fn (++⁻ˡ (pendings t) pt) (++⁻ˡ (joiners t E) pj) sn
+          , mapᴬ (λ {n} h → later (lift-ext (spot-of t e′) F) (U.headˢ (U.step n)) h)
+                 (far-lanes ls z gl cl fn (++⁻ʳ (pendings t) pt) (++⁻ʳ (joiners t E) pj))
+        ... | inj₂ (z , e′) =
+          clear-lanes ls e′ lv gl cl fn (++⁻ʳ (pendings t) pt) (++⁻ʳ (joiners t E) pj) sn
+          , mapᴬ (λ {n} h → later (lift-ext-lanes (spot-lanes ls e′) F) (U.headˢ (U.step n)) h)
+                 (far-lanes (lane c k t ∷ []) (cong (_++ []) z) (d , g , up tt) (ct , up tt) fn
+                            (++⁺ (++⁻ˡ (pendings t) pt) []) (++⁺ (++⁻ˡ (joiners t E) pj) []))
+
+  -- At a burst boundary every other node's next event comes after the
+  -- firing cold's step: another cold's is a queued timer's, past the
+  -- run's position (`Ordered`, `Timed`) and so past every step of the
+  -- frame (cascades never nest, `rooted`); a joiner's copy is its
+  -- source's (`caught`), shown below that source's step since it joined
+  -- at or before the run (`past`).
+  clear : ∀ {h c} {st : State h} {A u τ} {s : Sink h A} {hd r i} {b : Frame A u}
+        → (H : Holding (firing s hd τ r i b ∷ []) c st) → lower (get (State.heap st) hd) ≡ false
+        → ∀ {q} {ph : Phase A} → U.burstˢ τ r i b ≡ U.skipˢ q (nodeOf ph)
+        → On.Clear (State.heap st) (spot-of (Holding.tree H) (Holding.firing≡ H)) [] [] q
+  clear {r = []} H lv eq = ⊥-elim (head (Holding.rooted H) refl)
+  clear {st = st} {τ = τ} {r = x ∷ r′} {i} {b} H lv {q} {ph} eq with head (Holding.behind H)
+  ... | (d , pd) , lt =
+    On.Clearing.clear-at (State.heap st) (State.pos st) q pF (Holding.tree H) (Holding.firing≡ H) {[]} {[]} {[]} {ph} lv
+                         (Holding.gated H) (Holding.caught H) tt
+                         (mapᴬ (λ {tm} h lv′ → beyond tm (proj₂ (lookup (proj₂ (Holding.ordered H)) (h lv′)))) (proj₂ (Holding.timed H)))
+                         (Holding.past H) (trans (spot-step (Holding.tree H) (Holding.firing≡ H)) eq)
+    where qe : (x ∷ r′) ++ [ ix i ] ≡ q
+          qe = just-injective (trans (sym (burst-head τ (x ∷ r′) i b)) (cong U.headˢ eq))
+          pF : State.pos st <ᵖ q ≡ true
+          pF = subst (λ z → State.pos st <ᵖ z ≡ true) qe lt
+          beyond : ∀ tm → State.pos st <ᵖ cascade tm ≡ true → Beyond q (cascade tm)
+          beyond tm pc Y =
+            subst (λ z → (z ++ Y) <ᵖ cascade tm ≡ true) qe
+              (subst (λ z → z <ᵖ cascade tm ≡ true) (sym (++-assoc (x ∷ r′) [ ix i ] Y))
+                (<ᵖ-cascade x r′ d i Y (Timer.due tm) (Timer.from tm) (subst (λ z → z <ᵖ cascade tm ≡ true) pd pc)))

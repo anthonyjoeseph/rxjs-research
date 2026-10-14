@@ -168,13 +168,13 @@ contact; it must be solid before Tier 2 is written over it.
 
 ### Big picture tier roadmap
 
-- **THE FOCUS.** `clear`, then `catch-up`: the firing cold's step lifts
-  through its `Spot` whenever every sibling on the way up steps later
-  (`Clear`, proven sufficient with `Gated` alone). Left: whether the witness
-  supplies `Clear` — every other node's next event bounded from `Ordered`,
-  `Timed`, `caught`, `past`, `behind` — and whether each joiner's copy then
-  takes the step below its join point. Decides whether those conjuncts pin
-  the meaning's next event; both deliveries stand on it.
+- **THE FOCUS.** `catch-up`: the firing cold's step now lifts to the root
+  from the witness alone (`clear`, over `rooted`: no cascade sits below a
+  frame's later steps). Ruled out: a sibling stepping first. Left: whether
+  each joiner's copy of a moved source takes the same step below its join
+  point (`past`), silently and in join order, and whether the refreshed
+  tree is the one `settled` names. Decides whether `caught` pins a copy's
+  next event; both deliveries stand on it.
 - **THE PHASE MOVED.** `pop-live`, `reheld-stall`, `reheld-quiet`,
   `reheld-later`: a cold's phase moved by `stepAt`, its joiners `settled`,
   keeps every conjunct but `open≡`, the popped timer pinned to one cold by `Timed` and `Ordered`, a
@@ -212,8 +212,6 @@ contact; it must be solid before Tier 2 is written over it.
   on each side before a calm point.
 - **`done-seg`** (Simulation) — FALSITY, `NO EVIDENCE`: a frame closing on its
   end, the completion delivered.
-- **`clear`** (Focus) — FALSITY, `NO EVIDENCE`: every sibling of a firing cold
-  steps after it.
 - **`catch-up`** (Simulation) — FALSITY, `NO EVIDENCE`: the joiners' copies
   take the same step, silently.
 - **`reheld-stall`** (Simulation) — FALSITY, `NO EVIDENCE`: a stalled cold's

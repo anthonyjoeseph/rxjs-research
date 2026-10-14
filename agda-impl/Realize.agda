@@ -335,12 +335,12 @@ module Realizing (R : Set) where
       this-lane : ∀ {Δ B C} {c k} {t : Sub h Δ B} {ls} {s : Sink h C} {hd} → Spot t s hd → SpotLanes (lane c k t ∷ ls) s hd
       next-lane : ∀ {Δ B C} {l} {ls : List (Lane h Δ B)} {s : Sink h C} {hd} → SpotLanes ls s hd → SpotLanes (l ∷ ls) s hd
 
-  private
-    one : ∀ {X : Set₁} {x : X} xs ys → xs ++ ys ≡ x ∷ [] → (xs ≡ x ∷ [] × ys ≡ []) ⊎ (xs ≡ [] × ys ≡ x ∷ [])
-    one []           ys e    = inj₂ (refl , e)
-    one (_ ∷ [])     []  refl = inj₁ (refl , refl)
-    one (_ ∷ [])     (_ ∷ _) ()
-    one (_ ∷ _ ∷ _)  ys  ()
+  -- One of two lists holds the one firing.
+  one : ∀ {X : Set₁} {x : X} xs ys → xs ++ ys ≡ x ∷ [] → (xs ≡ x ∷ [] × ys ≡ []) ⊎ (xs ≡ [] × ys ≡ x ∷ [])
+  one []           ys e    = inj₂ (refl , e)
+  one (_ ∷ [])     []  refl = inj₁ (refl , refl)
+  one (_ ∷ [])     (_ ∷ _) ()
+  one (_ ∷ _ ∷ _)  ys  ()
 
   -- The one frame being burst, found.
   mutual
@@ -742,6 +742,8 @@ module Realizing (R : Set) where
       clocked : All (λ f → Firing.since f + Firing.u f ≡ State.clock st) fs
       behind  : All (λ f → Σ Pos (λ d → State.pos st ≡ Firing.at′ f ++ d)
                          × State.pos st <ᵖ (Firing.at′ f ++ [ ix (Firing.index f) ]) ≡ true) fs
+      -- A frame being burst sits under the root or is a cascade.
+      rooted  : All (λ f → Firing.at′ f ≢ []) fs
       timed   : Timed (State.timers st) (pendings tree)
       joined  : Joined (subjects tree) (joiners tree [])
       ordered : Ordered st
