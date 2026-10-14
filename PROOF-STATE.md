@@ -168,11 +168,12 @@ must be solid before Tier 2 is written over it.
 ### Big picture tier roadmap
 
 - **THE RELATION.** `Rel` and `RelSubj` as definitions over the ghost
-  positions the pure run keeps. `make places` finds them to be the
-  denotation's on every seed, so a relation can match event for event, with
-  no reordering. Every leaf below is stated in these, so a wrong relation is
-  wrong everywhere. This leg decides whether the bound half ("on any budget, no
-  more") holds of `connect`'s subject.
+  positions the pure run keeps. `make ghosts` finds every observer a run makes
+  — each operator's, each join to a subject — delivered a prefix of what its
+  subtree denotes where it was subscribed, so the bound half holds observer by
+  observer, the subject's included. Every leaf below is stated in these, so a
+  wrong relation is wrong everywhere; what is left to decide is how one
+  relation spans state the kernels share.
 - **ONE OPERATOR AT A TIME.** The `*-rel` leaves, `connect-rel` first: the one
   whose kernel and denotation are shaped least alike.
 - **THE ROOT.** `run-rel` and `run-bound`: `Rel`'s two halves read off at
