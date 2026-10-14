@@ -17,6 +17,8 @@
 --                                does not show (`quickcheck.Ghost`)
 --   Oracle-CLI exact FROM COUNT  the seeds with a live observer behind the
 --                                run (`quickcheck.Ghost`)
+--   Oracle-CLI settled FROM COUNT the seeds with an observer shown an event
+--                                under a value it was shown (`quickcheck.Ghost`)
 --   Oracle-CLI why SEED          that check's record, entry by entry
 --   Oracle-CLI hand              those two and placing over `quickcheck.Adversary`
 --   Oracle-CLI why-hand N        the record of its Nth program
@@ -45,7 +47,7 @@ open import quickcheck.Code using (Prog; showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Chain using (chainFails)
-open import quickcheck.Ghost using (ghosts; exact; ghostFails; exactFails; exactWhy; watchedCount)
+open import quickcheck.Ghost using (ghosts; exact; settled; ghostFails; exactFails; settledFails; exactWhy; watchedCount)
 open import quickcheck.Adversary using (cases)
 import quickcheck.Spin as Spin
 open import Tree using (Obs)
@@ -71,7 +73,7 @@ private
 
   hand : List (String × Prog natᵗ) → IO ⊤
   hand []             = putStrLn "hand: done"
-  hand ((l , p) ∷ cs) = putStrLn ((if exact p ∧ ghosts p ∧ placing p then "hand: ok   " else "hand: FAIL ") ++ l) >>= λ _ → hand cs
+  hand ((l , p) ∷ cs) = putStrLn ((if exact p ∧ ghosts p ∧ settled p ∧ placing p then "hand: ok   " else "hand: FAIL ") ++ l) >>= λ _ → hand cs
 
   spins : List (String × Obs Timeline [] ℕ) → IO ⊤
   spins []             = putStrLn "spin: done"
@@ -86,7 +88,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -106,6 +108,10 @@ private
   dispatch ("exact" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (exactFails f′ c′) (λ s → putStrLn ("exact: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("exact: done " ++ showℕ c′ ++ ", " ++ showℕ (watchedCount f′ c′) ++ " entries")
+  ... | _       | _       = usage
+  dispatch ("settled" ∷ f ∷ c ∷ []) with nat f | nat c
+  ... | just f′ | just c′ = each (settledFails f′ c′) (λ s → putStrLn ("settled: FAIL seed " ++ showℕ s))
+                            >>= λ _ → putStrLn ("settled: done " ++ showℕ c′)
   ... | _       | _       = usage
   dispatch ("why" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showCode natᵗ (program s′)) >>= λ _ → each′ (exactWhy (program s′))

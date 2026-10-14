@@ -244,6 +244,24 @@ private
   every f []       = true
   every f (x ∷ xs) = f x ∧ every f xs
 
+  -- `e` lies under `q ++ [ ix _ ]` or `q ++ [ sub _ ]`: where the
+  -- delivery of a value at `q` runs.
+  inside : Pos → Pos → Bool
+  inside []      (ix _ ∷ _)  = true
+  inside []      (sub _ ∷ _) = true
+  inside []      _           = false
+  inside (l ∷ q) (l′ ∷ e)    = samePos [ l ] [ l′ ] ∧ inside q e
+  inside (_ ∷ _) []          = false
+
+  -- After a value at `q`, nothing shown where its delivery runs.
+  settles : List (Pos × Bool) → Bool
+  settles []             = true
+  settles ((p , b) ∷ es) = (b ∨ every (λ e → not (inside p (proj₁ e))) es) ∧ settles es
+
+  settledAt : Pos × Tag → Bool
+  settledAt (_ , _ , (ex , _) , subd _ _) = settles ex
+  settledAt _                             = true
+
   record′ : Prog natᵗ → List (Pos × Tag)
   record′ p = Watched.deliveries (depth 3 p) 40000 (toObs timeline 3 p [] [] [])
 
@@ -254,6 +272,11 @@ ghosts p = every (λ d → holds (keyOf d) ds) ds
 exact : Prog natᵗ → Bool
 exact p = every (exactAt nds) nds
   where nds = numbered 0 (record′ p)
+
+-- SETTLED: what each observer is shown never returns under a value it
+-- was shown, where that value's delivery runs.
+settled : Prog natᵗ → Bool
+settled p = every settledAt (record′ p)
 
 -- One seed's record, every entry: its number, position, observer, kind;
 -- a subscription with what it is shown.
@@ -291,6 +314,11 @@ exactWhy p = mapL (λ e → showE e S.++ (if exactAt nds e then "" else "   <== 
 -- The seeds from `from`, `count` of them, with an observer behind the run.
 exactFails : ℕ → ℕ → List ℕ
 exactFails from count = filterᵇ (λ s → not (exact (program s))) (mapL (from +_) (upTo count))
+
+-- The seeds from `from`, `count` of them, with an observer shown an event
+-- under a value it was shown.
+settledFails : ℕ → ℕ → List ℕ
+settledFails from count = filterᵇ (λ s → not (settled (program s))) (mapL (from +_) (upTo count))
 
 -- The seeds from `from`, `count` of them, with an observer out of place.
 ghostFails : ℕ → ℕ → List ℕ
