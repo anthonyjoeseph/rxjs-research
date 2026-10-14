@@ -1,4 +1,4 @@
-{-# OPTIONS --guardedness #-}
+{-# OPTIONS --guardedness --large-indices #-}
 
 -- THE SIMULATION.  The machine's trace and the events the root is shown
 -- are the same run up to silent steps: each value the machine shows is
@@ -24,13 +24,16 @@ open import Data.Product using (_,_; Σ)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; observe; root)
 open import denotation.Order using (_⊑_; Chain)
-open import denotation.Unfold using (⟦_⟧)
+open import denotation.Unfold using (⟦_⟧; Node; subscribe; unfold; shown; outˢ; skipˢ; endˢ; hushˢ) renaming (step to stepᵁ; Step to Stepᵁ)
+open import adequacy.Carrier using (module Carrying)
 open import operation.Machine using (module Machine)
 open import operation.Placed using (Placed; cut; ends; quiets; sends; skips; items; Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; frames-cut)
 open import operation.PureObservable using (PureObs; module Pure)
 
 module Sim (R : Set) where
-  open Machine R using (Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix)
+  open Machine R using (Trace; Trace∞; tau; out; end; idle; trace; begin; Read; read; noted; reading; prefix; Mach; Step; silent; value; complete; drained; step)
+  open Machine R using () renaming (shown to shownᴹ)
+  open Carrying R using (Carried)
   open Pure R using (cutOff; frames)
   open Read
 
@@ -53,41 +56,76 @@ module Sim (R : Set) where
 
   open _~∞_
 
+  ------------------------------------------------------------------------
+  -- The corecursion
+
+  -- The machine's next step against the meaning's: matched events and
+  -- paired silent steps guarded, a side's lone silent step inductive, so
+  -- each side passes finitely many alone.  `Rel` is where the
+  -- corecursion re-enters.
+  module _ {ℓ} (Rel : Mach → Node R → Set ℓ) where
+    data Wait : Step → Stepᵁ R → Set ℓ where
+      both  : ∀ {m c p} → Rel m c → Wait (silent m) (skipˢ p c)
+      outs  : ∀ {m c p a} → Rel m c → Wait (value (tick p) p a m) (outˢ p a c)
+      ends  : ∀ {p} → Wait (complete p) (endˢ p)
+      idles : Wait drained hushˢ
+      left  : ∀ {m s} → Wait (step m) s → Wait (silent m) s
+      right : ∀ {t c p} → Wait t (stepᵁ c) → Wait t (skipˢ p c)
+
+    module From (kept : ∀ {m c} → Rel m c → Wait (step m) (stepᵁ c)) where
+      mutual
+        sim-from : ∀ {m c} → Rel m c → trace m ~ unfold c
+        sim-from r = go (kept r)
+
+        go : ∀ {t s} → Wait t s → shownᴹ t ~ shown s
+        go (both r)  = tau~ λ where .force → sim-from r
+        go (outs r)  = out~ λ where .force → sim-from r
+        go ends      = end~
+        go idles     = idle~
+        go (left w)  = tauˡ (go w)
+        go (right w) = skipʳ (go w)
+
   postulate
-    -- The program's run is what the root is shown.
-    --
-    -- The route: an invariant over every LIVE observer the machine has
-    -- made, each delivered exactly what its subtree's meaning shows at
-    -- positions before the run's (`Oracle-CLI exact`), kept by each step
-    -- of the machine, one observer at a time; and progress, the run's
-    -- position passing every one the root's meaning shows, the two
-    -- sides ending, falling quiet or spinning at the same point.  An
-    -- observer is dead once it completes, a switch moves off it, or the
-    -- observer that subscribed it is dead.
-    --
-    -- Tested, both halves, against `Unfold`'s own node meanings, each
-    -- joiner held to its own copy of the source: the invariant on drawn
-    -- seeds (`Oracle-CLI exact`) and at the connect feed's edges, a
-    -- joiner subscribed or the body completing mid-feed
-    -- (`quickcheck.Adversary`); progress on programs spinning with no
-    -- budget, a source spinning beside its body's later events, a switch
-    -- onto a lane spinning on subscribe, a cut ending a source emitting
-    -- forever (`quickcheck.Spin`).
-    --
-    -- DEAD ROUTE: one exact relation at a single hole of the tree,
-    --   delivery climbing the context frame by frame.  A connect's feed
-    --   and a lane bursting inline deliver at a context deeper than the
-    --   frame's, and refocusing the hole there needs the whole invariant
-    --   rebuilt at every frame on the way up and down.
-    --
-    -- RECOVERY: `git show 94ae8083` restores the single-hole route
-    --   (`adequacy.Realize`, `adequacy.Segment`, `adequacy.deliver`,
-    --   `adequacy.step`): the heap realizing a configuration (`Holds`,
-    --   `Joined`, `Dead`), calm points and the glue over them.  The same commit restores
-    --   the order on positions in `denotation.MonotonicList`: strict,
-    --   transitive, total, past a position past everything under it, a
-    --   burst's steps before its close, cascades never nesting.
-    sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
+    -- B KEPT, C FINITE: a carried state's next step, against its
+    -- configuration's, passes each side alone finitely often before the
+    -- two meet again carried, or end, or fall quiet together.
+    kept : ∀ {m c} → Carried m c → Wait Carried (step m) (stepᵁ c)
+
+    -- The run begins carried: the program pending at the root.
+    carried-begin : (o : PureObs [] R) → Carried (begin o) (subscribe o [] root)
+
+  -- The program's run is what the root is shown.
+  --
+  -- The corecursion re-enters on `adequacy.Carrier`'s relation: every
+  -- live observer the machine has made held to its subtree's meaning
+  -- (`Oracle-CLI exact`), and what the machine owes next an agenda
+  -- located in the witness.  An observer is dead once it completes, a
+  -- switch moves off it, or the observer that subscribed it is dead.
+  --
+  -- Tested, both halves, against `Unfold`'s own node meanings, each
+  -- joiner held to its own copy of the source: the invariant on drawn
+  -- seeds (`Oracle-CLI exact`) and at the connect feed's edges, a
+  -- joiner subscribed or the body completing mid-feed
+  -- (`quickcheck.Adversary`); progress on programs spinning with no
+  -- budget, a source spinning beside its body's later events, a switch
+  -- onto a lane spinning on subscribe, a cut ending a source emitting
+  -- forever (`quickcheck.Spin`).
+  --
+  -- DEAD ROUTE: one exact relation at a single hole of the tree,
+  --   delivery climbing the context frame by frame.  A connect's feed
+  --   and a lane bursting inline deliver at a context deeper than the
+  --   frame's, and refocusing the hole there needs the whole invariant
+  --   rebuilt at every frame on the way up and down.
+  --
+  -- RECOVERY: `git show 94ae8083` restores the single-hole route
+  --   (`adequacy.Realize`, `adequacy.Segment`, `adequacy.deliver`,
+  --   `adequacy.step`): the heap realizing a configuration (`Holds`,
+  --   `Joined`, `Dead`), calm points and the glue over them.  The same commit restores
+  --   the order on positions in `denotation.MonotonicList`: strict,
+  --   transitive, total, past a position past everything under it, a
+  --   burst's steps before its close, cascades never nesting.
+  sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
+  sim o = From.sim-from Carried kept (carried-begin o)
 
   ------------------------------------------------------------------------
   -- Below: every prefix placed

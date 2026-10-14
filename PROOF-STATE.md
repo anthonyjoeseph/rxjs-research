@@ -162,27 +162,19 @@ point at one, the row is FALSITY.
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
 the root, positions forgotten down to ticks. Both halves are read off one
 weak simulation, `sim`, between the small-step machine's trace and the events
-the root is shown. The route, in `sim`'s header: every LIVE observer the
-machine has made is delivered exactly what its subtree's meaning shows before
-the run's position (B), kept one machine step at a time; and the run's
-position passes every one the root's meaning shows (C). Work the riskiest
+the root is shown. `sim` is a corecursion over `adequacy.Carrier`'s relation
+(B: every live observer held to its subtree's meaning, the machine's agenda
+located in the witness); its leaves are `kept`, B kept and each one-sided wait
+finite (C), and `carried-begin`. Work the riskiest
 question first: try to REFUTE the route, and leave anything tractable last.
 
 ### Big picture tier roadmap
 
-- **SIM AS A GUARDED CORECURSION, C AS ITS MEASURE.** Write `sim`'s body:
-  a corecursion over a relation between the machine's state and an
-  `Unfold` node, silent steps on both sides paired, a one-sided wait an
-  inductive derivation. That derivation IS C's measure, and the relation
-  is B's carrier: define it, not postulate it, over the heap's live
-  observers and the nodes they are held to. Leaves: B kept by a step, and
-  the wait finite. Decides whether B and C, as `Oracle-CLI exact` and
-  `Oracle-CLI spin` test them, are what the corecursion consumes.
-- **B'S STEP AT THE FEEDER, IN AGDA.** B's preservation through the
-  feeder's loop, proved: each parent's node built from its children's,
-  every sibling past the position by B itself rather than a separate
-  invariant, a joiner not yet fed merely ahead of the position. Decides
-  whether the step both earlier routes failed is local.
+- **B'S STEP AT THE FEEDER, IN AGDA.** `kept` split by the machine's
+  control, the feed's case a body: a source's value read into `feeding`,
+  each joiner's delivery a step of its `Behind` copy, the connect's own
+  skip paired or passed. Decides whether `Feed`, `Behind` and the agenda
+  carry the step both earlier routes failed, or which field is missing.
 - **B'S STEP AT A DEATH, IN AGDA.** An observer dying mid-burst: a
   `takeWhile` cutting, a switch moving off its lane, a connect's body
   completing and its source stopped. The dead are owed nothing, so B must
@@ -190,13 +182,15 @@ question first: try to REFUTE the route, and leave anything tractable last.
   rule is a function of the heap's flags.
 - **THE TRACTABLE REST, LAST.** Liveness in the heap's cut and closed flags;
   B's steps at `map`, `scan` and `defer`; each kernel's state as a function
-  of what it was delivered; the root wiring; `ticks-up`. None is taken while
-  a leg above is open.
+  of what it was delivered; `carried-begin`, by `_≗_`'s unit law; `ticks-up`.
+  None is taken while a leg above is open.
 
 ### The ledger
 
-- **`sim`** (Simulation) — FALSITY, `DEAD ROUTE, RECOVERY`: the machine's trace
-  is the root's events up to silent steps; the route in its header.
+- **`kept`** (Simulation) — FALSITY, `NO EVIDENCE`: a carried state's step against
+  its configuration's, each side alone finitely often; B and C at once.
+- **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program pending at
+  the root, carried.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 
