@@ -9,6 +9,8 @@
 --   Oracle-CLI io SEED           the IO engine's trace of one seed
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
 --                                are no chain (`quickcheck.Chain`)
+--   Oracle-CLI places FROM COUNT the seeds whose pure run places its
+--                                record where the denotation does not
 --
 -- The IO engine runs one seed per process because a program that never
 -- finishes never returns: the caller's timeout is the only way out.
@@ -29,7 +31,7 @@ open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Code using (showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program)
-open import quickcheck.Chain using (chainFails)
+open import quickcheck.Chain using (chainFails; placeFails; placed)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -48,7 +50,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI places FROM COUNT"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -60,6 +62,10 @@ private
   dispatch ("chain" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (chainFails f′ c′) (λ s → putStrLn ("chain: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("chain: done " ++ showℕ c′)
+  ... | _       | _       = usage
+  dispatch ("places" ∷ f ∷ c ∷ []) with nat f | nat c
+  ... | just f′ | just c′ = each (placeFails f′ c′) (λ s → putStrLn ("places: FAIL seed " ++ showℕ s))
+                            >>= λ _ → putStrLn ("places: done " ++ showℕ c′ ++ ", " ++ showℕ (placed f′ c′) ++ " positions compared")
   ... | _       | _       = usage
   dispatch _ = usage
 

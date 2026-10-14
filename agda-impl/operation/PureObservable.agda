@@ -28,7 +28,7 @@ open import Level using (Lift; lift; lower)
 
 open import Tree using (Obs; Later)
 open import operation.AbstractObservable using (Ty; Prims; module Run)
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Timeline)
+open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last; root) renaming (sub to subᴾ)
 
 ------------------------------------------------------------------------
 -- Worlds
@@ -129,7 +129,8 @@ module Pure (R : Set) where
   wkAll ρ (_∷_ {x = k} x xs) = wkVal k ρ x ∷ wkAll ρ xs
 
   -- A frame of a started cold, due on the clock.  `at` is the frame's
-  -- tick on the cold's own timeline, to time the frame after it.
+  -- tick on the cold's own timeline, to time the frame after it; `from`
+  -- the position the timer was set at, which places the frame.
   record Timer (h : World) : Set₁ where
     field
       {A}    : Set
@@ -137,11 +138,16 @@ module Pure (R : Set) where
       sink   : Sink h A
       handle : Handle h
       at′    : Time
+      from   : Pos
       frame  : Burst A
 
   wkTimer : ∀ {h v} → h ⊑ v → Timer h → Timer v
   wkTimer ρ tm = record { due = Timer.due tm ; sink = wk∋ ρ (Timer.sink tm) ; handle = wk∋ ρ (Timer.handle tm)
-                        ; at′ = Timer.at′ tm ; frame = Timer.frame tm }
+                        ; at′ = Timer.at′ tm ; from = Timer.from tm ; frame = Timer.frame tm }
+
+  -- A frame set at e, due at t, is a cascade rooted at ix t ∷ subᴾ e ∷ [].
+  cascade : ∀ {h} → Timer h → Pos
+  cascade tm = ix (Timer.due tm) ∷ subᴾ (Timer.from tm) ∷ []
 
   record State (h : World) : Set₁ where
     field
@@ -150,6 +156,8 @@ module Pure (R : Set) where
       timers : List (Timer h)
       log    : List (Time × R)     -- the root's record
       ended  : Bool                -- whether the root has completed
+      pos    : Pos                 -- where the run is: a ghost
+      marks  : List Pos            -- where each entry of the record was made: a ghost
 
   mapList : ∀ {a b} {X : Set a} {Y : Set b} → (X → Y) → List X → List Y
   mapList f []       = []
@@ -158,7 +166,7 @@ module Pure (R : Set) where
   -- The state, after making an entry holding `x`.
   extend : ∀ {h k} → State h → Val (k ∷ h) k → State (k ∷ h)
   extend st x = record { heap = x ∷ wkAll new (State.heap st) ; clock = State.clock st ; timers = mapList (wkTimer new) (State.timers st)
-                       ; log = State.log st ; ended = State.ended st }
+                       ; log = State.log st ; ended = State.ended st ; pos = State.pos st ; marks = State.marks st }
 
   -- After every timer due no later: two timers due together fire in the
   -- order they were set.
@@ -208,6 +216,12 @@ module Pure (R : Set) where
   unlessSpent : ∀ {w} → Handle w → M w ⊤ → M w ⊤
   unlessSpent hd m = bind (spent hd) λ s → if s then ret tt else m
 
+  hereᴾ : ∀ {w B} → (Pos → M w B) → M w B
+  hereᴾ k σ st = k (State.pos st) σ st
+
+  gotoᴾ : ∀ {w} → Pos → M w ⊤
+  gotoᴾ p = modifyState λ σ st → record st { pos = p }
+
   callbacks : ∀ {w A} → Sink w A → ∀ {h} → w ⊑ h → State h → Callbacks A h
   callbacks s σ st = get (State.heap st) (wk∋ σ s)
 
@@ -230,44 +244,49 @@ module Pure (R : Set) where
     finishᴾ : ∀ {w A} → Sink w A → M w ⊤
     finishᴾ s = runCb s Callbacks.onComplete
 
-    setTimer : ∀ {w A} → Sink w A → Handle w → ℕ → Time → Burst A → M w ⊤
-    setTimer s hd d t b = modifyState λ σ st → record st { timers = insert (record
-      { due = State.clock st + d ; sink = wk∋ σ s ; handle = wk∋ σ hd ; at′ = t ; frame = b }) (State.timers st) }
+    setTimer : ∀ {w A} → Sink w A → Handle w → ℕ → Time → Pos → Burst A → M w ⊤
+    setTimer s hd d t e b = modifyState λ σ st → record st { timers = insert (record
+      { due = State.clock st + d ; sink = wk∋ σ s ; handle = wk∋ σ hd ; at′ = t ; from = e ; frame = b }) (State.timers st) }
 
-    -- The frames after one ending at tick `now` of the cold's timeline.
-    schedule : ∀ {w A} → Sink w A → Handle w → Time → ML A → M w ⊤
-    schedule s hd now done     = unlessSpent hd (bind (spend hd) λ _ → finishᴾ s)
-    schedule s hd now quiet    = ret tt
-    schedule s hd now (at t b) = setTimer s hd (t ∸ now) t b
+    -- The frames after one ending at tick `now` of the cold's timeline,
+    -- at position e: the completion there, the next frame's timer set there.
+    schedule : ∀ {w A} → Sink w A → Handle w → Time → Pos → ML A → M w ⊤
+    schedule s hd now e done     = unlessSpent hd (bind (spend hd) λ _ → bind (gotoᴾ e) λ _ → finishᴾ s)
+    schedule s hd now e quiet    = ret tt
+    schedule s hd now e (at t b) = setTimer s hd (t ∸ now) t e b
 
-    -- A closed subscriber or a spent cold stops the playing.
+    -- A closed subscriber or a spent cold stops the playing.  A burst at
+    -- r puts its i-th step at r ++ [ ix i ] and ends at r ++ [ last ].
     mutual
-      burst : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Burst A → M w ⊤
-      burst zero    s hd t b = λ σ st → res same st nothing
-      burst (suc f) s hd t b = bind (closedᴾ s hd) λ c → if c then ret tt else stepᴾ f s hd t b
+      burst : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Pos → ℕ → Burst A → M w ⊤
+      burst zero    s hd t r i b = λ σ st → res same st nothing
+      burst (suc f) s hd t r i b = bind (closedᴾ s hd) λ c → if c then ret tt else stepᴾ f s hd t r i b
 
-      stepᴾ : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Burst A → M w ⊤
-      stepᴾ f s hd t (emit a k) = bind (unlessSpent hd (sendᴾ s a)) λ _ → unlessSpent hd (burst f s hd t (Burst∞.force k))
-      stepᴾ f s hd t (stall k)  = burst f s hd t (Burst∞.force k)
-      stepᴾ f s hd t (close k)  = schedule s hd t (ML∞.force k)
+      stepᴾ : ∀ {w A} → ℕ → Sink w A → Handle w → Time → Pos → ℕ → Burst A → M w ⊤
+      stepᴾ f s hd t r i (emit a k) = bind (unlessSpent hd (bind (gotoᴾ (r ++ [ ix i ])) λ _ → sendᴾ s a)) λ _ →
+                                        unlessSpent hd (burst f s hd t r (suc i) (Burst∞.force k))
+      stepᴾ f s hd t r i (stall k)  = burst f s hd t r (suc i) (Burst∞.force k)
+      stepᴾ f s hd t r i (close k)  = schedule s hd t (r ++ [ last ]) (ML∞.force k)
 
     first : ∀ {w A} → Sink w A → Handle w → ML A → M w ⊤
-    first s hd (at 0 b) = burst n s hd 0 b
-    first s hd m        = schedule s hd 0 m
+    first s hd (at 0 b) = hereᴾ λ p → burst n s hd 0 p 0 b
+    first s hd m        = hereᴾ λ p → schedule s hd 0 (p ++ [ last ]) m
 
     fire : ∀ {h} → List (Timer h) → State h → Res h Bool
     fire []        st = res same st (just false)
     fire (tm ∷ ts) st = then (λ _ _ st′ → res same st′ (just true))
-                          (unlessSpent (Timer.handle tm) (burst n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (Timer.frame tm))
-                            same (record st { clock = Timer.due tm ; timers = ts }))
+                          (unlessSpent (Timer.handle tm) (burst n (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm))
+                            same (record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }))
 
     nextᴾ : ∀ {w} → M w Bool
     nextᴾ σ st = fire (State.timers st) st
 
   -- The record's effects.
   outcome : ∀ {h X} → Out R X → State h → Res h X
-  outcome (note a) st = res same (record st { log = if State.ended st then State.log st else State.log st ++ [ (State.clock st , a) ] }) (just tt)
-  outcome fin     st = res same (record st { ended = true }) (just tt)
+  outcome (note a) st = res same (record st { log = if State.ended st then State.log st else State.log st ++ [ (State.clock st , a) ]
+                                            ; marks = if State.ended st then State.marks st else State.marks st ++ [ State.pos st ] }) (just tt)
+  outcome fin     st = res same (record st { ended = true
+                                            ; marks = if State.ended st then State.marks st else State.marks st ++ [ State.pos st ] }) (just tt)
 
   Pureᴿ : ℕ → Runtime
   Pureᴿ n = record
@@ -285,6 +304,8 @@ module Pure (R : Set) where
                      same (extend st (lift false)))
     ; stopᴿ      = spend
     ; effᴿ       = λ e σ st → outcome e st
+    ; hereᴿ      = hereᴾ
+    ; gotoᴿ      = gotoᴾ
     ; divergeᴿ   = λ σ st → res same st nothing
     ; nextᴿ      = λ run → Play.nextᴾ n run
     }
@@ -346,7 +367,7 @@ module Pure (R : Set) where
   -- nothing.  Lines up clause for clause with `denotation.Denote.approx`.
   deferredᴺ : ℕ → Deferred
   deferredᴺ zero    l ρ = ⊥ᴷ
-  deferredᴺ (suc n) l ρ = compileWith (deferredᴺ n) (Later.force l) ρ
+  deferredᴺ (suc n) l ρ = deeper (compileWith (deferredᴺ n) (Later.force l) ρ)
 
   compileᴺ : ℕ → ∀ {Γ A w} → PureObs Γ A → Env Γ w → Subscribe A w
   compileᴺ n = compileWith (deferredᴺ n)
@@ -362,7 +383,7 @@ module Pure (R : Set) where
   loopᴺ n (suc m) = Engine.loopStep (Pureᴿ n) (runᴺ n (suc m)) (loopᴺ n m)
 
   start : State []
-  start = record { heap = [] ; clock = 0 ; timers = [] ; log = [] ; ended = false }
+  start = record { heap = [] ; clock = 0 ; timers = [] ; log = [] ; ended = false ; pos = root ; marks = [] }
 
   -- Runs a subscription on approximant n of the engine, with the root
   -- observer recording each value at the tick the clock is on, and reads
@@ -375,3 +396,10 @@ module Pure (R : Set) where
 -- Approximant n of a program's run.
 toArray : ℕ → ∀ {A} → PureObs [] A → ML A
 toArray n {A} o = Pure.runPure A n (Pure.compileᴺ A n o [])
+
+-- Where each entry of approximant n's record was made: the ghost
+-- positions, which `quickcheck.Chain` holds to the denotation's.
+toMarks : ℕ → ∀ {A} → PureObs [] A → List Pos
+toMarks n {A} o = State.marks (Res.state (Engine.drive (Pureᴿ n) (runᴺ n n) (loopᴺ n n) (compileᴺ n o []) recorder same start))
+  where open Pure A
+        open Run (Pureᴾ A)

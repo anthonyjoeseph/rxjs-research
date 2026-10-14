@@ -91,8 +91,9 @@ module Link (R : Set) where
                       {e : MonotonicList A → MonotonicList B}
                   → Rel s d → (∀ {v} (σ : w ≤ʷ v) {st r} → RelSubj st r → Rel (b σ st) (e r))
                   → Rel (connectᴷ s b) (connectᴰ d e)
-    -- `deferᴰ` adds one `skip`, a `stall` once reported, invisible either way.
-    defer-rel     : ∀ {A w} {s : Subscribe A w} {d} → Rel s d → Rel s (deferᴰ d)
+    -- `deferᴰ` adds one `skip`, a `stall` once reported, invisible either
+    -- way, and subscribes its body one level down, as `deeper` does.
+    defer-rel     : ∀ {A w} {s : Subscribe A w} {d} → Rel s d → Rel (deeper s) (deferᴰ d)
     -- A cut-off `defer` on both sides: each shows nothing.
     bot-rel       : ∀ {A w} → Rel {A} {w} ⊥ᴷ ⊥ᴰ
 
