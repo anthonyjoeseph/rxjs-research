@@ -334,6 +334,24 @@ private
 ... | eq = <ᵖ-shift p q h
 ... | gt = refl
 
+-- Nothing lies strictly between a position and the one just past it.
+<ᵖ-step : ∀ p q → p <ᵖ q ≡ true → q <ᵖ (p ++ [ ix 0 ]) ≡ false
+<ᵖ-step []      []                ()
+<ᵖ-step []      (ix zero ∷ [])    h = refl
+<ᵖ-step []      (ix zero ∷ _ ∷ _) h = refl
+<ᵖ-step []      (ix (suc _) ∷ _)  h = refl
+<ᵖ-step []      (sub _ ∷ _)       h = refl
+<ᵖ-step []      (last ∷ _)        h = refl
+<ᵖ-step (a ∷ p) []                ()
+<ᵖ-step (a ∷ p) (b ∷ q)           h with cmpLabel a b in c | cmpLabel b a in d
+... | lt | lt with () ← trans (sym (refl-label a)) (lt-label a b a c d)
+... | lt | eq with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel a z ≡ lt) (eq-label b a d) c)
+... | lt | gt = refl
+... | eq | lt with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel z a ≡ lt) (sym (eq-label a b c)) d)
+... | eq | eq = <ᵖ-step p q h
+... | eq | gt with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel z a ≡ gt) (sym (eq-label a b c)) d)
+... | gt | _  with () ← h
+
 -- A position is before every position below it, and of two positions
 -- that part at one label, the earlier label's is the earlier.
 <ᵖ-below : ∀ p {l} ys → p <ᵖ (p ++ l ∷ ys) ≡ true

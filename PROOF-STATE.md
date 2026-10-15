@@ -185,16 +185,13 @@ by their own silent steps (`Mirror`).
   dead body (split out as `emit-unseen`), a take stopping at its last
   value, a resume needing more than the frame it pops, a measure blind to
   a cut, a queue bound on joiners, a polled burst as a re-entry state.
-- **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
-  over `alien-apart`: a subscription keys nothing under a position
-  apart from it, so a flatMap's lanes and a connect's body step inside
-  no sibling's position, which is what keeps `Steady` and a flatMap's
-  order. Ruled out: a join of a run merely in order, a flatMap of any
-  outer in order, lanes placed wherever they subscribe, sources merely
-  clear of a flatMap's subtree, an operator showing a position it does
-  not key, a subscription where no tick heads it and sources stepping
-  where they then emit. Decides whether an outer's own positions own nothing it
-  shows later, which apartness of each lane from the next needs.
+- **THE ORDER.** `spread-sub`, then `steady-flat` and `fresh-flat` over
+  `FlatOrder`'s lane roots: pairwise apart, each lane alien to what is apart
+  from its root, the outer apart from each. `ordered-flat` is a body over
+  `spread-sub` alone. Ruled out: a lane's end tied with another lane or the
+  outer, a lane's first before where it subscribes. Decides whether a
+  stream's later events carry tags only from joins made earlier, the causal
+  half of `spread-sub`; its ordering half follows from `Ordered` and `Steady`.
 - **THE DEFER.** `ordered-defer` and `within-defer`: a defer over sorted,
   alien sources is in order, and its program, fed, is placed within.
   Decides whether a defer's notices keep its sources steady when
@@ -212,9 +209,9 @@ by their own silent steps (`Mirror`).
   is paid once as a field of `Carried`.
 ### The ledger
 
-- **`ordered-flat`** (Placed) — FALSITY, `REFUTED×2`: a flatMap where a tick
-  heads it merges its outer and lanes in order, over sorted sources alien to
-  it.
+- **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`: after a subscription's
+  value at `x`, nothing later lies a step past where a lane would key under
+  `x`'s lane root, nor keys it. Never attempted; the causal half is the risk.
 - **`ordered-defer`** (Placed) — FALSITY, `REFUTED`: a defer's run where a tick
   heads it, over sources sorted and alien to it, is in order.
 - **`steady-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap where a tick heads
