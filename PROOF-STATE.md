@@ -217,7 +217,7 @@ by their own silent steps (`Mirror`).
 - **THE PROGRESS.** `reachedᴿ` as a body: induction on `Ahead`, carrying
   `Inner`, over one leaf, a re-entry hop steps the ghost or lowers a
   machine measure. A burst's steps, a lane admit, a defer and a popped
-  timer (its frame's root skip) step the ghost; a poll, a spent burst
+  timer (one skip, tied with its burst's first step) step the ghost; a poll, a spent burst
   dropped, a burst over and owed todos paid leave it in place, each
   finitely often per frame. Decides whether those four are a measure on
   the pure driver alone, or need a ghost-only marker in the shared machine,
