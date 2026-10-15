@@ -31,7 +31,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst; subst₂)
 
 import Tree as T
-open import denotation.MonotonicList using (MonotonicList; Events; Events∞; Pos; Time; tick; out; skip; end; hush; observe; root)
+open import denotation.MonotonicList using (MonotonicList; Events; Events∞; Pos; Time; tick; out; skip; end; observe; root)
 open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
 open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
@@ -222,42 +222,17 @@ module Honesty (R : Set) where
   Logged qs xs k (just a) = Sent qs xs k a
   Logged qs xs k nothing  = ⊥
 
-  -- What leads the events: skips, then a value or the end at `p`, `r`
-  -- what follows it.
-  data Lead : Events R → Pos → Maybe R → Events R → Set where
-    leadOut  : ∀ {p a r} → Lead (out p a r) p (just a) (force r)
-    leadEnd  : ∀ {p} → Lead (end p) p nothing hush
-    leadSkip : ∀ {q r p b r′} → Lead (force r) p b r′ → Lead (skip q r) p b r′
-
-  lead-has : ∀ {e p b r} → Lead e p b r → Has e p b
-  lead-has leadOut      = atOut
-  lead-has leadEnd      = atEnd
-  lead-has (leadSkip l) = pastSkip (lead-has l)
-
-  lead-rest : ∀ {e p b r k c} → Lead e p b r → Has r k c → Has e k c
-  lead-rest leadOut      x = pastOut x
-  lead-rest leadEnd      ()
-  lead-rest (leadSkip l) x = pastSkip (lead-rest l x)
-
-  lead-split : ∀ {e p b r k c} → Lead e p b r → Has e k c → (k ≡ p × c ≡ b) ⊎ Has r k c
-  lead-split leadOut      atOut        = inj₁ (refl , refl)
-  lead-split leadOut      (pastOut x)  = inj₂ x
-  lead-split leadEnd      atEnd        = inj₁ (refl , refl)
-  lead-split (leadSkip l) (pastSkip x) = lead-split l x
-
-  -- Events led by their end hold no value.
-  lead-ended : ∀ {e p r k a} → Lead e p nothing r → Has e k (just a) → ⊥
-  lead-ended leadEnd      ()
-  lead-ended (leadSkip l) (pastSkip x) = lead-ended l x
-
-  -- What a step shows of the residual: a silent step keeps it; a value
-  -- at its tick leads it, what follows lying past the value; a
-  -- completion is its end; a drained run leaves nothing of it.
+  -- What a step shows of the residual, as a set: a silent step keeps
+  -- it; a value at its tick is in it, and leaves the rest of it, all past
+  -- the value; a completion is its end, no value left in it; a drained
+  -- run leaves nothing of it.
   data Shows (rest : Events R) : Step → Set₁ where
     silentˢ   : ∀ {m′} → Inner rest m′ → Shows rest (silent m′)
-    valueˢ    : ∀ {t p a m′ r} → t ≡ tick p → Lead rest p (just a) r → (∀ {k b} → Has r k b → k ≤ᵖ p → ⊥) → Inner r m′
+    valueˢ    : ∀ {t p a m′ r} → t ≡ tick p → Has rest p (just a)
+              → (∀ {k b} → Has r k b → Has rest k b) → (∀ {k b} → Has rest k b → (k ≡ p × b ≡ just a) ⊎ Has r k b)
+              → (∀ {k b} → Has r k b → k ≤ᵖ p → ⊥) → Inner r m′
               → Shows rest (value t p a m′)
-    completeˢ : ∀ {p r} → Lead rest p nothing r → Shows rest (complete p)
+    completeˢ : ∀ {p} → Has rest p nothing → (∀ {k a} → Has rest k (just a) → ⊥) → Shows rest (complete p)
     drainedˢ  : (∀ {k b} → Has rest k b → ⊥) → Shows rest drained
 
   postulate
@@ -294,7 +269,7 @@ module Honesty (R : Set) where
   -- A completion is the events' end, the residual holding no value.
   ends : ∀ {e m p} (h : HonMach e m) → step m ≡ complete p → Has e p nothing × (∀ {k a} → Has (HonMach.rest h) k (just a) → ⊥)
   ends h eq with subst (Shows (HonMach.rest h)) eq (inner-next (HonMach.inner h))
-  ... | completeˢ l = HonMach.within h (lead-has l) , lead-ended l
+  ... | completeˢ x none = HonMach.within h x , none
 
   -- A drained run has delivered all of it.
   dries : ∀ {e m} (h : HonMach e m) → step m ≡ drained → ∀ {k b} → Has (HonMach.rest h) k b → ⊥
@@ -389,13 +364,13 @@ module Honesty (R : Set) where
     }
     where open HonMach h
   honest-step {e} {m} h (valueᵗ {t} {p} {a} eq) with subst (Shows (HonMach.rest h)) eq (inner-next (HonMach.inner h)) | value-notes m eq
-  ... | valueˢ {r = r} tp l beyond i | kl , km = record
+  ... | valueˢ {r = r} tp x₀ sub sp beyond i | kl , km = record
     { rest   = r
     ; logged = λ s → logged′ (subst₂ (λ qs xs → Sent qs xs _ _) km kl s)
     ; split  = λ x → [ (λ l′ → inj₁ (subst₂ (λ qs xs → Logged qs xs _ _) (sym km) (sym kl) l′)) , inj₂ ]′ (split′ x)
     ; past   = λ x ow → past′ x (subst (Any (_ ≤ᵖ_)) km ow)
     ; paired = subst₂ (λ qs xs → length qs ≡ length xs) (sym km) (sym kl) (snoc-length {qs = Mach.marks m} {Mach.log m} paired)
-    ; within = λ x → within (lead-rest l x)
+    ; within = λ x → within (sub x)
     ; inner  = i
     }
     where
@@ -403,17 +378,17 @@ module Honesty (R : Set) where
     logged′ : ∀ {k a′} → Sent (Mach.marks m ++ [ p ]) (Mach.log m ++ [ (t , a) ]) k a′ → Has e k (just a′)
     logged′ s with sent-snoc {Mach.marks m} {Mach.log m} paired s
     ... | inj₁ s′       = logged s′
-    ... | inj₂ (kp , x) = subst₂ (λ k a′ → Has e k (just a′)) (sym kp) (cong proj₂ x) (within (lead-has l))
+    ... | inj₂ (kp , x) = subst₂ (λ k a′ → Has e k (just a′)) (sym kp) (cong proj₂ x) (within x₀)
     split′ : ∀ {k b} → Has e k b → Logged (Mach.marks m ++ [ p ]) (Mach.log m ++ [ (t , a) ]) k b ⊎ Has r k b
     split′ x with split x
     ... | inj₁ lg = inj₁ (logged-snoc lg)
-    ... | inj₂ y with lead-split l y
+    ... | inj₂ y with sp y
     ...   | inj₂ y′       = inj₂ y′
     ...   | inj₁ (kp , ba) = inj₁ (subst₂ (λ k b → Logged (Mach.marks m ++ [ p ]) (Mach.log m ++ [ (t , a) ]) k b) (sym kp) (sym ba)
                                     (subst (λ t′ → Sent (Mach.marks m ++ [ p ]) (Mach.log m ++ [ (t′ , a) ]) p a) (sym tp) (sent-last {Mach.marks m} {Mach.log m} paired)))
     past′ : ∀ {k b} → Has r k b → Any (k ≤ᵖ_) (Mach.marks m ++ [ p ]) → ⊥
     past′ x ow with ++⁻ (Mach.marks m) ow
-    ... | inj₁ o          = past (lead-rest l x) o
+    ... | inj₁ o          = past (sub x) o
     ... | inj₂ (here kp)  = beyond x kp
     ... | inj₂ (there ())
 

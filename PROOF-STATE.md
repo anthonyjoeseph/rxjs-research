@@ -233,7 +233,7 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **`Inner`** (Content) — FALSITY, `DEAD ROUTE×3`: a postulated type; the whole
   configuration will deliver the residual, as `WellMach` is well.
 - **`inner-walk`** (Content) — FALSITY, `NO EVIDENCE`: a step not the loop's
-  turn shows the residual: keeps it, leads it with its value, or ends it.
+  turn shows the residual: keeps it, takes its least value, or ends it.
 - **`inner-turn`** (Content) — FALSITY, `NO EVIDENCE`: the loop's turn shows
   the residual, and a drained run has delivered all of it.
 - **`inner-launch`** (Content) — FALSITY, `NO EVIDENCE`: an honest subscription
