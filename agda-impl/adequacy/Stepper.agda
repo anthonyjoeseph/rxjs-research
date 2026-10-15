@@ -399,14 +399,6 @@ shut-after c {ρ} (U.skipˢ k b)  = skip-same (sym (shut-meaning (here refl) c b
 shut-after c (U.endˢ e)         = ≃-refl (end e)
 shut-after c U.hushˢ            = ≃-refl hush
 
--- A joiner told its source's end joined before it, once it has ended.
-shut-joined : ∀ {Γ A B} (i : A ∈ Γ) c (j : B ∈ Γ) p (ρ : NEnv Γ) {xs} → lookup ρ i ≡ end c
-            → Within (U.joinᶜ j p xs (U.told i c j p nothing (U.same? i j))) ρ → Within (U.joinᶜ j p xs nothing) ρ
-shut-joined i c j p ρ l w with U.same? i j in eq
-... | nothing   = w
-... | just refl with same-≡ i j eq
-... | refl rewrite l = tt
-
 mutual
   shut-placed : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placed (U.shut i c n) ρ → Placed n ρ
   shut-placed i c n ρ l (o , w) = subst Ordered (shut-meaning i c n ρ l) o , shut-within i c n ρ l w
@@ -420,8 +412,7 @@ mutual
   shut-within i c (U.scanᶜ f z n)           ρ l w = shut-placed i c n ρ l w
   shut-within i c (U.takeWhileᶜ k p n)      ρ l w = shut-placed i c n ρ l w
   shut-within i c (U.flatMapᶜ op g o ls qs) ρ l (wo , wl) = shut-placedᴹ i c o ρ l wo , shut-placedᴸ i c ls ρ l wl
-  shut-within i c (U.joinᶜ j p xs (just e)) ρ l w = tt
-  shut-within i c (U.joinᶜ j p xs nothing)  ρ l w = shut-joined i c j p ρ l w
+  shut-within i c (U.joinᶜ j p xs e)        ρ l w = tt
   shut-within i c (U.connectᶜ b (U.live s)) ρ l (wb , ws) =
     shut-placed (there i) c b (U.meaning s ρ ∷ᴬ ρ) l (subst (λ x → Placed (U.shut (there i) c b) (x ∷ᴬ ρ)) (shut-meaning i c s ρ l) wb)
     , shut-placed i c s ρ l ws
@@ -555,29 +546,47 @@ postulate
   --   can keep the count a lane's pre-join skips need.
   -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
   fed-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) q (a : A) (l : Events∞ A) {x : Events A} → x ≃ out q a l
-        → Ordered x → Ordered (out q a l) → M.before (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ)) ≡ true
+        → Ordered x → Ordered (out q a l) → Atop (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ))
         → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
         → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
 
   -- A skip atop what follows it is forgotten.
   skip-drop : ∀ {A k} {l : Events∞ A} → Ordered (skip k l) → skip k l ≃ force l
 
+  -- EVENTS AT ONE POSITION COMMUTE: a source's step taken ahead of the
+  -- body's events at its own position, the body's tie run shown first.
+  ahead-even : ∀ {A B} (x : Events B) q (t : Events∞ A) → Ordered x → Atop (q ++ [ ix 0 ]) x
+             → M.before (q ++ [ ix 0 ]) x ≡ false → Atop q (force t)
+             → M.ahead x (q ++ [ ix 0 ]) t false ≃ skip (q ++ [ ix 0 ]) (λ where .force → M.beside x (force t))
+
   -- A NODE'S MEANING LAGS: whatever it shows is taken after a body's
   -- event at `k` that comes before its step and its sources'.
   lags : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ k
        → Wins (just k) (U.headˢ (U.step c)) ≡ true → First (just k) δ → Lags k (U.meaning c (ρᴱ δ))
 
-  -- A NODE'S MEANING LEADS NOTHING: whatever it shows comes after `j`,
-  -- which comes before its step and its sources'.
+  -- A NODE'S MEANING LEADS NOTHING: whatever it shows comes no earlier
+  -- than `j`, which comes before its step and its sources'.  At `j` it
+  -- may: a joiner placed at its source's next step shows a pre-join skip
+  -- just past it, and nothing in the placing says positions never meet.
   --
-  -- REFUTED: 07140662 over a placing without the joiners' order, by a joiner placed at its source's next step
+  -- REFUTED: 07140662 strictly after `j`, by a joiner placed at its source's next step
   leads : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ j
-        → U.beforeˢ j (U.step c) ≡ true → First (just j) δ → M.before j (U.meaning c (ρᴱ δ)) ≡ true
+        → U.beforeˢ j (U.step c) ≡ true → First (just j) δ → Atop j (U.meaning c (ρᴱ δ))
 
   -- A STEP KEEPS THE GHOST PLACED: the stepped node is placed, atop what
   -- the step shows.
+  --
+  -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
   placed-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
                → Placedˢ (ρᴱ δ) (U.step c)
+
+-- The source's next taken first, ahead of the body's events at the same
+-- position.
+tie-lead : ∀ {A B} (x : Events B) q (t : Events∞ A) → Ordered x → Atop (q ++ [ ix 0 ]) x → Atop q (force t)
+         → M.ahead x (q ++ [ ix 0 ]) t (M.before (q ++ [ ix 0 ]) x) ≃ skip (q ++ [ ix 0 ]) (λ where .force → M.beside x (force t))
+tie-lead x q t o a at with M.before (q ++ [ ix 0 ]) x in e
+... | true  = ≃-trans (ahead-lead x (q ++ [ ix 0 ]) t true refl) (skip-same refl)
+... | false = ≃-trans (ahead-even x q t o a e at) (skip-same refl)
 
 -- The source's next taken after the body's step.
 LagsHead : ∀ {Γ A B} → U.Step Γ B → Events A → Set
@@ -605,7 +614,7 @@ conn : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) (s
      → (Wins (U.headˢ sb) (U.headˢ ss) ≡ true → First (U.headˢ sb) δ → U.meaning b (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) ≃ afterᴱ (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) sb)
      → (First (U.headˢ ss) δ → U.meaning s (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) ss)
      → (∀ k → Wins (just k) (U.headˢ ss) ≡ true → First (just k) δ → Lags k (U.meaning s (ρᴱ δ)))
-     → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → M.before j (U.meaning b (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ)) ≡ true)
+     → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → Atop j (U.meaning b (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ)))
      → Placedˢ (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) sb → Placedˢ (ρᴱ δ) ss → Placedˢ (ρᴱ δ) (U.sourceˢ b sb s ss)
      → First (U.headˢ (U.sourceˢ b sb s ss)) δ
      → U.meaning (U.connectᶜ b (U.live s)) (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) (U.sourceˢ b sb s ss)
@@ -623,7 +632,7 @@ conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs
      → (Wins (U.headˢ sb) (U.headˢ ss) ≡ true → First (U.headˢ sb) δ → MB ≃ afterᴱ (ms ∷ᴬ ρ) sb)
      → (First (U.headˢ ss) δ → ms ≃ afterᴱ ρ ss)
      → (∀ k → Wins (just k) (U.headˢ ss) ≡ true → First (just k) δ → Lags k ms)
-     → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → M.before j MB ≡ true)
+     → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → Atop j MB)
      → Placedˢ (ms ∷ᴬ ρ) sb → Placedˢ ρ ss → Placedˢ ρ (U.sourceˢ b sb s ss)
      → First (U.headˢ (U.sourceˢ b sb s ss)) δ → M.beside MB ms ≃ afterᴱ ρ (U.sourceˢ b sb s ss)
   go U.hushˢ          U.hushˢ hb hs lg ld pab pas pa fi =
@@ -636,9 +645,9 @@ conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs
   go sb@(U.outˢ k _ _) (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
   go sb@(U.skipˢ k _)  (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
   go sb@(U.endˢ k)     (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb (U.outˢ q x s′) hb hs lg ld pab pas@(_ , ps′) (_ , _ , pbf , _) fi | true =
+  go sb (U.outˢ q x s′) hb hs lg ld pab pas@(atq , ps′) (_ , _ , pbf , _) fi | true =
     ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) ordOut (≃-refl MB) e₁)
-   (≃-trans (ahead-lead MB (q ++ [ ix 0 ]) _ _ (ld (q ++ [ ix 0 ]) eq (wins-self q) fi))
+   (≃-trans (tie-lead MB q _ (proj₁ pb) (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) atq)
             (skip-cong (beside-≃ (proj₁ pb) (proj₁ pbf) (proj₁ ps′) (proj₁ ps′) (fed-≃ b ρ q x _ e₁ (proj₁ ps) ordOut (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) pb pbf) (≃-refl _))))
     where e₁ = hs (first-sub q δ fi)
           ordOut = ordered-after ρ (U.outˢ q x s′) (pas)
@@ -647,9 +656,9 @@ conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs
   go sb@(U.outˢ k _ _) (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
   go sb@(U.skipˢ k _)  (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
   go sb@(U.endˢ k)     (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb (U.skipˢ q s′) hb hs lg ld pab pas (_ , _ , pb′ , ps′) fi | true =
+  go sb (U.skipˢ q s′) hb hs lg ld pab pas@(atq , _) (_ , _ , pb′ , ps′) fi | true =
     ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) ordSk (≃-refl MB) e₁)
-   (≃-trans (ahead-lead MB (q ++ [ ix 0 ]) _ _ (ld (q ++ [ ix 0 ]) eq (wins-self q) fi))
+   (≃-trans (tie-lead MB q _ (proj₁ pb) (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) atq)
             (skip-cong (beside-≃ (proj₁ pb) (proj₁ pb′) (proj₁ ps′) (proj₁ ps′)
                          (env-≃ b ρ (≃-trans e₁ (skip-drop ordSk)) (proj₁ ps) (proj₁ ps′) pb pb′) (≃-refl _))))
     where e₁ = hs (first-sub q δ fi)

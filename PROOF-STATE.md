@@ -185,9 +185,10 @@ by their own silent steps (`Mirror`).
   all `≃` forgets, and whether `M.beside` respects `≃` between sorted events.
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
   the meaning's events are sorted, a step keeps every node so, and what a
-  node shows comes after any earlier step. Ruled out: a placing without
-  each live joiner joined before what its source has yet to show. Decides
-  whether `Placed`, a field of `Carried`, is the order the connect needs.
+  node shows comes no earlier than any earlier step. Ruled out: a node
+  showing strictly after it, and a placing with each live joiner joined
+  before its source, which a step does not keep. Decides whether `Placed`,
+  a field of `Carried`, is the order the connect needs, ties and all.
 - **THE MERGES.** `go-skips` with `∼-trans`: a flatMap's meaning is what
   its step shows, each lane showing its own. Ruled out: merges over `∼`
   alone, over unsorted events, or with matched skips kept in place.
@@ -219,11 +220,13 @@ by their own silent steps (`Mirror`).
   alike.
 - **`beside-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: `M.beside` respects `≃`
   between events in order.
+- **`ahead-even`** (Stepper) — FALSITY, `NO EVIDENCE`: a source's step commutes
+  with the body's events at its own position.
 - **`skip-drop`** (Stepper) — FALSITY, `NO EVIDENCE`: a skip atop what follows
   it is forgotten.
 - **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
   subscribed at the root is placed.
-- **`placed-after`** (Stepper) — FALSITY, `NO EVIDENCE`: a step keeps the ghost
+- **`placed-after`** (Stepper) — FALSITY, `REFUTED`: a step keeps the ghost
   placed.
 - **`lags`** (Stepper) — FALSITY, `NO EVIDENCE`: a node's meaning shows nothing
   before a body's event that comes first.
