@@ -177,7 +177,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `burst-onward`, `sub-onward` and `turn-pops` carry
+- **THE MOVE.** `owned-pop`, `timed-pop` and `pendings-path`: the pop's
+  facts that are not one field kept at one node. A queued frame is a
+  waiting cold's; the fired cold's frame alone leaves the queue; what the
+  turn owed moves to the fired cold's burst. Their shared apparatus is a
+  path's transport across a plant: apart from, above or below it.
+  Decides whether `Books.fresh` and `Queue.ordered` pay the queue's
+  uniqueness, or the queue needs it as a field. The other hops copy the
+  pop's template: one leaf rewritten at a path, a lemma per field kept.
+- **THE PROGRESS.** `burst-onward` and `sub-onward` carry
   liveness: each silent hop passes a skip, leaves the ghost alike and
   lowers `measure`, or reaches a step that is not silent. Ruled out: a
   ghost-only marker in the shared machine; a burst queued but by a leaf
@@ -208,13 +216,11 @@ by their own silent steps (`Mirror`).
   out: a stepper `≃` short of strong agreement, every operator respecting
   it and a source's step tied with the body's skips commuting. Decides whether `join-quiet` needs its
   sources' silence carried further than `First`.
-- **THE MACHINE SIDE.** `note-least`, `note-onward`, `turn-pops`,
-  `turn-dry`, `sub-onward` and `burst-onward`: a note records the least
-  value the ghost holds, a popped timer's frame is the ghost's frames node,
-  a drained run's ghost shows nothing, and a subscription or a burst runs
-  silently to the next re-entry state. Decides whether "least" is paid
-  once as a field of `Carried`, and whether the ghost's timers need an
-  order of their own or `WellQueue`'s.
+- **THE MACHINE SIDE.** `note-least`, `note-onward`, `turn-dry`,
+  `sub-onward` and `burst-onward`: a note records the least value the
+  ghost holds, a drained run's ghost shows nothing, and a subscription or
+  a burst runs silently to the next re-entry state. Decides whether
+  "least" is paid once as a field of `Carried`.
 ### The ledger
 
 - **`ordered-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap merges its outer
@@ -264,8 +270,6 @@ by their own silent steps (`Mirror`).
   value the ghost holds.
 - **`note-onward`** (Content) — FALSITY, `NO EVIDENCE`: past a note the run
   runs the stepped ghost.
-- **`turn-pops`** (Content) — FALSITY, `NO EVIDENCE`: a popped timer's frame is
-  the ghost's frames node at its tick, no skip passed, a timer spent.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
 - **`sub-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription begun
@@ -274,6 +278,28 @@ by their own silent steps (`Mirror`).
 - **`burst-onward`** (Content) — FALSITY, `NO EVIDENCE`: a burst's frame steps
   silently to the next re-entry state, past a skip, a burst dropped or to a
   note.
+- **`owned-pop`** (Moves) — FALSITY, `NO EVIDENCE`: nothing owed at the turn,
+  the popped cold fired is owed only its burst.
+- **`timed-pop`** (Moves) — FALSITY, `NO EVIDENCE`: the fired cold's frame
+  leaves the queue with its timer, and nothing else does.
+- **`pendings-path`** (Moves) — FALSITY, `NO EVIDENCE`: a queued pending frame
+  is a waiting cold's, at a path.
+- **`part-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one of
+  the same open part leaves the tree's open part.
+- **`pend-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
+  owing as much leaves the work owed.
+- **`names-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
+  of the same names leaves the tree's.
+- **`subjects-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to
+  one of the same subjects leaves the tree's.
+- **`joiners-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
+  of the same joiners leaves the tree's.
+- **`holds-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
+  holding no less, same teardown, keeps the tree's kernels held.
+- **`gated-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
+  gated and dead no less, same open part, keeps the tree gated.
+- **`fed-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one fed
+  no less keeps the tree's joiners fed.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never

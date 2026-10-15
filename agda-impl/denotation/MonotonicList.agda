@@ -19,7 +19,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; 
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n)
+open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n; <⇒≤; ≤-reflexive)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -349,6 +349,12 @@ private
 -- Two subjects' subscribers part in the order they joined.
 <ᵖ-sub : ∀ i j → i <ᵖ j ≡ true → (sub i ∷ []) <ᵖ (sub j ∷ []) ≡ true
 <ᵖ-sub i j h rewrite isLt-lt h = refl
+
+-- Led by the tick.
+<ᵖ-tick : ∀ a b p q → (ix a ∷ p) <ᵖ (ix b ∷ q) ≡ true → a ≤ b
+<ᵖ-tick a b p q h with lexi-lt (cmpℕ a b) (cmpPos p q) (isLt-lt h)
+... | inj₁ c       = <⇒≤ (lt-ℕ c)
+... | inj₂ (c , _) = ≤-reflexive (eq-ℕ c)
 
 -- A burst's values part in order.
 <ᵖ-ix : ∀ i → (ix i ∷ []) <ᵖ (ix (suc i) ∷ []) ≡ true

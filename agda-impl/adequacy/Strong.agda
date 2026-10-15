@@ -199,10 +199,12 @@ module Strongly (R : Set) where
   -- Every subscription the run still reaches, with its names
 
   -- A started cold, subscribed at tick `τ`: between frames, its timeline
-  -- from the frame it waits for, the frame's timer set at `e`; or at step
+  -- from the frame it waits for, the frame's timer set at `e`; that
+  -- frame's timer popped, its burst held and not yet stepped; or at step
   -- `i` of the frame at `r`.
   data Phase (A : Set) : Set where
     waiting : ∀ {u} → Time → Pos → From A u → Phase A
+    fired   : ∀ {u} → Time → Pos → From A u → Phase A
     playing : ∀ {t} → Time → Pos → ℕ → Frame A t → Phase A
 
   -- A takeWhile running; its failing value passed at the position given,
@@ -393,12 +395,14 @@ module Strongly (R : Set) where
   -- The configuration a cold's phase is.
   nodeOf : ∀ {Δ A} → Phase A → U.Node Δ A
   nodeOf (waiting τ e m)   = U.framesᶜ τ e m
+  nodeOf (fired τ e m)     = U.framesᶜ τ e m
   nodeOf (playing τ r i b) = U.burstᶜ τ r i b
 
   -- The frame a cold waits for, as the timer that should be queued.
   timerOf : ∀ {h A} → Sink h A → Handle h → Phase A → List (Timer h)
   timerOf s hd (waiting τ e (at t _ b)) = record { due = τ + t ; sink = s ; handle = hd ; at′ = t ; from = e ; frame = b } ∷ []
   timerOf s hd (waiting τ e _)          = []
+  timerOf s hd (fired _ _ _)            = []
   timerOf s hd (playing _ _ _ _)        = []
 
   -- What the joiners of each subject are.
@@ -731,12 +735,21 @@ module Strongly (R : Set) where
   playingOf {r = r} {i} {u} {sk = sk} {hd} {fr} _ pl =
     record { sink = sk ; handle = hd ; at′ = u ; under′ = r ; index = i ; frame = fr ; polled = pl }
 
+  -- A fired cold's burst, as the timer's pop made it: its first step, at
+  -- the frame's cascade.
+  firedOf : ∀ {h Δ A τ e v u x} {t : Sub h [] R} {sk : Sink h A} {hd} {fr : Frame A u}
+          → Path t (coldˢ {Δ = Δ} sk hd (fired {u = v} τ e (at u x fr))) → Playing h
+  firedOf {τ = τ} {e} {u = u} {sk = sk} {hd} {fr} _ =
+    record { sink = sk ; handle = hd ; at′ = u ; under′ = ix (τ + u) ∷ subᴾ e ∷ [] ; index = 0 ; frame = fr ; polled = false }
+
   module Against {h : World} (t : Sub h [] R) where
-    -- A burst the driver holds: a cold the witness has playing, not yet
-    -- polled for this step; or one over, the machine to resume.
+    -- A burst the driver holds: a cold the witness has playing, or fired,
+    -- not yet polled for this step; or one over, the machine to resume.
     data BurstAs : Maybe (Playing h) → Set₁ where
       playsAs : ∀ {Δ A τ r i u} {sk : Sink h A} {hd} {fr : Frame A u}
                 (π : Path t (coldˢ {Δ = Δ} sk hd (playing τ r i fr))) → BurstAs (just (playingOf π false))
+      firesAs : ∀ {Δ A τ e v u x} {sk : Sink h A} {hd} {fr : Frame A u}
+                (π : Path t (coldˢ {Δ = Δ} sk hd (fired {u = v} τ e (at u x fr)))) → BurstAs (just (firedOf π))
       overAs  : BurstAs nothing
 
     -- Each frame, run in the current world, the agenda up to `_≗_`, at
@@ -779,6 +792,7 @@ module Strongly (R : Set) where
 
     burstSpots : ∀ {b} → BurstAs b → List (Spot t)
     burstSpots (playsAs π) = spot π ∷ []
+    burstSpots (firesAs π) = spot π ∷ []
     burstSpots overAs      = []
 
     stackBursts : ∀ {w p σ bs} {K : Stack w ⊤} → StackAs p σ K bs → List (Spot t)
@@ -827,12 +841,13 @@ module Strongly (R : Set) where
     Clocked {p} n (noteAs _ _ _)            = n ≡ tick p
     Clocked {p} n (subAs _ _ _)             = n ≡ tick p
     Clocked n (burstAs (playsAs {τ = τ} {r} {u = u} _) _) = n ≡ τ + u × n ≡ tick r
+    Clocked n (burstAs (firesAs {τ = τ} {u = u} _) _)     = n ≡ τ + u
 
   ------------------------------------------------------------------------
   -- THE RELATION, one record per concern
 
   -- EVERYTHING DUE BEFORE THE NEXT TURN IS OWED: an `of`'s rest to the
-  -- agenda; a playing cold's frame to a burst in flight; a subscription
+  -- agenda; a playing or fired cold's frame to a burst in flight; a subscription
   -- reached and not begun to the one under way, or to a connect's source
   -- the agenda owes; a live takeWhile's completion and cut, and a
   -- connect's feed, to the agenda; and every call run where its node
@@ -843,6 +858,8 @@ module Strongly (R : Set) where
     field
       ofs    : ∀ {Δ A q i xs} (π : Path t (ofˢ {Δ = Δ} {A} q i xs)) → (q , emitC π) ∈ agenda ca
       plays  : ∀ {Δ A s hd τ r i u} {b : Frame A u} (π : Path t (coldˢ {Δ = Δ} s hd (playing τ r i b)))
+             → spentʰ hd ≡ false → spot π ∈ bursts ca
+      fires  : ∀ {Δ A s hd τ e u} {m : From A u} (π : Path t (coldˢ {Δ = Δ} s hd (fired τ e m)))
              → spentʰ hd ≡ false → spot π ∈ bursts ca
       begun  : ∀ {Δ A s q} (π : Path t (pendingˢ {Δ = Δ} {A} s q)) → spot π ∈ begins ca
       ends   : ∀ {Δ A i p c k q} {s : Sub h Δ A} (π : Path t (takeWhileˢ i p c k (ending q) s))
@@ -949,7 +966,7 @@ module Strongly (R : Set) where
     ; tree    = pendingˢ o root
     ; ctlAs   = Against.subAs here ([] , []ᴬ , same , refl , ≗-refl _) Against.bottomAs
     ; meets   = refl
-    ; owned   = record { ofs = λ () ; plays = λ () ; begun = λ { here → Any.here refl } ; ends = λ () ; cuts = λ () ; feeds = λ () ; fins = λ ()
+    ; owned   = record { ofs = λ () ; plays = λ () ; fires = λ () ; begun = λ { here → Any.here refl } ; ends = λ () ; cuts = λ () ; feeds = λ () ; fins = λ ()
                        ; placed = []ᴬ }
     ; kernels = record { holds = _ ; gated = _ }
     ; meaning = record { fed = _ }

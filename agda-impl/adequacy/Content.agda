@@ -22,10 +22,15 @@ open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Nat.Properties using (suc-injective)
-open import Data.List.Relation.Unary.All using ([]; _∷_)
+open import Data.Nat.Properties using (suc-injective; ≤-refl)
+open import Data.List.Relation.Unary.All using (All; []; _∷_; map)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs)
+open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_; tail)
+open import Data.List.Relation.Unary.Linked.Properties using (Linked⇒All)
+open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
+open import Level using (lift)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _<_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
@@ -34,19 +39,20 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
-  skip⁼; end⁼; agree; agree-sym; agree-trans)
+  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; _<ᵖ_; <ᵖ-trans; <ᵖ-tick)
 import denotation.Unfold as U
+open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import denotation.Compositional using ([]ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Moves using (module Moving)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; []; os; afterᴱ)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
-open import Tree using (Obs)
 open import operation.PureObservable using (PureObs; Out; note; module Pure)
 open import operation.AbstractObservable using (module Heap) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_)
@@ -55,13 +61,15 @@ open Events∞
 
 module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
-  open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; held; run; asking; bottom; spent?)
+  open Shared Timeline (Out R) using (Conf; Heapᴹ; ⟨_,_,_⟩; held; run; asking; bottom; spent?)
   open Heap using (_⊑_)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
-    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane)
-  open Strongly.Against R using (calmAs; noteAs; subAs; burstAs)
-  open Pure R using (End; finished; dry; cutOff; recorder)
+    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired)
+  open Strongly.Against R using (calmAs; noteAs; subAs; burstAs; firesAs; bottomAs)
+  open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
+  open Moving R using (pend; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
+    joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop)
   open Read
 
   ----------------------------------------------------------------------
@@ -258,40 +266,6 @@ module Honesty (R : Set) where
   ----------------------------------------------------------------------
   -- WHAT IS LEFT BEFORE THE GHOST MOVES
 
-  -- The subscription work a program owes: one for each operator reached
-  -- and not begun.  A defer's body is not counted: its expansion is a
-  -- skip of the meaning's.
-  syn : ∀ {Δ A} → Obs Timeline Δ A → ℕ
-  syn (T.cold c)          = 1
-  syn T.empty             = 1
-  syn (T.of xs)           = 1
-  syn (T.map f s)         = suc (syn s)
-  syn (T.scan f z s)      = suc (syn s)
-  syn (T.takeWhile i q s) = suc (syn s)
-  syn (T.flatMap op f s)  = suc (syn s)
-  syn (T.connect s b)     = suc (syn s + syn b)
-  syn (T.connected i)     = 1
-  syn (T.defer l)         = 1
-
-  -- The witness's subscriptions reached and not begun, as work owed.
-  mutual
-    pend : ∀ {h Δ A} → Sub h Δ A → ℕ
-    pend (pendingˢ s q)                    = syn s
-    pend (coldˢ _ _ _)                     = 0
-    pend (ofˢ _ _ _)                       = 0
-    pend doneˢ                             = 0
-    pend (mapˢ f s)                        = pend s
-    pend (scanˢ f r s)                     = pend s
-    pend (takeWhileˢ i q c k tk s)         = pend s
-    pend (flatMapˢ op f fl oc k r s ls)    = pend s + pendᴸ ls
-    pend (connectˢ S c b kb k fd e src bd) = pend src + pend bd
-    pend (joinˢ _ _ _ _ _)                 = 0
-    pend (deferˢ k s)                      = pend s
-
-    pendᴸ : ∀ {h Δ B} → List (Lane h Δ B) → ℕ
-    pendᴸ []                = 0
-    pendᴸ (lane c k s ∷ ls) = pend s + pendᴸ ls
-
   -- THE WORK LEFT AT A RE-ENTRY CONFIGURATION, in order: subscriptions
   -- owed, timers queued, bursts held.
   Measure : Set
@@ -349,11 +323,6 @@ module Honesty (R : Set) where
     turn-dry : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
              → Mach.bursts m ≡ [] → Mach.timers m ≡ [] → ∀ {k b} → Has (residual g) k b → ⊥
 
-    -- The turn popping a timer: its frame is the ghost's frames node at
-    -- its tick, a timer spent and the ghost alike.
-    turn-pops : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ bottom
-              → Mach.bursts m ≡ [] → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
-
     -- A subscription begun runs its kernel's code silently to the next
     -- re-entry state: past a defer's skip, or its pending node begun, the
     -- ghost alike.
@@ -375,6 +344,81 @@ module Honesty (R : Set) where
     note-onward : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
                 → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                 → ∀ {t q a′ m′} → step m ≡ value t q a′ m′ → Mirror g′ m′
+
+  -- A popped timer's burst, spent, dropped: the turn again.
+  drop-spent : ∀ {h} {hp : Heapᴹ h} {p w} {σ : w ⊑ h} {ts lg en mk} (tm : Timer h)
+             → spent? hp (Timer.handle tm) ≡ true
+             → step (mach ⟨ hp , p , held σ bottom ⟩ (Timer.due tm) ts
+                       (just (record { sink = Timer.sink tm ; handle = Timer.handle tm ; at′ = Timer.at′ tm
+                                     ; under′ = cascade tm ; index = 0 ; frame = Timer.frame tm ; polled = false }) ∷ []) [] lg en mk)
+               ≡ silent (mach ⟨ hp , p , held σ bottom ⟩ (Timer.due tm) ts [] [] lg en mk)
+  drop-spent _ sp rewrite sp = refl
+
+  true≢false : true ≢ false
+  true≢false ()
+
+  -- The queue's head spent: the rest of the queue still every live
+  -- pending frame.
+  timed-spent : ∀ {h} {H : Heapᴹ h} {tm ts ps} → At.spentʰ H (Timer.handle tm) ≡ true → At.Timed H (tm ∷ ts) ps → At.Timed H ts ps
+  timed-spent {H = H} {tm} {ts} sp (_ ∷ as , bs) = as , map keep bs
+    where
+      keep : ∀ {x} → (At.spentʰ H (Timer.handle x) ≡ false → x ∈ᴸ tm ∷ ts) → At.spentʰ H (Timer.handle x) ≡ false → x ∈ᴸ ts
+      keep f nsp with f nsp
+      ... | here refl = ⊥-elim (true≢false (trans (sym sp) nsp))
+      ... | there i   = i
+
+  -- The queue's head popped: the rest due no earlier than it.
+  ahead-pop : ∀ {h} {p : Pos} {clk} {tm : Timer h} {ts}
+            → Linked (λ x y → cascade x <ᵖ cascade y ≡ true) (tm ∷ ts)
+            → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) (tm ∷ ts)
+            → All (λ x → Timer.due tm ≤ Timer.due x × p <ᵖ cascade x ≡ true) ts
+  ahead-pop [-]                (_ ∷ [])  = []
+  ahead-pop {p = p} {tm = tm} (r ∷ lk) (_ ∷ ah) = go (Linked⇒All {R = λ a b → cascade a <ᵖ cascade b ≡ true} (λ {x} {y} {z} → <ᵖ-trans (cascade x) (cascade y) (cascade z)) {v = tm} r lk) ah
+    where
+      go : ∀ {clk xs} → All (λ x → cascade tm <ᵖ cascade x ≡ true) xs → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
+         → All (λ x → Timer.due tm ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
+      go []       []             = []
+      go {xs = x ∷ _} (c ∷ cs) ((_ , a) ∷ as) = (<ᵖ-tick (Timer.due tm) (Timer.due x) (subᴾ (Timer.from tm) ∷ []) (subᴾ (Timer.from x) ∷ []) c , a) ∷ go cs as
+
+  -- THE TURN POPPING A TIMER: a spent one's burst dropped a step later,
+  -- the ghost alike, a timer fewer; a live one's cold fired, the same
+  -- meaning node with its burst held, a timer fewer.
+  turn-pops : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ bottom
+            → Mach.bursts m ≡ [] → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+  turn-pops {m = mach ⟨ _ , _ , _ ⟩ _ [] _ _ _ _ _} record { books = record { paidUp = refl } } refl refl ()
+  turn-pops {g} {mach ⟨ hp , p , _ ⟩ _ (tm ∷ ts) _ _ lg en mk} {σ = σ}
+    cr@record { tree = t ; ctlAs = calmAs ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = q
+              ; books = record { fresh = fs ; paidUp = refl ; running = rn } } refl refl refl
+    with spent? hp (Timer.handle tm) in sp
+  ... | true =
+    g , mach ⟨ hp , p , held σ bottom ⟩ (Timer.due tm) ts [] [] lg en mk , then (drop-spent tm sp) now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt ; owned = ow
+        ; kernels = kn ; meaning = mn
+        ; queue = record { past = Queue.past q ; timed = timed-spent {H = hp} sp (Queue.timed q) ; joined = Queue.joined q
+                         ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
+        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₁ ≤-refl))
+  ... | false with proj₁ (Queue.timed q)
+  ...   | inj₁ s ∷ _ = ⊥-elim (true≢false (trans (sym s) sp))
+  ...   | inj₂ i ∷ _ with pendings-path {t = t} i
+  ...     | waits {τ = τ} {e = e} {u = u} {x = x} {sk = sk} {hd = hd} {fr = fr} π =
+    g , _ , now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = plant π v
+        ; ctlAs = burstAs (firesAs (planted π v)) bottomAs
+        ; meets = trans (part-plant hp {t = t} π v refl) mt
+        ; owned = owned-pop hp {t = t} π ow sp
+        ; kernels = record { holds = holds-plant hp {t = t} π v refl (λ h → h) (Kernels.holds kn)
+                           ; gated = gated-plant hp {t = t} π v refl (λ _ → lift (λ _ → refl)) (λ d → λ { here → d here }) (Kernels.gated kn) }
+        ; meaning = record { fed = fed-plant hp {t = t} π v (λ _ f → f) _ (Meaning.fed mn) }
+        ; queue = record { past = subst (All _) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.past q)
+                         ; timed = timed-pop hp {t = t} π (Queue.timed q) (Queue.ordered q) fs
+                         ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)
+                         ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (pend-plant {t = t} π v refl , inj₁ ≤-refl))
+    where v = coldˢ sk hd (fired τ e (at u x fr))
 
   -- The stepper is the meaning, as sets.
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
