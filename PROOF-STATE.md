@@ -170,15 +170,16 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### Big picture tier roadmap
 
-- **HONEST, DEFINED.** `HonMach` a relation over configurations, as
-  `WellMach` is, over a ghost tree of the compiled program's kernels and
-  their cells; `Honest` the per-kernel half `honest-launch` reads. Ruled
-  out: a relation blind to cells, a sound half apart from a whole half, a
-  cut at an observer's own marks, a spec per observer framed by others,
-  honesty under every context, an owed bound at the run's position (an
-  `under` returning puts it back above what was just delivered). Decides
-  whether the bound, the last delivery, is kept by `honest-walk` alone or
-  needs `honest-turn`'s timers too.
+- **HONEST, DEFINED.** `HonMach` is a record: the record among the events,
+  the rest in a residual past every mark; `honest-alike` reads it. Left:
+  `Inner` a relation over configurations, as `WellMach` is, over a ghost
+  tree of the compiled program's kernels and their cells; `Honest` the
+  per-kernel half `honest-launch` reads. Ruled out: a relation blind to
+  cells, a sound half apart from a whole half, a cut at an observer's own
+  marks, a spec per observer framed by others, honesty under every
+  context, an owed bound at the run's position. Decides whether the
+  residual past the last delivery is kept by `honest-walk` alone or needs
+  `honest-turn`'s timers too.
 - **THE PROTOCOL'S RISK.** `takeWhileᴷ-well` and `connectᴷ-well` as
   bodies, over a placeless unsubscribe and one label per callback in a
   scope. Ruled out: a second callback sharing a scope, an unsubscribe
@@ -195,9 +196,9 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **THE PROTOCOL, THE REST.** The remaining kernel `-well` rows; `connect`
   and `flatMap` lead, their subscriptions scoped under `ix 0`, `ix 1` and
   `sub`. Decides whether a callback's position travels with it on the heap.
-- **THE RESIDUAL.** `HonMach`'s ghost a configuration whose `meaning` is
-  what the run has yet to deliver: `honest-launch` by `subscribed`,
-  `honest-alike` by the residual lying past the last delivery. Decides
+- **THE RESIDUAL.** `Inner`'s ghost a configuration whose `meaning` is
+  `HonMach`'s `rest`: `honest-launch` by `subscribed`, the residual at the
+  launch the whole of the events. Decides
   whether the dead simulation's cost, every other live node past the one
   the machine moved, is paid once as a field of the invariant rather than
   re-established at every step.
@@ -230,16 +231,14 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **`scanᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `scan` well-positioned.
 - **`Honest`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; a
   subscription's deliveries alike a meaning, at any position.
-- **`HonMach`** (Content) — FALSITY, `DEAD ROUTE×3`: a postulated type; the
-  whole configuration honest to the root's events, as `WellMach` is well.
+- **`Inner`** (Content) — FALSITY, `DEAD ROUTE×3`: a postulated type; the whole
+  configuration will deliver the residual, as `WellMach` is well.
 - **`honest-walk`** (Content) — FALSITY, `NO EVIDENCE`: a step not the loop's
   turn keeps the machine honest.
 - **`honest-turn`** (Content) — FALSITY, `NO EVIDENCE`: the loop's turn keeps
   the machine honest.
 - **`honest-launch`** (Content) — FALSITY, `NO EVIDENCE`: an honest
   subscription launched under the recorder is an honest machine.
-- **`honest-alike`** (Content) — FALSITY, `NO EVIDENCE`: an honest machine's
-  record is alike its events.
 - **`HonestEnv`** (Content) — FALSITY, `NO EVIDENCE`: a postulated type; each
   joiner in scope fed its source's hot run.
 - **`connectᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `connect` honest to

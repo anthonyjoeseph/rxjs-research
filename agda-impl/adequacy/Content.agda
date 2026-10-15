@@ -15,13 +15,18 @@
 module adequacy.Content where
 
 open import Level using (lift)
-open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Relation.Unary.Any using (Any)
+open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List.Relation.Unary.Any using (Any; here; there)
+open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
+import Data.List.Relation.Unary.Any as Any
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Data.Nat.Properties using (suc-injective)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Bool using (true; false)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
-open import Data.Product using (_×_; _,_; Σ)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -189,9 +194,9 @@ module Honesty (R : Set) where
     dryʰ  : step m ≡ drained → Stands m dry (Mach.marks m)
 
   postulate
-    -- THE MACHINE HONEST TO `e`: ONE relation over the whole
+    -- THE CONFIGURATION WILL DELIVER `rest`: ONE relation over the whole
     -- configuration, as `WellMach` is, never one per observer.  A
-    -- postulated TYPE: each live observer owed its meaning's events up to
+    -- postulated TYPE: each live observer owed its meaning's events past
     -- the last delivery, every kernel's cells holding what it has
     -- consumed, every frame on the stack what it has yet to deliver.
     --
@@ -208,8 +213,28 @@ module Honesty (R : Set) where
     --   A `Ref` is a membership proof into the world, forgeable by any
     --   computation at a larger world, so some context writes `scan`'s
     --   accumulator; only the compiled program's own context is honest.
-    HonMach : Events R → Mach → Set₁
+    Inner : Events R → Mach → Set₁
 
+  -- The record holds a value at `k`; it never holds an end.
+  Logged : List Pos → List (Time × R) → Pos → Maybe R → Set
+  Logged qs xs k (just a) = Sent qs xs k a
+  Logged qs xs k nothing  = ⊥
+
+  -- THE MACHINE HONEST TO `e`: what it has recorded is among `e`, and
+  -- what of `e` it has not lies in `rest`, past every mark, which the
+  -- configuration will deliver.
+  record HonMach (e : Events R) (m : Mach) : Set₁ where
+    field
+      rest   : Events R
+      logged : ∀ {k a} → Sent (Mach.marks m) (Mach.log m) k a → Has e k (just a)
+      split  : ∀ {k b} → Has e k b → Logged (Mach.marks m) (Mach.log m) k b ⊎ Has rest k b
+      past   : ∀ {k b} → Has rest k b → Any (k ≤ᵖ_) (Mach.marks m) → ⊥
+      paired : length (Mach.marks m) ≡ length (Mach.log m)
+      ends   : ∀ {p} → step m ≡ complete p → Has e p nothing × (∀ {k a} → Has rest k (just a) → ⊥)
+      dries  : step m ≡ drained → ∀ {k b} → Has rest k b → ⊥
+      inner  : Inner rest m
+
+  postulate
     -- An honest subscription launched under the recorder is honest to
     -- the events its meaning shows at the root.
     honest-launch : ∀ {s : Subscribe R []} {M} → Honest {R} s M → HonMach (observe M root) (launch s recorder)
@@ -221,8 +246,49 @@ module Honesty (R : Set) where
     -- THE LOOP'S TURN: popping a timer keeps it honest.
     honest-turn : ∀ {e m m′} → HonMach e m → idle m ≡ true → m ↦ m′ → HonMach e m′
 
-    -- An honest machine's record is alike its events, however it stands.
-    honest-alike : ∀ {e m en qs} → HonMach e m → Stands m en qs → Alike en qs (Mach.log m) e
+  -- A value sent is at one of the record's marks.
+  sent-mark : ∀ {qs xs k a} → Sent qs xs k a → Any (k ≡_) qs
+  sent-mark sentHere      = here refl
+  sent-mark (sentLater s) = there (sent-mark s)
+
+  -- Marks past the record's end send nothing more, and lose nothing.
+  sent-++ : ∀ {qs xs k a} ys → Sent qs xs k a → Sent (qs ++ ys) xs k a
+  sent-++ ys sentHere      = sentHere
+  sent-++ ys (sentLater s) = sentLater (sent-++ ys s)
+
+  sent-cut : ∀ {qs xs ys k a} → length qs ≡ length xs → Sent (qs ++ ys) xs k a → Sent qs xs k a
+  sent-cut {[]}    {[]}    eq ()
+  sent-cut {_ ∷ _} {_ ∷ _} eq sentHere      = sentHere
+  sent-cut {_ ∷ _} {_ ∷ _} eq (sentLater s) = sentLater (sent-cut (suc-injective eq) s)
+
+  -- An honest machine's record is alike its events, however it stands.
+  honest-alike : ∀ {e m en qs} → HonMach e m → Stands m en qs → Alike en qs (Mach.log m) e
+  honest-alike h cutʰ = record
+    { sound = logged
+    ; whole = λ x ow → [ (λ s → s) , (λ r → ⊥-elim (past r ow)) ]′ (split x)
+    ; ended = tt
+    }
+    where open HonMach h
+  honest-alike {m = m} h (finʰ {p} eq) = record
+    { sound = λ s → logged (sent-cut paired s)
+    ; whole = λ x _ → [ sent-++ [ p ] , (λ r → ⊥-elim (proj₂ (ends eq) r)) ]′ (split x)
+    ; ended = p , proj₁ (ends eq) , ++⁺ʳ (Mach.marks m) (here refl)
+    }
+    where open HonMach h
+  honest-alike h (dryʰ eq) = record
+    { sound = logged
+    ; whole = λ x _ → [ (λ s → s) , (λ r → ⊥-elim (dries eq r)) ]′ (split x)
+    ; ended = ended
+    }
+    where
+    open HonMach h
+    ended : ∀ {k b} → Has _ k b → Any (k ≤ᵖ_) _
+    ended {b = just a}  x with split x
+    ... | inj₁ s = Any.map inj₁ (sent-mark s)
+    ... | inj₂ r = ⊥-elim (dries eq r)
+    ended {b = nothing} x with split x
+    ... | inj₁ ()
+    ... | inj₂ r = ⊥-elim (dries eq r)
 
   -- One step keeps the machine honest.
   honest-step : ∀ {e m m′} → HonMach e m → m ↦ m′ → HonMach e m′
