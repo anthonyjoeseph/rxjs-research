@@ -43,7 +43,7 @@ open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeli
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import denotation.Compositional using ([]ᵉ)
-open import adequacy.Sorted using (_≤ᵖ_)
+open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
 open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
@@ -63,6 +63,7 @@ module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read; feed)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle)
+  open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve)
   open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
@@ -176,6 +177,19 @@ module Honesty (R : Set) where
   data _⇝_ (m : Mach) : Mach → Set₁ where
     now  : m ⇝ m
     then : ∀ {m₁ m′} → step m ≡ silent m₁ → m₁ ⇝ m′ → m ⇝ m′
+
+  -- A silent step, and a value shown, keep the machine sorted.
+  sorted-step : ∀ {m m′} → Σ Pos (λ lo → WellMach lo m) → step m ≡ silent m′ → Σ Pos λ lo → WellMach lo m′
+  sorted-step (lo , w) e with subst (WellStep lo) e (preserve w)
+  ... | silentʷ _ w′ = _ , w′
+
+  sorted-⇝ : ∀ {m m′} → Σ Pos (λ lo → WellMach lo m) → m ⇝ m′ → Σ Pos λ lo → WellMach lo m′
+  sorted-⇝ w now        = w
+  sorted-⇝ w (then e p) = sorted-⇝ (sorted-step w e) p
+
+  sorted-value : ∀ {m t q a m′} → Σ Pos (λ lo → WellMach lo m) → step m ≡ value t q a m′ → Σ Pos λ lo → WellMach lo m′
+  sorted-value (lo , w) e with subst (WellStep lo) e (preserve w)
+  ... | valueʷ _ w′ = _ , w′
 
   -- THE CONFIGURATION RUNS THE GHOST: it runs silently to a re-entry
   -- configuration against it.  No intermediate configuration is related
@@ -666,6 +680,7 @@ module Honesty (R : Set) where
       meaning : Meaning (Conf.heap (Mach.conf m₁)) T
       queue   : Queue (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) (Mach.clock m₁) (Mach.timers m₁) T
       books   : Books T (runAs [] (done≗ refl) stack) m₁
+      sorted  : Σ Pos λ lo → WellMach lo m₁
 
   -- The same climb, the value restated at another path.
   reclimb : ∀ {g m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -677,7 +692,7 @@ module Honesty (R : Set) where
   reclimb cl cd lf = record
     { sane = Climbing.sane cl ; placed = Climbing.placed cl ; ctl = Climbing.ctl cl ; code = cd ; stack = Climbing.stack cl ; lifted = lf
     ; owned = Climbing.owned cl ; kernels = Climbing.kernels cl ; meaning = Climbing.meaning cl ; queue = Climbing.queue cl
-    ; books = Climbing.books cl }
+    ; books = Climbing.books cl ; sorted = Climbing.sorted cl }
 
   -- One operator climbed: a re-entry configuration reached, or the
   -- value one operator higher, the path shorter.
@@ -695,6 +710,10 @@ module Honesty (R : Set) where
   ⇝-trans : ∀ {m m₁ m₂} → m ⇝ m₁ → m₁ ⇝ m₂ → m ⇝ m₂
   ⇝-trans now          q = q
   ⇝-trans (then e p)   q = then e (⇝-trans p q)
+
+  -- A hop's machine sorted.
+  hop-sorted : ∀ {g m m′ m₀} → Carried g m → step m ≡ silent m′ → m′ ⇝ m₀ → Σ Pos λ lo → WellMach lo m₀
+  hop-sorted cr e p = sorted-⇝ (Carried.sorted cr) (then e p)
 
   hopped-pre : ∀ {g m m′ m₁} {st : Strong g m} → m′ ⇝ m₁ → Hopped st m₁ → Hopped st m′
   hopped-pre path (g″ , m₀ , path′ , st₀ , gn) = g″ , m₀ , ⇝-trans path path′ , st₀ , gn
@@ -738,7 +757,9 @@ module Honesty (R : Set) where
     -- an ordering claim: the value first among a connect's source and
     -- body, a flatMap's outer and lanes.  So the claim is that nothing
     -- else the ghost holds comes first: no call further down the agenda,
-    -- no burst held or timer queued, no subscription owed.
+    -- no burst held or timer queued, no subscription owed.  The order
+    -- the machine keeps is `Carried.sorted`'s: every frame `Under` the
+    -- run, every timer past its epoch.
     -- DEAD ROUTE: from the record as it stands.  A stack frame's calls
     --   are ordered against the current position only by `backAs`'s
     --   `q <ᵖ p`, which does not make `q` a prefix of `p`: a frame at `q`
@@ -893,7 +914,8 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned = owned-spent hp calmAs sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
-        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr eq now })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
   burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
     cr@record { tree = t ; ctlAs = burstAs x restᴴ (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = q
@@ -904,7 +926,8 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned = owned-spent hp (runAs ks e K″) sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
-        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr eq now })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
 
   -- A burst's frame stepped: found spent, polled, or played.
@@ -951,12 +974,13 @@ module Honesty (R : Set) where
   climb-root : ∀ {g m} (st : Strong g m) {m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {y : R} → Climbing g m₁ {T = T} here y → Hopped st m₁
   climb-root {g} st {mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {T}
     record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ ke ; stack = sk ; lifted = c′ , pv , _ , lifts-here , sg ; owned = ow
-           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } } =
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so } =
     g , _ , then refl now
     , carried (record
         { sane = sn ; placed = pl ; tree = T ; ctlAs = noteAs [] (ke tt) sk ; meets = c′ , pv , sg
         ; owned = owned-move hp (noteAs [] (ke tt) sk) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
-        ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } })
+        ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } 
+        ; sorted = sorted-⇝ so (then refl now) })
     , showing (agrees (λ n → agree-refl n _)) (λ ())
 
   -- One operator climbed, by the operator.
@@ -1025,7 +1049,8 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
-        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl (then refl now) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1034,7 +1059,8 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned = owned-move hp (runAs ks e K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
-        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl (then refl now) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (backAs q ks qp e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1045,7 +1071,8 @@ module Honesty (R : Set) where
         ; owned = owned-move hp (runAs ks e K″) refl refl refl ow ; kernels = kn ; meaning = mn
         ; queue = record { timed = Queue.timed qu ; joined = Queue.joined qu ; ordered = Queue.ordered qu
                          ; ahead = map (λ { (c , a) → c , <ᵖ-trans q p _ qp a }) (Queue.ahead qu) }
-        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl (then refl now) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (playsAs π) hᴷ K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1054,7 +1081,8 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = burstAs (playsAs π) hᴷ K″ ; meets = mt
         ; owned = owned-move hp (burstAs (playsAs π) hᴷ K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
-        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl (then refl now) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , m<n⇒m<1+n ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (firesAs π) hᴷ K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1063,7 +1091,8 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = burstAs (firesAs π) hᴷ K″ ; meets = mt
         ; owned = owned-move hp (burstAs (firesAs π) hᴷ K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
-        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl (then refl now) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , m<n⇒m<1+n ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs bottomᴴ bottomAs) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1072,7 +1101,8 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
-        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl (then refl (then refl now)) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs restᴴ (restAs ks e K‴)) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn
@@ -1081,7 +1111,8 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K‴ ; meets = mt
         ; owned = owned-move hp (runAs ks e K‴) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
-        ; books = record { fresh = fs ; clocked = proj₂ (proj₂ ck) ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = proj₂ (proj₂ ck) ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl (then refl (then refl now)) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
 
   -- Past a value recorded, the run runs the stepped ghost: the record's
@@ -1101,7 +1132,8 @@ module Honesty (R : Set) where
                          ; placed = Owned.placed ow }
         ; kernels = Carried.kernels cr ; meaning = Carried.meaning cr ; queue = Carried.queue cr
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
-                         ; paidUp = Books.paidUp (Carried.books cr) ; running = refl } })
+                         ; paidUp = Books.paidUp (Carried.books cr) ; running = refl } 
+        ; sorted = sorted-value (Carried.sorted cr) refl })
 
   -- A popped timer's burst, spent, dropped: the turn again.
   drop-spent : ∀ {h} {hp : Heapᴹ h} {p w} {σ : w ⊑ h} {ts lg en mk} (tm : Timer h)
@@ -1151,7 +1183,8 @@ module Honesty (R : Set) where
         ; kernels = kn ; meaning = mn
         ; queue = record { timed = timed-spent {H = hp} sp (Queue.timed q) ; joined = Queue.joined q
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
-        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl (then (drop-spent tm sp) now) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₁ ≤-refl))
   ... | false with proj₁ (Queue.timed q)
   ...   | inj₁ s ∷ _ = ⊥-elim (true≢false (trans (sym s) sp))
@@ -1169,7 +1202,8 @@ module Honesty (R : Set) where
         ; queue = record { timed = timed-pop hp {t = t} π (Queue.timed q) (Queue.ordered q) fs
                          ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
-        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl , tt ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl , tt ; paidUp = refl ; running = rn } 
+        ; sorted = hop-sorted cr refl now })
     , lowered (λ n → agree-refl n _) (inj₂ (pend-plant {t = t} π v refl , inj₁ ≤-refl))
     where v = coldˢ sk hd (fired τ e (at u x fr))
 

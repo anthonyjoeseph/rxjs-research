@@ -41,6 +41,7 @@ open import operation.Machine using (module Machine)
 import denotation.Unfold as U
 open import adequacy.Sane using (Sane; sane-subscribe)
 open import adequacy.Placed using (placed-subscribe) renaming (Placed to Placedᵍ)
+open import adequacy.Sorted using (module Sorting)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
 module Strongly (R : Set) where
@@ -51,6 +52,7 @@ module Strongly (R : Set) where
   open Shared Timeline (Out R) using (Callbacks; Heapᴹ; look; Conf; Ctl; Stack; bottom; push; rest; back; rehold; run; asking; ⟨_,_,_⟩) renaming (held to holding)
   open Pure R using (Timer; cascade)
   open Machine R using (Mach; Playing; begin)
+  open Sorting R using (WellMach; begin-well)
 
   ------------------------------------------------------------------------
   -- The same program, whatever world its names were weakened through
@@ -939,7 +941,8 @@ module Strongly (R : Set) where
 
   -- THE CONFIGURATION RUNS THE GHOST FROM A RE-ENTRY STATE: a witness
   -- holding every subscription the run reaches, whose open part is the
-  -- ghost, and the machine's control and stack its agenda.
+  -- ghost, and the machine's control and stack its agenda; the machine
+  -- sorted, every frame it keeps under where it runs.
   record Carried (g : U.Node [] R) (m : Mach) : Set₁ where
     H = Conf.heap (Mach.conf m)
     field
@@ -953,6 +956,7 @@ module Strongly (R : Set) where
       meaning : Meaning H tree
       queue   : Queue H (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) tree
       books   : Books tree ctlAs m
+      sorted  : Σ Pos λ lo → WellMach lo m
 
   -- A RE-ENTRY CONFIGURATION AGAINST THE GHOST: carried, or the root's
   -- completion about to be shown where the ghost ends.
@@ -995,4 +999,5 @@ module Strongly (R : Set) where
     ; kernels = record { holds = _ ; gated = _ }
     ; meaning = record { fed = _ }
     ; queue   = record { timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
-    ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl } }
+    ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl }
+    ; sorted  = root , begin-well o }

@@ -178,11 +178,12 @@ by their own silent steps (`Mirror`).
 ### Big picture tier roadmap
 
 - **THE PROGRESS.** `emit-lifts`, then `note-least`: the ghost's next
-  event is the agenda's first. Carry `Sorted`'s proven `WellMach` in the
-  record, its frames `Under` the run, its timers and bursts past it; then
-  prove a subtree's head is an obligation it owes. Ruled out: deriving it
-  from `backAs`'s `q <ᵖ p`, which admits a frame beside the run. Decides
-  whether the machine's sortedness is the one ordering fact both `of`
+  event is the agenda's first. The record carries `Sorted`'s `WellMach`,
+  its frames `Under` the run, its timers past the epoch; what remains is
+  that a subtree's head is an obligation it owes, read off `Owned`, and
+  that `WellMach` puts each one past the first call. Ruled out: deriving
+  the order from `backAs`'s `q <ᵖ p`, which admits a frame beside the
+  run. Decides whether sortedness is the one ordering fact both `of`
   values and notes read. Then `emit-run`, `climb-take`, the `-onward`
   leaves and `burst-poll`.
 - **THE ORDER.** `spread-flat` and `spread-connect`, then `steady-flat` and
