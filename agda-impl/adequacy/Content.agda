@@ -18,6 +18,7 @@ open import Level using (lift)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
+open import Data.Bool using (true; false)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; _,_; Σ)
@@ -38,7 +39,7 @@ open Events∞
 module Honesty (R : Set) where
   open Run (Pureᴾ R) using (Subscribe; Subject; Env; wkEnv; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via; startCold)
   open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; reading; begin; launch; Read; read)
-  open Sorting R using (WellSub; compile-well)
+  open Sorting R using (WellSub; compile-well; idle)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
 
@@ -174,6 +175,11 @@ module Honesty (R : Set) where
     silentʰ   : ∀ {m m′} → Reached e m → step m ≡ silent m′ → Reached e m′
     valueʰ    : ∀ {m m′ t p a} → Reached e m → step m ≡ value t p a m′ → Reached e m′
 
+  -- One step of the machine that leaves a configuration behind.
+  data _↦_ (m : Mach) : Mach → Set₁ where
+    silentᵗ : ∀ {m′} → step m ≡ silent m′ → m ↦ m′
+    valueᵗ  : ∀ {t p a m′} → step m ≡ value t p a m′ → m ↦ m′
+
   -- How a configuration's record stands: cut at its clock, or the run
   -- complete or drained there.
   data Stands (m : Mach) : End → Set₁ where
@@ -182,10 +188,56 @@ module Honesty (R : Set) where
     dryʰ  : step m ≡ drained → Stands m dry
 
   postulate
-    -- THE MACHINE'S CONTENT: a configuration reached from an honest
-    -- launch keeps a record alike its meaning's events, however it stands.
-    kept : ∀ {e m en} → Reached e m → Stands m en → Alike en (Mach.marks m) (Mach.log m) e
+    -- THE MACHINE HONEST TO `e`: ONE relation over the whole
+    -- configuration, as `WellMach` is, never one per observer.  A
+    -- postulated TYPE: each live observer owed its meaning's events up to
+    -- the run's position, every kernel's cells holding what it has
+    -- consumed, every frame on the stack what it has yet to deliver.
+    --
+    -- DEAD ROUTE: a spec per observer, its triples quantifying over the
+    --   frame around it.  A cut flows ownership upstream: `takeWhile`'s
+    --   completion cancels its source from inside the source's own
+    --   callback, so the source's cells are written within its call and
+    --   cannot be framed out of it.  And a frame naming other observers'
+    --   specs sits a universe above them, so no heap can store it.
+    -- DEAD ROUTE: honesty under every context the subscription runs in.
+    --   A `Ref` is a membership proof into the world, forgeable by any
+    --   computation at a larger world, so some context writes `scan`'s
+    --   accumulator; only the compiled program's own context is honest.
+    HonMach : Events R → Mach → Set₁
 
+    -- An honest subscription launched under the recorder is honest to
+    -- the events its meaning shows at the root.
+    honest-launch : ∀ {s : Subscribe R []} {M} → Honest {R} s M → HonMach (observe M root) (launch s recorder)
+
+    -- THE TREE WALK: a step that is not the loop's turn keeps the machine
+    -- honest.
+    honest-walk : ∀ {e m m′} → HonMach e m → idle m ≡ false → m ↦ m′ → HonMach e m′
+
+    -- THE LOOP'S TURN: popping a timer keeps it honest.
+    honest-turn : ∀ {e m m′} → HonMach e m → idle m ≡ true → m ↦ m′ → HonMach e m′
+
+    -- An honest machine's record is alike its events, however it stands.
+    honest-alike : ∀ {e m en} → HonMach e m → Stands m en → Alike en (Mach.marks m) (Mach.log m) e
+
+  -- One step keeps the machine honest.
+  honest-step : ∀ {e m m′} → HonMach e m → m ↦ m′ → HonMach e m′
+  honest-step {m = m} h t with idle m in eq
+  ... | true  = honest-turn h eq t
+  ... | false = honest-walk h eq t
+
+  -- Every configuration reached from an honest launch is honest.
+  honest : ∀ {e m} → Reached e m → HonMach e m
+  honest (launchedʰ h refl) = honest-launch h
+  honest (silentʰ r eq)     = honest-step (honest r) (silentᵗ eq)
+  honest (valueʰ r eq)      = honest-step (honest r) (valueᵗ eq)
+
+  -- THE MACHINE'S CONTENT: a configuration reached from an honest
+  -- launch keeps a record alike its meaning's events, however it stands.
+  kept : ∀ {e m en} → Reached e m → Stands m en → Alike en (Mach.marks m) (Mach.log m) e
+  kept r = honest-alike (honest r)
+
+  postulate
     -- The first n steps, read, are the record of the configuration n
     -- steps on.
     read-is-kept : ∀ {e m} (r : Reached e m) n → Σ Mach λ m′ → Σ (Reached e m′) λ _ → Σ End λ en → Stands m′ en

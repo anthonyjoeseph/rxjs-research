@@ -175,12 +175,13 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   and ghost checks green on it. Removes the cost stopping every other leg:
   nothing below is stated until the engine it speaks of is the one the
   oracle passes.
-- **HONEST, DEFINED.** `Honest` a relation over configurations, as
-  `WellMach` is: each live observer owed its meaning's events in order up
-  to the run's position, its kernel's cells holding what it has consumed.
-  Ruled out: a relation blind to cells, a sound half apart from a whole
-  half, a cut at an observer's own marks. Decides whether that owed bound
-  is kept by the walk's cases alone, or needs the timers' too.
+- **HONEST, DEFINED.** `HonMach` a relation over configurations, as
+  `WellMach` is, over a ghost tree of the compiled program's kernels and
+  their cells; `Honest` the per-kernel half `honest-launch` reads. Ruled
+  out: a relation blind to cells, a sound half apart from a whole half, a
+  cut at an observer's own marks, a spec per observer framed by others,
+  honesty under every context. Decides whether the owed bound is kept by
+  `honest-walk` alone, or needs `honest-turn`'s timers too.
 - **THE PROTOCOL'S RISK.** `takeWhileᴷ-well` and `connectᴷ-well` as
   bodies, over a placeless unsubscribe and one label per callback in a
   scope. Ruled out: a second callback sharing a scope, an unsubscribe
@@ -226,6 +227,16 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **`scanᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `scan` well-positioned.
 - **`Honest`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; a
   subscription's deliveries alike a meaning, at any position.
+- **`HonMach`** (Content) — FALSITY, `DEAD ROUTE×2`: a postulated type; the
+  whole configuration honest to the root's events, as `WellMach` is well.
+- **`honest-walk`** (Content) — FALSITY, `NO EVIDENCE`: a step not the loop's
+  turn keeps the machine honest.
+- **`honest-turn`** (Content) — FALSITY, `NO EVIDENCE`: the loop's turn keeps
+  the machine honest.
+- **`honest-launch`** (Content) — FALSITY, `NO EVIDENCE`: an honest
+  subscription launched under the recorder is an honest machine.
+- **`honest-alike`** (Content) — FALSITY, `NO EVIDENCE`: an honest machine's
+  record is alike its events.
 - **`HonestEnv`** (Content) — FALSITY, `NO EVIDENCE`: a postulated type; each
   joiner in scope fed its source's hot run.
 - **`connectᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `connect` honest to
@@ -246,8 +257,6 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **`scanᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `scan` honest.
 - **`honest-[]`** (Content) — FALSITY, `NO EVIDENCE`: the empty environments
   honest to each other.
-- **`kept`** (Content) — FALSITY, `NO EVIDENCE`: a configuration reached from
-  an honest launch keeps a record alike its meaning's events.
 - **`read-is-kept`** (Content) — FALSITY, `NO EVIDENCE`: the first n steps,
   read, are some reached configuration's record.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
