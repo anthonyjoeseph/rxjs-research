@@ -176,15 +176,14 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
-  the meaning's events are sorted, a step keeps every node so, and what a
-  node shows comes no earlier than any earlier step. Ruled out: a node
-  showing strictly after it, a step not coming first keeping the placing,
-  a placing with each live joiner joined before its source, and an unsane
-  node lagging. No congruence reads the placing; the connect's tie and
-  these leaves do. Decides whether `lags` is inductive by node, its `k`
-  passed through a connect whose source steps first, or `Placed`, a field
-  of `Carried`, must carry the bound.
+- **THE ORDER.** `placed-subscribe` with `placed-after` and `leads`: the
+  meaning's events are sorted, a step keeps every node so, and what a node
+  shows at an earlier step is skips. Ruled out: a node showing strictly
+  after it, a step not coming first keeping the placing, a placing with
+  each live joiner joined before its source, and a lag needing the
+  placing: `lags` is by node, its sources bounded a step past and each
+  source's lag a field of `Settled`. Decides whether `leads` goes the
+  same way, and whether `Placed` is needed beyond `placed-after`'s tie.
 - **THE OPERATORS.** `go-skips`, `take-first`, `join-quiet` and
   `defer-after`: a flatMap's meaning is what its step shows, a cut step
   comes first when the uncut did, an untold joiner fed nothing under
@@ -215,10 +214,10 @@ by their own silent steps (`Mirror`).
   subscribed at the root is placed.
 - **`placed-after`** (Stepper) — FALSITY, `REFUTED×2`: a step keeps the ghost
   placed.
-- **`lags`** (Stepper) — FALSITY, `REFUTED`: a node's meaning shows nothing
-  before a body's event that comes first.
 - **`leads`** (Stepper) — FALSITY, `REFUTED`: a node's meaning shows only skips
   at an earlier step, and nothing before it.
+- **`lags-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning shows
+  nothing before a body's event that comes first, its sources a step past.
 - **`go-skips`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning is
   what its step shows, each lane showing its own.
 - **`join-quiet`** (Stepper) — FALSITY, `NO EVIDENCE`: an untold joiner fed

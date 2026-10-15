@@ -22,8 +22,8 @@ open import Data.Nat using (_<_; _≤_)
 open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Data.Empty using (⊥-elim)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong; cong₂)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
@@ -289,6 +289,18 @@ private
 
 <ᵖ-irrefl : ∀ p → p <ᵖ p ≡ false
 <ᵖ-irrefl p rewrite refl-pos p = refl
+
+-- What is no earlier than what is no earlier is no earlier.
+private
+  ≮-by : ∀ p q r c → cmpPos q p ≡ c → q <ᵖ p ≡ false → r <ᵖ q ≡ false → r <ᵖ p ≡ true → ⊥
+  ≮-by p q r lt c h₁ h₂ e with () ← trans (sym h₁) (cong isLt c)
+  ≮-by p q r eq c h₁ h₂ e with () ← trans (sym e) (subst (λ z → r <ᵖ z ≡ false) (eq-pos q p c) h₂)
+  ≮-by p q r gt c h₁ h₂ e with () ← trans (sym (cong isLt (lt-pos r p q (isLt-lt e) (flip-pos q p c)))) h₂
+
+≮-trans : ∀ p q r → q <ᵖ p ≡ false → r <ᵖ q ≡ false → r <ᵖ p ≡ false
+≮-trans p q r h₁ h₂ with r <ᵖ p in e
+... | false = refl
+... | true  = ⊥-elim (≮-by p q r (cmpPos q p) refl h₁ h₂ e)
 
 private
   past : ∀ p → cmpPos (p ++ [ ix 0 ]) [] ≡ gt
