@@ -23,8 +23,9 @@ open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; s≤s⁻¹)
 open import Data.Nat.ListAction using (sum)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; <-trans; n<1+n)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
+open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst; subst₂; cong)
 
 import Tree as T
@@ -288,58 +289,6 @@ module Keeping (R : Set) where
   fire-weight {st = st} r = cong (_+ length (State.timers st)) (fire-work (Carried.ctlAs r))
 
   ------------------------------------------------------------------------
-  -- B kept
-
-  postulate
-    -- Code running: the agenda's next call, or a subscription beginning.
-    --
-    -- At a connect's feed the meaning has fed every joiner at once, at
-    -- the connect's skip, and the first owed joiner's value at
-    -- `q ++ [ sub j ]` is its next shown event only if every other live
-    -- node's next is past it.  `Carried` holds nothing positional for
-    -- nodes the agenda does not owe, so this step needs a field placing
-    -- each live node's next shown event past the agenda's region.
-    kept-run : ∀ {h} {st : State h} {w B} {a : Act h B} {σ : w ⊑ h} {K : Stack w B} {c}
-             → (r : Carried ⟨ st , run a σ K ⟩ c) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
-
-    -- A burst whose cold is spent returns to what waits on it: the
-    -- burst leaves the agenda, so whatever the return re-enters is
-    -- lighter, and the meaning shows nothing of a spent cold.
-    returned : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-             → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ true → Lighter r
-             → Wait Carried (step ⟨ st , ret tt σ K ⟩) (stepᵁ c)
-
-    -- An unspent cold's subscriber reads open, its check only reading
-    -- the heap.
-    asks-open : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-              → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → spent? st hd ≡ false
-              → Lefts ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩
-                      ⟨ st , ret false same (push (asked s hd τ p i b) σ K) ⟩
-
-    -- The frame's step is a value: the meaning's next event is it, at
-    -- `p ++ [ ix i ]`, every other open node waiting past that.
-    burst-emit : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {a k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-               → (r : Carried ⟨ st , burst s hd τ p i (emit {A} {u} a k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
-               → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (emit a k)) σ K) ⟩) (stepᵁ c)
-
-    -- The frame closes: the cold completes, falls quiet, or waits on a
-    -- timer due past the clock.
-    burst-close : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-                → (r : Carried ⟨ st , burst s hd τ p i (close {A} {u} k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
-                → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (close k)) σ K) ⟩) (stepᵁ c)
-
-  -- A burst whose cold is spent returns at once.
-  burst-spent : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
-              → spent? st hd ≡ true → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , ret _ σ K ⟩
-  burst-spent e rewrite e = refl
-
-  -- Otherwise it asks its subscriber whether it is closed.
-  burst-open : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
-             → spent? st hd ≡ false
-             → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩
-  burst-open e rewrite e = refl
-
-  ------------------------------------------------------------------------
   -- A burst's step, its cold in context
 
   -- The configuration, the bursting cold's node in its context: the
@@ -368,16 +317,79 @@ module Keeping (R : Set) where
   aim (Against.burstAs π _)     = record { path = π ; τ′ = _ ; steps = refl }
   aim (Against.fireAs refl π _) = record { path = π ; τ′ = _ ; steps = refl }
 
+  -- The meaning holds the bursting cold at a hole: every gate on its
+  -- path open.
+  Seen : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+       → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → Set₁
+  Seen {st = st} r = Open.OpenPath (State.heap st) (Aimed.path (aim (Carried.ctlAs r)))
+
+  ------------------------------------------------------------------------
+  -- B kept
+
+  -- The burst's poll of its subscriber, reading `x`.
+  Polls : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+        → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → Bool → Set₁
+  Polls {st = st} {s = s} {hd} {τ} {p} {i} {b} {σ} {K} _ x =
+    Lefts ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩ ⟨ st , ret x same (push (asked s hd τ p i b) σ K) ⟩
+
   postulate
-    -- EVERY GATE ON THE BURSTING COLD'S PATH OPEN: each takeWhile live
-    -- and still taking, the lane live, a source's body open, a body's
-    -- source running or ended where the connect records it.  Below a
-    -- closed gate the cold would be spent; a takeWhile past its failing
-    -- value with the cold unspent is the case Carried does not rule out,
-    -- its completion owed by a call the agenda holds below the burst.
-    opened : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-           → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false
-           → Open.OpenPath (State.heap st) (Aimed.path (aim (Carried.ctlAs r)))
+    -- Code running: the agenda's next call, or a subscription beginning.
+    --
+    -- At a connect's feed the meaning has fed every joiner at once, at
+    -- the connect's skip, and the first owed joiner's value at
+    -- `q ++ [ sub j ]` is its next shown event only if every other live
+    -- node's next is past it.  `Carried` holds nothing positional for
+    -- nodes the agenda does not owe, so this step needs a field placing
+    -- each live node's next shown event past the agenda's region.
+    kept-run : ∀ {h} {st : State h} {w B} {a : Act h B} {σ : w ⊑ h} {K : Stack w B} {c}
+             → (r : Carried ⟨ st , run a σ K ⟩ c) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+    -- A burst whose cold is spent, or whose subscriber reads closed,
+    -- returns to what waits on it: the burst leaves the agenda, so
+    -- whatever the return re-enters is lighter, and the meaning shows
+    -- nothing of a spent cold, nor of one below a cut gate.
+    returned : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+             → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ true ⊎ Polls r true → Lighter r
+             → Wait Carried (step ⟨ st , ret tt σ K ⟩) (stepᵁ c)
+
+    -- An unspent cold's poll of its subscriber reads one way or the
+    -- other, only reading the heap.  Closed is reachable: a source cut
+    -- inside its own subscribe burst, before the cut has a subscription
+    -- to unsubscribe, keeps bursting unspent.
+    asks : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+         → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Σ Bool (Polls r)
+
+    -- The frame's step is a value: the meaning's next event is it, at
+    -- `p ++ [ ix i ]`, every other open node waiting past that.
+    burst-emit : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {a k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+               → (r : Carried ⟨ st , burst s hd τ p i (emit {A} {u} a k) σ K ⟩ c) → spent? st hd ≡ false → Seen r → Lighter r
+               → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (emit a k)) σ K) ⟩) (stepᵁ c)
+
+    -- The frame closes: the cold completes, falls quiet, or waits on a
+    -- timer due past the clock.
+    -- An unspent cold the meaning does not see, its poll reading open,
+    -- plays its frame unseen: a source whose connect's body has closed
+    -- inside the source's own subscribe burst feeds only silenced
+    -- joiners.  A takeWhile past its failing value and still live would
+    -- pass such a value on, the case Carried does not rule out.
+    unseen : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+           → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → ¬ Seen r → Lighter r
+           → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i b) σ K) ⟩) (stepᵁ c)
+
+    burst-close : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+                → (r : Carried ⟨ st , burst s hd τ p i (close {A} {u} k) σ K ⟩ c) → spent? st hd ≡ false → Seen r → Lighter r
+                → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (close k)) σ K) ⟩) (stepᵁ c)
+
+  -- A burst whose cold is spent returns at once.
+  burst-spent : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
+              → spent? st hd ≡ true → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , ret _ σ K ⟩
+  burst-spent e rewrite e = refl
+
+  -- Otherwise it asks its subscriber whether it is closed.
+  burst-open : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
+             → spent? st hd ≡ false
+             → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩
+  burst-open e rewrite e = refl
 
   private
     inert : ∀ {h} {H : All (Val h) h} {Δ A} (ph : Phase A) → Open.Inert H (nodeOf {Δ} ph)
@@ -390,31 +402,31 @@ module Keeping (R : Set) where
 
   -- The open part read through the path to the bursting cold.
   focused : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-          → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → spent? st hd ≡ false → Focus c p i b
-  focused {st = st} r sp = record
+          → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Seen r → Focus c p i b
+  focused {st = st} r sp o = record
     { ctx   = proj₁ found
     ; hole  = nodeOf A.ph
     ; τ′    = A.τ′
     ; open≡ = just-injective (trans (sym (Carried.open≡ r)) (proj₂ found))
     ; steps = A.steps }
     where module A = Aimed (aim (Carried.ctlAs r))
-          found = Open.focus-path (State.heap st) A.path (opened r sp) (inert {H = State.heap st} A.ph) (cold-part {H = State.heap st} {Δ = A.Δ} {sk = A.sk} A.ph sp)
+          found = Open.focus-path (State.heap st) A.path o (inert {H = State.heap st} A.ph) (cold-part {H = State.heap st} {Δ = A.Δ} {sk = A.sk} A.ph sp)
 
   postulate
     -- B'S POSITIONAL FIELD AT A FIRE: nothing owed but the burst, every
     -- other open node on the path waits beyond the cascade — it never
     -- steps again, or it waits on a timer queued past this one.
     cleared : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {c}
-            → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) (sp : spent? st hd ≡ false)
-            → Clear p (Focus.ctx (focused r sp))
+            → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
+            → Clear p (Focus.ctx (focused r sp o))
 
     -- B'S POSITIONAL FIELD AT A BURST UNDER A CALL: a cold started
     -- inline, its frame before every other open node's next event, read
     -- operator by operator up the path.
     ahead-run : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {v Y x} {ρ : v ⊑ w}
                   {K : Stack v Y} {c}
-              → (r : Carried ⟨ st , burst s hd τ p i b σ (push x ρ K) ⟩ c) (sp : spent? st hd ≡ false)
-              → Wins (Focus.ctx (focused r sp)) (burstˢ (Focus.τ′ (focused r sp)) p i b)
+              → (r : Carried ⟨ st , burst s hd τ p i b σ (push x ρ K) ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
+              → Wins (Focus.ctx (focused r sp o)) (burstˢ (Focus.τ′ (focused r sp o)) p i b)
 
   private
     burst-head : ∀ {Δ A u} τ p i (b : Frame A u) → headˢ (burstˢ {Δ} τ p i b) ≡ just (p ++ [ ix i ])
@@ -424,55 +436,61 @@ module Keeping (R : Set) where
 
   -- The frame's step comes before every other open node's next event.
   ahead : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-        → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) (sp : spent? st hd ≡ false)
-        → Wins (Focus.ctx (focused r sp)) (burstˢ (Focus.τ′ (focused r sp)) p i b)
-  ahead {p = p} {i} {b} {K = loop} r sp = clear-wins p [ ix i ] ctx (burstˢ τ′ p i b) (cleared r sp) (burst-head τ′ p i b)
-    where open Focus (focused r sp)
-  ahead {K = push x ρ K} r sp = ahead-run r sp
+        → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
+        → Wins (Focus.ctx (focused r sp o)) (burstˢ (Focus.τ′ (focused r sp o)) p i b)
+  ahead {p = p} {i} {b} {K = loop} r sp o = clear-wins p [ ix i ] ctx (burstˢ τ′ p i b) (cleared r sp o) (burst-head τ′ p i b)
+    where open Focus (focused r sp o)
+  ahead {K = push x ρ K} r sp o = ahead-run r sp o
 
   -- The meaning's step is the burst's, lifted to the root.
   aimed : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-        → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) (sp : spent? st hd ≡ false)
-        → stepᵁ c ≡ lift (Focus.ctx (focused r sp)) (burstˢ (Focus.τ′ (focused r sp)) p i b)
-  aimed r sp = trans (cong stepᵁ open≡) (trans (plug-step ctx hole (subst (Wins ctx) (sym steps) (ahead r sp))) (cong (lift ctx) steps))
-    where open Focus (focused r sp)
+        → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
+        → stepᵁ c ≡ lift (Focus.ctx (focused r sp o)) (burstˢ (Focus.τ′ (focused r sp o)) p i b)
+  aimed r sp o = trans (cong stepᵁ open≡) (trans (plug-step ctx hole (subst (Wins ctx) (sym steps) (ahead r sp o))) (cong (lift ctx) steps))
+    where open Focus (focused r sp o)
 
   -- The stall lifted: the meaning skips to the cold one step on.
   stalled : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-          → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) (sp : spent? st hd ≡ false)
+          → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
           → Σ Pos λ k′ → Σ (Node [] R) λ c′ → stepᵁ c ≡ skipˢ k′ c′
-  stalled {p = p} {i} {k} r sp with skip-lifts (Focus.ctx (focused r sp)) (p ++ [ ix i ]) (burstᶜ (Focus.τ′ (focused r sp)) p (suc i) (Frame∞.force k))
-  ... | k′ , c′ , e = k′ , c′ , trans (aimed r sp) e
+  stalled {p = p} {i} {k} r sp o with skip-lifts (Focus.ctx (focused r sp o)) (p ++ [ ix i ]) (burstᶜ (Focus.τ′ (focused r sp o)) p (suc i) (Frame∞.force k))
+  ... | k′ , c′ , e = k′ , c′ , trans (aimed r sp o) e
 
   postulate
     -- B kept at a stall: the cold one step on, in the witness the stall
     -- leaves.
     restalled : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-              → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) (sp : spent? st hd ≡ false)
-              → Carried ⟨ st , burst s hd τ p (suc i) (Frame∞.force k) σ K ⟩ (proj₁ (proj₂ (stalled r sp)))
+              → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
+              → Carried ⟨ st , burst s hd τ p (suc i) (Frame∞.force k) σ K ⟩ (proj₁ (proj₂ (stalled r sp o)))
 
   -- The frame's step is a stall: both sides skip it.
   burst-stall : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-              → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
+              → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) → spent? st hd ≡ false → Seen r → Lighter r
               → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (stall k)) σ K) ⟩) (stepᵁ c)
-  burst-stall r sp _ = subst (Wait Carried (silent _)) (sym (proj₂ (proj₂ (stalled r sp)))) (both (restalled r sp))
+  burst-stall r sp o _ = subst (Wait Carried (silent _)) (sym (proj₂ (proj₂ (stalled r sp o)))) (both (restalled r sp o))
 
   played : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} (b : Frame A u) {σ : w ⊑ h} {K : Stack w ⊤} {c}
-         → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Lighter r
+         → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Seen r → Lighter r
          → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i b) σ K) ⟩) (stepᵁ c)
   played (emit a k) = burst-emit
   played (stall k)  = burst-stall
   played (close k)  = burst-close
 
-  -- A cold's frame at its next step, its subscriber asked if closed; or
+  -- A cold's frame at its next step, its subscriber polled; or
   -- a popped timer's at its first, its cold still waiting on it.
   kept-burst : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
              → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → Lighter r → Wait Carried (step ⟨ st , burst s hd τ p i b σ K ⟩) (stepᵁ c)
-  kept-burst {st = st} {hd = hd} {b = b} {c = c} r lt = by (spent? st hd) refl
+  kept-burst {st = st} {s = s} {hd = hd} {τ} {p} {i} {b = b} {σ} {K} {c = c} r lt = by (spent? st hd) refl
     where
-      by : (x : Bool) → spent? st hd ≡ x → Wait Carried (step ⟨ st , burst _ hd _ _ _ b _ _ ⟩) (stepᵁ c)
-      by true  sp = subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-spent sp)) (left (returned r sp lt))
-      by false sp = subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-open sp)) (left (lefts (asks-open r sp) (played b r sp lt)))
+      by : (x : Bool) → spent? st hd ≡ x → Wait Carried (step ⟨ st , burst s hd τ p i b σ K ⟩) (stepᵁ c)
+      by true  sp = subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-spent sp)) (left (returned r (inj₁ sp) lt))
+      by false sp = subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-open sp)) (left (polled (asks r sp)))
+        where
+          polled : Σ Bool (Polls r) → Wait Carried (step ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩) (stepᵁ c)
+          polled (false , o) with Open.open? (State.heap st) (Aimed.path (aim (Carried.ctlAs r)))
+          ... | yes seen = lefts o (played b r sp seen lt)
+          ... | no  hid  = lefts o (unseen r sp hid lt)
+          polled (true  , o) = lefts o (left (returned r (inj₂ o) lt))
 
   private
     fired : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} (r : Carried ⟨ st , turn ⟩ c) (e : State.timers st ≡ tm ∷ ts)

@@ -171,19 +171,19 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
 
 ### Big picture tier roadmap
 
-- **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
-  turn; it gains a field placing every live node's next shown event past the
-  region the agenda owes, true at `carried-begin`. A popped timer's first
-  step is its first test: `cleared`, the agenda empty, so every sibling
-  waits on a later timer or never steps; `opened`, the gates on the path,
-  comes first, since `cleared` reads the context it opens. Then `ahead-run`,
-  and `burst-emit` landing as the stall did. Then the feed's case of `kept-run`. The meaning feeds its joiners
-  from one run of the source, as the machine's subject does, so a joiner
-  holds exactly what the feed owes it (`Fed`). Decides whether the position
-  order alone orders the meaning's leaves against the machine.
+- **B'S POSITIONAL FIELD.** `Carried` gains a field placing every live
+  node's next shown event past the region the agenda owes. A popped timer's
+  first step is its first test: `cleared`, the agenda empty, every sibling
+  waiting on a later timer or never stepping; and `unseen`, a burst whose
+  path is shut playing silently, which holds the one place Carried does not
+  rule out, a live takeWhile past its failing value. Then
+  `ahead-run`, `burst-emit` as the stall did, and the feed's case of
+  `kept-run`, the meaning feeding its joiners from one run of the source
+  (`Fed`). Decides whether the position order alone orders the meaning's
+  leaves against the machine.
 - **C'S MEASURE, AGAINST THE RETURNS.** `kept` is a recursion on `weight`:
   the agenda's calls, the bursts in flight, the subscriptions owed and the
-  timers queued. `returned` and `asks-open` first, the burst leaving the
+  timers queued. `returned` and `asks` first, the burst leaving the
   agenda; then `kept-run`'s silent steps, a subscription's `weighᴼ` spent
   before its first wait. Decides whether a step the meaning does not take
   always re-enters lighter, or the measure needs the meaning's steps too.
@@ -207,16 +207,16 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
   the burst's path waits beyond the cascade.
 - **`ahead-run`** (Kept) — FALSITY, `NO EVIDENCE`: a cold started inline bursts
   before every other open node's next event.
-- **`opened`** (Kept) — FALSITY, `NO EVIDENCE`: every gate on an unspent
-  bursting cold's path open, so the meaning holds it at a hole.
+- **`unseen`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold polling open
+  whose path is shut plays its frame with the meaning unmoved.
 - **`restalled`** (Kept) — FALSITY, `NO EVIDENCE`: after a stall, the meaning
   stepped is carried at the burst's next index.
 - **`burst-close`** (Kept) — FALSITY, `NO EVIDENCE`: a frame closing completes
   the cold, quiets it, or queues a timer past the clock.
-- **`returned`** (Kept) — FALSITY, `NO EVIDENCE`: a spent cold's burst returns
-  and re-enters lighter.
-- **`asks-open`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's subscriber
-  reads open, its check only reading.
+- **`returned`** (Kept) — FALSITY, `NO EVIDENCE`: a spent cold's burst, or one
+  polling closed, returns and re-enters lighter.
+- **`asks`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's poll of its
+  subscriber reads open or closed, only reading.
 - **`calm-hush`** (Kept) — FALSITY, `NO EVIDENCE`: no timer queued, the meaning
   falls quiet by silent steps.
 - **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program

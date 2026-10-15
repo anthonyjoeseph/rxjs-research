@@ -703,24 +703,32 @@ module Carrying (R : Set) where
     unended (waiting _ _ doneᶠ) = false
     unended _                    = true
 
+    -- Below a switch cut once its subscription is attached, every cold
+    -- spent.  Before then the cut has nothing to unsubscribe: a source cut
+    -- inside its own subscribe burst keeps its colds unspent, each reading
+    -- its subscriber closed, until the attach unsubscribes them.
+    Cut↓ : ∀ {Δ A} → Maybe (Sink h ⊤) → Sub h Δ A → Set₁
+    Cut↓ nothing  s = Lift _ ⊤
+    Cut↓ (just _) s = Dead s
+
     -- Below a cut kill switch, a cut lane or a connect's closed body, every
-    -- cold is spent; no live cold waits on its end, which its frame's
-    -- last step delivers.
+    -- cold is spent once attached; no live cold waits on its end, which
+    -- its frame's last step delivers.
     mutual
       Gated : ∀ {Δ A} → Sub h Δ A → Set₁
       Gated (coldˢ s hd ph)                       = Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
       Gated (mapˢ f s)                            = Gated s
       Gated (scanˢ f r s)                         = Gated s
-      Gated (takeWhileˢ i p c k tk s)             = (val (Kit.live c) ≡ false → Dead s) × Gated s
+      Gated (takeWhileˢ i p c k tk s)             = (val (Kit.live c) ≡ false → Cut↓ k s) × Gated s
       Gated (flatMapˢ op f fl oc k r so ls)       = Gated so × GatedLanes ls
       Gated (connectˢ s₁ p S c k fd e src body)   =
-        (part body ≡ nothing → Dead src) × Gated src × Gated body
+        (part body ≡ nothing → Cut↓ k src) × Gated src × Gated body
       Gated (deferˢ k s)                          = Gated s
       Gated _                                     = Lift _ ⊤
 
       GatedLanes : ∀ {Δ B} → List (Lane h Δ B) → Set₁
       GatedLanes []                = Lift _ ⊤
-      GatedLanes (lane c k s ∷ ls) = (val (Kit.live c) ≡ false → Dead s) × Gated s × GatedLanes ls
+      GatedLanes (lane c k s ∷ ls) = (val (Kit.live c) ≡ false → Cut↓ k s) × Gated s × GatedLanes ls
 
     ----------------------------------------------------------------------
     -- Every subscription against its kernel

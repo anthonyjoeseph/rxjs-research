@@ -14,7 +14,10 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit.Polymorphic using (⊤)
+open import Data.Unit.Polymorphic using (⊤; tt)
+open import Data.Bool.Properties using (_≟_)
+open import Relation.Nullary using (Dec; yes; no)
+open import Relation.Nullary.Decidable using (_×-dec_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong)
 
 open import denotation.MonotonicList using (Pos)
@@ -29,7 +32,7 @@ module Aiming (R : Set) where
   open Run (Pureᴾ R) using (module Kit; module FlatKit)
   open FlatKit using (Flat)
   open Pure R using (Val)
-  open Carrying R using (module At; Sub; Lane; lane; taking
+  open Carrying R using (module At; Sub; Lane; lane; Taking; taking; ending; taken
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
                         ; this-lane; next-lane)
 
@@ -58,6 +61,38 @@ module Aiming (R : Set) where
       OpenLanes : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Set₁
       OpenLanes (this-lane {c = c} π) = val (Kit.live c) ≡ true × OpenPath π
       OpenLanes (next-lane π)         = OpenLanes π
+
+    -- WHETHER THE PATH IS OPEN, gate by gate.
+    private
+      held? : ∀ {Δ A} (x : Maybe (Node Δ A)) → Dec (Σ (Node Δ A) λ m → x ≡ just m)
+      held? (just m) = yes (m , refl)
+      held? nothing  = no λ { (_ , ()) }
+
+      ran? : ∀ {Δ A} e (x : Maybe (Node Δ A)) → Dec ((Σ (Node Δ A) λ m → x ≡ just m) ⊎ (x ≡ nothing × Σ Pos λ c → e ≡ just c))
+      ran? e        (just m) = yes (inj₁ (m , refl))
+      ran? (just c) nothing  = yes (inj₂ (refl , c , refl))
+      ran? nothing  nothing  = no λ { (inj₁ (_ , ())) ; (inj₂ (_ , _ , ())) }
+
+      taking? : (tk : Taking) → Dec (tk ≡ taking)
+      taking? taking     = yes refl
+      taking? (ending q) = no λ ()
+      taking? taken      = no λ ()
+
+    mutual
+      open? : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → Dec (OpenPath π)
+      open? here                                = yes tt
+      open? (in-map π)                          = open? π
+      open? (in-scan π)                         = open? π
+      open? (in-take {c = c} {tk = tk} π)       = (val (Kit.live c) ≟ true) ×-dec (taking? tk ×-dec open? π)
+      open? (in-outer π)                        = open? π
+      open? (in-lanes π)                        = open-lanes? π
+      open? (in-source {b = b} π)               = held? (part b) ×-dec open? π
+      open? (in-body {e = e} {t = s} π)         = ran? e (part s) ×-dec open? π
+      open? (in-defer π)                        = open? π
+
+      open-lanes? : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → Dec (OpenLanes π)
+      open-lanes? (this-lane {c = c} π) = (val (Kit.live c) ≟ true) ×-dec open? π
+      open-lanes? (next-lane π)         = open-lanes? π
 
     -- Untouched by any connect's end: a cold's node.
     Inert : ∀ {Δ A} → Node Δ A → Set₁
