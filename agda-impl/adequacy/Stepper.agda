@@ -538,7 +538,9 @@ postulate
 
   -- A NODE'S MEANING LAGS: whatever it shows is taken after a body's
   -- event at `k` that comes before its step and its sources'.
-  lags : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ k
+  --
+  -- REFUTED: 3cab1ca8 stated without the node sane, by a joiner untold of an ended source
+  lags : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ) → ∀ k
        → Wins (just k) (U.headˢ (U.step c)) ≡ true → First (just k) δ → Lags k (U.meaning c (ρᴱ δ))
 
   -- A NODE'S MEANING LEADS NOTHING: whatever it shows at `j`, which comes
@@ -742,7 +744,7 @@ live-skips : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env 
            → Shows b (U.live s ∷ δ) → Shows s δ → Shows (U.connectᶜ b (U.live s)) δ
 live-skips b s δ st sn@(_ , sns) pl@(_ , pb , ps) hb hs =
   conn b s δ st sn pl (U.step b) (U.step s) (λ w f → hb (w , f)) hs
-       (λ k w f → lags s δ st ps k w f)
+       (λ k w f → lags s δ st sns ps k w f)
        (λ j bj w f → leads b (U.live s ∷ δ) (hs , ps , st) pb j bj (w , f))
        (placed-after s δ st sns ps)
 

@@ -1,8 +1,9 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE GHOST IS PLACED: every node's meaning, read where the ghost reads
--- it, comes in position order.  A merge respects `≃` only between events
--- in order, so the stepper needs every meaning it merges placed.
+-- it, comes in position order.  A connect takes its source's step ahead
+-- of its body's skips tied with it, so the stepper needs the source's
+-- rest atop that step.
 module adequacy.Placed where
 
 open import Data.Bool using (false)
