@@ -176,45 +176,53 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE CONNECT.** `fed-≃` with `flat-≃`, `defer-≃` and `beside-≃`: a
-  running connect is a body over these, its body reading its source alike
-  the body fed its source's step, and a node reading alike environments
-  alike over the readers. Ruled out: exact agreement, per approximant or
-  under a ghost anchored in its sources' step history, a body fed a value
-  it would join its source only after or with a joiner told, and `fed-≃`
-  by recursion on the node under its own hypothesis. Proven: a sorted skip
-  is a `≃` forget, a source's step commutes with the body's tied events,
-  and a joiner reads alike sorted sources alike. Decides whether the body
-  fed the step and the body reading it are alike past a cut.
+- **THE FIXED SKIP.** `fed-≃`, restating `M.rejoin`: a joiner shows every
+  source step before its join as one skip at `p ++ [ ix 0 ]`, no count.
+  Ties are already legal, and skips are not observable. Three of `fed-≃`'s
+  dead routes are the count no witness keeps; this deletes the count, and
+  the joiner's index shift with it. Decides whether a joiner fed its
+  source's step is exactly the joiner reading it, pre-join or post-join.
+- **THE EXACT STEPPER.** `∼-trans` with `go-skips` and `beside-≃`: the
+  stepper's skips made the meaning's, so `≃` is strong bisimilarity and
+  transitive for free; the stalling half, the sorted hypotheses on the
+  merges and `skip-drop` go with it. Ruled out before the fixed skip:
+  exact agreement, by the pre-join count. De-risk first by pointing CI's
+  exact check of `denotation.Unfold` against the per-node meaning at the
+  fixed skip. Decides whether any skip mismatch survives the count.
+- **THE CONNECT.** `fed-≃` with `flat-≃` and `defer-≃`: a running connect
+  is a body over these, its body reading its source alike the body fed its
+  source's step. Ruled out: a body fed a value it would join its source
+  only after or with a joiner told, and `fed-≃` by recursion on the node
+  under its own hypothesis. Proven: a sorted skip is a `≃` forget, a
+  source's step commutes with the body's tied events, and a joiner reads
+  alike sorted sources alike. Decides whether the body fed the step and
+  the body reading it are alike past a cut.
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
   the meaning's events are sorted, a step keeps every node so, and what a
   node shows comes no earlier than any earlier step. Ruled out: a node
   showing strictly after it, a step not coming first keeping the placing,
-  and a placing with each live joiner joined before its source. Decides whether `Placed`,
-  a field of `Carried`, is the order the connect needs, ties and all.
-- **THE MERGES.** `go-skips` with `∼-trans`: a flatMap's meaning is what
-  its step shows, each lane showing its own. Ruled out: merges over `∼`
-  alone, over unsorted events, or with matched skips kept in place.
-  Decides whether the meaning's events are sorted and `M.go` respects `≃`
-  between sorted events.
+  and a placing with each live joiner joined before its source. Decides
+  whether `Placed`, a field of `Carried`, is the order the connect needs.
 - **THE OPERATORS.** `takeWhileᴱ-≃`, `take-first`, `join-quiet` and
   `defer-after`: a cut respects `≃`, a cut step comes first when the uncut
   did, an untold joiner fed nothing under silent sources shows nothing, a
   defer is its program subscribed. Decides whether `join-quiet` needs its
   sources' silence carried further than `First`.
-- **THE LEAST VALUE.** `note-least` with `note-onward`: the value a note
-  records is the least the ghost holds, and past it the run runs the
-  stepped ghost. Decides whether "least" is paid once as a field of
-  `Carried`, the ghost's sources past the last delivery as `WellMach`'s
-  are, rather than re-established at every step.
-- **THE TURN.** `turn-pops` with `turn-dry`: a popped timer's frame is the
-  ghost's frames node at its tick, and a drained run's ghost shows nothing.
-  Decides whether the ghost's timers need an order of their own or
-  `WellQueue`'s.
-- **THE KERNEL RUN.** `sub-onward` with `burst-onward`: a subscription
-  begun, or a burst's frame, runs its kernel's code silently to the next
-  re-entry state. Decides whether the four carried states close under the
-  run, a poll's answer and a popped timer passing silently.
+- **THE MACHINE SIDE.** `note-least`, `note-onward`, `turn-pops`,
+  `turn-dry`, `sub-onward` and `burst-onward`: a note records the least
+  value the ghost holds, a popped timer's frame is the ghost's frames node,
+  a drained run's ghost shows nothing, and a subscription or a burst runs
+  silently to the next re-entry state. Decides whether "least" is paid
+  once as a field of `Carried`, and whether the ghost's timers need an
+  order of their own or `WellQueue`'s.
+- **THE PROGRESS.** `reachedᴿ` as a body: induction on `Ahead`, carrying
+  `Inner`, over one leaf, a re-entry hop steps the ghost or lowers a
+  machine measure. Census first which hops leave the ghost in place: a
+  burst's steps are stepper events, a popped timer appears not to be.
+  Preferred repair: the meaning shows a skip at each such hop, so the
+  measure is the ghost's skips before the value alone. Only if that does
+  not cover every hop: a ghost-only marker in the shared machine, as
+  `here` is, which the IO runtime ignores. Decides the measure.
 ### The ledger
 
 - **`fed-≃`** (Stepper) — FALSITY, `REFUTED×2, DEAD ROUTE×4, RECOVERY`: a body
