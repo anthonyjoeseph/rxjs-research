@@ -31,7 +31,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
-  skip⁼; end⁼; agree; agree-sym)
+  skip⁼; end⁼; agree; agree-sym; agree-trans)
 import denotation.Unfold as U
 open import denotation.Compositional using ([]ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_)
@@ -231,12 +231,30 @@ module Honesty (R : Set) where
     where no : ∀ {q b} → Has hush q b → ⊥
           no ()
 
-  -- A ghost whose residual is `g`'s, which `m′` runs.
-  Ahead : U.Node [] R → Mach → Set₁
-  Ahead g m′ = Σ (U.Node [] R) λ g″ → residual g ≋ residual g″ × Mirror g″ m′
+  -- `y` is `x` past none or more of its leading skips, alike at every
+  -- depth at each stage.  As sets the two are the same; as a measure a
+  -- skip dropped is progress, which `≋` cannot see.
+  data Past : Events R → Events R → Set where
+    agrees  : ∀ {x y} → (∀ n → Agree n x y) → Past x y
+    skipped : ∀ {x y k r} → (∀ n → Agree n x (skip k r)) → Past (force r) y → Past x y
 
-  onward : ∀ {rest g m′} → rest ≋ residual g → Ahead g m′ → Inner rest m′
-  onward e (g″ , s , mi) = record { ghost = g″ ; same = ≋-trans e s ; mirror = mi }
+  skip-same : ∀ {k r} → skip k r ≋ force r
+  skip-same = (λ { (pastSkip h) → h }) , pastSkip
+
+  past-same : ∀ {x y} → Past x y → x ≋ y
+  past-same (agrees ag)    = same-agree ag
+  past-same (skipped ag p) = ≋-trans (same-agree ag) (≋-trans skip-same (past-same p))
+
+  past-pre : ∀ {x y z} → (∀ n → Agree n x y) → Past y z → Past x z
+  past-pre ag (agrees ag′)    = agrees λ n → agree-trans (ag n) (ag′ n)
+  past-pre ag (skipped ag′ p) = skipped (λ n → agree-trans (ag n) (ag′ n)) p
+
+  -- A ghost past `g`'s residual, which `m′` runs.
+  Hopped : U.Node [] R → Mach → Set₁
+  Hopped g m′ = Σ (U.Node [] R) λ g″ → Past (residual g) (residual g″) × Mirror g″ m′
+
+  onward : ∀ {rest g m′} → rest ≋ residual g → Hopped g m′ → Inner rest m′
+  onward e (g″ , s , mi) = record { ghost = g″ ; same = ≋-trans e (past-same s) ; mirror = mi }
 
   -- The driver's turn with a burst held is silent, whatever the burst.
   if-silent : ∀ (x y : Bool) {A B C} → Σ Mach λ m′ → (if x then silent A else if y then silent B else silent C) ≡ silent m′
@@ -261,18 +279,20 @@ module Honesty (R : Set) where
              → Mach.bursts m ≡ [] → Mach.timers m ≡ [] → ∀ {k b} → Has (residual g) k b → ⊥
 
     -- The turn popping a timer: its frame is the ghost's frames node at
-    -- its tick.
+    -- its tick, the ghost moved past no skip.
     turn-pops : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
-              → Mach.bursts m ≡ [] → ∀ {m′} → step m ≡ silent m′ → Ahead g m′
+              → Mach.bursts m ≡ [] → ∀ {m′} → step m ≡ silent m′ → Hopped g m′
 
     -- A subscription begun runs its kernel's code silently to the next
-    -- re-entry state.
+    -- re-entry state, the ghost past the skips it shows on the way (a
+    -- defer's).
     sub-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
-               → ∀ {m′} → step m ≡ silent m′ → Ahead g m′
+               → ∀ {m′} → step m ≡ silent m′ → Hopped g m′
 
-    -- A burst's frame stepped: polled, played, or found spent.
+    -- A burst's frame stepped: polled, played, or found spent, the ghost
+    -- past the skips its steps show.
     burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ K
-                 → Mach.bursts m ≡ just b ∷ bs → ∀ {m′} → step m ≡ silent m′ → Ahead g m′
+                 → Mach.bursts m ≡ just b ∷ bs → ∀ {m′} → step m ≡ silent m′ → Hopped g m′
 
     -- A value recorded is the least the ghost still holds.
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
@@ -284,9 +304,6 @@ module Honesty (R : Set) where
                 → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                 → ∀ {t q a′ m′} → step m ≡ value t q a′ m′ → Mirror g′ m′
 
-  -- THE STRONG STEP: from a re-entry configuration the machine runs
-  -- silently to the next, or records a least value of the residual, or
-  -- ends it.  By the re-entry state.
   -- The stepper is the meaning, as sets.
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
   step-alike g sn pl = same-agree (_≃_.agreeing (step-skips g sn pl))
@@ -294,26 +311,54 @@ module Honesty (R : Set) where
   residual-steps : ∀ g → Sane [] g → Placed g [] → Steps (residual g) (U.step g)
   residual-steps g sn pl = steps-after (U.step g) (step-alike g sn pl)
 
-  strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
-  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st sn pl) e =
-    completeˢ (proj₂ e (proj₁ rs)) λ h → proj₂ rs (proj₁ e h)
-    where rs = subst (Steps (residual g)) st (residual-steps g sn pl)
-  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
+  -- What a re-entry configuration's ghost is held to.
+  strong-sane : ∀ {g m} → Strong g m → Sane [] g × Placed g []
+  strong-sane (carried cr)          = Carried.sane cr , Carried.placed cr
+  strong-sane (closing _ _ _ sn pl) = sn , pl
+
+  -- The ghost's residual is what its step shows, at every depth.
+  strong-agrees : ∀ {g m} → Strong g m → ∀ n → Agree n (residual g) (after (U.step g))
+  strong-agrees {g} st = _≃_.agreeing (step-skips g (proj₁ (strong-sane st)) (proj₂ (strong-sane st)))
+
+  -- THE STRONG STEP: from a re-entry configuration the machine records
+  -- the value the ghost's step shows, a least of what it leaves, and runs
+  -- the stepped ghost; or ends with the ghost; or drains over a ghost
+  -- showing nothing; or runs silently to a ghost past this one's skips.
+  data Hop (g : U.Node [] R) (m : Mach) : Set₁ where
+    valueᴴ    : ∀ {t p a m′ g′} → step m ≡ value t p a m′ → U.step g ≡ U.outˢ p a g′ → t ≡ tick p
+              → (∀ {q b} → Has (residual g′) q b → q ≤ᵖ p → ⊥) → Mirror g′ m′ → Hop g m
+    completeᴴ : ∀ {p} → step m ≡ complete p → U.step g ≡ U.endˢ p → Hop g m
+    drainedᴴ  : step m ≡ drained → (∀ {k b} → Has (residual g) k b → ⊥) → Hop g m
+    silentᴴ   : ∀ {m′} → step m ≡ silent m′ → Hopped g m′ → Hop g m
+
+  -- By the re-entry state.
+  strong-hop : ∀ {g m} → Strong g m → Hop g m
+  strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st sn pl) = completeᴴ refl st
+  strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     with Carried.ctlAs cr | Carried.meets cr | Books.paidUp (Carried.books cr) | Books.clocked (Carried.books cr)
        | Books.running (Carried.books cr)
-  ... | subAs π x K | _ | refl | _ | _ = silentˢ (onward {g = g} e (sub-onward {g = g} cr refl refl))
-  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
+  ... | subAs π x K | _ | refl | _ | _ = silentᴴ refl (sub-onward {g = g} cr refl refl)
+  strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     | noteAs ks x K | g′ , _ , st | refl | ck | refl =
-    valueˢ ck (proj₂ e (proj₁ rs)) (λ h → proj₂ e (proj₁ (proj₂ rs) h)) (λ h → proj₂ (proj₂ rs) (proj₁ e h))
-      (note-least {g = g} cr refl st) (record { ghost = g′ ; same = ≋-refl ; mirror = note-onward {g = g} cr refl st refl })
-    where rs = subst (Steps (residual g)) st (residual-steps g (Carried.sane cr) (Carried.placed cr))
-  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
+    valueᴴ refl st ck (note-least {g = g} cr refl st) (note-onward {g = g} cr refl st refl)
+  strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     | calmAs | _ | refl | _ | refl with ts
-  ... | []    = drainedˢ λ h → turn-dry {g = g} cr refl refl refl (proj₁ e h)
-  ... | _ ∷ _ = silentˢ (onward {g = g} e (turn-pops {g = g} cr refl refl refl))
-  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
+  ... | []    = drainedᴴ refl (turn-dry {g = g} cr refl refl refl)
+  ... | _ ∷ _ = silentᴴ refl (turn-pops {g = g} cr refl refl refl)
+  strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     | burstAs {b = b} x K | _ | refl | _ | _ with if-silent (spent? hp (Playing.handle b)) (Playing.polled b)
-  ... | m′ , eq = subst (Shows _) (sym eq) (silentˢ (onward {g = g} e (burst-onward {g = g} cr refl refl eq)))
+  ... | m′ , eq = silentᴴ eq (burst-onward {g = g} cr refl refl eq)
+
+  strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
+  strong-shows {rest} {g} st e with strong-hop st
+  ... | valueᴴ {g′ = g′} eq stp ck least mi = subst (Shows rest) (sym eq)
+    (valueˢ ck (proj₂ e (proj₁ rs)) (λ h → proj₂ e (proj₁ (proj₂ rs) h)) (λ h → proj₂ (proj₂ rs) (proj₁ e h)) least
+      (record { ghost = g′ ; same = ≋-refl ; mirror = mi }))
+    where rs = subst (Steps (residual g)) stp (residual-steps g (proj₁ (strong-sane st)) (proj₂ (strong-sane st)))
+  ... | completeᴴ eq stp = subst (Shows rest) (sym eq) (completeˢ (proj₂ e (proj₁ rs)) λ h → proj₂ rs (proj₁ e h))
+    where rs = subst (Steps (residual g)) stp (residual-steps g (proj₁ (strong-sane st)) (proj₂ (strong-sane st)))
+  ... | drainedᴴ eq no = subst (Shows rest) (sym eq) (drainedˢ λ h → no (proj₁ e h))
+  ... | silentᴴ eq h = subst (Shows rest) (sym eq) (silentˢ (onward {g = g} e h))
 
   -- Every step shows the residual: on the way to a re-entry
   -- configuration a silent step keeps the ghost.

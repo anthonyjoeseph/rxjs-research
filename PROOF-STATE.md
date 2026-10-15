@@ -163,7 +163,8 @@ point at one, the row is FALSITY.
 at the root, positions forgotten down to ticks. SAFETY, every prefix placed
 against the meaning's events, is a body: SORTED (`adequacy.Sorted`, the
 machine alone) and ALIKE as sets (`content`) is placed (`placing`). LIVENESS
-is `reachedᴿ`. Sortedness rides SCOPED positions: `under l m k` runs `m` at
+is by an item's depth, then the run's calm (`adequacy.Progress`).
+Sortedness rides SCOPED positions: `under l m k` runs `m` at
 `pos ++ [l]` and puts `pos` back, so the run's positions are a tree's
 pre-order; each kernel is well-positioned (`Well`, unary) given its
 observer is; `preserve` is the tree walk, the timers and the loop's turn,
@@ -176,6 +177,16 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
+- **THE PROGRESS.** `calm-leaf`: no endless silent run of re-entry
+  configurations over one residual. A burst's steps, a lane admit and a
+  defer pass the ghost's skips (`Hopped`); a popped timer, a poll, a spent
+  burst dropped, a burst over and owed todos paid leave it in place, each
+  finitely often per frame. Ruled out: a meaning skip at a timer pop, at
+  the frame's root (a hot's rekey sorts it after the burst, oracle) or
+  tied with the burst's first step (`placing`), and a liveness by set
+  alone, blind to a skip passed. Decides whether those five are a measure
+  on the pure driver alone, or need a ghost-only marker in the shared
+  machine, as `here` is, which the IO runtime ignores.
 - **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
@@ -204,16 +215,6 @@ by their own silent steps (`Mirror`).
   silently to the next re-entry state. Decides whether "least" is paid
   once as a field of `Carried`, and whether the ghost's timers need an
   order of their own or `WellQueue`'s.
-- **THE PROGRESS.** `reachedᴿ` as a body: induction on `Ahead`, carrying
-  `Inner`, over one leaf, a re-entry hop steps the ghost or lowers a
-  machine measure. A burst's steps, a lane admit and a defer step the
-  ghost; a popped timer, a poll, a spent burst dropped, a burst over and
-  owed todos paid leave it in place, each finitely often per frame. Ruled
-  out: a meaning skip at a timer pop, at the frame's root (a hot's rekey
-  sorts it after the burst, oracle) or tied with the burst's first step
-  (an `out` must rise past it, `placing`). Decides whether those five are a
-  measure on the pure driver alone, or need a ghost-only marker in the
-  shared machine, as `here` is, which the IO runtime ignores.
 ### The ledger
 
 - **`ordered-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap merges its outer
@@ -264,17 +265,17 @@ by their own silent steps (`Mirror`).
 - **`note-onward`** (Content) — FALSITY, `NO EVIDENCE`: past a note the run
   runs the stepped ghost.
 - **`turn-pops`** (Content) — FALSITY, `NO EVIDENCE`: a popped timer's frame is
-  the ghost's frames node at its tick.
+  the ghost's frames node at its tick, no skip passed.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
 - **`sub-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription begun
-  runs silently to the next re-entry state.
+  runs silently to the next re-entry state, the ghost past its skips.
 - **`burst-onward`** (Content) — FALSITY, `NO EVIDENCE`: a burst's frame steps
-  silently to the next re-entry state.
+  silently to the next re-entry state, the ghost past its skips.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
-- **`reachedᴿ`** (Adequacy) — FALSITY, `NO EVIDENCE`: every item the meaning's
-  events reach, some prefix reaches.
+- **`calm-leaf`** (Progress) — FALSITY, `NO EVIDENCE`: from a re-entry
+  configuration, no endless silent run of them over one residual.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 

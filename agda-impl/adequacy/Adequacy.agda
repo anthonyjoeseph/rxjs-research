@@ -26,6 +26,7 @@ open import operation.PureObservable using (PureObs; module Pure)
 open import denotation.MonotonicList using (ML; Events; observe; root; ticks)
 open import adequacy.Sorted using (module Sorting)
 open import adequacy.Content using (module Honesty)
+open import adequacy.Progress using (module Progressing)
 open import denotation.Order using (_⊑_; _≃_; Shows; Chain; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
 open import denotation.Denote using (⟦_⟧)
 
@@ -42,6 +43,7 @@ module Link (R : Set) where
   open Pure R using (End; finished; dry; cutOff; frames; recorder)
   open Sorting R using (Ascending; ascending; sorted)
   open Honesty R using (Alike; content)
+  open Progressing R using (reached)
   open Read
 
   -- The first n steps, read.
@@ -76,11 +78,12 @@ module Link (R : Set) where
   placedᴿ : (o : PureObs [] R) (n : ℕ) → Placed (ending (read-of o n)) (marks (read-of o n)) (log (read-of o n)) (events o)
   placedᴿ o n = placing o (ascending (sorted o) n 0) (content o n)
 
-  postulate
-    -- LIVENESS: whatever item the meaning's events reach, finitely many
-    -- steps of the machine reach.
-    reachedᴿ : (o : PureObs [] R) → ∀ {k} → Ahead (events o) k → Σ ℕ λ n → k ≤ length (items (log (read-of o n)) (ending (read-of o n)))
+  -- LIVENESS: whatever item the meaning's events reach, finitely many
+  -- steps of the machine reach.
+  reachedᴿ : (o : PureObs [] R) → ∀ {k} → Ahead (events o) k → Σ ℕ λ n → k ≤ length (items (log (read-of o n)) (ending (read-of o n)))
+  reachedᴿ = reached
 
+  postulate
     -- The meaning's ticks never fall.
     --
     -- RECOVERY: `git show a2e0bb8b` restores `<ᵖ-trans`, `<ᵖ-irrefl` and
