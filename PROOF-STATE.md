@@ -177,6 +177,21 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
+- **THE DEFER.** `reach-later`, `ordered-defer`, `steady-defer`,
+  `fresh-defer`, `within-defer` and `defer-after`: every defer case is one
+  design question, recursion through `Later`, where induction over a
+  program is not structural. Decides whether one route carries them all:
+  a property indexed by depth, by induction on depth then program, or a
+  safety property closed under agreeing to every depth with a program that
+  has it, reusing the coinductive combinators through `approx` and the
+  non-expansive lemmas. Either way the defer arms become one assembly.
+- **THE ORDER.** `spread-sub`, then `steady-flat` and `fresh-flat` over
+  `FlatOrder`'s lane roots: pairwise apart, each lane alien to what is apart
+  from its root, the outer apart from each. `ordered-flat` is a body over
+  `spread-sub` alone. Ruled out: a lane's end tied with another lane or the
+  outer, a lane's first before where it subscribes. Decides whether a
+  stream's later events carry tags only from joins made earlier, the causal
+  half of `spread-sub`; its ordering half follows from `Ordered` and `Steady`.
 - **THE PROGRESS.** `emit-open` and `climb-take`, then `sub-onward`, the
   other `-onward` leaves and `burst-poll`, carry liveness. The climb is one
   height induction over a snoc view of the path, map, defer, body and root
@@ -185,28 +200,14 @@ by their own silent steps (`Mirror`).
   dead body (split out as `emit-unseen`), a take stopping at its last
   value, a resume needing more than the frame it pops, a measure blind to
   a cut, a queue bound on joiners, a polled burst as a re-entry state.
-- **THE ORDER.** `spread-sub`, then `steady-flat` and `fresh-flat` over
-  `FlatOrder`'s lane roots: pairwise apart, each lane alien to what is apart
-  from its root, the outer apart from each. `ordered-flat` is a body over
-  `spread-sub` alone. Ruled out: a lane's end tied with another lane or the
-  outer, a lane's first before where it subscribes. Decides whether a
-  stream's later events carry tags only from joins made earlier, the causal
-  half of `spread-sub`; its ordering half follows from `Ordered` and `Steady`.
-- **THE DEFER.** `ordered-defer` and `within-defer`: a defer over sorted,
-  alien sources is in order, and its program, fed, is placed within.
-  Decides whether a defer's notices keep its sources steady when
-  replayed, which `within-defer` would follow from as a feed.
-- **THE OPERATORS.** `go-skips`, `take-first`, `join-quiet` and
-  `defer-after`: a flatMap's meaning is what its step shows, a cut step
-  comes first when the uncut did, an untold joiner fed nothing under
-  silent sources shows nothing, a defer is its program subscribed. Ruled
+- **THE JOIN.** `join-quiet`: an untold joiner fed nothing under silent
+  sources shows nothing. Decides whether it needs its sources' silence
+  carried further than `First`, the one operator side condition no
+  ordering fact settles.
+- **THE OPERATORS.** `go-skips` and `take-first`: a flatMap's meaning is
+  what its step shows, a cut step comes first when the uncut did. Ruled
   out: a stepper `≃` short of strong agreement, every operator respecting
-  it and a source's step tied with the body's skips commuting. Decides whether `join-quiet` needs its
-  sources' silence carried further than `First`.
-- **THE MACHINE SIDE.** `note-least`, `turn-dry` and `sane-out`: a note
-  records the least value the ghost holds, a drained run's ghost shows
-  nothing, a ghost's value shown leaves it sane. Decides whether "least"
-  is paid once as a field of `Carried`.
+  it and a source's step tied with the body's skips commuting.
 ### The ledger
 
 - **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`: after a subscription's
