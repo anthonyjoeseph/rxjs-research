@@ -15,6 +15,8 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
+open import Data.Nat.Properties using (+-suc; m≤m+n)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -23,7 +25,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 import Tree as T
 open import Tree using (Later)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-atop; <ᵖ-shift)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-atop; <ᵖ-shift; <ᵖ-split; <ᵖ-inside; <ᵖ-succ; <ᵖ-ix≥)
   renaming (sub to subᴾ)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
@@ -571,16 +573,158 @@ lookup-≈ : ∀ {Γ A} {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → (i : A ∈ Γ) �
 lookup-≈ (a ∷ᵉ e) (here refl) = a
 lookup-≈ (a ∷ᵉ e) (there i)   = lookup-≈ e i
 
+module _ {A : Set} (p : Pos) where
+  mutual
+    rejoin-∼ : ∀ i j {x y : Events A} → x ∼ y → M.rejoin p i x ∼ M.rejoin p j y
+    rejoin-∼ i j (out∼ {k} t) with p <ᵖ k
+    ... | true  = out∼ (rejoin-∼∞ i j t)
+    ... | false = skip∼ (rejoin-∼∞ (suc i) (suc j) t)
+    rejoin-∼ i j (skip∼ {k} {k′} t) with p <ᵖ k | p <ᵖ k′
+    ... | true  | true  = skip∼ (rejoin-∼∞ i j t)
+    ... | true  | false = skip∼ (rejoin-∼∞ i (suc j) t)
+    ... | false | true  = skip∼ (rejoin-∼∞ (suc i) j t)
+    ... | false | false = skip∼ (rejoin-∼∞ (suc i) (suc j) t)
+    rejoin-∼ i j (skipˡ {k} r) with p <ᵖ k
+    ... | true  = skipˡ (rejoin-∼ i j r)
+    ... | false = skipˡ (rejoin-∼ (suc i) j r)
+    rejoin-∼ i j (skipʳ {k = k} r) with p <ᵖ k
+    ... | true  = skipʳ (rejoin-∼ i j r)
+    ... | false = skipʳ (rejoin-∼ i (suc j) r)
+    rejoin-∼ i j end∼  = ∼-refl _
+    rejoin-∼ i j hush∼ = hush∼
+
+    rejoin-∼∞ : ∀ i j {x y : Events A} → x ∼∞ y → M.rejoin p i x ∼∞ M.rejoin p j y
+    ∼force (rejoin-∼∞ i j t) = rejoin-∼ i j (∼force t)
+
+  -- what a joiner shows of an event is no earlier than the event
+  stall-x : ∀ {v} i (x : Events A) → Stalls v (M.rejoin p i x) → Stalls v x
+  stays (stall-x {v} i (out q a r) s) with p <ᵖ q in pq
+  ... | true  = <ᵖ-trans q (q ++ [ subᴾ p ]) v (<ᵖ-below q []) (proj₁ (stays s)) , stall-x i (force r) (proj₂ (stays s))
+  ... | false = <ᵖ-trans q (p ++ [ ix i ]) v (<ᵖ-atop p q (p ++ [ ix i ]) pq (<ᵖ-below p [])) (proj₁ (stays s)) , stall-x (suc i) (force r) (proj₂ (stays s))
+  stays (stall-x {v} i (skip q r) s) with p <ᵖ q in pq
+  ... | true  = <ᵖ-trans q (q ++ [ subᴾ p ]) v (<ᵖ-below q []) (proj₁ (stays s)) , stall-x i (force r) (proj₂ (stays s))
+  ... | false = <ᵖ-trans q (p ++ [ ix i ]) v (<ᵖ-atop p q (p ++ [ ix i ]) pq (<ᵖ-below p [])) (proj₁ (stays s)) , stall-x (suc i) (force r) (proj₂ (stays s))
+  stays (stall-x i (end c) s) with p <ᵖ c
+  ... | true  = ⊥-elim (stays s)
+  ... | false = ⊥-elim (stays s)
+  stays (stall-x i hush s) = ⊥-elim (stays s)
+
+  private
+    no : true ≡ false → ⊥
+    no ()
+
+    lt-le : ∀ z v w → z <ᵖ v ≡ true → w <ᵖ v ≡ false → z <ᵖ w ≡ true
+    lt-le z v w a b with <ᵖ-split w v b
+    ... | inj₁ refl = a
+    ... | inj₂ c    = <ᵖ-trans z v w a c
+
+    le0 : ∀ z → p <ᵖ z ≡ false → z <ᵖ (p ++ [ ix 0 ]) ≡ true
+    le0 z h with <ᵖ-split p z h
+    ... | inj₁ refl = <ᵖ-below p []
+    ... | inj₂ zp   = <ᵖ-trans z p _ zp (<ᵖ-below p [])
+
+    nlt : ∀ z → z <ᵖ (p ++ [ ix 0 ]) ≡ true → p <ᵖ z ≡ false
+    nlt z h with <ᵖ-succ z p h
+    ... | inj₁ refl = <ᵖ-irrefl p
+    ... | inj₂ zp with p <ᵖ z in pz
+    ...   | false = refl
+    ...   | true  = trans (sym (<ᵖ-trans p z p pz zp)) (<ᵖ-irrefl p)
+
+  module _ {v : Pos} (x : Events A) (i : ℕ) (sr : Stalls v (M.rejoin p i x)) where
+    -- past the join: a later event of y′ would show between q and v
+    module _ (q : Pos) (pq : p <ᵖ q ≡ true) (qv : (q ++ [ subᴾ p ]) <ᵖ v ≡ false) where
+      stuck : ∀ j (t : Events A) → Atop q t → Ordered t → Atop (q ++ [ subᴾ p ]) (M.rejoin p j t)
+            → Ordered (M.rejoin p j t) → Stalls v t → Stalls (q ++ [ ix 0 ]) t
+      stays (stuck j (out z a r) aq ot ar or st) with p <ᵖ z in pz | <ᵖ-split z q aq
+      ... | true  | inj₁ refl = <ᵖ-below q [] , stuck j (force r) (proj₁ (ordered ot)) (proj₂ (ordered ot)) (proj₁ (ordered or)) (proj₂ (ordered or)) (proj₂ (stays st))
+      ... | false | inj₁ refl = ⊥-elim (no (trans (sym pq) pz))
+      ... | true  | inj₂ qz   = ⊥-elim (no (trans (sym (<ᵖ-inside q z (subᴾ p) (subᴾ p) qz (lt-le z v _ (proj₁ (stays st)) qv))) ar))
+      ... | false | inj₂ qz   = ⊥-elim (no (trans (sym (<ᵖ-trans p q z pq qz)) pz))
+      stays (stuck j (skip z r) aq ot ar or st) with p <ᵖ z in pz | <ᵖ-split z q aq
+      ... | true  | inj₁ refl = <ᵖ-below q [] , stuck j (force r) (proj₁ (ordered ot)) (proj₂ (ordered ot)) (proj₁ (ordered or)) (proj₂ (ordered or)) (proj₂ (stays st))
+      ... | false | inj₁ refl = ⊥-elim (no (trans (sym pq) pz))
+      ... | true  | inj₂ qz   = ⊥-elim (no (trans (sym (<ᵖ-inside q z (subᴾ p) (subᴾ p) qz (lt-le z v _ (proj₁ (stays st)) qv))) ar))
+      ... | false | inj₂ qz   = ⊥-elim (no (trans (sym (<ᵖ-trans p q z pq qz)) pz))
+      stays (stuck j (end c) aq ot ar or st) = stays st
+      stays (stuck j hush    aq ot ar or st) = stays st
+
+      under : ∀ k (x′ : Events A) → Stalls (q ++ [ ix 0 ]) x′ → Stalls v (M.rejoin p k x′) → Stalls q x′
+      stays (under k (out z a r) s₀ s₁) with p <ᵖ z in pz | <ᵖ-succ z q (proj₁ (stays s₀))
+      ... | true  | inj₁ refl = ⊥-elim (no (trans (sym (proj₁ (stays s₁))) qv))
+      ... | false | inj₁ refl = ⊥-elim (no (trans (sym pq) pz))
+      ... | true  | inj₂ zq   = zq , under k (force r) (proj₂ (stays s₀)) (proj₂ (stays s₁))
+      ... | false | inj₂ zq   = zq , under (suc k) (force r) (proj₂ (stays s₀)) (proj₂ (stays s₁))
+      stays (under k (skip z r) s₀ s₁) with p <ᵖ z in pz | <ᵖ-succ z q (proj₁ (stays s₀))
+      ... | true  | inj₁ refl = ⊥-elim (no (trans (sym (proj₁ (stays s₁))) qv))
+      ... | false | inj₁ refl = ⊥-elim (no (trans (sym pq) pz))
+      ... | true  | inj₂ zq   = zq , under k (force r) (proj₂ (stays s₀)) (proj₂ (stays s₁))
+      ... | false | inj₂ zq   = zq , under (suc k) (force r) (proj₂ (stays s₀)) (proj₂ (stays s₁))
+      stays (under k (end c) s₀ s₁) = stays s₀
+      stays (under k hush    s₀ s₁) = stays s₀
+
+      -- y′ stays at its head, so x stays at q, and so then does y′
+
+    -- before the join: every later event of y′ precedes the join too
+    module _ (j : ℕ) (jv : (p ++ [ ix j ]) <ᵖ v ≡ false) where
+      stuckᵖ : ∀ k (t : Events A) → Atop (p ++ [ ix j ]) (M.rejoin p k t) → Ordered (M.rejoin p k t)
+             → Stalls v t → Stalls (p ++ [ ix 0 ]) t
+      stays (stuckᵖ k (out z a r) at or st) with p <ᵖ z in pz
+      ... | true  = ⊥-elim (no (trans (sym (<ᵖ-inside p z (ix j) (subᴾ p) pz (lt-le z v _ (proj₁ (stays st)) jv))) at))
+      ... | false = le0 z pz , stuckᵖ (suc k) (force r) (atop-down (M.rejoin p (suc k) (force r)) (proj₁ (ordered or)) at) (proj₂ (ordered or)) (proj₂ (stays st))
+      stays (stuckᵖ k (skip z r) at or st) with p <ᵖ z in pz
+      ... | true  = ⊥-elim (no (trans (sym (<ᵖ-inside p z (ix j) (subᴾ p) pz (lt-le z v _ (proj₁ (stays st)) jv))) at))
+      ... | false = le0 z pz , stuckᵖ (suc k) (force r) (atop-down (M.rejoin p (suc k) (force r)) (proj₁ (ordered or)) at) (proj₂ (ordered or)) (proj₂ (stays st))
+      stays (stuckᵖ k (end c) at or st) = stays st
+      stays (stuckᵖ k hush    at or st) = stays st
+
+      -- x then only ever precedes the join, so its skips climb past j
+      climb : ∀ n k (x′ : Events A) → j ≤ n + k → Stalls (p ++ [ ix 0 ]) x′ → Stalls v (M.rejoin p k x′) → ⊥
+      climb n k (out z a r) le s₀ s₁ with p <ᵖ z in pz
+      ... | true  = no (trans (sym pz) (nlt z (proj₁ (stays s₀))))
+      climb zero k (out z a r) le s₀ s₁ | false = no (trans (sym (lt-le (p ++ [ ix k ]) v (p ++ [ ix j ]) (proj₁ (stays s₁)) jv)) (<ᵖ-ix≥ p le))
+      climb (suc n) k (out z a r) le s₀ s₁ | false = climb n (suc k) (force r) (subst (j ≤_) (sym (+-suc n k)) le) (proj₂ (stays s₀)) (proj₂ (stays s₁))
+      climb n k (skip z r) le s₀ s₁ with p <ᵖ z in pz
+      ... | true  = no (trans (sym pz) (nlt z (proj₁ (stays s₀))))
+      climb zero k (skip z r) le s₀ s₁ | false = no (trans (sym (lt-le (p ++ [ ix k ]) v (p ++ [ ix j ]) (proj₁ (stays s₁)) jv)) (<ᵖ-ix≥ p le))
+      climb (suc n) k (skip z r) le s₀ s₁ | false = climb n (suc k) (force r) (subst (j ≤_) (sym (+-suc n k)) le) (proj₂ (stays s₀)) (proj₂ (stays s₁))
+      climb n k (end c) le s₀ s₁ = stays s₀
+      climb n k hush    le s₀ s₁ = stays s₀
+
+    -- walking y′, x's stalling stays shared
+    walk : ∀ j (y′ : Events A) → Ordered y′ → Ordered (M.rejoin p j y′)
+         → (∀ w → Stalls w x → Stalls w y′) → (∀ w → Stalls w y′ → Stalls w x) → Stalls v (M.rejoin p j y′)
+    stays (walk j (out q a r) oy ory to from) with p <ᵖ q in pq
+    ... | true with (q ++ [ subᴾ p ]) <ᵖ v in qv
+    ...   | true  = refl , walk j (force r) (proj₂ (ordered oy)) (proj₂ (ordered ory)) (λ w s → proj₂ (stays (to w s))) (λ w s → from w (record { stays = atop-up (force r) (proj₁ (ordered oy)) s , s }))
+    ...   | false = ⊥-elim (no (trans (sym (proj₁ (stays (to q (under q pq qv i x (from _ (record { stays = <ᵖ-below q [] , stuck q pq qv j (force r) (proj₁ (ordered oy)) (proj₂ (ordered oy)) (proj₁ (ordered ory)) (proj₂ (ordered ory)) (proj₂ (stays (to v (stall-x i x sr)))) })) sr))))) (<ᵖ-irrefl q)))
+    stays (walk j (out q a r) oy ory to from) | false with (p ++ [ ix j ]) <ᵖ v in jv
+    ...   | true  = refl , walk (suc j) (force r) (proj₂ (ordered oy)) (proj₂ (ordered ory)) (λ w s → proj₂ (stays (to w s))) (λ w s → from w (record { stays = atop-up (force r) (proj₁ (ordered oy)) s , s }))
+    ...   | false = ⊥-elim (climb j jv j i x (m≤m+n j i) (from _ (record { stays = le0 q pq , stuckᵖ j jv (suc j) (force r) (proj₁ (ordered ory)) (proj₂ (ordered ory)) (proj₂ (stays (to v (stall-x i x sr)))) })) sr)
+    stays (walk j (skip q r) oy ory to from) with p <ᵖ q in pq
+    ... | true with (q ++ [ subᴾ p ]) <ᵖ v in qv
+    ...   | true  = refl , walk j (force r) (proj₂ (ordered oy)) (proj₂ (ordered ory)) (λ w s → proj₂ (stays (to w s))) (λ w s → from w (record { stays = atop-up (force r) (proj₁ (ordered oy)) s , s }))
+    ...   | false = ⊥-elim (no (trans (sym (proj₁ (stays (to q (under q pq qv i x (from _ (record { stays = <ᵖ-below q [] , stuck q pq qv j (force r) (proj₁ (ordered oy)) (proj₂ (ordered oy)) (proj₁ (ordered ory)) (proj₂ (ordered ory)) (proj₂ (stays (to v (stall-x i x sr)))) })) sr))))) (<ᵖ-irrefl q)))
+    stays (walk j (skip q r) oy ory to from) | false with (p ++ [ ix j ]) <ᵖ v in jv
+    ...   | true  = refl , walk (suc j) (force r) (proj₂ (ordered oy)) (proj₂ (ordered ory)) (λ w s → proj₂ (stays (to w s))) (λ w s → from w (record { stays = atop-up (force r) (proj₁ (ordered oy)) s , s }))
+    ...   | false = ⊥-elim (climb j jv j i x (m≤m+n j i) (from _ (record { stays = le0 q pq , stuckᵖ j jv (suc j) (force r) (proj₁ (ordered ory)) (proj₂ (ordered ory)) (proj₂ (stays (to v (stall-x i x sr)))) })) sr)
+    stays (walk j (end c) oy ory to from) = ⊥-elim (stays (to v (stall-x i x sr)))
+    stays (walk j hush    oy ory to from) = ⊥-elim (stays (to v (stall-x i x sr)))
+
+-- A JOINER READS ALIKE SOURCES ALIKE: what its source showed before it
+-- joined is skips, as many as there were steps, and what after it is
+-- rekeyed under `sub p`.  Each side stalls where the other does: a shown
+-- position the other's run never passes would hold its own run below it.
+rejoin-≃ : ∀ {A} p {x y : Events A} → x ≃ y → Ordered x → Ordered y
+         → Ordered (M.rejoin p 0 x) → Ordered (M.rejoin p 0 y) → M.rejoin p 0 x ≃ M.rejoin p 0 y
+rejoin-≃ p {x} {y} e ox oy orx ory = record
+  { alike  = rejoin-∼ p 0 0 (alike e)
+  ; stalls = λ v → (λ s → walk p x 0 s 0 y oy ory (λ w → proj₁ (stalls e w)) (λ w → proj₂ (stalls e w)))
+                 , (λ s → walk p y 0 s 0 x ox orx (λ w → proj₂ (stalls e w)) (λ w → proj₁ (stalls e w))) }
+
 postulate
   -- `M.beside` respects `≃` between events in order.
   beside-≃ : ∀ {A B} {x x′ : Events B} {y y′ : Events A} → Ordered x → Ordered x′ → Ordered y → Ordered y′
            → x ≃ x′ → y ≃ y′ → M.beside x y ≃ M.beside x′ y′
-
-  -- A JOINER READS ALIKE SOURCES ALIKE: what its source showed before it
-  -- joined is skips, as many as there were steps, and what after it is
-  -- rekeyed under `sub p`.
-  rejoin-≃ : ∀ {A} p {x y : Events A} → x ≃ y → Ordered x → Ordered y
-           → Ordered (M.rejoin p 0 x) → Ordered (M.rejoin p 0 y) → M.rejoin p 0 x ≃ M.rejoin p 0 y
 
   -- A DEFER READS ALIKE ENVIRONMENTS ALIKE: the fold's meaning of the
   -- program it defers, over the environment's runs made hot.
