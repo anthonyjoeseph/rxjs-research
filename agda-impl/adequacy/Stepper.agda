@@ -16,6 +16,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Function using (id)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
@@ -538,15 +539,88 @@ first-sub q (U.live s  ∷ δ) (w , f) = wins (U.headˢ (U.step s)) w , first-su
 wins-self : ∀ q → Wins (just (q ++ [ ix 0 ])) (just q) ≡ true
 wins-self q = cong not (<ᵖ-irrefl (q ++ [ ix 0 ]))
 
+-- An out on tails alike.
+out-cong : ∀ {A k a} {l r : Events∞ A} → force l ≃ force r → out k a l ≃ out k a r
+out-cong p = record
+  { alike  = out∼ (record { ∼force = alike p })
+  ; stalls = λ v → (λ s → record { stays = proj₁ (stays s) , proj₁ (stalls p v) (proj₂ (stays s)) })
+                 , (λ s → record { stays = proj₁ (stays s) , proj₂ (stalls p v) (proj₂ (stays s)) }) }
+
+-- What a joiner was fed, ahead of alike runs.
+fedᴺ-≃ : ∀ {A} (xs : List (Pos × A)) {x y : Events A} → x ≃ y → U.fedᴺ xs x ≃ U.fedᴺ xs y
+fedᴺ-≃ []             e = e
+fedᴺ-≃ ((q , a) ∷ xs) e = out-cong (fedᴺ-≃ xs e)
+
+fedᴺ-ordered : ∀ {A} (xs : List (Pos × A)) {x : Events A} → Ordered (U.fedᴺ xs x) → Ordered x
+fedᴺ-ordered []             o = o
+fedᴺ-ordered ((q , a) ∷ xs) o = fedᴺ-ordered xs (proj₂ (ordered o))
+
+-- Environments alike entry by entry: the same, or alike and each in order.
+Alike : ∀ {A} → Events A → Events A → Set
+Alike x y = x ≡ y ⊎ (x ≃ y × Ordered x × Ordered y)
+
+data _≈ᴱ_ : ∀ {Γ} → NEnv Γ → NEnv Γ → Set₁ where
+  []ᵉ  : []ᴬ ≈ᴱ []ᴬ
+  _∷ᵉ_ : ∀ {A Γ} {x y : Events A} {ρ σ : NEnv Γ} → Alike x y → ρ ≈ᴱ σ → (x ∷ᴬ ρ) ≈ᴱ (y ∷ᴬ σ)
+
+≈ᴱ-refl : ∀ {Γ} (ρ : NEnv Γ) → ρ ≈ᴱ ρ
+≈ᴱ-refl []ᴬ      = []ᵉ
+≈ᴱ-refl (x ∷ᴬ ρ) = inj₁ refl ∷ᵉ ≈ᴱ-refl ρ
+
+lookup-≈ : ∀ {Γ A} {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → (i : A ∈ Γ) → Alike (lookup ρ i) (lookup σ i)
+lookup-≈ (a ∷ᵉ e) (here refl) = a
+lookup-≈ (a ∷ᵉ e) (there i)   = lookup-≈ e i
+
 postulate
   -- `M.beside` respects `≃` between events in order.
   beside-≃ : ∀ {A B} {x x′ : Events B} {y y′ : Events A} → Ordered x → Ordered x′ → Ordered y → Ordered y′
            → x ≃ x′ → y ≃ y′ → M.beside x y ≃ M.beside x′ y′
 
-  -- A body reads alike sources alike, both in order and it placed under
-  -- each.
-  env-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) {x y : Events A} → x ≃ y → Ordered x → Ordered y
-        → Placed b (x ∷ᴬ ρ) → Placed b (y ∷ᴬ ρ) → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning b (y ∷ᴬ ρ)
+  -- A JOINER READS ALIKE SOURCES ALIKE: what its source showed before it
+  -- joined is skips, as many as there were steps, and what after it is
+  -- rekeyed under `sub p`.
+  rejoin-≃ : ∀ {A} p {x y : Events A} → x ≃ y → Ordered x → Ordered y
+           → Ordered (M.rejoin p 0 x) → Ordered (M.rejoin p 0 y) → M.rejoin p 0 x ≃ M.rejoin p 0 y
+
+  -- A DEFER READS ALIKE ENVIRONMENTS ALIKE: the fold's meaning of the
+  -- program it defers, over the environment's runs made hot.
+  defer-≃ : ∀ {Γ A} (l : Later Timeline Γ A) p {ρ σ : NEnv Γ} → ρ ≈ᴱ σ
+          → Placed (U.deferᶜ l p) ρ → Placed (U.deferᶜ l p) σ → U.meaning (U.deferᶜ l p) ρ ≃ U.meaning (U.deferᶜ l p) σ
+
+  -- A FLATMAP READS ALIKE ENVIRONMENTS ALIKE: its outer and its lanes in
+  -- flight, and the lanes it has yet to subscribe, each reading them
+  -- from where it joins.
+  flat-≃ : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs {ρ σ : NEnv Γ} → ρ ≈ᴱ σ
+         → Placed (U.flatMapᶜ op g o ls qs) ρ → Placed (U.flatMapᶜ op g o ls qs) σ
+         → U.meaning (U.flatMapᶜ op g o ls qs) ρ ≃ U.meaning (U.flatMapᶜ op g o ls qs) σ
+
+-- A node reads alike environments alike, placed under each.
+envs-≃ : ∀ {Γ A} (c : U.Node Γ A) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Placed c ρ → Placed c σ → U.meaning c ρ ≃ U.meaning c σ
+envs-≃ (U.framesᶜ τ r m)            e _ _ = ≃-refl _
+envs-≃ (U.burstᶜ τ r i b)           e _ _ = ≃-refl _
+envs-≃ (U.endᶜ r)                   e _ _ = ≃-refl _
+envs-≃ (U.ofᶜ r i xs)               e _ _ = ≃-refl _
+envs-≃ (U.mapᶜ f c)                 e (_ , pc) (_ , pc′) = mapᴱ-≃ f (envs-≃ c e pc pc′)
+envs-≃ (U.scanᶜ f z c)              e (_ , pc) (_ , pc′) = scanᴱ-≃ f z (envs-≃ c e pc pc′)
+envs-≃ (U.takeWhileᶜ i p c)         e (_ , pc) (_ , pc′) = takeWhileᴱ-≃ i p (envs-≃ c e pc pc′)
+envs-≃ (U.flatMapᶜ op g o ls qs)    e pr ps = flat-≃ op g o ls qs e pr ps
+envs-≃ (U.joinᶜ i p xs (just c))    e _ _ = ≃-refl _
+envs-≃ (U.joinᶜ i p xs nothing) {ρ} e (o , _) (o′ , _) with lookup-≈ e i
+... | inj₁ eq = subst (λ z → U.fedᴺ xs (M.rejoin p 0 (lookup ρ i)) ≃ U.fedᴺ xs (M.rejoin p 0 z)) eq (≃-refl _)
+... | inj₂ (x≃ , ox , oy) = fedᴺ-≃ xs (rejoin-≃ p x≃ ox oy (fedᴺ-ordered xs o) (fedᴺ-ordered xs o′))
+envs-≃ (U.connectᶜ b (U.live s))    e (_ , pb , ps) (_ , pb′ , ps′) =
+  beside-≃ (proj₁ pb) (proj₁ pb′) (proj₁ ps) (proj₁ ps′) (envs-≃ b (inj₂ (s≃ , proj₁ ps , proj₁ ps′) ∷ᵉ e) pb pb′) s≃
+  where s≃ = envs-≃ s e ps ps′
+envs-≃ (U.connectᶜ b (U.ended c))   e (_ , pb) (_ , pb′) = envs-≃ b (inj₁ refl ∷ᵉ e) pb pb′
+envs-≃ (U.deferᶜ l p)               e pr ps = defer-≃ l p e pr ps
+
+-- A body reads alike sources alike, both in order and it placed under
+-- each.
+env-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) {x y : Events A} → x ≃ y → Ordered x → Ordered y
+      → Placed b (x ∷ᴬ ρ) → Placed b (y ∷ᴬ ρ) → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning b (y ∷ᴬ ρ)
+env-≃ b ρ e ox oy = envs-≃ b (inj₂ (e , ox , oy) ∷ᵉ ≈ᴱ-refl ρ)
+
+postulate
 
   -- A BODY FED ITS SOURCE'S STEP IS ALIKE THE BODY READING IT: a joiner
   -- fed the value its source shows at `q`, reading the source past it,
@@ -569,6 +643,12 @@ postulate
   --   keeps no count of a source's steps, and a silent run is matched by
   --   the residual as a set alone (`Ahead`), so no field of the witness
   --   can keep the count a lane's pre-join skips need.
+  -- DEAD ROUTE: recursion on the node under its own hypothesis.  A
+  --   `takeWhileᶜ` cut at its inner's head shows it under `ix 0` or `last`,
+  --   and a connect shows its source's step under `ix 0`, so the inner's
+  --   meaning is atop `q` only, not `q ++ [ ix 0 ]`; and past a cut the
+  --   inner may join its source before `q` unfed while the cut hides it,
+  --   so the inners are not alike at all.
   -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
   fed-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) q (a : A) (l : Events∞ A) {x : Events A} → x ≃ out q a l
         → Ordered x → Ordered (out q a l) → Atop (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ))
