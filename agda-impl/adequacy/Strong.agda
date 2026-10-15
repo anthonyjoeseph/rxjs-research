@@ -19,7 +19,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_]; foldr)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_)
 open import Level using (Lift; lower)
@@ -34,7 +34,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to [
 
 import Tree as T
 open import Tree using (Obs; Later)
-open import denotation.MonotonicList using (Time; Pos; From; Frame; Timeline; at; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Time; Pos; From; Frame; Timeline; at; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ; quiet to quietᶠ) renaming (sub to subᴾ)
 open import operation.AbstractObservable using (base; maybe; quiet; module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out; note; fin; module Pure)
 open import operation.Machine using (module Machine)
@@ -888,6 +888,72 @@ module Strongly (R : Set) where
       paidUp  : Mach.todo m ≡ []
       running : Mach.ended m ≡ false
 
+  -- A joiner untold while its connect's source runs, told once it ends.
+  Told : Bool → Maybe Pos → Set
+  Told true  nothing  = ⊤
+  Told true  (just _) = ⊥
+  Told false nothing  = ⊥
+  Told false (just _) = ⊤
+
+  -- Every connect in scope, running.
+  allLive : ∀ (Γ : List Set) → All (λ _ → Bool) Γ
+  allLive []      = []ᴬ
+  allLive (_ ∷ Γ) = true ∷ᴬ allLive Γ
+
+  -- THE GHOST IS A RUN'S CONFIGURATION: each joiner told its end exactly
+  -- when its connect's source has ended; each lane a flatMap will
+  -- subscribe, untold, as `subscribe` makes it.  `ν` says, per connect
+  -- in scope, whether its source runs.
+  mutual
+    Sane : ∀ {Γ A} → All (λ _ → Bool) Γ → U.Node Γ A → Set
+    Sane ν (U.mapᶜ f c)              = Sane ν c
+    Sane ν (U.scanᶜ f z c)           = Sane ν c
+    Sane ν (U.takeWhileᶜ i p c)      = Sane ν c
+    Sane {Γ} ν (U.flatMapᶜ op g o ls qs) = Saneᴹ ν o × Saneᴸ ν ls × (∀ a q → Sane (allLive Γ) (g a q))
+    Sane ν (U.joinᶜ i p xs e)        = Told (lookup ν i) e
+    Sane ν (U.connectᶜ b (U.live s)) = Sane (true ∷ᴬ ν) b × Sane ν s
+    Sane ν (U.connectᶜ b (U.ended c)) = Sane (false ∷ᴬ ν) b
+    Sane ν _                         = ⊤
+
+    Saneᴹ : ∀ {Γ A} → All (λ _ → Bool) Γ → Maybe (U.Node Γ A) → Set
+    Saneᴹ ν nothing  = ⊤
+    Saneᴹ ν (just c) = Sane ν c
+
+    Saneᴸ : ∀ {Γ A} → All (λ _ → Bool) Γ → List (U.Node Γ A) → Set
+    Saneᴸ ν []       = ⊤
+    Saneᴸ ν (c ∷ cs) = Sane ν c × Saneᴸ ν cs
+
+  -- Every connect in scope still running.
+  Running : ∀ {Γ : List Set} → All (λ _ → Bool) Γ → Set₁
+  Running {Γ} ν = ∀ {A} (i : A ∈ Γ) → lookup ν i ≡ true
+
+  running-∷ : ∀ {Γ : List Set} {B : Set} {ν : All (λ _ → Bool) Γ} → Running ν → Running {B ∷ Γ} (true ∷ᴬ ν)
+  running-∷ r (Any.here refl) = refl
+  running-∷ r (Any.there i)   = r i
+
+  running-all : ∀ {Γ : List Set} → Running (allLive Γ)
+  running-all {_ ∷ Γ} (Any.here refl) = refl
+  running-all {_ ∷ Γ} (Any.there i)   = running-all i
+
+  sane-start : ∀ {Γ : List Set} {A : Set} {ν : All (λ _ → Bool) Γ} p (m : From A 0) → Sane ν (U.startᶜ {Γ} p m)
+  sane-start p (at zero _ b)    = tt
+  sane-start p (at (suc _) _ b) = tt
+  sane-start p doneᶠ            = tt
+  sane-start p quietᶠ           = tt
+
+  -- A program subscribed while its connects run is a run's configuration.
+  sane-subscribe : ∀ {Γ : List Set} {A : Set} {ν : All (λ _ → Bool) Γ} (o : Obs Timeline Γ A) p → Running ν → Sane ν (U.subscribe o p)
+  sane-subscribe (T.cold c)          p r = sane-start p (lower c)
+  sane-subscribe T.empty             p r = tt
+  sane-subscribe (T.of xs)           p r = tt
+  sane-subscribe (T.map f s)         p r = sane-subscribe s p r
+  sane-subscribe (T.scan f z s)      p r = sane-subscribe s p r
+  sane-subscribe (T.takeWhile i q s) p r = sane-subscribe s p r
+  sane-subscribe (T.flatMap op f s)  p r = sane-subscribe s p r , tt , λ a q → sane-subscribe (f a) q running-all
+  sane-subscribe (T.connect s b)     p r = sane-subscribe b _ (running-∷ r) , sane-subscribe s _ r
+  sane-subscribe (T.connected i)     p r rewrite r i = tt
+  sane-subscribe (T.defer l)         p r = tt
+
   -- What the ghost is, at each state: what the witness has open; at a
   -- value about to be recorded, what steps to it by that value.
   Meets : ∀ {h} {t : Sub h [] R} {p ctl bs} → Against.CtlAs t p ctl bs → Maybe (U.Node [] R) → U.Node [] R → Set₁
@@ -900,6 +966,7 @@ module Strongly (R : Set) where
   record Carried (g : U.Node [] R) (m : Mach) : Set₁ where
     H = Conf.heap (Mach.conf m)
     field
+      sane    : Sane []ᴬ g
       tree    : Sub (Conf.world (Mach.conf m)) [] R
       ctlAs   : Against.CtlAs tree (Conf.pos (Mach.conf m)) (Conf.ctl (Mach.conf m)) (Mach.bursts m)
       meets   : Meets ctlAs (At.part H tree) g
@@ -934,13 +1001,14 @@ module Strongly (R : Set) where
   data Strong (g : U.Node [] R) (m : Mach) : Set₁ where
     carried : Carried g m → Strong g m
     closing : ∀ {h hp p w B k σ K} → Mach.conf m ≡ ⟨_,_,_⟩ {h} hp p (asking {w = w} {B = B} fin k σ K)
-            → Mach.ended m ≡ false → U.step g ≡ U.endˢ p → Strong g m
+            → Mach.ended m ≡ false → U.step g ≡ U.endˢ p → Sane []ᴬ g → Strong g m
 
   -- THE LAUNCH IS A SUBSCRIPTION ABOUT TO BEGIN: the program, pending at
   -- the root, nothing yet allocated or owed.
   strong-begin : (o : Obs Timeline [] R) → Strong (U.subscribe o root) (begin o)
   strong-begin o = carried record
-    { tree    = pendingˢ o root
+    { sane    = sane-subscribe o root (λ ())
+    ; tree    = pendingˢ o root
     ; ctlAs   = Against.subAs here ([] , []ᴬ , same , refl , ≗-refl _) Against.bottomAs
     ; meets   = refl
     ; owned   = record { ofs = λ () ; plays = λ () ; begun = λ { here → Any.here refl } ; ends = λ () ; cuts = λ () ; feeds = λ () ; fins = λ ()

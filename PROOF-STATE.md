@@ -177,10 +177,12 @@ by their own silent steps (`Mirror`).
 ### Big picture tier roadmap
 
 - **THE STEPPER.** `residual-steps`: the ghost's next step is its
-  residual's least event, as a set, by `U.step`'s clauses against
-  `U.meaning`'s. Decides whether it holds of every node, or only of nodes a
-  run reaches (a joiner fed out of order, a source unsorted), the witness
-  then owing the ghost a well-formedness it does not yet carry.
+  residual's event, as a set, by `U.step`'s clauses against `U.meaning`'s,
+  of a `Sane` ghost. Ruled out: every node (a told joiner under a live
+  source). Decides whether `Sane` (joiners told exactly at their source's
+  end, lanes fresh) is all a run's configuration owes, and whether events
+  alike up to skips is a congruence for every stream function, as a feed
+  past a joiner's join shifts its skips.
 - **THE LEAST VALUE.** `note-least` with `note-onward`: the value a note
   records is the least the ghost holds, and past it the run runs the
   stepped ghost. Decides whether "least" is paid once as a field of
@@ -203,8 +205,8 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`residual-steps`** (Content) — FALSITY, `NO EVIDENCE`: the ghost's step is
-  its residual's least event, of every node.
+- **`residual-steps`** (Content) — FALSITY, `REFUTED`: the ghost's step is its
+  residual's event, of a `Sane` ghost.
 - **`note-least`** (Content) — FALSITY, `NO EVIDENCE`: a note records the least
   value the ghost holds.
 - **`note-onward`** (Content) — FALSITY, `NO EVIDENCE`: past a note the run

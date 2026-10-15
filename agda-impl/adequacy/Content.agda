@@ -50,7 +50,7 @@ module Honesty (R : Set) where
   open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; held; run; asking; bottom; spent?)
   open Heap using (_⊑_)
   open Recording R using (silent-keeps; value-notes)
-  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing)
+  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sane)
   open Strongly.Against R using (calmAs; noteAs; subAs; burstAs)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
@@ -229,11 +229,13 @@ module Honesty (R : Set) where
   if-silent false false = _ , refl
 
   postulate
-    -- THE STEPPER IS THE MEANING, event for event, as sets: the ghost's
-    -- next step is its residual's least event.  Stated of every node, the
-    -- ones no run reaches included: a joiner fed out of order, a
-    -- connect's source unsorted.
-    residual-steps : ∀ g → Steps (residual g) (U.step g)
+    -- THE STEPPER IS THE MEANING, event for event, as sets, of a run's
+    -- configuration (`Sane`): a joiner told its end while its source
+    -- runs is fed the source's values by the stepper and shows them,
+    -- where the meaning reads it as its end alone.
+    --
+    -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
+    residual-steps : ∀ g → Sane [] g → Steps (residual g) (U.step g)
 
     -- The turn, nothing held and no timer queued: the ghost shows
     -- nothing.
@@ -268,9 +270,9 @@ module Honesty (R : Set) where
   -- silently to the next, or records a least value of the residual, or
   -- ends it.  By the re-entry state.
   strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
-  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st) e =
+  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st sn) e =
     completeˢ (proj₂ e (proj₁ rs)) λ h → proj₂ rs (proj₁ e h)
-    where rs = subst (Steps (residual g)) st (residual-steps g)
+    where rs = subst (Steps (residual g)) st (residual-steps g sn)
   strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
     with Carried.ctlAs cr | Carried.meets cr | Books.paidUp (Carried.books cr) | Books.clocked (Carried.books cr)
        | Books.running (Carried.books cr)
@@ -279,7 +281,7 @@ module Honesty (R : Set) where
     | noteAs ks x K | g′ , _ , st | refl | ck | refl =
     valueˢ ck (proj₂ e (proj₁ rs)) (λ h → proj₂ e (proj₁ (proj₂ rs) h)) (λ h → proj₂ (proj₂ rs) (proj₁ e h))
       (note-least {g = g} cr refl st) (record { ghost = g′ ; same = ≋-refl ; mirror = note-onward {g = g} cr refl st refl })
-    where rs = subst (Steps (residual g)) st (residual-steps g)
+    where rs = subst (Steps (residual g)) st (residual-steps g (Carried.sane cr))
   strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
     | calmAs | _ | refl | _ | refl with ts
   ... | []    = drainedˢ λ h → turn-dry {g = g} cr refl refl refl (proj₁ e h)
