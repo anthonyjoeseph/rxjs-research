@@ -171,6 +171,8 @@ Every live postulate carries one. PROOF-STATE assigns; this file defines.
 
 **Only BANKING is held (Anthony).** Deleting, renaming, splitting, restating and reclassifying a row are all free. The one held move is a name leaving the postulate ledger while still declared in `agda-impl`.
 
+**Never attempted is the riskiest state (Anthony).** A postulate whose body has never been tried knows nothing about its own shape, and everything built since it was stated is a bet on that shape. Among rows of one class, an untried row outranks a probed one, and the longer the tree has moved around it, the more. Silence on a row is not safety.
+
 ### Tier order is law (Anthony)
 
 **Lower tiers finish first. Strictly — not "mostly", not "while a build runs".** Each tier is built ON the one below, so grinding an upper-tier statement while a lower tier is open bets on ground a design failure would move. **Carve-out: answering a DESIGN question** — cheap, and it aims the grind. Never grinding over one.
