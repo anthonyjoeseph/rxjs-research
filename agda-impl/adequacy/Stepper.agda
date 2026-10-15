@@ -399,6 +399,14 @@ shut-after c {ρ} (U.skipˢ k b)  = skip-same (sym (shut-meaning (here refl) c b
 shut-after c (U.endˢ e)         = ≃-refl (end e)
 shut-after c U.hushˢ            = ≃-refl hush
 
+-- A joiner told its source's end joined before it, once it has ended.
+shut-joined : ∀ {Γ A B} (i : A ∈ Γ) c (j : B ∈ Γ) p (ρ : NEnv Γ) {xs} → lookup ρ i ≡ end c
+            → Within (U.joinᶜ j p xs (U.told i c j p nothing (U.same? i j))) ρ → Within (U.joinᶜ j p xs nothing) ρ
+shut-joined i c j p ρ l w with U.same? i j in eq
+... | nothing   = w
+... | just refl with same-≡ i j eq
+... | refl rewrite l = tt
+
 mutual
   shut-placed : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placed (U.shut i c n) ρ → Placed n ρ
   shut-placed i c n ρ l (o , w) = subst Ordered (shut-meaning i c n ρ l) o , shut-within i c n ρ l w
@@ -412,7 +420,8 @@ mutual
   shut-within i c (U.scanᶜ f z n)           ρ l w = shut-placed i c n ρ l w
   shut-within i c (U.takeWhileᶜ k p n)      ρ l w = shut-placed i c n ρ l w
   shut-within i c (U.flatMapᶜ op g o ls qs) ρ l (wo , wl) = shut-placedᴹ i c o ρ l wo , shut-placedᴸ i c ls ρ l wl
-  shut-within i c (U.joinᶜ j p xs e)        ρ l w = tt
+  shut-within i c (U.joinᶜ j p xs (just e)) ρ l w = tt
+  shut-within i c (U.joinᶜ j p xs nothing)  ρ l w = shut-joined i c j p ρ l w
   shut-within i c (U.connectᶜ b (U.live s)) ρ l (wb , ws) =
     shut-placed (there i) c b (U.meaning s ρ ∷ᴬ ρ) l (subst (λ x → Placed (U.shut (there i) c b) (x ∷ᴬ ρ)) (shut-meaning i c s ρ l) wb)
     , shut-placed i c s ρ l ws
@@ -524,8 +533,11 @@ postulate
         → Placed b (x ∷ᴬ ρ) → Placed b (y ∷ᴬ ρ) → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning b (y ∷ᴬ ρ)
 
   -- A BODY FED ITS SOURCE'S STEP IS ALIKE THE BODY READING IT: a joiner
-  -- fed the value its source shows at `q`, reading the source past it.
+  -- fed the value its source shows at `q`, reading the source past it,
+  -- the body's meaning showing nothing before the value.  A joiner the
+  -- body makes later is never fed, so it must join after the value.
   --
+  -- REFUTED: 69f610c0 stated without the body's meaning after the value, by a body joining its source later
   -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
   --   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
   --   (`M.rejoin`), and a value from before its join as a skip; the
@@ -543,7 +555,8 @@ postulate
   --   can keep the count a lane's pre-join skips need.
   -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
   fed-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) q (a : A) (l : Events∞ A) {x : Events A} → x ≃ out q a l
-        → Ordered x → Ordered (out q a l) → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
+        → Ordered x → Ordered (out q a l) → M.before (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ)) ≡ true
+        → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
         → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
 
   -- A skip atop what follows it is forgotten.
@@ -556,6 +569,8 @@ postulate
 
   -- A NODE'S MEANING LEADS NOTHING: whatever it shows comes after `j`,
   -- which comes before its step and its sources'.
+  --
+  -- REFUTED: 07140662 over a placing without the joiners' order, by a joiner placed at its source's next step
   leads : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ j
         → U.beforeˢ j (U.step c) ≡ true → First (just j) δ → M.before j (U.meaning c (ρᴱ δ)) ≡ true
 
@@ -624,7 +639,7 @@ conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs
   go sb (U.outˢ q x s′) hb hs lg ld pab pas@(_ , ps′) (_ , _ , pbf , _) fi | true =
     ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) ordOut (≃-refl MB) e₁)
    (≃-trans (ahead-lead MB (q ++ [ ix 0 ]) _ _ (ld (q ++ [ ix 0 ]) eq (wins-self q) fi))
-            (skip-cong (beside-≃ (proj₁ pb) (proj₁ pbf) (proj₁ ps′) (proj₁ ps′) (fed-≃ b ρ q x _ e₁ (proj₁ ps) ordOut pb pbf) (≃-refl _))))
+            (skip-cong (beside-≃ (proj₁ pb) (proj₁ pbf) (proj₁ ps′) (proj₁ ps′) (fed-≃ b ρ q x _ e₁ (proj₁ ps) ordOut (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) pb pbf) (≃-refl _))))
     where e₁ = hs (first-sub q δ fi)
           ordOut = ordered-after ρ (U.outˢ q x s′) (pas)
   go sb (U.skipˢ q s′) hb hs lg ld pab pas pa fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
