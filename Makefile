@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain leaves bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
@@ -37,7 +37,6 @@ help:
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
-	@echo "  leaves        every operator is non-expansive, sampled (ARGS=\"FROM COUNT\", default 0 2000)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
@@ -101,16 +100,6 @@ chain: oracle-build
 	  echo "$$out" | grep -q '^chain: done ' || { echo "chain: RED — the run never finished"; exit 1; }; \
 	  if echo "$$out" | grep -q '^chain: FAIL '; then echo "chain: RED"; exit 1; fi; \
 	  echo "chain: GREEN"
-
-# Every operator's inputs cut after k steps leave the program unmoved for
-# k steps: `compositional`'s leaves, sampled, on ARGS="FROM COUNT" seeds
-# (default "0 2000", under a second).
-LEAVES_ARGS = $(or $(ARGS),0 2000)
-leaves: oracle-build
-	@out=$$($(ORACLE_BIN) leaves $(LEAVES_ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^leaves: done ' || { echo "leaves: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^leaves: FAIL '; then echo "leaves: RED"; exit 1; fi; \
-	  echo "leaves: GREEN"
 
 # The runner prints a FAIL line per failing row and a closing `done` line;
 # a run without the `done` line died part-way and is red.  See

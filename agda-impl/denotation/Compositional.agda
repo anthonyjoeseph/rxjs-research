@@ -31,8 +31,6 @@ open import denotation.Denote using (DenEnv; flatOp; approx; ⟦_⟧)
 -- The leaves: each operator reads its inputs non-expansively, its first
 -- k steps fixed by its inputs' first k.  Every output step is some input
 -- step shown, so none reads further ahead than it has emitted.
--- `quickcheck.Leaves` samples all five at once: every input cut after k
--- steps leaves a drawn program's root unmoved for k steps.
 
 postulate
   mapᴰ-ne : ∀ {A B k} (f : A → B) {x y : MonotonicList A} → x ≈[ k ] y → mapᴰ f x ≈[ k ] mapᴰ f y

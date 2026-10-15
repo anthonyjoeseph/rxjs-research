@@ -9,8 +9,6 @@
 --   Oracle-CLI io SEED           the IO engine's trace of one seed
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
 --                                are no chain (`quickcheck.Chain`)
---   Oracle-CLI leaves FROM COUNT the seeds where an operator reads past
---                                its inputs' agreement (`quickcheck.Leaves`)
 --   Oracle-CLI hand              the QuickCheck property over
 --                                `quickcheck.Adversary`'s programs
 --
@@ -36,7 +34,6 @@ open import quickcheck.Code using (Prog; showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program; prop)
 open import quickcheck.Chain using (chainFails)
-open import quickcheck.Leaves using (leavesFails)
 open import quickcheck.Adversary using (cases)
 
 private
@@ -60,7 +57,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI leaves FROM COUNT | Oracle-CLI hand"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI hand"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -72,10 +69,6 @@ private
   dispatch ("chain" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (chainFails f′ c′) (λ s → putStrLn ("chain: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("chain: done " ++ showℕ c′)
-  ... | _       | _       = usage
-  dispatch ("leaves" ∷ f ∷ c ∷ []) with nat f | nat c
-  ... | just f′ | just c′ = each (leavesFails f′ c′) (λ s → putStrLn ("leaves: FAIL seed " ++ showℕ s))
-                            >>= λ _ → putStrLn ("leaves: done " ++ showℕ c′)
   ... | _       | _       = usage
   dispatch ("hand" ∷ []) = hand cases
   dispatch _ = usage

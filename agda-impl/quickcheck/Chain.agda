@@ -20,20 +20,10 @@ open import quickcheck.Oracle using (depth)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (natᵗ)
 
--- The same position: neither below the other.
-samePos : Pos → Pos → Bool
-samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
-
--- `k` steps exactly alike.
-agrees : ℕ → Events ℕ → Events ℕ → Bool
-agrees zero    _           _           = true
-agrees (suc k) (out p a l) (out q b r) = samePos p q ∧ (a ≡ᵇ b) ∧ agrees k (Events∞.force l) (Events∞.force r)
-agrees (suc k) (skip p l)  (skip q r)  = samePos p q ∧ agrees k (Events∞.force l) (Events∞.force r)
-agrees (suc k) (end p)     (end q)     = samePos p q
-agrees (suc k) hush        hush        = true
-agrees (suc k) _           _           = false
-
 private
+  samePos : Pos → Pos → Bool
+  samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
+
   -- `k` steps of nothing but `skip`s.
   spins : ℕ → Events ℕ → Bool
   spins zero    _          = true
@@ -53,6 +43,15 @@ private
   below (suc k) (end p)     (end q)     = samePos p q
   below (suc k) hush        hush        = true
   below (suc k) l           r           = spins (suc k) l
+
+  -- `k` steps exactly alike.
+  agrees : ℕ → Events ℕ → Events ℕ → Bool
+  agrees zero    _           _           = true
+  agrees (suc k) (out p a l) (out q b r) = samePos p q ∧ (a ≡ᵇ b) ∧ agrees k (Events∞.force l) (Events∞.force r)
+  agrees (suc k) (skip p l)  (skip q r)  = samePos p q ∧ agrees k (Events∞.force l) (Events∞.force r)
+  agrees (suc k) (end p)     (end q)     = samePos p q
+  agrees (suc k) hush        hush        = true
+  agrees (suc k) _           _           = false
 
   every : (ℕ → Bool) → List ℕ → Bool
   every f []       = true
