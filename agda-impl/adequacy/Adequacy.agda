@@ -27,7 +27,10 @@ run {A} o = limit λ n → Machine.prefix A n o
 -- RECOVERY: git show 1222f49a restores the simulation this was proven
 --   over (the adequacy Simulation, Carrier, Kept and Wait modules), the
 --   stepper Unfold and its link to the fold, the positional Placed, the
---   per-observer Ghost and Spin checks, and the limit's least-upper-bound
---   proof in the Order module.
+--   per-observer Ghost and Spin checks, the limit's least-upper-bound
+--   proof in the Order module, and the Placing check of the machine's
+--   trace against the meaning's events, positions included, which the
+--   bug cache also ran (a meaning silent where the machine works agrees
+--   with it by ticks, and only positions see it).
 postulate
   adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)

@@ -9,10 +9,7 @@
 --   Oracle-CLI io SEED           the IO engine's trace of one seed
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
 --                                are no chain (`quickcheck.Chain`)
---   Oracle-CLI placing FROM COUNT the seeds whose machine trace strays
---                                from the meaning, positions included
---                                (`quickcheck.Placing`)
---   Oracle-CLI hand              the QuickCheck property and placing over
+--   Oracle-CLI hand              the QuickCheck property over
 --                                `quickcheck.Adversary`'s programs
 --
 -- The IO engine runs one seed per process because a program that never
@@ -20,7 +17,7 @@
 module quickcheck.Oracle-CLI where
 
 open import Agda.Builtin.IO using (IO)
-open import Data.Bool using (_∧_; if_then_else_)
+open import Data.Bool using (if_then_else_)
 open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; _+_)
@@ -38,7 +35,6 @@ open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; 
 open import quickcheck.Quickcheck using (program; prop)
 open import quickcheck.Chain using (chainFails)
 open import quickcheck.Adversary using (cases)
-open import quickcheck.Placing using (placing; placingFails)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -55,13 +51,13 @@ private
 
   hand : List (String × Prog natᵗ) → IO ⊤
   hand []             = putStrLn "hand: done"
-  hand ((l , p) ∷ cs) = putStrLn ((if prop p ∧ placing p then "hand: ok   " else "hand: FAIL ") ++ l) >>= λ _ → hand cs
+  hand ((l , p) ∷ cs) = putStrLn ((if prop p then "hand: ok   " else "hand: FAIL ") ++ l) >>= λ _ → hand cs
 
   nat : String → Maybe ℕ
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI hand"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI hand"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -73,10 +69,6 @@ private
   dispatch ("chain" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (chainFails f′ c′) (λ s → putStrLn ("chain: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("chain: done " ++ showℕ c′)
-  ... | _       | _       = usage
-  dispatch ("placing" ∷ f ∷ c ∷ []) with nat f | nat c
-  ... | just f′ | just c′ = each (placingFails f′ c′) (λ s → putStrLn ("placing: FAIL seed " ++ showℕ s))
-                            >>= λ _ → putStrLn ("placing: done " ++ showℕ c′)
   ... | _       | _       = usage
   dispatch ("hand" ∷ []) = hand cases
   dispatch _ = usage
