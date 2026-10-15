@@ -58,19 +58,19 @@ open Ordered public
 data Ext (k : Pos) : Pos → Set where
   ext : ∀ l ls → Ext k (k ++ l ∷ ls)
 
--- `e`'s first is no proper extension of `k`.
-Apart : ∀ {A} → Pos → Events A → Set
-Apart k (out h _ _) = ¬ Ext k h
-Apart k (skip h _)  = ¬ Ext k h
-Apart k (end h)     = ¬ Ext k h
-Apart k hush        = ⊤
-
 -- `e`'s first is strictly past `k`, and no proper extension of it.
 Past : ∀ {A} → Pos → Events A → Set
 Past k (out h _ _) = k <ᵖ h ≡ true × ¬ Ext k h
 Past k (skip h _)  = k <ᵖ h ≡ true × ¬ Ext k h
 Past k (end h)     = k <ᵖ h ≡ true × ¬ Ext k h
 Past k hush        = ⊤
+
+-- `e`'s first no proper extension of `k`, and strictly past it if a value.
+Clear : ∀ {A} → Pos → Events A → Set
+Clear k (out h _ _) = k <ᵖ h ≡ true × ¬ Ext k h
+Clear k (skip h _)  = ¬ Ext k h
+Clear k (end h)     = ¬ Ext k h
+Clear k hush        = ⊤
 
 -- Never a step inside the position just left, and never one tied with
 -- a value.  A rejoin keys a source's event at `q` under `q`, so a
@@ -79,7 +79,7 @@ Past k hush        = ⊤
 mutual
   Steadies : ∀ {A} → Events A → Set
   Steadies (out k _ r) = Past k (force r) × Steady (force r)
-  Steadies (skip k r)  = Apart k (force r) × Steady (force r)
+  Steadies (skip k r)  = Clear k (force r) × Steady (force r)
   Steadies (end _)     = ⊤
   Steadies hush        = ⊤
 
@@ -829,6 +829,7 @@ postulate
   -- empty position, where its own steps would sit at bare ticks.
   --
   -- REFUTED: 91953190 at the empty position, a lane's timer frame shown just inside the outer's step at its tick
+  -- REFUTED: 42e70878 over sources stepping and then emitting at one position, a takeWhile showing the value inside the step
   steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
              → Steady (U.meaning (U.subscribe o p) ρ)
 
