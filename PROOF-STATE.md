@@ -214,8 +214,8 @@ by their own silent steps (`Mirror`).
   subscribed at the root is placed.
 - **`placed-after`** (Stepper) — FALSITY, `REFUTED×2`: a step keeps the ghost
   placed.
-- **`leads`** (Stepper) — FALSITY, `REFUTED`: a node's meaning shows only skips
-  at an earlier step, and nothing before it.
+- **`leads`** (Stepper) — FALSITY, `REFUTED×2`: a node's meaning shows only
+  skips at an earlier step, and nothing before it.
 - **`lags-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning shows
   nothing before a body's event that comes first, its sources a step past.
 - **`go-skips`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning is

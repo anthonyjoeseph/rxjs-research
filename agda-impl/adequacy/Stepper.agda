@@ -754,7 +754,8 @@ postulate
   -- meet; an event there would come ahead of the source's tied step.
   --
   -- REFUTED: 07140662 strictly after `j`, by a joiner placed at its source's next step
-  leads : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ j
+  -- REFUTED: 7d5d0332 stated without the node sane, by a joiner untold of an ended source
+  leads : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ) → ∀ j
         → U.beforeˢ j (U.step c) ≡ true → First (just j) δ → Tied j (U.meaning c (ρᴱ δ))
 
   -- A STEP KEEPS THE GHOST PLACED: a step coming first leaves the stepped
@@ -999,10 +1000,10 @@ mutual
   live-skips : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) → Settled δ
              → Sane (flags δ) (U.connectᶜ b (U.live s)) → Placed (U.connectᶜ b (U.live s)) (ρᴱ δ)
              → Shows b (U.live s ∷ δ) → Shows s δ → Shows (U.connectᶜ b (U.live s)) δ
-  live-skips b s δ st sn@(_ , sns) pl@(_ , pb , ps) hb hs =
+  live-skips b s δ st sn@(sbn , sns) pl@(_ , pb , ps) hb hs =
     conn b s δ st sn pl (U.step b) (U.step s) (λ w f → hb (w , f)) hs
          (λ k w f → lags s δ st sns ps k w (first-under k δ f))
-         (λ j bj w f → leads b (U.live s ∷ δ) (hs , ps , lags₂ s δ st hs sns ps , st) pb j bj (w , f))
+         (λ j bj w f → leads b (U.live s ∷ δ) (hs , ps , lags₂ s δ st hs sns ps , st) sbn pb j bj (w , f))
          (placed-after s δ st sns ps)
 
   os : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ) → Shows c δ
