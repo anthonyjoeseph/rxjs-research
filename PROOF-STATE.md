@@ -177,16 +177,14 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `emit-onward` and `sub-onward`, then the other
-  `-onward` leaves and `burst-poll`, carry liveness: each silent hop
-  passes a skip, shows a value, or leaves the ghost alike with less work
-  left. `emit-onward` first: an `of`'s value climbs the observers along
-  its `Path` to a note, a skip or an end. Decides whether that climb is
-  one induction on the path, the walk `walk` already is, with each
-  operator's step a lemma. Ruled out: a resume needing anything but the
-  frame it pops (proven); a measure blind to a cut, a continuation or a
-  frame (the control's `weight`); a queue bound on joiners, which a
-  scope's return breaks; a polled burst as a re-entry state.
+- **THE PROGRESS.** `emit-open` and `climb-take`, then `sub-onward`, the
+  other `-onward` leaves and `burst-poll`, carry liveness. The climb is one
+  height induction over a snoc view of the path, map, defer, body and root
+  proven; decides whether each operator's side condition in `Lifts` is an
+  ordering fact the ghost already holds. Ruled out: a climb blind to a
+  dead body (split out as `emit-unseen`), a take stopping at its last
+  value, a resume needing more than the frame it pops, a measure blind to
+  a cut, a queue bound on joiners, a polled burst as a re-entry state.
 - **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
@@ -261,8 +259,25 @@ by their own silent steps (`Mirror`).
   value the ghost holds.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
-- **`emit-onward`** (Content) — FALSITY, `NO EVIDENCE`: an `of`'s next value
-  climbs its observers to a note, a skip or an end.
+- **`emit-open`** (Content) — FALSITY, `NO EVIDENCE`: an open, seen `of`'s next
+  value lifts along its path, each frame's side condition holding, and the
+  climb starts aloft.
+- **`climb-take`** (Content) — FALSITY, `NO EVIDENCE`: a take's last value
+  climbs on into its completion; the height measure alone would rise there.
+- **`emit-unseen`** (Content) — FALSITY, `NO EVIDENCE`: an `of` emitting into
+  joiners the ghost no longer sees, after a connect's body ended.
+- **`climb-lanes`** (Content) — FALSITY, `NO EVIDENCE`: a lane's value climbs
+  into its flatMap through `wkObs same`, equal up to `≗`.
+- **`climb-scan`** (Content) — FALSITY, `NO EVIDENCE`: a scan writes its cell
+  and climbs on; the heap frame for the written cell is the content.
+- **`climb-outer`** (Content) — FALSITY, `NO EVIDENCE`: an outer value opens a
+  lane and stops at the subscription it begins.
+- **`climb-source`** (Content) — FALSITY, `NO EVIDENCE`: a connect source's
+  value feeds its subject's joiners and stops there.
+- **`emit-shut`** (Content) — FALSITY, `NO EVIDENCE`: an `of` whose observer
+  path is closed skips its value.
+- **`emit-last`** (Content) — FALSITY, `NO EVIDENCE`: an `of` with nothing left
+  completes and climbs to its end.
 - **`sub-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription begun
   runs its kernel to the next re-entry state.
 - **`feed-onward`** (Content) — FALSITY, `NO EVIDENCE`: the rest of a connect's
