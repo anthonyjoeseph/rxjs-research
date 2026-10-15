@@ -547,35 +547,36 @@ x ≈ y = ∀ k → x ≈[ k ] y
 Settling : ∀ {A} → (ℕ → MonotonicList A) → Set
 Settling c = ∀ n → c n ≈[ n ] c (suc n)
 
+-- Agreeing for k steps is an equivalence, and implies agreeing for fewer.
+agree-refl : ∀ {A} k (x : Events A) → Agree k x x
+agree-refl zero    x           = stop
+agree-refl (suc k) (out p a l) = out⁼ (agree-refl k (force l))
+agree-refl (suc k) (skip p l)  = skip⁼ (agree-refl k (force l))
+agree-refl (suc k) (end p)     = end⁼
+agree-refl (suc k) hush        = hush⁼
+
+agree-sym : ∀ {A k} {x y : Events A} → Agree k x y → Agree k y x
+agree-sym stop      = stop
+agree-sym (out⁼ a)  = out⁼ (agree-sym a)
+agree-sym (skip⁼ a) = skip⁼ (agree-sym a)
+agree-sym end⁼      = end⁼
+agree-sym hush⁼     = hush⁼
+
+agree-trans : ∀ {A k} {x y z : Events A} → Agree k x y → Agree k y z → Agree k x z
+agree-trans stop      _         = stop
+agree-trans (out⁼ a)  (out⁼ b)  = out⁼ (agree-trans a b)
+agree-trans (skip⁼ a) (skip⁼ b) = skip⁼ (agree-trans a b)
+agree-trans end⁼      end⁼      = end⁼
+agree-trans hush⁼     hush⁼     = hush⁼
+
+agree-pred : ∀ {A k} {x y : Events A} → Agree (suc k) x y → Agree k x y
+agree-pred {k = zero}  _         = stop
+agree-pred {k = suc k} (out⁼ a)  = out⁼ (agree-pred a)
+agree-pred {k = suc k} (skip⁼ a) = skip⁼ (agree-pred a)
+agree-pred {k = suc k} end⁼      = end⁼
+agree-pred {k = suc k} hush⁼     = hush⁼
+
 private
-  agree-refl : ∀ {A} k (x : Events A) → Agree k x x
-  agree-refl zero    x           = stop
-  agree-refl (suc k) (out p a l) = out⁼ (agree-refl k (force l))
-  agree-refl (suc k) (skip p l)  = skip⁼ (agree-refl k (force l))
-  agree-refl (suc k) (end p)     = end⁼
-  agree-refl (suc k) hush        = hush⁼
-
-  agree-sym : ∀ {A k} {x y : Events A} → Agree k x y → Agree k y x
-  agree-sym stop      = stop
-  agree-sym (out⁼ a)  = out⁼ (agree-sym a)
-  agree-sym (skip⁼ a) = skip⁼ (agree-sym a)
-  agree-sym end⁼      = end⁼
-  agree-sym hush⁼     = hush⁼
-
-  agree-trans : ∀ {A k} {x y z : Events A} → Agree k x y → Agree k y z → Agree k x z
-  agree-trans stop      _         = stop
-  agree-trans (out⁼ a)  (out⁼ b)  = out⁼ (agree-trans a b)
-  agree-trans (skip⁼ a) (skip⁼ b) = skip⁼ (agree-trans a b)
-  agree-trans end⁼      end⁼      = end⁼
-  agree-trans hush⁼     hush⁼     = hush⁼
-
-  agree-pred : ∀ {A k} {x y : Events A} → Agree (suc k) x y → Agree k x y
-  agree-pred {k = zero}  _         = stop
-  agree-pred {k = suc k} (out⁼ a)  = out⁼ (agree-pred a)
-  agree-pred {k = suc k} (skip⁼ a) = skip⁼ (agree-pred a)
-  agree-pred {k = suc k} end⁼      = end⁼
-  agree-pred {k = suc k} hush⁼     = hush⁼
-
   agree-≤ : ∀ {A m n} {x y : Events A} → m ≤′ n → Agree n x y → Agree m x y
   agree-≤ ≤′-refl       a = a
   agree-≤ (≤′-step m≤n) a = agree-≤ m≤n (agree-pred a)
@@ -627,7 +628,7 @@ private
     settle-agree {es = es} (settled s (1≤′suc m))
       (diag-limit {es = λ n → rest (es (suc n))} (λ n → agree-rest (s (suc n))) m)
 
--- Agreeing for k steps is an equivalence, and implies agreeing for fewer.
+-- The same, at every subscription.
 ≈ₖ-refl : ∀ {A k} (x : MonotonicList A) → x ≈[ k ] x
 ≈ₖ-refl x = agrees λ p → agree-refl _ (observe x p)
 

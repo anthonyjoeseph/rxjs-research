@@ -20,9 +20,8 @@ open import denotation.Denote using (⟦_⟧)
 run : ∀ {A} → PureObs [] A → ML A
 run {A} o = limit λ n → Machine.prefix A n o
 
--- Postulated bare until `denotation.Compositional` is proven: a proof
--- here is built on `MonotonicList`'s definition, which compositionality
--- may still move.
+-- A proof here is built on `MonotonicList`'s definition, and may change
+-- it only where `denotation.Compositional.compositional` still checks.
 --
 -- RECOVERY: git show 1222f49a restores the simulation this was proven
 --   over (the adequacy Simulation, Carrier, Kept and Wait modules), the

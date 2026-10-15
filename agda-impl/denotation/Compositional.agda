@@ -8,8 +8,8 @@
 -- The assembly: the approximants settle (`settles`), each approximant
 -- reads its environment non-expansively (`approx-ne`), so each clause is
 -- the operator's approximant moved to the limit by its non-expansiveness.
--- The leaves are the operators' non-expansiveness, one per operator, and
--- `deferᴰ` is not a leaf: it is contractive outright.
+-- The operators' non-expansiveness is `denotation.NonExpansive`'s, and
+-- `deferᴰ` is contractive outright.
 module denotation.Compositional where
 
 open import Data.List using (List; _∷_; []; _++_; [_])
@@ -17,7 +17,6 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_; []; lookup)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Bool using (Bool)
 open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (refl)
 
@@ -26,29 +25,7 @@ open import denotation.MonotonicList using (MonotonicList; Timeline; coldᴰ; ix
   Contractive; lub-limit; ≈ₖ-refl; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; emptyᴰ; ofᴰ; mapᴰ; scanᴰ;
   takeWhileᴰ; flatMapᴰ; connectᴰ; deferᴰ)
 open import denotation.Denote using (DenEnv; flatOp; approx; ⟦_⟧)
-
-------------------------------------------------------------------------
--- The leaves: each operator reads its inputs non-expansively, its first
--- k steps fixed by its inputs' first k.  Every output step is some input
--- step shown, so none reads further ahead than it has emitted.
-
-postulate
-  mapᴰ-ne : ∀ {A B k} (f : A → B) {x y : MonotonicList A} → x ≈[ k ] y → mapᴰ f x ≈[ k ] mapᴰ f y
-
-  scanᴰ-ne : ∀ {A B k} (f : B → A → B) z {x y : MonotonicList A} → x ≈[ k ] y → scanᴰ f z x ≈[ k ] scanᴰ f z y
-
-  takeWhileᴰ-ne : ∀ {A k} i (p : A → Bool) {x y : MonotonicList A} → x ≈[ k ] y → takeWhileᴰ i p x ≈[ k ] takeWhileᴰ i p y
-
-  -- The lanes are read at the positions the outer's elements subscribe
-  -- them, so agreeing lanes are asked for at EVERY element, not only the
-  -- ones a run reaches.
-  flatMapᴰ-ne : ∀ {A B k} op {f g : A → MonotonicList B} {x y : MonotonicList A}
-              → x ≈[ k ] y → (∀ a → f a ≈[ k ] g a) → flatMapᴰ op f x ≈[ k ] flatMapᴰ op g y
-
-  -- The body is handed the hot source, so agreeing bodies are asked for
-  -- at agreeing handles, not one shared handle.
-  connectᴰ-ne : ∀ {A B k} {x y : MonotonicList A} {f g : MonotonicList A → MonotonicList B}
-              → x ≈[ k ] y → (∀ {r r′} → r ≈[ k ] r′ → f r ≈[ k ] g r′) → connectᴰ x f ≈[ k ] connectᴰ y g
+open import denotation.NonExpansive using (mapᴰ-ne; scanᴰ-ne; takeWhileᴰ-ne; flatMapᴰ-ne; connectᴰ-ne)
 
 -- A `defer` shows a skip before its body, so it settles one step more.
 deferᴰ-contractive : ∀ {A} → Contractive (deferᴰ {A})

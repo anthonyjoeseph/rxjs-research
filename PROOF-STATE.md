@@ -1,7 +1,7 @@
 # PROOF-STATE — the roadmap
 
 **What this file is.** The ordered worklist for the one goal: discharging the
-four tiers below — no postulates, everything typechecks. This file holds the SCHEDULE — each tier's
+three tiers below — no postulates, everything typechecks. This file holds the SCHEDULE — each tier's
 next legs — over a LEDGER of one-line hooks; everything else lives in the
 code.
 
@@ -157,68 +157,32 @@ its proven precedent in the postulate's own `TWIN:` — if the hook here cannot
 point at one, the row is FALSITY.
 
 
-## Tier 1 — compositionality
-
-**THE MEANING IS COMPOSITIONAL.** `compositional`: each node's meaning is
-its operator's `MonotonicList` function applied to its children's
-meanings, up to `_≈_`. Its body is assembled: the approximants settle,
-each reads its environment non-expansively, and `deferᴰ` is contractive.
-The leaves are the operators' non-expansiveness, `_≈[_]_` at every
-subscription position. This tier fixes `MonotonicList` before adequacy
-is built on it, so a leaf's refutation may move the definition.
-
-### Big picture tier roadmap
-
-- **FLATMAP'S LANE BUDGET.** `flatMapᴰ-ne` as a body over `go`'s cases:
-  every lane in flight agrees for at least the output's remaining steps,
-  kept through `admit`'s queue, `switch` dropping a lane, and `earliest`
-  reading every lane's head. Decides whether one budget per lane is the
-  invariant, or `flatMapᴰ` must change.
-- **CONNECT'S INTERLEAVING.** `connectᴰ-ne` over `rejoin` and `beside`:
-  a late joiner's skipped prefix is one skip per source step, and
-  `before` reads one step of each side. Decides whether the same budget
-  invariant carries the hot handle.
-- **THE UNARY OPERATORS.** `mapᴰ-ne`, `scanᴰ-ne`, `takeWhileᴰ-ne`, each
-  by coinduction on `Agree`, one output step per input step. Last: none
-  can move the currency.
-
-### The ledger
-
-- **`flatMapᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: lanes join
-  mid-run, queue, and drop; the earliest is chosen by every lane's head.
-- **`connectᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: the body and the
-  source interleave, each read one step ahead.
-- **`takeWhileᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: one output step
-  per input step, ending early.
-- **`scanᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: one output step per
-  input step.
-- **`mapᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: one output step per
-  input step.
-
-## Tier 2 — the adequacy theorem
+## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the meaning observed at
-the root, positions forgotten down to ticks. Postulated bare until Tier 1
-fixes `MonotonicList`.
+the root, positions forgotten down to ticks. The meaning is compositional
+(`compositional`, proven), so a route may change `MonotonicList` only
+where `compositional` still checks.
 
 ### Big picture tier roadmap
 
-- **RECOVER WHAT STILL FITS.** Once Tier 1 lands, read the simulation its
-  header's `RECOVERY` names against the settled `MonotonicList`, and
-  restate `adequacy` as a body over whichever of its leaves survive.
+- **RECOVER WHAT STILL FITS.** Read the simulation the header's
+  `RECOVERY` names against the current `MonotonicList`, and restate
+  `adequacy` as a body over whichever of its leaves survive. Decides
+  whether the old weak simulation is still the route.
 
 ### The ledger
 
 - **`adequacy`** (Adequacy) — FALSITY, `RECOVERY`: the machine's run and the
   fold show the same.
 
-## Tier 3 — the simultaneous spec
+## Tier 2 — the simultaneous spec
 
 **THE STATEMENT.** Define the new "simultaneous" spec over the denotation,
 adapted from the old `agda/` tree's statement modules (reference only). No
 rows until the statements exist; each lands as a postulate here.
 
-## Tier 4 — the simultaneous spec, proven
+## Tier 3 — the simultaneous spec, proven
 
-**THE PROOF.** Discharge Tier 3's statements using the denotation and
-`adequacy`. No rows until Tier 3 states them.
+**THE PROOF.** Discharge Tier 2's statements using the denotation and
+`adequacy`. No rows until Tier 2 states them.
