@@ -14,8 +14,8 @@ open import Data.Nat using (ℕ; zero; suc; _<ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
-open import denotation.MonotonicList using (MonotonicList; Events; Events∞; Agree; agree-refl; mapᴰ; scanᴰ; takeWhileᴰ; scanᴱ;
-  takeWhileᴱ; taking; connectᴰ; hot; rejoin; beside; ahead; before; stop; out⁼; skip⁼; end⁼;
+open import denotation.MonotonicList using (MonotonicList; Events; Events∞; hush; Agree; agree-refl; mapᴰ; scanᴰ; takeWhileᴰ; scanᴱ;
+  takeWhileᴱ; taking; connectᴰ; hot; rejoin; beside; ahead; hushed; before; stop; out⁼; skip⁼; end⁼;
   hush⁼; agree-pred; _≈[_]_; agrees; agree; ≈ₖ-pred; ix; _<ᵖ_; mapᴱ; FlatOp; mergeᶠ; switchᶠ;
   exhaustᶠ; head; Earliest; none; found; earliest; admit; go; viaOuter; race; outer; lane;
   flatMapᴰ)
@@ -132,7 +132,8 @@ mutual
     ahead-ne (before (q ++ [ ix 0 ]) b) (before (q ++ [ ix 0 ]) b′) (before-agree (q ++ [ ix 0 ]) bb) bb a
   beside-ne {m = suc m} {b} {b′} bb (skip⁼ {p = q} a) =
     ahead-ne (before (q ++ [ ix 0 ]) b) (before (q ++ [ ix 0 ]) b′) (before-agree (q ++ [ ix 0 ]) bb) bb a
-  beside-ne {m = suc m} bb end⁼  = bb
+  beside-ne {m = suc m} {b} {b′} bb (end⁼ {p = c}) =
+    ahead-ne {s = hushed} {s′ = hushed} (before (c ++ [ ix 0 ]) b) (before (c ++ [ ix 0 ]) b′) (before-agree (c ++ [ ix 0 ]) bb) bb (agree-refl m hush)
   beside-ne {m = suc m} bb hush⁼ = bb
 
   -- The flag is `before` of each side, equal because the bodies agree.

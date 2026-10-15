@@ -248,7 +248,7 @@ module Strongly (R : Set) where
       -- Joined at `j`: the registered sink and its flag, and what the
       -- meaning has fed it and not yet shown, with where it ends once
       -- told; gone once its completion is delivered.
-      joinˢ      : ∀ {Δ A} → Pos → Sink h A → Ref h (base Bool) → A ∈ Δ → Maybe (List (Pos × A) × Maybe Pos) → Sub h Δ A
+      joinˢ      : ∀ {Δ A} → Pos → Sink h A → Ref h (base Bool) → A ∈ Δ → Maybe (List (Pos × Maybe A) × Maybe Pos) → Sub h Δ A
       -- A `defer` reached: the unsubscribe it stashed once its body's
       -- subscription exists, its body.
       deferˢ     : ∀ {Δ A} → Maybe (Quiet h) → Sub h Δ A → Sub h Δ A
@@ -537,7 +537,7 @@ module Strongly (R : Set) where
     connected nothing  nothing  (just b) = nothing
 
     -- A joiner shows what it holds until it is gone.
-    joinedᶜ : ∀ {Δ A} → A ∈ Δ → Pos → Maybe (List (Pos × A) × Maybe Pos) → Maybe (U.Node Δ A)
+    joinedᶜ : ∀ {Δ A} → A ∈ Δ → Pos → Maybe (List (Pos × Maybe A) × Maybe Pos) → Maybe (U.Node Δ A)
     joinedᶜ x j nothing          = nothing
     joinedᶜ x j (just (xs , e))  = just (U.joinᶜ x j xs e)
 
@@ -588,14 +588,14 @@ module Strongly (R : Set) where
 
     -- What the meaning has fed a joiner at `j` and the run still owes it:
     -- the value, under the joiner's position; the completion, likewise.
-    owing : ∀ {A : Set} → Feed A h → Pos → Maybe (List (Pos × A) × Maybe Pos)
+    owing : ∀ {A : Set} → Feed A h → Pos → Maybe (List (Pos × Maybe A) × Maybe Pos)
     owing idle             j = just ([] , nothing)
-    owing (feeding x q ss) j = just ((q ++ [ subᴾ j ] , x) ∷ [] , nothing)
+    owing (feeding x q ss) j = just ((q ++ [ subᴾ j ] , just x) ∷ [] , nothing)
     owing (finishing q ss) j = just ([] , just (q ++ [ subᴾ j ]))
 
     -- Owed nothing: still waiting while its source runs, gone once the
     -- source has ended.
-    owingNone : ∀ {A : Set} → Maybe Pos → Maybe (List (Pos × A) × Maybe Pos)
+    owingNone : ∀ {A : Set} → Maybe Pos → Maybe (List (Pos × Maybe A) × Maybe Pos)
     owingNone nothing  = just ([] , nothing)
     owingNone (just c) = nothing
 

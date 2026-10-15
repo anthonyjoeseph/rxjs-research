@@ -143,3 +143,6 @@ jobs:
 
       - name: make oracle
         run: make oracle
+
+      - name: make stepping
+        run: make stepping

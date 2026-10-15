@@ -564,13 +564,13 @@ deferᴰ s = cold λ p → skip (p ++ [ ix 0 ]) λ where .force → observe s (p
 -- works, and one working forever is never silent.  Each source step at
 -- `q` shows at its first effect, the subject taking it, before anything
 -- the subject delivers: so no event sits above another, which rekeying
--- a hot under `sub` needs to keep the order.  The body's end ends both;
--- once the source is done, the body runs alone.
+-- a hot under `sub` needs to keep the order; its end likewise, once.  The
+-- body's end ends both; once the source is done, the body runs alone.
 mutual
   beside : ∀ {A B} → Events B → Events A → Events B
   beside b (out q _ s) = ahead b (q ++ [ ix 0 ]) s (before (q ++ [ ix 0 ]) b)
   beside b (skip q s)  = ahead b (q ++ [ ix 0 ]) s (before (q ++ [ ix 0 ]) b)
-  beside b (end _)     = b
+  beside {A} b (end c) = ahead b (c ++ [ ix 0 ]) (hushed {A}) (before (c ++ [ ix 0 ]) b)
   beside b hush        = b
 
   -- the source's next step, shown at `q`, and whether it comes before the body's
@@ -580,6 +580,10 @@ mutual
   ahead (skip k r)  q s false = skip k λ where .force → ahead (force r) q s (before q (force r))
   ahead (end c)     q s false = end c
   ahead hush        q s false = hush
+
+  -- an ended source, shown once at its end, then silent
+  hushed : ∀ {A} → Events∞ A
+  force hushed = hush
 
   before : ∀ {B} → Pos → Events B → Bool
   before q (out k _ _) = q <ᵖ k

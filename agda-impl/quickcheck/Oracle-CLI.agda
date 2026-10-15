@@ -17,6 +17,8 @@
 --   Oracle-CLI ghosts FROM COUNT the seeds with an observer inside the run
 --                                delivered what its subtree's denotation
 --                                does not show (`quickcheck.Ghost`)
+--   Oracle-CLI stepping FROM COUNT the seeds whose stepper parts from the
+--                                meaning, skips included (`quickcheck.Stepping`)
 --   Oracle-CLI exact FROM COUNT  the seeds with a live observer behind the
 --                                run (`quickcheck.Ghost`)
 --   Oracle-CLI settled FROM COUNT the seeds with an observer shown an event
@@ -55,6 +57,7 @@ import quickcheck.Spin as Spin
 open import Tree using (Obs)
 open import denotation.MonotonicList using (Timeline)
 open import quickcheck.Placing using (placing; placingFails)
+open import quickcheck.Stepping using (steppingFails)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -90,7 +93,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -130,6 +133,10 @@ private
   dispatch ("placing" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (placingFails f′ c′) (λ s → putStrLn ("placing: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("placing: done " ++ showℕ c′)
+  ... | _       | _       = usage
+  dispatch ("stepping" ∷ f ∷ c ∷ []) with nat f | nat c
+  ... | just f′ | just c′ = each (steppingFails f′ c′) (λ s → putStrLn ("stepping: FAIL seed " ++ showℕ s))
+                            >>= λ _ → putStrLn ("stepping: done " ++ showℕ c′)
   ... | _       | _       = usage
   dispatch ("hand" ∷ []) = hand cases
   dispatch ("spin" ∷ []) = spins Spin.cases

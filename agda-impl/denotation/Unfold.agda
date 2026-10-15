@@ -37,7 +37,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
-open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
+open import Data.List.Relation.Unary.All using (All; lookup; updateAt) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 import Data.List as L
 
 import Tree as T
@@ -56,6 +56,11 @@ open Events∞
 ------------------------------------------------------------------------
 -- Configurations
 
+-- A step of connect `i`'s source, a value or a skip, that a node not yet
+-- subscribed has still to be fed once it is.
+data Notice (Γ : List Set) : Set₁ where
+  notice : ∀ {A} → A ∈ Γ → Pos → Maybe A → Notice Γ
+
 mutual
   data Node : List Set → Set → Set₁ where
     framesᶜ    : ∀ {Γ A t} → Time → Pos → From A t → Node Γ A
@@ -67,11 +72,12 @@ mutual
     takeWhileᶜ : ∀ {Γ A} → Bool → (A → Bool) → Node Γ A → Node Γ A
     flatMapᶜ   : ∀ {Γ A B} → T.FlatOp → (A → Pos → Node Γ B) → Maybe (Node Γ A) → List (Node Γ B) → List A → Node Γ B
     -- Joined to connect `i` at `p`: what it has been fed and not yet
-    -- shown, and where it ends once its source has.
-    joinᶜ      : ∀ {Γ A} → A ∈ Γ → Pos → List (Pos × A) → Maybe Pos → Node Γ A
+    -- shown, a value or a skip, and where it ends once its source has.
+    joinᶜ      : ∀ {Γ A} → A ∈ Γ → Pos → List (Pos × Maybe A) → Maybe Pos → Node Γ A
     -- A connect's body, and its source while it runs, else where it ended.
     connectᶜ   : ∀ {Γ A B} → Node (A ∷ Γ) B → Source Γ A → Node Γ B
-    deferᶜ     : ∀ {Γ A} → Later Timeline Γ A → Pos → Node Γ A
+    -- Reached at `p`, and the source steps it has still to be fed.
+    deferᶜ     : ∀ {Γ A} → Later Timeline Γ A → Pos → List (Notice Γ) → Node Γ A
 
   data Source (Γ : List Set) (A : Set) : Set₁ where
     live  : Node Γ A → Source Γ A
@@ -103,7 +109,7 @@ subscribe (takeWhile i q s) p = takeWhileᶜ i q (subscribe s p)
 subscribe (flatMap op f s)  p = flatMapᶜ op (λ a q → subscribe (f a) q) (just (subscribe s p)) [] []
 subscribe (connect s b)     p = connectᶜ (subscribe b (p ++ [ ix 0 ])) (live (subscribe s (p ++ [ ix 1 ])))
 subscribe (connected i)     p = joinᶜ i p [] nothing
-subscribe (defer l)         p = deferᶜ l p
+subscribe (defer l)         p = deferᶜ l p []
 
 ------------------------------------------------------------------------
 -- A connect's source, delivered to its joiners
@@ -113,9 +119,11 @@ same? (here refl) (here refl) = just refl
 same? (there i)   (there j)   = same? i j
 same? _           _           = nothing
 
--- A joiner of connect `i` is fed a value at `q` if it joined before `q`.
-fed : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → A → B ∈ Γ → Pos → List (Pos × B) → Maybe (A ≡ B) → List (Pos × B)
-fed i q a j p xs (just refl) = if p <ᵖ q then xs ++ [ q ++ [ subᴾ p ] , a ] else xs
+-- A joiner of connect `i` is fed the source's step at `q`, a value or a
+-- skip, under its own position if it joined before `q`, else as a skip
+-- at its subscription.
+fed : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → Maybe A → B ∈ Γ → Pos → List (Pos × Maybe B) → Maybe (A ≡ B) → List (Pos × Maybe B)
+fed i q a j p xs (just refl) = if p <ᵖ q then xs ++ [ q ++ [ subᴾ p ] , a ] else xs ++ [ p ++ [ ix 0 ] , nothing ]
 fed i q a j p xs nothing     = xs
 
 -- And told where it ends, once: at the source's end if it joined before
@@ -125,26 +133,31 @@ told i c j p nothing  (just refl) = just (if p <ᵖ c then c ++ [ subᴾ p ] els
 told i c j p e        _           = e
 
 mutual
-  feed : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → A → Node Γ B → Node Γ B
+  feed : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → Maybe A → Node Γ B → Node Γ B
   feed i q a (mapᶜ f c)              = mapᶜ f (feed i q a c)
   feed i q a (scanᶜ f z c)           = scanᶜ f z (feed i q a c)
   feed i q a (takeWhileᶜ b p c)      = takeWhileᶜ b p (feed i q a c)
-  feed i q a (flatMapᶜ op g o ls qs) = flatMapᶜ op g (feedᴹ i q a o) (feedᴸ i q a ls) qs
+  feed i q a (flatMapᶜ op g o ls qs) = flatMapᶜ op (λ x r → feed i q a (g x r)) (feedᴹ i q a o) (feedᴸ i q a ls) qs
   feed i q a (joinᶜ j p xs e)        = joinᶜ j p (fed i q a j p xs (same? i j)) e
   feed i q a (connectᶜ b s)          = connectᶜ (feed (there i) q a b) (feedˢ i q a s)
+  feed i q a (deferᶜ l p ns)         = deferᶜ l p (ns ++ [ notice i q a ])
   feed i q a c                       = c
 
-  feedᴹ : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → A → Maybe (Node Γ B) → Maybe (Node Γ B)
+  feedᴹ : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → Maybe A → Maybe (Node Γ B) → Maybe (Node Γ B)
   feedᴹ i q a nothing  = nothing
   feedᴹ i q a (just c) = just (feed i q a c)
 
-  feedᴸ : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → A → List (Node Γ B) → List (Node Γ B)
+  feedᴸ : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → Maybe A → List (Node Γ B) → List (Node Γ B)
   feedᴸ i q a []       = []
   feedᴸ i q a (c ∷ cs) = feed i q a c ∷ feedᴸ i q a cs
 
-  feedˢ : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → A → Source Γ B → Source Γ B
+  feedˢ : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → Maybe A → Source Γ B → Source Γ B
   feedˢ i q a (live s)  = live (feed i q a s)
   feedˢ i q a (ended c) = ended c
+
+feeds : ∀ {Γ B} → List (Notice Γ) → Node Γ B → Node Γ B
+feeds []                  c = c
+feeds (notice i q a ∷ ns) c = feeds ns (feed i q a c)
 
 mutual
   shut : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → Pos → Node Γ B → Node Γ B
@@ -220,8 +233,9 @@ takeWhileˢ i p (skipˢ k c)  = skipˢ k (takeWhileᶜ i p c)
 takeWhileˢ i p (endˢ k)     = endˢ k
 takeWhileˢ i p hushˢ        = hushˢ
 
-joinˢ : ∀ {Γ A} → A ∈ Γ → Pos → List (Pos × A) → Maybe Pos → Step Γ A
-joinˢ i p ((q , a) ∷ xs) e        = outˢ q a (joinᶜ i p xs e)
+joinˢ : ∀ {Γ A} → A ∈ Γ → Pos → List (Pos × Maybe A) → Maybe Pos → Step Γ A
+joinˢ i p ((q , just a) ∷ xs) e   = outˢ q a (joinᶜ i p xs e)
+joinˢ i p ((q , nothing) ∷ xs) e  = skipˢ q (joinᶜ i p xs e)
 joinˢ i p []             (just c) = endˢ c
 joinˢ i p []             nothing  = hushˢ
 
@@ -248,9 +262,9 @@ beforeˢ q hushˢ        = true
 -- The source's next event, when it comes before the body's.
 sourceˢ : ∀ {Γ A B} → Node (A ∷ Γ) B → Step (A ∷ Γ) B → Node Γ A → Step Γ A → Step Γ B
 sourceˢ b sb s (outˢ q a s′) =
-  if beforeˢ (q ++ [ ix 0 ]) sb then skipˢ (q ++ [ ix 0 ]) (connectᶜ (feed (here refl) q a b) (live s′)) else bodyˢ (live s) sb
+  if beforeˢ (q ++ [ ix 0 ]) sb then skipˢ (q ++ [ ix 0 ]) (connectᶜ (feed (here refl) q (just a) b) (live s′)) else bodyˢ (live s) sb
 sourceˢ b sb s (skipˢ q s′)  =
-  if beforeˢ (q ++ [ ix 0 ]) sb then skipˢ (q ++ [ ix 0 ]) (connectᶜ b (live s′)) else bodyˢ (live s) sb
+  if beforeˢ (q ++ [ ix 0 ]) sb then skipˢ (q ++ [ ix 0 ]) (connectᶜ (feed (here refl) q nothing b) (live s′)) else bodyˢ (live s) sb
 sourceˢ b sb s (endˢ c)      =
   if beforeˢ (c ++ [ ix 0 ]) sb then skipˢ (c ++ [ ix 0 ]) (connectᶜ (shut (here refl) c b) (ended c)) else bodyˢ (live s) sb
 sourceˢ b sb s hushˢ         = bodyˢ (live s) sb
@@ -308,7 +322,7 @@ mutual
   step (joinᶜ i p xs e)         = joinˢ i p xs e
   step (connectᶜ b (live s))    = sourceˢ b (step b) s (step s)
   step (connectᶜ b (ended c))   = shutˢᵗ c (step b)
-  step (deferᶜ l p)             = skipˢ (p ++ [ ix 0 ]) (subscribe (Later.force l) (p ++ [ ix 1 ]))
+  step (deferᶜ l p ns)          = skipˢ (p ++ [ ix 0 ]) (feeds ns (subscribe (Later.force l) (p ++ [ ix 1 ])))
 
   earliest : ∀ {Γ B} → List (Node Γ B) → Earliest Γ B
   earliest []       = none
@@ -354,10 +368,20 @@ lookup-hots : ∀ {Γ A} (ρ : NEnv Γ) (i : A ∈ Γ) → lookup (hots ρ) i �
 lookup-hots (e ∷ᴬ ρ) (here refl) = refl
 lookup-hots (e ∷ᴬ ρ) (there i)   = lookup-hots ρ i
 
+-- A source's step at `q`, a value or a skip, then the rest.
+put : ∀ {A} → Pos → Maybe A → Events∞ A → Events A
+put q (just a) l = out q a l
+put q nothing  l = skip q l
+
+-- The source steps a defer has still to be fed, put back on its sources.
+replay : ∀ {Γ} → List (Notice Γ) → NEnv Γ → NEnv Γ
+replay []                  ρ = ρ
+replay (notice i q a ∷ ns) ρ = updateAt i (λ e → put q a λ where .force → e) (replay ns ρ)
+
 -- What a joiner was fed and has not shown, then the rest.
-fedᴺ : ∀ {A} → List (Pos × A) → Events A → Events A
+fedᴺ : ∀ {A} → List (Pos × Maybe A) → Events A → Events A
 fedᴺ []             e = e
-fedᴺ ((q , a) ∷ xs) e = out q a λ where .force → fedᴺ xs e
+fedᴺ ((q , a) ∷ xs) e = put q a λ where .force → fedᴺ xs e
 
 -- A joiner after its feed: told its end, or the source's run, rejoined.
 joined : ∀ {Γ A} → A ∈ Γ → Pos → Maybe Pos → NEnv Γ → Events A
@@ -385,7 +409,7 @@ mutual
   meaning (joinᶜ i p xs e)        ρ = fedᴺ xs (joined i p e ρ)
   meaning (connectᶜ b (live s))   ρ = M.beside (meaning b (meaning s ρ ∷ᴬ ρ)) (meaning s ρ)
   meaning (connectᶜ b (ended c))  ρ = meaning b (end c ∷ᴬ ρ)
-  meaning (deferᶜ l p)            ρ = M.observe (deferᴰ (⟦ Later.force l ⟧ᴰ (hots ρ))) p
+  meaning (deferᶜ l p ns)         ρ = M.observe (deferᴰ (⟦ Later.force l ⟧ᴰ (hots (replay ns ρ)))) p
 
   meaningᴹ : ∀ {Γ A} → Maybe (Node Γ A) → NEnv Γ → Maybe (Events A)
   meaningᴹ nothing  ρ = nothing

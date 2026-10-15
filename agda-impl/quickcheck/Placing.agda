@@ -11,7 +11,7 @@
 -- machine still working there, however much it worked before.
 --
 -- And the events rise, as `ticks-up` needs: each at a position past the
--- last, headed by its tick.
+-- last, a skip at one no earlier, headed by its tick.
 module quickcheck.Placing where
 
 open import Data.Bool using (Bool; true; false; _∧_; not)
@@ -55,7 +55,7 @@ private
   rising : ℕ → Pos → Events ℕ → Bool
   rising zero    _ _           = true
   rising (suc k) q (out p _ r) = headed p ∧ (q <ᵖ p) ∧ rising k p (Events∞.force r)
-  rising (suc k) q (skip p r)  = headed p ∧ (q <ᵖ p) ∧ rising k p (Events∞.force r)
+  rising (suc k) q (skip p r)  = headed p ∧ not (p <ᵖ q) ∧ rising k p (Events∞.force r)
   rising (suc k) q (end p)     = headed p ∧ (q <ᵖ p)
   rising (suc k) q hush        = true
 

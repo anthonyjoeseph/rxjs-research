@@ -177,12 +177,12 @@ by their own silent steps (`Mirror`).
 ### Big picture tier roadmap
 
 - **THE EXACT STEPPER.** `∼-trans` with `go-skips` and `beside-≃`: the
-  stepper's skips made the meaning's, so `≃` is strong bisimilarity and
-  transitive for free; the stalling half, the sorted hypotheses on the
-  merges and `skip-drop` go with it. Ruled out before the fixed skip:
-  exact agreement, by the pre-join count. De-risk first by pointing CI's
-  exact check of `denotation.Unfold` against the per-node meaning at the
-  fixed skip. Decides whether any skip mismatch survives the count.
+  stepper shows every skip the meaning does, each joiner fed every source
+  step, lanes and defers yet to subscribe included, so `≃` can be restated
+  as strong bisimilarity, transitive for free, the stalling half and the
+  merges' sorted hypotheses going with it. Ruled out: a skip mismatch at
+  the pre-join count, by CI's `make stepping`. Decides whether `fed-≃`
+  survives the restatement as plain equality of meanings.
 - **THE FED CUT.** `fed-take` with `fed-connect`, `fed-flat` and
   `fed-defer`: `fed-≃` is a body by node, its joiner arm proven over the
   fixed skip, a map and a scan recursing, these four its leaves. Ruled
@@ -192,9 +192,9 @@ by their own silent steps (`Mirror`).
 - **THE CONNECT.** `flat-≃` and `defer-≃` with the fed leaves: a running
   connect is a body over these, its body reading its source alike the body
   fed its source's step. Ruled out: a body fed a value it would join its
-  source only after or with a joiner told. Proven: a sorted skip is a `≃` forget, a
-  source's step commutes with the body's tied events, and a joiner reads
-  alike sorted sources alike. Decides whether the body fed the step and
+  source only after or with a joiner told. Proven: a source's step
+  commutes with the body's tied events, and a joiner reads alike sorted
+  sources alike. Decides whether the body fed the step and
   the body reading it are alike past a cut.
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
   the meaning's events are sorted, a step keeps every node so, and what a
