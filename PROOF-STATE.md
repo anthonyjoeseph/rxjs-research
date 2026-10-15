@@ -166,17 +166,12 @@ machine alone) and ALIKE as sets (`content`) is placed (`placing`). LIVENESS
 is `reachedᴿ`. Sortedness rides SCOPED positions: `under l m k` runs `m` at
 `pos ++ [l]` and puts `pos` back, so the run's positions are a tree's
 pre-order; each kernel is well-positioned (`Well`, unary) given its
-observer is; `preserve` is the tree walk, the timers and the loop's turn.
+observer is; `preserve` is the tree walk, the timers and the loop's turn,
+a body: a turn opens an epoch at its timer's cascade, and setting a timer
+moves the last to where it was set, so same-tick timers pop in order.
 
 ### Big picture tier roadmap
 
-- **THE WALK, ITS TIMERS.** `walk-timers` and `turn` over `WellMach`'s
-  queue. The run's half is a body: levels tie the stack to the bursts and
-  what is owed, so the loop's turn finds only the root's level. Ruled out: a
-  frame well only from below its position, a `cancel` running a stashed
-  unsubscribe that is `Still`, a turn over a cold's frame. Decides whether
-  same-tick timers pop in the order they were set (`Before`), and whether a
-  join's write keeps every queued timer past the last it moves.
 - **HONEST, DEFINED.** `HonMach` is a record over a residual past every
   mark, kept by each step as `Shows` says. Left: `Inner` a relation over configurations, as `WellMach` is, over a ghost
   tree of the compiled program's kernels and their cells; `Honest` the
@@ -198,13 +193,12 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
   in finitely many steps. Decides whether liveness needs a measure, and
   whether a `connect` feedback loop that spins makes it false.
+- **PLACED.** `placing` with `ticks-up`: an ascending record alike the
+  events as a set is their prefix, placed. Decides whether sortedness and
+  set equality pin the order, or two events at one position can swap.
 
 ### The ledger
 
-- **`walk-timers`** (Sorted) — FALSITY, `NO EVIDENCE`: a step not the loop's
-  turn keeps every timer past what it shows, queued in `Before` order.
-- **`turn`** (Sorted) — FALSITY, `NO EVIDENCE`: the loop's turn pops the
-  earliest timer, its burst past every position shown.
 - **`Honest`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; a
   subscription's deliveries alike a meaning, at any position.
 - **`Inner`** (Content) — FALSITY, `DEAD ROUTE×3`: a postulated type; the whole
