@@ -176,15 +176,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `placed-subscribe` and `within-defer`: the meaning's
-  events are sorted, a defer's program is placed within. Ruled out: a
-  node showing strictly after an earlier step, a step not coming first
+- **THE ORDER.** `ordered-flat`, `ordered-defer`, `ordered-beside` and
+  `within-defer`: a flatMap, a defer and a connect keep their parts'
+  order, and a defer's program, fed, is placed within. Ruled out: a node
+  showing strictly after an earlier step, a step not coming first
   keeping the placing, a placing with each live joiner joined before its
-  source; and `lags`, `leads`, `placed-after` and a flatMap's step go by
-  node, over each source's lag at its own head and its order, fed and
-  told bodies placed as they were, a flatMap's lanes yet to subscribe
-  placed as a part. Decides whether a program subscribed anywhere, over
-  sources in order, is placed, which both would follow from.
+  source; and a program subscribed anywhere over sources in order is
+  placed by operator, its lanes' order and start as parts. Decides
+  whether a defer's notices keep its sources in order when replayed,
+  which `within-defer` would follow from as a feed of a placed program.
 - **THE OPERATORS.** `go-skips`, `take-first`, `join-quiet` and
   `defer-after`: a flatMap's meaning is what its step shows, a cut step
   comes first when the uncut did, an untold joiner fed nothing under
@@ -211,8 +211,20 @@ by their own silent steps (`Mirror`).
   shared machine, as `here` is, which the IO runtime ignores.
 ### The ledger
 
-- **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
-  subscribed at the root is placed.
+- **`ordered-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap merges its
+  outer and lanes in order, each lane in order and atop where it subscribes.
+- **`ordered-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer's run, over
+  sources in order, is in order.
+- **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
+  steps merge into its body in order.
+- **`atop-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription shows
+  nothing before where it is made.
+- **`ordered-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`: a join keeps its
+  source's order.
+- **`ordered-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps the order.
+- **`ordered-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run is in
+  order.
+- **`ordered-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is in order.
 - **`within-defer`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer's program,
   subscribed and fed, is placed within.
 - **`lags-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning shows
