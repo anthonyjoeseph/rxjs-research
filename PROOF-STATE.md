@@ -182,8 +182,8 @@ by their own silent steps (`Mirror`).
   no sibling's position, which is what keeps `Steady` and a flatMap's
   order. Ruled out: a join of a run merely in order, a flatMap of any
   outer in order, lanes placed wherever they subscribe, sources merely
-  clear of a flatMap's subtree, and an operator showing a position it
-  does not key. Decides whether an outer's own positions own nothing it
+  clear of a flatMap's subtree, an operator showing a position it does
+  not key, and a subscription at the empty position. Decides whether an outer's own positions own nothing it
   shows later, which apartness of each lane from the next needs.
 - **THE DEFER.** `ordered-defer` and `within-defer`: a defer over sorted,
   alien sources is in order, and its program, fed, is placed within.
@@ -219,8 +219,9 @@ by their own silent steps (`Mirror`).
   and lanes in order, over sources sorted and alien to where it subscribes.
 - **`ordered-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer's run, over
   sources sorted and alien to where it subscribes, is in order.
-- **`steady-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription over
-  sorted, alien sources never steps inside its last position nor ties an out.
+- **`steady-sub`** (Placed) — FALSITY, `REFUTED`: a subscription somewhere,
+  over sorted, alien sources, never steps inside its last position nor ties an
+  out.
 - **`reach-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program
   subscribed is held to any `Rules`; `reach` there, short of a recursion.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source

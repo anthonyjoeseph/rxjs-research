@@ -342,6 +342,11 @@ sibling p     ne (inj₁ q) = sibling-prefix p ne q
 sibling p {i} {j} ne (inj₂ t) =
   <-irrefl refl (<-≤-trans (tagged-weigh (p ++ [ ix i ]) p (tagged-mark _ p _ (ix-mark j) t)) (prefix-weigh p (p ++ [ ix i ]) (prefix-++ p [ ix i ])))
 
+-- A child is somewhere.
+snoc-there : ∀ p {l : M.Label} → p ++ [ l ] ≢ []
+snoc-there []      ()
+snoc-there (_ ∷ _) ()
+
 -- A first child is never a timer's tick.
 no-tick : ∀ p m → p ++ [ ix 0 ] ≢ ix (suc m) ∷ []
 no-tick []          m ()
@@ -820,8 +825,12 @@ postulate
 
   -- A SUBSCRIPTION OVER STEADY SOURCES IS STEADY: a joiner's skips for
   -- what it missed sit just past the join, which nothing it rekeys
-  -- lies inside, its sources being alien to it.
-  steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Steady (U.meaning (U.subscribe o p) ρ)
+  -- lies inside, its sources being alien to it.  Somewhere, not at the
+  -- empty position, where its own steps would sit at bare ticks.
+  --
+  -- REFUTED: 91953190 at the empty position, a lane's timer frame shown just inside the outer's step at its tick
+  steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+             → Steady (U.meaning (U.subscribe o p) ρ)
 
 
 -- A CONNECT'S SOURCE KEYS NOTHING UNDER ITS BODY: the two are siblings.
@@ -851,7 +860,7 @@ placed-sub (connect s b) p ρ so cl = ordered-beside _ _ (proj₁ pb) (proj₁ p
   where cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
         ps = placed-sub s (p ++ [ ix 1 ]) ρ so cs
         pb = placed-sub b (p ++ [ ix 0 ]) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ)
-               ((proj₁ ps , steady-sub s (p ++ [ ix 1 ]) ρ so cs) , so) (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl)
+               ((proj₁ ps , steady-sub s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs) , so) (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl)
 placed-sub (connected i) p ρ so cl = ordered-rejoin p _ (proj₁ sl) (proj₂ sl) , tt
   where sl = sorted-lookup ρ so i
 placed-sub (defer l) p ρ so cl = ordered-defer l p ρ so cl , tt
