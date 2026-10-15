@@ -125,9 +125,14 @@ module Machine (R : Set) where
   asked m _                   = m
 
   -- Feed the machine one input, and answer what it asks: one transition.
+  -- A world that did not grow carries the driver's state as it is, so a
+  -- run of silent steps stacks no weakenings on the timers.
+  fed′ : (m : Mach) → Next (Conf.world (Mach.conf m)) → Mach
+  fed′ m (next ⟨ hp , p , c ⟩ same os) = asked (record m { conf = ⟨ hp , p , c ⟩ }) os
+  fed′ m n                             = asked (moved m n) (Next.outputs n)
+
   feed : (m : Mach) → Input (Mach.conf m) → Mach
-  feed m i = asked (moved m n) (Next.outputs n)
-    where n = transition (Mach.conf m) i
+  feed m i = fed′ m (transition (Mach.conf m) i)
 
   -- A burst's step, its sink read open: the next frame's value
   -- delivered at its position, a stall skipped, a close scheduling the

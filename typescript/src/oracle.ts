@@ -145,9 +145,32 @@ const main = async (): Promise<void> => {
     ["prog", String(start), String(count)],
     timeoutMs * Math.max(1, Math.ceil(count / 50)),
   );
-  if (listing.failed !== undefined)
-    throw new Error(`Oracle-CLI prog: ${listing.failed}`);
-  const rows = listing.out
+  // A listing cut short is listed again a seed at a time, so a seed whose
+  // engines never finish is named, and the others still checked.
+  // Five stuck seeds end the search: a slowdown everywhere is one finding.
+  const seeds = Array.from({ length: count }, (_, i) => start + i);
+  const single = seeds.reduce<
+    { seed: number; listed?: { out: string; failed?: string } }[]
+  >(
+    (acc, s) =>
+      listing.failed === undefined ||
+      acc.filter(({ listed }) => listed?.failed !== undefined).length >= 5
+        ? acc
+        : [...acc, { seed: s, listed: cli(["prog", String(s), "1"]) }],
+    [],
+  );
+  const stuck = single.filter(({ listed }) => listed?.failed !== undefined);
+  stuck.forEach(({ seed, listed }) =>
+    console.log(`oracle: FAIL seed ${seed}\n  listing    ${listed?.failed}`),
+  );
+  const rows = (
+    listing.failed === undefined
+      ? listing.out
+      : single
+          .filter(({ listed }) => listed?.failed === undefined)
+          .map(({ listed }) => listed?.out ?? "")
+          .join("\n")
+  )
     .split("\n")
     .filter((l) => l.trim().length > 0)
     .map((l) => JSON.parse(l) as Row);
