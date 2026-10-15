@@ -7,8 +7,9 @@
 module adequacy.Placed where
 
 open import Data.Bool using (Bool; true; false)
+open import Data.Empty using (⊥)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Properties using (++-assoc)
 open import Data.Nat using (zero; suc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -21,7 +22,7 @@ open import Relation.Nullary using (¬_)
 open import Level using (lower)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; _<ᵖ_; root)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; _<ᵖ_; root)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
@@ -84,24 +85,54 @@ mutual
 
 open Steady public
 
--- No event of `e` lies inside `p`'s subtree.
+-- `k` a prefix of `h`, and a proper one.
+Prefix : Pos → Pos → Set
+Prefix []      h       = ⊤
+Prefix (_ ∷ _) []      = ⊥
+Prefix (a ∷ k) (b ∷ h) = a ≡ b × Prefix k h
+
+Prefix⁺ : Pos → Pos → Set
+Prefix⁺ []      []      = ⊥
+Prefix⁺ []      (_ ∷ _) = ⊤
+Prefix⁺ (_ ∷ _) []      = ⊥
+Prefix⁺ (a ∷ k) (b ∷ h) = a ≡ b × Prefix⁺ k h
+
+-- `h` keyed under `k`: inside its subtree, or tagged by a join or a
+-- timer keyed under it.  A rejoin at `p` keys a source's `q` as
+-- `q ++ [ sub p ]`, and a frame of a cold at `p` sits at
+-- `ix t ∷ sub e ∷ []` for an `e` under `p`: neither inside `p`.
 mutual
-  Clears : ∀ {A} → Pos → Events A → Set
-  Clears p (out h _ r) = ¬ Ext p h × Clear p (force r)
-  Clears p (skip h r)  = ¬ Ext p h × Clear p (force r)
-  Clears p (end h)     = ¬ Ext p h
-  Clears p hush        = ⊤
+  Owned : Pos → Pos → Set
+  Owned k h = Prefix k h ⊎ Tagged k h
 
-  record Clear {A} (p : Pos) (e : Events A) : Set where
+  Tagged : Pos → Pos → Set
+  Tagged k []          = ⊥
+  Tagged k (ix _ ∷ h)  = Tagged k h
+  Tagged k (sub j ∷ h) = Owned k j ⊎ Tagged k h
+  Tagged k (last ∷ h)  = Tagged k h
+
+-- Strictly keyed under `k`: anywhere but `k` itself.
+Beneath : Pos → Pos → Set
+Beneath k h = Prefix⁺ k h ⊎ Tagged k h
+
+-- No event of `e` keyed under `p`.
+mutual
+  Aliens : ∀ {A} → Pos → Events A → Set
+  Aliens p (out h _ r) = ¬ Owned p h × Alien p (force r)
+  Aliens p (skip h r)  = ¬ Owned p h × Alien p (force r)
+  Aliens p (end h)     = ¬ Owned p h
+  Aliens p hush        = ⊤
+
+  record Alien {A} (p : Pos) (e : Events A) : Set where
     coinductive
-    field clear : Clears p e
+    field alien : Aliens p e
 
-open Clear public
+open Alien public
 
--- Every source clear of `p`: the subtree a subscription at `p` keys.
-Clearᴱ : ∀ {Γ} → Pos → NEnv Γ → Set
-Clearᴱ p []ᴬ      = ⊤
-Clearᴱ p (e ∷ᴬ ρ) = Clear p e × Clearᴱ p ρ
+-- Every source alien to `p`: what a subscription at `p` keys.
+Alienᴱ : ∀ {Γ} → Pos → NEnv Γ → Set
+Alienᴱ p []ᴬ      = ⊤
+Alienᴱ p (e ∷ᴬ ρ) = Alien p e × Alienᴱ p ρ
 
 -- `e` shows an event at `k`.
 data Reaches {A} (k : Pos) : Events A → Set where
@@ -170,19 +201,75 @@ ordered (ordered-scan f z (skip k r)  o) = atop-scan f z k (force r) (proj₁ (o
 ordered (ordered-scan f z (end k)     o) = tt
 ordered (ordered-scan f z hush        o) = tt
 
--- Inside `p ++ [ l ]` is inside `p`.
-under-ext : ∀ p l {h} → Ext (p ++ [ l ]) h → Ext p h
-under-ext p l (ext m ms) = subst (Ext p) (sym (++-assoc p [ l ] (m ∷ ms))) (ext l (m ∷ ms))
+prefix-++ : ∀ k w → Prefix k (k ++ w)
+prefix-++ []      w = tt
+prefix-++ (a ∷ k) w = refl , prefix-++ k w
 
-clear-under : ∀ {A} p l (e : Events A) → Clear p e → Clear (p ++ [ l ]) e
-clear (clear-under p l (out h _ r) c) = (λ x → proj₁ (clear c) (under-ext p l x)) , clear-under p l (force r) (proj₂ (clear c))
-clear (clear-under p l (skip h r)  c) = (λ x → proj₁ (clear c) (under-ext p l x)) , clear-under p l (force r) (proj₂ (clear c))
-clear (clear-under p l (end h)     c) = λ x → clear c (under-ext p l x)
-clear (clear-under p l hush        c) = tt
+prefix-trans : ∀ k j h → Prefix k j → Prefix j h → Prefix k h
+prefix-trans []      j       h       _          _          = tt
+prefix-trans (_ ∷ _) []      _       ()         _
+prefix-trans (_ ∷ _) (_ ∷ _) []      _          ()
+prefix-trans (a ∷ k) (b ∷ j) (c ∷ h) (refl , p) (refl , q) = refl , prefix-trans k j h p q
 
-clearᴱ-under : ∀ {Γ} p l (ρ : NEnv Γ) → Clearᴱ p ρ → Clearᴱ (p ++ [ l ]) ρ
-clearᴱ-under p l []ᴬ      c        = tt
-clearᴱ-under p l (e ∷ᴬ ρ) (ce , c) = clear-under p l e ce , clearᴱ-under p l ρ c
+-- A tag inside `j` is inside what `j` prefixes.
+tagged-prefix : ∀ k j h → Tagged k j → Prefix j h → Tagged k h
+tagged-prefix k []          h       ()         _
+tagged-prefix k (_ ∷ _)     []      _          ()
+tagged-prefix k (ix _ ∷ j)  (_ ∷ h) t          (refl , p) = tagged-prefix k j h t p
+tagged-prefix k (last ∷ j)  (_ ∷ h) t          (refl , p) = tagged-prefix k j h t p
+tagged-prefix k (sub _ ∷ j) (_ ∷ h) (inj₁ o)   (refl , p) = inj₁ o
+tagged-prefix k (sub _ ∷ j) (_ ∷ h) (inj₂ t)   (refl , p) = inj₂ (tagged-prefix k j h t p)
+
+-- Keyed under what is keyed under `k` is keyed under `k`.
+mutual
+  owned-trans : ∀ k j h → Owned k j → Owned j h → Owned k h
+  owned-trans k j h (inj₁ p) (inj₁ q) = inj₁ (prefix-trans k j h p q)
+  owned-trans k j h (inj₂ t) (inj₁ q) = inj₂ (tagged-prefix k j h t q)
+  owned-trans k j h o        (inj₂ t) = inj₂ (owned-tagged k j h o t)
+
+  owned-tagged : ∀ k j h → Owned k j → Tagged j h → Tagged k h
+  owned-tagged k j []          o ()
+  owned-tagged k j (ix _ ∷ h)  o t        = owned-tagged k j h o t
+  owned-tagged k j (last ∷ h)  o t        = owned-tagged k j h o t
+  owned-tagged k j (sub i ∷ h) o (inj₁ q) = inj₁ (owned-trans k j i o q)
+  owned-tagged k j (sub i ∷ h) o (inj₂ t) = inj₂ (owned-tagged k j h o t)
+
+-- What a flatMap shows just before a lane, strictly under `p`, puts the
+-- lane under `p`.
+prefix-lane : ∀ k x l → Prefix⁺ k (x ++ [ l ]) → Prefix k x
+prefix-lane []          x       l _          = tt
+prefix-lane (_ ∷ [])    []      l (refl , ())
+prefix-lane (_ ∷ _ ∷ _) []      l (refl , ())
+prefix-lane (a ∷ k)     (b ∷ x) l (refl , p) = refl , prefix-lane k x l p
+
+tagged-lane : ∀ k x n → Tagged k (x ++ [ ix n ]) → Tagged k x
+tagged-lane k []          n ()
+tagged-lane k (ix _ ∷ x)  n t        = tagged-lane k x n t
+tagged-lane k (last ∷ x)  n t        = tagged-lane k x n t
+tagged-lane k (sub _ ∷ x) n (inj₁ o) = inj₁ o
+tagged-lane k (sub _ ∷ x) n (inj₂ t) = inj₂ (tagged-lane k x n t)
+
+tagged-++ : ∀ k h w → Tagged k h → Tagged k (h ++ w)
+tagged-++ k []          w ()
+tagged-++ k (ix _ ∷ h)  w t        = tagged-++ k h w t
+tagged-++ k (last ∷ h)  w t        = tagged-++ k h w t
+tagged-++ k (sub _ ∷ h) w (inj₁ o) = inj₁ o
+tagged-++ k (sub _ ∷ h) w (inj₂ t) = inj₂ (tagged-++ k h w t)
+
+owned-lane : ∀ p x → Beneath p (x ++ [ ix 0 ]) → Owned p (x ++ [ ix 1 ])
+owned-lane p x (inj₁ q) = inj₁ (prefix-trans p x (x ++ [ ix 1 ]) (prefix-lane p x (ix 0) q) (prefix-++ x [ ix 1 ]))
+owned-lane p x (inj₂ t) = inj₂ (tagged-++ p x [ ix 1 ] (tagged-lane p x 0 t))
+
+-- Alien to `p` is alien to whatever `p` keys.
+alien-owned : ∀ {A} p k → Owned p k → (e : Events A) → Alien p e → Alien k e
+alien (alien-owned p k o (out h _ r) a) = (λ x → proj₁ (alien a) (owned-trans p k h o x)) , alien-owned p k o (force r) (proj₂ (alien a))
+alien (alien-owned p k o (skip h r)  a) = (λ x → proj₁ (alien a) (owned-trans p k h o x)) , alien-owned p k o (force r) (proj₂ (alien a))
+alien (alien-owned p k o (end h)     a) = λ x → alien a (owned-trans p k h o x)
+alien (alien-owned p k o hush        a) = tt
+
+alienᴱ-owned : ∀ {Γ} p k → Owned p k → (ρ : NEnv Γ) → Alienᴱ p ρ → Alienᴱ k ρ
+alienᴱ-owned p k o []ᴬ      a        = tt
+alienᴱ-owned p k o (e ∷ᴬ ρ) (ae , a) = alien-owned p k o e ae , alienᴱ-owned p k o ρ a
 
 start-within : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → Within (U.startᶜ p m) ρ
 start-within p (M.at zero _ _)    ρ = tt
@@ -211,7 +298,7 @@ postulate
   -- skip just past it, ahead of the body's later events.
   ordered-beside : ∀ {A B} (b : Events B) (s : Events A) → Ordered b → Ordered s → Ordered (M.beside b s)
 
-  -- A FLATMAP SUBSCRIBED MERGES IN ORDER: over sorted sources clear of
+  -- A FLATMAP SUBSCRIBED MERGES IN ORDER: over sorted sources alien to
   -- where it subscribes.
   --
   -- The risk is a tie: an outer value at `q` shows as a skip just past
@@ -220,32 +307,41 @@ postulate
   -- none.
   --
   -- REFUTED: 37b70651 of any outer node in order, by a joiner told a value and a skip at one position
-  ordered-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Clearᴱ p ρ
+  ordered-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ
                → Ordered (U.meaning (U.subscribe (flatMap op f s) p) ρ)
 
   -- A DEFER'S RUN IS IN ORDER: its program, reached, over sorted sources
-  -- clear of where it subscribes.
-  ordered-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Clearᴱ p ρ → Ordered (U.meaning (U.deferᶜ l p []) ρ)
+  -- alien to where it subscribes.
+  ordered-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Ordered (U.meaning (U.deferᶜ l p []) ρ)
 
   -- A SUBSCRIPTION OVER STEADY SOURCES IS STEADY: a joiner's skips for
   -- what it missed sit just past the join, which nothing it rekeys
-  -- lies inside, its sources being clear of it.
-  steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Clearᴱ p ρ → Steady (U.meaning (U.subscribe o p) ρ)
+  -- lies inside, its sources being alien to it.
+  steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Steady (U.meaning (U.subscribe o p) ρ)
 
-  -- A CONNECT'S SOURCE STAYS OUT OF ITS BODY'S SUBTREE.
-  clear-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Clearᴱ p ρ
-            → Clear (p ++ [ ix 0 ]) (U.meaning (U.subscribe o (p ++ [ ix 1 ])) ρ)
+  -- A CONNECT'S SOURCE KEYS NOTHING UNDER ITS BODY: what it shows is
+  -- keyed under its own subscription, or a source's position tagged.
+  alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
+            → Alien (p ++ [ ix 0 ]) (U.meaning (U.subscribe o (p ++ [ ix 1 ])) ρ)
 
-  -- A FLATMAP'S SOURCES STAY OUT OF EVERY LANE IT CAN ADMIT: wherever it
-  -- shows a skip at `x ++ [ ix 0 ]`, they are clear of `x ++ [ ix 1 ]`.
-  -- The risk is a position the flatMap shows that is keyed under a
-  -- source's, a joiner's rekey, rather than under where it subscribes.
-  clear-shown : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Clearᴱ p ρ
-              → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Clearᴱ (x ++ [ ix 1 ]) ρ
+  -- A SUBSCRIPTION SHOWS ONLY WHAT IT KEYS: inside where it subscribes,
+  -- a source's position tagged by one of its joins, or a frame of one of
+  -- its timers.  The risk is an operator showing a source's position
+  -- untagged.
+  owned-reach : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) h → Reaches h (U.meaning (U.subscribe o p) ρ) → Beneath p h
 
--- A program subscribed anywhere, over sorted sources clear of where it
+-- A flatMap's sources stay out of every lane it can admit: the skip
+-- before the lane is keyed under the flatMap, so the lane is.
+--
+-- REFUTED: f5faeaf6 of sources merely clear of the flatMap's subtree, by one tagged under its join
+alien-shown : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
+            → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ
+alien-shown op f s p ρ al x r =
+  alienᴱ-owned p (x ++ [ ix 1 ]) (owned-lane p x (owned-reach (flatMap op f s) p ρ (x ++ [ ix 0 ]) r)) ρ al
+
+-- A program subscribed anywhere, over sorted sources alien to where it
 -- subscribes, is placed.
-placed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Clearᴱ p ρ → Placed (U.subscribe o p) ρ
+placed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Placed (U.subscribe o p) ρ
 placed-sub (cold c) p ρ so cl =
   subst Ordered (sym (U.start-meaning p (lower c) ρ)) (ordered-start p (lower c)) , start-within p (lower c) ρ
 placed-sub empty p ρ so cl = record { ordered = tt } , tt
@@ -258,12 +354,12 @@ placed-sub (takeWhile i q s) p ρ so cl = ordered-take i q _ (proj₁ ps) , ps
   where ps = placed-sub s p ρ so cl
 placed-sub (flatMap op f s) p ρ so cl =
   ordered-flat op f s p ρ so cl , placed-sub s p ρ so cl , tt
-  , λ a x r → placed-sub (f a) (x ++ [ ix 1 ]) ρ so (clear-shown op f s p ρ so cl x r)
+  , λ a x r → placed-sub (f a) (x ++ [ ix 1 ]) ρ so (alien-shown op f s p ρ cl x r)
 placed-sub (connect s b) p ρ so cl = ordered-beside _ _ (proj₁ pb) (proj₁ ps) , pb , ps
-  where cs = clearᴱ-under p (ix 1) ρ cl
+  where cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
         ps = placed-sub s (p ++ [ ix 1 ]) ρ so cs
         pb = placed-sub b (p ++ [ ix 0 ]) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ)
-               ((proj₁ ps , steady-sub s (p ++ [ ix 1 ]) ρ so cs) , so) (clear-sub s p ρ cl , clearᴱ-under p (ix 0) ρ cl)
+               ((proj₁ ps , steady-sub s (p ++ [ ix 1 ]) ρ so cs) , so) (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl)
 placed-sub (connected i) p ρ so cl = ordered-rejoin p _ (proj₁ sl) (proj₂ sl) , tt
   where sl = sorted-lookup ρ so i
 placed-sub (defer l) p ρ so cl = ordered-defer l p ρ so cl , tt

@@ -176,16 +176,17 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `steady-sub`, `clear-shown`, `ordered-flat` and
-  `ordered-rejoin`: a subscription over sorted sources clear of it is
-  steady, the lanes a flatMap shows subscribe clear of every source, and
-  a flatMap and a join of steady parts keep order. Ruled out: a join of
-  a run merely in order, a flatMap of any outer in order (a joiner told
-  a value and a skip at one position) and lanes placed wherever they
-  subscribe. Decides whether a joiner's rekeyed positions stay clear of
-  a lane's, and whether every operator keeps `Steady`.
+- **THE ORDER.** `owned-reach`, `steady-sub`, `ordered-flat` and
+  `ordered-rejoin`: a subscription shows only what it keys, over sorted
+  sources alien to it is steady, and a flatMap and a join of steady
+  parts keep order. Ruled out: a join of a run merely in order, a
+  flatMap of any outer in order (a joiner told a value and a skip at
+  one position), lanes placed wherever they subscribe, and sources
+  merely clear of a flatMap's subtree (one tagged under its join).
+  Decides whether any operator shows a source's position untagged, and
+  whether every operator keeps `Steady`.
 - **THE DEFER.** `ordered-defer` and `within-defer`: a defer over sorted,
-  clear sources is in order, and its program, fed, is placed within.
+  alien sources is in order, and its program, fed, is placed within.
   Decides whether a defer's notices keep its sources steady when
   replayed, which `within-defer` would follow from as a feed.
 - **THE OPERATORS.** `go-skips`, `take-first`, `join-quiet` and
@@ -215,15 +216,16 @@ by their own silent steps (`Mirror`).
 ### The ledger
 
 - **`ordered-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap merges its outer
-  and lanes in order, over sources sorted and clear of where it subscribes.
+  and lanes in order, over sources sorted and alien to where it subscribes.
 - **`ordered-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer's run, over
-  sources sorted and clear of where it subscribes, is in order.
+  sources sorted and alien to where it subscribes, is in order.
 - **`steady-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription over
-  sorted, clear sources never steps inside its last position nor ties an out.
-- **`clear-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source,
-  subscribed at its `ix 1`, shows nothing inside its `ix 0`.
-- **`clear-shown`** (Placed) — FALSITY, `NO EVIDENCE`: a lane a flatMap shows
-  the outer reaching subscribes where no source event lies.
+  sorted, alien sources never steps inside its last position nor ties an out.
+- **`owned-reach`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription shows
+  only positions keyed strictly under it: inside, or tagged by its joins or
+  timers.
+- **`alien-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source,
+  subscribed at its `ix 1`, keys nothing under its `ix 0`.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
   steps merge into its body in order.
 - **`ordered-rejoin`** (Placed) — FALSITY, `REFUTED`: a join keeps a steady
