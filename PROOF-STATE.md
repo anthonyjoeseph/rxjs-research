@@ -176,7 +176,7 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `steady-sub`, `ordered-flat` and `ordered-rejoin`
+- **THE ORDER.** `steady-flat`, `steady-connect`, `ordered-flat` and `ordered-rejoin`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
   no sibling's position, which is what keeps `Steady` and a flatMap's
@@ -220,15 +220,25 @@ by their own silent steps (`Mirror`).
   and lanes in order, over sources sorted and alien to where it subscribes.
 - **`ordered-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer's run, over
   sources sorted and alien to where it subscribes, is in order.
-- **`steady-sub`** (Placed) — FALSITY, `REFUTED×2`: a subscription somewhere,
-  over sorted, alien sources, never steps inside its last position nor ties an
-  out, before or after a step.
+- **`steady-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap somewhere,
+  over sorted, alien sources, is steady: no lane steps inside its outer's.
+- **`steady-connect`** (Placed) — FALSITY, `NO EVIDENCE`: a connect somewhere,
+  over sorted, alien sources, is steady: its source's steps tie with nothing.
+- **`steady-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer somewhere, over
+  sorted, alien sources, is steady.
 - **`reach-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program
   subscribed is held to any `Rules`; `reach` there, short of a recursion.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
   steps merge into its body in order.
 - **`ordered-rejoin`** (Placed) — FALSITY, `REFUTED`: a join keeps a steady
   source's order.
+- **`steady-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`: a join keeps an alien
+  steady run steady.
+- **`steady-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
+  steady.
+- **`steady-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run somewhere
+  is steady.
+- **`steady-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is steady.
 - **`ordered-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps the order.
 - **`ordered-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run is in
   order.

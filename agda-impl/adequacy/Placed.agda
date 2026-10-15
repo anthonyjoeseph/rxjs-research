@@ -227,6 +227,43 @@ ordered (ordered-scan f z (skip k r)  o) = atop-scan f z k (force r) (proj₁ (o
 ordered (ordered-scan f z (end k)     o) = tt
 ordered (ordered-scan f z hush        o) = tt
 
+-- A value changed, or a running total, keeps a run steady.
+clear-map : ∀ {A B} (f : A → B) k (e : Events A) → Clear k e → Clear k (M.mapᴱ f e)
+clear-map f k (out _ _ _) c = c
+clear-map f k (skip _ _)  c = c
+clear-map f k (end _)     c = c
+clear-map f k hush        c = c
+
+past-map : ∀ {A B} (f : A → B) k (e : Events A) → Past k e → Past k (M.mapᴱ f e)
+past-map f k (out _ _ _) c = c
+past-map f k (skip _ _)  c = c
+past-map f k (end _)     c = c
+past-map f k hush        c = c
+
+steady-map : ∀ {A B} (f : A → B) (e : Events A) → Steady e → Steady (M.mapᴱ f e)
+steady (steady-map f (out k a r) st) = past-map f k (force r) (proj₁ (steady st)) , steady-map f (force r) (proj₂ (steady st))
+steady (steady-map f (skip k r)  st) = clear-map f k (force r) (proj₁ (steady st)) , steady-map f (force r) (proj₂ (steady st))
+steady (steady-map f (end k)     st) = tt
+steady (steady-map f hush        st) = tt
+
+clear-scan : ∀ {A B} (f : B → A → B) z k (e : Events A) → Clear k e → Clear k (M.scanᴱ f z e)
+clear-scan f z k (out _ _ _) c = c
+clear-scan f z k (skip _ _)  c = c
+clear-scan f z k (end _)     c = c
+clear-scan f z k hush        c = c
+
+past-scan : ∀ {A B} (f : B → A → B) z k (e : Events A) → Past k e → Past k (M.scanᴱ f z e)
+past-scan f z k (out _ _ _) c = c
+past-scan f z k (skip _ _)  c = c
+past-scan f z k (end _)     c = c
+past-scan f z k hush        c = c
+
+steady-scan : ∀ {A B} (f : B → A → B) z (e : Events A) → Steady e → Steady (M.scanᴱ f z e)
+steady (steady-scan f z (out k a r) st) = past-scan f (f z a) k (force r) (proj₁ (steady st)) , steady-scan f (f z a) (force r) (proj₂ (steady st))
+steady (steady-scan f z (skip k r)  st) = clear-scan f z k (force r) (proj₁ (steady st)) , steady-scan f z (force r) (proj₂ (steady st))
+steady (steady-scan f z (end k)     st) = tt
+steady (steady-scan f z hush        st) = tt
+
 prefix-++ : ∀ k w → Prefix k (k ++ w)
 prefix-++ []      w = tt
 prefix-++ (a ∷ k) w = refl , prefix-++ k w
@@ -823,15 +860,35 @@ postulate
   -- alien to where it subscribes.
   ordered-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Ordered (U.meaning (U.deferᶜ l p []) ρ)
 
-  -- A SUBSCRIPTION OVER STEADY SOURCES IS STEADY: a joiner's skips for
-  -- what it missed sit just past the join, which nothing it rekeys
-  -- lies inside, its sources being alien to it.  Somewhere, not at the
-  -- empty position, where its own steps would sit at bare ticks.
-  --
-  -- REFUTED: 91953190 at the empty position, a lane's timer frame shown just inside the outer's step at its tick
-  -- REFUTED: 42e70878 over sources stepping and then emitting at one position, a takeWhile showing the value inside the step
-  steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
-             → Steady (U.meaning (U.subscribe o p) ρ)
+  -- A COLD'S RUN IS STEADY somewhere: its frames step at its ticks.
+  steady-start : ∀ {A} p (m : From A 0) → p ≢ [] → Steady (M.start p m)
+
+  -- A LIST'S RUN IS STEADY: each value at the next index.
+  steady-of : ∀ {A} p i (xs : List A) → Steady (M.ofᴱ p i xs)
+
+  -- A CUT KEEPS A RUN STEADY: the failing value just inside its own
+  -- position, its completion just past that.
+  steady-take : ∀ {A} i (p : A → Bool) (e : Events A) → Steady e → Steady (M.takeWhileᴱ i p e)
+
+  -- A JOIN KEEPS AN ALIEN STEADY RUN STEADY: what it missed as skips
+  -- just past the join, nothing it shows later inside them.  Not of any
+  -- steady run: one emitting inside `p ++ [ ix 0 ]` after a missed step
+  -- shows it inside those skips.
+  steady-rejoin : ∀ {A} p (e : Events A) → Steady e → Alien p e → Steady (M.rejoin p e)
+
+  -- A FLATMAP SUBSCRIBED SOMEWHERE IS STEADY, over sources sorted and
+  -- alien to it: no lane steps inside its outer's last position.
+  steady-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+              → Steady (U.meaning (U.subscribe (flatMap op f s) p) ρ)
+
+  -- A CONNECT SUBSCRIBED SOMEWHERE IS STEADY, over sources sorted and
+  -- alien to it: its source's steps tie with nothing its body shows.
+  steady-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+                 → Steady (U.meaning (U.subscribe (connect s b) p) ρ)
+
+  -- A DEFER'S RUN IS STEADY somewhere, over sources sorted and alien to it.
+  steady-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+               → Steady (U.meaning (U.deferᶜ l p []) ρ)
 
 
 -- A CONNECT'S SOURCE KEYS NOTHING UNDER ITS BODY: the two are siblings.
@@ -840,6 +897,27 @@ alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p �
 alien-sub o p ρ al =
   alien-apart o (p ++ [ ix 0 ]) (p ++ [ ix 1 ]) ρ (alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ al)
     (sibling p (λ ())) (sibling p (λ ())) (no-tick p)
+
+-- A SUBSCRIPTION OVER STEADY SOURCES IS STEADY: a joiner's skips for
+-- what it missed sit just past the join, which nothing it rekeys
+-- lies inside, its sources being alien to it.  Somewhere, not at the
+-- empty position, where its own steps would sit at bare ticks.
+--
+-- REFUTED: 91953190 at the empty position, a lane's timer frame shown just inside the outer's step at its tick
+-- REFUTED: 42e70878 over sources stepping and then emitting at one position, a takeWhile showing the value inside the step
+steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+           → Steady (U.meaning (U.subscribe o p) ρ)
+steady-sub (cold c) p ρ np so cl = subst Steady (sym (U.start-meaning p (lower c) ρ)) (steady-start p (lower c) np)
+steady-sub empty p ρ np so cl = record { steady = tt }
+steady-sub (of xs) p ρ np so cl = steady-of p 0 xs
+steady-sub (map f s) p ρ np so cl = steady-map f _ (steady-sub s p ρ np so cl)
+steady-sub (scan f z s) p ρ np so cl = steady-scan f z _ (steady-sub s p ρ np so cl)
+steady-sub (takeWhile i q s) p ρ np so cl = steady-take i q _ (steady-sub s p ρ np so cl)
+steady-sub (flatMap op f s) p ρ np so cl = steady-flat op f s p ρ np so cl
+steady-sub (connect s b) p ρ np so cl = steady-connect s b p ρ np so cl
+steady-sub (connected i) p ρ np so cl =
+  steady-rejoin p _ (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
+steady-sub (defer l) p ρ np so cl = steady-defer l p ρ np so cl
 
 -- A program subscribed anywhere, over sorted sources alien to where it
 -- subscribes, is placed.
