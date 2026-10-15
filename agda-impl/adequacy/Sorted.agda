@@ -195,21 +195,27 @@ module Sorting (R : Set) where
   ----------------------------------------------------------------------
   -- THE WALK: a well configuration rises
 
-  -- What waits on the stack, well: each continuation well where it
-  -- resumes, given the last delivery no later than there.
-  data WellStack (p : Pos) : ∀ {w X} → Stack w X → Set₁ where
-    bottomʷ : ∀ {w} → WellStack p (bottom {w})
-    restʷ   : ∀ {u w B} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → (∀ lo → lo ≤ᵖ p → Well p lo m) → WellStack p k → WellStack p (push (rest m) ρ k)
-    backʷ   : ∀ {u w B} q {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → (∀ lo → lo ≤ᵖ q → Well q lo m) → WellStack q k → WellStack p (push (back q m) ρ k)
-    reholdʷ : ∀ {u w} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p k → WellStack p (push rehold ρ k)
-    toldʷ   : ∀ {u w} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p k → WellStack p (push told ρ k)
+  -- What waits on the stack, well.  `WellStack p lo k`: pushed at `p`
+  -- with the last delivery at `lo`, `k` resumes well from wherever a
+  -- scope at `p` may leave the last, as `Well`'s own continuations do.
+  -- Each frame was pushed where the one below it had settled.
+  data WellStack (p lo : Pos) : ∀ {w X} → Stack w X → Set₁ where
+    bottomʷ : ∀ {w} → WellStack p lo (bottom {w})
+    restʷ   : ∀ {u w B lo₀} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Settled p lo₀ lo → (∀ lo′ → Settled p lo lo′ → Well p lo′ m)
+            → WellStack p lo₀ k → WellStack p lo (push (rest m) ρ k)
+    backʷ   : ∀ {u w B lo₀} q {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Settled q lo₀ lo → (∀ lo′ → Settled p lo lo′ → Well q lo′ m)
+            → WellStack q lo₀ k → WellStack p lo (push (back q m) ρ k)
+    reholdʷ : ∀ {u w} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p lo k → WellStack p lo (push rehold ρ k)
+    toldʷ   : ∀ {u w} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p lo k → WellStack p lo (push told ρ k)
 
-  -- What runs next, well at the configuration's position.
+  -- What runs next, well at the configuration's position, the last
+  -- delivery settled from where the top frame was pushed.
   data WellCtl {h : World} (lo p : Pos) : Ctl h → Set₁ where
-    runʷ    : ∀ {w B a} {σ : w ⊑ h} {k : Stack w B} → Well p lo a → WellStack p k → WellCtl lo p (run a σ k)
-    retʷ    : ∀ {w X x} {σ : w ⊑ h} {k : Stack w X} → WellStack p k → WellCtl lo p (ret x σ k)
-    heldʷ   : ∀ {w} {σ : w ⊑ h} {k : Stack w ⊤} → WellStack p k → WellCtl lo p (held σ k)
-    askingʷ : ∀ {w X B e k′} {σ : w ⊑ h} {k : Stack w B} → (∀ x → Well p p (k′ x)) → WellStack p k → WellCtl lo p (asking {X = X} e k′ σ k)
+    runʷ    : ∀ {w B a lo₀} {σ : w ⊑ h} {k : Stack w B} → Settled p lo₀ lo → Well p lo a → WellStack p lo₀ k → WellCtl lo p (run a σ k)
+    retʷ    : ∀ {w X x lo₀} {σ : w ⊑ h} {k : Stack w X} → Settled p lo₀ lo → WellStack p lo₀ k → WellCtl lo p (ret x σ k)
+    heldʷ   : ∀ {w lo₀} {σ : w ⊑ h} {k : Stack w ⊤} → Settled p lo₀ lo → WellStack p lo₀ k → WellCtl lo p (held σ k)
+    askingʷ : ∀ {w X B e k′ lo₀} {σ : w ⊑ h} {k : Stack w B} → Settled p lo₀ lo → (∀ x → Well p p (k′ x)) → WellStack p lo₀ k
+            → WellCtl lo p (asking {X = X} e k′ σ k)
 
   -- Every observer the heap holds, well; every unsubscribe it holds,
   -- placeless.
@@ -271,6 +277,13 @@ module Sorting (R : Set) where
     -- computation, or plays a burst, at the configuration's position;
     -- the protocol's indices carry the last delivery, so the run stays
     -- well and a value shown is no earlier than the last.
+    --
+    -- A burst a timer started plays from its cascade, over whatever stack
+    -- the turn found, and what it delivers settles under the cascade, not
+    -- under the stack's position.  So this holds only if the loop's turn
+    -- comes over an empty stack: every `held` over a frame has a burst
+    -- playing or a resume owed.  Nothing in `WellMach` says so yet.
+    -- REFUTED: 6df2c787 with a frame well only from a last delivery no later than its position
     walk-tree : ∀ {lo m} → WellMach lo m → idle m ≡ false → StepBy WellRun lo (step m)
 
     -- THE TIMERS: a step that is not the loop's turn shows values only
@@ -301,7 +314,7 @@ module Sorting (R : Set) where
   -- its observer, nothing on the heap, queued or playing.
   begin-well : (o : PureObs [] R) → WellMach root (begin o)
   begin-well o = record
-    { going = record { ctl    = runʷ (compile-well o [] (lift tt) same recorder _ root root (inj₁ refl) recorder-well (λ σ sub _ p lo → doneʷ)) bottomʷ
+    { going = record { ctl    = runʷ (inj₁ refl , inj₁ refl) (compile-well o [] (lift tt) same recorder _ root root (inj₁ refl) recorder-well (λ σ sub _ p lo → doneʷ)) bottomʷ
                      ; heap   = (λ ()) , (λ ())
                      ; bursts = [] }
     ; queue = record { timers = [] ; queued = AllPairs.[] } }

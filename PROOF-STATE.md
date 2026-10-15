@@ -190,9 +190,10 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   rest of the `-honest` contracts, `connect` first. Decides whether the
   per-kernel contracts compose across a shared heap and a hot run.
 - **THE WALK.** `walk-tree`, `walk-timers` and `turn` by the step's
-  cases, over `WellMach`'s run and queue. Decides whether same-tick timers
-  pop in the order of the positions they were set at (`Before`), or the
-  queue needs more than that order.
+  cases, over `WellMach`'s run and queue, each frame carrying the last
+  delivery it was pushed at. Ruled out: a frame well only from below its
+  position. Decides whether the loop's turn always finds an empty stack,
+  and whether same-tick timers pop in the order they were set (`Before`).
 - **THE PROTOCOL, THE REST.** The remaining kernel `-well` rows; `connect`
   and `flatMap` lead, their subscriptions scoped under `ix 0`, `ix 1` and
   `sub`. Decides whether a callback's position travels with it on the heap.
@@ -206,8 +207,9 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   well-positioned, its failing value under `ix 0`, its completion `last`.
 - **`walk-timers`** (Sorted) — FALSITY, `NO EVIDENCE`: a step not the loop's
   turn keeps every timer past what it shows, queued in `Before` order.
-- **`walk-tree`** (Sorted) — FALSITY, `NO EVIDENCE`: a step not the loop's turn
-  keeps the run well and shows nothing earlier.
+- **`walk-tree`** (Sorted) — FALSITY, `REFUTED`: a step not the loop's turn
+  keeps the run well and shows nothing earlier; a timer's burst needs an empty
+  stack under it.
 - **`turn`** (Sorted) — FALSITY, `NO EVIDENCE`: the loop's turn pops the
   earliest timer, its burst past every position shown.
 - **`connectᴷ-well`** (Sorted) — FALSITY, `REFUTED`: `connect` well-positioned,
