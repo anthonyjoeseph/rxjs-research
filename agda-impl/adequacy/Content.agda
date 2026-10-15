@@ -39,6 +39,7 @@ open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Sane using (Sane)
+open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; _∼_; _∼∞_; ∼-sym; out∼; end∼; skip∼; skipˡ; skipʳ; []; os; afterᴱ)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; Out; note; module Pure)
@@ -262,8 +263,8 @@ module Honesty (R : Set) where
   -- reads it as its end alone.
   --
   -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
-  step-skips : ∀ g → Sane [] g → residual g ≃ after (U.step g)
-  step-skips g sn = os g [] tt sn tt
+  step-skips : ∀ g → Sane [] g → Placed g [] → residual g ≃ after (U.step g)
+  step-skips g sn pl = os g [] tt sn pl tt
 
   postulate
     -- The turn, nothing held and no timer queued: the ghost shows
@@ -299,16 +300,16 @@ module Honesty (R : Set) where
   -- silently to the next, or records a least value of the residual, or
   -- ends it.  By the re-entry state.
   -- The stepper is the meaning, as sets.
-  step-alike : ∀ g → Sane [] g → residual g ≋ after (U.step g)
-  step-alike g sn = same-skips (step-skips g sn)
+  step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
+  step-alike g sn pl = same-skips (step-skips g sn pl)
 
-  residual-steps : ∀ g → Sane [] g → Steps (residual g) (U.step g)
-  residual-steps g sn = steps-after (U.step g) (step-alike g sn)
+  residual-steps : ∀ g → Sane [] g → Placed g [] → Steps (residual g) (U.step g)
+  residual-steps g sn pl = steps-after (U.step g) (step-alike g sn pl)
 
   strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
-  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st sn) e =
+  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st sn pl) e =
     completeˢ (proj₂ e (proj₁ rs)) λ h → proj₂ rs (proj₁ e h)
-    where rs = subst (Steps (residual g)) st (residual-steps g sn)
+    where rs = subst (Steps (residual g)) st (residual-steps g sn pl)
   strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
     with Carried.ctlAs cr | Carried.meets cr | Books.paidUp (Carried.books cr) | Books.clocked (Carried.books cr)
        | Books.running (Carried.books cr)
@@ -317,7 +318,7 @@ module Honesty (R : Set) where
     | noteAs ks x K | g′ , _ , st | refl | ck | refl =
     valueˢ ck (proj₂ e (proj₁ rs)) (λ h → proj₂ e (proj₁ (proj₂ rs) h)) (λ h → proj₂ (proj₂ rs) (proj₁ e h))
       (note-least {g = g} cr refl st) (record { ghost = g′ ; same = ≋-refl ; mirror = note-onward {g = g} cr refl st refl })
-    where rs = subst (Steps (residual g)) st (residual-steps g (Carried.sane cr))
+    where rs = subst (Steps (residual g)) st (residual-steps g (Carried.sane cr) (Carried.placed cr))
   strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
     | calmAs | _ | refl | _ | refl with ts
   ... | []    = drainedˢ λ h → turn-dry {g = g} cr refl refl refl (proj₁ e h)

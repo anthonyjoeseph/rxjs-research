@@ -40,6 +40,7 @@ open import operation.PureObservable using (Pureᴾ; Out; note; fin; module Pure
 open import operation.Machine using (module Machine)
 import denotation.Unfold as U
 open import adequacy.Sane using (Sane; sane-subscribe)
+open import adequacy.Placed using (placed-subscribe) renaming (Placed to Placedᵍ)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
 module Strongly (R : Set) where
@@ -902,6 +903,7 @@ module Strongly (R : Set) where
     H = Conf.heap (Mach.conf m)
     field
       sane    : Sane []ᴬ g
+      placed  : Placedᵍ g []ᴬ
       tree    : Sub (Conf.world (Mach.conf m)) [] R
       ctlAs   : Against.CtlAs tree (Conf.pos (Mach.conf m)) (Conf.ctl (Mach.conf m)) (Mach.bursts m)
       meets   : Meets ctlAs (At.part H tree) g
@@ -936,13 +938,14 @@ module Strongly (R : Set) where
   data Strong (g : U.Node [] R) (m : Mach) : Set₁ where
     carried : Carried g m → Strong g m
     closing : ∀ {h hp p w B k σ K} → Mach.conf m ≡ ⟨_,_,_⟩ {h} hp p (asking {w = w} {B = B} fin k σ K)
-            → Mach.ended m ≡ false → U.step g ≡ U.endˢ p → Sane []ᴬ g → Strong g m
+            → Mach.ended m ≡ false → U.step g ≡ U.endˢ p → Sane []ᴬ g → Placedᵍ g []ᴬ → Strong g m
 
   -- THE LAUNCH IS A SUBSCRIPTION ABOUT TO BEGIN: the program, pending at
   -- the root, nothing yet allocated or owed.
   strong-begin : (o : Obs Timeline [] R) → Strong (U.subscribe o root) (begin o)
   strong-begin o = carried record
     { sane    = sane-subscribe o root (λ ())
+    ; placed  = placed-subscribe o
     ; tree    = pendingˢ o root
     ; ctlAs   = Against.subAs here ([] , []ᴬ , same , refl , ≗-refl _) Against.bottomAs
     ; meets   = refl

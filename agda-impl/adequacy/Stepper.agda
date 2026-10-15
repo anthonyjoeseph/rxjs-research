@@ -22,12 +22,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 import Tree as T
 open import Tree using (Later)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; out⁼; skip⁼; end⁼; hush⁼; agree)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl)
   renaming (sub to subᴾ)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Told)
+open import adequacy.Placed using (Atop; Ordered; ordered; Placed; Within; Placedᴹ; Placedᴸ)
 
 open Events∞
 
@@ -246,10 +247,10 @@ First k (U.ended _ ∷ δ) = First k δ
 Shows : ∀ {Γ A} → U.Node Γ A → Env Γ → Set
 Shows c δ = First (U.headˢ (U.step c)) δ → U.meaning c (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) (U.step c)
 
--- Every running source shows its step.
+-- Every running source shows its step, and is placed.
 Settled : ∀ {Γ} → Env Γ → Set
 Settled []              = ⊤
-Settled (U.live s  ∷ δ) = Shows s δ × Settled δ
+Settled (U.live s  ∷ δ) = Shows s δ × Placed s (ρᴱ δ) × Settled δ
 Settled (U.ended _ ∷ δ) = Settled δ
 
 ------------------------------------------------------------------------
@@ -333,31 +334,8 @@ postulate
   -- showing its step whenever it comes first, a flatMap's meaning is what
   -- its step shows.
   go-skips : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs (δ : Env Γ) → Settled δ
-           → Sane (flags δ) (U.flatMapᶜ op g o ls qs) → Showsᴹ o δ → Showsᴸ ls δ → Shows (U.flatMapᶜ op g o ls qs) δ
-
-  -- A RUNNING CONNECT STEPS AS IT MEANS: its body, reading its source,
-  -- and its source, each showing its step whenever it comes first, the
-  -- connect's meaning is what its step shows: its body's step or its
-  -- source's, a value fed to the body's joiners.
-  --
-  -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
-  --   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
-  --   (`M.rejoin`), and a value from before its join as a skip; the
-  --   stepper feeds a joiner values only, and only those after it joined.
-  -- DEAD ROUTE: exact agreement per approximant with the stepper's joiner
-  --   shown every source step as `M.rejoin` shows it.  A lane a flatMap
-  --   has yet to subscribe reads its connect's source from where the
-  --   ghost's source stands, so the meaning shows it one pre-join skip at
-  --   `p ++ [ ix i ]` per source step before its join, and a source step
-  --   leaves one fewer.  Witness 950a4208.
-  -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
-  --   step history.  The ghost is the witness's open part (`part`), which
-  --   keeps no count of a source's steps, and a silent run is matched by
-  --   the residual as a set alone (`Ahead`), so no field of the witness
-  --   can keep the count a lane's pre-join skips need.
-  -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
-  live-skips : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) → Settled δ
-             → Sane (flags δ) (U.connectᶜ b (U.live s)) → Shows b (U.live s ∷ δ) → Shows s δ → Shows (U.connectᶜ b (U.live s)) δ
+           → Sane (flags δ) (U.flatMapᶜ op g o ls qs) → Placed (U.flatMapᶜ op g o ls qs) (ρᴱ δ)
+           → Showsᴹ o δ → Showsᴸ ls δ → Shows (U.flatMapᶜ op g o ls qs) δ
 
   -- A DEFER STEPS AS IT MEANS: one skip, then the program it defers
   -- subscribed, as the fold's meaning of it.
@@ -421,34 +399,303 @@ shut-after c {ρ} (U.skipˢ k b)  = skip-same (sym (shut-meaning (here refl) c b
 shut-after c (U.endˢ e)         = ≃-refl (end e)
 shut-after c U.hushˢ            = ≃-refl hush
 
+mutual
+  shut-placed : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placed (U.shut i c n) ρ → Placed n ρ
+  shut-placed i c n ρ l (o , w) = subst Ordered (shut-meaning i c n ρ l) o , shut-within i c n ρ l w
+
+  shut-within : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Within (U.shut i c n) ρ → Within n ρ
+  shut-within i c (U.framesᶜ τ e m)         ρ l w = w
+  shut-within i c (U.burstᶜ τ r k b)        ρ l w = w
+  shut-within i c (U.endᶜ p)                ρ l w = w
+  shut-within i c (U.ofᶜ p k xs)            ρ l w = w
+  shut-within i c (U.mapᶜ f n)              ρ l w = shut-placed i c n ρ l w
+  shut-within i c (U.scanᶜ f z n)           ρ l w = shut-placed i c n ρ l w
+  shut-within i c (U.takeWhileᶜ k p n)      ρ l w = shut-placed i c n ρ l w
+  shut-within i c (U.flatMapᶜ op g o ls qs) ρ l (wo , wl) = shut-placedᴹ i c o ρ l wo , shut-placedᴸ i c ls ρ l wl
+  shut-within i c (U.joinᶜ j p xs e)        ρ l w = tt
+  shut-within i c (U.connectᶜ b (U.live s)) ρ l (wb , ws) =
+    shut-placed (there i) c b (U.meaning s ρ ∷ᴬ ρ) l (subst (λ x → Placed (U.shut (there i) c b) (x ∷ᴬ ρ)) (shut-meaning i c s ρ l) wb)
+    , shut-placed i c s ρ l ws
+  shut-within i c (U.connectᶜ b (U.ended e)) ρ l w = shut-placed (there i) c b (end e ∷ᴬ ρ) l w
+  shut-within i c (U.deferᶜ k p)            ρ l w = w
+
+  shut-placedᴹ : ∀ {Γ A B} (i : A ∈ Γ) c (o : Maybe (U.Node Γ B)) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placedᴹ (U.shutᴹ i c o) ρ → Placedᴹ o ρ
+  shut-placedᴹ i c nothing  ρ l w = tt
+  shut-placedᴹ i c (just n) ρ l w = shut-placed i c n ρ l w
+
+  shut-placedᴸ : ∀ {Γ A B} (i : A ∈ Γ) c (ns : List (U.Node Γ B)) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placedᴸ (U.shutᴸ i c ns) ρ → Placedᴸ ns ρ
+  shut-placedᴸ i c []       ρ l w        = tt
+  shut-placedᴸ i c (n ∷ ns) ρ l (wn , ws) = shut-placed i c n ρ l wn , shut-placedᴸ i c ns ρ l ws
+
+------------------------------------------------------------------------
+-- A running connect
+
+≃-sym : ∀ {A} {x y : Events A} → x ≃ y → y ≃ x
+≃-sym p = record { alike = ∼-sym (alike p) ; stalls = λ v → proj₂ (stalls p v) , proj₁ (stalls p v) }
+
+skip-cong : ∀ {A k} {l r : Events∞ A} → force l ≃ force r → skip k l ≃ skip k r
+skip-cong p = record
+  { alike  = skip∼ (record { ∼force = alike p })
+  ; stalls = λ v → (λ s → record { stays = proj₁ (stays s) , proj₁ (stalls p v) (proj₂ (stays s)) })
+                 , (λ s → record { stays = proj₁ (stays s) , proj₂ (stalls p v) (proj₂ (stays s)) }) }
+
+-- The events' first is taken after a body's event at `k`.
+Lags : ∀ {A} → Pos → Events A → Set
+Lags k (out h _ _) = (h ++ [ ix 0 ]) <ᵖ k ≡ false
+Lags k (skip h _)  = (h ++ [ ix 0 ]) <ᵖ k ≡ false
+Lags k (end _)     = ⊤
+Lags k hush        = ⊤
+
+-- The source's next taken after the body's, or before it.
+ahead-out : ∀ {A B} k (a : B) (r : Events∞ B) q (t : Events∞ A) b (r′ : Events∞ B) → b ≡ false
+          → force r′ ≡ M.ahead (force r) q t (M.before q (force r)) → M.ahead (out k a r) q t b ≃ out k a r′
+ahead-out k a r q t .false r′ refl e = out-same (sym e)
+
+ahead-skip : ∀ {A B} k (r : Events∞ B) q (t : Events∞ A) b (r′ : Events∞ B) → b ≡ false
+           → force r′ ≡ M.ahead (force r) q t (M.before q (force r)) → M.ahead (skip k r) q t b ≃ skip k r′
+ahead-skip k r q t .false r′ refl e = skip-same (sym e)
+
+ahead-end : ∀ {A B} k q (t : Events∞ A) b → b ≡ false → M.ahead {B = B} (end k) q t b ≃ end k
+ahead-end k q t .false refl = ≃-refl (end k)
+
+ahead-lead : ∀ {A B} (x : Events B) q (t : Events∞ A) b → b ≡ true → M.ahead x q t b ≃ skip q (λ where .force → M.beside x (force t))
+ahead-lead x q t .true refl = skip-same refl
+
+beside-out : ∀ {A B} k (a : B) (r : Events∞ B) (e : Events A) (r′ : Events∞ B) → Lags k e
+           → force r′ ≡ M.beside (force r) e → M.beside (out k a r) e ≃ out k a r′
+beside-out k a r (out h x t) r′ lag f = ahead-out k a r (h ++ [ ix 0 ]) t _ r′ lag f
+beside-out k a r (skip h t)  r′ lag f = ahead-out k a r (h ++ [ ix 0 ]) t _ r′ lag f
+beside-out k a r (end c)     r′ lag f = out-same (sym f)
+beside-out k a r hush        r′ lag f = out-same (sym f)
+
+beside-skip : ∀ {A B} k (r : Events∞ B) (e : Events A) (r′ : Events∞ B) → Lags k e
+            → force r′ ≡ M.beside (force r) e → M.beside (skip k r) e ≃ skip k r′
+beside-skip k r (out h x t) r′ lag f = ahead-skip k r (h ++ [ ix 0 ]) t _ r′ lag f
+beside-skip k r (skip h t)  r′ lag f = ahead-skip k r (h ++ [ ix 0 ]) t _ r′ lag f
+beside-skip k r (end c)     r′ lag f = skip-same (sym f)
+beside-skip k r hush        r′ lag f = skip-same (sym f)
+
+beside-end : ∀ {A B} k (e : Events A) → Lags k e → M.beside {B = B} (end k) e ≃ end k
+beside-end k (out h x t) lag = ahead-end k (h ++ [ ix 0 ]) t _ lag
+beside-end k (skip h t)  lag = ahead-end k (h ++ [ ix 0 ]) t _ lag
+beside-end k (end c)     lag = ≃-refl (end k)
+beside-end k hush        lag = ≃-refl (end k)
+
+-- What a step shows sits atop the stepped node's meaning, and that node
+-- is placed.
+Placedˢ : ∀ {Γ A} → NEnv Γ → U.Step Γ A → Set
+Placedˢ ρ (U.outˢ k a c) = Atop k (U.meaning c ρ) × Placed c ρ
+Placedˢ ρ (U.skipˢ k c)  = Atop k (U.meaning c ρ) × Placed c ρ
+Placedˢ ρ (U.endˢ k)     = ⊤
+Placedˢ ρ U.hushˢ        = ⊤
+
+ordered-after : ∀ {Γ A} (ρ : NEnv Γ) (s : U.Step Γ A) → Placedˢ ρ s → Ordered (afterᴱ ρ s)
+ordered (ordered-after ρ (U.outˢ k a c) (at , pl)) = at , proj₁ pl
+ordered (ordered-after ρ (U.skipˢ k c)  (at , pl)) = at , proj₁ pl
+ordered (ordered-after ρ (U.endˢ k)     _)         = tt
+ordered (ordered-after ρ U.hushˢ        _)         = tt
+
+-- A step that comes first just past `q` comes first at `q`.
+not-past : ∀ x y z → y <ᵖ z ≡ true → not (x <ᵖ z) ≡ true → not (x <ᵖ y) ≡ true
+not-past x y z yz w with x <ᵖ y in e
+... | false = refl
+... | true  = subst (λ b → not b ≡ true) (<ᵖ-trans x y z e yz) w
+
+first-sub : ∀ {Γ} q (δ : Env Γ) → First (just (q ++ [ ix 0 ])) δ → First (just q) δ
+first-sub q []              tt       = tt
+first-sub q (U.ended _ ∷ δ) f        = first-sub q δ f
+first-sub q (U.live s  ∷ δ) (w , f) = wins (U.headˢ (U.step s)) w , first-sub q δ f
+  where wins : ∀ h → Wins (just (q ++ [ ix 0 ])) h ≡ true → Wins (just q) h ≡ true
+        wins nothing  w = refl
+        wins (just r) w = not-past (r ++ [ ix 0 ]) q (q ++ [ ix 0 ]) (<ᵖ-below q []) w
+
+-- A source's step taken just past itself comes first.
+wins-self : ∀ q → Wins (just (q ++ [ ix 0 ])) (just q) ≡ true
+wins-self q = cong not (<ᵖ-irrefl (q ++ [ ix 0 ]))
+
+postulate
+  -- `M.beside` respects `≃` between events in order.
+  beside-≃ : ∀ {A B} {x x′ : Events B} {y y′ : Events A} → Ordered x → Ordered x′ → Ordered y → Ordered y′
+           → x ≃ x′ → y ≃ y′ → M.beside x y ≃ M.beside x′ y′
+
+  -- A body reads alike sources alike, both in order and it placed under
+  -- each.
+  env-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) {x y : Events A} → x ≃ y → Ordered x → Ordered y
+        → Placed b (x ∷ᴬ ρ) → Placed b (y ∷ᴬ ρ) → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning b (y ∷ᴬ ρ)
+
+  -- A BODY FED ITS SOURCE'S STEP IS ALIKE THE BODY READING IT: a joiner
+  -- fed the value its source shows at `q`, reading the source past it.
+  --
+  -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
+  --   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
+  --   (`M.rejoin`), and a value from before its join as a skip; the
+  --   stepper feeds a joiner values only, and only those after it joined.
+  -- DEAD ROUTE: exact agreement per approximant with the stepper's joiner
+  --   shown every source step as `M.rejoin` shows it.  A lane a flatMap
+  --   has yet to subscribe reads its connect's source from where the
+  --   ghost's source stands, so the meaning shows it one pre-join skip at
+  --   `p ++ [ ix i ]` per source step before its join, and a source step
+  --   leaves one fewer.  Witness 950a4208.
+  -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
+  --   step history.  The ghost is the witness's open part (`part`), which
+  --   keeps no count of a source's steps, and a silent run is matched by
+  --   the residual as a set alone (`Ahead`), so no field of the witness
+  --   can keep the count a lane's pre-join skips need.
+  -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
+  fed-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) q (a : A) (l : Events∞ A) {x : Events A} → x ≃ out q a l
+        → Ordered x → Ordered (out q a l) → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
+        → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
+
+  -- A skip atop what follows it is forgotten.
+  skip-drop : ∀ {A k} {l : Events∞ A} → Ordered (skip k l) → skip k l ≃ force l
+
+  -- A NODE'S MEANING LAGS: whatever it shows is taken after a body's
+  -- event at `k` that comes before its step and its sources'.
+  lags : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ k
+       → Wins (just k) (U.headˢ (U.step c)) ≡ true → First (just k) δ → Lags k (U.meaning c (ρᴱ δ))
+
+  -- A NODE'S MEANING LEADS NOTHING: whatever it shows comes after `j`,
+  -- which comes before its step and its sources'.
+  leads : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ j
+        → U.beforeˢ j (U.step c) ≡ true → First (just j) δ → M.before j (U.meaning c (ρᴱ δ)) ≡ true
+
+  -- A STEP KEEPS THE GHOST PLACED: the stepped node is placed, atop what
+  -- the step shows.
+  placed-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
+               → Placedˢ (ρᴱ δ) (U.step c)
+
+-- The source's next taken after the body's step.
+LagsHead : ∀ {Γ A B} → U.Step Γ B → Events A → Set
+LagsHead (U.outˢ k _ _) e = Lags k e
+LagsHead (U.skipˢ k _)  e = Lags k e
+LagsHead (U.endˢ k)     e = Lags k e
+LagsHead U.hushˢ        e = ⊥
+
+beside-head : ∀ {Γ A B} (s : U.Node Γ A) (ρ : NEnv Γ) (sb : U.Step (A ∷ Γ) B) → LagsHead sb (U.meaning s ρ)
+            → M.beside (afterᴱ (U.meaning s ρ ∷ᴬ ρ) sb) (U.meaning s ρ) ≃ afterᴱ ρ (U.bodyˢ (U.live s) sb)
+beside-head s ρ (U.outˢ k a b) lag = beside-out k a _ (U.meaning s ρ) _ lag refl
+beside-head s ρ (U.skipˢ k b)  lag = beside-skip k _ (U.meaning s ρ) _ lag refl
+beside-head s ρ (U.endˢ k)     lag = beside-end k (U.meaning s ρ) lag
+
+ordered-hush : ∀ {A} → Ordered {A} hush
+ordered ordered-hush = tt
+
+ordered-end : ∀ {A} k → Ordered {A} (end k)
+ordered (ordered-end k) = tt
+
+-- The connect, its body's step and its source's named.
+conn : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) (st : Settled δ)
+     → Sane (flags δ) (U.connectᶜ b (U.live s)) → Placed (U.connectᶜ b (U.live s)) (ρᴱ δ)
+     → (sb : U.Step (A ∷ Γ) B) (ss : U.Step Γ A)
+     → (Wins (U.headˢ sb) (U.headˢ ss) ≡ true → First (U.headˢ sb) δ → U.meaning b (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) ≃ afterᴱ (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) sb)
+     → (First (U.headˢ ss) δ → U.meaning s (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) ss)
+     → (∀ k → Wins (just k) (U.headˢ ss) ≡ true → First (just k) δ → Lags k (U.meaning s (ρᴱ δ)))
+     → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → M.before j (U.meaning b (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ)) ≡ true)
+     → Placedˢ (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) sb → Placedˢ (ρᴱ δ) ss → Placedˢ (ρᴱ δ) (U.sourceˢ b sb s ss)
+     → First (U.headˢ (U.sourceˢ b sb s ss)) δ
+     → U.meaning (U.connectᶜ b (U.live s)) (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) (U.sourceˢ b sb s ss)
+conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs lg ld pab pas pa fi
+  where
+  ρ  = ρᴱ δ
+  ms = U.meaning s ρ
+  MB = U.meaning b (ms ∷ᴬ ρ)
+
+  -- The body's step taken first.
+  body : ∀ sb → Placedˢ (ms ∷ᴬ ρ) sb → MB ≃ afterᴱ (ms ∷ᴬ ρ) sb → LagsHead sb ms → M.beside MB ms ≃ afterᴱ ρ (U.bodyˢ (U.live s) sb)
+  body sb pab e lag = ≃-trans (beside-≃ (proj₁ pb) (ordered-after (ms ∷ᴬ ρ) sb pab) (proj₁ ps) (proj₁ ps) e (≃-refl ms)) (beside-head s ρ sb lag)
+
+  go : ∀ sb ss
+     → (Wins (U.headˢ sb) (U.headˢ ss) ≡ true → First (U.headˢ sb) δ → MB ≃ afterᴱ (ms ∷ᴬ ρ) sb)
+     → (First (U.headˢ ss) δ → ms ≃ afterᴱ ρ ss)
+     → (∀ k → Wins (just k) (U.headˢ ss) ≡ true → First (just k) δ → Lags k ms)
+     → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → M.before j MB ≡ true)
+     → Placedˢ (ms ∷ᴬ ρ) sb → Placedˢ ρ ss → Placedˢ ρ (U.sourceˢ b sb s ss)
+     → First (U.headˢ (U.sourceˢ b sb s ss)) δ → M.beside MB ms ≃ afterᴱ ρ (U.sourceˢ b sb s ss)
+  go U.hushˢ          U.hushˢ hb hs lg ld pab pas pa fi =
+    beside-≃ (proj₁ pb) ordered-hush (proj₁ ps) ordered-hush (hb refl fi) (hs fi)
+  go sb@(U.outˢ k _ _) U.hushˢ hb hs lg ld pab pas pa fi = body sb pab (hb refl fi) (lg k refl fi)
+  go sb@(U.skipˢ k _)  U.hushˢ hb hs lg ld pab pas pa fi = body sb pab (hb refl fi) (lg k refl fi)
+  go sb@(U.endˢ k)     U.hushˢ hb hs lg ld pab pas pa fi = body sb pab (hb refl fi) (lg k refl fi)
+  go sb (U.outˢ q x s′) hb hs lg ld pab pas pa fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
+  go U.hushˢ           (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false with () ← eq
+  go sb@(U.outˢ k _ _) (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.outˢ q x s′) hb hs lg ld pab pas@(_ , ps′) (_ , _ , pbf , _) fi | true =
+    ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) ordOut (≃-refl MB) e₁)
+   (≃-trans (ahead-lead MB (q ++ [ ix 0 ]) _ _ (ld (q ++ [ ix 0 ]) eq (wins-self q) fi))
+            (skip-cong (beside-≃ (proj₁ pb) (proj₁ pbf) (proj₁ ps′) (proj₁ ps′) (fed-≃ b ρ q x _ e₁ (proj₁ ps) ordOut pb pbf) (≃-refl _))))
+    where e₁ = hs (first-sub q δ fi)
+          ordOut = ordered-after ρ (U.outˢ q x s′) (pas)
+  go sb (U.skipˢ q s′) hb hs lg ld pab pas pa fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
+  go U.hushˢ           (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false with () ← eq
+  go sb@(U.outˢ k _ _) (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.skipˢ q s′) hb hs lg ld pab pas (_ , _ , pb′ , ps′) fi | true =
+    ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) ordSk (≃-refl MB) e₁)
+   (≃-trans (ahead-lead MB (q ++ [ ix 0 ]) _ _ (ld (q ++ [ ix 0 ]) eq (wins-self q) fi))
+            (skip-cong (beside-≃ (proj₁ pb) (proj₁ pb′) (proj₁ ps′) (proj₁ ps′)
+                         (env-≃ b ρ (≃-trans e₁ (skip-drop ordSk)) (proj₁ ps) (proj₁ ps′) pb pb′) (≃-refl _))))
+    where e₁ = hs (first-sub q δ fi)
+          ordSk = ordered-after ρ (U.skipˢ q s′) pas
+  go sb (U.endˢ c) hb hs lg ld pab pas pa fi with U.beforeˢ (c ++ [ ix 0 ]) sb in eq
+  go U.hushˢ           (U.endˢ c) hb hs lg ld pab pas pa fi | false with () ← eq
+  go sb@(U.outˢ k _ _) (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.endˢ c) hb hs lg ld pab pas (at , ordX , pbs) fi | true =
+    ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) (ordered-end c) (≃-refl MB) e₁)
+   (≃-trans (env-≃ b ρ e₁ (proj₁ ps) (ordered-end c) pb (shut-placed (here refl) c b (end c ∷ᴬ ρ) refl pbs))
+            (subst (λ X → X ≃ afterᴱ ρ (U.skipˢ (c ++ [ ix 0 ]) (U.connectᶜ (U.shut (here refl) c b) (U.ended c))))
+                   (shut-meaning (here refl) c b (end c ∷ᴬ ρ) refl)
+                   (≃-trans (≃-sym (skip-drop ordSk)) (skip-same refl))))
+    where e₁ = hs (first-sub c δ fi)
+          ordSk : Ordered (skip (c ++ [ ix 0 ]) (λ where .force → U.meaning (U.shut (here refl) c b) (end c ∷ᴬ ρ)))
+          ordered ordSk = at , ordX
+
+-- A RUNNING CONNECT STEPS AS IT MEANS: its body, reading its source, and
+-- its source, each showing its step whenever it comes first, the
+-- connect's meaning is what its step shows: its body's step or its
+-- source's, a value fed to the body's joiners.
+live-skips : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) → Settled δ
+           → Sane (flags δ) (U.connectᶜ b (U.live s)) → Placed (U.connectᶜ b (U.live s)) (ρᴱ δ)
+           → Shows b (U.live s ∷ δ) → Shows s δ → Shows (U.connectᶜ b (U.live s)) δ
+live-skips b s δ st sn@(snb , sns) pl@(_ , pb , ps) hb hs =
+  conn b s δ st sn pl (U.step b) (U.step s) (λ w f → hb (w , f)) hs
+       (λ k w f → lags s δ st ps k w f)
+       (λ j bj w f → leads b (U.live s ∷ δ) (hs , ps , st) pb j bj (w , f))
+       (placed-after b (U.live s ∷ δ) (hs , ps , st) snb pb) (placed-after s δ st sns ps)
+       (placed-after (U.connectᶜ b (U.live s)) δ st sn pl)
+
 ------------------------------------------------------------------------
 -- Every node
 
 mutual
-  os : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Shows c δ
-  os (U.framesᶜ τ e m)    δ st sn fi = frames-after τ e m
-  os (U.burstᶜ τ r i b)   δ st sn fi = burst-after τ r i b
-  os (U.endᶜ p)           δ st sn fi = ≃-refl (end p)
-  os (U.ofᶜ p i xs)       δ st sn fi = of-after p i xs
-  os (U.mapᶜ f c)         δ st sn fi =
-    ≃-trans (mapᴱ-≃ f (os c δ st sn (subst (λ k → First k δ) (map-head f (U.step c)) fi))) (map-after f (U.step c))
-  os (U.scanᶜ f z c)      δ st sn fi =
-    ≃-trans (scanᴱ-≃ f z (os c δ st sn (subst (λ k → First k δ) (scan-head f z (U.step c)) fi))) (scan-after f z (U.step c))
-  os (U.takeWhileᶜ i p c) δ st sn fi =
-    ≃-trans (takeWhileᴱ-≃ i p (os c δ st sn (take-first i p (U.step c) δ fi))) (take-after i p (U.step c))
-  os (U.flatMapᶜ op g o ls qs) δ st sn =
-    go-skips op g o ls qs δ st sn (osᴹ o δ st (proj₁ sn)) (osᴸ ls δ st (proj₁ (proj₂ sn)))
-  os (U.joinᶜ i p xs e)   δ st sn fi = join-after i p xs e δ st sn fi
-  os (U.connectᶜ b (U.live s)) δ st (sb , ss) =
-    live-skips b s δ st (sb , ss) (os b (U.live s ∷ δ) (os s δ st ss , st) sb) (os s δ st ss)
-  os (U.connectᶜ b (U.ended c)) δ st sn fi =
-    ≃-trans (os b (U.ended c ∷ δ) st sn (subst (λ k → First k δ) (shut-head c (U.step b)) fi)) (shut-after c (U.step b))
-  os (U.deferᶜ l p)       δ st sn fi = defer-after l p (ρᴱ δ)
+  os : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ) → Shows c δ
+  os (U.framesᶜ τ e m)    δ st sn pl fi = frames-after τ e m
+  os (U.burstᶜ τ r i b)   δ st sn pl fi = burst-after τ r i b
+  os (U.endᶜ p)           δ st sn pl fi = ≃-refl (end p)
+  os (U.ofᶜ p i xs)       δ st sn pl fi = of-after p i xs
+  os (U.mapᶜ f c)         δ st sn (_ , pl) fi =
+    ≃-trans (mapᴱ-≃ f (os c δ st sn pl (subst (λ k → First k δ) (map-head f (U.step c)) fi))) (map-after f (U.step c))
+  os (U.scanᶜ f z c)      δ st sn (_ , pl) fi =
+    ≃-trans (scanᴱ-≃ f z (os c δ st sn pl (subst (λ k → First k δ) (scan-head f z (U.step c)) fi))) (scan-after f z (U.step c))
+  os (U.takeWhileᶜ i p c) δ st sn (_ , pl) fi =
+    ≃-trans (takeWhileᴱ-≃ i p (os c δ st sn pl (take-first i p (U.step c) δ fi))) (take-after i p (U.step c))
+  os (U.flatMapᶜ op g o ls qs) δ st sn pl@(_ , po , pls) =
+    go-skips op g o ls qs δ st sn pl (osᴹ o δ st (proj₁ sn) po) (osᴸ ls δ st (proj₁ (proj₂ sn)) pls)
+  os (U.joinᶜ i p xs e)   δ st sn pl fi = join-after i p xs e δ st sn fi
+  os (U.connectᶜ b (U.live s)) δ st sn@(sb , ss) pl@(_ , pb , ps) =
+    live-skips b s δ st sn pl (os b (U.live s ∷ δ) (os s δ st ss ps , ps , st) sb pb) (os s δ st ss ps)
+  os (U.connectᶜ b (U.ended c)) δ st sn (_ , pb) fi =
+    ≃-trans (os b (U.ended c ∷ δ) st sn pb (subst (λ k → First k δ) (shut-head c (U.step b)) fi)) (shut-after c (U.step b))
+  os (U.deferᶜ l p)       δ st sn pl fi = defer-after l p (ρᴱ δ)
 
-  osᴹ : ∀ {Γ A} (o : Maybe (U.Node Γ A)) (δ : Env Γ) → Settled δ → Saneᴹ (flags δ) o → Showsᴹ o δ
-  osᴹ nothing  δ st sn = tt
-  osᴹ (just c) δ st sn = os c δ st sn
+  osᴹ : ∀ {Γ A} (o : Maybe (U.Node Γ A)) (δ : Env Γ) → Settled δ → Saneᴹ (flags δ) o → Placedᴹ o (ρᴱ δ) → Showsᴹ o δ
+  osᴹ nothing  δ st sn pl = tt
+  osᴹ (just c) δ st sn pl = os c δ st sn pl
 
-  osᴸ : ∀ {Γ A} (ls : List (U.Node Γ A)) (δ : Env Γ) → Settled δ → Saneᴸ (flags δ) ls → Showsᴸ ls δ
-  osᴸ []       δ st sn        = tt
-  osᴸ (c ∷ cs) δ st (sc , sl) = os c δ st sc , osᴸ cs δ st sl
+  osᴸ : ∀ {Γ A} (ls : List (U.Node Γ A)) (δ : Env Γ) → Settled δ → Saneᴸ (flags δ) ls → Placedᴸ ls (ρᴱ δ) → Showsᴸ ls δ
+  osᴸ []       δ st sn        pl        = tt
+  osᴸ (c ∷ cs) δ st (sc , sl) (pc , pl) = os c δ st sc pc , osᴸ cs δ st sl pl

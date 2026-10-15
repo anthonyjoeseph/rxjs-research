@@ -255,6 +255,9 @@ private
 <ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
 <ᵖ-trans p q r h₁ h₂ rewrite lt-pos p q r (isLt-lt h₁) (isLt-lt h₂) = refl
 
+<ᵖ-irrefl : ∀ p → p <ᵖ p ≡ false
+<ᵖ-irrefl p rewrite refl-pos p = refl
+
 
 -- A position is before every position below it, and of two positions
 -- that part at one label, the earlier label's is the earlier.

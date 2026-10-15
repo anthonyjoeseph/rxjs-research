@@ -176,11 +176,16 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE CONNECT.** `live-skips`: a running connect's meaning is what its
-  step shows, its body reading its source alike the body fed its source's
-  step. Ruled out: exact agreement, per approximant or under a ghost
-  anchored in its sources' step history. Decides whether a lane's pre-join
-  skips, one fewer per source step, are all `≃` forgets.
+- **THE CONNECT.** `fed-≃` with `env-≃`, `beside-≃` and `skip-drop`: a
+  running connect is a body over these, its body reading its source alike
+  the body fed its source's step. Ruled out: exact agreement, per
+  approximant or under a ghost anchored in its sources' step history.
+  Decides whether a lane's pre-join skips, one fewer per source step, are
+  all `≃` forgets, and whether `M.beside` respects `≃` between sorted events.
+- **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
+  the meaning's events are sorted, a step keeps every node so, and what a
+  node shows comes after any earlier step. Decides whether `Placed`, a
+  field of `Carried`, is the order the connect's step needs.
 - **THE MERGES.** `go-skips` with `∼-trans`: a flatMap's meaning is what
   its step shows, each lane showing its own. Ruled out: merges over `∼`
   alone, over unsorted events, or with matched skips kept in place.
@@ -206,8 +211,22 @@ by their own silent steps (`Mirror`).
   run, a poll's answer and a popped timer passing silently.
 ### The ledger
 
-- **`live-skips`** (Stepper) — FALSITY, `DEAD ROUTE×3, RECOVERY`: a running
-  connect's meaning is what its step shows.
+- **`fed-≃`** (Stepper) — FALSITY, `DEAD ROUTE×3, RECOVERY`: a body fed its
+  source's step is alike the body reading it.
+- **`env-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a body reads alike sources
+  alike.
+- **`beside-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: `M.beside` respects `≃`
+  between events in order.
+- **`skip-drop`** (Stepper) — FALSITY, `NO EVIDENCE`: a skip atop what follows
+  it is forgotten.
+- **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
+  subscribed at the root is placed.
+- **`placed-after`** (Stepper) — FALSITY, `NO EVIDENCE`: a step keeps the ghost
+  placed.
+- **`lags`** (Stepper) — FALSITY, `NO EVIDENCE`: a node's meaning shows nothing
+  before a body's event that comes first.
+- **`leads`** (Stepper) — FALSITY, `NO EVIDENCE`: a node's meaning shows
+  nothing before an earlier step.
 - **`go-skips`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning is
   what its step shows, each lane showing its own.
 - **`∼-trans`** (Stepper) — FALSITY, `DEAD ROUTE`: weak bisimilarity is
