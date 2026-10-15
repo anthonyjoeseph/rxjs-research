@@ -39,11 +39,11 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
-  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; ix; _<ᵖ_; <ᵖ-tick; <ᵖ-trans)
+  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; ix; _<ᵖ_; <ᵖ-tick; <ᵖ-trans; <ᵖ-apart)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import denotation.Compositional using ([]ᵉ)
-open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
+open import adequacy.Sorted using (_≤ᵖ_; Under; module Sorting)
 open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
@@ -67,9 +67,9 @@ module Honesty (R : Set) where
   open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
-    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗;
+    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
     Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; Taking; taking; taken; feeding; finishing; PathLanes; this-lane; next-lane;
-    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets)
+    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets; Each; Heads)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
@@ -484,29 +484,106 @@ module Honesty (R : Set) where
   Far : ∀ {Γ A} → Pos → U.Node Γ A → Set
   Far p c = ∀ {k} → U.headˢ (U.step c) ≡ just k → Beyond p k
 
-  Farᴹ : ∀ {Γ A} → Pos → Maybe (U.Node Γ A) → Set
-  Farᴹ p nothing  = ⊤
-  Farᴹ p (just c) = Far p c
+  -- A node whose next event is not under `p`.
+  Off : ∀ {Γ A} → Pos → U.Node Γ A → Set
+  Off p c = ∀ {k} → U.headˢ (U.step c) ≡ just k → Under p k → ⊥
 
-  -- EVERY SIBLING THE PATH PASSES WAITS ON `p`: a flatMap's other lanes
-  -- and its outer, a connect's source or body, each next event past
-  -- everything under `p`.  What each side condition of `Lifts` asks,
-  -- given the step at the path's end is under `p`.
+  -- No earlier than `p` and not under it: past all of it.
+  beyond-apart : ∀ {p k} → p ≤ᵖ k → (Under p k → ⊥) → Beyond p k
+  beyond-apart {p} (inj₁ refl) nu = ⊥-elim (nu ([] , sym (++-identityʳ p)))
+  beyond-apart {p} {k} (inj₂ lt) nu = record { past = λ y → <ᵖ-apart p k y lt (λ ys e → nu (ys , e)) }
+
+  far-apart : ∀ {p Γ A} {c : U.Node Γ A} → Heads p c → Off p c → Far p c
+  far-apart hd off e = beyond-apart (hd e) (off e)
+
+  Opt : (∀ {Γ A} → U.Node Γ A → Set) → ∀ {Γ A} → Maybe (U.Node Γ A) → Set
+  Opt P nothing  = ⊤
+  Opt P (just c) = P c
+
+  -- EVERY SIBLING THE PATH PASSES PASSES `P`: a flatMap's other lanes and
+  -- its outer, a connect's source or body.  At `Far p`, what each side
+  -- condition of `Lifts` asks, given the step at the path's end is under
+  -- `p`.
   mutual
-    Clear : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Pos → Path t u → Set₁
-    Clear H p here                    = Lift _ ⊤
-    Clear H p (in-map ρ)              = Clear H p ρ
-    Clear H p (in-scan ρ)             = Clear H p ρ
-    Clear H p (in-take ρ)             = Clear H p ρ
-    Clear H p (in-outer {ls = ls} ρ)  = All (Far p) (At.partLanes H ls) × Clear H p ρ
-    Clear H p (in-lanes {t = t} πL)   = Farᴹ p (At.part H t) × ClearL H p πL
-    Clear H p (in-source {bd = bd} ρ) = Farᴹ p (At.part H bd) × Clear H p ρ
-    Clear H p (in-body {t = t} ρ)     = Farᴹ p (At.part H t) × Clear H p ρ
-    Clear H p (in-defer ρ)            = Clear H p ρ
+    Clear : ∀ {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Set₁
+    Clear H P here                    = Lift _ ⊤
+    Clear H P (in-map ρ)              = Clear H P ρ
+    Clear H P (in-scan ρ)             = Clear H P ρ
+    Clear H P (in-take ρ)             = Clear H P ρ
+    Clear H P (in-outer {ls = ls} ρ)  = All P (At.partLanes H ls) × Clear H P ρ
+    Clear H P (in-lanes {t = t} πL)   = Opt P (At.part H t) × ClearL H P πL
+    Clear H P (in-source {bd = bd} ρ) = Opt P (At.part H bd) × Clear H P ρ
+    Clear H P (in-body {t = t} ρ)     = Opt P (At.part H t) × Clear H P ρ
+    Clear H P (in-defer ρ)            = Clear H P ρ
 
-    ClearL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → Pos → PathLanes ls u → Set₁
-    ClearL H p (this-lane {ls = ls} ρ) = All (Far p) (At.partLanes H ls) × Clear H p ρ
-    ClearL H p (next-lane {l = l} πL)  = All (Far p) (At.partLanes H (l ∷ [])) × ClearL H p πL
+    ClearL : ∀ {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′}
+           → PathLanes ls u → Set₁
+    ClearL H P (this-lane {ls = ls} ρ) = All P (At.partLanes H ls) × Clear H P ρ
+    ClearL H P (next-lane {l = l} πL)  = All P (At.partLanes H (l ∷ [])) × ClearL H P πL
+
+  -- Two facts of every sibling, one.
+  module _ {P Q R′ : ∀ {Γ A} → U.Node Γ A → Set} (f : ∀ {Γ A} {c : U.Node Γ A} → P c → Q c → R′ c) where
+    all-zip : ∀ {Γ A} {cs : List (U.Node Γ A)} → All P cs → All Q cs → All R′ cs
+    all-zip []       []       = []
+    all-zip (a ∷ as) (b ∷ bs) = f a b ∷ all-zip as bs
+
+    opt-zip : ∀ {Γ A} (o : Maybe (U.Node Γ A)) → Opt P o → Opt Q o → Opt R′ o
+    opt-zip nothing  _ _ = tt
+    opt-zip (just c) a b = f a b
+
+    mutual
+      clear-zip : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → Clear H P π → Clear H Q π → Clear H R′ π
+      clear-zip here          _         _         = lift tt
+      clear-zip (in-map ρ)    a         b         = clear-zip ρ a b
+      clear-zip (in-scan ρ)   a         b         = clear-zip ρ a b
+      clear-zip (in-take ρ)   a         b         = clear-zip ρ a b
+      clear-zip (in-outer ρ)  (a , a′)  (b , b′)  = all-zip a b , clear-zip ρ a′ b′
+      clear-zip {H = H} (in-lanes {t = t} πL) (a , a′) (b , b′) = opt-zip (At.part H t) a b , clearL-zip πL a′ b′
+      clear-zip {H = H} (in-source {bd = bd} ρ) (a , a′) (b , b′) = opt-zip (At.part H bd) a b , clear-zip ρ a′ b′
+      clear-zip {H = H} (in-body {t = t} ρ) (a , a′) (b , b′) = opt-zip (At.part H t) a b , clear-zip ρ a′ b′
+      clear-zip (in-defer ρ)  a         b         = clear-zip ρ a b
+
+      clearL-zip : ∀ {h} {H : Heapᴹ h} {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u)
+                 → ClearL H P πL → ClearL H Q πL → ClearL H R′ πL
+      clearL-zip (this-lane ρ)  (a , a′) (b , b′) = all-zip a b , clear-zip ρ a′ b′
+      clearL-zip (next-lane πL) (a , a′) (b , b′) = all-zip a b , clearL-zip πL a′ b′
+
+  -- What every node below passes, every sibling along a path does.
+  module _ {h} {H : Heapᴹ h} {P : ∀ {Γ A} → U.Node Γ A → Set} where
+    opt-each : ∀ {Γ A} (o : Maybe (U.Node Γ A)) → (∀ {c} → o ≡ just c → P c) → Opt P o
+    opt-each nothing  f = tt
+    opt-each (just c) f = f refl
+
+    lane-only : ∀ {Δ B Δ′ A′} {l : Lane h Δ B} {ls} {u : Sub h Δ′ A′} → PathLanes (l ∷ []) u → PathLanes (l ∷ ls) u
+    lane-only (this-lane ρ)  = this-lane ρ
+    lane-only (next-lane ())
+
+    each-lanes : ∀ {Δ B} (ls : List (Lane h Δ B))
+               → (∀ {Δ′ A′} {u : Sub h Δ′ A′} → PathLanes ls u → ∀ {c} → At.part H u ≡ just c → P c) → All P (At.partLanes H ls)
+    each-lanes []                f = []
+    each-lanes (lane c k s ∷ ls) f with At.val H (Kit.live c)
+    ... | false = each-lanes ls (λ πL → f (next-lane πL))
+    ... | true with At.part H s in e
+    ...   | nothing = each-lanes ls (λ πL → f (next-lane πL))
+    ...   | just x  = f (this-lane here) e ∷ each-lanes ls (λ πL → f (next-lane πL))
+
+    mutual
+      clear-each : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Each H P t → (π : Path t u) → Clear H P π
+      clear-each ev here                    = lift tt
+      clear-each ev (in-map ρ)              = clear-each (λ ψ → ev (in-map ψ)) ρ
+      clear-each ev (in-scan ρ)             = clear-each (λ ψ → ev (in-scan ψ)) ρ
+      clear-each ev (in-take ρ)             = clear-each (λ ψ → ev (in-take ψ)) ρ
+      clear-each ev (in-outer {ls = ls} ρ)  = each-lanes ls (λ πL → ev (in-lanes πL)) , clear-each (λ ψ → ev (in-outer ψ)) ρ
+      clear-each ev (in-lanes {t = t} πL)   = opt-each (At.part H t) (ev (in-outer here)) , clearL-each (λ πL′ → ev (in-lanes πL′)) πL
+      clear-each ev (in-source {bd = bd} ρ) = opt-each (At.part H bd) (ev (in-body here)) , clear-each (λ ψ → ev (in-source ψ)) ρ
+      clear-each ev (in-body {t = t} ρ)     = opt-each (At.part H t) (ev (in-source here)) , clear-each (λ ψ → ev (in-body ψ)) ρ
+      clear-each ev (in-defer ρ)            = clear-each (λ ψ → ev (in-defer ψ)) ρ
+
+      clearL-each : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′}
+                  → (∀ {Δ″ A″} {w : Sub h Δ″ A″} → PathLanes ls w → ∀ {c} → At.part H w ≡ just c → P c)
+                  → (πL : PathLanes ls u) → ClearL H P πL
+      clearL-each f (this-lane {ls = ls} ρ) = each-lanes ls (λ πL → f (next-lane πL)) , clear-each (λ ψ → f (this-lane ψ)) ρ
+      clearL-each f (next-lane {l = l} πL)  = each-lanes (l ∷ []) (λ πL′ → f (lane-only πL′)) , clearL-each (λ πL′ → f (next-lane πL′)) πL
 
   -- Walking two paths is walking each.
   mutual
@@ -709,6 +786,7 @@ module Honesty (R : Set) where
       queue   : Queue (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) (Mach.clock m₁) (Mach.timers m₁) T
       books   : Books T (runAs [] (done≗ refl) stack) m₁
       sorted  : Σ Pos λ lo → WellMach lo m₁
+      behind  : Each (Conf.heap (Mach.conf m₁)) (Heads (Conf.pos (Mach.conf m₁))) T
 
   -- The same climb, the value restated at another path.
   reclimb : ∀ {g m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -720,7 +798,7 @@ module Honesty (R : Set) where
   reclimb cl cd lf = record
     { sane = Climbing.sane cl ; placed = Climbing.placed cl ; ctl = Climbing.ctl cl ; code = cd ; stack = Climbing.stack cl ; lifted = lf
     ; owned = Climbing.owned cl ; kernels = Climbing.kernels cl ; meaning = Climbing.meaning cl ; queue = Climbing.queue cl
-    ; books = Climbing.books cl ; sorted = Climbing.sorted cl }
+    ; books = Climbing.books cl ; sorted = Climbing.sorted cl ; behind = Climbing.behind cl }
 
   -- One operator climbed: a re-entry configuration reached, or the
   -- value one operator higher, the path shorter.
@@ -742,6 +820,12 @@ module Honesty (R : Set) where
   -- A hop's machine sorted.
   hop-sorted : ∀ {g m m′ m₀} → Carried g m → step m ≡ silent m′ → m′ ⇝ m₀ → Σ Pos λ lo → WellMach lo m₀
   hop-sorted cr e p = sorted-⇝ (Carried.sorted cr) (then e p)
+
+  -- The run moved back: every node still heads no earlier.
+  each-back : ∀ {h} {H : Heapᴹ h} {t : Sub h [] R} {q p} → q <ᵖ p ≡ true → Each H (Heads p) t → Each H (Heads q) t
+  each-back {q = q} {p} qp ev ψ e hk with ev ψ e hk
+  ... | inj₁ refl = inj₂ qp
+  ... | inj₂ pk   = inj₂ (<ᵖ-trans q p _ qp pk)
 
   hopped-pre : ∀ {g m m′ m₁} {st : Strong g m} → m′ ⇝ m₁ → Hopped st m₁ → Hopped st m′
   hopped-pre path (g″ , m₀ , path′ , st₀ , gn) = g″ , m₀ , ⇝-trans path path′ , st₀ , gn
@@ -786,24 +870,23 @@ module Honesty (R : Set) where
     -- the body's part must already read its joiners told: the record's,
     -- not the path's.
     heads-lift : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-               → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) p π
+               → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) (Far p) π
                → Σ (U.Node [] R) λ c → At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ just c
                  × Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step c)
 
-    -- The agenda's first call an open `of` the ghost holds: nothing else
-    -- the ghost holds comes first, no call further down the agenda, no
-    -- burst held or timer queued, no subscription owed.  The order the
-    -- machine keeps is `Carried.sorted`'s: every frame `Under` the run,
-    -- every timer past its epoch.
-    -- DEAD ROUTE: from the record as it stands.  A stack frame's calls
-    --   are ordered against the current position only by `backAs`'s
-    --   `q <ᵖ p`, which does not make `q` a prefix of `p`: a frame at `q`
-    --   beside `p` holding an `of` has its next value ahead of this one.
-    --   The record admits that configuration; `under`'s scoping never
-    --   builds it, every call a frame keeps landing past all of `p`.
-    others-past : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- The agenda's first call an open `of` the ghost holds: no sibling
+    -- its path passes heads under the `of`'s base.  A value under it the
+    -- ghost still holds is the `of`'s own; what a connect's source fed
+    -- the body's joiners under its earlier values, they have taken.
+    spread-past : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
                 → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-                → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) p π
+                → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) (Off p) π
+
+    -- A live timer popped at the turn: its cold, fired, heads past where
+    -- the run is, the queue's timers being past it.
+    behind-fire : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
+                  (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
+                → Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
 
     -- A value through a scan: its cell read and written, the
     -- accumulated value one operator up.  The ghost's lift read the cell
@@ -950,7 +1033,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned = owned-spent hp calmAs sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr eq now })
+        ; sorted = hop-sorted cr eq now ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
   burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
     cr@record { tree = t ; ctlAs = burstAs x restᴴ (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = q
@@ -962,7 +1045,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned = owned-spent hp (runAs ks e K″) sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr eq now })
+        ; sorted = hop-sorted cr eq now ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
 
   -- A burst's frame stepped: found spent, polled, or played.
@@ -1009,13 +1092,13 @@ module Honesty (R : Set) where
   climb-root : ∀ {g m} (st : Strong g m) {m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {y : R} → Climbing g m₁ {T = T} here y → Hopped st m₁
   climb-root {g} st {mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {T}
     record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ ke ; stack = sk ; lifted = c′ , pv , _ , lifts-here , sg ; owned = ow
-           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so } =
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so ; behind = bh } =
     g , _ , then refl now
     , carried (record
         { sane = sn ; placed = pl ; tree = T ; ctlAs = noteAs [] (ke tt) sk ; meets = c′ , pv , sg
         ; owned = owned-move hp (noteAs [] (ke tt) sk) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } 
-        ; sorted = sorted-⇝ so (then refl now) })
+        ; sorted = sorted-⇝ so (then refl now) ; behind = bh })
     , showing (agrees (λ n → agree-refl n _)) (λ ())
 
   -- One operator climbed, by the operator.
@@ -1052,6 +1135,32 @@ module Honesty (R : Set) where
   run-meets (noteAs _ _ _)      ()
   run-meets (subAs _ _ _)       ()
   run-meets (burstAs _ _ _)     ()
+
+  -- The agenda's first call an `of` at `p`: the run is at `p`.
+  run-at : ∀ {h} {t : Sub h [] R} {q c bs} (ca : CtlAs t q c bs) {Δ A p i xs} {π : Path t (ofˢ {Δ = Δ} {A} p i xs)}
+         → firstCall ca ≡ just (emitC π) → All (Placedᴬ t) (agenda t ca) → q ≡ p
+  run-at (runAs (_ ∷ _) _ _) refl (pl ∷ _) = pl
+  run-at (runAs [] _ _)      ()
+  run-at calmAs              ()
+  run-at (noteAs _ _ _)      ()
+  run-at (subAs _ _ _)       ()
+  run-at (burstAs _ _ _)     ()
+
+  -- The agenda's first call an open `of` the ghost holds: every sibling
+  -- its path passes heads past the `of`'s base, no earlier than the run
+  -- (`Carried.behind`) and not under it.
+  -- DEAD ROUTE: a per-frame order.  A stack frame's calls are ordered
+  --   against the current position only by `backAs`'s `q <ᵖ p`, which
+  --   does not make `q` a prefix of `p`: a frame at `q` beside `p`
+  --   holding an `of` has its next value ahead of this one.
+  others-past : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) (Far p) π
+  others-past {m = m} cr {p = p} π fc op sn =
+    clear-zip {P = Heads p} {Q = Off p} {R′ = Far p} (λ {Γ} {A} {c} → far-apart {p} {Γ} {A} {c}) π
+      (clear-each (subst (λ q → Each (Conf.heap (Mach.conf m)) (Heads q) (Carried.tree cr))
+                         (run-at (Carried.ctlAs cr) fc (Owned.placed (Carried.owned cr))) (Carried.behind cr)) π)
+      (spread-past cr π fc op sn)
 
   -- The agenda's first call an open `of` the ghost holds: the ghost's
   -- step is that `of`'s, lifted.
@@ -1102,7 +1211,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1112,7 +1221,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned = owned-move hp (runAs ks e K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (backAs q ks qp e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1124,7 +1233,7 @@ module Honesty (R : Set) where
         ; queue = record { timed = Queue.timed qu ; joined = Queue.joined qu ; ordered = Queue.ordered qu
                          ; ahead = map (λ { (c , a) → c , <ᵖ-trans q p _ qp a }) (Queue.ahead qu) }
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind = each-back qp (Carried.behind cr) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (playsAs π) hᴷ K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1134,7 +1243,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = burstAs (playsAs π) hᴷ K″ ; meets = mt
         ; owned = owned-move hp (burstAs (playsAs π) hᴷ K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , m<n⇒m<1+n ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (firesAs π) hᴷ K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1144,7 +1253,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = burstAs (firesAs π) hᴷ K″ ; meets = mt
         ; owned = owned-move hp (burstAs (firesAs π) hᴷ K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , m<n⇒m<1+n ≤-refl))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs bottomᴴ bottomAs) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
@@ -1154,7 +1263,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl (then refl now)) })
+        ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs restᴴ (restAs ks e K‴)) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn
@@ -1164,7 +1273,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K‴ ; meets = mt
         ; owned = owned-move hp (runAs ks e K‴) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ (proj₂ ck) ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl (then refl now)) })
+        ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
 
   -- Past a value recorded, the run runs the stepped ghost: the record's
@@ -1185,7 +1294,7 @@ module Honesty (R : Set) where
         ; kernels = Carried.kernels cr ; meaning = Carried.meaning cr ; queue = Carried.queue cr
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = refl } 
-        ; sorted = sorted-value (Carried.sorted cr) refl })
+        ; sorted = sorted-value (Carried.sorted cr) refl ; behind = Carried.behind cr })
 
   -- A popped timer's burst, spent, dropped: the turn again.
   drop-spent : ∀ {h} {hp : Heapᴹ h} {p w} {σ : w ⊑ h} {ts lg en mk} (tm : Timer h)
@@ -1236,7 +1345,7 @@ module Honesty (R : Set) where
         ; queue = record { timed = timed-spent {H = hp} sp (Queue.timed q) ; joined = Queue.joined q
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then (drop-spent tm sp) now) })
+        ; sorted = hop-sorted cr refl (then (drop-spent tm sp) now) ; behind = Carried.behind cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₁ ≤-refl))
   ... | false with proj₁ (Queue.timed q)
   ...   | inj₁ s ∷ _ = ⊥-elim (true≢false (trans (sym s) sp))
@@ -1255,7 +1364,7 @@ module Honesty (R : Set) where
                          ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl , tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl now })
+        ; sorted = hop-sorted cr refl now ; behind = behind-fire cr π })
     , lowered (λ n → agree-refl n _) (inj₂ (pend-plant {t = t} π v refl , inj₁ ≤-refl))
     where v = coldˢ sk hd (fired τ e (at u x fr))
 

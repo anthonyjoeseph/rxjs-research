@@ -41,7 +41,7 @@ open import operation.Machine using (module Machine)
 import denotation.Unfold as U
 open import adequacy.Sane using (Sane; sane-subscribe)
 open import adequacy.Placed using (placed-subscribe) renaming (Placed to Placedᵍ)
-open import adequacy.Sorted using (module Sorting)
+open import adequacy.Sorted using (module Sorting; _≤ᵖ_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
 module Strongly (R : Set) where
@@ -935,6 +935,14 @@ module Strongly (R : Set) where
 
   -- What the ghost is, at each state: what the witness has open; at a
   -- value about to be recorded, what steps to it by that value.
+  -- Every node the ghost holds below `t` passes `P`.
+  Each : ∀ {h} (H : Heapᴹ h) → (∀ {Γ A} → U.Node Γ A → Set) → ∀ {Δ A} → Sub h Δ A → Set₁
+  Each {h} H P t = ∀ {Δ′ A′} {u : Sub h Δ′ A′} → Path t u → ∀ {c} → At.part H u ≡ just c → P c
+
+  -- Its next event no earlier than `q`.
+  Heads : ∀ {Γ A} → Pos → U.Node Γ A → Set
+  Heads q c = ∀ {k} → U.headˢ (U.step c) ≡ just k → q ≤ᵖ k
+
   Meets : ∀ {h} {t : Sub h [] R} {p ctl bs} → Against.CtlAs t p ctl bs → Maybe (U.Node [] R) → U.Node [] R → Set₁
   Meets (Against.noteAs {p = p} {a} _ _ _) n g = Σ (U.Node [] R) λ g′ → n ≡ just g′ × U.step g ≡ U.outˢ p a g′
   Meets _                                  n g = n ≡ just g
@@ -942,7 +950,8 @@ module Strongly (R : Set) where
   -- THE CONFIGURATION RUNS THE GHOST FROM A RE-ENTRY STATE: a witness
   -- holding every subscription the run reaches, whose open part is the
   -- ghost, and the machine's control and stack its agenda; the machine
-  -- sorted, every frame it keeps under where it runs.
+  -- sorted, every frame it keeps under where it runs; every node the
+  -- ghost holds heading no earlier than where the run is.
   record Carried (g : U.Node [] R) (m : Mach) : Set₁ where
     H = Conf.heap (Mach.conf m)
     field
@@ -957,6 +966,7 @@ module Strongly (R : Set) where
       queue   : Queue H (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) tree
       books   : Books tree ctlAs m
       sorted  : Σ Pos λ lo → WellMach lo m
+      behind  : Each H (Heads (Conf.pos (Mach.conf m))) tree
 
   -- A RE-ENTRY CONFIGURATION AGAINST THE GHOST: carried, or the root's
   -- completion about to be shown where the ghost ends.
@@ -987,6 +997,11 @@ module Strongly (R : Set) where
 
   -- THE LAUNCH IS A SUBSCRIPTION ABOUT TO BEGIN: the program, pending at
   -- the root, nothing yet allocated or owed.
+  postulate
+    -- A program subscribed at the root heads no earlier than it: its
+    -- first event under the root, or a timer's tick past it.
+    heads-begin : (o : Obs Timeline [] R) → Heads root (U.subscribe o root)
+
   strong-begin : (o : Obs Timeline [] R) → Strong (U.subscribe o root) (begin o)
   strong-begin o = carried record
     { sane    = sane-subscribe o root (λ ())
@@ -1000,4 +1015,5 @@ module Strongly (R : Set) where
     ; meaning = record { fed = _ }
     ; queue   = record { timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
     ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl }
-    ; sorted  = root , begin-well o }
+    ; sorted  = root , begin-well o
+    ; behind  = λ { here refl → heads-begin o } }

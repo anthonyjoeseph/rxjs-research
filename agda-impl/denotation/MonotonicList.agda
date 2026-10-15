@@ -402,6 +402,16 @@ private
 ... | eq = <ᵖ-next p q y h
 ... | gt with () ← h
 
+-- Past `p` and not under it: past everything under it.
+<ᵖ-apart : ∀ p q y → p <ᵖ q ≡ true → (∀ ys → q ≡ p ++ ys → ⊥) → (p ++ y) <ᵖ q ≡ true
+<ᵖ-apart []      []      y () ne
+<ᵖ-apart []      (b ∷ q) y _  ne = ⊥-elim (ne (b ∷ q) refl)
+<ᵖ-apart (a ∷ p) []      y () ne
+<ᵖ-apart (a ∷ p) (b ∷ q) y h  ne with cmpLabel a b in c
+... | lt = refl
+... | eq = <ᵖ-apart p q y h (λ ys e → ne ys (cong₂ _∷_ (sym (eq-label a b c)) e))
+... | gt with () ← h
+
 ------------------------------------------------------------------------
 -- What a subscriber sees
 

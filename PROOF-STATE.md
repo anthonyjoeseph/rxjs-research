@@ -177,16 +177,20 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `others-past`, then `note-least`: the ghost's next
-  event is the agenda's first, `Clear` its form along an `of`'s path. The
-  record carries `Sorted`'s `WellMach`; what remains is that a sibling's
-  head is an obligation it owes, read off `Owned`, and that each stacked
-  call's next label lands past the frame it was pushed under, a field
-  every frame's producer owes. Also open: ghost events of values dropped
-  before the root, which `Well` does not constrain. Ruled out: deriving
-  the order from `backAs`'s `q <ᵖ p`, which admits a frame beside the
-  run. Decides whether sortedness is the one ordering fact both `of`
-  values and notes read.
+- **GHOST AHEAD.** `spread-past`, then `behind`'s producers: `others-past`
+  is a body over `Carried.behind` (every node the ghost holds heads no
+  earlier than the run) and `spread-past` (no sibling heads under the
+  `of`'s base). A scope returning only lowers the position, so the
+  record's own producers are proven or `behind-fire`/`heads-begin`; the
+  risk left is each `under l` entry, owed inside the postulated hops
+  (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
+  per-frame label order read off `backAs`. If a frame's next event is
+  invisible to the record, `under` stores its label in its frame.
+- **THE MEASURE.** `climb-take` and `emit-unseen`: a failing take's value
+  climbs into its completion, where the height rises; an `of` feeds
+  joiners past its body's end, work the ghost does not see. Decides a
+  lexicographic measure whose first part a cut lowers, and how long the
+  unseen window is under the body's cut of its source.
 - **THE ORDER.** `steady-start` and `ordered-start` first, the cold's run
   where a tick heads it: two refutations in one region, so attempt the
   assembly before restating again. Then `spread-flat`, `spread-connect`,
@@ -194,13 +198,6 @@ by their own silent steps (`Mirror`).
   lane's end tied with another lane or the outer, a lane's first before
   where it subscribes. Decides whether the start region is converging or
   is a mechanism to reconsider.
-- **THE TAKE'S CLIMB.** `climb-take`: a failing take's value climbs on
-  into its completion, where the height measure rises. Decides the
-  measure the climb runs on: the value and the completion it owes as one
-  item, or a lexicographic pair whose first part a cut lowers.
-- **THE UNSEEN.** `emit-unseen`: an `of` feeding joiners past its body's
-  end, work the ghost does not see. Decides what falls while the ghost
-  stands still, and whether the run's `measure` already counts it.
 - **THE SHUT BODY.** `heads-lift`: a connect past its source's end shows
   its body shut, so the body's part must read every joiner left already
   told. `told` keeps an end it has; decides whether `Meaning`'s feed
@@ -254,8 +251,12 @@ by their own silent steps (`Mirror`).
   value the ghost holds.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
-- **`others-past`** (Content) — FALSITY, `DEAD ROUTE`: the agenda's first call
-  an open, seen `of`, every sibling its path passes waits past it.
+- **`spread-past`** (Content) — FALSITY, `NO EVIDENCE`: no sibling an open
+  `of`'s path passes heads under its base; what a source fed, joiners took.
+- **`behind-fire`** (Content) — FALSITY, `NO EVIDENCE`: a timer popped at the
+  turn, its fired cold heads no earlier than the run.
+- **`heads-begin`** (Strong) — FALSITY, `NO EVIDENCE`: a program subscribed at
+  the root heads no earlier than it.
 - **`heads-lift`** (Content) — FALSITY, `NO EVIDENCE`: every sibling waiting,
   the ghost's step is the `of`'s lifted along its path, a shut body read told.
 - **`emit-run`** (Content) — FALSITY, `NO EVIDENCE`: an open `of`'s value
