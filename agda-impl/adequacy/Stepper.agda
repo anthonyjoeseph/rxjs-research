@@ -9,7 +9,7 @@
 module adequacy.Stepper where
 
 open import Data.Bool using (Bool; true; false; not)
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 import Tree as T
 open import Tree using (Later)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-atop)
   renaming (sub to subᴾ)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
@@ -135,6 +135,18 @@ skip-same {l = l} e = record
   { alike  = skip∼ (record { ∼force = subst (force l ∼_) e (∼-refl (force l)) })
   ; stalls = λ v → (λ s → record { stays = proj₁ (stays s) , subst (Stalls v) e (proj₂ (stays s)) })
                  , (λ s → record { stays = proj₁ (stays s) , subst (Stalls v) (sym e) (proj₂ (stays s)) }) }
+
+-- A skip atop what follows it is forgotten.
+skip-drop : ∀ {A k} {l : Events∞ A} → Ordered (skip k l) → skip k l ≃ force l
+skip-drop {k = k} {l} o = record
+  { alike  = skipˡ (∼-refl (force l))
+  ; stalls = λ v → (λ s → proj₂ (stays s))
+                 , (λ s → record { stays = up (force l) (proj₁ (ordered o)) s , s }) }
+  where up : ∀ {v} (e : Events _) → Atop k e → Stalls v e → k <ᵖ v ≡ true
+        up {v} (out h _ _) a s = <ᵖ-atop h k v a (proj₁ (stays s))
+        up {v} (skip h _)  a s = <ᵖ-atop h k v a (proj₁ (stays s))
+        up (end _) a s = ⊥-elim (stays s)
+        up hush    a s = ⊥-elim (stays s)
 
 ------------------------------------------------------------------------
 -- The stream functions respect it
@@ -549,9 +561,6 @@ postulate
         → Ordered x → Ordered (out q a l) → Atop (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ))
         → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
         → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
-
-  -- A skip atop what follows it is forgotten.
-  skip-drop : ∀ {A k} {l : Events∞ A} → Ordered (skip k l) → skip k l ≃ force l
 
   -- EVENTS AT ONE POSITION COMMUTE: a source's step taken ahead of the
   -- body's events at its own position, the body's tie run shown first.

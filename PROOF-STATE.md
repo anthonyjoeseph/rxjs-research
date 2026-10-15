@@ -176,11 +176,11 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE CONNECT.** `fed-≃` with `env-≃`, `beside-≃` and `skip-drop`: a
-  running connect is a body over these, its body reading its source alike
-  the body fed its source's step. Ruled out: exact agreement, per
-  approximant or under a ghost anchored in its sources' step history, and
-  a body fed a value it would join its source only after.
+- **THE CONNECT.** `fed-≃` with `env-≃` and `beside-≃`: a running connect
+  is a body over these, its body reading its source alike the body fed its
+  source's step. Ruled out: exact agreement, per approximant or under a
+  ghost anchored in its sources' step history, and a body fed a value it
+  would join its source only after; a sorted skip is a `≃` forget.
   Decides whether a lane's pre-join skips, one fewer per source step, are
   all `≃` forgets, and whether `M.beside` respects `≃` between sorted events.
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
@@ -222,8 +222,6 @@ by their own silent steps (`Mirror`).
   between events in order.
 - **`ahead-even`** (Stepper) — FALSITY, `NO EVIDENCE`: a source's step commutes
   with the body's events at its own position.
-- **`skip-drop`** (Stepper) — FALSITY, `NO EVIDENCE`: a skip atop what follows
-  it is forgotten.
 - **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
   subscribed at the root is placed.
 - **`placed-after`** (Stepper) — FALSITY, `REFUTED×2`: a step keeps the ghost

@@ -252,11 +252,49 @@ private
   isLt-lt {eq} ()
   isLt-lt {gt} ()
 
+  gt-ℕ : ∀ {m n} → cmpℕ m n ≡ gt → n < m
+  gt-ℕ {m} {n} h with m <ᵇ n | n <ᵇ m in e
+  gt-ℕ {m} {n} () | true  | _
+  gt-ℕ {m} {n} h  | false | true  = <ᵇ⇒< n m (subst T (sym e) tt)
+  gt-ℕ {m} {n} () | false | false
+
+  lexi-gt : ∀ c r → lexi c r ≡ gt → c ≡ gt ⊎ (c ≡ eq × r ≡ gt)
+  lexi-gt lt r ()
+  lexi-gt eq r h = inj₂ (refl , h)
+  lexi-gt gt r h = inj₁ refl
+
+  mutual
+    flip-label : ∀ a b → cmpLabel a b ≡ gt → cmpLabel b a ≡ lt
+    flip-label (ix m)  (ix n)  h = ℕ-lt {n} {m} (gt-ℕ {m} {n} h)
+    flip-label (sub p) (sub q) h = flip-pos p q h
+    flip-label (sub _) (ix _)  h = refl
+    flip-label last    (ix _)  h = refl
+    flip-label last    (sub _) h = refl
+    flip-label (ix _)  (sub _) ()
+    flip-label (ix _)  last    ()
+    flip-label (sub _) last    ()
+    flip-label last    last    ()
+
+    flip-pos : ∀ p q → cmpPos p q ≡ gt → cmpPos q p ≡ lt
+    flip-pos []      []      ()
+    flip-pos []      (_ ∷ _) ()
+    flip-pos (_ ∷ _) []      h = refl
+    flip-pos (a ∷ p) (b ∷ q) h with lexi-gt (cmpLabel a b) (cmpPos p q) h
+    ... | inj₁ x rewrite flip-label a b x = refl
+    ... | inj₂ (x , y)
+      rewrite subst (λ z → cmpLabel z a ≡ eq) (eq-label a b x) (refl-label a) | flip-pos p q y = refl
+
 <ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
 <ᵖ-trans p q r h₁ h₂ rewrite lt-pos p q r (isLt-lt h₁) (isLt-lt h₂) = refl
 
 <ᵖ-irrefl : ∀ p → p <ᵖ p ≡ false
 <ᵖ-irrefl p rewrite refl-pos p = refl
+
+-- What is no earlier than `k` and before `v` has `k` before `v`.
+<ᵖ-atop : ∀ h k v → h <ᵖ k ≡ false → h <ᵖ v ≡ true → k <ᵖ v ≡ true
+<ᵖ-atop h k v n l with cmpPos h k in e
+... | eq = subst (λ z → z <ᵖ v ≡ true) (eq-pos h k e) l
+... | gt = <ᵖ-trans k h v (subst (λ c → isLt c ≡ true) (sym (flip-pos h k e)) refl) l
 
 
 -- A position is before every position below it, and of two positions
