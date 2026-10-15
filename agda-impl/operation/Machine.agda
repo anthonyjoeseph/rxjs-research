@@ -30,7 +30,7 @@ open import operation.PureObservable using (World; _⊑_; same; _⨾_; new; wk�
 open import denotation.MonotonicList using (ML; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last)
 
 module Machine (R : Set) where
-  open Run (Pureᴾ R) using (Act; newRef; readRef; writeRef; register; send; finish; startCold; stop; eff; here; goto; diverge; unfold;
+  open Run (Pureᴾ R) using (Act; newRef; readRef; writeRef; register; send; finish; startCold; stop; eff; here; under; diverge; unfold;
     Observer; Subscription; Subscribe; Env; compile; wkAct; wkEl)
   open Run (Pureᴾ R) using () renaming (done to doneᴬ)
   open Pure R using (State; Callbacks; get; put; extend; Timer; insert; cascade; recorder; start; End; finished; cutOff; frames)
@@ -44,6 +44,10 @@ module Machine (R : Set) where
   -- whose emit is being delivered.  Y is what it hands on.
   data Wait (w : World) : Set → Set → Set₁ where
     rest   : ∀ {B} → Act w B → Wait w ⊤ B
+    -- A scoped body returning: the position put back where the scope
+    -- opened, then the rest.  So the run's position is always the path
+    -- of the `back` frames on the stack, extended by the open scope's label.
+    back   : ∀ {B} → Pos → Act w B → Wait w ⊤ B
     asked  : ∀ {A u} → Sink w A → Handle w → Time → Pos → ℕ → Frame A u → Wait w Bool ⊤
     sent   : ∀ {A u} → Sink w A → Handle w → Time → Pos → ℕ → Frame A u → Wait w ⊤ ⊤
 
@@ -90,7 +94,8 @@ module Machine (R : Set) where
   schedule : ∀ {h w A u} → State h → Sink h A → Handle h → Time → Pos → From A u → w ⊑ h → Stack w ⊤ → Mach
   schedule st s hd now e done σ k =
     if spent? st hd then ⟨ st , ret tt σ k ⟩
-    else ⟨ record st { heap = put (State.heap st) hd (lift true) ; pos = e } , run (Callbacks.onComplete (cbs st s)) σ k ⟩
+    else ⟨ record st { heap = put (State.heap st) hd (lift true) ; pos = e }
+         , run (Callbacks.onComplete (cbs st s)) same (push (back (State.pos st) (doneᴬ tt)) σ k) ⟩
   schedule st s hd now e quiet σ k = ⟨ st , ret tt σ k ⟩
   schedule st s hd now e (at t _ b) σ k =
     ⟨ record st { timers = insert (record { due = State.clock st + (t ∸ now) ; sink = s ; handle = hd ; at′ = t ; from = e ; frame = b })
@@ -113,9 +118,10 @@ module Machine (R : Set) where
   -- A `defer` reached: its body compiled one level down, as `deferᴰ`
   -- puts it, its subscription's unsubscribe a registered sink.
   unfolded : ∀ {h Γ A} → Later Timeline Γ A → Env Γ h → (A → Act h ⊤) → Act h ⊤ → Act h Bool → (∀ {v} → h ⊑ v → Sink v ⊤ → Act v ⊤) → Act h ⊤
-  unfolded l e n c x k = here λ p → goto (p ++ [ ix 1 ])
+  unfolded l e n c x k = under (ix 1)
     (compile (Later.force l) e same (record { next = n ; complete = c ; closed = x }) λ σ sub →
       register (λ _ → Subscription.unsubscribe sub) (doneᴬ tt) (doneᴬ false) λ τ sk → k (σ ⨾ τ) sk)
+    (doneᴬ tt)
 
   -- The record's effects: a value shown unless the root has completed.
   effect : ∀ {h w B X} → State h → Out R X → (X → Act h B) → w ⊑ h → Stack w B → Step
@@ -140,16 +146,17 @@ module Machine (R : Set) where
   runs st (stop hd k′)       σ k = silent ⟨ record st { heap = put (State.heap st) hd (lift true) } , run k′ σ k ⟩
   runs st (eff e k′)         σ k = effect st e k′ σ k
   runs st (here k′)          σ k = silent ⟨ st , run (k′ (State.pos st)) σ k ⟩
-  runs st (goto p k′)        σ k = silent ⟨ record st { pos = p } , run k′ σ k ⟩
+  runs st (under l m k′)     σ k = silent ⟨ record st { pos = State.pos st ++ [ l ] } , run m same (push (back (State.pos st) k′) σ k) ⟩
   runs st diverge            σ k = silent ⟨ st , run diverge σ k ⟩
   runs st (unfold l e n c x k′ m) σ k = silent ⟨ st , run (unfolded l e n c x k′) same (push (rest m) σ k) ⟩
 
   returns : ∀ {h w X} → State h → X → w ⊑ h → Stack w X → Step
   returns st x σ loop                             = silent ⟨ st , turn ⟩
   returns st x σ (push (rest m) ρ k)              = silent ⟨ st , run (wkAct σ m) (ρ ⨾ σ) k ⟩
+  returns st x σ (push (back p m) ρ k)            = silent ⟨ record st { pos = p } , run (wkAct σ m) (ρ ⨾ σ) k ⟩
   returns st c σ (push (asked s hd t r i b) ρ k)  =
     silent (if c then ⟨ st , ret tt (ρ ⨾ σ) k ⟩ else play st (wk∋ σ s) (wk∋ σ hd) t r i b (ρ ⨾ σ) k)
-  returns st x σ (push (sent s hd t r i b) ρ k)   = silent ⟨ st , burst (wk∋ σ s) (wk∋ σ hd) t r i b (ρ ⨾ σ) k ⟩
+  returns st x σ (push (sent s hd t r i b) ρ k)   = silent ⟨ record st { pos = r } , burst (wk∋ σ s) (wk∋ σ hd) t r i b (ρ ⨾ σ) k ⟩
 
   step : Mach → Step
   step ⟨ st , run a σ k ⟩ = runs st a σ k

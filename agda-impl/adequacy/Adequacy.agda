@@ -8,19 +8,28 @@
 -- Two halves, proven apart.  BELOW: every prefix's record, positions and
 -- all, is placed against the meaning's events (`operation.Placed`), so
 -- shows nothing they do not — SAFETY, a fact about every finite prefix.
+-- Safety is two facts that never meet: the record is SORTED
+-- (`adequacy.Sorted`, the machine alone) and ALIKE the events as a set
+-- (content, one observer at a time); sorted and alike is placed.
 -- ABOVE: whatever the meaning shows lies within some prefix — LIVENESS.
 -- Neither half is stated against the other's steps.
 module adequacy.Adequacy where
 
-open import Data.List using ([]; _++_; [_]; length)
+open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List.Relation.Unary.Any using (Any)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Unit using (⊤)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _≤_)
-open import Data.Product using (_,_; Σ; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import operation.Placed using (Up; Placed; Ahead; items; ahead; framed; shows; placed-⊑; frames-cut)
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (PureObs; module Pure)
-open import denotation.MonotonicList using (ML; Events; observe; root; ticks)
+open import denotation.MonotonicList using (ML; Events; Pos; Time; tick; out; skip; end; force; observe; root; ticks)
+open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
+open import adequacy.Content using (module Honesty)
 open import denotation.Order using (_⊑_; _≃_; Shows; Chain; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
 open import denotation.Denote using (⟦_⟧)
 
@@ -33,41 +42,94 @@ events : ∀ {A} → PureObs [] A → Events A
 events o = observe (⟦ o ⟧ []) root
 
 module Link (R : Set) where
-  open Machine R using (prefix; reading; trace; begin; Read; read; Trace∞; tau; out; end; idle)
-  open Pure R using (cutOff; frames)
+  open Machine R using (prefix; reading; trace; begin; launch; Read; read; Trace∞; tau; out; end; idle)
+  open Pure R using (End; finished; dry; cutOff; frames; recorder)
+  open Sorting R using (Ascending; ascending; sorted)
+  open Honesty R using (Honest; compile-honest; honest-[])
   open Read
+
+  ----------------------------------------------------------------------
+  -- Alike as sets
+
+  -- The events hold a value (`just`) or their end (`nothing`) at `k`.
+  data Has : Events R → Pos → Maybe R → Set where
+    atOut    : ∀ {k a r} → Has (out k a r) k (just a)
+    atEnd    : ∀ {k} → Has (end k) k nothing
+    pastOut  : ∀ {k a r q b} → Has (force r) q b → Has (out k a r) q b
+    pastSkip : ∀ {k r q b} → Has (force r) q b → Has (skip k r) q b
+
+  -- The record has sent `a` at `k`, on `k`'s tick.
+  data Sent : List Pos → List (Time × R) → Pos → R → Set where
+    sentHere  : ∀ {k a qs xs} → Sent (k ∷ qs) ((tick k , a) ∷ xs) k a
+    sentLater : ∀ {k a q x qs xs} → Sent qs xs k a → Sent (q ∷ qs) (x ∷ xs) k a
+
+  -- What the record owes: a cut record only what lies at or before one
+  -- of its marks; an ended or silent one everything.
+  Owed : End → List Pos → Pos → Set
+  Owed (cutOff _) qs k = Any (k ≤ᵖ_) qs
+  Owed _          qs k = ⊤
+
+  -- How each end is matched: finished at the events' `end`, its mark
+  -- among the record's; dry over events with nothing past the marks;
+  -- cut owes nothing.
+  Ending : End → List Pos → Events R → Set
+  Ending finished   qs e = Σ Pos λ q → Has e q nothing × Any (q ≡_) qs
+  Ending dry        qs e = ∀ {k b} → Has e k b → Any (k ≤ᵖ_) qs
+  Ending (cutOff _) qs e = ⊤
+
+  -- The record and the events alike as sets: every value sent is an
+  -- event at its mark; every event owed was sent; the record ends as the
+  -- events do.
+  record Alike (en : End) (qs : List Pos) (xs : List (Time × R)) (e : Events R) : Set where
+    field
+      sound : ∀ {k a} → Sent qs xs k a → Has e k (just a)
+      whole : ∀ {k a} → Has e k (just a) → Owed en qs k → Sent qs xs k a
+      ended : Ending en qs e
 
   -- The first n steps, read.
   read-of : PureObs [] R → ℕ → Read
   read-of o n = reading n 0 (trace (begin o))
 
   postulate
-    -- SAFETY: every prefix of the run is placed against the meaning's
-    -- events: each value the root was sent is the events' next `out`,
-    -- at its position, and the run ends as they do.
-    --
-    -- The route: SORTEDNESS, the machine delivering to every observer at
-    -- strictly increasing positions, a fact about the machine alone; and
-    -- each observer's deliveries its subtree's meaning, subscribed where
-    -- it was, cut where its subscriber left — one kernel at a time, each
-    -- kernel's outputs its operator applied to the inputs it was
-    -- delivered.  Sorted and alike as sets is alike as runs.
-    --
-    -- DEAD ROUTE: a step-by-step simulation against a stepper that picks
-    --   the configuration's earliest node (`denotation.Unfold`).  Every
-    --   step owes that every other live node is past the one the machine
-    --   moved, re-established across a reconstruction of the tree at the
-    --   machine's control, so each new kernel or death reopened it.
-    --
-    -- RECOVERY: `git show fbdfc8ed` restores that simulation:
-    --   `adequacy.Carrier`, `adequacy.Kept`, `adequacy.Plug`,
-    --   `adequacy.Aim`, `adequacy.Wait` and `adequacy.Simulation`'s
-    --   relation, with the stepper's link to the fold (`stepped`).  The
-    --   same commit restores the order on positions in
-    --   `denotation.MonotonicList` (`<ᵖ-trans`, `<ᵖ-asym`, `<ᵖ-tick`,
-    --   `<ᵖ-++ʳ`), and `denotation.Unfold`'s stepper proven the fold's.
-    placedᴿ : (o : PureObs [] R) (n : ℕ) → Placed (ending (read-of o n)) (marks (read-of o n)) (log (read-of o n)) (events o)
+    -- SORTED AND ALIKE IS PLACED: a record ascending in its marks and
+    -- alike a program's events as a set is those events, in order.  No
+    -- machine: the fold's positions ascend too, so two ascending lists
+    -- with the same members agree.  Stated at a program's events, not
+    -- any events, since only the fold's are known to ascend.
+    placing : (o : PureObs [] R) → ∀ {en qs xs} → Ascending root qs → Alike en qs xs (events o) → Placed en qs xs (events o)
 
+    -- DELIVERED: a subscription honest to a meaning, launched at the
+    -- root with the recorder, records every prefix alike that meaning's
+    -- events as a set.  Honesty's definition read at the root observer.
+    delivered : ∀ {s m} → Honest {R} {[]} s m → ∀ n →
+                let r = reading n 0 (trace (launch s recorder)) in Alike (ending r) (marks r) (log r) (observe m root)
+
+  -- CONTENT: every prefix's record is alike the meaning's events as a
+  -- set: the compiled tree honest to its meaning, kernel by kernel.
+  content : (o : PureObs [] R) (n : ℕ) → Alike (ending (read-of o n)) (marks (read-of o n)) (log (read-of o n)) (events o)
+  content o n = delivered (compile-honest o [] [] honest-[]) n
+
+  -- SAFETY: every prefix of the run is placed against the meaning's
+  -- events: each value the root was sent is the events' next `out`, at
+  -- its position, and the run ends as they do.
+  --
+  -- DEAD ROUTE: a step-by-step simulation against a stepper that picks
+  --   the configuration's earliest node (`denotation.Unfold`).  Every
+  --   step owes that every other live node is past the one the machine
+  --   moved, re-established across a reconstruction of the tree at the
+  --   machine's control, so each new kernel or death reopened it.
+  --
+  -- RECOVERY: `git show fbdfc8ed` restores that simulation:
+  --   `adequacy.Carrier`, `adequacy.Kept`, `adequacy.Plug`,
+  --   `adequacy.Aim`, `adequacy.Wait` and `adequacy.Simulation`'s
+  --   relation, with the stepper's link to the fold (`stepped`).  The
+  --   same commit restores the order on positions in
+  --   `denotation.MonotonicList` (`<ᵖ-trans`, `<ᵖ-asym`, `<ᵖ-tick`,
+  --   `<ᵖ-++ʳ`), and `denotation.Unfold`'s stepper proven the fold's.
+  placedᴿ : (o : PureObs [] R) (n : ℕ) → Placed (ending (read-of o n)) (marks (read-of o n)) (log (read-of o n)) (events o)
+  placedᴿ o n = placing o (ascending (sorted o) n 0) (content o n)
+
+  postulate
     -- LIVENESS: whatever item the meaning's events reach, finitely many
     -- steps of the machine reach.
     reachedᴿ : (o : PureObs [] R) → ∀ {k} → Ahead (events o) k → Σ ℕ λ n → k ≤ length (items (log (read-of o n)) (ending (read-of o n)))
