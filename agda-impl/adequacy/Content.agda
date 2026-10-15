@@ -30,7 +30,7 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Events; Events∞; Pos; Time; tick; out; skip; end; observe; root; Agree; out⁼; skip⁼; end⁼;
+open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; observe; root; Agree; out⁼; skip⁼; end⁼;
   agree; agree-sym; agree-trans; lub; lub-limit; Settling; agrees) renaming (cold to coldᴹ)
 import denotation.Unfold as U
 open import denotation.Compositional using (from; settle; []ᵉ)
@@ -39,14 +39,19 @@ open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
 open import denotation.Denote using (⟦_⟧)
-open import operation.PureObservable using (PureObs; module Pure)
+open import operation.PureObservable using (PureObs; Out; note; module Pure)
+open import operation.AbstractObservable using (module Heap) renaming (module Machine to Shared)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 
 open Events∞
 
 module Honesty (R : Set) where
-  open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
+  open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
+  open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; held; run; asking; bottom; spent?)
+  open Heap using (_⊑_)
   open Recording R using (silent-keeps; value-notes)
-  open Strongly R using (Strong; strong-begin)
+  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing)
+  open Strongly.Against R using (calmAs; noteAs; subAs; burstAs)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
 
@@ -194,11 +199,94 @@ module Honesty (R : Set) where
   inner-launch : (o : PureObs [] R) → Inner (observe (⟦ o ⟧ []) root) (begin o)
   inner-launch o = record { ghost = U.subscribe o root ; same = same-agree (begun o) ; mirror = begin o , now , strong-begin o }
 
+  ≋-refl : ∀ {x} → x ≋ x
+  ≋-refl = (λ h → h) , (λ h → h)
+
+  ≋-trans : ∀ {x y z} → x ≋ y → y ≋ z → x ≋ z
+  ≋-trans xy yz = (λ h → proj₁ yz (proj₁ xy h)) , (λ h → proj₂ xy (proj₂ yz h))
+
+  -- WHAT THE GHOST'S STEP SAYS OF ITS RESIDUAL, as a set: a value is in
+  -- it, and the rest is what the stepped ghost shows; a skip keeps it; an
+  -- end is all of it but the end; a hush leaves nothing.
+  Steps : Events R → U.Step [] R → Set
+  Steps e (U.outˢ k a g′) = Has e k (just a) × (∀ {q b} → Has (residual g′) q b → Has e q b)
+                          × (∀ {q b} → Has e q b → (q ≡ k × b ≡ just a) ⊎ Has (residual g′) q b)
+  Steps e (U.skipˢ k g′)  = e ≋ residual g′
+  Steps e (U.endˢ k)      = Has e k nothing × (∀ {q a} → Has e q (just a) → ⊥)
+  Steps e U.hushˢ         = ∀ {q b} → Has e q b → ⊥
+
+  -- A ghost whose residual is `g`'s, which `m′` runs.
+  Ahead : U.Node [] R → Mach → Set₁
+  Ahead g m′ = Σ (U.Node [] R) λ g″ → residual g ≋ residual g″ × Mirror g″ m′
+
+  onward : ∀ {rest g m′} → rest ≋ residual g → Ahead g m′ → Inner rest m′
+  onward e (g″ , s , mi) = record { ghost = g″ ; same = ≋-trans e s ; mirror = mi }
+
+  -- The driver's turn with a burst held is silent, whatever the burst.
+  if-silent : ∀ (x y : Bool) {A B C} → Σ Mach λ m′ → (if x then silent A else if y then silent B else silent C) ≡ silent m′
+  if-silent true  _     = _ , refl
+  if-silent false true  = _ , refl
+  if-silent false false = _ , refl
+
   postulate
-    -- THE STRONG STEP: from a re-entry configuration the machine runs
-    -- silently to the next, or records a least value of the residual, or
-    -- ends it.
-    strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
+    -- THE STEPPER IS THE MEANING, event for event, as sets: the ghost's
+    -- next step is its residual's least event.  Stated of every node, the
+    -- ones no run reaches included: a joiner fed out of order, a
+    -- connect's source unsorted.
+    residual-steps : ∀ g → Steps (residual g) (U.step g)
+
+    -- The turn, nothing held and no timer queued: the ghost shows
+    -- nothing.
+    turn-dry : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
+             → Mach.bursts m ≡ [] → Mach.timers m ≡ [] → ∀ {k b} → Has (residual g) k b → ⊥
+
+    -- The turn popping a timer: its frame is the ghost's frames node at
+    -- its tick.
+    turn-pops : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
+              → Mach.bursts m ≡ [] → ∀ {m′} → step m ≡ silent m′ → Ahead g m′
+
+    -- A subscription begun runs its kernel's code silently to the next
+    -- re-entry state.
+    sub-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
+               → ∀ {m′} → step m ≡ silent m′ → Ahead g m′
+
+    -- A burst's frame stepped: polled, played, or found spent.
+    burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ K
+                 → Mach.bursts m ≡ just b ∷ bs → ∀ {m′} → step m ≡ silent m′ → Ahead g m′
+
+    -- A value recorded is the least the ghost still holds.
+    note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
+               → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
+               → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ Conf.pos (Mach.conf m) → ⊥
+
+    -- Past a value recorded, the run runs the stepped ghost.
+    note-onward : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
+                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
+                → ∀ {t q a′ m′} → step m ≡ value t q a′ m′ → Mirror g′ m′
+
+  -- THE STRONG STEP: from a re-entry configuration the machine runs
+  -- silently to the next, or records a least value of the residual, or
+  -- ends it.  By the re-entry state.
+  strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
+  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st) e =
+    completeˢ (proj₂ e (proj₁ rs)) λ h → proj₂ rs (proj₁ e h)
+    where rs = subst (Steps (residual g)) st (residual-steps g)
+  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
+    with Carried.ctlAs cr | Carried.meets cr | Books.paidUp (Carried.books cr) | Books.clocked (Carried.books cr)
+       | Books.running (Carried.books cr)
+  ... | subAs π x K | _ | refl | _ | _ = silentˢ (onward {g = g} e (sub-onward {g = g} cr refl refl))
+  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
+    | noteAs ks x K | g′ , _ , st | refl | ck | refl =
+    valueˢ ck (proj₂ e (proj₁ rs)) (λ h → proj₂ e (proj₁ (proj₂ rs) h)) (λ h → proj₂ (proj₂ rs) (proj₁ e h))
+      (note-least {g = g} cr refl st) (record { ghost = g′ ; same = ≋-refl ; mirror = note-onward {g = g} cr refl st refl })
+    where rs = subst (Steps (residual g)) st (residual-steps g)
+  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
+    | calmAs | _ | refl | _ | refl with ts
+  ... | []    = drainedˢ λ h → turn-dry {g = g} cr refl refl refl (proj₁ e h)
+  ... | _ ∷ _ = silentˢ (onward {g = g} e (turn-pops {g = g} cr refl refl refl))
+  strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr) e
+    | burstAs {b = b} x K | _ | refl | _ | _ with if-silent (spent? hp (Playing.handle b)) (Playing.polled b)
+  ... | m′ , eq = subst (Shows _) (sym eq) (silentˢ (onward {g = g} e (burst-onward {g = g} cr refl refl eq)))
 
   -- Every step shows the residual: on the way to a re-entry
   -- configuration a silent step keeps the ghost.

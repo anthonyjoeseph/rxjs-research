@@ -933,7 +933,7 @@ module Strongly (R : Set) where
   --   specs sits a universe above them, so no heap can store it.
   data Strong (g : U.Node [] R) (m : Mach) : Set₁ where
     carried : Carried g m → Strong g m
-    ending  : ∀ {h hp p w B k σ K} → Mach.conf m ≡ ⟨_,_,_⟩ {h} hp p (asking {w = w} {B = B} fin k σ K)
+    closing : ∀ {h hp p w B k σ K} → Mach.conf m ≡ ⟨_,_,_⟩ {h} hp p (asking {w = w} {B = B} fin k σ K)
             → Mach.ended m ≡ false → U.step g ≡ U.endˢ p → Strong g m
 
   -- THE LAUNCH IS A SUBSCRIPTION ABOUT TO BEGIN: the program, pending at

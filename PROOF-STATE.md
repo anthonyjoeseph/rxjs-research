@@ -176,21 +176,24 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE STRONG STEP, DISPATCHED.** `strong-shows` a body by re-entry
-  state (`adequacy.Strong`'s `CtlAs`), one leaf each: the root's completion
-  where the ghost ends; a note, the value the ghost steps by; a
-  subscription, a burst's frame and the turn, each a silent run to the next
-  state. Decides which state carries the risk, and whether the five close
-  under the run with a poll's answer and a popped timer passing silently.
-- **THE LEAST VALUE.** `strong-shows` at a note: the silent run to it
-  computed from the kernel's own code; the recorded value a least event of
-  the residual. Decides whether "least" is paid once as a
-  field, the ghost's sources past the last delivery as `WellMach`'s are,
-  rather than re-established at every step.
-- **THE TURN.** `strong-shows` between turns: a popped timer's frame is the
+- **THE STEPPER.** `residual-steps`: the ghost's next step is its
+  residual's least event, as a set, by `U.step`'s clauses against
+  `U.meaning`'s. Decides whether it holds of every node, or only of nodes a
+  run reaches (a joiner fed out of order, a source unsorted), the witness
+  then owing the ghost a well-formedness it does not yet carry.
+- **THE LEAST VALUE.** `note-least` with `note-onward`: the value a note
+  records is the least the ghost holds, and past it the run runs the
+  stepped ghost. Decides whether "least" is paid once as a field of
+  `Carried`, the ghost's sources past the last delivery as `WellMach`'s
+  are, rather than re-established at every step.
+- **THE TURN.** `turn-pops` with `turn-dry`: a popped timer's frame is the
   ghost's frames node at its tick, and a drained run's ghost shows nothing.
   Decides whether the ghost's timers need an order of their own or
   `WellQueue`'s.
+- **THE KERNEL RUN.** `sub-onward` with `burst-onward`: a subscription
+  begun, or a burst's frame, runs its kernel's code silently to the next
+  re-entry state. Decides whether the four carried states close under the
+  run, a poll's answer and a popped timer passing silently.
 - **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
   in finitely many steps. Decides whether liveness needs a measure, and
   whether a `connect` feedback loop that spins makes it false.
@@ -200,8 +203,20 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`strong-shows`** (Content) — FALSITY, `NO EVIDENCE`: from a re-entry
-  configuration the run reaches the next silently, or shows the residual.
+- **`residual-steps`** (Content) — FALSITY, `NO EVIDENCE`: the ghost's step is
+  its residual's least event, of every node.
+- **`note-least`** (Content) — FALSITY, `NO EVIDENCE`: a note records the least
+  value the ghost holds.
+- **`note-onward`** (Content) — FALSITY, `NO EVIDENCE`: past a note the run
+  runs the stepped ghost.
+- **`turn-pops`** (Content) — FALSITY, `NO EVIDENCE`: a popped timer's frame is
+  the ghost's frames node at its tick.
+- **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
+  queued, the ghost shows nothing.
+- **`sub-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription begun
+  runs silently to the next re-entry state.
+- **`burst-onward`** (Content) — FALSITY, `NO EVIDENCE`: a burst's frame steps
+  silently to the next re-entry state.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`reachedᴿ`** (Adequacy) — FALSITY, `NO EVIDENCE`: every item the meaning's
