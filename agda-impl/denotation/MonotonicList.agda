@@ -302,6 +302,13 @@ private
 ... | false = refl
 ... | true  = ⊥-elim (≮-by p q r (cmpPos q p) refl h₁ h₂ e)
 
+-- No later is earlier or the same.
+<ᵖ-split : ∀ p q → q <ᵖ p ≡ false → p <ᵖ q ≡ true ⊎ p ≡ q
+<ᵖ-split p q h with cmpPos p q in c
+... | lt = inj₁ refl
+... | eq = inj₂ (eq-pos p q c)
+... | gt with () ← trans (sym h) (cong isLt (flip-pos p q c))
+
 private
   past : ∀ p → cmpPos (p ++ [ ix 0 ]) [] ≡ gt
   past []      = refl
