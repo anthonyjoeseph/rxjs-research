@@ -78,6 +78,7 @@ open FixIO using (fixIO)
 
 {-# FOREIGN GHC import qualified Data.IORef #-}
 {-# FOREIGN GHC import qualified Data.Function #-}
+{-# FOREIGN GHC import qualified Unsafe.Coerce #-}
 {-# COMPILE GHC IORef = type Data.IORef.IORef #-}
 {-# COMPILE GHC newIORef = \ _ -> Data.IORef.newIORef #-}
 {-# COMPILE GHC readIORef = \ _ -> Data.IORef.readIORef #-}
@@ -215,7 +216,6 @@ record Loop : Set where
 -- now.  The machine's types are not followed across a real effect.
 postulate
   coerce : ∀ {a} {A B : Set a} → A → B
-{-# FOREIGN GHC import qualified Unsafe.Coerce #-}
 {-# COMPILE GHC coerce = \ _ _ _ -> Unsafe.Coerce.unsafeCoerce #-}
 
 private
