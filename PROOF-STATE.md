@@ -170,12 +170,12 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### Big picture tier roadmap
 
-- **THE PROTOCOL'S RISK.** `connectᴷ-well` as a body, over `wk-well`
-  and `bind-well`, a placeless cut, and one label per callback in a scope.
-  Ruled out: a second callback sharing a scope, an unsubscribe guarded as
-  a delivery, a protocol needing the heap's closed flags for `takeWhile`.
-  Decides whether `Well` stays unary when a subject delivers to its
-  joiners in the order its cell lists them.
+- **THE PROTOCOL, CLOSED.** `flatMapᴷ-well` as a body, then `of`,
+  `empty`, `cold`, `map` and `scan`, over `Well` reading a cell as it
+  `Fits`. Ruled out: a unary `Well` blind to cells, a subject's joiners
+  out of join order, a second callback sharing a scope. Decides whether
+  a lane's refill `send` and `killAll`'s cuts need a cell invariant past
+  the joiners'.
 - **HONEST, DEFINED.** `HonMach` is a record over a residual past every
   mark, kept by each step as `Shows` says. Left: `Inner` a relation over configurations, as `WellMach` is, over a ghost
   tree of the compiled program's kernels and their cells; `Honest` the
@@ -192,10 +192,8 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   cases, over `WellMach`'s run and queue, each frame carrying the last
   delivery it was pushed at. Ruled out: a frame well only from below its
   position. Decides whether the loop's turn always finds an empty stack,
-  and whether same-tick timers pop in the order they were set (`Before`).
-- **THE PROTOCOL, THE REST.** The remaining kernel `-well` rows; `connect`
-  and `flatMap` lead, their subscriptions scoped under `ix 0`, `ix 1` and
-  `sub`. Decides whether a callback's position travels with it on the heap.
+  whether same-tick timers pop in the order they were set (`Before`), and
+  whether a join's write keeps every queued timer past the last it moves.
 - **THE RESIDUAL.** `Inner`'s ghost a configuration whose `meaning` is
   `HonMach`'s `rest`: `inner-launch` by `subscribed`, the residual at the
   launch the whole of the events. Decides
@@ -215,11 +213,8 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   stack under it.
 - **`turn`** (Sorted) — FALSITY, `NO EVIDENCE`: the loop's turn pops the
   earliest timer, its burst past every position shown.
-- **`connectᴷ-well`** (Sorted) — FALSITY, `REFUTED`: `connect` well-positioned,
-  body under `ix 0`, source under `ix 1`.
 - **`flatMapᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `flatMap`
   well-positioned, each inner under its `sub`.
-- **`joinᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: a joiner well-positioned.
 - **`emptyᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `empty` well-positioned.
 - **`ofᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `of` well-positioned, each
   value under its `ix`.

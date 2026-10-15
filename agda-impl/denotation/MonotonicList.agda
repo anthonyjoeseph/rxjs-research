@@ -268,6 +268,10 @@ private
 ... | inj₂ (_ , ())
 <ᵖ-part (x ∷ p) ys zs h rewrite refl-label x = <ᵖ-part p ys zs h
 
+-- Two subjects' subscribers part in the order they joined.
+<ᵖ-sub : ∀ i j → i <ᵖ j ≡ true → (sub i ∷ []) <ᵖ (sub j ∷ []) ≡ true
+<ᵖ-sub i j h rewrite isLt-lt h = refl
+
 ------------------------------------------------------------------------
 -- What a subscriber sees
 

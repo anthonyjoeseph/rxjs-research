@@ -45,6 +45,9 @@ data Ty : Set₁ where
   list  : Ty → Ty
   maybe : Ty → Ty
   _⊗_   : Ty → Ty → Ty
+  -- A subject's subscribers, each with the position it joined at: its
+  -- own code, so a proof can say what such a list holds.
+  joins : Set → Ty
 
 -- A runtime's names live in a WORLD — what has been allocated — and stay
 -- valid in every larger one (`_⊑_`).  IO has one world; the pure heap's
@@ -134,6 +137,7 @@ module Run (P : Prims) where
   El w (list t)  = List (El w t)
   El w (maybe t) = Maybe (El w t)
   El w (s ⊗ t)   = El w s × El w t
+  El w (joins A) = List (Sink w A × Pos)
 
   Ref : World → Ty → Set
   Ref w t = El w (ref t)
@@ -148,6 +152,8 @@ module Run (P : Prims) where
   wkEl (maybe t) ρ nothing  = nothing
   wkEl (maybe t) ρ (just x) = just (wkEl t ρ x)
   wkEl (s ⊗ t)   ρ (x , y)  = wkEl s ρ x , wkEl t ρ y
+  wkEl (joins A) ρ []             = []
+  wkEl (joins A) ρ ((s , j) ∷ xs) = (wkSink ρ s , j) ∷ wkEl (joins A) ρ xs
 
   wkR : ∀ {w v t} → w ⊑ v → Ref w t → Ref v t
   wkR {t = t} = wkEl (ref t)
@@ -158,7 +164,7 @@ module Run (P : Prims) where
   -- after the source has completed is completed at once, as in rxjs.
   record Subject (A : Set) (w : World) : Set where
     field
-      subscribers : Ref w (list (sink A ⊗ base Pos))
+      subscribers : Ref w (joins A)
       closed      : Ref w (base Bool)
 
   wkSubject : ∀ {A w v} → w ⊑ v → Subject A w → Subject A v
@@ -513,7 +519,7 @@ module Run (P : Prims) where
   -- which runs inside the body's scope.  The body's subscription is kept
   -- in a cell until the source's exists.  A `Kont` never moves the
   -- position, so a continuation run inside a scope places nothing.
-  connectᴷ {A} s b ρ o k = newRef (list (sink A ⊗ base Pos)) [] λ σ subs → newB false λ τ cl → newCut λ υ c →
+  connectᴷ {A} s b ρ o k = newRef (joins A) [] λ σ subs → newB false λ τ cl → newCut λ υ c →
     newRef (maybe quiet) nothing λ υ′ bodyRef →
     let st = record { subscribers = wkR (τ ⨾ υ ⨾ υ′) subs ; closed = wkR (υ ⨾ υ′) cl } ; o′ = wkObs (σ ⨾ τ ⨾ υ ⨾ υ′) o
         c′ = wkCut υ′ c in

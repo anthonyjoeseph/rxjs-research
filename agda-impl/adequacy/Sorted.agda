@@ -19,23 +19,24 @@ module adequacy.Sorted where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Nat using (suc)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; map)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.Maybe using (maybe; just; nothing)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
-open import Level using (Lift; lift)
-open import Data.Product using (_×_; _,_; Σ)
+open import Level using (Lift; lift; lower)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (Pos; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; Timeline)
-open import operation.AbstractObservable using (module Run; module Heap) renaming (module Machine to Shared)
+open import denotation.MonotonicList using (Pos; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; <ᵖ-sub; Timeline) renaming (sub to subᴾ)
+open import operation.AbstractObservable using (Ty; _⊗_; joins; module Run; module Heap)
+  renaming (base to baseᵗ; ref to refᵗ; sink to sinkᵗ; quiet to quietᵗ; list to listᵗ; maybe to maybeᵗ) renaming (module Machine to Shared)
 open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
-open Heap using (World; _⊑_; _⨾_; same; Sink; Quiet; Handle)
+open Heap using (World; _⊑_; _⨾_; _∋_; cell; same; Sink; Quiet; Handle)
 open import operation.Machine using (module Machine)
 
 ------------------------------------------------------------------------
@@ -75,19 +76,23 @@ settled-note : ∀ {p lo lo′} → lo ≤ᵖ p → Settled p p lo′ → Settle
 settled-note {p} le (a , inj₁ refl) = le , inj₂ ([] , sym (++-identityʳ p))
 settled-note     le (a , inj₂ u)    = ≤ᵖ-trans le a , inj₂ u
 
--- Wherever a child under `ix 0` left the last, it is before a sibling under `last`.
-settled-last : ∀ q {lo lo′} → lo ≤ᵖ q → Settled (q ++ [ ix 0 ]) lo lo′ → lo′ ≤ᵖ (q ++ [ last ])
-settled-last q le (_ , inj₁ refl)       = ≤ᵖ-trans le (inj₂ (<ᵖ-below q []))
-settled-last q le (_ , inj₂ (y , refl)) rewrite ++-assoc q [ ix 0 ] y = inj₂ (<ᵖ-part q y [] refl)
+-- Wherever a child left the last, it is before a later sibling.
+settled-next : ∀ q {a b lo lo′} → (a ∷ []) <ᵖ (b ∷ []) ≡ true → lo ≤ᵖ (q ++ [ b ]) → Settled (q ++ [ a ]) lo lo′ → lo′ ≤ᵖ (q ++ [ b ])
+settled-next q     h le (_ , inj₁ refl)       = le
+settled-next q {a} h le (_ , inj₂ (y , refl)) rewrite ++-assoc q [ a ] y = inj₂ (<ᵖ-part q y [] h)
+
+-- Before a scope, before each of its children.
+≤ᵖ-child : ∀ q {l lo} → lo ≤ᵖ q → lo ≤ᵖ (q ++ [ l ])
+≤ᵖ-child q le = ≤ᵖ-trans le (inj₂ (<ᵖ-below q []))
 
 module Sorting (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read)
   open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; Ctl; run; ret; held; asking; Stack; bottom; push; Wait; rest; back; rehold; told
                                      ; Heapᴹ; Callbacks; cbs; look)
-  open Run (Pureᴾ R) using (Act; Ref; El; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; stash; cancel; eff; here; under; diverge; unfold
+  open Run (Pureᴾ R) using (Act; Ref; El; wkEl; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; stash; cancel; eff; here; under; diverge; unfold
                            ; Observer; Subscription; Subscribe; Kont; Env; Subject; wkEnv; wkR; compile; wkAct; wkObs; _>>=ᴬ_; _>>ᴬ_; module Kit; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via)
   open Pure R using (Timer; cascade; recorder)
-  open Kit using (Cut; wkCut; cut; guard; guarded; attach; when; skipᴬ)
+  open Kit using (Cut; wkCut; cut; guard; guarded; attach; when; skipᴬ; each; unsubscribeVia)
   open Read
 
   ----------------------------------------------------------------------
@@ -99,7 +104,7 @@ module Sorting (R : Set) where
       field rises : RisingStep lo (step m)
 
     data RisingStep (lo : Pos) : Step → Set₁ where
-      silentʳ   : ∀ {m} → Rising lo m → RisingStep lo (silent m)
+      silentʳ   : ∀ {m lo′} → lo ≤ᵖ lo′ → Rising lo′ m → RisingStep lo (silent m)
       valueʳ    : ∀ {t p a m} → lo ≤ᵖ p → Rising p m → RisingStep lo (value t p a m)
       completeʳ : ∀ {p} → lo ≤ᵖ p → RisingStep lo (complete p)
       drainedʳ  : RisingStep lo drained
@@ -108,6 +113,10 @@ module Sorting (R : Set) where
     []ᵃ  : Ascending lo []
     _∷ᵃ_ : ∀ {p ps} → lo ≤ᵖ p → Ascending p ps → Ascending lo (p ∷ ps)
 
+  ascending-from : ∀ {lo lo′ ps} → lo ≤ᵖ lo′ → Ascending lo′ ps → Ascending lo ps
+  ascending-from le []ᵃ        = []ᵃ
+  ascending-from le (h ∷ᵃ a)   = ≤ᵖ-trans le h ∷ᵃ a
+
   -- A rising run's record is ascending, however far it is read.
   mutual
     ascending : ∀ {lo m} → Rising lo m → ∀ n c → Ascending lo (marks (reading n c (trace m)))
@@ -115,7 +124,7 @@ module Sorting (R : Set) where
     ascending r (suc n) c = ascendingˢ (Rising.rises r) n c
 
     ascendingˢ : ∀ {lo s} → RisingStep lo s → ∀ n c → Ascending lo (marks (reading (suc n) c (shown s)))
-    ascendingˢ (silentʳ r)     n c = ascending r n _
+    ascendingˢ (silentʳ le r)  n c = ascending-from le (ascending r n _)
     ascendingˢ (valueʳ le r)   n c = le ∷ᵃ ascending r n _
     ascendingˢ (completeʳ le)  n c = le ∷ᵃ []ᵃ
     ascendingˢ drainedʳ        n c = []ᵃ
@@ -123,19 +132,52 @@ module Sorting (R : Set) where
   ----------------------------------------------------------------------
   -- THE PROTOCOL: a computation well-positioned
 
+  -- What a cell may hold, the last delivery at `lo`: a subject's joiners
+  -- listed in the order of the positions they joined at, every one of
+  -- them before `lo`.  So a later join, at no position before `lo`, comes
+  -- after every one listed.
+  joined : ∀ {w A} → El w (joins A) → List Pos
+  joined = map proj₂
+
+  Fits : ∀ {w} → Pos → (t : Ty) → El w t → Set
+  Fits lo (joins A) ss = AllPairs (λ i j → i <ᵖ j ≡ true) (joined ss) × All (λ i → i <ᵖ lo ≡ true) (joined ss)
+  Fits lo (baseᵗ X)  _  = ⊤
+  Fits lo (refᵗ t)   _  = ⊤
+  Fits lo (sinkᵗ A)  _  = ⊤
+  Fits lo quietᵗ     _  = ⊤
+  Fits lo (listᵗ t)  _  = ⊤
+  Fits lo (maybeᵗ t) _  = ⊤
+  Fits lo (s ⊗ t)   _  = ⊤
+
+  joined-wk : ∀ {w v A} (ρ : w ⊑ v) (ss : El w (joins A)) → joined (wkEl (joins A) ρ ss) ≡ joined ss
+  joined-wk ρ []             = refl
+  joined-wk ρ ((s , j) ∷ ss) = cong (j ∷_) (joined-wk ρ ss)
+
+  fits-wk : ∀ {w v} lo t (ρ : w ⊑ v) (a : El w t) → Fits lo t a → Fits lo t (wkEl t ρ a)
+  fits-wk lo (joins A) ρ ss f rewrite joined-wk ρ ss = f
+  fits-wk lo (baseᵗ X)  ρ a  f = tt
+  fits-wk lo (refᵗ t)   ρ a  f = tt
+  fits-wk lo (sinkᵗ A)  ρ a  f = tt
+  fits-wk lo quietᵗ     ρ a  f = tt
+  fits-wk lo (listᵗ t)  ρ a  f = tt
+  fits-wk lo (maybeᵗ t) ρ a  f = tt
+  fits-wk lo (s ⊗ t)   ρ a  f = tt
+
   -- `Well p lo m`: run at position `p`, the last delivery at `lo`, `m`
   -- delivers at no position before the last, and every scope it opens
   -- leaves the last delivery `Settled` in it.  A delivery is the root's
   -- record, or an observer's callback run; an observer's callbacks are
   -- well wherever they are called no earlier than the last delivery.  An
   -- unsubscribe delivers nothing, so it is well wherever it runs: it is
-  -- stashed only so, and cancelled anywhere.
+  -- stashed only so, and cancelled anywhere.  A cell is read as it
+  -- `Fits`, and written so; a write may move the last on, as a join's
+  -- does past the position it joined at.
   mutual
     data Well {w B} (p lo : Pos) : Act w B → Set₁ where
       doneʷ     : ∀ {b} → Well p lo (done b)
-      newRefʷ   : ∀ {t a} {k : ∀ {v} → w ⊑ v → Ref v t → Act v B} → (∀ {v} (σ : w ⊑ v) r → Well p lo (k σ r)) → Well p lo (newRef t a k)
-      readRefʷ  : ∀ {t} {r : Ref w t} {k : ∀ {v} → w ⊑ v → El v t → Act v B} → (∀ {v} (σ : w ⊑ v) a → Well p lo (k σ a)) → Well p lo (readRef {t = t} r k)
-      writeRefʷ : ∀ {t} {r : Ref w t} {a : El w t} {k : Act w B} → Well p lo k → Well p lo (writeRef {t = t} r a k)
+      newRefʷ   : ∀ {t a} {k : ∀ {v} → w ⊑ v → Ref v t → Act v B} → Fits lo t a → (∀ {v} (σ : w ⊑ v) r → Well p lo (k σ r)) → Well p lo (newRef t a k)
+      readRefʷ  : ∀ {t} {r : Ref w t} {k : ∀ {v} → w ⊑ v → El v t → Act v B} → (∀ {v} (σ : w ⊑ v) a → Fits lo t a → Well p lo (k σ a)) → Well p lo (readRef {t = t} r k)
+      writeRefʷ : ∀ {t} {r : Ref w t} {a : El w t} {k : Act w B} lo′ → Settled p lo lo′ → Fits lo′ t a → Well p lo′ k → Well p lo (writeRef {t = t} r a k)
       registerʷ : ∀ {A} {n : A → Act w ⊤} {c : Act w ⊤} {x : Act w Bool} {k : ∀ {v} → w ⊑ v → Sink v A → Act v B} → WellObs (record { next = n ; complete = c ; closed = x })
                 → (∀ {v} (σ : w ⊑ v) s → Well p lo (k σ s)) → Well p lo (register n c x k)
       sendʷ     : ∀ {A} {s : Sink w A} {a : A} {k : Act w B} → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → Well p lo′ k) → Well p lo (send s a k)
@@ -183,9 +225,9 @@ module Sorting (R : Set) where
   -- Weakening moves no delivery.
   wk-well : ∀ {w v B p lo} {m : Act w B} (ρ : w ⊑ v) → Well p lo m → Well p lo (wkAct ρ m)
   wk-well ρ doneʷ                  = doneʷ
-  wk-well ρ (newRefʷ h)            = newRefʷ λ σ r → h (ρ ⨾ σ) r
-  wk-well ρ (readRefʷ h)           = readRefʷ λ σ a → h (ρ ⨾ σ) a
-  wk-well ρ (writeRefʷ w)          = writeRefʷ (wk-well ρ w)
+  wk-well ρ (newRefʷ {t} {a} f h)  = newRefʷ (fits-wk _ t ρ a f) λ σ r → h (ρ ⨾ σ) r
+  wk-well ρ (readRefʷ h)           = readRefʷ λ σ a f → h (ρ ⨾ σ) a f
+  wk-well ρ (writeRefʷ {t} {a = a} lo′ st f w) = writeRefʷ lo′ st (fits-wk lo′ t ρ a f) (wk-well ρ w)
   wk-well ρ (registerʷ (wn , wc , wx) h) =
     registerʷ ((λ a q lo le → wk-well ρ (wn a q lo le)) , (λ q lo le → wk-well ρ (wc q lo le)) , (λ q lo → wk-well ρ (wx q lo))) λ σ s → h (ρ ⨾ σ) s
   wk-well ρ (sendʷ le h)           = sendʷ le λ lo′ st → wk-well ρ (h lo′ st)
@@ -208,9 +250,9 @@ module Sorting (R : Set) where
   -- Sequencing: the rest well from wherever the first left the last.
   bind-well : ∀ {w A B p lo} {m : Act w A} {f : A → Act w B} → Well p lo m → (∀ lo′ → Settled p lo lo′ → ∀ x → Well p lo′ (f x)) → Well p lo (m >>=ᴬ f)
   bind-well doneʷ             hf = hf _ settled-refl _
-  bind-well (newRefʷ h)       hf = newRefʷ λ σ r → bind-well (h σ r) λ lo′ st x → wk-well σ (hf lo′ st x)
-  bind-well (readRefʷ h)      hf = readRefʷ λ σ a → bind-well (h σ a) λ lo′ st x → wk-well σ (hf lo′ st x)
-  bind-well (writeRefʷ w)     hf = writeRefʷ (bind-well w hf)
+  bind-well (newRefʷ f h)     hf = newRefʷ f λ σ r → bind-well (h σ r) λ lo′ st x → wk-well σ (hf lo′ st x)
+  bind-well (readRefʷ h)      hf = readRefʷ λ σ a f → bind-well (h σ a f) λ lo′ st x → wk-well σ (hf lo′ st x)
+  bind-well (writeRefʷ lo′ st f w) hf = writeRefʷ lo′ st f (bind-well w λ lo″ st′ → hf lo″ (settled-trans st st′))
   bind-well (registerʷ wo h)  hf = registerʷ wo λ σ s → bind-well (h σ s) λ lo′ st x → wk-well σ (hf lo′ st x)
   bind-well (sendʷ le h)      hf = sendʷ le λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans st st′)
   bind-well (finishʷ le h)    hf = finishʷ le λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans st st′)
@@ -227,26 +269,29 @@ module Sorting (R : Set) where
 
   -- A cut delivers nothing: it cancels a stashed unsubscribe, if any.
   cut-placeless : ∀ {w} (c : Cut w) → Placeless (cut c)
-  cut-placeless c p lo = writeRefʷ (readRefʷ λ where
-    σ nothing  → doneʷ
-    σ (just t) → cancelʷ λ _ _ → doneʷ)
+  cut-placeless c p lo = writeRefʷ lo settled-refl tt (readRefʷ λ where
+    σ nothing  _ → doneʷ
+    σ (just t) _ → cancelʷ λ _ _ → doneʷ)
+
+  when-well : ∀ {w p lo} (r : Ref w (baseᵗ Bool)) {m : Act w ⊤} → Well p lo m → Well p lo (Kit.readB r λ b → when b m)
+  when-well r w = readRefʷ λ where
+    σ true  _ → wk-well σ w
+    σ false _ → doneʷ
 
   guard-well : ∀ {w p lo} (c : Cut w) {m : Act w ⊤} → Well p lo m → Well p lo (guard c m)
-  guard-well c w = readRefʷ λ where
-    σ true  → wk-well σ w
-    σ false → doneʷ
+  guard-well c = when-well (Kit.live c)
 
   guarded-well : ∀ {A w} (c : Cut w) {o : Observer A w} → WellObs o → WellObs (guarded c o)
   guarded-well c (wn , wc , wx) = (λ a q lo le → guard-well c (wn a q lo le)) , (λ q lo le → guard-well c (wc q lo le))
                                 , λ q lo → readRefʷ λ where
-                                    σ true  → wk-well σ (wx q lo)
-                                    σ false → doneʷ
+                                    σ true  _ → wk-well σ (wx q lo)
+                                    σ false _ → doneʷ
 
   -- Attaching an unsubscribe that places nothing places nothing.
   attach-well : ∀ {w} (c : Cut w) sub → Placeless (Subscription.unsubscribe sub) → Placeless (attach c sub)
-  attach-well c sub pl p lo = stashʷ pl λ σ t → writeRefʷ (readRefʷ λ where
-    τ true  → doneʷ
-    τ false → wk-well τ (wk-well σ (pl p lo)))
+  attach-well c sub pl p lo = stashʷ pl λ σ t → writeRefʷ lo settled-refl tt (readRefʷ λ where
+    τ true  _ → doneʷ
+    τ false _ → wk-well τ (wk-well σ (pl p lo)))
 
   -- takeWhile's observer: a failing value under `ix 0` when inclusive,
   -- then the completion under `last`, then the cut.
@@ -259,14 +304,14 @@ module Sorting (R : Set) where
     next′ : ∀ a q lo → lo ≤ᵖ q → Well q lo (if f a then Observer.next o a else under (ix 0) (Observer.next o a) (under last (Observer.complete o) (cut c)))
     next′ a q lo le with f a
     ... | true  = wn a q lo le
-    ... | false = underʷ (wn a (q ++ [ ix 0 ]) lo (≤ᵖ-trans le (inj₂ (<ᵖ-below q []))))
-                    λ lo′ st → underʷ (wc (q ++ [ last ]) lo′ (settled-last q le st)) λ _ _ → cut-placeless c q _
+    ... | false = underʷ (wn a (q ++ [ ix 0 ]) lo (≤ᵖ-child q le))
+                    λ lo′ st → underʷ (wc (q ++ [ last ]) lo′ (settled-next q refl (≤ᵖ-child q le) st)) λ _ _ → cut-placeless c q _
   takeWhile-obs false f c {o} (wn , wc , wx) = next′ , wc , wx
     where
     next′ : ∀ a q lo → lo ≤ᵖ q → Well q lo (if f a then Observer.next o a else under last (Observer.complete o) (cut c))
     next′ a q lo le with f a
     ... | true  = wn a q lo le
-    ... | false = underʷ (wc (q ++ [ last ]) lo (≤ᵖ-trans le (inj₂ (<ᵖ-below q [])))) λ _ _ → cut-placeless c q _
+    ... | false = underʷ (wc (q ++ [ last ]) lo (≤ᵖ-child q le)) λ _ _ → cut-placeless c q _
 
   -- The risk of the protocol: two callbacks in one scope.  A callback
   -- may leave the last delivery anywhere settled in its scope, so a
@@ -277,10 +322,94 @@ module Sorting (R : Set) where
   -- REFUTED: 72324013 with the failing value delivered unscoped beside the completion
   takeWhileᴷ-well : ∀ {A w} i f {s : Subscribe A w} → WellSub {A} {w} s → WellSub (takeWhileᴷ i f s)
   takeWhileᴷ-well i f hs ρ o k q lo le wo wk =
-    newRefʷ λ σ l → newRefʷ λ τ h →
+    newRefʷ tt λ σ l → newRefʷ tt λ τ h →
       let c = (wkR τ l , h) in
       hs _ _ _ q lo le (guarded-well c (takeWhile-obs i f c (wk-obs (σ ⨾ τ) wo)))
          λ υ sub pl q′ lo′ → bind-well (attach-well (wkCut υ c) sub pl q′ lo′) λ lo″ _ _ → wk ((σ ⨾ τ) ⨾ υ) _ (cut-placeless (wkCut υ c)) q′ lo″
+
+  -- A subject's delivery to each joiner it lists, under `sub` of where it
+  -- joined: listed in the order they joined, each is past where the one
+  -- before it left the last.
+  each-sub-well : ∀ {w A} q lo (ss : El w (joins A)) (g : Sink w A → Act w ⊤)
+                → (∀ x lo′ → lo′ ≤ᵖ (q ++ [ subᴾ (proj₂ x) ]) → Well (q ++ [ subᴾ (proj₂ x) ]) lo′ (g (proj₁ x)))
+                → AllPairs (λ i j → i <ᵖ j ≡ true) (joined ss) → All (λ j → lo ≤ᵖ (q ++ [ subᴾ j ])) (joined ss)
+                → Well q lo (each ss λ j → under (subᴾ (proj₂ j)) (g (proj₁ j)) skipᴬ)
+  each-sub-well q lo []       g hg _        _        = doneʷ
+  each-sub-well q lo (x ∷ xs) g hg (r AllPairs.∷ rs) (l ∷ ls) = underʷ (hg x lo l) λ lo′ st → each-sub-well q lo′ xs g hg rs (moved st r ls)
+    where
+    moved : ∀ {lo′ js} → Settled (q ++ [ subᴾ (proj₂ x) ]) lo lo′ → All (λ j → proj₂ x <ᵖ j ≡ true) js
+          → All (λ j → lo ≤ᵖ (q ++ [ subᴾ j ])) js → All (λ j → lo′ ≤ᵖ (q ++ [ subᴾ j ])) js
+    moved st []                []       = []
+    moved st (_∷_ {j} h hs) (k ∷ ks) = settled-next q (<ᵖ-sub (proj₂ x) j h) k st ∷ moved st hs ks
+
+  before-each : ∀ q {lo} → lo ≤ᵖ q → (js : List Pos) → All (λ j → lo ≤ᵖ (q ++ [ subᴾ j ])) js
+  before-each q le []       = []
+  before-each q le (j ∷ js) = ≤ᵖ-child q le ∷ before-each q le js
+
+  via-placeless : ∀ {w} (mb : _) → Placeless {w} (unsubscribeVia mb)
+  via-placeless nothing  p lo = doneʷ
+  via-placeless (just t) p lo = cancelʷ λ _ _ → doneʷ
+
+  -- The body under `ix 0`, the source under `ix 1`: whatever the body
+  -- left, the source is past it.  The subject delivers to its joiners as
+  -- its cell lists them, in the order they joined; the body's completion
+  -- cuts the source, which places nothing.
+  -- REFUTED: 72324013 with the cut a send to a registered sink, which `Well` guards as a delivery
+  -- REFUTED: f4ba20a9 with a cell read well whatever it holds, so a subject's joiners listed out of order
+  connectᴷ-well : ∀ {A B w} {s : Subscribe A w} {b : ∀ {v} → w ⊑ v → Subject A v → Subscribe B v} → WellSub {A} {w} s → (∀ {v} σ st → WellSub {B} {v} (b σ st)) → WellSub (connectᴷ s b)
+  connectᴷ-well hs hb ρ o k q lo le (wn , wc , wx) wk =
+    newRefʷ (AllPairs.[] , []) λ σ subs → newRefʷ tt λ τ cl → newRefʷ tt λ υ₁ l → newRefʷ tt λ υ₂ h → newRefʷ tt λ υ′ bodyRef →
+      underʷ (hb _ _ _ _ _ (q ++ [ ix 0 ]) lo (≤ᵖ-child q le)
+                 ((λ a q′ lo′ le′ → wk-well _ (wn a q′ lo′ le′))
+                 , (λ q′ lo′ le′ → bind-well (wk-well _ (wc q′ lo′ le′)) λ lo″ _ _ → cut-placeless _ q′ lo″)
+                 , (λ q′ lo′ → wk-well _ (wx q′ lo′)))
+                 λ π sub pl p′ lo′ → stashʷ pl λ π′ t → writeRefʷ lo′ settled-refl tt doneʷ)
+        λ lo′ st → underʷ (hs _ _ _ (q ++ [ ix 1 ]) lo′ (settled-next q refl (≤ᵖ-child q le) st)
+                    ((λ a q′ lo″ le″ → readRefʷ λ _ ss (asc , _) →
+                        each-sub-well q′ lo″ ss _ (λ x lo‴ le‴ → sendʷ le‴ λ _ _ → doneʷ) asc (before-each q′ le″ (joined ss)))
+                    , (λ q′ lo″ le″ → writeRefʷ lo″ settled-refl tt (readRefʷ λ _ ss (asc , _) →
+                        each-sub-well q′ lo″ ss _ (λ x lo‴ le‴ → finishʷ le‴ λ _ _ → doneʷ) asc (before-each q′ le″ (joined ss))))
+                    , (λ q′ lo″ → readRefʷ λ _ _ _ → doneʷ))
+                    λ ψ src pl p′ lo″ → bind-well (attach-well _ src pl p′ lo″) λ lo‴ _ _ → readRefʷ λ ψ′ mb _ →
+                      wk (σ ⨾ τ ⨾ (υ₁ ⨾ υ₂) ⨾ υ′ ⨾ ψ ⨾ ψ′) _ (λ p″ lo⁗ → bind-well (wk-well ψ′ (pl p″ lo⁗)) λ lo⁵ _ _ → via-placeless mb p″ lo⁵) p′ lo‴)
+          λ _ _ → doneʷ
+
+  ≤ᵖ-after : ∀ {i lo p} → i <ᵖ lo ≡ true → lo ≤ᵖ p → i <ᵖ p ≡ true
+  ≤ᵖ-after         h (inj₁ refl) = h
+  ≤ᵖ-after {i} {lo} {p} h (inj₂ g) = <ᵖ-trans i lo p h g
+
+  all-snoc : ∀ {S : Set} {P : Pos → Set} (ss : List (S × Pos)) x → All P (map proj₂ ss) → P (proj₂ x) → All P (map proj₂ (ss ++ [ x ]))
+  all-snoc []       x []       px = px ∷ []
+  all-snoc (y ∷ ys) x (q ∷ qs) px = q ∷ all-snoc ys x qs px
+
+  all-map : ∀ {P Q : Pos → Set} {js} → (∀ {j} → P j → Q j) → All P js → All Q js
+  all-map f []       = []
+  all-map f (q ∷ qs) = f q ∷ all-map f qs
+
+  pairs-snoc : ∀ {S : Set} (ss : List (S × Pos)) x → AllPairs (λ i j → i <ᵖ j ≡ true) (map proj₂ ss)
+             → All (λ i → i <ᵖ proj₂ x ≡ true) (map proj₂ ss) → AllPairs (λ i j → i <ᵖ j ≡ true) (map proj₂ (ss ++ [ x ]))
+  pairs-snoc []       x AllPairs.[]        []       = [] AllPairs.∷ AllPairs.[]
+  pairs-snoc (y ∷ ys) x (r AllPairs.∷ rs) (b ∷ bs) = all-snoc ys x r b AllPairs.∷ pairs-snoc ys x rs bs
+
+  -- A join lists itself past every joiner listed, all before the last,
+  -- and moves the last on past where it joined.  Joining a completed
+  -- subject completes at once, under `last`.
+  joinᴷ-well : ∀ {A w} st → WellSub (joinᴷ {A} {w} st)
+  joinᴷ-well st ρ o k p lo le (wn , wc , wx) wk = hereʷ (readRefʷ λ where
+    σ true  _ → underʷ (wk-well σ (wc (p ++ [ last ]) lo (≤ᵖ-child p le))) λ lo′ _ → wk-well σ (wk Heap.same _ (λ _ _ → doneʷ) p lo′)
+    σ false _ → newRefʷ tt λ σ′ l →
+      registerʷ ((λ a q lo′ le′ → when-well l (wk-well (σ ⨾ σ′) (wn a q lo′ le′)))
+                , (λ q lo′ le′ → when-well l (wk-well (σ ⨾ σ′) (wc q lo′ le′)))
+                , (λ q lo′ → readRefʷ λ where
+                     τ true  _ → wk-well τ (wk-well (σ ⨾ σ′) (wx q lo′))
+                     τ false _ → doneʷ))
+        λ τ sk → readRefʷ λ π ss (asc , below) →
+          let below′ = all-map (λ {j} h → ≤ᵖ-after {j} h le) below in
+          writeRefʷ (p ++ [ last ]) (≤ᵖ-child p le , inj₂ ([ last ] , refl))
+            (pairs-snoc ss _ asc below′
+            , all-snoc ss _ (all-map (λ {j} h → ≤ᵖ-after {j} h (≤ᵖ-child p (inj₁ refl))) below′) (<ᵖ-below p []))
+            (wk-well π (wk ((σ ⨾ σ′) ⨾ τ) (record { unsubscribe = writeRef (wkR τ l) false skipᴬ })
+                           (λ p′ lo″ → writeRefʷ lo″ settled-refl tt doneʷ) p (p ++ [ last ]))))
 
   postulate
     -- THE PROTOCOL, ONE KERNEL AT A TIME.
@@ -293,13 +422,7 @@ module Sorting (R : Set) where
     -- Each lane subscribed under `ix 1`, its observer guarded by its cut.
     flatMapᴷ-well   : ∀ {A B w} op {f : A → Subscribe B w} {s : Subscribe A w} → (∀ a → WellSub {B} {w} (f a)) → WellSub {A} {w} s → WellSub (flatMapᴷ op f s)
 
-    -- The body's completion cuts the source after delivering wherever it
-    -- did: the cut cancels a stashed unsubscribe, which places nothing.
-    -- REFUTED: 72324013 with the cut a send to a registered sink, which `Well` guards as a delivery
-    connectᴷ-well   : ∀ {A B w} {s : Subscribe A w} {b : ∀ {v} → w ⊑ v → Subject A v → Subscribe B v} → WellSub {A} {w} s → (∀ {v} σ st → WellSub {B} {v} (b σ st)) → WellSub (connectᴷ s b)
 
-    -- A join is delivered to under `sub` of the position it joined at.
-    joinᴷ-well      : ∀ {A w} st → WellSub (joinᴷ {A} {w} st)
 
   -- Every compiled tree well, kernel by kernel.
   compile-well : ∀ {Γ A w} (o : Obs _ Γ A) (e : Env Γ w) → WellEnv e → WellSub (compile o e)
@@ -340,11 +463,12 @@ module Sorting (R : Set) where
             → WellCtl lo p (asking {X = X} e k′ σ k)
 
   -- Every observer the heap holds, well; every unsubscribe it holds,
-  -- placeless.
-  WellHeap : ∀ {h} → Heapᴹ h → Set₁
-  WellHeap {h} hp = (∀ {A} (s : _) → WellObs {A} {h} (record { next = Callbacks.onNext (cbs hp s) ; complete = Callbacks.onComplete (cbs hp s)
-                                                            ; closed = Callbacks.isClosed (cbs hp s) }))
-                  × (∀ (t : Quiet h) → Placeless (look hp t))
+  -- placeless; every cell's content fitting the last delivery.
+  WellHeap : ∀ {h} → Pos → Heapᴹ h → Set₁
+  WellHeap {h} lo hp = (∀ {A} (s : _) → WellObs {A} {h} (record { next = Callbacks.onNext (cbs hp s) ; complete = Callbacks.onComplete (cbs hp s)
+                                                               ; closed = Callbacks.isClosed (cbs hp s) }))
+                     × (∀ (t : Quiet h) → Placeless (look hp t))
+                     × (∀ {t} (r : h ∋ cell t) → Fits lo t (lower (look hp r)))
 
   -- The run well: the running computation and every frame waiting on
   -- the stack, every callback the heap holds, every burst playing past
@@ -352,7 +476,7 @@ module Sorting (R : Set) where
   record WellRun (lo : Pos) (m : Mach) : Set₁ where
     field
       ctl    : WellCtl lo (Conf.pos (Mach.conf m)) (Conf.ctl (Mach.conf m))
-      heap   : WellHeap (Conf.heap (Mach.conf m))
+      heap   : WellHeap lo (Conf.heap (Mach.conf m))
       bursts : All (maybe (λ b → lo ≤ᵖ Playing.under′ b) (Lift _ ⊤)) (Mach.bursts m)
 
   -- One timer pops before another: its cascade is the earlier, so two
@@ -374,7 +498,7 @@ module Sorting (R : Set) where
 
   -- One step, its next configuration `P` and never earlier.
   data StepBy (P : Pos → Mach → Set₁) (lo : Pos) : Step → Set₁ where
-    silentʷ   : ∀ {m} → P lo m → StepBy P lo (silent m)
+    silentʷ   : ∀ {m lo′} → lo ≤ᵖ lo′ → P lo′ m → StepBy P lo (silent m)
     valueʷ    : ∀ {t p a m} → lo ≤ᵖ p → P p m → StepBy P lo (value t p a m)
     completeʷ : ∀ {p} → lo ≤ᵖ p → StepBy P lo (complete p)
     drainedʷ  : StepBy P lo drained
@@ -382,11 +506,18 @@ module Sorting (R : Set) where
   WellStep : Pos → Step → Set₁
   WellStep = StepBy WellMach
 
-  joinʷ : ∀ {lo s} → StepBy WellRun lo s → StepBy WellQueue lo s → WellStep lo s
-  joinʷ (silentʷ r)     (silentʷ q)     = silentʷ (record { going = r ; queue = q })
-  joinʷ (valueʷ le r)   (valueʷ _ q)    = valueʷ le (record { going = r ; queue = q })
-  joinʷ (completeʷ le)  (completeʷ _)   = completeʷ le
-  joinʷ drainedʷ        drainedʷ        = drainedʷ
+  -- The queue well where the run's step left the last.
+  QueueAt : ∀ {lo s} → StepBy WellRun lo s → Set₁
+  QueueAt (silentʷ {m} {lo′} _ _) = WellQueue lo′ m
+  QueueAt (valueʷ {p = p} {m = m} _ _) = WellQueue p m
+  QueueAt (completeʷ _)          = Lift _ ⊤
+  QueueAt drainedʷ               = Lift _ ⊤
+
+  joinʷ : ∀ {lo s} (r : StepBy WellRun lo s) → QueueAt r → WellStep lo s
+  joinʷ (silentʷ le r)  q = silentʷ le (record { going = r ; queue = q })
+  joinʷ (valueʷ le r)   q = valueʷ le (record { going = r ; queue = q })
+  joinʷ (completeʷ le)  _ = completeʷ le
+  joinʷ drainedʷ        _ = drainedʷ
 
   -- The loop's turn: held, nothing playing, so the next step pops a timer.
   idle : Mach → Bool
@@ -409,10 +540,11 @@ module Sorting (R : Set) where
     walk-tree : ∀ {lo m} → WellMach lo m → idle m ≡ false → StepBy WellRun lo (step m)
 
     -- THE TIMERS: a step that is not the loop's turn shows values only
-    -- under the playing burst's cascade, so every timer queued stays past
-    -- them; a timer it sets is queued at its due tick after every timer
-    -- set earlier on that tick.
-    walk-timers : ∀ {lo m} → WellMach lo m → idle m ≡ false → StepBy WellQueue lo (step m)
+    -- under the playing burst's cascade, and moves the last on only past
+    -- a join in it, so every timer queued stays past them; a timer it
+    -- sets is queued at its due tick after every timer set earlier on
+    -- that tick.
+    walk-timers : ∀ {lo m} (w : WellMach lo m) (b : idle m ≡ false) → QueueAt (walk-tree w b)
 
     -- THE LOOP'S TURN: the earliest timer popped, its frame played from
     -- its cascade, which every other timer is past.
@@ -437,7 +569,7 @@ module Sorting (R : Set) where
   begin-well : (o : PureObs [] R) → WellMach root (begin o)
   begin-well o = record
     { going = record { ctl    = runʷ (inj₁ refl , inj₁ refl) (compile-well o [] (lift tt) same recorder _ root root (inj₁ refl) recorder-well (λ σ sub _ p lo → doneʷ)) bottomʷ
-                     ; heap   = (λ ()) , (λ ())
+                     ; heap   = (λ ()) , (λ ()) , (λ ())
                      ; bursts = [] }
     ; queue = record { timers = [] ; queued = AllPairs.[] } }
 
@@ -446,7 +578,7 @@ module Sorting (R : Set) where
     rising w .Rising.rises = risingˢ (preserve w)
 
     risingˢ : ∀ {lo s} → WellStep lo s → RisingStep lo s
-    risingˢ (silentʷ w)     = silentʳ (rising w)
+    risingˢ (silentʷ le w)  = silentʳ le (rising w)
     risingˢ (valueʷ le w)   = valueʳ le (rising w)
     risingˢ (completeʷ le)  = completeʳ le
     risingˢ drainedʷ        = drainedʳ
