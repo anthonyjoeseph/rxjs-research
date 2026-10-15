@@ -18,25 +18,26 @@
 module adequacy.Sorted where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
-open import Data.Nat using (suc; pred; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _<ᵇ_; _≡ᵇ_)
 open import Data.List using (List; []; _∷_; _++_; [_]; map; null)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
-open import Data.Maybe using (maybe; just; nothing)
+open import Data.Maybe using (Maybe; maybe; just; nothing) renaming (map to mapMaybe)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Level using (Lift; lift; lower)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
 import Tree as T
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.MonotonicList using (Pos; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; <ᵖ-sub; <ᵖ-ix; Timeline) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Pos; From; done; quiet; at; emit; stall; close; From∞; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; <ᵖ-sub; <ᵖ-ix; Timeline) renaming (sub to subᴾ)
 open import operation.AbstractObservable using (Ty; _⊗_; joins; module Run; module Heap)
   renaming (base to baseᵗ; ref to refᵗ; sink to sinkᵗ; quiet to quietᵗ; list to listᵗ; maybe to maybeᵗ) renaming (module Machine to Shared)
 open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
-open Heap using (World; _⊑_; _⨾_; _∋_; cell; same; Sink; Quiet; Handle)
+open Heap using (World; _⊑_; _⨾_; _∋_; here; there; new; wk∋; cell; slot; hush; play; same; Sink; Quiet; Handle)
 open import operation.Machine using (module Machine)
 
 ------------------------------------------------------------------------
@@ -86,12 +87,12 @@ settled-next q {a} h le (_ , inj₂ (y , refl)) rewrite ++-assoc q [ a ] y = inj
 ≤ᵖ-child q le = ≤ᵖ-trans le (inj₂ (<ᵖ-below q []))
 
 module Sorting (R : Set) where
-  open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read)
-  open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; Ctl; run; ret; held; asking; Stack; bottom; push; Wait; rest; back; rehold; told
-                                     ; Heapᴹ; Callbacks; cbs; look)
+  open Machine R using (Mach; mach; Playing; wkPlaying; Todo; resume; owing; starting; feed; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read) renaming (play to playᴹ)
+  open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; go; Ctl; run; ret; held; asking; Stack; bottom; push; Wait; rest; back; rehold; told
+                                     ; Heapᴹ; Callbacks; cbs; look; spent?; Val; Stored; get; put; store; extend; wkAll; wkVal; stored)
   open Run (Pureᴾ R) using (Act; Ref; El; wkEl; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; stash; cancel; eff; here; under; diverge; unfold
                            ; Observer; Subscription; Subscribe; Kont; Env; Subject; wkEnv; wkR; compile; wkAct; wkObs; _>>=ᴬ_; _>>ᴬ_; module Kit; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via; emitAll; wkSub; module FlatKit)
-  open Pure R using (Timer; cascade; recorder)
+  open Pure R using (Timer; cascade; recorder; mapList)
   open Kit using (Cut; wkCut; cut; guard; guarded; attach; when; skipᴬ; each; unsubscribeVia; readB; modify; newCut)
   open FlatKit using (Flat; wkFlat; newFlat; module FlatMap)
   open Read
@@ -223,7 +224,7 @@ module Sorting (R : Set) where
       divergeʷ  : Well p lo diverge
       unfoldʷ   : ∀ {Γ A} {l : T.Later Timeline Γ A} {e : Env Γ w} {n : A → Act w ⊤} {c : Act w ⊤} {x : Act w Bool}
                     {k : ∀ {v} → w ⊑ v → Quiet v → Act v ⊤} {m : Act w B} → WellEnv {Γ} e → WellObs {A} (record { next = n ; complete = c ; closed = x })
-                → (∀ lo′ → Settled (p ++ [ ix 1 ]) lo lo′ → Well p lo′ m) → Well p lo (unfold l e n c x k m)
+                → (∀ {v} (σ : w ⊑ v) t → Placeless (k σ t)) → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → Well p lo′ m) → Well p lo (unfold l e n c x k m)
 
     -- An observer: each callback well wherever it is called no earlier
     -- than the last delivery.  Asking whether it is closed is `Still`.
@@ -270,8 +271,8 @@ module Sorting (R : Set) where
   wk-well ρ (hereʷ w)              = hereʷ (wk-well ρ w)
   wk-well ρ (underʷ w h)           = underʷ (wk-well ρ w) λ lo′ st → wk-well ρ (h lo′ st)
   wk-well ρ divergeʷ               = divergeʷ
-  wk-well ρ (unfoldʷ we (wn , wc , wx) h) =
-    unfoldʷ (lift tt) ((λ a q lo le → wk-well ρ (wn a q lo le)) , (λ q lo le → wk-well ρ (wc q lo le)) , wk-still ρ wx) λ lo′ st → wk-well ρ (h lo′ st)
+  wk-well ρ (unfoldʷ we (wn , wc , wx) kp le h) =
+    unfoldʷ (lift tt) ((λ a q lo le → wk-well ρ (wn a q lo le)) , (λ q lo le → wk-well ρ (wc q lo le)) , wk-still ρ wx) (λ σ t → kp (ρ ⨾ σ) t) le λ lo′ st → wk-well ρ (h lo′ st)
 
   wk-obs : ∀ {A w v} {o : Observer A w} (ρ : w ⊑ v) → WellObs o → WellObs (wkObs ρ o)
   wk-obs ρ (wn , wc , wx) = (λ a q lo le → wk-well ρ (wn a q lo le)) , (λ q lo le → wk-well ρ (wc q lo le)) , wk-still ρ wx
@@ -294,7 +295,7 @@ module Sorting (R : Set) where
   bind-well (hereʷ w)         hf = hereʷ (bind-well w hf)
   bind-well (underʷ w h)      hf = underʷ w λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans (settled-out st) st′)
   bind-well divergeʷ          hf = divergeʷ
-  bind-well (unfoldʷ we wo h) hf = unfoldʷ we wo λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans (settled-out st) st′)
+  bind-well (unfoldʷ we wo kp le h) hf = unfoldʷ we wo kp le λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans st st′)
 
   -- What is still is well wherever it runs, and the rest from there.
   still-bind : ∀ {w A B p lo} {m : Act w A} {f : A → Act w B} → Still m → (∀ x → Well p lo (f x)) → Well p lo (m >>=ᴬ f)
@@ -596,49 +597,119 @@ module Sorting (R : Set) where
   compile-well (T.flatMap op f s)  e we = flatMapᴷ-well op (λ a → compile-well (f a) e we) (compile-well s e we)
   compile-well (T.connect s b)     e we = connectᴷ-well (compile-well s e we) λ σ st → compile-well b (st ∷ wkEnv σ e) (lift tt)
   compile-well (T.connected i)     e we = joinᴷ-well _
-  compile-well (T.defer l)         e we = λ ρ o k p lo le wo wk → unfoldʷ (lift tt) wo λ lo′ st → doneʷ
+  compile-well (T.defer l)         e we = λ ρ o k p lo le wo wk → unfoldʷ (lift tt) wo (λ τ t → wk τ _ (cancelˢ doneˢ)) le λ lo′ st → doneʷ
 
   ----------------------------------------------------------------------
   -- THE WALK: a well configuration rises
 
-  -- What waits on the stack, well.  `WellStack p lo k`: pushed at `p`
-  -- with the last delivery at `lo`, `k` resumes well from wherever a
-  -- scope at `p` may leave the last, as `Well`'s own continuations do.
-  -- Each frame was pushed where the one below it had settled.
-  data WellStack (p lo : Pos) : ∀ {w X} → Stack w X → Set₁ where
-    bottomʷ : ∀ {w} → WellStack p lo (bottom {w})
-    restʷ   : ∀ {u w B lo₀} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Settled p lo₀ lo → (∀ lo′ → Settled p lo lo′ → Well p lo′ m)
-            → WellStack p lo₀ k → WellStack p lo (push (rest m) ρ k)
-    backʷ   : ∀ {u w B lo₀} q {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Settled q lo₀ lo → (∀ lo′ → Settled p lo lo′ → Well q lo′ m)
-            → WellStack q lo₀ k → WellStack p lo (push (back q m) ρ k)
-    reholdʷ : ∀ {u w} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p lo k → WellStack p lo (push rehold ρ k)
-    toldʷ   : ∀ {u w} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p lo k → WellStack p lo (push told ρ k)
+  -- A level's burst, by position: playing from `c` at its `i`-th frame,
+  -- or over, its completion owed or delivered.
+  data Entry : Set where
+    playing : Pos → ℕ → Entry
+    over    : Entry
+
+  entry : ∀ {h} → Maybe (Playing h) → Entry
+  entry (just b) = playing (Playing.under′ b) (Playing.index b)
+  entry nothing  = over
+
+  -- What is owed, by position: a resume, or a completion there.
+  due : ∀ {h} → Todo h → Maybe Pos
+  due resume        = nothing
+  due (owing _ _ e) = just e
+
+  -- The root's level, held over the bottom: a timer's burst playing, its
+  -- completion owed, delivered, its frames rescheduled, or nothing.
+  data RootAt (lo : Pos) : List Entry → List (Maybe Pos) → Set where
+    playingʳ : ∀ {c i} → lo ≤ᵖ (c ++ [ ix i ]) → RootAt lo [ playing c i ] []
+    owingʳ   : ∀ {e} → lo ≤ᵖ e → RootAt lo [ over ] [ just e ]
+    overʳ    : RootAt lo [ over ] []
+    resumeʳ  : RootAt lo [] [ nothing ]
+    idleʳ    : RootAt lo [] []
+
+  -- A cold's level, started at `P` over the levels `es`: its burst
+  -- playing under `P`, its completion owed at `P ++ [ last ]`, delivered,
+  -- or its frames on timers.
+  data ColdAt (P lo : Pos) (es : List Entry) : List Entry → List (Maybe Pos) → Set where
+    playingᶜ : ∀ {i} → lo ≤ᵖ (P ++ [ ix i ]) → ColdAt P lo es (playing P i ∷ es) []
+    owingᶜ   : lo ≤ᵖ (P ++ [ last ]) → ColdAt P lo es (over ∷ es) [ just (P ++ [ last ]) ]
+    overᶜ    : ColdAt P lo es (over ∷ es) []
+    resumeᶜ  : ColdAt P lo es es [ nothing ]
+
+  mutual
+    -- What waits on the stack, well.  `WellStack p lo k es`: pushed at
+    -- `p` with the last delivery at `lo`, `k` resumes well from wherever
+    -- a scope at `p` may leave the last, as `Well`'s own continuations
+    -- do; `es`, the bursts of the levels it holds.  A scope's frame puts
+    -- back an enclosing position.  A delivery's frames hand the turn back
+    -- to the level that fed it, from wherever the delivery left the last.
+    data WellStack (p lo : Pos) : ∀ {w X} → Stack w X → List Entry → Set₁ where
+      bottomʷ : ∀ {w} → WellStack p lo (bottom {w}) []
+      restʷ   : ∀ {u w B lo₀ es} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Settled p lo₀ lo → (∀ lo′ → Settled p lo lo′ → Well p lo′ m)
+              → WellStack p lo₀ k es → WellStack p lo (push (rest m) ρ k) es
+      backʷ   : ∀ {u w B lo₀ es} q {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Under q p → Settled q lo₀ lo → (∀ lo′ → Settled p lo lo′ → Well q lo′ m)
+              → WellStack q lo₀ k es → WellStack p lo (push (back q m) ρ k) es
+      fedʷ    : ∀ {t u w es} P {ρ : u ⊑ w} {σ : t ⊑ u} {k : Stack t ⊤} → (∀ lo′ → Settled p lo lo′ → WellHeld lo′ P k es [])
+              → WellStack p lo (push (back P (done tt)) ρ (push rehold σ k)) es
+
+    -- What waits on a `Still` computation: it returns to the last exactly
+    -- where it found it.  A cancel's frame, a still frame, the turn handed
+    -- back after a delivery, or a poll's answer.
+    data StillStack (p lo : Pos) : ∀ {w X} → Stack w X → List Entry → Set₁ where
+      stillRestʷ  : ∀ {u w B lo₀ es} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Settled p lo₀ lo → Well p lo m → WellStack p lo₀ k es
+                  → StillStack p lo (push (rest m) ρ k) es
+      stillStillʷ : ∀ {u w B es} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Still m → StillStack p lo k es → StillStack p lo (push (rest m) ρ k) es
+      reholdʷ     : ∀ {u w es} {ρ : u ⊑ w} {k : Stack u ⊤} → WellHeld lo p k es [] → StillStack p lo (push rehold ρ k) es
+      toldʷ       : ∀ {u w c i es} {ρ : u ⊑ w} {k : Stack u ⊤} → WellHeld lo p k (playing c i ∷ es) [] → StillStack p lo (push told ρ k) (playing c i ∷ es)
+
+    -- The driver's turn at `P`, well: over the bottom, the root's level;
+    -- over a cold's frame, that cold's level, the last settled in `P`
+    -- from where its frame was pushed.  `ts`: what is owed it.
+    data WellHeld (lo P : Pos) : ∀ {w} → Stack w ⊤ → List Entry → List (Maybe Pos) → Set₁ where
+      rootʰ : ∀ {w es ts} → RootAt lo es ts → WellHeld lo P (bottom {w}) es ts
+      coldʰ : ∀ {u w B lo₀ es₀ es ts} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → Settled P lo₀ lo → WellStack P lo₀ (push (rest m) ρ k) es₀
+            → ColdAt P lo es₀ es ts → WellHeld lo P (push (rest m) ρ k) es ts
 
   -- What runs next, well at the configuration's position, the last
-  -- delivery settled from where the top frame was pushed.
-  data WellCtl {h : World} (lo p : Pos) : Ctl h → Set₁ where
-    runʷ    : ∀ {w B a lo₀} {σ : w ⊑ h} {k : Stack w B} → Settled p lo₀ lo → Well p lo a → WellStack p lo₀ k → WellCtl lo p (run a σ k)
-    retʷ    : ∀ {w X x lo₀} {σ : w ⊑ h} {k : Stack w X} → Settled p lo₀ lo → WellStack p lo₀ k → WellCtl lo p (ret x σ k)
-    heldʷ   : ∀ {w lo₀} {σ : w ⊑ h} {k : Stack w ⊤} → Settled p lo₀ lo → WellStack p lo₀ k → WellCtl lo p (held σ k)
-    askingʷ : ∀ {w X B e k′ lo₀} {σ : w ⊑ h} {k : Stack w B} → Settled p lo₀ lo → (∀ x → Well p p (k′ x)) → WellStack p lo₀ k
-            → WellCtl lo p (asking {X = X} e k′ σ k)
+  -- delivery settled from where the top frame was pushed.  A `Still`
+  -- computation runs over a `StillStack`.  Nothing is owed but at the
+  -- driver's turn.
+  data WellCtl {h : World} (lo p : Pos) : Ctl h → List Entry → List (Maybe Pos) → Set₁ where
+    runʷ      : ∀ {w B a lo₀ es} {σ : w ⊑ h} {k : Stack w B} → Settled p lo₀ lo → Well p lo a → WellStack p lo₀ k es → WellCtl lo p (run a σ k) es []
+    retʷ      : ∀ {w X x lo₀ es} {σ : w ⊑ h} {k : Stack w X} → Settled p lo₀ lo → WellStack p lo₀ k es → WellCtl lo p (ret x σ k) es []
+    stillʷ    : ∀ {w B a es} {σ : w ⊑ h} {k : Stack w B} → Still a → StillStack p lo k es → WellCtl lo p (run a σ k) es []
+    stillRetʷ : ∀ {w X x es} {σ : w ⊑ h} {k : Stack w X} → StillStack p lo k es → WellCtl lo p (ret x σ k) es []
+    heldʷ     : ∀ {w es ts} {σ : w ⊑ h} {k : Stack w ⊤} → WellHeld lo p k es ts → WellCtl lo p (held σ k) es ts
+    notingʷ   : ∀ {w B a lo₀ es} {k′ : ⊤ → Act h B} {σ : w ⊑ h} {k : Stack w B} → lo ≤ᵖ p → Settled p lo₀ lo → Well p p (k′ tt) → WellStack p lo₀ k es
+              → WellCtl lo p (asking (note a) k′ σ k) es []
+    finningʷ  : ∀ {w B es} {k′ : ⊤ → Act h B} {σ : w ⊑ h} {k : Stack w B} → lo ≤ᵖ p → WellCtl lo p (asking fin k′ σ k) es []
 
-  -- Every observer the heap holds, well; every unsubscribe it holds,
-  -- `Still`; every cell's content fitting the last delivery.
-  WellHeap : ∀ {h} → Pos → Heapᴹ h → Set₁
-  WellHeap {h} lo hp = (∀ {A} (s : _) → WellObs {A} {h} (record { next = Callbacks.onNext (cbs hp s) ; complete = Callbacks.onComplete (cbs hp s)
-                                                               ; closed = Callbacks.isClosed (cbs hp s) }))
-                     × (∀ (t : Quiet h) → Still (look hp t))
-                     × (∀ {t} (r : h ∋ cell t) → Fits lo t (lower (look hp r)))
+  -- What an entry holds, well: a cell fitting the last delivery, a well
+  -- observer's callbacks, a `Still` unsubscribe.
+  WellVal : ∀ {w} → Pos → ∀ k → Val w k → Set₁
+  WellVal lo (cell t) x  = Lift _ (Fits lo t (lower x))
+  WellVal lo (slot A) cb = WellObs (record { next = Callbacks.onNext cb ; complete = Callbacks.onComplete cb ; closed = Callbacks.isClosed cb })
+  WellVal lo hush m      = Still m
+  WellVal lo play _      = Lift _ ⊤
 
-  -- The run well: the running computation and every frame waiting on
-  -- the stack, every callback the heap holds, every burst playing past
-  -- every position shown.
+  -- Every entry the heap holds well, as it was stored.
+  record WellHeap {h} (lo : Pos) (hp : Heapᴹ h) : Set₁ where
+    constructor heapʷ
+    field holds : ∀ {k} (i : h ∋ k) → WellVal lo k (Stored.val (get hp i))
+  open WellHeap
+
+  -- The run well: what runs next and every frame waiting on the stack,
+  -- every level's burst playing past the last, everything the heap
+  -- holds, and the root not yet complete.
   record WellRun (lo : Pos) (m : Mach) : Set₁ where
+    constructor wellʳ
     field
-      ctl    : WellCtl lo (Conf.pos (Mach.conf m)) (Conf.ctl (Mach.conf m))
-      heap   : WellHeap lo (Conf.heap (Mach.conf m))
-      bursts : All (maybe (λ b → lo ≤ᵖ Playing.under′ b) (Lift _ ⊤)) (Mach.bursts m)
+      {es}    : List Entry
+      {ts}    : List (Maybe Pos)
+      ctl     : WellCtl lo (Conf.pos (Mach.conf m)) (Conf.ctl (Mach.conf m)) es ts
+      entries : map entry (Mach.bursts m) ≡ es
+      dues    : map due (Mach.todo m) ≡ ts
+      heap    : WellHeap lo (Conf.heap (Mach.conf m))
+      fresh   : Mach.ended m ≡ false
 
   -- One timer pops before another: its cascade is the earlier, so two
   -- due on one tick pop in the order of the positions they were set at.
@@ -680,26 +751,306 @@ module Sorting (R : Set) where
   joinʷ (completeʷ le)  _ = completeʷ le
   joinʷ drainedʷ        _ = drainedʷ
 
-  -- The loop's turn: held, nothing playing, so the next step pops a timer.
+  -- The loop's turn: held, nothing playing or owed, so the next step pops
+  -- a timer.
   idle : Mach → Bool
-  idle m with Conf.ctl (Mach.conf m) | Mach.bursts m
-  ... | held _ _ | [] = true
-  ... | _        | _  = false
+  idle m with Conf.ctl (Mach.conf m) | Mach.bursts m | Mach.todo m
+  ... | held _ _ | [] | [] = true
+  ... | _        | _  | _  = false
+
+  -- A cell's fit holds of any later last.
+  fits-up : ∀ {w lo lo′} t {a : El w t} → lo ≤ᵖ lo′ → Fits lo t a → Fits lo′ t a
+  fits-up (joins A)  le (ps , below) = ps , All-map le below
+    where All-map : ∀ {lo lo′} → lo ≤ᵖ lo′ → ∀ {xs} → All (λ i → i <ᵖ lo ≡ true) xs → All (λ i → i <ᵖ lo′ ≡ true) xs
+          All-map le []                 = []
+          All-map (inj₁ refl) (x ∷ xs)  = x ∷ All-map (inj₁ refl) xs
+          All-map {lo} {lo′} (inj₂ h) {i ∷ _} (x ∷ xs) = <ᵖ-trans i lo lo′ x h ∷ All-map (inj₂ h) xs
+  fits-up (baseᵗ X)  le f = tt
+  fits-up (refᵗ t)   le f = tt
+  fits-up (sinkᵗ A)  le f = tt
+  fits-up quietᵗ     le f = tt
+  fits-up (listᵗ t)  le f = tt
+  fits-up (maybeᵗ t) le f = tt
+  fits-up (s ⊗ t)   le f = tt
+
+  heap-up : ∀ {h lo lo′} {hp : Heapᴹ h} → lo ≤ᵖ lo′ → WellHeap lo hp → WellHeap lo′ hp
+  heap-up le wh = heapʷ λ where
+    {cell t} i → lift (fits-up t le (lower (holds wh i)))
+    {slot A} i → holds wh i
+    {hush}   i → holds wh i
+    {play}   i → holds wh i
+
+  -- The last at a delivery: settled there from any no later.
+  settled-at : ∀ {p lo₀ lo} → Settled p lo₀ lo → lo ≤ᵖ p → Settled p lo₀ p
+  settled-at {p} (a , _) le = ≤ᵖ-trans a le , inj₂ ([] , sym (++-identityʳ p))
+
+  -- The machine's driver state weakened, by position unmoved.
+  entries-wk : ∀ {h v} (ρ : h ⊑ v) (bs : List (Maybe (Playing h))) → map entry (mapList (mapMaybe (wkPlaying ρ)) bs) ≡ map entry bs
+  entries-wk ρ []             = refl
+  entries-wk ρ (just b ∷ bs)  = cong (_ ∷_) (entries-wk ρ bs)
+  entries-wk ρ (nothing ∷ bs) = cong (_ ∷_) (entries-wk ρ bs)
+
+  -- An entry well, weakened.
+  val-wk : ∀ {w v lo} k (ρ : w ⊑ v) {x : Val w k} → WellVal lo k x → WellVal lo k (wkVal k ρ x)
+  val-wk (cell t) ρ {x} f = lift (fits-wk _ t ρ (lower x) (lower f))
+  val-wk (slot A) ρ wo    = wk-obs ρ wo
+  val-wk hush     ρ s     = wk-still ρ s
+  val-wk play     ρ _     = lift tt
+
+  look-well : ∀ {h lo} {hp : Heapᴹ h} → WellHeap lo hp → ∀ {k} (i : h ∋ k) → WellVal lo k (look hp i)
+  look-well {hp = hp} wh {k} i = val-wk k (Stored.into (get hp i)) (holds wh i)
+
+  -- The heap grown, and written, well.
+  wkAll-well : ∀ {h v w lo} (ρ : h ⊑ v) (xs : All (Stored h) w) → (∀ {k} (i : w ∋ k) → WellVal lo k (Stored.val (get xs i)))
+             → ∀ {k} (i : w ∋ k) → WellVal lo k (Stored.val (get (wkAll ρ xs) i))
+  wkAll-well ρ (stored x σ ∷ xs) wx here      = wx here
+  wkAll-well ρ (stored x σ ∷ xs) wx (there i) = wkAll-well ρ xs (λ j → wx (there j)) i
+
+  extend-well : ∀ {h lo k} {hp : Heapᴹ h} {x : Val (k ∷ h) k} → WellHeap lo hp → WellVal lo k x → WellHeap lo (extend hp x)
+  extend-well {hp = hp} wh wx = heapʷ λ where
+    here      → wx
+    (there i) → wkAll-well new hp (holds wh) i
+
+  put-well : ∀ {h w lo k} (xs : All (Stored h) w) (i : w ∋ k) {y : Stored h k} → WellVal lo k (Stored.val y) → (∀ {k′} (j : w ∋ k′) → WellVal lo k′ (Stored.val (get xs j)))
+           → ∀ {k′} (j : w ∋ k′) → WellVal lo k′ (Stored.val (get (put xs i y) j))
+  put-well (x ∷ xs) here      wy wx here      = wy
+  put-well (x ∷ xs) here      wy wx (there j) = wx (there j)
+  put-well (x ∷ xs) (there i) wy wx here      = wx here
+  put-well (x ∷ xs) (there i) wy wx (there j) = put-well xs i wy (λ j′ → wx (there j′)) j
+
+  store-well : ∀ {h lo k} {hp : Heapᴹ h} (i : h ∋ k) {x : Val h k} → WellHeap lo hp → WellVal lo k x → WellHeap lo (store hp i x)
+  store-well {hp = hp} i wh wx = heapʷ (put-well hp i wx (holds wh))
+
+  -- A cold started at `p`: its first frame playing, or its completion
+  -- owed, or its frames on timers.
+  started-well : ∀ {lo h A} {hp : Heapᴹ h} {p u B es} {m : Act h B} {ρ : u ⊑ h} {k : Stack u B} {cl tm bu lg mk}
+                 (s : Sink h A) (hd : Handle h) (f : From A 0) → lo ≤ᵖ p → WellStack p lo (push (rest m) ρ k) es → map entry bu ≡ es → WellHeap lo hp
+               → WellRun lo (starting (mach ⟨ hp , p , held same (push (rest m) ρ k) ⟩ cl tm bu [] lg false mk) s hd f)
+  started-well s hd done            le ws eb wh = wellʳ (heldʷ (coldʰ settled-refl ws (owingᶜ (≤ᵖ-child _ le)))) (cong (over ∷_) eb) refl wh refl
+  started-well s hd quiet           le ws eb wh = wellʳ (heldʷ (coldʰ settled-refl ws resumeᶜ)) eb refl wh refl
+  started-well s hd (at zero _ b)   le ws eb wh = wellʳ (heldʷ (coldʰ settled-refl ws (playingᶜ (≤ᵖ-child _ le)))) (cong (_ ∷_) eb) refl wh refl
+  started-well s hd (at (suc t) _ b) le ws eb wh = wellʳ (heldʷ (coldʰ settled-refl ws resumeᶜ)) eb refl wh refl
+
+  -- A run step from a well computation.
+  runs-run : ∀ {lo lo₀ h} {hp : Heapᴹ h} {p w B es} {a : Act h B} {σ : w ⊑ h} {k : Stack w B} {cl tm bu lg mk}
+           → Settled p lo₀ lo → Well p lo a → WellStack p lo₀ k es → map entry bu ≡ es → WellHeap lo hp
+           → StepBy WellRun lo (step (mach ⟨ hp , p , run a σ k ⟩ cl tm bu [] lg false mk))
+  runs-run st doneʷ ws eb wh = silentʷ (inj₁ refl) (wellʳ (retʷ st ws) eb refl wh refl)
+  runs-run {lo} {bu = bu} st (newRefʷ {t} {a} f h) ws eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ st (h new here) ws) (trans (entries-wk new bu) eb) refl (extend-well wh (lift (fits-wk lo t new a f))) refl)
+  runs-run {hp = hp} st (readRefʷ {r = r} h) ws eb wh = silentʷ (inj₁ refl) (wellʳ (runʷ st (h same _ (lower (look-well {hp = hp} wh r))) ws) eb refl wh refl)
+  runs-run {hp = hp} st (writeRefʷ {r = r} lo′ st′ f wk) ws eb wh =
+    silentʷ (proj₁ st′) (wellʳ (runʷ (settled-trans st st′) wk ws) eb refl (store-well r (heap-up {hp = hp} (proj₁ st′) wh) (lift f)) refl)
+  runs-run {bu = bu} st (registerʷ wo h) ws eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ st (h new here) ws) (trans (entries-wk new bu) eb) refl (extend-well wh (wk-obs new wo)) refl)
+  runs-run {lo = lo} {hp = hp} {p = p} st (sendʷ {s = s} {a = a} le h) ws eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ settled-refl (proj₁ (look-well {hp = hp} wh s) a p lo le) (restʷ st h ws)) eb refl wh refl)
+  runs-run {lo = lo} {hp = hp} {p = p} st (finishʷ {s = s} le h) ws eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ settled-refl (proj₁ (proj₂ (look-well {hp = hp} wh s)) p lo le) (restʷ st h ws)) eb refl wh refl)
+  runs-run {bu = bu} st (startColdʷ {c = c} {s = s} le h) ws eb wh =
+    silentʷ (inj₁ refl) (started-well (wk∋ new s) here (lower c) le (restʷ st (λ lo′ st′ → h lo′ st′ new here) ws) (trans (entries-wk new bu) eb)
+                                      (extend-well wh (lift tt)))
+  runs-run st (stopʷ {h = hd} wk) ws eb wh = silentʷ (inj₁ refl) (wellʳ (runʷ st wk ws) eb refl (store-well hd wh (lift tt)) refl)
+  runs-run {bu = bu} st (stashʷ sm h) ws eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ st (h new here) ws) (trans (entries-wk new bu) eb) refl (extend-well wh (wk-still new sm)) refl)
+  runs-run {hp = hp} st (cancelʷ {t = t} wk) ws eb wh = silentʷ (inj₁ refl) (wellʳ (stillʷ (look-well {hp = hp} wh t) (stillRestʷ st wk ws)) eb refl wh refl)
+  runs-run st (noteʷ le wk) ws eb wh = silentʷ (inj₁ refl) (wellʳ (notingʷ le st wk ws) eb refl wh refl)
+  runs-run st (finʷ le) ws eb wh = silentʷ (inj₁ refl) (wellʳ (finningʷ le) eb refl wh refl)
+  runs-run st (hereʷ wk) ws eb wh = silentʷ (inj₁ refl) (wellʳ (runʷ st wk ws) eb refl wh refl)
+  runs-run {p = p} st (underʷ {l = l} wm h) ws eb wh = silentʷ (inj₁ refl) (wellʳ (runʷ settled-refl wm (backʷ p ([ l ] , refl) st h ws)) eb refl wh refl)
+  runs-run st divergeʷ ws eb wh = silentʷ (inj₁ refl) (wellʳ (runʷ st divergeʷ ws) eb refl wh refl)
+  runs-run {p = p} st (unfoldʷ {l = l} {e = e} we wo kp le h) ws eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ settled-refl (underʷ (compile-well (T.Later.force l) e (lift tt) same _ _ (p ++ [ ix 1 ]) _ (≤ᵖ-child p le) wo
+                                                         λ σ′ sub us p′ lo′ → stashʷ us λ τ t → kp (σ′ ⨾ τ) t p′ lo′)
+                                                 λ _ _ → doneʷ)
+                                (restʷ st h ws)) eb refl wh refl)
+
+  -- A run step from a still computation.
+  runs-still : ∀ {lo h} {hp : Heapᴹ h} {p w B es} {a : Act h B} {σ : w ⊑ h} {k : Stack w B} {cl tm bu lg mk}
+             → Still a → StillStack p lo k es → map entry bu ≡ es → WellHeap lo hp
+             → StepBy WellRun lo (step (mach ⟨ hp , p , run a σ k ⟩ cl tm bu [] lg false mk))
+  runs-still doneˢ ss eb wh = silentʷ (inj₁ refl) (wellʳ (stillRetʷ ss) eb refl wh refl)
+  runs-still {lo} {bu = bu} (newRefˢ {t} {a} f h) ss eb wh =
+    silentʷ (inj₁ refl) (wellʳ (stillʷ (h new here) ss) (trans (entries-wk new bu) eb) refl (extend-well wh (lift (fits-wk lo t new a (f lo)))) refl)
+  runs-still (readRefˢ h) ss eb wh = silentʷ (inj₁ refl) (wellʳ (stillʷ (h same _) ss) eb refl wh refl)
+  runs-still {lo} (writeRefˢ {r = r} f k) ss eb wh = silentʷ (inj₁ refl) (wellʳ (stillʷ k ss) eb refl (store-well r wh (lift (f lo))) refl)
+  runs-still {hp = hp} (cancelˢ {t = t} k) ss eb wh = silentʷ (inj₁ refl) (wellʳ (stillʷ (look-well {hp = hp} wh t) (stillStillʷ k ss)) eb refl wh refl)
+  runs-still (stopˢ {h = hd} k) ss eb wh = silentʷ (inj₁ refl) (wellʳ (stillʷ k ss) eb refl (store-well hd wh (lift tt)) refl)
+
+  runs-well : ∀ {lo h} {hp : Heapᴹ h} {p w B} {a : Act h B} {σ : w ⊑ h} {k : Stack w B} {cl tm bu td lg en mk}
+            → WellRun lo (mach ⟨ hp , p , run a σ k ⟩ cl tm bu td lg en mk) → StepBy WellRun lo (step (mach ⟨ hp , p , run a σ k ⟩ cl tm bu td lg en mk))
+  runs-well {td = []} (wellʳ (runʷ st wa ws) eb refl wh refl) = runs-run st wa ws eb wh
+  runs-well {td = []} (wellʳ (stillʷ sa ss) eb refl wh refl)  = runs-still sa ss eb wh
+  runs-well {td = _ ∷ _} (wellʳ (runʷ _ _ _) _ () _ _)
+  runs-well {td = _ ∷ _} (wellʳ (stillʷ _ _) _ () _ _)
+
+  -- Settled in a scope is settled in any enclosing one.
+  settled-up : ∀ {q p lo lo′} → Under q p → Settled p lo lo′ → Settled q lo lo′
+  settled-up         u            (a , inj₁ e)            = a , inj₁ e
+  settled-up {q} (y , refl) (a , inj₂ (z , refl)) = a , inj₂ (y ++ z , ++-assoc q y z)
+
+  ∷-tail : ∀ {x y : Entry} {xs ys : List Entry} → _≡_ {A = List Entry} (x ∷ xs) (y ∷ ys) → xs ≡ ys
+  ∷-tail refl = refl
+
+  -- A poll answered closed: the level's burst over, a resume owed.
+  quit-well : ∀ {lo P w c i es} {k : Stack w ⊤} → WellHeld lo P k (playing c i ∷ es) [] → WellHeld lo P k es [ nothing ]
+  quit-well (rootʰ (playingʳ _))     = rootʰ resumeʳ
+  quit-well (coldʰ st ws (playingᶜ _)) = coldʰ st ws resumeᶜ
+
+  -- A return to a well stack.
+  returns-run : ∀ {lo lo₀ h} {hp : Heapᴹ h} {p w X es} {x : X} {σ : w ⊑ h} {k : Stack w X} {cl tm bu lg mk}
+              → Settled p lo₀ lo → WellStack p lo₀ k es → map entry bu ≡ es → WellHeap lo hp
+              → StepBy WellRun lo (step (mach ⟨ hp , p , ret x σ k ⟩ cl tm bu [] lg false mk))
+  returns-run st bottomʷ eb wh = silentʷ (inj₁ refl) (wellʳ (heldʷ (rootʰ idleʳ)) eb refl wh refl)
+  returns-run {lo} {σ = σ} st (restʷ st₁ h ws) eb wh = silentʷ (inj₁ refl) (wellʳ (runʷ (settled-trans st₁ st) (wk-well σ (h lo st)) ws) eb refl wh refl)
+  returns-run {lo} {σ = σ} st (backʷ q u st₁ h ws) eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ (settled-trans st₁ (settled-up u st)) (wk-well σ (h lo st)) ws) eb refl wh refl)
+  returns-run {lo} st (fedʷ P h) eb wh = silentʷ (inj₁ refl) (wellʳ (stillʷ doneˢ (reholdʷ (h lo st))) eb refl wh refl)
+
+  -- A return to a still stack: the last where it was.
+  returns-still : ∀ {lo h} {hp : Heapᴹ h} {p w X es} {x : X} {σ : w ⊑ h} {k : Stack w X} {cl tm bu lg mk}
+                → StillStack p lo k es → map entry bu ≡ es → WellHeap lo hp
+                → StepBy WellRun lo (step (mach ⟨ hp , p , ret x σ k ⟩ cl tm bu [] lg false mk))
+  returns-still {σ = σ} (stillRestʷ st h ws) eb wh = silentʷ (inj₁ refl) (wellʳ (runʷ st (wk-well σ h) ws) eb refl wh refl)
+  returns-still {σ = σ} (stillStillʷ sm ss) eb wh = silentʷ (inj₁ refl) (wellʳ (stillʷ (wk-still σ sm) ss) eb refl wh refl)
+  returns-still (reholdʷ wh′) eb wh = silentʷ (inj₁ refl) (wellʳ (heldʷ wh′) eb refl wh refl)
+  returns-still {x = false} (toldʷ wh′) eb wh = silentʷ (inj₁ refl) (wellʳ (heldʷ wh′) eb refl wh refl)
+  returns-still {x = true} {bu = b ∷ bu} (toldʷ wh′) eb wh = silentʷ (inj₁ refl) (wellʳ (heldʷ (quit-well wh′)) (∷-tail eb) refl wh refl)
+  returns-still {x = true} {bu = []} (toldʷ wh′) () wh
+
+  returns-well : ∀ {lo h} {hp : Heapᴹ h} {p w X} {x : X} {σ : w ⊑ h} {k : Stack w X} {cl tm bu td lg en mk}
+               → WellRun lo (mach ⟨ hp , p , ret x σ k ⟩ cl tm bu td lg en mk) → StepBy WellRun lo (step (mach ⟨ hp , p , ret x σ k ⟩ cl tm bu td lg en mk))
+  returns-well {td = []} (wellʳ (retʷ st ws) eb refl wh refl)  = returns-run st ws eb wh
+  returns-well {td = []} (wellʳ (stillRetʷ ss) eb refl wh refl) = returns-still ss eb wh
+  returns-well {td = _ ∷ _} (wellʳ (retʷ _ _) _ () _ _)
+  returns-well {td = _ ∷ _} (wellʳ (stillRetʷ _) _ () _ _)
+
+  ∷-head : ∀ {x y : Entry} {xs ys : List Entry} → _≡_ {A = List Entry} (x ∷ xs) (y ∷ ys) → x ≡ y
+  ∷-head refl = refl
+
+  -- At most one thing is owed.
+  owed-once : ∀ {lo P w es x y zs} {k : Stack w ⊤} → WellHeld lo P k es (x ∷ y ∷ zs) → ⊥
+  owed-once (rootʰ ())
+  owed-once (coldʰ _ _ ())
+
+  -- A resume paid: the level returns to the frame its cold was started
+  -- from, or the root's turn comes round.
+  paid-resume : ∀ {lo h} {hp : Heapᴹ h} {p w es} {σ : w ⊑ h} {k : Stack w ⊤} {cl tm bu lg mk}
+              → WellHeld lo p k es [ nothing ] → map entry bu ≡ es → WellHeap lo hp
+              → StepBy WellRun lo (step (mach ⟨ hp , p , held σ k ⟩ cl tm bu (resume ∷ []) lg false mk))
+  paid-resume (rootʰ resumeʳ)       eb wh = silentʷ (inj₁ refl) (wellʳ (heldʷ (rootʰ idleʳ)) eb refl wh refl)
+  paid-resume (coldʰ st ws resumeᶜ) eb wh = returns-run st ws eb wh
+
+  -- A completion paid: delivered at its position, the level's turn
+  -- handed back from wherever it leaves the last, the burst over.
+  paid-owing : ∀ {lo h A} {hp : Heapᴹ h} {p w es e} {σ : w ⊑ h} {k : Stack w ⊤} {hd : Handle h} {s : Sink h A} {cl tm bu lg mk}
+             → WellHeld lo p k es [ just e ] → map entry bu ≡ es → WellHeap lo hp
+             → StepBy WellRun lo (step (mach ⟨ hp , p , held σ k ⟩ cl tm bu (owing hd s e ∷ []) lg false mk))
+  paid-owing {lo} {hp = hp} {p} {e = e} {hd = hd} {s} (rootʰ (owingʳ le)) eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ settled-refl (proj₁ (proj₂ (look-well wh s)) e lo le) (fedʷ p λ lo′ st → rootʰ overʳ)) eb refl wh′ refl)
+    where wh′ = store-well {hp = hp} hd wh (lift tt)
+  paid-owing {lo} {hp = hp} {p} {hd = hd} {s} (coldʰ st ws (owingᶜ le)) eb wh =
+    silentʷ (inj₁ refl) (wellʳ (runʷ settled-refl (proj₁ (proj₂ (look-well wh s)) (p ++ [ last ]) lo le)
+                                     (fedʷ p λ lo′ st′ → coldʰ (settled-trans st (settled-up ([ last ] , refl) st′)) ws overᶜ)) eb refl wh′ refl)
+    where wh′ = store-well {hp = hp} hd wh (lift tt)
+
+  paid-well : ∀ {lo h} {hp : Heapᴹ h} {p w} {σ : w ⊑ h} {k : Stack w ⊤} {cl tm bu t td lg en mk}
+            → WellRun lo (mach ⟨ hp , p , held σ k ⟩ cl tm bu (t ∷ td) lg en mk) → StepBy WellRun lo (step (mach ⟨ hp , p , held σ k ⟩ cl tm bu (t ∷ td) lg en mk))
+  paid-well {t = resume}        {td = []}    (wellʳ (heldʷ wh) eb refl wh′ refl) = paid-resume wh eb wh′
+  paid-well {t = owing hd s e} {td = []}    (wellʳ (heldʷ wh) eb refl wh′ refl) = paid-owing wh eb wh′
+  paid-well                     {td = _ ∷ _} (wellʳ (heldʷ wh) eb refl wh′ refl) = ⊥-elim (owed-once wh)
+
+  -- The top level's burst over: the level returns, or the root's turn
+  -- comes round.
+  leave-well : ∀ {lo h} {hp : Heapᴹ h} {p w x es} {σ : w ⊑ h} {k : Stack w ⊤} {cl tm bu lg mk}
+             → WellHeld lo p k (x ∷ es) [] → map entry bu ≡ es → WellHeap lo hp
+             → StepBy WellRun lo (silent (feed (mach ⟨ hp , p , held σ k ⟩ cl tm bu [] lg false mk) go))
+  leave-well (rootʰ (playingʳ _))      eb wh = silentʷ (inj₁ refl) (wellʳ (heldʷ (rootʰ idleʳ)) eb refl wh refl)
+  leave-well (rootʰ overʳ)             eb wh = silentʷ (inj₁ refl) (wellʳ (heldʷ (rootʰ idleʳ)) eb refl wh refl)
+  leave-well (coldʰ st ws (playingᶜ _)) eb wh = returns-run st ws eb wh
+  leave-well (coldʰ st ws overᶜ)        eb wh = returns-run st ws eb wh
+
+  -- A frame played on: its value delivered at its index, a stall
+  -- skipped, or the burst closed and the rest scheduled.
+  play-well : ∀ {lo h} {hp : Heapᴹ h} {p w es c i} {σ : w ⊑ h} {k : Stack w ⊤} {cl tm lg mk} (b : Playing h) {bu}
+            → Playing.under′ b ≡ c → Playing.index b ≡ i → WellHeld lo p k (playing c i ∷ es) [] → map entry bu ≡ es → WellHeap lo hp
+            → StepBy WellRun lo (silent (playᴹ (mach ⟨ hp , p , held σ k ⟩ cl tm (just b ∷ bu) [] lg false mk) b bu))
+  play-well b refl refl wh eb hw with Playing.frame b
+  play-well {lo} {p = p} {c = c} {i} b refl refl (rootʰ (playingʳ le)) eb hw | emit a k′ =
+    silentʷ (inj₁ refl) (wellʳ (runʷ settled-refl (proj₁ (look-well hw (Playing.sink b)) a (c ++ [ ix i ]) lo le)
+                                     (fedʷ p λ lo′ st → rootʰ (playingʳ (settled-next c (<ᵖ-ix i) (≤ᵖ-trans le (inj₂ (<ᵖ-part c [] [] (<ᵖ-ix i)))) st))))
+                               (cong (_ ∷_) eb) refl hw refl)
+  play-well {lo} {p = p} {i = i} b refl refl (coldʰ st ws (playingᶜ le)) eb hw | emit a k′ =
+    silentʷ (inj₁ refl) (wellʳ (runʷ settled-refl (proj₁ (look-well hw (Playing.sink b)) a (p ++ [ ix i ]) lo le)
+                                     (fedʷ p λ lo′ st′ → coldʰ (settled-trans st (settled-up ([ ix i ] , refl) st′)) ws
+                                                               (playingᶜ (settled-next p (<ᵖ-ix i) (≤ᵖ-trans le (inj₂ (<ᵖ-part p [] [] (<ᵖ-ix i)))) st′))))
+                               (cong (_ ∷_) eb) refl hw refl)
+  play-well {c = c} {i} b refl refl (rootʰ (playingʳ le)) eb hw | stall k′ =
+    silentʷ (inj₁ refl) (wellʳ (heldʷ (rootʰ (playingʳ (≤ᵖ-trans le (inj₂ (<ᵖ-part c [] [] (<ᵖ-ix i))))))) (cong (_ ∷_) eb) refl hw refl)
+  play-well {p = p} {i = i} b refl refl (coldʰ st ws (playingᶜ le)) eb hw | stall k′ =
+    silentʷ (inj₁ refl) (wellʳ (heldʷ (coldʰ st ws (playingᶜ (≤ᵖ-trans le (inj₂ (<ᵖ-part p [] [] (<ᵖ-ix i))))))) (cong (_ ∷_) eb) refl hw refl)
+  play-well b refl refl wh eb hw | close k′ with From∞.force k′
+  play-well {c = c} b refl refl (rootʰ (playingʳ le)) eb hw | close k′ | done =
+    silentʷ (inj₁ refl) (wellʳ (heldʷ (rootʰ (owingʳ (≤ᵖ-trans le (inj₂ (<ᵖ-part c [] [] refl)))))) (cong (_ ∷_) eb) refl hw refl)
+  play-well {p = p} b refl refl (coldʰ st ws (playingᶜ le)) eb hw | close k′ | done =
+    silentʷ (inj₁ refl) (wellʳ (heldʷ (coldʰ st ws (owingᶜ (≤ᵖ-trans le (inj₂ (<ᵖ-part p [] [] refl)))))) (cong (_ ∷_) eb) refl hw refl)
+  play-well b refl refl (rootʰ (playingʳ le)) eb hw | close k′ | quiet = silentʷ (inj₁ refl) (wellʳ (heldʷ (rootʰ resumeʳ)) eb refl hw refl)
+  play-well b refl refl (coldʰ st ws (playingᶜ le)) eb hw | close k′ | quiet = silentʷ (inj₁ refl) (wellʳ (heldʷ (coldʰ st ws resumeᶜ)) eb refl hw refl)
+  play-well b refl refl (rootʰ (playingʳ le)) eb hw | close k′ | at _ _ _ = silentʷ (inj₁ refl) (wellʳ (heldʷ (rootʰ resumeʳ)) eb refl hw refl)
+  play-well b refl refl (coldʰ st ws (playingᶜ le)) eb hw | close k′ | at _ _ _ = silentʷ (inj₁ refl) (wellʳ (heldʷ (coldʰ st ws resumeᶜ)) eb refl hw refl)
+
+  playing-inj : ∀ {c c′ i i′} → playing c i ≡ playing c′ i′ → c ≡ c′ × i ≡ i′
+  playing-inj refl = refl , refl
+
+  -- A playing burst: spent, it is over; polled, it plays; else its sink
+  -- is asked whether it is closed, which is `Still`.
+  turned-playing : ∀ {lo h} {hp : Heapᴹ h} {p w es c i} {σ : w ⊑ h} {k : Stack w ⊤} {cl tm lg mk} (b : Playing h) {bu}
+                 → Playing.under′ b ≡ c → Playing.index b ≡ i → WellHeld lo p k (playing c i ∷ es) [] → map entry bu ≡ es → WellHeap lo hp
+                 → StepBy WellRun lo (step (mach ⟨ hp , p , held σ k ⟩ cl tm (just b ∷ bu) [] lg false mk))
+  turned-playing {hp = hp} b ec ei wh eb hw with spent? hp (Playing.handle b)
+  ... | true  = leave-well wh eb hw
+  ... | false with Playing.polled b
+  ...   | true  = play-well b ec ei wh eb hw
+  ...   | false rewrite ec | ei = silentʷ (inj₁ refl) (wellʳ (stillʷ (proj₂ (proj₂ (look-well hw (Playing.sink b)))) (toldʷ wh)) (cong (_ ∷_) eb) refl hw refl)
+
+  turned-well : ∀ {lo h} {hp : Heapᴹ h} {p w} {σ : w ⊑ h} {k : Stack w ⊤} {cl tm b bu lg en mk}
+              → WellRun lo (mach ⟨ hp , p , held σ k ⟩ cl tm (b ∷ bu) [] lg en mk) → StepBy WellRun lo (step (mach ⟨ hp , p , held σ k ⟩ cl tm (b ∷ bu) [] lg en mk))
+  turned-well {b = nothing} (wellʳ (heldʷ wh@(rootʰ overʳ)) eb refl hw refl)        = leave-well wh (∷-tail eb) hw
+  turned-well {b = nothing} (wellʳ (heldʷ wh@(coldʰ _ _ overᶜ)) eb refl hw refl)    = leave-well wh (∷-tail eb) hw
+  turned-well {b = nothing} (wellʳ (heldʷ (rootʰ (playingʳ _))) eb refl hw refl)     with ∷-head eb
+  ... | ()
+  turned-well {b = nothing} (wellʳ (heldʷ (coldʰ _ _ (playingᶜ _))) eb refl hw refl) with ∷-head eb
+  ... | ()
+  turned-well {b = nothing} (wellʳ (heldʷ (rootʰ idleʳ)) () refl hw refl)
+  turned-well {b = just b} (wellʳ (heldʷ wh@(rootʰ (playingʳ _))) eb refl hw refl) =
+    turned-playing b (proj₁ (playing-inj (∷-head eb))) (proj₂ (playing-inj (∷-head eb))) wh (∷-tail eb) hw
+  turned-well {b = just b} (wellʳ (heldʷ wh@(coldʰ _ _ (playingᶜ _))) eb refl hw refl) =
+    turned-playing b (proj₁ (playing-inj (∷-head eb))) (proj₂ (playing-inj (∷-head eb))) wh (∷-tail eb) hw
+  turned-well {b = just b} (wellʳ (heldʷ (rootʰ overʳ)) eb refl hw refl) with ∷-head eb
+  ... | ()
+  turned-well {b = just b} (wellʳ (heldʷ (coldʰ _ _ overᶜ)) eb refl hw refl) with ∷-head eb
+  ... | ()
+  turned-well {b = just b} (wellʳ (heldʷ (rootʰ idleʳ)) () refl hw refl)
+
+  -- THE TREE WALK: a step that is not the loop's turn runs the
+  -- computation, or plays the top level's burst, at the configuration's
+  -- position; the protocol's indices carry the last delivery, so the run
+  -- stays well and a value shown is no earlier than the last.
+  walk-tree : ∀ {lo m} → WellMach lo m → idle m ≡ false → StepBy WellRun lo (step m)
+  walk-tree {lo} {m = mach ⟨ hp , p , asking (note a) k σ s ⟩ cl tm bu td lg en mk} w b with WellRun.fresh (WellMach.going w)
+  ... | refl with WellRun.ctl (WellMach.going w)
+  ...   | notingʷ le st wk ws = valueʷ le (record { ctl = runʷ (settled-at st le) wk ws ; entries = WellRun.entries (WellMach.going w)
+                                                  ; dues = WellRun.dues (WellMach.going w) ; heap = heap-up {hp = hp} le (WellRun.heap (WellMach.going w)) ; fresh = refl })
+  walk-tree {m = mach ⟨ hp , p , asking fin k σ s ⟩ cl tm bu td lg en mk} w b with WellRun.fresh (WellMach.going w)
+  ... | refl with WellRun.ctl (WellMach.going w)
+  ...   | finningʷ le = completeʷ le
+  walk-tree {m = mach ⟨ hp , p , run a σ k ⟩ cl tm bu td lg en mk} w b = runs-well (WellMach.going w)
+  walk-tree {m = mach ⟨ hp , p , ret x σ k ⟩ cl tm bu td lg en mk} w b = returns-well (WellMach.going w)
+  walk-tree {m = mach ⟨ hp , p , held σ k ⟩ cl tm bu (t ∷ td) lg en mk} w b = paid-well (WellMach.going w)
+  walk-tree {m = mach ⟨ hp , p , held σ k ⟩ cl tm (x ∷ bu) [] lg en mk} w b = turned-well (WellMach.going w)
+  walk-tree {m = mach ⟨ hp , p , held σ k ⟩ cl tm [] [] lg en mk} w ()
 
   postulate
-    -- THE TREE WALK: a step that is not the loop's turn runs the
-    -- computation, or plays a burst, at the configuration's position;
-    -- the protocol's indices carry the last delivery, so the run stays
-    -- well and a value shown is no earlier than the last.
-    --
-    -- A burst a timer started plays from its cascade, over whatever stack
-    -- the turn found, and what it delivers settles under the cascade, not
-    -- under the stack's position.  So this holds only if the loop's turn
-    -- comes over an empty stack: every `held` over a frame has a burst
-    -- playing or a resume owed.  Nothing in `WellMach` says so yet.
-    -- REFUTED: 6df2c787 with a frame well only from a last delivery no later than its position
-    walk-tree : ∀ {lo m} → WellMach lo m → idle m ≡ false → StepBy WellRun lo (step m)
-
     -- THE TIMERS: a step that is not the loop's turn shows values only
     -- under the playing burst's cascade, and moves the last on only past
     -- a join in it, so every timer queued stays past them; a timer it
@@ -729,9 +1080,8 @@ module Sorting (R : Set) where
   -- its observer, nothing on the heap, queued or playing.
   begin-well : (o : PureObs [] R) → WellMach root (begin o)
   begin-well o = record
-    { going = record { ctl    = runʷ (inj₁ refl , inj₁ refl) (compile-well o [] (lift tt) same recorder _ root root (inj₁ refl) recorder-well (λ σ sub _ p lo → doneʷ)) bottomʷ
-                     ; heap   = (λ ()) , (λ ()) , (λ ())
-                     ; bursts = [] }
+    { going = record { ctl     = runʷ (inj₁ refl , inj₁ refl) (compile-well o [] (lift tt) same recorder _ root root (inj₁ refl) recorder-well (λ σ sub _ p lo → doneʷ)) bottomʷ
+                     ; entries = refl ; dues = refl ; heap = heapʷ λ () ; fresh = refl }
     ; queue = record { timers = [] ; queued = AllPairs.[] } }
 
   mutual
