@@ -14,7 +14,10 @@ inside the typechecker, and the corpus is append-only, so the gate's bill would
 grow with it without bound.
 
 The runner holds each row to `quickcheck.Quickcheck.prop` — the property the
-QuickCheck sweep samples. A row says only which program to run.
+QuickCheck sweep samples — and to `quickcheck.Placing.placing`, which `make
+placing` samples: a meaning silent where the machine works on agrees with it by
+ticks, and only the positional check sees it. A row says only which program to
+run.
 
 **The runner matches its verdicts in a helper, never with a `with`.** A `with` on
 the verdict makes the typechecker normalise a whole run and exhausts any heap;
