@@ -176,13 +176,6 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE EXACT STEPPER.** `∼-trans` with `go-skips` and `beside-≃`: the
-  stepper shows every skip the meaning does, each joiner fed every source
-  step, lanes and defers yet to subscribe included, so `≃` can be restated
-  as strong bisimilarity, transitive for free, the stalling half and the
-  merges' sorted hypotheses going with it. Ruled out: a skip mismatch at
-  the pre-join count, by CI's `make stepping`. Decides whether `fed-≃`
-  survives the restatement as plain equality of meanings.
 - **THE FED CUT.** `fed-take` with `fed-connect`, `fed-flat` and
   `fed-defer`: `fed-≃` is a body by node, its joiner arm proven over the
   fixed skip, a map and a scan recursing, these four its leaves. Ruled
@@ -202,10 +195,12 @@ by their own silent steps (`Mirror`).
   showing strictly after it, a step not coming first keeping the placing,
   and a placing with each live joiner joined before its source. Decides
   whether `Placed`, a field of `Carried`, is the order the connect needs.
-- **THE OPERATORS.** `takeWhileᴱ-≃`, `take-first`, `join-quiet` and
-  `defer-after`: a cut respects `≃`, a cut step comes first when the uncut
-  did, an untold joiner fed nothing under silent sources shows nothing, a
-  defer is its program subscribed. Decides whether `join-quiet` needs its
+- **THE OPERATORS.** `go-skips`, `take-first`, `join-quiet` and
+  `defer-after`: a flatMap's meaning is what its step shows, a cut step
+  comes first when the uncut did, an untold joiner fed nothing under
+  silent sources shows nothing, a defer is its program subscribed. Ruled
+  out: a stepper `≃` short of strong agreement, every operator respecting
+  it and a source's step tied with the body's skips commuting. Decides whether `join-quiet` needs its
   sources' silence carried further than `First`.
 - **THE MACHINE SIDE.** `note-least`, `note-onward`, `turn-pops`,
   `turn-dry`, `sub-onward` and `burst-onward`: a note records the least
@@ -238,23 +233,18 @@ by their own silent steps (`Mirror`).
   environments alike, lanes yet to subscribe included.
 - **`defer-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer reads alike
   environments alike.
-- **`beside-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: `M.beside` respects `≃`
-  between events in order.
 - **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
   subscribed at the root is placed.
 - **`placed-after`** (Stepper) — FALSITY, `REFUTED×2`: a step keeps the ghost
   placed.
 - **`lags`** (Stepper) — FALSITY, `NO EVIDENCE`: a node's meaning shows nothing
   before a body's event that comes first.
-- **`leads`** (Stepper) — FALSITY, `REFUTED`: a node's meaning shows nothing
-  before an earlier step.
+- **`leads`** (Stepper) — FALSITY, `REFUTED`: a node's meaning shows only skips
+  at an earlier step, and nothing before it.
 - **`go-skips`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning is
   what its step shows, each lane showing its own.
-- **`∼-trans`** (Stepper) — FALSITY, `DEAD ROUTE`: weak bisimilarity is
-  transitive.
 - **`join-quiet`** (Stepper) — FALSITY, `NO EVIDENCE`: an untold joiner fed
   nothing under silent sources shows nothing.
-- **`takeWhileᴱ-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a cut respects `≃`.
 - **`take-first`** (Stepper) — FALSITY, `NO EVIDENCE`: a cut step comes first
   when the uncut one did.
 - **`defer-after`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer's meaning is

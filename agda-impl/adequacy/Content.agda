@@ -40,14 +40,13 @@ open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
-open import adequacy.Stepper using (_≃_; _∼_; _∼∞_; ∼-sym; out∼; end∼; skip∼; skipˡ; skipʳ; []; os; afterᴱ)
+open import adequacy.Stepper using (_≃_; []; os; afterᴱ)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; Out; note; module Pure)
 open import operation.AbstractObservable using (module Heap) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 
 open Events∞
-open _∼∞_
 
 module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
@@ -120,17 +119,6 @@ module Honesty (R : Set) where
   same-agree : ∀ {x y} → (∀ n → Agree n x y) → x ≋ y
   same-agree ag = has-agree ag , has-agree (λ n → agree-sym (ag n))
 
-  -- Events alike skips aside hold the same events.
-  has-skips : ∀ {x y k b} → x ∼ y → Has x k b → Has y k b
-  has-skips (out∼ _)    atOut        = atOut
-  has-skips end∼        atEnd        = atEnd
-  has-skips (out∼ r)    (pastOut h)  = pastOut (has-skips (∼force r) h)
-  has-skips (skip∼ r)   (pastSkip h) = pastSkip (has-skips (∼force r) h)
-  has-skips (skipˡ r)   (pastSkip h) = has-skips r h
-  has-skips (skipʳ r)   h            = pastSkip (has-skips r h)
-
-  same-skips : ∀ {x y} → x ≃ y → x ≋ y
-  same-skips a = has-skips (_≃_.alike a) , has-skips (∼-sym (_≃_.alike a))
 
   ----------------------------------------------------------------------
   -- THE GHOST
@@ -256,7 +244,7 @@ module Honesty (R : Set) where
   if-silent false true  = _ , refl
   if-silent false false = _ , refl
 
-  -- THE STEPPER IS THE MEANING, skips aside, of a run's configuration
+  -- THE STEPPER IS THE MEANING, skips included, of a run's configuration
   -- (`Sane`): what the ghost's step shows, then the meaning of the ghost
   -- it leaves.  A joiner told its end while its source runs is fed the
   -- source's values by the stepper and shows them, where the meaning
@@ -301,7 +289,7 @@ module Honesty (R : Set) where
   -- ends it.  By the re-entry state.
   -- The stepper is the meaning, as sets.
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
-  step-alike g sn pl = same-skips (step-skips g sn pl)
+  step-alike g sn pl = same-agree (_≃_.agreeing (step-skips g sn pl))
 
   residual-steps : ∀ g → Sane [] g → Placed g [] → Steps (residual g) (U.step g)
   residual-steps g sn pl = steps-after (U.step g) (step-alike g sn pl)

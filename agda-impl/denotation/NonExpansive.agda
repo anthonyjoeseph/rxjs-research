@@ -64,34 +64,33 @@ private
 ------------------------------------------------------------------------
 -- ONE STEP IN, ONE STEP OUT
 
-private
-  mapᴱ-ne : ∀ {A B m} (f : A → B) {x y : Events A} → Agree m x y → Agree m (mapᴱ f x) (mapᴱ f y)
-  mapᴱ-ne f stop      = stop
-  mapᴱ-ne f (out⁼ a)  = out⁼ (mapᴱ-ne f a)
-  mapᴱ-ne f (skip⁼ a) = skip⁼ (mapᴱ-ne f a)
-  mapᴱ-ne f end⁼      = end⁼
-  mapᴱ-ne f hush⁼     = hush⁼
+mapᴱ-ne : ∀ {A B m} (f : A → B) {x y : Events A} → Agree m x y → Agree m (mapᴱ f x) (mapᴱ f y)
+mapᴱ-ne f stop      = stop
+mapᴱ-ne f (out⁼ a)  = out⁼ (mapᴱ-ne f a)
+mapᴱ-ne f (skip⁼ a) = skip⁼ (mapᴱ-ne f a)
+mapᴱ-ne f end⁼      = end⁼
+mapᴱ-ne f hush⁼     = hush⁼
 
-  scanᴱ-ne : ∀ {A B m} (f : B → A → B) z {x y : Events A} → Agree m x y → Agree m (scanᴱ f z x) (scanᴱ f z y)
-  scanᴱ-ne f z stop                = stop
-  scanᴱ-ne f z (out⁼ {a = a} r)    = out⁼ (scanᴱ-ne f (f z a) r)
-  scanᴱ-ne f z (skip⁼ r)           = skip⁼ (scanᴱ-ne f z r)
-  scanᴱ-ne f z end⁼                = end⁼
-  scanᴱ-ne f z hush⁼               = hush⁼
+scanᴱ-ne : ∀ {A B m} (f : B → A → B) z {x y : Events A} → Agree m x y → Agree m (scanᴱ f z x) (scanᴱ f z y)
+scanᴱ-ne f z stop                = stop
+scanᴱ-ne f z (out⁼ {a = a} r)    = out⁼ (scanᴱ-ne f (f z a) r)
+scanᴱ-ne f z (skip⁼ r)           = skip⁼ (scanᴱ-ne f z r)
+scanᴱ-ne f z end⁼                = end⁼
+scanᴱ-ne f z hush⁼               = hush⁼
 
-  mutual
-    takeWhileᴱ-ne : ∀ {A m} i (p : A → Bool) {x y : Events A} → Agree m x y → Agree m (takeWhileᴱ i p x) (takeWhileᴱ i p y)
-    takeWhileᴱ-ne i p stop                 = stop
-    takeWhileᴱ-ne i p (out⁼ {a = a} r)     = taking-ne i p (p a) r
-    takeWhileᴱ-ne i p (skip⁼ r)            = skip⁼ (takeWhileᴱ-ne i p r)
-    takeWhileᴱ-ne i p end⁼                 = end⁼
-    takeWhileᴱ-ne i p hush⁼                = hush⁼
+mutual
+  takeWhileᴱ-ne : ∀ {A m} i (p : A → Bool) {x y : Events A} → Agree m x y → Agree m (takeWhileᴱ i p x) (takeWhileᴱ i p y)
+  takeWhileᴱ-ne i p stop                 = stop
+  takeWhileᴱ-ne i p (out⁼ {a = a} r)     = taking-ne i p (p a) r
+  takeWhileᴱ-ne i p (skip⁼ r)            = skip⁼ (takeWhileᴱ-ne i p r)
+  takeWhileᴱ-ne i p end⁼                 = end⁼
+  takeWhileᴱ-ne i p hush⁼                = hush⁼
 
-    taking-ne : ∀ {A m k a} i (p : A → Bool) t {l r : Events∞ A} → Agree m (Events∞.force l) (Events∞.force r)
-              → Agree (suc m) (taking i p k a t l) (taking i p k a t r)
-    taking-ne i     p true  a = out⁼ (takeWhileᴱ-ne i p a)
-    taking-ne {m = m} true  p false a = out⁼ (agree-refl m _)
-    taking-ne false p false a = end⁼
+  taking-ne : ∀ {A m k a} i (p : A → Bool) t {l r : Events∞ A} → Agree m (Events∞.force l) (Events∞.force r)
+            → Agree (suc m) (taking i p k a t l) (taking i p k a t r)
+  taking-ne i     p true  a = out⁼ (takeWhileᴱ-ne i p a)
+  taking-ne {m = m} true  p false a = out⁼ (agree-refl m _)
+  taking-ne false p false a = end⁼
 
 mapᴰ-ne : ∀ {A B k} (f : A → B) {x y : MonotonicList A} → x ≈[ k ] y → mapᴰ f x ≈[ k ] mapᴰ f y
 mapᴰ-ne f xy = agrees λ p → mapᴱ-ne f (agree xy p)
@@ -107,23 +106,22 @@ takeWhileᴰ-ne i p xy = agrees λ q → takeWhileᴱ-ne i p (agree xy q)
 -- source step, all at one position, and the body and the source
 -- interleave, each read one step ahead.
 
-private
-  rejoin-ne : ∀ {A m} p {x y : Events A} → Agree m x y → Agree m (rejoin p x) (rejoin p y)
-  rejoin-ne p stop = stop
-  rejoin-ne p (out⁼ {p = q} a) with p <ᵖ q
-  ... | true  = out⁼ (rejoin-ne p a)
-  ... | false = skip⁼ (rejoin-ne p a)
-  rejoin-ne p (skip⁼ {p = q} a) with p <ᵖ q
-  ... | true  = skip⁼ (rejoin-ne p a)
-  ... | false = skip⁼ (rejoin-ne p a)
-  rejoin-ne {m = suc m} p (end⁼ {p = c}) = agree-refl (suc m) _
-  rejoin-ne p hush⁼ = hush⁼
+rejoin-ne : ∀ {A m} p {x y : Events A} → Agree m x y → Agree m (rejoin p x) (rejoin p y)
+rejoin-ne p stop = stop
+rejoin-ne p (out⁼ {p = q} a) with p <ᵖ q
+... | true  = out⁼ (rejoin-ne p a)
+... | false = skip⁼ (rejoin-ne p a)
+rejoin-ne p (skip⁼ {p = q} a) with p <ᵖ q
+... | true  = skip⁼ (rejoin-ne p a)
+... | false = skip⁼ (rejoin-ne p a)
+rejoin-ne {m = suc m} p (end⁼ {p = c}) = agree-refl (suc m) _
+rejoin-ne p hush⁼ = hush⁼
 
-  before-agree : ∀ {B m} q {x y : Events B} → Agree (suc m) x y → before q x ≡ before q y
-  before-agree q (out⁼ _)  = refl
-  before-agree q (skip⁼ _) = refl
-  before-agree q end⁼      = refl
-  before-agree q hush⁼     = refl
+before-agree : ∀ {B m} q {x y : Events B} → Agree (suc m) x y → before q x ≡ before q y
+before-agree q (out⁼ _)  = refl
+before-agree q (skip⁼ _) = refl
+before-agree q end⁼      = refl
+before-agree q hush⁼     = refl
 
 mutual
   beside-ne : ∀ {A B m} {b b′ : Events B} {e e′ : Events A} → Agree m b b′ → Agree m e e′ → Agree m (beside b e) (beside b′ e′)

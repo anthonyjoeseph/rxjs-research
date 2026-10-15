@@ -14,7 +14,7 @@ module denotation.MonotonicList where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; []; _++_; [_]; length)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_; Σ)
+open import Data.Product using (_×_; _,_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; ≤′-step)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
@@ -22,9 +22,8 @@ open import Data.Nat using (_<_; _≤_)
 open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Data.Empty using (⊥; ⊥-elim)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
-open import Data.List.Properties using (++-assoc)
+open import Data.Empty using (⊥-elim)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong; cong₂)
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
@@ -311,14 +310,6 @@ private
 ... | eq = <ᵖ-shift p q h
 ... | gt = refl
 
--- What is no earlier than `k` and before `v` has `k` before `v`.
-<ᵖ-atop : ∀ h k v → h <ᵖ k ≡ false → h <ᵖ v ≡ true → k <ᵖ v ≡ true
-<ᵖ-atop h k v n l with cmpPos h k in e
-... | eq = subst (λ z → z <ᵖ v ≡ true) (eq-pos h k e) l
-... | gt = <ᵖ-trans k h v (subst (λ c → isLt c ≡ true) (sym (flip-pos h k e)) refl) l
-
-
-
 -- A position is before every position below it, and of two positions
 -- that part at one label, the earlier label's is the earlier.
 <ᵖ-below : ∀ p {l} ys → p <ᵖ (p ++ l ∷ ys) ≡ true
@@ -338,59 +329,6 @@ private
 -- A burst's values part in order.
 <ᵖ-ix : ∀ i → (ix i ∷ []) <ᵖ (ix (suc i) ∷ []) ≡ true
 <ᵖ-ix i rewrite ℕ-lt {i} {suc i} (n<1+n i) = refl
-
--- No earlier is the same or later.
-<ᵖ-split : ∀ z q → z <ᵖ q ≡ false → z ≡ q ⊎ q <ᵖ z ≡ true
-<ᵖ-split z q h with cmpPos z q in e
-... | eq = inj₁ (eq-pos z q e)
-... | gt = inj₂ (subst (λ c → isLt c ≡ true) (sym (flip-pos z q e)) refl)
-
-private
-  lt≢eq : lt ≡ eq → ⊥
-  lt≢eq ()
-
-  nil-lt : ∀ ys → cmpPos ys [] ≡ lt → ⊥
-  nil-lt []      ()
-  nil-lt (_ ∷ _) ()
-
-  between : ∀ a y l → isLt (cmpPos a y) ≡ true → isLt (cmpPos y (a ++ [ l ])) ≡ true
-          → Σ Label λ c → Σ Pos λ ys → y ≡ a ++ c ∷ ys × (c ∷ []) <ᵖ (l ∷ []) ≡ true
-  between []      []       l () _
-  between []      (c ∷ ys) l _  h with lexi-lt (cmpLabel c l) (cmpPos ys []) (isLt-lt h)
-  ... | inj₁ x       = c , ys , refl , subst (λ z → isLt (lexi z eq) ≡ true) (sym x) refl
-  ... | inj₂ (_ , u) = ⊥-elim (nil-lt ys u)
-  between (b ∷ a) []      l () _
-  between (b ∷ a) (c ∷ y) l h₁ h₂ with cmpLabel b c in e
-  ... | lt with lexi-lt (cmpLabel c b) (cmpPos y (a ++ [ l ])) (isLt-lt h₂)
-  ...   | inj₁ x       = ⊥-elim (lt≢eq (trans (sym (lt-label b c b e x)) (refl-label b)))
-  ...   | inj₂ (x , _) = ⊥-elim (lt≢eq (trans (sym e) (subst (λ z → cmpLabel b z ≡ eq) (sym (eq-label c b x)) (refl-label b))))
-  between (b ∷ a) (c ∷ y) l h₁ h₂ | eq with eq-label b c e
-  ... | refl with between a y l h₁ (subst (λ z → isLt (lexi z (cmpPos y (a ++ [ l ]))) ≡ true) (refl-label b) h₂)
-  ...   | c′ , ys , u , w = c′ , ys , cong (b ∷_) u , w
-
-  min0 : ∀ c → (c ∷ []) <ᵖ (ix 0 ∷ []) ≡ false
-  min0 (ix m) with 0 <ᵇ m
-  ... | true  = refl
-  ... | false = refl
-  min0 (sub _) = refl
-  min0 last    = refl
-
--- What lies strictly between `a` and `a ++ [ l ]` is below `a`, at a
--- label before `l`; so anything below it is still before `a ++ [ l ]`.
-<ᵖ-inside : ∀ a y l m → a <ᵖ y ≡ true → y <ᵖ (a ++ [ l ]) ≡ true → (y ++ [ m ]) <ᵖ (a ++ [ l ]) ≡ true
-<ᵖ-inside a y l m h₁ h₂ with between a y l h₁ h₂
-... | c , ys , refl , w = subst (λ z → z <ᵖ (a ++ [ l ]) ≡ true) (sym (++-assoc a (c ∷ ys) [ m ])) (<ᵖ-part a (ys ++ [ m ]) [] w)
-
--- Nothing lies strictly between `q` and `q ++ [ ix 0 ]`.
-<ᵖ-succ : ∀ z q → z <ᵖ (q ++ [ ix 0 ]) ≡ true → z ≡ q ⊎ z <ᵖ q ≡ true
-<ᵖ-succ z q h with z <ᵖ q in e
-... | true  = inj₂ refl
-... | false with <ᵖ-split z q e
-...   | inj₁ u  = inj₁ u
-...   | inj₂ qz with between q z (ix 0) qz h
-...     | c , _ , _ , w = ⊥-elim (lt≢eq′ (trans (sym w) (min0 c)))
-  where lt≢eq′ : true ≡ false → ⊥
-        lt≢eq′ ()
 
 ------------------------------------------------------------------------
 -- What a subscriber sees
