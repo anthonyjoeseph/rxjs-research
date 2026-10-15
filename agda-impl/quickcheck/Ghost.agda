@@ -6,7 +6,7 @@
 -- run is compiled to approximant n, every node's observer watched: what
 -- it is delivered, and where, goes on the record, tagged with the node, the
 -- position the node was subscribed at, and what the denotation shows a
--- subscriber there: `denotation.Unfold`'s meaning, the one `sim` states.
+-- subscriber there: `denotation.Unfold`'s meaning.
 -- A node under a `connect` is held to its meaning beside the source the
 -- `connect` subscribed, fed to its joiners as the meaning feeds them.  Each observer's deliveries must be a
 -- prefix of what it is shown, or extend it where the denotation was read

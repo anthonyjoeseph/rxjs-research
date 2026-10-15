@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
--- PROGRESS, AGAINST SPINS.  `sim`'s progress half says the run passes
+-- PROGRESS, AGAINST SPINS.  Adequacy's liveness half, `reachedᴿ`, says the run passes
 -- every position the root's meaning shows, the two sides ending, falling
 -- quiet or spinning at the same point.  `quickcheck.Placing` cannot see a
 -- spin on one side only: running out of fuel reads as a pass.  This can:

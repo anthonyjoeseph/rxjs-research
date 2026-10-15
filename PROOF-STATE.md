@@ -159,89 +159,46 @@ point at one, the row is FALSITY.
 
 ## Tier 1 — the adequacy theorem
 
-**THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-the root, positions forgotten down to ticks. Both halves are read off one weak
-simulation, `sim`, between the machine's trace and Unfold's stepper. A
-configuration also has a meaning, its nodes read by the fold's own stream
-functions, proven the fold's (`denoted`); `stepped` links the stepper to it.
-`sim` is a corecursion over `adequacy.Carrier`'s relation (B: every live
-observer held to its subtree's meaning, the agenda located in the witness);
-its leaves are `kept`, B kept and each one-sided wait finite (C), and
-`carried-begin`. Try to REFUTE the route first; leave the tractable last.
+**THE LINK.** `adequacy`: the pure run's limit is the fold's meaning observed
+at the root, positions forgotten down to ticks. Two halves, proven apart and
+against the fold directly: SAFETY, every prefix of the machine's run placed
+against the meaning's events (`placedᴿ`); LIVENESS, every item the events
+reach reached by some prefix (`reachedᴿ`); and the events' ticks never fall
+(`ticks-up`). Safety's route is SORTEDNESS, the machine delivering at
+positions that never fall, a fact about the machine alone, beside each
+observer's deliveries matching its subtree's meaning, one kernel at a time.
+Sortedness is the riskiest and the largest; it goes first.
 
 ### Big picture tier roadmap
 
-- **B'S POSITIONAL FIELD.** `Carried` gains a field: every sub the agenda
-  does not owe `Rests` beyond the run's position. `kept-feed` is its first
-  test: the first owed joiner's value is the meaning's next event only if
-  every other live node rests past it, the meaning feeding its joiners from
-  one run of the source (`Fed`). Then `resting`, the field at a fire;
-  `unseen`, a burst whose path is shut playing silently, with the one place
-  Carried does not rule out, a live takeWhile past its failing value;
-  `ahead-run` and `burst-emit`. Decides whether the position order alone
-  orders the meaning's leaves against the machine.
-- **C'S MEASURE, AGAINST THE RETURNS.** `kept` is a recursion on `weight`:
-  the agenda's calls, the bursts in flight, the subscriptions owed and the
-  timers queued. `returned` and `asks` first, the burst leaving the
-  agenda; then the run's silent steps (`kept-done`, `kept-kont`, `kept-sub`), a subscription's `weighᴼ` spent
-  before its first wait. Decides whether a step the meaning does not take
-  always re-enters lighter, or the measure needs the meaning's steps too.
-- **B'S STEP AT A DEATH, IN AGDA.** An observer dying mid-burst: a
-  `takeWhile` cutting, a switch moving off its lane, a connect's body
-  completing and its source stopped. The dead are owed nothing, so B must
-  drop them in the same step that kills them. Decides whether the death
-  rule is a function of the heap's flags.
-- **THE TRACTABLE REST, LAST.** Liveness in the heap's cut and closed flags;
-  B's steps at `map`, `scan` and `defer`; each kernel's state as a function
-  of what it was delivered; `carried-begin`, by `_≗_`'s unit law; `ticks-up`.
-  None is taken while a leg above is open.
+- **SORTEDNESS, STATED.** `placedᴿ` becomes a body: `sorted`, the machine's
+  position never falling across a step, over `Machine` alone; root content,
+  every value the root is sent an `out` of the events and every `out` below
+  the run's position sent; and the placing lemma, sorted and alike as sets
+  is placed, proven. A CI check of `sorted` beside it. Decides whether
+  sortedness holds at the machine's one `pos`, or needs each observer's.
+- **SORTEDNESS, BY STEP.** `sorted` split by what moves the position: a
+  kernel's `goto`, a burst's step and its close, a turn popping a timer.
+  The turn is the risk: same-tick timers must pop in the order of the
+  positions they were made at, so the queue's order is creation order and
+  creation order is position order. Decides whether each kernel's position
+  discipline is its own, or the timer queue carries an invariant.
+- **CONTENT, PER OBSERVER.** Root content as a body over every observer's:
+  its deliveries its subtree's meaning, subscribed where it was, cut where
+  its subscriber left; each kernel's outputs its operator applied to what it
+  was delivered. `connect` first, its joiners fed one hot run. Decides
+  whether every kernel's state is a function of its delivered inputs.
+- **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
+  in finitely many steps; a silent spin in the events is one in the machine.
+  Decides whether liveness needs a measure, or follows from sortedness and
+  each step's position.
 
 ### The ledger
 
-- **`kept-feed`** (Kept) — FALSITY, `NO EVIDENCE`: a connect's feed shows the
-  first owed joiner's value, the meaning's next event only if every other live
-  node rests past it.
-- **`kept-fin`** (Kept) — FALSITY, `NO EVIDENCE`: a connect's source completion
-  told to each joiner, as the feed.
-- **`kept-sub`** (Kept) — FALSITY, `NO EVIDENCE`: a subscription beginning at
-  its pending node re-enters carried.
-- **`kept-emit`** (Kept) — FALSITY, `NO EVIDENCE`: an `of`'s next value is the
-  meaning's next event at the `of`.
-- **`kept-take1`** (Kept) — FALSITY, `NO EVIDENCE`: a takeWhile past its
-  failing value completes, then cuts.
-- **`kept-take2`** (Kept) — FALSITY, `NO EVIDENCE`: a takeWhile's cut, after
-  its completion.
-- **`kept-body`** (Kept) — FALSITY, `NO EVIDENCE`: a connect's body completed
-  cuts its source.
-- **`kept-kont`** (Kept) — FALSITY, `NO EVIDENCE`: a subscription's
-  continuation, handed its unsubscribe.
-- **`kept-done`** (Kept) — FALSITY, `NO EVIDENCE`: the agenda done, the run
-  returns to the stack.
-- **`burst-emit`** (Kept) — FALSITY, `NO EVIDENCE`: a frame's value is the
-  meaning's next event, every other open node past it.
-- **`resting`** (Kept) — FALSITY, `NO EVIDENCE`: at a fire, every sub beside
-  the burst's path rests beyond the cascade.
-- **`ends-told`** (Kept) — FALSITY, `NO EVIDENCE`: below an ended source, every
-  joiner the body holds already told its end.
-- **`ahead-run`** (Kept) — FALSITY, `NO EVIDENCE`: a cold started inline bursts
-  before every other open node's next event.
-- **`unseen`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold polling open
-  whose path is shut plays its frame with the meaning unmoved.
-- **`restalled`** (Kept) — FALSITY, `NO EVIDENCE`: after a stall, the meaning
-  stepped is carried at the burst's next index.
-- **`burst-close`** (Kept) — FALSITY, `NO EVIDENCE`: a frame closing completes
-  the cold, quiets it, or queues a timer past the clock.
-- **`returned`** (Kept) — FALSITY, `NO EVIDENCE`: a spent cold's burst, or one
-  polling closed, returns and re-enters lighter.
-- **`asks`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's poll of its
-  subscriber reads open or closed, only reading.
-- **`calm-hush`** (Kept) — FALSITY, `NO EVIDENCE`: no timer queued, the meaning
-  falls quiet by silent steps.
-- **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program
-  pending at the root, carried.
-- **`stepped`** (Adequacy) — FALSITY, `DEAD ROUTE`: the stepper and its
-  configuration's show the same; they differ in how `connect` feeds its
-  joiners.
+- **`placedᴿ`** (Adequacy) — FALSITY, `DEAD ROUTE, RECOVERY`: every prefix of
+  the run placed against the meaning's events.
+- **`reachedᴿ`** (Adequacy) — FALSITY, `NO EVIDENCE`: every item the meaning's
+  events reach, some prefix reaches.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 

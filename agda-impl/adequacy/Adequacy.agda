@@ -2,144 +2,125 @@
 
 -- THE LINK.  The pure runtime and the denotation agree: the limit of the
 -- machine's prefixes is the meaning, observed at the root, with positions
--- forgotten down to ticks.  The meaning is `denotation.Denote`'s fold; the
--- simulation is run against `denotation.Unfold`'s stepper, a proof device,
--- and `unfolded` carries its reading to the fold's: the stepper to its
--- configuration's meaning (`stepped`), that meaning to the fold's
--- (`denotation.Unfold.denoted`).
+-- forgotten down to ticks.  The meaning is `denotation.Denote`'s fold,
+-- read directly: no stepper stands between them.
 --
--- Both halves are read off one simulation between the machine's trace
--- and the events the root is shown (`Simulation`).  BELOW: every prefix's
--- record, positions and all, is placed against those events
--- (`operation.Placed`), so shows nothing they do not.  ABOVE: whatever
--- the meaning shows lies within some prefix, which shows the same.
+-- Two halves, proven apart.  BELOW: every prefix's record, positions and
+-- all, is placed against the meaning's events (`operation.Placed`), so
+-- shows nothing they do not — SAFETY, a fact about every finite prefix.
+-- ABOVE: whatever the meaning shows lies within some prefix — LIVENESS.
+-- Neither half is stated against the other's steps.
 module adequacy.Adequacy where
 
-open import Data.List using ([])
-open import Data.Nat using (ℕ)
+open import Data.List using ([]; _++_; [_]; length)
+open import Data.List.Relation.Unary.All using ([])
+open import Data.Nat using (ℕ; zero; suc; _≤_)
 open import Data.Product using (_,_; Σ; proj₁; proj₂)
 
-open import operation.Placed using (Up; ahead; framed; shows; placed-⊑)
+open import operation.Placed using (Up; Placed; Ahead; items; ahead; framed; shows; placed-⊑; frames-cut)
 open import operation.Machine using (module Machine)
-open import operation.PureObservable using (PureObs)
-open import adequacy.Simulation using (module Sim)
-open import denotation.MonotonicList using (ML; MonotonicList; Events; Events∞; out; skip; end; hush; Agree; out⁼; skip⁼; end⁼; hush⁼;
-  agree; agree-sym; _≈_; observe; root; ticks; inFrame; tick)
-open import denotation.Order using (_⊑_; _≃_; Shows; ShowsIn; nil; at⁺; emit⁺; stall⁺; close⁺; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
+open import operation.PureObservable using (PureObs; module Pure)
+open import denotation.MonotonicList using (ML; Events; observe; root; ticks)
+open import denotation.Order using (_⊑_; _≃_; Shows; Chain; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
 open import denotation.Denote using (⟦_⟧)
-open import Data.List.Relation.Unary.All using ([])
-open import denotation.Unfold using ([]; unfold; subscribe; denoted) renaming (⟦_⟧ to ⟦_⟧ᵘ)
-open import Data.Bool using (true; false)
-open import Data.Nat using (suc; _<ᵇ_)
 
 -- The pure run: the limit of the machine's prefixes.
 run : ∀ {A} → PureObs [] A → ML A
 run {A} o = limit λ n → Machine.prefix A n o
 
--- The stepper's run, as the run reports one.
-meaning : ∀ {A} → PureObs [] A → ML A
-meaning o = ticks (unfold (subscribe o root))
-
-------------------------------------------------------------------------
--- Runs alike for any number of steps report the same
-
-private
-  Same : ∀ {A} → Events A → Events A → Set
-  Same x y = ∀ k → Agree k x y
-
-  data Twin {A : Set} : Events A → Events A → Set where
-    outᵗ  : ∀ {p a l r} → Same (Events∞.force l) (Events∞.force r) → Twin (out p a l) (out p a r)
-    skipᵗ : ∀ {p l r} → Same (Events∞.force l) (Events∞.force r) → Twin (skip p l) (skip p r)
-    endᵗ  : ∀ {p} → Twin (end p) (end p)
-    hushᵗ : Twin hush hush
-
-  out-rest : ∀ {A k p q} {a b : A} {l r} → Agree (suc k) (out p a l) (out q b r) → Agree k (Events∞.force l) (Events∞.force r)
-  out-rest (out⁼ x) = x
-
-  skip-rest : ∀ {A k p q} {l r : Events∞ A} → Agree (suc k) (skip p l) (skip q r) → Agree k (Events∞.force l) (Events∞.force r)
-  skip-rest (skip⁼ x) = x
-
-  twin : ∀ {A} {x y : Events A} → Same x y → Twin x y
-  twin s with s 1
-  ... | out⁼ _  = outᵗ λ k → out-rest (s (suc k))
-  ... | skip⁼ _ = skipᵗ λ k → skip-rest (s (suc k))
-  ... | end⁼    = endᵗ
-  ... | hush⁼   = hushᵗ
-
-  mutual
-    shows-twin : ∀ {A} {x y : Events A} → Twin x y → ∀ {is} → Shows (ticks x) is → Shows (ticks y) is
-    shows-twin (outᵗ s)  nil              = nil
-    shows-twin (outᵗ s)  (at⁺ nil)        = at⁺ nil
-    shows-twin (outᵗ s)  (at⁺ (emit⁺ sh)) = at⁺ (emit⁺ (in-twin (twin s) sh))
-    shows-twin (skipᵗ s) nil              = nil
-    shows-twin (skipᵗ s) (at⁺ nil)        = at⁺ nil
-    shows-twin (skipᵗ s) (at⁺ (stall⁺ sh)) = at⁺ (stall⁺ (in-twin (twin s) sh))
-    shows-twin endᵗ      sh               = sh
-    shows-twin hushᵗ     sh               = sh
-
-    in-twin : ∀ {A t} {x y : Events A} → Twin x y → ∀ {is} → ShowsIn t (inFrame t x) is → ShowsIn t (inFrame t y) is
-    in-twin {t = t} (outᵗ {p = p} s) sh with tick p <ᵇ suc t
-    in-twin (outᵗ s) nil           | true  = nil
-    in-twin (outᵗ s) (emit⁺ sh)    | true  = emit⁺ (in-twin (twin s) sh)
-    in-twin (outᵗ s) nil           | false = nil
-    in-twin (outᵗ s) (close⁺ sh)   | false = close⁺ (shows-twin (outᵗ s) sh)
-    in-twin {t = t} (skipᵗ {p = p} s) sh with tick p <ᵇ suc t
-    in-twin (skipᵗ s) nil          | true  = nil
-    in-twin (skipᵗ s) (stall⁺ sh)  | true  = stall⁺ (in-twin (twin s) sh)
-    in-twin (skipᵗ s) nil          | false = nil
-    in-twin (skipᵗ s) (close⁺ sh)  | false = close⁺ (shows-twin (skipᵗ s) sh)
-    in-twin endᵗ  sh = sh
-    in-twin hushᵗ sh = sh
-
--- The same meaning reports the same run, wherever it is subscribed.
-ticks-≈ : ∀ {A} {x y : MonotonicList A} → x ≈ y → ∀ p → ticks (observe x p) ≃ ticks (observe y p)
-ticks-≈ xy p = shows-twin (twin λ k → agree (xy k) p) , shows-twin (twin λ k → agree-sym (agree (xy k) p))
+-- What a subscriber at the root is shown.
+events : ∀ {A} → PureObs [] A → Events A
+events o = observe (⟦ o ⟧ []) root
 
 module Link (R : Set) where
-  open Machine R using (prefix; reading; trace; begin; Read)
-  open Sim R using (sim; placed; got)
+  open Machine R using (prefix; reading; trace; begin; Read; read; Trace∞; tau; out; end; idle)
+  open Pure R using (cutOff; frames)
   open Read
 
+  -- The first n steps, read.
+  read-of : PureObs [] R → ℕ → Read
+  read-of o n = reading n 0 (trace (begin o))
+
   postulate
+    -- SAFETY: every prefix of the run is placed against the meaning's
+    -- events: each value the root was sent is the events' next `out`,
+    -- at its position, and the run ends as they do.
+    --
+    -- The route: SORTEDNESS, the machine delivering to every observer at
+    -- strictly increasing positions, a fact about the machine alone; and
+    -- each observer's deliveries its subtree's meaning, subscribed where
+    -- it was, cut where its subscriber left — one kernel at a time, each
+    -- kernel's outputs its operator applied to the inputs it was
+    -- delivered.  Sorted and alike as sets is alike as runs.
+    --
+    -- DEAD ROUTE: a step-by-step simulation against a stepper that picks
+    --   the configuration's earliest node (`denotation.Unfold`).  Every
+    --   step owes that every other live node is past the one the machine
+    --   moved, re-established across a reconstruction of the tree at the
+    --   machine's control, so each new kernel or death reopened it.
+    --
+    -- RECOVERY: `git show fbdfc8ed` restores that simulation:
+    --   `adequacy.Carrier`, `adequacy.Kept`, `adequacy.Plug`,
+    --   `adequacy.Aim`, `adequacy.Wait` and `adequacy.Simulation`'s
+    --   relation, with the stepper's link to the fold (`stepped`).  The
+    --   same commit restores the order on positions in
+    --   `denotation.MonotonicList` (`<ᵖ-trans`, `<ᵖ-asym`, `<ᵖ-tick`,
+    --   `<ᵖ-++ʳ`), and `denotation.Unfold`'s stepper proven the fold's.
+    placedᴿ : (o : PureObs [] R) (n : ℕ) → Placed (ending (read-of o n)) (marks (read-of o n)) (log (read-of o n)) (events o)
+
+    -- LIVENESS: whatever item the meaning's events reach, finitely many
+    -- steps of the machine reach.
+    reachedᴿ : (o : PureObs [] R) → ∀ {k} → Ahead (events o) k → Σ ℕ λ n → k ≤ length (items (log (read-of o n)) (ending (read-of o n)))
+
     -- The meaning's ticks never fall.
     --
     -- RECOVERY: `git show a2e0bb8b` restores `<ᵖ-trans`, `<ᵖ-irrefl` and
     --   `<ᵖ-ix` in `denotation.MonotonicList`: positions strictly ordered,
     --   and an earlier one at no later a tick.
-    ticks-up : (o : PureObs [] R) → Up 0 (unfold (subscribe o root))
+    ticks-up : (o : PureObs [] R) → Up 0 (events o)
 
   -- THE UPPER HALF: whatever the meaning shows, some prefix shows.  It
   -- shows as many items, and they are the meaning's.
-  reaches : (o : PureObs [] R) → ∀ {is} → Shows (meaning o) is → Σ ℕ λ n → Shows (prefix n o) is
-  reaches o s with got 0 (ahead s) (sim o)
-  ... | n , long = n , shows-≼ (cmp-long (shows-cmp s (shows (ticks-up o) (placed n 0 (sim o)))) long) (framed (log r) (ending r))
-    where r = reading n 0 (trace (begin o))
+  reaches : (o : PureObs [] R) → ∀ {is} → Shows (ticks (events o)) is → Σ ℕ λ n → Shows (prefix n o) is
+  reaches o s with reachedᴿ o (ahead s)
+  ... | n , long = n , shows-≼ (cmp-long (shows-cmp s (shows (ticks-up o) (placedᴿ o n))) long) (framed (log r) (ending r))
+    where r = read-of o n
 
   -- Each prefix is below the meaning.
-  complete : (o : PureObs [] R) (n : ℕ) → prefix n o ⊑ meaning o
-  complete o n = placed-⊑ (ticks-up o) (placed n 0 (sim o))
+  complete : (o : PureObs [] R) (n : ℕ) → prefix n o ⊑ ticks (events o)
+  complete o n = placed-⊑ (ticks-up o) (placedᴿ o n)
 
-postulate
-  -- The stepper shows what its configuration means: each value at its
-  -- tick, in order, then completion or silence.  Every node's step is its
-  -- operator's stream function taken one event at a time, but at a
-  -- `connect`: the stepper feeds its joiners from the source as it runs,
-  -- where the meaning hands each joiner the source's whole run, rejoined.
-  --
-  -- DEAD ROUTE: `Wait`'s right side retargeted at the configuration's
-  --   meaning, so the simulation lands on it directly.  The meaning's
-  --   next event is still its earliest leaf's, chosen by the position
-  --   order the stepper's `pick` uses, so every step of B would carry
-  --   that choice: the link moves into `kept`, it does not go.
-  stepped : ∀ {A} (o : PureObs [] A) → meaning o ≃ ticks (observe (⟦ o ⟧ᵘ []) root)
+  ------------------------------------------------------------------------
+  -- The prefixes, a chain
 
--- The stepper and the fold show the same.
-unfolded : ∀ {A} (o : PureObs [] A) → meaning o ≃ ticks (observe (⟦ o ⟧ []) root)
-unfolded o = (λ s → proj₁ d (proj₁ (stepped o) s)) , λ s → proj₂ (stepped o) (proj₂ d s)
-  where d = ticks-≈ (denoted o) root
+  -- A longer prefix is the same, or extends the record of a cut one.
+  private
+    data Grows : Read → Read → Set where
+      stays : ∀ {r} → Grows r r
+      cuts  : ∀ {ms xs c ms′ e′} ys → Grows (read ms xs (cutOff c)) (read ms′ (xs ++ ys) e′)
+
+    noted-grows : ∀ {p x r r′} → Grows r r′ → Grows (Machine.noted R p x r) (Machine.noted R p x r′)
+    noted-grows stays     = stays
+    noted-grows (cuts ys) = cuts ys
+
+    grows : ∀ n c l → Grows (reading n c l) (reading (suc n) c l)
+    grows zero    c (tau t k)     = cuts []
+    grows zero    c (out t p a k) = cuts [ (t , a) ]
+    grows zero    c (end p)       = cuts []
+    grows zero    c idle          = cuts []
+    grows (suc n) c (tau t k)     = grows n t (Trace∞.force k)
+    grows (suc n) c (out t p a k) = noted-grows (grows n t (Trace∞.force k))
+    grows (suc n) c (end p)       = stays
+    grows (suc n) c idle          = stays
+
+    grows-⊑ : ∀ {r r′} → Grows r r′ → frames (log r) (ending r) ⊑ frames (log r′) (ending r′)
+    grows-⊑ stays s                               = s
+    grows-⊑ (cuts {xs = xs} {c = c} {e′ = e′} ys) = frames-cut xs ys c e′
+
+  prefix-chain : (o : PureObs [] R) → Chain (λ n → prefix n o)
+  prefix-chain o n = grows-⊑ (grows n 0 (trace (begin o)))
 
 adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)
-adequacy {A} o = (λ s → proj₁ (unfolded o) (limit-least (prefix-chain o) (complete o) s))
-               , λ s → limit-ub (prefix-chain o) (proj₁ (reaches o (proj₂ (unfolded o) s))) (proj₂ (reaches o (proj₂ (unfolded o) s)))
+adequacy {A} o = limit-least (prefix-chain o) (complete o)
+               , λ s → limit-ub (prefix-chain o) (proj₁ (reaches o s)) (proj₂ (reaches o s))
   where open Link A
-        open Sim A using (prefix-chain)

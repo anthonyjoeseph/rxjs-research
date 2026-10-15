@@ -7,10 +7,9 @@
 -- ITS MEANING (`meaning`, `⟦_⟧`): each node read by its operator's own
 -- stream function in `MonotonicList`, the source of a `connect` handed to
 -- its joiners whole, as `connectᴰ` hands it.  So a program subscribed is
--- `Denote`'s approximant (`subscribed`), and its meaning the fold's
--- (`denoted`).
+-- `Denote`'s approximant (`subscribed`).
 --
--- ITS STEPPER (`step`, `unfold`), the machine's proof device: `step`
+-- ITS STEPPER (`step`, `unfold`), the test harness's reading of a run: `step`
 -- finds the configuration's next event by structural recursion, and
 -- `unfold` repeats it, guarded by the event it found, so it needs no
 -- approximants.  Each node but `connect` steps exactly as its operator's
@@ -45,10 +44,9 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.MonotonicList using (MonotonicList; Events; Events∞; out; skip; end; hush; Time; Pos; ix; last; tick; _<ᵖ_;
   Timeline; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close) renaming (sub to subᴾ; cold to coldᴹ)
 import denotation.MonotonicList as M
-open import denotation.MonotonicList using (Agree; agree-refl; _≈[_]_; _≈_; agrees; agree; Settling; lub; lub-limit; ≈ₖ-refl; ≈ₖ-sym;
-  ≈ₖ-trans; ≈ₖ-pred; hot; deferᴰ; ⊥ᴰ)
+open import denotation.MonotonicList using (Agree; agree-refl; _≈[_]_; agrees; agree; lub; ≈ₖ-refl; ≈ₖ-pred; hot; deferᴰ; ⊥ᴰ)
 open import denotation.Denote using (DenEnv; flatOp; approx) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import denotation.Compositional using (EnvAgree; []ᵉ; _∷ᵉ_; lookup-agree; deferᴰ-contractive; settles; toward)
+open import denotation.Compositional using (EnvAgree; _∷ᵉ_; lookup-agree; deferᴰ-contractive)
 open import denotation.NonExpansive using (mapᴰ-ne; scanᴰ-ne; takeWhileᴰ-ne; flatMapᴰ-ne; beside-ne; hot-ne)
 
 open Events∞
@@ -433,11 +431,3 @@ subscribed {k = k} n (connected i) {ρ} {σ} e =
   agrees λ p → agree (subst (λ r → r ≈[ k ] lookup σ i) (lookup-hots ρ i) (lookup-agree e i)) p
 subscribed zero    (defer l)         e = ≈ₖ-refl _
 subscribed (suc n) (defer l)         e = ≈ₖ-pred (deferᴰ-contractive (subscribed n (Later.force l) e))
-
--- The approximants settle, as the fold's do, and their limit is the
--- fold's meaning.
-denoted : ∀ {A} (o : Obs Timeline [] A) → ⟦ o ⟧ [] ≈ ⟦ o ⟧ᴰ []ᴬ
-denoted o k = ≈ₖ-trans (≈ₖ-sym (lub-limit {c = λ n → nodeᴹ n o []ᴬ} settling k)) (≈ₖ-trans (subscribed k o []ᵉ) (toward k o []ᴬ))
-  where
-    settling : Settling (λ n → nodeᴹ n o []ᴬ)
-    settling n = ≈ₖ-trans (subscribed n o []ᵉ) (≈ₖ-trans (settles o []ᴬ n) (≈ₖ-sym (subscribed (suc n) o []ᵉ)))
