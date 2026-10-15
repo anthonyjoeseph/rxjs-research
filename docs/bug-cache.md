@@ -40,4 +40,4 @@ Never delete or overwrite a row. A fixed bug becomes a passing guard that stays.
 
 Not in `make gate`: it checks the evaluator through GHC and the FFI, not the
 proof, so **no proof may ever depend on it**. CI runs it as its own job, with the
-compiled MAlonzo objects cached on the toolchain. Locally: `make bg T=bug-cache`.
+compiled MAlonzo objects cached on the toolchain. Never run locally — CI only.

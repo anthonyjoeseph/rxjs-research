@@ -47,7 +47,7 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `comments-check` | a date, a historical marker or a LINE NUMBER in `agda-impl`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `TWIN`/`REFUTED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
 | `agda` | anything that does not typecheck from Main — **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 
-Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`, `make bug-cache`.
+Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`.
 
 ## Autonomy
 
@@ -81,7 +81,7 @@ Every PROOF-STATE.md tier discharged: no postulates, everything typechecks. "Pas
 ## Agda builds
 
 - **`make gate` is the merge gate:** `gate-cheap`, then `make agda` (`agda-impl/Main.agda`).
-- **The bug cache runs locally and in its own CI job (Anthony).** `make bug-cache`, through `make bg`. Checked by GHC and the FFI — never a proof's dependency.
+- **The harness never runs locally — only in CI, in the background (Anthony).** Bug cache, oracle, every `quickcheck/` binary (placing, ghosts, exact, hand, spin): never built or run in a session, so it never blocks real work. Checked by GHC and the FFI — never a proof's dependency.
 - **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. → [docs/agda-build.md](docs/agda-build.md)
 - **Two commands: `make bg T=<target>` as a BACKGROUND tool call, then `make bg-check T=<target>`.** `bg` blocks, logs, appends `EXIT=<code>`. `bg-check` reports GREEN / RED-with-tail / STILL-RUNNING. `bg-wait` is for a human. A `sleep N; tail` or `until` loop is the apparatus re-implemented worse. `make bg` always exits non-zero by design, so **a completion notification is never a result — `bg-check` is.**
 - **"Detached" means the Bash tool's background flag, never shell syntax (Anthony).** Type the command bare. No `&` (backgrounds a wrapper the harness already manages), no `>/dev/null 2>&1` (throws away WHERE the log is), **and never a pipe — a pipeline exits with the LAST command's status, so `make gate | tail` reports the tail's success over a RED build.** A foreground call is capped at 600 s and a build that outruns it is KILLED. **One build at a time.** → [docs/bg.md](docs/bg.md)
