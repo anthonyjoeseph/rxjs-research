@@ -17,24 +17,25 @@
 -- meaning, so a kernel's case reads only the kernel.
 module adequacy.Sorted where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Nat using (suc)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.Maybe using (maybe)
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
+open import Data.Maybe using (maybe; just; nothing)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Level using (Lift; lift)
 open import Data.Product using (_×_; _,_; Σ)
-open import Data.Sum using (_⊎_; inj₁)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (Pos; ix; root; _<ᵖ_; Timeline)
+open import denotation.MonotonicList using (Pos; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; Timeline)
 open import operation.AbstractObservable using (module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
-open Heap using (World; _⊑_; same; Sink; Quiet; Handle)
+open Heap using (World; _⊑_; _⨾_; same; Sink; Quiet; Handle)
 open import operation.Machine using (module Machine)
 
 ------------------------------------------------------------------------
@@ -52,13 +53,41 @@ Under p q = Σ Pos λ y → q ≡ p ++ y
 Settled : Pos → Pos → Pos → Set
 Settled p lo lo′ = lo ≤ᵖ lo′ × (lo ≡ lo′ ⊎ Under p lo′)
 
+≤ᵖ-trans : ∀ {p q r} → p ≤ᵖ q → q ≤ᵖ r → p ≤ᵖ r
+≤ᵖ-trans (inj₁ refl) h           = h
+≤ᵖ-trans h           (inj₁ refl) = h
+≤ᵖ-trans {p} {q} {r} (inj₂ a) (inj₂ b) = inj₂ (<ᵖ-trans p q r a b)
+
+settled-refl : ∀ {p lo} → Settled p lo lo
+settled-refl = inj₁ refl , inj₁ refl
+
+settled-trans : ∀ {p lo lo′ lo″} → Settled p lo lo′ → Settled p lo′ lo″ → Settled p lo lo″
+settled-trans (a , x) (b , inj₁ refl) = ≤ᵖ-trans a b , x
+settled-trans (a , x) (b , inj₂ u)    = ≤ᵖ-trans a b , inj₂ u
+
+-- Settled in a child scope is settled in its parent.
+settled-out : ∀ {p l lo lo′} → Settled (p ++ [ l ]) lo lo′ → Settled p lo lo′
+settled-out         (a , inj₁ e)            = a , inj₁ e
+settled-out {p} {l} (a , inj₂ (y , refl)) = a , inj₂ (l ∷ y , ++-assoc p [ l ] y)
+
+-- Settled from a delivery at the scope itself is settled from before it.
+settled-note : ∀ {p lo lo′} → lo ≤ᵖ p → Settled p p lo′ → Settled p lo lo′
+settled-note {p} le (a , inj₁ refl) = le , inj₂ ([] , sym (++-identityʳ p))
+settled-note     le (a , inj₂ u)    = ≤ᵖ-trans le a , inj₂ u
+
+-- Wherever a child under `ix 0` left the last, it is before a sibling under `last`.
+settled-last : ∀ q {lo lo′} → lo ≤ᵖ q → Settled (q ++ [ ix 0 ]) lo lo′ → lo′ ≤ᵖ (q ++ [ last ])
+settled-last q le (_ , inj₁ refl)       = ≤ᵖ-trans le (inj₂ (<ᵖ-below q []))
+settled-last q le (_ , inj₂ (y , refl)) rewrite ++-assoc q [ ix 0 ] y = inj₂ (<ᵖ-part q y [] refl)
+
 module Sorting (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read)
   open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; Ctl; run; ret; held; asking; Stack; bottom; push; Wait; rest; back; rehold; told
                                      ; Heapᴹ; Callbacks; cbs; look)
   open Run (Pureᴾ R) using (Act; Ref; El; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; stash; cancel; eff; here; under; diverge; unfold
-                           ; Observer; Subscription; Subscribe; Kont; Env; Subject; wkEnv; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via)
+                           ; Observer; Subscription; Subscribe; Kont; Env; Subject; wkEnv; wkR; compile; wkAct; wkObs; _>>=ᴬ_; _>>ᴬ_; module Kit; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via)
   open Pure R using (Timer; cascade; recorder)
+  open Kit using (Cut; wkCut; cut; guard; guarded; attach; when; skipᴬ)
   open Read
 
   ----------------------------------------------------------------------
@@ -151,6 +180,108 @@ module Sorting (R : Set) where
   WellSub : ∀ {A w} → Subscribe A w → Set₁
   WellSub {A} {w} s = ∀ {v} (ρ : w ⊑ v) (o : Observer A v) (k : Kont v) p lo → lo ≤ᵖ p → WellObs o → WellKont k → Well p lo (s ρ o k)
 
+  -- Weakening moves no delivery.
+  wk-well : ∀ {w v B p lo} {m : Act w B} (ρ : w ⊑ v) → Well p lo m → Well p lo (wkAct ρ m)
+  wk-well ρ doneʷ                  = doneʷ
+  wk-well ρ (newRefʷ h)            = newRefʷ λ σ r → h (ρ ⨾ σ) r
+  wk-well ρ (readRefʷ h)           = readRefʷ λ σ a → h (ρ ⨾ σ) a
+  wk-well ρ (writeRefʷ w)          = writeRefʷ (wk-well ρ w)
+  wk-well ρ (registerʷ (wn , wc , wx) h) =
+    registerʷ ((λ a q lo le → wk-well ρ (wn a q lo le)) , (λ q lo le → wk-well ρ (wc q lo le)) , (λ q lo → wk-well ρ (wx q lo))) λ σ s → h (ρ ⨾ σ) s
+  wk-well ρ (sendʷ le h)           = sendʷ le λ lo′ st → wk-well ρ (h lo′ st)
+  wk-well ρ (finishʷ le h)         = finishʷ le λ lo′ st → wk-well ρ (h lo′ st)
+  wk-well ρ (startColdʷ le h)      = startColdʷ le λ lo′ st σ hd → h lo′ st (ρ ⨾ σ) hd
+  wk-well ρ (stopʷ w)              = stopʷ (wk-well ρ w)
+  wk-well ρ (stashʷ pl h)          = stashʷ (λ p lo → wk-well ρ (pl p lo)) λ σ t → h (ρ ⨾ σ) t
+  wk-well ρ (cancelʷ h)            = cancelʷ λ lo′ st → wk-well ρ (h lo′ st)
+  wk-well ρ (noteʷ le w)           = noteʷ le (wk-well ρ w)
+  wk-well ρ (finʷ le)              = finʷ le
+  wk-well ρ (hereʷ w)              = hereʷ (wk-well ρ w)
+  wk-well ρ (underʷ w h)           = underʷ (wk-well ρ w) λ lo′ st → wk-well ρ (h lo′ st)
+  wk-well ρ divergeʷ               = divergeʷ
+  wk-well ρ (unfoldʷ we (wn , wc , wx) h) =
+    unfoldʷ (lift tt) ((λ a q lo le → wk-well ρ (wn a q lo le)) , (λ q lo le → wk-well ρ (wc q lo le)) , (λ q lo → wk-well ρ (wx q lo))) λ lo′ st → wk-well ρ (h lo′ st)
+
+  wk-obs : ∀ {A w v} {o : Observer A w} (ρ : w ⊑ v) → WellObs o → WellObs (wkObs ρ o)
+  wk-obs ρ (wn , wc , wx) = (λ a q lo le → wk-well ρ (wn a q lo le)) , (λ q lo le → wk-well ρ (wc q lo le)) , (λ q lo → wk-well ρ (wx q lo))
+
+  -- Sequencing: the rest well from wherever the first left the last.
+  bind-well : ∀ {w A B p lo} {m : Act w A} {f : A → Act w B} → Well p lo m → (∀ lo′ → Settled p lo lo′ → ∀ x → Well p lo′ (f x)) → Well p lo (m >>=ᴬ f)
+  bind-well doneʷ             hf = hf _ settled-refl _
+  bind-well (newRefʷ h)       hf = newRefʷ λ σ r → bind-well (h σ r) λ lo′ st x → wk-well σ (hf lo′ st x)
+  bind-well (readRefʷ h)      hf = readRefʷ λ σ a → bind-well (h σ a) λ lo′ st x → wk-well σ (hf lo′ st x)
+  bind-well (writeRefʷ w)     hf = writeRefʷ (bind-well w hf)
+  bind-well (registerʷ wo h)  hf = registerʷ wo λ σ s → bind-well (h σ s) λ lo′ st x → wk-well σ (hf lo′ st x)
+  bind-well (sendʷ le h)      hf = sendʷ le λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans st st′)
+  bind-well (finishʷ le h)    hf = finishʷ le λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans st st′)
+  bind-well (startColdʷ le h) hf = startColdʷ le λ lo′ st σ hd → bind-well (h lo′ st σ hd) λ lo″ st′ x → wk-well σ (hf lo″ (settled-trans st st′) x)
+  bind-well (stopʷ w)         hf = stopʷ (bind-well w hf)
+  bind-well (stashʷ pl h)     hf = stashʷ pl λ σ t → bind-well (h σ t) λ lo′ st x → wk-well σ (hf lo′ st x)
+  bind-well (cancelʷ h)       hf = cancelʷ λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans st st′)
+  bind-well (noteʷ le w)      hf = noteʷ le (bind-well w λ lo′ st → hf lo′ (settled-note le st))
+  bind-well (finʷ le)         hf = finʷ le
+  bind-well (hereʷ w)         hf = hereʷ (bind-well w hf)
+  bind-well (underʷ w h)      hf = underʷ w λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans (settled-out st) st′)
+  bind-well divergeʷ          hf = divergeʷ
+  bind-well (unfoldʷ we wo h) hf = unfoldʷ we wo λ lo′ st → bind-well (h lo′ st) λ lo″ st′ → hf lo″ (settled-trans (settled-out st) st′)
+
+  -- A cut delivers nothing: it cancels a stashed unsubscribe, if any.
+  cut-placeless : ∀ {w} (c : Cut w) → Placeless (cut c)
+  cut-placeless c p lo = writeRefʷ (readRefʷ λ where
+    σ nothing  → doneʷ
+    σ (just t) → cancelʷ λ _ _ → doneʷ)
+
+  guard-well : ∀ {w p lo} (c : Cut w) {m : Act w ⊤} → Well p lo m → Well p lo (guard c m)
+  guard-well c w = readRefʷ λ where
+    σ true  → wk-well σ w
+    σ false → doneʷ
+
+  guarded-well : ∀ {A w} (c : Cut w) {o : Observer A w} → WellObs o → WellObs (guarded c o)
+  guarded-well c (wn , wc , wx) = (λ a q lo le → guard-well c (wn a q lo le)) , (λ q lo le → guard-well c (wc q lo le))
+                                , λ q lo → readRefʷ λ where
+                                    σ true  → wk-well σ (wx q lo)
+                                    σ false → doneʷ
+
+  -- Attaching an unsubscribe that places nothing places nothing.
+  attach-well : ∀ {w} (c : Cut w) sub → Placeless (Subscription.unsubscribe sub) → Placeless (attach c sub)
+  attach-well c sub pl p lo = stashʷ pl λ σ t → writeRefʷ (readRefʷ λ where
+    τ true  → doneʷ
+    τ false → wk-well τ (wk-well σ (pl p lo)))
+
+  -- takeWhile's observer: a failing value under `ix 0` when inclusive,
+  -- then the completion under `last`, then the cut.
+  takeWhile-obs : ∀ {A w} i (f : A → Bool) (c : Cut w) {o : Observer A w} → WellObs o
+                → WellObs {A} {w} (record { next = λ a → if f a then Observer.next o a
+                                                       else (when i (under (ix 0) (Observer.next o a) skipᴬ) >>ᴬ under last (Observer.complete o) (cut c))
+                                         ; complete = Observer.complete o ; closed = Observer.closed o })
+  takeWhile-obs true f c {o} (wn , wc , wx) = next′ , wc , wx
+    where
+    next′ : ∀ a q lo → lo ≤ᵖ q → Well q lo (if f a then Observer.next o a else under (ix 0) (Observer.next o a) (under last (Observer.complete o) (cut c)))
+    next′ a q lo le with f a
+    ... | true  = wn a q lo le
+    ... | false = underʷ (wn a (q ++ [ ix 0 ]) lo (≤ᵖ-trans le (inj₂ (<ᵖ-below q []))))
+                    λ lo′ st → underʷ (wc (q ++ [ last ]) lo′ (settled-last q le st)) λ _ _ → cut-placeless c q _
+  takeWhile-obs false f c {o} (wn , wc , wx) = next′ , wc , wx
+    where
+    next′ : ∀ a q lo → lo ≤ᵖ q → Well q lo (if f a then Observer.next o a else under last (Observer.complete o) (cut c))
+    next′ a q lo le with f a
+    ... | true  = wn a q lo le
+    ... | false = underʷ (wc (q ++ [ last ]) lo (≤ᵖ-trans le (inj₂ (<ᵖ-below q [])))) λ _ _ → cut-placeless c q _
+
+  -- The risk of the protocol: two callbacks in one scope.  A callback
+  -- may leave the last delivery anywhere settled in its scope, so a
+  -- second callback in that scope needs its own later label: an
+  -- inclusive `takeWhile` delivers its failing value under `ix 0` and
+  -- completes under `last`.  Its cut cancels a stashed unsubscribe,
+  -- which places nothing, wherever the completion left the last.
+  -- REFUTED: 72324013 with the failing value delivered unscoped beside the completion
+  takeWhileᴷ-well : ∀ {A w} i f {s : Subscribe A w} → WellSub {A} {w} s → WellSub (takeWhileᴷ i f s)
+  takeWhileᴷ-well i f hs ρ o k q lo le wo wk =
+    newRefʷ λ σ l → newRefʷ λ τ h →
+      let c = (wkR τ l , h) in
+      hs _ _ _ q lo le (guarded-well c (takeWhile-obs i f c (wk-obs (σ ⨾ τ) wo)))
+         λ υ sub pl q′ lo′ → bind-well (attach-well (wkCut υ c) sub pl q′ lo′) λ lo″ _ _ → wk ((σ ⨾ τ) ⨾ υ) _ (cut-placeless (wkCut υ c)) q′ lo″
+
   postulate
     -- THE PROTOCOL, ONE KERNEL AT A TIME.
     emptyᴷ-well     : ∀ {A w} → WellSub (emptyᴷ {A} {w})
@@ -158,15 +289,6 @@ module Sorting (R : Set) where
     coldᴷ-well      : ∀ {A w} c → WellSub (via {A} {w} (startCold c))
     mapᴷ-well       : ∀ {A B w} f {s : Subscribe A w} → WellSub {A} {w} s → WellSub (mapᴷ {A} {B} f s)
     scanᴷ-well      : ∀ {A B w} f z {s : Subscribe A w} → WellSub {A} {w} s → WellSub (scanᴷ {A} {B} f z s)
-
-    -- The risk of the protocol: two callbacks in one scope.  A callback
-    -- may leave the last delivery anywhere settled in its scope, so a
-    -- second callback in that scope needs its own later label: an
-    -- inclusive `takeWhile` delivers its failing value under `ix 0` and
-    -- completes under `last`.  Its cut cancels a stashed unsubscribe,
-    -- which places nothing, wherever the completion left the last.
-    -- REFUTED: 72324013 with the failing value delivered unscoped beside the completion
-    takeWhileᴷ-well : ∀ {A w} i p {s : Subscribe A w} → WellSub {A} {w} s → WellSub (takeWhileᴷ i p s)
 
     -- Each lane subscribed under `ix 1`, its observer guarded by its cut.
     flatMapᴷ-well   : ∀ {A B w} op {f : A → Subscribe B w} {s : Subscribe A w} → (∀ a → WellSub {B} {w} (f a)) → WellSub {A} {w} s → WellSub (flatMapᴷ op f s)

@@ -170,6 +170,12 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### Big picture tier roadmap
 
+- **THE PROTOCOL'S RISK.** `connectᴷ-well` as a body, over `wk-well`
+  and `bind-well`, a placeless cut, and one label per callback in a scope.
+  Ruled out: a second callback sharing a scope, an unsubscribe guarded as
+  a delivery, a protocol needing the heap's closed flags for `takeWhile`.
+  Decides whether `Well` stays unary when a subject delivers to its
+  joiners in the order its cell lists them.
 - **HONEST, DEFINED.** `HonMach` is a record over a residual past every
   mark, kept by each step as `Shows` says. Left: `Inner` a relation over configurations, as `WellMach` is, over a ghost
   tree of the compiled program's kernels and their cells; `Honest` the
@@ -179,11 +185,6 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   context, an owed bound at the run's position. Decides whether the
   residual is shown by `inner-walk` alone or needs `inner-turn`'s timers
   too.
-- **THE PROTOCOL'S RISK.** `takeWhileᴷ-well` and `connectᴷ-well` as
-  bodies, over a placeless unsubscribe and one label per callback in a
-  scope. Ruled out: a second callback sharing a scope, an unsubscribe
-  guarded as a delivery. Decides whether `Well` stays unary in positions,
-  or `Settled` must read the heap's closed flags.
 - **CONTENT, ASSEMBLED.** `kept` and `read-is-kept` over `Reached`, then the
   rest of the `-honest` contracts, `connect` first. Decides whether the
   per-kernel contracts compose across a shared heap and a hot run.
@@ -207,8 +208,6 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### The ledger
 
-- **`takeWhileᴷ-well`** (Sorted) — FALSITY, `REFUTED`: a `takeWhile`
-  well-positioned, its failing value under `ix 0`, its completion `last`.
 - **`walk-timers`** (Sorted) — FALSITY, `NO EVIDENCE`: a step not the loop's
   turn keeps every timer past what it shows, queued in `Before` order.
 - **`walk-tree`** (Sorted) — FALSITY, `REFUTED`: a step not the loop's turn
