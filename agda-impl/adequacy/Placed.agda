@@ -915,6 +915,10 @@ tagged-split k (sub _ ∷ q) j (inj₂ t) with tagged-split k q j t
 ... | inj₁ t′ = inj₁ (inj₂ t′)
 ... | inj₂ o  = inj₂ o
 
+-- Neither a prefix of the other.
+Unrelated : Pos → Pos → Set
+Unrelated k h = ¬ Prefix k h × ¬ Prefix h k
+
 -- Neither keys the other.
 Disjoint : Pos → Pos → Set
 Disjoint a h = ¬ Owned a h × ¬ Owned h a
@@ -1040,10 +1044,17 @@ postulate
   steady-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
               → Steady (U.meaning (U.subscribe (flatMap op f s) p) ρ)
 
-  -- A CONNECT SUBSCRIBED SOMEWHERE IS STEADY, over sources sorted and
-  -- alien to it: its source's steps tie with nothing its body shows.
-  steady-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
-                 → Steady (U.meaning (U.subscribe (connect s b) p) ρ)
+  -- A CONNECT'S BODY STAYS CLEAR OF ITS SOURCE'S STEPS, over sources
+  -- sorted and alien to it: nothing the body shows lies above or below
+  -- the position just past any source event, where the step shows.
+  unrelated-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+                    → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ))
+                            (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
+
+  -- A SOURCE'S STEPS MERGE INTO A STEADY BODY STEADILY when nothing the
+  -- body shows lies above or below where a step shows.
+  steady-beside : ∀ {A B} (b : Events B) (s : Events A) → Steady b → Steady s
+                → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) s) b → Steady (M.beside b s)
 
   -- A DEFER'S RUN IS STEADY somewhere, over sources sorted and alien to it.
   steady-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
@@ -1056,6 +1067,10 @@ alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p �
 alien-sub o p ρ al =
   alien-apart o (p ++ [ ix 0 ]) (p ++ [ ix 1 ]) ρ (alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ al)
     (sibling p (λ ())) (sibling p (λ ())) (no-tick p)
+
+-- A program subscribed anywhere, over sorted sources alien to where it
+-- subscribes, is placed.
+placed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Placed (U.subscribe o p) ρ
 
 -- A SUBSCRIPTION OVER STEADY SOURCES IS STEADY: a joiner's skips for
 -- what it missed sit just past the join, which nothing it rekeys
@@ -1073,14 +1088,17 @@ steady-sub (map f s) p ρ np so cl = steady-map f _ (steady-sub s p ρ np so cl)
 steady-sub (scan f z s) p ρ np so cl = steady-scan f z _ (steady-sub s p ρ np so cl)
 steady-sub (takeWhile i q s) p ρ np so cl = steady-take i q _ (steady-sub s p ρ np so cl)
 steady-sub (flatMap op f s) p ρ np so cl = steady-flat op f s p ρ np so cl
-steady-sub (connect s b) p ρ np so cl = steady-connect s b p ρ np so cl
+steady-sub (connect s b) p ρ np so cl =
+  steady-beside _ _ (steady-sub b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (snoc-there p) ((proj₁ (placed-sub s (p ++ [ ix 1 ]) ρ so cs) , ss) , so)
+                                (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl))
+                    ss (unrelated-connect s b p ρ np so cl)
+  where S  = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
+        cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+        ss = steady-sub s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs
 steady-sub (connected i) p ρ np so cl =
   steady-rejoin p _ (proj₁ (sorted-lookup ρ so i)) (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
 steady-sub (defer l) p ρ np so cl = steady-defer l p ρ np so cl
 
--- A program subscribed anywhere, over sorted sources alien to where it
--- subscribes, is placed.
-placed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Placed (U.subscribe o p) ρ
 placed-sub (cold c) p ρ so cl =
   subst Ordered (sym (U.start-meaning p (lower c) ρ)) (ordered-start p (lower c)) , start-within p (lower c) ρ
 placed-sub empty p ρ so cl = record { ordered = tt } , tt

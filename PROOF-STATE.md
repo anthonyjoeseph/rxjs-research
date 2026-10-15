@@ -176,7 +176,7 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `steady-flat`, `steady-connect` and `ordered-flat`
+- **THE ORDER.** `steady-flat`, `unrelated-connect` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
   no sibling's position, which is what keeps `Steady` and a flatMap's
@@ -222,8 +222,10 @@ by their own silent steps (`Mirror`).
   sources sorted and alien to where it subscribes, is in order.
 - **`steady-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap somewhere,
   over sorted, alien sources, is steady: no lane steps inside its outer's.
-- **`steady-connect`** (Placed) — FALSITY, `NO EVIDENCE`: a connect somewhere,
-  over sorted, alien sources, is steady: its source's steps tie with nothing.
+- **`unrelated-connect`** (Placed) — FALSITY, `NO EVIDENCE`: nothing a
+  connect's body shows lies above or below a position just past a source event.
+- **`steady-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a source's steps merge
+  steadily into a steady body clear of them.
 - **`steady-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer somewhere, over
   sorted, alien sources, is steady.
 - **`reach-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program
