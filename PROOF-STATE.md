@@ -163,7 +163,7 @@ point at one, the row is FALSITY.
 at the root, positions forgotten down to ticks. SAFETY, every prefix placed
 against the meaning's events, is a body: SORTED (`adequacy.Sorted`, the
 machine alone) and ALIKE as sets (`content`) is placed (`placing`). LIVENESS
-is by an item's depth, then the run's calm (`adequacy.Progress`).
+is by an item's depth, then the witness's `measure` (`adequacy.Progress`).
 Sortedness rides SCOPED positions: `under l m k` runs `m` at
 `pos ++ [l]` and puts `pos` back, so the run's positions are a tree's
 pre-order; each kernel is well-positioned (`Well`, unary) given its
@@ -177,16 +177,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `calm-leaf`: no endless silent run of re-entry
-  configurations over one residual. A burst's steps, a lane admit and a
-  defer pass the ghost's skips (`Hopped`); a popped timer, a poll, a spent
-  burst dropped, a burst over and owed todos paid leave it in place, each
-  finitely often per frame. Ruled out: a meaning skip at a timer pop, at
-  the frame's root (a hot's rekey sorts it after the burst, oracle) or
-  tied with the burst's first step (`placing`), and a liveness by set
-  alone, blind to a skip passed. Decides whether those five are a measure
-  on the pure driver alone, or need a ghost-only marker in the shared
-  machine, as `here` is, which the IO runtime ignores.
+- **THE PROGRESS.** `sub-onward`, `burst-onward` and `turn-pops` carry
+  liveness: each silent hop passes a skip, leaves the ghost alike and
+  lowers `measure` (pending syntax, then timers, then bursts), or reaches
+  a step that is not silent. Ruled out: a ghost-only marker in the shared
+  machine (the measure is the witness's `Sub` tree and the driver's
+  queues), a meaning skip at a timer pop, at the frame's root or tied
+  with the burst's first step. Decides whether every hop that queues a
+  burst spends pending syntax or a timer, and whether a connect's feed
+  and a lane admit pass a skip rather than leave the ghost alike.
 - **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
@@ -265,17 +264,17 @@ by their own silent steps (`Mirror`).
 - **`note-onward`** (Content) — FALSITY, `NO EVIDENCE`: past a note the run
   runs the stepped ghost.
 - **`turn-pops`** (Content) — FALSITY, `NO EVIDENCE`: a popped timer's frame is
-  the ghost's frames node at its tick, no skip passed.
+  the ghost's frames node at its tick, no skip passed, a timer spent.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
 - **`sub-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription begun
-  runs silently to the next re-entry state, the ghost past its skips.
+  runs silently to the next re-entry state, past a skip or its pending node
+  spent.
 - **`burst-onward`** (Content) — FALSITY, `NO EVIDENCE`: a burst's frame steps
-  silently to the next re-entry state, the ghost past its skips.
+  silently to the next re-entry state, past a skip, a burst dropped or to a
+  note.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
-- **`calm-leaf`** (Progress) — FALSITY, `NO EVIDENCE`: from a re-entry
-  configuration, no endless silent run of them over one residual.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 

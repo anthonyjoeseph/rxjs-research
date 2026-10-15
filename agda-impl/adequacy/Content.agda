@@ -25,10 +25,13 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat.Properties using (suc-injective)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.Nat using (ℕ; zero; suc; _+_; _<_)
+open import Data.Nat.Induction using (<-wellFounded)
+open import Induction.WellFounded using (WellFounded)
+open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
   skip⁼; end⁼; agree; agree-sym; agree-trans)
@@ -42,6 +45,8 @@ open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; []; os; afterᴱ)
 open import denotation.Denote using (⟦_⟧)
+import Tree as T
+open import Tree using (Obs)
 open import operation.PureObservable using (PureObs; Out; note; module Pure)
 open import operation.AbstractObservable using (module Heap) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_)
@@ -53,7 +58,8 @@ module Honesty (R : Set) where
   open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; held; run; asking; bottom; spent?)
   open Heap using (_⊑_)
   open Recording R using (silent-keeps; value-notes)
-  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing)
+  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
+    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane)
   open Strongly.Against R using (calmAs; noteAs; subAs; burstAs)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
@@ -249,12 +255,77 @@ module Honesty (R : Set) where
   past-pre ag (agrees ag′)    = agrees λ n → agree-trans (ag n) (ag′ n)
   past-pre ag (skipped ag′ p) = skipped (λ n → agree-trans (ag n) (ag′ n)) p
 
-  -- A ghost past `g`'s residual, which `m′` runs.
-  Hopped : U.Node [] R → Mach → Set₁
-  Hopped g m′ = Σ (U.Node [] R) λ g″ → Past (residual g) (residual g″) × Mirror g″ m′
+  ----------------------------------------------------------------------
+  -- WHAT IS LEFT BEFORE THE GHOST MOVES
 
-  onward : ∀ {rest g m′} → rest ≋ residual g → Hopped g m′ → Inner rest m′
-  onward e (g″ , s , mi) = record { ghost = g″ ; same = ≋-trans e (past-same s) ; mirror = mi }
+  -- The subscription work a program owes: one for each operator reached
+  -- and not begun.  A defer's body is not counted: its expansion is a
+  -- skip of the meaning's.
+  syn : ∀ {Δ A} → Obs Timeline Δ A → ℕ
+  syn (T.cold c)          = 1
+  syn T.empty             = 1
+  syn (T.of xs)           = 1
+  syn (T.map f s)         = suc (syn s)
+  syn (T.scan f z s)      = suc (syn s)
+  syn (T.takeWhile i q s) = suc (syn s)
+  syn (T.flatMap op f s)  = suc (syn s)
+  syn (T.connect s b)     = suc (syn s + syn b)
+  syn (T.connected i)     = 1
+  syn (T.defer l)         = 1
+
+  -- The witness's subscriptions reached and not begun, as work owed.
+  mutual
+    pend : ∀ {h Δ A} → Sub h Δ A → ℕ
+    pend (pendingˢ s q)                    = syn s
+    pend (coldˢ _ _ _)                     = 0
+    pend (ofˢ _ _ _)                       = 0
+    pend doneˢ                             = 0
+    pend (mapˢ f s)                        = pend s
+    pend (scanˢ f r s)                     = pend s
+    pend (takeWhileˢ i q c k tk s)         = pend s
+    pend (flatMapˢ op f fl oc k r s ls)    = pend s + pendᴸ ls
+    pend (connectˢ S c b kb k fd e src bd) = pend src + pend bd
+    pend (joinˢ _ _ _ _ _)                 = 0
+    pend (deferˢ k s)                      = pend s
+
+    pendᴸ : ∀ {h Δ B} → List (Lane h Δ B) → ℕ
+    pendᴸ []                = 0
+    pendᴸ (lane c k s ∷ ls) = pend s + pendᴸ ls
+
+  -- THE WORK LEFT AT A RE-ENTRY CONFIGURATION, in order: subscriptions
+  -- owed, timers queued, bursts held.
+  Measure : Set
+  Measure = ℕ × ℕ × ℕ
+
+  _≺_ : Measure → Measure → Set
+  _≺_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_)
+
+  ≺-wf : WellFounded _≺_
+  ≺-wf = ×-wellFounded <-wellFounded (×-wellFounded <-wellFounded <-wellFounded)
+
+  measure : ∀ {g m} → Strong g m → Measure
+  measure {m = m} (carried cr) = pend (Carried.tree cr) , length (Mach.timers m) , length (Mach.bursts m)
+  measure (closing _ _ _ _ _)  = 0 , 0 , 0
+
+  -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
+  -- past a skip of its residual; or the ghost alike, less work left; or
+  -- a configuration whose next step shows something.
+  data Gain {g m g″ m₀} (st : Strong g m) (st₀ : Strong g″ m₀) : Set₁ where
+    passed  : ∀ {k r} → (∀ n → Agree n (residual g) (skip k r)) → Past (force r) (residual g″) → Gain st st₀
+    lowered : (∀ n → Agree n (residual g) (residual g″)) → measure st₀ ≺ measure st → Gain st st₀
+    showing : Past (residual g) (residual g″) → (∀ {m″} → step m₀ ≢ silent m″) → Gain st st₀
+
+  gain-past : ∀ {g m g″ m₀} {st : Strong g m} {st₀ : Strong g″ m₀} → Gain st st₀ → Past (residual g) (residual g″)
+  gain-past (passed ag p)  = skipped ag p
+  gain-past (lowered ag _) = agrees ag
+  gain-past (showing p _)  = p
+
+  -- `m′` runs silently to a re-entry configuration, which `st` gains.
+  Hopped : ∀ {g m} → Strong g m → Mach → Set₁
+  Hopped st m′ = Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m′ ⇝ m₀ × Σ (Strong g″ m₀) λ st₀ → Gain st st₀
+
+  onward : ∀ {rest g m m′} {st : Strong g m} → rest ≋ residual g → Hopped st m′ → Inner rest m′
+  onward e (g″ , m₀ , path , st₀ , gn) = record { ghost = g″ ; same = ≋-trans e (past-same (gain-past gn)) ; mirror = m₀ , path , st₀ }
 
   -- The driver's turn with a burst held is silent, whatever the burst.
   if-silent : ∀ (x y : Bool) {A B C} → Σ Mach λ m′ → (if x then silent A else if y then silent B else silent C) ≡ silent m′
@@ -279,20 +350,21 @@ module Honesty (R : Set) where
              → Mach.bursts m ≡ [] → Mach.timers m ≡ [] → ∀ {k b} → Has (residual g) k b → ⊥
 
     -- The turn popping a timer: its frame is the ghost's frames node at
-    -- its tick, the ghost moved past no skip.
-    turn-pops : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
-              → Mach.bursts m ≡ [] → ∀ {m′} → step m ≡ silent m′ → Hopped g m′
+    -- its tick, a timer spent and the ghost alike.
+    turn-pops : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ bottom
+              → Mach.bursts m ≡ [] → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
 
     -- A subscription begun runs its kernel's code silently to the next
-    -- re-entry state, the ghost past the skips it shows on the way (a
-    -- defer's).
-    sub-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
-               → ∀ {m′} → step m ≡ silent m′ → Hopped g m′
+    -- re-entry state: past a defer's skip, or its pending node begun, the
+    -- ghost alike.
+    sub-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
+               → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
 
-    -- A burst's frame stepped: polled, played, or found spent, the ghost
-    -- past the skips its steps show.
-    burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ K
-                 → Mach.bursts m ≡ just b ∷ bs → ∀ {m′} → step m ≡ silent m′ → Hopped g m′
+    -- A burst's frame stepped: polled, played, or found spent.  A stall
+    -- or a close is a skip passed; a spent or closed burst dropped leaves
+    -- the ghost alike; a value delivered to the root reaches its note.
+    burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
+                 → Mach.bursts m ≡ just b ∷ bs → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
 
     -- A value recorded is the least the ghost still holds.
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
@@ -324,15 +396,15 @@ module Honesty (R : Set) where
   -- the value the ghost's step shows, a least of what it leaves, and runs
   -- the stepped ghost; or ends with the ghost; or drains over a ghost
   -- showing nothing; or runs silently to a ghost past this one's skips.
-  data Hop (g : U.Node [] R) (m : Mach) : Set₁ where
+  data Hop {g m} (st : Strong g m) : Set₁ where
     valueᴴ    : ∀ {t p a m′ g′} → step m ≡ value t p a m′ → U.step g ≡ U.outˢ p a g′ → t ≡ tick p
-              → (∀ {q b} → Has (residual g′) q b → q ≤ᵖ p → ⊥) → Mirror g′ m′ → Hop g m
-    completeᴴ : ∀ {p} → step m ≡ complete p → U.step g ≡ U.endˢ p → Hop g m
-    drainedᴴ  : step m ≡ drained → (∀ {k b} → Has (residual g) k b → ⊥) → Hop g m
-    silentᴴ   : ∀ {m′} → step m ≡ silent m′ → Hopped g m′ → Hop g m
+              → (∀ {q b} → Has (residual g′) q b → q ≤ᵖ p → ⊥) → Mirror g′ m′ → Hop st
+    completeᴴ : ∀ {p} → step m ≡ complete p → U.step g ≡ U.endˢ p → Hop st
+    drainedᴴ  : step m ≡ drained → (∀ {k b} → Has (residual g) k b → ⊥) → Hop st
+    silentᴴ   : ∀ {m′} → step m ≡ silent m′ → Hopped st m′ → Hop st
 
   -- By the re-entry state.
-  strong-hop : ∀ {g m} → Strong g m → Hop g m
+  strong-hop : ∀ {g m} (st : Strong g m) → Hop st
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st sn pl) = completeᴴ refl st
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     with Carried.ctlAs cr | Carried.meets cr | Books.paidUp (Carried.books cr) | Books.clocked (Carried.books cr)

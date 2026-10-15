@@ -6,9 +6,8 @@
 -- From a re-entry configuration the machine records the ghost's value,
 -- ends or drains with it, or runs silently to a ghost past its skips
 -- (`adequacy.Content`'s `Hop`).  A value or a skip passed lowers how far
--- into the residual the item lies; a ghost left where it was lowers
--- nothing, so a run is owed to be calm: no endless silent run of re-entry
--- configurations over one residual.
+-- into the residual the item lies; a ghost left where it was lowers the
+-- witness's remaining work (`measure`), which is well-founded.
 module adequacy.Progress where
 
 open import Data.Empty using (⊥; ⊥-elim)
@@ -18,9 +17,10 @@ open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; m≤n⇒m≤1+n; ≤-trans)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
+open import Induction.WellFounded using (Acc; acc)
 
-open import denotation.MonotonicList using (Events; Events∞; out; end; Agree; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-trans; observe; root)
+open import denotation.MonotonicList using (Events; Events∞; out; skip; end; Agree; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-trans; observe; root)
 open import denotation.Denote using (⟦_⟧)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
@@ -34,8 +34,8 @@ open Events∞
 module Progressing (R : Set) where
   open Machine R using (Mach; step; silent; value; complete; drained; trace; shown; reading; begin; Read; Trace; Trace∞; tau; idle)
     renaming (out to outᵗ; end to endᵗ)
-  open Honesty R using (Has; atOut; pastSkip; residual; begun; _⇝_; now; then; Past; agrees; skipped; past-pre; tail-out; tail-skip;
-    has-agree; after; Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-agrees)
+  open Honesty R using (Has; atOut; pastSkip; residual; begun; _⇝_; now; then; Past; agrees; skipped; past-pre; passed; lowered; showing; tail-out; tail-skip;
+    has-agree; after; _≺_; ≺-wf; measure; Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-agrees)
   open Strongly R using (Strong; strong-begin)
   open Read
 
@@ -105,22 +105,6 @@ module Progressing (R : Set) where
   ahead-none no hushᵃ     = ≤-refl
 
   ----------------------------------------------------------------------
-  -- THE RUN IS CALM
-
-  -- No endless silent run of re-entry configurations whose ghosts all
-  -- show `e`: each re-entry reached silently over `e` is calm again, and
-  -- the chain is finite.
-  data Calm (e : Events R) (m : Mach) : Set₁ where
-    calm : (∀ {m′ m₀ g′} → step m ≡ silent m′ → m′ ⇝ m₀ → Strong g′ m₀ → (∀ n → Agree n e (residual g′)) → Calm e m₀) → Calm e m
-
-  postulate
-    -- A RE-ENTRY CONFIGURATION IS CALM over its ghost's residual: the
-    -- silent hops that leave the ghost where it is — a popped timer, a
-    -- poll, a spent burst dropped, a burst over, owed todos paid — come
-    -- finitely often before one moves it.
-    calm-leaf : ∀ {g m} → Strong g m → Calm (residual g) m
-
-  ----------------------------------------------------------------------
   -- THE ASSEMBLY
 
   -- A value the ghost shows lies one item in.
@@ -140,40 +124,74 @@ module Progressing (R : Set) where
   ... | z≤n     = zeroᵍ
   ... | s≤s z≤n = idleᵍ
 
+  -- Past a skip of `e`, an item lies shallower.
+  skipped-split : ∀ {f e q r y k} → (∀ n → Agree n e (skip q r)) → Past (force r) y → (a : Ahead e (suc k)) → depth a ≤ f
+                → Σ (Ahead y (suc k)) λ b → depth b < f
+  skipped-split {f} ag p a le with ahead-agree ag a
+  ... | skipᵃ a′ , de with ahead-past p a′
+  ...   | b , le′ = b , ≤-trans (s≤s le′) (subst (_≤ f) (sym de) le)
+
   -- A ghost past `e` shows it alike, or past a skip, an item lying
   -- shallower.
   past-split : ∀ {f e y k} → Past e y → (a : Ahead e (suc k)) → depth a ≤ f
              → (∀ n → Agree n e y) ⊎ Σ (Ahead y (suc k)) λ b → depth b < f
-  past-split (agrees ag) a le = inj₁ ag
-  past-split {f} (skipped ag p) a le with ahead-agree ag a
-  ... | skipᵃ a′ , de with ahead-past p a′
-  ...   | b , le′ = inj₂ (b , ≤-trans (s≤s le′) (subst (_≤ f) (sym de) le))
+  past-split (agrees ag)    a le = inj₁ ag
+  past-split (skipped ag p) a le = inj₂ (skipped-split ag p a le)
+
+  value≢silent : ∀ {t p a m′ m″} → value t p a m′ ≢ silent m″
+  value≢silent ()
+
+  complete≢silent : ∀ {p m″} → complete p ≢ silent m″
+  complete≢silent ()
+
+  drained≢silent : ∀ {m″} → drained ≢ silent m″
+  drained≢silent ()
 
   -- From a re-entry configuration over `e`, the machine gets as far as
-  -- `e` reaches.  By the item's depth, then the run's calm.
-  reentry : ∀ f {e g m k} (a : Ahead e k) → depth a < f → Strong g m → (∀ n → Agree n e (residual g)) → Calm e m → Hop g m
-          → Gets (trace m) k
-  reentry f       {k = zero}  a lt st ag cm h = zeroᵍ
-  reentry zero    {k = suc k} a () st ag cm h
-  reentry (suc f) {g = g} {k = suc k} a (s≤s lt) st ag cm (valueᴴ eq stp _ _ (m₀ , path , st₀)) =
-    subst (λ s → Gets (shown s) (suc k)) (sym eq)
-      (outᵍ (walk path (reentry f (proj₁ v) (proj₂ v) st₀ (λ n → agree-refl n _) (calm-leaf st₀) (strong-hop st₀))))
-    where v = value-step a lt (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n)))
-  reentry (suc f) {g = g} {k = suc k} a (s≤s lt) st ag cm (completeᴴ eq stp) =
-    subst (λ s → Gets (shown s) (suc k)) (sym eq)
-      (end-gets a (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n))))
-  reentry (suc f) {k = suc k} a (s≤s lt) st ag cm (drainedᴴ eq no) =
-    subst (λ s → Gets (shown s) (suc k)) (sym eq) (idle-gets a (λ h → no (has-agree ag h)))
-  reentry (suc f) {k = suc k} a (s≤s lt) st ag (calm cm) (silentᴴ eq (g″ , past , m₀ , path , st₀)) =
-    subst (λ s → Gets (shown s) (suc k)) (sym eq) (tauᵍ (walk path
-      ([ (λ ag″ → reentry (suc f) a (s≤s lt) st₀ ag″ (cm eq path st₀ ag″) (strong-hop st₀))
-       , (λ b → reentry f (proj₁ b) (proj₂ b) st₀ (λ n → agree-refl n _) (calm-leaf st₀) (strong-hop st₀)) ]′
-       (past-split (past-pre ag past) a lt))))
+  -- `e` reaches.  By the item's depth, then the work left before the
+  -- ghost moves; a configuration whose step shows something by depth
+  -- alone.
+  mutual
+    reentry : ∀ f {e g m k} (a : Ahead e k) → depth a < f → (st : Strong g m) → (∀ n → Agree n e (residual g))
+            → Acc _≺_ (measure st) → Hop st → Gets (trace m) k
+    reentry f a lt st ag ac h@(valueᴴ eq _ _ _ _) = shown-gets f a lt st ag h (λ eq′ → value≢silent (trans (sym eq) eq′))
+    reentry f a lt st ag ac h@(completeᴴ eq _)    = shown-gets f a lt st ag h (λ eq′ → complete≢silent (trans (sym eq) eq′))
+    reentry f a lt st ag ac h@(drainedᴴ eq _)     = shown-gets f a lt st ag h (λ eq′ → drained≢silent (trans (sym eq) eq′))
+    reentry f       {k = zero}  a lt st ag ac (silentᴴ _ _) = zeroᵍ
+    reentry zero    {k = suc k} a () st ag ac (silentᴴ _ _)
+    reentry (suc f) {k = suc k} a (s≤s lt) st ag (acc rs) (silentᴴ eq (g″ , m₀ , path , st₀ , lowered ag″ lo)) =
+      subst (λ s → Gets (shown s) (suc k)) (sym eq)
+        (tauᵍ (walk path (reentry (suc f) a (s≤s lt) st₀ (λ n → agree-trans (ag n) (ag″ n)) (rs lo) (strong-hop st₀))))
+    reentry (suc f) {k = suc k} a (s≤s lt) st ag ac (silentᴴ eq (g″ , m₀ , path , st₀ , passed ag₁ p)) =
+      subst (λ s → Gets (shown s) (suc k)) (sym eq)
+        (tauᵍ (walk path (reentry f (proj₁ b) (proj₂ b) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀))))
+      where b = skipped-split (λ n → agree-trans (ag n) (ag₁ n)) p a lt
+    reentry (suc f) {k = suc k} a (s≤s lt) st ag ac (silentᴴ eq (g″ , m₀ , path , st₀ , showing p ns)) =
+      subst (λ s → Gets (shown s) (suc k)) (sym eq) (tauᵍ (walk path
+        ([ (λ ag″ → shown-gets (suc f) a (s≤s lt) st₀ ag″ (strong-hop st₀) ns)
+         , (λ b → reentry f (proj₁ b) (proj₂ b) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀)) ]′
+         (past-split (past-pre ag p) a lt))))
+
+    -- A re-entry configuration whose step shows something.
+    shown-gets : ∀ f {e g m k} (a : Ahead e k) → depth a < f → (st : Strong g m) → (∀ n → Agree n e (residual g)) → Hop st
+               → (∀ {m″} → step m ≢ silent m″) → Gets (trace m) k
+    shown-gets f       {k = zero}  a lt st ag h ns = zeroᵍ
+    shown-gets zero    {k = suc k} a () st ag h ns
+    shown-gets (suc f) {g = g} {k = suc k} a (s≤s lt) st ag (valueᴴ eq stp _ _ (m₀ , path , st₀)) ns =
+      subst (λ s → Gets (shown s) (suc k)) (sym eq)
+        (outᵍ (walk path (reentry f (proj₁ v) (proj₂ v) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀))))
+      where v = value-step a lt (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n)))
+    shown-gets (suc f) {g = g} {k = suc k} a (s≤s lt) st ag (completeᴴ eq stp) ns =
+      subst (λ s → Gets (shown s) (suc k)) (sym eq)
+        (end-gets a (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n))))
+    shown-gets (suc f) {k = suc k} a (s≤s lt) st ag (drainedᴴ eq no) ns =
+      subst (λ s → Gets (shown s) (suc k)) (sym eq) (idle-gets a (λ h → no (has-agree ag h)))
+    shown-gets (suc f) {k = suc k} a lt st ag (silentᴴ eq _) ns = ⊥-elim (ns eq)
 
   -- LIVENESS: whatever item the meaning's events reach, some prefix of
   -- the launch's run reads.
   reached : (o : PureObs [] R) → ∀ {k} → Ahead (observe (⟦ o ⟧ []) root) k
           → Σ ℕ λ n → k ≤ length (items (log (reading n 0 (trace (begin o)))) (ending (reading n 0 (trace (begin o)))))
-  reached o a = gets-reading (reentry (suc (depth b)) b ≤-refl st (λ n → agree-refl n _) (calm-leaf st) (strong-hop st)) 0
+  reached o a = gets-reading (reentry (suc (depth b)) b ≤-refl st (λ n → agree-refl n _) (≺-wf _) (strong-hop st)) 0
     where b  = proj₁ (ahead-agree (begun o) a)
           st = strong-begin o
