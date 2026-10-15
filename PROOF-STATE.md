@@ -192,7 +192,7 @@ by their own silent steps (`Mirror`).
   order. Ruled out: a join of a run merely in order, a flatMap of any
   outer in order, lanes placed wherever they subscribe, sources merely
   clear of a flatMap's subtree, an operator showing a position it does
-  not key, a subscription at the empty position and sources stepping
+  not key, a subscription where no tick heads it and sources stepping
   where they then emit. Decides whether an outer's own positions own nothing it
   shows later, which apartness of each lane from the next needs.
 - **THE DEFER.** `ordered-defer` and `within-defer`: a defer over sorted,
@@ -212,12 +212,13 @@ by their own silent steps (`Mirror`).
   is paid once as a field of `Carried`.
 ### The ledger
 
-- **`ordered-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap merges its outer
-  and lanes in order, over sources sorted and alien to where it subscribes.
-- **`ordered-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer's run, over
-  sources sorted and alien to where it subscribes, is in order.
-- **`steady-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap somewhere,
-  over sorted, alien sources, is steady: no lane steps inside its outer's.
+- **`ordered-flat`** (Placed) — FALSITY, `REFUTED×2`: a flatMap where a tick
+  heads it merges its outer and lanes in order, over sorted sources alien to
+  it.
+- **`ordered-defer`** (Placed) — FALSITY, `REFUTED`: a defer's run where a tick
+  heads it, over sources sorted and alien to it, is in order.
+- **`steady-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap where a tick heads
+  it, over sorted, alien sources, is steady: no lane steps inside its outer's.
 - **`fresh-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run in
   order, steady and fresh, fresh: nothing just past its failing value or end.
 - **`fresh-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap somewhere, over
@@ -226,20 +227,20 @@ by their own silent steps (`Mirror`).
   sorted, alien sources, keys nothing just past its own events.
 - **`fresh-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run keys
   nothing just past its own events, its frames tagged with earlier bursts.
-- **`steady-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer somewhere, over
-  sorted, alien sources, is steady.
+- **`steady-defer`** (Placed) — FALSITY, `REFUTED`: a defer where a tick heads
+  it, over sorted, alien sources, is steady.
 - **`reach-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program
   subscribed is held to any `Rules`; `reach` there, short of a recursion.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
   steps merge into its body in order.
 - **`steady-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
   steady.
-- **`steady-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run somewhere
-  is steady.
+- **`steady-start`** (Placed) — FALSITY, `REFUTED`: a cold's run where a tick
+  heads it is steady.
 - **`steady-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is steady.
 - **`ordered-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps the order.
-- **`ordered-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run is in
-  order.
+- **`ordered-start`** (Placed) — FALSITY, `REFUTED`: a cold's run where a tick
+  heads it is in order.
 - **`ordered-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is in order.
 - **`within-defer`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer's program,
   subscribed and fed, is placed within.

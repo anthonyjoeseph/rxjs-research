@@ -199,14 +199,34 @@ mutual
   Placedᴸ []       ρ = ⊤
   Placedᴸ (c ∷ cs) ρ = Placed c ρ × Placedᴸ cs ρ
 
--- Each connect's source in order, and steady.
+-- A tick heads it, as it heads every position under the root: a
+-- timer's frame sits at a bare tick, so only there does it sort after
+-- the steps before it.
+Headed : Pos → Set
+Headed (ix _ ∷ _) = ⊤
+Headed _          = ⊥
+
+headed-snoc : ∀ p {l : M.Label} → Headed p → Headed (p ++ [ l ])
+headed-snoc (ix _ ∷ _) h = tt
+headed-snoc []         ()
+headed-snoc (sub _ ∷ _) ()
+headed-snoc (last ∷ _) ()
+
+headed-there : ∀ p → Headed p → p ≢ []
+headed-there (ix _ ∷ _) h ()
+
+-- Each connect's source in order, steady, and headed.
 Sorted : ∀ {Γ} → NEnv Γ → Set
 Sorted []ᴬ      = ⊤
-Sorted (e ∷ᴬ ρ) = (Ordered e × Steady e) × Sorted ρ
+Sorted (e ∷ᴬ ρ) = (Ordered e × Steady e) × Every Headed e × Sorted ρ
 
 sorted-lookup : ∀ {Γ A} (ρ : NEnv Γ) → Sorted ρ → (i : A ∈ Γ) → Ordered (lookup ρ i) × Steady (lookup ρ i)
-sorted-lookup (e ∷ᴬ ρ) (o , so) (here refl) = o
-sorted-lookup (e ∷ᴬ ρ) (o , so) (there i)   = sorted-lookup ρ so i
+sorted-lookup (e ∷ᴬ ρ) (o , _ , so) (here refl) = o
+sorted-lookup (e ∷ᴬ ρ) (o , _ , so) (there i)   = sorted-lookup ρ so i
+
+sorted-headed : ∀ {Γ} (ρ : NEnv Γ) → Sorted ρ → Everyᴱ Headed ρ
+sorted-headed []ᴬ      _            = tt
+sorted-headed (e ∷ᴬ ρ) (_ , h , so) = h , sorted-headed ρ so
 
 -- A value changed, or a running total, keeps its position.
 atop-map : ∀ {A B} (f : A → B) k (e : Events A) → Atop k e → Atop k (M.mapᴱ f e)
@@ -932,6 +952,31 @@ keyedRules p = record
   ; source = λ _ _ → tt
   }
 
+-- Headed: subscribing where a tick heads, over sources so headed.
+headedRules : Rules
+headedRules = record
+  { S      = Headed
+  ; P      = Headed
+  ; Src    = Headed
+  ; child  = λ j _ _ h → headed-snoc j h
+  ; deeper = λ h _ _ x → headed-snoc h x
+  ; held   = λ _ x → x
+  ; frame  = λ _ _ _ → tt
+  ; join   = λ q _ hq _ → headed-snoc q hq
+  ; source = λ _ x → x
+  }
+
+-- A SUBSCRIPTION WHERE A TICK HEADS SHOWS ONLY WHERE ONE HEADS.
+headed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Every Headed (U.meaning (U.subscribe o p) ρ)
+headed-sub o p ρ hp so = Reach.reach headedRules o p ρ hp (sorted-headed ρ so)
+
+-- A lane subscribes headed just past where the step admitting it shows.
+headed-lane : ∀ x → Headed (x ++ [ ix 0 ]) → Headed (x ++ [ ix 1 ])
+headed-lane []          h = tt
+headed-lane (ix _ ∷ _)  h = tt
+headed-lane (sub _ ∷ _) ()
+headed-lane (last ∷ _)  ()
+
 prefix-split : ∀ a j l → Prefix a (j ++ [ l ]) → Prefix a j ⊎ a ≡ j ++ [ l ]
 prefix-split []          j       l _          = inj₁ tt
 prefix-split (_ ∷ [])    []      l (refl , _) = inj₂ refl
@@ -1124,8 +1169,11 @@ start-within p M.done             ρ = tt
 start-within p M.quiet            ρ = tt
 
 postulate
-  -- A COLD'S RUN IS IN ORDER: a burst, or its frames, from the start.
-  ordered-start : ∀ {A} p (m : From A 0) → Ordered (M.start p m)
+  -- A COLD'S RUN IS IN ORDER where a tick heads it: a burst, or its
+  -- frames, from the start.
+  --
+  -- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
+  ordered-start : ∀ {A} p (m : From A 0) → Headed p → Ordered (M.start p m)
 
   -- A LIST'S RUN IS IN ORDER: its values at rising indices, then its end.
   ordered-of : ∀ {A} p i (xs : List A) → Ordered (M.ofᴱ p i xs)
@@ -1147,15 +1195,21 @@ postulate
   -- none.
   --
   -- REFUTED: 37b70651 of any outer node in order, by a joiner told a value and a skip at one position
-  ordered-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ
+  -- REFUTED: 0d0df253 wherever no tick heads the position, a lane's timer frame sorting before the step admitting it
+  ordered-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                → Ordered (U.meaning (U.subscribe (flatMap op f s) p) ρ)
 
   -- A DEFER'S RUN IS IN ORDER: its program, reached, over sorted sources
   -- alien to where it subscribes.
-  ordered-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Ordered (U.meaning (U.deferᶜ l p []) ρ)
+  --
+  -- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
+  ordered-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Ordered (U.meaning (U.deferᶜ l p []) ρ)
 
-  -- A COLD'S RUN IS STEADY somewhere: its frames step at its ticks.
-  steady-start : ∀ {A} p (m : From A 0) → p ≢ [] → Steady (M.start p m)
+  -- A COLD'S RUN IS STEADY where a tick heads it: its frames step at its
+  -- ticks.
+  --
+  -- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
+  steady-start : ∀ {A} p (m : From A 0) → Headed p → Steady (M.start p m)
 
   -- A LIST'S RUN IS STEADY: each value at the next index.
   steady-of : ∀ {A} p i (xs : List A) → Steady (M.ofᴱ p i xs)
@@ -1164,9 +1218,12 @@ postulate
   -- position, its completion just past that.
   steady-take : ∀ {A} i (p : A → Bool) (e : Events A) → Steady e → Steady (M.takeWhileᴱ i p e)
 
-  -- A FLATMAP SUBSCRIBED SOMEWHERE IS STEADY, over sources sorted and
-  -- alien to it: no lane steps inside its outer's last position.
-  steady-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+  -- A FLATMAP SUBSCRIBED WHERE A TICK HEADS IS STEADY, over sources
+  -- sorted and alien to it: no lane steps inside its outer's last
+  -- position.
+  --
+  -- REFUTED: 0d0df253 wherever no tick heads the position, a lane's timer frame sorting before the step admitting it
+  steady-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
               → Steady (U.meaning (U.subscribe (flatMap op f s) p) ρ)
 
   -- A COLD'S RUN IS FRESH: each burst under its root, each frame tagged
@@ -1188,8 +1245,11 @@ postulate
               → Fresh (U.meaning (U.deferᶜ l p []) ρ)
 
 
-  -- A DEFER'S RUN IS STEADY somewhere, over sources sorted and alien to it.
-  steady-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+  -- A DEFER'S RUN IS STEADY where a tick heads it, over sources sorted
+  -- and alien to it.
+  --
+  -- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
+  steady-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                → Steady (U.meaning (U.deferᶜ l p []) ρ)
 
 
@@ -1288,16 +1348,16 @@ fresh-beside b s fb fs ap =
 -- A SUBSCRIPTION IS FRESH somewhere, over sources sorted and alien to
 -- it: nothing it shows lies under, or is tagged under, the position
 -- just past one of its events.
-alien-steps : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ → Fresh (U.meaning (U.subscribe o p) ρ)
+alien-steps : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Fresh (U.meaning (U.subscribe o p) ρ)
 
 -- A CONNECT'S BODY STAYS APART FROM ITS SOURCE'S STEPS, over sources
 -- sorted and alien to it: nothing the body shows keys, or is keyed
 -- under, the position just past any source event, where the step shows.
-apart-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ
+apart-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
               → Every (λ q → Every (Disjoint (q ++ [ ix 0 ])) (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ)))
                       (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ)
-apart-connect s b p ρ so cl =
-  every-mono per S (every-zip S keyed (every-zip S (alien-sub s p ρ cl) (alien-steps s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs)))
+apart-connect s b p ρ hp so cl =
+  every-mono per S (every-zip S keyed (every-zip S (alien-sub s p ρ cl) (alien-steps s (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so cs)))
   where
     S  = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
     cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
@@ -1317,85 +1377,94 @@ apart-connect s b p ρ so cl =
 
 -- A CONNECT'S BODY STAYS CLEAR OF ITS SOURCE'S STEPS: nothing it shows
 -- lies above or below the position just past any source event.
-unrelated-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+unrelated-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                   → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ))
                           (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
-unrelated-connect s b p ρ np so cl =
-  every-swap _ S (every-mono (λ q → every-mono (λ k d → (λ x → proj₂ d (inj₁ x)) , (λ x → proj₁ d (inj₁ x))) _) S (apart-connect s b p ρ so cl))
+unrelated-connect s b p ρ hp so cl =
+  every-swap _ S (every-mono (λ q → every-mono (λ k d → (λ x → proj₂ d (inj₁ x)) , (λ x → proj₁ d (inj₁ x))) _) S (apart-connect s b p ρ hp so cl))
   where S = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
 
--- A program subscribed anywhere, over sorted sources alien to where it
--- subscribes, is placed.
-placed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Placed (U.subscribe o p) ρ
+-- A program subscribed where a tick heads, over sorted sources alien to
+-- where it subscribes, is placed.
+placed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Placed (U.subscribe o p) ρ
 
 -- A SUBSCRIPTION OVER STEADY SOURCES IS STEADY: a joiner's skips for
 -- what it missed sit just past the join, which nothing it rekeys
--- lies inside, its sources being alien to it.  Somewhere, not at the
--- empty position, where its own steps would sit at bare ticks.
+-- lies inside, its sources being alien to it.  Where a tick heads it,
+-- as one heads every real subscription: elsewhere its frames sit at
+-- bare ticks, ahead of its own steps.
 --
 -- REFUTED: 91953190 at the empty position, a lane's timer frame shown just inside the outer's step at its tick
+-- REFUTED: 0d0df253 off the empty position where no tick heads it, that frame sorting before the step
 -- REFUTED: 42e70878 over sources stepping and then emitting at one position, a takeWhile showing the value inside the step
-steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
            → Steady (U.meaning (U.subscribe o p) ρ)
-steady-sub (cold c) p ρ np so cl = subst Steady (sym (U.start-meaning p (lower c) ρ)) (steady-start p (lower c) np)
-steady-sub empty p ρ np so cl = record { steady = tt }
-steady-sub (of xs) p ρ np so cl = steady-of p 0 xs
-steady-sub (map f s) p ρ np so cl = steady-map f _ (steady-sub s p ρ np so cl)
-steady-sub (scan f z s) p ρ np so cl = steady-scan f z _ (steady-sub s p ρ np so cl)
-steady-sub (takeWhile i q s) p ρ np so cl = steady-take i q _ (steady-sub s p ρ np so cl)
-steady-sub (flatMap op f s) p ρ np so cl = steady-flat op f s p ρ np so cl
-steady-sub (connect s b) p ρ np so cl =
-  steady-beside _ _ (steady-sub b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (snoc-there p) ((proj₁ (placed-sub s (p ++ [ ix 1 ]) ρ so cs) , ss) , so)
+steady-sub (cold c) p ρ hp so cl = subst Steady (sym (U.start-meaning p (lower c) ρ)) (steady-start p (lower c) hp)
+steady-sub empty p ρ hp so cl = record { steady = tt }
+steady-sub (of xs) p ρ hp so cl = steady-of p 0 xs
+steady-sub (map f s) p ρ hp so cl = steady-map f _ (steady-sub s p ρ hp so cl)
+steady-sub (scan f z s) p ρ hp so cl = steady-scan f z _ (steady-sub s p ρ hp so cl)
+steady-sub (takeWhile i q s) p ρ hp so cl = steady-take i q _ (steady-sub s p ρ hp so cl)
+steady-sub (flatMap op f s) p ρ hp so cl = steady-flat op f s p ρ hp so cl
+steady-sub (connect s b) p ρ hp so cl =
+  steady-beside _ _ (steady-sub b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (headed-snoc p hp)
+                                ((proj₁ (placed-sub s (p ++ [ ix 1 ]) ρ hs so cs) , ss) , headed-sub s (p ++ [ ix 1 ]) ρ hs so , so)
                                 (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl))
-                    ss (unrelated-connect s b p ρ np so cl)
+                    ss (unrelated-connect s b p ρ hp so cl)
   where S  = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
+        hs = headed-snoc p hp
         cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
-        ss = steady-sub s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs
-steady-sub (connected i) p ρ np so cl =
+        ss = steady-sub s (p ++ [ ix 1 ]) ρ hs so cs
+steady-sub (connected i) p ρ hp so cl =
   steady-rejoin p _ (proj₁ (sorted-lookup ρ so i)) (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
-steady-sub (defer l) p ρ np so cl = steady-defer l p ρ np so cl
+steady-sub (defer l) p ρ hp so cl = steady-defer l p ρ hp so cl
 
-placed-sub (cold c) p ρ so cl =
-  subst Ordered (sym (U.start-meaning p (lower c) ρ)) (ordered-start p (lower c)) , start-within p (lower c) ρ
-placed-sub empty p ρ so cl = record { ordered = tt } , tt
-placed-sub (of xs) p ρ so cl = ordered-of p 0 xs , tt
-placed-sub (map f s) p ρ so cl = ordered-map f _ (proj₁ ps) , ps
-  where ps = placed-sub s p ρ so cl
-placed-sub (scan f z s) p ρ so cl = ordered-scan f z _ (proj₁ ps) , ps
-  where ps = placed-sub s p ρ so cl
-placed-sub (takeWhile i q s) p ρ so cl = ordered-take i q _ (proj₁ ps) , ps
-  where ps = placed-sub s p ρ so cl
-placed-sub (flatMap op f s) p ρ so cl =
-  ordered-flat op f s p ρ so cl , placed-sub s p ρ so cl , tt
-  , λ a x r → placed-sub (f a) (x ++ [ ix 1 ]) ρ so (alien-shown op f s p ρ cl x r)
-placed-sub (connect s b) p ρ so cl = ordered-beside _ _ (proj₁ pb) (proj₁ ps) , pb , ps
-  where cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
-        ps = placed-sub s (p ++ [ ix 1 ]) ρ so cs
-        pb = placed-sub b (p ++ [ ix 0 ]) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ)
-               ((proj₁ ps , steady-sub s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs) , so) (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl)
-placed-sub (connected i) p ρ so cl = ordered-rejoin p _ (proj₁ sl) (proj₂ sl) , tt
-  where sl = sorted-lookup ρ so i
-placed-sub (defer l) p ρ so cl = ordered-defer l p ρ so cl , tt
-
-alien-steps (cold c) p ρ np so cl = subst Fresh (sym (U.start-meaning p (lower c) ρ)) (fresh-start p (lower c))
-alien-steps empty p ρ np so cl = fresh-even _ (end (p ++ [ last ])) (record { every = weigh-mark p last last-mark })
-alien-steps (of xs) p ρ np so cl = fresh-even _ _ (even-of p 0 xs)
-alien-steps (map f s) p ρ np so cl = fresh-map f _ (alien-steps s p ρ np so cl)
-alien-steps (scan f z s) p ρ np so cl = fresh-scan f z _ (alien-steps s p ρ np so cl)
-alien-steps (takeWhile i q s) p ρ np so cl =
-  fresh-take i q _ (proj₁ (placed-sub s p ρ so cl)) (steady-sub s p ρ np so cl) (alien-steps s p ρ np so cl)
-alien-steps (flatMap op f s) p ρ np so cl = fresh-flat op f s p ρ np so cl
-alien-steps (connect s b) p ρ np so cl =
-  fresh-beside _ S (alien-steps b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (snoc-there p) ((proj₁ (placed-sub s (p ++ [ ix 1 ]) ρ so cs) , steady-sub s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs) , so)
-                                      (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl))
-                   (alien-steps s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs)
-                   (every-swap {R = λ q k → Disjoint (q ++ [ ix 0 ]) k} _ S (apart-connect s b p ρ so cl))
-  where S  = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
+placed-sub (cold c) p ρ hp so cl =
+  subst Ordered (sym (U.start-meaning p (lower c) ρ)) (ordered-start p (lower c) hp) , start-within p (lower c) ρ
+placed-sub empty p ρ hp so cl = record { ordered = tt } , tt
+placed-sub (of xs) p ρ hp so cl = ordered-of p 0 xs , tt
+placed-sub (map f s) p ρ hp so cl = ordered-map f _ (proj₁ ps) , ps
+  where ps = placed-sub s p ρ hp so cl
+placed-sub (scan f z s) p ρ hp so cl = ordered-scan f z _ (proj₁ ps) , ps
+  where ps = placed-sub s p ρ hp so cl
+placed-sub (takeWhile i q s) p ρ hp so cl = ordered-take i q _ (proj₁ ps) , ps
+  where ps = placed-sub s p ρ hp so cl
+placed-sub (flatMap op f s) p ρ hp so cl =
+  ordered-flat op f s p ρ hp so cl , placed-sub s p ρ hp so cl , tt
+  , λ a x r → placed-sub (f a) (x ++ [ ix 1 ]) ρ (headed-lane x (every-reach _ (x ++ [ ix 0 ]) (headed-sub (flatMap op f s) p ρ hp so) r))
+                so (alien-shown op f s p ρ cl x r)
+placed-sub (connect s b) p ρ hp so cl = ordered-beside _ _ (proj₁ pb) (proj₁ ps) , pb , ps
+  where hs = headed-snoc p hp
         cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
-alien-steps (connected i) p ρ np so cl = fresh-rejoin p _ (every-lookup (λ h → ¬ Owned p h) ρ cl i)
-alien-steps (defer l) p ρ np so cl = fresh-defer l p ρ np so cl
+        ps = placed-sub s (p ++ [ ix 1 ]) ρ hs so cs
+        pb = placed-sub b (p ++ [ ix 0 ]) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ) (headed-snoc p hp)
+               ((proj₁ ps , steady-sub s (p ++ [ ix 1 ]) ρ hs so cs) , headed-sub s (p ++ [ ix 1 ]) ρ hs so , so)
+               (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl)
+placed-sub (connected i) p ρ hp so cl = ordered-rejoin p _ (proj₁ sl) (proj₂ sl) , tt
+  where sl = sorted-lookup ρ so i
+placed-sub (defer l) p ρ hp so cl = ordered-defer l p ρ hp so cl , tt
+
+alien-steps (cold c) p ρ hp so cl = subst Fresh (sym (U.start-meaning p (lower c) ρ)) (fresh-start p (lower c))
+alien-steps empty p ρ hp so cl = fresh-even _ (end (p ++ [ last ])) (record { every = weigh-mark p last last-mark })
+alien-steps (of xs) p ρ hp so cl = fresh-even _ _ (even-of p 0 xs)
+alien-steps (map f s) p ρ hp so cl = fresh-map f _ (alien-steps s p ρ hp so cl)
+alien-steps (scan f z s) p ρ hp so cl = fresh-scan f z _ (alien-steps s p ρ hp so cl)
+alien-steps (takeWhile i q s) p ρ hp so cl =
+  fresh-take i q _ (proj₁ (placed-sub s p ρ hp so cl)) (steady-sub s p ρ hp so cl) (alien-steps s p ρ hp so cl)
+alien-steps (flatMap op f s) p ρ hp so cl = fresh-flat op f s p ρ (headed-there p hp) so cl
+alien-steps (connect s b) p ρ hp so cl =
+  fresh-beside _ S (alien-steps b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (headed-snoc p hp)
+                                ((proj₁ (placed-sub s (p ++ [ ix 1 ]) ρ hs so cs) , steady-sub s (p ++ [ ix 1 ]) ρ hs so cs) , headed-sub s (p ++ [ ix 1 ]) ρ hs so , so)
+                                (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl))
+                   (alien-steps s (p ++ [ ix 1 ]) ρ hs so cs)
+                   (every-swap {R = λ q k → Disjoint (q ++ [ ix 0 ]) k} _ S (apart-connect s b p ρ hp so cl))
+  where S  = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
+        hs = headed-snoc p hp
+        cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+alien-steps (connected i) p ρ hp so cl = fresh-rejoin p _ (every-lookup (λ h → ¬ Owned p h) ρ cl i)
+alien-steps (defer l) p ρ hp so cl = fresh-defer l p ρ (headed-there p hp) so cl
 
 -- THE MEANING'S EVENTS ARE SORTED: a program subscribed at the root is
 -- placed.
 placed-subscribe : ∀ {A} (o : Obs Timeline [] A) → Placed (U.subscribe o root) []ᴬ
-placed-subscribe o = placed-sub o root []ᴬ tt tt
+placed-subscribe o = placed-sub o root []ᴬ tt tt tt
