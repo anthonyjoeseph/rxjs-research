@@ -573,12 +573,13 @@ postulate
   leads : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ j
         → U.beforeˢ j (U.step c) ≡ true → First (just j) δ → Atop j (U.meaning c (ρᴱ δ))
 
-  -- A STEP KEEPS THE GHOST PLACED: the stepped node is placed, atop what
-  -- the step shows.
+  -- A STEP KEEPS THE GHOST PLACED: a step coming first leaves the stepped
+  -- node placed, atop what the step shows.
   --
+  -- REFUTED: d2d13661 without the step coming first, by a merge whose joiner lane shows its source's earlier event
   -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
   placed-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
-               → Placedˢ (ρᴱ δ) (U.step c)
+               → First (U.headˢ (U.step c)) δ → Placedˢ (ρᴱ δ) (U.step c)
 
 -- The source's next taken first, ahead of the body's events at the same
 -- position.
@@ -615,7 +616,9 @@ conn : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) (s
      → (First (U.headˢ ss) δ → U.meaning s (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) ss)
      → (∀ k → Wins (just k) (U.headˢ ss) ≡ true → First (just k) δ → Lags k (U.meaning s (ρᴱ δ)))
      → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → Atop j (U.meaning b (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ)))
-     → Placedˢ (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) sb → Placedˢ (ρᴱ δ) ss → Placedˢ (ρᴱ δ) (U.sourceˢ b sb s ss)
+     → (Wins (U.headˢ sb) (U.headˢ ss) ≡ true → First (U.headˢ sb) δ → Placedˢ (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) sb)
+     → (First (U.headˢ ss) δ → Placedˢ (ρᴱ δ) ss)
+     → (First (U.headˢ (U.sourceˢ b sb s ss)) δ → Placedˢ (ρᴱ δ) (U.sourceˢ b sb s ss))
      → First (U.headˢ (U.sourceˢ b sb s ss)) δ
      → U.meaning (U.connectᶜ b (U.live s)) (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) (U.sourceˢ b sb s ss)
 conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs lg ld pab pas pa fi
@@ -633,42 +636,50 @@ conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs
      → (First (U.headˢ ss) δ → ms ≃ afterᴱ ρ ss)
      → (∀ k → Wins (just k) (U.headˢ ss) ≡ true → First (just k) δ → Lags k ms)
      → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → Atop j MB)
-     → Placedˢ (ms ∷ᴬ ρ) sb → Placedˢ ρ ss → Placedˢ ρ (U.sourceˢ b sb s ss)
+     → (Wins (U.headˢ sb) (U.headˢ ss) ≡ true → First (U.headˢ sb) δ → Placedˢ (ms ∷ᴬ ρ) sb)
+     → (First (U.headˢ ss) δ → Placedˢ ρ ss)
+     → (First (U.headˢ (U.sourceˢ b sb s ss)) δ → Placedˢ ρ (U.sourceˢ b sb s ss))
      → First (U.headˢ (U.sourceˢ b sb s ss)) δ → M.beside MB ms ≃ afterᴱ ρ (U.sourceˢ b sb s ss)
   go U.hushˢ          U.hushˢ hb hs lg ld pab pas pa fi =
     beside-≃ (proj₁ pb) ordered-hush (proj₁ ps) ordered-hush (hb refl fi) (hs fi)
-  go sb@(U.outˢ k _ _) U.hushˢ hb hs lg ld pab pas pa fi = body sb pab (hb refl fi) (lg k refl fi)
-  go sb@(U.skipˢ k _)  U.hushˢ hb hs lg ld pab pas pa fi = body sb pab (hb refl fi) (lg k refl fi)
-  go sb@(U.endˢ k)     U.hushˢ hb hs lg ld pab pas pa fi = body sb pab (hb refl fi) (lg k refl fi)
+  go sb@(U.outˢ k _ _) U.hushˢ hb hs lg ld pab pas pa fi = body sb (pab refl fi) (hb refl fi) (lg k refl fi)
+  go sb@(U.skipˢ k _)  U.hushˢ hb hs lg ld pab pas pa fi = body sb (pab refl fi) (hb refl fi) (lg k refl fi)
+  go sb@(U.endˢ k)     U.hushˢ hb hs lg ld pab pas pa fi = body sb (pab refl fi) (hb refl fi) (lg k refl fi)
   go sb (U.outˢ q x s′) hb hs lg ld pab pas pa fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
   go U.hushˢ           (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false with () ← eq
-  go sb@(U.outˢ k _ _) (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.skipˢ k _)  (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.endˢ k)     (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb (U.outˢ q x s′) hb hs lg ld pab pas@(atq , ps′) (_ , _ , pbf , _) fi | true =
+  go sb@(U.outˢ k _ _) (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.outˢ q x s′) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.outˢ q x s′) hb hs lg ld pab pas pa fi | true =
     ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) ordOut (≃-refl MB) e₁)
    (≃-trans (tie-lead MB q _ (proj₁ pb) (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) atq)
             (skip-cong (beside-≃ (proj₁ pb) (proj₁ pbf) (proj₁ ps′) (proj₁ ps′) (fed-≃ b ρ q x _ e₁ (proj₁ ps) ordOut (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) pb pbf) (≃-refl _))))
     where e₁ = hs (first-sub q δ fi)
-          ordOut = ordered-after ρ (U.outˢ q x s′) (pas)
+          ordOut = ordered-after ρ (U.outˢ q x s′) (pas (first-sub q δ fi))
+          atq = proj₁ (pas (first-sub q δ fi))
+          ps′ = proj₂ (pas (first-sub q δ fi))
+          pbf = proj₁ (proj₂ (proj₂ (pa fi)))
   go sb (U.skipˢ q s′) hb hs lg ld pab pas pa fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
   go U.hushˢ           (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false with () ← eq
-  go sb@(U.outˢ k _ _) (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.skipˢ k _)  (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.endˢ k)     (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb (U.skipˢ q s′) hb hs lg ld pab pas@(atq , _) (_ , _ , pb′ , ps′) fi | true =
+  go sb@(U.outˢ k _ _) (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.skipˢ q s′) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.skipˢ q s′) hb hs lg ld pab pas pa fi | true =
     ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) ordSk (≃-refl MB) e₁)
    (≃-trans (tie-lead MB q _ (proj₁ pb) (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) atq)
             (skip-cong (beside-≃ (proj₁ pb) (proj₁ pb′) (proj₁ ps′) (proj₁ ps′)
                          (env-≃ b ρ (≃-trans e₁ (skip-drop ordSk)) (proj₁ ps) (proj₁ ps′) pb pb′) (≃-refl _))))
     where e₁ = hs (first-sub q δ fi)
-          ordSk = ordered-after ρ (U.skipˢ q s′) pas
+          ordSk = ordered-after ρ (U.skipˢ q s′) (pas (first-sub q δ fi))
+          atq = proj₁ (pas (first-sub q δ fi))
+          pb′ = proj₁ (proj₂ (proj₂ (pa fi)))
+          ps′ = proj₂ (proj₂ (proj₂ (pa fi)))
   go sb (U.endˢ c) hb hs lg ld pab pas pa fi with U.beforeˢ (c ++ [ ix 0 ]) sb in eq
   go U.hushˢ           (U.endˢ c) hb hs lg ld pab pas pa fi | false with () ← eq
-  go sb@(U.outˢ k _ _) (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.skipˢ k _)  (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.endˢ k)     (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb pab (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb (U.endˢ c) hb hs lg ld pab pas (at , ordX , pbs) fi | true =
+  go sb@(U.outˢ k _ _) (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.endˢ c) hb hs lg ld pab pas pa fi | false = body sb (pab (cong not eq) fi) (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.endˢ c) hb hs lg ld pab pas pa fi | true =
     ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) (ordered-end c) (≃-refl MB) e₁)
    (≃-trans (env-≃ b ρ e₁ (proj₁ ps) (ordered-end c) pb (shut-placed (here refl) c b (end c ∷ᴬ ρ) refl pbs))
             (subst (λ X → X ≃ afterᴱ ρ (U.skipˢ (c ++ [ ix 0 ]) (U.connectᶜ (U.shut (here refl) c b) (U.ended c))))
@@ -676,7 +687,8 @@ conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs
                    (≃-trans (≃-sym (skip-drop ordSk)) (skip-same refl))))
     where e₁ = hs (first-sub c δ fi)
           ordSk : Ordered (skip (c ++ [ ix 0 ]) (λ where .force → U.meaning (U.shut (here refl) c b) (end c ∷ᴬ ρ)))
-          ordered ordSk = at , ordX
+          ordered ordSk = proj₁ (pa fi) , proj₁ (proj₂ (pa fi))
+          pbs = proj₂ (proj₂ (pa fi))
 
 -- A RUNNING CONNECT STEPS AS IT MEANS: its body, reading its source, and
 -- its source, each showing its step whenever it comes first, the
@@ -689,7 +701,7 @@ live-skips b s δ st sn@(snb , sns) pl@(_ , pb , ps) hb hs =
   conn b s δ st sn pl (U.step b) (U.step s) (λ w f → hb (w , f)) hs
        (λ k w f → lags s δ st ps k w f)
        (λ j bj w f → leads b (U.live s ∷ δ) (hs , ps , st) pb j bj (w , f))
-       (placed-after b (U.live s ∷ δ) (hs , ps , st) snb pb) (placed-after s δ st sns ps)
+       (λ w f → placed-after b (U.live s ∷ δ) (hs , ps , st) snb pb (w , f)) (placed-after s δ st sns ps)
        (placed-after (U.connectᶜ b (U.live s)) δ st sn pl)
 
 ------------------------------------------------------------------------

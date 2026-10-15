@@ -186,8 +186,8 @@ by their own silent steps (`Mirror`).
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
   the meaning's events are sorted, a step keeps every node so, and what a
   node shows comes no earlier than any earlier step. Ruled out: a node
-  showing strictly after it, and a placing with each live joiner joined
-  before its source, which a step does not keep. Decides whether `Placed`,
+  showing strictly after it, a step not coming first keeping the placing,
+  and a placing with each live joiner joined before its source. Decides whether `Placed`,
   a field of `Carried`, is the order the connect needs, ties and all.
 - **THE MERGES.** `go-skips` with `∼-trans`: a flatMap's meaning is what
   its step shows, each lane showing its own. Ruled out: merges over `∼`
@@ -226,7 +226,7 @@ by their own silent steps (`Mirror`).
   it is forgotten.
 - **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
   subscribed at the root is placed.
-- **`placed-after`** (Stepper) — FALSITY, `REFUTED`: a step keeps the ghost
+- **`placed-after`** (Stepper) — FALSITY, `REFUTED×2`: a step keeps the ghost
   placed.
 - **`lags`** (Stepper) — FALSITY, `NO EVIDENCE`: a node's meaning shows nothing
   before a body's event that comes first.
