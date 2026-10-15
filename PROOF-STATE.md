@@ -171,14 +171,14 @@ question first: try to REFUTE the route, and leave anything tractable last.
 
 ### Big picture tier roadmap
 
-- **THE FOLD AS THE SIMULATION'S TARGET.** Measured on 300 programs: the
-  machine takes up to 74 silent steps for one fold step (median 7), and its
-  position moves match the fold's steps in only half the windows, so neither
-  the fold's count nor a positional lockstep is C's measure alone. Candidate:
-  lexicographic, the fold's steps, then the machine's synchronous work before
-  its next `defer` expansion or timer, each of which costs the fold a step.
-  Measure that bound, then restate `sim` against the fold and delete Unfold
-  and `unfolded`. Decides which meaning the tier is worked against.
+- **THE FOLD AS THE SIMULATION'S TARGET.** Measured on 300 programs: one
+  fold step costs the machine up to 74 silent steps, and its position moves
+  match the fold's steps in only half the windows, so neither is C's measure
+  alone. But every window's machine steps stay within 9 × fold steps × tree
+  size. So C's measure is lexicographic: the fold's steps, then the
+  machine's synchronous work left, a function of its control and agenda.
+  Define that function, then restate `sim` against the fold and delete
+  Unfold and `unfolded`. Decides which meaning the tier is worked against.
 - **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
   turn; it gains a field placing every live node's next shown event past the
   region the agenda owes, true at `carried-begin`. A popped timer's first
