@@ -116,6 +116,30 @@ module Moving (R : Set) where
     pendᴸ []                = 0
     pendᴸ (lane c k s ∷ ls) = pend s + pendᴸ ls
 
+  -- What each takeWhile has still to do: fail, then complete.
+  stage : Taking → ℕ
+  stage taking     = 2
+  stage (ending _) = 1
+  stage taken      = 0
+
+  mutual
+    takes : ∀ {h Δ A} → Sub h Δ A → ℕ
+    takes (pendingˢ s q)                    = 0
+    takes (coldˢ _ _ _)                     = 0
+    takes (ofˢ _ _ _)                       = 0
+    takes doneˢ                             = 0
+    takes (mapˢ f s)                        = takes s
+    takes (scanˢ f r s)                     = takes s
+    takes (takeWhileˢ i q c k tk s)         = stage tk + takes s
+    takes (flatMapˢ op f fl oc k r s ls)    = takes s + takesᴸ ls
+    takes (connectˢ S c b kb k fd e src bd) = takes src + takes bd
+    takes (joinˢ _ _ _ _ _)                 = 0
+    takes (deferˢ k s)                      = takes s
+
+    takesᴸ : ∀ {h Δ B} → List (Lane h Δ B) → ℕ
+    takesᴸ []                = 0
+    takesᴸ (lane c k s ∷ ls) = takes s + takesᴸ ls
+
   ----------------------------------------------------------------------
   -- THE POP: a waiting cold whose timer popped goes `fired`, the same
   -- meaning node with no timer owed.
@@ -529,6 +553,24 @@ module Moving (R : Set) where
                 → pend u ≡ pend v → pendᴸ (plantᴸ π v) ≡ pendᴸ ls
     pend-plantᴸ (this-lane π) v eq                rewrite pend-plant π v eq = refl
     pend-plantᴸ (next-lane {l = lane c k s} π) v eq rewrite pend-plantᴸ π v eq = refl
+
+  mutual
+    takes-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                → takes u ≡ takes v → takes (plant π v) ≡ takes t
+    takes-plant here v eq          = sym eq
+    takes-plant (in-map π) v eq    = takes-plant π v eq
+    takes-plant (in-scan π) v eq   = takes-plant π v eq
+    takes-plant (in-take π) v eq   rewrite takes-plant π v eq = refl
+    takes-plant (in-outer π) v eq  rewrite takes-plant π v eq = refl
+    takes-plant (in-lanes π) v eq  rewrite takes-plantᴸ π v eq = refl
+    takes-plant (in-source π) v eq rewrite takes-plant π v eq = refl
+    takes-plant (in-body π) v eq   rewrite takes-plant π v eq = refl
+    takes-plant (in-defer π) v eq  = takes-plant π v eq
+
+    takes-plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                 → takes u ≡ takes v → takesᴸ (plantᴸ π v) ≡ takesᴸ ls
+    takes-plantᴸ (this-lane π) v eq                rewrite takes-plant π v eq = refl
+    takes-plantᴸ (next-lane {l = lane c k s} π) v eq rewrite takes-plantᴸ π v eq = refl
 
   mutual
     names-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)

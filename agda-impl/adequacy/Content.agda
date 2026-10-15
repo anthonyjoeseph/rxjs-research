@@ -22,7 +22,7 @@ open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Nat.Properties using (suc-injective; ≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; m<m+n)
+open import Data.Nat.Properties using (suc-injective; ≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; m<m+n; <-trans)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
@@ -73,7 +73,7 @@ module Honesty (R : Set) where
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
-  open Moving R using (pend; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
+  open Moving R using (pend; takes; takes-plant; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Read
 
@@ -301,19 +301,55 @@ module Honesty (R : Set) where
   weight (burstAs _ _ K) = work K
 
   -- THE WORK LEFT AT A RE-ENTRY CONFIGURATION, in order: subscriptions
-  -- owed, timers queued, bursts held, the control's own.
+  -- owed, takeWhiles' stages, timers queued, bursts held (the tree's
+  -- load), then the control's own.
+  Load : Set
+  Load = ℕ × ℕ × ℕ × ℕ
+
+  _⊏_ : Load → Load → Set
+  _⊏_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_))
+
+  _≼_ : Load → Load → Set
+  a ≼ b = a ≡ b ⊎ a ⊏ b
+
+  load : (m : Mach) → Sub (Conf.world (Mach.conf m)) [] R → Load
+  load m t = pend t , takes t , length (Mach.timers m) , length (Mach.bursts m)
+
+  lex-trans : ∀ {B : Set} {_<₂_ : B → B → Set} → (∀ {x y z} → x <₂ y → y <₂ z → x <₂ z)
+            → ∀ {a b c : ℕ × B} → ×-Lex _≡_ _<_ _<₂_ a b → ×-Lex _≡_ _<_ _<₂_ b c → ×-Lex _≡_ _<_ _<₂_ a c
+  lex-trans t (inj₁ ab)        (inj₁ bc)        = inj₁ (<-trans ab bc)
+  lex-trans t (inj₁ ab)        (inj₂ (refl , _)) = inj₁ ab
+  lex-trans t (inj₂ (refl , _)) (inj₁ bc)        = inj₁ bc
+  lex-trans t (inj₂ (refl , ab)) (inj₂ (refl , bc)) = inj₂ (refl , t ab bc)
+
+  ⊏-trans : ∀ {a b c} → a ⊏ b → b ⊏ c → a ⊏ c
+  ⊏-trans = lex-trans {_<₂_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_)}
+              (lex-trans {_<₂_ = ×-Lex _≡_ _<_ _<_} (lex-trans {_<₂_ = _<_} <-trans))
+
+  ≼-trans : ∀ {a b c} → a ≼ b → b ≼ c → a ≼ c
+  ≼-trans (inj₁ refl) bc          = bc
+  ≼-trans (inj₂ ab)   (inj₁ refl) = inj₂ ab
+  ≼-trans (inj₂ ab)   (inj₂ bc)   = inj₂ (⊏-trans ab bc)
+
+  ⊏-≼ : ∀ {a b c} → a ⊏ b → b ≼ c → a ⊏ c
+  ⊏-≼ ab (inj₁ refl) = ab
+  ⊏-≼ ab (inj₂ bc)   = ⊏-trans ab bc
+
   Measure : Set
-  Measure = ℕ × ℕ × ℕ × ℕ
+  Measure = Load × ℕ
 
   _≺_ : Measure → Measure → Set
-  _≺_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_))
+  _≺_ = ×-Lex _≡_ _⊏_ _<_
 
   ≺-wf : WellFounded _≺_
-  ≺-wf = ×-wellFounded <-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded <-wellFounded))
+  ≺-wf = ×-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded <-wellFounded))) <-wellFounded
 
   measure : ∀ {g m} → Strong g m → Measure
-  measure {m = m} (carried cr) = pend (Carried.tree cr) , length (Mach.timers m) , length (Mach.bursts m) , weight (Carried.ctlAs cr)
-  measure (closing _ _ _ _ _)  = 0 , 0 , 0 , 0
+  measure {m = m} (carried cr) = load m (Carried.tree cr) , weight (Carried.ctlAs cr)
+  measure (closing _ _ _ _ _)  = (0 , 0 , 0 , 0) , 0
+
+  loadOf : ∀ {g m} → Strong g m → Load
+  loadOf st = proj₁ (measure st)
 
   -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
   -- past a skip of its residual; or the ghost alike, less work left; or
@@ -766,7 +802,7 @@ module Honesty (R : Set) where
   -- the path walks to, the agenda empty above the stack.  The node it
   -- reaches already past the value, and the ghost's step the value
   -- lifted along the path.
-  record Climbing (g : U.Node [] R) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+  record Climbing (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
                   (σ : Path T v) (y : A) : Set₁ where
     field
       sane    : Sane [] g
@@ -787,18 +823,34 @@ module Honesty (R : Set) where
       books   : Books T (runAs [] (done≗ refl) stack) m₁
       sorted  : Σ Pos λ lo → WellMach lo m₁
       behind  : Each (Conf.heap (Mach.conf m₁)) (Heads (Conf.pos (Mach.conf m₁))) T
+      kept    : load m₁ T ≼ ℓ
 
   -- The same climb, the value restated at another path.
-  reclimb : ∀ {g m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-              {v′ : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} {σ : Path T v} {y : A} (cl : Climbing g m₁ σ y) {σ′ : Path T v′} {y′ : A′}
+  reclimb : ∀ {g ℓ m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+              {v′ : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} {σ : Path T v} {y : A} (cl : Climbing g ℓ m₁ σ y) {σ′ : Path T v′} {y′ : A′}
           → Climbing.act cl ≗ Observer.next (Here.obs (walk σ′ top)) y′
           → Σ (U.Node Δ′ A′) (λ c′ → At.part (Conf.heap (Mach.conf m₁)) v′ ≡ just c′
               × Σ (U.Step [] R) λ S → Lifts (Conf.heap (Mach.conf m₁)) σ′ (U.outˢ (Conf.pos (Mach.conf m₁)) y′ c′) S × U.step g ≡ S)
-          → Climbing g m₁ σ′ y′
+          → Climbing g ℓ m₁ σ′ y′
   reclimb cl cd lf = record
     { sane = Climbing.sane cl ; placed = Climbing.placed cl ; ctl = Climbing.ctl cl ; code = cd ; stack = Climbing.stack cl ; lifted = lf
     ; owned = Climbing.owned cl ; kernels = Climbing.kernels cl ; meaning = Climbing.meaning cl ; queue = Climbing.queue cl
-    ; books = Climbing.books cl ; sorted = Climbing.sorted cl ; behind = Climbing.behind cl }
+    ; books = Climbing.books cl ; sorted = Climbing.sorted cl ; behind = Climbing.behind cl ; kept = Climbing.kept cl }
+
+  -- The same climb, held to a load no lighter.
+  relevel : ∀ {g ℓ ℓ′ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {y : A}
+          → Climbing g ℓ′ m₁ σ y → ℓ′ ≼ ℓ → Climbing g ℓ m₁ σ y
+  relevel cl le = record
+    { sane = Climbing.sane cl ; placed = Climbing.placed cl ; ctl = Climbing.ctl cl ; code = Climbing.code cl ; stack = Climbing.stack cl
+    ; lifted = Climbing.lifted cl ; owned = Climbing.owned cl ; kernels = Climbing.kernels cl ; meaning = Climbing.meaning cl
+    ; queue = Climbing.queue cl ; books = Climbing.books cl ; sorted = Climbing.sorted cl ; behind = Climbing.behind cl
+    ; kept = ≼-trans (Climbing.kept cl) le }
+
+  -- The value one operator higher, the path shorter, the load at most `ℓ`.
+  data Rises (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+             (σ : Path T v) : Set₁ where
+    rises : ∀ {m₂ Δ′ A′} {T′ : Sub (Conf.world (Mach.conf m₂)) [] R} {v′ : Sub (Conf.world (Mach.conf m₂)) Δ′ A′} {σ′ : Path T′ v′} {y′ : A′}
+          → m₁ ⇝ m₂ → height σ′ < height σ → Climbing g ℓ m₂ σ′ y′ → Rises g ℓ m₁ σ
 
   -- One operator climbed: a re-entry configuration reached, or the
   -- value one operator higher, the path shorter.
@@ -806,12 +858,12 @@ module Honesty (R : Set) where
                (σ : Path T v) : Set₁ where
     landed : Hopped st m₁ → Climbed st m₁ σ
     rose   : ∀ {m₂ Δ′ A′} {T′ : Sub (Conf.world (Mach.conf m₂)) [] R} {v′ : Sub (Conf.world (Mach.conf m₂)) Δ′ A′} {σ′ : Path T′ v′} {y′ : A′}
-           → m₁ ⇝ m₂ → height σ′ < height σ → Climbing g m₂ σ′ y′ → Climbed st m₁ σ
+           → m₁ ⇝ m₂ → height σ′ < height σ → Climbing g (loadOf st) m₂ σ′ y′ → Climbed st m₁ σ
 
   -- Some value on its way up.
-  data Aloft (g : U.Node [] R) (m₁ : Mach) : Set₁ where
+  data Aloft (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) : Set₁ where
     aloft : ∀ {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {y : A}
-          → Climbing g m₁ σ y → Aloft g m₁
+          → Climbing g ℓ m₁ σ y → Aloft g ℓ m₁
 
   ⇝-trans : ∀ {m m₁ m₂} → m ⇝ m₁ → m₁ ⇝ m₂ → m ⇝ m₂
   ⇝-trans now          q = q
@@ -852,6 +904,14 @@ module Honesty (R : Set) where
 
     -- An `of` reading its observer open where the ghost does not hold it:
     -- a connect's source fed on past its body's end.
+    --
+    -- FALSE as stated, by rxjs.  The source is subscribed after the body
+    -- and its cut attached only once its subscribe returns, so a body
+    -- ending inside that burst (a take of one) leaves the rest of the
+    -- burst to run into a subject nobody joins.  An unbounded synchronous
+    -- source (`ones`) there spins forever, a sibling lane never reached;
+    -- the meaning has the body's end end both and shows the sibling.  No
+    -- measure can mend that: the meaning must keep the burst as skips.
     emit-unseen : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
                 → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
                 → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
@@ -862,7 +922,7 @@ module Honesty (R : Set) where
     emit-run : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
              → Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step g)
-             → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g m₁
+             → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
 
     -- The ghost's step, from a path every sibling of which waits: the
     -- `of`'s step lifted, each operator's side condition read off
@@ -893,36 +953,49 @@ module Honesty (R : Set) where
     -- before the write; the path above it does not read it.
     climb-scan : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
                  {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
-               → Climbing g m₁ (ρ ⊕ in-scan here) y → Climbed st m₁ (ρ ⊕ in-scan here)
+               → Climbing g (loadOf st) m₁ (ρ ⊕ in-scan here) y → Climbed st m₁ (ρ ⊕ in-scan here)
 
-    -- A value through a takeWhile: passed one operator up; or failing,
-    -- delivered first when inclusive, then the completion climbs, then
-    -- the cut.  The failing value cannot stop at the completion owed: the
-    -- ghost alike, the control's work would rise.
-    climb-take : ∀ {g m} (st : Strong g m) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k tk}
-                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u)) {y : A}
-               → Climbing g m₁ (ρ ⊕ in-take here) y → Climbed st m₁ (ρ ⊕ in-take here)
+    -- A value a live takeWhile passes: one operator up, the tree's load
+    -- as it was.
+    take-pass : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k}
+                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k taking u)) {y : A} → p y ≡ true
+              → Climbing g ℓ m₁ (ρ ⊕ in-take here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
+
+    -- A value an inclusive takeWhile fails on: delivered under `ix 0`,
+    -- the take `ending` where the run is, its completion a call owed.
+    take-out : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {p c k}
+               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ true p c k taking u)) {y : A} → p y ≡ false
+             → Climbing g ℓ m₁ (ρ ⊕ in-take here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
+
+    -- A value an exclusive takeWhile fails on: the take `ending` where
+    -- the run is, its completion the agenda's call.  The ghost alike,
+    -- the take a stage on.
+    take-end : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {p c k}
+               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ false p c k taking u)) {y : A} → p y ≡ false
+             → Climbing g ℓ m₁ (ρ ⊕ in-take here) y
+             → Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m₁ ⇝ m₀ × Σ (Carried g″ m₀) λ cr
+               → (∀ n → Agree n (residual g) (residual g″)) × load m₀ (Carried.tree cr) ⊏ load m₁ T
 
     -- A value reaching a flatMap's outer: admitted, a lane begun or
     -- queued, the ghost past the outer's skip.
     climb-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r}
                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
                   (ρ : Path T (flatMapˢ op f fl oc k r u ls)) {y : A}
-                → Climbing g m₁ (ρ ⊕ in-outer here) y → Climbed st m₁ (ρ ⊕ in-outer here)
+                → Climbing g (loadOf st) m₁ (ρ ⊕ in-outer here) y → Climbed st m₁ (ρ ⊕ in-outer here)
 
     -- A value out of a lane: guarded by its cut, one operator up, its
     -- observer the flatMap's weakened through `same`.
     climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r}
                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
                   (ρ : Path T (flatMapˢ op f fl oc k r t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {y : C}
-                → Climbing g m₁ (ρ ⊕ in-lanes πL) y → Climbed st m₁ (ρ ⊕ in-lanes πL)
+                → Climbing g (loadOf st) m₁ (ρ ⊕ in-lanes πL) y → Climbed st m₁ (ρ ⊕ in-lanes πL)
 
     -- A value reaching a connect's subject: the feed of its subscribers
     -- owed, the ghost past the source's skip.
     climb-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e}
                    {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
                    (ρ : Path T (connectˢ Sj c b kb k fd e u bd)) {y : A}
-                 → Climbing g m₁ (ρ ⊕ in-source here) y → Climbed st m₁ (ρ ⊕ in-source here)
+                 → Climbing g (loadOf st) m₁ (ρ ⊕ in-source here) y → Climbed st m₁ (ρ ⊕ in-source here)
 
     -- A subscription's continuation handed its unsubscribe, which it
     -- stashes: the ghost alike, a call fewer.
@@ -1034,7 +1107,7 @@ module Honesty (R : Set) where
         ; owned = owned-spent hp calmAs sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr eq now ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl)))))
   burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
     cr@record { tree = t ; ctlAs = burstAs x restᴴ (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = q
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl sp eq
@@ -1046,7 +1119,7 @@ module Honesty (R : Set) where
         ; owned = owned-spent hp (runAs ks e K″) sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr eq now ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl)))))
 
   -- A burst's frame stepped: found spent, polled, or played.
   burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
@@ -1057,8 +1130,8 @@ module Honesty (R : Set) where
   ... | false | true  = burst-play cr c bq sp pl eq
 
   -- A value through a map: mapped, one operator up.
-  climb-map : ∀ {g m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : A → B} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-              (ρ : Path T (mapˢ f u)) {y : A} → Climbing g m₁ (ρ ⊕ in-map here) y → Climbing g m₁ ρ (f y)
+  climb-map : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : A → B} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+              (ρ : Path T (mapˢ f u)) {y : A} → Climbing g ℓ m₁ (ρ ⊕ in-map here) y → Climbing g ℓ m₁ ρ (f y)
   climb-map {m₁ = m₁} {f = f} ρ {y} cl with Climbing.lifted cl
   ... | c′ , pv , S , L , sg with lifts-split ρ (in-map here) L
   ...   | _ , lifts-map lifts-here , Lρ = reclimb cl
@@ -1066,8 +1139,8 @@ module Honesty (R : Set) where
     (U.mapᶜ f c′ , cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) pv , S , Lρ , sg)
 
   -- A value through a defer, as it is.
-  climb-defer : ∀ {g m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {k} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-                (ρ : Path T (deferˢ k u)) {y : A} → Climbing g m₁ (ρ ⊕ in-defer here) y → Climbing g m₁ ρ y
+  climb-defer : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {k} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                (ρ : Path T (deferˢ k u)) {y : A} → Climbing g ℓ m₁ (ρ ⊕ in-defer here) y → Climbing g ℓ m₁ ρ y
   climb-defer ρ {y} cl with Climbing.lifted cl
   ... | c′ , pv , S , L , sg with lifts-split ρ (in-defer here) L
   ...   | _ , lifts-defer lifts-here , Lρ = reclimb cl
@@ -1076,9 +1149,9 @@ module Honesty (R : Set) where
 
   -- A value out of a connect's body, as it is: beside its source, or
   -- past its source's end.
-  climb-body : ∀ {g m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e} {t : Sub (Conf.world (Mach.conf m₁)) Δ A}
+  climb-body : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e} {t : Sub (Conf.world (Mach.conf m₁)) Δ A}
                {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B} (ρ : Path T (connectˢ Sj c b kb k fd e t u)) {y : B}
-             → Climbing g m₁ (ρ ⊕ in-body here) y → Climbing g m₁ ρ y
+             → Climbing g ℓ m₁ (ρ ⊕ in-body here) y → Climbing g ℓ m₁ ρ y
   climb-body {m₁ = m₁} {e = e} ρ {y} cl with Climbing.lifted cl
   ... | c′ , pv , S , L , sg with lifts-split ρ (in-body here) L
   ...   | _ , lifts-body pt _ lifts-here , Lρ = reclimb cl
@@ -1088,9 +1161,30 @@ module Honesty (R : Set) where
     (subst (λ W → Climbing.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Climbing.code cl))
     (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) e) pt pv , S , Lρ , sg)
 
+  -- The value risen, held to the climb's load.
+  rise : ∀ {g m} {st : Strong g m} {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
+       → load m₁ T ≼ loadOf st → Rises g (load m₁ T) m₁ σ → Climbed st m₁ σ
+  rise le (rises path lt cl) = rose path lt (relevel cl le)
+
+  -- A value through a takeWhile: passed one operator up; or failing,
+  -- delivered first when inclusive, then the completion climbs, then
+  -- the cut.  The failing value cannot stop at the completion owed with
+  -- the ghost alike unless the take's stage counts: the control's work
+  -- rises.
+  climb-take : ∀ {g m} (st : Strong g m) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k tk}
+               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u)) {y : A}
+             → Climbing g (loadOf st) m₁ (ρ ⊕ in-take here) y → Climbed st m₁ (ρ ⊕ in-take here)
+  climb-take st {i = i} {p} ρ {y} cl with Climbing.lifted cl
+  ... | c′ , pv , S , L , sg with lifts-split ρ (in-take here) L
+  ...   | _ , lifts-take lv lifts-here , Lρ with p y in py | i
+  ...     | true  | _     = rise (Climbing.kept cl) (take-pass ρ py cl)
+  ...     | false | true  = rise (Climbing.kept cl) (take-out ρ py cl)
+  ...     | false | false with take-end ρ py cl
+  ...       | g″ , m₀ , path , cr , ag , lt = landed (g″ , m₀ , path , carried cr , lowered ag (inj₁ (⊏-≼ lt (Climbing.kept cl))))
+
   -- A value at the root: recorded next, the ghost's step showing it.
-  climb-root : ∀ {g m} (st : Strong g m) {m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {y : R} → Climbing g m₁ {T = T} here y → Hopped st m₁
-  climb-root {g} st {mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {T}
+  climb-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {y : R} → Climbing g ℓ m₁ {T = T} here y → Hopped st m₁
+  climb-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {T}
     record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ ke ; stack = sk ; lifted = c′ , pv , _ , lifts-here , sg ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so ; behind = bh } =
     g , _ , then refl now
@@ -1103,7 +1197,7 @@ module Honesty (R : Set) where
 
   -- One operator climbed, by the operator.
   climb-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-               {v : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} (ρ : Path T u) {s : Path u v} → One s → ∀ {y} → Climbing g m₁ (ρ ⊕ s) y → Climbed st m₁ (ρ ⊕ s)
+               {v : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} (ρ : Path T u) {s : Path u v} → One s → ∀ {y} → Climbing g (loadOf st) m₁ (ρ ⊕ s) y → Climbed st m₁ (ρ ⊕ s)
   climb-step st ρ one-map       cl = rose now (one-lower ρ one-map) (climb-map ρ cl)
   climb-step st ρ one-scan      cl = climb-scan st ρ cl
   climb-step st ρ one-take      cl = climb-take st ρ cl
@@ -1116,7 +1210,7 @@ module Honesty (R : Set) where
   -- A VALUE CLIMBS TO A RE-ENTRY CONFIGURATION: one operator at a time,
   -- from the path's far end, each step to a shorter path.
   climb : ∀ {g m} (st : Strong g m) (n : ℕ) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-          (σ : Path T v) {y : A} → height σ < n → Climbing g m₁ σ y → Hopped st m₁
+          (σ : Path T v) {y : A} → height σ < n → Climbing g (loadOf st) m₁ σ y → Hopped st m₁
   climb st zero    σ () cl
   climb st (suc n) σ lt cl with view σ
   ... | whole      = climb-root st cl
@@ -1124,7 +1218,7 @@ module Honesty (R : Set) where
   ...   | landed hp         = hp
   ...   | rose path lt′ cl′ = hopped-pre path (climb st n _ (≤-trans lt′ (≤-pred lt)) cl′)
 
-  soar : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Aloft g m₁) → Hopped st m′
+  soar : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Aloft g (loadOf st) m₁) → Hopped st m′
   soar st (m₁ , path , aloft {σ = σ} cl) = hopped-pre path (climb st (suc (height σ)) σ ≤-refl cl)
 
   -- An agenda under way: the ghost is the tree's part.
@@ -1174,7 +1268,7 @@ module Honesty (R : Set) where
   -- step that value lifted.
   emit-open : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
             → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-            → seen (Conf.heap (Mach.conf m)) π ≡ true → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g m₁
+            → seen (Conf.heap (Mach.conf m)) π ≡ true → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
   emit-open cr π fc op sn = emit-run cr π fc op (emit-lifts cr π fc op sn)
 
   -- An `of`'s next value climbs the observers above it: to the root's
@@ -1212,7 +1306,7 @@ module Honesty (R : Set) where
         ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
@@ -1222,7 +1316,7 @@ module Honesty (R : Set) where
         ; owned = owned-move hp (runAs ks e K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (backAs q ks qp e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
@@ -1234,7 +1328,7 @@ module Honesty (R : Set) where
                          ; ahead = map (λ { (c , a) → c , <ᵖ-trans q p _ qp a }) (Queue.ahead qu) }
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind = each-back qp (Carried.behind cr) })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (playsAs π) hᴷ K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
@@ -1244,7 +1338,7 @@ module Honesty (R : Set) where
         ; owned = owned-move hp (burstAs (playsAs π) hᴷ K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , m<n⇒m<1+n ≤-refl))))
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , m<n⇒m<1+n ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (firesAs π) hᴷ K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
@@ -1254,7 +1348,7 @@ module Honesty (R : Set) where
         ; owned = owned-move hp (burstAs (firesAs π) hᴷ K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , m<n⇒m<1+n ≤-refl))))
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , m<n⇒m<1+n ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs bottomᴴ bottomAs) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
               ; books = record { fresh = fs ; paidUp = refl ; running = rn } } refl refl =
@@ -1264,7 +1358,7 @@ module Honesty (R : Set) where
         ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl)))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs restᴴ (restAs ks e K‴)) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn
               ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
@@ -1274,7 +1368,7 @@ module Honesty (R : Set) where
         ; owned = owned-move hp (runAs ks e K‴) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ (proj₂ ck) ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl)))))
 
   -- Past a value recorded, the run runs the stepped ghost: the record's
   -- continuation is the agenda, about to run.
@@ -1346,7 +1440,7 @@ module Honesty (R : Set) where
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then (drop-spent tm sp) now) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₁ ≤-refl))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl))))
   ... | false with proj₁ (Queue.timed q)
   ...   | inj₁ s ∷ _ = ⊥-elim (true≢false (trans (sym s) sp))
   ...   | inj₂ i ∷ _ with pendings-path {t = t} i
@@ -1365,7 +1459,7 @@ module Honesty (R : Set) where
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl , tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl now ; behind = behind-fire cr π })
-    , lowered (λ n → agree-refl n _) (inj₂ (pend-plant {t = t} π v refl , inj₁ ≤-refl))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (pend-plant {t = t} π v refl , inj₂ (takes-plant {t = t} π v refl , inj₁ ≤-refl))))
     where v = coldˢ sk hd (fired τ e (at u x fr))
 
   -- The stepper is the meaning, as sets.

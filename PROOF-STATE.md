@@ -186,11 +186,14 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE MEASURE.** `climb-take` and `emit-unseen`: a failing take's value
-  climbs into its completion, where the height rises; an `of` feeds
-  joiners past its body's end, work the ghost does not see. Decides a
-  lexicographic measure whose first part a cut lowers, and how long the
-  unseen window is under the body's cut of its source.
+- **THE MEASURE.** `emit-unseen`: an `of` feeding a connect's subject
+  past its body's end, work the ghost does not see. The window is the
+  source's whole subscribe burst, the cut attaching only after it, and
+  rxjs runs it out: an unbounded synchronous source there spins forever
+  where `connectᴰ` has the body's end end both. Waits on a ruling on the
+  semantics. Ruled out: a measure blind to a take's stage; the load
+  counts it, so `climb-take` is a body over `take-pass`, `take-out`,
+  `take-end`.
 - **THE ORDER.** `steady-start` and `ordered-start` first, the cold's run
   where a tick heads it: two refutations in one region, so attempt the
   assembly before restating again. Then `spread-flat`, `spread-connect`,
@@ -261,10 +264,15 @@ by their own silent steps (`Mirror`).
   the ghost's step is the `of`'s lifted along its path, a shut body read told.
 - **`emit-run`** (Content) — FALSITY, `NO EVIDENCE`: an open `of`'s value
   handed on under its scope, the climb starts aloft.
-- **`climb-take`** (Content) — FALSITY, `NO EVIDENCE`: a take's last value
-  climbs on into its completion; the height measure alone would rise there.
+- **`take-end`** (Content) — FALSITY, `NO EVIDENCE`: an exclusive take's
+  failing value lands at its completion owed, the ghost alike, a stage on.
+- **`take-out`** (Content) — FALSITY, `NO EVIDENCE`: an inclusive take's
+  failing value climbs under `ix 0`, the take ending where the run is.
+- **`take-pass`** (Content) — FALSITY, `NO EVIDENCE`: a passing value climbs
+  one operator, the tree's load as it was.
 - **`emit-unseen`** (Content) — FALSITY, `NO EVIDENCE`: an `of` emitting into
-  joiners the ghost no longer sees, after a connect's body ended.
+  joiners the ghost no longer sees, after a connect's body ended. False for an
+  unbounded synchronous source: a semantics question.
 - **`climb-lanes`** (Content) — FALSITY, `NO EVIDENCE`: a lane's value climbs
   into its flatMap through `wkObs same`, equal up to `≗`.
 - **`climb-scan`** (Content) — FALSITY, `NO EVIDENCE`: a scan writes its cell
