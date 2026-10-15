@@ -192,9 +192,12 @@ module Honesty (R : Set) where
     -- THE MACHINE HONEST TO `e`: ONE relation over the whole
     -- configuration, as `WellMach` is, never one per observer.  A
     -- postulated TYPE: each live observer owed its meaning's events up to
-    -- the run's position, every kernel's cells holding what it has
+    -- the last delivery, every kernel's cells holding what it has
     -- consumed, every frame on the stack what it has yet to deliver.
     --
+    -- DEAD ROUTE: the owed bound at the run's position.  A scope returning
+    --   puts the position back above what it just delivered, so a cut
+    --   record owes the events up to its last mark, which lie past it.
     -- DEAD ROUTE: a spec per observer, its triples quantifying over the
     --   frame around it.  A cut flows ownership upstream: `takeWhile`'s
     --   completion cancels its source from inside the source's own

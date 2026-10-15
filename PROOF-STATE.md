@@ -170,18 +170,15 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### Big picture tier roadmap
 
-- **ONE DRIVER, CHECKED.** The shared `Machine`'s one `transition`, both
-  drivers one step per transition, typechecks; what remains is CI's oracle
-  and ghost checks green on it. Removes the cost stopping every other leg:
-  nothing below is stated until the engine it speaks of is the one the
-  oracle passes.
 - **HONEST, DEFINED.** `HonMach` a relation over configurations, as
   `WellMach` is, over a ghost tree of the compiled program's kernels and
   their cells; `Honest` the per-kernel half `honest-launch` reads. Ruled
   out: a relation blind to cells, a sound half apart from a whole half, a
   cut at an observer's own marks, a spec per observer framed by others,
-  honesty under every context. Decides whether the owed bound is kept by
-  `honest-walk` alone, or needs `honest-turn`'s timers too.
+  honesty under every context, an owed bound at the run's position (an
+  `under` returning puts it back above what was just delivered). Decides
+  whether the bound, the last delivery, is kept by `honest-walk` alone or
+  needs `honest-turn`'s timers too.
 - **THE PROTOCOL'S RISK.** `takeWhileᴷ-well` and `connectᴷ-well` as
   bodies, over a placeless unsubscribe and one label per callback in a
   scope. Ruled out: a second callback sharing a scope, an unsubscribe
@@ -198,6 +195,12 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **THE PROTOCOL, THE REST.** The remaining kernel `-well` rows; `connect`
   and `flatMap` lead, their subscriptions scoped under `ix 0`, `ix 1` and
   `sub`. Decides whether a callback's position travels with it on the heap.
+- **THE RESIDUAL.** `HonMach`'s ghost a configuration whose `meaning` is
+  what the run has yet to deliver: `honest-launch` by `subscribed`,
+  `honest-alike` by the residual lying past the last delivery. Decides
+  whether the dead simulation's cost, every other live node past the one
+  the machine moved, is paid once as a field of the invariant rather than
+  re-established at every step.
 - **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
   in finitely many steps. Decides whether liveness needs a measure, and
   whether a `connect` feedback loop that spins makes it false.
@@ -227,7 +230,7 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **`scanᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `scan` well-positioned.
 - **`Honest`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; a
   subscription's deliveries alike a meaning, at any position.
-- **`HonMach`** (Content) — FALSITY, `DEAD ROUTE×2`: a postulated type; the
+- **`HonMach`** (Content) — FALSITY, `DEAD ROUTE×3`: a postulated type; the
   whole configuration honest to the root's events, as `WellMach` is well.
 - **`honest-walk`** (Content) — FALSITY, `NO EVIDENCE`: a step not the loop's
   turn keeps the machine honest.
