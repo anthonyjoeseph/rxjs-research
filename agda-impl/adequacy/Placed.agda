@@ -22,7 +22,7 @@ open import Relation.Nullary using (¬_)
 open import Level using (lower)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; _<ᵖ_; root)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_; root)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
@@ -271,6 +271,130 @@ alienᴱ-owned : ∀ {Γ} p k → Owned p k → (ρ : NEnv Γ) → Alienᴱ p ρ
 alienᴱ-owned p k o []ᴬ      a        = tt
 alienᴱ-owned p k o (e ∷ᴬ ρ) (ae , a) = alien-owned p k o e ae , alienᴱ-owned p k o ρ a
 
+-- Every position `e` shows strictly keyed under `p`.
+Keyed : ∀ {A} → Pos → Events A → Set
+Keyed p e = ∀ h → Reaches h e → Beneath p h
+
+prefix-refl : ∀ k → Prefix k k
+prefix-refl []      = tt
+prefix-refl (a ∷ k) = refl , prefix-refl k
+
+prefix-snoc : ∀ k r l → Prefix k r → Prefix⁺ k (r ++ [ l ])
+prefix-snoc []      []      l _          = tt
+prefix-snoc []      (_ ∷ _) l _          = tt
+prefix-snoc (_ ∷ _) []      l ()
+prefix-snoc (a ∷ k) (b ∷ r) l (refl , q) = refl , prefix-snoc k r l q
+
+prefix⁺-++ : ∀ k h w → Prefix⁺ k h → Prefix⁺ k (h ++ w)
+prefix⁺-++ []      []      w ()
+prefix⁺-++ []      (_ ∷ _) w _          = tt
+prefix⁺-++ (_ ∷ _) []      w ()
+prefix⁺-++ (a ∷ k) (b ∷ h) w (refl , q) = refl , prefix⁺-++ k h w q
+
+prefix⁺-prefix : ∀ k h → Prefix⁺ k h → Prefix k h
+prefix⁺-prefix []      h       _          = tt
+prefix⁺-prefix (_ ∷ _) []      ()
+prefix⁺-prefix (a ∷ k) (b ∷ h) (refl , q) = refl , prefix⁺-prefix k h q
+
+owned-snoc : ∀ p r l → Owned p r → Beneath p (r ++ [ l ])
+owned-snoc p r l (inj₁ q) = inj₁ (prefix-snoc p r l q)
+owned-snoc p r l (inj₂ t) = inj₂ (tagged-++ p r [ l ] t)
+
+beneath-snoc : ∀ p k l → Beneath p k → Beneath p (k ++ [ l ])
+beneath-snoc p k l (inj₁ q) = inj₁ (prefix⁺-++ p k [ l ] q)
+beneath-snoc p k l (inj₂ t) = inj₂ (tagged-++ p k [ l ] t)
+
+beneath-owned : ∀ p k → Beneath p k → Owned p k
+beneath-owned p k (inj₁ q) = inj₁ (prefix⁺-prefix p k q)
+beneath-owned p k (inj₂ t) = inj₂ t
+
+-- A join at `p` tags what it rekeys with `p` itself.
+tagged-sub : ∀ q p → Tagged p (q ++ [ sub p ])
+tagged-sub []          p = inj₁ (inj₁ (prefix-refl p))
+tagged-sub (ix _ ∷ q)  p = tagged-sub q p
+tagged-sub (last ∷ q)  p = tagged-sub q p
+tagged-sub (sub _ ∷ q) p = inj₂ (tagged-sub q p)
+
+-- A cold keys its subscribe burst under where it subscribes, and every
+-- later frame under a timer tagged with a position under it.
+mutual
+  keyed-frames : ∀ {A t} p τ e (m : M.From A t) → Owned p e → Keyed p (M.frames τ e m)
+  keyed-frames p τ e M.done        o h ()
+  keyed-frames p τ e M.quiet       o h ()
+  keyed-frames p τ e (M.at _ _ b)  o h x = keyed-burst p τ _ 0 b (inj₂ (inj₁ o)) h x
+
+  keyed-burst : ∀ {A t} p τ r i (b : M.Frame A t) → Owned p r → Keyed p (M.burst τ r i b)
+  keyed-burst p τ r i (M.emit a k) o _ out-here        = owned-snoc p r (ix i) o
+  keyed-burst p τ r i (M.emit a k) o h (out-there x)   = keyed-burst p τ r (suc i) (M.Frame∞.force k) o h x
+  keyed-burst p τ r i (M.stall k)  o _ skip-here       = owned-snoc p r (ix i) o
+  keyed-burst p τ r i (M.stall k)  o h (skip-there x)  = keyed-burst p τ r (suc i) (M.Frame∞.force k) o h x
+  keyed-burst p τ r i (M.close k)  o _ skip-here       = owned-snoc p r (ix i) o
+  keyed-burst p τ r i (M.close k)  o h (skip-there x)  =
+    keyed-frames p τ (r ++ [ last ]) (M.From∞.force k) (beneath-owned p _ (owned-snoc p r last o)) h x
+
+keyed-start : ∀ {A} p (m : From A 0) → Keyed p (M.start p m)
+keyed-start p (M.at zero _ b)      = keyed-burst p (tick p) p 0 b (inj₁ (prefix-refl p))
+keyed-start p m@(M.at (suc _) _ _) = keyed-frames p (tick p) (p ++ [ last ]) m (inj₁ (prefix-++ p [ last ]))
+keyed-start p m@M.done             = keyed-frames {t = 0} p (tick p) (p ++ [ last ]) m (inj₁ (prefix-++ p [ last ]))
+keyed-start p m@M.quiet            = keyed-frames {t = 0} p (tick p) (p ++ [ last ]) m (inj₁ (prefix-++ p [ last ]))
+
+keyed-of : ∀ {A} p i (xs : List A) → Keyed p (M.ofᴱ p i xs)
+keyed-of p i []       h ()
+keyed-of p i (x ∷ xs) _ out-here      = owned-snoc p p (ix i) (inj₁ (prefix-refl p))
+keyed-of p i (x ∷ xs) h (out-there y) = keyed-of p (suc i) xs h y
+
+keyed-map : ∀ {A B} p (f : A → B) (e : Events A) → Keyed p e → Keyed p (M.mapᴱ f e)
+keyed-map p f (out k a r) ke _ out-here       = ke _ out-here
+keyed-map p f (out k a r) ke h (out-there x)  = keyed-map p f (force r) (λ h′ y → ke h′ (out-there y)) h x
+keyed-map p f (skip k r)  ke _ skip-here      = ke _ skip-here
+keyed-map p f (skip k r)  ke h (skip-there x) = keyed-map p f (force r) (λ h′ y → ke h′ (skip-there y)) h x
+keyed-map p f (end k)     ke h ()
+keyed-map p f hush        ke h ()
+
+keyed-scan : ∀ {A B} p (f : B → A → B) z (e : Events A) → Keyed p e → Keyed p (M.scanᴱ f z e)
+keyed-scan p f z (out k a r) ke _ out-here       = ke _ out-here
+keyed-scan p f z (out k a r) ke h (out-there x)  = keyed-scan p f (f z a) (force r) (λ h′ y → ke h′ (out-there y)) h x
+keyed-scan p f z (skip k r)  ke _ skip-here      = ke _ skip-here
+keyed-scan p f z (skip k r)  ke h (skip-there x) = keyed-scan p f z (force r) (λ h′ y → ke h′ (skip-there y)) h x
+keyed-scan p f z (end k)     ke h ()
+keyed-scan p f z hush        ke h ()
+
+-- A cut shows its failing value, if at all, just past where it was.
+mutual
+  keyed-take : ∀ {A} p i (q : A → Bool) (e : Events A) → Keyed p e → Keyed p (M.takeWhileᴱ i q e)
+  keyed-take p i q (out k a r) ke h x              = keyed-taking p i q k a (q a) r ke h x
+  keyed-take p i q (skip k r)  ke _ skip-here      = ke _ skip-here
+  keyed-take p i q (skip k r)  ke h (skip-there x) = keyed-take p i q (force r) (λ h′ y → ke h′ (skip-there y)) h x
+  keyed-take p i q (end k)     ke h ()
+  keyed-take p i q hush        ke h ()
+
+  keyed-taking : ∀ {A} p i (q : A → Bool) k a b (r : Events∞ A) → Keyed p (out k a r) → Keyed p (M.taking i q k a b r)
+  keyed-taking p i     q k a true  r ke _ out-here      = ke _ out-here
+  keyed-taking p i     q k a true  r ke h (out-there x) = keyed-take p i q (force r) (λ h′ y → ke h′ (out-there y)) h x
+  keyed-taking p true  q k a false r ke _ out-here      = beneath-snoc p k (ix 0) (ke _ out-here)
+  keyed-taking p true  q k a false r ke h (out-there ())
+  keyed-taking p false q k a false r ke h ()
+
+-- A join at `p` shows what it missed just past `p`, the rest tagged.
+mutual
+  keyed-rejoin : ∀ {A} p (e : Events A) → Keyed p (M.rejoin p e)
+  keyed-rejoin p (out q a k) h x = keyed-shown p q (just a) k (p <ᵖ q) h x
+  keyed-rejoin p (skip q k)  h x = keyed-shown p q nothing k (p <ᵖ q) h x
+  keyed-rejoin p (end c)     h x with p <ᵖ c
+  keyed-rejoin p (end c)     h () | true
+  keyed-rejoin p (end c)     h () | false
+  keyed-rejoin p hush        h ()
+
+  keyed-shown : ∀ {A} p q (a : Maybe A) (k : Events∞ A) b → Keyed p (M.shown p q a k b)
+  keyed-shown p q (just a) k true  _ out-here       = inj₂ (tagged-sub q p)
+  keyed-shown p q (just a) k true  h (out-there x)  = keyed-rejoin p (force k) h x
+  keyed-shown p q nothing  k true  _ skip-here      = inj₂ (tagged-sub q p)
+  keyed-shown p q nothing  k true  h (skip-there x) = keyed-rejoin p (force k) h x
+  keyed-shown p q (just a) k false _ skip-here      = owned-snoc p p (ix 0) (inj₁ (prefix-refl p))
+  keyed-shown p q (just a) k false h (skip-there x) = keyed-rejoin p (force k) h x
+  keyed-shown p q nothing  k false _ skip-here      = owned-snoc p p (ix 0) (inj₁ (prefix-refl p))
+  keyed-shown p q nothing  k false h (skip-there x) = keyed-rejoin p (force k) h x
+
 start-within : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → Within (U.startᶜ p m) ρ
 start-within p (M.at zero _ _)    ρ = tt
 start-within p (M.at (suc _) _ _) ρ = tt
@@ -324,11 +448,37 @@ postulate
   alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
             → Alien (p ++ [ ix 0 ]) (U.meaning (U.subscribe o (p ++ [ ix 1 ])) ρ)
 
-  -- A SUBSCRIPTION SHOWS ONLY WHAT IT KEYS: inside where it subscribes,
-  -- a source's position tagged by one of its joins, or a frame of one of
-  -- its timers.  The risk is an operator showing a source's position
-  -- untagged.
-  owned-reach : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) h → Reaches h (U.meaning (U.subscribe o p) ρ) → Beneath p h
+  -- A FLATMAP SHOWS ONLY WHAT IT KEYS: its outer's positions, each value
+  -- just past where it was, and its lanes', each keyed under where it
+  -- was admitted.  The risk is `go`'s merge showing a position of its
+  -- own making.
+  owned-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ)
+             → Keyed p (U.meaning (U.subscribe (flatMap op f s) p) ρ)
+
+  -- A CONNECT SHOWS ONLY WHAT IT KEYS: its body's positions, and each of
+  -- its source's steps and its end just past where it was.
+  owned-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ)
+                → Keyed p (U.meaning (U.subscribe (connect s b) p) ρ)
+
+  -- A DEFER SHOWS ONLY WHAT IT KEYS: its skip just past where it
+  -- subscribes, then its program's run under it, read by the fold's
+  -- meaning rather than the unfold's.
+  owned-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Keyed p (U.meaning (U.deferᶜ l p []) ρ)
+
+-- A SUBSCRIPTION SHOWS ONLY WHAT IT KEYS: inside where it subscribes, a
+-- source's position tagged by one of its joins, or a frame of one of its
+-- timers.
+owned-reach : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Keyed p (U.meaning (U.subscribe o p) ρ)
+owned-reach (cold c)          p ρ = subst (Keyed p) (sym (U.start-meaning p (lower c) ρ)) (keyed-start p (lower c))
+owned-reach empty             p ρ h ()
+owned-reach (of xs)           p ρ = keyed-of p 0 xs
+owned-reach (map f s)         p ρ = keyed-map p f _ (owned-reach s p ρ)
+owned-reach (scan f z s)      p ρ = keyed-scan p f z _ (owned-reach s p ρ)
+owned-reach (takeWhile i q s) p ρ = keyed-take p i q _ (owned-reach s p ρ)
+owned-reach (flatMap op f s)  p ρ = owned-flat op f s p ρ
+owned-reach (connect s b)     p ρ = owned-connect s b p ρ
+owned-reach (connected i)     p ρ = keyed-rejoin p (lookup ρ i)
+owned-reach (defer l)         p ρ = owned-defer l p ρ
 
 -- A flatMap's sources stay out of every lane it can admit: the skip
 -- before the lane is keyed under the flatMap, so the lane is.

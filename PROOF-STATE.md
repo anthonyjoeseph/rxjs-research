@@ -176,8 +176,8 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `owned-reach`, `steady-sub`, `ordered-flat` and
-  `ordered-rejoin`: a subscription shows only what it keys, over sorted
+- **THE ORDER.** `owned-flat`, `steady-sub`, `ordered-flat` and
+  `ordered-rejoin`: a flatMap shows only what it keys, over sorted
   sources alien to it is steady, and a flatMap and a join of steady
   parts keep order. Ruled out: a join of a run merely in order, a
   flatMap of any outer in order (a joiner told a value and a skip at
@@ -221,9 +221,12 @@ by their own silent steps (`Mirror`).
   sources sorted and alien to where it subscribes, is in order.
 - **`steady-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription over
   sorted, alien sources never steps inside its last position nor ties an out.
-- **`owned-reach`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription shows
-  only positions keyed strictly under it: inside, or tagged by its joins or
-  timers.
+- **`owned-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap shows only
+  positions keyed strictly under it, its merge minting none of its own.
+- **`owned-connect`** (Placed) — FALSITY, `NO EVIDENCE`: a connect shows only
+  positions keyed strictly under it, its source's steps and end just past them.
+- **`owned-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer shows only
+  positions keyed strictly under it, its program read by the fold's meaning.
 - **`alien-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source,
   subscribed at its `ix 1`, keys nothing under its `ix 0`.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
