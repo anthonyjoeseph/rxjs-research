@@ -30,7 +30,7 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; observe; root; Agree; out⁼; skip⁼; end⁼;
+open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼; skip⁼; end⁼;
   agree; agree-sym; agree-trans; lub; lub-limit; Settling; agrees) renaming (cold to coldᴹ)
 import denotation.Unfold as U
 open import denotation.Compositional using (from; settle; []ᵉ)
@@ -215,6 +215,29 @@ module Honesty (R : Set) where
   Steps e (U.endˢ k)      = Has e k nothing × (∀ {q a} → Has e q (just a) → ⊥)
   Steps e U.hushˢ         = ∀ {q b} → Has e q b → ⊥
 
+  -- What a step shows, then the residual of the ghost it leaves.
+  after : U.Step [] R → Events R
+  after (U.outˢ k a g′) = out k a λ where .force → residual g′
+  after (U.skipˢ k g′)  = skip k λ where .force → residual g′
+  after (U.endˢ k)      = end k
+  after U.hushˢ         = hush
+
+  -- Events alike, as a set, with what a step shows are what it says.
+  steps-after : ∀ {e} s → e ≋ after s → Steps e s
+  steps-after (U.outˢ k a g′) eq = proj₂ eq atOut , (λ h → proj₂ eq (pastOut h)) , λ h → split (proj₁ eq h)
+    where split : ∀ {q b} → Has (after (U.outˢ k a g′)) q b → (q ≡ k × b ≡ just a) ⊎ Has (residual g′) q b
+          split atOut       = inj₁ (refl , refl)
+          split (pastOut h) = inj₂ h
+  steps-after (U.skipˢ k g′)  eq = (λ h → past (proj₁ eq h)) , λ h → proj₂ eq (pastSkip h)
+    where past : ∀ {q b} → Has (after (U.skipˢ k g′)) q b → Has (residual g′) q b
+          past (pastSkip h) = h
+  steps-after (U.endˢ k)      eq = proj₂ eq atEnd , λ h → no (proj₁ eq h)
+    where no : ∀ {q a} → Has (end k) q (just a) → ⊥
+          no ()
+  steps-after U.hushˢ         eq = λ h → no (proj₁ eq h)
+    where no : ∀ {q b} → Has hush q b → ⊥
+          no ()
+
   -- A ghost whose residual is `g`'s, which `m′` runs.
   Ahead : U.Node [] R → Mach → Set₁
   Ahead g m′ = Σ (U.Node [] R) λ g″ → residual g ≋ residual g″ × Mirror g″ m′
@@ -229,13 +252,22 @@ module Honesty (R : Set) where
   if-silent false false = _ , refl
 
   postulate
-    -- THE STEPPER IS THE MEANING, event for event, as sets, of a run's
-    -- configuration (`Sane`): a joiner told its end while its source
-    -- runs is fed the source's values by the stepper and shows them,
-    -- where the meaning reads it as its end alone.
+    -- THE STEPPER IS THE MEANING, as sets, of a run's configuration
+    -- (`Sane`): what the ghost's step shows, then the residual of the
+    -- ghost it leaves.  A joiner told its end while its source runs is
+    -- fed the source's values by the stepper and shows them, where the
+    -- meaning reads it as its end alone.
+    --
+    -- So the proof runs modulo skips, and the source's skips are unbounded,
+    -- so the relation must survive a merge (`M.beside`, `M.go`) whose
+    -- order a skip's position steers.
     --
     -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
-    residual-steps : ∀ g → Sane [] g → Steps (residual g) (U.step g)
+    -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
+    --   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
+    --   (`M.rejoin`), and a value from before its join as a skip; the
+    --   stepper feeds a joiner values only, and only those after it joined.
+    step-alike : ∀ g → Sane [] g → residual g ≋ after (U.step g)
 
     -- The turn, nothing held and no timer queued: the ghost shows
     -- nothing.
@@ -269,6 +301,9 @@ module Honesty (R : Set) where
   -- THE STRONG STEP: from a re-entry configuration the machine runs
   -- silently to the next, or records a least value of the residual, or
   -- ends it.  By the re-entry state.
+  residual-steps : ∀ g → Sane [] g → Steps (residual g) (U.step g)
+  residual-steps g sn = steps-after (U.step g) (step-alike g sn)
+
   strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
   strong-shows {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (closing refl refl st sn) e =
     completeˢ (proj₂ e (proj₁ rs)) λ h → proj₂ rs (proj₁ e h)
