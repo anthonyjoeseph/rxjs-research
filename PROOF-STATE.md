@@ -177,13 +177,14 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `spread-sub`, then `steady-flat` and `fresh-flat` over
-  `FlatOrder`'s lane roots: pairwise apart, each lane alien to what is apart
-  from its root, the outer apart from each. `ordered-flat` is a body over
-  `spread-sub` alone. Ruled out: a lane's end tied with another lane or the
-  outer, a lane's first before where it subscribes. Decides whether a
-  stream's later events carry tags only from joins made earlier, the causal
-  half of `spread-sub`; its ordering half follows from `Ordered` and `Steady`.
+- **THE ORDER.** `spread-flat` and `spread-connect`, then `steady-flat` and
+  `fresh-flat` over `FlatOrder`'s lane roots: pairwise apart, each lane
+  alien to what is apart from its root, the outer apart from each.
+  `spread-sub` is a body over per-operator leaves. Ruled out: a lane's end
+  tied with another lane or the outer, a lane's first before where it
+  subscribes. Decides whether a stream's later events carry tags only from
+  joins made earlier, the causal half of spreading; its ordering half
+  follows from `Ordered` and `Steady`.
 - **THE PROGRESS.** `emit-open` and `climb-take`, then `sub-onward`, the
   other `-onward` leaves and `burst-poll`, carry liveness. The climb is one
   height induction over a snoc view of the path, map, defer, body and root
@@ -202,9 +203,17 @@ by their own silent steps (`Mirror`).
   it and a source's step tied with the body's skips commuting.
 ### The ledger
 
-- **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`: after a subscription's
-  value at `x`, nothing later lies a step past where a lane would key under
-  `x`'s lane root, nor keys it. Never attempted; the causal half is the risk.
+- **`spread-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap's lane value
+  apart from every later step past it. Route: `Fit` carries the lane's
+  `Spread`; tags reach other lanes only through roots `Shy` rules out.
+- **`spread-connect`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's body
+  values apart from its source's later steps shown just past them.
+- **`spread-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`: a rejoin keeps a
+  sorted source, alien to the join, spread.
+- **`spread-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
+  spread.
+- **`spread-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run is spread.
+- **`spread-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is spread.
 - **`steady-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap where a tick heads
   it, over sorted, alien sources, is steady: no lane steps inside its outer's.
 - **`fresh-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run in

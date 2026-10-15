@@ -1274,6 +1274,40 @@ spread (spread-map f (skip x r)  s) = spread-map f (force r) (spread s)
 spread (spread-map f (end x)     s) = tt
 spread (spread-map f hush        s) = tt
 
+spread-scan : ∀ {A B} (f : B → A → B) z (e : Events A) → Spread e → Spread (M.scanᴱ f z e)
+spread (spread-scan f z (out x a r) s) = every-scan f (f z a) (force r) (proj₁ (spread s)) , spread-scan f (f z a) (force r) (proj₂ (spread s))
+spread (spread-scan f z (skip x r)  s) = spread-scan f z (force r) (spread s)
+spread (spread-scan f z (end x)     s) = tt
+spread (spread-scan f z hush        s) = tt
+
+rest-spread : ∀ {A} (x : Events A) → Spread x → Spread (rest x)
+rest-spread (out _ _ _) s = proj₂ (spread s)
+rest-spread (skip _ _)  s = spread s
+rest-spread (end _)     s = record { spread = tt }
+rest-spread hush        s = s
+
+spread-head : ∀ {A n} {x : Events A} {h a r} → Agree (suc n) x (out h a r) → Spread x
+            → Every (λ y → Disjoint (y ++ [ ix 1 ]) (h ++ [ ix 1 ])) (rest x)
+spread-head (out⁼ _) s = proj₁ (spread s)
+
+-- A LIMIT OF SPREAD RUNS IS SPREAD: each value's later positions are
+-- read by every approximant past it.
+mutual
+  spread-lim : ∀ {A} (xs : ℕ → Events A) (y : Events A) → (∀ n → Spread (xs n)) → (∀ n → Agree n (xs n) y) → Spread y
+  spread (spread-lim xs y ps ag) = spreads-lim xs y ps ag
+
+  spreads-lim : ∀ {A} (xs : ℕ → Events A) (y : Events A) → (∀ n → Spread (xs n)) → (∀ n → Agree n (xs n) y) → Spreads y
+  spreads-lim xs (out h a r) ps ag =
+    every-lim (λ n → rest (xs (suc n))) (force r) (λ n → spread-head (ag (suc n)) (ps (suc n))) (λ n → rest-agree (ag (suc n)))
+    , spread-lim (λ n → rest (xs (suc n))) (force r) (λ n → rest-spread (xs (suc n)) (ps (suc n))) (λ n → rest-agree (ag (suc n)))
+  spreads-lim xs (skip h r)  ps ag =
+    spread-lim (λ n → rest (xs (suc n))) (force r) (λ n → rest-spread (xs (suc n)) (ps (suc n))) (λ n → rest-agree (ag (suc n)))
+  spreads-lim xs (end h)     ps ag = tt
+  spreads-lim xs hush        ps ag = tt
+
+spread-≈ : ∀ {A} (x y : Events A) → (∀ k → Agree k x y) → Spread x → Spread y
+spread-≈ x y a sp = spread-lim (λ _ → x) y (λ _ → sp) a
+
 -- `e`'s first, if any, strictly past `k`.
 Beyond : ∀ {A} → Pos → Events A → Set
 Beyond k (out h _ _) = k <ᵖ h ≡ true
@@ -1823,12 +1857,33 @@ postulate
   -- skip just past it, ahead of the body's later events.
   ordered-beside : ∀ {A B} (b : Events B) (s : Events A) → Ordered b → Ordered s → Ordered (M.beside b s)
 
-  -- A SUBSCRIPTION SPREADS ITS VALUES: nothing after a value lies where
-  -- a lane admitted after it would key, nor is keyed by where the
-  -- value's own lane subscribes.  The ordering half is Ordered and
-  -- Steady; the rest is causal, no event tagged with a join made later.
-  spread-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-             → Spread (U.meaning (U.subscribe o p) ρ)
+  -- A COLD'S RUN IS SPREAD: no later burst or frame keyed under where a
+  -- value's lane would subscribe, a burst's root holding no frame's.
+  spread-start : ∀ {A} p (m : From A 0) → Spread (M.start p m)
+
+  -- A LIST'S RUN IS SPREAD: its values at sibling indices.
+  spread-of : ∀ {A} p i (xs : List A) → Spread (M.ofᴱ p i xs)
+
+  -- A CUT KEEPS A RUN SPREAD: the failing value and the completion just
+  -- inside and past a position later than every value kept.
+  spread-take : ∀ {A} i (p : A → Bool) (e : Events A) → Ordered e → Steady e → Spread e → Spread (M.takeWhileᴱ i p e)
+
+  -- A REJOIN KEEPS A SOURCE'S RUN SPREAD, alien to the join: each value
+  -- rekeyed under the join, which no position of the source's is keyed
+  -- under, its pre-join skips and end beside the join.
+  spread-rejoin : ∀ {A} p (e : Events A) → Ordered e → Steady e → Alien p e → Spread (M.rejoin p e)
+
+  -- A FLATMAP SUBSCRIBED IS SPREAD: a lane's value is keyed under the
+  -- lane's root, apart from every later lane's and the outer's later
+  -- steps, its outer being spread.
+  spread-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+              → Spread (U.meaning (U.subscribe (flatMap op f s) p) ρ)
+
+  -- A CONNECT SUBSCRIBED IS SPREAD: its body's values, rekeyed under
+  -- joins or its own, apart from its source's later steps shown just
+  -- past them.
+  spread-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+                 → Spread (U.meaning (U.subscribe (connect s b) p) ρ)
 
   -- A COLD'S RUN IS STEADY where a tick heads it: its frames step at its
   -- ticks.
@@ -1935,6 +1990,12 @@ every (fresh-defer l p ρ hp cl fr) =
     shy q b = past-weigh q (p ++ [ ix 0 ])
       (subst (_≤ weigh q) (sym (weigh-mark p (ix 0) (ix-mark 0)))
         (<⇒≤ (subst (_< weigh q) (weigh-mark p (ix 1) (ix-mark 1)) (beneath-weigh P₁ q b))))
+
+-- A DEFER'S RUN IS SPREAD, its program's being: the skip shows no value.
+spread-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
+             → Spread (U.meaning (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ) → Spread (U.meaning (U.deferᶜ l p []) ρ)
+spread (spread-defer l p ρ hp cl sp) = spread-≈ S X alike sp
+  where open Deferred l p ρ hp cl
 
 -- Of every `q` in `s`, every `k` in `b`: so of every `k`, every `q`.
 every-swap : ∀ {A B} {R : Pos → Pos → Set} (b : Events B) (s : Events A) → Every (λ q → Every (R q) b) s → Every (λ k → Every (λ q → R q k) s) b
@@ -2072,6 +2133,13 @@ ordered-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline �
 ordered-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
              → Ordered (U.meaning (U.subscribe o p) ρ)
 
+-- A FINITE PROGRAM SUBSCRIBED SPREADS ITS VALUES: nothing after a
+-- value lies where a lane admitted after it would key, nor is keyed by
+-- where the value's own lane subscribes.  The ordering half is Ordered
+-- and Steady; the rest is causal, no event tagged with a join made later.
+spread-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+            → Spread (U.meaning (U.subscribe o p) ρ)
+
 -- A SUBSCRIPTION OVER STEADY SOURCES IS STEADY: a joiner's skips for
 -- what it missed sit just past the join, which nothing it rekeys
 -- lies inside, its sources being alien to it.  Where a tick heads it,
@@ -2127,6 +2195,21 @@ ordered-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
   ordered-defer l p ρ hp cl (ordered-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
                                (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
+spread-subᶠ (cold c) _ p ρ hp so cl = subst Spread (sym (U.start-meaning p (lower c) ρ)) (spread-start p (lower c))
+spread-subᶠ empty _ p ρ hp so cl = record { spread = tt }
+spread-subᶠ (of xs) _ p ρ hp so cl = spread-of p 0 xs
+spread-subᶠ (map f s) (map-f fs) p ρ hp so cl = spread-map f _ (spread-subᶠ s fs p ρ hp so cl)
+spread-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = spread-scan f z _ (spread-subᶠ s fs p ρ hp so cl)
+spread-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl =
+  spread-take i q _ (ordered-subᶠ s fs p ρ hp so cl) (steady-subᶠ s fs p ρ hp so cl) (spread-subᶠ s fs p ρ hp so cl)
+spread-subᶠ (flatMap op f s) _ p ρ hp so cl = spread-flat op f s p ρ hp so cl
+spread-subᶠ (connect s b) _ p ρ hp so cl = spread-connect s b p ρ hp so cl
+spread-subᶠ (connected i) _ p ρ hp so cl =
+  spread-rejoin p _ (proj₁ (sorted-lookup ρ so i)) (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
+spread-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
+  spread-defer l p ρ hp cl (spread-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
+                              (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
+
 alien-steps (cold c) _ p ρ hp so cl = subst Fresh (sym (U.start-meaning p (lower c) ρ)) (fresh-start p (lower c))
 alien-steps empty _ p ρ hp so cl = fresh-even _ (end (p ++ [ last ])) (record { every = weigh-mark p last last-mark })
 alien-steps (of xs) _ p ρ hp so cl = fresh-even _ _ (even-of p 0 xs)
@@ -2152,7 +2235,7 @@ alien-steps (defer l) (defer-f fl) p ρ hp so cl =
 ordered-flat op f s ff fs p ρ hp so cl =
   O.ordered-go (flatOp op) (just (M.mapᴱ F S)) [] [] O.[]ᴿ tt []ᴬ []ᴬ
     ( (ordered-map F S (ordered-subᶠ s fs p ρ hp so cl) , steady-map F S (steady-subᶠ s fs p ρ hp so cl))
-    , spread-map F S (spread-sub s p ρ hp so cl)
+    , spread-map F S (spread-subᶠ s fs p ρ hp so cl)
     , every-map F S (every-zip S (every-mono (beneath-owned p) S keyed) (headed-sub s p ρ hp so))
     , O.spawn-map F S gen )
   where
