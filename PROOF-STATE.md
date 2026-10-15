@@ -170,16 +170,23 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### Big picture tier roadmap
 
-- **SCOPED, CHECKED.** The broad strokes typecheck: `under` in
-  `operation.AbstractObservable` and `operation.Machine` (the `back`
-  frame), `adequacy.Sorted` and the `placedᴿ` body. CI's oracle and ghost
-  checks green on the scoped positions, `connect`'s restructure included.
-  Removes the cost stopping every other leg: nothing below is stated until
-  the engine it speaks of is the one the oracle passes.
+- **ONE DRIVER, CHECKED.** The shared `Machine`'s one `transition`,
+  driven by `operation.Machine` (timelines) and `operation.Observable`
+  (real colds), typechecked with scoped positions; CI's oracle and ghost
+  checks green. Removes the cost stopping every other leg: nothing below is
+  stated until the engine it speaks of is the one the oracle passes.
+- **HONEST, DEFINED.** `Honest` defined over the machine's histories, then
+  `scanᴷ-honest` and `takeWhileᴷ-honest` stated against it. A kernel whose
+  output reads its input's ORDER cannot be honest from an input alike only
+  as a set. Decides whether content and sortedness stay apart, or each
+  observer must be placed, not only the root.
 - **THE PROTOCOL'S RISK.** `takeWhileᴷ-well` first: two `takeWhile`s
   failing on one value complete under the same `last`, the second after the
   observer below already completed there. Decides whether `Well` is unary
   in positions alone, or `Settled` must read the heap's closed flags.
+- **CONTENT, ASSEMBLED.** `kept` and `read-is-kept` over `Reached`, then the
+  rest of the `-honest` contracts, `connect` first. Decides whether the
+  per-kernel contracts compose across a shared heap and a hot run.
 - **THE WALK.** `walk-tree`, `walk-timers` and `turn` by the step's
   cases, over `WellMach`'s run and queue. Decides whether same-tick timers
   pop in the order of the positions they were set at (`Before`), or the
@@ -187,16 +194,9 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **THE PROTOCOL, THE REST.** The remaining kernel `-well` rows; `connect`
   and `flatMap` lead, their subscriptions scoped under `ix 0`, `ix 1` and
   `sub`. Decides whether a callback's position travels with it on the heap.
-- **CONTENT, PER KERNEL.** `Honest` defined over the machine's histories
-  (`adequacy.Content`), then the per-kernel `-honest` contracts, `connect`
-  and `takeWhile` first, then `kept` and `read-is-kept`. Decides whether
-  every kernel's state is a function of its delivered inputs.
 - **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
-  in finitely many steps. Decides whether liveness needs a measure.
-- **ONE DRIVER, CHECKED.** `operation.AbstractObservable`'s `Machine`, one
-  pure `transition`, driven by `operation.Machine` (timelines) and
-  `operation.Observable` (real colds): typechecked, then CI's oracle. Decides
-  whether the IO runtime shares the pure step with no cast but `coerce`.
+  in finitely many steps. Decides whether liveness needs a measure, and
+  whether a `connect` feedback loop that spins makes it false.
 
 ### The ledger
 
