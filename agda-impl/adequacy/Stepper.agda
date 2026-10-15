@@ -18,11 +18,11 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Function using (id)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; cong₂; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 import Tree as T
 open import Tree using (Later)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-atop)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-atop; <ᵖ-shift)
   renaming (sub to subᴾ)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
@@ -136,17 +136,30 @@ skip-same {l = l} e = record
   ; stalls = λ v → (λ s → record { stays = proj₁ (stays s) , subst (Stalls v) e (proj₂ (stays s)) })
                  , (λ s → record { stays = proj₁ (stays s) , subst (Stalls v) (sym e) (proj₂ (stays s)) }) }
 
+-- No earlier than no earlier, and what stalls below `v` atop `k` has `k` below it.
+≮-trans : ∀ h k r → h <ᵖ k ≡ false → k <ᵖ r ≡ false → h <ᵖ r ≡ false
+≮-trans h k r a b with h <ᵖ r in e
+... | false = refl
+... | true  = trans (sym (<ᵖ-atop h k r a e)) b
+
+atop-down : ∀ {A k r} (e : Events A) → Atop k e → k <ᵖ r ≡ false → Atop r e
+atop-down {k = k} {r} (out h _ _) a b = ≮-trans h k r a b
+atop-down {k = k} {r} (skip h _)  a b = ≮-trans h k r a b
+atop-down {k = k} {r} (end h)     a b = ≮-trans h k r a b
+atop-down             hush        a b = tt
+
+atop-up : ∀ {A k v} (e : Events A) → Atop k e → Stalls v e → k <ᵖ v ≡ true
+atop-up {k = k} {v} (out h _ _) a s = <ᵖ-atop h k v a (proj₁ (stays s))
+atop-up {k = k} {v} (skip h _)  a s = <ᵖ-atop h k v a (proj₁ (stays s))
+atop-up (end _) a s = ⊥-elim (stays s)
+atop-up hush    a s = ⊥-elim (stays s)
+
 -- A skip atop what follows it is forgotten.
 skip-drop : ∀ {A k} {l : Events∞ A} → Ordered (skip k l) → skip k l ≃ force l
-skip-drop {k = k} {l} o = record
+skip-drop {l = l} o = record
   { alike  = skipˡ (∼-refl (force l))
   ; stalls = λ v → (λ s → proj₂ (stays s))
-                 , (λ s → record { stays = up (force l) (proj₁ (ordered o)) s , s }) }
-  where up : ∀ {v} (e : Events _) → Atop k e → Stalls v e → k <ᵖ v ≡ true
-        up {v} (out h _ _) a s = <ᵖ-atop h k v a (proj₁ (stays s))
-        up {v} (skip h _)  a s = <ᵖ-atop h k v a (proj₁ (stays s))
-        up (end _) a s = ⊥-elim (stays s)
-        up hush    a s = ⊥-elim (stays s)
+                 , (λ s → record { stays = atop-up (force l) (proj₁ (ordered o)) s , s }) }
 
 ------------------------------------------------------------------------
 -- The stream functions respect it
@@ -562,12 +575,6 @@ postulate
         → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
         → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
 
-  -- EVENTS AT ONE POSITION COMMUTE: a source's step taken ahead of the
-  -- body's events at its own position, the body's tie run shown first.
-  ahead-even : ∀ {A B} (x : Events B) q (t : Events∞ A) → Ordered x → Atop (q ++ [ ix 0 ]) x
-             → M.before (q ++ [ ix 0 ]) x ≡ false → Atop q (force t)
-             → M.ahead x (q ++ [ ix 0 ]) t false ≃ skip (q ++ [ ix 0 ]) (λ where .force → M.beside x (force t))
-
   -- A NODE'S MEANING LAGS: whatever it shows is taken after a body's
   -- event at `k` that comes before its step and its sources'.
   lags : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Placed c (ρᴱ δ) → ∀ k
@@ -590,13 +597,118 @@ postulate
   placed-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
                → First (U.headˢ (U.step c)) δ → Placedˢ (ρᴱ δ) (U.step c)
 
+-- EVENTS AT ONE POSITION COMMUTE: a source's step taken ahead of the
+-- body's events at its own position, the body's tie run shown first.
+module _ {A} (q : Pos) (t : Events∞ A) (at : Atop q (force t)) where
+  private
+    Q : Pos
+    Q = q ++ [ ix 0 ]
+
+    later : ∀ {q′ x t′} → force t ≡ out q′ x t′ → (q′ ++ [ ix 0 ]) <ᵖ Q ≡ false
+    later {q′} e = <ᵖ-shift q′ q (subst (Atop q) e at)
+
+    later′ : ∀ {q′ t′} → force t ≡ skip q′ t′ → (q′ ++ [ ix 0 ]) <ᵖ Q ≡ false
+    later′ {q′} e = <ᵖ-shift q′ q (subst (Atop q) e at)
+
+    rest : ∀ {B k} {r : Events∞ B} → Atop k (force r) × Ordered (force r) → k <ᵖ Q ≡ false → Atop Q (force r)
+    rest {r = r} (a , _) b = atop-down (force r) a b
+
+  mutual
+    even∼ : ∀ {B} (x : Events B) b → M.before Q x ≡ b → Ordered x → Atop Q x → M.ahead x Q t b ∼ M.beside x (force t)
+    even∼ x true _ o a = skipˡ (∼-refl _)
+    even∼ (out k w r) false e o a with force t in ft
+    ... | out q′ _ _ rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later ft) e = out∼ (even∼∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a))
+    ... | skip q′ _  rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later′ ft) e = out∼ (even∼∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a))
+    ... | end _ = out∼ (even∼∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a))
+    ... | hush  = out∼ (even∼∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a))
+    even∼ (skip k r) false e o a with force t in ft
+    ... | out q′ _ _ rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later ft) e = skip∼ (even∼∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a))
+    ... | skip q′ _  rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later′ ft) e = skip∼ (even∼∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a))
+    ... | end _ = skip∼ (even∼∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a))
+    ... | hush  = skip∼ (even∼∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a))
+    even∼ (end c) false e o a with force t in ft
+    ... | out q′ _ _ rewrite ≮-trans (q′ ++ [ ix 0 ]) Q c (later ft) e = end∼
+    ... | skip q′ _  rewrite ≮-trans (q′ ++ [ ix 0 ]) Q c (later′ ft) e = end∼
+    ... | end _ = end∼
+    ... | hush  = end∼
+    even∼ hush false () o a
+
+    even∼∞ : ∀ {B} (y : Events B) {z} → force t ≡ z → Ordered y → Atop Q y → M.ahead y Q t (M.before Q y) ∼∞ M.beside y z
+    ∼force (even∼∞ y refl o a) = even∼ y _ refl o a
+
+    fw : ∀ {B v} (x : Events B) b → M.before Q x ≡ b → Ordered x → Atop Q x → Stalls v (M.ahead x Q t b) → Stalls v (M.beside x (force t))
+    stays (fw x true _ o a s) = stays (proj₂ (stays s))
+    stays (fw (out k w r) false e o a s) with force t in ft
+    ... | out q′ _ _ rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later ft) e = proj₁ (stays s) , fw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | skip q′ _  rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later′ ft) e = proj₁ (stays s) , fw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | end _ = proj₁ (stays s) , fw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | hush  = proj₁ (stays s) , fw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    stays (fw (skip k r) false e o a s) with force t in ft
+    ... | out q′ _ _ rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later ft) e = proj₁ (stays s) , fw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | skip q′ _  rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later′ ft) e = proj₁ (stays s) , fw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | end _ = proj₁ (stays s) , fw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | hush  = proj₁ (stays s) , fw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    stays (fw (end c) false e o a s) = ⊥-elim (stays s)
+    stays (fw hush false () o a s)
+
+    fw∞ : ∀ {B v} (y : Events B) {z} → force t ≡ z → Ordered y → Atop Q y → Stalls v (M.ahead y Q t (M.before Q y)) → Stalls v (M.beside y z)
+    fw∞ y refl o a s = fw y _ refl o a s
+
+  private
+    ahead-atop : ∀ {B} (x : Events B) q′ (t′ : Events∞ A) → Atop Q x → Atop Q (M.ahead x q′ t′ false)
+    ahead-atop (out _ _ _) q′ t′ a = a
+    ahead-atop (skip _ _)  q′ t′ a = a
+    ahead-atop (end _)     q′ t′ a = a
+    ahead-atop hush        q′ t′ a = tt
+
+    beside-atop : ∀ {B} (x : Events B) → Atop Q x → Atop Q (M.beside x (force t))
+    beside-atop x a with force t in ft
+    ... | out q′ _ t′ with M.before (q′ ++ [ ix 0 ]) x
+    ...   | true  = later ft
+    ...   | false = ahead-atop x (q′ ++ [ ix 0 ]) t′ a
+    beside-atop x a | skip q′ t′ with M.before (q′ ++ [ ix 0 ]) x
+    ...   | true  = later′ ft
+    ...   | false = ahead-atop x (q′ ++ [ ix 0 ]) t′ a
+    beside-atop x a | end _ = a
+    beside-atop x a | hush  = a
+
+  mutual
+    bw : ∀ {B v} (x : Events B) b → M.before Q x ≡ b → Ordered x → Atop Q x → Stalls v (M.beside x (force t)) → Stalls v (M.ahead x Q t b)
+    stays (bw x true _ o a s) = atop-up _ (beside-atop x a) s , s
+    stays (bw (out k w r) false e o a s) with force t in ft
+    ... | out q′ _ _ rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later ft) e = proj₁ (stays s) , bw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | skip q′ _  rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later′ ft) e = proj₁ (stays s) , bw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | end _ = proj₁ (stays s) , bw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | hush  = proj₁ (stays s) , bw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    stays (bw (skip k r) false e o a s) with force t in ft
+    ... | out q′ _ _ rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later ft) e = proj₁ (stays s) , bw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | skip q′ _  rewrite ≮-trans (q′ ++ [ ix 0 ]) Q k (later′ ft) e = proj₁ (stays s) , bw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | end _ = proj₁ (stays s) , bw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    ... | hush  = proj₁ (stays s) , bw∞ (force r) ft (proj₂ (ordered o)) (rest {r = r} (ordered o) a) (proj₂ (stays s))
+    stays (bw (end c) false e o a s) with force t in ft
+    ... | out q′ _ _ rewrite ≮-trans (q′ ++ [ ix 0 ]) Q c (later ft) e = stays s
+    ... | skip q′ _  rewrite ≮-trans (q′ ++ [ ix 0 ]) Q c (later′ ft) e = stays s
+    ... | end _ = stays s
+    ... | hush  = stays s
+    stays (bw hush false () o a s)
+
+    bw∞ : ∀ {B v} (y : Events B) {z} → force t ≡ z → Ordered y → Atop Q y → Stalls v (M.beside y z) → Stalls v (M.ahead y Q t (M.before Q y))
+    bw∞ y refl o a s = bw y _ refl o a s
+
+  ahead-even : ∀ {B} (x : Events B) → Ordered x → Atop Q x → M.before Q x ≡ false
+              → M.ahead x Q t false ≃ skip Q (λ where .force → M.beside x (force t))
+  ahead-even x o a e = record
+    { alike  = skipʳ (even∼ x false e o a)
+    ; stalls = λ v → (λ s → record { stays = atop-up _ (beside-atop x a) (fw x false e o a s) , fw x false e o a s })
+                   , (λ s → bw x false e o a (proj₂ (stays s))) }
+
 -- The source's next taken first, ahead of the body's events at the same
 -- position.
 tie-lead : ∀ {A B} (x : Events B) q (t : Events∞ A) → Ordered x → Atop (q ++ [ ix 0 ]) x → Atop q (force t)
          → M.ahead x (q ++ [ ix 0 ]) t (M.before (q ++ [ ix 0 ]) x) ≃ skip (q ++ [ ix 0 ]) (λ where .force → M.beside x (force t))
 tie-lead x q t o a at with M.before (q ++ [ ix 0 ]) x in e
 ... | true  = ≃-trans (ahead-lead x (q ++ [ ix 0 ]) t true refl) (skip-same refl)
-... | false = ≃-trans (ahead-even x q t o a e at) (skip-same refl)
+... | false = ≃-trans (ahead-even q t at x o a e) (skip-same refl)
 
 -- The source's next taken after the body's step.
 LagsHead : ∀ {Γ A B} → U.Step Γ B → Events A → Set

@@ -180,7 +180,8 @@ by their own silent steps (`Mirror`).
   is a body over these, its body reading its source alike the body fed its
   source's step. Ruled out: exact agreement, per approximant or under a
   ghost anchored in its sources' step history, and a body fed a value it
-  would join its source only after; a sorted skip is a `≃` forget.
+  would join its source only after. Proven: a sorted skip is a `≃`
+  forget, and a source's step commutes with the body's tied events.
   Decides whether a lane's pre-join skips, one fewer per source step, are
   all `≃` forgets, and whether `M.beside` respects `≃` between sorted events.
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
@@ -220,8 +221,6 @@ by their own silent steps (`Mirror`).
   alike.
 - **`beside-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: `M.beside` respects `≃`
   between events in order.
-- **`ahead-even`** (Stepper) — FALSITY, `NO EVIDENCE`: a source's step commutes
-  with the body's events at its own position.
 - **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
   subscribed at the root is placed.
 - **`placed-after`** (Stepper) — FALSITY, `REFUTED×2`: a step keeps the ghost

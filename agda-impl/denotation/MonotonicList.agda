@@ -290,6 +290,26 @@ private
 <ᵖ-irrefl : ∀ p → p <ᵖ p ≡ false
 <ᵖ-irrefl p rewrite refl-pos p = refl
 
+private
+  past : ∀ p → cmpPos (p ++ [ ix 0 ]) [] ≡ gt
+  past []      = refl
+  past (_ ∷ _) = refl
+
+  top : ∀ a → isLt (lexi (cmpLabel a (ix 0)) gt) ≡ false
+  top (ix m) with 0 <ᵇ m
+  ... | true  = refl
+  ... | false = refl
+  top (sub _) = refl
+  top last    = refl
+
+-- What is no earlier stays so a step past each.
+<ᵖ-shift : ∀ p q → p <ᵖ q ≡ false → (p ++ [ ix 0 ]) <ᵖ (q ++ [ ix 0 ]) ≡ false
+<ᵖ-shift []      []      h = refl
+<ᵖ-shift (a ∷ p) []      h rewrite past p = top a
+<ᵖ-shift (a ∷ p) (b ∷ q) h with cmpLabel a b
+... | eq = <ᵖ-shift p q h
+... | gt = refl
+
 -- What is no earlier than `k` and before `v` has `k` before `v`.
 <ᵖ-atop : ∀ h k v → h <ᵖ k ≡ false → h <ᵖ v ≡ true → k <ᵖ v ≡ true
 <ᵖ-atop h k v n l with cmpPos h k in e
