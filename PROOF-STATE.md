@@ -175,11 +175,12 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   and ghost checks green on it. Removes the cost stopping every other leg:
   nothing below is stated until the engine it speaks of is the one the
   oracle passes.
-- **HONEST, DEFINED.** `Honest` defined over the machine's histories, then
-  `scanᴷ-honest` and `takeWhileᴷ-honest` stated against it. A kernel whose
-  output reads its input's ORDER cannot be honest from an input alike only
-  as a set. Decides whether content and sortedness stay apart, or each
-  observer must be placed, not only the root.
+- **HONEST, DEFINED.** `Honest` defined over the machine's histories:
+  an observer handed to a subscription in a running configuration, its
+  deliveries alike `observe M p`. Ruled out: honesty as a set alone for an
+  order-reading kernel, so those contracts read `WellSub`. Decides whether
+  honesty can be stated for an open subscription, its heap and joiners a
+  context, or needs the whole configuration.
 - **THE PROTOCOL'S RISK.** `takeWhileᴷ-well` first: two `takeWhile`s
   failing on one value complete under the same `last`, the second after the
   observer below already completed there. Decides whether `Well` is unary
@@ -220,7 +221,7 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   well-positioned.
 - **`mapᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `map` well-positioned.
 - **`scanᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `scan` well-positioned.
-- **`Honest`** (Content) — FALSITY, `NO EVIDENCE`: a postulated type; a
+- **`Honest`** (Content) — FALSITY, `DEAD ROUTE`: a postulated type; a
   subscription's deliveries alike a meaning, at any position.
 - **`HonestEnv`** (Content) — FALSITY, `NO EVIDENCE`: a postulated type; each
   joiner in scope fed its source's hot run.

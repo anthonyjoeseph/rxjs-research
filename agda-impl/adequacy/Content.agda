@@ -14,18 +14,19 @@
 -- No step of the machine is matched to a step of anything.
 module adequacy.Content where
 
+open import Level using (lift)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; _,_; Σ)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 import Tree as T
 open import denotation.MonotonicList using (MonotonicList; Events; Events∞; Pos; Time; tick; out; skip; end; observe; root)
-open import adequacy.Sorted using (_≤ᵖ_)
+open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
 open import operation.Machine using (module Machine)
 open import denotation.Denote using (⟦_⟧; DenEnv)
 open import operation.AbstractObservable using (module Run; module Heap)
@@ -37,6 +38,7 @@ open Events∞
 module Honesty (R : Set) where
   open Run (Pureᴾ R) using (Subscribe; Subject; Env; wkEnv; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via; startCold)
   open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; reading; begin; launch; Read; read)
+  open Sorting R using (WellSub; compile-well)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
 
@@ -84,6 +86,17 @@ module Honesty (R : Set) where
     -- subscribed at whatever position `p`, the machine's deliveries to it
     -- are alike `observe m p` as a set, cut where its subscriber left.
     -- A postulated TYPE, to be defined over the machine's histories.
+    --
+    -- A kernel that reads its input's ORDER (`scan`, `takeWhile`, a
+    -- flattening, `connect`) is owed its input's sortedness as well, as a
+    -- `WellSub`: alike as a set and delivered in ascending position is
+    -- the meaning's events in order.
+    --
+    -- DEAD ROUTE: honesty as a set alone, for an order-reading kernel.  An
+    --   input delivering at `p ++ [ ix 1 ]` before `p ++ [ ix 0 ]` is alike
+    --   as a set a meaning with those events ascending, and `scan` over it
+    --   shows partial sums the meaning has not, so `scanᴷ-honest` from a
+    --   set-honest input alone is false.
     Honest : ∀ {A w} → Subscribe A w → MonotonicList A → Set₁
 
     -- An environment honest to a denotational one: each `connect` in
@@ -96,17 +109,19 @@ module Honesty (R : Set) where
     emptyᴷ-honest     : ∀ {Γ A w} (δ : DenEnv Γ) → Honest {A} {w} emptyᴷ (⟦ T.empty ⟧ δ)
     ofᴷ-honest        : ∀ {Γ A w} xs (δ : DenEnv Γ) → Honest {A} {w} (ofᴷ xs) (⟦ T.of xs ⟧ δ)
     mapᴷ-honest       : ∀ {Γ A B w} f {s : Subscribe A w} (o : PureObs Γ A) δ → Honest {A} {w} s (⟦ o ⟧ δ) → Honest {B} (mapᴷ f s) (⟦ T.map f o ⟧ δ)
-    scanᴷ-honest      : ∀ {Γ A B w} f z {s : Subscribe A w} (o : PureObs Γ A) δ → Honest {A} {w} s (⟦ o ⟧ δ) → Honest {B} (scanᴷ f z s) (⟦ T.scan f z o ⟧ δ)
+    scanᴷ-honest      : ∀ {Γ A B w} f z {s : Subscribe A w} (o : PureObs Γ A) δ → WellSub s → Honest {A} {w} s (⟦ o ⟧ δ) → Honest {B} (scanᴷ f z s) (⟦ T.scan f z o ⟧ δ)
     -- The contract's risk: `takeWhile` completes at the value that fails,
     -- and rxjs delivers that completion before the source's next value.
-    takeWhileᴷ-honest : ∀ {Γ A w} i p {s : Subscribe A w} (o : PureObs Γ A) δ → Honest {A} {w} s (⟦ o ⟧ δ) → Honest (takeWhileᴷ i p s) (⟦ T.takeWhile i p o ⟧ δ)
+    takeWhileᴷ-honest : ∀ {Γ A w} i p {s : Subscribe A w} (o : PureObs Γ A) δ → WellSub s → Honest {A} {w} s (⟦ o ⟧ δ) → Honest (takeWhileᴷ i p s) (⟦ T.takeWhile i p o ⟧ δ)
     flatMapᴷ-honest   : ∀ {Γ A B w} op {f : A → Subscribe B w} {s : Subscribe A w} (g : A → PureObs Γ B) (o : PureObs Γ A) δ
+                      → (∀ a → WellSub (f a)) → WellSub s
                       → (∀ a → Honest {B} {w} (f a) (⟦ g a ⟧ δ)) → Honest {A} {w} s (⟦ o ⟧ δ)
                       → Honest (flatMapᴷ op f s) (⟦ T.flatMap op g o ⟧ δ)
     -- `connect`: its joiners fed one hot run, the source's, from where
     -- the body subscribed it.
     connectᴷ-honest   : ∀ {Γ A B w} {s : Subscribe A w} {b : ∀ {v} → w ⊑ v → Subject A v → Subscribe B v} (o : PureObs Γ A) (c : PureObs (A ∷ Γ) B)
                         (e : Env Γ w) δ
+                      → WellSub s → (∀ {v} (σ : w ⊑ v) st → WellSub (b σ st))
                       → Honest {A} {w} s (⟦ o ⟧ δ)
                       → (∀ {v} (σ : w ⊑ v) st r → HonestEnv (st ∷ wkEnv σ e) (r ∷ δ) → Honest {B} {v} (b σ st) (⟦ c ⟧ (r ∷ δ)))
                       → Honest (connectᴷ s b) (⟦ T.connect o c ⟧ δ)
@@ -120,10 +135,11 @@ module Honesty (R : Set) where
   compile-honest T.empty             e δ he = emptyᴷ-honest δ
   compile-honest (T.of xs)           e δ he = ofᴷ-honest xs δ
   compile-honest (T.map f s)         e δ he = mapᴷ-honest f s δ (compile-honest s e δ he)
-  compile-honest (T.scan f z s)      e δ he = scanᴷ-honest f z s δ (compile-honest s e δ he)
-  compile-honest (T.takeWhile i p s) e δ he = takeWhileᴷ-honest i p s δ (compile-honest s e δ he)
-  compile-honest (T.flatMap op f s)  e δ he = flatMapᴷ-honest op f s δ (λ a → compile-honest (f a) e δ he) (compile-honest s e δ he)
-  compile-honest (T.connect s b)     e δ he = connectᴷ-honest s b e δ (compile-honest s e δ he) λ σ st r he′ → compile-honest b (st ∷ wkEnv σ e) (r ∷ δ) he′
+  compile-honest (T.scan f z s)      e δ he = scanᴷ-honest f z s δ (compile-well s e (lift tt)) (compile-honest s e δ he)
+  compile-honest (T.takeWhile i p s) e δ he = takeWhileᴷ-honest i p s δ (compile-well s e (lift tt)) (compile-honest s e δ he)
+  compile-honest (T.flatMap op f s)  e δ he = flatMapᴷ-honest op f s δ (λ a → compile-well (f a) e (lift tt)) (compile-well s e (lift tt))
+                                                 (λ a → compile-honest (f a) e δ he) (compile-honest s e δ he)
+  compile-honest (T.connect s b)     e δ he = connectᴷ-honest s b e δ (compile-well s e (lift tt)) (λ σ st → compile-well b (st ∷ wkEnv σ e) (lift tt)) (compile-honest s e δ he) λ σ st r he′ → compile-honest b (st ∷ wkEnv σ e) (r ∷ δ) he′
   compile-honest (T.connected i)     e δ he = joinᴷ-honest i e δ he
   compile-honest (T.defer l)         e δ he = deferᴷ-honest l e δ he
 
