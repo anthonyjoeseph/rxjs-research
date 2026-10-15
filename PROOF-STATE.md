@@ -169,29 +169,25 @@ is built on it, so a leaf's refutation may move the definition.
 
 ### Big picture tier roadmap
 
-- **REFUTE THE LEAVES BY SAMPLING.** A QuickCheck over every operator:
-  cut a drawn run after k steps and continue it differently (`⊥ᴰ`), then
-  compare the operator's output on the two for k steps at every
-  position. Decides, before any grinding, whether `_≈[_]_` at each
-  position is the currency every operator respects.
-- **CONNECT'S HANDLE.** `connectᴰ-ne` hands the body `hot` of the
-  source's run. A late joiner skips what came before it, so the handle's
-  first k steps may read more than k of the source's. Decides whether
-  agreeing sources give agreeing handles, or whether the currency must
-  count steps per position differently.
-- **FLATMAP'S LOOKAHEAD.** `flatMapᴰ-ne`: picking the earliest lane reads
-  every lane's head, and a bounded merge queues lanes past its bound.
-  Decides whether output step j reads at most j steps of each input.
+- **FLATMAP'S LANE BUDGET.** `flatMapᴰ-ne` as a body over `go`'s cases:
+  every lane in flight agrees for at least the output's remaining steps,
+  kept through `admit`'s queue, `switch` dropping a lane, and `earliest`
+  reading every lane's head. Decides whether one budget per lane is the
+  invariant, or `flatMapᴰ` must change.
+- **CONNECT'S INTERLEAVING.** `connectᴰ-ne` over `rejoin` and `beside`:
+  a late joiner's skipped prefix is one skip per source step, and
+  `before` reads one step of each side. Decides whether the same budget
+  invariant carries the hot handle.
 - **THE UNARY OPERATORS.** `mapᴰ-ne`, `scanᴰ-ne`, `takeWhileᴰ-ne`, each
   by coinduction on `Agree`, one output step per input step. Last: none
   can move the currency.
 
 ### The ledger
 
-- **`connectᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: the hot handle's
-  late joiners skip the source's past.
-- **`flatMapᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: the earliest lane
-  is chosen by reading every lane's head.
+- **`flatMapᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: lanes join
+  mid-run, queue, and drop; the earliest is chosen by every lane's head.
+- **`connectᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: the body and the
+  source interleave, each read one step ahead.
 - **`takeWhileᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: one output step
   per input step, ending early.
 - **`scanᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: one output step per
