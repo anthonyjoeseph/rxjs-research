@@ -6,8 +6,8 @@
 --
 -- A GHOST: the meaning's own configuration (`denotation.Unfold`'s
 -- `Node`), which the machine's configuration runs.  What is still to be
--- delivered is the ghost's residual, the limit of its approximants at the
--- root; at the launch the ghost is the program subscribed there, so the
+-- delivered is the ghost's residual, its meaning (`U.meaning`); at the
+-- launch the ghost is the program subscribed there, so the
 -- residual is the meaning's events (`begun`, by `subscribed`).  Each step
 -- keeps the residual or delivers a least event of it (`Shows`).  No step
 -- of the machine is matched to a step of a stepper.  Only the run's
@@ -31,9 +31,9 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼; skip⁼; end⁼;
-  agree; agree-sym; agree-trans; lub; lub-limit; Settling; agrees) renaming (cold to coldᴹ)
+  agree; agree-sym)
 import denotation.Unfold as U
-open import denotation.Compositional using (from; settle; []ᵉ)
+open import denotation.Compositional using ([]ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
@@ -44,6 +44,37 @@ open import operation.AbstractObservable using (module Heap) renaming (module Ma
 open import Data.Bool using (Bool; true; false; if_then_else_)
 
 open Events∞
+
+------------------------------------------------------------------------
+-- Alike skips aside: the same values and ends in the same order, finitely
+-- many skips between them on either side, or both skipping for ever.
+
+mutual
+  data _≃_ {A : Set} : Events A → Events A → Set where
+    out≃  : ∀ {k a l r} → force l ≃∞ force r → out k a l ≃ out k a r
+    end≃  : ∀ {k} → end k ≃ end k
+    hush≃ : hush ≃ hush
+    skip≃ : ∀ {k k′ l r} → force l ≃∞ force r → skip k l ≃ skip k′ r
+    skipˡ : ∀ {k l y} → force l ≃ y → skip k l ≃ y
+    skipʳ : ∀ {x k r} → x ≃ force r → x ≃ skip k r
+
+  record _≃∞_ {A : Set} (x y : Events A) : Set where
+    coinductive
+    field ≃force : x ≃ y
+
+open _≃∞_
+
+mutual
+  ≃-sym : ∀ {A} {x y : Events A} → x ≃ y → y ≃ x
+  ≃-sym (out≃ r)  = out≃ (≃∞-sym r)
+  ≃-sym end≃      = end≃
+  ≃-sym hush≃     = hush≃
+  ≃-sym (skip≃ r) = skip≃ (≃∞-sym r)
+  ≃-sym (skipˡ r) = skipʳ (≃-sym r)
+  ≃-sym (skipʳ r) = skipˡ (≃-sym r)
+
+  ≃∞-sym : ∀ {A} {x y : Events A} → x ≃∞ y → y ≃∞ x
+  ≃force (≃∞-sym r) = ≃-sym (≃force r)
 
 module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
@@ -116,24 +147,28 @@ module Honesty (R : Set) where
   same-agree : ∀ {x y} → (∀ n → Agree n x y) → x ≋ y
   same-agree ag = has-agree ag , has-agree (λ n → agree-sym (ag n))
 
+  -- Events alike skips aside hold the same events.
+  has-skips : ∀ {x y k b} → x ≃ y → Has x k b → Has y k b
+  has-skips (out≃ _)    atOut        = atOut
+  has-skips end≃        atEnd        = atEnd
+  has-skips (out≃ r)    (pastOut h)  = pastOut (has-skips (≃force r) h)
+  has-skips (skip≃ r)   (pastSkip h) = pastSkip (has-skips (≃force r) h)
+  has-skips (skipˡ r)   (pastSkip h) = has-skips r h
+  has-skips (skipʳ r)   h            = pastSkip (has-skips r h)
+
+  same-skips : ∀ {x y} → x ≃ y → x ≋ y
+  same-skips a = has-skips a , has-skips (≃-sym a)
+
   ----------------------------------------------------------------------
   -- THE GHOST
 
-  -- What a configuration of the meaning will show: its approximants'
-  -- limit, at the root.
+  -- What a configuration of the meaning will show.
   residual : U.Node [] R → Events R
-  residual g = observe (lub λ n → coldᴹ λ _ → U.meaning n g []) root
+  residual g = U.meaning g []
 
-  -- The program subscribed at the root shows the meaning's events: each
-  -- approximant of its configuration is the fold's, so they settle as the
-  -- fold's do, and their limit is the fold's limit.
+  -- The program subscribed at the root shows the meaning's events.
   begun : (o : PureObs [] R) → ∀ n → Agree n (observe (⟦ o ⟧ []) root) (residual (U.subscribe o root))
-  begun o n = agree-trans (agree (from n o []) root)
-                (agree-trans (agree-sym (agree (U.subscribed n o []ᵉ) root)) (agree (lub-limit settling n) root))
-    where
-    settling : Settling (λ n → coldᴹ λ _ → U.meaning n (U.subscribe o root) [])
-    settling n = agrees λ _ → agree-trans (agree (U.subscribed n o []ᵉ) root)
-                   (agree-trans (agree (settle n o []) root) (agree-sym (agree (U.subscribed {k = n} (suc n) o []ᵉ) root)))
+  begun o n = agree-sym (agree (U.subscribed {k = n} o []ᵉ) root)
 
   ----------------------------------------------------------------------
   -- THE ASSEMBLY: from a launch to an alike record
@@ -252,15 +287,16 @@ module Honesty (R : Set) where
   if-silent false false = _ , refl
 
   postulate
-    -- THE STEPPER IS THE MEANING, as sets, of a run's configuration
-    -- (`Sane`): what the ghost's step shows, then the residual of the
-    -- ghost it leaves.  A joiner told its end while its source runs is
-    -- fed the source's values by the stepper and shows them, where the
-    -- meaning reads it as its end alone.
+    -- THE STEPPER IS THE MEANING, skips aside, of a run's configuration
+    -- (`Sane`): what the ghost's step shows, then the meaning of the ghost
+    -- it leaves.  A joiner told its end while its source runs is fed the
+    -- source's values by the stepper and shows them, where the meaning
+    -- reads it as its end alone.
     --
-    -- So the proof runs modulo skips, and the source's skips are unbounded,
-    -- so the relation must survive a merge (`M.beside`, `M.go`) whose
-    -- order a skip's position steers.
+    -- Skips aside, because the meaning's joiner shows its source's every
+    -- step and a lane's join comes after a count of them that the ghost
+    -- does not keep; so the relation must survive a merge (`M.beside`,
+    -- `M.go`) whose order a skip's position steers.
     --
     -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
     -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
@@ -273,8 +309,13 @@ module Honesty (R : Set) where
     --   ghost's source stands, so the meaning shows it one pre-join skip at
     --   `p ++ [ ix i ]` per source step before its join, and a source step
     --   leaves one fewer.  Witness 950a4208.
+    -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
+    --   step history.  The ghost is the witness's open part (`part`), which
+    --   keeps no count of a source's steps, and a silent run is matched by
+    --   the residual as a set alone (`Ahead`), so no field of the witness
+    --   can keep the count a lane's pre-join skips need.
     -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
-    step-alike : ∀ g → Sane [] g → residual g ≋ after (U.step g)
+    step-skips : ∀ g → Sane [] g → residual g ≃ after (U.step g)
 
     -- The turn, nothing held and no timer queued: the ghost shows
     -- nothing.
@@ -308,6 +349,10 @@ module Honesty (R : Set) where
   -- THE STRONG STEP: from a re-entry configuration the machine runs
   -- silently to the next, or records a least value of the residual, or
   -- ends it.  By the re-entry state.
+  -- The stepper is the meaning, as sets.
+  step-alike : ∀ g → Sane [] g → residual g ≋ after (U.step g)
+  step-alike g sn = same-skips (step-skips g sn)
+
   residual-steps : ∀ g → Sane [] g → Steps (residual g) (U.step g)
   residual-steps g sn = steps-after (U.step g) (step-alike g sn)
 

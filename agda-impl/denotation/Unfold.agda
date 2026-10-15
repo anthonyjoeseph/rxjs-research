@@ -4,10 +4,11 @@
 -- configuration: one node per operator still running, a `defer` left
 -- unexpanded until its turn.  It has two readings.
 --
--- ITS MEANING (`meaning`, `⟦_⟧`): each node read by its operator's own
--- stream function in `MonotonicList`, the source of a `connect` handed to
--- its joiners whole, as `connectᴰ` hands it.  So a program subscribed is
--- `Denote`'s approximant (`subscribed`).
+-- ITS MEANING (`meaning`): each node read by its operator's own stream
+-- function in `MonotonicList`, the source of a `connect` handed to its
+-- joiners whole, as `connectᴰ` hands it, and a `defer` by the fold's
+-- meaning of what it defers, so no node needs approximants.  So a
+-- program subscribed is `Denote`'s meaning (`subscribed`).
 --
 -- ITS STEPPER (`step`, `unfold`), the test harness's reading of a run: `step`
 -- finds the configuration's next event by structural recursion, and
@@ -44,9 +45,10 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.MonotonicList using (MonotonicList; Events; Events∞; out; skip; end; hush; Time; Pos; ix; last; tick; _<ᵖ_;
   Timeline; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close) renaming (sub to subᴾ; cold to coldᴹ)
 import denotation.MonotonicList as M
-open import denotation.MonotonicList using (Agree; agree-refl; _≈[_]_; agrees; agree; lub; ≈ₖ-refl; ≈ₖ-pred; hot; deferᴰ; ⊥ᴰ)
-open import denotation.Denote using (DenEnv; flatOp; approx) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import denotation.Compositional using (EnvAgree; _∷ᵉ_; lookup-agree; deferᴰ-contractive)
+open import denotation.MonotonicList using (Agree; agree-refl; _≈[_]_; agrees; agree; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; hot; deferᴰ)
+open import denotation.Denote using (DenEnv; flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
+open import denotation.Compositional using (EnvAgree; _∷ᵉ_; lookup-agree; deferᴰ-contractive; approx-ne; from; toward; Compositional; compositional)
+module C = Compositional compositional
 open import denotation.NonExpansive using (mapᴰ-ne; scanᴰ-ne; takeWhileᴰ-ne; flatMapᴰ-ne; beside-ne; hot-ne)
 
 open Events∞
@@ -343,6 +345,15 @@ mutual
 NEnv : List Set → Set₁
 NEnv = All Events
 
+-- A joiner's handle is its source's run, made hot.
+hots : ∀ {Γ} → NEnv Γ → DenEnv Γ
+hots []ᴬ      = []ᴬ
+hots (e ∷ᴬ ρ) = hot e ∷ᴬ hots ρ
+
+lookup-hots : ∀ {Γ A} (ρ : NEnv Γ) (i : A ∈ Γ) → lookup (hots ρ) i ≡ hot (lookup ρ i)
+lookup-hots (e ∷ᴬ ρ) (here refl) = refl
+lookup-hots (e ∷ᴬ ρ) (there i)   = lookup-hots ρ i
+
 -- What a joiner was fed and has not shown, then the rest.
 fedᴺ : ∀ {A} → List (Pos × A) → Events A → Events A
 fedᴺ []             e = e
@@ -357,77 +368,67 @@ outerᴺ : ∀ {A B} → (A → MonotonicList B) → Maybe (Events A) → Maybe 
 outerᴺ f nothing  = nothing
 outerᴺ f (just e) = just (M.mapᴱ f e)
 
--- APPROXIMANT n of a node's meaning: `Denote`'s approximant, for a
--- configuration, every path through more than n `defer`s cut off at ⊥ᴰ.
--- Lexicographic on (n , node), as `approx` is.
+-- A node's meaning, each read by its operator's own stream function, a
+-- `defer` by the fold's meaning of the program it defers.
 mutual
-  meaning : ∀ {Γ A} → ℕ → Node Γ A → NEnv Γ → Events A
-  meaning n       (framesᶜ τ e m)         ρ = M.frames τ e m
-  meaning n       (burstᶜ τ r i b)        ρ = M.burst τ r i b
-  meaning n       (endᶜ p)                ρ = end p
-  meaning n       (ofᶜ p i xs)            ρ = M.ofᴱ p i xs
-  meaning n       (mapᶜ f c)              ρ = M.mapᴱ f (meaning n c ρ)
-  meaning n       (scanᶜ f z c)           ρ = M.scanᴱ f z (meaning n c ρ)
-  meaning n       (takeWhileᶜ i p c)      ρ = M.takeWhileᴱ i p (meaning n c ρ)
-  meaning n       (flatMapᶜ op g o ls qs) ρ =
-    M.go (flatOp op) (outerᴺ (λ a → coldᴹ λ q → meaning n (g a q) ρ) (meaningᴹ n o ρ)) (meanings n ls ρ)
-         (L.map (λ a → coldᴹ λ q → meaning n (g a q) ρ) qs)
-  meaning n       (joinᶜ i p xs e)        ρ = fedᴺ xs (joined i p e ρ)
-  meaning n       (connectᶜ b (live s))   ρ = M.beside (meaning n b (meaning n s ρ ∷ᴬ ρ)) (meaning n s ρ)
-  meaning n       (connectᶜ b (ended c))  ρ = meaning n b (end c ∷ᴬ ρ)
-  meaning zero    (deferᶜ l p)            ρ = M.observe ⊥ᴰ p
-  meaning (suc n) (deferᶜ l p)            ρ = M.observe (deferᴰ (nodeᴹ n (Later.force l) ρ)) p
+  meaning : ∀ {Γ A} → Node Γ A → NEnv Γ → Events A
+  meaning (framesᶜ τ e m)         ρ = M.frames τ e m
+  meaning (burstᶜ τ r i b)        ρ = M.burst τ r i b
+  meaning (endᶜ p)                ρ = end p
+  meaning (ofᶜ p i xs)            ρ = M.ofᴱ p i xs
+  meaning (mapᶜ f c)              ρ = M.mapᴱ f (meaning c ρ)
+  meaning (scanᶜ f z c)           ρ = M.scanᴱ f z (meaning c ρ)
+  meaning (takeWhileᶜ i p c)      ρ = M.takeWhileᴱ i p (meaning c ρ)
+  meaning (flatMapᶜ op g o ls qs) ρ =
+    M.go (flatOp op) (outerᴺ (λ a → coldᴹ λ q → meaning (g a q) ρ) (meaningᴹ o ρ)) (meanings ls ρ)
+         (L.map (λ a → coldᴹ λ q → meaning (g a q) ρ) qs)
+  meaning (joinᶜ i p xs e)        ρ = fedᴺ xs (joined i p e ρ)
+  meaning (connectᶜ b (live s))   ρ = M.beside (meaning b (meaning s ρ ∷ᴬ ρ)) (meaning s ρ)
+  meaning (connectᶜ b (ended c))  ρ = meaning b (end c ∷ᴬ ρ)
+  meaning (deferᶜ l p)            ρ = M.observe (deferᴰ (⟦ Later.force l ⟧ᴰ (hots ρ))) p
 
-  meaningᴹ : ∀ {Γ A} → ℕ → Maybe (Node Γ A) → NEnv Γ → Maybe (Events A)
-  meaningᴹ n nothing  ρ = nothing
-  meaningᴹ n (just c) ρ = just (meaning n c ρ)
+  meaningᴹ : ∀ {Γ A} → Maybe (Node Γ A) → NEnv Γ → Maybe (Events A)
+  meaningᴹ nothing  ρ = nothing
+  meaningᴹ (just c) ρ = just (meaning c ρ)
 
-  meanings : ∀ {Γ A} → ℕ → List (Node Γ A) → NEnv Γ → List (Events A)
-  meanings n []       ρ = []
-  meanings n (c ∷ cs) ρ = meaning n c ρ ∷ meanings n cs ρ
+  meanings : ∀ {Γ A} → List (Node Γ A) → NEnv Γ → List (Events A)
+  meanings []       ρ = []
+  meanings (c ∷ cs) ρ = meaning c ρ ∷ meanings cs ρ
 
-  -- A program subscribed wherever it is asked.
-  nodeᴹ : ∀ {Γ A} → ℕ → Obs Timeline Γ A → NEnv Γ → MonotonicList A
-  nodeᴹ n o ρ = coldᴹ λ p → meaning n (subscribe o p) ρ
-
--- THE MEANING: the limit of the approximants.
-⟦_⟧ : ∀ {Γ A} → Obs Timeline Γ A → Srcs Γ → MonotonicList A
-⟦ o ⟧ δ = lub λ n → coldᴹ λ p → meaning n (wrap δ (subscribe o p)) []ᴬ
+-- A program subscribed wherever it is asked.
+nodeᴹ : ∀ {Γ A} → Obs Timeline Γ A → NEnv Γ → MonotonicList A
+nodeᴹ o ρ = coldᴹ λ p → meaning (subscribe o p) ρ
 
 ------------------------------------------------------------------------
 -- The meaning is the fold's
 
--- A joiner's handle is its source's run, made hot.
-hots : ∀ {Γ} → NEnv Γ → DenEnv Γ
-hots []ᴬ      = []ᴬ
-hots (e ∷ᴬ ρ) = hot e ∷ᴬ hots ρ
+start-meaning : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → meaning (startᶜ p m) ρ ≡ M.start p m
+start-meaning p (at zero _ b)    ρ = refl
+start-meaning p (at (suc _) _ b) ρ = refl
+start-meaning p done             ρ = refl
+start-meaning p quiet            ρ = refl
 
-lookup-hots : ∀ {Γ A} (ρ : NEnv Γ) (i : A ∈ Γ) → lookup (hots ρ) i ≡ hot (lookup ρ i)
-lookup-hots (e ∷ᴬ ρ) (here refl) = refl
-lookup-hots (e ∷ᴬ ρ) (there i)   = lookup-hots ρ i
+-- The fold's meaning reads its environment non-expansively.
+⟦⟧-ne : ∀ {Γ A k} (o : Obs Timeline Γ A) {ρ σ : DenEnv Γ} → EnvAgree k ρ σ → ⟦ o ⟧ᴰ ρ ≈[ k ] ⟦ o ⟧ᴰ σ
+⟦⟧-ne {k = k} o {ρ} {σ} e = ≈ₖ-trans (from k o ρ) (≈ₖ-trans (approx-ne k o e) (toward k o σ))
 
-start-meaning : ∀ {Γ A} n p (m : From A 0) (ρ : NEnv Γ) → meaning n (startᶜ p m) ρ ≡ M.start p m
-start-meaning n p (at zero _ b)    ρ = refl
-start-meaning n p (at (suc _) _ b) ρ = refl
-start-meaning n p done             ρ = refl
-start-meaning n p quiet            ρ = refl
-
--- Approximant n of a program's meaning is the fold's, for as long as the
+-- A program subscribed is the fold's meaning, for as long as the
 -- environments agree.
-subscribed : ∀ {Γ A k} n (o : Obs Timeline Γ A) {ρ : NEnv Γ} {σ : DenEnv Γ} → EnvAgree k (hots ρ) σ → nodeᴹ n o ρ ≈[ k ] approx n o σ
-subscribed n       (cold c)          {ρ} e = agrees λ p →
-  subst (λ x → Agree _ x (M.start p (lower c))) (sym (start-meaning n p (lower c) ρ)) (agree-refl _ _)
-subscribed n       empty             e = ≈ₖ-refl _
-subscribed n       (of xs)           e = ≈ₖ-refl _
-subscribed n       (map f s)         e = mapᴰ-ne f (subscribed n s e)
-subscribed n       (scan f z s)      e = scanᴰ-ne f z (subscribed n s e)
-subscribed n       (takeWhile i p s) e = takeWhileᴰ-ne i p (subscribed n s e)
-subscribed n       (flatMap op f s)  {ρ} e =
-  flatMapᴰ-ne (flatOp op) {f = λ a → nodeᴹ n (f a) ρ} (subscribed n s e) λ a → subscribed n (f a) e
-subscribed n       (connect s b)     e = agrees λ p →
-  beside-ne (agree (subscribed n b (hot-ne (agree src (p ++ [ ix 1 ])) ∷ᵉ e)) (p ++ [ ix 0 ])) (agree src (p ++ [ ix 1 ]))
-  where src = subscribed n s e
-subscribed {k = k} n (connected i) {ρ} {σ} e =
-  agrees λ p → agree (subst (λ r → r ≈[ k ] lookup σ i) (lookup-hots ρ i) (lookup-agree e i)) p
-subscribed zero    (defer l)         e = ≈ₖ-refl _
-subscribed (suc n) (defer l)         e = ≈ₖ-pred (deferᴰ-contractive (subscribed n (Later.force l) e))
+subscribed : ∀ {Γ A k} (o : Obs Timeline Γ A) {ρ : NEnv Γ} {σ : DenEnv Γ} → EnvAgree k (hots ρ) σ → nodeᴹ o ρ ≈[ k ] ⟦ o ⟧ᴰ σ
+subscribed {k = k} (cold c) {ρ} {σ} e = ≈ₖ-trans (agrees λ p →
+  subst (λ x → Agree _ x (M.start p (lower c))) (sym (start-meaning p (lower c) ρ)) (agree-refl _ _)) (≈ₖ-sym (C.coldᶜ c σ k))
+subscribed {k = k} empty             {σ = σ} e = ≈ₖ-sym (C.emptyᶜ σ k)
+subscribed {k = k} (of xs)           {σ = σ} e = ≈ₖ-sym (C.ofᶜ xs σ k)
+subscribed {k = k} (map f s)         {σ = σ} e = ≈ₖ-trans (mapᴰ-ne f (subscribed s e)) (≈ₖ-sym (C.mapᶜ f s σ k))
+subscribed {k = k} (scan f z s)      {σ = σ} e = ≈ₖ-trans (scanᴰ-ne f z (subscribed s e)) (≈ₖ-sym (C.scanᶜ f z s σ k))
+subscribed {k = k} (takeWhile i p s) {σ = σ} e = ≈ₖ-trans (takeWhileᴰ-ne i p (subscribed s e)) (≈ₖ-sym (C.takeWhileᶜ i p s σ k))
+subscribed {k = k} (flatMap op f s)  {ρ} {σ} e =
+  ≈ₖ-trans (flatMapᴰ-ne (flatOp op) {f = λ a → nodeᴹ (f a) ρ} (subscribed s e) λ a → subscribed (f a) e) (≈ₖ-sym (C.flatMapᶜ op f s σ k))
+subscribed {k = k} (connect s b)     {σ = σ} e = ≈ₖ-trans (agrees λ p →
+  beside-ne (agree (subscribed b (hot-ne (agree src (p ++ [ ix 1 ])) ∷ᵉ e)) (p ++ [ ix 0 ])) (agree src (p ++ [ ix 1 ])))
+  (≈ₖ-sym (C.connectᶜ s b σ k))
+  where src = subscribed s e
+subscribed {k = k} (connected i)     {ρ} {σ} e = ≈ₖ-trans (agrees λ p →
+  agree (subst (λ r → r ≈[ k ] lookup σ i) (lookup-hots ρ i) (lookup-agree e i)) p) (≈ₖ-sym (C.connectedᶜ i σ k))
+subscribed {k = k} (defer l)         {ρ} {σ} e = ≈ₖ-trans (agrees λ p → agree-refl _ _)
+  (≈ₖ-trans (≈ₖ-pred (deferᴰ-contractive (⟦⟧-ne (Later.force l) e))) (≈ₖ-sym (C.deferᶜ l σ k)))
