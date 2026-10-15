@@ -53,13 +53,13 @@ Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger,
 
 Standing approval for any change — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
 
-**The `Obs` tree (`Tree.agda`) is FIXED, and the engine is not (Anthony).** Its formers are not the spec, so the standing approval above reads as licensing a new one — it does not. Engine internals are free: the kernels, the runtimes, the relation, whatever makes it work and provable. A change that needs a new `Obs` former, or re-types an existing one, is a question instead.
+**The `Obs` tree (`Tree.agda`) is FIXED, and the engine is not (Anthony).** Its formers are not the batchSimultaneous spec, so the standing approval above reads as licensing a new one — it does not. Engine internals are free: the kernels, the runtimes, the relation, whatever makes it work and provable. A change that needs a new `Obs` former, or re-types an existing one, is a question instead.
 
 **The stop conditions are exhaustive — nothing else is one (Anthony: "never stop working until you hit a stop condition").** All three are questions only Anthony can answer:
 
-- **The semantics must move** — the denotation disagrees with real rxjs in a way that is not a bug in either, or the spec's statement needs restating. A question, never a patch.
+- **The semantics must move** — the denotation disagrees with real rxjs in a way that is not a bug in either, or the batchSimultaneous spec's statement needs restating. A question, never a patch.
 - **The proof is SPIRALLING** — the same region producing FALSITY across three successive subdivisions. Reconsider the mechanism, don't subdivide a fourth time.
-- **The impossibility pair** — two programs whose primitives produce byte-identical emit streams (same provenances, init/close, values, order) but that genuinely batch differently in real rxjs. **STOP and tell Anthony; do not act on it.** Not the same as "impl disagrees with spec", which is just a bug to fix in the impl.
+- **The impossibility pair** — two programs whose primitives produce byte-identical emit streams (same provenances, init/close, values, order) but that genuinely batch differently in real rxjs. **STOP and tell Anthony; do not act on it.** Not the same as "the batchSimultaneous impl disagrees with the batchSimultaneous spec", which is just a bug to fix in the impl.
 
 ## The goal
 
