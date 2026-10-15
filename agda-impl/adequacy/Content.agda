@@ -22,7 +22,7 @@ open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Nat.Properties using (suc-injective; ≤-refl)
+open import Data.Nat.Properties using (suc-injective; ≤-refl; m<n⇒m<1+n)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
@@ -30,7 +30,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Level using (lift)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _+_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
@@ -39,7 +39,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
-  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; _<ᵖ_; <ᵖ-tick)
+  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; _<ᵖ_; <ᵖ-tick; <ᵖ-trans)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import denotation.Compositional using ([]ᵉ)
@@ -65,8 +65,9 @@ module Honesty (R : Set) where
   open Heap using (_⊑_; Handle)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
-    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot)
-  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; bottomAs; restAs; bottomᴴ; restᴴ; BurstAs;
+    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗;
+    Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; taken; feeding; finishing)
+  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
   open Moving R using (pend; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
@@ -267,20 +268,36 @@ module Honesty (R : Set) where
   ----------------------------------------------------------------------
   -- WHAT IS LEFT BEFORE THE GHOST MOVES
 
+  -- The control's own work: the calls owed and the frames they wait in,
+  -- code about to run counted once.  What the ghost never sees: a
+  -- continuation handed its unsubscribe, a cut, a frame resumed.
+  work : ∀ {h} {t : Sub h [] R} {w p} {σ : w ⊑ h} {K bs} → StackAs t p σ K bs → ℕ
+  work bottomAs             = 0
+  work (restAs ks _ K)      = suc (length ks + work K)
+  work (backAs _ ks _ _ K)  = suc (length ks + work K)
+  work (reholdAs _ _ K)     = suc (work K)
+
+  weight : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → ℕ
+  weight calmAs          = 0
+  weight (noteAs ks _ K) = suc (length ks + work K)
+  weight (runAs ks _ K)  = suc (length ks + work K)
+  weight (subAs _ _ K)   = suc (work K)
+  weight (burstAs _ _ K) = work K
+
   -- THE WORK LEFT AT A RE-ENTRY CONFIGURATION, in order: subscriptions
-  -- owed, timers queued, bursts held.
+  -- owed, timers queued, bursts held, the control's own.
   Measure : Set
-  Measure = ℕ × ℕ × ℕ
+  Measure = ℕ × ℕ × ℕ × ℕ
 
   _≺_ : Measure → Measure → Set
-  _≺_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_)
+  _≺_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_))
 
   ≺-wf : WellFounded _≺_
-  ≺-wf = ×-wellFounded <-wellFounded (×-wellFounded <-wellFounded <-wellFounded)
+  ≺-wf = ×-wellFounded <-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded <-wellFounded))
 
   measure : ∀ {g m} → Strong g m → Measure
-  measure {m = m} (carried cr) = pend (Carried.tree cr) , length (Mach.timers m) , length (Mach.bursts m)
-  measure (closing _ _ _ _ _)  = 0 , 0 , 0
+  measure {m = m} (carried cr) = pend (Carried.tree cr) , length (Mach.timers m) , length (Mach.bursts m) , weight (Carried.ctlAs cr)
+  measure (closing _ _ _ _ _)  = 0 , 0 , 0 , 0
 
   -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
   -- past a skip of its residual; or the ghost alike, less work left; or
@@ -318,19 +335,88 @@ module Honesty (R : Set) where
   step-skips : ∀ g → Sane [] g → Placed g [] → residual g ≃ after (U.step g)
   step-skips g sn pl = os g [] tt sn pl tt
 
+  -- `m`, carried, runs silently on to a re-entry configuration it gains.
+  Hops : ∀ {g m} → Carried g m → Set₁
+  Hops {m = m} cr = ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+  -- What the control is about to run: a subscription begun, or the
+  -- agenda's first call.
+  opening : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Bool
+  opening (subAs _ _ _) = true
+  opening _             = false
+
+  firstCall : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Maybe (Call t)
+  firstCall (runAs (k ∷ _) _ _) = just k
+  firstCall _                   = nothing
+
+  -- The control moved, owing what it owed.
+  owned-move : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {p c bs p₀ c₀ bs₀} {ca : CtlAs t p c bs} (ca₀ : CtlAs t p₀ c₀ bs₀)
+             → agenda t ca₀ ≡ agenda t ca → bursts t ca₀ ≡ bursts t ca → begins t ca₀ ≡ begins t ca
+             → Owned H t ca → Owned H t ca₀
+  owned-move H {t} ca₀ ag bu be ow = record
+    { ofs    = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.ofs ow π)
+    ; plays  = λ π nsp → subst (λ z → _ ∈ᴸ z) (sym bu) (Owned.plays ow π nsp)
+    ; fires  = λ π nsp → subst (λ z → _ ∈ᴸ z) (sym bu) (Owned.fires ow π nsp)
+    ; begun  = λ π → subst (λ z → _ ∈ᴸ z) (sym be) (Owned.begun ow π)
+    ; ends   = λ π l → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.ends ow π l)
+    ; cuts   = λ π l → proj₁ (Owned.cuts ow π l) , subst (λ z → _ ∈ᴸ z) (sym ag) (proj₂ (Owned.cuts ow π l))
+    ; feeds  = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.feeds ow π)
+    ; fins   = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.fins ow π)
+    ; placed = subst (All (Placedᴬ t)) (sym ag) (Owned.placed ow) }
+
   postulate
     -- The turn, nothing held and no timer queued: the ghost shows
     -- nothing.
     turn-dry : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
              → Mach.bursts m ≡ [] → Mach.timers m ≡ [] → ∀ {k b} → Has (residual g) k b → ⊥
 
-    -- Code run, a subscription begun or the agenda, runs silently to the
-    -- next re-entry state: past a defer's skip, a lane admitted, its
-    -- pending node begun, or a value reaching its note.  The measure has
-    -- no part for the agenda, so a hop returning to the driver's turn with
-    -- the ghost alike gains only by running on past the turn.
-    run-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
-               → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    -- A subscription begun at its pending node, its kernel run to the
+    -- next re-entry state: its program smaller by what was begun, or
+    -- past a defer's skip.
+    sub-onward : ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
+
+    -- An `of`'s next value climbs the observers above it: to the root's
+    -- note, past a skip (a connect's feed, a lane admitted, a stall), or
+    -- to a takeWhile's end.
+    emit-onward : ∀ {g m} (cr : Carried g m) {Δ A p i xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i xs))
+                → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → Hops cr
+
+    -- A subscription's continuation handed its unsubscribe, which it
+    -- stashes: the ghost alike, a call fewer.
+    kont-onward : ∀ {g m} (cr : Carried g m) {Δ A} {u : Sub _ Δ A} (π : Path (Carried.tree cr) u)
+                → firstCall (Carried.ctlAs cr) ≡ just (kontC π) → Hops cr
+
+    -- A takeWhile's completion delivered under its failing value, then
+    -- its cut.
+    take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q) s))
+                 → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → Hops cr
+
+    -- A completed takeWhile's cut: its kill switch thrown, its source's
+    -- unsubscribe run; the ghost alike, a call fewer.
+    take2-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k taken s))
+                 → firstCall (Carried.ctlAs cr) ≡ just (take2C π) → Hops cr
+
+    -- A connect's cut once its body completes: the ghost alike, a call
+    -- fewer.
+    body-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
+                  (π : Path (Carried.tree cr) (connectˢ S c b kb k fd e s bd))
+                → firstCall (Carried.ctlAs cr) ≡ just (bodyC π) → Hops cr
+
+    -- The rest of a connect's feed of a value: each subscriber left
+    -- shows it or skips it.
+    feed-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k x r ss e} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
+                  (π : Path (Carried.tree cr) (connectˢ S c b kb k (feeding x r ss) e s bd))
+                → firstCall (Carried.ctlAs cr) ≡ just (feedC π) → Hops cr
+
+    -- The rest of a connect's feed of its source's end.
+    fin-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
+                 (π : Path (Carried.tree cr) (connectˢ S c b kb k (finishing r ss) e s bd))
+               → firstCall (Carried.ctlAs cr) ≡ just (finC π) → Hops cr
+
+    -- A connect's source subscribed once its body is: its program begun.
+    src-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e s₁ q} {bd : Sub _ (A ∷ Δ) B}
+                 (π : Path (Carried.tree cr) (connectˢ S c b kb k fd e (pendingˢ {Δ = Δ} s₁ q) bd))
+               → firstCall (Carried.ctlAs cr) ≡ just (srcC π) → Hops cr
 
     -- A live burst's sink polled: open, the frame to play; closed, the
     -- burst dropped and the stack resumed.
@@ -404,7 +490,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned = owned-spent hp calmAs sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , ≤-refl)))
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
   burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
     cr@record { tree = t ; ctlAs = burstAs x restᴴ (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = q
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl sp eq
@@ -415,7 +501,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned = owned-spent hp (runAs ks e K″) sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , ≤-refl)))
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
 
   -- A burst's frame stepped: found spent, polled, or played.
   burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
@@ -424,6 +510,87 @@ module Honesty (R : Set) where
   ... | true  | _     = burst-spent cr c bq sp eq
   ... | false | false = burst-poll cr c bq sp pl eq
   ... | false | true  = burst-play cr c bq sp pl eq
+
+  -- CODE RUNS SILENTLY ON TO A RE-ENTRY STATE: a subscription begun, the
+  -- agenda's first call, or the agenda done and its stack resumed: a
+  -- frame's rest, a scope's continuation at the position it puts back, a
+  -- burst held, the turn.  The ghost alike, the control's work less.
+  run-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
+             → Hops cr
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs _ _ _ } refl eq = sub-onward cr refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (emitC π ∷ _) _ _ } refl eq = emit-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (kontC π ∷ _) _ _ } refl eq = kont-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (take1C π ∷ _) _ _ } refl eq = take1-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (take2C π ∷ _) _ _ } refl eq = take2-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (bodyC π ∷ _) _ _ } refl eq = body-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (feedC π ∷ _) _ _ } refl eq = feed-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (finC π ∷ _) _ _ } refl eq = fin-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (srcC π ∷ _) _ _ } refl eq = src-onward cr π refl eq
+  run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
+    cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) bottomAs ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+              ; books = record { fresh = fs ; paidUp = refl ; running = rn } } refl refl =
+    g , _ , then refl now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
+        ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
+        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
+  run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
+    cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+              ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
+    g , _ , then refl now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
+        ; owned = owned-move hp (runAs ks e K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
+  run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
+    cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (backAs q ks qp e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+              ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
+    g , _ , then refl now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
+        ; owned = owned-move hp (runAs ks e K″) refl refl refl ow ; kernels = kn ; meaning = mn
+        ; queue = record { timed = Queue.timed qu ; joined = Queue.joined qu ; ordered = Queue.ordered qu
+                         ; ahead = map (λ { (c , a) → c , <ᵖ-trans q p _ qp a }) (Queue.ahead qu) }
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl))))
+  run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
+    cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (playsAs π) hᴷ K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+              ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
+    g , _ , then refl now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = burstAs (playsAs π) hᴷ K″ ; meets = mt
+        ; owned = owned-move hp (burstAs (playsAs π) hᴷ K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , m<n⇒m<1+n ≤-refl))))
+  run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
+    cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (firesAs π) hᴷ K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+              ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
+    g , _ , then refl now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = burstAs (firesAs π) hᴷ K″ ; meets = mt
+        ; owned = owned-move hp (burstAs (firesAs π) hᴷ K″) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₂ (refl , m<n⇒m<1+n ≤-refl))))
+  run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
+    cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs bottomᴴ bottomAs) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+              ; books = record { fresh = fs ; paidUp = refl ; running = rn } } refl refl =
+    g , _ , then refl (then refl now)
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
+        ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
+        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
+  run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
+    cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs restᴴ (restAs ks e K‴)) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn
+              ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
+    g , _ , then refl (then refl now)
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K‴ ; meets = mt
+        ; owned = owned-move hp (runAs ks e K‴) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
+        ; books = record { fresh = fs ; clocked = proj₂ (proj₂ ck) ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))
 
   -- Past a value recorded, the run runs the stepped ghost: the record's
   -- continuation is the agenda, about to run.
@@ -490,7 +657,7 @@ module Honesty (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt ; owned = ow
         ; kernels = kn ; meaning = mn
-        ; queue = record { past = Queue.past q ; timed = timed-spent {H = hp} sp (Queue.timed q) ; joined = Queue.joined q
+        ; queue = record { timed = timed-spent {H = hp} sp (Queue.timed q) ; joined = Queue.joined q
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₁ ≤-refl))
@@ -507,8 +674,7 @@ module Honesty (R : Set) where
         ; kernels = record { holds = holds-plant hp {t = t} π v refl (λ h → h) (Kernels.holds kn)
                            ; gated = gated-plant hp {t = t} π v refl (λ _ → lift (λ _ → refl)) (λ d → λ { here → d here }) (Kernels.gated kn) }
         ; meaning = record { fed = fed-plant hp {t = t} π v (λ _ f → f) _ (Meaning.fed mn) }
-        ; queue = record { past = subst (All _) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.past q)
-                         ; timed = timed-pop hp {t = t} π (Queue.timed q) (Queue.ordered q) fs
+        ; queue = record { timed = timed-pop hp {t = t} π (Queue.timed q) (Queue.ordered q) fs
                          ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl , tt ; paidUp = refl ; running = rn } })

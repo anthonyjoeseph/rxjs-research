@@ -763,12 +763,13 @@ module Strongly (R : Set) where
     -- the position the frame resumes at: a scope's, the one it puts back;
     -- any other, the one control returns to it at.  A delivery the driver
     -- fed returns to the burst it came from.  Indexed by the position
-    -- control returns at, and the driver's bursts the stack's own.
+    -- control returns at, and the driver's bursts the stack's own.  A
+    -- scope's position below the one it returns from.
     data StackAs : ∀ {w} → Pos → w ⊑ h → Stack w ⊤ → List (Maybe (Playing h)) → Set₁ where
       bottomAs : ∀ {w p} {σ : w ⊑ h} → StackAs p σ bottom []
       restAs   : ∀ {u w p bs} {m : Act w ⊤} {ρ : u ⊑ w} {σ : w ⊑ h} {K} (ks : List (Call t))
                → wkAct σ m ≗ ⟦ ks ⟧ → StackAs p (ρ ⨾ σ) K bs → StackAs p σ (push (rest m) ρ K) bs
-      backAs   : ∀ {u w p bs} q {m : Act w ⊤} {ρ : u ⊑ w} {σ : w ⊑ h} {K} (ks : List (Call t))
+      backAs   : ∀ {u w p bs} q {m : Act w ⊤} {ρ : u ⊑ w} {σ : w ⊑ h} {K} (ks : List (Call t)) → q <ᵖ p ≡ true
                → wkAct σ m ≗ ⟦ ks ⟧ → StackAs q (ρ ⨾ σ) K bs → StackAs p σ (push (back q m) ρ K) bs
       reholdAs : ∀ {u w p bs b} {ρ : u ⊑ w} {σ : w ⊑ h} {K}
                → BurstAs b → Held K → StackAs p (ρ ⨾ σ) K bs → StackAs p σ (push rehold ρ K) (b ∷ bs)
@@ -797,7 +798,7 @@ module Strongly (R : Set) where
     stackJobs : ∀ {w p σ bs} {K : Stack w ⊤} → StackAs p σ K bs → List (Job t)
     stackJobs bottomAs             = []
     stackJobs (restAs {p = p} ks _ K) = at⟦ p ⟧ ks ++ stackJobs K
-    stackJobs (backAs q ks _ K)    = at⟦ q ⟧ ks ++ stackJobs K
+    stackJobs (backAs q ks _ _ K)  = at⟦ q ⟧ ks ++ stackJobs K
     stackJobs (reholdAs _ _ K)     = stackJobs K
 
     burstSpots : ∀ {b} → BurstAs b → List (Spot t)
@@ -808,7 +809,7 @@ module Strongly (R : Set) where
     stackBursts : ∀ {w p σ bs} {K : Stack w ⊤} → StackAs p σ K bs → List (Spot t)
     stackBursts bottomAs        = []
     stackBursts (restAs _ _ K)  = stackBursts K
-    stackBursts (backAs _ _ _ K) = stackBursts K
+    stackBursts (backAs _ _ _ _ K) = stackBursts K
     stackBursts (reholdAs b _ K) = burstSpots b ++ stackBursts K
 
     agenda : ∀ {p c bs} → CtlAs p c bs → List (Job t)
@@ -858,7 +859,7 @@ module Strongly (R : Set) where
     Ticked : ∀ {w p σ bs} {K : Stack w ⊤} → ℕ → StackAs p σ K bs → Set
     Ticked n bottomAs                 = ⊤
     Ticked n (restAs {p = p} _ _ K)   = n ≡ tick p × Ticked n K
-    Ticked n (backAs q _ _ K)         = n ≡ tick q × Ticked n K
+    Ticked n (backAs q _ _ _ K)       = n ≡ tick q × Ticked n K
     Ticked n (reholdAs b _ K)         = BurstClocked n b × Ticked n K
 
     Clocked : ∀ {p c bs} → ℕ → CtlAs p c bs → Set
@@ -911,13 +912,11 @@ module Strongly (R : Set) where
     field
       fed : Fed t []ᴬ
 
-  -- Every joiner joined no later than the run's position; the queue, its
-  -- pending frames and dead ones, in order, each due no earlier than now
+  -- The queue, its pending frames and dead ones, in order, each due no earlier than now
   -- and past where the run is; the subjects' subscribers its joiners.
   record Queue {h} (H : Heapᴹ h) (p : Pos) (clock : ℕ) (timers : List (Timer h)) (t : Sub h [] R) : Set₁ where
     open At H
     field
-      past    : All (λ j → p <ᵖ Joiner.at′ j ≡ false) (joiners t []ᴬ)
       timed   : Timed timers (pendings t)
       joined  : Joined (subjects t) (joiners t []ᴬ)
       ordered : Linked (λ x y → cascade x <ᵖ cascade y ≡ true) timers
@@ -995,5 +994,5 @@ module Strongly (R : Set) where
                        ; placed = []ᴬ }
     ; kernels = record { holds = _ ; gated = _ }
     ; meaning = record { fed = _ }
-    ; queue   = record { past = []ᴬ ; timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
+    ; queue   = record { timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
     ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl } }

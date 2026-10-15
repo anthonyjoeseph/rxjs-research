@@ -177,18 +177,16 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `burst-poll`, then `burst-play` and `run-onward`,
-  carry liveness: each silent hop passes a skip, leaves the ghost alike
-  and lowers `measure`, or reaches a step that is not silent.
-  `burst-poll` first: a poll runs its sink's `isClosed` under a `told`
-  frame back to the turn. Decides whether `Holds` pins that callback to
-  a read of the cold's liveness, a fixed few silent steps, or whether a
-  poll needs a re-entry state of its own. Ruled out: a resume with no
-  re-entry state (`runAs` is one, the agenda about to run); a held stack
-  topped by a scope or a rehold (`Held`), so no resume loops or returns
-  to a scope's position; a clock unpaid at a frame's return (`Ticked`);
-  a move needing more of its subtree than its node's premises; a
-  ghost-only marker in the shared machine.
+- **THE PROGRESS.** `emit-onward` and `sub-onward`, then the other
+  `-onward` leaves and `burst-poll`, carry liveness: each silent hop
+  passes a skip, shows a value, or leaves the ghost alike with less work
+  left. `emit-onward` first: an `of`'s value climbs the observers along
+  its `Path` to a note, a skip or an end. Decides whether that climb is
+  one induction on the path, the walk `walk` already is, with each
+  operator's step a lemma. Ruled out: a resume needing anything but the
+  frame it pops (proven); a measure blind to a cut, a continuation or a
+  frame (the control's `weight`); a queue bound on joiners, which a
+  scope's return breaks; a polled burst as a re-entry state.
 - **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
@@ -263,8 +261,24 @@ by their own silent steps (`Mirror`).
   value the ghost holds.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
-- **`run-onward`** (Content) — FALSITY, `NO EVIDENCE`: code run, a subscription
-  begun or the agenda, runs silently to the next re-entry state.
+- **`emit-onward`** (Content) — FALSITY, `NO EVIDENCE`: an `of`'s next value
+  climbs its observers to a note, a skip or an end.
+- **`sub-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription begun
+  runs its kernel to the next re-entry state.
+- **`feed-onward`** (Content) — FALSITY, `NO EVIDENCE`: the rest of a connect's
+  feed of a value, each subscriber showing or skipping it.
+- **`fin-onward`** (Content) — FALSITY, `NO EVIDENCE`: the rest of a connect's
+  feed of its source's end.
+- **`take1-onward`** (Content) — FALSITY, `NO EVIDENCE`: a takeWhile's
+  completion delivered, then its cut.
+- **`src-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
+  subscribed once its body is.
+- **`take2-onward`** (Content) — FALSITY, `NO EVIDENCE`: a completed
+  takeWhile's cut, a call fewer.
+- **`body-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's cut once
+  its body completes, a call fewer.
+- **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's
+  continuation stashes its unsubscribe, a call fewer.
 - **`burst-poll`** (Content) — FALSITY, `NO EVIDENCE`: a live burst's sink
   polled, open to play or closed and dropped.
 - **`burst-play`** (Content) — FALSITY, `NO EVIDENCE`: a polled burst's frame
