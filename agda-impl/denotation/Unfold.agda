@@ -1,22 +1,27 @@
 {-# OPTIONS --guardedness #-}
 
--- A PROGRAM TREE'S MEANING, UNFOLDED.  A subscription is an inductive
+-- A RUN IN PROGRESS, AS A CONFIGURATION.  A subscription is an inductive
 -- configuration: one node per operator still running, a `defer` left
--- unexpanded until its turn.  `step` finds the configuration's next event
--- by structural recursion, and `unfold` repeats it, guarded by the event
--- it found.  So the meaning is productive without fuel and without
--- approximants, recursion through `defer` included.
+-- unexpanded until its turn.  It has two readings.
 --
--- Each node but `connect` steps exactly as its operator in `MonotonicList`
--- does, clause for clause, positions included.  There a joiner reads the
--- source's whole run ahead, rekeyed; here a `connect` steps its source once,
--- beside its body, and feeds each value to the joiners the body holds,
--- as an rxjs Subject's `next` does: a joiner shows what it was fed, at
--- the value's position under its own.  A configuration is typed by the
--- connects in scope, so a joiner names its connect and is fed only its
--- values.
+-- ITS MEANING (`meaning`, `⟦_⟧`): each node read by its operator's own
+-- stream function in `MonotonicList`, the source of a `connect` handed to
+-- its joiners whole, as `connectᴰ` hands it.  So a program subscribed is
+-- `Denote`'s approximant (`subscribed`), and its meaning the fold's
+-- (`denoted`).
 --
--- DEAD ROUTE: `⟦_⟧` by guarded corecursion over the tree directly, the
+-- ITS STEPPER (`step`, `unfold`), the machine's proof device: `step`
+-- finds the configuration's next event by structural recursion, and
+-- `unfold` repeats it, guarded by the event it found, so it needs no
+-- approximants.  Each node but `connect` steps exactly as its operator's
+-- stream function does, clause for clause, positions included; a
+-- `connect` steps its source once, beside its body, and feeds each value
+-- to the joiners the body holds, as an rxjs Subject's `next` does: a
+-- joiner shows what it was fed, at the value's position under its own.
+-- A configuration is typed by the connects in scope, so a joiner names
+-- its connect and is fed only its values.
+--
+-- DEAD ROUTE: the meaning by guarded corecursion over the tree directly, the
 --   `defer` clause a `skip` whose tail is `⟦ force l ⟧`.  Agda refuses it:
 --   every other clause puts its recursive call under a stream function
 --   (`mapᴱ`, `go`, `rejoin`), which could strip the guard, so the call
@@ -31,12 +36,20 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Level using (lower)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
+import Data.List as L
 
 import Tree as T
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList using (MonotonicList; Events; Events∞; out; skip; end; hush; Time; Pos; ix; last; tick; _<ᵖ_;
   Timeline; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close) renaming (sub to subᴾ; cold to coldᴹ)
+import denotation.MonotonicList as M
+open import denotation.MonotonicList using (Agree; agree-refl; _≈[_]_; _≈_; agrees; agree; Settling; lub; lub-limit; ≈ₖ-refl; ≈ₖ-sym;
+  ≈ₖ-trans; ≈ₖ-pred; hot; deferᴰ; ⊥ᴰ)
+open import denotation.Denote using (DenEnv; flatOp; approx) renaming (⟦_⟧ to ⟦_⟧ᴰ)
+open import denotation.Compositional using (EnvAgree; []ᵉ; _∷ᵉ_; lookup-agree; deferᴰ-contractive; settles; toward)
+open import denotation.NonExpansive using (mapᴰ-ne; scanᴰ-ne; takeWhileᴰ-ne; flatMapᴰ-ne; beside-ne; hot-ne)
 
 open Events∞
 
@@ -310,7 +323,7 @@ mutual
     where so = step o
 
 ------------------------------------------------------------------------
--- The meaning
+-- The stepper's run
 
 mutual
   unfold : ∀ {Γ A} → Node Γ A → Events A
@@ -322,5 +335,109 @@ mutual
   shown (endˢ k)     = end k
   shown hushˢ        = hush
 
+⟦_⟧ˢ : ∀ {Γ A} → Obs Timeline Γ A → Srcs Γ → MonotonicList A
+⟦ o ⟧ˢ δ = coldᴹ λ p → unfold (wrap δ (subscribe o p))
+
+------------------------------------------------------------------------
+-- The meaning: each node read by its operator's own stream function
+
+-- Each connect in scope, as its source's run from where the source stands.
+NEnv : List Set → Set₁
+NEnv = All Events
+
+-- What a joiner was fed and has not shown, then the rest.
+fedᴺ : ∀ {A} → List (Pos × A) → Events A → Events A
+fedᴺ []             e = e
+fedᴺ ((q , a) ∷ xs) e = out q a λ where .force → fedᴺ xs e
+
+-- A joiner after its feed: told its end, or the source's run, rejoined.
+joined : ∀ {Γ A} → A ∈ Γ → Pos → Maybe Pos → NEnv Γ → Events A
+joined i p (just c) ρ = end c
+joined i p nothing  ρ = M.rejoin p 0 (lookup ρ i)
+
+outerᴺ : ∀ {A B} → (A → MonotonicList B) → Maybe (Events A) → Maybe (Events (MonotonicList B))
+outerᴺ f nothing  = nothing
+outerᴺ f (just e) = just (M.mapᴱ f e)
+
+-- APPROXIMANT n of a node's meaning: `Denote`'s approximant, for a
+-- configuration, every path through more than n `defer`s cut off at ⊥ᴰ.
+-- Lexicographic on (n , node), as `approx` is.
+mutual
+  meaning : ∀ {Γ A} → ℕ → Node Γ A → NEnv Γ → Events A
+  meaning n       (framesᶜ τ e m)         ρ = M.frames τ e m
+  meaning n       (burstᶜ τ r i b)        ρ = M.burst τ r i b
+  meaning n       (endᶜ p)                ρ = end p
+  meaning n       (ofᶜ p i xs)            ρ = M.ofᴱ p i xs
+  meaning n       (mapᶜ f c)              ρ = M.mapᴱ f (meaning n c ρ)
+  meaning n       (scanᶜ f z c)           ρ = M.scanᴱ f z (meaning n c ρ)
+  meaning n       (takeWhileᶜ i p c)      ρ = M.takeWhileᴱ i p (meaning n c ρ)
+  meaning n       (flatMapᶜ op g o ls qs) ρ =
+    M.go (flatOp op) (outerᴺ (λ a → coldᴹ λ q → meaning n (g a q) ρ) (meaningᴹ n o ρ)) (meanings n ls ρ)
+         (L.map (λ a → coldᴹ λ q → meaning n (g a q) ρ) qs)
+  meaning n       (joinᶜ i p xs e)        ρ = fedᴺ xs (joined i p e ρ)
+  meaning n       (connectᶜ b (live s))   ρ = M.beside (meaning n b (meaning n s ρ ∷ᴬ ρ)) (meaning n s ρ)
+  meaning n       (connectᶜ b (ended c))  ρ = meaning n b (end c ∷ᴬ ρ)
+  meaning zero    (deferᶜ l p)            ρ = M.observe ⊥ᴰ p
+  meaning (suc n) (deferᶜ l p)            ρ = M.observe (deferᴰ (nodeᴹ n (Later.force l) ρ)) p
+
+  meaningᴹ : ∀ {Γ A} → ℕ → Maybe (Node Γ A) → NEnv Γ → Maybe (Events A)
+  meaningᴹ n nothing  ρ = nothing
+  meaningᴹ n (just c) ρ = just (meaning n c ρ)
+
+  meanings : ∀ {Γ A} → ℕ → List (Node Γ A) → NEnv Γ → List (Events A)
+  meanings n []       ρ = []
+  meanings n (c ∷ cs) ρ = meaning n c ρ ∷ meanings n cs ρ
+
+  -- A program subscribed wherever it is asked.
+  nodeᴹ : ∀ {Γ A} → ℕ → Obs Timeline Γ A → NEnv Γ → MonotonicList A
+  nodeᴹ n o ρ = coldᴹ λ p → meaning n (subscribe o p) ρ
+
+-- THE MEANING: the limit of the approximants.
 ⟦_⟧ : ∀ {Γ A} → Obs Timeline Γ A → Srcs Γ → MonotonicList A
-⟦ o ⟧ δ = coldᴹ λ p → unfold (wrap δ (subscribe o p))
+⟦ o ⟧ δ = lub λ n → coldᴹ λ p → meaning n (wrap δ (subscribe o p)) []ᴬ
+
+------------------------------------------------------------------------
+-- The meaning is the fold's
+
+-- A joiner's handle is its source's run, made hot.
+hots : ∀ {Γ} → NEnv Γ → DenEnv Γ
+hots []ᴬ      = []ᴬ
+hots (e ∷ᴬ ρ) = hot e ∷ᴬ hots ρ
+
+lookup-hots : ∀ {Γ A} (ρ : NEnv Γ) (i : A ∈ Γ) → lookup (hots ρ) i ≡ hot (lookup ρ i)
+lookup-hots (e ∷ᴬ ρ) (here refl) = refl
+lookup-hots (e ∷ᴬ ρ) (there i)   = lookup-hots ρ i
+
+start-meaning : ∀ {Γ A} n p (m : From A 0) (ρ : NEnv Γ) → meaning n (startᶜ p m) ρ ≡ M.start p m
+start-meaning n p (at zero _ b)    ρ = refl
+start-meaning n p (at (suc _) _ b) ρ = refl
+start-meaning n p done             ρ = refl
+start-meaning n p quiet            ρ = refl
+
+-- Approximant n of a program's meaning is the fold's, for as long as the
+-- environments agree.
+subscribed : ∀ {Γ A k} n (o : Obs Timeline Γ A) {ρ : NEnv Γ} {σ : DenEnv Γ} → EnvAgree k (hots ρ) σ → nodeᴹ n o ρ ≈[ k ] approx n o σ
+subscribed n       (cold c)          {ρ} e = agrees λ p →
+  subst (λ x → Agree _ x (M.start p (lower c))) (sym (start-meaning n p (lower c) ρ)) (agree-refl _ _)
+subscribed n       empty             e = ≈ₖ-refl _
+subscribed n       (of xs)           e = ≈ₖ-refl _
+subscribed n       (map f s)         e = mapᴰ-ne f (subscribed n s e)
+subscribed n       (scan f z s)      e = scanᴰ-ne f z (subscribed n s e)
+subscribed n       (takeWhile i p s) e = takeWhileᴰ-ne i p (subscribed n s e)
+subscribed n       (flatMap op f s)  {ρ} e =
+  flatMapᴰ-ne (flatOp op) {f = λ a → nodeᴹ n (f a) ρ} (subscribed n s e) λ a → subscribed n (f a) e
+subscribed n       (connect s b)     e = agrees λ p →
+  beside-ne (agree (subscribed n b (hot-ne (agree src (p ++ [ ix 1 ])) ∷ᵉ e)) (p ++ [ ix 0 ])) (agree src (p ++ [ ix 1 ]))
+  where src = subscribed n s e
+subscribed {k = k} n (connected i) {ρ} {σ} e =
+  agrees λ p → agree (subst (λ r → r ≈[ k ] lookup σ i) (lookup-hots ρ i) (lookup-agree e i)) p
+subscribed zero    (defer l)         e = ≈ₖ-refl _
+subscribed (suc n) (defer l)         e = ≈ₖ-pred (deferᴰ-contractive (subscribed n (Later.force l) e))
+
+-- The approximants settle, as the fold's do, and their limit is the
+-- fold's meaning.
+denoted : ∀ {A} (o : Obs Timeline [] A) → ⟦ o ⟧ [] ≈ ⟦ o ⟧ᴰ []ᴬ
+denoted o k = ≈ₖ-trans (≈ₖ-sym (lub-limit {c = λ n → nodeᴹ n o []ᴬ} settling k)) (≈ₖ-trans (subscribed k o []ᵉ) (toward k o []ᴬ))
+  where
+    settling : Settling (λ n → nodeᴹ n o []ᴬ)
+    settling n = ≈ₖ-trans (subscribed n o []ᵉ) (≈ₖ-trans (settles o []ᴬ n) (≈ₖ-sym (subscribed (suc n) o []ᵉ)))

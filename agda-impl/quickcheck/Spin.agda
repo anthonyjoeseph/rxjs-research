@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Tree using (Obs; Later; of; map; takeWhile; flatMap; connect; connected; defer; merge; ones; mergeᶠ; switchᶠ; exhaustᶠ)
 import Tree as T
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; observe; root; Timeline)
-open import denotation.Unfold using (⟦_⟧; [])
+open import denotation.Unfold using (⟦_⟧ˢ; [])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (script; timeline)
 open import quickcheck.Ghost using (showP)
@@ -79,12 +79,12 @@ private
 
 -- Each side's first `n` events, the same.
 progress : ℕ → Obs Timeline [] ℕ → Bool
-progress n o = sameAll (run n budget (trace (begin o))) (meant n budget (observe (⟦ o ⟧ []) root))
+progress n o = sameAll (run n budget (trace (begin o))) (meant n budget (observe (⟦ o ⟧ˢ []) root))
 
 -- Each side's first `n` events.
 progressWhy : ℕ → Obs Timeline [] ℕ → List String
 progressWhy n o = "machine:" ∷ shows (run n budget (trace (begin o)))
-               ++ "meaning:" ∷ shows (meant n budget (observe (⟦ o ⟧ []) root))
+               ++ "meaning:" ∷ shows (meant n budget (observe (⟦ o ⟧ˢ []) root))
   where
         showE : Ev → String
         showE (val p a) = "  " S.++ showℕ a S.++ " @" S.++ showP p

@@ -125,31 +125,31 @@ private
   before-agree q end⁼      = refl
   before-agree q hush⁼     = refl
 
-  mutual
-    beside-ne : ∀ {A B m} {b b′ : Events B} {e e′ : Events A} → Agree m b b′ → Agree m e e′ → Agree m (beside b e) (beside b′ e′)
-    beside-ne {m = zero} _ _ = stop
-    beside-ne {m = suc m} {b} {b′} bb (out⁼ {p = q} a) =
-      ahead-ne (before (q ++ [ ix 0 ]) b) (before (q ++ [ ix 0 ]) b′) (before-agree (q ++ [ ix 0 ]) bb) bb a
-    beside-ne {m = suc m} {b} {b′} bb (skip⁼ {p = q} a) =
-      ahead-ne (before (q ++ [ ix 0 ]) b) (before (q ++ [ ix 0 ]) b′) (before-agree (q ++ [ ix 0 ]) bb) bb a
-    beside-ne {m = suc m} bb end⁼  = bb
-    beside-ne {m = suc m} bb hush⁼ = bb
+mutual
+  beside-ne : ∀ {A B m} {b b′ : Events B} {e e′ : Events A} → Agree m b b′ → Agree m e e′ → Agree m (beside b e) (beside b′ e′)
+  beside-ne {m = zero} _ _ = stop
+  beside-ne {m = suc m} {b} {b′} bb (out⁼ {p = q} a) =
+    ahead-ne (before (q ++ [ ix 0 ]) b) (before (q ++ [ ix 0 ]) b′) (before-agree (q ++ [ ix 0 ]) bb) bb a
+  beside-ne {m = suc m} {b} {b′} bb (skip⁼ {p = q} a) =
+    ahead-ne (before (q ++ [ ix 0 ]) b) (before (q ++ [ ix 0 ]) b′) (before-agree (q ++ [ ix 0 ]) bb) bb a
+  beside-ne {m = suc m} bb end⁼  = bb
+  beside-ne {m = suc m} bb hush⁼ = bb
 
-    -- The flag is `before` of each side, equal because the bodies agree.
-    ahead-ne : ∀ {A B m q} {b b′ : Events B} {s s′ : Events∞ A} t t′ → t ≡ t′ → Agree (suc m) b b′
-             → Agree m (Events∞.force s) (Events∞.force s′) → Agree (suc m) (ahead b q s t) (ahead b′ q s′ t′)
-    ahead-ne true  _ refl bb a = skip⁼ (beside-ne (agree-pred bb) a)
-    ahead-ne {m = zero}  false _ refl (out⁼ _)  a = out⁼ stop
-    ahead-ne {m = zero}  false _ refl (skip⁼ _) a = skip⁼ stop
-    ahead-ne {m = suc m} {q = q} false _ refl (out⁼ {l = r} {r = r′} bb) a =
-      out⁼ (ahead-ne (before q (Events∞.force r)) (before q (Events∞.force r′)) (before-agree q bb) bb (agree-pred a))
-    ahead-ne {m = suc m} {q = q} false _ refl (skip⁼ {l = r} {r = r′} bb) a =
-      skip⁼ (ahead-ne (before q (Events∞.force r)) (before q (Events∞.force r′)) (before-agree q bb) bb (agree-pred a))
-    ahead-ne false _ refl end⁼  a = end⁼
-    ahead-ne false _ refl hush⁼ a = hush⁼
+  -- The flag is `before` of each side, equal because the bodies agree.
+  ahead-ne : ∀ {A B m q} {b b′ : Events B} {s s′ : Events∞ A} t t′ → t ≡ t′ → Agree (suc m) b b′
+           → Agree m (Events∞.force s) (Events∞.force s′) → Agree (suc m) (ahead b q s t) (ahead b′ q s′ t′)
+  ahead-ne true  _ refl bb a = skip⁼ (beside-ne (agree-pred bb) a)
+  ahead-ne {m = zero}  false _ refl (out⁼ _)  a = out⁼ stop
+  ahead-ne {m = zero}  false _ refl (skip⁼ _) a = skip⁼ stop
+  ahead-ne {m = suc m} {q = q} false _ refl (out⁼ {l = r} {r = r′} bb) a =
+    out⁼ (ahead-ne (before q (Events∞.force r)) (before q (Events∞.force r′)) (before-agree q bb) bb (agree-pred a))
+  ahead-ne {m = suc m} {q = q} false _ refl (skip⁼ {l = r} {r = r′} bb) a =
+    skip⁼ (ahead-ne (before q (Events∞.force r)) (before q (Events∞.force r′)) (before-agree q bb) bb (agree-pred a))
+  ahead-ne false _ refl end⁼  a = end⁼
+  ahead-ne false _ refl hush⁼ a = hush⁼
 
-  hot-ne : ∀ {A k} {e e′ : Events A} → Agree k e e′ → hot e ≈[ k ] hot e′
-  hot-ne a = agrees λ p → rejoin-ne p 0 a
+hot-ne : ∀ {A k} {e e′ : Events A} → Agree k e e′ → hot e ≈[ k ] hot e′
+hot-ne a = agrees λ p → rejoin-ne p 0 a
 
 connectᴰ-ne : ∀ {A B k} {x y : MonotonicList A} {f g : MonotonicList A → MonotonicList B}
             → x ≈[ k ] y → (∀ {r r′} → r ≈[ k ] r′ → f r ≈[ k ] g r′) → connectᴰ x f ≈[ k ] connectᴰ y g

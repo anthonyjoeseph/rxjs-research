@@ -20,7 +20,7 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; tick; observe; root)
-open import denotation.Unfold using (⟦_⟧; [])
+open import denotation.Unfold using (⟦_⟧ˢ; [])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)
@@ -63,7 +63,7 @@ private
 placing : Prog natᵗ → Bool
 placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e
   where o = toObs timeline 3 p [] [] []
-        e = observe (⟦ o ⟧ []) root
+        e = observe (⟦ o ⟧ˢ []) root
 
 -- The seeds from f on which the machine's trace strays from the meaning.
 placingFails : ℕ → ℕ → List ℕ

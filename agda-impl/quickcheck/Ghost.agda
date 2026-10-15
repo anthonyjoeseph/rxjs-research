@@ -31,7 +31,7 @@ open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; note)
 open import operation.Machine using (module Machine)
 open import denotation.MonotonicList using (MonotonicList; Label; sub; last; Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; observe; Timeline)
-open import denotation.Unfold using (Srcs; ⟦_⟧; subscribe; []; _∷_)
+open import denotation.Unfold using (Srcs; ⟦_⟧ˢ; subscribe; []; _∷_)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Oracle using (depth; until)
 open import quickcheck.Quickcheck using (program)
@@ -93,7 +93,7 @@ module Watched where
     watched = watchedS false
 
     watchedS : Bool → ℕ → Key → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → Srcs Γ → Subscribe A w
-    watchedS sw n par π t ρ δ = watch sw par π (⟦ t ⟧ δ) λ me → node n me π t ρ δ
+    watchedS sw n par π t ρ δ = watch sw par π (⟦ t ⟧ˢ δ) λ me → node n me π t ρ δ
 
     node : ℕ → Key → List ℕ → ∀ {Γ A w} → Obs Timeline Γ A → Env Γ w → Srcs Γ → Subscribe A w
     node n       me π (cold c)          ρ δ = via (startCold c)

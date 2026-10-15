@@ -160,27 +160,24 @@ point at one, the row is FALSITY.
 ## Tier 1 — the adequacy theorem
 
 **THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-the root, positions forgotten down to ticks. The denotation is the
-compositional fold (`folded`); both halves are read off one weak simulation,
-`sim`, between the machine's trace and Unfold's stepper, and `unfolded`
-carries that to the fold. `sim` is a corecursion over `adequacy.Carrier`'s relation
-(B: every live observer held to its subtree's meaning, the machine's agenda
-located in the witness); its leaves are `kept`, B kept and each one-sided wait
-finite (C), and `carried-begin`. Work the riskiest
-question first: try to REFUTE the route, and leave anything tractable last. The meaning is
-compositional (`compositional`, proven); a route may change `MonotonicList`
-only where it still checks.
+the root, positions forgotten down to ticks. Both halves are read off one weak
+simulation, `sim`, between the machine's trace and Unfold's stepper. A
+configuration also has a meaning, its nodes read by the fold's own stream
+functions, proven the fold's (`denoted`); `stepped` links the stepper to it.
+`sim` is a corecursion over `adequacy.Carrier`'s relation (B: every live
+observer held to its subtree's meaning, the agenda located in the witness);
+its leaves are `kept`, B kept and each one-sided wait finite (C), and
+`carried-begin`. Try to REFUTE the route first; leave the tractable last.
 
 ### Big picture tier roadmap
 
-- **THE FOLD AS THE SIMULATION'S TARGET.** Measured on 300 programs: one
-  fold step costs the machine up to 74 silent steps, and its position moves
-  match the fold's steps in only half the windows, so neither is C's measure
-  alone. But every window's machine steps stay within 9 × fold steps × tree
-  size. So C's measure is lexicographic: the fold's steps, then the
-  machine's synchronous work left, a function of its control and agenda.
-  Define that function, then restate `sim` against the fold and delete
-  Unfold and `unfolded`. Decides which meaning the tier is worked against.
+- **THE CONFIGURATION'S MEANING AS THE SIMULATION'S TARGET.** `Wait`'s
+  right side becomes the meaning of the configuration `Carried` holds, not
+  the stepper's step, so `sim` lands on `⟦_⟧` and `stepped` and the stepper
+  go. C's measure is lexicographic: the meaning's steps, then the machine's
+  synchronous work left, a function of its control and agenda (within
+  9 × meaning steps × tree size on 300 programs). Decides whether the
+  stepper is needed at all.
 - **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
   turn; it gains a field placing every live node's next shown event past the
   region the agenda owes, true at `carried-begin`. A popped timer's first
@@ -210,8 +207,9 @@ only where it still checks.
   falls quiet by silent steps.
 - **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program
   pending at the root, carried.
-- **`unfolded`** (Adequacy) — FALSITY, `NO EVIDENCE`: the stepper and the fold
-  show the same; they differ in how `connect` feeds its joiners.
+- **`stepped`** (Adequacy) — FALSITY, `NO EVIDENCE`: the stepper and its
+  configuration's show the same; they differ in how `connect` feeds its
+  joiners.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
 

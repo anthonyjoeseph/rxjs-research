@@ -26,9 +26,9 @@ open import Data.Product using (_,_; Σ)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; observe; root; Pos)
+open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; tick; root; Pos)
 open import denotation.Order using (_⊑_; Chain)
-open import denotation.Unfold using (⟦_⟧; Node; []; subscribe; unfold; shown; outˢ; skipˢ; endˢ; hushˢ; ofᶜ; mapᶜ) renaming (step to stepᵁ; Step to Stepᵁ)
+open import denotation.Unfold using (Node; []; subscribe; unfold; shown; outˢ; skipˢ; endˢ; hushˢ; ofᶜ; mapᶜ) renaming (step to stepᵁ; Step to Stepᵁ)
 open import adequacy.Carrier using (module Carrying)
 open import adequacy.Kept using (module Keeping)
 open import adequacy.Wait using (module Waiting)
@@ -116,7 +116,7 @@ module Sim (R : Set) where
   --   the order on positions in `denotation.MonotonicList`: strict,
   --   transitive, total, past a position past everything under it, a
   --   burst's steps before its close, cascades never nesting.
-  sim : (o : PureObs [] R) → trace (begin o) ~ observe (⟦ o ⟧ []) root
+  sim : (o : PureObs [] R) → trace (begin o) ~ unfold (subscribe o root)
   sim o = From.sim-from kept (carried-begin o)
 
   ------------------------------------------------------------------------
