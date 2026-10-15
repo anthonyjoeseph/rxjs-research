@@ -55,7 +55,7 @@ Settled p lo lo′ = lo ≤ᵖ lo′ × (lo ≡ lo′ ⊎ Under p lo′)
 module Sorting (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read)
   open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; Ctl; run; ret; held; asking; Stack; bottom; push; Wait; rest; back; rehold; told
-                                     ; Heapᴹ; Callbacks; cbs; get)
+                                     ; Heapᴹ; Callbacks; cbs; look)
   open Run (Pureᴾ R) using (Act; Ref; El; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; stash; cancel; eff; here; under; diverge; unfold
                            ; Observer; Subscription; Subscribe; Kont; Env; Subject; wkEnv; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via)
   open Pure R using (Timer; cascade; recorder)
@@ -222,7 +222,7 @@ module Sorting (R : Set) where
   WellHeap : ∀ {h} → Heapᴹ h → Set₁
   WellHeap {h} hp = (∀ {A} (s : _) → WellObs {A} {h} (record { next = Callbacks.onNext (cbs hp s) ; complete = Callbacks.onComplete (cbs hp s)
                                                             ; closed = Callbacks.isClosed (cbs hp s) }))
-                  × (∀ (t : Quiet h) → Placeless (get hp t))
+                  × (∀ (t : Quiet h) → Placeless (look hp t))
 
   -- The run well: the running computation and every frame waiting on
   -- the stack, every callback the heap holds, every burst playing past

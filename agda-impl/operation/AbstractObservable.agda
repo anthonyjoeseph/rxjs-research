@@ -607,21 +607,40 @@ module Machine (C : Set → Set₁) (E : Set → Set) where
   put (x ∷ xs) here      y = y ∷ xs
   put (x ∷ xs) (there i) y = x ∷ put xs i y
 
-  wkAll : ∀ {h v} {w} → h ⊑ v → All (Val h) w → All (Val v) w
-  wkAll ρ []                 = []
-  wkAll ρ (_∷_ {x = k} x xs) = wkVal k ρ x ∷ wkAll ρ xs
+  -- An entry as it was stored, in the world it was stored in, and how
+  -- that world grew since.  Weakened only when read: a callback stored
+  -- and called k allocations later is weakened once, by the one composed
+  -- inclusion, not wrapped in k weakenings re-run at every call.
+  record Stored (h : World) (k : Kind) : Set₁ where
+    constructor stored
+    field
+      {made} : World
+      val    : Val made k
+      into   : made ⊑ h
+
+  wkAll : ∀ {h v} {w} → h ⊑ v → All (Stored h) w → All (Stored v) w
+  wkAll ρ []                = []
+  wkAll ρ (stored x σ ∷ xs) = stored x (σ ⨾ ρ) ∷ wkAll ρ xs
 
   Heapᴹ : World → Set₁
-  Heapᴹ h = All (Val h) h
+  Heapᴹ h = All (Stored h) h
 
   extend : ∀ {h k} → Heapᴹ h → Val (k ∷ h) k → Heapᴹ (k ∷ h)
-  extend hp x = x ∷ wkAll new hp
+  extend hp x = stored x same ∷ wkAll new hp
+
+  -- What an entry holds, in the heap's world.
+  look : ∀ {h k} → Heapᴹ h → h ∋ k → Val h k
+  look {k = k} hp i with get hp i
+  ... | stored x σ = wkVal k σ x
+
+  store : ∀ {h k} → Heapᴹ h → h ∋ k → Val h k → Heapᴹ h
+  store hp i x = put hp i (stored x same)
 
   cbs : ∀ {h A} → Heapᴹ h → Sink h A → Callbacks A h
-  cbs hp s = get hp s
+  cbs hp s = look hp s
 
   spent? : ∀ {h} → Heapᴹ h → Handle h → Bool
-  spent? hp hd = lower (get hp hd)
+  spent? hp hd = lower (look hp hd)
 
   ----------------------------------------------------------------------
   -- Configurations
@@ -708,8 +727,8 @@ module Machine (C : Set → Set₁) (E : Set → Set) where
   runs : ∀ {h w B} → Heapᴹ h → Pos → Act h B → w ⊑ h → Stack w B → Next h
   runs hp p (done b)            σ k = still hp p (ret b σ k)
   runs hp p (newRef t a k′)     σ k = next ⟨ extend hp (lift (wkEl t new a)) , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
-  runs hp p (readRef r k′)      σ k = still hp p (run (k′ same (lower (get hp r))) σ k)
-  runs hp p (writeRef r a k′)   σ k = still (put hp r (lift a)) p (run k′ σ k)
+  runs hp p (readRef r k′)      σ k = still hp p (run (k′ same (lower (look hp r))) σ k)
+  runs hp p (writeRef r a k′)   σ k = still (store hp r (lift a)) p (run k′ σ k)
   runs hp p (register n c x k′) σ k = next ⟨ extend hp (record { onNext = λ a → wkAct new (n a) ; onComplete = wkAct new c ; isClosed = wkAct new x })
                                            , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
   runs hp p (send s a k′)       σ k = still hp p (run (Callbacks.onNext (cbs hp s) a) same (push (rest k′) σ k))
@@ -718,9 +737,9 @@ module Machine (C : Set → Set₁) (E : Set → Set) where
   -- it says `go`.
   runs hp p (startCold c s k′)  σ k = next ⟨ extend hp (lift false) , p , held same (push (rest (k′ new here)) (σ ⨾ new) k) ⟩ new
                                            [ start c (wk∋ new s) here ]
-  runs hp p (stop hd k′)        σ k = next ⟨ put hp hd (lift true) , p , run k′ σ k ⟩ same [ stopped hd ]
+  runs hp p (stop hd k′)        σ k = next ⟨ store hp hd (lift true) , p , run k′ σ k ⟩ same [ stopped hd ]
   runs hp p (stash m k′)        σ k = next ⟨ extend hp (wkAct new m) , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
-  runs hp p (cancel t k′)       σ k = still hp p (run (get hp t) same (push (rest k′) σ k))
+  runs hp p (cancel t k′)       σ k = still hp p (run (look hp t) same (push (rest k′) σ k))
   runs hp p (eff e k′)          σ k = next ⟨ hp , p , asking e k′ σ k ⟩ same [ perform e ]
   runs hp p (here k′)           σ k = still hp p (run (k′ p) σ k)
   runs hp p (under l m k′)      σ k = still hp (p ++ [ l ]) (run m same (push (back p k′) σ k))
@@ -745,7 +764,7 @@ module Machine (C : Set → Set₁) (E : Set → Set) where
   transition ⟨ hp , p , held σ k ⟩       go          = returns hp p tt σ k
   transition ⟨ hp , p , asking e k′ σ k ⟩ (answer x) = still hp p (run (k′ x) σ k)
   transition ⟨ hp , p , held σ k ⟩       (deliver s a q) = fed hp p q (Callbacks.onNext (cbs hp s) a) σ k
-  transition ⟨ hp , p , held σ k ⟩       (end hd s q) = fed (put hp hd (lift true)) p q (Callbacks.onComplete (cbs hp s)) σ k
+  transition ⟨ hp , p , held σ k ⟩       (end hd s q) = fed (store hp hd (lift true)) p q (Callbacks.onComplete (cbs hp s)) σ k
   transition ⟨ hp , p , held σ k ⟩       (poll s)    = still hp p (run (Callbacks.isClosed (cbs hp s)) same (push told σ k))
   transition ⟨ hp , p , c ⟩              _           = still hp p c
 
