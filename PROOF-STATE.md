@@ -173,7 +173,7 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
 
 - **B'S POSITIONAL FIELD.** `Carried` gains a field placing every live
   node's next shown event past the region the agenda owes. A popped timer's
-  first step is its first test: `cleared`, the agenda empty, every sibling
+  first step is its first test: `beside`, the agenda empty, every sibling
   waiting on a later timer or never stepping; and `unseen`, a burst whose
   path is shut playing silently, which holds the one place Carried does not
   rule out, a live takeWhile past its failing value. Then
@@ -203,8 +203,10 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
   next call or a subscription beginning; the connect's feed is here.
 - **`burst-emit`** (Kept) — FALSITY, `NO EVIDENCE`: a frame's value is the
   meaning's next event, every other open node past it.
-- **`cleared`** (Kept) — FALSITY, `NO EVIDENCE`: at a fire, every sibling on
-  the burst's path waits beyond the cascade.
+- **`beside`** (Kept) — FALSITY, `NO EVIDENCE`: at a fire, every sub beside the
+  burst's path waits beyond the cascade.
+- **`ends-told`** (Kept) — FALSITY, `NO EVIDENCE`: below an ended source, every
+  joiner the body holds already told its end.
 - **`ahead-run`** (Kept) — FALSITY, `NO EVIDENCE`: a cold started inline bursts
   before every other open node's next event.
 - **`unseen`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold polling open

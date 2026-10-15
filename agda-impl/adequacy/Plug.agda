@@ -10,8 +10,7 @@ open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 import Data.List.Relation.Unary.All as AllP
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
-open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit.Polymorphic using (⊤; tt)
@@ -19,10 +18,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 
 import Tree as T
 open import denotation.MonotonicList using (Pos; ix; last; _<ᵖ_; <ᵖ-asym; <ᵖ-++ʳ)
-open import denotation.Unfold using (Node; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; connectᶜ; live; ended; feed; shut
-                                    ; Step; outˢ; skipˢ; endˢ; hushˢ; headˢ; step; mapˢ; scanˢ; takeWhileˢ; outerˢ; laneˢ
-                                    ; bodyˢ; shutˢᵗ; sourceˢ; beforeˢ; raceˢ; goˢ; Earliest; none; found; pick; earliest; taking; admit
-                                    ; shutᴹ; shutᴸ)
+open import denotation.Unfold using (Node; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; connectᶜ; live; ended; feed; shut; Step; outˢ;
+  skipˢ; endˢ; hushˢ; headˢ; step; mapˢ; scanˢ; takeWhileˢ; outerˢ; laneˢ; bodyˢ; shutˢᵗ;
+  sourceˢ; beforeˢ; raceˢ; goˢ; Earliest; none; found; pick; earliest; taking; admit)
 
 data Nope : Set₁ where
 
@@ -410,54 +408,6 @@ plug-∷ʳᶜ : ∀ {Γ A Γ₁ A₁ Δ B} (C : Ctx Γ A Γ₁ A₁) (G : Frame 
 plug-∷ʳᶜ []      G n = refl
 plug-∷ʳᶜ (F ∷ C) G n = plug-∷ʳᶜ C G (plugF F n)
 
-------------------------------------------------------------------------
--- A connect's end told through a context
-
--- The connect a frame's operator sees, from the hole's scope.
-innerF : ∀ {X Γ A Δ B} → Frame Γ A Δ B → X ∈ Δ → X ∈ Γ
-innerF (bodyF s)  i = there i
-innerF (endedF c) i = there i
-innerF (mapF f)                i = i
-innerF (scanF f z)             i = i
-innerF (takeF b p)             i = i
-innerF (outerF op g ls qs)     i = i
-innerF (laneF op g o bs as qs) i = i
-innerF (srcF b)                i = i
-
-innerC : ∀ {X Γ A Δ B} → Ctx Γ A Δ B → X ∈ Δ → X ∈ Γ
-innerC []      i = i
-innerC (F ∷ C) i = innerF F (innerC C i)
-
-shutF : ∀ {X Γ A Δ B} → X ∈ Δ → Pos → Frame Γ A Δ B → Frame Γ A Δ B
-shutF i c (mapF f)                = mapF f
-shutF i c (scanF f z)             = scanF f z
-shutF i c (takeF b p)             = takeF b p
-shutF i c (outerF op g ls qs)     = outerF op g (shutᴸ i c ls) qs
-shutF i c (laneF op g o bs as qs) = laneF op g (shutᴹ i c o) (shutᴸ i c bs) (shutᴸ i c as) qs
-shutF i c (bodyF s)               = bodyF (shut i c s)
-shutF i c (endedF e)              = endedF e
-shutF i c (srcF b)                = srcF (shut (there i) c b)
-
-shutC : ∀ {X Γ A Δ B} → X ∈ Δ → Pos → Ctx Γ A Δ B → Ctx Γ A Δ B
-shutC i c []      = []
-shutC i c (F ∷ C) = shutF (innerC C i) c F ∷ shutC i c C
-
-private
-  shutᴸ-++ : ∀ {X Γ B} (i : X ∈ Γ) c (bs : List (Node Γ B)) n as → shutᴸ i c (bs ++ n ∷ as) ≡ shutᴸ i c bs ++ shut i c n ∷ shutᴸ i c as
-  shutᴸ-++ i c []       n as = refl
-  shutᴸ-++ i c (b ∷ bs) n as = cong (shut i c b ∷_) (shutᴸ-++ i c bs n as)
-
-shut-plugF : ∀ {X Γ A Δ B} (i : X ∈ Δ) c (F : Frame Γ A Δ B) n → shut i c (plugF F n) ≡ plugF (shutF i c F) (shut (innerF F i) c n)
-shut-plugF i c (mapF f)                n = refl
-shut-plugF i c (scanF f z)             n = refl
-shut-plugF i c (takeF b p)             n = refl
-shut-plugF i c (outerF op g ls qs)     n = refl
-shut-plugF i c (laneF op g o bs as qs) n = cong (λ l → flatMapᶜ op g (shutᴹ i c o) l qs) (shutᴸ-++ i c bs n as)
-shut-plugF i c (bodyF s)               n = refl
-shut-plugF i c (endedF e)              n = refl
-shut-plugF i c (srcF b)                n = refl
-
--- TOLD AT THE ROOT, TOLD FRAME BY FRAME.
-shut-plug : ∀ {X Γ A Δ B} (i : X ∈ Δ) c (C : Ctx Γ A Δ B) n → shut i c (plug C n) ≡ plug (shutC i c C) (shut (innerC C i) c n)
-shut-plug i c []      n = refl
-shut-plug i c (F ∷ C) n = trans (shut-plug i c C (plugF F n)) (cong (plug (shutC i c C)) (shut-plugF (innerC C i) c F n))
+clear-∷ʳᶜ : ∀ {Γ A Γ₁ A₁ Δ B} r (C : Ctx Γ A Γ₁ A₁) (G : Frame Γ₁ A₁ Δ B) → Clear r C → ClearF r G → Clear r (C ∷ʳᶜ G)
+clear-∷ʳᶜ r []      G _        g = g , tt
+clear-∷ʳᶜ r (F ∷ C) G (f , cl) g = f , clear-∷ʳᶜ r C G cl g

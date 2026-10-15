@@ -391,34 +391,46 @@ module Keeping (R : Set) where
              → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩
   burst-open e rewrite e = refl
 
-  private
-    inert : ∀ {h} {H : All (Val h) h} {Δ A} (ph : Phase A) → Open.Inert H (nodeOf {Δ} ph)
-    inert (waiting τ e m)   i c = refl
-    inert (playing τ r j b) i c = refl
+  postulate
+    -- BELOW A CONNECT WHOSE SOURCE HAS ENDED, every joiner of it the body
+    -- holds already told its end: one owed nothing is gone (`Fed`), one
+    -- owed the source's completion holds it.  One owed a value from a
+    -- source already ended is the case Carried does not rule out.
+    ends-told : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → Open.Stable (State.heap st) (Aimed.path (aim (Carried.ctlAs r)))
 
+  private
     cold-part : ∀ {h} {H : All (Val h) h} {Δ A} {sk : Sink h A} {hd} (ph : Phase A) → At.spentʰ H hd ≡ false
               → At.part H (coldˢ {Δ = Δ} sk hd ph) ≡ just (nodeOf ph)
     cold-part ph sp rewrite sp = refl
 
-  -- The open part read through the path to the bursting cold.
+  -- The open part read through the path to the bursting cold: its
+  -- context, clear wherever every sub beside the path is.
+  found : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+        → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Seen r
+        → Σ (Ctx (Aimed.Δ (aim (Carried.ctlAs r))) A [] R) λ C
+          → At.part (State.heap st) (Carried.tree r) ≡ just (plug C (nodeOf (Aimed.ph (aim (Carried.ctlAs r)))))
+          × (∀ q → Open.Beside (State.heap st) q (Aimed.path (aim (Carried.ctlAs r))) → Clear q C)
+  found {st = st} r sp o =
+    Open.focus-path (State.heap st) A.path o (ends-told r) (cold-part {H = State.heap st} {Δ = A.Δ} {sk = A.sk} A.ph sp)
+    where module A = Aimed (aim (Carried.ctlAs r))
+
   focused : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
           → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Seen r → Focus c p i b
-  focused {st = st} r sp o = record
-    { ctx   = proj₁ found
-    ; hole  = nodeOf A.ph
-    ; τ′    = A.τ′
-    ; open≡ = just-injective (trans (sym (Carried.open≡ r)) (proj₂ found))
-    ; steps = A.steps }
-    where module A = Aimed (aim (Carried.ctlAs r))
-          found = Open.focus-path (State.heap st) A.path o (inert {H = State.heap st} A.ph) (cold-part {H = State.heap st} {Δ = A.Δ} {sk = A.sk} A.ph sp)
+  focused r sp o = record
+    { ctx   = proj₁ (found r sp o)
+    ; hole  = nodeOf (Aimed.ph (aim (Carried.ctlAs r)))
+    ; τ′    = Aimed.τ′ (aim (Carried.ctlAs r))
+    ; open≡ = just-injective (trans (sym (Carried.open≡ r)) (proj₁ (proj₂ (found r sp o))))
+    ; steps = Aimed.steps (aim (Carried.ctlAs r)) }
 
   postulate
     -- B'S POSITIONAL FIELD AT A FIRE: nothing owed but the burst, every
-    -- other open node on the path waits beyond the cascade — it never
-    -- steps again, or it waits on a timer queued past this one.
-    cleared : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {c}
-            → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
-            → Clear p (Focus.ctx (focused r sp o))
+    -- sub beside its path waits beyond the cascade — it never steps
+    -- again, or it waits on a timer queued past this one.
+    beside : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {c}
+           → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) → spent? st hd ≡ false → Seen r
+           → Open.Beside (State.heap st) p (Aimed.path (aim (Carried.ctlAs r)))
 
     -- B'S POSITIONAL FIELD AT A BURST UNDER A CALL: a cold started
     -- inline, its frame before every other open node's next event, read
@@ -427,6 +439,12 @@ module Keeping (R : Set) where
                   {K : Stack v Y} {c}
               → (r : Carried ⟨ st , burst s hd τ p i b σ (push x ρ K) ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
               → Wins (Focus.ctx (focused r sp o)) (burstˢ (Focus.τ′ (focused r sp o)) p i b)
+
+  -- At a fire, the context clear of the cascade.
+  cleared : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {c}
+          → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
+          → Clear p (Focus.ctx (focused r sp o))
+  cleared {p = p} r sp o = proj₂ (proj₂ (found r sp o)) p (beside r sp o)
 
   private
     burst-head : ∀ {Δ A u} τ p i (b : Frame A u) → headˢ (burstˢ {Δ} τ p i b) ≡ just (p ++ [ ix i ])
