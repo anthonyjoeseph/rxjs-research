@@ -177,14 +177,14 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `emit-open` and `climb-take`, then `sub-onward`, the
-  other `-onward` leaves and `burst-poll`, carry liveness. The climb is one
-  height induction over a snoc view of the path, map, defer, body and root
-  proven; decides whether each operator's side condition in `Lifts` is an
-  ordering fact the ghost already holds. Ruled out: a climb blind to a
-  dead body (split out as `emit-unseen`), a take stopping at its last
-  value, a resume needing more than the frame it pops, a measure blind to
-  a cut, a queue bound on joiners, a polled burst as a re-entry state.
+- **THE PROGRESS.** `emit-lifts`, then `note-least`: the ghost's next
+  event is the agenda's first. Carry `Sorted`'s proven `WellMach` in the
+  record, its frames `Under` the run, its timers and bursts past it; then
+  prove a subtree's head is an obligation it owes. Ruled out: deriving it
+  from `backAs`'s `q <ᵖ p`, which admits a frame beside the run. Decides
+  whether the machine's sortedness is the one ordering fact both `of`
+  values and notes read. Then `emit-run`, `climb-take`, the `-onward`
+  leaves and `burst-poll`.
 - **THE ORDER.** `spread-flat` and `spread-connect`, then `steady-flat` and
   `fresh-flat` over `FlatOrder`'s lane roots: pairwise apart, each lane
   alien to what is apart from its root, the outer apart from each.
@@ -241,9 +241,10 @@ by their own silent steps (`Mirror`).
   value the ghost holds.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
-- **`emit-open`** (Content) — FALSITY, `NO EVIDENCE`: an open, seen `of`'s next
-  value lifts along its path, each frame's side condition holding, and the
-  climb starts aloft.
+- **`emit-lifts`** (Content) — FALSITY, `DEAD ROUTE`: the agenda's first call
+  an open, seen `of`, the ghost's step is its value lifted along its path.
+- **`emit-run`** (Content) — FALSITY, `NO EVIDENCE`: an open `of`'s value
+  handed on under its scope, the climb starts aloft.
 - **`climb-take`** (Content) — FALSITY, `NO EVIDENCE`: a take's last value
   climbs on into its completion; the height measure alone would rise there.
 - **`emit-unseen`** (Content) — FALSITY, `NO EVIDENCE`: an `of` emitting into

@@ -725,14 +725,29 @@ module Honesty (R : Set) where
                 → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
                 → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
 
-    -- An `of` reading its observer open, the ghost holding it: its next
-    -- value on its way up, the `of` past it, the ghost's step that value
-    -- lifted.  Every side condition `Lifts` asks is an ordering claim:
-    -- the value first among a connect's source and body, a flatMap's
-    -- outer and lanes.
-    emit-open : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-              → seen (Conf.heap (Mach.conf m)) π ≡ true → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g m₁
+    -- An `of` reading its observer open, its value handed on under the
+    -- `of`'s scope: the `of` past it, the value on its way up, the
+    -- ghost's step the value lifted.
+    emit-run : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+             → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+             → Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step g)
+             → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g m₁
+
+    -- The agenda's first call an open `of` the ghost holds: the ghost's
+    -- step is that `of`'s, lifted.  Every side condition `Lifts` asks is
+    -- an ordering claim: the value first among a connect's source and
+    -- body, a flatMap's outer and lanes.  So the claim is that nothing
+    -- else the ghost holds comes first: no call further down the agenda,
+    -- no burst held or timer queued, no subscription owed.
+    -- DEAD ROUTE: from the record as it stands.  A stack frame's calls
+    --   are ordered against the current position only by `backAs`'s
+    --   `q <ᵖ p`, which does not make `q` a prefix of `p`: a frame at `q`
+    --   beside `p` holding an `of` has its next value ahead of this one.
+    --   The record admits that configuration; `under`'s scoping never
+    --   builds it, every call a frame keeps landing past all of `p`.
+    emit-lifts : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+               → seen (Conf.heap (Mach.conf m)) π ≡ true → Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step g)
 
     -- A value through a scan: its cell read and written, the
     -- accumulated value one operator up.  The ghost's lift read the cell
@@ -969,6 +984,13 @@ module Honesty (R : Set) where
 
   soar : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Aloft g m₁) → Hopped st m′
   soar st (m₁ , path , aloft {σ = σ} cl) = hopped-pre path (climb st (suc (height σ)) σ ≤-refl cl)
+
+  -- An open `of` the ghost holds: its value on its way up, the ghost's
+  -- step that value lifted.
+  emit-open : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ true → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g m₁
+  emit-open cr π fc op sn = emit-run cr π fc op (emit-lifts cr π fc op sn)
 
   -- An `of`'s next value climbs the observers above it: to the root's
   -- note, past a skip (a connect's feed, a lane admitted), or to a
