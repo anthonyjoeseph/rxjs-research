@@ -169,27 +169,28 @@ pre-order; each kernel is well-positioned (`Well`, unary) given its
 observer is; `preserve` is the tree walk, the timers and the loop's turn,
 a body: a turn opens an epoch at its timer's cascade, and setting a timer
 moves the last to where it was set, so same-tick timers pop in order.
+Content rides a GHOST, the meaning's own configuration, which the machine's
+runs; at the launch its residual is the events (`begun`, by `subscribed`).
 
 ### Big picture tier roadmap
 
-- **HONEST, DEFINED.** `HonMach` is a record over a residual past every
-  mark, kept by each step as `Shows` says. Left: `Inner` a relation over configurations, as `WellMach` is, over a ghost
-  tree of the compiled program's kernels and their cells; `Honest` the
-  per-kernel half `inner-launch` reads. Ruled out: a relation blind to
-  cells, a sound half apart from a whole half, a cut at an observer's own
-  marks, a spec per observer framed by others, honesty under every
-  context, an owed bound at the run's position. Decides whether the
-  residual is shown by `inner-walk` alone or needs `inner-turn`'s timers
-  too.
-- **CONTENT, ASSEMBLED.** `kept` and `read-is-kept` over `Reached`, then the
-  rest of the `-honest` contracts, `connect` first. Decides whether the
-  per-kernel contracts compose across a shared heap and a hot run.
-- **THE RESIDUAL.** `Inner`'s ghost a configuration whose `meaning` is
-  `HonMach`'s `rest`: `inner-launch` by `subscribed`, the residual at the
-  launch the whole of the events. Decides
-  whether the dead simulation's cost, every other live node past the one
-  the machine moved, is paid once as a field of the invariant rather than
-  re-established at every step.
+- **MIRROR, DEFINED.** `Inner` is a ghost (`denotation.Unfold`'s `Node`)
+  whose residual is the rest, run by the configuration (`Mirror`). Left:
+  `Mirror` a relation of the ghost's nodes to the kernels, their cells and
+  the stack, the ghost given a node for a value in flight; `mirror-begin`
+  by the subscription's own steps. Decides whether a node per kernel and a
+  pending value per frame suffice, or a frame owes more than a value.
+- **THE WALK, SHOWN.** `inner-walk` over `Mirror`: a callback's step keeps
+  the residual by unfolding its operator's stream function one event; a
+  value reaching the root is a least event of it. Decides whether "least"
+  is paid once as a field, the ghost's sources past the last delivery as
+  `WellMach`'s are, rather than re-established at every step.
+- **THE TURN, SHOWN.** `inner-turn`: a popped timer's frame is the ghost's
+  frames node at its tick, and a drained run's ghost shows nothing. Decides
+  whether the ghost's timers need an order of their own or `WellQueue`'s.
+- **CONTENT, ASSEMBLED.** `read-is-kept`: the launch's first n steps, read,
+  are a reached configuration's record. Decides whether a read cut inside a
+  completion's step marks it as `Stands` does.
 - **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
   in finitely many steps. Decides whether liveness needs a measure, and
   whether a `connect` feedback loop that spins makes it false.
@@ -199,36 +200,14 @@ moves the last to where it was set, so same-tick timers pop in order.
 
 ### The ledger
 
-- **`Honest`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; a
-  subscription's deliveries alike a meaning, at any position.
-- **`Inner`** (Content) — FALSITY, `DEAD ROUTE×3`: a postulated type; the whole
-  configuration will deliver the residual, as `WellMach` is well.
+- **`Mirror`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; the
+  configuration runs the ghost, node for kernel, cells for state.
 - **`inner-walk`** (Content) — FALSITY, `NO EVIDENCE`: a step not the loop's
   turn shows the residual: keeps it, takes its least value, or ends it.
 - **`inner-turn`** (Content) — FALSITY, `NO EVIDENCE`: the loop's turn shows
   the residual, and a drained run has delivered all of it.
-- **`inner-launch`** (Content) — FALSITY, `NO EVIDENCE`: an honest subscription
-  launched under the recorder will deliver the root's events.
-- **`HonestEnv`** (Content) — FALSITY, `NO EVIDENCE`: a postulated type; each
-  joiner in scope fed its source's hot run.
-- **`connectᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `connect` honest to
-  `connectᴰ`, its joiners fed one hot run.
-- **`takeWhileᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `takeWhile`
-  honest to `takeWhileᴰ`, completing at the failing value.
-- **`flatMapᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `flatMap` honest to
-  `flatMapᴰ`.
-- **`joinᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: a joiner honest to its
-  environment's entry.
-- **`deferᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `defer` honest to
-  `deferᴰ`.
-- **`coldᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: a cold source honest
-  to `coldᴰ`.
-- **`emptyᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `empty` honest.
-- **`ofᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `of` honest.
-- **`mapᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `map` honest.
-- **`scanᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `scan` honest.
-- **`honest-[]`** (Content) — FALSITY, `NO EVIDENCE`: the empty environments
-  honest to each other.
+- **`mirror-begin`** (Content) — FALSITY, `NO EVIDENCE`: the launch runs the
+  program subscribed at the root.
 - **`read-is-kept`** (Content) — FALSITY, `REFUTED`: the launch's first n
   steps, read, are some reached configuration's record, a completion marked.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
