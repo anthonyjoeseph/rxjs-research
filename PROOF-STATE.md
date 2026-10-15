@@ -171,20 +171,19 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
 
 ### Big picture tier roadmap
 
-- **B'S POSITIONAL FIELD.** `Carried` gains a field placing every live
-  node's next shown event past the region the agenda owes. A popped timer's
-  first step is its first test: `resting`, the agenda empty, every leaf
-  beside the path on a later timer or never stepping; and `unseen`, a burst whose
-  path is shut playing silently, which holds the one place Carried does not
-  rule out, a live takeWhile past its failing value. Then
-  `ahead-run`, `burst-emit` as the stall did, and the feed's case of
-  `kept-run`, the meaning feeding its joiners from one run of the source
-  (`Fed`). Decides whether the position order alone orders the meaning's
-  leaves against the machine.
+- **B'S POSITIONAL FIELD.** `Carried` gains a field: every sub the agenda
+  does not owe `Rests` beyond the run's position. `kept-feed` is its first
+  test: the first owed joiner's value is the meaning's next event only if
+  every other live node rests past it, the meaning feeding its joiners from
+  one run of the source (`Fed`). Then `resting`, the field at a fire;
+  `unseen`, a burst whose path is shut playing silently, with the one place
+  Carried does not rule out, a live takeWhile past its failing value;
+  `ahead-run` and `burst-emit`. Decides whether the position order alone
+  orders the meaning's leaves against the machine.
 - **C'S MEASURE, AGAINST THE RETURNS.** `kept` is a recursion on `weight`:
   the agenda's calls, the bursts in flight, the subscriptions owed and the
   timers queued. `returned` and `asks` first, the burst leaving the
-  agenda; then `kept-run`'s silent steps, a subscription's `weighᴼ` spent
+  agenda; then the run's silent steps (`kept-done`, `kept-kont`, `kept-sub`), a subscription's `weighᴼ` spent
   before its first wait. Decides whether a step the meaning does not take
   always re-enters lighter, or the measure needs the meaning's steps too.
 - **B'S STEP AT A DEATH, IN AGDA.** An observer dying mid-burst: a
@@ -199,8 +198,25 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
 
 ### The ledger
 
-- **`kept-run`** (Kept) — FALSITY, `NO EVIDENCE`: code running, the agenda's
-  next call or a subscription beginning; the connect's feed is here.
+- **`kept-feed`** (Kept) — FALSITY, `NO EVIDENCE`: a connect's feed shows the
+  first owed joiner's value, the meaning's next event only if every other live
+  node rests past it.
+- **`kept-fin`** (Kept) — FALSITY, `NO EVIDENCE`: a connect's source completion
+  told to each joiner, as the feed.
+- **`kept-sub`** (Kept) — FALSITY, `NO EVIDENCE`: a subscription beginning at
+  its pending node re-enters carried.
+- **`kept-emit`** (Kept) — FALSITY, `NO EVIDENCE`: an `of`'s next value is the
+  meaning's next event at the `of`.
+- **`kept-take1`** (Kept) — FALSITY, `NO EVIDENCE`: a takeWhile past its
+  failing value completes, then cuts.
+- **`kept-take2`** (Kept) — FALSITY, `NO EVIDENCE`: a takeWhile's cut, after
+  its completion.
+- **`kept-body`** (Kept) — FALSITY, `NO EVIDENCE`: a connect's body completed
+  cuts its source.
+- **`kept-kont`** (Kept) — FALSITY, `NO EVIDENCE`: a subscription's
+  continuation, handed its unsubscribe.
+- **`kept-done`** (Kept) — FALSITY, `NO EVIDENCE`: the agenda done, the run
+  returns to the stack.
 - **`burst-emit`** (Kept) — FALSITY, `NO EVIDENCE`: a frame's value is the
   meaning's next event, every other open node past it.
 - **`resting`** (Kept) — FALSITY, `NO EVIDENCE`: at a fire, every sub beside

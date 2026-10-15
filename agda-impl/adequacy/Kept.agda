@@ -45,7 +45,7 @@ module Keeping (R : Set) where
   open Run (Pureᴾ R) using (Act)
   open Pure R using (State; Timer; cascade; Callbacks; Val)
   open Machine R using (Mach; ⟨_,_⟩; Stack; loop; run; ret; burst; turn; step; silent; drained; spent?; asked; push; cbs)
-  open Carrying R using (Carried; module At; module Against; Owned; Ordered; Sub; Lane; lane; Call; feedC; finC; Spot
+  open Carrying R using (Carried; module At; module Against; Owned; Ordered; Sub; Lane; lane; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; Spot; _≗_; ⟦_⟧; feeding; finishing; ending; taken
                         ; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ
                         ; waiting; playing; Phase; nodeOf; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
                         ; this-lane; next-lane; Meaning; Kernels; Queue; Books; pendings; lanePendings; joiners; Joiner; firing)
@@ -332,18 +332,85 @@ module Keeping (R : Set) where
   Polls {st = st} {s = s} {hd} {τ} {p} {i} {b} {σ} {K} _ x =
     Lefts ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩ ⟨ st , ret x same (push (asked s hd τ p i b) σ K) ⟩
 
+  -- The machine running the agenda `ks`, with the stack as the witness has it.
+  Noting : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+         → (r : Carried ⟨ st , run a σ K ⟩ c) → List (Call (Carried.tree r)) → Set₁
+  Noting {a = a} {σ} {K} r ks =
+    Σ (a ≗ ⟦ ks ⟧) λ q → Σ (Against.StackAs (Carried.tree r) σ K) λ sK → Carried.ctlAs r ≡ Against.noteAs ks q sK
+
   postulate
-    -- Code running: the agenda's next call, or a subscription beginning.
-    --
-    -- At a connect's feed the meaning has fed every joiner at once, at
-    -- the connect's skip, and the first owed joiner's value at
+    -- The agenda done: the run returns to the stack.
+    kept-done : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → (r : Carried ⟨ st , run a σ K ⟩ c) → Noting r [] → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+    -- An `of`'s next value: the meaning's next event at the `of`.
+    kept-emit : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → (r : Carried ⟨ st , run a σ K ⟩ c) → ∀ {Δ A p i xs} (π : Path (Carried.tree r) (ofˢ {Δ = Δ} {A} p i xs)) ks
+              → Noting r (emitC π ∷ ks) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+    -- A subscription's continuation, handed what unsubscribes it.
+    kept-kont : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → (r : Carried ⟨ st , run a σ K ⟩ c) → ∀ {Δ A} {u : Sub h Δ A} (π : Path (Carried.tree r) u) ks
+              → Noting r (kontC π ∷ ks) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+    -- A takeWhile past its failing value: its completion, then its cut.
+    kept-take1 : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+               → (r : Carried ⟨ st , run a σ K ⟩ c) → ∀ {Δ A i p cut k q} {s : Sub h Δ A} (π : Path (Carried.tree r) (takeWhileˢ i p cut k (ending q) s)) ks
+               → Noting r (take1C π ∷ ks) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+    -- A takeWhile's completion delivered: its cut.
+    kept-take2 : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+               → (r : Carried ⟨ st , run a σ K ⟩ c) → ∀ {Δ A i p cut k} {s : Sub h Δ A} (π : Path (Carried.tree r) (takeWhileˢ i p cut k taken s)) ks
+               → Noting r (take2C π ∷ ks) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+    -- A connect's body completed: its source cut.
+    kept-body : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → (r : Carried ⟨ st , run a σ K ⟩ c) → ∀ {Δ A B s₁ q S cut k fd e} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+                (π : Path (Carried.tree r) (connectˢ s₁ q S cut k fd e s b)) ks
+              → Noting r (bodyC π ∷ ks) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+    -- A CONNECT'S FEED: the meaning has fed every joiner at once, at the
+    -- connect's skip, and the first owed joiner's value at
     -- `q ++ [ sub j ]` is its next shown event only if every other live
     -- node's next is past it.  `Carried` holds nothing positional for
     -- nodes the agenda does not owe, so this step needs a field placing
     -- each live node's next shown event past the agenda's region.
-    kept-run : ∀ {h} {st : State h} {w B} {a : Act h B} {σ : w ⊑ h} {K : Stack w B} {c}
-             → (r : Carried ⟨ st , run a σ K ⟩ c) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+    kept-feed : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → (r : Carried ⟨ st , run a σ K ⟩ c) → ∀ {Δ A B s₁ q S cut k x p ss e} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+                (π : Path (Carried.tree r) (connectˢ s₁ q S cut k (feeding x p ss) e s b)) ks
+              → Noting r (feedC π ∷ ks) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
 
+    -- A connect's source completed: each joiner told, as the feed.
+    kept-fin : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+             → (r : Carried ⟨ st , run a σ K ⟩ c) → ∀ {Δ A B s₁ q S cut k p ss e} {s : Sub h Δ A} {b : Sub h (A ∷ Δ) B}
+               (π : Path (Carried.tree r) (connectˢ s₁ q S cut k (finishing p ss) e s b)) ks
+             → Noting r (finC π ∷ ks) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+    -- A subscription beginning at its pending node.
+    kept-sub : ∀ {h} {st : State h} {w} {a : Act h ⊤} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+             → (r : Carried ⟨ st , run a σ K ⟩ c) → ∀ {Δ A s q} (π : Path (Carried.tree r) (pendingˢ {Δ = Δ} {A} s q)) ks {x sK}
+             → Carried.ctlAs r ≡ Against.subAs π ks x sK → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+
+  private
+    running : ∀ {h} {st : State h} {w B} {a : Act h B} {σ : w ⊑ h} {K : Stack w B} {c}
+            → (r : Carried ⟨ st , run a σ K ⟩ c) → Lighter r → (x : Against.CtlAs (Carried.tree r) (run a σ K)) → Carried.ctlAs r ≡ x
+            → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+    running r lt (Against.noteAs []              q sK) e = kept-done r (q , sK , e) lt
+    running r lt (Against.noteAs (emitC π ∷ ks)  q sK) e = kept-emit r π ks (q , sK , e) lt
+    running r lt (Against.noteAs (kontC π ∷ ks)  q sK) e = kept-kont r π ks (q , sK , e) lt
+    running r lt (Against.noteAs (take1C π ∷ ks) q sK) e = kept-take1 r π ks (q , sK , e) lt
+    running r lt (Against.noteAs (take2C π ∷ ks) q sK) e = kept-take2 r π ks (q , sK , e) lt
+    running r lt (Against.noteAs (bodyC π ∷ ks)  q sK) e = kept-body r π ks (q , sK , e) lt
+    running r lt (Against.noteAs (feedC π ∷ ks)  q sK) e = kept-feed r π ks (q , sK , e) lt
+    running r lt (Against.noteAs (finC π ∷ ks)   q sK) e = kept-fin r π ks (q , sK , e) lt
+    running r lt (Against.subAs π ks x sK)             e = kept-sub r π ks e lt
+
+  -- Code running: the agenda's next call, or a subscription beginning.
+  kept-run : ∀ {h} {st : State h} {w B} {a : Act h B} {σ : w ⊑ h} {K : Stack w B} {c}
+           → (r : Carried ⟨ st , run a σ K ⟩ c) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+  kept-run r lt = running r lt (Carried.ctlAs r) refl
+
+  postulate
     -- A burst whose cold is spent, or whose subscriber reads closed,
     -- returns to what waits on it: the burst leaves the agenda, so
     -- whatever the return re-enters is lighter, and the meaning shows
