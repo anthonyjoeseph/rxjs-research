@@ -224,8 +224,6 @@ by their own silent steps (`Mirror`).
   over sorted, alien sources, is steady: no lane steps inside its outer's.
 - **`alien-steps`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription
   somewhere, over sorted, alien sources, owns nothing just past its own events.
-- **`steady-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a source's steps merge
-  steadily into a steady body clear of them.
 - **`steady-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer somewhere, over
   sorted, alien sources, is steady.
 - **`reach-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program

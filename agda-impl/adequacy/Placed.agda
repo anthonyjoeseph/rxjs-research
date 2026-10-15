@@ -919,6 +919,96 @@ tagged-split k (sub _ ∷ q) j (inj₂ t) with tagged-split k q j t
 Unrelated : Pos → Pos → Set
 Unrelated k h = ¬ Prefix k h × ¬ Prefix h k
 
+ext-prefix : ∀ {k h} → Ext k h → Prefix k h
+ext-prefix (ext l ls) = prefix-++ _ (l ∷ ls)
+
+-- No later and no prefix is earlier.
+strict : ∀ k q → q <ᵖ k ≡ false → ¬ Prefix k q → k <ᵖ q ≡ true
+strict k q a np with <ᵖ-split k q a
+... | inj₁ kq   = kq
+... | inj₂ refl = ⊥-elim (np (prefix-refl k))
+
+-- `e`'s first, if any, shows its step outside `q`.
+Next : ∀ {A} → Pos → Events A → Set
+Next q (out h _ _) = ¬ Ext q (h ++ [ ix 0 ])
+Next q (skip h _)  = ¬ Ext q (h ++ [ ix 0 ])
+Next q (end h)     = ¬ Ext q (h ++ [ ix 0 ])
+Next q hush        = ⊤
+
+away-next : ∀ {A} q (e : Events A) → Away q e → Next (q ++ [ ix 0 ]) e
+away-next q (out h _ _) ne = λ x → ne (under-ext q h x)
+away-next q (skip h _)  ne = λ x → ne (under-ext q h x)
+away-next q (end h)     ne = λ x → ne (under-ext q h x)
+away-next q hush        ne = tt
+
+-- The body's next, kept or behind a step.
+past-ahead : ∀ {A B} k (b : Events B) q (s : Events∞ A) → Past k b → k <ᵖ q ≡ true → ¬ Ext k q → Past k (M.ahead b q s (M.before q b))
+past-ahead k b q s pb kq ne with M.before q b
+past-ahead k b           q s pb kq ne | true  = kq , ne
+past-ahead k (out _ _ _) q s pb kq ne | false = pb
+past-ahead k (skip _ _)  q s pb kq ne | false = pb
+past-ahead k (end _)     q s pb kq ne | false = pb
+past-ahead k hush        q s pb kq ne | false = tt
+
+clear-ahead : ∀ {A B} k (b : Events B) q (s : Events∞ A) → Clear k b → ¬ Ext k q → Clear k (M.ahead b q s (M.before q b))
+clear-ahead k b q s cb ne with M.before q b
+clear-ahead k b           q s cb ne | true  = ne
+clear-ahead k (out _ _ _) q s cb ne | false = cb
+clear-ahead k (skip _ _)  q s cb ne | false = cb
+clear-ahead k (end _)     q s cb ne | false = cb
+clear-ahead k hush        q s cb ne | false = tt
+
+-- After a step at `q`, the body's next is past it, and so is the next step.
+clear-head : ∀ {B} q (b : Events B) → M.before q b ≡ true → Every (λ k → Unrelated k q) b → Clear q b
+clear-head q (out k _ _) qk ub = qk , λ x → proj₂ (proj₁ (every ub)) (ext-prefix x)
+clear-head q (skip k _)  qk ub = λ x → proj₂ (proj₁ (every ub)) (ext-prefix x)
+clear-head q (end k)     qk ub = λ x → proj₂ (every ub) (ext-prefix x)
+clear-head q hush        qk ub = tt
+
+clear-step : ∀ {A B} q (b : Events B) q′ (r : Events∞ A) → M.before q b ≡ true → Every (λ k → Unrelated k q) b → ¬ Ext q q′
+           → Clear q (M.ahead b q′ r (M.before q′ b))
+clear-step q b q′ r qb ub nx with M.before q′ b
+clear-step q b           q′ r qb ub nx | true  = nx
+clear-step q (out k a r′) q′ r qb ub nx | false = clear-head q (out k a r′) qb ub
+clear-step q (skip k r′)  q′ r qb ub nx | false = clear-head q (skip k r′) qb ub
+clear-step q (end k)      q′ r qb ub nx | false = clear-head q (end k) qb ub
+clear-step q hush         q′ r qb ub nx | false = tt
+
+clear-beside : ∀ {A B} q (b : Events B) (s : Events A) → M.before q b ≡ true → Every (λ k → Unrelated k q) b → Next q s → Clear q (M.beside b s)
+clear-beside q b (out h _ r) qb ub nx = clear-step q b (h ++ [ ix 0 ]) r qb ub nx
+clear-beside q b (skip h r)  qb ub nx = clear-step q b (h ++ [ ix 0 ]) r qb ub nx
+clear-beside q b (end c)     qb ub nx = clear-step q b (c ++ [ ix 0 ]) M.hushed qb ub nx
+clear-beside q b hush        qb ub nx = clear-head q b qb ub
+
+-- A SOURCE'S STEPS MERGE INTO A STEADY BODY STEADILY when nothing the
+-- body shows lies above or below where a step shows.
+mutual
+  steady-beside : ∀ {A B} (b : Events B) (s : Events A) → Steady b → Steady s
+                → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) s) b → Steady (M.beside b s)
+  steady (steady-beside b (out q _ s) sb ss u) =
+    steady (steady-ahead b (q ++ [ ix 0 ]) s _ refl sb (proj₂ (steady ss)) (every-mono (λ k x → proj₁ (every x)) b u)
+                         (every-mono (λ k x → proj₂ (every x)) b u) (away-next q (force s) (past-away q (force s) (proj₁ (steady ss)))))
+  steady (steady-beside b (skip q s) sb ss u) =
+    steady (steady-ahead b (q ++ [ ix 0 ]) s _ refl sb (proj₂ (steady ss)) (every-mono (λ k x → proj₁ (every x)) b u)
+                         (every-mono (λ k x → proj₂ (every x)) b u) (away-next q (force s) (clear-away q (force s) (proj₁ (steady ss)))))
+  steady (steady-beside b (end c) sb ss u) =
+    steady (steady-ahead b (c ++ [ ix 0 ]) M.hushed _ refl sb (record { steady = tt }) (every-mono (λ k x → every x) b u)
+                         (every-mono (λ k x → record { every = tt }) b u) tt)
+  steady (steady-beside b hush sb ss u) = steady sb
+
+  steady-ahead : ∀ {A B} (b : Events B) q (s : Events∞ A) t → t ≡ M.before q b → Steady b → Steady (force s)
+               → Every (λ k → Unrelated k q) b → Every (λ k → Every (λ q′ → Unrelated k (q′ ++ [ ix 0 ])) (force s)) b → Next q (force s)
+               → Steady (M.ahead b q s t)
+  steady (steady-ahead b q s true e sb ss ub us nx) = clear-beside q b (force s) (sym e) ub nx , steady-beside b (force s) sb ss us
+  steady (steady-ahead (out k a r) q s false e sb ss ub us nx) =
+    past-ahead k (force r) q s (proj₁ (steady sb)) (strict k q (sym e) (proj₁ (proj₁ (every ub)))) (λ x → proj₁ (proj₁ (every ub)) (ext-prefix x))
+    , steady-ahead (force r) q s _ refl (proj₂ (steady sb)) ss (proj₂ (every ub)) (proj₂ (every us)) nx
+  steady (steady-ahead (skip k r) q s false e sb ss ub us nx) =
+    clear-ahead k (force r) q s (proj₁ (steady sb)) (λ x → proj₁ (proj₁ (every ub)) (ext-prefix x))
+    , steady-ahead (force r) q s _ refl (proj₂ (steady sb)) ss (proj₂ (every ub)) (proj₂ (every us)) nx
+  steady (steady-ahead (end c) q s false e sb ss ub us nx) = tt
+  steady (steady-ahead hush q s false e sb ss ub us nx) = tt
+
 -- Neither keys the other.
 Disjoint : Pos → Pos → Set
 Disjoint a h = ¬ Owned a h × ¬ Owned h a
@@ -1050,10 +1140,6 @@ postulate
   alien-steps : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
               → Every (λ q → Alien (q ++ [ ix 0 ]) (U.meaning (U.subscribe o p) ρ)) (U.meaning (U.subscribe o p) ρ)
 
-  -- A SOURCE'S STEPS MERGE INTO A STEADY BODY STEADILY when nothing the
-  -- body shows lies above or below where a step shows.
-  steady-beside : ∀ {A B} (b : Events B) (s : Events A) → Steady b → Steady s
-                → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) s) b → Steady (M.beside b s)
 
   -- A DEFER'S RUN IS STEADY somewhere, over sources sorted and alien to it.
   steady-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
