@@ -176,14 +176,21 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE STEPPER.** `step-skips`: a `Sane` ghost's meaning is, skips aside
-  (`≃`), what its step shows then the stepped ghost's. Ruled out: every
-  node (a told joiner under a live source); exact agreement, per
-  approximant or under a ghost anchored in its sources' step history; a
-  matched skip moving, or merging unsorted events (`M.beside` refuted on
-  both). Decides whether the meaning's events are sorted, whether a
-  connect's body fed its source's step is alike the body reading that
-  step, and whether `M.beside` and `M.go` respect `≃` between sorted events.
+- **THE CONNECT.** `live-skips`: a running connect's meaning is what its
+  step shows, its body reading its source alike the body fed its source's
+  step. Ruled out: exact agreement, per approximant or under a ghost
+  anchored in its sources' step history. Decides whether a lane's pre-join
+  skips, one fewer per source step, are all `≃` forgets.
+- **THE MERGES.** `go-skips` with `∼-trans`: a flatMap's meaning is what
+  its step shows, each lane showing its own. Ruled out: merges over `∼`
+  alone, over unsorted events, or with matched skips kept in place.
+  Decides whether the meaning's events are sorted and `M.go` respects `≃`
+  between sorted events.
+- **THE OPERATORS.** `takeWhileᴱ-≃`, `take-first`, `join-quiet` and
+  `defer-after`: a cut respects `≃`, a cut step comes first when the uncut
+  did, an untold joiner fed nothing under silent sources shows nothing, a
+  defer is its program subscribed. Decides whether `join-quiet` needs its
+  sources' silence carried further than `First`.
 - **THE LEAST VALUE.** `note-least` with `note-onward`: the value a note
   records is the least the ghost holds, and past it the run runs the
   stepped ghost. Decides whether "least" is paid once as a field of
@@ -197,18 +204,21 @@ by their own silent steps (`Mirror`).
   begun, or a burst's frame, runs its kernel's code silently to the next
   re-entry state. Decides whether the four carried states close under the
   run, a poll's answer and a popped timer passing silently.
-- **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
-  in finitely many steps. Decides whether liveness needs a measure, and
-  whether a `connect` feedback loop that spins makes it false.
-- **PLACED.** `placing` with `ticks-up`: an ascending record alike the
-  events as a set is their prefix, placed. Decides whether sortedness and
-  set equality pin the order, or two events at one position can swap.
-
 ### The ledger
 
-- **`step-skips`** (Content) — FALSITY, `REFUTED, DEAD ROUTE×3, RECOVERY`: a
-  `Sane` ghost's meaning is, skips aside, its step's event, then the stepped
-  ghost's.
+- **`live-skips`** (Stepper) — FALSITY, `DEAD ROUTE×3, RECOVERY`: a running
+  connect's meaning is what its step shows.
+- **`go-skips`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning is
+  what its step shows, each lane showing its own.
+- **`∼-trans`** (Stepper) — FALSITY, `DEAD ROUTE`: weak bisimilarity is
+  transitive.
+- **`join-quiet`** (Stepper) — FALSITY, `NO EVIDENCE`: an untold joiner fed
+  nothing under silent sources shows nothing.
+- **`takeWhileᴱ-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a cut respects `≃`.
+- **`take-first`** (Stepper) — FALSITY, `NO EVIDENCE`: a cut step comes first
+  when the uncut one did.
+- **`defer-after`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer's meaning is
+  one skip, then its program subscribed.
 - **`note-least`** (Content) — FALSITY, `NO EVIDENCE`: a note records the least
   value the ghost holds.
 - **`note-onward`** (Content) — FALSITY, `NO EVIDENCE`: past a note the run

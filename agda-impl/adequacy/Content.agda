@@ -30,69 +30,30 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼; skip⁼; end⁼;
-  agree; agree-sym)
+open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
+  skip⁼; end⁼; agree; agree-sym)
 import denotation.Unfold as U
 open import denotation.Compositional using ([]ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Sane using (Sane)
+open import adequacy.Stepper using (_≃_; _∼_; _∼∞_; ∼-sym; out∼; end∼; skip∼; skipˡ; skipʳ; []; os; afterᴱ)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; Out; note; module Pure)
 open import operation.AbstractObservable using (module Heap) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 
 open Events∞
-
-------------------------------------------------------------------------
--- Alike skips aside: the same values and ends in the same order, finitely
--- many skips between them on either side, or both skipping for ever.
---
--- A merge orders by position, skips included (`M.beside`, `M.go`), so a
--- skip matched across the two keeps its position; and it respects the
--- relation only between sorted events, an unmatched skip free to sit
--- anywhere.
---
--- REFUTED: 0af1ff0e M.beside respecting it with a matched skip free to move, by a source spinning below the body's value
--- REFUTED: d09ec415 M.beside respecting it between unsorted events, by an unmatched skip above the value after it
--- DEAD ROUTE: an unmatched skip bounded by the event after it, in place
---   of sortedness.  Not transitive: a skip matched on one side above an
---   unmatched one on the other is unbounded once the middle is dropped.
-
-mutual
-  data _≃_ {A : Set} : Events A → Events A → Set where
-    out≃  : ∀ {k a l r} → force l ≃∞ force r → out k a l ≃ out k a r
-    end≃  : ∀ {k} → end k ≃ end k
-    hush≃ : hush ≃ hush
-    skip≃ : ∀ {k l r} → force l ≃∞ force r → skip k l ≃ skip k r
-    skipˡ : ∀ {k l y} → force l ≃ y → skip k l ≃ y
-    skipʳ : ∀ {x k r} → x ≃ force r → x ≃ skip k r
-
-  record _≃∞_ {A : Set} (x y : Events A) : Set where
-    coinductive
-    field ≃force : x ≃ y
-
-open _≃∞_
-
-mutual
-  ≃-sym : ∀ {A} {x y : Events A} → x ≃ y → y ≃ x
-  ≃-sym (out≃ r)  = out≃ (≃∞-sym r)
-  ≃-sym end≃      = end≃
-  ≃-sym hush≃     = hush≃
-  ≃-sym (skip≃ r) = skip≃ (≃∞-sym r)
-  ≃-sym (skipˡ r) = skipʳ (≃-sym r)
-  ≃-sym (skipʳ r) = skipˡ (≃-sym r)
-
-  ≃∞-sym : ∀ {A} {x y : Events A} → x ≃∞ y → y ≃∞ x
-  ≃force (≃∞-sym r) = ≃-sym (≃force r)
+open _∼∞_
 
 module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
   open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; held; run; asking; bottom; spent?)
   open Heap using (_⊑_)
   open Recording R using (silent-keeps; value-notes)
-  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sane)
+  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing)
   open Strongly.Against R using (calmAs; noteAs; subAs; burstAs)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
@@ -159,16 +120,16 @@ module Honesty (R : Set) where
   same-agree ag = has-agree ag , has-agree (λ n → agree-sym (ag n))
 
   -- Events alike skips aside hold the same events.
-  has-skips : ∀ {x y k b} → x ≃ y → Has x k b → Has y k b
-  has-skips (out≃ _)    atOut        = atOut
-  has-skips end≃        atEnd        = atEnd
-  has-skips (out≃ r)    (pastOut h)  = pastOut (has-skips (≃force r) h)
-  has-skips (skip≃ r)   (pastSkip h) = pastSkip (has-skips (≃force r) h)
+  has-skips : ∀ {x y k b} → x ∼ y → Has x k b → Has y k b
+  has-skips (out∼ _)    atOut        = atOut
+  has-skips end∼        atEnd        = atEnd
+  has-skips (out∼ r)    (pastOut h)  = pastOut (has-skips (∼force r) h)
+  has-skips (skip∼ r)   (pastSkip h) = pastSkip (has-skips (∼force r) h)
   has-skips (skipˡ r)   (pastSkip h) = has-skips r h
   has-skips (skipʳ r)   h            = pastSkip (has-skips r h)
 
   same-skips : ∀ {x y} → x ≃ y → x ≋ y
-  same-skips a = has-skips a , has-skips (≃-sym a)
+  same-skips a = has-skips (_≃_.alike a) , has-skips (∼-sym (_≃_.alike a))
 
   ----------------------------------------------------------------------
   -- THE GHOST
@@ -263,10 +224,7 @@ module Honesty (R : Set) where
 
   -- What a step shows, then the residual of the ghost it leaves.
   after : U.Step [] R → Events R
-  after (U.outˢ k a g′) = out k a λ where .force → residual g′
-  after (U.skipˢ k g′)  = skip k λ where .force → residual g′
-  after (U.endˢ k)      = end k
-  after U.hushˢ         = hush
+  after = afterᴱ []
 
   -- Events alike, as a set, with what a step shows are what it says.
   steps-after : ∀ {e} s → e ≋ after s → Steps e s
@@ -297,36 +255,17 @@ module Honesty (R : Set) where
   if-silent false true  = _ , refl
   if-silent false false = _ , refl
 
-  postulate
-    -- THE STEPPER IS THE MEANING, skips aside, of a run's configuration
-    -- (`Sane`): what the ghost's step shows, then the meaning of the ghost
-    -- it leaves.  A joiner told its end while its source runs is fed the
-    -- source's values by the stepper and shows them, where the meaning
-    -- reads it as its end alone.
-    --
-    -- Skips aside, because the meaning's joiner shows its source's every
-    -- step and a lane's join comes after a count of them that the ghost
-    -- does not keep.
-    --
-    -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
-    -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
-    --   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
-    --   (`M.rejoin`), and a value from before its join as a skip; the
-    --   stepper feeds a joiner values only, and only those after it joined.
-    -- DEAD ROUTE: exact agreement per approximant with the stepper's joiner
-    --   shown every source step as `M.rejoin` shows it.  A lane a flatMap
-    --   has yet to subscribe reads its connect's source from where the
-    --   ghost's source stands, so the meaning shows it one pre-join skip at
-    --   `p ++ [ ix i ]` per source step before its join, and a source step
-    --   leaves one fewer.  Witness 950a4208.
-    -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
-    --   step history.  The ghost is the witness's open part (`part`), which
-    --   keeps no count of a source's steps, and a silent run is matched by
-    --   the residual as a set alone (`Ahead`), so no field of the witness
-    --   can keep the count a lane's pre-join skips need.
-    -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
-    step-skips : ∀ g → Sane [] g → residual g ≃ after (U.step g)
+  -- THE STEPPER IS THE MEANING, skips aside, of a run's configuration
+  -- (`Sane`): what the ghost's step shows, then the meaning of the ghost
+  -- it leaves.  A joiner told its end while its source runs is fed the
+  -- source's values by the stepper and shows them, where the meaning
+  -- reads it as its end alone.
+  --
+  -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
+  step-skips : ∀ g → Sane [] g → residual g ≃ after (U.step g)
+  step-skips g sn = os g [] tt sn tt
 
+  postulate
     -- The turn, nothing held and no timer queued: the ghost shows
     -- nothing.
     turn-dry : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
