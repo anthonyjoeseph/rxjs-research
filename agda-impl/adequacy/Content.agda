@@ -17,7 +17,7 @@ module adequacy.Content where
 open import Level using (lift)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
-open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
+open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -25,15 +25,16 @@ open import Data.Nat.Properties using (suc-injective)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Bool using (true; false)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; suc)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst; subst₂)
 
 import Tree as T
-open import denotation.MonotonicList using (MonotonicList; Events; Events∞; Pos; Time; tick; out; skip; end; observe; root)
+open import denotation.MonotonicList using (MonotonicList; Events; Events∞; Pos; Time; tick; out; skip; end; hush; observe; root)
 open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
 open import operation.Machine using (module Machine)
+open import adequacy.Record using (module Recording)
 open import denotation.Denote using (⟦_⟧; DenEnv)
 open import operation.AbstractObservable using (module Run; module Heap)
 open Heap using (_⊑_)
@@ -45,6 +46,7 @@ module Honesty (R : Set) where
   open Run (Pureᴾ R) using (Subscribe; Subject; Env; wkEnv; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via; startCold)
   open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; reading; begin; launch; Read; read)
   open Sorting R using (WellSub; compile-well; idle)
+  open Recording R using (silent-keeps; value-notes)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
 
@@ -220,6 +222,62 @@ module Honesty (R : Set) where
   Logged qs xs k (just a) = Sent qs xs k a
   Logged qs xs k nothing  = ⊥
 
+  -- What leads the events: skips, then a value or the end at `p`, `r`
+  -- what follows it.
+  data Lead : Events R → Pos → Maybe R → Events R → Set where
+    leadOut  : ∀ {p a r} → Lead (out p a r) p (just a) (force r)
+    leadEnd  : ∀ {p} → Lead (end p) p nothing hush
+    leadSkip : ∀ {q r p b r′} → Lead (force r) p b r′ → Lead (skip q r) p b r′
+
+  lead-has : ∀ {e p b r} → Lead e p b r → Has e p b
+  lead-has leadOut      = atOut
+  lead-has leadEnd      = atEnd
+  lead-has (leadSkip l) = pastSkip (lead-has l)
+
+  lead-rest : ∀ {e p b r k c} → Lead e p b r → Has r k c → Has e k c
+  lead-rest leadOut      x = pastOut x
+  lead-rest leadEnd      ()
+  lead-rest (leadSkip l) x = pastSkip (lead-rest l x)
+
+  lead-split : ∀ {e p b r k c} → Lead e p b r → Has e k c → (k ≡ p × c ≡ b) ⊎ Has r k c
+  lead-split leadOut      atOut        = inj₁ (refl , refl)
+  lead-split leadOut      (pastOut x)  = inj₂ x
+  lead-split leadEnd      atEnd        = inj₁ (refl , refl)
+  lead-split (leadSkip l) (pastSkip x) = lead-split l x
+
+  -- Events led by their end hold no value.
+  lead-ended : ∀ {e p r k a} → Lead e p nothing r → Has e k (just a) → ⊥
+  lead-ended leadEnd      ()
+  lead-ended (leadSkip l) (pastSkip x) = lead-ended l x
+
+  -- What a step shows of the residual: a silent step keeps it; a value
+  -- at its tick leads it, what follows lying past the value; a
+  -- completion is its end; a drained run leaves nothing of it.
+  data Shows (rest : Events R) : Step → Set₁ where
+    silentˢ   : ∀ {m′} → Inner rest m′ → Shows rest (silent m′)
+    valueˢ    : ∀ {t p a m′ r} → t ≡ tick p → Lead rest p (just a) r → (∀ {k b} → Has r k b → k ≤ᵖ p → ⊥) → Inner r m′
+              → Shows rest (value t p a m′)
+    completeˢ : ∀ {p r} → Lead rest p nothing r → Shows rest (complete p)
+    drainedˢ  : (∀ {k b} → Has rest k b → ⊥) → Shows rest drained
+
+  postulate
+    -- An honest subscription launched under the recorder will deliver
+    -- the events its meaning shows at the root.
+    inner-launch : ∀ {s : Subscribe R []} {M} → Honest {R} s M → Inner (observe M root) (launch s recorder)
+
+    -- THE TREE WALK: a step that is not the loop's turn shows the
+    -- residual.
+    inner-walk : ∀ {rest m} → Inner rest m → idle m ≡ false → Shows rest (step m)
+
+    -- THE LOOP'S TURN: popping a timer shows the residual.
+    inner-turn : ∀ {rest m} → Inner rest m → idle m ≡ true → Shows rest (step m)
+
+  -- Every step shows the residual.
+  inner-next : ∀ {rest m} → Inner rest m → Shows rest (step m)
+  inner-next {m = m} i with idle m in eq
+  ... | true  = inner-turn i eq
+  ... | false = inner-walk i eq
+
   -- THE MACHINE HONEST TO `e`: what it has recorded is among `e`, and
   -- what of `e` it has not lies in `rest`, past every mark, which the
   -- configuration will deliver.
@@ -230,21 +288,24 @@ module Honesty (R : Set) where
       split  : ∀ {k b} → Has e k b → Logged (Mach.marks m) (Mach.log m) k b ⊎ Has rest k b
       past   : ∀ {k b} → Has rest k b → Any (k ≤ᵖ_) (Mach.marks m) → ⊥
       paired : length (Mach.marks m) ≡ length (Mach.log m)
-      ends   : ∀ {p} → step m ≡ complete p → Has e p nothing × (∀ {k a} → Has rest k (just a) → ⊥)
-      dries  : step m ≡ drained → ∀ {k b} → Has rest k b → ⊥
+      within : ∀ {k b} → Has rest k b → Has e k b
       inner  : Inner rest m
 
-  postulate
-    -- An honest subscription launched under the recorder is honest to
-    -- the events its meaning shows at the root.
-    honest-launch : ∀ {s : Subscribe R []} {M} → Honest {R} s M → HonMach (observe M root) (launch s recorder)
+  -- A completion is the events' end, the residual holding no value.
+  ends : ∀ {e m p} (h : HonMach e m) → step m ≡ complete p → Has e p nothing × (∀ {k a} → Has (HonMach.rest h) k (just a) → ⊥)
+  ends h eq with subst (Shows (HonMach.rest h)) eq (inner-next (HonMach.inner h))
+  ... | completeˢ l = HonMach.within h (lead-has l) , lead-ended l
 
-    -- THE TREE WALK: a step that is not the loop's turn keeps the machine
-    -- honest.
-    honest-walk : ∀ {e m m′} → HonMach e m → idle m ≡ false → m ↦ m′ → HonMach e m′
+  -- A drained run has delivered all of it.
+  dries : ∀ {e m} (h : HonMach e m) → step m ≡ drained → ∀ {k b} → Has (HonMach.rest h) k b → ⊥
+  dries h eq with subst (Shows (HonMach.rest h)) eq (inner-next (HonMach.inner h))
+  ... | drainedˢ none = none
 
-    -- THE LOOP'S TURN: popping a timer keeps it honest.
-    honest-turn : ∀ {e m m′} → HonMach e m → idle m ≡ true → m ↦ m′ → HonMach e m′
+  -- An honest subscription launched under the recorder is honest to
+  -- the events its meaning shows at the root, all of them still owed.
+  honest-launch : ∀ {s : Subscribe R []} {M} → Honest {R} s M → HonMach (observe M root) (launch s recorder)
+  honest-launch {M = M} h = record
+    { rest = observe M root ; logged = λ () ; split = inj₂ ; past = λ _ () ; paired = refl ; within = λ x → x ; inner = inner-launch h }
 
   -- A value sent is at one of the record's marks.
   sent-mark : ∀ {qs xs k a} → Sent qs xs k a → Any (k ≡_) qs
@@ -259,7 +320,7 @@ module Honesty (R : Set) where
   sent-cut : ∀ {qs xs ys k a} → length qs ≡ length xs → Sent (qs ++ ys) xs k a → Sent qs xs k a
   sent-cut {[]}    {[]}    eq ()
   sent-cut {_ ∷ _} {_ ∷ _} eq sentHere      = sentHere
-  sent-cut {_ ∷ _} {_ ∷ _} eq (sentLater s) = sentLater (sent-cut (suc-injective eq) s)
+  sent-cut {_ ∷ qs} {_ ∷ xs} eq (sentLater s) = sentLater (sent-cut {qs} {xs} (suc-injective eq) s)
 
   -- An honest machine's record is alike its events, however it stands.
   honest-alike : ∀ {e m en qs} → HonMach e m → Stands m en qs → Alike en qs (Mach.log m) e
@@ -270,14 +331,14 @@ module Honesty (R : Set) where
     }
     where open HonMach h
   honest-alike {m = m} h (finʰ {p} eq) = record
-    { sound = λ s → logged (sent-cut paired s)
-    ; whole = λ x _ → [ sent-++ [ p ] , (λ r → ⊥-elim (proj₂ (ends eq) r)) ]′ (split x)
-    ; ended = p , proj₁ (ends eq) , ++⁺ʳ (Mach.marks m) (here refl)
+    { sound = λ s → logged (sent-cut {Mach.marks m} {Mach.log m} paired s)
+    ; whole = λ x _ → [ sent-++ [ p ] , (λ r → ⊥-elim (proj₂ (ends h eq) r)) ]′ (split x)
+    ; ended = p , proj₁ (ends h eq) , ++⁺ʳ (Mach.marks m) (here refl)
     }
     where open HonMach h
   honest-alike h (dryʰ eq) = record
     { sound = logged
-    ; whole = λ x _ → [ (λ s → s) , (λ r → ⊥-elim (dries eq r)) ]′ (split x)
+    ; whole = λ x _ → [ (λ s → s) , (λ r → ⊥-elim (dries h eq r)) ]′ (split x)
     ; ended = ended
     }
     where
@@ -285,16 +346,76 @@ module Honesty (R : Set) where
     ended : ∀ {k b} → Has _ k b → Any (k ≤ᵖ_) _
     ended {b = just a}  x with split x
     ... | inj₁ s = Any.map inj₁ (sent-mark s)
-    ... | inj₂ r = ⊥-elim (dries eq r)
+    ... | inj₂ r = ⊥-elim (dries h eq r)
     ended {b = nothing} x with split x
     ... | inj₁ ()
-    ... | inj₂ r = ⊥-elim (dries eq r)
+    ... | inj₂ r = ⊥-elim (dries h eq r)
 
-  -- One step keeps the machine honest.
+  -- The record grown by one entry keeps what it sent, and sends the new
+  -- entry at its mark.
+  sent-snoc-keep : ∀ {qs xs ys zs k a} → Sent qs xs k a → Sent (qs ++ ys) (xs ++ zs) k a
+  sent-snoc-keep sentHere      = sentHere
+  sent-snoc-keep (sentLater s) = sentLater (sent-snoc-keep s)
+
+  logged-snoc : ∀ {qs xs ys zs k b} → Logged qs xs k b → Logged (qs ++ ys) (xs ++ zs) k b
+  logged-snoc {b = just a} s = sent-snoc-keep s
+
+  sent-last : ∀ {qs xs q a} → length qs ≡ length xs → Sent (qs ++ [ q ]) (xs ++ [ (tick q , a) ]) q a
+  sent-last {[]}     {[]}     eq = sentHere
+  sent-last {_ ∷ qs} {_ ∷ xs} eq = sentLater (sent-last {qs} {xs} (suc-injective eq))
+
+  sent-snoc : ∀ {qs xs q x k a} → length qs ≡ length xs → Sent (qs ++ [ q ]) (xs ++ [ x ]) k a → Sent qs xs k a ⊎ (k ≡ q × x ≡ (tick k , a))
+  sent-snoc {[]}    {[]}    eq sentHere      = inj₂ (refl , refl)
+  sent-snoc {[]}    {[]}    eq (sentLater ())
+  sent-snoc {_ ∷ _} {_ ∷ _} eq sentHere      = inj₁ sentHere
+  sent-snoc {_ ∷ qs} {_ ∷ xs} eq (sentLater s) = [ (λ s′ → inj₁ (sentLater s′)) , inj₂ ]′ (sent-snoc {qs} {xs} (suc-injective eq) s)
+
+  snoc-length : ∀ {A B : Set} {qs : List A} {xs : List B} {q x} → length qs ≡ length xs → length (qs ++ [ q ]) ≡ length (xs ++ [ x ])
+  snoc-length {qs = []}    {[]}    eq = refl
+  snoc-length {qs = _ ∷ qs} {_ ∷ xs} eq = cong suc (snoc-length {qs = qs} {xs} (suc-injective eq))
+
+  -- One step keeps the machine honest: a silent one keeps its record
+  -- and its residual; a value moves the residual's lead into the record.
   honest-step : ∀ {e m m′} → HonMach e m → m ↦ m′ → HonMach e m′
-  honest-step {m = m} h t with idle m in eq
-  ... | true  = honest-turn h eq t
-  ... | false = honest-walk h eq t
+  honest-step {m = m} h (silentᵗ eq) with subst (Shows (HonMach.rest h)) eq (inner-next (HonMach.inner h)) | silent-keeps m eq
+  ... | silentˢ i | kl , km = record
+    { rest   = rest
+    ; logged = λ s → logged (subst₂ (λ qs xs → Sent qs xs _ _) km kl s)
+    ; split  = λ x → [ (λ l → inj₁ (subst₂ (λ qs xs → Logged qs xs _ _) (sym km) (sym kl) l)) , inj₂ ]′ (split x)
+    ; past   = λ r ow → past r (subst (Any (_ ≤ᵖ_)) km ow)
+    ; paired = subst₂ (λ qs xs → length qs ≡ length xs) (sym km) (sym kl) paired
+    ; within = within
+    ; inner  = i
+    }
+    where open HonMach h
+  honest-step {e} {m} h (valueᵗ {t} {p} {a} eq) with subst (Shows (HonMach.rest h)) eq (inner-next (HonMach.inner h)) | value-notes m eq
+  ... | valueˢ {r = r} tp l beyond i | kl , km = record
+    { rest   = r
+    ; logged = λ s → logged′ (subst₂ (λ qs xs → Sent qs xs _ _) km kl s)
+    ; split  = λ x → [ (λ l′ → inj₁ (subst₂ (λ qs xs → Logged qs xs _ _) (sym km) (sym kl) l′)) , inj₂ ]′ (split′ x)
+    ; past   = λ x ow → past′ x (subst (Any (_ ≤ᵖ_)) km ow)
+    ; paired = subst₂ (λ qs xs → length qs ≡ length xs) (sym km) (sym kl) (snoc-length {qs = Mach.marks m} {Mach.log m} paired)
+    ; within = λ x → within (lead-rest l x)
+    ; inner  = i
+    }
+    where
+    open HonMach h
+    logged′ : ∀ {k a′} → Sent (Mach.marks m ++ [ p ]) (Mach.log m ++ [ (t , a) ]) k a′ → Has e k (just a′)
+    logged′ s with sent-snoc {Mach.marks m} {Mach.log m} paired s
+    ... | inj₁ s′       = logged s′
+    ... | inj₂ (kp , x) = subst₂ (λ k a′ → Has e k (just a′)) (sym kp) (cong proj₂ x) (within (lead-has l))
+    split′ : ∀ {k b} → Has e k b → Logged (Mach.marks m ++ [ p ]) (Mach.log m ++ [ (t , a) ]) k b ⊎ Has r k b
+    split′ x with split x
+    ... | inj₁ lg = inj₁ (logged-snoc lg)
+    ... | inj₂ y with lead-split l y
+    ...   | inj₂ y′       = inj₂ y′
+    ...   | inj₁ (kp , ba) = inj₁ (subst₂ (λ k b → Logged (Mach.marks m ++ [ p ]) (Mach.log m ++ [ (t , a) ]) k b) (sym kp) (sym ba)
+                                    (subst (λ t′ → Sent (Mach.marks m ++ [ p ]) (Mach.log m ++ [ (t′ , a) ]) p a) (sym tp) (sent-last {Mach.marks m} {Mach.log m} paired)))
+    past′ : ∀ {k b} → Has r k b → Any (k ≤ᵖ_) (Mach.marks m ++ [ p ]) → ⊥
+    past′ x ow with ++⁻ (Mach.marks m) ow
+    ... | inj₁ o          = past (lead-rest l x) o
+    ... | inj₂ (here kp)  = beyond x kp
+    ... | inj₂ (there ())
 
   -- Every configuration reached from an honest launch is honest.
   honest : ∀ {e m} → Reached e m → HonMach e m
