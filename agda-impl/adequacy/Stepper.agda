@@ -232,12 +232,23 @@ take-after i p (U.skipˢ k c) = skip-same refl
 take-after i p (U.endˢ k)    = ≃-refl (end k)
 take-after i p U.hushˢ       = ≃-refl hush
 
--- An untold joiner's step is silent only when its source's is.
-postulate
-  -- A joiner untold and fed nothing, every running source silent: it
-  -- shows nothing.
-  join-quiet : ∀ {Γ A} (i : A ∈ Γ) p (δ : Env Γ) → Settled δ → Told (lookup (flags δ) i) nothing → First nothing δ
-             → M.rejoin p (lookup (ρᴱ δ) i) ≃ hush
+-- A step no silent head beats is silent, and shows nothing.
+silent : ∀ {Γ A} (st : U.Step Γ A) → Wins nothing (U.headˢ st) ≡ true → U.headˢ st ≡ nothing × (∀ ρ → afterᴱ ρ st ≃ hush)
+silent (U.outˢ k a c) ()
+silent (U.skipˢ k c)  ()
+silent (U.endˢ k)     ()
+silent U.hushˢ        w = refl , λ ρ → ≃-refl hush
+
+-- A JOINER UNTOLD AND FED NOTHING, EVERY RUNNING SOURCE SILENT, SHOWS
+-- NOTHING: its source runs, and shows its silent step.
+join-quiet : ∀ {Γ A} (i : A ∈ Γ) p (δ : Env Γ) → Settled δ → Told (lookup (flags δ) i) nothing → First nothing δ
+           → M.rejoin p (lookup (ρᴱ δ) i) ≃ hush
+join-quiet (here refl) p (U.live s ∷ δ) (sh , _) t (w , fi) =
+  rejoin-≃ p (≃-trans (sh (subst (λ h → First h δ) (sym (proj₁ q)) fi)) (proj₂ q (ρᴱ δ)))
+  where q = silent (U.step s) w
+join-quiet (here refl) p (U.ended c ∷ δ) st () fi
+join-quiet (there i)   p (U.live s ∷ δ)  (_ , _ , _ , st) t (_ , fi) = join-quiet i p δ st t fi
+join-quiet (there i)   p (U.ended c ∷ δ) st t fi = join-quiet i p δ st t fi
 
 join-after : ∀ {Γ A} (i : A ∈ Γ) p xs e (δ : Env Γ) → Settled δ → Told (lookup (flags δ) i) e → First (U.headˢ (U.joinˢ i p xs e)) δ
            → U.meaning (U.joinᶜ i p xs e) (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) (U.joinˢ i p xs e)

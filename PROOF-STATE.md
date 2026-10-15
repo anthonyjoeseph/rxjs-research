@@ -177,14 +177,6 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `spread-flat` and `spread-connect`, then `steady-flat` and
-  `fresh-flat` over `FlatOrder`'s lane roots: pairwise apart, each lane
-  alien to what is apart from its root, the outer apart from each.
-  `spread-sub` is a body over per-operator leaves. Ruled out: a lane's end
-  tied with another lane or the outer, a lane's first before where it
-  subscribes. Decides whether a stream's later events carry tags only from
-  joins made earlier, the causal half of spreading; its ordering half
-  follows from `Ordered` and `Steady`.
 - **THE PROGRESS.** `emit-open` and `climb-take`, then `sub-onward`, the
   other `-onward` leaves and `burst-poll`, carry liveness. The climb is one
   height induction over a snoc view of the path, map, defer, body and root
@@ -193,10 +185,14 @@ by their own silent steps (`Mirror`).
   dead body (split out as `emit-unseen`), a take stopping at its last
   value, a resume needing more than the frame it pops, a measure blind to
   a cut, a queue bound on joiners, a polled burst as a re-entry state.
-- **THE JOIN.** `join-quiet`: an untold joiner fed nothing under silent
-  sources shows nothing. Decides whether it needs its sources' silence
-  carried further than `First`, the one operator side condition no
-  ordering fact settles.
+- **THE ORDER.** `spread-flat` and `spread-connect`, then `steady-flat` and
+  `fresh-flat` over `FlatOrder`'s lane roots: pairwise apart, each lane
+  alien to what is apart from its root, the outer apart from each.
+  `spread-sub` is a body over per-operator leaves. Ruled out: a lane's end
+  tied with another lane or the outer, a lane's first before where it
+  subscribes. Decides whether a stream's later events carry tags only from
+  joins made earlier, the causal half of spreading; its ordering half
+  follows from `Ordered` and `Steady`.
 - **THE OPERATORS.** `go-skips` and `take-first`: a flatMap's meaning is
   what its step shows, a cut step comes first when the uncut did. Ruled
   out: a stepper `≃` short of strong agreement, every operator respecting
@@ -239,8 +235,6 @@ by their own silent steps (`Mirror`).
   shows only skips at a step coming before its own and its sources'.
 - **`go-skips`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning is
   what its step shows, each lane showing its own.
-- **`join-quiet`** (Stepper) — FALSITY, `NO EVIDENCE`: an untold joiner fed
-  nothing under silent sources shows nothing.
 - **`take-first`** (Stepper) — FALSITY, `NO EVIDENCE`: a cut step comes first
   when the uncut one did.
 - **`note-least`** (Content) — FALSITY, `NO EVIDENCE`: a note records the least
