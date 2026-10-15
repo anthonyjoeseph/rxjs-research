@@ -10,12 +10,12 @@ module adequacy.Stepper where
 
 open import Data.Bool using (Bool; true; false; not; if_then_else_)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; _++_; [_]; map)
+open import Data.List using (List; []; _∷_; _++_; [_]; map; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (zero; suc)
+open import Data.Nat using (zero; suc; _<ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List.Properties using (++-assoc)
@@ -1207,7 +1207,7 @@ mutual
   shut-within i c (U.mapᶜ f n)               ρ e w = shut-placed i c n ρ e w
   shut-within i c (U.scanᶜ f z n)            ρ e w = shut-placed i c n ρ e w
   shut-within i c (U.takeWhileᶜ b p n)       ρ e w = shut-placed i c n ρ e w
-  shut-within i c (U.flatMapᶜ op g o ls qs)  ρ e (wo , wl) = shut-placedᴹ i c o ρ e wo , shut-placedᴸ i c ls ρ e wl
+  shut-within i c (U.flatMapᶜ op g o ls qs)  ρ e (wo , wl , wg) = shut-placedᴹ i c o ρ e wo , shut-placedᴸ i c ls ρ e wl , wg
   shut-within i c (U.joinᶜ _ _ _ _)          ρ e w = tt
   shut-within i c (U.connectᶜ b (U.live s))  ρ e (pb , ps) =
     subst (λ x → Placed (U.shut (there i) c b) (x ∷ᴬ ρ)) (sym (shut-meaning i c s ρ e)) (shut-placed (there i) c b _ e pb) , shut-placed i c s ρ e ps
@@ -1235,7 +1235,7 @@ mutual
   within-≈ (U.mapᶜ f n)               r w = placed-≈ n r w
   within-≈ (U.scanᶜ f z n)            r w = placed-≈ n r w
   within-≈ (U.takeWhileᶜ b p n)       r w = placed-≈ n r w
-  within-≈ (U.flatMapᶜ op g o ls qs)  r (wo , wl) = placed-≈ᴹ o r wo , placed-≈ᴸ ls r wl
+  within-≈ (U.flatMapᶜ op g o ls qs)  r (wo , wl , wg) = placed-≈ᴹ o r wo , placed-≈ᴸ ls r wl , λ a q → placed-≈ (g a q) r (wg a q)
   within-≈ (U.joinᶜ _ _ _ _)          r w = tt
   within-≈ (U.connectᶜ b (U.live s))  r (pb , ps) = placed-≈ b (envs-≃ s r ∷ᵉ r) pb , placed-≈ s r ps
   within-≈ (U.connectᶜ b (U.ended c)) r pb = placed-≈ b (≃-refl (end c) ∷ᵉ r) pb
@@ -1264,7 +1264,8 @@ mutual
   fed-within (U.mapᶜ g c)               i q a f sn lv w = fed-placed c i q a f sn lv w
   fed-within (U.scanᶜ g z c)            i q a f sn lv w = fed-placed c i q a f sn lv w
   fed-within (U.takeWhileᶜ j p c)       i q a f sn lv w = fed-placed c i q a f sn lv w
-  fed-within (U.flatMapᶜ op g o ls qs)  i q a f (so , sl , _) lv (wo , wl) = fed-placedᴹ o i q a f so lv wo , fed-placedᴸ ls i q a f sl lv wl
+  fed-within {Γ} (U.flatMapᶜ op g o ls qs) i q a f (so , sl , sg) lv (wo , wl , wg) =
+    fed-placedᴹ o i q a f so lv wo , fed-placedᴸ ls i q a f sl lv wl , λ x r → fed-placed (g x r) i q a f (sg x r) (live-true Γ i) (wg x r)
   fed-within (U.joinᶜ _ _ _ _)          i q a f sn lv w = tt
   fed-within (U.connectᶜ b (U.live s))  i q a f {ν} (sb , ss) lv (pb , ps) =
     fed-placed b (there i) q a (there′ (fed-≃ s i q a f {ν} ss lv) f) {true ∷ᴬ ν} sb lv pb , fed-placed s i q a f ss lv ps
@@ -1314,13 +1315,129 @@ within-shut c (U.skipˢ _ b)  P = shut-placed (here refl) c b _ refl (proj₂ P)
 within-shut c (U.endˢ _)     P = tt
 within-shut c U.hushˢ        P = tt
 
-postulate
-  -- A FLATMAP'S STEP KEEPS ITS PARTS PLACED: a step coming first leaves
-  -- its outer and each lane in flight placed.
-  within-flat : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs (δ : Env Γ) → Settled δ
-              → Sane (flags δ) (U.flatMapᶜ op g o ls qs) → Placed (U.flatMapᶜ op g o ls qs) (ρᴱ δ)
-              → First (U.headˢ (U.step (U.flatMapᶜ op g o ls qs))) δ → Withinˢ (ρᴱ δ) (U.step (U.flatMapᶜ op g o ls qs))
+-- A flatMap's step, part by part: its outer's or the earliest lane's
+-- step placed when it comes first, the rest of its lanes as they were,
+-- and a lane admitted placed as every lane its `g` makes is.
+Afterᴹ : ∀ {Γ A} → Env Γ → Maybe (U.Node Γ A) → Set
+Afterᴹ δ nothing  = ⊤
+Afterᴹ δ (just c) = First (U.headˢ (U.step c)) δ → Placedˢ (ρᴱ δ) (U.step c)
 
+Afterᴸ : ∀ {Γ A} → Env Γ → List (U.Node Γ A) → Set
+Afterᴸ δ []       = ⊤
+Afterᴸ δ (c ∷ cs) = (First (U.headˢ (U.step c)) δ → Placedˢ (ρᴱ δ) (U.step c)) × Afterᴸ δ cs
+
+after-pick : ∀ {Γ A} (δ : Env Γ) (bs : List (U.Node Γ A)) {l} as → Afterᴸ δ (bs ++ l ∷ as)
+           → First (U.headˢ (U.step l)) δ → Placedˢ (ρᴱ δ) (U.step l)
+after-pick δ []       as (a , _) = a
+after-pick δ (b ∷ bs) as (_ , r) = after-pick δ bs as r
+
+placedᴸ-split : ∀ {Γ A} {ρ : NEnv Γ} (bs : List (U.Node Γ A)) {l} as → Placedᴸ (bs ++ l ∷ as) ρ → Placedᴸ bs ρ × Placed l ρ × Placedᴸ as ρ
+placedᴸ-split []       as (pl , pa) = tt , pl , pa
+placedᴸ-split (b ∷ bs) as (pb , p)  = (pb , proj₁ s) , proj₂ s
+  where s = placedᴸ-split bs as p
+
+placedᴸ-++ : ∀ {Γ A} {ρ : NEnv Γ} (bs cs : List (U.Node Γ A)) → Placedᴸ bs ρ → Placedᴸ cs ρ → Placedᴸ (bs ++ cs) ρ
+placedᴸ-++ []       cs pb       pc = pc
+placedᴸ-++ (b ∷ bs) cs (pb , p) pc = pb , placedᴸ-++ bs cs p pc
+
+-- The earliest lane is one of them, the rest split around it.
+pick-race : ∀ {Γ A} (l : U.Node Γ A) s ls {k k′ bs′ c′ sc′ as′ kr bs c sc as} (b : Bool)
+          → (ls ≡ bs′ ++ c′ ∷ as′ × sc′ ≡ U.step c′) → s ≡ U.step l
+          → (if b then U.found k [] l s ls else U.found k′ (l ∷ bs′) c′ sc′ as′) ≡ U.found kr bs c sc as
+          → l ∷ ls ≡ bs ++ c ∷ as × sc ≡ U.step c
+pick-race l s ls true  ih es refl = refl , es
+pick-race l s ls false ih es refl = cong (l ∷_) (proj₁ ih) , proj₂ ih
+
+pick-split : ∀ {Γ A} (l : U.Node Γ A) s ls h (e : U.Earliest Γ A) {k bs c sc as}
+           → (∀ {k′ bs′ c′ sc′ as′} → e ≡ U.found k′ bs′ c′ sc′ as′ → ls ≡ bs′ ++ c′ ∷ as′ × sc′ ≡ U.step c′)
+           → s ≡ U.step l → U.pick l s ls h e ≡ U.found k bs c sc as → l ∷ ls ≡ bs ++ c ∷ as × sc ≡ U.step c
+pick-split l s ls nothing  U.none                        ih es ()
+pick-split l s ls nothing  (U.found k′ bs′ c′ sc′ as′) ih es refl = cong (l ∷_) (proj₁ (ih refl)) , proj₂ (ih refl)
+pick-split l s ls (just k) U.none                        ih es refl = refl , es
+pick-split l s ls (just k) (U.found k′ bs′ c′ sc′ as′) ih es e    = pick-race l s ls (k <ᵖ k′) (ih refl) es e
+
+earliest-split : ∀ {Γ A} (ls : List (U.Node Γ A)) {k bs l s as} → U.earliest ls ≡ U.found k bs l s as → ls ≡ bs ++ l ∷ as × s ≡ U.step l
+earliest-split []       ()
+earliest-split (l ∷ ls) e =
+  pick-split l (U.step l) ls (U.headˢ (U.step l)) (U.earliest ls) (λ {k′} {bs′} {c′} {sc′} {as′} → earliest-split ls {k′} {bs′} {c′} {sc′} {as′}) refl e
+
+placed-admit : ∀ {Γ A B} {ρ : NEnv Γ} op (g : A → Pos → U.Node Γ B) q a ls qs → (∀ a q → Placed (g a q) ρ) → Placedᴸ ls ρ
+             → Placedᴸ (proj₁ (U.admit op g q a ls qs)) ρ
+placed-admit (T.mergeᶠ nothing)  g q a ls       qs pg pl = pg a q , pl
+placed-admit (T.mergeᶠ (just n)) g q a ls       qs pg pl with length ls <ᵇ n
+... | true  = pg a q , pl
+... | false = pl
+placed-admit T.switchᶠ           g q a ls       qs pg pl = pg a q , tt
+placed-admit T.exhaustᶠ          g q a []       qs pg pl = pg a q , tt
+placed-admit T.exhaustᶠ          g q a (l ∷ ls) qs pg pl = pl
+
+within-outer : ∀ {Γ A B} {ρ : NEnv Γ} op (g : A → Pos → U.Node Γ B) (so : U.Step Γ A) ls qs
+             → Placedˢ ρ so → Placedᴸ ls ρ → (∀ a q → Placed (g a q) ρ) → Withinˢ ρ (U.outerˢ op g so ls qs)
+within-outer op g (U.outˢ q a o) ls qs P pl pg with U.admit op g (q ++ [ ix 1 ]) a ls qs | placed-admit op g (q ++ [ ix 1 ]) a ls qs pg pl
+... | ls′ , qs′ | pa = proj₂ P , pa , pg
+within-outer op g (U.skipˢ q o)  ls       qs       P pl pg = proj₂ P , pl , pg
+within-outer op g (U.endˢ c)     []       []       P pl pg = tt
+within-outer op g (U.endˢ c)     (l ∷ ls) qs       P pl pg = tt , pl , pg
+within-outer op g (U.endˢ c)     []       (a ∷ qs) P pl pg = tt , pl , pg
+within-outer op g U.hushˢ        ls       qs       P pl pg = tt
+
+first-outer : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (so : U.Step Γ A) ls qs (δ : Env Γ)
+            → First (U.headˢ (U.outerˢ op g so ls qs)) δ → First (U.headˢ so) δ
+first-outer op g (U.outˢ q a o) ls qs δ f with U.admit op g (q ++ [ ix 1 ]) a ls qs
+... | _ , _ = first-sub q δ f
+first-outer op g (U.skipˢ q o)  ls       qs       δ f = f
+first-outer op g (U.endˢ c)     []       []       δ f = f
+first-outer op g (U.endˢ c)     (_ ∷ _)  qs       δ f = f
+first-outer op g (U.endˢ c)     []       (_ ∷ _)  δ f = f
+first-outer op g U.hushˢ        ls       qs       δ f = f
+
+within-lane : ∀ {Γ A B} {ρ : NEnv Γ} op (g : A → Pos → U.Node Γ B) o bs (s : U.Step Γ B) as qs
+            → Placedᴹ o ρ → Placedᴸ bs ρ → Placedˢ ρ s → Placedᴸ as ρ → (∀ a q → Placed (g a q) ρ)
+            → Withinˢ ρ (U.laneˢ op g o bs s as qs)
+within-lane op g o        bs       (U.outˢ k b c) as       qs       po pb P pa pg = po , placedᴸ-++ bs (c ∷ as) pb (proj₂ P , pa) , pg
+within-lane op g o        bs       (U.skipˢ k c)  as       qs       po pb P pa pg = po , placedᴸ-++ bs (c ∷ as) pb (proj₂ P , pa) , pg
+within-lane op g o        bs       (U.endˢ c)     as       (a ∷ qs) po pb P pa pg = po , (pg a (c ++ [ ix 1 ]) , placedᴸ-++ bs as pb pa) , pg
+within-lane op g nothing  []       (U.endˢ c)     []       []       po pb P pa pg = tt
+within-lane op g (just o) bs       (U.endˢ c)     as       []       po pb P pa pg = po , placedᴸ-++ bs as pb pa , pg
+within-lane op g nothing  (b ∷ bs) (U.endˢ c)     as       []       po pb P pa pg = po , placedᴸ-++ (b ∷ bs) as pb pa , pg
+within-lane op g nothing  []       (U.endˢ c)     (a ∷ as) []       po pb P pa pg = po , pa , pg
+within-lane op g o        bs       U.hushˢ        as       qs       po pb P pa pg = tt
+
+first-lane : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o bs (s : U.Step Γ B) as qs (δ : Env Γ)
+           → First (U.headˢ (U.laneˢ op g o bs s as qs)) δ → First (U.headˢ s) δ
+first-lane op g o        bs       (U.outˢ k b c) as       qs       δ f = f
+first-lane op g o        bs       (U.skipˢ k c)  as       qs       δ f = f
+first-lane op g o        bs       (U.endˢ c)     as       (a ∷ qs) δ f = first-sub c δ f
+first-lane op g nothing  []       (U.endˢ c)     []       []       δ f = f
+first-lane op g (just o) bs       (U.endˢ c)     as       []       δ f = f
+first-lane op g nothing  (b ∷ bs) (U.endˢ c)     as       []       δ f = f
+first-lane op g nothing  []       (U.endˢ c)     (a ∷ as) []       δ f = f
+first-lane op g o        bs       U.hushˢ        as       qs       δ f = f
+
+go-lane : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o bs l as qs (δ : Env Γ)
+        → Placedᴹ o (ρᴱ δ) → Placedᴸ (bs ++ l ∷ as) (ρᴱ δ) → (∀ a q → Placed (g a q) (ρᴱ δ)) → Afterᴸ δ (bs ++ l ∷ as)
+        → First (U.headˢ (U.laneˢ op g o bs (U.step l) as qs)) δ → Withinˢ (ρᴱ δ) (U.laneˢ op g o bs (U.step l) as qs)
+go-lane op g o bs l as qs δ po pl pg al fi =
+  within-lane op g o bs (U.step l) as qs po (proj₁ sp) (after-pick δ bs as al (first-lane op g o bs (U.step l) as qs δ fi)) (proj₂ (proj₂ sp)) pg
+  where sp = placedᴸ-split bs as pl
+
+within-go : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs (δ : Env Γ)
+          → Placedᴹ o (ρᴱ δ) → Placedᴸ ls (ρᴱ δ) → (∀ a q → Placed (g a q) (ρᴱ δ)) → Afterᴹ δ o → Afterᴸ δ ls
+          → First (U.headˢ (U.goˢ op g o ls qs (U.earliest ls))) δ → Withinˢ (ρᴱ δ) (U.goˢ op g o ls qs (U.earliest ls))
+within-go op g o ls qs δ po pl pg ao al fi with U.earliest ls in ee
+within-go op g nothing  ls qs δ po pl pg ao al fi | U.none = tt
+within-go op g (just o) ls qs δ po pl pg ao al fi | U.none =
+  within-outer op g (U.step o) ls qs (ao (first-outer op g (U.step o) ls qs δ fi)) pl pg
+within-go op g nothing  ls qs δ po pl pg ao al fi | U.found k bs l s as with earliest-split ls ee
+... | refl , refl = go-lane op g nothing bs l as qs δ po pl pg al fi
+within-go op g (just o) ls qs δ po pl pg ao al fi | U.found k bs l s as with earliest-split ls ee
+... | refl , refl with U.headˢ (U.step o) in eh
+...   | nothing = go-lane op g (just o) bs l as qs δ po pl pg al fi
+...   | just k′ with k′ <ᵖ k
+...     | true  = within-outer op g (U.step o) (bs ++ l ∷ as) qs (ao (subst (λ h → First h δ) eh (first-outer op g (U.step o) (bs ++ l ∷ as) qs δ fi))) pl pg
+...     | false = go-lane op g (just o) bs l as qs δ po pl pg al fi
+
+postulate
   -- A DEFER'S PROGRAM IS PLACED WITHIN: subscribed, and fed what its
   -- sources showed since, each part reads its sources in order.
   within-defer : ∀ {Γ A} (l : Later Timeline Γ A) p ns (δ : Env Γ) → Settled δ → Withinˢ (ρᴱ δ) (U.step (U.deferᶜ l p ns))
@@ -1435,7 +1552,8 @@ mutual
     within-scan f z (U.step c) (placed-after c δ st sn pc (subst (λ k → First k δ) (scan-head f z (U.step c)) fi))
   within-after (U.takeWhileᶜ i p c) δ st sn (_ , pc) fi =
     within-take i p (U.step c) (placed-after c δ st sn pc (take-first i p (U.step c) δ fi))
-  within-after (U.flatMapᶜ op g o ls qs) δ st sn pl fi = within-flat op g o ls qs δ st sn pl fi
+  within-after (U.flatMapᶜ op g o ls qs) δ st (so , sl , _) (_ , po , pl , pg) fi =
+    within-go op g o ls qs δ po pl pg (placed-afterᴹ o δ st so po) (placed-afterᴸ ls δ st sl pl) fi
   within-after (U.joinᶜ i p xs e)   δ st sn pl fi = within-join i p xs e
   within-after (U.connectᶜ b (U.live s)) δ st (sb , ss) (_ , pb , ps) fi =
     wconn b s δ sb pb ps (U.step b) (U.step s) (λ w f → placed-after b (U.live s ∷ δ) (hs , ps , ld , st) sb pb (w , f))
@@ -1467,7 +1585,7 @@ mutual
     ≃-trans (scanᴱ-≃ f z (os c δ st sn pl (subst (λ k → First k δ) (scan-head f z (U.step c)) fi))) (scan-after f z (U.step c))
   os (U.takeWhileᶜ i p c) δ st sn (_ , pl) fi =
     ≃-trans (takeWhileᴱ-≃ i p (os c δ st sn pl (take-first i p (U.step c) δ fi))) (take-after i p (U.step c))
-  os (U.flatMapᶜ op g o ls qs) δ st sn pl@(_ , po , pls) =
+  os (U.flatMapᶜ op g o ls qs) δ st sn pl@(_ , po , pls , _) =
     go-skips op g o ls qs δ st sn pl (osᴹ o δ st (proj₁ sn) po) (osᴸ ls δ st (proj₁ (proj₂ sn)) pls)
   os (U.joinᶜ i p xs e)   δ st sn pl fi = join-after i p xs e δ st sn fi
   os (U.connectᶜ b (U.live s)) δ st sn@(sb , ss) pl@(_ , pb , ps) =
@@ -1476,6 +1594,14 @@ mutual
   os (U.connectᶜ b (U.ended c)) δ st sn (_ , pb) fi =
     ≃-trans (os b (U.ended c ∷ δ) st sn pb (subst (λ k → First k δ) (shut-head c (U.step b)) fi)) (shut-after c (U.step b))
   os (U.deferᶜ l p ns)    δ st sn pl fi = defer-after l p ns (ρᴱ δ)
+
+  placed-afterᴹ : ∀ {Γ A} (o : Maybe (U.Node Γ A)) (δ : Env Γ) → Settled δ → Saneᴹ (flags δ) o → Placedᴹ o (ρᴱ δ) → Afterᴹ δ o
+  placed-afterᴹ nothing  δ st sn pl = tt
+  placed-afterᴹ (just c) δ st sn pl = placed-after c δ st sn pl
+
+  placed-afterᴸ : ∀ {Γ A} (ls : List (U.Node Γ A)) (δ : Env Γ) → Settled δ → Saneᴸ (flags δ) ls → Placedᴸ ls (ρᴱ δ) → Afterᴸ δ ls
+  placed-afterᴸ []       δ st sn        pl        = tt
+  placed-afterᴸ (c ∷ cs) δ st (sc , sl) (pc , pl) = placed-after c δ st sc pc , placed-afterᴸ cs δ st sl pl
 
   osᴹ : ∀ {Γ A} (o : Maybe (U.Node Γ A)) (δ : Env Γ) → Settled δ → Saneᴹ (flags δ) o → Placedᴹ o (ρᴱ δ) → Showsᴹ o δ
   osᴹ nothing  δ st sn pl = tt

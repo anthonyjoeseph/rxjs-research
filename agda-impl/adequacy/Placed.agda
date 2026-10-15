@@ -43,7 +43,8 @@ mutual
 open Ordered public
 
 -- Every node's meaning in order, read in its own environment: a
--- connect's body reading its source's.
+-- connect's body reading its source's, a flatMap's lanes yet to
+-- subscribe, wherever they will be, reading its own.
 mutual
   Placed : ∀ {Γ A} → U.Node Γ A → NEnv Γ → Set
   Placed c ρ = Ordered (U.meaning c ρ) × Within c ρ
@@ -52,7 +53,7 @@ mutual
   Within (U.mapᶜ f c)               ρ = Placed c ρ
   Within (U.scanᶜ f z c)            ρ = Placed c ρ
   Within (U.takeWhileᶜ i p c)       ρ = Placed c ρ
-  Within (U.flatMapᶜ op g o ls qs)  ρ = Placedᴹ o ρ × Placedᴸ ls ρ
+  Within (U.flatMapᶜ op g o ls qs)  ρ = Placedᴹ o ρ × Placedᴸ ls ρ × (∀ a q → Placed (g a q) ρ)
   Within (U.connectᶜ b (U.live s))  ρ = Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ
   Within (U.connectᶜ b (U.ended c)) ρ = Placed b (end c ∷ᴬ ρ)
   Within _                          ρ = ⊤
