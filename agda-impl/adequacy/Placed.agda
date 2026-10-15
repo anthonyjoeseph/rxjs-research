@@ -11,7 +11,7 @@ open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
-open import Data.Nat.Properties using (+-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
+open import Data.Nat.Properties using (+-suc; +-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
@@ -19,7 +19,7 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; cong)
 open import Relation.Nullary using (¬_)
 open import Level using (lower)
 
@@ -119,24 +119,46 @@ mutual
 Beneath : Pos → Pos → Set
 Beneath k h = Prefix⁺ k h ⊎ Tagged k h
 
--- No event of `e` keyed under `p`.
+-- Every position `e` shows, its end's included, satisfies `P`.
 mutual
-  Aliens : ∀ {A} → Pos → Events A → Set
-  Aliens p (out h _ r) = ¬ Owned p h × Alien p (force r)
-  Aliens p (skip h r)  = ¬ Owned p h × Alien p (force r)
-  Aliens p (end h)     = ¬ Owned p h
-  Aliens p hush        = ⊤
+  Everys : ∀ {A} → (Pos → Set) → Events A → Set
+  Everys P (out h _ r) = P h × Every P (force r)
+  Everys P (skip h r)  = P h × Every P (force r)
+  Everys P (end h)     = P h
+  Everys P hush        = ⊤
 
-  record Alien {A} (p : Pos) (e : Events A) : Set where
+  record Every {A} (P : Pos → Set) (e : Events A) : Set where
     coinductive
-    field alien : Aliens p e
+    field every : Everys P e
 
-open Alien public
+open Every public
+
+-- Every source's positions satisfying `P`.
+Everyᴱ : ∀ {Γ} → (Pos → Set) → NEnv Γ → Set
+Everyᴱ P []ᴬ      = ⊤
+Everyᴱ P (e ∷ᴬ ρ) = Every P e × Everyᴱ P ρ
+
+every-mono : ∀ {A} {P Q : Pos → Set} → (∀ h → P h → Q h) → (e : Events A) → Every P e → Every Q e
+every (every-mono f (out h _ r) pe) = f h (proj₁ (every pe)) , every-mono f (force r) (proj₂ (every pe))
+every (every-mono f (skip h r)  pe) = f h (proj₁ (every pe)) , every-mono f (force r) (proj₂ (every pe))
+every (every-mono f (end h)     pe) = f h (every pe)
+every (every-mono f hush        pe) = tt
+
+every-monoᴱ : ∀ {Γ} {P Q : Pos → Set} → (∀ h → P h → Q h) → (ρ : NEnv Γ) → Everyᴱ P ρ → Everyᴱ Q ρ
+every-monoᴱ f []ᴬ      _         = tt
+every-monoᴱ f (e ∷ᴬ ρ) (pe , pρ) = every-mono f e pe , every-monoᴱ f ρ pρ
+
+every-lookup : ∀ {Γ A} P (ρ : NEnv Γ) → Everyᴱ P ρ → (i : A ∈ Γ) → Every P (lookup ρ i)
+every-lookup P (e ∷ᴬ ρ) (pe , pρ) (here refl) = pe
+every-lookup P (e ∷ᴬ ρ) (pe , pρ) (there i)   = every-lookup P ρ pρ i
+
+-- No event of `e` keyed under `p`.
+Alien : ∀ {A} → Pos → Events A → Set
+Alien p = Every (λ h → ¬ Owned p h)
 
 -- Every source alien to `p`: what a subscription at `p` keys.
 Alienᴱ : ∀ {Γ} → Pos → NEnv Γ → Set
-Alienᴱ p []ᴬ      = ⊤
-Alienᴱ p (e ∷ᴬ ρ) = Alien p e × Alienᴱ p ρ
+Alienᴱ p = Everyᴱ (λ h → ¬ Owned p h)
 
 -- `e` shows an event at `k`.
 data Reaches {A} (k : Pos) : Events A → Set where
@@ -265,15 +287,8 @@ owned-lane p x (inj₁ q) = inj₁ (prefix-trans p x (x ++ [ ix 1 ]) (prefix-lan
 owned-lane p x (inj₂ t) = inj₂ (tagged-++ p x [ ix 1 ] (tagged-lane p x 0 t))
 
 -- Alien to `p` is alien to whatever `p` keys.
-alien-owned : ∀ {A} p k → Owned p k → (e : Events A) → Alien p e → Alien k e
-alien (alien-owned p k o (out h _ r) a) = (λ x → proj₁ (alien a) (owned-trans p k h o x)) , alien-owned p k o (force r) (proj₂ (alien a))
-alien (alien-owned p k o (skip h r)  a) = (λ x → proj₁ (alien a) (owned-trans p k h o x)) , alien-owned p k o (force r) (proj₂ (alien a))
-alien (alien-owned p k o (end h)     a) = λ x → alien a (owned-trans p k h o x)
-alien (alien-owned p k o hush        a) = tt
-
 alienᴱ-owned : ∀ {Γ} p k → Owned p k → (ρ : NEnv Γ) → Alienᴱ p ρ → Alienᴱ k ρ
-alienᴱ-owned p k o []ᴬ      a        = tt
-alienᴱ-owned p k o (e ∷ᴬ ρ) (ae , a) = alien-owned p k o e ae , alienᴱ-owned p k o ρ a
+alienᴱ-owned p k o = every-monoᴱ (λ h na x → na (owned-trans p k h o x))
 
 -- A position's size, a tag counting what it holds.
 mutual
@@ -304,12 +319,18 @@ mutual
   tagged-weigh k (sub j ∷ h) (inj₁ o) = s≤s (≤-trans (owned-weigh k j o) (m≤m+n (weigh j) (weigh h)))
   tagged-weigh k (sub j ∷ h) (inj₂ t) = <-≤-trans (tagged-weigh k h t) (m≤n+m (weigh h) (suc (weigh j)))
 
-tagged-snoc : ∀ k h i → Tagged k (h ++ [ ix i ]) → Tagged k h
-tagged-snoc k []          i ()
-tagged-snoc k (ix _ ∷ h)  i t        = tagged-snoc k h i t
-tagged-snoc k (last ∷ h)  i t        = tagged-snoc k h i t
-tagged-snoc k (sub _ ∷ h) i (inj₁ o) = inj₁ o
-tagged-snoc k (sub _ ∷ h) i (inj₂ t) = inj₂ (tagged-snoc k h i t)
+-- A label marking a step, not a tag.
+data Mark : M.Label → Set where
+  ix-mark   : ∀ i → Mark (ix i)
+  last-mark : Mark last
+
+tagged-mark : ∀ k h l → Mark l → Tagged k (h ++ [ l ]) → Tagged k h
+tagged-mark k []          l (ix-mark _) ()
+tagged-mark k []          l last-mark   ()
+tagged-mark k (ix _ ∷ h)  l m t        = tagged-mark k h l m t
+tagged-mark k (last ∷ h)  l m t        = tagged-mark k h l m t
+tagged-mark k (sub _ ∷ h) l m (inj₁ o) = inj₁ o
+tagged-mark k (sub _ ∷ h) l m (inj₂ t) = inj₂ (tagged-mark k h l m t)
 
 sibling-prefix : ∀ p {i j} → i ≢ j → ¬ Prefix (p ++ [ ix i ]) (p ++ [ ix j ])
 sibling-prefix []      ne (refl , _) = ne refl
@@ -318,8 +339,8 @@ sibling-prefix (_ ∷ p) ne (_ , q)    = sibling-prefix p ne q
 -- Two children of one position key nothing of each other.
 sibling : ∀ p {i j} → i ≢ j → ¬ Owned (p ++ [ ix i ]) (p ++ [ ix j ])
 sibling p     ne (inj₁ q) = sibling-prefix p ne q
-sibling p {i} ne (inj₂ t) =
-  <-irrefl refl (<-≤-trans (tagged-weigh (p ++ [ ix i ]) p (tagged-snoc _ p _ t)) (prefix-weigh p (p ++ [ ix i ]) (prefix-++ p [ ix i ])))
+sibling p {i} {j} ne (inj₂ t) =
+  <-irrefl refl (<-≤-trans (tagged-weigh (p ++ [ ix i ]) p (tagged-mark _ p _ (ix-mark j) t)) (prefix-weigh p (p ++ [ ix i ]) (prefix-++ p [ ix i ])))
 
 -- A first child is never a timer's tick.
 no-tick : ∀ p m → p ++ [ ix 0 ] ≢ ix (suc m) ∷ []
@@ -327,25 +348,11 @@ no-tick []          m ()
 no-tick (_ ∷ [])    m ()
 no-tick (_ ∷ _ ∷ _) m ()
 
--- Every position `e` shows, its end's included, strictly keyed under `p`.
-mutual
-  Keys : ∀ {A} → Pos → Events A → Set
-  Keys p (out h _ r) = Beneath p h × Keyed p (force r)
-  Keys p (skip h r)  = Beneath p h × Keyed p (force r)
-  Keys p (end h)     = Beneath p h
-  Keys p hush        = ⊤
-
-  record Keyed {A} (p : Pos) (e : Events A) : Set where
-    coinductive
-    field keyed : Keys p e
-
-open Keyed public
-
-keyed-reach : ∀ {A} p (e : Events A) h → Keyed p e → Reaches h e → Beneath p h
-keyed-reach p (out h _ r) _ ke out-here       = proj₁ (keyed ke)
-keyed-reach p (out _ _ r) h ke (out-there x)  = keyed-reach p (force r) h (proj₂ (keyed ke)) x
-keyed-reach p (skip h r)  _ ke skip-here      = proj₁ (keyed ke)
-keyed-reach p (skip _ r)  h ke (skip-there x) = keyed-reach p (force r) h (proj₂ (keyed ke)) x
+every-reach : ∀ {A} {P : Pos → Set} (e : Events A) h → Every P e → Reaches h e → P h
+every-reach (out h _ r) _ pe out-here       = proj₁ (every pe)
+every-reach (out _ _ r) h pe (out-there x)  = every-reach (force r) h (proj₂ (every pe)) x
+every-reach (skip h r)  _ pe skip-here      = proj₁ (every pe)
+every-reach (skip _ r)  h pe (skip-there x) = every-reach (force r) h (proj₂ (every pe)) x
 
 prefix-refl : ∀ k → Prefix k k
 prefix-refl []      = tt
@@ -387,138 +394,6 @@ tagged-sub (ix _ ∷ q)  p = tagged-sub q p
 tagged-sub (last ∷ q)  p = tagged-sub q p
 tagged-sub (sub _ ∷ q) p = inj₂ (tagged-sub q p)
 
--- A cold keys its subscribe burst under where it subscribes, and every
--- later frame under a timer tagged with a position under it.
-mutual
-  keyed-frames : ∀ {A t} p τ e (m : M.From A t) → Beneath p e → Keyed p (M.frames τ e m)
-  keyed (keyed-frames p τ e M.done       o) = o
-  keyed (keyed-frames p τ e M.quiet      o) = tt
-  keyed (keyed-frames p τ e (M.at _ _ b) o) = keyed (keyed-burst p τ _ 0 b (inj₂ (inj₁ (beneath-owned p e o))))
-
-  keyed-burst : ∀ {A t} p τ r i (b : M.Frame A t) → Owned p r → Keyed p (M.burst τ r i b)
-  keyed (keyed-burst p τ r i (M.emit a k) o) = owned-snoc p r (ix i) o , keyed-burst p τ r (suc i) (M.Frame∞.force k) o
-  keyed (keyed-burst p τ r i (M.stall k)  o) = owned-snoc p r (ix i) o , keyed-burst p τ r (suc i) (M.Frame∞.force k) o
-  keyed (keyed-burst p τ r i (M.close k)  o) = owned-snoc p r (ix i) o , keyed-frames p τ (r ++ [ last ]) (M.From∞.force k) (owned-snoc p r last o)
-
-keyed-start : ∀ {A} p (m : From A 0) → Keyed p (M.start p m)
-keyed-start p (M.at zero _ b)      = keyed-burst p (tick p) p 0 b (inj₁ (prefix-refl p))
-keyed-start p m@(M.at (suc _) _ _) = keyed-frames p (tick p) (p ++ [ last ]) m (owned-snoc p p last (inj₁ (prefix-refl p)))
-keyed-start p m@M.done             = keyed-frames {t = 0} p (tick p) (p ++ [ last ]) m (owned-snoc p p last (inj₁ (prefix-refl p)))
-keyed-start p m@M.quiet            = keyed-frames {t = 0} p (tick p) (p ++ [ last ]) m (owned-snoc p p last (inj₁ (prefix-refl p)))
-
-keyed-of : ∀ {A} p i (xs : List A) → Keyed p (M.ofᴱ p i xs)
-keyed (keyed-of p i [])       = owned-snoc p p last (inj₁ (prefix-refl p))
-keyed (keyed-of p i (x ∷ xs)) = owned-snoc p p (ix i) (inj₁ (prefix-refl p)) , keyed-of p (suc i) xs
-
-keyed-map : ∀ {A B} p (f : A → B) (e : Events A) → Keyed p e → Keyed p (M.mapᴱ f e)
-keyed (keyed-map p f (out k a r) ke) = proj₁ (keyed ke) , keyed-map p f (force r) (proj₂ (keyed ke))
-keyed (keyed-map p f (skip k r)  ke) = proj₁ (keyed ke) , keyed-map p f (force r) (proj₂ (keyed ke))
-keyed (keyed-map p f (end k)     ke) = keyed ke
-keyed (keyed-map p f hush        ke) = tt
-
-keyed-scan : ∀ {A B} p (f : B → A → B) z (e : Events A) → Keyed p e → Keyed p (M.scanᴱ f z e)
-keyed (keyed-scan p f z (out k a r) ke) = proj₁ (keyed ke) , keyed-scan p f (f z a) (force r) (proj₂ (keyed ke))
-keyed (keyed-scan p f z (skip k r)  ke) = proj₁ (keyed ke) , keyed-scan p f z (force r) (proj₂ (keyed ke))
-keyed (keyed-scan p f z (end k)     ke) = keyed ke
-keyed (keyed-scan p f z hush        ke) = tt
-
--- A cut shows its failing value, if at all, just past where it was, and
--- ends just past it.
-mutual
-  keyed-take : ∀ {A} p i (q : A → Bool) (e : Events A) → Keyed p e → Keyed p (M.takeWhileᴱ i q e)
-  keyed (keyed-take p i q (out k a r) ke) = keyed (keyed-taking p i q k a (q a) r ke)
-  keyed (keyed-take p i q (skip k r)  ke) = proj₁ (keyed ke) , keyed-take p i q (force r) (proj₂ (keyed ke))
-  keyed (keyed-take p i q (end k)     ke) = keyed ke
-  keyed (keyed-take p i q hush        ke) = tt
-
-  keyed-taking : ∀ {A} p i (q : A → Bool) k a b (r : Events∞ A) → Keyed p (out k a r) → Keyed p (M.taking i q k a b r)
-  keyed (keyed-taking p i     q k a true  r ke) = proj₁ (keyed ke) , keyed-take p i q (force r) (proj₂ (keyed ke))
-  keyed (keyed-taking p true  q k a false r ke) =
-    beneath-snoc p k (ix 0) (proj₁ (keyed ke)) , record { keyed = beneath-snoc p k last (proj₁ (keyed ke)) }
-  keyed (keyed-taking p false q k a false r ke) = beneath-snoc p k last (proj₁ (keyed ke))
-
--- A join at `p` shows what it missed just past `p`, the rest tagged.
-mutual
-  keyed-rejoin : ∀ {A} p (e : Events A) → Keyed p (M.rejoin p e)
-  keyed (keyed-rejoin p (out q a k)) = keyed (keyed-shown p q (just a) k (p <ᵖ q))
-  keyed (keyed-rejoin p (skip q k))  = keyed (keyed-shown p q nothing k (p <ᵖ q))
-  keyed (keyed-rejoin p (end c))     with p <ᵖ c
-  ... | true  = inj₂ (tagged-sub c p)
-  ... | false = owned-snoc p p last (inj₁ (prefix-refl p))
-  keyed (keyed-rejoin p hush)        = tt
-
-  keyed-shown : ∀ {A} p q (a : Maybe A) (k : Events∞ A) b → Keyed p (M.shown p q a k b)
-  keyed (keyed-shown p q (just a) k true)  = inj₂ (tagged-sub q p) , keyed-rejoin p (force k)
-  keyed (keyed-shown p q nothing  k true)  = inj₂ (tagged-sub q p) , keyed-rejoin p (force k)
-  keyed (keyed-shown p q (just a) k false) = owned-snoc p p (ix 0) (inj₁ (prefix-refl p)) , keyed-rejoin p (force k)
-  keyed (keyed-shown p q nothing  k false) = owned-snoc p p (ix 0) (inj₁ (prefix-refl p)) , keyed-rejoin p (force k)
-
-prefix-trans⁺ : ∀ k j h → Prefix k j → Prefix⁺ j h → Prefix⁺ k h
-prefix-trans⁺ []      []      h       _          q          = q
-prefix-trans⁺ []      (_ ∷ _) []      _          ()
-prefix-trans⁺ []      (_ ∷ _) (_ ∷ _) _          _          = tt
-prefix-trans⁺ (_ ∷ _) []      _       ()         _
-prefix-trans⁺ (_ ∷ _) (_ ∷ _) []      _          ()
-prefix-trans⁺ (a ∷ k) (b ∷ j) (c ∷ h) (refl , p) (refl , q) = refl , prefix-trans⁺ k j h p q
-
--- Strictly keyed under what `p` keys is strictly keyed under `p`.
-beneath-trans : ∀ p k h → Owned p k → Beneath k h → Beneath p h
-beneath-trans p k h (inj₁ o) (inj₁ q) = inj₁ (prefix-trans⁺ p k h o q)
-beneath-trans p k h (inj₂ t) (inj₁ q) = inj₂ (tagged-prefix p k h t (prefix⁺-prefix k h q))
-beneath-trans p k h o        (inj₂ t) = inj₂ (owned-tagged p k h o t)
-
-keyed-under : ∀ {A} p k → Owned p k → (e : Events A) → Keyed k e → Keyed p e
-keyed (keyed-under p k o (out h _ r) ke) = beneath-trans p k h o (proj₁ (keyed ke)) , keyed-under p k o (force r) (proj₂ (keyed ke))
-keyed (keyed-under p k o (skip h r)  ke) = beneath-trans p k h o (proj₁ (keyed ke)) , keyed-under p k o (force r) (proj₂ (keyed ke))
-keyed (keyed-under p k o (end h)     ke) = beneath-trans p k h o (keyed ke)
-keyed (keyed-under p k o hush        ke) = tt
-
--- A connect shows each of its source's steps, and its end, just past it.
-mutual
-  keyed-beside : ∀ {A B} p (b : Events B) (s : Events A) → Keyed p b → Keyed p s → Keyed p (M.beside b s)
-  keyed (keyed-beside p b (out q _ r) kb ks) =
-    keyed (keyed-ahead p b (q ++ [ ix 0 ]) r _ kb (beneath-snoc p q (ix 0) (proj₁ (keyed ks))) (proj₂ (keyed ks)))
-  keyed (keyed-beside p b (skip q r)  kb ks) =
-    keyed (keyed-ahead p b (q ++ [ ix 0 ]) r _ kb (beneath-snoc p q (ix 0) (proj₁ (keyed ks))) (proj₂ (keyed ks)))
-  keyed (keyed-beside p b (end c)     kb ks) =
-    keyed (keyed-ahead p b (c ++ [ ix 0 ]) M.hushed _ kb (beneath-snoc p c (ix 0) (keyed ks)) (record { keyed = tt }))
-  keyed (keyed-beside p b hush        kb ks) = keyed kb
-
-  keyed-ahead : ∀ {A B} p (b : Events B) q (s : Events∞ A) t → Keyed p b → Beneath p q → Keyed p (force s) → Keyed p (M.ahead b q s t)
-  keyed (keyed-ahead p b           q s true  kb bq ks) = bq , keyed-beside p b (force s) kb ks
-  keyed (keyed-ahead p (out k a r) q s false kb bq ks) = proj₁ (keyed kb) , keyed-ahead p (force r) q s _ (proj₂ (keyed kb)) bq ks
-  keyed (keyed-ahead p (skip k r)  q s false kb bq ks) = proj₁ (keyed kb) , keyed-ahead p (force r) q s _ (proj₂ (keyed kb)) bq ks
-  keyed (keyed-ahead p (end c)     q s false kb bq ks) = keyed kb
-  keyed (keyed-ahead p hush        q s false kb bq ks) = tt
-
--- A lane keyed wherever it subscribes under `p`.
-Lane : ∀ {B} → Pos → MonotonicList B → Set
-Lane p m = ∀ k → Owned p k → Keyed p (M.observe m k)
-
--- An outer keyed under `p`, each value a lane keyed under `p`.
-mutual
-  Outers : ∀ {B} → Pos → Events (MonotonicList B) → Set
-  Outers p (out h m r) = Beneath p h × Lane p m × Outer p (force r)
-  Outers p (skip h r)  = Beneath p h × Outer p (force r)
-  Outers p (end h)     = Beneath p h
-  Outers p hush        = ⊤
-
-  record Outer {B} (p : Pos) (e : Events (MonotonicList B)) : Set where
-    coinductive
-    field outerly : Outers p e
-
-open Outer public
-
-outer-map : ∀ {A B} p (F : A → MonotonicList B) (e : Events A) → (∀ a → Lane p (F a)) → Keyed p e → Outer p (M.mapᴱ F e)
-outerly (outer-map p F (out h a r) lf ke) = proj₁ (keyed ke) , lf a , outer-map p F (force r) lf (proj₂ (keyed ke))
-outerly (outer-map p F (skip h r)  lf ke) = proj₁ (keyed ke) , outer-map p F (force r) lf (proj₂ (keyed ke))
-outerly (outer-map p F (end h)     lf ke) = keyed ke
-outerly (outer-map p F hush        lf ke) = tt
-
-Outerᴹ : ∀ {B} → Pos → Maybe (Events (MonotonicList B)) → Set
-Outerᴹ p nothing  = ⊤
-Outerᴹ p (just e) = Outer p e
-
 -- The lane `earliest` picks, and those around it, are lanes it was given.
 Picked : ∀ {B} → (Events B → Set) → Earliest B → Set
 Picked P none              = ⊤
@@ -534,78 +409,6 @@ earliest-all P (l ∷ ls) (pl ∷ᴬ al) with M.head l | M.earliest ls | earlies
 ...   | true  = []ᴬ , pl , al
 ...   | false = pl ∷ᴬ pb , pc , pa
 
--- An admitted lane subscribes keyed, and a queued one stays a lane.
-Admitted : ∀ {B} → Pos → List (Events B) × List (MonotonicList B) → Set
-Admitted p (ls , qs) = All (Keyed p) ls × All (Lane p) qs
-
-admit-all : ∀ {B} p op q (m : MonotonicList B) ls qs → Owned p q → Lane p m → All (Keyed p) ls → All (Lane p) qs
-          → Admitted p (M.admit op q m ls qs)
-admit-all p (M.mergeᶠ nothing)  q m ls       qs o lm kl kq = lm q o ∷ᴬ kl , kq
-admit-all p (M.mergeᶠ (just n)) q m ls       qs o lm kl kq with length ls <ᵇ n
-... | true  = lm q o ∷ᴬ kl , kq
-... | false = kl , All++⁺ kq (lm ∷ᴬ []ᴬ)
-admit-all p M.switchᶠ           q m ls       qs o lm kl kq = lm q o ∷ᴬ []ᴬ , kq
-admit-all p M.exhaustᶠ          q m []       qs o lm kl kq = lm q o ∷ᴬ []ᴬ , kq
-admit-all p M.exhaustᶠ          q m (l ∷ ls) qs o lm kl kq = kl , kq
-
--- A flatMap's merge shows its outer's skips and ends where they were,
--- each value just past where it was, and its lanes' events where they
--- were, each lane's end just past it when another is queued.
-mutual
-  keyed-go : ∀ {B} p op (o : Maybe (Events (MonotonicList B))) ls qs → Outerᴹ p o → All (Keyed p) ls → All (Lane p) qs
-           → Keyed p (M.go op o ls qs)
-  keyed-go p op o ls qs ko kl kq with M.earliest ls | earliest-all (Keyed p) ls kl
-  ... | none            | _                = keyed-via p op o ls qs ko kl kq
-  ... | found k bs l as | (kb , kl₁ , ka)  = keyed-race p op o k bs l as qs ko kb kl₁ ka kq
-
-  keyed-via : ∀ {B} p op (o : Maybe (Events (MonotonicList B))) ls qs → Outerᴹ p o → All (Keyed p) ls → All (Lane p) qs
-            → Keyed p (M.viaOuter op o ls qs)
-  keyed-via p op nothing  ls qs ko kl kq = record { keyed = tt }
-  keyed-via p op (just e) ls qs ko kl kq = keyed-outer p op e ls qs ko kl kq
-
-  keyed-race : ∀ {B} p op (o : Maybe (Events (MonotonicList B))) k bs (l : Events B) as qs → Outerᴹ p o
-             → All (Keyed p) bs → Keyed p l → All (Keyed p) as → All (Lane p) qs → Keyed p (M.race op o k bs l as qs)
-  keyed-race p op nothing  k bs l as qs ko kb kl ka kq = keyed-lane p op nothing bs l as qs ko kb kl ka kq
-  keyed-race p op (just e) k bs l as qs ko kb kl ka kq with M.head e
-  ... | nothing = keyed-lane p op (just e) bs l as qs ko kb kl ka kq
-  ... | just k′ with k′ <ᵖ k
-  ...   | true  = keyed-outer p op e (bs ++ l ∷ as) qs ko (All++⁺ kb (kl ∷ᴬ ka)) kq
-  ...   | false = keyed-lane p op (just e) bs l as qs ko kb kl ka kq
-
-  keyed-outer : ∀ {B} p op (e : Events (MonotonicList B)) ls qs → Outer p e → All (Keyed p) ls → All (Lane p) qs
-              → Keyed p (M.outer op e ls qs)
-  keyed (keyed-outer p op (out q m r) ls qs ko kl kq)
-    with M.admit op (q ++ [ ix 1 ]) m ls qs
-       | admit-all p op (q ++ [ ix 1 ]) m ls qs
-           (beneath-owned p _ (beneath-snoc p q (ix 1) (proj₁ (outerly ko)))) (proj₁ (proj₂ (outerly ko))) kl kq
-  ... | ls′ , qs′ | (kl′ , kq′) =
-    beneath-snoc p q (ix 0) (proj₁ (outerly ko)) , keyed-go p op (just (force r)) ls′ qs′ (proj₂ (proj₂ (outerly ko))) kl′ kq′
-  keyed (keyed-outer p op (skip q r) ls qs ko kl kq) =
-    proj₁ (outerly ko) , keyed-go p op (just (force r)) ls qs (proj₂ (outerly ko)) kl kq
-  keyed (keyed-outer p op (end c) []       []       ko kl kq) = outerly ko
-  keyed (keyed-outer p op (end c) []       (m ∷ qs) ko kl kq) = outerly ko , keyed-go p op nothing [] (m ∷ qs) tt kl kq
-  keyed (keyed-outer p op (end c) (l ∷ ls) qs       ko kl kq) = outerly ko , keyed-go p op nothing (l ∷ ls) qs tt kl kq
-  keyed (keyed-outer p op hush    ls       qs       ko kl kq) = tt
-
-  keyed-lane : ∀ {B} p op (o : Maybe (Events (MonotonicList B))) bs (l : Events B) as qs → Outerᴹ p o
-             → All (Keyed p) bs → Keyed p l → All (Keyed p) as → All (Lane p) qs → Keyed p (M.lane op o bs l as qs)
-  keyed (keyed-lane p op o bs (out k b r) as qs ko kb kl ka kq) =
-    proj₁ (keyed kl) , keyed-go p op o (bs ++ force r ∷ as) qs ko (All++⁺ kb (proj₂ (keyed kl) ∷ᴬ ka)) kq
-  keyed (keyed-lane p op o bs (skip k r) as qs ko kb kl ka kq) =
-    proj₁ (keyed kl) , keyed-go p op o (bs ++ force r ∷ as) qs ko (All++⁺ kb (proj₂ (keyed kl) ∷ᴬ ka)) kq
-  keyed (keyed-lane p op o bs (end c) as (m ∷ qs) ko kb kl ka (lm ∷ᴬ kq)) =
-    beneath-snoc p c (ix 0) (keyed kl)
-    , keyed-go p op o (M.observe m (c ++ [ ix 1 ]) ∷ bs ++ as) qs ko
-        (lm (c ++ [ ix 1 ]) (beneath-owned p _ (beneath-snoc p c (ix 1) (keyed kl))) ∷ᴬ All++⁺ kb ka) kq
-  keyed (keyed-lane p op nothing  []       (end c) []       [] ko kb kl ka kq) = keyed kl
-  keyed (keyed-lane p op nothing  []       (end c) (a ∷ as) [] ko kb kl ka kq) =
-    keyed kl , keyed-go p op nothing (a ∷ as) [] ko ka kq
-  keyed (keyed-lane p op nothing  (b ∷ bs) (end c) as       [] ko kb kl ka kq) =
-    keyed kl , keyed-go p op nothing (b ∷ bs ++ as) [] ko (All++⁺ kb ka) kq
-  keyed (keyed-lane p op (just e) bs       (end c) as       [] ko kb kl ka kq) =
-    keyed kl , keyed-go p op (just e) (bs ++ as) [] ko (All++⁺ kb ka) kq
-  keyed (keyed-lane p op o bs hush as qs ko kb kl ka kq) = tt
-
 -- What agrees at every depth shows the same positions.
 out-tail : ∀ {A k h h′ a b} {l r : Events∞ A} → Agree (suc k) (out h a l) (out h′ b r) → Agree k (force l) (force r)
 out-tail (out⁼ t) = t
@@ -614,16 +417,363 @@ skip-tail : ∀ {A k h h′} {l r : Events∞ A} → Agree (suc k) (skip h l) (s
 skip-tail (skip⁼ t) = t
 
 mutual
-  keyed-≈ : ∀ {A} p (x y : Events A) → (∀ k → Agree k x y) → Keyed p x → Keyed p y
-  keyed (keyed-≈ p x y a kx) = keys-≈ p x y a (a 1) kx
+  every-≈ : ∀ {A} {P : Pos → Set} (x y : Events A) → (∀ k → Agree k x y) → Every P x → Every P y
+  every (every-≈ x y a px) = everys-≈ x y a (a 1) px
 
-  keys-≈ : ∀ {A} p (x y : Events A) → (∀ k → Agree k x y) → Agree 1 x y → Keyed p x → Keys p y
-  keys-≈ p (out h _ l) (out h _ r) a (out⁼ _)  kx =
-    proj₁ (keyed kx) , keyed-≈ p (force l) (force r) (λ k → out-tail (a (suc k))) (proj₂ (keyed kx))
-  keys-≈ p (skip h l)  (skip h r)  a (skip⁼ _) kx =
-    proj₁ (keyed kx) , keyed-≈ p (force l) (force r) (λ k → skip-tail (a (suc k))) (proj₂ (keyed kx))
-  keys-≈ p (end h)     (end h)     a end⁼      kx = keyed kx
-  keys-≈ p hush        hush        a hush⁼     kx = tt
+  everys-≈ : ∀ {A} {P : Pos → Set} (x y : Events A) → (∀ k → Agree k x y) → Agree 1 x y → Every P x → Everys P y
+  everys-≈ (out h _ l) (out h _ r) a (out⁼ _)  px =
+    proj₁ (every px) , every-≈ (force l) (force r) (λ k → out-tail (a (suc k))) (proj₂ (every px))
+  everys-≈ (skip h l)  (skip h r)  a (skip⁼ _) px =
+    proj₁ (every px) , every-≈ (force l) (force r) (λ k → skip-tail (a (suc k))) (proj₂ (every px))
+  everys-≈ (end h)     (end h)     a end⁼      px = every px
+  everys-≈ hush        hush        a hush⁼     px = tt
+
+-- What a subscription is held to: `S` where it subscribes, `P` what it
+-- shows, `Src` what its sources show.  Each field is one way an
+-- operator makes a position: a step or an end under where it
+-- subscribes, a mark just past what it shows, a timer's frame tagged
+-- with the burst before it, a source's position tagged with a join.
+record Rules : Set₁ where
+  field
+    S P Src : Pos → Set
+    child   : ∀ j l → Mark l → S j → P (j ++ [ l ])
+    deeper  : ∀ h l → Mark l → P h → P (h ++ [ l ])
+    held    : ∀ h → P h → S h
+    frame   : ∀ n e → P e → S (ix (suc n) ∷ sub e ∷ [])
+    join    : ∀ q j → Src q → S j → P (q ++ [ sub j ])
+    source  : ∀ h → P h → Src h
+
+module Reach (R : Rules) where
+  open Rules R
+
+  -- A cold shows its subscribe burst under where it subscribes, and
+  -- each later frame at a tick past it, tagged with the burst before.
+  mutual
+    every-frames : ∀ {A t} τ e (m : M.From A (suc t)) → P e → Every P (M.frames τ e m)
+    every (every-frames τ e M.done                    pe) = pe
+    every (every-frames τ e M.quiet                   pe) = tt
+    every (every-frames τ e (M.at (suc t′) (s≤s _) b) pe) =
+      every (every-burst τ _ 0 b (subst (λ x → S (ix x ∷ sub e ∷ [])) (sym (+-suc τ t′)) (frame (τ + t′) e pe)))
+
+    every-burst : ∀ {A t} τ r i (b : M.Frame A t) → S r → Every P (M.burst τ r i b)
+    every (every-burst τ r i (M.emit a k) sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) (M.Frame∞.force k) sr
+    every (every-burst τ r i (M.stall k)  sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) (M.Frame∞.force k) sr
+    every (every-burst τ r i (M.close k)  sr) =
+      child r (ix i) (ix-mark i) sr , every-frames τ (r ++ [ last ]) (M.From∞.force k) (child r last last-mark sr)
+
+  every-start : ∀ {A} p (m : From A 0) → S p → Every P (M.start p m)
+  every-start p (M.at zero _ b)    sp = every-burst (tick p) p 0 b sp
+  every-start p (M.at (suc n) _ b) sp =
+    every-burst (tick p) _ 0 b
+      (subst (λ x → S (ix x ∷ sub (p ++ [ last ]) ∷ [])) (sym (+-suc (tick p) n)) (frame (tick p + n) _ (child p last last-mark sp)))
+  every-start p M.done             sp = record { every = child p last last-mark sp }
+  every-start p M.quiet            sp = record { every = tt }
+
+  every-of : ∀ {A} p i (xs : List A) → S p → Every P (M.ofᴱ p i xs)
+  every (every-of p i []       sp) = child p last last-mark sp
+  every (every-of p i (x ∷ xs) sp) = child p (ix i) (ix-mark i) sp , every-of p (suc i) xs sp
+
+  every-map : ∀ {A B} (f : A → B) (e : Events A) → Every P e → Every P (M.mapᴱ f e)
+  every (every-map f (out k a r) pe) = proj₁ (every pe) , every-map f (force r) (proj₂ (every pe))
+  every (every-map f (skip k r)  pe) = proj₁ (every pe) , every-map f (force r) (proj₂ (every pe))
+  every (every-map f (end k)     pe) = every pe
+  every (every-map f hush        pe) = tt
+
+  every-scan : ∀ {A B} (f : B → A → B) z (e : Events A) → Every P e → Every P (M.scanᴱ f z e)
+  every (every-scan f z (out k a r) pe) = proj₁ (every pe) , every-scan f (f z a) (force r) (proj₂ (every pe))
+  every (every-scan f z (skip k r)  pe) = proj₁ (every pe) , every-scan f z (force r) (proj₂ (every pe))
+  every (every-scan f z (end k)     pe) = every pe
+  every (every-scan f z hush        pe) = tt
+
+  -- A cut shows its failing value, if at all, just past where it was,
+  -- and ends just past it.
+  mutual
+    every-take : ∀ {A} i (q : A → Bool) (e : Events A) → Every P e → Every P (M.takeWhileᴱ i q e)
+    every (every-take i q (out k a r) pe) = every (every-taking i q k a (q a) r pe)
+    every (every-take i q (skip k r)  pe) = proj₁ (every pe) , every-take i q (force r) (proj₂ (every pe))
+    every (every-take i q (end k)     pe) = every pe
+    every (every-take i q hush        pe) = tt
+
+    every-taking : ∀ {A} i (q : A → Bool) k a b (r : Events∞ A) → Every P (out k a r) → Every P (M.taking i q k a b r)
+    every (every-taking i     q k a true  r pe) = proj₁ (every pe) , every-take i q (force r) (proj₂ (every pe))
+    every (every-taking true  q k a false r pe) =
+      deeper k (ix 0) (ix-mark 0) (proj₁ (every pe)) , record { every = deeper k last last-mark (proj₁ (every pe)) }
+    every (every-taking false q k a false r pe) = deeper k last last-mark (proj₁ (every pe))
+
+  -- A join at `p` shows what it missed just past `p`, the rest tagged.
+  mutual
+    every-rejoin : ∀ {A} p (e : Events A) → S p → Every Src e → Every P (M.rejoin p e)
+    every (every-rejoin p (out q a k) sp se) = every (every-shown p q (just a) k (p <ᵖ q) sp (proj₁ (every se)) (proj₂ (every se)))
+    every (every-rejoin p (skip q k)  sp se) = every (every-shown p q nothing k (p <ᵖ q) sp (proj₁ (every se)) (proj₂ (every se)))
+    every (every-rejoin p (end c)     sp se) with p <ᵖ c
+    ... | true  = join c p (every se) sp
+    ... | false = child p last last-mark sp
+    every (every-rejoin p hush        sp se) = tt
+
+    every-shown : ∀ {A} p q (a : Maybe A) (k : Events∞ A) b → S p → Src q → Every Src (force k) → Every P (M.shown p q a k b)
+    every (every-shown p q (just a) k true  sp sq sk) = join q p sq sp , every-rejoin p (force k) sp sk
+    every (every-shown p q nothing  k true  sp sq sk) = join q p sq sp , every-rejoin p (force k) sp sk
+    every (every-shown p q (just a) k false sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk
+    every (every-shown p q nothing  k false sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk
+
+  -- A connect shows each of its source's steps, and its end, just past it.
+  mutual
+    every-beside : ∀ {A B} (b : Events B) (s : Events A) → Every P b → Every P s → Every P (M.beside b s)
+    every (every-beside b (out q _ r) pb ps) =
+      every (every-ahead b (q ++ [ ix 0 ]) r (M.before (q ++ [ ix 0 ]) b) pb (deeper q (ix 0) (ix-mark 0) (proj₁ (every ps))) (proj₂ (every ps)))
+    every (every-beside b (skip q r)  pb ps) =
+      every (every-ahead b (q ++ [ ix 0 ]) r (M.before (q ++ [ ix 0 ]) b) pb (deeper q (ix 0) (ix-mark 0) (proj₁ (every ps))) (proj₂ (every ps)))
+    every (every-beside b (end c)     pb ps) =
+      every (every-ahead b (c ++ [ ix 0 ]) M.hushed (M.before (c ++ [ ix 0 ]) b) pb (deeper c (ix 0) (ix-mark 0) (every ps)) (record { every = tt }))
+    every (every-beside b hush        pb ps) = every pb
+
+    every-ahead : ∀ {A B} (b : Events B) q (s : Events∞ A) t → Every P b → P q → Every P (force s) → Every P (M.ahead b q s t)
+    every (every-ahead b           q s true  pb pq ps) = pq , every-beside b (force s) pb ps
+    every (every-ahead (out k a r) q s false pb pq ps) = proj₁ (every pb) , every-ahead (force r) q s _ (proj₂ (every pb)) pq ps
+    every (every-ahead (skip k r)  q s false pb pq ps) = proj₁ (every pb) , every-ahead (force r) q s _ (proj₂ (every pb)) pq ps
+    every (every-ahead (end c)     q s false pb pq ps) = every pb
+    every (every-ahead hush        q s false pb pq ps) = tt
+
+  -- A lane held to the rules wherever it may subscribe.
+  Lane : ∀ {B} → MonotonicList B → Set
+  Lane m = ∀ k → S k → Every P (M.observe m k)
+
+  -- An outer held to the rules, each value a lane.
+  mutual
+    Outers : ∀ {B} → Events (MonotonicList B) → Set
+    Outers (out h m r) = P h × Lane m × Outer (force r)
+    Outers (skip h r)  = P h × Outer (force r)
+    Outers (end h)     = P h
+    Outers hush        = ⊤
+
+    record Outer {B} (e : Events (MonotonicList B)) : Set where
+      coinductive
+      field outerly : Outers e
+
+  open Outer public
+
+  outer-map : ∀ {A B} (F : A → MonotonicList B) (e : Events A) → (∀ a → Lane (F a)) → Every P e → Outer (M.mapᴱ F e)
+  outerly (outer-map F (out h a r) lf pe) = proj₁ (every pe) , lf a , outer-map F (force r) lf (proj₂ (every pe))
+  outerly (outer-map F (skip h r)  lf pe) = proj₁ (every pe) , outer-map F (force r) lf (proj₂ (every pe))
+  outerly (outer-map F (end h)     lf pe) = every pe
+  outerly (outer-map F hush        lf pe) = tt
+
+  Outerᴹ : ∀ {B} → Maybe (Events (MonotonicList B)) → Set
+  Outerᴹ nothing  = ⊤
+  Outerᴹ (just e) = Outer e
+
+  -- An admitted lane subscribes held, and a queued one stays a lane.
+  Admitted : ∀ {B} → List (Events B) × List (MonotonicList B) → Set
+  Admitted (ls , qs) = All (Every P) ls × All Lane qs
+
+  admit-all : ∀ {B} op q (m : MonotonicList B) ls qs → S q → Lane m → All (Every P) ls → All Lane qs
+            → Admitted (M.admit op q m ls qs)
+  admit-all (M.mergeᶠ nothing)  q m ls       qs sq lm pl pq = lm q sq ∷ᴬ pl , pq
+  admit-all (M.mergeᶠ (just n)) q m ls       qs sq lm pl pq with length ls <ᵇ n
+  ... | true  = lm q sq ∷ᴬ pl , pq
+  ... | false = pl , All++⁺ pq (lm ∷ᴬ []ᴬ)
+  admit-all M.switchᶠ           q m ls       qs sq lm pl pq = lm q sq ∷ᴬ []ᴬ , pq
+  admit-all M.exhaustᶠ          q m []       qs sq lm pl pq = lm q sq ∷ᴬ []ᴬ , pq
+  admit-all M.exhaustᶠ          q m (l ∷ ls) qs sq lm pl pq = pl , pq
+
+  -- A flatMap's merge shows its outer's skips and ends where they were,
+  -- each value just past where it was, and its lanes' events where they
+  -- were, each lane's end just past it when another is queued.
+  mutual
+    every-go : ∀ {B} op (o : Maybe (Events (MonotonicList B))) ls qs → Outerᴹ o → All (Every P) ls → All Lane qs
+             → Every P (M.go op o ls qs)
+    every-go op o ls qs po pl pq with M.earliest ls | earliest-all (Every P) ls pl
+    ... | none            | _                = every-via op o ls qs po pl pq
+    ... | found k bs l as | (pb , pl₁ , pa)  = every-race op o k bs l as qs po pb pl₁ pa pq
+
+    every-via : ∀ {B} op (o : Maybe (Events (MonotonicList B))) ls qs → Outerᴹ o → All (Every P) ls → All Lane qs
+              → Every P (M.viaOuter op o ls qs)
+    every-via op nothing  ls qs po pl pq = record { every = tt }
+    every-via op (just e) ls qs po pl pq = every-outer op e ls qs po pl pq
+
+    every-race : ∀ {B} op (o : Maybe (Events (MonotonicList B))) k bs (l : Events B) as qs → Outerᴹ o
+               → All (Every P) bs → Every P l → All (Every P) as → All Lane qs → Every P (M.race op o k bs l as qs)
+    every-race op nothing  k bs l as qs po pb pl pa pq = every-lane op nothing bs l as qs po pb pl pa pq
+    every-race op (just e) k bs l as qs po pb pl pa pq with M.head e
+    ... | nothing = every-lane op (just e) bs l as qs po pb pl pa pq
+    ... | just k′ with k′ <ᵖ k
+    ...   | true  = every-outer op e (bs ++ l ∷ as) qs po (All++⁺ pb (pl ∷ᴬ pa)) pq
+    ...   | false = every-lane op (just e) bs l as qs po pb pl pa pq
+
+    every-outer : ∀ {B} op (e : Events (MonotonicList B)) ls qs → Outer e → All (Every P) ls → All Lane qs
+                → Every P (M.outer op e ls qs)
+    every (every-outer op (out q m r) ls qs po pl pq)
+      with M.admit op (q ++ [ ix 1 ]) m ls qs
+         | admit-all op (q ++ [ ix 1 ]) m ls qs
+             (held _ (deeper q (ix 1) (ix-mark 1) (proj₁ (outerly po)))) (proj₁ (proj₂ (outerly po))) pl pq
+    ... | ls′ , qs′ | (pl′ , pq′) =
+      deeper q (ix 0) (ix-mark 0) (proj₁ (outerly po)) , every-go op (just (force r)) ls′ qs′ (proj₂ (proj₂ (outerly po))) pl′ pq′
+    every (every-outer op (skip q r) ls qs po pl pq) =
+      proj₁ (outerly po) , every-go op (just (force r)) ls qs (proj₂ (outerly po)) pl pq
+    every (every-outer op (end c) []       []       po pl pq) = outerly po
+    every (every-outer op (end c) []       (m ∷ qs) po pl pq) = outerly po , every-go op nothing [] (m ∷ qs) tt pl pq
+    every (every-outer op (end c) (l ∷ ls) qs       po pl pq) = outerly po , every-go op nothing (l ∷ ls) qs tt pl pq
+    every (every-outer op hush    ls       qs       po pl pq) = tt
+
+    every-lane : ∀ {B} op (o : Maybe (Events (MonotonicList B))) bs (l : Events B) as qs → Outerᴹ o
+               → All (Every P) bs → Every P l → All (Every P) as → All Lane qs → Every P (M.lane op o bs l as qs)
+    every (every-lane op o bs (out k b r) as qs po pb pl pa pq) =
+      proj₁ (every pl) , every-go op o (bs ++ force r ∷ as) qs po (All++⁺ pb (proj₂ (every pl) ∷ᴬ pa)) pq
+    every (every-lane op o bs (skip k r) as qs po pb pl pa pq) =
+      proj₁ (every pl) , every-go op o (bs ++ force r ∷ as) qs po (All++⁺ pb (proj₂ (every pl) ∷ᴬ pa)) pq
+    every (every-lane op o bs (end c) as (m ∷ qs) po pb pl pa (lm ∷ᴬ pq)) =
+      deeper c (ix 0) (ix-mark 0) (every pl)
+      , every-go op o (M.observe m (c ++ [ ix 1 ]) ∷ bs ++ as) qs po
+          (lm (c ++ [ ix 1 ]) (held _ (deeper c (ix 1) (ix-mark 1) (every pl))) ∷ᴬ All++⁺ pb pa) pq
+    every (every-lane op nothing  []       (end c) []       [] po pb pl pa pq) = every pl
+    every (every-lane op nothing  []       (end c) (a ∷ as) [] po pb pl pa pq) =
+      every pl , every-go op nothing (a ∷ as) [] po pa pq
+    every (every-lane op nothing  (b ∷ bs) (end c) as       [] po pb pl pa pq) =
+      every pl , every-go op nothing (b ∷ bs ++ as) [] po (All++⁺ pb pa) pq
+    every (every-lane op (just e) bs       (end c) as       [] po pb pl pa pq) =
+      every pl , every-go op (just e) (bs ++ as) [] po (All++⁺ pb pa) pq
+    every (every-lane op o bs hush as qs po pb pl pa pq) = tt
+
+  postulate
+    -- A DEFERRED PROGRAM SUBSCRIBED IS HELD TO THE RULES: `reach` at the
+    -- program a defer holds.
+    --
+    -- DEAD ROUTE: `reach` calling itself at `Later.force l`, which is
+    --   not structurally smaller, under `every-≈`, so not guarded either;
+    --   with the structural calls of the other operators no argument
+    --   decreases on every cycle.  An `Every` indexed by depth, by
+    --   induction on depth then program, would carry it.
+    reach-later : ∀ {Γ A} (l : Later Timeline Γ A) k (ρ : NEnv Γ) → S k → Everyᴱ Src ρ
+                → Every P (U.meaning (U.subscribe (Later.force l) k) ρ)
+
+  -- A SUBSCRIPTION IS HELD TO THE RULES: subscribed where they allow,
+  -- over sources showing what they allow.
+  reach : ∀ {Γ A} (o : Obs Timeline Γ A) k (ρ : NEnv Γ) → S k → Everyᴱ Src ρ → Every P (U.meaning (U.subscribe o k) ρ)
+  reach (cold c)          k ρ sk sρ = subst (Every P) (sym (U.start-meaning k (lower c) ρ)) (every-start k (lower c) sk)
+  reach empty             k ρ sk sρ = record { every = child k last last-mark sk }
+  reach (of xs)           k ρ sk sρ = every-of k 0 xs sk
+  reach (map f s)         k ρ sk sρ = every-map f _ (reach s k ρ sk sρ)
+  reach (scan f z s)      k ρ sk sρ = every-scan f z _ (reach s k ρ sk sρ)
+  reach (takeWhile i q s) k ρ sk sρ = every-take i q _ (reach s k ρ sk sρ)
+  reach (flatMap op f s)  k ρ sk sρ =
+    every-go (flatOp op) (just (M.mapᴱ F (U.meaning (U.subscribe s k) ρ))) [] []
+      (outer-map F _ (λ a j sj → reach (f a) j ρ sj sρ) (reach s k ρ sk sρ)) []ᴬ []ᴬ
+    where F = λ a → M.cold λ q → U.meaning (U.subscribe (f a) q) ρ
+  reach (connect s b)     k ρ sk sρ =
+    every-beside _ _
+      (reach b (k ++ [ ix 0 ]) (U.meaning (U.subscribe s (k ++ [ ix 1 ])) ρ ∷ᴬ ρ) (held _ (child k (ix 0) (ix-mark 0) sk))
+        (every-mono source _ (reach s (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ) , sρ))
+      (reach s (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ)
+  reach (connected i)     k ρ sk sρ = every-rejoin k (lookup ρ i) sk (every-lookup Src ρ sρ i)
+  reach (defer l)         k ρ sk sρ = record { every =
+    child k (ix 0) (ix-mark 0) sk
+    , every-≈ _ _ (λ n → agree (U.subscribed (Later.force l) (env-refl (U.hots ρ))) (k ++ [ ix 1 ]))
+        (reach-later l (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ) }
+
+-- Keyed under `p`: subscribing where `p` keys, showing strictly under it.
+keyedRules : Pos → Rules
+keyedRules p = record
+  { S      = Owned p
+  ; P      = Beneath p
+  ; Src    = λ _ → ⊤
+  ; child  = λ j l _ o → owned-snoc p j l o
+  ; deeper = λ h l _ b → beneath-snoc p h l b
+  ; held   = beneath-owned p
+  ; frame  = λ n e b → inj₂ (inj₁ (beneath-owned p e b))
+  ; join   = λ q j _ o → inj₂ (owned-tagged p j (q ++ [ sub j ]) o (tagged-sub q j))
+  ; source = λ _ _ → tt
+  }
+
+prefix-split : ∀ a j l → Prefix a (j ++ [ l ]) → Prefix a j ⊎ a ≡ j ++ [ l ]
+prefix-split []          j       l _          = inj₁ tt
+prefix-split (_ ∷ [])    []      l (refl , _) = inj₂ refl
+prefix-split (_ ∷ _ ∷ _) []      l (refl , ())
+prefix-split (x ∷ a)     (_ ∷ j) l (refl , q) with prefix-split a j l q
+... | inj₁ p  = inj₁ (refl , p)
+... | inj₂ eq = inj₂ (cong (x ∷_) eq)
+
+tagged-split : ∀ k q j → Tagged k (q ++ [ sub j ]) → Tagged k q ⊎ Owned k j
+tagged-split k []          j (inj₁ o) = inj₂ o
+tagged-split k []          j (inj₂ ())
+tagged-split k (ix _ ∷ q)  j t        = tagged-split k q j t
+tagged-split k (last ∷ q)  j t        = tagged-split k q j t
+tagged-split k (sub _ ∷ q) j (inj₁ o) = inj₁ (inj₁ o)
+tagged-split k (sub _ ∷ q) j (inj₂ t) with tagged-split k q j t
+... | inj₁ t′ = inj₁ (inj₂ t′)
+... | inj₂ o  = inj₂ o
+
+-- Neither keys the other.
+Disjoint : Pos → Pos → Set
+Disjoint a h = ¬ Owned a h × ¬ Owned h a
+
+apart-mark : ∀ a j l → Mark l → Disjoint a j → Disjoint a (j ++ [ l ])
+apart-mark a j l m (na , nb) = fwd , λ o → nb (owned-trans j (j ++ [ l ]) a (inj₁ (prefix-++ j [ l ])) o)
+  where
+    fwd : ¬ Owned a (j ++ [ l ])
+    fwd (inj₁ q) with prefix-split a j l q
+    ... | inj₁ q′ = na (inj₁ q′)
+    ... | inj₂ eq = nb (subst (Owned j) (sym eq) (inj₁ (prefix-++ j [ l ])))
+    fwd (inj₂ t) = na (inj₂ (tagged-mark a j l m t))
+
+-- A frame's root holds its burst's tag, so whatever it keys, or keys
+-- it, the tag does too.
+frame-fwd : ∀ a n e → (∀ m → a ≢ ix (suc m) ∷ []) → ¬ Owned a e → ¬ Owned e a → ¬ Owned a (ix (suc n) ∷ sub e ∷ [])
+frame-fwd []              n e nt na nb (inj₁ _)                 = na (inj₁ tt)
+frame-fwd (_ ∷ [])        n e nt na nb (inj₁ (refl , _))        = nt n refl
+frame-fwd (_ ∷ _ ∷ [])    n e nt na nb (inj₁ (refl , refl , _)) = nb (inj₂ (inj₁ (inj₁ (prefix-refl e))))
+frame-fwd (_ ∷ _ ∷ _ ∷ _) n e nt na nb (inj₁ (_ , _ , ()))
+frame-fwd a               n e nt na nb (inj₂ (inj₁ o))          = na o
+frame-fwd a               n e nt na nb (inj₂ (inj₂ ()))
+
+frame-bwd : ∀ a n e → ¬ Owned e a → ¬ Owned (ix (suc n) ∷ sub e ∷ []) a
+frame-bwd []          n e nb (inj₁ ())
+frame-bwd (_ ∷ [])    n e nb (inj₁ (_ , ()))
+frame-bwd (_ ∷ _ ∷ _) n e nb (inj₁ (refl , refl , _)) = nb (inj₂ (inj₁ (inj₁ (prefix-refl e))))
+frame-bwd a           n e nb (inj₂ t)                 = nb (inj₂ (owned-tagged e _ a (inj₂ (inj₁ (inj₁ (prefix-refl e)))) t))
+
+apart-join : ∀ a q j → ¬ Owned a q → Disjoint a j → Disjoint a (q ++ [ sub j ])
+apart-join a q j sq (na , nb) = fwd , λ o → nb (owned-trans j (q ++ [ sub j ]) a (inj₂ (tagged-sub q j)) o)
+  where
+    fwd : ¬ Owned a (q ++ [ sub j ])
+    fwd (inj₁ p) with prefix-split a q (sub j) p
+    ... | inj₁ p′ = sq (inj₁ p′)
+    ... | inj₂ eq = nb (subst (Owned j) (sym eq) (inj₂ (tagged-sub q j)))
+    fwd (inj₂ t) with tagged-split a q j t
+    ... | inj₁ t′ = sq (inj₂ t′)
+    ... | inj₂ o  = na o
+
+-- Apart from `a`, over sources alien to it.
+apartRules : ∀ a → (∀ m → a ≢ ix (suc m) ∷ []) → Rules
+apartRules a nt = record
+  { S      = Disjoint a
+  ; P      = Disjoint a
+  ; Src    = λ h → ¬ Owned a h
+  ; child  = apart-mark a
+  ; deeper = apart-mark a
+  ; held   = λ _ x → x
+  ; frame  = λ n e (na , nb) → frame-fwd a n e nt na nb , frame-bwd a n e nb
+  ; join   = apart-join a
+  ; source = λ _ → proj₁
+  }
+
+-- A SUBSCRIPTION KEYS NOTHING UNDER A POSITION APART FROM IT: over
+-- sources alien to `a`, where neither keys the other and `a` is no
+-- timer's tick.  `keyedRules` does not carry it: a tag under the join
+-- says nothing of the source position it tags.
+alien-apart : ∀ {Γ A} (o : Obs Timeline Γ A) a k (ρ : NEnv Γ) → Alienᴱ a ρ → ¬ Owned a k → ¬ Owned k a
+            → (∀ m → a ≢ ix (suc m) ∷ []) → Alien a (U.meaning (U.subscribe o k) ρ)
+alien-apart o a k ρ al na nb nt = every-mono (λ _ → proj₁) _ (Reach.reach (apartRules a nt) o k ρ (na , nb) al)
+
+-- A flatMap's sources stay out of every lane it can admit: the skip
+-- before the lane is keyed under the flatMap, so the lane is.
+--
+-- REFUTED: f5faeaf6 of sources merely clear of the flatMap's subtree, by one tagged under its join
+alien-shown : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
+            → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ
+alien-shown op f s p ρ al x r =
+  alienᴱ-owned p (x ++ [ ix 1 ])
+    (owned-lane p x (every-reach _ (x ++ [ ix 0 ])
+      (Reach.reach (keyedRules p) (flatMap op f s) p ρ (inj₁ (prefix-refl p)) (every-monoᴱ (λ _ _ → tt) ρ al)) r)) ρ al
 
 start-within : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → Within (U.startᶜ p m) ρ
 start-within p (M.at zero _ _)    ρ = tt
@@ -637,16 +787,6 @@ postulate
 
   -- A LIST'S RUN IS IN ORDER: its values at rising indices, then its end.
   ordered-of : ∀ {A} p i (xs : List A) → Ordered (M.ofᴱ p i xs)
-
-  -- A DEFERRED PROGRAM SUBSCRIBED SHOWS ONLY WHAT IT KEYS: `owned-reach`
-  -- at the program a defer holds.
-  --
-  -- DEAD ROUTE: `owned-reach` calling itself at `Later.force l`, which is
-  --   not structurally smaller, under `keyed-≈` and `keyed-under`, so not
-  --   guarded either; with the structural calls of the other operators no
-  --   argument decreases on every cycle.  A `Keyed` indexed by depth, by
-  --   induction on depth then program, would carry it.
-  owned-later : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Keyed p (U.meaning (U.subscribe (Later.force l) p) ρ)
 
   -- A CUT KEEPS THE ORDER: the run up to the first value failing, then
   -- its end.
@@ -683,50 +823,6 @@ postulate
   -- lies inside, its sources being alien to it.
   steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Steady (U.meaning (U.subscribe o p) ρ)
 
-  -- A SUBSCRIPTION KEYS NOTHING UNDER A POSITION APART FROM IT: over
-  -- sources alien to `a`, where neither keys the other and `a` is no
-  -- timer's tick.  What it shows is inside `k`, a source's position
-  -- tagged under `k`, or a frame of a timer it set, at a tick past
-  -- `k`'s, tagged under `k` too.
-  --
-  -- `owned-reach` does not carry it: `Keyed` says a tagged position is
-  -- tagged under `k`, and forgets that what it tags is a source's.
-  alien-apart : ∀ {Γ A} (o : Obs Timeline Γ A) a k (ρ : NEnv Γ) → Alienᴱ a ρ → ¬ Owned a k → ¬ Owned k a
-              → (∀ m → a ≢ ix (suc m) ∷ []) → Alien a (U.meaning (U.subscribe o k) ρ)
-
-
--- A SUBSCRIPTION SHOWS ONLY WHAT IT KEYS: inside where it subscribes, a
--- source's position tagged by one of its joins, or a frame of one of its
--- timers.
-owned-reach : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Keyed p (U.meaning (U.subscribe o p) ρ)
-owned-reach (cold c)          p ρ = subst (Keyed p) (sym (U.start-meaning p (lower c) ρ)) (keyed-start p (lower c))
-owned-reach empty             p ρ = record { keyed = owned-snoc p p last (inj₁ (prefix-refl p)) }
-owned-reach (of xs)           p ρ = keyed-of p 0 xs
-owned-reach (map f s)         p ρ = keyed-map p f _ (owned-reach s p ρ)
-owned-reach (scan f z s)      p ρ = keyed-scan p f z _ (owned-reach s p ρ)
-owned-reach (takeWhile i q s) p ρ = keyed-take p i q _ (owned-reach s p ρ)
-owned-reach (flatMap op f s)  p ρ =
-  keyed-go p (flatOp op) (just (M.mapᴱ F (U.meaning (U.subscribe s p) ρ))) [] []
-    (outer-map p F _ (λ a k o → keyed-under p k o _ (owned-reach (f a) k ρ)) (owned-reach s p ρ)) []ᴬ []ᴬ
-  where F = λ a → M.cold λ q → U.meaning (U.subscribe (f a) q) ρ
-owned-reach (connect s b)     p ρ =
-  keyed-beside p _ _
-    (keyed-under p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) _ (owned-reach b (p ++ [ ix 0 ]) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ)))
-    (keyed-under p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) _ (owned-reach s (p ++ [ ix 1 ]) ρ))
-owned-reach (connected i)     p ρ = keyed-rejoin p (lookup ρ i)
-owned-reach (defer l)         p ρ = record { keyed =
-  owned-snoc p p (ix 0) (inj₁ (prefix-refl p))
-  , keyed-≈ p _ _ (λ k → agree (U.subscribed (Later.force l) (env-refl (U.hots ρ))) (p ++ [ ix 1 ]))
-      (keyed-under p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) _ (owned-later l (p ++ [ ix 1 ]) ρ)) }
-
--- A flatMap's sources stay out of every lane it can admit: the skip
--- before the lane is keyed under the flatMap, so the lane is.
---
--- REFUTED: f5faeaf6 of sources merely clear of the flatMap's subtree, by one tagged under its join
-alien-shown : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
-            → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ
-alien-shown op f s p ρ al x r =
-  alienᴱ-owned p (x ++ [ ix 1 ]) (owned-lane p x (keyed-reach p _ (x ++ [ ix 0 ]) (owned-reach (flatMap op f s) p ρ) r)) ρ al
 
 -- A CONNECT'S SOURCE KEYS NOTHING UNDER ITS BODY: the two are siblings.
 alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ

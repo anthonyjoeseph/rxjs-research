@@ -176,15 +176,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `alien-apart`, `steady-sub`, `ordered-flat` and
-  `ordered-rejoin`: a subscription keys nothing under a position apart
-  from it, so a flatMap's lanes and a connect's body step inside no
-  sibling's position, which is what keeps `Steady` and a flatMap's
+- **THE ORDER.** `steady-sub`, `ordered-flat` and `ordered-rejoin`
+  over `alien-apart`: a subscription keys nothing under a position
+  apart from it, so a flatMap's lanes and a connect's body step inside
+  no sibling's position, which is what keeps `Steady` and a flatMap's
   order. Ruled out: a join of a run merely in order, a flatMap of any
   outer in order, lanes placed wherever they subscribe, sources merely
-  clear of a flatMap's subtree, an operator showing a position it does
-  not key, and `Keyed` carrying apartness. Decides whether apartness is
-  one induction by operator, as `owned-reach` is.
+  clear of a flatMap's subtree, and an operator showing a position it
+  does not key. Decides whether an outer's own positions own nothing it
+  shows later, which apartness of each lane from the next needs.
 - **THE DEFER.** `ordered-defer` and `within-defer`: a defer over sorted,
   alien sources is in order, and its program, fed, is placed within.
   Decides whether a defer's notices keep its sources steady when
@@ -221,11 +221,8 @@ by their own silent steps (`Mirror`).
   sources sorted and alien to where it subscribes, is in order.
 - **`steady-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription over
   sorted, alien sources never steps inside its last position nor ties an out.
-- **`owned-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program
-  subscribed shows only what it keys; `owned-reach` there, short of a
-  recursion.
-- **`alien-apart`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription over
-  sources alien to a position apart from it keys nothing under that position.
+- **`reach-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program
+  subscribed is held to any `Rules`; `reach` there, short of a recursion.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
   steps merge into its body in order.
 - **`ordered-rejoin`** (Placed) — FALSITY, `REFUTED`: a join keeps a steady
