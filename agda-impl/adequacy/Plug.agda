@@ -18,7 +18,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 
 import Tree as T
 open import denotation.MonotonicList using (Pos; ix; last; _<ᵖ_; <ᵖ-asym; <ᵖ-++ʳ)
-open import denotation.Unfold using (Node; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; connectᶜ; live; ended; feed; shut; Step; outˢ;
+open import denotation.Unfold using (Node; framesᶜ; burstᶜ; endᶜ; ofᶜ; joinᶜ; deferᶜ; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; connectᶜ; live; ended; feed; shut; Step; outˢ;
   skipˢ; endˢ; hushˢ; headˢ; step; mapˢ; scanˢ; takeWhileˢ; outerˢ; laneˢ; bodyˢ; shutˢᵗ;
   sourceˢ; beforeˢ; raceˢ; goˢ; Earliest; none; found; pick; earliest; taking; admit)
 
@@ -255,9 +255,13 @@ Beyond r (just k′) = ∀ x → (r ++ x) <ᵖ k′ ≡ true
 Beyondᴺ : ∀ {Γ A} → Pos → Node Γ A → Set
 Beyondᴺ r n = Beyond r (headˢ (step n))
 
+-- What is open, if anything, as `P` says.
+Opt : ∀ {Γ A} → (Node Γ A → Set) → Maybe (Node Γ A) → Set
+Opt P nothing  = ⊤
+Opt P (just o) = P o
+
 OuterB : ∀ {Γ A} → Pos → Maybe (Node Γ A) → Set
-OuterB r nothing  = ⊤
-OuterB r (just o) = Beyondᴺ r o
+OuterB r = Opt (Beyondᴺ r)
 
 -- Every sibling a frame holds waits beyond `r`.
 ClearF : ∀ {Γ A Δ B} → Pos → Frame Γ A Δ B → Set₁
@@ -395,6 +399,116 @@ clear-wins : ∀ {Γ A Δ B} r x (C : Ctx Γ A Δ B) (s : Step Γ A) → Clear r
 clear-wins r x []      s _         _ = tt
 clear-wins r x (F ∷ C) s (cf , cc) h with liftF-head F s h
 ... | y , e = clear-winsF r x F s cf h , clear-wins r (x ++ y) C (liftF F s) cc (trans e (cong just (++-assoc r x y)))
+
+------------------------------------------------------------------------
+-- A configuration waiting beyond `r`
+
+-- Every leaf's own next event beyond `r`: no operator moves an event
+-- before its children's, so neither does the node.
+mutual
+  Waits : ∀ {Γ A} → Pos → Node Γ A → Set
+  Waits r (mapᶜ f c)              = Waits r c
+  Waits r (scanᶜ f z c)           = Waits r c
+  Waits r (takeWhileᶜ i p c)      = Waits r c
+  Waits r (flatMapᶜ op g o ls qs) = WaitsM r o × WaitsL r ls
+  Waits r (connectᶜ b (live s))   = Waits r b × Waits r s
+  Waits r (connectᶜ b (ended c))  = Waits r b
+  Waits r n                       = Beyondᴺ r n
+
+  WaitsM : ∀ {Γ A} → Pos → Maybe (Node Γ A) → Set
+  WaitsM r nothing  = ⊤
+  WaitsM r (just n) = Waits r n
+
+  WaitsL : ∀ {Γ A} → Pos → List (Node Γ A) → Set
+  WaitsL r []       = ⊤
+  WaitsL r (n ∷ ns) = Waits r n × WaitsL r ns
+
+private
+  ext-beyond : ∀ {r k m} → Beyond r (just k) → Ext k m → Beyond r m
+  ext-beyond {r} {k} b (y , refl) x = <ᵖ-++ʳ (r ++ x) k y (b x)
+
+  hush-lift : ∀ {Γ A Δ B} (F : Frame Γ A Δ B) → headˢ (liftF F hushˢ) ≡ nothing
+  hush-lift (mapF f)                = refl
+  hush-lift (scanF f z)             = refl
+  hush-lift (takeF i p)             = refl
+  hush-lift (outerF op g ls qs)     = refl
+  hush-lift (laneF op g o bs as qs) = refl
+  hush-lift (bodyF src)             = refl
+  hush-lift (endedF c)              = refl
+  hush-lift (srcF b)                = refl
+
+  lift-beyond : ∀ {Γ A Δ B} r (F : Frame Γ A Δ B) s → Beyond r (headˢ s) → Beyond r (headˢ (liftF F s))
+  lift-beyond r F (outˢ k a c) b = ext-beyond b (liftF-head F (outˢ k a c) refl)
+  lift-beyond r F (skipˢ k c)  b = ext-beyond b (liftF-head F (skipˢ k c) refl)
+  lift-beyond r F (endˢ k)     b = ext-beyond b (liftF-head F (endˢ k) refl)
+  lift-beyond r F hushˢ        b rewrite hush-lift F = tt
+
+  if-beyond : ∀ {Γ B} r c (x y : Step Γ B) → Beyond r (headˢ x) → Beyond r (headˢ y) → Beyond r (headˢ (if c then x else y))
+  if-beyond r true  x y bx by = bx
+  if-beyond r false x y bx by = by
+
+  BeyondE : ∀ {Γ B} → Pos → Earliest Γ B → Set
+  BeyondE r none                = ⊤
+  BeyondE r (found k bs l s as) = Beyond r (headˢ s)
+
+  pick-beyond : ∀ {Γ B} r (l : Node Γ B) s ls h E → Beyond r (headˢ s) → BeyondE r E → BeyondE r (pick l s ls h E)
+  pick-beyond r l s ls nothing  none                  b e = tt
+  pick-beyond r l s ls nothing  (found k′ bs c sc as) b e = e
+  pick-beyond r l s ls (just k) none                  b e = b
+  pick-beyond r l s ls (just k) (found k′ bs c sc as) b e with k <ᵖ k′
+  ... | true  = b
+  ... | false = e
+
+  earliest-beyond : ∀ {Γ B} r (ls : List (Node Γ B)) → All (Beyondᴺ r) ls → BeyondE r (earliest ls)
+  earliest-beyond r []       []       = tt
+  earliest-beyond r (l ∷ ls) (b ∷ bs) = pick-beyond r l (step l) ls (headˢ (step l)) (earliest ls) b (earliest-beyond r ls bs)
+
+  race-beyond : ∀ {Γ A B} r op (g : A → Pos → Node Γ B) (o : Node Γ A) so h k bs l s as qs
+              → Beyond r (headˢ so) → Beyond r (headˢ s) → Beyond r (headˢ (raceˢ op g o so h k bs l s as qs))
+  race-beyond r op g o so nothing   k bs l s as qs bo bl = lift-beyond r (laneF op g (just o) bs as qs) s bl
+  race-beyond r op g o so (just k′) k bs l s as qs bo bl =
+    if-beyond r (k′ <ᵖ k) _ _ (lift-beyond r (outerF op g (bs ++ l ∷ as) qs) so bo) (lift-beyond r (laneF op g (just o) bs as qs) s bl)
+
+  go-beyond : ∀ {Γ A B} r op (g : A → Pos → Node Γ B) o ls qs E → OuterB r o → BeyondE r E → Beyond r (headˢ (goˢ op g o ls qs E))
+  go-beyond r op g nothing  ls qs none                bo be = tt
+  go-beyond r op g (just o) ls qs none                bo be = lift-beyond r (outerF op g ls qs) (step o) bo
+  go-beyond r op g nothing  ls qs (found k bs l s as) bo be = lift-beyond r (laneF op g nothing bs as qs) s be
+  go-beyond r op g (just o) ls qs (found k bs l s as) bo be = race-beyond r op g o (step o) (headˢ (step o)) k bs l s as qs bo be
+
+  src-beyond : ∀ {Γ A B} r (b : Node (A ∷ Γ) B) sb (s : Node Γ A) ss → Beyond r (headˢ sb) → Beyond r (headˢ ss)
+             → Beyond r (headˢ (sourceˢ b sb s ss))
+  src-beyond r b sb s (outˢ q a s′) bb bs =
+    if-beyond r (beforeˢ (q ++ [ ix 0 ]) sb) _ _ (ext-beyond {r} bs ([ ix 0 ] , refl)) (lift-beyond r (bodyF s) sb bb)
+  src-beyond r b sb s (skipˢ q s′)  bb bs =
+    if-beyond r (beforeˢ (q ++ [ ix 0 ]) sb) _ _ (ext-beyond {r} bs ([ ix 0 ] , refl)) (lift-beyond r (bodyF s) sb bb)
+  src-beyond r b sb s (endˢ c)      bb bs =
+    if-beyond r (beforeˢ (c ++ [ ix 0 ]) sb) _ _ (ext-beyond {r} bs ([ ix 0 ] , refl)) (lift-beyond r (bodyF s) sb bb)
+  src-beyond r b sb s hushˢ         bb bs = lift-beyond r (bodyF s) sb bb
+
+-- A NODE WAITING BEYOND `r` STEPS BEYOND IT.
+mutual
+  waits : ∀ {Γ A} r (n : Node Γ A) → Waits r n → Beyondᴺ r n
+  waits r (framesᶜ τ e m)         w         = w
+  waits r (burstᶜ τ q i b)        w         = w
+  waits r (endᶜ p)                w         = w
+  waits r (ofᶜ p i xs)            w         = w
+  waits r (joinᶜ x p xs e)        w         = w
+  waits r (deferᶜ l p)            w         = w
+  waits r (mapᶜ f c)              w         = lift-beyond r (mapF f) (step c) (waits r c w)
+  waits r (scanᶜ f z c)           w         = lift-beyond r (scanF f z) (step c) (waits r c w)
+  waits r (takeWhileᶜ i p c)      w         = lift-beyond r (takeF i p) (step c) (waits r c w)
+  waits r (flatMapᶜ op g o ls qs) (wo , wl) =
+    go-beyond r op g o ls qs (earliest ls) (waitsM r o wo) (earliest-beyond r ls (waitsL r ls wl))
+  waits r (connectᶜ b (live s))   (wb , ws) = src-beyond r b (step b) s (step s) (waits r b wb) (waits r s ws)
+  waits r (connectᶜ b (ended c))  w         = lift-beyond r (endedF c) (step b) (waits r b w)
+
+  waitsM : ∀ {Γ A} r (o : Maybe (Node Γ A)) → WaitsM r o → OuterB r o
+  waitsM r nothing  _ = tt
+  waitsM r (just n) w = waits r n w
+
+  waitsL : ∀ {Γ A} r (ls : List (Node Γ A)) → WaitsL r ls → All (Beyondᴺ r) ls
+  waitsL r []       _        = []
+  waitsL r (n ∷ ns) (w , ws) = waits r n w ∷ waitsL r ns ws
 
 ------------------------------------------------------------------------
 -- Contexts built from the root down

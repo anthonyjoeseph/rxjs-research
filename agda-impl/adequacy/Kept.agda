@@ -39,7 +39,7 @@ open import denotation.MonotonicList using (Frame; at)
 open import adequacy.Carrier using (module Carrying)
 open import adequacy.Wait using (module Waiting)
 open import adequacy.Aim using (module Aiming)
-open import adequacy.Plug using (Ctx; plug; lift; Wins; plug-step; skip-lifts; Clear; clear-wins)
+open import adequacy.Plug using (Ctx; plug; lift; Wins; plug-step; skip-lifts; Clear; clear-wins; Beyondᴺ; Waits; waits)
 
 module Keeping (R : Set) where
   open Run (Pureᴾ R) using (Act)
@@ -410,7 +410,7 @@ module Keeping (R : Set) where
         → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Seen r
         → Σ (Ctx (Aimed.Δ (aim (Carried.ctlAs r))) A [] R) λ C
           → At.part (State.heap st) (Carried.tree r) ≡ just (plug C (nodeOf (Aimed.ph (aim (Carried.ctlAs r)))))
-          × (∀ q → Open.Beside (State.heap st) q (Aimed.path (aim (Carried.ctlAs r))) → Clear q C)
+          × (∀ q → Open.Beside (State.heap st) (Beyondᴺ q) (Aimed.path (aim (Carried.ctlAs r))) → Clear q C)
   found {st = st} r sp o =
     Open.focus-path (State.heap st) A.path o (ends-told r) (cold-part {H = State.heap st} {Δ = A.Δ} {sk = A.sk} A.ph sp)
     where module A = Aimed (aim (Carried.ctlAs r))
@@ -426,11 +426,11 @@ module Keeping (R : Set) where
 
   postulate
     -- B'S POSITIONAL FIELD AT A FIRE: nothing owed but the burst, every
-    -- sub beside its path waits beyond the cascade — it never steps
-    -- again, or it waits on a timer queued past this one.
-    beside : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {c}
-           → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) → spent? st hd ≡ false → Seen r
-           → Open.Beside (State.heap st) p (Aimed.path (aim (Carried.ctlAs r)))
+    -- sub beside its path at rest beyond the cascade: each leaf never
+    -- steps again, or waits on a timer queued past this one.
+    resting : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {c}
+            → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) → spent? st hd ≡ false → Seen r
+            → Open.Rested (State.heap st) p (Aimed.path (aim (Carried.ctlAs r)))
 
     -- B'S POSITIONAL FIELD AT A BURST UNDER A CALL: a cold started
     -- inline, its frame before every other open node's next event, read
@@ -444,7 +444,10 @@ module Keeping (R : Set) where
   cleared : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {c}
           → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) (sp : spent? st hd ≡ false) (o : Seen r)
           → Clear p (Focus.ctx (focused r sp o))
-  cleared {p = p} r sp o = proj₂ (proj₂ (found r sp o)) p (beside r sp o)
+  cleared {st = st} {p = p} r sp o =
+    proj₂ (proj₂ (found r sp o)) p
+      (Open.beside-map (State.heap st) (Waits p) (Beyondᴺ p) (λ n → waits p n) (Aimed.path (aim (Carried.ctlAs r)))
+        (Open.rested (State.heap st) p (Aimed.path (aim (Carried.ctlAs r))) (resting r sp o)))
 
   private
     burst-head : ∀ {Δ A u} τ p i (b : Frame A u) → headˢ (burstˢ {Δ} τ p i b) ≡ just (p ++ [ ix i ])
