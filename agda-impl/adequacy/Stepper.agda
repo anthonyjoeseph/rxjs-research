@@ -279,7 +279,7 @@ frames-after : ∀ {Γ A t} τ e (m : From A t) {ρ : NEnv Γ} → M.frames τ e
 burst-after : ∀ {Γ A t} τ r i (b : Frame A t) {ρ : NEnv Γ} → M.burst τ r i b ≃ afterᴱ ρ (U.burstˢ τ r i b)
 frames-after τ e M.done       = ≃-refl (end e)
 frames-after τ e M.quiet      = ≃-refl hush
-frames-after τ e (M.at t _ b) = skip-same refl
+frames-after τ e (M.at t _ b) = burst-after τ _ 0 b
 burst-after τ r i (M.emit a k) = out-same refl
 burst-after τ r i (M.stall k)  = skip-same refl
 burst-after τ r i (M.close k)  = skip-same refl

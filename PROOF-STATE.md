@@ -216,12 +216,14 @@ by their own silent steps (`Mirror`).
   order of their own or `WellQueue`'s.
 - **THE PROGRESS.** `reachedᴿ` as a body: induction on `Ahead`, carrying
   `Inner`, over one leaf, a re-entry hop steps the ghost or lowers a
-  machine measure. A burst's steps, a lane admit, a defer and a popped
-  timer (one skip, tied with its burst's first step) step the ghost; a poll, a spent burst
-  dropped, a burst over and owed todos paid leave it in place, each
-  finitely often per frame. Decides whether those four are a measure on
-  the pure driver alone, or need a ghost-only marker in the shared machine,
-  as `here` is, which the IO runtime ignores.
+  machine measure. A burst's steps, a lane admit and a defer step the
+  ghost; a popped timer, a poll, a spent burst dropped, a burst over and
+  owed todos paid leave it in place, each finitely often per frame. Ruled
+  out: a meaning skip at a timer pop, at the frame's root (a hot's rekey
+  sorts it after the burst, oracle) or tied with the burst's first step
+  (an `out` must rise past it, `placing`). Decides whether those five are a
+  measure on the pure driver alone, or need a ghost-only marker in the
+  shared machine, as `here` is, which the IO runtime ignores.
 ### The ledger
 
 - **`fed-take`** (Stepper) — FALSITY, `DEAD ROUTE`: a cut fed its source's step
