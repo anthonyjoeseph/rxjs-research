@@ -7,7 +7,8 @@
 module adequacy.Placed where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List.Properties using (∷-injective; ∷-injectiveʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
@@ -17,7 +18,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂; ∃₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
@@ -350,6 +351,99 @@ prefix-trans []      j       h       _          _          = tt
 prefix-trans (_ ∷ _) []      _       ()         _
 prefix-trans (_ ∷ _) (_ ∷ _) []      _          ()
 prefix-trans (a ∷ k) (b ∷ j) (c ∷ h) (refl , p) (refl , q) = refl , prefix-trans k j h p q
+
+ext-eq : ∀ {k h} → Ext k h → ∃₂ λ l ls → h ≡ k ++ l ∷ ls
+ext-eq (ext l ls) = l , ls , refl
+
+cons-ext : ∀ {k h} a → Ext k h → Ext (a ∷ k) (a ∷ h)
+cons-ext a (ext l ls) = ext l ls
+
+ext-irrefl : ∀ k → ¬ Ext k k
+ext-irrefl k x with ext-eq x
+... | l , ls , e = go k l ls e
+  where go : ∀ k l ls → k ≡ k ++ l ∷ ls → ⊥
+        go []      l ls ()
+        go (a ∷ k) l ls e = go k l ls (∷-injectiveʳ e)
+
+owned-ext : ∀ {k h} → Ext k h → Owned k h
+owned-ext (ext l ls) = inj₁ (prefix-++ _ (l ∷ ls))
+
+-- One position below another a label down was below it already.
+under-ext : ∀ q h {x y} → Ext (q ++ [ x ]) (h ++ [ y ]) → Ext q h
+under-ext q h {x} x′ with ext-eq x′
+... | l , ls , e = go q h e
+  where nil : ∀ q l ls → [] ≡ (q ++ [ x ]) ++ l ∷ ls → ⊥
+        nil []      l ls ()
+        nil (_ ∷ _) l ls ()
+        go : ∀ q h {y l ls} → h ++ [ y ] ≡ (q ++ [ x ]) ++ l ∷ ls → Ext q h
+        go []      []      e with () ← ∷-injectiveʳ e
+        go []      (b ∷ h) e = ext b h
+        go (a ∷ q) []      {l = l} {ls} e = ⊥-elim (nil q l ls (∷-injectiveʳ e))
+        go (a ∷ q) (b ∷ h) e with ∷-injective e
+        ... | refl , e′ = cons-ext a (go q h e′)
+
+-- After a missed event, nothing the join shows lies inside its skips:
+-- an alien source has nothing under the join.
+clear-pre : ∀ {A} p (e : Events A) → Alien p e → Clear (p ++ [ ix 0 ]) (M.rejoin p e)
+clear-pre p (out h _ _) al with p <ᵖ h in ph
+... | true  = <ᵖ-next p h (sub p) ph , λ x → proj₁ (every al) (owned-ext (under-ext p h x))
+... | false = ext-irrefl (p ++ [ ix 0 ])
+clear-pre p (skip h _)  al with p <ᵖ h in ph
+... | true  = λ x → proj₁ (every al) (owned-ext (under-ext p h x))
+... | false = ext-irrefl (p ++ [ ix 0 ])
+clear-pre p (end c)     al with p <ᵖ c in pc
+... | true  = λ x → every al (owned-ext (under-ext p c x))
+... | false = λ x → ext-irrefl p (under-ext p p x)
+clear-pre p hush        al = tt
+
+-- After a source event the join shows, the next it shows is not inside
+-- it, and past it as the source's next is.
+apart-in : ∀ q h x → q <ᵖ h ≡ true → ¬ Ext q h → (q ++ [ x ]) <ᵖ (h ++ [ x ]) ≡ true × ¬ Ext (q ++ [ x ]) (h ++ [ x ])
+apart-in q h x qh ne = <ᵖ-down q h x x qh (off ne) , λ y → ne (under-ext q h y)
+
+past-in : ∀ {A} p q (e : Events A) → p <ᵖ q ≡ true → Past q e → Past (q ++ [ sub p ]) (M.rejoin p e)
+past-in p q (out h _ _) pq (qh , ne) with p <ᵖ h in ph
+... | true  = apart-in q h (sub p) qh ne
+... | false with () ← trans (sym ph) (<ᵖ-trans p q h pq qh)
+past-in p q (skip h _)  pq (qh , ne) with p <ᵖ h in ph
+... | true  = apart-in q h (sub p) qh ne
+... | false with () ← trans (sym ph) (<ᵖ-trans p q h pq qh)
+past-in p q (end c)     pq (qc , ne) with p <ᵖ c in pc
+... | true  = apart-in q c (sub p) qc ne
+... | false with () ← trans (sym pc) (<ᵖ-trans p q c pq qc)
+past-in p q hush        pq _ = tt
+
+clear-in : ∀ {A} p q (e : Events A) → p <ᵖ q ≡ true → Atop q e → Clear q e → Clear (q ++ [ sub p ]) (M.rejoin p e)
+clear-in p q (out h _ _) pq a (qh , ne) with p <ᵖ h in ph
+... | true  = apart-in q h (sub p) qh ne
+... | false with () ← trans (sym ph) (still p q h pq a)
+clear-in p q (skip h _)  pq a ne with p <ᵖ h in ph
+... | true  = λ y → ne (under-ext q h y)
+... | false with () ← trans (sym ph) (still p q h pq a)
+clear-in p q (end c)     pq a ne with p <ᵖ c in pc
+... | true  = λ y → ne (under-ext q c y)
+... | false with () ← trans (sym pc) (still p q c pq a)
+clear-in p q hush        pq a _ = tt
+
+-- A JOIN KEEPS AN ALIEN STEADY RUN STEADY: what it missed as skips
+-- just past the join, nothing it shows later inside them.  Not of any
+-- steady run: one emitting inside `p ++ [ ix 0 ]` after a missed step
+-- shows it inside those skips.
+steady-rejoin : ∀ {A} p (e : Events A) → Ordered e → Steady e → Alien p e → Steady (M.rejoin p e)
+steady (steady-rejoin p (out q a k) o st al) with p <ᵖ q in pq
+... | true  = past-in p q (force k) pq (proj₁ (steady st))
+            , steady-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₂ (every al))
+... | false = clear-pre p (force k) (proj₂ (every al))
+            , steady-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₂ (every al))
+steady (steady-rejoin p (skip q k) o st al) with p <ᵖ q in pq
+... | true  = clear-in p q (force k) pq (proj₁ (ordered o)) (proj₁ (steady st))
+            , steady-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₂ (every al))
+... | false = clear-pre p (force k) (proj₂ (every al))
+            , steady-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₂ (every al))
+steady (steady-rejoin p (end c) o st al) with p <ᵖ c
+... | true  = tt
+... | false = tt
+steady (steady-rejoin p hush o st al) = tt
 
 -- A tag inside `j` is inside what `j` prefixes.
 tagged-prefix : ∀ k j h → Tagged k j → Prefix j h → Tagged k h
@@ -941,12 +1035,6 @@ postulate
   -- position, its completion just past that.
   steady-take : ∀ {A} i (p : A → Bool) (e : Events A) → Steady e → Steady (M.takeWhileᴱ i p e)
 
-  -- A JOIN KEEPS AN ALIEN STEADY RUN STEADY: what it missed as skips
-  -- just past the join, nothing it shows later inside them.  Not of any
-  -- steady run: one emitting inside `p ++ [ ix 0 ]` after a missed step
-  -- shows it inside those skips.
-  steady-rejoin : ∀ {A} p (e : Events A) → Steady e → Alien p e → Steady (M.rejoin p e)
-
   -- A FLATMAP SUBSCRIBED SOMEWHERE IS STEADY, over sources sorted and
   -- alien to it: no lane steps inside its outer's last position.
   steady-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
@@ -987,7 +1075,7 @@ steady-sub (takeWhile i q s) p ρ np so cl = steady-take i q _ (steady-sub s p �
 steady-sub (flatMap op f s) p ρ np so cl = steady-flat op f s p ρ np so cl
 steady-sub (connect s b) p ρ np so cl = steady-connect s b p ρ np so cl
 steady-sub (connected i) p ρ np so cl =
-  steady-rejoin p _ (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
+  steady-rejoin p _ (proj₁ (sorted-lookup ρ so i)) (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
 steady-sub (defer l) p ρ np so cl = steady-defer l p ρ np so cl
 
 -- A program subscribed anywhere, over sorted sources alien to where it

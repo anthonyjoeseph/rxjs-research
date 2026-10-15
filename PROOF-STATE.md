@@ -230,8 +230,6 @@ by their own silent steps (`Mirror`).
   subscribed is held to any `Rules`; `reach` there, short of a recursion.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
   steps merge into its body in order.
-- **`steady-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`: a join keeps an alien
-  steady run steady.
 - **`steady-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
   steady.
 - **`steady-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run somewhere
