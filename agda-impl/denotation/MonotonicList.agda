@@ -19,7 +19,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; 
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n; <⇒≱)
+open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -392,15 +392,6 @@ private
   where lt≢eq′ : true ≡ false → ⊥
         lt≢eq′ ()
 
--- A later index is no earlier.
-<ᵖ-ix≥ : ∀ p {i j} → j ≤ i → (p ++ [ ix i ]) <ᵖ (p ++ [ ix j ]) ≡ false
-<ᵖ-ix≥ []      {i} {j} h with i <ᵇ j in e
-... | true  = ⊥-elim (<⇒≱ (<ᵇ⇒< i j (subst T (sym e) tt)) h)
-... | false with j <ᵇ i
-...   | true  = refl
-...   | false = refl
-<ᵖ-ix≥ (b ∷ p) h rewrite refl-label b = <ᵖ-ix≥ p h
-
 ------------------------------------------------------------------------
 -- What a subscriber sees
 
@@ -431,22 +422,23 @@ data MonotonicList (A : Set) : Set where
 -- joining while a value is being delivered misses that value, and
 -- joining after completion completes at once, both as an rxjs Subject.
 -- What the subject delivers is rekeyed under `sub p`.  The dropped
--- prefix becomes skips just after `p`, before anything the join shows.
+-- prefix becomes skips just after `p`, all at the one position, before
+-- anything the join shows: nothing lies between `p` and `p ++ [ ix 0 ]`.
 mutual
-  rejoin : ∀ {A} → Pos → ℕ → Events A → Events A
-  rejoin p i (out q a k) = shown p i q (just a) k (p <ᵖ q)
-  rejoin p i (skip q k)  = shown p i q nothing k (p <ᵖ q)
-  rejoin p i (end c)     = if p <ᵖ c then end (c ++ [ sub p ]) else end (p ++ [ last ])
-  rejoin p i hush        = hush
+  rejoin : ∀ {A} → Pos → Events A → Events A
+  rejoin p (out q a k) = shown p q (just a) k (p <ᵖ q)
+  rejoin p (skip q k)  = shown p q nothing k (p <ᵖ q)
+  rejoin p (end c)     = if p <ᵖ c then end (c ++ [ sub p ]) else end (p ++ [ last ])
+  rejoin p hush        = hush
 
-  shown : ∀ {A} → Pos → ℕ → Pos → Maybe A → Events∞ A → Bool → Events A
-  shown p i q (just a) k true  = out (q ++ [ sub p ]) a λ where .force → rejoin p i (force k)
-  shown p i q nothing  k true  = skip (q ++ [ sub p ]) λ where .force → rejoin p i (force k)
-  shown p i q _        k false = skip (p ++ [ ix i ]) λ where .force → rejoin p (suc i) (force k)
+  shown : ∀ {A} → Pos → Pos → Maybe A → Events∞ A → Bool → Events A
+  shown p q (just a) k true  = out (q ++ [ sub p ]) a λ where .force → rejoin p (force k)
+  shown p q nothing  k true  = skip (q ++ [ sub p ]) λ where .force → rejoin p (force k)
+  shown p q _        k false = skip (p ++ [ ix 0 ]) λ where .force → rejoin p (force k)
 
 -- What a subscriber arriving at position `p` sees.
 observe : ∀ {A} → MonotonicList A → Pos → Events A
-observe (hot e)  p = rejoin p 0 e
+observe (hot e)  p = rejoin p e
 observe (cold f) p = f p
 
 ------------------------------------------------------------------------

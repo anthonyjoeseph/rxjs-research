@@ -362,7 +362,7 @@ fedᴺ ((q , a) ∷ xs) e = out q a λ where .force → fedᴺ xs e
 -- A joiner after its feed: told its end, or the source's run, rejoined.
 joined : ∀ {Γ A} → A ∈ Γ → Pos → Maybe Pos → NEnv Γ → Events A
 joined i p (just c) ρ = end c
-joined i p nothing  ρ = M.rejoin p 0 (lookup ρ i)
+joined i p nothing  ρ = M.rejoin p (lookup ρ i)
 
 outerᴺ : ∀ {A B} → (A → MonotonicList B) → Maybe (Events A) → Maybe (Events (MonotonicList B))
 outerᴺ f nothing  = nothing

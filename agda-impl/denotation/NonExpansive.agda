@@ -104,20 +104,20 @@ takeWhileᴰ-ne i p xy = agrees λ q → takeWhileᴱ-ne i p (agree xy q)
 
 ------------------------------------------------------------------------
 -- CONNECT: the hot handle shows a joiner's skipped past as one skip per
--- source step, and the body and the source interleave, each read one
--- step ahead.
+-- source step, all at one position, and the body and the source
+-- interleave, each read one step ahead.
 
 private
-  rejoin-ne : ∀ {A m} p i {x y : Events A} → Agree m x y → Agree m (rejoin p i x) (rejoin p i y)
-  rejoin-ne p i stop = stop
-  rejoin-ne p i (out⁼ {p = q} a) with p <ᵖ q
-  ... | true  = out⁼ (rejoin-ne p i a)
-  ... | false = skip⁼ (rejoin-ne p (suc i) a)
-  rejoin-ne p i (skip⁼ {p = q} a) with p <ᵖ q
-  ... | true  = skip⁼ (rejoin-ne p i a)
-  ... | false = skip⁼ (rejoin-ne p (suc i) a)
-  rejoin-ne {m = suc m} p i (end⁼ {p = c}) = agree-refl (suc m) _
-  rejoin-ne p i hush⁼ = hush⁼
+  rejoin-ne : ∀ {A m} p {x y : Events A} → Agree m x y → Agree m (rejoin p x) (rejoin p y)
+  rejoin-ne p stop = stop
+  rejoin-ne p (out⁼ {p = q} a) with p <ᵖ q
+  ... | true  = out⁼ (rejoin-ne p a)
+  ... | false = skip⁼ (rejoin-ne p a)
+  rejoin-ne p (skip⁼ {p = q} a) with p <ᵖ q
+  ... | true  = skip⁼ (rejoin-ne p a)
+  ... | false = skip⁼ (rejoin-ne p a)
+  rejoin-ne {m = suc m} p (end⁼ {p = c}) = agree-refl (suc m) _
+  rejoin-ne p hush⁼ = hush⁼
 
   before-agree : ∀ {B m} q {x y : Events B} → Agree (suc m) x y → before q x ≡ before q y
   before-agree q (out⁼ _)  = refl
@@ -149,7 +149,7 @@ mutual
   ahead-ne false _ refl hush⁼ a = hush⁼
 
 hot-ne : ∀ {A k} {e e′ : Events A} → Agree k e e′ → hot e ≈[ k ] hot e′
-hot-ne a = agrees λ p → rejoin-ne p 0 a
+hot-ne a = agrees λ p → rejoin-ne p a
 
 connectᴰ-ne : ∀ {A B k} {x y : MonotonicList A} {f g : MonotonicList A → MonotonicList B}
             → x ≈[ k ] y → (∀ {r r′} → r ≈[ k ] r′ → f r ≈[ k ] g r′) → connectᴰ x f ≈[ k ] connectᴰ y g

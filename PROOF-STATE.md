@@ -176,12 +176,13 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE FIXED SKIP.** `fed-≃`, restating `M.rejoin`: a joiner shows every
-  source step before its join as one skip at `p ++ [ ix 0 ]`, no count.
-  Ties are already legal, and skips are not observable. Three of `fed-≃`'s
-  dead routes are the count no witness keeps; this deletes the count, and
-  the joiner's index shift with it. Decides whether a joiner fed its
-  source's step is exactly the joiner reading it, pre-join or post-join.
+- **THE FIXED SKIP.** `fed-≃` up to `≃`: `M.rejoin` shows every source
+  step before its join as a skip at `p ++ [ ix 0 ]`, and `rejoin-≃` holds
+  over it, so a joiner fed its source's step and the joiner reading it
+  differ pre-join only in how many skips sit at one position, which `≃`
+  forgets. Ruled out: the joiner's index shift. Decides whether `fed-≃`
+  falls by matching the two runs step for step, pre-join and post-join,
+  with skips the only slack.
 - **THE EXACT STEPPER.** `∼-trans` with `go-skips` and `beside-≃`: the
   stepper's skips made the meaning's, so `≃` is strong bisimilarity and
   transitive for free; the stalling half, the sorted hypotheses on the
