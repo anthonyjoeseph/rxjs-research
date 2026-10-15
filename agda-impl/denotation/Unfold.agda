@@ -191,7 +191,7 @@ burstˢ τ r i (close k)  = skipˢ (r ++ [ ix i ]) (framesᶜ τ (r ++ [ last ])
 framesˢ : ∀ {Γ A t} → Time → Pos → From A t → Step Γ A
 framesˢ τ e done       = endˢ e
 framesˢ τ e quiet      = hushˢ
-framesˢ τ e (at t _ b) = burstˢ τ (ix (τ + t) ∷ subᴾ e ∷ []) 0 b
+framesˢ τ e (at t _ b) = skipˢ (ix (τ + t) ∷ subᴾ e ∷ []) (burstᶜ τ (ix (τ + t) ∷ subᴾ e ∷ []) 0 b)
 
 ofˢ : ∀ {Γ A} → Pos → ℕ → List A → Step Γ A
 ofˢ p i []       = endˢ (p ++ [ last ])

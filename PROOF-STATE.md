@@ -176,12 +176,6 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE FED CUT.** `fed-take` with `fed-connect`, `fed-flat` and
-  `fed-defer`: `fed-≃` is a body by node, its joiner arm proven over the
-  fixed skip, a map and a scan recursing, these four its leaves. Ruled
-  out: the joiner's index shift, and recursion under a cut or into a
-  connect's body under the node's own hypothesis. Decides whether a cut
-  and a connect's body need their inners alike only below `q ++ [ ix 0 ]`.
 - **THE EXACT STEPPER.** `∼-trans` with `go-skips` and `beside-≃`: the
   stepper's skips made the meaning's, so `≃` is strong bisimilarity and
   transitive for free; the stalling half, the sorted hypotheses on the
@@ -189,6 +183,12 @@ by their own silent steps (`Mirror`).
   exact agreement, by the pre-join count. De-risk first by pointing CI's
   exact check of `denotation.Unfold` against the per-node meaning at the
   fixed skip. Decides whether any skip mismatch survives the count.
+- **THE FED CUT.** `fed-take` with `fed-connect`, `fed-flat` and
+  `fed-defer`: `fed-≃` is a body by node, its joiner arm proven over the
+  fixed skip, a map and a scan recursing, these four its leaves. Ruled
+  out: the joiner's index shift, and recursion under a cut or into a
+  connect's body under the node's own hypothesis. Decides whether a cut
+  and a connect's body need their inners alike only below `q ++ [ ix 0 ]`.
 - **THE CONNECT.** `flat-≃` and `defer-≃` with the fed leaves: a running
   connect is a body over these, its body reading its source alike the body
   fed its source's step. Ruled out: a body fed a value it would join its
@@ -216,12 +216,12 @@ by their own silent steps (`Mirror`).
   order of their own or `WellQueue`'s.
 - **THE PROGRESS.** `reachedᴿ` as a body: induction on `Ahead`, carrying
   `Inner`, over one leaf, a re-entry hop steps the ghost or lowers a
-  machine measure. Census first which hops leave the ghost in place: a
-  burst's steps are stepper events, a popped timer appears not to be.
-  Preferred repair: the meaning shows a skip at each such hop, so the
-  measure is the ghost's skips before the value alone. Only if that does
-  not cover every hop: a ghost-only marker in the shared machine, as
-  `here` is, which the IO runtime ignores. Decides the measure.
+  machine measure. A burst's steps, a lane admit, a defer and a popped
+  timer (its frame's root skip) step the ghost; a poll, a spent burst
+  dropped, a burst over and owed todos paid leave it in place, each
+  finitely often per frame. Decides whether those four are a measure on
+  the pure driver alone, or need a ghost-only marker in the shared machine,
+  as `here` is, which the IO runtime ignores.
 ### The ledger
 
 - **`fed-take`** (Stepper) — FALSITY, `DEAD ROUTE`: a cut fed its source's step

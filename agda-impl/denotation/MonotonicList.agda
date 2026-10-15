@@ -447,12 +447,13 @@ observe (cold f) p = f p
 -- A burst at `r` puts its i-th step at `r ++ [ ix i ]` and ends at
 -- `r ++ [ last ]`, which is also where the timer for the next frame is
 -- created: after the burst and all it caused.  A frame at tick 0 is the
--- subscribe burst, rooted at the subscription itself.
+-- subscribe burst, rooted at the subscription itself.  A timer firing
+-- shows as one skip at the frame's root, before its burst.
 mutual
   frames : ∀ {A t} → Time → Pos → From A t → Events A
   frames τ e done       = end e
   frames τ e quiet      = hush
-  frames τ e (at t _ b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+  frames τ e (at t _ b) = skip (ix (τ + t) ∷ sub e ∷ []) (λ where .force → burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b)
 
   burst : ∀ {A t} → Time → Pos → ℕ → Frame A t → Events A
   burst τ r i (emit a k) = out (r ++ [ ix i ]) a (λ where .force → burst τ r (suc i) (Frame∞.force k))
