@@ -33,7 +33,7 @@ open import denotation.Compositional using (EnvAgree; deferᴰ-contractive) rena
 open import denotation.Unfold using (NEnv; ⟦⟧-ne)
 open import denotation.Denote using (flatOp)
 open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Told; allLive)
-open import adequacy.Placed using (Atop; Ordered; ordered; Placed; Placedᴹ; Placedᴸ)
+open import adequacy.Placed using (Atop; Orders; Ordered; ordered; Placed; Within; Placedᴹ; Placedᴸ)
 
 open Events∞
 
@@ -385,6 +385,48 @@ Placedˢ ρ (U.outˢ k a c) = Atop k (U.meaning c ρ) × Placed c ρ
 Placedˢ ρ (U.skipˢ k c)  = Atop k (U.meaning c ρ) × Placed c ρ
 Placedˢ ρ (U.endˢ k)     = ⊤
 Placedˢ ρ U.hushˢ        = ⊤
+
+-- What the stepped node holds within it is placed.
+Withinˢ : ∀ {Γ A} → NEnv Γ → U.Step Γ A → Set
+Withinˢ ρ (U.outˢ k a c) = Within c ρ
+Withinˢ ρ (U.skipˢ k c)  = Within c ρ
+Withinˢ ρ (U.endˢ k)     = ⊤
+Withinˢ ρ U.hushˢ        = ⊤
+
+≃-out : ∀ {A k a} {l r : Events∞ A} → out k a l ≃ out k a r → force l ≃ force r
+≃-out {k = k} {a} {l} {r} e = alike λ n → go n (agreeing e (suc n))
+  where go : ∀ n → Agree (suc n) (out k a l) (out k a r) → Agree n (force l) (force r)
+        go n (out⁼ g) = g
+
+≃-skip : ∀ {A k} {l r : Events∞ A} → skip k l ≃ skip k r → force l ≃ force r
+≃-skip {k = k} {l} {r} e = alike λ n → go n (agreeing e (suc n))
+  where go : ∀ n → Agree (suc n) (skip k l) (skip k r) → Agree n (force l) (force r)
+        go n (skip⁼ g) = g
+
+atop-agree : ∀ {A k} {x y : Events A} → Agree 1 x y → Atop k x → Atop k y
+atop-agree (out⁼ _)  at = at
+atop-agree (skip⁼ _) at = at
+atop-agree end⁼      at = at
+atop-agree hush⁼     at = at
+
+-- Alike runs are alike in order.
+mutual
+  ordered-≃ : ∀ {A} {x y : Events A} → x ≃ y → Ordered x → Ordered y
+  ordered (ordered-≃ e o) = orders-≃ (agreeing e 1) e (ordered o)
+
+  orders-≃ : ∀ {A} {x y : Events A} → Agree 1 x y → x ≃ y → Orders x → Orders y
+  orders-≃ (out⁼ _)  e (at , o) = atop-agree (agreeing (≃-out e) 1) at , ordered-≃ (≃-out e) o
+  orders-≃ (skip⁼ _) e (at , o) = atop-agree (agreeing (≃-skip e) 1) at , ordered-≃ (≃-skip e) o
+  orders-≃ end⁼      e o        = tt
+  orders-≃ hush⁼     e o        = tt
+
+-- A node in order showing its step leaves the stepped node in order,
+-- atop what the step shows.
+placed-step : ∀ {Γ A} (ρ : NEnv Γ) (s : U.Step Γ A) {x : Events A} → x ≃ afterᴱ ρ s → Ordered x → Withinˢ ρ s → Placedˢ ρ s
+placed-step ρ (U.outˢ k a c) e o w = proj₁ (ordered (ordered-≃ e o)) , proj₂ (ordered (ordered-≃ e o)) , w
+placed-step ρ (U.skipˢ k c)  e o w = proj₁ (ordered (ordered-≃ e o)) , proj₂ (ordered (ordered-≃ e o)) , w
+placed-step ρ (U.endˢ k)     e o w = tt
+placed-step ρ U.hushˢ        e o w = tt
 
 -- A step that comes first just past `q` comes first at `q`.
 not-past : ∀ x y z → y <ᵖ z ≡ true → not (x <ᵖ z) ≡ true → not (x <ᵖ y) ≡ true
@@ -825,16 +867,6 @@ first-step j (U.skipˢ k _)  δ e f = first-le k j δ e f
 first-step j (U.endˢ k)     δ e f = first-le k j δ e f
 first-step j U.hushˢ        δ () f
 
-postulate
-
-  -- A STEP KEEPS THE GHOST PLACED: a step coming first leaves the stepped
-  -- node placed, atop what the step shows.
-  --
-  -- REFUTED: d2d13661 without the step coming first, by a merge whose joiner lane shows its source's earlier event
-  -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
-  placed-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
-               → First (U.headˢ (U.step c)) δ → Placedˢ (ρᴱ δ) (U.step c)
-
 -- A NODE FED ITS SOURCE'S STEP IS ALIKE THE NODE READING IT, at
 -- whichever connect's index it reads that source: a joiner fed the step
 -- its source shows at `q`, a value or a skip, reading the source past
@@ -1111,6 +1143,188 @@ mutual
   tie (tied-ahead j x          Q s false tx l ls os) | past b   = past (ahead-past j x Q s b)
   tie (tied-ahead j (skip _ r) Q s false tx l ls os) | tied tr = tied (tied-ahead j (force r) Q s _ tr l ls os)
 
+------------------------------------------------------------------------
+-- Placed within, part by part
+
+within-burst : ∀ {Γ A t} {ρ : NEnv Γ} τ r i (b : Frame A t) → Withinˢ ρ (U.burstˢ τ r i b)
+within-burst τ r i (M.emit _ _) = tt
+within-burst τ r i (M.stall _)  = tt
+within-burst τ r i (M.close _)  = tt
+
+within-frames : ∀ {Γ A t} {ρ : NEnv Γ} τ e (m : From A t) → Withinˢ ρ (U.framesˢ τ e m)
+within-frames τ e M.done       = tt
+within-frames τ e M.quiet      = tt
+within-frames τ e (M.at _ _ b) = within-burst τ _ 0 b
+
+within-of : ∀ {Γ A} {ρ : NEnv Γ} p i (xs : List A) → Withinˢ ρ (U.ofˢ p i xs)
+within-of p i []      = tt
+within-of p i (_ ∷ _) = tt
+
+within-join : ∀ {Γ A} {ρ : NEnv Γ} (i : A ∈ Γ) p xs e → Withinˢ ρ (U.joinˢ i p xs e)
+within-join i p ((_ , just _) ∷ _) e = tt
+within-join i p ((_ , nothing) ∷ _) e = tt
+within-join i p [] (just _)          = tt
+within-join i p [] nothing           = tt
+
+within-map : ∀ {Γ A B} {ρ : NEnv Γ} (f : A → B) (s : U.Step Γ A) → Placedˢ ρ s → Withinˢ ρ (U.mapˢ f s)
+within-map f (U.outˢ _ _ _) P = proj₂ P
+within-map f (U.skipˢ _ _)  P = proj₂ P
+within-map f (U.endˢ _)     P = tt
+within-map f U.hushˢ        P = tt
+
+within-scan : ∀ {Γ A B} {ρ : NEnv Γ} (f : B → A → B) z (s : U.Step Γ A) → Placedˢ ρ s → Withinˢ ρ (U.scanˢ f z s)
+within-scan f z (U.outˢ _ _ _) P = proj₂ P
+within-scan f z (U.skipˢ _ _)  P = proj₂ P
+within-scan f z (U.endˢ _)     P = tt
+within-scan f z U.hushˢ        P = tt
+
+within-take : ∀ {Γ A} {ρ : NEnv Γ} i (p : A → Bool) (s : U.Step Γ A) → Placedˢ ρ s → Withinˢ ρ (U.takeWhileˢ i p s)
+within-take i p (U.outˢ k a c) P with p a
+within-take i     p (U.outˢ k a c) P | true  = proj₂ P
+within-take true  p (U.outˢ k a c) P | false = tt
+within-take false p (U.outˢ k a c) P | false = tt
+within-take i p (U.skipˢ _ _) P = proj₂ P
+within-take i p (U.endˢ _)    P = tt
+within-take i p U.hushˢ       P = tt
+
+within-body : ∀ {Γ A B} {ρ : NEnv Γ} (s : U.Node Γ A) (sb : U.Step (A ∷ Γ) B) → Placedˢ (U.meaning s ρ ∷ᴬ ρ) sb → Placed s ρ
+            → Withinˢ ρ (U.bodyˢ (U.live s) sb)
+within-body s (U.outˢ _ _ _) P ps = proj₂ P , ps
+within-body s (U.skipˢ _ _)  P ps = proj₂ P , ps
+within-body s (U.endˢ _)     P ps = tt
+within-body s U.hushˢ        P ps = tt
+
+-- A body past its source's end, told so, is placed as it was.
+mutual
+  shut-placed : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placed n ρ → Placed (U.shut i c n) ρ
+  shut-placed i c n ρ e (o , w) = subst Ordered (sym (shut-meaning i c n ρ e)) o , shut-within i c n ρ e w
+
+  shut-within : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Within n ρ → Within (U.shut i c n) ρ
+  shut-within i c (U.framesᶜ _ _ _)          ρ e w = tt
+  shut-within i c (U.burstᶜ _ _ _ _)         ρ e w = tt
+  shut-within i c (U.endᶜ _)                 ρ e w = tt
+  shut-within i c (U.ofᶜ _ _ _)              ρ e w = tt
+  shut-within i c (U.mapᶜ f n)               ρ e w = shut-placed i c n ρ e w
+  shut-within i c (U.scanᶜ f z n)            ρ e w = shut-placed i c n ρ e w
+  shut-within i c (U.takeWhileᶜ b p n)       ρ e w = shut-placed i c n ρ e w
+  shut-within i c (U.flatMapᶜ op g o ls qs)  ρ e (wo , wl) = shut-placedᴹ i c o ρ e wo , shut-placedᴸ i c ls ρ e wl
+  shut-within i c (U.joinᶜ _ _ _ _)          ρ e w = tt
+  shut-within i c (U.connectᶜ b (U.live s))  ρ e (pb , ps) =
+    subst (λ x → Placed (U.shut (there i) c b) (x ∷ᴬ ρ)) (sym (shut-meaning i c s ρ e)) (shut-placed (there i) c b _ e pb) , shut-placed i c s ρ e ps
+  shut-within i c (U.connectᶜ b (U.ended _)) ρ e pb = shut-placed (there i) c b _ e pb
+  shut-within i c (U.deferᶜ _ _ _)           ρ e w = tt
+
+  shut-placedᴹ : ∀ {Γ A B} (i : A ∈ Γ) c (o : Maybe (U.Node Γ B)) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placedᴹ o ρ → Placedᴹ (U.shutᴹ i c o) ρ
+  shut-placedᴹ i c nothing  ρ e w = tt
+  shut-placedᴹ i c (just n) ρ e w = shut-placed i c n ρ e w
+
+  shut-placedᴸ : ∀ {Γ A B} (i : A ∈ Γ) c (ns : List (U.Node Γ B)) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placedᴸ ns ρ → Placedᴸ (U.shutᴸ i c ns) ρ
+  shut-placedᴸ i c []       ρ e w        = tt
+  shut-placedᴸ i c (n ∷ ns) ρ e (pn , w) = shut-placed i c n ρ e pn , shut-placedᴸ i c ns ρ e w
+
+-- Alike environments place a node alike.
+mutual
+  placed-≈ : ∀ {Γ B} (n : U.Node Γ B) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Placed n ρ → Placed n σ
+  placed-≈ n r (o , w) = ordered-≃ (envs-≃ n r) o , within-≈ n r w
+
+  within-≈ : ∀ {Γ B} (n : U.Node Γ B) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Within n ρ → Within n σ
+  within-≈ (U.framesᶜ _ _ _)          r w = tt
+  within-≈ (U.burstᶜ _ _ _ _)         r w = tt
+  within-≈ (U.endᶜ _)                 r w = tt
+  within-≈ (U.ofᶜ _ _ _)              r w = tt
+  within-≈ (U.mapᶜ f n)               r w = placed-≈ n r w
+  within-≈ (U.scanᶜ f z n)            r w = placed-≈ n r w
+  within-≈ (U.takeWhileᶜ b p n)       r w = placed-≈ n r w
+  within-≈ (U.flatMapᶜ op g o ls qs)  r (wo , wl) = placed-≈ᴹ o r wo , placed-≈ᴸ ls r wl
+  within-≈ (U.joinᶜ _ _ _ _)          r w = tt
+  within-≈ (U.connectᶜ b (U.live s))  r (pb , ps) = placed-≈ b (envs-≃ s r ∷ᵉ r) pb , placed-≈ s r ps
+  within-≈ (U.connectᶜ b (U.ended c)) r pb = placed-≈ b (≃-refl (end c) ∷ᵉ r) pb
+  within-≈ (U.deferᶜ _ _ _)           r w = tt
+
+  placed-≈ᴹ : ∀ {Γ B} (o : Maybe (U.Node Γ B)) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Placedᴹ o ρ → Placedᴹ o σ
+  placed-≈ᴹ nothing  r w = tt
+  placed-≈ᴹ (just n) r w = placed-≈ n r w
+
+  placed-≈ᴸ : ∀ {Γ B} (ns : List (U.Node Γ B)) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Placedᴸ ns ρ → Placedᴸ ns σ
+  placed-≈ᴸ []       r w        = tt
+  placed-≈ᴸ (n ∷ ns) r (pn , w) = placed-≈ n r pn , placed-≈ᴸ ns r w
+
+-- A node fed its source's step is placed as the node reading it.
+mutual
+  fed-placed : ∀ {Γ A B} (b : U.Node Γ B) (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
+             → ∀ {ν} → Sane ν b → lookup ν i ≡ true → Placed b ρ → Placed (U.feed i q a b) σ
+  fed-placed b i q a f sn lv (o , w) = ordered-≃ (fed-≃ b i q a f sn lv) o , fed-within b i q a f sn lv w
+
+  fed-within : ∀ {Γ A B} (b : U.Node Γ B) (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
+             → ∀ {ν} → Sane ν b → lookup ν i ≡ true → Within b ρ → Within (U.feed i q a b) σ
+  fed-within (U.framesᶜ _ _ _)          i q a f sn lv w = tt
+  fed-within (U.burstᶜ _ _ _ _)         i q a f sn lv w = tt
+  fed-within (U.endᶜ _)                 i q a f sn lv w = tt
+  fed-within (U.ofᶜ _ _ _)              i q a f sn lv w = tt
+  fed-within (U.mapᶜ g c)               i q a f sn lv w = fed-placed c i q a f sn lv w
+  fed-within (U.scanᶜ g z c)            i q a f sn lv w = fed-placed c i q a f sn lv w
+  fed-within (U.takeWhileᶜ j p c)       i q a f sn lv w = fed-placed c i q a f sn lv w
+  fed-within (U.flatMapᶜ op g o ls qs)  i q a f (so , sl , _) lv (wo , wl) = fed-placedᴹ o i q a f so lv wo , fed-placedᴸ ls i q a f sl lv wl
+  fed-within (U.joinᶜ _ _ _ _)          i q a f sn lv w = tt
+  fed-within (U.connectᶜ b (U.live s))  i q a f {ν} (sb , ss) lv (pb , ps) =
+    fed-placed b (there i) q a (there′ (fed-≃ s i q a f {ν} ss lv) f) {true ∷ᴬ ν} sb lv pb , fed-placed s i q a f ss lv ps
+  fed-within (U.connectᶜ b (U.ended c)) i q a f {ν} sn lv pb =
+    fed-placed b (there i) q a (there′ (≃-refl (end c)) f) {false ∷ᴬ ν} sn lv pb
+  fed-within (U.deferᶜ _ _ _)           i q a f sn lv w = tt
+
+  fed-placedᴹ : ∀ {Γ A B} (o : Maybe (U.Node Γ B)) (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
+              → ∀ {ν} → Saneᴹ ν o → lookup ν i ≡ true → Placedᴹ o ρ → Placedᴹ (U.feedᴹ i q a o) σ
+  fed-placedᴹ nothing  i q a f sn lv w = tt
+  fed-placedᴹ (just c) i q a f sn lv w = fed-placed c i q a f sn lv w
+
+  fed-placedᴸ : ∀ {Γ A B} (ls : List (U.Node Γ B)) (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
+              → ∀ {ν} → Saneᴸ ν ls → lookup ν i ≡ true → Placedᴸ ls ρ → Placedᴸ (U.feedᴸ i q a ls) σ
+  fed-placedᴸ []       i q a f sn        lv w        = tt
+  fed-placedᴸ (c ∷ cs) i q a f (sc , sl) lv (pc , w) = fed-placed c i q a f sc lv pc , fed-placedᴸ cs i q a f sl lv w
+
+-- A source's step before the body's ties the body fed, or told its end;
+-- the body's before the source's carries the source along.
+untie : ∀ {Γ B} q (sb : U.Step Γ B) → U.beforeˢ (q ++ [ ix 0 ]) sb ≡ false → Wins (U.headˢ sb) (just q) ≡ true
+untie q (U.outˢ k _ _) e = cong not e
+untie q (U.skipˢ k _)  e = cong not e
+untie q (U.endˢ k)     e = cong not e
+untie q U.hushˢ        ()
+
+wconn : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) → Sane (true ∷ᴬ flags δ) b
+      → Placed b (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) → Placed s (ρᴱ δ) → (sb : U.Step (A ∷ Γ) B) (ss : U.Step Γ A)
+      → (Wins (U.headˢ sb) (U.headˢ ss) ≡ true → First (U.headˢ sb) δ → Placedˢ (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ) sb)
+      → (First (U.headˢ ss) δ → U.meaning s (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) ss)
+      → (First (U.headˢ ss) δ → Placedˢ (ρᴱ δ) ss)
+      → First (U.headˢ (U.sourceˢ b sb s ss)) δ → Withinˢ (ρᴱ δ) (U.sourceˢ b sb s ss)
+wconn b s δ sn pb ps sb U.hushˢ pbs hs pss fi =
+  within-body s sb (pbs refl (subst (λ k → First k δ) (body-head (U.live s) sb) fi)) ps
+wconn b s δ sn pb ps sb (U.outˢ q x s′) pbs hs pss fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
+... | false = within-body s sb (pbs (untie q sb eq) (subst (λ k → First k δ) (body-head (U.live s) sb) fi)) ps
+... | true  = fed-placed b (here refl) q (just x) (here′ (hs (first-sub q δ fi)) (≈ᴱ-refl (ρᴱ δ))) sn refl pb , proj₂ (pss (first-sub q δ fi))
+wconn b s δ sn pb ps sb (U.skipˢ q s′) pbs hs pss fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
+... | false = within-body s sb (pbs (untie q sb eq) (subst (λ k → First k δ) (body-head (U.live s) sb) fi)) ps
+... | true  = fed-placed b (here refl) q nothing (here′ (hs (first-sub q δ fi)) (≈ᴱ-refl (ρᴱ δ))) sn refl pb , proj₂ (pss (first-sub q δ fi))
+wconn b s δ sn pb ps sb (U.endˢ c) pbs hs pss fi with U.beforeˢ (c ++ [ ix 0 ]) sb in eq
+... | false = within-body s sb (pbs (untie c sb eq) (subst (λ k → First k δ) (body-head (U.live s) sb) fi)) ps
+... | true  = shut-placed (here refl) c b (end c ∷ᴬ ρᴱ δ) refl (placed-≈ b (hs (first-sub c δ fi) ∷ᵉ ≈ᴱ-refl (ρᴱ δ)) pb)
+
+within-shut : ∀ {Γ A B} {ρ : NEnv Γ} c (sb : U.Step (A ∷ Γ) B) → Placedˢ (end c ∷ᴬ ρ) sb → Withinˢ ρ (U.shutˢᵗ c sb)
+within-shut c (U.outˢ _ _ b) P = shut-placed (here refl) c b _ refl (proj₂ P)
+within-shut c (U.skipˢ _ b)  P = shut-placed (here refl) c b _ refl (proj₂ P)
+within-shut c (U.endˢ _)     P = tt
+within-shut c U.hushˢ        P = tt
+
+postulate
+  -- A FLATMAP'S STEP KEEPS ITS PARTS PLACED: a step coming first leaves
+  -- its outer and each lane in flight placed.
+  within-flat : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs (δ : Env Γ) → Settled δ
+              → Sane (flags δ) (U.flatMapᶜ op g o ls qs) → Placed (U.flatMapᶜ op g o ls qs) (ρᴱ δ)
+              → First (U.headˢ (U.step (U.flatMapᶜ op g o ls qs))) δ → Withinˢ (ρᴱ δ) (U.step (U.flatMapᶜ op g o ls qs))
+
+  -- A DEFER'S PROGRAM IS PLACED WITHIN: subscribed, and fed what its
+  -- sources showed since, each part reads its sources in order.
+  within-defer : ∀ {Γ A} (l : Later Timeline Γ A) p ns (δ : Env Γ) → Settled δ → Withinˢ (ρᴱ δ) (U.step (U.deferᶜ l p ns))
+
 postulate
   -- A FLATMAP LEADS NOTHING: what it shows at a `j` coming before its
   -- step and its sources' is a skip there.
@@ -1198,6 +1412,40 @@ mutual
     leads b (U.ended c ∷ δ) st sn pb j (before-moved j (U.step b) (U.shutˢᵗ c (U.step b)) (shut-head c (U.step b)) bj) f
   leads (U.deferᶜ l p ns)  δ st sn pl j bj f =
     tied-step (ρᴱ δ) (U.step (U.deferᶜ l p ns)) (agreeing (defer-after l p ns (ρᴱ δ)) 1) bj
+
+  -- A STEP KEEPS THE GHOST PLACED: a step coming first leaves the stepped
+  -- node placed, atop what the step shows.  The node in order showing
+  -- its step is in order past it; what it holds goes part by part.
+  --
+  -- REFUTED: d2d13661 without the step coming first, by a merge whose joiner lane shows its source's earlier event
+  -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
+  placed-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
+               → First (U.headˢ (U.step c)) δ → Placedˢ (ρᴱ δ) (U.step c)
+  placed-after c δ st sn pl fi = placed-step (ρᴱ δ) (U.step c) (os c δ st sn pl fi) (proj₁ pl) (within-after c δ st sn pl fi)
+
+  within-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
+               → First (U.headˢ (U.step c)) δ → Withinˢ (ρᴱ δ) (U.step c)
+  within-after (U.framesᶜ τ e m)    δ st sn pl fi = within-frames τ e m
+  within-after (U.burstᶜ τ r i b)   δ st sn pl fi = within-burst τ r i b
+  within-after (U.endᶜ p)           δ st sn pl fi = tt
+  within-after (U.ofᶜ p i xs)       δ st sn pl fi = within-of p i xs
+  within-after (U.mapᶜ f c)         δ st sn (_ , pc) fi =
+    within-map f (U.step c) (placed-after c δ st sn pc (subst (λ k → First k δ) (map-head f (U.step c)) fi))
+  within-after (U.scanᶜ f z c)      δ st sn (_ , pc) fi =
+    within-scan f z (U.step c) (placed-after c δ st sn pc (subst (λ k → First k δ) (scan-head f z (U.step c)) fi))
+  within-after (U.takeWhileᶜ i p c) δ st sn (_ , pc) fi =
+    within-take i p (U.step c) (placed-after c δ st sn pc (take-first i p (U.step c) δ fi))
+  within-after (U.flatMapᶜ op g o ls qs) δ st sn pl fi = within-flat op g o ls qs δ st sn pl fi
+  within-after (U.joinᶜ i p xs e)   δ st sn pl fi = within-join i p xs e
+  within-after (U.connectᶜ b (U.live s)) δ st (sb , ss) (_ , pb , ps) fi =
+    wconn b s δ sb pb ps (U.step b) (U.step s) (λ w f → placed-after b (U.live s ∷ δ) (hs , ps , ld , st) sb pb (w , f))
+          hs (placed-after s δ st ss ps) fi
+    where hs = os s δ st ss ps
+          ld : Leading s δ
+          ld k w u = lags s δ st ss ps k w u
+  within-after (U.connectᶜ b (U.ended c)) δ st sn (_ , pb) fi =
+    within-shut c (U.step b) (placed-after b (U.ended c ∷ δ) st sn pb (subst (λ k → First k δ) (shut-head c (U.step b)) fi))
+  within-after (U.deferᶜ l p ns)    δ st sn pl fi = within-defer l p ns δ st
 
   live-skips : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) → Settled δ
              → Sane (flags δ) (U.connectᶜ b (U.live s)) → Placed (U.connectᶜ b (U.live s)) (ρᴱ δ)

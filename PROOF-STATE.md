@@ -176,14 +176,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `placed-subscribe` with `placed-after`: the meaning's
-  events are sorted, and a step keeps every node so. Ruled out: a node
-  showing strictly after an earlier step, a step not coming first keeping
-  the placing, a placing with each live joiner joined before its source,
-  and a lag or a tie needing the node's own placing: `lags` and `leads`
-  go by node, over each source's lag at its own head (a field of
-  `Settled`) and, for a tie, its order. Decides whether `placed-after`
-  goes by node the same way, its connect's tie from `leads`.
+- **THE ORDER.** `placed-subscribe`, `within-flat` and `within-defer`:
+  the meaning's events are sorted, a flatMap's step keeps its outer and
+  lanes in flight placed, a defer's program is placed within. Ruled out:
+  a node showing strictly after an earlier step, a step not coming first
+  keeping the placing, a placing with each live joiner joined before its
+  source; and `lags`, `leads` and `placed-after` go by node, over each
+  source's lag at its own head and its order, fed and told bodies placed
+  as they were. Decides whether a program subscribed anywhere, over
+  sources in order, is placed, which `within-defer` would follow from.
 - **THE OPERATORS.** `go-skips`, `take-first`, `join-quiet` and
   `defer-after`: a flatMap's meaning is what its step shows, a cut step
   comes first when the uncut did, an untold joiner fed nothing under
@@ -212,8 +213,10 @@ by their own silent steps (`Mirror`).
 
 - **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
   subscribed at the root is placed.
-- **`placed-after`** (Stepper) — FALSITY, `REFUTED×2`: a step keeps the ghost
-  placed.
+- **`within-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's step coming
+  first keeps its outer and each lane in flight placed.
+- **`within-defer`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer's program,
+  subscribed and fed, is placed within.
 - **`lags-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning shows
   nothing before a body's event that comes first, its sources a step past.
 - **`leads-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning
