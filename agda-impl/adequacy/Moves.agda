@@ -425,7 +425,7 @@ module Moving (R : Set) where
               (π : Path t (coldˢ {Δ = Δ} sk hd (waiting {u = v} τ e (at u x fr))))
             → Owned H t (Against.calmAs {p = p} {σ = σ})
             → Owned H (plant π (coldˢ sk hd (fired τ e (at u x fr))))
-                (Against.burstAs {p = p} {σ = σ} (Against.firesAs (planted π _)) Against.bottomAs)
+                (Against.burstAs {p = p} {σ = σ} (Against.firesAs (planted π _)) Against.bottomᴴ Against.bottomAs)
   owned-pop {h} H {τ = τ} {e = e} {u = u} {x = x} {sk = sk} {hd = hd} {fr = fr} π ow = record
     { ofs    = λ π′ → ⊥-elim (no-of π′)
     ; plays  = λ π′ nsp → ⊥-elim (no-play π′ nsp)

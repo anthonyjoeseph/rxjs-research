@@ -29,6 +29,7 @@ open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift)
 open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (WellFounded)
@@ -59,13 +60,14 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open Events∞
 
 module Honesty (R : Set) where
-  open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
-  open Shared Timeline (Out R) using (Conf; Heapᴹ; ⟨_,_,_⟩; held; run; asking; bottom; spent?)
-  open Heap using (_⊑_)
+  open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read; feed)
+  open Shared Timeline (Out R) using (Conf; Heapᴹ; ⟨_,_,_⟩; held; run; asking; bottom; spent?) renaming (go to goᴵ)
+  open Heap using (_⊑_; Handle)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
-    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; Owned)
-  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; bottomAs)
+    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot)
+  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; bottomAs; restAs; bottomᴴ; restᴴ; BurstAs;
+    StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
   open Moving R using (pend; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -330,12 +332,6 @@ module Honesty (R : Set) where
     run-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
 
-    -- A spent burst dropped, the stack resumed: the ghost alike, a burst
-    -- fewer.
-    burst-spent : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
-                → Mach.bursts m ≡ just b ∷ bs → spent? (Conf.heap (Mach.conf m)) (Playing.handle b) ≡ true
-                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
-
     -- A live burst's sink polled: open, the frame to play; closed, the
     -- burst dropped and the stack resumed.
     burst-poll : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
@@ -356,6 +352,70 @@ module Honesty (R : Set) where
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ Conf.pos (Mach.conf m) → ⊥
+
+  -- A spot's handle, where its node is a cold.
+  handleOf : ∀ {h} {t : Sub h [] R} → Spot t → Maybe (Handle h)
+  handleOf (spot {u = coldˢ _ hd _} _) = just hd
+  handleOf _                           = nothing
+
+  -- A spent burst owes nothing: no live cold is its spot.
+  spent-spot : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {b} (x : BurstAs t (just b)) {S} → spent? H (Playing.handle b) ≡ true
+             → ∀ {Δ A s hd v} (π : Path t (coldˢ {Δ = Δ} {A} s hd v)) → spent? H hd ≡ false → spot π ∈ᴸ burstSpots t x ++ S → spot π ∈ᴸ S
+  spent-spot H (playsAs _) sp π nsp (here e) = ⊥-elim (true≢false (trans (sym sp) (subst (λ z → spent? H z ≡ false) (just-injective (cong handleOf e)) nsp)))
+  spent-spot H (firesAs _) sp π nsp (here e) = ⊥-elim (true≢false (trans (sym sp) (subst (λ z → spent? H z ≡ false) (just-injective (cong handleOf e)) nsp)))
+  spent-spot H (playsAs _) sp π nsp (there i) = i
+  spent-spot H (firesAs _) sp π nsp (there i) = i
+
+  -- A spent burst dropped: what the stack under it owes is all that is
+  -- owed.
+  owned-spent : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {p₀ c₀ bs₀ b w p} {σ : w ⊑ h} {K bs} {x : BurstAs t (just b)} {hᴷ} {K′ : StackAs t p σ K bs}
+                (ca₀ : CtlAs t p₀ c₀ bs₀) → spent? H (Playing.handle b) ≡ true
+              → agenda t ca₀ ≡ stackJobs t K′ → bursts t ca₀ ≡ stackBursts t K′ → begins t ca₀ ≡ sources t (stackJobs t K′)
+              → Owned H t (burstAs x hᴷ K′) → Owned H t ca₀
+  owned-spent H {t} {x = x} ca₀ sp ag bu be ow = record
+    { ofs    = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.ofs ow π)
+    ; plays  = λ π nsp → subst (λ z → _ ∈ᴸ z) (sym bu) (spent-spot H x sp π nsp (Owned.plays ow π nsp))
+    ; fires  = λ π nsp → subst (λ z → _ ∈ᴸ z) (sym bu) (spent-spot H x sp π nsp (Owned.fires ow π nsp))
+    ; begun  = λ π → subst (λ z → _ ∈ᴸ z) (sym be) (Owned.begun ow π)
+    ; ends   = λ π l → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.ends ow π l)
+    ; cuts   = λ π l → proj₁ (Owned.cuts ow π l) , subst (λ z → _ ∈ᴸ z) (sym ag) (proj₂ (Owned.cuts ow π l))
+    ; feeds  = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.feeds ow π)
+    ; fins   = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.fins ow π)
+    ; placed = subst (All (Placedᴬ t)) (sym ag) (Owned.placed ow) }
+
+  -- A spent burst dropped, the stack it holds over resumed.
+  drop-held : ∀ {h} {hp : Heapᴹ h} {p w} {σ : w ⊑ h} {K clk ts b bs lg en mk} → spent? hp (Playing.handle b) ≡ true
+            → step (mach ⟨ hp , p , held σ K ⟩ clk ts (just b ∷ bs) [] lg en mk) ≡ silent (feed (mach ⟨ hp , p , held σ K ⟩ clk ts bs [] lg en mk) goᴵ)
+  drop-held sp rewrite sp = refl
+
+  -- A spent burst dropped, the stack resumed: the turn over nothing, or
+  -- what follows the cold's start, about to run.  The ghost alike, a
+  -- burst fewer.
+  burst-spent : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
+              → Mach.bursts m ≡ just b ∷ bs → spent? (Conf.heap (Mach.conf m)) (Playing.handle b) ≡ true
+              → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+  burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
+    cr@record { tree = t ; ctlAs = burstAs x bottomᴴ bottomAs ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = q
+              ; books = record { fresh = fs ; paidUp = refl ; running = rn } } refl refl sp eq
+    with trans (sym eq) (drop-held {hp = hp} {p = p} {σ = σ} {K = K} {clk = clk} {ts = ts} {b = b} {bs = bs} {lg = lg} {en = en} {mk = mk} sp)
+  ... | refl =
+    g , _ , now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
+        ; owned = owned-spent hp calmAs sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
+        ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , ≤-refl)))
+  burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
+    cr@record { tree = t ; ctlAs = burstAs x restᴴ (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = q
+              ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl sp eq
+    with trans (sym eq) (drop-held {hp = hp} {p = p} {σ = σ} {K = K} {clk = clk} {ts = ts} {b = b} {bs = bs} {lg = lg} {en = en} {mk = mk} sp)
+  ... | refl =
+    g , _ , now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
+        ; owned = owned-spent hp (runAs ks e K″) sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
+        ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , inj₂ (refl , ≤-refl)))
 
   -- A burst's frame stepped: found spent, polled, or played.
   burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
@@ -441,7 +501,7 @@ module Honesty (R : Set) where
     g , _ , now
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = plant π v
-        ; ctlAs = burstAs (firesAs (planted π v)) bottomAs
+        ; ctlAs = burstAs (firesAs (planted π v)) bottomᴴ bottomAs
         ; meets = trans (part-plant hp {t = t} π v refl) mt
         ; owned = owned-pop hp {t = t} π ow
         ; kernels = record { holds = holds-plant hp {t = t} π v refl (λ h → h) (Kernels.holds kn)
@@ -451,7 +511,7 @@ module Honesty (R : Set) where
                          ; timed = timed-pop hp {t = t} π (Queue.timed q) (Queue.ordered q) fs
                          ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
-        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl ; paidUp = refl ; running = rn } })
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl , tt ; paidUp = refl ; running = rn } })
     , lowered (λ n → agree-refl n _) (inj₂ (pend-plant {t = t} π v refl , inj₁ ≤-refl))
     where v = coldˢ sk hd (fired τ e (at u x fr))
 
@@ -492,13 +552,13 @@ module Honesty (R : Set) where
   ... | runAs ks x K | _ | refl | _ | _ = silentᴴ refl (run-onward {g = g} cr refl refl)
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     | noteAs ks x K | g′ , _ , st | refl | ck | refl =
-    valueᴴ refl st ck (note-least {g = g} cr refl st) (note-onward {g = g} cr refl st refl)
+    valueᴴ refl st (proj₁ ck) (note-least {g = g} cr refl st) (note-onward {g = g} cr refl st refl)
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     | calmAs | _ | refl | _ | refl with ts
   ... | []    = drainedᴴ refl (turn-dry {g = g} cr refl refl refl)
   ... | _ ∷ _ = silentᴴ refl (turn-pops {g = g} cr refl refl refl)
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
-    | burstAs {b = b} x K | _ | refl | _ | _ with if-silent (spent? hp (Playing.handle b)) (Playing.polled b)
+    | burstAs {b = b} x _ K | _ | refl | _ | _ with if-silent (spent? hp (Playing.handle b)) (Playing.polled b)
   ... | m′ , eq = silentᴴ eq (burst-onward {g = g} cr refl refl eq)
 
   strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)

@@ -752,6 +752,13 @@ module Strongly (R : Set) where
                 (π : Path t (coldˢ {Δ = Δ} sk hd (fired {u = v} τ e (at u x fr)))) → BurstAs (just (firedOf π))
       overAs  : BurstAs nothing
 
+    -- A stack the driver holds over: the bottom, or what follows a cold's
+    -- start.  The turn is reached nowhere else, and a delivery or a poll
+    -- the driver feeds returns to the stack it held.
+    data Held {w} : Stack w ⊤ → Set₁ where
+      bottomᴴ : Held bottom
+      restᴴ   : ∀ {u B} {m : Act w B} {ρ : u ⊑ w} {K : Stack u B} → Held (push (rest m) ρ K)
+
     -- Each frame, run in the current world, the agenda up to `_≗_`, at
     -- the position the frame resumes at: a scope's, the one it puts back;
     -- any other, the one control returns to it at.  A delivery the driver
@@ -764,7 +771,7 @@ module Strongly (R : Set) where
       backAs   : ∀ {u w p bs} q {m : Act w ⊤} {ρ : u ⊑ w} {σ : w ⊑ h} {K} (ks : List (Call t))
                → wkAct σ m ≗ ⟦ ks ⟧ → StackAs q (ρ ⨾ σ) K bs → StackAs p σ (push (back q m) ρ K) bs
       reholdAs : ∀ {u w p bs b} {ρ : u ⊑ w} {σ : w ⊑ h} {K}
-               → BurstAs b → StackAs p (ρ ⨾ σ) K bs → StackAs p σ (push rehold ρ K) (b ∷ bs)
+               → BurstAs b → Held K → StackAs p (ρ ⨾ σ) K bs → StackAs p σ (push rehold ρ K) (b ∷ bs)
 
     -- THE RE-ENTRY STATES: the driver's turn with nothing held; a value
     -- about to be recorded, the agenda its continuation; the agenda about
@@ -781,7 +788,7 @@ module Strongly (R : Set) where
               → (Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ h) λ υ → wkEnv υ E′ ≡ env (walk π top)
                    × act ≗ compile s E′ υ (obs (walk π top)) (kont (walk π top)))
               → StackAs q σ K bs → CtlAs q (run act σ K) bs
-      burstAs : ∀ {w p bs b} {σ : w ⊑ h} {K} → BurstAs (just b) → StackAs p σ K bs → CtlAs p (holding σ K) (just b ∷ bs)
+      burstAs : ∀ {w p bs b} {σ : w ⊑ h} {K} → BurstAs (just b) → Held K → StackAs p σ K bs → CtlAs p (holding σ K) (just b ∷ bs)
 
     -- What is owed, gathered from the control and the stack: the calls on
     -- the agenda, at their positions; the bursts in flight; the
@@ -791,7 +798,7 @@ module Strongly (R : Set) where
     stackJobs bottomAs             = []
     stackJobs (restAs {p = p} ks _ K) = at⟦ p ⟧ ks ++ stackJobs K
     stackJobs (backAs q ks _ K)    = at⟦ q ⟧ ks ++ stackJobs K
-    stackJobs (reholdAs _ K)       = stackJobs K
+    stackJobs (reholdAs _ _ K)     = stackJobs K
 
     burstSpots : ∀ {b} → BurstAs b → List (Spot t)
     burstSpots (playsAs π) = spot π ∷ []
@@ -802,21 +809,21 @@ module Strongly (R : Set) where
     stackBursts bottomAs        = []
     stackBursts (restAs _ _ K)  = stackBursts K
     stackBursts (backAs _ _ _ K) = stackBursts K
-    stackBursts (reholdAs b K)  = burstSpots b ++ stackBursts K
+    stackBursts (reholdAs b _ K) = burstSpots b ++ stackBursts K
 
     agenda : ∀ {p c bs} → CtlAs p c bs → List (Job t)
     agenda calmAs                  = []
     agenda (noteAs {p = p} ks _ K) = at⟦ p ⟧ ks ++ stackJobs K
     agenda (runAs {p = p} ks _ K)  = at⟦ p ⟧ ks ++ stackJobs K
     agenda (subAs _ _ K)           = stackJobs K
-    agenda (burstAs _ K)           = stackJobs K
+    agenda (burstAs _ _ K)         = stackJobs K
 
     bursts : ∀ {p c bs} → CtlAs p c bs → List (Spot t)
     bursts calmAs         = []
     bursts (noteAs _ _ K) = stackBursts K
     bursts (runAs _ _ K)  = stackBursts K
     bursts (subAs _ _ K)  = stackBursts K
-    bursts (burstAs b K)  = burstSpots b ++ stackBursts K
+    bursts (burstAs b _ K) = burstSpots b ++ stackBursts K
 
     sources : List (Job t) → List (Spot t)
     sources []                  = []
@@ -840,14 +847,26 @@ module Strongly (R : Set) where
     Placed _                       = ⊤
 
     -- Where the clock stands: a callback's position is at its tick, a
-    -- burst's frame at its own; the turn has none.
+    -- burst's frame at its own; the turn has none.  Every frame the
+    -- stack resumes at, and every burst it holds, the same: the clock
+    -- does not move while anything is held.
+    BurstClocked : ∀ {b} → ℕ → BurstAs b → Set
+    BurstClocked n (playsAs {τ = τ} {r} {u = u} _) = n ≡ τ + u × n ≡ tick r
+    BurstClocked n (firesAs {τ = τ} {u = u} _)     = n ≡ τ + u
+    BurstClocked n overAs                          = ⊤
+
+    Ticked : ∀ {w p σ bs} {K : Stack w ⊤} → ℕ → StackAs p σ K bs → Set
+    Ticked n bottomAs                 = ⊤
+    Ticked n (restAs {p = p} _ _ K)   = n ≡ tick p × Ticked n K
+    Ticked n (backAs q _ _ K)         = n ≡ tick q × Ticked n K
+    Ticked n (reholdAs b _ K)         = BurstClocked n b × Ticked n K
+
     Clocked : ∀ {p c bs} → ℕ → CtlAs p c bs → Set
-    Clocked n calmAs                        = ⊤
-    Clocked {p} n (noteAs _ _ _)            = n ≡ tick p
-    Clocked {p} n (runAs _ _ _)             = n ≡ tick p
-    Clocked {p} n (subAs _ _ _)             = n ≡ tick p
-    Clocked n (burstAs (playsAs {τ = τ} {r} {u = u} _) _) = n ≡ τ + u × n ≡ tick r
-    Clocked n (burstAs (firesAs {τ = τ} {u = u} _) _)     = n ≡ τ + u
+    Clocked n calmAs              = ⊤
+    Clocked {p} n (noteAs _ _ K)  = n ≡ tick p × Ticked n K
+    Clocked {p} n (runAs _ _ K)   = n ≡ tick p × Ticked n K
+    Clocked {p} n (subAs _ _ K)   = n ≡ tick p × Ticked n K
+    Clocked n (burstAs b _ K)     = BurstClocked n b × Ticked n K
 
   ------------------------------------------------------------------------
   -- THE RELATION, one record per concern
@@ -977,4 +996,4 @@ module Strongly (R : Set) where
     ; kernels = record { holds = _ ; gated = _ }
     ; meaning = record { fed = _ }
     ; queue   = record { past = []ᴬ ; timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
-    ; books   = record { fresh = []ᴾ ; clocked = refl ; paidUp = refl ; running = refl } }
+    ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl } }

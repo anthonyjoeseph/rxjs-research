@@ -177,17 +177,18 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `burst-spent`, then `burst-poll`, `burst-play` and
-  `run-onward`, carry liveness: each silent hop passes a skip, leaves the
-  ghost alike and lowers `measure`, or reaches a step that is not silent.
-  `burst-spent` first: a body resuming the stack frame by frame, an
-  over burst looping, into `runAs`, `burstAs` or `calmAs`. Decides
-  whether `runAs`'s clock at its return position is paid by the burst's
-  `Clocked`, or a frame's position needs a tick of its own. Ruled out:
-  a resume with no re-entry state (`runAs` is one, the agenda about to
-  run); a move needing more of its subtree than its node's premises; a
-  ghost-only marker in the shared machine; a lane admit or a connect's
-  feed with no skip (`Unfold`).
+- **THE PROGRESS.** `burst-poll`, then `burst-play` and `run-onward`,
+  carry liveness: each silent hop passes a skip, leaves the ghost alike
+  and lowers `measure`, or reaches a step that is not silent.
+  `burst-poll` first: a poll runs its sink's `isClosed` under a `told`
+  frame back to the turn. Decides whether `Holds` pins that callback to
+  a read of the cold's liveness, a fixed few silent steps, or whether a
+  poll needs a re-entry state of its own. Ruled out: a resume with no
+  re-entry state (`runAs` is one, the agenda about to run); a held stack
+  topped by a scope or a rehold (`Held`), so no resume loops or returns
+  to a scope's position; a clock unpaid at a frame's return (`Ticked`);
+  a move needing more of its subtree than its node's premises; a
+  ghost-only marker in the shared machine.
 - **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
@@ -264,8 +265,6 @@ by their own silent steps (`Mirror`).
   queued, the ghost shows nothing.
 - **`run-onward`** (Content) — FALSITY, `NO EVIDENCE`: code run, a subscription
   begun or the agenda, runs silently to the next re-entry state.
-- **`burst-spent`** (Content) — FALSITY, `NO EVIDENCE`: a spent burst dropped,
-  the stack resumed, the ghost alike and a burst fewer.
 - **`burst-poll`** (Content) — FALSITY, `NO EVIDENCE`: a live burst's sink
   polled, open to play or closed and dropped.
 - **`burst-play`** (Content) — FALSITY, `NO EVIDENCE`: a polled burst's frame
