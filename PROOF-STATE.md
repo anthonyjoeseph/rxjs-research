@@ -176,18 +176,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **STRONG, DEFINED.** `Strong` a data type of the run's re-entry
-  configurations: a witness of every subscription the run reaches, with
-  its names, one constructor per kernel, as the deleted Carrier's `Sub`
-  was (`git show fbdfc8ed`); what is owed once the current callback returns
-  an agenda of kernel code, equal up to how names were weakened;
-  `strong-begin` the subscription state at the root. Decides whether five
-  re-entry states (between turns, a value to record, a subscription to
-  begin, a frame to step, a timer popped) suffice under scoped positions
-  and the driver's `rehold`/`told` frames, or a poll's answer needs its own.
-- **THE STRONG STEP.** `strong-shows` by re-entry state: the silent run to
-  the next one computed from the kernel's own code; a recorded value a
-  least event of the residual. Decides whether "least" is paid once as a
+- **THE STRONG STEP, DISPATCHED.** `strong-shows` a body by re-entry
+  state (`adequacy.Strong`'s `CtlAs`), one leaf each: the root's completion
+  where the ghost ends; a note, the value the ghost steps by; a
+  subscription, a burst's frame and the turn, each a silent run to the next
+  state. Decides which state carries the risk, and whether the five close
+  under the run with a poll's answer and a popped timer passing silently.
+- **THE LEAST VALUE.** `strong-shows` at a note: the silent run to it
+  computed from the kernel's own code; the recorded value a least event of
+  the residual. Decides whether "least" is paid once as a
   field, the ghost's sources past the last delivery as `WellMach`'s are,
   rather than re-established at every step.
 - **THE TURN.** `strong-shows` between turns: a popped timer's frame is the
@@ -203,12 +200,8 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`Strong`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; the
-  run's re-entry configurations against the ghost.
 - **`strong-shows`** (Content) — FALSITY, `NO EVIDENCE`: from a re-entry
   configuration the run reaches the next silently, or shows the residual.
-- **`strong-begin`** (Content) — FALSITY, `NO EVIDENCE`: the launch is a
-  subscription about to begin at the root.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`reachedᴿ`** (Adequacy) — FALSITY, `NO EVIDENCE`: every item the meaning's

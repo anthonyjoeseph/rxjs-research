@@ -37,6 +37,7 @@ open import denotation.Compositional using (from; settle; []ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
+open import adequacy.Strong using (module Strongly)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Pure)
 
@@ -45,6 +46,7 @@ open Events∞
 module Honesty (R : Set) where
   open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
   open Recording R using (silent-keeps; value-notes)
+  open Strongly R using (Strong; strong-begin)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
 
@@ -150,42 +152,6 @@ module Honesty (R : Set) where
     cutʰ  : Stands m (cutOff (Mach.clock m)) (Mach.marks m)
     finʰ  : ∀ {p} → step m ≡ complete p → Stands m finished (Mach.marks m ++ [ p ])
     dryʰ  : step m ≡ drained → Stands m dry (Mach.marks m)
-
-  postulate
-    -- A RE-ENTRY CONFIGURATION AGAINST THE GHOST: ONE relation over the
-    -- whole configuration, as `WellMach` is, never one per observer, and
-    -- only where the run re-enters — between turns, a value about to be
-    -- recorded, a subscription about to begin, a cold's frame about to
-    -- step, a timer just popped.  Every other configuration is reached
-    -- from one of these by its own silent steps (`Mirror`).  A postulated
-    -- TYPE: each kernel the run still reaches a node of the ghost, its
-    -- cells what the node keeps, what is owed once the current callback
-    -- returns a kernel's code at a node.
-    --
-    -- DEAD ROUTE: a contract per kernel over the histories its observer is
-    --   delivered, composed by `compile`.  The contract must hold under
-    --   every context the subscription runs in, and a `Ref` is a
-    --   membership proof into the world, forgeable by any computation at a
-    --   larger world, so some context writes `scan`'s accumulator; only
-    --   the compiled program's own configuration is honest.
-    -- DEAD ROUTE: a relation over `Act` blind to the heap.  `scanᴷ`'s
-    --   `next` reads its accumulator from a cell and delivers `f b a`; a
-    --   relation whose `readRef` case quantifies over every content must
-    --   accept every `b`.
-    -- DEAD ROUTE: the owed bound at the run's position.  A scope returning
-    --   puts the position back above what it just delivered, so a cut
-    --   record owes the events up to its last mark, which lie past it.
-    -- DEAD ROUTE: a spec per observer, its triples quantifying over the
-    --   frame around it.  A cut flows ownership upstream: `takeWhile`'s
-    --   completion cancels its source from inside the source's own
-    --   callback, so the source's cells are written within its call and
-    --   cannot be framed out of it.  And a frame naming other observers'
-    --   specs sits a universe above them, so no heap can store it.
-    Strong : U.Node [] R → Mach → Set₁
-
-    -- The launch is a subscription about to begin: the program, at the
-    -- root.
-    strong-begin : (o : PureObs [] R) → Strong (U.subscribe o root) (begin o)
 
   -- `m` runs silently to `m′`.
   data _⇝_ (m : Mach) : Mach → Set₁ where
