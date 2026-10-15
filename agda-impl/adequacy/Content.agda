@@ -25,8 +25,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat.Properties using (suc-injective; ≤-refl)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
-open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_; tail)
-open import Data.List.Relation.Unary.Linked.Properties using (Linked⇒All)
+open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -39,7 +38,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
-  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; _<ᵖ_; <ᵖ-trans; <ᵖ-tick)
+  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; _<ᵖ_; <ᵖ-tick)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import denotation.Compositional using ([]ᵉ)
@@ -69,7 +68,7 @@ module Honesty (R : Set) where
   open Strongly.Against R using (calmAs; noteAs; subAs; burstAs; firesAs; bottomAs)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
   open Moving R using (pend; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
-    joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop)
+    joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Read
 
   ----------------------------------------------------------------------
@@ -354,9 +353,6 @@ module Honesty (R : Set) where
                ≡ silent (mach ⟨ hp , p , held σ bottom ⟩ (Timer.due tm) ts [] [] lg en mk)
   drop-spent _ sp rewrite sp = refl
 
-  true≢false : true ≢ false
-  true≢false ()
-
   -- The queue's head spent: the rest of the queue still every live
   -- pending frame.
   timed-spent : ∀ {h} {H : Heapᴹ h} {tm ts ps} → At.spentʰ H (Timer.handle tm) ≡ true → At.Timed H (tm ∷ ts) ps → At.Timed H ts ps
@@ -372,8 +368,7 @@ module Honesty (R : Set) where
             → Linked (λ x y → cascade x <ᵖ cascade y ≡ true) (tm ∷ ts)
             → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) (tm ∷ ts)
             → All (λ x → Timer.due tm ≤ Timer.due x × p <ᵖ cascade x ≡ true) ts
-  ahead-pop [-]                (_ ∷ [])  = []
-  ahead-pop {p = p} {tm = tm} (r ∷ lk) (_ ∷ ah) = go (Linked⇒All {R = λ a b → cascade a <ᵖ cascade b ≡ true} (λ {x} {y} {z} → <ᵖ-trans (cascade x) (cascade y) (cascade z)) {v = tm} r lk) ah
+  ahead-pop {p = p} {tm = tm} lk (_ ∷ ah) = go (later lk) ah
     where
       go : ∀ {clk xs} → All (λ x → cascade tm <ᵖ cascade x ≡ true) xs → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
          → All (λ x → Timer.due tm ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
@@ -408,7 +403,7 @@ module Honesty (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = plant π v
         ; ctlAs = burstAs (firesAs (planted π v)) bottomAs
         ; meets = trans (part-plant hp {t = t} π v refl) mt
-        ; owned = owned-pop hp {t = t} π ow sp
+        ; owned = owned-pop hp {t = t} π ow
         ; kernels = record { holds = holds-plant hp {t = t} π v refl (λ h → h) (Kernels.holds kn)
                            ; gated = gated-plant hp {t = t} π v refl (λ _ → lift (λ _ → refl)) (λ d → λ { here → d here }) (Kernels.gated kn) }
         ; meaning = record { fed = fed-plant hp {t = t} π v (λ _ f → f) _ (Meaning.fed mn) }

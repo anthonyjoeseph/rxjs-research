@@ -177,14 +177,14 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE MOVE.** `owned-pop`, `timed-pop` and `pendings-path`: the pop's
-  facts that are not one field kept at one node. A queued frame is a
-  waiting cold's; the fired cold's frame alone leaves the queue; what the
-  turn owed moves to the fired cold's burst. Their shared apparatus is a
-  path's transport across a plant: apart from, above or below it.
-  Decides whether `Books.fresh` and `Queue.ordered` pay the queue's
-  uniqueness, or the queue needs it as a field. The other hops copy the
-  pop's template: one leaf rewritten at a path, a lemma per field kept.
+- **THE PLANT.** The lemmas a rewrite at a path keeps (`part-plant`
+  through `fed-plant`, `pendings-plant`) and `pendings-fresh`, each an
+  induction on the path. Riskiest: `gated-plant` and `holds-plant`,
+  whose node premises must carry a parent's clause: a connect's `Cut↓`
+  over its source, a kernel holding its child's teardown. Decides whether
+  a premise at the node suffices or a move must say more of its subtree.
+  Ruled out: the queue needing uniqueness as a field (`Books.fresh` pays
+  it); a transport left open (`unplant` places every node).
 - **THE PROGRESS.** `burst-onward` and `sub-onward` carry
   liveness: each silent hop passes a skip, leaves the ghost alike and
   lowers `measure`, or reaches a step that is not silent. Ruled out: a
@@ -278,12 +278,10 @@ by their own silent steps (`Mirror`).
 - **`burst-onward`** (Content) — FALSITY, `NO EVIDENCE`: a burst's frame steps
   silently to the next re-entry state, past a skip, a burst dropped or to a
   note.
-- **`owned-pop`** (Moves) — FALSITY, `NO EVIDENCE`: nothing owed at the turn,
-  the popped cold fired is owed only its burst.
-- **`timed-pop`** (Moves) — FALSITY, `NO EVIDENCE`: the fired cold's frame
-  leaves the queue with its timer, and nothing else does.
-- **`pendings-path`** (Moves) — FALSITY, `NO EVIDENCE`: a queued pending frame
-  is a waiting cold's, at a path.
+- **`pendings-fresh`** (Moves) — FALSITY, `NO EVIDENCE`: no two pending frames
+  share a handle, the names being distinct.
+- **`pendings-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten
+  replaces its own pending frames in place.
 - **`part-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one of
   the same open part leaves the tree's open part.
 - **`pend-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
