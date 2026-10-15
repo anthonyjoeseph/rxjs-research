@@ -177,15 +177,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `emit-lifts`, then `note-least`: the ghost's next
-  event is the agenda's first. The record carries `Sorted`'s `WellMach`,
-  its frames `Under` the run, its timers past the epoch; what remains is
-  that a subtree's head is an obligation it owes, read off `Owned`, and
-  that `WellMach` puts each one past the first call. Ruled out: deriving
-  the order from `backAs`'s `q <ᵖ p`, which admits a frame beside the
-  run. Decides whether sortedness is the one ordering fact both `of`
-  values and notes read. Then `emit-run`, `climb-take`, the `-onward`
-  leaves and `burst-poll`.
+- **THE PROGRESS.** `others-past`, then `note-least`: the ghost's next
+  event is the agenda's first, `Clear` its form along an `of`'s path. The
+  record carries `Sorted`'s `WellMach`; what remains is that a sibling's
+  head is an obligation it owes, read off `Owned`, and that each stacked
+  call's next label lands past the frame it was pushed under. Ruled out:
+  deriving the order from `backAs`'s `q <ᵖ p`, which admits a frame
+  beside the run. Decides whether sortedness is the one ordering fact
+  both `of` values and notes read. Then `heads-lift`, `emit-run`,
+  `climb-take`, the `-onward` leaves and `burst-poll`.
 - **THE ORDER.** `spread-flat` and `spread-connect`, then `steady-flat` and
   `fresh-flat` over `FlatOrder`'s lane roots: pairwise apart, each lane
   alien to what is apart from its root, the outer apart from each.
@@ -242,8 +242,10 @@ by their own silent steps (`Mirror`).
   value the ghost holds.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
-- **`emit-lifts`** (Content) — FALSITY, `DEAD ROUTE`: the agenda's first call
-  an open, seen `of`, the ghost's step is its value lifted along its path.
+- **`others-past`** (Content) — FALSITY, `DEAD ROUTE`: the agenda's first call
+  an open, seen `of`, every sibling its path passes waits past it.
+- **`heads-lift`** (Content) — FALSITY, `NO EVIDENCE`: every sibling waiting,
+  the ghost's step is the `of`'s lifted along its path, a shut body read told.
 - **`emit-run`** (Content) — FALSITY, `NO EVIDENCE`: an open `of`'s value
   handed on under its scope, the climb starts aloft.
 - **`climb-take`** (Content) — FALSITY, `NO EVIDENCE`: a take's last value

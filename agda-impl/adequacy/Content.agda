@@ -27,7 +27,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_; map)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
-open import Level using (lift)
+open import Level using (Lift; lift)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _+_)
@@ -63,13 +63,13 @@ module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read; feed)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle)
-  open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve)
+  open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
   open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗;
     Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; Taking; taking; taken; feeding; finishing; PathLanes; this-lane; next-lane;
-    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗)
+    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
@@ -480,6 +480,34 @@ module Honesty (R : Set) where
     liftsL-split (next-lane πL) τ (lifts-next L)    with liftsL-split πL τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-next Lρ
 
+  -- A node whose next event is past `p` and everything under it.
+  Far : ∀ {Γ A} → Pos → U.Node Γ A → Set
+  Far p c = ∀ {k} → U.headˢ (U.step c) ≡ just k → Beyond p k
+
+  Farᴹ : ∀ {Γ A} → Pos → Maybe (U.Node Γ A) → Set
+  Farᴹ p nothing  = ⊤
+  Farᴹ p (just c) = Far p c
+
+  -- EVERY SIBLING THE PATH PASSES WAITS ON `p`: a flatMap's other lanes
+  -- and its outer, a connect's source or body, each next event past
+  -- everything under `p`.  What each side condition of `Lifts` asks,
+  -- given the step at the path's end is under `p`.
+  mutual
+    Clear : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Pos → Path t u → Set₁
+    Clear H p here                    = Lift _ ⊤
+    Clear H p (in-map ρ)              = Clear H p ρ
+    Clear H p (in-scan ρ)             = Clear H p ρ
+    Clear H p (in-take ρ)             = Clear H p ρ
+    Clear H p (in-outer {ls = ls} ρ)  = All (Far p) (At.partLanes H ls) × Clear H p ρ
+    Clear H p (in-lanes {t = t} πL)   = Farᴹ p (At.part H t) × ClearL H p πL
+    Clear H p (in-source {bd = bd} ρ) = Farᴹ p (At.part H bd) × Clear H p ρ
+    Clear H p (in-body {t = t} ρ)     = Farᴹ p (At.part H t) × Clear H p ρ
+    Clear H p (in-defer ρ)            = Clear H p ρ
+
+    ClearL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → Pos → PathLanes ls u → Set₁
+    ClearL H p (this-lane {ls = ls} ρ) = All (Far p) (At.partLanes H ls) × Clear H p ρ
+    ClearL H p (next-lane {l = l} πL)  = All (Far p) (At.partLanes H (l ∷ [])) × ClearL H p πL
+
   -- Walking two paths is walking each.
   mutual
     walk-⊕ : ∀ {h Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (τ : Path u v) (W : Here h Δ A)
@@ -752,23 +780,30 @@ module Honesty (R : Set) where
              → Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step g)
              → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g m₁
 
-    -- The agenda's first call an open `of` the ghost holds: the ghost's
-    -- step is that `of`'s, lifted.  Every side condition `Lifts` asks is
-    -- an ordering claim: the value first among a connect's source and
-    -- body, a flatMap's outer and lanes.  So the claim is that nothing
-    -- else the ghost holds comes first: no call further down the agenda,
-    -- no burst held or timer queued, no subscription owed.  The order
-    -- the machine keeps is `Carried.sorted`'s: every frame `Under` the
-    -- run, every timer past its epoch.
+    -- The ghost's step, from a path every sibling of which waits: the
+    -- `of`'s step lifted, each operator's side condition read off
+    -- `Clear`.  A connect whose source has ended shows its body shut, so
+    -- the body's part must already read its joiners told: the record's,
+    -- not the path's.
+    heads-lift : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+               → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) p π
+               → Σ (U.Node [] R) λ c → At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ just c
+                 × Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step c)
+
+    -- The agenda's first call an open `of` the ghost holds: nothing else
+    -- the ghost holds comes first, no call further down the agenda, no
+    -- burst held or timer queued, no subscription owed.  The order the
+    -- machine keeps is `Carried.sorted`'s: every frame `Under` the run,
+    -- every timer past its epoch.
     -- DEAD ROUTE: from the record as it stands.  A stack frame's calls
     --   are ordered against the current position only by `backAs`'s
     --   `q <ᵖ p`, which does not make `q` a prefix of `p`: a frame at `q`
     --   beside `p` holding an `of` has its next value ahead of this one.
     --   The record admits that configuration; `under`'s scoping never
     --   builds it, every call a frame keeps landing past all of `p`.
-    emit-lifts : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-               → seen (Conf.heap (Mach.conf m)) π ≡ true → Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step g)
+    others-past : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+                → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+                → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) p π
 
     -- A value through a scan: its cell read and written, the
     -- accumulated value one operator up.  The ghost's lift read the cell
@@ -1008,6 +1043,23 @@ module Honesty (R : Set) where
 
   soar : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Aloft g m₁) → Hopped st m′
   soar st (m₁ , path , aloft {σ = σ} cl) = hopped-pre path (climb st (suc (height σ)) σ ≤-refl cl)
+
+  -- An agenda under way: the ghost is the tree's part.
+  run-meets : ∀ {h} {t : Sub h [] R} {p c bs} (ca : CtlAs t p c bs) {n g k} → firstCall ca ≡ just k → Meets ca n g → n ≡ just g
+  run-meets (runAs (_ ∷ _) _ _) refl mt = mt
+  run-meets (runAs [] _ _)      ()
+  run-meets calmAs              ()
+  run-meets (noteAs _ _ _)      ()
+  run-meets (subAs _ _ _)       ()
+  run-meets (burstAs _ _ _)     ()
+
+  -- The agenda's first call an open `of` the ghost holds: the ghost's
+  -- step is that `of`'s, lifted.
+  emit-lifts : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+             → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+             → seen (Conf.heap (Mach.conf m)) π ≡ true → Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step g)
+  emit-lifts cr π fc op sn with heads-lift cr π sn (others-past cr π fc op sn)
+  ... | c , pc , L = subst (λ c′ → Lifts _ π _ (U.step c′)) (just-injective (trans (sym pc) (run-meets (Carried.ctlAs cr) fc (Carried.meets cr)))) L
 
   -- An open `of` the ghost holds: its value on its way up, the ghost's
   -- step that value lifted.
