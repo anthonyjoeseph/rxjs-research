@@ -1,4 +1,4 @@
-{-# OPTIONS --guardedness #-}
+{-# OPTIONS --guardedness --large-indices #-}
 
 -- THE ONE COPY OF THE OPERATIONAL SEMANTICS.  A program is a tree
 -- (`Obs`, in `Tree`); compiling it gives `Act` programs, built from the
@@ -265,7 +265,7 @@ module Run (P : Prims) where
 
   -- One level down, where `deferᴰ` puts its body: at p ++ [ ix 1 ].
   deeper : ∀ {A w} → Subscribe A w → Subscribe A w
-  deeper s ρ o k = under (ix 1) (s ρ o k) skipᴬ
+  deeper s ρ o k = under (ix 1) (s ρ o k) (done tt)
 
   -- Sequencing, which the free monad gets by walking its continuations.
   infixl 1 _>>=ᴬ_ _>>ᴬ_

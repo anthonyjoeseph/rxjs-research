@@ -18,11 +18,12 @@
 module adequacy.Sorted where
 
 open import Data.Bool using (Bool; true; false)
+open import Data.Nat using (suc)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Maybe using (maybe)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
-open import Level using (Lift)
+open import Level using (Lift; lift)
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Sum using (_⊎_; inj₁)
 open import Data.Unit using (⊤; tt)
@@ -33,7 +34,7 @@ open import Tree using (Obs)
 open import denotation.MonotonicList using (Pos; ix; root; _<ᵖ_; Timeline)
 open import operation.AbstractObservable using (module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
-open Heap using (World; _⊑_; same)
+open Heap using (World; _⊑_; same; Sink; Handle)
 open import operation.Machine using (module Machine)
 
 ------------------------------------------------------------------------
@@ -55,8 +56,8 @@ module Sorting (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read)
   open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; Ctl; run; ret; held; asking; Stack; bottom; push; Wait; rest; back; rehold; told
                                      ; Heapᴹ; Callbacks; cbs)
-  open Run (Pureᴾ R) using (Act; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; eff; here; under; diverge; unfold
-                           ; Observer; Subscribe; Kont; Env; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via)
+  open Run (Pureᴾ R) using (Act; Ref; El; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; eff; here; under; diverge; unfold
+                           ; Observer; Subscription; Subscribe; Kont; Env; Subject; wkEnv; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via)
   open Pure R using (Timer; cascade; recorder)
   open Read
 
@@ -101,22 +102,23 @@ module Sorting (R : Set) where
   mutual
     data Well {w B} (p lo : Pos) : Act w B → Set₁ where
       doneʷ     : ∀ {b} → Well p lo (done b)
-      newRefʷ   : ∀ {t a k} → (∀ {v} (σ : w ⊑ v) r → Well p lo (k σ r)) → Well p lo (newRef t a k)
-      readRefʷ  : ∀ {t} {r : _} {k} → (∀ {v} (σ : w ⊑ v) a → Well p lo (k σ a)) → Well p lo (readRef {t = t} r k)
-      writeRefʷ : ∀ {t r a k} → Well p lo k → Well p lo (writeRef {t = t} r a k)
-      registerʷ : ∀ {A} {n : A → Act w ⊤} {c x k} → WellObs (record { next = n ; complete = c ; closed = x })
+      newRefʷ   : ∀ {t a} {k : ∀ {v} → w ⊑ v → Ref v t → Act v B} → (∀ {v} (σ : w ⊑ v) r → Well p lo (k σ r)) → Well p lo (newRef t a k)
+      readRefʷ  : ∀ {t} {r : Ref w t} {k : ∀ {v} → w ⊑ v → El v t → Act v B} → (∀ {v} (σ : w ⊑ v) a → Well p lo (k σ a)) → Well p lo (readRef {t = t} r k)
+      writeRefʷ : ∀ {t} {r : Ref w t} {a : El w t} {k : Act w B} → Well p lo k → Well p lo (writeRef {t = t} r a k)
+      registerʷ : ∀ {A} {n : A → Act w ⊤} {c : Act w ⊤} {x : Act w Bool} {k : ∀ {v} → w ⊑ v → Sink v A → Act v B} → WellObs (record { next = n ; complete = c ; closed = x })
                 → (∀ {v} (σ : w ⊑ v) s → Well p lo (k σ s)) → Well p lo (register n c x k)
-      sendʷ     : ∀ {A s} {a : A} {k} → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → Well p lo′ k) → Well p lo (send s a k)
-      finishʷ   : ∀ {A} {s : _} {k} → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → Well p lo′ k) → Well p lo (finish {A = A} s k)
-      startColdʷ : ∀ {A c s k} → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → ∀ {v} (σ : w ⊑ v) h → Well p lo′ (k σ h))
+      sendʷ     : ∀ {A} {s : Sink w A} {a : A} {k : Act w B} → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → Well p lo′ k) → Well p lo (send s a k)
+      finishʷ   : ∀ {A} {s : Sink w A} {k : Act w B} → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → Well p lo′ k) → Well p lo (finish {A = A} s k)
+      startColdʷ : ∀ {A} {c : Timeline A} {s : Sink w A} {k : ∀ {v} → w ⊑ v → Handle v → Act v B} → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → ∀ {v} (σ : w ⊑ v) h → Well p lo′ (k σ h))
                  → Well p lo (startCold {A = A} c s k)
-      stopʷ     : ∀ {h k} → Well p lo k → Well p lo (stop h k)
-      noteʷ     : ∀ {a k} → lo ≤ᵖ p → Well p p (k _) → Well p lo (eff (note a) k)
-      finʷ      : ∀ {k} → lo ≤ᵖ p → Well p lo (eff fin k)
-      hereʷ     : ∀ {k} → Well p lo (k p) → Well p lo (here k)
-      underʷ    : ∀ {l m k} → Well (p ++ [ l ]) lo m → (∀ lo′ → Settled (p ++ [ l ]) lo lo′ → Well p lo′ k) → Well p lo (under l m k)
+      stopʷ     : ∀ {h : Handle w} {k : Act w B} → Well p lo k → Well p lo (stop h k)
+      noteʷ     : ∀ {a} {k : ⊤ → Act w B} → lo ≤ᵖ p → Well p p (k _) → Well p lo (eff (note a) k)
+      finʷ      : ∀ {k : ⊤ → Act w B} → lo ≤ᵖ p → Well p lo (eff fin k)
+      hereʷ     : ∀ {k : Pos → Act w B} → Well p lo (k p) → Well p lo (here k)
+      underʷ    : ∀ {l} {m : Act w ⊤} {k : Act w B} → Well (p ++ [ l ]) lo m → (∀ lo′ → Settled (p ++ [ l ]) lo lo′ → Well p lo′ k) → Well p lo (under l m k)
       divergeʷ  : Well p lo diverge
-      unfoldʷ   : ∀ {Γ A l e n c x k m} → WellEnv {Γ} e → WellObs {A} (record { next = n ; complete = c ; closed = x })
+      unfoldʷ   : ∀ {Γ A} {l : T.Later Timeline Γ A} {e : Env Γ w} {n : A → Act w ⊤} {c : Act w ⊤} {x : Act w Bool}
+                    {k : ∀ {v} → w ⊑ v → Sink v ⊤ → Act v ⊤} {m : Act w B} → WellEnv {Γ} e → WellObs {A} (record { next = n ; complete = c ; closed = x })
                 → (∀ lo′ → Settled (p ++ [ ix 1 ]) lo lo′ → Well p lo′ m) → Well p lo (unfold l e n c x k m)
 
     -- An observer: each callback well wherever it is called no earlier
@@ -128,32 +130,32 @@ module Sorting (R : Set) where
 
     -- The connects in scope: each subject's joins well.
     WellEnv : ∀ {Γ w} → Env Γ w → Set₁
-    WellEnv e = ⊤
+    WellEnv e = Lift _ ⊤
 
   -- A continuation places nothing: well wherever it runs.
   WellKont : ∀ {w} → Kont w → Set₁
-  WellKont k = ∀ {v} (σ : _ ⊑ v) sub p lo → Well p lo (k σ sub)
+  WellKont {w} k = ∀ {v} (σ : w ⊑ v) (sub : Subscription v) p lo → Well p lo (k σ sub)
 
   -- A subscription: subscribed fresh, with a well observer and a
   -- continuation that places nothing, it is well.
   WellSub : ∀ {A w} → Subscribe A w → Set₁
-  WellSub {w = w} s = ∀ {v} (ρ : w ⊑ v) o k p lo → lo ≤ᵖ p → WellObs o → WellKont k → Well p lo (s ρ o k)
+  WellSub {A} {w} s = ∀ {v} (ρ : w ⊑ v) (o : Observer A v) (k : Kont v) p lo → lo ≤ᵖ p → WellObs o → WellKont k → Well p lo (s ρ o k)
 
   postulate
     -- THE PROTOCOL, ONE KERNEL AT A TIME.
     emptyᴷ-well     : ∀ {A w} → WellSub (emptyᴷ {A} {w})
     ofᴷ-well        : ∀ {A w} xs → WellSub (ofᴷ {A} {w} xs)
     coldᴷ-well      : ∀ {A w} c → WellSub (via {A} {w} (startCold c))
-    mapᴷ-well       : ∀ {A B w} f {s} → WellSub {A} {w} s → WellSub (mapᴷ {A} {B} f s)
-    scanᴷ-well      : ∀ {A B w} f z {s} → WellSub {A} {w} s → WellSub (scanᴷ {A} {B} f z s)
+    mapᴷ-well       : ∀ {A B w} f {s : Subscribe A w} → WellSub {A} {w} s → WellSub (mapᴷ {A} {B} f s)
+    scanᴷ-well      : ∀ {A B w} f z {s : Subscribe A w} → WellSub {A} {w} s → WellSub (scanᴷ {A} {B} f z s)
     -- The risk of the protocol: a `takeWhile` completing under `last`
     -- after its value went down, where the observer below may have
     -- completed under the same `last` already.  Only that observer
     -- being closed keeps the second completion from delivering, so
     -- `Settled` may need to know what the heap's flags say.
-    takeWhileᴷ-well : ∀ {A w} i p {s} → WellSub {A} {w} s → WellSub (takeWhileᴷ i p s)
-    flatMapᴷ-well   : ∀ {A B w} op {f s} → (∀ a → WellSub {B} {w} (f a)) → WellSub {A} {w} s → WellSub (flatMapᴷ op f s)
-    connectᴷ-well   : ∀ {A B w} {s b} → WellSub {A} {w} s → (∀ {v} σ st → WellSub {B} {v} (b σ st)) → WellSub (connectᴷ s b)
+    takeWhileᴷ-well : ∀ {A w} i p {s : Subscribe A w} → WellSub {A} {w} s → WellSub (takeWhileᴷ i p s)
+    flatMapᴷ-well   : ∀ {A B w} op {f : A → Subscribe B w} {s : Subscribe A w} → (∀ a → WellSub {B} {w} (f a)) → WellSub {A} {w} s → WellSub (flatMapᴷ op f s)
+    connectᴷ-well   : ∀ {A B w} {s : Subscribe A w} {b : ∀ {v} → w ⊑ v → Subject A v → Subscribe B v} → WellSub {A} {w} s → (∀ {v} σ st → WellSub {B} {v} (b σ st)) → WellSub (connectᴷ s b)
     joinᴷ-well      : ∀ {A w} st → WellSub (joinᴷ {A} {w} st)
 
   -- Every compiled tree well, kernel by kernel.
@@ -165,24 +167,24 @@ module Sorting (R : Set) where
   compile-well (T.scan f z s)      e we = scanᴷ-well f z (compile-well s e we)
   compile-well (T.takeWhile i p s) e we = takeWhileᴷ-well i p (compile-well s e we)
   compile-well (T.flatMap op f s)  e we = flatMapᴷ-well op (λ a → compile-well (f a) e we) (compile-well s e we)
-  compile-well (T.connect s b)     e we = connectᴷ-well (compile-well s e we) λ σ st → compile-well b _ _
+  compile-well (T.connect s b)     e we = connectᴷ-well (compile-well s e we) λ σ st → compile-well b (st ∷ wkEnv σ e) (lift tt)
   compile-well (T.connected i)     e we = joinᴷ-well _
-  compile-well (T.defer l)         e we = λ ρ o k p lo le wo wk → unfoldʷ _ wo λ lo′ st → doneʷ
+  compile-well (T.defer l)         e we = λ ρ o k p lo le wo wk → unfoldʷ (lift tt) wo λ lo′ st → doneʷ
 
   ----------------------------------------------------------------------
   -- THE WALK: a well configuration rises
 
   -- What waits on the stack, well: each continuation well where it
   -- resumes, given the last delivery no later than there.
-  data WellStack {w} (p : Pos) : ∀ {X} → Stack w X → Set₁ where
-    bottomʷ : WellStack p bottom
-    restʷ   : ∀ {u B Y} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → (∀ lo → lo ≤ᵖ p → Well p lo m) → WellStack p k → WellStack p (push (rest m) ρ k)
-    backʷ   : ∀ {u B} q {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → (∀ lo → lo ≤ᵖ q → Well q lo m) → WellStack q k → WellStack p (push (back q m) ρ k)
-    reholdʷ : ∀ {u} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p k → WellStack p (push rehold ρ k)
-    toldʷ   : ∀ {u} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p k → WellStack p (push told ρ k)
+  data WellStack (p : Pos) : ∀ {w X} → Stack w X → Set₁ where
+    bottomʷ : ∀ {w} → WellStack p (bottom {w})
+    restʷ   : ∀ {u w B} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → (∀ lo → lo ≤ᵖ p → Well p lo m) → WellStack p k → WellStack p (push (rest m) ρ k)
+    backʷ   : ∀ {u w B} q {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → (∀ lo → lo ≤ᵖ q → Well q lo m) → WellStack q k → WellStack p (push (back q m) ρ k)
+    reholdʷ : ∀ {u w} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p k → WellStack p (push rehold ρ k)
+    toldʷ   : ∀ {u w} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p k → WellStack p (push told ρ k)
 
   -- What runs next, well at the configuration's position.
-  data WellCtl {h} (lo p : Pos) : Ctl h → Set₁ where
+  data WellCtl {h : World} (lo p : Pos) : Ctl h → Set₁ where
     runʷ    : ∀ {w B a} {σ : w ⊑ h} {k : Stack w B} → Well p lo a → WellStack p k → WellCtl lo p (run a σ k)
     retʷ    : ∀ {w X x} {σ : w ⊑ h} {k : Stack w X} → WellStack p k → WellCtl lo p (ret x σ k)
     heldʷ   : ∀ {w} {σ : w ⊑ h} {k : Stack w ⊤} → WellStack p k → WellCtl lo p (held σ k)
@@ -216,7 +218,7 @@ module Sorting (R : Set) where
 
   record WellMach (lo : Pos) (m : Mach) : Set₁ where
     field
-      run   : WellRun lo m
+      going : WellRun lo m
       queue : WellQueue lo m
 
   -- One step, its next configuration `P` and never earlier.
@@ -230,8 +232,8 @@ module Sorting (R : Set) where
   WellStep = StepBy WellMach
 
   joinʷ : ∀ {lo s} → StepBy WellRun lo s → StepBy WellQueue lo s → WellStep lo s
-  joinʷ (silentʷ r)     (silentʷ q)     = silentʷ (record { run = r ; queue = q })
-  joinʷ (valueʷ le r)   (valueʷ _ q)    = valueʷ le (record { run = r ; queue = q })
+  joinʷ (silentʷ r)     (silentʷ q)     = silentʷ (record { going = r ; queue = q })
+  joinʷ (valueʷ le r)   (valueʷ _ q)    = valueʷ le (record { going = r ; queue = q })
   joinʷ (completeʷ le)  (completeʷ _)   = completeʷ le
   joinʷ drainedʷ        drainedʷ        = drainedʷ
 
@@ -276,7 +278,7 @@ module Sorting (R : Set) where
   -- its observer, nothing on the heap, queued or playing.
   begin-well : (o : PureObs [] R) → WellMach root (begin o)
   begin-well o = record
-    { run   = record { ctl    = runʷ (compile-well o [] tt same recorder _ root root (inj₁ refl) recorder-well (λ σ sub p lo → doneʷ)) bottomʷ
+    { going = record { ctl    = runʷ (compile-well o [] (lift tt) same recorder _ root root (inj₁ refl) recorder-well (λ σ sub p lo → doneʷ)) bottomʷ
                      ; heap   = λ ()
                      ; bursts = [] }
     ; queue = record { timers = [] ; queued = AllPairs.[] } }

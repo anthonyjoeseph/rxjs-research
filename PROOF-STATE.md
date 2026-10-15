@@ -170,11 +170,11 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### Big picture tier roadmap
 
-- **ONE DRIVER, CHECKED.** The shared `Machine`'s one `transition`,
-  driven by `operation.Machine` (timelines) and `operation.Observable`
-  (real colds), typechecked with scoped positions; CI's oracle and ghost
-  checks green. Removes the cost stopping every other leg: nothing below is
-  stated until the engine it speaks of is the one the oracle passes.
+- **ONE DRIVER, CHECKED.** The shared `Machine`'s one `transition`, both
+  drivers one step per transition, typechecks; what remains is CI's oracle
+  and ghost checks green on it. Removes the cost stopping every other leg:
+  nothing below is stated until the engine it speaks of is the one the
+  oracle passes.
 - **HONEST, DEFINED.** `Honest` defined over the machine's histories, then
   `scanᴷ-honest` and `takeWhileᴷ-honest` stated against it. A kernel whose
   output reads its input's ORDER cannot be honest from an input alike only

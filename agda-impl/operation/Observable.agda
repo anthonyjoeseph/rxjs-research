@@ -163,7 +163,7 @@ record Slot : Set where
 IOᴾ : Prims
 IOᴾ = prims IOCold IO
 
-open Heap
+open Heap using (World; _⊑_; _∋_; here; there; _⨾_; wk∋; Sink; Handle)
 open Run IOᴾ
 open Machine IOCold IO
 
@@ -273,30 +273,29 @@ private
 -- THE IO DRIVER: the shared machine, fed by the world
 
 module Drive (lp : Loop) where
-  mutual
-    -- Feed one input chosen against the configuration as it stands, then
-    -- do what the machine asks and run it until it holds.  A poll's
-    -- answer is returned.
+  -- What the driver does, as one recursion closed with `fixIO`: feed one
+  -- input chosen against the configuration as it stands, or run the
+  -- machine until it holds.
+  data Call : Set₁ where
+    feeding  : ((l : Live) → Input (Live.conf l)) → Call
+    settling : Call
+
+  private
+    _>>′_ : ∀ {A : Set} → IO Bool → IO A → IO A
+    m >>′ n = m >>= λ _ → n
+
+  -- The entry a cold names by index, read in the current world.
+  named : (l : Live) → ℕ → (∀ {A} → Sink (Conf.world (Live.conf l)) A → Handle (Conf.world (Live.conf l)) → Input (Live.conf l)) → Input (Live.conf l)
+  named l idx k with nth idx (Live.tickets l)
+  ... | just t  = k (wk∋ (Ticket.grown t) (Ticket.sink t)) (wk∋ (Ticket.grown t) (Ticket.handle t))
+  ... | nothing = go
+
+  module Body (self : Call → IO Bool) where
     feed : ((l : Live) → Input (Live.conf l)) → IO Bool
-    feed i = readIORef₁ (Loop.live lp) >>= λ l → taken l (transition (Live.conf l) (i l))
+    feed i = self (feeding i)
 
-    taken : (l : Live) → Next (Conf.world (Live.conf l)) → IO Bool
-    taken l (next c ρ os) =
-      writeIORef₁ (Loop.live lp) (record { conf = c ; tickets = mapList (λ t → record t { grown = Ticket.grown t ⨾ ρ }) (Live.tickets l) }) >>
-      obey os >>= λ b → settle >> pure b
-
-    -- What the machine asks: an effect performed and answered; a cold
-    -- started, its burst fed now; a teardown run; a poll answered.
-    obey : ∀ {h} → List (Output h) → IO Bool
-    obey []                    = pure false
-    obey (perform e ∷ _)       = e >>= λ x → feed (λ _ → answer (coerce x))
-    obey (start c s hd ∷ _)    = started c s hd >> pure false
-    obey (stopped hd ∷ _)      = readIORef₁ (Loop.live lp) >>= λ l → stopping hd (Live.tickets l) >> pure false
-    obey (closedIs b ∷ _)      = pure b
-
-    -- Run until the machine holds.
-    settle : IO ⊤
-    settle = readIORef₁ (Loop.live lp) >>= λ l → if running (Live.conf l) then feed (λ _ → go) >> settle else pure tt
+    settle : IO Bool
+    settle = self settling
 
     -- A cold started: its ticket filed, its `subscription` run — each
     -- `produce` fed as a delivery — then the machine resumed.
@@ -307,27 +306,46 @@ module Drive (lp : Loop) where
       let sl  = record { spent = sp ; tearDown = td }
           idx = len (Live.tickets l)
           st  = IOCold.create c (record
-            { produce  = λ a → atomically lp (unless sp (feed (λ l′ → named l′ idx λ s′ hd′ → deliver s′ (coerce a) []) >> pure tt))
-            ; complete = atomically lp (unless sp (feed (λ l′ → named l′ idx λ s′ hd′ → end hd′ s′ []) >> runTeardown sl))
+            { produce  = λ a → atomically lp (unless sp (feed (λ l′ → named l′ idx λ s′ hd′ → deliver s′ (coerce a) []) >>′ pure tt))
+            ; complete = atomically lp (unless sp (feed (λ l′ → named l′ idx λ s′ hd′ → end hd′ s′ []) >>′ runTeardown sl))
             ; closed   = atomically lp (readIORef sp >>= λ x → if x then pure true else feed (λ l′ → named l′ idx λ s′ hd′ → poll s′))
             ; after    = setTimer lp })
-      in writeIORef₁ (Loop.live lp) (record l { tickets = Live.tickets l ++ (record { sink = coerce s ; handle = coerce hd ; grown = coerce Heap.same ; slot = sl } ∷ []) }) >>
+      in writeIORef₁ (Loop.live lp) (record l { tickets = Live.tickets l ++ (record { made = _ ; A = A ; sink = s ; handle = hd ; grown = coerce (Heap.same {w = Conf.world (Live.conf l)}) ; slot = sl } ∷ []) }) >>
          Started.subscription st >>= λ i →
          writeIORef td (just (Started.teardown st i)) >>
          readIORef sp >>= λ x → (if x then runTeardown sl else pure tt) >>
-         feed (λ _ → go) >> pure tt
+         feed (λ _ → go) >>′ pure tt
 
     -- A teardown: the started cold whose handle this is, spent and torn down.
     stopping : ∀ {h v} → Handle h → List (Ticket v) → IO ⊤
     stopping hd []       = pure tt
-    stopping hd (t ∷ ts) = if coerce (wk∋ (Ticket.grown t) (Ticket.handle t)) ≡ₙ hd
+    stopping hd (t ∷ ts) = if coerce {B = Handle _} (wk∋ (Ticket.grown t) (Ticket.handle t)) ≡ₙ hd
                            then (writeIORef (Slot.spent (Ticket.slot t)) true >> runTeardown (Ticket.slot t)) else stopping hd ts
 
-  -- The entry a cold names by index, read in the current world.
-  named : (l : Live) → ℕ → (∀ {A} → Sink (Conf.world (Live.conf l)) A → Handle (Conf.world (Live.conf l)) → Input (Live.conf l)) → Input (Live.conf l)
-  named l idx k with nth idx (Live.tickets l)
-  ... | just t  = k (wk∋ (Ticket.grown t) (Ticket.sink t)) (wk∋ (Ticket.grown t) (Ticket.handle t))
-  ... | nothing = go
+    -- What the machine asks: an effect performed and answered; a cold
+    -- started, its burst fed now; a teardown run; a poll answered.
+    obey : ∀ {h} → List (Output h) → IO Bool
+    obey []                    = pure false
+    obey (perform e ∷ _)       = e >>= λ x → feed (λ _ → answer (coerce x))
+    obey (start c s hd ∷ _)    = started c s hd >> pure false
+    obey (stopped hd ∷ _)      = readIORef₁ (Loop.live lp) >>= λ l → stopping hd (Live.tickets l) >> pure false
+    obey (closedIs b ∷ _)      = pure b
+
+    -- One transition taken: the tickets carried into the grown world, the
+    -- outputs obeyed, the machine run until it holds.  A poll's answer is
+    -- returned.
+    taken : (l : Live) → Next (Conf.world (Live.conf l)) → IO Bool
+    taken l (next c ρ os) =
+      writeIORef₁ (Loop.live lp) (record { conf = c ; tickets = mapList (λ t → record { sink = Ticket.sink t ; handle = Ticket.handle t ; grown = Ticket.grown t ⨾ ρ ; slot = Ticket.slot t }) (Live.tickets l) }) >>
+      obey os >>= λ b → settle >>′ pure b
+
+    call : Call → IO Bool
+    call (feeding i) = readIORef₁ (Loop.live lp) >>= λ l → taken l (transition (Live.conf l) (i l))
+    call settling    = readIORef₁ (Loop.live lp) >>= λ l → if running (Live.conf l) then feed (λ _ → go) >>′ settle else pure false
+
+  drive : Call → IO Bool
+  drive = fixIO′ Body.call
+
 
 ------------------------------------------------------------------------
 -- A timeline, played
@@ -344,12 +362,12 @@ fromTimeline {A} c = record
   where
     -- `self` plays the frames after this burst.
     burst : Emit A → IORef Bool → (∀ t → From A (suc t) → IO ⊤) → ∀ t → Frame A t → IO ⊤
-    burst e off self t = fixIO′ λ go b → Emit.closed e >>= λ c → if c then pure tt else step go b
+    burst e off self t = fixIO′ λ next′ b → Emit.closed e >>= λ c → if c then pure tt else step next′ b
       where
         step : (Frame A t → IO ⊤) → Frame A t → IO ⊤
-        step go (emit a k) = Emit.produce e a >> unless off (go (Frame∞.force k))
-        step go (stall k)  = go (Frame∞.force k)
-        step go (close k)  = self t (From∞.force k)
+        step next′ (emit a k) = Emit.produce e a >> unless off (next′ (Frame∞.force k))
+        step next′ (stall k)  = next′ (Frame∞.force k)
+        step next′ (close k)  = self t (From∞.force k)
 
     play : Emit A → IORef Bool → Time → ∀ {u} → From A u → IO ⊤
     play e off now m = fixIO′ step (now , _ , m)
@@ -375,7 +393,7 @@ subscribe {A} o f c =
   newLock >>= λ lk → newIORef 0 >>= λ cl → newIORef [] >>= λ ts →
   newIORef₁ (record { conf = load (compile o []) (observer cl) ; tickets = [] }) >>= λ lv →
   let lp = record { clock = cl ; timers = ts ; lock = lk ; live = lv } in
-  atomically lp (Drive.settle lp) >> fixIO′ (λ again _ → nextTimer lp >>= λ more → if more then again tt else pure tt) tt
+  atomically lp (Drive.drive lp Drive.settling >>= λ _ → pure tt) >> fixIO′ (λ again _ → nextTimer lp >>= λ more → if more then again tt else pure tt) tt
   where
     observer : IORef ℕ → Observer A []
     observer cl = record
