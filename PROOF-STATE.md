@@ -176,15 +176,18 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `ordered-flat`, `ordered-defer`, `ordered-beside` and
-  `within-defer`: a flatMap, a defer and a connect keep their parts'
-  order, and a defer's program, fed, is placed within. Ruled out: a node
-  showing strictly after an earlier step, a step not coming first
-  keeping the placing, a placing with each live joiner joined before its
-  source; and a program subscribed anywhere over sources in order is
-  placed by operator, its lanes' order and start as parts. Decides
-  whether a defer's notices keep its sources in order when replayed,
-  which `within-defer` would follow from as a feed of a placed program.
+- **THE ORDER.** `steady-sub`, `clear-shown`, `ordered-flat` and
+  `ordered-rejoin`: a subscription over sorted sources clear of it is
+  steady, the lanes a flatMap shows subscribe clear of every source, and
+  a flatMap and a join of steady parts keep order. Ruled out: a join of
+  a run merely in order, a flatMap of any outer in order (a joiner told
+  a value and a skip at one position) and lanes placed wherever they
+  subscribe. Decides whether a joiner's rekeyed positions stay clear of
+  a lane's, and whether every operator keeps `Steady`.
+- **THE DEFER.** `ordered-defer` and `within-defer`: a defer over sorted,
+  clear sources is in order, and its program, fed, is placed within.
+  Decides whether a defer's notices keep its sources steady when
+  replayed, which `within-defer` would follow from as a feed.
 - **THE OPERATORS.** `go-skips`, `take-first`, `join-quiet` and
   `defer-after`: a flatMap's meaning is what its step shows, a cut step
   comes first when the uncut did, an untold joiner fed nothing under
@@ -211,15 +214,19 @@ by their own silent steps (`Mirror`).
   shared machine, as `here` is, which the IO runtime ignores.
 ### The ledger
 
-- **`ordered-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap merges its
-  outer and lanes in order, each lane in order and atop where it subscribes.
+- **`ordered-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap merges its outer
+  and lanes in order, over sources sorted and clear of where it subscribes.
 - **`ordered-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer's run, over
-  sources in order, is in order.
+  sources sorted and clear of where it subscribes, is in order.
+- **`steady-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription over
+  sorted, clear sources never steps inside its last position nor ties an out.
+- **`clear-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source,
+  subscribed at its `ix 1`, shows nothing inside its `ix 0`.
+- **`clear-shown`** (Placed) — FALSITY, `NO EVIDENCE`: a lane a flatMap shows
+  the outer reaching subscribes where no source event lies.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
   steps merge into its body in order.
-- **`atop-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription shows
-  nothing before where it is made.
-- **`ordered-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`: a join keeps its
+- **`ordered-rejoin`** (Placed) — FALSITY, `REFUTED`: a join keeps a steady
   source's order.
 - **`ordered-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps the order.
 - **`ordered-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run is in
