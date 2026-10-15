@@ -24,7 +24,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 import Tree as T
 open import Tree using (Later)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; stop; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-sym; agree-trans; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-shift; <ᵖ-part; ≮-trans; <ᵖ-split; last; agrees; agree; ≈ₖ-pred)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; stop; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-sym; agree-trans; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-shift; <ᵖ-part; ≮-trans; <ᵖ-split; last; agrees; agree; ≈ₖ-pred)
   renaming (sub to subᴾ)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
@@ -627,11 +627,6 @@ fed-defer l p ns i q a {ρ} {σ} f sn lv =
 ≮-up p q r qr qp with r <ᵖ p in e
 ... | false = refl
 ... | true  = trans (sym (<ᵖ-trans q r p qr e)) qp
-
-<ᵖ-asym : ∀ p q → p <ᵖ q ≡ true → q <ᵖ p ≡ false
-<ᵖ-asym p q h with q <ᵖ p in e
-... | false = refl
-... | true  = trans (sym (<ᵖ-trans p q p h e)) (<ᵖ-irrefl p)
 
 not-true : ∀ {b} → not b ≡ true → b ≡ false
 not-true {false} refl = refl

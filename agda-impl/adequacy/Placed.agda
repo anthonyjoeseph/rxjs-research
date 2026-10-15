@@ -19,12 +19,12 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
 open import Level using (lower)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Timeline; MonotonicList; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; Earliest; none; found; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_; root)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Timeline; MonotonicList; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; Earliest; none; found; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_; root; <ᵖ-asym; <ᵖ-down; <ᵖ-next; <ᵖ-split; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-part)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
@@ -263,6 +263,83 @@ steady (steady-scan f z (out k a r) st) = past-scan f (f z a) k (force r) (proj�
 steady (steady-scan f z (skip k r)  st) = clear-scan f z k (force r) (proj₁ (steady st)) , steady-scan f z (force r) (proj₂ (steady st))
 steady (steady-scan f z (end k)     st) = tt
 steady (steady-scan f z hush        st) = tt
+
+-- `e`'s first, if any, no proper extension of `k`.
+Away : ∀ {A} → Pos → Events A → Set
+Away k (out h _ _) = ¬ Ext k h
+Away k (skip h _)  = ¬ Ext k h
+Away k (end h)     = ¬ Ext k h
+Away k hush        = ⊤
+
+past-away : ∀ {A} k (e : Events A) → Past k e → Away k e
+past-away k (out _ _ _) c = proj₂ c
+past-away k (skip _ _)  c = proj₂ c
+past-away k (end _)     c = proj₂ c
+past-away k hush        c = tt
+
+clear-away : ∀ {A} k (e : Events A) → Clear k e → Away k e
+clear-away k (out _ _ _) c = proj₂ c
+clear-away k (skip _ _)  c = c
+clear-away k (end _)     c = c
+clear-away k hush        c = tt
+
+off : ∀ {k h} → ¬ Ext k h → ∀ l ls → h ≡ k ++ l ∷ ls → ⊥
+off ne l ls refl = ne (ext l ls)
+
+-- Rekeyed under one label, what was no earlier and not below stays so.
+under : ∀ q h x → h <ᵖ q ≡ false → ¬ Ext q h → (h ++ [ x ]) <ᵖ (q ++ [ x ]) ≡ false
+under q h x a ne with <ᵖ-split q h a
+... | inj₁ qh   = <ᵖ-asym (q ++ [ x ]) (h ++ [ x ]) (<ᵖ-down q h x x qh (off ne))
+... | inj₂ refl = <ᵖ-irrefl (q ++ [ x ])
+
+still : ∀ p q h → p <ᵖ q ≡ true → h <ᵖ q ≡ false → p <ᵖ h ≡ true
+still p q h pq a with <ᵖ-split q h a
+... | inj₁ qh   = <ᵖ-trans p q h pq qh
+... | inj₂ refl = pq
+
+-- After a source event the join shows, the next it shows is no earlier.
+atop-in : ∀ {A} p q (e : Events A) → p <ᵖ q ≡ true → Atop q e → Away q e → Atop (q ++ [ sub p ]) (M.rejoin p e)
+atop-in p q (out h _ _) pq a ne with p <ᵖ h in ph
+... | true  = under q h (sub p) a ne
+... | false with () ← trans (sym ph) (still p q h pq a)
+atop-in p q (skip h _)  pq a ne with p <ᵖ h in ph
+... | true  = under q h (sub p) a ne
+... | false with () ← trans (sym ph) (still p q h pq a)
+atop-in p q (end c)     pq a ne with p <ᵖ c in pc
+... | true  = under q c (sub p) a ne
+... | false with () ← trans (sym pc) (still p q c pq a)
+atop-in p q hush        pq a ne = tt
+
+-- After a missed event, anything the join shows is no earlier.
+atop-pre : ∀ {A} p (e : Events A) → Atop (p ++ [ ix 0 ]) (M.rejoin p e)
+atop-pre p (out h _ _) with p <ᵖ h in ph
+... | true  = <ᵖ-asym (p ++ [ ix 0 ]) (h ++ [ sub p ]) (<ᵖ-next p h (sub p) ph)
+... | false = <ᵖ-irrefl (p ++ [ ix 0 ])
+atop-pre p (skip h _)  with p <ᵖ h in ph
+... | true  = <ᵖ-asym (p ++ [ ix 0 ]) (h ++ [ sub p ]) (<ᵖ-next p h (sub p) ph)
+... | false = <ᵖ-irrefl (p ++ [ ix 0 ])
+atop-pre p (end c)     with p <ᵖ c in pc
+... | true  = <ᵖ-asym (p ++ [ ix 0 ]) (c ++ [ sub p ]) (<ᵖ-next p c (sub p) pc)
+... | false = <ᵖ-asym (p ++ [ ix 0 ]) (p ++ [ last ]) (<ᵖ-part p {ix 0} {last} [] [] refl)
+atop-pre p hush        = tt
+
+-- A JOIN KEEPS ITS STEADY SOURCE'S ORDER: what it missed as skips
+-- just past the join, the rest rekeyed under it.
+--
+-- REFUTED: 37b70651 of a source merely in order, stepping inside its last position
+ordered-rejoin : ∀ {A} p (e : Events A) → Ordered e → Steady e → Ordered (M.rejoin p e)
+ordered (ordered-rejoin p (out q a k) o st) with p <ᵖ q in pq
+... | true  = atop-in p q (force k) pq (proj₁ (ordered o)) (past-away q (force k) (proj₁ (steady st)))
+            , ordered-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st))
+... | false = atop-pre p (force k) , ordered-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st))
+ordered (ordered-rejoin p (skip q k) o st) with p <ᵖ q in pq
+... | true  = atop-in p q (force k) pq (proj₁ (ordered o)) (clear-away q (force k) (proj₁ (steady st)))
+            , ordered-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st))
+... | false = atop-pre p (force k) , ordered-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st))
+ordered (ordered-rejoin p (end c) o st) with p <ᵖ c
+... | true  = tt
+... | false = tt
+ordered (ordered-rejoin p hush o st) = tt
 
 prefix-++ : ∀ k w → Prefix k (k ++ w)
 prefix-++ []      w = tt
@@ -833,12 +910,6 @@ postulate
   -- A CUT KEEPS THE ORDER: the run up to the first value failing, then
   -- its end.
   ordered-take : ∀ {A} i (p : A → Bool) (e : Events A) → Ordered e → Ordered (M.takeWhileᴱ i p e)
-
-  -- A JOIN KEEPS ITS STEADY SOURCE'S ORDER: what it missed as skips
-  -- just past the join, the rest rekeyed under it.
-  --
-  -- REFUTED: 37b70651 of a source merely in order, stepping inside its last position
-  ordered-rejoin : ∀ {A} p (e : Events A) → Ordered e → Steady e → Ordered (M.rejoin p e)
 
   -- A CONNECT'S SOURCE MERGES INTO ITS BODY IN ORDER: each source step a
   -- skip just past it, ahead of the body's later events.

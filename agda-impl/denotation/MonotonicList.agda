@@ -290,6 +290,11 @@ private
 <ᵖ-irrefl : ∀ p → p <ᵖ p ≡ false
 <ᵖ-irrefl p rewrite refl-pos p = refl
 
+<ᵖ-asym : ∀ p q → p <ᵖ q ≡ true → q <ᵖ p ≡ false
+<ᵖ-asym p q h with q <ᵖ p in e
+... | false = refl
+... | true  = trans (sym (<ᵖ-trans p q p h e)) (<ᵖ-irrefl p)
+
 -- What is no earlier than what is no earlier is no earlier.
 private
   ≮-by : ∀ p q r c → cmpPos q p ≡ c → q <ᵖ p ≡ false → r <ᵖ q ≡ false → r <ᵖ p ≡ true → ⊥
@@ -348,6 +353,30 @@ private
 -- A burst's values part in order.
 <ᵖ-ix : ∀ i → (ix i ∷ []) <ᵖ (ix (suc i) ∷ []) ≡ true
 <ᵖ-ix i rewrite ℕ-lt {i} {suc i} (n<1+n i) = refl
+
+-- Positions in order and not one below the other stay in order a label
+-- down; and what is past `p` is past `p ++ [ ix 0 ]` a label down.
+<ᵖ-down : ∀ k h x y → k <ᵖ h ≡ true → (∀ l ls → h ≡ k ++ l ∷ ls → ⊥) → (k ++ [ x ]) <ᵖ (h ++ [ y ]) ≡ true
+<ᵖ-down []      []      x y () ne
+<ᵖ-down []      (l ∷ h) x y _  ne = ⊥-elim (ne l h refl)
+<ᵖ-down (a ∷ k) []      x y () ne
+<ᵖ-down (a ∷ k) (b ∷ h) x y kh ne with cmpLabel a b in c
+... | lt = refl
+... | eq = <ᵖ-down k h x y kh (λ l ls e → ne l ls (cong₂ _∷_ (sym (eq-label a b c)) e))
+... | gt with () ← kh
+
+<ᵖ-next : ∀ p q y → p <ᵖ q ≡ true → (p ++ [ ix 0 ]) <ᵖ (q ++ [ y ]) ≡ true
+<ᵖ-next []      []                  y ()
+<ᵖ-next []      (ix zero ∷ [])      y h = refl
+<ᵖ-next []      (ix zero ∷ _ ∷ _)   y h = refl
+<ᵖ-next []      (ix (suc _) ∷ _)    y h = refl
+<ᵖ-next []      (sub _ ∷ _)         y h = refl
+<ᵖ-next []      (last ∷ _)          y h = refl
+<ᵖ-next (a ∷ p) []                  y ()
+<ᵖ-next (a ∷ p) (b ∷ q)             y h with cmpLabel a b
+... | lt = refl
+... | eq = <ᵖ-next p q y h
+... | gt with () ← h
 
 ------------------------------------------------------------------------
 -- What a subscriber sees

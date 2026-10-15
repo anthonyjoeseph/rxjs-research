@@ -176,7 +176,7 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `steady-flat`, `steady-connect`, `ordered-flat` and `ordered-rejoin`
+- **THE ORDER.** `steady-flat`, `steady-connect` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
   no sibling's position, which is what keeps `Steady` and a flatMap's
@@ -230,8 +230,6 @@ by their own silent steps (`Mirror`).
   subscribed is held to any `Rules`; `reach` there, short of a recursion.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
   steps merge into its body in order.
-- **`ordered-rejoin`** (Placed) — FALSITY, `REFUTED`: a join keeps a steady
-  source's order.
 - **`steady-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`: a join keeps an alien
   steady run steady.
 - **`steady-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
