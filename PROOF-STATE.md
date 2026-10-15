@@ -181,10 +181,11 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   Ruled out: a relation blind to cells, a sound half apart from a whole
   half, a cut at an observer's own marks. Decides whether that owed bound
   is kept by the walk's cases alone, or needs the timers' too.
-- **THE PROTOCOL'S RISK.** `takeWhileᴷ-well` first: two `takeWhile`s
-  failing on one value complete under the same `last`, the second after the
-  observer below already completed there. Decides whether `Well` is unary
-  in positions alone, or `Settled` must read the heap's closed flags.
+- **THE PROTOCOL'S RISK.** `takeWhileᴷ-well` and `connectᴷ-well` as
+  bodies, over a placeless unsubscribe and one label per callback in a
+  scope. Ruled out: a second callback sharing a scope, an unsubscribe
+  guarded as a delivery. Decides whether `Well` stays unary in positions,
+  or `Settled` must read the heap's closed flags.
 - **CONTENT, ASSEMBLED.** `kept` and `read-is-kept` over `Reached`, then the
   rest of the `-honest` contracts, `connect` first. Decides whether the
   per-kernel contracts compose across a shared heap and a hot run.
@@ -201,16 +202,16 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### The ledger
 
-- **`takeWhileᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: a `takeWhile`
-  well-positioned; its completion under `last` may follow the observer's.
+- **`takeWhileᴷ-well`** (Sorted) — FALSITY, `REFUTED`: a `takeWhile`
+  well-positioned, its failing value under `ix 0`, its completion `last`.
 - **`walk-timers`** (Sorted) — FALSITY, `NO EVIDENCE`: a step not the loop's
   turn keeps every timer past what it shows, queued in `Before` order.
 - **`walk-tree`** (Sorted) — FALSITY, `NO EVIDENCE`: a step not the loop's turn
   keeps the run well and shows nothing earlier.
 - **`turn`** (Sorted) — FALSITY, `NO EVIDENCE`: the loop's turn pops the
   earliest timer, its burst past every position shown.
-- **`connectᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `connect`
-  well-positioned, body under `ix 0`, source under `ix 1`.
+- **`connectᴷ-well`** (Sorted) — FALSITY, `REFUTED`: `connect` well-positioned,
+  body under `ix 0`, source under `ix 1`.
 - **`flatMapᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `flatMap`
   well-positioned, each inner under its `sub`.
 - **`joinᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: a joiner well-positioned.

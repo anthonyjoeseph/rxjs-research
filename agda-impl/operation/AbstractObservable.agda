@@ -41,6 +41,7 @@ data Ty : Set₁ where
   base  : Set → Ty
   ref   : Ty → Ty
   sink  : Set → Ty
+  quiet : Ty
   list  : Ty → Ty
   maybe : Ty → Ty
   _⊗_   : Ty → Ty → Ty
@@ -58,9 +59,11 @@ record Prims : Set₂ where
     _⨾_      : ∀ {u v w} → u ⊑ v → v ⊑ w → u ⊑ w
     RefOf    : World → Ty → Set → Set
     Sink     : World → Set → Set      -- a registered observer, as a first-order name
+    Quiet    : World → Set            -- a stored unsubscribe, as a first-order name
     Handle   : World → Set            -- a started cold, as the runtime tracks it
     wkRef    : ∀ {w v t} (X : World → Set) → w ⊑ v → RefOf w t (X w) → RefOf v t (X v)
     wkSink   : ∀ {w v A} → w ⊑ v → Sink w A → Sink v A
+    wkQuiet  : ∀ {w v} → w ⊑ v → Quiet w → Quiet v
     wkHandle : ∀ {w v} → w ⊑ v → Handle w → Handle v
     Cold     : Set → Set₁             -- the cold leaf
     Eff      : Set → Set              -- what a top-level observer may do natively
@@ -70,10 +73,12 @@ record Prims : Set₂ where
 
 -- Named, not opened, so `Prims`' fields of the same names do not clash.
 module Heap where
-  -- What one heap entry is: a cell, a registered observer, a started cold.
+  -- What one heap entry is: a cell, a registered observer, a stored
+  -- unsubscribe, a started cold.
   data Kind : Set₁ where
     cell : Ty → Kind
     slot : Set → Kind
+    hush : Kind
     play : Kind
 
   World : Set₁
@@ -104,6 +109,9 @@ module Heap where
   Sink : World → Set → Set
   Sink w A = w ∋ slot A
 
+  Quiet : World → Set
+  Quiet w = w ∋ hush
+
   Handle : World → Set
   Handle w = w ∋ play
 
@@ -111,8 +119,8 @@ module Heap where
 prims : (Set → Set₁) → (Set → Set) → Prims
 prims C E = record
   { World = Heap.World ; _⊑_ = Heap._⊑_ ; ⊑-refl = Heap.same ; _⨾_ = Heap._⨾_
-  ; RefOf = λ w t _ → w Heap.∋ Heap.cell t ; Sink = Heap.Sink ; Handle = Heap.Handle
-  ; wkRef = λ _ → Heap.wk∋ ; wkSink = Heap.wk∋ ; wkHandle = Heap.wk∋
+  ; RefOf = λ w t _ → w Heap.∋ Heap.cell t ; Sink = Heap.Sink ; Quiet = Heap.Quiet ; Handle = Heap.Handle
+  ; wkRef = λ _ → Heap.wk∋ ; wkSink = Heap.wk∋ ; wkQuiet = Heap.wk∋ ; wkHandle = Heap.wk∋
   ; Cold = C ; Eff = E }
 
 module Run (P : Prims) where
@@ -122,6 +130,7 @@ module Run (P : Prims) where
   El w (base X)  = X
   El w (ref t)   = RefOf w t (El w t)
   El w (sink A)  = Sink w A
+  El w quiet     = Quiet w
   El w (list t)  = List (El w t)
   El w (maybe t) = Maybe (El w t)
   El w (s ⊗ t)   = El w s × El w t
@@ -133,6 +142,7 @@ module Run (P : Prims) where
   wkEl (base X)  ρ x        = x
   wkEl (ref t)   ρ r        = wkRef (λ u → El u t) ρ r
   wkEl (sink A)  ρ s        = wkSink ρ s
+  wkEl quiet     ρ t        = wkQuiet ρ t
   wkEl (list t)  ρ []       = []
   wkEl (list t)  ρ (x ∷ xs) = wkEl t ρ x ∷ wkEl (list t) ρ xs
   wkEl (maybe t) ρ nothing  = nothing
@@ -185,6 +195,10 @@ module Run (P : Prims) where
     finish    : ∀ {w A B} → Sink w A → Act w B → Act w B
     startCold : ∀ {w A B} → Cold A → Sink w A → (∀ {v} → w ⊑ v → Handle v → Act v B) → Act w B
     stop      : ∀ {w B} → Handle w → Act w B → Act w B
+    -- An unsubscribe, kept to run later: delivering nothing, it is not a
+    -- `Sink`, whose callbacks deliver where they are run.
+    stash     : ∀ {w B} → Act w ⊤ → (∀ {v} → w ⊑ v → Quiet v → Act v B) → Act w B
+    cancel    : ∀ {w B} → Quiet w → Act w B → Act w B
     eff       : ∀ {w A B} → Eff A → (A → Act w B) → Act w B
     -- WHERE THE RUN IS, as `denotation.MonotonicList` places an event: a
     -- ghost the pure runtime keeps and the IO runtime ignores; nothing
@@ -199,10 +213,10 @@ module Run (P : Prims) where
     diverge   : ∀ {w B} → Act w B
     -- A `defer`, subscribed but not yet compiled: the tree, the connects
     -- in scope, the observer's three parts, and what to do once the
-    -- subscription exists — its unsubscribe a registered sink, since an
-    -- `Act` cannot take an `Act` as an argument — then the rest.
+    -- subscription exists — its unsubscribe stashed, since an `Act`
+    -- cannot take an `Act` as an argument — then the rest.
     unfold    : ∀ {w Γ A B} → Later Cold Γ A → Env Γ w → (A → Act w ⊤) → Act w ⊤ → Act w Bool
-              → (∀ {v} → w ⊑ v → Sink v ⊤ → Act v ⊤) → Act w B → Act w B
+              → (∀ {v} → w ⊑ v → Quiet v → Act v ⊤) → Act w B → Act w B
 
   wkAct : ∀ {w v B} → w ⊑ v → Act w B → Act v B
   wkAct ρ (done b)                 = done b
@@ -214,6 +228,8 @@ module Run (P : Prims) where
   wkAct ρ (finish s k)             = finish (wkSink ρ s) (wkAct ρ k)
   wkAct ρ (startCold c s k)        = startCold c (wkSink ρ s) λ σ → k (ρ ⨾ σ)
   wkAct ρ (stop h k)               = stop (wkHandle ρ h) (wkAct ρ k)
+  wkAct ρ (stash m k)              = stash (wkAct ρ m) λ σ → k (ρ ⨾ σ)
+  wkAct ρ (cancel t k)             = cancel (wkQuiet ρ t) (wkAct ρ k)
   wkAct ρ (eff e k)                = eff e λ a → wkAct ρ (k a)
   wkAct ρ (here k)                 = here λ p → wkAct ρ (k p)
   wkAct ρ (under l m k)            = under l (wkAct ρ m) (wkAct ρ k)
@@ -279,6 +295,8 @@ module Run (P : Prims) where
   finish s k       >>=ᴬ f = finish s (k >>=ᴬ f)
   startCold c s k  >>=ᴬ f = startCold c s λ σ h → k σ h >>=ᴬ λ x → wkAct σ (f x)
   stop h k         >>=ᴬ f = stop h (k >>=ᴬ f)
+  stash m k        >>=ᴬ f = stash m λ σ t → k σ t >>=ᴬ λ x → wkAct σ (f x)
+  cancel t k       >>=ᴬ f = cancel t (k >>=ᴬ f)
   eff e k          >>=ᴬ f = eff e λ a → k a >>=ᴬ f
   here k           >>=ᴬ f = here λ p → k p >>=ᴬ f
   under l m k      >>=ᴬ f = under l m (k >>=ᴬ f)
@@ -321,10 +339,10 @@ module Run (P : Prims) where
     -- `guard`, and the subscription is unsubscribed — at once if it
     -- exists, or the moment it does, since a source can be cut during its
     -- own subscribe burst.  The unsubscribe is a callback, so it is kept
-    -- as a registered `Sink`, the one place a `Ref` can hold one.  A code,
+    -- as a stashed `Quiet`, the one place a `Ref` can hold one.  A code,
     -- not a record, because a lane list holds them.
     cutTy : Ty
-    cutTy = ref (base Bool) ⊗ ref (maybe (sink ⊤))
+    cutTy = ref (base Bool) ⊗ ref (maybe quiet)
 
     Cut : World → Set
     Cut w = El w cutTy
@@ -332,36 +350,36 @@ module Run (P : Prims) where
     live : ∀ {w} → Cut w → Ref w (base Bool)
     live = proj₁
 
-    held : ∀ {w} → Cut w → Ref w (maybe (sink ⊤))
+    held : ∀ {w} → Cut w → Ref w (maybe quiet)
     held = proj₂
 
     wkCut : ∀ {w v} → w ⊑ v → Cut w → Cut v
     wkCut = wkEl cutTy
 
     newCut : ∀ {w B} → (∀ {v} → w ⊑ v → Cut v → Act v B) → Act w B
-    newCut k = newB true λ σ l → newRef (maybe (sink ⊤)) nothing λ τ h → k (σ ⨾ τ) (wkR τ l , h)
+    newCut k = newB true λ σ l → newRef (maybe quiet) nothing λ τ h → k (σ ⨾ τ) (wkR τ l , h)
 
     cut : ∀ {w} → Cut w → Act w ⊤
     cut c = writeRef (live c) false (readRef (held c) λ _ → λ where
       nothing   → skipᴬ
-      (just sk) → send sk tt skipᴬ)
+      (just t)  → cancel t skipᴬ)
 
     guard : ∀ {w} → Cut w → Act w ⊤ → Act w ⊤
     guard c m = readB (live c) λ b → when b m
 
     attach : ∀ {w} → Cut w → Subscription w → Act w ⊤
-    attach c sub = register (λ _ → Subscription.unsubscribe sub) skipᴬ (done false) λ σ sk →
-                   writeRef (held (wkCut σ c)) (just sk) (readB (live (wkCut σ c)) λ b →
+    attach c sub = stash (Subscription.unsubscribe sub) λ σ t →
+                   writeRef (held (wkCut σ c)) (just t) (readB (live (wkCut σ c)) λ b →
                    if b then skipᴬ else Subscription.unsubscribe (wkSubn σ sub))
 
     guarded : ∀ {A w} → Cut w → Observer A w → Observer A w
     guarded c o = record { next = λ a → guard c (Observer.next o a) ; complete = guard c (Observer.complete o)
                          ; closed = readB (live c) λ b → if b then Observer.closed o else done true }
 
-    -- A subscription kept as a registered sink, unsubscribed through it.
-    unsubscribeVia : ∀ {w} → Maybe (Sink w ⊤) → Act w ⊤
-    unsubscribeVia nothing   = skipᴬ
-    unsubscribeVia (just sk) = send sk tt skipᴬ
+    -- A subscription kept stashed, unsubscribed through it.
+    unsubscribeVia : ∀ {w} → Maybe (Quiet w) → Act w ⊤
+    unsubscribeVia nothing  = skipᴬ
+    unsubscribeVia (just t) = cancel t skipᴬ
 
   open Kit
 
@@ -389,12 +407,13 @@ module Run (P : Prims) where
     s (ρ ⨾ σ) (record { next = λ a → readB r λ b → writeRef r (f b a) (Observer.next o′ (f b a))
                       ; complete = Observer.complete o′ ; closed = Observer.closed o′ }) (wkKont σ k)
 
-  -- The failing value leaves only when inclusive; then the completion,
-  -- then the source is cut.
+  -- The failing value leaves only when inclusive, under `ix 0`; then the
+  -- completion under `last`, then the source is cut.  Two callbacks in
+  -- one scope each get their own label.
   takeWhileᴷ : ∀ {A w} → Bool → (A → Bool) → Subscribe A w → Subscribe A w
   takeWhileᴷ i p s ρ o k = newCut λ σ c → let o′ = wkObs σ o in
     s (ρ ⨾ σ) (guarded c (record { next = λ a → if p a then Observer.next o′ a
-                                               else (when i (Observer.next o′ a) >>ᴬ under last (Observer.complete o′) (cut c))
+                                               else (when i (under (ix 0) (Observer.next o′ a) skipᴬ) >>ᴬ under last (Observer.complete o′) (cut c))
                                  ; complete = Observer.complete o′ ; closed = Observer.closed o′ }))
       λ τ sub → attach (wkCut τ c) sub >>ᴬ k (σ ⨾ τ) (record { unsubscribe = cut (wkCut τ c) })
 
@@ -495,11 +514,11 @@ module Run (P : Prims) where
   -- in a cell until the source's exists.  A `Kont` never moves the
   -- position, so a continuation run inside a scope places nothing.
   connectᴷ {A} s b ρ o k = newRef (list (sink A ⊗ base Pos)) [] λ σ subs → newB false λ τ cl → newCut λ υ c →
-    newRef (maybe (sink ⊤)) nothing λ υ′ bodyRef →
+    newRef (maybe quiet) nothing λ υ′ bodyRef →
     let st = record { subscribers = wkR (τ ⨾ υ ⨾ υ′) subs ; closed = wkR (υ ⨾ υ′) cl } ; o′ = wkObs (σ ⨾ τ ⨾ υ ⨾ υ′) o
         c′ = wkCut υ′ c in
     under (ix 0) (b (ρ ⨾ σ ⨾ τ ⨾ υ ⨾ υ′) st ⊑-refl (record { next = Observer.next o′ ; complete = Observer.complete o′ >>ᴬ cut c′ ; closed = Observer.closed o′ })
-      λ π body → register (λ _ → Subscription.unsubscribe body) skipᴬ (done false) λ π′ sk → writeRef (wkR (π ⨾ π′) bodyRef) (just sk) skipᴬ)
+      λ π body → stash (Subscription.unsubscribe body) λ π′ t → writeRef (wkR (π ⨾ π′) bodyRef) (just t) skipᴬ)
     (under (ix 1) (s (ρ ⨾ σ ⨾ τ ⨾ υ ⨾ υ′) (record
       { next = λ a → readRef (Subject.subscribers st) λ _ ss → each ss λ j → under (subᴾ (proj₂ j)) (send (proj₁ j) a skipᴬ) skipᴬ
       ; complete = writeRef (Subject.closed st) true (readRef (Subject.subscribers st) λ _ ss →
@@ -536,7 +555,7 @@ module Run (P : Prims) where
   compile (connect s b)     ρ = connectᴷ (compile s ρ) λ σ st → compile b (st ∷ wkEnv σ ρ)
   compile (connected i)     ρ = joinᴷ (lookup ρ i)
   compile (defer l)         ρ σ o k = unfold l (wkEnv σ ρ) (Observer.next o) (Observer.complete o) (Observer.closed o)
-                                        (λ τ sk → k τ (record { unsubscribe = send sk tt (done tt) })) (done tt)
+                                        (λ τ t → k τ (record { unsubscribe = cancel t (done tt) })) (done tt)
 
 
 
@@ -570,12 +589,14 @@ module Machine (C : Set → Set₁) (E : Set → Set) where
   Val : World → Kind → Set₁
   Val h (cell t) = Lift _ (El h t)
   Val h (slot A) = Callbacks A h
+  Val h hush     = Act h ⊤
   Val h play     = Lift _ Bool
 
   wkVal : ∀ {h v} k → h ⊑ v → Val h k → Val v k
   wkVal (cell t) ρ x  = lift (wkEl t ρ (lower x))
   wkVal (slot A) ρ cb = record { onNext = λ a → wkAct ρ (Callbacks.onNext cb a) ; onComplete = wkAct ρ (Callbacks.onComplete cb)
                                ; isClosed = wkAct ρ (Callbacks.isClosed cb) }
+  wkVal hush     ρ m  = wkAct ρ m
   wkVal play     ρ x  = x
 
   get : ∀ {ℓ} {P : Kind → Set ℓ} {w k} → All P w → w ∋ k → P k
@@ -677,11 +698,11 @@ module Machine (C : Set → Set₁) (E : Set → Set) where
   still hp p c = next ⟨ hp , p , c ⟩ same []
 
   -- A `defer` reached: its body compiled one level down, as `deferᴰ`
-  -- puts it, its subscription's unsubscribe a registered sink.
-  unfolded : ∀ {h Γ A} → Later C Γ A → Env Γ h → (A → Act h ⊤) → Act h ⊤ → Act h Bool → (∀ {v} → h ⊑ v → Sink v ⊤ → Act v ⊤) → Act h ⊤
+  -- puts it, its subscription's unsubscribe stashed.
+  unfolded : ∀ {h Γ A} → Later C Γ A → Env Γ h → (A → Act h ⊤) → Act h ⊤ → Act h Bool → (∀ {v} → h ⊑ v → Quiet v → Act v ⊤) → Act h ⊤
   unfolded l e n c x k = under (ix 1)
     (compile (Later.force l) e same (record { next = n ; complete = c ; closed = x }) λ σ sub →
-      register (λ _ → Subscription.unsubscribe sub) (done tt) (done false) λ τ sk → k (σ ⨾ τ) sk)
+      stash (Subscription.unsubscribe sub) λ τ t → k (σ ⨾ τ) t)
     (done tt)
 
   runs : ∀ {h w B} → Heapᴹ h → Pos → Act h B → w ⊑ h → Stack w B → Next h
@@ -698,6 +719,8 @@ module Machine (C : Set → Set₁) (E : Set → Set) where
   runs hp p (startCold c s k′)  σ k = next ⟨ extend hp (lift false) , p , held same (push (rest (k′ new here)) (σ ⨾ new) k) ⟩ new
                                            [ start c (wk∋ new s) here ]
   runs hp p (stop hd k′)        σ k = next ⟨ put hp hd (lift true) , p , run k′ σ k ⟩ same [ stopped hd ]
+  runs hp p (stash m k′)        σ k = next ⟨ extend hp (wkAct new m) , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
+  runs hp p (cancel t k′)       σ k = still hp p (run (get hp t) same (push (rest k′) σ k))
   runs hp p (eff e k′)          σ k = next ⟨ hp , p , asking e k′ σ k ⟩ same [ perform e ]
   runs hp p (here k′)           σ k = still hp p (run (k′ p) σ k)
   runs hp p (under l m k′)      σ k = still hp (p ++ [ l ]) (run m same (push (back p k′) σ k))

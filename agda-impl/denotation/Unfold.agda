@@ -209,7 +209,7 @@ scanˢ f z hushˢ        = hushˢ
 
 taking : ∀ {Γ A} → Bool → (A → Bool) → Pos → A → Node Γ A → Bool → Step Γ A
 taking i     p k a c true  = outˢ k a (takeWhileᶜ i p c)
-taking true  p k a c false = outˢ k a (endᶜ (k ++ [ last ]))
+taking true  p k a c false = outˢ (k ++ [ ix 0 ]) a (endᶜ (k ++ [ last ]))
 taking false p k a c false = endˢ (k ++ [ last ])
 
 takeWhileˢ : ∀ {Γ A} → Bool → (A → Bool) → Step Γ A → Step Γ A

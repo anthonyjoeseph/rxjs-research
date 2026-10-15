@@ -268,8 +268,8 @@ scanᴱ f z (skip k r)  = skip k λ where .force → scanᴱ f z (force r)
 scanᴱ f z (end k)     = end k
 scanᴱ f z hush        = hush
 
--- The first failing value leaves first only when inclusive; the
--- completion sits after its position either way.
+-- The first failing value leaves first only when inclusive, under
+-- `ix 0` of its position; the completion under `last` either way.
 mutual
   takeWhileᴱ : ∀ {A} → Bool → (A → Bool) → Events A → Events A
   takeWhileᴱ i p (out k a r) = taking i p k a (p a) r
@@ -279,7 +279,7 @@ mutual
 
   taking : ∀ {A} → Bool → (A → Bool) → Pos → A → Bool → Events∞ A → Events A
   taking i     p k a true  r = out k a λ where .force → takeWhileᴱ i p (force r)
-  taking true  p k a false r = out k a λ where .force → end (k ++ [ last ])
+  taking true  p k a false r = out (k ++ [ ix 0 ]) a λ where .force → end (k ++ [ last ])
   taking false p k a false r = end (k ++ [ last ])
 
 ofᴱ : ∀ {A} → Pos → ℕ → List A → Events A

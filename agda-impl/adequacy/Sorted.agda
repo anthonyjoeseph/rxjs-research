@@ -34,7 +34,7 @@ open import Tree using (Obs)
 open import denotation.MonotonicList using (Pos; ix; root; _<ᵖ_; Timeline)
 open import operation.AbstractObservable using (module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
-open Heap using (World; _⊑_; same; Sink; Handle)
+open Heap using (World; _⊑_; same; Sink; Quiet; Handle)
 open import operation.Machine using (module Machine)
 
 ------------------------------------------------------------------------
@@ -55,8 +55,8 @@ Settled p lo lo′ = lo ≤ᵖ lo′ × (lo ≡ lo′ ⊎ Under p lo′)
 module Sorting (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read)
   open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; Ctl; run; ret; held; asking; Stack; bottom; push; Wait; rest; back; rehold; told
-                                     ; Heapᴹ; Callbacks; cbs)
-  open Run (Pureᴾ R) using (Act; Ref; El; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; eff; here; under; diverge; unfold
+                                     ; Heapᴹ; Callbacks; cbs; get)
+  open Run (Pureᴾ R) using (Act; Ref; El; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; stash; cancel; eff; here; under; diverge; unfold
                            ; Observer; Subscription; Subscribe; Kont; Env; Subject; wkEnv; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via)
   open Pure R using (Timer; cascade; recorder)
   open Read
@@ -98,7 +98,9 @@ module Sorting (R : Set) where
   -- delivers at no position before the last, and every scope it opens
   -- leaves the last delivery `Settled` in it.  A delivery is the root's
   -- record, or an observer's callback run; an observer's callbacks are
-  -- well wherever they are called no earlier than the last delivery.
+  -- well wherever they are called no earlier than the last delivery.  An
+  -- unsubscribe delivers nothing, so it is well wherever it runs: it is
+  -- stashed only so, and cancelled anywhere.
   mutual
     data Well {w B} (p lo : Pos) : Act w B → Set₁ where
       doneʷ     : ∀ {b} → Well p lo (done b)
@@ -112,13 +114,15 @@ module Sorting (R : Set) where
       startColdʷ : ∀ {A} {c : Timeline A} {s : Sink w A} {k : ∀ {v} → w ⊑ v → Handle v → Act v B} → lo ≤ᵖ p → (∀ lo′ → Settled p lo lo′ → ∀ {v} (σ : w ⊑ v) h → Well p lo′ (k σ h))
                  → Well p lo (startCold {A = A} c s k)
       stopʷ     : ∀ {h : Handle w} {k : Act w B} → Well p lo k → Well p lo (stop h k)
+      stashʷ    : ∀ {m : Act w ⊤} {k : ∀ {v} → w ⊑ v → Quiet v → Act v B} → Placeless m → (∀ {v} (σ : w ⊑ v) t → Well p lo (k σ t)) → Well p lo (stash m k)
+      cancelʷ   : ∀ {t : Quiet w} {k : Act w B} → (∀ lo′ → Settled p lo lo′ → Well p lo′ k) → Well p lo (cancel t k)
       noteʷ     : ∀ {a} {k : ⊤ → Act w B} → lo ≤ᵖ p → Well p p (k _) → Well p lo (eff (note a) k)
       finʷ      : ∀ {k : ⊤ → Act w B} → lo ≤ᵖ p → Well p lo (eff fin k)
       hereʷ     : ∀ {k : Pos → Act w B} → Well p lo (k p) → Well p lo (here k)
       underʷ    : ∀ {l} {m : Act w ⊤} {k : Act w B} → Well (p ++ [ l ]) lo m → (∀ lo′ → Settled (p ++ [ l ]) lo lo′ → Well p lo′ k) → Well p lo (under l m k)
       divergeʷ  : Well p lo diverge
       unfoldʷ   : ∀ {Γ A} {l : T.Later Timeline Γ A} {e : Env Γ w} {n : A → Act w ⊤} {c : Act w ⊤} {x : Act w Bool}
-                    {k : ∀ {v} → w ⊑ v → Sink v ⊤ → Act v ⊤} {m : Act w B} → WellEnv {Γ} e → WellObs {A} (record { next = n ; complete = c ; closed = x })
+                    {k : ∀ {v} → w ⊑ v → Quiet v → Act v ⊤} {m : Act w B} → WellEnv {Γ} e → WellObs {A} (record { next = n ; complete = c ; closed = x })
                 → (∀ lo′ → Settled (p ++ [ ix 1 ]) lo lo′ → Well p lo′ m) → Well p lo (unfold l e n c x k m)
 
     -- An observer: each callback well wherever it is called no earlier
@@ -128,16 +132,22 @@ module Sorting (R : Set) where
               × (∀ q lo → lo ≤ᵖ q → Well q lo (Observer.complete o))
               × (∀ q lo → Well q lo (Observer.closed o))
 
+    -- Well wherever it runs, from wherever the last delivery was.
+    Placeless : ∀ {w} → Act w ⊤ → Set₁
+    Placeless m = ∀ p lo → Well p lo m
+
     -- The connects in scope: each subject's joins well.
     WellEnv : ∀ {Γ w} → Env Γ w → Set₁
     WellEnv e = Lift _ ⊤
 
-  -- A continuation places nothing: well wherever it runs.
+  -- A continuation places nothing: well wherever it runs, handed a
+  -- subscription whose unsubscribe places nothing.
   WellKont : ∀ {w} → Kont w → Set₁
-  WellKont {w} k = ∀ {v} (σ : w ⊑ v) (sub : Subscription v) p lo → Well p lo (k σ sub)
+  WellKont {w} k = ∀ {v} (σ : w ⊑ v) (sub : Subscription v) → Placeless (Subscription.unsubscribe sub) → Placeless (k σ sub)
 
   -- A subscription: subscribed fresh, with a well observer and a
-  -- continuation that places nothing, it is well.
+  -- continuation that places nothing, it is well.  So the subscription it
+  -- hands that continuation must place nothing too.
   WellSub : ∀ {A w} → Subscribe A w → Set₁
   WellSub {A} {w} s = ∀ {v} (ρ : w ⊑ v) (o : Observer A v) (k : Kont v) p lo → lo ≤ᵖ p → WellObs o → WellKont k → Well p lo (s ρ o k)
 
@@ -148,14 +158,25 @@ module Sorting (R : Set) where
     coldᴷ-well      : ∀ {A w} c → WellSub (via {A} {w} (startCold c))
     mapᴷ-well       : ∀ {A B w} f {s : Subscribe A w} → WellSub {A} {w} s → WellSub (mapᴷ {A} {B} f s)
     scanᴷ-well      : ∀ {A B w} f z {s : Subscribe A w} → WellSub {A} {w} s → WellSub (scanᴷ {A} {B} f z s)
-    -- The risk of the protocol: a `takeWhile` completing under `last`
-    -- after its value went down, where the observer below may have
-    -- completed under the same `last` already.  Only that observer
-    -- being closed keeps the second completion from delivering, so
-    -- `Settled` may need to know what the heap's flags say.
+
+    -- The risk of the protocol: two callbacks in one scope.  A callback
+    -- may leave the last delivery anywhere settled in its scope, so a
+    -- second callback in that scope needs its own later label: an
+    -- inclusive `takeWhile` delivers its failing value under `ix 0` and
+    -- completes under `last`.  Its cut cancels a stashed unsubscribe,
+    -- which places nothing, wherever the completion left the last.
+    -- REFUTED: 72324013 with the failing value delivered unscoped beside the completion
     takeWhileᴷ-well : ∀ {A w} i p {s : Subscribe A w} → WellSub {A} {w} s → WellSub (takeWhileᴷ i p s)
+
+    -- Each lane subscribed under `ix 1`, its observer guarded by its cut.
     flatMapᴷ-well   : ∀ {A B w} op {f : A → Subscribe B w} {s : Subscribe A w} → (∀ a → WellSub {B} {w} (f a)) → WellSub {A} {w} s → WellSub (flatMapᴷ op f s)
+
+    -- The body's completion cuts the source after delivering wherever it
+    -- did: the cut cancels a stashed unsubscribe, which places nothing.
+    -- REFUTED: 72324013 with the cut a send to a registered sink, which `Well` guards as a delivery
     connectᴷ-well   : ∀ {A B w} {s : Subscribe A w} {b : ∀ {v} → w ⊑ v → Subject A v → Subscribe B v} → WellSub {A} {w} s → (∀ {v} σ st → WellSub {B} {v} (b σ st)) → WellSub (connectᴷ s b)
+
+    -- A join is delivered to under `sub` of the position it joined at.
     joinᴷ-well      : ∀ {A w} st → WellSub (joinᴷ {A} {w} st)
 
   -- Every compiled tree well, kernel by kernel.
@@ -190,10 +211,12 @@ module Sorting (R : Set) where
     heldʷ   : ∀ {w} {σ : w ⊑ h} {k : Stack w ⊤} → WellStack p k → WellCtl lo p (held σ k)
     askingʷ : ∀ {w X B e k′} {σ : w ⊑ h} {k : Stack w B} → (∀ x → Well p p (k′ x)) → WellStack p k → WellCtl lo p (asking {X = X} e k′ σ k)
 
-  -- Every observer the heap holds, well.
+  -- Every observer the heap holds, well; every unsubscribe it holds,
+  -- placeless.
   WellHeap : ∀ {h} → Heapᴹ h → Set₁
-  WellHeap {h} hp = ∀ {A} (s : _) → WellObs {A} {h} (record { next = Callbacks.onNext (cbs hp s) ; complete = Callbacks.onComplete (cbs hp s)
-                                                           ; closed = Callbacks.isClosed (cbs hp s) })
+  WellHeap {h} hp = (∀ {A} (s : _) → WellObs {A} {h} (record { next = Callbacks.onNext (cbs hp s) ; complete = Callbacks.onComplete (cbs hp s)
+                                                            ; closed = Callbacks.isClosed (cbs hp s) }))
+                  × (∀ (t : Quiet h) → Placeless (get hp t))
 
   -- The run well: the running computation and every frame waiting on
   -- the stack, every callback the heap holds, every burst playing past
@@ -278,8 +301,8 @@ module Sorting (R : Set) where
   -- its observer, nothing on the heap, queued or playing.
   begin-well : (o : PureObs [] R) → WellMach root (begin o)
   begin-well o = record
-    { going = record { ctl    = runʷ (compile-well o [] (lift tt) same recorder _ root root (inj₁ refl) recorder-well (λ σ sub p lo → doneʷ)) bottomʷ
-                     ; heap   = λ ()
+    { going = record { ctl    = runʷ (compile-well o [] (lift tt) same recorder _ root root (inj₁ refl) recorder-well (λ σ sub _ p lo → doneʷ)) bottomʷ
+                     ; heap   = (λ ()) , (λ ())
                      ; bursts = [] }
     ; queue = record { timers = [] ; queued = AllPairs.[] } }
 

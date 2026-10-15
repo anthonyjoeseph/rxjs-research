@@ -24,9 +24,10 @@ import {
 // counted from the innermost binder.
 
 // `quickcheck.Ty`'s values: unit is null, a pair an array, a sum a
-// one-key object.
+// one-key object.  A natural is exact, as Agda's `ℕ` is: a literal reads
+// as a number, and arithmetic makes a bigint.
 export type Value =
-  null | boolean | number | Value[] | { l: Value } | { r: Value };
+  null | boolean | number | bigint | Value[] | { l: Value } | { r: Value };
 
 export type Tm =
   | ["var", number]
@@ -61,7 +62,7 @@ export type Code =
   | ["var", number]
   | ["defer", Code];
 
-const nat = (v: Value): number => v as number;
+const nat = (v: Value): bigint => BigInt(v as number | bigint);
 const pair = (v: Value): Value[] => v as Value[];
 
 export const evalTm = (tm: Tm, th: Value[]): Value => {

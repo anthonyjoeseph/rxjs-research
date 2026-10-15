@@ -20,6 +20,19 @@ import { Code, Value, compileProg } from "./obs.js";
 const UNFOLD = 3;
 
 type Event = { tick: number } | { val: Value };
+
+// A natural past 2^53 is exact only as text: an Agda trace is read with
+// its integers quoted, and every event compared as that same text.
+const exactly = (json: string): unknown =>
+  JSON.parse(json.replace(/([:,[]\s*)(\d+)(?=\s*[,\]}])/g, '$1"$2"'));
+const canon = (v: unknown): unknown =>
+  typeof v === "number" || typeof v === "bigint"
+    ? String(v)
+    : Array.isArray(v)
+      ? v.map(canon)
+      : v !== null && typeof v === "object"
+        ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, canon(x)]))
+        : v;
 type End = "completed" | "silent" | "cut";
 type Trace = { events: Event[]; end: End };
 type Row = {
@@ -72,7 +85,7 @@ const rxjsTrace = async (prog: Code): Promise<Trace> => {
 };
 
 const same = (a: Event, b: Event): boolean =>
-  JSON.stringify(a) === JSON.stringify(b);
+  JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 const prefix = (xs: Event[], ys: Event[]): boolean =>
   xs.length <= ys.length && xs.every((x, i) => same(x, ys[i]));
 
@@ -108,7 +121,7 @@ const cli = (
       : { out: r.stdout };
 };
 
-const show = (t: Trace): string => JSON.stringify(t);
+const show = (t: Trace): string => JSON.stringify(canon(t));
 
 const check = async (row: Row): Promise<string[]> => {
   const rx = await rxjsTrace(row.prog);
@@ -117,7 +130,7 @@ const check = async (row: Row): Promise<string[]> => {
   const io = loops(row.prog) ? undefined : cli(["io", String(row.seed)]);
   const ioTrace: Trace | undefined =
     io?.failed === undefined && io !== undefined
-      ? (JSON.parse(io.out) as Trace)
+      ? (exactly(io.out) as Trace)
       : undefined;
   const bad = [
     ...(agrees(row.denote, rx) ? [] : [`denotation ${show(row.denote)}`]),
@@ -161,7 +174,9 @@ const main = async (): Promise<void> => {
   );
   const stuck = single.filter(({ listed }) => listed?.failed !== undefined);
   stuck.forEach(({ seed, listed }) =>
-    console.log(`oracle: FAIL seed ${seed}\n  listing    ${listed?.failed}`),
+    console.log(
+      `oracle: FAIL seed ${seed}\n  prog       ${cli(["code", String(seed)]).out.trim()}\n  listing    ${listed?.failed}`,
+    ),
   );
   const rows = (
     listing.failed === undefined
@@ -173,7 +188,14 @@ const main = async (): Promise<void> => {
   )
     .split("\n")
     .filter((l) => l.trim().length > 0)
-    .map((l) => JSON.parse(l) as Row);
+    .map((l) => {
+      const exact = exactly(l) as Row;
+      return {
+        ...(JSON.parse(l) as Row),
+        denote: exact.denote,
+        pure: exact.pure,
+      };
+    });
   const verdicts = await Promise.all(
     rows.map(async (row) => ({ row, bad: await check(row) })),
   );
