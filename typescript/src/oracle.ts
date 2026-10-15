@@ -175,7 +175,7 @@ const main = async (): Promise<void> => {
   const stuck = single.filter(({ listed }) => listed?.failed !== undefined);
   stuck.forEach(({ seed, listed }) =>
     console.log(
-      `oracle: FAIL seed ${seed}\n  prog       ${cli(["code", String(seed)]).out.trim()}\n  listing    ${listed?.failed}`,
+      `oracle: FAIL seed ${seed}\n  prog       ${cli(["code", String(seed)]).out.trim()}\n  listing    ${listed?.failed}\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}`,
     ),
   );
   const rows = (

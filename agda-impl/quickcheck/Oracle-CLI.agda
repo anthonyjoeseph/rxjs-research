@@ -7,6 +7,8 @@
 --   Oracle-CLI prog FROM COUNT   one line per seed: the program, the
 --                                denotation's trace and the machine's
 --   Oracle-CLI io SEED           the IO engine's trace of one seed
+--   Oracle-CLI denote SEED       the denotation's trace of one seed
+--   Oracle-CLI pure SEED         the machine's trace of one seed
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
 --                                are no chain (`quickcheck.Chain`)
 --   Oracle-CLI placing FROM COUNT the seeds whose machine trace strays
@@ -88,7 +90,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -96,6 +98,12 @@ private
   ... | _       | _       = usage
   dispatch ("code" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showCode natᵗ (program s′))
+  ... | nothing = usage
+  dispatch ("denote" ∷ s ∷ []) with nat s
+  ... | just s′ = putStrLn (showTrace natᵗ (denoteTrace 3 500 (program s′)))
+  ... | nothing = usage
+  dispatch ("pure" ∷ s ∷ []) with nat s
+  ... | just s′ = putStrLn (showTrace natᵗ (pureTrace 3 500 (program s′)))
   ... | nothing = usage
   dispatch ("io" ∷ s ∷ []) with nat s
   ... | just s′ = io s′
