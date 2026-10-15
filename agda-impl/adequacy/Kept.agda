@@ -9,7 +9,7 @@ module adequacy.Kept where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; length) renaming (map to mapᴸ)
+open import Data.List using (List; []; _∷_; _++_; [_]; length) renaming (map to mapᴸ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 import Data.List.Relation.Unary.All as All
@@ -21,21 +21,22 @@ open import Data.Maybe using (just)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; s≤s⁻¹)
 open import Data.Nat.ListAction using (sum)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; <-trans; n<1+n)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst; subst₂; cong)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (Pos; _<ᵖ_; <ᵖ-trans; <ᵖ-tick; emit; stall; close) renaming (sub to subᴾ)
-open import denotation.Unfold using (Node; hushˢ; skipˢ) renaming (step to stepᵁ)
+open import denotation.MonotonicList using (Pos; Time; ix; Frame∞; _<ᵖ_; <ᵖ-trans; <ᵖ-tick; emit; stall; close) renaming (sub to subᴾ)
+open import denotation.Unfold using (Node; hushˢ; skipˢ; burstᶜ; burstˢ) renaming (step to stepᵁ)
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; _⊑_; Sink; Handle; same; module Pure)
 open import operation.Machine using (module Machine)
 open import denotation.MonotonicList using (Frame; at)
 open import adequacy.Carrier using (module Carrying)
 open import adequacy.Wait using (module Waiting)
+open import adequacy.Plug using (Ctx; plug; lift; Wins; plug-step; skip-lifts)
 
 module Keeping (R : Set) where
   open Run (Pureᴾ R) using (Act)
@@ -45,7 +46,7 @@ module Keeping (R : Set) where
                         ; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ
                         ; waiting; playing; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
                         ; this-lane; next-lane; Meaning; Kernels; Queue; Books; pendings; lanePendings; joiners; Joiner; firing)
-  open Waiting R using (Wait; idles; left; right)
+  open Waiting R using (Wait; both; idles; left; right)
 
   ------------------------------------------------------------------------
   -- The run moving on: a later position
@@ -318,12 +319,6 @@ module Keeping (R : Set) where
                → (r : Carried ⟨ st , burst s hd τ p i (emit {A} {u} a k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
                → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (emit a k)) σ K) ⟩) (stepᵁ c)
 
-    -- The frame's step is a stall: the meaning skips it, every other
-    -- open node waiting past it.
-    burst-stall : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-                → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
-                → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (stall k)) σ K) ⟩) (stepᵁ c)
-
     -- The frame closes: the cold completes, falls quiet, or waits on a
     -- timer due past the clock.
     burst-close : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
@@ -340,6 +335,60 @@ module Keeping (R : Set) where
              → spent? st hd ≡ false
              → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩
   burst-open e rewrite e = refl
+
+  ------------------------------------------------------------------------
+  -- A burst's step, its cold in context
+
+  -- The configuration, the bursting cold's node in its context: the
+  -- node's next step is the frame's at `p ++ [ ix i ]`.
+  record Focus {A u} (c : Node [] R) (p : Pos) (i : ℕ) (b : Frame A u) : Set₁ where
+    field
+      {Δ}   : List Set
+      ctx   : Ctx Δ A [] R
+      hole  : Node Δ A
+      τ′    : Time
+      open≡ : c ≡ plug ctx hole
+      steps : stepᵁ hole ≡ burstˢ τ′ p i b
+
+  postulate
+    -- The open part read through the path to the bursting cold: every
+    -- gate on the path open, the cold not spent.
+    focused : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+            → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → spent? st hd ≡ false → Focus c p i b
+
+    -- B'S POSITIONAL FIELD AT A BURST: the frame's step comes before
+    -- every other open node's next event, read operator by operator up
+    -- the path.
+    ahead : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+          → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) (sp : spent? st hd ≡ false)
+          → Wins (Focus.ctx (focused r sp)) (burstˢ (Focus.τ′ (focused r sp)) p i b)
+
+  -- The meaning's step is the burst's, lifted to the root.
+  aimed : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+        → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) (sp : spent? st hd ≡ false)
+        → stepᵁ c ≡ lift (Focus.ctx (focused r sp)) (burstˢ (Focus.τ′ (focused r sp)) p i b)
+  aimed r sp = trans (cong stepᵁ open≡) (trans (plug-step ctx hole (subst (Wins ctx) (sym steps) (ahead r sp))) (cong (lift ctx) steps))
+    where open Focus (focused r sp)
+
+  -- The stall lifted: the meaning skips to the cold one step on.
+  stalled : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+          → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) (sp : spent? st hd ≡ false)
+          → Σ Pos λ k′ → Σ (Node [] R) λ c′ → stepᵁ c ≡ skipˢ k′ c′
+  stalled {p = p} {i} {k} r sp with skip-lifts (Focus.ctx (focused r sp)) (p ++ [ ix i ]) (burstᶜ (Focus.τ′ (focused r sp)) p (suc i) (Frame∞.force k))
+  ... | k′ , c′ , e = k′ , c′ , trans (aimed r sp) e
+
+  postulate
+    -- B kept at a stall: the cold one step on, in the witness the stall
+    -- leaves.
+    restalled : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) (sp : spent? st hd ≡ false)
+              → Carried ⟨ st , burst s hd τ p (suc i) (Frame∞.force k) σ K ⟩ (proj₁ (proj₂ (stalled r sp)))
+
+  -- The frame's step is a stall: both sides skip it.
+  burst-stall : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
+              → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (stall k)) σ K) ⟩) (stepᵁ c)
+  burst-stall r sp _ = subst (Wait Carried (silent _)) (sym (proj₂ (proj₂ (stalled r sp)))) (both (restalled r sp))
 
   played : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} (b : Frame A u) {σ : w ⊑ h} {K : Stack w ⊤} {c}
          → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Lighter r

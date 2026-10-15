@@ -174,9 +174,9 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
 - **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
   turn; it gains a field placing every live node's next shown event past the
   region the agenda owes, true at `carried-begin`. A popped timer's first
-  step, `burst-emit` and `burst-stall` with the cold still waiting, is its
-  first test: the agenda is empty, so every open node waits past the timer's
-  cascade. Then the feed's case of `kept-run`. The meaning feeds its joiners
+  step, `ahead` with the cold still waiting, is its first test: the agenda
+  is empty, so every open node waits past the timer's cascade; `burst-emit`
+  lands on it as the stall did. Then the feed's case of `kept-run`. The meaning feeds its joiners
   from one run of the source, as the machine's subject does, so a joiner
   holds exactly what the feed owes it (`Fed`). Decides whether the position
   order alone orders the meaning's leaves against the machine.
@@ -202,8 +202,12 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
   next call or a subscription beginning; the connect's feed is here.
 - **`burst-emit`** (Kept) — FALSITY, `NO EVIDENCE`: a frame's value is the
   meaning's next event, every other open node past it.
-- **`burst-stall`** (Kept) — FALSITY, `NO EVIDENCE`: a frame's stall is the
-  meaning's next skip, every other open node past it.
+- **`ahead`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's burst wins
+  every comparison on its path; every other open node waits past it.
+- **`focused`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's burst sits
+  in the meaning at a hole, its next step the frame's.
+- **`restalled`** (Kept) — FALSITY, `NO EVIDENCE`: after a stall, the meaning
+  stepped is carried at the burst's next index.
 - **`burst-close`** (Kept) — FALSITY, `NO EVIDENCE`: a frame closing completes
   the cold, quiets it, or queues a timer past the clock.
 - **`returned`** (Kept) — FALSITY, `NO EVIDENCE`: a spent cold's burst returns
