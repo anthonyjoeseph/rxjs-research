@@ -176,15 +176,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `owned-flat`, `steady-sub`, `ordered-flat` and
-  `ordered-rejoin`: a flatMap shows only what it keys, over sorted
-  sources alien to it is steady, and a flatMap and a join of steady
-  parts keep order. Ruled out: a join of a run merely in order, a
-  flatMap of any outer in order (a joiner told a value and a skip at
-  one position), lanes placed wherever they subscribe, and sources
-  merely clear of a flatMap's subtree (one tagged under its join).
-  Decides whether any operator shows a source's position untagged, and
-  whether every operator keeps `Steady`.
+- **THE ORDER.** `steady-sub`, `alien-sub`, `ordered-flat` and
+  `ordered-rejoin`: a subscription over sorted sources alien to it is
+  steady, a connect's source keys nothing under its body, and a flatMap
+  and a join of steady parts keep order. Ruled out: a join of a run
+  merely in order, a flatMap of any outer in order (a joiner told a
+  value and a skip at one position), lanes placed wherever they
+  subscribe, sources merely clear of a flatMap's subtree, and an
+  operator showing a position it does not key. Decides whether every
+  operator keeps `Steady`.
 - **THE DEFER.** `ordered-defer` and `within-defer`: a defer over sorted,
   alien sources is in order, and its program, fed, is placed within.
   Decides whether a defer's notices keep its sources steady when
@@ -221,12 +221,9 @@ by their own silent steps (`Mirror`).
   sources sorted and alien to where it subscribes, is in order.
 - **`steady-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription over
   sorted, alien sources never steps inside its last position nor ties an out.
-- **`owned-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap shows only
-  positions keyed strictly under it, its merge minting none of its own.
-- **`owned-connect`** (Placed) — FALSITY, `NO EVIDENCE`: a connect shows only
-  positions keyed strictly under it, its source's steps and end just past them.
-- **`owned-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer shows only
-  positions keyed strictly under it, its program read by the fold's meaning.
+- **`owned-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program
+  subscribed shows only what it keys; `owned-reach` there, short of a
+  recursion.
 - **`alien-sub`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source,
   subscribed at its `ix 1`, keys nothing under its `ix 0`.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
