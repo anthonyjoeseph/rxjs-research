@@ -9,7 +9,7 @@
 module adequacy.Stepper where
 
 open import Data.Bool using (Bool; true; false; not)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -18,7 +18,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; cong₂; subst)
 
 import Tree as T
 open import Tree using (Later)
@@ -334,20 +334,6 @@ mutual
 
 open Tied
 
-tied-atop : ∀ {B} Q (x : Events B) → Tied Q x → Atop Q x
-tied-atop Q x td with tie td
-tied-atop Q (out h _ _) td | past b with h <ᵖ Q in e
-... | false = refl
-... | true  = trans (sym (<ᵖ-trans Q h Q b e)) (<ᵖ-irrefl Q)
-tied-atop Q (skip h _)  td | past b with h <ᵖ Q in e
-... | false = refl
-... | true  = trans (sym (<ᵖ-trans Q h Q b e)) (<ᵖ-irrefl Q)
-tied-atop Q (end h)     td | past b with h <ᵖ Q in e
-... | false = refl
-... | true  = trans (sym (<ᵖ-trans Q h Q b e)) (<ᵖ-irrefl Q)
-tied-atop Q hush        td | past b = tt
-tied-atop Q (skip Q r)  td | tied _ = <ᵖ-irrefl Q
-
 -- The source's next taken after the body's, or before it.
 ahead-out : ∀ {A B} k (a : B) (r : Events∞ B) q (t : Events∞ A) b (r′ : Events∞ B) → b ≡ false
           → force r′ ≡ M.ahead (force r) q t (M.before q (force r)) → M.ahead (out k a r) q t b ≃ out k a r′
@@ -454,32 +440,57 @@ private
   fedᴺ-snoc []       k nothing  l = skip-same refl
   fedᴺ-snoc ((q , b) ∷ xs) k a l = put-cong q b (fedᴺ-snoc xs k a l)
 
-  atop-map : ∀ {A B k} (f : A → B) (e : Events A) → Atop k (M.mapᴱ f e) → Atop k e
-  atop-map f (out _ _ _) h = h
-  atop-map f (skip _ _)  h = h
-  atop-map f (end _)     h = h
-  atop-map f hush        h = h
+-- An environment fed its source's step at `i`: alike the reading one
+-- elsewhere, and at `i` the step, then the run it feeds.
+data Fedᴱ {A : Set} (q : Pos) (a : Maybe A) : ∀ {Γ} → A ∈ Γ → NEnv Γ → NEnv Γ → Set₁ where
+  here′  : ∀ {Γ x} {l : Events∞ A} {ρ σ : NEnv Γ} → x ≃ U.put q a l → ρ ≈ᴱ σ → Fedᴱ q a (here refl) (x ∷ᴬ ρ) (force l ∷ᴬ σ)
+  there′ : ∀ {B Γ} {i : A ∈ Γ} {x y : Events B} {ρ σ : NEnv Γ} → x ≃ y → Fedᴱ q a i ρ σ → Fedᴱ q a (there i) (x ∷ᴬ ρ) (y ∷ᴬ σ)
 
-  atop-scan : ∀ {A B k} (f : B → A → B) z (e : Events A) → Atop k (M.scanᴱ f z e) → Atop k e
-  atop-scan f z (out _ _ _) h = h
-  atop-scan f z (skip _ _)  h = h
-  atop-scan f z (end _)     h = h
-  atop-scan f z hush        h = h
+-- A node fed its source's step, and the node reading it.
+Fed : ∀ {Γ B} → U.Node Γ B → Set₁
+Fed {Γ} b = ∀ {A} (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
+  → ∀ {ν} → Sane ν b → lookup ν i ≡ true
+  → Placed b ρ → Placed (U.feed i q a b) σ → U.meaning b ρ ≃ U.meaning (U.feed i q a b) σ
 
--- A body fed its source's step, and the body reading it.
-Fed : ∀ {Γ A B} → U.Node (A ∷ Γ) B → Set₁
-Fed {Γ} {A} b = (ρ : NEnv Γ) (q : Pos) (a : Maybe A) (l : Events∞ A) {x : Events A} → x ≃ U.put q a l
-  → ∀ {ν} → Sane (true ∷ᴬ ν) b → Atop (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ))
-  → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
-  → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
+private
+  fed-indep : ∀ {Γ Δ A B} (i : A ∈ Γ) (i′ : A ∈ Δ) q (a : Maybe A) (j : B ∈ Γ) (j′ : B ∈ Δ) p xs m
+            → U.fed i q a j p xs m ≡ U.fed i′ q a j′ p xs m
+  fed-indep i i′ q a j j′ p xs (just refl) = refl
+  fed-indep i i′ q a j j′ p xs nothing     = refl
+
+  -- the joiner of the fed source itself
+  fed-here : ∀ {A} p xs q (a : Maybe A) (l : Events∞ A) {x : Events A} → x ≃ U.put q a l
+           → U.fedᴺ xs (M.rejoin p x) ≃ U.fedᴺ (U.fed (here refl) q a (here {xs = []} refl) p xs (just refl)) (M.rejoin p (force l))
+  fed-here p xs q a l e with p <ᵖ q in pq
+  ... | true  = ≃-trans (fedᴺ-≃ xs (≃-trans (rejoin-≃ p e) (rejoin-in p {q} {l} a pq))) (≃-sym (fedᴺ-snoc xs _ a (rejoined p l)))
+  ... | false = ≃-trans (fedᴺ-≃ xs (≃-trans (rejoin-≃ p e) (rejoin-pre p {q} {l} a pq))) (≃-sym (fedᴺ-snoc xs _ nothing (rejoined p l)))
 
 -- A JOINER FED ITS SOURCE'S STEP IS THE JOINER READING IT: fed the step
 -- under its own position if it joined before it, else as its pre-join
--- skip.
-fed-join : ∀ {Γ A} p xs → Fed {Γ} {A} (U.joinᶜ (here refl) p xs nothing)
-fed-join p xs ρ q a l {x} e sn at pl pf with p <ᵖ q in pq
-... | true  = ≃-trans (fedᴺ-≃ xs (≃-trans (rejoin-≃ p e) (rejoin-in p {q} {l} a pq))) (≃-sym (fedᴺ-snoc xs _ a (rejoined p l)))
-... | false = ≃-trans (fedᴺ-≃ xs (≃-trans (rejoin-≃ p e) (rejoin-pre p {q} {l} a pq))) (≃-sym (fedᴺ-snoc xs _ nothing (rejoined p l)))
+-- skip; a joiner of another source is not fed at all.
+fed-joiner : ∀ {Γ A B} {q} {a : Maybe A} {i : A ∈ Γ} {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ → ∀ {ν} → lookup ν i ≡ true
+           → (j : B ∈ Γ) → ∀ p xs e → Told (lookup ν j) e
+           → U.fedᴺ xs (U.joined j p e ρ) ≃ U.fedᴺ (U.fed i q a j p xs (U.same? i j)) (U.joined j p e σ)
+fed-joiner {q = q} {a} (here′ {l = l} e r) lv (here refl) p xs nothing  t = fed-here p xs q a l e
+fed-joiner (here′ e r) {true ∷ᴬ _} refl (here refl) p xs (just c) ()
+fed-joiner (here′ e r)  lv (there j)   p xs nothing  t = fedᴺ-≃ xs (rejoin-≃ p (lookup-≈ r j))
+fed-joiner (here′ e r)  lv (there j)   p xs (just c) t = ≃-refl _
+fed-joiner (there′ e f) lv (here refl) p xs nothing  t = fedᴺ-≃ xs (rejoin-≃ p e)
+fed-joiner (there′ e f) lv (here refl) p xs (just c) t = ≃-refl _
+fed-joiner {q = q} {a} {there i} {_ ∷ᴬ ρ} {_ ∷ᴬ σ} (there′ {B = C} e f) {_ ∷ᴬ ν} lv (there j) p xs nothing t =
+  subst (λ ys → U.fedᴺ xs (U.joined j p nothing ρ) ≃ U.fedᴺ ys (U.joined j p nothing σ)) (fed-indep {Δ = C ∷ _} i (there i) q a j (there j) p xs (U.same? i j)) (fed-joiner f {ν} lv j p xs nothing t)
+fed-joiner {q = q} {a} {there i} {_ ∷ᴬ ρ} {_ ∷ᴬ σ} (there′ {B = C} e f) {_ ∷ᴬ ν} lv (there j) p xs (just c) t =
+  subst (λ ys → U.fedᴺ xs (U.joined j p (just c) ρ) ≃ U.fedᴺ ys (U.joined j p (just c) σ)) (fed-indep {Δ = C ∷ _} i (there i) q a j (there j) p xs (U.same? i j)) (fed-joiner f {ν} lv j p xs (just c) t)
+
+-- A defer's notices: the last put back on the environment first.
+replay-snoc : ∀ {Γ} ns (n : U.Notice Γ) (σ : NEnv Γ) → U.replay (ns ++ [ n ]) σ ≡ U.replay ns (U.replay [ n ] σ)
+replay-snoc []       n σ = refl
+replay-snoc (U.notice j r b ∷ ns) n σ = cong (U.replay [ U.notice j r b ]) (replay-snoc ns n σ)
+
+-- A fed environment, its step put back, is the reading one.
+fedᴱ-≈ : ∀ {Γ A} {q} {a : Maybe A} {i : A ∈ Γ} {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ → ρ ≈ᴱ U.replay [ U.notice i q a ] σ
+fedᴱ-≈ {q = q} {a} (here′ {l = l} e r) = ≃-trans e (put-cong q a (≃-refl (force l))) ∷ᵉ r
+fedᴱ-≈ (there′ e f) = e ∷ᵉ fedᴱ-≈ f
 
 postulate
   -- A DEFER READS ALIKE ENVIRONMENTS ALIKE: the fold's meaning of the
@@ -517,31 +528,17 @@ env-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) {x y : Events A}
       → Placed b (x ∷ᴬ ρ) → Placed b (y ∷ᴬ ρ) → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning b (y ∷ᴬ ρ)
 env-≃ b ρ e = envs-≃ b (e ∷ᵉ ≈ᴱ-refl ρ)
 
-postulate
-  -- A CUT FED ITS SOURCE'S STEP IS THE CUT READING IT.
-  --
-  -- DEAD ROUTE: recursion on the inner under the cut's own hypothesis.  A
-  --   `takeWhileᶜ` cut at its inner's head shows it under `ix 0` or `last`,
-  --   so the inner's meaning is atop `q` only, not `q ++ [ ix 0 ]`; and past
-  --   a cut the inner may join its source before `q` unfed while the cut
-  --   hides it, so the inners are not alike at all.
-  fed-take : ∀ {Γ A B} i p (c : U.Node (A ∷ Γ) B) → Fed (U.takeWhileᶜ i p c)
+-- A DEFER FED ITS SOURCE'S STEP IS THE DEFER READING IT: its notices
+-- put the step back on the environment it reads.
+fed-defer : ∀ {Γ B} (l : Later Timeline Γ B) p ns → Fed (U.deferᶜ l p ns)
+fed-defer l p ns i q a {ρ} {σ} f sn lv pl (o , _) =
+  subst (U.meaning (U.deferᶜ l p ns) ρ ≃_) (sym m) (defer-≃ l p ns (fedᴱ-≈ f) pl (subst Ordered m o , tt))
+  where m = cong (U.meaning (U.deferᶜ l p [])) (replay-snoc ns (U.notice i q a) σ)
 
+postulate
   -- A FLATMAP FED ITS SOURCE'S STEP IS THE FLATMAP READING IT: its outer,
   -- its lanes in flight and the lanes it has yet to subscribe.
-  fed-flat : ∀ {Γ A B C} op (g : C → Pos → U.Node (A ∷ Γ) B) o ls qs → Fed (U.flatMapᶜ op g o ls qs)
-
-  -- A CONNECT FED ITS SOURCE'S STEP IS THE CONNECT READING IT: its body
-  -- and its own source each fed.
-  --
-  -- DEAD ROUTE: recursion on the body under the connect's own hypothesis.
-  --   A connect shows its source's step under `ix 0`, so its body's meaning
-  --   is atop `q` only, not `q ++ [ ix 0 ]`.
-  fed-connect : ∀ {Γ A B C} (b : U.Node (C ∷ A ∷ Γ) B) (s : U.Source (A ∷ Γ) C) → Fed (U.connectᶜ b s)
-
-  -- A DEFER FED ITS SOURCE'S STEP IS THE DEFER READING IT: the fold's
-  -- meaning of the program it defers, over the source's run made hot.
-  fed-defer : ∀ {Γ A B} (l : Later Timeline (A ∷ Γ) B) p ns → Fed (U.deferᶜ l p ns)
+  fed-flat : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs → Fed (U.flatMapᶜ op g o ls qs)
 
 postulate
 
@@ -568,15 +565,16 @@ postulate
   placed-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
                → First (U.headˢ (U.step c)) δ → Placedˢ (ρᴱ δ) (U.step c)
 
--- A BODY FED ITS SOURCE'S STEP IS ALIKE THE BODY READING IT: a joiner
--- fed the step its source shows at `q`, a value or a skip, reading the
--- source past it, the body's meaning showing nothing before the step.
--- Every joiner is fed, those the body has yet to make included (a lane's
--- `g`, a defer's notices), as the meaning shows each of them every step;
--- and a joiner told its end is fed all the same, so none may be told
--- while the source runs.
+-- A NODE FED ITS SOURCE'S STEP IS ALIKE THE NODE READING IT, at
+-- whichever connect's index it reads that source: a joiner fed the step
+-- its source shows at `q`, a value or a skip, reading the source past
+-- it.  Every joiner is fed, those the node has yet to make included (a
+-- lane's `g`, a defer's notices, which put the step back on what the
+-- defer reads), so the node may show anything before the step; and a
+-- joiner told its end is fed all the same, so none may be told while
+-- the source runs.  A cut and a connect are congruences, a connect's
+-- body fed one index further out.
 --
--- REFUTED: 69f610c0 stated without the body's meaning after the value, by a body joining its source later
 -- REFUTED: 082ad778 stated without the body sane, by a joiner told its end
 -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
 --   step history.  The ghost is the witness's open part (`part`), which
@@ -584,23 +582,22 @@ postulate
 --   the residual as a set alone (`Ahead`), so no field of the witness
 --   can keep the count a lane's pre-join skips need.
 -- RECOVERY: git show 950a4208 restores step-alike over step-agrees
-fed-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) → Fed b
-fed-≃ (U.framesᶜ _ _ _)            ρ q a l e sn at pl pf = ≃-refl _
-fed-≃ (U.burstᶜ _ _ _ _)           ρ q a l e sn at pl pf = ≃-refl _
-fed-≃ (U.endᶜ _)                   ρ q a l e sn at pl pf = ≃-refl _
-fed-≃ (U.ofᶜ _ _ _)                ρ q a l e sn at pl pf = ≃-refl _
-fed-≃ (U.mapᶜ f c)                 ρ q a l {x} e sn at pl pf =
-  mapᴱ-≃ f (fed-≃ c ρ q a l e sn (atop-map f (U.meaning c (x ∷ᴬ ρ)) at) (proj₂ pl) (proj₂ pf))
-fed-≃ (U.scanᶜ f z c)              ρ q a l {x} e sn at pl pf =
-  scanᴱ-≃ f z (fed-≃ c ρ q a l e sn (atop-scan f z (U.meaning c (x ∷ᴬ ρ)) at) (proj₂ pl) (proj₂ pf))
-fed-≃ (U.takeWhileᶜ i p c)         ρ q a l e sn at pl pf = fed-take i p c ρ q a l e sn at pl pf
-fed-≃ (U.flatMapᶜ op g o ls qs)    ρ q a l e sn at pl pf = fed-flat op g o ls qs ρ q a l e sn at pl pf
-fed-≃ (U.joinᶜ (here refl) p xs nothing)  ρ q a l e {ν} sn at pl pf = fed-join p xs ρ q a l e {ν} sn at pl pf
-fed-≃ (U.joinᶜ (here refl) p xs (just c)) ρ q a l e sn at pl pf = ⊥-elim sn
-fed-≃ (U.joinᶜ (there j) p xs nothing)    ρ q a l e sn at pl pf = ≃-refl _
-fed-≃ (U.joinᶜ (there j) p xs (just c))   ρ q a l e sn at pl pf = ≃-refl _
-fed-≃ (U.connectᶜ b s)             ρ q a l e sn at pl pf = fed-connect b s ρ q a l e sn at pl pf
-fed-≃ (U.deferᶜ l′ p ns)           ρ q a l e {ν} sn at pl pf = fed-defer l′ p ns ρ q a l e {ν} sn at pl pf
+fed-≃ : ∀ {Γ B} (b : U.Node Γ B) → Fed b
+fed-≃ (U.framesᶜ _ _ _)         i q a f sn lv pl pf = ≃-refl _
+fed-≃ (U.burstᶜ _ _ _ _)        i q a f sn lv pl pf = ≃-refl _
+fed-≃ (U.endᶜ _)                i q a f sn lv pl pf = ≃-refl _
+fed-≃ (U.ofᶜ _ _ _)             i q a f sn lv pl pf = ≃-refl _
+fed-≃ (U.mapᶜ g c)              i q a f sn lv pl pf = mapᴱ-≃ g (fed-≃ c i q a f sn lv (proj₂ pl) (proj₂ pf))
+fed-≃ (U.scanᶜ g z c)           i q a f sn lv pl pf = scanᴱ-≃ g z (fed-≃ c i q a f sn lv (proj₂ pl) (proj₂ pf))
+fed-≃ (U.takeWhileᶜ j p c)      i q a f sn lv pl pf = takeWhileᴱ-≃ j p (fed-≃ c i q a f sn lv (proj₂ pl) (proj₂ pf))
+fed-≃ (U.flatMapᶜ op g o ls qs) i q a f sn lv pl pf = fed-flat op g o ls qs i q a f sn lv pl pf
+fed-≃ (U.joinᶜ j p xs e)        i q a f {ν} sn lv pl pf = fed-joiner f {ν} lv j p xs e sn
+fed-≃ (U.connectᶜ b (U.live s)) i q a f {ν} (sb , ss) lv (_ , pb , ps) (_ , pb′ , ps′) =
+  beside-≃ (fed-≃ b (there i) q a (there′ s≃ f) {true ∷ᴬ ν} sb lv pb pb′) s≃
+  where s≃ = fed-≃ s i q a f {ν} ss lv ps ps′
+fed-≃ (U.connectᶜ b (U.ended c)) i q a f {ν} sn lv (_ , pb) (_ , pb′) =
+  fed-≃ b (there i) q a (there′ (≃-refl (end c)) f) {false ∷ᴬ ν} sn lv pb pb′
+fed-≃ (U.deferᶜ l p ns)         i q a f {ν} sn lv pl pf = fed-defer l p ns i q a f {ν} sn lv pl pf
 
 -- The source's rest, each event no earlier than `Q` once shown.
 Behind : ∀ {A} → Pos → Events A → Set
@@ -703,7 +700,7 @@ conn b s δ st sn (_ , pb , _) sb ss hb hs lg ld pas pa fi = go sb ss hb hs lg l
   go sb (U.outˢ q x s′) hb hs lg ld pas pa fi | true =
     ≃-trans (beside-≃ (≃-refl MB) e₁)
    (≃-trans (tie-lead q _ atq MB td)
-            (skip-cong (beside-≃ (fed-≃ b ρ q (just x) _ e₁ (proj₁ sn) (tied-atop _ MB td) pb pbf) (≃-refl (U.meaning s′ (ρᴱ δ))))))
+            (skip-cong (beside-≃ (fed-≃ b (here refl) q (just x) (here′ e₁ (≈ᴱ-refl ρ)) (proj₁ sn) refl pb pbf) (≃-refl (U.meaning s′ (ρᴱ δ))))))
     where e₁ = hs (first-sub q δ fi)
           atq = proj₁ (pas (first-sub q δ fi))
           pbf = proj₁ (proj₂ (proj₂ (pa fi)))
@@ -716,7 +713,7 @@ conn b s δ st sn (_ , pb , _) sb ss hb hs lg ld pas pa fi = go sb ss hb hs lg l
   go sb (U.skipˢ q s′) hb hs lg ld pas pa fi | true =
     ≃-trans (beside-≃ (≃-refl MB) e₁)
    (≃-trans (tie-lead q _ atq MB td)
-            (skip-cong (beside-≃ (fed-≃ b ρ q nothing _ e₁ (proj₁ sn) (tied-atop _ MB td) pb pb′) (≃-refl (U.meaning s′ (ρᴱ δ))))))
+            (skip-cong (beside-≃ (fed-≃ b (here refl) q nothing (here′ e₁ (≈ᴱ-refl ρ)) (proj₁ sn) refl pb pb′) (≃-refl (U.meaning s′ (ρᴱ δ))))))
     where e₁ = hs (first-sub q δ fi)
           atq = proj₁ (pas (first-sub q δ fi))
           pb′ = proj₁ (proj₂ (proj₂ (pa fi)))

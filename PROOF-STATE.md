@@ -176,19 +176,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE FED CUT.** `fed-take` with `fed-connect`, `fed-flat` and
-  `fed-defer`: `fed-≃` is a body by node, its joiner arm proven over the
-  fixed skip, a map and a scan recursing, these four its leaves. Ruled
-  out: the joiner's index shift, and recursion under a cut or into a
-  connect's body under the node's own hypothesis. Decides whether a cut
-  and a connect's body need their inners alike only below `q ++ [ ix 0 ]`.
-- **THE CONNECT.** `flat-≃` and `defer-≃` with the fed leaves: a running
-  connect is a body over these, its body reading its source alike the body
-  fed its source's step. Ruled out: a body fed a value it would join its
-  source only after or with a joiner told. Proven: a source's step
-  commutes with the body's tied events, and a joiner reads alike sorted
-  sources alike. Decides whether the body fed the step and
-  the body reading it are alike past a cut.
+- **THE MERGE CONGRUENCE.** `fed-flat` with `flat-≃` and `defer-≃`: a
+  flatMap fed its source's step, or reading alike environments, is
+  alike, its outer's values lane makers alike wherever subscribed.
+  `fed-≃` is a body at every connect's index, a cut and a connect
+  congruences, a defer its notices put back. Ruled out: a fed body
+  needing to show nothing before the step, and a cut's or a connect's
+  inner alike only past `q ++ [ ix 0 ]`. Decides whether `M.go` respects
+  lanes alike, and whether the placing every arm carries, read by these
+  leaves alone, can go.
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
   the meaning's events are sorted, a step keeps every node so, and what a
   node shows comes no earlier than any earlier step. Ruled out: a node
@@ -221,14 +217,8 @@ by their own silent steps (`Mirror`).
   shared machine, as `here` is, which the IO runtime ignores.
 ### The ledger
 
-- **`fed-take`** (Stepper) — FALSITY, `DEAD ROUTE`: a cut fed its source's step
-  is alike the cut reading it.
-- **`fed-connect`** (Stepper) — FALSITY, `DEAD ROUTE`: a connect fed its
-  source's step is alike the connect reading it.
 - **`fed-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap fed its source's
   step is alike the flatMap reading it.
-- **`fed-defer`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer fed its source's
-  step is alike the defer reading it.
 - **`flat-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap reads alike
   environments alike, lanes yet to subscribe included.
 - **`defer-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer reads alike
