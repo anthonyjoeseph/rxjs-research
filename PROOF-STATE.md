@@ -179,10 +179,11 @@ by their own silent steps (`Mirror`).
 - **THE STEPPER.** `step-skips`: a `Sane` ghost's meaning is, skips aside
   (`≃`), what its step shows then the stepped ghost's. Ruled out: every
   node (a told joiner under a live source); exact agreement, per
-  approximant or under a ghost anchored in its sources' step history (the
-  witness keeps no count of a source's steps). Decides whether a connect's
-  body fed its source's step is alike, skips aside, the body reading that
-  step from its source, and whether `M.beside` and `M.go` respect `≃`.
+  approximant or under a ghost anchored in its sources' step history; a
+  matched skip moving, or merging unsorted events (`M.beside` refuted on
+  both). Decides whether the meaning's events are sorted, whether a
+  connect's body fed its source's step is alike the body reading that
+  step, and whether `M.beside` and `M.go` respect `≃` between sorted events.
 - **THE LEAST VALUE.** `note-least` with `note-onward`: the value a note
   records is the least the ghost holds, and past it the run runs the
   stepped ghost. Decides whether "least" is paid once as a field of

@@ -48,13 +48,24 @@ open Events∞
 ------------------------------------------------------------------------
 -- Alike skips aside: the same values and ends in the same order, finitely
 -- many skips between them on either side, or both skipping for ever.
+--
+-- A merge orders by position, skips included (`M.beside`, `M.go`), so a
+-- skip matched across the two keeps its position; and it respects the
+-- relation only between sorted events, an unmatched skip free to sit
+-- anywhere.
+--
+-- REFUTED: 0af1ff0e M.beside respecting it with a matched skip free to move, by a source spinning below the body's value
+-- REFUTED: d09ec415 M.beside respecting it between unsorted events, by an unmatched skip above the value after it
+-- DEAD ROUTE: an unmatched skip bounded by the event after it, in place
+--   of sortedness.  Not transitive: a skip matched on one side above an
+--   unmatched one on the other is unbounded once the middle is dropped.
 
 mutual
   data _≃_ {A : Set} : Events A → Events A → Set where
     out≃  : ∀ {k a l r} → force l ≃∞ force r → out k a l ≃ out k a r
     end≃  : ∀ {k} → end k ≃ end k
     hush≃ : hush ≃ hush
-    skip≃ : ∀ {k k′ l r} → force l ≃∞ force r → skip k l ≃ skip k′ r
+    skip≃ : ∀ {k l r} → force l ≃∞ force r → skip k l ≃ skip k r
     skipˡ : ∀ {k l y} → force l ≃ y → skip k l ≃ y
     skipʳ : ∀ {x k r} → x ≃ force r → x ≃ skip k r
 
@@ -295,8 +306,7 @@ module Honesty (R : Set) where
     --
     -- Skips aside, because the meaning's joiner shows its source's every
     -- step and a lane's join comes after a count of them that the ghost
-    -- does not keep; so the relation must survive a merge (`M.beside`,
-    -- `M.go`) whose order a skip's position steers.
+    -- does not keep.
     --
     -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
     -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
