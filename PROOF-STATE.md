@@ -176,15 +176,6 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE MERGE CONGRUENCE.** `fed-flat` with `flat-≃` and `defer-≃`: a
-  flatMap fed its source's step, or reading alike environments, is
-  alike, its outer's values lane makers alike wherever subscribed.
-  `fed-≃` is a body at every connect's index, a cut and a connect
-  congruences, a defer its notices put back. Ruled out: a fed body
-  needing to show nothing before the step, and a cut's or a connect's
-  inner alike only past `q ++ [ ix 0 ]`. Decides whether `M.go` respects
-  lanes alike, and whether the placing every arm carries, read by these
-  leaves alone, can go.
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
   the meaning's events are sorted, a step keeps every node so, and what a
   node shows comes no earlier than any earlier step. Ruled out: a node
@@ -217,12 +208,6 @@ by their own silent steps (`Mirror`).
   shared machine, as `here` is, which the IO runtime ignores.
 ### The ledger
 
-- **`fed-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap fed its source's
-  step is alike the flatMap reading it.
-- **`flat-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap reads alike
-  environments alike, lanes yet to subscribe included.
-- **`defer-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer reads alike
-  environments alike.
 - **`placed-subscribe`** (Placed) — FALSITY, `NO EVIDENCE`: a program
   subscribed at the root is placed.
 - **`placed-after`** (Stepper) — FALSITY, `REFUTED×2`: a step keeps the ghost

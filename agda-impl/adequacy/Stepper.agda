@@ -10,7 +10,7 @@ module adequacy.Stepper where
 
 open import Data.Bool using (Bool; true; false; not)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
@@ -22,14 +22,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 import Tree as T
 open import Tree using (Later)
-open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; stop; out⁼; skip⁼; agree-refl; agree-sym; agree-trans; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-shift)
+open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame; Timeline; out; skip; end; hush; ix; _<ᵖ_; Agree; stop; out⁼; skip⁼; agree-refl; agree-sym; agree-trans; <ᵖ-trans; <ᵖ-below; <ᵖ-irrefl; <ᵖ-shift; agrees; agree; ≈ₖ-pred)
   renaming (sub to subᴾ)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
-open import denotation.NonExpansive using (mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; rejoin-ne; beside-ne)
-open import denotation.Unfold using (NEnv)
-open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Told)
-open import adequacy.Placed using (Atop; Ordered; Placed; Within; Placedᴹ; Placedᴸ)
+open import denotation.NonExpansive using (mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; rejoin-ne; beside-ne; hot-ne; go-ne; Lanes; []ᴸ; _∷ᴸ_; Queue; []ᑫ; _∷ᑫ_; doneᴼ; liveᴼ)
+open import denotation.Compositional using (EnvAgree; deferᴰ-contractive) renaming ([]ᵉ to []ᵈ; _∷ᵉ_ to _∷ᵈ_)
+open import denotation.Unfold using (NEnv; ⟦⟧-ne)
+open import denotation.Denote using (flatOp)
+open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Told; allLive)
+open import adequacy.Placed using (Atop; Placed; Placedᴹ; Placedᴸ)
 
 open Events∞
 
@@ -283,34 +285,6 @@ shut-after c {ρ} (U.skipˢ k b)  = skip-same (sym (shut-meaning (here refl) c b
 shut-after c (U.endˢ e)         = ≃-refl (end e)
 shut-after c U.hushˢ            = ≃-refl hush
 
-mutual
-  shut-placed : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placed (U.shut i c n) ρ → Placed n ρ
-  shut-placed i c n ρ l (o , w) = subst Ordered (shut-meaning i c n ρ l) o , shut-within i c n ρ l w
-
-  shut-within : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Within (U.shut i c n) ρ → Within n ρ
-  shut-within i c (U.framesᶜ τ e m)         ρ l w = w
-  shut-within i c (U.burstᶜ τ r k b)        ρ l w = w
-  shut-within i c (U.endᶜ p)                ρ l w = w
-  shut-within i c (U.ofᶜ p k xs)            ρ l w = w
-  shut-within i c (U.mapᶜ f n)              ρ l w = shut-placed i c n ρ l w
-  shut-within i c (U.scanᶜ f z n)           ρ l w = shut-placed i c n ρ l w
-  shut-within i c (U.takeWhileᶜ k p n)      ρ l w = shut-placed i c n ρ l w
-  shut-within i c (U.flatMapᶜ op g o ls qs) ρ l (wo , wl) = shut-placedᴹ i c o ρ l wo , shut-placedᴸ i c ls ρ l wl
-  shut-within i c (U.joinᶜ j p xs e)        ρ l w = tt
-  shut-within i c (U.connectᶜ b (U.live s)) ρ l (wb , ws) =
-    shut-placed (there i) c b (U.meaning s ρ ∷ᴬ ρ) l (subst (λ x → Placed (U.shut (there i) c b) (x ∷ᴬ ρ)) (shut-meaning i c s ρ l) wb)
-    , shut-placed i c s ρ l ws
-  shut-within i c (U.connectᶜ b (U.ended e)) ρ l w = shut-placed (there i) c b (end e ∷ᴬ ρ) l w
-  shut-within i c (U.deferᶜ k p ns)         ρ l w = w
-
-  shut-placedᴹ : ∀ {Γ A B} (i : A ∈ Γ) c (o : Maybe (U.Node Γ B)) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placedᴹ (U.shutᴹ i c o) ρ → Placedᴹ o ρ
-  shut-placedᴹ i c nothing  ρ l w = tt
-  shut-placedᴹ i c (just n) ρ l w = shut-placed i c n ρ l w
-
-  shut-placedᴸ : ∀ {Γ A B} (i : A ∈ Γ) c (ns : List (U.Node Γ B)) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placedᴸ (U.shutᴸ i c ns) ρ → Placedᴸ ns ρ
-  shut-placedᴸ i c []       ρ l w        = tt
-  shut-placedᴸ i c (n ∷ ns) ρ l (wn , ws) = shut-placed i c n ρ l wn , shut-placedᴸ i c ns ρ l ws
-
 ------------------------------------------------------------------------
 -- A running connect
 
@@ -449,8 +423,7 @@ data Fedᴱ {A : Set} (q : Pos) (a : Maybe A) : ∀ {Γ} → A ∈ Γ → NEnv �
 -- A node fed its source's step, and the node reading it.
 Fed : ∀ {Γ B} → U.Node Γ B → Set₁
 Fed {Γ} b = ∀ {A} (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
-  → ∀ {ν} → Sane ν b → lookup ν i ≡ true
-  → Placed b ρ → Placed (U.feed i q a b) σ → U.meaning b ρ ≃ U.meaning (U.feed i q a b) σ
+  → ∀ {ν} → Sane ν b → lookup ν i ≡ true → U.meaning b ρ ≃ U.meaning (U.feed i q a b) σ
 
 private
   fed-indep : ∀ {Γ Δ A B} (i : A ∈ Γ) (i′ : A ∈ Δ) q (a : Maybe A) (j : B ∈ Γ) (j′ : B ∈ Δ) p xs m
@@ -492,53 +465,74 @@ fedᴱ-≈ : ∀ {Γ A} {q} {a : Maybe A} {i : A ∈ Γ} {ρ σ : NEnv Γ} → F
 fedᴱ-≈ {q = q} {a} (here′ {l = l} e r) = ≃-trans e (put-cong q a (≃-refl (force l))) ∷ᵉ r
 fedᴱ-≈ (there′ e f) = e ∷ᵉ fedᴱ-≈ f
 
-postulate
-  -- A DEFER READS ALIKE ENVIRONMENTS ALIKE: the fold's meaning of the
-  -- program it defers, over the environment's runs made hot.
-  defer-≃ : ∀ {Γ A} (l : Later Timeline Γ A) p ns {ρ σ : NEnv Γ} → ρ ≈ᴱ σ
-          → Placed (U.deferᶜ l p ns) ρ → Placed (U.deferᶜ l p ns) σ → U.meaning (U.deferᶜ l p ns) ρ ≃ U.meaning (U.deferᶜ l p ns) σ
+-- A lane maker: each value's lanes, read in `ρ` wherever subscribed.
+lanesᴺ : ∀ {Γ} {A B : Set} → (A → Pos → U.Node Γ B) → NEnv Γ → A → M.MonotonicList B
+lanesᴺ g ρ x = M.cold λ r → U.meaning (g x r) ρ
 
-  -- A FLATMAP READS ALIKE ENVIRONMENTS ALIKE: its outer and its lanes in
-  -- flight, and the lanes it has yet to subscribe, each reading them
-  -- from where it joins.
-  flat-≃ : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs {ρ σ : NEnv Γ} → ρ ≈ᴱ σ
-         → Placed (U.flatMapᶜ op g o ls qs) ρ → Placed (U.flatMapᶜ op g o ls qs) σ
-         → U.meaning (U.flatMapᶜ op g o ls qs) ρ ≃ U.meaning (U.flatMapᶜ op g o ls qs) σ
+-- A defer's notices put back on environments alike.
+private
+  notice-≈ : ∀ {Γ} (n : U.Notice Γ) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → U.replay [ n ] ρ ≈ᴱ U.replay [ n ] σ
+  notice-≈ (U.notice (here refl) q a) (e ∷ᵉ r) = put-cong q a e ∷ᵉ r
+  notice-≈ (U.notice (there i) q a)   (e ∷ᵉ r) = e ∷ᵉ notice-≈ (U.notice i q a) r
 
--- A node reads alike environments alike, placed under each.
-envs-≃ : ∀ {Γ A} (c : U.Node Γ A) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Placed c ρ → Placed c σ → U.meaning c ρ ≃ U.meaning c σ
-envs-≃ (U.framesᶜ τ r m)            e _ _ = ≃-refl _
-envs-≃ (U.burstᶜ τ r i b)           e _ _ = ≃-refl _
-envs-≃ (U.endᶜ r)                   e _ _ = ≃-refl _
-envs-≃ (U.ofᶜ r i xs)               e _ _ = ≃-refl _
-envs-≃ (U.mapᶜ f c)                 e (_ , pc) (_ , pc′) = mapᴱ-≃ f (envs-≃ c e pc pc′)
-envs-≃ (U.scanᶜ f z c)              e (_ , pc) (_ , pc′) = scanᴱ-≃ f z (envs-≃ c e pc pc′)
-envs-≃ (U.takeWhileᶜ i p c)         e (_ , pc) (_ , pc′) = takeWhileᴱ-≃ i p (envs-≃ c e pc pc′)
-envs-≃ (U.flatMapᶜ op g o ls qs)    e pr ps = flat-≃ op g o ls qs e pr ps
-envs-≃ (U.joinᶜ i p xs (just c))    e _ _ = ≃-refl _
-envs-≃ (U.joinᶜ i p xs nothing)     e _ _ = fedᴺ-≃ xs (rejoin-≃ p (lookup-≈ e i))
-envs-≃ (U.connectᶜ b (U.live s))    e (_ , pb , ps) (_ , pb′ , ps′) =
-  beside-≃ (envs-≃ b (s≃ ∷ᵉ e) pb pb′) s≃
-  where s≃ = envs-≃ s e ps ps′
-envs-≃ (U.connectᶜ b (U.ended c))   e (_ , pb) (_ , pb′) = envs-≃ b (≃-refl _ ∷ᵉ e) pb pb′
-envs-≃ (U.deferᶜ l p ns)            e pr ps = defer-≃ l p ns e pr ps
+  replay-≈ : ∀ {Γ} ns {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → U.replay ns ρ ≈ᴱ U.replay ns σ
+  replay-≈ []                   e = e
+  replay-≈ (U.notice i q a ∷ ns) e = notice-≈ (U.notice i q a) (replay-≈ ns e)
 
--- A body reads alike sources alike, it placed under each.
-env-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) {x y : Events A} → x ≃ y
-      → Placed b (x ∷ᴬ ρ) → Placed b (y ∷ᴬ ρ) → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning b (y ∷ᴬ ρ)
+  hots-agree : ∀ {Γ} {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → ∀ n → EnvAgree n (U.hots ρ) (U.hots σ)
+  hots-agree []ᵉ      n = []ᵈ
+  hots-agree (e ∷ᵉ r) n = hot-ne (agreeing e n) ∷ᵈ hots-agree r n
+
+  live-true : ∀ Γ {A} (i : A ∈ Γ) → lookup (allLive Γ) i ≡ true
+  live-true (_ ∷ Γ) (here refl) = refl
+  live-true (_ ∷ Γ) (there i)   = live-true Γ i
+
+  queue-≃ : ∀ {A B : Set} {n} {F G : A → M.MonotonicList B} → (∀ x → F x M.≈[ n ] G x) → ∀ qs → Queue n (map F qs) (map G qs)
+  queue-≃ FG []       = []ᑫ
+  queue-≃ FG (x ∷ qs) = FG x ∷ᑫ queue-≃ FG qs
+
+-- A DEFER READS ALIKE ENVIRONMENTS ALIKE: the fold's meaning of the
+-- program it defers, over the environment's runs made hot.
+defer-≃ : ∀ {Γ A} (l : Later Timeline Γ A) p ns {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → U.meaning (U.deferᶜ l p ns) ρ ≃ U.meaning (U.deferᶜ l p ns) σ
+defer-≃ l p ns e = alike λ n → agree (≈ₖ-pred (deferᴰ-contractive (⟦⟧-ne (Later.force l) (hots-agree (replay-≈ ns e) n)))) p
+
+-- A NODE READS ALIKE ENVIRONMENTS ALIKE: a flatMap's outer, its lanes in
+-- flight and the lanes it has yet to subscribe each reading them from
+-- where it joins.
+mutual
+  envs-≃ : ∀ {Γ A} (c : U.Node Γ A) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → U.meaning c ρ ≃ U.meaning c σ
+  envs-≃ (U.framesᶜ τ r m)            e = ≃-refl _
+  envs-≃ (U.burstᶜ τ r i b)           e = ≃-refl _
+  envs-≃ (U.endᶜ r)                   e = ≃-refl _
+  envs-≃ (U.ofᶜ r i xs)               e = ≃-refl _
+  envs-≃ (U.mapᶜ f c)                 e = mapᴱ-≃ f (envs-≃ c e)
+  envs-≃ (U.scanᶜ f z c)              e = scanᴱ-≃ f z (envs-≃ c e)
+  envs-≃ (U.takeWhileᶜ i p c)         e = takeWhileᴱ-≃ i p (envs-≃ c e)
+  envs-≃ (U.flatMapᶜ op g nothing ls qs) {ρ} {σ} e = alike λ n →
+    go-ne (flatOp op) (lanesᴺ g ρ) (lanesᴺ g σ) (λ x → agrees λ r → agreeing (envs-≃ (g x r) e) n) doneᴼ (envsᴸ ls e n) (queue-≃ (λ x → agrees λ r → agreeing (envs-≃ (g x r) e) n) qs)
+  envs-≃ (U.flatMapᶜ op g (just o) ls qs) {ρ} {σ} e = alike λ n →
+    go-ne (flatOp op) (lanesᴺ g ρ) (lanesᴺ g σ) (λ x → agrees λ r → agreeing (envs-≃ (g x r) e) n) (liveᴼ (agreeing (envs-≃ o e) n)) (envsᴸ ls e n) (queue-≃ (λ x → agrees λ r → agreeing (envs-≃ (g x r) e) n) qs)
+  envs-≃ (U.joinᶜ i p xs (just c))    e = ≃-refl _
+  envs-≃ (U.joinᶜ i p xs nothing)     e = fedᴺ-≃ xs (rejoin-≃ p (lookup-≈ e i))
+  envs-≃ (U.connectᶜ b (U.live s))    e = beside-≃ (envs-≃ b (s≃ ∷ᵉ e)) s≃
+    where s≃ = envs-≃ s e
+  envs-≃ (U.connectᶜ b (U.ended c))   e = envs-≃ b (≃-refl _ ∷ᵉ e)
+  envs-≃ (U.deferᶜ l p ns)            e = defer-≃ l p ns e
+
+  envsᴸ : ∀ {Γ A} (ls : List (U.Node Γ A)) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → ∀ n → Lanes n (U.meanings ls ρ) (U.meanings ls σ)
+  envsᴸ []       e n = []ᴸ
+  envsᴸ (c ∷ cs) e n = agreeing (envs-≃ c e) n ∷ᴸ envsᴸ cs e n
+
+-- A body reads alike sources alike.
+env-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) {x y : Events A} → x ≃ y → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning b (y ∷ᴬ ρ)
 env-≃ b ρ e = envs-≃ b (e ∷ᵉ ≈ᴱ-refl ρ)
 
 -- A DEFER FED ITS SOURCE'S STEP IS THE DEFER READING IT: its notices
 -- put the step back on the environment it reads.
 fed-defer : ∀ {Γ B} (l : Later Timeline Γ B) p ns → Fed (U.deferᶜ l p ns)
-fed-defer l p ns i q a {ρ} {σ} f sn lv pl (o , _) =
-  subst (U.meaning (U.deferᶜ l p ns) ρ ≃_) (sym m) (defer-≃ l p ns (fedᴱ-≈ f) pl (subst Ordered m o , tt))
+fed-defer l p ns i q a {ρ} {σ} f sn lv =
+  subst (U.meaning (U.deferᶜ l p ns) ρ ≃_) (sym m) (defer-≃ l p ns (fedᴱ-≈ f))
   where m = cong (U.meaning (U.deferᶜ l p [])) (replay-snoc ns (U.notice i q a) σ)
-
-postulate
-  -- A FLATMAP FED ITS SOURCE'S STEP IS THE FLATMAP READING IT: its outer,
-  -- its lanes in flight and the lanes it has yet to subscribe.
-  fed-flat : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs → Fed (U.flatMapᶜ op g o ls qs)
 
 postulate
 
@@ -582,22 +576,35 @@ postulate
 --   the residual as a set alone (`Ahead`), so no field of the witness
 --   can keep the count a lane's pre-join skips need.
 -- RECOVERY: git show 950a4208 restores step-alike over step-agrees
-fed-≃ : ∀ {Γ B} (b : U.Node Γ B) → Fed b
-fed-≃ (U.framesᶜ _ _ _)         i q a f sn lv pl pf = ≃-refl _
-fed-≃ (U.burstᶜ _ _ _ _)        i q a f sn lv pl pf = ≃-refl _
-fed-≃ (U.endᶜ _)                i q a f sn lv pl pf = ≃-refl _
-fed-≃ (U.ofᶜ _ _ _)             i q a f sn lv pl pf = ≃-refl _
-fed-≃ (U.mapᶜ g c)              i q a f sn lv pl pf = mapᴱ-≃ g (fed-≃ c i q a f sn lv (proj₂ pl) (proj₂ pf))
-fed-≃ (U.scanᶜ g z c)           i q a f sn lv pl pf = scanᴱ-≃ g z (fed-≃ c i q a f sn lv (proj₂ pl) (proj₂ pf))
-fed-≃ (U.takeWhileᶜ j p c)      i q a f sn lv pl pf = takeWhileᴱ-≃ j p (fed-≃ c i q a f sn lv (proj₂ pl) (proj₂ pf))
-fed-≃ (U.flatMapᶜ op g o ls qs) i q a f sn lv pl pf = fed-flat op g o ls qs i q a f sn lv pl pf
-fed-≃ (U.joinᶜ j p xs e)        i q a f {ν} sn lv pl pf = fed-joiner f {ν} lv j p xs e sn
-fed-≃ (U.connectᶜ b (U.live s)) i q a f {ν} (sb , ss) lv (_ , pb , ps) (_ , pb′ , ps′) =
-  beside-≃ (fed-≃ b (there i) q a (there′ s≃ f) {true ∷ᴬ ν} sb lv pb pb′) s≃
-  where s≃ = fed-≃ s i q a f {ν} ss lv ps ps′
-fed-≃ (U.connectᶜ b (U.ended c)) i q a f {ν} sn lv (_ , pb) (_ , pb′) =
-  fed-≃ b (there i) q a (there′ (≃-refl (end c)) f) {false ∷ᴬ ν} sn lv pb pb′
-fed-≃ (U.deferᶜ l p ns)         i q a f {ν} sn lv pl pf = fed-defer l p ns i q a f {ν} sn lv pl pf
+mutual
+  fed-≃ : ∀ {Γ B} (b : U.Node Γ B) → Fed b
+  fed-≃ (U.framesᶜ _ _ _)         i q a f sn lv = ≃-refl _
+  fed-≃ (U.burstᶜ _ _ _ _)        i q a f sn lv = ≃-refl _
+  fed-≃ (U.endᶜ _)                i q a f sn lv = ≃-refl _
+  fed-≃ (U.ofᶜ _ _ _)             i q a f sn lv = ≃-refl _
+  fed-≃ (U.mapᶜ g c)              i q a f sn lv = mapᴱ-≃ g (fed-≃ c i q a f sn lv)
+  fed-≃ (U.scanᶜ g z c)           i q a f sn lv = scanᴱ-≃ g z (fed-≃ c i q a f sn lv)
+  fed-≃ (U.takeWhileᶜ j p c)      i q a f sn lv = takeWhileᴱ-≃ j p (fed-≃ c i q a f sn lv)
+  fed-≃ {Γ} (U.flatMapᶜ op g nothing ls qs) i q a {ρ} {σ} f (_ , sl , sg) lv = alike λ n →
+    go-ne (flatOp op) (lanesᴺ g ρ) (lanesᴺ (λ x r → U.feed i q a (g x r)) σ) (G n) doneᴼ (fedᴸ ls i q a f sl lv n) (queue-≃ (G n) qs)
+    where G : ∀ n x → lanesᴺ g ρ x M.≈[ n ] lanesᴺ (λ x r → U.feed i q a (g x r)) σ x
+          G n x = agrees λ r → agreeing (fed-≃ (g x r) i q a f (sg x r) (live-true Γ i)) n
+  fed-≃ {Γ} (U.flatMapᶜ op g (just o) ls qs) i q a {ρ} {σ} f (so , sl , sg) lv = alike λ n →
+    go-ne (flatOp op) (lanesᴺ g ρ) (lanesᴺ (λ x r → U.feed i q a (g x r)) σ) (G n) (liveᴼ (agreeing (fed-≃ o i q a f so lv) n)) (fedᴸ ls i q a f sl lv n) (queue-≃ (G n) qs)
+    where G : ∀ n x → lanesᴺ g ρ x M.≈[ n ] lanesᴺ (λ x r → U.feed i q a (g x r)) σ x
+          G n x = agrees λ r → agreeing (fed-≃ (g x r) i q a f (sg x r) (live-true Γ i)) n
+  fed-≃ (U.joinᶜ j p xs e)        i q a f {ν} sn lv = fed-joiner f {ν} lv j p xs e sn
+  fed-≃ (U.connectᶜ b (U.live s)) i q a f {ν} (sb , ss) lv =
+    beside-≃ (fed-≃ b (there i) q a (there′ s≃ f) {true ∷ᴬ ν} sb lv) s≃
+    where s≃ = fed-≃ s i q a f {ν} ss lv
+  fed-≃ (U.connectᶜ b (U.ended c)) i q a f {ν} sn lv =
+    fed-≃ b (there i) q a (there′ (≃-refl (end c)) f) {false ∷ᴬ ν} sn lv
+  fed-≃ (U.deferᶜ l p ns)         i q a f {ν} sn lv = fed-defer l p ns i q a f {ν} sn lv
+
+  fedᴸ : ∀ {Γ A B} (ls : List (U.Node Γ B)) (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
+       → ∀ {ν} → Saneᴸ ν ls → lookup ν i ≡ true → ∀ n → Lanes n (U.meanings ls ρ) (U.meanings (U.feedᴸ i q a ls) σ)
+  fedᴸ []       i q a f sn       lv n = []ᴸ
+  fedᴸ (c ∷ cs) i q a f (sc , sl) lv n = agreeing (fed-≃ c i q a f sc lv) n ∷ᴸ fedᴸ cs i q a f sl lv n
 
 -- The source's rest, each event no earlier than `Q` once shown.
 Behind : ∀ {A} → Pos → Events A → Set
@@ -666,10 +673,9 @@ conn : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) (s
      → (∀ k → Wins (just k) (U.headˢ ss) ≡ true → First (just k) δ → Lags k (U.meaning s (ρᴱ δ)))
      → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → Tied j (U.meaning b (U.meaning s (ρᴱ δ) ∷ᴬ ρᴱ δ)))
      → (First (U.headˢ ss) δ → Placedˢ (ρᴱ δ) ss)
-     → (First (U.headˢ (U.sourceˢ b sb s ss)) δ → Placedˢ (ρᴱ δ) (U.sourceˢ b sb s ss))
      → First (U.headˢ (U.sourceˢ b sb s ss)) δ
      → U.meaning (U.connectᶜ b (U.live s)) (ρᴱ δ) ≃ afterᴱ (ρᴱ δ) (U.sourceˢ b sb s ss)
-conn b s δ st sn (_ , pb , _) sb ss hb hs lg ld pas pa fi = go sb ss hb hs lg ld pas pa fi
+conn b s δ st sn _ sb ss hb hs lg ld pas fi = go sb ss hb hs lg ld pas fi
   where
   ρ  = ρᴱ δ
   ms = U.meaning s ρ
@@ -685,51 +691,47 @@ conn b s δ st sn (_ , pb , _) sb ss hb hs lg ld pas pa fi = go sb ss hb hs lg l
      → (∀ k → Wins (just k) (U.headˢ ss) ≡ true → First (just k) δ → Lags k ms)
      → (∀ j → U.beforeˢ j sb ≡ true → Wins (just j) (U.headˢ ss) ≡ true → First (just j) δ → Tied j MB)
      → (First (U.headˢ ss) δ → Placedˢ ρ ss)
-     → (First (U.headˢ (U.sourceˢ b sb s ss)) δ → Placedˢ ρ (U.sourceˢ b sb s ss))
      → First (U.headˢ (U.sourceˢ b sb s ss)) δ → M.beside MB ms ≃ afterᴱ ρ (U.sourceˢ b sb s ss)
-  go U.hushˢ          U.hushˢ hb hs lg ld pas pa fi =
+  go U.hushˢ          U.hushˢ hb hs lg ld pas fi =
     beside-≃ (hb refl fi) (hs fi)
-  go sb@(U.outˢ k _ _) U.hushˢ hb hs lg ld pas pa fi = body sb (hb refl fi) (lg k refl fi)
-  go sb@(U.skipˢ k _)  U.hushˢ hb hs lg ld pas pa fi = body sb (hb refl fi) (lg k refl fi)
-  go sb@(U.endˢ k)     U.hushˢ hb hs lg ld pas pa fi = body sb (hb refl fi) (lg k refl fi)
-  go sb (U.outˢ q x s′) hb hs lg ld pas pa fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
-  go U.hushˢ           (U.outˢ q x s′) hb hs lg ld pas pa fi | false with () ← eq
-  go sb@(U.outˢ k _ _) (U.outˢ q x s′) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.skipˢ k _)  (U.outˢ q x s′) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.endˢ k)     (U.outˢ q x s′) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb (U.outˢ q x s′) hb hs lg ld pas pa fi | true =
+  go sb@(U.outˢ k _ _) U.hushˢ hb hs lg ld pas fi = body sb (hb refl fi) (lg k refl fi)
+  go sb@(U.skipˢ k _)  U.hushˢ hb hs lg ld pas fi = body sb (hb refl fi) (lg k refl fi)
+  go sb@(U.endˢ k)     U.hushˢ hb hs lg ld pas fi = body sb (hb refl fi) (lg k refl fi)
+  go sb (U.outˢ q x s′) hb hs lg ld pas fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
+  go U.hushˢ           (U.outˢ q x s′) hb hs lg ld pas fi | false with () ← eq
+  go sb@(U.outˢ k _ _) (U.outˢ q x s′) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.outˢ q x s′) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.outˢ q x s′) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.outˢ q x s′) hb hs lg ld pas fi | true =
     ≃-trans (beside-≃ (≃-refl MB) e₁)
    (≃-trans (tie-lead q _ atq MB td)
-            (skip-cong (beside-≃ (fed-≃ b (here refl) q (just x) (here′ e₁ (≈ᴱ-refl ρ)) (proj₁ sn) refl pb pbf) (≃-refl (U.meaning s′ (ρᴱ δ))))))
+            (skip-cong (beside-≃ (fed-≃ b (here refl) q (just x) (here′ e₁ (≈ᴱ-refl ρ)) (proj₁ sn) refl) (≃-refl (U.meaning s′ (ρᴱ δ))))))
     where e₁ = hs (first-sub q δ fi)
           atq = proj₁ (pas (first-sub q δ fi))
-          pbf = proj₁ (proj₂ (proj₂ (pa fi)))
           td = ld (q ++ [ ix 0 ]) eq (wins-self q) fi
-  go sb (U.skipˢ q s′) hb hs lg ld pas pa fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
-  go U.hushˢ           (U.skipˢ q s′) hb hs lg ld pas pa fi | false with () ← eq
-  go sb@(U.outˢ k _ _) (U.skipˢ q s′) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.skipˢ k _)  (U.skipˢ q s′) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.endˢ k)     (U.skipˢ q s′) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb (U.skipˢ q s′) hb hs lg ld pas pa fi | true =
+  go sb (U.skipˢ q s′) hb hs lg ld pas fi with U.beforeˢ (q ++ [ ix 0 ]) sb in eq
+  go U.hushˢ           (U.skipˢ q s′) hb hs lg ld pas fi | false with () ← eq
+  go sb@(U.outˢ k _ _) (U.skipˢ q s′) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.skipˢ q s′) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.skipˢ q s′) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.skipˢ q s′) hb hs lg ld pas fi | true =
     ≃-trans (beside-≃ (≃-refl MB) e₁)
    (≃-trans (tie-lead q _ atq MB td)
-            (skip-cong (beside-≃ (fed-≃ b (here refl) q nothing (here′ e₁ (≈ᴱ-refl ρ)) (proj₁ sn) refl pb pb′) (≃-refl (U.meaning s′ (ρᴱ δ))))))
+            (skip-cong (beside-≃ (fed-≃ b (here refl) q nothing (here′ e₁ (≈ᴱ-refl ρ)) (proj₁ sn) refl) (≃-refl (U.meaning s′ (ρᴱ δ))))))
     where e₁ = hs (first-sub q δ fi)
           atq = proj₁ (pas (first-sub q δ fi))
-          pb′ = proj₁ (proj₂ (proj₂ (pa fi)))
           td = ld (q ++ [ ix 0 ]) eq (wins-self q) fi
-  go sb (U.endˢ c) hb hs lg ld pas pa fi with U.beforeˢ (c ++ [ ix 0 ]) sb in eq
-  go U.hushˢ           (U.endˢ c) hb hs lg ld pas pa fi | false with () ← eq
-  go sb@(U.outˢ k _ _) (U.endˢ c) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.skipˢ k _)  (U.endˢ c) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb@(U.endˢ k)     (U.endˢ c) hb hs lg ld pas pa fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
-  go sb (U.endˢ c) hb hs lg ld pas pa fi | true =
+  go sb (U.endˢ c) hb hs lg ld pas fi with U.beforeˢ (c ++ [ ix 0 ]) sb in eq
+  go U.hushˢ           (U.endˢ c) hb hs lg ld pas fi | false with () ← eq
+  go sb@(U.outˢ k _ _) (U.endˢ c) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.skipˢ k _)  (U.endˢ c) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb@(U.endˢ k)     (U.endˢ c) hb hs lg ld pas fi | false = body sb (hb (cong not eq) fi) (lg k (cong not eq) fi)
+  go sb (U.endˢ c) hb hs lg ld pas fi | true =
     ≃-trans (beside-≃ (≃-refl MB) e₁)
    (≃-trans (tie-lead c M.hushed tt MB (ld (c ++ [ ix 0 ]) eq (wins-self c) fi))
             (skip-cong (subst (MB ≃_) (sym (shut-meaning (here refl) c b (end c ∷ᴬ ρ) refl))
-                              (env-≃ b ρ e₁ pb (shut-placed (here refl) c b (end c ∷ᴬ ρ) refl pbs)))))
+                              (env-≃ b ρ e₁))))
     where e₁ = hs (first-sub c δ fi)
-          pbs = proj₂ (proj₂ (pa fi))
 
 -- A RUNNING CONNECT STEPS AS IT MEANS: its body, reading its source, and
 -- its source, each showing its step whenever it comes first, the
@@ -743,7 +745,6 @@ live-skips b s δ st sn@(_ , sns) pl@(_ , pb , ps) hb hs =
        (λ k w f → lags s δ st ps k w f)
        (λ j bj w f → leads b (U.live s ∷ δ) (hs , ps , st) pb j bj (w , f))
        (placed-after s δ st sns ps)
-       (placed-after (U.connectᶜ b (U.live s)) δ st sn pl)
 
 ------------------------------------------------------------------------
 -- Every node
