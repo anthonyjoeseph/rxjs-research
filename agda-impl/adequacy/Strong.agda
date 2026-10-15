@@ -16,7 +16,7 @@
 module adequacy.Strong where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_]; foldr) renaming (map to mapᴸ)
+open import Data.List using (List; []; _∷_; _++_; [_]; foldr)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
@@ -537,7 +537,7 @@ module Strongly (R : Set) where
     -- A joiner shows what it holds until it is gone.
     joinedᶜ : ∀ {Δ A} → A ∈ Δ → Pos → Maybe (List (Pos × A) × Maybe Pos) → Maybe (U.Node Δ A)
     joinedᶜ x j nothing          = nothing
-    joinedᶜ x j (just (xs , e))  = just (U.joinᶜ x j 0 (mapᴸ (λ { (q , a) → q , just a }) xs) e)
+    joinedᶜ x j (just (xs , e))  = just (U.joinᶜ x j xs e)
 
     taking? : ∀ {Δ A} → Bool → (A → Bool) → Taking → Maybe (U.Node Δ A) → Maybe (U.Node Δ A)
     taking? i p taking     s = mapᴹ (U.takeWhileᶜ i p) s
@@ -910,7 +910,7 @@ module Strongly (R : Set) where
     Sane ν (U.scanᶜ f z c)           = Sane ν c
     Sane ν (U.takeWhileᶜ i p c)      = Sane ν c
     Sane {Γ} ν (U.flatMapᶜ op g o ls qs) = Saneᴹ ν o × Saneᴸ ν ls × (∀ a q → Sane (allLive Γ) (g a q))
-    Sane ν (U.joinᶜ i p n xs e)      = Told (lookup ν i) e
+    Sane ν (U.joinᶜ i p xs e)        = Told (lookup ν i) e
     Sane ν (U.connectᶜ b (U.live s)) = Sane (true ∷ᴬ ν) b × Sane ν s
     Sane ν (U.connectᶜ b (U.ended c)) = Sane (false ∷ᴬ ν) b
     Sane ν _                         = ⊤

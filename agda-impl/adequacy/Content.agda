@@ -31,7 +31,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼; skip⁼; end⁼;
-  agree; agree-sym; agree-trans; agree-pred; stop; hush⁼; lub; lub-limit; Settling; agrees) renaming (cold to coldᴹ)
+  agree; agree-sym; agree-trans; lub; lub-limit; Settling; agrees) renaming (cold to coldᴹ)
 import denotation.Unfold as U
 open import denotation.Compositional using (from; settle; []ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_)
@@ -238,13 +238,6 @@ module Honesty (R : Set) where
     where no : ∀ {q b} → Has hush q b → ⊥
           no ()
 
-  -- What a step shows, then approximant n of the ghost it leaves.
-  afterₙ : ℕ → U.Step [] R → Events R
-  afterₙ n (U.outˢ k a g′) = out k a λ where .force → U.meaning n g′ []
-  afterₙ n (U.skipˢ k g′)  = skip k λ where .force → U.meaning n g′ []
-  afterₙ n (U.endˢ k)      = end k
-  afterₙ n U.hushˢ         = hush
-
   -- A ghost whose residual is `g`'s, which `m′` runs.
   Ahead : U.Node [] R → Mach → Set₁
   Ahead g m′ = Σ (U.Node [] R) λ g″ → residual g ≋ residual g″ × Mirror g″ m′
@@ -259,18 +252,29 @@ module Honesty (R : Set) where
   if-silent false false = _ , refl
 
   postulate
-    -- A node's approximants settle, as a program's do (`settle`).
-    node-settles : ∀ (g : U.Node [] R) → Settling (λ n → coldᴹ λ _ → U.meaning n g [])
-
-    -- THE STEPPER IS THE MEANING, approximant by approximant, of a run's
-    -- configuration (`Sane`): what the ghost's step shows, then the ghost
-    -- it leaves.  A joiner shows its source's steps as `M.rejoin` does,
-    -- so each node steps as its stream function does.  A joiner told its
-    -- end while its source runs is fed the source's values by the
-    -- stepper and shows them, where the meaning reads it as its end alone.
+    -- THE STEPPER IS THE MEANING, as sets, of a run's configuration
+    -- (`Sane`): what the ghost's step shows, then the residual of the
+    -- ghost it leaves.  A joiner told its end while its source runs is
+    -- fed the source's values by the stepper and shows them, where the
+    -- meaning reads it as its end alone.
+    --
+    -- So the proof runs modulo skips, and the source's skips are unbounded,
+    -- so the relation must survive a merge (`M.beside`, `M.go`) whose
+    -- order a skip's position steers.
     --
     -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
-    step-agrees : ∀ g → Sane [] g → ∀ n → Agree n (U.meaning n g []) (afterₙ n (U.step g))
+    -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
+    --   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
+    --   (`M.rejoin`), and a value from before its join as a skip; the
+    --   stepper feeds a joiner values only, and only those after it joined.
+    -- DEAD ROUTE: exact agreement per approximant with the stepper's joiner
+    --   shown every source step as `M.rejoin` shows it.  A lane a flatMap
+    --   has yet to subscribe reads its connect's source from where the
+    --   ghost's source stands, so the meaning shows it one pre-join skip at
+    --   `p ++ [ ix i ]` per source step before its join, and a source step
+    --   leaves one fewer.  Witness 950a4208.
+    -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
+    step-alike : ∀ g → Sane [] g → residual g ≋ after (U.step g)
 
     -- The turn, nothing held and no timer queued: the ghost shows
     -- nothing.
@@ -304,22 +308,6 @@ module Honesty (R : Set) where
   -- THE STRONG STEP: from a re-entry configuration the machine runs
   -- silently to the next, or records a least value of the residual, or
   -- ends it.  By the re-entry state.
-  -- Approximant n of a node is its residual, n steps deep.
-  approx-residual : ∀ g n → Agree n (U.meaning n g []) (residual g)
-  approx-residual g n = agree (lub-limit {c = λ n → coldᴹ λ _ → U.meaning n g []} (node-settles g) n) root
-
-  after-residual : ∀ n s → Agree n (afterₙ n s) (after s)
-  after-residual zero    s               = stop
-  after-residual (suc n) (U.outˢ k a g′) = out⁼ (agree-pred (approx-residual g′ (suc n)))
-  after-residual (suc n) (U.skipˢ k g′)  = skip⁼ (agree-pred (approx-residual g′ (suc n)))
-  after-residual (suc n) (U.endˢ k)      = end⁼
-  after-residual (suc n) U.hushˢ         = hush⁼
-
-  -- The stepper is the meaning, as sets.
-  step-alike : ∀ g → Sane [] g → residual g ≋ after (U.step g)
-  step-alike g sn = same-agree λ n →
-    agree-trans (agree-sym (approx-residual g n)) (agree-trans (step-agrees g sn n) (after-residual n (U.step g)))
-
   residual-steps : ∀ g → Sane [] g → Steps (residual g) (U.step g)
   residual-steps g sn = steps-after (U.step g) (step-alike g sn)
 
