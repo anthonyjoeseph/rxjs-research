@@ -7,9 +7,9 @@
 -- turns.  The relation never rests at a return.
 module adequacy.Kept where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; length) renaming (map to mapᴸ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 import Data.List.Relation.Unary.All as All
@@ -18,13 +18,17 @@ open import Data.List.Relation.Unary.Any using (here; there)
 import Data.List.Relation.Unary.Linked as Linked
 open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_)
 open import Data.Maybe using (just)
-open import Data.Nat using (_≤_; _+_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; s≤s⁻¹)
+open import Data.Nat.ListAction using (sum)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; <-trans; n<1+n)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst)
+open import Data.Unit using (⊤; tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst; subst₂; cong)
 
-open import denotation.MonotonicList using (Pos; _<ᵖ_; <ᵖ-trans; <ᵖ-tick) renaming (sub to subᴾ)
+import Tree as T
+open import Tree using (Obs)
+open import denotation.MonotonicList using (Pos; _<ᵖ_; <ᵖ-trans; <ᵖ-tick; emit; stall; close) renaming (sub to subᴾ)
 open import denotation.Unfold using (Node; hushˢ; skipˢ) renaming (step to stepᵁ)
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; _⊑_; Sink; Handle; same; module Pure)
@@ -35,9 +39,9 @@ open import adequacy.Wait using (module Waiting)
 
 module Keeping (R : Set) where
   open Run (Pureᴾ R) using (Act)
-  open Pure R using (State; Timer; cascade)
-  open Machine R using (Mach; ⟨_,_⟩; Stack; loop; run; ret; burst; turn; step; silent; drained; spent?)
-  open Carrying R using (Carried; module At; module Against; Owned; Ordered; Sub; Lane; lane
+  open Pure R using (State; Timer; cascade; Callbacks)
+  open Machine R using (Mach; ⟨_,_⟩; Stack; loop; run; ret; burst; turn; step; silent; drained; spent?; asked; push; cbs)
+  open Carrying R using (Carried; module At; module Against; Owned; Ordered; Sub; Lane; lane; Call; feedC; finC; Spot
                         ; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ
                         ; waiting; playing; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
                         ; this-lane; next-lane; Meaning; Kernels; Queue; Books; pendings; lanePendings; joiners; Joiner; firing)
@@ -213,6 +217,73 @@ module Keeping (R : Set) where
     calm-hush : ∀ {h} {st : State h} {c} → Carried ⟨ st , turn ⟩ c → State.timers st ≡ [] → Quiets c
 
   ------------------------------------------------------------------------
+  -- C: the measure
+
+  -- What a subscription costs before it waits: one step per operator
+  -- reached synchronously, a cold its start, its check and its first
+  -- frame.
+  weighᴼ : ∀ {C Γ A} → Obs C Γ A → ℕ
+  weighᴼ (T.cold _)          = 3
+  weighᴼ (T.map f s)         = suc (weighᴼ s)
+  weighᴼ (T.scan f z s)      = suc (weighᴼ s)
+  weighᴼ (T.takeWhile i p s) = suc (weighᴼ s)
+  weighᴼ (T.flatMap op f s)  = suc (weighᴼ s)
+  weighᴼ (T.connect s b)     = suc (weighᴼ s + weighᴼ b)
+  weighᴼ _                   = 1
+
+  -- The synchronous work a carried state owes before the meaning must
+  -- move: each call on the agenda, a feed one per joiner; each burst in
+  -- flight; each subscription reached and not begun.
+  module Weigh {h} (t : Sub h [] R) where
+    open Against t
+
+    weighU : ∀ {Δ A} → Sub h Δ A → ℕ
+    weighU (pendingˢ s q) = weighᴼ s
+    weighU _              = 0
+
+    weighC : Call t → ℕ
+    weighC (feedC {ss = ss} π) = suc (length ss)
+    weighC (finC {ss = ss} π)  = suc (length ss)
+    weighC _                   = 1
+
+    work : ∀ {ctl} → CtlAs ctl → ℕ
+    work ca = sum (mapᴸ weighC (agenda ca)) + length (bursts ca) + sum (mapᴸ (λ x → weighU (Spot.u x)) (begins ca))
+
+  -- The work owed, and a timer per frame still to fire.
+  weight : ∀ {m c} → Carried m c → ℕ
+  weight {m} r = Weigh.work (Carried.tree r) (Carried.ctlAs r) + length (State.timers (Mach.state m))
+
+  -- The simulation already kept at every lighter carried state: what a
+  -- step re-entering the relation with the meaning unmoved is handed.
+  Lighter : ∀ {m c} → Carried m c → Set₁
+  Lighter r = ∀ {m′ c′} (r′ : Carried m′ c′) → weight r′ < weight r → Wait Carried (step m′) (stepᵁ c′)
+
+  -- Silent machine steps, the meaning unmoved.
+  data Lefts : Mach → Mach → Set₁ where
+    stay : ∀ {m} → Lefts m m
+    next : ∀ {m m′ m″} → step m ≡ silent m′ → Lefts m′ m″ → Lefts m m″
+
+  lefts : ∀ {m m′ s} → Lefts m m′ → Wait Carried (step m′) s → Wait Carried (step m) s
+  lefts stay       w = w
+  lefts (next e l) w rewrite e = left (lefts l w)
+
+  private
+    calm-work : ∀ {h} {t : Sub h [] R} (ca : Against.CtlAs t turn) → Weigh.work t ca ≡ 0
+    calm-work Against.calmAs = refl
+
+    fire-work : ∀ {h} {t : Sub h [] R} {A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u}
+              → (ca : Against.CtlAs t (burst s hd τ p i b same loop)) → Weigh.work t ca ≡ 1
+    fire-work (Against.burstAs π Against.loopAs)  = refl
+    fire-work (Against.fireAs _ π Against.loopAs) = refl
+
+  calm-weight : ∀ {h} {st : State h} {c} (r : Carried ⟨ st , turn ⟩ c) → weight r ≡ length (State.timers st)
+  calm-weight {st = st} r = cong (_+ length (State.timers st)) (calm-work (Carried.ctlAs r))
+
+  fire-weight : ∀ {h} {st : State h} {A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {c}
+              → (r : Carried ⟨ st , burst s hd τ p i b same loop ⟩ c) → weight r ≡ suc (length (State.timers st))
+  fire-weight {st = st} r = cong (_+ length (State.timers st)) (fire-work (Carried.ctlAs r))
+
+  ------------------------------------------------------------------------
   -- B kept
 
   postulate
@@ -225,34 +296,109 @@ module Keeping (R : Set) where
     -- nodes the agenda does not owe, so this step needs a field placing
     -- each live node's next shown event past the agenda's region.
     kept-run : ∀ {h} {st : State h} {w B} {a : Act h B} {σ : w ⊑ h} {K : Stack w B} {c}
-             → Carried ⟨ st , run a σ K ⟩ c → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
+             → (r : Carried ⟨ st , run a σ K ⟩ c) → Lighter r → Wait Carried (step ⟨ st , run a σ K ⟩) (stepᵁ c)
 
-    -- A cold's frame at its next step, its subscriber asked if closed; or
-    -- a popped timer's at its first, its cold still waiting on it, so the
-    -- meaning's next event is that frame's first step at the timer's
-    -- cascade, everything else open waiting past it.
-    kept-burst : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-               → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → Wait Carried (step ⟨ st , burst s hd τ p i b σ K ⟩) (stepᵁ c)
+    -- A burst whose cold is spent returns to what waits on it: the
+    -- burst leaves the agenda, so whatever the return re-enters is
+    -- lighter, and the meaning shows nothing of a spent cold.
+    returned : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+             → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ true → Lighter r
+             → Wait Carried (step ⟨ st , ret tt σ K ⟩) (stepᵁ c)
+
+    -- An unspent cold's subscriber reads open, its check only reading
+    -- the heap.
+    asks-open : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+              → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → spent? st hd ≡ false
+              → Lefts ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩
+                      ⟨ st , ret false same (push (asked s hd τ p i b) σ K) ⟩
+
+    -- The frame's step is a value: the meaning's next event is it, at
+    -- `p ++ [ ix i ]`, every other open node waiting past that.
+    burst-emit : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {a k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+               → (r : Carried ⟨ st , burst s hd τ p i (emit {A} {u} a k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
+               → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (emit a k)) σ K) ⟩) (stepᵁ c)
+
+    -- The frame's step is a stall: the meaning skips it, every other
+    -- open node waiting past it.
+    burst-stall : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+                → (r : Carried ⟨ st , burst s hd τ p i (stall {A} {u} k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
+                → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (stall k)) σ K) ⟩) (stepᵁ c)
+
+    -- The frame closes: the cold completes, falls quiet, or waits on a
+    -- timer due past the clock.
+    burst-close : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {k} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+                → (r : Carried ⟨ st , burst s hd τ p i (close {A} {u} k) σ K ⟩ c) → spent? st hd ≡ false → Lighter r
+                → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i (close k)) σ K) ⟩) (stepᵁ c)
 
   -- A burst whose cold is spent returns at once.
   burst-spent : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
               → spent? st hd ≡ true → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , ret _ σ K ⟩
   burst-spent e rewrite e = refl
 
-  calm : ∀ {h} (ts : List (Timer h)) {st : State h} {c} → State.timers st ≡ ts → Carried ⟨ st , turn ⟩ c → Wait Carried (step ⟨ st , turn ⟩) (stepᵁ c)
-  calm []        e r with calm-hush r e
+  -- Otherwise it asks its subscriber whether it is closed.
+  burst-open : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
+             → spent? st hd ≡ false
+             → step ⟨ st , burst s hd τ p i b σ K ⟩ ≡ silent ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd τ p i b) σ K) ⟩
+  burst-open e rewrite e = refl
+
+  played : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} (b : Frame A u) {σ : w ⊑ h} {K : Stack w ⊤} {c}
+         → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false → Lighter r
+         → Wait Carried (step ⟨ st , ret false same (push (asked s hd τ p i b) σ K) ⟩) (stepᵁ c)
+  played (emit a k) = burst-emit
+  played (stall k)  = burst-stall
+  played (close k)  = burst-close
+
+  -- A cold's frame at its next step, its subscriber asked if closed; or
+  -- a popped timer's at its first, its cold still waiting on it.
+  kept-burst : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+             → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → Lighter r → Wait Carried (step ⟨ st , burst s hd τ p i b σ K ⟩) (stepᵁ c)
+  kept-burst {st = st} {hd = hd} {b = b} {c = c} r lt = by (spent? st hd) refl
+    where
+      by : (x : Bool) → spent? st hd ≡ x → Wait Carried (step ⟨ st , burst _ hd _ _ _ b _ _ ⟩) (stepᵁ c)
+      by true  sp = subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-spent sp)) (left (returned r sp lt))
+      by false sp = subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-open sp)) (left (lefts (asks-open r sp) (played b r sp lt)))
+
+  private
+    fired : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} (r : Carried ⟨ st , turn ⟩ c) (e : State.timers st ≡ tm ∷ ts)
+            (sp : spent? st (Timer.handle tm) ≡ false) → Lighter r → Lighter (pop r e sp)
+    fired r e sp lt r′ l = lt r′ (subst (weight r′ <_) (trans (fire-weight (pop r e sp)) (sym (trans (calm-weight r) (cong length e)))) l)
+
+    staled : ∀ {h} {st : State h} {c} {tm : Timer h} {ts : List (Timer h)} (r : Carried ⟨ st , turn ⟩ c) (e : State.timers st ≡ tm ∷ ts)
+             (sp : spent? st (Timer.handle tm) ≡ true) → Lighter r → Lighter (stale r e sp)
+    staled {ts = ts} r e sp lt r′ l =
+      lt r′ (<-trans l (subst₂ _<_ (sym (calm-weight (stale r e sp))) (sym (trans (calm-weight r) (cong length e))) (n<1+n (length ts))))
+
+  -- A queued timer pops.
+  turn-pop : ∀ {h} {st : State h} {tm : Timer h} {ts : List (Timer h)} → State.timers st ≡ tm ∷ ts
+           → step ⟨ st , turn ⟩ ≡ silent ⟨ record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
+                                        , burst (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) same loop ⟩
+  turn-pop e rewrite e = refl
+
+  calm : ∀ {h} (ts : List (Timer h)) {st : State h} {c} → State.timers st ≡ ts → (r : Carried ⟨ st , turn ⟩ c) → Lighter r
+       → Wait Carried (step ⟨ st , turn ⟩) (stepᵁ c)
+  calm []        e r lt with calm-hush r e
   ... | q rewrite e = quiets q
-  calm (tm ∷ ts) {st = st} {c} e r with spent? st (Timer.handle tm) in sp
-  ... | false rewrite e = left (kept-burst (pop r e sp))
-  ... | true rewrite e = left (subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-spent sp)) (left (left (calm ts refl (stale r e sp)))))
+  calm (tm ∷ ts) {st = st} {c} e r lt with spent? st (Timer.handle tm) in sp
+  ... | false = subst (λ x → Wait Carried x (stepᵁ c)) (sym (turn-pop e)) (left (kept-burst (pop r e sp) (fired r e sp lt)))
+  ... | true  = subst (λ x → Wait Carried x (stepᵁ c)) (sym (turn-pop e))
+                  (left (subst (λ x → Wait Carried x (stepᵁ c)) (sym (burst-spent sp)) (left (left (calm ts refl (stale r e sp) (staled r e sp lt))))))
+
+  keep : ∀ {m c} (r : Carried m c) → Lighter r → Wait Carried (step m) (stepᵁ c)
+  keep {⟨ st , run a σ K ⟩}              r lt = kept-run r lt
+  keep {⟨ st , ret x σ K ⟩}              r lt with Carried.ctlAs r
+  ... | ()
+  keep {⟨ st , burst s hd τ p i b σ K ⟩} r lt = kept-burst r lt
+  keep {⟨ st , turn ⟩}                   r lt = calm _ refl r lt
+
+  -- C: each step the meaning does not take with the machine re-enters
+  -- the relation lighter.
+  kept-under : ∀ n {m c} (r : Carried m c) → weight r < n → Wait Carried (step m) (stepᵁ c)
+  kept-under zero    r ()
+  kept-under (suc n) r w< = keep r λ r′ l → kept-under n r′ (≤-trans l (s≤s⁻¹ w<))
 
   -- Every node due before the next turn is owed (`Owned`): without it a
   -- state between turns with an `of` open steps drained while the
   -- meaning shows the `of`'s value, and `adequacy.Simulation.unowned`
   -- keeps that state out.
   kept : ∀ {m c} → Carried m c → Wait Carried (step m) (stepᵁ c)
-  kept {⟨ st , run a σ K ⟩}                r = kept-run r
-  kept {⟨ st , ret x σ K ⟩}                r with Carried.ctlAs r
-  ... | ()
-  kept {⟨ st , burst s hd τ p i b σ K ⟩}   r = kept-burst r
-  kept {⟨ st , turn ⟩}                     r = calm _ refl r
+  kept r = kept-under (suc (weight r)) r ≤-refl

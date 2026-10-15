@@ -125,6 +125,12 @@ postulate
   -- operator's stream function taken one event at a time, but at a
   -- `connect`: the stepper feeds its joiners from the source as it runs,
   -- where the meaning hands each joiner the source's whole run, rejoined.
+  --
+  -- DEAD ROUTE: `Wait`'s right side retargeted at the configuration's
+  --   meaning, so the simulation lands on it directly.  The meaning's
+  --   next event is still its earliest leaf's, chosen by the position
+  --   order the stepper's `pick` uses, so every step of B would carry
+  --   that choice: the link moves into `kept`, it does not go.
   stepped : ∀ {A} (o : PureObs [] A) → meaning o ≃ ticks (observe (⟦ o ⟧ᵘ []) root)
 
 -- The stepper and the fold show the same.

@@ -171,22 +171,21 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
 
 ### Big picture tier roadmap
 
-- **THE CONFIGURATION'S MEANING AS THE SIMULATION'S TARGET.** `Wait`'s
-  right side becomes the meaning of the configuration `Carried` holds, not
-  the stepper's step, so `sim` lands on `⟦_⟧` and `stepped` and the stepper
-  go. C's measure is lexicographic: the meaning's steps, then the machine's
-  synchronous work left, a function of its control and agenda (within
-  9 × meaning steps × tree size on 300 programs). Decides whether the
-  stepper is needed at all.
 - **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
   turn; it gains a field placing every live node's next shown event past the
   region the agenda owes, true at `carried-begin`. A popped timer's first
-  step, `kept-burst` with the cold still waiting, is its first test: the
-  agenda is empty, so every open node waits past the timer's cascade. Then
-  the feed's case of `kept-run`. The meaning feeds its joiners from one run of
-  the source, as the machine's subject does, so a joiner holds exactly what
-  the feed owes it (`Fed`) and no joiner lags its source. Decides whether the
-  position order alone orders the meaning's leaves against the machine.
+  step, `burst-emit` and `burst-stall` with the cold still waiting, is its
+  first test: the agenda is empty, so every open node waits past the timer's
+  cascade. Then the feed's case of `kept-run`. The meaning feeds its joiners
+  from one run of the source, as the machine's subject does, so a joiner
+  holds exactly what the feed owes it (`Fed`). Decides whether the position
+  order alone orders the meaning's leaves against the machine.
+- **C'S MEASURE, AGAINST THE RETURNS.** `kept` is a recursion on `weight`:
+  the agenda's calls, the bursts in flight, the subscriptions owed and the
+  timers queued. `returned` and `asks-open` first, the burst leaving the
+  agenda; then `kept-run`'s silent steps, a subscription's `weighᴼ` spent
+  before its first wait. Decides whether a step the meaning does not take
+  always re-enters lighter, or the measure needs the meaning's steps too.
 - **B'S STEP AT A DEATH, IN AGDA.** An observer dying mid-burst: a
   `takeWhile` cutting, a switch moving off its lane, a connect's body
   completing and its source stopped. The dead are owed nothing, so B must
@@ -201,13 +200,21 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
 
 - **`kept-run`** (Kept) — FALSITY, `NO EVIDENCE`: code running, the agenda's
   next call or a subscription beginning; the connect's feed is here.
-- **`kept-burst`** (Kept) — FALSITY, `NO EVIDENCE`: a cold's frame at its next
-  step, or a popped timer's at its first, its subscriber asked if closed.
+- **`burst-emit`** (Kept) — FALSITY, `NO EVIDENCE`: a frame's value is the
+  meaning's next event, every other open node past it.
+- **`burst-stall`** (Kept) — FALSITY, `NO EVIDENCE`: a frame's stall is the
+  meaning's next skip, every other open node past it.
+- **`burst-close`** (Kept) — FALSITY, `NO EVIDENCE`: a frame closing completes
+  the cold, quiets it, or queues a timer past the clock.
+- **`returned`** (Kept) — FALSITY, `NO EVIDENCE`: a spent cold's burst returns
+  and re-enters lighter.
+- **`asks-open`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's subscriber
+  reads open, its check only reading.
 - **`calm-hush`** (Kept) — FALSITY, `NO EVIDENCE`: no timer queued, the meaning
   falls quiet by silent steps.
 - **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program
   pending at the root, carried.
-- **`stepped`** (Adequacy) — FALSITY, `NO EVIDENCE`: the stepper and its
+- **`stepped`** (Adequacy) — FALSITY, `DEAD ROUTE`: the stepper and its
   configuration's show the same; they differ in how `connect` feeds its
   joiners.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
