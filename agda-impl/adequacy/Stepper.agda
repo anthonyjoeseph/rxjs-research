@@ -769,9 +769,12 @@ postulate
   -- A BODY FED ITS SOURCE'S STEP IS ALIKE THE BODY READING IT: a joiner
   -- fed the value its source shows at `q`, reading the source past it,
   -- the body's meaning showing nothing before the value.  A joiner the
-  -- body makes later is never fed, so it must join after the value.
+  -- body makes later is never fed, so it must join after the value; and
+  -- a joiner told its end is fed all the same, so none may be told while
+  -- the source runs.
   --
   -- REFUTED: 69f610c0 stated without the body's meaning after the value, by a body joining its source later
+  -- REFUTED: 082ad778 stated without the body sane, by a joiner told its end
   -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
   --   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
   --   (`M.rejoin`), and a value from before its join as a skip; the
@@ -795,7 +798,7 @@ postulate
   --   so the inners are not alike at all.
   -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
   fed-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) q (a : A) (l : Events∞ A) {x : Events A} → x ≃ out q a l
-        → Ordered x → Ordered (out q a l) → Atop (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ))
+        → ∀ {ν} → Sane (true ∷ᴬ ν) b → Ordered x → Ordered (out q a l) → Atop (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ))
         → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
         → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
 
@@ -998,7 +1001,7 @@ conn b s δ st sn (_ , pb , ps) sb ss hb hs lg ld pab pas pa fi = go sb ss hb hs
   go sb (U.outˢ q x s′) hb hs lg ld pab pas pa fi | true =
     ≃-trans (beside-≃ (proj₁ pb) (proj₁ pb) (proj₁ ps) ordOut (≃-refl MB) e₁)
    (≃-trans (tie-lead MB q _ (proj₁ pb) (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) atq)
-            (skip-cong (beside-≃ (proj₁ pb) (proj₁ pbf) (proj₁ ps′) (proj₁ ps′) (fed-≃ b ρ q x _ e₁ (proj₁ ps) ordOut (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) pb pbf) (≃-refl _))))
+            (skip-cong (beside-≃ (proj₁ pb) (proj₁ pbf) (proj₁ ps′) (proj₁ ps′) (fed-≃ b ρ q x _ e₁ (proj₁ sn) (proj₁ ps) ordOut (ld (q ++ [ ix 0 ]) eq (wins-self q) fi) pb pbf) (≃-refl _))))
     where e₁ = hs (first-sub q δ fi)
           ordOut = ordered-after ρ (U.outˢ q x s′) (pas (first-sub q δ fi))
           atq = proj₁ (pas (first-sub q δ fi))

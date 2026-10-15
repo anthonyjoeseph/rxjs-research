@@ -181,11 +181,11 @@ by their own silent steps (`Mirror`).
   the body fed its source's step, and a node reading alike environments
   alike over the readers. Ruled out: exact agreement, per approximant or
   under a ghost anchored in its sources' step history, a body fed a value
-  it would join its source only after, and `fed-≃` by recursion on the
-  node under its own hypothesis. Proven: a sorted skip is a `≃` forget, a
-  source's step commutes with the body's tied events, and a joiner reads
-  alike sorted sources alike, pre-join skips and all. Decides whether the
-  body fed the step and the body reading it are alike past a cut.
+  it would join its source only after or with a joiner told, and `fed-≃`
+  by recursion on the node under its own hypothesis. Proven: a sorted skip
+  is a `≃` forget, a source's step commutes with the body's tied events,
+  and a joiner reads alike sorted sources alike. Decides whether the body
+  fed the step and the body reading it are alike past a cut.
 - **THE ORDER.** `placed-subscribe` with `placed-after`, `lags` and `leads`:
   the meaning's events are sorted, a step keeps every node so, and what a
   node shows comes no earlier than any earlier step. Ruled out: a node
@@ -217,7 +217,7 @@ by their own silent steps (`Mirror`).
   run, a poll's answer and a popped timer passing silently.
 ### The ledger
 
-- **`fed-≃`** (Stepper) — FALSITY, `REFUTED, DEAD ROUTE×4, RECOVERY`: a body
+- **`fed-≃`** (Stepper) — FALSITY, `REFUTED×2, DEAD ROUTE×4, RECOVERY`: a body
   fed its source's step is alike the body reading it.
 - **`flat-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap reads alike
   environments alike, lanes yet to subscribe included.
