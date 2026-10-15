@@ -10,7 +10,9 @@
 -- root; at the launch the ghost is the program subscribed there, so the
 -- residual is the meaning's events (`begun`, by `subscribed`).  Each step
 -- keeps the residual or delivers a least event of it (`Shows`).  No step
--- of the machine is matched to a step of a stepper.
+-- of the machine is matched to a step of a stepper.  Only the run's
+-- re-entry configurations are related to the ghost (`Strong`); every
+-- other is reached from one by its own silent steps.
 module adequacy.Content where
 
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
@@ -22,7 +24,6 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat.Properties using (suc-injective)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
-open import Data.Bool using (true; false)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
@@ -33,7 +34,7 @@ open import denotation.MonotonicList using (Events; Events∞; Pos; Time; tick; 
   agree; agree-sym; agree-trans; lub; lub-limit; Settling; agrees) renaming (cold to coldᴹ)
 import denotation.Unfold as U
 open import denotation.Compositional using (from; settle; []ᵉ)
-open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
+open import adequacy.Sorted using (_≤ᵖ_)
 open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
 open import denotation.Denote using (⟦_⟧)
@@ -43,7 +44,6 @@ open Events∞
 
 module Honesty (R : Set) where
   open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
-  open Sorting R using (idle)
   open Recording R using (silent-keeps; value-notes)
   open Pure R using (End; finished; dry; cutOff; recorder)
   open Read
@@ -152,14 +152,15 @@ module Honesty (R : Set) where
     dryʰ  : step m ≡ drained → Stands m dry (Mach.marks m)
 
   postulate
-    -- THE CONFIGURATION RUNS THE GHOST: ONE relation over the whole
-    -- configuration, as `WellMach` is, never one per observer.  A
-    -- postulated TYPE: each kernel the run still reaches a node of the
-    -- ghost, its cells what the node keeps, each frame on the stack a
-    -- value on its way up the ghost's tree.
-    --
-    -- The ghost's `Node` has no node for a value in flight: a scope's
-    -- frame between an input's delivery and its output's is owed one.
+    -- A RE-ENTRY CONFIGURATION AGAINST THE GHOST: ONE relation over the
+    -- whole configuration, as `WellMach` is, never one per observer, and
+    -- only where the run re-enters — between turns, a value about to be
+    -- recorded, a subscription about to begin, a cold's frame about to
+    -- step, a timer just popped.  Every other configuration is reached
+    -- from one of these by its own silent steps (`Mirror`).  A postulated
+    -- TYPE: each kernel the run still reaches a node of the ghost, its
+    -- cells what the node keeps, what is owed once the current callback
+    -- returns a kernel's code at a node.
     --
     -- DEAD ROUTE: a contract per kernel over the histories its observer is
     --   delivered, composed by `compile`.  The contract must hold under
@@ -180,10 +181,22 @@ module Honesty (R : Set) where
     --   callback, so the source's cells are written within its call and
     --   cannot be framed out of it.  And a frame naming other observers'
     --   specs sits a universe above them, so no heap can store it.
-    Mirror : U.Node [] R → Mach → Set₁
+    Strong : U.Node [] R → Mach → Set₁
 
-    -- The launch runs the program subscribed at the root.
-    mirror-begin : (o : PureObs [] R) → Mirror (U.subscribe o root) (begin o)
+    -- The launch is a subscription about to begin: the program, at the
+    -- root.
+    strong-begin : (o : PureObs [] R) → Strong (U.subscribe o root) (begin o)
+
+  -- `m` runs silently to `m′`.
+  data _⇝_ (m : Mach) : Mach → Set₁ where
+    now  : m ⇝ m
+    then : ∀ {m₁ m′} → step m ≡ silent m₁ → m₁ ⇝ m′ → m ⇝ m′
+
+  -- THE CONFIGURATION RUNS THE GHOST: it runs silently to a re-entry
+  -- configuration against it.  No intermediate configuration is related
+  -- to the ghost but by the steps the machine takes from it.
+  Mirror : U.Node [] R → Mach → Set₁
+  Mirror g m = Σ Mach λ m₀ → m ⇝ m₀ × Strong g m₀
 
   -- THE CONFIGURATION WILL DELIVER `rest`: it runs a ghost whose
   -- residual `rest` is, as a set.
@@ -213,21 +226,21 @@ module Honesty (R : Set) where
 
   -- The launch will deliver the meaning's events.
   inner-launch : (o : PureObs [] R) → Inner (observe (⟦ o ⟧ []) root) (begin o)
-  inner-launch o = record { ghost = U.subscribe o root ; same = same-agree (begun o) ; mirror = mirror-begin o }
+  inner-launch o = record { ghost = U.subscribe o root ; same = same-agree (begun o) ; mirror = begin o , now , strong-begin o }
 
   postulate
-    -- THE TREE WALK: a step that is not the loop's turn shows the
-    -- residual.
-    inner-walk : ∀ {rest m} → Inner rest m → idle m ≡ false → Shows rest (step m)
+    -- THE STRONG STEP: from a re-entry configuration the machine runs
+    -- silently to the next, or records a least value of the residual, or
+    -- ends it.
+    strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
 
-    -- THE LOOP'S TURN: popping a timer shows the residual.
-    inner-turn : ∀ {rest m} → Inner rest m → idle m ≡ true → Shows rest (step m)
-
-  -- Every step shows the residual.
+  -- Every step shows the residual: on the way to a re-entry
+  -- configuration a silent step keeps the ghost.
   inner-next : ∀ {rest m} → Inner rest m → Shows rest (step m)
-  inner-next {m = m} i with idle m in eq
-  ... | true  = inner-turn i eq
-  ... | false = inner-walk i eq
+  inner-next i with Inner.mirror i
+  ... | m₀ , now , st          = strong-shows st (Inner.same i)
+  ... | m₀ , then eq path , st =
+    subst (Shows _) (sym eq) (silentˢ (record { ghost = Inner.ghost i ; same = Inner.same i ; mirror = m₀ , path , st }))
 
   -- THE MACHINE HONEST TO `e`: what it has recorded is among `e`, and
   -- what of `e` it has not lies in `rest`, past every mark, which the

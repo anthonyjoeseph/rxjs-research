@@ -171,23 +171,29 @@ a body: a turn opens an epoch at its timer's cascade, and setting a timer
 moves the last to where it was set, so same-tick timers pop in order.
 Content rides a GHOST, the meaning's own configuration, which the machine's
 runs; at the launch its residual is the events (`begun`, by `subscribed`).
+Only re-entry configurations are related to the ghost; the rest reach one
+by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **MIRROR, DEFINED.** `Inner` is a ghost (`denotation.Unfold`'s `Node`)
-  whose residual is the rest, run by the configuration (`Mirror`). Left:
-  `Mirror` a relation of the ghost's nodes to the kernels, their cells and
-  the stack, the ghost given a node for a value in flight; `mirror-begin`
-  by the subscription's own steps. Decides whether a node per kernel and a
-  pending value per frame suffice, or a frame owes more than a value.
-- **THE WALK, SHOWN.** `inner-walk` over `Mirror`: a callback's step keeps
-  the residual by unfolding its operator's stream function one event; a
-  value reaching the root is a least event of it. Decides whether "least"
-  is paid once as a field, the ghost's sources past the last delivery as
-  `WellMach`'s are, rather than re-established at every step.
-- **THE TURN, SHOWN.** `inner-turn`: a popped timer's frame is the ghost's
-  frames node at its tick, and a drained run's ghost shows nothing. Decides
-  whether the ghost's timers need an order of their own or `WellQueue`'s.
+- **STRONG, DEFINED.** `Strong` a data type of the run's re-entry
+  configurations: a witness of every subscription the run reaches, with
+  its names, one constructor per kernel, as the deleted Carrier's `Sub`
+  was (`git show fbdfc8ed`); what is owed once the current callback returns
+  an agenda of kernel code, equal up to how names were weakened;
+  `strong-begin` the subscription state at the root. Decides whether five
+  re-entry states (between turns, a value to record, a subscription to
+  begin, a frame to step, a timer popped) suffice under scoped positions
+  and the driver's `rehold`/`told` frames, or a poll's answer needs its own.
+- **THE STRONG STEP.** `strong-shows` by re-entry state: the silent run to
+  the next one computed from the kernel's own code; a recorded value a
+  least event of the residual. Decides whether "least" is paid once as a
+  field, the ghost's sources past the last delivery as `WellMach`'s are,
+  rather than re-established at every step.
+- **THE TURN.** `strong-shows` between turns: a popped timer's frame is the
+  ghost's frames node at its tick, and a drained run's ghost shows nothing.
+  Decides whether the ghost's timers need an order of their own or
+  `WellQueue`'s.
 - **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
   in finitely many steps. Decides whether liveness needs a measure, and
   whether a `connect` feedback loop that spins makes it false.
@@ -197,14 +203,12 @@ runs; at the launch its residual is the events (`begun`, by `subscribed`).
 
 ### The ledger
 
-- **`Mirror`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; the
-  configuration runs the ghost, node for kernel, cells for state.
-- **`inner-walk`** (Content) — FALSITY, `NO EVIDENCE`: a step not the loop's
-  turn shows the residual: keeps it, takes its least value, or ends it.
-- **`inner-turn`** (Content) — FALSITY, `NO EVIDENCE`: the loop's turn shows
-  the residual, and a drained run has delivered all of it.
-- **`mirror-begin`** (Content) — FALSITY, `NO EVIDENCE`: the launch runs the
-  program subscribed at the root.
+- **`Strong`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; the
+  run's re-entry configurations against the ghost.
+- **`strong-shows`** (Content) — FALSITY, `NO EVIDENCE`: from a re-entry
+  configuration the run reaches the next silently, or shows the residual.
+- **`strong-begin`** (Content) — FALSITY, `NO EVIDENCE`: the launch is a
+  subscription about to begin at the root.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`reachedᴿ`** (Adequacy) — FALSITY, `NO EVIDENCE`: every item the meaning's
