@@ -181,23 +181,35 @@ by their own silent steps (`Mirror`).
   event is the agenda's first, `Clear` its form along an `of`'s path. The
   record carries `Sorted`'s `WellMach`; what remains is that a sibling's
   head is an obligation it owes, read off `Owned`, and that each stacked
-  call's next label lands past the frame it was pushed under. Ruled out:
-  deriving the order from `backAs`'s `q <ᵖ p`, which admits a frame
-  beside the run. Decides whether sortedness is the one ordering fact
-  both `of` values and notes read. Then `heads-lift`, `emit-run`,
-  `climb-take`, the `-onward` leaves and `burst-poll`.
-- **THE ORDER.** `spread-flat` and `spread-connect`, then `steady-flat` and
-  `fresh-flat` over `FlatOrder`'s lane roots: pairwise apart, each lane
-  alien to what is apart from its root, the outer apart from each.
-  `spread-sub` is a body over per-operator leaves. Ruled out: a lane's end
-  tied with another lane or the outer, a lane's first before where it
-  subscribes. Decides whether a stream's later events carry tags only from
-  joins made earlier, the causal half of spreading; its ordering half
-  follows from `Ordered` and `Steady`.
+  call's next label lands past the frame it was pushed under, a field
+  every frame's producer owes. Also open: ghost events of values dropped
+  before the root, which `Well` does not constrain. Ruled out: deriving
+  the order from `backAs`'s `q <ᵖ p`, which admits a frame beside the
+  run. Decides whether sortedness is the one ordering fact both `of`
+  values and notes read.
+- **THE ORDER.** `steady-start` and `ordered-start` first, the cold's run
+  where a tick heads it: two refutations in one region, so attempt the
+  assembly before restating again. Then `spread-flat`, `spread-connect`,
+  `steady-flat`, `fresh-flat` over `FlatOrder`'s lane roots. Ruled out: a
+  lane's end tied with another lane or the outer, a lane's first before
+  where it subscribes. Decides whether the start region is converging or
+  is a mechanism to reconsider.
+- **THE TAKE'S CLIMB.** `climb-take`: a failing take's value climbs on
+  into its completion, where the height measure rises. Decides the
+  measure the climb runs on: the value and the completion it owes as one
+  item, or a lexicographic pair whose first part a cut lowers.
+- **THE UNSEEN.** `emit-unseen`: an `of` feeding joiners past its body's
+  end, work the ghost does not see. Decides what falls while the ghost
+  stands still, and whether the run's `measure` already counts it.
+- **THE SHUT BODY.** `heads-lift`: a connect past its source's end shows
+  its body shut, so the body's part must read every joiner left already
+  told. `told` keeps an end it has; decides whether `Meaning`'s feed
+  invariant supplies the rest, or the record owes a field.
 - **THE OPERATORS.** `go-skips` and `take-first`: a flatMap's meaning is
   what its step shows, a cut step comes first when the uncut did. Ruled
   out: a stepper `≃` short of strong agreement, every operator respecting
   it and a source's step tied with the body's skips commuting.
+
 ### The ledger
 
 - **`spread-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap's lane value
