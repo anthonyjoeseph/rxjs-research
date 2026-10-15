@@ -188,9 +188,6 @@ runs; at the launch its residual is the events (`begun`, by `subscribed`).
 - **THE TURN, SHOWN.** `inner-turn`: a popped timer's frame is the ghost's
   frames node at its tick, and a drained run's ghost shows nothing. Decides
   whether the ghost's timers need an order of their own or `WellQueue`'s.
-- **CONTENT, ASSEMBLED.** `read-is-kept`: the launch's first n steps, read,
-  are a reached configuration's record. Decides whether a read cut inside a
-  completion's step marks it as `Stands` does.
 - **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
   in finitely many steps. Decides whether liveness needs a measure, and
   whether a `connect` feedback loop that spins makes it false.
@@ -208,8 +205,6 @@ runs; at the launch its residual is the events (`begun`, by `subscribed`).
   the residual, and a drained run has delivered all of it.
 - **`mirror-begin`** (Content) — FALSITY, `NO EVIDENCE`: the launch runs the
   program subscribed at the root.
-- **`read-is-kept`** (Content) — FALSITY, `REFUTED`: the launch's first n
-  steps, read, are some reached configuration's record, a completion marked.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`reachedᴿ`** (Adequacy) — FALSITY, `NO EVIDENCE`: every item the meaning's

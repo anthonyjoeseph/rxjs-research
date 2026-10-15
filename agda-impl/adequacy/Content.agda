@@ -14,6 +14,7 @@
 module adequacy.Content where
 
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
 import Data.List.Relation.Unary.Any as Any
@@ -23,10 +24,10 @@ open import Data.Nat.Properties using (suc-injective)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Bool using (true; false)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc)
+open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; tick; out; skip; end; observe; root; Agree; out⁼; skip⁼; end⁼;
   agree; agree-sym; agree-trans; lub; lub-limit; Settling; agrees) renaming (cold to coldᴹ)
@@ -41,7 +42,7 @@ open import operation.PureObservable using (PureObs; module Pure)
 open Events∞
 
 module Honesty (R : Set) where
-  open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; reading; begin; launch; Read; read)
+  open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read)
   open Sorting R using (idle)
   open Recording R using (silent-keeps; value-notes)
   open Pure R using (End; finished; dry; cutOff; recorder)
@@ -339,7 +340,7 @@ module Honesty (R : Set) where
     }
     where open HonMach h
   honest-step {e} {m} h (valueᵗ {t} {p} {a} eq) with subst (Shows (HonMach.rest h)) eq (inner-next (HonMach.inner h)) | value-notes m eq
-  ... | valueˢ {r = r} tp x₀ sub sp beyond i | kl , km = record
+  ... | valueˢ {r = r} tp x₀ sub sp beyond i | (kl , km) , _ = record
     { rest   = r
     ; logged = λ s → logged′ (subst₂ (λ qs xs → Sent qs xs _ _) km kl s)
     ; split  = λ x → [ (λ l′ → inj₁ (subst₂ (λ qs xs → Logged qs xs _ _) (sym km) (sym kl) l′)) , inj₂ ]′ (split′ x)
@@ -378,13 +379,34 @@ module Honesty (R : Set) where
   kept : ∀ {e m en qs} → Reached e m → Stands m en qs → Alike en qs (Mach.log m) e
   kept r = honest-alike (honest r)
 
-  postulate
-    -- The launch's first n steps, read, are the record of the
-    -- configuration n steps on.
-    --
-    -- REFUTED: 48b1b730 with the read from any reached configuration, its record the machine's marks alone
-    read-is-kept : (o : PureObs [] R) (n : ℕ) → Σ Mach λ m′ → Σ (Reached (observe (⟦ o ⟧ []) root) m′) λ _ → Σ End λ en
-                 → Σ (List Pos) λ qs → Stands m′ en qs × reading n 0 (trace (begin o)) ≡ read qs (Mach.log m′) en
+  -- What a reader of the run from a reached configuration has, put after
+  -- that configuration's record, is the record of one reached from it,
+  -- standing as the reader's run stands.
+  Onward : Events R → Mach → Read → Set₁
+  Onward e m x = Σ Mach λ m′ → Σ (Reached e m′) λ _ → Σ End λ en → Σ (List Pos) λ qs
+               → Stands m′ en qs × read (Mach.marks m ++ marks x) (Mach.log m ++ log x) (ending x) ≡ read qs (Mach.log m′) en
+
+  mutual
+    read-on : ∀ {e m} → Reached e m → ∀ n → Onward e m (reading n (Mach.clock m) (trace m))
+    read-on {m = m} r zero    = m , r , _ , _ , cutʰ , cong₂ (λ qs xs → read qs xs _) (++-identityʳ _) (++-identityʳ _)
+    read-on {m = m} r (suc n) = read-step r n (step m) refl
+
+    read-step : ∀ {e m} → Reached e m → ∀ n s → step m ≡ s → Onward e m (reading (suc n) (Mach.clock m) (shown s))
+    read-step {m = m} r n (silent m₁) eq with read-on (silentʰ r eq) n | silent-keeps m eq
+    ... | m′ , r′ , en , qs , st , x | kl , km = m′ , r′ , en , qs , st , subst₂ (λ ms ls → read (ms ++ _) (ls ++ _) _ ≡ _) km kl x
+    read-step {m = m} r n (value t p a m₁) eq with value-notes m eq
+    ... | (kl , km) , refl with read-on (valueʰ r eq) n
+    ...   | m′ , r′ , en , qs , st , x = m′ , r′ , en , qs , st ,
+              trans (cong₂ (λ ms ls → read ms ls _) (sym (++-assoc (Mach.marks m) [ p ] _)) (sym (++-assoc (Mach.log m) [ (t , a) ] _)))
+                    (subst₂ (λ ms ls → read (ms ++ _) (ls ++ _) _ ≡ _) km kl x)
+    read-step {m = m} r n (complete p) eq = m , r , finished , _ , finʰ eq , cong (λ ls → read _ ls finished) (++-identityʳ _)
+    read-step {m = m} r n drained      eq = m , r , dry , _ , dryʰ eq , cong₂ (λ qs xs → read qs xs dry) (++-identityʳ _) (++-identityʳ _)
+
+  -- The launch's first n steps, read, are the record of a configuration
+  -- reached from it.
+  read-is-kept : (o : PureObs [] R) (n : ℕ) → Σ Mach λ m′ → Σ (Reached (observe (⟦ o ⟧ []) root) m′) λ _ → Σ End λ en
+               → Σ (List Pos) λ qs → Stands m′ en qs × reading n 0 (trace (begin o)) ≡ read qs (Mach.log m′) en
+  read-is-kept o n = read-on (launchedʰ o refl) n
 
   -- CONTENT: every prefix's record alike the meaning's events as a set.
   content : (o : PureObs [] R) (n : ℕ) → let x = reading n 0 (trace (begin o)) in Alike (ending x) (marks x) (log x) (observe (⟦ o ⟧ []) root)
