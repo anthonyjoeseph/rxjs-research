@@ -177,14 +177,6 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE DEFER.** `reach-later`, `ordered-defer`, `steady-defer`,
-  `fresh-defer`, `within-defer` and `defer-after`: every defer case is one
-  design question, recursion through `Later`, where induction over a
-  program is not structural. Decides whether one route carries them all:
-  a property indexed by depth, by induction on depth then program, or a
-  safety property closed under agreeing to every depth with a program that
-  has it, reusing the coinductive combinators through `approx` and the
-  non-expansive lemmas. Either way the defer arms become one assembly.
 - **THE ORDER.** `spread-sub`, then `steady-flat` and `fresh-flat` over
   `FlatOrder`'s lane roots: pairwise apart, each lane alien to what is apart
   from its root, the outer apart from each. `ordered-flat` is a body over
@@ -213,22 +205,14 @@ by their own silent steps (`Mirror`).
 - **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`: after a subscription's
   value at `x`, nothing later lies a step past where a lane would key under
   `x`'s lane root, nor keys it. Never attempted; the causal half is the risk.
-- **`ordered-defer`** (Placed) — FALSITY, `REFUTED`: a defer's run where a tick
-  heads it, over sources sorted and alien to it, is in order.
 - **`steady-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap where a tick heads
   it, over sorted, alien sources, is steady: no lane steps inside its outer's.
 - **`fresh-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run in
   order, steady and fresh, fresh: nothing just past its failing value or end.
 - **`fresh-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap somewhere, over
   sorted, alien sources, keys nothing just past its own events.
-- **`fresh-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer somewhere, over
-  sorted, alien sources, keys nothing just past its own events.
 - **`fresh-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run keys
   nothing just past its own events, its frames tagged with earlier bursts.
-- **`steady-defer`** (Placed) — FALSITY, `REFUTED`: a defer where a tick heads
-  it, over sorted, alien sources, is steady.
-- **`reach-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program
-  subscribed is held to any `Rules`; `reach` there, short of a recursion.
 - **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
   steps merge into its body in order.
 - **`steady-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
@@ -240,8 +224,6 @@ by their own silent steps (`Mirror`).
 - **`ordered-start`** (Placed) — FALSITY, `REFUTED`: a cold's run where a tick
   heads it is in order.
 - **`ordered-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is in order.
-- **`within-defer`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer's program,
-  subscribed and fed, is placed within.
 - **`lags-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning shows
   nothing before a body's event that comes first, its sources a step past.
 - **`leads-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning
@@ -252,8 +234,6 @@ by their own silent steps (`Mirror`).
   nothing under silent sources shows nothing.
 - **`take-first`** (Stepper) — FALSITY, `NO EVIDENCE`: a cut step comes first
   when the uncut one did.
-- **`defer-after`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer's meaning is
-  one skip, then its program subscribed.
 - **`note-least`** (Content) — FALSITY, `NO EVIDENCE`: a note records the least
   value the ghost holds.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer

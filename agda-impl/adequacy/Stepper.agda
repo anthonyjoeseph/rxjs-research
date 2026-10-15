@@ -29,11 +29,13 @@ open import denotation.MonotonicList using (Events; Events∞; Pos; From; Frame;
 import denotation.MonotonicList as M
 import denotation.Unfold as U
 open import denotation.NonExpansive using (mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; rejoin-ne; beside-ne; hot-ne; go-ne; Lanes; []ᴸ; _∷ᴸ_; Queue; []ᑫ; _∷ᑫ_; doneᴼ; liveᴼ)
-open import denotation.Compositional using (EnvAgree; deferᴰ-contractive) renaming ([]ᵉ to []ᵈ; _∷ᵉ_ to _∷ᵈ_)
+open import denotation.Compositional using (EnvAgree; env-refl; deferᴰ-contractive) renaming ([]ᵉ to []ᵈ; _∷ᵉ_ to _∷ᵈ_)
 open import denotation.Unfold using (NEnv; ⟦⟧-ne)
 open import denotation.Denote using (flatOp)
-open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Told; allLive)
-open import adequacy.Placed using (Atop; Orders; Ordered; ordered; Placed; Within; Placedᴹ; Placedᴸ; Reaches; out-here; skip-here; out-there; skip-there)
+open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Told; allLive; running-all; sane-subscribe; sane-feed)
+open import adequacy.Placed using (Atop; Ordered; ordered; ordered-≈; steady-≈; every-≈; Everyᴱ; Sorted; Alienᴱ; placed-sub;
+  headed-snoc; alienᴱ-owned; prefix-++; Placed; Within; Placedᴹ; Placedᴸ; Reaches; out-here;
+  skip-here; out-there; skip-there)
 
 open Events∞
 
@@ -268,10 +270,6 @@ postulate
             → Sane (flags δ) (U.flatMapᶜ op g o ls qs) → Placed (U.flatMapᶜ op g o ls qs) (ρᴱ δ) → ∀ k
             → Wins (just k) (U.headˢ (U.step (U.flatMapᶜ op g o ls qs))) ≡ true → Under k δ → Lags k (U.meaning (U.flatMapᶜ op g o ls qs) (ρᴱ δ))
 
-  -- A DEFER STEPS AS IT MEANS: one skip, then the program it defers
-  -- subscribed, as the fold's meaning of it.
-  defer-after : ∀ {Γ A} (l : Later Timeline Γ A) p ns (ρ : NEnv Γ) → U.meaning (U.deferᶜ l p ns) ρ ≃ afterᴱ ρ (U.step (U.deferᶜ l p ns))
-
 -- `same?` answers yes only for one index.
 same-≡ : ∀ {Γ : List Set} {A : Set} (i j : A ∈ Γ) → U.same? i j ≡ just refl → i ≡ j
 same-≡ (here refl) (here refl) e = refl
@@ -403,23 +401,6 @@ Withinˢ ρ U.hushˢ        = ⊤
   where go : ∀ n → Agree (suc n) (skip k l) (skip k r) → Agree n (force l) (force r)
         go n (skip⁼ g) = g
 
-atop-agree : ∀ {A k} {x y : Events A} → Agree 1 x y → Atop k x → Atop k y
-atop-agree (out⁼ _)  at = at
-atop-agree (skip⁼ _) at = at
-atop-agree end⁼      at = at
-atop-agree hush⁼     at = at
-
--- Alike runs are alike in order.
-mutual
-  ordered-≃ : ∀ {A} {x y : Events A} → x ≃ y → Ordered x → Ordered y
-  ordered (ordered-≃ e o) = orders-≃ (agreeing e 1) e (ordered o)
-
-  orders-≃ : ∀ {A} {x y : Events A} → Agree 1 x y → x ≃ y → Orders x → Orders y
-  orders-≃ (out⁼ _)  e (at , o) = atop-agree (agreeing (≃-out e) 1) at , ordered-≃ (≃-out e) o
-  orders-≃ (skip⁼ _) e (at , o) = atop-agree (agreeing (≃-skip e) 1) at , ordered-≃ (≃-skip e) o
-  orders-≃ end⁼      e o        = tt
-  orders-≃ hush⁼     e o        = tt
-
 -- Alike runs show alike positions.
 reaches-≃ : ∀ {A k} {x y : Events A} → x ≃ y → Reaches k x → Reaches k y
 reaches-≃ e r with agreeing e 1
@@ -431,8 +412,8 @@ reaches-≃ e (skip-there r) | skip⁼ _ = skip-there (reaches-≃ (≃-skip e) 
 -- A node in order showing its step leaves the stepped node in order,
 -- atop what the step shows.
 placed-step : ∀ {Γ A} (ρ : NEnv Γ) (s : U.Step Γ A) {x : Events A} → x ≃ afterᴱ ρ s → Ordered x → Withinˢ ρ s → Placedˢ ρ s
-placed-step ρ (U.outˢ k a c) e o w = proj₁ (ordered (ordered-≃ e o)) , proj₂ (ordered (ordered-≃ e o)) , w
-placed-step ρ (U.skipˢ k c)  e o w = proj₁ (ordered (ordered-≃ e o)) , proj₂ (ordered (ordered-≃ e o)) , w
+placed-step ρ (U.outˢ k a c) e o w = proj₁ (ordered (ordered-≈ _ _ (agreeing e) o)) , proj₂ (ordered (ordered-≈ _ _ (agreeing e) o)) , w
+placed-step ρ (U.skipˢ k c)  e o w = proj₁ (ordered (ordered-≈ _ _ (agreeing e) o)) , proj₂ (ordered (ordered-≈ _ _ (agreeing e) o)) , w
 placed-step ρ (U.endˢ k)     e o w = tt
 placed-step ρ U.hushˢ        e o w = tt
 
@@ -917,6 +898,24 @@ mutual
   fedᴸ []       i q a f sn       lv n = []ᴸ
   fedᴸ (c ∷ cs) i q a f (sc , sl) lv n = agreeing (fed-≃ c i q a f sc lv) n ∷ᴸ fedᴸ cs i q a f sl lv n
 
+-- A notice put back on the environment feeds it.
+fedᴱ-replay : ∀ {Γ A} (i : A ∈ Γ) q (a : Maybe A) (σ : NEnv Γ) → Fedᴱ q a i (U.replay [ U.notice i q a ] σ) σ
+fedᴱ-replay (here refl) q a (x ∷ᴬ σ) = here′ (≃-refl _) (≈ᴱ-refl σ)
+fedᴱ-replay (there i)   q a (x ∷ᴬ σ) = there′ (≃-refl x) (fedᴱ-replay i q a σ)
+
+-- A node reading its notices put back is the node fed them.
+feeds-≃ : ∀ {Γ B} ns (c : U.Node Γ B) (ρ : NEnv Γ) → Sane (allLive Γ) c → U.meaning c (U.replay ns ρ) ≃ U.meaning (U.feeds ns c) ρ
+feeds-≃ []                    c ρ sn = ≃-refl _
+feeds-≃ {Γ} (U.notice i q a ∷ ns) c ρ sn =
+  ≃-trans (fed-≃ c i q a (fedᴱ-replay i q a (U.replay ns ρ)) sn (live-true Γ i)) (feeds-≃ ns (U.feed i q a c) ρ (sane-feed i q a c sn))
+
+-- A DEFER STEPS AS IT MEANS: one skip, then the program it defers
+-- subscribed and fed its notices, as the fold's meaning of it.
+defer-after : ∀ {Γ A} (l : Later Timeline Γ A) p ns (ρ : NEnv Γ) → U.meaning (U.deferᶜ l p ns) ρ ≃ afterᴱ ρ (U.step (U.deferᶜ l p ns))
+defer-after l p ns ρ = skip-cong (≃-trans
+  (alike λ n → agree-sym (agree (U.subscribed (Later.force l) (env-refl (U.hots (U.replay ns ρ)))) (p ++ [ ix 1 ])))
+  (feeds-≃ ns (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ (sane-subscribe (Later.force l) _ running-all)))
+
 -- The source's rest, each event no earlier than `Q` once shown.
 Behind : ∀ {A} → Pos → Events A → Set
 Behind Q (out q′ _ _) = (q′ ++ [ ix 0 ]) <ᵖ Q ≡ false
@@ -1197,6 +1196,16 @@ within-body s (U.skipˢ _ _)  P ps = proj₂ P , ps
 within-body s (U.endˢ _)     P ps = tt
 within-body s U.hushˢ        P ps = tt
 
+-- Alike environments are sorted alike, and alien alike.
+sorted-≈ : ∀ {Γ} {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Sorted ρ → Sorted σ
+sorted-≈ []ᵉ                       s                = tt
+sorted-≈ (_∷ᵉ_ {x = x} {y} e r) ((o , st) , h , s) =
+  (ordered-≈ x y (agreeing e) o , steady-≈ x y (agreeing e) st) , every-≈ x y (agreeing e) h , sorted-≈ r s
+
+everyᴱ-≈ : ∀ {Γ} {P : Pos → Set} {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Everyᴱ P ρ → Everyᴱ P σ
+everyᴱ-≈ []ᵉ                       s        = tt
+everyᴱ-≈ (_∷ᵉ_ {x = x} {y} e r) (h , s) = every-≈ x y (agreeing e) h , everyᴱ-≈ r s
+
 -- A body past its source's end, told so, is placed as it was.
 mutual
   shut-placed : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placed n ρ → Placed (U.shut i c n) ρ
@@ -1216,7 +1225,7 @@ mutual
   shut-within i c (U.connectᶜ b (U.live s))  ρ e (pb , ps) =
     subst (λ x → Placed (U.shut (there i) c b) (x ∷ᴬ ρ)) (sym (shut-meaning i c s ρ e)) (shut-placed (there i) c b _ e pb) , shut-placed i c s ρ e ps
   shut-within i c (U.connectᶜ b (U.ended _)) ρ e pb = shut-placed (there i) c b _ e pb
-  shut-within i c (U.deferᶜ _ _ _)           ρ e w = tt
+  shut-within i c (U.deferᶜ _ _ _)           ρ e w = w
 
   shut-placedᴹ : ∀ {Γ A B} (i : A ∈ Γ) c (o : Maybe (U.Node Γ B)) (ρ : NEnv Γ) → lookup ρ i ≡ end c → Placedᴹ o ρ → Placedᴹ (U.shutᴹ i c o) ρ
   shut-placedᴹ i c nothing  ρ e w = tt
@@ -1229,7 +1238,7 @@ mutual
 -- Alike environments place a node alike.
 mutual
   placed-≈ : ∀ {Γ B} (n : U.Node Γ B) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Placed n ρ → Placed n σ
-  placed-≈ n r (o , w) = ordered-≃ (envs-≃ n r) o , within-≈ n r w
+  placed-≈ n r (o , w) = ordered-≈ _ _ (agreeing (envs-≃ n r)) o , within-≈ n r w
 
   within-≈ : ∀ {Γ B} (n : U.Node Γ B) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Within n ρ → Within n σ
   within-≈ (U.framesᶜ _ _ _)          r w = tt
@@ -1244,7 +1253,7 @@ mutual
   within-≈ (U.joinᶜ _ _ _ _)          r w = tt
   within-≈ (U.connectᶜ b (U.live s))  r (pb , ps) = placed-≈ b (envs-≃ s r ∷ᵉ r) pb , placed-≈ s r ps
   within-≈ (U.connectᶜ b (U.ended c)) r pb = placed-≈ b (≃-refl (end c) ∷ᵉ r) pb
-  within-≈ (U.deferᶜ _ _ _)           r w = tt
+  within-≈ (U.deferᶜ _ _ ns)          r (hp , so , cl) = hp , sorted-≈ (replay-≈ ns r) so , everyᴱ-≈ (replay-≈ ns r) cl
 
   placed-≈ᴹ : ∀ {Γ B} (o : Maybe (U.Node Γ B)) {ρ σ : NEnv Γ} → ρ ≈ᴱ σ → Placedᴹ o ρ → Placedᴹ o σ
   placed-≈ᴹ nothing  r w = tt
@@ -1258,7 +1267,7 @@ mutual
 mutual
   fed-placed : ∀ {Γ A B} (b : U.Node Γ B) (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
              → ∀ {ν} → Sane ν b → lookup ν i ≡ true → Placed b ρ → Placed (U.feed i q a b) σ
-  fed-placed b i q a f sn lv (o , w) = ordered-≃ (fed-≃ b i q a f sn lv) o , fed-within b i q a f sn lv w
+  fed-placed b i q a f sn lv (o , w) = ordered-≈ _ _ (agreeing (fed-≃ b i q a f sn lv)) o , fed-within b i q a f sn lv w
 
   fed-within : ∀ {Γ A B} (b : U.Node Γ B) (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
              → ∀ {ν} → Sane ν b → lookup ν i ≡ true → Within b ρ → Within (U.feed i q a b) σ
@@ -1278,7 +1287,10 @@ mutual
     fed-placed b (there i) q a (there′ (fed-≃ s i q a f {ν} ss lv) f) {true ∷ᴬ ν} sb lv pb , fed-placed s i q a f ss lv ps
   fed-within (U.connectᶜ b (U.ended c)) i q a f {ν} sn lv pb =
     fed-placed b (there i) q a (there′ (≃-refl (end c)) f) {false ∷ᴬ ν} sn lv pb
-  fed-within (U.deferᶜ _ _ _)           i q a f sn lv w = tt
+  fed-within (U.deferᶜ _ p ns)          i q a {ρ} {σ} f sn lv (hp , so , cl) =
+    hp , subst Sorted (sym m) (sorted-≈ e so) , subst (Alienᴱ p) (sym m) (everyᴱ-≈ e cl)
+    where e = replay-≈ ns (fedᴱ-≈ f)
+          m = replay-snoc ns (U.notice i q a) σ
 
   fed-placedᴹ : ∀ {Γ A B} (o : Maybe (U.Node Γ B)) (i : A ∈ Γ) q (a : Maybe A) {ρ σ : NEnv Γ} → Fedᴱ q a i ρ σ
               → ∀ {ν} → Saneᴹ ν o → lookup ν i ≡ true → Placedᴹ o ρ → Placedᴹ (U.feedᴹ i q a o) σ
@@ -1469,10 +1481,18 @@ within-go op g (just o) ls qs δ e po pl pg ao al fi | U.found k bs l s as with 
 ...     | true  = within-outer op g (U.step o) (bs ++ l ∷ as) qs e (ao (subst (λ h → First h δ) eh (first-outer op g (U.step o) (bs ++ l ∷ as) qs δ fi))) pl pg
 ...     | false = go-lane op g (just o) bs l as qs δ e po pl pg al fi
 
-postulate
-  -- A DEFER'S PROGRAM IS PLACED WITHIN: subscribed, and fed what its
-  -- sources showed since, each part reads its sources in order.
-  within-defer : ∀ {Γ A} (l : Later Timeline Γ A) p ns (δ : Env Γ) → Settled δ → Withinˢ (ρᴱ δ) (U.step (U.deferᶜ l p ns))
+-- A node placed reading its notices put back is placed fed them.
+feeds-placed : ∀ {Γ B} ns (c : U.Node Γ B) (ρ : NEnv Γ) → Sane (allLive Γ) c → Placed c (U.replay ns ρ) → Placed (U.feeds ns c) ρ
+feeds-placed []                        c ρ sn pc = pc
+feeds-placed {Γ} (U.notice i q a ∷ ns) c ρ sn pc =
+  feeds-placed ns (U.feed i q a c) ρ (sane-feed i q a c sn) (fed-placed c i q a (fedᴱ-replay i q a (U.replay ns ρ)) sn (live-true Γ i) pc)
+
+-- A DEFER'S PROGRAM IS PLACED WITHIN: subscribed where its sources stood,
+-- then fed what they showed since.
+within-defer : ∀ {Γ A} (l : Later Timeline Γ A) p ns (ρ : NEnv Γ) → Within (U.deferᶜ l p ns) ρ → Withinˢ ρ (U.step (U.deferᶜ l p ns))
+within-defer l p ns ρ (hp , so , cl) = proj₂ (feeds-placed ns (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ
+  (sane-subscribe (Later.force l) _ running-all)
+  (placed-sub (Later.force l) (p ++ [ ix 1 ]) (U.replay ns ρ) (headed-snoc p hp) so (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) (U.replay ns ρ) cl)))
 
 postulate
   -- A FLATMAP LEADS NOTHING: what it shows at a `j` coming before its
@@ -1595,7 +1615,7 @@ mutual
           ld k w u = lags s δ st ss ps k w u
   within-after (U.connectᶜ b (U.ended c)) δ st sn (_ , pb) fi =
     within-shut c (U.step b) (placed-after b (U.ended c ∷ δ) st sn pb (subst (λ k → First k δ) (shut-head c (U.step b)) fi))
-  within-after (U.deferᶜ l p ns)    δ st sn pl fi = within-defer l p ns δ st
+  within-after (U.deferᶜ l p ns)    δ st sn pl fi = within-defer l p ns (ρᴱ δ) (proj₂ pl)
 
   live-skips : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (δ : Env Γ) → Settled δ
              → Sane (flags δ) (U.connectᶜ b (U.live s)) → Placed (U.connectᶜ b (U.live s)) (ρᴱ δ)
