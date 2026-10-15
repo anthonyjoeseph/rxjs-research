@@ -49,7 +49,7 @@ open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
-open import adequacy.Stepper using (_≃_; []; os; afterᴱ)
+open import adequacy.Stepper using (_≃_; []; os; afterᴱ; placed-after; Placedˢ)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (PureObs; Out; note; module Pure)
@@ -64,8 +64,8 @@ module Honesty (R : Set) where
   open Heap using (_⊑_)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
-    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired)
-  open Strongly.Against R using (calmAs; noteAs; subAs; burstAs; firesAs; bottomAs)
+    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; Owned)
+  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; bottomAs)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
   open Moving R using (pend; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -322,27 +322,67 @@ module Honesty (R : Set) where
     turn-dry : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
              → Mach.bursts m ≡ [] → Mach.timers m ≡ [] → ∀ {k b} → Has (residual g) k b → ⊥
 
-    -- A subscription begun runs its kernel's code silently to the next
-    -- re-entry state: past a defer's skip, or its pending node begun, the
-    -- ghost alike.
-    sub-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
+    -- Code run, a subscription begun or the agenda, runs silently to the
+    -- next re-entry state: past a defer's skip, a lane admitted, its
+    -- pending node begun, or a value reaching its note.  The measure has
+    -- no part for the agenda, so a hop returning to the driver's turn with
+    -- the ghost alike gains only by running on past the turn.
+    run-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
 
-    -- A burst's frame stepped: polled, played, or found spent.  A stall
-    -- or a close is a skip passed; a spent or closed burst dropped leaves
-    -- the ghost alike; a value delivered to the root reaches its note.
-    burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
-                 → Mach.bursts m ≡ just b ∷ bs → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    -- A spent burst dropped, the stack resumed: the ghost alike, a burst
+    -- fewer.
+    burst-spent : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
+                → Mach.bursts m ≡ just b ∷ bs → spent? (Conf.heap (Mach.conf m)) (Playing.handle b) ≡ true
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+    -- A live burst's sink polled: open, the frame to play; closed, the
+    -- burst dropped and the stack resumed.
+    burst-poll : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
+               → Mach.bursts m ≡ just b ∷ bs → spent? (Conf.heap (Mach.conf m)) (Playing.handle b) ≡ false → Playing.polled b ≡ false
+               → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+    -- A polled burst's frame played: a value delivered and run to the
+    -- next re-entry state, a stall's skip passed, or a close scheduling
+    -- the rest.
+    burst-play : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
+               → Mach.bursts m ≡ just b ∷ bs → spent? (Conf.heap (Mach.conf m)) (Playing.handle b) ≡ false → Playing.polled b ≡ true
+               → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+    -- A ghost's value shown, the ghost it leaves still sane.
+    sane-out : ∀ {g : U.Node [] R} {k a g′} → Sane [] g → U.step g ≡ U.outˢ k a g′ → Sane [] g′
 
     -- A value recorded is the least the ghost still holds.
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ Conf.pos (Mach.conf m) → ⊥
 
-    -- Past a value recorded, the run runs the stepped ghost.
-    note-onward : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
-                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
-                → ∀ {t q a′ m′} → step m ≡ value t q a′ m′ → Mirror g′ m′
+  -- A burst's frame stepped: found spent, polled, or played.
+  burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
+               → Mach.bursts m ≡ just b ∷ bs → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+  burst-onward {m = m} {b = b} cr c bq eq with spent? (Conf.heap (Mach.conf m)) (Playing.handle b) in sp | Playing.polled b in pl
+  ... | true  | _     = burst-spent cr c bq sp eq
+  ... | false | false = burst-poll cr c bq sp pl eq
+  ... | false | true  = burst-play cr c bq sp pl eq
+
+  -- Past a value recorded, the run runs the stepped ghost: the record's
+  -- continuation is the agenda, about to run.
+  note-onward : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
+              → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
+              → ∀ {t q a′ m′} → step m ≡ value t q a′ m′ → Mirror g′ m′
+  note-onward {g} {m = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk}
+    cr@record { tree = t ; ctlAs = noteAs ks ke K ; meets = g″ , pe , st″ ; owned = ow ; books = record { running = refl } } refl stp refl
+    with trans (sym st″) stp
+  ... | refl = _ , now , carried (record
+        { sane = sane-out {g = g} (Carried.sane cr) stp
+        ; placed = proj₂ (subst (Placedˢ []) stp (placed-after g [] tt (Carried.sane cr) (Carried.placed cr) tt))
+        ; tree = t ; ctlAs = runAs ks ke K ; meets = pe
+        ; owned = record { ofs = Owned.ofs ow ; plays = Owned.plays ow ; fires = Owned.fires ow ; begun = Owned.begun ow
+                         ; ends = Owned.ends ow ; cuts = Owned.cuts ow ; feeds = Owned.feeds ow ; fins = Owned.fins ow
+                         ; placed = Owned.placed ow }
+        ; kernels = Carried.kernels cr ; meaning = Carried.meaning cr ; queue = Carried.queue cr
+        ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
+                         ; paidUp = Books.paidUp (Carried.books cr) ; running = refl } })
 
   -- A popped timer's burst, spent, dropped: the turn again.
   drop-spent : ∀ {h} {hp : Heapᴹ h} {p w} {σ : w ⊑ h} {ts lg en mk} (tm : Timer h)
@@ -448,7 +488,8 @@ module Honesty (R : Set) where
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     with Carried.ctlAs cr | Carried.meets cr | Books.paidUp (Carried.books cr) | Books.clocked (Carried.books cr)
        | Books.running (Carried.books cr)
-  ... | subAs π x K | _ | refl | _ | _ = silentᴴ refl (sub-onward {g = g} cr refl refl)
+  ... | subAs π x K | _ | refl | _ | _ = silentᴴ refl (run-onward {g = g} cr refl refl)
+  ... | runAs ks x K | _ | refl | _ | _ = silentᴴ refl (run-onward {g = g} cr refl refl)
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     | noteAs ks x K | g′ , _ , st | refl | ck | refl =
     valueᴴ refl st ck (note-least {g = g} cr refl st) (note-onward {g = g} cr refl st refl)

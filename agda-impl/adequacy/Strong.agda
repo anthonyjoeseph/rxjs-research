@@ -767,13 +767,16 @@ module Strongly (R : Set) where
                → BurstAs b → StackAs p (ρ ⨾ σ) K bs → StackAs p σ (push rehold ρ K) (b ∷ bs)
 
     -- THE RE-ENTRY STATES: the driver's turn with nothing held; a value
-    -- about to be recorded, the agenda its continuation; a subscription
-    -- about to begin at its pending node, compiled in some world its
-    -- subjects were weakened from; a cold's frame about to step.
+    -- about to be recorded, the agenda its continuation; the agenda about
+    -- to run; a subscription about to begin at its pending node, compiled
+    -- in some world its subjects were weakened from; a cold's frame about
+    -- to step.
     data CtlAs : Pos → Ctl h → List (Maybe (Playing h)) → Set₁ where
       calmAs  : ∀ {w p} {σ : w ⊑ h} → CtlAs p (holding σ bottom) []
       noteAs  : ∀ {w p a bs} {k : ⊤ → Act h ⊤} {σ : w ⊑ h} {K} (ks : List (Call t))
               → k tt ≗ ⟦ ks ⟧ → StackAs p σ K bs → CtlAs p (asking (note a) k σ K) bs
+      runAs   : ∀ {w p bs} {act : Act h ⊤} {σ : w ⊑ h} {K} (ks : List (Call t))
+              → act ≗ ⟦ ks ⟧ → StackAs p σ K bs → CtlAs p (run act σ K) bs
       subAs   : ∀ {w Δ A bs} {s : Obs Timeline Δ A} {q} {act : Act h ⊤} {σ : w ⊑ h} {K} (π : Path t (pendingˢ s q))
               → (Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ h) λ υ → wkEnv υ E′ ≡ env (walk π top)
                    × act ≗ compile s E′ υ (obs (walk π top)) (kont (walk π top)))
@@ -804,12 +807,14 @@ module Strongly (R : Set) where
     agenda : ∀ {p c bs} → CtlAs p c bs → List (Job t)
     agenda calmAs                  = []
     agenda (noteAs {p = p} ks _ K) = at⟦ p ⟧ ks ++ stackJobs K
+    agenda (runAs {p = p} ks _ K)  = at⟦ p ⟧ ks ++ stackJobs K
     agenda (subAs _ _ K)           = stackJobs K
     agenda (burstAs _ K)           = stackJobs K
 
     bursts : ∀ {p c bs} → CtlAs p c bs → List (Spot t)
     bursts calmAs         = []
     bursts (noteAs _ _ K) = stackBursts K
+    bursts (runAs _ _ K)  = stackBursts K
     bursts (subAs _ _ K)  = stackBursts K
     bursts (burstAs b K)  = burstSpots b ++ stackBursts K
 
@@ -839,6 +844,7 @@ module Strongly (R : Set) where
     Clocked : ∀ {p c bs} → ℕ → CtlAs p c bs → Set
     Clocked n calmAs                        = ⊤
     Clocked {p} n (noteAs _ _ _)            = n ≡ tick p
+    Clocked {p} n (runAs _ _ _)             = n ≡ tick p
     Clocked {p} n (subAs _ _ _)             = n ≡ tick p
     Clocked n (burstAs (playsAs {τ = τ} {r} {u = u} _) _) = n ≡ τ + u × n ≡ tick r
     Clocked n (burstAs (firesAs {τ = τ} {u = u} _) _)     = n ≡ τ + u

@@ -177,18 +177,17 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `burst-onward` and `sub-onward` carry
-  liveness: each silent hop passes a skip, leaves the ghost alike and
-  lowers `measure`, or reaches a step that is not silent. Ruled out: a
-  move needing more of its subtree than its node's own premises (each
-  `-plant` lemma is a path induction); a ghost-only marker in the shared
-  machine; a burst queued but by a leaf
-  subscribed, a timer popped or a close (`Machine.starting`, `turned`,
-  `schedule`); a lane admit or a connect's feed with no skip (`Unfold`).
-  A burst ended resumes the stack's suspended code before the next
-  re-entry, so a hop's gain is the resumed code's, not its case's.
-  Decides whether that resume needs a re-entry state of its own for the
-  leaves to split by case.
+- **THE PROGRESS.** `burst-spent`, then `burst-poll`, `burst-play` and
+  `run-onward`, carry liveness: each silent hop passes a skip, leaves the
+  ghost alike and lowers `measure`, or reaches a step that is not silent.
+  `burst-spent` first: a body resuming the stack frame by frame, an
+  over burst looping, into `runAs`, `burstAs` or `calmAs`. Decides
+  whether `runAs`'s clock at its return position is paid by the burst's
+  `Clocked`, or a frame's position needs a tick of its own. Ruled out:
+  a resume with no re-entry state (`runAs` is one, the agenda about to
+  run); a move needing more of its subtree than its node's premises; a
+  ghost-only marker in the shared machine; a lane admit or a connect's
+  feed with no skip (`Unfold`).
 - **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
@@ -210,11 +209,10 @@ by their own silent steps (`Mirror`).
   out: a stepper `≃` short of strong agreement, every operator respecting
   it and a source's step tied with the body's skips commuting. Decides whether `join-quiet` needs its
   sources' silence carried further than `First`.
-- **THE MACHINE SIDE.** `note-least`, `note-onward`, `turn-dry`,
-  `sub-onward` and `burst-onward`: a note records the least value the
-  ghost holds, a drained run's ghost shows nothing, and a subscription or
-  a burst runs silently to the next re-entry state. Decides whether
-  "least" is paid once as a field of `Carried`.
+- **THE MACHINE SIDE.** `note-least`, `turn-dry` and `sane-out`: a note
+  records the least value the ghost holds, a drained run's ghost shows
+  nothing, a ghost's value shown leaves it sane. Decides whether "least"
+  is paid once as a field of `Carried`.
 ### The ledger
 
 - **`ordered-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap merges its outer
@@ -262,16 +260,18 @@ by their own silent steps (`Mirror`).
   one skip, then its program subscribed.
 - **`note-least`** (Content) — FALSITY, `NO EVIDENCE`: a note records the least
   value the ghost holds.
-- **`note-onward`** (Content) — FALSITY, `NO EVIDENCE`: past a note the run
-  runs the stepped ghost.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
-- **`sub-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription begun
-  runs silently to the next re-entry state, past a skip or its pending node
-  spent.
-- **`burst-onward`** (Content) — FALSITY, `NO EVIDENCE`: a burst's frame steps
-  silently to the next re-entry state, past a skip, a burst dropped or to a
-  note.
+- **`run-onward`** (Content) — FALSITY, `NO EVIDENCE`: code run, a subscription
+  begun or the agenda, runs silently to the next re-entry state.
+- **`burst-spent`** (Content) — FALSITY, `NO EVIDENCE`: a spent burst dropped,
+  the stack resumed, the ghost alike and a burst fewer.
+- **`burst-poll`** (Content) — FALSITY, `NO EVIDENCE`: a live burst's sink
+  polled, open to play or closed and dropped.
+- **`burst-play`** (Content) — FALSITY, `NO EVIDENCE`: a polled burst's frame
+  played, a value run on, a stall passed, a close scheduled.
+- **`sane-out`** (Content) — FALSITY, `NO EVIDENCE`: a ghost's value shown
+  leaves it sane.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
