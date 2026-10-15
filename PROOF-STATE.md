@@ -257,8 +257,8 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **`scanᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `scan` honest.
 - **`honest-[]`** (Content) — FALSITY, `NO EVIDENCE`: the empty environments
   honest to each other.
-- **`read-is-kept`** (Content) — FALSITY, `NO EVIDENCE`: the first n steps,
-  read, are some reached configuration's record.
+- **`read-is-kept`** (Content) — FALSITY, `REFUTED`: the launch's first n
+  steps, read, are some reached configuration's record, a completion marked.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`reachedᴿ`** (Adequacy) — FALSITY, `NO EVIDENCE`: every item the meaning's

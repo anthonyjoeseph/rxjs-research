@@ -15,7 +15,7 @@
 module adequacy.Content where
 
 open import Level using (lift)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Bool using (true; false)
@@ -180,12 +180,13 @@ module Honesty (R : Set) where
     silentᵗ : ∀ {m′} → step m ≡ silent m′ → m ↦ m′
     valueᵗ  : ∀ {t p a m′} → step m ≡ value t p a m′ → m ↦ m′
 
-  -- How a configuration's record stands: cut at its clock, or the run
-  -- complete or drained there.
-  data Stands (m : Mach) : End → Set₁ where
-    cutʰ  : Stands m (cutOff (Mach.clock m))
-    finʰ  : ∀ {p} → step m ≡ complete p → Stands m finished
-    dryʰ  : step m ≡ drained → Stands m dry
+  -- How a configuration's record stands, and where its entries were
+  -- made: cut at its clock, or the run drained there, the record's marks
+  -- the machine's own; or complete there, its completion marked last.
+  data Stands (m : Mach) : End → List Pos → Set₁ where
+    cutʰ  : Stands m (cutOff (Mach.clock m)) (Mach.marks m)
+    finʰ  : ∀ {p} → step m ≡ complete p → Stands m finished (Mach.marks m ++ [ p ])
+    dryʰ  : step m ≡ drained → Stands m dry (Mach.marks m)
 
   postulate
     -- THE MACHINE HONEST TO `e`: ONE relation over the whole
@@ -218,7 +219,7 @@ module Honesty (R : Set) where
     honest-turn : ∀ {e m m′} → HonMach e m → idle m ≡ true → m ↦ m′ → HonMach e m′
 
     -- An honest machine's record is alike its events, however it stands.
-    honest-alike : ∀ {e m en} → HonMach e m → Stands m en → Alike en (Mach.marks m) (Mach.log m) e
+    honest-alike : ∀ {e m en qs} → HonMach e m → Stands m en qs → Alike en qs (Mach.log m) e
 
   -- One step keeps the machine honest.
   honest-step : ∀ {e m m′} → HonMach e m → m ↦ m′ → HonMach e m′
@@ -234,21 +235,23 @@ module Honesty (R : Set) where
 
   -- THE MACHINE'S CONTENT: a configuration reached from an honest
   -- launch keeps a record alike its meaning's events, however it stands.
-  kept : ∀ {e m en} → Reached e m → Stands m en → Alike en (Mach.marks m) (Mach.log m) e
+  kept : ∀ {e m en qs} → Reached e m → Stands m en qs → Alike en qs (Mach.log m) e
   kept r = honest-alike (honest r)
 
   postulate
-    -- The first n steps, read, are the record of the configuration n
-    -- steps on.
-    read-is-kept : ∀ {e m} (r : Reached e m) n → Σ Mach λ m′ → Σ (Reached e m′) λ _ → Σ End λ en → Stands m′ en
-                 × reading n 0 (trace m) ≡ read (Mach.marks m′) (Mach.log m′) en
+    -- The launch's first n steps, read, are the record of the
+    -- configuration n steps on.
+    --
+    -- REFUTED: 48b1b730 with the read from any reached configuration, its record the machine's marks alone
+    read-is-kept : ∀ {s : Subscribe R []} {M} (h : Honest {R} s M) n → Σ Mach λ m′ → Σ (Reached (observe M root) m′) λ _ → Σ End λ en
+                 → Σ (List Pos) λ qs → Stands m′ en qs × reading n 0 (trace (launch s recorder)) ≡ read qs (Mach.log m′) en
 
-  -- The configuration's record, read.
-  alike-read : ∀ {e m} (r : Reached e m) n → let x = reading n 0 (trace m) in Alike (ending x) (marks x) (log x) e
-  alike-read r n with read-is-kept r n
-  ... | m′ , r′ , en , st , eq rewrite eq = kept r′ st
+  -- The launch's record, read.
+  alike-read : ∀ {s : Subscribe R []} {M} (h : Honest {R} s M) n → let x = reading n 0 (trace (launch s recorder)) in Alike (ending x) (marks x) (log x) (observe M root)
+  alike-read h n with read-is-kept h n
+  ... | m′ , r′ , en , qs , st , eq rewrite eq = kept r′ st
 
   -- CONTENT: every prefix's record alike the meaning's events as a set:
   -- the compiled tree honest to its meaning, kernel by kernel, launched.
   content : (o : PureObs [] R) (n : ℕ) → let x = reading n 0 (trace (begin o)) in Alike (ending x) (marks x) (log x) (observe (⟦ o ⟧ []) root)
-  content o n = alike-read (launchedʰ (compile-honest o [] [] honest-[]) refl) n
+  content o n = alike-read (compile-honest o [] [] honest-[]) n
