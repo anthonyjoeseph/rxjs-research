@@ -13,15 +13,16 @@
 -- And the events rise, as `ticks-up` needs: each at a position past the
 -- last, a skip at one no earlier, headed by its tick.  And they are steady, as `steady-sub`
 -- says: nothing strictly inside the position just left, and a value
--- strictly past it.
+-- strictly past it.  And nothing is keyed just past another, as
+-- `alien-steps` says.
 module quickcheck.Placing where
 
-open import Data.Bool using (Bool; true; false; _∧_; not)
-open import Data.List using (List; []; _∷_; filterᵇ; upTo; length; take) renaming (map to mapL)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
+open import Data.List using (List; []; _∷_; _++_; [_]; filterᵇ; upTo; length; take) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_; _<ᵇ_)
 
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; tick; observe; root)
+open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; sub; _<ᵖ_; tick; observe; root)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (Prog; toObs; timeline)
@@ -82,10 +83,36 @@ private
   steadyᵇ (suc n) (skip k r)  = clearᵇ k (Events∞.force r) ∧ steadyᵇ n (Events∞.force r)
   steadyᵇ (suc n) _           = true
 
--- The machine's trace placed against the meaning, and the meaning rising
--- and steady.
+  prefixᵇ : Pos → Pos → Bool
+  prefixᵇ k h = not (length h <ᵇ length k) ∧ samePos (take (length k) h) k
+
+  mutual
+    ownedᵇ : Pos → Pos → Bool
+    ownedᵇ k h = prefixᵇ k h ∨ taggedᵇ k h
+
+    taggedᵇ : Pos → Pos → Bool
+    taggedᵇ k []          = false
+    taggedᵇ k (sub j ∷ h) = ownedᵇ k j ∨ taggedᵇ k h
+    taggedᵇ k (_ ∷ h)     = taggedᵇ k h
+
+  positions : ℕ → Events ℕ → List Pos
+  positions zero    _           = []
+  positions (suc n) (out k _ r) = k ∷ positions n (Events∞.force r)
+  positions (suc n) (skip k r)  = k ∷ positions n (Events∞.force r)
+  positions (suc n) (end k)     = k ∷ []
+  positions (suc n) hush        = []
+
+  allᵇ : (Pos → Bool) → List Pos → Bool
+  allᵇ f []       = true
+  allᵇ f (x ∷ xs) = f x ∧ allᵇ f xs
+
+  stepsᵇ : List Pos → Bool
+  stepsᵇ ps = allᵇ (λ q → allᵇ (λ h → not (ownedᵇ (q ++ [ ix 0 ]) h)) ps) ps
+
+-- The machine's trace placed against the meaning, and the meaning rising,
+-- steady and keying nothing just past its own events.
 placing : Prog natᵗ → Bool
-placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steadyᵇ 4000 e
+placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steadyᵇ 4000 e ∧ stepsᵇ (positions 200 e)
   where o = toObs timeline 3 p [] [] []
         e = observe (⟦ o ⟧ˢ []) root
 

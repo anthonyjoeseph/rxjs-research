@@ -1044,12 +1044,11 @@ postulate
   steady-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
               → Steady (U.meaning (U.subscribe (flatMap op f s) p) ρ)
 
-  -- A CONNECT'S BODY STAYS CLEAR OF ITS SOURCE'S STEPS, over sources
-  -- sorted and alien to it: nothing the body shows lies above or below
-  -- the position just past any source event, where the step shows.
-  unrelated-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
-                    → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ))
-                            (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
+  -- A SUBSCRIPTION OWNS NOTHING JUST PAST ITS OWN EVENTS, somewhere,
+  -- over sources sorted and alien to it: nothing it shows lies under, or
+  -- is tagged under, the position just past one of its events.
+  alien-steps : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+              → Every (λ q → Alien (q ++ [ ix 0 ]) (U.meaning (U.subscribe o p) ρ)) (U.meaning (U.subscribe o p) ρ)
 
   -- A SOURCE'S STEPS MERGE INTO A STEADY BODY STEADILY when nothing the
   -- body shows lies above or below where a step shows.
@@ -1067,6 +1066,45 @@ alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p �
 alien-sub o p ρ al =
   alien-apart o (p ++ [ ix 0 ]) (p ++ [ ix 1 ]) ρ (alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ al)
     (sibling p (λ ())) (sibling p (λ ())) (no-tick p)
+
+every-zip : ∀ {A} {P Q : Pos → Set} (e : Events A) → Every P e → Every Q e → Every (λ h → P h × Q h) e
+every (every-zip (out h _ r) pe qe) = (proj₁ (every pe) , proj₁ (every qe)) , every-zip (force r) (proj₂ (every pe)) (proj₂ (every qe))
+every (every-zip (skip h r)  pe qe) = (proj₁ (every pe) , proj₁ (every qe)) , every-zip (force r) (proj₂ (every pe)) (proj₂ (every qe))
+every (every-zip (end h)     pe qe) = every pe , every qe
+every (every-zip hush        pe qe) = tt
+
+-- Of every `q` in `s`, every `k` in `b`: so of every `k`, every `q`.
+every-swap : ∀ {A B} {R : Pos → Pos → Set} (b : Events B) (s : Events A) → Every (λ q → Every (R q) b) s → Every (λ k → Every (λ q → R q k) s) b
+every (every-swap (out k _ r) s h) = every-mono (λ q x → proj₁ (every x)) s h , every-swap (force r) s (every-mono (λ q x → proj₂ (every x)) s h)
+every (every-swap (skip k r)  s h) = every-mono (λ q x → proj₁ (every x)) s h , every-swap (force r) s (every-mono (λ q x → proj₂ (every x)) s h)
+every (every-swap (end k)     s h) = every-mono (λ q x → every x) s h
+every (every-swap hush        s h) = tt
+
+-- A CONNECT'S BODY STAYS CLEAR OF ITS SOURCE'S STEPS, over sources
+-- sorted and alien to it: nothing the body shows lies above or below
+-- the position just past any source event, where the step shows.
+unrelated-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+                  → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ))
+                          (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
+unrelated-connect s b p ρ np so cl =
+  every-swap _ S (every-mono per S (every-zip S keyed (every-zip S (alien-sub s p ρ cl) (alien-steps s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs))))
+  where
+    S  = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
+    cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+    keyed : Every (Beneath (p ++ [ ix 1 ])) S
+    keyed = Reach.reach (keyedRules (p ++ [ ix 1 ])) s (p ++ [ ix 1 ]) ρ (inj₁ (prefix-refl _)) (every-monoᴱ (λ _ _ → tt) ρ cs)
+    per : ∀ q → Beneath (p ++ [ ix 1 ]) q × ¬ Owned (p ++ [ ix 0 ]) q × Alien (q ++ [ ix 0 ]) S
+        → Every (λ k → Unrelated k (q ++ [ ix 0 ])) (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (S ∷ᴬ ρ))
+    per q (bq , nq , aq) =
+      every-mono (λ k d → (λ x → proj₂ d (inj₁ x)) , (λ x → proj₁ d (inj₁ x))) _
+        (Reach.reach (apartRules (q ++ [ ix 0 ]) (no-tick q)) b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (proj₂ dq , proj₁ dq)
+          (aq , alienᴱ-owned p (q ++ [ ix 0 ]) (beneath-owned p (q ++ [ ix 0 ]) (owned-snoc p q (ix 0) oq)) ρ cl))
+      where
+        oq : Owned p q
+        oq = owned-trans p (p ++ [ ix 1 ]) q (inj₁ (prefix-++ p [ ix 1 ])) (beneath-owned (p ++ [ ix 1 ]) q bq)
+        dq : Disjoint (p ++ [ ix 0 ]) (q ++ [ ix 0 ])
+        dq = apart-mark (p ++ [ ix 0 ]) q (ix 0) (ix-mark 0)
+               (nq , λ o → sibling p {1} {0} (λ ()) (owned-trans (p ++ [ ix 1 ]) q (p ++ [ ix 0 ]) (beneath-owned (p ++ [ ix 1 ]) q bq) o))
 
 -- A program subscribed anywhere, over sorted sources alien to where it
 -- subscribes, is placed.
