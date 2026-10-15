@@ -12,26 +12,30 @@ open import Data.Bool using (true; false)
 open import Data.Nat using (ℕ; suc; _+_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Product using (_×_; _,_; Σ; proj₂)
-open import Data.List.Relation.Unary.All using (All; []; _∷_; map)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
+open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (tabulate to tabulateᴬ; lookup to lookupᴬ)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁻ to all-++⁻)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
+open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (++⁺ to pairs-++⁺)
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_)
 open import Data.List.Relation.Unary.Linked.Properties using (Linked⇒All)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.List.Relation.Unary.Any.Properties using (++⁻)
+open import Data.List.Relation.Unary.Any.Properties using (++⁻; ++⁺ˡ; ++⁺ʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Maybe using (just; nothing)
 
 open import Tree using (Obs)
 import Tree as T
-open import denotation.MonotonicList using (Timeline; From; Frame; at; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl)
+open import denotation.MonotonicList using (Timeline; From; Frame; at; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl) renaming (done to doneᶠ; quiet to quietᶠ)
 import denotation.Unfold as U
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out; module Pure)
 open import adequacy.Strong using (module Strongly)
 
 module Moving (R : Set) where
-  open Heap using (World; Sink; Handle; _⊑_)
+  open Heap using (World; Sink; Handle; _⊑_; play; slot; cell)
   open Shared Timeline (Out R) using (Heapᴹ)
   open Pure R using (Timer; cascade)
   open Strongly R
@@ -113,37 +117,6 @@ module Moving (R : Set) where
     pendᴸ (lane c k s ∷ ls) = pend s + pendᴸ ls
 
   ----------------------------------------------------------------------
-  -- What a node rewritten keeps, each part of the relation from the
-  -- same part of the node.
-
-  postulate
-    part-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-               → At.part H u ≡ At.part H v → At.part H (plant π v) ≡ At.part H t
-
-    pend-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-               → pend u ≡ pend v → pend (plant π v) ≡ pend t
-
-    names-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                → names u ≡ names v → names (plant π v) ≡ names t
-
-    subjects-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                   → subjects u ≡ subjects v → subjects (plant π v) ≡ subjects t
-
-    joiners-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                  → (∀ E → joiners u E ≡ joiners v E) → ∀ E → joiners (plant π v) E ≡ joiners t E
-
-    holds-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                → unsub u ≡ unsub v → (∀ {E o} → At.Holds H u E o → At.Holds H v E o)
-                → ∀ {E o} → At.Holds H t E o → At.Holds H (plant π v) E o
-
-    gated-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Dead H u → At.Dead H v)
-                → At.Gated H t → At.Gated H (plant π v)
-
-    fed-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-              → (∀ ν → At.Fed H u ν → At.Fed H v ν) → ∀ ν → At.Fed H t ν → At.Fed H (plant π v) ν
-
-  ----------------------------------------------------------------------
   -- THE POP: a waiting cold whose timer popped goes `fired`, the same
   -- meaning node with no timer owed.
 
@@ -206,15 +179,111 @@ module Moving (R : Set) where
   others []       (a ∷ _)  = map (λ d e → d (sym e)) a
   others (_ ∷ xs) (a ∷ as) = all-mid xs a ∷ others xs as
 
-  postulate
-    -- The queue's frames: the node's own, replaced in place.
-    pendings-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                   → Σ (List (Timer h)) λ xs → Σ (List (Timer h)) λ ys
-                     → pendings t ≡ xs ++ pendings u ++ ys × pendings (plant π v) ≡ xs ++ pendings v ++ ys
+  -- One list's middle `m` replaced by `m′`, the rest kept.
+  Splice : ∀ {a} {X : Set a} → List X → List X → List X → List X → Set a
+  Splice {X = X} p m p′ m′ = Σ (List X) λ xs → Σ (List X) λ ys → p ≡ xs ++ m ++ ys × p′ ≡ xs ++ m′ ++ ys
 
-    -- Each cold's frame is its own: no two pending frames share a handle.
+  spliced-r : ∀ {a} {X : Set a} {p m p′ m′ : List X} L → Splice p m p′ m′ → Splice (p ++ L) m (p′ ++ L) m′
+  spliced-r {m = m} {m′ = m′} L (xs , ys , e , e′) = xs , ys ++ L , shift m e , shift m′ e′
+    where
+      shift : ∀ {q} n → q ≡ xs ++ n ++ ys → q ++ L ≡ xs ++ n ++ ys ++ L
+      shift n refl = trans (++-assoc xs (n ++ ys) L) (cong (xs ++_) (++-assoc n ys L))
+
+  spliced-l : ∀ {a} {X : Set a} {p m p′ m′ : List X} P → Splice p m p′ m′ → Splice (P ++ p) m (P ++ p′) m′
+  spliced-l {m = m} {m′ = m′} P (xs , ys , e , e′) = P ++ xs , ys , shift m e , shift m′ e′
+    where
+      shift : ∀ {q} n → q ≡ xs ++ n ++ ys → P ++ q ≡ (P ++ xs) ++ n ++ ys
+      shift n refl = sym (++-assoc P xs (n ++ ys))
+
+  -- The queue's frames: the node's own, replaced in place.
+  mutual
+    pendings-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                   → Splice (pendings t) (pendings u) (pendings (plant π v)) (pendings v)
+    pendings-plant {u = u} here v = [] , [] , sym (++-identityʳ (pendings u)) , sym (++-identityʳ (pendings v))
+    pendings-plant (in-map π) v                    = pendings-plant π v
+    pendings-plant (in-scan π) v                   = pendings-plant π v
+    pendings-plant (in-take π) v                   = pendings-plant π v
+    pendings-plant (in-outer {ls = ls} π) v        = spliced-r (lanePendings ls) (pendings-plant π v)
+    pendings-plant (in-lanes {t = so} π) v         = spliced-l (pendings so) (pendings-plantᴸ π v)
+    pendings-plant (in-source {bd = bd} π) v       = spliced-r (pendings bd) (pendings-plant π v)
+    pendings-plant (in-body {t = src} π) v         = spliced-l (pendings src) (pendings-plant π v)
+    pendings-plant (in-defer π) v                  = pendings-plant π v
+
+    pendings-plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                    → Splice (lanePendings ls) (pendings u) (lanePendings (plantᴸ π v)) (pendings v)
+    pendings-plantᴸ (this-lane {ls = ls} π) v        = spliced-r (lanePendings ls) (pendings-plant π v)
+    pendings-plantᴸ (next-lane {l = lane c k s} π) v = spliced-l (pendings s) (pendings-plantᴸ π v)
+
+  -- A list's pairs, split at a join.
+  pairs-split : ∀ {a r} {X : Set a} {R : X → X → Set r} xs {ys} → AllPairs R (xs ++ ys)
+              → AllPairs R xs × AllPairs R ys × All (λ x → All (R x) ys) xs
+  pairs-split []       ps       = [] , ps , []
+  pairs-split (x ∷ xs) (a ∷ ps) with pairs-split xs ps | all-++⁻ xs a
+  ... | l , r , c | al , ar = al ∷ l , r , ar ∷ c
+
+  pairs-r : ∀ {a r} {X : Set a} {R : X → X → Set r} xs {ys} → AllPairs R (xs ++ ys) → AllPairs R ys
+  pairs-r xs ps = proj₁ (proj₂ (pairs-split xs ps))
+
+  -- Frames named apart, handles apart.
+  apart : ∀ {h} {xs ys : List (Name h)} {ps qs : List (Timer h)} → All (λ x → All (x ≢_) ys) xs
+        → (∀ {a} → a ∈ᴸ ps → (play , Timer.handle a) ∈ᴸ xs) → (∀ {b} → b ∈ᴸ qs → (play , Timer.handle b) ∈ᴸ ys)
+        → All (λ a → All (λ b → Timer.handle a ≢ Timer.handle b) qs) ps
+  apart c f g = tabulateᴬ λ a∈ → tabulateᴬ λ b∈ eq → lookupᴬ (lookupᴬ c (f a∈)) (g b∈) (cong (play ,_) eq)
+
+  -- A pending frame's handle is its cold's.
+  mutual
+    pend-named : ∀ {h Δ A} {t : Sub h Δ A} {tm : Timer h} → tm ∈ᴸ pendings t → (play , Timer.handle tm) ∈ᴸ names t
+    pend-named {t = coldˢ s hd (waiting τ e (at u x b))} (here refl) = there (here refl)
+    pend-named {t = mapˢ f s} i                        = pend-named {t = s} i
+    pend-named {t = scanˢ f r s} i                     = there (pend-named {t = s} i)
+    pend-named {t = takeWhileˢ i p c k tk s} j         = ++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (pend-named {t = s} j))
+    pend-named {t = flatMapˢ op f fl oc k r so ls} i with ++⁻ (pendings so) i
+    ... | inj₁ j = ++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ (pend-named {t = so} j)))))
+    ... | inj₂ j = ++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) (lane-named {ls = ls} j)))))
+    pend-named {t = connectˢ S c b kb k fd e src bd} i with ++⁻ (pendings src) i
+    ... | inj₁ j = ++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ (pend-named {t = src} j))))))
+    ... | inj₂ j = ++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) (pend-named {t = bd} j))))))
+    pend-named {t = deferˢ k s} i                      = ++⁺ʳ (quietName k) (pend-named {t = s} i)
+
+    lane-named : ∀ {h Δ B} {ls : List (Lane h Δ B)} {tm : Timer h} → tm ∈ᴸ lanePendings ls → (play , Timer.handle tm) ∈ᴸ laneNames ls
+    lane-named {ls = lane c k s ∷ ls} i with ++⁻ (pendings s) i
+    ... | inj₁ j = ++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ (pend-named {t = s} j)))
+    ... | inj₂ j = ++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) (lane-named {ls = ls} j)))
+
+  -- Each cold's frame is its own: no two pending frames share a handle.
+  mutual
     pendings-fresh : ∀ {h Δ A} {t : Sub h Δ A} → AllPairs _≢_ (names t)
                    → AllPairs (λ a b → Timer.handle a ≢ Timer.handle b) (pendings t)
+    pendings-fresh {t = pendingˢ _ _}                              _ = []
+    pendings-fresh {t = coldˢ s hd (waiting τ e (at u x b))}       _ = [] ∷ []
+    pendings-fresh {t = coldˢ s hd (waiting τ e doneᶠ)}            _ = []
+    pendings-fresh {t = coldˢ s hd (waiting τ e quietᶠ)}           _ = []
+    pendings-fresh {t = coldˢ s hd (fired _ _ _)}                  _ = []
+    pendings-fresh {t = coldˢ s hd (playing _ _ _ _)}              _ = []
+    pendings-fresh {t = ofˢ _ _ _}                                 _ = []
+    pendings-fresh {t = doneˢ}                                     _ = []
+    pendings-fresh {t = mapˢ f s}                                  ps = pendings-fresh {t = s} ps
+    pendings-fresh {t = scanˢ f r s}                               (_ ∷ ps) = pendings-fresh {t = s} ps
+    pendings-fresh {t = takeWhileˢ i p c k tk s}                   ps =
+      pendings-fresh {t = s} (pairs-r (quietName k) (pairs-r (cutNames c) ps))
+    pendings-fresh {t = flatMapˢ op f fl oc k r so ls}             ps
+      with pairs-split (names so) (pairs-r ((slot _ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps))))
+    ... | l , rs , c = pairs-++⁺ (pendings-fresh {t = so} l) (lanes-fresh {ls = ls} rs)
+                         (apart c (λ {a} → pend-named {t = so} {tm = a}) (λ {b} → lane-named {ls = ls} {tm = b}))
+    pendings-fresh {t = connectˢ S c b kb k fd e src bd}           ps
+      with pairs-split (names src)
+             (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((cell _ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps)))))
+    ... | l , rs , cr = pairs-++⁺ (pendings-fresh {t = src} l) (pendings-fresh {t = bd} rs)
+                          (apart cr (λ {a} → pend-named {t = src} {tm = a}) (λ {b′} → pend-named {t = bd} {tm = b′}))
+    pendings-fresh {t = joinˢ _ _ _ _ _}                           _ = []
+    pendings-fresh {t = deferˢ k s}                                ps = pendings-fresh {t = s} (pairs-r (quietName k) ps)
+
+    lanes-fresh : ∀ {h Δ B} {ls : List (Lane h Δ B)} → AllPairs _≢_ (laneNames ls)
+                → AllPairs (λ a b → Timer.handle a ≢ Timer.handle b) (lanePendings ls)
+    lanes-fresh {ls = []}             _ = []
+    lanes-fresh {ls = lane c k s ∷ ls} ps with pairs-split (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps))
+    ... | l , rs , cr = pairs-++⁺ (pendings-fresh {t = s} l) (lanes-fresh {ls = ls} rs)
+                          (apart cr (λ {a} → pend-named {t = s} {tm = a}) (λ {b} → lane-named {ls = ls} {tm = b}))
 
   -- The fired cold's frame leaves the queue with its timer: the queue's
   -- others are later, so not it, and the pending frames' others not
@@ -420,3 +489,206 @@ module Moving (R : Set) where
       ... | inj₁ (() , _)
       ... | inj₂ (_ , q , same)         = gone (Owned.fins ow q)
       ... | inj₂ (_ , q , same-connect) = gone (Owned.fins ow q)
+
+  ----------------------------------------------------------------------
+  -- What a node rewritten keeps, each part of the relation from the
+  -- same part of the node.
+
+  mutual
+    part-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+               → At.part H u ≡ At.part H v → At.part H (plant π v) ≡ At.part H t
+    part-plant H here v eq          = sym eq
+    part-plant H (in-map π) v eq    rewrite part-plant H π v eq = refl
+    part-plant H (in-scan π) v eq   rewrite part-plant H π v eq = refl
+    part-plant H (in-take π) v eq   rewrite part-plant H π v eq = refl
+    part-plant H (in-outer π) v eq  rewrite part-plant H π v eq = refl
+    part-plant H (in-lanes π) v eq  rewrite part-plantᴸ H π v eq = refl
+    part-plant H (in-source π) v eq rewrite part-plant H π v eq = refl
+    part-plant H (in-body π) v eq   rewrite part-plant H π v eq = refl
+    part-plant H (in-defer π) v eq  = part-plant H π v eq
+
+    part-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                → At.part H u ≡ At.part H v → At.partLanes H (plantᴸ π v) ≡ At.partLanes H ls
+    part-plantᴸ H (this-lane π) v eq                rewrite part-plant H π v eq = refl
+    part-plantᴸ H (next-lane {l = lane c k s} π) v eq rewrite part-plantᴸ H π v eq = refl
+
+  mutual
+    pend-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+               → pend u ≡ pend v → pend (plant π v) ≡ pend t
+    pend-plant here v eq          = sym eq
+    pend-plant (in-map π) v eq    = pend-plant π v eq
+    pend-plant (in-scan π) v eq   = pend-plant π v eq
+    pend-plant (in-take π) v eq   = pend-plant π v eq
+    pend-plant (in-outer π) v eq  rewrite pend-plant π v eq = refl
+    pend-plant (in-lanes π) v eq  rewrite pend-plantᴸ π v eq = refl
+    pend-plant (in-source π) v eq rewrite pend-plant π v eq = refl
+    pend-plant (in-body π) v eq   rewrite pend-plant π v eq = refl
+    pend-plant (in-defer π) v eq  = pend-plant π v eq
+
+    pend-plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                → pend u ≡ pend v → pendᴸ (plantᴸ π v) ≡ pendᴸ ls
+    pend-plantᴸ (this-lane π) v eq                rewrite pend-plant π v eq = refl
+    pend-plantᴸ (next-lane {l = lane c k s} π) v eq rewrite pend-plantᴸ π v eq = refl
+
+  mutual
+    names-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                → names u ≡ names v → names (plant π v) ≡ names t
+    names-plant here v eq          = sym eq
+    names-plant (in-map π) v eq    = names-plant π v eq
+    names-plant (in-scan π) v eq   rewrite names-plant π v eq = refl
+    names-plant (in-take π) v eq   rewrite names-plant π v eq = refl
+    names-plant (in-outer π) v eq  rewrite names-plant π v eq = refl
+    names-plant (in-lanes π) v eq  rewrite names-plantᴸ π v eq = refl
+    names-plant (in-source π) v eq rewrite names-plant π v eq = refl
+    names-plant (in-body π) v eq   rewrite names-plant π v eq = refl
+    names-plant (in-defer π) v eq  rewrite names-plant π v eq = refl
+
+    names-plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                 → names u ≡ names v → laneNames (plantᴸ π v) ≡ laneNames ls
+    names-plantᴸ (this-lane π) v eq                rewrite names-plant π v eq = refl
+    names-plantᴸ (next-lane {l = lane c k s} π) v eq rewrite names-plantᴸ π v eq = refl
+
+  mutual
+    subjects-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                   → subjects u ≡ subjects v → subjects (plant π v) ≡ subjects t
+    subjects-plant here v eq          = sym eq
+    subjects-plant (in-map π) v eq    = subjects-plant π v eq
+    subjects-plant (in-scan π) v eq   = subjects-plant π v eq
+    subjects-plant (in-take π) v eq   = subjects-plant π v eq
+    subjects-plant (in-outer π) v eq  rewrite subjects-plant π v eq = refl
+    subjects-plant (in-lanes π) v eq  rewrite subjects-plantᴸ π v eq = refl
+    subjects-plant (in-source π) v eq rewrite subjects-plant π v eq = refl
+    subjects-plant (in-body π) v eq   rewrite subjects-plant π v eq = refl
+    subjects-plant (in-defer π) v eq  = subjects-plant π v eq
+
+    subjects-plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                    → subjects u ≡ subjects v → laneSubjects (plantᴸ π v) ≡ laneSubjects ls
+    subjects-plantᴸ (this-lane π) v eq                rewrite subjects-plant π v eq = refl
+    subjects-plantᴸ (next-lane {l = lane c k s} π) v eq rewrite subjects-plantᴸ π v eq = refl
+
+  mutual
+    joiners-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                  → (∀ E → joiners u E ≡ joiners v E) → ∀ E → joiners (plant π v) E ≡ joiners t E
+    joiners-plant here v eq E                      = sym (eq E)
+    joiners-plant (in-map π) v eq E                = joiners-plant π v eq E
+    joiners-plant (in-scan π) v eq E               = joiners-plant π v eq E
+    joiners-plant (in-take π) v eq E               = joiners-plant π v eq E
+    joiners-plant (in-outer π) v eq E              rewrite joiners-plant π v eq E = refl
+    joiners-plant (in-lanes π) v eq E              rewrite joiners-plantᴸ π v eq E = refl
+    joiners-plant (in-source π) v eq E             rewrite joiners-plant π v eq E = refl
+    joiners-plant (in-body {S = S} π) v eq E       rewrite joiners-plant π v eq (S ∷ E) = refl
+    joiners-plant (in-defer π) v eq E              = joiners-plant π v eq E
+
+    joiners-plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                   → (∀ E → joiners u E ≡ joiners v E) → ∀ E → laneJoiners (plantᴸ π v) E ≡ laneJoiners ls E
+    joiners-plantᴸ (this-lane π) v eq E                rewrite joiners-plant π v eq E = refl
+    joiners-plantᴸ (next-lane {l = lane c k s} π) v eq E rewrite joiners-plantᴸ π v eq E = refl
+
+  -- What unsubscribing does: a node's own, or its source's.
+  unsub-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+              → unsub u ≡ unsub v → unsub (plant π v) ≡ unsub t
+  unsub-plant here v eq          = sym eq
+  unsub-plant (in-map π) v eq    = unsub-plant π v eq
+  unsub-plant (in-scan π) v eq   = unsub-plant π v eq
+  unsub-plant (in-take π) v eq   = refl
+  unsub-plant (in-outer π) v eq  = refl
+  unsub-plant (in-lanes π) v eq  = refl
+  unsub-plant (in-source π) v eq rewrite unsub-plant π v eq = refl
+  unsub-plant (in-body π) v eq   = refl
+  unsub-plant (in-defer π) v eq  = refl
+
+  -- A lane's switch is kept: the live count and the switches.
+  count-plant : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+              → At.count H (plantᴸ π v) ≡ At.count H ls
+  count-plant H (this-lane π) v                = refl
+  count-plant H (next-lane {l = lane c k s} π) v rewrite count-plant H π v = refl
+
+  switches-plant : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                 → At.switches H (plantᴸ π v) ≡ At.switches H ls
+  switches-plant H (this-lane π) v                = refl
+  switches-plant H (next-lane {l = lane c k s} π) v = cong (c ∷_) (switches-plant H π v)
+
+  mutual
+    holds-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                → unsub u ≡ unsub v → (∀ {E o} → At.Holds H u E o → At.Holds H v E o)
+                → ∀ {E o} → At.Holds H t E o → At.Holds H (plant π v) E o
+    holds-plant H here v ue hv hs = hv hs
+    holds-plant H (in-map π) v ue hv hs = holds-plant H π v ue hv hs
+    holds-plant H (in-scan π) v ue hv hs = holds-plant H π v ue hv hs
+    holds-plant H (in-take {c = c} {k = k} π) v ue hv (ak , hs) =
+      subst (At.Attached H c k) (sym (unsub-plant π v ue)) ak , holds-plant H π v ue hv hs
+    holds-plant H (in-outer {oc = oc} {k = k} π) v ue hv (rf , sl , ak , hs , ac , gn , hl) =
+      rf , sl , subst (At.Attached H oc k) (sym (unsub-plant π v ue)) ak , holds-plant H π v ue hv hs , ac , gn , hl
+    holds-plant H (in-lanes {op = op} {f = f} {fl = fl} π) v ue hv {E} {o} (rf , sl , ak , hs , ac , (g , ge , ga) , hl) =
+      rf , sl , ak , hs , trans ac (sym (count-plant H π v)) , (g , trans ge (sym (switches-plant H π v)) , ga)
+      , holds-plantᴸ H π v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
+    holds-plant H (in-source {c = c} {k = k} π) v ue hv (ak , be , st , hs , hb) =
+      subst (At.Attached H c k) (sym (unsub-plant π v ue)) ak , be , st , holds-plant H π v ue hv hs , hb
+    holds-plant H (in-body {kb = kb} π) v ue hv (ak , be , st , hs , hb) =
+      ak , be , subst (At.Stashed H kb) (sym (unsub-plant π v ue)) st , hs , holds-plant H π v ue hv hb
+    holds-plant H (in-defer {k = k} π) v ue hv (st , hs) =
+      subst (At.Stashed H k) (sym (unsub-plant π v ue)) st , holds-plant H π v ue hv hs
+
+    holds-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                 → unsub u ≡ unsub v → (∀ {E o} → At.Holds H u E o → At.Holds H v E o)
+                 → ∀ {A : Set} {op} {f : A → Obs Timeline Δ B} {E o fl}
+                 → At.HoldsLanes H op f E o fl ls → At.HoldsLanes H op f E o fl (plantᴸ π v)
+    holds-plantᴸ H (this-lane {c = c} {k = k} π) v ue hv (ak , hs , hl) =
+      subst (At.Attached H c k) (sym (unsub-plant π v ue)) ak , holds-plant H π v ue hv hs , hl
+    holds-plantᴸ H (next-lane {l = lane c k s} π) v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} (ak , hs , hl) =
+      ak , hs , holds-plantᴸ H π v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
+
+  -- Every cold below spent: below the planted node from the new one's,
+  -- elsewhere from the old tree's.
+  dead-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+             → (At.Dead H u → At.Dead H v) → At.Dead H t → At.Dead H (plant π v)
+  dead-plant H π v dv d π′ with unplant π v π′
+  ... | inj₁ (ρ , _)        = dv (λ q → d (π ⊕ q)) ρ
+  ... | inj₂ (_ , q , same) = d q
+
+  cut-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+            → (At.Dead H u → At.Dead H v) → ∀ k → At.Cut↓ H k t → At.Cut↓ H k (plant π v)
+  cut-plant H π v dv nothing  c = c
+  cut-plant H π v dv (just _) d = dead-plant H π v dv d
+
+  mutual
+    gated-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Dead H u → At.Dead H v)
+                → At.Gated H t → At.Gated H (plant π v)
+    gated-plant H here v pe gv dv g = gv g
+    gated-plant H (in-map π) v pe gv dv g = gated-plant H π v pe gv dv g
+    gated-plant H (in-scan π) v pe gv dv g = gated-plant H π v pe gv dv g
+    gated-plant H (in-take {k = k} π) v pe gv dv (cg , g) =
+      (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v pe gv dv g
+    gated-plant H (in-outer π) v pe gv dv (g , gl) = gated-plant H π v pe gv dv g , gl
+    gated-plant H (in-lanes π) v pe gv dv (g , gl) = g , gated-plantᴸ H π v pe gv dv gl
+    gated-plant H (in-source {k = k} π) v pe gv dv (cg , g , gb) =
+      (λ n → cut-plant H π v dv k (cg n)) , gated-plant H π v pe gv dv g , gb
+    gated-plant H (in-body π) v pe gv dv (cg , g , gb) =
+      (λ n → cg (trans (sym (part-plant H π v pe)) n)) , g , gated-plant H π v pe gv dv gb
+    gated-plant H (in-defer π) v pe gv dv g = gated-plant H π v pe gv dv g
+
+    gated-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                 → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Dead H u → At.Dead H v)
+                 → At.GatedLanes H ls → At.GatedLanes H (plantᴸ π v)
+    gated-plantᴸ H (this-lane {k = k} π) v pe gv dv (cg , g , gl) =
+      (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v pe gv dv g , gl
+    gated-plantᴸ H (next-lane {l = lane c k s} π) v pe gv dv (cg , g , gl) = cg , g , gated-plantᴸ H π v pe gv dv gl
+
+  mutual
+    fed-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+              → (∀ ν → At.Fed H u ν → At.Fed H v ν) → ∀ ν → At.Fed H t ν → At.Fed H (plant π v) ν
+    fed-plant H here v fv ν f                             = fv ν f
+    fed-plant H (in-map π) v fv ν f                       = fed-plant H π v fv ν f
+    fed-plant H (in-scan π) v fv ν f                      = fed-plant H π v fv ν f
+    fed-plant H (in-take π) v fv ν f                      = fed-plant H π v fv ν f
+    fed-plant H (in-outer π) v fv ν (f , fl)              = fed-plant H π v fv ν f , fl
+    fed-plant H (in-lanes π) v fv ν (f , fl)              = f , fed-plantᴸ H π v fv ν fl
+    fed-plant H (in-source π) v fv ν (f , fb)             = fed-plant H π v fv ν f , fb
+    fed-plant H (in-body {fd = fd} {e = e} π) v fv ν (f , fb) = f , fed-plant H π v fv ((fd , e) ∷ ν) fb
+    fed-plant H (in-defer π) v fv ν f                     = fed-plant H π v fv ν f
+
+    fed-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+               → (∀ ν → At.Fed H u ν → At.Fed H v ν) → ∀ ν → At.FedLanes H ls ν → At.FedLanes H (plantᴸ π v) ν
+    fed-plantᴸ H (this-lane π) v fv ν (f , fl)                = fed-plant H π v fv ν f , fl
+    fed-plantᴸ H (next-lane {l = lane c k s} π) v fv ν (f , fl) = f , fed-plantᴸ H π v fv ν fl

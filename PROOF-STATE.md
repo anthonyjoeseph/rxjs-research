@@ -177,18 +177,12 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PLANT.** The lemmas a rewrite at a path keeps (`part-plant`
-  through `fed-plant`, `pendings-plant`) and `pendings-fresh`, each an
-  induction on the path. Riskiest: `gated-plant` and `holds-plant`,
-  whose node premises must carry a parent's clause: a connect's `Cut↓`
-  over its source, a kernel holding its child's teardown. Decides whether
-  a premise at the node suffices or a move must say more of its subtree.
-  Ruled out: the queue needing uniqueness as a field (`Books.fresh` pays
-  it); a transport left open (`unplant` places every node).
 - **THE PROGRESS.** `burst-onward` and `sub-onward` carry
   liveness: each silent hop passes a skip, leaves the ghost alike and
   lowers `measure`, or reaches a step that is not silent. Ruled out: a
-  ghost-only marker in the shared machine; a burst queued but by a leaf
+  move needing more of its subtree than its node's own premises (each
+  `-plant` lemma is a path induction); a ghost-only marker in the shared
+  machine; a burst queued but by a leaf
   subscribed, a timer popped or a close (`Machine.starting`, `turned`,
   `schedule`); a lane admit or a connect's feed with no skip (`Unfold`).
   A burst ended resumes the stack's suspended code before the next
@@ -278,26 +272,6 @@ by their own silent steps (`Mirror`).
 - **`burst-onward`** (Content) — FALSITY, `NO EVIDENCE`: a burst's frame steps
   silently to the next re-entry state, past a skip, a burst dropped or to a
   note.
-- **`pendings-fresh`** (Moves) — FALSITY, `NO EVIDENCE`: no two pending frames
-  share a handle, the names being distinct.
-- **`pendings-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten
-  replaces its own pending frames in place.
-- **`part-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one of
-  the same open part leaves the tree's open part.
-- **`pend-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
-  owing as much leaves the work owed.
-- **`names-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
-  of the same names leaves the tree's.
-- **`subjects-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to
-  one of the same subjects leaves the tree's.
-- **`joiners-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
-  of the same joiners leaves the tree's.
-- **`holds-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
-  holding no less, same teardown, keeps the tree's kernels held.
-- **`gated-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one
-  gated and dead no less, same open part, keeps the tree gated.
-- **`fed-plant`** (Moves) — FALSITY, `NO EVIDENCE`: a node rewritten to one fed
-  no less keeps the tree's joiners fed.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
