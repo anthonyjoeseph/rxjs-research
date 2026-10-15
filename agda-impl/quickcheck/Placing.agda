@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
--- THE MACHINE'S TRACE, PLACED, TESTED: the bisimulation the adequacy
--- proof runs on, decided on a finite prefix.  Each value the machine
+-- THE MACHINE'S TRACE, PLACED, TESTED: the machine against the fold's
+-- events, positions included, decided on a finite prefix.  Each value the machine
 -- records sits at the denotation's next `out`, at the same position, on
 -- that position's tick; its completion at the `end`, its queue run dry
 -- over `hush`.  Silent steps pass together while both sides have one,
@@ -10,8 +10,8 @@
 -- a meaning that says nothing more will ever happen is refuted by a
 -- machine still working there, however much it worked before.
 --
--- And the events rise, as `ticks-up` needs: each at a position past the
--- last, headed by its tick.
+-- And the events rise: each at a position past the last, headed by its
+-- tick.
 module quickcheck.Placing where
 
 open import Data.Bool using (Bool; true; false; _∧_; not)
@@ -20,9 +20,10 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; tick; observe; root)
-open import denotation.Unfold using (⟦_⟧; [])
+open import denotation.Denote using (⟦_⟧[_])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (Prog; toObs; timeline)
+open import quickcheck.Oracle using (depth)
 open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
 
@@ -63,7 +64,7 @@ private
 placing : Prog natᵗ → Bool
 placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e
   where o = toObs timeline 3 p [] [] []
-        e = observe (⟦ o ⟧ []) root
+        e = observe (⟦ o ⟧[ depth 3 p ] []) root
 
 -- The seeds from f on which the machine's trace strays from the meaning.
 placingFails : ℕ → ℕ → List ℕ

@@ -15,6 +15,10 @@ open import adequacy.Adequacy using (adequacy)
 -- operator's `MonotonicList` function applied to its children's.
 open import denotation.Denote using (folded)
 
+-- THE MEANING IS COMPOSITIONAL: a node's meaning is its operator applied
+-- to its children's meanings, so proofs over it go one operator at a time.
+open import denotation.Compositional using (compositional)
+
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.
 open import Tree using (merge; flatMap; ones)

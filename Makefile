@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain ghosts placing placing-count bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain placing placing-count bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
@@ -38,7 +38,6 @@ help:
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
 	@echo "  placing       the machine's trace is placed against the root's events (ARGS=\"FROM COUNT\", default 0 300, max 500 without SWEEP=1)"
-	@echo "  ghosts        every observer in the run is shown what its subtree denotes (ARGS=\"FROM COUNT\")"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
@@ -103,7 +102,7 @@ chain: oracle-build
 	  if echo "$$out" | grep -q '^chain: FAIL '; then echo "chain: RED"; exit 1; fi; \
 	  echo "chain: GREEN"
 
-# The machine's trace placed against the meaning, positions included, on
+# The machine's trace placed against the fold's events, positions included, on
 # ARGS="FROM COUNT" seeds (default "0 300").  A smoke check for a change to
 # the denotation or the engine, never a sweep: COUNT over 500 is refused
 # unless SWEEP=1.
@@ -118,15 +117,6 @@ placing: placing-count oracle-build
 	  echo "$$out" | grep -q '^placing: done ' || { echo "placing: RED — the run never finished"; exit 1; }; \
 	  if echo "$$out" | grep -q '^placing: FAIL '; then echo "placing: RED"; exit 1; fi; \
 	  echo "placing: GREEN"
-
-# Every observer inside the run against its subtree's denotation, on
-# ARGS="FROM COUNT" seeds: green when the run reaches its `done` line and no
-# seed FAILs.
-ghosts: oracle-build
-	@out=$$($(ORACLE_BIN) ghosts $(ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^ghosts: done ' || { echo "ghosts: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^ghosts: FAIL '; then echo "ghosts: RED"; exit 1; fi; \
-	  echo "ghosts: GREEN"
 
 # The runner prints a FAIL line per failing row and a closing `done` line;
 # a run without the `done` line died part-way and is red.  See

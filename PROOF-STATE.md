@@ -1,7 +1,7 @@
 # PROOF-STATE — the roadmap
 
 **What this file is.** The ordered worklist for the one goal: discharging the
-three tiers below — no postulates, everything typechecks. This file holds the SCHEDULE — each tier's
+four tiers below — no postulates, everything typechecks. This file holds the SCHEDULE — each tier's
 next legs — over a LEDGER of one-line hooks; everything else lives in the
 code.
 
@@ -157,69 +157,72 @@ its proven precedent in the postulate's own `TWIN:` — if the hook here cannot
 point at one, the row is FALSITY.
 
 
-## Tier 1 — the adequacy theorem
+## Tier 1 — compositionality
 
-**THE LINK.** `adequacy`: the pure run's limit is the denotation observed at
-the root, positions forgotten down to ticks. The denotation is the
-compositional fold (`folded`); both halves are read off one weak simulation,
-`sim`, between the machine's trace and Unfold's stepper, and `unfolded`
-carries that to the fold. `sim` is a corecursion over `adequacy.Carrier`'s relation
-(B: every live observer held to its subtree's meaning, the machine's agenda
-located in the witness); its leaves are `kept`, B kept and each one-sided wait
-finite (C), and `carried-begin`. Work the riskiest
-question first: try to REFUTE the route, and leave anything tractable last.
+**THE MEANING IS COMPOSITIONAL.** `compositional`: each node's meaning is
+its operator's `MonotonicList` function applied to its children's
+meanings, up to `_≈_`. Its body is assembled: the approximants settle,
+each reads its environment non-expansively, and `deferᴰ` is contractive.
+The leaves are the operators' non-expansiveness, `_≈[_]_` at every
+subscription position. This tier fixes `MonotonicList` before adequacy
+is built on it, so a leaf's refutation may move the definition.
 
 ### Big picture tier roadmap
 
-- **THE FOLD AS THE SIMULATION'S TARGET.** Measured on 300 programs: one
-  fold step costs the machine up to 74 silent steps, and its position moves
-  match the fold's steps in only half the windows, so neither is C's measure
-  alone. But every window's machine steps stay within 9 × fold steps × tree
-  size. So C's measure is lexicographic: the fold's steps, then the
-  machine's synchronous work left, a function of its control and agenda.
-  Define that function, then restate `sim` against the fold and delete
-  Unfold and `unfolded`. Decides which meaning the tier is worked against.
-- **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
-  turn; it gains a field placing every live node's next shown event past the
-  region the agenda owes, true at `carried-begin`. A popped timer's first
-  step, `kept-burst` with the cold still waiting, is its first test: the
-  agenda is empty, so every open node waits past the timer's cascade. Then
-  the feed's case of `kept-run`. The meaning feeds its joiners from one run of
-  the source, as the machine's subject does, so a joiner holds exactly what
-  the feed owes it (`Fed`) and no joiner lags its source. Decides whether the
-  position order alone orders the meaning's leaves against the machine.
-- **B'S STEP AT A DEATH, IN AGDA.** An observer dying mid-burst: a
-  `takeWhile` cutting, a switch moving off its lane, a connect's body
-  completing and its source stopped. The dead are owed nothing, so B must
-  drop them in the same step that kills them. Decides whether the death
-  rule is a function of the heap's flags.
-- **THE TRACTABLE REST, LAST.** Liveness in the heap's cut and closed flags;
-  B's steps at `map`, `scan` and `defer`; each kernel's state as a function
-  of what it was delivered; `carried-begin`, by `_≗_`'s unit law; `ticks-up`.
-  None is taken while a leg above is open.
+- **REFUTE THE LEAVES BY SAMPLING.** A QuickCheck over every operator:
+  cut a drawn run after k steps and continue it differently (`⊥ᴰ`), then
+  compare the operator's output on the two for k steps at every
+  position. Decides, before any grinding, whether `_≈[_]_` at each
+  position is the currency every operator respects.
+- **CONNECT'S HANDLE.** `connectᴰ-ne` hands the body `hot` of the
+  source's run. A late joiner skips what came before it, so the handle's
+  first k steps may read more than k of the source's. Decides whether
+  agreeing sources give agreeing handles, or whether the currency must
+  count steps per position differently.
+- **FLATMAP'S LOOKAHEAD.** `flatMapᴰ-ne`: picking the earliest lane reads
+  every lane's head, and a bounded merge queues lanes past its bound.
+  Decides whether output step j reads at most j steps of each input.
+- **THE UNARY OPERATORS.** `mapᴰ-ne`, `scanᴰ-ne`, `takeWhileᴰ-ne`, each
+  by coinduction on `Agree`, one output step per input step. Last: none
+  can move the currency.
 
 ### The ledger
 
-- **`kept-run`** (Kept) — FALSITY, `NO EVIDENCE`: code running, the agenda's
-  next call or a subscription beginning; the connect's feed is here.
-- **`kept-burst`** (Kept) — FALSITY, `NO EVIDENCE`: a cold's frame at its next
-  step, or a popped timer's at its first, its subscriber asked if closed.
-- **`calm-hush`** (Kept) — FALSITY, `NO EVIDENCE`: no timer queued, the meaning
-  falls quiet by silent steps.
-- **`carried-begin`** (Simulation) — FALSITY, `NO EVIDENCE`: the program
-  pending at the root, carried.
-- **`unfolded`** (Adequacy) — FALSITY, `NO EVIDENCE`: the stepper and the fold
-  show the same; they differ in how `connect` feeds its joiners.
-- **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
-  fall.
+- **`connectᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: the hot handle's
+  late joiners skip the source's past.
+- **`flatMapᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: the earliest lane
+  is chosen by reading every lane's head.
+- **`takeWhileᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: one output step
+  per input step, ending early.
+- **`scanᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: one output step per
+  input step.
+- **`mapᴰ-ne`** (Compositional) — FALSITY, `NO EVIDENCE`: one output step per
+  input step.
 
-## Tier 2 — the simultaneous spec
+## Tier 2 — the adequacy theorem
+
+**THE LINK.** `adequacy`: the pure run's limit is the meaning observed at
+the root, positions forgotten down to ticks. Postulated bare until Tier 1
+fixes `MonotonicList`.
+
+### Big picture tier roadmap
+
+- **RECOVER WHAT STILL FITS.** Once Tier 1 lands, read the simulation its
+  header's `RECOVERY` names against the settled `MonotonicList`, and
+  restate `adequacy` as a body over whichever of its leaves survive.
+
+### The ledger
+
+- **`adequacy`** (Adequacy) — FALSITY, `RECOVERY`: the machine's run and the
+  fold show the same.
+
+## Tier 3 — the simultaneous spec
 
 **THE STATEMENT.** Define the new "simultaneous" spec over the denotation,
 adapted from the old `agda/` tree's statement modules (reference only). No
 rows until the statements exist; each lands as a postulate here.
 
-## Tier 3 — the simultaneous spec, proven
+## Tier 4 — the simultaneous spec, proven
 
-**THE PROOF.** Discharge Tier 2's statements using the denotation and
-`adequacy`. No rows until Tier 2 states them.
+**THE PROOF.** Discharge Tier 3's statements using the denotation and
+`adequacy`. No rows until Tier 3 states them.

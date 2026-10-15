@@ -207,13 +207,6 @@ module Run (P : Prims) where
   via start ρ o k = register (Observer.next o) (Observer.complete o) (Observer.closed o) λ σ s →
                     start s λ τ h → k (σ ⨾ τ) (record { unsubscribe = stop h (done tt) })
 
-  ⊥ᴷ : ∀ {A w} → Subscribe A w
-  ⊥ᴷ ρ o k = diverge
-
-  -- One level down, where `deferᴰ` puts its body: at p ++ [ ix 1 ].
-  deeper : ∀ {A w} → Subscribe A w → Subscribe A w
-  deeper s ρ o k = here λ p → goto (p ++ [ ix 1 ]) (s ρ o k)
-
   -- Sequencing, which the free monad gets by walking its continuations.
   infixl 1 _>>=ᴬ_ _>>ᴬ_
   _>>=ᴬ_ : ∀ {w A B} → Act w A → (A → Act w B) → Act w B

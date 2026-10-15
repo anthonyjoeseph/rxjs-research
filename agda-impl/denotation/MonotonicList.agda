@@ -19,7 +19,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; 
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; <⇒≤; ≤-reflexive)
+open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong; cong₂)
@@ -230,19 +230,6 @@ private
     ... | inj₂ (x , _) | inj₁ y       rewrite subst (λ z → cmpLabel z c ≡ lt) (sym (eq-label a b x)) y = refl
     ... | inj₂ (x , u) | inj₂ (y , v)
       rewrite subst (λ z → cmpLabel z c ≡ eq) (sym (eq-label a b x)) y | lt-pos p q r u v = refl
-
-  isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
-  isLt-lt {lt} h = refl
-  isLt-lt {eq} ()
-  isLt-lt {gt} ()
-
-<ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
-<ᵖ-trans p q r h₁ h₂ rewrite lt-pos p q r (isLt-lt h₁) (isLt-lt h₂) = refl
-
-<ᵖ-tick : ∀ a b p q → (ix a ∷ p) <ᵖ (ix b ∷ q) ≡ true → a ≤ b
-<ᵖ-tick a b p q h with lexi-lt (cmpℕ a b) (cmpPos p q) (isLt-lt h)
-... | inj₁ l       = <⇒≤ (lt-ℕ {a} {b} l)
-... | inj₂ (e , _) = ≤-reflexive (eq-ℕ {a} {b} e)
 
 ------------------------------------------------------------------------
 -- What a subscriber sees
@@ -544,8 +531,11 @@ data Agree {A : Set} : ℕ → Events A → Events A → Set where
   hush⁼ : ∀ {k} → Agree (suc k) hush hush
 
 -- Agreeing for k steps at every subscription.
-_≈[_]_ : ∀ {A} → MonotonicList A → ℕ → MonotonicList A → Set
-x ≈[ k ] y = ∀ p → Agree k (observe x p) (observe y p)
+-- A record, not a function type, so a proof's type names both sides.
+record _≈[_]_ {A : Set} (x : MonotonicList A) (k : ℕ) (y : MonotonicList A) : Set where
+  constructor agrees
+  field agree : ∀ p → Agree k (observe x p) (observe y p)
+open _≈[_]_ public
 
 -- THE SAME MEANING: alike at every subscription, for any number of steps.
 _≈_ : ∀ {A} → MonotonicList A → MonotonicList A → Set
@@ -637,6 +627,19 @@ private
     settle-agree {es = es} (settled s (1≤′suc m))
       (diag-limit {es = λ n → rest (es (suc n))} (λ n → agree-rest (s (suc n))) m)
 
+-- Agreeing for k steps is an equivalence, and implies agreeing for fewer.
+≈ₖ-refl : ∀ {A k} (x : MonotonicList A) → x ≈[ k ] x
+≈ₖ-refl x = agrees λ p → agree-refl _ (observe x p)
+
+≈ₖ-sym : ∀ {A k} {x y : MonotonicList A} → x ≈[ k ] y → y ≈[ k ] x
+≈ₖ-sym a = agrees λ p → agree-sym (agree a p)
+
+≈ₖ-trans : ∀ {A k} {x y z : MonotonicList A} → x ≈[ k ] y → y ≈[ k ] z → x ≈[ k ] z
+≈ₖ-trans a b = agrees λ p → agree-trans (agree a p) (agree b p)
+
+≈ₖ-pred : ∀ {A k} {x y : MonotonicList A} → x ≈[ suc k ] y → x ≈[ k ] y
+≈ₖ-pred a = agrees λ p → agree-pred (agree a p)
+
 -- THE LIMIT of approximants that settle one step at a time: approximant
 -- n's first n steps are final, so step j is read off approximant j+1.
 -- Defined for any sequence; `lub-limit` says what it is of a settling one.
@@ -646,7 +649,7 @@ lub c = cold λ p → diag λ n → observe (c n) p
 -- A settling sequence agrees with its limit for as many steps as the
 -- approximant's index.
 lub-limit : ∀ {A} {c : ℕ → MonotonicList A} → Settling c → ∀ m → c m ≈[ m ] lub c
-lub-limit s m p = diag-limit (λ n → s n p) m
+lub-limit s m = agrees λ p → diag-limit (λ n → agree (s n) p) m
 
 -- Approximant n of a recursive definition: unfold it n times from ⊥ᴰ.
 iterate : ∀ {A} → ℕ → (MonotonicList A → MonotonicList A) → MonotonicList A
@@ -666,14 +669,14 @@ Contractive f = ∀ {k x y} → x ≈[ k ] y → f x ≈[ suc k ] f y
 
 -- A contractive `f`'s limit is its fixed point.
 fix-unfold : ∀ {A} {f : MonotonicList A → MonotonicList A} → Contractive f → fixᴰ f ≈ f (fixᴰ f)
-fix-unfold {f = f} cf k p =
-  agree-trans (agree-sym (lub-limit {c = c} iterates k p))
-    (agree-trans (iterates k p) (agree-pred (cf (lub-limit {c = c} iterates k) p)))
+fix-unfold {f = f} cf k =
+  ≈ₖ-trans (≈ₖ-sym (lub-limit {c = c} iterates k))
+    (≈ₖ-trans (iterates k) (≈ₖ-pred (cf (lub-limit {c = c} iterates k))))
   where
     c : ℕ → MonotonicList _
     c n = iterate n f
     iterates : Settling c
-    iterates zero    p = stop
+    iterates zero      = agrees λ p → stop
     iterates (suc n)   = cf (iterates n)
 
 ------------------------------------------------------------------------
