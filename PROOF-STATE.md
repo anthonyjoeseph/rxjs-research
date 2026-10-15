@@ -176,7 +176,7 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE ORDER.** `alien-steps`, `steady-flat` and `ordered-flat`
+- **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
   no sibling's position, which is what keeps `Steady` and a flatMap's
@@ -222,8 +222,14 @@ by their own silent steps (`Mirror`).
   sources sorted and alien to where it subscribes, is in order.
 - **`steady-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap somewhere,
   over sorted, alien sources, is steady: no lane steps inside its outer's.
-- **`alien-steps`** (Placed) — FALSITY, `NO EVIDENCE`: a subscription
-  somewhere, over sorted, alien sources, owns nothing just past its own events.
+- **`fresh-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run in
+  order, steady and fresh, fresh: nothing just past its failing value or end.
+- **`fresh-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap somewhere, over
+  sorted, alien sources, keys nothing just past its own events.
+- **`fresh-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer somewhere, over
+  sorted, alien sources, keys nothing just past its own events.
+- **`fresh-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run keys
+  nothing just past its own events, its frames tagged with earlier bursts.
 - **`steady-defer`** (Placed) — FALSITY, `NO EVIDENCE`: a defer somewhere, over
   sorted, alien sources, is steady.
 - **`reach-later`** (Placed) — FALSITY, `DEAD ROUTE`: a deferred program

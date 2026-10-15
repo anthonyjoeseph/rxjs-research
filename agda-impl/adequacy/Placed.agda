@@ -12,7 +12,7 @@ open import Data.List.Properties using (∷-injective; ∷-injectiveʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
-open import Data.Nat.Properties using (+-suc; +-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
+open import Data.Nat.Properties using (+-suc; +-monoʳ-≤; +-monoʳ-<; <⇒≤; <-≤-trans; ≤-trans; ≤-reflexive; m≤n+m; m≤m+n; <-irrefl)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
@@ -156,6 +156,11 @@ every-lookup P (e ∷ᴬ ρ) (pe , pρ) (there i)   = every-lookup P ρ pρ i
 -- No event of `e` keyed under `p`.
 Alien : ∀ {A} → Pos → Events A → Set
 Alien p = Every (λ h → ¬ Owned p h)
+
+-- Nothing a run shows lies under, or is tagged under, the position just
+-- past one of its own events, where a step there would show.
+Fresh : ∀ {A} → Events A → Set
+Fresh e = Every (λ q → Alien (q ++ [ ix 0 ]) e) e
 
 -- Every source alien to `p`: what a subscription at `p` keys.
 Alienᴱ : ∀ {Γ} → Pos → NEnv Γ → Set
@@ -555,6 +560,13 @@ snoc-there : ∀ p {l : M.Label} → p ++ [ l ] ≢ []
 snoc-there []      ()
 snoc-there (_ ∷ _) ()
 
+snoc-inj : ∀ x q {l l′ : M.Label} → x ++ [ l ] ≡ q ++ [ l′ ] → x ≡ q × l ≡ l′
+snoc-inj []      []      e = refl , proj₁ (∷-injective e)
+snoc-inj []      (_ ∷ q) e = ⊥-elim (snoc-there q (sym (∷-injectiveʳ e)))
+snoc-inj (_ ∷ x) []      e = ⊥-elim (snoc-there x (∷-injectiveʳ e))
+snoc-inj (a ∷ x) (_ ∷ q) e with ∷-injective e
+... | refl , e′ = cong (a ∷_) (proj₁ (snoc-inj x q e′)) , proj₂ (snoc-inj x q e′)
+
 -- A first child is never a timer's tick.
 no-tick : ∀ p m → p ++ [ ix 0 ] ≢ ix (suc m) ∷ []
 no-tick []          m ()
@@ -600,6 +612,28 @@ beneath-owned : ∀ p k → Beneath p k → Owned p k
 beneath-owned p k (inj₁ q) = inj₁ (prefix⁺-prefix p k q)
 beneath-owned p k (inj₂ t) = inj₂ t
 
+-- A mark weighs one.
+weigh-mark : ∀ h l → Mark l → weigh (h ++ [ l ]) ≡ suc (weigh h)
+weigh-mark []      _ (ix-mark _) = refl
+weigh-mark []      _ last-mark   = refl
+weigh-mark (a ∷ h) l m           = trans (cong (weighˡ a +_) (weigh-mark h l m)) (+-suc (weighˡ a) (weigh h))
+
+prefix⁺-weigh : ∀ k h → Prefix⁺ k h → weigh k < weigh h
+prefix⁺-weigh []      (ix _ ∷ h)  _          = s≤s z≤n
+prefix⁺-weigh []      (sub _ ∷ h) _          = s≤s z≤n
+prefix⁺-weigh []      (last ∷ h)  _          = s≤s z≤n
+prefix⁺-weigh (_ ∷ _) []          ()
+prefix⁺-weigh (a ∷ k) (_ ∷ h)     (refl , p) = +-monoʳ-< (weighˡ a) (prefix⁺-weigh k h p)
+
+-- Strictly keyed under `p` is heavier than `p`.
+beneath-weigh : ∀ p h → Beneath p h → weigh p < weigh h
+beneath-weigh p h (inj₁ q) = prefix⁺-weigh p h q
+beneath-weigh p h (inj₂ t) = tagged-weigh p h t
+
+-- Just past a position keys nothing as heavy as it.
+past-weigh : ∀ x h → weigh h ≤ weigh x → ¬ Owned (x ++ [ ix 0 ]) h
+past-weigh x h le o = <-irrefl refl (<-≤-trans (s≤s le) (subst (_≤ weigh h) (weigh-mark x (ix 0) (ix-mark 0)) (owned-weigh _ _ o)))
+
 -- A join at `p` tags what it rekeys with `p` itself.
 tagged-sub : ∀ q p → Tagged p (q ++ [ sub p ])
 tagged-sub []          p = inj₁ (inj₁ (prefix-refl p))
@@ -640,6 +674,37 @@ mutual
     proj₁ (every px) , every-≈ (force l) (force r) (λ k → skip-tail (a (suc k))) (proj₂ (every px))
   everys-≈ (end h)     (end h)     a end⁼      px = every px
   everys-≈ hush        hush        a hush⁼     px = tt
+
+every-map : ∀ {A B} {P : Pos → Set} (f : A → B) (e : Events A) → Every P e → Every P (M.mapᴱ f e)
+every (every-map f (out k a r) pe) = proj₁ (every pe) , every-map f (force r) (proj₂ (every pe))
+every (every-map f (skip k r)  pe) = proj₁ (every pe) , every-map f (force r) (proj₂ (every pe))
+every (every-map f (end k)     pe) = every pe
+every (every-map f hush        pe) = tt
+
+every-scan : ∀ {A B} {P : Pos → Set} (f : B → A → B) z (e : Events A) → Every P e → Every P (M.scanᴱ f z e)
+every (every-scan f z (out k a r) pe) = proj₁ (every pe) , every-scan f (f z a) (force r) (proj₂ (every pe))
+every (every-scan f z (skip k r)  pe) = proj₁ (every pe) , every-scan f z (force r) (proj₂ (every pe))
+every (every-scan f z (end k)     pe) = every pe
+every (every-scan f z hush        pe) = tt
+
+-- A connect shows each of its source's steps, and its end, just past it.
+mutual
+  every-beside : ∀ {A B} {P : Pos → Set} (b : Events B) (s : Events A) → Every P b → Every (λ q → P (q ++ [ ix 0 ])) s → Every P (M.beside b s)
+  every (every-beside b (out q _ r) pb ps) =
+    every (every-ahead b (q ++ [ ix 0 ]) r (M.before (q ++ [ ix 0 ]) b) pb (proj₁ (every ps)) (proj₂ (every ps)))
+  every (every-beside b (skip q r)  pb ps) =
+    every (every-ahead b (q ++ [ ix 0 ]) r (M.before (q ++ [ ix 0 ]) b) pb (proj₁ (every ps)) (proj₂ (every ps)))
+  every (every-beside b (end c)     pb ps) =
+    every (every-ahead b (c ++ [ ix 0 ]) M.hushed (M.before (c ++ [ ix 0 ]) b) pb (every ps) (record { every = tt }))
+  every (every-beside b hush        pb ps) = every pb
+
+  every-ahead : ∀ {A B} {P : Pos → Set} (b : Events B) q (s : Events∞ A) t → Every P b → P q → Every (λ q → P (q ++ [ ix 0 ])) (force s)
+              → Every P (M.ahead b q s t)
+  every (every-ahead b           q s true  pb pq ps) = pq , every-beside b (force s) pb ps
+  every (every-ahead (out k a r) q s false pb pq ps) = proj₁ (every pb) , every-ahead (force r) q s _ (proj₂ (every pb)) pq ps
+  every (every-ahead (skip k r)  q s false pb pq ps) = proj₁ (every pb) , every-ahead (force r) q s _ (proj₂ (every pb)) pq ps
+  every (every-ahead (end c)     q s false pb pq ps) = every pb
+  every (every-ahead hush        q s false pb pq ps) = tt
 
 -- What a subscription is held to: `S` where it subscribes, `P` what it
 -- shows, `Src` what its sources show.  Each field is one way an
@@ -686,18 +751,6 @@ module Reach (R : Rules) where
   every (every-of p i []       sp) = child p last last-mark sp
   every (every-of p i (x ∷ xs) sp) = child p (ix i) (ix-mark i) sp , every-of p (suc i) xs sp
 
-  every-map : ∀ {A B} (f : A → B) (e : Events A) → Every P e → Every P (M.mapᴱ f e)
-  every (every-map f (out k a r) pe) = proj₁ (every pe) , every-map f (force r) (proj₂ (every pe))
-  every (every-map f (skip k r)  pe) = proj₁ (every pe) , every-map f (force r) (proj₂ (every pe))
-  every (every-map f (end k)     pe) = every pe
-  every (every-map f hush        pe) = tt
-
-  every-scan : ∀ {A B} (f : B → A → B) z (e : Events A) → Every P e → Every P (M.scanᴱ f z e)
-  every (every-scan f z (out k a r) pe) = proj₁ (every pe) , every-scan f (f z a) (force r) (proj₂ (every pe))
-  every (every-scan f z (skip k r)  pe) = proj₁ (every pe) , every-scan f z (force r) (proj₂ (every pe))
-  every (every-scan f z (end k)     pe) = every pe
-  every (every-scan f z hush        pe) = tt
-
   -- A cut shows its failing value, if at all, just past where it was,
   -- and ends just past it.
   mutual
@@ -728,24 +781,6 @@ module Reach (R : Rules) where
     every (every-shown p q nothing  k true  sp sq sk) = join q p sq sp , every-rejoin p (force k) sp sk
     every (every-shown p q (just a) k false sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk
     every (every-shown p q nothing  k false sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk
-
-  -- A connect shows each of its source's steps, and its end, just past it.
-  mutual
-    every-beside : ∀ {A B} (b : Events B) (s : Events A) → Every P b → Every P s → Every P (M.beside b s)
-    every (every-beside b (out q _ r) pb ps) =
-      every (every-ahead b (q ++ [ ix 0 ]) r (M.before (q ++ [ ix 0 ]) b) pb (deeper q (ix 0) (ix-mark 0) (proj₁ (every ps))) (proj₂ (every ps)))
-    every (every-beside b (skip q r)  pb ps) =
-      every (every-ahead b (q ++ [ ix 0 ]) r (M.before (q ++ [ ix 0 ]) b) pb (deeper q (ix 0) (ix-mark 0) (proj₁ (every ps))) (proj₂ (every ps)))
-    every (every-beside b (end c)     pb ps) =
-      every (every-ahead b (c ++ [ ix 0 ]) M.hushed (M.before (c ++ [ ix 0 ]) b) pb (deeper c (ix 0) (ix-mark 0) (every ps)) (record { every = tt }))
-    every (every-beside b hush        pb ps) = every pb
-
-    every-ahead : ∀ {A B} (b : Events B) q (s : Events∞ A) t → Every P b → P q → Every P (force s) → Every P (M.ahead b q s t)
-    every (every-ahead b           q s true  pb pq ps) = pq , every-beside b (force s) pb ps
-    every (every-ahead (out k a r) q s false pb pq ps) = proj₁ (every pb) , every-ahead (force r) q s _ (proj₂ (every pb)) pq ps
-    every (every-ahead (skip k r)  q s false pb pq ps) = proj₁ (every pb) , every-ahead (force r) q s _ (proj₂ (every pb)) pq ps
-    every (every-ahead (end c)     q s false pb pq ps) = every pb
-    every (every-ahead hush        q s false pb pq ps) = tt
 
   -- A lane held to the rules wherever it may subscribe.
   Lane : ∀ {B} → MonotonicList B → Set
@@ -876,7 +911,7 @@ module Reach (R : Rules) where
     every-beside _ _
       (reach b (k ++ [ ix 0 ]) (U.meaning (U.subscribe s (k ++ [ ix 1 ])) ρ ∷ᴬ ρ) (held _ (child k (ix 0) (ix-mark 0) sk))
         (every-mono source _ (reach s (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ) , sρ))
-      (reach s (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ)
+      (every-mono (λ q → deeper q (ix 0) (ix-mark 0)) _ (reach s (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ))
   reach (connected i)     k ρ sk sρ = every-rejoin k (lookup ρ i) sk (every-lookup Src ρ sρ i)
   reach (defer l)         k ρ sk sρ = record { every =
     child k (ix 0) (ix-mark 0) sk
@@ -1134,11 +1169,23 @@ postulate
   steady-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
               → Steady (U.meaning (U.subscribe (flatMap op f s) p) ρ)
 
-  -- A SUBSCRIPTION OWNS NOTHING JUST PAST ITS OWN EVENTS, somewhere,
-  -- over sources sorted and alien to it: nothing it shows lies under, or
-  -- is tagged under, the position just past one of its events.
-  alien-steps : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
-              → Every (λ q → Alien (q ++ [ ix 0 ]) (U.meaning (U.subscribe o p) ρ)) (U.meaning (U.subscribe o p) ρ)
+  -- A COLD'S RUN IS FRESH: each burst under its root, each frame tagged
+  -- with the burst before it.
+  fresh-start : ∀ {A} p (m : From A 0) → Fresh (M.start p m)
+
+  -- A CUT KEEPS A RUN FRESH: the failing value just inside its own
+  -- position, its completion just past that, over a run in order and
+  -- steady, which never shows a value where it stepped before.
+  fresh-take : ∀ {A} i (q : A → Bool) (e : Events A) → Ordered e → Steady e → Fresh e → Fresh (M.takeWhileᴱ i q e)
+
+  -- A FLATMAP SUBSCRIBED SOMEWHERE IS FRESH, over sources sorted and
+  -- alien to it.
+  fresh-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+             → Fresh (U.meaning (U.subscribe (flatMap op f s) p) ρ)
+
+  -- A DEFER'S RUN IS FRESH somewhere, over sources sorted and alien to it.
+  fresh-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+              → Fresh (U.meaning (U.deferᶜ l p []) ρ)
 
 
   -- A DEFER'S RUN IS STEADY somewhere, over sources sorted and alien to it.
@@ -1166,31 +1213,116 @@ every (every-swap (skip k r)  s h) = every-mono (λ q x → proj₁ (every x)) s
 every (every-swap (end k)     s h) = every-mono (λ q x → every x) s h
 every (every-swap hush        s h) = tt
 
--- A CONNECT'S BODY STAYS CLEAR OF ITS SOURCE'S STEPS, over sources
--- sorted and alien to it: nothing the body shows lies above or below
--- the position just past any source event, where the step shows.
-unrelated-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
-                  → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ))
-                          (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
-unrelated-connect s b p ρ np so cl =
-  every-swap _ S (every-mono per S (every-zip S keyed (every-zip S (alien-sub s p ρ cl) (alien-steps s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs))))
+-- A run all at one weight is fresh.
+fresh-even : ∀ {A} n (e : Events A) → Every (λ h → weigh h ≡ n) e → Fresh e
+fresh-even n e ev = every-mono (λ x wx → every-mono (λ h wh → past-weigh x h (≤-reflexive (trans wh (sym wx)))) e ev) e ev
+
+even-of : ∀ {A} p i (xs : List A) → Every (λ h → weigh h ≡ suc (weigh p)) (M.ofᴱ p i xs)
+every (even-of p i [])       = weigh-mark p last last-mark
+every (even-of p i (x ∷ xs)) = weigh-mark p (ix i) (ix-mark i) , even-of p (suc i) xs
+
+fresh-map : ∀ {A B} (f : A → B) (e : Events A) → Fresh e → Fresh (M.mapᴱ f e)
+fresh-map f e fr = every-map f e (every-mono (λ q → every-map f e) e fr)
+
+fresh-scan : ∀ {A B} (f : B → A → B) z (e : Events A) → Fresh e → Fresh (M.scanᴱ f z e)
+fresh-scan f z e fr = every-scan f z e (every-mono (λ q → every-scan f z e) e fr)
+
+-- A label past `a` keys nothing a mark past what `a` does not key.
+drop-snoc : ∀ a h x y → Mark y → ¬ Owned a h → ¬ Owned (a ++ [ x ]) (h ++ [ y ])
+drop-snoc a h x y m na (inj₁ q) with prefix-split (a ++ [ x ]) h y q
+... | inj₁ q′ = na (owned-trans a (a ++ [ x ]) h (inj₁ (prefix-++ a [ x ])) (inj₁ q′))
+... | inj₂ eq = na (inj₁ (subst (Prefix a) (proj₁ (snoc-inj a h eq)) (prefix-refl a)))
+drop-snoc a h x y m na (inj₂ t) = na (inj₂ (owned-tagged a (a ++ [ x ]) h (inj₁ (prefix-++ a [ x ])) (tagged-mark _ h y m t)))
+
+-- Just past what a join shows lies nothing it shows: what it rekeys is
+-- tagged with the join, which nothing under the join keys; its skips
+-- and end are lighter than anything under it.
+under-tag : ∀ p x q → Beneath p x → ¬ Owned p q → ¬ Owned (x ++ [ ix 0 ]) (q ++ [ sub p ])
+under-tag p x q b nq (inj₁ pr) with prefix-split (x ++ [ ix 0 ]) q (sub p) pr
+... | inj₁ pr′ = nq (owned-trans p (x ++ [ ix 0 ]) q (beneath-owned p _ (beneath-snoc p x (ix 0) b)) (inj₁ pr′))
+... | inj₂ eq with () ← proj₂ (snoc-inj x q eq)
+under-tag p x q b nq (inj₂ t) with tagged-split (x ++ [ ix 0 ]) q p t
+... | inj₁ t′ = nq (owned-trans p (x ++ [ ix 0 ]) q (beneath-owned p _ (beneath-snoc p x (ix 0) b)) (inj₂ t′))
+... | inj₂ o  = past-weigh x p (<⇒≤ (beneath-weigh p x b)) o
+
+under-mark : ∀ p x l → Mark l → Beneath p x → ¬ Owned (x ++ [ ix 0 ]) (p ++ [ l ])
+under-mark p x l m b = past-weigh x (p ++ [ l ]) (subst (_≤ weigh x) (sym (weigh-mark p l m)) (beneath-weigh p x b))
+
+mutual
+  alien-rejoin : ∀ {A} p x (e : Events A) → Beneath p x → Alien p e → Alien (x ++ [ ix 0 ]) (M.rejoin p e)
+  every (alien-rejoin p x (out q a k) b al) = every (alien-showing p x q (just a) k (p <ᵖ q) b (proj₁ (every al)) (proj₂ (every al)))
+  every (alien-rejoin p x (skip q k)  b al) = every (alien-showing p x q nothing k (p <ᵖ q) b (proj₁ (every al)) (proj₂ (every al)))
+  every (alien-rejoin p x (end c)     b al) with p <ᵖ c
+  ... | true  = under-tag p x c b (every al)
+  ... | false = under-mark p x last last-mark b
+  every (alien-rejoin p x hush        b al) = tt
+
+  alien-showing : ∀ {A} p x q (a : Maybe A) (k : Events∞ A) t → Beneath p x → ¬ Owned p q → Alien p (force k)
+                → Alien (x ++ [ ix 0 ]) (M.shown p q a k t)
+  every (alien-showing p x q (just a) k true  b nq al) = under-tag p x q b nq , alien-rejoin p x (force k) b al
+  every (alien-showing p x q nothing  k true  b nq al) = under-tag p x q b nq , alien-rejoin p x (force k) b al
+  every (alien-showing p x q (just a) k false b nq al) = under-mark p x (ix 0) (ix-mark 0) b , alien-rejoin p x (force k) b al
+  every (alien-showing p x q nothing  k false b nq al) = under-mark p x (ix 0) (ix-mark 0) b , alien-rejoin p x (force k) b al
+
+-- A JOIN OF AN ALIEN RUN IS FRESH: everything it shows is under it.
+fresh-rejoin : ∀ {A} p (e : Events A) → Alien p e → Fresh (M.rejoin p e)
+fresh-rejoin p e al =
+  every-mono (λ x b → alien-rejoin p x e b al) _
+    (Reach.every-rejoin (keyedRules p) p e (inj₁ (prefix-refl p)) (every-mono (λ _ _ → tt) e al))
+
+-- A MERGE IS FRESH when both runs are and each of the body's events is
+-- apart from the position just past each source event.
+fresh-beside : ∀ {A B} (b : Events B) (s : Events A) → Fresh b → Fresh s
+             → Every (λ k → Every (λ q → Disjoint (q ++ [ ix 0 ]) k) s) b → Fresh (M.beside b s)
+fresh-beside b s fb fs ap =
+  every-beside b s
+    (every-mono (λ k fk → every-beside b s (proj₁ fk)
+                  (every-mono (λ q d → drop-snoc k q (ix 0) (ix 0) (ix-mark 0)
+                                         (λ o → proj₂ d (owned-trans k q (q ++ [ ix 0 ]) o (inj₁ (prefix-++ q [ ix 0 ]))))) s (proj₂ fk)))
+       b (every-zip b fb ap))
+    (every-mono (λ q fq → every-beside b s
+                  (every-mono (λ k d o → proj₁ d (owned-trans (q ++ [ ix 0 ]) ((q ++ [ ix 0 ]) ++ [ ix 0 ]) k (inj₁ (prefix-++ _ [ ix 0 ])) o)) b (proj₂ fq))
+                  (every-mono (λ q′ → drop-snoc (q ++ [ ix 0 ]) q′ (ix 0) (ix 0) (ix-mark 0)) s (proj₁ fq)))
+       s (every-zip s fs (every-swap {R = λ k q → Disjoint (q ++ [ ix 0 ]) k} s b ap)))
+
+-- A SUBSCRIPTION IS FRESH somewhere, over sources sorted and alien to
+-- it: nothing it shows lies under, or is tagged under, the position
+-- just past one of its events.
+alien-steps : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ → Fresh (U.meaning (U.subscribe o p) ρ)
+
+-- A CONNECT'S BODY STAYS APART FROM ITS SOURCE'S STEPS, over sources
+-- sorted and alien to it: nothing the body shows keys, or is keyed
+-- under, the position just past any source event, where the step shows.
+apart-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ
+              → Every (λ q → Every (Disjoint (q ++ [ ix 0 ])) (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ)))
+                      (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ)
+apart-connect s b p ρ so cl =
+  every-mono per S (every-zip S keyed (every-zip S (alien-sub s p ρ cl) (alien-steps s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs)))
   where
     S  = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
     cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
     keyed : Every (Beneath (p ++ [ ix 1 ])) S
     keyed = Reach.reach (keyedRules (p ++ [ ix 1 ])) s (p ++ [ ix 1 ]) ρ (inj₁ (prefix-refl _)) (every-monoᴱ (λ _ _ → tt) ρ cs)
     per : ∀ q → Beneath (p ++ [ ix 1 ]) q × ¬ Owned (p ++ [ ix 0 ]) q × Alien (q ++ [ ix 0 ]) S
-        → Every (λ k → Unrelated k (q ++ [ ix 0 ])) (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (S ∷ᴬ ρ))
+        → Every (Disjoint (q ++ [ ix 0 ])) (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (S ∷ᴬ ρ))
     per q (bq , nq , aq) =
-      every-mono (λ k d → (λ x → proj₂ d (inj₁ x)) , (λ x → proj₁ d (inj₁ x))) _
-        (Reach.reach (apartRules (q ++ [ ix 0 ]) (no-tick q)) b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (proj₂ dq , proj₁ dq)
-          (aq , alienᴱ-owned p (q ++ [ ix 0 ]) (beneath-owned p (q ++ [ ix 0 ]) (owned-snoc p q (ix 0) oq)) ρ cl))
+      Reach.reach (apartRules (q ++ [ ix 0 ]) (no-tick q)) b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (proj₂ dq , proj₁ dq)
+        (aq , alienᴱ-owned p (q ++ [ ix 0 ]) (beneath-owned p (q ++ [ ix 0 ]) (owned-snoc p q (ix 0) oq)) ρ cl)
       where
         oq : Owned p q
         oq = owned-trans p (p ++ [ ix 1 ]) q (inj₁ (prefix-++ p [ ix 1 ])) (beneath-owned (p ++ [ ix 1 ]) q bq)
         dq : Disjoint (p ++ [ ix 0 ]) (q ++ [ ix 0 ])
         dq = apart-mark (p ++ [ ix 0 ]) q (ix 0) (ix-mark 0)
                (nq , λ o → sibling p {1} {0} (λ ()) (owned-trans (p ++ [ ix 1 ]) q (p ++ [ ix 0 ]) (beneath-owned (p ++ [ ix 1 ]) q bq) o))
+
+-- A CONNECT'S BODY STAYS CLEAR OF ITS SOURCE'S STEPS: nothing it shows
+-- lies above or below the position just past any source event.
+unrelated-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → p ≢ [] → Sorted ρ → Alienᴱ p ρ
+                  → Every (λ k → Every (λ q → Unrelated k (q ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ))
+                          (U.meaning (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
+unrelated-connect s b p ρ np so cl =
+  every-swap _ S (every-mono (λ q → every-mono (λ k d → (λ x → proj₂ d (inj₁ x)) , (λ x → proj₁ d (inj₁ x))) _) S (apart-connect s b p ρ so cl))
+  where S = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
 
 -- A program subscribed anywhere, over sorted sources alien to where it
 -- subscribes, is placed.
@@ -1244,6 +1376,24 @@ placed-sub (connect s b) p ρ so cl = ordered-beside _ _ (proj₁ pb) (proj₁ p
 placed-sub (connected i) p ρ so cl = ordered-rejoin p _ (proj₁ sl) (proj₂ sl) , tt
   where sl = sorted-lookup ρ so i
 placed-sub (defer l) p ρ so cl = ordered-defer l p ρ so cl , tt
+
+alien-steps (cold c) p ρ np so cl = subst Fresh (sym (U.start-meaning p (lower c) ρ)) (fresh-start p (lower c))
+alien-steps empty p ρ np so cl = fresh-even _ (end (p ++ [ last ])) (record { every = weigh-mark p last last-mark })
+alien-steps (of xs) p ρ np so cl = fresh-even _ _ (even-of p 0 xs)
+alien-steps (map f s) p ρ np so cl = fresh-map f _ (alien-steps s p ρ np so cl)
+alien-steps (scan f z s) p ρ np so cl = fresh-scan f z _ (alien-steps s p ρ np so cl)
+alien-steps (takeWhile i q s) p ρ np so cl =
+  fresh-take i q _ (proj₁ (placed-sub s p ρ so cl)) (steady-sub s p ρ np so cl) (alien-steps s p ρ np so cl)
+alien-steps (flatMap op f s) p ρ np so cl = fresh-flat op f s p ρ np so cl
+alien-steps (connect s b) p ρ np so cl =
+  fresh-beside _ S (alien-steps b (p ++ [ ix 0 ]) (S ∷ᴬ ρ) (snoc-there p) ((proj₁ (placed-sub s (p ++ [ ix 1 ]) ρ so cs) , steady-sub s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs) , so)
+                                      (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl))
+                   (alien-steps s (p ++ [ ix 1 ]) ρ (snoc-there p) so cs)
+                   (every-swap {R = λ q k → Disjoint (q ++ [ ix 0 ]) k} _ S (apart-connect s b p ρ so cl))
+  where S  = U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ
+        cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+alien-steps (connected i) p ρ np so cl = fresh-rejoin p _ (every-lookup (λ h → ¬ Owned p h) ρ cl i)
+alien-steps (defer l) p ρ np so cl = fresh-defer l p ρ np so cl
 
 -- THE MEANING'S EVENTS ARE SORTED: a program subscribed at the root is
 -- placed.
