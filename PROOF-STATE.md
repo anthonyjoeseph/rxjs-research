@@ -177,15 +177,16 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE PROGRESS.** `sub-onward`, `burst-onward` and `turn-pops` carry
+- **THE PROGRESS.** `burst-onward`, `sub-onward` and `turn-pops` carry
   liveness: each silent hop passes a skip, leaves the ghost alike and
-  lowers `measure` (pending syntax, then timers, then bursts), or reaches
-  a step that is not silent. Ruled out: a ghost-only marker in the shared
-  machine (the measure is the witness's `Sub` tree and the driver's
-  queues), a meaning skip at a timer pop, at the frame's root or tied
-  with the burst's first step. Decides whether every hop that queues a
-  burst spends pending syntax or a timer, and whether a connect's feed
-  and a lane admit pass a skip rather than leave the ghost alike.
+  lowers `measure`, or reaches a step that is not silent. Ruled out: a
+  ghost-only marker in the shared machine; a burst queued but by a leaf
+  subscribed, a timer popped or a close (`Machine.starting`, `turned`,
+  `schedule`); a lane admit or a connect's feed with no skip (`Unfold`).
+  A burst ended resumes the stack's suspended code before the next
+  re-entry, so a hop's gain is the resumed code's, not its case's.
+  Decides whether that resume needs a re-entry state of its own for the
+  leaves to split by case.
 - **THE ORDER.** `fresh-flat`, `steady-flat` and `ordered-flat`
   over `alien-apart`: a subscription keys nothing under a position
   apart from it, so a flatMap's lanes and a connect's body step inside
