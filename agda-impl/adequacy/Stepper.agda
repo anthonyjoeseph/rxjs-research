@@ -704,6 +704,47 @@ module _ {A : Set} (p : Pos) where
     stays (walk (end c) oy ory to from) = ⊥-elim (stays (to v (stall-x x sr)))
     stays (walk hush    oy ory to from) = ⊥-elim (stays (to v (stall-x x sr)))
 
+  -- nothing a joiner shows comes before its pre-join skips
+  above : ∀ z → p <ᵖ z ≡ true → z <ᵖ (p ++ [ ix 0 ]) ≡ false
+  above z h with z <ᵖ (p ++ [ ix 0 ]) in e
+  ... | false = refl
+  ... | true  = ⊥-elim (no (trans (sym h) (nlt z e)))
+
+  joins-atop : ∀ (e : Events A) → Atop (p ++ [ ix 0 ]) (M.rejoin p e)
+  joins-atop (out k a r) with p <ᵖ k in pk
+  ... | true  = above _ (<ᵖ-trans p k _ pk (<ᵖ-below k []))
+  ... | false = <ᵖ-irrefl (p ++ [ ix 0 ])
+  joins-atop (skip k r) with p <ᵖ k in pk
+  ... | true  = above _ (<ᵖ-trans p k _ pk (<ᵖ-below k []))
+  ... | false = <ᵖ-irrefl (p ++ [ ix 0 ])
+  joins-atop (end c) with p <ᵖ c in pc
+  ... | true  = above _ (<ᵖ-trans p c _ pc (<ᵖ-below c []))
+  ... | false = above _ (<ᵖ-below p [])
+  joins-atop hush = tt
+
+  -- the rest of a source, rejoined
+  rejoined : Events∞ A → Events∞ A
+  force (rejoined l) = M.rejoin p (force l)
+
+  module _ {q : Pos} {a : A} {l : Events∞ A} where
+    -- a source's event after the join, shown
+    after-in : p <ᵖ q ≡ true → M.rejoin p (out q a l) ≃ out (q ++ [ subᴾ p ]) a (rejoined l)
+    after-in h with p <ᵖ q | h
+    ... | true | refl = out-same refl
+
+    after-ordered : p <ᵖ q ≡ true → Ordered (out (q ++ [ subᴾ p ]) a (rejoined l)) → Ordered (M.rejoin p (out q a l))
+    after-ordered h o with p <ᵖ q | h
+    ... | true | refl = record { ordered = ordered o }
+
+    -- a source's event before the join, a skip just past it
+    before-ordered : p <ᵖ q ≡ false → Ordered (M.rejoin p (force l)) → Ordered (M.rejoin p (out q a l))
+    before-ordered h o with p <ᵖ q | h
+    ... | false | refl = record { ordered = joins-atop (force l) , o }
+
+    before-≃ : p <ᵖ q ≡ false → Ordered (M.rejoin p (out q a l)) → M.rejoin p (out q a l) ≃ M.rejoin p (force l)
+    before-≃ h o with p <ᵖ q | h
+    ... | false | refl = skip-drop o
+
 -- A JOINER READS ALIKE SOURCES ALIKE: what its source showed before it
 -- joined is skips, all at one position just after `p`, and what after it
 -- is rekeyed under `sub p`.  Each side stalls where the other does: a shown
@@ -714,6 +755,45 @@ rejoin-≃ p {x} {y} e ox oy orx ory = record
   { alike  = rejoin-∼ p (alike e)
   ; stalls = λ v → (λ s → walk p x s y oy ory (λ w → proj₁ (stalls e w)) (λ w → proj₂ (stalls e w)))
                  , (λ s → walk p y s x ox orx (λ w → proj₂ (stalls e w)) (λ w → proj₁ (stalls e w))) }
+
+private
+  fedᴺ-snoc : ∀ {A} xs k (a : A) (l : Events∞ A) → U.fedᴺ (xs ++ [ (k , a) ]) (force l) ≃ U.fedᴺ xs (out k a l)
+  fedᴺ-snoc []       k a l = out-same refl
+  fedᴺ-snoc (_ ∷ xs) k a l = out-cong (fedᴺ-snoc xs k a l)
+
+  snoc-ordered : ∀ {A} xs k (a : A) (l : Events∞ A) → Ordered (U.fedᴺ (xs ++ [ (k , a) ]) (force l)) → Ordered (out k a l)
+  snoc-ordered []       k a l o = record { ordered = ordered o }
+  snoc-ordered (_ ∷ xs) k a l o = snoc-ordered xs k a l (proj₂ (ordered o))
+
+  atop-map : ∀ {A B k} (f : A → B) (e : Events A) → Atop k (M.mapᴱ f e) → Atop k e
+  atop-map f (out _ _ _) h = h
+  atop-map f (skip _ _)  h = h
+  atop-map f (end _)     h = h
+  atop-map f hush        h = h
+
+  atop-scan : ∀ {A B k} (f : B → A → B) z (e : Events A) → Atop k (M.scanᴱ f z e) → Atop k e
+  atop-scan f z (out _ _ _) h = h
+  atop-scan f z (skip _ _)  h = h
+  atop-scan f z (end _)     h = h
+  atop-scan f z hush        h = h
+
+-- A body fed its source's step, and the body reading it.
+Fed : ∀ {Γ A B} → U.Node (A ∷ Γ) B → Set₁
+Fed {Γ} {A} b = (ρ : NEnv Γ) (q : Pos) (a : A) (l : Events∞ A) {x : Events A} → x ≃ out q a l
+  → ∀ {ν} → Sane (true ∷ᴬ ν) b → Ordered x → Ordered (out q a l) → Atop (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ))
+  → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
+  → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
+
+-- A JOINER FED ITS SOURCE'S STEP IS THE JOINER READING IT: fed the value
+-- if it joined before it, else reading the value as its pre-join skip.
+fed-join : ∀ {Γ A} p xs → Fed {Γ} {A} (U.joinᶜ (here refl) p xs nothing)
+fed-join p xs ρ q a l {x} e sn ox oy at pl pf with p <ᵖ q in pq
+... | true  = ≃-trans (fedᴺ-≃ xs (≃-trans (rejoin-≃ p e ox oy orx ory) (after-in p {q} {a} {l} pq))) (≃-sym (fedᴺ-snoc xs _ a (rejoined p l)))
+  where orx = fedᴺ-ordered xs (proj₁ pl)
+        ory = after-ordered p {q} {a} {l} pq (snoc-ordered xs _ a (rejoined p l) (proj₁ pf))
+... | false = fedᴺ-≃ xs (≃-trans (rejoin-≃ p e ox oy orx ory) (before-≃ p {q} {a} {l} pq ory))
+  where orx = fedᴺ-ordered xs (proj₁ pl)
+        ory = before-ordered p {q} {a} {l} pq (fedᴺ-ordered xs (proj₁ pf))
 
 postulate
   -- `M.beside` respects `≃` between events in order.
@@ -759,42 +839,32 @@ env-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) {x y : Events A}
 env-≃ b ρ e ox oy = envs-≃ b (inj₂ (e , ox , oy) ∷ᵉ ≈ᴱ-refl ρ)
 
 postulate
-
-  -- A BODY FED ITS SOURCE'S STEP IS ALIKE THE BODY READING IT: a joiner
-  -- fed the value its source shows at `q`, reading the source past it,
-  -- the body's meaning showing nothing before the value.  A joiner the
-  -- body makes later is never fed, so it must join after the value; and
-  -- a joiner told its end is fed all the same, so none may be told while
-  -- the source runs.
+  -- A CUT FED ITS SOURCE'S STEP IS THE CUT READING IT.
   --
-  -- REFUTED: 69f610c0 stated without the body's meaning after the value, by a body joining its source later
-  -- REFUTED: 082ad778 stated without the body sane, by a joiner told its end
-  -- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
-  --   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
-  --   (`M.rejoin`), and a value from before its join as a skip; the
-  --   stepper feeds a joiner values only, and only those after it joined.
-  -- DEAD ROUTE: exact agreement per approximant with the stepper's joiner
-  --   shown every source step as `M.rejoin` shows it.  A lane a flatMap
-  --   has yet to subscribe reads its connect's source from where the
-  --   ghost's source stands, so the meaning shows it one pre-join skip at
-  --   `p ++ [ ix 0 ]` per source step before its join, and a source step
-  --   leaves one fewer.  Witness 950a4208.
-  -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
-  --   step history.  The ghost is the witness's open part (`part`), which
-  --   keeps no count of a source's steps, and a silent run is matched by
-  --   the residual as a set alone (`Ahead`), so no field of the witness
-  --   can keep the count a lane's pre-join skips need.
-  -- DEAD ROUTE: recursion on the node under its own hypothesis.  A
+  -- DEAD ROUTE: recursion on the inner under the cut's own hypothesis.  A
   --   `takeWhileᶜ` cut at its inner's head shows it under `ix 0` or `last`,
-  --   and a connect shows its source's step under `ix 0`, so the inner's
-  --   meaning is atop `q` only, not `q ++ [ ix 0 ]`; and past a cut the
-  --   inner may join its source before `q` unfed while the cut hides it,
-  --   so the inners are not alike at all.
-  -- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
-  fed-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) q (a : A) (l : Events∞ A) {x : Events A} → x ≃ out q a l
-        → ∀ {ν} → Sane (true ∷ᴬ ν) b → Ordered x → Ordered (out q a l) → Atop (q ++ [ ix 0 ]) (U.meaning b (x ∷ᴬ ρ))
-        → Placed b (x ∷ᴬ ρ) → Placed (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
-        → U.meaning b (x ∷ᴬ ρ) ≃ U.meaning (U.feed (here refl) q a b) (force l ∷ᴬ ρ)
+  --   so the inner's meaning is atop `q` only, not `q ++ [ ix 0 ]`; and past
+  --   a cut the inner may join its source before `q` unfed while the cut
+  --   hides it, so the inners are not alike at all.
+  fed-take : ∀ {Γ A B} i p (c : U.Node (A ∷ Γ) B) → Fed (U.takeWhileᶜ i p c)
+
+  -- A FLATMAP FED ITS SOURCE'S STEP IS THE FLATMAP READING IT: its outer,
+  -- its lanes in flight and the lanes it has yet to subscribe.
+  fed-flat : ∀ {Γ A B C} op (g : C → Pos → U.Node (A ∷ Γ) B) o ls qs → Fed (U.flatMapᶜ op g o ls qs)
+
+  -- A CONNECT FED ITS SOURCE'S STEP IS THE CONNECT READING IT: its body
+  -- and its own source each fed.
+  --
+  -- DEAD ROUTE: recursion on the body under the connect's own hypothesis.
+  --   A connect shows its source's step under `ix 0`, so its body's meaning
+  --   is atop `q` only, not `q ++ [ ix 0 ]`.
+  fed-connect : ∀ {Γ A B C} (b : U.Node (C ∷ A ∷ Γ) B) (s : U.Source (A ∷ Γ) C) → Fed (U.connectᶜ b s)
+
+  -- A DEFER FED ITS SOURCE'S STEP IS THE DEFER READING IT: the fold's
+  -- meaning of the program it defers, over the source's run made hot.
+  fed-defer : ∀ {Γ A B} (l : Later Timeline (A ∷ Γ) B) p → Fed (U.deferᶜ l p)
+
+postulate
 
   -- A NODE'S MEANING LAGS: whatever it shows is taken after a body's
   -- event at `k` that comes before its step and its sources'.
@@ -817,6 +887,49 @@ postulate
   -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
   placed-after : ∀ {Γ A} (c : U.Node Γ A) (δ : Env Γ) → Settled δ → Sane (flags δ) c → Placed c (ρᴱ δ)
                → First (U.headˢ (U.step c)) δ → Placedˢ (ρᴱ δ) (U.step c)
+
+-- A BODY FED ITS SOURCE'S STEP IS ALIKE THE BODY READING IT: a joiner
+-- fed the value its source shows at `q`, reading the source past it,
+-- the body's meaning showing nothing before the value.  A joiner the
+-- body makes later is never fed, so it must join after the value; and
+-- a joiner told its end is fed all the same, so none may be told while
+-- the source runs.
+--
+-- REFUTED: 69f610c0 stated without the body's meaning after the value, by a body joining its source later
+-- REFUTED: 082ad778 stated without the body sane, by a joiner told its end
+-- DEAD ROUTE: exact agreement per approximant (`same-agree`).  The
+--   meaning's joiner shows each of its source's skips, at `q ++ [ sub p ]`
+--   (`M.rejoin`), and a value from before its join as a skip; the
+--   stepper feeds a joiner values only, and only those after it joined.
+-- DEAD ROUTE: exact agreement per approximant with the stepper's joiner
+--   shown every source step as `M.rejoin` shows it.  A lane a flatMap
+--   has yet to subscribe reads its connect's source from where the
+--   ghost's source stands, so the meaning shows it one pre-join skip at
+--   `p ++ [ ix 0 ]` per source step before its join, and a source step
+--   leaves one fewer.  Witness 950a4208.
+-- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
+--   step history.  The ghost is the witness's open part (`part`), which
+--   keeps no count of a source's steps, and a silent run is matched by
+--   the residual as a set alone (`Ahead`), so no field of the witness
+--   can keep the count a lane's pre-join skips need.
+-- RECOVERY: git show 950a4208 restores the joiner shown every source step, and step-alike over step-agrees
+fed-≃ : ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) → Fed b
+fed-≃ (U.framesᶜ _ _ _)            ρ q a l e sn ox oy at pl pf = ≃-refl _
+fed-≃ (U.burstᶜ _ _ _ _)           ρ q a l e sn ox oy at pl pf = ≃-refl _
+fed-≃ (U.endᶜ _)                   ρ q a l e sn ox oy at pl pf = ≃-refl _
+fed-≃ (U.ofᶜ _ _ _)                ρ q a l e sn ox oy at pl pf = ≃-refl _
+fed-≃ (U.mapᶜ f c)                 ρ q a l {x} e sn ox oy at pl pf =
+  mapᴱ-≃ f (fed-≃ c ρ q a l e sn ox oy (atop-map f (U.meaning c (x ∷ᴬ ρ)) at) (proj₂ pl) (proj₂ pf))
+fed-≃ (U.scanᶜ f z c)              ρ q a l {x} e sn ox oy at pl pf =
+  scanᴱ-≃ f z (fed-≃ c ρ q a l e sn ox oy (atop-scan f z (U.meaning c (x ∷ᴬ ρ)) at) (proj₂ pl) (proj₂ pf))
+fed-≃ (U.takeWhileᶜ i p c)         ρ q a l e sn ox oy at pl pf = fed-take i p c ρ q a l e sn ox oy at pl pf
+fed-≃ (U.flatMapᶜ op g o ls qs)    ρ q a l e sn ox oy at pl pf = fed-flat op g o ls qs ρ q a l e sn ox oy at pl pf
+fed-≃ (U.joinᶜ (here refl) p xs nothing)  ρ q a l e {ν} sn ox oy at pl pf = fed-join p xs ρ q a l e {ν} sn ox oy at pl pf
+fed-≃ (U.joinᶜ (here refl) p xs (just c)) ρ q a l e sn ox oy at pl pf = ⊥-elim sn
+fed-≃ (U.joinᶜ (there j) p xs nothing)    ρ q a l e sn ox oy at pl pf = ≃-refl _
+fed-≃ (U.joinᶜ (there j) p xs (just c))   ρ q a l e sn ox oy at pl pf = ≃-refl _
+fed-≃ (U.connectᶜ b s)             ρ q a l e sn ox oy at pl pf = fed-connect b s ρ q a l e sn ox oy at pl pf
+fed-≃ (U.deferᶜ l′ p)              ρ q a l e {ν} sn ox oy at pl pf = fed-defer l′ p ρ q a l e {ν} sn ox oy at pl pf
 
 -- EVENTS AT ONE POSITION COMMUTE: a source's step taken ahead of the
 -- body's events at its own position, the body's tie run shown first.

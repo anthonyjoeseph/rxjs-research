@@ -176,13 +176,12 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE FIXED SKIP.** `fed-≃` up to `≃`: `M.rejoin` shows every source
-  step before its join as a skip at `p ++ [ ix 0 ]`, and `rejoin-≃` holds
-  over it, so a joiner fed its source's step and the joiner reading it
-  differ pre-join only in how many skips sit at one position, which `≃`
-  forgets. Ruled out: the joiner's index shift. Decides whether `fed-≃`
-  falls by matching the two runs step for step, pre-join and post-join,
-  with skips the only slack.
+- **THE FED CUT.** `fed-take` with `fed-connect`, `fed-flat` and
+  `fed-defer`: `fed-≃` is a body by node, its joiner arm proven over the
+  fixed skip, a map and a scan recursing, these four its leaves. Ruled
+  out: the joiner's index shift, and recursion under a cut or into a
+  connect's body under the node's own hypothesis. Decides whether a cut
+  and a connect's body need their inners alike only below `q ++ [ ix 0 ]`.
 - **THE EXACT STEPPER.** `∼-trans` with `go-skips` and `beside-≃`: the
   stepper's skips made the meaning's, so `≃` is strong bisimilarity and
   transitive for free; the stalling half, the sorted hypotheses on the
@@ -190,11 +189,10 @@ by their own silent steps (`Mirror`).
   exact agreement, by the pre-join count. De-risk first by pointing CI's
   exact check of `denotation.Unfold` against the per-node meaning at the
   fixed skip. Decides whether any skip mismatch survives the count.
-- **THE CONNECT.** `fed-≃` with `flat-≃` and `defer-≃`: a running connect
-  is a body over these, its body reading its source alike the body fed its
-  source's step. Ruled out: a body fed a value it would join its source
-  only after or with a joiner told, and `fed-≃` by recursion on the node
-  under its own hypothesis. Proven: a sorted skip is a `≃` forget, a
+- **THE CONNECT.** `flat-≃` and `defer-≃` with the fed leaves: a running
+  connect is a body over these, its body reading its source alike the body
+  fed its source's step. Ruled out: a body fed a value it would join its
+  source only after or with a joiner told. Proven: a sorted skip is a `≃` forget, a
   source's step commutes with the body's tied events, and a joiner reads
   alike sorted sources alike. Decides whether the body fed the step and
   the body reading it are alike past a cut.
@@ -226,8 +224,14 @@ by their own silent steps (`Mirror`).
   `here` is, which the IO runtime ignores. Decides the measure.
 ### The ledger
 
-- **`fed-≃`** (Stepper) — FALSITY, `REFUTED×2, DEAD ROUTE×4, RECOVERY`: a body
-  fed its source's step is alike the body reading it.
+- **`fed-take`** (Stepper) — FALSITY, `DEAD ROUTE`: a cut fed its source's step
+  is alike the cut reading it.
+- **`fed-connect`** (Stepper) — FALSITY, `DEAD ROUTE`: a connect fed its
+  source's step is alike the connect reading it.
+- **`fed-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap fed its source's
+  step is alike the flatMap reading it.
+- **`fed-defer`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer fed its source's
+  step is alike the defer reading it.
 - **`flat-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap reads alike
   environments alike, lanes yet to subscribe included.
 - **`defer-≃`** (Stepper) — FALSITY, `NO EVIDENCE`: a defer reads alike
