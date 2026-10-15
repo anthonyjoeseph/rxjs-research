@@ -11,13 +11,15 @@
 -- machine still working there, however much it worked before.
 --
 -- And the events rise, as `ticks-up` needs: each at a position past the
--- last, a skip at one no earlier, headed by its tick.
+-- last, a skip at one no earlier, headed by its tick.  And they are steady, as `steady-sub`
+-- says: nothing strictly inside the position just left, and a value
+-- strictly past it.
 module quickcheck.Placing where
 
 open import Data.Bool using (Bool; true; false; _∧_; not)
-open import Data.List using (List; []; _∷_; filterᵇ; upTo) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; filterᵇ; upTo; length; take) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_; _<ᵇ_)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; _<ᵖ_; tick; observe; root)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
@@ -59,9 +61,31 @@ private
   rising (suc k) q (end p)     = headed p ∧ (q <ᵖ p)
   rising (suc k) q hush        = true
 
--- The machine's trace placed against the meaning, and the meaning rising.
+  inside : Pos → Pos → Bool
+  inside k h = (length k <ᵇ length h) ∧ samePos (take (length k) h) k
+
+  pastᵇ : Pos → Events ℕ → Bool
+  pastᵇ k (out h _ _) = (k <ᵖ h) ∧ not (inside k h)
+  pastᵇ k (skip h _)  = (k <ᵖ h) ∧ not (inside k h)
+  pastᵇ k (end h)     = (k <ᵖ h) ∧ not (inside k h)
+  pastᵇ k hush        = true
+
+  clearᵇ : Pos → Events ℕ → Bool
+  clearᵇ k (out h _ _) = (k <ᵖ h) ∧ not (inside k h)
+  clearᵇ k (skip h _)  = not (inside k h)
+  clearᵇ k (end h)     = not (inside k h)
+  clearᵇ k hush        = true
+
+  steadyᵇ : ℕ → Events ℕ → Bool
+  steadyᵇ zero    _           = true
+  steadyᵇ (suc n) (out k _ r) = pastᵇ k (Events∞.force r) ∧ steadyᵇ n (Events∞.force r)
+  steadyᵇ (suc n) (skip k r)  = clearᵇ k (Events∞.force r) ∧ steadyᵇ n (Events∞.force r)
+  steadyᵇ (suc n) _           = true
+
+-- The machine's trace placed against the meaning, and the meaning rising
+-- and steady.
 placing : Prog natᵗ → Bool
-placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e
+placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steadyᵇ 4000 e
   where o = toObs timeline 3 p [] [] []
         e = observe (⟦ o ⟧ˢ []) root
 
