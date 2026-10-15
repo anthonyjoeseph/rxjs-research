@@ -175,8 +175,8 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
   turn; it gains a field placing every live node's next shown event past the
   region the agenda owes, true at `carried-begin`. A popped timer's first
   step is its first test: `cleared`, the agenda empty, so every sibling
-  waits on a later timer or never steps; `focused` as a body along the
-  path comes first, since `cleared` reads its context. Then `ahead-run`,
+  waits on a later timer or never steps; `opened`, the gates on the path,
+  comes first, since `cleared` reads the context it opens. Then `ahead-run`,
   and `burst-emit` landing as the stall did. Then the feed's case of `kept-run`. The meaning feeds its joiners
   from one run of the source, as the machine's subject does, so a joiner
   holds exactly what the feed owes it (`Fed`). Decides whether the position
@@ -207,8 +207,8 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
   the burst's path waits beyond the cascade.
 - **`ahead-run`** (Kept) — FALSITY, `NO EVIDENCE`: a cold started inline bursts
   before every other open node's next event.
-- **`focused`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's burst sits
-  in the meaning at a hole, its next step the frame's.
+- **`opened`** (Kept) — FALSITY, `NO EVIDENCE`: every gate on an unspent
+  bursting cold's path open, so the meaning holds it at a hole.
 - **`restalled`** (Kept) — FALSITY, `NO EVIDENCE`: after a stall, the meaning
   stepped is carried at the burst's next index.
 - **`burst-close`** (Kept) — FALSITY, `NO EVIDENCE`: a frame closing completes

@@ -18,6 +18,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 import Data.List.Relation.Unary.Linked as Linked
 open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_)
 open import Data.Maybe using (just)
+open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; s≤s⁻¹)
 open import Data.Nat.ListAction using (sum)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; <-trans; n<1+n)
@@ -36,17 +37,19 @@ open import operation.Machine using (module Machine)
 open import denotation.MonotonicList using (Frame; at)
 open import adequacy.Carrier using (module Carrying)
 open import adequacy.Wait using (module Waiting)
+open import adequacy.Aim using (module Aiming)
 open import adequacy.Plug using (Ctx; plug; lift; Wins; plug-step; skip-lifts; Clear; clear-wins)
 
 module Keeping (R : Set) where
   open Run (Pureᴾ R) using (Act)
-  open Pure R using (State; Timer; cascade; Callbacks)
+  open Pure R using (State; Timer; cascade; Callbacks; Val)
   open Machine R using (Mach; ⟨_,_⟩; Stack; loop; run; ret; burst; turn; step; silent; drained; spent?; asked; push; cbs)
   open Carrying R using (Carried; module At; module Against; Owned; Ordered; Sub; Lane; lane; Call; feedC; finC; Spot
                         ; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ
-                        ; waiting; playing; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
+                        ; waiting; playing; Phase; nodeOf; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
                         ; this-lane; next-lane; Meaning; Kernels; Queue; Books; pendings; lanePendings; joiners; Joiner; firing)
   open Waiting R using (Wait; both; idles; left; right)
+  open Aiming R using (module Open)
 
   ------------------------------------------------------------------------
   -- The run moving on: a later position
@@ -350,12 +353,54 @@ module Keeping (R : Set) where
       open≡ : c ≡ plug ctx hole
       steps : stepᵁ hole ≡ burstˢ τ′ p i b
 
-  postulate
-    -- The open part read through the path to the bursting cold: every
-    -- gate on the path open, the cold not spent.
-    focused : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-            → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → spent? st hd ≡ false → Focus c p i b
+  -- The cold the control bursts, and its node stepping the frame.
+  record Aimed {h} (t : Sub h [] R) {A u} (hd : Handle h) (p : Pos) (i : ℕ) (b : Frame A u) : Set₁ where
+    field
+      {Δ}   : List Set
+      {sk}  : Sink h A
+      {ph}  : Phase A
+      path  : Path t (coldˢ {Δ = Δ} sk hd ph)
+      τ′    : Time
+      steps : stepᵁ (nodeOf {Δ} ph) ≡ burstˢ τ′ p i b
 
+  aim : ∀ {h} {t : Sub h [] R} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤}
+      → Against.CtlAs t (burst s hd τ p i b σ K) → Aimed t hd p i b
+  aim (Against.burstAs π _)     = record { path = π ; τ′ = _ ; steps = refl }
+  aim (Against.fireAs refl π _) = record { path = π ; τ′ = _ ; steps = refl }
+
+  postulate
+    -- EVERY GATE ON THE BURSTING COLD'S PATH OPEN: each takeWhile live
+    -- and still taking, the lane live, a source's body open, a body's
+    -- source running or ended where the connect records it.  Below a
+    -- closed gate the cold would be spent; a takeWhile past its failing
+    -- value with the cold unspent is the case Carried does not rule out,
+    -- its completion owed by a call the agenda holds below the burst.
+    opened : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+           → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) → spent? st hd ≡ false
+           → Open.OpenPath (State.heap st) (Aimed.path (aim (Carried.ctlAs r)))
+
+  private
+    inert : ∀ {h} {H : All (Val h) h} {Δ A} (ph : Phase A) → Open.Inert H (nodeOf {Δ} ph)
+    inert (waiting τ e m)   i c = refl
+    inert (playing τ r j b) i c = refl
+
+    cold-part : ∀ {h} {H : All (Val h) h} {Δ A} {sk : Sink h A} {hd} (ph : Phase A) → At.spentʰ H hd ≡ false
+              → At.part H (coldˢ {Δ = Δ} sk hd ph) ≡ just (nodeOf ph)
+    cold-part ph sp rewrite sp = refl
+
+  -- The open part read through the path to the bursting cold.
+  focused : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+          → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → spent? st hd ≡ false → Focus c p i b
+  focused {st = st} r sp = record
+    { ctx   = proj₁ found
+    ; hole  = nodeOf A.ph
+    ; τ′    = A.τ′
+    ; open≡ = just-injective (trans (sym (Carried.open≡ r)) (proj₂ found))
+    ; steps = A.steps }
+    where module A = Aimed (aim (Carried.ctlAs r))
+          found = Open.focus-path (State.heap st) A.path (opened r sp) (inert {H = State.heap st} A.ph) (cold-part {H = State.heap st} {Δ = A.Δ} {sk = A.sk} A.ph sp)
+
+  postulate
     -- B'S POSITIONAL FIELD AT A FIRE: nothing owed but the burst, every
     -- other open node on the path waits beyond the cascade — it never
     -- steps again, or it waits on a timer queued past this one.
