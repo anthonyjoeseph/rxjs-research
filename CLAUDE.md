@@ -1,6 +1,6 @@
 # Working methodology
 
-Agda model (`agda-impl/`) + TypeScript impl (`typescript/`). Agda is gospel; TS conforms. **`agda/` is reference only** — never edited, to be deleted.
+Agda model (`agda-impl/`) + TypeScript impl (`typescript/`). **`agda/` is reference only** — never edited, to be deleted.
 
 ## The point of this repo (Anthony)
 
@@ -51,7 +51,7 @@ Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger,
 
 ## Autonomy
 
-Standing approval for any change that **does not alter the spec** — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
+Standing approval for any change — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
 
 **The `Obs` tree (`Tree.agda`) is FIXED, and the engine is not (Anthony).** Its formers are not the spec, so the standing approval above reads as licensing a new one — it does not. Engine internals are free: the kernels, the runtimes, the relation, whatever makes it work and provable. A change that needs a new `Obs` former, or re-types an existing one, is a question instead.
 
