@@ -170,12 +170,6 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### Big picture tier roadmap
 
-- **THE PROTOCOL, CLOSED.** `flatMapᴷ-well` as a body, then `of`,
-  `empty`, `cold`, `map` and `scan`, over `Well` reading a cell as it
-  `Fits`. Ruled out: a unary `Well` blind to cells, a subject's joiners
-  out of join order, a second callback sharing a scope. Decides whether
-  a lane's refill `send` and `killAll`'s cuts need a cell invariant past
-  the joiners'.
 - **HONEST, DEFINED.** `HonMach` is a record over a residual past every
   mark, kept by each step as `Shows` says. Left: `Inner` a relation over configurations, as `WellMach` is, over a ghost
   tree of the compiled program's kernels and their cells; `Honest` the
@@ -191,7 +185,8 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
 - **THE WALK.** `walk-tree`, `walk-timers` and `turn` by the step's
   cases, over `WellMach`'s run and queue, each frame carrying the last
   delivery it was pushed at. Ruled out: a frame well only from below its
-  position. Decides whether the loop's turn always finds an empty stack,
+  position, a `cancel` running a stashed unsubscribe that is `Still`.
+  Decides whether the loop's turn always finds an empty stack,
   whether same-tick timers pop in the order they were set (`Before`), and
   whether a join's write keeps every queued timer past the last it moves.
 - **THE RESIDUAL.** `Inner`'s ghost a configuration whose `meaning` is
@@ -213,15 +208,6 @@ observer is; `preserve` is the tree walk, the timers and the loop's turn.
   stack under it.
 - **`turn`** (Sorted) — FALSITY, `NO EVIDENCE`: the loop's turn pops the
   earliest timer, its burst past every position shown.
-- **`flatMapᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `flatMap`
-  well-positioned, each inner under its `sub`.
-- **`emptyᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `empty` well-positioned.
-- **`ofᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `of` well-positioned, each
-  value under its `ix`.
-- **`coldᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: a cold source
-  well-positioned.
-- **`mapᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `map` well-positioned.
-- **`scanᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `scan` well-positioned.
 - **`Honest`** (Content) — FALSITY, `DEAD ROUTE×4`: a postulated type; a
   subscription's deliveries alike a meaning, at any position.
 - **`Inner`** (Content) — FALSITY, `DEAD ROUTE×3`: a postulated type; the whole
