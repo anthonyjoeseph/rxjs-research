@@ -10,7 +10,8 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
-open import Data.Nat using (zero; suc; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
+open import Data.Nat.Properties using (+-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
@@ -18,7 +19,7 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst)
 open import Relation.Nullary using (¬_)
 open import Level using (lower)
 
@@ -273,6 +274,58 @@ alien (alien-owned p k o hush        a) = tt
 alienᴱ-owned : ∀ {Γ} p k → Owned p k → (ρ : NEnv Γ) → Alienᴱ p ρ → Alienᴱ k ρ
 alienᴱ-owned p k o []ᴬ      a        = tt
 alienᴱ-owned p k o (e ∷ᴬ ρ) (ae , a) = alien-owned p k o e ae , alienᴱ-owned p k o ρ a
+
+-- A position's size, a tag counting what it holds.
+mutual
+  weigh : Pos → ℕ
+  weigh []      = 0
+  weigh (l ∷ h) = weighˡ l + weigh h
+
+  weighˡ : M.Label → ℕ
+  weighˡ (ix _)  = 1
+  weighˡ (sub j) = suc (weigh j)
+  weighˡ last    = 1
+
+prefix-weigh : ∀ k h → Prefix k h → weigh k ≤ weigh h
+prefix-weigh []      h       _          = z≤n
+prefix-weigh (_ ∷ _) []      ()
+prefix-weigh (a ∷ k) (_ ∷ h) (refl , p) = +-monoʳ-≤ (weighˡ a) (prefix-weigh k h p)
+
+-- What keys `h` is no larger than it, and a tag strictly smaller.
+mutual
+  owned-weigh : ∀ k h → Owned k h → weigh k ≤ weigh h
+  owned-weigh k h (inj₁ p) = prefix-weigh k h p
+  owned-weigh k h (inj₂ t) = <⇒≤ (tagged-weigh k h t)
+
+  tagged-weigh : ∀ k h → Tagged k h → weigh k < weigh h
+  tagged-weigh k []          ()
+  tagged-weigh k (ix _ ∷ h)  t        = <-≤-trans (tagged-weigh k h t) (m≤n+m (weigh h) 1)
+  tagged-weigh k (last ∷ h)  t        = <-≤-trans (tagged-weigh k h t) (m≤n+m (weigh h) 1)
+  tagged-weigh k (sub j ∷ h) (inj₁ o) = s≤s (≤-trans (owned-weigh k j o) (m≤m+n (weigh j) (weigh h)))
+  tagged-weigh k (sub j ∷ h) (inj₂ t) = <-≤-trans (tagged-weigh k h t) (m≤n+m (weigh h) (suc (weigh j)))
+
+tagged-snoc : ∀ k h i → Tagged k (h ++ [ ix i ]) → Tagged k h
+tagged-snoc k []          i ()
+tagged-snoc k (ix _ ∷ h)  i t        = tagged-snoc k h i t
+tagged-snoc k (last ∷ h)  i t        = tagged-snoc k h i t
+tagged-snoc k (sub _ ∷ h) i (inj₁ o) = inj₁ o
+tagged-snoc k (sub _ ∷ h) i (inj₂ t) = inj₂ (tagged-snoc k h i t)
+
+sibling-prefix : ∀ p {i j} → i ≢ j → ¬ Prefix (p ++ [ ix i ]) (p ++ [ ix j ])
+sibling-prefix []      ne (refl , _) = ne refl
+sibling-prefix (_ ∷ p) ne (_ , q)    = sibling-prefix p ne q
+
+-- Two children of one position key nothing of each other.
+sibling : ∀ p {i j} → i ≢ j → ¬ Owned (p ++ [ ix i ]) (p ++ [ ix j ])
+sibling p     ne (inj₁ q) = sibling-prefix p ne q
+sibling p {i} ne (inj₂ t) =
+  <-irrefl refl (<-≤-trans (tagged-weigh (p ++ [ ix i ]) p (tagged-snoc _ p _ t)) (prefix-weigh p (p ++ [ ix i ]) (prefix-++ p [ ix i ])))
+
+-- A first child is never a timer's tick.
+no-tick : ∀ p m → p ++ [ ix 0 ] ≢ ix (suc m) ∷ []
+no-tick []          m ()
+no-tick (_ ∷ [])    m ()
+no-tick (_ ∷ _ ∷ _) m ()
 
 -- Every position `e` shows, its end's included, strictly keyed under `p`.
 mutual
@@ -630,10 +683,16 @@ postulate
   -- lies inside, its sources being alien to it.
   steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Sorted ρ → Alienᴱ p ρ → Steady (U.meaning (U.subscribe o p) ρ)
 
-  -- A CONNECT'S SOURCE KEYS NOTHING UNDER ITS BODY: what it shows is
-  -- keyed under its own subscription, or a source's position tagged.
-  alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
-            → Alien (p ++ [ ix 0 ]) (U.meaning (U.subscribe o (p ++ [ ix 1 ])) ρ)
+  -- A SUBSCRIPTION KEYS NOTHING UNDER A POSITION APART FROM IT: over
+  -- sources alien to `a`, where neither keys the other and `a` is no
+  -- timer's tick.  What it shows is inside `k`, a source's position
+  -- tagged under `k`, or a frame of a timer it set, at a tick past
+  -- `k`'s, tagged under `k` too.
+  --
+  -- `owned-reach` does not carry it: `Keyed` says a tagged position is
+  -- tagged under `k`, and forgets that what it tags is a source's.
+  alien-apart : ∀ {Γ A} (o : Obs Timeline Γ A) a k (ρ : NEnv Γ) → Alienᴱ a ρ → ¬ Owned a k → ¬ Owned k a
+              → (∀ m → a ≢ ix (suc m) ∷ []) → Alien a (U.meaning (U.subscribe o k) ρ)
 
 
 -- A SUBSCRIPTION SHOWS ONLY WHAT IT KEYS: inside where it subscribes, a
@@ -668,6 +727,13 @@ alien-shown : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ
             → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ
 alien-shown op f s p ρ al x r =
   alienᴱ-owned p (x ++ [ ix 1 ]) (owned-lane p x (keyed-reach p _ (x ++ [ ix 0 ]) (owned-reach (flatMap op f s) p ρ) r)) ρ al
+
+-- A CONNECT'S SOURCE KEYS NOTHING UNDER ITS BODY: the two are siblings.
+alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
+          → Alien (p ++ [ ix 0 ]) (U.meaning (U.subscribe o (p ++ [ ix 1 ])) ρ)
+alien-sub o p ρ al =
+  alien-apart o (p ++ [ ix 0 ]) (p ++ [ ix 1 ]) ρ (alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ al)
+    (sibling p (λ ())) (sibling p (λ ())) (no-tick p)
 
 -- A program subscribed anywhere, over sorted sources alien to where it
 -- subscribes, is placed.
