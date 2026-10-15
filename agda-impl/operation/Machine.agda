@@ -1,173 +1,166 @@
 {-# OPTIONS --guardedness --large-indices #-}
 
--- THE SMALL-STEP ENGINE.  The pure runtime as a machine over first-order
--- configurations: the state, what runs next, and an explicit stack of
--- what waits on its result.  `step` takes one step by structural
--- recursion, an `Act` constructor or a frame of a cold's burst, and
--- `trace` repeats it, guarded by the step: a run is a coinductive
--- stream with a silent step wherever work is done.  So there is no
--- burst budget, no callback depth and no loop turn to count, and a
--- `defer` is compiled when the run reaches it.
---
--- The heap, the timers and the record are `PureObservable`'s, and each
--- step does what its clause of the pure monad does: a callback run
--- pushes what follows it, a burst checks its cold spent and its
--- subscriber closed before each step, a turn pops the earliest timer.
+-- THE PURE DRIVER.  `operation.AbstractObservable`'s machine, fed on a
+-- virtual clock: every transition is the shared one, and what this
+-- module adds is only what the pure runtime feeds it — each started
+-- timeline played into its sink, a frame at a time, its later frames on
+-- timers — and what it does with what the machine asks: the record's
+-- effects answered at once.  `step` takes one step by structural
+-- recursion and `trace` repeats it, guarded by the step: a run is a
+-- coinductive stream with a silent step wherever work is done.
 module operation.Machine where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_)
 open import Data.Product using (_×_; _,_)
-open import Data.Unit using (⊤; tt)
-open import Level using (lift; lower)
+open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapMaybe)
+open import Data.Unit using (tt)
+open import Level using (lower)
 
-open import Tree using (Later)
-open import operation.AbstractObservable using (module Run)
-open import operation.PureObservable using (World; _⊑_; same; _⨾_; new; wk∋; Sink; Handle; Pureᴾ; PureObs; Out; note; fin; module Pure)
-  renaming (here to top)
+open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
+open import operation.PureObservable using (Pureᴾ; PureObs; Out; note; fin; module Pure)
 open import denotation.MonotonicList using (ML; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last)
 
 module Machine (R : Set) where
-  open Run (Pureᴾ R) using (Act; newRef; readRef; writeRef; register; send; finish; startCold; stop; eff; here; under; diverge; unfold;
-    Observer; Subscription; Subscribe; Env; compile; wkAct; wkEl)
-  open Run (Pureᴾ R) using () renaming (done to doneᴬ)
-  open Pure R using (State; Callbacks; get; put; extend; Timer; insert; cascade; recorder; start; End; finished; cutOff; frames)
+  open Heap
+  open Run (Pureᴾ R) using (Subscribe; Observer; compile)
+  open Shared Timeline (Out R)
+  open Pure R using (Timer; wkTimer; insert; cascade; mapList; recorder; End; finished; cutOff; frames)
   open Pure R using () renaming (dry to dryᴱ)
 
   ------------------------------------------------------------------------
-  -- Configurations
+  -- The driver's state
 
-  -- What waits on a result of type X, made in world w: the rest of an
-  -- `Act`; a burst asking its subscriber whether it is closed; a burst
-  -- whose emit is being delivered.  Y is what it hands on.
-  data Wait (w : World) : Set → Set → Set₁ where
-    rest   : ∀ {B} → Act w B → Wait w ⊤ B
-    -- A scoped body returning: the position put back where the scope
-    -- opened, then the rest.  So the run's position is always the path
-    -- of the `back` frames on the stack, extended by the open scope's label.
-    back   : ∀ {B} → Pos → Act w B → Wait w ⊤ B
-    asked  : ∀ {A u} → Sink w A → Handle w → Time → Pos → ℕ → Frame A u → Wait w Bool ⊤
-    sent   : ∀ {A u} → Sink w A → Handle w → Time → Pos → ℕ → Frame A u → Wait w ⊤ ⊤
-
-  -- Each frame made in its own world, linked to the one below it by how
-  -- that world grew.  The bottom is the loop's next turn.
-  data Stack : World → Set → Set₁ where
-    loop : ∀ {w} → Stack w ⊤
-    push : ∀ {u w X Y} → Wait w X Y → u ⊑ w → Stack u Y → Stack w X
-
-  -- What runs next in world h, its result going to a stack made at w.
-  -- A burst stands before its step: its cold is checked spent, then its
-  -- subscriber asked whether it is closed.
-  data Ctl (h : World) : Set₁ where
-    run   : ∀ {w B} → Act h B → w ⊑ h → Stack w B → Ctl h
-    ret   : ∀ {w X} → X → w ⊑ h → Stack w X → Ctl h
-    burst : ∀ {w A u} → Sink h A → Handle h → Time → Pos → ℕ → Frame A u → w ⊑ h → Stack w ⊤ → Ctl h
-    turn  : Ctl h
-
-  record Mach : Set₁ where
-    constructor ⟨_,_⟩
+  -- A started timeline being played into its sink: its frame at tick t,
+  -- placed under r, the next value the i-th.  `polled`: its sink has been
+  -- asked whether it is closed, the answer not yet in.
+  record Playing (h : World) : Set₁ where
     field
-      {world} : World
-      state   : State world
-      ctl     : Ctl world
+      {A}    : Set
+      {u}    : Time
+      sink   : Sink h A
+      handle : Handle h
+      at′    : Time
+      under′ : Pos
+      index  : ℕ
+      frame  : Frame A at′
+      polled : Bool
+
+  wkPlaying : ∀ {h v} → h ⊑ v → Playing h → Playing v
+  wkPlaying ρ b = record b { sink = wk∋ ρ (Playing.sink b) ; handle = wk∋ ρ (Playing.handle b) }
+
+  -- The shared configuration, with the clock, the timers, the bursts
+  -- being played (innermost first) and the root's record.
+  record Mach : Set₁ where
+    constructor mach
+    field
+      conf   : Conf
+      clock  : ℕ
+      timers : List (Timer (Conf.world conf))
+      bursts : List (Maybe (Playing (Conf.world conf)))   -- `nothing`: a burst over, the machine to resume
+      log    : List (Time × R)     -- the root's record
+      ended  : Bool                -- whether the root has completed
+      marks  : List Pos            -- where each entry of the record was made: a ghost
+
+  pos : Mach → Pos
+  pos m = Conf.pos (Mach.conf m)
 
   ------------------------------------------------------------------------
   -- One step
 
   -- What a step shows: nothing, a value recorded at the clock and the
-  -- position the state stands at, the root's completion, or a queue run dry.
+  -- position it was made at, the root's completion, or a queue run dry.
   data Step : Set₁ where
     silent   : Mach → Step
     value    : Time → Pos → R → Mach → Step
     complete : Pos → Step
     drained  : Step
 
-  spent? : ∀ {h} → State h → Handle h → Bool
-  spent? st hd = lower (get (State.heap st) hd)
+  -- A transition taken: the timers and bursts carried into the grown world.
+  moved : (m : Mach) → Next (Conf.world (Mach.conf m)) → Mach
+  moved m (next c ρ _) = record m { conf = c ; timers = mapList (wkTimer ρ) (Mach.timers m) ; bursts = mapList (mapMaybe (wkPlaying ρ)) (Mach.bursts m) }
 
-  cbs : ∀ {h A} → State h → Sink h A → Callbacks A h
-  cbs st s = get (State.heap st) s
+  mutual
+    -- Feed the machine one input, and answer what it asks.
+    feed : (m : Mach) → Input (Mach.conf m) → Step
+    feed m i = asked (moved m n) (Next.outputs n)
+      where n = transition (Mach.conf m) i
 
-  -- The frames after one ending at tick `now`, at position e.
-  schedule : ∀ {h w A u} → State h → Sink h A → Handle h → Time → Pos → From A u → w ⊑ h → Stack w ⊤ → Mach
-  schedule st s hd now e done σ k =
-    if spent? st hd then ⟨ st , ret tt σ k ⟩
-    else ⟨ record st { heap = put (State.heap st) hd (lift true) ; pos = e }
-         , run (Callbacks.onComplete (cbs st s)) same (push (back (State.pos st) (doneᴬ tt)) σ k) ⟩
-  schedule st s hd now e quiet σ k = ⟨ st , ret tt σ k ⟩
-  schedule st s hd now e (at t _ b) σ k =
-    ⟨ record st { timers = insert (record { due = State.clock st + (t ∸ now) ; sink = s ; handle = hd ; at′ = t ; from = e ; frame = b })
-                                  (State.timers st) }
-    , ret tt σ k ⟩
+    -- What the machine asked: a started timeline pushed to be played; a
+    -- poll's answer, closed ending the burst; a teardown nothing, the heap
+    -- holding it spent.  An effect waits in `asking` for `step`.
+    asked : (m : Mach) → List (Output (Conf.world (Mach.conf m))) → Step
+    asked m []                 = silent m
+    asked m (start c s hd ∷ _) = starting m s hd (lower c)
+    asked m (closedIs true ∷ _)  with Mach.bursts m
+    ... | _ ∷ bs = feed (record m { bursts = bs }) go
+    ... | []     = silent m
+    asked m (closedIs false ∷ _) = silent m
+    asked m (stopped hd ∷ _)     = silent m
+    asked m (perform e ∷ _)      = silent m
 
-  -- A burst's step, its subscriber read open.
-  play : ∀ {h w A u} → State h → Sink h A → Handle h → Time → Pos → ℕ → Frame A u → w ⊑ h → Stack w ⊤ → Mach
-  play st s hd t r i (emit a k′) σ k =
-    if spent? st hd then ⟨ st , ret tt σ k ⟩
-    else ⟨ record st { pos = r ++ [ ix i ] } , run (Callbacks.onNext (cbs st s) a) same (push (sent s hd t r (suc i) (Frame∞.force k′)) σ k) ⟩
-  play st s hd t r i (stall k′) σ k = ⟨ st , burst s hd t r (suc i) (Frame∞.force k′) σ k ⟩
-  play st s hd t r i (close k′) σ k = schedule st s hd t (r ++ [ last ]) (From∞.force k′) σ k
+    -- A burst's step, its sink read open: the next frame's value
+    -- delivered at its position, a stall skipped, a close scheduling the
+    -- rest.
+    play : (m : Mach) → Playing (Conf.world (Mach.conf m)) → List (Maybe (Playing (Conf.world (Mach.conf m)))) → Step
+    play m b bs with Playing.frame b
+    ... | emit a k′ = feed (record m { bursts = just (record b { index = suc (Playing.index b) ; frame = Frame∞.force k′ ; polled = false }) ∷ bs })
+                           (deliver (Playing.sink b) a (Playing.under′ b ++ [ ix (Playing.index b) ]))
+    ... | stall k′  = silent (record m { bursts = just (record b { index = suc (Playing.index b) ; frame = Frame∞.force k′ }) ∷ bs })
+    ... | close k′  = schedule (record m { bursts = bs }) (Playing.sink b) (Playing.handle b) (Playing.at′ b) (Playing.under′ b ++ [ last ]) (From∞.force k′)
 
-  -- A cold just started: frame 0 delivered inline, or its frames scheduled.
-  first : ∀ {h w A} → State h → Sink h A → Handle h → From A 0 → w ⊑ h → Stack w ⊤ → Mach
-  first st s hd (at zero _ b) σ k = ⟨ st , burst s hd 0 (State.pos st) 0 b σ k ⟩
-  first st s hd m             σ k = schedule st s hd 0 (State.pos st ++ [ last ]) m σ k
+    -- A timeline just started: frame 0 played now, or its frames scheduled.
+    starting : (m : Mach) → ∀ {A} → Sink (Conf.world (Mach.conf m)) A → Handle (Conf.world (Mach.conf m)) → From A 0 → Step
+    starting m s hd (at zero _ b) = silent (record m { bursts = just (record { sink = s ; handle = hd ; at′ = 0 ; under′ = pos m ; index = 0 ; frame = b ; polled = false })
+                                                               ∷ Mach.bursts m })
+    starting m s hd f             = schedule m s hd 0 (pos m ++ [ last ]) f
 
-  -- A `defer` reached: its body compiled one level down, as `deferᴰ`
-  -- puts it, its subscription's unsubscribe a registered sink.
-  unfolded : ∀ {h Γ A} → Later Timeline Γ A → Env Γ h → (A → Act h ⊤) → Act h ⊤ → Act h Bool → (∀ {v} → h ⊑ v → Sink v ⊤ → Act v ⊤) → Act h ⊤
-  unfolded l e n c x k = under (ix 1)
-    (compile (Later.force l) e same (record { next = n ; complete = c ; closed = x }) λ σ sub →
-      register (λ _ → Subscription.unsubscribe sub) (doneᴬ tt) (doneᴬ false) λ τ sk → k (σ ⨾ τ) sk)
-    (doneᴬ tt)
+    -- The frames after one ending, at position e: a completion, nothing,
+    -- or a timer for the next.  The burst over, the machine resumes.
+    schedule : (m : Mach) → ∀ {A u} → Sink (Conf.world (Mach.conf m)) A → Handle (Conf.world (Mach.conf m)) → Time → Pos → From A u → Step
+    schedule m s hd now e done        = feed (record m { bursts = nothing ∷ Mach.bursts m }) (end hd s e)
+    schedule m s hd now e quiet       = feed m go
+    schedule m s hd now e (at t _ fr) = feed (record m { timers = insert (record { due = Mach.clock m + (t ∸ now) ; sink = s ; handle = hd
+                                                                                 ; at′ = t ; from = e ; frame = fr })
+                                                                       (Mach.timers m) }) go
 
-  -- The record's effects: a value shown unless the root has completed.
-  effect : ∀ {h w B X} → State h → Out R X → (X → Act h B) → w ⊑ h → Stack w B → Step
-  effect st (note a) k σ m with State.ended st
-  ... | true  = silent ⟨ st , run (k tt) σ m ⟩
-  ... | false = value (State.clock st) (State.pos st) a
-                  ⟨ record st { log = State.log st ++ [ (State.clock st , a) ] ; marks = State.marks st ++ [ State.pos st ] } , run (k tt) σ m ⟩
-  effect st fin k σ m with State.ended st
-  ... | true  = silent ⟨ st , run (k tt) σ m ⟩
-  ... | false = complete (State.pos st)
-
-  runs : ∀ {h w B} → State h → Act h B → w ⊑ h → Stack w B → Step
-  runs st (doneᴬ b)          σ k = silent ⟨ st , ret b σ k ⟩
-  runs st (newRef t a k′)    σ k = silent ⟨ extend st (lift (wkEl t new a)) , run (k′ new top) (σ ⨾ new) k ⟩
-  runs st (readRef r k′)     σ k = silent ⟨ st , run (k′ same (lower (get (State.heap st) r))) σ k ⟩
-  runs st (writeRef r a k′)  σ k = silent ⟨ record st { heap = put (State.heap st) r (lift a) } , run k′ σ k ⟩
-  runs st (register n c x k′) σ k = silent ⟨ extend st (record { onNext = λ a → wkAct new (n a) ; onComplete = wkAct new c ; isClosed = wkAct new x })
-                                          , run (k′ new top) (σ ⨾ new) k ⟩
-  runs st (send s a k′)      σ k = silent ⟨ st , run (Callbacks.onNext (cbs st s) a) same (push (rest k′) σ k) ⟩
-  runs st (finish s k′)      σ k = silent ⟨ st , run (Callbacks.onComplete (cbs st s)) same (push (rest k′) σ k) ⟩
-  runs st (startCold c s k′) σ k = silent (first (extend st (lift false)) (wk∋ new s) top (lower c) same (push (rest (k′ new top)) (σ ⨾ new) k))
-  runs st (stop hd k′)       σ k = silent ⟨ record st { heap = put (State.heap st) hd (lift true) } , run k′ σ k ⟩
-  runs st (eff e k′)         σ k = effect st e k′ σ k
-  runs st (here k′)          σ k = silent ⟨ st , run (k′ (State.pos st)) σ k ⟩
-  runs st (under l m k′)     σ k = silent ⟨ record st { pos = State.pos st ++ [ l ] } , run m same (push (back (State.pos st) k′) σ k) ⟩
-  runs st diverge            σ k = silent ⟨ st , run diverge σ k ⟩
-  runs st (unfold l e n c x k′ m) σ k = silent ⟨ st , run (unfolded l e n c x k′) same (push (rest m) σ k) ⟩
-
-  returns : ∀ {h w X} → State h → X → w ⊑ h → Stack w X → Step
-  returns st x σ loop                             = silent ⟨ st , turn ⟩
-  returns st x σ (push (rest m) ρ k)              = silent ⟨ st , run (wkAct σ m) (ρ ⨾ σ) k ⟩
-  returns st x σ (push (back p m) ρ k)            = silent ⟨ record st { pos = p } , run (wkAct σ m) (ρ ⨾ σ) k ⟩
-  returns st c σ (push (asked s hd t r i b) ρ k)  =
-    silent (if c then ⟨ st , ret tt (ρ ⨾ σ) k ⟩ else play st (wk∋ σ s) (wk∋ σ hd) t r i b (ρ ⨾ σ) k)
-  returns st x σ (push (sent s hd t r i b) ρ k)   = silent ⟨ record st { pos = r } , burst (wk∋ σ s) (wk∋ σ hd) t r i b (ρ ⨾ σ) k ⟩
+  -- An effect answered with no step of its own: the machine resumed.
+  resumed : (m : Mach) → Input (Mach.conf m) → Mach
+  resumed m i = moved m (transition (Mach.conf m) i)
 
   step : Mach → Step
-  step ⟨ st , run a σ k ⟩ = runs st a σ k
-  step ⟨ st , ret x σ k ⟩ = returns st x σ k
-  step ⟨ st , burst s hd t r i b σ k ⟩ =
-    silent (if spent? st hd then ⟨ st , ret tt σ k ⟩
-            else ⟨ st , run (Callbacks.isClosed (cbs st s)) same (push (asked s hd t r i b) σ k) ⟩)
-  step ⟨ st , turn ⟩ with State.timers st
+  step m with Mach.conf m | Mach.bursts m
+  -- The record's effects: a value shown unless the root has completed.
+  ... | ⟨ hp , p , asking (note a) k σ s ⟩ | _ with Mach.ended m
+  ...   | true  = feed m (answer tt)
+  ...   | false = value (Mach.clock m) p a (resumed (record m { log = Mach.log m ++ [ (Mach.clock m , a) ] ; marks = Mach.marks m ++ [ p ] }) (answer tt))
+  step m | ⟨ hp , p , asking fin k σ s ⟩ | _ with Mach.ended m
+  ...   | true  = feed m (answer tt)
+  ...   | false = complete p
+  -- The machine running: one transition.
+  step m | ⟨ _ , _ , run _ _ _ ⟩ | _ = feed m go
+  step m | ⟨ _ , _ , ret _ _ _ ⟩ | _ = feed m go
+  -- Held over a burst: spent, it is over; unpolled, its sink is asked
+  -- whether it is closed; polled open, it plays.
+  step m | ⟨ _ , _ , held _ _ ⟩ | nothing ∷ bs = feed (record m { bursts = bs }) go
+  step m | ⟨ hp , _ , held _ _ ⟩ | just b ∷ bs =
+    if spent? hp (Playing.handle b) then feed (record m { bursts = bs }) go
+    else if Playing.polled b then play m b bs
+    else feed (record m { bursts = just (record b { polled = true }) ∷ bs }) (poll (Playing.sink b))
+  -- Held with nothing to play: the loop's turn, the earliest timer popped.
+  step m | ⟨ _ , _ , held _ _ ⟩ | [] with Mach.timers m
   ... | []      = drained
-  ... | tm ∷ ts = silent ⟨ record st { clock = Timer.due tm ; timers = ts ; pos = cascade tm }
-                         , burst (Timer.sink tm) (Timer.handle tm) (Timer.at′ tm) (cascade tm) 0 (Timer.frame tm) same loop ⟩
+  ... | tm ∷ ts = silent (record m { clock = Timer.due tm ; timers = ts
+                                   ; bursts = just (record { sink = Timer.sink tm ; handle = Timer.handle tm ; at′ = Timer.at′ tm
+                                                           ; under′ = cascade tm ; index = 0 ; frame = Timer.frame tm ; polled = false }) ∷ [] })
+
+  -- Subscribing at the root, then the loop.
+  launch : ∀ {A} → Subscribe A [] → Observer A [] → Mach
+  launch s o = mach (load s o) 0 [] [] [] false []
+
+  begin : PureObs [] R → Mach
+  begin o = launch (compile o []) recorder
 
   ------------------------------------------------------------------------
   -- The run
@@ -192,17 +185,10 @@ module Machine (R : Set) where
     trace m = shown (step m)
 
     shown : Step → Trace
-    shown (silent m)      = tau (State.clock (Mach.state m)) λ where .force → trace m
+    shown (silent m)      = tau (Mach.clock m) λ where .force → trace m
     shown (value t p a m) = out t p a λ where .force → trace m
     shown (complete p)    = end p
     shown drained         = idle
-
-  -- Subscribing at the root, then the loop.
-  launch : ∀ {A} → Subscribe A [] → Observer A [] → Mach
-  launch s o = ⟨ start , run (s same o λ _ _ → doneᴬ tt) same loop ⟩
-
-  begin : PureObs [] R → Mach
-  begin o = launch (compile o []) recorder
 
   -- What a reader of the first n steps has: where each value was shown,
   -- each value at its clock, and how the run stood — cut at the last clock

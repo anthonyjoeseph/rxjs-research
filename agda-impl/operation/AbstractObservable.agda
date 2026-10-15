@@ -1,20 +1,20 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE ONE COPY OF THE OPERATIONAL SEMANTICS.  A program is a tree
--- (`Obs`, in `Tree`); compiling it gives `Act` programs, built from the operator
--- kernels.  Both runtimes run those same programs: the IO one through
--- the interpreter and event loop here, against a monad (`Runtime`) that
--- `Observable` hands IO; the pure one as a small-step machine
--- (`Machine`) over `PureObservable`'s heap and virtual clock.
+-- (`Obs`, in `Tree`); compiling it gives `Act` programs, built from the
+-- operator kernels.  Both runtimes run those same programs on the SAME
+-- MACHINE (`Machine`, below): one pure transition, `conf → input → conf ×
+-- outputs`, over one heap (`Heap`).  A runtime is only a DRIVER: what it
+-- feeds the machine (a cold's emissions, an effect's answer) and what it
+-- does with what the machine asks (start a cold, perform an effect).  The
+-- pure driver plays timelines on a virtual clock (`operation.Machine`);
+-- the IO driver runs real colds on a real one (`operation.Observable`).
 --
--- A `defer` compiles to an `unfold`, its body compiled only when reached,
--- so compiling is total.  Running a stored callback, reaching an `unfold`
--- and taking the loop's next turn are each open in the recursion, and
--- each runtime closes them its own way: the IO one with `fixIO`, the
--- machine by stepping, its trace coinductive.
+-- A `defer` compiles to an `unfold`, its body compiled only when the
+-- machine reaches it, so compiling is total.
 --
--- The shared code is parametric in the runtime's types (`Prims`), so it
--- can neither inspect a ref, nor look inside a cold, nor perform IO.
+-- The shared code is parametric in a runtime's cold and its native
+-- effects, so it can neither look inside a cold nor perform IO.
 module operation.AbstractObservable where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; not)
@@ -24,8 +24,9 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; pred; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
+open import Level using (Lift; lift; lower)
 
-open import denotation.MonotonicList using (Pos; Label; ix; last) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Pos; Label; ix; last; root) renaming (sub to subᴾ)
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 
 ------------------------------------------------------------------------
@@ -63,6 +64,56 @@ record Prims : Set₂ where
     wkHandle : ∀ {w v} → w ⊑ v → Handle w → Handle v
     Cold     : Set → Set₁             -- the cold leaf
     Eff      : Set → Set              -- what a top-level observer may do natively
+
+------------------------------------------------------------------------
+-- THE HEAP, shared: worlds and names
+
+-- Named, not opened, so `Prims`' fields of the same names do not clash.
+module Heap where
+  -- What one heap entry is: a cell, a registered observer, a started cold.
+  data Kind : Set₁ where
+    cell : Ty → Kind
+    slot : Set → Kind
+    play : Kind
+
+  World : Set₁
+  World = List Kind
+
+  -- A name: a position in the world, newest first.
+  data _∋_ : World → Kind → Set where
+    here  : ∀ {k w} → (k ∷ w) ∋ k
+    there : ∀ {j k w} → w ∋ k → (j ∷ w) ∋ k
+
+  -- A later world: this one, with entries made since.
+  data _⊑_ : World → World → Set where
+    same : ∀ {w} → w ⊑ w
+    grow : ∀ {k w v} → w ⊑ v → w ⊑ (k ∷ v)
+
+  infixr 5 _⨾_
+  _⨾_ : ∀ {u v w} → u ⊑ v → v ⊑ w → u ⊑ w
+  ρ ⨾ same   = ρ
+  ρ ⨾ grow σ = grow (ρ ⨾ σ)
+
+  wk∋ : ∀ {w v k} → w ⊑ v → w ∋ k → v ∋ k
+  wk∋ same     i = i
+  wk∋ (grow ρ) i = there (wk∋ ρ i)
+
+  new : ∀ {k w} → w ⊑ (k ∷ w)
+  new = grow same
+
+  Sink : World → Set → Set
+  Sink w A = w ∋ slot A
+
+  Handle : World → Set
+  Handle w = w ∋ play
+
+-- A runtime's primitives: the shared heap's names, its cold, its effects.
+prims : (Set → Set₁) → (Set → Set) → Prims
+prims C E = record
+  { World = Heap.World ; _⊑_ = Heap._⊑_ ; ⊑-refl = Heap.same ; _⨾_ = Heap._⨾_
+  ; RefOf = λ w t _ → w Heap.∋ Heap.cell t ; Sink = Heap.Sink ; Handle = Heap.Handle
+  ; wkRef = λ _ → Heap.wk∋ ; wkSink = Heap.wk∋ ; wkHandle = Heap.wk∋
+  ; Cold = C ; Eff = E }
 
 module Run (P : Prims) where
   open Prims P
@@ -487,67 +538,198 @@ module Run (P : Prims) where
   compile (defer l)         ρ σ o k = unfold l (wkEnv σ ρ) (Observer.next o) (Observer.complete o) (Observer.closed o)
                                         (λ τ sk → k τ (record { unsubscribe = send sk tt (done tt) })) (done tt)
 
-  -- THE MONAD, and the handful of things only it can do: what
-  -- `Observable` supplies to run the engine in IO.  The operations that
-  -- run a stored callback take the interpreter to run it with, since the
-  -- callback lives in the runtime's tables.  Those that make a name hand
-  -- it to a Kripke continuation, as `Act` does.
-  record Runtime : Set₂ where
+
+
+------------------------------------------------------------------------
+-- THE DRIVER'S SHAPE
+
+-- A pure transition: a state, an input that state admits, what follows.
+-- Both runtimes are this one transition, fed by different drivers.
+record Driver (S : Set₁) (I : S → Set₁) (N : S → Set₁) : Set₁ where
+  field transition : (s : S) → I s → N s
+
+------------------------------------------------------------------------
+-- THE MACHINE, shared: the one interpreter of `Act`
+
+module Machine (C : Set → Set₁) (E : Set → Set) where
+  open Heap
+  open Run (prims C E)
+  open Kit using (skipᴬ)
+
+  ----------------------------------------------------------------------
+  -- The heap's contents
+
+  record Callbacks (A : Set) (h : World) : Set₁ where
     field
-      M          : World → Set → Set₁
-      return     : ∀ {w A} → A → M w A
-      _>>=_      : ∀ {w A B} → M w A → (A → M w B) → M w B
-      newRefᴿ    : ∀ {w B} t → El w t → (∀ {v} → w ⊑ v → Ref v t → M v B) → M w B
-      readRefᴿ   : ∀ {w B t} → Ref w t → (∀ {v} → w ⊑ v → El v t → M v B) → M w B
-      writeRefᴿ  : ∀ {w t} → Ref w t → El w t → M w ⊤
-      registerᴿ  : (∀ {w B} → Act w B → M w B) → ∀ {w A B} → (A → Act w ⊤) → Act w ⊤ → Act w Bool
-                 → (∀ {v} → w ⊑ v → Sink v A → M v B) → M w B
-      sendᴿ      : (∀ {w B} → Act w B → M w B) → ∀ {w A} → Sink w A → A → M w ⊤
-      finishᴿ    : (∀ {w B} → Act w B → M w B) → ∀ {w A} → Sink w A → M w ⊤
-      -- Delivers the cold's subscribe burst inline, and arranges for its
-      -- later emissions to reach the event queue.
-      startColdᴿ : (∀ {w B} → Act w B → M w B) → ∀ {w A B} → Cold A → Sink w A → (∀ {v} → w ⊑ v → Handle v → M v B) → M w B
-      stopᴿ      : ∀ {w} → Handle w → M w ⊤
-      effᴿ       : ∀ {w A} → Eff A → M w A
-      hereᴿ      : ∀ {w B} → (Pos → M w B) → M w B
-      gotoᴿ      : ∀ {w} → Pos → M w ⊤
-      divergeᴿ   : ∀ {w A} → M w A
-      -- Runs the next timer as one cascade; false when none is left.  Both
-      -- runtimes pop the earliest, ties in the order they were set, as two
-      -- `setTimeout`s with one delay.
-      nextᴿ      : (∀ {w B} → Act w B → M w B) → ∀ {w} → M w Bool
+      onNext     : A → Act h ⊤
+      onComplete : Act h ⊤
+      isClosed   : Act h Bool
 
-  -- THE ENGINE: interpreter, event loop and entry point, written once.
-  -- Each is one layer, open in the recursion it needs — a callback run
-  -- from a table, the loop's next turn — and the runtime closes it.
-  module Engine (R : Runtime) where
-    open Runtime R
+  -- What an entry holds, in the world the heap has reached.  A started
+  -- cold holds whether it is spent.
+  Val : World → Kind → Set₁
+  Val h (cell t) = Lift _ (El h t)
+  Val h (slot A) = Callbacks A h
+  Val h play     = Lift _ Bool
 
-    RunAct : Set₁
-    RunAct = ∀ {w B} → Act w B → M w B
+  wkVal : ∀ {h v} k → h ⊑ v → Val h k → Val v k
+  wkVal (cell t) ρ x  = lift (wkEl t ρ (lower x))
+  wkVal (slot A) ρ cb = record { onNext = λ a → wkAct ρ (Callbacks.onNext cb a) ; onComplete = wkAct ρ (Callbacks.onComplete cb)
+                               ; isClosed = wkAct ρ (Callbacks.isClosed cb) }
+  wkVal play     ρ x  = x
 
-    -- `self` runs a stored callback, or a `defer`'s body once compiled;
-    -- everything else is structural.
-    interpret : RunAct → RunAct
-    interpret self (done b)           = return b
-    interpret self (newRef t a k)     = newRefᴿ t a λ σ r → interpret self (k σ r)
-    interpret self (readRef r k)      = readRefᴿ r λ σ a → interpret self (k σ a)
-    interpret self (writeRef r a k)   = writeRefᴿ r a >>= λ _ → interpret self k
-    interpret self (register n c x k) = registerᴿ self n c x λ σ s → interpret self (k σ s)
-    interpret self (send s a k)       = sendᴿ self s a >>= λ _ → interpret self k
-    interpret self (finish s k)       = finishᴿ self s >>= λ _ → interpret self k
-    interpret self (startCold c s k)  = startColdᴿ self c s λ σ h → interpret self (k σ h)
-    interpret self (stop h k)         = stopᴿ h >>= λ _ → interpret self k
-    interpret self (eff e k)          = effᴿ e >>= λ a → interpret self (k a)
-    interpret self (here k)           = hereᴿ λ p → interpret self (k p)
-    interpret self (under l m k)      = hereᴿ λ p → gotoᴿ (p ++ [ l ]) >>= λ _ → interpret self m >>= λ _ → gotoᴿ p >>= λ _ → interpret self k
-    interpret self diverge            = divergeᴿ
-    interpret self (unfold l e n c x k m) =
-      self (compile (Later.force l) e ⊑-refl (record { next = n ; complete = c ; closed = x }) λ σ sub →
-            register (λ _ → Subscription.unsubscribe sub) (done tt) (done false) λ τ sk → k (σ ⨾ τ) sk)
-      >>= λ _ → interpret self m
+  get : ∀ {ℓ} {P : Kind → Set ℓ} {w k} → All P w → w ∋ k → P k
+  get (x ∷ xs) here      = x
+  get (x ∷ xs) (there i) = get xs i
 
-    -- One turn of the event loop; `again` is the rest of it.
-    loopStep : RunAct → ∀ {w} → M w ⊤ → M w ⊤
-    loopStep run again = nextᴿ run >>= λ more → if more then again else return tt
+  put : ∀ {ℓ} {P : Kind → Set ℓ} {w k} → All P w → w ∋ k → P k → All P w
+  put (x ∷ xs) here      y = y ∷ xs
+  put (x ∷ xs) (there i) y = x ∷ put xs i y
 
+  wkAll : ∀ {h v} {w} → h ⊑ v → All (Val h) w → All (Val v) w
+  wkAll ρ []                 = []
+  wkAll ρ (_∷_ {x = k} x xs) = wkVal k ρ x ∷ wkAll ρ xs
+
+  Heapᴹ : World → Set₁
+  Heapᴹ h = All (Val h) h
+
+  extend : ∀ {h k} → Heapᴹ h → Val (k ∷ h) k → Heapᴹ (k ∷ h)
+  extend hp x = x ∷ wkAll new hp
+
+  cbs : ∀ {h A} → Heapᴹ h → Sink h A → Callbacks A h
+  cbs hp s = get hp s
+
+  spent? : ∀ {h} → Heapᴹ h → Handle h → Bool
+  spent? hp hd = lower (get hp hd)
+
+  ----------------------------------------------------------------------
+  -- Configurations
+
+  -- What waits on a result of type X, made in world w.  `back`: a scope
+  -- returning, its position put back.  `rehold`: a delivery the driver
+  -- fed, after which the driver has the turn again.  `told`: a poll the
+  -- driver fed, its answer handed out.
+  data Wait (w : World) : Set → Set → Set₁ where
+    rest   : ∀ {B} → Act w B → Wait w ⊤ B
+    back   : ∀ {B} → Pos → Act w B → Wait w ⊤ B
+    rehold : Wait w ⊤ ⊤
+    told   : Wait w Bool ⊤
+
+  -- Each frame made in its own world, linked to the one below it by how
+  -- that world grew.  The bottom hands the turn to the driver for good.
+  data Stack : World → Set → Set₁ where
+    bottom : ∀ {w} → Stack w ⊤
+    push   : ∀ {u w X Y} → Wait w X Y → u ⊑ w → Stack u Y → Stack w X
+
+  -- What runs next in world h.  `held`: the DRIVER'S TURN — a cold's
+  -- burst being played, or nothing at all over `bottom`; the driver feeds
+  -- deliveries and polls, then `go` resumes the stack.  `asking`: an
+  -- effect's answer awaited.
+  data Ctl (h : World) : Set₁ where
+    run    : ∀ {w B} → Act h B → w ⊑ h → Stack w B → Ctl h
+    ret    : ∀ {w X} → X → w ⊑ h → Stack w X → Ctl h
+    held   : ∀ {w} → w ⊑ h → Stack w ⊤ → Ctl h
+    asking : ∀ {w X B} → E X → (X → Act h B) → w ⊑ h → Stack w B → Ctl h
+
+  record Conf : Set₁ where
+    constructor ⟨_,_,_⟩
+    field
+      {world} : World
+      heap    : Heapᴹ world
+      pos     : Pos          -- where the run is: a ghost the IO driver ignores
+      ctl     : Ctl world
+  open Conf
+
+  -- What the machine asks of its driver.
+  data Output (h : World) : Set₁ where
+    perform  : ∀ {X} → E X → Output h                        -- run it, `answer` its result
+    start    : ∀ {A} → C A → Sink h A → Handle h → Output h  -- play it into the sink: its burst now
+    stopped  : Handle h → Output h                            -- tear it down
+    closedIs : Bool → Output h                                -- a poll's answer
+
+  -- What an `asking` machine waits for.
+  Awaited : Conf → Set
+  Awaited ⟨ _ , _ , asking {X = X} _ _ _ _ ⟩ = X
+  Awaited _                                = ⊤
+
+  -- What a driver may feed.  A delivery carries the position its
+  -- emission is placed at; the IO driver passes `[]`.
+  data Input (c : Conf) : Set₁ where
+    go      : Input c
+    answer  : Awaited c → Input c
+    deliver : ∀ {A} → Sink (world c) A → A → Pos → Input c
+    end     : ∀ {A} → Handle (world c) → Sink (world c) A → Pos → Input c   -- the cold completed: spent, then its sink's completion
+    poll    : ∀ {A} → Sink (world c) A → Input c
+
+  -- One transition's result: the next configuration, how the world grew,
+  -- and what is asked of the driver.
+  record Next (h : World) : Set₁ where
+    constructor next
+    field
+      conf    : Conf
+      grew    : h ⊑ world conf
+      outputs : List (Output (world conf))
+
+  ----------------------------------------------------------------------
+  -- One transition
+
+  still : ∀ {h} → Heapᴹ h → Pos → Ctl h → Next h
+  still hp p c = next ⟨ hp , p , c ⟩ same []
+
+  -- A `defer` reached: its body compiled one level down, as `deferᴰ`
+  -- puts it, its subscription's unsubscribe a registered sink.
+  unfolded : ∀ {h Γ A} → Later C Γ A → Env Γ h → (A → Act h ⊤) → Act h ⊤ → Act h Bool → (∀ {v} → h ⊑ v → Sink v ⊤ → Act v ⊤) → Act h ⊤
+  unfolded l e n c x k = under (ix 1)
+    (compile (Later.force l) e same (record { next = n ; complete = c ; closed = x }) λ σ sub →
+      register (λ _ → Subscription.unsubscribe sub) (done tt) (done false) λ τ sk → k (σ ⨾ τ) sk)
+    (done tt)
+
+  runs : ∀ {h w B} → Heapᴹ h → Pos → Act h B → w ⊑ h → Stack w B → Next h
+  runs hp p (done b)            σ k = still hp p (ret b σ k)
+  runs hp p (newRef t a k′)     σ k = next ⟨ extend hp (lift (wkEl t new a)) , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
+  runs hp p (readRef r k′)      σ k = still hp p (run (k′ same (lower (get hp r))) σ k)
+  runs hp p (writeRef r a k′)   σ k = still (put hp r (lift a)) p (run k′ σ k)
+  runs hp p (register n c x k′) σ k = next ⟨ extend hp (record { onNext = λ a → wkAct new (n a) ; onComplete = wkAct new c ; isClosed = wkAct new x })
+                                           , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
+  runs hp p (send s a k′)       σ k = still hp p (run (Callbacks.onNext (cbs hp s) a) same (push (rest k′) σ k))
+  runs hp p (finish s k′)       σ k = still hp p (run (Callbacks.onComplete (cbs hp s)) same (push (rest k′) σ k))
+  -- The cold's burst is the driver's: it holds, feeding deliveries, until
+  -- it says `go`.
+  runs hp p (startCold c s k′)  σ k = next ⟨ extend hp (lift false) , p , held same (push (rest (k′ new here)) (σ ⨾ new) k) ⟩ new
+                                           [ start c (wk∋ new s) here ]
+  runs hp p (stop hd k′)        σ k = next ⟨ put hp hd (lift true) , p , run k′ σ k ⟩ same [ stopped hd ]
+  runs hp p (eff e k′)          σ k = next ⟨ hp , p , asking e k′ σ k ⟩ same [ perform e ]
+  runs hp p (here k′)           σ k = still hp p (run (k′ p) σ k)
+  runs hp p (under l m k′)      σ k = still hp (p ++ [ l ]) (run m same (push (back p k′) σ k))
+  runs hp p diverge             σ k = still hp p (run diverge σ k)
+  runs hp p (unfold l e n c x k′ m) σ k = still hp p (run (unfolded l e n c x k′) same (push (rest m) σ k))
+
+  returns : ∀ {h w X} → Heapᴹ h → Pos → X → w ⊑ h → Stack w X → Next h
+  returns hp p x σ bottom              = still hp p (held σ bottom)
+  returns hp p x σ (push (rest m) ρ k)   = still hp p (run (wkAct σ m) (ρ ⨾ σ) k)
+  returns hp p x σ (push (back q m) ρ k) = still hp q (run (wkAct σ m) (ρ ⨾ σ) k)
+  returns hp p x σ (push rehold ρ k)     = still hp p (held (ρ ⨾ σ) k)
+  returns hp p b σ (push told ρ k)       = next ⟨ hp , p , held (ρ ⨾ σ) k ⟩ same [ closedIs b ]
+
+  -- A callback the driver fed, run while it holds: at the position fed,
+  -- the old one put back, then the driver's turn again.
+  fed : ∀ {h w} → Heapᴹ h → Pos → Pos → Act h ⊤ → w ⊑ h → Stack w ⊤ → Next h
+  fed hp p q a σ k = still hp q (run a same (push (back p (done tt)) same (push rehold σ k)))
+
+  transition : (c : Conf) → Input c → Next (world c)
+  transition ⟨ hp , p , run a σ k ⟩      go          = runs hp p a σ k
+  transition ⟨ hp , p , ret x σ k ⟩      go          = returns hp p x σ k
+  transition ⟨ hp , p , held σ k ⟩       go          = returns hp p tt σ k
+  transition ⟨ hp , p , asking e k′ σ k ⟩ (answer x) = still hp p (run (k′ x) σ k)
+  transition ⟨ hp , p , held σ k ⟩       (deliver s a q) = fed hp p q (Callbacks.onNext (cbs hp s) a) σ k
+  transition ⟨ hp , p , held σ k ⟩       (end hd s q) = fed (put hp hd (lift true)) p q (Callbacks.onComplete (cbs hp s)) σ k
+  transition ⟨ hp , p , held σ k ⟩       (poll s)    = still hp p (run (Callbacks.isClosed (cbs hp s)) same (push told σ k))
+  transition ⟨ hp , p , c ⟩              _           = still hp p c
+
+  -- THE MACHINE: the one transition both drivers feed.
+  machine : Driver Conf Input (λ c → Next (world c))
+  machine = record { transition = transition }
+
+  -- Subscribing at the root: the machine's first configuration.
+  load : ∀ {A} → Subscribe A [] → Observer A [] → Conf
+  load s o = ⟨ [] , root , run (s same o λ _ _ → done tt) same bottom ⟩

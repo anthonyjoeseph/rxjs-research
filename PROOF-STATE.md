@@ -166,7 +166,7 @@ machine alone) and ALIKE as sets (`content`) is placed (`placing`). LIVENESS
 is `reachedᴿ`. Sortedness rides SCOPED positions: `under l m k` runs `m` at
 `pos ++ [l]` and puts `pos` back, so the run's positions are a tree's
 pre-order; each kernel is well-positioned (`Well`, unary) given its
-observer is, and the machine's `preserve` carries the walk and the timers.
+observer is; `preserve` is the tree walk, the timers and the loop's turn.
 
 ### Big picture tier roadmap
 
@@ -180,83 +180,78 @@ observer is, and the machine's `preserve` carries the walk and the timers.
   failing on one value complete under the same `last`, the second after the
   observer below already completed there. Decides whether `Well` is unary
   in positions alone, or `Settled` must read the heap's closed flags.
-- **THE WALK.** `WellMach` defined: the running computation, every stack
-  frame, every heap callback, every queued timer well. Then `preserve` by
-  the step's cases. Decides whether same-tick timers pop in the order of the
-  positions they were set at, or the queue carries its own invariant.
+- **THE WALK.** `walk-tree`, `walk-timers` and `turn` by the step's
+  cases, over `WellMach`'s run and queue. Decides whether same-tick timers
+  pop in the order of the positions they were set at (`Before`), or the
+  queue needs more than that order.
 - **THE PROTOCOL, THE REST.** The remaining kernel `-well` rows; `connect`
   and `flatMap` lead, their subscriptions scoped under `ix 0`, `ix 1` and
   `sub`. Decides whether a callback's position travels with it on the heap.
 - **CONTENT, PER KERNEL.** `Honest` defined over the machine's histories
   (`adequacy.Content`), then the per-kernel `-honest` contracts, `connect`
-  and `takeWhile` first, and `delivered`. Decides whether every kernel's
-  state is a function of its delivered inputs.
+  and `takeWhile` first, then `kept` and `read-is-kept`. Decides whether
+  every kernel's state is a function of its delivered inputs.
 - **LIVENESS.** `reachedᴿ`: a position the events pass, the machine passes
   in finitely many steps. Decides whether liveness needs a measure.
-- **ONE DRIVER.** `operation.Driver`: the engine a pure transition
-  (`engine`), both runtimes the generic `drive` over different inputs, and
-  `driven` linking it to `operation.Machine`. Decides whether the IO
-  runtime can share the machine's step, not only its `Act`.
+- **ONE DRIVER, CHECKED.** `operation.AbstractObservable`'s `Machine`, one
+  pure `transition`, driven by `operation.Machine` (timelines) and
+  `operation.Observable` (real colds): typechecked, then CI's oracle. Decides
+  whether the IO runtime shares the pure step with no cast but `coerce`.
 
 ### The ledger
 
 - **`takeWhileᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: a `takeWhile`
   well-positioned; its completion under `last` may follow the observer's.
-- **`WellMach`** (Sorted) — FALSITY, `NO EVIDENCE`: a postulated type; the
-  machine configuration well, to be defined.
-- **`preserve`** (Sorted) — FALSITY, `NO EVIDENCE`: a well configuration's
-  step keeps it well and shows nothing earlier.
-- **`begin-well`** (Sorted) — FALSITY, `NO EVIDENCE`: the compiled program
-  and its recorder begin well at the root.
+- **`walk-timers`** (Sorted) — FALSITY, `NO EVIDENCE`: a step not the loop's
+  turn keeps every timer past what it shows, queued in `Before` order.
+- **`walk-tree`** (Sorted) — FALSITY, `NO EVIDENCE`: a step not the loop's turn
+  keeps the run well and shows nothing earlier.
+- **`turn`** (Sorted) — FALSITY, `NO EVIDENCE`: the loop's turn pops the
+  earliest timer, its burst past every position shown.
 - **`connectᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `connect`
   well-positioned, body under `ix 0`, source under `ix 1`.
 - **`flatMapᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `flatMap`
   well-positioned, each inner under its `sub`.
-- **`joinᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: a joiner
-  well-positioned.
-- **`emptyᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `empty`
-  well-positioned.
-- **`ofᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `of` well-positioned,
-  each value under its `ix`.
+- **`joinᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: a joiner well-positioned.
+- **`emptyᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `empty` well-positioned.
+- **`ofᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `of` well-positioned, each
+  value under its `ix`.
 - **`coldᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: a cold source
   well-positioned.
 - **`mapᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `map` well-positioned.
-- **`scanᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `scan`
-  well-positioned.
+- **`scanᴷ-well`** (Sorted) — FALSITY, `NO EVIDENCE`: `scan` well-positioned.
 - **`Honest`** (Content) — FALSITY, `NO EVIDENCE`: a postulated type; a
   subscription's deliveries alike a meaning, at any position.
-- **`HonestEnv`** (Content) — FALSITY, `NO EVIDENCE`: a postulated type;
-  each joiner in scope fed its source's hot run.
-- **`connectᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `connect`
-  honest to `connectᴰ`, its joiners fed one hot run.
+- **`HonestEnv`** (Content) — FALSITY, `NO EVIDENCE`: a postulated type; each
+  joiner in scope fed its source's hot run.
+- **`connectᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `connect` honest to
+  `connectᴰ`, its joiners fed one hot run.
 - **`takeWhileᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `takeWhile`
   honest to `takeWhileᴰ`, completing at the failing value.
-- **`flatMapᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `flatMap`
-  honest to `flatMapᴰ`.
-- **`joinᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: a joiner honest to
-  its environment's entry.
+- **`flatMapᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `flatMap` honest to
+  `flatMapᴰ`.
+- **`joinᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: a joiner honest to its
+  environment's entry.
 - **`deferᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `defer` honest to
   `deferᴰ`.
-- **`coldᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: a cold source
-  honest to `coldᴰ`.
+- **`coldᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: a cold source honest
+  to `coldᴰ`.
 - **`emptyᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `empty` honest.
 - **`ofᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `of` honest.
 - **`mapᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `map` honest.
 - **`scanᴷ-honest`** (Content) — FALSITY, `NO EVIDENCE`: `scan` honest.
-- **`honest-[]`** (Content) — FALSITY, `NO EVIDENCE`: the empty
-  environments honest to each other.
-- **`delivered`** (Adequacy) — FALSITY, `NO EVIDENCE`: an honest
-  subscription launched at the root records alike its meaning's events.
-- **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record
-  alike a program's events as a set is placed against them.
+- **`honest-[]`** (Content) — FALSITY, `NO EVIDENCE`: the empty environments
+  honest to each other.
+- **`kept`** (Content) — FALSITY, `NO EVIDENCE`: a configuration reached from
+  an honest launch keeps a record alike its meaning's events.
+- **`read-is-kept`** (Content) — FALSITY, `NO EVIDENCE`: the first n steps,
+  read, are some reached configuration's record.
+- **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
+  a program's events as a set is placed against them.
 - **`reachedᴿ`** (Adequacy) — FALSITY, `NO EVIDENCE`: every item the meaning's
   events reach, some prefix reaches.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never
   fall.
-- **`engine`** (Driver) — FALSITY, `NO EVIDENCE`: the engine as one pure
-  transition, clock in, root deliveries out.
-- **`driven`** (Driver) — FALSITY, `NO EVIDENCE`: every machine prefix the
-  engine driven by some clock.
 
 ## Tier 2 — the simultaneous spec
 

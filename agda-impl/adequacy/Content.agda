@@ -15,18 +15,65 @@
 module adequacy.Content where
 
 open import Data.List using (List; []; _∷_)
+open import Data.List.Relation.Unary.Any using (Any)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
-open import Data.Unit using (⊤; tt)
+open import Data.Product using (_×_; _,_; Σ)
+open import Data.Unit using (⊤)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 import Tree as T
-open import Tree using (Obs)
-open import denotation.MonotonicList using (MonotonicList)
+open import denotation.MonotonicList using (MonotonicList; Events; Pos; Time; tick; out; skip; end; force; observe; root)
+open import adequacy.Sorted using (_≤ᵖ_)
+open import operation.Machine using (module Machine)
 open import denotation.Denote using (⟦_⟧; DenEnv)
 open import operation.AbstractObservable using (module Run)
-open import operation.PureObservable using (PureObs; Pureᴾ)
+open import operation.PureObservable using (PureObs; Pureᴾ; module Pure)
 
 module Honesty (R : Set) where
   open Run (Pureᴾ R) using (Subscribe; Env; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via; startCold)
+  open Machine R using (Mach; Step; silent; value; complete; drained; step; trace; reading; begin; launch; Read; read)
+  open Pure R using (End; finished; dry; cutOff; recorder)
+  open Read
+
+  ----------------------------------------------------------------------
+  -- Alike as sets
+
+  -- The events hold a value (`just`) or their end (`nothing`) at `k`.
+  data Has : Events R → Pos → Maybe R → Set where
+    atOut    : ∀ {k a r} → Has (out k a r) k (just a)
+    atEnd    : ∀ {k} → Has (end k) k nothing
+    pastOut  : ∀ {k a r q b} → Has (force r) q b → Has (out k a r) q b
+    pastSkip : ∀ {k r q b} → Has (force r) q b → Has (skip k r) q b
+
+  -- The record has sent `a` at `k`, on `k`'s tick.
+  data Sent : List Pos → List (Time × R) → Pos → R → Set where
+    sentHere  : ∀ {k a qs xs} → Sent (k ∷ qs) ((tick k , a) ∷ xs) k a
+    sentLater : ∀ {k a q x qs xs} → Sent qs xs k a → Sent (q ∷ qs) (x ∷ xs) k a
+
+  -- What the record owes: a cut record only what lies at or before one
+  -- of its marks; an ended or silent one everything.
+  Owed : End → List Pos → Pos → Set
+  Owed (cutOff _) qs k = Any (k ≤ᵖ_) qs
+  Owed _          qs k = ⊤
+
+  -- How each end is matched: finished at the events' `end`, its mark
+  -- among the record's; dry over events with nothing past the marks;
+  -- cut owes nothing.
+  Ending : End → List Pos → Events R → Set
+  Ending finished   qs e = Σ Pos λ q → Has e q nothing × Any (q ≡_) qs
+  Ending dry        qs e = ∀ {k b} → Has e k b → Any (k ≤ᵖ_) qs
+  Ending (cutOff _) qs e = ⊤
+
+  -- The record and the events alike as sets: every value sent is an
+  -- event at its mark; every event owed was sent; the record ends as the
+  -- events do.
+  record Alike (en : End) (qs : List Pos) (xs : List (Time × R)) (e : Events R) : Set where
+    field
+      sound : ∀ {k a} → Sent qs xs k a → Has e k (just a)
+      whole : ∀ {k a} → Has e k (just a) → Owed en qs k → Sent qs xs k a
+      ended : Ending en qs e
+
 
   postulate
     -- A subscription honest to a meaning: whatever observer it is handed,
@@ -78,3 +125,40 @@ module Honesty (R : Set) where
   postulate
     -- The empty environments are honest to each other.
     honest-[] : ∀ {w} → HonestEnv {[]} {w} _ []
+
+  ----------------------------------------------------------------------
+  -- THE ASSEMBLY: from an honest launch to an alike record
+
+  -- A configuration reached from an honest launch, by the machine's own
+  -- steps.
+  data Reached (e : Events R) : Mach → Set₁ where
+    launchedʰ : ∀ {s M} → Honest {R} s M → e ≡ observe M root → Reached e (launch s recorder)
+    silentʰ   : ∀ {m m′} → Reached e m → step m ≡ silent m′ → Reached e m′
+    valueʰ    : ∀ {m m′ t p a} → Reached e m → step m ≡ value t p a m′ → Reached e m′
+
+  -- How a configuration's record stands: cut at its clock, or the run
+  -- complete or drained there.
+  data Stands (m : Mach) : End → Set₁ where
+    cutʰ  : Stands m (cutOff (Mach.clock m))
+    finʰ  : ∀ {p} → step m ≡ complete p → Stands m finished
+    dryʰ  : step m ≡ drained → Stands m dry
+
+  postulate
+    -- THE MACHINE'S CONTENT: a configuration reached from an honest
+    -- launch keeps a record alike its meaning's events, however it stands.
+    kept : ∀ {e m en} → Reached e m → Stands m en → Alike en (Mach.marks m) (Mach.log m) e
+
+    -- The first n steps, read, are the record of the configuration n
+    -- steps on.
+    read-is-kept : ∀ {e m} (r : Reached e m) n → Σ Mach λ m′ → Σ (Reached e m′) λ _ → Σ End λ en → Stands m′ en
+                 × reading n 0 (trace m) ≡ read (Mach.marks m′) (Mach.log m′) en
+
+  -- The configuration's record, read.
+  alike-read : ∀ {e m} (r : Reached e m) n → let x = reading n 0 (trace m) in Alike (ending x) (marks x) (log x) e
+  alike-read r n with read-is-kept r n
+  ... | m′ , r′ , en , st , eq rewrite eq = kept r′ st
+
+  -- CONTENT: every prefix's record alike the meaning's events as a set:
+  -- the compiled tree honest to its meaning, kernel by kernel, launched.
+  content : (o : PureObs [] R) (n : ℕ) → let x = reading n 0 (trace (begin o)) in Alike (ending x) (marks x) (log x) (observe (⟦ o ⟧ []) root)
+  content o n = alike-read (launchedʰ (compile-honest o [] [] honest-[]) refl) n

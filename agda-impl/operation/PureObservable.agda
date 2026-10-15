@@ -1,68 +1,24 @@
 {-# OPTIONS --guardedness --large-indices #-}
 
--- THE PURE RUNTIME'S DATA.  A heap and a virtual clock, which
--- `operation.Machine` steps.  A cold leaf is a timeline relative to its
--- subscribe time, so the program itself says when everything happens:
--- there is no separate schedule, and quantifying over programs covers
--- every ordering.
---
--- The heap is TYPED BY ITS WORLD: a list saying what each entry is, so
--- reading a cell returns its content at its own type with no cast.
--- `--large-indices` only because the world lists codes, which live in
--- `Set₁`, and a name is a position in it.
+-- THE PURE RUNTIME'S OWN PARTS.  The heap and the machine are shared
+-- (`operation.AbstractObservable`'s `Heap` and `Machine`); what is the
+-- pure runtime's alone is its cold, a timeline relative to its subscribe
+-- time, its virtual clock and timers, and its native effect, the root's
+-- record.  So the program itself says when everything happens: there is
+-- no separate schedule, and quantifying over programs covers every
+-- ordering.  `operation.Machine` is the driver that plays them.
 module operation.PureObservable where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; [])
-open import Data.List.Relation.Unary.All using (All; _∷_; [])
+open import Data.List.Relation.Unary.All using (_∷_; [])
 open import Data.Nat using (ℕ; _≤ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤; tt)
-open import Level using (Lift; lift; lower)
 
 open import Tree using (Obs)
-open import operation.AbstractObservable using (Ty; Prims; module Run)
+open import operation.AbstractObservable using (Prims; prims; module Heap; module Run)
 open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last; root) renaming (sub to subᴾ)
-
-------------------------------------------------------------------------
--- Worlds
-
--- What one heap entry is: a cell, a registered observer, a started cold.
-data Kind : Set₁ where
-  cell : Ty → Kind
-  slot : Set → Kind
-  play : Kind
-
-World : Set₁
-World = List Kind
-
--- A name: a position in the world, newest first.
-data _∋_ : World → Kind → Set where
-  here  : ∀ {k w} → (k ∷ w) ∋ k
-  there : ∀ {j k w} → w ∋ k → (j ∷ w) ∋ k
-
--- A later world: this one, with entries made since.
-data _⊑_ : World → World → Set where
-  same : ∀ {w} → w ⊑ w
-  grow : ∀ {k w v} → w ⊑ v → w ⊑ (k ∷ v)
-
-infixr 5 _⨾_
-_⨾_ : ∀ {u v w} → u ⊑ v → v ⊑ w → u ⊑ w
-ρ ⨾ same   = ρ
-ρ ⨾ grow σ = grow (ρ ⨾ σ)
-
-wk∋ : ∀ {w v k} → w ⊑ v → w ∋ k → v ∋ k
-wk∋ same     i = i
-wk∋ (grow ρ) i = there (wk∋ ρ i)
-
-new : ∀ {k w} → w ⊑ (k ∷ w)
-new = grow same
-
-Sink : World → Set → Set
-Sink w A = w ∋ slot A
-
-Handle : World → Set
-Handle w = w ∋ play
 
 -- THE ROOT'S RECORD, kept by the runtime rather than in the heap: no
 -- `Act` can name it, so whatever runs, it only grows — a value is added
@@ -72,55 +28,20 @@ data Out (R : Set) : Set → Set where
   note : R → Out R ⊤
   fin  : Out R ⊤
 
--- Refs, sinks and handles are names in the world.  A pure observer's
--- only native effects are the record's.
+-- A pure observer's only native effects are the record's.
 Pureᴾ : Set → Prims
-Pureᴾ R = record
-  { World = World ; _⊑_ = _⊑_ ; ⊑-refl = same ; _⨾_ = _⨾_
-  ; RefOf = λ w t _ → w ∋ cell t ; Sink = Sink ; Handle = Handle
-  ; wkRef = λ _ → wk∋ ; wkSink = wk∋ ; wkHandle = wk∋
-  ; Cold = Timeline ; Eff = Out R }
+Pureᴾ R = prims Timeline (Out R)
 
 PureObs : List Set → Set → Set₁
 PureObs = Obs Timeline
 
 -- Everything run on behalf of a root observing `R`.
 module Pure (R : Set) where
+  open Heap
   open Run (Pureᴾ R)
 
   ------------------------------------------------------------------------
-  -- The heap
-
-  record Callbacks (A : Set) (h : World) : Set₁ where
-    field
-      onNext     : A → Act h ⊤
-      onComplete : Act h ⊤
-      isClosed   : Act h Bool
-
-  -- What an entry holds, in the world the heap has reached.  A started
-  -- cold holds whether it is spent.
-  Val : World → Kind → Set₁
-  Val h (cell t) = Lift _ (El h t)
-  Val h (slot A) = Callbacks A h
-  Val h play     = Lift _ Bool
-
-  wkVal : ∀ {h v} k → h ⊑ v → Val h k → Val v k
-  wkVal (cell t) ρ x  = lift (wkEl t ρ (lower x))
-  wkVal (slot A) ρ cb = record { onNext = λ a → wkAct ρ (Callbacks.onNext cb a) ; onComplete = wkAct ρ (Callbacks.onComplete cb)
-                               ; isClosed = wkAct ρ (Callbacks.isClosed cb) }
-  wkVal play     ρ x  = x
-
-  get : ∀ {ℓ} {P : Kind → Set ℓ} {w k} → All P w → w ∋ k → P k
-  get (x ∷ xs) here      = x
-  get (x ∷ xs) (there i) = get xs i
-
-  put : ∀ {ℓ} {P : Kind → Set ℓ} {w k} → All P w → w ∋ k → P k → All P w
-  put (x ∷ xs) here      y = y ∷ xs
-  put (x ∷ xs) (there i) y = x ∷ put xs i y
-
-  wkAll : ∀ {h v} {w} → h ⊑ v → All (Val h) w → All (Val v) w
-  wkAll ρ []                 = []
-  wkAll ρ (_∷_ {x = k} x xs) = wkVal k ρ x ∷ wkAll ρ xs
+  -- The clock's timers
 
   -- A frame of a started cold, due on the clock.  `at` is the frame's
   -- tick on the cold's own timeline, to time the frame after it; `from`
@@ -143,24 +64,9 @@ module Pure (R : Set) where
   cascade : ∀ {h} → Timer h → Pos
   cascade tm = ix (Timer.due tm) ∷ subᴾ (Timer.from tm) ∷ []
 
-  record State (h : World) : Set₁ where
-    field
-      heap   : All (Val h) h
-      clock  : ℕ
-      timers : List (Timer h)
-      log    : List (Time × R)     -- the root's record
-      ended  : Bool                -- whether the root has completed
-      pos    : Pos                 -- where the run is: a ghost
-      marks  : List Pos            -- where each entry of the record was made: a ghost
-
   mapList : ∀ {a b} {X : Set a} {Y : Set b} → (X → Y) → List X → List Y
   mapList f []       = []
   mapList f (x ∷ xs) = f x ∷ mapList f xs
-
-  -- The state, after making an entry holding `x`.
-  extend : ∀ {h k} → State h → Val (k ∷ h) k → State (k ∷ h)
-  extend st x = record { heap = x ∷ wkAll new (State.heap st) ; clock = State.clock st ; timers = mapList (wkTimer new) (State.timers st)
-                       ; log = State.log st ; ended = State.ended st ; pos = State.pos st ; marks = State.marks st }
 
   -- After every timer due no later: two timers due together fire in the
   -- order they were set.
@@ -212,6 +118,3 @@ module Pure (R : Set) where
     ; complete = eff fin λ _ → done tt
     ; closed   = done false }
 
-
-  start : State []
-  start = record { heap = [] ; clock = 0 ; timers = [] ; log = [] ; ended = false ; pos = root ; marks = [] }

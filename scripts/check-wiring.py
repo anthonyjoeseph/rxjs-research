@@ -1156,6 +1156,11 @@ def eta_target(inner):
     return head.group(0)
 
 
+# Tokens that end an application: what follows is not an argument of the
+# postulate but the rest of a chain (`readIORef r >>= λ x → f x`) or a branch.
+_APP_END = {">>=", ">>", "$", "\u2192", "\u03bb", "\\", "then", "else", "in", "let", "where", "with", "|"}
+
+
 def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
     """R2's suppression set: (file, line) -> {names passed as BARE arguments
     to an applied postulate}.
@@ -1237,8 +1242,8 @@ def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
                             k = k2
                             continue
                         mm = re.match(r"[^\s(){}\[\],;]+", expr[k:])
-                        if not mm:
-                            break
+                        if not mm or mm.group(0) in _APP_END:
+                            break                     # an infix bind, a lambda, a branch
                         for (ln, _t) in span:
                             suppressed[(relpath, ln)].add(mm.group(0))
                         k += mm.end()

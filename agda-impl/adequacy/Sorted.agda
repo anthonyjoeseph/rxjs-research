@@ -19,17 +19,21 @@ module adequacy.Sorted where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (maybe)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs)
+open import Level using (Lift)
 open import Data.Product using (_×_; _,_; Σ)
-open import Data.Sum using (_⊎_)
-open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.Sum using (_⊎_; inj₁)
+open import Data.Unit using (⊤; tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (Pos; Label; ix; last; root; _<ᵖ_)
-open import operation.AbstractObservable using (module Run)
-open import operation.PureObservable using (World; _⊑_; PureObs; Pureᴾ; Out; note; fin; module Pure)
+open import denotation.MonotonicList using (Pos; ix; root; _<ᵖ_; Timeline)
+open import operation.AbstractObservable using (module Run; module Heap) renaming (module Machine to Shared)
+open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
+open Heap using (World; _⊑_; same)
 open import operation.Machine using (module Machine)
 
 ------------------------------------------------------------------------
@@ -48,11 +52,12 @@ Settled : Pos → Pos → Pos → Set
 Settled p lo lo′ = lo ≤ᵖ lo′ × (lo ≡ lo′ ⊎ Under p lo′)
 
 module Sorting (R : Set) where
-  open Machine R using (Mach; ⟨_,_⟩; Ctl; run; ret; burst; turn; Stack; loop; push; Wait; rest; back; asked; sent
-                       ; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read)
+  open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; begin; launch; reading; Read)
+  open Shared Timeline (Out R) using (Conf; ⟨_,_,_⟩; Ctl; run; ret; held; asking; Stack; bottom; push; Wait; rest; back; rehold; told
+                                     ; Heapᴹ; Callbacks; cbs)
   open Run (Pureᴾ R) using (Act; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; eff; here; under; diverge; unfold
                            ; Observer; Subscribe; Kont; Env; compile; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via)
-  open Pure R using (State; recorder)
+  open Pure R using (Timer; cascade; recorder)
   open Read
 
   ----------------------------------------------------------------------
@@ -167,31 +172,114 @@ module Sorting (R : Set) where
   ----------------------------------------------------------------------
   -- THE WALK: a well configuration rises
 
-  -- The machine's configuration well: the running computation, every
-  -- frame waiting on the stack, every callback the heap holds, and every
-  -- timer queued past every position shown.
+  -- What waits on the stack, well: each continuation well where it
+  -- resumes, given the last delivery no later than there.
+  data WellStack {w} (p : Pos) : ∀ {X} → Stack w X → Set₁ where
+    bottomʷ : WellStack p bottom
+    restʷ   : ∀ {u B Y} {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → (∀ lo → lo ≤ᵖ p → Well p lo m) → WellStack p k → WellStack p (push (rest m) ρ k)
+    backʷ   : ∀ {u B} q {m : Act w B} {ρ : u ⊑ w} {k : Stack u B} → (∀ lo → lo ≤ᵖ q → Well q lo m) → WellStack q k → WellStack p (push (back q m) ρ k)
+    reholdʷ : ∀ {u} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p k → WellStack p (push rehold ρ k)
+    toldʷ   : ∀ {u} {ρ : u ⊑ w} {k : Stack u ⊤} → WellStack p k → WellStack p (push told ρ k)
+
+  -- What runs next, well at the configuration's position.
+  data WellCtl {h} (lo p : Pos) : Ctl h → Set₁ where
+    runʷ    : ∀ {w B a} {σ : w ⊑ h} {k : Stack w B} → Well p lo a → WellStack p k → WellCtl lo p (run a σ k)
+    retʷ    : ∀ {w X x} {σ : w ⊑ h} {k : Stack w X} → WellStack p k → WellCtl lo p (ret x σ k)
+    heldʷ   : ∀ {w} {σ : w ⊑ h} {k : Stack w ⊤} → WellStack p k → WellCtl lo p (held σ k)
+    askingʷ : ∀ {w X B e k′} {σ : w ⊑ h} {k : Stack w B} → (∀ x → Well p p (k′ x)) → WellStack p k → WellCtl lo p (asking {X = X} e k′ σ k)
+
+  -- Every observer the heap holds, well.
+  WellHeap : ∀ {h} → Heapᴹ h → Set₁
+  WellHeap {h} hp = ∀ {A} (s : _) → WellObs {A} {h} (record { next = Callbacks.onNext (cbs hp s) ; complete = Callbacks.onComplete (cbs hp s)
+                                                           ; closed = Callbacks.isClosed (cbs hp s) })
+
+  -- The run well: the running computation and every frame waiting on
+  -- the stack, every callback the heap holds, every burst playing past
+  -- every position shown.
+  record WellRun (lo : Pos) (m : Mach) : Set₁ where
+    field
+      ctl    : WellCtl lo (Conf.pos (Mach.conf m)) (Conf.ctl (Mach.conf m))
+      heap   : WellHeap (Conf.heap (Mach.conf m))
+      bursts : All (maybe (λ b → lo ≤ᵖ Playing.under′ b) (Lift _ ⊤)) (Mach.bursts m)
+
+  -- One timer pops before another: its cascade is the earlier, so two
+  -- due on one tick pop in the order of the positions they were set at.
+  Before : ∀ {h} → Timer h → Timer h → Set
+  Before tm t′ = cascade tm <ᵖ cascade t′ ≡ true
+
+  -- The queue well: every timer past every position shown, and in the
+  -- order they pop.
+  record WellQueue (lo : Pos) (m : Mach) : Set₁ where
+    field
+      timers : All (λ tm → lo <ᵖ cascade tm ≡ true) (Mach.timers m)
+      queued : AllPairs Before (Mach.timers m)
+
+  record WellMach (lo : Pos) (m : Mach) : Set₁ where
+    field
+      run   : WellRun lo m
+      queue : WellQueue lo m
+
+  -- One step, its next configuration `P` and never earlier.
+  data StepBy (P : Pos → Mach → Set₁) (lo : Pos) : Step → Set₁ where
+    silentʷ   : ∀ {m} → P lo m → StepBy P lo (silent m)
+    valueʷ    : ∀ {t p a m} → lo ≤ᵖ p → P p m → StepBy P lo (value t p a m)
+    completeʷ : ∀ {p} → lo ≤ᵖ p → StepBy P lo (complete p)
+    drainedʷ  : StepBy P lo drained
+
+  WellStep : Pos → Step → Set₁
+  WellStep = StepBy WellMach
+
+  joinʷ : ∀ {lo s} → StepBy WellRun lo s → StepBy WellQueue lo s → WellStep lo s
+  joinʷ (silentʷ r)     (silentʷ q)     = silentʷ (record { run = r ; queue = q })
+  joinʷ (valueʷ le r)   (valueʷ _ q)    = valueʷ le (record { run = r ; queue = q })
+  joinʷ (completeʷ le)  (completeʷ _)   = completeʷ le
+  joinʷ drainedʷ        drainedʷ        = drainedʷ
+
+  -- The loop's turn: held, nothing playing, so the next step pops a timer.
+  idle : Mach → Bool
+  idle m with Conf.ctl (Mach.conf m) | Mach.bursts m
+  ... | held _ _ | [] = true
+  ... | _        | _  = false
+
   postulate
-    WellMach : Pos → Mach → Set₁
+    -- THE TREE WALK: a step that is not the loop's turn runs the
+    -- computation, or plays a burst, at the configuration's position;
+    -- the protocol's indices carry the last delivery, so the run stays
+    -- well and a value shown is no earlier than the last.
+    walk-tree : ∀ {lo m} → WellMach lo m → idle m ≡ false → StepBy WellRun lo (step m)
 
-  -- One step of a well configuration: well again, never earlier.
-  data WellStep (lo : Pos) : Step → Set₁ where
-    silentʷ   : ∀ {m} → WellMach lo m → WellStep lo (silent m)
-    valueʷ    : ∀ {t p a m} → lo ≤ᵖ p → WellMach p m → WellStep lo (value t p a m)
-    completeʷ : ∀ {p} → lo ≤ᵖ p → WellStep lo (complete p)
-    drainedʷ  : WellStep lo drained
+    -- THE TIMERS: a step that is not the loop's turn shows values only
+    -- under the playing burst's cascade, so every timer queued stays past
+    -- them; a timer it sets is queued at its due tick after every timer
+    -- set earlier on that tick.
+    walk-timers : ∀ {lo m} → WellMach lo m → idle m ≡ false → StepBy WellQueue lo (step m)
 
-  postulate
-    -- The machine's fundamental lemma: a well configuration's step keeps
-    -- it well, and a value it shows is no earlier than the last.
-    --
-    -- The timers are here: a turn's cascade, `ix due ∷ sub from ∷ []`,
-    -- must be past every position shown, so same-tick timers pop in the
-    -- order of the positions they were set at.
-    preserve : ∀ {lo m} → WellMach lo m → WellStep lo (step m)
+    -- THE LOOP'S TURN: the earliest timer popped, its frame played from
+    -- its cascade, which every other timer is past.
+    turn : ∀ {lo m} → WellMach lo m → idle m ≡ true → WellStep lo (step m)
 
-    -- The run begins well: the program compiled at the root, the
-    -- recorder its observer.
-    begin-well : (o : PureObs [] R) → WellMach root (begin o)
+  walk : ∀ {lo m} → WellMach lo m → idle m ≡ false → WellStep lo (step m)
+  walk w b = joinʷ (walk-tree w b) (walk-timers w b)
+
+  -- The machine's fundamental lemma: a well configuration's step keeps
+  -- it well, and a value it shows is no earlier than the last.
+  preserve : ∀ {lo m} → WellMach lo m → WellStep lo (step m)
+  preserve {m = m} w with idle m in eq
+  ... | true  = turn w eq
+  ... | false = walk w eq
+
+  -- The recorder is well: a value or completion at no earlier a position.
+  recorder-well : WellObs recorder
+  recorder-well = (λ a q lo le → noteʷ le doneʷ) , (λ q lo le → finʷ le) , (λ q lo → doneʷ)
+
+  -- The run begins well: the program compiled at the root, the recorder
+  -- its observer, nothing on the heap, queued or playing.
+  begin-well : (o : PureObs [] R) → WellMach root (begin o)
+  begin-well o = record
+    { run   = record { ctl    = runʷ (compile-well o [] tt same recorder _ root root (inj₁ refl) recorder-well (λ σ sub p lo → doneʷ)) bottomʷ
+                     ; heap   = λ ()
+                     ; bursts = [] }
+    ; queue = record { timers = [] ; queued = AllPairs.[] } }
 
   mutual
     rising : ∀ {lo m} → WellMach lo m → Rising lo m
