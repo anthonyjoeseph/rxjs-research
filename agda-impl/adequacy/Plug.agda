@@ -8,17 +8,19 @@ module adequacy.Plug where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
+import Data.List.Relation.Unary.All as AllP
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; Σ)
-open import Data.Unit.Polymorphic using (⊤)
+open import Data.Unit.Polymorphic using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 import Tree as T
-open import denotation.MonotonicList using (Pos; ix; _<ᵖ_)
+open import denotation.MonotonicList using (Pos; ix; last; _<ᵖ_; <ᵖ-asym; <ᵖ-++ʳ)
 open import denotation.Unfold using (Node; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; connectᶜ; live; ended; feed; shut
                                     ; Step; outˢ; skipˢ; endˢ; hushˢ; headˢ; step; mapˢ; scanˢ; takeWhileˢ; outerˢ; laneˢ
-                                    ; bodyˢ; shutˢᵗ; sourceˢ; beforeˢ; raceˢ; goˢ; Earliest; none; found; pick; earliest)
+                                    ; bodyˢ; shutˢᵗ; sourceˢ; beforeˢ; raceˢ; goˢ; Earliest; none; found; pick; earliest; taking; admit)
 
 data Nope : Set₁ where
 
@@ -241,3 +243,155 @@ skip-lifts []      k n = k , n , refl
 skip-lifts (F ∷ C) k n with skip-liftsF F k n
 ... | k₁ , n₁ , e with skip-lifts C k₁ n₁
 ...   | k′ , c , e′ = k′ , c , trans (cong (lift C) e) e′
+
+------------------------------------------------------------------------
+-- Every sibling beyond the hole's root
+
+-- Strictly after everything at or under `r`.
+Beyond : Pos → Maybe Pos → Set
+Beyond r nothing   = ⊤
+Beyond r (just k′) = ∀ x → (r ++ x) <ᵖ k′ ≡ true
+
+Beyondᴺ : ∀ {Γ A} → Pos → Node Γ A → Set
+Beyondᴺ r n = Beyond r (headˢ (step n))
+
+OuterB : ∀ {Γ A} → Pos → Maybe (Node Γ A) → Set
+OuterB r nothing  = ⊤
+OuterB r (just o) = Beyondᴺ r o
+
+-- Every sibling a frame holds waits beyond `r`.
+ClearF : ∀ {Γ A Δ B} → Pos → Frame Γ A Δ B → Set₁
+ClearF r (outerF op g ls qs)     = All (Beyondᴺ r) ls
+ClearF r (laneF op g o bs as qs) = OuterB r o × All (Beyondᴺ r) bs × All (Beyondᴺ r) as
+ClearF r (bodyF src)             = Beyondᴺ r src × ⊤
+ClearF r (srcF b)                = Beyondᴺ r b × ⊤
+ClearF r _                       = ⊤
+
+Clear : ∀ {Γ A Δ B} → Pos → Ctx Γ A Δ B → Set₁
+Clear r []      = ⊤
+Clear r (F ∷ C) = ClearF r F × Clear r C
+
+-- A lift keeps a step's head or moves it under it.
+Ext : Pos → Maybe Pos → Set
+Ext k m = Σ Pos λ y → m ≡ just (k ++ y)
+
+private
+  kept-at : ∀ k → Ext k (just k)
+  kept-at k = [] , cong just (sym (++-identityʳ k))
+
+  under : ∀ k y → Ext k (just (k ++ y))
+  under k y = y , refl
+
+  taking-head : ∀ {Γ A} i (p : A → Bool) k a (c : Node Γ A) t → Ext k (headˢ (taking i p k a c t))
+  taking-head i     p k a c true  = kept-at k
+  taking-head true  p k a c false = kept-at k
+  taking-head false p k a c false = under k [ last ]
+
+  outer-head : ∀ {Γ A B} op (g : A → Pos → Node Γ B) (s : Step Γ A) ls qs {k} → headˢ s ≡ just k
+             → Ext k (headˢ (outerˢ op g s ls qs))
+  outer-head op g (outˢ q a o) ls qs refl with admit op g (q ++ [ ix 1 ]) a ls qs
+  ... | _ , _ = under q [ ix 0 ]
+  outer-head op g (skipˢ q o) ls       qs      refl = kept-at q
+  outer-head op g (endˢ c)    []       []      refl = kept-at c
+  outer-head op g (endˢ c)    []       (_ ∷ _) refl = kept-at c
+  outer-head op g (endˢ c)    (_ ∷ _)  qs      refl = kept-at c
+  outer-head op g hushˢ       ls       qs      ()
+
+  lane-head : ∀ {Γ A B} op (g : A → Pos → Node Γ B) o bs (s : Step Γ B) as qs {k} → headˢ s ≡ just k
+            → Ext k (headˢ (laneˢ op g o bs s as qs))
+  lane-head op g o        bs      (outˢ k b c)  as      qs       refl = kept-at k
+  lane-head op g o        bs      (skipˢ k c)   as      qs       refl = kept-at k
+  lane-head op g o        bs      (endˢ c)      as      (_ ∷ _)  refl = under c [ ix 0 ]
+  lane-head op g nothing  []      (endˢ c)      []      []       refl = kept-at c
+  lane-head op g nothing  []      (endˢ c)      (_ ∷ _) []       refl = kept-at c
+  lane-head op g nothing  (_ ∷ _) (endˢ c)      as      []       refl = kept-at c
+  lane-head op g (just o) bs      (endˢ c)      as      []       refl = kept-at c
+  lane-head op g o        bs      hushˢ         as      qs       ()
+
+  src-head : ∀ {Γ A B} (b : Node (A ∷ Γ) B) (s : Step Γ A) {k} → headˢ s ≡ just k → Ext k (headˢ (srcWin b s))
+  src-head b (outˢ q a s′) refl = under q [ ix 0 ]
+  src-head b (skipˢ q s′)  refl = under q [ ix 0 ]
+  src-head b (endˢ c)      refl = under c [ ix 0 ]
+  src-head b hushˢ         ()
+
+liftF-head : ∀ {Γ A Δ B} (F : Frame Γ A Δ B) (s : Step Γ A) {k} → headˢ s ≡ just k → Ext k (headˢ (liftF F s))
+liftF-head (mapF f)                (outˢ k a c) refl = kept-at k
+liftF-head (mapF f)                (skipˢ k c)  refl = kept-at k
+liftF-head (mapF f)                (endˢ k)     refl = kept-at k
+liftF-head (scanF f z)             (outˢ k a c) refl = kept-at k
+liftF-head (scanF f z)             (skipˢ k c)  refl = kept-at k
+liftF-head (scanF f z)             (endˢ k)     refl = kept-at k
+liftF-head (takeF i p)             (outˢ k a c) refl = taking-head i p k a c (p a)
+liftF-head (takeF i p)             (skipˢ k c)  refl = kept-at k
+liftF-head (takeF i p)             (endˢ k)     refl = kept-at k
+liftF-head (outerF op g ls qs)     s            h    = outer-head op g s ls qs h
+liftF-head (laneF op g o bs as qs) s            h    = lane-head op g o bs s as qs h
+liftF-head (bodyF src)             (outˢ k a c) refl = kept-at k
+liftF-head (bodyF src)             (skipˢ k c)  refl = kept-at k
+liftF-head (bodyF src)             (endˢ k)     refl = kept-at k
+liftF-head (endedF e)              (outˢ k a c) refl = kept-at k
+liftF-head (endedF e)              (skipˢ k c)  refl = kept-at k
+liftF-head (endedF e)              (endˢ k)     refl = kept-at k
+liftF-head (srcF b)                s            h    = src-head b s h
+liftF-head _                       hushˢ        ()
+
+private
+  later-of : ∀ r x m → Beyond r m → Later (r ++ x) m
+  later-of r x nothing   _ = tt
+  later-of r x (just k′) b = b x
+
+  nb-of : ∀ r x m → Beyond r m → NotBefore (r ++ x) m
+  nb-of r x nothing   _ = tt
+  nb-of r x (just k′) b = <ᵖ-asym (r ++ x) k′ (b x)
+
+  outer-nb : ∀ {Γ A} r x (o : Maybe (Node Γ A)) → OuterB r o → OuterNB (r ++ x) o
+  outer-nb r x nothing  _ = tt
+  outer-nb r x (just o) b = nb-of r x (headˢ (step o)) b
+
+  before-head : ∀ {Γ B} q (s : Step Γ B) {k} → headˢ s ≡ just k → beforeˢ q s ≡ q <ᵖ k
+  before-head q (outˢ k _ _) refl = refl
+  before-head q (skipˢ k _)  refl = refl
+  before-head q (endˢ k)     refl = refl
+  before-head q hushˢ        ()
+
+  past : ∀ {Γ B} r x q (s : Step Γ B) → (∀ y → (r ++ y) <ᵖ q ≡ true) → headˢ s ≡ just (r ++ x) → beforeˢ (q ++ [ ix 0 ]) s ≡ false
+  past r x q s b h = trans (before-head (q ++ [ ix 0 ]) s h) (<ᵖ-asym (r ++ x) (q ++ [ ix 0 ]) (<ᵖ-++ʳ (r ++ x) q [ ix 0 ] (b x)))
+
+  src-after : ∀ {Γ A B} r x (ss : Step Γ A) (s : Step (A ∷ Γ) B) → Beyond r (headˢ ss) → headˢ s ≡ just (r ++ x) → SrcAfter ss s
+  src-after r x (outˢ q _ _) s b h = past r x q s b h
+  src-after r x (skipˢ q _)  s b h = past r x q s b h
+  src-after r x (endˢ c)     s b h = past r x c s b h
+  src-after r x hushˢ        s b h = tt
+
+  first-of : ∀ {Γ B} r x (sb : Step Γ B) → Beyond r (headˢ sb) → beforeˢ ((r ++ x) ++ [ ix 0 ]) sb ≡ true
+  first-of r x (outˢ k _ _) b rewrite ++-assoc r x [ ix 0 ] = b (x ++ [ ix 0 ])
+  first-of r x (skipˢ k _)  b rewrite ++-assoc r x [ ix 0 ] = b (x ++ [ ix 0 ])
+  first-of r x (endˢ k)     b rewrite ++-assoc r x [ ix 0 ] = b (x ++ [ ix 0 ])
+  first-of r x hushˢ        b = refl
+
+  src-first : ∀ {Γ A B} r x (sb : Step (A ∷ Γ) B) (s : Step Γ A) → Beyond r (headˢ sb) → headˢ s ≡ just (r ++ x) → SrcFirst sb s
+  src-first r x sb (outˢ q _ _) b refl = first-of r x sb b , tt
+  src-first r x sb (skipˢ q _)  b refl = first-of r x sb b , tt
+  src-first r x sb (endˢ c)     b refl = first-of r x sb b , tt
+  src-first r x sb hushˢ        b ()
+
+  clear-winsF : ∀ {Γ A Δ B} r x (F : Frame Γ A Δ B) (s : Step Γ A) → ClearF r F → headˢ s ≡ just (r ++ x) → WinsF F s
+  clear-winsF r x (outerF op g ls qs) s cf h =
+    subst (λ m → HeadIs m λ k → All (λ l → Later k (headˢ (step l))) ls) (sym h)
+      (AllP.map (λ {l} → later-of r x (headˢ (step l))) cf)
+  clear-winsF r x (laneF op g o bs as qs) s (ob , cbs , cas) h =
+    subst (λ m → HeadIs m λ k → OuterNB k o × All (λ l → NotBefore k (headˢ (step l))) bs × All (λ l → Later k (headˢ (step l))) as) (sym h)
+      (outer-nb r x o ob , AllP.map (λ {l} → nb-of r x (headˢ (step l))) cbs , AllP.map (λ {l} → later-of r x (headˢ (step l))) cas)
+  clear-winsF r x (bodyF src)  s (b , _) h = src-after r x (step src) s b h , tt
+  clear-winsF r x (srcF b)     s (cb , _) h = src-first r x (step b) s cb h
+  clear-winsF r x (mapF f)     s _ _ = tt
+  clear-winsF r x (scanF f z)  s _ _ = tt
+  clear-winsF r x (takeF i p)  s _ _ = tt
+  clear-winsF r x (endedF c)   s _ _ = tt
+
+-- EVERY SIBLING BEYOND THE ROOT, THE HOLE WINS: whatever it steps at
+-- under `r`, each lift keeps under `r`.
+clear-wins : ∀ {Γ A Δ B} r x (C : Ctx Γ A Δ B) (s : Step Γ A) → Clear r C → headˢ s ≡ just (r ++ x) → Wins C s
+clear-wins r x []      s _         _ = tt
+clear-wins r x (F ∷ C) s (cf , cc) h with liftF-head F s h
+... | y , e = clear-winsF r x F s cf h , clear-wins r (x ++ y) C (liftF F s) cc (trans e (cong just (++-assoc r x y)))

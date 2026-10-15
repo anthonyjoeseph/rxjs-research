@@ -174,9 +174,10 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
 - **B'S POSITIONAL FIELD.** `Carried` owns every node due before the next
   turn; it gains a field placing every live node's next shown event past the
   region the agenda owes, true at `carried-begin`. A popped timer's first
-  step, `ahead` with the cold still waiting, is its first test: the agenda
-  is empty, so every open node waits past the timer's cascade; `burst-emit`
-  lands on it as the stall did. Then the feed's case of `kept-run`. The meaning feeds its joiners
+  step is its first test: `cleared`, the agenda empty, so every sibling
+  waits on a later timer or never steps; `focused` as a body along the
+  path comes first, since `cleared` reads its context. Then `ahead-run`,
+  and `burst-emit` landing as the stall did. Then the feed's case of `kept-run`. The meaning feeds its joiners
   from one run of the source, as the machine's subject does, so a joiner
   holds exactly what the feed owes it (`Fed`). Decides whether the position
   order alone orders the meaning's leaves against the machine.
@@ -202,8 +203,10 @@ its leaves are `kept`, B kept and each one-sided wait finite (C), and
   next call or a subscription beginning; the connect's feed is here.
 - **`burst-emit`** (Kept) — FALSITY, `NO EVIDENCE`: a frame's value is the
   meaning's next event, every other open node past it.
-- **`ahead`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's burst wins
-  every comparison on its path; every other open node waits past it.
+- **`cleared`** (Kept) — FALSITY, `NO EVIDENCE`: at a fire, every sibling on
+  the burst's path waits beyond the cascade.
+- **`ahead-run`** (Kept) — FALSITY, `NO EVIDENCE`: a cold started inline bursts
+  before every other open node's next event.
 - **`focused`** (Kept) — FALSITY, `NO EVIDENCE`: an unspent cold's burst sits
   in the meaning at a hole, its next step the frame's.
 - **`restalled`** (Kept) — FALSITY, `NO EVIDENCE`: after a stall, the meaning

@@ -19,10 +19,11 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; 
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; <⇒≤; ≤-reflexive)
+open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; <⇒≤; ≤-reflexive; <-irrefl)
+open import Data.Empty using (⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong; cong₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
@@ -236,6 +237,29 @@ private
   isLt-lt {eq} ()
   isLt-lt {gt} ()
 
+  ℕ-refl : ∀ n → cmpℕ n n ≡ eq
+  ℕ-refl n with n <ᵇ n in e
+  ... | true  = ⊥-elim (<-irrefl refl (<ᵇ⇒< n n (subst T (sym e) tt)))
+  ... | false = refl
+
+  mutual
+    label-refl : ∀ a → cmpLabel a a ≡ eq
+    label-refl (ix n)  = ℕ-refl n
+    label-refl (sub p) = pos-refl p
+    label-refl last    = refl
+
+    pos-refl : ∀ p → cmpPos p p ≡ eq
+    pos-refl []      = refl
+    pos-refl (a ∷ p) rewrite label-refl a | pos-refl p = refl
+
+  ext-pos : ∀ p q y → cmpPos p q ≡ lt → cmpPos p (q ++ y) ≡ lt
+  ext-pos []      (_ ∷ _) y h = refl
+  ext-pos []      []      y ()
+  ext-pos (_ ∷ _) []      y ()
+  ext-pos (a ∷ p) (b ∷ q) y h with lexi-lt (cmpLabel a b) (cmpPos p q) h
+  ... | inj₁ x       rewrite x = refl
+  ... | inj₂ (x , u) rewrite x = ext-pos p q y u
+
 <ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
 <ᵖ-trans p q r h₁ h₂ rewrite lt-pos p q r (isLt-lt h₁) (isLt-lt h₂) = refl
 
@@ -243,6 +267,17 @@ private
 <ᵖ-tick a b p q h with lexi-lt (cmpℕ a b) (cmpPos p q) (isLt-lt h)
 ... | inj₁ l       = <⇒≤ (lt-ℕ {a} {b} l)
 ... | inj₂ (e , _) = ≤-reflexive (eq-ℕ {a} {b} e)
+
+-- Strict: never both before and after.
+<ᵖ-asym : ∀ p q → p <ᵖ q ≡ true → q <ᵖ p ≡ false
+<ᵖ-asym p q h with q <ᵖ p in e
+... | false = refl
+... | true  with trans (sym (<ᵖ-trans p q p h e)) (cong isLt (pos-refl p))
+...   | ()
+
+-- Before a position, before everything under it.
+<ᵖ-++ʳ : ∀ p q y → p <ᵖ q ≡ true → p <ᵖ (q ++ y) ≡ true
+<ᵖ-++ʳ p q y h rewrite ext-pos p q y (isLt-lt h) = refl
 
 ------------------------------------------------------------------------
 -- What a subscriber sees

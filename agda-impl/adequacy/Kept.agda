@@ -29,14 +29,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 import Tree as T
 open import Tree using (Obs)
 open import denotation.MonotonicList using (Pos; Time; ix; Frame∞; _<ᵖ_; <ᵖ-trans; <ᵖ-tick; emit; stall; close) renaming (sub to subᴾ)
-open import denotation.Unfold using (Node; hushˢ; skipˢ; burstᶜ; burstˢ) renaming (step to stepᵁ)
+open import denotation.Unfold using (Node; hushˢ; skipˢ; burstᶜ; burstˢ; headˢ) renaming (step to stepᵁ)
 open import operation.AbstractObservable using (module Run)
 open import operation.PureObservable using (Pureᴾ; _⊑_; Sink; Handle; same; module Pure)
 open import operation.Machine using (module Machine)
 open import denotation.MonotonicList using (Frame; at)
 open import adequacy.Carrier using (module Carrying)
 open import adequacy.Wait using (module Waiting)
-open import adequacy.Plug using (Ctx; plug; lift; Wins; plug-step; skip-lifts)
+open import adequacy.Plug using (Ctx; plug; lift; Wins; plug-step; skip-lifts; Clear; clear-wins)
 
 module Keeping (R : Set) where
   open Run (Pureᴾ R) using (Act)
@@ -356,12 +356,34 @@ module Keeping (R : Set) where
     focused : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
             → Carried ⟨ st , burst s hd τ p i b σ K ⟩ c → spent? st hd ≡ false → Focus c p i b
 
-    -- B'S POSITIONAL FIELD AT A BURST: the frame's step comes before
-    -- every other open node's next event, read operator by operator up
-    -- the path.
-    ahead : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
-          → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) (sp : spent? st hd ≡ false)
-          → Wins (Focus.ctx (focused r sp)) (burstˢ (Focus.τ′ (focused r sp)) p i b)
+    -- B'S POSITIONAL FIELD AT A FIRE: nothing owed but the burst, every
+    -- other open node on the path waits beyond the cascade — it never
+    -- steps again, or it waits on a timer queued past this one.
+    cleared : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {c}
+            → (r : Carried ⟨ st , burst s hd τ p i b σ loop ⟩ c) (sp : spent? st hd ≡ false)
+            → Clear p (Focus.ctx (focused r sp))
+
+    -- B'S POSITIONAL FIELD AT A BURST UNDER A CALL: a cold started
+    -- inline, its frame before every other open node's next event, read
+    -- operator by operator up the path.
+    ahead-run : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {v Y x} {ρ : v ⊑ w}
+                  {K : Stack v Y} {c}
+              → (r : Carried ⟨ st , burst s hd τ p i b σ (push x ρ K) ⟩ c) (sp : spent? st hd ≡ false)
+              → Wins (Focus.ctx (focused r sp)) (burstˢ (Focus.τ′ (focused r sp)) p i b)
+
+  private
+    burst-head : ∀ {Δ A u} τ p i (b : Frame A u) → headˢ (burstˢ {Δ} τ p i b) ≡ just (p ++ [ ix i ])
+    burst-head τ p i (emit a k) = refl
+    burst-head τ p i (stall k)  = refl
+    burst-head τ p i (close k)  = refl
+
+  -- The frame's step comes before every other open node's next event.
+  ahead : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
+        → (r : Carried ⟨ st , burst s hd τ p i b σ K ⟩ c) (sp : spent? st hd ≡ false)
+        → Wins (Focus.ctx (focused r sp)) (burstˢ (Focus.τ′ (focused r sp)) p i b)
+  ahead {p = p} {i} {b} {K = loop} r sp = clear-wins p [ ix i ] ctx (burstˢ τ′ p i b) (cleared r sp) (burst-head τ′ p i b)
+    where open Focus (focused r sp)
+  ahead {K = push x ρ K} r sp = ahead-run r sp
 
   -- The meaning's step is the burst's, lifted to the root.
   aimed : ∀ {h} {st : State h} {w A u} {s : Sink h A} {hd : Handle h} {τ p i} {b : Frame A u} {σ : w ⊑ h} {K : Stack w ⊤} {c}
