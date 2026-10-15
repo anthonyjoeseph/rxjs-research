@@ -84,19 +84,36 @@ module Honesty (R : Set) where
   postulate
     -- A subscription honest to a meaning: whatever observer it is handed,
     -- subscribed at whatever position `p`, the machine's deliveries to it
-    -- are alike `observe m p` as a set, cut where its subscriber left.
-    -- A postulated TYPE, to be defined over the machine's histories.
+    -- are alike `observe m p` as a set, owed up to the position the run
+    -- has shown unless its subscriber left.  A postulated TYPE.
     --
     -- A kernel that reads its input's ORDER (`scan`, `takeWhile`, a
     -- flattening, `connect`) is owed its input's sortedness as well, as a
     -- `WellSub`: alike as a set and delivered in ascending position is
     -- the meaning's events in order.
     --
+    -- What a callback may deliver depends on the cells its kernel keeps,
+    -- and what it is owed on the run's position.  So honesty speaks of a
+    -- configuration, its position and its heap's cells, the subscription
+    -- open within it.
+    --
     -- DEAD ROUTE: honesty as a set alone, for an order-reading kernel.  An
     --   input delivering at `p ++ [ ix 1 ]` before `p ++ [ ix 0 ]` is alike
     --   as a set a meaning with those events ascending, and `scan` over it
     --   shows partial sums the meaning has not, so `scanᴷ-honest` from a
     --   set-honest input alone is false.
+    -- DEAD ROUTE: a unary relation over `Act` blind to the heap, each
+    --   delivery checked against the meaning alone.  `scanᴷ`'s `next` reads
+    --   its accumulator from a cell and delivers `f b a`; a relation whose
+    --   `readRef` case quantifies over every content must accept every `b`.
+    -- DEAD ROUTE: a sound half (each delivery an event) proven apart from a
+    --   whole half (each owed event delivered).  `scanᴷ`'s delivery at `q`
+    --   is an event only if its input delivered every event below `q`
+    --   first: the output's soundness is the input's wholeness.
+    -- DEAD ROUTE: an observer owed only what lies below its own marks.  A
+    --   merge's output owes an inner's event below the output's last mark
+    --   though that inner has delivered nothing near it, so
+    --   `flatMapᴷ-honest` from inners each cut at their own marks is false.
     Honest : ∀ {A w} → Subscribe A w → MonotonicList A → Set₁
 
     -- An environment honest to a denotational one: each `connect` in
