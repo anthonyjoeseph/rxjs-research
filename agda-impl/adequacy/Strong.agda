@@ -1258,7 +1258,7 @@ module Strongly (R : Set) where
   opens-subscribe (T.takeWhile i q s) p = opens-take i q _ (opens-subscribe s p)
   opens-subscribe (T.flatMap op f s)  p = opens-outer op (λ a q → U.subscribe (f a) q) (U.subscribe s p) _ (opens-subscribe s p)
   opens-subscribe (T.connect s b)     p =
-    opens-source (p ++ [ ix 1 ]) (U.subscribe b (p ++ [ ix 0 ])) _ (U.subscribe s (p ++ [ ix 1 ])) _ (opens-subscribe b (p ++ [ ix 0 ]))
+    opens-source (p ++ [ ix 1 ]) (U.subscribe b (p ++ [ ix 0 ])) _ (U.subscribe s (p ++ [ ix 1 ])) (U.step (U.subscribe s (p ++ [ ix 1 ]))) (opens-subscribe b (p ++ [ ix 0 ]))
   opens-subscribe (T.connected i)     p = tt
   opens-subscribe (T.defer l)         p = opens-++ p (ix 0)
 
