@@ -206,7 +206,7 @@ by their own silent steps (`Mirror`).
   is a body over `Carried.behind` (every node the ghost holds heads no
   earlier than the run) and `spread-past` (no sibling heads under the
   `of`'s base). A scope returning only lowers the position, so the
-  record's own producers are proven or `behind-fire`/`heads-begin`; the
+  record's own producers are proven or `behind-fire`; the
   risk left is each `under l` entry, owed inside the postulated hops
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
@@ -215,7 +215,7 @@ by their own silent steps (`Mirror`).
   values stay keyed apart from its source's later ones by weight (no
   position owns a lighter one) and the source alien to the joiner, or
   the source owes an order on its own tags. Then `spread-take`,
-  `spread-start`, then `ordered-connect`, `steady-connect`, reusing
+  then `ordered-connect`, `steady-connect`, reusing
   `Walk`. Ruled out: a connect owing more than `Rise` and the source's
   marks (`spread-connect` is a walk over `Walk.Side`); a lane owing more
   than its root's apartness; pins by position alone; a take owing more
@@ -232,8 +232,6 @@ by their own silent steps (`Mirror`).
   its source's, tagged with it, over a source alien to it.
 - **`spread-take`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a failing value
   kept just inside its position, which nothing its source left keys.
-- **`spread-start`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a cold leaf's
-  bursts siblings, each frame tagged by the close before it.
 - **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
   source steps merge into its body in order, the source's run past the body's
   end its tail.
@@ -252,8 +250,6 @@ by their own silent steps (`Mirror`).
   `of`'s path passes heads under its base; what a source fed, joiners took.
 - **`behind-fire`** (Content) — FALSITY, `NO EVIDENCE`: a timer popped at the
   turn, its fired cold heads no earlier than the run.
-- **`heads-begin`** (Strong) — FALSITY, `NO EVIDENCE`: a program subscribed at
-  the root heads no earlier than it.
 - **`shut-step`** (Content) — FALSITY, `NO EVIDENCE`: a connect past its
   source's end, an `of` in its body: the body shut steps as it does, shut
   after.

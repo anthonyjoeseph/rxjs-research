@@ -12,7 +12,7 @@ open import Data.List.Properties using (∷-injective; ∷-injectiveʳ; ++-assoc
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl; +-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
+open import Data.Nat.Properties using (≤-refl; +-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; +-monoˡ-≤; +-assoc; n≤1+n; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
@@ -5652,10 +5652,6 @@ trailing-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ 
               → Trailing (U.stateᴺ (U.subscribe o p) ρ)
 
 postulate
-  -- A COLD LEAF'S RUN SPREADS where a tick heads it: each burst's steps
-  -- siblings, each frame tagged by the close before it.
-  spread-start : ∀ {A} p (m : From A 0) → Headed p → Spread (M.start p m)
-
   -- A CUT SPREADS ITS SOURCE'S RUN: a failing value kept just inside its
   -- own position, which nothing its source left running keys.
   spread-take : ∀ {A} i (q : A → Bool) (e : Events A) c → Trail e c → Spread e → Spread (M.takeWhileᴱ i q e)
@@ -5672,6 +5668,106 @@ sibling-spread p {l} {l′} m m′ ne = disjoint-swap _ _ d₂ , proj₁ d₁
   where
     d₁ = apart-mark (p ++ [ l ]) (p ++ [ l′ ]) (ix 1) (ix-mark 1) (sibling p m′ ne , sibling p m (λ e → ne (sym e)))
     d₂ = apart-mark ((p ++ [ l′ ]) ++ [ ix 1 ]) (p ++ [ l ]) (ix 1) (ix-mark 1) (disjoint-swap _ _ d₁)
+
+weigh-++ : ∀ a b → weigh (a ++ b) ≡ weigh a + weigh b
+weigh-++ []      b = refl
+weigh-++ (l ∷ a) b = trans (cong (weighˡ l +_) (weigh-++ a b)) (sym (+-assoc (weighˡ l) (weigh a) (weigh b)))
+
+-- A position keyed under a value's lane shares its second label: a tag
+-- the value's own root holds, so smaller than it.
+second-sub : ∀ r i n e z → Prefix ((r ++ [ ix i ]) ++ [ ix 1 ]) (ix n ∷ sub e ∷ z) → weigh e < weigh r
+second-sub []           i n e z (_ , () , _)
+second-sub (a ∷ [])     i n e z (_ , () , _)
+second-sub (a ∷ b ∷ r′) i n e z (_ , refl , _) = ≤-trans (m≤m+n (suc (weigh e)) (weigh r′)) (m≤n+m _ (weighˡ a))
+
+-- After a value at `r ++ [ ix i ]` of a cold's burst: the burst's later
+-- steps its siblings, and every later frame rooted past the close, its
+-- root tagging the close before it, so heavier than the value's lane.
+module Apart {A : Set} (τ : ℕ) (r : Pos) (i : ℕ) where
+  private
+    X1 = (r ++ [ ix i ]) ++ [ ix 1 ]
+
+  data Chain : Pos → Set where
+    base : Chain (r ++ [ last ])
+    step : ∀ {e} n → Chain e → Chain (ix n ∷ sub e ∷ last ∷ [])
+
+  x1≡ : weigh X1 ≡ (weigh r + 1) + 1
+  x1≡ = trans (weigh-++ (r ++ [ ix i ]) [ ix 1 ]) (cong (_+ 1) (weigh-++ r [ ix i ]))
+
+  chain-weigh : ∀ {e} → Chain e → weigh r + 1 ≤ weigh e
+  chain-weigh base         = subst (_≤ weigh (r ++ [ last ])) (weigh-++ r [ last ]) ≤-refl
+  chain-weigh (step {e} n c) = ≤-trans (chain-weigh c) (≤-trans (m≤m+n (weigh e) 1) (≤-trans (n≤1+n _) (n≤1+n _)))
+
+  nested : ∀ {e} → Chain e → weigh e < weigh r → ⊥
+  nested c lt = <-irrefl refl (<-≤-trans lt (≤-trans (m≤m+n (weigh r) 1) (chain-weigh c)))
+
+  frame-big : ∀ {e} → Chain e → ∀ n {l} → Mark l → weigh X1 < weigh (ix n ∷ sub e ∷ l ∷ [])
+  frame-big {e} c n (ix-mark _) = subst (_< _) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
+  frame-big {e} c n last-mark   = subst (_< _) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
+
+  big : ∀ {h} → weigh X1 < weigh h → ¬ Owned h X1
+  big lt o = <-irrefl refl (<-≤-trans lt (owned-weigh _ _ o))
+
+  big-ext : ∀ {h} z → weigh X1 < weigh h → ¬ Owned (h ++ z) X1
+  big-ext {h} z lt = big (<-≤-trans lt (prefix-weigh h (h ++ z) (prefix-++ h z)))
+
+  no-own : ∀ {e} → Chain e → ¬ Owned X1 e
+  no-own base o = sibling r last-mark (λ ()) (owned-trans (r ++ [ ix i ]) X1 (r ++ [ last ]) (inj₁ (prefix-++ (r ++ [ ix i ]) [ ix 1 ])) o)
+  no-own (step {e} n c) (inj₁ q)        = nested c (second-sub r i n e _ q)
+  no-own (step n c)     (inj₂ (inj₁ o)) = no-own c o
+  no-own (step n c)     (inj₂ (inj₂ ()))
+
+  far : ∀ {e} → Chain e → ∀ n {l} → Mark l → ¬ Owned X1 (ix n ∷ sub e ∷ l ∷ ix 1 ∷ [])
+  far {e} c n m           (inj₁ q)        = nested c (second-sub r i n e _ q)
+  far c n m               (inj₂ (inj₁ o)) = no-own c o
+  far c n (ix-mark _)     (inj₂ (inj₂ ()))
+  far c n last-mark       (inj₂ (inj₂ ()))
+
+  frame-sp : ∀ {e} → Chain e → ∀ n {l} → Mark l → Sp (r ++ [ ix i ]) (ix n ∷ sub e ∷ l ∷ [])
+  frame-sp c n m = (big-ext [ ix 1 ] (frame-big c n m) , far c n m) , big (frame-big c n m)
+
+  mutual
+    frames-apart : ∀ {e t} → Chain e → Sp (r ++ [ ix i ]) e → (m : From A t) → Every (Sp (r ++ [ ix i ])) (M.frames τ e m)
+    frames-apart c ok M.done       = record { every = ok }
+    frames-apart c ok M.quiet      = record { every = tt }
+    frames-apart c ok (M.at t _ b) = chain-burst (τ + t) c 0 b
+
+    chain-burst : ∀ {e t} n → Chain e → ∀ j (b : M.Frame A t) → Every (Sp (r ++ [ ix i ])) (M.burst τ (ix n ∷ sub e ∷ []) j b)
+    every (chain-burst n c j (M.emit a k)) = frame-sp c n (ix-mark j) , chain-burst n c (suc j) (M.Frame∞.force k) , everyT-idle
+    every (chain-burst n c j (M.stall k))  = frame-sp c n (ix-mark j) , chain-burst n c (suc j) (M.Frame∞.force k) , everyT-idle
+    every (chain-burst n c j (M.close k))  =
+      frame-sp c n (ix-mark j) , frames-apart (step n c) (frame-sp c n last-mark) (M.From∞.force k) , everyT-idle
+
+  burst-apart : ∀ {t} j → i < j → (b : M.Frame A t) → Every (Sp (r ++ [ ix i ])) (M.burst τ r j b)
+  every (burst-apart j lt (M.emit a k)) = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) (M.Frame∞.force k) , everyT-idle
+    where sib : ∀ j → i < j → Sp (r ++ [ ix i ]) (r ++ [ ix j ])
+          sib j lt = sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
+  every (burst-apart j lt (M.stall k))  = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) (M.Frame∞.force k) , everyT-idle
+    where sib : ∀ j → i < j → Sp (r ++ [ ix i ]) (r ++ [ ix j ])
+          sib j lt = sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
+  every (burst-apart j lt (M.close k))  =
+    sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
+    , frames-apart base (sibling-spread r last-mark (ix-mark i) (λ ())) (M.From∞.force k) , everyT-idle
+
+-- A COLD LEAF'S RUN SPREADS: each burst's steps siblings, each frame
+-- tagged by the close before it.
+mutual
+  spread-frames : ∀ {A t} τ e (m : From A t) → Spread (M.frames τ e m)
+  spread-frames τ e M.done       = record { spread = tt }
+  spread-frames τ e M.quiet      = record { spread = tt }
+  spread-frames τ e (M.at t _ b) = spread-burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+
+  spread-burst : ∀ {A t} τ r i (b : M.Frame A t) → Spread (M.burst τ r i b)
+  spread (spread-burst τ r i (M.emit a k)) =
+    (Apart.burst-apart τ r i (suc i) ≤-refl (M.Frame∞.force k) , everyT-idle) , spread-burst τ r (suc i) (M.Frame∞.force k)
+  spread (spread-burst τ r i (M.stall k))  = spread-burst τ r (suc i) (M.Frame∞.force k)
+  spread (spread-burst τ r i (M.close k))  = spread-frames τ (r ++ [ last ]) (M.From∞.force k)
+
+spread-start : ∀ {A} p (m : From A 0) → Headed p → Spread (M.start p m)
+spread-start p (M.at zero _ b)    _ = spread-burst (tick p) p 0 b
+spread-start p (M.at (suc t) l b) _ = spread-frames (tick p) (p ++ [ last ]) (M.at (suc t) l b)
+spread-start p M.done             _ = spread-frames {t = 0} (tick p) (p ++ [ last ]) M.done
+spread-start p M.quiet            _ = spread-frames {t = 0} (tick p) (p ++ [ last ]) M.quiet
 
 -- A LIST'S RUN SPREADS: its values siblings, its end beside them.
 of-apart : ∀ {A} p i j (xs : List A) → i < j
