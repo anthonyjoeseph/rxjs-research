@@ -578,7 +578,7 @@ module Ascending (R : Set) where
                → Calling g ℓ m₁ (ρ ⊕ in-outer here) sg → At.val (Conf.heap (Mach.conf m₁)) (Kit.live oc) ≡ true
 
   -- A pair of lists both empty.
-  nulls : ∀ {X Y : Set} (xs : List X) (ys : List Y) → (null xs ∧ null ys) ≡ true → xs ≡ [] × ys ≡ []
+  nulls : ∀ {a b} {X : Set a} {Y : Set b} (xs : List X) (ys : List Y) → (null xs ∧ null ys) ≡ true → xs ≡ [] × ys ≡ []
   nulls []      []      refl = refl , refl
   nulls []      (_ ∷ _) ()
   nulls (_ ∷ _) _       ()
