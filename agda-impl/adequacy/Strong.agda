@@ -938,9 +938,17 @@ module Strongly (R : Set) where
 
   -- What the ghost is, at each state: what the witness has open; at a
   -- value about to be recorded, what steps to it by that value.
-  -- Every node the ghost holds below `t` passes `P`.
-  Each : ∀ {h} (H : Heapᴹ h) → (∀ {Γ A} → U.Node Γ A → Set) → ∀ {Δ A} → Sub h Δ A → Set₁
-  Each {h} H P t = ∀ {Δ′ A′} {u : Sub h Δ′ A′} → Path t u → ∀ {c} → At.part H u ≡ just c → P c
+  -- Every node the ghost holds below `t` passes `P`, and so does what a
+  -- held flatMap's ended parts left running, and what a held connect's
+  -- ended source did.
+  record Each {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) {Δ A} (t : Sub h Δ A) : Set₁ where
+    field
+      parts : ∀ {Δ′ A′} {u : Sub h Δ′ A′} → Path t u → ∀ {c} → At.part H u ≡ just c → P c
+      pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+            → Path t (flatMapˢ op f fl oc k r pl so ls) → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → P pl
+      rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+            → Path t (connectˢ S c b kb k fd rp e rt src bd) → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
 
   -- Its next event no earlier than `q`.
   Heads : ∀ {Γ A} → Pos → U.Node Γ A → Set
@@ -1019,4 +1027,4 @@ module Strongly (R : Set) where
     ; queue   = record { timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
     ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl }
     ; sorted  = root , begin-well o
-    ; behind  = λ { here refl → heads-begin o } }
+    ; behind  = record { parts = λ { here refl → heads-begin o } ; pools = λ () ; rests = λ () } }

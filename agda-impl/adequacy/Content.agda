@@ -24,6 +24,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat.Properties using (suc-injective; ≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; m<m+n; <-trans)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
@@ -39,7 +40,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
-  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; ix; _<ᵖ_; <ᵖ-tick; <ᵖ-trans; <ᵖ-apart)
+  skip⁼; end⁼; agree; agree-sym; agree-trans; agree-refl; at; ix; _<ᵖ_; <ᵖ-tick; <ᵖ-trans;
+  <ᵖ-apart; <ᵖ-asym; <ᵖ-below)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import denotation.Compositional using ([]ᵉ)
@@ -56,6 +58,7 @@ import Tree as T
 open import operation.PureObservable using (PureObs; Out; note; Pureᴾ; module Pure)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
+open import Data.Bool.Properties using (∧-zeroʳ)
 
 open Events∞
 
@@ -69,7 +72,7 @@ module Honesty (R : Set) where
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
     Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; Taking; taking; taken; feeding; finishing; PathLanes; this-lane; next-lane;
-    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets; Each; Heads)
+    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets; Each; Heads) renaming (ending to endingᵗ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
@@ -540,8 +543,9 @@ module Honesty (R : Set) where
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-next Lρ
 
   -- A node whose next event is past `p` and everything under it.
-  Far : ∀ {Γ A} → Pos → U.Node Γ A → Set
-  Far p c = ∀ {k} → U.headˢ (U.step c) ≡ just k → Beyond p k
+  record Far {Γ A} (p : Pos) (c : U.Node Γ A) : Set where
+    constructor far
+    field far-at : ∀ {k} → U.headˢ (U.step c) ≡ just k → Beyond p k
 
   -- A node whose next event is not under `p`.
   Off : ∀ {Γ A} → Pos → U.Node Γ A → Set
@@ -553,26 +557,37 @@ module Honesty (R : Set) where
   beyond-apart {p} {k} (inj₂ lt) nu = record { past = λ y → <ᵖ-apart p k y lt (λ ys e → nu (ys , e)) }
 
   far-apart : ∀ {p Γ A} {c : U.Node Γ A} → Heads p c → Off p c → Far p c
-  far-apart hd off e = beyond-apart (hd e) (off e)
+  far-apart hd off = far λ e → beyond-apart (hd e) (off e)
 
   Opt : (∀ {Γ A} → U.Node Γ A → Set) → ∀ {Γ A} → Maybe (U.Node Γ A) → Set
   Opt P nothing  = ⊤
   Opt P (just c) = P c
 
-  -- EVERY SIBLING THE PATH PASSES PASSES `P`: a flatMap's other lanes and
-  -- its outer, a connect's source or body.  At `Far p`, what each side
-  -- condition of `Lifts` asks, given the step at the path's end is under
-  -- `p`.
+  -- What a held node's ended parts left running passes `P`: a flatMap's
+  -- pool, a connect's ended source's rest.
+  Pooled : ∀ {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) {Δ B Δ′ B′} → U.Node Δ B → Sub h Δ′ B′ → Set₁
+  Pooled H P pl u = ∀ {c} → At.part H u ≡ just c → P pl
+
+  Rested : ∀ {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) {Δ A Δ′ B′} → U.Node Δ A → Sub h Δ A → Maybe Pos → Sub h Δ′ B′ → Set₁
+  Rested H P rt src e u = ∀ {n} → At.part H u ≡ just n → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
+
+  -- EVERY SIBLING THE PATH PASSES PASSES `P`: a flatMap's other lanes,
+  -- its outer and its pool, a connect's source or body and an ended
+  -- source's rest.  At `Far p`, what each side condition of `Lifts` asks,
+  -- given the step at the path's end is under `p`.
   mutual
     Clear : ∀ {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Set₁
     Clear H P here                    = Lift _ ⊤
     Clear H P (in-map ρ)              = Clear H P ρ
     Clear H P (in-scan ρ)             = Clear H P ρ
     Clear H P (in-take ρ)             = Clear H P ρ
-    Clear H P (in-outer {ls = ls} ρ)  = All P (At.partLanes H ls) × Clear H P ρ
-    Clear H P (in-lanes {t = t} πL)   = Opt P (At.part H t) × ClearL H P πL
+    Clear H P (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t} {ls} ρ) =
+      All P (At.partLanes H ls) × Pooled H P pl (flatMapˢ op f fl oc k r pl t ls) × Clear H P ρ
+    Clear H P (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t} {ls} πL) =
+      Opt P (At.part H t) × Pooled H P pl (flatMapˢ op f fl oc k r pl t ls) × ClearL H P πL
     Clear H P (in-source {bd = bd} ρ) = Opt P (At.part H bd) × Clear H P ρ
-    Clear H P (in-body {t = t} ρ)     = Opt P (At.part H t) × Clear H P ρ
+    Clear H P (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t} {bd} ρ) =
+      Opt P (At.part H t) × Rested H P rt t e (connectˢ Sj c b kb k fd rp e rt t bd) × Clear H P ρ
     Clear H P (in-defer ρ)            = Clear H P ρ
 
     ClearL : ∀ {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′}
@@ -596,10 +611,12 @@ module Honesty (R : Set) where
       clear-zip (in-map ρ)    a         b         = clear-zip ρ a b
       clear-zip (in-scan ρ)   a         b         = clear-zip ρ a b
       clear-zip (in-take ρ)   a         b         = clear-zip ρ a b
-      clear-zip (in-outer ρ)  (a , a′)  (b , b′)  = all-zip a b , clear-zip ρ a′ b′
-      clear-zip {H = H} (in-lanes {t = t} πL) (a , a′) (b , b′) = opt-zip (At.part H t) a b , clearL-zip πL a′ b′
+      clear-zip (in-outer ρ)  (a , pa , a′)  (b , pb , b′)  = all-zip a b , (λ e → f (pa e) (pb e)) , clear-zip ρ a′ b′
+      clear-zip {H = H} (in-lanes {t = t} πL) (a , pa , a′) (b , pb , b′) =
+        opt-zip (At.part H t) a b , (λ e → f (pa e) (pb e)) , clearL-zip πL a′ b′
       clear-zip {H = H} (in-source {bd = bd} ρ) (a , a′) (b , b′) = opt-zip (At.part H bd) a b , clear-zip ρ a′ b′
-      clear-zip {H = H} (in-body {t = t} ρ) (a , a′) (b , b′) = opt-zip (At.part H t) a b , clear-zip ρ a′ b′
+      clear-zip {H = H} (in-body {t = t} ρ) (a , ra , a′) (b , rb , b′) =
+        opt-zip (At.part H t) a b , (λ e n j → f (ra e n j) (rb e n j)) , clear-zip ρ a′ b′
       clear-zip (in-defer ρ)  a         b         = clear-zip ρ a b
 
       clearL-zip : ∀ {h} {H : Heapᴹ h} {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u)
@@ -626,23 +643,30 @@ module Honesty (R : Set) where
     ...   | nothing = each-lanes ls (λ πL → f (next-lane πL))
     ...   | just x  = f (this-lane here) e ∷ each-lanes ls (λ πL → f (next-lane πL))
 
+    each-sub : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Each H P t → Path t u → Each H P u
+    each-sub ev ρ = record { parts = λ ψ → Each.parts ev (ρ ⊕ ψ) ; pools = λ ψ → Each.pools ev (ρ ⊕ ψ) ; rests = λ ψ → Each.rests ev (ρ ⊕ ψ) }
+
     mutual
       clear-each : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Each H P t → (π : Path t u) → Clear H P π
       clear-each ev here                    = lift tt
-      clear-each ev (in-map ρ)              = clear-each (λ ψ → ev (in-map ψ)) ρ
-      clear-each ev (in-scan ρ)             = clear-each (λ ψ → ev (in-scan ψ)) ρ
-      clear-each ev (in-take ρ)             = clear-each (λ ψ → ev (in-take ψ)) ρ
-      clear-each ev (in-outer {ls = ls} ρ)  = each-lanes ls (λ πL → ev (in-lanes πL)) , clear-each (λ ψ → ev (in-outer ψ)) ρ
-      clear-each ev (in-lanes {t = t} πL)   = opt-each (At.part H t) (ev (in-outer here)) , clearL-each (λ πL′ → ev (in-lanes πL′)) πL
-      clear-each ev (in-source {bd = bd} ρ) = opt-each (At.part H bd) (ev (in-body here)) , clear-each (λ ψ → ev (in-source ψ)) ρ
-      clear-each ev (in-body {t = t} ρ)     = opt-each (At.part H t) (ev (in-source here)) , clear-each (λ ψ → ev (in-body ψ)) ρ
-      clear-each ev (in-defer ρ)            = clear-each (λ ψ → ev (in-defer ψ)) ρ
+      clear-each ev (in-map ρ)              = clear-each (each-sub ev (in-map here)) ρ
+      clear-each ev (in-scan ρ)             = clear-each (each-sub ev (in-scan here)) ρ
+      clear-each ev (in-take ρ)             = clear-each (each-sub ev (in-take here)) ρ
+      clear-each ev (in-outer {ls = ls} ρ)  =
+        each-lanes ls (λ πL → Each.parts ev (in-lanes πL)) , Each.pools ev here , clear-each (each-sub ev (in-outer here)) ρ
+      clear-each ev (in-lanes {t = t} πL)   =
+        opt-each (At.part H t) (Each.parts ev (in-outer here)) , Each.pools ev here , clearL-each (λ πL′ → each-sub ev (in-lanes πL′)) πL
+      clear-each ev (in-source {bd = bd} ρ) = opt-each (At.part H bd) (Each.parts ev (in-body here)) , clear-each (each-sub ev (in-source here)) ρ
+      clear-each ev (in-body {t = t} ρ)     =
+        opt-each (At.part H t) (Each.parts ev (in-source here)) , Each.rests ev here , clear-each (each-sub ev (in-body here)) ρ
+      clear-each ev (in-defer ρ)            = clear-each (each-sub ev (in-defer here)) ρ
 
       clearL-each : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′}
-                  → (∀ {Δ″ A″} {w : Sub h Δ″ A″} → PathLanes ls w → ∀ {c} → At.part H w ≡ just c → P c)
+                  → (∀ {Δ″ A″} {w : Sub h Δ″ A″} → PathLanes ls w → Each H P w)
                   → (πL : PathLanes ls u) → ClearL H P πL
-      clearL-each f (this-lane {ls = ls} ρ) = each-lanes ls (λ πL → f (next-lane πL)) , clear-each (λ ψ → f (this-lane ψ)) ρ
-      clearL-each f (next-lane {l = l} πL)  = each-lanes (l ∷ []) (λ πL′ → f (lane-only πL′)) , clearL-each (λ πL′ → f (next-lane πL′)) πL
+      clearL-each f (this-lane {ls = ls} ρ) = each-lanes ls (λ πL → Each.parts (f (next-lane πL)) here) , clear-each (f (this-lane here)) ρ
+      clearL-each f (next-lane {l = l} πL)  =
+        each-lanes (l ∷ []) (λ πL′ → Each.parts (f (lane-only πL′)) here) , clearL-each (λ πL′ → f (next-lane πL′)) πL
 
   -- Walking two paths is walking each.
   mutual
@@ -897,10 +921,16 @@ module Honesty (R : Set) where
   hop-sorted cr e p = sorted-⇝ (Carried.sorted cr) (then e p)
 
   -- The run moved back: every node still heads no earlier.
-  each-back : ∀ {h} {H : Heapᴹ h} {t : Sub h [] R} {q p} → q <ᵖ p ≡ true → Each H (Heads p) t → Each H (Heads q) t
-  each-back {q = q} {p} qp ev ψ e hk with ev ψ e hk
+  heads-back : ∀ {q p Γ A} {c : U.Node Γ A} → q <ᵖ p ≡ true → Heads p c → Heads q c
+  heads-back {q} {p} qp hd hk with hd hk
   ... | inj₁ refl = inj₂ qp
   ... | inj₂ pk   = inj₂ (<ᵖ-trans q p _ qp pk)
+
+  each-back : ∀ {h} {H : Heapᴹ h} {t : Sub h [] R} {q p} → q <ᵖ p ≡ true → Each H (Heads p) t → Each H (Heads q) t
+  each-back qp ev = record
+    { parts = λ ψ {c} e → heads-back {c = c} qp (Each.parts ev ψ e)
+    ; pools = λ {pl = pl} ψ e → heads-back {c = pl} qp (Each.pools ev ψ e)
+    ; rests = λ {rt = rt} ψ e n j → heads-back {c = rt} qp (Each.rests ev ψ e n j) }
 
   hopped-pre : ∀ {g m m′ m₁} {st : Strong g m} → m′ ⇝ m₁ → Hopped st m₁ → Hopped st m′
   hopped-pre path (g″ , m₀ , path′ , st₀ , gn) = g″ , m₀ , ⇝-trans path path′ , st₀ , gn
@@ -956,15 +986,18 @@ module Honesty (R : Set) where
              → Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step g)
              → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
 
-    -- The ghost's step, from a path every sibling of which waits: the
-    -- `of`'s step lifted, each operator's side condition read off
-    -- `Clear`.  A connect whose source has ended shows its body shut, so
-    -- the body's part must already read its joiners told: the record's,
-    -- not the path's.
-    heads-lift : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-               → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) (Far p) π
-               → Σ (U.Node [] R) λ c → At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ just c
-                 × Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step c)
+    -- A connect whose source has ended, holding an `of` in its body: the
+    -- body shut steps as the body does, shut after.  What the body holds
+    -- the shut can tell is a joiner owed a value (a feed under way past
+    -- the source's end, `Fed`'s `feeding` beside an `e`), or a joiner
+    -- not yet subscribed (a pending `connected`, its end told where it
+    -- would subscribe).  The first must not exist, the second must end
+    -- past every event the body steps to first.
+    shut-step : ∀ {g m} (cr : Carried g m) {Δ A B Sj c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ A}
+                {bd : Sub (Conf.world (Mach.conf m)) (A ∷ Δ) B} (ρ : Path (Carried.tree cr) (connectˢ Sj c b kb k fd rp e rt src bd))
+                {Δ′ A′ p i x xs} (π : Path bd (ofˢ {Δ = Δ′} {A′} p i (x ∷ xs)))
+              → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₁} → e ≡ just c₁ → ∀ {b₀} → At.part (Conf.heap (Mach.conf m)) bd ≡ just b₀
+              → U.shutˢᵗ rp c₁ rt (U.step (U.shut (Any.here refl) c₁ b₀)) ≡ U.shutˢᵗ rp c₁ rt (U.step b₀)
 
     -- The agenda's first call an open `of` the ghost holds: no sibling
     -- its path passes heads under the `of`'s base.  A value under it the
@@ -1086,6 +1119,385 @@ module Honesty (R : Set) where
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ Conf.pos (Mach.conf m) → ⊥
+
+  ----------------------------------------------------------------------
+  -- THE GHOST'S STEP, FROM A PATH EVERY SIBLING OF WHICH WAITS
+
+  -- A step whose next event is under `p`.
+  data Below (p : Pos) {Γ A} (S : U.Step Γ A) : Set where
+    below : ∀ {k} → U.headˢ S ≡ just k → Under p k → Below p S
+
+  under-++ : ∀ {p k} z → Under p k → Under p (k ++ z)
+  under-++ {p} z (y , refl) = y ++ z , ++-assoc p y z
+
+  far-lt : ∀ {p k k′} → Beyond p k′ → Under p k → k <ᵖ k′ ≡ true
+  far-lt record { past = f } (y , refl) = f y
+
+  far-gt : ∀ {p k k′} → Beyond p k′ → Under p k → k′ <ᵖ k ≡ false
+  far-gt {k = k} {k′} bk uk = <ᵖ-asym k k′ (far-lt bk uk)
+
+  -- Each operator keeps the next event under `p`.
+  below-map : ∀ {p Γ A B} {f : A → B} {S : U.Step Γ A} → Below p S → Below p (U.mapˢ f S)
+  below-map {S = U.outˢ _ _ _} (below h u) = below h u
+  below-map {S = U.skipˢ _ _}  (below h u) = below h u
+  below-map {S = U.endˢ _}     (below h u) = below h u
+  below-map {S = U.hushˢ} (below () _)
+
+  below-scan : ∀ {p Γ A B} {f : B → A → B} {z} {S : U.Step Γ A} → Below p S → Below p (U.scanˢ f z S)
+  below-scan {S = U.outˢ _ _ _} (below h u) = below h u
+  below-scan {S = U.skipˢ _ _}  (below h u) = below h u
+  below-scan {S = U.endˢ _}     (below h u) = below h u
+  below-scan {S = U.hushˢ} (below () _)
+
+  below-take : ∀ {p Γ A} i (q : A → Bool) {S : U.Step Γ A} → Below p S → Below p (U.takeWhileˢ i q S)
+  below-take true  q {U.outˢ k a c} (below refl u) with q a
+  ... | true  = below refl u
+  ... | false = below refl (under-++ _ u)
+  below-take false q {U.outˢ k a c} (below refl u) with q a
+  ... | true  = below refl u
+  ... | false = below refl (under-++ _ u)
+  below-take i q {U.skipˢ _ _} (below h u) = below h u
+  below-take i q {U.endˢ _}    (below h u) = below h u
+  below-take i q {U.hushˢ} (below () _)
+
+  below-outer : ∀ {p Γ A B} {op} {g : A → Pos → U.Node Γ B} {o : U.Node Γ A} {S ls qs pl} → Below p S → Below p (U.outerˢ op g o S ls qs pl)
+  below-outer {S = U.outˢ q _ _} (below refl u) = below refl (under-++ _ u)
+  below-outer {S = U.skipˢ _ _} (below h u) = below h u
+  below-outer {S = U.endˢ _} {[]} {[]} (below h u) = below h u
+  below-outer {S = U.endˢ _} {[]} {_ ∷ _} (below h u) = below h u
+  below-outer {S = U.endˢ _} {_ ∷ _} (below h u) = below h u
+  below-outer {S = U.hushˢ} (below () _)
+
+  below-lane : ∀ {p Γ A B} {op} {g : A → Pos → U.Node Γ B} {o : Maybe (U.Node Γ A)} {bs l S as qs pl}
+             → Below p S → Below p (U.laneˢ op g o bs l S as qs pl)
+  below-lane {S = U.outˢ _ _ _} (below h u) = below h u
+  below-lane {S = U.skipˢ _ _} (below h u) = below h u
+  below-lane {S = U.endˢ c} {qs = _ ∷ _} (below refl u) = below refl (under-++ _ u)
+  below-lane {o = nothing} {[]} {S = U.endˢ _} {[]} {[]} (below h u) = below h u
+  below-lane {o = nothing} {[]} {S = U.endˢ _} {_ ∷ _} {[]} (below h u) = below h u
+  below-lane {o = nothing} {_ ∷ _} {S = U.endˢ _} {qs = []} (below h u) = below h u
+  below-lane {o = just _} {S = U.endˢ _} {qs = []} (below h u) = below h u
+  below-lane {S = U.hushˢ} (below () _)
+
+  below-source : ∀ {p Γ A B} {r} {b : U.Node (A ∷ Γ) B} {sb} {s : U.Node Γ A} {S} → SourceFirst S sb → Below p S → Below p (U.sourceˢ r b sb s S)
+  below-source {S = U.outˢ q _ _} sf (below refl u) rewrite sf = below refl (under-++ _ u)
+  below-source {S = U.skipˢ q _}  sf (below refl u) rewrite sf = below refl (under-++ _ u)
+  below-source {S = U.endˢ c}     sf (below refl u) rewrite sf = below refl (under-++ _ u)
+  below-source {S = U.hushˢ} () _
+
+  below-body : ∀ {p Γ A B} {r} {s : U.Source Γ A} {S : U.Step (A ∷ Γ) B} → Below p S → Below p (U.bodyˢ r s S)
+  below-body {S = U.outˢ _ _ _} (below h u) = below h u
+  below-body {S = U.skipˢ _ _}  (below h u) = below h u
+  below-body {S = U.endˢ _}     (below h u) = below h u
+  below-body {S = U.hushˢ} (below () _)
+
+  below-shut : ∀ {p Γ A B} {r c} {t : U.Node Γ A} {S : U.Step (A ∷ Γ) B} → Below p S → Below p (U.shutˢᵗ r c t S)
+  below-shut {S = U.outˢ _ _ _} (below h u) = below h u
+  below-shut {S = U.skipˢ _ _}  (below h u) = below h u
+  below-shut {S = U.endˢ _}     (below h u) = below h u
+  below-shut {S = U.hushˢ} (below () _)
+
+  -- A step's order against a position is its next event's.
+  beforeᴹ : Pos → Maybe Pos → Bool
+  beforeᴹ q nothing  = true
+  beforeᴹ q (just k) = q <ᵖ k
+
+  before-head : ∀ {Γ B} q (S : U.Step Γ B) → U.beforeˢ q S ≡ beforeᴹ q (U.headˢ S)
+  before-head q (U.outˢ _ _ _) = refl
+  before-head q (U.skipˢ _ _)  = refl
+  before-head q (U.endˢ _)     = refl
+  before-head q U.hushˢ        = refl
+
+  shut-head : ∀ {Γ A B} {r c} {t : U.Node Γ A} (S : U.Step (A ∷ Γ) B) → U.headˢ (U.shutˢᵗ r c t S) ≡ U.headˢ S
+  shut-head (U.outˢ _ _ _) = refl
+  shut-head (U.skipˢ _ _)  = refl
+  shut-head (U.endˢ _)     = refl
+  shut-head U.hushˢ        = refl
+
+  -- A sibling past `p` steps after the step under `p`.
+  before-far : ∀ {p q Γ B} {b : U.Node Γ B} → Far p b → Under p q → U.beforeˢ q (U.step b) ≡ true
+  before-far {b = b} fb u with U.step b in eb
+  ... | U.outˢ _ _ _ = far-lt (Far.far-at fb (cong U.headˢ eb)) u
+  ... | U.skipˢ _ _  = far-lt (Far.far-at fb (cong U.headˢ eb)) u
+  ... | U.endˢ _     = far-lt (Far.far-at fb (cong U.headˢ eb)) u
+  ... | U.hushˢ      = refl
+
+  before-not : ∀ {p q Γ B} {S : U.Step Γ B} → Beyond p q → Below p S → U.beforeˢ (q ++ [ ix 0 ]) S ≡ false
+  before-not {q = q} {S = U.outˢ k _ _} bq (below refl u) = <ᵖ-asym k (q ++ [ ix 0 ]) (<ᵖ-trans k q (q ++ [ ix 0 ]) (far-lt bq u) (<ᵖ-below q []))
+  before-not {q = q} {S = U.skipˢ k _}  bq (below refl u) = <ᵖ-asym k (q ++ [ ix 0 ]) (<ᵖ-trans k q (q ++ [ ix 0 ]) (far-lt bq u) (<ᵖ-below q []))
+  before-not {q = q} {S = U.endˢ k}     bq (below refl u) = <ᵖ-asym k (q ++ [ ix 0 ]) (<ᵖ-trans k q (q ++ [ ix 0 ]) (far-lt bq u) (<ᵖ-below q []))
+  before-not {S = U.hushˢ} bq (below () _)
+
+  source-first : ∀ {p Γ A B} {b : U.Node (A ∷ Γ) B} {S : U.Step Γ A} → Far p b → Below p S → SourceFirst S (U.step b)
+  source-first {S = U.outˢ _ _ _} fb (below refl u) = before-far fb (under-++ [ ix 0 ] u)
+  source-first {S = U.skipˢ _ _}  fb (below refl u) = before-far fb (under-++ [ ix 0 ] u)
+  source-first {S = U.endˢ _}     fb (below refl u) = before-far fb (under-++ [ ix 0 ] u)
+  source-first {S = U.hushˢ} fb (below () _)
+
+  body-first : ∀ {p Γ A B} {c : U.Node Γ A} {S : U.Step (A ∷ Γ) B} → Far p c → Below p S → BodyFirst (U.step c) S
+  body-first {c = c} fc b with U.step c in ec
+  ... | U.outˢ _ _ _ = before-not (Far.far-at fc (cong U.headˢ ec)) b
+  ... | U.skipˢ _ _  = before-not (Far.far-at fc (cong U.headˢ ec)) b
+  ... | U.endˢ _     = before-not (Far.far-at fc (cong U.headˢ ec)) b
+  ... | U.hushˢ      = tt
+
+  body-step : ∀ {Γ A B} {r} {b : U.Node (A ∷ Γ) B} {sb} {s : U.Node Γ A} sc → BodyFirst sc sb → U.sourceˢ r b sb s sc ≡ U.bodyˢ r (U.live s) sb
+  body-step (U.outˢ _ _ _) bf rewrite bf = refl
+  body-step (U.skipˢ _ _)  bf rewrite bf = refl
+  body-step (U.endˢ _)     bf rewrite bf = refl
+  body-step U.hushˢ        _  = refl
+
+  rest-behind : ∀ {p Γ A B} {t : U.Node Γ A} {S : U.Step (A ∷ Γ) B} → Far p t → Below p S → RestBehind t S
+  rest-behind ft b et = before-not (Far.far-at ft (cong U.headˢ et)) b
+
+  ended-shut : ∀ {Γ A B} {r c} {b : U.Node (A ∷ Γ) B} {t : U.Node Γ A} {X S : U.Step (A ∷ Γ) B} → RestBehind t S → U.headˢ X ≡ U.headˢ S
+             → U.endedˢ r b X c t (U.step t) ≡ U.shutˢᵗ r c t X
+  ended-shut {t = t} {X} {S} rb hx with U.step t in et
+  ... | U.skipˢ k _ rewrite before-head (k ++ [ ix 0 ]) X | hx | sym (before-head (k ++ [ ix 0 ]) S) | rb refl = refl
+  ... | U.outˢ _ _ _ = refl
+  ... | U.endˢ _     = refl
+  ... | U.hushˢ      = refl
+
+  -- The earliest lane, read off the lanes.
+  FarE : Pos → ∀ {Γ B} → U.Earliest Γ B → Set
+  FarE p U.none                = ⊤
+  FarE p (U.found k _ _ _ _)   = Beyond p k
+
+  earliest-far : ∀ {p Γ B} (ls : List (U.Node Γ B)) → All (Far p) ls → FarE p (U.earliest ls)
+  earliest-far []       []        = tt
+  earliest-far (c ∷ ls) (fc ∷ fs) with U.headˢ (U.step c) in hc | U.earliest ls | earliest-far ls fs
+  ... | nothing | U.none               | _ = tt
+  ... | nothing | U.found _ _ _ _ _    | f = f
+  ... | just k  | U.none               | _ = Far.far-at fc hc
+  ... | just k  | U.found k′ _ _ _ _   | f with k <ᵖ k′
+  ...   | true  = Far.far-at fc hc
+  ...   | false = f
+
+  earliest-split : ∀ {Γ B} (ls : List (U.Node Γ B)) {k bs l s as} → U.earliest ls ≡ U.found k bs l s as → bs ++ l ∷ as ≡ ls
+  earliest-split []       ()
+  earliest-split (c ∷ ls) e with U.headˢ (U.step c) | U.earliest ls in ee
+  ... | nothing | U.none = ⊥-elim (none≢ e)
+    where none≢ : ∀ {Γ B} {k bs l s as} → U.none {Γ} {B} ≡ U.found k bs l s as → ⊥
+          none≢ ()
+  ... | nothing | U.found _ _ _ _ _ with e
+  ...   | refl = cong (c ∷_) (earliest-split ls ee)
+  earliest-split (c ∷ ls) refl | just k | U.none = refl
+  earliest-split (c ∷ ls) e | just k | U.found k′ _ _ _ _ with k <ᵖ k′ | e
+  ...   | true  | refl = refl
+  ...   | false | refl = cong (c ∷_) (earliest-split ls ee)
+
+  earliest-found : ∀ {p Γ B} {bs : List (U.Node Γ B)} {l as k} → All (Far p) bs → All (Far p) as → U.headˢ (U.step l) ≡ just k → Under p k
+                 → U.earliest (bs ++ l ∷ as) ≡ U.found k bs l (U.step l) as
+  earliest-found {as = as} [] fas hl u rewrite hl with U.earliest as | earliest-far as fas
+  ... | U.none                | _  = refl
+  ... | U.found k′ _ _ _ _    | bk rewrite far-lt bk u = refl
+  earliest-found {bs = b ∷ bs} {l} {as} (fb ∷ fbs) fas hl u with U.headˢ (U.step b) in hb
+  ... | nothing = cong (U.pick b (U.step b) (bs ++ l ∷ as) nothing) (earliest-found fbs fas hl u)
+  ... | just kb = trans (cong (U.pick b (U.step b) (bs ++ l ∷ as) (just kb)) (earliest-found fbs fas hl u)) (pick-past (far-gt (Far.far-at fb hb) u))
+    where pick-past : ∀ {k} → kb <ᵖ k ≡ false → U.pick b (U.step b) (bs ++ l ∷ as) (just kb) (U.found k bs l (U.step l) as) ≡ U.found k (b ∷ bs) l (U.step l) as
+          pick-past e rewrite e = refl
+
+  outer-first : ∀ {p Γ A B} {S : U.Step Γ A} {ls : List (U.Node Γ B)} → Below p S → All (Far p) ls → OuterFirst S ls
+  outer-first {p} {ls = ls} (below {k′} hk u) fs ee = k′ , hk , far-lt (subst (FarE p) ee (earliest-far ls fs)) u
+
+  lane-first : ∀ {p Γ A} {o : Maybe (U.Node Γ A)} {q} → Opt (Far p) o → Under p q → LaneFirst o q
+  lane-first {o = nothing} _  _ = tt
+  lane-first {o = just o}  fo u ho = far-gt (Far.far-at fo ho) u
+
+  pool-outer : ∀ {p Γ A B} {pl : U.Node Γ B} {o₀ : U.Node Γ A} {S} {E : U.Earliest Γ B} → Far p pl → Below p S → PoolBehind pl (U.runᵒ o₀ S) E
+  pool-outer {E = U.none}              fp (below hS u) ep rewrite hS = far-gt (Far.far-at fp (cong U.headˢ ep)) u
+  pool-outer {E = U.found _ _ _ _ _}   fp (below hS u) ep rewrite hS | far-gt (Far.far-at fp (cong U.headˢ ep)) u = refl
+
+  pool-lane : ∀ {p Γ A B} {pl : U.Node Γ B} {o : Maybe (U.Node Γ A)} {q bs l S as} → Far p pl → Under p q
+            → PoolBehind pl (U.outerOf o) (U.found q bs l S as)
+  pool-lane {o = nothing} fp u ep = far-gt (Far.far-at fp (cong U.headˢ ep)) u
+  pool-lane {o = just _}  fp u ep rewrite far-gt (Far.far-at fp (cong U.headˢ ep)) u = ∧-zeroʳ _
+
+  -- A flatMap's step is its outer's, or a lane's, by the side conditions.
+  flat-outer : ∀ {Γ A B} {op} {g : A → Pos → U.Node Γ B} {o₀ : U.Node Γ A} {S} {LS qs pl}
+             → PoolBehind pl (U.runᵒ o₀ S) (U.earliest LS) → OuterFirst S LS
+             → U.flatˢ op g (U.runᵒ o₀ S) LS qs pl (U.step pl) (U.earliest LS) ≡ U.outerˢ op g o₀ S LS qs pl
+  flat-outer {op = op} {g} {o₀} {S} {LS} {qs} {pl} pb of with U.step pl in ep
+  ... | U.skipˢ _ _  rewrite pb refl = go
+    where go : U.goˢ op g (U.runᵒ o₀ S) LS qs pl (U.earliest LS) ≡ U.outerˢ op g o₀ S LS qs pl
+          go with U.earliest LS in ee
+          ... | U.none = refl
+          ... | U.found k bs l s as with of refl
+          ...   | k′ , hk , lt rewrite hk | lt | earliest-split LS ee = refl
+  ... | U.outˢ _ _ _ = go
+    where go : U.goˢ op g (U.runᵒ o₀ S) LS qs pl (U.earliest LS) ≡ U.outerˢ op g o₀ S LS qs pl
+          go with U.earliest LS in ee
+          ... | U.none = refl
+          ... | U.found k bs l s as with of refl
+          ...   | k′ , hk , lt rewrite hk | lt | earliest-split LS ee = refl
+  ... | U.endˢ _     = go
+    where go : U.goˢ op g (U.runᵒ o₀ S) LS qs pl (U.earliest LS) ≡ U.outerˢ op g o₀ S LS qs pl
+          go with U.earliest LS in ee
+          ... | U.none = refl
+          ... | U.found k bs l s as with of refl
+          ...   | k′ , hk , lt rewrite hk | lt | earliest-split LS ee = refl
+  ... | U.hushˢ      = go
+    where go : U.goˢ op g (U.runᵒ o₀ S) LS qs pl (U.earliest LS) ≡ U.outerˢ op g o₀ S LS qs pl
+          go with U.earliest LS in ee
+          ... | U.none = refl
+          ... | U.found k bs l s as with of refl
+          ...   | k′ , hk , lt rewrite hk | lt | earliest-split LS ee = refl
+
+  go-lane : ∀ {Γ A B} {op} {g : A → Pos → U.Node Γ B} (o : Maybe (U.Node Γ A)) {LS qs pl k bs l S as} → LaneFirst o k
+          → U.goˢ op g (U.outerOf o) LS qs pl (U.found k bs l S as) ≡ U.laneˢ op g o bs l S as qs pl
+  go-lane nothing  _ = refl
+  go-lane (just o) lf with U.headˢ (U.step o) in ho
+  ... | nothing = refl
+  ... | just k′ rewrite lf refl = refl
+
+  flat-lane : ∀ {Γ A B} {op} {g : A → Pos → U.Node Γ B} {o : Maybe (U.Node Γ A)} {LS qs pl k bs l S as}
+            → U.earliest LS ≡ U.found k bs l S as → PoolBehind pl (U.outerOf o) (U.found k bs l S as) → LaneFirst o k
+            → U.flatˢ op g (U.outerOf o) LS qs pl (U.step pl) (U.earliest LS) ≡ U.laneˢ op g o bs l S as qs pl
+  flat-lane {o = o} {pl = pl} ea pb lf rewrite ea with U.step pl in ep
+  ... | U.skipˢ _ _  rewrite pb refl = go-lane o lf
+  ... | U.outˢ _ _ _ = go-lane o lf
+  ... | U.endˢ _     = go-lane o lf
+  ... | U.hushˢ      = go-lane o lf
+
+  -- A maybe, split without abstracting it from the goal.
+  data Peek {ℓ} {X : Set ℓ} (x : Maybe X) : Set ℓ where
+    peek-nothing : x ≡ nothing → Peek x
+    peek-just    : ∀ {y} → x ≡ just y → Peek x
+
+  peek : ∀ {ℓ} {X : Set ℓ} (x : Maybe X) → Peek x
+  peek nothing  = peek-nothing refl
+  peek (just _) = peek-just refl
+
+  module _ {g m} (cr : Carried g m) where
+    private
+      W = Conf.world (Mach.conf m)
+      H = Conf.heap (Mach.conf m)
+
+    lanes-cons : ∀ {Δ B} (l : Lane W Δ B) (ls : List (Lane W Δ B)) → At.partLanes H (l ∷ ls) ≡ At.partLanes H (l ∷ []) ++ At.partLanes H ls
+    lanes-cons (lane c k s) ls with At.val H (Kit.live c)
+    ... | false = refl
+    ... | true with At.part H s
+    ...   | nothing = refl
+    ...   | just _  = refl
+
+    held-flat : ∀ {Δ A B} {op f fl oc k r pl} {so : Sub W Δ A} {ls : List (Lane W Δ B)} {o₀}
+              → At.part H so ≡ just o₀
+              → At.part H (flatMapˢ op f fl oc k r pl so ls)
+                ≡ just (U.flatMapᶜ op (λ a q → U.subscribe (f a) q) (just o₀) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl)
+    held-flat po rewrite po = refl
+
+    held-lanes : ∀ {Δ A B} {op f fl oc k r pl} {so : Sub W Δ A} {ls : List (Lane W Δ B)} {bs l as}
+               → At.partLanes H ls ≡ bs ++ l ∷ as
+               → At.part H (flatMapˢ op f fl oc k r pl so ls)
+                 ≡ just (U.flatMapᶜ op (λ a q → U.subscribe (f a) q) (At.part H so) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl)
+    held-lanes {so = so} {bs = bs} eq rewrite eq with At.part H so
+    ... | just _ = refl
+    ... | nothing with bs
+    ...   | []    = refl
+    ...   | _ ∷ _ = refl
+
+    held-src : ∀ {Δ A B Sj c b kb k fd rp e rt} {src : Sub W Δ A} {bd : Sub W (A ∷ Δ) B} {c₀ b₀}
+             → At.part H src ≡ just c₀ → At.part H bd ≡ just b₀
+             → At.part H (connectˢ Sj c b kb k fd rp e rt src bd) ≡ just (U.connectᶜ rp b₀ (U.live c₀))
+    held-src ps pb rewrite ps | pb = refl
+
+    held-shut : ∀ {Δ A B Sj c b kb k fd rp c₁ rt} {src : Sub W Δ A} {bd : Sub W (A ∷ Δ) B} {b₀}
+              → At.part H src ≡ nothing → At.part H bd ≡ just b₀
+              → At.part H (connectˢ Sj c b kb k fd rp (just c₁) rt src bd) ≡ just (U.connectᶜ rp (U.shut (Any.here refl) c₁ b₀) (U.ended c₁ rt))
+    held-shut ps pb rewrite ps | pb = refl
+
+    -- The value an `of` the ghost holds emits, lifted up a path every
+    -- sibling of which waits: the ghost's part there, its step the `of`'s
+    -- lifted, and its next event under the `of`'s base.
+    mutual
+      lift-up : ∀ {Δ A} {t : Sub W Δ A} (ρ₀ : Path (Carried.tree cr) t) {Δ′ A′ p i x xs} (π : Path t (ofˢ {Δ = Δ′} {A′} p i (x ∷ xs)))
+              → seen H π ≡ true → Clear H (Far p) π
+              → Σ (U.Node Δ A) λ c → At.part H t ≡ just c × Lifts H π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step c) × Below p (U.step c)
+      lift-up ρ₀ {p = p} {i} {x} {xs} here sn cl = U.ofᶜ p i (x ∷ xs) , refl , lifts-here , below refl ([ ix i ] , refl)
+      lift-up ρ₀ (in-map {f = f} ρ) sn cl with lift-up (ρ₀ ⊕ in-map here) ρ sn cl
+      ... | c , pc , L , b rewrite pc = U.mapᶜ f c , refl , lifts-map L , below-map b
+      lift-up ρ₀ (in-scan {f = f} {r} ρ) sn cl with lift-up (ρ₀ ⊕ in-scan here) ρ sn cl
+      ... | c , pc , L , b rewrite pc = U.scanᶜ f (At.val H r) c , refl , lifts-scan L , below-scan b
+      lift-up ρ₀ (in-take {i = i} {q} {c} {tk = taking} ρ) sn cl with At.val H (Kit.live c) in lv
+      lift-up ρ₀ (in-take {tk = taking} ρ) () cl | false
+      ... | true with lift-up (ρ₀ ⊕ in-take here) ρ sn cl
+      ...   | c′ , pc , L , b rewrite pc = U.takeWhileᶜ i q c′ , refl , lifts-take lv L , below-take i q b
+      lift-up ρ₀ (in-take {c = c} {tk = endingᵗ _ _} ρ) sn cl with At.val H (Kit.live c)
+      lift-up ρ₀ (in-take {tk = endingᵗ _ _} ρ) () cl | false
+      lift-up ρ₀ (in-take {tk = endingᵗ _ _} ρ) () cl | true
+      lift-up ρ₀ (in-take {c = c} {tk = taken} ρ) sn cl with At.val H (Kit.live c)
+      lift-up ρ₀ (in-take {tk = taken} ρ) () cl | false
+      lift-up ρ₀ (in-take {tk = taken} ρ) () cl | true
+      lift-up ρ₀ (in-outer {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) sn (fl′ , pd , cl) with lift-up (ρ₀ ⊕ in-outer here) ρ sn cl
+      ... | o₀ , po , L , b =
+        _ , hp , subst (Lifts H (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) _) (sym st) (lifts-outer po (outer-first b fl′) (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) L) ,
+        subst (Below _) (sym st) (below-outer b)
+        where hp = held-flat {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} po
+              fp = pd hp
+              st = flat-outer {op = op} {LS = At.partLanes H ls} {qs = At.val H (FlatKit.Flat.queue fl)} {pl = pl} (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) (outer-first b fl′)
+      lift-up ρ₀ (in-lanes {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} πL) sn (fo , pd , cl) with lift-up-lanes (λ πL′ → ρ₀ ⊕ in-lanes πL′) πL sn cl
+      ... | bs , l , as , eq , LL , fbs , fas , below {q} hq u =
+        _ , hp , subst (Lifts H (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} πL) _) (sym st) (lifts-lanes LL ea (lane-first fo u) (pool-lane {o = At.part H so} {bs = bs} {l = l} {S = U.step l} {as = as} fp u)) ,
+        subst (Below _) (sym st) (below-lane (below hq u))
+        where hp = held-lanes {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} eq
+              fp = pd hp
+              ea : U.earliest (At.partLanes H ls) ≡ U.found q bs l (U.step l) as
+              ea = trans (cong U.earliest eq) (earliest-found fbs fas hq u)
+              st = flat-lane {op = op} {o = At.part H so} {LS = At.partLanes H ls} {qs = At.val H (FlatKit.Flat.queue fl)} ea (pool-lane {o = At.part H so} {bs = bs} {l = l} {S = U.step l} {as = as} fp u) (lane-first fo u)
+      lift-up ρ₀ (in-source {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = ej} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fb , cl) with peek (At.part H bd)
+      ... | peek-nothing pb = ⊥-elim (true≢false (sym (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn)))
+      ... | peek-just pb with lift-up (ρ₀ ⊕ in-source here) ρ (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn) cl
+      ...   | c₀ , pc , L , b = _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {e = ej} {rt = rtj} {src = src} {bd = bd} pc pb , lifts-source pc pb (source-first fb′ b) L , below-source (source-first fb′ b) b
+        where fb′ = subst (Opt (Far _)) pb fb
+      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = nothing} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fc , rd , cl) with peek (At.part H src)
+      ... | peek-nothing ps = ⊥-elim (true≢false (sym (subst (λ z → (is-just z ∨ false) ∧ seen H ρ ≡ true) ps sn)))
+      ... | peek-just {c₀} ps with lift-up (ρ₀ ⊕ in-body here) ρ (subst (λ z → (is-just z ∨ false) ∧ seen H ρ ≡ true) ps sn) cl
+      ...   | b₀ , pb , L , b =
+        _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {rt = rtj} {src = src} {bd = bd} ps pb , subst (Lifts H _ _) (sym st) (lifts-body ps (body-first fc′ b) L) , subst (Below _) (sym st) (below-body b)
+        where fc′ = subst (Opt (Far _)) ps fc
+              st = body-step (U.step c₀) (body-first fc′ b)
+      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = just c₁} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fc , rd , cl) with peek (At.part H src)
+      ... | peek-just {c₀} ps with lift-up (ρ₀ ⊕ in-body here) ρ (subst (λ z → (is-just z ∨ true) ∧ seen H ρ ≡ true) ps sn) cl
+      ...   | b₀ , pb , L , b =
+        _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {rt = rtj} {src = src} {bd = bd} ps pb , subst (Lifts H _ _) (sym st) (lifts-body ps (body-first fc′ b) L) , subst (Below _) (sym st) (below-body b)
+        where fc′ = subst (Opt (Far _)) ps fc
+              st = body-step (U.step c₀) (body-first fc′ b)
+      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = just c₁} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fc , rd , cl) | peek-nothing ps
+        with lift-up (ρ₀ ⊕ in-body here) ρ (subst (λ z → (is-just z ∨ true) ∧ seen H ρ ≡ true) ps sn) cl
+      ...   | b₀ , pb , L , b =
+        _ , held-shut {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {rt = rtj} {src = src} {bd = bd} ps pb , subst (Lifts H _ _) (sym st) (lifts-shut ps refl rb L) , subst (Below _) (sym st) (below-shut b)
+        where fr = rd (held-shut {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {rt = rtj} {src = src} {bd = bd} ps pb) ps refl
+              rb = rest-behind fr b
+              sh = shut-step cr ρ₀ ρ ps refl pb
+              hx = trans (sym (shut-head (U.step (U.shut (Any.here refl) c₁ b₀)))) (trans (cong U.headˢ sh) (shut-head (U.step b₀)))
+              st = trans (ended-shut rb hx) sh
+      lift-up ρ₀ (in-defer ρ) sn cl with lift-up (ρ₀ ⊕ in-defer here) ρ sn cl
+      ... | c , pc , L , b = c , pc , lifts-defer L , b
+
+      lift-up-lanes : ∀ {Δ B} {ls : List (Lane W Δ B)} (κ : ∀ {Δ″ A″} {w : Sub W Δ″ A″} → PathLanes ls w → Path (Carried.tree cr) w)
+                      {Δ′ A′ p i x xs} (πL : PathLanes ls (ofˢ {Δ = Δ′} {A′} p i (x ∷ xs)))
+                    → seenL H πL ≡ true → ClearL H (Far p) πL
+                    → Σ (List (U.Node Δ B)) λ bs → Σ (U.Node Δ B) λ l → Σ (List (U.Node Δ B)) λ as
+                      → At.partLanes H ls ≡ bs ++ l ∷ as × LiftsLane H πL (U.step (U.ofᶜ p i (x ∷ xs))) bs (U.step l) as
+                        × All (Far p) bs × All (Far p) as × Below p (U.step l)
+      lift-up-lanes κ (this-lane {c = c} {ls = ls} ρ) sn (fas , cl) with At.val H (Kit.live c) in lv
+      lift-up-lanes κ (this-lane ρ) () (fas , cl) | false
+      ... | true with lift-up (κ (this-lane here)) ρ sn cl
+      ...   | c′ , pc , L , b rewrite pc = [] , c′ , At.partLanes H ls , refl , lifts-this lv L , [] , fas , b
+      lift-up-lanes κ (next-lane {l = l} {ls} πL) sn (fl , cl) with lift-up-lanes (λ πL′ → κ (next-lane πL′)) πL sn cl
+      ... | bs , l′ , as , eq , LL , fbs , fas , b =
+        At.partLanes H (l ∷ []) ++ bs , l′ , as ,
+        trans (lanes-cons l ls) (trans (cong (At.partLanes H (l ∷ []) ++_) eq) (sym (++-assoc (At.partLanes H (l ∷ [])) bs (l′ ∷ as)))) ,
+        lifts-next LL , all-++⁺ fl fbs , fas , b
+
+  -- The ghost's step, from a path every sibling of which waits: the
+  -- `of`'s step lifted, each operator's side condition read off `Clear`.
+  heads-lift : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+             → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) (Far p) π
+             → Σ (U.Node [] R) λ c → At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ just c
+               × Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step c)
+  heads-lift cr π sn cl with lift-up cr here π sn cl
+  ... | c , pc , L , _ = c , pc , L
 
   -- A spot's handle, where its node is a cold.
   handleOf : ∀ {h} {t : Sub h [] R} → Spot t → Maybe (Handle h)

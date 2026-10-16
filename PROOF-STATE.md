@@ -184,10 +184,13 @@ by their own silent steps (`Mirror`).
   out: the ghost past the burst's skip (no part past an end holds it); a
   measure without `left`, the values the `of`s still owe; a measure
   blind to a take's stage.
-- **THE SHUT BODY.** `heads-lift`: a connect past its source's end shows
-  its body shut, so the body's part must read every joiner left already
-  told. `told` keeps an end it has; decides whether `Meaning`'s feed
-  invariant supplies the rest, or the record owes a field.
+- **THE SHUT BODY.** `shut-step`: a connect past its source's end steps
+  its body shut as the body steps, shut after. Decides whether a feed can
+  be under way past the source's end (`Fed` owes `feeding` beside an end
+  ruled out, a field) and whether a pending `connected` in the body ends
+  past the body's next event. Ruled out: every other operator on the
+  climb (`lift-up` is a body), and the record's stored pools and rests as
+  unvouched (`Each` carries them).
 - **GHOST AHEAD.** `spread-past`, then `behind`'s producers: `others-past`
   is a body over `Carried.behind` (every node the ghost holds heads no
   earlier than the run) and `spread-past` (no sibling heads under the
@@ -240,8 +243,9 @@ by their own silent steps (`Mirror`).
   turn, its fired cold heads no earlier than the run.
 - **`heads-begin`** (Strong) — FALSITY, `NO EVIDENCE`: a program subscribed at
   the root heads no earlier than it.
-- **`heads-lift`** (Content) — FALSITY, `NO EVIDENCE`: every sibling waiting,
-  the ghost's step is the `of`'s lifted along its path, a shut body read told.
+- **`shut-step`** (Content) — FALSITY, `NO EVIDENCE`: a connect past its
+  source's end, an `of` in its body: the body shut steps as it does, shut
+  after.
 - **`emit-run`** (Content) — FALSITY, `NO EVIDENCE`: an open `of`'s value
   handed on under its scope, the climb starts aloft.
 - **`take-end`** (Content) — FALSITY, `NO EVIDENCE`: an exclusive take's
