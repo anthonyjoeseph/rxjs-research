@@ -71,7 +71,7 @@ module Honesty (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle; Quiet; same)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
-  open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit; when)
+  open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
@@ -1661,7 +1661,7 @@ module Honesty (R : Set) where
   take-part H lv pv rewrite lv | pv = refl
 
   -- A guard read open over a predicate holding: what it guards.
-  pass-code : ∀ {w} {b q : Bool} {m n : Act w ⊤} → b ≡ true → q ≡ true → when b (if q then m else n) ≗ m
+  pass-code : ∀ {w} {b q : Bool} {m n : Act w ⊤} → b ≡ true → q ≡ true → Kit.when b (if q then m else n) ≗ m
   pass-code refl refl = ≗-refl _
 
   -- A value a live takeWhile passes: its guard read, one operator up,
