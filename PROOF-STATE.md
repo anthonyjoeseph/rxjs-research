@@ -186,14 +186,14 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `calm-skip-n` first: a lane's skip is never tied with
-  its own end (the `untied` check), so `Lane` owes an untied field.
-  Decides whether a lane's own run supplies it. Then `trailing-sub`,
-  now owing a flat cut whose steps sit apart from where an end
-  subscribes (the `flat` and `trails` checks); then `spread-sub`,
-  `ordered-connect`, `steady-connect`. Ruled out: a pool step owing
-  more than a flat pool kept apart from every live root both ways
-  (`calm-pool-n` is a body, as are the outer steps).
+- **THE ORDER.** `trailing-sub` first: what a cut leaves running is
+  sorted, flat, trails the next event and sits apart from where an end
+  subscribes (the `trails` and `flat` checks). Decides whether each
+  operator's meaning keeps its cut that way, or `Trail` owes more. Then
+  `spread-sub`, `ordered-connect`, `steady-connect` (now owing an end
+  strictly past a skip). Ruled out: the flatMap walk owing more than its
+  parts' order and steadiness, an end strictly past what precedes it
+  (every calm step is a body).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -222,8 +222,6 @@ by their own silent steps (`Mirror`).
   end its tail.
 - **`steady-connect`** (Placed) — FALSITY, `RECOVERY×2`, `X`: a connect where a
   tick heads it is steady, its source's rest stepping where it would have.
-- **`calm-skip-n`** (Placed) — FALSITY, `NO EVIDENCE`: a lane skipping, every
-  part shows its next event clean of the skip.
 - **`step-skips`** (Stepper) — FALSITY, `REFUTED×2, DEAD ROUTE, RECOVERY×2`,
   `X`: a sane, placed root ghost's meaning is what its step shows, then the
   stepped node's.

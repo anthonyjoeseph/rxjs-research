@@ -12,8 +12,8 @@
 --
 -- And the events rise, as `ticks-up` needs: each at a position past the
 -- last, a skip at one no earlier, headed by its tick.  And they are steady, as `steady-sub`
--- says: nothing strictly inside the position just left, and a value
--- strictly past it.  And nothing is keyed just past another.
+-- says: nothing strictly inside the position just left, and a value or
+-- an end strictly past it.  And nothing is keyed just past another.
 module quickcheck.Placing where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
@@ -74,7 +74,7 @@ private
   clearᵇ : Pos → Events ℕ → Bool
   clearᵇ k (out h _ _) = (k <ᵖ h) ∧ not (inside k h)
   clearᵇ k (skip h _)  = not (inside k h)
-  clearᵇ k (end h)     = not (inside k h)
+  clearᵇ k (end h)     = (k <ᵖ h) ∧ not (inside k h)
   clearᵇ k hush        = true
 
   steadyᵇ : ℕ → Events ℕ → Bool
@@ -173,23 +173,12 @@ private
           next (skip _ r′)  = flatsᵇ n r′
           next _            = true
 
-  -- No skip followed straight away by an end at its own position: a
-  -- lane doing so with one queued would have its merge step inside it.
-  untiedᵇ : ℕ → Events ℕ → Bool
-  untiedᵇ zero    _          = true
-  untiedᵇ (suc n) (out _ _ r) = untiedᵇ n (Events∞.force r)
-  untiedᵇ (suc n) (skip k r)  = after (Events∞.force r) ∧ untiedᵇ n (Events∞.force r)
-    where after : Events ℕ → Bool
-          after (end c) = not (samePos k c)
-          after _       = true
-  untiedᵇ (suc n) _           = true
-
 -- The machine's trace placed against the meaning, and the meaning rising,
 -- steady and keying nothing just past its own events; and what a cut
 -- leaves running trailing it, and its values spread.  Each check by name.
 checks : Prog natᵗ → List (String × Bool)
 checks p = ("placed" , placedᵇ 6000 12000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
-         ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e) ∷ ("untied" , untiedᵇ 4000 e)
+         ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e)
          ∷ ("flat" , flatsᵇ 400 s) ∷ []
   where o = toObs timeline 3 p [] [] []
         s = enter (⟦ o ⟧ˢ []) root

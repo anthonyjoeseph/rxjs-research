@@ -71,15 +71,17 @@ Past k (skip h _)  = k <ᵖ h ≡ true × ¬ Ext k h
 Past k (end h)     = k <ᵖ h ≡ true × ¬ Ext k h
 Past k hush        = ⊤
 
--- `e`'s first no proper extension of `k`, and strictly past it if a value.
+-- `e`'s first no proper extension of `k`, and strictly past it if a value
+-- or an end.
 Clear : ∀ {A} → Pos → Events A → Set
 Clear k (out h _ _) = k <ᵖ h ≡ true × ¬ Ext k h
 Clear k (skip h _)  = ¬ Ext k h
-Clear k (end h)     = ¬ Ext k h
+Clear k (end h)     = k <ᵖ h ≡ true × ¬ Ext k h
 Clear k hush        = ⊤
 
 -- Never a step inside the position just left, and never one tied with
--- a value.  A rejoin keys a source's event at `q` under `q`, so a
+-- a value or an end: a flatMap lane ending where it just stepped, one
+-- queued, would subscribe it inside that step.  A rejoin keys a source's event at `q` under `q`, so a
 -- source stepping inside `q` sorts first, and a flatMap shows a value
 -- at `q` just past `q`, so a source stepping to `q` again sorts first.
 mutual
@@ -380,7 +382,7 @@ past-away k hush        c = tt
 clear-away : ∀ {A} k (e : Events A) → Clear k e → Away k e
 clear-away k (out _ _ _) c = proj₂ c
 clear-away k (skip _ _)  c = c
-clear-away k (end _)     c = c
+clear-away k (end _)     c = proj₂ c
 clear-away k hush        c = tt
 
 off : ∀ {k h} → ¬ Ext k h → ∀ l ls → h ≡ k ++ l ∷ ls → ⊥
@@ -491,8 +493,8 @@ clear-pre p (skip h _)  al with p <ᵖ h in ph
 ... | true  = λ x → proj₁ (every al) (owned-ext (under-ext p h x))
 ... | false = ext-irrefl (p ++ [ ix 0 ])
 clear-pre p (end c)     al with p <ᵖ c in pc
-... | true  = λ x → every al (owned-ext (under-ext p c x))
-... | false = λ x → ext-irrefl p (under-ext p p x)
+... | true  = <ᵖ-next p c (sub p) pc , λ x → every al (owned-ext (under-ext p c x))
+... | false = <ᵖ-part p {ix 0} {last} [] [] refl , λ x → ext-irrefl p (under-ext p p x)
 clear-pre p hush        al = tt
 
 -- After a source event the join shows, the next it shows is not inside
@@ -519,8 +521,8 @@ clear-in p q (out h _ _) pq a (qh , ne) with p <ᵖ h in ph
 clear-in p q (skip h _)  pq a ne with p <ᵖ h in ph
 ... | true  = λ y → ne (under-ext q h y)
 ... | false with () ← trans (sym ph) (still p q h pq a)
-clear-in p q (end c)     pq a ne with p <ᵖ c in pc
-... | true  = λ y → ne (under-ext q c y)
+clear-in p q (end c)     pq a (qc , ne) with p <ᵖ c in pc
+... | true  = apart-in q c (sub p) qc ne
 ... | false with () ← trans (sym pc) (still p q c pq a)
 clear-in p q hush        pq a _ = tt
 
@@ -1350,7 +1352,7 @@ atop-clear r c hush        oc a al = tt
 beyond-clear : ∀ {A} k (e : Events A) → Beyond k e → Alien k e → Clear k e
 beyond-clear k (out h _ _) b al = b , λ { (ext l ls) → proj₁ (every al) (inj₁ (prefix-++ k (l ∷ ls))) }
 beyond-clear k (skip h _)  b al = λ { (ext l ls) → proj₁ (every al) (inj₁ (prefix-++ k (l ∷ ls))) }
-beyond-clear k (end h)     b al = λ { (ext l ls) → every al (inj₁ (prefix-++ k (l ∷ ls))) }
+beyond-clear k (end h)     b al = b , λ { (ext l ls) → every al (inj₁ (prefix-++ k (l ∷ ls))) }
 beyond-clear k hush        b al = tt
 
 Atopᴹ : ∀ {A} → Pos → Maybe (Events∞ A) → Set
@@ -1530,7 +1532,7 @@ past-atop k hush        _       = tt
 past-clear : ∀ {A} k (e : Events A) → Past k e → Clear k e
 past-clear k (out h _ _) p       = p
 past-clear k (skip h _)  (_ , n) = n
-past-clear k (end h)     (_ , n) = n
+past-clear k (end h)     p       = p
 past-clear k hush        _       = tt
 
 rising-ordered : ∀ {A} (e : Events A) → Rising e → Ordered e
@@ -1657,7 +1659,7 @@ clear-take : ∀ {A} i (p : A → Bool) k (e : Events A) → Clear k e → Clear
 clear-take i p k (out h a r) ck with p a | i
 ... | true  | _     = ck
 ... | false | true  = past-snoc k h (ix 0) ck
-... | false | false = proj₂ (past-snoc k h last ck)
+... | false | false = past-snoc k h last ck
 clear-take i p k (skip h r)  ck = ck
 clear-take i p k (end h)     ck = ck
 clear-take i p k hush        ck = tt
@@ -2158,21 +2160,21 @@ lead-hush hush        ls hs = tt
 At : ∀ {A} → (Bool → Pos → Set) → Events A → Set
 At P (out h _ _) = P true h
 At P (skip h _)  = P false h
-At P (end h)     = P false h
+At P (end h)     = P true h
 At P hush        = ⊤
 
 -- What a lane, the outer and the pool would show first in the merge.
 LaneAt : ∀ {A B : Set} → (Bool → Pos → Set) → List A → Events B → Set
 LaneAt P qs      (out h _ _) = P true h
 LaneAt P qs      (skip h _)  = P false h
-LaneAt P []      (end c)     = P false c
+LaneAt P []      (end c)     = P true c
 LaneAt P (_ ∷ _) (end c)     = P false (c ++ [ ix 0 ])
 LaneAt P qs      hush        = ⊤
 
 OuterAt : ∀ {A} → (Bool → Pos → Set) → Events A → Set
 OuterAt P (out q _ _) = P false (q ++ [ ix 0 ])
 OuterAt P (skip q _)  = P false q
-OuterAt P (end c)     = P false c
+OuterAt P (end c)     = P true c
 OuterAt P hush        = ⊤
 
 OuterAtᴹ : ∀ {A} → (Bool → Pos → Set) → Maybe (Events∞ A) → Set
@@ -2183,52 +2185,56 @@ PoolAt : (Bool → Pos → Set) → Tail → Set
 PoolAt P (pin k _) = P false k
 PoolAt P idle      = ⊤
 
-first-lane : ∀ {B} P op (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t (x : Events B) → LaneAt P qs x
+-- An end shown as a step where other parts run on.
+Down : (Bool → Pos → Set) → Set
+Down P = ∀ h → P true h → P false h
+
+first-lane : ∀ {B} P → Down P → ∀ op (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t (x : Events B) → LaneAt P qs x
            → At P (M.lane op o bs l as qs t x)
-first-lane P op o        bs      l as      qs       t (out _ _ _) a = a
-first-lane P op o        bs      l as      qs       t (skip _ _)  a = a
-first-lane P op o        bs      l as      (m ∷ qs) t (end c)     a = a
-first-lane P op nothing  []      l []      []       t (end c)     a = a
-first-lane P op nothing  []      l (_ ∷ _) []       t (end c)     a = a
-first-lane P op nothing  (_ ∷ _) l as      []       t (end c)     a = a
-first-lane P op (just _) bs      l as      []       t (end c)     a = a
-first-lane P op o        bs      l as      qs       t hush        a = tt
+first-lane P dn op o        bs      l as      qs       t (out _ _ _) a = a
+first-lane P dn op o        bs      l as      qs       t (skip _ _)  a = a
+first-lane P dn op o        bs      l as      (m ∷ qs) t (end c)     a = a
+first-lane P dn op nothing  []      l []      []       t (end c)     a = a
+first-lane P dn op nothing  []      l (_ ∷ _) []       t (end c)     a = dn c a
+first-lane P dn op nothing  (_ ∷ _) l as      []       t (end c)     a = dn c a
+first-lane P dn op (just _) bs      l as      []       t (end c)     a = dn c a
+first-lane P dn op o        bs      l as      qs       t hush        a = tt
 
-first-outer : ∀ {B} P op (e : Events∞ (MonotonicList B)) ls qs t (x : Events (MonotonicList B)) → OuterAt P x
+first-outer : ∀ {B} P → Down P → ∀ op (e : Events∞ (MonotonicList B)) ls qs t (x : Events (MonotonicList B)) → OuterAt P x
             → At P (M.outer op e ls qs t x)
-first-outer P op e ls qs t (out q m r) a with M.admit op (q ++ [ ix 1 ]) m ls qs
+first-outer P dn op e ls qs t (out q m r) a with M.admit op (q ++ [ ix 1 ]) m ls qs
 ... | ls′ , qs′ , d = a
-first-outer P op e ls       qs       t (skip q r) a = a
-first-outer P op e []       []       t (end c)    a = a
-first-outer P op e []       (m ∷ qs) t (end c)    a = a
-first-outer P op e (l ∷ ls) qs       t (end c)    a = a
-first-outer P op e ls       qs       t hush       a = tt
+first-outer P dn op e ls       qs       t (skip q r) a = a
+first-outer P dn op e []       []       t (end c)    a = a
+first-outer P dn op e []       (m ∷ qs) t (end c)    a = dn c a
+first-outer P dn op e (l ∷ ls) qs       t (end c)    a = dn c a
+first-outer P dn op e ls       qs       t hush       a = tt
 
-first-race : ∀ {B} P op (o : Maybe (Events∞ (MonotonicList B))) k′ bs (l : Events∞ B) as qs t → LaneAt P qs (force l) → OuterAtᴹ P o
+first-race : ∀ {B} P → Down P → ∀ op (o : Maybe (Events∞ (MonotonicList B))) k′ bs (l : Events∞ B) as qs t → LaneAt P qs (force l) → OuterAtᴹ P o
            → At P (M.race op o k′ bs l as qs t)
-first-race P op nothing  k′ bs l as qs t al ao = first-lane P op nothing bs l as qs t (force l) al
-first-race P op (just e) k′ bs l as qs t al ao with M.head (force e)
-... | nothing = first-lane P op (just e) bs l as qs t (force l) al
+first-race P dn op nothing  k′ bs l as qs t al ao = first-lane P dn op nothing bs l as qs t (force l) al
+first-race P dn op (just e) k′ bs l as qs t al ao with M.head (force e)
+... | nothing = first-lane P dn op (just e) bs l as qs t (force l) al
 ... | just k″ with k″ <ᵖ k′
-...   | true  = first-outer P op e (bs ++ l ∷ as) qs t (force e) ao
-...   | false = first-lane P op (just e) bs l as qs t (force l) al
+...   | true  = first-outer P dn op e (bs ++ l ∷ as) qs t (force e) ao
+...   | false = first-lane P dn op (just e) bs l as qs t (force l) al
 
-first-via : ∀ {B} P op (o : Maybe (Events∞ (MonotonicList B))) ls qs t → OuterAtᴹ P o → At P (M.viaOuter op o ls qs t)
-first-via P op nothing  ls qs t ao = tt
-first-via P op (just e) ls qs t ao = first-outer P op e ls qs t (force e) ao
+first-via : ∀ {B} P → Down P → ∀ op (o : Maybe (Events∞ (MonotonicList B))) ls qs t → OuterAtᴹ P o → At P (M.viaOuter op o ls qs t)
+first-via P dn op nothing  ls qs t ao = tt
+first-via P dn op (just e) ls qs t ao = first-outer P dn op e ls qs t (force e) ao
 
-first-parts : ∀ {B} P op (o : Maybe (Events∞ (MonotonicList B))) ls qs t → All (λ l → LaneAt P qs (force l)) ls → OuterAtᴹ P o
+first-parts : ∀ {B} P → Down P → ∀ op (o : Maybe (Events∞ (MonotonicList B))) ls qs t → All (λ l → LaneAt P qs (force l)) ls → OuterAtᴹ P o
             → At P (M.parts op o ls qs t)
-first-parts P op o ls qs t al ao with M.earliest ls | earliest-all (λ l → LaneAt P qs (force l)) ls al
-... | none             | _             = first-via P op o ls qs t ao
-... | found k′ bs l as | (_ , al′ , _) = first-race P op o k′ bs l as qs t al′ ao
+first-parts P dn op o ls qs t al ao with M.earliest ls | earliest-all (λ l → LaneAt P qs (force l)) ls al
+... | none             | _             = first-via P dn op o ls qs t ao
+... | found k′ bs l as | (_ , al′ , _) = first-race P dn op o k′ bs l as qs t al′ ao
 
-first-go : ∀ {B} P op (o : Maybe (Events∞ (MonotonicList B))) ls qs t → All (λ l → LaneAt P qs (force l)) ls → OuterAtᴹ P o → PoolAt P t
+first-go : ∀ {B} P → Down P → ∀ op (o : Maybe (Events∞ (MonotonicList B))) ls qs t → All (λ l → LaneAt P qs (force l)) ls → OuterAtᴹ P o → PoolAt P t
          → At P (M.go op o ls qs t)
-first-go P op o ls qs idle      al ao at = first-parts P op o ls qs idle al ao
-first-go P op o ls qs (pin k u) al ao at with M.ahead-of k o ls
+first-go P dn op o ls qs idle      al ao at = first-parts P dn op o ls qs idle al ao
+first-go P dn op o ls qs (pin k u) al ao at with M.ahead-of k o ls
 ... | true  = at
-... | false = first-parts P op o ls qs (pin k u) al ao
+... | false = first-parts P dn op o ls qs (pin k u) al ao
 
 -- After an event at `k`, a value or not, the next: no earlier, past it
 -- if either is a value, and never inside it.
@@ -2271,7 +2277,7 @@ next-past k hush        n = tt
 next-clear : ∀ {A} k (e : Events A) → At (Next false k) e → Clear k e
 next-clear k (out h _ _) n = proj₂ n
 next-clear k (skip h _)  n = proj₂ (proj₂ n)
-next-clear k (end h)     n = proj₂ (proj₂ n)
+next-clear k (end h)     n = proj₂ n
 next-clear k hush        n = tt
 
 calm-ordered : ∀ {A} (e : Events A) → Calm e → Ordered e
@@ -2327,7 +2333,12 @@ pool-next v k idle      a n = tt
 next-go : ∀ {B} v k op (o : Maybe (Events∞ (MonotonicList B))) ls qs t → All (λ l → Atop k (force l)) ls → Atopᴹ k o → AtopT k t
         → Obl v k o ls qs t → At (Next v k) (M.go op o ls qs t)
 next-go v k op o ls qs t al ao at (nl , no , np) =
-  first-go (Next v k) op o ls qs t (lanes-next v k qs ls al nl) (outerᴹ-next v k o ao no) (pool-next v k t at np)
+  first-go (Next v k) dn op o ls qs t (lanes-next v k qs ls al nl) (outerᴹ-next v k o ao no) (pool-next v k t at np)
+  where strict-down : ∀ v {h} → Strict v true k h → Strict v false k h
+        strict-down true  s = s
+        strict-down false s = tt
+        dn : Down (Next v k)
+        dn h (a , s , x) = a , strict-down v s , x
 
 -- Strictly past `k`, and not inside it.
 Aloof : Pos → Pos → Set
@@ -2393,14 +2404,14 @@ pool-apart r k idle      ok a al = tt
 laneAt-map : ∀ {A B : Set} {P Q : Bool → Pos → Set} → (∀ v h → P v h → Q v h) → (qs : List A) (x : Events B) → LaneAt P qs x → LaneAt Q qs x
 laneAt-map f qs      (out h _ _) a = f true h a
 laneAt-map f qs      (skip h _)  a = f false h a
-laneAt-map f []      (end c)     a = f false c a
+laneAt-map f []      (end c)     a = f true c a
 laneAt-map f (_ ∷ _) (end c)     a = f false (c ++ [ ix 0 ]) a
 laneAt-map f qs      hush        a = tt
 
 outerAt-map : ∀ {A} {P Q : Bool → Pos → Set} → (∀ v h → P v h → Q v h) → (x : Events A) → OuterAt P x → OuterAt Q x
 outerAt-map f (out q _ _) a = f false (q ++ [ ix 0 ]) a
 outerAt-map f (skip q _)  a = f false q a
-outerAt-map f (end c)     a = f false c a
+outerAt-map f (end c)     a = f true c a
 outerAt-map f hush        a = tt
 
 poolAt-map : ∀ {P Q : Bool → Pos → Set} → (∀ v h → P v h → Q v h) → (t : Tail) → PoolAt P t → PoolAt Q t
@@ -3016,7 +3027,7 @@ module FlatOrder (p : Pos) where
               → All (Aside o) rs → Heldᴹ o → Pool o rs (pin k u) → Obl false k o ls qs (later u)
   calm-pool-n o ls qs k u e R pt asd h (st , et , ew , ef) =
     by-lanes ls R (proj₁ (proj₁ (everyᵀ ew))) (proj₁ (proj₁ (everyᵀ et))) (clears-of o e)
-    , by-outer o (proj₂ (proj₁ (everyᵀ et)))
+    , by-outer o e (proj₂ (proj₁ (everyᵀ et)))
     , by-pool (later u) (proj₁ (flatᵀ ef))
     where
       kk = proj₂ (proj₁ (everyᵀ ew))
@@ -3037,25 +3048,18 @@ module FlatOrder (p : Pos) where
       by-apart q nk x with ext-snoc k q (ix 0) x
       ... | inj₁ x′   = nk (owned-ext x′)
       ... | inj₂ refl = nk (inj₁ (prefix-refl k))
-      by-first : ∀ {A} (x : Events A) → Free x k → OuterAt (Clean false k) x
-      by-first (out q _ _) f = tt , by-apart q (proj₂ (proj₂ (proj₁ (every f))))
-      by-first (skip q _)  f = tt , λ x → proj₂ (proj₂ (proj₁ (every f))) (owned-ext x)
-      by-first (end c)     f = tt , λ x → proj₂ (proj₂ (every f)) (owned-ext x)
-      by-first hush        f = tt
-      by-outer : ∀ o → FreeO o k → OuterAtᴹ (Clean false k) o
-      by-outer nothing  f = tt
-      by-outer (just x) f = by-first (force x) (proj₁ f)
+      by-first : ∀ {A} (x : Events A) → Beyond k x → Free x k → OuterAt (Clean false k) x
+      by-first (out q _ _) b f = tt , by-apart q (proj₂ (proj₂ (proj₁ (every f))))
+      by-first (skip q _)  b f = tt , λ x → proj₂ (proj₂ (proj₁ (every f))) (owned-ext x)
+      by-first (end c)     b f = b , λ x → proj₂ (proj₂ (every f)) (owned-ext x)
+      by-first hush        b f = tt
+      by-outer : ∀ o → M.ahead-of k o ls ≡ true → FreeO o k → OuterAtᴹ (Clean false k) o
+      by-outer nothing  e f = tt
+      by-outer (just x) e f with M.clear k (M.head (force x)) in d
+      ... | true = by-first (force x) (clear-beyond k (force x) d) (proj₁ f)
       by-pool : ∀ t → EveryT (λ h → ¬ Ext k h) t → PoolAt (Clean false k) t
       by-pool (pin _ _) a = tt , proj₁ (everyᵀ a)
       by-pool idle      a = tt
-
-  postulate
-    -- AFTER A LANE'S SKIP AT `k`, NOTHING SHOWS INSIDE IT, AND A VALUE
-    -- PAST IT: the lane's own end, with one queued, not at `k` itself.
-    calm-skip-n : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t k w {rbs r ras}
-                → Roots bs rbs → Lane r (skip k w) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
-                → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop k (force y)) bs → All (λ y → Atop k (force y)) as → Atopᴹ k o → AtopT k t
-                → Obl false k o (bs ++ w ∷ as) qs t
 
   -- Every other lane's first, keyed apart from `r` and no earlier than
   -- `k` it keys: away from `k`.
@@ -3091,6 +3095,33 @@ module FlatOrder (p : Pos) where
       ds  = proj₁ (parted-pick rbs r ras pt)
       cl : ∀ v h → Aloof k h → Clean true k v h
       cl v h = clean-of true v
+
+  -- After a lane's skip at `k`, nothing shows inside it, and a value or
+  -- an end past it: the lane's own by its steadiness, an end strictly
+  -- past so a queued lane's step is not inside it either; the others
+  -- keyed apart from its root.
+  calm-skip : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t k w {rbs r ras}
+            → Roots bs rbs → Lane r (skip k w) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
+            → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop k (force y)) bs → All (λ y → Atop k (force y)) as → Atopᴹ k o → AtopT k t
+            → Obl false k o (bs ++ w ∷ as) qs t
+  calm-skip {B} o bs l as qs t k w {rbs} {r} {ras} rb st ra pt asd h pl ab aa ao at =
+    All++⁺ (mapᴬ (λ {y} → laneAt-map cl qs (force y)) (calm-apart r k qs okr ok rb (All++⁻ˡ rbs ds) ab))
+      (own qs (force w) (proj₁ (steady (Lane.std st)))
+       ∷ᴬ mapᴬ (λ {y} → laneAt-map cl qs (force y)) (calm-apart r k qs okr ok ra (All++⁻ʳ rbs ds) aa))
+    , outerᴹ-map cl o (outer-apart r k o ok (proj₁ (all-pick rbs ras asd)) ao)
+    , poolAt-map cl t (pool-apart r k t ok at (everyT-mono (λ h a → proj₁ (all-pick rbs ras (proj₁ a))) t (proj₁ (proj₂ pl))))
+    where
+      okr = Lane.ok st
+      ok  = proj₁ (proj₁ (every (Lane.kx st)))
+      ds  = proj₁ (parted-pick rbs r ras pt)
+      cl : ∀ v h → Aloof k h → Clean false k v h
+      cl v h = clean-of false v
+      own : ∀ {A} (qs : List A) (x : Events B) → Clear k x → LaneAt (Clean false k) qs x
+      own qs      (out h _ _) c = c
+      own qs      (skip h _)  c = tt , c
+      own []      (end c)     a = a
+      own (_ ∷ _) (end c)     a = tt , proj₂ (past-step k c a)
+      own qs      hush        c = tt
 
   -- After a lane's end at `c`, nothing shows inside it: what it left
   -- running trails it, the other parts keyed apart from its root.
@@ -3161,7 +3192,7 @@ module FlatOrder (p : Pos) where
   outer-clear : ∀ {A} q (x : Events A) → Clear q x → OuterAt (Clean false q) x
   outer-clear q (out h _ _) c = clean-of false false (past-step q h c)
   outer-clear q (skip h _)  c = tt , c
-  outer-clear q (end h)     c = tt , c
+  outer-clear q (end h)     c = c
   outer-clear q hush        c = tt
 
   -- The lane an outer value at `q` subscribes: away from the step it shows.
@@ -3353,7 +3384,7 @@ module FlatOrder (p : Pos) where
       next-go true k op o (bs ++ w ∷ as) qs t (All++⁺ ab (proj₁ (ordered (Lane.ord st)) ∷ᴬ aa)) ao at (calm-out o bs l as qs t k b w rb st ra pt asd h pl ab aa ao at)
       , calm-go op o (bs ++ w ∷ as) qs t (roots-++ rb (lane-out st ∷ᴿ ra)) pt asd gq h pl
     calms (calm-lane op o bs l as qs t (skip k w) rb st ra pt asd gq h pl refl ab aa ao at) =
-      next-go false k op o (bs ++ w ∷ as) qs t (All++⁺ ab (proj₁ (ordered (Lane.ord st)) ∷ᴬ aa)) ao at (calm-skip-n o bs l as qs t k w rb st ra pt asd h pl ab aa ao at)
+      next-go false k op o (bs ++ w ∷ as) qs t (All++⁺ ab (proj₁ (ordered (Lane.ord st)) ∷ᴬ aa)) ao at (calm-skip o bs l as qs t k w rb st ra pt asd h pl ab aa ao at)
       , calm-go op o (bs ++ w ∷ as) qs t (roots-++ rb (lane-skip st ∷ᴿ ra)) pt asd gq h pl
     calms (calm-lane op o bs l as (m ∷ qs) t (end c) {rbs} {r} {ras} rb st ra pt asd (gm ∷ᴬ gq) h pl refl ab aa ao at) =
       next-go false c₀ op o (M.enter m c₁ ∷ bs ++ as) qs (t ∪ cut l)
