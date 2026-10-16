@@ -211,15 +211,15 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `spread-rejoin` first: decides whether a joiner's
-  values stay keyed apart from its source's later ones by weight (no
-  position owns a lighter one) and the source alien to the joiner, or
-  the source owes an order on its own tags. Then `spread-take`,
-  then `ordered-connect`, `steady-connect`, reusing
-  `Walk`. Ruled out: a connect owing more than `Rise` and the source's
-  marks (`spread-connect` is a walk over `Walk.Side`); a lane owing more
-  than its root's apartness; pins by position alone; a take owing more
-  than a value's disjointness from its pins (`trail-take`).
+- **THE ORDER.** `ordered-connect`, then `steady-connect`, reusing
+  `Walk`: decides whether a connect's merge of source steps into its
+  body owes more than each side's order. Ruled out: a joiner owing its
+  source an order on its own tags (`spread-rejoin` is a body by weight:
+  no position owns a lighter one); a connect owing more than `Rise` and
+  the source's marks (`spread-connect` is a walk over `Walk.Side`); a
+  lane owing more than its root's apartness; pins by position alone; a
+  take owing more than a value's disjointness from its pins
+  (`trail-take`, `spread-take`).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -228,10 +228,6 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`spread-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a joiner's values
-  its source's, tagged with it, over a source alien to it.
-- **`spread-take`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a failing value
-  kept just inside its position, which nothing its source left keys.
 - **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
   source steps merge into its body in order, the source's run past the body's
   end its tail.

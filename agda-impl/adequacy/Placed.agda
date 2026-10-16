@@ -5651,14 +5651,199 @@ fresh-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : N
 trailing-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
               → Trailing (U.stateᴺ (U.subscribe o p) ρ)
 
-postulate
-  -- A CUT SPREADS ITS SOURCE'S RUN: a failing value kept just inside its
-  -- own position, which nothing its source left running keys.
-  spread-take : ∀ {A} i (q : A → Bool) (e : Events A) c → Trail e c → Spread e → Spread (M.takeWhileᴱ i q e)
+-- A cut shows its source's positions, or a step just under one.
+module _ {P : Pos → Set} (d₀ : ∀ h → P h → P (h ++ [ ix 0 ])) (dₗ : ∀ h → P h → P (h ++ [ last ])) where
+  mutual
+    every-cut : ∀ {A} i (q : A → Bool) (e : Events A) → Every P e → Every P (M.takeWhileᴱ i q e)
+    every (every-cut i q (out k a r) pe) = every (every-cutting i q k a (q a) r pe)
+    every (every-cut i q (skip k r)  pe) = proj₁ (every pe) , every-cut i q (force r) (proj₁ (proj₂ (every pe))) , proj₂ (proj₂ (every pe))
+    every (every-cut i q (end k)     pe) = every pe
+    every (every-cut i q hush        pe) = tt
 
-  -- A JOINER'S RUN SPREADS over a source in order, steady and alien to
-  -- it: each value its source's, tagged with the joiner.
-  spread-rejoin : ∀ {A} p (e : Events A) → Ordered e → Steady e → Alien p e → Spread (M.rejoin p e)
+    every-cutting : ∀ {A} i (q : A → Bool) k a b (r : Events∞ A) → Every P (out k a r) → Every P (M.taking i q k a b r)
+    every (every-cutting i     q k a true  r pe) = proj₁ (every pe) , every-cut i q (force r) (proj₁ (proj₂ (every pe))) , proj₂ (proj₂ (every pe))
+    every (every-cutting true  q k a false r pe) = d₀ k (proj₁ (every pe)) , record { every = dₗ k (proj₁ (every pe)) } , proj₂ (proj₂ (every pe))
+    every (every-cutting false q k a false r pe) = dₗ k (proj₁ (every pe))
+
+-- Apart from a lane, a step just under it too.
+sp-mark : ∀ x k {l} → Mark l → Sp x k → Sp x (k ++ [ l ])
+sp-mark x k {l} m ((_ , b) , c) =
+  ( (λ o → c (owned-drop k [ l ] _ (owned-drop (k ++ [ l ]) [ ix 1 ] _ o)))
+  , proj₁ (apart-mark (x ++ [ ix 1 ]) (k ++ [ l ]) (ix 1) (ix-mark 1) (apart-mark (x ++ [ ix 1 ]) k l m (nk , c))) )
+  , (λ o → c (owned-drop k [ l ] _ o))
+  where
+    nk : ¬ Owned (x ++ [ ix 1 ]) k
+    nk o = b (owned-trans (x ++ [ ix 1 ]) k (k ++ [ ix 1 ]) o (inj₁ (prefix-++ k [ ix 1 ])))
+
+-- What a source left running apart from a value: apart from the step
+-- kept just inside it.
+sp-cut : ∀ k t → Disjoint k t → Sp (k ++ [ ix 0 ]) t
+sp-cut k t d =
+  ( (λ o → proj₁ d₁ (owned-drop t [ ix 1 ] _ o))
+  , (λ o → proj₁ (apart-mark k t (ix 1) (ix-mark 1) d) (owned-drop k [ ix 0 ] _ (owned-drop (k ++ [ ix 0 ]) [ ix 1 ] _ o))) )
+  , proj₁ d₁
+  where
+    d₁ = apart-mark t (k ++ [ ix 0 ]) (ix 1) (ix-mark 1) (apart-mark t k (ix 0) (ix-mark 0) (disjoint-swap k t d))
+
+-- A CUT SPREADS ITS SOURCE'S RUN: a failing value kept just inside its
+-- own position, which nothing its source left running keys.
+mutual
+  spread-take : ∀ {A} i (q : A → Bool) (e : Events A) c → Trail e c → Spread e → Spread (M.takeWhileᴱ i q e)
+  spread (spread-take i q (out k a r) c t s) = spread (spread-taking i q k a (q a) r c t s)
+  spread (spread-take i q (skip k r)  c t s) = spread-take i q (force r) (cut r) (proj₂ (proj₂ (trail t))) (spread s)
+  spread (spread-take i q (end k)     c t s) = tt
+  spread (spread-take i q hush        c t s) = tt
+
+  spread-taking : ∀ {A} i (q : A → Bool) k a b (r : Events∞ A) c → Trail (out k a r) c → Spread (out k a r) → Spread (M.taking i q k a b r)
+  spread (spread-taking i     q k a true  r c t s) =
+    ( every-cut (λ h → sp-mark k h (ix-mark 0)) (λ h → sp-mark k h last-mark) i q (force r) (proj₁ (proj₁ (spread s)))
+    , proj₂ (proj₁ (spread s)) )
+    , spread-take i q (force r) (cut r) (proj₁ (proj₂ (proj₂ (trail t)))) (proj₂ (spread s))
+  spread (spread-taking true  q k a false r c t s) =
+    ( record { every = sibling-spread k last-mark (ix-mark 0) (λ ()) }
+    , everyT-mono (sp-cut k) (cut r) (proj₂ (proj₂ (proj₂ (trail t)))) )
+    , record { spread = tt }
+  spread (spread-taking false q k a false r c t s) = tt
+
+owned-drop : ∀ k w h → Owned (k ++ w) h → Owned k h
+owned-drop k w h = owned-trans k (k ++ w) h (inj₁ (prefix-++ k w))
+
+-- Keyed under a position tagged with `p`: keyed under `p`.
+mutual
+  sub-owned : ∀ k p h → Owned (k ++ [ sub p ]) h → Owned p h
+  sub-owned k p h (inj₁ pr) = inj₂ (tagged-prefix p (k ++ [ sub p ]) h (tagged-sub k p) pr)
+  sub-owned k p h (inj₂ t)  = inj₂ (sub-tagged k p h t)
+
+  sub-tagged : ∀ k p h → Tagged (k ++ [ sub p ]) h → Tagged p h
+  sub-tagged k p []          ()
+  sub-tagged k p (ix _ ∷ h)  t        = sub-tagged k p h t
+  sub-tagged k p (last ∷ h)  t        = sub-tagged k p h t
+  sub-tagged k p (sub j ∷ h) (inj₁ o) = inj₁ (sub-owned k p j o)
+  sub-tagged k p (sub j ∷ h) (inj₂ t) = inj₂ (sub-tagged k p h t)
+
+-- A position tagged with `p` outweighs it, and a step under `p` too.
+heavy : ∀ k p → ¬ Owned (k ++ [ sub p ]) p
+heavy k p o = <-irrefl refl (<-≤-trans (tagged-weigh p (k ++ [ sub p ]) (tagged-sub k p)) (owned-weigh _ _ o))
+
+snoc-weigh : ∀ p (l : M.Label) → weigh p < weigh (p ++ [ l ])
+snoc-weigh []      (ix _)  = s≤s z≤n
+snoc-weigh []      (sub _) = s≤s z≤n
+snoc-weigh []      last    = s≤s z≤n
+snoc-weigh (a ∷ p) l       = +-monoʳ-< (weighˡ a) (snoc-weigh p l)
+
+longer : ∀ p (l : M.Label) → ¬ Owned (p ++ [ l ]) p
+longer p l o = <-irrefl refl (<-≤-trans (snoc-weigh p l) (owned-weigh _ _ o))
+
+mark-sub : ∀ {l} → Mark l → ∀ j → sub j ≢ l
+mark-sub (ix-mark _) j ()
+mark-sub last-mark   j ()
+
+snoc-ne : ∀ a b {l l′ : M.Label} → l ≢ l′ → a ++ [ l ] ≢ b ++ [ l′ ]
+snoc-ne a b ne eq = ne (proj₂ (snoc-inj a b eq))
+
+-- Two of a source's positions apart, the second alien to the joiner,
+-- both tagged with it: the first keys nothing of the second's lane.
+tagged-apart : ∀ p a b → ¬ Owned p b → a ≢ b → ¬ Owned (a ++ [ sub p ]) ((b ++ [ sub p ]) ++ [ ix 1 ])
+tagged-apart p a b nb ne (inj₁ pr) with prefix-split (a ++ [ sub p ]) (b ++ [ sub p ]) (ix 1) pr
+... | inj₂ eq = snoc-ne a (b ++ [ sub p ]) (λ ()) eq
+... | inj₁ pr′ with prefix-split (a ++ [ sub p ]) b (sub p) pr′
+...   | inj₁ pb = nb (sub-owned a p b (inj₁ pb))
+...   | inj₂ eq = ne (proj₁ (snoc-inj a b eq))
+tagged-apart p a b nb ne (inj₂ t) with tagged-split (a ++ [ sub p ]) b p (tagged-lane (a ++ [ sub p ]) (b ++ [ sub p ]) 1 t)
+... | inj₁ tb = nb (inj₂ (sub-tagged a p b tb))
+... | inj₂ o  = heavy a p o
+
+-- A joiner's own step keys nothing of a tagged lane over a source alien
+-- to it, and the tagged position nothing of the step's lane.
+pre-apart : ∀ p q l → ¬ Owned p q → ¬ Owned (p ++ [ l ]) ((q ++ [ sub p ]) ++ [ ix 1 ])
+pre-apart p q l nq (inj₂ t) with tagged-split (p ++ [ l ]) q p (tagged-lane (p ++ [ l ]) (q ++ [ sub p ]) 1 t)
+... | inj₁ tq = nq (owned-drop p [ l ] q (inj₂ tq))
+... | inj₂ o  = longer p l o
+pre-apart p q l nq (inj₁ pr) with prefix-split p (q ++ [ sub p ]) (ix 1) (prefix-trans p (p ++ [ l ]) ((q ++ [ sub p ]) ++ [ ix 1 ]) (prefix-++ p [ l ]) pr)
+... | inj₂ eq = heavy q p (inj₁ (subst (Prefix (q ++ [ sub p ])) (sym eq) (prefix-++ (q ++ [ sub p ]) [ ix 1 ])))
+... | inj₁ pr′ with prefix-split p q (sub p) pr′
+...   | inj₁ pq = nq (inj₁ pq)
+...   | inj₂ eq = heavy q p (inj₁ (subst (Prefix (q ++ [ sub p ])) (sym eq) (prefix-refl (q ++ [ sub p ]))))
+
+pre-apart′ : ∀ p q {l} → Mark l → ¬ Owned (q ++ [ sub p ]) ((p ++ [ l ]) ++ [ ix 1 ])
+pre-apart′ p q {l} m (inj₁ pr) with prefix-split (q ++ [ sub p ]) (p ++ [ l ]) (ix 1) pr
+... | inj₂ eq = snoc-ne q (p ++ [ l ]) (λ ()) eq
+... | inj₁ pr′ with prefix-split (q ++ [ sub p ]) p l pr′
+...   | inj₁ pp = heavy q p (inj₁ pp)
+...   | inj₂ eq = snoc-ne q p (mark-sub m p) eq
+pre-apart′ p q {l} m (inj₂ t) =
+  heavy q p (inj₂ (tagged-mark (q ++ [ sub p ]) p l m (tagged-lane (q ++ [ sub p ]) (p ++ [ l ]) 1 t)))
+
+sp-join : ∀ p q h → ¬ Owned p q → ¬ Owned p h → q <ᵖ h ≡ true → Sp (q ++ [ sub p ]) (h ++ [ sub p ])
+sp-join p q h nq nh qh =
+  ( (λ o → tagged-apart p h q nq hq (owned-drop (h ++ [ sub p ]) [ ix 1 ] _ o))
+  , (λ o → tagged-apart p q h nh (λ e → hq (sym e)) (owned-drop (q ++ [ sub p ]) [ ix 1 ] _ o)) )
+  , tagged-apart p h q nq hq
+  where
+    hq : h ≢ q
+    hq e with trans (sym (subst (λ x → q <ᵖ x ≡ true) e qh)) (<ᵖ-irrefl q)
+    ... | ()
+
+sp-pre : ∀ p q {l} → Mark l → ¬ Owned p q → Sp (q ++ [ sub p ]) (p ++ [ l ])
+sp-pre p q {l} m nq =
+  ( (λ o → pre-apart p q l nq (owned-drop (p ++ [ l ]) [ ix 1 ] _ o))
+  , (λ o → pre-apart′ p q m (owned-drop (q ++ [ sub p ]) [ ix 1 ] _ o)) )
+  , pre-apart p q l nq
+
+-- Strictly past `q`, then no earlier than that: strictly past `q`.
+beyond-on : ∀ {A} q h (e : Events A) → q <ᵖ h ≡ true → Atop h e → Beyond q e
+beyond-on q h (out k _ _) qh a with <ᵖ-split h k a
+... | inj₁ hk   = <ᵖ-trans q h k qh hk
+... | inj₂ refl = qh
+beyond-on q h (skip k _)  qh a with <ᵖ-split h k a
+... | inj₁ hk   = <ᵖ-trans q h k qh hk
+... | inj₂ refl = qh
+beyond-on q h (end k)     qh a with <ᵖ-split h k a
+... | inj₁ hk   = <ᵖ-trans q h k qh hk
+... | inj₂ refl = qh
+beyond-on q h hush        qh a = tt
+
+-- What a joiner shows after a value tagged from `q`, over a source past
+-- it: tagged from past `q`, or its own step.
+module _ (p q : Pos) (nq : ¬ Owned p q) where
+  mutual
+    sp-rejoin : ∀ {A} (e : Events A) → Alien p e → Ordered e → Beyond q e → Every (Sp (q ++ [ sub p ])) (M.rejoin p e)
+    every (sp-rejoin (out h a k) al o b) =
+      every (sp-shown h (just a) k (p <ᵖ h) (proj₁ (every al)) (proj₁ (proj₂ (every al))) (proj₁ (ordered o)) (proj₂ (ordered o)) b)
+    every (sp-rejoin (skip h k)  al o b) =
+      every (sp-shown h nothing k (p <ᵖ h) (proj₁ (every al)) (proj₁ (proj₂ (every al))) (proj₁ (ordered o)) (proj₂ (ordered o)) b)
+    every (sp-rejoin (end c)     al o b) with p <ᵖ c
+    ... | true  = sp-join p q c nq (every al) b
+    ... | false = sp-pre p q last-mark nq
+    every (sp-rejoin hush        al o b) = tt
+
+    sp-shown : ∀ {A} h (a : Maybe A) (k : Events∞ A) c → ¬ Owned p h → Alien p (force k) → Atop h (force k) → Ordered (force k)
+             → q <ᵖ h ≡ true → Every (Sp (q ++ [ sub p ])) (M.shown p h a k c)
+    every (sp-shown h (just a) k true  nh al at o qh) =
+      sp-join p q h nq nh qh , sp-rejoin (force k) al o (beyond-on q h (force k) qh at) , everyT-idle
+    every (sp-shown h nothing  k true  nh al at o qh) =
+      sp-join p q h nq nh qh , sp-rejoin (force k) al o (beyond-on q h (force k) qh at) , everyT-idle
+    every (sp-shown h (just a) k false nh al at o qh) =
+      sp-pre p q (ix-mark 0) nq , sp-rejoin (force k) al o (beyond-on q h (force k) qh at) , everyT-idle
+    every (sp-shown h nothing  k false nh al at o qh) =
+      sp-pre p q (ix-mark 0) nq , sp-rejoin (force k) al o (beyond-on q h (force k) qh at) , everyT-idle
+
+-- A JOINER'S RUN SPREADS over a source in order, steady and alien to
+-- it: each value its source's, tagged with the joiner.
+spread-rejoin : ∀ {A} p (e : Events A) → Ordered e → Steady e → Alien p e → Spread (M.rejoin p e)
+spread (spread-rejoin p (out q a k) o st al) with p <ᵖ q
+... | true  =
+  ( sp-rejoin p q (proj₁ (every al)) (force k) (proj₁ (proj₂ (every al))) (proj₂ (ordered o)) (past-beyond q (force k) (proj₁ (steady st)))
+  , everyT-idle )
+  , spread-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₁ (proj₂ (every al)))
+... | false = spread-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₁ (proj₂ (every al)))
+spread (spread-rejoin p (skip q k) o st al) with p <ᵖ q
+... | true  = spread-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₁ (proj₂ (every al)))
+... | false = spread-rejoin p (force k) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₁ (proj₂ (every al)))
+spread (spread-rejoin p (end c) o st al) with p <ᵖ c
+... | true  = tt
+... | false = tt
+spread (spread-rejoin p hush o st al) = tt
 
 -- Two marks under one position, neither's lane keyed by the other's,
 -- nor its lane by it.
