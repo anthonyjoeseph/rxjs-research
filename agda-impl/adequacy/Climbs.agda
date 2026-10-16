@@ -40,7 +40,7 @@ open import adequacy.Stepper using (placed-after; Placedˢ)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (Out; note; Pureᴾ; module Pure)
-open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
+open import operation.AbstractObservable using (module Heap; module Run; fifo) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Lift using (module Lifting)
@@ -60,7 +60,7 @@ module Ascending (R : Set) where
   open Pure R using (Timer; cascade)
   open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite; look-store)
-  open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk-same; bind≗)
+  open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
@@ -1008,16 +1008,68 @@ module Ascending (R : Set) where
          → Act (Conf.world (Mach.conf m₁)) ⊤ → Act (Conf.world (Mach.conf m₁)) ⊤ → Mach
   resend (mach ⟨ _ , q , _ ⟩ clk ts bs td lg en mk) H ϑ K a n = mach ⟨ H , q , run a same⊑ (push (rest n) ϑ K) ⟩ clk ts bs td lg en mk
 
+  -- A queue read whose continuations agree, case by case.
+  readF-cases : ∀ {w X} {r : Ref w (fifo X)} {k k′ : List X → Act w ⊤} → (∀ x → k x ≗ k′ x) → Kit.readF r k ≗ Kit.readF r k′
+  readF-cases e = readRef≗ refl λ σ x → wk≗ σ (e x)
+
+  -- A dequeue at the queue it reads: empty, the settle; else the head's
+  -- lane begun.
+  dequeueOf : ∀ {h} {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
+            → Path T (flatMapˢ op f fl oc k r pl u ls) → List A → Act h ⊤
+  dequeueOf {op = op} {f} {fl} ρ []       = Canon.Flat′.settle op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl
+  dequeueOf {fl = fl}          ρ (y ∷ ys) = writeRef (FlatKit.Flat.queue fl) ys (startAt ρ y)
+
+  dequeue-cases : ∀ {h} {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) → dequeueAt ρ ≗ Kit.readF (FlatKit.Flat.queue fl) (dequeueOf ρ)
+  dequeue-cases ρ = readF-cases λ where
+    []      → ≗-refl (dequeueOf ρ [])
+    (y ∷ ys) → ≗-refl (dequeueOf ρ (y ∷ ys))
+
   postulate
-    -- A lane's freed slot handed on: the queue read; empty, the flatMap
-    -- settled, ending one operator up with nothing left, else the pool
-    -- taking the lane's rest; a value queued, its lane begun.
-    lane-dequeue : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
-                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
-                   (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
-                 → ∀ {a n} → a ≗ dequeueAt ρ → n ≗ ⟦ ks ⟧ᶜ
-                 → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
+    -- A freed slot with nothing queued: the flatMap's settle read; its
+    -- outer done and no lane left, its end one operator up with the
+    -- call's rest owed in a frame; else the pool taking the lane's rest.
+    lane-settle : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                  {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
+                  (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
+                → At.val (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ []
+                → ∀ {a n} → a ≗ dequeueOf ρ [] → n ≗ ⟦ ks ⟧ᶜ
+                → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
+
+    -- A freed slot with a value queued: the queue's head taken, its lane
+    -- begun.  The lane's cut is allocated, so this owes the strong
+    -- tree's transport along `_⊑_` that `outer-start` owes.
+    lane-next : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
+                (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
+              → ∀ {y ys} → At.val (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ y ∷ ys
+              → ∀ {a n} → a ≗ dequeueOf ρ (y ∷ ys) → n ≗ ⟦ ks ⟧ᶜ
+              → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
+
+  -- A freed slot's queue read, by what it holds.
+  lane-queue : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+               {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+               (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
+               (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
+             → ∀ qs → At.val (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ qs
+             → ∀ {a n} → a ≗ dequeueOf ρ qs → n ≗ ⟦ ks ⟧ᶜ
+             → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
+  lane-queue st ρ πL o cl []       e = lane-settle st ρ πL o cl e
+  lane-queue st ρ πL o cl (y ∷ ys) e = lane-next st ρ πL o cl e
+
+  -- A lane's freed slot handed on: the queue read.
+  lane-dequeue : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                 {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                 (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
+                 (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
+               → ∀ {a n} → a ≗ dequeueAt ρ → n ≗ ⟦ ks ⟧ᶜ
+               → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
+  lane-dequeue st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {fl = fl} ρ πL o cl@record { ctl = refl } ea en
+    with reads {hp = freed hp (laneOf o) fl} (≗-trans ea (dequeue-cases ρ))
+  ... | k₁ , f₁ , p₁ = hopped-pre p₁ (lane-queue st ρ πL o cl _ refl
+          (≗-trans (f₁ same⊑ _) (wk-same (dequeueOf ρ (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.queue fl))))) en)
 
   -- A lane ended: its guard read open, its cut dropped, the count down,
   -- the refill sent.

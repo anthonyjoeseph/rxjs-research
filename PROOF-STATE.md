@@ -184,10 +184,11 @@ by their own silent steps (`Mirror`).
   An operator's call is reads, writes and a RESTAGE of its node,
   node-local but for carrying stack, calls and agenda across it: a
   take's stage, a connect's feed, a flatMap's pool, its admit by
-  policy, a lane's end down to its refill's send. Every guard read open
-  by `calling-open`. Remaining: `lane-dequeue`, the queue read then settle or start;
-  `outer-start`, which allocates, so it waits on a strong tree's
-  transport along `_⊑_` that `sub-onward` and a dequeue's start owe too.
+  policy, a lane's end down to its queue read. Every guard read open by
+  `calling-open`. Remaining: `lane-settle`, the settle read as
+  `close-outer` reads it; `outer-start` and `lane-next`, which allocate,
+  so wait on a strong tree's transport along `_⊑_` that `sub-onward`
+  owes too.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -199,7 +200,7 @@ by their own silent steps (`Mirror`).
   `Off`. Ruled out for the scan: a write needs no non-local leaf but
   `tells-past`. Remaining: an own-cell apartness fold carrying
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
-  and `up-lanes` by a flatMap head bound; then `lane-dequeue` and
+  and `up-lanes` by a flatMap head bound; then `lane-settle` and
   `close-outer`'s `sd-*` the same way, in the form C consumes.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
@@ -217,8 +218,10 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
-- **`lane-dequeue`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's freed slot
-  handed on settles the flatMap, or begins the next queued value's lane.
+- **`lane-settle`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot with
+  nothing queued settles the flatMap: its end one operator up, or the pool.
+- **`lane-next`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot with a value
+  queued takes it and begins its lane; allocates, as `outer-start` does.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
   path reads open.
 - **`outer-start`** (Climbs) — FALSITY, `NO EVIDENCE`: an admitted value with
