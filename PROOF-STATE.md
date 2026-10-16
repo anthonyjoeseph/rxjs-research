@@ -190,7 +190,7 @@ by their own silent steps (`Mirror`).
   running beside its body's cut, the burst's pins keyed under the
   connect's own lane. Decides whether `Trailings`' new disjointness of a
   value from its cut reaches a body's tail, or the connect owes it. Then
-  `trail-defer`, `spread-sub`, `ordered-connect`, `steady-connect`.
+  `spread-sub`, `ordered-connect`, `steady-connect`.
   Ruled out: a take owing anything past a value's disjointness from the
   pins it trails and leaves (`trail-take`); the flatMap's merge owing
   anything past `Roots`, `Pool`, `Aside` and `Heldᴹ`.
@@ -214,8 +214,6 @@ by their own silent steps (`Mirror`).
 
 - **`trail-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
   source burst left running beside its body's cut trails what it shows next.
-- **`trail-defer`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a defer's cuts
-  trail its run, its program's subscribed past the skip doing so.
 - **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: after a value,
   nothing later keys where its lane would, nor under it, nor over it.
 - **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's

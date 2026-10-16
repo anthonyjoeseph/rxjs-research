@@ -1927,6 +1927,55 @@ trail-idle : ∀ {A} (x : Events A) → Trailings x → Trail x idle
 trail (trail-idle x t) = sortedT-idle , everyT-idle , t
 trailᶠ (trail-idle x t) = flatT-idle
 
+-- A TRAIL HOLDS OF WHAT AGREES WITH IT at every depth: its run and what
+-- it leaves running alike.
+atopT-≈ : ∀ h t u → Agreeᵀ 1 t u → AtopT h t → AtopT h u
+atopT-≈ h (pin k _) (pin k _) (pin⁼ _) a = a
+atopT-≈ h idle      idle      idle⁼    a = a
+
+mutual
+  sortedT-≈ : ∀ t u → (∀ k → Agreeᵀ k t u) → SortedT t → SortedT u
+  sortedᵀ (sortedT-≈ t u ag st) = sortedTs-≈ t u ag (ag 1) st
+
+  sortedTs-≈ : ∀ t u → (∀ k → Agreeᵀ k t u) → Agreeᵀ 1 t u → SortedT t → SortedTs u
+  sortedTs-≈ (pin k l) (pin k r) ag (pin⁼ _) st =
+    atopT-≈ k (later l) (later r) (restᵀ-agree (ag 2)) (proj₁ (sortedᵀ st))
+    , sortedT-≈ (later l) (later r) (λ n → restᵀ-agree (ag (suc n))) (proj₂ (sortedᵀ st))
+  sortedTs-≈ idle      idle      ag idle⁼    st = tt
+
+mutual
+  flatT-≈ : ∀ t u → (∀ k → Agreeᵀ k t u) → FlatT t → FlatT u
+  flatᵀ (flatT-≈ t u ag ft) = flatTs-≈ t u ag (ag 1) ft
+
+  flatTs-≈ : ∀ t u → (∀ k → Agreeᵀ k t u) → Agreeᵀ 1 t u → FlatT t → FlatTs u
+  flatTs-≈ (pin k l) (pin k r) ag (pin⁼ _) ft =
+    everyT-≈ (later l) (later r) (λ n → restᵀ-agree (ag (suc n))) (proj₁ (flatᵀ ft))
+    , flatT-≈ (later l) (later r) (λ n → restᵀ-agree (ag (suc n))) (proj₂ (flatᵀ ft))
+  flatTs-≈ idle      idle      ag idle⁼    ft = tt
+
+trailE-≈ : ∀ {A} (x y : Events A) → Agree 1 x y → ∀ k → TrailE x k → TrailE y k
+trailE-≈ (out _ _ _) (out _ _ _) (out⁼ _ _)  k t = t
+trailE-≈ (skip _ _)  (skip _ _)  (skip⁼ _ _) k t = t
+trailE-≈ (end _)     (end _)     end⁼        k t = t
+trailE-≈ hush        hush        hush⁼       k t = t
+
+mutual
+  trail-≈ : ∀ {A} (x y : Events A) c d → (∀ k → Agree k x y) → (∀ k → Agreeᵀ k c d) → Trail x c → Trail y d
+  trail (trail-≈ x y c d ag at tr) =
+    sortedT-≈ c d at (proj₁ (trail tr))
+    , everyT-≈ c d at (everyT-mono (trailE-≈ x y (ag 1)) c (proj₁ (proj₂ (trail tr))))
+    , trailings-≈ x y ag (ag 1) (proj₂ (proj₂ (trail tr)))
+  trailᶠ (trail-≈ x y c d ag at tr) = flatT-≈ c d at (trailᶠ tr)
+
+  trailings-≈ : ∀ {A} (x y : Events A) → (∀ k → Agree k x y) → Agree 1 x y → Trailings x → Trailings y
+  trailings-≈ (out _ _ l) (out _ _ r) ag (out⁼ _ _) (t , e) =
+    trail-≈ (force l) (force r) (cut l) (cut r) (λ k → rest-agree (ag (suc k))) (λ k → M.agree-tail (ag (suc k))) t
+    , everyT-≈ (cut l) (cut r) (λ k → M.agree-tail (ag (suc k))) e
+  trailings-≈ (skip _ l)  (skip _ r)  ag (skip⁼ _ _) t =
+    trail-≈ (force l) (force r) (cut l) (cut r) (λ k → rest-agree (ag (suc k))) (λ k → M.agree-tail (ag (suc k))) t
+  trailings-≈ (end _)     (end _)     ag end⁼        t = tt
+  trailings-≈ hush        hush        ag hush⁼       t = tt
+
 -- A cold leaf's run leaves nothing running at any state.
 mutual
   trail-frames : ∀ {A t} τ e (m : From A t) → Trail (M.frames τ e m) idle
@@ -3964,10 +4013,15 @@ mutual
   trailᶠ (trail-taking i q h a b r c o s tr) = trailᶠ tr
 
 -- A DEFER'S CUTS TRAIL ITS RUN where a tick heads it, its program's
--- subscribed just past its skip doing so.
-postulate
-  trail-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
-              → Trailing (U.stateᴺ (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ) → Trailing (U.stateᴺ (U.deferᶜ l p []) ρ)
+-- subscribed just past its skip doing so: the skip leaves nothing
+-- running, and past it the program's run is what it shows.
+trail-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
+            → Trailing (U.stateᴺ (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ) → Trailing (U.stateᴺ (U.deferᶜ l p []) ρ)
+trail (trail-defer l p ρ hp cl tr) =
+  sortedT-idle , everyT-idle
+  , trail-≈ S X _ _ alike (λ k → agreeᵀ (U.subscribed (Later.force l) (env-refl (U.hots ρ))) P₁) tr
+  where open Deferred l p ρ hp cl
+trailᶠ (trail-defer l p ρ hp cl tr) = flatT-idle
 
 -- A FINITE PROGRAM'S CUTS TRAIL ITS RUN, where a tick heads it, over
 -- sorted sources alien to it: at every state, what a cut would leave
