@@ -86,7 +86,7 @@ module Honesty (R : Set) where
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears)
   open Locality R using (site-holds; site-gated)
-  open Lowering R using (site-lowers; queue-lowers)
+  open Lowering R using (site-lowers; queue-lowers; torn-owned)
   open Read
 
   ----------------------------------------------------------------------
@@ -1122,14 +1122,6 @@ module Honesty (R : Set) where
   tear-cut {hp = hp} cr z {ks} e eq = site-tears hp (Kernels.holds (Carried.kernels cr)) (Books.fresh (Carried.books cr)) z {ks} e eq
 
   postulate
-    -- A teardown only throws switches, spends colds and silences
-    -- joiners: what is owed of a live switch or an unspent cold was owed
-    -- before, the cut itself is owed no longer, and a body that held no
-    -- part holds none.
-    torn-owned : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} (z : Site t)
-                 {p w bs} {act act′ : Act h ⊤} {σ : w ⊑ h} {K ks} {e : act ≗ ⟦ siteCall z ∷ ks ⟧ᶜ} {e′ : act′ ≗ ⟦ ks ⟧ᶜ}
-                 {Kᴬ : StackAs t p σ K bs} → Owned H t (runAs (siteCall z ∷ ks) e Kᴬ) → Owned (siteHeap H z) t (runAs ks e′ Kᴬ)
-
     -- A joiner silenced owes nothing; every other as it was.
     torn-fed : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
              → At.Fed (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) []

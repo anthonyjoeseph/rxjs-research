@@ -289,8 +289,8 @@ by their own silent steps (`Mirror`).
   completion delivered, then its cut.
 - **`src-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
   subscribed once its body is.
-- **`torn-owned`** (Content) — FALSITY, `NO EVIDENCE`: what a cut leaves owes
-  nothing new, the cut itself no longer owed.
+- **`parted-torn`** (Lowers) — FALSITY, `NO EVIDENCE`: a body with no part
+  has none once a cut runs; a flatMap's queue needs the names apart.
 - **`holds-torn`** (Local) — FALSITY, `NO EVIDENCE`: an unsubscribe keeps the
   kernel of the subscription it tears, its lanes left none live.
 - **`spent-torn`** (Local) — FALSITY, `NO EVIDENCE`: an unsubscribe leaves what

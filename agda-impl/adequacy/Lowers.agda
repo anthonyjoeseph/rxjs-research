@@ -15,11 +15,13 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
-open import Data.List.Relation.Unary.All using (All) renaming (map to mapᴬ)
+open import Data.List.Relation.Unary.All using (All) renaming (map to mapᴬ; tail to tailᴬ)
+open import Data.List.Relation.Unary.Any using () renaming (here to hereᴬ; there to thereᴬ)
+open import Data.Empty using (⊥-elim)
 open import Data.List.Relation.Unary.Linked using (Linked)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
-open import denotation.MonotonicList using (Timeline)
+open import denotation.MonotonicList using (Timeline; Pos)
 open import operation.AbstractObservable using (module Heap; module Run; base; list; joins) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
@@ -29,8 +31,9 @@ module Lowering (R : Set) where
   open Heap using (Kind; cell; slot; play; _∋_; same) renaming (here to hereʰ; there to thereʰ)
   open Shared Timeline (Out R) using (Heapᴹ; store; look; stored)
   open Strongly R
-  open Tearing R using (torn; tornVia; thrown; thrownLanes; look-store; get-put-same; Site; takeSite; bodySite; siteHeap)
-  open Run (Pureᴾ R) using (module Kit; module FlatKit; module Subject)
+  open Tearing R using (torn; tornVia; thrown; thrownLanes; look-store; get-put-same; Site; takeSite; bodySite; siteHeap; siteCall)
+  open Run (Pureᴾ R) using (Act; module Kit; module FlatKit; module Subject)
+  open Heap using (_⊑_)
 
   ----------------------------------------------------------------------
   -- Kinds apart
@@ -175,3 +178,79 @@ module Lowering (R : Set) where
               , mapᴬ (λ { {joiner S sk j} m → subst ((sk , j) ∈ᴸ_) (sym (cong lower (subs lw (Subject.subscribers S)))) m }) (proj₂ (Queue.joined q))
     ; ordered = Queue.ordered q
     ; ahead   = Queue.ahead q }
+
+  ----------------------------------------------------------------------
+  -- What is owed, a cut run
+
+  false≢true : false ≢ true
+  false≢true ()
+
+  dropped : ∀ {h} (H : Heapᴹ h) (l : h ∋ cell (base Bool)) → lower (look (store H l (lift false)) l) ≡ false
+  dropped H l rewrite get-put-same H l {y = stored (lift false) same} = refl
+
+  -- A cut's own switch, thrown.
+  site-dead : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A} (π : Path t (takeWhileˢ i q c k taken s))
+            → lower (look (siteHeap H (takeSite π)) (Kit.live c)) ≡ false
+  site-dead H {c = c} {k} {s} π = lowers (via-lowers _ k s) (Kit.live c) (dropped H (Kit.live c))
+
+  raised : ∀ {h} {H H′ : Heapᴹ h} → Lowers H H′ → (l : h ∋ cell (base Bool)) → lower (look H′ l) ≡ true → lower (look H l) ≡ true
+  raised {H = H} lw l e with lower (look H l) in eq
+  ... | true  = refl
+  ... | false = ⊥-elim (false≢true (trans (sym (lowers lw l eq)) e))
+
+  -- The calls a cut is.
+  cutLike : ∀ {h} {t : Sub h [] R} → Call t → Bool
+  cutLike (take2C _) = true
+  cutLike (bodyC _)  = true
+  cutLike _          = false
+
+  cut-like : ∀ {h} {t : Sub h [] R} (z : Site t) → cutLike (siteCall z) ≡ true
+  cut-like (takeSite _) = refl
+  cut-like (bodySite _) = refl
+
+  past : ∀ {h} {t : Sub h [] R} (z : Site t) {p q : Pos} {c} {js : List (Job t)} → cutLike c ≡ false
+       → (q , c) ∈ᴸ (p , siteCall z) ∷ js → (q , c) ∈ᴸ js
+  past z f (hereᴬ eq) = ⊥-elim (false≢true (trans (sym f) (trans (cong (λ j → cutLike (proj₂ j)) eq) (cut-like z))))
+  past z f (thereᴬ m) = m
+
+  -- The cut run owed no longer: its switch is thrown.
+  cut-gone : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} (z : Site t) {p : Pos} {js Δ A i q c k} {s : Sub h Δ A}
+             (π : Path t (takeWhileˢ i q c k taken s)) {r}
+           → lower (look (siteHeap H z) (Kit.live c)) ≡ true → (r , take2C π) ∈ᴸ (p , siteCall z) ∷ js → (r , take2C π) ∈ᴸ js
+  cut-gone H (takeSite π₀) π l (hereᴬ refl) = ⊥-elim (false≢true (trans (sym (site-dead H π₀)) l))
+  cut-gone H (bodySite π₀) π l (hereᴬ ())
+  cut-gone H z             π l (thereᴬ m)   = m
+
+  sources-past : ∀ {h} {t : Sub h [] R} (z : Site t) {p : Pos} {js} → Against.sources t ((p , siteCall z) ∷ js) ≡ Against.sources t js
+  sources-past (takeSite _) = refl
+  sources-past (bodySite _) = refl
+
+  postulate
+    -- A body that held no part holds none once a cut has run: a cut
+    -- only spends, throws and silences, so every `if` `part` reads goes
+    -- to `nothing` or stays.  Except a flatMap's queue, which `merged`
+    -- reads: the teardown stores the active count, a `base ℕ` cell, and
+    -- a `base (List A)` cell is not apart from it by kind (`List ⊤` and
+    -- `ℕ` are not distinguishable), so a body needs the tree's names
+    -- apart, `Books.fresh` at the one call site.
+    parted-torn : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} (z : Site t) {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+                → Path t (connectˢ S c b kb k fd rp e rt s bd) → At.part H bd ≡ nothing → At.part (siteHeap H z) bd ≡ nothing
+
+  -- A teardown only throws switches, spends colds and silences joiners:
+  -- what is owed of a live switch or an unspent cold was owed before,
+  -- the cut itself is owed no longer.
+  torn-owned : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} (z : Site t)
+               {p w bs} {act act′ : Act h ⊤} {σ : w ⊑ h} {K ks} {e : act ≗ ⟦ siteCall z ∷ ks ⟧} {e′ : act′ ≗ ⟦ ks ⟧}
+               {Kᴬ : Against.StackAs t p σ K bs} → Owned H t (Against.runAs (siteCall z ∷ ks) e Kᴬ) → Owned (siteHeap H z) t (Against.runAs ks e′ Kᴬ)
+  torn-owned H {t} z ow = record
+    { ofs    = λ π → past z refl (Owned.ofs ow π)
+    ; plays  = λ {hd = hd} π nsp → Owned.plays ow π (unspent (spends lw hd) nsp)
+    ; fires  = λ {hd = hd} π nsp → Owned.fires ow π (unspent (spends lw hd) nsp)
+    ; begun  = λ π → subst (λ xs → _ ∈ᴸ xs) (sources-past z) (Owned.begun ow π)
+    ; ends   = λ {c = c} π l → past z refl (Owned.ends ow π (raised lw (Kit.live c) l))
+    ; cuts   = λ {c = c} π l → proj₁ (Owned.cuts ow π (raised lw (Kit.live c) l)) , cut-gone H z π l (proj₂ (Owned.cuts ow π (raised lw (Kit.live c) l)))
+    ; feeds  = λ π → past z refl (Owned.feeds ow π)
+    ; fins   = λ π → past z refl (Owned.fins ow π)
+    ; bodies = λ π m → parted-torn H z π (Owned.bodies ow π (thereᴬ m))
+    ; placed = tailᴬ (Owned.placed ow) }
+    where lw = site-lowers H z
