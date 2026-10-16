@@ -35,6 +35,7 @@ open import operation.Machine using (module Machine)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
+open import adequacy.Local using (module Locality)
 
 module Unsubbing (R : Set) where
   open Heap using (World; Quiet; _⊑_; same; grow; _⨾_)
@@ -45,6 +46,7 @@ module Unsubbing (R : Set) where
   open Strongly R
   open Moving R using (pairs-r; pairs-split)
   open Tearing R
+  open Locality R using (cuts; cuts-switches; attached-alike; stashed-alike; holds-at)
 
   ----------------------------------------------------------------------
   -- `m` runs silently to `m′`
@@ -276,14 +278,6 @@ module Unsubbing (R : Set) where
   -- What an unsubscribe reads: each switch's attachment, each stash, and
   -- a flatMap's lanes in flight, a prefix of its lanes' switches
 
-  cuts : ∀ {h Δ B} → List (Lane h Δ B) → List (Kit.Cut h)
-  cuts []                = []
-  cuts (lane c _ _ ∷ ls) = c ∷ cuts ls
-
-  cuts-switches : ∀ {h} (H : Heapᴹ h) {Δ B} (ls : List (Lane h Δ B)) → At.switches H ls ≡ cuts ls
-  cuts-switches H []                = refl
-  cuts-switches H (lane c _ _ ∷ ls) = cong (c ∷_) (cuts-switches H ls)
-
   mutual
     Tearable : ∀ {h} → Heapᴹ h → ∀ {Δ A} → Sub h Δ A → Set₁
     Tearable H (mapˢ f s)                              = Tearable H s
@@ -320,38 +314,8 @@ module Unsubbing (R : Set) where
     tearableLanes {op = op} {f = f} {E = E} {o = o} {fl = fl} (lane c k s ∷ ls) (a , hs , hl) =
       a , tearable s hs , tearableLanes {op = op} {f = f} {E = E} {o = o} {fl = fl} ls hl
 
-  -- Every subscription below a path against its kernel.
-  mutual
-    holds-at : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {E o} → Path t u → At.Holds H t E o
-             → Σ (Env Δ′ h) λ E′ → Σ (Observer A′ h) λ o′ → At.Holds H u E′ o′
-    holds-at here          hs                          = _ , _ , hs
-    holds-at (in-map π)    hs                          = holds-at π hs
-    holds-at (in-scan π)   hs                          = holds-at π hs
-    holds-at (in-take π)   (_ , hs)                    = holds-at π hs
-    holds-at (in-outer π)  (_ , _ , _ , hso , _)       = holds-at π hso
-    holds-at {t = flatMapˢ op f fl _ _ _ _ _ _} {E = E} {o = o} (in-lanes π) (_ , _ , _ , _ , _ , _ , hl) =
-      holdsL-at {op = op} {f = f} {E = E} {o = o} {fl = fl} π hl
-    holds-at (in-source π) (_ , _ , _ , hsrc , _)      = holds-at π hsrc
-    holds-at (in-body π)   (_ , _ , _ , _ , hbd)       = holds-at π hbd
-    holds-at (in-defer π)  (_ , hs)                    = holds-at π hs
-
-    holdsL-at : ∀ {h} {H : Heapᴹ h} {Δ A B Δ′ A′ op f E o fl} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u
-              → At.HoldsLanes H {A = A} op f E o fl ls → Σ (Env Δ′ h) λ E′ → Σ (Observer A′ h) λ o′ → At.Holds H u E′ o′
-    holdsL-at (this-lane π) (_ , hs , _) = holds-at π hs
-    holdsL-at {op = op} {f = f} {E = E} {o = o} {fl = fl} (next-lane π) (_ , _ , hl) = holdsL-at {op = op} {f = f} {E = E} {o = o} {fl = fl} π hl
-
   ----------------------------------------------------------------------
   -- Tearable reads only its own names
-
-  attached-alike : ∀ {h} {H H′ : Heapᴹ h} (c : Kit.Cut h) (k : Maybe (Quiet h)) {u}
-                 → Alike H H′ (cutNames c) → Alike H H′ (quietName k) → At.Attached H c k u → At.Attached H′ c k u
-  attached-alike c nothing  agc agk (lift e) = lift (trans (cong lower (agc (Kit.held c) (there (here refl)))) e)
-  attached-alike c (just q) agc agk (e , st) =
-    trans (cong lower (agc (Kit.held c) (there (here refl)))) e , subst (_≗ _) (sym (agk q (here refl))) st
-
-  stashed-alike : ∀ {h} {H H′ : Heapᴹ h} (k : Maybe (Quiet h)) {u} → Alike H H′ (quietName k) → At.Stashed H k u → At.Stashed H′ k u
-  stashed-alike nothing  ag st = st
-  stashed-alike (just q) ag st = subst (_≗ _) (sym (ag q (here refl))) st
 
   mutual
     tearable-alike : ∀ {h} {H H′ : Heapᴹ h} {Δ A} (u : Sub h Δ A) → Alike H H′ (names u) → Tearable H u → Tearable H′ u
@@ -362,10 +326,10 @@ module Unsubbing (R : Set) where
     tearable-alike (mapˢ f s)                ag t = tearable-alike s ag t
     tearable-alike (scanˢ f r s)             ag t = tearable-alike s (λ j m → ag j (there m)) t
     tearable-alike (takeWhileˢ i p c k tk s) ag (a , t) =
-      attached-alike c k (λ j m → ag j (++⁺ˡ m)) (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ˡ m))) a
+      attached-alike c k (ag (Kit.held c) (there (here refl))) (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ˡ m))) a
       , tearable-alike s (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) m))) t
     tearable-alike (flatMapˢ op f fl oc k r pl so ls) ag (a , t , (gone , eq) , tl) =
-      attached-alike oc k (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ˡ m))) (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ˡ m)))) a
+      attached-alike oc k (ag (Kit.held oc) (++⁺ʳ (flatNames fl) (there (here refl)))) (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ˡ m)))) a
       , tearable-alike so (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))) t
       , (gone , trans (cong (λ z → lower z ++ gone) (ag (FlatKit.Flat.lanes fl) (there (there (there (here refl)))))) eq)
       , tearableL-alike ls (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))) tl
@@ -380,7 +344,7 @@ module Unsubbing (R : Set) where
     tearableL-alike : ∀ {h} {H H′ : Heapᴹ h} {Δ B} (ls : List (Lane h Δ B)) → Alike H H′ (laneNames ls) → TearableLanes H ls → TearableLanes H′ ls
     tearableL-alike []                ag t = t
     tearableL-alike (lane c k s ∷ ls) ag (a , t , tl) =
-      attached-alike c k (λ j m → ag j (++⁺ˡ m)) (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ˡ m))) a
+      attached-alike c k (ag (Kit.held c) (there (here refl))) (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ˡ m))) a
       , tearable-alike s (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ m)))) t
       , tearableL-alike ls (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m)))) tl
 

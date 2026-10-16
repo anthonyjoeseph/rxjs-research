@@ -52,6 +52,7 @@ open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
+open import adequacy.Local using (module Locality)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; afterᴱ; placed-after; Placedˢ; step-skips)
@@ -83,6 +84,7 @@ module Honesty (R : Set) where
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears)
+  open Locality R using (site-holds; site-gated)
   open Read
 
   ----------------------------------------------------------------------
@@ -1126,17 +1128,6 @@ module Honesty (R : Set) where
                  {p w bs} {act act′ : Act h ⊤} {σ : w ⊑ h} {K ks} {e : act ≗ ⟦ siteCall z ∷ ks ⟧ᶜ} {e′ : act′ ≗ ⟦ ks ⟧ᶜ}
                  {Kᴬ : StackAs t p σ K bs} → Owned H t (runAs (siteCall z ∷ ks) e Kᴬ) → Owned (siteHeap H z) t (runAs ks e′ Kᴬ)
 
-    -- Every subscription still against its kernel: a teardown writes no
-    -- slot, no attachment and no stash, and a flatMap's lanes dropped
-    -- leave none open.
-    torn-holds : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
-               → At.Holds (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) [] rootObs
-
-    -- Below the thrown switch, what unsubscribing reached is spent, as
-    -- `Spent` follows `unsub`; elsewhere every gate as it was.
-    torn-gated : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
-               → At.Gated (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr)
-
     -- A joiner silenced owes nothing; every other as it was.
     torn-fed : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
              → At.Fed (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) []
@@ -1145,6 +1136,16 @@ module Honesty (R : Set) where
     -- the subjects' subscribers joiners or silenced.
     torn-queue : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
                → Queue (siteHeap (Conf.heap (Mach.conf m)) z) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) (Carried.tree cr)
+
+  -- Every subscription still against its kernel, and every gate: the
+  -- cut moves only the node it runs from.
+  torn-holds : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+             → At.Holds (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) [] rootObs
+  torn-holds cr z = site-holds _ (Books.fresh (Carried.books cr)) z (Kernels.holds (Carried.kernels cr))
+
+  torn-gated : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+             → At.Gated (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr)
+  torn-gated cr z = site-gated _ (Books.fresh (Carried.books cr)) z (Kernels.holds (Carried.kernels cr)) (Kernels.gated (Carried.kernels cr))
 
   -- A site holds no part, a body's by `Owned.bodies`, so the tree's
   -- part is the same once its switch is thrown.

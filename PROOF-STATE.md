@@ -177,8 +177,9 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE TEARDOWN.** The other `torn-` field leaves, over Torn's frame
-  lemmas and Unsub's run of a cut, `cut-onward` serving a taken
+- **THE TEARDOWN.** The `torn-` field leaves and Local's `-torn` leaves under
+  them, over Local's `-path` lemmas (a cut moves only its node) and Unsub's
+  run of a cut, `cut-onward` serving a taken
   takeWhile and an ended body alike; then the END CLIMB, a `Climbing` for completes,
   under `take1-onward`, `fin-onward` and `emit-last`. Ruled out: every
   cold below a cut switch spent (a lane cut inside its cold's first
@@ -290,10 +291,12 @@ by their own silent steps (`Mirror`).
   subscribed once its body is.
 - **`torn-owned`** (Content) — FALSITY, `NO EVIDENCE`: what a cut leaves owes
   nothing new, the cut itself no longer owed.
-- **`torn-holds`** (Content) — FALSITY, `NO EVIDENCE`: every subscription still
-  against its kernel after a cut.
-- **`torn-gated`** (Content) — FALSITY, `NO EVIDENCE`: below the thrown switch,
-  what unsubscribing reached is spent.
+- **`holds-torn`** (Local) — FALSITY, `NO EVIDENCE`: an unsubscribe keeps the
+  kernel of the subscription it tears, its lanes left none live.
+- **`spent-torn`** (Local) — FALSITY, `NO EVIDENCE`: an unsubscribe leaves what
+  it reaches spent, the lanes it skips by their gates.
+- **`gated-torn`** (Local) — FALSITY, `NO EVIDENCE`: an unsubscribe keeps the
+  gates of the subscription it tears.
 - **`torn-fed`** (Content) — FALSITY, `NO EVIDENCE`: a cut's silenced joiners
   owe nothing, the others as they were.
 - **`torn-queue`** (Content) — FALSITY, `NO EVIDENCE`: the queue and the
