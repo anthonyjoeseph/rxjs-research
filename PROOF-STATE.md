@@ -253,8 +253,6 @@ by their own silent steps (`Mirror`).
   failing value lands at its completion owed, the ghost alike, a stage on.
 - **`take-out`** (Content) — FALSITY, `NO EVIDENCE`: an inclusive take's
   failing value climbs under `ix 0`, the take ending where the run is.
-- **`take-pass`** (Content) — FALSITY, `NO EVIDENCE`: a passing value climbs
-  one operator, the tree's load as it was.
 - **`emit-void`** (Content) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
   hold emits to a guard that drops it, the ghost alike, a value fewer.
 - **`climb-lanes`** (Content) — FALSITY, `NO EVIDENCE`: a lane's value climbs

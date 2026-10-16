@@ -69,14 +69,14 @@ open Events∞
 module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read; feed)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look) renaming (go to goᴵ)
-  open Heap using (World; _⊑_; Handle; Quiet)
+  open Heap using (World; _⊑_; Handle; Quiet; same)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
-  open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
+  open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit; when)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
     Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; Taking; taking; taken; feeding; finishing; PathLanes; this-lane; next-lane;
-    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets; Each; Heads; rootObs;
+    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; ≗-refl; Meets; Each; Heads; rootObs;
     seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
@@ -84,7 +84,7 @@ module Honesty (R : Set) where
   open Moving R using (pend; takes; takes-plant; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
-  open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears)
+  open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears; ≗-trans; wk-same)
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
   open Read
@@ -1020,12 +1020,6 @@ module Honesty (R : Set) where
                  {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
                → Climbing g (loadOf st) m₁ (ρ ⊕ in-scan here) y → Climbed st m₁ (ρ ⊕ in-scan here)
 
-    -- A value a live takeWhile passes: one operator up, the tree's load
-    -- as it was.
-    take-pass : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k}
-                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k taking u)) {y : A} → p y ≡ true
-              → Climbing g ℓ m₁ (ρ ⊕ in-take here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
-
     -- A value an inclusive takeWhile fails on: delivered under `ix 0`,
     -- the take `ending` where the run is, its completion a call owed.
     take-out : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {p c k}
@@ -1660,6 +1654,35 @@ module Honesty (R : Set) where
   ...   | _ , lifts-shut pt refl _ lifts-here , Lρ = reclimb cl
     (subst (λ W → Climbing.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Climbing.code cl))
     (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg)
+
+  -- A live take's part, its source's lifted.
+  take-part : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {c′} → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
+            → At.part H (takeWhileˢ i p c k taking u) ≡ just (U.takeWhileᶜ i p c′)
+  take-part H lv pv rewrite lv | pv = refl
+
+  -- A guard read open over a predicate holding: what it guards.
+  pass-code : ∀ {w} {b q : Bool} {m n : Act w ⊤} → b ≡ true → q ≡ true → when b (if q then m else n) ≗ m
+  pass-code refl refl = ≗-refl _
+
+  -- A value a live takeWhile passes: its guard read, one operator up,
+  -- the tree's load as it was.
+  take-pass : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k}
+              {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k taking u)) {y : A} → p y ≡ true
+            → Climbing g ℓ m₁ (ρ ⊕ in-take here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
+  take-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T} {i} {p} {c} ρ {y} py
+    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+           ; behind = bh ; kept = kp }
+    with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-take here) top) cd
+  ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
+    rises (then refl now) (one-lower ρ one-take) (record
+      { sane = sn ; placed = pl ; ctl = refl
+      ; code = ≗-trans (f same _) (≗-trans (wk-same _) (pass-code lv py))
+      ; stack = sk
+      ; lifted = U.takeWhileᶜ i p c′ , take-part hp lv pv , S , subst (λ s → Lifts hp ρ s S) (cong (U.taking i p q y c′) py) Lρ , sg
+      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = inj₁ refl })
 
   -- The value risen, held to the climb's load.
   rise : ∀ {g m} {st : Strong g m} {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
