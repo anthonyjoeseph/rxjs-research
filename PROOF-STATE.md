@@ -186,16 +186,15 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `fresh-subᶠ` first: the walk now clears a connect's
-  pins from history, so all that remains is the per-program fact that
-  what a subscription leaves running after `n` lies inside no alien
-  position past `n` but a bare tick. A body by operator: decides whether
-  a flatMap's lane runs only once its admitting skip has shown, and
-  whether a nested connect's burst keeps it. Then `spread-sub`,
-  `ordered-connect`, `steady-connect`, reusing `Walk`. Ruled out: pins
-  by position alone; a skip trailed only by the step under it; a mark
-  only at `k ++ [ ix 0 ]`; a take owing more than a value's
-  disjointness from its pins (`trail-take`).
+- **THE ORDER.** `fresh-connect` first: a connect's cuts are fresh,
+  its burst inside only its own subscription and its body showing
+  nothing the connect does not, so `Walk` carrying the connect's own
+  last shown step should close it. Then `fresh-flat`: decides whether a
+  lane runs only once its admitting skip has shown, through queues and
+  switches. Then `spread-sub`, `ordered-connect`, `steady-connect`,
+  reusing `Walk`. Ruled out: pins by position alone; a skip trailed
+  only by the step under it; a mark only at `k ++ [ ix 0 ]`; a take
+  owing more than a value's disjointness from its pins (`trail-take`).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -214,9 +213,12 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`fresh-subᶠ`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: what a finite
-  program leaves running lies inside nothing alien but a tick or a position
-  before its last step.
+- **`fresh-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: what a connect
+  leaves running lies inside nothing alien but a tick or a position before its
+  last step.
+- **`fresh-flat`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: what a flatMap
+  leaves running lies inside nothing alien but a tick or a position before its
+  last step.
 - **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: after a value,
   nothing later keys where its lane would, nor under it, nor over it.
 - **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
