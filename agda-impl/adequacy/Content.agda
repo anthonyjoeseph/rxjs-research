@@ -69,7 +69,7 @@ open Events∞
 module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read; feed)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look) renaming (go to goᴵ)
-  open Heap using (World; _⊑_; Handle; Quiet; same)
+  open Heap using (World; _⊑_; Handle; Quiet) renaming (same to same⊑)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
   open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
@@ -1677,7 +1677,7 @@ module Honesty (R : Set) where
   ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
     rises (then refl now) (one-lower ρ one-take) (record
       { sane = sn ; placed = pl ; ctl = refl
-      ; code = ≗-trans (f same _) (≗-trans (wk-same _) (pass-code lv py))
+      ; code = ≗-trans (f same⊑ _) (≗-trans (wk-same _) (pass-code lv py))
       ; stack = sk
       ; lifted = U.takeWhileᶜ i p c′ , take-part hp lv pv , S , subst (λ s → Lifts hp ρ s S) (cong (U.taking i p q y c′) py) Lρ , sg
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
