@@ -1669,7 +1669,7 @@ module Honesty (R : Set) where
   take-pass : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k}
               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k taking u)) {y : A} → p y ≡ true
             → Climbing g ℓ m₁ (ρ ⊕ in-take here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
-  take-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} ρ {y} py
+  take-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {y} py
     record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
            ; behind = bh ; kept = kp }
@@ -1679,7 +1679,7 @@ module Honesty (R : Set) where
       { sane = sn ; placed = pl ; ctl = refl
       ; code = ≗-trans (f same⊑ _) (≗-trans (wk-same _) (pass-code lv py))
       ; stack = sk
-      ; lifted = U.takeWhileᶜ i p c′ , take-part hp lv pv , S , subst (λ s → Lifts hp ρ s S) (cong (U.taking i p q y c′) py) Lρ , sg
+      ; lifted = U.takeWhileᶜ i p c′ , take-part hp {i = i} {p = p} {c = c} {k = k} {u = u} lv pv , S , subst (λ s → Lifts hp ρ s S) (cong (U.taking i p q y c′) py) Lρ , sg
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = inj₁ refl })
