@@ -109,15 +109,19 @@ private
   stepsᵇ : List Pos → Bool
   stepsᵇ ps = allᵇ (λ q → allᵇ (λ h → not (ownedᵇ (q ++ [ ix 0 ]) h)) ps) ps
 
+  -- Neither keyed under the other.
+  apartᵇ : Pos → Pos → Bool
+  apartᵇ a b = not (ownedᵇ a b) ∧ not (ownedᵇ b a)
+
   -- What a cut leaves running trails the run: its steps in order, none
   -- before a value coming next, nor before a skip but the one showing
   -- that very step just past it; all past an end and none inside it,
-  -- none keyed where that end would subscribe a lane; nothing left
-  -- behind silence.
+  -- none keyed where that end would subscribe a lane, nor over it;
+  -- nothing left behind silence.
   trailᵇ : Events ℕ → Pos → Bool
   trailᵇ (out n _ _) k = not (k <ᵖ n)
   trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ samePos n (k ++ [ ix 0 ])
-  trailᵇ (end n)     k = (n <ᵖ k) ∧ not (inside n k) ∧ not (ownedᵇ (n ++ [ ix 1 ]) k)
+  trailᵇ (end n)     k = (n <ᵖ k) ∧ not (inside n k) ∧ apartᵇ (n ++ [ ix 1 ]) k
   trailᵇ hush        k = false
 
   pinsᵇ : ℕ → Tail → List Pos
@@ -140,8 +144,6 @@ private
 
   -- After a value at `x`, nothing later, shown or left running, keys
   -- where a lane admitted at `x` would, nor under it, nor over it.
-  apartᵇ : Pos → Pos → Bool
-  apartᵇ a b = not (ownedᵇ a b) ∧ not (ownedᵇ b a)
 
   laterᵇ : ℕ → Events∞ ℕ → List Pos
   laterᵇ zero    r = []
