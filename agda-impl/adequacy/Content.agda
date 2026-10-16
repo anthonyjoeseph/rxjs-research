@@ -1886,14 +1886,14 @@ module Honesty (R : Set) where
                {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
                (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u))
              → Closing g (loadOf st) m₁ (ρ ⊕ in-body here) → Closed st m₁ (ρ ⊕ in-body here)
-  close-body st {m₁ = m₁} {T = T} {t = t} {u} ρ
+  close-body st {m₁ = m₁} {T = T} {c = c} {t = t} {u} ρ
     record { sane = sn ; placed = pl ; ks = ks ; ctl = cx ; code = cd ; stack = sk ; gone = gn ; lifted = S , L , sg ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
            ; behind = bh ; kept = kp }
     with lifts-split ρ (in-body here) L
   ... | _ , Lb , Lρ = rose now (one-lower ρ one-body) (record
       { sane = sn ; placed = pl ; ks = bodyC ρ ∷ ks ; ctl = cx
-      ; code = ≗-trans (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-body here) top) cd) (seq-assoc _ _ _)
+      ; code = ≗-trans (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-body here) top) cd) (seq-assoc (Observer.complete (Here.obs (walk ρ top))) (Kit.cut c) ⟦ ks ⟧ᶜ)
       ; stack = sk
       ; gone = gone-connect (Conf.heap (Mach.conf m₁)) {t = t} {u = u} gn
       ; lifted = S , subst (λ s → Lifts (Conf.heap (Mach.conf m₁)) ρ s S) (body-end Lb) Lρ , sg
