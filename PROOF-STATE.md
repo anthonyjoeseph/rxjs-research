@@ -177,17 +177,17 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE TEARDOWN.** The `torn-` field leaves and Local's `-torn` leaves under
-  them, over Local's `-path` lemmas (a cut moves only its node) and Unsub's
-  run of a cut, `cut-onward` serving a taken
-  takeWhile and an ended body alike; then the END CLIMB, a `Climbing` for completes,
+- **THE TEARDOWN.** `torn-fed` and `parted-torn`, the last leaves under
+  `cut-onward`, which serves a taken takeWhile and an ended body alike; then the END CLIMB, a `Climbing` for completes,
   under `take1-onward`, `fin-onward` and `emit-last`. Ruled out: every
   cold below a cut switch spent (a lane cut inside its cold's first
   burst stays unspent until attached, so `Gated` reads `Spent`); a
   connect's source torn once its body ends (a note falls before the cut,
   so `Gated` reads the switch); heads owed below a site (`Each` reads
   only what `seen` holds, and a teardown leaves what it reached unseen);
-  a cut's run allocating, emitting or yielding (Unsub's `tears`).
+  a cut's run allocating, emitting or yielding (Unsub's `tears`); a
+  flatMap torn leaving a lane live (the lanes it skips are gone, and a
+  teardown only lowers).
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,
@@ -291,12 +291,6 @@ by their own silent steps (`Mirror`).
   subscribed once its body is.
 - **`parted-torn`** (Lowers) — FALSITY, `NO EVIDENCE`: a body with no part
   has none once a cut runs; a flatMap's queue needs the names apart.
-- **`holds-torn`** (Local) — FALSITY, `NO EVIDENCE`: an unsubscribe keeps the
-  kernel of the subscription it tears, its lanes left none live.
-- **`spent-torn`** (Local) — FALSITY, `NO EVIDENCE`: an unsubscribe leaves what
-  it reaches spent, the lanes it skips by their gates.
-- **`gated-torn`** (Local) — FALSITY, `NO EVIDENCE`: an unsubscribe keeps the
-  gates of the subscription it tears.
 - **`torn-fed`** (Content) — FALSITY, `NO EVIDENCE`: a cut's silenced joiners
   owe nothing, the others as they were.
 - **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's

@@ -10,14 +10,18 @@
 -- the heap moved under.
 module adequacy.Local where
 
-open import Data.List using (List; []; _∷_; _++_)
-open import Data.Bool using (false)
+open import Data.List using (List; []; _∷_; _++_; length)
+open import Data.List.Properties using (∷-injectiveʳ)
+open import Data.Bool using (true; false)
+open import Data.Nat using (ℕ; zero; suc)
+open import Data.Empty using (⊥-elim)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_; Σ; proj₁)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
-open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; tabulate to tabulateᴬ; lookup to lookupᴬ)
+open import Data.List.Relation.Unary.All using (All; _∷_) renaming ([] to []ᴬ; tabulate to tabulateᴬ; lookup to lookupᴬ; map to mapᴬ)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁻ to all-++⁻)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -29,15 +33,18 @@ open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
+open import adequacy.Lowers using (module Lowering)
 
 module Locality (R : Set) where
-  open Heap using (Quiet; Sink; _∋_)
-  open Shared Timeline (Out R) using (Heapᴹ; look; store)
+  open Heap using (Quiet; Sink; _∋_; same)
+  open Shared Timeline (Out R) using (Heapᴹ; look; store; stored; Val; wkVal)
   open Strongly R
   open Moving R using (pairs-split; pairs-r)
   open Tearing R using (Off; Alike; names-path; lanes-path; fresh-path; narrow; apart-r; apart-l; ≢-flip; look-store; torn; tornVia; thrown; thrown-off;
-    Site; takeSite; bodySite; siteHeap)
+    thrownLanes; thrownLanes-off; torn-off; tornVia-off; get-put-same; Site; takeSite; bodySite; siteHeap)
   open Run (Pureᴾ R) using (Env; Observer; module Kit; module FlatKit)
+  open Lowering R using (module Lowers; via-lowers; thrown-lowers; lanes-lowers; dropped; false≢true)
+  open Lowers using (lowers)
 
   ----------------------------------------------------------------------
   -- A flatMap's lanes: their switches, those gone
@@ -454,74 +461,331 @@ module Locality (R : Set) where
   -- spent and the gates of the subscription it tears.  Elsewhere `Off`
   -- carries each part across, so these are all a cut owes the relation.
 
-  postulate
-    -- A flatMap's lanes in flight are the first so many of its lanes and
-    -- the rest are cut, so `torn` throwing that many leaves none live.
+  pair-head : ∀ {a} {X : Set a} {x : X} {xs} → AllPairs _≢_ (x ∷ xs) → All (x ≢_) xs
+  pair-head (a ∷ _) = a
+
+  stored-at : ∀ {h k} (H : Heapᴹ h) (i : h ∋ k) (x : Val h k) → look (store H i x) i ≡ wkVal k same x
+  stored-at H i x rewrite get-put-same H i {y = stored x same} = refl
+
+  -- A switch thrown: what it holds read alike, beside the switch itself.
+  module Throw {h} (H : Heapᴹ h) (c : Kit.Cut h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) {ns : List (Name h)}
+               (sub : ∀ {y} → y ∈ᴸ names s → y ∈ᴸ ns) (ps : AllPairs _≢_ (cutNames c ++ quietName k ++ ns)) where
+    H₀ = store H (Kit.live c) (lift false)
+
+    ag₀ : Alike H H₀ (names s)
+    ag₀ j m = look-store H (Kit.live c) j (lookupᴬ (apart-r (cutNames c) ps (here refl)) (++⁺ʳ (quietName k) (sub m)))
+
+    eh : look (thrown H c k s) (Kit.held c) ≡ look H (Kit.held c)
+    eh = thrown-off H c k s (Kit.held c) (≢-flip (lookupᴬ (pair-head ps) (here refl)))
+                    (narrow (λ m → ++⁺ʳ (quietName k) (sub m)) (apart-r (cutNames c) ps (there (here refl))))
+
+    agk : Alike H (thrown H c k s) (quietName k)
+    agk j m = thrown-off H c k s j (lookupᴬ (apart-l (cutNames c) ps (++⁺ˡ m)) (here refl)) (narrow sub (apart-r (quietName k) (pairs-r (cutNames c) ps) m))
+
+  -- The lanes a flatMap throws, and those already gone, all read thrown.
+  lanes-dead : ∀ {h} (H : Heapᴹ h) (xs gone : List (Kit.Cut h)) {Δ B} (ls : List (Lane h Δ B)) → xs ++ gone ≡ cuts ls
+             → All (λ c → At.val H (Kit.live c) ≡ false) gone → All (λ c → At.val (thrownLanes H (length xs) ls) (Kit.live c) ≡ false) (cuts ls)
+  lanes-dead H []       gone ls eq ga = subst (All (λ c → At.val H (Kit.live c) ≡ false)) eq ga
+  lanes-dead H (x ∷ xs) gone [] () ga
+  lanes-dead H (x ∷ xs) gone (lane c k s ∷ ls) eq ga =
+    lowers (lanes-lowers (thrown H c k s) (length xs) ls) (Kit.live c) (lowers (via-lowers _ k s) (Kit.live c) (dropped H (Kit.live c)))
+    ∷ lanes-dead (thrown H c k s) xs gone ls (∷-injectiveʳ eq) (mapᴬ (λ {c′} e → lowers (thrown-lowers H c k s) (Kit.live c′) e) ga)
+
+  count-dead : ∀ {h} (H : Heapᴹ h) {Δ B} (ls : List (Lane h Δ B)) → All (λ c → At.val H (Kit.live c) ≡ false) (cuts ls) → At.count H ls ≡ 0
+  count-dead H []                d       = refl
+  count-dead H (lane c k s ∷ ls) (e ∷ d) rewrite e = count-dead H ls d
+
+  -- A lane whose switch reads thrown is cut, by its gate.
+  spentL-dead : ∀ {h} (H : Heapᴹ h) {Δ B} (ls : List (Lane h Δ B)) → All (λ c → At.val H (Kit.live c) ≡ false) (cuts ls)
+              → At.GatedLanes H ls → At.SpentLanes H ls
+  spentL-dead H []                d       g             = lift tt
+  spentL-dead H (lane c k s ∷ ls) (e ∷ d) (g₁ , _ , g₃) = g₁ e , spentL-dead H ls d g₃
+
+  cut-of : ∀ {h} {H : Heapᴹ h} (k : Maybe (Quiet h)) {Δ A} {s : Sub h Δ A} → At.Spent H s → At.Cut↓ H k s
+  cut-of nothing  sp = lift tt
+  cut-of (just _) sp = sp
+
+  -- A flatMap torn: its outer thrown, its counts cleared, its lanes in
+  -- flight thrown.  The lanes it holds are the first so many of its
+  -- lanes and the rest are gone, so none is left live.
+  module FlatTear {h} (H : Heapᴹ h) {Δ A B op f fl oc k r pl} {so : Sub h Δ A} {ls : List (Lane h Δ B)}
+                  (ps : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl so ls))) where
+    H′ = thrown H oc k so
+    H₁ = store H′ (FlatKit.Flat.lanes fl) (lift [])
+    H₂ = store H₁ (FlatKit.Flat.active fl) (lift 0)
+    xs = lower (look H′ (FlatKit.Flat.lanes fl))
+    Ht = thrownLanes H₂ (length xs) ls
+
+    P₁ = pairs-r (flatNames fl) ps
+    P₂ = pairs-r (cutNames oc) P₁
+    P₃ = pairs-r (quietName k) P₂
+    P₄ = pairs-r ((_ , r) ∷ []) P₃
+    PS = proj₁ (pairs-split (names so) P₄)
+    PL = pairs-r (names so) P₄
+
+    module T = Throw H oc k so (λ m → there (++⁺ˡ m)) P₁
+
+    aA = apart-r (flatNames fl) ps (here refl)
+    aL = apart-r (flatNames fl) ps (there (there (there (here refl))))
+    aR = apart-r (flatNames fl) ps (there (there (there (there (here refl)))))
+
+    inS : ∀ {x} → x ∈ᴸ names so → x ∈ᴸ cutNames oc ++ quietName k ++ (_ , r) ∷ names so ++ laneNames ls
+    inS m = ++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))
+
+    inL : ∀ {x} → x ∈ᴸ laneNames ls → x ∈ᴸ cutNames oc ++ quietName k ++ (_ , r) ∷ names so ++ laneNames ls
+    inL m = ++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))
+
+    -- What the counts cleared and the lanes thrown leave.
+    past : ∀ {k′} (j : h ∋ k′) → All (_≢_ {A = Name h} (k′ , j)) (laneNames ls)
+         → _≢_ {A = Name h} (_ , FlatKit.Flat.active fl) (k′ , j) → _≢_ {A = Name h} (_ , FlatKit.Flat.lanes fl) (k′ , j) → look Ht j ≡ look H′ j
+    past j a na nl = trans (thrownLanes-off H₂ (length xs) ls j a) (trans (look-store H₁ (FlatKit.Flat.active fl) j na) (look-store H′ (FlatKit.Flat.lanes fl) j nl))
+
+    agS : Alike H′ Ht (names so)
+    agS j m = past j (apart-r (names so) P₄ m) (lookupᴬ aA (inS m)) (lookupᴬ aL (inS m))
+
+    agL : Alike H H₂ (laneNames ls)
+    agL j m = trans (look-store H₁ (FlatKit.Flat.active fl) j (lookupᴬ aA (inL m)))
+                (trans (look-store H′ (FlatKit.Flat.lanes fl) j (lookupᴬ aL (inL m)))
+                  (thrown-off H oc k so j (lookupᴬ (apart-l (cutNames oc) P₁ (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))) (here refl))
+                                          (apart-l (names so) P₄ m)))
+
+    erf : look Ht (FlatKit.Flat.refill fl) ≡ look H (FlatKit.Flat.refill fl)
+    erf = trans (past (FlatKit.Flat.refill fl) (narrow inL aR) (λ ()) (λ ())) (thrown-off H oc k so (FlatKit.Flat.refill fl) (lookupᴬ aR (here refl)) (narrow inS aR))
+
+    er : look Ht r ≡ look H r
+    er = trans (past r (narrow (++⁺ʳ (names so)) ar) (λ ()) (λ ())) (thrown-off H oc k so r (λ ()) (narrow ++⁺ˡ ar))
+      where ar = apart-r ((_ , r) ∷ []) P₃ (here refl)
+
+    eh : look Ht (Kit.held oc) ≡ look H (Kit.held oc)
+    eh = trans (past (Kit.held oc) (narrow (λ m → ++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m))) (apart-r (cutNames oc) P₁ (there (here refl))))
+                     (lookupᴬ aA (there (here refl))) (lookupᴬ aL (there (here refl)))) T.eh
+
+    agk : Alike H Ht (quietName k)
+    agk j m = trans (past j (narrow (λ m′ → there (++⁺ʳ (names so) m′)) (apart-r (quietName k) P₂ m))
+                            (lookupᴬ aA (++⁺ʳ (cutNames oc) (++⁺ˡ m))) (lookupᴬ aL (++⁺ʳ (cutNames oc) (++⁺ˡ m)))) (T.agk j m)
+
+    eA : At.val Ht (FlatKit.Flat.active fl) ≡ 0
+    eA = cong lower (trans (thrownLanes-off H₂ (length xs) ls (FlatKit.Flat.active fl) (narrow (λ m → there (there (there (there (inL m))))) (pair-head ps)))
+                           (stored-at H₁ (FlatKit.Flat.active fl) (lift 0)))
+
+    eL : At.val Ht (FlatKit.Flat.lanes fl) ≡ []
+    eL = cong lower (trans (thrownLanes-off H₂ (length xs) ls (FlatKit.Flat.lanes fl) (narrow inL aL))
+                           (trans (look-store H₁ (FlatKit.Flat.active fl) (FlatKit.Flat.lanes fl) (λ ())) (stored-at H′ (FlatKit.Flat.lanes fl) (lift []))))
+
+    module _ (gn : Gone H fl ls) where
+      split : xs ++ proj₁ gn ≡ cuts ls
+      split = trans (cong (λ z → lower z ++ proj₁ gn) (thrown-off H oc k so (FlatKit.Flat.lanes fl) (lookupᴬ aL (here refl)) (narrow inS aL)))
+                    (trans (proj₁ (proj₂ gn)) (cuts-switches H ls))
+
+      gone₂ : All (λ c → At.val H₂ (Kit.live c) ≡ false) (proj₁ gn)
+      gone₂ = tabulateᴬ λ {c} m → trans (cong lower (agL (Kit.live c) (cut-in ls (subst (c ∈ᴸ_) (trans (proj₁ (proj₂ gn)) (cuts-switches H ls))
+                                                                                         (++⁺ʳ (At.val H (FlatKit.Flat.lanes fl)) m)))))
+                                          (lookupᴬ (proj₂ (proj₂ gn)) m)
+
+      dead : All (λ c → At.val Ht (Kit.live c) ≡ false) (cuts ls)
+      dead = lanes-dead H₂ xs (proj₁ gn) ls split gone₂
+
+      gone : Gone Ht fl ls
+      gone = cuts ls , trans (cong (_++ cuts ls) eL) (sym (cuts-switches Ht ls)) , dead
+
+  -- A connect torn: its source, then its body if attached.
+  module ConnTear {h} (H : Heapᴹ h) {Δ A B S c b kb k fd e rp rt} {src : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+                  (ps : AllPairs _≢_ (names (connectˢ S c b kb k fd rp e rt src bd))) where
+    H₁ = torn H src
+    H₂ = tornVia H₁ kb bd
+    Q₀ = pairs-r (subjectNames S) ps
+    Q₁ = pairs-r (cutNames c) Q₀
+    Q₂ = pairs-r ((_ , b) ∷ []) Q₁
+    Q₃ = pairs-r (quietName kb) Q₂
+    Q₄ = pairs-r (quietName k) Q₃
+    Ps = proj₁ (pairs-split (names src) Q₄)
+    Pb = pairs-r (names src) Q₄
+
+    past : ∀ {k′} (j : h ∋ k′) → All (_≢_ {A = Name h} (k′ , j)) (names src ++ names bd) → look H₂ j ≡ look H j
+    past j a = trans (tornVia-off H₁ kb bd j (proj₂ (all-++⁻ (names src) a))) (torn-off H src j (proj₁ (all-++⁻ (names src) a)))
+
+    eh : look H₂ (Kit.held c) ≡ look H (Kit.held c)
+    eh = past (Kit.held c) (narrow (λ m → there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) m))) (apart-r (cutNames c) Q₀ (there (here refl))))
+
+    agk : Alike H H₂ (quietName k)
+    agk j m = past j (apart-r (quietName k) Q₃ m)
+
+    eb : look H₂ b ≡ look H b
+    eb = past b (narrow (λ m → ++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) m)) (apart-r ((_ , b) ∷ []) Q₁ (here refl)))
+
+    agkb : Alike H H₂ (quietName kb)
+    agkb j m = past j (narrow (++⁺ʳ (quietName k)) (apart-r (quietName kb) Q₂ m))
+
+    agS : Alike H₁ H₂ (names src)
+    agS j m = tornVia-off H₁ kb bd j (apart-r (names src) Q₄ m)
+
+    agB : Alike H H₁ (names bd)
+    agB j m = torn-off H src j (apart-l (names src) Q₄ m)
+
+  -- A lane thrown leaves the lanes after it alike.
+  laneAlike : ∀ {h} (H : Heapᴹ h) (c : Kit.Cut h) (k : Maybe (Quiet h)) {Δ B} (s : Sub h Δ B) {ls : List (Lane h Δ B)}
+            → AllPairs _≢_ (laneNames (lane c k s ∷ ls)) → Alike H (thrown H c k s) (laneNames ls)
+  laneAlike H c k s ps j m =
+    thrown-off H c k s j (lookupᴬ (apart-l (cutNames c) ps (++⁺ʳ (quietName k) (++⁺ʳ (names s) m))) (here refl))
+                         (apart-l (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps)) m)
+
+  mutual
     holds-torn : ∀ {h} (H : Heapᴹ h) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
                → ∀ {E o} → At.Holds H s E o → At.Holds (torn H s) s E o
+    holds-torn H (pendingˢ s q)  ps       hs = hs
+    holds-torn H (coldˢ s hd ph) ps       hs = Heaps.slot-alike H (store H hd (lift true)) s (look-store H hd s λ ()) hs
+    holds-torn H (ofˢ p i xs)    ps       hs = hs
+    holds-torn H doneˢ           ps       hs = hs
+    holds-torn H (mapˢ f s)      ps       hs = holds-torn H s ps hs
+    holds-torn H (scanˢ f r s)   (_ ∷ ps) hs = holds-torn H s ps hs
+    holds-torn H (takeWhileˢ i p c k tk s) ps (a , hs) =
+      attached-alike c k T.eh T.agk a , via-holds T.H₀ k s (pairs-r (quietName k) (pairs-r (cutNames c) ps)) (Heaps.holds-alike H T.H₀ s T.ag₀ hs)
+      where module T = Throw H c k s (λ m → m) ps
+    holds-torn H (flatMapˢ op f fl oc k r pl so ls) ps {E} {o} (rf , sl , a , hs , ac , gn , hl) =
+      trans (cong lower F.erf) rf
+      , Heaps.slot-alike H F.Ht r F.er sl
+      , attached-alike oc k F.eh F.agk a
+      , Heaps.holds-alike F.H′ F.Ht so F.agS (via-holds F.T.H₀ k so F.PS (Heaps.holds-alike H F.T.H₀ so F.T.ag₀ hs))
+      , trans F.eA (sym (count-dead F.Ht ls (F.dead gn)))
+      , F.gone gn
+      , holdsL-torn F.H₂ (length F.xs) ls F.PL {op = op} {f = f} {E = E} {o = o} {fl = fl} (Heaps.holdsL-alike H F.H₂ ls F.agL {op = op} {f = f} {E = E} {o = o} {fl = fl} hl)
+      where module F = FlatTear H {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} ps
+    holds-torn H (connectˢ S c b kb k fd rp e rt src bd) ps (a , be , st , hs , hb) =
+      attached-alike c k C.eh C.agk a , trans (cong lower C.eb) be , stashed-alike kb C.agkb st
+      , Heaps.holds-alike C.H₁ C.H₂ src C.agS (holds-torn H src C.Ps hs)
+      , via-holds C.H₁ kb bd C.Pb (Heaps.holds-alike H C.H₁ bd C.agB hb)
+      where module C = ConnTear H {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {src = src} {bd = bd} ps
+    holds-torn H (joinˢ j sk l x st) ps hs = Heaps.slot-alike H (store H l (lift false)) sk (look-store H l sk λ ()) hs
+    holds-torn H (deferˢ k s) ps (st , hs) =
+      stashed-alike k (λ j m → tornVia-off H k s j (apart-r (quietName k) ps m)) st , via-holds H k s (pairs-r (quietName k) ps) hs
 
+    holdsL-torn : ∀ {h} (H : Heapᴹ h) (n : ℕ) {Δ B} (ls : List (Lane h Δ B)) → AllPairs _≢_ (laneNames ls)
+                → ∀ {A : Set} {op f E o fl} → At.HoldsLanes H {A = A} op f E o fl ls → At.HoldsLanes (thrownLanes H n ls) {A = A} op f E o fl ls
+    holdsL-torn H zero    ls ps hl = hl
+    holdsL-torn H (suc n) []  ps hl = hl
+    holdsL-torn {h} H (suc n) (lane c k s ∷ ls) ps {op = op} {f} {E} {o} {fl} (a , hs , hl) =
+      attached-alike c k (trans (past (Kit.held c) (narrow (λ m → ++⁺ʳ (quietName k) (++⁺ʳ (names s) m)) (apart-r (cutNames c) ps (there (here refl))))) T.eh)
+                         (λ j m → trans (past j (narrow (++⁺ʳ (names s)) (apart-r (quietName k) (pairs-r (cutNames c) ps) m))) (T.agk j m)) a
+      , Heaps.holds-alike H₁ (thrownLanes H₁ n ls) s (λ j m → past j (apart-r (names s) P m))
+                          (via-holds T.H₀ k s (proj₁ (pairs-split (names s) P)) (Heaps.holds-alike H T.H₀ s T.ag₀ hs))
+      , holdsL-torn H₁ n ls (pairs-r (names s) P) {op = op} {f = f} {E = E} {o = o} {fl = fl} (Heaps.holdsL-alike H H₁ ls (laneAlike H c k s {ls} ps) {op = op} {f = f} {E = E} {o = o} {fl = fl} hl)
+      where
+        module T = Throw H c k s (λ m → ++⁺ˡ m) ps
+        H₁ = thrown H c k s
+        P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+        past : ∀ {k′} (j : h ∋ k′) → All (_≢_ {A = Name h} (k′ , j)) (laneNames ls) → look (thrownLanes H₁ n ls) j ≡ look H₁ j
+        past j a = thrownLanes-off H₁ n ls j a
+
+    via-holds : ∀ {h} (H : Heapᴹ h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
+              → ∀ {E o} → At.Holds H s E o → At.Holds (tornVia H k s) s E o
+    via-holds H nothing  s ps hs = hs
+    via-holds H (just _) s ps hs = holds-torn H s ps hs
+
+  mutual
     -- The lanes `torn` leaves unthrown are cut already, and their gates
     -- give their spent.
     spent-torn : ∀ {h} (H : Heapᴹ h) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
                → ∀ {E o} → At.Holds H s E o → At.Gated H s → At.Spent (torn H s) s
+    spent-torn H (pendingˢ s q)  ps       hs g = lift tt
+    spent-torn H (coldˢ s hd ph) ps       hs g = lift (cong lower (stored-at H hd (lift true)))
+    spent-torn H (ofˢ p i xs)    ps       hs g = lift tt
+    spent-torn H doneˢ           ps       hs g = lift tt
+    spent-torn H (mapˢ f s)      ps       hs g = spent-torn H s ps hs g
+    spent-torn H (scanˢ f r s)   (_ ∷ ps) hs g = spent-torn H s ps hs g
+    spent-torn H (takeWhileˢ i p c k tk s) ps (_ , hs) (_ , g) =
+      via-cut T.H₀ k s (pairs-r (quietName k) (pairs-r (cutNames c) ps)) (Heaps.holds-alike H T.H₀ s T.ag₀ hs) (Heaps.gated-alike H T.H₀ s T.ag₀ g)
+      where module T = Throw H c k s (λ m → m) ps
+    spent-torn H (flatMapˢ op f fl oc k r pl so ls) ps {E} {o} (_ , _ , _ , hs , _ , gn , hl) (g₁ , g₂) =
+      Heaps.cut-alike F.H′ F.Ht k so F.agS (via-cut F.T.H₀ k so F.PS (Heaps.holds-alike H F.T.H₀ so F.T.ag₀ hs) (Heaps.gated-alike H F.T.H₀ so F.T.ag₀ g₁))
+      , spentL-torn F.H₂ F.xs (proj₁ gn) ls (F.split gn) (F.gone₂ gn) F.PL {op = op} {f = f} {E = E} {o = o} {fl = fl}
+                    (Heaps.holdsL-alike H F.H₂ ls F.agL {op = op} {f = f} {E = E} {o = o} {fl = fl} hl) (Heaps.gatedL-alike H F.H₂ ls F.agL g₂)
+      where module F = FlatTear H {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} ps
+    spent-torn H (connectˢ S c b kb k fd rp e rt src bd) ps (_ , _ , _ , hs , hb) (_ , g₂ , g₃) =
+      Heaps.cut-alike C.H₁ C.H₂ k src C.agS (cut-of k (spent-torn H src C.Ps hs g₂))
+      , via-cut C.H₁ kb bd C.Pb (Heaps.holds-alike H C.H₁ bd C.agB hb) (Heaps.gated-alike H C.H₁ bd C.agB g₃)
+      where module C = ConnTear H {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {src = src} {bd = bd} ps
+    spent-torn H (joinˢ j sk l x st) ps hs       g = lift tt
+    spent-torn H (deferˢ k s)        ps (_ , hs) g = via-cut H k s (pairs-r (quietName k) ps) hs g
 
+    spentL-torn : ∀ {h} (H : Heapᴹ h) (xs gone : List (Kit.Cut h)) {Δ B} (ls : List (Lane h Δ B)) → xs ++ gone ≡ cuts ls
+                → All (λ c → At.val H (Kit.live c) ≡ false) gone → AllPairs _≢_ (laneNames ls)
+                → ∀ {A : Set} {op f E o fl} → At.HoldsLanes H {A = A} op f E o fl ls → At.GatedLanes H ls → At.SpentLanes (thrownLanes H (length xs) ls) ls
+    spentL-torn H []       gone ls eq ga ps hl gl = spentL-dead H ls (subst (All (λ c → At.val H (Kit.live c) ≡ false)) eq ga) gl
+    spentL-torn H (x ∷ xs) gone [] () ga ps hl gl
+    spentL-torn H (x ∷ xs) gone (lane c k s ∷ ls) eq ga ps {op = op} {f} {E} {o} {fl} (_ , hs , hl) (_ , g , gl) =
+      Heaps.cut-alike H₁ (thrownLanes H₁ (length xs) ls) k s (λ j m → thrownLanes-off H₁ (length xs) ls j (apart-r (names s) P m))
+        (via-cut T.H₀ k s (proj₁ (pairs-split (names s) P)) (Heaps.holds-alike H T.H₀ s T.ag₀ hs) (Heaps.gated-alike H T.H₀ s T.ag₀ g))
+      , spentL-torn H₁ xs gone ls (∷-injectiveʳ eq) (mapᴬ (λ {c′} e → lowers (thrown-lowers H c k s) (Kit.live c′) e) ga) (pairs-r (names s) P) {op = op} {f = f} {E = E} {o = o} {fl = fl}
+                    (Heaps.holdsL-alike H H₁ ls (laneAlike H c k s {ls} ps) {op = op} {f = f} {E = E} {o = o} {fl = fl} hl)
+                    (Heaps.gatedL-alike H H₁ ls (laneAlike H c k s {ls} ps) gl)
+      where
+        module T = Throw H c k s (λ m → ++⁺ˡ m) ps
+        H₁ = thrown H c k s
+        P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+
+    via-cut : ∀ {h} (H : Heapᴹ h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
+            → ∀ {E o} → At.Holds H s E o → At.Gated H s → At.Cut↓ (tornVia H k s) k s
+    via-cut H nothing  s ps hs g = lift tt
+    via-cut H (just _) s ps hs g = spent-torn H s ps hs g
+
+  mutual
     gated-torn : ∀ {h} (H : Heapᴹ h) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
                → ∀ {E o} → At.Holds H s E o → At.Gated H s → At.Gated (torn H s) s
+    gated-torn H (pendingˢ s q)  ps       hs g = g
+    gated-torn H (coldˢ s hd ph) ps       hs g = lift (λ e → ⊥-elim (false≢true (trans (sym e) (cong lower (stored-at H hd (lift true))))))
+    gated-torn H (ofˢ p i xs)    ps       hs g = g
+    gated-torn H doneˢ           ps       hs g = g
+    gated-torn H (mapˢ f s)      ps       hs g = gated-torn H s ps hs g
+    gated-torn H (scanˢ f r s)   (_ ∷ ps) hs g = gated-torn H s ps hs g
+    gated-torn H (takeWhileˢ i p c k tk s) ps (a , hs) (g₁ , g) =
+      (λ _ → spent-torn H (takeWhileˢ i p c k tk s) ps (a , hs) (g₁ , g))
+      , via-gated T.H₀ k s (pairs-r (quietName k) (pairs-r (cutNames c) ps)) (Heaps.holds-alike H T.H₀ s T.ag₀ hs) (Heaps.gated-alike H T.H₀ s T.ag₀ g)
+      where module T = Throw H c k s (λ m → m) ps
+    gated-torn H (flatMapˢ op f fl oc k r pl so ls) ps {E} {o} (_ , _ , _ , hs , _ , _ , hl) (g₁ , g₂) =
+      Heaps.gated-alike F.H′ F.Ht so F.agS (via-gated F.T.H₀ k so F.PS (Heaps.holds-alike H F.T.H₀ so F.T.ag₀ hs) (Heaps.gated-alike H F.T.H₀ so F.T.ag₀ g₁))
+      , gatedL-torn F.H₂ (length F.xs) ls F.PL {op = op} {f = f} {E = E} {o = o} {fl = fl} (Heaps.holdsL-alike H F.H₂ ls F.agL {op = op} {f = f} {E = E} {o = o} {fl = fl} hl) (Heaps.gatedL-alike H F.H₂ ls F.agL g₂)
+      where module F = FlatTear H {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} ps
+    gated-torn H (connectˢ S c b kb k fd rp e rt src bd) ps {E} {o} hs@(_ , _ , _ , hsrc , hb) g@(_ , g₂ , g₃) =
+      (λ _ → proj₁ (spent-torn H (connectˢ S c b kb k fd rp e rt src bd) ps {E} {o} hs g))
+      , Heaps.gated-alike C.H₁ C.H₂ src C.agS (gated-torn H src C.Ps hsrc g₂)
+      , via-gated C.H₁ kb bd C.Pb (Heaps.holds-alike H C.H₁ bd C.agB hb) (Heaps.gated-alike H C.H₁ bd C.agB g₃)
+      where module C = ConnTear H {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {src = src} {bd = bd} ps
+    gated-torn H (joinˢ j sk l x st) ps hs       g = g
+    gated-torn H (deferˢ k s)        ps (_ , hs) g = via-gated H k s (pairs-r (quietName k) ps) hs g
 
-  via-holds : ∀ {h} (H : Heapᴹ h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
-            → ∀ {E o} → At.Holds H s E o → At.Holds (tornVia H k s) s E o
-  via-holds H nothing  s ps hs = hs
-  via-holds H (just _) s ps hs = holds-torn H s ps hs
+    gatedL-torn : ∀ {h} (H : Heapᴹ h) (n : ℕ) {Δ B} (ls : List (Lane h Δ B)) → AllPairs _≢_ (laneNames ls)
+                → ∀ {A : Set} {op f E o fl} → At.HoldsLanes H {A = A} op f E o fl ls → At.GatedLanes H ls → At.GatedLanes (thrownLanes H n ls) ls
+    gatedL-torn H zero    ls ps hl gl = gl
+    gatedL-torn H (suc n) []  ps hl gl = gl
+    gatedL-torn H (suc n) (lane c k s ∷ ls) ps {op = op} {f} {E} {o} {fl} (_ , hs , hl) (_ , g , gl) =
+      (λ _ → Heaps.cut-alike H₁ Ht k s agt (via-cut T.H₀ k s Ps hs₀ g₀))
+      , Heaps.gated-alike H₁ Ht s agt (via-gated T.H₀ k s Ps hs₀ g₀)
+      , gatedL-torn H₁ n ls (pairs-r (names s) P) {op = op} {f = f} {E = E} {o = o} {fl = fl} (Heaps.holdsL-alike H H₁ ls (laneAlike H c k s {ls} ps) {op = op} {f = f} {E = E} {o = o} {fl = fl} hl)
+                    (Heaps.gatedL-alike H H₁ ls (laneAlike H c k s {ls} ps) gl)
+      where
+        module T = Throw H c k s (λ m → ++⁺ˡ m) ps
+        H₁ = thrown H c k s
+        Ht = thrownLanes H₁ n ls
+        P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+        Ps = proj₁ (pairs-split (names s) P)
+        hs₀ = Heaps.holds-alike H T.H₀ s T.ag₀ hs
+        g₀ = Heaps.gated-alike H T.H₀ s T.ag₀ g
+        agt : Alike H₁ Ht (names s)
+        agt j m = thrownLanes-off H₁ n ls j (apart-r (names s) P m)
 
-  via-cut : ∀ {h} (H : Heapᴹ h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
-          → ∀ {E o} → At.Holds H s E o → At.Gated H s → At.Cut↓ (tornVia H k s) k s
-  via-cut H nothing  s ps hs g = lift tt
-  via-cut H (just _) s ps hs g = spent-torn H s ps hs g
-
-  via-gated : ∀ {h} (H : Heapᴹ h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
-            → ∀ {E o} → At.Holds H s E o → At.Gated H s → At.Gated (tornVia H k s) s
-  via-gated H nothing  s ps hs g = g
-  via-gated H (just _) s ps hs g = gated-torn H s ps hs g
+    via-gated : ∀ {h} (H : Heapᴹ h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
+              → ∀ {E o} → At.Holds H s E o → At.Gated H s → At.Gated (tornVia H k s) s
+    via-gated H nothing  s ps hs g = g
+    via-gated H (just _) s ps hs g = gated-torn H s ps hs g
 
   -- A thrown switch moves only the switch and what it holds.
   thrown-at : ∀ {h} (H : Heapᴹ h) (c : Kit.Cut h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) {ns}
             → (_ , Kit.live c) ∈ᴸ ns → (∀ {y} → y ∈ᴸ names s → y ∈ᴸ ns) → Off H (thrown H c k s) ns
   thrown-at H c k s ml sub j a = thrown-off H c k s j (lookupᴬ a ml) (narrow sub a)
 
-  pair-head : ∀ {a} {X : Set a} {x : X} {xs} → AllPairs _≢_ (x ∷ xs) → All (x ≢_) xs
-  pair-head (a ∷ _) = a
-
-  -- The takeWhile a cut runs from, at the heap it leaves.
-  module TakeSite {h} (H : Heapᴹ h) {Δ A i q c k} {s : Sub h Δ A} (ps : AllPairs _≢_ (names (takeWhileˢ i q c k taken s))) where
-    H₁ = store H (Kit.live c) (lift false)
-    H′ = thrown H c k s
-    P  = pairs-r (quietName k) (pairs-r (cutNames c) ps)
-
-    off : Off H H′ (names (takeWhileˢ i q c k taken s))
-    off = thrown-at H c k s (here refl) (λ m → ++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) m))
-
-    ag₁ : Alike H H₁ (names s)
-    ag₁ j m = look-store H (Kit.live c) j (lookupᴬ (apart-r (cutNames c) ps (here refl)) (++⁺ʳ (quietName k) m))
-
-    eh : look H′ (Kit.held c) ≡ look H (Kit.held c)
-    eh = thrown-off H c k s (Kit.held c) (≢-flip (lookupᴬ (pair-head ps) (here refl)))
-                    (narrow (++⁺ʳ (quietName k)) (apart-r (cutNames c) ps (there (here refl))))
-
-    agk : Alike H H′ (quietName k)
-    agk j m = thrown-off H c k s j (lookupᴬ (apart-l (cutNames c) ps (++⁺ˡ m)) (here refl)) (apart-r (quietName k) (pairs-r (cutNames c) ps) m)
-
-    holds : ∀ {E o} → At.Holds H (takeWhileˢ i q c k taken s) E o → At.Holds H′ (takeWhileˢ i q c k taken s) E o
-    holds (a , hs) = attached-alike c k eh agk a , via-holds H₁ k s P (Heaps.holds-alike H H₁ s ag₁ hs)
-
-    module _ {E o} (hs : At.Holds H s E o) (g : At.Gated H s) where
-      hs₁ = Heaps.holds-alike H H₁ s ag₁ hs
-      g₁  = Heaps.gated-alike H H₁ s ag₁ g
-
-      spent : At.Spent H′ (takeWhileˢ i q c k taken s)
-      spent = via-cut H₁ k s P hs₁ g₁
-
-      gated : At.Gated H′ (takeWhileˢ i q c k taken s)
-      gated = (λ _ → spent) , via-gated H₁ k s P hs₁ g₁
+  takeOff : ∀ {h} (H : Heapᴹ h) (c : Kit.Cut h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) {i q tk}
+          → Off H (thrown H c k s) (names (takeWhileˢ i q c k tk s))
+  takeOff H c k s = thrown-at H c k s (here refl) (λ m → ++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) m))
 
   -- The connect a cut runs from, its body ended, at the heap it leaves.
   module BodySite {h} (H : Heapᴹ h) {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
@@ -580,17 +844,17 @@ module Locality (R : Set) where
   -- The heap a cut leaves, against the root's kernel and gates.
   site-holds : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} → AllPairs _≢_ (names t) → (z : Site t)
              → At.Holds H t []ᴬ rootObs → At.Holds (siteHeap H z) t []ᴬ rootObs
-  site-holds H ps (takeSite {i = i} {q} {c} {k} {s} π) = Heaps.holds-path H (thrown H c k s) π ps T.off (λ {E} {o} → T.holds {E} {o})
-    where module T = TakeSite H {i = i} {q = q} {c = c} {k = k} {s = s} (fresh-path π ps)
+  site-holds H ps (takeSite {i = i} {q} {c} {k} {s} π) =
+    Heaps.holds-path H (thrown H c k s) π ps (takeOff H c k s {i = i} {q = q} {tk = taken}) (λ {E} {o} → holds-torn H (takeWhileˢ i q c k taken s) (fresh-path π ps) {E} {o})
   site-holds H ps (bodySite {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} π) = Heaps.holds-path H (thrown H c k s) π ps B.off (λ {E} {o} → B.holds {E} {o})
     where module B = BodySite H {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {s = s} {bd = bd} (fresh-path π ps)
 
   site-gated : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} → AllPairs _≢_ (names t) → (z : Site t)
              → At.Holds H t []ᴬ rootObs → At.Gated H t → At.Gated (siteHeap H z) t
   site-gated H ps (takeSite {i = i} {q} {c} {k} {s} π) hs g with holds-at π hs | gated-at π g
-  ... | _ , _ , (_ , hu) | (_ , gu) =
-    Heaps.gated-path H (thrown H c k s) π ps T.off (λ _ → T.gated hu gu) (λ _ → T.spent hu gu) g
-    where module T = TakeSite H {i = i} {q = q} {c = c} {k = k} {s = s} (fresh-path π ps)
+  ... | _ , _ , hu | gu =
+    Heaps.gated-path H (thrown H c k s) π ps (takeOff H c k s {i = i} {q = q} {tk = taken})
+      (λ _ → gated-torn H (takeWhileˢ i q c k taken s) (fresh-path π ps) hu gu) (λ _ → spent-torn H (takeWhileˢ i q c k taken s) (fresh-path π ps) hu gu) g
   site-gated H ps (bodySite {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} π) hs g with holds-at π hs | gated-at π g
   ... | _ , _ , (_ , _ , _ , hu , _) | (_ , gu , _) =
     Heaps.gated-path H (thrown H c k s) π ps B.off (B.gated hu gu) (B.spent hu gu) g
