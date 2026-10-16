@@ -300,20 +300,39 @@ module Honesty (R : Set) where
   weight (subAs _ _ K)   = suc (work K)
   weight (burstAs _ _ K) = work K
 
+  -- The values the tree's `of`s have still to emit.  A connect's source
+  -- runs its subscribe burst out into a subject nobody reads once what
+  -- held it has ended, as rxjs does: no ghost holds those values and no
+  -- other count moves, so only this one sees them go.
+  mutual
+    left : ∀ {h Δ A} → Sub h Δ A → ℕ
+    left (ofˢ _ _ xs)                      = length xs
+    left (mapˢ f s)                        = left s
+    left (scanˢ f r s)                     = left s
+    left (takeWhileˢ i q c k tk s)         = left s
+    left (flatMapˢ op f fl oc k r pl s ls) = left s + leftᴸ ls
+    left (connectˢ S c b kb k fd rp e rt src bd) = left src + left bd
+    left (deferˢ k s)                      = left s
+    left _                                 = 0
+
+    leftᴸ : ∀ {h Δ B} → List (Lane h Δ B) → ℕ
+    leftᴸ []                = 0
+    leftᴸ (lane c k s ∷ ls) = left s + leftᴸ ls
+
   -- THE WORK LEFT AT A RE-ENTRY CONFIGURATION, in order: subscriptions
-  -- owed, takeWhiles' stages, timers queued, bursts held (the tree's
-  -- load), then the control's own.
+  -- owed, takeWhiles' stages, timers queued, bursts held, values the
+  -- `of`s owe (the tree's load), then the control's own.
   Load : Set
-  Load = ℕ × ℕ × ℕ × ℕ
+  Load = ℕ × ℕ × ℕ × ℕ × ℕ
 
   _⊏_ : Load → Load → Set
-  _⊏_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_))
+  _⊏_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_)))
 
   _≼_ : Load → Load → Set
   a ≼ b = a ≡ b ⊎ a ⊏ b
 
   load : (m : Mach) → Sub (Conf.world (Mach.conf m)) [] R → Load
-  load m t = pend t , takes t , length (Mach.timers m) , length (Mach.bursts m)
+  load m t = pend t , takes t , length (Mach.timers m) , length (Mach.bursts m) , left t
 
   lex-trans : ∀ {B : Set} {_<₂_ : B → B → Set} → (∀ {x y z} → x <₂ y → y <₂ z → x <₂ z)
             → ∀ {a b c : ℕ × B} → ×-Lex _≡_ _<_ _<₂_ a b → ×-Lex _≡_ _<_ _<₂_ b c → ×-Lex _≡_ _<_ _<₂_ a c
@@ -323,8 +342,9 @@ module Honesty (R : Set) where
   lex-trans t (inj₂ (refl , ab)) (inj₂ (refl , bc)) = inj₂ (refl , t ab bc)
 
   ⊏-trans : ∀ {a b c} → a ⊏ b → b ⊏ c → a ⊏ c
-  ⊏-trans = lex-trans {_<₂_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_)}
-              (lex-trans {_<₂_ = ×-Lex _≡_ _<_ _<_} (lex-trans {_<₂_ = _<_} <-trans))
+  ⊏-trans = lex-trans {_<₂_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_))}
+              (lex-trans {_<₂_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_)}
+                (lex-trans {_<₂_ = ×-Lex _≡_ _<_ _<_} (lex-trans {_<₂_ = _<_} <-trans)))
 
   ≼-trans : ∀ {a b c} → a ≼ b → b ≼ c → a ≼ c
   ≼-trans (inj₁ refl) bc          = bc
@@ -342,11 +362,12 @@ module Honesty (R : Set) where
   _≺_ = ×-Lex _≡_ _⊏_ _<_
 
   ≺-wf : WellFounded _≺_
-  ≺-wf = ×-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded <-wellFounded))) <-wellFounded
+  ≺-wf = ×-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded
+           (×-wellFounded <-wellFounded <-wellFounded)))) <-wellFounded
 
   measure : ∀ {g m} → Strong g m → Measure
   measure {m = m} (carried cr) = load m (Carried.tree cr) , weight (Carried.ctlAs cr)
-  measure (closing _ _ _ _ _)  = (0 , 0 , 0 , 0) , 0
+  measure (closing _ _ _ _ _)  = (0 , 0 , 0 , 0 , 0) , 0
 
   loadOf : ∀ {g m} → Strong g m → Load
   loadOf st = proj₁ (measure st)
@@ -905,15 +926,27 @@ module Honesty (R : Set) where
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ false → Hops cr
 
     -- An `of` reading its observer open where the ghost does not hold it:
-    -- a connect's source fed on past its body's end.  The source is
+    -- a connect's source fed on past what held it.  The source is
     -- subscribed after the body and its cut attached only once its
-    -- subscribe returns, so a body ending inside that burst leaves the
-    -- rest of the burst to run into a subject nobody joins, as rxjs does.
-    -- The meaning keeps that burst running as skips (`U.burstingᶜ`, a
-    -- pool's or an ended source's rest), so the ghost steps past it.
-    emit-unseen : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-                → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-                → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
+    -- subscribe returns, and it reads its subject, not its connect's
+    -- observer; so a body, or a takeWhile or lane above the connect,
+    -- ending inside that burst leaves the rest of the burst to run into a
+    -- subject nobody reads, as rxjs does.  The value climbs to the node
+    -- that hides it (a takeWhile or lane cut, a connect whose body has
+    -- ended) and dies at a guard; that node's part ignores everything
+    -- under it, so the ghost is alike, and the `of` owes a value fewer.
+    -- Nothing under a part that has ended reads open, so no lane is
+    -- admitted, no subscription begun on the way.
+    -- DEAD ROUTE: the ghost past the burst's skip (`U.burstingᶜ`).  A
+    --   part past its end shows nothing under it: a cut takeWhile and a
+    --   connect with no body have no part, and an `ending` take's rest
+    --   stops at its end, which sits before every later value of the
+    --   burst.  No skip of the ghost's is this value.
+    emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false → ∀ {m′} → step m ≡ silent m′
+              → Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m′ ⇝ m₀ × Σ (Carried g″ m₀) λ cr₀
+                → (∀ n → Agree n (residual g) (residual g″)) × load m₀ (Carried.tree cr₀) ⊏ load m (Carried.tree cr)
 
     -- An `of` reading its observer open, its value handed on under the
     -- `of`'s scope: the `of` past it, the value on its way up, the
@@ -1106,7 +1139,7 @@ module Honesty (R : Set) where
         ; owned = owned-spent hp calmAs sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr eq now ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl)))))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
   burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
     cr@record { tree = t ; ctlAs = burstAs x restᴴ (restAs ks e K″) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn ; queue = q
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl sp eq
@@ -1118,7 +1151,7 @@ module Honesty (R : Set) where
         ; owned = owned-spent hp (runAs ks e K″) sp refl refl refl ow ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr eq now ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl)))))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
 
   -- A burst's frame stepped: found spent, polled, or played.
   burst-onward : ∀ {g m w K b bs} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ held σ K
@@ -1270,6 +1303,13 @@ module Honesty (R : Set) where
             → seen (Conf.heap (Mach.conf m)) π ≡ true → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
   emit-open cr π fc op sn = emit-run cr π fc op (emit-lifts cr π fc op sn)
 
+  -- An `of` the ghost does not hold: the ghost alike, the load lighter.
+  emit-unseen : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
+  emit-unseen cr π fc op sn eq with emit-void cr π fc op sn eq
+  ... | g″ , m₀ , path , cr₀ , ag , lt = g″ , m₀ , path , carried cr₀ , lowered ag (inj₁ lt)
+
   -- An `of`'s next value climbs the observers above it: to the root's
   -- note, past a skip (a connect's feed, a lane admitted), or to a
   -- takeWhile's end.
@@ -1357,7 +1397,7 @@ module Honesty (R : Set) where
         ; owned = owned-move hp calmAs refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl)))))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs restᴴ (restAs ks e K‴)) ; meets = mt ; owned = ow ; kernels = kn ; meaning = mn
               ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
@@ -1367,7 +1407,7 @@ module Honesty (R : Set) where
         ; owned = owned-move hp (runAs ks e K‴) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ (proj₂ ck) ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind = Carried.behind cr })
-    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , ≤-refl)))))
+    , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
 
   -- Past a value recorded, the run runs the stepped ghost: the record's
   -- continuation is the agenda, about to run.

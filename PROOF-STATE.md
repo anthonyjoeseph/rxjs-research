@@ -177,12 +177,13 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE MEASURE.** `emit-unseen`: an `of` fed past its connect's body's
-  end, a burst the meaning keeps as skips (`U.burstingᶜ`). Decides
-  whether the ghost's step over that burst lowers the measure, or a
-  spinning source owes the measure a term. Ruled out: a measure blind to
-  a take's stage; `climb-take` is a body over `take-pass`, `take-out`,
-  `take-end`.
+- **THE MEASURE.** `emit-void`: a connect's source bursting on into a
+  subject nobody reads, past an ended body, take or lane. Decides whether
+  the value's climb to the node hiding it raises no subscription, stage,
+  timer or burst, everything under an ended part reading closed. Ruled
+  out: the ghost past the burst's skip (no part past an end holds it); a
+  measure without `left`, the values the `of`s still owe; a measure
+  blind to a take's stage.
 - **THE SHUT BODY.** `heads-lift`: a connect past its source's end shows
   its body shut, so the body's part must read every joiner left already
   told. `told` keeps an end it has; decides whether `Meaning`'s feed
@@ -249,9 +250,8 @@ by their own silent steps (`Mirror`).
   failing value climbs under `ix 0`, the take ending where the run is.
 - **`take-pass`** (Content) — FALSITY, `NO EVIDENCE`: a passing value climbs
   one operator, the tree's load as it was.
-- **`emit-unseen`** (Content) — FALSITY, `NO EVIDENCE`: an `of` emitting into
-  joiners the ghost no longer sees, after a connect's body ended; the meaning
-  keeps the burst as skips.
+- **`emit-void`** (Content) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
+  hold emits to a guard that drops it, the ghost alike, a value fewer.
 - **`climb-lanes`** (Content) — FALSITY, `NO EVIDENCE`: a lane's value climbs
   into its flatMap through `wkObs same`, equal up to `≗`.
 - **`climb-scan`** (Content) — FALSITY, `NO EVIDENCE`: a scan writes its cell
