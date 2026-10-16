@@ -147,13 +147,6 @@ module Lifting (R : Set) where
                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {y : C}
                 → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (sends y) → Called st m₁ (ρ ⊕ in-lanes πL)
 
-    -- A value reaching a connect's subject: the feed of its subscribers
-    -- owed, the ghost past the source's skip.
-    climb-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
-                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
-                   (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {y : A}
-                 → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (sends y) → Called st m₁ (ρ ⊕ in-source here)
-
     -- A subscription's continuation handed its unsubscribe, which it
     -- stashes: the ghost alike, a call fewer.
     kont-onward : ∀ {g m} (cr : Carried g m) {Δ A} {u : Sub _ Δ A} (π : Path (Carried.tree cr) u)

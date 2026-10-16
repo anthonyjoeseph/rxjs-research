@@ -186,8 +186,8 @@ by their own silent steps (`Mirror`).
   moved in the tree: node-local but for carrying the stack and agenda
   across it (`end-stack`, `end-owned`); an inclusive one's the same
   restage under one `under` step (`out-owned`). Remaining:
-  `climb-source`, `close-source` on a connect, restages by the same
-  shape; `climb-outer`, `close-outer`, `climb-lanes`, `close-lanes` on a
+  `close-source` on a connect, a restage like `climb-source`'s
+  (`Feeds`, over `src-idle`); `climb-outer`, `close-outer`, `climb-lanes`, `close-lanes` on a
   flatMap.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
@@ -296,8 +296,24 @@ by their own silent steps (`Mirror`).
   at a scan's accumulator.
 - **`climb-outer`** (Lift) — FALSITY, `NO EVIDENCE`: an outer value opens a
   lane and stops at the subscription it begins.
-- **`climb-source`** (Lift) — FALSITY, `NO EVIDENCE`: a connect source's value
-  feeds its subject's joiners and stops there.
+- **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source reaches
+  its subject only with no feed under way.
+- **`fed-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a feed
+  restaged has a sane, placed part, the ghost past the source's skip.
+- **`fed-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
+  stands against it with a connect's feed restaged.
+- **`fed-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
+  with a connect's feed restaged.
+- **`fed-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a feed
+  restaged, the feed the one call owed.
+- **`fed-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
+  connect's feed restaged.
+- **`fed-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
+  connect's feed restaged: the joiners' parts move with it.
+- **`fed-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
+  connect's feed restaged.
+- **`fed-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no sooner
+  than the run with a connect's feed restaged.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value.
 - **`sub-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a subscription begun runs

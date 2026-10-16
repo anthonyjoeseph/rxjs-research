@@ -23,7 +23,7 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Events∞; Pos; Timeline; Agree; agree-refl; at; last; ix; tick; _<ᵖ_; <ᵖ-tick; <ᵖ-trans; <ᵖ-below)
+open import denotation.MonotonicList using (Events∞; force; skip; Pos; Timeline; Agree; agree-refl; at; last; ix; tick; _<ᵖ_; <ᵖ-tick; <ᵖ-trans; <ᵖ-below)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import adequacy.Sorted using (module Sorting)
@@ -52,16 +52,16 @@ module Ascending (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; spent?; store) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle) renaming (same to same⊑)
   open Sorting R using (WellMach)
-  open Run (Pureᴾ R) using (Ref; Act; writeRef; Observer; _>>ᴬ_; module Kit; under; done; wkAct)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; taking; finishing; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; under≗; ≗-refl; Meets; Each; Heads; seen) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Run (Pureᴾ R) using (Ref; Act; writeRef; Observer; _>>ᴬ_; module Kit; module Subject; under; done; wkAct)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; take2C; bodyC; feedC; finC; srcC; taking; finishing; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; under≗; ≗-refl; Meets; Each; Heads; seen) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade)
   open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite)
   open Unsubbing R using (_⇝_; now; then; ≗-trans; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
-  open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; heightL; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; climb-outer; climb-lanes; climb-source; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
+  open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; heightL; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
+  open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; climb-outer; climb-lanes; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind)
   open Read
 
@@ -587,6 +587,65 @@ module Ascending (R : Set) where
              → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) sg → Called st m₁ (ρ ⊕ in-lanes πL)
   call-lanes st ρ πL o {sends _}  cl = climb-lanes st ρ πL o cl
   call-lanes st ρ πL o {closes _} cl = close-lanes st ρ πL o cl
+
+  -- A CONNECT FEEDING: the feed restaged from `idle` to the source's
+  -- value at the run's position, owed to the subscribers the feed read,
+  -- the ghost past the source's skip.
+  module Feeds {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B Sj c b kb k rp e rt} {u : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+               (ρ : Path T (connectˢ Sj c b kb k idle rp e rt u bd)) (y : A) (q : Pos) where
+    v  = connectˢ Sj c b kb k (feeding y q (At.val H (Subject.subscribers Sj))) rp e rt u bd
+    T′ = plant ρ v
+
+    postulate
+      fed-stack   : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} → StackAs T p′ ϑ K bs → StackAs T′ p′ ϑ K bs
+      fed-ticked  : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (fed-stack sk)
+      fed-owned   : ∀ {w bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {act} (sk : StackAs T q ϑ K bs) (e : act ≗ ⟦ feedC (planted ρ v) ∷ [] ⟧ᶜ)
+              → Owned H T (runAs [] (≗-refl _) sk) → Owned H T′ (runAs (feedC (planted ρ v) ∷ []) e (fed-stack sk))
+      fed-kernels : Kernels H T → Kernels H T′
+      fed-meaning : Meaning H T → Meaning H T′
+      fed-queue   : ∀ {clk ts} → Queue H q clk ts T → Queue H q clk ts T′
+      fed-behind  : Each H (Heads q) T → Each H (Heads q) T′
+      fed-ghost   : ∀ {g S c′} → Sane [] g → Placed g [] → At.part H u ≡ just c′
+              → Lifts H (ρ ⊕ in-source here) (U.outˢ q y c′) S → U.step g ≡ S
+              → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+                × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (force r) (residual g″)
+
+  -- A connect's source reaches its subject only with no feed under way:
+  -- the subject's subscribers are fed before the source runs again.
+  postulate
+    src-idle : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+               (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {y : A}
+             → Calling g ℓ m₁ (ρ ⊕ in-source here) (sends y) → fd ≡ idle
+
+  -- A value reaching a connect's subject: the subscribers read, the feed
+  -- owed them, the ghost past the source's skip.
+  climb-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+                 (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {y : A}
+               → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (sends y) → Called st m₁ (ρ ⊕ in-source here)
+  climb-source st ρ cl with src-idle ρ cl
+  climb-source st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {Sj} {c} {b} {kb} {k} {e = e} {rp} {rt} {u = u} {bd} ρ {y}
+    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+           ; behind = bh } | refl
+    with subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-source here) top) cd
+  ... | readRef≗ refl f with Feeds.fed-ghost hp ρ y q sn pl pv L sg
+  ...   | g″ , pg , sn″ , pl″ , k′ , r , ag , pp =
+    landed (g″ , _ , then refl now
+      , carried (record
+        { sane = sn″ ; placed = pl″ ; tree = Feeds.T′ hp ρ y q
+        ; ctlAs = runAs (feedC (planted ρ v) ∷ []) (≗-trans (f same⊑ ss) (seq-done _)) (Feeds.fed-stack hp ρ y q sk)
+        ; meets = pg
+        ; owned = Feeds.fed-owned hp ρ y q sk (≗-trans (f same⊑ ss) (seq-done _)) ow
+        ; kernels = Feeds.fed-kernels hp ρ y q kn ; meaning = Feeds.fed-meaning hp ρ y q mn ; queue = Feeds.fed-queue hp ρ y q qu
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
+                         ; clocked = proj₁ ck , Feeds.fed-ticked hp ρ y q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
+        ; sorted = sorted-⇝ so (then refl now) ; behind = Feeds.fed-behind hp ρ y q bh })
+      , passed ag pp)
+    where
+      ss = At.val hp (Subject.subscribers Sj)
+      v  = connectˢ Sj c b kb k (feeding y q ss) rp e rt u bd
 
   -- A signal reaching a connect's subject.
   call-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
