@@ -182,11 +182,12 @@ by their own silent steps (`Mirror`).
   recursion, by `call-step` over one lemma per operator. Ruled out: a
   third mid-call state; an inclusive take's completion after its failing
   value rides the stack frame the value runs under, not the calls owed.
-  What remains are the operator leaves: `climb-outer`, `close-outer`,
-  `climb-lanes`, `close-lanes` on a flatMap; `climb-source`,
-  `close-source` on a connect; `take-out`, `take-end` on a take. Each
-  decides whether its operator's call is a write and a framing, as the
-  scan's is, or reads past its node.
+  An exclusive take's call is a read and a RESTAGE, the take's stage
+  moved in the tree: node-local but for carrying the stack and agenda
+  across it (`end-stack`, `end-owned`). Remaining: `take-out`;
+  `climb-source`, `close-source` on a connect, restages by the same
+  shape; `climb-outer`, `close-outer`, `climb-lanes`, `close-lanes` on a
+  flatMap.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -240,8 +241,22 @@ by their own silent steps (`Mirror`).
   end, an `of` in its body: the body shut steps as it does, shut after.
 - **`emit-run`** (Lift) — FALSITY, `NO EVIDENCE`: an open `of`'s value handed
   on under its scope, the climb starts aloft.
-- **`take-end`** (Lift) — FALSITY, `NO EVIDENCE`: an exclusive take's failing
-  value lands at its completion owed, the ghost alike, a stage on.
+- **`end-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
+  stands against it with a take restaged `ending`.
+- **`end-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the restaged stack ticks
+  as the stack did.
+- **`end-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds of the take
+  restaged `ending`, its completion the one call owed.
+- **`end-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
+  take restaged `ending`.
+- **`end-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
+  take restaged `ending`.
+- **`end-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a take
+  restaged `ending`.
+- **`end-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
+  sooner than the run with a take restaged `ending`.
+- **`end-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a take
+  restaged `ending` has a sane, placed part meaning what the ghost did.
 - **`take-out`** (Lift) — FALSITY, `NO EVIDENCE`: an inclusive take's failing
   value climbs under `ix 0`, the take ending where the run is.
 - **`emit-void`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not

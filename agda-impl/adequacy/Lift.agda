@@ -139,15 +139,6 @@ module Lifting (R : Set) where
                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ true p c k taking u)) {y : A} → p y ≡ false
              → Calling g ℓ m₁ (ρ ⊕ in-take here) (sends y) → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
 
-    -- A value an exclusive takeWhile fails on: the take `ending` where
-    -- the run is, its completion the agenda's call.  The ghost alike,
-    -- the take a stage on.
-    take-end : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {p c k}
-               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ false p c k taking u)) {y : A} → p y ≡ false
-             → Calling g ℓ m₁ (ρ ⊕ in-take here) (sends y)
-             → Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m₁ ⇝ m₀ × Σ (Carried g″ m₀) λ cr
-               → (∀ n → Agree n (residual g) (residual g″)) × load m₀ (Carried.tree cr) ⊏ load m₁ T
-
     -- A value reaching a flatMap's outer: admitted, a lane begun or
     -- queued, the ghost past the outer's skip.
     climb-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}

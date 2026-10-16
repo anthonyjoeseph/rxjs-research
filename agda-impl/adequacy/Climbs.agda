@@ -4,12 +4,12 @@
 -- operator's callback one rise; and the close, its teardown.
 module adequacy.Climbs where
 
-open import Data.List using (List; []; _∷_; _++_)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; +-monoʳ-<; +-monoˡ-<)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
@@ -23,7 +23,7 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Events∞; Pos; Timeline; agree-refl; at; _<ᵖ_; <ᵖ-tick; <ᵖ-trans)
+open import denotation.MonotonicList using (Events∞; Pos; Timeline; Agree; agree-refl; at; last; _<ᵖ_; <ᵖ-tick; <ᵖ-trans)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import adequacy.Sorted using (module Sorting)
@@ -33,7 +33,7 @@ open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
-open import adequacy.Sane using (sane-out)
+open import adequacy.Sane using (Sane; sane-out)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (placed-after; Placedˢ)
 open import denotation.Denote using (⟦_⟧)
@@ -52,16 +52,16 @@ module Ascending (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle) renaming (same to same⊑)
   open Sorting R using (WellMach)
-  open Run (Pureᴾ R) using (Ref; Act; writeRef; Observer; _>>ᴬ_; module Kit)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; taking; finishing; PathLanes; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; Here; walk; top; _≗_; eff≗; readRef≗; writeRef≗; ≗-refl; Meets; Each; Heads; seen) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
+  open Run (Pureᴾ R) using (Ref; Act; writeRef; Observer; _>>ᴬ_; module Kit; under; done)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; taking; finishing; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; ≗-refl; Meets; Each; Heads; seen) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade)
-  open Moving R using (takes-plant; plant; planted; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
+  open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite)
   open Unsubbing R using (_⇝_; now; then; ≗-trans; wk-same; bind≗)
-  open Sequencing R using (seq-assoc)
-  open Ghosting R using (module Far; module Calling; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-body; lifts-shut; lifts-defer; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; take-out; take-end; climb-outer; climb-lanes; climb-source; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
+  open Sequencing R using (seq-assoc; seq-done)
+  open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-body; lifts-shut; lifts-defer; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
+  open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; take-out; climb-outer; climb-lanes; climb-source; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind)
   open Read
 
@@ -267,6 +267,101 @@ module Ascending (R : Set) where
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = inj₁ refl })
+
+  -- A path to a planted node walks as the path it replaced: a walk reads
+  -- no node's children.
+  mutual
+    walk-planted : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ρ : Path t x) (v : Sub h Δ′ A′) (H : Here h Δ A)
+                 → walk (planted ρ v) H ≡ walk ρ H
+    walk-planted here         v H = refl
+    walk-planted (in-map ρ)   v H = walk-planted ρ v _
+    walk-planted (in-scan ρ)  v H = walk-planted ρ v _
+    walk-planted (in-take ρ)  v H = walk-planted ρ v _
+    walk-planted (in-outer ρ) v H = walk-planted ρ v _
+    walk-planted (in-lanes {op = op} {f} {fl} ρ) v H = walk-plantedᴸ op f fl H ρ v
+    walk-planted (in-source ρ) v H = walk-planted ρ v _
+    walk-planted (in-body ρ)  v H = walk-planted ρ v _
+    walk-planted (in-defer ρ) v H = walk-planted ρ v _
+
+    walk-plantedᴸ : ∀ {h Δ A B Δ′ A′} {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} op (f : A → T.Obs Timeline Δ B) fl (H : Here h Δ B)
+                    (ρ : PathLanes ls x) (v : Sub h Δ′ A′) → walkLanes op f fl H (plantedᴸ ρ v) ≡ walkLanes op f fl H ρ
+    walk-plantedᴸ op f fl H (this-lane ρ) v = walk-planted ρ v _
+    walk-plantedᴸ op f fl H (next-lane ρ) v = walk-plantedᴸ op f fl H ρ v
+
+  -- A plant counting fewer stages than what it replaced counts fewer.
+  mutual
+    takes-less : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ρ : Path t x) (v : Sub h Δ′ A′) → takes v < takes x → takes (plant ρ v) < takes t
+    takes-less here                    v lt = lt
+    takes-less (in-map ρ)              v lt = takes-less ρ v lt
+    takes-less (in-scan ρ)             v lt = takes-less ρ v lt
+    takes-less (in-take {tk = tk} ρ)   v lt = +-monoʳ-< (stage tk) (takes-less ρ v lt)
+    takes-less (in-outer {ls = ls} ρ)  v lt = +-monoˡ-< (takesᴸ ls) (takes-less ρ v lt)
+    takes-less (in-lanes {t = so} ρ)   v lt = +-monoʳ-< (takes so) (takes-lessᴸ ρ v lt)
+    takes-less (in-source {bd = bd} ρ) v lt = +-monoˡ-< (takes bd) (takes-less ρ v lt)
+    takes-less (in-body {t = s} ρ)     v lt = +-monoʳ-< (takes s) (takes-less ρ v lt)
+    takes-less (in-defer ρ)            v lt = takes-less ρ v lt
+
+    takes-lessᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} (ρ : PathLanes ls x) (v : Sub h Δ′ A′)
+                → takes v < takes x → takesᴸ (plantᴸ ρ v) < takesᴸ ls
+    takes-lessᴸ (this-lane {ls = ls} ρ)          v lt = +-monoˡ-< (takesᴸ ls) (takes-less ρ v lt)
+    takes-lessᴸ (next-lane {l = lane c k s} ρ)   v lt = +-monoʳ-< (takes s) (takes-lessᴸ ρ v lt)
+
+  -- A guard read open over a predicate failing, an exclusive take's:
+  -- the completion and the cut.
+  end-code : ∀ {w} {b q : Bool} {m x : Act w ⊤} → b ≡ true → q ≡ false → Kit.when b (if q then m else (done tt >>ᴬ x)) ≗ x
+  end-code refl refl = ≗-refl _
+
+  -- AN EXCLUSIVE TAKE ENDED: the take a stage on, `ending` where the run
+  -- is over what its source's failing value left, nothing else of the
+  -- tree moved, and the completion its one call owed ahead of the stack.
+  module Ended {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A p c k} {u : Sub h Δ A} (ρ : Path T (takeWhileˢ false p c k taking u))
+               (q : Pos) (c′ : U.Node Δ A) where
+    v  = takeWhileˢ false p c k (Strongly.ending q c′) u
+    T′ = plant ρ v
+
+    postulate
+      end-stack   : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} → StackAs T p′ ϑ K bs → StackAs T′ p′ ϑ K bs
+      end-ticked  : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (end-stack sk)
+      end-owned   : ∀ {w bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {act} (sk : StackAs T q ϑ K bs) (e : act ≗ ⟦ take1C (planted ρ v) ∷ [] ⟧ᶜ)
+              → At.val H (Kit.live c) ≡ true → Owned H T (runAs [] (≗-refl _) sk) → Owned H T′ (runAs (take1C (planted ρ v) ∷ []) e (end-stack sk))
+      end-kernels : Kernels H T → Kernels H T′
+      end-meaning : Meaning H T → Meaning H T′
+      end-queue   : ∀ {clk ts} → Queue H q clk ts T → Queue H q clk ts T′
+      end-behind  : Each H (Heads q) T → Each H (Heads q) T′
+      end-ghost : ∀ {g S} → Sane [] g → Placed g [] → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
+              → Lifts H ρ (U.endˢ (q ++ [ last ])) S → U.step g ≡ S
+              → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × (∀ n → Agree n (residual g) (residual g″))
+
+  -- A value an exclusive takeWhile fails on: its guard read, the take
+  -- ended, its completion the agenda's call.
+  take-end : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {p c k}
+             {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ false p c k taking u)) {y : A} → p y ≡ false
+           → Calling g ℓ m₁ (ρ ⊕ in-take here) (sends y)
+           → Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m₁ ⇝ m₀ × Σ (Carried g″ m₀) λ cr
+             → (∀ n → Agree n (residual g) (residual g″)) × load m₀ (Carried.tree cr) ⊏ load m₁ T
+  take-end {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {p = p} {c = c} {k = k} {u = u} ρ {y} py
+    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+           ; behind = bh }
+    with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-take here) top) cd
+  ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f
+    with Ended.end-ghost hp ρ q c′ sn pl lv pv (subst (λ s → Lifts hp ρ s S) (cong (U.taking false p q y c′) py) Lρ) sg
+  ...   | g″ , pg , sn″ , pl″ , ag =
+    g″ , _ , then refl now
+    , record
+        { sane = sn″ ; placed = pl″ ; tree = Ended.T′ hp ρ q c′
+        ; ctlAs = runAs (take1C (planted ρ v) ∷ []) e (Ended.end-stack hp ρ q c′ sk)
+        ; meets = pg
+        ; owned = Ended.end-owned hp ρ q c′ sk e lv ow
+        ; kernels = Ended.end-kernels hp ρ q c′ kn ; meaning = Ended.end-meaning hp ρ q c′ mn ; queue = Ended.end-queue hp ρ q c′ qu
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
+                         ; clocked = proj₁ ck , Ended.end-ticked hp ρ q c′ clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
+        ; sorted = sorted-⇝ so (then refl now) ; behind = Ended.end-behind hp ρ q c′ bh }
+    , ag , inj₂ (pend-plant {t = T} ρ v refl , inj₁ (takes-less ρ v ≤-refl))
+    where
+      v = takeWhileˢ false p c k (Strongly.ending q c′) u
+      e = ≗-trans (f same⊑ (At.val hp (Kit.live c))) (≗-trans (wk-same _) (≗-trans (end-code lv py)
+            (subst (λ W → _ ≗ (under last (Observer.complete (Here.obs W)) (Kit.cut c) >>ᴬ done tt)) (sym (walk-planted ρ v top)) (seq-done _))))
 
   -- The signal risen, held to the call's load.
   rise : ∀ {g m} {st : Strong g m} {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}

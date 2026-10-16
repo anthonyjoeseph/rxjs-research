@@ -6,7 +6,7 @@
 -- which agree up to `_≗_`.
 module adequacy.Seq where
 
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Maybe using (just; nothing)
@@ -97,6 +97,25 @@ module Sequencing (R : Set) where
   seq-wk σ (under l m k′)           k = under≗ (≗-refl _) (seq-wk σ k′ k)
   seq-wk σ diverge                  k = diverge≗
   seq-wk σ (unfold l e n c x k′ m)  k = unfold≗ refl (λ a → ≗-refl _) (≗-refl _) (≗-refl _) (λ υ q → ≗-refl _) (seq-wk σ m k)
+
+  -- A sequence ended by nothing.
+  seq-done : ∀ {w} (m : Act w ⊤) → m ≗ (m >>ᴬ done tt)
+  seq-done (done b)              = ≗-refl _
+  seq-done (newRef t a k)        = newRef≗ refl λ σ r → seq-done (k σ r)
+  seq-done (readRef r k)         = readRef≗ refl λ σ x → seq-done (k σ x)
+  seq-done (writeRef r a k)      = writeRef≗ refl refl (seq-done k)
+  seq-done (register n c x k)    = register≗ (λ a → ≗-refl _) (≗-refl _) (≗-refl _) λ σ s → seq-done (k σ s)
+  seq-done (send s a k)          = send≗ refl (seq-done k)
+  seq-done (finish s k)          = finish≗ refl (seq-done k)
+  seq-done (startCold c s k)     = startCold≗ refl λ σ h → seq-done (k σ h)
+  seq-done (stop h k)            = stop≗ refl (seq-done k)
+  seq-done (stash m k)           = stash≗ (≗-refl _) λ σ q → seq-done (k σ q)
+  seq-done (cancel q k)          = cancel≗ refl (seq-done k)
+  seq-done (eff e k)             = eff≗ λ a → seq-done (k a)
+  seq-done (hereᴬ k)             = here≗ λ p → seq-done (k p)
+  seq-done (under l m k)         = under≗ (≗-refl _) (seq-done k)
+  seq-done diverge               = diverge≗
+  seq-done (unfold l e n c x k m) = unfold≗ refl (λ a → ≗-refl _) (≗-refl _) (≗-refl _) (λ σ q → ≗-refl _) (seq-done m)
 
   -- A sequence re-associated.
   seq-assoc : ∀ {w B} (m n : Act w ⊤) (k : Act w B) → ((m >>ᴬ n) >>ᴬ k) ≗ (m >>ᴬ (n >>ᴬ k))
