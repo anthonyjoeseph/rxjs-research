@@ -146,3 +146,6 @@ jobs:
 
       - name: make stepping
         run: make stepping
+
+      - name: make placing
+        run: make placing

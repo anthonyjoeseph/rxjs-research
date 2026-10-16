@@ -186,13 +186,13 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `steady-start` and `ordered-start` first, the cold's run
-  where a tick heads it: two refutations in one region, so attempt the
-  assembly before restating again. Then `ordered-flat`, `steady-flat`,
-  `ordered-connect`, `steady-connect` over the meaning that keeps a pool
-  and an ended source's rest. Ruled out: a lane's end tied with another
-  lane or the outer, a lane's first before where it subscribes. Decides
-  whether the start region is converging or is a mechanism to reconsider.
+- **THE ORDER.** `ordered-flat` and `steady-flat`, then `ordered-connect`
+  and `steady-connect`, over the meaning that keeps a pool and an ended
+  source's rest. A leaf's run rises (`Rising`) once a tick heads it, and a
+  cut keeps order and steadiness, so the risk left is the merges alone:
+  whether a pool shown once ahead of every running part, and a rest past
+  its body's end, sort. Ruled out: a lane's end tied with another lane or
+  the outer, a lane's first before where it subscribes.
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -221,15 +221,6 @@ by their own silent steps (`Mirror`).
   tick heads it is steady, its source's rest stepping where it would have.
 - **`steady-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap where a tick heads
   it, over sorted, alien sources, is steady: no lane steps inside its outer's.
-- **`steady-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
-  steady.
-- **`steady-start`** (Placed) — FALSITY, `REFUTED`: a cold's run where a tick
-  heads it is steady.
-- **`steady-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is steady.
-- **`ordered-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps the order.
-- **`ordered-start`** (Placed) — FALSITY, `REFUTED`: a cold's run where a tick
-  heads it is in order.
-- **`ordered-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is in order.
 - **`step-skips`** (Stepper) — FALSITY, `REFUTED×2, DEAD ROUTE, RECOVERY×2`,
   `X`: a sane, placed root ghost's meaning is what its step shows, then the
   stepped node's.

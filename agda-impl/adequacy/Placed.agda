@@ -12,7 +12,7 @@ open import Data.List.Properties using (∷-injective; ∷-injectiveʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
-open import Data.Nat.Properties using (+-suc; +-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
+open import Data.Nat.Properties using (+-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
@@ -28,7 +28,7 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.MonotonicList using (Events; Events∞; Pos; From; Timeline; MonotonicList; Agree; out⁼; skip⁼; end⁼; hush⁼; agree;
   agreeᵀ; Earliest; none; found; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_; root;
   <ᵖ-asym; <ᵖ-down; <ᵖ-next; <ᵖ-split; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-part; ≮-trans; <ᵖ-below;
-  <ᵖ-tick; Tail; Tail∞; pin; idle; _∪_; tailᴱ; Agreeᵀ; pin⁼; idle⁼)
+  <ᵖ-tick; <ᵖ-ix; Tail; Tail∞; pin; idle; _∪_; tailᴱ; Agreeᵀ; pin⁼; idle⁼)
 import denotation.MonotonicList as M
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
@@ -1498,20 +1498,191 @@ start-within p (M.at (suc _) _ _) ρ = tt
 start-within p M.done             ρ = tt
 start-within p M.quiet            ρ = tt
 
-postulate
-  -- A COLD'S RUN IS IN ORDER where a tick heads it: a burst, or its
-  -- frames, from the start.
-  --
-  -- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
-  ordered-start : ∀ {A} p (m : From A 0) → Headed p → Ordered (M.start p m)
+-- A RUN RISING: each event strictly before the next and not around
+-- it, so both in order and steady.
+mutual
+  Rises : ∀ {A} → Events A → Set
+  Rises (out k _ r) = Past k (force r) × Rising (force r)
+  Rises (skip k r)  = Past k (force r) × Rising (force r)
+  Rises (end _)     = ⊤
+  Rises hush        = ⊤
 
-  -- A LIST'S RUN IS IN ORDER: its values at rising indices, then its end.
-  ordered-of : ∀ {A} p i (xs : List A) → Ordered (M.ofᴱ p i xs)
+  record Rising {A} (e : Events A) : Set where
+    coinductive
+    field rises : Rises e
 
-  -- A CUT KEEPS THE ORDER: the run up to the first value failing, then
-  -- its end.
+open Rising public
+
+past-atop : ∀ {A} k (e : Events A) → Past k e → Atop k e
+past-atop k (out h _ _) (l , _) = <ᵖ-asym k h l
+past-atop k (skip h _)  (l , _) = <ᵖ-asym k h l
+past-atop k (end h)     (l , _) = <ᵖ-asym k h l
+past-atop k hush        _       = tt
+
+past-clear : ∀ {A} k (e : Events A) → Past k e → Clear k e
+past-clear k (out h _ _) p       = p
+past-clear k (skip h _)  (_ , n) = n
+past-clear k (end h)     (_ , n) = n
+past-clear k hush        _       = tt
+
+rising-ordered : ∀ {A} (e : Events A) → Rising e → Ordered e
+ordered (rising-ordered (out k _ r) ri) = past-atop k _ (proj₁ (rises ri)) , rising-ordered _ (proj₂ (rises ri))
+ordered (rising-ordered (skip k r)  ri) = past-atop k _ (proj₁ (rises ri)) , rising-ordered _ (proj₂ (rises ri))
+ordered (rising-ordered (end _)     ri) = tt
+ordered (rising-ordered hush        ri) = tt
+
+rising-steady : ∀ {A} (e : Events A) → Rising e → Steady e
+steady (rising-steady (out k _ r) ri) = proj₁ (rises ri) , rising-steady _ (proj₂ (rises ri))
+steady (rising-steady (skip k r)  ri) = past-clear k _ (proj₁ (rises ri)) , rising-steady _ (proj₂ (rises ri))
+steady (rising-steady (end _)     ri) = tt
+steady (rising-steady hush        ri) = tt
+
+-- One label on from the same position: strictly past it, not inside it.
+next-ix : ∀ r i → (r ++ [ ix i ]) <ᵖ (r ++ [ ix (suc i) ]) ≡ true × ¬ Ext (r ++ [ ix i ]) (r ++ [ ix (suc i) ])
+next-ix r i = <ᵖ-part r [] [] (<ᵖ-ix i) , λ x → ext-irrefl r (under-ext r r x)
+
+ix-last : ∀ r i → (r ++ [ ix i ]) <ᵖ (r ++ [ last ]) ≡ true × ¬ Ext (r ++ [ ix i ]) (r ++ [ last ])
+ix-last r i = <ᵖ-part r [] [] refl , λ x → ext-irrefl r (under-ext r r x)
+
+ix-< : ∀ {m n} → m < n → (ix m ∷ []) <ᵖ (ix n ∷ []) ≡ true
+ix-< {m} {suc n} l with m≤n⇒m<n∨m≡n (≤-pred l)
+... | inj₁ l′   = <ᵖ-trans (ix m ∷ []) (ix n ∷ []) (ix (suc n) ∷ []) (ix-< l′) (<ᵖ-ix n)
+... | inj₂ refl = <ᵖ-ix n
+
+-- A later tick: strictly past, and not inside.
+tick-past : ∀ {m n} p q → m < n → (ix m ∷ p) <ᵖ (ix n ∷ q) ≡ true × ¬ Ext (ix m ∷ p) (ix n ∷ q)
+tick-past {m} {n} p q l = <ᵖ-part [] {ix m} {ix n} p q (ix-< l) , apart
+  where apart : ¬ Ext (ix m ∷ p) (ix n ∷ q)
+        apart x with ext-eq x
+        ... | _ , _ , e with ∷-injective e
+        ...   | refl , _ = <⇒≢ l refl
+
+-- A burst's first event is at its next index.
+burst-past : ∀ {A t} τ r i (b : M.Frame A t) {k} → k <ᵖ (r ++ [ ix i ]) ≡ true × ¬ Ext k (r ++ [ ix i ]) → Past k (M.burst τ r i b)
+burst-past τ r i (M.emit _ _) h = h
+burst-past τ r i (M.stall _)  h = h
+burst-past τ r i (M.close _)  h = h
+
+-- A burst at its frame's tick rises, and so does every frame after it:
+-- each frame's tick past the last.
+mutual
+  rising-burst : ∀ {A t} τ n q i (b : M.Frame A t) → n ≡ τ + t → Rising (M.burst τ (ix n ∷ q) i b)
+  rises (rising-burst τ n q i (M.emit a f) e) = burst-past τ _ (suc i) (M.Frame∞.force f) (next-ix (ix n ∷ q) i) , rising-burst τ n q (suc i) _ e
+  rises (rising-burst τ n q i (M.stall f)  e) = burst-past τ _ (suc i) (M.Frame∞.force f) (next-ix (ix n ∷ q) i) , rising-burst τ n q (suc i) _ e
+  rises (rising-burst τ n q i (M.close f)  e) = frames-past τ q i (M.From∞.force f) e , rising-frames τ _ (M.From∞.force f)
+
+  rising-frames : ∀ {A t} τ e (m : From A t) → Rising (M.frames τ e m)
+  rises (rising-frames τ e M.done)         = tt
+  rises (rising-frames τ e M.quiet)        = tt
+  rises (rising-frames τ e (M.at t′ _ b)) = rises (rising-burst τ (τ + t′) (sub e ∷ []) 0 b refl)
+
+  frames-past : ∀ {A t n} τ q i (m : From A (suc t)) → n ≡ τ + t → Past (ix n ∷ q ++ [ ix i ]) (M.frames τ (ix n ∷ q ++ [ last ]) m)
+  frames-past τ q i M.done        e    = ix-last (ix _ ∷ q) i
+  frames-past τ q i M.quiet       e    = tt
+  frames-past τ q i (M.at t′ l b) refl = burst-past τ _ 0 b (tick-past (q ++ [ ix i ]) _ (+-monoʳ-< τ l))
+
+-- A COLD'S RUN RISES where a tick heads it: its subscribe burst at the
+-- tick's own label, every later frame at a later tick.
+--
+-- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
+rising-start : ∀ {A} p (m : From A 0) → Headed p → Rising (M.start p m)
+rising-start (ix τ ∷ q)  (M.at zero _ b)    hp = rising-burst τ τ q 0 b (sym (+-identityʳ τ))
+rising-start []          (M.at zero _ b)    ()
+rising-start (sub _ ∷ _) (M.at zero _ b)    ()
+rising-start (last ∷ _)  (M.at zero _ b)    ()
+rising-start p           (M.at (suc t) l b) hp = rising-frames (tick p) (p ++ [ last ]) (M.at (suc t) l b)
+rising-start p           M.done             hp = rising-frames {t = 0} (tick p) (p ++ [ last ]) M.done
+rising-start p           M.quiet            hp = rising-frames {t = 0} (tick p) (p ++ [ last ]) M.quiet
+
+ordered-start : ∀ {A} p (m : From A 0) → Headed p → Ordered (M.start p m)
+ordered-start p m hp = rising-ordered _ (rising-start p m hp)
+
+steady-start : ∀ {A} p (m : From A 0) → Headed p → Steady (M.start p m)
+steady-start p m hp = rising-steady _ (rising-start p m hp)
+
+-- A LIST'S RUN RISES: its values at rising indices, then its end.
+rising-of : ∀ {A} p i (xs : List A) → Rising (M.ofᴱ p i xs)
+rises (rising-of p i [])           = tt
+rises (rising-of p i (x ∷ []))     = ix-last p i , rising-of p (suc i) []
+rises (rising-of p i (x ∷ y ∷ xs)) = next-ix p i , rising-of p (suc i) (y ∷ xs)
+
+ordered-of : ∀ {A} p i (xs : List A) → Ordered (M.ofᴱ p i xs)
+ordered-of p i xs = rising-ordered _ (rising-of p i xs)
+
+steady-of : ∀ {A} p i (xs : List A) → Steady (M.ofᴱ p i xs)
+steady-of p i xs = rising-steady _ (rising-of p i xs)
+
+-- A position one label down from another is inside only what that one
+-- is inside or is.
+ext-snoc : ∀ k h x → Ext k (h ++ [ x ]) → Ext k h ⊎ k ≡ h
+ext-snoc k h x e with ext-eq e
+... | _ , _ , eq = go k h eq
+  where go : ∀ k h {l ls} → h ++ [ x ] ≡ k ++ l ∷ ls → Ext k h ⊎ k ≡ h
+        go []          []      e = inj₂ refl
+        go []          (b ∷ h) e = inj₁ (ext b h)
+        go (a ∷ [])    []      e with () ← ∷-injectiveʳ e
+        go (a ∷ _ ∷ _) []      e with () ← ∷-injectiveʳ e
+        go (a ∷ k)     (b ∷ h) e with ∷-injective e
+        ... | refl , e′ with go k h e′
+        ...   | inj₁ x′   = inj₁ (cons-ext a x′)
+        ...   | inj₂ refl = inj₂ refl
+
+past-snoc : ∀ k h x → k <ᵖ h ≡ true × ¬ Ext k h → k <ᵖ (h ++ [ x ]) ≡ true × ¬ Ext k (h ++ [ x ])
+past-snoc k h x (l , n) = <ᵖ-trans k h (h ++ [ x ]) l (<ᵖ-below h []) , away
+  where away : ¬ Ext k (h ++ [ x ])
+        away e with ext-snoc k h x e
+        ... | inj₁ e′   = n e′
+        ... | inj₂ refl with () ← trans (sym l) (<ᵖ-irrefl k)
+
+-- A cut shows a run's first event, or that event's own completion just
+-- below it: whatever the run's first was past or clear of, the cut's is.
+past-take : ∀ {A} i (p : A → Bool) k (e : Events A) → Past k e → Past k (M.takeWhileᴱ i p e)
+past-take i p k (out h a r) pk with p a | i
+... | true  | _     = pk
+... | false | true  = past-snoc k h (ix 0) pk
+... | false | false = past-snoc k h last pk
+past-take i p k (skip h r)  pk = pk
+past-take i p k (end h)     pk = pk
+past-take i p k hush        pk = tt
+
+clear-take : ∀ {A} i (p : A → Bool) k (e : Events A) → Clear k e → Clear k (M.takeWhileᴱ i p e)
+clear-take i p k (out h a r) ck with p a | i
+... | true  | _     = ck
+... | false | true  = past-snoc k h (ix 0) ck
+... | false | false = proj₂ (past-snoc k h last ck)
+clear-take i p k (skip h r)  ck = ck
+clear-take i p k (end h)     ck = ck
+clear-take i p k hush        ck = tt
+
+-- A CUT KEEPS THE ORDER: the run up to the first value failing, then
+-- its end.
+mutual
   ordered-take : ∀ {A} i (p : A → Bool) (e : Events A) → Ordered e → Ordered (M.takeWhileᴱ i p e)
+  ordered (ordered-take i p (out h a r) o) = ordered (ordered-taking i p h a (p a) r (ordered o))
+  ordered (ordered-take i p (skip h r)  o) = atop-take i p h _ (proj₁ (ordered o)) , ordered-take i p _ (proj₂ (ordered o))
+  ordered (ordered-take i p (end h)     o) = tt
+  ordered (ordered-take i p hush        o) = tt
 
+  ordered-taking : ∀ {A} i (p : A → Bool) h a b (r : Events∞ A) → Atop h (force r) × Ordered (force r) → Ordered (M.taking i p h a b r)
+  ordered (ordered-taking i     p h a true  r (at , o)) = atop-take i p h _ at , ordered-take i p _ o
+  ordered (ordered-taking true  p h a false r _)        = <ᵖ-asym (h ++ [ ix 0 ]) (h ++ [ last ]) (proj₁ (ix-last h 0)) , record { ordered = tt }
+  ordered (ordered-taking false p h a false r _)        = tt
+
+-- A CUT KEEPS A RUN STEADY: the failing value just inside its own
+-- position, its completion just past that.
+mutual
+  steady-take : ∀ {A} i (p : A → Bool) (e : Events A) → Steady e → Steady (M.takeWhileᴱ i p e)
+  steady (steady-take i p (out h a r) s) = steady (steady-taking i p h a (p a) r (steady s))
+  steady (steady-take i p (skip h r)  s) = clear-take i p h _ (proj₁ (steady s)) , steady-take i p _ (proj₂ (steady s))
+  steady (steady-take i p (end h)     s) = tt
+  steady (steady-take i p hush        s) = tt
+
+  steady-taking : ∀ {A} i (p : A → Bool) h a b (r : Events∞ A) → Past h (force r) × Steady (force r) → Steady (M.taking i p h a b r)
+  steady (steady-taking i     p h a true  r (pk , s)) = past-take i p h _ pk , steady-take i p _ s
+  steady (steady-taking true  p h a false r _)        = ix-last h 0 , record { steady = tt }
+  steady (steady-taking false p h a false r _)        = tt
+
+postulate
   -- A CONNECT SUBSCRIBED IS IN ORDER: each source step a skip just past
   -- it, ahead of the body's later events, and what the source runs on
   -- with past the body's end left as the tail.
@@ -1530,19 +1701,6 @@ postulate
   -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Placed.agda restores `FlatOrder`, the proof over pool-free lanes, ghost roots pairwise apart
   ordered-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                → Ordered (U.meaning (U.subscribe (flatMap op f s) p) ρ)
-
-  -- A COLD'S RUN IS STEADY where a tick heads it: its frames step at its
-  -- ticks.
-  --
-  -- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
-  steady-start : ∀ {A} p (m : From A 0) → Headed p → Steady (M.start p m)
-
-  -- A LIST'S RUN IS STEADY: each value at the next index.
-  steady-of : ∀ {A} p i (xs : List A) → Steady (M.ofᴱ p i xs)
-
-  -- A CUT KEEPS A RUN STEADY: the failing value just inside its own
-  -- position, its completion just past that.
-  steady-take : ∀ {A} i (p : A → Bool) (e : Events A) → Steady e → Steady (M.takeWhileᴱ i p e)
 
   -- A FLATMAP SUBSCRIBED WHERE A TICK HEADS IS STEADY, over sources
   -- sorted and alien to it: no lane steps inside its outer's last
