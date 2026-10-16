@@ -1896,6 +1896,70 @@ mutual
     proj₁ (trail t) , everyT-mono (trailE-map f x) c (proj₁ (proj₂ (trail t))) , trailings-map f x (proj₂ (proj₂ (trail t)))
   trailᶠ (trail-map f x c t) = trailᶠ t
 
+trailE-scan : ∀ {A B} (f : B → A → B) z (x : Events A) k → TrailE x k → TrailE (M.scanᴱ f z x) k
+trailE-scan f z (out _ _ _) k t = t
+trailE-scan f z (skip _ _)  k t = t
+trailE-scan f z (end _)     k t = t
+trailE-scan f z hush        k ()
+
+mutual
+  trailings-scan : ∀ {A B} (f : B → A → B) z (x : Events A) → Trailings x → Trailings (M.scanᴱ f z x)
+  trailings-scan f z (out _ a r) t = trail-scan f (f z a) (force r) (cut r) t
+  trailings-scan f z (skip _ r)  t = trail-scan f z (force r) (cut r) t
+  trailings-scan f z (end _)     t = tt
+  trailings-scan f z hush        t = tt
+
+  trail-scan : ∀ {A B} (f : B → A → B) z (x : Events A) c → Trail x c → Trail (M.scanᴱ f z x) c
+  trail (trail-scan f z x c t) =
+    proj₁ (trail t) , everyT-mono (trailE-scan f z x) c (proj₁ (proj₂ (trail t))) , trailings-scan f z x (proj₂ (proj₂ (trail t)))
+  trailᶠ (trail-scan f z x c t) = trailᶠ t
+
+-- A run leaving nothing running, at its last state, trails it.
+trail-idle : ∀ {A} (x : Events A) → Trailings x → Trail x idle
+trail (trail-idle x t) = sortedT-idle , everyT-idle , t
+trailᶠ (trail-idle x t) = flatT-idle
+
+-- A cold leaf's run leaves nothing running at any state.
+mutual
+  trail-frames : ∀ {A t} τ e (m : From A t) → Trail (M.frames τ e m) idle
+  trail-frames τ e M.done        = trail-idle _ tt
+  trail-frames τ e M.quiet       = trail-idle _ tt
+  trail-frames τ e (M.at t _ b)  = trail-burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+
+  trail-burst : ∀ {A t} τ r i (b : M.Frame A t) → Trail (M.burst τ r i b) idle
+  trail (trail-burst τ r i (M.emit a k)) = sortedT-idle , everyT-idle , trail-burst τ r (suc i) (M.Frame∞.force k)
+  trail (trail-burst τ r i (M.stall k))  = sortedT-idle , everyT-idle , trail-burst τ r (suc i) (M.Frame∞.force k)
+  trail (trail-burst τ r i (M.close k))  = sortedT-idle , everyT-idle , trail-frames τ (r ++ [ last ]) (M.From∞.force k)
+  trailᶠ (trail-burst τ r i b) = flatT-idle
+
+trailing-start : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → Trailing (U.stateᴺ (U.startᶜ p m) ρ)
+trailing-start p (M.at zero _ b)    ρ = trail-burst (tick p) p 0 b
+trailing-start p (M.at (suc t) le b) ρ = trail-frames (tick p) (p ++ [ last ]) (M.at (suc t) le b)
+trailing-start p M.done             ρ = trail-idle _ tt
+trailing-start p M.quiet            ρ = trail-idle _ tt
+
+-- A list's run leaves nothing running.
+trail-of : ∀ {A} p i (xs : List A) → Trail (M.ofᴱ p i xs) idle
+trail-of p i []       = trail-idle _ tt
+trail-of p i (x ∷ xs) = trail-idle _ (trail-of p (suc i) xs)
+
+-- A joiner's run leaves nothing running, whatever its source left.
+mutual
+  trail-rejoin : ∀ {A} p (e : Events A) → Trail (M.rejoin p e) idle
+  trail-rejoin p (out q a k) = trail-shown p q (just a) k (p <ᵖ q)
+  trail-rejoin p (skip q k)  = trail-shown p q nothing k (p <ᵖ q)
+  trail-rejoin p (end c) with p <ᵖ c
+  ... | true  = trail-idle _ tt
+  ... | false = trail-idle _ tt
+  trail-rejoin p hush        = trail-idle _ tt
+
+  trail-shown : ∀ {A} p q (a : Maybe A) (k : Events∞ A) b → Trail (M.shown p q a k b) idle
+  trail (trail-shown p q (just a) k true)  = sortedT-idle , everyT-idle , trail-rejoin p (force k)
+  trail (trail-shown p q nothing  k true)  = sortedT-idle , everyT-idle , trail-rejoin p (force k)
+  trail (trail-shown p q (just a) k false) = sortedT-idle , everyT-idle , trail-rejoin p (force k)
+  trail (trail-shown p q nothing  k false) = sortedT-idle , everyT-idle , trail-rejoin p (force k)
+  trailᶠ (trail-shown p q a k b) = flatT-idle
+
 -- After a value at `x`, nothing later, shown or left running, lies
 -- where a lane admitted then would key, nor keys where `x`'s does.
 mutual
@@ -3445,14 +3509,41 @@ module FlatOrder (p : Pos) where
       pack : ∀ h → (Owned j h × Headed h) × (∀ (i : Σ Pos (λ R → Ok R × Disjoint R j)) → ¬ Owned (proj₁ i) h) → Under j h
       pack h ((o , hd) , f) = o , hd , λ R ok d → f (R , ok , d)
 
--- A SUBSCRIPTION'S CUTS TRAIL ITS RUN, where a tick heads it, over
+-- A FLATMAP'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
+-- sources alien to it: what the outer and every lane would leave running,
+-- side by side with what ended parts left, trails what the merge shows
+-- next.
+postulate
+  trail-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
+             → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+             → Trailing (U.stateᴺ (U.subscribe (flatMap op f s) p) ρ)
+
+-- A CONNECT'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
+-- sources alien to it: its source's burst left running beside what its
+-- body would leave trails what the connect shows next.
+postulate
+  trail-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+                → Trailing (U.stateᴺ (U.subscribe (connect s b) p) ρ)
+
+-- A TAKEWHILE KEEPS ITS SOURCE'S CUTS TRAILING, its source in order and
+-- steady: what was left running before the first failing value trails
+-- that value moved under `ix 0`, and the completion under `last`.
+postulate
+  trail-take : ∀ {A} i (q : A → Bool) (x : Events A) c → Ordered x → Steady x → Trail x c → Trail (M.takeWhileᴱ i q x) c
+
+-- A DEFER'S CUTS TRAIL ITS RUN where a tick heads it, its program's
+-- subscribed just past its skip doing so.
+postulate
+  trail-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
+              → Trailing (U.stateᴺ (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ) → Trailing (U.stateᴺ (U.deferᶜ l p []) ρ)
+
+-- A FINITE PROGRAM'S CUTS TRAIL ITS RUN, where a tick heads it, over
 -- sorted sources alien to it: at every state, what a cut would leave
 -- running is sorted and flat, none of it before a value coming next, nor
 -- before a skip but the step that skip shows just past it; all of it past
 -- an end, none keyed where that end would subscribe a lane, nor over it.
-postulate
-  trailing-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-               → Trailing (U.stateᴺ (U.subscribe o p) ρ)
+trailing-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+              → Trailing (U.stateᴺ (U.subscribe o p) ρ)
 
 -- A SUBSCRIPTION'S VALUES SPREAD, where a tick heads it, over sorted
 -- sources alien to it: after a value at `x`, nothing later, shown or
@@ -3506,6 +3597,20 @@ steady-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
   steady-defer l p ρ hp cl (steady-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
                               (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
+trailing-subᶠ (cold c) _ p ρ hp so cl = trailing-start p (lower c) ρ
+trailing-subᶠ empty _ p ρ hp so cl = trail-idle _ tt
+trailing-subᶠ (of xs) _ p ρ hp so cl = trail-of p 0 xs
+trailing-subᶠ (map f s) (map-f fs) p ρ hp so cl = trail-map f _ _ (trailing-subᶠ s fs p ρ hp so cl)
+trailing-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = trail-scan f z _ _ (trailing-subᶠ s fs p ρ hp so cl)
+trailing-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl =
+  trail-take i q _ _ (ordered-subᶠ s fs p ρ hp so cl) (steady-subᶠ s fs p ρ hp so cl) (trailing-subᶠ s fs p ρ hp so cl)
+trailing-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = trail-flat op f s ff fs p ρ hp so cl
+trailing-subᶠ (connect s b) _ p ρ hp so cl = trail-connect s b p ρ hp so cl
+trailing-subᶠ (connected i) _ p ρ hp so cl = trail-rejoin p (lookup ρ i)
+trailing-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
+  trail-defer l p ρ hp cl (trailing-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
+                             (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
+
 flat-calm {Γ} {A} {B} op f s ff fs p ρ hp so cl =
   O.ordered-go (flatOp op) (just E) [] [] idle O.[]ᴿ tt []ᴬ []ᴬ held (sortedT-idle , everyT-idle , everyT-idle , flatT-idle)
   , calm-steady _ (O.calm-go (flatOp op) (just E) [] [] idle O.[]ᴿ tt []ᴬ []ᴬ held (sortedT-idle , everyT-idle , everyT-idle , flatT-idle))
@@ -3522,7 +3627,7 @@ flat-calm {Γ} {A} {B} op f s ff fs p ρ hp so cl =
            (every-zip (force S) (proj₁ kp) (proj₁ hd) , everyT-zip (cut S) (proj₂ kp) (proj₂ hd))
     gen : ∀ a → O.Gen (F a)
     gen a j (bj , hj) =
-      ordered-subᶠ (f a) (ff a) j ρ hj so cj , rise-sub (f a) j ρ hj , steady-subᶠ (f a) (ff a) j ρ hj so cj , trailing-sub (f a) j ρ hj so cj
+      ordered-subᶠ (f a) (ff a) j ρ hj so cj , rise-sub (f a) j ρ hj , steady-subᶠ (f a) (ff a) j ρ hj so cj , trailing-subᶠ (f a) (ff a) j ρ hj so cj
       , O.under∞ j L
           (every∞-mono (beneath-owned j) L (Reach.reachᶠ (keyedRules j) (f a) (ff a) j ρ (inj₁ (prefix-refl j)) (every-monoᴱ (λ _ _ → tt) ρ cj)))
           (Reach.reachᶠ headedRules (f a) (ff a) j ρ hj (sorted-headed ρ so))
@@ -3534,7 +3639,7 @@ flat-calm {Γ} {A} {B} op f s ff fs p ρ hp so cl =
         cj = alienᴱ-owned p j (beneath-owned p j bj) ρ cl
     held : O.Outer (force E) (cut E)
     held = O.outer (ordered-map F _ (ordered-subᶠ s fs p ρ hp so cl)) (steady-map F _ (steady-subᶠ s fs p ρ hp so cl))
-             (trail-map F (force S) (cut S) (trailing-sub s p ρ hp so cl)) (spread-map F _ (spread-sub s p ρ hp so cl))
+             (trail-map F (force S) (cut S) (trailing-subᶠ s fs p ρ hp so cl)) (spread-map F _ (spread-sub s p ρ hp so cl))
              (every-map F _ (proj₁ ko)) (proj₂ ko) (O.spawn-map F _ gen)
 
 ordered-subᶠ (cold c) _ p ρ hp so cl = subst Ordered (sym (U.start-meaning p (lower c) ρ)) (ordered-start p (lower c) hp)

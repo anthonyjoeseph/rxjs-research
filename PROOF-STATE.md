@@ -186,14 +186,14 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `trailing-sub` first: what a cut leaves running is
-  sorted, flat, trails the next event and sits apart from where an end
-  subscribes (the `trails` and `flat` checks). Decides whether each
-  operator's meaning keeps its cut that way, or `Trail` owes more. Then
-  `spread-sub`, `ordered-connect`, `steady-connect` (now owing an end
-  strictly past a skip). Ruled out: the flatMap walk owing more than its
-  parts' order and steadiness, an end strictly past what precedes it
-  (every calm step is a body).
+- **THE ORDER.** `trail-flat` first: a FlatOrder walk over `M.whole`,
+  each part's cut trailing its own next (`trailing-subᶠ` on the parts).
+  Decides whether the merge keeps parts' cuts trailing what it shows, or
+  `Trail` owes the walk more. Then `trail-take` (a cut left before a
+  failing value against the moved value and `last`), `trail-connect`,
+  `trail-defer`, `spread-sub`, `ordered-connect`, `steady-connect`.
+  Ruled out: a cold leaf's, a list's, a joiner's, a map's or a scan's
+  cut failing to trail (all proven; none leaves anything running).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -212,9 +212,16 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`trailing-sub`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: at every state,
-  what a cut would leave running is sorted and flat and trails the run's next
-  event, nothing inside an end nor keyed where it subscribes.
+- **`trail-flat`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: what a flatMap's
+  outer and lanes would leave running, beside what ended parts left, trails
+  what the merge shows next.
+- **`trail-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
+  source burst left running beside its body's cut trails what it shows next.
+- **`trail-take`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a takeWhile over an
+  ordered, steady, trailing run keeps its cuts trailing past the moved value
+  and the `last` end.
+- **`trail-defer`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a defer's cuts
+  trail its run, its program's subscribed past the skip doing so.
 - **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: after a value,
   nothing later keys where its lane would, nor under it, nor over it.
 - **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
