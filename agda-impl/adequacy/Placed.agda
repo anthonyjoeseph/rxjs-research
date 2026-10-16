@@ -5301,28 +5301,28 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
   -- THE ORDER WALK: each step the connect shows no earlier than the one
   -- before, the source's past the body's last and the body's past the
   -- source's last.
-  atop-cue : ∀ L β (σ : Events∞ A) e → Cue L e → Atop L (force β) → Atop L (M.side r β σ e)
+  atop-cue : ∀ L (β : Events∞ B) (σ : Events∞ A) (e : Events A) → Cue L e → Atop L (force β) → Atop L (M.side r β σ e)
   atop-cue L β σ (out q _ _) c a = atop-ahead r β σ (q ++ [ ix 0 ]) (M.before (q ++ [ ix 0 ]) (force β)) L a c
   atop-cue L β σ (skip q _)  c a = atop-ahead r β σ (q ++ [ ix 0 ]) (M.before (q ++ [ ix 0 ]) (force β)) L a c
   atop-cue L β σ (end q)     c a = atop-ahead r β σ (q ++ [ ix 0 ]) (M.before (q ++ [ ix 0 ]) (force β)) L a c
   atop-cue L β σ hush        c a = a
 
   mutual
-    or-beside : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → Ordered (M.beside r β σ)
+    or-beside : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Ordered (force β) → Ordered (M.beside r β σ)
     or-beside β σ ts os ob = or-side β σ ts os ob (force σ) refl
 
-    or-side : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Ordered (M.side r β σ e)
+    or-side : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Ordered (M.side r β σ e)
     or-side β σ ts os ob (out k a s) eq = or-ahead β σ ts os ob (out k a s) eq tt _ refl
     or-side β σ ts os ob (skip k s)  eq = or-ahead β σ ts os ob (skip k s) eq tt _ refl
     or-side β σ ts os ob (end c)     eq = or-ahead β σ ts os ob (end c) eq tt _ refl
     or-side β σ ts os ob hush        eq = ob
 
-    or-ahead : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Going e → ∀ b
+    or-ahead : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Going e → ∀ b
              → M.before (M.shownAt e) (force β) ≡ b → Ordered (M.ahead r β σ (M.shownAt e) b)
     or-ahead β σ ts os ob e eq g true  be = or-src β σ ts os ob e eq g be
     or-ahead β σ ts os ob e eq g false be = or-body σ ts os e eq g (force β) ob be
 
-    or-src : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Going e
+    or-src : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Going e
            → M.before (M.shownAt e) (force β) ≡ true → Ordered (M.ahead r β σ (M.shownAt e) true)
     ordered (or-src β σ ts os ob e eq g be) =
       atop-cue q β σ′ (force σ′) (cue-onward q σ (force σ) refl ts os (subst (λ z → Cue (M.shownAt z) (force σ)) eq (cue-self (force σ))))
@@ -5331,7 +5331,7 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
       where q  = M.shownAt e
             σ′ = M.onward∞ σ (force σ)
 
-    or-body : ∀ σ → Trailing σ → Ordered (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Ordered x
+    or-body : ∀ (σ : Events∞ A) → Trailing σ → Ordered (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Ordered x
             → M.before (M.shownAt e) x ≡ false → Ordered (M.body r σ (M.shownAt e) x)
     ordered (or-body σ ts os e eq g (out n a β′) ox be) =
       atop-ahead r β′ σ (M.shownAt e) (M.before (M.shownAt e) (force β′)) n (proj₁ (ordered ox)) be , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
@@ -5418,22 +5418,22 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
   UB β σ = Every∞ (λ k → Every∞ (λ q → Unrelated k (q ++ [ ix 0 ])) σ) β
 
   mutual
-    st-beside : ∀ β σ → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → Steady (M.beside r β σ)
+    st-beside : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → Steady (M.beside r β σ)
     st-beside β σ ts os ss sb u = st-side β σ ts os ss sb u (force σ) refl
 
-    st-side : ∀ β σ → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e
+    st-side : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e
             → Steady (M.side r β σ e)
     st-side β σ ts os ss sb u (out k a s) eq = st-ahead β σ ts os ss sb u (out k a s) eq tt _ refl
     st-side β σ ts os ss sb u (skip k s)  eq = st-ahead β σ ts os ss sb u (skip k s) eq tt _ refl
     st-side β σ ts os ss sb u (end c)     eq = st-ahead β σ ts os ss sb u (end c) eq tt _ refl
     st-side β σ ts os ss sb u hush        eq = sb
 
-    st-ahead : ∀ β σ → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e → Going e
+    st-ahead : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e → Going e
              → ∀ b → M.before (M.shownAt e) (force β) ≡ b → Steady (M.ahead r β σ (M.shownAt e) b)
     st-ahead β σ ts os ss sb u e eq g true  be = st-src β σ ts os ss sb u e eq g be
     st-ahead β σ ts os ss sb u e eq g false be = st-body σ ts os ss e eq g (force β) sb (proj₁ u) be
 
-    st-src : ∀ β σ → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e → Going e
+    st-src : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e → Going e
            → M.before (M.shownAt e) (force β) ≡ true → Steady (M.ahead r β σ (M.shownAt e) true)
     steady (st-src β σ ts os ss sb u e eq g be) =
       clear-side q β σ′ (force σ′) be (every-mono (λ k w → head-shown {P = Unrelated k} σ e eq g w) (force β) (proj₁ u))
@@ -5444,7 +5444,7 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
       where q  = M.shownAt e
             σ′ = M.onward∞ σ (force σ)
 
-    st-body : ∀ σ → Trailing σ → Ordered (force σ) → Steady (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Steady x
+    st-body : ∀ (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Steady (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Steady x
             → Every (λ k → Every∞ (λ q → Unrelated k (q ++ [ ix 0 ])) σ) x → M.before (M.shownAt e) x ≡ false
             → Steady (M.body r σ (M.shownAt e) x)
     steady (st-body σ ts os ss e eq g (out n a β′) sx ux be) =
@@ -6310,7 +6310,7 @@ spread-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
     cl′ = alien-sub s p ρ cl , c₀
 
 steady-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
-  W.st-beside _ _ (W.Side.ts sd) (W.Side.os sd) (W.Side.ss sd) (steady-subᶠ b fb (p ++ [ ix 0 ]) ρ′ (headed-snoc p hp) so′ cl′)
+  W.st-beside (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) ρ′) (U.stateᴺ (U.subscribe s r) ρ) (W.Side.ts sd) (W.Side.os sd) (W.Side.ss sd) (steady-subᶠ b fb (p ++ [ ix 0 ]) ρ′ (headed-snoc p hp) so′ cl′)
     (W.unrelated sd (under-shown-connect s b fs fb p ρ hp so cl))
   where
     module W = Walk {A} {B} p hp
@@ -6326,7 +6326,7 @@ steady-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
     sd = connect-side s b fs fb p ρ hp so cl
 
 ordered-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
-  W.or-beside _ _ (W.Side.ts sd) (W.Side.os sd) (ordered-subᶠ b fb (p ++ [ ix 0 ]) ρ′ (headed-snoc p hp) so′ cl′)
+  W.or-beside (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) ρ′) (U.stateᴺ (U.subscribe s r) ρ) (W.Side.ts sd) (W.Side.os sd) (ordered-subᶠ b fb (p ++ [ ix 0 ]) ρ′ (headed-snoc p hp) so′ cl′)
   where
     module W = Walk {A} {B} p hp
     r  = p ++ [ ix 1 ]
