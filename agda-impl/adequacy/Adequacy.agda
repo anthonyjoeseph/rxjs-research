@@ -26,6 +26,7 @@ open import operation.PureObservable using (PureObs; module Pure)
 open import denotation.MonotonicList using (ML; Events; observe; root; ticks)
 open import adequacy.Sorted using (module Sorting)
 open import adequacy.Content using (module Honesty)
+open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Progress using (module Progressing)
 open import denotation.Order using (_⊑_; _≃_; Shows; Chain; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
 open import denotation.Denote using (⟦_⟧)
@@ -42,7 +43,8 @@ module Link (R : Set) where
   open Machine R using (prefix; reading; trace; begin; launch; Read; read; Trace∞; tau; out; end; idle)
   open Pure R using (End; finished; dry; cutOff; frames; recorder)
   open Sorting R using (Ascending; ascending; sorted)
-  open Honesty R using (Alike; content)
+  open Ghosting R using (Alike)
+  open Honesty R using (content)
   open Progressing R using (reached)
   open Read
 
