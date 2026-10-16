@@ -461,7 +461,7 @@ def extract_definitions(src_dir, files):
             # `where` search, which scans ahead and would otherwise mistake a
             # LATER `module … where` for this line's header.
             if (tok0 == "module" and len(tokens) > 2
-                    and tokens[1] != "_" and tokens[2] == "="):
+                    and tokens[1] != "_" and is_module_app(tokens)):
                 register(tokens[1], relpath, i + 1, "module-app")
                 i += 1
                 continue
@@ -645,7 +645,7 @@ def extract_definitions(src_dir, files):
             # `module V = Walk … burstH` is a member of `module BurstWalk …
             # where`, so it is THIS loop that has to see it (2026-08-18).
             if (tok0 == "module" and len(tokens) > 2
-                    and tokens[1] != "_" and tokens[2] == "="):
+                    and tokens[1] != "_" and is_module_app(tokens)):
                 register(tokens[1], relpath, i + 1, "module-app")
                 i += 1
                 continue
@@ -1154,6 +1154,17 @@ def eta_target(inner):
             return None
         pos = m.end()
     return head.group(0)
+
+
+def is_module_app(tokens):
+    """`module V = M …` or, parameterised, `module V (x : T) = M …`: an
+    `=` on the header line before any `where`."""
+    for t in tokens[2:]:
+        if t == "where":
+            return False
+        if t == "=":
+            return True
+    return False
 
 
 # Tokens that end an application: what follows is not an argument of the
