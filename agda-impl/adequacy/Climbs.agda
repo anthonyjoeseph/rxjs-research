@@ -696,7 +696,7 @@ module Ascending (R : Set) where
       { sane = sn ; placed = pd ; ctl = refl
       ; code = ≗-trans e₅ (bind≗ (open-code {m = Observer.complete o} (trans (cong (λ x → x ∧ b) (Settles.done-read hp ρ)) eq)) λ _ → ≗-refl ⟦ ks ⟧ᶜ)
       ; stack = sk
-      ; lifted = trans (Settles.sd-part hp ρ (flatMapˢ op f fl oc k r po u ls)) (flat-gone hp gn (proj₁ nl) (proj₂ nl)) , S
+      ; lifted = trans (Settles.sd-part hp ρ (flatMapˢ op f fl oc k r po u ls)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)) , S
                , Settles.sd-lifts hp ρ (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
                                                (proj₁ nl) (proj₂ nl) Lρ) , sg
       ; owned = Settles.sd-owned hp ρ ow ; kernels = Settles.sd-kernels hp ρ kn ; meaning = Settles.sd-meaning hp ρ mn
