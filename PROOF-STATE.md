@@ -189,7 +189,7 @@ by their own silent steps (`Mirror`).
   admit by policy; an inclusive take's under one `under` step. Every
   guard read open by `calling-open`. Remaining: `outer-start`, which
   allocates, so it waits on a strong tree's transport along `_⊑_` that
-  `sub-onward` owes too; `climb-lanes`, `close-lanes`.
+  `sub-onward` owes too; `close-lanes`.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -312,8 +312,6 @@ by their own silent steps (`Mirror`).
   sooner than the run under `ix 0` with a take restaged `ending`.
 - **`emit-void`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
   hold emits to a guard that drops it, the ghost alike, a value fewer.
-- **`climb-lanes`** (Lift) — FALSITY, `NO EVIDENCE`: a lane's value climbs into
-  its flatMap through `wkObs same`, equal up to `≗`.
 - **`up-lanes`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
   scan in one of its lanes heads no sooner than that lane's part.
 - **`up-outer`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
