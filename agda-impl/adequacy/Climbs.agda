@@ -564,8 +564,8 @@ module Ascending (R : Set) where
   postulate
     -- A lane ended: shut, the active count down, the next queued value
     -- begun or the flatMap ended past its outer's end.
-    close-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                  {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
+    close-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                  {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {ks}
                 → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks) → Called st m₁ (ρ ⊕ in-lanes πL)
 
@@ -877,7 +877,7 @@ module Ascending (R : Set) where
   call-outer st ρ {closes _} cl = close-outer st ρ cl
 
   -- A lane's cut, the one its path passes.
-  laneOf : ∀ {h Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u} → OneLane πL → Kit.Cut h
+  laneOf : ∀ {h Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} → OneLane πL → Kit.Cut h
   laneOf (one-this {c = c}) = c
   laneOf (one-next o)       = laneOf o
 
@@ -923,11 +923,11 @@ module Ascending (R : Set) where
 
   -- A value out of a lane: its guard read open, one operator up, the
   -- flatMap showing the lane past it.
-  lane-pass : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+  climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
               {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
               (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {y : B}
             → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (sends y) → Called st m₁ (ρ ⊕ in-lanes πL)
-  lane-pass st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {y}
+  climb-lanes st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {y}
     cl@record { sane = sn ; placed = pd ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; kept = kp }
     with lifts-split ρ (in-lanes πL) L
@@ -946,17 +946,11 @@ module Ascending (R : Set) where
                              (lane-step o LL) Lρ , sg
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = sorted-⇝ so p₁ ; behind = bh ; kept = inj₁ refl }))
 
-  climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
-                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {y : C}
-              → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (sends y) → Called st m₁ (ρ ⊕ in-lanes πL)
-  climb-lanes st ρ πL one-this     cl = lane-pass st ρ πL one-this cl
-  climb-lanes st ρ πL (one-next o) cl = lane-pass st ρ πL (one-next o) cl
 
   -- A signal out of a lane.
-  call-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-               {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
-               (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {sg : Signal T C}
+  call-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+               {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+               (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {sg : Signal T B}
              → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) sg → Called st m₁ (ρ ⊕ in-lanes πL)
   call-lanes st ρ πL o {sends _}  cl = climb-lanes st ρ πL o cl
   call-lanes st ρ πL o {closes _} cl = close-lanes st ρ πL o cl

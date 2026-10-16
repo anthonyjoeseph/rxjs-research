@@ -695,15 +695,15 @@ module Ghosting (R : Set) where
       one-scan   : ∀ {Δ A B} {f : B → A → B} {r} {t : Sub h Δ A} → One (in-scan {f = f} {r} {t = t} here)
       one-take   : ∀ {Δ A} {i p c k tk} {t : Sub h Δ A} → One (in-take {i = i} {p} {c} {k} {tk} {t = t} here)
       one-outer  : ∀ {Δ A B} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} → One (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = t} {ls} here)
-      one-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u}
+      one-lanes  : ∀ {Δ A B} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u}
                  → OneLane πL → One (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = t} πL)
       one-source : ∀ {Δ A B} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → One (in-source {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {bd} here)
       one-body   : ∀ {Δ A B} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → One (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {bd} here)
       one-defer  : ∀ {Δ A} {k} {t : Sub h Δ A} → One (in-defer {k = k} {t = t} here)
 
-    data OneLane {h} : ∀ {Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} → PathLanes ls u → Set₁ where
+    data OneLane {h} : ∀ {Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} → PathLanes ls u → Set₁ where
       one-this : ∀ {Δ B} {c k} {t : Sub h Δ B} {ls} → OneLane (this-lane {c = c} {k} {t = t} {ls} here)
-      one-next : ∀ {Δ B Δ′ C} {l} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u} → OneLane πL → OneLane (next-lane {l = l} πL)
+      one-next : ∀ {Δ B} {l} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} → OneLane πL → OneLane (next-lane {l = l} πL)
 
   -- A path read from its far end: none, or a path and one operator more.
   data Last {h Δ A} {t : Sub h Δ A} : ∀ {Δ′ A′} {v : Sub h Δ′ A′} → Path t v → Set₁ where
@@ -711,7 +711,7 @@ module Ghosting (R : Set) where
     snoc  : ∀ {Δ′ A′ Δ″ A″} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (s : Path u v) → One s → Last (ρ ⊕ s)
 
   data LastL {h Δ B} {ls : List (Lane h Δ B)} : ∀ {Δ′ A′} {v : Sub h Δ′ A′} → PathLanes ls v → Set₁ where
-    oneL  : ∀ {Δ′ A′} {v : Sub h Δ′ A′} {πL : PathLanes ls v} → OneLane πL → LastL πL
+    oneL  : ∀ {v : Sub h Δ B} {πL : PathLanes ls v} → OneLane πL → LastL πL
     snocL : ∀ {Δ′ A′ Δ″ A″} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (πL : PathLanes ls u) (s : Path u v) → One s → LastL (πL ⊕ᴸ s)
 
   mutual
@@ -796,7 +796,7 @@ module Ghosting (R : Set) where
     height-one one-body      = refl
     height-one one-defer     = refl
 
-    heightL-one : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {πL : PathLanes ls u} → OneLane πL → heightL πL ≡ 1
+    heightL-one : ∀ {h Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} → OneLane πL → heightL πL ≡ 1
     heightL-one one-this     = refl
     heightL-one (one-next o) = heightL-one o
 
