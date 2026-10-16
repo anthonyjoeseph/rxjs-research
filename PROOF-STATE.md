@@ -185,9 +185,10 @@ by their own silent steps (`Mirror`).
   An exclusive take's call is a read and a RESTAGE, the take's stage
   moved in the tree: node-local but for carrying the stack and agenda
   across it (`end-stack`, `end-owned`); an inclusive one's the same
-  restage under one `under` step (`out-owned`). Remaining:
-  `close-source` on a connect, a restage like `climb-source`'s
-  (`Feeds`, over `src-idle`); `climb-outer`, `close-outer`, `climb-lanes`, `close-lanes` on a
+  restage under one `under` step (`out-owned`); a connect's source a
+  read, a write and the feed or finish restaged (`Feeds`, `Fins`, over
+  `src-idle`). Shared residue: calls and stack carried across a restage (`fin-calls`, `fed-stack`, `fin-stack`). Remaining:
+  `climb-outer`, `close-outer`, `climb-lanes`, `close-lanes` on a
   flatMap.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
@@ -201,7 +202,7 @@ by their own silent steps (`Mirror`).
   `tells-past`. Remaining: an own-cell apartness fold carrying
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
   and `up-lanes` by a flatMap head bound; then `close-outer`,
-  `close-lanes`, `close-source` the same way, in the form C consumes.
+  `close-lanes` the same way, in the form C consumes.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -218,8 +219,6 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
-- **`close-source`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source
-  ended closes its subject, its subscribers' finish owed.
 - **`close-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane ended shuts,
   refills, or ends the flatMap past its outer's end.
 - **`close-outer`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's outer ended
@@ -259,8 +258,8 @@ by their own silent steps (`Mirror`).
 - **`end-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a take
   restaged `ending` has a sane, placed part meaning what the ghost did.
 - **`out-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds of the take
-  restaged `ending`, its completion owed in the frame its failing value
-  runs under.
+  restaged `ending`, its completion owed in the frame its failing value runs
+  under.
 - **`out-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a take
   restaged `ending`, the run gone under `ix 0`.
 - **`out-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
@@ -274,8 +273,8 @@ by their own silent steps (`Mirror`).
 - **`up-outer`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
   scan in its outer heads no sooner than the outer's part.
 - **`tells-past`** (Frame) — FALSITY, `NO EVIDENCE`: a call under way, a
-  connect past its source's end tells its body's untold joiners no
-  sooner than the run.
+  connect past its source's end tells its body's untold joiners no sooner than
+  the run.
 - **`shut-heads`** (Frame) — FALSITY, `NO EVIDENCE`: a shut heads where its
   node did, or at an end it tells.
 - **`up-untold`** (Frame) — FALSITY, `NO EVIDENCE`: a write at a scan's
@@ -296,7 +295,7 @@ by their own silent steps (`Mirror`).
   at a scan's accumulator.
 - **`climb-outer`** (Lift) — FALSITY, `NO EVIDENCE`: an outer value opens a
   lane and stops at the subscription it begins.
-- **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source reaches
+- **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source signals
   its subject only with no feed under way.
 - **`fed-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a feed
   restaged has a sane, placed part, the ghost past the source's skip.
@@ -312,8 +311,26 @@ by their own silent steps (`Mirror`).
   connect's feed restaged: the joiners' parts move with it.
 - **`fed-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
   connect's feed restaged.
-- **`fed-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no sooner
-  than the run with a connect's feed restaged.
+- **`fed-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
+  sooner than the run with a connect's feed restaged.
+- **`fin-calls`** (Climbs) — FALSITY, `NO EVIDENCE`: the calls owed carry
+  across a connect's subject closed and its finish staged.
+- **`fin-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a finish
+  staged has a sane, placed part, the ghost past the source's skip.
+- **`fin-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
+  stands against it with a connect's finish staged.
+- **`fin-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
+  with a connect's finish staged.
+- **`fin-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
+  finish staged, the finish ahead of the calls owed.
+- **`fin-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
+  connect's subject closed and its finish staged.
+- **`fin-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
+  connect's subject closed and its finish staged.
+- **`fin-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
+  connect's subject closed and its finish staged.
+- **`fin-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
+  sooner than the run with a connect's finish staged.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value.
 - **`sub-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a subscription begun runs

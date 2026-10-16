@@ -52,13 +52,13 @@ module Ascending (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; spent?; store) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle) renaming (same to same⊑)
   open Sorting R using (WellMach)
-  open Run (Pureᴾ R) using (Ref; Act; writeRef; Observer; _>>ᴬ_; module Kit; module Subject; under; done; wkAct)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; take2C; bodyC; feedC; finC; srcC; taking; finishing; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; under≗; ≗-refl; Meets; Each; Heads; seen) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; El; Observer; _>>ᴬ_; module Kit; module Subject; under; done; wkAct)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; under≗; ≗-refl; Meets; Each; Heads; seen) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade)
   open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite)
-  open Unsubbing R using (_⇝_; now; then; ≗-trans; wk-same; bind≗)
+  open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; heightL; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; climb-outer; climb-lanes; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
@@ -565,13 +565,6 @@ module Ascending (R : Set) where
                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {ks}
                 → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks) → Called st m₁ (ρ ⊕ in-lanes πL)
 
-    -- A connect's source ended: its subject closed, the finish of its
-    -- subscribers owed.
-    close-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
-                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
-                   (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {ks}
-                 → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (closes ks) → Called st m₁ (ρ ⊕ in-source here)
-
   -- A signal reaching a flatMap's outer.
   call-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
@@ -610,13 +603,13 @@ module Ascending (R : Set) where
               → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
 
-  -- A connect's source reaches its subject only with no feed under way:
+  -- A connect's source signals its subject only with no feed under way:
   -- the subject's subscribers are fed before the source runs again.
   postulate
     src-idle : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
-               (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {y : A}
-             → Calling g ℓ m₁ (ρ ⊕ in-source here) (sends y) → fd ≡ idle
+               (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {sg : Signal T A}
+             → Calling g ℓ m₁ (ρ ⊕ in-source here) sg → fd ≡ idle
 
   -- A value reaching a connect's subject: the subscribers read, the feed
   -- owed them, the ghost past the source's skip.
@@ -646,6 +639,72 @@ module Ascending (R : Set) where
     where
       ss = At.val hp (Subject.subscribers Sj)
       v  = connectˢ Sj c b kb k (feeding y q ss) rp e rt u bd
+
+  -- A read, one step: the cell's value handed to what follows it.
+  reads : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {t} {r : Ref h t}
+            {k : ∀ {v} → h ⊑ v → El v t → Act v ⊤}
+        → a ≗ readRef r k
+        → Σ (∀ {v} → h ⊑ v → El v t → Act v ⊤) λ k′ → (∀ {v} (τ : h ⊑ v) x → k′ τ x ≗ k τ x)
+          × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ hp , q , run (k′ same⊑ (At.val hp r)) σ K ⟩ clk ts bs td lg en mk)
+  reads (readRef≗ refl f) = _ , f , then refl now
+
+  -- A CONNECT FINISHING: its subject closed, the feed restaged from `idle`
+  -- to the source's end at the run's position, owed to the subscribers
+  -- the feed read, ahead of the calls the end owed, the ghost past the
+  -- source's skip.
+  module Fins {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B Sj c b kb k rp e rt} {u : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+              (ρ : Path T (connectˢ Sj c b kb k idle rp e rt u bd)) (q : Pos) where
+    H′ = store H (Subject.closed Sj) (lift true)
+    v  = connectˢ Sj c b kb k (finishing q (At.val H′ (Subject.subscribers Sj))) rp e rt u bd
+    T′ = plant ρ v
+
+    postulate
+      fin-calls   : (ks : List (Call T)) → Σ (List (Call T′)) λ ks′ → ⟦ ks ⟧ᶜ ≗ ⟦ ks′ ⟧ᶜ
+      fin-stack   : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} → StackAs T p′ ϑ K bs → StackAs T′ p′ ϑ K bs
+      fin-ticked  : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (fin-stack sk)
+      fin-owned   : ∀ {w bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {act} (sk : StackAs T q ϑ K bs) (ks : List (Call T))
+                    (e : act ≗ ⟦ finC (planted ρ v) ∷ proj₁ (fin-calls ks) ⟧ᶜ)
+              → Owned H T (runAs ks (≗-refl _) sk) → Owned H′ T′ (runAs (finC (planted ρ v) ∷ proj₁ (fin-calls ks)) e (fin-stack sk))
+      fin-kernels : Kernels H T → Kernels H′ T′
+      fin-meaning : Meaning H T → Meaning H′ T′
+      fin-queue   : ∀ {clk ts} → Queue H q clk ts T → Queue H′ q clk ts T′
+      fin-behind  : Each H (Heads q) T → Each H′ (Heads q) T′
+      fin-ghost   : ∀ {g S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
+              → Lifts H (ρ ⊕ in-source here) (U.endˢ q) S → U.step g ≡ S
+              → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+                × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+
+  -- A connect's source ended: its subject closed, the subscribers read,
+  -- their finish owed ahead of the calls the end owed.
+  close-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+                 (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {ks}
+               → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (closes ks) → Called st m₁ (ρ ⊕ in-source here)
+  close-source st ρ cl with src-idle ρ cl
+  close-source st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {Sj} {c} {b} {kb} {k} {e = e} {rp} {rt} {u = u} {bd} ρ {ks}
+    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+           ; behind = bh } | refl
+    with writes (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-source here) top) cd)
+  ... | n′ , en , path₁ with reads {hp = Fins.H′ hp ρ q} en
+  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q sn pl gn L sg
+  ...     | g″ , pg , sn″ , pl″ , k″ , r , ag , pp =
+    landed (g″ , _ , path
+      , carried (record
+        { sane = sn″ ; placed = pl″ ; tree = Fins.T′ hp ρ q
+        ; ctlAs = runAs (finC (planted ρ v) ∷ proj₁ (Fins.fin-calls hp ρ q ks)) ec (Fins.fin-stack hp ρ q sk)
+        ; meets = pg
+        ; owned = Fins.fin-owned hp ρ q sk ks ec ow
+        ; kernels = Fins.fin-kernels hp ρ q kn ; meaning = Fins.fin-meaning hp ρ q mn ; queue = Fins.fin-queue hp ρ q qu
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
+                         ; clocked = proj₁ ck , Fins.fin-ticked hp ρ q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
+        ; sorted = sorted-⇝ so path ; behind = Fins.fin-behind hp ρ q bh })
+      , passed ag pp)
+    where
+      path = ⇝-trans path₁ path₂
+      ss = At.val (Fins.H′ hp ρ q) (Subject.subscribers Sj)
+      v  = connectˢ Sj c b kb k (finishing q ss) rp e rt u bd
+      ec = ≗-trans (f same⊑ ss) (bind≗ (≗-refl (Strongly.code R (finC (planted ρ v)))) λ _ → ≗-trans (wk-same ⟦ ks ⟧ᶜ) (proj₂ (Fins.fin-calls hp ρ q ks)))
 
   -- A signal reaching a connect's subject.
   call-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
