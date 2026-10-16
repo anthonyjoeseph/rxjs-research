@@ -633,24 +633,39 @@ module Strongly (R : Set) where
     ----------------------------------------------------------------------
     -- The gates
 
-    -- Every cold below spent.
-    Dead : ∀ {Δ A} → Sub h Δ A → Set₁
-    Dead t = ∀ {Δ′ B} {sk : Sink h B} {hd ph} → Path t (coldˢ {Δ = Δ′} sk hd ph) → spentʰ hd ≡ true
+    -- Every cold below spent that unsubscribing reaches: below a
+    -- subscription not yet attached, nothing.  A switch cut before its
+    -- subscription is attached has nothing to unsubscribe: a source cut
+    -- inside its own subscribe burst, or a lane cut while its cold's
+    -- first burst plays, keeps its colds unspent, each reading its
+    -- subscriber closed, until the attach unsubscribes them.
+    mutual
+      Spent : ∀ {Δ A} → Sub h Δ A → Set₁
+      Spent (coldˢ s hd ph)                         = Lift _ (spentʰ hd ≡ true)
+      Spent (mapˢ f s)                              = Spent s
+      Spent (scanˢ f r s)                           = Spent s
+      Spent (takeWhileˢ i p c k tk s)               = Cut↓ k s
+      Spent (flatMapˢ op f fl oc k r pl so ls)      = Cut↓ k so × SpentLanes ls
+      Spent (connectˢ S c b kb k fd rp e rt src bd) = Cut↓ k src × Cut↓ kb bd
+      Spent (deferˢ k s)                            = Cut↓ k s
+      Spent _                                       = Lift _ ⊤
+
+      SpentLanes : ∀ {Δ B} → List (Lane h Δ B) → Set₁
+      SpentLanes []                = Lift _ ⊤
+      SpentLanes (lane c k s ∷ ls) = Cut↓ k s × SpentLanes ls
+
+      -- Below a subscription once attached, what unsubscribing reaches
+      -- spent.
+      Cut↓ : ∀ {Δ A} → Maybe (Quiet h) → Sub h Δ A → Set₁
+      Cut↓ nothing  s = Lift _ ⊤
+      Cut↓ (just _) s = Spent s
 
     unended : ∀ {A} → Phase A → Bool
     unended (waiting _ _ doneᶠ) = false
     unended _                    = true
 
-    -- Below a switch cut once its subscription is attached, every cold
-    -- spent.  Before then the cut has nothing to unsubscribe: a source cut
-    -- inside its own subscribe burst keeps its colds unspent, each reading
-    -- its subscriber closed, until the attach unsubscribes them.
-    Cut↓ : ∀ {Δ A} → Maybe (Quiet h) → Sub h Δ A → Set₁
-    Cut↓ nothing  s = Lift _ ⊤
-    Cut↓ (just _) s = Dead s
-
-    -- Below a cut kill switch, a cut lane or a connect's closed body, every
-    -- cold is spent once attached; no live cold waits on its end, which
+    -- Below a cut kill switch, a cut lane or a connect's closed body, what
+    -- unsubscribing reaches is spent once attached; no live cold waits on its end, which
     -- its frame's last step delivers.
     mutual
       Gated : ∀ {Δ A} → Sub h Δ A → Set₁
@@ -904,7 +919,7 @@ module Strongly (R : Set) where
       placed : All Placed (agenda ca)
 
   -- Every subscription against what its kernel registered; below a closed
-  -- gate, every cold spent.
+  -- gate, every cold unsubscribing reaches spent.
   record Kernels {h} (H : Heapᴹ h) (t : Sub h [] R) : Set₁ where
     open At H
     field

@@ -177,6 +177,14 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
+- **THE TEARDOWN.** `take2-onward`, `body-onward`: a cut switch's
+  teardown runs silent and writes only beneath a part already ended.
+  Decides whether one leaf, the machine reaching the same run over the
+  heap `unsub` leaves torn, plus a lemma per `Carried` field over the
+  torn heap, carries every cut; then the END CLIMB, a `Climbing` for
+  completes, under `take1-onward`, `fin-onward` and `emit-last`. Ruled
+  out: every cold below a cut switch spent (a lane cut inside its cold's
+  first burst stays unspent until attached, so `Gated` reads `Spent`).
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,

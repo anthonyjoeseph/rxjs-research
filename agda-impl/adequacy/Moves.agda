@@ -680,22 +680,34 @@ module Moving (R : Set) where
     holds-plantᴸ H (next-lane {l = lane c k s} π) v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} (ak , hs , hl) =
       ak , hs , holds-plantᴸ H π v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
 
-  -- Every cold below spent: below the planted node from the new one's,
-  -- elsewhere from the old tree's.
-  dead-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-             → (At.Dead H u → At.Dead H v) → At.Dead H t → At.Dead H (plant π v)
-  dead-plant H π v dv d π′ with unplant π v π′
-  ... | inj₁ (ρ , _)        = dv (λ q → d (π ⊕ q)) ρ
-  ... | inj₂ (_ , q , same) = d q
+  -- What unsubscribing reaches spent: below the planted node from the
+  -- new one's, elsewhere from the old tree's.
+  mutual
+    spent-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                → (At.Spent H u → At.Spent H v) → At.Spent H t → At.Spent H (plant π v)
+    spent-plant H here v sv s                                    = sv s
+    spent-plant H (in-map π) v sv s                              = spent-plant H π v sv s
+    spent-plant H (in-scan π) v sv s                             = spent-plant H π v sv s
+    spent-plant H (in-take {k = k} π) v sv s                     = cut-plant H π v sv k s
+    spent-plant H (in-outer {k = k} π) v sv (s , sl)             = cut-plant H π v sv k s , sl
+    spent-plant H (in-lanes π) v sv (s , sl)                     = s , spent-plantᴸ H π v sv sl
+    spent-plant H (in-source {k = k} π) v sv (s , sb)            = cut-plant H π v sv k s , sb
+    spent-plant H (in-body {kb = kb} π) v sv (s , sb)            = s , cut-plant H π v sv kb sb
+    spent-plant H (in-defer {k = k} π) v sv s                    = cut-plant H π v sv k s
 
-  cut-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-            → (At.Dead H u → At.Dead H v) → ∀ k → At.Cut↓ H k t → At.Cut↓ H k (plant π v)
-  cut-plant H π v dv nothing  c = c
-  cut-plant H π v dv (just _) d = dead-plant H π v dv d
+    spent-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                 → (At.Spent H u → At.Spent H v) → At.SpentLanes H ls → At.SpentLanes H (plantᴸ π v)
+    spent-plantᴸ H (this-lane {k = k} π) v sv (s , sl)           = cut-plant H π v sv k s , sl
+    spent-plantᴸ H (next-lane {l = lane c k s} π) v sv (s′ , sl) = s′ , spent-plantᴸ H π v sv sl
+
+    cut-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+              → (At.Spent H u → At.Spent H v) → ∀ k → At.Cut↓ H k t → At.Cut↓ H k (plant π v)
+    cut-plant H π v sv nothing  c = c
+    cut-plant H π v sv (just _) s = spent-plant H π v sv s
 
   mutual
     gated-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Dead H u → At.Dead H v)
+                → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
                 → At.Gated H t → At.Gated H (plant π v)
     gated-plant H here v pe gv dv g = gv g
     gated-plant H (in-map π) v pe gv dv g = gated-plant H π v pe gv dv g
@@ -711,7 +723,7 @@ module Moving (R : Set) where
     gated-plant H (in-defer π) v pe gv dv g = gated-plant H π v pe gv dv g
 
     gated-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
-                 → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Dead H u → At.Dead H v)
+                 → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
                  → At.GatedLanes H ls → At.GatedLanes H (plantᴸ π v)
     gated-plantᴸ H (this-lane {k = k} π) v pe gv dv (cg , g , gl) =
       (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v pe gv dv g , gl
