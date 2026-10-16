@@ -19,7 +19,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≡ᵇ_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_; _<ᵇ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
@@ -51,15 +51,15 @@ open Events∞
 
 module Ascending (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; step; Read; feed)
-  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; spent?; store) renaming (go to goᴵ)
-  open Heap using (World; _⊑_; Handle) renaming (same to same⊑)
+  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; rest; spent?; store; Callbacks; cbs) renaming (go to goᴵ)
+  open Heap using (World; _⊑_; Handle; Sink) renaming (same to same⊑)
   open Sorting R using (WellMach)
-  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; under≗; ≗-refl; Meets; Each; Heads; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade)
   open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
-  open Tearing R using (fresh-path; takeSite; bodySite)
+  open Tearing R using (fresh-path; takeSite; bodySite; look-store)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
@@ -561,14 +561,6 @@ module Ascending (R : Set) where
     (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-scan here) top) (Calling.code cl))
     (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) gn , S , Lρ , sg))
 
-  postulate
-    -- A lane ended: shut, the active count down, the next queued value
-    -- begun or the flatMap ended past its outer's end.
-    close-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                  {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
-                  (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {ks}
-                → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks) → Called st m₁ (ρ ⊕ in-lanes πL)
-
   -- A climbing signal's path reads open: an emitter whose observer path
   -- is closed skips, each operator it passes guarded it on the way up,
   -- and nothing the path passes is cut while it climbs.
@@ -946,6 +938,103 @@ module Ascending (R : Set) where
                              (lane-step o LL) Lρ , sg
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = sorted-⇝ so p₁ ; behind = bh ; kept = inj₁ refl }))
 
+
+  -- A send, one step: the sink's callback run, what follows owed.
+  sends : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {X} {s : Sink h X} {x} {n : Act h ⊤}
+        → a ≗ send s x n
+        → Σ (Act h ⊤) λ n′ → n′ ≗ n
+          × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ hp , q , run (Callbacks.onNext (cbs hp s) x) same⊑ (push (rest n′) σ K) ⟩ clk ts bs td lg en mk)
+  sends (send≗ refl e) = _ , e , then refl now
+
+  -- An act at a value, read at one equal to it.
+  at-val : ∀ {a} {X : Set a} {w} {F : X → Act w ⊤} {G : Act w ⊤} {y z : X} → y ≡ z → F z ≗ G → F y ≗ G
+  at-val refl e = e
+
+  -- Every subscription along a path against what the walk hands its
+  -- kernel.
+  mutual
+    holds-walk : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (W : Here h Δ A)
+               → At.Holds H t (Here.env W) (Here.obs W) → At.Holds H u (Here.env (walk π W)) (Here.obs (walk π W))
+    holds-walk H here          W hs                    = hs
+    holds-walk H (in-map π)    W hs                    = holds-walk H π _ hs
+    holds-walk H (in-scan π)   W hs                    = holds-walk H π _ hs
+    holds-walk H (in-take π)   W (_ , hs)              = holds-walk H π _ hs
+    holds-walk H (in-outer π)  W (_ , _ , _ , hso , _) = holds-walk H π _ hso
+    holds-walk H {t = flatMapˢ op f fl _ _ _ _ _ _} (in-lanes π) W (_ , _ , _ , _ , _ , _ , hl) = holdsL-walk H {op = op} {f = f} {fl = fl} π W hl
+    holds-walk H (in-source π) W (_ , _ , _ , hs , _)  = holds-walk H π _ hs
+    holds-walk H (in-body π)   W (_ , _ , _ , _ , hs)  = holds-walk H π _ hs
+    holds-walk H (in-defer π)  W (_ , hs)              = holds-walk H π _ hs
+
+    holdsL-walk : ∀ {h} (H : Heapᴹ h) {Δ A B Δ′ A′ op f fl} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (W : Here h Δ B)
+                → At.HoldsLanes H {A = A} op f (Here.env W) (Here.obs W) fl ls
+                → At.Holds H u (Here.env (walkLanes op f fl W π)) (Here.obs (walkLanes op f fl W π))
+    holdsL-walk H (this-lane π) W (_ , hs , _) = holds-walk H π _ hs
+    holdsL-walk H {op = op} {f = f} {fl = fl} (next-lane π) W (_ , _ , hl) = holdsL-walk H {op = op} {f = f} {fl = fl} π W hl
+
+  -- What a lane's end runs past its guard.
+  laneEnd : ∀ {h} {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)} {v : Sub h Δ B} {πL : PathLanes ls v}
+          → Path T (flatMapˢ op f fl oc k r pl u ls) → OneLane πL → Act h ⊤
+  laneEnd {op = op} {f} {fl} ρ o = Observer.complete (Canon.Flat′.lane op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl same⊑ (laneOf o))
+
+  -- What a freed slot's refill runs.
+  dequeueAt : ∀ {h} {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
+            → Path T (flatMapˢ op f fl oc k r pl u ls) → Act h ⊤
+  dequeueAt {op = op} {f} {fl} ρ = Canon.Flat′.dequeue op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl
+
+  -- The heap a lane's end leaves: its cut dropped, then its count down.
+  unlive : ∀ {h} → Heapᴹ h → Kit.Cut h → Heapᴹ h
+  unlive H c = store H (Kit.live c) (lift false)
+
+  freed : ∀ {h A} → Heapᴹ h → Kit.Cut h → FlatKit.Flat A h → Heapᴹ h
+  freed H c fl = store (unlive H c) (FlatKit.Flat.active fl) (lift (pred (At.val (unlive H c) (FlatKit.Flat.active fl))))
+
+  -- The machine at a new heap running a callback, the call's rest owed
+  -- past it.
+  resend : (m₁ : Mach) → Heapᴹ (Conf.world (Mach.conf m₁)) → {w : World} → w ⊑ Conf.world (Mach.conf m₁) → Stack w ⊤
+         → Act (Conf.world (Mach.conf m₁)) ⊤ → Act (Conf.world (Mach.conf m₁)) ⊤ → Mach
+  resend (mach ⟨ _ , q , _ ⟩ clk ts bs td lg en mk) H ϑ K a n = mach ⟨ H , q , run a same⊑ (push (rest n) ϑ K) ⟩ clk ts bs td lg en mk
+
+  postulate
+    -- A lane's freed slot handed on: the queue read; empty, the flatMap
+    -- settled, ending one operator up with nothing left, else the pool
+    -- taking the lane's rest; a value queued, its lane begun.
+    lane-dequeue : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
+                   (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
+                 → ∀ {a n} → a ≗ dequeueAt ρ → n ≗ ⟦ ks ⟧ᶜ
+                 → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
+
+  -- A lane ended: its guard read open, its cut dropped, the count down,
+  -- the refill sent.
+  close-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {ks}
+              → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks) → Called st m₁ (ρ ⊕ in-lanes πL)
+  close-lanes st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
+    cl@record { ctl = refl ; code = cd ; lifted = _ , _ , L , _ ; kernels = kn }
+    with lifts-split ρ (in-lanes πL) L
+       | reads (subst (λ W → _ ≗ (Observer.complete W >>ᴬ ⟦ ks ⟧ᶜ)) (trans (cong Here.obs (walk-⊕ ρ (in-lanes πL) top)) (walk-lane o op f fl (walk ρ top))) cd)
+  ... | _ , lifts-lanes LL _ _ _ , _ | k₁ , f₁ , p₁
+    with writes (≗-trans (f₁ same⊑ (At.val hp (Kit.live (laneOf o))))
+                   (bind≗ (≗-trans (wk-same (Kit.when (At.val hp (Kit.live (laneOf o))) (laneEnd ρ o))) (open-code (lane-live o LL))) λ _ → wk-same ⟦ ks ⟧ᶜ))
+  ...   | n₂ , e₂ , p₂ with reads {hp = unlive hp (laneOf o)} e₂
+  ...     | k₃ , f₃ , p₃ with writes {hp = unlive hp (laneOf o)} (f₃ same⊑ (At.val (unlive hp (laneOf o)) (FlatKit.Flat.active fl)))
+  ...       | n₄ , e₄ , p₄
+    with reads {hp = freed hp (laneOf o) fl} (≗-trans e₄ (bind≗ (wk-same refillAt) λ _ → wk-same ⟦ ks ⟧ᶜ))
+  ...         | k₅ , f₅ , p₅ with sends {hp = freed hp (laneOf o) fl} (at-val {F = k₅ same⊑} rq (f₅ same⊑ (just r)))
+  ...           | n₆ , e₆ , p₆ =
+    landed (hopped-pre (⇝-trans p₁ (⇝-trans p₂ (⇝-trans p₃ (⇝-trans p₄ (⇝-trans p₅ p₆)))))
+                       (lane-dequeue st ρ πL o cl (at-val {F = λ c → Callbacks.onNext c tt} sq (proj₁ (proj₁ (proj₂ hw)) tt)) (≗-trans e₆ (wk-same ⟦ ks ⟧ᶜ))))
+    where
+      H₁ = unlive hp (laneOf o)
+      H₂ = freed hp (laneOf o) fl
+      hw = holds-walk hp ρ top (Kernels.holds kn)
+      refillAt = readRef (FlatKit.Flat.refill fl) λ τ → Canon.Flat′.handOn op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl τ
+      rq : At.val H₂ (FlatKit.Flat.refill fl) ≡ just r
+      rq = trans (cong lower (look-store H₁ (FlatKit.Flat.active fl) (FlatKit.Flat.refill fl) (λ ())))
+                 (trans (cong lower (look-store hp (Kit.live (laneOf o)) (FlatKit.Flat.refill fl) (λ ()))) (proj₁ hw))
+      sq = trans (look-store H₁ (FlatKit.Flat.active fl) r (λ ())) (look-store hp (Kit.live (laneOf o)) r (λ ()))
 
   -- A signal out of a lane.
   call-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}

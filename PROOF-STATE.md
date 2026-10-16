@@ -180,16 +180,14 @@ by their own silent steps (`Mirror`).
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
   climbing, a value or an end with its calls owed, and `call` its one
   recursion, by `call-step` over one lemma per operator. Ruled out: a
-  third mid-call state; an inclusive take's completion after its failing
-  value rides the stack frame the value runs under, not the calls owed.
+  third mid-call state.
   An operator's call is reads, writes and a RESTAGE of its node,
-  node-local but for carrying stack, calls and agenda across it
-  (`end-stack`, `fin-calls`, `end-owned`): a take's stage, a connect's
-  feed (over `src-idle`), a flatMap's pool (over `active-lanes`), its
-  admit by policy; an inclusive take's under one `under` step. Every
-  guard read open by `calling-open`. Remaining: `outer-start`, which
-  allocates, so it waits on a strong tree's transport along `_⊑_` that
-  `sub-onward` owes too; `close-lanes`.
+  node-local but for carrying stack, calls and agenda across it: a
+  take's stage, a connect's feed, a flatMap's pool, its admit by
+  policy, a lane's end down to its refill's send. Every guard read open
+  by `calling-open`. Remaining: `lane-dequeue`, the queue read then settle or start;
+  `outer-start`, which allocates, so it waits on a strong tree's
+  transport along `_⊑_` that `sub-onward` and a dequeue's start owe too.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -201,7 +199,7 @@ by their own silent steps (`Mirror`).
   `Off`. Ruled out for the scan: a write needs no non-local leaf but
   `tells-past`. Remaining: an own-cell apartness fold carrying
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
-  and `up-lanes` by a flatMap head bound; then `close-lanes` and
+  and `up-lanes` by a flatMap head bound; then `lane-dequeue` and
   `close-outer`'s `sd-*` the same way, in the form C consumes.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
@@ -219,8 +217,8 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
-- **`close-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane ended shuts,
-  refills, or ends the flatMap past its outer's end.
+- **`lane-dequeue`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's freed slot
+  handed on settles the flatMap, or begins the next queued value's lane.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
   path reads open.
 - **`outer-start`** (Climbs) — FALSITY, `NO EVIDENCE`: an admitted value with
