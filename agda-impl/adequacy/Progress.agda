@@ -78,10 +78,10 @@ module Progressing (R : Set) where
   ahead-agree : ∀ {x y k} → (∀ n → Agree n x y) → (a : Ahead x k) → Σ (Ahead y k) λ b → depth b ≡ depth a
   ahead-agree ag none = none , refl
   ahead-agree ag (outᵃ a) with ag 1
-  ... | out⁼ _ with ahead-agree (λ n → tail-out (ag (suc n))) a
+  ... | out⁼ _ _ with ahead-agree (λ n → tail-out (ag (suc n))) a
   ...   | b , eq = outᵃ b , cong suc eq
   ahead-agree ag (skipᵃ a) with ag 1
-  ... | skip⁼ _ with ahead-agree (λ n → tail-skip (ag (suc n))) a
+  ... | skip⁼ _ _ with ahead-agree (λ n → tail-skip (ag (suc n))) a
   ...   | b , eq = skipᵃ b , cong suc eq
   ahead-agree ag endᵃ with ag 1
   ... | end⁼ = endᵃ , refl

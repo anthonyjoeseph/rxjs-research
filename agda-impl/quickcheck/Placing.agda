@@ -13,8 +13,7 @@
 -- And the events rise, as `ticks-up` needs: each at a position past the
 -- last, a skip at one no earlier, headed by its tick.  And they are steady, as `steady-sub`
 -- says: nothing strictly inside the position just left, and a value
--- strictly past it.  And nothing is keyed just past another, as
--- `alien-steps` says.
+-- strictly past it.  And nothing is keyed just past another.
 module quickcheck.Placing where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)

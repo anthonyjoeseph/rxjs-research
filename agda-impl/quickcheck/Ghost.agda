@@ -105,7 +105,7 @@ module Watched where
     node n       me π (flatMap op f s)  ρ δ = flatMapᴷ op (λ a → watchedS (isSwitch op) n me (1 ∷ π) (f a) ρ δ) (watched n me (0 ∷ π) s ρ δ)
     node n       me π (connect s b)     ρ δ σ o k = here λ p →
       connectᴷ (watched n me (0 ∷ π) s ρ δ)
-               (λ τ st → watched n me (1 ∷ π) b (st ∷ wkEnv τ ρ) (subscribe s (p ++ [ ix 1 ]) ∷ δ)) σ o k
+               (λ τ st → watched n me (1 ∷ π) b (st ∷ wkEnv τ ρ) ((p ++ [ ix 1 ] , subscribe s (p ++ [ ix 1 ])) ∷ δ)) σ o k
     node n       me π (connected i)     ρ δ = joinᴷ (lookup ρ i)
     node zero    me π (defer l)         ρ δ = ⊥ᴷ
     node (suc n) me π (defer l)         ρ δ = deeper (watched n me (0 ∷ π) (Later.force l) ρ δ)

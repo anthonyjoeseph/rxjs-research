@@ -186,53 +186,41 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE MEASURE.** `emit-unseen`: an `of` feeding a connect's subject
-  past its body's end, work the ghost does not see. The window is the
-  source's whole subscribe burst, the cut attaching only after it, and
-  rxjs runs it out: an unbounded synchronous source there spins forever
-  where `connectᴰ` has the body's end end both. Waits on a ruling on the
-  semantics. Ruled out: a measure blind to a take's stage; the load
-  counts it, so `climb-take` is a body over `take-pass`, `take-out`,
-  `take-end`.
 - **THE ORDER.** `steady-start` and `ordered-start` first, the cold's run
   where a tick heads it: two refutations in one region, so attempt the
-  assembly before restating again. Then `spread-flat`, `spread-connect`,
-  `steady-flat`, `fresh-flat` over `FlatOrder`'s lane roots. Ruled out: a
-  lane's end tied with another lane or the outer, a lane's first before
-  where it subscribes. Decides whether the start region is converging or
-  is a mechanism to reconsider.
+  assembly before restating again. Then `ordered-flat`, `steady-flat`,
+  `ordered-connect`, `steady-connect` over the meaning that keeps a pool
+  and an ended source's rest. Ruled out: a lane's end tied with another
+  lane or the outer, a lane's first before where it subscribes. Decides
+  whether the start region is converging or is a mechanism to reconsider.
+- **THE STEPPER.** `step-skips` and `within-step` at the root: the
+  ghost's meaning is what its step shows, skips included, now that a
+  pool's and a rest's skips are the meaning's own. Ruled out: exact
+  agreement anchored in a source's step history. Decides whether the
+  witness's ghost-only fields carry enough to step a merge.
+- **THE MEASURE.** `emit-unseen`: an `of` fed past its connect's body's
+  end, a burst the meaning keeps as skips (`U.burstingᶜ`). Decides
+  whether the ghost's step over that burst lowers the measure, or a
+  spinning source owes the measure a term. Ruled out: a measure blind to
+  a take's stage; `climb-take` is a body over `take-pass`, `take-out`,
+  `take-end`.
 - **THE SHUT BODY.** `heads-lift`: a connect past its source's end shows
   its body shut, so the body's part must read every joiner left already
   told. `told` keeps an end it has; decides whether `Meaning`'s feed
   invariant supplies the rest, or the record owes a field.
-- **THE OPERATORS.** `go-skips` and `take-first`: a flatMap's meaning is
-  what its step shows, a cut step comes first when the uncut did. Ruled
-  out: a stepper `≃` short of strong agreement, every operator respecting
-  it and a source's step tied with the body's skips commuting.
 
 ### The ledger
 
-- **`spread-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap's lane value
-  apart from every later step past it. Route: `Fit` carries the lane's
-  `Spread`; tags reach other lanes only through roots `Shy` rules out.
-- **`spread-connect`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's body
-  values apart from its source's later steps shown just past them.
-- **`spread-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`: a rejoin keeps a
-  sorted source, alien to the join, spread.
-- **`spread-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
-  spread.
-- **`spread-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run is spread.
-- **`spread-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is spread.
+- **`ordered-flat`** (Placed) — FALSITY, `REFUTED×2, RECOVERY`, `X`: a flatMap
+  merges in order, a pool's and an ended part's rest shown once ahead of every
+  running part.
+- **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
+  source steps merge into its body in order, the source's run past the body's
+  end its tail.
+- **`steady-connect`** (Placed) — FALSITY, `RECOVERY×2`, `X`: a connect where a
+  tick heads it is steady, its source's rest stepping where it would have.
 - **`steady-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap where a tick heads
   it, over sorted, alien sources, is steady: no lane steps inside its outer's.
-- **`fresh-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run in
-  order, steady and fresh, fresh: nothing just past its failing value or end.
-- **`fresh-flat`** (Placed) — FALSITY, `NO EVIDENCE`: a flatMap somewhere, over
-  sorted, alien sources, keys nothing just past its own events.
-- **`fresh-start`** (Placed) — FALSITY, `NO EVIDENCE`: a cold's run keys
-  nothing just past its own events, its frames tagged with earlier bursts.
-- **`ordered-beside`** (Placed) — FALSITY, `NO EVIDENCE`: a connect's source
-  steps merge into its body in order.
 - **`steady-take`** (Placed) — FALSITY, `NO EVIDENCE`: a cut keeps a run
   steady.
 - **`steady-start`** (Placed) — FALSITY, `REFUTED`: a cold's run where a tick
@@ -242,14 +230,11 @@ by their own silent steps (`Mirror`).
 - **`ordered-start`** (Placed) — FALSITY, `REFUTED`: a cold's run where a tick
   heads it is in order.
 - **`ordered-of`** (Placed) — FALSITY, `NO EVIDENCE`: a list's run is in order.
-- **`lags-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning shows
-  nothing before a body's event that comes first, its sources a step past.
-- **`leads-flat`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning
-  shows only skips at a step coming before its own and its sources'.
-- **`go-skips`** (Stepper) — FALSITY, `NO EVIDENCE`: a flatMap's meaning is
-  what its step shows, each lane showing its own.
-- **`take-first`** (Stepper) — FALSITY, `NO EVIDENCE`: a cut step comes first
-  when the uncut one did.
+- **`step-skips`** (Stepper) — FALSITY, `REFUTED×2, DEAD ROUTE, RECOVERY×2`,
+  `X`: a sane, placed root ghost's meaning is what its step shows, then the
+  stepped node's.
+- **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
+  ghost's step leaves its parts placed.
 - **`note-least`** (Content) — FALSITY, `NO EVIDENCE`: a note records the least
   value the ghost holds.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
@@ -271,8 +256,8 @@ by their own silent steps (`Mirror`).
 - **`take-pass`** (Content) — FALSITY, `NO EVIDENCE`: a passing value climbs
   one operator, the tree's load as it was.
 - **`emit-unseen`** (Content) — FALSITY, `NO EVIDENCE`: an `of` emitting into
-  joiners the ghost no longer sees, after a connect's body ended. False for an
-  unbounded synchronous source: a semantics question.
+  joiners the ghost no longer sees, after a connect's body ended; the meaning
+  keeps the burst as skips.
 - **`climb-lanes`** (Content) — FALSITY, `NO EVIDENCE`: a lane's value climbs
   into its flatMap through `wkObs same`, equal up to `≗`.
 - **`climb-scan`** (Content) — FALSITY, `NO EVIDENCE`: a scan writes its cell

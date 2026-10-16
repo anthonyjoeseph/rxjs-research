@@ -26,7 +26,7 @@ open import denotation.Order using (Item; val; fin; silent; Shows; ShowsIn; nil;
   renaming (_≼_ to _≼ˡ_; []≼ to []≼ˡ; ∷≼ to ∷≼ˡ)
 open import operation.PureObservable using (module Pure)
 
-open Events∞
+open Events∞ using (force)
 
 ------------------------------------------------------------------------
 -- Ticks that never fall

@@ -21,7 +21,7 @@ open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList using (MonotonicList; Timeline; coldᴰ; ix; skip⁼; stop; _≈[_]_; agrees; agree; _≈_; Settling;
+open import denotation.MonotonicList using (MonotonicList; Timeline; coldᴰ; ix; skip⁼; stop; stopᵀ; idle; agreeᵀ-refl; _≈[_]_; agrees; agree; agreeᵀ; _≈_; Settling;
   Contractive; lub-limit; ≈ₖ-refl; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; emptyᴰ; ofᴰ; mapᴰ; scanᴰ;
   takeWhileᴰ; flatMapᴰ; connectᴰ; deferᴰ)
 open import denotation.Denote using (DenEnv; flatOp; approx; ⟦_⟧)
@@ -29,7 +29,7 @@ open import denotation.NonExpansive using (mapᴰ-ne; scanᴰ-ne; takeWhileᴰ-n
 
 -- A `defer` shows a skip before its body, so it settles one step more.
 deferᴰ-contractive : ∀ {A} → Contractive (deferᴰ {A})
-deferᴰ-contractive xy = agrees λ p → skip⁼ (agree xy (p ++ [ ix 1 ]))
+deferᴰ-contractive xy = agrees (λ p → agreeᵀ-refl _ idle) λ p → skip⁼ (agreeᵀ xy (p ++ [ ix 1 ])) (agree xy (p ++ [ ix 1 ]))
 
 ------------------------------------------------------------------------
 -- Environments agreeing for k steps, handle by handle.
@@ -75,7 +75,7 @@ settle n       (flatMap op f s)  ρ = flatMapᴰ-ne (flatOp op) (settle n s ρ) 
 settle n       (connect s b)     ρ = connectᴰ-ne (settle n s ρ) λ {r} {r′} rr →
   ≈ₖ-trans (approx-ne n b (rr ∷ᵉ env-refl ρ)) (settle n b (r′ ∷ ρ))
 settle n       (connected i)     ρ = ≈ₖ-refl _
-settle zero    (defer l)         ρ = agrees λ p → stop
+settle zero    (defer l)         ρ = agrees (λ p → stopᵀ) λ p → stop
 settle (suc n) (defer l)         ρ = deferᴰ-contractive (settle n (Later.force l) ρ)
 
 settles : ∀ {Γ A} (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → Settling (λ n → approx n o ρ)

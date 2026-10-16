@@ -53,10 +53,10 @@ module Moving (R : Set) where
     plant (in-map {f = f} π) v                                         = mapˢ f (plant π v)
     plant (in-scan {f = f} {r} π) v                                    = scanˢ f r (plant π v)
     plant (in-take {i = i} {p} {c} {k} {tk} π) v                       = takeWhileˢ i p c k tk (plant π v)
-    plant (in-outer {op = op} {f} {fl} {oc} {k} {r} {ls = ls} π) v     = flatMapˢ op f fl oc k r (plant π v) ls
-    plant (in-lanes {op = op} {f} {fl} {oc} {k} {r} {t = so} π) v      = flatMapˢ op f fl oc k r so (plantᴸ π v)
-    plant (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {bd = bd} π) v = connectˢ S c b kb k fd e (plant π v) bd
-    plant (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {t = s} π) v     = connectˢ S c b kb k fd e s (plant π v)
+    plant (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {ls = ls} π) v     = flatMapˢ op f fl oc k r pl (plant π v) ls
+    plant (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} π) v      = flatMapˢ op f fl oc k r pl so (plantᴸ π v)
+    plant (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {bd = bd} π) v = connectˢ S c b kb k fd rp e rt (plant π v) bd
+    plant (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = s} π) v     = connectˢ S c b kb k fd rp e rt s (plant π v)
     plant (in-defer {k = k} π) v                                       = deferˢ k (plant π v)
 
     plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Sub h Δ′ A′ → List (Lane h Δ B)
@@ -107,8 +107,8 @@ module Moving (R : Set) where
     pend (mapˢ f s)                        = pend s
     pend (scanˢ f r s)                     = pend s
     pend (takeWhileˢ i q c k tk s)         = pend s
-    pend (flatMapˢ op f fl oc k r s ls)    = pend s + pendᴸ ls
-    pend (connectˢ S c b kb k fd e src bd) = pend src + pend bd
+    pend (flatMapˢ op f fl oc k r pl s ls)    = pend s + pendᴸ ls
+    pend (connectˢ S c b kb k fd rp e rt src bd) = pend src + pend bd
     pend (joinˢ _ _ _ _ _)                 = 0
     pend (deferˢ k s)                      = pend s
 
@@ -117,9 +117,9 @@ module Moving (R : Set) where
     pendᴸ (lane c k s ∷ ls) = pend s + pendᴸ ls
 
   -- What each takeWhile has still to do: fail, then complete.
-  stage : Taking → ℕ
+  stage : ∀ {Δ A} → Taking Δ A → ℕ
   stage taking     = 2
-  stage (ending _) = 1
+  stage (ending _ _) = 1
   stage taken      = 0
 
   mutual
@@ -131,8 +131,8 @@ module Moving (R : Set) where
     takes (mapˢ f s)                        = takes s
     takes (scanˢ f r s)                     = takes s
     takes (takeWhileˢ i q c k tk s)         = stage tk + takes s
-    takes (flatMapˢ op f fl oc k r s ls)    = takes s + takesᴸ ls
-    takes (connectˢ S c b kb k fd e src bd) = takes src + takes bd
+    takes (flatMapˢ op f fl oc k r pl s ls)    = takes s + takesᴸ ls
+    takes (connectˢ S c b kb k fd rp e rt src bd) = takes src + takes bd
     takes (joinˢ _ _ _ _ _)                 = 0
     takes (deferˢ k s)                      = takes s
 
@@ -161,10 +161,10 @@ module Moving (R : Set) where
     pendings-path {t = mapˢ f s} i                        = rewait in-map (pendings-path i)
     pendings-path {t = scanˢ f r s} i                     = rewait in-scan (pendings-path i)
     pendings-path {t = takeWhileˢ i p c k tk s} j         = rewait in-take (pendings-path j)
-    pendings-path {t = flatMapˢ op f fl oc k r so ls} i with ++⁻ (pendings so) i
+    pendings-path {t = flatMapˢ op f fl oc k r pl so ls} i with ++⁻ (pendings so) i
     ... | inj₁ j = rewait in-outer (pendings-path j)
     ... | inj₂ j = lanes-path in-lanes j
-    pendings-path {t = connectˢ S c b kb k fd e src bd} i with ++⁻ (pendings src) i
+    pendings-path {t = connectˢ S c b kb k fd rp e rt src bd} i with ++⁻ (pendings src) i
     ... | inj₁ j = rewait in-source (pendings-path j)
     ... | inj₂ j = rewait in-body (pendings-path j)
     pendings-path {t = deferˢ k s} i                      = rewait in-defer (pendings-path i)
@@ -261,10 +261,10 @@ module Moving (R : Set) where
     pend-named {t = mapˢ f s} i                        = pend-named {t = s} i
     pend-named {t = scanˢ f r s} i                     = there (pend-named {t = s} i)
     pend-named {t = takeWhileˢ i p c k tk s} j         = ++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (pend-named {t = s} j))
-    pend-named {t = flatMapˢ op f fl oc k r so ls} i with ++⁻ (pendings so) i
+    pend-named {t = flatMapˢ op f fl oc k r pl so ls} i with ++⁻ (pendings so) i
     ... | inj₁ j = ++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ (pend-named {t = so} j)))))
     ... | inj₂ j = ++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) (lane-named {ls = ls} j)))))
-    pend-named {t = connectˢ S c b kb k fd e src bd} i with ++⁻ (pendings src) i
+    pend-named {t = connectˢ S c b kb k fd rp e rt src bd} i with ++⁻ (pendings src) i
     ... | inj₁ j = ++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ (pend-named {t = src} j))))))
     ... | inj₂ j = ++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) (pend-named {t = bd} j))))))
     pend-named {t = deferˢ k s} i                      = ++⁺ʳ (quietName k) (pend-named {t = s} i)
@@ -290,11 +290,11 @@ module Moving (R : Set) where
     pendings-fresh {t = scanˢ f r s}                               (_ ∷ ps) = pendings-fresh {t = s} ps
     pendings-fresh {t = takeWhileˢ i p c k tk s}                   ps =
       pendings-fresh {t = s} (pairs-r (quietName k) (pairs-r (cutNames c) ps))
-    pendings-fresh {t = flatMapˢ op f fl oc k r so ls}             ps
+    pendings-fresh {t = flatMapˢ op f fl oc k r pl so ls}             ps
       with pairs-split (names so) (pairs-r ((slot _ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps))))
     ... | l , rs , c = pairs-++⁺ (pendings-fresh {t = so} l) (lanes-fresh {ls = ls} rs)
                          (apart c (λ {a} → pend-named {t = so} {tm = a}) (λ {b} → lane-named {ls = ls} {tm = b}))
-    pendings-fresh {t = connectˢ S c b kb k fd e src bd}           ps
+    pendings-fresh {t = connectˢ S c b kb k fd rp e rt src bd}           ps
       with pairs-split (names src)
              (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((cell _ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps)))))
     ... | l , rs , cr = pairs-++⁺ (pendings-fresh {t = src} l) (pendings-fresh {t = bd} rs)
@@ -374,10 +374,10 @@ module Moving (R : Set) where
     same-map     : ∀ {Δ A B} {f : A → B} {s s′ : Sub h Δ A} → Same (mapˢ f s) (mapˢ f s′)
     same-scan    : ∀ {Δ A B} {f : B → A → B} {r} {s s′ : Sub h Δ A} → Same (scanˢ f r s) (scanˢ f r s′)
     same-take    : ∀ {Δ A} {i p c k tk} {s s′ : Sub h Δ A} → Same (takeWhileˢ i p c k tk s) (takeWhileˢ i p c k tk s′)
-    same-flat    : ∀ {Δ A B} {op f fl oc k r} {s s′ : Sub h Δ A} {ls ls′ : List (Lane h Δ B)}
-                 → Same (flatMapˢ op f fl oc k r s ls) (flatMapˢ op f fl oc k r s′ ls′)
-    same-connect : ∀ {Δ A B} {S c b kb k fd e} {s s′ : Sub h Δ A} {bd bd′ : Sub h (A ∷ Δ) B}
-                 → Same (connectˢ S c b kb k fd e s bd) (connectˢ S c b kb k fd e s′ bd′)
+    same-flat    : ∀ {Δ A B} {op f fl oc k r pl} {s s′ : Sub h Δ A} {ls ls′ : List (Lane h Δ B)}
+                 → Same (flatMapˢ op f fl oc k r pl s ls) (flatMapˢ op f fl oc k r pl s′ ls′)
+    same-connect : ∀ {Δ A B} {S c b kb k fd e rp rt} {s s′ : Sub h Δ A} {bd bd′ : Sub h (A ∷ Δ) B}
+                 → Same (connectˢ S c b kb k fd rp e rt s bd) (connectˢ S c b kb k fd rp e rt s′ bd′)
     same-defer   : ∀ {Δ A} {k} {s s′ : Sub h Δ A} → Same (deferˢ k s) (deferˢ k s′)
 
   -- A node of the rewritten tree: at or below the planted node, or one
@@ -488,7 +488,7 @@ module Moving (R : Set) where
       ... | inj₁ (() , _)
       ... | inj₂ (_ , q , same) = gone (Owned.begun ow q)
 
-      no-end : ∀ {Δ′ A′ i p c k q} {s : Sub h Δ′ A′} → Path (plant π fc) (takeWhileˢ i p c k (ending q) s) → At.val H (Kit.live c) ≡ true → ⊥
+      no-end : ∀ {Δ′ A′ i p c k q n} {s : Sub h Δ′ A′} → Path (plant π fc) (takeWhileˢ i p c k (ending q n) s) → At.val H (Kit.live c) ≡ true → ⊥
       no-end π′ l with unplant π fc π′
       ... | inj₁ (() , _)
       ... | inj₂ (_ , q , same)      = gone (Owned.ends ow q l)
@@ -500,15 +500,15 @@ module Moving (R : Set) where
       ... | inj₂ (_ , q , same)      = gone (proj₂ (Owned.cuts ow q l))
       ... | inj₂ (_ , q , same-take) = gone (proj₂ (Owned.cuts ow q l))
 
-      no-feed : ∀ {Δ′ A B S c b kb k x q ss e′} {s : Sub h Δ′ A} {bd : Sub h (A ∷ Δ′) B}
-              → Path (plant π fc) (connectˢ S c b kb k (feeding x q ss) e′ s bd) → ⊥
+      no-feed : ∀ {Δ′ A B S c b kb k x q ss e′ rp rt} {s : Sub h Δ′ A} {bd : Sub h (A ∷ Δ′) B}
+              → Path (plant π fc) (connectˢ S c b kb k (feeding x q ss) rp e′ rt s bd) → ⊥
       no-feed π′ with unplant π fc π′
       ... | inj₁ (() , _)
       ... | inj₂ (_ , q , same)         = gone (Owned.feeds ow q)
       ... | inj₂ (_ , q , same-connect) = gone (Owned.feeds ow q)
 
-      no-fin : ∀ {Δ′ A B S c b kb k q ss e′} {s : Sub h Δ′ A} {bd : Sub h (A ∷ Δ′) B}
-             → Path (plant π fc) (connectˢ S c b kb k (finishing q ss) e′ s bd) → ⊥
+      no-fin : ∀ {Δ′ A B S c b kb k q ss e′ rp rt} {s : Sub h Δ′ A} {bd : Sub h (A ∷ Δ′) B}
+             → Path (plant π fc) (connectˢ S c b kb k (finishing q ss) rp e′ rt s bd) → ⊥
       no-fin π′ with unplant π fc π′
       ... | inj₁ (() , _)
       ... | inj₂ (_ , q , same)         = gone (Owned.fins ow q)

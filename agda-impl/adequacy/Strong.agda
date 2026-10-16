@@ -210,11 +210,12 @@ module Strongly (R : Set) where
     playing : ∀ {t} → Time → Pos → ℕ → Frame A t → Phase A
 
   -- A takeWhile running; its failing value passed at the position given,
-  -- its completion under it owed; its completion delivered, its cut owed.
-  data Taking : Set where
-    taking : Taking
-    ending : Pos → Taking
-    taken  : Taking
+  -- its completion under it owed, its source's configuration as the value
+  -- left it; its completion delivered, its cut owed.
+  data Taking (Δ : List Set) (A : Set) : Set₁ where
+    taking : Taking Δ A
+    ending : Pos → U.Node Δ A → Taking Δ A
+    taken  : Taking Δ A
 
   -- A connect's feed: none under way; a value from the source at `q`,
   -- owed still to the subscribers listed; the source's completion at `q`,
@@ -238,17 +239,19 @@ module Strongly (R : Set) where
       scanˢ      : ∀ {Δ A B} → (B → A → B) → Ref h (base B) → Sub h Δ A → Sub h Δ B
       -- Its kill switch, the unsubscribe `attach` stashed once the
       -- source's subscription exists, the source.
-      takeWhileˢ : ∀ {Δ A} → Bool → (A → Bool) → Cut h → Maybe (Quiet h) → Taking → Sub h Δ A → Sub h Δ A
+      takeWhileˢ : ∀ {Δ A} → Bool → (A → Bool) → Cut h → Maybe (Quiet h) → Taking Δ A → Sub h Δ A → Sub h Δ A
       -- Its cells, the outer's kill switch and stashed unsubscribe, the
-      -- refill sink, the outer, and every lane it subscribed.
+      -- refill sink, the meaning's pool of what its ended parts left
+      -- running, the outer, and every lane it subscribed.
       flatMapˢ   : ∀ {Δ A B} → T.FlatOp → (A → Obs Timeline Δ B) → Flat A h → Cut h → Maybe (Quiet h) → Sink h ⊤
-                 → Sub h Δ A → List (Lane h Δ B) → Sub h Δ B
+                 → U.Node Δ B → Sub h Δ A → List (Lane h Δ B) → Sub h Δ B
       -- The subject, the source's kill switch, the cell for the body's
       -- unsubscribe and what it stashed there, the source's stashed
-      -- unsubscribe, the feed, where the source ended once it has, the
-      -- source, the body.
+      -- unsubscribe, the feed, where the source subscribes, where it
+      -- ended once it has and what the meaning keeps of it running past
+      -- that, the source, the body.
       connectˢ   : ∀ {Δ A B} → Subject A h → Cut h → Ref h (maybe quiet) → Maybe (Quiet h) → Maybe (Quiet h) → Feed A h
-                 → Maybe Pos → Sub h Δ A → Sub h (A ∷ Δ) B → Sub h Δ B
+                 → Pos → Maybe Pos → U.Node Δ A → Sub h Δ A → Sub h (A ∷ Δ) B → Sub h Δ B
       -- Joined at `j`: the registered sink and its flag, and what the
       -- meaning has fed it and not yet shown, with where it ends once
       -- told; gone once its completion is delivered.
@@ -275,8 +278,8 @@ module Strongly (R : Set) where
   unsub (mapˢ f s)                         = unsub s
   unsub (scanˢ f r s)                      = unsub s
   unsub (takeWhileˢ i p c k tk s)          = cut c
-  unsub (flatMapˢ op f fl oc k r so ls)    = cut oc >>ᴬ killAllᶜ fl
-  unsub (connectˢ S c b kb k fd e src bd)  = unsub src >>ᴬ unsubscribeVia kb
+  unsub (flatMapˢ op f fl oc k r pl so ls)    = cut oc >>ᴬ killAllᶜ fl
+  unsub (connectˢ S c b kb k fd rp e rt src bd)  = unsub src >>ᴬ unsubscribeVia kb
   unsub (joinˢ j sk l x st)                = writeRef l false skipᴬ
   unsub (deferˢ k s)                       = unsubscribeVia k
 
@@ -289,14 +292,14 @@ module Strongly (R : Set) where
       in-map    : ∀ {Δ A B Δ′ C} {f : A → B} {t : Sub h Δ A} {u : Sub h Δ′ C} → Path t u → Path (mapˢ f t) u
       in-scan   : ∀ {Δ A B Δ′ C} {f : B → A → B} {r} {t : Sub h Δ A} {u : Sub h Δ′ C} → Path t u → Path (scanˢ f r t) u
       in-take   : ∀ {Δ A Δ′ C} {i p c k tk} {t : Sub h Δ A} {u : Sub h Δ′ C} → Path t u → Path (takeWhileˢ i p c k tk t) u
-      in-outer  : ∀ {Δ A B Δ′ C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C}
-                → Path t u → Path (flatMapˢ op f fl oc k r t ls) u
-      in-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C}
-                → PathLanes ls u → Path (flatMapˢ op f fl oc k r t ls) u
-      in-source : ∀ {Δ A B Δ′ C} {S c b kb k fd e} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C}
-                → Path t u → Path (connectˢ S c b kb k fd e t bd) u
-      in-body   : ∀ {Δ A B Δ′ C} {S c b kb k fd e} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C}
-                → Path bd u → Path (connectˢ S c b kb k fd e t bd) u
+      in-outer  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C}
+                → Path t u → Path (flatMapˢ op f fl oc k r pl t ls) u
+      in-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C}
+                → PathLanes ls u → Path (flatMapˢ op f fl oc k r pl t ls) u
+      in-source : ∀ {Δ A B Δ′ C} {S c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C}
+                → Path t u → Path (connectˢ S c b kb k fd rp e rt t bd) u
+      in-body   : ∀ {Δ A B Δ′ C} {S c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C}
+                → Path bd u → Path (connectˢ S c b kb k fd rp e rt t bd) u
       in-defer  : ∀ {Δ A Δ′ C} {k} {t : Sub h Δ A} {u : Sub h Δ′ C} → Path t u → Path (deferˢ k t) u
 
     data PathLanes {h} : ∀ {Δ B Δ′ C} → List (Lane h Δ B) → Sub h Δ′ C → Set₁ where
@@ -367,15 +370,15 @@ module Strongly (R : Set) where
   data Call {h} (t : Sub h [] R) : Set₁ where
     emitC  : ∀ {Δ A} {p i xs} → Path t (ofˢ {Δ = Δ} {A} p i xs) → Call t
     kontC  : ∀ {Δ A} {u : Sub h Δ A} → Path t u → Call t
-    take1C : ∀ {Δ A} {i p c k q} {s : Sub h Δ A} → Path t (takeWhileˢ i p c k (ending q) s) → Call t
+    take1C : ∀ {Δ A} {i p c k q n} {s : Sub h Δ A} → Path t (takeWhileˢ i p c k (ending q n) s) → Call t
     take2C : ∀ {Δ A} {i p c k} {s : Sub h Δ A} → Path t (takeWhileˢ i p c k taken s) → Call t
-    bodyC  : ∀ {Δ A B} {S c b kb k fd e} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → Path t (connectˢ S c b kb k fd e s bd) → Call t
-    feedC  : ∀ {Δ A B} {S c b kb k x r ss e} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
-           → Path t (connectˢ S c b kb k (feeding x r ss) e s bd) → Call t
-    finC   : ∀ {Δ A B} {S c b kb k r ss e} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
-           → Path t (connectˢ S c b kb k (finishing r ss) e s bd) → Call t
-    srcC   : ∀ {Δ A B} {S c b kb k fd e s₁ q} {bd : Sub h (A ∷ Δ) B}
-           → Path t (connectˢ S c b kb k fd e (pendingˢ {Δ = Δ} s₁ q) bd) → Call t
+    bodyC  : ∀ {Δ A B} {S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → Path t (connectˢ S c b kb k fd rp e rt s bd) → Call t
+    feedC  : ∀ {Δ A B} {S c b kb k x r ss e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+           → Path t (connectˢ S c b kb k (feeding x r ss) rp e rt s bd) → Call t
+    finC   : ∀ {Δ A B} {S c b kb k r ss e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+           → Path t (connectˢ S c b kb k (finishing r ss) rp e rt s bd) → Call t
+    srcC   : ∀ {Δ A B} {S c b kb k fd e s₁ q rp rt} {bd : Sub h (A ∷ Δ) B}
+           → Path t (connectˢ S c b kb k fd rp e rt (pendingˢ {Δ = Δ} s₁ q) bd) → Call t
 
   code : ∀ {h} {t : Sub h [] R} → Call t → Act h ⊤
   code (emitC {i = i} {xs} π)            = emitAll (obs (walk π top)) i xs
@@ -422,8 +425,8 @@ module Strongly (R : Set) where
     pendings (mapˢ f s)                        = pendings s
     pendings (scanˢ f r s)                     = pendings s
     pendings (takeWhileˢ i p c k tk s)         = pendings s
-    pendings (flatMapˢ op f fl oc k r so ls)   = pendings so ++ lanePendings ls
-    pendings (connectˢ S c b kb k fd e src bd) = pendings src ++ pendings bd
+    pendings (flatMapˢ op f fl oc k r pl so ls)   = pendings so ++ lanePendings ls
+    pendings (connectˢ S c b kb k fd rp e rt src bd) = pendings src ++ pendings bd
     pendings (deferˢ k s)                      = pendings s
     pendings _                                 = []
 
@@ -436,8 +439,8 @@ module Strongly (R : Set) where
     subjects (mapˢ f s)                        = subjects s
     subjects (scanˢ f r s)                     = subjects s
     subjects (takeWhileˢ i p c k tk s)         = subjects s
-    subjects (flatMapˢ op f fl oc k r so ls)   = subjects so ++ laneSubjects ls
-    subjects (connectˢ S c b kb k fd e src bd) = (_ , S) ∷ subjects src ++ subjects bd
+    subjects (flatMapˢ op f fl oc k r pl so ls)   = subjects so ++ laneSubjects ls
+    subjects (connectˢ S c b kb k fd rp e rt src bd) = (_ , S) ∷ subjects src ++ subjects bd
     subjects (deferˢ k s)                      = subjects s
     subjects _                                 = []
 
@@ -450,8 +453,8 @@ module Strongly (R : Set) where
     joiners (mapˢ f s)                        E = joiners s E
     joiners (scanˢ f r s)                     E = joiners s E
     joiners (takeWhileˢ i p c k tk s)         E = joiners s E
-    joiners (flatMapˢ op f fl oc k r so ls)   E = joiners so E ++ laneJoiners ls E
-    joiners (connectˢ S c b kb k fd e src bd) E = joiners src E ++ joiners bd (S ∷ᴬ E)
+    joiners (flatMapˢ op f fl oc k r pl so ls)   E = joiners so E ++ laneJoiners ls E
+    joiners (connectˢ S c b kb k fd rp e rt src bd) E = joiners src E ++ joiners bd (S ∷ᴬ E)
     joiners (joinˢ j sk l x st)               E = joiner (lookup E x) sk j ∷ []
     joiners (deferˢ k s)                      E = joiners s E
     joiners _                                 E = []
@@ -485,8 +488,8 @@ module Strongly (R : Set) where
     names (mapˢ f s)                        = names s
     names (scanˢ f r s)                     = (cell _ , r) ∷ names s
     names (takeWhileˢ i p c k tk s)         = cutNames c ++ quietName k ++ names s
-    names (flatMapˢ op f fl oc k r so ls)   = flatNames fl ++ cutNames oc ++ quietName k ++ (slot _ , r) ∷ names so ++ laneNames ls
-    names (connectˢ S c b kb k fd e src bd) =
+    names (flatMapˢ op f fl oc k r pl so ls)   = flatNames fl ++ cutNames oc ++ quietName k ++ (slot _ , r) ∷ names so ++ laneNames ls
+    names (connectˢ S c b kb k fd rp e rt src bd) =
       subjectNames S ++ cutNames c ++ (cell _ , b) ∷ quietName kb ++ quietName k ++ names src ++ names bd
     names (joinˢ j sk l x st)               = (slot _ , sk) ∷ (cell _ , l) ∷ []
     names (deferˢ k s)                      = quietName k ++ names s
@@ -530,27 +533,27 @@ module Strongly (R : Set) where
     consᴹ (just x) xs = x ∷ xs
 
     -- A flatMap is open while its outer, a lane or the queue is.
-    merged : ∀ {Δ A B} → T.FlatOp → (A → Pos → U.Node Δ B) → Maybe (U.Node Δ A) → List (U.Node Δ B) → List A → Maybe (U.Node Δ B)
-    merged op g nothing []       []       = nothing
-    merged op g o       ls       qs       = just (U.flatMapᶜ op g o ls qs)
+    merged : ∀ {Δ A B} → T.FlatOp → (A → Pos → U.Node Δ B) → Maybe (U.Node Δ A) → List (U.Node Δ B) → List A → U.Node Δ B → Maybe (U.Node Δ B)
+    merged op g nothing []       []       pl = nothing
+    merged op g o       ls       qs       pl = just (U.flatMapᶜ op g o ls qs pl)
 
     -- A connect is open while its body is, beside its source while that
     -- runs; past the source's end, every joiner the body holds told so.
-    connected : ∀ {Δ A B} → Maybe Pos → Maybe (U.Node Δ A) → Maybe (U.Node (A ∷ Δ) B) → Maybe (U.Node Δ B)
-    connected e        s        nothing  = nothing
-    connected e        (just s) (just b) = just (U.connectᶜ b (U.live s))
-    connected (just c) nothing  (just b) = just (U.connectᶜ (U.shut (Any.here refl) c b) (U.ended c))
-    connected nothing  nothing  (just b) = nothing
+    connected : ∀ {Δ A B} → Pos → Maybe Pos → U.Node Δ A → Maybe (U.Node Δ A) → Maybe (U.Node (A ∷ Δ) B) → Maybe (U.Node Δ B)
+    connected r e        t s        nothing  = nothing
+    connected r e        t (just s) (just b) = just (U.connectᶜ r b (U.live s))
+    connected r (just c) t nothing  (just b) = just (U.connectᶜ r (U.shut (Any.here refl) c b) (U.ended c t))
+    connected r nothing  t nothing  (just b) = nothing
 
     -- A joiner shows what it holds until it is gone.
     joinedᶜ : ∀ {Δ A} → A ∈ Δ → Pos → Maybe (List (Pos × Maybe A) × Maybe Pos) → Maybe (U.Node Δ A)
     joinedᶜ x j nothing          = nothing
     joinedᶜ x j (just (xs , e))  = just (U.joinᶜ x j xs e)
 
-    taking? : ∀ {Δ A} → Bool → (A → Bool) → Taking → Maybe (U.Node Δ A) → Maybe (U.Node Δ A)
-    taking? i p taking     s = mapᴹ (U.takeWhileᶜ i p) s
-    taking? i p (ending k) s = just (U.endᶜ (k ++ [ last ]))
-    taking? i p taken      s = nothing
+    taking? : ∀ {Δ A} → Bool → (A → Bool) → Taking Δ A → Maybe (U.Node Δ A) → Maybe (U.Node Δ A)
+    taking? i p taking       s = mapᴹ (U.takeWhileᶜ i p) s
+    taking? i p (ending k c) s = just (U.endingᶜ (k ++ [ last ]) c)
+    taking? i p taken        s = nothing
 
     -- The lanes still open.
     count : ∀ {Δ B} → List (Lane h Δ B) → ℕ
@@ -573,9 +576,9 @@ module Strongly (R : Set) where
       part (mapˢ f s)                        = mapᴹ (U.mapᶜ f) (part s)
       part (scanˢ f r s)                     = mapᴹ (U.scanᶜ f (val r)) (part s)
       part (takeWhileˢ i p c k tk s)         = if val (Kit.live c) then taking? i p tk (part s) else nothing
-      part (flatMapˢ op f fl oc k r so ls)   =
-        merged op (λ a q → U.subscribe (f a) q) (part so) (partLanes ls) (val (Flat.queue fl))
-      part (connectˢ S c b kb k fd e src bd) = connected e (part src) (part bd)
+      part (flatMapˢ op f fl oc k r pl so ls)   =
+        merged op (λ a q → U.subscribe (f a) q) (part so) (partLanes ls) (val (Flat.queue fl)) pl
+      part (connectˢ S c b kb k fd rp e rt src bd) = connected rp e rt (part src) (part bd)
       part (joinˢ j sk l x st)               = if val l then joinedᶜ x j st else nothing
       part (deferˢ k s)                      = part s
 
@@ -616,8 +619,8 @@ module Strongly (R : Set) where
       Fed (mapˢ f s)                        ν = Fed s ν
       Fed (scanˢ f r s)                     ν = Fed s ν
       Fed (takeWhileˢ i p c k tk s)         ν = Fed s ν
-      Fed (flatMapˢ op f fl oc k r so ls)   ν = Fed so ν × FedLanes ls ν
-      Fed (connectˢ S c b kb k fd e src bd) ν = Fed src ν × Fed bd ((fd , e) ∷ᴬ ν)
+      Fed (flatMapˢ op f fl oc k r pl so ls)   ν = Fed so ν × FedLanes ls ν
+      Fed (connectˢ S c b kb k fd rp e rt src bd) ν = Fed src ν × Fed bd ((fd , e) ∷ᴬ ν)
       Fed (joinˢ j sk l x st)               ν = let (fd , e) = lookup ν x in
         Lift _ (val l ≡ true → (Owed fd sk j → st ≡ owing fd j) × (¬ Owed fd sk j → st ≡ owingNone e))
       Fed (deferˢ k s)                      ν = Fed s ν
@@ -655,8 +658,8 @@ module Strongly (R : Set) where
       Gated (mapˢ f s)                        = Gated s
       Gated (scanˢ f r s)                     = Gated s
       Gated (takeWhileˢ i p c k tk s)         = (val (Kit.live c) ≡ false → Cut↓ k s) × Gated s
-      Gated (flatMapˢ op f fl oc k r so ls)   = Gated so × GatedLanes ls
-      Gated (connectˢ S c b kb k fd e src bd) = (part bd ≡ nothing → Cut↓ k src) × Gated src × Gated bd
+      Gated (flatMapˢ op f fl oc k r pl so ls)   = Gated so × GatedLanes ls
+      Gated (connectˢ S c b kb k fd rp e rt src bd) = (part bd ≡ nothing → Cut↓ k src) × Gated src × Gated bd
       Gated (deferˢ k s)                      = Gated s
       Gated _                                 = Lift _ ⊤
 
@@ -673,13 +676,13 @@ module Strongly (R : Set) where
       Holds (mapˢ f s)                        E o = Holds s E (mapO f o)
       Holds (scanˢ f r s)                     E o = Holds s E (scanO f r o)
       Holds (takeWhileˢ i p c k tk s)         E o = Attached c k (unsub s) × Holds s E (takeWhileO i p c o)
-      Holds (flatMapˢ op f fl oc k r so ls)   E o =
+      Holds (flatMapˢ op f fl oc k r pl so ls)   E o =
         val (Flat.refill fl) ≡ just r × slotIs r (Flat′.refillCb op f E o fl)
         × Attached oc k (unsub so) × Holds so E (Flat′.outerO op f E o fl oc)
         × val (Flat.active fl) ≡ count ls
         × Σ (List (Cut h)) (λ gone → val (Flat.lanes fl) ++ gone ≡ switches ls × All (λ c → val (Kit.live c) ≡ false) gone)
         × HoldsLanes op f E o fl ls
-      Holds (connectˢ S c b kb k fd e src bd) E o =
+      Holds (connectˢ S c b kb k fd rp e rt src bd) E o =
         Attached c k (unsub src) × val b ≡ kb × Stashed kb (unsub bd)
         × Holds src E (feeder S) × Holds bd (S ∷ᴬ E) (bodyO c o)
       Holds (joinˢ j sk l x st)               E o = slotIs sk (joinerCb l o)
@@ -890,14 +893,14 @@ module Strongly (R : Set) where
       fires  : ∀ {Δ A s hd τ e u} {m : From A u} (π : Path t (coldˢ {Δ = Δ} s hd (fired τ e m)))
              → spentʰ hd ≡ false → spot π ∈ bursts ca
       begun  : ∀ {Δ A s q} (π : Path t (pendingˢ {Δ = Δ} {A} s q)) → spot π ∈ begins ca
-      ends   : ∀ {Δ A i p c k q} {s : Sub h Δ A} (π : Path t (takeWhileˢ i p c k (ending q) s))
+      ends   : ∀ {Δ A i p c k q n} {s : Sub h Δ A} (π : Path t (takeWhileˢ i p c k (ending q n) s))
              → val (Kit.live c) ≡ true → (q , take1C π) ∈ agenda ca
       cuts   : ∀ {Δ A i p c k} {s : Sub h Δ A} (π : Path t (takeWhileˢ i p c k taken s))
              → val (Kit.live c) ≡ true → Σ Pos λ q → (q , take2C π) ∈ agenda ca
-      feeds  : ∀ {Δ A B S c b kb k x q ss e} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
-             → (π : Path t (connectˢ S c b kb k (feeding x q ss) e s bd)) → (q , feedC π) ∈ agenda ca
-      fins   : ∀ {Δ A B S c b kb k q ss e} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
-             → (π : Path t (connectˢ S c b kb k (finishing q ss) e s bd)) → (q , finC π) ∈ agenda ca
+      feeds  : ∀ {Δ A B S c b kb k x q ss e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+             → (π : Path t (connectˢ S c b kb k (feeding x q ss) rp e rt s bd)) → (q , feedC π) ∈ agenda ca
+      fins   : ∀ {Δ A B S c b kb k q ss e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+             → (π : Path t (connectˢ S c b kb k (finishing q ss) rp e rt s bd)) → (q , finC π) ∈ agenda ca
       placed : All Placed (agenda ca)
 
   -- Every subscription against what its kernel registered; below a closed

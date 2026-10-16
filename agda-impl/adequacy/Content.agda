@@ -50,7 +50,7 @@ open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
-open import adequacy.Stepper using (_≃_; []; os; afterᴱ; placed-after; Placedˢ)
+open import adequacy.Stepper using (_≃_; afterᴱ; placed-after; Placedˢ; step-skips)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (PureObs; Out; note; Pureᴾ; module Pure)
@@ -118,18 +118,18 @@ module Honesty (R : Set) where
 
   -- Alike at every depth.
   tail-out : ∀ {n k} {a : R} {l r} → Agree (suc n) (out k a l) (out k a r) → Agree n (force l) (force r)
-  tail-out (out⁼ x) = x
+  tail-out (out⁼ _ x) = x
 
   tail-skip : ∀ {n k} {l r : Events∞ R} → Agree (suc n) (skip k l) (skip k r) → Agree n (force l) (force r)
-  tail-skip (skip⁼ x) = x
+  tail-skip (skip⁼ _ x) = x
 
   -- Events alike at every depth hold the same events.
   has-agree : ∀ {x y k b} → (∀ n → Agree n x y) → Has x k b → Has y k b
   has-agree ag h with ag 1
-  has-agree ag atOut        | out⁼ _  = atOut
+  has-agree ag atOut        | out⁼ _ _ = atOut
   has-agree ag atEnd        | end⁼    = atEnd
-  has-agree ag (pastOut h)  | out⁼ _  = pastOut (has-agree (λ n → tail-out (ag (suc n))) h)
-  has-agree ag (pastSkip h) | skip⁼ _ = pastSkip (has-agree (λ n → tail-skip (ag (suc n))) h)
+  has-agree ag (pastOut h)  | out⁼ _ _ = pastOut (has-agree (λ n → tail-out (ag (suc n))) h)
+  has-agree ag (pastSkip h) | skip⁼ _ _ = pastSkip (has-agree (λ n → tail-skip (ag (suc n))) h)
 
   -- The same events, as a set.
   _≋_ : Events R → Events R → Set
@@ -377,15 +377,6 @@ module Honesty (R : Set) where
   if-silent false true  = _ , refl
   if-silent false false = _ , refl
 
-  -- THE STEPPER IS THE MEANING, skips included, of a run's configuration
-  -- (`Sane`): what the ghost's step shows, then the meaning of the ghost
-  -- it leaves.  A joiner told its end while its source runs is fed the
-  -- source's values by the stepper and shows them, where the meaning
-  -- reads it as its end alone.
-  --
-  -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
-  step-skips : ∀ g → Sane [] g → Placed g [] → residual g ≃ after (U.step g)
-  step-skips g sn pl = os g [] tt sn pl tt
 
   -- `m`, carried, runs silently on to a re-entry configuration it gains.
   Hops : ∀ {g m} → Carried g m → Set₁
@@ -437,6 +428,15 @@ module Honesty (R : Set) where
   OuterFirst : ∀ {Γ A B} → U.Step Γ A → List (U.Node Γ B) → Set₁
   OuterFirst S ls = ∀ {k bs l s as} → U.earliest ls ≡ U.found k bs l s as → Σ Pos λ k′ → U.headˢ S ≡ just k′ × k′ <ᵖ k ≡ true
 
+  -- What a flatMap's ended parts left running steps no sooner than its
+  -- outer and lanes.
+  PoolBehind : ∀ {Γ A B} → U.Node Γ B → U.Outer Γ A → U.Earliest Γ B → Set₁
+  PoolBehind p o e = ∀ {k p′} → U.step p ≡ U.skipˢ k p′ → U.aheadˢ k o e ≡ false
+
+  -- What an ended source left running steps no sooner than the body.
+  RestBehind : ∀ {Γ A B} → U.Node Γ A → U.Step (A ∷ Γ) B → Set₁
+  RestBehind t sb = ∀ {k t′} → U.step t ≡ U.skipˢ k t′ → U.beforeˢ (k ++ [ ix 0 ]) sb ≡ false
+
   -- The earliest lane's step, at `k`, ahead of the outer's.
   LaneFirst : ∀ {Γ A} → Maybe (U.Node Γ A) → Pos → Set
   LaneFirst nothing  k = ⊤
@@ -456,24 +456,26 @@ module Honesty (R : Set) where
                    → Lifts H ρ s S → Lifts H (in-scan {f = f} {r} ρ) s (U.scanˢ f (At.val H r) S)
       lifts-take   : ∀ {Δ A Δ′ C} {i p c k} {t : Sub h Δ A} {u : Sub h Δ′ C} {ρ : Path t u} {s S}
                    → At.val H (Kit.live c) ≡ true → Lifts H ρ s S → Lifts H (in-take {i = i} {p} {c} {k} {taking} ρ) s (U.takeWhileˢ i p S)
-      lifts-outer  : ∀ {Δ A B Δ′ C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {ρ : Path t u} {s S}
-                   → OuterFirst S (At.partLanes H ls) → Lifts H ρ s S
-                   → Lifts H (in-outer {op = op} {f} {fl} {oc} {k} {r} {ls = ls} ρ) s
-                       (U.outerˢ op (λ a q → U.subscribe (f a) q) S (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)))
-      lifts-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u}
+      lifts-outer  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {ρ : Path t u} {s S o₀}
+                   → At.part H t ≡ just o₀ → OuterFirst S (At.partLanes H ls)
+                   → PoolBehind pl (U.outerOf (just o₀)) (U.earliest (At.partLanes H ls)) → Lifts H ρ s S
+                   → Lifts H (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {ls = ls} ρ) s
+                       (U.outerˢ op (λ a q → U.subscribe (f a) q) o₀ S (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl)
+      lifts-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u}
                        {s bs l S as q}
                    → LiftsLane H πL s bs S as → U.earliest (At.partLanes H ls) ≡ U.found q bs l S as → LaneFirst (At.part H t) q
-                   → Lifts H (in-lanes {op = op} {f} {fl} {oc} {k} {r} {t = t} πL) s
-                       (U.laneˢ op (λ a q → U.subscribe (f a) q) (At.part H t) bs S as (At.val H (FlatKit.Flat.queue fl)))
-      lifts-source : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path t u} {s S c₀ b₀}
+                   → PoolBehind pl (U.outerOf (At.part H t)) (U.found q bs l S as)
+                   → Lifts H (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = t} πL) s
+                       (U.laneˢ op (λ a q → U.subscribe (f a) q) (At.part H t) bs l S as (At.val H (FlatKit.Flat.queue fl)) pl)
+      lifts-source : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path t u} {s S c₀ b₀}
                    → At.part H t ≡ just c₀ → At.part H bd ≡ just b₀ → SourceFirst S (U.step b₀) → Lifts H ρ s S
-                   → Lifts H (in-source {S = Sj} {c} {b} {kb} {k} {fd} {e} {bd = bd} ρ) s (U.sourceˢ b₀ (U.step b₀) c₀ S)
-      lifts-body   : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path bd u} {s S c₀}
+                   → Lifts H (in-source {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {bd = bd} ρ) s (U.sourceˢ rp b₀ (U.step b₀) c₀ S)
+      lifts-body   : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path bd u} {s S c₀}
                    → At.part H t ≡ just c₀ → BodyFirst (U.step c₀) S → Lifts H ρ s S
-                   → Lifts H (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {t = t} ρ) s (U.bodyˢ (U.live c₀) S)
-      lifts-shut   : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path bd u} {s S c₀}
-                   → At.part H t ≡ nothing → e ≡ just c₀ → Lifts H ρ s S
-                   → Lifts H (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {t = t} ρ) s (U.shutˢᵗ c₀ S)
+                   → Lifts H (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} ρ) s (U.bodyˢ rp (U.live c₀) S)
+      lifts-shut   : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path bd u} {s S c₀}
+                   → At.part H t ≡ nothing → e ≡ just c₀ → RestBehind rt S → Lifts H ρ s S
+                   → Lifts H (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} ρ) s (U.shutˢᵗ rp c₀ rt S)
       lifts-defer  : ∀ {Δ A Δ′ C} {k} {t : Sub h Δ A} {u : Sub h Δ′ C} {ρ : Path t u} {s S}
                    → Lifts H ρ s S → Lifts H (in-defer {k = k} ρ) s S
 
@@ -495,16 +497,16 @@ module Honesty (R : Set) where
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-scan Lρ
     lifts-split (in-take ρ)   τ (lifts-take lv L)          with lifts-split ρ τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-take lv Lρ
-    lifts-split (in-outer ρ)  τ (lifts-outer of L)         with lifts-split ρ τ L
-    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-outer of Lρ
-    lifts-split (in-lanes πL) τ (lifts-lanes L ea lf)      with liftsL-split πL τ L
-    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-lanes Lρ ea lf
+    lifts-split (in-outer ρ)  τ (lifts-outer po of pb L)   with lifts-split ρ τ L
+    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-outer po of pb Lρ
+    lifts-split (in-lanes πL) τ (lifts-lanes L ea lf pb)   with liftsL-split πL τ L
+    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-lanes Lρ ea lf pb
     lifts-split (in-source ρ) τ (lifts-source pt pb sf L)  with lifts-split ρ τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-source pt pb sf Lρ
     lifts-split (in-body ρ)   τ (lifts-body pt bf L)       with lifts-split ρ τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-body pt bf Lρ
-    lifts-split (in-body ρ)   τ (lifts-shut pt e L)        with lifts-split ρ τ L
-    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-shut pt e Lρ
+    lifts-split (in-body ρ)   τ (lifts-shut pt e rb L)     with lifts-split ρ τ L
+    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-shut pt e rb Lρ
     lifts-split (in-defer ρ)  τ (lifts-defer L)            with lifts-split ρ τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-defer Lρ
 
@@ -647,11 +649,11 @@ module Honesty (R : Set) where
       one-map    : ∀ {Δ A B} {f : A → B} {t : Sub h Δ A} → One (in-map {f = f} {t = t} here)
       one-scan   : ∀ {Δ A B} {f : B → A → B} {r} {t : Sub h Δ A} → One (in-scan {f = f} {r} {t = t} here)
       one-take   : ∀ {Δ A} {i p c k tk} {t : Sub h Δ A} → One (in-take {i = i} {p} {c} {k} {tk} {t = t} here)
-      one-outer  : ∀ {Δ A B} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} → One (in-outer {op = op} {f} {fl} {oc} {k} {r} {t = t} {ls} here)
-      one-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u}
-                 → OneLane πL → One (in-lanes {op = op} {f} {fl} {oc} {k} {r} {t = t} πL)
-      one-source : ∀ {Δ A B} {Sj c b kb k fd e} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → One (in-source {S = Sj} {c} {b} {kb} {k} {fd} {e} {t = t} {bd} here)
-      one-body   : ∀ {Δ A B} {Sj c b kb k fd e} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → One (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {t = t} {bd} here)
+      one-outer  : ∀ {Δ A B} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} → One (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = t} {ls} here)
+      one-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u}
+                 → OneLane πL → One (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = t} πL)
+      one-source : ∀ {Δ A B} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → One (in-source {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {bd} here)
+      one-body   : ∀ {Δ A B} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → One (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {bd} here)
       one-defer  : ∀ {Δ A} {k} {t : Sub h Δ A} → One (in-defer {k = k} {t = t} here)
 
     data OneLane {h} : ∀ {Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} → PathLanes ls u → Set₁ where
@@ -776,7 +778,7 @@ module Honesty (R : Set) where
     openedL H o (this-lane {c = c} p) = opened H (At.val H (Kit.live c) ∧ o) p
     openedL H o (next-lane p)         = openedL H o p
 
-  isTaking : Taking → Bool
+  isTaking : ∀ {Δ A} → Taking Δ A → Bool
   isTaking taking = true
   isTaking _      = false
 
@@ -903,15 +905,12 @@ module Honesty (R : Set) where
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ false → Hops cr
 
     -- An `of` reading its observer open where the ghost does not hold it:
-    -- a connect's source fed on past its body's end.
-    --
-    -- FALSE as stated, by rxjs.  The source is subscribed after the body
-    -- and its cut attached only once its subscribe returns, so a body
-    -- ending inside that burst (a take of one) leaves the rest of the
-    -- burst to run into a subject nobody joins.  An unbounded synchronous
-    -- source (`ones`) there spins forever, a sibling lane never reached;
-    -- the meaning has the body's end end both and shows the sibling.  No
-    -- measure can mend that: the meaning must keep the burst as skips.
+    -- a connect's source fed on past its body's end.  The source is
+    -- subscribed after the body and its cut attached only once its
+    -- subscribe returns, so a body ending inside that burst leaves the
+    -- rest of the burst to run into a subject nobody joins, as rxjs does.
+    -- The meaning keeps that burst running as skips (`U.burstingᶜ`, a
+    -- pool's or an ended source's rest), so the ghost steps past it.
     emit-unseen : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
                 → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
                 → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
@@ -978,23 +977,23 @@ module Honesty (R : Set) where
 
     -- A value reaching a flatMap's outer: admitted, a lane begun or
     -- queued, the ghost past the outer's skip.
-    climb-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r}
+    climb-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
-                  (ρ : Path T (flatMapˢ op f fl oc k r u ls)) {y : A}
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A}
                 → Climbing g (loadOf st) m₁ (ρ ⊕ in-outer here) y → Climbed st m₁ (ρ ⊕ in-outer here)
 
     -- A value out of a lane: guarded by its cut, one operator up, its
     -- observer the flatMap's weakened through `same`.
-    climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r}
+    climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
-                  (ρ : Path T (flatMapˢ op f fl oc k r t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {y : C}
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {y : C}
                 → Climbing g (loadOf st) m₁ (ρ ⊕ in-lanes πL) y → Climbed st m₁ (ρ ⊕ in-lanes πL)
 
     -- A value reaching a connect's subject: the feed of its subscribers
     -- owed, the ghost past the source's skip.
-    climb-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e}
+    climb-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
                    {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
-                   (ρ : Path T (connectˢ Sj c b kb k fd e u bd)) {y : A}
+                   (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {y : A}
                  → Climbing g (loadOf st) m₁ (ρ ⊕ in-source here) y → Climbed st m₁ (ρ ⊕ in-source here)
 
     -- A subscription's continuation handed its unsubscribe, which it
@@ -1004,7 +1003,7 @@ module Honesty (R : Set) where
 
     -- A takeWhile's completion delivered under its failing value, then
     -- its cut.
-    take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q) s))
+    take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
                  → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → Hops cr
 
     -- A completed takeWhile's cut: its kill switch thrown, its source's
@@ -1014,24 +1013,24 @@ module Honesty (R : Set) where
 
     -- A connect's cut once its body completes: the ghost alike, a call
     -- fewer.
-    body-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
-                  (π : Path (Carried.tree cr) (connectˢ S c b kb k fd e s bd))
+    body-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
+                  (π : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt s bd))
                 → firstCall (Carried.ctlAs cr) ≡ just (bodyC π) → Hops cr
 
     -- The rest of a connect's feed of a value: each subscriber left
     -- shows it or skips it.
-    feed-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k x r ss e} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
-                  (π : Path (Carried.tree cr) (connectˢ S c b kb k (feeding x r ss) e s bd))
+    feed-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k x r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
+                  (π : Path (Carried.tree cr) (connectˢ S c b kb k (feeding x r ss) rp e rt s bd))
                 → firstCall (Carried.ctlAs cr) ≡ just (feedC π) → Hops cr
 
     -- The rest of a connect's feed of its source's end.
-    fin-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
-                 (π : Path (Carried.tree cr) (connectˢ S c b kb k (finishing r ss) e s bd))
+    fin-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
+                 (π : Path (Carried.tree cr) (connectˢ S c b kb k (finishing r ss) rp e rt s bd))
                → firstCall (Carried.ctlAs cr) ≡ just (finC π) → Hops cr
 
     -- A connect's source subscribed once its body is: its program begun.
-    src-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e s₁ q} {bd : Sub _ (A ∷ Δ) B}
-                 (π : Path (Carried.tree cr) (connectˢ S c b kb k fd e (pendingˢ {Δ = Δ} s₁ q) bd))
+    src-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e s₁ q rp rt} {bd : Sub _ (A ∷ Δ) B}
+                 (π : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt (pendingˢ {Δ = Δ} s₁ q) bd))
                → firstCall (Carried.ctlAs cr) ≡ just (srcC π) → Hops cr
 
     -- A live burst's sink polled: open, the frame to play; closed, the
@@ -1149,17 +1148,17 @@ module Honesty (R : Set) where
 
   -- A value out of a connect's body, as it is: beside its source, or
   -- past its source's end.
-  climb-body : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e} {t : Sub (Conf.world (Mach.conf m₁)) Δ A}
-               {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B} (ρ : Path T (connectˢ Sj c b kb k fd e t u)) {y : B}
+  climb-body : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt} {t : Sub (Conf.world (Mach.conf m₁)) Δ A}
+               {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B} (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u)) {y : B}
              → Climbing g ℓ m₁ (ρ ⊕ in-body here) y → Climbing g ℓ m₁ ρ y
-  climb-body {m₁ = m₁} {e = e} ρ {y} cl with Climbing.lifted cl
+  climb-body {m₁ = m₁} {e = e} {rp} {rt} ρ {y} cl with Climbing.lifted cl
   ... | c′ , pv , S , L , sg with lifts-split ρ (in-body here) L
   ...   | _ , lifts-body pt _ lifts-here , Lρ = reclimb cl
     (subst (λ W → Climbing.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Climbing.code cl))
-    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) e) pt pv , S , Lρ , sg)
-  ...   | _ , lifts-shut pt refl lifts-here , Lρ = reclimb cl
+    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg)
+  ...   | _ , lifts-shut pt refl _ lifts-here , Lρ = reclimb cl
     (subst (λ W → Climbing.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Climbing.code cl))
-    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) e) pt pv , S , Lρ , sg)
+    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg)
 
   -- The value risen, held to the climb's load.
   rise : ∀ {g m} {st : Strong g m} {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
@@ -1380,7 +1379,7 @@ module Honesty (R : Set) where
     with trans (sym st″) stp
   ... | refl = _ , now , carried (record
         { sane = sane-out {g = g} (Carried.sane cr) stp
-        ; placed = proj₂ (subst (Placedˢ []) stp (placed-after g [] tt (Carried.sane cr) (Carried.placed cr) tt))
+        ; placed = proj₂ (subst (Placedˢ []) stp (placed-after g (Carried.sane cr) (Carried.placed cr)))
         ; tree = t ; ctlAs = runAs ks ke K ; meets = pe
         ; owned = record { ofs = Owned.ofs ow ; plays = Owned.plays ow ; fires = Owned.fires ow ; begun = Owned.begun ow
                          ; ends = Owned.ends ow ; cuts = Owned.cuts ow ; feeds = Owned.feeds ow ; fins = Owned.fins ow
