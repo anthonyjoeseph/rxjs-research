@@ -28,7 +28,7 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
-open import Level using (Lift; lift; lower)
+open import Level using (Lift; lift)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _+_)
@@ -50,6 +50,7 @@ open import operation.Machine using (module Machine)
 open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
+open import adequacy.Torn using (module Tearing)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; afterᴱ; placed-after; Placedˢ; step-skips)
@@ -78,6 +79,7 @@ module Honesty (R : Set) where
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
   open Moving R using (pend; takes; takes-plant; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
+  open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part)
   open Read
 
   ----------------------------------------------------------------------
@@ -1113,54 +1115,6 @@ module Honesty (R : Set) where
   ----------------------------------------------------------------------
   -- THE TEARDOWN: what unsubscribing leaves, in the order `unsub` runs
 
-  -- The heap a subscription's unsubscribe leaves: its colds spent, its
-  -- switches thrown, its joiners silenced, below a switch only once
-  -- attached; a flatMap's lanes cut as `killAllᶜ` reads them, the first
-  -- so many of the lanes it holds.
-  mutual
-    torn : ∀ {h} → Heapᴹ h → ∀ {Δ A} → Sub h Δ A → Heapᴹ h
-    torn H (coldˢ s hd ph)                         = store H hd (lift true)
-    torn H (mapˢ f s)                              = torn H s
-    torn H (scanˢ f r s)                           = torn H s
-    torn H (takeWhileˢ i p c k tk s)               = thrown H c k s
-    torn H (flatMapˢ op f fl oc k r pl so ls)      = let H′ = thrown H oc k so in
-      thrownLanes (store (store H′ (FlatKit.Flat.lanes fl) (lift [])) (FlatKit.Flat.active fl) (lift 0))
-                  (length (lower (look H′ (FlatKit.Flat.lanes fl)))) ls
-    torn H (connectˢ S c b kb k fd rp e rt src bd) = tornVia (torn H src) kb bd
-    torn H (joinˢ j sk l x st)                     = store H l (lift false)
-    torn H (deferˢ k s)                            = tornVia H k s
-    torn H _                                       = H
-
-    tornVia : ∀ {h} → Heapᴹ h → Maybe (Quiet h) → ∀ {Δ A} → Sub h Δ A → Heapᴹ h
-    tornVia H nothing  s = H
-    tornVia H (just _) s = torn H s
-
-    -- A switch thrown, and what it holds unsubscribed.
-    thrown : ∀ {h} → Heapᴹ h → Kit.Cut h → Maybe (Quiet h) → ∀ {Δ A} → Sub h Δ A → Heapᴹ h
-    thrown H c k s = tornVia (store H (Kit.live c) (lift false)) k s
-
-    thrownLanes : ∀ {h} → Heapᴹ h → ℕ → ∀ {Δ B} → List (Lane h Δ B) → Heapᴹ h
-    thrownLanes H zero    ls                = H
-    thrownLanes H (suc n) []                = H
-    thrownLanes H (suc n) (lane c k s ∷ ls) = thrownLanes (thrown H c k s) n ls
-
-  -- Where a cut runs from the agenda's head: a takeWhile already taken,
-  -- or a connect whose body has ended. Each holds no part, and its code
-  -- throws its switch.
-  data Site {h} (t : Sub h [] R) : Set₁ where
-    takeSite : ∀ {Δ A i q c k} {s : Sub h Δ A} → Path t (takeWhileˢ i q c k taken s) → Site t
-    bodySite : ∀ {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
-             → Path t (connectˢ S c b kb k fd rp e rt s bd) → Site t
-
-  siteCall : ∀ {h} {t : Sub h [] R} → Site t → Call t
-  siteCall (takeSite π) = take2C π
-  siteCall (bodySite π) = bodyC π
-
-  -- The heap its cut leaves.
-  siteHeap : ∀ {h} {t : Sub h [] R} → Heapᴹ h → Site t → Heapᴹ h
-  siteHeap H (takeSite {c = c} {k} {s} π)       = thrown H c k s
-  siteHeap H (bodySite {c = c} {k = k} {s = s} π) = thrown H c k s
-
   postulate
     -- A cut from the agenda's head runs silently to the rest of the
     -- agenda, over the heap its switch thrown leaves.
@@ -1169,12 +1123,6 @@ module Honesty (R : Set) where
                (z : Site (Carried.tree cr)) {ks}
              → act ≗ ⟦ siteCall z ∷ ks ⟧ᶜ → ∀ {m′} → step (mach ⟨ hp , p , run act σ K ⟩ clk ts bs td lg en mk) ≡ silent m′
              → Σ (Act h ⊤) λ act′ → act′ ≗ ⟦ ks ⟧ᶜ × m′ ⇝ mach ⟨ siteHeap hp z , p , run act′ σ K ⟩ clk ts bs td lg en mk
-
-    -- A site holds no part, a body's by `Owned.bodies`, so the tree's
-    -- part is the same once its switch is thrown.
-    torn-part : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
-              → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
-              → At.part (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) ≡ At.part (Conf.heap (Mach.conf m)) (Carried.tree cr)
 
     -- A teardown only throws switches, spends colds and silences
     -- joiners: what is owed of a live switch or an unspent cold was owed
@@ -1210,6 +1158,15 @@ module Honesty (R : Set) where
     -- its queue and pool, which held no head of its own before.
     torn-behind : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
                 → Each (siteHeap (Conf.heap (Mach.conf m)) z) (Heads (Conf.pos (Mach.conf m))) (Carried.tree cr)
+
+  -- A site holds no part, a body's by `Owned.bodies`, so the tree's
+  -- part is the same once its switch is thrown.
+  torn-part : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+            → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+            → At.part (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) ≡ At.part (Conf.heap (Mach.conf m)) (Carried.tree cr)
+  torn-part cr (takeSite π) _ = torn-take-part _ π (Books.fresh (Carried.books cr))
+  torn-part {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
+    torn-body-part _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl))
 
   -- A cut: its kill switch thrown, what it holds unsubscribed; the ghost
   -- alike, a call fewer.

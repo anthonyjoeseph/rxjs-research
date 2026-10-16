@@ -293,8 +293,6 @@ by their own silent steps (`Mirror`).
 - **`tear-cut`** (Content) — FALSITY, `NO EVIDENCE`: a cut at a taken
   takeWhile or an ended body runs silently to the agenda's rest over the
   heap `thrown` leaves.
-- **`torn-part`** (Content) — FALSITY, `NO EVIDENCE`: the tree's part is
-  unmoved by a cut at a site holding none, a body's by `Owned.bodies`.
 - **`torn-owned`** (Content) — FALSITY, `NO EVIDENCE`: what a cut leaves owes
   nothing new, the cut itself no longer owed.
 - **`torn-holds`** (Content) — FALSITY, `NO EVIDENCE`: every subscription still
