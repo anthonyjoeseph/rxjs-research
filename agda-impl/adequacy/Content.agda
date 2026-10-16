@@ -473,6 +473,13 @@ module Honesty (R : Set) where
   LaneFirst nothing  k = ⊤
   LaneFirst (just o) k = ∀ {k′} → U.headˢ (U.step o) ≡ just k′ → k′ <ᵖ k ≡ false
 
+  -- An outer or a source as the ghost steps it: the node the heap holds,
+  -- or, once it has ended, gone from the heap and the node it was, which
+  -- the ghost's own step pins.
+  data Was {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) (o : U.Node Δ A) : Set₁ where
+    still : At.part H t ≡ just o → Was H t o
+    was   : At.part H t ≡ nothing → Was H t o
+
   -- THE GHOST'S STEP, FROM A STEP AT THE PATH'S END: `s` at the node the
   -- path reaches, `S` at the node it starts from, each operator on the
   -- way the meaning's own step, its order said by the side condition
@@ -488,7 +495,7 @@ module Honesty (R : Set) where
       lifts-take   : ∀ {Δ A Δ′ C} {i p c k} {t : Sub h Δ A} {u : Sub h Δ′ C} {ρ : Path t u} {s S}
                    → At.val H (Kit.live c) ≡ true → Lifts H ρ s S → Lifts H (in-take {i = i} {p} {c} {k} {taking} ρ) s (U.takeWhileˢ i p S)
       lifts-outer  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {ρ : Path t u} {s S o₀}
-                   → At.part H t ≡ just o₀ → OuterFirst S (At.partLanes H ls)
+                   → Was H t o₀ → OuterFirst S (At.partLanes H ls)
                    → PoolBehind pl (U.outerOf (just o₀)) (U.earliest (At.partLanes H ls)) → Lifts H ρ s S
                    → Lifts H (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {ls = ls} ρ) s
                        (U.outerˢ op (λ a q → U.subscribe (f a) q) o₀ S (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl)
@@ -499,7 +506,7 @@ module Honesty (R : Set) where
                    → Lifts H (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = t} πL) s
                        (U.laneˢ op (λ a q → U.subscribe (f a) q) (At.part H t) bs l S as (At.val H (FlatKit.Flat.queue fl)) pl)
       lifts-source : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path t u} {s S c₀ b₀}
-                   → At.part H t ≡ just c₀ → At.part H bd ≡ just b₀ → SourceFirst S (U.step b₀) → Lifts H ρ s S
+                   → Was H t c₀ → At.part H bd ≡ just b₀ → SourceFirst S (U.step b₀) → Lifts H ρ s S
                    → Lifts H (in-source {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {bd = bd} ρ) s (U.sourceˢ rp b₀ (U.step b₀) c₀ S)
       lifts-body   : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path bd u} {s S c₀}
                    → At.part H t ≡ just c₀ → BodyFirst (U.step c₀) S → Lifts H ρ s S
@@ -1467,7 +1474,7 @@ module Honesty (R : Set) where
       lift-up ρ₀ (in-take {tk = taken} ρ) () cl | true
       lift-up ρ₀ (in-outer {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) sn (fl′ , pd , cl) with lift-up (ρ₀ ⊕ in-outer here) ρ sn cl
       ... | o₀ , po , L , b =
-        _ , hp , subst (Lifts H (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) _) (sym st) (lifts-outer po (outer-first b fl′) (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) L) ,
+        _ , hp , subst (Lifts H (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) _) (sym st) (lifts-outer (still po) (outer-first b fl′) (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) L) ,
         subst (Below _) (sym st) (below-outer b)
         where hp = held-flat {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} po
               fp = pd hp
@@ -1484,7 +1491,7 @@ module Honesty (R : Set) where
       lift-up ρ₀ (in-source {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = ej} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fb , cl) with peek (At.part H bd)
       ... | peek-nothing pb = ⊥-elim (true≢false (sym (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn)))
       ... | peek-just pb with lift-up (ρ₀ ⊕ in-source here) ρ (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn) cl
-      ...   | c₀ , pc , L , b = _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {e = ej} {rt = rtj} {src = src} {bd = bd} pc pb , lifts-source pc pb (source-first fb′ b) L , below-source (source-first fb′ b) b
+      ...   | c₀ , pc , L , b = _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {e = ej} {rt = rtj} {src = src} {bd = bd} pc pb , lifts-source (still pc) pb (source-first fb′ b) L , below-source (source-first fb′ b) b
         where fb′ = subst (Opt (Far _)) pb fb
       lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = nothing} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fc , rd , cl) with peek (At.part H src)
       ... | peek-nothing ps = ⊥-elim (true≢false (sym (subst (λ z → (is-just z ∨ false) ∧ seen H ρ ≡ true) ps sn)))

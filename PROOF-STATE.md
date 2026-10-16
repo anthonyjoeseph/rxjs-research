@@ -185,7 +185,9 @@ by their own silent steps (`Mirror`).
   re-entry configuration or a `Closing` one operator up. Ruled out: a map,
   scan, defer, live take or body owing a completion more than its source's
   (`close-take`, `close-body`, the body's cut owed with its body gone); the
-  root owing more than the record's end (`close-root`).
+  root owing more than the record's end (`close-root`); a completion that
+  cannot cross an ended outer or source at all (`Was`: the ghost steps the
+  node it was).
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,
