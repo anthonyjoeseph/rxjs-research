@@ -187,8 +187,9 @@ by their own silent steps (`Mirror`).
   (`end-stack`, `fin-calls`, `end-owned`): a take's stage, a connect's
   feed (over `src-idle`), a flatMap's pool (over `active-lanes`), its
   admit by policy; an inclusive take's under one `under` step. Every
-  guard read open by `calling-open`. Remaining: `outer-start`, the one
-  lane start bounded merge and exhaust share; `climb-lanes`, `close-lanes`.
+  guard read open by `calling-open`. Remaining: `outer-start`, which
+  allocates, so it waits on a strong tree's transport along `_⊑_` that
+  `sub-onward` owes too; `climb-lanes`, `close-lanes`.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,

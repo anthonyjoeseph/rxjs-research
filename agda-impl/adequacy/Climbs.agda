@@ -789,6 +789,10 @@ module Ascending (R : Set) where
     -- A lane begun for an admitted value: counted, cut, listed and
     -- subscribed under the run's `ix 1`, the run at the lane's pending
     -- node; the ghost past the outer's skip, the lane its own.
+    --
+    -- The cut is allocated, so the tree, its heap and every field of the
+    -- call are owed in the grown world: no transport of a strong tree
+    -- along `_⊑_` exists yet, and `sub-onward` owes the same one.
     outer-start : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
                   (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))

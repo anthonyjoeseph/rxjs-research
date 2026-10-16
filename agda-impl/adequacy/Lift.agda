@@ -68,6 +68,10 @@ module Lifting (R : Set) where
     -- A subscription begun at its pending node, its kernel run to the
     -- next re-entry state: its program smaller by what was begun, or
     -- past a defer's skip.
+    --
+    -- A kernel allocates its cells, so the tree is owed in the grown
+    -- world: no transport of a strong tree along `_⊑_` exists yet, and
+    -- `outer-start` owes the same one.
     sub-onward : ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
 
     -- An `of` reading its observer closed: its burst over, nothing
