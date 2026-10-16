@@ -7,13 +7,14 @@
 module adequacy.Torn where
 
 open import Data.List using (List; []; _∷_; _++_; length)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∨_)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_,_; proj₁; proj₂)
-open import Data.Empty using (⊥-elim)
+open import Data.Maybe using (Maybe; just; nothing; is-just)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Level using (lift; lower)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (tabulate to tabulateᴬ; lookup to lookupᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁻ to all-++⁻)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
@@ -22,6 +23,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 
 open import denotation.MonotonicList using (Timeline)
+import denotation.Unfold as U
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
@@ -104,6 +106,14 @@ module Tearing (R : Set) where
   look-store : ∀ {h k k′} (H : Heapᴹ h) (i : h ∋ k) (j : h ∋ k′) {x} → _≢_ {A = Name h} (k , i) (k′ , j)
              → look (store H i x) j ≡ look H j
   look-store H i j {x} ne rewrite get-put H i j {y = stored x same} ne = refl
+
+  get-put-same : ∀ {ℓ} {P : Kind → Set ℓ} {w k} (xs : All P w) (i : w ∋ k) {y : P k} → get (put xs i y) i ≡ y
+  get-put-same (x ∷ xs) hereʰ      = refl
+  get-put-same (x ∷ xs) (thereʰ i) = get-put-same xs i
+
+  -- A switch thrown reads thrown.
+  cut-stored : ∀ {h} (H : Heapᴹ h) (c : Kit.Cut h) → At.val (store H (Kit.live c) (lift false)) (Kit.live c) ≡ false
+  cut-stored H c rewrite get-put-same H (Kit.live c) {y = stored (lift false) same} = refl
 
   -- A heap moved only at the names given: alike at every other.
   Off : ∀ {h} → Heapᴹ h → Heapᴹ h → List (Name h) → Set₁
@@ -299,34 +309,232 @@ module Tearing (R : Set) where
   if-nothing true  = refl
   if-nothing false = refl
 
-  -- A takeWhile already taken holds none, whatever its switch reads.
+  -- A takeWhile already taken holds none, whatever its switch reads;
+  -- its switch thrown, nothing below it is seen.
+  module _ {h} (H : Heapᴹ h) {Δ A i q c k} {s : Sub h Δ A} (ps : AllPairs _≢_ (names (takeWhileˢ i q c k taken s))) where
+    private
+      H′ = thrown H c k s
+
+    take-off : Off H H′ (names (takeWhileˢ i q c k taken s))
+    take-off j a with all-++⁻ (cutNames c) a
+    ... | nl ∷ _ , b = thrown-off H c k s j nl (proj₂ (all-++⁻ (quietName k) b))
+
+    take-eq : At.part H′ (takeWhileˢ i q c k taken s) ≡ At.part H (takeWhileˢ i q c k taken s)
+    take-eq = trans (if-nothing (At.val H′ (Kit.live c))) (sym (if-nothing (At.val H (Kit.live c))))
+
+    take-thrown : At.val H′ (Kit.live c) ≡ false
+    take-thrown = trans (cong lower (tornVia-off (store H (Kit.live c) (lift false)) k s (Kit.live c)
+                          (narrow (λ m → ++⁺ʳ (quietName k) m) (apart-r (cutNames c) ps (here refl))))) (cut-stored H c)
+
+    take-dead : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path (takeWhileˢ i q c k taken s) u) → seen H′ ψ ≡ true → is-just (At.part H′ u) ≡ true → ⊥
+    take-dead here        _  ju = false≢ (subst (λ z → is-just z ≡ true) (if-nothing (At.val H′ (Kit.live c))) ju)
+    take-dead (in-take ψ) sn _  = false≢ (trans (sym take-thrown) (proj₁ (∧-split (At.val H′ (Kit.live c)) sn)))
+
+  -- A connect whose body holds none holds none, its source torn or not;
+  -- nothing below it is seen.
+  module _ {h} (H : Heapᴹ h) {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+           (ps : AllPairs _≢_ (names (connectˢ S c b kb k fd rp e rt s bd))) (none : At.part H bd ≡ nothing) where
+    private
+      H′ = thrown H c k s
+      ps₅ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
+
+    body-off : Off H H′ (names (connectˢ S c b kb k fd rp e rt s bd))
+    body-off j a with all-++⁻ (subjectNames S) a
+    ... | _ , a₁ with all-++⁻ (cutNames c) a₁
+    ... | nl ∷ _ , _ ∷ a₂ with all-++⁻ (quietName kb) a₂
+    ... | _ , a₃ with all-++⁻ (quietName k) a₃
+    ... | _ , a₄ = thrown-off H c k s j nl (proj₁ (all-++⁻ (names s) a₄))
+
+    body-none : At.part H′ bd ≡ nothing
+    body-none = trans (part-alike H H′ bd alike) none
+      where
+        alike : Alike H H′ (names bd)
+        alike j m = thrown-off H c k s j
+          (≢-flip (lookupᴬ (apart-r (cutNames c) (pairs-r (subjectNames S) ps) (here refl))
+                           (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m))))))
+          (apart-l (names s) ps₅ m)
+
+    body-eq : At.part H′ (connectˢ S c b kb k fd rp e rt s bd) ≡ At.part H (connectˢ S c b kb k fd rp e rt s bd)
+    body-eq rewrite body-none | none = refl
+
+    body-dead : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path (connectˢ S c b kb k fd rp e rt s bd) u) → seen H′ ψ ≡ true → is-just (At.part H′ u) ≡ true → ⊥
+    body-dead here          _  ju = false≢ (subst (λ z → is-just (At.connected H′ rp e rt (At.part H′ s) z) ≡ true) body-none ju)
+    body-dead (in-source ψ) sn _  = false≢ (subst (λ z → is-just z ≡ true) body-none (proj₁ (∧-split (is-just (At.part H′ bd)) sn)))
+    body-dead (in-body ψ)   sn ju =
+      false≢ (subst (λ z → is-just z ≡ true) body-none (seen-up H′ ψ (proj₂ (∧-split (is-just (At.part H′ s) ∨ is-just e) sn)) ju))
+
   torn-take-part : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A} (π : Path t (takeWhileˢ i q c k taken s))
                  → AllPairs _≢_ (names t) → At.part (thrown H c k s) t ≡ At.part H t
-  torn-take-part H {c = c} {k} {s} π ps =
-    part-path H (thrown H c k s) π ps off (trans (if-nothing (At.val (thrown H c k s) (Kit.live c))) (sym (if-nothing (At.val H (Kit.live c)))))
-    where
-      off : Off H (thrown H c k s) (cutNames c ++ quietName k ++ names s)
-      off j a with all-++⁻ (cutNames c) a
-      ... | nl ∷ _ , b = thrown-off H c k s j nl (proj₂ (all-++⁻ (quietName k) b))
+  torn-take-part H {Δ = Δ} {A} {i} {q} {c} {k} {s} π ps =
+    part-path H _ π ps (take-off H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) (take-eq H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps))
 
-  -- A connect whose body holds none holds none, its source torn or not.
   torn-body-part : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
                    (π : Path t (connectˢ S c b kb k fd rp e rt s bd))
                  → AllPairs _≢_ (names t) → At.part H bd ≡ nothing → At.part (thrown H c k s) t ≡ At.part H t
-  torn-body-part H {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s = s} {bd} π ps none = part-path H (thrown H c k s) π ps off at
-    where
-      psᵘ = fresh-path π ps
-      ps₅ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) psᵘ))))
-      off : Off H (thrown H c k s) (subjectNames S ++ cutNames c ++ (_ , b) ∷ quietName kb ++ quietName k ++ names s ++ names bd)
-      off j a with all-++⁻ (subjectNames S) a
-      ... | _ , a₁ with all-++⁻ (cutNames c) a₁
-      ... | nl ∷ _ , _ ∷ a₂ with all-++⁻ (quietName kb) a₂
-      ... | _ , a₃ with all-++⁻ (quietName k) a₃
-      ... | _ , a₄ = thrown-off H c k s j nl (proj₁ (all-++⁻ (names s) a₄))
-      alike : Alike H (thrown H c k s) (names bd)
-      alike j m = thrown-off H c k s j
-        (≢-flip (lookupᴬ (apart-r (cutNames c) (pairs-r (subjectNames S) psᵘ) (here refl))
-                         (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m))))))
-        (apart-l (names s) ps₅ m)
-      at : At.part (thrown H c k s) (connectˢ S c b kb k fd rp e rt s bd) ≡ At.part H (connectˢ S c b kb k fd rp e rt s bd)
-      at rewrite part-alike H (thrown H c k s) bd alike | none = refl
+  torn-body-part H {Δ = Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} π ps none =
+    part-path H _ π ps (body-off H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
+                       (body-eq H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
+
+  ----------------------------------------------------------------------
+  -- A path seen past a teardown was seen before it, to the same part
+
+  mutual
+    seen-alike : ∀ {h} (H H′ : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (ψ : Path t u)
+               → Alike H H′ (names t) → seen H′ ψ ≡ seen H ψ
+    seen-alike H H′ here ag = refl
+    seen-alike H H′ (in-map ψ) ag = seen-alike H H′ ψ ag
+    seen-alike H H′ (in-scan ψ) ag = seen-alike H H′ ψ (λ j m → ag j (there m))
+    seen-alike H H′ (in-take {c = c} {k} ψ) ag
+      rewrite ag (Kit.live c) (here refl) | seen-alike H H′ ψ (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) m))) = refl
+    seen-alike H H′ (in-outer {fl = fl} {oc} {k} ψ) ag =
+      seen-alike H H′ ψ (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m))))))
+    seen-alike H H′ (in-lanes {fl = fl} {oc} {k} {t = so} πL) ag =
+      seenL-alike H H′ πL (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m))))))
+    seen-alike H H′ (in-source {S = S} {c} {kb = kb} {k} {t = src} {bd} ψ) ag
+      rewrite part-alike H H′ bd (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m)))))))
+            | seen-alike H H′ ψ (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))))) = refl
+    seen-alike H H′ (in-body {S = S} {c} {kb = kb} {k} {t = src} {bd} ψ) ag
+      rewrite part-alike H H′ src (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))))
+            | seen-alike H H′ ψ (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m))))))) = refl
+    seen-alike H H′ (in-defer {k = k} ψ) ag = seen-alike H H′ ψ (λ j m → ag j (++⁺ʳ (quietName k) m))
+
+    seenL-alike : ∀ {h} (H H′ : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u)
+                → Alike H H′ (laneNames ls) → seenL H′ πL ≡ seenL H πL
+    seenL-alike H H′ (this-lane {c = c} {k} ψ) ag
+      rewrite ag (Kit.live c) (here refl) | seen-alike H H′ ψ (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ m)))) = refl
+    seenL-alike H H′ (next-lane {l = lane c k s} πL) ag =
+      seenL-alike H H′ πL (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m))))
+
+  -- Against a site: a node apart from what its teardown wrote, or above
+  -- it.
+  Same : ∀ {h} → Heapᴹ h → Heapᴹ h → ∀ {Δ A Δ′ A′} → Sub h Δ A → Sub h Δ′ A′ → Set₁
+  Same H H′ w u = Alike H H′ (names u) ⊎ Path u w
+
+  -- A connect above a site, held: its source reads alike.
+  src-path : ∀ {h} (H H′ : Heapᴹ h) {Δ A Δ′ A′ B′ S c b kb k fd rp e rt} {w : Sub h Δ A} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+           → Off H H′ (names w) → At.part H′ w ≡ At.part H w → (is-just (At.part H′ w) ≡ true → ⊥)
+           → AllPairs _≢_ (names (connectˢ S c b kb k fd rp e rt src bd)) → Path (connectˢ S c b kb k fd rp e rt src bd) w
+           → is-just (At.part H′ (connectˢ S c b kb k fd rp e rt src bd)) ≡ true → At.part H′ src ≡ At.part H src
+  src-path H H′ off eqw nw ps here ju = ⊥-elim (nw ju)
+  src-path H H′ {S = S} {c} {b} {kb} {k} {src = src} off eqw nw ps (in-source ρ) ju =
+    part-path H H′ ρ (proj₁ (pairs-split (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))))) off eqw
+  src-path H H′ {S = S} {c} {b} {kb} {k} {src = src} off eqw nw ps (in-body ρ) ju =
+    part-alike H H′ src (λ j m → off j (narrow (names-path ρ)
+      (apart-r (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))) m)))
+
+  module Seeing {h} (H H′ : Heapᴹ h) {Δ A} {w : Sub h Δ A} (off : Off H H′ (names w)) (eqw : At.part H′ w ≡ At.part H w)
+                (dead : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path w u) → seen H′ ψ ≡ true → is-just (At.part H′ u) ≡ true → ⊥) where
+    mutual
+      vis : ∀ {Δ₀ A₀ Δ′ A′} {t : Sub h Δ₀ A₀} {u : Sub h Δ′ A′} → AllPairs _≢_ (names t) → Path t w → (ψ : Path t u)
+          → seen H′ ψ ≡ true → is-just (At.part H′ u) ≡ true → seen H ψ ≡ true × Same H H′ w u
+      vis ps here ψ sn ju = ⊥-elim (dead ψ sn ju)
+      vis ps π here sn ju = refl , inj₂ π
+      vis ps (in-map π) (in-map ψ) sn ju = vis ps π ψ sn ju
+      vis (_ ∷ ps) (in-scan π) (in-scan ψ) sn ju = vis ps π ψ sn ju
+      vis ps (in-take {c = c} {k} {tk = tk} π) (in-take ψ) sn ju with ∧-split (At.val H′ (Kit.live c)) sn
+      ... | lv , r with ∧-split (isTaking tk) r
+      ... | tg , sψ with vis (pairs-r (quietName k) (pairs-r (cutNames c) ps)) π ψ sψ ju
+      ... | s′ , sm =
+        ∧-join (trans (sym (cong lower (off (Kit.live c) (narrow (λ m → ++⁺ʳ (quietName k) (names-path π m)) (apart-r (cutNames c) ps (here refl)))))) lv)
+               (∧-join tg s′) , sm
+      vis ps (in-outer {fl = fl} {oc} {k} {r} {t = so} π) (in-outer ψ) sn ju =
+        vis (proj₁ (pairs-split (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))))) π ψ sn ju
+      vis ps (in-outer {fl = fl} {oc} {k} {r} {t = so} {ls} π) (in-lanes ψL) sn ju =
+        trans (sym (seenL-alike H H′ ψL al)) sn , inj₁ (λ j m → al j (lanes-path ψL m))
+        where
+          al : Alike H H′ (laneNames ls)
+          al j m = off j (narrow (names-path π) (apart-l (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))) m))
+      vis ps (in-lanes {fl = fl} {oc} {k} {r} {t = so} πL) (in-outer ψ) sn ju =
+        trans (sym (seen-alike H H′ ψ al)) sn , inj₁ (λ j m → al j (names-path ψ m))
+        where
+          al : Alike H H′ (names so)
+          al j m = off j (narrow (lanes-path πL) (apart-r (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))) m))
+      vis ps (in-lanes {fl = fl} {oc} {k} {r} {t = so} πL) (in-lanes ψL) sn ju =
+        visL (pairs-r (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps))))) πL ψL sn ju
+      vis ps (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} π) (in-source ψ) sn ju with ∧-split (is-just (At.part H′ bd)) sn
+      ... | jb , sψ with vis (proj₁ (pairs-split (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))))) π ψ sψ ju
+      ... | s′ , sm = ∧-join (subst (λ z → is-just z ≡ true) (part-alike H H′ bd al) jb) s′ , sm
+        where
+          al : Alike H H′ (names bd)
+          al j m = off j (narrow (names-path π) (apart-l (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))) m))
+      vis ps (in-source {S = S} {c} {b} {kb} {k} {e = e} {t = src} {bd} π) (in-body ψ) sn ju with ∧-split (is-just (At.part H′ src) ∨ is-just e) sn
+      ... | js , sψ =
+        ∧-join (subst (λ z → (is-just z ∨ is-just e) ≡ true)
+                 (part-path H H′ π (proj₁ (pairs-split (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))))) off eqw) js)
+               (trans (sym (seen-alike H H′ ψ al)) sψ) , inj₁ (λ j m → al j (names-path ψ m))
+        where
+          al : Alike H H′ (names bd)
+          al j m = off j (narrow (names-path π) (apart-l (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))) m))
+      vis ps (in-body {S = S} {c} {b} {kb} {k} {t = src} {bd} π) (in-source ψ) sn ju with ∧-split (is-just (At.part H′ bd)) sn
+      ... | jb , sψ =
+        ∧-join (subst (λ z → is-just z ≡ true)
+                 (part-path H H′ π (pairs-r (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps)))))) off eqw) jb)
+               (trans (sym (seen-alike H H′ ψ al)) sψ) , inj₁ (λ j m → al j (names-path ψ m))
+        where
+          al : Alike H H′ (names src)
+          al j m = off j (narrow (names-path π) (apart-r (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))) m))
+      vis ps (in-body {S = S} {c} {b} {kb} {k} {e = e} {t = src} {bd} π) (in-body ψ) sn ju with ∧-split (is-just (At.part H′ src) ∨ is-just e) sn
+      ... | js , sψ with vis (pairs-r (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps)))))) π ψ sψ ju
+      ... | s′ , sm = ∧-join (subst (λ z → (is-just z ∨ is-just e) ≡ true) (part-alike H H′ src al) js) s′ , sm
+        where
+          al : Alike H H′ (names src)
+          al j m = off j (narrow (names-path π) (apart-r (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))) m))
+      vis ps (in-defer {k = k} π) (in-defer ψ) sn ju = vis (pairs-r (quietName k) ps) π ψ sn ju
+
+      visL : ∀ {Δ₀ B₀ Δ′ A′} {ls : List (Lane h Δ₀ B₀)} {u : Sub h Δ′ A′} → AllPairs _≢_ (laneNames ls) → PathLanes ls w → (ψL : PathLanes ls u)
+           → seenL H′ ψL ≡ true → is-just (At.part H′ u) ≡ true → seenL H ψL ≡ true × Same H H′ w u
+      visL ps (this-lane {c = c} {k} {t = s} π) (this-lane ψ) sn ju with ∧-split (At.val H′ (Kit.live c)) sn
+      ... | lv , sψ with vis (proj₁ (pairs-split (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps)))) π ψ sψ ju
+      ... | s′ , sm =
+        ∧-join (trans (sym (cong lower (off (Kit.live c) (narrow (λ m → ++⁺ʳ (quietName k) (++⁺ˡ (names-path π m))) (apart-r (cutNames c) ps (here refl)))))) lv) s′ , sm
+      visL ps (this-lane {c = c} {k} {t = s} {ls} π) (next-lane ψL) sn ju =
+        trans (sym (seenL-alike H H′ ψL al)) sn , inj₁ (λ j m → al j (lanes-path ψL m))
+        where
+          al : Alike H H′ (laneNames ls)
+          al j m = off j (narrow (names-path π) (apart-l (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps)) m))
+      visL ps (next-lane {l = lane c k s} πL) (this-lane ψ) sn ju with ∧-split (At.val H′ (Kit.live c)) sn
+      ... | lv , sψ =
+        ∧-join (trans (sym (cong lower (off (Kit.live c) (narrow (λ m → ++⁺ʳ (quietName k) (++⁺ʳ (names s) (lanes-path πL m))) (apart-r (cutNames c) ps (here refl)))))) lv)
+               (trans (sym (seen-alike H H′ ψ al)) sψ) , inj₁ (λ j m → al j (names-path ψ m))
+        where
+          al : Alike H H′ (names s)
+          al j m = off j (narrow (lanes-path πL) (apart-r (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps)) m))
+      visL ps (next-lane {l = lane c k s} πL) (next-lane ψL) sn ju =
+        visL (pairs-r (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps))) πL ψL sn ju
+
+    same-part : ∀ {Δ′ A′} {u : Sub h Δ′ A′} → AllPairs _≢_ (names u) → Same H H′ w u → At.part H′ u ≡ At.part H u
+    same-part {u = u} ps (inj₁ al) = part-alike H H′ u al
+    same-part         ps (inj₂ ρ)  = part-path H H′ ρ ps off eqw
+
+    same-src : ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+             → AllPairs _≢_ (names (connectˢ S c b kb k fd rp e rt src bd)) → Same H H′ w (connectˢ S c b kb k fd rp e rt src bd)
+             → is-just (At.part H′ (connectˢ S c b kb k fd rp e rt src bd)) ≡ true → At.part H′ src ≡ At.part H src
+    same-src {S = S} {c} {kb = kb} {k} {src = src} ps (inj₁ al) _ =
+      part-alike H H′ src (λ j m → al j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))))
+    same-src ps (inj₂ ρ) ju = src-path H H′ off eqw (dead here refl) ps ρ ju
+
+    -- What every node held passes, every node held past the teardown does.
+    each-seen : ∀ {P : ∀ {Γ A} → U.Node Γ A → Set} {Δ₀ A₀} {t : Sub h Δ₀ A₀} → AllPairs _≢_ (names t) → Path t w → Each H P t → Each H′ P t
+    each-seen ps π ev = record
+      { parts = λ ψ sn e → Each.parts ev ψ (proj₁ (vis ps π ψ sn (cong is-just e)))
+                             (trans (sym (same-part (fresh-path ψ ps) (proj₂ (vis ps π ψ sn (cong is-just e))))) e)
+      ; pools = λ ψ sn e → Each.pools ev ψ (proj₁ (vis ps π ψ sn (cong is-just e)))
+                             (trans (sym (same-part (fresh-path ψ ps) (proj₂ (vis ps π ψ sn (cong is-just e))))) e)
+      ; rests = λ ψ sn e none ej → Each.rests ev ψ (proj₁ (vis ps π ψ sn (cong is-just e)))
+                             (trans (sym (same-part (fresh-path ψ ps) (proj₂ (vis ps π ψ sn (cong is-just e))))) e)
+                             (trans (sym (same-src (fresh-path ψ ps) (proj₂ (vis ps π ψ sn (cong is-just e))) (cong is-just e))) none) ej }
+
+  -- Every part held heads as it did: a site's teardown leaves what it
+  -- reached unseen, and the rest reads alike.
+  torn-take-each : ∀ {h} (H : Heapᴹ h) {P : ∀ {Γ A} → U.Node Γ A → Set} {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A}
+                   (π : Path t (takeWhileˢ i q c k taken s)) → AllPairs _≢_ (names t) → Each H P t → Each (thrown H c k s) P t
+  torn-take-each H {Δ = Δ} {A} {i} {q} {c} {k} {s} π ps =
+    Seeing.each-seen H _ (take-off H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) (take-eq H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps))
+                         (take-dead H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) ps π
+
+  torn-body-each : ∀ {h} (H : Heapᴹ h) {P : ∀ {Γ A} → U.Node Γ A → Set} {t : Sub h [] R} {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+                   (π : Path t (connectˢ S c b kb k fd rp e rt s bd)) → AllPairs _≢_ (names t) → At.part H bd ≡ nothing → Each H P t → Each (thrown H c k s) P t
+  torn-body-each H {Δ = Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} π ps none =
+    Seeing.each-seen H _ (body-off H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
+                         (body-eq H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
+                         (body-dead H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none) ps π

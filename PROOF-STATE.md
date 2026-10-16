@@ -177,16 +177,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE TEARDOWN.** `torn-behind` first: decides whether `Each` may read
-  parts below a taken takeWhile at all, since a flatMap there whose lanes
-  are cut shows what is left of it. Then the other `torn-` field leaves
-  and `tear-cut`, over look/store frame lemmas, `cut-onward` serving a
-  taken takeWhile and an ended body alike; then
-  the END CLIMB, a `Climbing` for completes, under `take1-onward`,
-  `fin-onward` and `emit-last`. Ruled out: every cold below a cut switch
-  spent (a lane cut inside its cold's first burst stays unspent until
-  attached, so `Gated` reads `Spent`); a connect's source torn once its
-  body ends (a note falls before the cut, so `Gated` reads the switch).
+- **THE TEARDOWN.** The other `torn-` field leaves and `tear-cut`, over
+  Torn's frame lemmas, `cut-onward` serving a taken takeWhile and an
+  ended body alike; then the END CLIMB, a `Climbing` for completes,
+  under `take1-onward`, `fin-onward` and `emit-last`. Ruled out: every
+  cold below a cut switch spent (a lane cut inside its cold's first
+  burst stays unspent until attached, so `Gated` reads `Spent`); a
+  connect's source torn once its body ends (a note falls before the cut,
+  so `Gated` reads the switch); heads owed below a site (`Each` reads
+  only what `seen` holds, and a teardown leaves what it reached unseen).
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,
@@ -288,8 +287,6 @@ by their own silent steps (`Mirror`).
   completion delivered, then its cut.
 - **`src-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
   subscribed once its body is.
-- **`torn-behind`** (Content) — FALSITY, `NO EVIDENCE`: every part heads no
-  earlier after a cut, a flatMap below it shown as what its cut lanes left.
 - **`tear-cut`** (Content) — FALSITY, `NO EVIDENCE`: a cut at a taken
   takeWhile or an ended body runs silently to the agenda's rest over the
   heap `thrown` leaves.

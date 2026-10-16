@@ -73,13 +73,14 @@ module Honesty (R : Set) where
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
     Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; Taking; taking; taken; feeding; finishing; PathLanes; this-lane; next-lane;
-    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets; Each; Heads; rootObs) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
+    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets; Each; Heads; rootObs;
+    seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
   open Moving R using (pend; takes; takes-plant; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
-  open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part)
+  open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Read
 
   ----------------------------------------------------------------------
@@ -637,39 +638,60 @@ module Honesty (R : Set) where
     lane-only (this-lane ρ)  = this-lane ρ
     lane-only (next-lane ())
 
+    seenL-only : ∀ {Δ B Δ′ A′} {l : Lane h Δ B} {ls} {u : Sub h Δ′ A′} (πL : PathLanes (l ∷ []) u) → seenL H (lane-only {ls = ls} πL) ≡ seenL H πL
+    seenL-only (this-lane ρ)  = refl
+    seenL-only (next-lane ())
+
+    ∨-true : ∀ {x y} → x ≡ true → x ∨ y ≡ true
+    ∨-true refl = refl
+
     each-lanes : ∀ {Δ B} (ls : List (Lane h Δ B))
-               → (∀ {Δ′ A′} {u : Sub h Δ′ A′} → PathLanes ls u → ∀ {c} → At.part H u ≡ just c → P c) → All P (At.partLanes H ls)
+               → (∀ {Δ′ A′} {u : Sub h Δ′ A′} (πL : PathLanes ls u) → seenL H πL ≡ true → ∀ {c} → At.part H u ≡ just c → P c)
+               → All P (At.partLanes H ls)
     each-lanes []                f = []
-    each-lanes (lane c k s ∷ ls) f with At.val H (Kit.live c)
+    each-lanes (lane c k s ∷ ls) f with At.val H (Kit.live c) in lv
     ... | false = each-lanes ls (λ πL → f (next-lane πL))
     ... | true with At.part H s in e
     ...   | nothing = each-lanes ls (λ πL → f (next-lane πL))
-    ...   | just x  = f (this-lane here) e ∷ each-lanes ls (λ πL → f (next-lane πL))
+    ...   | just x  = f (this-lane here) (∧-join lv refl) e ∷ each-lanes ls (λ πL → f (next-lane πL))
 
-    each-sub : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Each H P t → Path t u → Each H P u
-    each-sub ev ρ = record { parts = λ ψ → Each.parts ev (ρ ⊕ ψ) ; pools = λ ψ → Each.pools ev (ρ ⊕ ψ) ; rests = λ ψ → Each.rests ev (ρ ⊕ ψ) }
+    each-sub : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Each H P t → (ρ : Path t u) → seen H ρ ≡ true → Each H P u
+    each-sub ev ρ sρ = record
+      { parts = λ ψ sψ → Each.parts ev (ρ ⊕ ψ) (seen-join H ρ ψ sρ sψ)
+      ; pools = λ ψ sψ → Each.pools ev (ρ ⊕ ψ) (seen-join H ρ ψ sρ sψ)
+      ; rests = λ ψ sψ → Each.rests ev (ρ ⊕ ψ) (seen-join H ρ ψ sρ sψ) }
 
+    -- Along a path the ghost holds to a part it holds.
     mutual
-      clear-each : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Each H P t → (π : Path t u) → Clear H P π
-      clear-each ev here                    = lift tt
-      clear-each ev (in-map ρ)              = clear-each (each-sub ev (in-map here)) ρ
-      clear-each ev (in-scan ρ)             = clear-each (each-sub ev (in-scan here)) ρ
-      clear-each ev (in-take ρ)             = clear-each (each-sub ev (in-take here)) ρ
-      clear-each ev (in-outer {ls = ls} ρ)  =
-        each-lanes ls (λ πL → Each.parts ev (in-lanes πL)) , Each.pools ev here , clear-each (each-sub ev (in-outer here)) ρ
-      clear-each ev (in-lanes {t = t} πL)   =
-        opt-each (At.part H t) (Each.parts ev (in-outer here)) , Each.pools ev here , clearL-each (λ πL′ → each-sub ev (in-lanes πL′)) πL
-      clear-each ev (in-source {bd = bd} ρ) = opt-each (At.part H bd) (Each.parts ev (in-body here)) , clear-each (each-sub ev (in-source here)) ρ
-      clear-each ev (in-body {t = t} ρ)     =
-        opt-each (At.part H t) (Each.parts ev (in-source here)) , Each.rests ev here , clear-each (each-sub ev (in-body here)) ρ
-      clear-each ev (in-defer ρ)            = clear-each (each-sub ev (in-defer here)) ρ
+      clear-each : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Each H P t → (π : Path t u) → seen H π ≡ true
+                 → is-just (At.part H u) ≡ true → Clear H P π
+      clear-each ev here                    _  _ = lift tt
+      clear-each ev (in-map ρ)              sn j = clear-each (each-sub ev (in-map here) refl) ρ sn j
+      clear-each ev (in-scan ρ)             sn j = clear-each (each-sub ev (in-scan here) refl) ρ sn j
+      clear-each ev (in-take {c = c} {tk = tk} ρ) sn j with ∧-split (At.val H (Kit.live c)) sn
+      ... | lv , r with ∧-split (isTaking tk) r
+      ... | tg , sρ = clear-each (each-sub ev (in-take here) (∧-join lv (∧-join tg refl))) ρ sρ j
+      clear-each ev (in-outer {ls = ls} ρ)  sn j =
+        each-lanes ls (λ πL sL → Each.parts ev (in-lanes πL) sL) , Each.pools ev here refl , clear-each (each-sub ev (in-outer here) refl) ρ sn j
+      clear-each ev (in-lanes {t = t} πL)   sn j =
+        opt-each (At.part H t) (Each.parts ev (in-outer here) refl) , Each.pools ev here refl
+        , clearL-each (λ πL′ sL → each-sub ev (in-lanes πL′) sL) πL sn j
+      clear-each ev (in-source {bd = bd} ρ) sn j with ∧-split (is-just (At.part H bd)) sn
+      ... | jb , sρ = opt-each (At.part H bd) (Each.parts ev (in-body here) (∧-join (∨-true (seen-up H ρ sρ j)) refl))
+                    , clear-each (each-sub ev (in-source here) (∧-join jb refl)) ρ sρ j
+      clear-each ev (in-body {e = e} {t = t} ρ) sn j with ∧-split (is-just (At.part H t) ∨ is-just e) sn
+      ... | js , sρ = opt-each (At.part H t) (Each.parts ev (in-source here) (∧-join (seen-up H ρ sρ j) refl)) , Each.rests ev here refl
+                    , clear-each (each-sub ev (in-body here) (∧-join js refl)) ρ sρ j
+      clear-each ev (in-defer ρ)            sn j = clear-each (each-sub ev (in-defer here) refl) ρ sn j
 
       clearL-each : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′}
-                  → (∀ {Δ″ A″} {w : Sub h Δ″ A″} → PathLanes ls w → Each H P w)
-                  → (πL : PathLanes ls u) → ClearL H P πL
-      clearL-each f (this-lane {ls = ls} ρ) = each-lanes ls (λ πL → Each.parts (f (next-lane πL)) here) , clear-each (f (this-lane here)) ρ
-      clearL-each f (next-lane {l = l} πL)  =
-        each-lanes (l ∷ []) (λ πL′ → Each.parts (f (lane-only πL′)) here) , clearL-each (λ πL′ → f (next-lane πL′)) πL
+                  → (∀ {Δ″ A″} {w : Sub h Δ″ A″} (πL : PathLanes ls w) → seenL H πL ≡ true → Each H P w)
+                  → (πL : PathLanes ls u) → seenL H πL ≡ true → is-just (At.part H u) ≡ true → ClearL H P πL
+      clearL-each f (this-lane {c = c} {ls = ls} ρ) sn j with ∧-split (At.val H (Kit.live c)) sn
+      ... | lv , sρ = each-lanes ls (λ πL sL → Each.parts (f (next-lane πL) sL) here refl) , clear-each (f (this-lane here) (∧-join lv refl)) ρ sρ j
+      clearL-each f (next-lane {l = l} πL)  sn j =
+        each-lanes (l ∷ []) (λ πL′ sL → Each.parts (f (lane-only πL′) (trans (seenL-only πL′) sL)) here refl)
+        , clearL-each (λ πL′ → f (next-lane πL′)) πL sn j
 
   -- Walking two paths is walking each.
   mutual
@@ -826,28 +848,6 @@ module Honesty (R : Set) where
     openedL H o (this-lane {c = c} p) = opened H (At.val H (Kit.live c) ∧ o) p
     openedL H o (next-lane p)         = openedL H o p
 
-  isTaking : ∀ {Δ A} → Taking Δ A → Bool
-  isTaking taking = true
-  isTaking _      = false
-
-  -- Whether the ghost holds the path's end: every takeWhile live and
-  -- taking, every lane live, every connect open.
-  mutual
-    seen : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Bool
-    seen H here                              = true
-    seen H (in-map p)                        = seen H p
-    seen H (in-scan p)                       = seen H p
-    seen H (in-take {c = c} {tk = tk} p)     = At.val H (Kit.live c) ∧ isTaking tk ∧ seen H p
-    seen H (in-outer p)                      = seen H p
-    seen H (in-lanes p)                      = seenL H p
-    seen H (in-source {bd = bd} p)           = is-just (At.part H bd) ∧ seen H p
-    seen H (in-body {e = e} {t = t} p)       = (is-just (At.part H t) ∨ is-just e) ∧ seen H p
-    seen H (in-defer p)                      = seen H p
-
-    seenL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Bool
-    seenL H (this-lane {c = c} p) = At.val H (Kit.live c) ∧ seen H p
-    seenL H (next-lane p)         = seenL H p
-
   -- A VALUE ON ITS WAY UP: `y` about to be delivered to the observer
   -- the path walks to, the agenda empty above the stack.  The node it
   -- reaches already past the value, and the ghost's step the value
@@ -931,9 +931,9 @@ module Honesty (R : Set) where
 
   each-back : ∀ {h} {H : Heapᴹ h} {t : Sub h [] R} {q p} → q <ᵖ p ≡ true → Each H (Heads p) t → Each H (Heads q) t
   each-back qp ev = record
-    { parts = λ ψ {c} e → heads-back {c = c} qp (Each.parts ev ψ e)
-    ; pools = λ {pl = pl} ψ e → heads-back {c = pl} qp (Each.pools ev ψ e)
-    ; rests = λ {rt = rt} ψ e n j → heads-back {c = rt} qp (Each.rests ev ψ e n j) }
+    { parts = λ ψ sψ {c} e → heads-back {c = c} qp (Each.parts ev ψ sψ e)
+    ; pools = λ {pl = pl} ψ sψ e → heads-back {c = pl} qp (Each.pools ev ψ sψ e)
+    ; rests = λ {rt = rt} ψ sψ e n j → heads-back {c = rt} qp (Each.rests ev ψ sψ e n j) }
 
   hopped-pre : ∀ {g m m′ m₁} {st : Strong g m} → m′ ⇝ m₁ → Hopped st m₁ → Hopped st m′
   hopped-pre path (g″ , m₀ , path′ , st₀ , gn) = g″ , m₀ , ⇝-trans path path′ , st₀ , gn
@@ -1152,13 +1152,6 @@ module Honesty (R : Set) where
     torn-queue : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
                → Queue (siteHeap (Conf.heap (Mach.conf m)) z) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) (Carried.tree cr)
 
-    -- Every part the ghost holds still heads no earlier than the run.
-    -- The risk: `Each` reads parts below the site too, and a flatMap
-    -- there whose lanes are cut shows a part made of what is left of it,
-    -- its queue and pool, which held no head of its own before.
-    torn-behind : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
-                → Each (siteHeap (Conf.heap (Mach.conf m)) z) (Heads (Conf.pos (Mach.conf m))) (Carried.tree cr)
-
   -- A site holds no part, a body's by `Owned.bodies`, so the tree's
   -- part is the same once its switch is thrown.
   torn-part : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
@@ -1167,6 +1160,15 @@ module Honesty (R : Set) where
   torn-part cr (takeSite π) _ = torn-take-part _ π (Books.fresh (Carried.books cr))
   torn-part {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
     torn-body-part _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl))
+
+  -- Every part the ghost holds still heads no earlier than the run:
+  -- what the teardown reached it holds no longer, the rest reads alike.
+  torn-behind : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+              → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+              → Each (siteHeap (Conf.heap (Mach.conf m)) z) (Heads (Conf.pos (Mach.conf m))) (Carried.tree cr)
+  torn-behind cr (takeSite π) _ = torn-take-each _ π (Books.fresh (Carried.books cr)) (Carried.behind cr)
+  torn-behind {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
+    torn-body-each _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl)) (Carried.behind cr)
 
   -- A cut: its kill switch thrown, what it holds unsubscribed; the ghost
   -- alike, a call fewer.
@@ -1184,7 +1186,7 @@ module Honesty (R : Set) where
         ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
-        ; sorted = hop-sorted cr eq path ; behind = torn-behind cr z })
+        ; sorted = hop-sorted cr eq path ; behind = torn-behind cr z refl })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
 
   ----------------------------------------------------------------------
@@ -1765,7 +1767,7 @@ module Honesty (R : Set) where
   others-past {m = m} cr {p = p} π fc op sn =
     clear-zip {P = Heads p} {Q = Off p} {R′ = Far p} (λ {Γ} {A} {c} → far-apart {p} {Γ} {A} {c}) π
       (clear-each (subst (λ q → Each (Conf.heap (Mach.conf m)) (Heads q) (Carried.tree cr))
-                         (run-at (Carried.ctlAs cr) fc (Owned.placed (Carried.owned cr))) (Carried.behind cr)) π)
+                         (run-at (Carried.ctlAs cr) fc (Owned.placed (Carried.owned cr))) (Carried.behind cr)) π sn refl)
       (spread-past cr π fc op sn)
 
   -- The agenda's first call an open `of` the ghost holds: the ghost's

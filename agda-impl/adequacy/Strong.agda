@@ -15,10 +15,11 @@
 -- the continuation its kernel was handed.
 module adequacy.Strong where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
+open import Data.Bool.Properties using (∧-assoc)
 open import Data.List using (List; []; _∷_; _++_; [_]; foldr)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Nat using (ℕ; suc; _+_; _≤_)
 open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_)
@@ -29,7 +30,7 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to []ᴾ)
 
 import Tree as T
@@ -959,18 +960,160 @@ module Strongly (R : Set) where
       paidUp  : Mach.todo m ≡ []
       running : Mach.ended m ≡ false
 
+  -- Whether the ghost holds the path's end: every takeWhile live and
+  -- taking, every lane live, every connect open.
+  isTaking : ∀ {Δ A} → Taking Δ A → Bool
+  isTaking taking = true
+  isTaking _      = false
+
+  mutual
+    seen : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Bool
+    seen H here                              = true
+    seen H (in-map p)                        = seen H p
+    seen H (in-scan p)                       = seen H p
+    seen H (in-take {c = c} {tk = tk} p)     = At.val H (Kit.live c) ∧ isTaking tk ∧ seen H p
+    seen H (in-outer p)                      = seen H p
+    seen H (in-lanes p)                      = seenL H p
+    seen H (in-source {bd = bd} p)           = is-just (At.part H bd) ∧ seen H p
+    seen H (in-body {e = e} {t = t} p)       = (is-just (At.part H t) ∨ is-just e) ∧ seen H p
+    seen H (in-defer p)                      = seen H p
+
+    seenL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Bool
+    seenL H (this-lane {c = c} p) = At.val H (Kit.live c) ∧ seen H p
+    seenL H (next-lane p)         = seenL H p
+
+  ∧-split : ∀ x {y} → x ∧ y ≡ true → x ≡ true × y ≡ true
+  ∧-split true  p = refl , p
+  ∧-split false ()
+
+  ∧-join : ∀ {x y} → x ≡ true → y ≡ true → x ∧ y ≡ true
+  ∧-join refl refl = refl
+
+  false≢ : ∀ {a} {X : Set a} → false ≡ true → X
+  false≢ ()
+
+  -- A path held is each of its halves held.
+  module _ {h} (H : Heapᴹ h) where
+    private
+      ∧-assoc₃ : ∀ a b x y → a ∧ b ∧ x ∧ y ≡ (a ∧ b ∧ x) ∧ y
+      ∧-assoc₃ a b x y = sym (trans (∧-assoc a (b ∧ x) y) (cong (a ∧_) (∧-assoc b x y)))
+
+    mutual
+      seen-⊕ : ∀ {Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (ψ : Path u v)
+             → seen H (ρ ⊕ ψ) ≡ seen H ρ ∧ seen H ψ
+      seen-⊕ here          ψ = refl
+      seen-⊕ (in-map ρ)    ψ = seen-⊕ ρ ψ
+      seen-⊕ (in-scan ρ)   ψ = seen-⊕ ρ ψ
+      seen-⊕ (in-take {c = c} {tk = tk} ρ) ψ =
+        trans (cong (λ z → At.val H (Kit.live c) ∧ isTaking tk ∧ z) (seen-⊕ ρ ψ)) (∧-assoc₃ (At.val H (Kit.live c)) (isTaking tk) (seen H ρ) (seen H ψ))
+      seen-⊕ (in-outer ρ)  ψ = seen-⊕ ρ ψ
+      seen-⊕ (in-lanes πL) ψ = seenL-⊕ πL ψ
+      seen-⊕ (in-source {bd = bd} ρ) ψ =
+        trans (cong (is-just (At.part H bd) ∧_) (seen-⊕ ρ ψ)) (sym (∧-assoc (is-just (At.part H bd)) (seen H ρ) (seen H ψ)))
+      seen-⊕ (in-body {e = e} {t = t} ρ) ψ =
+        trans (cong ((is-just (At.part H t) ∨ is-just e) ∧_) (seen-⊕ ρ ψ)) (sym (∧-assoc (is-just (At.part H t) ∨ is-just e) (seen H ρ) (seen H ψ)))
+      seen-⊕ (in-defer ρ)  ψ = seen-⊕ ρ ψ
+
+      seenL-⊕ : ∀ {Δ B Δ′ A′ Δ″ A″} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (πL : PathLanes ls u) (ψ : Path u v)
+              → seenL H (πL ⊕ᴸ ψ) ≡ seenL H πL ∧ seen H ψ
+      seenL-⊕ (this-lane {c = c} ρ) ψ =
+        trans (cong (At.val H (Kit.live c) ∧_) (seen-⊕ ρ ψ)) (sym (∧-assoc (At.val H (Kit.live c)) (seen H ρ) (seen H ψ)))
+      seenL-⊕ (next-lane πL) ψ = seenL-⊕ πL ψ
+
+    seen-join : ∀ {Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (ψ : Path u v)
+              → seen H ρ ≡ true → seen H ψ ≡ true → seen H (ρ ⊕ ψ) ≡ true
+    seen-join ρ ψ sρ sψ = trans (seen-⊕ ρ ψ) (cong₂ _∧_ sρ sψ)
+
+  -- What the ghost holds at a path's end, held, it holds at every node
+  -- above.
+  module _ {h} (H : Heapᴹ h) where
+    open At H
+
+    private
+      Filled : ∀ {X : Set₁} → List X → Set
+      Filled []      = ⊥
+      Filled (_ ∷ _) = ⊤
+
+      map-just : ∀ {X Y : Set₁} (f : X → Y) (m : Maybe X) → is-just m ≡ true → is-just (mapᴹ f m) ≡ true
+      map-just f (just _) _ = refl
+      map-just f nothing  ()
+
+      outer-just : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) ls qs pl
+                 → is-just o ≡ true → is-just (merged op g o ls qs pl) ≡ true
+      outer-just op g (just _) ls qs pl _ = refl
+      outer-just op g nothing  ls qs pl ()
+
+      lanes-just : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) ls qs pl
+                 → Filled ls → is-just (merged op g o ls qs pl) ≡ true
+      lanes-just op g (just _) ls      qs pl _ = refl
+      lanes-just op g nothing  (_ ∷ _) qs pl _ = refl
+      lanes-just op g nothing  []      qs pl ()
+
+      cons-holds : ∀ {X : Set₁} (m : Maybe X) xs → is-just m ≡ true → Filled (consᴹ m xs)
+      cons-holds (just _) xs _ = tt
+      cons-holds nothing  xs ()
+
+      cons-keeps : ∀ {X : Set₁} (m : Maybe X) xs → Filled xs → Filled (consᴹ m xs)
+      cons-keeps (just _) xs _  = tt
+      cons-keeps nothing  xs hs = hs
+
+      source-just : ∀ {Δ A B} r e t (s : Maybe (U.Node Δ A)) (b : Maybe (U.Node (A ∷ Δ) B))
+                  → is-just s ≡ true → is-just b ≡ true → is-just (connected r e t s b) ≡ true
+      source-just r e t (just _) (just _) _  _ = refl
+      source-just r e t nothing  _        () _
+      source-just r e t (just _) nothing  _  ()
+
+      body-just : ∀ {Δ A B} r e t (s : Maybe (U.Node Δ A)) (b : Maybe (U.Node (A ∷ Δ) B))
+                → (is-just s ∨ is-just e) ≡ true → is-just b ≡ true → is-just (connected r e t s b) ≡ true
+      body-just r e        t (just _) (just _) _  _ = refl
+      body-just r (just _) t nothing  (just _) _  _ = refl
+      body-just r nothing  t nothing  (just _) () _
+      body-just r e        t s        nothing  _  ()
+
+    mutual
+      seen-up : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (ψ : Path t u) → seen H ψ ≡ true → is-just (part u) ≡ true → is-just (part t) ≡ true
+      seen-up here                         _  j = j
+      seen-up (in-map {f = f} {t = s} ψ)   sn j = map-just (U.mapᶜ f) (part s) (seen-up ψ sn j)
+      seen-up (in-scan {f = f} {r} {t = s} ψ) sn j = map-just (U.scanᶜ f (val r)) (part s) (seen-up ψ sn j)
+      seen-up (in-take {i = i} {p} {c} {tk = taking} {t = s} ψ) sn j with val (Kit.live c)
+      ... | true  = map-just (U.takeWhileᶜ i p) (part s) (seen-up ψ sn j)
+      ... | false = false≢ sn
+      seen-up (in-take {c = c} {tk = ending _ _} ψ) sn j = false≢ (proj₂ (∧-split (val (Kit.live c)) sn))
+      seen-up (in-take {c = c} {tk = taken} ψ)      sn j = false≢ (proj₂ (∧-split (val (Kit.live c)) sn))
+      seen-up (in-outer {op = op} {f} {fl} {pl = pl} {t = so} {ls} ψ) sn j =
+        outer-just op (λ a q → U.subscribe (f a) q) (part so) (partLanes ls) (val (Flat.queue fl)) pl (seen-up ψ sn j)
+      seen-up (in-lanes {op = op} {f} {fl} {pl = pl} {t = so} {ls} πL) sn j =
+        lanes-just op (λ a q → U.subscribe (f a) q) (part so) (partLanes ls) (val (Flat.queue fl)) pl (seenL-up πL sn j)
+      seen-up (in-source {e = e} {rp} {rt} {t = src} {bd} ψ) sn j with ∧-split (is-just (part bd)) sn
+      ... | jb , sψ = source-just rp e rt (part src) (part bd) (seen-up ψ sψ j) jb
+      seen-up (in-body {e = e} {rp} {rt} {t = src} {bd} ψ) sn j with ∧-split (is-just (part src) ∨ is-just e) sn
+      ... | js , sψ = body-just rp e rt (part src) (part bd) js (seen-up ψ sψ j)
+      seen-up (in-defer ψ) sn j = seen-up ψ sn j
+
+      seenL-up : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u) → seenL H πL ≡ true → is-just (part u) ≡ true
+               → Filled (partLanes ls)
+      seenL-up (this-lane {c = c} {t = s} {ls} ψ) sn j with val (Kit.live c)
+      ... | true  = cons-holds (part s) (partLanes ls) (seen-up ψ sn j)
+      ... | false = false≢ sn
+      seenL-up (next-lane {l = lane c k s} {ls} πL) sn j with val (Kit.live c)
+      ... | true  = cons-keeps (part s) (partLanes ls) (seenL-up πL sn j)
+      ... | false = seenL-up πL sn j
+
   -- What the ghost is, at each state: what the witness has open; at a
   -- value about to be recorded, what steps to it by that value.
   -- Every node the ghost holds below `t` passes `P`, and so does what a
   -- held flatMap's ended parts left running, and what a held connect's
-  -- ended source did.
+  -- ended source did.  Held: `seen`, so a teardown, which leaves what it
+  -- reached unseen, answers for nothing below its switch.
   record Each {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) {Δ A} (t : Sub h Δ A) : Set₁ where
     field
-      parts : ∀ {Δ′ A′} {u : Sub h Δ′ A′} → Path t u → ∀ {c} → At.part H u ≡ just c → P c
+      parts : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path t u) → seen H ψ ≡ true → ∀ {c} → At.part H u ≡ just c → P c
       pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
-            → Path t (flatMapˢ op f fl oc k r pl so ls) → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → P pl
+            → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
+            → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → P pl
       rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
-            → Path t (connectˢ S c b kb k fd rp e rt src bd) → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+            → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
+            → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
             → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
 
   -- Its next event no earlier than `q`.
@@ -1050,4 +1193,4 @@ module Strongly (R : Set) where
     ; queue   = record { timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
     ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl }
     ; sorted  = root , begin-well o
-    ; behind  = record { parts = λ { here refl → heads-begin o } ; pools = λ () ; rests = λ () } }
+    ; behind  = record { parts = λ { here _ refl → heads-begin o } ; pools = λ () ; rests = λ () } }
