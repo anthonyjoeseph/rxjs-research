@@ -5302,9 +5302,9 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
   -- before, the source's past the body's last and the body's past the
   -- source's last.
   atop-cue : ∀ L β (σ : Events∞ A) e → Cue L e → Atop L (force β) → Atop L (M.side r β σ e)
-  atop-cue L β σ (out _ _ _) c a = atop-ahead r β σ _ _ L a c
-  atop-cue L β σ (skip _ _)  c a = atop-ahead r β σ _ _ L a c
-  atop-cue L β σ (end _)     c a = atop-ahead r β σ _ _ L a c
+  atop-cue L β σ (out q _ _) c a = atop-ahead r β σ (q ++ [ ix 0 ]) (M.before (q ++ [ ix 0 ]) (force β)) L a c
+  atop-cue L β σ (skip q _)  c a = atop-ahead r β σ (q ++ [ ix 0 ]) (M.before (q ++ [ ix 0 ]) (force β)) L a c
+  atop-cue L β σ (end q)     c a = atop-ahead r β σ (q ++ [ ix 0 ]) (M.before (q ++ [ ix 0 ]) (force β)) L a c
   atop-cue L β σ hush        c a = a
 
   mutual
@@ -5361,9 +5361,9 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
 
   clear-side : ∀ q β (σ : Events∞ A) e → M.before q (force β) ≡ true → Every (λ k → Unrelated k q) (force β)
              → Head (λ h → ¬ Ext q (h ++ [ ix 0 ])) e → Clear q (M.side r β σ e)
-  clear-side q β σ (out _ _ _) qb ub nx = clear-ahead q β σ _ _ qb ub nx
-  clear-side q β σ (skip _ _)  qb ub nx = clear-ahead q β σ _ _ qb ub nx
-  clear-side q β σ (end _)     qb ub nx = clear-ahead q β σ _ _ qb ub nx
+  clear-side q β σ (out h _ _) qb ub nx = clear-ahead q β σ (h ++ [ ix 0 ]) (M.before (h ++ [ ix 0 ]) (force β)) qb ub nx
+  clear-side q β σ (skip h _)  qb ub nx = clear-ahead q β σ (h ++ [ ix 0 ]) (M.before (h ++ [ ix 0 ]) (force β)) qb ub nx
+  clear-side q β σ (end h)     qb ub nx = clear-ahead q β σ (h ++ [ ix 0 ]) (M.before (h ++ [ ix 0 ]) (force β)) qb ub nx
   clear-side q β σ hush        qb ub nx = clear-head q (force β) qb ub
 
   past-body : ∀ n (σ : Events∞ A) q (x : Events B) → Past n x → Past n (M.body r σ q x)
