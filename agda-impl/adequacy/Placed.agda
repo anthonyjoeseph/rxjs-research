@@ -2768,6 +2768,26 @@ at-beyond k (skip h _)  b al = b , λ e → proj₁ (every al) (owned-ext e)
 at-beyond k (end c)     b al = b , λ e → every al (owned-ext e)
 at-beyond k hush        b al = tt
 
+-- Each value a run shows satisfies `G`.
+mutual
+  Valuess : ∀ {A} → (A → Set) → Events A → Set
+  Valuess G (out _ a r) = G a × Values G (force r)
+  Valuess G (skip _ r)  = Values G (force r)
+  Valuess G (end _)     = ⊤
+  Valuess G hush        = ⊤
+
+  record Values {A} (G : A → Set) (e : Events A) : Set where
+    coinductive
+    field values : Valuess G e
+
+open Values public
+
+values-map : ∀ {A B} {G : B → Set} (f : A → B) (e : Events A) → (∀ a → G (f a)) → Values G (M.mapᴱ f e)
+values (values-map f (out h a r) g) = g a , values-map f (force r) g
+values (values-map f (skip h r)  g) = values-map f (force r) g
+values (values-map f (end h)     g) = tt
+values (values-map f hush        g) = tt
+
 -- A FLATMAP'S MERGE IN ORDER, under `p`.  Each lane carries a ghost
 -- root, where it subscribed; roots are pairwise apart, each lane keyed
 -- under its own and by nothing apart from it a lane may subscribe at,
@@ -2793,26 +2813,6 @@ module FlatOrder (p : Pos) where
 
   Gen : ∀ {B} → MonotonicList B → Set
   Gen m = ∀ j → Ok j → Fit j (M.enter m j)
-
-  -- Each outer value a lane fit wherever it may subscribe.
-  mutual
-    Spawns : ∀ {B} → Events (MonotonicList B) → Set
-    Spawns (out _ m r) = Gen m × Spawn (force r)
-    Spawns (skip _ r)  = Spawn (force r)
-    Spawns (end _)     = ⊤
-    Spawns hush        = ⊤
-
-    record Spawn {B} (e : Events (MonotonicList B)) : Set where
-      coinductive
-      field spawned : Spawns e
-
-  open Spawn public
-
-  spawn-map : ∀ {A B} (F : A → MonotonicList B) (e : Events A) → (∀ a → Gen (F a)) → Spawn (M.mapᴱ F e)
-  spawned (spawn-map F (out h a r) g) = g a , spawn-map F (force r) g
-  spawned (spawn-map F (skip h r)  g) = spawn-map F (force r) g
-  spawned (spawn-map F (end h)     g) = tt
-  spawned (spawn-map F hush        g) = tt
 
   -- A lane in flight under its root: its run, and what it leaves running.
   record Lane {B} (r : Pos) (x : Events B) (c : Tail) : Set where
@@ -2877,7 +2877,7 @@ module FlatOrder (p : Pos) where
       spr : Spread x
       kx  : Every K x
       kc  : EveryT K c
-      spn : Spawn x
+      spn : Values Gen x
 
   Heldᴹ : ∀ {B} → Maybe (Events∞ (MonotonicList B)) → Set
   Heldᴹ nothing  = ⊤
@@ -2886,12 +2886,12 @@ module FlatOrder (p : Pos) where
   outer-out : ∀ {B q m c} {w : Events∞ (MonotonicList B)} → Outer (out q m w) c → Outer (force w) (cut w)
   outer-out h = outer (proj₂ (ordered (Outer.ord h))) (proj₂ (steady (Outer.std h))) (proj₁ (proj₂ (proj₂ (trail (Outer.trl h)))))
                       (proj₂ (spread (Outer.spr h))) (proj₁ (proj₂ (every (Outer.kx h)))) (proj₂ (proj₂ (every (Outer.kx h))))
-                      (proj₂ (spawned (Outer.spn h)))
+                      (proj₂ (values (Outer.spn h)))
 
   outer-skip : ∀ {B q c} {w : Events∞ (MonotonicList B)} → Outer (skip q w) c → Outer (force w) (cut w)
   outer-skip h = outer (proj₂ (ordered (Outer.ord h))) (proj₂ (steady (Outer.std h))) (proj₂ (proj₂ (trail (Outer.trl h))))
                        (spread (Outer.spr h)) (proj₁ (proj₂ (every (Outer.kx h)))) (proj₂ (proj₂ (every (Outer.kx h))))
-                       (spawned (Outer.spn h))
+                       (values (Outer.spn h))
 
   -- Where a value at `y` subscribes its lane, apart from root `r`; and
   -- `y` itself over no root.
@@ -3275,7 +3275,7 @@ module FlatOrder (p : Pos) where
                   → Ordered (M.outer op e ls qs t x)
     ordered (ordered-outer op e ls qs t (out q m w) R pt asd gq h pl ld at)
       with M.admit op (q ++ [ ix 1 ]) m ls qs
-         | admit-ok op q m w t ls qs R pt (mapᴬ proj₁ asd) gq (proj₁ (spawned (Outer.spn h))) (lane-ok q (proj₁ (every (Outer.kx h))))
+         | admit-ok op q m w t ls qs R pt (mapᴬ proj₁ asd) gq (proj₁ (values (Outer.spn h))) (lane-ok q (proj₁ (every (Outer.kx h))))
              (proj₁ (spread (Outer.spr h))) ld (proj₂ (every (Outer.kx h))) pl
     ... | ls′ , qs′ , d | taken R′ pt′ asd′ at′ gq′ pl′ ad =
       atop-go op (just w) ls′ qs′ (t ∪ d) (q ++ [ ix 0 ]) at′ (beyond-step q (force w) (past-beyond q (force w) (proj₁ (steady (Outer.std h)))))
@@ -3593,17 +3593,17 @@ module FlatOrder (p : Pos) where
              → Lead (out q m w) ls → Atopᴴ (out q m w) t
              → Obl false (q ++ [ ix 0 ]) (just w) ls′ qs′ (t ∪ d)
   calm-admit (M.mergeᶠ nothing) e ls qs t q m w refl R pt asd gq h (st , et , wd) ld at =
-    admitted q m qs (proj₁ (every (Outer.kx h))) (proj₁ (spawned (Outer.spn h))) ∷ᴬ kept-lanes q qs (proj₁ (every (Outer.kx h))) R (mapᴬ (λ a → proj₁ (every (proj₁ a))) asd) ld , step-outer h , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t idle (step-pool q m w t at et) tt
+    admitted q m qs (proj₁ (every (Outer.kx h))) (proj₁ (values (Outer.spn h))) ∷ᴬ kept-lanes q qs (proj₁ (every (Outer.kx h))) R (mapᴬ (λ a → proj₁ (every (proj₁ a))) asd) ld , step-outer h , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t idle (step-pool q m w t at et) tt
   calm-admit (M.mergeᶠ (just n)) e ls qs t q m w eq R pt asd gq h (st , et , wd) ld at with length ls <ᵇ n
   calm-admit (M.mergeᶠ (just n)) e ls qs t q m w refl R pt asd gq h (st , et , wd) ld at | true =
-    admitted q m qs (proj₁ (every (Outer.kx h))) (proj₁ (spawned (Outer.spn h))) ∷ᴬ kept-lanes q qs (proj₁ (every (Outer.kx h))) R (mapᴬ (λ a → proj₁ (every (proj₁ a))) asd) ld , step-outer h , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t idle (step-pool q m w t at et) tt
+    admitted q m qs (proj₁ (every (Outer.kx h))) (proj₁ (values (Outer.spn h))) ∷ᴬ kept-lanes q qs (proj₁ (every (Outer.kx h))) R (mapᴬ (λ a → proj₁ (every (proj₁ a))) asd) ld , step-outer h , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t idle (step-pool q m w t at et) tt
   calm-admit (M.mergeᶠ (just n)) e ls qs t q m w refl R pt asd gq h (st , et , wd) ld at | false =
     kept-lanes q (qs ++ [ m ]) (proj₁ (every (Outer.kx h))) R (mapᴬ (λ a → proj₁ (every (proj₁ a))) asd) ld , step-outer h , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t idle (step-pool q m w t at et) tt
   calm-admit M.switchᶠ e ls qs t q m w refl R pt asd gq h (st , et , wd) ld at =
-    admitted q m qs (proj₁ (every (Outer.kx h))) (proj₁ (spawned (Outer.spn h))) ∷ᴬ []ᴬ , step-outer h
+    admitted q m qs (proj₁ (every (Outer.kx h))) (proj₁ (values (Outer.spn h))) ∷ᴬ []ᴬ , step-outer h
     , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t (M.cuts ls) (step-pool q m w t at et) (drops-clean q ls (proj₁ (every (Outer.kx h))) R (mapᴬ (λ a → proj₁ (every (proj₁ a))) asd) ld)
   calm-admit M.exhaustᶠ e [] qs t q m w refl []ᴿ pt asd gq h (st , et , wd) ld at =
-    admitted q m qs (proj₁ (every (Outer.kx h))) (proj₁ (spawned (Outer.spn h))) ∷ᴬ []ᴬ , step-outer h , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t idle (step-pool q m w t at et) tt
+    admitted q m qs (proj₁ (every (Outer.kx h))) (proj₁ (values (Outer.spn h))) ∷ᴬ []ᴬ , step-outer h , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t idle (step-pool q m w t at et) tt
   calm-admit M.exhaustᶠ e (l ∷ ls) qs t q m w refl R pt asd gq h (st , et , wd) ld at =
     kept-lanes q qs (proj₁ (every (Outer.kx h))) R (mapᴬ (λ a → proj₁ (every (proj₁ a))) asd) ld , step-outer h , poolAt-∪ (Clean false (q ++ [ ix 0 ])) t idle (step-pool q m w t at et) tt
 
@@ -4029,7 +4029,7 @@ module FlatOrder (p : Pos) where
                   → Calm (M.outer op e ls qs t x)
     calms (calm-outer op e ls qs t (out q m w) R pt asd gq h pl ld at)
       with M.admit op (q ++ [ ix 1 ]) m ls qs in eq
-         | admit-ok op q m w t ls qs R pt (mapᴬ proj₁ asd) gq (proj₁ (spawned (Outer.spn h))) (lane-ok q (proj₁ (every (Outer.kx h))))
+         | admit-ok op q m w t ls qs R pt (mapᴬ proj₁ asd) gq (proj₁ (values (Outer.spn h))) (lane-ok q (proj₁ (every (Outer.kx h))))
              (proj₁ (spread (Outer.spr h))) ld (proj₂ (every (Outer.kx h))) pl
     ... | ls′ , qs′ , d | taken R′ pt′ asd′ at′ gq′ pl′ ad =
       next-go false (q ++ [ ix 0 ]) op (just w) ls′ qs′ (t ∪ d) at′ (beyond-step q (force w) (past-beyond q (force w) (proj₁ (steady (Outer.std h)))))
@@ -5041,14 +5041,198 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
     freshᴿ (fr-body β σ fs e eq g (end c) xe be) = tt
     freshᴿ (fr-body β σ fs e eq g hush    xe be) = tt
 
+------------------------------------------------------------------------
+-- A flatMap's merge, each part fresh against the last step it showed.
+
+module FlatFresh (p : Pos) where
+  K : Pos → Set
+  K y = Owned p y × Headed y
+
+  -- A lane in flight: what it leaves running fresh against `L`, its run
+  -- fresh, keyed under `p`.
+  Lanef : ∀ {B} → Pos → Events∞ B → Set
+  Lanef L l = EveryT (Fresh p L) (cut l) × FreshRun p (force l) × Every K (force l)
+
+  -- A lane admitted just past `q` is fresh against the skip the merge
+  -- shows at `q`'s left.
+  GenF : ∀ {B} → MonotonicList B → Set
+  GenF m = ∀ q → K q → Lanef (q ++ [ ix 0 ]) (M.enter m (q ++ [ ix 1 ]))
+
+  Freshᴼ : ∀ {B} → Pos → Maybe (Events∞ (MonotonicList B)) → Set
+  Freshᴼ L nothing  = ⊤
+  Freshᴼ L (just e) = EveryT (Fresh p L) (cut e) × FreshRun p (force e) × Values GenF (force e) × Every K (force e)
+
+  -- Fresh against a step, fresh against any after it.
+  up : ∀ L L′ → L′ <ᵖ L ≡ false → (t : Tail) → EveryT (Fresh p L) t → EveryT (Fresh p L′) t
+  up L L′ a = everyT-mono (λ h → fresh-past p L L′ h a)
+
+  lane-up : ∀ {B} L L′ → L′ <ᵖ L ≡ false → (l : Events∞ B) → Lanef L l → Lanef L′ l
+  lane-up L L′ a l (c , r , k) = up L L′ a (cut l) c , r , k
+
+  lanes-up : ∀ {B} L L′ → L′ <ᵖ L ≡ false → (ls : List (Events∞ B)) → All (Lanef L) ls → All (Lanef L′) ls
+  lanes-up L L′ a ls = mapᴬ (λ {l} → lane-up L L′ a l)
+
+  outer-up : ∀ {B} L L′ → L′ <ᵖ L ≡ false → (o : Maybe (Events∞ (MonotonicList B))) → Freshᴼ L o → Freshᴼ L′ o
+  outer-up L L′ a nothing  fo            = tt
+  outer-up L L′ a (just e) (c , r , v , k) = up L L′ a (cut e) c , r , v , k
+
+  cuts-fresh : ∀ {B} L (ls : List (Events∞ B)) → All (Lanef L) ls → EveryT (Fresh p L) (M.cuts ls)
+  cuts-fresh L []       []ᴬ        = everyT-idle
+  cuts-fresh L (l ∷ ls) (fl ∷ᴬ al) = everyT-∪ (cut l) (M.cuts ls) (proj₁ fl) (cuts-fresh L ls al)
+
+  whole-fresh : ∀ {B} L (o : Maybe (Events∞ (MonotonicList B))) ls t → Freshᴼ L o → All (Lanef L) ls → EveryT (Fresh p L) t
+              → EveryT (Fresh p L) (M.whole o ls t)
+  whole-fresh L nothing  ls t fo fl ft = everyT-∪ idle (M.cuts ls ∪ t) everyT-idle (everyT-∪ (M.cuts ls) t (cuts-fresh L ls fl) ft)
+  whole-fresh L (just e) ls t fo fl ft = everyT-∪ (cut e) (M.cuts ls ∪ t) (proj₁ fo) (everyT-∪ (M.cuts ls) t (cuts-fresh L ls fl) ft)
+
+  -- An admitted lane runs fresh, a queued one stays fresh where it would
+  -- be admitted, and a dropped one leaves its tail.
+  Admittedᶠ : ∀ {B} → Pos → List (Events∞ B) × List (MonotonicList B) × Tail → Set
+  Admittedᶠ L (ls , qs , d) = All (Lanef L) ls × All GenF qs × EveryT (Fresh p L) d
+
+  admit-fresh : ∀ {B} op q (m : MonotonicList B) ls qs L → Lanef L (M.enter m q) → GenF m → All (Lanef L) ls → All GenF qs
+              → Admittedᶠ L (M.admit op q m ls qs)
+  admit-fresh (M.mergeᶠ nothing)  q m ls       qs L lm gm fl fq = lm ∷ᴬ fl , fq , everyT-idle
+  admit-fresh (M.mergeᶠ (just n)) q m ls       qs L lm gm fl fq with length ls <ᵇ n
+  ... | true  = lm ∷ᴬ fl , fq , everyT-idle
+  ... | false = fl , All++⁺ fq (gm ∷ᴬ []ᴬ) , everyT-idle
+  admit-fresh M.switchᶠ           q m ls       qs L lm gm fl fq = lm ∷ᴬ []ᴬ , fq , cuts-fresh L ls fl
+  admit-fresh M.exhaustᶠ          q m []       qs L lm gm fl fq = lm ∷ᴬ []ᴬ , fq , everyT-idle
+  admit-fresh M.exhaustᶠ          q m (l ∷ ls) qs L lm gm fl fq = fl , fq , everyT-idle
+
+  -- Each step the merge shows is no earlier than the last, so every part
+  -- fresh against the last is fresh against it; the part that showed it
+  -- is fresh against it by its own run.
+  mutual
+    fr-go : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t L → Freshᴼ L o → All (Lanef L) ls → All GenF qs
+          → EveryT (Fresh p L) t → Atop L (M.go op o ls qs t) → Ordered (M.go op o ls qs t) → FreshRun p (M.go op o ls qs t)
+    freshᴿ (fr-go op o ls qs idle      L fo fl fq ft at od) = freshᴿ (fr-parts op o ls qs idle L fo fl fq ft at od)
+    freshᴿ (fr-go op o ls qs (pin k u) L fo fl fq ft at od) =
+      freshᴿ (fr-left op o ls qs k u (M.ahead-of k o ls) L fo fl fq ft at od)
+
+    fr-left : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs k u b L → Freshᴼ L o → All (Lanef L) ls → All GenF qs
+            → EveryT (Fresh p L) (pin k u) → Atop L (M.left op o ls qs k u b) → Ordered (M.left op o ls qs k u b)
+            → FreshRun p (M.left op o ls qs k u b)
+    freshᴿ (fr-left op o ls qs k u true  L fo fl fq ft at od) =
+      whole-fresh k o ls (later u) fo′ fl′ ft′ , fr-go op o ls qs (later u) k fo′ fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        fo′ = outer-up L k at o fo
+        fl′ = lanes-up L k at ls fl
+        ft′ = up L k at (later u) (proj₂ (everyᵀ ft))
+    freshᴿ (fr-left op o ls qs k u false L fo fl fq ft at od) = freshᴿ (fr-parts op o ls qs (pin k u) L fo fl fq ft at od)
+
+    fr-parts : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t L → Freshᴼ L o → All (Lanef L) ls → All GenF qs
+             → EveryT (Fresh p L) t → Atop L (M.parts op o ls qs t) → Ordered (M.parts op o ls qs t) → FreshRun p (M.parts op o ls qs t)
+    fr-parts op o ls qs t L fo fl fq ft at od with M.earliest ls | earliest-all (Lanef L) ls fl
+    ... | none            | _               = fr-via op o ls qs t L fo fl fq ft at od
+    ... | found k bs l as | (fb , fl₁ , fa) = fr-race op o k bs l as qs t L fo fb fl₁ fa fq ft at od
+
+    fr-via : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t L → Freshᴼ L o → All (Lanef L) ls → All GenF qs
+           → EveryT (Fresh p L) t → Atop L (M.viaOuter op o ls qs t) → Ordered (M.viaOuter op o ls qs t)
+           → FreshRun p (M.viaOuter op o ls qs t)
+    fr-via op nothing  ls qs t L fo                  fl fq ft at od = record { freshᴿ = tt }
+    fr-via op (just e) ls qs t L (ce , re , ve , ke) fl fq ft at od = fr-outer op e ls qs t (force e) L ce re ve ke fl fq ft at od
+
+    fr-race : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) k bs (l : Events∞ B) as qs t L → Freshᴼ L o
+            → All (Lanef L) bs → Lanef L l → All (Lanef L) as → All GenF qs → EveryT (Fresh p L) t
+            → Atop L (M.race op o k bs l as qs t) → Ordered (M.race op o k bs l as qs t) → FreshRun p (M.race op o k bs l as qs t)
+    fr-race op nothing  k bs l as qs t L fo fb (cl , rl , kl) fa fq ft at od =
+      fr-lane op nothing bs l as qs t (force l) L fo fb cl rl kl fa fq ft at od
+    fr-race op (just e) k bs l as qs t L fo fb (cl , rl , kl) fa fq ft at od with M.head (force e)
+    ... | nothing = fr-lane op (just e) bs l as qs t (force l) L fo fb cl rl kl fa fq ft at od
+    ... | just k′ with k′ <ᵖ k
+    ...   | true  = fr-outer op e (bs ++ l ∷ as) qs t (force e) L (proj₁ fo) (proj₁ (proj₂ fo)) (proj₁ (proj₂ (proj₂ fo)))
+                      (proj₂ (proj₂ (proj₂ fo))) (All++⁺ fb ((cl , rl , kl) ∷ᴬ fa)) fq ft at od
+    ...   | false = fr-lane op (just e) bs l as qs t (force l) L fo fb cl rl kl fa fq ft at od
+
+    fr-outer : ∀ {B} op (e : Events∞ (MonotonicList B)) ls qs t (x : Events (MonotonicList B)) L → EveryT (Fresh p L) (cut e)
+             → FreshRun p x → Values GenF x → Every K x → All (Lanef L) ls → All GenF qs → EveryT (Fresh p L) t
+             → Atop L (M.outer op e ls qs t x) → Ordered (M.outer op e ls qs t x) → FreshRun p (M.outer op e ls qs t x)
+    freshᴿ (fr-outer op e ls qs t (out q m r) L ce rx vx kx fl fq ft at od) with M.admit op (q ++ [ ix 1 ]) m ls qs in eq
+    ... | ls′ , qs′ , d =
+      whole-fresh Q (just r) ls′ (t ∪ d) fo′ (proj₁ ad) ft′
+      , fr-go op (just r) ls′ qs′ (t ∪ d) Q fo′ (proj₁ ad) (proj₁ (proj₂ ad)) ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        Q = q ++ [ ix 0 ]
+        fo′ : Freshᴼ Q (just r)
+        fo′ = everyT-mono (λ h → fresh-up p q Q h (inj₁ (<ᵖ-below q []))) (cut r) (proj₁ (freshᴿ rx)) , proj₂ (freshᴿ rx)
+              , proj₂ (values vx) , proj₁ (proj₂ (every kx))
+        ad : Admittedᶠ Q (ls′ , qs′ , d)
+        ad = subst (Admittedᶠ Q) eq
+               (admit-fresh op (q ++ [ ix 1 ]) m ls qs Q (proj₁ (values vx) q (proj₁ (every kx))) (proj₁ (values vx))
+                  (lanes-up L Q at ls fl) fq)
+        ft′ = everyT-∪ t d (up L Q at t ft) (proj₂ (proj₂ ad))
+    freshᴿ (fr-outer op e ls qs t (skip q r) L ce rx vx kx fl fq ft at od) =
+      whole-fresh q (just r) ls t fo′ fl′ ft′ , fr-go op (just r) ls qs t q fo′ fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        fo′ : Freshᴼ q (just r)
+        fo′ = proj₁ (freshᴿ rx) , proj₂ (freshᴿ rx) , values vx , proj₁ (proj₂ (every kx))
+        fl′ = lanes-up L q at ls fl
+        ft′ = up L q at t ft
+    freshᴿ (fr-outer op e []       []       t (end c) L ce rx vx kx fl fq ft at od) = tt
+    freshᴿ (fr-outer {B} op e []       (m ∷ qs) t (end c) L ce rx vx kx fl fq ft at od) =
+      whole-fresh {B} c nothing [] (t ∪ cut e) tt []ᴬ ft′ , fr-go op nothing [] (m ∷ qs) (t ∪ cut e) c tt []ᴬ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where ft′ = everyT-∪ t (cut e) (up L c at t ft) (up L c at (cut e) ce)
+    freshᴿ (fr-outer op e (l ∷ ls) qs       t (end c) L ce rx vx kx fl fq ft at od) =
+      whole-fresh c nothing (l ∷ ls) (t ∪ cut e) tt fl′ ft′
+      , fr-go op nothing (l ∷ ls) qs (t ∪ cut e) c tt fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        fl′ = lanes-up L c at (l ∷ ls) fl
+        ft′ = everyT-∪ t (cut e) (up L c at t ft) (up L c at (cut e) ce)
+    freshᴿ (fr-outer op e ls       qs       t hush    L ce rx vx kx fl fq ft at od) = tt
+
+    fr-lane : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t (x : Events B) L → Freshᴼ L o
+            → All (Lanef L) bs → EveryT (Fresh p L) (cut l) → FreshRun p x → Every K x → All (Lanef L) as → All GenF qs
+            → EveryT (Fresh p L) t → Atop L (M.lane op o bs l as qs t x) → Ordered (M.lane op o bs l as qs t x)
+            → FreshRun p (M.lane op o bs l as qs t x)
+    freshᴿ (fr-lane op o bs l as qs t (out k b r) L fo fb cl rx kx fa fq ft at od) =
+      whole-fresh k o (bs ++ r ∷ as) t fo′ fl′ ft′ , fr-go op o (bs ++ r ∷ as) qs t k fo′ fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        fo′ = outer-up L k at o fo
+        fl′ = All++⁺ (lanes-up L k at bs fb) ((proj₁ (freshᴿ rx) , proj₂ (freshᴿ rx) , proj₁ (proj₂ (every kx))) ∷ᴬ lanes-up L k at as fa)
+        ft′ = up L k at t ft
+    freshᴿ (fr-lane op o bs l as qs t (skip k r) L fo fb cl rx kx fa fq ft at od) =
+      whole-fresh k o (bs ++ r ∷ as) t fo′ fl′ ft′ , fr-go op o (bs ++ r ∷ as) qs t k fo′ fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        fo′ = outer-up L k at o fo
+        fl′ = All++⁺ (lanes-up L k at bs fb) ((proj₁ (freshᴿ rx) , proj₂ (freshᴿ rx) , proj₁ (proj₂ (every kx))) ∷ᴬ lanes-up L k at as fa)
+        ft′ = up L k at t ft
+    freshᴿ (fr-lane op o bs l as (m ∷ qs) t (end c) L fo fb cl rx kx fa (gm ∷ᴬ fq) ft at od) =
+      whole-fresh Q o ls′ (t ∪ cut l) fo′ fl′ ft′ , fr-go op o ls′ qs (t ∪ cut l) Q fo′ fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        Q = c ++ [ ix 0 ]
+        ls′ = M.enter m (c ++ [ ix 1 ]) ∷ bs ++ as
+        fo′ = outer-up L Q at o fo
+        fl′ = gm c (every kx) ∷ᴬ All++⁺ (lanes-up L Q at bs fb) (lanes-up L Q at as fa)
+        ft′ = everyT-∪ t (cut l) (up L Q at t ft) (up L Q at (cut l) cl)
+    freshᴿ (fr-lane op nothing  []       l []       [] t (end c) L fo fb cl rx kx fa fq ft at od) = tt
+    freshᴿ (fr-lane op nothing  []       l (a ∷ as) [] t (end c) L fo fb cl rx kx fa fq ft at od) =
+      whole-fresh c nothing (a ∷ as) (t ∪ cut l) tt fl′ ft′ , fr-go op nothing (a ∷ as) [] (t ∪ cut l) c tt fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        fl′ = lanes-up L c at (a ∷ as) fa
+        ft′ = everyT-∪ t (cut l) (up L c at t ft) (up L c at (cut l) cl)
+    freshᴿ (fr-lane op nothing  (b ∷ bs) l as       [] t (end c) L fo fb cl rx kx fa fq ft at od) =
+      whole-fresh c nothing (b ∷ bs ++ as) (t ∪ cut l) tt fl′ ft′
+      , fr-go op nothing (b ∷ bs ++ as) [] (t ∪ cut l) c tt fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        fl′ = All++⁺ (lanes-up L c at (b ∷ bs) fb) (lanes-up L c at as fa)
+        ft′ = everyT-∪ t (cut l) (up L c at t ft) (up L c at (cut l) cl)
+    freshᴿ (fr-lane op (just e) bs       l as       [] t (end c) L fo fb cl rx kx fa fq ft at od) =
+      whole-fresh c (just e) (bs ++ as) (t ∪ cut l) fo′ fl′ ft′
+      , fr-go op (just e) (bs ++ as) [] (t ∪ cut l) c fo′ fl′ fq ft′ (proj₁ (ordered od)) (proj₂ (ordered od))
+      where
+        fo′ = outer-up L c at (just e) fo
+        fl′ = All++⁺ (lanes-up L c at bs fb) (lanes-up L c at as fa)
+        ft′ = everyT-∪ t (cut l) (up L c at t ft) (up L c at (cut l) cl)
+    freshᴿ (fr-lane op o bs l as qs t hush L fo fb cl rx kx fa fq ft at od) = tt
+
 -- A FLATMAP'S CUTS ARE FRESH, over sorted sources alien to where it
 -- subscribes: a lane inside an outer value at `q` is admitted at the skip
 -- the flatMap shows just past `q`, and a lane a completion admits at the
 -- skip just past that completion.
-postulate
-  fresh-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
-             → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-             → Fresh∞ p (U.stateᴺ (U.subscribe (flatMap op f s) p) ρ)
+fresh-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
+           → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+           → Fresh∞ p (U.stateᴺ (U.subscribe (flatMap op f s) p) ρ)
 
 -- A CONNECT'S CUTS ARE FRESH, over sorted sources alien to where it
 -- subscribes: its source's burst lies inside only its own subscription,
@@ -5309,8 +5493,47 @@ flat-calm {Γ} {A} {B} op f s ff fs p ρ hp so cl =
     held : O.Outer (force E) (cut E)
     held = O.outer (ordered-map F _ (ordered-subᶠ s fs p ρ hp so cl)) (steady-map F _ (steady-subᶠ s fs p ρ hp so cl))
              (trail-map F (force S) (cut S) (trailing-subᶠ s fs p ρ hp so cl)) (spread-map F _ (spread-sub s p ρ hp so cl))
-             (every-map F _ (proj₁ ko)) (proj₂ ko) (O.spawn-map F _ gen)
+             (every-map F _ (proj₁ ko)) (proj₂ ko) (values-map F _ gen)
     c₀ = O.calm-at (flatOp op) (just E) [] [] idle O.[]ᴿ tt []ᴬ []ᴬ held (sortedT-idle , everyT-idle , everyT-idle , flatT-idle)
+
+fresh-flat {Γ} {A} {B} op f s ff fs p ρ hp so cl =
+  W.whole-fresh p (just E) [] idle fo []ᴬ everyT-idle
+  , W.fr-go (flatOp op) (just E) [] [] idle p fo []ᴬ []ᴬ everyT-idle
+      (atop-go (flatOp op) (just E) [] [] idle p []ᴬ (atop-map F p _ (rise-sub s p ρ hp)) tt) (proj₁ (flat-calm op f s ff fs p ρ hp so cl))
+  where
+    module W = FlatFresh p
+    S = U.stateᴺ (U.subscribe s p) ρ
+    F : A → MonotonicList B
+    F a = M.cold λ q → U.stateᴺ (U.subscribe (f a) q) ρ
+    E = U.outer∞ (λ a q → U.subscribe (f a) q) (U.subscribe s p) ρ
+    kp = Reach.reachᶠ (keyedRules p) s fs p ρ (inj₁ (prefix-refl p)) (every-monoᴱ (λ _ _ → tt) ρ cl)
+    hd = Reach.reachᶠ headedRules s fs p ρ hp (sorted-headed ρ so)
+    ko : Every W.K (force S)
+    ko = every-mono (λ h bh → beneath-owned p h (proj₁ bh) , proj₂ bh) (force S) (every-zip (force S) (proj₁ kp) (proj₁ hd))
+    gen : ∀ a → W.GenF (F a)
+    gen a q (oq , hq) = everyT-mono first (cut L) (proj₁ fL) , fresh-widen p j wide (force L) (proj₂ fL) , kL
+      where
+        j = q ++ [ ix 1 ]
+        L = U.stateᴺ (U.subscribe (f a) j) ρ
+        oj : Owned p j
+        oj = owned-trans p q j oq (inj₁ (prefix-++ q [ ix 1 ]))
+        hj = headed-snoc q hq
+        cj = alienᴱ-owned p j oj ρ cl
+        fL = fresh-subᶠ (f a) (ff a) j ρ hj so cj
+        wide : ∀ k → ¬ Owned p k → ¬ Owned j k
+        wide k no o = no (owned-trans p j k oj o)
+        first : ∀ h → Fresh j j h → Fresh p (q ++ [ ix 0 ]) h
+        first h fh k x no with fh k x (wide k no)
+        ... | inj₂ t  = inj₂ t
+        ... | inj₁ kj = inj₁ (below-lane q k 1 0 (λ pq → no (owned-trans p q k oq (inj₁ pq))) kj)
+        kL : Every W.K (force L)
+        kL = every-zip (force L)
+               (every-mono (λ h bh → owned-trans p j h oj (beneath-owned j h bh)) (force L)
+                  (proj₁ (Reach.reachᶠ (keyedRules j) (f a) (ff a) j ρ (inj₁ (prefix-refl j)) (every-monoᴱ (λ _ _ → tt) ρ cj))))
+               (proj₁ (Reach.reachᶠ headedRules (f a) (ff a) j ρ hj (sorted-headed ρ so)))
+    fo : W.Freshᴼ p (just E)
+    fo = proj₁ fS , fresh-map F p _ (proj₂ fS) , values-map F _ gen , every-map F _ ko
+      where fS = fresh-subᶠ s fs p ρ hp so cl
 
 ordered-subᶠ (cold c) _ p ρ hp so cl = subst Ordered (sym (U.start-meaning p (lower c) ρ)) (ordered-start p (lower c) hp)
 ordered-subᶠ empty _ p ρ hp so cl = record { ordered = tt }
