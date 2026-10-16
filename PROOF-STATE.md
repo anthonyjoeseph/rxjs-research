@@ -186,16 +186,16 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `trail-connect` first, as a walk over `M.beside`'s
-  `side`, `ahead` and `body`: a source step re-shown past the source's
-  subscription marks every pin its cut left (`Marks`), and a body's
-  joined delivery `q ++ [ sub j ]` comes after the step shown for `q`.
-  Decides whether the source's and the body's own trails carry the
-  walk, or the connect owes an invariant tying the body's joiners to
-  the source still running. Then `spread-sub`, `ordered-connect`,
-  `steady-connect`. Ruled out: a skip trailed only by the step just
-  under it (`trail-connect`'s refutation); a take owing anything past
-  a value's disjointness from its pins (`trail-take`).
+- **THE ORDER.** `connect-causal` first: the walk over `M.beside`'s
+  `side`, `ahead` and `body` carries the connect's trail on the source's
+  and body's own trails plus alienness, leaving only that no pin the
+  source's burst left Tags the body's next head, nor is Ext'd by a body
+  cut pin, over reachable `Walked` states. Decides whether the body's
+  joiners follow the source by the meaning alone, or `Walked` owes the
+  joined deliveries' history. Then `spread-sub`, `ordered-connect`,
+  `steady-connect`, reusing `Walk`. Ruled out: a skip trailed only by
+  the step just under it; a mark only at `k ++ [ ix 0 ]`; a take owing
+  anything past a value's disjointness from its pins (`trail-take`).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -214,8 +214,9 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`trail-connect`** (Placed) — FALSITY, `REFUTED`, `X`: a connect's source
-  burst left running beside its body's cut trails what it shows next.
+- **`connect-causal`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: no pin a
+  connect's source burst left Tags its body's next head or is extended by a
+  body cut pin.
 - **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: after a value,
   nothing later keys where its lane would, nor under it, nor over it.
 - **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's

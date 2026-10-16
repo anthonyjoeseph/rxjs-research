@@ -1859,6 +1859,8 @@ atopT-every h idle      f pt = tt
 
 -- `n` marks the step at `k`: just past it, or just past a mark of it, as
 -- a connect re-shows a skip it did not take.
+--
+-- REFUTED: e295322c by a connect re-showing its lane's skip at `k ++ [ ix 0 , ix 0 ]`, `k` still pinned, while a mark was only `k ++ [ ix 0 ]`
 data Marks (k : Pos) : Pos → Set where
   shown  : Marks k (k ++ [ ix 0 ])
   reshown : ∀ {n} → Marks k n → Marks k (n ++ [ ix 0 ])
@@ -1868,13 +1870,75 @@ marks-eq         shown      = [] , refl
 marks-eq {k = k} (reshown m) with marks-eq m
 ... | zs , refl = zs ++ [ ix 0 ] , ++-assoc k (ix 0 ∷ zs) [ ix 0 ]
 
+-- Past `k`, and no proper extension of it: no extension of it at all.
+past-apart : ∀ k h → k <ᵖ h ≡ true → ¬ Ext k h → ∀ ys → h ≡ k ++ ys → ⊥
+past-apart k h kh nx []       e with () ← trans (sym (subst (λ z → k <ᵖ z ≡ true) (trans e (++-identityʳ k)) kh)) (<ᵖ-irrefl k)
+past-apart k h kh nx (l ∷ ls) e = nx (subst (Ext k) (sym e) (ext l ls))
+
+-- Past `k`'s subtree, and so is all that comes no earlier.
+past-noext : ∀ k n h → k <ᵖ n ≡ true → ¬ Ext k n → h <ᵖ n ≡ false → ¬ Ext k h
+past-noext k n .(k ++ l ∷ ls) kn nx hn (ext l ls) with () ← trans (sym hn) (M.<ᵖ-apart k n (l ∷ ls) kn (past-apart k n kn nx))
+
+prefix-rest : ∀ k h → Prefix k h → Σ Pos (λ ys → h ≡ k ++ ys)
+prefix-rest []      h       _          = h , refl
+prefix-rest (_ ∷ _) []      ()
+prefix-rest (a ∷ k) (b ∷ h) (refl , p) with prefix-rest k h p
+... | ys , refl = ys , refl
+
+prefix-lt : ∀ j n → Prefix j n → j ≡ n ⊎ j <ᵖ n ≡ true
+prefix-lt j n pr with prefix-rest j n pr
+... | []     , refl = inj₁ (sym (++-identityʳ j))
+... | l ∷ ls , refl = inj₂ (<ᵖ-below j ls)
+
+inside-prefix : ∀ r k h → M.inside r k ≡ true → Prefix k h → M.inside r h ≡ true
+inside-prefix r k h i pr with prefix-rest k h pr
+... | ys , refl = M.inside-++ r k ys i
+
+ext-prefix : ∀ {k j n} → Ext k j → Prefix j n → Ext k n
+ext-prefix {k} {n = n} (ext l ls) pr with prefix-rest (k ++ l ∷ ls) n pr
+... | ys , refl = subst (Ext k) (sym (++-assoc k (l ∷ ls) ys)) (ext l (ls ++ ys))
+
+marks-prefix : ∀ {k n} → Marks k n → Prefix k n
+marks-prefix {k} shown             = prefix-++ k [ ix 0 ]
+marks-prefix {k} (reshown {n} m)   = prefix-trans k n (n ++ [ ix 0 ]) (marks-prefix m) (prefix-++ n [ ix 0 ])
+
+-- Between a step and its mark, its mark too.
+marks-mid : ∀ {j n} k → Marks j n → j <ᵖ k ≡ true → n <ᵖ k ≡ false → Marks j k
+marks-mid {j} k shown jk nk with <ᵖ-split (j ++ [ ix 0 ]) k (<ᵖ-step j k jk)
+... | inj₁ lt with () ← trans (sym lt) nk
+... | inj₂ refl = shown
+marks-mid {j} k (reshown {n} m) jk nk with n <ᵖ k in e
+... | false = marks-mid k m jk e
+... | true with <ᵖ-split (n ++ [ ix 0 ]) k (<ᵖ-step n k e)
+...   | inj₁ lt with () ← trans (sym lt) nk
+...   | inj₂ refl = reshown m
+
+-- Between a step and its mark, under the mark.
+marks-under : ∀ {j n} k → Marks j n → j <ᵖ k ≡ true → n <ᵖ k ≡ false → Prefix k n
+marks-under {j} k shown jk nk with <ᵖ-split (j ++ [ ix 0 ]) k (<ᵖ-step j k jk)
+... | inj₁ lt with () ← trans (sym lt) nk
+... | inj₂ refl = prefix-refl k
+marks-under {j} k (reshown {n} m) jk nk with n <ᵖ k in e
+... | false = prefix-trans k n (n ++ [ ix 0 ]) (marks-under k m jk e) (prefix-++ n [ ix 0 ])
+... | true with <ᵖ-split (n ++ [ ix 0 ]) k (<ᵖ-step n k e)
+...   | inj₁ lt with () ← trans (sym lt) nk
+...   | inj₂ refl = prefix-refl k
+
+-- A mark of a step keyed with none of `a` is not keyed under `a`.
+marks-alien : ∀ {a k n} → Marks k n → Owned a n → Disjoint a k → ⊥
+marks-alien {a} {k} shown (inj₁ pr) d with prefix-split a k (ix 0) pr
+... | inj₁ q  = proj₁ d (inj₁ q)
+... | inj₂ eq = proj₂ d (subst (Owned k) (sym eq) (inj₁ (prefix-++ k [ ix 0 ])))
+marks-alien {a} {k} shown (inj₂ t) d = proj₁ d (inj₂ (tagged-lane a k 0 t))
+marks-alien {a} {k} (reshown {n} m) (inj₁ pr) d with prefix-split a n (ix 0) pr
+... | inj₁ q  = marks-alien m (inj₁ q) d
+... | inj₂ eq = proj₂ d (subst (Owned k) (sym eq) (inj₁ (prefix-trans k n (n ++ [ ix 0 ]) (marks-prefix m) (prefix-++ n [ ix 0 ]))))
+marks-alien {a} {k} (reshown {n} m) (inj₂ t) d = marks-alien m (inj₂ (tagged-lane a n 0 t)) d
+
 -- Past a step and not under it: past its marks.
 marks-past : ∀ {k n} h → Marks k n → k <ᵖ h ≡ true → ¬ Ext k h → n <ᵖ h ≡ true
 marks-past {k} h m kh nx with marks-eq m
-... | zs , refl = M.<ᵖ-apart k h (ix 0 ∷ zs) kh ne
-  where ne : ∀ ys → h ≡ k ++ ys → ⊥
-        ne []       e with () ← trans (sym (subst (λ z → k <ᵖ z ≡ true) (trans e (++-identityʳ k)) kh)) (<ᵖ-irrefl k)
-        ne (l ∷ ls) e = nx (subst (Ext k) (sym e) (ext l ls))
+... | zs , refl = M.<ᵖ-apart k h (ix 0 ∷ zs) kh (past-apart k h kh nx)
 
 -- Between a step and its mark: under the step.
 marks-between : ∀ {k n} q → Marks k n → k <ᵖ q ≡ true → q <ᵖ n ≡ true → Prefix k q
@@ -1882,12 +1946,21 @@ marks-between {k} q m kq qn with marks-eq m
 ... | zs , refl with M.<ᵖ-between k q (ix 0 ∷ zs) kq qn
 ...   | ys , refl = prefix-++ k ys
 
+-- What a skip at `n` lets run on: no step before it but one it marks.
+Marked : Pos → Pos → Set
+Marked n k = k <ᵖ n ≡ false ⊎ Marks k n
+
+marked-cue : ∀ {j n} m → Marks j n → n <ᵖ m ≡ false → Marked m j
+marked-cue {j} m mk nm with j <ᵖ m in e
+... | true  = inj₂ (marks-mid m mk e nm)
+... | false = inj₁ refl
+
 -- What a cut leaves running trails the run's next event: no step before
 -- a value nor keyed with it, nor before a skip but a step it marks; every step past an end, and none keyed where that end would
 -- subscribe a lane, nor over it; nothing left behind silence.
 TrailE : ∀ {A} → Events A → Pos → Set
 TrailE (out n _ _) k = k <ᵖ n ≡ false × Disjoint n k
-TrailE (skip n _)  k = k <ᵖ n ≡ false ⊎ Marks k n
+TrailE (skip n _)  k = Marked n k
 TrailE (end n)     k = n <ᵖ k ≡ true × Disjoint (n ++ [ ix 1 ]) k × ¬ Ext n k
 TrailE hush        k = ⊥
 
@@ -3950,15 +4023,6 @@ module FlatOrder (p : Pos) where
       pack : ∀ h → (Owned j h × Headed h) × (∀ (i : Σ Pos (λ R → Ok R × Disjoint R j)) → ¬ Owned (proj₁ i) h) → Under j h
       pack h ((o , hd) , f) = o , hd , λ R ok d → f (R , ok , d)
 
--- A CONNECT'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
--- sources alien to it: its source's burst left running beside what its
--- body would leave trails what the connect shows next.
---
--- REFUTED: e295322c by a connect re-showing its lane's skip at `k ++ [ ix 0 , ix 0 ]`, `k` still pinned, while the skip clause admitted only `k ++ [ ix 0 ]`
-postulate
-  trail-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-                → Trailing (U.stateᴺ (U.subscribe (connect s b) p) ρ)
-
 -- Keyed with no step `h` keys, so with none just under it.
 disjoint-snoc : ∀ h k l → (∀ x → Tagged k (x ++ [ l ]) → Tagged k x) → Disjoint h k → Disjoint (h ++ [ l ]) k
 disjoint-snoc h k l tg (nh , nk) = (λ o → nh (owned-trans h (h ++ [ l ]) k (inj₁ (prefix-++ h [ l ])) o)) , down
@@ -4042,6 +4106,481 @@ trail (trail-defer l p ρ hp cl tr) =
   where open Deferred l p ρ hp cl
 trailᶠ (trail-defer l p ρ hp cl tr) = flatT-idle
 
+-- `P` of where `e` next shows, if anywhere.
+Head : ∀ {A} → (Pos → Set) → Events A → Set
+Head P (out n _ _) = P n
+Head P (skip n _)  = P n
+Head P (end n)     = P n
+Head P hush        = ⊤
+
+-- A run that steps.
+Going : ∀ {A} → Events A → Set
+Going hush = ⊥
+Going _    = ⊤
+
+------------------------------------------------------------------------
+-- A tail run as events, against itself.
+
+atopT-trans : ∀ k j t → j <ᵖ k ≡ false → AtopT j t → AtopT k t
+atopT-trans k j (pin h _) jk a = ≮-trans k j h jk a
+atopT-trans k j idle      jk a = tt
+
+sorted-above : ∀ k t → SortedT t → AtopT k t → EveryT (λ j → j <ᵖ k ≡ false) t
+everyᵀ (sorted-above k (pin j u) st a) = a , sorted-above k (later u) (proj₂ (sortedᵀ st)) (atopT-trans k j (later u) a (proj₁ (sortedᵀ st)))
+everyᵀ (sorted-above k idle      st a) = tt
+
+trail-tail : ∀ {A} t → SortedT t → FlatT t → Trail {A} (tailᴱ t) t
+trail (trail-tail (pin k u) st ft) =
+  st , record { everyᵀ = inj₁ (<ᵖ-irrefl k) , everyT-mono (λ j a → inj₁ a) (later u) (sorted-above k (later u) (proj₂ (sortedᵀ st)) (proj₁ (sortedᵀ st))) }
+  , trail-tail (later u) (proj₂ (sortedᵀ st)) (proj₂ (flatᵀ ft))
+trailᶠ (trail-tail (pin k u) st ft) = ft
+trail (trail-tail idle st ft) = sortedT-idle , everyT-idle , tt
+trailᶠ (trail-tail idle st ft) = flatT-idle
+
+atop-tailᴱ : ∀ {A} k t → AtopT k t → Atop k (tailᴱ {A} t)
+atop-tailᴱ k (pin h _) a = a
+atop-tailᴱ k idle      a = tt
+
+ordered-tail : ∀ {A} t → SortedT t → Ordered (tailᴱ {A} t)
+ordered (ordered-tail (pin k u) st) = atop-tailᴱ k (later u) (proj₁ (sortedᵀ st)) , ordered-tail (later u) (proj₂ (sortedᵀ st))
+ordered (ordered-tail idle      st) = tt
+
+clear-tail : ∀ {A} k t → EveryT (λ h → ¬ Ext k h) t → Clear k (tailᴱ {A} t)
+clear-tail k (pin h _) e = proj₁ (everyᵀ e)
+clear-tail k idle      e = tt
+
+steady-tail : ∀ {A} t → FlatT t → Steady (tailᴱ {A} t)
+steady (steady-tail (pin k u) ft) = clear-tail k (later u) (proj₁ (flatᵀ ft)) , steady-tail (later u) (proj₂ (flatᵀ ft))
+steady (steady-tail idle      ft) = tt
+
+-- A source past its next step, from what its cut trails.
+trailing-onward : ∀ {A} (σ : Events∞ A) e → force σ ≡ e → Trail e (cut σ) → Trailing (M.onward∞ σ e)
+trailing-onward σ (out _ _ s) _ tr = proj₁ (proj₂ (proj₂ (trail tr)))
+trailing-onward σ (skip _ s)  _ tr = proj₂ (proj₂ (trail tr))
+trailing-onward σ (end _)     _ tr = trail-tail (cut σ) (proj₁ (trail tr)) (trailᶠ tr)
+trailing-onward σ hush        eq tr = subst (λ z → Trail z (cut σ)) (sym eq) tr
+
+ordered-onward : ∀ {A} (σ : Events∞ A) e → force σ ≡ e → Trail e (cut σ) → Ordered e → Ordered (force (M.onward∞ σ e))
+ordered-onward σ (out _ _ s) _ tr o = proj₂ (ordered o)
+ordered-onward σ (skip _ s)  _ tr o = proj₂ (ordered o)
+ordered-onward σ (end _)     _ tr o = ordered-tail (cut σ) (proj₁ (trail tr))
+ordered-onward σ hush        eq tr o = subst Ordered (sym eq) o
+
+steady-onward : ∀ {A} (σ : Events∞ A) e → force σ ≡ e → Trail e (cut σ) → Steady e → Steady (force (M.onward∞ σ e))
+steady-onward σ (out _ _ s) _ tr st = proj₂ (steady st)
+steady-onward σ (skip _ s)  _ tr st = proj₂ (steady st)
+steady-onward σ (end _)     _ tr st = steady-tail (cut σ) (trailᶠ tr)
+steady-onward σ hush        eq tr st = subst Steady (sym eq) st
+
+-- Beside nothing running, a trail is its own.
+trail-hushed : ∀ {B} t u (x : Events B) → EveryT (λ _ → ⊥) t → Trail x u → Trail x (t ∪ u)
+trail-hushed idle      u x e tr = tr
+trail-hushed (pin k _) u x e tr = ⊥-elim (proj₁ (everyᵀ e))
+
+------------------------------------------------------------------------
+-- No later step inside a pinned one.
+
+past-on : ∀ {A} k n (x : Events A) → k <ᵖ n ≡ true → ¬ Ext k n → Past n x → Past k x
+past-on k n (out h _ _) kn nx (nh , _) = <ᵖ-trans k n h kn nh , past-noext k n h kn nx (<ᵖ-asym n h nh)
+past-on k n (skip h _)  kn nx (nh , _) = <ᵖ-trans k n h kn nh , past-noext k n h kn nx (<ᵖ-asym n h nh)
+past-on k n (end h)     kn nx (nh , _) = <ᵖ-trans k n h kn nh , past-noext k n h kn nx (<ᵖ-asym n h nh)
+past-on k n hush        kn nx p        = tt
+
+-- A skip showing again where it stood.
+Tie : ∀ {A} → Pos → Events A → Set
+Tie k (skip n _) = n ≡ k
+Tie k _          = ⊥
+
+-- Past `k`'s subtree, or a skip at `k` again.
+Fore : ∀ {A} → Pos → Events A → Set
+Fore k e = Past k e ⊎ Tie k e
+
+clear-fore : ∀ {A} n (x : Events A) → Clear n x → Atop n x → Fore n x
+clear-fore n (out h _ _) c a = inj₁ c
+clear-fore n (skip h _)  c a with <ᵖ-split n h a
+... | inj₁ nh   = inj₁ (nh , c)
+... | inj₂ refl = inj₂ refl
+clear-fore n (end h)     c a = inj₁ c
+clear-fore n hush        c a = inj₁ tt
+
+fore-trans : ∀ {A} k n (x : Events A) → (k <ᵖ n ≡ true × ¬ Ext k n) ⊎ n ≡ k → Fore n x → Fore k x
+fore-trans k n x          (inj₂ refl)       f           = f
+fore-trans k n x          (inj₁ (kn , nx)) (inj₁ p)    = inj₁ (past-on k n x kn nx p)
+fore-trans k n (skip h _) (inj₁ (kn , nx)) (inj₂ refl) = inj₁ (kn , nx)
+fore-trans k n (out _ _ _) (inj₁ _) (inj₂ ())
+fore-trans k n (end _)     (inj₁ _) (inj₂ ())
+fore-trans k n hush        (inj₁ _) (inj₂ ())
+
+fore-head : ∀ {A} k (e : Events A) → Fore k e → Head (λ h → ¬ Ext k h) e
+fore-head k (out h _ _) (inj₁ p)    = proj₂ p
+fore-head k (out h _ _) (inj₂ ())
+fore-head k (skip h _)  (inj₁ p)    = proj₂ p
+fore-head k (skip h _)  (inj₂ refl) = ext-irrefl k
+fore-head k (end h)     (inj₁ p)    = proj₂ p
+fore-head k (end h)     (inj₂ ())
+fore-head k hush        f           = tt
+
+------------------------------------------------------------------------
+-- A SOURCE'S BURST, run on under `r`: in order, flat, and trailing
+-- where the source's next step shows.
+
+module Bursting (r : Pos) where
+
+  -- `m` no later than where `e` next shows.
+  Cue : ∀ {A} → Pos → Events A → Set
+  Cue m = Head (λ h → (h ++ [ ix 0 ]) <ᵖ m ≡ false)
+
+  cue-self : ∀ {A} (e : Events A) → Cue (M.shownAt e) e
+  cue-self (out k _ _) = <ᵖ-irrefl (k ++ [ ix 0 ])
+  cue-self (skip k _)  = <ᵖ-irrefl (k ++ [ ix 0 ])
+  cue-self (end k)     = <ᵖ-irrefl (k ++ [ ix 0 ])
+  cue-self hush        = tt
+
+  cue-on : ∀ {A} k m (x : Events A) → (k ++ [ ix 0 ]) <ᵖ m ≡ false → Atop k x → Cue m x
+  cue-on k m (out n _ _) c a = ≮-trans m (k ++ [ ix 0 ]) (n ++ [ ix 0 ]) c (M.<ᵖ-shift n k a)
+  cue-on k m (skip n _)  c a = ≮-trans m (k ++ [ ix 0 ]) (n ++ [ ix 0 ]) c (M.<ᵖ-shift n k a)
+  cue-on k m (end n)     c a = ≮-trans m (k ++ [ ix 0 ]) (n ++ [ ix 0 ]) c (M.<ᵖ-shift n k a)
+  cue-on k m hush        c a = tt
+
+  cue-marked : ∀ k m → (k ++ [ ix 0 ]) <ᵖ m ≡ false → Marked m k
+  cue-marked k m c = marked-cue m shown c
+
+  out-marked : ∀ k m → (k ++ [ ix 0 ]) <ᵖ m ≡ false → ∀ j → j <ᵖ k ≡ false × Disjoint k j → Marked m j
+  out-marked k m c j (jk , d) = inj₁ (≮-trans m (k ++ [ ix 0 ]) j c (<ᵖ-step k j (take-ahead k j jk d)))
+
+  skip-marked : ∀ k m → (k ++ [ ix 0 ]) <ᵖ m ≡ false → ∀ j → Marked k j → Marked m j
+  skip-marked k m c j (inj₁ jk) with <ᵖ-split k j jk
+  ... | inj₁ kj   = inj₁ (≮-trans m (k ++ [ ix 0 ]) j c (<ᵖ-step k j kj))
+  ... | inj₂ refl = cue-marked k m c
+  skip-marked k m c j (inj₂ mk) = marked-cue m (reshown mk) c
+
+  end-marked : ∀ c m → (c ++ [ ix 0 ]) <ᵖ m ≡ false → ∀ j → c <ᵖ j ≡ true × Disjoint (c ++ [ ix 1 ]) j × ¬ Ext c j → Marked m j
+  end-marked c m q j (cj , _ , nx) = inj₁ (≮-trans m (c ++ [ ix 0 ]) j q (<ᵖ-asym (c ++ [ ix 0 ]) j (marks-past j shown cj nx)))
+
+  mutual
+    lead-run : ∀ {A} m (e : Events A) t → Trail e t → Ordered e → Cue m e → EveryT (Marked m) (M.runOn r e t)
+    lead-run m (out k _ s) t tr o c =
+      lead-pinned m k s t (M.inside r k) (cue-marked k m c) (proj₁ (proj₂ (proj₂ (trail tr)))) (proj₂ (ordered o))
+        (cue-on k m (force s) c (proj₁ (ordered o))) (everyT-mono (out-marked k m c) t (proj₁ (proj₂ (trail tr))))
+    lead-run m (skip k s)  t tr o c =
+      lead-pinned m k s t (M.inside r k) (cue-marked k m c) (proj₂ (proj₂ (trail tr))) (proj₂ (ordered o))
+        (cue-on k m (force s) c (proj₁ (ordered o))) (everyT-mono (skip-marked k m c) t (proj₁ (proj₂ (trail tr))))
+    lead-run m (end k)     t tr o c = everyT-mono (end-marked k m c) t (proj₁ (proj₂ (trail tr)))
+    lead-run m hush        t tr o c = everyT-mono (λ _ ()) t (proj₁ (proj₂ (trail tr)))
+
+    lead-pinned : ∀ {A} m k (s : Events∞ A) t b → Marked m k → Trail (force s) (cut s) → Ordered (force s) → Cue m (force s)
+                → EveryT (Marked m) t → EveryT (Marked m) (M.pinned r k s t b)
+    everyᵀ (lead-pinned m k s t true  mk tr o c et) = mk , lead-run m (force s) (cut s) tr o c
+    everyᵀ (lead-pinned m k s t false mk tr o c et) = everyᵀ et
+
+  atopT-pin : ∀ {A} k n (s : Events∞ A) t b → n <ᵖ k ≡ false → (M.inside r n ≡ false → AtopT k t) → M.inside r n ≡ b
+            → AtopT k (M.pinned r n s t b)
+  atopT-pin k n s t true  a f ib = a
+  atopT-pin k n s t false a f ib = f ib
+
+  skip-atop : ∀ k n → n <ᵖ k ≡ false → M.inside r k ≡ true → M.inside r n ≡ false → ∀ j → Marked n j → j <ᵖ k ≡ false
+  skip-atop k n a ik nb j (inj₁ jn) = ≮-trans k n j a jn
+  skip-atop k n a ik nb j (inj₂ mk) with j <ᵖ k in e
+  ... | false = refl
+  ... | true with () ← trans (sym (inside-prefix r k n ik (marks-under k mk e a))) nb
+
+  -- What runs on past a pinned step comes no earlier.
+  atopT-run : ∀ {A} k (e : Events A) t → Atop k e → Trail e t → M.inside r k ≡ true → AtopT k (M.runOn r e t)
+  atopT-run k (out n _ s) t a tr ik =
+    atopT-pin k n s t (M.inside r n) a (λ _ → atopT-every k t (λ j tj → ≮-trans k n j a (proj₁ tj)) (proj₁ (proj₂ (trail tr)))) refl
+  atopT-run k (skip n s)  t a tr ik =
+    atopT-pin k n s t (M.inside r n) a (λ nb → atopT-every k t (skip-atop k n a ik nb) (proj₁ (proj₂ (trail tr)))) refl
+  atopT-run k (end c)     t a tr ik = atopT-every k t (λ j tj → ≮-trans k c j a (<ᵖ-asym c j (proj₁ tj))) (proj₁ (proj₂ (trail tr)))
+  atopT-run k hush        t a tr ik = atopT-every k t (λ j ()) (proj₁ (proj₂ (trail tr)))
+
+  mutual
+    sorted-run : ∀ {A} (e : Events A) t → Ordered e → Trail e t → SortedT (M.runOn r e t)
+    sorted-run (out n _ s) t o tr = sorted-pinned n s t (M.inside r n) refl (proj₂ (ordered o)) (proj₁ (ordered o)) (proj₁ (proj₂ (proj₂ (trail tr)))) (proj₁ (trail tr))
+    sorted-run (skip n s)  t o tr = sorted-pinned n s t (M.inside r n) refl (proj₂ (ordered o)) (proj₁ (ordered o)) (proj₂ (proj₂ (trail tr))) (proj₁ (trail tr))
+    sorted-run (end _)     t o tr = proj₁ (trail tr)
+    sorted-run hush        t o tr = proj₁ (trail tr)
+
+    sorted-pinned : ∀ {A} n (s : Events∞ A) t b → M.inside r n ≡ b → Ordered (force s) → Atop n (force s) → Trail (force s) (cut s)
+                  → SortedT t → SortedT (M.pinned r n s t b)
+    sortedᵀ (sorted-pinned n s t true  ib o a tr st) = atopT-run n (force s) (cut s) a tr ib , sorted-run (force s) (cut s) o tr
+    sortedᵀ (sorted-pinned n s t false ib o a tr st) = sortedᵀ st
+
+  out-noext : ∀ {A} k n (a : A) (s : Events∞ A) → Fore k (out n a s) → ∀ j → j <ᵖ n ≡ false × Disjoint n j → ¬ Ext k j
+  out-noext k n a s (inj₁ (kn , nx)) j (jn , _) = past-noext k n j kn nx jn
+  out-noext k n a s (inj₂ ()) j _
+
+  skip-noext : ∀ {A} k n (s : Events∞ A) → Fore k (skip n s) → M.inside r k ≡ true → M.inside r n ≡ false → ∀ j → Marked n j → ¬ Ext k j
+  skip-noext k n s (inj₁ (kn , nx)) ik nb j (inj₁ jn) = past-noext k n j kn nx jn
+  skip-noext k n s (inj₁ (kn , nx)) ik nb j (inj₂ mk) = λ x → nx (ext-prefix x (marks-prefix mk))
+  skip-noext k n s (inj₂ refl)      ik nb j _ with () ← trans (sym ik) nb
+
+  end-noext : ∀ {A} k c → Fore {A} k (end c) → ∀ j → c <ᵖ j ≡ true × Disjoint (c ++ [ ix 1 ]) j × ¬ Ext c j → ¬ Ext k j
+  end-noext k c (inj₁ (kc , nx)) j (cj , _) = past-noext k c j kc nx (<ᵖ-asym c j cj)
+  end-noext k c (inj₂ ()) j _
+
+  out-fore : ∀ {A} k n (a : A) (s : Events∞ A) → Fore k (out n a s) → (k <ᵖ n ≡ true × ¬ Ext k n) ⊎ n ≡ k
+  out-fore k n a s (inj₁ p) = inj₁ p
+  out-fore k n a s (inj₂ ())
+
+  mutual
+    noext-run : ∀ {A} k (e : Events A) t → Fore k e → M.inside r k ≡ true → Ordered e → Steady e → Trail e t
+              → EveryT (λ h → ¬ Ext k h) (M.runOn r e t)
+    noext-run k (out n a s) t f ik o st tr =
+      noext-pin k n s t (M.inside r n) refl (fore-head k (out n a s) f) (fore-trans k n (force s) (out-fore k n a s f) (inj₁ (proj₁ (steady st))))
+        ik (proj₂ (ordered o)) (proj₂ (steady st)) (proj₁ (proj₂ (proj₂ (trail tr))))
+        (λ nb → everyT-mono (out-noext k n a s f) t (proj₁ (proj₂ (trail tr))))
+    noext-run k (skip n s)  t f ik o st tr =
+      noext-pin k n s t (M.inside r n) refl (fore-head k (skip n s) f)
+        (fore-trans k n (force s) f (clear-fore n (force s) (proj₁ (steady st)) (proj₁ (ordered o))))
+        ik (proj₂ (ordered o)) (proj₂ (steady st)) (proj₂ (proj₂ (trail tr)))
+        (λ nb → everyT-mono (skip-noext k n s f ik nb) t (proj₁ (proj₂ (trail tr))))
+    noext-run {A} k (end c) t f ik o st tr = everyT-mono (end-noext {A} k c f) t (proj₁ (proj₂ (trail tr)))
+    noext-run k hush        t f ik o st tr = everyT-mono (λ j ()) t (proj₁ (proj₂ (trail tr)))
+
+    noext-pin : ∀ {A} k n (s : Events∞ A) t b → M.inside r n ≡ b → ¬ Ext k n → Fore k (force s) → M.inside r k ≡ true
+              → Ordered (force s) → Steady (force s) → Trail (force s) (cut s) → (M.inside r n ≡ false → EveryT (λ h → ¬ Ext k h) t)
+              → EveryT (λ h → ¬ Ext k h) (M.pinned r n s t b)
+    everyᵀ (noext-pin k n s t true  ib nn f ik o st tr ft) = nn , noext-run k (force s) (cut s) f ik o st tr
+    everyᵀ (noext-pin k n s t false ib nn f ik o st tr ft) = everyᵀ (ft ib)
+
+  mutual
+    flat-run : ∀ {A} (e : Events A) t → Ordered e → Steady e → Trail e t → FlatT (M.runOn r e t)
+    flat-run (out n _ s) t o st tr =
+      flat-pin n s t (M.inside r n) refl (inj₁ (proj₁ (steady st))) (proj₂ (ordered o)) (proj₂ (steady st)) (proj₁ (proj₂ (proj₂ (trail tr)))) (trailᶠ tr)
+    flat-run (skip n s)  t o st tr =
+      flat-pin n s t (M.inside r n) refl (clear-fore n (force s) (proj₁ (steady st)) (proj₁ (ordered o)))
+        (proj₂ (ordered o)) (proj₂ (steady st)) (proj₂ (proj₂ (trail tr))) (trailᶠ tr)
+    flat-run (end _)     t o st tr = trailᶠ tr
+    flat-run hush        t o st tr = trailᶠ tr
+
+    flat-pin : ∀ {A} n (s : Events∞ A) t b → M.inside r n ≡ b → Fore n (force s) → Ordered (force s) → Steady (force s)
+             → Trail (force s) (cut s) → FlatT t → FlatT (M.pinned r n s t b)
+    flatᵀ (flat-pin n s t true  ib f o st tr ft) = noext-run n (force s) (cut s) f ib o st tr , flat-run (force s) (cut s) o st tr
+    flatᵀ (flat-pin n s t false ib f o st tr ft) = flatᵀ ft
+
+------------------------------------------------------------------------
+-- The walk's reachable states.
+
+-- `β′` is what `x` steps onto, taking a value or a skip.
+Onto : ∀ {B} → Events B → Events∞ B → Set
+Onto (out _ _ β) β′ = β ≡ β′
+Onto (skip _ β)  β′ = β ≡ β′
+Onto (end _)     β′ = ⊥
+Onto hush        β′ = ⊥
+
+-- A connect's body and source, from `β₀` and `σ₀`, each stepped where
+-- it comes first.
+data Walked {A B} (β₀ : Events∞ B) (σ₀ : Events∞ A) : Events∞ B → Events∞ A → Set where
+  at-start  : Walked β₀ σ₀ β₀ σ₀
+  by-source : ∀ {β σ} → Walked β₀ σ₀ β σ → Going (force σ) → M.before (M.shownAt (force σ)) (force β) ≡ true
+            → Walked β₀ σ₀ β (M.onward∞ σ (force σ))
+  by-body   : ∀ {β σ β′} → Walked β₀ σ₀ β σ → Going (force σ) → M.before (M.shownAt (force σ)) (force β) ≡ false → Onto (force β) β′
+            → Walked β₀ σ₀ β′ σ
+
+-- Nothing the body shows next is tagged by a step of the source's burst,
+-- nor anything it leaves running inside one.
+Causal : ∀ {A B} → Pos → Events∞ B → Events∞ A → Set
+Causal r β σ = EveryT (λ k → Head (λ n → ¬ Tagged k n) (force β) × EveryT (λ h → ¬ Ext k h) (cut β)) (M.burstOn r σ)
+
+------------------------------------------------------------------------
+-- THE WALK: a connect's cuts trail its run at every reachable state.
+
+module Walk {A B} (r P₀ : Pos) (β₀ : Events∞ B) (σ₀ : Events∞ A) (cause : ∀ {β σ} → Walked β₀ σ₀ β σ → Causal r β σ) where
+  open Bursting r
+
+  record Side (β : Events∞ B) (σ : Events∞ A) : Set where
+    field
+      tb : Trailing β
+      ts : Trailing σ
+      os : Ordered (force σ)
+      ss : Steady (force σ)
+      kb : Every∞ (Owned P₀) β
+      ks : Every∞ (Disjoint P₀) σ
+      wk : Walked β₀ σ₀ β σ
+
+  -- What the source next shows is keyed with none of the body.
+  shown-apart : ∀ (e : Events A) → Going e → Every (Disjoint P₀) e → ¬ Owned P₀ (M.shownAt e)
+  shown-apart (out k _ _) g pe = proj₁ (apart-mark P₀ k (ix 0) (ix-mark 0) (proj₁ (every pe)))
+  shown-apart (skip k _)  g pe = proj₁ (apart-mark P₀ k (ix 0) (ix-mark 0) (proj₁ (every pe)))
+  shown-apart (end k)     g pe = proj₁ (apart-mark P₀ k (ix 0) (ix-mark 0) (every pe))
+  shown-apart hush        () pe
+
+  -- Before the body's next, what it leaves running trails a skip.
+  body-lead : ∀ q (x : Events B) c → M.before q x ≡ true → Trail x c → EveryT (Marked q) c
+  body-lead q (out k _ _) c qk tr = everyT-mono (λ j z → inj₁ (≮-trans q k j (<ᵖ-asym q k qk) (proj₁ z))) c (proj₁ (proj₂ (trail tr)))
+  body-lead q (skip k _)  c qk tr = everyT-mono lead c (proj₁ (proj₂ (trail tr)))
+    where lead : ∀ j → Marked k j → Marked q j
+          lead j (inj₁ jk) = inj₁ (≮-trans q k j (<ᵖ-asym q k qk) jk)
+          lead j (inj₂ mk) = marked-cue q mk (<ᵖ-asym q k qk)
+  body-lead q (end k)     c qk tr = everyT-mono (λ j z → inj₁ (≮-trans q k j (<ᵖ-asym q k qk) (<ᵖ-asym k j (proj₁ z)))) c (proj₁ (proj₂ (trail tr)))
+  body-lead q hush        c qk tr = everyT-mono (λ j ()) c (proj₁ (proj₂ (trail tr)))
+
+  -- A body step `n` before the source's `q`, beside a burst step `j`.
+  module Pin q n j (nq : ¬ Owned P₀ q) (on : Owned P₀ n) (nl : q <ᵖ n ≡ false) (dj : Disjoint P₀ j) (tg : ¬ Tagged j n) where
+    nlt : n <ᵖ q ≡ true
+    nlt with <ᵖ-split n q nl
+    ... | inj₁ x  = x
+    ... | inj₂ eq = ⊥-elim (nq (subst (Owned P₀) eq on))
+
+    unowned : Marked q j → ¬ Owned j n
+    unowned mj (inj₁ pr) with prefix-lt j n pr
+    ... | inj₁ eq = proj₁ dj (subst (Owned P₀) (sym eq) on)
+    ... | inj₂ jn with mj
+    ...   | inj₁ jq with () ← trans (sym jq) (<ᵖ-trans j n q jn nlt)
+    ...   | inj₂ mq = marks-alien (marks-mid n mq jn nl) on dj
+    unowned mj (inj₂ t) = tg t
+
+    unkeys : ¬ Owned n j
+    unkeys o = proj₁ dj (owned-trans P₀ n j on o)
+
+    apart : Marked q j → Disjoint n j
+    apart mj = unkeys , unowned mj
+
+    atop : Marked q j → j <ᵖ n ≡ false
+    atop (inj₁ jq) = ≮-trans n q j nl jq
+    atop (inj₂ mq) with j <ᵖ n in e
+    ... | false = refl
+    ... | true  = ⊥-elim (marks-alien (marks-mid n mq e nl) on dj)
+
+    past : Marked q j → n <ᵖ j ≡ true
+    past mj = take-ahead n j (atop mj) (apart mj)
+
+  out-pin : ∀ q n → ¬ Owned P₀ q → Owned P₀ n → q <ᵖ n ≡ false → ∀ j → (Marked q j × Disjoint P₀ j) × ¬ Tagged j n → j <ᵖ n ≡ false × Disjoint n j
+  out-pin q n nq on nl j ((mj , dj) , tg) = atop mj , apart mj
+    where open Pin q n j nq on nl dj tg
+
+  end-pin : ∀ q c → ¬ Owned P₀ q → Owned P₀ c → q <ᵖ c ≡ false → ∀ j → (Marked q j × Disjoint P₀ j) × ¬ Tagged j c
+          → c <ᵖ j ≡ true × Disjoint (c ++ [ ix 1 ]) j × ¬ Ext c j
+  end-pin q c nq on nl j ((mj , dj) , tg) = past mj , disjoint-snoc c j (ix 1) (λ x → tagged-lane j x 1) (apart mj) , λ x → unkeys (owned-ext x)
+    where open Pin q c j nq on nl dj tg
+
+  module At {β σ} (sd : Side β σ) where
+    open Side sd
+
+    burst-sorted : SortedT (M.burstOn r σ ∪ cut β)
+    burst-sorted = sortedT-∪ _ _ (sorted-run (force σ) (cut σ) os ts) (proj₁ (trail tb))
+
+    pins-apart : EveryT (λ a → EveryT (Apart a) (cut β)) (M.burstOn r σ)
+    pins-apart = everyT-mono pair (M.burstOn r σ) (everyT-zip (M.burstOn r σ) (cause wk) (everyT-burstOn r σ ks))
+      where pair : ∀ k → (Head (λ n → ¬ Tagged k n) (force β) × EveryT (λ h → ¬ Ext k h) (cut β)) × Disjoint P₀ k → EveryT (Apart k) (cut β)
+            pair k ((_ , nx) , dk) = everyT-mono (λ h z → proj₁ z , λ x → proj₁ dk (owned-trans P₀ h k (proj₂ z) (owned-ext x))) (cut β)
+                                       (everyT-zip (cut β) nx (proj₂ kb))
+
+    burst-flat : FlatT (M.burstOn r σ ∪ cut β)
+    burst-flat = flatT-∪ _ _ (flat-run (force σ) (cut σ) os ss ts) (trailᶠ tb) pins-apart
+
+    -- Each burst step, against the source's next and the body's.
+    pinsAt : ∀ e → force σ ≡ e → EveryT (λ j → Marked (M.shownAt e) j × Disjoint P₀ j) (M.burstOn r σ)
+    pinsAt e eq = everyT-zip (M.burstOn r σ) (lead-run (M.shownAt e) (force σ) (cut σ) ts os (subst (Cue (M.shownAt e)) (sym eq) (cue-self e)))
+                    (everyT-burstOn r σ ks)
+
+    pinsOn : ∀ e → force σ ≡ e → ∀ x → force β ≡ x → EveryT (λ j → (Marked (M.shownAt e) j × Disjoint P₀ j) × Head (λ n → ¬ Tagged j n) x) (M.burstOn r σ)
+    pinsOn e eq x xe = everyT-zip (M.burstOn r σ) (pinsAt e eq) (everyT-mono (λ k c → subst (Head (λ n → ¬ Tagged k n)) xe (proj₁ c)) (M.burstOn r σ) (cause wk))
+
+    nqAt : ∀ e → force σ ≡ e → Going e → ¬ Owned P₀ (M.shownAt e)
+    nqAt e eq g = shown-apart e g (subst (Every (Disjoint P₀)) eq (proj₁ ks))
+
+    -- The source steps first.
+    toSource : ∀ e → force σ ≡ e → Going e → M.before (M.shownAt e) (force β) ≡ true → Side β (M.onward∞ σ (force σ))
+    toSource e eq g be = record
+      { tb = tb
+      ; ts = trailing-onward σ (force σ) refl ts
+      ; os = ordered-onward σ (force σ) refl ts os
+      ; ss = steady-onward σ (force σ) refl ts ss
+      ; kb = kb
+      ; ks = every-onward σ (force σ) (proj₁ ks) (proj₂ ks) (proj₁ ks)
+      ; wk = by-source wk (subst Going (sym eq) g) (subst (λ z → M.before (M.shownAt z) (force β) ≡ true) (sym eq) be)
+      }
+
+    -- The body steps first.
+    toBody : ∀ e → force σ ≡ e → Going e → ∀ x → force β ≡ x → M.before (M.shownAt e) x ≡ false → ∀ β′ → Onto x β′
+           → Trailing β′ → Every∞ (Owned P₀) β′ → Side β′ σ
+    toBody e eq g x xe be β′ ot tb′ kb′ = record
+      { tb = tb′
+      ; ts = ts
+      ; os = os
+      ; ss = ss
+      ; kb = kb′
+      ; ks = ks
+      ; wk = by-body wk (subst Going (sym eq) g)
+               (subst (λ z → M.before (M.shownAt z) (force β) ≡ false) (sym eq) (subst (λ z → M.before (M.shownAt e) z ≡ false) (sym xe) be))
+               (subst (λ z → Onto z β′) (sym xe) ot)
+      }
+
+  open At
+
+  mutual
+    tr-beside : ∀ β σ → Side β σ → Trail (M.beside r β σ) (M.burstOn r σ ∪ cut β)
+    tr-beside β σ sd = tr-side β σ sd (force σ) refl
+
+    tr-side : ∀ β σ → Side β σ → ∀ e → force σ ≡ e → Trail (M.side r β σ e) (M.runOn r e (cut σ) ∪ cut β)
+    tr-side β σ sd (out k a s) eq =
+      tr-ahead β σ sd (out k a s) eq tt _ refl _ (cong (λ z → M.runOn r z (cut σ) ∪ cut β) eq)
+    tr-side β σ sd (skip k s)  eq =
+      tr-ahead β σ sd (skip k s) eq tt _ refl _ (cong (λ z → M.runOn r z (cut σ) ∪ cut β) eq)
+    tr-side β σ sd (end c)     eq =
+      tr-ahead β σ sd (end c) eq tt _ refl _ (cong (λ z → M.runOn r z (cut σ) ∪ cut β) eq)
+    tr-side β σ sd hush        eq =
+      trail-hushed (cut σ) (cut β) (force β) (proj₁ (proj₂ (trail (subst (λ z → Trail z (cut σ)) eq (Side.ts sd))))) (Side.tb sd)
+
+    tr-ahead : ∀ β σ → Side β σ → ∀ e → force σ ≡ e → Going e → ∀ b → M.before (M.shownAt e) (force β) ≡ b
+             → ∀ c → M.burstOn r σ ∪ cut β ≡ c → Trail (M.ahead r β σ (M.shownAt e) b) c
+    tr-ahead β σ sd e eq g true  be c ce = tr-src β σ sd e eq g be c ce
+    tr-ahead β σ sd e eq g false be c ce = tr-body β σ sd e eq g (force β) refl be c ce
+
+    tr-src : ∀ β σ → Side β σ → ∀ e → force σ ≡ e → Going e → M.before (M.shownAt e) (force β) ≡ true
+           → ∀ c → M.burstOn r σ ∪ cut β ≡ c → Trail (M.ahead r β σ (M.shownAt e) true) c
+    trail (tr-src β σ sd e eq g be c ce) =
+      subst SortedT ce (burst-sorted sd)
+      , subst (EveryT (Marked (M.shownAt e))) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (λ j z → proj₁ z) (M.burstOn r σ) (pinsAt sd e eq))
+          (body-lead (M.shownAt e) (force β) (cut β) be (Side.tb sd)))
+      , tr-beside β (M.onward∞ σ (force σ)) (toSource sd e eq g be)
+    trailᶠ (tr-src β σ sd e eq g be c ce) = subst FlatT ce (burst-flat sd)
+
+    tr-body : ∀ β σ → Side β σ → ∀ e → force σ ≡ e → Going e → ∀ x → force β ≡ x → M.before (M.shownAt e) x ≡ false
+            → ∀ c → M.burstOn r σ ∪ cut β ≡ c → Trail (M.body r σ (M.shownAt e) x) c
+    trail (tr-body β σ sd e eq g (out n a β′) xe be c′ ce) =
+      subst SortedT ce (burst-sorted sd)
+      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (out-pin q n nq on be) (M.burstOn r σ) (pinsOn sd e eq _ xe)) (proj₁ (proj₂ (trail tbx))))
+      , tr-ahead β′ σ (toBody sd e eq g _ xe be β′ refl (proj₁ (proj₂ (proj₂ (trail tbx)))) (proj₂ (every kbx))) e eq g _ refl _ refl
+      , everyT-∪ (M.burstOn r σ) (cut β′) (everyT-mono (λ j z → proj₂ (out-pin q n nq on be j z)) (M.burstOn r σ) (pinsOn sd e eq _ xe))
+          (proj₂ (proj₂ (proj₂ (trail tbx))))
+      where q = M.shownAt e
+            nq = nqAt sd e eq g
+            tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
+            kbx = subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd))
+            on = proj₁ (every kbx)
+    trail (tr-body β σ sd e eq g (skip n β′) xe be c′ ce) =
+      subst SortedT ce (burst-sorted sd)
+      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (λ j z → inj₁ (proj₁ (out-pin q n nq on be j z))) (M.burstOn r σ) (pinsOn sd e eq _ xe))
+          (proj₁ (proj₂ (trail tbx))))
+      , tr-ahead β′ σ (toBody sd e eq g _ xe be β′ refl (proj₂ (proj₂ (trail tbx))) (proj₂ (every kbx))) e eq g _ refl _ refl
+      where q = M.shownAt e
+            nq = nqAt sd e eq g
+            tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
+            kbx = subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd))
+            on = proj₁ (every kbx)
+    trail (tr-body β σ sd e eq g (end c) xe be c′ ce) =
+      subst SortedT ce (burst-sorted sd)
+      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (end-pin q c nq on be) (M.burstOn r σ) (pinsOn sd e eq _ xe)) (proj₁ (proj₂ (trail tbx))))
+      , tt
+      where q = M.shownAt e
+            nq = nqAt sd e eq g
+            tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
+            on = every (subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd)))
+    trail (tr-body β σ sd e eq g hush xe () c′ ce)
+    trailᶠ (tr-body β σ sd e eq g x xe be c′ ce) = subst FlatT ce (burst-flat sd)
+
+-- A CONNECT'S BODY FOLLOWS WHAT ITS SOURCE SHOWED, where a tick heads it,
+-- over sorted sources alien to it: at every state its walk reaches,
+-- nothing the body shows next is tagged by a step of the source's burst
+-- still to come, nor is anything it leaves running inside one.
+postulate
+  connect-causal : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+                 → ∀ {β σ} → Walked (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
+                                    (U.stateᴺ (U.subscribe s (p ++ [ ix 1 ])) ρ) β σ
+                 → Causal (p ++ [ ix 1 ]) β σ
+
 -- A FINITE PROGRAM'S CUTS TRAIL ITS RUN, where a tick heads it, over
 -- sorted sources alien to it: at every state, what a cut would leave
 -- running is sorted and flat, none of it before a value coming next, nor
@@ -4103,6 +4642,36 @@ steady-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
   steady-defer l p ρ hp cl (steady-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
                               (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
+-- A CONNECT'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
+-- sources alien to it: its source's burst left running beside what its
+-- body would leave trails what the connect shows next, at every state
+-- the walk reaches.
+trail-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ
+              → Alienᴱ p ρ → Trailing (U.stateᴺ (U.subscribe (connect s b) p) ρ)
+trail-connect s b fs fb p ρ hp so cl =
+  Walk.tr-beside r P₀ Bᶜ Sᶜ (connect-causal s b p ρ hp so cl) Bᶜ Sᶜ record
+    { tb = trailing-subᶠ b fb P₀ ρ′ (headed-snoc p hp) so′ cl′
+    ; ts = trailing-subᶠ s fs r ρ hr so cr
+    ; os = ordered-subᶠ s fs r ρ hr so cr
+    ; ss = steady-subᶠ s fs r ρ hr so cr
+    ; kb = every∞-mono (beneath-owned P₀) Bᶜ (Reach.reachᶠ (keyedRules P₀) b fb P₀ ρ′ (inj₁ (prefix-refl P₀)) (every-monoᴱ (λ _ _ → tt) ρ′ cl′))
+    ; ks = Reach.reachᶠ (apartRules P₀ (no-tick p)) s fs r ρ (sibling p (λ ()) , sibling p (λ ())) c₀
+    ; wk = at-start
+    }
+  where
+    r  = p ++ [ ix 1 ]
+    P₀ = p ++ [ ix 0 ]
+    hr = headed-snoc p hp
+    cr = alienᴱ-owned p r (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+    c₀ = alienᴱ-owned p P₀ (inj₁ (prefix-++ p [ ix 0 ])) ρ cl
+    Sᶜ = U.stateᴺ (U.subscribe s r) ρ
+    ρ′ = U.meaning (U.subscribe s r) ρ ∷ᴬ ρ
+    Bᶜ = U.stateᴺ (U.subscribe b P₀) ρ′
+    so′ : Sorted ρ′
+    so′ = (ordered-subᶠ s fs r ρ hr so cr , steady-subᶠ s fs r ρ hr so cr) , headed-sub s r ρ hr so , so
+    cl′ : Alienᴱ P₀ ρ′
+    cl′ = alien-sub s p ρ cl , c₀
+
 trailing-subᶠ (cold c) _ p ρ hp so cl = trailing-start p (lower c) ρ
 trailing-subᶠ empty _ p ρ hp so cl = trail-idle _ tt
 trailing-subᶠ (of xs) _ p ρ hp so cl = trail-of p 0 xs
@@ -4111,7 +4680,7 @@ trailing-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = trail-scan f z _ _ (tra
 trailing-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl =
   trail-take i q _ _ (ordered-subᶠ s fs p ρ hp so cl) (steady-subᶠ s fs p ρ hp so cl) (trailing-subᶠ s fs p ρ hp so cl)
 trailing-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = proj₂ (proj₂ (flat-calm op f s ff fs p ρ hp so cl))
-trailing-subᶠ (connect s b) _ p ρ hp so cl = trail-connect s b p ρ hp so cl
+trailing-subᶠ (connect s b) (connect-f fs fb) p ρ hp so cl = trail-connect s b fs fb p ρ hp so cl
 trailing-subᶠ (connected i) _ p ρ hp so cl = trail-rejoin p (lookup ρ i)
 trailing-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
   trail-defer l p ρ hp cl (trailing-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so

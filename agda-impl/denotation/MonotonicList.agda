@@ -435,6 +435,15 @@ private
 ... | eq | eq with <ᵖ-between p q ys h h′
 ...   | zs , e = zs , cong₂ _∷_ (sym (eq-label a b c)) e
 
+-- Under `r`, and so is everything under it.
+inside-++ : ∀ r k ys → inside r k ≡ true → inside r (k ++ ys) ≡ true
+inside-++ []      k       ys i = refl
+inside-++ (a ∷ r) []      ys ()
+inside-++ (a ∷ r) (b ∷ k) ys i with cmpLabel a b
+... | lt with () ← i
+... | eq = inside-++ r k ys i
+... | gt with () ← i
+
 ------------------------------------------------------------------------
 -- What a subscriber sees
 
