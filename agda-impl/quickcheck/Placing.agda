@@ -109,13 +109,14 @@ private
   stepsᵇ ps = allᵇ (λ q → allᵇ (λ h → not (ownedᵇ (q ++ [ ix 0 ]) h)) ps) ps
 
   -- What a cut leaves running trails the run: its steps in order, none
-  -- before a value or the end coming next, nor before a skip but the
-  -- one showing that very step just past it.
+  -- before a value coming next, nor before a skip but the one showing
+  -- that very step just past it; all past an end, and none keyed where
+  -- that end would subscribe a lane; nothing left behind silence.
   trailᵇ : Events ℕ → Pos → Bool
   trailᵇ (out n _ _) k = not (k <ᵖ n)
   trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ samePos n (k ++ [ ix 0 ])
-  trailᵇ (end n)     k = n <ᵖ k
-  trailᵇ hush        k = true
+  trailᵇ (end n)     k = (n <ᵖ k) ∧ not (ownedᵇ (n ++ [ ix 1 ]) k)
+  trailᵇ hush        k = false
 
   pinsᵇ : ℕ → Tail → List Pos
   pinsᵇ zero    _         = []
