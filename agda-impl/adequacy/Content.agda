@@ -28,7 +28,7 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
-open import Level using (Lift; lift)
+open import Level using (Lift; lift; lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _+_)
@@ -64,15 +64,15 @@ open Events∞
 
 module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read; feed)
-  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?) renaming (go to goᴵ)
-  open Heap using (World; _⊑_; Handle)
+  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look) renaming (go to goᴵ)
+  open Heap using (World; _⊑_; Handle; Quiet)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
   open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
     Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; Taking; taking; taken; feeding; finishing; PathLanes; this-lane; next-lane;
-    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets; Each; Heads) renaming (ending to endingᵗ)
+    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; Meets; Each; Heads; rootObs) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
@@ -1072,11 +1072,6 @@ module Honesty (R : Set) where
     take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
                  → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → Hops cr
 
-    -- A completed takeWhile's cut: its kill switch thrown, its source's
-    -- unsubscribe run; the ghost alike, a call fewer.
-    take2-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k taken s))
-                 → firstCall (Carried.ctlAs cr) ≡ just (take2C π) → Hops cr
-
     -- A connect's cut once its body completes: the ghost alike, a call
     -- fewer.
     body-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
@@ -1120,6 +1115,106 @@ module Honesty (R : Set) where
                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ Conf.pos (Mach.conf m) → ⊥
 
+  ----------------------------------------------------------------------
+  -- THE TEARDOWN: what unsubscribing leaves, in the order `unsub` runs
+
+  -- The heap a subscription's unsubscribe leaves: its colds spent, its
+  -- switches thrown, its joiners silenced, below a switch only once
+  -- attached; a flatMap's lanes cut as `killAllᶜ` reads them, the first
+  -- so many of the lanes it holds.
+  mutual
+    torn : ∀ {h} → Heapᴹ h → ∀ {Δ A} → Sub h Δ A → Heapᴹ h
+    torn H (coldˢ s hd ph)                         = store H hd (lift true)
+    torn H (mapˢ f s)                              = torn H s
+    torn H (scanˢ f r s)                           = torn H s
+    torn H (takeWhileˢ i p c k tk s)               = thrown H c k s
+    torn H (flatMapˢ op f fl oc k r pl so ls)      = let H′ = thrown H oc k so in
+      thrownLanes (store (store H′ (FlatKit.Flat.lanes fl) (lift [])) (FlatKit.Flat.active fl) (lift 0))
+                  (length (lower (look H′ (FlatKit.Flat.lanes fl)))) ls
+    torn H (connectˢ S c b kb k fd rp e rt src bd) = tornVia (torn H src) kb bd
+    torn H (joinˢ j sk l x st)                     = store H l (lift false)
+    torn H (deferˢ k s)                            = tornVia H k s
+    torn H _                                       = H
+
+    tornVia : ∀ {h} → Heapᴹ h → Maybe (Quiet h) → ∀ {Δ A} → Sub h Δ A → Heapᴹ h
+    tornVia H nothing  s = H
+    tornVia H (just _) s = torn H s
+
+    -- A switch thrown, and what it holds unsubscribed.
+    thrown : ∀ {h} → Heapᴹ h → Kit.Cut h → Maybe (Quiet h) → ∀ {Δ A} → Sub h Δ A → Heapᴹ h
+    thrown H c k s = tornVia (store H (Kit.live c) (lift false)) k s
+
+    thrownLanes : ∀ {h} → Heapᴹ h → ℕ → ∀ {Δ B} → List (Lane h Δ B) → Heapᴹ h
+    thrownLanes H zero    ls                = H
+    thrownLanes H (suc n) []                = H
+    thrownLanes H (suc n) (lane c k s ∷ ls) = thrownLanes (thrown H c k s) n ls
+
+  postulate
+    -- A completed takeWhile's cut from the agenda's head runs silently
+    -- to the rest of the agenda, over the heap its switch thrown leaves.
+    tear-take : ∀ {g h hp p w σ K act clk ts bs td lg en mk}
+                (cr : Carried g (mach (⟨_,_,_⟩ {h} hp p (run {w = w} act σ K)) clk ts bs td lg en mk))
+                {Δ A i q c k} {s : Sub h Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s)) {ks}
+              → act ≗ ⟦ take2C π ∷ ks ⟧ᶜ → ∀ {m′} → step (mach ⟨ hp , p , run act σ K ⟩ clk ts bs td lg en mk) ≡ silent m′
+              → Σ (Act h ⊤) λ act′ → act′ ≗ ⟦ ks ⟧ᶜ × m′ ⇝ mach ⟨ thrown hp c k s , p , run act′ σ K ⟩ clk ts bs td lg en mk
+
+    -- A takeWhile already taken holds no part, so the tree's part is the
+    -- same once its switch is thrown.
+    torn-part : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
+              → At.part (thrown (Conf.heap (Mach.conf m)) c k s) (Carried.tree cr) ≡ At.part (Conf.heap (Mach.conf m)) (Carried.tree cr)
+
+    -- A teardown only throws switches, spends colds and silences
+    -- joiners: what is owed of a live switch or an unspent cold was owed
+    -- before, and the cut itself is owed no longer.
+    torn-owned : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A} (π : Path t (takeWhileˢ i q c k taken s))
+                 {p w bs} {act act′ : Act h ⊤} {σ : w ⊑ h} {K ks} {e : act ≗ ⟦ take2C π ∷ ks ⟧ᶜ} {e′ : act′ ≗ ⟦ ks ⟧ᶜ}
+                 {Kᴬ : StackAs t p σ K bs} → Owned H t (runAs (take2C π ∷ ks) e Kᴬ) → Owned (thrown H c k s) t (runAs ks e′ Kᴬ)
+
+    -- Every subscription still against its kernel: a teardown writes no
+    -- slot, no attachment and no stash, and a flatMap's lanes dropped
+    -- leave none open.
+    torn-holds : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
+               → At.Holds (thrown (Conf.heap (Mach.conf m)) c k s) (Carried.tree cr) [] rootObs
+
+    -- Below the thrown switch, what unsubscribing reached is spent, as
+    -- `Spent` follows `unsub`; elsewhere every gate as it was.
+    torn-gated : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
+               → At.Gated (thrown (Conf.heap (Mach.conf m)) c k s) (Carried.tree cr)
+
+    -- A joiner silenced owes nothing; every other as it was.
+    torn-fed : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
+             → At.Fed (thrown (Conf.heap (Mach.conf m)) c k s) (Carried.tree cr) []
+
+    -- The queue untouched: its timers each a pending frame's or spent,
+    -- the subjects' subscribers joiners or silenced.
+    torn-queue : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
+               → Queue (thrown (Conf.heap (Mach.conf m)) c k s) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) (Carried.tree cr)
+
+    -- Every part the ghost holds still heads no earlier than the run.
+    -- The risk: `Each` reads parts below the taken takeWhile too, and a
+    -- flatMap there whose lanes are cut shows a part made of what is left
+    -- of it, its queue and pool, which held no head of its own before.
+    torn-behind : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
+                → Each (thrown (Conf.heap (Mach.conf m)) c k s) (Heads (Conf.pos (Mach.conf m))) (Carried.tree cr)
+
+  -- A completed takeWhile's cut: its kill switch thrown, its source's
+  -- unsubscribe run; the ghost alike, a call fewer.
+  take2-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k taken s))
+               → firstCall (Carried.ctlAs cr) ≡ just (take2C π) → Hops cr
+  take2-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} cr@record { ctlAs = runAs (_ ∷ ks) e Kᴬ } π refl eq
+    with tear-take cr π {ks} e eq
+  ... | act′ , e′ , path = g , _ , path
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr ; ctlAs = runAs ks e′ Kᴬ
+        ; meets = trans (torn-part cr π) (Carried.meets cr)
+        ; owned = torn-owned hp π (Carried.owned cr)
+        ; kernels = record { holds = torn-holds cr π ; gated = torn-gated cr π }
+        ; meaning = record { fed = torn-fed cr π }
+        ; queue = torn-queue cr π
+        ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
+                         ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
+        ; sorted = hop-sorted cr eq path ; behind = torn-behind cr π })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
   ----------------------------------------------------------------------
   -- THE GHOST'S STEP, FROM A PATH EVERY SIBLING OF WHICH WAITS
 

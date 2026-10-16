@@ -177,14 +177,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE TEARDOWN.** `take2-onward`, `body-onward`: a cut switch's
-  teardown runs silent and writes only beneath a part already ended.
-  Decides whether one leaf, the machine reaching the same run over the
-  heap `unsub` leaves torn, plus a lemma per `Carried` field over the
-  torn heap, carries every cut; then the END CLIMB, a `Climbing` for
-  completes, under `take1-onward`, `fin-onward` and `emit-last`. Ruled
-  out: every cold below a cut switch spent (a lane cut inside its cold's
-  first burst stays unspent until attached, so `Gated` reads `Spent`).
+- **THE TEARDOWN.** `torn-behind` first: decides whether `Each` may read
+  parts below a taken takeWhile at all, since a flatMap there whose lanes
+  are cut shows what is left of it. Then the other `torn-` field leaves
+  and `tear-take`, then `body-onward` as the same body over `thrown`,
+  once Carried says a connect's body is done when its cut is owed; then
+  the END CLIMB, a `Climbing` for completes, under `take1-onward`,
+  `fin-onward` and `emit-last`. Ruled out: every cold below a cut switch
+  spent (a lane cut inside its cold's first burst stays unspent until
+  attached, so `Gated` reads `Spent`).
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,
@@ -286,8 +287,22 @@ by their own silent steps (`Mirror`).
   completion delivered, then its cut.
 - **`src-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
   subscribed once its body is.
-- **`take2-onward`** (Content) — FALSITY, `NO EVIDENCE`: a completed
-  takeWhile's cut, a call fewer.
+- **`torn-behind`** (Content) — FALSITY, `NO EVIDENCE`: every part heads no
+  earlier after a cut, a flatMap below it shown as what its cut lanes left.
+- **`tear-take`** (Content) — FALSITY, `NO EVIDENCE`: a completed takeWhile's
+  cut runs silently to the agenda's rest over the heap `thrown` leaves.
+- **`torn-part`** (Content) — FALSITY, `NO EVIDENCE`: the tree's part is
+  unmoved by a cut below a taken takeWhile.
+- **`torn-owned`** (Content) — FALSITY, `NO EVIDENCE`: what a cut leaves owes
+  nothing new, the cut itself no longer owed.
+- **`torn-holds`** (Content) — FALSITY, `NO EVIDENCE`: every subscription still
+  against its kernel after a cut.
+- **`torn-gated`** (Content) — FALSITY, `NO EVIDENCE`: below the thrown switch,
+  what unsubscribing reached is spent.
+- **`torn-fed`** (Content) — FALSITY, `NO EVIDENCE`: a cut's silenced joiners
+  owe nothing, the others as they were.
+- **`torn-queue`** (Content) — FALSITY, `NO EVIDENCE`: the queue and the
+  subjects' subscribers still in order after a cut.
 - **`body-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's cut once
   its body completes, a call fewer.
 - **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's

@@ -639,6 +639,8 @@ module Strongly (R : Set) where
     -- inside its own subscribe burst, or a lane cut while its cold's
     -- first burst plays, keeps its colds unspent, each reading its
     -- subscriber closed, until the attach unsubscribes them.
+    --
+    -- REFUTED: 00dd1c06 of every cold below a cut switch, by a lane whose cold plays its first burst into a takeWhile that fails and cuts
     mutual
       Spent : ∀ {Δ A} → Sub h Δ A → Set₁
       Spent (coldˢ s hd ph)                         = Lift _ (spentʰ hd ≡ true)
