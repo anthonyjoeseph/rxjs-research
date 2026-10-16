@@ -589,7 +589,7 @@ module Ascending (R : Set) where
 
   -- A flatMap's settle, read a cell at a time: its done flag, its count,
   -- its queue.
-  settledᵒ : ∀ {h A B} → Observer B h → Bool → ℕ → List A → Act h ⊤
+  settledᵒ : ∀ {h} {A B : Set} → Observer B h → Bool → ℕ → List A → Act h ⊤
   settledᵒ o d n qs = Kit.when (d ∧ (n ≡ᵇ 0) ∧ null qs) (Observer.complete o)
 
   settleᵒ₂ : ∀ {h A B} → Observer B h → FlatKit.Flat A h → Bool → ℕ → Act h ⊤
@@ -653,7 +653,7 @@ module Ascending (R : Set) where
         pool-behind  : ∀ {q} → Each H′ (Heads q) T → Each H′ (Heads q) T′
         pool-ghost   : ∀ {g q S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
                      → (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl))) ≡ false
-                     → OuterFirst (U.endˢ q) (At.partLanes H ls) → PoolBehind pl (U.outerOf (just o₀)) (U.earliest (At.partLanes H ls))
+                     → OuterFirst {A = A} (U.endˢ q) (At.partLanes H ls) → PoolBehind pl (U.outerOf (just o₀)) (U.earliest (At.partLanes H ls))
                      → Lifts H ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl) S
                      → U.step g ≡ S
                      → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
