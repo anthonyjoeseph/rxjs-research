@@ -5334,9 +5334,9 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
     or-body : ∀ σ → Trailing σ → Ordered (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Ordered x
             → M.before (M.shownAt e) x ≡ false → Ordered (M.body r σ (M.shownAt e) x)
     ordered (or-body σ ts os e eq g (out n a β′) ox be) =
-      atop-ahead r β′ σ (M.shownAt e) _ n (proj₁ (ordered ox)) be , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
+      atop-ahead r β′ σ (M.shownAt e) (M.before (M.shownAt e) (force β′)) n (proj₁ (ordered ox)) be , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
     ordered (or-body σ ts os e eq g (skip n β′) ox be) =
-      atop-ahead r β′ σ (M.shownAt e) _ n (proj₁ (ordered ox)) be , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
+      atop-ahead r β′ σ (M.shownAt e) (M.before (M.shownAt e) (force β′)) n (proj₁ (ordered ox)) be , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
     ordered (or-body σ ts os e eq g (end c)     ox be) = tt
     ordered (or-body σ ts os e eq g hush        ox be) = tt
 
@@ -5448,12 +5448,12 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
             → Every (λ k → Every∞ (λ q → Unrelated k (q ++ [ ix 0 ])) σ) x → M.before (M.shownAt e) x ≡ false
             → Steady (M.body r σ (M.shownAt e) x)
     steady (st-body σ ts os ss e eq g (out n a β′) sx ux be) =
-      past-ahead n β′ σ q _ (proj₁ (steady sx)) (strict n q be (proj₁ un)) (λ x → proj₁ un (ext-prefixed x))
+      past-ahead n β′ σ q (M.before q (force β′)) (proj₁ (steady sx)) (strict n q be (proj₁ un)) (λ x → proj₁ un (ext-prefixed x))
       , st-ahead β′ σ ts os ss (proj₂ (steady sx)) (proj₂ (every ux)) e eq g _ refl
       where q  = M.shownAt e
             un = head-shown {P = Unrelated n} σ e eq g (proj₁ (every ux))
     steady (st-body σ ts os ss e eq g (skip n β′) sx ux be) =
-      clear-next n β′ σ q _ (proj₁ (steady sx)) (λ x → proj₁ un (ext-prefixed x))
+      clear-next n β′ σ q (M.before q (force β′)) (proj₁ (steady sx)) (λ x → proj₁ un (ext-prefixed x))
       , st-ahead β′ σ ts os ss (proj₂ (steady sx)) (proj₂ (every ux)) e eq g _ refl
       where q  = M.shownAt e
             un = head-shown {P = Unrelated n} σ e eq g (proj₁ (every ux))
