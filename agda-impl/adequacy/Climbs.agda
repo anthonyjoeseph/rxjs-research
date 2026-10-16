@@ -55,7 +55,7 @@ module Ascending (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look; stored) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle; Quiet) renaming (same to same⊑)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
-  open Run (Pureᴾ R) using (Act; writeRef; Observer; Subject; _>>ᴬ_; module Kit; module FlatKit)
+  open Run (Pureᴾ R) using (Ref; Act; writeRef; Observer; Subject; _>>ᴬ_; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
@@ -218,7 +218,7 @@ module Ascending (R : Set) where
   rise le (rises path lt cl) = rose path lt (relevel cl le)
 
   -- A write, one step: the cell stored, what follows it run.
-  writes : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {r} {z} {n : Act h ⊤}
+  writes : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {t} {r : Ref h t} {z} {n : Act h ⊤}
          → a ≗ writeRef r z n
          → Σ (Act h ⊤) λ n′ → n′ ≗ n × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ store hp r (lift z) , q , run n′ σ K ⟩ clk ts bs td lg en mk)
   writes (writeRef≗ refl refl e) = _ , e , then refl now

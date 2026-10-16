@@ -28,6 +28,11 @@ AGDA_BIN ?= agda
 export AGDA_BIN
 AGDA := $(AGDA_BIN) -W error
 
+# PER-DEFINITION TIMES, opt in: `make agda AGDA_PROFILE=--profile=definitions`.
+# Agda leaves profiling options out of an interface's validity key, so this
+# rechecks nothing, and it times only the modules this run rechecks.
+AGDA_PROFILE ?=
+
 all: help
 
 help:
@@ -70,7 +75,7 @@ gate-cheap:
 	done
 
 agda:
-	@cd $(SRC) && $(AGDA) Main.agda
+	@cd $(SRC) && $(AGDA) $(AGDA_PROFILE) Main.agda
 
 gate:
 	@$(MAKE) --no-print-directory gate-cheap || { scripts/notify.py "RED (cheap checks)"; exit 1; }
