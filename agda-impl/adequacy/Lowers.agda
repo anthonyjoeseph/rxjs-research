@@ -6,10 +6,10 @@
 -- joiner's switch and slot — holds after it if it held before.
 module adequacy.Lowers where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.List using (List; []; _∷_; length)
-open import Data.Maybe using (just; nothing)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
@@ -22,10 +22,11 @@ open import Data.List.Relation.Unary.Linked using (Linked)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
 open import denotation.MonotonicList using (Timeline; Pos)
-open import operation.AbstractObservable using (module Heap; module Run; base; list; joins) renaming (module Machine to Shared)
+open import operation.AbstractObservable using (module Heap; module Run; base; list; joins; fifo) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Torn using (module Tearing)
+import denotation.Unfold as U
 
 module Lowering (R : Set) where
   open Heap using (Kind; cell; slot; play; _∋_; same) renaming (here to hereʰ; there to thereʰ)
@@ -65,16 +66,17 @@ module Lowering (R : Set) where
       lowers : (l : h ∋ cell (base Bool)) → lower (look H l) ≡ false → lower (look H′ l) ≡ false
       slots  : ∀ {A} (s : h ∋ slot A) → look H′ s ≡ look H s
       subs   : ∀ {A} (r : h ∋ cell (joins A)) → look H′ r ≡ look H r
+      queues : ∀ {A} (q : h ∋ cell (fifo A)) → look H′ q ≡ look H q
 
   open Lowers
 
   lowers-refl : ∀ {h} (H : Heapᴹ h) → Lowers H H
-  lowers-refl H = record { spends = λ _ e → e ; lowers = λ _ e → e ; slots = λ _ → refl ; subs = λ _ → refl }
+  lowers-refl H = record { spends = λ _ e → e ; lowers = λ _ e → e ; slots = λ _ → refl ; subs = λ _ → refl ; queues = λ _ → refl }
 
   lowers-trans : ∀ {h} {H H₁ H₂ : Heapᴹ h} → Lowers H H₁ → Lowers H₁ H₂ → Lowers H H₂
   lowers-trans a b = record
     { spends = λ hd e → spends b hd (spends a hd e) ; lowers = λ l e → lowers b l (lowers a l e)
-    ; slots = λ s → trans (slots b s) (slots a s) ; subs = λ r → trans (subs b r) (subs a r) }
+    ; slots = λ s → trans (slots b s) (slots a s) ; subs = λ r → trans (subs b r) (subs a r) ; queues = λ q → trans (queues b q) (queues a q) }
 
   -- Two names of one kind: the same, or apart.
   decide : ∀ {w k} (i j : w ∋ k) → i ≡ j ⊎ i ≢ j
@@ -90,19 +92,21 @@ module Lowering (R : Set) where
 
   -- A store at a kind the queue never reads.
   store-apart : ∀ {h k} (H : Heapᴹ h) (i : h ∋ k) x → k ≢ play → k ≢ cell (base Bool)
-              → (∀ {A} → k ≢ slot A) → (∀ {A} → k ≢ cell (joins A)) → Lowers H (store H i x)
-  store-apart H i x np nb ns nj = record
+              → (∀ {A} → k ≢ slot A) → (∀ {A} → k ≢ cell (joins A)) → (∀ {A} → k ≢ cell (fifo A)) → Lowers H (store H i x)
+  store-apart H i x np nb ns nj nq = record
     { spends = λ hd e → trans (cong lower (look-store H i hd (λ q → np (cong proj₁ q)))) e
     ; lowers = λ l e → trans (cong lower (look-store H i l (λ q → nb (cong proj₁ q)))) e
     ; slots  = λ s → look-store H i s (λ q → ns (cong proj₁ q))
-    ; subs   = λ r → look-store H i r (λ q → nj (cong proj₁ q)) }
+    ; subs   = λ r → look-store H i r (λ q → nj (cong proj₁ q))
+    ; queues = λ r → look-store H i r (λ q → nq (cong proj₁ q)) }
 
   spend-lowers : ∀ {h} (H : Heapᴹ h) (hd : h ∋ play) → Lowers H (store H hd (lift true))
   spend-lowers H hd = record
     { spends = sp
     ; lowers = λ l e → trans (cong lower (look-store H hd l λ ())) e
     ; slots  = λ s → look-store H hd s λ ()
-    ; subs   = λ r → look-store H hd r λ () }
+    ; subs   = λ r → look-store H hd r λ ()
+    ; queues = λ r → look-store H hd r λ () }
     where
       sp : (hd′ : _ ∋ play) → lower (look H hd′) ≡ true → lower (look (store H hd (lift true)) hd′) ≡ true
       sp hd′ e with decide hd hd′
@@ -114,7 +118,8 @@ module Lowering (R : Set) where
     { spends = λ hd e → trans (cong lower (look-store H l hd λ ())) e
     ; lowers = lw
     ; slots  = λ s → look-store H l s λ ()
-    ; subs   = λ r → look-store H l r λ () }
+    ; subs   = λ r → look-store H l r λ ()
+    ; queues = λ r → look-store H l r λ () }
     where
       lw : (l′ : _ ∋ cell (base Bool)) → lower (look H l′) ≡ false → lower (look (store H l (lift false)) l′) ≡ false
       lw l′ e with decide l l′
@@ -138,8 +143,8 @@ module Lowering (R : Set) where
           H₁ = store H′ (FlatKit.Flat.lanes fl) (lift [])
           H₂ = store H₁ (FlatKit.Flat.active fl) (lift 0) in
       lowers-trans (thrown-lowers H oc k so)
-        (lowers-trans (store-apart H′ (FlatKit.Flat.lanes fl) (lift []) (λ ()) (λ ()) (λ ()) (λ ()))
-          (lowers-trans (store-apart H₁ (FlatKit.Flat.active fl) (lift 0) (λ ()) (λ e → ℕ≢Bool (cong baseOf e)) (λ ()) (λ ()))
+        (lowers-trans (store-apart H′ (FlatKit.Flat.lanes fl) (lift []) (λ ()) (λ ()) (λ ()) (λ ()) (λ ()))
+          (lowers-trans (store-apart H₁ (FlatKit.Flat.active fl) (lift 0) (λ ()) (λ e → ℕ≢Bool (cong baseOf e)) (λ ()) (λ ()) (λ ()))
             (lanes-lowers H₂ (length (lower (look H′ (FlatKit.Flat.lanes fl)))) ls)))
     torn-lowers H (connectˢ S c b kb k fd rp e rt src bd) = lowers-trans (torn-lowers H src) (via-lowers (torn H src) kb bd)
     torn-lowers H (joinˢ j sk l x st)                     = drop-lowers H l
@@ -245,16 +250,90 @@ module Lowering (R : Set) where
     fedL-lowers lw []                f          = f
     fedL-lowers lw (lane c k s ∷ ls) (f₁ , f₂) = fed-lowers lw s f₁ , fedL-lowers lw ls f₂
 
-  postulate
-    -- A body that held no part holds none once a cut has run: a cut
-    -- only spends, throws and silences, so every `if` `part` reads goes
-    -- to `nothing` or stays.  Except a flatMap's queue, which `merged`
-    -- reads: the teardown stores the active count, a `base ℕ` cell, and
-    -- a `base (List A)` cell is not apart from it by kind (`List ⊤` and
-    -- `ℕ` are not distinguishable), so a body needs the tree's names
-    -- apart, `Books.fresh` at the one call site.
-    parted-torn : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} (z : Site t) {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
-                → Path t (connectˢ S c b kb k fd rp e rt s bd) → At.part H bd ≡ nothing → At.part (siteHeap H z) bd ≡ nothing
+  -- A part gone stays gone once a heap is lowered: every `if` `part`
+  -- reads goes to `nothing` or stays, and the one cell it reads past a
+  -- switch, a flatMap's queue, is of a kind nothing lowering writes.
+  gone-if : ∀ {X : Set₁} {b b′ : Bool} {x x′ : Maybe X} → (b′ ≡ true → b ≡ true) → (x ≡ nothing → x′ ≡ nothing)
+          → (if b then x else nothing) ≡ nothing → (if b′ then x′ else nothing) ≡ nothing
+  gone-if {b = b}     {false} r g e = refl
+  gone-if {b = true}  {true}  r g e = g e
+  gone-if {b = false} {true}  r g e = ⊥-elim (false≢true (r refl))
+
+  gone-spent : ∀ {X : Set₁} {b b′ : Bool} {x : X} → (b ≡ true → b′ ≡ true)
+             → (if b then nothing else just x) ≡ nothing → (if b′ then nothing else just x) ≡ nothing
+  gone-spent {b = true}  r e rewrite r refl = refl
+  gone-spent {b = false} r ()
+
+  module _ {h} {H H′ : Heapᴹ h} (lw : Lowers H H′) where
+    gone-map : ∀ {X Y : Set₁} {f f′ : X → Y} (m : Maybe X) {m′ : Maybe X} → (m ≡ nothing → m′ ≡ nothing)
+             → At.mapᴹ H f m ≡ nothing → At.mapᴹ H′ f′ m′ ≡ nothing
+    gone-map nothing  g e rewrite g refl = refl
+    gone-map (just _) g ()
+
+    gone-taking : ∀ {Δ A} i p (tk : Taking Δ A) (m : Maybe (U.Node Δ A)) {m′} → (m ≡ nothing → m′ ≡ nothing)
+                → At.taking? H i p tk m ≡ nothing → At.taking? H′ i p tk m′ ≡ nothing
+    gone-taking i p taking m g e = gone-map m g e
+    gone-taking i p taken  m g e = refl
+    gone-taking i p (ending _ _) m g ()
+
+    gone-merged : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) ls qs pl
+                → At.merged H op g o ls qs pl ≡ nothing → o ≡ nothing × ls ≡ [] × qs ≡ []
+    gone-merged op g nothing  []      []      pl e  = refl , refl , refl
+    gone-merged op g nothing  []      (_ ∷ _) pl ()
+    gone-merged op g nothing  (_ ∷ _) qs      pl ()
+    gone-merged op g (just _) ls      qs      pl ()
+
+    gone-connected : ∀ {Δ A B} r e t (s : Maybe (U.Node Δ A)) (b : Maybe (U.Node (A ∷ Δ) B))
+                   → At.connected H r e t s b ≡ nothing → b ≡ nothing ⊎ (s ≡ nothing × e ≡ nothing)
+    gone-connected r e       t s       nothing  g = inj₁ refl
+    gone-connected r nothing t nothing (just b) g = inj₂ (refl , refl)
+    gone-connected r (just _) t nothing (just b) ()
+    gone-connected r e       t (just _) (just b) ()
+
+    connected-none : ∀ {Δ A B} r t (b : Maybe (U.Node (A ∷ Δ) B)) → At.connected H′ r nothing t nothing b ≡ nothing
+    connected-none r t nothing  = refl
+    connected-none r t (just b) = refl
+
+    gone-cons : ∀ {X : Set₁} (x : Maybe X) xs → At.consᴹ H x xs ≡ [] → x ≡ nothing × xs ≡ []
+    gone-cons nothing  xs e = refl , e
+    gone-cons (just _) xs ()
+
+    gone-lane : ∀ {Δ B} {b b′ : Bool} (x : Maybe (U.Node Δ B)) {x′} xs {xs′} → (b′ ≡ true → b ≡ true) → (x ≡ nothing → x′ ≡ nothing) → (xs ≡ [] → xs′ ≡ [])
+              → (if b then At.consᴹ H x xs else xs) ≡ [] → (if b′ then At.consᴹ H′ x′ xs′ else xs′) ≡ []
+    gone-lane {b = false} {false} x xs r g gs e = gs e
+    gone-lane {b = true}  {false} x xs r g gs e = gs (proj₂ (gone-cons x xs e))
+    gone-lane {b = false} {true}  x xs r g gs e = ⊥-elim (false≢true (r refl))
+    gone-lane {b = true}  {true}  x xs r g gs e with gone-cons x xs e
+    ... | nx , nxs rewrite g nx | gs nxs = refl
+
+    mutual
+      part-gone : ∀ {Δ A} (s : Sub h Δ A) → At.part H s ≡ nothing → At.part H′ s ≡ nothing
+      part-gone (pendingˢ s q)                          ()
+      part-gone (coldˢ s hd ph)                         e = gone-spent (spends lw hd) e
+      part-gone (ofˢ p i xs)                            ()
+      part-gone doneˢ                                   e = refl
+      part-gone (mapˢ f s)                              e = gone-map (At.part H s) (part-gone s) e
+      part-gone (scanˢ f r s)                           e = gone-map (At.part H s) (part-gone s) e
+      part-gone (takeWhileˢ i p c k tk s)               e =
+        gone-if (raised lw (Kit.live c)) (gone-taking i p tk (At.part H s) (part-gone s)) e
+      part-gone (flatMapˢ op f fl oc k r pl so ls)      e
+        with gone-merged op (λ a q → U.subscribe (f a) q) (At.part H so) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl e
+      ... | no , nl , nq rewrite part-gone so no | lanes-gone ls nl | cong lower (queues lw (FlatKit.Flat.queue fl)) | nq = refl
+      part-gone (connectˢ S c b kb k fd rp e rt src bd) g with gone-connected rp e rt (At.part H src) (At.part H bd) g
+      ... | inj₁ nb         rewrite part-gone bd nb = refl
+      ... | inj₂ (ns , refl) rewrite part-gone src ns = connected-none rp rt (At.part H′ bd)
+      part-gone (joinˢ j sk l x st)                     e = gone-if (raised lw l) (λ n → n) e
+      part-gone (deferˢ k s)                            e = part-gone s e
+
+      lanes-gone : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.partLanes H ls ≡ [] → At.partLanes H′ ls ≡ []
+      lanes-gone []                e = refl
+      lanes-gone (lane c k s ∷ ls) e =
+        gone-lane (At.part H s) (At.partLanes H ls) (raised lw (Kit.live c)) (part-gone s) (lanes-gone ls) e
+
+  -- A body that held no part holds none once a cut has run.
+  parted-torn : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} (z : Site t) {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+              → Path t (connectˢ S c b kb k fd rp e rt s bd) → At.part H bd ≡ nothing → At.part (siteHeap H z) bd ≡ nothing
+  parted-torn H z {bd = bd} _ = part-gone (site-lowers H z) bd
 
   -- A teardown only throws switches, spends colds and silences joiners:
   -- what is owed of a live switch or an unspent cold was owed before,

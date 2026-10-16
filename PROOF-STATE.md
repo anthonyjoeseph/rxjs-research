@@ -177,17 +177,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE TEARDOWN.** `parted-torn`, the last leaf under
-  `cut-onward`, which serves a taken takeWhile and an ended body alike; then the END CLIMB, a `Climbing` for completes,
-  under `take1-onward`, `fin-onward` and `emit-last`. Ruled out: every
-  cold below a cut switch spent (a lane cut inside its cold's first
-  burst stays unspent until attached, so `Gated` reads `Spent`); a
-  connect's source torn once its body ends (a note falls before the cut,
-  so `Gated` reads the switch); heads owed below a site (`Each` reads
-  only what `seen` holds, and a teardown leaves what it reached unseen);
-  a cut's run allocating, emitting or yielding (Unsub's `tears`); a
-  flatMap torn leaving a lane live (the lanes it skips are gone, and a
-  teardown only lowers).
+- **THE END CLIMB.** A `Climbing` for completes, under `take1-onward`,
+  `fin-onward` and `emit-last`, now that a cut's run is a body
+  (`cut-onward`, every leaf proven). Decides whether a completion's climb
+  can reuse the value climb's record with the value dropped. Ruled out:
+  every cold below a cut switch spent (a lane cut inside its cold's first
+  burst stays unspent until attached); a connect's source torn once its
+  body ends; heads owed below a site; a cut's run allocating, emitting or
+  yielding; a flatMap torn leaving a lane live; a teardown reopening a
+  gone body (a queue is a `fifo` cell, a kind no teardown writes).
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,
@@ -277,8 +275,6 @@ by their own silent steps (`Mirror`).
   completion delivered, then its cut.
 - **`src-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
   subscribed once its body is.
-- **`parted-torn`** (Lowers) — FALSITY, `NO EVIDENCE`: a body with no part has
-  none once a cut runs; a flatMap's queue needs the names apart.
 - **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's
   continuation stashes its unsubscribe, a call fewer.
 - **`burst-poll`** (Content) — FALSITY, `NO EVIDENCE`: a live burst's sink

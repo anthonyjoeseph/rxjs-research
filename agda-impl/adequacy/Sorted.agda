@@ -35,7 +35,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 import Tree as T
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList using (Pos; From; done; quiet; at; emit; stall; close; From∞; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; <ᵖ-sub; <ᵖ-ix; Timeline) renaming (sub to subᴾ)
-open import operation.AbstractObservable using (Ty; _⊗_; joins; module Run; module Heap)
+open import operation.AbstractObservable using (Ty; _⊗_; joins; fifo; module Run; module Heap)
   renaming (base to baseᵗ; ref to refᵗ; sink to sinkᵗ; quiet to quietᵗ; list to listᵗ; maybe to maybeᵗ) renaming (module Machine to Shared)
 open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
 open Heap using (World; _⊑_; _⨾_; _∋_; here; there; new; wk∋; cell; slot; hush; play; same; Sink; Quiet; Handle)
@@ -94,7 +94,7 @@ module Sorting (R : Set) where
   open Run (Pureᴾ R) using (Act; Ref; El; wkEl; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; stash; cancel; eff; here; under; diverge; unfold
                            ; Observer; Subscription; Subscribe; Kont; Env; Subject; wkEnv; wkR; compile; wkAct; wkObs; _>>=ᴬ_; _>>ᴬ_; module Kit; emptyᴷ; ofᴷ; mapᴷ; scanᴷ; takeWhileᴷ; flatMapᴷ; connectᴷ; joinᴷ; via; emitAll; wkSub; module FlatKit)
   open Pure R using (Timer; wkTimer; insert; cascade; recorder; mapList)
-  open Kit using (Cut; wkCut; cut; guard; guarded; attach; when; skipᴬ; each; unsubscribeVia; readB; modify; newCut)
+  open Kit using (Cut; wkCut; cut; guard; guarded; attach; when; skipᴬ; each; unsubscribeVia; readB; readF; modify; newCut)
   open FlatKit using (Flat; wkFlat; newFlat; module FlatMap)
   open Read
 
@@ -151,6 +151,7 @@ module Sorting (R : Set) where
   Fits lo (listᵗ t)  _  = ⊤
   Fits lo (maybeᵗ t) _  = ⊤
   Fits lo (s ⊗ t)   _  = ⊤
+  Fits lo (fifo X)   _  = ⊤
 
   joined-wk : ∀ {w v A} (ρ : w ⊑ v) (ss : El w (joins A)) → joined (wkEl (joins A) ρ ss) ≡ joined ss
   joined-wk ρ []             = refl
@@ -165,6 +166,7 @@ module Sorting (R : Set) where
   fits-wk lo (listᵗ t)  ρ a  f = tt
   fits-wk lo (maybeᵗ t) ρ a  f = tt
   fits-wk lo (s ⊗ t)   ρ a  f = tt
+  fits-wk lo (fifo X)   ρ a  f = tt
 
   -- Still: delivers nothing and moves nothing — cells read, written so
   -- they fit wherever the last is, cancelled and stopped.  Asking whether
@@ -494,6 +496,9 @@ module Sorting (R : Set) where
   readB-well : ∀ {v X C p lo} (r : Ref v (baseᵗ X)) {k : X → Act v C} → (∀ x → Well p lo (k x)) → Well p lo (readB r k)
   readB-well r h = readRefʷ λ σ x _ → wk-well σ (h x)
 
+  readF-well : ∀ {v X C p lo} (r : Ref v (fifo X)) {k : List X → Act v C} → (∀ x → Well p lo (k x)) → Well p lo (readF r k)
+  readF-well r h = readRefʷ λ σ x _ → wk-well σ (h x)
+
   when-ok : ∀ {v p lo} b {m : Act v ⊤} → Well p lo m → Well p lo (when b m)
   when-ok true  w = w
   when-ok false w = doneʷ
@@ -520,7 +525,7 @@ module Sorting (R : Set) where
     open FlatMap op f o st using () renaming (run to runᶠ)
 
     settle-well : ∀ q lo → lo ≤ᵖ q → Well q lo settle
-    settle-well q lo le = readB-well (Flat.outerDone st) λ d → readB-well (Flat.active st) λ n → readB-well (Flat.queue st) λ qs →
+    settle-well q lo le = readB-well (Flat.outerDone st) λ d → readB-well (Flat.active st) λ n → readF-well (Flat.queue st) λ qs →
       when-ok (d ∧ (n ≡ᵇ 0) ∧ null qs) (proj₁ (proj₂ wo) q lo le)
 
     killAll-still : Still killAll
@@ -553,7 +558,7 @@ module Sorting (R : Set) where
                 newRefʷ tt λ σ lv → newRefʷ tt λ τ h → started-well l hl (σ ⨾ τ) (wkR τ lv , h) q lo le
 
     dequeue-well : ∀ q lo → lo ≤ᵖ q → Well q lo dequeue
-    dequeue-well q lo le = readB-well (Flat.queue st) λ where
+    dequeue-well q lo le = readF-well (Flat.queue st) λ where
       []       → settle-well q lo le
       (a ∷ as) → writeRefʷ lo settled-refl tt (start-well (f a) (hf a) q lo le)
 
@@ -788,6 +793,7 @@ module Sorting (R : Set) where
   fits-up (listᵗ t)  le f = tt
   fits-up (maybeᵗ t) le f = tt
   fits-up (s ⊗ t)   le f = tt
+  fits-up (fifo X)   le f = tt
 
   heap-up : ∀ {h lo lo′} {hp : Heapᴹ h} → lo ≤ᵖ lo′ → WellHeap lo hp → WellHeap lo′ hp
   heap-up le wh = heapʷ λ where

@@ -48,6 +48,9 @@ data Ty : Set₁ where
   -- A subject's subscribers, each with the position it joined at: its
   -- own code, so a proof can say what such a list holds.
   joins : Set → Ty
+  -- A flatMap's queue of waiting values: the user's, as `base` holds,
+  -- but its own code, so no count a teardown resets is read as one.
+  fifo  : Set → Ty
 
 -- A runtime's names live in a WORLD — what has been allocated — and stay
 -- valid in every larger one (`_⊑_`).  IO has one world; the pure heap's
@@ -138,6 +141,7 @@ module Run (P : Prims) where
   El w (maybe t) = Maybe (El w t)
   El w (s ⊗ t)   = El w s × El w t
   El w (joins A) = List (Sink w A × Pos)
+  El w (fifo X)  = List X
 
   Ref : World → Ty → Set
   Ref w t = El w (ref t)
@@ -154,6 +158,7 @@ module Run (P : Prims) where
   wkEl (s ⊗ t)   ρ (x , y)  = wkEl s ρ x , wkEl t ρ y
   wkEl (joins A) ρ []             = []
   wkEl (joins A) ρ ((s , j) ∷ xs) = (wkSink ρ s , j) ∷ wkEl (joins A) ρ xs
+  wkEl (fifo X)  ρ xs             = xs
 
   wkR : ∀ {w v t} → w ⊑ v → Ref w t → Ref v t
   wkR {t = t} = wkEl (ref t)
@@ -335,6 +340,13 @@ module Run (P : Prims) where
     modifyB : ∀ {w X} → Ref w (base X) → (X → X) → Act w ⊤
     modifyB r f = modify r λ _ → f
 
+    -- A queue's reads and writes, as a base cell's.
+    readF : ∀ {w B X} → Ref w (fifo X) → (List X → Act w B) → Act w B
+    readF r k = readRef r λ σ x → wkAct σ (k x)
+
+    modifyF : ∀ {w X} → Ref w (fifo X) → (List X → List X) → Act w ⊤
+    modifyF r f = modify r λ _ → f
+
     when : ∀ {w} → Bool → Act w ⊤ → Act w ⊤
     when b m = if b then m else skipᴬ
 
@@ -437,7 +449,7 @@ module Run (P : Prims) where
       field
         active    : Ref w (base ℕ)
         outerDone : Ref w (base Bool)
-        queue     : Ref w (base (List A))
+        queue     : Ref w (fifo A)
         lanes     : Ref w (list cutTy)
         refill    : Ref w (maybe (sink ⊤))
 
@@ -446,7 +458,7 @@ module Run (P : Prims) where
                          ; lanes = wkR ρ (Flat.lanes st) ; refill = wkR ρ (Flat.refill st) }
 
     newFlat : ∀ {A w B} → (∀ {v} → w ⊑ v → Flat A v → Act v B) → Act w B
-    newFlat k = newB 0 λ σ₁ a → newB false λ σ₂ d → newB [] λ σ₃ q → newRef (list cutTy) [] λ σ₄ ls → newRef (maybe (sink ⊤)) nothing λ σ₅ r →
+    newFlat k = newB 0 λ σ₁ a → newB false λ σ₂ d → newRef (fifo _) [] λ σ₃ q → newRef (list cutTy) [] λ σ₄ ls → newRef (maybe (sink ⊤)) nothing λ σ₅ r →
       k (σ₁ ⨾ σ₂ ⨾ σ₃ ⨾ σ₄ ⨾ σ₅) (record { active = wkR (σ₂ ⨾ σ₃ ⨾ σ₄ ⨾ σ₅) a ; outerDone = wkR (σ₃ ⨾ σ₄ ⨾ σ₅) d
                                        ; queue = wkR (σ₄ ⨾ σ₅) q ; lanes = wkR σ₅ ls ; refill = r })
 
@@ -454,7 +466,7 @@ module Run (P : Prims) where
       open Flat st
 
       settle : Act w ⊤
-      settle = readB outerDone λ d → readB active λ n → readB queue λ q →
+      settle = readB outerDone λ d → readB active λ n → readF queue λ q →
                when (d ∧ (n ≡ᵇ 0) ∧ null q) (Observer.complete o)
 
       killAll : Act w ⊤
@@ -480,13 +492,13 @@ module Run (P : Prims) where
         modify (Flat.lanes (wkFlat σ st)) (λ τ cs → wkCut τ c ∷ cs) >>ᴬ under (ix 1) (l σ (guarded c (lane σ c)) λ τ → attach (wkCut τ c)) skipᴬ)
 
       dequeue : Act w ⊤
-      dequeue = readB queue λ where
+      dequeue = readF queue λ where
         []       → settle
         (a ∷ as) → writeRef queue as (start (f a))
 
       admit : FlatOp → A → Act w ⊤
       admit (mergeᶠ nothing)  a = start (f a)
-      admit (mergeᶠ (just n)) a = readB active λ c → if c <ᵇ n then start (f a) else modifyB queue (_++ [ a ])
+      admit (mergeᶠ (just n)) a = readB active λ c → if c <ᵇ n then start (f a) else modifyF queue (_++ [ a ])
       admit switchᶠ           a = killAll >>ᴬ start (f a)
       admit exhaustᶠ          a = readB active λ c → when (c ≡ᵇ 0) (start (f a))
 

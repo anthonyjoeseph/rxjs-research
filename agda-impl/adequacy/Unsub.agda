@@ -29,7 +29,7 @@ open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
 open import denotation.MonotonicList using (Timeline)
-open import operation.AbstractObservable using (module Heap; module Run; base; ref; sink; quiet; list; maybe; _⊗_; joins) renaming (module Machine to Shared)
+open import operation.AbstractObservable using (module Heap; module Run; base; ref; sink; quiet; list; maybe; _⊗_; joins; fifo) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import operation.Machine using (module Machine)
 open import adequacy.Strong using (module Strongly)
@@ -134,6 +134,7 @@ module Unsubbing (R : Set) where
   wkEl-same (s ⊗ t)   (x , y)        = cong₂ _,_ (wkEl-same s x) (wkEl-same t y)
   wkEl-same (joins A) []             = refl
   wkEl-same (joins A) ((s , j) ∷ xs) = cong ((s , j) ∷_) (wkEl-same (joins A) xs)
+  wkEl-same (fifo X)  xs             = refl
 
   wkEnv-same : ∀ {Γ w} (e : Env Γ w) → wkEnv same e ≡ e
   wkEnv-same []         = refl
