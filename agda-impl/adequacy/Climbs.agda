@@ -940,11 +940,11 @@ module Ascending (R : Set) where
 
 
   -- A send, one step: the sink's callback run, what follows owed.
-  sends : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {X} {s : Sink h X} {x} {n : Act h ⊤}
-        → a ≗ send s x n
-        → Σ (Act h ⊤) λ n′ → n′ ≗ n
-          × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ hp , q , run (Callbacks.onNext (cbs hp s) x) same⊑ (push (rest n′) σ K) ⟩ clk ts bs td lg en mk)
-  sends (send≗ refl e) = _ , e , then refl now
+  sendStep : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {X} {s : Sink h X} {x} {n : Act h ⊤}
+           → a ≗ send s x n
+           → Σ (Act h ⊤) λ n′ → n′ ≗ n
+             × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ hp , q , run (Callbacks.onNext (cbs hp s) x) same⊑ (push (rest n′) σ K) ⟩ clk ts bs td lg en mk)
+  sendStep (send≗ refl e) = _ , e , then refl now
 
   -- An act at a value, read at one equal to it.
   at-val : ∀ {a} {X : Set a} {w} {F : X → Act w ⊤} {G : Act w ⊤} {y z : X} → y ≡ z → F z ≗ G → F y ≗ G
@@ -988,6 +988,20 @@ module Ascending (R : Set) where
   freed : ∀ {h A} → Heapᴹ h → Kit.Cut h → FlatKit.Flat A h → Heapᴹ h
   freed H c fl = store (unlive H c) (FlatKit.Flat.active fl) (lift (pred (At.val (unlive H c) (FlatKit.Flat.active fl))))
 
+  -- A freed slot's refill read: the sink, handed on.
+  refillAt : ∀ {h} {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
+           → Path T (flatMapˢ op f fl oc k r pl u ls) → Act h ⊤
+  refillAt {op = op} {f} {fl} ρ = readRef (FlatKit.Flat.refill fl) λ τ → Canon.Flat′.handOn op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl τ
+
+  -- A lane's end touches neither the refill cell nor any sink.
+  refill-freed : ∀ {h} (H : Heapᴹ h) {A} (c : Kit.Cut h) (fl : FlatKit.Flat A h)
+               → At.val (freed H c fl) (FlatKit.Flat.refill fl) ≡ At.val H (FlatKit.Flat.refill fl)
+  refill-freed H c fl = trans (cong lower (look-store (unlive H c) (FlatKit.Flat.active fl) (FlatKit.Flat.refill fl) (λ ())))
+                              (cong lower (look-store H (Kit.live c) (FlatKit.Flat.refill fl) (λ ())))
+
+  slot-freed : ∀ {h} (H : Heapᴹ h) {A X} (c : Kit.Cut h) (fl : FlatKit.Flat A h) (s : Sink h X) → cbs (freed H c fl) s ≡ cbs H s
+  slot-freed H c fl s = trans (look-store (unlive H c) (FlatKit.Flat.active fl) s (λ ())) (look-store H (Kit.live c) s (λ ()))
+
   -- The machine at a new heap running a callback, the call's rest owed
   -- past it.
   resend : (m₁ : Mach) → Heapᴹ (Conf.world (Mach.conf m₁)) → {w : World} → w ⊑ Conf.world (Mach.conf m₁) → Stack w ⊤
@@ -1021,20 +1035,15 @@ module Ascending (R : Set) where
   ...   | n₂ , e₂ , p₂ with reads {hp = unlive hp (laneOf o)} e₂
   ...     | k₃ , f₃ , p₃ with writes {hp = unlive hp (laneOf o)} (f₃ same⊑ (At.val (unlive hp (laneOf o)) (FlatKit.Flat.active fl)))
   ...       | n₄ , e₄ , p₄
-    with reads {hp = freed hp (laneOf o) fl} (≗-trans e₄ (bind≗ (wk-same refillAt) λ _ → wk-same ⟦ ks ⟧ᶜ))
-  ...         | k₅ , f₅ , p₅ with sends {hp = freed hp (laneOf o) fl} (at-val {F = k₅ same⊑} rq (f₅ same⊑ (just r)))
+    with reads {hp = freed hp (laneOf o) fl} (≗-trans e₄ (bind≗ (wk-same (refillAt ρ)) λ _ → wk-same ⟦ ks ⟧ᶜ))
+  ...         | k₅ , f₅ , p₅
+    with sendStep {hp = freed hp (laneOf o) fl}
+           (at-val {F = k₅ same⊑} (trans (refill-freed hp (laneOf o) fl) (proj₁ (holds-walk hp ρ top (Kernels.holds kn)))) (f₅ same⊑ (just r)))
   ...           | n₆ , e₆ , p₆ =
     landed (hopped-pre (⇝-trans p₁ (⇝-trans p₂ (⇝-trans p₃ (⇝-trans p₄ (⇝-trans p₅ p₆)))))
-                       (lane-dequeue st ρ πL o cl (at-val {F = λ c → Callbacks.onNext c tt} sq (proj₁ (proj₁ (proj₂ hw)) tt)) (≗-trans e₆ (wk-same ⟦ ks ⟧ᶜ))))
-    where
-      H₁ = unlive hp (laneOf o)
-      H₂ = freed hp (laneOf o) fl
-      hw = holds-walk hp ρ top (Kernels.holds kn)
-      refillAt = readRef (FlatKit.Flat.refill fl) λ τ → Canon.Flat′.handOn op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl τ
-      rq : At.val H₂ (FlatKit.Flat.refill fl) ≡ just r
-      rq = trans (cong lower (look-store H₁ (FlatKit.Flat.active fl) (FlatKit.Flat.refill fl) (λ ())))
-                 (trans (cong lower (look-store hp (Kit.live (laneOf o)) (FlatKit.Flat.refill fl) (λ ()))) (proj₁ hw))
-      sq = trans (look-store H₁ (FlatKit.Flat.active fl) r (λ ())) (look-store hp (Kit.live (laneOf o)) r (λ ()))
+                       (lane-dequeue st ρ πL o cl (at-val {F = λ c → Callbacks.onNext c tt} (slot-freed hp (laneOf o) fl r)
+                                                    (proj₁ (proj₁ (proj₂ (holds-walk hp ρ top (Kernels.holds kn)))) tt))
+                                     (≗-trans e₆ (wk-same ⟦ ks ⟧ᶜ))))
 
   -- A signal out of a lane.
   call-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
