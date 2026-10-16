@@ -182,14 +182,12 @@ by their own silent steps (`Mirror`).
   recursion, by `call-step` over one lemma per operator. Ruled out: a
   third mid-call state; an inclusive take's completion after its failing
   value rides the stack frame the value runs under, not the calls owed.
-  An exclusive take's call is a read and a RESTAGE, the take's stage
-  moved in the tree: node-local but for carrying the stack and agenda
-  across it (`end-stack`, `end-owned`); an inclusive one's the same
-  restage under one `under` step (`out-owned`); a connect's source a
-  read, a write and the feed or finish restaged (`Feeds`, `Fins`, over
-  `src-idle`). Shared residue: calls and stack carried across a restage (`fin-calls`, `fed-stack`, `fin-stack`). Remaining:
-  `climb-outer`, `close-outer`, `climb-lanes`, `close-lanes` on a
-  flatMap.
+  An operator's call is reads, writes and a RESTAGE of its node,
+  node-local but for carrying stack, calls and agenda across it
+  (`end-stack`, `fin-calls`, `end-owned`): a take's stage, a connect's
+  feed (over `src-idle`), a flatMap's pool (over `outer-live`,
+  `active-lanes`); an inclusive take's under one `under` step.
+  Remaining: `climb-outer`, `climb-lanes`, `close-lanes`.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -201,8 +199,8 @@ by their own silent steps (`Mirror`).
   `Off`. Ruled out for the scan: a write needs no non-local leaf but
   `tells-past`. Remaining: an own-cell apartness fold carrying
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
-  and `up-lanes` by a flatMap head bound; then `close-outer`,
-  `close-lanes` the same way, in the form C consumes.
+  and `up-lanes` by a flatMap head bound; then `close-lanes` and
+  `close-outer`'s `sd-*` the same way, in the form C consumes.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -221,8 +219,46 @@ by their own silent steps (`Mirror`).
   ghost's step leaves its parts placed.
 - **`close-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane ended shuts,
   refills, or ends the flatMap past its outer's end.
-- **`close-outer`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's outer ended
-  settles: the flatMap ends with no lane left, or runs on.
+- **`outer-live`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's outer
+  signals only while its cut is live.
+- **`active-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's count reads
+  zero exactly when no lane is live.
+- **`pool-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer ended with lanes
+  or a queue left: the pool restaged, the ghost past the outer's skip.
+- **`pool-calls`** (Climbs) — FALSITY, `NO EVIDENCE`: the calls owed carry
+  across a flatMap's pool restaged.
+- **`pool-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
+  stands against it with a flatMap's pool restaged.
+- **`pool-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
+  with a flatMap's pool restaged.
+- **`pool-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
+  flatMap's pool restaged.
+- **`pool-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
+  flatMap's pool restaged.
+- **`pool-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
+  flatMap's pool restaged.
+- **`pool-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
+  flatMap's pool restaged.
+- **`pool-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
+  sooner than the run with a flatMap's pool restaged.
+- **`sd-active`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves its count.
+- **`sd-fifo`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done flag
+  leaves its queue.
+- **`sd-part`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done flag
+  leaves every part.
+- **`sd-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves every lift.
+- **`sd-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves `Owned`.
+- **`sd-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves `Kernels`.
+- **`sd-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves `Meaning`.
+- **`sd-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves `Queue`.
+- **`sd-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves every part's head.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a takeWhile's completion
   begun under its failing value, its cut the frame's rest.
 - **`last-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a spent `of`'s completion

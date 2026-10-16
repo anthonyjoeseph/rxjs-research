@@ -4,7 +4,7 @@
 -- operator's callback one rise; and the close, its teardown.
 module adequacy.Climbs where
 
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; null)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥-elim)
@@ -15,10 +15,10 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
-open import Level using (lift)
+open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
@@ -40,10 +40,11 @@ open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (Out; note; Pureᴾ; module Pure)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Lift using (module Lifting)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Local using (module Locality)
 
 open Events∞
 
@@ -52,7 +53,7 @@ module Ascending (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; spent?; store) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle) renaming (same to same⊑)
   open Sorting R using (WellMach)
-  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; El; Observer; _>>ᴬ_; module Kit; module Subject; under; done; wkAct)
+  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct)
   open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; under≗; ≗-refl; Meets; Each; Heads; seen) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade)
@@ -60,8 +61,9 @@ module Ascending (R : Set) where
   open Tearing R using (fresh-path; takeSite; bodySite)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
-  open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; heightL; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
+  open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; heightL; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; climb-outer; climb-lanes; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
+  open Locality R using (stored-at)
   open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind)
   open Read
 
@@ -518,6 +520,14 @@ module Ascending (R : Set) where
          → Σ (Act h ⊤) λ n′ → n′ ≗ n × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ store hp r (lift z) , q , run n′ σ K ⟩ clk ts bs td lg en mk)
   writes (writeRef≗ refl refl e) = _ , e , then refl now
 
+  -- A read, one step: the cell's value handed to what follows it.
+  reads : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {t} {r : Ref h t}
+            {k : ∀ {v} → h ⊑ v → El v t → Act v ⊤}
+        → a ≗ readRef r k
+        → Σ (∀ {v} → h ⊑ v → El v t → Act v ⊤) λ k′ → (∀ {v} (τ : h ⊑ v) x → k′ τ x ≗ k τ x)
+          × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ hp , q , run (k′ same⊑ (At.val hp r)) σ K ⟩ clk ts bs td lg en mk)
+  reads (readRef≗ refl f) = _ , f , then refl now
+
   -- A value through a scan: its cell read and written, the accumulated
   -- value one operator up, the tree's load as it was.
   scan-pass : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
@@ -551,19 +561,181 @@ module Ascending (R : Set) where
     (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) gn , S , Lρ , sg))
 
   postulate
-    -- A flatMap's outer ended: its done flag written, settled: the
-    -- flatMap ends if no lane is left, or the lanes run on.
-    close-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                  {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
-                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {ks}
-                → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (closes ks) → Called st m₁ (ρ ⊕ in-outer here)
-
     -- A lane ended: shut, the active count down, the next queued value
     -- begun or the flatMap ended past its outer's end.
     close-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {ks}
                 → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks) → Called st m₁ (ρ ⊕ in-lanes πL)
+
+  -- A flatMap's outer signals only while the flatMap is subscribed: its
+  -- cut is what unsubscribing it pulls, and an emitter whose observer
+  -- path is closed skips.
+  postulate
+    outer-live : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                 (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {sg : Signal T A}
+               → Calling g ℓ m₁ (ρ ⊕ in-outer here) sg → At.val (Conf.heap (Mach.conf m₁)) (Kit.live oc) ≡ true
+
+  -- A pair of lists both empty.
+  nulls : ∀ {X Y : Set} (xs : List X) (ys : List Y) → (null xs ∧ null ys) ≡ true → xs ≡ [] × ys ≡ []
+  nulls []      []      refl = refl , refl
+  nulls []      (_ ∷ _) ()
+  nulls (_ ∷ _) _       ()
+
+  -- A guard read shut: nothing.
+  shut-code : ∀ {w} {b : Bool} {m : Act w ⊤} → b ≡ false → Kit.when b m ≗ done tt
+  shut-code refl = ≗-refl _
+
+  -- A flatMap's settle, read a cell at a time: its done flag, its count,
+  -- its queue.
+  settledᵒ : ∀ {h A B} → Observer B h → Bool → ℕ → List A → Act h ⊤
+  settledᵒ o d n qs = Kit.when (d ∧ (n ≡ᵇ 0) ∧ null qs) (Observer.complete o)
+
+  settleᵒ₂ : ∀ {h A B} → Observer B h → FlatKit.Flat A h → Bool → ℕ → Act h ⊤
+  settleᵒ₂ o fl d n = Kit.readF (FlatKit.Flat.queue fl) (settledᵒ o d n)
+
+  settleᵒ₁ : ∀ {h A B} → Observer B h → FlatKit.Flat A h → Bool → Act h ⊤
+  settleᵒ₁ o fl d = Kit.readB (FlatKit.Flat.active fl) (settleᵒ₂ o fl d)
+
+  settleᵒ : ∀ {h A B} → Observer B h → FlatKit.Flat A h → Act h ⊤
+  settleᵒ o fl = Kit.readB (FlatKit.Flat.outerDone fl) (settleᵒ₁ o fl)
+
+  -- A flatMap with its outer gone, no lane live and nothing queued shows
+  -- nothing.
+  flat-gone : ∀ {h} (H : Heapᴹ h) {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
+            → At.part H u ≡ nothing → At.partLanes H ls ≡ [] → At.val H (FlatKit.Flat.queue fl) ≡ []
+            → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ nothing
+  flat-gone H e₁ e₂ e₃ rewrite e₁ | e₂ | e₃ = refl
+
+  -- A FLATMAP'S OUTER ENDED: its done flag written, nothing else of the
+  -- heap or the tree moved; settled, the count read as the live lanes.
+  module Settles {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
+                 (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) where
+    H′ = store H (FlatKit.Flat.outerDone fl) (lift true)
+
+    done-read : At.val H′ (FlatKit.Flat.outerDone fl) ≡ true
+    done-read = cong lower (stored-at H (FlatKit.Flat.outerDone fl) (lift true))
+
+    postulate
+      sd-active    : At.val H′ (FlatKit.Flat.active fl) ≡ At.val H (FlatKit.Flat.active fl)
+      sd-fifo      : At.val H′ (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
+      sd-part      : ∀ {Δ′ A′} (v : Sub h Δ′ A′) → At.part H′ v ≡ At.part H v
+      sd-lifts     : ∀ {Δ′ A′ Δ″ A″} {t : Sub h Δ′ A′} {v : Sub h Δ″ A″} {σ : Path t v} {s S} → Lifts H σ s S → Lifts H′ σ s S
+      sd-owned     : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
+      sd-kernels   : Kernels H T → Kernels H′ T
+      sd-meaning   : Meaning H T → Meaning H′ T
+      sd-queue     : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
+      sd-behind    : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
+      active-lanes : Kernels H T → (At.val H (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ null (At.partLanes H ls)
+
+    settle-eq : Kernels H T → ((At.val H′ (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl)))
+                              ≡ (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl)))
+    settle-eq kn = trans (cong₂ (λ n qs → (n ≡ᵇ 0) ∧ null qs) sd-active sd-fifo)
+                         (cong (λ x → x ∧ null (At.val H (FlatKit.Flat.queue fl))) (active-lanes kn))
+
+    -- Lanes or a queue left: the pool takes what the outer left running,
+    -- the ghost past the outer's skip.
+    module Pooled (o₀ : U.Node Δ A) where
+      v  = flatMapˢ op f fl oc k r (U.unionᶜ pl (U.restᶜ o₀)) u ls
+      T′ = plant ρ v
+
+      postulate
+        pool-calls   : (ks : List (Call T)) → Σ (List (Call T′)) λ ks′ → ⟦ ks ⟧ᶜ ≗ ⟦ ks′ ⟧ᶜ
+        pool-stack   : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} → StackAs T p′ ϑ K bs → StackAs T′ p′ ϑ K bs
+        pool-ticked  : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (pool-stack sk)
+        pool-owned   : ∀ {w q bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {act} (sk : StackAs T q ϑ K bs) (ks : List (Call T))
+                       (e : act ≗ ⟦ proj₁ (pool-calls ks) ⟧ᶜ)
+                     → Owned H′ T (runAs ks (≗-refl _) sk) → Owned H′ T′ (runAs (proj₁ (pool-calls ks)) e (pool-stack sk))
+        pool-kernels : Kernels H′ T → Kernels H′ T′
+        pool-meaning : Meaning H′ T → Meaning H′ T′
+        pool-queue   : ∀ {q clk ts} → Queue H′ q clk ts T → Queue H′ q clk ts T′
+        pool-behind  : ∀ {q} → Each H′ (Heads q) T → Each H′ (Heads q) T′
+        pool-ghost   : ∀ {g q S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
+                     → (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl))) ≡ false
+                     → OuterFirst (U.endˢ q) (At.partLanes H ls) → PoolBehind pl (U.outerOf (just o₀)) (U.earliest (At.partLanes H ls))
+                     → Lifts H ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl) S
+                     → U.step g ≡ S
+                     → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+                       × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+
+  -- A flatMap's outer ended: its guard read open, its done flag written,
+  -- its count and queue read.  Nothing left: the flatMap's end one
+  -- operator up.  Else the lanes run on, the pool taking what the outer
+  -- left running.
+  close-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {ks}
+              → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (closes ks) → Called st m₁ (ρ ⊕ in-outer here)
+  close-outer st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} ρ {ks}
+    cl@record { sane = sn ; placed = pd ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+              ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+              ; behind = bh ; kept = kp }
+    with lifts-split ρ (in-outer here) L
+       | reads (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-outer here) top) cd)
+  ... | _ , lifts-outer {o₀ = o₀} of pb lifts-here , Lρ | k₁ , f₁ , p₁
+    with writes (≗-trans (f₁ same⊑ (At.val hp (Kit.live oc)))
+                   (bind≗ (≗-trans (wk-same (Kit.when (At.val hp (Kit.live oc))
+                                              (writeRef (FlatKit.Flat.outerDone fl) true (settleᵒ (Here.obs (walk ρ top)) fl))))
+                                   (open-code (outer-live ρ cl)))
+                          λ _ → wk-same ⟦ ks ⟧ᶜ))
+  ...   | n₂ , e₂ , p₂ with reads {hp = Settles.H′ hp ρ} e₂
+  ...     | k₃ , f₃ , p₃
+    with reads {hp = Settles.H′ hp ρ}
+           (≗-trans (f₃ same⊑ (At.val (Settles.H′ hp ρ) (FlatKit.Flat.outerDone fl)))
+              (bind≗ (wk-same (settleᵒ₁ (Here.obs (walk ρ top)) fl (At.val (Settles.H′ hp ρ) (FlatKit.Flat.outerDone fl)))) λ _ → wk-same ⟦ ks ⟧ᶜ))
+  ...       | k₄ , f₄ , p₄
+    with reads {hp = Settles.H′ hp ρ}
+           (≗-trans (f₄ same⊑ (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl)))
+              (bind≗ (wk-same (settleᵒ₂ (Here.obs (walk ρ top)) fl (At.val (Settles.H′ hp ρ) (FlatKit.Flat.outerDone fl))
+                                          (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl)))) λ _ → wk-same ⟦ ks ⟧ᶜ))
+  ...         | k₅ , f₅ , p₅
+    with (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)) in eq
+  ...           | true =
+    rise kp (rises {sg′ = closes ks} path (one-lower ρ one-outer) (record
+      { sane = sn ; placed = pd ; ctl = refl
+      ; code = ≗-trans e₅ (bind≗ (open-code {m = Observer.complete o} (trans (cong (λ x → x ∧ b) (Settles.done-read hp ρ)) eq)) λ _ → ≗-refl ⟦ ks ⟧ᶜ)
+      ; stack = sk
+      ; lifted = trans (Settles.sd-part hp ρ (flatMapˢ op f fl oc k r po u ls)) (flat-gone hp gn (proj₁ nl) (proj₂ nl)) , S
+               , Settles.sd-lifts hp ρ (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
+                                               (proj₁ nl) (proj₂ nl) Lρ) , sg
+      ; owned = Settles.sd-owned hp ρ ow ; kernels = Settles.sd-kernels hp ρ kn ; meaning = Settles.sd-meaning hp ρ mn
+      ; queue = Settles.sd-queue hp ρ qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ bh ; kept = inj₁ refl }))
+    where
+      o    = Here.obs (walk ρ top)
+      b    = (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl))
+      path = ⇝-trans p₁ (⇝-trans p₂ (⇝-trans p₃ (⇝-trans p₄ p₅)))
+      e₅   = ≗-trans (f₅ same⊑ (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))
+               (bind≗ (wk-same (settledᵒ o (At.val (Settles.H′ hp ρ) (FlatKit.Flat.outerDone fl)) (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl))
+                                         (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))) λ _ → wk-same ⟦ ks ⟧ᶜ)
+      nl   = nulls (At.partLanes hp ls) (At.val hp (FlatKit.Flat.queue fl)) (trans (sym (Settles.settle-eq hp ρ kn)) eq)
+  ...           | false
+    with Settles.Pooled.pool-ghost hp ρ o₀ sn pd gn (trans (sym (Settles.settle-eq hp ρ kn)) eq) of pb Lρ sg
+  ...             | g″ , pg , sn″ , pd″ , k″ , r″ , ag , pp =
+    landed (g″ , _ , path
+      , carried (record
+        { sane = sn″ ; placed = pd″ ; tree = Settles.Pooled.T′ hp ρ o₀
+        ; ctlAs = runAs (proj₁ (Settles.Pooled.pool-calls hp ρ o₀ ks)) ec (Settles.Pooled.pool-stack hp ρ o₀ sk)
+        ; meets = pg
+        ; owned = Settles.Pooled.pool-owned hp ρ o₀ sk ks ec (Settles.sd-owned hp ρ ow)
+        ; kernels = Settles.Pooled.pool-kernels hp ρ o₀ (Settles.sd-kernels hp ρ kn)
+        ; meaning = Settles.Pooled.pool-meaning hp ρ o₀ (Settles.sd-meaning hp ρ mn)
+        ; queue = Settles.Pooled.pool-queue hp ρ o₀ (Settles.sd-queue hp ρ qu)
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
+                         ; clocked = proj₁ ck , Settles.Pooled.pool-ticked hp ρ o₀ clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
+        ; sorted = sorted-⇝ so path ; behind = Settles.Pooled.pool-behind hp ρ o₀ (Settles.sd-behind hp ρ bh) })
+      , passed ag pp)
+    where
+      o    = Here.obs (walk ρ top)
+      b    = (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl))
+      v    = flatMapˢ op f fl oc k r (U.unionᶜ po (U.restᶜ o₀)) u ls
+      path = ⇝-trans p₁ (⇝-trans p₂ (⇝-trans p₃ (⇝-trans p₄ p₅)))
+      e₅   = ≗-trans (f₅ same⊑ (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))
+               (bind≗ (wk-same (settledᵒ o (At.val (Settles.H′ hp ρ) (FlatKit.Flat.outerDone fl)) (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl))
+                                         (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))) λ _ → wk-same ⟦ ks ⟧ᶜ)
+      ec   = ≗-trans (≗-trans e₅ (bind≗ (shut-code {m = Observer.complete o} (trans (cong (λ x → x ∧ b) (Settles.done-read hp ρ)) eq)) λ _ → ≗-refl ⟦ ks ⟧ᶜ))
+                     (proj₂ (Settles.Pooled.pool-calls hp ρ o₀ ks))
 
   -- A signal reaching a flatMap's outer.
   call-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
@@ -639,14 +811,6 @@ module Ascending (R : Set) where
     where
       ss = At.val hp (Subject.subscribers Sj)
       v  = connectˢ Sj c b kb k (feeding y q ss) rp e rt u bd
-
-  -- A read, one step: the cell's value handed to what follows it.
-  reads : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {t} {r : Ref h t}
-            {k : ∀ {v} → h ⊑ v → El v t → Act v ⊤}
-        → a ≗ readRef r k
-        → Σ (∀ {v} → h ⊑ v → El v t → Act v ⊤) λ k′ → (∀ {v} (τ : h ⊑ v) x → k′ τ x ≗ k τ x)
-          × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ hp , q , run (k′ same⊑ (At.val hp r)) σ K ⟩ clk ts bs td lg en mk)
-  reads (readRef≗ refl f) = _ , f , then refl now
 
   -- A CONNECT FINISHING: its subject closed, the feed restaged from `idle`
   -- to the source's end at the run's position, owed to the subscribers
