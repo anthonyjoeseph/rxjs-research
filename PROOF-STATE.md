@@ -183,10 +183,10 @@ by their own silent steps (`Mirror`).
   node's own name keeps every other node's predicate, so a step owes only
   its node's fact. `climb-scan` is a body over the `scan-*` framing
   leaves; next `close-outer`, `close-lanes`, `close-source` the same way.
-  Decides whether the four writes fall with only node-local leaves;
-  `scan-behind` is the whole-tree one, a part's head bounded by its
-  children's, and surviving as one is the finding. Done when the
-  framing leaves are proven.
+  Decides whether the four writes fall with only node-local leaves.
+  `scan-behind` is a body: the whole-tree residue is `scan-above`, a
+  part's head bounded by its children's, one bound per `taking?`,
+  `merged`, `connected`. Done when the framing leaves are proven.
 - **C. THE CALLBACK RELATION.** One per-operator lemma: an observer at a
   path, run from a related state, reaches a related state with the ghost
   advanced, by recursion up the path. `Climbing` and `Closing` become one
@@ -243,8 +243,12 @@ by their own silent steps (`Mirror`).
   hold emits to a guard that drops it, the ghost alike, a value fewer.
 - **`climb-lanes`** (Lift) — FALSITY, `NO EVIDENCE`: a lane's value climbs
   into its flatMap through `wkObs same`, equal up to `≗`.
-- **`scan-behind`** (Frame) — FALSITY, `NO EVIDENCE`: the parts above a
-  written accumulator still head no sooner than the run.
+- **`scan-above`** (Frame) — FALSITY, `NO EVIDENCE`: the scan and every
+  part above it still head no sooner than the run after the write.
+- **`scan-sees`** (Frame) — FALSITY, `NO EVIDENCE`: a path seen after the
+  write was seen before, to a node alike or above the scan.
+- **`scan-defined`** (Frame) — FALSITY, `NO EVIDENCE`: whether a node has
+  a part never reads an accumulator.
 - **`scan-lifts`** (Frame) — FALSITY, `NO EVIDENCE`: a lift above a scan
   survives a write at its accumulator.
 - **`scan-owned`** (Frame) — FALSITY, `NO EVIDENCE`: `Owned` survives a write

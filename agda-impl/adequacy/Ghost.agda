@@ -34,14 +34,9 @@ open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import denotation.Compositional using ([]ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_; Under; module Sorting)
 open import operation.Machine using (module Machine)
-open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
-open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
-open import adequacy.Local using (module Locality)
-open import adequacy.Lowers using (module Lowering)
-open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (afterᴱ)
@@ -54,27 +49,16 @@ open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not
 open Events∞
 
 module Ghosting (R : Set) where
-  open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read; feed)
-  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look; stored) renaming (go to goᴵ)
-  open Heap using (World; _⊑_; Handle; Quiet) renaming (same to same⊑)
+  open Machine R using (Mach; Step; silent; value; complete; drained; step; begin; Read)
+  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; run)
+  open Heap using (World; _⊑_)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
-  open Run (Pureᴾ R) using (Act; writeRef; Observer; Subject; _>>ᴬ_; module Kit; module FlatKit)
-  open Recording R using (silent-keeps; value-notes)
-  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
-    flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
-    Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; Taking; taking; taken; feeding; finishing; PathLanes; this-lane; next-lane;
-    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; names; ≗-refl; Meets; Each; Heads; rootObs;
-    seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
-  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
-    StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
-  open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
-  open Moving R using (pend; takes; takes-plant; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
-    joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
-  open Tearing R using (part-alike; look-store; get-put-same; fresh-path; Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
-  open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears; ≗-trans; wk-same; bind≗)
-  open Locality R using (site-holds; site-gated)
-  open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
-  open Sequencing R using (seq-assoc)
+  open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
+  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; Owned; Path; done≗; Call; taking; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; Each; Heads; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join)
+  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; bottomAs; restAs; backAs; reholdAs; StackAs; CtlAs; agenda; bursts; begins) renaming (Placed to Placedᴬ)
+  open Pure R using (End; finished; dry; cutOff)
+  open Moving R using (pend; takes)
+  open Unsubbing R using (_⇝_; now; then; ⇝-trans)
   open Read
 
 
