@@ -12,7 +12,7 @@ open import Data.List.Properties using (∷-injective; ∷-injectiveʳ; ++-assoc
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
-open import Data.Nat.Properties using (+-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
+open import Data.Nat.Properties using (≤-refl; +-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
@@ -929,14 +929,21 @@ mutual
 -- operator makes a position: a step or an end under where it
 -- subscribes, a mark just past what it shows, a timer's frame tagged
 -- with the burst before it, a source's position tagged with a join.
+-- A burst's end keeps its root's tick.
+tick-last : ∀ r → tick (r ++ [ last ]) ≡ tick r
+tick-last []          = refl
+tick-last (ix _ ∷ _)  = refl
+tick-last (sub _ ∷ _) = refl
+tick-last (last ∷ _)  = refl
+
 record Rules : Set₁ where
   field
     S P Src : Pos → Set
     child   : ∀ j l → Mark l → S j → P (j ++ [ l ])
     deeper  : ∀ h l → Mark l → P h → P (h ++ [ l ])
     held    : ∀ h → P h → S h
-    frame   : ∀ n e → P e → S (ix (suc n) ∷ sub e ∷ [])
-    join    : ∀ q j → Src q → S j → P (q ++ [ sub j ])
+    frame   : ∀ n e → P e → tick e ≤ n → S (ix (suc n) ∷ sub e ∷ [])
+    join    : ∀ q j → Src q → S j → j <ᵖ q ≡ true → P (q ++ [ sub j ])
     source  : ∀ h → P h → Src h
 
 module Reach (R : Rules) where
@@ -945,23 +952,25 @@ module Reach (R : Rules) where
   -- A cold shows its subscribe burst under where it subscribes, and
   -- each later frame at a tick past it, tagged with the burst before.
   mutual
-    every-frames : ∀ {A t} τ e (m : M.From A (suc t)) → P e → Every P (M.frames τ e m)
-    every (every-frames τ e M.done                    pe) = pe
-    every (every-frames τ e M.quiet                   pe) = tt
-    every (every-frames τ e (M.at (suc t′) (s≤s _) b) pe) =
-      every (every-burst τ _ 0 b (subst (λ x → S (ix x ∷ sub e ∷ [])) (sym (+-suc τ t′)) (frame (τ + t′) e pe)))
+    every-frames : ∀ {A t} τ e (m : M.From A (suc t)) → tick e ≡ τ + t → P e → Every P (M.frames τ e m)
+    every (every-frames τ e M.done                     te pe) = pe
+    every (every-frames τ e M.quiet                    te pe) = tt
+    every (every-frames τ e (M.at (suc t′) (s≤s le) b) te pe) =
+      every (every-burst τ _ 0 b refl (subst (λ x → S (ix x ∷ sub e ∷ [])) (sym (+-suc τ t′))
+        (frame (τ + t′) e pe (subst (_≤ τ + t′) (sym te) (+-monoʳ-≤ τ le)))))
 
-    every-burst : ∀ {A t} τ r i (b : M.Frame A t) → S r → Every P (M.burst τ r i b)
-    every (every-burst τ r i (M.emit a k) sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) (M.Frame∞.force k) sr , everyT-idle
-    every (every-burst τ r i (M.stall k)  sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) (M.Frame∞.force k) sr , everyT-idle
-    every (every-burst τ r i (M.close k)  sr) =
-      child r (ix i) (ix-mark i) sr , every-frames τ (r ++ [ last ]) (M.From∞.force k) (child r last last-mark sr) , everyT-idle
+    every-burst : ∀ {A t} τ r i (b : M.Frame A t) → tick r ≡ τ + t → S r → Every P (M.burst τ r i b)
+    every (every-burst τ r i (M.emit a k) tr sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) (M.Frame∞.force k) tr sr , everyT-idle
+    every (every-burst τ r i (M.stall k)  tr sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) (M.Frame∞.force k) tr sr , everyT-idle
+    every (every-burst τ r i (M.close k)  tr sr) =
+      child r (ix i) (ix-mark i) sr , every-frames τ (r ++ [ last ]) (M.From∞.force k) (trans (tick-last r) tr) (child r last last-mark sr) , everyT-idle
 
   every-start : ∀ {A} p (m : From A 0) → S p → Every P (M.start p m)
-  every-start p (M.at zero _ b)    sp = every-burst (tick p) p 0 b sp
+  every-start p (M.at zero _ b)    sp = every-burst (tick p) p 0 b (sym (+-identityʳ (tick p))) sp
   every-start p (M.at (suc n) _ b) sp =
-    every-burst (tick p) _ 0 b
-      (subst (λ x → S (ix x ∷ sub (p ++ [ last ]) ∷ [])) (sym (+-suc (tick p) n)) (frame (tick p + n) _ (child p last last-mark sp)))
+    every-burst (tick p) _ 0 b refl
+      (subst (λ x → S (ix x ∷ sub (p ++ [ last ]) ∷ [])) (sym (+-suc (tick p) n))
+        (frame (tick p + n) _ (child p last last-mark sp) (subst (_≤ tick p + n) (sym (tick-last p)) (m≤m+n (tick p) n))))
   every-start p M.done             sp = record { every = child p last last-mark sp }
   every-start p M.quiet            sp = record { every = tt }
 
@@ -987,18 +996,18 @@ module Reach (R : Rules) where
   -- A join at `p` shows what it missed just past `p`, the rest tagged.
   mutual
     every-rejoin : ∀ {A} p (e : Events A) → S p → Every Src e → Every P (M.rejoin p e)
-    every (every-rejoin p (out q a k) sp se) = every (every-shown p q (just a) k (p <ᵖ q) sp (proj₁ (every se)) (proj₁ (proj₂ (every se))))
-    every (every-rejoin p (skip q k)  sp se) = every (every-shown p q nothing k (p <ᵖ q) sp (proj₁ (every se)) (proj₁ (proj₂ (every se))))
-    every (every-rejoin p (end c)     sp se) with p <ᵖ c
-    ... | true  = join c p (every se) sp
+    every (every-rejoin p (out q a k) sp se) = every (every-shown p q (just a) k (p <ᵖ q) refl sp (proj₁ (every se)) (proj₁ (proj₂ (every se))))
+    every (every-rejoin p (skip q k)  sp se) = every (every-shown p q nothing k (p <ᵖ q) refl sp (proj₁ (every se)) (proj₁ (proj₂ (every se))))
+    every (every-rejoin p (end c)     sp se) with p <ᵖ c in pc
+    ... | true  = join c p (every se) sp pc
     ... | false = child p last last-mark sp
     every (every-rejoin p hush        sp se) = tt
 
-    every-shown : ∀ {A} p q (a : Maybe A) (k : Events∞ A) b → S p → Src q → Every Src (force k) → Every P (M.shown p q a k b)
-    every (every-shown p q (just a) k true  sp sq sk) = join q p sq sp , every-rejoin p (force k) sp sk , everyT-idle
-    every (every-shown p q nothing  k true  sp sq sk) = join q p sq sp , every-rejoin p (force k) sp sk , everyT-idle
-    every (every-shown p q (just a) k false sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk , everyT-idle
-    every (every-shown p q nothing  k false sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk , everyT-idle
+    every-shown : ∀ {A} p q (a : Maybe A) (k : Events∞ A) b → p <ᵖ q ≡ b → S p → Src q → Every Src (force k) → Every P (M.shown p q a k b)
+    every (every-shown p q (just a) k true  pq sp sq sk) = join q p sq sp pq , every-rejoin p (force k) sp sk , everyT-idle
+    every (every-shown p q nothing  k true  pq sp sq sk) = join q p sq sp pq , every-rejoin p (force k) sp sk , everyT-idle
+    every (every-shown p q (just a) k false pq sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk , everyT-idle
+    every (every-shown p q nothing  k false pq sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk , everyT-idle
 
   -- A lane held to the rules wherever it may subscribe.
   Lane : ∀ {B} → MonotonicList B → Set
@@ -1197,8 +1206,8 @@ keyedRules p = record
   ; child  = λ j l _ o → owned-snoc p j l o
   ; deeper = λ h l _ b → beneath-snoc p h l b
   ; held   = beneath-owned p
-  ; frame  = λ n e b → inj₂ (inj₁ (beneath-owned p e b))
-  ; join   = λ q j _ o → inj₂ (owned-tagged p j (q ++ [ sub j ]) o (tagged-sub q j))
+  ; frame  = λ n e b _ → inj₂ (inj₁ (beneath-owned p e b))
+  ; join   = λ q j _ o _ → inj₂ (owned-tagged p j (q ++ [ sub j ]) o (tagged-sub q j))
   ; source = λ _ _ → tt
   }
 
@@ -1211,8 +1220,8 @@ headedRules = record
   ; child  = λ j _ _ h → headed-snoc j h
   ; deeper = λ h _ _ x → headed-snoc h x
   ; held   = λ _ x → x
-  ; frame  = λ _ _ _ → tt
-  ; join   = λ q _ hq _ → headed-snoc q hq
+  ; frame  = λ _ _ _ _ → tt
+  ; join   = λ q _ hq _ _ → headed-snoc q hq
   ; source = λ _ x → x
   }
 
@@ -1294,8 +1303,8 @@ apartRules a nt = record
   ; child  = apart-mark a
   ; deeper = apart-mark a
   ; held   = λ _ x → x
-  ; frame  = λ n e (na , nb) → frame-fwd a n e nt na nb , frame-bwd a n e nb
-  ; join   = apart-join a
+  ; frame  = λ n e (na , nb) _ → frame-fwd a n e nt na nb , frame-bwd a n e nb
+  ; join   = λ q j nq dj _ → apart-join a q j nq dj
   ; source = λ _ → proj₁
   }
 
@@ -1567,6 +1576,72 @@ tick-past {m} {n} p q l = <ᵖ-part [] {ix m} {ix n} p q (ix-< l) , apart
         ... | _ , _ , e with ∷-injective e
         ...   | refl , _ = <⇒≢ l refl
 
+prefix-rest : ∀ k h → Prefix k h → Σ Pos (λ ys → h ≡ k ++ ys)
+prefix-rest []      h       _          = h , refl
+prefix-rest (_ ∷ _) []      ()
+prefix-rest (a ∷ k) (b ∷ h) (refl , p) with prefix-rest k h p
+... | ys , refl = ys , refl
+
+prefix-lt : ∀ j n → Prefix j n → j ≡ n ⊎ j <ᵖ n ≡ true
+prefix-lt j n pr with prefix-rest j n pr
+... | []     , refl = inj₁ (sym (++-identityʳ j))
+... | l ∷ ls , refl = inj₂ (<ᵖ-below j ls)
+
+-- RISING: whatever under `p` tags a position came before it.  A join
+-- keys a source's event after where it joined, and a timer's frame
+-- sits at a tick past its burst's.
+Rise : Pos → Pos → Set
+Rise p h = Headed h × (∀ k → Headed k → Owned p k → Tagged k h → k <ᵖ h ≡ true)
+
+rise-owned : ∀ p k h → Rise p h → Headed k → Owned p k → Owned k h → k ≡ h ⊎ k <ᵖ h ≡ true
+rise-owned p k h r hk ok (inj₁ pr) = prefix-lt k h pr
+rise-owned p k h r hk ok (inj₂ t)  = inj₂ (proj₂ r k hk ok t)
+
+tick-mono : ∀ k h → Headed k → Headed h → k ≡ h ⊎ k <ᵖ h ≡ true → tick k ≤ tick h
+tick-mono (ix t ∷ ks) (ix u ∷ hs) _ _ (inj₁ refl) = ≤-refl
+tick-mono (ix t ∷ ks) (ix u ∷ hs) _ _ (inj₂ lt)   = <ᵖ-tick t u ks hs lt
+tick-mono []          _           () _
+tick-mono (sub _ ∷ _) _           () _
+tick-mono (last ∷ _)  _           () _
+tick-mono (ix _ ∷ _)  []          _ ()
+tick-mono (ix _ ∷ _)  (sub _ ∷ _) _ ()
+tick-mono (ix _ ∷ _)  (last ∷ _)  _ ()
+
+rise-mark : ∀ p j l → Mark l → Rise p j → Rise p (j ++ [ l ])
+rise-mark p j l m (hj , rj) =
+  headed-snoc j hj , λ k hk ok t → <ᵖ-trans k j (j ++ [ l ]) (rj k hk ok (tagged-mark k j l m t)) (<ᵖ-below j [])
+
+rise-frame : ∀ p n e → Rise p e → tick e ≤ n → Rise p (ix (suc n) ∷ sub e ∷ [])
+rise-frame p n e re te = tt , tg
+  where tg : ∀ k → Headed k → Owned p k → Tagged k (ix (suc n) ∷ sub e ∷ []) → k <ᵖ (ix (suc n) ∷ sub e ∷ []) ≡ true
+        tg (ix t ∷ ks) hk ok (inj₁ o) =
+          proj₁ (tick-past ks (sub e ∷ []) (s≤s (≤-trans (tick-mono (ix t ∷ ks) e hk (proj₁ re) (rise-owned p _ e re hk ok o)) te)))
+        tg []          () ok _
+        tg (sub _ ∷ _) () ok _
+        tg (last ∷ _)  () ok _
+
+rise-join : ∀ p q j → Rise p q → Rise p j → j <ᵖ q ≡ true → Rise p (q ++ [ sub j ])
+rise-join p q j rq rj jq = headed-snoc q (proj₁ rq) , tg
+  where tg : ∀ k → Headed k → Owned p k → Tagged k (q ++ [ sub j ]) → k <ᵖ (q ++ [ sub j ]) ≡ true
+        tg k hk ok t with tagged-split k q j t
+        ... | inj₁ tq = <ᵖ-trans k q (q ++ [ sub j ]) (proj₂ rq k hk ok tq) (<ᵖ-below q [])
+        ... | inj₂ oj with rise-owned p k j rj hk ok oj
+        ...   | inj₁ refl = <ᵖ-trans k q (q ++ [ sub j ]) jq (<ᵖ-below q [])
+        ...   | inj₂ kj   = <ᵖ-trans k q (q ++ [ sub j ]) (<ᵖ-trans k j q kj jq) (<ᵖ-below q [])
+
+risingRules : Pos → Rules
+risingRules p = record
+  { S      = Rise p
+  ; P      = Rise p
+  ; Src    = Rise p
+  ; child  = λ j l m r → rise-mark p j l m r
+  ; deeper = λ h l m r → rise-mark p h l m r
+  ; held   = λ _ r → r
+  ; frame  = rise-frame p
+  ; join   = rise-join p
+  ; source = λ _ r → r
+  }
+
 -- A burst's first event is at its next index.
 burst-past : ∀ {A t} τ r i (b : M.Frame A t) {k} → k <ᵖ (r ++ [ ix i ]) ≡ true × ¬ Ext k (r ++ [ ix i ]) → Past k (M.burst τ r i b)
 burst-past τ r i (M.emit _ _) h = h
@@ -1734,6 +1809,13 @@ every (every-zip (skip h r)  pe qe) = (proj₁ (every pe) , proj₁ (every qe)) 
 every (every-zip (end h)     pe qe) = every pe , every qe
 every (every-zip hush        pe qe) = tt
 
+-- Sources alien to `p` rise under anything `p` owns: nothing there tags them.
+rise-env : ∀ {Γ} p r → Owned p r → (ρ : NEnv Γ) → Everyᴱ Headed ρ → Alienᴱ p ρ → Everyᴱ (Rise r) ρ
+rise-env p r pr []ᴬ      _         _         = tt
+rise-env p r pr (e ∷ᴬ ρ) (he , hρ) (ae , aρ) =
+  every-mono (λ h z → proj₁ z , λ k hk ok t → ⊥-elim (proj₂ z (owned-trans p r h pr (inj₂ (owned-tagged r k h ok t))))) e (every-zip e he ae)
+  , rise-env p r pr ρ hρ aρ
+
 -- A DEFER SHOWS A SKIP, THEN ITS PROGRAM SUBSCRIBED JUST PAST IT: the
 -- fold's meaning there agrees with the program's at every depth, and
 -- nothing the program shows sorts before where it subscribes, nor keys
@@ -1878,17 +1960,6 @@ past-apart k h kh nx (l ∷ ls) e = nx (subst (Ext k) (sym e) (ext l ls))
 -- Past `k`'s subtree, and so is all that comes no earlier.
 past-noext : ∀ k n h → k <ᵖ n ≡ true → ¬ Ext k n → h <ᵖ n ≡ false → ¬ Ext k h
 past-noext k n .(k ++ l ∷ ls) kn nx hn (ext l ls) with () ← trans (sym hn) (M.<ᵖ-apart k n (l ∷ ls) kn (past-apart k n kn nx))
-
-prefix-rest : ∀ k h → Prefix k h → Σ Pos (λ ys → h ≡ k ++ ys)
-prefix-rest []      h       _          = h , refl
-prefix-rest (_ ∷ _) []      ()
-prefix-rest (a ∷ k) (b ∷ h) (refl , p) with prefix-rest k h p
-... | ys , refl = ys , refl
-
-prefix-lt : ∀ j n → Prefix j n → j ≡ n ⊎ j <ᵖ n ≡ true
-prefix-lt j n pr with prefix-rest j n pr
-... | []     , refl = inj₁ (sym (++-identityʳ j))
-... | l ∷ ls , refl = inj₂ (<ᵖ-below j ls)
 
 inside-prefix : ∀ r k h → M.inside r k ≡ true → Prefix k h → M.inside r h ≡ true
 inside-prefix r k h i pr with prefix-rest k h pr
@@ -4377,10 +4448,9 @@ data Walked {A B} (β₀ : Events∞ B) (σ₀ : Events∞ A) : Events∞ B → 
   by-body   : ∀ {β σ β′} → Walked β₀ σ₀ β σ → Going (force σ) → M.before (M.shownAt (force σ)) (force β) ≡ false → Onto (force β) β′
             → Walked β₀ σ₀ β′ σ
 
--- Nothing the body shows next is tagged by a step of the source's burst,
--- nor anything it leaves running inside one.
+-- Nothing the body leaves running lies inside a step of the source's burst.
 Causal : ∀ {A B} → Pos → Events∞ B → Events∞ A → Set
-Causal r β σ = EveryT (λ k → Head (λ n → ¬ Tagged k n) (force β) × EveryT (λ h → ¬ Ext k h) (cut β)) (M.burstOn r σ)
+Causal r β σ = EveryT (λ k → EveryT (λ h → ¬ Ext k h) (cut β)) (M.burstOn r σ)
 
 ------------------------------------------------------------------------
 -- THE WALK: a connect's cuts trail its run at every reachable state.
@@ -4396,6 +4466,9 @@ module Walk {A B} (r P₀ : Pos) (β₀ : Events∞ B) (σ₀ : Events∞ A) (ca
       ss : Steady (force σ)
       kb : Every∞ (Owned P₀) β
       ks : Every∞ (Disjoint P₀) σ
+      kr : Every∞ (Rise r) β
+      hs : Every∞ Headed σ
+      rs : Every∞ (Owned r) σ
       wk : Walked β₀ σ₀ β σ
 
   -- What the source next shows is keyed with none of the body.
@@ -4416,19 +4489,22 @@ module Walk {A B} (r P₀ : Pos) (β₀ : Events∞ B) (σ₀ : Events∞ A) (ca
   body-lead q hush        c qk tr = everyT-mono (λ j ()) c (proj₁ (proj₂ (trail tr)))
 
   -- A body step `n` before the source's `q`, beside a burst step `j`.
-  module Pin q n j (nq : ¬ Owned P₀ q) (on : Owned P₀ n) (nl : q <ᵖ n ≡ false) (dj : Disjoint P₀ j) (tg : ¬ Tagged j n) where
+  module Pin q n j (nq : ¬ Owned P₀ q) (on : Owned P₀ n) (nl : q <ᵖ n ≡ false) (rn : Rise r n) (dj : Disjoint P₀ j) (hj : Headed j) (oj : Owned r j) where
     nlt : n <ᵖ q ≡ true
     nlt with <ᵖ-split n q nl
     ... | inj₁ x  = x
     ... | inj₂ eq = ⊥-elim (nq (subst (Owned P₀) eq on))
 
+    -- A burst step the source has not passed lies nowhere before `n`.
+    late : Marked q j → j <ᵖ n ≡ true → ⊥
+    late (inj₁ jq) jn with () ← trans (sym jq) (<ᵖ-trans j n q jn nlt)
+    late (inj₂ mq) jn = marks-alien (marks-mid n mq jn nl) on dj
+
     unowned : Marked q j → ¬ Owned j n
     unowned mj (inj₁ pr) with prefix-lt j n pr
     ... | inj₁ eq = proj₁ dj (subst (Owned P₀) (sym eq) on)
-    ... | inj₂ jn with mj
-    ...   | inj₁ jq with () ← trans (sym jq) (<ᵖ-trans j n q jn nlt)
-    ...   | inj₂ mq = marks-alien (marks-mid n mq jn nl) on dj
-    unowned mj (inj₂ t) = tg t
+    ... | inj₂ jn = late mj jn
+    unowned mj (inj₂ t) = late mj (proj₂ rn j hj oj t)
 
     unkeys : ¬ Owned n j
     unkeys o = proj₁ dj (owned-trans P₀ n j on o)
@@ -4445,14 +4521,15 @@ module Walk {A B} (r P₀ : Pos) (β₀ : Events∞ B) (σ₀ : Events∞ A) (ca
     past : Marked q j → n <ᵖ j ≡ true
     past mj = take-ahead n j (atop mj) (apart mj)
 
-  out-pin : ∀ q n → ¬ Owned P₀ q → Owned P₀ n → q <ᵖ n ≡ false → ∀ j → (Marked q j × Disjoint P₀ j) × ¬ Tagged j n → j <ᵖ n ≡ false × Disjoint n j
-  out-pin q n nq on nl j ((mj , dj) , tg) = atop mj , apart mj
-    where open Pin q n j nq on nl dj tg
+  out-pin : ∀ q n → ¬ Owned P₀ q → Owned P₀ n → q <ᵖ n ≡ false → Rise r n → ∀ j → (Marked q j × Disjoint P₀ j) × Headed j × Owned r j
+          → j <ᵖ n ≡ false × Disjoint n j
+  out-pin q n nq on nl rn j ((mj , dj) , hj , oj) = atop mj , apart mj
+    where open Pin q n j nq on nl rn dj hj oj
 
-  end-pin : ∀ q c → ¬ Owned P₀ q → Owned P₀ c → q <ᵖ c ≡ false → ∀ j → (Marked q j × Disjoint P₀ j) × ¬ Tagged j c
+  end-pin : ∀ q c → ¬ Owned P₀ q → Owned P₀ c → q <ᵖ c ≡ false → Rise r c → ∀ j → (Marked q j × Disjoint P₀ j) × Headed j × Owned r j
           → c <ᵖ j ≡ true × Disjoint (c ++ [ ix 1 ]) j × ¬ Ext c j
-  end-pin q c nq on nl j ((mj , dj) , tg) = past mj , disjoint-snoc c j (ix 1) (λ x → tagged-lane j x 1) (apart mj) , λ x → unkeys (owned-ext x)
-    where open Pin q c j nq on nl dj tg
+  end-pin q c nq on nl rc j ((mj , dj) , hj , oj) = past mj , disjoint-snoc c j (ix 1) (λ x → tagged-lane j x 1) (apart mj) , λ x → unkeys (owned-ext x)
+    where open Pin q c j nq on nl rc dj hj oj
 
   module At {β σ} (sd : Side β σ) where
     open Side sd
@@ -4462,8 +4539,8 @@ module Walk {A B} (r P₀ : Pos) (β₀ : Events∞ B) (σ₀ : Events∞ A) (ca
 
     pins-apart : EveryT (λ a → EveryT (Apart a) (cut β)) (M.burstOn r σ)
     pins-apart = everyT-mono pair (M.burstOn r σ) (everyT-zip (M.burstOn r σ) (cause wk) (everyT-burstOn r σ ks))
-      where pair : ∀ k → (Head (λ n → ¬ Tagged k n) (force β) × EveryT (λ h → ¬ Ext k h) (cut β)) × Disjoint P₀ k → EveryT (Apart k) (cut β)
-            pair k ((_ , nx) , dk) = everyT-mono (λ h z → proj₁ z , λ x → proj₁ dk (owned-trans P₀ h k (proj₂ z) (owned-ext x))) (cut β)
+      where pair : ∀ k → EveryT (λ h → ¬ Ext k h) (cut β) × Disjoint P₀ k → EveryT (Apart k) (cut β)
+            pair k (nx , dk) = everyT-mono (λ h z → proj₁ z , λ x → proj₁ dk (owned-trans P₀ h k (proj₂ z) (owned-ext x))) (cut β)
                                        (everyT-zip (cut β) nx (proj₂ kb))
 
     burst-flat : FlatT (M.burstOn r σ ∪ cut β)
@@ -4474,8 +4551,8 @@ module Walk {A B} (r P₀ : Pos) (β₀ : Events∞ B) (σ₀ : Events∞ A) (ca
     pinsAt e eq = everyT-zip (M.burstOn r σ) (lead-run (M.shownAt e) (force σ) (cut σ) ts os (subst (Cue (M.shownAt e)) (sym eq) (cue-self e)))
                     (everyT-burstOn r σ ks)
 
-    pinsOn : ∀ e → force σ ≡ e → ∀ x → force β ≡ x → EveryT (λ j → (Marked (M.shownAt e) j × Disjoint P₀ j) × Head (λ n → ¬ Tagged j n) x) (M.burstOn r σ)
-    pinsOn e eq x xe = everyT-zip (M.burstOn r σ) (pinsAt e eq) (everyT-mono (λ k c → subst (Head (λ n → ¬ Tagged k n)) xe (proj₁ c)) (M.burstOn r σ) (cause wk))
+    pinsOn : ∀ e → force σ ≡ e → EveryT (λ j → (Marked (M.shownAt e) j × Disjoint P₀ j) × Headed j × Owned r j) (M.burstOn r σ)
+    pinsOn e eq = everyT-zip (M.burstOn r σ) (pinsAt e eq) (everyT-zip (M.burstOn r σ) (everyT-burstOn r σ hs) (everyT-burstOn r σ rs))
 
     nqAt : ∀ e → force σ ≡ e → Going e → ¬ Owned P₀ (M.shownAt e)
     nqAt e eq g = shown-apart e g (subst (Every (Disjoint P₀)) eq (proj₁ ks))
@@ -4489,19 +4566,25 @@ module Walk {A B} (r P₀ : Pos) (β₀ : Events∞ B) (σ₀ : Events∞ A) (ca
       ; ss = steady-onward σ (force σ) refl ts ss
       ; kb = kb
       ; ks = every-onward σ (force σ) (proj₁ ks) (proj₂ ks) (proj₁ ks)
+      ; kr = kr
+      ; hs = every-onward σ (force σ) (proj₁ hs) (proj₂ hs) (proj₁ hs)
+      ; rs = every-onward σ (force σ) (proj₁ rs) (proj₂ rs) (proj₁ rs)
       ; wk = by-source wk (subst Going (sym eq) g) (subst (λ z → M.before (M.shownAt z) (force β) ≡ true) (sym eq) be)
       }
 
     -- The body steps first.
     toBody : ∀ e → force σ ≡ e → Going e → ∀ x → force β ≡ x → M.before (M.shownAt e) x ≡ false → ∀ β′ → Onto x β′
-           → Trailing β′ → Every∞ (Owned P₀) β′ → Side β′ σ
-    toBody e eq g x xe be β′ ot tb′ kb′ = record
+           → Trailing β′ → Every∞ (Owned P₀) β′ → Every∞ (Rise r) β′ → Side β′ σ
+    toBody e eq g x xe be β′ ot tb′ kb′ kr′ = record
       { tb = tb′
       ; ts = ts
       ; os = os
       ; ss = ss
       ; kb = kb′
       ; ks = ks
+      ; kr = kr′
+      ; hs = hs
+      ; rs = rs
       ; wk = by-body wk (subst Going (sym eq) g)
                (subst (λ z → M.before (M.shownAt z) (force β) ≡ false) (sym eq) (subst (λ z → M.before (M.shownAt e) z ≡ false) (sym xe) be))
                (subst (λ z → Onto z β′) (sym xe) ot)
@@ -4541,40 +4624,52 @@ module Walk {A B} (r P₀ : Pos) (β₀ : Events∞ B) (σ₀ : Events∞ A) (ca
             → ∀ c → M.burstOn r σ ∪ cut β ≡ c → Trail (M.body r σ (M.shownAt e) x) c
     trail (tr-body β σ sd e eq g (out n a β′) xe be c′ ce) =
       subst SortedT ce (burst-sorted sd)
-      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (out-pin q n nq on be) (M.burstOn r σ) (pinsOn sd e eq _ xe)) (proj₁ (proj₂ (trail tbx))))
-      , tr-ahead β′ σ (toBody sd e eq g _ xe be β′ refl (proj₁ (proj₂ (proj₂ (trail tbx)))) (proj₂ (every kbx))) e eq g _ refl _ refl
-      , everyT-∪ (M.burstOn r σ) (cut β′) (everyT-mono (λ j z → proj₂ (out-pin q n nq on be j z)) (M.burstOn r σ) (pinsOn sd e eq _ xe))
+      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (out-pin q n nq on be rn) (M.burstOn r σ) (pinsOn sd e eq)) (proj₁ (proj₂ (trail tbx))))
+      , tr-ahead β′ σ (toBody sd e eq g _ xe be β′ refl (proj₁ (proj₂ (proj₂ (trail tbx)))) (proj₂ (every kbx)) (proj₂ (every krx))) e eq g _ refl _ refl
+      , everyT-∪ (M.burstOn r σ) (cut β′) (everyT-mono (λ j z → proj₂ (out-pin q n nq on be rn j z)) (M.burstOn r σ) (pinsOn sd e eq))
           (proj₂ (proj₂ (proj₂ (trail tbx))))
       where q = M.shownAt e
             nq = nqAt sd e eq g
             tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
             kbx = subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd))
             on = proj₁ (every kbx)
+            krx = subst (Every (Rise r)) xe (proj₁ (Side.kr sd))
+            rn = proj₁ (every krx)
     trail (tr-body β σ sd e eq g (skip n β′) xe be c′ ce) =
       subst SortedT ce (burst-sorted sd)
-      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (λ j z → inj₁ (proj₁ (out-pin q n nq on be j z))) (M.burstOn r σ) (pinsOn sd e eq _ xe))
+      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (λ j z → inj₁ (proj₁ (out-pin q n nq on be rn j z))) (M.burstOn r σ) (pinsOn sd e eq))
           (proj₁ (proj₂ (trail tbx))))
-      , tr-ahead β′ σ (toBody sd e eq g _ xe be β′ refl (proj₂ (proj₂ (trail tbx))) (proj₂ (every kbx))) e eq g _ refl _ refl
+      , tr-ahead β′ σ (toBody sd e eq g _ xe be β′ refl (proj₂ (proj₂ (trail tbx))) (proj₂ (every kbx)) (proj₂ (every krx))) e eq g _ refl _ refl
       where q = M.shownAt e
             nq = nqAt sd e eq g
             tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
             kbx = subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd))
             on = proj₁ (every kbx)
+            krx = subst (Every (Rise r)) xe (proj₁ (Side.kr sd))
+            rn = proj₁ (every krx)
     trail (tr-body β σ sd e eq g (end c) xe be c′ ce) =
       subst SortedT ce (burst-sorted sd)
-      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (end-pin q c nq on be) (M.burstOn r σ) (pinsOn sd e eq _ xe)) (proj₁ (proj₂ (trail tbx))))
+      , subst (EveryT _) ce (everyT-∪ (M.burstOn r σ) (cut β) (everyT-mono (end-pin q c nq on be rc) (M.burstOn r σ) (pinsOn sd e eq)) (proj₁ (proj₂ (trail tbx))))
       , tt
       where q = M.shownAt e
             nq = nqAt sd e eq g
             tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
             on = every (subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd)))
+            rc = every (subst (Every (Rise r)) xe (proj₁ (Side.kr sd)))
     trail (tr-body β σ sd e eq g hush xe () c′ ce)
     trailᶠ (tr-body β σ sd e eq g x xe be c′ ce) = subst FlatT ce (burst-flat sd)
 
 -- A CONNECT'S BODY FOLLOWS WHAT ITS SOURCE SHOWED, where a tick heads it,
 -- over sorted sources alien to it: at every state its walk reaches,
--- nothing the body shows next is tagged by a step of the source's burst
--- still to come, nor is anything it leaves running inside one.
+-- nothing the body leaves running lies inside a step of the source's
+-- burst still to come.  A body's pin inside a source step `k` sits under
+-- the body's delivery of `k`, so the body passed that delivery, and the
+-- walk passes a body event only once the source's next shows no earlier.
+--
+-- DEAD ROUTE: positions alone, as the head of the body's run is cleared
+--   by `Rise`: a pin's position says which delivery it sits under, never
+--   whether the body has shown that delivery yet, so the history of the
+--   walk is owed.
 postulate
   connect-causal : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                  → ∀ {β σ} → Walked (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
@@ -4656,6 +4751,9 @@ trail-connect s b fs fb p ρ hp so cl =
     ; ss = steady-subᶠ s fs r ρ hr so cr
     ; kb = every∞-mono (beneath-owned P₀) Bᶜ (Reach.reachᶠ (keyedRules P₀) b fb P₀ ρ′ (inj₁ (prefix-refl P₀)) (every-monoᴱ (λ _ _ → tt) ρ′ cl′))
     ; ks = Reach.reachᶠ (apartRules P₀ (no-tick p)) s fs r ρ (sibling p (λ ()) , sibling p (λ ())) c₀
+    ; kr = Reach.reachᶠ (risingRules r) b fb P₀ ρ′ rP₀ (Reach.reach (risingRules r) s r ρ rr rρ , rρ)
+    ; hs = Reach.reachᶠ headedRules s fs r ρ hr (sorted-headed ρ so)
+    ; rs = every∞-mono (beneath-owned r) Sᶜ (Reach.reachᶠ (keyedRules r) s fs r ρ (inj₁ (prefix-refl r)) (every-monoᴱ (λ _ _ → tt) ρ cl))
     ; wk = at-start
     }
   where
@@ -4671,6 +4769,12 @@ trail-connect s b fs fb p ρ hp so cl =
     so′ = (ordered-subᶠ s fs r ρ hr so cr , steady-subᶠ s fs r ρ hr so cr) , headed-sub s r ρ hr so , so
     cl′ : Alienᴱ P₀ ρ′
     cl′ = alien-sub s p ρ cl , c₀
+    rr : Rise r r
+    rr = hr , λ k hk ok t → ⊥-elim (<-irrefl refl (tagged-weigh r r (owned-tagged r k r ok t)))
+    rP₀ : Rise r P₀
+    rP₀ = headed-snoc p hp , λ k hk ok t → ⊥-elim (sibling p (λ ()) (inj₂ (owned-tagged r k P₀ ok t)))
+    rρ : Everyᴱ (Rise r) ρ
+    rρ = rise-env p r (inj₁ (prefix-++ p [ ix 1 ])) ρ (sorted-headed ρ so) cl
 
 trailing-subᶠ (cold c) _ p ρ hp so cl = trailing-start p (lower c) ρ
 trailing-subᶠ empty _ p ρ hp so cl = trail-idle _ tt
