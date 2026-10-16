@@ -12,12 +12,14 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Relation.Unary.Linked using (_∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
-open import Level using (lift)
+open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 open import Data.Sum using (_⊎_; [_,_]′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
+open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
+open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child)
 
 open import denotation.MonotonicList using (Events∞; Timeline; Pos)
 import denotation.Unfold as U
@@ -34,13 +36,14 @@ open Events∞
 
 module Framing (R : Set) where
   open Machine R using (Mach; Read)
-  open Run (Pureᴾ R) using (Ref)
+  open Run (Pureᴾ R) using (Ref; module Kit)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored)
   open Heap using () renaming (same to same⊑)
   open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Owned; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
-                         mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join)
+                         mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
+                         Taking; taking; taken; cutNames; quietName) renaming (ending to endingᵀ)
   open Strongly.Against R using (CtlAs)
-  open Tearing R using (Alike; part-alike; look-store; get-put-same; fresh-path)
+  open Tearing R using (Alike; part-alike; look-store; get-put-same; fresh-path; names-path; apart-r; ≢-flip)
   open Ghosting R using (module Climbing; Lifts; Climbing)
   open Read
 
@@ -100,6 +103,23 @@ module Framing (R : Set) where
   heads-rescan : ∀ {Γ A B q} (g : B → A → B) {z₁ z₂} {c : U.Node Γ A} → Heads q (U.scanᶜ g z₁ c) → Heads q (U.scanᶜ g z₂ c)
   heads-rescan g {z₁} {z₂} {c} hd e = hd (trans (head-scan g z₁ (U.step c)) (trans (sym (head-scan g z₂ (U.step c))) e))
 
+  -- A take's head is its source's, or under it.
+  taking-head : ∀ {Γ A q} i (p : A → Bool) k a (c : U.Node Γ A) b → (∀ {k′} → just k ≡ just k′ → q ≤ᵖ k′)
+              → ∀ {k′} → U.headˢ (U.taking i p k a c b) ≡ just k′ → q ≤ᵖ k′
+  taking-head i     p k a c true  hd refl = hd refl
+  taking-head true  p k a c false hd refl = ≤ᵖ-child k (hd refl)
+  taking-head false p k a c false hd refl = ≤ᵖ-child k (hd refl)
+
+  take-head : ∀ {Γ A q} i (p : A → Bool) (s : U.Step Γ A) → (∀ {k} → U.headˢ s ≡ just k → q ≤ᵖ k)
+            → ∀ {k} → U.headˢ (U.takeWhileˢ i p s) ≡ just k → q ≤ᵖ k
+  take-head i p (U.outˢ k a c) hd = taking-head i p k a c (p a) hd
+  take-head i p (U.skipˢ k c)  hd = hd
+  take-head i p (U.endˢ k)     hd = hd
+  take-head i p U.hushˢ        hd ()
+
+  heads-take : ∀ {Γ A q} i (p : A → Bool) {c : U.Node Γ A} → Heads q c → Heads q (U.takeWhileᶜ i p c)
+  heads-take i p {c} hd = take-head i p (U.step c) hd
+
   -- THE PARTS ABOVE A WRITTEN SCAN, walked down to it: a map's, a scan's
   -- and a defer's head is their child's; a take's, a flatMap's and a
   -- connect's are each bounded by what is below them.
@@ -115,8 +135,6 @@ module Framing (R : Set) where
     via (there m)   = next-lane (via m)
 
     postulate
-      up-take   : ∀ {Δ′ A′} {i p c k tk} {s : Sub h Δ′ A′} (ψ : Path T (takeWhileˢ i p c k tk s)) → Path s (scanˢ f r u)
-                → Up (ψ ⊕ in-take here) → Up ψ
       up-outer  : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
                   (ψ : Path T (flatMapˢ op g fl oc k rf pl so ls)) → Path so (scanˢ f r u) → Up (ψ ⊕ in-outer here) → Up ψ
       up-lanes  : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
@@ -136,6 +154,31 @@ module Framing (R : Set) where
               → ∀ {c} → At.mapᴹ H′ (U.scanᶜ g z′) m ≡ just c → Heads q c
     lift-scan g z′ (just c₀) up refl = heads-scan g z′ {c₀} (up refl)
     lift-scan g z′ nothing   up ()
+
+    lift-take : ∀ {Δ′ A′} i (p : A′ → Bool) (m : Maybe (U.Node Δ′ A′)) → (∀ {c} → m ≡ just c → Heads q c)
+              → ∀ {c} → At.mapᴹ H′ (U.takeWhileᶜ i p) m ≡ just c → Heads q c
+    lift-take i p (just c₀) up refl = heads-take i p {c₀} (up refl)
+    lift-take i p nothing   up ()
+
+    -- A take's switch is apart from the accumulator below it.
+    live-apart : ∀ {Δ′ A′} {i p c k tk} {s : Sub h Δ′ A′} → Path T (takeWhileˢ i p c k tk s) → Path s (scanˢ f r u)
+               → At.val H′ (Kit.live c) ≡ At.val H (Kit.live c)
+    live-apart {c = c} {k} ψ π =
+      cong lower (look-store H r (Kit.live c) (≢-flip (lookupᴬ (apart-r (cutNames c) (fresh-path ψ fs) (here refl)) (++⁺ʳ (quietName k) (names-path π (here refl))))))
+
+    take-go : ∀ {Δ′ A′} {i p c k} {tk : Taking Δ′ A′} {s : Sub h Δ′ A′} (ψ : Path T (takeWhileˢ i p c k tk s)) → Up (ψ ⊕ in-take here) → seen H ψ ≡ true
+            → ∀ b → At.val H (Kit.live c) ≡ b → ∀ {c′} → (if b then At.taking? H′ i p tk (At.part H′ s) else nothing) ≡ just c′ → Heads q c′
+    take-go ψ up sn false lv ()
+    take-go {i = i} {p} {tk = taking} {s} ψ up sn true lv e =
+      lift-take i p (At.part H′ s) (up (seen-join H ψ (in-take here) sn (cong (λ b → b ∧ true ∧ true) lv))) e
+    take-go {i = i} {p} {c} {tk = endingᵀ k′ n} {s} ψ up sn true lv {c′} e =
+      Each.parts bh ψ sn (subst (λ b → (if b then At.taking? H i p (endingᵀ k′ n) (At.part H s) else nothing) ≡ just c′) (sym lv) e)
+    take-go {tk = taken} ψ up sn true lv ()
+
+    up-take : ∀ {Δ′ A′} {i p c k tk} {s : Sub h Δ′ A′} (ψ : Path T (takeWhileˢ i p c k tk s)) → Path s (scanˢ f r u)
+            → Up (ψ ⊕ in-take here) → Up ψ
+    up-take {i = i} {p} {c} {tk = tk} {s} ψ π up sn {c′} e =
+      take-go ψ up sn (At.val H (Kit.live c)) refl (subst (λ b → (if b then At.taking? H′ i p tk (At.part H′ s) else nothing) ≡ just c′) (live-apart ψ π) e)
 
     base-lemma : (m m′ : Maybe (U.Node Δ A)) → m′ ≡ m → (∀ {c} → At.mapᴹ H (U.scanᶜ f (At.val H r)) m ≡ just c → Heads q c)
                → ∀ {c} → At.mapᴹ H′ (U.scanᶜ f (At.val H′ r)) m′ ≡ just c → Heads q c
