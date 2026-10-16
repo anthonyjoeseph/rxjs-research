@@ -1020,7 +1020,10 @@ module Honesty (R : Set) where
 
     -- A value through a scan: its cell read and written, the
     -- accumulated value one operator up.  The ghost's lift read the cell
-    -- before the write; the path above it does not read it.
+    -- before the write.  An outer above it reads its whole subtree's
+    -- part, the scan's with it, so the write moves that outer's `Was`
+    -- and `PoolBehind` node: the lift above is re-proven at the new
+    -- part, not carried.
     climb-scan : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
                  {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
                → Climbing g (loadOf st) m₁ (ρ ⊕ in-scan here) y → Climbed st m₁ (ρ ⊕ in-scan here)
