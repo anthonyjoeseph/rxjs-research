@@ -1821,22 +1821,6 @@ mutual
   steady (steady-taking true  p h a false r _)        = ix-last h 0 , record { steady = tt }
   steady (steady-taking false p h a false r _)        = tt
 
-postulate
-  -- A CONNECT SUBSCRIBED IS IN ORDER: each source step a skip just past
-  -- it, ahead of the body's later events, and what the source runs on
-  -- with past the body's end left as the tail.
-  ordered-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-                  → Ordered (U.meaning (U.subscribe (connect s b) p) ρ)
-
-  -- A CONNECT SUBSCRIBED WHERE A TICK HEADS IS STEADY, over sources
-  -- sorted and alien to it: nothing the body shows lies above or below
-  -- where a source step shows, and the source's run past the body's end
-  -- steps where it would have.
-  --
-  -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Placed.agda restores `steady-beside`, the proof over a merge without tails
-  -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Placed.agda restores `alien-steps`, a subscription keying nothing just past its own events, which `steady-beside` read
-  steady-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-                 → Steady (U.meaning (U.subscribe (connect s b) p) ρ)
 
 
 -- A CONNECT'S SOURCE KEYS NOTHING UNDER ITS BODY: the two are siblings.
@@ -4934,6 +4918,55 @@ mutual
   freshes-widen p q w (end _)     t       = tt
   freshes-widen p q w hush        t       = tt
 
+owned-drop : ∀ k w h → Owned (k ++ w) h → Owned k h
+owned-drop k w h = owned-trans k (k ++ w) h (inj₁ (prefix-++ k w))
+
+-- Keyed under a position tagged with `p`: keyed under `p`.
+mutual
+  sub-owned : ∀ k p h → Owned (k ++ [ sub p ]) h → Owned p h
+  sub-owned k p h (inj₁ pr) = inj₂ (tagged-prefix p (k ++ [ sub p ]) h (tagged-sub k p) pr)
+  sub-owned k p h (inj₂ t)  = inj₂ (sub-tagged k p h t)
+
+  sub-tagged : ∀ k p h → Tagged (k ++ [ sub p ]) h → Tagged p h
+  sub-tagged k p []          ()
+  sub-tagged k p (ix _ ∷ h)  t        = sub-tagged k p h t
+  sub-tagged k p (last ∷ h)  t        = sub-tagged k p h t
+  sub-tagged k p (sub j ∷ h) (inj₁ o) = inj₁ (sub-owned k p j o)
+  sub-tagged k p (sub j ∷ h) (inj₂ t) = inj₂ (sub-tagged k p h t)
+
+-- A position tagged with `p` outweighs it, and a step under `p` too.
+heavy : ∀ k p → ¬ Owned (k ++ [ sub p ]) p
+heavy k p o = <-irrefl refl (<-≤-trans (tagged-weigh p (k ++ [ sub p ]) (tagged-sub k p)) (owned-weigh _ _ o))
+
+snoc-weigh : ∀ p (l : M.Label) → weigh p < weigh (p ++ [ l ])
+snoc-weigh []      (ix _)  = s≤s z≤n
+snoc-weigh []      (sub _) = s≤s z≤n
+snoc-weigh []      last    = s≤s z≤n
+snoc-weigh (a ∷ p) l       = +-monoʳ-< (weighˡ a) (snoc-weigh p l)
+
+longer : ∀ p (l : M.Label) → ¬ Owned (p ++ [ l ]) p
+longer p l o = <-irrefl refl (<-≤-trans (snoc-weigh p l) (owned-weigh _ _ o))
+
+mark-sub : ∀ {l} → Mark l → ∀ j → sub j ≢ l
+mark-sub (ix-mark _) j ()
+mark-sub last-mark   j ()
+
+snoc-ne : ∀ a b {l l′ : M.Label} → l ≢ l′ → a ++ [ l ] ≢ b ++ [ l′ ]
+snoc-ne a b ne eq = ne (proj₂ (snoc-inj a b eq))
+
+-- Neither a prefix of the other.
+Unrelated : Pos → Pos → Set
+Unrelated k h = ¬ Prefix k h × ¬ Prefix h k
+
+ext-prefixed : ∀ {k h} → Ext k h → Prefix k h
+ext-prefixed (ext l ls) = prefix-++ _ (l ∷ ls)
+
+-- No later and no prefix is earlier.
+strict : ∀ k q → q <ᵖ k ≡ false → ¬ Prefix k q → k <ᵖ q ≡ true
+strict k q a np with <ᵖ-split k q a
+... | inj₁ kq   = kq
+... | inj₂ refl = ⊥-elim (np (prefix-refl k))
+
 ------------------------------------------------------------------------
 -- THE WALK: a connect's cuts trail its run at every reachable state.
 
@@ -5257,6 +5290,200 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
             frx = subst (FreshRun P₀) xe (Side.fr sd)
     spread (sp-body β σ sd e eq g (end c) xe sx be) = tt
     spread (sp-body β σ sd e eq g hush    xe sx be) = tt
+
+  -- THE ORDER WALK: each step the connect shows no earlier than the one
+  -- before, the source's past the body's last and the body's past the
+  -- source's last.
+  atop-body : ∀ L (σ : Events∞ A) q (x : Events B) → Atop L x → Atop L (M.body r σ q x)
+  atop-body L σ q (out _ _ _) a = a
+  atop-body L σ q (skip _ _)  a = a
+  atop-body L σ q (end _)     a = a
+  atop-body L σ q hush        a = tt
+
+  atop-ahead : ∀ L β (σ : Events∞ A) q b → q <ᵖ L ≡ false → Atop L (force β) → Atop L (M.ahead r β σ q b)
+  atop-ahead L β σ q true  qL a = qL
+  atop-ahead L β σ q false qL a = atop-body L σ q (force β) a
+
+  atop-side : ∀ L β (σ : Events∞ A) e → Cue L e → Atop L (force β) → Atop L (M.side r β σ e)
+  atop-side L β σ (out _ _ _) c a = atop-ahead L β σ _ _ c a
+  atop-side L β σ (skip _ _)  c a = atop-ahead L β σ _ _ c a
+  atop-side L β σ (end _)     c a = atop-ahead L β σ _ _ c a
+  atop-side L β σ hush        c a = a
+
+  mutual
+    or-beside : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → Ordered (M.beside r β σ)
+    or-beside β σ ts os ob = or-side β σ ts os ob (force σ) refl
+
+    or-side : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Ordered (M.side r β σ e)
+    or-side β σ ts os ob (out k a s) eq = or-ahead β σ ts os ob (out k a s) eq tt _ refl
+    or-side β σ ts os ob (skip k s)  eq = or-ahead β σ ts os ob (skip k s) eq tt _ refl
+    or-side β σ ts os ob (end c)     eq = or-ahead β σ ts os ob (end c) eq tt _ refl
+    or-side β σ ts os ob hush        eq = ob
+
+    or-ahead : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Going e → ∀ b
+             → M.before (M.shownAt e) (force β) ≡ b → Ordered (M.ahead r β σ (M.shownAt e) b)
+    or-ahead β σ ts os ob e eq g true  be = or-src β σ ts os ob e eq g be
+    or-ahead β σ ts os ob e eq g false be = or-body σ ts os e eq g (force β) ob be
+
+    or-src : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Going e
+           → M.before (M.shownAt e) (force β) ≡ true → Ordered (M.ahead r β σ (M.shownAt e) true)
+    ordered (or-src β σ ts os ob e eq g be) =
+      atop-side q β σ′ (force σ′) (cue-onward q σ (force σ) refl ts os (subst (λ z → Cue (M.shownAt z) (force σ)) eq (cue-self (force σ))))
+        (before-atop q (force β) be)
+      , or-beside β σ′ (trailing-onward σ (force σ) refl ts) (ordered-onward σ (force σ) refl ts os) ob
+      where q  = M.shownAt e
+            σ′ = M.onward∞ σ (force σ)
+
+    or-body : ∀ σ → Trailing σ → Ordered (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Ordered x
+            → M.before (M.shownAt e) x ≡ false → Ordered (M.body r σ (M.shownAt e) x)
+    ordered (or-body σ ts os e eq g (out n a β′) ox be) =
+      atop-ahead n β′ σ (M.shownAt e) _ be (proj₁ (ordered ox)) , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
+    ordered (or-body σ ts os e eq g (skip n β′) ox be) =
+      atop-ahead n β′ σ (M.shownAt e) _ be (proj₁ (ordered ox)) , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
+    ordered (or-body σ ts os e eq g (end c)     ox be) = tt
+    ordered (or-body σ ts os e eq g hush        ox be) = tt
+
+  -- THE STEADY WALK: a source step's shown position lies outside the
+  -- body's next, and the source's; a body step's outside the source's.
+  clear-head : ∀ q (x : Events B) → M.before q x ≡ true → Every (λ k → Unrelated k q) x → Clear q x
+  clear-head q (out k _ _) qk ux = qk , λ e → proj₂ (proj₁ (every ux)) (ext-prefixed e)
+  clear-head q (skip k _)  qk ux = λ e → proj₂ (proj₁ (every ux)) (ext-prefixed e)
+  clear-head q (end k)     qk ux = qk , λ e → proj₂ (every ux) (ext-prefixed e)
+  clear-head q hush        qk ux = tt
+
+  clear-body : ∀ q (σ : Events∞ A) q′ (x : Events B) → M.before q x ≡ true → Every (λ k → Unrelated k q) x → Clear q (M.body r σ q′ x)
+  clear-body q σ q′ (out k a β) qk ux = clear-head q (out k a β) qk ux
+  clear-body q σ q′ (skip k β)  qk ux = clear-head q (skip k β) qk ux
+  clear-body q σ q′ (end k)     qk ux = clear-head q (end k) qk ux
+  clear-body q σ q′ hush        qk ux = tt
+
+  clear-ahead : ∀ q β (σ : Events∞ A) q′ b → M.before q (force β) ≡ true → Every (λ k → Unrelated k q) (force β) → ¬ Ext q q′
+              → Clear q (M.ahead r β σ q′ b)
+  clear-ahead q β σ q′ true  qb ub nx = nx
+  clear-ahead q β σ q′ false qb ub nx = clear-body q σ q′ (force β) qb ub
+
+  clear-side : ∀ q β (σ : Events∞ A) e → M.before q (force β) ≡ true → Every (λ k → Unrelated k q) (force β)
+             → Head (λ h → ¬ Ext q (h ++ [ ix 0 ])) e → Clear q (M.side r β σ e)
+  clear-side q β σ (out _ _ _) qb ub nx = clear-ahead q β σ _ _ qb ub nx
+  clear-side q β σ (skip _ _)  qb ub nx = clear-ahead q β σ _ _ qb ub nx
+  clear-side q β σ (end _)     qb ub nx = clear-ahead q β σ _ _ qb ub nx
+  clear-side q β σ hush        qb ub nx = clear-head q (force β) qb ub
+
+  past-body : ∀ n (σ : Events∞ A) q (x : Events B) → Past n x → Past n (M.body r σ q x)
+  past-body n σ q (out _ _ _) pb = pb
+  past-body n σ q (skip _ _)  pb = pb
+  past-body n σ q (end _)     pb = pb
+  past-body n σ q hush        pb = tt
+
+  past-ahead : ∀ n β (σ : Events∞ A) q b → Past n (force β) → n <ᵖ q ≡ true → ¬ Ext n q → Past n (M.ahead r β σ q b)
+  past-ahead n β σ q true  pb nq nx = nq , nx
+  past-ahead n β σ q false pb nq nx = past-body n σ q (force β) pb
+
+  clear-under : ∀ n (σ : Events∞ A) q (x : Events B) → Clear n x → Clear n (M.body r σ q x)
+  clear-under n σ q (out _ _ _) cb = cb
+  clear-under n σ q (skip _ _)  cb = cb
+  clear-under n σ q (end _)     cb = cb
+  clear-under n σ q hush        cb = tt
+
+  clear-next : ∀ n β (σ : Events∞ A) q b → Clear n (force β) → ¬ Ext n q → Clear n (M.ahead r β σ q b)
+  clear-next n β σ q true  cb nx = nx
+  clear-next n β σ q false cb nx = clear-under n σ q (force β) cb
+
+  -- Where the source next shows, read off what holds just past each step.
+  head-shown : ∀ {P : Pos → Set} (σ : Events∞ A) e → force σ ≡ e → Going e → Every∞ (λ q → P (q ++ [ ix 0 ])) σ → P (M.shownAt e)
+  head-shown {P} σ e eq g u = go e g (subst (Every (λ q → P (q ++ [ ix 0 ]))) eq (proj₁ u))
+    where
+      go : ∀ e → Going e → Every (λ q → P (q ++ [ ix 0 ])) e → P (M.shownAt e)
+      go (out _ _ _) g pe = proj₁ (every pe)
+      go (skip _ _)  g pe = proj₁ (every pe)
+      go (end _)     g pe = every pe
+      go hush        () pe
+
+  away-head : ∀ k (x : Events A) → Away k x → Head (λ h → ¬ Ext (k ++ [ ix 0 ]) (h ++ [ ix 0 ])) x
+  away-head k (out h _ _) aw = λ x → aw (under-ext k h x)
+  away-head k (skip h _)  aw = λ x → aw (under-ext k h x)
+  away-head k (end h)     aw = λ x → aw (under-ext k h x)
+  away-head k hush        aw = tt
+
+  tail-head : ∀ c t → EveryT (TrailE {A} (end c)) t → Head (λ h → ¬ Ext (c ++ [ ix 0 ]) (h ++ [ ix 0 ])) (tailᴱ {A} t)
+  tail-head c (pin j u) e = λ x → proj₂ (proj₂ (proj₁ (everyᵀ e))) (under-ext c j x)
+  tail-head c idle      e = tt
+
+  -- The source's next shows outside where its step showed.
+  next-away : ∀ (σ : Events∞ A) e → Going e → Trail e (cut σ) → Steady e
+            → Head (λ h → ¬ Ext (M.shownAt e) (h ++ [ ix 0 ])) (force (M.onward∞ σ e))
+  next-away σ (out k _ s) g tr se = away-head k (force s) (past-away k (force s) (proj₁ (steady se)))
+  next-away σ (skip k s)  g tr se = away-head k (force s) (clear-away k (force s) (proj₁ (steady se)))
+  next-away σ (end c)     g tr se = tail-head c (cut σ) (proj₁ (proj₂ (trail tr)))
+  next-away σ hush        () tr se
+
+  UB : Events∞ B → Events∞ A → Set
+  UB β σ = Every∞ (λ k → Every∞ (λ q → Unrelated k (q ++ [ ix 0 ])) σ) β
+
+  mutual
+    st-beside : ∀ β σ → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → Steady (M.beside r β σ)
+    st-beside β σ ts os ss sb u = st-side β σ ts os ss sb u (force σ) refl
+
+    st-side : ∀ β σ → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e
+            → Steady (M.side r β σ e)
+    st-side β σ ts os ss sb u (out k a s) eq = st-ahead β σ ts os ss sb u (out k a s) eq tt _ refl
+    st-side β σ ts os ss sb u (skip k s)  eq = st-ahead β σ ts os ss sb u (skip k s) eq tt _ refl
+    st-side β σ ts os ss sb u (end c)     eq = st-ahead β σ ts os ss sb u (end c) eq tt _ refl
+    st-side β σ ts os ss sb u hush        eq = sb
+
+    st-ahead : ∀ β σ → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e → Going e
+             → ∀ b → M.before (M.shownAt e) (force β) ≡ b → Steady (M.ahead r β σ (M.shownAt e) b)
+    st-ahead β σ ts os ss sb u e eq g true  be = st-src β σ ts os ss sb u e eq g be
+    st-ahead β σ ts os ss sb u e eq g false be = st-body σ ts os ss e eq g (force β) sb (proj₁ u) be
+
+    st-src : ∀ β σ → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → ∀ e → force σ ≡ e → Going e
+           → M.before (M.shownAt e) (force β) ≡ true → Steady (M.ahead r β σ (M.shownAt e) true)
+    steady (st-src β σ ts os ss sb u e eq g be) =
+      clear-side q β σ′ (force σ′) be (every-mono (λ k w → head-shown {P = Unrelated k} σ e eq g w) (force β) (proj₁ u))
+        (subst (λ z → Head (λ h → ¬ Ext q (h ++ [ ix 0 ])) (force (M.onward∞ σ z))) (sym eq)
+           (next-away σ e g (subst (λ z → Trail z (cut σ)) eq ts) (subst Steady eq ss)))
+      , st-beside β σ′ (trailing-onward σ (force σ) refl ts) (ordered-onward σ (force σ) refl ts os) (steady-onward σ (force σ) refl ts ss) sb
+          (every∞-mono (λ k w → every-onward σ (force σ) (proj₁ w) (proj₂ w) (proj₁ w)) β u)
+      where q  = M.shownAt e
+            σ′ = M.onward∞ σ (force σ)
+
+    st-body : ∀ σ → Trailing σ → Ordered (force σ) → Steady (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Steady x
+            → Every (λ k → Every∞ (λ q → Unrelated k (q ++ [ ix 0 ])) σ) x → M.before (M.shownAt e) x ≡ false
+            → Steady (M.body r σ (M.shownAt e) x)
+    steady (st-body σ ts os ss e eq g (out n a β′) sx ux be) =
+      past-ahead n β′ σ q _ (proj₁ (steady sx)) (strict n q be (proj₁ un)) (λ x → proj₁ un (ext-prefixed x))
+      , st-ahead β′ σ ts os ss (proj₂ (steady sx)) (proj₂ (every ux)) e eq g _ refl
+      where q  = M.shownAt e
+            un = head-shown {P = Unrelated n} σ e eq g (proj₁ (every ux))
+    steady (st-body σ ts os ss e eq g (skip n β′) sx ux be) =
+      clear-next n β′ σ q _ (proj₁ (steady sx)) (λ x → proj₁ un (ext-prefixed x))
+      , st-ahead β′ σ ts os ss (proj₂ (steady sx)) (proj₂ (every ux)) e eq g _ refl
+      where q  = M.shownAt e
+            un = head-shown {P = Unrelated n} σ e eq g (proj₁ (every ux))
+    steady (st-body σ ts os ss e eq g (end c)     sx ux be) = tt
+    steady (st-body σ ts os ss e eq g hush        sx ux be) = tt
+
+  -- A body step keyed under it, a source step apart from it and under
+  -- the source's root: the body step no prefix of where the source
+  -- step shows.
+  easy-pt : ∀ k q → Owned P₀ k → Disjoint P₀ q → Owned r q → ¬ Prefix k (q ++ [ ix 0 ])
+  easy-pt k q ok dq oq pr with prefix-split k q (ix 0) pr
+  ... | inj₁ pk = proj₁ dq (owned-trans P₀ k q ok (inj₁ pk))
+  ... | inj₂ eq = shown (subst (Owned P₀) eq ok)
+    where
+      shown : ¬ Owned P₀ (q ++ [ ix 0 ])
+      shown (inj₂ t) = proj₁ dq (inj₂ (tagged-lane P₀ q 0 t))
+      shown (inj₁ pq) with prefix-split P₀ q (ix 0) pq
+      ... | inj₁ pq′ = proj₁ dq (inj₁ pq′)
+      ... | inj₂ e   = longer p (ix 1) (subst (Owned r) (sym (proj₁ (snoc-inj p q e))) oq)
+
+  -- The body unrelated to the source's shown steps, given that none of
+  -- its steps lies under one.
+  unrelated : ∀ {β σ} → Side β σ → Every∞ (λ k → Every∞ (λ q → ¬ Prefix (q ++ [ ix 0 ]) k) σ) β → UB β σ
+  unrelated {β} {σ} sd hard =
+    every∞-mono (λ k x → every∞-mono (λ q y → easy-pt k q (proj₁ x) (proj₁ (proj₁ y)) (proj₂ (proj₁ y)) , proj₂ y) σ
+                           (every∞-zip σ (every∞-zip σ (Side.ks sd) (Side.rs sd)) (proj₂ x)))
+      β (every∞-zip β (Side.kb sd) hard)
 
   -- Keyed with none of the connect, keyed with none of its body.
   narrow₀ : ∀ k → ¬ Owned p k → ¬ Owned P₀ k
@@ -5705,42 +5932,6 @@ mutual
     , record { spread = tt }
   spread (spread-taking false q k a false r c t s) = tt
 
-owned-drop : ∀ k w h → Owned (k ++ w) h → Owned k h
-owned-drop k w h = owned-trans k (k ++ w) h (inj₁ (prefix-++ k w))
-
--- Keyed under a position tagged with `p`: keyed under `p`.
-mutual
-  sub-owned : ∀ k p h → Owned (k ++ [ sub p ]) h → Owned p h
-  sub-owned k p h (inj₁ pr) = inj₂ (tagged-prefix p (k ++ [ sub p ]) h (tagged-sub k p) pr)
-  sub-owned k p h (inj₂ t)  = inj₂ (sub-tagged k p h t)
-
-  sub-tagged : ∀ k p h → Tagged (k ++ [ sub p ]) h → Tagged p h
-  sub-tagged k p []          ()
-  sub-tagged k p (ix _ ∷ h)  t        = sub-tagged k p h t
-  sub-tagged k p (last ∷ h)  t        = sub-tagged k p h t
-  sub-tagged k p (sub j ∷ h) (inj₁ o) = inj₁ (sub-owned k p j o)
-  sub-tagged k p (sub j ∷ h) (inj₂ t) = inj₂ (sub-tagged k p h t)
-
--- A position tagged with `p` outweighs it, and a step under `p` too.
-heavy : ∀ k p → ¬ Owned (k ++ [ sub p ]) p
-heavy k p o = <-irrefl refl (<-≤-trans (tagged-weigh p (k ++ [ sub p ]) (tagged-sub k p)) (owned-weigh _ _ o))
-
-snoc-weigh : ∀ p (l : M.Label) → weigh p < weigh (p ++ [ l ])
-snoc-weigh []      (ix _)  = s≤s z≤n
-snoc-weigh []      (sub _) = s≤s z≤n
-snoc-weigh []      last    = s≤s z≤n
-snoc-weigh (a ∷ p) l       = +-monoʳ-< (weighˡ a) (snoc-weigh p l)
-
-longer : ∀ p (l : M.Label) → ¬ Owned (p ++ [ l ]) p
-longer p l o = <-irrefl refl (<-≤-trans (snoc-weigh p l) (owned-weigh _ _ o))
-
-mark-sub : ∀ {l} → Mark l → ∀ j → sub j ≢ l
-mark-sub (ix-mark _) j ()
-mark-sub last-mark   j ()
-
-snoc-ne : ∀ a b {l l′ : M.Label} → l ≢ l′ → a ++ [ l ] ≢ b ++ [ l′ ]
-snoc-ne a b ne eq = ne (proj₂ (snoc-inj a b eq))
-
 -- Two of a source's positions apart, the second alien to the joiner,
 -- both tagged with it: the first keys nothing of the second's lane.
 tagged-apart : ∀ p a b → ¬ Owned p b → a ≢ b → ¬ Owned (a ++ [ sub p ]) ((b ++ [ sub p ]) ++ [ ix 1 ])
@@ -5986,6 +6177,21 @@ spread-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ �
                → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                → Spread (U.meaning (U.subscribe (connect s b) p) ρ)
 
+-- A CONNECT SUBSCRIBED IS IN ORDER: each source step a skip just past
+-- it, ahead of the body's later events, and what the source runs on
+-- with past the body's end left as the tail.
+ordered-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+                → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+                → Ordered (U.meaning (U.subscribe (connect s b) p) ρ)
+
+-- A CONNECT SUBSCRIBED WHERE A TICK HEADS IS STEADY, over sources
+-- sorted and alien to it: nothing the body shows lies above or below
+-- where a source step shows, and the source's run past the body's end
+-- steps where it would have.
+steady-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+               → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+               → Steady (U.meaning (U.subscribe (connect s b) p) ρ)
+
 -- A FINITE PROGRAM SUBSCRIBED IS IN ORDER, where a tick heads, over
 -- sorted sources alien to where it subscribes.
 ordered-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
@@ -6024,7 +6230,7 @@ steady-subᶠ (map f s) (map-f fs) p ρ hp so cl = steady-map f _ (steady-subᶠ
 steady-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = steady-scan f z _ (steady-subᶠ s fs p ρ hp so cl)
 steady-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl = steady-take i q _ (steady-subᶠ s fs p ρ hp so cl)
 steady-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = proj₁ (proj₂ (flat-calm op f s ff fs p ρ hp so cl))
-steady-subᶠ (connect s b) _ p ρ hp so cl = steady-connect s b p ρ hp so cl
+steady-subᶠ (connect s b) (connect-f fs fb) p ρ hp so cl = steady-connect s b fs fb p ρ hp so cl
 steady-subᶠ (connected i) _ p ρ hp so cl =
   steady-rejoin p _ (proj₁ (sorted-lookup ρ so i)) (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
 steady-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
@@ -6032,6 +6238,17 @@ steady-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
                               (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
 -- Where a connect starts: its body and its source, each just subscribed.
+-- A CONNECT'S BODY LIES UNDER NONE OF ITS SOURCE'S STEPS, over sources
+-- sorted and alien to it: nothing the body shows or leaves running lies
+-- under where a source step shows, its run past an end included.
+--
+-- RECOVERY: git show 43da74d9:agda-impl/adequacy/Placed.agda restores `alien-steps`, a subscription keying nothing just past its own events, from which this was read over a merge without tails
+postulate
+  under-shown-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+                      → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+                      → Every∞ (λ k → Every∞ (λ q → ¬ Prefix (q ++ [ ix 0 ]) k) (U.stateᴺ (U.subscribe s (p ++ [ ix 1 ])) ρ))
+                               (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
+
 connect-side : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b → ∀ p (ρ : NEnv Γ) (hp : Headed p) → Sorted ρ
              → Alienᴱ p ρ → Walk.Side p hp (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
                                         (U.stateᴺ (U.subscribe s (p ++ [ ix 1 ])) ρ)
@@ -6101,6 +6318,37 @@ spread-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
     so′ = (ordered-subᶠ s fs r ρ hr so cr , steady-subᶠ s fs r ρ hr so cr) , headed-sub s r ρ hr so , so
     cl′ : Alienᴱ P₀ ρ′
     cl′ = alien-sub s p ρ cl , c₀
+
+steady-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
+  W.st-beside _ _ (W.Side.ts sd) (W.Side.os sd) (W.Side.ss sd) (steady-subᶠ b fb (p ++ [ ix 0 ]) ρ′ (headed-snoc p hp) so′ cl′)
+    (W.unrelated sd (under-shown-connect s b fs fb p ρ hp so cl))
+  where
+    module W = Walk {A} {B} p hp
+    r  = p ++ [ ix 1 ]
+    hr = headed-snoc p hp
+    cr = alienᴱ-owned p r (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+    c₀ = alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl
+    ρ′ = U.meaning (U.subscribe s r) ρ ∷ᴬ ρ
+    so′ : Sorted ρ′
+    so′ = (ordered-subᶠ s fs r ρ hr so cr , steady-subᶠ s fs r ρ hr so cr) , headed-sub s r ρ hr so , so
+    cl′ : Alienᴱ (p ++ [ ix 0 ]) ρ′
+    cl′ = alien-sub s p ρ cl , c₀
+    sd = connect-side s b fs fb p ρ hp so cl
+
+ordered-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
+  W.or-beside _ _ (W.Side.ts sd) (W.Side.os sd) (ordered-subᶠ b fb (p ++ [ ix 0 ]) ρ′ (headed-snoc p hp) so′ cl′)
+  where
+    module W = Walk {A} {B} p hp
+    r  = p ++ [ ix 1 ]
+    hr = headed-snoc p hp
+    cr = alienᴱ-owned p r (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+    c₀ = alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl
+    ρ′ = U.meaning (U.subscribe s r) ρ ∷ᴬ ρ
+    so′ : Sorted ρ′
+    so′ = (ordered-subᶠ s fs r ρ hr so cr , steady-subᶠ s fs r ρ hr so cr) , headed-sub s r ρ hr so , so
+    cl′ : Alienᴱ (p ++ [ ix 0 ]) ρ′
+    cl′ = alien-sub s p ρ cl , c₀
+    sd = connect-side s b fs fb p ρ hp so cl
 
 fresh-connect {Γ} {A} {B} s b fs fb p ρ hp so cl = W.cuts-fresh fs₀ , W.fr-beside Bᶜ Sᶜ fs₀
   where
@@ -6275,7 +6523,7 @@ ordered-subᶠ (map f s) (map-f fs) p ρ hp so cl = ordered-map f _ (ordered-sub
 ordered-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = ordered-scan f z _ (ordered-subᶠ s fs p ρ hp so cl)
 ordered-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl = ordered-take i q _ (ordered-subᶠ s fs p ρ hp so cl)
 ordered-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = proj₁ (flat-calm op f s ff fs p ρ hp so cl)
-ordered-subᶠ (connect s b) _ p ρ hp so cl = ordered-connect s b p ρ hp so cl
+ordered-subᶠ (connect s b) (connect-f fs fb) p ρ hp so cl = ordered-connect s b fs fb p ρ hp so cl
 ordered-subᶠ (connected i) _ p ρ hp so cl = ordered-rejoin p _ (proj₁ sl) (proj₂ sl)
   where sl = sorted-lookup ρ so i
 ordered-subᶠ (defer l) (defer-f fl) p ρ hp so cl =

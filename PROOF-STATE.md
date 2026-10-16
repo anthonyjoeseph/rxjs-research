@@ -211,15 +211,16 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `ordered-connect`, then `steady-connect`, reusing
-  `Walk`: decides whether a connect's merge of source steps into its
-  body owes more than each side's order. Ruled out: a joiner owing its
-  source an order on its own tags (`spread-rejoin` is a body by weight:
-  no position owns a lighter one); a connect owing more than `Rise` and
-  the source's marks (`spread-connect` is a walk over `Walk.Side`); a
-  lane owing more than its root's apartness; pins by position alone; a
-  take owing more than a value's disjointness from its pins
-  (`trail-take`, `spread-take`).
+- **THE ORDER.** `under-shown-connect`: decides whether a body step
+  can lie under a source step's shown position, a joiner's tag of a
+  source event inside an earlier one's subtree. Ruled out: a connect's
+  order or steadiness owing more than each side's own plus this
+  (`ordered-connect`, `steady-connect` are walks over `Walk.Side`); a
+  body step keyed over a source's shown step (`Walk.easy-pt`); a joiner
+  owing its source an order on its own tags (`spread-rejoin`, by
+  weight); a connect owing more than `Rise` and the source's marks
+  (`spread-connect`); a take owing more than a value's disjointness
+  from its pins (`trail-take`, `spread-take`).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -228,11 +229,8 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
-  source steps merge into its body in order, the source's run past the body's
-  end its tail.
-- **`steady-connect`** (Placed) — FALSITY, `RECOVERY×2`, `X`: a connect where a
-  tick heads it is steady, its source's rest stepping where it would have.
+- **`under-shown-connect`** (Placed) — FALSITY, `RECOVERY`, `X`: no step a
+  connect's body shows or leaves lies under where a source step shows.
 - **`step-skips`** (Stepper) — FALSITY, `REFUTED×2, DEAD ROUTE, RECOVERY×2`,
   `X`: a sane, placed root ghost's meaning is what its step shows, then the
   stepped node's.
@@ -281,8 +279,8 @@ by their own silent steps (`Mirror`).
   completion delivered, then its cut.
 - **`src-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
   subscribed once its body is.
-- **`parted-torn`** (Lowers) — FALSITY, `NO EVIDENCE`: a body with no part
-  has none once a cut runs; a flatMap's queue needs the names apart.
+- **`parted-torn`** (Lowers) — FALSITY, `NO EVIDENCE`: a body with no part has
+  none once a cut runs; a flatMap's queue needs the names apart.
 - **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's
   continuation stashes its unsubscribe, a call fewer.
 - **`burst-poll`** (Content) — FALSITY, `NO EVIDENCE`: a live burst's sink
