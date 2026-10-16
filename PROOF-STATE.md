@@ -177,6 +177,16 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
+- **THE MEASURE.** `emit-unseen`: an `of` fed past its connect's body's
+  end, a burst the meaning keeps as skips (`U.burstingᶜ`). Decides
+  whether the ghost's step over that burst lowers the measure, or a
+  spinning source owes the measure a term. Ruled out: a measure blind to
+  a take's stage; `climb-take` is a body over `take-pass`, `take-out`,
+  `take-end`.
+- **THE SHUT BODY.** `heads-lift`: a connect past its source's end shows
+  its body shut, so the body's part must read every joiner left already
+  told. `told` keeps an end it has; decides whether `Meaning`'s feed
+  invariant supplies the rest, or the record owes a field.
 - **GHOST AHEAD.** `spread-past`, then `behind`'s producers: `others-past`
   is a body over `Carried.behind` (every node the ghost holds heads no
   earlier than the run) and `spread-past` (no sibling heads under the
@@ -200,16 +210,6 @@ by their own silent steps (`Mirror`).
   pool's and a rest's skips are the meaning's own. Ruled out: exact
   agreement anchored in a source's step history. Decides whether the
   witness's ghost-only fields carry enough to step a merge.
-- **THE MEASURE.** `emit-unseen`: an `of` fed past its connect's body's
-  end, a burst the meaning keeps as skips (`U.burstingᶜ`). Decides
-  whether the ghost's step over that burst lowers the measure, or a
-  spinning source owes the measure a term. Ruled out: a measure blind to
-  a take's stage; `climb-take` is a body over `take-pass`, `take-out`,
-  `take-end`.
-- **THE SHUT BODY.** `heads-lift`: a connect past its source's end shows
-  its body shut, so the body's part must read every joiner left already
-  told. `told` keeps an end it has; decides whether `Meaning`'s feed
-  invariant supplies the rest, or the record owes a field.
 
 ### The ledger
 
