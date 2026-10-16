@@ -8,7 +8,7 @@ module adequacy.Placed where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List.Properties using (∷-injective; ∷-injectiveʳ; ++-assoc)
+open import Data.List.Properties using (∷-injective; ∷-injectiveʳ; ++-assoc; ++-identityʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
@@ -1857,13 +1857,37 @@ atopT-every : ∀ h {P : Pos → Set} t → (∀ k → P k → k <ᵖ h ≡ fals
 atopT-every h (pin k u) f pt = f k (proj₁ (everyᵀ pt))
 atopT-every h idle      f pt = tt
 
+-- `n` marks the step at `k`: just past it, or just past a mark of it, as
+-- a connect re-shows a skip it did not take.
+data Marks (k : Pos) : Pos → Set where
+  shown  : Marks k (k ++ [ ix 0 ])
+  reshown : ∀ {n} → Marks k n → Marks k (n ++ [ ix 0 ])
+
+marks-eq : ∀ {k n} → Marks k n → Σ Pos (λ zs → n ≡ k ++ ix 0 ∷ zs)
+marks-eq         shown      = [] , refl
+marks-eq {k = k} (reshown m) with marks-eq m
+... | zs , refl = zs ++ [ ix 0 ] , ++-assoc k (ix 0 ∷ zs) [ ix 0 ]
+
+-- Past a step and not under it: past its marks.
+marks-past : ∀ {k n} h → Marks k n → k <ᵖ h ≡ true → ¬ Ext k h → n <ᵖ h ≡ true
+marks-past {k} h m kh nx with marks-eq m
+... | zs , refl = M.<ᵖ-apart k h (ix 0 ∷ zs) kh ne
+  where ne : ∀ ys → h ≡ k ++ ys → ⊥
+        ne []       e with () ← trans (sym (subst (λ z → k <ᵖ z ≡ true) (trans e (++-identityʳ k)) kh)) (<ᵖ-irrefl k)
+        ne (l ∷ ls) e = nx (subst (Ext k) (sym e) (ext l ls))
+
+-- Between a step and its mark: under the step.
+marks-between : ∀ {k n} q → Marks k n → k <ᵖ q ≡ true → q <ᵖ n ≡ true → Prefix k q
+marks-between {k} q m kq qn with marks-eq m
+... | zs , refl with M.<ᵖ-between k q (ix 0 ∷ zs) kq qn
+...   | ys , refl = prefix-++ k ys
+
 -- What a cut leaves running trails the run's next event: no step before
--- a value nor keyed with it, nor before a skip but the one showing that very step just
--- past it; every step past an end, and none keyed where that end would
+-- a value nor keyed with it, nor before a skip but a step it marks; every step past an end, and none keyed where that end would
 -- subscribe a lane, nor over it; nothing left behind silence.
 TrailE : ∀ {A} → Events A → Pos → Set
 TrailE (out n _ _) k = k <ᵖ n ≡ false × Disjoint n k
-TrailE (skip n _)  k = k <ᵖ n ≡ false ⊎ n ≡ k ++ [ ix 0 ]
+TrailE (skip n _)  k = k <ᵖ n ≡ false ⊎ Marks k n
 TrailE (end n)     k = n <ᵖ k ≡ true × Disjoint (n ++ [ ix 1 ]) k × ¬ Ext n k
 TrailE hush        k = ⊥
 
@@ -2858,8 +2882,8 @@ module FlatOrder (p : Pos) where
       go : ∀ x → Beyond q x → TrailE x k → Under r k → k <ᵖ (q ++ [ ix 0 ]) ≡ false
       go (out n _ _) b tr          u = <ᵖ-step q k (still q n k b (proj₁ tr))
       go (skip n _)  b (inj₁ tr)   u = <ᵖ-step q k (still q n k b tr)
-      go (skip n _)  b (inj₂ refl) u with k <ᵖ q in kq
-      ... | true  = ⊥-elim (t≢f (trans (sym b) (<ᵖ-step k q kq)))
+      go (skip n _)  b (inj₂ m) u with k <ᵖ q in kq
+      ... | true  = ⊥-elim (aside-not r q d (owned-trans r k q (proj₁ u) (inj₁ (marks-between q m kq b))))
       ... | false with <ᵖ-split q k kq
       ...   | inj₁ qk   = <ᵖ-step q k qk
       ...   | inj₂ refl = ⊥-elim (aside-not r q d (proj₁ u))
@@ -3456,9 +3480,9 @@ module FlatOrder (p : Pos) where
   lags : ∀ {A} (x : Events A) k h → TrailE x h → Atop k x → ¬ Ext h k → Lag k h
   lags (out n _ _) k h tr        at nx = ≮-trans k n h at (proj₁ tr)
   lags (skip n _)  k h (inj₁ tr) at nx = ≮-trans k n h at tr
-  lags (skip n _)  k h (inj₂ refl) at nx with h <ᵖ k in hk
+  lags (skip n _)  k h (inj₂ m) at nx with h <ᵖ k in hk
   ... | false = refl
-  ... | true  with () ← trans (sym (proj₁ (step-past h k (hk , nx)))) at
+  ... | true  with () ← trans (sym (marks-past k m hk nx)) at
   lags (end n)     k h tr        at nx with h <ᵖ k in hk
   ... | false = refl
   ... | true  with () ← trans (sym (<ᵖ-trans n h k (proj₁ tr) hk)) at
@@ -3480,10 +3504,10 @@ module FlatOrder (p : Pos) where
   everyᵀ (lag-pin k u st) = <ᵖ-irrefl k , sorted-lag k (later u) (proj₂ (sortedᵀ st)) (proj₁ (sortedᵀ st))
 
   -- No earlier than `c`: past the step just under it, or that step's own.
-  lag-step : ∀ c h → Lag c h → Lag (c ++ [ ix 0 ]) h ⊎ c ++ [ ix 0 ] ≡ h ++ [ ix 0 ]
+  lag-step : ∀ c h → Lag c h → Lag (c ++ [ ix 0 ]) h ⊎ Marks h (c ++ [ ix 0 ])
   lag-step c h l with <ᵖ-split c h l
   ... | inj₁ ch   = inj₁ (<ᵖ-step c h ch)
-  ... | inj₂ refl = inj₂ refl
+  ... | inj₂ refl = inj₂ shown
 
   owned-ix : ∀ h c i → Owned h (c ++ [ ix i ]) → Owned h c ⊎ h ≡ c ++ [ ix i ]
   owned-ix h c i (inj₁ pr) with prefix-split h c (ix i) pr
@@ -3520,7 +3544,7 @@ module FlatOrder (p : Pos) where
             → EveryT P t → EveryT P (M.whole o ls t)
   lag-whole o ls t a b c = everyT-∪ (M.cutᴼ o) (M.cuts ls ∪ t) a (everyT-∪ (M.cuts ls) t (cuts-every ls b) c)
 
-  lift-skip : ∀ k c → EveryT (Lag k) c → EveryT (λ h → h <ᵖ k ≡ false ⊎ k ≡ h ++ [ ix 0 ]) c
+  lift-skip : ∀ k c → EveryT (Lag k) c → EveryT (λ h → h <ᵖ k ≡ false ⊎ Marks h k) c
   lift-skip k c = everyT-mono (λ _ → inj₁) c
 
   -- What a lane's event at `k` leaves aside: the other lanes, the outer
@@ -3929,16 +3953,11 @@ module FlatOrder (p : Pos) where
 -- A CONNECT'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
 -- sources alien to it: its source's burst left running beside what its
 -- body would leave trails what the connect shows next.
+--
+-- REFUTED: e295322c by a connect re-showing its lane's skip at `k ++ [ ix 0 , ix 0 ]`, `k` still pinned, while the skip clause admitted only `k ++ [ ix 0 ]`
 postulate
   trail-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                 → Trailing (U.stateᴺ (U.subscribe (connect s b) p) ρ)
-
-tagged-last : ∀ k x → Tagged k (x ++ [ last ]) → Tagged k x
-tagged-last k []          ()
-tagged-last k (ix _ ∷ x)  t        = tagged-last k x t
-tagged-last k (last ∷ x)  t        = tagged-last k x t
-tagged-last k (sub _ ∷ x) (inj₁ o) = inj₁ o
-tagged-last k (sub _ ∷ x) (inj₂ t) = inj₂ (tagged-last k x t)
 
 -- Keyed with no step `h` keys, so with none just under it.
 disjoint-snoc : ∀ h k l → (∀ x → Tagged k (x ++ [ l ]) → Tagged k x) → Disjoint h k → Disjoint (h ++ [ l ]) k
@@ -3962,15 +3981,15 @@ take-end h k hk d =
   M.<ᵖ-apart h k [ last ] hk (λ ys eq → proj₁ d (inj₁ (subst (Prefix h) (sym eq) (prefix-++ h ys))))
   , disjoint-snoc (h ++ [ last ]) k (ix 1) (λ x → tagged-lane k x 1) dl
   , λ x → proj₁ dl (owned-ext x)
-  where dl = disjoint-snoc h k last (tagged-last k) d
+  where dl = disjoint-snoc h k last (λ x → tagged-mark k x last last-mark) d
 
 -- A pin trailing what comes past a value at `h`, keyed with none of `h`:
 -- past `h`.
 pin-past : ∀ {A} h (x : Events A) k → Past h x → TrailE x k → Disjoint h k → h <ᵖ k ≡ true
 pin-past h (out n _ _) k (hn , _) (l , _)    d = still h n k hn l
 pin-past h (skip n _)  k (hn , _) (inj₁ l)   d = still h n k hn l
-pin-past h (skip n _)  k (hn , _) (inj₂ refl) d with k <ᵖ h in kh
-... | true  = ⊥-elim (t≢f (trans (sym hn) (<ᵖ-step k h kh)))
+pin-past h (skip n _)  k (hn , _) (inj₂ m) d with k <ᵖ h in kh
+... | true  = ⊥-elim (proj₂ d (inj₁ (marks-between h m kh hn)))
 ... | false = take-ahead h k kh d
 pin-past h (end n)     k (hn , _) (nk , _)   d = <ᵖ-trans h n k hn nk
 pin-past h hush        k _        ()         d

@@ -186,14 +186,16 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `trail-connect` first: a connect's source burst left
-  running beside its body's cut, the burst's pins keyed under the
-  connect's own lane. Decides whether `Trailings`' new disjointness of a
-  value from its cut reaches a body's tail, or the connect owes it. Then
-  `spread-sub`, `ordered-connect`, `steady-connect`.
-  Ruled out: a take owing anything past a value's disjointness from the
-  pins it trails and leaves (`trail-take`); the flatMap's merge owing
-  anything past `Roots`, `Pool`, `Aside` and `Heldᴹ`.
+- **THE ORDER.** `trail-connect` first, as a walk over `M.beside`'s
+  `side`, `ahead` and `body`: a source step re-shown past the source's
+  subscription marks every pin its cut left (`Marks`), and a body's
+  joined delivery `q ++ [ sub j ]` comes after the step shown for `q`.
+  Decides whether the source's and the body's own trails carry the
+  walk, or the connect owes an invariant tying the body's joiners to
+  the source still running. Then `spread-sub`, `ordered-connect`,
+  `steady-connect`. Ruled out: a skip trailed only by the step just
+  under it (`trail-connect`'s refutation); a take owing anything past
+  a value's disjointness from its pins (`trail-take`).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -212,8 +214,8 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`trail-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
-  source burst left running beside its body's cut trails what it shows next.
+- **`trail-connect`** (Placed) — FALSITY, `REFUTED`, `X`: a connect's source
+  burst left running beside its body's cut trails what it shows next.
 - **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: after a value,
   nothing later keys where its lane would, nor under it, nor over it.
 - **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's

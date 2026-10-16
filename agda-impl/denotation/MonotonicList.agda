@@ -14,7 +14,7 @@ module denotation.MonotonicList where
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.List using (List; _∷_; []; _++_; [_]; length)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; Σ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; ≤′-step)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
@@ -420,6 +420,20 @@ private
 ... | lt = refl
 ... | eq = <ᵖ-apart p q y h (λ ys e → ne ys (cong₂ _∷_ (sym (eq-label a b c)) e))
 ... | gt with () ← h
+
+-- Past `p` and before something under it: under it.
+<ᵖ-between : ∀ p q ys → p <ᵖ q ≡ true → q <ᵖ (p ++ ys) ≡ true → Σ Pos (λ zs → q ≡ p ++ zs)
+<ᵖ-between []      q       ys _ _  = q , refl
+<ᵖ-between (a ∷ p) []      ys () _
+<ᵖ-between (a ∷ p) (b ∷ q) ys h h′ with cmpLabel a b in c | cmpLabel b a in d
+... | lt | lt with () ← trans (sym (refl-label a)) (lt-label a b a c d)
+... | lt | eq with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel a z ≡ lt) (eq-label b a d) c)
+... | lt | gt with () ← h′
+... | eq | lt with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel z a ≡ lt) (sym (eq-label a b c)) d)
+... | eq | gt with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel z a ≡ gt) (sym (eq-label a b c)) d)
+... | gt | _  with () ← h
+... | eq | eq with <ᵖ-between p q ys h h′
+...   | zs , e = zs , cong₂ _∷_ (sym (eq-label a b c)) e
 
 ------------------------------------------------------------------------
 -- What a subscriber sees

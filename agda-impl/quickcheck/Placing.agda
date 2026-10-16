@@ -113,14 +113,25 @@ private
   apartᵇ : Pos → Pos → Bool
   apartᵇ a b = not (ownedᵇ a b) ∧ not (ownedᵇ b a)
 
+  -- `n` is `k` and then one or more `ix 0`: a skip marking the step at
+  -- `k`, re-shown by every connect it passes untaken.
+  marksᵇ : Pos → Pos → Bool
+  marksᵇ []      n = zeros n
+    where zeros : Pos → Bool
+          zeros (ix zero ∷ [])     = true
+          zeros (ix zero ∷ y ∷ ys) = zeros (y ∷ ys)
+          zeros _                  = false
+  marksᵇ (a ∷ k) []      = false
+  marksᵇ (a ∷ k) (b ∷ n) = samePos (a ∷ []) (b ∷ []) ∧ marksᵇ k n
+
   -- What a cut leaves running trails the run: its steps in order, none
   -- before a value coming next nor keyed with it, nor before a skip but
-  -- the one showing that very step just past it; all past an end and
+  -- a step it marks; all past an end and
   -- none inside it, none keyed where that end would subscribe a lane,
   -- nor over it; nothing left behind silence.
   trailᵇ : Events ℕ → Pos → Bool
   trailᵇ (out n _ _) k = not (k <ᵖ n) ∧ apartᵇ n k
-  trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ samePos n (k ++ [ ix 0 ])
+  trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ marksᵇ k n
   trailᵇ (end n)     k = (n <ᵖ k) ∧ not (inside n k) ∧ apartᵇ (n ++ [ ix 1 ]) k
   trailᵇ hush        k = false
 
