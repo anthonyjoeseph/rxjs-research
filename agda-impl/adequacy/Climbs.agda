@@ -394,7 +394,7 @@ module Ascending (R : Set) where
       end-behind  : Each H (Heads q) T → Each H (Heads q) T′
       out-owned   : ∀ {w bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {N : Act h ⊤} (sk : StackAs T q ϑ K bs) (e : wkAct same⊑ N ≗ ⟦ take1C (planted ρ v) ∷ [] ⟧ᶜ)
               → At.val H (Kit.live c) ≡ true → Owned H T (runAs [] (≗-refl _) sk)
-              → Owned H T′ (runAs [] (≗-refl _) (backAs q (take1C (planted ρ v) ∷ []) (<ᵖ-below q []) e (end-stack sk)))
+              → Owned H T′ (runAs [] (≗-refl _) (backAs q (take1C (planted ρ v) ∷ []) (<ᵖ-below q {ix 0} []) e (end-stack sk)))
       out-queue   : ∀ {clk ts} → Queue H q clk ts T → Queue H (q ++ [ ix 0 ]) clk ts T′
       out-behind  : Each H (Heads q) T → Each H (Heads (q ++ [ ix 0 ])) T′
       end-ghost : ∀ {g S} → Sane [] g → Placed g [] → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
@@ -465,7 +465,7 @@ module Ascending (R : Set) where
       X = under last (Observer.complete (Here.obs (walk ρ top))) (Kit.cut c)
       e = ≗-trans (wk-same N′) (≗-trans eN
             (subst (λ W → X ≗ (under last (Observer.complete (Here.obs W)) (Kit.cut c) >>ᴬ done tt)) (sym (walk-planted ρ v top)) (seq-done X)))
-      st = backAs q (take1C (planted ρ v) ∷ []) (<ᵖ-below q []) e (Ended.end-stack hp ρ q c′ sk)
+      st = backAs q (take1C (planted ρ v) ∷ []) (<ᵖ-below q {ix 0} []) e (Ended.end-stack hp ρ q c′ sk)
 
   -- The signal risen, held to the call's load.
   rise : ∀ {g m} {st : Strong g m} {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
