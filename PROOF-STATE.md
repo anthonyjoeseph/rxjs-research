@@ -184,8 +184,9 @@ by their own silent steps (`Mirror`).
   an operator's own completion code (a body's cut, a subject's finish, a
   lane's refill, an outer's settle) leaves a re-entry configuration or a
   `Closing` one operator up, from what `Closing` carries. Ruled out: a map,
-  scan or defer owing a completion more than its source's (`close-map`,
-  `close-scan`, `close-defer`); a teardown reopening a gone body (a queue
+  scan, defer or live take owing a completion more than its source's
+  (`close-map`, `close-scan`, `close-defer`, `close-take`); a completion at the root owing more than the
+  record's end (`close-root`); a teardown reopening a gone body (a queue
   is a `fifo` cell, a kind no teardown writes); a cut's run allocating,
   emitting or yielding.
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
@@ -244,10 +245,6 @@ by their own silent steps (`Mirror`).
   refills, or ends the flatMap past its outer's end.
 - **`close-outer`** (Content) — FALSITY, `NO EVIDENCE`: a flatMap's outer ended
   settles: the flatMap ends with no lane left, or runs on.
-- **`close-take`** (Content) — FALSITY, `NO EVIDENCE`: a completion through a
-  live takeWhile, its guard read open.
-- **`close-root`** (Content) — FALSITY, `NO EVIDENCE`: a completion at the root
-  records the run's end.
 - **`take1-enter`** (Content) — FALSITY, `NO EVIDENCE`: a takeWhile's
   completion begun under its failing value, its cut the frame's rest.
 - **`last-enter`** (Content) — FALSITY, `NO EVIDENCE`: a spent `of`'s

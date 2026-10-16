@@ -84,7 +84,7 @@ module Honesty (R : Set) where
   open Moving R using (pend; takes; takes-plant; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
-  open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears; ≗-trans; wk-same)
+  open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears; ≗-trans; wk-same; bind≗)
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
   open Read
@@ -1819,13 +1819,38 @@ module Honesty (R : Set) where
     (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-defer here) top) (Closing.code cl))
     (Closing.ends cl) (S , Lρ , sg)
 
-  postulate
-    -- A completion through a live takeWhile: its guard read open, one
-    -- operator up, the take showing its source's end.
-    close-take : ∀ {g m} (st : Strong g m) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k tk}
-                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u))
-               → Closing g (loadOf st) m₁ (ρ ⊕ in-take here) → Closed st m₁ (ρ ⊕ in-take here)
+  -- A guard read open: what it guards.
+  open-code : ∀ {w} {b : Bool} {m : Act w ⊤} → b ≡ true → Kit.when b m ≗ m
+  open-code refl = ≗-refl _
 
+  -- A live take shows its source's end.
+  ends-take : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {q} → At.val H (Kit.live c) ≡ true
+            → (∀ {c′} → At.part H u ≡ just c′ → U.step c′ ≡ U.endˢ q)
+            → ∀ {c′} → At.part H (takeWhileˢ i p c k taking u) ≡ just c′ → U.step c′ ≡ U.endˢ q
+  ends-take H {i = i} {p} {u = u} lv es rewrite lv = ends-mapᴹ H (λ c e → cong (U.takeWhileˢ i p) e) (At.part H u) es
+
+  -- A completion through a live takeWhile: its guard read open, one
+  -- operator up, the take showing its source's end.
+  close-take : ∀ {g m} (st : Strong g m) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k tk}
+               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u))
+             → Closing g (loadOf st) m₁ (ρ ⊕ in-take here) → Closed st m₁ (ρ ⊕ in-take here)
+  close-take st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ
+    record { sane = sn ; placed = pl ; ks = ks ; ctl = refl ; code = cd ; stack = sk ; ends = es ; lifted = S , L , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+           ; behind = bh ; kept = kp }
+    with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-take here) top) cd
+  ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
+    rose (then refl now) (one-lower ρ one-take) (record
+      { sane = sn ; placed = pl ; ctl = refl
+      ; code = ≗-trans (f same⊑ _) (bind≗ (≗-trans (wk-same _) (open-code lv)) λ _ → wk-same _)
+      ; stack = sk
+      ; ends = ends-take hp {i = i} {p = p} {c = c} {k = k} {u = u} lv es
+      ; lifted = S , Lρ , sg
+      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = kp })
+
+  postulate
     -- A flatMap's outer ended: its done flag written, settled: the
     -- flatMap ends if no lane is left, or the lanes run on.
     close-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
@@ -1854,9 +1879,12 @@ module Honesty (R : Set) where
                  (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u))
                → Closing g (loadOf st) m₁ (ρ ⊕ in-body here) → Closed st m₁ (ρ ⊕ in-body here)
 
-    -- A completion at the root: the run's end recorded, the ghost's
-    -- step its end.
-    close-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} → Closing g ℓ m₁ {T = T} here → Hopped st m₁
+  -- A completion at the root: the run's end asked of the record, the
+  -- ghost's step its end.
+  close-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} → Closing g ℓ m₁ {T = T} here → Hopped st m₁
+  close-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk}
+    record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ _ ; lifted = _ , lifts-here , sg ; books = record { running = refl } } =
+    g , _ , then refl now , closing refl refl sg sn pl , showing (agrees (λ n → agree-refl n _)) (λ ())
 
   -- One operator closed, by the operator.
   close-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
