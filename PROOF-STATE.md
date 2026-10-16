@@ -177,7 +177,7 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE TEARDOWN.** `torn-fed` and `parted-torn`, the last leaves under
+- **THE TEARDOWN.** `parted-torn`, the last leaf under
   `cut-onward`, which serves a taken takeWhile and an ended body alike; then the END CLIMB, a `Climbing` for completes,
   under `take1-onward`, `fin-onward` and `emit-last`. Ruled out: every
   cold below a cut switch spent (a lane cut inside its cold's first
@@ -291,16 +291,12 @@ by their own silent steps (`Mirror`).
   subscribed once its body is.
 - **`parted-torn`** (Lowers) — FALSITY, `NO EVIDENCE`: a body with no part
   has none once a cut runs; a flatMap's queue needs the names apart.
-- **`torn-fed`** (Content) — FALSITY, `NO EVIDENCE`: a cut's silenced joiners
-  owe nothing, the others as they were.
 - **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's
   continuation stashes its unsubscribe, a call fewer.
 - **`burst-poll`** (Content) — FALSITY, `NO EVIDENCE`: a live burst's sink
   polled, open to play or closed and dropped.
 - **`burst-play`** (Content) — FALSITY, `NO EVIDENCE`: a polled burst's frame
   played, a value run on, a stall passed, a close scheduled.
-- **`sane-out`** (Content) — FALSITY, `NO EVIDENCE`: a ghost's value shown
-  leaves it sane.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never

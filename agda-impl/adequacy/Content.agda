@@ -54,7 +54,7 @@ open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Local using (module Locality)
 open import adequacy.Lowers using (module Lowering)
-open import adequacy.Sane using (Sane)
+open import adequacy.Sane using (Sane; sane-out)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; afterᴱ; placed-after; Placedˢ; step-skips)
 open import denotation.Denote using (⟦_⟧)
@@ -86,7 +86,7 @@ module Honesty (R : Set) where
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears)
   open Locality R using (site-holds; site-gated)
-  open Lowering R using (site-lowers; queue-lowers; torn-owned)
+  open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
   open Read
 
   ----------------------------------------------------------------------
@@ -1101,9 +1101,6 @@ module Honesty (R : Set) where
                → Mach.bursts m ≡ just b ∷ bs → spent? (Conf.heap (Mach.conf m)) (Playing.handle b) ≡ false → Playing.polled b ≡ true
                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
 
-    -- A ghost's value shown, the ghost it leaves still sane.
-    sane-out : ∀ {g : U.Node [] R} {k a g′} → Sane [] g → U.step g ≡ U.outˢ k a g′ → Sane [] g′
-
     -- A value recorded is the least the ghost still holds.
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
@@ -1121,10 +1118,10 @@ module Honesty (R : Set) where
            → Σ (Act h ⊤) λ act′ → act′ ≗ ⟦ ks ⟧ᶜ × m′ ⇝ mach ⟨ siteHeap hp z , p , run act′ σ K ⟩ clk ts bs td lg en mk
   tear-cut {hp = hp} cr z {ks} e eq = site-tears hp (Kernels.holds (Carried.kernels cr)) (Books.fresh (Carried.books cr)) z {ks} e eq
 
-  postulate
-    -- A joiner silenced owes nothing; every other as it was.
-    torn-fed : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
-             → At.Fed (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) []
+  -- A joiner silenced owes nothing; every other as it was.
+  torn-fed : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+           → At.Fed (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) []
+  torn-fed cr z = fed-lowers (site-lowers _ z) (Carried.tree cr) (Meaning.fed (Carried.meaning cr))
 
   -- Every subscription still against its kernel, and every gate: the
   -- cut moves only the node it runs from.
