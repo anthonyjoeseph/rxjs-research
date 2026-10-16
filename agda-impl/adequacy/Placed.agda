@@ -1596,14 +1596,18 @@ prefix-lt j n pr with prefix-rest j n pr
 ... | []     , refl = inj₁ (sym (++-identityʳ j))
 ... | l ∷ ls , refl = inj₂ (<ᵖ-below j ls)
 
+-- What comes before a position under `p`, outside `p`, comes before `p`.
+below-under : ∀ p k ys → ¬ Prefix p k → k <ᵖ (p ++ ys) ≡ true → k <ᵖ p ≡ true
+below-under p k ys np h with k <ᵖ p in e
+... | true  = refl
+... | false with <ᵖ-split p k e
+...   | inj₂ refl = ⊥-elim (np (prefix-refl p))
+...   | inj₁ pk with () ← trans (sym (<ᵖ-asym (p ++ ys) k (M.<ᵖ-apart p k ys pk (λ zs q → np (subst (Prefix p) (sym q) (prefix-++ p zs)))))) h
+
 -- What comes before a lane under `p`, outside `p`, comes before every
 -- lane under it.
 below-lane : ∀ p k i j → ¬ Prefix p k → k <ᵖ (p ++ [ ix i ]) ≡ true → k <ᵖ (p ++ [ ix j ]) ≡ true
-below-lane p k i j np h with k <ᵖ p in e
-... | true  = <ᵖ-trans k p (p ++ [ ix j ]) e (<ᵖ-below p [])
-... | false with <ᵖ-split p k e
-...   | inj₂ refl = ⊥-elim (np (prefix-refl p))
-...   | inj₁ pk with () ← trans (sym (<ᵖ-asym (p ++ [ ix i ]) k (M.<ᵖ-apart p k [ ix i ] pk (λ ys q → np (subst (Prefix p) (sym q) (prefix-++ p ys)))))) h
+below-lane p k i j np h = <ᵖ-trans k p (p ++ [ ix j ]) (below-under p k [ ix i ] np h) (<ᵖ-below p [])
 
 -- RISING: whatever under `p` tags a position came before it.  A join
 -- keys a source's event after where it joined, and a timer's frame
@@ -1982,6 +1986,13 @@ past-noext k n .(k ++ l ∷ ls) kn nx hn (ext l ls) with () ← trans (sym hn) (
 inside-prefix : ∀ r k h → M.inside r k ≡ true → Prefix k h → M.inside r h ≡ true
 inside-prefix r k h i pr with prefix-rest k h pr
 ... | ys , refl = M.inside-++ r k ys i
+
+-- Inside `r` is under it.
+inside-under : ∀ r k → M.inside r k ≡ true → Prefix r k
+inside-under []      k       i = tt
+inside-under (a ∷ r) []      ()
+inside-under (a ∷ r) (b ∷ k) i with M.inside-cons a r b k i
+... | e , i′ = e , inside-under r k i′
 
 ext-prefix : ∀ {k j n} → Ext k j → Prefix j n → Ext k n
 ext-prefix {k} {n = n} (ext l ls) pr with prefix-rest (k ++ l ∷ ls) n pr
@@ -4349,6 +4360,12 @@ module Bursting (r : Pos) where
   every-cue m (end _)     pe = every pe
   every-cue m hush        pe = tt
 
+  cue-down : ∀ {A} m m′ (e : Events A) → m <ᵖ m′ ≡ false → Cue m e → Cue m′ e
+  cue-down m m′ (out k _ _) mm c = ≮-trans m′ m (k ++ [ ix 0 ]) mm c
+  cue-down m m′ (skip k _)  mm c = ≮-trans m′ m (k ++ [ ix 0 ]) mm c
+  cue-down m m′ (end k)     mm c = ≮-trans m′ m (k ++ [ ix 0 ]) mm c
+  cue-down m m′ hush        mm c = tt
+
   -- Past an end, what it left running shows past it.
   cue-tail : ∀ {A} m c t → (c ++ [ ix 0 ]) <ᵖ m ≡ false → EveryT (λ j → c <ᵖ j ≡ true × Disjoint (c ++ [ ix 1 ]) j × ¬ Ext c j) t
            → Cue {A} m (tailᴱ t)
@@ -4487,7 +4504,7 @@ module Bursting (r : Pos) where
 -- What `c` lies inside, keyed with none of `p`, came before `n`, or is a
 -- bare tick.
 Fresh : Pos → Pos → Pos → Set
-Fresh p n c = ∀ k → Ext k c → Disjoint p k → k <ᵖ n ≡ true ⊎ Σ ℕ (λ t → k ≡ ix t ∷ [])
+Fresh p n c = ∀ k → Ext k c → ¬ Owned p k → k <ᵖ n ≡ true ⊎ Σ ℕ (λ t → k ≡ ix t ∷ [])
 
 -- After each step a run shows, what it leaves running is fresh against it.
 mutual
@@ -4514,6 +4531,21 @@ fresh-up p n m c nm f k x d with f k x d
 ... | inj₁ kn with nm
 ...   | inj₁ lt   = inj₁ (<ᵖ-trans k n m kn lt)
 ...   | inj₂ refl = inj₁ kn
+
+fresh-past : ∀ p n m c → m <ᵖ n ≡ false → Fresh p n c → Fresh p m c
+fresh-past p n m c h = fresh-up p n m c (<ᵖ-split n m h)
+
+-- Fresh against a step under `p`, fresh against `p`.
+fresh-under : ∀ p ys c → Fresh p (p ++ ys) c → Fresh p p c
+fresh-under p ys c f k x no with f k x no
+... | inj₂ t  = inj₂ t
+... | inj₁ kl = inj₁ (below-under p k ys (λ q → no (inj₁ q)) kl)
+
+-- What an end left running, all past `m`, runs on fresh.
+fresh-tail : ∀ {A} p m t → EveryT (Fresh p m) t → EveryT (λ k → m <ᵖ k ≡ true) t → FreshRun {A} p (tailᴱ t)
+freshᴿ (fresh-tail p m (pin k u) ct mt) =
+  everyT-mono (λ h → fresh-up p m k h (inj₁ (proj₁ (everyᵀ mt)))) (later u) (proj₂ (everyᵀ ct)) , fresh-tail p m (later u) (proj₂ (everyᵀ ct)) (proj₂ (everyᵀ mt))
+freshᴿ (fresh-tail p m idle ct mt) = tt
 
 mutual
   freshes-map : ∀ {A B} (f : A → B) p (x : Events A) → Freshes p x → Freshes p (M.mapᴱ f x)
@@ -4586,10 +4618,41 @@ mutual
   freshᴿ (fresh-shown p q j (just a) k false) = everyT-idle , fresh-rejoin p q (force k)
   freshᴿ (fresh-shown p q j nothing  k false) = everyT-idle , fresh-rejoin p q (force k)
 
+-- Freshness holds of what agrees with it at every depth, and of a
+-- position owning less.
+mutual
+  fresh-≈ : ∀ {A} p (x y : Events A) → (∀ k → Agree k x y) → FreshRun p x → FreshRun p y
+  freshᴿ (fresh-≈ p x y ag fr) = freshes-≈ p x y ag (ag 1) (freshᴿ fr)
+
+  freshes-≈ : ∀ {A} p (x y : Events A) → (∀ k → Agree k x y) → Agree 1 x y → Freshes p x → Freshes p y
+  freshes-≈ p (out _ _ l) (out _ _ r) ag (out⁼ _ _) (c , t) =
+    everyT-≈ (cut l) (cut r) (λ k → M.agree-tail (ag (suc k))) c , fresh-≈ p (force l) (force r) (λ k → rest-agree (ag (suc k))) t
+  freshes-≈ p (skip _ l)  (skip _ r)  ag (skip⁼ _ _) (c , t) =
+    everyT-≈ (cut l) (cut r) (λ k → M.agree-tail (ag (suc k))) c , fresh-≈ p (force l) (force r) (λ k → rest-agree (ag (suc k))) t
+  freshes-≈ p (end _)     (end _)     ag end⁼        t = tt
+  freshes-≈ p hush        hush        ag hush⁼       t = tt
+
+mutual
+  fresh-widen : ∀ {A} p q → (∀ k → ¬ Owned p k → ¬ Owned q k) → (x : Events A) → FreshRun q x → FreshRun p x
+  freshᴿ (fresh-widen p q w x fr) = freshes-widen p q w x (freshᴿ fr)
+
+  freshes-widen : ∀ {A} p q → (∀ k → ¬ Owned p k → ¬ Owned q k) → (x : Events A) → Freshes q x → Freshes p x
+  freshes-widen p q w (out _ _ r) (c , t) = everyT-mono (λ h f k x d → f k x (w k d)) (cut r) c , fresh-widen p q w (force r) t
+  freshes-widen p q w (skip _ r)  (c , t) = everyT-mono (λ h f k x d → f k x (w k d)) (cut r) c , fresh-widen p q w (force r) t
+  freshes-widen p q w (end _)     t       = tt
+  freshes-widen p q w hush        t       = tt
+
 ------------------------------------------------------------------------
 -- THE WALK: a connect's cuts trail its run at every reachable state.
 
-module Walk {A B} (r P₀ : Pos) (rt : ∀ t → ¬ Owned r (ix t ∷ [])) where
+module Walk {A B} (p : Pos) (hp : Headed p) where
+  r P₀ : Pos
+  r  = p ++ [ ix 1 ]
+  P₀ = p ++ [ ix 0 ]
+
+  rt : ∀ t → ¬ Owned r (ix t ∷ [])
+  rt t = owned-tick p t hp
+
   open Bursting r
 
   record Side (β : Events∞ B) (σ : Events∞ A) : Set where
@@ -4697,7 +4760,7 @@ module Walk {A B} (r P₀ : Pos) (rt : ∀ t → ¬ Owned r (ix t ∷ [])) where
         pair k ((mk , dk) , _ , ok) = everyT-mono apart (cut β) (everyT-zip (cut β) fc (proj₂ kb))
           where
             inside : ∀ h → Fresh P₀ lf h → ¬ Ext k h
-            inside h fh x with fh k x dk
+            inside h fh x with fh k x (proj₁ dk)
             ... | inj₁ kl       = late (M.shownAt e) lf k (nqAt e eq g) lo nl dk mk kl
             ... | inj₂ (t , kt) = rt t (subst (Owned r) kt ok)
             apart : ∀ h → Fresh P₀ lf h × Owned P₀ h → Apart k h
@@ -4818,6 +4881,166 @@ module Walk {A B} (r P₀ : Pos) (rt : ∀ t → ¬ Owned r (ix t ∷ [])) where
     trail (tr-body β σ sd e eq g hush xe () c′ ce)
     trailᶠ (tr-body β σ sd e eq g x xe be c′ ce) = subst FlatT ce (burst-flat sd e eq g)
 
+  -- Keyed with none of the connect, keyed with none of its body.
+  narrow₀ : ∀ k → ¬ Owned p k → ¬ Owned P₀ k
+  narrow₀ k no o = no (owned-trans p P₀ k (inj₁ (prefix-++ p [ ix 0 ])) o)
+
+  pinned-under : ∀ k → M.inside r k ≡ true → Σ Pos (λ ys → k ≡ p ++ ys)
+  pinned-under k i = prefix-rest p k (prefix-trans p r k (prefix-++ p [ ix 1 ]) (inside-under r k i))
+
+  -- The source's burst, fresh against any step no earlier than the
+  -- connect: what its pins lie inside, outside the connect, lies before it.
+  mutual
+    fresh-burstOn : ∀ L → L <ᵖ p ≡ false → (σ : Events∞ A) → EveryT (Fresh p L) (cut σ) → FreshRun p (force σ)
+                  → EveryT (Fresh p L) (M.burstOn r σ)
+    fresh-burstOn L pl σ ct fr = fresh-runOn L pl (force σ) (cut σ) ct fr
+
+    fresh-runOn : ∀ L → L <ᵖ p ≡ false → (e : Events A) → ∀ t → EveryT (Fresh p L) t → FreshRun p e → EveryT (Fresh p L) (M.runOn r e t)
+    fresh-runOn L pl (out k _ s) t ct fr = fresh-pinned L pl k s t (M.inside r k) refl ct (proj₁ (freshᴿ fr)) (proj₂ (freshᴿ fr))
+    fresh-runOn L pl (skip k s)  t ct fr = fresh-pinned L pl k s t (M.inside r k) refl ct (proj₁ (freshᴿ fr)) (proj₂ (freshᴿ fr))
+    fresh-runOn L pl (end _)     t ct fr = ct
+    fresh-runOn L pl hush        t ct fr = ct
+
+    fresh-pinned : ∀ L → L <ᵖ p ≡ false → ∀ k (s : Events∞ A) t b → M.inside r k ≡ b → EveryT (Fresh p L) t
+                 → EveryT (Fresh p k) (cut s) → FreshRun p (force s) → EveryT (Fresh p L) (M.pinned r k s t b)
+    everyᵀ (fresh-pinned L pl k s t true  ib ct cs fs) = at-k , fresh-burstOn L pl s (everyT-mono lift (cut s) cs) fs
+      where
+        ys = proj₁ (pinned-under k ib)
+        ke = proj₂ (pinned-under k ib)
+        at-k : Fresh p L k
+        at-k k′ x no with ext-eq x
+        ... | l , ls , e =
+          inj₁ (still k′ p L (below-under p k′ ys (λ q → no (inj₁ q)) (subst (λ z → k′ <ᵖ z ≡ true) (trans (sym e) ke) (<ᵖ-below k′ ls))) pl)
+        lift : ∀ h → Fresh p k h → Fresh p L h
+        lift h f = fresh-past p p L h pl (fresh-under p ys h (subst (λ z → Fresh p z h) ke f))
+    everyᵀ (fresh-pinned L pl k s t false ib ct cs fs) = everyᵀ ct
+
+  -- The source past its next step, fresh against where that step shows.
+  fresh-onward : ∀ L (σ : Events∞ A) e → Going e → Trail e (cut σ) → M.shownAt e <ᵖ L ≡ false → EveryT (Fresh p L) (cut σ) → FreshRun p e
+               → EveryT (Fresh p (M.shownAt e)) (cut (M.onward∞ σ e)) × FreshRun p (force (M.onward∞ σ e))
+  fresh-onward L σ (out k _ s) g tr lq ct fr =
+    everyT-mono (λ h → fresh-up p k (k ++ [ ix 0 ]) h (inj₁ (<ᵖ-below k []))) (cut s) (proj₁ (freshᴿ fr)) , proj₂ (freshᴿ fr)
+  fresh-onward L σ (skip k s)  g tr lq ct fr =
+    everyT-mono (λ h → fresh-up p k (k ++ [ ix 0 ]) h (inj₁ (<ᵖ-below k []))) (cut s) (proj₁ (freshᴿ fr)) , proj₂ (freshᴿ fr)
+  fresh-onward L σ (end c)     g tr lq ct fr =
+    cq , fresh-tail p (c ++ [ ix 0 ]) (cut σ) cq (everyT-mono (λ j z → marks-past j shown (proj₁ z) (proj₂ (proj₂ z))) (cut σ) (proj₁ (proj₂ (trail tr))))
+    where cq = everyT-mono (λ h → fresh-past p L (c ++ [ ix 0 ]) h lq) (cut σ) ct
+  fresh-onward L σ hush        () tr lq ct fr
+
+  before-atop : ∀ q (x : Events B) → M.before q x ≡ true → Atop q x
+  before-atop q (out k _ _) h = <ᵖ-asym q k h
+  before-atop q (skip k _)  h = <ᵖ-asym q k h
+  before-atop q (end k)     h = <ᵖ-asym q k h
+  before-atop q hush        h = tt
+
+  -- A side the connect last showed at `L`: no earlier than the connect,
+  -- nor later than either run's next; both runs' cuts fresh against it.
+  record FSide (β : Events∞ B) (σ : Events∞ A) : Set where
+    field
+      sd : Side β σ
+      ob : Ordered (force β)
+      L  : Pos
+      pL : L <ᵖ p ≡ false
+      cL : Cue L (force σ)
+      bL : Atop L (force β)
+      bc : EveryT (Fresh p L) (cut β)
+      sc : EveryT (Fresh p L) (cut σ)
+      sr : FreshRun p (force σ)
+
+  -- What a side leaves running is fresh against where it last showed.
+  cuts-fresh : ∀ {β σ} (fs : FSide β σ) → EveryT (Fresh p (FSide.L fs)) (M.burstOn r σ ∪ cut β)
+  cuts-fresh {β} {σ} fs = everyT-∪ (M.burstOn r σ) (cut β) (fresh-burstOn L pL σ sc sr) bc
+    where open FSide fs
+
+  toSourceF : ∀ {β σ} (fs : FSide β σ) e → force σ ≡ e → Going e → M.before (M.shownAt e) (force β) ≡ true → FSide β (M.onward∞ σ (force σ))
+  toSourceF {β} {σ} fs e eq g be = record
+    { sd = toSource sd e eq g be
+    ; ob = ob
+    ; L  = M.shownAt e
+    ; pL = ≮-trans p L (M.shownAt e) pL qL
+    ; cL = cue-onward (M.shownAt e) σ (force σ) refl (Side.ts sd) (Side.os sd) (subst (λ z → Cue (M.shownAt z) (force σ)) eq (cue-self (force σ)))
+    ; bL = before-atop (M.shownAt e) (force β) be
+    ; bc = everyT-mono (λ h → fresh-past p L (M.shownAt e) h qL) (cut β) bc
+    ; sc = proj₁ on
+    ; sr = proj₂ on
+    }
+    where
+      open FSide fs
+      qL = cue-shown L e g (subst (Cue L) eq cL)
+      on = subst (λ z → EveryT (Fresh p (M.shownAt e)) (cut (M.onward∞ σ z)) × FreshRun p (force (M.onward∞ σ z))) (sym eq)
+             (fresh-onward L σ e g (subst (λ z → Trail z (cut σ)) eq (Side.ts sd)) qL sc (subst (FreshRun p) eq sr))
+
+  -- THE FRESH WALK: at every state the connect reaches, what it leaves
+  -- running is fresh against the step it shows.
+  mutual
+    fr-beside : ∀ β σ → FSide β σ → FreshRun p (M.beside r β σ)
+    fr-beside β σ fs = fr-side β σ fs (force σ) refl
+
+    fr-side : ∀ β σ → FSide β σ → ∀ e → force σ ≡ e → FreshRun p (M.side r β σ e)
+    fr-side β σ fs (out k a s) eq = fr-ahead β σ fs (out k a s) eq tt _ refl
+    fr-side β σ fs (skip k s)  eq = fr-ahead β σ fs (skip k s) eq tt _ refl
+    fr-side β σ fs (end c)     eq = fr-ahead β σ fs (end c) eq tt _ refl
+    fr-side β σ fs hush        eq = fresh-widen p P₀ narrow₀ (force β) (Side.fr (FSide.sd fs))
+
+    fr-ahead : ∀ β σ → FSide β σ → ∀ e → force σ ≡ e → Going e → ∀ b → M.before (M.shownAt e) (force β) ≡ b
+             → FreshRun p (M.ahead r β σ (M.shownAt e) b)
+    fr-ahead β σ fs e eq g true  be = fr-src β σ fs e eq g be
+    fr-ahead β σ fs e eq g false be = fr-body β σ fs e eq g (force β) refl be
+
+    fr-src : ∀ β σ → FSide β σ → ∀ e → force σ ≡ e → Going e → M.before (M.shownAt e) (force β) ≡ true
+           → FreshRun p (M.ahead r β σ (M.shownAt e) true)
+    freshᴿ (fr-src β σ fs e eq g be) = cuts-fresh fs′ , fr-beside β (M.onward∞ σ (force σ)) fs′
+      where fs′ = toSourceF fs e eq g be
+
+    fr-body : ∀ β σ → FSide β σ → ∀ e → force σ ≡ e → Going e → ∀ x → force β ≡ x → M.before (M.shownAt e) x ≡ false
+            → FreshRun p (M.body r σ (M.shownAt e) x)
+    freshᴿ (fr-body β σ fs e eq g (out n a β′) xe be) = cuts-fresh fs′ , fr-ahead β′ σ fs′ e eq g _ refl
+      where
+        open FSide fs
+        tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
+        kbx = subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd))
+        krx = subst (Every (Rise r)) xe (proj₁ (Side.kr sd))
+        frx = subst (FreshRun P₀) xe (Side.fr sd)
+        obx = subst Ordered xe ob
+        bn  = subst (Atop L) xe bL
+        fs′ : FSide β′ σ
+        fs′ = record
+          { sd = toBody sd e eq n be (proj₁ (every kbx)) β′ (proj₁ (proj₂ (proj₂ (trail tbx)))) (proj₂ (every kbx)) (proj₂ (every krx))
+                        (proj₁ (freshᴿ frx)) (proj₂ (freshᴿ frx))
+          ; ob = proj₂ (ordered obx)
+          ; L  = n
+          ; pL = ≮-trans p L n pL bn
+          ; cL = subst (Cue n) (sym eq) (shown-cue n e be)
+          ; bL = proj₁ (ordered obx)
+          ; bc = everyT-mono (λ h f k x no → f k x (narrow₀ k no)) (cut β′) (proj₁ (freshᴿ frx))
+          ; sc = everyT-mono (λ h → fresh-past p L n h bn) (cut σ) sc
+          ; sr = sr
+          }
+    freshᴿ (fr-body β σ fs e eq g (skip n β′) xe be) = cuts-fresh fs′ , fr-ahead β′ σ fs′ e eq g _ refl
+      where
+        open FSide fs
+        tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
+        kbx = subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd))
+        krx = subst (Every (Rise r)) xe (proj₁ (Side.kr sd))
+        frx = subst (FreshRun P₀) xe (Side.fr sd)
+        obx = subst Ordered xe ob
+        bn  = subst (Atop L) xe bL
+        fs′ : FSide β′ σ
+        fs′ = record
+          { sd = toBody sd e eq n be (proj₁ (every kbx)) β′ (proj₂ (proj₂ (trail tbx))) (proj₂ (every kbx)) (proj₂ (every krx))
+                        (proj₁ (freshᴿ frx)) (proj₂ (freshᴿ frx))
+          ; ob = proj₂ (ordered obx)
+          ; L  = n
+          ; pL = ≮-trans p L n pL bn
+          ; cL = subst (Cue n) (sym eq) (shown-cue n e be)
+          ; bL = proj₁ (ordered obx)
+          ; bc = everyT-mono (λ h f k x no → f k x (narrow₀ k no)) (cut β′) (proj₁ (freshᴿ frx))
+          ; sc = everyT-mono (λ h → fresh-past p L n h bn) (cut σ) sc
+          ; sr = sr
+          }
+    freshᴿ (fr-body β σ fs e eq g (end c) xe be) = tt
+    freshᴿ (fr-body β σ fs e eq g hush    xe be) = tt
+
 -- A FLATMAP'S CUTS ARE FRESH, over sorted sources alien to where it
 -- subscribes: a lane inside an outer value at `q` is admitted at the skip
 -- the flatMap shows just past `q`, and a lane a completion admits at the
@@ -4830,34 +5053,9 @@ postulate
 -- A CONNECT'S CUTS ARE FRESH, over sorted sources alien to where it
 -- subscribes: its source's burst lies inside only its own subscription,
 -- and its body shows nothing the connect does not.
-postulate
-  fresh-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
-                → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-                → Fresh∞ p (U.stateᴺ (U.subscribe (connect s b) p) ρ)
-
--- Freshness holds of what agrees with it at every depth, and of a
--- position owning less.
-mutual
-  fresh-≈ : ∀ {A} p (x y : Events A) → (∀ k → Agree k x y) → FreshRun p x → FreshRun p y
-  freshᴿ (fresh-≈ p x y ag fr) = freshes-≈ p x y ag (ag 1) (freshᴿ fr)
-
-  freshes-≈ : ∀ {A} p (x y : Events A) → (∀ k → Agree k x y) → Agree 1 x y → Freshes p x → Freshes p y
-  freshes-≈ p (out _ _ l) (out _ _ r) ag (out⁼ _ _) (c , t) =
-    everyT-≈ (cut l) (cut r) (λ k → M.agree-tail (ag (suc k))) c , fresh-≈ p (force l) (force r) (λ k → rest-agree (ag (suc k))) t
-  freshes-≈ p (skip _ l)  (skip _ r)  ag (skip⁼ _ _) (c , t) =
-    everyT-≈ (cut l) (cut r) (λ k → M.agree-tail (ag (suc k))) c , fresh-≈ p (force l) (force r) (λ k → rest-agree (ag (suc k))) t
-  freshes-≈ p (end _)     (end _)     ag end⁼        t = tt
-  freshes-≈ p hush        hush        ag hush⁼       t = tt
-
-mutual
-  fresh-widen : ∀ {A} p q → (∀ k → Disjoint p k → Disjoint q k) → (x : Events A) → FreshRun q x → FreshRun p x
-  freshᴿ (fresh-widen p q w x fr) = freshes-widen p q w x (freshᴿ fr)
-
-  freshes-widen : ∀ {A} p q → (∀ k → Disjoint p k → Disjoint q k) → (x : Events A) → Freshes q x → Freshes p x
-  freshes-widen p q w (out _ _ r) (c , t) = everyT-mono (λ h f k x d → f k x (w k d)) (cut r) c , fresh-widen p q w (force r) t
-  freshes-widen p q w (skip _ r)  (c , t) = everyT-mono (λ h f k x d → f k x (w k d)) (cut r) c , fresh-widen p q w (force r) t
-  freshes-widen p q w (end _)     t       = tt
-  freshes-widen p q w hush        t       = tt
+fresh-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+              → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+              → Fresh∞ p (U.stateᴺ (U.subscribe (connect s b) p) ρ)
 
 -- A DEFER'S CUTS ARE FRESH, its program's being: what is alien to the
 -- defer is alien to its program, and before the program's position only
@@ -4871,12 +5069,12 @@ fresh-defer l p ρ hp cl (fc , fr) =
                     , fresh-≈ p S X alike (fresh-widen p P₁ wide S fr) }
   where
     open Deferred l p ρ hp cl
-    wide : ∀ k → Disjoint p k → Disjoint P₁ k
-    wide k d = disjoint-snoc p k (ix 1) (λ x → tagged-lane k x 1) d
+    wide : ∀ k → ¬ Owned p k → ¬ Owned P₁ k
+    wide k no o = no (owned-trans p P₁ k (inj₁ (prefix-++ p [ ix 1 ])) o)
     first : ∀ h → Fresh P₁ P₁ h → Fresh p (p ++ [ ix 0 ]) h
     first h f k x d with f k x (wide k d)
     ... | inj₂ t  = inj₂ t
-    ... | inj₁ kl = inj₁ (below-lane p k 1 0 (λ q → proj₁ d (inj₁ q)) kl)
+    ... | inj₁ kl = inj₁ (below-lane p k 1 0 (λ q → d (inj₁ q)) kl)
 
 -- A FINITE PROGRAM'S CUTS ARE FRESH, where a tick heads it, over sorted
 -- sources alien to it: at every state, what it leaves running lies inside
@@ -4884,22 +5082,6 @@ fresh-defer l p ρ hp cl (fc , fr) =
 -- last showed.
 fresh-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
            → Fresh∞ p (U.stateᴺ (U.subscribe o p) ρ)
-fresh-subᶠ (cold c) _ p ρ hp so cl = fresh-start p (lower c) ρ
-fresh-subᶠ empty _ p ρ hp so cl = everyT-idle , record { freshᴿ = tt }
-fresh-subᶠ (of xs) _ p ρ hp so cl = everyT-idle , fresh-of p p 0 xs
-fresh-subᶠ (map f s) (map-f fs) p ρ hp so cl =
-  proj₁ (fresh-subᶠ s fs p ρ hp so cl) , fresh-map f p _ (proj₂ (fresh-subᶠ s fs p ρ hp so cl))
-fresh-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl =
-  proj₁ (fresh-subᶠ s fs p ρ hp so cl) , fresh-scan f z p _ (proj₂ (fresh-subᶠ s fs p ρ hp so cl))
-fresh-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl =
-  proj₁ (fresh-subᶠ s fs p ρ hp so cl) , fresh-take i q p _ (proj₂ (fresh-subᶠ s fs p ρ hp so cl))
-fresh-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = fresh-flat op f s ff fs p ρ hp so cl
-fresh-subᶠ (connect s b) (connect-f fs fb) p ρ hp so cl = fresh-connect s b fs fb p ρ hp so cl
-fresh-subᶠ (connected i) _ p ρ hp so cl = everyT-idle , fresh-rejoin p p (lookup ρ i)
-fresh-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
-  fresh-defer l p ρ hp cl (fresh-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
-                             (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
-
 -- A FINITE PROGRAM'S CUTS TRAIL ITS RUN, where a tick heads it, over
 -- sorted sources alien to it: at every state, what a cut would leave
 -- running is sorted and flat, none of it before a value coming next, nor
@@ -4961,14 +5143,11 @@ steady-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
   steady-defer l p ρ hp cl (steady-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
                               (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
--- A CONNECT'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
--- sources alien to it: its source's burst left running beside what its
--- body would leave trails what the connect shows next, at every state
--- the walk reaches.
-trail-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ
-              → Alienᴱ p ρ → Trailing (U.stateᴺ (U.subscribe (connect s b) p) ρ)
-trail-connect s b fs fb p ρ hp so cl =
-  Walk.tr-beside r P₀ (λ t → owned-tick p t hp) Bᶜ Sᶜ record
+-- Where a connect starts: its body and its source, each just subscribed.
+connect-side : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b → ∀ p (ρ : NEnv Γ) (hp : Headed p) → Sorted ρ
+             → Alienᴱ p ρ → Walk.Side p hp (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
+                                        (U.stateᴺ (U.subscribe s (p ++ [ ix 1 ])) ρ)
+connect-side s b fs fb p ρ hp so cl = record
     { tb = trailing-subᶠ b fb P₀ ρ′ (headed-snoc p hp) so′ cl′
     ; ts = trailing-subᶠ s fs r ρ hr so cr
     ; os = ordered-subᶠ s fs r ρ hr so cr
@@ -5012,6 +5191,80 @@ trail-connect s b fs fb p ρ hp so cl =
     above h (rh , oh) with rise-owned r r h rh hr (inj₁ (prefix-refl r)) oh
     ... | inj₁ e  = up h (subst (λ z → P₀ <ᵖ z ≡ true) e (proj₁ (next-ix p 0)))
     ... | inj₂ lt = up h (<ᵖ-trans P₀ r h (proj₁ (next-ix p 0)) lt)
+
+-- A CONNECT'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
+-- sources alien to it: its source's burst left running beside what its
+-- body would leave trails what the connect shows next, at every state
+-- the walk reaches.
+trail-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ
+              → Alienᴱ p ρ → Trailing (U.stateᴺ (U.subscribe (connect s b) p) ρ)
+trail-connect s b fs fb p ρ hp so cl = Walk.tr-beside p hp _ _ (connect-side s b fs fb p ρ hp so cl)
+
+fresh-connect {Γ} {A} {B} s b fs fb p ρ hp so cl = W.cuts-fresh fs₀ , W.fr-beside Bᶜ Sᶜ fs₀
+  where
+    module W = Walk {A} {B} p hp
+    r  = p ++ [ ix 1 ]
+    P₀ = p ++ [ ix 0 ]
+    hr = headed-snoc p hp
+    cr = alienᴱ-owned p r (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+    c₀ = alienᴱ-owned p P₀ (inj₁ (prefix-++ p [ ix 0 ])) ρ cl
+    Sᶜ = U.stateᴺ (U.subscribe s r) ρ
+    ρ′ = U.meaning (U.subscribe s r) ρ ∷ᴬ ρ
+    Bᶜ = U.stateᴺ (U.subscribe b P₀) ρ′
+    so′ : Sorted ρ′
+    so′ = (ordered-subᶠ s fs r ρ hr so cr , steady-subᶠ s fs r ρ hr so cr) , headed-sub s r ρ hr so , so
+    cl′ : Alienᴱ P₀ ρ′
+    cl′ = alien-sub s p ρ cl , c₀
+    sd = connect-side s b fs fb p ρ hp so cl
+    fS = fresh-subᶠ s fs r ρ hr so cr
+    pP : P₀ <ᵖ p ≡ false
+    pP = <ᵖ-asym p P₀ (<ᵖ-below p [])
+    wide : ∀ k → ¬ Owned p k → ¬ Owned r k
+    wide k no o = no (owned-trans p r k (inj₁ (prefix-++ p [ ix 1 ])) o)
+    rPP : Rise P₀ P₀
+    rPP = headed-snoc p hp , λ k hk ok t → ⊥-elim (<-irrefl refl (tagged-weigh P₀ P₀ (owned-tagged P₀ k P₀ ok t)))
+    rPr : Rise P₀ r
+    rPr = hr , λ k hk ok t → ⊥-elim (sibling p (λ ()) (inj₂ (owned-tagged P₀ k r ok t)))
+    rρ : Everyᴱ (Rise P₀) ρ
+    rρ = rise-env p P₀ (inj₁ (prefix-++ p [ ix 0 ])) ρ (sorted-headed ρ so) cl
+    rB = Reach.reachᶠ (risingRules P₀) b fb P₀ ρ′ rPP (Reach.reach (risingRules P₀) s r ρ rPr rρ , rρ)
+    past : ∀ h → Owned P₀ h × Rise P₀ h → h <ᵖ p ≡ false
+    past h (oh , rh) with rise-owned P₀ P₀ h rh (headed-snoc p hp) (inj₁ (prefix-refl P₀)) oh
+    ... | inj₁ e  = <ᵖ-asym p h (subst (λ z → p <ᵖ z ≡ true) e (<ᵖ-below p []))
+    ... | inj₂ lt = <ᵖ-asym p h (<ᵖ-trans p P₀ h (<ᵖ-below p []) lt)
+    atop : ∀ (x : Events B) → Every (λ h → h <ᵖ p ≡ false) x → Atop p x
+    atop (out _ _ _) pe = proj₁ (every pe)
+    atop (skip _ _)  pe = proj₁ (every pe)
+    atop (end _)     pe = every pe
+    atop hush        pe = tt
+    fs₀ : W.FSide Bᶜ Sᶜ
+    fs₀ = record
+      { sd = sd
+      ; ob = ordered-subᶠ b fb P₀ ρ′ (headed-snoc p hp) so′ cl′
+      ; L  = p
+      ; pL = <ᵖ-irrefl p
+      ; cL = Bursting.cue-down r P₀ p (force Sᶜ) pP (W.Side.lc sd)
+      ; bL = atop (force Bᶜ) (every-mono past (force Bᶜ) (every-zip (force Bᶜ) (proj₁ (W.Side.kb sd)) (proj₁ rB)))
+      ; bc = everyT-mono (λ h f → fresh-under p [ ix 0 ] h (λ k x no → f k x (W.narrow₀ k no))) (cut Bᶜ) (W.Side.fc sd)
+      ; sc = everyT-mono (λ h f → fresh-under p [ ix 1 ] h (λ k x no → f k x (wide k no))) (cut Sᶜ) (proj₁ fS)
+      ; sr = fresh-widen p r wide (force Sᶜ) (proj₂ fS)
+      }
+
+fresh-subᶠ (cold c) _ p ρ hp so cl = fresh-start p (lower c) ρ
+fresh-subᶠ empty _ p ρ hp so cl = everyT-idle , record { freshᴿ = tt }
+fresh-subᶠ (of xs) _ p ρ hp so cl = everyT-idle , fresh-of p p 0 xs
+fresh-subᶠ (map f s) (map-f fs) p ρ hp so cl =
+  proj₁ (fresh-subᶠ s fs p ρ hp so cl) , fresh-map f p _ (proj₂ (fresh-subᶠ s fs p ρ hp so cl))
+fresh-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl =
+  proj₁ (fresh-subᶠ s fs p ρ hp so cl) , fresh-scan f z p _ (proj₂ (fresh-subᶠ s fs p ρ hp so cl))
+fresh-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl =
+  proj₁ (fresh-subᶠ s fs p ρ hp so cl) , fresh-take i q p _ (proj₂ (fresh-subᶠ s fs p ρ hp so cl))
+fresh-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = fresh-flat op f s ff fs p ρ hp so cl
+fresh-subᶠ (connect s b) (connect-f fs fb) p ρ hp so cl = fresh-connect s b fs fb p ρ hp so cl
+fresh-subᶠ (connected i) _ p ρ hp so cl = everyT-idle , fresh-rejoin p p (lookup ρ i)
+fresh-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
+  fresh-defer l p ρ hp cl (fresh-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
+                             (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
 trailing-subᶠ (cold c) _ p ρ hp so cl = trailing-start p (lower c) ρ
 trailing-subᶠ empty _ p ρ hp so cl = trail-idle _ tt

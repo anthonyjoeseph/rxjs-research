@@ -186,12 +186,11 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `fresh-connect` first: a connect's cuts are fresh,
-  its burst inside only its own subscription and its body showing
-  nothing the connect does not, so `Walk` carrying the connect's own
-  last shown step should close it. Then `fresh-flat`: decides whether a
-  lane runs only once its admitting skip has shown, through queues and
-  switches. Then `spread-sub`, `ordered-connect`, `steady-connect`,
+- **THE ORDER.** `fresh-flat` first: decides whether a lane runs only
+  once its admitting skip has shown, through queues and switches. A walk
+  over the flatMap's parts, each part's cut fresh against the last step
+  shown, a lane's alien prefixes before its admitting outer step (as
+  `fresh-defer`'s lane). `fresh-connect` is a body (`Walk.FSide`). Then `spread-sub`, `ordered-connect`, `steady-connect`,
   reusing `Walk`. Ruled out: pins by position alone; a skip trailed
   only by the step under it; a mark only at `k ++ [ ix 0 ]`; a take
   owing more than a value's disjointness from its pins (`trail-take`).
@@ -213,9 +212,6 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`fresh-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: what a connect
-  leaves running lies inside nothing alien but a tick or a position before its
-  last step.
 - **`fresh-flat`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: what a flatMap
   leaves running lies inside nothing alien but a tick or a position before its
   last step.

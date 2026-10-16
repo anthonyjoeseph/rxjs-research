@@ -444,6 +444,13 @@ inside-++ (a ∷ r) (b ∷ k) ys i with cmpLabel a b
 ... | eq = inside-++ r k ys i
 ... | gt with () ← i
 
+-- Under `r`, a label at a time.
+inside-cons : ∀ a r b k → inside (a ∷ r) (b ∷ k) ≡ true → a ≡ b × inside r k ≡ true
+inside-cons a r b k i with cmpLabel a b in e
+... | lt with () ← i
+... | eq = eq-label a b e , i
+... | gt with () ← i
+
 ------------------------------------------------------------------------
 -- What a subscriber sees
 
