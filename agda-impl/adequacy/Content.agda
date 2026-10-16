@@ -1850,7 +1850,7 @@ module Honesty (R : Set) where
                {Δ A B Sj cc b kb k fd e rp rt q} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} (ρ : Path t (connectˢ Sj cc b kb k fd rp e rt s bd))
              → agenda t ca₀ ≡ (q , bodyC ρ) ∷ agenda t ca → bursts t ca₀ ≡ bursts t ca → begins t ca₀ ≡ begins t ca
              → At.part H bd ≡ nothing → Owned H t ca → Owned H t ca₀
-  owned-body H {t} ca₀ ρ ag bu be gn ow = record
+  owned-body H {t} {ca = ca} ca₀ {q = q} ρ ag bu be gn ow = record
     { ofs    = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (there (Owned.ofs ow π))
     ; plays  = λ π nsp → subst (λ z → _ ∈ᴸ z) (sym bu) (Owned.plays ow π nsp)
     ; fires  = λ π nsp → subst (λ z → _ ∈ᴸ z) (sym bu) (Owned.fires ow π nsp)
@@ -1863,7 +1863,7 @@ module Honesty (R : Set) where
     ; placed = subst (All (Placedᴬ t)) (sym ag) (tt ∷ Owned.placed ow) }
     where
       bodied : ∀ {Δ′ A′ B′ Sj′ c′ b′ kb′ k′ fd′ e′ rp′ rt′ q′} {s′ : Sub _ Δ′ A′} {bd′ : Sub _ (A′ ∷ Δ′) B′}
-               (π : Path t (connectˢ Sj′ c′ b′ kb′ k′ fd′ rp′ e′ rt′ s′ bd′)) → (q′ , bodyC π) ∈ᴸ (_ , bodyC ρ) ∷ agenda t _ → At.part H bd′ ≡ nothing
+               (π : Path t (connectˢ Sj′ c′ b′ kb′ k′ fd′ rp′ e′ rt′ s′ bd′)) → (q′ , bodyC π) ∈ᴸ (q , bodyC ρ) ∷ agenda t ca → At.part H bd′ ≡ nothing
       bodied π (here refl) = gn
       bodied π (there i)   = Owned.bodies ow π i
 
@@ -1897,7 +1897,7 @@ module Honesty (R : Set) where
       ; stack = sk
       ; gone = gone-connect (Conf.heap (Mach.conf m₁)) {t = t} {u = u} gn
       ; lifted = S , subst (λ s → Lifts (Conf.heap (Mach.conf m₁)) ρ s S) (body-end Lb) Lρ , sg
-      ; owned = owned-body (Conf.heap (Mach.conf m₁)) (runAs (bodyC ρ ∷ ks) (≗-refl _) sk) ρ refl refl refl gn ow
+      ; owned = owned-body (Conf.heap (Mach.conf m₁)) (runAs (bodyC ρ ∷ ks) (≗-refl ⟦ bodyC ρ ∷ ks ⟧ᶜ) sk) ρ refl refl refl gn ow
       ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = so ; behind = bh ; kept = kp })
