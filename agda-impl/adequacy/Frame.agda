@@ -21,7 +21,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
 open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child)
 
-open import denotation.MonotonicList using (Events∞; Timeline; Pos; ix)
+open import denotation.MonotonicList using (Events∞; Timeline; Pos; ix; last; _<ᵖ_)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import operation.Machine using (module Machine)
@@ -155,11 +155,76 @@ module Framing (R : Set) where
   heads-source : ∀ {Γ A B q} r {b : U.Node (A ∷ Γ) B} {s : U.Node Γ A} → Heads q s → Heads q b → Heads q (U.connectᶜ r b (U.live s))
   heads-source r {b} {s} hs hb = source-head r b (U.step b) s (U.step s) hb hs
 
+  -- Where a shut at `i` tells a joiner its end, the joiners untold:
+  -- each one's subscription.
+  untoldᴶ : ∀ {A B : Set} → Pos → Maybe Pos → Maybe (A ≡ B) → List Pos
+  untoldᴶ p nothing (just refl) = [ p ]
+  untoldᴶ p e       m           = []
+
+  mutual
+    untold : ∀ {Γ A B} → A ∈ᴸ Γ → U.Node Γ B → List Pos
+    untold i (U.mapᶜ f n)                 = untold i n
+    untold i (U.scanᶜ f z n)              = untold i n
+    untold i (U.takeWhileᶜ b p n)         = untold i n
+    untold i (U.flatMapᶜ op g o ls qs pl) = untoldᴹ i o ++ untoldᴸ i ls ++ untold i pl
+    untold i (U.joinᶜ j p xs e)           = untoldᴶ p e (U.same? i j)
+    untold i (U.connectᶜ r b s)           = untold (there i) b ++ untoldˢ i s
+    untold i (U.endingᶜ p n)              = untold i n
+    untold i (U.restᶜ n)                  = untold i n
+    untold i (U.unionᶜ x y)               = untold i x ++ untold i y
+    untold i (U.burstingᶜ r t)            = untold i t
+    untold i (U.underᶜ s b)               = untoldˢ i s ++ untold (there i) b
+    untold i n                            = []
+
+    untoldᴹ : ∀ {Γ A B} → A ∈ᴸ Γ → Maybe (U.Node Γ B) → List Pos
+    untoldᴹ i nothing  = []
+    untoldᴹ i (just n) = untold i n
+
+    untoldᴸ : ∀ {Γ A B} → A ∈ᴸ Γ → List (U.Node Γ B) → List Pos
+    untoldᴸ i []       = []
+    untoldᴸ i (n ∷ ns) = untold i n ++ untoldᴸ i ns
+
+    untoldˢ : ∀ {Γ A B} → A ∈ᴸ Γ → U.Source Γ B → List Pos
+    untoldˢ i (U.live s)    = untold i s
+    untoldˢ i (U.ended e t) = untold i t
+
+  -- Every end a shut at `c` tells comes no sooner than `q`.
+  Tells : Pos → Pos → List Pos → Set
+  Tells q c = All (λ p → q ≤ᵖ (if p <ᵖ c then c ++ [ subᴾ p ] else p ++ [ last ]))
+
+  -- A shut heads where the node did, or at an end it tells.
+  postulate
+    shut-heads : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Heads q b → Tells q c (untold i b) → Heads q (U.shut i c b)
+
+  shut-heads-step : ∀ {Γ A B q} r c (t : U.Node Γ A) (S : U.Step (A ∷ Γ) B) → HeadsS q S → HeadsS q (U.shutˢᵗ r c t S)
+  shut-heads-step r c t (U.outˢ _ _ _) hs = hs
+  shut-heads-step r c t (U.skipˢ _ _)  hs = hs
+  shut-heads-step r c t (U.endˢ _)     hs = hs
+  shut-heads-step r c t U.hushˢ        hs = hs
+
+  -- A connect past its source's end: its body's head, or a rest's skip
+  -- under where the source would have skipped.
+  ended-head : ∀ {Γ A B q} r c (b : U.Node (A ∷ Γ) B) (t : U.Node Γ A) (st : U.Step Γ A)
+             → Heads q b → HeadsS q st → HeadsS q (U.endedˢ r b (U.step b) c t st)
+  ended-head r c b t (U.skipˢ k t′) hb ht =
+    if-head (U.beforeˢ (k ++ [ ix 0 ]) (U.step b)) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r b (U.ended c t′))) (U.shutˢᵗ r c t (U.step b))
+      (child-skip k (ix 0) (U.connectᶜ r b (U.ended c t′)) ht) (shut-heads-step r c t (U.step b) hb)
+  ended-head r c b t (U.outˢ _ _ _) hb ht = shut-heads-step r c t (U.step b) hb
+  ended-head r c b t (U.endˢ _)     hb ht = shut-heads-step r c t (U.step b) hb
+  ended-head r c b t U.hushˢ        hb ht = shut-heads-step r c t (U.step b) hb
+
+  -- What a connect past its source's end has not told its body's
+  -- joiners, it tells no sooner than `q`.
+  Untold : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ A} (t : Sub h Δ A) → Set₁
+  Untold {h} H q t = ∀ {Δ′ A′ B′} {S c b kb k fd rp c₀ rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                   → (ψ : Path t (connectˢ S c b kb k fd rp (just c₀) rt src bd)) → seen H ψ ≡ true → At.part H src ≡ nothing
+                   → ∀ {b₀} → At.part H bd ≡ just b₀ → Tells q c₀ (untold (here refl) b₀)
+
   -- THE PARTS ABOVE A WRITTEN SCAN, walked down to it: a map's, a scan's
   -- and a defer's head is their child's; a take's, a flatMap's and a
   -- connect's are each bounded by what is below them.
   module Above {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} (f : B → A → B) (r : Ref h (base B)) (u : Sub h Δ A)
-               (fs : AllPairs _≢_ (names T)) (z : B) (q : Pos) (bh : Each H (Heads q) T) where
+               (fs : AllPairs _≢_ (names T)) (z : B) (q : Pos) (bh : Each H (Heads q) T) (ut : Untold H q T) where
     H′ = store H r (lift z)
 
     Up : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path T x → Set₁
@@ -175,12 +240,21 @@ module Framing (R : Set) where
       up-lanes  : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
                   (ψ : Path T (flatMapˢ op g fl oc k rf pl so ls)) {c k′} {t : Sub h Δ′ B′} (m : lane c k′ t ∈ᴸ ls)
                 → Path t (scanˢ f r u) → Up (ψ ⊕ in-lanes (via m)) → Up ψ
-      -- A connect past its source's end, the scan in its body: the body
-      -- shut at the source's end.
-      up-ended  : ∀ {Δ′ A′ B′} {S c b kb k fd rp c₀ rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
-                  (ψ : Path T (connectˢ S c b kb k fd rp (just c₀) rt src bd)) → Path bd (scanˢ f r u) → Up (ψ ⊕ in-body here)
-                → seen H ψ ≡ true → At.part H src ≡ nothing → ∀ {b′} → At.part H′ bd ≡ just b′
-                → Heads q (U.connectᶜ rp (U.shut (here refl) c₀ b′) (U.ended c₀ rt))
+      -- A written scan's part tells its joiners what it did.
+      up-untold : ∀ {Δ′ B′} {x : Sub h Δ′ B′} → Path T x → Path x (scanˢ f r u)
+                → ∀ {A′} (i : A′ ∈ᴸ Δ′) {b₀ b′} → At.part H x ≡ just b₀ → At.part H′ x ≡ just b′ → untold i b′ ≡ untold i b₀
+
+    -- A connect past its source's end, the scan in its body: the body
+    -- shut at the source's end.
+    up-ended : ∀ {Δ′ A′ B′} {S c b kb k fd rp c₀ rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+               (ψ : Path T (connectˢ S c b kb k fd rp (just c₀) rt src bd)) → Path bd (scanˢ f r u) → Up (ψ ⊕ in-body here)
+             → seen H ψ ≡ true → At.part H src ≡ nothing → ∀ {b₀ b′} → At.part H bd ≡ just b₀ → At.part H′ bd ≡ just b′
+             → Heads q (U.connectᶜ rp (U.shut (here refl) c₀ b′) (U.ended c₀ rt))
+    up-ended {rp = rp} {c₀} {rt} ψ π up sn p {b′ = b′} pb pb′ =
+      ended-head rp c₀ (U.shut (here refl) c₀ b′) rt (U.step rt)
+        (shut-heads (here refl) c₀ b′ (up (seen-join H ψ (in-body here) sn (cong (λ m → (is-just m ∨ true) ∧ true) p)) pb′)
+                    (subst (Tells q c₀) (sym (up-untold (ψ ⊕ in-body here) π (here refl) pb pb′)) (ut ψ sn p pb)))
+        (Each.rests bh ψ sn (cong₂ (At.connected H rp (just c₀) rt) p pb) p refl)
 
     lift-map : ∀ {Δ′ A′ B′} (g : A′ → B′) (m : Maybe (U.Node Δ′ A′)) → (∀ {c} → m ≡ just c → Heads q c)
              → ∀ {c} → At.mapᴹ H′ (U.mapᶜ g) m ≡ just c → Heads q c
@@ -255,7 +329,7 @@ module Framing (R : Set) where
       heads-source rp {b′} {s} (Each.parts bh (ψ ⊕ in-source here) (seen-join H ψ (in-source here) sn (cong (λ m → is-just m ∧ true) pb)) p)
         (up (seen-join H ψ (in-body here) sn (cong (λ m → (is-just m ∨ is-just e) ∧ true) p)) pb′)
     body-go {e = nothing} ψ π up sn nothing (just b′) (just b) p pb′ pb d ()
-    body-go {e = just c₀} ψ π up sn nothing (just b′) (just b) p pb′ pb d refl = up-ended ψ π up sn p pb′
+    body-go {e = just c₀} ψ π up sn nothing (just b′) (just b) p pb′ pb d refl = up-ended ψ π up sn p pb pb′
 
     up-body : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
               (ψ : Path T (connectˢ S c b kb k fd rp e rt src bd)) → Path bd (scanˢ f r u) → Up (ψ ⊕ in-body here) → Up ψ
@@ -292,6 +366,12 @@ module Framing (R : Set) where
       aboveL ψ κ (this-lane π)  = up-lanes ψ (κ (here refl)) π (above (ψ ⊕ in-lanes (via (κ (here refl)))) π)
       aboveL ψ κ (next-lane πL) = aboveL ψ (λ m → κ (there m)) πL
 
+  -- A call under way: what the ghost has not told a shut body's
+  -- joiners, it tells no sooner than where the run is.
+  postulate
+    tells-past : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg}
+               → Calling g ℓ m₁ σ sg → Untold (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) T
+
   -- The scan and every part above it still head no sooner than where
   -- the run is.
   scan-above : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -300,7 +380,7 @@ module Framing (R : Set) where
              → ∀ {c} → At.part (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) x ≡ just c
              → Heads (Conf.pos (Mach.conf m₁)) c
   scan-above {m₁ = m₁} {f = f} {r} {u} ρ {y} cl =
-    Above.above H f r u (Books.fresh (Calling.books cl)) (f (At.val H r) y) (Conf.pos (Mach.conf m₁)) (Calling.behind cl)
+    Above.above H f r u (Books.fresh (Calling.books cl)) (f (At.val H r) y) (Conf.pos (Mach.conf m₁)) (Calling.behind cl) (tells-past cl)
     where H = Conf.heap (Mach.conf m₁)
 
   just-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ true → Σ X λ c → m ≡ just c

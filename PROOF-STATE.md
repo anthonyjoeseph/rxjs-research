@@ -187,14 +187,16 @@ by their own silent steps (`Mirror`).
   `close-source` on a connect; `take-out`, `take-end` on a take. Each
   decides whether its operator's call is a write and a framing, as the
   scan's is, or reads past its node.
-- **UP-ENDED.** `up-ended`, a connect's body shut at its source's end, is
-  the one scan leaf that is not node-local: it reads what an end leaves
-  behind, which `shut-step` reads too. Decided inside C's record: whether
-  the end signal's fields already carry it, or `Carried` owes a field.
+- **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
+  the shut body by `shut-heads` over what it tells. Ruled out: the end
+  signal's fields carrying it; the non-local residue is `tells-past`,
+  which `shut-step` reads too. Decides whether `tells-past` is a field
+  `Carried` owes, every producer framing it, or follows from `Owned`'s
+  finishes and the agenda's placement.
 - **B. THE LOCAL INVARIANT.** Each field of `Carried` a fold over the tree
   of node-local predicates, one framing lemma per field over `Alike` and
   `Off`. Ruled out for the scan: a write needs no non-local leaf but
-  `up-ended`. Remaining: an own-cell apartness fold carrying
+  `tells-past`. Remaining: an own-cell apartness fold carrying
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
   and `up-lanes` by a flatMap head bound; then `close-outer`,
   `close-lanes`, `close-source` the same way, in the form C consumes.
@@ -250,9 +252,13 @@ by their own silent steps (`Mirror`).
   scan in one of its lanes heads no sooner than that lane's part.
 - **`up-outer`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
   scan in its outer heads no sooner than the outer's part.
-- **`up-ended`** (Frame) — FALSITY, `NO EVIDENCE`: a connect past its
-  source's end, a written scan in its body, heads no sooner than the run
-  with its body shut at that end.
+- **`tells-past`** (Frame) — FALSITY, `NO EVIDENCE`: a call under way, a
+  connect past its source's end tells its body's untold joiners no
+  sooner than the run.
+- **`shut-heads`** (Frame) — FALSITY, `NO EVIDENCE`: a shut heads where its
+  node did, or at an end it tells.
+- **`up-untold`** (Frame) — FALSITY, `NO EVIDENCE`: a write at a scan's
+  accumulator leaves which joiners are untold alike.
 - **`scan-sees`** (Frame) — FALSITY, `NO EVIDENCE`: a path seen after the write
   was seen before, to a node alike or above the scan.
 - **`scan-defined`** (Frame) — FALSITY, `NO EVIDENCE`: whether a node has a
