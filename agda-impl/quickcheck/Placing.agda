@@ -114,12 +114,12 @@ private
   apartᵇ a b = not (ownedᵇ a b) ∧ not (ownedᵇ b a)
 
   -- What a cut leaves running trails the run: its steps in order, none
-  -- before a value coming next, nor before a skip but the one showing
-  -- that very step just past it; all past an end and none inside it,
-  -- none keyed where that end would subscribe a lane, nor over it;
-  -- nothing left behind silence.
+  -- before a value coming next nor keyed with it, nor before a skip but
+  -- the one showing that very step just past it; all past an end and
+  -- none inside it, none keyed where that end would subscribe a lane,
+  -- nor over it; nothing left behind silence.
   trailᵇ : Events ℕ → Pos → Bool
-  trailᵇ (out n _ _) k = not (k <ᵖ n)
+  trailᵇ (out n _ _) k = not (k <ᵖ n) ∧ apartᵇ n k
   trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ samePos n (k ++ [ ix 0 ])
   trailᵇ (end n)     k = (n <ᵖ k) ∧ not (inside n k) ∧ apartᵇ (n ++ [ ix 1 ]) k
   trailᵇ hush        k = false
@@ -133,12 +133,13 @@ private
   sortedᵇ (x ∷ y ∷ xs) = not (y <ᵖ x) ∧ sortedᵇ (y ∷ xs)
   sortedᵇ _            = true
 
+  -- And after a value, nothing left running keyed with it.
   trailsᵇ : ℕ → Events∞ ℕ → Bool
   trailsᵇ zero    r = true
   trailsᵇ (suc n) r = sortedᵇ ks ∧ allᵇ (trailᵇ (Events∞.force r)) ks ∧ next (Events∞.force r)
     where ks = pinsᵇ 12 (Events∞.cut r)
           next : Events ℕ → Bool
-          next (out _ _ r′) = trailsᵇ n r′
+          next (out x _ r′) = allᵇ (apartᵇ x) (pinsᵇ 12 (Events∞.cut r′)) ∧ trailsᵇ n r′
           next (skip _ r′)  = trailsᵇ n r′
           next _            = true
 

@@ -214,7 +214,7 @@ by their own silent steps (`Mirror`).
 
 - **`trail-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
   source burst left running beside its body's cut trails what it shows next.
-- **`trail-take`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a takeWhile over an
+- **`trail-take`** (Placed) — FALSITY, `REFUTED`, `X`: a takeWhile over an
   ordered, steady, trailing run keeps its cuts trailing past the moved value
   and the `last` end.
 - **`trail-defer`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a defer's cuts

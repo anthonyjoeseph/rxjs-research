@@ -3847,6 +3847,8 @@ postulate
 -- A TAKEWHILE KEEPS ITS SOURCE'S CUTS TRAILING, its source in order and
 -- steady: what was left running before the first failing value trails
 -- that value moved under `ix 0`, and the completion under `last`.
+--
+-- REFUTED: d5bd7854 of a run merely in order, steady and trailing, a pin left at the failing value's own position
 postulate
   trail-take : ∀ {A} i (q : A → Bool) (x : Events A) c → Ordered x → Steady x → Trail x c → Trail (M.takeWhileᴱ i q x) c
 
