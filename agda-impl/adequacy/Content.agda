@@ -23,9 +23,9 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat.Properties using (suc-injective; ≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; m<m+n; <-trans)
-open import Data.List.Relation.Unary.All using (All; []; _∷_; map)
+open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
-open import Data.List.Relation.Unary.AllPairs using (AllPairs)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (Lift; lift)
@@ -69,22 +69,22 @@ open Events∞
 
 module Honesty (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; drained; step; trace; shown; reading; begin; launch; Read; read; feed)
-  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look) renaming (go to goᴵ)
+  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look; stored) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle; Quiet) renaming (same to same⊑)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
-  open Run (Pureᴾ R) using (Act; Observer; Subject; _>>ᴬ_; module Kit; module FlatKit)
+  open Run (Pureᴾ R) using (Act; writeRef; Observer; Subject; _>>ᴬ_; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
     Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; Taking; taking; taken; feeding; finishing; PathLanes; this-lane; next-lane;
-    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; ≗-refl; Meets; Each; Heads; rootObs;
+    in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; names; ≗-refl; Meets; Each; Heads; rootObs;
     seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs;
     StackAs; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff; recorder; Timer; cascade)
   open Moving R using (pend; takes; takes-plant; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
-  open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
+  open Tearing R using (part-alike; look-store; get-put-same; fresh-path; Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears; ≗-trans; wk-same; bind≗)
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
@@ -473,18 +473,12 @@ module Honesty (R : Set) where
   LaneFirst nothing  k = ⊤
   LaneFirst (just o) k = ∀ {k′} → U.headˢ (U.step o) ≡ just k′ → k′ <ᵖ k ≡ false
 
-  -- An outer or a source as the ghost steps it: the node the heap holds,
-  -- or, once it has ended, gone from the heap and the node it was, which
-  -- the ghost's own step pins.
-  data Was {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) (o : U.Node Δ A) : Set₁ where
-    still : At.part H t ≡ just o → Was H t o
-    was   : At.part H t ≡ nothing → Was H t o
-
   -- THE GHOST'S STEP, FROM A STEP AT THE PATH'S END: `s` at the node the
   -- path reaches, `S` at the node it starts from, each operator on the
   -- way the meaning's own step, its order said by the side condition
   -- that picks it.  A lane's step comes with the lanes before and after
-  -- it.
+  -- it.  No ancestor reads its path child's part, only the child's
+  -- step, so a write inside a node leaves every lift above it.
   mutual
     data Lifts {h} (H : Heapᴹ h) : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → U.Step Δ′ A′ → U.Step Δ A → Set₁ where
       lifts-here   : ∀ {Δ A} {t : Sub h Δ A} {s} → Lifts H (here {t = t}) s s
@@ -495,18 +489,18 @@ module Honesty (R : Set) where
       lifts-take   : ∀ {Δ A Δ′ C} {i p c k} {t : Sub h Δ A} {u : Sub h Δ′ C} {ρ : Path t u} {s S}
                    → At.val H (Kit.live c) ≡ true → Lifts H ρ s S → Lifts H (in-take {i = i} {p} {c} {k} {taking} ρ) s (U.takeWhileˢ i p S)
       lifts-outer  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {ρ : Path t u} {s S o₀}
-                   → Was H t o₀ → OuterFirst S (At.partLanes H ls)
+                   → OuterFirst S (At.partLanes H ls)
                    → PoolBehind pl (U.outerOf (just o₀)) (U.earliest (At.partLanes H ls)) → Lifts H ρ s S
                    → Lifts H (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {ls = ls} ρ) s
                        (U.outerˢ op (λ a q → U.subscribe (f a) q) o₀ S (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl)
       lifts-lanes  : ∀ {Δ A B Δ′ C} {op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u}
                        {s bs l S as q}
-                   → LiftsLane H πL s bs S as → U.earliest (At.partLanes H ls) ≡ U.found q bs l S as → LaneFirst (At.part H t) q
+                   → LiftsLane H πL s bs S as → U.earliest (bs ++ l ∷ as) ≡ U.found q bs l S as → LaneFirst (At.part H t) q
                    → PoolBehind pl (U.outerOf (At.part H t)) (U.found q bs l S as)
                    → Lifts H (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = t} πL) s
                        (U.laneˢ op (λ a q → U.subscribe (f a) q) (At.part H t) bs l S as (At.val H (FlatKit.Flat.queue fl)) pl)
       lifts-source : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path t u} {s S c₀ b₀}
-                   → Was H t c₀ → At.part H bd ≡ just b₀ → SourceFirst S (U.step b₀) → Lifts H ρ s S
+                   → At.part H bd ≡ just b₀ → SourceFirst S (U.step b₀) → Lifts H ρ s S
                    → Lifts H (in-source {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {bd = bd} ρ) s (U.sourceˢ rp b₀ (U.step b₀) c₀ S)
       lifts-body   : ∀ {Δ A B Δ′ C} {Sj c b kb k fd e rp rt} {t : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} {u : Sub h Δ′ C} {ρ : Path bd u} {s S c₀}
                    → At.part H t ≡ just c₀ → BodyFirst (U.step c₀) S → Lifts H ρ s S
@@ -535,12 +529,12 @@ module Honesty (R : Set) where
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-scan Lρ
     lifts-split (in-take ρ)   τ (lifts-take lv L)          with lifts-split ρ τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-take lv Lρ
-    lifts-split (in-outer ρ)  τ (lifts-outer po of pb L)   with lifts-split ρ τ L
-    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-outer po of pb Lρ
+    lifts-split (in-outer ρ)  τ (lifts-outer of pb L)      with lifts-split ρ τ L
+    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-outer of pb Lρ
     lifts-split (in-lanes πL) τ (lifts-lanes L ea lf pb)   with liftsL-split πL τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-lanes Lρ ea lf pb
-    lifts-split (in-source ρ) τ (lifts-source pt pb sf L)  with lifts-split ρ τ L
-    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-source pt pb sf Lρ
+    lifts-split (in-source ρ) τ (lifts-source pb sf L)     with lifts-split ρ τ L
+    ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-source pb sf Lρ
     lifts-split (in-body ρ)   τ (lifts-body pt bf L)       with lifts-split ρ τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-body pt bf Lρ
     lifts-split (in-body ρ)   τ (lifts-shut pt e rb L)     with lifts-split ρ τ L
@@ -1018,16 +1012,6 @@ module Honesty (R : Set) where
                   (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
                 → Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
 
-    -- A value through a scan: its cell read and written, the
-    -- accumulated value one operator up.  The ghost's lift read the cell
-    -- before the write.  An outer above it reads its whole subtree's
-    -- part, the scan's with it, so the write moves that outer's `Was`
-    -- and `PoolBehind` node: the lift above is re-proven at the new
-    -- part, not carried.
-    climb-scan : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
-                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
-               → Climbing g (loadOf st) m₁ (ρ ⊕ in-scan here) y → Climbed st m₁ (ρ ⊕ in-scan here)
-
     -- A value an inclusive takeWhile fails on: delivered under `ix 0`,
     -- the take `ending` where the run is, its completion a call owed.
     take-out : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {p c k}
@@ -1477,14 +1461,14 @@ module Honesty (R : Set) where
       lift-up ρ₀ (in-take {tk = taken} ρ) () cl | true
       lift-up ρ₀ (in-outer {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) sn (fl′ , pd , cl) with lift-up (ρ₀ ⊕ in-outer here) ρ sn cl
       ... | o₀ , po , L , b =
-        _ , hp , subst (Lifts H (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) _) (sym st) (lifts-outer (still po) (outer-first b fl′) (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) L) ,
+        _ , hp , subst (Lifts H (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) _) (sym st) (lifts-outer (outer-first b fl′) (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) L) ,
         subst (Below _) (sym st) (below-outer b)
         where hp = held-flat {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} po
               fp = pd hp
               st = flat-outer {op = op} {LS = At.partLanes H ls} {qs = At.val H (FlatKit.Flat.queue fl)} {pl = pl} (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) (outer-first b fl′)
       lift-up ρ₀ (in-lanes {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} πL) sn (fo , pd , cl) with lift-up-lanes (λ πL′ → ρ₀ ⊕ in-lanes πL′) πL sn cl
       ... | bs , l , as , eq , LL , fbs , fas , below {q} hq u =
-        _ , hp , subst (Lifts H (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} πL) _) (sym st) (lifts-lanes LL ea (lane-first fo u) (pool-lane {o = At.part H so} {bs = bs} {l = l} {S = U.step l} {as = as} fp u)) ,
+        _ , hp , subst (Lifts H (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} πL) _) (sym st) (lifts-lanes LL (earliest-found fbs fas hq u) (lane-first fo u) (pool-lane {o = At.part H so} {bs = bs} {l = l} {S = U.step l} {as = as} fp u)) ,
         subst (Below _) (sym st) (below-lane (below hq u))
         where hp = held-lanes {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} eq
               fp = pd hp
@@ -1494,7 +1478,7 @@ module Honesty (R : Set) where
       lift-up ρ₀ (in-source {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = ej} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fb , cl) with peek (At.part H bd)
       ... | peek-nothing pb = ⊥-elim (true≢false (sym (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn)))
       ... | peek-just pb with lift-up (ρ₀ ⊕ in-source here) ρ (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn) cl
-      ...   | c₀ , pc , L , b = _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {e = ej} {rt = rtj} {src = src} {bd = bd} pc pb , lifts-source (still pc) pb (source-first fb′ b) L , below-source (source-first fb′ b) b
+      ...   | c₀ , pc , L , b = _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {e = ej} {rt = rtj} {src = src} {bd = bd} pc pb , lifts-source pb (source-first fb′ b) L , below-source (source-first fb′ b) b
         where fb′ = subst (Opt (Far _)) pb fb
       lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = nothing} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fc , rd , cl) with peek (At.part H src)
       ... | peek-nothing ps = ⊥-elim (true≢false (sym (subst (λ z → (is-just z ∨ false) ∧ seen H ρ ≡ true) ps sn)))
@@ -1686,6 +1670,67 @@ module Honesty (R : Set) where
   rise : ∀ {g m} {st : Strong g m} {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
        → load m₁ T ≼ loadOf st → Rises g (load m₁ T) m₁ σ → Climbed st m₁ σ
   rise le (rises path lt cl) = rose path lt (relevel cl le)
+
+  -- A write, one step: the cell stored, what follows it run.
+  writes : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {r} {z} {n : Act h ⊤}
+         → a ≗ writeRef r z n
+         → Σ (Act h ⊤) λ n′ → n′ ≗ n × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ store hp r (lift z) , q , run n′ σ K ⟩ clk ts bs td lg en mk)
+  writes (writeRef≗ refl refl e) = _ , e , then refl now
+
+  -- A scan's part, its accumulator written: its source's part, the
+  -- accumulator the value written, the source's names apart from it.
+  scan-part : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+            → ∀ {c′} z → At.part H u ≡ just c′ → At.part (store H r (lift z)) (scanˢ f r u) ≡ just (U.scanᶜ f z c′)
+  scan-part H {r = r} {u} (nr ∷ _) z pu
+    rewrite get-put-same H r {y = stored (lift z) same⊑}
+          | part-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m)) | pu = refl
+
+  -- A WRITE AT A SCAN'S ACCUMULATOR, FRAMED: nothing the relation holds
+  -- reads an accumulator but the parts above it, and an ancestor's lift
+  -- reads only its siblings and its own cells.
+  postulate
+    scan-owned   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+                 → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} z → Owned H T ca → Owned (store H r (lift z)) T ca
+    scan-kernels : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+                 → ∀ z → Kernels H T → Kernels (store H r (lift z)) T
+    scan-meaning : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+                 → ∀ z → Meaning H T → Meaning (store H r (lift z)) T
+    scan-queue   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+                 → ∀ {p clk ts} z → Queue H p clk ts T → Queue (store H r (lift z)) p clk ts T
+    scan-lifts   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} (ρ : Path T (scanˢ f r u)) → AllPairs _≢_ (names T)
+                 → ∀ {s S} z → Lifts H ρ s S → Lifts (store H r (lift z)) ρ s S
+
+    -- The parts above the scan move with it, each still heading no
+    -- sooner than where the run is: a part's next event is bounded by
+    -- its children's, and the scan's is its source's.
+    scan-behind  : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                   (ρ : Path T (scanˢ f r u)) {y : A} → Climbing g ℓ m₁ (ρ ⊕ in-scan here) y
+                 → Each (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) (Heads (Conf.pos (Mach.conf m₁))) T
+
+  -- A value through a scan: its cell read and written, the accumulated
+  -- value one operator up, the tree's load as it was.
+  scan-pass : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
+              {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
+            → Climbing g ℓ m₁ (ρ ⊕ in-scan here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-scan here)
+  scan-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {f = f} {r = r} {u = u} ρ {y}
+    cl@record { sane = sn ; placed = pl ; ϑ = ϑ ; K = K ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
+              ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+              ; behind = bh ; kept = kp }
+    with lifts-split ρ (in-scan here) L | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-scan here) top) cd
+  ... | _ , lifts-scan lifts-here , Lρ | readRef≗ refl k =
+    rises (then refl (proj₂ (proj₂ wr))) (one-lower ρ one-scan) (record
+      { sane = sn ; placed = pl ; ctl = refl ; code = proj₁ (proj₂ wr) ; stack = sk
+      ; lifted = U.scanᶜ f z c′ , scan-part hp (fresh-path ρ fs) z pv , S , scan-lifts hp ρ fs z Lρ , sg
+      ; owned = scan-owned hp ρ fs z ow ; kernels = scan-kernels hp ρ fs z kn ; meaning = scan-meaning hp ρ fs z mn ; queue = scan-queue hp ρ fs z qu
+      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so (then refl (proj₂ (proj₂ wr))) ; behind = scan-behind ρ cl ; kept = inj₁ refl })
+    where z = f (At.val hp r) y
+          wr = writes {σ = ϑ} {K = K} {clk = clk} {ts} {bs} {td} {lg} {en} {mk} (≗-trans (k same⊑ (At.val hp r)) (wk-same _))
+
+  climb-scan : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
+               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
+             → Climbing g (loadOf st) m₁ (ρ ⊕ in-scan here) y → Climbed st m₁ (ρ ⊕ in-scan here)
+  climb-scan st ρ cl = rise (Climbing.kept cl) (scan-pass ρ cl)
 
   -- A value through a takeWhile: passed one operator up; or failing,
   -- delivered first when inclusive, then the completion climbs, then

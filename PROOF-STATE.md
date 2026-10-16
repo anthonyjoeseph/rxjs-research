@@ -177,22 +177,16 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **A. THE SUMMARY.** `Lifts` reads, at each ancestor, only the child's
-  next-step summary (its head position, or ended), never its part, so a
-  write inside a node is invisible above it. `Was`, `OuterFirst` and
-  `PoolBehind` restated over the summary; `Climbing.lifted` and
-  `Closing.lifted` follow. Decides whether every ancestor's side condition
-  is a function of the child's summary; one that needs the child's whole
-  node is a finding, not a field. Done when Content is green with no
-  `At.part` of a strict subtree inside `Lifts`.
 - **B. THE LOCAL INVARIANT.** Each field of `Carried` a fold over the tree
   of node-local predicates reading only the node's `names`, with one
   framing lemma per field over `Local`'s `Alike` and `Off`: a store at a
   node's own name keeps every other node's predicate, so a step owes only
-  its node's fact. First consumers `climb-scan`, `close-outer`,
-  `close-lanes`, `close-source`. Decides whether the four writes fall with
-  only node-local leaves; a whole-tree obligation that survives is the
-  finding. Done when the framing lemmas are proven.
+  its node's fact. `climb-scan` is a body over the `scan-*` framing
+  leaves; next `close-outer`, `close-lanes`, `close-source` the same way.
+  Decides whether the four writes fall with only node-local leaves;
+  `scan-behind` is the whole-tree one, a part's head bounded by its
+  children's, and surviving as one is the finding. Done when the
+  framing leaves are proven.
 - **C. THE CALLBACK RELATION.** One per-operator lemma: an observer at a
   path, run from a related state, reaches a related state with the ghost
   advanced, by recursion up the path. `Climbing` and `Closing` become one
@@ -249,8 +243,18 @@ by their own silent steps (`Mirror`).
   hold emits to a guard that drops it, the ghost alike, a value fewer.
 - **`climb-lanes`** (Content) — FALSITY, `NO EVIDENCE`: a lane's value climbs
   into its flatMap through `wkObs same`, equal up to `≗`.
-- **`climb-scan`** (Content) — FALSITY, `NO EVIDENCE`: a scan writes its cell
-  and climbs on; the heap frame for the written cell is the content.
+- **`scan-behind`** (Content) — FALSITY, `NO EVIDENCE`: the parts above a
+  written accumulator still head no sooner than the run.
+- **`scan-lifts`** (Content) — FALSITY, `NO EVIDENCE`: a lift above a scan
+  survives a write at its accumulator.
+- **`scan-owned`** (Content) — FALSITY, `NO EVIDENCE`: `Owned` survives a write
+  at a scan's accumulator.
+- **`scan-kernels`** (Content) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
+  write at a scan's accumulator.
+- **`scan-meaning`** (Content) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
+  write at a scan's accumulator.
+- **`scan-queue`** (Content) — FALSITY, `NO EVIDENCE`: `Queue` survives a write
+  at a scan's accumulator.
 - **`climb-outer`** (Content) — FALSITY, `NO EVIDENCE`: an outer value opens a
   lane and stops at the subscription it begins.
 - **`climb-source`** (Content) — FALSITY, `NO EVIDENCE`: a connect source's
