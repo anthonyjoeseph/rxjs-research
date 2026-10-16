@@ -183,13 +183,12 @@ by their own silent steps (`Mirror`).
   third mid-call state.
   An operator's call is reads, writes and a RESTAGE of its node,
   node-local but for carrying stack, calls and agenda across it: a
-  take's stage, a connect's feed, a flatMap's pool, its admit by
-  policy, a lane's end down to its queue read. Every guard read open by
-  `calling-open`. A lane's settle rises as `close-outer`'s does, over
-  `lane-settles`: the done flag lags the outer's part while the outer's
-  end climbs, a fact of the call no field carries. Remaining:
-  `lane-pooled`; `outer-start` and `lane-next`, which allocate, so wait
-  on a strong tree's transport along `_⊑_` that `sub-onward` owes too.
+  take's stage, a connect's feed, a flatMap's pool, its admit, a lane's
+  end and settle. Guards open by `calling-open`. `lane-settles` is a
+  fact of the call no field carries: the done flag lags the outer's
+  part while the outer's end climbs. Remaining:
+  `outer-start` and `lane-next`, which allocate, so wait on a strong
+  tree's transport along `_⊑_` that `sub-onward` owes too.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -221,8 +220,8 @@ by their own silent steps (`Mirror`).
   ghost's step leaves its parts placed.
 - **`lane-settles`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot's settle
   tests the ghost's lane end: done flag the outer gone, count the lanes.
-- **`lane-pooled`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot settling
-  short of the end: the pool takes the lane's rest.
+- **`lane-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane ended short of its
+  flatMap's end: the pool takes its rest, the ghost past the lane's skip.
 - **`lane-next`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot with a value
   queued takes it and begins its lane; allocates, as `outer-start` does.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
