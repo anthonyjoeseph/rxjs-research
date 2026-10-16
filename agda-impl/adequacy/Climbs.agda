@@ -17,7 +17,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift; lower)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; is-nothing)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_; _<ᵇ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
@@ -1002,6 +1002,23 @@ module Ascending (R : Set) where
   slot-freed : ∀ {h} (H : Heapᴹ h) {A X} (c : Kit.Cut h) (fl : FlatKit.Flat A h) (s : Sink h X) → cbs (freed H c fl) s ≡ cbs H s
   slot-freed H c fl s = trans (look-store (unlive H c) (FlatKit.Flat.active fl) s (λ ())) (look-store H (Kit.live c) s (λ ()))
 
+  -- A LANE ENDED AND ITS SLOT FREED: its cut dropped and the count down,
+  -- nothing else of the heap or the tree moved.  Parts hold only with
+  -- the lane's own part gone: a live lane's part is its flatMap's.
+  module Freed {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ B}
+               (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) where
+    H′ = freed H (laneOf o) fl
+
+    postulate
+      fr-part    : At.part H u ≡ nothing → ∀ {Δ′ A′} (v : Sub h Δ′ A′) → At.part H′ v ≡ At.part H v
+      fr-lanes   : ∀ {s bs S as} → LiftsLane H πL s bs S as → At.part H u ≡ nothing → At.partLanes H′ ls ≡ bs ++ as
+      fr-lifts   : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
+      fr-owned   : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
+      fr-kernels : Kernels H T → Kernels H′ T
+      fr-meaning : Meaning H T → Meaning H′ T
+      fr-queue   : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
+      fr-behind  : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
+
   -- The machine at a new heap running a callback, the call's rest owed
   -- past it.
   resend : (m₁ : Mach) → Heapᴹ (Conf.world (Mach.conf m₁)) → {w : World} → w ⊑ Conf.world (Mach.conf m₁) → Stack w ⊤
@@ -1025,16 +1042,52 @@ module Ascending (R : Set) where
     []      → ≗-refl (dequeueOf ρ [])
     (y ∷ ys) → ≗-refl (dequeueOf ρ (y ∷ ys))
 
+  -- What a flatMap's settle tests, read off a heap.
+  settleᵇ : ∀ {h A} → Heapᴹ h → FlatKit.Flat A h → Bool
+  settleᵇ H fl = At.val H (FlatKit.Flat.outerDone fl) ∧ (At.val H (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val H (FlatKit.Flat.queue fl))
+
+  -- Whether a flatMap's ghost ends with a lane: its outer gone, no lane
+  -- beside it, nothing queued.
+  settledᵍ : ∀ {Γ A B} → Maybe (U.Node Γ A) → List (U.Node Γ B) → List (U.Node Γ B) → List A → Bool
+  settledᵍ o bs as qs = is-nothing o ∧ null bs ∧ null as ∧ null qs
+
+  settled-nil : ∀ {Γ A B} (o : Maybe (U.Node Γ A)) (bs as : List (U.Node Γ B)) (qs : List A)
+              → settledᵍ o bs as qs ≡ true → o ≡ nothing × bs ≡ [] × as ≡ [] × qs ≡ []
+  settled-nil nothing  []      []      []      refl = refl , refl , refl , refl
+  settled-nil (just _) _       _       _       ()
+  settled-nil nothing  (_ ∷ _) _       _       ()
+  settled-nil nothing  []      (_ ∷ _) _       ()
+  settled-nil nothing  []      []      (_ ∷ _) ()
+
+  -- A lane's end with nothing beside it: the flatMap's own end.
+  lane-end : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) {o bs as qs} l c pl → o ≡ nothing → bs ≡ [] → as ≡ [] → qs ≡ []
+           → U.laneˢ op g o bs l (U.endˢ c) as qs pl ≡ U.endˢ c
+  lane-end op g l c pl refl refl refl refl = refl
+
   postulate
-    -- A freed slot with nothing queued: the flatMap's settle read; its
-    -- outer done and no lane left, its end one operator up with the
-    -- call's rest owed in a frame; else the pool taking the lane's rest.
-    lane-settle : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+    -- A freed slot's settle tests what the ghost's lane end tests: the
+    -- done flag, the outer's part gone; the count, the lanes beside it.
+    --
+    -- Not a fact of the kernels: an outer's part is gone before its done
+    -- flag is written, while its own end climbs to `close-outer`.  No
+    -- lane ends in between, and no field of the call says so.
+    lane-settles : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) {ks}
+                 → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) (closes ks)
+                 → ∀ {s bs S as} → LiftsLane (Conf.heap (Mach.conf m₁)) πL s bs S as
+                 → settleᵇ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) fl
+                   ≡ settledᵍ (At.part (Conf.heap (Mach.conf m₁)) t) bs as (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.queue fl))
+
+    -- A freed slot settling short of the end: the outer or a lane left;
+    -- the pool takes the lane's rest, the ghost past the lane's skip.
+    lane-pooled : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
                   (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
-                → At.val (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ []
-                → ∀ {a n} → a ≗ dequeueOf ρ [] → n ≗ ⟦ ks ⟧ᶜ
+                → ∀ {s bs S as} → LiftsLane (Conf.heap (Mach.conf m₁)) πL s bs S as
+                → settledᵍ (At.part (Conf.heap (Mach.conf m₁)) t) bs as (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.queue fl)) ≡ false
+                → ∀ {a n} → a ≗ done tt → n ≗ ⟦ ks ⟧ᶜ
                 → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
 
     -- A freed slot with a value queued: the queue's head taken, its lane
@@ -1048,28 +1101,90 @@ module Ascending (R : Set) where
               → ∀ {a n} → a ≗ dequeueOf ρ (y ∷ ys) → n ≗ ⟦ ks ⟧ᶜ
               → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
 
+  -- A freed slot with nothing queued: the flatMap's settle read.  Its
+  -- outer done and no lane left, its end one operator up, the call's
+  -- rest owed in a frame; else the pool.
+  lane-settle : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
+                (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
+              → At.val (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ []
+              → ∀ {a n} → m₁ ⇝ resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n
+              → a ≗ dequeueOf ρ [] → n ≗ ⟦ ks ⟧ᶜ → Called st m₁ (ρ ⊕ in-lanes πL)
+  lane-settle st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
+    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+              ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+              ; behind = bh ; kept = kp } eq₀ {n = n} p ea eks
+    with lifts-split ρ (in-lanes πL) L | reads {hp = freed hp (laneOf o) fl} ea
+  ... | _ , lifts-lanes {bs = bs′} {l = l} {as = as′} LL _ _ _ , Lρ | k₁ , f₁ , p₁
+    with reads {hp = freed hp (laneOf o) fl}
+           (≗-trans (f₁ same⊑ (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.outerDone fl)))
+                    (wk-same (settleᵒ₁ (Here.obs (walk ρ top)) fl (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.outerDone fl)))))
+  ...   | k₂ , f₂ , p₂
+    with reads {hp = freed hp (laneOf o) fl}
+           (≗-trans (f₂ same⊑ (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.active fl)))
+                    (wk-same (settleᵒ₂ (Here.obs (walk ρ top)) fl (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.outerDone fl))
+                                       (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.active fl)))))
+  ...     | k₃ , f₃ , p₃
+    with settleᵇ (freed hp (laneOf o) fl) fl in eq
+  ...       | true =
+    rise kp (rises {sg′ = closes []} path (one-lower ρ (one-lanes o)) (record
+      { sane = sn ; placed = pd ; ctl = refl
+      ; code = ≗-trans e₃ (≗-trans (open-code {m = Observer.complete O} eq) (seq-done _))
+      ; stack = stk
+      ; lifted = flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o gn t) eo)
+                           (trans (Freed.fr-lanes hp ρ o LL gn) (cong₂ _++_ ebs eas)) eq₀
+               , S , Freed.fr-lifts hp ρ o (subst (λ s′ → Lifts hp ρ s′ S) (lane-end op G l q po eo ebs eas eqs)
+                                              (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S)
+                                                     (lane-step o LL) Lρ)) , sg
+      ; owned = owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o ow)
+      ; kernels = Freed.fr-kernels hp ρ o kn ; meaning = Freed.fr-meaning hp ρ o mn ; queue = Freed.fr-queue hp ρ o qu
+      ; books = record { fresh = fs ; clocked = proj₁ ck , proj₁ ck , proj₂ ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so path ; behind = Freed.fr-behind hp ρ o bh ; kept = inj₁ refl }))
+    where
+      H₂   = freed hp (laneOf o) fl
+      O    = Here.obs (walk ρ top)
+      G    = λ a j → U.subscribe (f a) j
+      path = ⇝-trans p (⇝-trans p₁ (⇝-trans p₂ p₃))
+      e₃   = ≗-trans (f₃ same⊑ (At.val H₂ (FlatKit.Flat.queue fl)))
+               (wk-same (settledᵒ O (At.val H₂ (FlatKit.Flat.outerDone fl)) (At.val H₂ (FlatKit.Flat.active fl)) (At.val H₂ (FlatKit.Flat.queue fl))))
+      stk  = restAs ks (≗-trans (wk-same n) eks) sk
+      nl   = settled-nil (At.part hp t) bs′ as′ (At.val hp (FlatKit.Flat.queue fl)) (trans (sym (lane-settles ρ o cl LL)) eq)
+      eo   = proj₁ nl
+      ebs  = proj₁ (proj₂ nl)
+      eas  = proj₁ (proj₂ (proj₂ nl))
+      eqs  = proj₂ (proj₂ (proj₂ nl))
+  ...       | false =
+    landed (hopped-pre (⇝-trans p (⇝-trans p₁ (⇝-trans p₂ p₃)))
+                       (lane-pooled st ρ πL o cl LL (trans (sym (lane-settles ρ o cl LL)) eq) (≗-trans e₃ (shut-code eq)) eks))
+    where
+      H₂   = freed hp (laneOf o) fl
+      O    = Here.obs (walk ρ top)
+      e₃   = ≗-trans (f₃ same⊑ (At.val H₂ (FlatKit.Flat.queue fl)))
+               (wk-same (settledᵒ O (At.val H₂ (FlatKit.Flat.outerDone fl)) (At.val H₂ (FlatKit.Flat.active fl)) (At.val H₂ (FlatKit.Flat.queue fl))))
+
   -- A freed slot's queue read, by what it holds.
   lane-queue : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
                (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
              → ∀ qs → At.val (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ qs
-             → ∀ {a n} → a ≗ dequeueOf ρ qs → n ≗ ⟦ ks ⟧ᶜ
-             → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
-  lane-queue st ρ πL o cl []       e = lane-settle st ρ πL o cl e
-  lane-queue st ρ πL o cl (y ∷ ys) e = lane-next st ρ πL o cl e
+             → ∀ {a n} → m₁ ⇝ resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n
+             → a ≗ dequeueOf ρ qs → n ≗ ⟦ ks ⟧ᶜ → Called st m₁ (ρ ⊕ in-lanes πL)
+  lane-queue st ρ πL o cl []       e p ea eks = lane-settle st ρ πL o cl e p ea eks
+  lane-queue st ρ πL o cl (y ∷ ys) e p ea eks = landed (hopped-pre p (lane-next st ρ πL o cl e ea eks))
 
   -- A lane's freed slot handed on: the queue read.
   lane-dequeue : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                  {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
                  (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) (o : OneLane πL) {ks}
                  (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
-               → ∀ {a n} → a ≗ dequeueAt ρ → n ≗ ⟦ ks ⟧ᶜ
-               → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
-  lane-dequeue st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {fl = fl} ρ πL o cl@record { ctl = refl } ea eks
+               → ∀ {a n} → m₁ ⇝ resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n
+               → a ≗ dequeueAt ρ → n ≗ ⟦ ks ⟧ᶜ → Called st m₁ (ρ ⊕ in-lanes πL)
+  lane-dequeue st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {fl = fl} ρ πL o cl@record { ctl = refl } p ea eks
     with reads {hp = freed hp (laneOf o) fl} (≗-trans ea (dequeue-cases ρ))
-  ... | k₁ , f₁ , p₁ = hopped-pre p₁ (lane-queue st ρ πL o cl _ refl
-          (≗-trans (f₁ same⊑ _) (wk-same (dequeueOf ρ (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.queue fl))))) eks)
+  ... | k₁ , f₁ , p₁ = lane-queue st ρ πL o cl _ refl (⇝-trans p p₁)
+          (≗-trans (f₁ same⊑ _) (wk-same (dequeueOf ρ (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.queue fl))))) eks
 
   -- A lane ended: its guard read open, its cut dropped, the count down,
   -- the refill sent.
@@ -1092,10 +1207,10 @@ module Ascending (R : Set) where
     with sendStep {hp = freed hp (laneOf o) fl}
            (at-val {F = k₅ same⊑} (trans (refill-freed hp (laneOf o) fl) (proj₁ (holds-walk hp ρ top (Kernels.holds kn)))) (f₅ same⊑ (just r)))
   ...           | n₆ , e₆ , p₆ =
-    landed (hopped-pre (⇝-trans p₁ (⇝-trans p₂ (⇝-trans p₃ (⇝-trans p₄ (⇝-trans p₅ p₆)))))
-                       (lane-dequeue st ρ πL o cl (at-val {F = λ c → Callbacks.onNext c tt} (slot-freed hp (laneOf o) fl r)
-                                                    (proj₁ (proj₁ (proj₂ (holds-walk hp ρ top (Kernels.holds kn)))) tt))
-                                     (≗-trans e₆ (wk-same ⟦ ks ⟧ᶜ))))
+    lane-dequeue st ρ πL o cl (⇝-trans p₁ (⇝-trans p₂ (⇝-trans p₃ (⇝-trans p₄ (⇝-trans p₅ p₆)))))
+                 (at-val {F = λ c → Callbacks.onNext c tt} (slot-freed hp (laneOf o) fl r)
+                         (proj₁ (proj₁ (proj₂ (holds-walk hp ρ top (Kernels.holds kn)))) tt))
+                 (≗-trans e₆ (wk-same ⟦ ks ⟧ᶜ))
 
   -- A signal out of a lane.
   call-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}

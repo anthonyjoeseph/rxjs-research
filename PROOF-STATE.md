@@ -185,10 +185,11 @@ by their own silent steps (`Mirror`).
   node-local but for carrying stack, calls and agenda across it: a
   take's stage, a connect's feed, a flatMap's pool, its admit by
   policy, a lane's end down to its queue read. Every guard read open by
-  `calling-open`. Remaining: `lane-settle`, the settle read as
-  `close-outer` reads it; `outer-start` and `lane-next`, which allocate,
-  so wait on a strong tree's transport along `_⊑_` that `sub-onward`
-  owes too.
+  `calling-open`. A lane's settle rises as `close-outer`'s does, over
+  `lane-settles`: the done flag lags the outer's part while the outer's
+  end climbs, a fact of the call no field carries. Remaining:
+  `lane-pooled`; `outer-start` and `lane-next`, which allocate, so wait
+  on a strong tree's transport along `_⊑_` that `sub-onward` owes too.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -200,7 +201,7 @@ by their own silent steps (`Mirror`).
   `Off`. Ruled out for the scan: a write needs no non-local leaf but
   `tells-past`. Remaining: an own-cell apartness fold carrying
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
-  and `up-lanes` by a flatMap head bound; then `lane-settle` and
+  and `up-lanes` by a flatMap head bound; then `fr-*` and
   `close-outer`'s `sd-*` the same way, in the form C consumes.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
@@ -218,8 +219,10 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
-- **`lane-settle`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot with
-  nothing queued settles the flatMap: its end one operator up, or the pool.
+- **`lane-settles`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot's settle
+  tests the ghost's lane end: done flag the outer gone, count the lanes.
+- **`lane-pooled`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot settling
+  short of the end: the pool takes the lane's rest.
 - **`lane-next`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot with a value
   queued takes it and begins its lane; allocates, as `outer-start` does.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
@@ -270,6 +273,14 @@ by their own silent steps (`Mirror`).
   flag leaves `Queue`.
 - **`sd-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves every part's head.
+- **`fr-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with its part gone leaves every part.
+- **`fr-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the lanes beside it as the ghost's.
+- **`fr-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the lift to its flatMap.
+- **`fr-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Owned`.
+- **`fr-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Kernels`.
+- **`fr-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Meaning`.
+- **`fr-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Queue`.
+- **`fr-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves every part's head.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a takeWhile's completion
   begun under its failing value, its cut the frame's rest.
 - **`last-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a spent `of`'s completion
