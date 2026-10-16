@@ -147,5 +147,34 @@ jobs:
       - name: make stepping
         run: make stepping
 
+
+  # The placing check: every drawn program's meaning is placed, rising
+  # and steady.  Its own job, so its slow seeds never starve the oracle.
+  placing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+
+      - name: Install TypeScript deps
+        run: cd typescript && npm ci
+
+      - name: Set up Agda
+        uses: ./.github/actions/agda-toolchain
+
+      - name: Cache compiled MAlonzo objects
+        uses: actions/cache@v4
+        with:
+          path: agda-impl/_cli/MAlonzo
+          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+
       - name: make placing
-        run: make placing
+        run: make placing ARGS="0 100"
