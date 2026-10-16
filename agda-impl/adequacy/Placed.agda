@@ -5885,7 +5885,7 @@ module Apart {A : Set} (τ : ℕ) (r : Pos) (i : ℕ) where
   far c n last-mark       (inj₂ (inj₂ ()))
 
   frame-sp : ∀ {e} → Chain e → ∀ n {l} → Mark l → Sp (r ++ [ ix i ]) (ix n ∷ sub e ∷ l ∷ [])
-  frame-sp c n m = (big-ext [ ix 1 ] (frame-big c n m) , far c n m) , big (frame-big c n m)
+  frame-sp {e} c n {l} m = (big-ext {h = ix n ∷ sub e ∷ l ∷ []} [ ix 1 ] (frame-big c n m) , far c n m) , big {h = ix n ∷ sub e ∷ l ∷ []} (frame-big c n m)
 
   mutual
     frames-apart : ∀ {e t} → Chain e → Sp (r ++ [ ix i ]) e → (m : From A t) → Every (Sp (r ++ [ ix i ])) (M.frames τ e m)
