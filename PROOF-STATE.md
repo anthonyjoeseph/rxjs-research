@@ -186,16 +186,15 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `spread-connect` first: decides whether a body's
-  joiner, showing a source value at `q` tagged with its own position,
-  stays keyed apart from the source's later steps shown just past
-  them. Then `spread-rejoin` (strictness after a value and the source
-  alien look sufficient), `spread-take`, `spread-start`, then
-  `ordered-connect`, `steady-connect`, reusing `Walk`. Ruled out: a
-  lane owing more than its root's apartness (`spread-flat` is a walk
-  over `Merge`); pins by position alone; a skip trailed only by the
-  step under it; a take owing more than a value's disjointness from
-  its pins (`trail-take`).
+- **THE ORDER.** `spread-rejoin` first: decides whether a joiner's
+  values stay keyed apart from its source's later ones by weight (no
+  position owns a lighter one) and the source alien to the joiner, or
+  the source owes an order on its own tags. Then `spread-take`,
+  `spread-start`, then `ordered-connect`, `steady-connect`, reusing
+  `Walk`. Ruled out: a connect owing more than `Rise` and the source's
+  marks (`spread-connect` is a walk over `Walk.Side`); a lane owing more
+  than its root's apartness; pins by position alone; a take owing more
+  than a value's disjointness from its pins (`trail-take`).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -214,8 +213,6 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`spread-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
-  values its body's, its source's steps only skips.
 - **`spread-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a joiner's values
   its source's, tagged with it, over a source alien to it.
 - **`spread-take`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a failing value

@@ -1863,6 +1863,9 @@ every (every-zip (skip h r)  pe qe) = (proj₁ (every pe) , proj₁ (every qe)) 
 every (every-zip (end h)     pe qe) = every pe , every qe
 every (every-zip hush        pe qe) = tt
 
+every∞-zip : ∀ {A} {P Q : Pos → Set} (r : Events∞ A) → Every∞ P r → Every∞ Q r → Every∞ (λ h → P h × Q h) r
+every∞-zip r (pe , pt) (qe , qt) = every-zip (force r) pe qe , everyT-zip (cut r) pt qt
+
 -- Sources alien to `p` rise under anything `p` owns: nothing there tags them.
 rise-env : ∀ {Γ} p r → Owned p r → (ρ : NEnv Γ) → Everyᴱ Headed ρ → Alienᴱ p ρ → Everyᴱ (Rise r) ρ
 rise-env p r pr []ᴬ      _         _         = tt
@@ -4679,6 +4682,29 @@ module Bursting (r : Pos) where
     everyᵀ (lead-pinned m k s t true  mk tr o c et) = mk , lead-run m (force s) (cut s) tr o c
     everyᵀ (lead-pinned m k s t false mk tr o c et) = everyᵀ et
 
+  -- Every step a run has yet to show, and every step any state of it
+  -- would leave running, is marked by where it next shows.
+  lead-cut : ∀ {A} m (e : Events A) t → Trail e t → Cue m e → EveryT (Marked m) t
+  lead-cut m (out k _ s) t tr c = everyT-mono (out-marked k m c) t (proj₁ (proj₂ (trail tr)))
+  lead-cut m (skip k s)  t tr c = everyT-mono (skip-marked k m c) t (proj₁ (proj₂ (trail tr)))
+  lead-cut m (end k)     t tr c = everyT-mono (end-marked k m c) t (proj₁ (proj₂ (trail tr)))
+  lead-cut m hush        t tr c = everyT-mono (λ _ ()) t (proj₁ (proj₂ (trail tr)))
+
+  lead-every : ∀ {A} m (e : Events A) t → Trail e t → Ordered e → Cue m e → Every (Marked m) e
+  every (lead-every m (out k _ s) t tr o c) =
+    cue-marked k m c , lead-every m (force s) (cut s) tr′ (proj₂ (ordered o)) c′ , lead-cut m (force s) (cut s) tr′ c′
+    where tr′ = proj₁ (proj₂ (proj₂ (trail tr)))
+          c′  = cue-on k m (force s) c (proj₁ (ordered o))
+  every (lead-every m (skip k s)  t tr o c) =
+    cue-marked k m c , lead-every m (force s) (cut s) tr′ (proj₂ (ordered o)) c′ , lead-cut m (force s) (cut s) tr′ c′
+    where tr′ = proj₂ (proj₂ (trail tr))
+          c′  = cue-on k m (force s) c (proj₁ (ordered o))
+  every (lead-every m (end k)     t tr o c) = cue-marked k m c
+  every (lead-every m hush        t tr o c) = tt
+
+  lead∞ : ∀ {A} m (s : Events∞ A) → Trailing s → Ordered (force s) → Cue m (force s) → Every∞ (Marked m) s
+  lead∞ m s tr o c = lead-every m (force s) (cut s) tr o c , lead-cut m (force s) (cut s) tr c
+
   atopT-pin : ∀ {A} k n (s : Events∞ A) t b → n <ᵖ k ≡ false → (M.inside r n ≡ false → AtopT k t) → M.inside r n ≡ b
             → AtopT k (M.pinned r n s t b)
   atopT-pin k n s t true  a f ib = a
@@ -5147,6 +5173,91 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
     trail (tr-body β σ sd e eq g hush xe () c′ ce)
     trailᶠ (tr-body β σ sd e eq g x xe be c′ ce) = subst FlatT ce (burst-flat sd e eq g)
 
+  -- A body step before a source step keys no lane admitted there, nor
+  -- does the source step key the body step's.
+  sp-late : ∀ n y → Owned P₀ n → Rise r n → Disjoint P₀ y → Headed y → Owned r y → n <ᵖ y ≡ true → Sp n y
+  sp-late n y on rn dy hy oy ny = sp-of n y (fwd , bwd)
+    where
+      on₁ : Owned P₀ (n ++ [ ix 1 ])
+      on₁ = beneath-owned P₀ _ (owned-snoc P₀ n (ix 1) on)
+      fwd : ¬ Owned y (n ++ [ ix 1 ])
+      fwd (inj₁ pr) with prefix-split y n (ix 1) pr
+      ... | inj₂ eq  = proj₁ dy (subst (Owned P₀) (sym eq) on₁)
+      ... | inj₁ pr′ with prefix-lt y n pr′
+      ...   | inj₁ eq = proj₁ dy (subst (Owned P₀) (sym eq) on)
+      ...   | inj₂ yn = t≢f (trans (sym yn) (<ᵖ-asym n y ny))
+      fwd (inj₂ t) = t≢f (trans (sym (proj₂ rn y hy oy (tagged-mark y n (ix 1) (ix-mark 1) t))) (<ᵖ-asym n y ny))
+      bwd : ¬ Owned (n ++ [ ix 1 ]) y
+      bwd o = proj₁ dy (owned-trans P₀ (n ++ [ ix 1 ]) y on₁ o)
+
+  every-shown : ∀ {C} {P : Pos → Set} (e : Events C) → Going e → Every (λ y → P y × P (y ++ [ ix 0 ])) e → P (M.shownAt e)
+  every-shown (out _ _ _) g pe = proj₂ (proj₁ (every pe))
+  every-shown (skip _ _)  g pe = proj₂ (proj₁ (every pe))
+  every-shown (end _)     g pe = proj₂ (every pe)
+  every-shown hush        () pe
+
+  -- Past a body step no later than where the source next shows, every
+  -- step the source has yet to show or leave running keys no lane the
+  -- body step admits, shown or not.
+  src-sp : ∀ {β σ} → Side β σ → ∀ e → force σ ≡ e → Going e → ∀ n → M.shownAt e <ᵖ n ≡ false → Owned P₀ n → Rise r n
+         → Every∞ (λ y → Sp n y × Sp n (y ++ [ ix 0 ])) σ
+  src-sp {β} {σ} sd e eq g n be on rn =
+    every∞-mono f σ (every∞-zip σ (every∞-zip σ (every∞-zip σ mk (Side.ks sd)) (Side.hs sd)) (Side.rs sd))
+    where
+      q  = M.shownAt e
+      nq = nqAt sd e eq g
+      mk = lead∞ q σ (Side.ts sd) (Side.os sd) (subst (Cue q) (sym eq) (cue-self e))
+      f : ∀ y → ((Marked q y × Disjoint P₀ y) × Headed y) × Owned r y → Sp n y × Sp n (y ++ [ ix 0 ])
+      f y (((my , dy) , hy) , oy) = sy , sp-step n y sy
+        where sy = sp-late n y on rn dy hy oy (Pin.past q n y nq on be rn dy hy oy my)
+
+  -- THE SPREAD WALK: after a body value, nothing the connect later shows
+  -- or leaves running keys where a lane admitted at it would.
+  mutual
+    sp-beside : ∀ β σ → Side β σ → Spread (force β) → Spread (M.beside r β σ)
+    sp-beside β σ sd sb = sp-side β σ sd sb (force σ) refl
+
+    sp-side : ∀ β σ → Side β σ → Spread (force β) → ∀ e → force σ ≡ e → Spread (M.side r β σ e)
+    sp-side β σ sd sb (out k a s) eq = sp-ahead β σ sd sb (out k a s) eq tt _ refl
+    sp-side β σ sd sb (skip k s)  eq = sp-ahead β σ sd sb (skip k s) eq tt _ refl
+    sp-side β σ sd sb (end c)     eq = sp-ahead β σ sd sb (end c) eq tt _ refl
+    sp-side β σ sd sb hush        eq = sb
+
+    sp-ahead : ∀ β σ → Side β σ → Spread (force β) → ∀ e → force σ ≡ e → Going e → ∀ b → M.before (M.shownAt e) (force β) ≡ b
+             → Spread (M.ahead r β σ (M.shownAt e) b)
+    sp-ahead β σ sd sb e eq g true  be = sp-src β σ sd sb e eq g be
+    sp-ahead β σ sd sb e eq g false be = sp-body β σ sd e eq g (force β) refl sb be
+
+    sp-src : ∀ β σ → Side β σ → Spread (force β) → ∀ e → force σ ≡ e → Going e → M.before (M.shownAt e) (force β) ≡ true
+           → Spread (M.ahead r β σ (M.shownAt e) true)
+    spread (sp-src β σ sd sb e eq g be) = sp-beside β (M.onward∞ σ (force σ)) (toSource sd e eq g be) sb
+
+    sp-body : ∀ β σ → Side β σ → ∀ e → force σ ≡ e → Going e → ∀ x → force β ≡ x → Spread x → M.before (M.shownAt e) x ≡ false
+            → Spread (M.body r σ (M.shownAt e) x)
+    spread (sp-body β σ sd e eq g (out n a β′) xe sx be) =
+      ( every-ahead {P = Sp n} r β′ σ q (M.before q (force β′)) (proj₁ (spread sx)) ss
+          (every-shown e g (subst (Every (λ y → Sp n y × Sp n (y ++ [ ix 0 ]))) eq (proj₁ ss)))
+      , everyT-∪ (M.burstOn r σ) (cut β′) (everyT-burstOn r σ (every∞-mono (λ _ → proj₁) σ ss)) (proj₂ (proj₁ (spread sx))) )
+      , sp-ahead β′ σ (toBody sd e eq n be on β′ (proj₁ (proj₂ (proj₂ (trail tbx)))) (proj₂ (every kbx)) (proj₂ (every krx))
+                         (proj₁ (freshᴿ frx)) (proj₂ (freshᴿ frx))) (proj₂ (spread sx)) e eq g _ refl
+      where q = M.shownAt e
+            tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
+            kbx = subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd))
+            on = proj₁ (every kbx)
+            krx = subst (Every (Rise r)) xe (proj₁ (Side.kr sd))
+            frx = subst (FreshRun P₀) xe (Side.fr sd)
+            ss = src-sp sd e eq g n be on (proj₁ (every krx))
+    spread (sp-body β σ sd e eq g (skip n β′) xe sx be) =
+      sp-ahead β′ σ (toBody sd e eq n be on β′ (proj₂ (proj₂ (trail tbx))) (proj₂ (every kbx)) (proj₂ (every krx))
+                       (proj₁ (freshᴿ frx)) (proj₂ (freshᴿ frx))) (spread sx) e eq g _ refl
+      where tbx = subst (λ z → Trail z (cut β)) xe (Side.tb sd)
+            kbx = subst (Every (Owned P₀)) xe (proj₁ (Side.kb sd))
+            on = proj₁ (every kbx)
+            krx = subst (Every (Rise r)) xe (proj₁ (Side.kr sd))
+            frx = subst (FreshRun P₀) xe (Side.fr sd)
+    spread (sp-body β σ sd e eq g (end c) xe sx be) = tt
+    spread (sp-body β σ sd e eq g hush    xe sx be) = tt
+
   -- Keyed with none of the connect, keyed with none of its body.
   narrow₀ : ∀ k → ¬ Owned p k → ¬ Owned P₀ k
   narrow₀ k no o = no (owned-trans p P₀ k (inj₁ (prefix-++ p [ ix 0 ])) o)
@@ -5553,12 +5664,6 @@ postulate
   -- it: each value its source's, tagged with the joiner.
   spread-rejoin : ∀ {A} p (e : Events A) → Ordered e → Steady e → Alien p e → Spread (M.rejoin p e)
 
-  -- A CONNECT'S VALUES SPREAD, over sorted sources alien to where it
-  -- subscribes: its body's values, its source's steps only skips.
-  spread-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
-                 → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-                 → Spread (U.meaning (U.subscribe (connect s b) p) ρ)
-
 -- Two marks under one position, neither's lane keyed by the other's,
 -- nor its lane by it.
 sibling-spread : ∀ p {l l′} → Mark l → Mark l′ → l ≢ l′
@@ -5592,6 +5697,13 @@ spread-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : 
 spread-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
             → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
             → Spread (U.meaning (U.subscribe (flatMap op f s) p) ρ)
+
+-- A CONNECT'S VALUES SPREAD, over sorted sources alien to where it
+-- subscribes: its body's values, its source's steps only skips, each
+-- past every body value shown before it.
+spread-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+               → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+               → Spread (U.meaning (U.subscribe (connect s b) p) ρ)
 
 -- A FINITE PROGRAM SUBSCRIBED IS IN ORDER, where a tick heads, over
 -- sorted sources alien to where it subscribes.
@@ -5694,6 +5806,20 @@ connect-side s b fs fb p ρ hp so cl = record
 trail-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ
               → Alienᴱ p ρ → Trailing (U.stateᴺ (U.subscribe (connect s b) p) ρ)
 trail-connect s b fs fb p ρ hp so cl = Walk.tr-beside p hp _ _ (connect-side s b fs fb p ρ hp so cl)
+
+spread-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
+  Walk.sp-beside {A} {B} p hp _ _ (connect-side s b fs fb p ρ hp so cl) (spread-subᶠ b fb P₀ ρ′ (headed-snoc p hp) so′ cl′)
+  where
+    r  = p ++ [ ix 1 ]
+    P₀ = p ++ [ ix 0 ]
+    hr = headed-snoc p hp
+    cr = alienᴱ-owned p r (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
+    c₀ = alienᴱ-owned p P₀ (inj₁ (prefix-++ p [ ix 0 ])) ρ cl
+    ρ′ = U.meaning (U.subscribe s r) ρ ∷ᴬ ρ
+    so′ : Sorted ρ′
+    so′ = (ordered-subᶠ s fs r ρ hr so cr , steady-subᶠ s fs r ρ hr so cr) , headed-sub s r ρ hr so , so
+    cl′ : Alienᴱ P₀ ρ′
+    cl′ = alien-sub s p ρ cl , c₀
 
 fresh-connect {Γ} {A} {B} s b fs fb p ρ hp so cl = W.cuts-fresh fs₀ , W.fr-beside Bᶜ Sᶜ fs₀
   where
