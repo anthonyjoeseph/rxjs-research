@@ -631,8 +631,9 @@ module Ascending (R : Set) where
 
     settle-eq : Kernels H T → ((At.val H′ (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl)))
                               ≡ (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl)))
-    settle-eq kn = trans (cong₂ (λ n qs → (n ≡ᵇ 0) ∧ null qs) sd-active sd-fifo)
-                         (cong (λ x → x ∧ null (At.val H (FlatKit.Flat.queue fl))) (active-lanes kn))
+    settle-eq kn = trans (cong (λ n → (n ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl))) sd-active)
+                   (trans (cong (λ qs → (At.val H (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null qs) sd-fifo)
+                          (cong (λ x → x ∧ null (At.val H (FlatKit.Flat.queue fl))) (active-lanes kn)))
 
     -- Lanes or a queue left: the pool takes what the outer left running,
     -- the ghost past the outer's skip.
