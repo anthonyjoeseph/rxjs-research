@@ -125,7 +125,7 @@ placing: placing-count oracle-build
 	      "placing: ok "*) ;; \
 	      "placing: FAIL "*) echo "$$out"; bad=1 ;; \
 	      *) echo "placing: ABORT seed $$s (exit $$code)"; bad=1; $(ORACLE_BIN) code $$s; \
-	         for c in placed rising steady steps trails spread untied; do \
+	         for c in placed rising steady steps trails spread untied flat; do \
 	           one=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s $$c +RTS -M3g -RTS 2>&1); \
 	           echo "  $$c (exit $$?): $$one"; done ;; \
 	    esac; s=$$(($$s + 1)); done; \

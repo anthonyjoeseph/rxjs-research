@@ -139,7 +139,7 @@ private
           next _            = true
 
   -- After a value at `x`, nothing later, shown or left running, keys
-  -- where a lane admitted at `x` would, nor under it.
+  -- where a lane admitted at `x` would, nor under it, nor over it.
   apartᵇ : Pos → Pos → Bool
   apartᵇ a b = not (ownedᵇ a b) ∧ not (ownedᵇ b a)
 
@@ -154,9 +154,22 @@ private
 
   spreadᵇ : ℕ → Events ℕ → Bool
   spreadᵇ zero    _           = true
-  spreadᵇ (suc n) (out x _ r) = allᵇ (λ y → apartᵇ (y ++ [ ix 1 ]) (x ++ [ ix 1 ])) (laterᵇ 60 r) ∧ spreadᵇ n (Events∞.force r)
+  spreadᵇ (suc n) (out x _ r) = allᵇ (λ y → apartᵇ (y ++ [ ix 1 ]) (x ++ [ ix 1 ]) ∧ not (ownedᵇ y (x ++ [ ix 1 ]))) (laterᵇ 60 r) ∧ spreadᵇ n (Events∞.force r)
   spreadᵇ (suc n) (skip _ r)  = spreadᵇ n (Events∞.force r)
   spreadᵇ (suc n) _           = true
+
+  -- What a cut leaves running: nothing inside a step before it.
+  flatᵇ : List Pos → Bool
+  flatᵇ []       = true
+  flatᵇ (x ∷ xs) = allᵇ (λ y → not (inside x y)) xs ∧ flatᵇ xs
+
+  flatsᵇ : ℕ → Events∞ ℕ → Bool
+  flatsᵇ zero    r = true
+  flatsᵇ (suc n) r = flatᵇ (pinsᵇ 12 (Events∞.cut r)) ∧ next (Events∞.force r)
+    where next : Events ℕ → Bool
+          next (out _ _ r′) = flatsᵇ n r′
+          next (skip _ r′)  = flatsᵇ n r′
+          next _            = true
 
   -- No skip followed straight away by an end at its own position: a
   -- lane doing so with one queued would have its merge step inside it.
@@ -174,7 +187,8 @@ private
 -- leaves running trailing it, and its values spread.  Each check by name.
 checks : Prog natᵗ → List (String × Bool)
 checks p = ("placed" , placedᵇ 6000 12000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
-         ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e) ∷ ("untied" , untiedᵇ 4000 e) ∷ []
+         ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e) ∷ ("untied" , untiedᵇ 4000 e)
+         ∷ ("flat" , flatsᵇ 400 s) ∷ []
   where o = toObs timeline 3 p [] [] []
         s = enter (⟦ o ⟧ˢ []) root
         e = Events∞.force s
