@@ -108,7 +108,8 @@ chain: oracle-build
 # ARGS="FROM COUNT" seeds (default "0 300").  A smoke check for a change to
 # the denotation or the engine, never a sweep: COUNT over 500 is refused
 # unless SWEEP=1.  One process per seed, each capped in time and heap, so a
-# seed that runs away is named instead of taking the runner down with it.
+# seed that runs away is named, with its program and each check alone,
+# instead of taking the runner down with it.
 PLACING_SEED_SECS = 90
 PLACING_ARGS = $(or $(ARGS),0 300)
 placing-count:
@@ -119,11 +120,14 @@ placing-count:
 placing: placing-count oracle-build
 	@set -- $(PLACING_ARGS); s=$$1; e=$$(($$1 + $$2)); bad=0; \
 	  while [ $$s -lt $$e ]; do \
-	    out=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s +RTS -M3g -RTS 2>&1); code=$$?; \
+	    out=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s all +RTS -M3g -RTS 2>&1); code=$$?; \
 	    case "$$out" in \
 	      "placing: ok "*) ;; \
 	      "placing: FAIL "*) echo "$$out"; bad=1 ;; \
-	      *) echo "placing: ABORT seed $$s (exit $$code)"; bad=1 ;; \
+	      *) echo "placing: ABORT seed $$s (exit $$code)"; bad=1; $(ORACLE_BIN) code $$s; \
+	         for c in placed rising steady steps trails spread; do \
+	           one=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s $$c +RTS -M3g -RTS 2>&1); \
+	           echo "  $$c (exit $$?): $$one"; done ;; \
 	    esac; s=$$(($$s + 1)); done; \
 	  if [ $$bad = 1 ]; then echo "placing: RED"; exit 1; fi; echo "placing: GREEN"
 

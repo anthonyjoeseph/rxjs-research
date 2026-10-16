@@ -20,7 +20,8 @@ open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; take)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_)
-open import Data.String using (String)
+open import Data.String using (String; _==_)
+open import Data.Product using (_×_; _,_)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; sub; _<ᵖ_; tick; enter; root; Tail; Tail∞; pin; idle)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
@@ -158,20 +159,25 @@ private
 
 -- The machine's trace placed against the meaning, and the meaning rising,
 -- steady and keying nothing just past its own events; and what a cut
--- leaves running trailing it, and its values spread.
-placing : Prog natᵗ → Bool
-placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steadyᵇ 4000 e ∧ stepsᵇ (positions 200 e) ∧ trailsᵇ 400 s ∧ spreadᵇ 100 e
+-- leaves running trailing it, and its values spread.  Each check by name.
+checks : Prog natᵗ → List (String × Bool)
+checks p = ("placed" , placedᵇ 40000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
+         ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e) ∷ []
   where o = toObs timeline 3 p [] [] []
         s = enter (⟦ o ⟧ˢ []) root
         e = Events∞.force s
 
--- Which of those a program fails, by name.
-placingParts : Prog natᵗ → List String
-placingParts p = part "placed" (placedᵇ 40000 (trace (begin o)) e) (part "rising" (rising 4000 [] e) (part "steady" (steadyᵇ 4000 e)
-                   (part "steps" (stepsᵇ (positions 200 e)) (part "trails" (trailsᵇ 400 s) (part "spread" (spreadᵇ 100 e) [])))))
-  where o = toObs timeline 3 p [] [] []
-        s = enter (⟦ o ⟧ˢ []) root
-        e = Events∞.force s
-        part : String → Bool → List String → List String
-        part n true  ns = ns
-        part n false ns = n ∷ ns
+placing : Prog natᵗ → Bool
+placing p = allᵇ′ (checks p)
+  where allᵇ′ : List (String × Bool) → Bool
+        allᵇ′ []             = true
+        allᵇ′ ((_ , b) ∷ cs) = b ∧ allᵇ′ cs
+
+-- The checks named `n` (all of them for "all") a program fails, by name.
+placingParts : String → Prog natᵗ → List String
+placingParts n p = failing (checks p)
+  where failing : List (String × Bool) → List String
+        failing []              = []
+        failing ((m , b) ∷ cs) with (n == "all") ∨ (n == m) | b
+        ... | true  | false = m ∷ failing cs
+        ... | _     | _     = failing cs

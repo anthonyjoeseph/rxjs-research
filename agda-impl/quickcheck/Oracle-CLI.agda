@@ -11,9 +11,10 @@
 --   Oracle-CLI pure SEED         the machine's trace of one seed
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
 --                                are no chain (`quickcheck.Chain`)
---   Oracle-CLI placing SEED      whether that seed's machine trace strays
+--   Oracle-CLI placing SEED CHECK whether that seed's machine trace strays
 --                                from the meaning, positions included, and
---                                which checks fail (`quickcheck.Placing`)
+--                                which checks fail; CHECK names one, or
+--                                "all" (`quickcheck.Placing`)
 --   Oracle-CLI ghosts FROM COUNT the seeds with an observer inside the run
 --                                delivered what its subtree's denotation
 --                                does not show (`quickcheck.Ghost`)
@@ -93,7 +94,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing SEED | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -130,8 +131,8 @@ private
   dispatch ("why" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showCode natᵗ (program s′)) >>= λ _ → each′ (exactWhy (program s′))
   ... | nothing = usage
-  dispatch ("placing" ∷ n ∷ []) with nat n
-  ... | just s  = putStrLn (verdict (placingParts (program s)))
+  dispatch ("placing" ∷ n ∷ c ∷ []) with nat n
+  ... | just s  = putStrLn (verdict (placingParts c (program s)))
     where verdict : List String → String
           verdict [] = "placing: ok seed " ++ n
           verdict ps = "placing: FAIL seed " ++ n ++ foldr (λ q r → " " ++ q ++ r) "" ps
