@@ -299,8 +299,6 @@ by their own silent steps (`Mirror`).
   gates of the subscription it tears.
 - **`torn-fed`** (Content) — FALSITY, `NO EVIDENCE`: a cut's silenced joiners
   owe nothing, the others as they were.
-- **`torn-queue`** (Content) — FALSITY, `NO EVIDENCE`: the queue and the
-  subjects' subscribers still in order after a cut.
 - **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's
   continuation stashes its unsubscribe, a call fewer.
 - **`burst-poll`** (Content) — FALSITY, `NO EVIDENCE`: a live burst's sink

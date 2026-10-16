@@ -53,6 +53,7 @@ open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Local using (module Locality)
+open import adequacy.Lowers using (module Lowering)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; afterᴱ; placed-after; Placedˢ; step-skips)
@@ -85,6 +86,7 @@ module Honesty (R : Set) where
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears)
   open Locality R using (site-holds; site-gated)
+  open Lowering R using (site-lowers; queue-lowers)
   open Read
 
   ----------------------------------------------------------------------
@@ -1132,11 +1134,6 @@ module Honesty (R : Set) where
     torn-fed : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
              → At.Fed (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) []
 
-    -- The queue untouched: its timers each a pending frame's or spent,
-    -- the subjects' subscribers joiners or silenced.
-    torn-queue : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
-               → Queue (siteHeap (Conf.heap (Mach.conf m)) z) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) (Carried.tree cr)
-
   -- Every subscription still against its kernel, and every gate: the
   -- cut moves only the node it runs from.
   torn-holds : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
@@ -1146,6 +1143,11 @@ module Honesty (R : Set) where
   torn-gated : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
              → At.Gated (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr)
   torn-gated cr z = site-gated _ (Books.fresh (Carried.books cr)) z (Kernels.holds (Carried.kernels cr)) (Kernels.gated (Carried.kernels cr))
+
+  -- The queue as it was: a teardown only spends, lowers and silences.
+  torn-queue : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+             → Queue (siteHeap (Conf.heap (Mach.conf m)) z) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) (Carried.tree cr)
+  torn-queue cr z = queue-lowers (site-lowers _ z) (Carried.queue cr)
 
   -- A site holds no part, a body's by `Owned.bodies`, so the tree's
   -- part is the same once its switch is thrown.
