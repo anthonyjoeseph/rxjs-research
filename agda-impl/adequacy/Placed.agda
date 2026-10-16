@@ -8,7 +8,7 @@ module adequacy.Placed where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List.Properties using (∷-injective; ∷-injectiveʳ)
+open import Data.List.Properties using (∷-injective; ∷-injectiveʳ; ++-assoc)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
@@ -16,7 +16,7 @@ open import Data.Nat.Properties using (+-identityʳ; +-monoʳ-<; ≤-pred; m≤n
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
-open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺; ++⁻ˡ to All++⁻ˡ; ++⁻ʳ to All++⁻ʳ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂; ∃₂; Σ)
 open import Data.Unit using (⊤; tt)
@@ -1812,7 +1812,7 @@ atopT-every h idle      f pt = tt
 TrailE : ∀ {A} → Events A → Pos → Set
 TrailE (out n _ _) k = k <ᵖ n ≡ false
 TrailE (skip n _)  k = k <ᵖ n ≡ false ⊎ n ≡ k ++ [ ix 0 ]
-TrailE (end n)     k = n <ᵖ k ≡ true × ¬ Owned (n ++ [ ix 1 ]) k
+TrailE (end n)     k = n <ᵖ k ≡ true × ¬ Owned (n ++ [ ix 1 ]) k × ¬ Ext n k
 TrailE hush        k = ⊥
 
 mutual
@@ -2279,6 +2279,103 @@ next-go : ∀ {B} v k op (o : Maybe (Events∞ (MonotonicList B))) ls qs t → A
 next-go v k op o ls qs t al ao at (nl , no , np) =
   first-go (Next v k) op o ls qs t (lanes-next v k qs ls al nl) (outerᴹ-next v k o ao no) (pool-next v k t at np)
 
+-- Strictly past `k`, and not inside it.
+Aloof : Pos → Pos → Set
+Aloof k h = k <ᵖ h ≡ true × ¬ Ext k h
+
+clean-of : ∀ v v′ {k h} → Aloof k h → Clean v k v′ h
+clean-of true  v′    a = a
+clean-of false true  a = a
+clean-of false false a = tt , proj₂ a
+
+-- Keyed apart from what keys `k`, and no earlier: away from `k`.
+apart-clean : ∀ r k h → Owned r k → ¬ Owned r h → h <ᵖ k ≡ false → Aloof k h
+apart-clean r k h ok nh a with <ᵖ-split k h a
+... | inj₁ kh   = kh , λ x → nh (owned-trans r k h ok (owned-ext x))
+... | inj₂ refl = ⊥-elim (nh ok)
+
+-- Aloof from `k`, so is the step just past `c`.
+past-step : ∀ k c → Aloof k c → Aloof k (c ++ [ ix 0 ])
+past-step k c (kc , nx) = <ᵖ-trans k c (c ++ [ ix 0 ]) kc (<ᵖ-below c []) , λ x → go (ext-snoc k c (ix 0) x)
+  where go : Ext k c ⊎ k ≡ c → ⊥
+        go (inj₁ e)    = nx e
+        go (inj₂ refl) = t≢f (trans (sym kc) (<ᵖ-irrefl k))
+
+-- Aloof from `c`, so from the step just past it.
+ext-up : ∀ c x h → Ext (c ++ [ x ]) h → Ext c h
+ext-up c x h e = subst (Ext c) (sym (trans (proj₂ (proj₂ (ext-eq e))) (++-assoc c [ x ] _))) (ext x _)
+
+step-past : ∀ c h → Aloof c h → Aloof (c ++ [ ix 0 ]) h
+step-past c h (ch , nx) with <ᵖ-split (c ++ [ ix 0 ]) h (<ᵖ-step c h ch)
+... | inj₁ sh   = sh , λ e → nx (ext-up c (ix 0) h e)
+... | inj₂ refl = ⊥-elim (nx (ext (ix 0) []))
+
+-- What a lane or the outer shows first, read off its own first.
+away-lane : ∀ {A B : Set} k (qs : List A) (x : Events B) → At (λ _ → Aloof k) x → LaneAt (λ _ → Aloof k) qs x
+away-lane k qs      (out h _ _) a = a
+away-lane k qs      (skip h _)  a = a
+away-lane k []      (end c)     a = a
+away-lane k (_ ∷ _) (end c)     a = past-step k c a
+away-lane k qs      hush        a = tt
+
+away-outer : ∀ {A} k (x : Events A) → At (λ _ → Aloof k) x → OuterAt (λ _ → Aloof k) x
+away-outer k (out q _ _) a = past-step k q a
+away-outer k (skip q _)  a = a
+away-outer k (end c)     a = a
+away-outer k hush        a = tt
+
+at-apart : ∀ {A} r k (x : Events A) → Owned r k → Atop k x → Every (λ h → ¬ Owned r h) x → At (λ _ → Aloof k) x
+at-apart r k (out h _ _) ok a al = apart-clean r k h ok (proj₁ (every al)) a
+at-apart r k (skip h _)  ok a al = apart-clean r k h ok (proj₁ (every al)) a
+at-apart r k (end c)     ok a al = apart-clean r k c ok (every al) a
+at-apart r k hush        ok a al = tt
+
+past-at : ∀ {A} k (x : Events A) → Past k x → At (λ _ → Aloof k) x
+past-at k (out h _ _) pk = pk
+past-at k (skip h _)  pk = pk
+past-at k (end c)     pk = pk
+past-at k hush        pk = tt
+
+pool-apart : ∀ r k t → Owned r k → AtopT k t → EveryT (λ h → ¬ Owned r h) t → PoolAt (λ _ → Aloof k) t
+pool-apart r k (pin h _) ok a al = apart-clean r k h ok (proj₁ (everyᵀ al)) a
+pool-apart r k idle      ok a al = tt
+
+laneAt-map : ∀ {A B : Set} {P Q : Bool → Pos → Set} → (∀ v h → P v h → Q v h) → (qs : List A) (x : Events B) → LaneAt P qs x → LaneAt Q qs x
+laneAt-map f qs      (out h _ _) a = f true h a
+laneAt-map f qs      (skip h _)  a = f false h a
+laneAt-map f []      (end c)     a = f false c a
+laneAt-map f (_ ∷ _) (end c)     a = f false (c ++ [ ix 0 ]) a
+laneAt-map f qs      hush        a = tt
+
+outerAt-map : ∀ {A} {P Q : Bool → Pos → Set} → (∀ v h → P v h → Q v h) → (x : Events A) → OuterAt P x → OuterAt Q x
+outerAt-map f (out q _ _) a = f false (q ++ [ ix 0 ]) a
+outerAt-map f (skip q _)  a = f false q a
+outerAt-map f (end c)     a = f false c a
+outerAt-map f hush        a = tt
+
+poolAt-map : ∀ {P Q : Bool → Pos → Set} → (∀ v h → P v h → Q v h) → (t : Tail) → PoolAt P t → PoolAt Q t
+poolAt-map f (pin k _) a = f false k a
+poolAt-map f idle      a = tt
+
+poolAt-∪ : ∀ (P : Bool → Pos → Set) t u → PoolAt P t → PoolAt P u → PoolAt P (t ∪ u)
+poolAt-∪ P idle      u at au = au
+poolAt-∪ P (pin k r) u at au = fst (M.sooner k u) u au
+  where fst : ∀ b u → PoolAt P u → PoolAt P (M.first k r u b)
+        fst true  u          au = at
+        fst false idle       au = at
+        fst false (pin k′ u) au = au
+
+outerᴹ-map : ∀ {A} {P Q : Bool → Pos → Set} → (∀ v h → P v h → Q v h) → (o : Maybe (Events∞ A)) → OuterAtᴹ P o → OuterAtᴹ Q o
+outerᴹ-map f nothing  a = tt
+outerᴹ-map f (just e) a = outerAt-map f (force e) a
+
+-- Past `k`, keying nothing under it: aloof from it.
+at-beyond : ∀ {A} k (x : Events A) → Beyond k x → Every (λ h → ¬ Owned k h) x → At (λ _ → Aloof k) x
+at-beyond k (out h _ _) b al = b , λ e → proj₁ (every al) (owned-ext e)
+at-beyond k (skip h _)  b al = b , λ e → proj₁ (every al) (owned-ext e)
+at-beyond k (end c)     b al = b , λ e → every al (owned-ext e)
+at-beyond k hush        b al = tt
+
 -- A FLATMAP'S MERGE IN ORDER, under `p`.  Each lane carries a ghost
 -- root, where it subscribed; roots are pairwise apart, each lane keyed
 -- under its own and by nothing apart from it a lane may subscribe at,
@@ -2559,8 +2656,8 @@ module FlatOrder (p : Pos) where
 
   -- Where a lane's end at `c` subscribes the next, apart from every
   -- other root and from where the outer subscribes its lanes.
-  hand-ok : ∀ r c → Ok r → Under r c → Ok (c ++ [ ix 1 ])
-  hand-ok r c (br , _) (orc , hc , _) = owned-snoc p c (ix 1) (owned-trans p r c (beneath-owned p r br) orc) , headed-snoc c hc
+  hand-ok : ∀ r c l → Ok r → Under r c → Ok (c ++ [ l ])
+  hand-ok r c l (br , _) (orc , hc , _) = owned-snoc p c l (owned-trans p r c (beneath-owned p r br) orc) , headed-snoc c hc
 
   hand-apart : ∀ r c r′ → Under r c → Ok r′ → Disjoint r r′ → Disjoint (c ++ [ ix 1 ]) r′
   hand-apart r c r′ (orc , _ , shy) ok′ d =
@@ -2676,7 +2773,7 @@ module FlatOrder (p : Pos) where
           , everyT-∪ t (cut l)
               (everyT-mono (λ k af → (λ o₁ → proj₁ (all-pick rbs ras (proj₁ af)) (owned-trans r c₁ k (own-lane r c orc) o₁))
                                      ∷ᴬ proj₂ (all-pick rbs ras (proj₁ af)) , proj₂ af) t ep)
-              (everyT-mono (λ k ut → proj₂ (proj₂ ut) ∷ᴬ proj₁ (ended o r k (rbs ++ ras) (proj₁ ut) oks ar h)
+              (everyT-mono (λ k ut → proj₁ (proj₂ (proj₂ ut)) ∷ᴬ proj₁ (ended o r k (rbs ++ ras) (proj₁ ut) oks ar h)
                                      , proj₂ (ended o r k (rbs ++ ras) (proj₁ ut) oks ar h))
                  (cut l) (everyT-zip (cut l) (Lane.kc st) (proj₁ (proj₂ (trail (Lane.trl st)))))))
       where
@@ -2684,7 +2781,7 @@ module FlatOrder (p : Pos) where
         c₁  = c ++ [ ix 1 ]
         uc  = every (Lane.kx st)
         orc = proj₁ uc
-        okc = hand-ok r c (Lane.ok st) uc
+        okc = hand-ok r c (ix 1) (Lane.ok st) uc
         fit = gm c₁ okc
         top = atop-weaken c₁ c₀ _ (<ᵖ-asym c₀ c₁ (<ᵖ-part c {ix 0} {ix 1} [] [] refl)) (proj₁ (proj₂ fit))
         pp  = parted-pick rbs r ras pt
@@ -2730,35 +2827,12 @@ module FlatOrder (p : Pos) where
     calm-pool-n : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) ls qs k u {rs} → M.ahead-of k o ls ≡ true → Roots ls rs → Parted rs
                 → All (Aside o) rs → Heldᴹ o → Pool o rs (pin k u) → Obl false k o ls qs (later u)
 
-    -- AFTER A LANE'S VALUE AT `k`, EVERY PART'S NEXT IS PAST IT AND NOT
-    -- INSIDE IT: the lane's own by its steadiness, the others keyed apart
-    -- from its root.
-    calm-out-n : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t k b w {rbs r ras}
-               → Roots bs rbs → Lane r (out k b w) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
-               → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop k (force y)) bs → All (λ y → Atop k (force y)) as → Atopᴹ k o → AtopT k t
-               → Obl true k o (bs ++ w ∷ as) qs t
-
     -- AFTER A LANE'S SKIP AT `k`, NOTHING SHOWS INSIDE IT, AND A VALUE
     -- PAST IT: the lane's own end, with one queued, not at `k` itself.
     calm-skip-n : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t k w {rbs r ras}
                 → Roots bs rbs → Lane r (skip k w) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
                 → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop k (force y)) bs → All (λ y → Atop k (force y)) as → Atopᴹ k o → AtopT k t
                 → Obl false k o (bs ++ w ∷ as) qs t
-
-    -- AFTER A LANE'S END AT `c` HANDS ITS QUEUE ON, NOTHING SHOWS INSIDE
-    -- THE STEP JUST PAST `c`: not the lane it subscribes, not another, not
-    -- what it left running.
-    calm-queue-n : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as m qs t c {rbs r ras}
-                 → Roots bs rbs → Lane {B} r (end c) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
-                 → Gen m → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop c (force y)) bs → All (λ y → Atop c (force y)) as → Atopᴹ c o → AtopT c t
-                 → Obl false (c ++ [ ix 0 ]) o (M.enter m (c ++ [ ix 1 ]) ∷ bs ++ as) qs (t ∪ cut l)
-
-    -- AFTER A LANE'S END AT `c`, NOTHING SHOWS INSIDE IT: what it left
-    -- running trailing it, the other parts keyed apart from its root.
-    calm-end-n : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as t c {rbs r ras}
-               → Roots bs rbs → Lane {B} r (end c) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
-               → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop c (force y)) bs → All (λ y → Atop c (force y)) as → Atopᴹ c o → AtopT c t
-               → Obl false c o (bs ++ as) [] (t ∪ cut l)
 
     -- AFTER AN OUTER VALUE'S STEP JUST PAST `q`, NOTHING SHOWS INSIDE
     -- THAT STEP: not the lane it admits, the lanes it keeps, what it drops.
@@ -2781,6 +2855,97 @@ module FlatOrder (p : Pos) where
                 → Outer {B} (end c) (cut e) → SortedT t × EveryT (λ k → All (λ r → ¬ Owned r k) rs × Free {MonotonicList B} (end c) k) t
                 → Lead {MonotonicList B} (end c) ls → Atopᴴ {MonotonicList B} (end c) t
                 → Obl {B} false c nothing ls qs (t ∪ cut e)
+  -- Every other lane's first, keyed apart from `r` and no earlier than
+  -- `k` it keys: away from `k`.
+  calm-apart : ∀ {B A} r k (qs : List A) {ls : List (Events∞ B)} {rs} → Ok r → Owned r k → Roots ls rs → All (Disjoint r) rs
+             → All (λ y → Atop k (force y)) ls → All (λ y → LaneAt (λ _ → Aloof k) qs (force y)) ls
+  calm-apart r k qs okr ok []ᴿ                  []ᴬ       []ᴬ       = []ᴬ
+  calm-apart r k qs okr ok (_∷ᴿ_ {l = y} sb R) (d ∷ᴬ ds) (a ∷ᴬ as) =
+    away-lane k qs (force y) (at-apart r k (force y) ok a (every-mono (λ h u → proj₂ (proj₂ u) r okr d) (force y) (Lane.kx sb)))
+    ∷ᴬ calm-apart r k qs okr ok R ds as
+
+  -- The outer's first, keyed apart from root `r`, no earlier than `k` it keys.
+  outer-apart : ∀ {B} r k (o : Maybe (Events∞ (MonotonicList B))) → Owned r k → Aside o r → Atopᴹ k o → OuterAtᴹ (λ _ → Aloof k) o
+  outer-apart r k nothing  ok _ _ = tt
+  outer-apart r k (just e) ok a x = away-outer k (force e) (at-apart r k (force e) ok x
+    (every-mono (λ q d o′ → proj₂ d (owned-trans r q (q ++ [ ix 1 ]) o′ (inj₁ (prefix-++ q [ ix 1 ])))) (force e) (proj₁ a)))
+
+  -- After a lane's value at `k`, every part's next is past it and not
+  -- inside it: the lane's own by its steadiness, the others keyed apart
+  -- from its root.
+  calm-out : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t k b w {rbs r ras}
+           → Roots bs rbs → Lane r (out k b w) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
+           → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop k (force y)) bs → All (λ y → Atop k (force y)) as → Atopᴹ k o → AtopT k t
+           → Obl true k o (bs ++ w ∷ as) qs t
+  calm-out {B} o bs l as qs t k b w {rbs} {r} {ras} rb st ra pt asd h pl ab aa ao at =
+    mapᴬ (λ {y} → laneAt-map cl qs (force y))
+      (All++⁺ (calm-apart r k qs okr ok rb (All++⁻ˡ rbs ds) ab)
+        (away-lane k qs (force w) (past-at k (force w) (proj₁ (steady (Lane.std st)))) ∷ᴬ calm-apart r k qs okr ok ra (All++⁻ʳ rbs ds) aa))
+    , outerᴹ-map cl o (outer-apart r k o ok (proj₁ (all-pick rbs ras asd)) ao)
+    , poolAt-map cl t (pool-apart r k t ok at (everyT-mono (λ h a → proj₁ (all-pick rbs ras (proj₁ a))) t (proj₂ pl)))
+    where
+      okr = Lane.ok st
+      ok  = proj₁ (proj₁ (every (Lane.kx st)))
+      ds  = proj₁ (parted-pick rbs r ras pt)
+      cl : ∀ v h → Aloof k h → Clean true k v h
+      cl v h = clean-of true v
+
+  -- After a lane's end at `c`, nothing shows inside it: what it left
+  -- running trails it, the other parts keyed apart from its root.
+  calm-end : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as t c {rbs r ras}
+           → Roots bs rbs → Lane {B} r (end c) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
+           → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop c (force y)) bs → All (λ y → Atop c (force y)) as → Atopᴹ c o → AtopT c t
+           → Obl false c o (bs ++ as) [] (t ∪ cut l)
+  calm-end {B} o bs l as t c {rbs} {r} {ras} rb st ra pt asd h pl ab aa ao at =
+    mapᴬ (λ {y} → laneAt-map cl [] (force y)) (All++⁺ (calm-apart r c [] okr oc rb (All++⁻ˡ rbs ds) ab) (calm-apart r c [] okr oc ra (All++⁻ʳ rbs ds) aa))
+    , outerᴹ-map cl o (outer-apart r c o oc (proj₁ (all-pick rbs ras asd)) ao)
+    , poolAt-∪ (Clean false c) t (cut l)
+        (poolAt-map cl t (pool-apart r c t oc at (everyT-mono (λ h a → proj₁ (all-pick rbs ras (proj₁ a))) t (proj₂ pl))))
+        (left (cut l) (proj₁ (proj₂ (trail (Lane.trl st)))))
+    where
+      okr = Lane.ok st
+      oc  = proj₁ (every (Lane.kx st))
+      ds  = proj₁ (parted-pick rbs r ras pt)
+      cl : ∀ v h → Aloof c h → Clean false c v h
+      cl v h = clean-of false v
+      left : ∀ u → EveryT (TrailE {B} (end c)) u → PoolAt (Clean false c) u
+      left (pin k _) e = tt , proj₂ (proj₂ (proj₁ (everyᵀ e)))
+      left idle      e = tt
+
+  -- After a lane's end at `c` hands its queue on, nothing shows inside
+  -- the step just past `c`: not the lane it subscribes, keyed apart from
+  -- that step, not another, not what it left running.
+  calm-queue : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as m qs t c {rbs r ras}
+             → Roots bs rbs → Lane {B} r (end c) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
+             → Gen m → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop c (force y)) bs → All (λ y → Atop c (force y)) as → Atopᴹ c o → AtopT c t
+             → Obl false (c ++ [ ix 0 ]) o (M.enter m (c ++ [ ix 1 ]) ∷ bs ++ as) qs (t ∪ cut l)
+  calm-queue {B} o bs l as m qs t c {rbs} {r} {ras} rb st ra pt asd gm h pl ab aa ao at =
+    laneAt-map (λ v h → clean-of false v) qs (force n) (away-lane c₀ qs (force n) first)
+    ∷ᴬ mapᴬ (λ {y} → laneAt-map cl qs (force y)) (All++⁺ (calm-apart r c qs okr oc rb (All++⁻ˡ rbs ds) ab) (calm-apart r c qs okr oc ra (All++⁻ʳ rbs ds) aa))
+    , outerᴹ-map cl o (outer-apart r c o oc (proj₁ (all-pick rbs ras asd)) ao)
+    , poolAt-∪ (Clean false c₀) t (cut l)
+        (poolAt-map cl t (pool-apart r c t oc at (everyT-mono (λ h a → proj₁ (all-pick rbs ras (proj₁ a))) t (proj₂ pl))))
+        (left (cut l) (proj₁ (proj₂ (trail (Lane.trl st)))))
+    where
+      c₀  = c ++ [ ix 0 ]
+      c₁  = c ++ [ ix 1 ]
+      n   = M.enter m c₁
+      okr = Lane.ok st
+      uc  = every (Lane.kx st)
+      oc  = proj₁ uc
+      ds  = proj₁ (parted-pick rbs r ras pt)
+      fit = gm c₁ (hand-ok r c (ix 1) okr uc)
+      d01 : Disjoint c₀ c₁
+      d01 = sibling c (λ ()) , sibling c (λ ())
+      first : At (λ _ → Aloof c₀) (force n)
+      first = at-beyond c₀ (force n) (beyond-still c₀ c₁ (force n) (<ᵖ-part c {ix 0} {ix 1} [] [] refl) (proj₁ (proj₂ fit)))
+                (every-mono (λ h u → proj₂ (proj₂ u) c₀ (hand-ok r c (ix 0) okr uc) d01) (force n) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ fit))))))
+      cl : ∀ v h → Aloof c h → Clean false c₀ v h
+      cl v h a = clean-of false v (step-past c h a)
+      left : ∀ u → EveryT (TrailE {B} (end c)) u → PoolAt (Clean false c₀) u
+      left (pin k _) e = clean-of false false (step-past c k (proj₁ (proj₁ (everyᵀ e)) , proj₂ (proj₂ (proj₁ (everyᵀ e)))))
+      left idle      e = tt
+
   mutual
     calm-go : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t {rs} → Roots ls rs → Parted rs → All (Aside o) rs → All Gen qs
                → Heldᴹ o → Pool o rs t → Calm (M.go op o ls qs t)
@@ -2866,7 +3031,7 @@ module FlatOrder (p : Pos) where
                  → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → ∀ {k} → M.head x ≡ just k → All (λ y → Atop k (force y)) bs
                  → All (λ y → Atop k (force y)) as → Atopᴹ k o → AtopT k t → Calm (M.lane op o bs l as qs t x)
     calms (calm-lane op o bs l as qs t (out k b w) rb st ra pt asd gq h pl refl ab aa ao at) =
-      next-go true k op o (bs ++ w ∷ as) qs t (All++⁺ ab (proj₁ (ordered (Lane.ord st)) ∷ᴬ aa)) ao at (calm-out-n o bs l as qs t k b w rb st ra pt asd h pl ab aa ao at)
+      next-go true k op o (bs ++ w ∷ as) qs t (All++⁺ ab (proj₁ (ordered (Lane.ord st)) ∷ᴬ aa)) ao at (calm-out o bs l as qs t k b w rb st ra pt asd h pl ab aa ao at)
       , calm-go op o (bs ++ w ∷ as) qs t (roots-++ rb (lane-out st ∷ᴿ ra)) pt asd gq h pl
     calms (calm-lane op o bs l as qs t (skip k w) rb st ra pt asd gq h pl refl ab aa ao at) =
       next-go false k op o (bs ++ w ∷ as) qs t (All++⁺ ab (proj₁ (ordered (Lane.ord st)) ∷ᴬ aa)) ao at (calm-skip-n o bs l as qs t k w rb st ra pt asd h pl ab aa ao at)
@@ -2878,7 +3043,7 @@ module FlatOrder (p : Pos) where
         (atopT-∪ c₀ t (cut l)
            (pool-step c t at (everyT-mono (λ k af eq → proj₁ (all-pick rbs ras (proj₁ af)) (subst (Owned r) eq orc)) t ep))
            (atopT-every c₀ (cut l) (λ k tr → <ᵖ-step c k (proj₁ tr)) (proj₁ (proj₂ (trail (Lane.trl st))))))
-        (calm-queue-n o bs l as m qs t c rb st ra pt asd gm h (sp , ep) ab aa ao at)
+        (calm-queue o bs l as m qs t c rb st ra pt asd gm h (sp , ep) ab aa ao at)
       , calm-go op o (M.enter m c₁ ∷ bs ++ as) qs (t ∪ cut l) (fresh c₁ (M.enter m c₁) fit okc ∷ᴿ roots-++ rb ra)
           (mapᴬ (λ {r′} od → hand-apart r c r′ uc (proj₁ od) (proj₂ od)) oks , proj₂ pp)
           (hand-aside r c o uc ar h ∷ᴬ proj₂ (all-pick rbs ras asd)) gq h
@@ -2886,7 +3051,7 @@ module FlatOrder (p : Pos) where
           , everyT-∪ t (cut l)
               (everyT-mono (λ k af → (λ o₁ → proj₁ (all-pick rbs ras (proj₁ af)) (owned-trans r c₁ k (own-lane r c orc) o₁))
                                      ∷ᴬ proj₂ (all-pick rbs ras (proj₁ af)) , proj₂ af) t ep)
-              (everyT-mono (λ k ut → proj₂ (proj₂ ut) ∷ᴬ proj₁ (ended o r k (rbs ++ ras) (proj₁ ut) oks ar h)
+              (everyT-mono (λ k ut → proj₁ (proj₂ (proj₂ ut)) ∷ᴬ proj₁ (ended o r k (rbs ++ ras) (proj₁ ut) oks ar h)
                                      , proj₂ (ended o r k (rbs ++ ras) (proj₁ ut) oks ar h))
                  (cut l) (everyT-zip (cut l) (Lane.kc st) (proj₁ (proj₂ (trail (Lane.trl st)))))))
       where
@@ -2894,7 +3059,7 @@ module FlatOrder (p : Pos) where
         c₁  = c ++ [ ix 1 ]
         uc  = every (Lane.kx st)
         orc = proj₁ uc
-        okc = hand-ok r c (Lane.ok st) uc
+        okc = hand-ok r c (ix 1) (Lane.ok st) uc
         fit = gm c₁ okc
         top = atop-weaken c₁ c₀ _ (<ᵖ-asym c₀ c₁ (<ᵖ-part c {ix 0} {ix 1} [] [] refl)) (proj₁ (proj₂ fit))
         pp  = parted-pick rbs r ras pt
@@ -2916,7 +3081,7 @@ module FlatOrder (p : Pos) where
     calm-ended op o bs l as t c {rbs} {r} {ras} rb st ra pt asd h (sp , ep) ab aa ao at =
       next-go false c op o (bs ++ as) [] (t ∪ cut l) (All++⁺ ab aa) ao
         (atopT-∪ c t (cut l) at (atopT-every c (cut l) (λ k tr → <ᵖ-asym c k (proj₁ tr)) (proj₁ (proj₂ (trail (Lane.trl st))))))
-        (calm-end-n o bs l as t c rb st ra pt asd h (sp , ep) ab aa ao at)
+        (calm-end o bs l as t c rb st ra pt asd h (sp , ep) ab aa ao at)
       , calm-go op o (bs ++ as) [] (t ∪ cut l) (roots-++ rb ra) (proj₂ pp) (proj₂ (all-pick rbs ras asd)) []ᴬ h
           ( sortedT-∪ t (cut l) sp (proj₁ (trail (Lane.trl st)))
           , everyT-∪ t (cut l) (everyT-mono (λ k af → proj₂ (all-pick rbs ras (proj₁ af)) , proj₂ af) t ep)
