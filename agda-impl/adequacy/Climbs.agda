@@ -893,6 +893,12 @@ module Ascending (R : Set) where
   lane-live one-this     (lifts-this lv _) = lv
   lane-live (one-next o) (lifts-next L)    = lane-live o L
 
+  -- The step a one-step lane path lifts is the lane's own.
+  lane-step : ∀ {h} {H : Heapᴹ h} {Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} (o : OneLane πL)
+            → ∀ {s bs S as} → LiftsLane H πL s bs S as → S ≡ s
+  lane-step one-this     (lifts-this _ lifts-here) = refl
+  lane-step (one-next o) (lifts-next L)            = lane-step o L
+
   -- A lane's parts, the first apart.
   lanes-one : ∀ {h} (H : Heapᴹ h) {Δ B} (l : Lane h Δ B) ls → At.partLanes H (l ∷ ls) ≡ At.partLanes H (l ∷ []) ++ At.partLanes H ls
   lanes-one H (lane c k s) ls with At.val H (Kit.live c) | At.part H s
@@ -926,7 +932,7 @@ module Ascending (R : Set) where
               ; kernels = kn ; meaning = mn ; queue = qu ; books = bk ; sorted = so ; behind = bh ; kept = kp }
     with lifts-split ρ (in-lanes πL) L
        | reads (subst (λ W → _ ≗ Observer.next W y) (trans (cong Here.obs (walk-⊕ ρ (in-lanes πL) top)) (walk-lane o op f fl (walk ρ top))) cd)
-  ... | _ , lifts-lanes {bs = bs′} {as = as′} LL _ _ _ , Lρ | k₁ , f₁ , p₁ =
+  ... | _ , lifts-lanes {bs = bs′} {l = l} {S = S₁} {as = as′} LL _ _ _ , Lρ | k₁ , f₁ , p₁ =
     rise kp (rises {sg′ = sends y} p₁ (one-lower ρ (one-lanes o)) (record
       { sane = sn ; placed = pd ; ctl = refl
       ; code = ≗-trans (f₁ same⊑ (At.val hp (Kit.live (laneOf o))))
@@ -936,7 +942,8 @@ module Ascending (R : Set) where
       ; lifted = _ , trans (cong (λ ls′ → At.merged hp op (λ a j → U.subscribe (f a) j) (At.part hp t) ls′ (At.val hp (FlatKit.Flat.queue fl)) po)
                                  (lanes-at hp o LL pu))
                            (merged-on hp op (λ a j → U.subscribe (f a) j) (At.part hp t) bs′ c′ as′ (At.val hp (FlatKit.Flat.queue fl)) po)
-                 , S , Lρ , sg
+                 , S , subst (λ S′ → Lifts hp ρ (U.laneˢ op (λ a j → U.subscribe (f a) j) (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S)
+                             (lane-step o LL) Lρ , sg
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu ; books = bk ; sorted = sorted-⇝ so p₁ ; behind = bh ; kept = inj₁ refl }))
 
   climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
