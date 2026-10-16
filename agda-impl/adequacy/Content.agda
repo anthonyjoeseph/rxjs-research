@@ -54,6 +54,7 @@ open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Local using (module Locality)
 open import adequacy.Lowers using (module Lowering)
+open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (Sane; sane-out)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; afterᴱ; placed-after; Placedˢ; step-skips)
@@ -87,6 +88,7 @@ module Honesty (R : Set) where
   open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears; ≗-trans; wk-same; bind≗)
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
+  open Sequencing R using (seq-assoc)
   open Read
 
   ----------------------------------------------------------------------
@@ -1732,8 +1734,9 @@ module Honesty (R : Set) where
 
   -- A COMPLETION ON ITS WAY UP: the observer the path walks to about
   -- to be told its source has ended, the calls `ks` owed after it.  The
-  -- node it leaves shows its end where the run is, and the ghost's step
-  -- is that end lifted along the path.
+  -- node it leaves is gone: the call that owed the end is spent, so the
+  -- `of` is done, the take taken, the joiner told.  The ghost's step is
+  -- that end lifted along the path.
   record Closing (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
                  (σ : Path T v) : Set₁ where
     field
@@ -1747,7 +1750,7 @@ module Honesty (R : Set) where
       ctl     : Conf.ctl (Mach.conf m₁) ≡ run act ϑ K
       code    : act ≗ (Observer.complete (Here.obs (walk σ top)) >>ᴬ ⟦ ks ⟧ᶜ)
       stack   : StackAs T (Conf.pos (Mach.conf m₁)) ϑ K (Mach.bursts m₁)
-      ends    : ∀ {c} → At.part (Conf.heap (Mach.conf m₁)) v ≡ just c → U.step c ≡ U.endˢ (Conf.pos (Mach.conf m₁))
+      gone    : At.part (Conf.heap (Mach.conf m₁)) v ≡ nothing
       lifted  : Σ (U.Step [] R) λ S → Lifts (Conf.heap (Mach.conf m₁)) σ (U.endˢ (Conf.pos (Mach.conf m₁))) S × U.step g ≡ S
       owned   : Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) stack)
       kernels : Kernels (Conf.heap (Mach.conf m₁)) T
@@ -1762,11 +1765,11 @@ module Honesty (R : Set) where
   reclose : ∀ {g ℓ m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
               {v′ : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} {σ : Path T v} (cl : Closing g ℓ m₁ σ) {σ′ : Path T v′}
           → Closing.act cl ≗ (Observer.complete (Here.obs (walk σ′ top)) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)
-          → (∀ {c} → At.part (Conf.heap (Mach.conf m₁)) v′ ≡ just c → U.step c ≡ U.endˢ (Conf.pos (Mach.conf m₁)))
+          → At.part (Conf.heap (Mach.conf m₁)) v′ ≡ nothing
           → Σ (U.Step [] R) (λ S → Lifts (Conf.heap (Mach.conf m₁)) σ′ (U.endˢ (Conf.pos (Mach.conf m₁))) S × U.step g ≡ S)
           → Closing g ℓ m₁ σ′
-  reclose cl cd es lf = record
-    { sane = Closing.sane cl ; placed = Closing.placed cl ; ctl = Closing.ctl cl ; code = cd ; stack = Closing.stack cl ; ends = es
+  reclose cl cd gn lf = record
+    { sane = Closing.sane cl ; placed = Closing.placed cl ; ctl = Closing.ctl cl ; code = cd ; stack = Closing.stack cl ; gone = gn
     ; lifted = lf ; owned = Closing.owned cl ; kernels = Closing.kernels cl ; meaning = Closing.meaning cl ; queue = Closing.queue cl
     ; books = Closing.books cl ; sorted = Closing.sorted cl ; behind = Closing.behind cl ; kept = Closing.kept cl }
 
@@ -1783,13 +1786,6 @@ module Honesty (R : Set) where
     afloat : ∀ {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
            → Closing g ℓ m₁ σ → Afloat g ℓ m₁
 
-  -- A part under a node map shows an end where its source does.
-  ends-mapᴹ : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′ k} {F : U.Node Δ A → U.Node Δ′ A′}
-            → (∀ c → U.step c ≡ U.endˢ k → U.step (F c) ≡ U.endˢ k) → (P : Maybe (U.Node Δ A))
-            → (∀ {c} → P ≡ just c → U.step c ≡ U.endˢ k) → ∀ {c} → At.mapᴹ H F P ≡ just c → U.step c ≡ U.endˢ k
-  ends-mapᴹ H hF (just c₀) e refl = hF c₀ (e refl)
-  ends-mapᴹ H hF nothing   e ()
-
   -- A completion through a map, as it is.
   close-map : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : A → B} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
               (ρ : Path T (mapˢ f u)) → Closing g ℓ m₁ (ρ ⊕ in-map here) → Closing g ℓ m₁ ρ
@@ -1797,7 +1793,7 @@ module Honesty (R : Set) where
   ... | S , L , sg with lifts-split ρ (in-map here) L
   ...   | _ , lifts-map lifts-here , Lρ = reclose cl
     (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-map here) top) (Closing.code cl))
-    (ends-mapᴹ (Conf.heap (Mach.conf m₁)) (λ c e → cong (U.mapˢ f) e) (At.part (Conf.heap (Mach.conf m₁)) u) (Closing.ends cl))
+    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) (Closing.gone cl))
     (S , Lρ , sg)
 
   -- A completion through a scan, as it is: the scan's cell unread.
@@ -1807,7 +1803,7 @@ module Honesty (R : Set) where
   ... | S , L , sg with lifts-split ρ (in-scan here) L
   ...   | _ , lifts-scan lifts-here , Lρ = reclose cl
     (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-scan here) top) (Closing.code cl))
-    (ends-mapᴹ (Conf.heap (Mach.conf m₁)) (λ c e → cong (U.scanˢ f (At.val (Conf.heap (Mach.conf m₁)) r)) e) (At.part (Conf.heap (Mach.conf m₁)) u) (Closing.ends cl))
+    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) (Closing.gone cl))
     (S , Lρ , sg)
 
   -- A completion through a defer, as it is.
@@ -1817,17 +1813,16 @@ module Honesty (R : Set) where
   ... | S , L , sg with lifts-split ρ (in-defer here) L
   ...   | _ , lifts-defer lifts-here , Lρ = reclose cl
     (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-defer here) top) (Closing.code cl))
-    (Closing.ends cl) (S , Lρ , sg)
+    (Closing.gone cl) (S , Lρ , sg)
 
   -- A guard read open: what it guards.
   open-code : ∀ {w} {b : Bool} {m : Act w ⊤} → b ≡ true → Kit.when b m ≗ m
   open-code refl = ≗-refl _
 
-  -- A live take shows its source's end.
-  ends-take : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {q} → At.val H (Kit.live c) ≡ true
-            → (∀ {c′} → At.part H u ≡ just c′ → U.step c′ ≡ U.endˢ q)
-            → ∀ {c′} → At.part H (takeWhileˢ i p c k taking u) ≡ just c′ → U.step c′ ≡ U.endˢ q
-  ends-take H {i = i} {p} {u = u} lv es rewrite lv = ends-mapᴹ H (λ c e → cong (U.takeWhileˢ i p) e) (At.part H u) es
+  -- A live take over a gone source is gone.
+  gone-take : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} → At.val H (Kit.live c) ≡ true
+            → At.part H u ≡ nothing → At.part H (takeWhileˢ i p c k taking u) ≡ nothing
+  gone-take H lv gn rewrite lv | gn = refl
 
   -- A completion through a live takeWhile: its guard read open, one
   -- operator up, the take showing its source's end.
@@ -1835,7 +1830,7 @@ module Honesty (R : Set) where
                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u))
              → Closing g (loadOf st) m₁ (ρ ⊕ in-take here) → Closed st m₁ (ρ ⊕ in-take here)
   close-take st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ
-    record { sane = sn ; placed = pl ; ks = ks ; ctl = refl ; code = cd ; stack = sk ; ends = es ; lifted = S , L , sg ; owned = ow
+    record { sane = sn ; placed = pl ; ks = ks ; ctl = refl ; code = cd ; stack = sk ; gone = gn ; lifted = S , L , sg ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
            ; behind = bh ; kept = kp }
     with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-take here) top) cd
@@ -1844,11 +1839,68 @@ module Honesty (R : Set) where
       { sane = sn ; placed = pl ; ctl = refl
       ; code = ≗-trans (f same⊑ _) (bind≗ (≗-trans (wk-same _) (open-code lv)) λ _ → wk-same _)
       ; stack = sk
-      ; ends = ends-take hp {i = i} {p = p} {c = c} {k = k} {u = u} lv es
+      ; gone = gone-take hp {i = i} {p = p} {c = c} {k = k} {u = u} lv gn
       ; lifted = S , Lρ , sg
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = kp })
+
+  -- A body's cut owed ahead of the agenda, its body gone.
+  owned-body : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {p c bs p₀ c₀ bs₀} {ca : CtlAs t p c bs} (ca₀ : CtlAs t p₀ c₀ bs₀)
+               {Δ A B Sj cc b kb k fd e rp rt q} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} (ρ : Path t (connectˢ Sj cc b kb k fd rp e rt s bd))
+             → agenda t ca₀ ≡ (q , bodyC ρ) ∷ agenda t ca → bursts t ca₀ ≡ bursts t ca → begins t ca₀ ≡ begins t ca
+             → At.part H bd ≡ nothing → Owned H t ca → Owned H t ca₀
+  owned-body H {t} ca₀ ρ ag bu be gn ow = record
+    { ofs    = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (there (Owned.ofs ow π))
+    ; plays  = λ π nsp → subst (λ z → _ ∈ᴸ z) (sym bu) (Owned.plays ow π nsp)
+    ; fires  = λ π nsp → subst (λ z → _ ∈ᴸ z) (sym bu) (Owned.fires ow π nsp)
+    ; begun  = λ π → subst (λ z → _ ∈ᴸ z) (sym be) (Owned.begun ow π)
+    ; ends   = λ π l → subst (λ z → _ ∈ᴸ z) (sym ag) (there (Owned.ends ow π l))
+    ; cuts   = λ π l → proj₁ (Owned.cuts ow π l) , subst (λ z → _ ∈ᴸ z) (sym ag) (there (proj₂ (Owned.cuts ow π l)))
+    ; feeds  = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (there (Owned.feeds ow π))
+    ; fins   = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (there (Owned.fins ow π))
+    ; bodies = λ π i → bodied π (subst (λ z → _ ∈ᴸ z) ag i)
+    ; placed = subst (All (Placedᴬ t)) (sym ag) (tt ∷ Owned.placed ow) }
+    where
+      bodied : ∀ {Δ′ A′ B′ Sj′ c′ b′ kb′ k′ fd′ e′ rp′ rt′ q′} {s′ : Sub _ Δ′ A′} {bd′ : Sub _ (A′ ∷ Δ′) B′}
+               (π : Path t (connectˢ Sj′ c′ b′ kb′ k′ fd′ rp′ e′ rt′ s′ bd′)) → (q′ , bodyC π) ∈ᴸ (_ , bodyC ρ) ∷ agenda t _ → At.part H bd′ ≡ nothing
+      bodied π (here refl) = gn
+      bodied π (there i)   = Owned.bodies ow π i
+
+  -- A connect over a gone body is gone.
+  gone-connect : ∀ {h} (H : Heapᴹ h) {Δ A B Sj c b kb k fd e rp rt} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B}
+               → At.part H u ≡ nothing → At.part H (connectˢ Sj c b kb k fd rp e rt t u) ≡ nothing
+  gone-connect H {t = t} gn rewrite gn with At.part H t
+  ... | just _  = refl
+  ... | nothing = refl
+
+  -- An end lifted out of a body is the connect's end.
+  body-end : ∀ {h} {H : Heapᴹ h} {Δ A B Sj c b kb k fd e rp rt} {t : Sub h Δ A} {u : Sub h (A ∷ Δ) B} {q S}
+           → Lifts H (in-body {S = Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} (here {t = u})) (U.endˢ q) S → S ≡ U.endˢ q
+  body-end (lifts-body _ _ lifts-here)   = refl
+  body-end (lifts-shut _ _ _ lifts-here) = refl
+
+  -- A connect's body ended: the connect's completion delivered, its
+  -- cut owed after it, the body gone as a `bodyC` owed asks.
+  close-body : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+               {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+               (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u))
+             → Closing g (loadOf st) m₁ (ρ ⊕ in-body here) → Closed st m₁ (ρ ⊕ in-body here)
+  close-body st {m₁ = m₁} {T = T} {t = t} {u} ρ
+    record { sane = sn ; placed = pl ; ks = ks ; ctl = cx ; code = cd ; stack = sk ; gone = gn ; lifted = S , L , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+           ; behind = bh ; kept = kp }
+    with lifts-split ρ (in-body here) L
+  ... | _ , Lb , Lρ = rose now (one-lower ρ one-body) (record
+      { sane = sn ; placed = pl ; ks = bodyC ρ ∷ ks ; ctl = cx
+      ; code = ≗-trans (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-body here) top) cd) (seq-assoc _ _ _)
+      ; stack = sk
+      ; gone = gone-connect (Conf.heap (Mach.conf m₁)) {t = t} {u = u} gn
+      ; lifted = S , subst (λ s → Lifts (Conf.heap (Mach.conf m₁)) ρ s S) (body-end Lb) Lρ , sg
+      ; owned = owned-body (Conf.heap (Mach.conf m₁)) (runAs (bodyC ρ ∷ ks) (≗-refl _) sk) ρ refl refl refl gn ow
+      ; kernels = kn ; meaning = mn ; queue = qu
+      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = so ; behind = bh ; kept = kp })
 
   postulate
     -- A flatMap's outer ended: its done flag written, settled: the
@@ -1871,13 +1923,6 @@ module Honesty (R : Set) where
                    {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
                    (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd))
                  → Closing g (loadOf st) m₁ (ρ ⊕ in-source here) → Closed st m₁ (ρ ⊕ in-source here)
-
-    -- A connect's body ended: the connect's completion delivered, its
-    -- cut owed after it.
-    close-body : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
-                 {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
-                 (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u))
-               → Closing g (loadOf st) m₁ (ρ ⊕ in-body here) → Closed st m₁ (ρ ⊕ in-body here)
 
   -- A completion at the root: the run's end asked of the record, the
   -- ghost's step its end.

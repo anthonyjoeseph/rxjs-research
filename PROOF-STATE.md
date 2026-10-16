@@ -177,18 +177,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE END CLIMB.** `close-body`, `close-source`, `close-lanes`,
-  `close-outer`: a completion's climb is a body (`close`, over `Closing`,
-  the value climb's record with the value dropped and the calls owed after
-  it), entered by `take1-enter`, `last-enter`, `fin-enter`. Decides whether
-  an operator's own completion code (a body's cut, a subject's finish, a
-  lane's refill, an outer's settle) leaves a re-entry configuration or a
-  `Closing` one operator up, from what `Closing` carries. Ruled out: a map,
-  scan, defer or live take owing a completion more than its source's
-  (`close-map`, `close-scan`, `close-defer`, `close-take`); a completion at the root owing more than the
-  record's end (`close-root`); a teardown reopening a gone body (a queue
-  is a `fifo` cell, a kind no teardown writes); a cut's run allocating,
-  emitting or yielding.
+- **THE END CLIMB.** `close-source`, `close-lanes`, `close-outer`: a
+  completion's climb is a body (`close`, over `Closing`, the value climb's
+  record with the value dropped, the node it leaves gone and the calls owed
+  after it), entered by `take1-enter`, `last-enter`, `fin-enter`. Decides
+  whether a subject's finish, a lane's refill or an outer's settle leaves a
+  re-entry configuration or a `Closing` one operator up. Ruled out: a map,
+  scan, defer, live take or body owing a completion more than its source's
+  (`close-take`, `close-body`, the body's cut owed with its body gone); the
+  root owing more than the record's end (`close-root`).
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,
@@ -237,8 +234,6 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
-- **`close-body`** (Content) — FALSITY, `NO EVIDENCE`: a connect's body ended
-  delivers the connect's completion, its cut owed after it.
 - **`close-source`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
   ended closes its subject, its subscribers' finish owed.
 - **`close-lanes`** (Content) — FALSITY, `NO EVIDENCE`: a lane ended shuts,
