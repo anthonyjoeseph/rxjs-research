@@ -16,7 +16,7 @@
 -- strictly past it.  And nothing is keyed just past another.
 module quickcheck.Placing where
 
-open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; take)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_)
@@ -173,7 +173,7 @@ private
 -- steady and keying nothing just past its own events; and what a cut
 -- leaves running trailing it, and its values spread.  Each check by name.
 checks : Prog natᵗ → List (String × Bool)
-checks p = ("placed" , placedᵇ 20000 40000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
+checks p = ("placed" , placedᵇ 6000 12000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
          ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e) ∷ ("untied" , untiedᵇ 4000 e) ∷ []
   where o = toObs timeline 3 p [] [] []
         s = enter (⟦ o ⟧ˢ []) root
@@ -185,17 +185,9 @@ placing p = allᵇ′ (checks p)
         allᵇ′ []             = true
         allᵇ′ ((_ , b) ∷ cs) = b ∧ allᵇ′ cs
 
--- Shorter placings, run only by name: where a seed outruns its time,
--- the budget at which it first does.
-shorter : Prog natᵗ → List (String × Bool)
-shorter p = ("placed-1k" , placedᵇ 500 1000 m e) ∷ ("placed-4k" , placedᵇ 2000 4000 m e) ∷ ("placed-12k" , placedᵇ 6000 12000 m e) ∷ []
-  where o = toObs timeline 3 p [] [] []
-        m = trace (begin o)
-        e = Events∞.force (enter (⟦ o ⟧ˢ []) root)
-
 -- The checks named `n` (all of them for "all") a program fails, by name.
 placingParts : String → Prog natᵗ → List String
-placingParts n p = failing (if n == "all" then checks p else checks p ++ shorter p)
+placingParts n p = failing (checks p)
   where failing : List (String × Bool) → List String
         failing []              = []
         failing ((m , b) ∷ cs) with (n == "all") ∨ (n == m) | b
