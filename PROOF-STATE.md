@@ -186,14 +186,15 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `trailing-sub` and `spread-sub`, then `steady-flat`,
-  `ordered-connect` and `steady-connect`. `ordered-flat` is a body: lanes
-  carry ghost roots pairwise apart, and the pool sorts because every cut
-  trails its run (`Trail`) and the outer's values spread. The risk left is
-  whether those two hold of every subscription, a connect's rest
-  included; `make placing` tests the first. Ruled out: a pool step tied
-  with an outer value's or a lane end's skip, a lane's first before where
-  it subscribes.
+- **THE ORDER.** The `calm-*-n` leaves, `calm-admit-n`, `calm-pool-n`,
+  `calm-queue-n` and `calm-end-n` first; then `trailing-sub`, `spread-sub`,
+  `ordered-connect`, `steady-connect`. `flat-calm` is a body: one walk
+  proves the merge ordered and steady, each step owing only that the parts
+  it leaves show their next event clean of it. Decides which record field
+  each case owes: an end's lane key off its trail, a pool item no lane
+  steps inside, roots apart from a value's step. Ruled out: a pool step
+  tied with an outer value's or a lane end's skip, a lane's first before
+  where it subscribes.
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -221,8 +222,22 @@ by their own silent steps (`Mirror`).
   end its tail.
 - **`steady-connect`** (Placed) — FALSITY, `RECOVERY×2`, `X`: a connect where a
   tick heads it is steady, its source's rest stepping where it would have.
-- **`steady-flat`** (Placed) — FALSITY, `REFUTED`: a flatMap where a tick heads
-  it, over sorted, alien sources, is steady: no lane steps inside its outer's.
+- **`calm-admit-n`** (Placed) — FALSITY, `NO EVIDENCE`: after an outer value
+  admits its lane, every part shows its next event clean of the value's step.
+- **`calm-pool-n`** (Placed) — FALSITY, `NO EVIDENCE`: a pool item stepping
+  ahead, every part shows its next event clean of it.
+- **`calm-queue-n`** (Placed) — FALSITY, `NO EVIDENCE`: a lane ending with one
+  queued, every part shows its next event clean of the end's step.
+- **`calm-end-n`** (Placed) — FALSITY, `NO EVIDENCE`: a lane ending with none
+  queued, every part shows its next event clean of the end.
+- **`calm-skip-n`** (Placed) — FALSITY, `NO EVIDENCE`: a lane skipping, every
+  part shows its next event clean of the skip.
+- **`calm-out-n`** (Placed) — FALSITY, `NO EVIDENCE`: a lane's value, every
+  part shows its next event strictly past it.
+- **`calm-oskip-n`** (Placed) — FALSITY, `NO EVIDENCE`: an outer skip, every
+  part shows its next event clean of it.
+- **`calm-oend-n`** (Placed) — FALSITY, `NO EVIDENCE`: the outer ending, every
+  part shows its next event clean of the end.
 - **`step-skips`** (Stepper) — FALSITY, `REFUTED×2, DEAD ROUTE, RECOVERY×2`,
   `X`: a sane, placed root ghost's meaning is what its step shows, then the
   stepped node's.
