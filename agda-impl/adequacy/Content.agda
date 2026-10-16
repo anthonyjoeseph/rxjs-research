@@ -51,6 +51,7 @@ open import adequacy.Record using (module Recording)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
+open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (_≃_; afterᴱ; placed-after; Placedˢ; step-skips)
@@ -81,6 +82,7 @@ module Honesty (R : Set) where
   open Moving R using (pend; takes; takes-plant; plant; planted; Waits; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant;
     joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
+  open Unsubbing R using (_⇝_; now; then; ⇝-trans; site-tears)
   open Read
 
   ----------------------------------------------------------------------
@@ -178,11 +180,6 @@ module Honesty (R : Set) where
     cutʰ  : Stands m (cutOff (Mach.clock m)) (Mach.marks m)
     finʰ  : ∀ {p} → step m ≡ complete p → Stands m finished (Mach.marks m ++ [ p ])
     dryʰ  : step m ≡ drained → Stands m dry (Mach.marks m)
-
-  -- `m` runs silently to `m′`.
-  data _⇝_ (m : Mach) : Mach → Set₁ where
-    now  : m ⇝ m
-    then : ∀ {m₁ m′} → step m ≡ silent m₁ → m₁ ⇝ m′ → m ⇝ m′
 
   -- A silent step, and a value shown, keep the machine sorted.
   sorted-step : ∀ {m m′} → Σ Pos (λ lo → WellMach lo m) → step m ≡ silent m′ → Σ Pos λ lo → WellMach lo m′
@@ -915,10 +912,6 @@ module Honesty (R : Set) where
     aloft : ∀ {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {y : A}
           → Climbing g ℓ m₁ σ y → Aloft g ℓ m₁
 
-  ⇝-trans : ∀ {m m₁ m₂} → m ⇝ m₁ → m₁ ⇝ m₂ → m ⇝ m₂
-  ⇝-trans now          q = q
-  ⇝-trans (then e p)   q = then e (⇝-trans p q)
-
   -- A hop's machine sorted.
   hop-sorted : ∀ {g m m′ m₀} → Carried g m → step m ≡ silent m′ → m′ ⇝ m₀ → Σ Pos λ lo → WellMach lo m₀
   hop-sorted cr e p = sorted-⇝ (Carried.sorted cr) (then e p)
@@ -1115,15 +1108,16 @@ module Honesty (R : Set) where
   ----------------------------------------------------------------------
   -- THE TEARDOWN: what unsubscribing leaves, in the order `unsub` runs
 
-  postulate
-    -- A cut from the agenda's head runs silently to the rest of the
-    -- agenda, over the heap its switch thrown leaves.
-    tear-cut : ∀ {g h hp p w σ K act clk ts bs td lg en mk}
-               (cr : Carried g (mach (⟨_,_,_⟩ {h} hp p (run {w = w} act σ K)) clk ts bs td lg en mk))
-               (z : Site (Carried.tree cr)) {ks}
-             → act ≗ ⟦ siteCall z ∷ ks ⟧ᶜ → ∀ {m′} → step (mach ⟨ hp , p , run act σ K ⟩ clk ts bs td lg en mk) ≡ silent m′
-             → Σ (Act h ⊤) λ act′ → act′ ≗ ⟦ ks ⟧ᶜ × m′ ⇝ mach ⟨ siteHeap hp z , p , run act′ σ K ⟩ clk ts bs td lg en mk
+  -- A cut from the agenda's head runs silently to the rest of the
+  -- agenda, over the heap its switch thrown leaves.
+  tear-cut : ∀ {g h hp p w σ K act clk ts bs td lg en mk}
+             (cr : Carried g (mach (⟨_,_,_⟩ {h} hp p (run {w = w} act σ K)) clk ts bs td lg en mk))
+             (z : Site (Carried.tree cr)) {ks}
+           → act ≗ ⟦ siteCall z ∷ ks ⟧ᶜ → ∀ {m′} → step (mach ⟨ hp , p , run act σ K ⟩ clk ts bs td lg en mk) ≡ silent m′
+           → Σ (Act h ⊤) λ act′ → act′ ≗ ⟦ ks ⟧ᶜ × m′ ⇝ mach ⟨ siteHeap hp z , p , run act′ σ K ⟩ clk ts bs td lg en mk
+  tear-cut {hp = hp} cr z {ks} e eq = site-tears hp (Kernels.holds (Carried.kernels cr)) (Books.fresh (Carried.books cr)) z {ks} e eq
 
+  postulate
     -- A teardown only throws switches, spends colds and silences
     -- joiners: what is owed of a live switch or an unspent cold was owed
     -- before, the cut itself is owed no longer, and a body that held no

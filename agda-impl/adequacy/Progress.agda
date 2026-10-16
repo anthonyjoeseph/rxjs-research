@@ -27,6 +27,7 @@ open import operation.Machine using (module Machine)
 open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; items)
 open import operation.PureObservable using (PureObs)
 open import adequacy.Content using (module Honesty)
+open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Strong using (module Strongly)
 
 open Events∞
@@ -34,7 +35,8 @@ open Events∞
 module Progressing (R : Set) where
   open Machine R using (Mach; step; silent; value; complete; drained; trace; shown; reading; begin; Read; Trace; Trace∞; tau; idle)
     renaming (out to outᵗ; end to endᵗ)
-  open Honesty R using (Has; atOut; pastSkip; residual; begun; _⇝_; now; then; Past; agrees; skipped; past-pre; passed; lowered; showing; tail-out; tail-skip;
+  open Unsubbing R using (_⇝_; now; then)
+  open Honesty R using (Has; atOut; pastSkip; residual; begun; Past; agrees; skipped; past-pre; passed; lowered; showing; tail-out; tail-skip;
     has-agree; after; _≺_; ≺-wf; measure; Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-agrees)
   open Strongly R using (Strong; strong-begin)
   open Read
