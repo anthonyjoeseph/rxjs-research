@@ -17,16 +17,16 @@
 module quickcheck.Placing where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
-open import Data.List using (List; []; _∷_; _++_; [_]; filterᵇ; upTo; length; take) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; take)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_)
+open import Data.String using (String)
 
 open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; sub; _<ᵖ_; tick; enter; root; Tail; Tail∞; pin; idle)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)
-open import quickcheck.Quickcheck using (program)
 
 open Machine ℕ using (Trace; Trace∞; tau; out; end; idle; trace; begin)
 
@@ -145,6 +145,13 @@ placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steady�
         s = enter (⟦ o ⟧ˢ []) root
         e = Events∞.force s
 
--- The seeds from f on which the machine's trace strays from the meaning.
-placingFails : ℕ → ℕ → List ℕ
-placingFails f c = filterᵇ (λ s → not (placing (program s))) (mapL (f +_) (upTo c))
+-- Which of those a program fails, by name.
+placingParts : Prog natᵗ → List String
+placingParts p = part "placed" (placedᵇ 40000 (trace (begin o)) e) (part "rising" (rising 4000 [] e) (part "steady" (steadyᵇ 4000 e)
+                   (part "steps" (stepsᵇ (positions 200 e)) (part "trails" (trailsᵇ 400 s) []))))
+  where o = toObs timeline 3 p [] [] []
+        s = enter (⟦ o ⟧ˢ []) root
+        e = Events∞.force s
+        part : String → Bool → List String → List String
+        part n true  ns = ns
+        part n false ns = n ∷ ns

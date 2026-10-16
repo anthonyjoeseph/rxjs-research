@@ -11,9 +11,9 @@
 --   Oracle-CLI pure SEED         the machine's trace of one seed
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
 --                                are no chain (`quickcheck.Chain`)
---   Oracle-CLI placing FROM COUNT the seeds whose machine trace strays
---                                from the meaning, positions included
---                                (`quickcheck.Placing`)
+--   Oracle-CLI placing SEED      whether that seed's machine trace strays
+--                                from the meaning, positions included, and
+--                                which checks fail (`quickcheck.Placing`)
 --   Oracle-CLI ghosts FROM COUNT the seeds with an observer inside the run
 --                                delivered what its subtree's denotation
 --                                does not show (`quickcheck.Ghost`)
@@ -35,7 +35,7 @@ module quickcheck.Oracle-CLI where
 
 open import Agda.Builtin.IO using (IO)
 open import Data.Bool using (_∧_; if_then_else_)
-open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; upTo; foldr) renaming (map to mapL)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Nat.Show using (readMaybe) renaming (show to showℕ)
@@ -56,7 +56,7 @@ open import quickcheck.Adversary using (cases)
 import quickcheck.Spin as Spin
 open import Tree using (Obs)
 open import denotation.MonotonicList using (Timeline)
-open import quickcheck.Placing using (placing; placingFails)
+open import quickcheck.Placing using (placing; placingParts)
 open import quickcheck.Stepping using (steppingFails)
 
 private
@@ -93,7 +93,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing FROM COUNT | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing SEED | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -130,10 +130,12 @@ private
   dispatch ("why" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showCode natᵗ (program s′)) >>= λ _ → each′ (exactWhy (program s′))
   ... | nothing = usage
-  dispatch ("placing" ∷ f ∷ c ∷ []) with nat f | nat c
-  ... | just f′ | just c′ = each (placingFails f′ c′) (λ s → putStrLn ("placing: FAIL seed " ++ showℕ s))
-                            >>= λ _ → putStrLn ("placing: done " ++ showℕ c′)
-  ... | _       | _       = usage
+  dispatch ("placing" ∷ n ∷ []) with nat n
+  ... | just s  = putStrLn (verdict (placingParts (program s)))
+    where verdict : List String → String
+          verdict [] = "placing: ok seed " ++ n
+          verdict ps = "placing: FAIL seed " ++ n ++ foldr (λ q r → " " ++ q ++ r) "" ps
+  ... | nothing = usage
   dispatch ("stepping" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (steppingFails f′ c′) (λ s → putStrLn ("stepping: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("stepping: done " ++ showℕ c′)

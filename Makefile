@@ -91,7 +91,7 @@ ORACLE_BIN := $(SRC)/_cli/Oracle-CLI
 
 oracle-build:
 	@test -f $(ORACLE_CLI) || { echo "oracle: RED — $(ORACLE_CLI) does not exist yet"; exit 1; }
-	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Oracle-CLI.agda
+	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli --ghc-flag=-rtsopts quickcheck/Oracle-CLI.agda
 
 oracle: oracle-build
 	@cd typescript && AGDA_CLI_BIN=$(CURDIR)/$(ORACLE_BIN) npm run --silent oracle -- $(ARGS)
@@ -107,7 +107,9 @@ chain: oracle-build
 # The machine's trace placed against the meaning, positions included, on
 # ARGS="FROM COUNT" seeds (default "0 300").  A smoke check for a change to
 # the denotation or the engine, never a sweep: COUNT over 500 is refused
-# unless SWEEP=1.
+# unless SWEEP=1.  One process per seed, each capped in time and heap, so a
+# seed that runs away is named instead of taking the runner down with it.
+PLACING_SEED_SECS = 90
 PLACING_ARGS = $(or $(ARGS),0 300)
 placing-count:
 	@set -- $(PLACING_ARGS); \
@@ -115,10 +117,15 @@ placing-count:
 	    echo "placing: COUNT $$2 refused — 300 seeds is the smoke check; SWEEP=1 to override" >&2; exit 2; fi
 
 placing: placing-count oracle-build
-	@out=$$($(ORACLE_BIN) placing $(PLACING_ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^placing: done ' || { echo "placing: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^placing: FAIL '; then echo "placing: RED"; exit 1; fi; \
-	  echo "placing: GREEN"
+	@set -- $(PLACING_ARGS); s=$$1; e=$$(($$1 + $$2)); bad=0; \
+	  while [ $$s -lt $$e ]; do \
+	    out=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s +RTS -M3g -RTS 2>&1); code=$$?; \
+	    case "$$out" in \
+	      "placing: ok "*) ;; \
+	      "placing: FAIL "*) echo "$$out"; bad=1 ;; \
+	      *) echo "placing: ABORT seed $$s (exit $$code)"; bad=1 ;; \
+	    esac; s=$$(($$s + 1)); done; \
+	  if [ $$bad = 1 ]; then echo "placing: RED"; exit 1; fi; echo "placing: GREEN"
 
 # The stepper against the meaning, event for event, skips included, on
 # ARGS="FROM COUNT" seeds (default "0 300").
