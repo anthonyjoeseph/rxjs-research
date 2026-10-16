@@ -186,11 +186,12 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `spread-sub` first: decides whether a value's lane
-  position stays clear of everything later, shown or left running,
-  through every operator. `fresh-subᶠ` is a body (`FlatFresh`: a lane
-  fresh against the skip admitting it, queued or switched in). Then
-  `ordered-connect`, `steady-connect`, reusing `Walk`. Ruled out: pins
+- **THE ORDER.** `spread-flat` first, then `spread-connect`: decides
+  whether lanes stay keyed apart through queues, switches and a body's
+  joiners. `spread-subᶠ` is a body by operator; `fresh-subᶠ` is a
+  body (`FlatFresh`). Then `spread-rejoin`,
+  `spread-take`, `spread-start`, then `ordered-connect`,
+  `steady-connect`, reusing `Walk`. Ruled out: pins
   by position alone; a skip trailed only by the step under it; a mark
   only at `k ++ [ ix 0 ]`; a take owing more than a value's
   disjointness from its pins (`trail-take`).
@@ -212,8 +213,16 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: after a value,
-  nothing later keys where its lane would, nor under it, nor over it.
+- **`spread-flat`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a flatMap's lanes
+  keyed apart from each other as its outer's values are.
+- **`spread-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
+  values its body's, its source's steps only skips.
+- **`spread-rejoin`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a joiner's values
+  its source's, tagged with it, over a source alien to it.
+- **`spread-take`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a failing value
+  kept just inside its position, which nothing its source left keys.
+- **`spread-start`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a cold leaf's
+  bursts siblings, each frame tagged by the close before it.
 - **`ordered-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
   source steps merge into its body in order, the source's run past the body's
   end its tail.

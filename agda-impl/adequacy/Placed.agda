@@ -641,15 +641,15 @@ tagged-mark k (last ∷ h)  l m t        = tagged-mark k h l m t
 tagged-mark k (sub _ ∷ h) l m (inj₁ o) = inj₁ o
 tagged-mark k (sub _ ∷ h) l m (inj₂ t) = inj₂ (tagged-mark k h l m t)
 
-sibling-prefix : ∀ p {i j} → i ≢ j → ¬ Prefix (p ++ [ ix i ]) (p ++ [ ix j ])
+sibling-prefix : ∀ p {l l′} → l ≢ l′ → ¬ Prefix (p ++ [ l ]) (p ++ [ l′ ])
 sibling-prefix []      ne (refl , _) = ne refl
 sibling-prefix (_ ∷ p) ne (_ , q)    = sibling-prefix p ne q
 
 -- Two children of one position key nothing of each other.
-sibling : ∀ p {i j} → i ≢ j → ¬ Owned (p ++ [ ix i ]) (p ++ [ ix j ])
-sibling p     ne (inj₁ q) = sibling-prefix p ne q
-sibling p {i} {j} ne (inj₂ t) =
-  <-irrefl refl (<-≤-trans (tagged-weigh (p ++ [ ix i ]) p (tagged-mark _ p _ (ix-mark j) t)) (prefix-weigh p (p ++ [ ix i ]) (prefix-++ p [ ix i ])))
+sibling : ∀ p {l l′} → Mark l′ → l ≢ l′ → ¬ Owned (p ++ [ l ]) (p ++ [ l′ ])
+sibling p     m ne (inj₁ q) = sibling-prefix p ne q
+sibling p {l} m ne (inj₂ t) =
+  <-irrefl refl (<-≤-trans (tagged-weigh (p ++ [ l ]) p (tagged-mark _ p _ m t)) (prefix-weigh p (p ++ [ l ]) (prefix-++ p [ l ])))
 
 -- A bare tick keyed under no position a tick heads.
 owned-tick : ∀ p t → Headed p → ¬ Owned (p ++ [ ix 1 ]) (ix t ∷ [])
@@ -1812,7 +1812,7 @@ alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p �
           → Alien (p ++ [ ix 0 ]) (U.meaning (U.subscribe o (p ++ [ ix 1 ])) ρ)
 alien-sub o p ρ al =
   alien-apart o (p ++ [ ix 0 ]) (p ++ [ ix 1 ]) ρ (alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ al)
-    (sibling p (λ ())) (sibling p (λ ())) (no-tick p)
+    (sibling p (ix-mark _) (λ ())) (sibling p (ix-mark _) (λ ())) (no-tick p)
 
 everyT-zip : ∀ {P Q : Pos → Set} (t : Tail) → EveryT P t → EveryT Q t → EveryT (λ h → P h × Q h) t
 everyᵀ (everyT-zip (pin k u) pt qt) = (proj₁ (everyᵀ pt) , proj₁ (everyᵀ qt)) , everyT-zip (later u) (proj₂ (everyᵀ pt)) (proj₂ (everyᵀ qt))
@@ -2235,6 +2235,51 @@ spread (spread-map f (out h a r) s) =
 spread (spread-map f (skip h r)  s) = spread-map f (force r) (spread s)
 spread (spread-map f (end h)     s) = tt
 spread (spread-map f hush        s) = tt
+
+spread-scan : ∀ {A B} (f : B → A → B) z (e : Events A) → Spread e → Spread (M.scanᴱ f z e)
+spread (spread-scan f z (out h a r) s) =
+  (every-scan f (f z a) (force r) (proj₁ (proj₁ (spread s))) , proj₂ (proj₁ (spread s))) , spread-scan f (f z a) (force r) (proj₂ (spread s))
+spread (spread-scan f z (skip h r)  s) = spread-scan f z (force r) (spread s)
+spread (spread-scan f z (end h)     s) = tt
+spread (spread-scan f z hush        s) = tt
+
+rest-spread : ∀ {A} (x : Events A) → Spread x → Spread (rest x)
+rest-spread (out _ _ _) s = proj₂ (spread s)
+rest-spread (skip _ _)  s = spread s
+rest-spread (end _)     s = record { spread = tt }
+rest-spread hush        s = s
+
+-- What follows a value at `x`, in whatever agrees with a run there.
+spread-rest : ∀ {A k} x a (r : Events∞ A) (e : Events A) → Agree (suc k) e (out x a r) → Spread e
+            → Every∞ (λ y → Disjoint (y ++ [ ix 1 ]) (x ++ [ ix 1 ]) × ¬ Owned y (x ++ [ ix 1 ])) (record { force = rest e ; cut = M.tailOf e })
+spread-rest x a r (out _ _ _) (out⁼ _ _) s = proj₁ (spread s)
+
+-- A LIMIT SPREADS WHERE ITS APPROXIMANTS DO.
+mutual
+  spread-lim : ∀ {A} (xs : ℕ → Events A) (y : Events A) → (∀ n → Spread (xs n)) → (∀ n → Agree n (xs n) y) → Spread y
+  spread (spread-lim xs y ps ag) = spreads-lim xs y ps ag (xs 1) (ag 1)
+
+  spreads-lim : ∀ {A} (xs : ℕ → Events A) (y : Events A) → (∀ n → Spread (xs n)) → (∀ n → Agree n (xs n) y)
+              → (x : Events A) → Agree 1 x y → Spreads y
+  spreads-lim xs (out h a r) ps ag (out h _ _) (out⁼ _ _) =
+    ( every-lim (λ n → rest (xs (suc n))) (force r) (λ n → proj₁ (spread-rest h a r (xs (suc n)) (ag (suc n)) (ps (suc n))))
+        (λ n → rest-agree (ag (suc n)))
+    , everyT-lim (λ n → M.tailOf (xs (suc n))) (cut r) (λ n → proj₂ (spread-rest h a r (xs (suc n)) (ag (suc n)) (ps (suc n))))
+        (λ n → M.agree-tail (ag (suc n))) )
+    , spread-lim (λ n → rest (xs (suc n))) (force r) (λ n → rest-spread (xs (suc n)) (ps (suc n))) (λ n → rest-agree (ag (suc n)))
+  spreads-lim xs (skip h r)  ps ag (skip h _)  (skip⁼ _ _) =
+    spread-lim (λ n → rest (xs (suc n))) (force r) (λ n → rest-spread (xs (suc n)) (ps (suc n))) (λ n → rest-agree (ag (suc n)))
+  spreads-lim xs (end h)     ps ag (end h)     end⁼        = tt
+  spreads-lim xs hush        ps ag hush        hush⁼       = tt
+
+spread-≈ : ∀ {A} (x y : Events A) → (∀ k → Agree k x y) → Spread x → Spread y
+spread-≈ x y a s = spread-lim (λ _ → x) y (λ _ → s) a
+
+-- A DEFER SPREADS, its program's being.
+spread-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
+             → Spread (U.meaning (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ) → Spread (U.meaning (U.deferᶜ l p []) ρ)
+spread (spread-defer l p ρ hp cl sp) = spread-≈ S X alike sp
+  where open Deferred l p ρ hp cl
 
 -- One fact for every index, step by step.
 mutual
@@ -3511,7 +3556,7 @@ module FlatOrder (p : Pos) where
       ds  = proj₁ (parted-pick rbs r ras pt)
       fit = gm c₁ (hand-ok r c (ix 1) okr uc)
       d01 : Disjoint c₀ c₁
-      d01 = sibling c (λ ()) , sibling c (λ ())
+      d01 = sibling c (ix-mark _) (λ ()) , sibling c (ix-mark _) (λ ())
       first : At (λ _ → Aloof c₀) (force n)
       first = at-beyond c₀ (force n) (beyond-still c₀ c₁ (force n) (<ᵖ-part c {ix 0} {ix 1} [] [] refl) (proj₁ (proj₂ fit)))
                 (every-mono (λ h u → proj₂ (proj₂ u) c₀ (hand-ok r c (ix 0) okr uc) d01) (force n) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ fit))))))
@@ -3552,7 +3597,7 @@ module FlatOrder (p : Pos) where
       ok₀ : Ok q₀
       ok₀ = owned-snoc p q (ix 0) (proj₁ kq) , headed-snoc q (proj₂ kq)
       d01 : Disjoint q₀ q₁
-      d01 = sibling q (λ ()) , sibling q (λ ())
+      d01 = sibling q (ix-mark _) (λ ()) , sibling q (ix-mark _) (λ ())
 
   -- The lanes an outer value at `q` keeps, past the step it shows.
   kept-lanes : ∀ {B A} q (qs : List A) {ls : List (Events∞ B)} {rs} → K q → Roots ls rs → All (λ r → D r q) rs
@@ -5274,13 +5319,58 @@ fresh-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : N
 trailing-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
               → Trailing (U.stateᴺ (U.subscribe o p) ρ)
 
--- A SUBSCRIPTION'S VALUES SPREAD, where a tick heads it, over sorted
+postulate
+  -- A COLD LEAF'S RUN SPREADS where a tick heads it: each burst's steps
+  -- siblings, each frame tagged by the close before it.
+  spread-start : ∀ {A} p (m : From A 0) → Headed p → Spread (M.start p m)
+
+  -- A CUT SPREADS ITS SOURCE'S RUN: a failing value kept just inside its
+  -- own position, which nothing its source left running keys.
+  spread-take : ∀ {A} i (q : A → Bool) (e : Events A) c → Trail e c → Spread e → Spread (M.takeWhileᴱ i q e)
+
+  -- A JOINER'S RUN SPREADS over a source in order, steady and alien to
+  -- it: each value its source's, tagged with the joiner.
+  spread-rejoin : ∀ {A} p (e : Events A) → Ordered e → Steady e → Alien p e → Spread (M.rejoin p e)
+
+  -- A FLATMAP'S VALUES SPREAD, over sorted sources alien to where it
+  -- subscribes: each lane keyed apart from every other, as the outer's
+  -- values are.
+  spread-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
+              → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+              → Spread (U.meaning (U.subscribe (flatMap op f s) p) ρ)
+
+  -- A CONNECT'S VALUES SPREAD, over sorted sources alien to where it
+  -- subscribes: its body's values, its source's steps only skips.
+  spread-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+                 → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+                 → Spread (U.meaning (U.subscribe (connect s b) p) ρ)
+
+-- Two marks under one position, neither's lane keyed by the other's,
+-- nor its lane by it.
+sibling-spread : ∀ p {l l′} → Mark l → Mark l′ → l ≢ l′
+               → Disjoint ((p ++ [ l ]) ++ [ ix 1 ]) ((p ++ [ l′ ]) ++ [ ix 1 ]) × ¬ Owned (p ++ [ l ]) ((p ++ [ l′ ]) ++ [ ix 1 ])
+sibling-spread p {l} {l′} m m′ ne = disjoint-swap _ _ d₂ , proj₁ d₁
+  where
+    d₁ = apart-mark (p ++ [ l ]) (p ++ [ l′ ]) (ix 1) (ix-mark 1) (sibling p m′ ne , sibling p m (λ e → ne (sym e)))
+    d₂ = apart-mark ((p ++ [ l′ ]) ++ [ ix 1 ]) (p ++ [ l ]) (ix 1) (ix-mark 1) (disjoint-swap _ _ d₁)
+
+-- A LIST'S RUN SPREADS: its values siblings, its end beside them.
+of-apart : ∀ {A} p i j (xs : List A) → i < j
+         → Every (λ y → Disjoint (y ++ [ ix 1 ]) ((p ++ [ ix i ]) ++ [ ix 1 ]) × ¬ Owned y ((p ++ [ ix i ]) ++ [ ix 1 ])) (M.ofᴱ p j xs)
+every (of-apart p i j []       lt) = sibling-spread p last-mark (ix-mark i) (λ ())
+every (of-apart p i j (x ∷ xs) lt) =
+  sibling-spread p (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl }) , of-apart p i (suc j) xs (<-≤-trans lt (m≤n+m j 1)) , everyT-idle
+
+spread-of : ∀ {A} p i (xs : List A) → Spread (M.ofᴱ p i xs)
+spread (spread-of p i [])       = tt
+spread (spread-of p i (x ∷ xs)) = (of-apart p i (suc i) xs ≤-refl , everyT-idle) , spread-of p (suc i) xs
+
+-- A FINITE PROGRAM'S VALUES SPREAD, where a tick heads it, over sorted
 -- sources alien to it: after a value at `x`, nothing later, shown or
 -- left running, keys where a lane admitted at `x` would, nor where a
 -- later value's lane would key under it.
-postulate
-  spread-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-             → Spread (U.meaning (U.subscribe o p) ρ)
+spread-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+            → Spread (U.meaning (U.subscribe o p) ρ)
 
 -- A FINITE PROGRAM SUBSCRIBED IS IN ORDER, where a tick heads, over
 -- sorted sources alien to where it subscribes.
@@ -5337,7 +5427,7 @@ connect-side s b fs fb p ρ hp so cl = record
     ; os = ordered-subᶠ s fs r ρ hr so cr
     ; ss = steady-subᶠ s fs r ρ hr so cr
     ; kb = every∞-mono (beneath-owned P₀) Bᶜ (Reach.reachᶠ (keyedRules P₀) b fb P₀ ρ′ (inj₁ (prefix-refl P₀)) (every-monoᴱ (λ _ _ → tt) ρ′ cl′))
-    ; ks = Reach.reachᶠ (apartRules P₀ (no-tick p)) s fs r ρ (sibling p (λ ()) , sibling p (λ ())) c₀
+    ; ks = Reach.reachᶠ (apartRules P₀ (no-tick p)) s fs r ρ (sibling p (ix-mark _) (λ ()) , sibling p (ix-mark _) (λ ())) c₀
     ; kr = Reach.reachᶠ (risingRules r) b fb P₀ ρ′ rP₀ (Reach.reach (risingRules r) s r ρ rr rρ , rρ)
     ; hs = Reach.reachᶠ headedRules s fs r ρ hr (sorted-headed ρ so)
     ; rs = rS
@@ -5363,7 +5453,7 @@ connect-side s b fs fb p ρ hp so cl = record
     rr : Rise r r
     rr = hr , λ k hk ok t → ⊥-elim (<-irrefl refl (tagged-weigh r r (owned-tagged r k r ok t)))
     rP₀ : Rise r P₀
-    rP₀ = headed-snoc p hp , λ k hk ok t → ⊥-elim (sibling p (λ ()) (inj₂ (owned-tagged r k P₀ ok t)))
+    rP₀ = headed-snoc p hp , λ k hk ok t → ⊥-elim (sibling p (ix-mark _) (λ ()) (inj₂ (owned-tagged r k P₀ ok t)))
     rρ : Everyᴱ (Rise r) ρ
     rρ = rise-env p r (inj₁ (prefix-++ p [ ix 1 ])) ρ (sorted-headed ρ so) cl
     rS = every∞-mono (beneath-owned r) Sᶜ (Reach.reachᶠ (keyedRules r) s fs r ρ (inj₁ (prefix-refl r)) (every-monoᴱ (λ _ _ → tt) ρ cl))
@@ -5408,7 +5498,7 @@ fresh-connect {Γ} {A} {B} s b fs fb p ρ hp so cl = W.cuts-fresh fs₀ , W.fr-b
     rPP : Rise P₀ P₀
     rPP = headed-snoc p hp , λ k hk ok t → ⊥-elim (<-irrefl refl (tagged-weigh P₀ P₀ (owned-tagged P₀ k P₀ ok t)))
     rPr : Rise P₀ r
-    rPr = hr , λ k hk ok t → ⊥-elim (sibling p (λ ()) (inj₂ (owned-tagged P₀ k r ok t)))
+    rPr = hr , λ k hk ok t → ⊥-elim (sibling p (ix-mark _) (λ ()) (inj₂ (owned-tagged P₀ k r ok t)))
     rρ : Everyᴱ (Rise P₀) ρ
     rρ = rise-env p P₀ (inj₁ (prefix-++ p [ ix 0 ])) ρ (sorted-headed ρ so) cl
     rB = Reach.reachᶠ (risingRules P₀) b fb P₀ ρ′ rPP (Reach.reach (risingRules P₀) s r ρ rPr rρ , rρ)
@@ -5492,7 +5582,7 @@ flat-calm {Γ} {A} {B} op f s ff fs p ρ hp so cl =
         cj = alienᴱ-owned p j (beneath-owned p j bj) ρ cl
     held : O.Outer (force E) (cut E)
     held = O.outer (ordered-map F _ (ordered-subᶠ s fs p ρ hp so cl)) (steady-map F _ (steady-subᶠ s fs p ρ hp so cl))
-             (trail-map F (force S) (cut S) (trailing-subᶠ s fs p ρ hp so cl)) (spread-map F _ (spread-sub s p ρ hp so cl))
+             (trail-map F (force S) (cut S) (trailing-subᶠ s fs p ρ hp so cl)) (spread-map F _ (spread-subᶠ s fs p ρ hp so cl))
              (every-map F _ (proj₁ ko)) (proj₂ ko) (values-map F _ gen)
     c₀ = O.calm-at (flatOp op) (just E) [] [] idle O.[]ᴿ tt []ᴬ []ᴬ held (sortedT-idle , everyT-idle , everyT-idle , flatT-idle)
 
@@ -5548,6 +5638,21 @@ ordered-subᶠ (connected i) _ p ρ hp so cl = ordered-rejoin p _ (proj₁ sl) (
 ordered-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
   ordered-defer l p ρ hp cl (ordered-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
                                (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
+
+spread-subᶠ (cold c) _ p ρ hp so cl = subst Spread (sym (U.start-meaning p (lower c) ρ)) (spread-start p (lower c) hp)
+spread-subᶠ empty _ p ρ hp so cl = record { spread = tt }
+spread-subᶠ (of xs) _ p ρ hp so cl = spread-of p 0 xs
+spread-subᶠ (map f s) (map-f fs) p ρ hp so cl = spread-map f _ (spread-subᶠ s fs p ρ hp so cl)
+spread-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = spread-scan f z _ (spread-subᶠ s fs p ρ hp so cl)
+spread-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl =
+  spread-take i q _ _ (trailing-subᶠ s fs p ρ hp so cl) (spread-subᶠ s fs p ρ hp so cl)
+spread-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = spread-flat op f s ff fs p ρ hp so cl
+spread-subᶠ (connect s b) (connect-f fs fb) p ρ hp so cl = spread-connect s b fs fb p ρ hp so cl
+spread-subᶠ (connected i) _ p ρ hp so cl =
+  spread-rejoin p _ (proj₁ (sorted-lookup ρ so i)) (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
+spread-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
+  spread-defer l p ρ hp cl (spread-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
+                              (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
 -- A PROGRAM SUBSCRIBED IS IN ORDER AND STEADY: its truncations are, and
 -- it agrees with each for as many steps as it is deep.
