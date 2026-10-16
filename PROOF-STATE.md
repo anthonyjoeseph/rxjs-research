@@ -185,7 +185,8 @@ by their own silent steps (`Mirror`).
   the END CLIMB, a `Climbing` for completes, under `take1-onward`,
   `fin-onward` and `emit-last`. Ruled out: every cold below a cut switch
   spent (a lane cut inside its cold's first burst stays unspent until
-  attached, so `Gated` reads `Spent`).
+  attached, so `Gated` reads `Spent`); a connect's source torn once its
+  body ends (a note falls before the cut, so `Gated` reads the switch).
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,

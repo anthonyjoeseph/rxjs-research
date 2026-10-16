@@ -666,9 +666,11 @@ module Strongly (R : Set) where
     unended (waiting _ _ doneᶠ) = false
     unended _                    = true
 
-    -- Below a cut kill switch, a cut lane or a connect's closed body, what
-    -- unsubscribing reaches is spent once attached; no live cold waits on its end, which
-    -- its frame's last step delivers.
+    -- Below a cut kill switch, a cut lane or a connect's thrown switch,
+    -- what unsubscribing reaches is spent once attached; no live cold
+    -- waits on its end, which its frame's last step delivers. A connect's
+    -- body ending does not tear its source: the source stays live until
+    -- the switch is thrown, and a note can fall in between.
     mutual
       Gated : ∀ {Δ A} → Sub h Δ A → Set₁
       Gated (coldˢ s hd ph)                   = Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
@@ -676,7 +678,7 @@ module Strongly (R : Set) where
       Gated (scanˢ f r s)                     = Gated s
       Gated (takeWhileˢ i p c k tk s)         = (val (Kit.live c) ≡ false → Cut↓ k s) × Gated s
       Gated (flatMapˢ op f fl oc k r pl so ls)   = Gated so × GatedLanes ls
-      Gated (connectˢ S c b kb k fd rp e rt src bd) = (part bd ≡ nothing → Cut↓ k src) × Gated src × Gated bd
+      Gated (connectˢ S c b kb k fd rp e rt src bd) = (val (Kit.live c) ≡ false → Cut↓ k src) × Gated src × Gated bd
       Gated (deferˢ k s)                      = Gated s
       Gated _                                 = Lift _ ⊤
 

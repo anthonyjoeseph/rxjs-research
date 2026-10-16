@@ -1998,7 +1998,7 @@ module Honesty (R : Set) where
         ; meets = trans (part-plant hp {t = t} π v refl) mt
         ; owned = owned-pop hp {t = t} π ow
         ; kernels = record { holds = holds-plant hp {t = t} π v refl (λ h → h) (Kernels.holds kn)
-                           ; gated = gated-plant hp {t = t} π v refl (λ _ → lift (λ _ → refl)) (λ s → s) (Kernels.gated kn) }
+                           ; gated = gated-plant hp {t = t} π v (λ _ → lift (λ _ → refl)) (λ s → s) (Kernels.gated kn) }
         ; meaning = record { fed = fed-plant hp {t = t} π v (λ _ f → f) _ (Meaning.fed mn) }
         ; queue = record { timed = timed-pop hp {t = t} π (Queue.timed q) (Queue.ordered q) fs
                          ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)

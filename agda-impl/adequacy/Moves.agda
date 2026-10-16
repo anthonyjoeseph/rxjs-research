@@ -707,27 +707,27 @@ module Moving (R : Set) where
 
   mutual
     gated-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
+                → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
                 → At.Gated H t → At.Gated H (plant π v)
-    gated-plant H here v pe gv dv g = gv g
-    gated-plant H (in-map π) v pe gv dv g = gated-plant H π v pe gv dv g
-    gated-plant H (in-scan π) v pe gv dv g = gated-plant H π v pe gv dv g
-    gated-plant H (in-take {k = k} π) v pe gv dv (cg , g) =
-      (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v pe gv dv g
-    gated-plant H (in-outer π) v pe gv dv (g , gl) = gated-plant H π v pe gv dv g , gl
-    gated-plant H (in-lanes π) v pe gv dv (g , gl) = g , gated-plantᴸ H π v pe gv dv gl
-    gated-plant H (in-source {k = k} π) v pe gv dv (cg , g , gb) =
-      (λ n → cut-plant H π v dv k (cg n)) , gated-plant H π v pe gv dv g , gb
-    gated-plant H (in-body π) v pe gv dv (cg , g , gb) =
-      (λ n → cg (trans (sym (part-plant H π v pe)) n)) , g , gated-plant H π v pe gv dv gb
-    gated-plant H (in-defer π) v pe gv dv g = gated-plant H π v pe gv dv g
+    gated-plant H here v gv dv g = gv g
+    gated-plant H (in-map π) v gv dv g = gated-plant H π v gv dv g
+    gated-plant H (in-scan π) v gv dv g = gated-plant H π v gv dv g
+    gated-plant H (in-take {k = k} π) v gv dv (cg , g) =
+      (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v gv dv g
+    gated-plant H (in-outer π) v gv dv (g , gl) = gated-plant H π v gv dv g , gl
+    gated-plant H (in-lanes π) v gv dv (g , gl) = g , gated-plantᴸ H π v gv dv gl
+    gated-plant H (in-source {k = k} π) v gv dv (cg , g , gb) =
+      (λ n → cut-plant H π v dv k (cg n)) , gated-plant H π v gv dv g , gb
+    gated-plant H (in-body π) v gv dv (cg , g , gb) =
+      cg , g , gated-plant H π v gv dv gb
+    gated-plant H (in-defer π) v gv dv g = gated-plant H π v gv dv g
 
     gated-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
-                 → At.part H u ≡ At.part H v → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
+                 → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
                  → At.GatedLanes H ls → At.GatedLanes H (plantᴸ π v)
-    gated-plantᴸ H (this-lane {k = k} π) v pe gv dv (cg , g , gl) =
-      (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v pe gv dv g , gl
-    gated-plantᴸ H (next-lane {l = lane c k s} π) v pe gv dv (cg , g , gl) = cg , g , gated-plantᴸ H π v pe gv dv gl
+    gated-plantᴸ H (this-lane {k = k} π) v gv dv (cg , g , gl) =
+      (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v gv dv g , gl
+    gated-plantᴸ H (next-lane {l = lane c k s} π) v gv dv (cg , g , gl) = cg , g , gated-plantᴸ H π v gv dv gl
 
   mutual
     fed-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
