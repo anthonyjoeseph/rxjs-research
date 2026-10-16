@@ -66,7 +66,7 @@ module Honesty (R : Set) where
   open Unsubbing R using (now; then)
   open Ghosting R using (module Alike; module Inner; Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ; _↦_; silentᵗ; valueᵗ; Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl; Steps; after; steps-after; Hopped; onward; if-silent; whole; landed; rose)
   open Lifting R using (turn-dry; note-least)
-  open Ascending R using (burst-onward; landed; rose; run-onward; note-onward; turn-pops)
+  open Ascending R using (burst-onward; run-onward; note-onward; turn-pops)
   open Read
 
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
