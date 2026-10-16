@@ -184,9 +184,9 @@ by their own silent steps (`Mirror`).
   its node's fact. `climb-scan` is a body over the `scan-*` framing
   leaves; next `close-outer`, `close-lanes`, `close-source` the same way.
   Decides whether the four writes fall with only node-local leaves.
-  `scan-behind` is a body: the whole-tree residue is `scan-above`, a
-  part's head bounded by its children's, one bound per `taking?`,
-  `merged`, `connected`. Done when the framing leaves are proven.
+  `scan-above` is a walk down to the scan: the residue is one `up-*`
+  bound per take, flatMap side and connect side, a part's head bounded
+  by its children's. Done when the framing leaves are proven.
 - **C. THE CALLBACK RELATION.** One per-operator lemma: an observer at a
   path, run from a related state, reaches a related state with the ghost
   advanced, by recursion up the path. `Climbing` and `Closing` become one
@@ -216,39 +216,46 @@ by their own silent steps (`Mirror`).
   refills, or ends the flatMap past its outer's end.
 - **`close-outer`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's outer ended
   settles: the flatMap ends with no lane left, or runs on.
-- **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a takeWhile's
-  completion begun under its failing value, its cut the frame's rest.
-- **`last-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a spent `of`'s
-  completion begun at its end.
+- **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a takeWhile's completion
+  begun under its failing value, its cut the frame's rest.
+- **`last-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a spent `of`'s completion
+  begun at its end.
 - **`fin-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed of its
   source's end, nothing left or the next subscriber's completion begun.
 - **`note-least`** (Lift) — FALSITY, `NO EVIDENCE`: a note records the least
   value the ghost holds.
 - **`turn-dry`** (Lift) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
-- **`spread-past`** (Lift) — FALSITY, `NO EVIDENCE`: no sibling an open
-  `of`'s path passes heads under its base; what a source fed, joiners took.
+- **`spread-past`** (Lift) — FALSITY, `NO EVIDENCE`: no sibling an open `of`'s
+  path passes heads under its base; what a source fed, joiners took.
 - **`behind-fire`** (Lift) — FALSITY, `NO EVIDENCE`: a timer popped at the
   turn, its fired cold heads no earlier than the run.
-- **`shut-step`** (Lift) — FALSITY, `NO EVIDENCE`: a connect past its
-  source's end, an `of` in its body: the body shut steps as it does, shut
-  after.
-- **`emit-run`** (Lift) — FALSITY, `NO EVIDENCE`: an open `of`'s value
-  handed on under its scope, the climb starts aloft.
-- **`take-end`** (Lift) — FALSITY, `NO EVIDENCE`: an exclusive take's
-  failing value lands at its completion owed, the ghost alike, a stage on.
-- **`take-out`** (Lift) — FALSITY, `NO EVIDENCE`: an inclusive take's
-  failing value climbs under `ix 0`, the take ending where the run is.
+- **`shut-step`** (Lift) — FALSITY, `NO EVIDENCE`: a connect past its source's
+  end, an `of` in its body: the body shut steps as it does, shut after.
+- **`emit-run`** (Lift) — FALSITY, `NO EVIDENCE`: an open `of`'s value handed
+  on under its scope, the climb starts aloft.
+- **`take-end`** (Lift) — FALSITY, `NO EVIDENCE`: an exclusive take's failing
+  value lands at its completion owed, the ghost alike, a stage on.
+- **`take-out`** (Lift) — FALSITY, `NO EVIDENCE`: an inclusive take's failing
+  value climbs under `ix 0`, the take ending where the run is.
 - **`emit-void`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
   hold emits to a guard that drops it, the ghost alike, a value fewer.
-- **`climb-lanes`** (Lift) — FALSITY, `NO EVIDENCE`: a lane's value climbs
-  into its flatMap through `wkObs same`, equal up to `≗`.
-- **`scan-above`** (Frame) — FALSITY, `NO EVIDENCE`: the scan and every
-  part above it still head no sooner than the run after the write.
-- **`scan-sees`** (Frame) — FALSITY, `NO EVIDENCE`: a path seen after the
-  write was seen before, to a node alike or above the scan.
-- **`scan-defined`** (Frame) — FALSITY, `NO EVIDENCE`: whether a node has
-  a part never reads an accumulator.
+- **`climb-lanes`** (Lift) — FALSITY, `NO EVIDENCE`: a lane's value climbs into
+  its flatMap through `wkObs same`, equal up to `≗`.
+- **`up-lanes`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
+  scan in one of its lanes heads no sooner than that lane's part.
+- **`up-outer`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
+  scan in its outer heads no sooner than the outer's part.
+- **`up-source`** (Frame) — FALSITY, `NO EVIDENCE`: a connect above a written
+  scan in its source heads no sooner than the source's part.
+- **`up-body`** (Frame) — FALSITY, `NO EVIDENCE`: a connect above a written
+  scan in its body heads no sooner than the body's part.
+- **`up-take`** (Frame) — FALSITY, `NO EVIDENCE`: a takeWhile above a written
+  scan heads no sooner than its source's part.
+- **`scan-sees`** (Frame) — FALSITY, `NO EVIDENCE`: a path seen after the write
+  was seen before, to a node alike or above the scan.
+- **`scan-defined`** (Frame) — FALSITY, `NO EVIDENCE`: whether a node has a
+  part never reads an accumulator.
 - **`scan-lifts`** (Frame) — FALSITY, `NO EVIDENCE`: a lift above a scan
   survives a write at its accumulator.
 - **`scan-owned`** (Frame) — FALSITY, `NO EVIDENCE`: `Owned` survives a write
@@ -261,20 +268,20 @@ by their own silent steps (`Mirror`).
   at a scan's accumulator.
 - **`climb-outer`** (Lift) — FALSITY, `NO EVIDENCE`: an outer value opens a
   lane and stops at the subscription it begins.
-- **`climb-source`** (Lift) — FALSITY, `NO EVIDENCE`: a connect source's
-  value feeds its subject's joiners and stops there.
-- **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer
-  path is closed skips its value.
-- **`sub-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a subscription begun
-  runs its kernel to the next re-entry state.
+- **`climb-source`** (Lift) — FALSITY, `NO EVIDENCE`: a connect source's value
+  feeds its subject's joiners and stops there.
+- **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
+  is closed skips its value.
+- **`sub-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a subscription begun runs
+  its kernel to the next re-entry state.
 - **`feed-onward`** (Lift) — FALSITY, `NO EVIDENCE`: the rest of a connect's
   feed of a value, each subscriber showing or skipping it.
 - **`src-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a connect's source
   subscribed once its body is.
 - **`kont-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a subscription's
   continuation stashes its unsubscribe, a call fewer.
-- **`burst-poll`** (Lift) — FALSITY, `NO EVIDENCE`: a live burst's sink
-  polled, open to play or closed and dropped.
+- **`burst-poll`** (Lift) — FALSITY, `NO EVIDENCE`: a live burst's sink polled,
+  open to play or closed and dropped.
 - **`burst-play`** (Lift) — FALSITY, `NO EVIDENCE`: a polled burst's frame
   played, a value run on, a stall passed, a close scheduled.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
