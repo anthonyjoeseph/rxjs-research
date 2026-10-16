@@ -186,14 +186,14 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `trail-take` first: a pin at the failing value's own
-  position trails the value but not its completion under `last`, so the
-  statement falls over runs merely in order, steady and trailing.
-  Decides whether `TrailE`'s value clause owes that no pin sits at or
-  under the value, or the take's source supplies it. Then
-  `trail-connect`, `trail-defer`, `spread-sub`, `ordered-connect`,
-  `steady-connect`. Ruled out: the flatMap's merge owing anything past
-  `Roots`, `Pool`, `Aside` and `Heldᴹ` (`trail-whole`, `flat-whole`).
+- **THE ORDER.** `trail-connect` first: a connect's source burst left
+  running beside its body's cut, the burst's pins keyed under the
+  connect's own lane. Decides whether `Trailings`' new disjointness of a
+  value from its cut reaches a body's tail, or the connect owes it. Then
+  `trail-defer`, `spread-sub`, `ordered-connect`, `steady-connect`.
+  Ruled out: a take owing anything past a value's disjointness from the
+  pins it trails and leaves (`trail-take`); the flatMap's merge owing
+  anything past `Roots`, `Pool`, `Aside` and `Heldᴹ`.
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -214,9 +214,6 @@ by their own silent steps (`Mirror`).
 
 - **`trail-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
   source burst left running beside its body's cut trails what it shows next.
-- **`trail-take`** (Placed) — FALSITY, `REFUTED`, `X`: a takeWhile over an
-  ordered, steady, trailing run keeps its cuts trailing past the moved value
-  and the `last` end.
 - **`trail-defer`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a defer's cuts
   trail its run, its program's subscribed past the skip doing so.
 - **`spread-sub`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: after a value,
