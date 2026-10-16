@@ -1066,10 +1066,10 @@ module Ascending (R : Set) where
                  (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks))
                → ∀ {a n} → a ≗ dequeueAt ρ → n ≗ ⟦ ks ⟧ᶜ
                → Hopped st (resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n)
-  lane-dequeue st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {fl = fl} ρ πL o cl@record { ctl = refl } ea en
+  lane-dequeue st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {fl = fl} ρ πL o cl@record { ctl = refl } ea eks
     with reads {hp = freed hp (laneOf o) fl} (≗-trans ea (dequeue-cases ρ))
   ... | k₁ , f₁ , p₁ = hopped-pre p₁ (lane-queue st ρ πL o cl _ refl
-          (≗-trans (f₁ same⊑ _) (wk-same (dequeueOf ρ (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.queue fl))))) en)
+          (≗-trans (f₁ same⊑ _) (wk-same (dequeueOf ρ (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.queue fl))))) eks)
 
   -- A lane ended: its guard read open, its cut dropped, the count down,
   -- the refill sent.
